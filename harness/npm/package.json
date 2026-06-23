@@ -1,0 +1,15 @@
+{
+  "name": "pi-extensions",
+  "private": true,
+  "dependencies": {
+    "pi-observational-memory": "^3.0.2",
+    "pi-rtk-optimizer": "^0.8.3"
+  },
+  "devDependencies": {
+    "typescript": "^5.9.3",
+    "@types/node": "^25.2.3"
+  },
+  "scripts": {
+    "typecheck": "tsc -p ../.typecheck --noEmit"
+  }
+}

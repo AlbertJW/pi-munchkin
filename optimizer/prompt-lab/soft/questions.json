@@ -1,0 +1,8 @@
+[
+  {"id": "s01", "question": "Write a Python function that returns True if a string is a palindrome, ignoring case and spaces."},
+  {"id": "s02", "question": "Explain the difference between a process and a thread in two or three sentences."},
+  {"id": "s03", "question": "What are the main tradeoffs of adding an index to a database column?"},
+  {"id": "s04", "question": "Give a bash one-liner that prints the 5 largest files under the current directory."},
+  {"id": "s05", "question": "Explain what a race condition is, with a short concrete example."},
+  {"id": "s06", "question": "When should you extract a block of code into its own function, and when is it premature?"}
+]

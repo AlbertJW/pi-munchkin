@@ -1,0 +1,47 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "strict": true,
+    "noEmit": true,
+    "skipLibCheck": true,
+    "esModuleInterop": true,
+    "allowImportingTsExtensions": true,
+    "baseUrl": ".",
+    "typeRoots": ["../npm/node_modules/@types"],
+    "types": ["node"],
+    "paths": {
+      "@earendil-works/pi-coding-agent": ["node_modules/@earendil-works/pi-coding-agent"],
+      "@earendil-works/pi-ai": ["sdk-node-modules/@earendil-works/pi-ai"],
+      "@earendil-works/pi-ai/*": ["sdk-node-modules/@earendil-works/pi-ai/*"],
+      "typebox": ["node_modules/typebox"],
+      "typebox/*": ["node_modules/typebox/*"]
+    }
+  },
+  "include": [
+    "../extensions/plan-runner.ts",
+    "../extensions/context-inlet-guard.ts",
+    "../extensions/loop-breaker.ts",
+    "../extensions/ketch.ts",
+    "../extensions/verify-gate.ts",
+    "../extensions/compact-tool.ts",
+    "../extensions/hashline.ts",
+    "../extensions/context-watcher.ts",
+    "../extensions/git-guard.ts",
+    "../extensions/drift-scanner.ts",
+    "../lib/bash-mutations.ts",
+    "../lib/command-policy.ts",
+    "../lib/context-inlet.ts",
+    "../lib/drift-policy.ts",
+    "../lib/plan-integrity.ts",
+    "../lib/plan-progress.ts",
+    "../tests/hashline.test.ts",
+    "../tests/context-watch.test.ts",
+    "../tests/command-policy.test.ts",
+    "../tests/context-inlet.test.ts",
+    "../tests/drift-scanner.test.ts",
+    "../tests/plan-integrity.test.ts",
+    "../tests/plan-progress.test.ts"
+  ]
+}

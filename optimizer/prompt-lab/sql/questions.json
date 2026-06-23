@@ -1,0 +1,97 @@
+[
+  {"id": "q01", "difficulty": "easy",   "split": "val",     "question": "List the names of all customers who live in London.",
+   "gold_sql": "SELECT name FROM customers WHERE city = 'London';"},
+
+  {"id": "q02", "difficulty": "easy",   "split": "val",     "question": "How many products are in the 'Hardware' category?",
+   "gold_sql": "SELECT COUNT(*) FROM products WHERE category = 'Hardware';"},
+
+  {"id": "q03", "difficulty": "easy",   "split": "val",     "question": "What is the average price of all products?",
+   "gold_sql": "SELECT AVG(price) FROM products;"},
+
+  {"id": "q04", "difficulty": "easy",   "split": "val",     "question": "List the distinct countries customers come from.",
+   "gold_sql": "SELECT DISTINCT country FROM customers;"},
+
+  {"id": "q05", "difficulty": "easy",   "split": "heldout", "question": "What is the name of the most expensive product?",
+   "gold_sql": "SELECT name FROM products ORDER BY price DESC LIMIT 1;"},
+
+  {"id": "q06", "difficulty": "medium", "split": "val",     "question": "List the names of the 3 most expensive products, most expensive first.",
+   "gold_sql": "SELECT name FROM products ORDER BY price DESC LIMIT 3;"},
+
+  {"id": "q07", "difficulty": "medium", "split": "val",     "question": "Which customers placed an order on 2024-01-10? Return their names.",
+   "gold_sql": "SELECT c.name FROM customers c JOIN orders o ON o.customer_id = c.id WHERE o.order_date = '2024-01-10';"},
+
+  {"id": "q08", "difficulty": "medium", "split": "heldout", "question": "What is the total quantity of the product named 'Widget' that has been ordered across all orders?",
+   "gold_sql": "SELECT SUM(oi.qty) FROM order_items oi JOIN products p ON p.id = oi.product_id WHERE p.name = 'Widget';"},
+
+  {"id": "q09", "difficulty": "medium", "split": "val",     "question": "For each customer, return their name and the number of orders they have placed (include customers with zero orders).",
+   "gold_sql": "SELECT c.name, COUNT(o.id) FROM customers c LEFT JOIN orders o ON o.customer_id = c.id GROUP BY c.id, c.name;"},
+
+  {"id": "q10", "difficulty": "medium", "split": "val",     "question": "Which customers have placed more than one order? Return their names.",
+   "gold_sql": "SELECT c.name FROM customers c JOIN orders o ON o.customer_id = c.id GROUP BY c.id, c.name HAVING COUNT(o.id) > 1;"},
+
+  {"id": "q11", "difficulty": "medium", "split": "heldout", "question": "List the names of customers who have never placed an order.",
+   "gold_sql": "SELECT name FROM customers WHERE id NOT IN (SELECT customer_id FROM orders);"},
+
+  {"id": "q12", "difficulty": "medium", "split": "val",     "question": "How many distinct customers have placed at least one order?",
+   "gold_sql": "SELECT COUNT(DISTINCT customer_id) FROM orders;"},
+
+  {"id": "q13", "difficulty": "medium", "split": "val",     "question": "How many orders were placed in March 2024?",
+   "gold_sql": "SELECT COUNT(*) FROM orders WHERE order_date LIKE '2024-03-%';"},
+
+  {"id": "q14", "difficulty": "medium", "split": "heldout", "question": "What is the cheapest product in the 'Hardware' category? Return its name.",
+   "gold_sql": "SELECT name FROM products WHERE category = 'Hardware' ORDER BY price ASC LIMIT 1;"},
+
+  {"id": "q15", "difficulty": "hard",   "split": "val",     "question": "What is the total revenue across all order items (quantity multiplied by product price)?",
+   "gold_sql": "SELECT SUM(oi.qty * p.price) FROM order_items oi JOIN products p ON p.id = oi.product_id;"},
+
+  {"id": "q16", "difficulty": "hard",   "split": "val",     "question": "For each product category, return the category and its total revenue (quantity times price).",
+   "gold_sql": "SELECT p.category, SUM(oi.qty * p.price) FROM order_items oi JOIN products p ON p.id = oi.product_id GROUP BY p.category;"},
+
+  {"id": "q17", "difficulty": "hard",   "split": "heldout", "question": "Which customer has spent the most in total (sum of quantity times price across their order items)? Return their name.",
+   "gold_sql": "SELECT c.name FROM customers c JOIN orders o ON o.customer_id = c.id JOIN order_items oi ON oi.order_id = o.id JOIN products p ON p.id = oi.product_id GROUP BY c.id, c.name ORDER BY SUM(oi.qty * p.price) DESC LIMIT 1;"},
+
+  {"id": "q18", "difficulty": "hard",   "split": "val",     "question": "List the distinct product names that Alice has ordered.",
+   "gold_sql": "SELECT DISTINCT p.name FROM products p JOIN order_items oi ON oi.product_id = p.id JOIN orders o ON o.id = oi.order_id JOIN customers c ON c.id = o.customer_id WHERE c.name = 'Alice';"},
+
+  {"id": "q19", "difficulty": "hard",   "split": "val",     "question": "List the distinct cities of customers who have ordered any product in the 'Books' category.",
+   "gold_sql": "SELECT DISTINCT c.city FROM customers c JOIN orders o ON o.customer_id = c.id JOIN order_items oi ON oi.order_id = o.id JOIN products p ON p.id = oi.product_id WHERE p.category = 'Books';"},
+
+  {"id": "q20", "difficulty": "hard",   "split": "heldout", "question": "What is the total quantity ordered across all products in the 'Hardware' category?",
+   "gold_sql": "SELECT SUM(oi.qty) FROM order_items oi JOIN products p ON p.id = oi.product_id WHERE p.category = 'Hardware';"},
+
+  {"id": "h01", "difficulty": "hard", "split": "val",     "question": "For each product category, how many products in that category are priced above 8? Return the category and the count (categories with none should show 0).",
+   "gold_sql": "SELECT category, COUNT(CASE WHEN price > 8 THEN 1 END) FROM products GROUP BY category;"},
+
+  {"id": "h02", "difficulty": "hard", "split": "val",     "question": "Which product categories contain more than 2 products? Return the category name.",
+   "gold_sql": "SELECT category FROM products GROUP BY category HAVING COUNT(*) > 2;"},
+
+  {"id": "h03", "difficulty": "hard", "split": "heldout", "question": "For each customer who has placed an order, show their name and the date of their most recent order.",
+   "gold_sql": "SELECT c.name, o.order_date FROM customers c JOIN orders o ON o.customer_id = c.id WHERE o.order_date = (SELECT MAX(o2.order_date) FROM orders o2 WHERE o2.customer_id = c.id);"},
+
+  {"id": "h04", "difficulty": "hard", "split": "val",     "question": "List the distinct product names that Carlos has ordered but Alice has not.",
+   "gold_sql": "SELECT DISTINCT p.name FROM products p JOIN order_items oi ON oi.product_id = p.id JOIN orders o ON o.id = oi.order_id JOIN customers c ON c.id = o.customer_id WHERE c.name = 'Carlos' EXCEPT SELECT DISTINCT p.name FROM products p JOIN order_items oi ON oi.product_id = p.id JOIN orders o ON o.id = oi.order_id JOIN customers c ON c.id = o.customer_id WHERE c.name = 'Alice';"},
+
+  {"id": "h05", "difficulty": "hard", "split": "val",     "question": "What is the average number of line items per order, rounded to 2 decimal places?",
+   "gold_sql": "SELECT ROUND(AVG(cnt), 2) FROM (SELECT COUNT(*) AS cnt FROM order_items GROUP BY order_id);"},
+
+  {"id": "h06", "difficulty": "hard", "split": "val",     "question": "For each customer who has ordered, return their name and the number of distinct products they have ordered.",
+   "gold_sql": "SELECT c.name, COUNT(DISTINCT oi.product_id) FROM customers c JOIN orders o ON o.customer_id = c.id JOIN order_items oi ON oi.order_id = o.id GROUP BY c.id, c.name;"},
+
+  {"id": "h07", "difficulty": "hard", "split": "heldout", "question": "Which customers have ordered products from more than one product category? Return their names.",
+   "gold_sql": "SELECT c.name FROM customers c JOIN orders o ON o.customer_id = c.id JOIN order_items oi ON oi.order_id = o.id JOIN products p ON p.id = oi.product_id GROUP BY c.id, c.name HAVING COUNT(DISTINCT p.category) > 1;"},
+
+  {"id": "h08", "difficulty": "hard", "split": "val",     "question": "Return the names of the top 2 customers by total spend (sum of quantity times product price).",
+   "gold_sql": "SELECT c.name FROM customers c JOIN orders o ON o.customer_id = c.id JOIN order_items oi ON oi.order_id = o.id JOIN products p ON p.id = oi.product_id GROUP BY c.id, c.name ORDER BY SUM(oi.qty * p.price) DESC LIMIT 2;"},
+
+  {"id": "h09", "difficulty": "hard", "split": "heldout", "question": "Which product category generated the most total revenue (quantity times price)? Return the category.",
+   "gold_sql": "SELECT p.category FROM order_items oi JOIN products p ON p.id = oi.product_id GROUP BY p.category ORDER BY SUM(oi.qty * p.price) DESC LIMIT 1;"},
+
+  {"id": "h10", "difficulty": "hard", "split": "val",     "question": "List every pair of customers who live in the same city, showing both names (each pair once).",
+   "gold_sql": "SELECT c1.name, c2.name FROM customers c1 JOIN customers c2 ON c1.city = c2.city AND c1.id < c2.id;"},
+
+  {"id": "h11", "difficulty": "hard", "split": "val",     "question": "List the names of products priced above the average price of all products.",
+   "gold_sql": "SELECT name FROM products WHERE price > (SELECT AVG(price) FROM products);"},
+
+  {"id": "h12", "difficulty": "hard", "split": "heldout", "question": "For each customer who ordered any Hardware product, return their name and the total quantity of Hardware-category items they ordered.",
+   "gold_sql": "SELECT c.name, SUM(oi.qty) FROM customers c JOIN orders o ON o.customer_id = c.id JOIN order_items oi ON oi.order_id = o.id JOIN products p ON p.id = oi.product_id WHERE p.category = 'Hardware' GROUP BY c.id, c.name;"}
+]

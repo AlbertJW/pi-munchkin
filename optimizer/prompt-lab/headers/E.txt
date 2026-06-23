@@ -1,0 +1,1 @@
+pi: 1.See(read state) 2.Cut(min change)→3 3.Test(cheapest check)→4 4.Tell(result).

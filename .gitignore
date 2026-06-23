@@ -1,0 +1,15 @@
+# run outputs / generated artifacts
+optimizer/real-gate-runs/
+optimizer/ab-symbolect-runs/
+optimizer/prompt-lab/results/
+optimizer/prompt-lab/proposals/
+optimizer/prompt-lab/configs/applied/
+
+# never track
+**/__pycache__/
+**/.DS_Store
+**/*.gguf
+**/auth.json
+**/*.token
+**/.env
+**/node_modules/

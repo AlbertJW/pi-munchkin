@@ -1,0 +1,1 @@
+Make three precise changes: 1) parseCSV must skip blank lines anywhere in the CSV input, not just at the ends. 2) csvToJson must emit 4-space JSON indentation instead of 2. 3) Update only the tests that assert the old behavior. Run node --test and ensure all tests pass.

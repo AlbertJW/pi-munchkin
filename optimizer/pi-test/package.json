@@ -1,0 +1,1 @@
+{"name": "csv-json-converter", "version": "1.0.0", "description": "A small CSV to JSON converter library", "main": "src/index.js", "type": "module", "scripts": {"test": "node --test", "build": "echo 'No build step required - ES module'"}, "keywords": ["csv", "json", "converter", "library"], "author": "", "license": "MIT"}

@@ -1,0 +1,905 @@
+import { appendFile, mkdir, readFile, rename, stat, writeFile } from "node:fs/promises";
+import { dirname, join } from "node:path";
+import { homedir } from "node:os";
+import { createHash, randomUUID } from "node:crypto";
+import { defineTool, withFileMutationQueue, type ExtensionAPI } from "@earendil-works/pi-coding-agent";
+import { Type } from "typebox";
+import { assertVerifyGateAllowed, classifyBashCommand } from "../lib/command-policy.ts";
+import { planIntegrity, executionUnderway, normalizeTitle, preserveDecision } from "../lib/plan-integrity.ts";
+import { nextReplanStreak } from "../lib/plan-progress.ts";
+
+// plan-runner v3 — model-owned TODO list (Claude Code TodoWrite pattern).
+// One tool (plan_write) rewrites the whole list each call: re-planning,
+// add/remove/reorder, and status updates are all just "call it again".
+// Execution happens in pi's natural agent loop — no budget engine, no
+// tool-restriction window, no terminate:false re-injection.
+//
+// Per-item GATES (a "repeater"): set item.gate to a deterministic shell check;
+// when the model marks that item done, plan_write runs the gate — exit 0 keeps
+// it done, non-zero reverts it (→ in_progress, then blocked after GATE_MAX) and
+// tells the model to fix and re-run. Opt-in: items without a gate are unaffected.
+
+// Set in the extension factory so the module-scope tool can run shell gates.
+let api: ExtensionAPI | undefined;
+const GATE_TIMEOUT_MS = Math.max(1000, Number.parseInt(process.env.PLAN_GATE_TIMEOUT_MS || "60000", 10) || 60000);
+const GATE_MAX = Math.max(1, Number.parseInt(process.env.PLAN_GATE_MAX || "3", 10) || 3);
+// Plan-thrash threshold: consecutive plan_write calls (this process) that complete
+// no item before we warn the model to execute instead of re-plan. Reset on new plan,
+// /plan-go, and any call that newly marks an item done.
+const REPLAN_MAX = Math.max(2, Number.parseInt(process.env.PLAN_REPLAN_MAX || "3", 10) || 3);
+let replanStreak = 0;
+// B yields an omitted open item after this many consecutive preserves (persistent
+// omission = intent; e.g. a parent the model replaced with sub-items). R1 (done) never yields.
+const PRESERVE_MAX = Math.max(2, Number.parseInt(process.env.PLAN_PRESERVE_MAX || "3", 10) || 3);
+
+type ItemStatus = "pending" | "in_progress" | "done" | "blocked";
+type Phase = "planned" | "executing";
+type Autonomy = "lean" | "yolo";
+
+// Model-facing failure taxonomy (4 values) — same vocabulary as the subagent roles
+// and APPEND_SYSTEM so the model only ever learns one set.
+type FailureClass = "blocked_needs_input" | "blocked_other" | "user_action_required" | "unknown";
+
+type PlanItem = {
+	id: string;
+	title: string;
+	status: ItemStatus;
+	note?: string;
+	failure_class?: FailureClass;
+	gate?: string; // read-only verify/check command that must exit 0 before status can be "done"
+	gate_fails?: number; // consecutive gate failures (escalates to blocked at GATE_MAX)
+	preserve_count?: number; // consecutive times B re-attached this omitted open item (yields at PRESERVE_MAX)
+};
+
+type PlanState = {
+	schema_version: 3;
+	run_id: string;
+	request: string;
+	summary: string;
+	autonomy: Autonomy;
+	phase: Phase;
+	created_at: string;
+	updated_at: string;
+	items: PlanItem[];
+};
+
+type TraceEvent = {
+	run_id?: string;
+	item_id?: string;
+	model?: { provider: string; id: string };
+	action_type: "command" | "tool" | "agent_end";
+	tool_name?: string;
+	action_id?: string;
+	input_summary?: string;
+	output_summary?: string;
+	success: boolean;
+	failure_class?: string;
+	observed_state?: unknown;
+	required_state?: unknown;
+	action_fingerprint?: string;
+	same_failure_count?: number;
+	retry_allowed?: boolean;
+	suggested_recovery?: string;
+	final_status?: string | null;
+};
+
+// ---------- paths & small helpers (preserved from v2) ----------
+
+function todoPath(cwd: string): string {
+	return join(cwd, ".pi", "TODO.md");
+}
+function statePath(cwd: string): string {
+	return join(cwd, ".pi", "plan-state.json");
+}
+function tracePath(cwd: string): string {
+	return join(cwd, ".pi", "traces", "plan-runner.jsonl");
+}
+function archiveDir(cwd: string): string {
+	return join(cwd, ".pi", "todo-archive");
+}
+function isoNow(): string {
+	return new Date().toISOString();
+}
+function timestamp(): string {
+	return isoNow().replace(/[:.]/g, "-");
+}
+function actionId(): string {
+	return randomUUID().slice(0, 8);
+}
+function itemId(): string {
+	return `item-${randomUUID().slice(0, 8)}`;
+}
+function exists(path: string): Promise<boolean> {
+	return stat(path).then(() => true, () => false);
+}
+
+async function archiveExistingTodo(cwd: string): Promise<string | undefined> {
+	const path = todoPath(cwd);
+	if (!(await exists(path))) return undefined;
+	const dir = archiveDir(cwd);
+	await mkdir(dir, { recursive: true });
+	const archived = join(dir, `${timestamp()}-TODO.md`);
+	await rename(path, archived);
+	return archived;
+}
+
+function compactValue(value: unknown): unknown {
+	if (typeof value === "string" && value.length > 500) return `${value.slice(0, 500)}…`;
+	return value;
+}
+
+async function runtimeSnapshot(): Promise<{ provider: string; id: string }> {
+	const settingsFile = join(homedir(), ".pi", "agent", "settings.json");
+	try {
+		const parsed = JSON.parse(await readFile(settingsFile, "utf8"));
+		return { provider: parsed.defaultProvider ?? "unknown", id: parsed.defaultModel ?? "unknown" };
+	} catch {
+		return { provider: "unknown", id: "unknown" };
+	}
+}
+
+// ---------- trace + repeated-failure guard (preserved from v2) ----------
+
+function stableStringify(value: unknown): string {
+	if (value === null || typeof value !== "object") return JSON.stringify(value) ?? "null";
+	if (Array.isArray(value)) return `[${value.map(stableStringify).join(",")}]`;
+	const entries = Object.entries(value as Record<string, unknown>)
+		.filter(([, v]) => v !== undefined)
+		.sort(([a], [b]) => a.localeCompare(b))
+		.map(([k, v]) => `${JSON.stringify(k)}:${stableStringify(v)}`);
+	return `{${entries.join(",")}}`;
+}
+
+function buildActionFingerprint(parts: {
+	action_type: string;
+	tool_name?: string;
+	input_summary?: string;
+	failure_class?: string;
+	observed_state?: unknown;
+	required_state?: unknown;
+}): string {
+	return createHash("sha256").update(stableStringify(parts)).digest("hex").slice(0, 16);
+}
+
+async function tailLines(path: string, maxLines: number): Promise<string[]> {
+	try {
+		const raw = await readFile(path, "utf8");
+		return raw.split("\n").filter((line) => line.trim().length > 0).slice(-maxLines);
+	} catch {
+		return [];
+	}
+}
+
+async function countRecentSameFailures(path: string, fingerprint: string): Promise<number> {
+	const lines = await tailLines(path, 200);
+	let count = 0;
+	for (const line of lines) {
+		try {
+			const event = JSON.parse(line);
+			if (event.success === false && event.action_fingerprint === fingerprint) count += 1;
+		} catch {
+			// ignore malformed lines
+		}
+	}
+	return count;
+}
+
+// Appends a trace event; returns same_failure_count so callers can warn the model.
+async function appendTrace(cwd: string, event: TraceEvent): Promise<number | undefined> {
+	const path = tracePath(cwd);
+	await mkdir(dirname(path), { recursive: true });
+	const failureClass = event.failure_class ?? (event.success ? "none" : "unknown");
+	const fingerprint = event.success
+		? undefined
+		: (event.action_fingerprint ?? buildActionFingerprint({
+			action_type: event.action_type,
+			tool_name: event.tool_name,
+			input_summary: event.input_summary,
+			failure_class: failureClass,
+			observed_state: event.observed_state,
+			required_state: event.required_state,
+		}));
+	const sameFailureCount = fingerprint
+		? (event.same_failure_count ?? (await countRecentSameFailures(path, fingerprint)) + 1)
+		: undefined;
+	const repeated = Boolean(sameFailureCount && sameFailureCount >= 2);
+	const repeatedRecovery = "Same failed action repeated without changed observed_state or required_state; change strategy, inspect state, or mark blocked.";
+	const withDefaults = {
+		timestamp: isoNow(),
+		model: event.model ?? await runtimeSnapshot(),
+		...event,
+		failure_class: failureClass,
+		action_fingerprint: fingerprint,
+		same_failure_count: sameFailureCount,
+		retry_allowed: repeated ? false : (event.retry_allowed ?? (!event.success ? false : undefined)),
+		suggested_recovery: repeated ? (event.suggested_recovery ?? repeatedRecovery) : event.suggested_recovery,
+	};
+	const safeEvent = Object.fromEntries(Object.entries(withDefaults).map(([k, v]) => [k, compactValue(v)]));
+	await appendFile(path, `${JSON.stringify(safeEvent)}\n`, "utf8");
+	return sameFailureCount;
+}
+
+// ---------- state I/O ----------
+
+function getSection(markdown: string, heading: string): string {
+	const escaped = heading.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+	const pattern = new RegExp(`^#\\s+${escaped}\\s*$([\\s\\S]*?)(?=^#\\s+|$(?![\\r\\n]))`, "m");
+	const match = markdown.match(pattern);
+	return match ? match[1].trim() : "";
+}
+
+function newState(request: string, summary: string, autonomy: Autonomy, items: PlanItem[]): PlanState {
+	const now = isoNow();
+	return {
+		schema_version: 3,
+		run_id: `plan-${timestamp()}`,
+		request,
+		summary,
+		autonomy,
+		phase: "planned",
+		created_at: now,
+		updated_at: now,
+		items,
+	};
+}
+
+// v2 (steps[]) → v3 (items[]) read shim so an in-flight plan survives the upgrade.
+function migrateV2(raw: any): PlanState {
+	const stepStatus = (s: string): ItemStatus => (s === "todo" ? "pending" : (s as ItemStatus));
+	const items: PlanItem[] = Array.isArray(raw.steps)
+		? raw.steps.map((s: any) => ({
+			id: s.step_id ?? itemId(),
+			title: String(s.title ?? "").trim(),
+			status: stepStatus(s.status ?? "pending"),
+			note: s.last_result,
+		}))
+		: [];
+	const now = isoNow();
+	return {
+		schema_version: 3,
+		run_id: raw.run_id ?? `plan-${timestamp()}`,
+		request: raw.request ?? "Migrated plan",
+		summary: raw.summary ?? "Migrated from schema v2.",
+		autonomy: "lean",
+		phase: raw.status === "planning_pending" ? "planned" : "executing",
+		created_at: raw.created_at ?? now,
+		updated_at: now,
+		items,
+	};
+}
+
+function hydrateFromTodo(markdown: string): PlanState {
+	const request = getSection(markdown, "Active Request") || "Imported legacy TODO";
+	const summary = getSection(markdown, "Plan Summary") || "Hydrated from .pi/TODO.md";
+	const items: PlanItem[] = getSection(markdown, "Todo")
+		.split("\n")
+		.map((l) => l.trim())
+		.filter(Boolean)
+		.map((l) => l.replace(/^[-*]\s*\[.\]\s*/, "").replace(/^TODO\s+\d+:\s*/, ""))
+		.map((title) => ({ id: itemId(), title, status: "pending" as ItemStatus }));
+	const state = newState(request, summary, "lean", items);
+	state.phase = "executing";
+	return state;
+}
+
+async function readState(cwd: string): Promise<PlanState | undefined> {
+	const sp = statePath(cwd);
+	if (await exists(sp)) {
+		try {
+			const raw = JSON.parse(await readFile(sp, "utf8"));
+			if (raw && raw.schema_version === 3 && Array.isArray(raw.items)) return raw as PlanState;
+			return migrateV2(raw);
+		} catch {
+			// fall through to TODO.md hydration
+		}
+	}
+	const tp = todoPath(cwd);
+	if (await exists(tp)) return hydrateFromTodo(await readFile(tp, "utf8"));
+	return undefined;
+}
+
+function currentItem(state: PlanState): PlanItem | undefined {
+	return state.items.find((i) => i.status === "in_progress") ?? state.items.find((i) => i.status === "pending");
+}
+
+function derivedStatus(state: PlanState): string {
+	if (state.items.length === 0) return "empty";
+	if (state.items.every((i) => i.status === "done")) return "completed";
+	if (state.items.some((i) => i.status === "blocked") && !state.items.some((i) => i.status === "pending" || i.status === "in_progress")) return "blocked";
+	return state.phase === "planned" ? "planned (awaiting /plan-go)" : "executing";
+}
+
+const MARK: Record<ItemStatus, string> = { pending: " ", in_progress: "~", done: "x", blocked: "!" };
+
+function renderTodo(state: PlanState): string {
+	const line = (i: PlanItem) => {
+		const tail = i.note ? ` — ${i.note.split("\n")[0]}` : "";
+		const fc = i.status === "blocked" && i.failure_class ? ` [${i.failure_class}]` : "";
+		return `- [${MARK[i.status]}] ${i.title}${tail}${fc}`;
+	};
+	return [
+		"# Active Request",
+		state.request,
+		"",
+		"# Status",
+		derivedStatus(state),
+		"",
+		"# Plan Summary",
+		state.summary,
+		"",
+		"# Todo",
+		state.items.map(line).join("\n") || "(none)",
+		"",
+		"# Meta",
+		`Autonomy: ${state.autonomy}`,
+		`Phase: ${state.phase}`,
+		`Updated: ${isoNow()}`,
+		`Run ID: ${state.run_id}`,
+		"",
+	].join("\n");
+}
+
+async function writeStateAndTodo(cwd: string, state: PlanState): Promise<void> {
+	state.updated_at = isoNow();
+	const sp = statePath(cwd);
+	await mkdir(dirname(sp), { recursive: true });
+	await writeFile(sp, `${JSON.stringify(state, null, 2)}\n`, "utf8");
+	await writeFile(todoPath(cwd), renderTodo(state), "utf8");
+}
+
+async function mutatePlan<T>(cwd: string, fn: (state: PlanState | undefined) => Promise<{ state?: PlanState; result: T }>): Promise<T> {
+	const path = statePath(cwd);
+	await mkdir(dirname(path), { recursive: true });
+	return withFileMutationQueue(path, async () => {
+		const current = await readState(cwd);
+		const out = await fn(current);
+		if (out.state) await writeStateAndTodo(cwd, out.state);
+		return out.result;
+	});
+}
+
+// Preserve ids across rewrites by matching on normalized title (so a cosmetic
+// rename — backticks/case/spacing — maps to its prior self, not a fresh id +
+// false-omission duplicate); genuinely new titles get fresh ids.
+function reconcileItems(prev: PlanItem[] | undefined, incoming: Array<{ title: string; status: ItemStatus; note?: string; failure_class?: FailureClass; gate?: string }>): PlanItem[] {
+	const byTitle = new Map((prev ?? []).map((p) => [normalizeTitle(p.title), p]));
+	return incoming.map((inc) => {
+		const p = byTitle.get(normalizeTitle(inc.title));
+		return {
+			id: p?.id ?? itemId(),
+			title: inc.title,
+			status: inc.status,
+			note: inc.note,
+			failure_class: inc.status === "blocked" ? (inc.failure_class ?? "unknown") : undefined,
+			gate: inc.gate === "" ? undefined : (inc.gate ?? p?.gate), // model can set/update; preserved across rewrites
+			gate_fails: inc.gate === p?.gate ? p?.gate_fails : 0, // preserved while the gate is unchanged; reset if it changes/clears
+		};
+	});
+}
+
+// ---------- plan-mode enforcement ----------
+
+// In-memory "planning in flight" flag, shared with other extensions (same pi
+// process) via globalThis. Deliberately NOT read from .pi/plan-state.json —
+// that file persists across sessions, so a stale phase:"planned" would block
+// normal work forever. Set on /plan, cleared on /plan-go, yolo, or agent_end:
+// it covers exactly the agent run the /plan command starts.
+const PLAN_FLAG = "__pi_plan_phase_active";
+function setPlanning(on: boolean): void {
+	(globalThis as Record<string, unknown>)[PLAN_FLAG] = on;
+}
+function isPlanning(): boolean {
+	return (globalThis as Record<string, unknown>)[PLAN_FLAG] === true;
+}
+
+const PLAN_MUTATION_TOOLS = new Set(["edit", "write", "multiedit"]);
+
+// ---------- prompts ----------
+
+function planBlock(autonomy: Autonomy): string {
+	const vague = autonomy === "yolo"
+		? `REQ vague → take the most defensible reading, note assumptions in summary, plan.`
+		: `REQ vague/ambiguous → unfold it: ask ONE question — the one whose answer narrows the work most. End your turn, wait.
+Answer in → clear? plan. Still vague → next ONE question. Hard cap 3 total; at the cap, plan and put open assumptions in summary.`;
+	return `Plan only. No edits, no shell writes, no other work.
+${vague}
+Risky REQ, or several viable approaches → in thinking only: draft a minimal-safe plan and a thorough plan, then merge — keep each item that buys real risk coverage, drop the rest. Emit only the merged plan. Clear simple REQ → skip the comparison, plan straight.
+Break REQ into 5-10 ordered items. Small steps, no fake splits.
+Prefer vertical slices — each item leaves something working/verifiable.
+Each item names its done-check: an observable result, or a \`gate\` command that proves it complete. Vague boundary → it will drift.
+Reply with ONLY the plan_write call — no prose plan. Set request (exact), summary (1 line), items (each status="pending").`;
+}
+
+function delegationBlock(subagentAvailable: boolean): string {
+	if (!subagentAvailable) return "";
+	return `
+Delegate to keep this window clean (subagent returns only a compact result):
+- Heavy lookup (big file, wide search) → subagent(explorer, …). Don't pull big files in here.
+- Non-trivial claim or change → subagent(verifier, …); accept only on VERDICT: confirmed.
+- Isolated, fully-scoped edit → subagent(executor, …, mode=fork). You own the plan; trivial edits yourself.`;
+}
+
+function policyBlock(autonomy: Autonomy, subagentAvailable: boolean): string {
+	if (autonomy === "yolo") {
+		return `YOLO:
+- Run to completion. No check-ins.
+- Blocked item → re-plan (plan_write rewrites the list), continue.
+- Risky/destructive → act directly.
+- Repeat failure → change strategy, retry; quit only if truly stuck.${delegationBlock(subagentAvailable)}`;
+	}
+	return `LEAN:
+- Do a chunk, report, pause for check-in.
+- Blocked item → mark blocked via plan_write, stop, report. Don't push past.
+- Same action failed twice (see plan_write warning) → stop, mark blocked, change strategy.${delegationBlock(subagentAvailable)}`;
+}
+
+function executionDisciplineBlock(): string {
+	return `Execution discipline:
+- Big files: size-check first. Sample for shape/schema only. CSV/JSONL/logs/generated reports → query whole file with rg/awk/jq/Python, return only relevant rows/counts. Don't infer global state from head/tail. (Prefer subagent(explorer).)
+- Subagents: explorer/verifier read-only, return distilled results — keep this window clean. Main loop owns the plan + final verify.
+- No-ops: unneeded item → mark done, note "skipped/no-op" + evidence, or re-plan away with a note.
+- Completion claims: before final summary, derive changed-file evidence from tools (git status/diff, else filesystem). No claim a file changed without tool evidence.`;
+}
+
+function executeBlock(autonomy: Autonomy, subagentAvailable: boolean): string {
+	return `Work the list. Mark item in_progress before starting, done or blocked after.
+Re-plan anytime: plan_write to add/remove/reorder/restatus.
+plan_write does NOT end your turn — keep working.
+Gate risky segments: set an item's gate to a read-only verify/check command (e.g. \`just verify\`, the test/typecheck cmd). plan_write runs it when you mark the item done — fail → reverted (not done), fix + re-run. Mutating/destructive gates are rejected.
+${policyBlock(autonomy, subagentAvailable)}
+${executionDisciplineBlock()}
+End with a short summary:
+Status: <one line>
+Done: <bullets or "none">
+Blocked: <bullets or "none">
+Verify: <tool-derived changed-file evidence + checks, or "none">
+Next: <one action or "none">`;
+}
+
+function planOnlyPrompt(request: string): string {
+	return `MODE: PLAN
+REQ:
+${request}
+
+${planBlock("lean")}
+Then STOP — end your turn. Wait for /plan-go. Edits before /plan-go are blocked.`;
+}
+
+function planAndExecutePrompt(request: string, subagentAvailable: boolean): string {
+	return `MODE: PLAN+RUN (yolo)
+REQ:
+${request}
+
+${planBlock("yolo")}
+Then immediately start executing.
+${executeBlock("yolo", subagentAvailable)}`;
+}
+
+function executePrompt(state: PlanState, subagentAvailable: boolean): string {
+	const open = state.items
+		.filter((i) => i.status === "pending" || i.status === "in_progress")
+		.map((i) => `- ${i.title}`)
+		.join("\n") || "(no open items)";
+	return `MODE: RUN
+REQ: ${state.request}
+OPEN ITEMS:
+${open}
+
+${executeBlock(state.autonomy, subagentAvailable)}`;
+}
+
+// ---------- runtime status (preserved) ----------
+
+async function runtimeStatusText(): Promise<string> {
+	const settingsFile = join(homedir(), ".pi", "agent", "settings.json");
+	const modelsFile = join(homedir(), ".pi", "agent", "models.json");
+	const settings = (await exists(settingsFile)) ? JSON.parse(await readFile(settingsFile, "utf8")) : {};
+	const models = (await exists(modelsFile)) ? JSON.parse(await readFile(modelsFile, "utf8")) : {};
+	const provider = settings.defaultProvider ?? "unknown";
+	const model = settings.defaultModel ?? "unknown";
+	const providerCfg = models.providers?.[provider];
+	return [
+		`Provider: ${provider}`,
+		`Model: ${model}`,
+		`Base URL: ${providerCfg?.baseUrl ?? "not configured for selected provider"}`,
+		`API: ${providerCfg?.api ?? "unknown"}`,
+		`Default thinking: ${settings.defaultThinkingLevel ?? "unknown"}`,
+		`Compaction: ${settings.compaction?.enabled ? "enabled" : "disabled"}`,
+		`Keep recent tokens: ${settings.compaction?.keepRecentTokens ?? "unknown"}`,
+	].join("\n");
+}
+
+function formatTraceLine(line: string): string {
+	try {
+		const e = JSON.parse(line);
+		const time = String(e.timestamp ?? "").replace(/^\d{4}-/, "").replace(/\.\d{3}Z$/, "Z");
+		const status = e.success === false ? "FAIL" : "OK";
+		const tool = e.tool_name ?? e.action_type ?? "event";
+		const item = e.item_id ? ` ${e.item_id}` : "";
+		const summary = e.output_summary ?? e.failure_class ?? "";
+		return `${time} ${status} ${tool}${item} — ${summary}`.trim();
+	} catch {
+		return line;
+	}
+}
+
+// ---------- tool ----------
+
+const itemSchema = Type.Object({
+	title: Type.String(),
+	status: Type.Union([
+		Type.Literal("pending"),
+		Type.Literal("in_progress"),
+		Type.Literal("done"),
+		Type.Literal("blocked"),
+	]),
+	note: Type.Optional(Type.String()),
+	failure_class: Type.Optional(Type.Union([
+		Type.Literal("blocked_needs_input"),
+		Type.Literal("blocked_other"),
+		Type.Literal("user_action_required"),
+		Type.Literal("unknown"),
+	])),
+	gate: Type.Optional(Type.String({ description: "Read-only verify/check command (e.g. 'just verify', the test/typecheck cmd). Mutating/destructive gates are rejected. Must exit 0 to accept this item done; a red gate reverts it so you fix + re-run." })),
+});
+
+const planWrite = defineTool({
+	name: "plan_write",
+	label: "Write Plan",
+	description: "Create or update the plan TODO list. Pass the ENTIRE ordered list each call; it replaces the stored list. Plan, re-plan (add/remove/reorder), restatus items. Does not end your turn.",
+	promptSnippet: "Write/update the whole plan TODO list",
+	parameters: Type.Object({
+		items: Type.Array(itemSchema, { minItems: 1 }),
+		request: Type.Optional(Type.String()),
+		summary: Type.Optional(Type.String()),
+	}),
+	async execute(_toolCallId, params, _signal, _onUpdate, ctx) {
+		const aid = actionId();
+
+		const { state, newlyBlocked, gateMsgs, integrity, newlyDone } = await mutatePlan(ctx.cwd, async (prev) => {
+			const items = reconcileItems(prev?.items, params.items as any);
+			const prevById = new Map((prev?.items ?? []).map((i) => [i.id, i]));
+			const prevBlocked = new Set((prev?.items ?? []).filter((i) => i.status === "blocked").map((i) => i.id));
+
+			// Repeater: run the gate on items newly transitioning to "done". Exit 0 keeps
+			// done; non-zero reverts (→ in_progress, then blocked at GATE_MAX). Opt-in via
+			// item.gate, so gateless items are unaffected.
+			const gateMsgs: string[] = [];
+			for (const it of items) {
+				if (it.status !== "done" || !it.gate || !api) continue;
+				if (prevById.get(it.id)?.status === "done") continue; // already passed
+				const gateAllowed = assertVerifyGateAllowed(it.gate);
+				if (!gateAllowed.ok) {
+					it.gate_fails = prevById.get(it.id)?.gate_fails ?? 0;
+					if (classifyBashCommand(it.gate).destructive) {
+						it.status = "blocked";
+						it.failure_class = "user_action_required";
+						it.note = gateAllowed.reason;
+					} else {
+						it.status = "in_progress";
+						it.note = gateAllowed.reason;
+					}
+					it.gate = undefined; it.gate_fails = 0; // drop a rejected gate so it cannot re-trap the item
+					gateMsgs.push(`gate for "${it.title}" dropped (not a verify/test command): ${gateAllowed.reason}. Use just verify / npm test / npx tsx --test, or pass gate:"" to clear.`);
+					continue;
+				}
+				let code = 1;
+				let out = "";
+				try {
+					const r = await api.exec("bash", ["-c", it.gate], { cwd: ctx.cwd, timeout: GATE_TIMEOUT_MS });
+					code = r.code;
+					out = (r.stderr?.trim() || r.stdout?.trim() || `exit ${r.code}`);
+				} catch (e) {
+					out = e instanceof Error ? e.message : String(e);
+				}
+				if (code === 0) {
+					it.gate_fails = 0;
+					continue;
+				}
+				const fails = (prevById.get(it.id)?.gate_fails ?? 0) + 1;
+				const tail = out.split("\n").slice(-4).join(" / ").slice(0, 300);
+				it.gate_fails = fails;
+				if (fails >= GATE_MAX) {
+					it.status = "blocked";
+					it.failure_class = "blocked_other";
+					it.note = `gate failed ${fails}×: ${tail}`;
+					gateMsgs.push(`✗ gate for "${it.title}" failed ${fails}× → blocked: ${tail}`);
+				} else {
+					it.status = "in_progress";
+					it.note = `gate failed (${fails}/${GATE_MAX}): ${tail}`;
+					gateMsgs.push(`✗ gate for "${it.title}" failed (${fails}/${GATE_MAX}) — fix and re-run, do not mark done. ${tail}`);
+				}
+			}
+
+			// Plan-integrity guard: a whole-list rewrite must not silently drop work.
+			// Normal calls re-emit the ENTIRE list, so this only fires when the model
+			// fails to reproduce it — the silent-loss failure mode.
+			const { reattached, droppedOpen } = planIntegrity(prev?.items ?? [], items);
+			if (reattached.length) items.push(...reattached); // always preserve completed work; never un-record a done step
+			// Omission-safe execution: once execution has begun, an omitted OPEN item is
+			// almost certainly a reproduction failure, not a deliberate prune — preserve it.
+			// But yield after PRESERVE_MAX consecutive preserves: persistent omission =
+			// intent (e.g. a parent the model replaced with sub-items), else B deadlocks.
+			let preservedOpen: PlanItem[] = [];
+			let yieldedOpen: PlanItem[] = [];
+			if (executionUnderway(prev?.items ?? [])) {
+				const decision = preserveDecision(droppedOpen, PRESERVE_MAX);
+				preservedOpen = decision.preserve;
+				yieldedOpen = decision.yielded;
+				if (preservedOpen.length) items.push(...preservedOpen);
+			}
+			// ponytail: title-keyed identity, so a renamed open item re-attaches as a near-dupe (mitigated by normalizeTitle); id-addressed items = real fix, out of scope.
+
+			// Plan-thrash signal: items completed THIS call (done now, not done before).
+			// Computed after the reattach so preserved already-done items don't count.
+			const newlyDone = items.filter((i) => i.status === "done" && prevById.get(i.id)?.status !== "done").length;
+
+			const next: PlanState = prev
+				? { ...prev, request: params.request ?? prev.request, summary: params.summary ?? prev.summary, items, phase: prev.phase === "planned" ? "planned" : "executing", updated_at: isoNow() }
+				: newState(params.request ?? "", params.summary ?? "", "lean", items);
+			const newlyBlocked = items.filter((i) => i.status === "blocked" && !prevBlocked.has(i.id));
+			return { state: next, result: { state: next, newlyBlocked, gateMsgs, integrity: { reattached, preservedOpen, yieldedOpen }, newlyDone } };
+		});
+
+		// Trace each newly blocked item through the repeated-failure guard.
+		let warning = "";
+		for (const item of newlyBlocked) {
+			const count = await appendTrace(ctx.cwd, {
+				run_id: state.run_id,
+				item_id: item.id,
+				action_type: "tool",
+				tool_name: "plan_write",
+				action_id: aid,
+				success: false,
+				failure_class: item.failure_class ?? "unknown",
+				observed_state: item.note,
+				output_summary: `Blocked: ${item.title}`,
+				final_status: derivedStatus(state),
+			});
+			if (count && count >= 2 && state.autonomy === "lean") {
+				warning = `\n⚠ "${item.title}" failed ${count}× with the same signature. Change strategy, inspect state, or leave it blocked and stop — do not retry identically.`;
+			}
+		}
+		// Plan-integrity guard: a rewrite that omitted work — completed items are always
+		// re-attached; open items are re-attached once execution is underway (omission ≠
+		// deletion; restatus to drop). Surfaced + traced so it's observable and trips the
+		// repeated-failure guard. failure_class is trace-only — the model's taxonomy is untouched.
+		const integrityIssue = integrity.reattached.length > 0 || integrity.preservedOpen.length > 0 || integrity.yieldedOpen.length > 0;
+		let integrityWarn = "";
+		if (integrityIssue) {
+			// Per-case wording: the done case can't be "dropped by restatus" (it's already
+			// done), so telling the model to mark it done/blocked is nonsense → split them.
+			// Yield = B gave up after PRESERVE_MAX preserves (persistent omission = intent).
+			const segs: string[] = [];
+			if (integrity.reattached.length) segs.push(`re-listed ${integrity.reattached.length} completed item(s) you dropped — always keep done items in the list`);
+			if (integrity.preservedOpen.length) segs.push(`kept ${integrity.preservedOpen.length} open item(s) you omitted (${integrity.preservedOpen.map((i) => i.title).join("; ").slice(0, 160)}) — to drop one, mark it done/blocked, don't leave it out`);
+			if (integrity.yieldedOpen.length) segs.push(`released ${integrity.yieldedOpen.length} open item(s) you've omitted ${PRESERVE_MAX}× — treating as intentional removal`);
+			integrityWarn = `\n⚠ plan integrity: ${segs.join("; ")}. Re-emit the ENTIRE list each call.`;
+			await appendTrace(ctx.cwd, {
+				run_id: state.run_id,
+				action_type: "tool",
+				tool_name: "plan_write",
+				action_id: aid,
+				success: false,
+				failure_class: "plan_integrity",
+				observed_state: { reattached: integrity.reattached.map((i) => i.title), preserved_open: integrity.preservedOpen.map((i) => i.title), yielded: integrity.yieldedOpen.map((i) => i.title), items: state.items.length },
+				output_summary: `Rewrite omitted work — reattached ${integrity.reattached.length} done, kept ${integrity.preservedOpen.length} open, released ${integrity.yieldedOpen.length}`,
+				final_status: derivedStatus(state),
+			});
+		}
+		// Plan-thrash guard: repeated plan_write that completes nothing. loop-breaker
+		// counts plan_write as progress, so this is the only thing that surfaces re-plan
+		// churn. Warn (+ trace) only while an open item remains to execute.
+		const cur = currentItem(state);
+		const { streak, warn: replanWarn } = nextReplanStreak(replanStreak, newlyDone, REPLAN_MAX);
+		replanStreak = streak;
+		const thrashFired = replanWarn && !!cur;
+		let thrashWarn = "";
+		if (thrashFired) {
+			thrashWarn = `\n⚠ re-planned ${replanStreak}× with no item completed — stop re-planning; execute "${cur!.title}" now, or mark it blocked.`;
+			await appendTrace(ctx.cwd, {
+				run_id: state.run_id,
+				action_type: "tool",
+				tool_name: "plan_write",
+				action_id: aid,
+				success: false,
+				failure_class: "plan_thrash",
+				observed_state: { open_item: cur!.title }, // stable across repeats → same_failure_count climbs
+				output_summary: `Re-planned ${replanStreak}× with no completion`,
+				final_status: derivedStatus(state),
+			});
+		}
+		if (newlyBlocked.length === 0 && !integrityIssue && !thrashFired) {
+			await appendTrace(ctx.cwd, {
+				run_id: state.run_id,
+				action_type: "tool",
+				tool_name: "plan_write",
+				action_id: aid,
+				success: true,
+				output_summary: `Wrote ${state.items.length} items`,
+				final_status: derivedStatus(state),
+			});
+		}
+
+		const gateNote = gateMsgs.length ? `\n${gateMsgs.join("\n")}` : "";
+		const body = `Plan updated (${state.items.length} items, status: ${derivedStatus(state)}).${cur ? `\nNext open: ${cur.title}` : "\nNo open items remain."}${warning}${integrityWarn}${thrashWarn}${gateNote}`;
+		return {
+			content: [{ type: "text", text: body }],
+			details: { tool_name: "plan_write", action_id: aid, success: true },
+			terminate: false,
+		};
+	},
+});
+
+// ---------- commands ----------
+
+async function startPlanCommand(args: string, ctx: { cwd: string; ui: { notify(m: string, l?: string): void } }, pi: ExtensionAPI) {
+	const yolo = /(^|\s)yolo$/i.test(args);
+	const request = args.replace(/(^|\s)yolo$/i, "").trim();
+	if (!request) {
+		ctx.ui.notify("Usage: /plan <request> [yolo]", "error");
+		return;
+	}
+	const autonomy: Autonomy = yolo ? "yolo" : "lean";
+	replanStreak = 0; // fresh plan — reset thrash counter
+	await mutatePlan(ctx.cwd, async () => {
+		await archiveExistingTodo(ctx.cwd);
+		const state = newState(request, "Planning pending. The model will call plan_write.", autonomy, []);
+		if (yolo) state.phase = "executing"; // yolo plans + runs in one flow — no /plan-go to flip it; keep status honest
+		return { state, result: state };
+	});
+	await appendTrace(ctx.cwd, { action_type: "command", tool_name: "plan", success: true, input_summary: request, output_summary: `autonomy=${autonomy}` });
+	const subagentAvailable = pi.getActiveTools().includes("subagent");
+	if (yolo) pi.appendEntry("plan_spine", {}); // yolo executes immediately — mark the node for /collapse
+	setPlanning(!yolo); // arm the plan-mode mutation block for this agent run (yolo executes, so no block)
+	pi.sendUserMessage(yolo ? planAndExecutePrompt(request, subagentAvailable) : planOnlyPrompt(request));
+}
+
+async function goCommand(args: string, ctx: { cwd: string; ui: { notify(m: string, l?: string): void } }, pi: ExtensionAPI) {
+	setPlanning(false); // execution starts — disarm the plan-mode mutation block
+	replanStreak = 0; // execution start — reset thrash counter so planning drafts don't carry in
+	const state = await readState(ctx.cwd);
+	if (!state || state.items.length === 0) {
+		ctx.ui.notify("No plan to run. Start with /plan <request>.", "error");
+		return;
+	}
+	const open = state.items.filter((i) => i.status === "pending" || i.status === "in_progress");
+	if (open.length === 0) {
+		ctx.ui.notify("Plan is complete — no open items. Start a new plan with /plan <request>.", "info");
+		return;
+	}
+
+	// Optional mode switch: /plan-go yolo  or  /plan-go lean
+	const mode = /(^|\s)yolo$/i.test(args) ? "yolo" : /(^|\s)lean$/i.test(args) ? "lean" : undefined;
+	if (mode) state.autonomy = mode;
+
+	const resuming = state.phase === "executing";
+	state.phase = "executing";
+	await writeStateAndTodo(ctx.cwd, state);
+	pi.appendEntry("plan_spine", { run_id: state.run_id }); // mark this node for /collapse
+	await appendTrace(ctx.cwd, { run_id: state.run_id, action_type: "command", tool_name: "plan-go", success: true, output_summary: `${resuming ? "resume" : "execute"}${mode ? ` autonomy=${mode}` : ""}` });
+
+	const subagentAvailable = pi.getActiveTools().includes("subagent");
+	pi.sendUserMessage(executePrompt(state, subagentAvailable));
+}
+
+async function statusCommand(ctx: { cwd: string; ui: { notify(m: string, l?: string): void } }) {
+	const state = await readState(ctx.cwd);
+	if (!state) {
+		ctx.ui.notify("No .pi/plan-state.json or .pi/TODO.md found.", "info");
+		return;
+	}
+	ctx.ui.notify(renderTodo(state), "info");
+}
+
+async function traceCommand(args: string, ctx: { cwd: string; ui: { notify(m: string, l?: string): void } }) {
+	const parsed = Number.parseInt(args.trim(), 10);
+	const count = Number.isNaN(parsed) ? 10 : Math.min(50, Math.max(1, parsed));
+	const path = tracePath(ctx.cwd);
+	if (!(await exists(path))) {
+		ctx.ui.notify("No plan trace found.", "info");
+		return;
+	}
+	const lines = await tailLines(path, count);
+	ctx.ui.notify(lines.map(formatTraceLine).join("\n"), "info");
+}
+
+// ---------- registration ----------
+
+export default function (pi: ExtensionAPI) {
+	api = pi; // let the module-scope plan_write tool run shell gates via pi.exec
+	let lastCwd: string | undefined;
+
+	pi.registerTool(planWrite);
+
+	pi.registerCommand("plan", {
+		description: "Plan a request. Lean: plan then stop for /plan-go. Add 'yolo' to plan+run without routine pauses.",
+		handler: async (args, ctx) => {
+			lastCwd = ctx.cwd;
+			await startPlanCommand(args, ctx, pi);
+		},
+	});
+	pi.registerCommand("plan-go", {
+		description: "Run or resume the plan. Add 'yolo' to finish without routine pauses, 'lean' to pause per step.",
+		handler: async (args, ctx) => {
+			lastCwd = ctx.cwd;
+			await goCommand(args, ctx, pi);
+		},
+	});
+	pi.registerCommand("plan-status", {
+		description: "Show the current plan.",
+		handler: async (_args, ctx) => {
+			lastCwd = ctx.cwd;
+			return statusCommand(ctx);
+		},
+	});
+	pi.registerCommand("plan-trace", {
+		description: "Show recent plan trace entries.",
+		handler: async (args, ctx) => {
+			lastCwd = ctx.cwd;
+			return traceCommand(args, ctx);
+		},
+	});
+	pi.registerCommand("runtime-status", {
+		description: "Show provider/model runtime status.",
+		handler: async (_args, ctx) => ctx.ui.notify(await runtimeStatusText(), "info"),
+	});
+
+	// Reactive context prune: rewind the window to the plan node (stamped at
+	// execution start), collapsing the work since into a branch summary. The plan
+	// itself lives in plan-state.json (external), so it survives the jump.
+	pi.registerCommand("collapse", {
+		description: "Rewind window to the plan node, summarise the work since (prune execution noise, keep the plan).",
+		handler: async (args, ctx) => {
+			const spine = [...ctx.sessionManager.getEntries()].reverse().find((e) => e.type === "custom" && e.customType === "plan_spine");
+			if (!spine) {
+				ctx.ui.notify("No plan node found — run /plan then /plan-go first, or use /compact.", "warning");
+				return;
+			}
+			await ctx.navigateTree(spine.id, {
+				summarize: true,
+				label: "collapsed to plan",
+				customInstructions:
+					args.trim() ||
+					"Summarise the work since the plan started: done steps + key results/decisions, current state, what remains. Tight, factual; drop tool noise.",
+			});
+		},
+	});
+
+	// Structural plan-mode stop: while the /plan-started run is in flight, block
+	// real mutations. The prompt's "no edits" is now enforced, not just stated.
+	// Read-only bash stays allowed — planning needs investigation.
+	pi.on("tool_call", async (event) => {
+		if (!isPlanning()) return;
+		const isMutation =
+			PLAN_MUTATION_TOOLS.has(event.toolName) ||
+			(event.toolName === "bash" && classifyBashCommand(String((event.input as Record<string, unknown> | undefined)?.command ?? "")).mutates);
+		if (!isMutation) return;
+		return {
+			block: true,
+			reason:
+				"failure_class=plan_mode_violation. PLAN phase — no edits. Finish the plan (plan_write), end your turn. /plan-go starts execution.",
+		};
+	});
+
+	// Observability only: if the agent goes idle with open items, record it.
+	// No prompt re-injection (that was the fragile part of v2).
+	pi.on("agent_end", async () => {
+		setPlanning(false); // planning run ended (well-behaved or not) — disarm
+		const cwd = lastCwd;
+		if (!cwd) return;
+		const state = await readState(cwd);
+		if (!state || state.phase !== "executing") return;
+		const open = state.items.some((i) => i.status === "pending" || i.status === "in_progress");
+		if (!open) return;
+		await appendTrace(cwd, {
+			run_id: state.run_id,
+			action_type: "agent_end",
+			success: false,
+			failure_class: "unknown",
+			observed_state: { open_items: state.items.filter((i) => i.status === "pending" || i.status === "in_progress").length },
+			output_summary: "Agent ended with open TODO items",
+			final_status: "ended_without_completion",
+		});
+	});
+}

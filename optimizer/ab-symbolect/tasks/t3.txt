@@ -1,0 +1,1 @@
+Two of the tests in test/align.test.js fail. Fix the bugs in src/align.js with minimal edits — preserve the file's tab indentation exactly. Do not modify any tests. Run node --test until all tests pass.

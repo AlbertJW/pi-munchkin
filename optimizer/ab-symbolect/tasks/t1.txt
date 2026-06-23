@@ -1,0 +1,1 @@
+Rename the exported function parseCSV to parseCsv everywhere in this project (source and all test files), updating every import and call site. Behavior unchanged. Run node --test and ensure all tests pass.

@@ -1,0 +1,1 @@
+test/quoting.test.js fails: parseCSV currently trims whitespace inside quoted fields, but whitespace inside a quoted field must be preserved exactly, while unquoted fields stay trimmed. Fix src/index.js so quoted fields keep their interior whitespace and every test passes. Do not modify any test file and do not add new exports. Run node --test until everything passes.
