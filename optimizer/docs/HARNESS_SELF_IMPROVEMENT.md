@@ -171,4 +171,32 @@ From the emoji-glyph guide, reconciled with our own measurement:
   the fleet: `./fleet-eval.sh --rt` → `fleet_report.py <gen>-rt --baseline A --candidate R`. **Adopt only if it
   wins under the do-no-harm rule.** Prior (symbolect) is negative, so the bar is real.
 
+## 8. Queued candidates (untested — awaiting an in-band task set)
+
+Ideas that survived research triage but are **not adopted** — each is one munchkin/A-B candidate,
+blocked only on a (model, task) pairing in the discriminating band (see calibrate.py; as of
+2026-07 the sole known in-band pairing is qwopus35-9b-coder × h1).
+
+- **Evidence-first claim rule** (from nuclear-grade-context-engineering; operator
+  `add-constraint`). Governor line: *"State a result only with the command output that proves
+  it; otherwise name the gap."* Hypothesis: cuts small-model done-hallucination.
+- **`add-rationale` operator** (from Google Labs design.md's dual-layer format). Append a
+  one-line *why* to each governor constraint; hypothesis: rationale improves a small model's
+  judgment in applying the rule. Candidate addition to `propose.py` OPERATORS.
+
+Test path for both: encode as a governor variant → `prompt_variant` config →
+`real_gate.sh` → `fleet_report.classify` (Fisher, do-no-harm). Adopt only on a significant win.
+
+**Verified fact (2026-07, corrects an unverified review LOW):** subagents DO load the global
+governor — the child `pi` process loads `~/.pi/agent/APPEND_SYSTEM.md` normally and the agent's
+role `.md` body is *appended* via `--append-system-prompt` (vendor/pi-subagent/runner.ts), not a
+replacement. A `subagent_governor` search dimension is therefore unnecessary.
+
+**Steer texts are now a search dimension:** the loop-breaker/verify-gate injected messages route
+through `lib/steer-texts.ts` (env `PI_MSG_*` templates, `{var}` placeholders) and schema.json's
+`messages` dimension — munchkin can propose wording experiments (freeform ≤400 chars, schema-key
+whitelisted). Harness telemetry (`lib/telemetry.ts` → `~/.pi/agent/telemetry/events.jsonl`,
+`scripts/telemetry-report.sh`) records every steer/block/abort/compaction + steer→progress
+compliance, giving future fitness signals beyond binary gate-pass.
+
 *Companion: `LOCAL_LLM_HARNESS_RESEARCH.md` (the playbook + gap analysis this builds on).*

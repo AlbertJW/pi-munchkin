@@ -64,6 +64,8 @@ def config_env(config):
         env[k] = str(v)
     for k, v in (config.get("thresholds") or {}).items():
         env[k] = str(v)
+    for k, v in (config.get("messages") or {}).items():  # steer-text templates (PI_MSG_*)
+        env[k] = str(v)
     return env
 
 def config_endpoint(config):
@@ -91,12 +93,13 @@ def apply(config, base_text=None, out_dir=APPLIED):
 def selftest():
     base = "RULE: do the thing precisely."
     c1 = {"prompt_variant": "A", "format": "md", "scaffold": "none", "optillm": "none",
-          "thresholds": {"LB_REPEAT_T1": 2}, "decoding": {"TEMP": 0.6}}
+          "thresholds": {"LB_REPEAT_T1": 2}, "decoding": {"TEMP": 0.6},
+          "messages": {"PI_MSG_LB_T2": "act now: {act}"}}
     a = apply(c1, base_text=base, out_dir="/tmp/cfg-selftest")
     b = apply(c1, base_text=base, out_dir="/tmp/cfg-selftest")
     assert a == b, "apply must be deterministic"
     assert a["prompt_text"] == base + "", "md leaves base unchanged, no scaffold"
-    assert a["env"] == {"LB_REPEAT_T1": "2", "TEMP": "0.6"}, a["env"]
+    assert a["env"] == {"LB_REPEAT_T1": "2", "TEMP": "0.6", "PI_MSG_LB_T2": "act now: {act}"}, a["env"]
     assert a["endpoint"] == DIRECT
 
     # format: xml wraps, json parses back to the base

@@ -1,16 +1,19 @@
 #!/usr/bin/env python3
-"""munchkin: bounded harness-refinement optimizer for ONE model (the loaded one on
-:8080 — intended: qwopus35-9b-coder, which sits in the discriminating band).
+"""munchkin: Karpathy-style autoresearch loop over every SAFE harness surface, for ONE
+model (the loaded one on :8080 — a model in the discriminating band on the chosen tasks).
 
-Loop, per round: gate the current-best governor on the in-band agentic tasks → a
-frontier model proposes K minimal governor edits from the FAILURES → gate each candidate
-→ adopt the Fisher-significant winner (reusing fleet_report.classify) → repeat until a
-plateau. HUMAN-GATED: the winner is written to prompt-lab/proposals/ for review; this
-NEVER edits the live ~/.pi/agent/APPEND_SYSTEM.md.
+Loop, per round: gate the current-best candidate on the in-band agentic tasks → a frontier
+model reads the EXPERIMENT JOURNAL (what was tried, what happened) + the failing traces and
+proposes K candidates — each may edit the governor text AND/OR move a schema dimension
+(format, scaffold, LB_*/VERIFY_GATE_* thresholds) → gate each → adopt the Fisher-significant
+winner (fleet_report.classify) → repeat until plateau. Deltas are validated against
+prompt-lab/configs/schema.json: only safe, no-relaunch, in-schema values ever run
+(decoding/optillm stay deferred: relaunch/structural). HUMAN-GATED: the winner (governor +
+config) is written to prompt-lab/proposals/ for review; this NEVER edits the live governor.
 
-The loop is pure + injectable (gate_fn/propose_fn), so --selftest proves it offline
-(stubbed gate + frontier, no GPU/network). Live run needs llama-server up (free :8080)
-and FRONTIER_BASE_URL/FRONTIER_API_KEY.
+The loop is pure + injectable (gate_fn/propose_fn, in-memory journal), so --selftest proves
+it offline (no GPU/network). Live run needs llama-server up (:8080) and
+FRONTIER_BASE_URL/FRONTIER_API_KEY.
 
 Usage:  munchkin.py [--gen m0] [--rounds 3] [--candidates 2] [--n 4] [--tasks t1,t2,t3]
         munchkin.py --dry        # print the session-count estimate, run nothing
@@ -26,15 +29,78 @@ RESULTS = os.path.join(LAB, "results")
 RUNS = os.path.join(HERE, "real-gate-runs")
 REAL_GATE = os.path.join(HERE, "real_gate.sh")
 TASKS_DIR = os.path.join(HERE, "ab-symbolect", "tasks")
+JOURNAL = os.path.join(RESULTS, "munchkin-journal.jsonl")
 LIVE_GOV = os.path.expanduser(os.environ.get(
     "GOVERNOR", os.path.join(HERE, "..", "harness", "APPEND_SYSTEM.md")))
 SATURATED = 0.85
 PLATEAU_STOP = 2
+JOURNAL_CTX = 24  # prior experiments shown to the proposer
 
 def _classify(bk, bn, ck, cn):
     sys.path.insert(0, LAB)
     from fleet_report import classify  # Fisher exact; single-model = this one model's base-vs-cand
     return classify(bk, bn, ck, cn)
+
+def load_schema_dims():
+    sys.path.insert(0, LAB)
+    from config import load_schema
+    return load_schema()["dimensions"]
+
+# ---------- candidates: governor text + safe config dims ----------
+
+def make_cand(gov, delta=None):
+    c = {"gov": gov, "format": "md", "scaffold": "none", "thresholds": {}, "messages": {}}
+    c.update(delta or {})
+    return c
+
+def cand_summary(c):
+    return {"format": c["format"], "scaffold": c["scaffold"], "thresholds": c["thresholds"],
+            "messages": c.get("messages", {}),
+            "gov_sha1": hashlib.sha1(c["gov"].encode()).hexdigest()[:10]}
+
+MSG_MAX_LEN = 400
+
+def sanitize_delta(delta, dims):
+    """Keep only SAFE, no-relaunch, in-schema deltas -> (clean, dropped). Anything else
+    (decoding, optillm, unknown keys, out-of-schema values) is dropped, never run.
+    `messages` is the one freeform dimension: key must be in the schema field list,
+    value a control-char-free string <= MSG_MAX_LEN."""
+    clean, dropped = {}, []
+    for k, v in (delta or {}).items():
+        if k in ("format", "scaffold") and v in dims[k]["values"]:
+            clean[k] = v
+        elif k == "thresholds" and isinstance(v, dict):
+            fields = dims["thresholds"]["fields"]
+            th = {f: fv for f, fv in v.items() if f in fields and fv in fields[f]}
+            if th:
+                clean["thresholds"] = th
+            dropped += [f"thresholds.{f}" for f in v if f not in th]
+        elif k == "messages" and isinstance(v, dict):
+            allowed = set(dims["messages"]["fields"])
+            ms = {}
+            for f, fv in v.items():
+                if f in allowed and isinstance(fv, str) and 0 < len(fv) <= MSG_MAX_LEN:
+                    ms[f] = "".join(ch for ch in fv if ch == "\n" or ch >= " ")
+                else:
+                    dropped.append(f"messages.{f}")
+            if ms:
+                clean["messages"] = ms
+        else:
+            dropped.append(k)
+    return clean, dropped
+
+# ---------- journal (the autoresearch memory) ----------
+
+def journal_tail(k=JOURNAL_CTX):
+    if not os.path.exists(JOURNAL):
+        return []
+    return [json.loads(l) for l in open(JOURNAL) if l.strip()][-k:]
+
+def journal_persist(entries):
+    os.makedirs(RESULTS, exist_ok=True)
+    with open(JOURNAL, "a") as f:
+        for e in entries:
+            f.write(json.dumps(e) + "\n")
 
 # ---------- real implementations (NOT exercised in --selftest) ----------
 
@@ -46,15 +112,17 @@ def server_model():
     except Exception:
         return None
 
-def real_gate_one(gov_text, tasks, n, gen):
-    """Gate one governor (base config only) → (passes, total, failing_traces)."""
+def real_gate_one(cand, tasks, n, gen):
+    """Gate one candidate (base config only) → (passes, total, failing_traces)."""
     os.makedirs(PROPOSALS, exist_ok=True)
     gov_path = os.path.join(PROPOSALS, gen + ".gov.md")
     cfg_path = os.path.join(PROPOSALS, gen + ".config.json")
     with open(gov_path, "w") as f:
-        f.write(gov_text)
+        f.write(cand["gov"])
     with open(cfg_path, "w") as f:
-        json.dump({"prompt_variant": gov_path, "format": "md", "scaffold": "none"}, f)
+        json.dump({"prompt_variant": gov_path, "format": cand["format"],
+                   "scaffold": cand["scaffold"], "thresholds": cand["thresholds"],
+                   "messages": cand.get("messages", {})}, f)
     out = os.path.join(RESULTS, gen + ".jsonl")
     if os.path.exists(out):
         os.remove(out)
@@ -74,45 +142,77 @@ def real_gate_one(gov_text, tasks, n, gen):
             failures.append({"task": r["task"], "log_tail": tail[-800:]})
     return k, len(base), failures
 
-def real_propose(gov_text, failures, k):
+def real_propose(best, failures, k, r, journal):
     sys.path.insert(0, LAB)
     from judge import frontier_call
     from propose import parse_candidates, OPERATORS
+    dims = load_schema_dims()
+    space = (f"format: {dims['format']['values']}; scaffold: {dims['scaffold']['values']}; "
+             f"thresholds: {json.dumps(dims['thresholds']['fields'])}; "
+             f"messages (steer-text templates, freeform string <=400 chars, keep {{var}} placeholders): "
+             f"{dims['messages']['fields']}")
+    hist = "\n".join(
+        f"- {e.get('gen','?')}/r{e.get('round','?')} [{e.get('operator','base')}] "
+        f"{json.dumps(e.get('config',{}))} -> {e.get('pass','?')} ({e.get('label','?')})"
+        for e in journal[-JOURNAL_CTX:]) or "(none yet)"
     fails = "\n\n".join(
         f"TASK {f['task']} (prose: {open(os.path.join(TASKS_DIR, f['task']+'.txt')).read().strip()[:200]})\n"
         f"what the model did (tail):\n{f['log_tail'][:400]}" for f in failures[:6])
-    sysmsg = ("You improve a coding-agent system prompt (the 'governor') so a small local model completes "
-              f"agentic coding tasks. Propose {k} DISTINCT minimal revised governors, each using one operator "
-              f"from: {', '.join(OPERATORS)}. Keep edits small + general (do not overfit to these tasks). "
+    sysmsg = ("You run autoresearch on a coding-agent harness so a small local model completes "
+              f"agentic coding tasks. Propose {k} DISTINCT candidates. Each candidate may revise the "
+              "system prompt (the 'governor') AND/OR move harness config dimensions. Searchable "
+              f"config space (exact allowed values): {space}. Each candidate uses one operator from: "
+              f"{', '.join(OPERATORS)}. Keep prompt edits small + general (do not overfit). "
+              f"AT LEAST ONE of the {k} candidates must change a config dimension via CONFIG. "
+              "Study the prior experiments: build on winners, do not repeat failures.\n"
               "Output each EXACTLY as:\n### CANDIDATE\nOPERATOR: <one>\nRATIONALE: <one line>\n"
-              "--- PROMPT ---\n<the FULL revised governor>\n--- END ---")
-    user = f"CURRENT GOVERNOR:\n```\n{gov_text}\n```\n\nFAILING TASKS:\n{fails}"
-    cands = parse_candidates(frontier_call(sysmsg, user))
-    return [body for _op, body in cands]
+              "CONFIG: <single-line JSON delta, or omit this line>\n"
+              "--- PROMPT ---\n<the FULL revised governor, or exactly UNCHANGED>\n--- END ---")
+    user = (f"CURRENT GOVERNOR (config {json.dumps(cand_summary(best))}):\n```\n{best['gov']}\n```\n\n"
+            f"PRIOR EXPERIMENTS:\n{hist}\n\nFAILING TASKS:\n{fails}")
+    out = []
+    for op, body, delta in parse_candidates(frontier_call(sysmsg, user)):
+        clean, dropped = sanitize_delta(delta, dims)
+        if dropped:
+            print(f"[munchkin] dropped out-of-schema delta keys: {dropped}")
+        if body == "UNCHANGED" and not clean:
+            continue  # no-op candidate
+        c = make_cand(best["gov"] if body == "UNCHANGED" else body, clean)
+        c["_op"] = op
+        out.append(c)
+    return out
 
 # ---------- pure loop (selftested) ----------
 
-def optimize(base_gov, tasks, n, rounds, k, gate_fn, propose_fn, gen):
-    best_gov = base_gov
-    bk, bn, failures = gate_fn(best_gov, tasks, n, f"{gen}-r0-base")
-    ledger = [{"round": 0, "event": "baseline", "pass": f"{bk}/{bn}"}]
+def optimize(base_cand, tasks, n, rounds, k, gate_fn, propose_fn, gen, journal=None):
+    journal = list(journal or [])
+    best = base_cand
+    bk, bn, failures = gate_fn(best, tasks, n, f"{gen}-r0-base")
+    ledger = [{"round": 0, "event": "baseline", "pass": f"{bk}/{bn}", "config": cand_summary(best)}]
+    journal.append({"gen": gen, "round": 0, "operator": "base",
+                    "config": cand_summary(best), "pass": f"{bk}/{bn}", "label": "baseline"})
     if bn and bk / bn > SATURATED:
         ledger.append({"event": "stop", "why": f"baseline saturated ({bk}/{bn}) — no headroom"})
-        return best_gov, ledger
+        return best, ledger, journal
     plateau = 0
     for r in range(rounds):
-        cands = propose_fn(best_gov, failures, k, r)
+        cands = propose_fn(best, failures, k, r, journal)
         scored = []
         for i, cg in enumerate(cands):
             ck, cn, cf = gate_fn(cg, tasks, n, f"{gen}-r{r}-c{i}")
             label, delta = _classify(bk, bn, ck, cn)
-            ledger.append({"round": r, "cand": i, "pass": f"{ck}/{cn}", "label": label, "delta": round(delta, 3)})
+            entry = {"round": r, "cand": i, "pass": f"{ck}/{cn}", "label": label,
+                     "delta": round(delta, 3), "operator": cg.get("_op", "?"),
+                     "config": cand_summary(cg)}
+            ledger.append(entry)
+            journal.append({"gen": gen, **entry})
             scored.append((label, ck, cn, cg, cf))
         winners = [s for s in scored if s[0] == "better"]
         if winners:
             w = max(winners, key=lambda s: s[1] / s[2] if s[2] else 0)
-            best_gov, bk, bn, failures = w[3], w[1], w[2], w[4]
-            ledger.append({"round": r, "event": "ADOPT", "pass": f"{bk}/{bn}"})
+            best, bk, bn, failures = w[3], w[1], w[2], w[4]
+            ledger.append({"round": r, "event": "ADOPT", "pass": f"{bk}/{bn}",
+                           "config": cand_summary(best)})
             plateau = 0
         else:
             plateau += 1
@@ -120,46 +220,79 @@ def optimize(base_gov, tasks, n, rounds, k, gate_fn, propose_fn, gen):
             if plateau >= PLATEAU_STOP:
                 ledger.append({"event": "stop", "why": "plateau"})
                 break
-    return best_gov, ledger
+    return best, ledger, journal
 
-def _write_outputs(gen, best_gov, ledger, base_gov):
+def _write_outputs(gen, best, ledger, base_cand, new_journal):
     os.makedirs(PROPOSALS, exist_ok=True)
     with open(os.path.join(RESULTS, f"munchkin-{gen}.jsonl"), "w") as f:
         for e in ledger:
             f.write(json.dumps(e) + "\n")
-    improved = best_gov != base_gov
+    journal_persist(new_journal)
+    improved = best != base_cand
     winner_path = os.path.join(PROPOSALS, f"munchkin-{gen}-winner.md")
     if improved:
         with open(winner_path, "w") as f:
-            f.write(best_gov)
+            f.write(best["gov"])
+        with open(os.path.join(PROPOSALS, f"munchkin-{gen}-winner.config.json"), "w") as f:
+            json.dump({k: v for k, v in best.items() if k != "gov" and not k.startswith("_")},
+                      f, indent=2)
     return improved, winner_path
 
-# ---------- selftest (offline: no GPU, no network) ----------
+# ---------- selftest (offline: no GPU, no network, no journal file I/O) ----------
 
 def selftest():
     live_hash_before = hashlib.sha1(open(LIVE_GOV, "rb").read()).hexdigest() if os.path.exists(LIVE_GOV) else None
-    base = "BASE governor: do the task."
+    dims = load_schema_dims()
 
-    def stub_gate(gov, tasks, n, gen):
-        k = 10 if "WINNER" in gov else (4 if "CAND" in gov else 3)
-        fails = [{"task": "t1", "log_tail": "model gave up"}]
-        return k, 12, fails
+    # schema guard: out-of-schema / unsafe deltas are dropped, in-schema survive
+    clean, dropped = sanitize_delta(
+        {"format": "yaml", "scaffold": "cot", "decoding": {"TEMP": 0.6},
+         "thresholds": {"LB_REPEAT_T1": 99, "LB_STREAK_SOFT": 8}}, dims)
+    assert clean == {"scaffold": "cot", "thresholds": {"LB_STREAK_SOFT": 8}}, clean
+    assert set(dropped) == {"format", "decoding", "thresholds.LB_REPEAT_T1"}, dropped
 
-    def stub_propose(gov, failures, k, r):
-        return ["governor v1 WINNER edition", "governor v1 CAND neutral"] if r == 0 \
-            else [f"governor r{r} CAND a", f"governor r{r} CAND b"]
+    # messages (freeform steer texts): allowed key + sane string survives; unknown
+    # key, oversize, and non-string are dropped; control chars stripped
+    clean, dropped = sanitize_delta(
+        {"messages": {"PI_MSG_LB_T2": "act \x07now: {act}", "PI_MSG_NOPE": "x",
+                      "PI_MSG_LB_T3": "y" * 500, "PI_MSG_VG_STEER": 42}}, dims)
+    assert clean == {"messages": {"PI_MSG_LB_T2": "act now: {act}"}}, clean
+    assert set(dropped) == {"messages.PI_MSG_NOPE", "messages.PI_MSG_LB_T3", "messages.PI_MSG_VG_STEER"}, dropped
 
-    best, ledger = optimize(base, ["t1"], 4, rounds=4, k=2, gate_fn=stub_gate, propose_fn=stub_propose, gen="selftest")
-    assert "WINNER" in best, f"should adopt the significant winner, got: {best!r}"
+    base = make_cand("BASE governor: do the task.")
+    seen_journals = []
+
+    def stub_gate(cand, tasks, n, gen):
+        # config-only winner: LB_STREAK_SOFT=8 lifts the pass rate; a prompt CAND is neutral
+        k = 10 if cand["thresholds"].get("LB_STREAK_SOFT") == 8 else (4 if "CAND" in cand["gov"] else 3)
+        return k, 12, [{"task": "t1", "log_tail": "model gave up"}]
+
+    def stub_propose(best, failures, k, r, journal):
+        seen_journals.append(list(journal))
+        if r == 0:  # a config-only candidate (gov UNCHANGED) + a neutral prompt edit
+            return [make_cand(best["gov"], {"thresholds": {"LB_STREAK_SOFT": 8}}),
+                    make_cand("governor v1 CAND neutral")]
+        return [make_cand(f"governor r{r} CAND a"), make_cand(f"governor r{r} CAND b")]
+
+    best, ledger, journal = optimize(base, ["t1"], 4, rounds=4, k=2,
+                                     gate_fn=stub_gate, propose_fn=stub_propose, gen="selftest")
+    # (a) the config-only candidate is adopted: gov unchanged, thresholds moved
+    assert best["gov"] == base["gov"] and best["thresholds"] == {"LB_STREAK_SOFT": 8}, best
     assert any(e.get("event") == "ADOPT" for e in ledger), "ledger missing ADOPT"
     assert any(e.get("why") == "plateau" for e in ledger), "should stop on plateau"
-    # the 4/12-vs-base-3/12 candidate must read as neutral (not adopted) — Fisher at n=12
-    r0 = [e for e in ledger if e.get("round") == 0 and "label" in e]
+    # 10/12-vs-3/12 = better; 4/12-vs-3/12 = neutral (Fisher at n=12)
+    r0 = [e for e in ledger if e.get("round") == 0 and "label" in e and e["label"] != "baseline"]
     assert any(e["label"] == "better" for e in r0) and any(e["label"] == "neutral" for e in r0), r0
-    # human-gate proof: the live governor must be byte-identical (we never write it)
+    # (c) journal feedback: round-1 proposer saw the round-0 experiments (baseline + 2 cands)
+    assert len(seen_journals[0]) == 1 and seen_journals[0][0]["label"] == "baseline"
+    assert len(seen_journals[1]) == 3 and any(e["label"] == "better" for e in seen_journals[1]), \
+        [e.get("label") for e in seen_journals[1]]
+    assert all("config" in e for e in seen_journals[1]), "journal entries must carry config"
+    # (d) human-gate proof: the live governor must be byte-identical (we never write it)
     live_hash_after = hashlib.sha1(open(LIVE_GOV, "rb").read()).hexdigest() if os.path.exists(LIVE_GOV) else None
     assert live_hash_before == live_hash_after, "munchkin must NOT touch the live governor"
-    print("munchkin selftest: OK (adopts winner, ignores neutral, plateau-stops, live governor untouched)")
+    print("munchkin selftest: OK (schema guard; config-only adopt; journal fed back; "
+          "neutral ignored; plateau-stops; live governor untouched)")
 
 def main():
     args = sys.argv[1:]
@@ -176,16 +309,18 @@ def main():
         print("(--dry: nothing run)"); return
     if not os.path.exists(LIVE_GOV):
         raise SystemExit(f"governor not found: {LIVE_GOV}")
-    base_gov = open(LIVE_GOV).read()
-    print(f"model on :8080 = {server_model()}  (intended: qwopus35-9b-coder)")
-    best, ledger = optimize(base_gov, tasks, n, rounds, k, real_gate_one, real_propose, gen)
-    improved, winner = _write_outputs(gen, best, ledger, base_gov)
+    base_cand = make_cand(open(LIVE_GOV).read())
+    prior = journal_tail()
+    print(f"model on :8080 = {server_model()}  |  prior journal entries: {len(prior)}")
+    best, ledger, journal = optimize(base_cand, tasks, n, rounds, k,
+                                     real_gate_one, real_propose, gen, journal=prior)
+    improved, winner = _write_outputs(gen, best, ledger, base_cand, journal[len(prior):])
     print("\n=== ledger ===")
     for e in ledger:
         print(" ", json.dumps(e))
     if improved:
-        print(f"\nWINNER governor → {winner}")
-        print("REVIEW it, then apply manually:  cp", winner, LIVE_GOV)
+        print(f"\nWINNER governor → {winner}  (+ .config.json alongside)")
+        print("REVIEW both, then apply manually: governor -> cp; config env -> your launcher/env.")
     else:
         print("\nno improvement found — live governor unchanged (as always; munchkin never edits it).")
 

@@ -87,6 +87,26 @@ python3 ab-machinery/metrics.py --selftest
 ./munchkin.py --dry          # prints the GPU session-count estimate
 ```
 
+## Research notes
+
+Approaches evaluated for this substrate — recorded so the reasoning isn't re-litigated:
+
+- **AgentBench** (THUDM) — rejected as a task source: wrong skill axis (bash/SQL agency, not
+  library edits), non-hermetic grading (live Docker + MySQL per task), and the published numbers
+  put small models at the floor (3–12%), not in the band.
+- **design.md** (Google Labs) — not adopted (frontend-specific, no benchmarks). Pocketed two
+  ideas: a *design-fidelity task class* (edge-case-rich, deterministically lintable — candidate
+  in-band fuel for models that saturate clean single-function tasks) and the `add-rationale`
+  operator hypothesis (see Queued candidates in `optimizer/docs/HARNESS_SELF_IMPROVEMENT.md`).
+- **nuclear-grade-context-engineering** (FlyFission) — rejected wholesale: it encodes discipline
+  as process prose for the model to follow, while this harness encodes the same load-bearing
+  ideas as mechanisms the model can't bypass (hidden tests = independent checker, verify-gate =
+  evidence before done, human-gated adoption = explicit verdict). Its evidence is author-judged
+  only. One nugget queued: the evidence-first claim rule as a governor candidate.
+- **Verified in code** (corrects an earlier unverified review finding): subagents DO load the
+  global governor — the child `pi` appends the role prompt (`--append-system-prompt`), it does
+  not replace `APPEND_SYSTEM.md`. No `subagent_governor` search dimension is needed.
+
 ## License
 
 MIT (`LICENSE`). Bundles the MIT-licensed `pi-subagent` and peer-depends on MIT-licensed pi — see

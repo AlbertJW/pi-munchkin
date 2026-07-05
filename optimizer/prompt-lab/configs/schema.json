@@ -41,6 +41,15 @@
         "LB_STREAK_SOFT": [8, 12],
         "VERIFY_GATE_MAX_FIRES": [2, 3]
       }
+    },
+    "messages": {
+      "kind": "env", "safe": true, "freeform": true,
+      "_note": "Steer-text templates (lib/steer-texts.ts). Values are FREEFORM strings <=400 chars ({var} placeholders per template) — munchkin validates key membership + length, not enumerated values. Emitted as env, no relaunch.",
+      "fields": [
+        "PI_MSG_LB_T1_TOOL", "PI_MSG_LB_T1_REASON", "PI_MSG_LB_T1_STREAK",
+        "PI_MSG_LB_T2", "PI_MSG_LB_T3", "PI_MSG_LB_OUTCOME",
+        "PI_MSG_VG_STEER", "PI_MSG_VG_STEER_FAILED"
+      ]
     }
   },
 
