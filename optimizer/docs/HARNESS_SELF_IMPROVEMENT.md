@@ -183,6 +183,51 @@ blocked only on a (model, task) pairing in the discriminating band (see calibrat
 - **`add-rationale` operator** (from Google Labs design.md's dual-layer format). Append a
   one-line *why* to each governor constraint; hypothesis: rationale improves a small model's
   judgment in applying the rule. Candidate addition to `propose.py` OPERATORS.
+- **Plan-block placement/pressure** (anti-signal from r/LocalLLaMA 1unobl4, 2026-07: a Gemma-4
+  26B *avoided* its planning tools when a persistent plan block was pinned at the tail of
+  context). Evidence-gated: if telemetry shows plan-runner steer non-compliance or plan_write
+  avoidance, test plan-injection placement as a munchkin dimension. Until then: nothing.
+- **Persistent re-enterable scoped contexts** ("applications" — same thread): stateful reduced-
+  tool views the agent leaves/re-enters, contents swapped out of the window. Subagents already
+  cover the spawn-and-distill 70%; revisit only if telemetry shows context-pollution failures in
+  long sessions. (The thread's menu-verb idea — never retype exact strings — is hashline, already
+  built, on the surface that matters.)
+- **From the 2026-07 harness-research sweep** (arXiv + pi ecosystem; full sources in the sweep
+  reports). Build-next tier, blocked only on m2s finishing (extensions frozen mid-run):
+  *recency-window tool-result pruning* (arXiv 2606.10209 — strongest ablation seen: 79→91.6%
+  completion at −63% tokens; env-gated extension, munchkin dim N∈{3,5,8,off}); *pi-readseek vs
+  hashline head-to-head* (MIT, hash-anchored edits — one fleet A/B, adopt the winner);
+  *failure-taxonomy steer table* (AgentDebug 2509.25370 +24%: error-pattern → class → targeted
+  steer; prototype = c6 static spec). Daily-driver tier (unmeasurable on 5-file gate fixtures —
+  adopt with telemetry, not the gate): *aider-style repo map* (tree-sitter+PageRank — our biggest
+  genuine gap), *phase-gated tool palette* (statewright; needs pi 0.80 dynamic tools), *pi-lens*
+  (LSP feedback in-loop; token-flood risk on 4B). Maintenance: pi 0.80 `/compat` migration
+  (audited: one import — see ~/.pi/agent/UPGRADE-0.80.md); 0.80.3 fixes llama-server-relevant
+  compaction bug. Negative result adopted as candidate c5: agent-written tests don't improve
+  resolution (2602.07900). Methodology: munchkin candidates now carry a falsifiable `prediction`
+  checked against per-gate telemetry windows in the journal (2604.25850).
+- **Gate-session write jail** (pattern from r/PiCodingAgent — the community DOES exist; Reddit is
+  unreachable from our tooling, so threads arrive as user-pastes). Their `agent-lock` (yeet-src,
+  BPF-LSM directory jail) is Linux-6.12-only + immature (5 commits, process-name keying), so
+  adopted **natively**: gate `pi -p --approve` sessions run unrestricted bash today (command-policy
+  classifies but doesn't ENFORCE) → wrap in macOS `sandbox-exec`/Seatbelt (`real-gate-fixtures/
+  gate.sb`, probed: outside-writes + sibling-prefix denied, workdir/tmp/~/.pi allowed, node --test
+  passes). Wiring into `real_gate.sh run_one` deferred until m2s frees the file. If gate execution
+  ever moves to the Linux box, revisit Landlock/agent-lock there. Interactive daily driver stays
+  unjailed by design (git-guard + human-in-loop).
+- **pi ecosystem finds** (2026-07; r/PiCodingAgent itself is unrecoverable from our tooling — no
+  Wayback/redlib/cache — but a research pivot surfaced these; I suspected confabulation and
+  VERIFIED each against npm/GitHub — all real, the round stats were just their own marketing):
+  - **pi-lean-ctx** (Apache-2.0, peer-deps pi ≥0.74, npm) — routes bash/read/grep/find/ls through
+    a lean-ctx layer for token savings. **Directly preempts the queued A1 result-pruner**: before
+    building our own, A/B pi-lean-ctx on the 4B (gate pass-rate + telemetry token counts) —
+    adopt-vs-build. Don't build what a maintained Apache-2.0 extension already does.
+  - **oh-my-pi** (can1357, 16.3k★, competing terminal-agent fork — the "OMP"/`omp` from the
+    agent-lock thread): hash-anchored edits + "optimized tool harness" + LSP + subagents.
+    Independently converged on hash-anchored editing → external validation that hashline was the
+    right bet. Pattern-mine read-only (not an extension; no vendoring).
+  - pi-caveman (~75% output-token compression) = the caveman skill already here; gate-irrelevant
+    (we grade code, not prose). qualisero/awesome-pi-agent (1093★, archived) = the real tool index.
 
 Test path for both: encode as a governor variant → `prompt_variant` config →
 `real_gate.sh` → `fleet_report.classify` (Fisher, do-no-harm). Adopt only on a significant win.

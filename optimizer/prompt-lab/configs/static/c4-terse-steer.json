@@ -1,0 +1,4 @@
+{
+  "name": "terse-steer",
+  "messages": { "PI_MSG_LB_T1_TOOL": "STOP. You already ran {label} ({repeat}x). Act NOW: {act}, or mark blocked. Do not re-run it." }
+}

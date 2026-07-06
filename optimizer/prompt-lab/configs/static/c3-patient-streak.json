@@ -1,0 +1,4 @@
+{
+  "name": "patient-streak",
+  "thresholds": { "LB_STREAK_SOFT": 12 }
+}

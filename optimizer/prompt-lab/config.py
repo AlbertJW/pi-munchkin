@@ -17,7 +17,7 @@ APPLIED = os.path.join(LAB, "configs", "applied")
 # fresh clone (no pi install) still runs the offline selftests.
 LIVE_GOV = os.path.expanduser(os.environ.get(
     "GOVERNOR", os.path.join(LAB, "..", "..", "harness", "APPEND_SYSTEM.md")))
-DIRECT = "http://127.0.0.1:8080"
+DIRECT = os.environ.get("LLAMA_URL", "http://127.0.0.1:8080")
 OPTILLM = "http://127.0.0.1:8000"
 
 def load_schema():

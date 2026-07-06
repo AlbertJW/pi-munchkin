@@ -34,8 +34,9 @@ for a in "$@"; do
 done
 [[ ${#FLEET[@]} -eq 0 ]] && FLEET=("${DEFAULT_FLEET[@]}")
 
-health() { curl -fsS -m 5 http://127.0.0.1:8080/health >/dev/null 2>&1; }
-loaded_alias() { curl -fsS -m 5 http://127.0.0.1:8080/v1/models 2>/dev/null | python3 -c 'import sys,json;d=json.load(sys.stdin)["data"];print(d[0]["id"] if d else "")' 2>/dev/null; }
+LLAMA_URL="${LLAMA_URL:-http://127.0.0.1:8080}"
+health() { curl -fsS -m 5 "$LLAMA_URL/health" >/dev/null 2>&1; }
+loaded_alias() { curl -fsS -m 5 "$LLAMA_URL/v1/models" 2>/dev/null | python3 -c 'import sys,json;d=json.load(sys.stdin)["data"];print(d[0]["id"] if d else "")' 2>/dev/null; }
 
 # Default suite = two surfaces: SQL (deterministic capability probe) + promptlab
 # governor/role tasks (the real governor signal). --rt instead runs the register-tint

@@ -17,7 +17,8 @@ set -uo pipefail
 
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 GEN="${GEN:-rg0}"; N="${N:-3}"
-DD="${DD:-}"; PI_TIMEOUT="${PI_TIMEOUT:-1800}"  # DD optional: only warns if set + mismatched
+DD="${DD:-}"; PI_TIMEOUT="${PI_TIMEOUT:-1800}"
+PI_MODEL="${PI_MODEL:-}"   # pi model id for the sessions (else pi uses its default — beware external defaults)
 BASE="${BASE:-$HERE/prompt-lab/configs/baseline.json}"
 CAND="${CAND:-$HERE/prompt-lab/configs/cand-cot.json}"
 FIXTURE="${FIXTURE:-$HERE/pi-test}"; TASKS_DIR="$HERE/ab-symbolect/tasks"; T3_FILES="$HERE/ab-symbolect/t3-files"
@@ -36,14 +37,20 @@ for a in "$@"; do
 	esac
 done
 if [[ ${#TASKS[@]} -eq 0 ]]; then
-	[[ "$HARD" == 1 ]] && TASKS=(h1 h2 h3) || TASKS=(t1 t2 t3 t4 t5 t6)
+	if [[ "$HARD" == 1 ]]; then
+		# every hidden task is one $FIXTURES/hidden/<id>.test.js — derive the list, no hardcoding
+		TASKS=(); for f in "$FIXTURES"/hidden/*.test.js; do [[ -e "$f" ]] && TASKS+=("$(basename "$f" .test.js)"); done
+	else
+		TASKS=(t1 t2 t3 t4 t5 t6)
+	fi
 fi
 
-# h* are HIDDEN-test tasks (SWE-bench style): the model gets a prose spec only and never
-# sees the grading test; the fixture's own tests are the visible Pass-to-Pass set, and the
-# hidden Fail-to-Pass test is installed only at grading. h3 uses a separate multi-file fixture.
-is_hidden() { case "$1" in h1|h2|h3) return 0 ;; *) return 1 ;; esac; }
-fixture_for() { case "$1" in h3) echo "$FIXTURES/hard-bracket" ;; *) echo "$FIXTURE" ;; esac; }
+# A HIDDEN-test task (SWE-bench style): the model gets a prose spec only and never sees the
+# grading test; the fixture's own test/ is the visible Pass-to-Pass set, and the hidden
+# Fail-to-Pass test is installed only at grading. Data-driven: a task is hidden iff it has a
+# hidden grader, and uses its own fixture dir $FIXTURES/<id>/ if one exists (else the default).
+is_hidden() { [[ -f "$FIXTURES/hidden/$1.test.js" ]]; }
+fixture_for() { case "$1" in h3) echo "$FIXTURES/hard-bracket" ;; *) [[ -d "$FIXTURES/$1" ]] && echo "$FIXTURES/$1" || echo "$FIXTURE" ;; esac; }
 
 # Shown-test tasks: (re)install the authoritative test — before the run (model sees the
 # spec) AND after (anti-tamper). Hidden tasks are handled separately at grading time.
@@ -55,8 +62,18 @@ install_tests() {  # $1=task $2=workdir
 	esac
 }
 
-health() { curl -fsS -m 5 http://127.0.0.1:8080/health >/dev/null 2>&1; }
-loaded_alias() { curl -fsS -m 5 http://127.0.0.1:8080/v1/models 2>/dev/null | python3 -c 'import sys,json;d=json.load(sys.stdin)["data"];print(d[0]["id"] if d else "")' 2>/dev/null; }
+LLAMA_URL="${LLAMA_URL:-http://127.0.0.1:8080}"   # point at a remote llama-server (e.g. http://192.168.1.50:8080)
+health() { curl -fsS -m 5 "$LLAMA_URL/health" >/dev/null 2>&1; }
+
+# Seatbelt write-jail for the headless pi sessions (r/PiCodingAgent agent-lock pattern,
+# macOS-native): kernel-denies writes outside {workdir, tmp, ~/.pi}. Reads/exec/network
+# untouched. SANDBOX=off to disable; auto-off when not on macOS / sandbox-exec missing.
+SANDBOX="${SANDBOX:-on}"
+GATE_SB="$HERE/real-gate-fixtures/gate.sb"
+if [[ "$SANDBOX" == "on" ]] && { [[ "$(uname)" != "Darwin" ]] || ! command -v sandbox-exec >/dev/null 2>&1 || [[ ! -f "$GATE_SB" ]]; }; then
+	SANDBOX=off
+fi
+loaded_alias() { curl -fsS -m 5 "$LLAMA_URL/v1/models" 2>/dev/null | python3 -c 'import sys,json;d=json.load(sys.stdin)["data"];print(d[0]["id"] if d else "")' 2>/dev/null; }
 
 if [[ "$DRY" == 1 ]]; then
 	echo "== real_gate DRY ==  GEN=$GEN  N=$N  base=$(basename "$BASE")  cand=$(basename "$CAND")"
@@ -78,6 +95,7 @@ trap 'echo "[real_gate] interrupted — tearing down in-flight pi" >&2; cleanup;
 
 health || { echo "no server on :8080" >&2; exit 1; }
 MODEL="$(loaded_alias)"; [[ -n "$MODEL" ]] || MODEL=unknown
+MODEL="$(basename "$MODEL" .gguf)"; MODEL="${MODEL//[^a-zA-Z0-9._-]/-}"  # alias-less servers report the gguf path
 [[ -n "$DD" && "$MODEL" != "$DD" ]] && echo "[real_gate] WARNING: loaded model '$MODEL' != expected '$DD'" >&2
 mkdir -p "$RUNS"
 echo "== real_gate: model=$MODEL  N=$N  tasks=${TASKS[*]} =="
@@ -98,10 +116,17 @@ run_one() {  # $1=config-path  $2=pattern(base|cand)  $3=task  $4=rep
 	local envlines; envlines="$(python3 "$CONFIG" --apply "$cfg" --workdir "$wd")"
 	local tools="read,edit,bash"; [[ "$task" == "t4" ]] && tools="read,edit,bash,subagent"
 
+	# jail: render the per-run Seatbelt profile (absolute paths; Seatbelt has no env)
+	local sbx=()
+	if [[ "$SANDBOX" == "on" ]]; then
+		sed -e "s|__WORKDIR__|$wd|" -e "s|__PI_STATE__|$HOME/.pi|" "$GATE_SB" > "$wd/.gate.sb"
+		sbx=(sandbox-exec -f "$wd/.gate.sb")
+	fi
+
 	# run pi in the background + wait, so the INT trap can kill it instantly
 	( cd "$wd"
 	  while IFS= read -r line; do [[ "$line" == *=* && "$line" != ENDPOINT=* && "$line" != LABEL=* ]] && export "${line?}"; done <<< "$envlines"
-	  timeout "$PI_TIMEOUT" pi -p --approve --tools "$tools" "$(cat "$TASKS_DIR/$task.txt")" ) > "$wd/run.log" 2>&1 &
+	  ${sbx[@]+"${sbx[@]}"} timeout "$PI_TIMEOUT" pi -p --approve ${PI_MODEL:+--model "$PI_MODEL"} --tools "$tools" "$(cat "$TASKS_DIR/$task.txt")" ) > "$wd/run.log" 2>&1 &
 	CHILD=$!; wait "$CHILD" || true; CHILD=""
 
 	# grading: restore authoritative tests so the model can't have tampered with them

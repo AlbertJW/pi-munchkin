@@ -1,0 +1,5 @@
+{
+  "name": "no-new-tests",
+  "prediction": "fewer turns burned authoring test files; pass-rate holds or rises (arXiv 2602.07900: agent-written tests don't improve resolution and consume budget)",
+  "gov_append": "Do not author new test files. Verify by RUNNING the project's existing test suite; only add a test when the task explicitly asks for one."
+}

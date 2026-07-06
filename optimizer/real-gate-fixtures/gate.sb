@@ -1,0 +1,17 @@
+;; Seatbelt write-jail for headless GATE pi sessions (real_gate.sh run_one).
+;; Pattern from r/PiCodingAgent's agent-lock (BPF-LSM, Linux-only) adopted macOS-native.
+;; Philosophy: allow default (reads/exec/network/signals untouched — near-zero breakage),
+;; fence WRITES to the task workdir + tmp + pi's own state. Rendered per run: real_gate.sh
+;; substitutes __WORKDIR__ and __PI_STATE__ with absolute paths (Seatbelt has no env vars).
+(version 1)
+(allow default)
+(deny file-write*)
+(allow file-write*
+  (subpath "__WORKDIR__")
+  (subpath "/private/tmp")
+  (subpath "/private/var/folders")
+  (subpath "__PI_STATE__")
+  (literal "/dev/null")
+  (literal "/dev/dtracehelper")
+  (subpath "/dev/fd")
+  (literal "/dev/tty"))

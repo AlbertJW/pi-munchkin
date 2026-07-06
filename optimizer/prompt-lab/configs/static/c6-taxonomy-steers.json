@@ -1,0 +1,8 @@
+{
+  "name": "taxonomy-steers",
+  "prediction": "outcome-loop steers convert to progress faster (lower turns_since in telemetry); pass-rate rises on tasks with repeated failures (AgentDebug: class-targeted feedback beats generic retry prompts)",
+  "messages": {
+    "PI_MSG_LB_OUTCOME": "[loop-breaker] FAILURE CLASS: stuck-outcome — the same failing result {n}x despite edits. Your fix point is wrong, not your syntax. Do the class fix: print/inspect the ACTUAL runtime value at the failure site, compare to expected, and edit where they diverge. Do not re-run the test before adding that visibility.",
+    "PI_MSG_LB_T1_REASON": "[loop-breaker] FAILURE CLASS: reasoning-loop — you thought the same thing {repeat}x with no file change. The missing information is NOT in your head. Do the class fix: {act}, or run ONE command that produces a fact you don't have yet."
+  }
+}

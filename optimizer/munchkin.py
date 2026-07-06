@@ -104,13 +104,68 @@ def journal_persist(entries):
 
 # ---------- real implementations (NOT exercised in --selftest) ----------
 
+# Per-gate observability: real_gate_one records each gate's wall-clock window; the
+# enrich hook counts harness telemetry events (steers/blocks/aborts from the LOCAL
+# pi sessions — the model may be remote, the harness always runs here) inside that
+# window, so a candidate's prediction is checkable against measured behavior.
+GATE_WINDOWS = {}
+TELEMETRY_FILE = os.path.expanduser(os.environ.get("TELEMETRY_FILE", "~/.pi/agent/telemetry/events.jsonl"))
+
+def _utc_z():
+    import datetime
+    return datetime.datetime.now(datetime.timezone.utc).isoformat(timespec="milliseconds").replace("+00:00", "Z")
+
+def telemetry_enrich(gen):
+    win = GATE_WINDOWS.get(gen)
+    if not win or not os.path.exists(TELEMETRY_FILE):
+        return {}
+    t0, t1 = win
+    counts = {}
+    for line in open(TELEMETRY_FILE):
+        try:
+            e = json.loads(line)
+        except ValueError:
+            continue
+        if t0 <= e.get("ts", "") <= t1:  # both are UTC ...Z ISO strings → lexical compare is safe
+            key = f"{e.get('ext', '?')}.{e.get('kind', '?')}"
+            counts[key] = counts.get(key, 0) + 1
+    return {"telemetry": counts} if counts else {}
+
 def server_model():
     import urllib.request
     try:
-        with urllib.request.urlopen("http://127.0.0.1:8080/v1/models", timeout=5) as r:
+        base = os.environ.get("LLAMA_URL", "http://127.0.0.1:8080")
+        with urllib.request.urlopen(f"{base}/v1/models", timeout=5) as r:
             return json.load(r)["data"][0]["id"]
     except Exception:
         return None
+
+def session_tail(wd, limit=800):
+    """Failure trace for the proposer: last assistant text from the run's pi session
+    JSONL (headless pi writes nothing to stdout, so run.log is always empty — the
+    real trace lives in ~/.pi/agent/sessions). Reuses metrics.session_file_for."""
+    try:
+        sys.path.insert(0, os.path.join(HERE, "ab-machinery"))
+        from metrics import session_file_for
+        sf = session_file_for(wd)
+        if not sf:
+            return ""
+        texts = []
+        for line in open(sf):
+            try:
+                m = json.loads(line).get("message") or {}
+            except ValueError:
+                continue
+            if m.get("role") != "assistant":
+                continue
+            c = m.get("content")
+            if isinstance(c, list):
+                t = " ".join(b.get("text", "") for b in c if isinstance(b, dict) and b.get("type") == "text").strip()
+                if t:
+                    texts.append(t)
+        return " […] ".join(texts[-3:])[-limit:]
+    except Exception:
+        return ""
 
 def real_gate_one(cand, tasks, n, gen):
     """Gate one candidate (base config only) → (passes, total, failing_traces)."""
@@ -127,19 +182,24 @@ def real_gate_one(cand, tasks, n, gen):
     if os.path.exists(out):
         os.remove(out)
     env = {**os.environ, "GEN": gen, "BASE": cfg_path, "N": str(n)}
+    t0 = _utc_z()
     subprocess.run(["bash", REAL_GATE, "--calibrate", *tasks], env=env, cwd=HERE, check=False)
+    GATE_WINDOWS[gen] = (t0, _utc_z())
     rows = [json.loads(l) for l in open(out)] if os.path.exists(out) else []
     base = [r for r in rows if r.get("pattern") == "base"]
     k = sum(r["score"] for r in base)
     failures = []
-    model = server_model() or "*"
     for r in base:
         if r["score"] == 0:
-            logs = glob.glob(os.path.join(RUNS, f"{gen}-{model}-base-{r['task']}-{r['rep']}", "run.log"))
+            wds = glob.glob(os.path.join(RUNS, f"{gen}-*-base-{r['task']}-{r['rep']}"))
             tail = ""
-            if logs:
-                tail = "".join(open(logs[0]).readlines()[-15:])
-            failures.append({"task": r["task"], "log_tail": tail[-800:]})
+            if wds:
+                tail = session_tail(wds[0])  # real trace: session jsonl (run.log is empty headless)
+                if not tail:
+                    log = os.path.join(wds[0], "run.log")
+                    if os.path.exists(log):
+                        tail = "".join(open(log).readlines()[-15:])[-800:]
+            failures.append({"task": r["task"], "log_tail": tail})
     return k, len(base), failures
 
 def real_propose(best, failures, k, r, journal):
@@ -182,15 +242,46 @@ def real_propose(best, failures, k, r, journal):
         out.append(c)
     return out
 
+def static_propose(spec_paths):
+    """--static mode: no frontier — candidates are HAND-AUTHORED spec files served one
+    round at a time (pure A/B; the loop still gates, Fisher-classifies, journals, and
+    adopts). Each spec is JSON: {"name": ..., "gov_append": <text appended to the
+    current-best governor, optional>, <plus any schema delta: format/scaffold/
+    thresholds/messages>}. Round r gets specs[r*k:(r+1)*k]."""
+    dims = load_schema_dims()
+    specs = []
+    for p in spec_paths:
+        s = json.load(open(p))
+        specs.append((s.pop("name", os.path.basename(p)), s.pop("gov_append", ""),
+                      s.pop("prediction", ""), s))
+
+    def propose(best, failures, k, r, journal):
+        out = []
+        for name, gov_append, prediction, delta in specs[r * k:(r + 1) * k]:
+            clean, dropped = sanitize_delta(delta, dims)
+            if dropped:
+                print(f"[munchkin] {name}: dropped out-of-schema delta keys: {dropped}")
+            gov = best["gov"] + ("\n\n" + gov_append.strip() if gov_append.strip() else "")
+            c = make_cand(gov, clean)
+            c["_op"] = f"static:{name}"
+            c["_pred"] = prediction  # falsifiable claim, checked against telemetry in the journal
+            out.append(c)
+        return out
+    return propose
+
 # ---------- pure loop (selftested) ----------
 
-def optimize(base_cand, tasks, n, rounds, k, gate_fn, propose_fn, gen, journal=None):
+def optimize(base_cand, tasks, n, rounds, k, gate_fn, propose_fn, gen, journal=None, enrich_fn=None):
+    """enrich_fn(gate_gen_label) -> dict: optional per-gate observability (e.g. telemetry
+    steer/block counts for the gate window) merged into ledger+journal entries, so a
+    candidate's PREDICTION (`_pred`) is checkable against what actually happened."""
     journal = list(journal or [])
     best = base_cand
     bk, bn, failures = gate_fn(best, tasks, n, f"{gen}-r0-base")
-    ledger = [{"round": 0, "event": "baseline", "pass": f"{bk}/{bn}", "config": cand_summary(best)}]
+    base_obs = enrich_fn(f"{gen}-r0-base") if enrich_fn else {}
+    ledger = [{"round": 0, "event": "baseline", "pass": f"{bk}/{bn}", "config": cand_summary(best), **base_obs}]
     journal.append({"gen": gen, "round": 0, "operator": "base",
-                    "config": cand_summary(best), "pass": f"{bk}/{bn}", "label": "baseline"})
+                    "config": cand_summary(best), "pass": f"{bk}/{bn}", "label": "baseline", **base_obs})
     if bn and bk / bn > SATURATED:
         ledger.append({"event": "stop", "why": f"baseline saturated ({bk}/{bn}) — no headroom"})
         return best, ledger, journal
@@ -201,9 +292,11 @@ def optimize(base_cand, tasks, n, rounds, k, gate_fn, propose_fn, gen, journal=N
         for i, cg in enumerate(cands):
             ck, cn, cf = gate_fn(cg, tasks, n, f"{gen}-r{r}-c{i}")
             label, delta = _classify(bk, bn, ck, cn)
+            obs = enrich_fn(f"{gen}-r{r}-c{i}") if enrich_fn else {}
             entry = {"round": r, "cand": i, "pass": f"{ck}/{cn}", "label": label,
                      "delta": round(delta, 3), "operator": cg.get("_op", "?"),
-                     "config": cand_summary(cg)}
+                     "prediction": cg.get("_pred", ""),
+                     "config": cand_summary(cg), **obs}
             ledger.append(entry)
             journal.append({"gen": gen, **entry})
             scored.append((label, ck, cn, cg, cf))
@@ -288,6 +381,31 @@ def selftest():
     assert len(seen_journals[1]) == 3 and any(e["label"] == "better" for e in seen_journals[1]), \
         [e.get("label") for e in seen_journals[1]]
     assert all("config" in e for e in seen_journals[1]), "journal entries must carry config"
+    # (e) static mode: hand-authored specs become candidates, no frontier involved;
+    # prediction contract rides along and lands in ledger+journal with enrich data
+    import tempfile
+    with tempfile.TemporaryDirectory() as td:
+        s1 = os.path.join(td, "ev.json"); s2 = os.path.join(td, "cot.json")
+        json.dump({"name": "evidence", "gov_append": "RULE X.", "prediction": "fewer loops"}, open(s1, "w"))
+        json.dump({"name": "cot", "scaffold": "cot", "decoding": {"TEMP": 0.6}}, open(s2, "w"))
+        cands = static_propose([s1, s2])(base, [], 2, 0, [])
+        assert len(cands) == 2, cands
+        assert cands[0]["gov"].endswith("RULE X.") and cands[0]["_op"] == "static:evidence"
+        assert cands[0]["_pred"] == "fewer loops"
+        assert cands[1]["scaffold"] == "cot" and "decoding" not in cands[1], "unsafe delta must drop"
+        assert static_propose([s1, s2])(base, [], 2, 1, []) == [], "round past specs is empty"
+
+        def stub_enrich(label):
+            return {"telemetry": {"loop-breaker.steer": 2}}
+        _, led2, jr2 = optimize(base, ["t1"], 4, rounds=1, k=2,
+                                gate_fn=stub_gate, propose_fn=static_propose([s1, s2]),
+                                gen="selftest2", journal=[], enrich_fn=stub_enrich)
+        cand_entries = [e for e in led2 if "cand" in e]
+        assert any(e.get("prediction") == "fewer loops" for e in cand_entries), cand_entries
+        assert all(e.get("telemetry") == {"loop-breaker.steer": 2} for e in cand_entries), \
+            "enrich observability must land in ledger entries"
+        assert all("telemetry" in e for e in jr2 if e.get("label") == "baseline"), "baseline enriched too"
+
     # (d) human-gate proof: the live governor must be byte-identical (we never write it)
     live_hash_after = hashlib.sha1(open(LIVE_GOV, "rb").read()).hexdigest() if os.path.exists(LIVE_GOV) else None
     assert live_hash_before == live_hash_after, "munchkin must NOT touch the live governor"
@@ -302,6 +420,10 @@ def main():
         return args[args.index(flag) + 1] if flag in args else d
     gen = opt("--gen", "m0"); rounds = int(opt("--rounds", "3")); k = int(opt("--candidates", "2"))
     n = int(opt("--n", "4")); tasks = opt("--tasks", "t1,t2,t3").split(",")
+    static = opt("--static", "")  # comma-separated candidate spec JSONs -> no frontier needed
+    if static:
+        paths = [os.path.expanduser(p) for p in static.split(",")]
+        rounds = (len(paths) + k - 1) // k  # exactly enough rounds to gate every spec
     sessions = (1 + rounds * k) * len(tasks) * n
     print(f"plan: gen={gen} rounds={rounds} candidates={k} n={n} tasks={tasks}")
     print(f"GPU cost estimate: ~{sessions} agentic sessions on the loaded model (each up to {os.environ.get('PI_TIMEOUT','1800')}s).")
@@ -311,9 +433,11 @@ def main():
         raise SystemExit(f"governor not found: {LIVE_GOV}")
     base_cand = make_cand(open(LIVE_GOV).read())
     prior = journal_tail()
-    print(f"model on :8080 = {server_model()}  |  prior journal entries: {len(prior)}")
+    print(f"target model = {server_model()}  |  prior journal entries: {len(prior)}")
+    propose_fn = static_propose(paths) if static else real_propose
     best, ledger, journal = optimize(base_cand, tasks, n, rounds, k,
-                                     real_gate_one, real_propose, gen, journal=prior)
+                                     real_gate_one, propose_fn, gen, journal=prior,
+                                     enrich_fn=telemetry_enrich)
     improved, winner = _write_outputs(gen, best, ledger, base_cand, journal[len(prior):])
     print("\n=== ledger ===")
     for e in ledger:

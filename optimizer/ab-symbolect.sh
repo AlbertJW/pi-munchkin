@@ -32,7 +32,8 @@ STAMP="$(date +%Y%m%d-%H%M%S)"
 TASKS=("${@:-}"); [[ -z "${TASKS[0]}" ]] && TASKS=(t1 t2 t3 t4)
 
 # ---- preconditions -----------------------------------------------------------
-curl -fsS -m 5 http://127.0.0.1:8080/health >/dev/null || { echo "llama-server not up on :8080" >&2; exit 1; }
+LLAMA_URL="${LLAMA_URL:-http://127.0.0.1:8080}"
+curl -fsS -m 5 "$LLAMA_URL/health" >/dev/null || { echo "llama-server not up at $LLAMA_URL" >&2; exit 1; }
 [[ -z "$(git -C "$AGENT_DIR" status --porcelain)" ]] || { echo "~/.pi/agent tree not clean — commit/stash first (needed for safe restore)" >&2; exit 1; }
 [[ -d "$FIXTURE/src" ]] || { echo "fixture missing: $FIXTURE" >&2; exit 1; }
 

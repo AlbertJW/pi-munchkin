@@ -106,6 +106,19 @@ Approaches evaluated for this substrate — recorded so the reasoning isn't re-l
 - **Verified in code** (corrects an earlier unverified review finding): subagents DO load the
   global governor — the child `pi` appends the role prompt (`--append-system-prompt`), it does
   not replace `APPEND_SYSTEM.md`. No `subagent_governor` search dimension is needed.
+- **pi ecosystem finds** (r/PiCodingAgent unreachable from tooling; verified via npm/GitHub):
+  *pi-lean-ctx* (Apache-2.0) does token-saving tool-output routing — evaluate it before
+  building an equivalent; *oh-my-pi* (16k-star fork) independently uses hash-anchored edits,
+  validating this repo's hashline approach.
+- **Gate-session write jail** (r/PiCodingAgent's agent-lock pattern) — the Linux-only BPF-LSM
+  tool itself doesn't fit, but it flagged a real gap: headless gate sessions ran unrestricted
+  bash. Adopted natively via macOS Seatbelt (`sandbox-exec`) fencing writes to the task
+  workdir; kernel-enforced, no model-visible prose.
+- **"Applications" / scoped agent views** (r/LocalLLaMA) — not adopted: the menu-verb idea
+  (model never retypes exact strings) is what hashline already does for edits, and subagents
+  cover scoped-context isolation. Pocketed one telemetry-gated candidate: the thread's
+  anti-signal that a tail-pinned persistent plan block made a small model avoid its planning
+  tools — test plan-injection placement if telemetry shows plan-steer non-compliance.
 
 ## License
 
