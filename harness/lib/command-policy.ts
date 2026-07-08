@@ -18,11 +18,24 @@ export type CommandPolicy = {
 
 const SAFE_REDIRECT_RE = /\d*>>?\s*(?:\/dev\/null|&\s*\d)/g;
 
-export const VERIFY_COMMAND_RE =
-	/\b(?:just\s+(?:verify|check|test)|npm\s+(?:test|run\s+(?:test|check|lint|typecheck|verify))|yarn\s+(?:test|check|lint)|pnpm\s+(?:test|run\s+(?:test|check|lint|typecheck|verify))|pytest|python(?:3)?\s+-m\s+pytest|cargo\s+test|go\s+test|make\s+(?:test|check|verify)|tsc(?:\s+--noEmit)?|bash\s+-n|ruff(?:\s+check)?|eslint|node\s+--test|(?:npx\s+(?:-y\s+)?)?tsx\s+--test|(?:npx\s+(?:-y\s+)?)?(?:vitest|jest))\b/i;
+// Command-position prefix: a token only counts when it starts a command — the
+// string start or after ; & | ( sudo/xargs/env/do/then. Without this, bare-word
+// matching misfires both ways: `echo pytest passed` counts as a verify (gate
+// silently passed) and `grep cp file` counts as a mutation ("progress" that
+// disarms the loop-breaker).
+const CMD_POS = String.raw`(?:^|[;&|(]\s*|\b(?:sudo|xargs|env|do|then|timeout\s+\S+)\s+|-exec\s+)(?:\w+=\S+\s+)*`;
 
-const MUTATION_RE =
-	/\b(?:tee|sed\s+-i|cp|mv|mkdir|touch|ln|dd|install|git\s+(?:add|commit|mv|rm|apply|restore|checkout|reset))\b/i;
+export const VERIFY_COMMAND_RE = new RegExp(
+	CMD_POS +
+		String.raw`(?:just\s+(?:verify|check|test)|npm\s+(?:test|run\s+(?:test|check|lint|typecheck|verify))|yarn\s+(?:test|check|lint)|pnpm\s+(?:test|run\s+(?:test|check|lint|typecheck|verify))|pytest|python(?:3)?\s+-m\s+pytest|cargo\s+test|go\s+test|make\s+(?:test|check|verify)|tsc(?:\s+--noEmit)?|bash\s+-n|ruff(?:\s+check)?|eslint|node\s+--test|(?:npx\s+(?:-y\s+)?)?tsx\s+--test|(?:npx\s+(?:-y\s+)?)?(?:vitest|jest))\b`,
+	"i",
+);
+
+const MUTATION_RE = new RegExp(
+	CMD_POS +
+		String.raw`(?:tee|sed\s+(?:-[a-zA-Z]+\s+)*(?:-i|--in-place)|perl\s+-[a-zA-Z]*i\b|cp|mv|mkdir|touch|ln|dd|install|truncate|chmod|chown|git\s+(?:add|commit|mv|rm|apply|restore|checkout|reset))\b`,
+	"i",
+);
 
 // `python -c` / `node -e` are dual-use: a read-only one-liner (json.load, print)
 // must NOT be treated as a mutation, or plan-mode and the verify-gate block the
@@ -37,8 +50,11 @@ function inlineInterpreterWrites(cmd: string): boolean {
 	return INLINE_INTERP_RE.test(cmd) && INTERP_WRITE_RE.test(cmd);
 }
 
-const DESTRUCTIVE_RE =
-	/\b(?:rm|rmdir|shred|mkfs|diskutil|dd|kill(?:all)?|pkill|shutdown|reboot|halt|launchctl|brew\s+(?:install|uninstall|upgrade|reinstall)|npm\s+(?:install|i|uninstall|remove)|pnpm\s+(?:install|add|remove)|yarn\s+(?:add|remove|install)|pip(?:3)?\s+install|python(?:3)?\s+-m\s+pip\s+install|cargo\s+install|git\s+(?:reset|checkout|restore|clean|rm)|docker\s+(?:compose\s+)?(?:down|rm|rmi|prune|kill|stop|restart)|kubectl\s+(?:delete|apply|replace|scale|rollout|cordon|drain)|terraform\s+(?:apply|destroy)|make\s+(?:deploy|release|migrate)|(?:deploy|release|migrate)\b)/i;
+const DESTRUCTIVE_RE = new RegExp(
+	CMD_POS +
+		String.raw`(?:rm|rmdir|shred|mkfs|diskutil|dd|kill(?:all)?|pkill|shutdown|reboot|halt|launchctl|find\b[^;&|\n]*\s-delete\b|brew\s+(?:install|uninstall|upgrade|reinstall)|npm\s+(?:install|i|uninstall|remove)|pnpm\s+(?:install|add|remove)|yarn\s+(?:add|remove|install)|pip(?:3)?\s+install|python(?:3)?\s+-m\s+pip\s+install|cargo\s+install|git\s+(?:reset|checkout|restore|clean|rm|push\s+[^;&|\n]*(?:--force(?:-with-lease)?|-f)\b)|docker\s+(?:compose\s+)?(?:down|rm|rmi|prune|kill|stop|restart)|kubectl\s+(?:delete|apply|replace|scale|rollout|cordon|drain)|terraform\s+(?:apply|destroy)|make\s+(?:deploy|release|migrate)|(?:deploy|release|migrate))\b`,
+	"i",
+);
 
 function stripHarmlessRedirects(cmd: string): string {
 	return cmd.replace(SAFE_REDIRECT_RE, " ");
@@ -126,18 +142,53 @@ export function assertVerifyGateAllowed(cmd: string, extraVerifyCommands: readon
 // Git commands that DISCARD uncommitted working-tree changes (the real footgun:
 // an agent "cleaning up" with `git reset --hard` and wiping your work). Narrow
 // on purpose — must NOT match safe forms: `git reset --soft/--mixed`,
-// `git checkout <branch>`, `git restore --staged` (only unstages), `git clean`
-// without -f (a no-op), or any non-git command. git-guard.ts uses this to
-// confirm-before-discard only when the tree is actually dirty.
+// `git checkout <branch>`, `git checkout -b`, `git restore --staged` (only
+// unstages), `git clean` without -f (a no-op), or any non-git command.
+// git-guard.ts uses this to confirm-before-discard only when the tree is dirty.
 const DISCARD_GIT_RES: readonly RegExp[] = [
 	/\bgit\s+reset\s+(?:[^\n]*\s)?--hard\b/i,
-	/\bgit\s+checkout\s+(?:-f\b|--force\b|--(?:\s|$)|\.(?:\s|$))/i, // checkout -- / checkout . / -f  (NOT `checkout <branch>`)
+	/\bgit\s+checkout\s+(?:[^\n]*\s)?(?:-f\b|--force\b)/i, // checkout ... -f/--force anywhere (incl. `checkout <branch> --force`)
+	/\bgit\s+checkout\s+(?:\S+\s+)?--(?:\s|$)/i, // checkout -- <paths> AND checkout <ref> -- <paths> (overwrites worktree)
+	/\bgit\s+checkout\s+\.(?:\s|$)/i, // checkout .
+	/\bgit\s+switch\s+(?:[^\n]*\s)?(?:-f\b|--force\b|--discard-changes\b)/i, // switch -f / --discard-changes
 	/\bgit\s+clean\b[^\n]*\s-[a-eg-z]*f|\bgit\s+clean\b[^\n]*--force\b/i, // clean with -f/--force
 ];
 
+// Strip git's global options between `git` and the subcommand (`git -C <dir>
+// reset --hard`, `git -c k=v checkout -- .`, --git-dir/--work-tree) so the
+// discard patterns above see a normalized `git <subcommand> …`.
+function normalizeGitGlobals(cmd: string): string {
+	return cmd.replace(/\bgit\s+(?:(?:-C\s+\S+|-c\s+\S+|--git-dir(?:=|\s+)\S+|--work-tree(?:=|\s+)\S+)\s+)+/gi, "git ");
+}
+
 export function discardsUncommittedWork(cmd: string): boolean {
-	const c = cmd.trim();
+	const c = normalizeGitGlobals(cmd.trim());
 	// `git restore <path>` discards working-tree changes; `git restore --staged` only unstages (safe).
 	if (/\bgit\s+restore\b/i.test(c) && !/\bgit\s+restore\s+--staged\b(?![^\n]*--worktree\b)/i.test(c)) return true;
 	return DISCARD_GIT_RES.some((re) => re.test(c));
+}
+
+// Where would a discarding git command actually run? The guard's dirty check
+// must look at THAT repo, not blindly at ctx.cwd — `cd /other/repo && git reset
+// --hard` was judged against the wrong tree (usually clean → fail-open →
+// allowed). Honors `git -C <dir>` and the last `cd <dir>` before the git
+// command; `~` expands against home, relative paths resolve against cwd.
+export function discardWorkdir(cmd: string, cwd: string, home: string): string {
+	const resolve = (dir: string): string => {
+		let d = dir.replace(/^["']|["']$/g, "");
+		if (d === "~") d = home;
+		else if (d.startsWith("~/")) d = home + d.slice(1);
+		if (!d.startsWith("/")) d = `${cwd.replace(/\/$/, "")}/${d}`;
+		return d;
+	};
+	const dashC = /\bgit\s+-C\s+(\S+)/i.exec(cmd);
+	if (dashC) return resolve(dashC[1]);
+	// last `cd <dir>` that precedes the git command
+	let lastCd: string | null = null;
+	const cdRe = /(?:^|[;&|]\s*)cd\s+([^\s;&|]+)/g;
+	const gitAt = cmd.search(/\bgit\s/i);
+	for (let m = cdRe.exec(cmd); m; m = cdRe.exec(cmd)) {
+		if (gitAt >= 0 && m.index < gitAt) lastCd = m[1];
+	}
+	return lastCd ? resolve(lastCd) : cwd;
 }

@@ -2,6 +2,7 @@ import { stat } from "node:fs/promises";
 import { basename, extname } from "node:path";
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { isPositiveNumber, resolveReadPath } from "../lib/context-inlet.ts";
+import { record } from "../lib/telemetry.ts";
 
 type ReadInput = {
 	path?: unknown;
@@ -9,9 +10,8 @@ type ReadInput = {
 	limit?: unknown;
 };
 
-const SMALL_FILE_BYTES = 20 * 1024;
 const LARGE_FILE_BYTES = 64 * 1024;
-const SUPPORT_FILE_BYTES = 8 * 1024;
+const SUPPORT_FILE_BYTES = 8 * 1024; // risky support files (logs/CSV/JSONL/traces) gate much earlier
 
 const RISKY_EXTENSIONS = new Set([".csv", ".tsv", ".jsonl", ".ndjson", ".log", ".trace", ".parquet"]);
 // Generic format/role markers for big low-value files (project-agnostic). Add
@@ -69,8 +69,9 @@ export default function (pi: ExtensionAPI) {
 			return;
 		}
 
-		if (bytes <= SMALL_FILE_BYTES) return;
-
+		// Threshold per risk class directly — the old 20KB small-file early-return
+		// made the 8KB risky threshold unreachable dead code (any file under 20KB
+		// skipped the check before the risky threshold was ever consulted).
 		const risky = riskySupportPath(input.path);
 		const threshold = risky ? SUPPORT_FILE_BYTES : LARGE_FILE_BYTES;
 		if (bytes <= threshold) return;
@@ -78,6 +79,7 @@ export default function (pi: ExtensionAPI) {
 		const key = resolvedPath;
 		const n = (blockCounts.get(key) ?? 0) + 1;
 		blockCounts.set(key, n);
+		record("context-inlet-guard", "block", { risky, bytes, n });
 
 		const reason =
 			n >= 3

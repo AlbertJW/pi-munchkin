@@ -1,5 +1,7 @@
+import { homedir } from "node:os";
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
-import { discardsUncommittedWork } from "../lib/command-policy.ts";
+import { discardsUncommittedWork, discardWorkdir } from "../lib/command-policy.ts";
+import { record } from "../lib/telemetry.ts";
 
 // Dangerous-git guard: confirm before a bash command DISCARDS uncommitted work.
 //
@@ -24,10 +26,13 @@ export default function (pi: ExtensionAPI) {
 		const command = String((event.input as Record<string, unknown> | undefined)?.command ?? "");
 		if (!discardsUncommittedWork(command)) return;
 
-		// Only intervene if there's actually uncommitted work to lose.
+		// Only intervene if there's actually uncommitted work to lose — checked in
+		// the repo the command actually targets (`cd X && …` / `git -C X …`), not
+		// blindly in ctx.cwd.
+		const wd = discardWorkdir(command, ctx.cwd, homedir());
 		let dirty: string;
 		try {
-			const r = await pi.exec("git", ["status", "--porcelain"], { cwd: ctx.cwd, timeout: 5000 });
+			const r = await pi.exec("git", ["status", "--porcelain"], { cwd: wd, timeout: 5000 });
 			dirty = (r.stdout || "").trim();
 		} catch {
 			return; // not a repo / git unavailable → nothing to guard, fail open
@@ -39,6 +44,7 @@ export default function (pi: ExtensionAPI) {
 			"Discard uncommitted changes?",
 			`\`${command}\` will discard ${n} uncommitted change(s). Commit or stash first?`,
 		);
+		record("git-guard", "confirm", { approved, changes: n });
 		if (approved) return; // user said go ahead
 		return {
 			block: true,

@@ -134,12 +134,20 @@ export default function (pi: ExtensionAPI) {
 						cut += 1;
 					}
 					slice = slice.slice(0, Math.max(1, cut));
+					// A single line can itself exceed the cap (minified/one-line file):
+					// keeping it whole would blow the context — hard-cut within the line.
+					if (slice.length === 1 && slice[0].length > MAX_BYTES) {
+						slice = [`${slice[0].slice(0, MAX_BYTES)} …[line truncated: ${slice[0].length} chars total]`];
+					}
 					body = annotate(slice, start);
 				}
 				const shown = slice.length;
 				const total = all.length;
 				if (start - 1 + shown < total) {
-					note = `\n[Truncated: lines ${start}-${start - 1 + shown} of ${total} — continue with offset=${start + shown}]`;
+					// Include limit= in the hint: the context-inlet-guard treats offset-only
+					// reads as unbounded and BLOCKS them — the hint must prescribe a call
+					// that actually passes the guard.
+					note = `\n[Truncated: lines ${start}-${start - 1 + shown} of ${total} — continue with offset=${start + shown}, limit=${maxLines}]`;
 				}
 				return { content: [{ type: "text" as const, text: `[${disp}#${tag}]\n${body}${note}` }], details: {} };
 			},

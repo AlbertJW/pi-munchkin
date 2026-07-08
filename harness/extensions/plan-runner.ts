@@ -5,8 +5,9 @@ import { createHash, randomUUID } from "node:crypto";
 import { defineTool, withFileMutationQueue, type ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { Type } from "typebox";
 import { assertVerifyGateAllowed, classifyBashCommand } from "../lib/command-policy.ts";
-import { planIntegrity, executionUnderway, normalizeTitle, preserveDecision } from "../lib/plan-integrity.ts";
-import { nextReplanStreak } from "../lib/plan-progress.ts";
+import { planIntegrity, executionUnderway, normalizeTitle, preserveDecision, reconcileItems as libReconcile, type ReconciledItem, type IncomingItem } from "../lib/plan-integrity.ts";
+import { nextReplanStreak, parseTodoLine } from "../lib/plan-progress.ts";
+import { record } from "../lib/telemetry.ts";
 
 // plan-runner v3 — model-owned TODO list (Claude Code TodoWrite pattern).
 // One tool (plan_write) rewrites the whole list each call: re-planning,
@@ -275,8 +276,9 @@ function hydrateFromTodo(markdown: string): PlanState {
 		.split("\n")
 		.map((l) => l.trim())
 		.filter(Boolean)
-		.map((l) => l.replace(/^[-*]\s*\[.\]\s*/, "").replace(/^TODO\s+\d+:\s*/, ""))
-		.map((title) => ({ id: itemId(), title, status: "pending" as ItemStatus }));
+		.map(parseTodoLine)
+		.filter((p) => p.title)
+		.map((p) => ({ id: itemId(), title: p.title, status: p.status as ItemStatus }));
 	const state = newState(request, summary, "lean", items);
 	state.phase = "executing";
 	return state;
@@ -358,23 +360,11 @@ async function mutatePlan<T>(cwd: string, fn: (state: PlanState | undefined) => 
 	});
 }
 
-// Preserve ids across rewrites by matching on normalized title (so a cosmetic
-// rename — backticks/case/spacing — maps to its prior self, not a fresh id +
-// false-omission duplicate); genuinely new titles get fresh ids.
+// Preserve ids + gate/gate_fails across rewrites (normalized-title identity).
+// Pure logic lives in lib/plan-integrity.ts (unit-testable without the SDK);
+// this thin wrapper injects the id factory and narrows the shared types.
 function reconcileItems(prev: PlanItem[] | undefined, incoming: Array<{ title: string; status: ItemStatus; note?: string; failure_class?: FailureClass; gate?: string }>): PlanItem[] {
-	const byTitle = new Map((prev ?? []).map((p) => [normalizeTitle(p.title), p]));
-	return incoming.map((inc) => {
-		const p = byTitle.get(normalizeTitle(inc.title));
-		return {
-			id: p?.id ?? itemId(),
-			title: inc.title,
-			status: inc.status,
-			note: inc.note,
-			failure_class: inc.status === "blocked" ? (inc.failure_class ?? "unknown") : undefined,
-			gate: inc.gate === "" ? undefined : (inc.gate ?? p?.gate), // model can set/update; preserved across rewrites
-			gate_fails: inc.gate === p?.gate ? p?.gate_fails : 0, // preserved while the gate is unchanged; reset if it changes/clears
-		};
-	});
+	return libReconcile(prev as ReconciledItem[] | undefined, incoming as IncomingItem[], itemId) as PlanItem[];
 }
 
 // ---------- plan-mode enforcement ----------
@@ -594,9 +584,15 @@ const planWrite = defineTool({
 				}
 				if (code === 0) {
 					it.gate_fails = 0;
+					// A green plan gate IS a passing verify. Share it (one-shot flag,
+					// same-process globalThis idiom) so verify-gate doesn't nag the
+					// wrap-up to verify again after the gate already ran green.
+					(globalThis as Record<string, unknown>).__pi_gate_green = true;
+					record("plan-runner", "gate", { pass: true });
 					continue;
 				}
 				const fails = (prevById.get(it.id)?.gate_fails ?? 0) + 1;
+				record("plan-runner", "gate", { pass: false, fails });
 				const tail = out.split("\n").slice(-4).join(" / ").slice(0, 300);
 				it.gate_fails = fails;
 				if (fails >= GATE_MAX) {
@@ -675,6 +671,11 @@ const planWrite = defineTool({
 			if (integrity.preservedOpen.length) segs.push(`kept ${integrity.preservedOpen.length} open item(s) you omitted (${integrity.preservedOpen.map((i) => i.title).join("; ").slice(0, 160)}) — to drop one, mark it done/blocked, don't leave it out`);
 			if (integrity.yieldedOpen.length) segs.push(`released ${integrity.yieldedOpen.length} open item(s) you've omitted ${PRESERVE_MAX}× — treating as intentional removal`);
 			integrityWarn = `\n⚠ plan integrity: ${segs.join("; ")}. Re-emit the ENTIRE list each call.`;
+			record("plan-runner", "integrity", {
+				reattached: integrity.reattached.length,
+				preserved: integrity.preservedOpen.length,
+				yielded: integrity.yieldedOpen.length,
+			});
 			await appendTrace(ctx.cwd, {
 				run_id: state.run_id,
 				action_type: "tool",
@@ -689,11 +690,18 @@ const planWrite = defineTool({
 		}
 		// Plan-thrash guard: repeated plan_write that completes nothing. loop-breaker
 		// counts plan_write as progress, so this is the only thing that surfaces re-plan
-		// churn. Warn (+ trace) only while an open item remains to execute.
+		// churn. Warn (+ trace) only while an open item remains to execute — and NEVER
+		// during /plan drafting: there, iterating plan_write with zero completions is
+		// the CONTRACT, and "execute now" is unactionable (plan mode blocks mutations).
 		const cur = currentItem(state);
-		const { streak, warn: replanWarn } = nextReplanStreak(replanStreak, newlyDone, REPLAN_MAX);
-		replanStreak = streak;
+		let replanWarn = false;
+		if (!isPlanning()) {
+			const r = nextReplanStreak(replanStreak, newlyDone, REPLAN_MAX);
+			replanStreak = r.streak;
+			replanWarn = r.warn;
+		}
 		const thrashFired = replanWarn && !!cur;
+		if (thrashFired) record("plan-runner", "thrash-warn", { streak: replanStreak });
 		let thrashWarn = "";
 		if (thrashFired) {
 			thrashWarn = `\n⚠ re-planned ${replanStreak}× with no item completed — stop re-planning; execute "${cur!.title}" now, or mark it blocked.`;

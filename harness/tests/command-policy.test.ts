@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { assertVerifyGateAllowed, classifyBashCommand, discardsUncommittedWork, isBashMutation, isSourceMutation, looksFailingOutput } from "../lib/command-policy.ts";
+import { assertVerifyGateAllowed, classifyBashCommand, discardWorkdir, discardsUncommittedWork, isBashMutation, isSourceMutation, looksFailingOutput } from "../lib/command-policy.ts";
 
 test("isSourceMutation: ops/infra churn does NOT arm the verify gate", () => {
 	// ops/infra — change deps/containers/VCS/env, not source → must not arm
@@ -137,4 +137,70 @@ test("verify-gate recognizes JS test runners, rejects non-verify gates", () => {
 		"git status",
 		"ls ~/.pi/agent/skills",
 	]) assert.equal(assertVerifyGateAllowed(c).ok, false, `should reject gate: ${c}`);
+});
+
+// --- review regressions: dangerous-command matrix + command-position anchoring ---
+
+test("classify: verify tokens only count at COMMAND POSITION (no silent gate-disarm)", () => {
+	// these mention a test/verify word but are NOT verify commands — must be read-only
+	for (const c of ["cat tests/test_foo.py", "ls tests/", "rg pytest src/", "echo pytest passed", "npm run dev", "grep -r 'go test' ."]) {
+		assert.equal(classifyBashCommand(c).verifyLike, false, `must NOT be verify: ${c}`);
+	}
+	// real verify invocations, incl. after a prefix
+	for (const c of ["pytest tests/", "cd sub && npm test", "python3 -m pytest", "node --test", "timeout 60 pytest"]) {
+		assert.equal(classifyBashCommand(c).verifyLike, true, `must be verify: ${c}`);
+	}
+});
+
+test("classify: dangerous commands are not misclassified as read_only", () => {
+	const destructive = ["git push --force", "git push -f origin main", "find . -name '*.tmp' -delete", "rm -rf build"];
+	for (const c of destructive) assert.equal(classifyBashCommand(c).risk, "destructive", `destructive: ${c}`);
+	const mutating = ["truncate -s 0 f.log", "perl -pi -e 's/a/b/' f", "chmod -R 755 .", "cp a b", "FOO=1 git add ."];
+	for (const c of mutating) assert.equal(classifyBashCommand(c).mutates, true, `mutates: ${c}`);
+	// bare words inside a read-only command must NOT count as mutations ("progress")
+	for (const c of ["grep cp file", "man mv", "echo rm -rf /", "git push origin main"]) {
+		assert.equal(isBashMutation(c), false, `read-only: ${c}`);
+	}
+});
+
+test("discardsUncommittedWork: covers the bypass forms the review found", () => {
+	for (const c of [
+		"git reset --hard",
+		"git -C /tmp/repo reset --hard",
+		"git -c core.editor=true checkout -- .",
+		"git checkout HEAD -- .",
+		"git checkout main --force",
+		"git switch -f other",
+		"git switch --discard-changes main",
+		"git checkout .",
+		"git restore src/app.ts",
+		"git clean -fd",
+	]) assert.equal(discardsUncommittedWork(c), true, `should guard: ${c}`);
+
+	for (const c of [
+		"git checkout main",
+		"git checkout -b feature",
+		"git checkout --track origin/x",
+		"git reset --soft HEAD~1",
+		"git restore --staged f",
+		"git clean -n",
+		"git status",
+	]) assert.equal(discardsUncommittedWork(c), false, `should NOT guard: ${c}`);
+});
+
+test("discardWorkdir: dirty check targets the repo the command actually hits", () => {
+	const cwd = "/work/here";
+	const home = "/Users/me";
+	// plain command → ctx.cwd
+	assert.equal(discardWorkdir("git reset --hard", cwd, home), cwd);
+	// cd prefix (&& and ;) → that dir
+	assert.equal(discardWorkdir("cd /other/repo && git reset --hard", cwd, home), "/other/repo");
+	assert.equal(discardWorkdir("cd sub/dir; git checkout -- .", cwd, home), "/work/here/sub/dir");
+	// last cd before the git wins
+	assert.equal(discardWorkdir("cd /a && cd /b && git reset --hard", cwd, home), "/b");
+	// git -C wins
+	assert.equal(discardWorkdir("git -C /repo2 reset --hard", cwd, home), "/repo2");
+	// ~ expansion
+	assert.equal(discardWorkdir("cd ~/proj && git clean -fd", cwd, home), "/Users/me/proj");
+	assert.equal(discardWorkdir("git -C ~ reset --hard", cwd, home), "/Users/me");
 });

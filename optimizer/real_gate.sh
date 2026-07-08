@@ -63,6 +63,7 @@ install_tests() {  # $1=task $2=workdir
 }
 
 LLAMA_URL="${LLAMA_URL:-http://127.0.0.1:8080}"   # point at a remote llama-server (e.g. http://192.168.1.50:8080)
+HEALTH_WAIT="${HEALTH_WAIT:-1800}"                # max seconds to wait out a mid-sweep server outage (e.g. OOM restart)
 health() { curl -fsS -m 5 "$LLAMA_URL/health" >/dev/null 2>&1; }
 
 # Seatbelt write-jail for the headless pi sessions (r/PiCodingAgent agent-lock pattern,
@@ -109,8 +110,15 @@ run_one() {  # $1=config-path  $2=pattern(base|cand)  $3=task  $4=rep
 	[[ "$task" == "t3" ]] && cp "$T3_FILES/align.js" "$wd/src/"   # the buggy source to fix (before only)
 	is_hidden "$task" || install_tests "$task" "$wd"             # shown tasks only; hidden tasks withhold the test
 
-	# fail fast if the server died mid-sweep (the wedge we hit before)
-	health || { echo "[real_gate] :8080 down before $pat/$task — aborting" >&2; exit 1; }
+	# server died mid-sweep (e.g. OOM): wait for it to come back (server side should
+	# auto-restart) instead of killing a multi-hour sweep; abort only past HEALTH_WAIT.
+	local waited=0
+	while ! health; do
+		[[ "$waited" -eq 0 ]] && echo "[real_gate] $LLAMA_URL down before $pat/$task — waiting up to ${HEALTH_WAIT}s for recovery" >&2
+		[[ "$waited" -ge "$HEALTH_WAIT" ]] && { echo "[real_gate] server still down after ${waited}s — aborting" >&2; exit 1; }
+		sleep 30; waited=$((waited + 30))
+	done
+	[[ "$waited" -gt 0 ]] && echo "[real_gate] server back after ~${waited}s — resuming" >&2
 
 	# apply the config: writes $wd/.pi/APPEND_SYSTEM.md, returns env lines
 	local envlines; envlines="$(python3 "$CONFIG" --apply "$cfg" --workdir "$wd")"

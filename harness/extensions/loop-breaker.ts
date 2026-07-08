@@ -1,5 +1,7 @@
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { isBashMutation, looksFailingOutput } from "../lib/command-policy.ts";
+import { steerText } from "../lib/steer-texts.ts";
+import { record } from "../lib/telemetry.ts";
 
 // Agentic loop-breaker.
 //
@@ -80,12 +82,14 @@ function stableStringify(v: unknown): string {
 		.join(",")}}`;
 }
 
-// Fingerprint a tool call. For bash/read we key on the meaningful field and
-// deliberately ignore offset/limit so a jiggled re-read still collides.
-function fpKey(name: string, args: Record<string, unknown>): string {
+// Fingerprint a tool call. For bash we key on the command; for read on
+// path@offset — the SAME offset re-read collides (a jiggled verbatim re-read
+// repeats its offset), but paginating a large file (offset 0, 2000, 4000, …)
+// is the read tool's own documented workflow and must NOT count as repetition.
+export function fpKey(name: string, args: Record<string, unknown>): string {
 	let key: string;
 	if (name === "bash") key = normText(String(args.command ?? ""));
-	else if (name === "read") key = normText(String(args.path ?? ""));
+	else if (name === "read") key = `${normText(String(args.path ?? ""))}@${Number(args.offset ?? 0) || 0}`;
 	else key = normText(stableStringify(args));
 	return hash(`${name}\0${key}`);
 }
@@ -106,6 +110,7 @@ type Episode = {
 	streak: number;
 	steered: Set<number>;
 	blocked: Set<string>;
+	lastSteerTurn: number | null; // telemetry: measures steer → progress compliance
 };
 
 function newEpisode(): Episode {
@@ -116,6 +121,7 @@ function newEpisode(): Episode {
 		streak: 0,
 		steered: new Set(),
 		blocked: new Set(),
+		lastSteerTurn: null,
 	};
 }
 
@@ -142,10 +148,12 @@ function outcomeFp(toolName: string, text: string): string {
 }
 
 function outcomeMessage(n: number, label: string): string {
-	return (
-		`[loop-breaker] Same failing result ${n}× (${label}) despite changes between. ` +
-		`Patching isn't moving the outcome. Stop — read the full error, change approach ` +
-		`(different fix point, add a debug print, simplify the repro), or mark blocked.`
+	return steerText(
+		"LB_OUTCOME",
+		"[loop-breaker] Same failing result {n}× ({label}) despite changes between. " +
+			"Patching isn't moving the outcome. Stop — read the full error, change approach " +
+			"(different fix point, add a debug print, simplify the repro), or mark blocked.",
+		{ n, label },
 	);
 }
 
@@ -170,37 +178,76 @@ function actWord(): string {
 	return isPlanning() ? "write the plan (plan_write)" : "edit";
 }
 
-function tier1Message(label: string, repeat: number, streak: number, byRepeat: boolean): string {
-	if (byRepeat) {
-		return (
-			`[loop-breaker] Repeated ${label} ${repeat}×, no file change. You have this. ` +
-			`Do ONE now: ${actWord()} · mark blocked + stop · name the one missing fact + how you'll get it. ` +
-			`Don't re-run that read/grep/command.`
-		);
-	}
-	if (isPlanning()) {
-		return (
-			`[loop-breaker] ${streak} read-only turns, no change. Enough to plan? ` +
-			`Call plan_write now. Need more? Continue, but don't re-run reads you've done.`
-		);
-	}
-	return (
-		`[loop-breaker] ${streak} read-only turns, no change. Enough to act? ` +
-		`Do it — edit (bash file-writes count) or answer. Need more? Continue, but don't re-run reads you've done.`
-	);
+// Pure tier/block decision (unit-testable without the SDK). Tier is driven by
+// the max of tool/reason repetition (or streak); a fingerprint is BLOCKED only
+// when TOOL repetition reaches the block threshold — reasoning repetition steers
+// but must never wall an innocent (n=1) tool call.
+export type Thresholds = { t1: number; t2: number; t3: number; streakSoft: number; streakHard: number };
+export function decideTier(
+	maxTool: number,
+	maxReason: number,
+	streak: number,
+	th: Thresholds,
+): { tier: 0 | 1 | 2 | 3; byToolRepeat: boolean; byReasonRepeat: boolean; blockWorst: boolean } {
+	const repeat = Math.max(maxTool, maxReason);
+	let tier: 0 | 1 | 2 | 3 = 0;
+	if (repeat >= th.t3 || streak >= th.streakHard) tier = 3;
+	else if (repeat >= th.t2) tier = 2;
+	else if (repeat >= th.t1 || streak >= th.streakSoft) tier = 1;
+	return {
+		tier,
+		byToolRepeat: maxTool >= th.t1,
+		byReasonRepeat: maxReason >= th.t1,
+		blockWorst: tier === 2 && maxTool >= th.t2, // tier-3 walls separately (every repeated fp)
+	};
 }
 
-function tier2Message(label: string, streak: number): string {
-	return (
-		`[loop-breaker] STILL LOOPING (${streak} turns, no edits). ${label} is now BLOCKED. ` +
-		`Stop gathering — act on what you have: ${actWord()}, or mark blocked + stop.`
+// Steer texts route through lib/steer-texts.ts: env PI_MSG_<NAME> overrides the
+// template (munchkin's `messages` search dimension); with no override the output
+// is byte-identical to the historical literals (asserted in tests).
+function tier1Message(label: string, repeat: number, streak: number, byToolRepeat: boolean, byReasonRepeat: boolean): string {
+	if (byToolRepeat) {
+		return steerText(
+			"LB_T1_TOOL",
+			"[loop-breaker] Repeated {label} {repeat}×, no file change. You have this. " +
+				"Do ONE now: {act} · mark blocked + stop · name the one missing fact + how you'll get it. " +
+				"Don't re-run that read/grep/command.",
+			{ label, repeat, act: actWord() },
+		);
+	}
+	if (byReasonRepeat) {
+		return steerText(
+			"LB_T1_REASON",
+			"[loop-breaker] Same reasoning repeated {repeat}× with no file change. Thinking it again " +
+				"won't change it. Do ONE now: {act} · mark blocked + stop · name the one missing fact.",
+			{ repeat, act: actWord() },
+		);
+	}
+	// LB_T1_STREAK: one override name, default chosen by mode (plan vs execute).
+	const streakDefault = isPlanning()
+		? "[loop-breaker] {streak} read-only turns, no change. Enough to plan? " +
+			"Call plan_write now. Need more? Continue, but don't re-run reads you've done."
+		: "[loop-breaker] {streak} read-only turns, no change. Enough to act? " +
+			"Do it — edit (bash file-writes count) or answer. Need more? Continue, but don't re-run reads you've done.";
+	return steerText("LB_T1_STREAK", streakDefault, { streak });
+}
+
+function tier2Message(label: string, streak: number, didBlock: boolean): string {
+	const blocked = didBlock ? `${label} is now BLOCKED. ` : `You keep circling the same reasoning. `;
+	return steerText(
+		"LB_T2",
+		"[loop-breaker] STILL LOOPING ({streak} turns, no edits). {blocked}" +
+			"Stop gathering — act on what you have: {act}, or mark blocked + stop.",
+		{ streak, blocked, act: actWord() },
 	);
 }
 
 function tier3Message(streak: number): string {
-	return (
-		`[loop-breaker] HARD STOP: ${streak} turns, no progress, no edits. Stop investigating. ` +
-		`${isPlanning() ? "Call plan_write now" : "Edit now"}, or reply with the one blocker. All repeated read-only actions blocked.`
+	return steerText(
+		"LB_T3",
+		"[loop-breaker] HARD STOP: {streak} turns, no progress, no edits. Stop investigating. " +
+			"{act}, or reply with the one blocker. All repeated read-only actions blocked.",
+		{ streak, act: isPlanning() ? "Call plan_write now" : "Edit now" },
 	);
 }
 
@@ -208,6 +255,14 @@ export default function (pi: ExtensionAPI) {
 	pi.on("session_start", async () => {
 		resetEpisode();
 		resetOutcomes();
+	});
+
+	// Compaction erases file contents from the window: re-reading them afterward
+	// is NECESSARY, not a loop. Clear counters and walls (outcome state stays —
+	// a stuck failing result is still stuck after compaction).
+	pi.on("session_compact", async () => {
+		record("loop-breaker", "compact-reset", { streak: ep.streak, blocked: ep.blocked.size });
+		resetEpisode();
 	});
 
 	// Detection + escalation.
@@ -251,6 +306,10 @@ export default function (pi: ExtensionAPI) {
 			const fired = outcomeFired.get(fp) ?? 0;
 			if ((n >= OUTCOME_T1 && fired === 0) || (n >= OUTCOME_T1 * 2 && fired === 1)) {
 				outcomeFired.set(fp, fired + 1);
+				// Flag for verify-gate: while an outcome loop is active, its "re-run
+				// till green" steer contradicts this "stop, change approach" one.
+				(globalThis as Record<string, unknown>).__pi_lb_outcome_at = Date.now();
+				record("loop-breaker", "outcome-steer", { n, turnIndex: event.turnIndex });
 				pi.sendUserMessage(outcomeMessage(n, outcomeLabels.get(fp) ?? r.toolName), { deliverAs: "followUp" });
 			}
 		}
@@ -263,6 +322,11 @@ export default function (pi: ExtensionAPI) {
 			toolCalls.some((c) => PROGRESS_TOOLS.has(c.name)) ||
 			toolCalls.some((c) => c.name === "bash" && isBashMutation(String(c.args.command ?? "")));
 		if (hasProgress) {
+			// Compliance signal: the model made progress after being steered — how
+			// many turns did the steer take to land?
+			if (ep.lastSteerTurn !== null) {
+				record("loop-breaker", "progress-after-steer", { turns_since: event.turnIndex - ep.lastSteerTurn });
+			}
 			resetEpisode();
 			return;
 		}
@@ -290,50 +354,75 @@ export default function (pi: ExtensionAPI) {
 			ep.reasonCounts.set(rfp, maxReason);
 		}
 
-		// Repetition is the loop signal and drives every tier (incl. the block).
-		// A bare read streak only ever nudges (T1) or, far out, hard-stops (T3) —
-		// it never blocks, because a long varied investigation is not a loop.
+		// Repetition is the loop signal and drives every tier. A bare read streak
+		// only ever nudges (T1) or, far out, hard-stops (T3) — a long varied
+		// investigation is not a loop.
 		const repeat = Math.max(maxTool, maxReason);
-		const byRepeat = repeat >= REPEAT_T1;
-		let tier = 0;
-		if (repeat >= REPEAT_T3 || ep.streak >= STREAK_HARD) tier = 3;
-		else if (repeat >= REPEAT_T2) tier = 2;
-		else if (repeat >= REPEAT_T1 || ep.streak >= STREAK_SOFT) tier = 1;
+		const d = decideTier(maxTool, maxReason, ep.streak, {
+			t1: REPEAT_T1, t2: REPEAT_T2, t3: REPEAT_T3, streakSoft: STREAK_SOFT, streakHard: STREAK_HARD,
+		});
+		const tier = d.tier;
 
 		if (tier === 0 || ep.steered.has(tier)) return;
 		for (let l = 1; l <= tier; l++) ep.steered.add(l);
+		ep.lastSteerTurn = event.turnIndex;
+		record("loop-breaker", "steer", {
+			tier, byTool: d.byToolRepeat, byReason: d.byReasonRepeat,
+			repeat, streak: ep.streak, turnIndex: event.turnIndex,
+		});
 
 		const label = ep.labels.get(worstFp) ?? "the same action";
 
 		if (tier === 1) {
-			pi.sendUserMessage(tier1Message(label, repeat, ep.streak, byRepeat), { deliverAs: "followUp" });
+			pi.sendUserMessage(tier1Message(label, repeat, ep.streak, d.byToolRepeat, d.byReasonRepeat), { deliverAs: "followUp" });
 			return;
 		}
 
 		if (tier === 2) {
-			if (worstFp) ep.blocked.add(worstFp);
-			pi.sendUserMessage(tier2Message(label, ep.streak), { deliverAs: "followUp" });
+			const didBlock = d.blockWorst && !!worstFp;
+			if (didBlock) ep.blocked.add(worstFp);
+			pi.sendUserMessage(tier2Message(label, ep.streak, didBlock), { deliverAs: "followUp" });
 			return;
 		}
 
-		// tier 3 — wall every repeated fingerprint and steer firmly.
+		// tier 3 — wall every genuinely repeated fingerprint and stop firmly.
 		for (const [fp, n] of ep.toolCounts) {
 			if (n >= REPEAT_T1) ep.blocked.add(fp);
 		}
-		pi.sendUserMessage(tier3Message(ep.streak), { deliverAs: "followUp" });
 		if (HARD_STOP_MODE === "shutdown") {
+			pi.sendUserMessage(tier3Message(ep.streak), { deliverAs: "followUp" });
 			ctx.ui.notify("loop-breaker: hard stop — shutting down pi", "error");
 			ctx.shutdown();
-		} else if (HARD_STOP_MODE === "abort") {
+			return;
+		}
+		if (HARD_STOP_MODE === "abort") {
+			// NO followUp here: a queued follow-up user message would restart the run
+			// we are aborting (self-defeating). Notify the UI, arm the mid-turn
+			// backstop, and stop.
+			record("loop-breaker", "abort", { streak: ep.streak, turnIndex: event.turnIndex });
+			ctx.ui.notify(`loop-breaker: hard stop — aborting run (${ep.streak} turns, no progress)`, "error");
+			// Fresh counters so a NEW loop after the stop escalates from scratch;
+			// keep the walls (blocked persists until real progress) and stay armed.
+			const blocked = ep.blocked;
+			ep = newEpisode();
+			ep.blocked = blocked;
 			abortArmed = true; // backstop: abort on the next looping tool call (reliable mid-turn hook)
 			ctx.abort(); // best-effort stop now — no-op if already idle between turns
+			return;
 		}
+		// "block" mode: steer + wall, run continues. Reset counters (keep walls) so
+		// continued looping can escalate again instead of latching silent forever.
+		pi.sendUserMessage(tier3Message(ep.streak), { deliverAs: "followUp" });
+		const blocked = ep.blocked;
+		ep = newEpisode();
+		ep.blocked = blocked;
 	});
 
 	// Tier 2/3 enforcement: block the specific repeated call(s).
 	pi.on("tool_call", async (event, ctx) => {
 		const fp = fpKey(event.toolName, (event.input ?? {}) as Record<string, unknown>);
 		if (!ep.blocked.has(fp)) return;
+		record("loop-breaker", "block", { tool: event.toolName, abortArmed });
 		if (abortArmed) {
 			abortArmed = false; // one-shot: stop the looping run, then fall back to plain blocking
 			ctx.abort();

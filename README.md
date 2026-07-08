@@ -119,6 +119,13 @@ Approaches evaluated for this substrate — recorded so the reasoning isn't re-l
   cover scoped-context isolation. Pocketed one telemetry-gated candidate: the thread's
   anti-signal that a tail-pinned persistent plan block made a small model avoid its planning
   tools — test plan-injection placement if telemetry shows plan-steer non-compliance.
+- **jlens / J-Space** (Anthropic's global-workspace paper, `anthropics/jacobian-lens`) —
+  rejected: needs HF safetensors + a CUDA GPU (fleet is GGUF on llama.cpp; no CUDA box),
+  base→fine-tune lens transfer unvalidated, and the readout is a cleaner view of known
+  intermediate-layer representations rather than a new capability. Pocketed for a hardware
+  change: J-space probe as a cheap steer-wording pre-screen ahead of the real gate (Fisher
+  remains the adoption authority); pre-fitted lenses exist at HF `neuronpedia/jacobian-lens`
+  for the fleet's Qwen bases.
 
 ## License
 

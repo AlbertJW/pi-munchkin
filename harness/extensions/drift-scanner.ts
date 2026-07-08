@@ -1,5 +1,5 @@
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
-import { completeSimple } from "@earendil-works/pi-ai";
+import { completeSimple } from "@earendil-works/pi-ai/compat";
 import { buildTruncatedDiff, extractFindings, isReviewableCommit, MAX_DIFF, REVIEW_PROMPT } from "../lib/drift-policy.ts";
 
 // Advisory drift / dead-code reviewer.
@@ -83,10 +83,14 @@ export default function (pi: ExtensionAPI) {
 			const findings = extractFindings(review.content as Array<{ type: string; text?: string }>, review.stopReason);
 			if (!findings) return; // CLEAN / empty / non-"stop" finish → nothing to surface
 
+			// Clamp: reviewer output is model-generated and unbounded; injecting it
+			// verbatim can dump thousands of tokens into a 30k window.
+			const clamped = findings.length > 4000 ? `${findings.slice(0, 4000)}\n…[drift review truncated]` : findings;
+
 			pi.sendUserMessage(
 				"[drift-scanner] Advisory review of your latest commit — possible drift it introduced " +
 					"(non-blocking). Make a fixup commit if real; ignore false positives. (DRIFT_SCANNER=off disables.)\n\n" +
-					findings,
+					clamped,
 				{ deliverAs: "followUp" },
 			);
 		} catch {

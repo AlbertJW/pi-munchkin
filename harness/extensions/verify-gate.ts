@@ -2,6 +2,8 @@ import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { readFile, readdir } from "node:fs/promises";
 import { join } from "node:path";
 import { classifyBashCommand, isSourceMutation, looksFailingOutput } from "../lib/command-policy.ts";
+import { steerText } from "../lib/steer-texts.ts";
+import { record } from "../lib/telemetry.ts";
 
 // Boundary verify gate ("the handoff is sacred").
 //
@@ -34,10 +36,17 @@ function planPhaseActive(): boolean {
 	return (globalThis as Record<string, unknown>).__pi_plan_phase_active === true;
 }
 
-// Generic "ran a verify" regex. The detected/forced gate command is appended at
-// session start so the exact project command also counts as verifying.
+// Generic "ran a verify" regex. Tokens must appear at COMMAND POSITION (start of
+// command or after ; & | ( sudo …) — `cat tests/foo.py`, `npm run dev`, or
+// `echo pytest passed` must NOT count as a verify (that silently disarms the
+// gate). The detected/forced gate command is appended at session start so the
+// exact project command also counts.
+const CMD_POS = "(?:^|[;&|(]\\s*|\\b(?:sudo|xargs|env)\\s+)";
 const VERIFY_BASE =
-	"just (?:verify|check|test)|\\btests?\\b|pytest|npm (?:test|run )|yarn test|\\btsc\\b|bash -n|go test|cargo test|make (?:test|check|verify)|ruff|eslint";
+	CMD_POS +
+	"(?:just (?:verify|check|test)|pytest\\b|python3? -m pytest\\b|npm test\\b|npm run (?:test|check|lint|typecheck|verify)\\b|" +
+	"yarn test\\b|tsc\\b|bash -n |go test\\b|cargo test\\b|make (?:test|check|verify)\\b|ruff\\b|eslint\\b|node --test\\b|" +
+	"(?:\\./|bash |sh )\\S*test\\S*)";
 
 function escapeRegex(s: string): string {
 	return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
@@ -90,9 +99,13 @@ async function detectGate(cwd: string): Promise<string | null> {
 	return null;
 }
 
-type State = { mutated: boolean; verifiedOk: boolean; fires: number };
+// fires counts per EDIT EPISODE (reset when a new source mutation re-arms the
+// gate) — a session-cumulative count kills the gate for the rest of a long
+// session after 3 fires even when each steer was complied with. sessionFires
+// (3× cap) stays as the runaway backstop.
+type State = { mutated: boolean; verifiedOk: boolean; fires: number; sessionFires: number };
 function fresh(): State {
-	return { mutated: false, verifiedOk: false, fires: 0 };
+	return { mutated: false, verifiedOk: false, fires: 0, sessionFires: 0 };
 }
 let st = fresh();
 let gateCmd: string | null = process.env.VERIFY_GATE_CMD || null;
@@ -111,10 +124,20 @@ function steer(verifyFailed: boolean): string {
 	const ctn = composeProject
 		? ` Tests look containerized — run the gate inside the stack (e.g. \`docker compose exec <service> ${gateCmd ?? "pytest"}\`); if the stack is down, skip rather than run it on the host.`
 		: "";
+	// Steer texts route through lib/steer-texts.ts (PI_MSG_* override; defaults
+	// byte-identical to the historical literals — asserted in tests).
 	if (verifyFailed) {
-		return `[verify-gate] Gate FAILED and you're wrapping up. Don't finish on a red gate — fix it, re-run ${g} till green. Unverified output must not cross the boundary.${ctn}`;
+		return steerText(
+			"VG_STEER_FAILED",
+			"[verify-gate] Gate FAILED and you're wrapping up. Don't finish on a red gate — fix it, re-run {gate} till green. Unverified output must not cross the boundary.{ctn}",
+			{ gate: g, ctn },
+		);
 	}
-	return `[verify-gate] You changed files, ran no passing gate. Before finishing: run ${g}, report result, fix + re-run if red. Unverified output must not cross the boundary.${ctn}`;
+	return steerText(
+		"VG_STEER",
+		"[verify-gate] You changed files, ran no passing gate. Before finishing: run {gate}, report result, fix + re-run if red. Unverified output must not cross the boundary.{ctn}",
+		{ gate: g, ctn },
+	);
 }
 
 export default function (pi: ExtensionAPI) {
@@ -151,6 +174,17 @@ export default function (pi: ExtensionAPI) {
 		) {
 			st.mutated = true;
 			st.verifiedOk = false;
+			st.fires = 0; // new edit episode: the gate may steer again
+		}
+
+		// A green plan-runner gate this turn IS a passing verify (one-shot flag,
+		// set by plan-runner when an item's gate exits 0) — consume it so the
+		// wrap-up isn't double-nagged after a gate already ran green.
+		const g = globalThis as Record<string, unknown>;
+		if (g.__pi_gate_green === true) {
+			g.__pi_gate_green = undefined;
+			st.verifiedOk = true;
+			record("verify-gate", "gate-green-consumed", {});
 		}
 
 		// Track verify: a verify-pattern bash command whose own result looks green.
@@ -167,15 +201,24 @@ export default function (pi: ExtensionAPI) {
 		}
 
 		// Fire on a wrap-up (text-only) turn when files changed but no passing verify.
+		// Defer to the loop-breaker's outcome detector: if it recently said "same
+		// failing result — STOP, change approach", nagging "re-run till green" here
+		// is contradictory double-steering. One voice at a time.
+		const outcomeAt = typeof g.__pi_lb_outcome_at === "number" ? (g.__pi_lb_outcome_at as number) : 0;
+		const outcomeActive = outcomeAt > 0 && Date.now() - outcomeAt < 120_000;
+
 		const wrappingUp = toolCalls.length === 0;
-		if (wrappingUp && st.mutated && !st.verifiedOk && st.fires < MAX_FIRES && !planPhaseActive()) {
+		if (wrappingUp && st.mutated && !st.verifiedOk && st.fires < MAX_FIRES && st.sessionFires < MAX_FIRES * 3 && !planPhaseActive() && !outcomeActive) {
 			st.fires += 1;
+			st.sessionFires += 1;
+			record("verify-gate", "steer", { failed: verifyFailedThisTurn, fires: st.fires, sessionFires: st.sessionFires, turnIndex: event.turnIndex });
 			pi.sendUserMessage(steer(verifyFailedThisTurn), { deliverAs: "followUp" });
 		}
 	});
 
 	pi.on("agent_end", async (_event, ctx) => {
 		if (st.mutated && !st.verifiedOk) {
+			record("verify-gate", "unverified-end", { fires: st.fires, sessionFires: st.sessionFires });
 			ctx.ui.notify("verify-gate: files changed, no passing gate", "warning");
 		}
 	});

@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { nextReplanStreak } from "../lib/plan-progress.ts";
+import { nextReplanStreak, parseTodoLine } from "../lib/plan-progress.ts";
 
 test("a call that completes nothing bumps the streak; warns at max", () => {
 	let s = 0;
@@ -26,4 +26,13 @@ test("below max never warns", () => {
 
 test("stays warning while thrash continues past max", () => {
 	assert.equal(nextReplanStreak(3, 0, 3).warn, true); // 4 ≥ 3
+});
+
+test("parseTodoLine: checkbox state hydrates done items as done, not pending", () => {
+	assert.deepEqual(parseTodoLine("- [x] ship the fix"), { title: "ship the fix", status: "done" });
+	assert.deepEqual(parseTodoLine("- [X] SHIPPED"), { title: "SHIPPED", status: "done" });
+	assert.deepEqual(parseTodoLine("- [ ] still open"), { title: "still open", status: "pending" });
+	assert.deepEqual(parseTodoLine("* [x] star style"), { title: "star style", status: "done" });
+	assert.deepEqual(parseTodoLine("- [ ] TODO 3: numbered form"), { title: "numbered form", status: "pending" });
+	assert.deepEqual(parseTodoLine("bare line no checkbox"), { title: "bare line no checkbox", status: "pending" });
 });

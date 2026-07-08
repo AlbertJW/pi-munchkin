@@ -13,3 +13,15 @@ export function nextReplanStreak(
 	const next = newlyDone > 0 ? 0 : streak + 1;
 	return { streak: next, warn: next >= max };
 }
+
+// Parse one legacy TODO.md list line into {title, status}. The checkbox STATE
+// is preserved — `[x]`/`[X]` hydrates as done. (The old hydrate stripped the
+// checkbox entirely, so completed work resurrected as pending and got redone.)
+export function parseTodoLine(line: string): { title: string; status: "pending" | "done" } {
+	const m = /^[-*]\s*\[(.)\]\s*/.exec(line);
+	const title = line
+		.replace(/^[-*]\s*\[.\]\s*/, "")
+		.replace(/^TODO\s+\d+:\s*/, "")
+		.trim();
+	return { title, status: m && m[1].toLowerCase() === "x" ? "done" : "pending" };
+}

@@ -24,6 +24,7 @@ def _text_of(content):
 
 def parse_session(lines):
     turns = edits = edit_err = reads = subag = tin = tout = lb = vg = 0
+    out_chars = 0
     last_call = None
     for line in lines:
         try:
@@ -44,7 +45,11 @@ def parse_session(lines):
             u = m.get("usage") or {}
             tin += u.get("input", 0); tout += u.get("output", 0)
             for c in m.get("content") or []:
-                if isinstance(c, dict) and c.get("type") == "toolCall":
+                if not isinstance(c, dict):
+                    continue
+                out_chars += len(c.get("text") or "") + len(c.get("thinking") or "")
+                if c.get("type") == "toolCall":
+                    out_chars += len(str(c.get("arguments") or ""))
                     n = (c.get("name") or "").lower(); last_call = n
                     if n == "edit": edits += 1
                     elif n == "read": reads += 1
@@ -52,13 +57,19 @@ def parse_session(lines):
         elif role in ("toolResult", "tool"):
             err = m.get("isError") or any(c.get("isError") for c in (m.get("content") or []) if isinstance(c, dict))
             if err and last_call == "edit": edit_err += 1
+    # ponytail: remote-llamacpp sessions record all-zero usage; fall back to
+    # chars of assistant output (text+thinking+toolCall args) so A/B still compares cost.
+    if tout == 0:
+        tout = out_chars
     return dict(zip(COLS, [turns, edits, edit_err, reads, subag, tin, tout, lb, vg]))
 
 def session_file_for(workdir):
     """Newest session jsonl whose session dir mentions this run (ab-symbolect rule)."""
-    munged = workdir.replace("/", "-")
+    munged = os.path.abspath(workdir).replace("/", "-")
     home = os.path.expanduser("~/.pi/agent/sessions")
-    cands = [d for d in glob.glob(home + "/*") if munged in d or os.path.basename(workdir) in d]
+    # boundary match ("...parens-1" must not grab "...parens-10"'s dir)
+    cands = [d for d in glob.glob(home + "/*")
+             if os.path.basename(d).rstrip("-").endswith((munged, os.path.basename(workdir)))]
     files = sorted((f for d in cands for f in glob.glob(d + "/*.jsonl")), key=os.path.getmtime)
     return files[-1] if files else None
 
@@ -85,6 +96,12 @@ def selftest():
            "in_tok": 30, "out_tok": 13, "lb_fires": 1, "vg_fires": 1}
     assert c == exp, f"{c} != {exp}"
     assert as_tsv(c) == "3\t1\t1\t2\t1\t30\t13\t1\t1", as_tsv(c)
+    # zero-usage session (remote-llamacpp) -> out_tok falls back to chars
+    zu = [json.dumps({"type": "message", "message": {"role": "assistant", "usage": {"input": 0, "output": 0},
+          "content": [{"type": "thinking", "thinking": "hm"},
+                      {"type": "toolCall", "name": "edit", "arguments": {"path": "x"}}]}})]
+    z = parse_session(zu)
+    assert z["out_tok"] == 2 + len(str({"path": "x"})), z
     print("metrics selftest: OK", as_tsv(c))
 
 def main():

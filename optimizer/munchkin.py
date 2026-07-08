@@ -183,8 +183,10 @@ def real_gate_one(cand, tasks, n, gen):
         os.remove(out)
     env = {**os.environ, "GEN": gen, "BASE": cfg_path, "N": str(n)}
     t0 = _utc_z()
-    subprocess.run(["bash", REAL_GATE, "--calibrate", *tasks], env=env, cwd=HERE, check=False)
+    rc = subprocess.run(["bash", REAL_GATE, "--calibrate", *tasks], env=env, cwd=HERE, check=False).returncode
     GATE_WINDOWS[gen] = (t0, _utc_z())
+    if rc != 0:  # aborted gate (server down past HEALTH_WAIT, ^C): never verdict on partial arms
+        raise SystemExit(f"[munchkin] gate {gen} aborted (exit {rc}) — fix the server and rerun; no verdict written")
     rows = [json.loads(l) for l in open(out)] if os.path.exists(out) else []
     base = [r for r in rows if r.get("pattern") == "base"]
     k = sum(r["score"] for r in base)

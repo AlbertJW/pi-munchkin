@@ -1,5 +1,6 @@
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { decide } from "../lib/context-watch.ts";
+import { record } from "../lib/telemetry.ts";
 
 // Active context-watcher: proactively compacts before the window fills.
 //
@@ -32,25 +33,52 @@ const FOCUS =
 	"Summarise older turns; keep the plan, recent edits with their file paths/#tags, the active task, and any unresolved error.";
 
 let armed = true;
+// Thrash guard: if compaction can't shrink usage below THRESHOLD, don't refire
+// forever — after 2 consecutive fires without dropping under REARM, go quiet and
+// let pi's reserveTokens auto-compaction be the net. Resets under REARM.
+let consecutiveFires = 0;
 
 export default function (pi: ExtensionAPI) {
 	if (!ENABLED) return;
 
 	pi.on("session_start", async () => {
 		armed = true;
+		consecutiveFires = 0;
+	});
+
+	// If compaction lands BETWEEN REARM and THRESHOLD, decide()'s hysteresis
+	// would never re-arm (usage only climbs from there) — the watcher was
+	// permanently disarmed after its first fire. Re-arm after any compaction
+	// that ends below the trigger; the thrash guard bounds refiring.
+	pi.on("session_compact", async (event, ctx) => {
+		const pct = ctx.getContextUsage?.()?.percent ?? null;
+		if (pct !== null && pct < THRESHOLD) armed = true;
+		// 0.79.10+ metadata: distinguishes our proactive fires ("manual", fromExtension)
+		// from pi's reserveTokens net ("threshold"/"overflow") in the telemetry.
+		const e = event as { reason?: string; willRetry?: boolean };
+		record("context-watcher", "compacted", { reason: e.reason ?? "unknown", willRetry: e.willRetry ?? false, pct: pct === null ? -1 : Math.round(pct) });
 	});
 
 	pi.on("turn_end", async (event, ctx) => {
 		const usage = ctx.getContextUsage?.();
 		const percent = usage?.percent ?? null;
+		if (percent !== null && percent < REARM) consecutiveFires = 0;
 		const d = decide(percent, armed, THRESHOLD, REARM);
 		armed = d.armed;
-		if (d.compact) {
+		if (d.compact && consecutiveFires < 2) {
+			consecutiveFires += 1;
+			record("context-watcher", "compact", { pct: Math.round(percent ?? 0), consecutive: consecutiveFires });
 			ctx.compact({
 				customInstructions: FOCUS,
-				onError: (e) => ctx.ui.notify(`context-watcher: compact failed: ${e.message}`, "warning"),
+				onError: (e) => {
+					armed = true; // failed compaction must not disarm the watcher — retry next turn
+					record("context-watcher", "compact-failed", { error: e.message.slice(0, 200) });
+					ctx.ui.notify(`context-watcher: compact failed: ${e.message}`, "warning");
+				},
 			});
 			ctx.ui.notify(`context-watcher: compacting at ${Math.round(percent ?? 0)}% of context`, "info");
+		} else if (d.compact) {
+			record("context-watcher", "thrash-silenced", { pct: Math.round(percent ?? 0) });
 		}
 	});
 }

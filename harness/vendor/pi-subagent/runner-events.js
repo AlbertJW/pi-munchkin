@@ -126,12 +126,21 @@ export function getFinalAssistantText(messages) {
   return "";
 }
 
+// Clamp: a subagent's final text enters the PARENT window verbatim — an
+// unbounded child answer can dump tens of thousands of tokens into a 30k
+// context. Subagents are contracted to return distilled results; cap hard.
+const MAX_SUMMARY_CHARS = 12000;
+function clampSummary(text) {
+  if (typeof text !== "string" || text.length <= MAX_SUMMARY_CHARS) return text;
+  return `${text.slice(0, MAX_SUMMARY_CHARS)}\n…[subagent output truncated: ${text.length} chars total]`;
+}
+
 export function getResultSummaryText(result) {
   const finalText = getFinalAssistantText(result?.messages);
-  if (finalText) return finalText;
+  if (finalText) return clampSummary(finalText);
 
   if (typeof result?.errorMessage === "string" && result.errorMessage.trim()) {
-    return result.errorMessage.trim();
+    return clampSummary(result.errorMessage.trim());
   }
 
   const isError =
@@ -140,7 +149,7 @@ export function getResultSummaryText(result) {
     result?.stopReason === "aborted";
 
   if (isError && typeof result?.stderr === "string" && result.stderr.trim()) {
-    return result.stderr.trim();
+    return clampSummary(result.stderr.trim());
   }
 
   return "(no output)";

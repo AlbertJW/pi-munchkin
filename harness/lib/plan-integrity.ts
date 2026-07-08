@@ -17,6 +17,45 @@ export function normalizeTitle(title: string): string {
 	return title.replace(/`/g, "").replace(/\s+/g, " ").trim().toLowerCase();
 }
 
+// Reconcile a whole-list rewrite against the prior items: preserve ids across a
+// cosmetic rename (normalized-title match), and — critically — preserve each
+// item's gate + gate_fails when the model omits the optional `gate` on rewrite.
+// gate_fails is keyed off the RESOLVED gate (omitted ⇒ preserved), so a rewrite
+// that simply drops the field can't wipe the failure counter and defeat
+// GATE_MAX escalation. Pure + generic (id factory injected) so it unit-tests
+// without the SDK.
+export type ReconciledItem = {
+	id: string;
+	title: string;
+	status: string;
+	note?: string;
+	failure_class?: string;
+	gate?: string;
+	gate_fails?: number;
+};
+export type IncomingItem = { title: string; status: string; note?: string; failure_class?: string; gate?: string };
+
+export function reconcileItems(
+	prev: ReconciledItem[] | undefined,
+	incoming: IncomingItem[],
+	makeId: () => string,
+): ReconciledItem[] {
+	const byTitle = new Map((prev ?? []).map((p) => [normalizeTitle(p.title), p]));
+	return incoming.map((inc) => {
+		const p = byTitle.get(normalizeTitle(inc.title));
+		const gate = inc.gate === "" ? undefined : (inc.gate ?? p?.gate); // model can set/update/clear
+		return {
+			id: p?.id ?? makeId(),
+			title: inc.title,
+			status: inc.status,
+			note: inc.note,
+			failure_class: inc.status === "blocked" ? (inc.failure_class ?? "unknown") : undefined,
+			gate,
+			gate_fails: gate === p?.gate ? p?.gate_fails : 0, // preserved while the resolved gate is unchanged
+		};
+	});
+}
+
 export function planIntegrity<T extends IntegrityItem>(
 	prev: T[],
 	reconciled: T[],

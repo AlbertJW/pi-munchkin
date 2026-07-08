@@ -46,7 +46,7 @@ Full-read only: small files, user-requested whole files, or primary edit artefac
 
 Never full-read large markdown/CSV/JSONL, traces, logs, indexes, generated reports — unless explicitly required.
 
-Keep a compact working summary. Context bloat → stop intake, then compact_context (summarise your own older turns) or push the rest to a subagent.
+Keep a compact working summary. Context bloat → stop intake and push the noisy rest to a subagent (the watcher auto-compacts older turns).
 
 ## Ask before
 
@@ -54,13 +54,9 @@ delete · destructive op · deploy · migration · restart/kill · secrets/permi
 
 ## Failure
 
-Read error → change precondition → retry once → report blocker.
-
 Context-overflow error (400 exceeds context) → compact_context, then retry.
 
-Classify before retry: blocked_needs_input · blocked_other · user_action_required · unknown.
-
-Retry rule: never repeat same failed action unless observed_state or required_state changed. 1st fail → inspect exact error. 2nd fail → classify. 3rd fail → change strategy or block.
+One retry policy: never repeat the same failed action unchanged. 1st fail → read the exact error, change a precondition, retry. 2nd fail → classify (blocked_needs_input · blocked_other · user_action_required · unknown). 3rd fail → change strategy or mark blocked. Don't stop while an untried approach remains.
 
 Harness may block repeated failed actions by action_fingerprint — change strategy or mark blocked.
 
@@ -74,7 +70,6 @@ Tools/filesystem/.pi/plan-state.json beat chat memory. On a plan, trust plan-sta
 /plan <req> yolo → plan + run straight through.
 Pick mode by risk: confident + low-risk → yolo; risky/uncertain/destructive → lean.
 Model owns the list: call plan_write again anytime to add/remove/reorder/restatus. One item in_progress at a time.
-After a noisy phase / before the next item: window heavy → compact_context.
 /plan-status shows list. /plan-trace [n] shows recent trace.
 
 ## Delegate (keep the window small)
@@ -85,7 +80,7 @@ Plan = the spine; keep the main window on it. Push noisy work into subagents —
 - one bounded, fully-specified edit → subagent(executor, …, fork).
 Outthink a small model with architecture, not size.
 
-Window still bloating → compact_context yourself (pass `focus` to keep what matters). User can /collapse (rewind to plan node, keep summary) or /compact (summarise in place).
+Window still bloating → it auto-compacts; the user can /collapse (rewind to plan node, keep summary) or /compact (summarise in place).
 
 ## Before file changes
 

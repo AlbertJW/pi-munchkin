@@ -27,17 +27,27 @@ function text(s: string) {
 
 async function runKetch(pi: ExtensionAPI, args: string[], signal: AbortSignal | undefined) {
 	let res: { stdout: string; stderr: string; code: number };
+	const started = Date.now();
 	try {
 		res = await pi.exec(KETCH, args, { timeout: TIMEOUT, signal });
 	} catch (err) {
 		const msg = err instanceof Error ? err.message : String(err);
-		return text(
-			`ketch failed (${msg}). Not on PATH? Install: brew install 1broseidon/tap/ketch (or set KETCH_BIN).`,
-		);
+		if (/enoent|not found/i.test(msg)) {
+			return text(`ketch not found. Install: brew install 1broseidon/tap/ketch (or set KETCH_BIN).`);
+		}
+		if (/timeout|timed.?out|abort/i.test(msg) || Date.now() - started >= TIMEOUT) {
+			return text(`ketch TIMED OUT after ${TIMEOUT}ms — no results. Try a narrower query, or skip this lookup.`);
+		}
+		return text(`ketch failed (${msg}).`);
 	}
 	const out = (res.stdout || "").trim();
+	// A timed-out/killed run can surface as a resolved result with partial or
+	// empty stdout — that is a FAILURE, never a success. Report it as such.
+	if (Date.now() - started >= TIMEOUT) {
+		return text(`ketch TIMED OUT after ${TIMEOUT}ms — treat any partial output as missing. Try a narrower query.`);
+	}
 	if (res.code !== 0 || !out) {
-		const errMsg = (res.stderr || "").trim() || `exit ${res.code}`;
+		const errMsg = (res.stderr || "").trim() || (res.code === 0 ? "no output" : `exit ${res.code}`);
 		return text(`ketch error: ${errMsg}`);
 	}
 	return text(out.length > MAX_CHARS ? `${out.slice(0, MAX_CHARS)}\n…[truncated]` : out);
