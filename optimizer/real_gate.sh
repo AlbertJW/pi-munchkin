@@ -87,6 +87,7 @@ if [[ "$DRY" == 1 ]]; then
 fi
 
 CHILD=""
+LOW_TOK_STREAK=0
 cleanup() {
 	[[ -n "$CHILD" ]] && kill "$CHILD" 2>/dev/null
 	pkill -P $$ 2>/dev/null
@@ -162,6 +163,19 @@ run_one() {  # $1=config-path  $2=pattern(base|cand)  $3=task  $4=rep
 	# success. The F2P grader asserts the behavior the task actually asks for.
 	[[ "$task" == "t2" ]] && ! ( cd "$wd" && node "$FIXTURES/t2-check.mjs" ) >/dev/null 2>&1 && gate=0
 	local tout; tout="$(python3 "$METRICS" "$wd" | cut -f7)"; [[ -n "$tout" ]] || tout=0
+
+	# Degraded-model tripwire: a server can keep serving HTTP while the model behind it
+	# is broken (hot-swap/reload) — sessions then return near-zero tokens and the
+	# connection-error guard never fires. Two consecutive near-empty sessions = abort.
+	if [[ "$tout" -lt "${MIN_SESSION_TOKENS:-100}" ]]; then
+		LOW_TOK_STREAK=$((LOW_TOK_STREAK + 1))
+		if [[ "$LOW_TOK_STREAK" -ge 2 ]]; then
+			echo "[real_gate] $LOW_TOK_STREAK consecutive sessions under ${MIN_SESSION_TOKENS:-100} output tokens — model looks degraded, aborting (this row not written)." >&2
+			exit 1
+		fi
+	else
+		LOW_TOK_STREAK=0
+	fi
 
 	python3 - "$RESULTS" "$MODEL" "$pat" "$task" "$rep" "$gate" "$tout" <<'PY'
 import json,sys
