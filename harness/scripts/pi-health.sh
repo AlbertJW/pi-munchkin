@@ -30,7 +30,10 @@ pkgs = json.load(open("settings.json")).get("packages", [])
 missing = []
 for p in pkgs:
     if p.startswith("npm:"):
-        if not os.path.isdir(os.path.join("npm/node_modules", p[4:])): missing.append(p)
+        spec = p[4:]
+        at = spec.rfind("@")  # strip @version; scoped "@scope/name" alone has @ only at 0
+        name = spec[:at] if at > 0 else spec
+        if not os.path.isdir(os.path.join("npm/node_modules", name)): missing.append(p)
     else:  # local path (e.g. vendor/pi-subagent, ./path)
         path = p[2:] if p.startswith("./") else p
         if not os.path.isdir(path): missing.append(p)

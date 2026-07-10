@@ -34,7 +34,13 @@ import {
 // ---------------------------------------------------------------------------
 
 const MAX_PARALLEL_TASKS = 8;
-const MAX_CONCURRENCY = 4;
+// Local llama-server is a single-concurrency provider: parallel children only queue,
+// thrash the KV/prompt cache, and (fork) multiply full-parent-context prompt cost.
+// Default 1; PI_SUBAGENT_CONCURRENCY=4 restores parallelism for cloud sessions.
+const MAX_CONCURRENCY = (() => {
+	const n = Number.parseInt(process.env.PI_SUBAGENT_CONCURRENCY || "1", 10);
+	return Number.isFinite(n) && n > 0 ? Math.min(n, MAX_PARALLEL_TASKS) : 1;
+})();
 const PARALLEL_HEARTBEAT_MS = 1000;
 const DEFAULT_MAX_DELEGATION_DEPTH = 3;
 const DEFAULT_PREVENT_CYCLE_DELEGATION = true;

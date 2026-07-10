@@ -13,7 +13,9 @@ import { Type } from "typebox";
 // Env overrides: KETCH_BIN, KETCH_BACKEND (ddg|brave|searxng),
 //   KETCH_CODE_BACKEND, KETCH_DOCS_BACKEND, KETCH_MAX_CHARS, KETCH_TIMEOUT_MS.
 
-const ENABLED = process.env.KETCH !== "off"; // on by default; KETCH=off to drop the web/code/docs tools
+// OFF by default (pi-local-model-audit #3): 4 fewer tools in every local prompt —
+// small models pick tools better from a short menu. `KETCH=on pi` for research sessions.
+const ENABLED = process.env.KETCH === "on";
 const KETCH = process.env.KETCH_BIN || "ketch";
 const BACKEND = process.env.KETCH_BACKEND || "ddg";
 const CODE_BACKEND = process.env.KETCH_CODE_BACKEND || "sourcegraph";
