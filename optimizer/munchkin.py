@@ -109,6 +109,7 @@ def journal_persist(entries):
 # pi sessions — the model may be remote, the harness always runs here) inside that
 # window, so a candidate's prediction is checkable against measured behavior.
 GATE_WINDOWS = {}
+CURRENT_GATE = None  # active real_gate Popen; the signal handler kills it on the way out
 TELEMETRY_FILE = os.path.expanduser(os.environ.get("TELEMETRY_FILE", "~/.pi/agent/telemetry/events.jsonl"))
 
 def _utc_z():
@@ -183,7 +184,13 @@ def real_gate_one(cand, tasks, n, gen):
         os.remove(out)
     env = {**os.environ, "GEN": gen, "BASE": cfg_path, "N": str(n)}
     t0 = _utc_z()
-    rc = subprocess.run(["bash", REAL_GATE, "--calibrate", *tasks], env=env, cwd=HERE, check=False).returncode
+    # Popen (not run) so a signal handler can kill the gate: killing munchkin alone
+    # orphans the bash gate, which keeps writing rows into the next run's files
+    # (seen live: 22 duplicated (task,rep) rows + workdir rm -rf collisions).
+    global CURRENT_GATE
+    CURRENT_GATE = subprocess.Popen(["bash", REAL_GATE, "--calibrate", *tasks], env=env, cwd=HERE)
+    rc = CURRENT_GATE.wait()
+    CURRENT_GATE = None
     GATE_WINDOWS[gen] = (t0, _utc_z())
     if rc != 0:  # aborted gate (server down past HEALTH_WAIT, ^C): never verdict on partial arms
         raise SystemExit(f"[munchkin] gate {gen} aborted (exit {rc}) — fix the server and rerun; no verdict written")
@@ -418,6 +425,19 @@ def main():
     args = sys.argv[1:]
     if "--selftest" in args:
         selftest(); return
+    # Die WITH the gate: pkill'ing munchkin must not orphan the bash gate child
+    # (real_gate traps TERM and tears down its own in-flight pi session).
+    import signal
+    def _reap(signum, _frame):
+        if CURRENT_GATE is not None and CURRENT_GATE.poll() is None:
+            CURRENT_GATE.terminate()
+            try:
+                CURRENT_GATE.wait(timeout=10)
+            except subprocess.TimeoutExpired:
+                CURRENT_GATE.kill()
+        sys.exit(128 + signum)
+    signal.signal(signal.SIGTERM, _reap)
+    signal.signal(signal.SIGINT, _reap)
     def opt(flag, d):
         return args[args.index(flag) + 1] if flag in args else d
     gen = opt("--gen", "m0"); rounds = int(opt("--rounds", "3")); k = int(opt("--candidates", "2"))
