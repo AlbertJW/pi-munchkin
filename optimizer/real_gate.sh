@@ -137,6 +137,15 @@ run_one() {  # $1=config-path  $2=pattern(base|cand)  $3=task  $4=rep
 	  ${sbx[@]+"${sbx[@]}"} timeout "$PI_TIMEOUT" pi -p --approve ${PI_MODEL:+--model "$PI_MODEL"} --tools "$tools" "$(cat "$TASKS_DIR/$task.txt")" ) > "$wd/run.log" 2>&1 &
 	CHILD=$!; wait "$CHILD" || true; CHILD=""
 
+	# HARNESS error != MODEL failure. If pi never reached the model, scoring this run
+	# would record a task result for a measurement that never happened (a no-op scores
+	# whatever the pristine fixture scores). Abort loudly; munchkin hard-stops on it.
+	if grep -q "Connection error." "$wd/run.log" 2>/dev/null; then
+		echo "[real_gate] pi could not reach the model ($pat/$task rep$rep) — aborting, no rows written." >&2
+		echo "[real_gate]   check: LLAMA_URL=$LLAMA_URL reachable from node (macOS Local Network permission?)" >&2
+		exit 1
+	fi
+
 	# grading: restore authoritative tests so the model can't have tampered with them
 	if is_hidden "$task"; then
 		rm -f "$wd"/test/*.test.js                       # drop any model-added/edited tests
@@ -149,6 +158,9 @@ run_one() {  # $1=config-path  $2=pattern(base|cand)  $3=task  $4=rep
 	( cd "$wd" && node --test ) > "$wd/gate.log" 2>&1 || gate=0
 	[[ "$task" == "t1" ]] && grep -rq "parseCSV" "$wd/src" "$wd/test" && gate=0
 	[[ "$task" == "t4" ]] && ! grep -rq "trim" "$wd/test" && gate=0
+	# t2's own tests pass on an untouched fixture — node --test alone scores a no-op as
+	# success. The F2P grader asserts the behavior the task actually asks for.
+	[[ "$task" == "t2" ]] && ! ( cd "$wd" && node "$FIXTURES/t2-check.mjs" ) >/dev/null 2>&1 && gate=0
 	local tout; tout="$(python3 "$METRICS" "$wd" | cut -f7)"; [[ -n "$tout" ]] || tout=0
 
 	python3 - "$RESULTS" "$MODEL" "$pat" "$task" "$rep" "$gate" "$tout" <<'PY'
