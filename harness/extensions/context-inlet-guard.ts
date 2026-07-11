@@ -1,7 +1,7 @@
 import { stat } from "node:fs/promises";
 import { basename, extname } from "node:path";
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
-import { isPositiveNumber, resolveReadPath } from "../lib/context-inlet.ts";
+import { isPositiveNumber, limitBypassesRiskyGate, resolveReadPath, RISKY_MAX_LIMIT } from "../lib/context-inlet.ts";
 import { record } from "../lib/telemetry.ts";
 
 type ReadInput = {
@@ -55,8 +55,11 @@ export default function (pi: ExtensionAPI) {
 		const input = event.input as ReadInput;
 		if (typeof input.path !== "string" || !input.path.trim()) return;
 
-		// A positive limit is bounded intake; offset alone can still read the rest of a file.
-		if (isPositiveNumber(input.limit)) return;
+		// A positive limit is bounded intake — UNLESS it's a huge limit on a risky
+		// file, which defeats the 8KiB gate (hashline's 50KiB cap is the only backstop).
+		const risky = riskySupportPath(input.path);
+		const bigLimit = limitBypassesRiskyGate(input.limit, risky);
+		if (isPositiveNumber(input.limit) && !bigLimit) return;
 
 		let bytes: number;
 		const resolvedPath = resolveReadPath(ctx.cwd, input.path);
@@ -72,17 +75,17 @@ export default function (pi: ExtensionAPI) {
 		// Threshold per risk class directly — the old 20KB small-file early-return
 		// made the 8KB risky threshold unreachable dead code (any file under 20KB
 		// skipped the check before the risky threshold was ever consulted).
-		const risky = riskySupportPath(input.path);
 		const threshold = risky ? SUPPORT_FILE_BYTES : LARGE_FILE_BYTES;
 		if (bytes <= threshold) return;
 
 		const key = resolvedPath;
 		const n = (blockCounts.get(key) ?? 0) + 1;
 		blockCounts.set(key, n);
-		record("context-inlet-guard", "block", { risky, bytes, n });
+		record("context-inlet-guard", "block", { risky, bytes, n, bigLimit });
 
-		const reason =
-			n >= 3
+		const reason = bigLimit
+			? `failure_class=context_intake_risk. limit=${input.limit} on risky file ${input.path} (${bytes}B) defeats bounded intake — page it: limit ≤ ${RISKY_MAX_LIMIT} lines per read, or use rg/head/tail.`
+			: n >= 3
 				? `failure_class=context_intake_risk. Told ${n}× to bounded-read ${input.path}. STOP the unbounded read. Use rg/head/tail or pass a positive limit NOW, or act on what you have. Repeats stay blocked.`
 				: blockReason(input.path, bytes, risky);
 
