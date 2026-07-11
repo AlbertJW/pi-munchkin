@@ -261,7 +261,7 @@ def static_propose(spec_paths):
     specs = []
     for p in spec_paths:
         s = json.load(open(p))
-        gov_full = ""
+        gov_full = None  # None = no replacement; "" is a VALID replacement (empty governor = variant F)
         gf = s.pop("gov_file", "")  # full-replacement governor (path relative to the spec)
         if gf:
             gov_full = open(os.path.join(os.path.dirname(os.path.abspath(p)), gf)).read()
@@ -274,7 +274,7 @@ def static_propose(spec_paths):
             clean, dropped = sanitize_delta(delta, dims)
             if dropped:
                 print(f"[munchkin] {name}: dropped out-of-schema delta keys: {dropped}")
-            gov = gov_full if gov_full else best["gov"] + ("\n\n" + gov_append.strip() if gov_append.strip() else "")
+            gov = gov_full if gov_full is not None else best["gov"] + ("\n\n" + gov_append.strip() if gov_append.strip() else "")
             c = make_cand(gov, clean)
             c["_op"] = f"static:{name}"
             c["_pred"] = prediction  # falsifiable claim, checked against telemetry in the journal
@@ -415,6 +415,13 @@ def selftest():
         json.dump({"name": "lean", "gov_file": "lean.md", "prediction": "same pass, fewer tokens"}, open(s3, "w"))
         lc = static_propose([s3])(base, [], 1, 0, [])
         assert lc[0]["gov"] == "LEAN RULES ONLY.", "gov_file must REPLACE, not append"
+
+        # empty gov_file = variant F (empty governor override) — "" must not fall back to base gov
+        s4 = os.path.join(td, "none.json")
+        open(os.path.join(td, "empty.md"), "w").close()
+        json.dump({"name": "none", "gov_file": "empty.md"}, open(s4, "w"))
+        nc = static_propose([s4])(base, [], 1, 0, [])
+        assert nc[0]["gov"] == "", "empty gov_file must yield an EMPTY governor, not the baseline"
 
         def stub_enrich(label):
             return {"telemetry": {"loop-breaker.steer": 2}}
