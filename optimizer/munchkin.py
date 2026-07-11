@@ -261,16 +261,20 @@ def static_propose(spec_paths):
     specs = []
     for p in spec_paths:
         s = json.load(open(p))
+        gov_full = ""
+        gf = s.pop("gov_file", "")  # full-replacement governor (path relative to the spec)
+        if gf:
+            gov_full = open(os.path.join(os.path.dirname(os.path.abspath(p)), gf)).read()
         specs.append((s.pop("name", os.path.basename(p)), s.pop("gov_append", ""),
-                      s.pop("prediction", ""), s))
+                      s.pop("prediction", ""), gov_full, s))
 
     def propose(best, failures, k, r, journal):
         out = []
-        for name, gov_append, prediction, delta in specs[r * k:(r + 1) * k]:
+        for name, gov_append, prediction, gov_full, delta in specs[r * k:(r + 1) * k]:
             clean, dropped = sanitize_delta(delta, dims)
             if dropped:
                 print(f"[munchkin] {name}: dropped out-of-schema delta keys: {dropped}")
-            gov = best["gov"] + ("\n\n" + gov_append.strip() if gov_append.strip() else "")
+            gov = gov_full if gov_full else best["gov"] + ("\n\n" + gov_append.strip() if gov_append.strip() else "")
             c = make_cand(gov, clean)
             c["_op"] = f"static:{name}"
             c["_pred"] = prediction  # falsifiable claim, checked against telemetry in the journal
@@ -403,6 +407,14 @@ def selftest():
         assert cands[0]["_pred"] == "fewer loops"
         assert cands[1]["scaffold"] == "cot" and "decoding" not in cands[1], "unsafe delta must drop"
         assert static_propose([s1, s2])(base, [], 2, 1, []) == [], "round past specs is empty"
+
+        # gov_file = full-replacement governor (path relative to the spec file)
+        s3 = os.path.join(td, "lean.json")
+        with open(os.path.join(td, "lean.md"), "w") as f:
+            f.write("LEAN RULES ONLY.")
+        json.dump({"name": "lean", "gov_file": "lean.md", "prediction": "same pass, fewer tokens"}, open(s3, "w"))
+        lc = static_propose([s3])(base, [], 1, 0, [])
+        assert lc[0]["gov"] == "LEAN RULES ONLY.", "gov_file must REPLACE, not append"
 
         def stub_enrich(label):
             return {"telemetry": {"loop-breaker.steer": 2}}

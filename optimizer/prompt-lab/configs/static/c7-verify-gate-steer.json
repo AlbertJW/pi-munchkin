@@ -1,0 +1,7 @@
+{
+  "name": "verify-gate-steer",
+  "prediction": "fewer verify-gate.unverified-end events; pass-rate rises on parens/equil iff the failures were compliance-bound (ended without running the gate) rather than capability-bound (ran it, couldn't fix red). Diagnostic either way.",
+  "messages": {
+    "PI_MSG_VG_STEER": "[verify-gate] STOP — do not end this turn. You edited files but no gate has passed. Run {gate} NOW and paste its full output. Only decide after you see it: if red, fix the code and re-run until green. Ending with 'done' but no green {gate} is a failed task.{ctn}"
+  }
+}

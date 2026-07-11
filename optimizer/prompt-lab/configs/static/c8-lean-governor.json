@@ -1,0 +1,5 @@
+{
+  "name": "lean-governor",
+  "prediction": "pass-rate holds (neutral-or-better) while median out_chars/session drops — governor prose duplicated by ENFORCED mechanisms (loop-breaker retry ladder, verify-gate, plan-runner workflow, context-watcher compaction) is dead prompt weight for a 4B",
+  "gov_file": "lean-governor.md"
+}
