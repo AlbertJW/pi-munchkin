@@ -1,0 +1,5 @@
+{
+  "name": "no-verify-gate",
+  "prediction": "pass-rate holds without the verify-gate (its 4B fires don't convert — m6: capability-bound; the gate's steers cost tokens without buying passes on this model class). If pass-rate DROPS, the gate earns permanent retention with evidence.",
+  "thresholds": { "VERIFY_GATE": "off" }
+}

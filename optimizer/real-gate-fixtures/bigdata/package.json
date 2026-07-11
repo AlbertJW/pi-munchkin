@@ -1,0 +1,1 @@
+{"name": "events-report", "version": "1.0.0", "description": "Event data analysis task", "main": "src/index.js", "type": "module", "scripts": {"test": "node --test"}, "license": "MIT"}

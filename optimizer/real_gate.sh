@@ -108,6 +108,7 @@ run_one() {  # $1=config-path  $2=pattern(base|cand)  $3=task  $4=rep
 	local fix; fix="$(fixture_for "$task")"
 	rm -rf "$wd"; mkdir -p "$wd"
 	cp -R "$fix/src" "$fix/test" "$fix/package.json" "$wd/"
+	[[ -d "$fix/data" ]] && cp -R "$fix/data" "$wd/"   # data-backed tasks (e.g. bigdata) ship their corpus
 	[[ "$task" == "t3" ]] && cp "$T3_FILES/align.js" "$wd/src/"   # the buggy source to fix (before only)
 	is_hidden "$task" || install_tests "$task" "$wd"             # shown tasks only; hidden tasks withhold the test
 
