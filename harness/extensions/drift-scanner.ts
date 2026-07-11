@@ -1,6 +1,7 @@
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { completeSimple } from "@earendil-works/pi-ai/compat";
 import { buildTruncatedDiff, extractFindings, isReviewableCommit, MAX_DIFF, REVIEW_PROMPT } from "../lib/drift-policy.ts";
+import { record } from "../lib/telemetry.ts";
 
 // Advisory drift / dead-code reviewer.
 //
@@ -69,7 +70,11 @@ export default function (pi: ExtensionAPI) {
 			const body = (truncated ? `[diff truncated to first ${MAX_DIFF} chars]\n\n` : "") + text;
 
 			const auth = await ctx.modelRegistry.getApiKeyAndHeaders(model);
-			if (!auth.ok) return; // can't authenticate this model → fail open
+			if (!auth.ok) {
+				record("drift-scanner", "review-skipped", { why: "auth" });
+				return; // can't authenticate this model → fail open
+			}
+			record("drift-scanner", "review-start", { diffChars: body.length, truncated });
 
 			const review = await completeSimple(
 				model,
@@ -81,7 +86,14 @@ export default function (pi: ExtensionAPI) {
 				{ timeoutMs: TIMEOUT_MS, maxRetries: 0, reasoning: "minimal", signal: ctx.signal, apiKey: auth.apiKey, headers: auth.headers },
 			);
 			const findings = extractFindings(review.content as Array<{ type: string; text?: string }>, review.stopReason);
-			if (!findings) return; // CLEAN / empty / non-"stop" finish → nothing to surface
+			if (!findings) {
+				const textLen = (review.content as Array<{ type: string; text?: string }>)
+					.filter((c) => c.type === "text")
+					.reduce((n, c) => n + (c.text?.length ?? 0), 0);
+				record("drift-scanner", "review-null", { stopReason: review.stopReason, textLen });
+				return; // CLEAN / empty / non-"stop" finish → nothing to surface
+			}
+			record("drift-scanner", "advisory", { chars: findings.length });
 
 			// Clamp: reviewer output is model-generated and unbounded; injecting it
 			// verbatim can dump thousands of tokens into a 30k window.
@@ -93,7 +105,8 @@ export default function (pi: ExtensionAPI) {
 					clamped,
 				{ deliverAs: "followUp" },
 			);
-		} catch {
+		} catch (e) {
+			record("drift-scanner", "review-error", { error: String((e as Error)?.message ?? e).slice(0, 150) });
 			return; // git error / endpoint down / timeout / aborted → fail open silently
 		}
 	});
