@@ -2,7 +2,7 @@ import { readFile, stat } from "node:fs/promises";
 import { join } from "node:path";
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { completeSimple } from "@earendil-works/pi-ai/compat";
-import { extractReflectFindings, MAX_ARTIFACT, MAX_ROUNDS, REFLECT_PROMPT, shouldIterate } from "../lib/reflect-policy.ts";
+import { extractReflectFindings, MAX_ARTIFACT, MAX_ROUNDS, METHODS, REFLECT_PROMPT, shouldIterate, voteFindings } from "../lib/reflect-policy.ts";
 import { steerText } from "../lib/steer-texts.ts";
 import { record } from "../lib/telemetry.ts";
 
@@ -63,13 +63,13 @@ export default function (pi: ExtensionAPI) {
 				return;
 			}
 
-			let model = ctx.model;
-			const arg = (args ?? "").trim();
-			if (arg) {
-				const named = ctx.modelRegistry.getAll().find((m) => m.id === arg);
-				if (named) model = named;
-				else ctx.ui.notify(`reflect: no model '${arg}' — using the session model (optillm methods are phase 2)`, "info");
+			const model = ctx.model;
+			const arg = (args ?? "").trim().toLowerCase();
+			const method = METHODS[arg || "default"];
+			if (arg && !method) {
+				ctx.ui.notify(`reflect: unknown method '${arg}' (have: ${Object.keys(METHODS).join(", ")}) — using default`, "info");
 			}
+			const m = method ?? METHODS.default;
 			if (!model) {
 				ctx.ui.notify("reflect: no active model", "warning");
 				return;
@@ -82,13 +82,25 @@ export default function (pi: ExtensionAPI) {
 					ctx.ui.notify("reflect: cannot authenticate the reviewer model", "warning");
 					return;
 				}
-				ctx.ui.notify(`reflect: reviewing (round ${rounds + 1}/${MAX_ROUNDS})…`, "info");
-				const review = await completeSimple(
-					model,
-					{ systemPrompt: REFLECT_PROMPT, messages: [{ role: "user", content: artifact, timestamp: Date.now() }] },
-					{ timeoutMs: TIMEOUT_MS, maxRetries: 0, reasoning: "minimal", signal: ctx.signal, apiKey: auth.apiKey, headers: auth.headers },
-				);
-				const findings = extractReflectFindings(review.content as Array<{ type: string; text?: string }>, review.stopReason);
+				ctx.ui.notify(`reflect: reviewing (round ${rounds + 1}/${MAX_ROUNDS}${m.samples > 1 ? `, ${m.samples}-sample vote` : ""})…`, "info");
+				const samples: Array<string | null> = [];
+				for (let i = 0; i < m.samples; i++) {
+					const review = await completeSimple(
+						model,
+						{ systemPrompt: REFLECT_PROMPT, messages: [{ role: "user", content: artifact, timestamp: Date.now() }] },
+						{
+							timeoutMs: TIMEOUT_MS,
+							maxRetries: 0,
+							reasoning: "minimal",
+							temperature: m.temperature,
+							signal: ctx.signal,
+							apiKey: auth.apiKey,
+							headers: auth.headers,
+						},
+					);
+					samples.push(extractReflectFindings(review.content as Array<{ type: string; text?: string }>, review.stopReason));
+				}
+				const findings = m.samples > 1 ? voteFindings(samples, m.minVotes) : samples[0];
 				rounds += 1;
 				if (!findings) {
 					record("reflect", "review", { round: rounds, clean: true });

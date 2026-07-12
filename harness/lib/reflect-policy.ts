@@ -46,3 +46,74 @@ export function extractReflectFindings(
 export function shouldIterate(round: number, findings: string | null): boolean {
 	return findings !== null && round < MAX_ROUNDS;
 }
+
+// ---------- reasoning methods (prompt strategies, not proxy infra) ----------
+
+// /reflect <method>. Each method = sampling shape + merge rule over the SAME
+// contract prompt. `sc` exists because of a measured pathology: single reviews
+// invent defects on clean plans (unreliable CLEAN), but hallucinated nitpicks
+// don't recur across independent samples while real flaws do — consistency
+// voting is the prompt-level cure.
+export type ReflectMethod = { samples: number; temperature: number; minVotes: number };
+export const METHODS: Record<string, ReflectMethod> = {
+	default: { samples: 1, temperature: 0.3, minVotes: 1 },
+	sc: { samples: 3, temperature: 0.8, minVotes: 2 },
+};
+
+// Normalize a finding line for cross-sample voting: tag + lowercased alnum
+// words. Different phrasings of the same flaw vote together if they share the
+// tag and enough content words (Jaccard >= 0.5 against an existing bucket).
+export function findingKeyWords(line: string): { tag: string; words: Set<string>; steps: Set<string> } {
+	const tag = (line.match(/\[(BLOCKER|RISK|CUT|VERIFY)\]/i)?.[1] ?? "?").toUpperCase();
+	// The strongest identity for a plan finding is WHICH ITEM it points at —
+	// phrasings of the same flaw diverge wildly, its step reference doesn't.
+	const steps = new Set(Array.from(line.matchAll(/(?:step|item|#)\s*(\d+)/gi), (m) => m[1]));
+	const words = new Set(
+		line
+			.toLowerCase()
+			.replace(/\[[a-z]+\]/g, "")
+			.split(/[^a-z0-9]+/)
+			.filter((w) => w.length > 3),
+	);
+	return { tag, words, steps };
+}
+
+// Overlap coefficient (intersection over the SMALLER set), not Jaccard: a
+// verbose prose finding is a superset of its terse dashed twin — Jaccard
+// punishes the size difference and splits votes for the same flaw.
+function similar(a: Set<string>, b: Set<string>): boolean {
+	let inter = 0;
+	for (const w of a) if (b.has(w)) inter++;
+	const smaller = Math.min(a.size, b.size);
+	return smaller > 0 && inter / smaller >= 0.5;
+}
+
+// Vote across samples: null samples (CLEAN) contribute no findings. Returns the
+// surviving findings (first-seen wording) or null when nothing reaches minVotes.
+export function voteFindings(samples: Array<string | null>, minVotes: number): string | null {
+	type Bucket = { tag: string; words: Set<string>; steps: Set<string>; line: string; votes: number };
+	const buckets: Bucket[] = [];
+	// A finding line in ANY of the model's observed formats: "- x", "* x", "1. x",
+	// "**x**". Small local reviewers ignore the dash contract often enough that a
+	// dash-only parser zeroes out REAL findings and votes a flawed plan CLEAN.
+	const findingLine = /^\s*(?:[-*]|\d+\.|\*\*)/;
+	for (const s of samples) {
+		if (!s) continue;
+		for (const line of s.split("\n")) {
+			if (!findingLine.test(line) || line.trim().length < 20) continue;
+			const { tag, words, steps } = findingKeyWords(line);
+			// Identity: same step reference wins outright; otherwise tag-compatible
+			// ("?" = untagged prose matches any) + word overlap. Small reviewers
+			// drop the [TAG] and the dash as often as they keep them.
+			const hit = buckets.find((b) => {
+				const stepHit = steps.size > 0 && b.steps.size > 0 && [...steps].some((n) => b.steps.has(n));
+				const tagOk = b.tag === tag || b.tag === "?" || tag === "?";
+				return stepHit || (tagOk && similar(b.words, words));
+			});
+			if (hit) hit.votes++;
+			else buckets.push({ tag, words, steps, line: line.trim(), votes: 1 });
+		}
+	}
+	const kept = buckets.filter((b) => b.votes >= minVotes).map((b) => b.line);
+	return kept.length ? kept.join("\n") : null;
+}
