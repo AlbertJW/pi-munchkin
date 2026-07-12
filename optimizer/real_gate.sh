@@ -136,6 +136,8 @@ run_one() {  # $1=config-path  $2=pattern(base|cand)  $3=task  $4=rep
 	# run pi in the background + wait, so the INT trap can kill it instantly
 	( cd "$wd"
 	  while IFS= read -r line; do [[ "$line" == *=* && "$line" != ENDPOINT=* && "$line" != LABEL=* ]] && export "${line?}"; done <<< "$envlines"
+	  # config-enabled extension tools must also be in the --tools palette
+	  [[ "${SPAN_TOOLS:-}" == "on" ]] && tools="$tools,search_spans,read_span"
 	  ${sbx[@]+"${sbx[@]}"} timeout "$PI_TIMEOUT" pi -p --approve ${PI_MODEL:+--model "$PI_MODEL"} --tools "$tools" "$(cat "$TASKS_DIR/$task.txt")" ) > "$wd/run.log" 2>&1 &
 	CHILD=$!; wait "$CHILD" || true; CHILD=""
 
