@@ -6,15 +6,21 @@ locally-served LLMs.
 
 Two halves:
 
-- **`harness/`** — the thing being tuned: a set of pi extensions (an anti-loop breaker, a
-  pre-"done" verify gate, a plan runner, drift/context/git guards, subagents) and a system-prompt
-  *governor* (`APPEND_SYSTEM.md`).
+- **`harness/`** — the thing being tuned: a set of pi extensions (an anti-loop breaker with
+  outcome-loop escalation, a pre-"done" verify gate, a plan runner, drift/context/git guards,
+  bounded span tools for large files, a fresh-context `/reflect` plan reviewer, fail-open
+  telemetry, subagents) and a system-prompt *governor* (`APPEND_SYSTEM.md`).
 - **`optimizer/`** — the loop that measures whether a change to the governor actually makes a model
   write better code, and only adopts changes that pass a statistical test.
 
-> **Status: a working substrate, not (yet) a validated auto-improver.** Every piece is built and
-> self-tested, but the optimizer has not yet produced a *measured* harness win — see "The honest
-> finding" below. This is infrastructure for finding wins, published as-is.
+> **Status: a validated loop with measured wins.** The headline result (dd1, n=36/arm on a local
+> 35B): pass-rate rose **monotonically as governor prose was removed** — full 5.2KB governor 83%
+> (with 9 loop-breaker aborts), lean 89%, *empty* 97% (p=0.053) — so the live governor is now a
+> 1.4KB minimal core (safety gates + feature docs), adopted through the loop's own human-gated
+> process. The same machinery killed six plausible candidates that measured as noise, rejected a
+> popular context extension as architecturally incompatible (and in doing so proved hash-anchored
+> editing is load-bearing for weak models). A tuning loop that mostly says **no** is the point;
+> see "The honest finding" for why the instrument is the hard part.
 
 ## How the optimizer works
 
@@ -59,6 +65,14 @@ band** (roughly 20–85% pass rate). Empirically:
 
 `optimizer/prompt-lab/calibrate.py` exists to find that band per model before you spend GPU hours
 optimizing.
+
+The second honest finding, learned the hard way: **the instrument fails more often than the
+hypothesis.** Every result above survived only because the gate distinguishes "the model failed
+the task" from "the harness never measured anything": tasks that score a no-op as success,
+sessions that never reached the model, a silently hot-swapped model, an orphaned sweep writing
+rows into the next run's files. Each has a dedicated guard now (`t2-check` fail-to-pass grading,
+connection-error abort, a degraded-model token tripwire, gate-process reaping) — budget as much
+effort for instrument integrity as for candidates.
 
 ## Setup
 
