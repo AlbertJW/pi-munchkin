@@ -1,5 +1,6 @@
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { isBashMutation, looksFailingOutput } from "../lib/command-policy.ts";
+import { decideOutcomeAction } from "../lib/loop-outcome.ts";
 import { steerText } from "../lib/steer-texts.ts";
 import { record } from "../lib/telemetry.ts";
 
@@ -304,12 +305,27 @@ export default function (pi: ExtensionAPI) {
 				outcomeLabels.set(fp, call ? labelFor(call.name, call.args) : r.toolName);
 			}
 			const fired = outcomeFired.get(fp) ?? 0;
-			if ((n >= OUTCOME_T1 && fired === 0) || (n >= OUTCOME_T1 * 2 && fired === 1)) {
+			const action = decideOutcomeAction(n, fired, OUTCOME_T1);
+			if (action === "steer") {
 				outcomeFired.set(fp, fired + 1);
 				// Flag for verify-gate: while an outcome loop is active, its "re-run
 				// till green" steer contradicts this "stop, change approach" one.
 				(globalThis as Record<string, unknown>).__pi_lb_outcome_at = Date.now();
 				record("loop-breaker", "outcome-steer", { n, turnIndex: event.turnIndex });
+				pi.sendUserMessage(outcomeMessage(n, outcomeLabels.get(fp) ?? r.toolName), { deliverAs: "followUp" });
+			} else if (action === "escalate") {
+				// Two ignored steers and the identical failing outcome STILL repeating:
+				// a grinder (seen live: 23-48 identical edit failures post-silence).
+				// Escalate like tier 3 instead of watching forever.
+				outcomeFired.set(fp, fired + 1);
+				if (HARD_STOP_MODE === "abort") {
+					record("loop-breaker", "outcome-abort", { n, turnIndex: event.turnIndex });
+					ctx.ui.notify(`loop-breaker: hard stop — same failing outcome ${n}× (${outcomeLabels.get(fp) ?? r.toolName})`, "error");
+					abortArmed = true;
+					ctx.abort();
+					return;
+				}
+				record("loop-breaker", "outcome-steer", { n, final: true, turnIndex: event.turnIndex });
 				pi.sendUserMessage(outcomeMessage(n, outcomeLabels.get(fp) ?? r.toolName), { deliverAs: "followUp" });
 			}
 		}
