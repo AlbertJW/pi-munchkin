@@ -1,0 +1,5 @@
+{
+  "name": "full-governor",
+  "prediction": "9B gradient point: if prose-harm scales with capability, the full 5.2KB governor should hurt the 9B less than it hurt the 35B (dd1: -14pp, 9 aborts) but more than it helps; baseline arm (minimal, live) should win or draw. Completes the 2B-4B-9B-35B curve.",
+  "gov_file": "full-governor-2026-07.md"
+}
