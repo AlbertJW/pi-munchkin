@@ -1,0 +1,5 @@
+{
+  "name": "span-tools",
+  "prediction": "bigdata pass-rate rises and/or retrieved chars drop (bounded query tools beat bash-improv on large structured files); parens/equil unchanged (no code-task regression). span-tools telemetry (search/read events) confirms actual usage.",
+  "thresholds": { "SPAN_TOOLS": "on" }
+}

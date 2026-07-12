@@ -94,6 +94,10 @@
         "VERIFY_GATE": [
           "on",
           "off"
+        ],
+        "SPAN_TOOLS": [
+          "on",
+          "off"
         ]
       }
     },
