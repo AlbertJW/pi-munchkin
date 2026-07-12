@@ -98,6 +98,10 @@
         "SPAN_TOOLS": [
           "on",
           "off"
+        ],
+        "HASHLINE_TAG": [
+          "hex",
+          "slug"
         ]
       }
     },

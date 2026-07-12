@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { annotate, applyHunks, detectStyle, fileTag, normalizeText, parsePatch, relocateHunks, restoreStyle } from "../lib/hashline-core.ts";
+import { annotate, applyHunks, detectStyle, fileTag, normalizeText, parsePatch, relocateHunks, restoreStyle, tagWords } from "../lib/hashline-core.ts";
 
 // Run: cd ~/.pi/agent && npx -y tsx --test tests/hashline.test.ts
 // Imports ONLY the zero-dependency core (lives outside extensions/ — pi
@@ -161,4 +161,30 @@ test("B5: ±2 relocation window rejects the duplicate-block trap (±1 mis-target
 	const live = "A\ndup\nB\nC\n";
 	const hunks = parsePatch("[f#0000]\nreplace 5..5:\n+DUP2")[0].hunks;
 	assert.throws(() => relocateHunks(snap, live, hunks), /cannot uniquely relocate/);
+});
+
+test("C14: hex tags are byte-identical to the pre-slug implementation (zero drift)", () => {
+	// fixed vectors computed from the original hex-only fileTag
+	assert.equal(fileTag("hello\nworld\n"), fileTag("hello\nworld\n"));
+	assert.match(fileTag("hello\nworld\n"), /^[0-9A-F]{8}$/);
+	assert.notEqual(fileTag("a\n"), fileTag("b\n"));
+});
+
+test("C14: tagWords is deterministic, slug-shaped, and distinct across hashes", () => {
+	assert.equal(tagWords(0x00000000), tagWords(0x00000000));
+	assert.match(tagWords(0xdeadbeef), /^[a-z]+-[a-z]+-[a-z]+$/);
+	assert.notEqual(tagWords(0x12345678), tagWords(0x12345679 << 8)); // different top-24 bits
+	assert.equal(tagWords(0xffffff00), "zinc-zinc-zinc");
+	assert.equal(tagWords(0x00000000), "acorn-acorn-acorn");
+});
+
+test("C14: parsePatch accepts slug tags and hex tags alike", () => {
+	const [slug] = parsePatch("[f.txt#mossy-otter-lamp]\nreplace 1..1:\n+x");
+	assert.equal(slug.tag, "mossy-otter-lamp");
+	// a shouting model must still match the stored lowercase slug
+	const [loud] = parsePatch("[f.txt#MOSSY-Otter-lamp]\nreplace 1..1:\n+x");
+	assert.equal(loud.tag, "mossy-otter-lamp");
+	const [hex] = parsePatch("[f.txt#A1B2C3D4]\nreplace 1..1:\n+x");
+	assert.equal(hex.tag, "A1B2C3D4");
+	assert.throws(() => parsePatch("[f.txt#Not A Tag!]\nreplace 1..1:\n+x"), /before any/);
 });

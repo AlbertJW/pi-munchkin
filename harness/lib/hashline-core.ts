@@ -1,7 +1,8 @@
-// Hashline pure core — tag, grammar, apply, relocate. Zero imports by design:
+// Hashline pure core — tag, grammar, apply, relocate. No SDK imports by design:
 // extensions/hashline.ts wires it to pi; tests/hashline.test.ts runs it
 // standalone (no SDK resolution needed). Format from can1357/oh-my-pi
 // (packages/hashline: format.ts, grammar.lark).
+import { TAG_WORDS } from "./tag-words.ts";
 
 export function normalizeText(s: string): string {
 	return s.replace(/^﻿/, "").replace(/\r\n?/g, "\n");
@@ -56,9 +57,23 @@ export function xxHash32(input: Uint8Array, seed = 0): number {
 // trim insensitivity, per OMP). OMP masks to 16 bits; we keep the full 32 —
 // a 1/65536 silent wrong-baseline collision is too likely over hundreds of
 // edits, and the cost is 4 extra chars per header.
+//
+// HASHLINE_TAG=slug (candidate c14) encodes the top 24 bits as three words —
+// small models mangle hex tags ("#main" invented live) but copy real words
+// reliably. 24 vs 32 bits: the snapshot store dedupes by tag AND text, and
+// stale-tag content relocation catches the residual, so the smaller space
+// trades negligible risk for copy fidelity. Read once at load, like other
+// env gates.
+const TAG_STYLE = process.env.HASHLINE_TAG === "slug" ? "slug" : "hex";
+
+export function tagWords(h: number): string {
+	return [(h >>> 24) & 0xff, (h >>> 16) & 0xff, (h >>> 8) & 0xff].map((b) => TAG_WORDS[b]).join("-");
+}
+
 export function fileTag(text: string): string {
 	const stripped = text.replace(/[ \t\r]+(?=\n|$)/g, "");
 	const h = xxHash32(new TextEncoder().encode(stripped)) >>> 0;
+	if (TAG_STYLE === "slug") return tagWords(h);
 	return h.toString(16).padStart(8, "0").toUpperCase();
 }
 
@@ -73,7 +88,9 @@ export type Hunk =
 
 export type Section = { path: string; tag: string; hunks: Hunk[] };
 
-const HEADER_RE = /^\[([^#\]]+)#([0-9A-Fa-f]{4,8})\]$/;
+// Accepts both tag encodings: hex (default) and word-slug (HASHLINE_TAG=slug,
+// any case — models sometimes shout; normalization below lowercases slugs).
+const HEADER_RE = /^\[([^#\]]+)#([0-9A-Fa-f]{4,8}|[A-Za-z]+(?:-[A-Za-z]+){1,3})\]$/;
 
 // EOL/BOM round-trip helpers: the engine works on normalized LF text; callers
 // detect the original style and restore it on write so a one-line edit never
@@ -131,7 +148,10 @@ export function parsePatch(input: string): Section[] {
 		if ((m = line.match(HEADER_RE))) {
 			closeHunk(n + 1);
 			if (cur && cur.hunks.length === 0) throw new Error(`bad patch: section [${cur.path}] has no hunks`);
-			cur = { path: m[1], tag: m[2].toUpperCase(), hunks: [] };
+			// hex tags normalize to upper (case-insensitive copy tolerance); slug
+			// tags contain "-" and normalize to lower — uppercasing them would
+			// mismatch every stored lowercase slug and fail all slug edits.
+			cur = { path: m[1], tag: m[2].includes("-") ? m[2].toLowerCase() : m[2].toUpperCase(), hunks: [] };
 			sections.push(cur);
 			continue;
 		}

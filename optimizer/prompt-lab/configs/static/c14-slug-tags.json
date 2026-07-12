@@ -1,0 +1,5 @@
+{
+  "name": "slug-tags",
+  "prediction": "edit_err/session drops (the tag-copy failure class shrinks; invented-tag errors vanish) and pass-rate holds or rises on edit-heavy tasks. Small-model-tier candidate: the DD's edit_err is already ~0.",
+  "thresholds": { "HASHLINE_TAG": "slug" }
+}
