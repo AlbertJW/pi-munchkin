@@ -9,6 +9,7 @@ baseline, both llama-swap routers. Selection constraint (user): no large models,
 |---|---|---|---|---|---|
 | **qwopus35-4b-mtp** | box | parens, equil, bigdata | ~40–55% | 57 t/s, ~3–5 min/session | all-round anchor (2 weeks of history) |
 | **qwen35-2b-opus-reasoning** | box | equil only | 40% (2/5) | thinking-heavy, 900s cap advised | narrow instrument + overthinking diagnostics |
+| **mellum2-12b-thinking** | mac (granted) | parens, bigdata | ~50% (1/2 each) | 43 t/s, thinking blowouts — 900s cap mandatory | the non-Qwen family — upgrades fleet verdicts to cross-family |
 
 ## Excluded, with reasons
 
@@ -19,14 +20,13 @@ baseline, both llama-swap routers. Selection constraint (user): no large models,
 | marco-nano | box (removed) | no structured tool calls |
 | gemma4-26b-hauhau | mac | 16.8GB — excluded per no-large-models rule (parens 0/1 partial, unmeasured otherwise) |
 | qwen36-35b-iq3s (DD) | mac | large + workstation rule; its band is known separately (roman/titlecase/bigdata) |
-| mellum2-12b-thinking | mac | gradient on parens 1/2 + bigdata 1/2 (!), but 13GB + mac-hosted; **best future addition** if a granted window appears — only non-Qwen family with measured gradient |
+| ~~mellum2-12b-thinking~~ | mac | **PROMOTED to the set 2026-07-13 (user-granted)** — see selected table |
 | grug-v2-9b | mac | unmeasured (sweep crash); 7GB — eligible for a future small-model mac block |
 | qwopus35-9b-coder | mac | unmeasured (sweep crash); known overthinker on hard tasks (cal9h partial) |
 
 ## Honest limitation
-The selected set is 2 members from 1 family (both Jackrong Qwen). Fleet verdicts read
-"consistent across two Qwen tiers", NOT "cross-family general". Mellum (or grug) added later
-upgrades that claim; recorded, not blocking.
+Set = 3 members, 2 families (Qwen 2B/4B + JetBrains MoE 12B). Cross-family sign direction is
+now measurable, at minimum viable width. grug (7GB) remains the cheapest future 4th member.
 
 ## Speed notes
 grug's 15.7 t/s is serving config (no MTP), not model quality — annotate, don't penalize.
