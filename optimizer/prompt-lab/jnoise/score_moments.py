@@ -53,7 +53,9 @@ def model_of(sdir):
 def score(moments_path, model_tag, out_path, model_ctx):
     """Carry turn + session + prefix_len alongside noise so analyze can test the
     position/non-independence confounds — noise correlates with confab ONLY if it
-    isn't just tracking 'late in a doomed session'."""
+    isn't just tracking 'late in a doomed session'. sublabel (CONFAB_COPY vs
+    CONFAB_BLIND) passes through so analyze can study the true tag-copy-failure
+    population separately from blind invention."""
     n = 0
     with open(out_path, "w") as out:
         for line in open(moments_path):
@@ -62,9 +64,11 @@ def score(moments_path, model_tag, out_path, model_ctx):
                 continue
             noise = jlens_entropy(mo, model_ctx)
             prefix_len = sum(len(c.get("text", "")) for c in mo.get("context", []))
-            out.write(json.dumps({"label": mo["label"], "model": model_tag, "noise": noise,
+            out.write(json.dumps({"label": mo["label"], "sublabel": mo.get("sublabel"),
+                                  "model": model_tag, "noise": noise,
                                   "turn": mo.get("turn"), "session": mo.get("session"),
-                                  "prefix_len": prefix_len}) + "\n")
+                                  "prefix_len": prefix_len,
+                                  "context_truncated": mo.get("context_truncated")}) + "\n")
             n += 1
     return n
 
@@ -100,24 +104,38 @@ def _directional(pos, neg):
 
 
 def analyze(scored_path):
-    """Per model: the PRIMARY tag-copy study (CONFAB vs CLEAN) kept separate from
-    the CONFAB_EXACT study (a different tool — old_string invention, no #TAG), plus
-    the position confound (does the noise signal beat turn-number alone?)."""
+    """Per model, bucketed by sublabel where available (CONFAB_COPY / CONFAB_BLIND)
+    else falling back to the plain label (backward-compat with pre-sublabel data):
+
+      CONFAB_vs_CLEAN — the PRIMARY claim: does noise separate a genuine tag-COPY
+                        failure (the model saw the right tag, typed a different
+                        one) from a clean copy? Uses CONFAB_COPY when the corpus
+                        has it; falls back to plain CONFAB on old scored files.
+      BLIND_vs_CLEAN  — CONFAB_BLIND (no prior tag at all — closer to invention
+                        than copy failure) studied SEPARATELY, never merged in.
+      EXACT_vs_CLEAN  — CONFAB_EXACT (different tool, no #TAG) — unchanged.
+      turn_confound_auc — does turn-number ALONE separate CONFAB_COPY from CLEAN
+                        as well as noise does? If so the "signal" is position.
+    """
     rows = [json.loads(l) for l in open(scored_path) if l.strip()]
     by_model = {}
     for r in rows:
-        by_model.setdefault(r["model"], collections.defaultdict(list))[r["label"]].append(r)
+        key = r.get("sublabel") or r["label"]
+        by_model.setdefault(r["model"], collections.defaultdict(list))[key].append(r)
     out = {}
     for model, d in sorted(by_model.items()):
         noise = lambda lab: [r["noise"] for r in d.get(lab, [])]
         turn = lambda lab: [r.get("turn") or 0 for r in d.get(lab, [])]
         res = {"n": {k: len(v) for k, v in d.items()}}
-        res["CONFAB_vs_CLEAN"] = _directional(noise("CONFAB"), noise("CLEAN"))
+        primary = "CONFAB_COPY" if d.get("CONFAB_COPY") else "CONFAB"  # fallback: pre-sublabel data
+        res["CONFAB_vs_CLEAN"] = _directional(noise(primary), noise("CLEAN"))
+        if d.get("CONFAB_BLIND"):
+            res["BLIND_vs_CLEAN"] = _directional(noise("CONFAB_BLIND"), noise("CLEAN"))
         if d.get("CONFAB_EXACT"):
             res["EXACT_vs_CLEAN"] = _directional(noise("CONFAB_EXACT"), noise("CLEAN"))
         # confound: how well does TURN NUMBER alone separate the classes? If this
         # rivals the noise AUC, the "signal" is position, not confabulation.
-        res["turn_confound_auc"] = round(roc_auc(turn("CONFAB"), turn("CLEAN")) or 0.5, 3) if noise("CONFAB") else None
+        res["turn_confound_auc"] = round(roc_auc(turn(primary), turn("CLEAN")) or 0.5, 3) if noise(primary) else None
         out[model] = res
     return out
 
@@ -128,59 +146,111 @@ def _write(path, rows):
             f.write(json.dumps(r) + "\n")
 
 
+def mock_noise(moment):
+    """Deterministic, content-derived pseudo-noise — NOT jlens, NOT a verdict.
+    Exists only to drive real corpus data through score()->analyze() end-to-end
+    so the pipeline is proven against real shape (variable context lengths,
+    multiple models, sublabels, missing fields) before the actual tool is wired."""
+    import hashlib
+    h = hashlib.sha1(json.dumps(moment.get("call_args"), sort_keys=True, default=str).encode()).hexdigest()
+    return (int(h[:8], 16) % 1000) / 100.0
+
+
+def shapecheck(moments_path):
+    """Mock-score a REAL moments file and run it through analyze() end-to-end.
+    Proves the pipeline survives real data (unlike the synthetic selftest
+    fixtures) — messy contexts, every model tag, sublabel presence/absence.
+    Returns (n_scored, {model: analyze-report})."""
+    import tempfile
+    with tempfile.TemporaryDirectory() as td:
+        scored = os.path.join(td, "mock_scored.jsonl")
+        n = 0
+        with open(scored, "w") as out:
+            for line in open(moments_path):
+                mo = json.loads(line)
+                prefix_len = sum(len(c.get("text", "")) for c in mo.get("context", []))
+                out.write(json.dumps({"label": mo["label"], "sublabel": mo.get("sublabel"),
+                                      "model": model_of(mo.get("sdir")), "noise": mock_noise(mo),
+                                      "turn": mo.get("turn"), "session": mo.get("session"),
+                                      "prefix_len": prefix_len}) + "\n")
+                n += 1
+        return n, analyze(scored)
+
+
+def _print_report(report):
+    for model, r in report.items():
+        print(f"== {model}  n={r['n']}  turn-confound AUC={r['turn_confound_auc']}")
+        for study in ("CONFAB_vs_CLEAN", "BLIND_vs_CLEAN", "EXACT_vs_CLEAN"):
+            if study in r:
+                s = r[study]
+                print(f"   {study}: AUC={s['auc']} strength={s['strength']} ({s['direction']}) -> {s['verdict']}")
+
+
 def selftest():
     import tempfile
-    row = lambda lab, noise, turn=1: {"label": lab, "model": "4B", "noise": noise, "turn": turn}
+    row = lambda lab, noise, turn=1, sub=None: {"label": lab, "sublabel": sub, "model": "4B", "noise": noise, "turn": turn}
     with tempfile.TemporaryDirectory() as td:
-        # (1) separable, confab HIGH -> STAGE, direction confab-high
+        # (1) separable, confab HIGH -> STAGE, direction confab-high (using sublabel)
         p = os.path.join(td, "a.jsonl")
-        _write(p, [row("CONFAB", x, 3) for x in (1.9, 2.0, 2.1, 1.95)] +
+        _write(p, [row("CONFAB", x, 3, "CONFAB_COPY") for x in (1.9, 2.0, 2.1, 1.95)] +
                   [row("CLEAN", x, 3) for x in (0.5, 0.6, 0.55, 0.4)])
         v = analyze(p)["4B"]["CONFAB_vs_CLEAN"]
         assert v["auc"] == 1.0 and v["direction"] == "confab-high" and v["verdict"] == "STAGE-c20", v
 
         # (2) INVERTED: confab LOW noise (confidently-wrong quadrant) must STAGE, not re-reject
         p = os.path.join(td, "b.jsonl")
-        _write(p, [row("CONFAB", x) for x in (0.1, 0.2, 0.15)] +
+        _write(p, [row("CONFAB", x, sub="CONFAB_COPY") for x in (0.1, 0.2, 0.15)] +
                   [row("CLEAN", x) for x in (0.9, 0.95, 0.85)])
         v = analyze(p)["4B"]["CONFAB_vs_CLEAN"]
         assert v["auc"] == 0.0 and v["strength"] == 1.0 and "inverted" in v["direction"] and v["verdict"] == "STAGE-c20", v
 
         # (3) overlapping -> re-reject
         p = os.path.join(td, "c.jsonl")
-        _write(p, [row("CONFAB", x) for x in (1.0, 1.1, 0.9)] + [row("CLEAN", x) for x in (1.0, 1.1, 0.9)])
+        _write(p, [row("CONFAB", x, sub="CONFAB_COPY") for x in (1.0, 1.1, 0.9)] + [row("CLEAN", x) for x in (1.0, 1.1, 0.9)])
         assert analyze(p)["4B"]["CONFAB_vs_CLEAN"]["verdict"] == "re-reject"
 
         # (4) position confound exposed: noise perfectly separates BUT so does turn
         p = os.path.join(td, "d.jsonl")
-        _write(p, [row("CONFAB", 2.0, turn=20) for _ in range(3)] + [row("CLEAN", 0.5, turn=2) for _ in range(3)])
+        _write(p, [row("CONFAB", 2.0, turn=20, sub="CONFAB_COPY") for _ in range(3)] +
+                  [row("CLEAN", 0.5, turn=2) for _ in range(3)])
         r = analyze(p)["4B"]
         assert r["CONFAB_vs_CLEAN"]["auc"] == 1.0 and r["turn_confound_auc"] == 1.0, r  # reader sees the confound
 
-        # (5) CONFAB_EXACT reported SEPARATELY, not merged into the tag study
+        # (5) CONFAB_EXACT and CONFAB_BLIND both reported SEPARATELY from the primary study
         p = os.path.join(td, "e.jsonl")
-        _write(p, [row("CONFAB", 2.0), row("CONFAB_EXACT", 1.5), row("CLEAN", 0.5), row("CLEAN", 0.6)])
+        _write(p, [row("CONFAB", 2.0, sub="CONFAB_COPY"), row("CONFAB", 1.7, sub="CONFAB_BLIND"),
+                   row("CONFAB_EXACT", 1.5), row("CLEAN", 0.5), row("CLEAN", 0.6)])
         r = analyze(p)["4B"]
-        assert r["n"]["CONFAB"] == 1 and r["n"]["CONFAB_EXACT"] == 1
-        assert "EXACT_vs_CLEAN" in r and r["CONFAB_vs_CLEAN"]["auc"] == 1.0
+        assert r["n"]["CONFAB_COPY"] == 1 and r["n"]["CONFAB_BLIND"] == 1 and r["n"]["CONFAB_EXACT"] == 1
+        assert "EXACT_vs_CLEAN" in r and "BLIND_vs_CLEAN" in r and r["CONFAB_vs_CLEAN"]["auc"] == 1.0
+        # the primary study used ONLY CONFAB_COPY's noise (2.0), not BLIND's (1.7) or EXACT's (1.5)
+        assert r["CONFAB_vs_CLEAN"]["auc"] == 1.0, "primary study must isolate CONFAB_COPY"
+
+        # (6) backward compat: scored rows with NO sublabel field (pre-QA-fix data)
+        # fall back to the plain CONFAB label as the primary study population.
+        p = os.path.join(td, "f.jsonl")
+        _write(p, [{"label": "CONFAB", "model": "4B", "noise": 2.0, "turn": 1}] +
+                  [{"label": "CLEAN", "model": "4B", "noise": 0.5, "turn": 1}])
+        r = analyze(p)["4B"]
+        assert r["CONFAB_vs_CLEAN"]["auc"] == 1.0, "legacy rows without sublabel still analyze correctly"
 
     # entropy sanity: uniform top-k = ln k ; a spike ~ 0
     assert abs(topk_entropy([0.0] * 50) - math.log(50)) < 1e-9
     assert topk_entropy([100.0] + [0.0] * 49) < 0.01
-    print("score_moments selftest: OK (direction incl. inverted, verdict bar, turn confound, EXACT separated, entropy)")
+    print("score_moments selftest: OK (direction incl. inverted, verdict bar, turn confound, "
+          "COPY/BLIND/EXACT separated, legacy fallback, entropy)")
 
 
 if __name__ == "__main__":
     if "--selftest" in sys.argv:
         selftest()
     elif len(sys.argv) > 2 and sys.argv[1] == "analyze":
-        for model, r in analyze(sys.argv[2]).items():
-            print(f"== {model}  n={r['n']}  turn-confound AUC={r['turn_confound_auc']}")
-            for study in ("CONFAB_vs_CLEAN", "EXACT_vs_CLEAN"):
-                if study in r:
-                    s = r[study]
-                    print(f"   {study}: AUC={s['auc']} strength={s['strength']} ({s['direction']}) -> {s['verdict']}")
+        _print_report(analyze(sys.argv[2]))
+    elif len(sys.argv) > 2 and sys.argv[1] == "shapecheck":
+        n, report = shapecheck(sys.argv[2])
+        print(f"shapecheck: {n} REAL moments mock-scored (noise is content-hash, NOT jlens — plumbing proof only)")
+        _print_report(report)
     elif len(sys.argv) > 2 and sys.argv[1] == "score":
         raise SystemExit("score: wire jlens_entropy() to the installed jlens-gguf first (see module docstring)")
     else:
-        raise SystemExit("usage: score_moments.py analyze <scored.jsonl> | --selftest  (score needs jlens)")
+        raise SystemExit("usage: score_moments.py analyze <scored.jsonl> | shapecheck <moments.jsonl> | --selftest")
