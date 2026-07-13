@@ -28,7 +28,8 @@
       "values": [
         "none",
         "cot",
-        "decompose"
+        "decompose",
+        "pause"
       ],
       "_note": "Reasoning scaffold appended to the system prompt. Strongly capability-tiered (small models gain most; CoT barely emerges <100B)."
     },

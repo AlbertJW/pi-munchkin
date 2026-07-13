@@ -13,10 +13,7 @@ import hashlib, json, os, sys
 LAB = os.path.dirname(os.path.abspath(__file__))
 SCHEMA = os.path.join(LAB, "configs", "schema.json")
 APPLIED = os.path.join(LAB, "configs", "applied")
-# GOVERNOR points at your live harness governor; defaults to the bundled one so a
-# fresh clone (no pi install) still runs the offline selftests.
-LIVE_GOV = os.path.expanduser(os.environ.get(
-    "GOVERNOR", os.path.join(LAB, "..", "..", "harness", "APPEND_SYSTEM.md")))
+LIVE_GOV = os.path.expanduser("~/.pi/agent/APPEND_SYSTEM.md")
 DIRECT = os.environ.get("LLAMA_URL", "http://127.0.0.1:8080")
 OPTILLM = "http://127.0.0.1:8000"
 
@@ -30,6 +27,9 @@ SCAFFOLD = {
     "none": "",
     "cot": "\n\nThink step by step before giving the final answer.",
     "decompose": "\n\nBreak the task into sub-steps, solve each, then give the final answer.",
+    # user's empirically-favored deliberation primer (stunspot collection; 4/5 in his own use).
+    # Anthropomorphic wording is deliberate — the test is Fisher, not literalism.
+    "pause": "\n\nPause. Reflect. Take a breath, sit down, and think about this step-by-step.",
 }
 
 def wrap_format(text, fmt):

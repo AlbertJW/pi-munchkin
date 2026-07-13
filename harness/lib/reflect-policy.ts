@@ -49,15 +49,29 @@ export function shouldIterate(round: number, findings: string | null): boolean {
 
 // ---------- reasoning methods (prompt strategies, not proxy infra) ----------
 
-// /reflect <method>. Each method = sampling shape + merge rule over the SAME
-// contract prompt. `sc` exists because of a measured pathology: single reviews
-// invent defects on clean plans (unreliable CLEAN), but hallucinated nitpicks
-// don't recur across independent samples while real flaws do — consistency
-// voting is the prompt-level cure.
-export type ReflectMethod = { samples: number; temperature: number; minVotes: number };
+// /reflect <method>. Each method = sampling shape + merge rule (+ optional
+// prompt override) over the findings contract. `sc` exists because of a
+// measured pathology: single reviews invent defects on clean plans, but
+// hallucinated nitpicks don't recur across independent samples while real
+// flaws do — consistency voting is the prompt-level cure. `premortem`
+// (stunspot collection, adapted) reviews PROSPECTIVELY: imagine the executed
+// plan failed spectacularly, work backward to preventative edits — a different
+// failure-detection axis than the retrospective defect scan.
+export type ReflectMethod = { samples: number; temperature: number; minVotes: number; prompt?: string; blurb: string };
+
+export const PREMORTEM_PROMPT =
+	"Assume the plan/answer below was executed and FAILED SPECTACULARLY. Work backward from that failure. " +
+	"MATERIALITY BAR: a risk counts ONLY if it plausibly causes the stated goal to fail or causes damage — " +
+	"taste, style, and process steps the plan never claimed are NOT risks. You are FORBIDDEN from proposing " +
+	"new features or extra scope; preventative edits must shrink or guard the plan, not grow it. " +
+	"Respond with ONLY one of: the single word CLEAN (no plausible spectacular failure), OR at most 5 lines, each " +
+	"exactly '- [RISK] <failure headline>: <principal cause> — <one concrete preventative edit>'. " +
+	"No headers, no bold, no prose paragraphs, no reasoning — just CLEAN or the list.";
+
 export const METHODS: Record<string, ReflectMethod> = {
-	default: { samples: 1, temperature: 0.3, minVotes: 1 },
-	sc: { samples: 3, temperature: 0.8, minVotes: 2 },
+	default: { samples: 1, temperature: 0.3, minVotes: 1, blurb: "one adversarial defect scan (fast; may invent findings on clean plans)" },
+	sc: { samples: 3, temperature: 0.8, minVotes: 2, blurb: "3-sample self-consistency vote (reliable CLEAN; 3x cost)" },
+	premortem: { samples: 1, temperature: 0.5, minVotes: 1, prompt: PREMORTEM_PROMPT, blurb: "prospective failure imagination -> preventative edits (stunspot pre-mortem, contract-adapted)" },
 };
 
 // Normalize a finding line for cross-sample voting: tag + lowercased alnum

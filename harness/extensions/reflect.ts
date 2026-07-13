@@ -51,8 +51,14 @@ export default function (pi: ExtensionAPI) {
 	});
 
 	pi.registerCommand("reflect", {
-		description: `Fresh-context adversarial review of the current plan (or last answer). Bounded findings, never adds scope, max ${MAX_ROUNDS} rounds. Optional arg: reviewer model id (phase 2).`,
+		description: `Fresh-context review of the current plan (or last answer). Bounded findings, never adds scope, max ${MAX_ROUNDS} rounds. Methods: ${Object.keys(METHODS).join(", ")} — '/reflect <method>'; '/reflect help' describes them.`,
 		handler: async (args, ctx) => {
+			const rawArg = (args ?? "").trim().toLowerCase();
+			if (rawArg === "help" || rawArg === "?" || rawArg === "list") {
+				const lines = Object.entries(METHODS).map(([k, v]) => `  ${k} — ${v.blurb}`);
+				ctx.ui.notify(`reflect methods:\n${lines.join("\n")}`, "info");
+				return;
+			}
 			if (!shouldIterate(rounds, "pending")) {
 				ctx.ui.notify(`reflect: round cap reached (${MAX_ROUNDS}) — act on the findings or start a fresh plan`, "warning");
 				return;
@@ -64,10 +70,9 @@ export default function (pi: ExtensionAPI) {
 			}
 
 			const model = ctx.model;
-			const arg = (args ?? "").trim().toLowerCase();
-			const method = METHODS[arg || "default"];
-			if (arg && !method) {
-				ctx.ui.notify(`reflect: unknown method '${arg}' (have: ${Object.keys(METHODS).join(", ")}) — using default`, "info");
+			const method = METHODS[rawArg || "default"];
+			if (rawArg && !method) {
+				ctx.ui.notify(`reflect: unknown method '${rawArg}' (have: ${Object.keys(METHODS).join(", ")}) — using default`, "info");
 			}
 			const m = method ?? METHODS.default;
 			if (!model) {
@@ -87,7 +92,7 @@ export default function (pi: ExtensionAPI) {
 				for (let i = 0; i < m.samples; i++) {
 					const review = await completeSimple(
 						model,
-						{ systemPrompt: REFLECT_PROMPT, messages: [{ role: "user", content: artifact, timestamp: Date.now() }] },
+						{ systemPrompt: m.prompt ?? REFLECT_PROMPT, messages: [{ role: "user", content: artifact, timestamp: Date.now() }] },
 						{
 							timeoutMs: TIMEOUT_MS,
 							maxRetries: 0,

@@ -48,3 +48,13 @@ test("the anti-growth clause is load-bearing and present", () => {
 	assert.ok(REFLECT_PROMPT.includes("CLEAN"));
 	assert.ok(/at most 5 lines/.test(REFLECT_PROMPT));
 });
+
+test("premortem method: contract-compliant prompt, wired into the registry", () => {
+	assert.ok(METHODS.premortem.prompt, "premortem carries its own prompt");
+	const p = METHODS.premortem.prompt as string;
+	assert.ok(p.includes("FAILED SPECTACULARLY"));
+	assert.ok(p.includes("- [RISK]"), "findings must use the RISK line contract");
+	assert.ok(p.includes("CLEAN"), "CLEAN sentinel preserved");
+	assert.ok(p.includes("FORBIDDEN from proposing"), "anti-growth clause preserved");
+	assert.ok(Object.values(METHODS).every((m) => m.blurb.length > 0), "every method self-describes for /reflect help");
+});
