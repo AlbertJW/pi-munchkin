@@ -96,8 +96,14 @@ cleanup() {
 trap 'echo "[real_gate] interrupted — tearing down in-flight pi" >&2; cleanup; exit 130' INT TERM
 
 health || { echo "no server on :8080" >&2; exit 1; }
-MODEL="$(loaded_alias)"; [[ -n "$MODEL" ]] || MODEL=unknown
-MODEL="$(basename "$MODEL" .gguf)"; MODEL="${MODEL//[^a-zA-Z0-9._-]/-}"  # alias-less servers report the gguf path
+# Behind a router (llama-swap) /v1/models lists the whole zoo — [0] would mislabel
+# every row. PI_MODEL is the requested member; it IS the row label there.
+if [[ -n "$PI_MODEL" ]]; then
+	MODEL="$PI_MODEL"
+else
+	MODEL="$(loaded_alias)"; [[ -n "$MODEL" ]] || MODEL=unknown
+	MODEL="$(basename "$MODEL" .gguf)"; MODEL="${MODEL//[^a-zA-Z0-9._-]/-}"  # alias-less servers report the gguf path
+fi
 [[ -n "$DD" && "$MODEL" != "$DD" ]] && echo "[real_gate] WARNING: loaded model '$MODEL' != expected '$DD'" >&2
 mkdir -p "$RUNS"
 echo "== real_gate: model=$MODEL  N=$N  tasks=${TASKS[*]} =="
