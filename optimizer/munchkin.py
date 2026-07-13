@@ -117,19 +117,26 @@ def _utc_z():
     return datetime.datetime.now(datetime.timezone.utc).isoformat(timespec="milliseconds").replace("+00:00", "Z")
 
 def telemetry_enrich(gen):
+    """Per-gate mechanism counts. Events carry a session key (sk = workdir basename,
+    `$GEN-...`) since 2026-07-13 — an EXACT join immune to concurrent runs. Events
+    without sk (older data) fall back to the gate's wall-clock window."""
     win = GATE_WINDOWS.get(gen)
-    if not win or not os.path.exists(TELEMETRY_FILE):
+    if not os.path.exists(TELEMETRY_FILE):
         return {}
-    t0, t1 = win
     counts = {}
     for line in open(TELEMETRY_FILE):
         try:
             e = json.loads(line)
         except ValueError:
             continue
-        if t0 <= e.get("ts", "") <= t1:  # both are UTC ...Z ISO strings → lexical compare is safe
-            key = f"{e.get('ext', '?')}.{e.get('kind', '?')}"
-            counts[key] = counts.get(key, 0) + 1
+        sk = e.get("sk")
+        if sk is not None:
+            if not sk.startswith(f"{gen}-"):
+                continue
+        elif not (win and win[0] <= e.get("ts", "") <= win[1]):  # legacy rows: UTC Z strings, lexical compare
+            continue
+        key = f"{e.get('ext', '?')}.{e.get('kind', '?')}"
+        counts[key] = counts.get(key, 0) + 1
     return {"telemetry": counts} if counts else {}
 
 def server_model():

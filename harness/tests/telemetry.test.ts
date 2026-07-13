@@ -65,3 +65,12 @@ test("record: never throws even with an unwritable path", () => {
 		delete process.env.TELEMETRY_FILE;
 	}
 });
+
+test("events carry the session key (exact enrichment join)", () => {
+	const f = join(tmpdir(), `tel-sk-${Date.now()}.jsonl`);
+	process.env.TELEMETRY_FILE = f;
+	record("t", "k", { a: 1 });
+	const row = JSON.parse(readFileSync(f, "utf8").trim());
+	assert.ok(typeof row.sk === "string" && row.sk.length > 0, "sk key present");
+	delete process.env.TELEMETRY_FILE;
+});

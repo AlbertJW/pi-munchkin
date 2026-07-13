@@ -156,6 +156,26 @@ run_one() {  # $1=config-path  $2=pattern(base|cand)  $3=task  $4=rep
 		exit 1
 	fi
 
+	# c18 fresh-context retry: an outcome-loop abort means the session poisoned itself
+	# (failed-attempt residue anchoring retries — 12-factor "dumb zone"). RETRY_FRESH=on
+	# grants ONE fresh session in the SAME workdir (work done persists) with a distilled
+	# handoff instead of the raw pile. Fires only where the alternative was certain fail.
+	local retried=0
+	local telfile="${TELEMETRY_FILE:-$HOME/.pi/agent/telemetry/events.jsonl}"
+	if [[ "${RETRY_FRESH:-off}" == "on" ]] && \
+	   grep -Eq "\"sk\":\"$(basename "$wd")\".*\"kind\":\"(outcome-)?abort\"" "$telfile" 2>/dev/null; then
+		retried=1
+		echo "  $pat/$task rep$rep aborted — RETRY_FRESH second session" >&2
+		( cd "$wd"
+		  while IFS= read -r line; do [[ "$line" == *=* && "$line" != ENDPOINT=* && "$line" != LABEL=* ]] && export "${line?}"; done <<< "$envlines"
+		  [[ "${SPAN_TOOLS:-}" == "on" ]] && tools="$tools,search_spans,read_span"
+		  ${sbx[@]+"${sbx[@]}"} timeout "$PI_TIMEOUT" pi -p --approve ${PI_MODEL:+--model "$PI_MODEL"} --tools "$tools" \
+		    "$(cat "$TASKS_DIR/$task.txt")
+
+NOTE: a previous attempt in this workdir was stopped for repeating the same failing approach. The partial work is present. Inspect the current state first, then take a DIFFERENT approach to whatever kept failing." ) >> "$wd/run.log" 2>&1 &
+		CHILD=$!; wait "$CHILD" || true; CHILD=""
+	fi
+
 	# grading: restore authoritative tests so the model can't have tampered with them
 	if is_hidden "$task"; then
 		rm -f "$wd"/test/*.test.js                       # drop any model-added/edited tests
@@ -186,11 +206,11 @@ run_one() {  # $1=config-path  $2=pattern(base|cand)  $3=task  $4=rep
 		LOW_TOK_STREAK=0
 	fi
 
-	python3 - "$RESULTS" "$MODEL" "$pat" "$task" "$rep" "$gate" "$tout" <<'PY'
+	python3 - "$RESULTS" "$MODEL" "$pat" "$task" "$rep" "$gate" "$tout" "$retried" <<'PY'
 import json,sys
-out,model,pat,task,rep,gate,tout=sys.argv[1:8]
+out,model,pat,task,rep,gate,tout,retried=sys.argv[1:9]
 rec={"task":task,"pattern":pat,"rep":int(rep),"model":model,"split":"val",
-     "score":int(gate),"out_chars":int(tout),"think_chars":0}
+     "score":int(gate),"out_chars":int(tout),"think_chars":0,"retried":int(retried)}
 open(out,"a").write(json.dumps(rec)+"\n")
 PY
 	echo "  $pat/$task rep$rep -> gate=$gate (out_tok=$tout)"

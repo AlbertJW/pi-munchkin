@@ -1,0 +1,5 @@
+{
+  "name": "fresh-retry",
+  "prediction": "converts a fraction of outcome-loop aborts into passes on failure-heavy (model,task) pairs — fresh context removes the failed-attempt residue that anchors retries (12-factor dumb-zone). Structurally do-no-harm: the retry fires only where the alternative was certain failure; the Fisher question is whether the gain justifies the extra session cost. retried:1 rows carry the mechanism metric.",
+  "thresholds": { "RETRY_FRESH": "on" }
+}

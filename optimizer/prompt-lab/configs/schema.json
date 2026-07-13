@@ -102,6 +102,10 @@
         "HASHLINE_TAG": [
           "hex",
           "slug"
+        ],
+        "RETRY_FRESH": [
+          "on",
+          "off"
         ]
       }
     },
