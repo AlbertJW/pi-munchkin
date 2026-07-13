@@ -9,12 +9,14 @@ discrimination study. Walks archived pi session JSONLs, finds every hashline
                  text"): old_string invention (lc-on arm-1 class).
   CLEAN        — edit applied without error: the control, same task structure.
 
-Emits one JSONL row per moment: {session, turn, label, call_args, context:
-[{role, text}...] } where context is the conversation UP TO the call. Honest
-limitation (documented for the scoring step): the reconstructed prefix omits
-pi's builtin system prompt and tool schemas — an approximate-but-CONSISTENT
-distortion applied identically to both classes, acceptable for within-corpus
-discrimination, not for absolute entropy claims.
+Emits one JSONL row per moment: {session, sdir, turn, label, call_args, context:
+[{role, text}...] } where context is the conversation UP TO the call. Context
+INCLUDES tool results (role "tool"), bounded to TOOLRESULT_CAP chars each —
+this is load-bearing: the correct hashline tag lives in the prior `read`
+OUTPUT (a tool result), so a prefix without it destroys the tag-copy signal
+for both classes (would false-reject jlens). The tag header sits at the top of
+a read result, so the head-cap preserves it. Still omitted: pi's builtin
+system prompt + tool schemas (a consistent distortion across classes).
 
   ./extract_moments.py <sessions_glob> -o moments.jsonl
   ./extract_moments.py --selftest
@@ -24,6 +26,10 @@ import json, os, sys
 
 CONFAB_PATTERNS = ["before any [path#TAG] header", "unknown tag", "stale tag"]
 CONFAB_EXACT_PATTERNS = ["Could not find the exact text"]
+# Head-cap tool-result text kept in the prefix: the `[path#TAG]` header sits at
+# the TOP of a hashline read, so the head preserves the copy target while
+# bounding the corpus file. Enough to hold a header + first lines.
+TOOLRESULT_CAP = int(os.environ.get("JNOISE_TOOLRESULT_CAP", "2500"))
 
 
 def classify_error(text):
@@ -88,6 +94,12 @@ def moments_from_session(path):
             t = _text_of(m.get("content"))
             if t:
                 context.append({"role": "user", "text": t})
+        elif role in ("toolResult", "tool"):
+            # Load-bearing: read outputs carry the tag the next edit must copy.
+            t = _text_of(m.get("content")) or "".join(
+                c.get("text", "") for c in (m.get("content") or []) if isinstance(c, dict))
+            if t:
+                context.append({"role": "tool", "text": t[:TOOLRESULT_CAP]})
 
 
 def run(session_glob, out_path):
@@ -107,6 +119,11 @@ def selftest():
         msg = lambda m: json.dumps({"type": "message", "message": m}) + "\n"
         with open(p, "w") as f:
             f.write(msg({"role": "user", "content": [{"type": "text", "text": "fix the bug"}]}))
+            # a READ result carrying the true tag — MUST land in the next edit's prefix
+            f.write(msg({"role": "assistant", "content": [
+                {"type": "toolCall", "id": "r", "name": "read", "arguments": {"path": "f"}}]}))
+            f.write(msg({"role": "toolResult", "toolCallId": "r", "isError": False, "content": [
+                {"type": "text", "text": "[f#A1B2]\n1:hello"}]}))
             f.write(msg({"role": "assistant", "content": [
                 {"type": "toolCall", "id": "a", "name": "edit", "arguments": {"input": "[f#mossy]..."}}]}))
             f.write(msg({"role": "toolResult", "toolCallId": "a", "isError": True, "content": [
@@ -121,7 +138,10 @@ def selftest():
                 {"type": "text", "text": "bash exploded"}]}))
         mos = list(moments_from_session(p))
         assert [m["label"] for m in mos] == ["CONFAB", "CLEAN"], mos
-        assert mos[0]["context"] == [{"role": "user", "text": "fix the bug"}], "context = convo before the call"
+        # the read output (with the real tag) MUST be in the confab moment's prefix
+        ctx_text = " ".join(c["text"] for c in mos[0]["context"])
+        assert "[f#A1B2]" in ctx_text, "tool result carrying the true tag must survive into context"
+        assert any(c["role"] == "tool" for c in mos[0]["context"]), "tool results included"
         assert "sdir" in mos[0], "moment carries its session-dir for model attribution"
         # bash errors and unmatched classes are excluded
         out = os.path.join(td, "o.jsonl")
