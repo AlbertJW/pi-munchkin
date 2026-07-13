@@ -77,7 +77,9 @@ def moments_from_session(path):
                     continue
                 label = classify_error(rtext) if err else "CLEAN"
                 if label:
-                    yield {"session": os.path.basename(path), "turn": turn, "label": label,
+                    # parent dir name = munged workdir -> carries GEN-MODEL-arm-task-rep
+                    yield {"session": os.path.basename(path), "sdir": os.path.basename(os.path.dirname(path)),
+                           "turn": turn, "label": label,
                            "call_args": c.get("arguments"), "context": list(context)}
             t = _text_of(m.get("content"))
             if t:
@@ -120,6 +122,7 @@ def selftest():
         mos = list(moments_from_session(p))
         assert [m["label"] for m in mos] == ["CONFAB", "CLEAN"], mos
         assert mos[0]["context"] == [{"role": "user", "text": "fix the bug"}], "context = convo before the call"
+        assert "sdir" in mos[0], "moment carries its session-dir for model attribution"
         # bash errors and unmatched classes are excluded
         out = os.path.join(td, "o.jsonl")
         counts = run(os.path.join(td, "*.jsonl"), out)
