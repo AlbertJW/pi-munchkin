@@ -21,6 +21,10 @@ CAND="${CAND:-}"
 
 [[ "$MODE" == "ab" && -z "$CAND" ]] && { echo "ab mode needs CAND=<config.json>" >&2; exit 1; }
 
+# Die WITH the children: a killed driver must not orphan its real_gate (which
+# would keep spawning sessions nothing collects — seen live, fleet sweep 07-13).
+trap 'pkill -P $$ 2>/dev/null; exit 130' INT TERM
+
 for model in $MODELS; do
 	echo "=== fleet: $model ($MODE) ==="
 	# one warm-up completion so the swap cost lands outside the first session
