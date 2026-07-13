@@ -22,6 +22,12 @@ import collections, json, math, os, sys
 LATE_FRAC = float(os.environ.get("JNOISE_LATE_FRAC", "0.85"))  # last 15% of layers
 TOPK = int(os.environ.get("JNOISE_TOPK", "50"))
 AUC_BAR = 0.70
+# The SESSION is the inference unit (audit 2026-07-13): a doomed session emits many
+# confabs + later clean corrections, so moment-level AUC overstates the effective
+# sample size. The verdict reads the AUC over per-session mean noise and requires
+# MIN_SESSIONS sessions per class — else UNDERPOWERED, never STAGE.
+MIN_SESSIONS = int(os.environ.get("JNOISE_MIN_SESSIONS", "20"))
+BOOTSTRAP_N = int(os.environ.get("JNOISE_BOOTSTRAP_N", "1000"))
 
 
 def topk_entropy(logits, k=TOPK):
@@ -90,17 +96,54 @@ def roc_auc(pos, neg):
     return (greater + 0.5 * ties) / (len(pos) * len(neg))
 
 
-def _directional(pos, neg):
-    """AUC + honest verdict that treats an INVERTED signal (confab = LOW noise, the
-    'confidently wrong' quadrant) as a real detector, not a re-reject. Reports the
-    raw AUC and the strength |AUC-0.5|."""
+def session_means(rows):
+    """Per-session mean noise for one class's rows -> [(session, mean)]."""
+    by = collections.defaultdict(list)
+    for r in rows:
+        by[r.get("session") or "?"].append(r["noise"])
+    return [(s, sum(v) / len(v)) for s, v in sorted(by.items())]
+
+
+def _strength(pos, neg):
     auc = roc_auc(pos, neg)
-    if auc is None:
-        return {"auc": None, "strength": None, "direction": None, "verdict": None}
-    strength = abs(auc - 0.5) + 0.5  # = max(auc, 1-auc)
-    return {"auc": round(auc, 3), "strength": round(strength, 3),
-            "direction": "confab-high" if auc >= 0.5 else "confab-LOW(inverted)",
-            "verdict": "STAGE-c20" if strength >= AUC_BAR else "re-reject"}
+    return None if auc is None else abs(auc - 0.5) + 0.5  # = max(auc, 1-auc)
+
+
+def _directional(pos_rows, neg_rows):
+    """Session-level directional verdict. Moment AUC is reported for reference, but
+    the verdict rides on the AUC over PER-SESSION MEAN noise (sessions are the
+    independent unit), needs MIN_SESSIONS per class, and carries a bootstrap 95% CI
+    on the session-level strength (resampling sessions). An INVERTED signal (confab
+    = LOW noise, the confidently-wrong quadrant) counts as a detector."""
+    import random
+    mom_auc = roc_auc([r["noise"] for r in pos_rows], [r["noise"] for r in neg_rows])
+    if mom_auc is None:
+        return {"auc_moment": None, "auc_session": None, "strength": None, "ci95": None,
+                "direction": None, "n_sessions": (0, 0), "verdict": None}
+    pos_s = session_means(pos_rows)
+    neg_s = session_means(neg_rows)
+    pv, nv = [m for _, m in pos_s], [m for _, m in neg_s]
+    sess_auc = roc_auc(pv, nv)
+    strength = _strength(pv, nv)
+    rng = random.Random(0)  # deterministic
+    boots = []
+    for _ in range(BOOTSTRAP_N):
+        bp = [pv[rng.randrange(len(pv))] for _ in pv]
+        bn = [nv[rng.randrange(len(nv))] for _ in nv]
+        s = _strength(bp, bn)
+        if s is not None:
+            boots.append(s)
+    boots.sort()
+    ci = (boots[int(0.025 * len(boots))], boots[int(0.975 * len(boots))]) if boots else None
+    n_pos, n_neg = len(pv), len(nv)
+    if n_pos < MIN_SESSIONS or n_neg < MIN_SESSIONS:
+        verdict = f"UNDERPOWERED (sessions: {n_pos} pos / {n_neg} neg, need >={MIN_SESSIONS} each)"
+    else:
+        verdict = "STAGE-c20" if strength >= AUC_BAR and (ci and ci[0] > 0.5) else "re-reject"
+    return {"auc_moment": round(mom_auc, 3), "auc_session": round(sess_auc, 3),
+            "strength": round(strength, 3), "ci95": [round(ci[0], 3), round(ci[1], 3)] if ci else None,
+            "direction": "confab-high" if sess_auc >= 0.5 else "confab-LOW(inverted)",
+            "n_sessions": (n_pos, n_neg), "verdict": verdict}
 
 
 def analyze(scored_path):
@@ -108,14 +151,16 @@ def analyze(scored_path):
     else falling back to the plain label (backward-compat with pre-sublabel data):
 
       CONFAB_vs_CLEAN — the PRIMARY claim: does noise separate a genuine tag-COPY
-                        failure (the model saw the right tag, typed a different
-                        one) from a clean copy? Uses CONFAB_COPY when the corpus
-                        has it; falls back to plain CONFAB on old scored files.
-      BLIND_vs_CLEAN  — CONFAB_BLIND (no prior tag at all — closer to invention
-                        than copy failure) studied SEPARATELY, never merged in.
-      EXACT_vs_CLEAN  — CONFAB_EXACT (different tool, no #TAG) — unchanged.
-      turn_confound_auc — does turn-number ALONE separate CONFAB_COPY from CLEAN
-                        as well as noise does? If so the "signal" is position.
+                        failure (the model saw the right tag FOR THE TARGET FILE,
+                        typed a different one) from a clean copy? Uses CONFAB_COPY
+                        when the corpus has it; falls back to plain CONFAB.
+      BLIND_vs_CLEAN  — CONFAB_BLIND (no target-file tag — invention) separate.
+      EXACT_vs_CLEAN  — CONFAB_EXACT (different tool, no #TAG) separate.
+      STALE           — counted, never studied (not confabulation; audit).
+      turn_confound_auc — does turn-number ALONE separate the primary classes as
+                        well as noise does? If so the "signal" is position.
+
+    Verdicts are SESSION-level (see _directional): moment AUC is reference only.
     """
     rows = [json.loads(l) for l in open(scored_path) if l.strip()]
     by_model = {}
@@ -124,18 +169,17 @@ def analyze(scored_path):
         by_model.setdefault(r["model"], collections.defaultdict(list))[key].append(r)
     out = {}
     for model, d in sorted(by_model.items()):
-        noise = lambda lab: [r["noise"] for r in d.get(lab, [])]
         turn = lambda lab: [r.get("turn") or 0 for r in d.get(lab, [])]
         res = {"n": {k: len(v) for k, v in d.items()}}
         primary = "CONFAB_COPY" if d.get("CONFAB_COPY") else "CONFAB"  # fallback: pre-sublabel data
-        res["CONFAB_vs_CLEAN"] = _directional(noise(primary), noise("CLEAN"))
+        res["CONFAB_vs_CLEAN"] = _directional(d.get(primary, []), d.get("CLEAN", []))
         if d.get("CONFAB_BLIND"):
-            res["BLIND_vs_CLEAN"] = _directional(noise("CONFAB_BLIND"), noise("CLEAN"))
+            res["BLIND_vs_CLEAN"] = _directional(d["CONFAB_BLIND"], d.get("CLEAN", []))
         if d.get("CONFAB_EXACT"):
-            res["EXACT_vs_CLEAN"] = _directional(noise("CONFAB_EXACT"), noise("CLEAN"))
+            res["EXACT_vs_CLEAN"] = _directional(d["CONFAB_EXACT"], d.get("CLEAN", []))
         # confound: how well does TURN NUMBER alone separate the classes? If this
         # rivals the noise AUC, the "signal" is position, not confabulation.
-        res["turn_confound_auc"] = round(roc_auc(turn(primary), turn("CLEAN")) or 0.5, 3) if noise(primary) else None
+        res["turn_confound_auc"] = round(roc_auc(turn(primary), turn("CLEAN")) or 0.5, 3) if d.get(primary) else None
         out[model] = res
     return out
 
@@ -183,62 +227,98 @@ def _print_report(report):
         for study in ("CONFAB_vs_CLEAN", "BLIND_vs_CLEAN", "EXACT_vs_CLEAN"):
             if study in r:
                 s = r[study]
-                print(f"   {study}: AUC={s['auc']} strength={s['strength']} ({s['direction']}) -> {s['verdict']}")
+                print(f"   {study}: session AUC={s['auc_session']} (moment {s['auc_moment']}) "
+                      f"strength={s['strength']} CI95={s['ci95']} sessions={s['n_sessions']} "
+                      f"({s['direction']}) -> {s['verdict']}")
 
 
 def selftest():
     import tempfile
-    row = lambda lab, noise, turn=1, sub=None: {"label": lab, "sublabel": sub, "model": "4B", "noise": noise, "turn": turn}
+    # rows carry a session id — sessions are the inference unit
+    row = lambda lab, noise, turn=1, sub=None, sess="s1": {"label": lab, "sublabel": sub, "model": "4B",
+                                                           "noise": noise, "turn": turn, "session": sess}
+
+    def powered(pos_noise, neg_noise, n=24, jitter=0.001):
+        """n distinct sessions per class, tightly clustered noise around the given levels."""
+        rows = []
+        for i in range(n):
+            rows.append(row("CONFAB", pos_noise + i * jitter, sub="CONFAB_COPY", sess=f"p{i}"))
+            rows.append(row("CLEAN", neg_noise + i * jitter, sess=f"n{i}"))
+        return rows
+
     with tempfile.TemporaryDirectory() as td:
-        # (1) separable, confab HIGH -> STAGE, direction confab-high (using sublabel)
+        # (1) separable, confab HIGH, powered -> STAGE with session-level verdict
         p = os.path.join(td, "a.jsonl")
-        _write(p, [row("CONFAB", x, 3, "CONFAB_COPY") for x in (1.9, 2.0, 2.1, 1.95)] +
-                  [row("CLEAN", x, 3) for x in (0.5, 0.6, 0.55, 0.4)])
+        _write(p, powered(2.0, 0.5))
         v = analyze(p)["4B"]["CONFAB_vs_CLEAN"]
-        assert v["auc"] == 1.0 and v["direction"] == "confab-high" and v["verdict"] == "STAGE-c20", v
+        assert v["auc_session"] == 1.0 and v["direction"] == "confab-high" and v["verdict"] == "STAGE-c20", v
+        assert v["ci95"] and v["ci95"][0] > 0.5, "bootstrap CI reported and clear of 0.5"
 
-        # (2) INVERTED: confab LOW noise (confidently-wrong quadrant) must STAGE, not re-reject
+        # (2) INVERTED signal (confidently-wrong quadrant), powered -> still STAGE
         p = os.path.join(td, "b.jsonl")
-        _write(p, [row("CONFAB", x, sub="CONFAB_COPY") for x in (0.1, 0.2, 0.15)] +
-                  [row("CLEAN", x) for x in (0.9, 0.95, 0.85)])
+        _write(p, powered(0.1, 0.9))
         v = analyze(p)["4B"]["CONFAB_vs_CLEAN"]
-        assert v["auc"] == 0.0 and v["strength"] == 1.0 and "inverted" in v["direction"] and v["verdict"] == "STAGE-c20", v
+        assert v["auc_session"] == 0.0 and v["strength"] == 1.0 and "inverted" in v["direction"] and v["verdict"] == "STAGE-c20", v
 
-        # (3) overlapping -> re-reject
+        # (3) UNDERPOWERED: perfect separation on too few sessions must NOT stage —
+        # this kills the "four 35B confabs yield a perfect AUC" failure mode (audit).
         p = os.path.join(td, "c.jsonl")
-        _write(p, [row("CONFAB", x, sub="CONFAB_COPY") for x in (1.0, 1.1, 0.9)] + [row("CLEAN", x) for x in (1.0, 1.1, 0.9)])
+        _write(p, [row("CONFAB", 2.0 + i * 0.01, sub="CONFAB_COPY", sess=f"p{i}") for i in range(4)] +
+                  [row("CLEAN", 0.5 + i * 0.01, sess=f"n{i}") for i in range(30)])
+        v = analyze(p)["4B"]["CONFAB_vs_CLEAN"]
+        assert v["verdict"].startswith("UNDERPOWERED"), v["verdict"]
+        assert v["auc_session"] == 1.0, "AUC still reported for transparency"
+
+        # (4) SESSION CLUSTERING: 60 confab moments from ONE doomed session + 1 from
+        # another must count as 2 sessions, not 61 samples — UNDERPOWERED, where the
+        # old moment-level AUC would have staged it.
+        p = os.path.join(td, "d.jsonl")
+        _write(p, [row("CONFAB", 2.0 + i * 0.001, sub="CONFAB_COPY", sess="doomed") for i in range(60)] +
+                  [row("CONFAB", 2.1, sub="CONFAB_COPY", sess="p2")] +
+                  [row("CLEAN", 0.5 + i * 0.001, sess=f"n{i}") for i in range(30)])
+        v = analyze(p)["4B"]["CONFAB_vs_CLEAN"]
+        assert v["n_sessions"][0] == 2, v["n_sessions"]
+        assert v["verdict"].startswith("UNDERPOWERED"), v["verdict"]
+        assert v["auc_moment"] == 1.0, "moment AUC kept as reference"
+
+        # (5) overlapping, powered -> re-reject (not underpowered, genuinely null)
+        p = os.path.join(td, "e.jsonl")
+        rows = []
+        for i in range(24):
+            lv = 1.0 + (i % 3) * 0.1
+            rows.append(row("CONFAB", lv, sub="CONFAB_COPY", sess=f"p{i}"))
+            rows.append(row("CLEAN", lv, sess=f"n{i}"))
+        _write(p, rows)
         assert analyze(p)["4B"]["CONFAB_vs_CLEAN"]["verdict"] == "re-reject"
 
-        # (4) position confound exposed: noise perfectly separates BUT so does turn
-        p = os.path.join(td, "d.jsonl")
-        _write(p, [row("CONFAB", 2.0, turn=20, sub="CONFAB_COPY") for _ in range(3)] +
-                  [row("CLEAN", 0.5, turn=2) for _ in range(3)])
-        r = analyze(p)["4B"]
-        assert r["CONFAB_vs_CLEAN"]["auc"] == 1.0 and r["turn_confound_auc"] == 1.0, r  # reader sees the confound
-
-        # (5) CONFAB_EXACT and CONFAB_BLIND both reported SEPARATELY from the primary study
-        p = os.path.join(td, "e.jsonl")
-        _write(p, [row("CONFAB", 2.0, sub="CONFAB_COPY"), row("CONFAB", 1.7, sub="CONFAB_BLIND"),
-                   row("CONFAB_EXACT", 1.5), row("CLEAN", 0.5), row("CLEAN", 0.6)])
-        r = analyze(p)["4B"]
-        assert r["n"]["CONFAB_COPY"] == 1 and r["n"]["CONFAB_BLIND"] == 1 and r["n"]["CONFAB_EXACT"] == 1
-        assert "EXACT_vs_CLEAN" in r and "BLIND_vs_CLEAN" in r and r["CONFAB_vs_CLEAN"]["auc"] == 1.0
-        # the primary study used ONLY CONFAB_COPY's noise (2.0), not BLIND's (1.7) or EXACT's (1.5)
-        assert r["CONFAB_vs_CLEAN"]["auc"] == 1.0, "primary study must isolate CONFAB_COPY"
-
-        # (6) backward compat: scored rows with NO sublabel field (pre-QA-fix data)
-        # fall back to the plain CONFAB label as the primary study population.
+        # (6) position confound exposed: noise separates BUT so does turn
         p = os.path.join(td, "f.jsonl")
-        _write(p, [{"label": "CONFAB", "model": "4B", "noise": 2.0, "turn": 1}] +
-                  [{"label": "CLEAN", "model": "4B", "noise": 0.5, "turn": 1}])
+        _write(p, [row("CONFAB", 2.0, turn=20, sub="CONFAB_COPY", sess=f"p{i}") for i in range(3)] +
+                  [row("CLEAN", 0.5, turn=2, sess=f"n{i}") for i in range(3)])
         r = analyze(p)["4B"]
-        assert r["CONFAB_vs_CLEAN"]["auc"] == 1.0, "legacy rows without sublabel still analyze correctly"
+        assert r["CONFAB_vs_CLEAN"]["auc_moment"] == 1.0 and r["turn_confound_auc"] == 1.0, r
+
+        # (7) STALE counted, never studied; BLIND/EXACT reported separately from primary
+        p = os.path.join(td, "g.jsonl")
+        _write(p, [row("CONFAB", 2.0, sub="CONFAB_COPY"), row("CONFAB", 1.7, sub="CONFAB_BLIND"),
+                   row("CONFAB_EXACT", 1.5), row("STALE", 1.6), row("CLEAN", 0.5), row("CLEAN", 0.6, sess="s2")])
+        r = analyze(p)["4B"]
+        assert r["n"]["STALE"] == 1 and not any("STALE" in k for k in r if k.endswith("_vs_CLEAN"))
+        assert "EXACT_vs_CLEAN" in r and "BLIND_vs_CLEAN" in r
+        assert r["CONFAB_vs_CLEAN"]["auc_moment"] == 1.0, "primary study isolates CONFAB_COPY"
+
+        # (8) backward compat: rows with no sublabel fall back to plain CONFAB
+        p = os.path.join(td, "h.jsonl")
+        _write(p, [{"label": "CONFAB", "model": "4B", "noise": 2.0, "turn": 1, "session": "a"},
+                   {"label": "CLEAN", "model": "4B", "noise": 0.5, "turn": 1, "session": "b"}])
+        assert analyze(p)["4B"]["CONFAB_vs_CLEAN"]["auc_moment"] == 1.0
 
     # entropy sanity: uniform top-k = ln k ; a spike ~ 0
     assert abs(topk_entropy([0.0] * 50) - math.log(50)) < 1e-9
     assert topk_entropy([100.0] + [0.0] * 49) < 0.01
-    print("score_moments selftest: OK (direction incl. inverted, verdict bar, turn confound, "
-          "COPY/BLIND/EXACT separated, legacy fallback, entropy)")
+    print("score_moments selftest: OK (session-level verdicts, UNDERPOWERED min-n, clustering guard, "
+          "bootstrap CI, direction incl. inverted, turn confound, COPY/BLIND/EXACT/STALE separated, "
+          "legacy fallback, entropy)")
 
 
 if __name__ == "__main__":
