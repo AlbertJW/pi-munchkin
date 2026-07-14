@@ -168,28 +168,43 @@ def model_of(sdir):
             else "mellum" if "mellum" in d else "35B" if ("35b" in d or "qwen36" in d) else "other")
 
 
-def score(moments_path, model_tag, out_path, model_ctx, clean_stride=1):
+def clean_session_selected(session, mod):
+    """Deterministic whole-SESSION selection for CLEAN subsampling (audit-3):
+    a moment-order stride systematically picked within-session positions and
+    excluded short sessions — hash-selecting sessions keeps session means intact
+    and samples the session population uniformly."""
+    import hashlib
+    if mod <= 1:
+        return True
+    h = int(hashlib.sha1((session or "?").encode()).hexdigest()[:8], 16)
+    return h % mod == 0
+
+
+def score(moments_path, model_tag, out_path, model_ctx, clean_session_mod=1):
     """Carry turn + session + prefix_len alongside noise so analyze can test the
-    position/non-independence confounds — noise correlates with confab ONLY if it
-    isn't just tracking 'late in a doomed session'. sublabel (CONFAB_COPY vs
-    CONFAB_BLIND) passes through so analyze can study the true tag-copy-failure
-    population separately from blind invention. clean_stride: deterministic
-    subsample of the (plentiful) CLEAN controls — every Nth row, declared before
-    scoring; confab classes are always scored in full."""
+    position/non-independence confounds. sublabel passes through so analyze can
+    study the true tag-copy-failure population separately from blind invention.
+    clean_session_mod: CLEAN controls come from the deterministic 1/mod session-hash
+    sample (whole sessions, declared before scoring); confab classes score in full.
+    Writes `<out>.stats.json` with attempted/scored/dropped PER CLASS (audit-3:
+    silent exclusions could differ by class and fake separation — analyze gates
+    the verdict on the drop-rate difference)."""
     n = 0
-    clean_i = 0
+    stats = collections.defaultdict(lambda: {"attempted": 0, "scored": 0, "dropped": 0})
     with open(out_path, "w", buffering=1) as out:  # line-buffered: progress visible mid-run
         for line in open(moments_path):
             mo = json.loads(line)
             if model_of(mo.get("sdir")) != model_tag:
                 continue
-            if mo["label"] == "CLEAN":
-                clean_i += 1
-                if (clean_i - 1) % clean_stride:
-                    continue
+            if mo["label"] == "CLEAN" and not clean_session_selected(mo.get("session"), clean_session_mod):
+                continue  # outside the declared sampling frame — not an exclusion
+            key = mo.get("sublabel") or mo["label"]
+            stats[key]["attempted"] += 1
             noise = jlens_entropy(mo, model_ctx)
-            if noise is None:  # no locatable tag span (e.g. malformed call input) — not scoreable
+            if noise is None:  # unscoreable (no locatable tag / trim would cut it)
+                stats[key]["dropped"] += 1
                 continue
+            stats[key]["scored"] += 1
             prefix_len = sum(len(c.get("text", "")) for c in mo.get("context", []))
             out.write(json.dumps({"label": mo["label"], "sublabel": mo.get("sublabel"),
                                   "model": model_tag, "noise": noise,
@@ -197,6 +212,9 @@ def score(moments_path, model_tag, out_path, model_ctx, clean_stride=1):
                                   "prefix_len": prefix_len,
                                   "context_truncated": mo.get("context_truncated")}) + "\n")
             n += 1
+    with open(out_path + ".stats.json", "w") as f:
+        json.dump({"model": model_tag, "clean_session_mod": clean_session_mod,
+                   "classes": dict(stats)}, f, indent=1)
     return n
 
 
@@ -276,7 +294,24 @@ def _directional(pos_rows, neg_rows):
             "verdict": verdict}
 
 
-def analyze(scored_path):
+EXCLUSION_MAX_DIFF = float(os.environ.get("JNOISE_EXCLUSION_MAX_DIFF", "0.10"))
+
+
+def _exclusion_check(stats, primary):
+    """(rates_str, biased) — drop-rate difference between the primary class and
+    CLEAN. Differential unscoreability can create separation on its own (audit-3);
+    a STAGE verdict is replaced by EXCLUSION-BIAS when the gap exceeds 10pp."""
+    cls = stats.get("classes", {})
+    def rate(k):
+        c = cls.get(k, {})
+        return (c.get("dropped", 0) / c["attempted"]) if c.get("attempted") else None
+    rp, rc = rate(primary), rate("CLEAN")
+    if rp is None or rc is None:
+        return "exclusions: n/a (no stats for one class)", False
+    return (f"drop rates: {primary} {rp:.1%} vs CLEAN {rc:.1%}", abs(rp - rc) > EXCLUSION_MAX_DIFF)
+
+
+def analyze(scored_path, stats_path=None):
     """Per model, bucketed by sublabel where available (CONFAB_COPY / CONFAB_BLIND)
     else falling back to the plain label (backward-compat with pre-sublabel data):
 
@@ -291,8 +326,14 @@ def analyze(scored_path):
                         well as noise does? If so the "signal" is position.
 
     Verdicts are SESSION-level (see _directional): moment AUC is reference only.
+    A STAGE verdict additionally requires the per-class drop rates (from the
+    score-time stats sidecar `<scored>.stats.json`) to differ by <=10pp between
+    the primary class and CLEAN — else EXCLUSION-BIAS (audit-3).
     """
     rows = [json.loads(l) for l in open(scored_path) if l.strip()]
+    if stats_path is None and os.path.exists(scored_path + ".stats.json"):
+        stats_path = scored_path + ".stats.json"
+    stats = json.load(open(stats_path)) if stats_path and os.path.exists(stats_path) else None
     by_model = {}
     for r in rows:
         key = r.get("sublabel") or r["label"]
@@ -303,6 +344,13 @@ def analyze(scored_path):
         res = {"n": {k: len(v) for k, v in d.items()}}
         primary = "CONFAB_COPY" if d.get("CONFAB_COPY") else "CONFAB"  # fallback: pre-sublabel data
         res["CONFAB_vs_CLEAN"] = _directional(d.get(primary, []), d.get("CLEAN", []))
+        if stats and stats.get("model") in (None, model):
+            rates, biased = _exclusion_check(stats, primary)
+            res["exclusions"] = rates
+            if biased and res["CONFAB_vs_CLEAN"]["verdict"] == "STAGE-c20":
+                res["CONFAB_vs_CLEAN"]["verdict"] = f"EXCLUSION-BIAS ({rates}) — fix scoreability before staging"
+        elif stats is None:
+            res["exclusions"] = "no stats sidecar — exclusion gate not evaluated (pre-audit-3 scored file)"
         if d.get("CONFAB_BLIND"):
             res["BLIND_vs_CLEAN"] = _directional(d["CONFAB_BLIND"], d.get("CLEAN", []))
         if d.get("CONFAB_EXACT"):
@@ -354,6 +402,8 @@ def shapecheck(moments_path):
 def _print_report(report):
     for model, r in report.items():
         print(f"== {model}  n={r['n']}  turn-confound AUC={r['turn_confound_auc']}")
+        if "exclusions" in r:
+            print(f"   {r['exclusions']}")
         for study in ("CONFAB_vs_CLEAN", "BLIND_vs_CLEAN", "EXACT_vs_CLEAN"):
             if study in r:
                 s = r[study]
@@ -470,11 +520,37 @@ def selftest():
                    {"label": "CLEAN", "model": "4B", "noise": 0.5, "turn": 1, "session": "b"}])
         assert analyze(p)["4B"]["CONFAB_vs_CLEAN"]["auc_moment"] == 1.0
 
+    # (9) EXCLUSION-BIAS gate (audit-3): a STAGE-worthy separation whose primary
+    # class dropped far more moments than CLEAN must NOT stage.
+    with tempfile.TemporaryDirectory() as td:
+        p = os.path.join(td, "x.jsonl")
+        _write(p, powered(2.0, 0.5))
+        with open(p + ".stats.json", "w") as f:
+            json.dump({"model": "4B", "classes": {
+                "CONFAB_COPY": {"attempted": 48, "scored": 24, "dropped": 24},   # 50% dropped
+                "CLEAN": {"attempted": 25, "scored": 24, "dropped": 1}}}, f)     # 4% dropped
+        v = analyze(p)["4B"]
+        assert v["CONFAB_vs_CLEAN"]["verdict"].startswith("EXCLUSION-BIAS"), v["CONFAB_vs_CLEAN"]["verdict"]
+        # same data, balanced drops -> stages normally
+        with open(p + ".stats.json", "w") as f:
+            json.dump({"model": "4B", "classes": {
+                "CONFAB_COPY": {"attempted": 25, "scored": 24, "dropped": 1},
+                "CLEAN": {"attempted": 25, "scored": 24, "dropped": 1}}}, f)
+        assert analyze(p)["4B"]["CONFAB_vs_CLEAN"]["verdict"] == "STAGE-c20"
+
+    # (10) session-hash CLEAN sampling: whole sessions in or out, deterministic
+    kept = {s for s in (f"sess{i}" for i in range(600)) if clean_session_selected(s, 6)}
+    kept2 = {s for s in (f"sess{i}" for i in range(600)) if clean_session_selected(s, 6)}
+    assert kept == kept2, "deterministic"
+    assert 40 <= len(kept) <= 160, f"~1/6 of 600 sessions, got {len(kept)}"
+    assert all(clean_session_selected(s, 1) for s in ("a", "b")), "mod=1 keeps everything"
+
     # entropy sanity: uniform top-k = ln k ; a spike ~ 0
     assert abs(topk_entropy([0.0] * 50) - math.log(50)) < 1e-9
     assert topk_entropy([100.0] + [0.0] * 49) < 0.01
     print("score_moments selftest: OK (session-level verdicts, UNDERPOWERED min-n, clustering guard, "
-          "bootstrap CI, direction incl. inverted, turn confound, COPY/BLIND/EXACT/STALE separated, "
+          "signed cluster CI incl. null regression, direction incl. inverted, turn confound, "
+          "COPY/BLIND/EXACT/STALE separated, EXCLUSION-BIAS gate, session-hash sampling, "
           "legacy fallback, entropy)")
 
 
@@ -509,8 +585,8 @@ if __name__ == "__main__":
         else:
             out = _arg("-o") or sys.exit("-o scored.jsonl required")
             n = score(sys.argv[2], _arg("--model", "4B"), out, ctx,
-                      clean_stride=int(_arg("--clean-stride", "1")))
-            print(f"scored {n} moments -> {out}")
+                      clean_session_mod=int(_arg("--clean-session-mod", "1")))
+            print(f"scored {n} moments -> {out} (+ .stats.json)")
             print(f"alignment: {ctx.get('align_stats', {})}")
     else:
         raise SystemExit("usage: score_moments.py analyze <scored.jsonl> | shapecheck <moments.jsonl> | "
