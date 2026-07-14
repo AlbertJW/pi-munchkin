@@ -92,7 +92,8 @@ def make_model_ctx(lens_path, native_url="http://127.0.0.1:8091", late_frac=LATE
     readout = LensReadout(weights, lens)
     n_layers = weights.n_layers
     late = [l for l in lens.source_layers if l >= int(late_frac * n_layers)] or [max(lens.source_layers)]
-    return {"client": client, "readout": readout, "late_layers": late}
+    n_ctx = int(client.props().get("n_ctx", 4096))
+    return {"client": client, "readout": readout, "late_layers": late, "n_ctx": n_ctx}
 
 
 def jlens_entropy(moment, model_ctx):
@@ -106,17 +107,46 @@ def jlens_entropy(moment, model_ctx):
     if text is None:
         return None
     client, readout, late = model_ctx["client"], model_ctx["readout"], model_ctx["late_layers"]
-    toks, pieces = client.tokenize_with_pieces(text, add_special=True)
-    # char offset of each token's END (specials render as empty/marker pieces)
-    tag_positions = []
-    off = 0
-    for i, p in enumerate(pieces):
-        start_off = off
-        off += len(p)
-        if start_off < span[1] and off > span[0]:  # token overlaps the tag span
-            tag_positions.append(i)
+    toks = client.tokenize(text, add_special=True)
+    # Tag positions by PREFIX TOKENIZATION (audit-2): summing decoded piece lengths
+    # breaks on special tokens / byte-fallback replacement chars — offsets silently
+    # drift and the entropy gets read at the wrong activations. Tokenizing the exact
+    # char prefixes sidesteps reconstruction entirely; a decode-back check validates,
+    # a small scan repairs BPE boundary drift, and an unrepairable moment is DROPPED
+    # (None), never silently mis-scored.
+    tag_str = text[span[0]:span[1]]
+    i0 = len(client.tokenize(text[:span[0]], add_special=True))
+    i1 = len(client.tokenize(text[:span[1]], add_special=True))
+    stats = model_ctx.setdefault("align_stats", {"exact": 0, "fallback": 0, "dropped": 0})
+
+    def _window_has_tag(a, b):
+        a, b = max(0, a), min(len(toks), b)
+        return b > a and tag_str in client.detokenize(toks[a:b])
+
+    if i1 > i0 and _window_has_tag(i0, i1):
+        stats["exact"] += 1
+    else:
+        hit = next(((i0 + da, i1 + db) for da in (-1, 0, 1, -2, 2, -3, 3) for db in (0, -1, 1, -2, 2, 3)
+                    if _window_has_tag(i0 + da, max(i0 + da + 1, i1 + db))), None)
+        if hit is None:
+            stats["dropped"] += 1
+            return None
+        i0, i1 = hit[0], max(hit[0] + 1, hit[1])
+        stats["fallback"] += 1
+    tag_positions = list(range(max(0, i0), min(len(toks), i1)))
     if not tag_positions:
+        stats["dropped"] += 1
         return None
+    # token-level guard: the char budget under-estimates code-heavy transcripts
+    # (~2.5 chars/token), so a prompt can still exceed the server window. Trim
+    # from the FRONT — the tag lives at the end (inside the final call).
+    n_ctx = model_ctx.get("n_ctx", 4096)
+    if len(toks) > n_ctx - 8:
+        cut = len(toks) - (n_ctx - 8)
+        if tag_positions[0] - cut < 1:
+            return None  # tag would fall off — unscoreable, not silently wrong
+        toks = toks[cut:]
+        tag_positions = [i - cut for i in tag_positions]
     pred_positions = sorted({max(0, i - 1) for i in tag_positions})
     fr = client.forward(toks, capture_layers=late, capture=True)
     ents = []
@@ -148,7 +178,7 @@ def score(moments_path, model_tag, out_path, model_ctx, clean_stride=1):
     scoring; confab classes are always scored in full."""
     n = 0
     clean_i = 0
-    with open(out_path, "w") as out:
+    with open(out_path, "w", buffering=1) as out:  # line-buffered: progress visible mid-run
         for line in open(moments_path):
             mo = json.loads(line)
             if model_of(mo.get("sdir")) != model_tag:
@@ -188,53 +218,62 @@ def roc_auc(pos, neg):
 
 
 def session_means(rows):
-    """Per-session mean noise for one class's rows -> [(session, mean)]."""
+    """Per-session mean noise for one class's rows -> {session: mean}."""
     by = collections.defaultdict(list)
     for r in rows:
         by[r.get("session") or "?"].append(r["noise"])
-    return [(s, sum(v) / len(v)) for s, v in sorted(by.items())]
-
-
-def _strength(pos, neg):
-    auc = roc_auc(pos, neg)
-    return None if auc is None else abs(auc - 0.5) + 0.5  # = max(auc, 1-auc)
+    return {s: sum(v) / len(v) for s, v in by.items()}
 
 
 def _directional(pos_rows, neg_rows):
-    """Session-level directional verdict. Moment AUC is reported for reference, but
-    the verdict rides on the AUC over PER-SESSION MEAN noise (sessions are the
-    independent unit), needs MIN_SESSIONS per class, and carries a bootstrap 95% CI
-    on the session-level strength (resampling sessions). An INVERTED signal (confab
-    = LOW noise, the confidently-wrong quadrant) counts as a detector."""
+    """Session-level directional verdict, audit-2 corrected:
+
+    - CI is on the SIGNED session AUC. The previous CI bootstrapped the FOLDED
+      statistic max(AUC, 1-AUC), which is >=0.5 by construction — its lower bound
+      clearing 0.5 was near-vacuous as evidence against the null.
+    - CLUSTER bootstrap: resample unique SESSIONS; each resampled session brings
+      whatever class means it has (one session can contribute BOTH a confab mean
+      and a clean mean — independent per-class resampling broke that dependence).
+    - Verdict: >=MIN_SESSIONS per class AND the signed 95% CI excludes 0.5 (either
+      side — an INVERTED detector still counts) AND strength >= AUC_BAR.
+    """
     import random
     mom_auc = roc_auc([r["noise"] for r in pos_rows], [r["noise"] for r in neg_rows])
     if mom_auc is None:
-        return {"auc_moment": None, "auc_session": None, "strength": None, "ci95": None,
-                "direction": None, "n_sessions": (0, 0), "verdict": None}
+        return {"auc_moment": None, "auc_session": None, "strength": None, "ci95_signed": None,
+                "direction": None, "n_sessions": (0, 0), "n_shared_sessions": 0, "verdict": None}
     pos_s = session_means(pos_rows)
     neg_s = session_means(neg_rows)
-    pv, nv = [m for _, m in pos_s], [m for _, m in neg_s]
-    sess_auc = roc_auc(pv, nv)
-    strength = _strength(pv, nv)
+    sess_auc = roc_auc(list(pos_s.values()), list(neg_s.values()))
+    strength = abs(sess_auc - 0.5) + 0.5  # for the pre-registered bar only, never bootstrapped
+    sessions = sorted(set(pos_s) | set(neg_s))
     rng = random.Random(0)  # deterministic
     boots = []
     for _ in range(BOOTSTRAP_N):
-        bp = [pv[rng.randrange(len(pv))] for _ in pv]
-        bn = [nv[rng.randrange(len(nv))] for _ in nv]
-        s = _strength(bp, bn)
-        if s is not None:
-            boots.append(s)
+        bp, bn = [], []
+        for _ in sessions:
+            s = sessions[rng.randrange(len(sessions))]
+            if s in pos_s:
+                bp.append(pos_s[s])
+            if s in neg_s:
+                bn.append(neg_s[s])
+        a = roc_auc(bp, bn)
+        if a is not None:
+            boots.append(a)
     boots.sort()
     ci = (boots[int(0.025 * len(boots))], boots[int(0.975 * len(boots))]) if boots else None
-    n_pos, n_neg = len(pv), len(nv)
+    n_pos, n_neg = len(pos_s), len(neg_s)
+    ci_excludes_null = bool(ci) and (ci[0] > 0.5 or ci[1] < 0.5)
     if n_pos < MIN_SESSIONS or n_neg < MIN_SESSIONS:
         verdict = f"UNDERPOWERED (sessions: {n_pos} pos / {n_neg} neg, need >={MIN_SESSIONS} each)"
     else:
-        verdict = "STAGE-c20" if strength >= AUC_BAR and (ci and ci[0] > 0.5) else "re-reject"
+        verdict = "STAGE-c20" if strength >= AUC_BAR and ci_excludes_null else "re-reject"
     return {"auc_moment": round(mom_auc, 3), "auc_session": round(sess_auc, 3),
-            "strength": round(strength, 3), "ci95": [round(ci[0], 3), round(ci[1], 3)] if ci else None,
+            "strength": round(strength, 3),
+            "ci95_signed": [round(ci[0], 3), round(ci[1], 3)] if ci else None,
             "direction": "confab-high" if sess_auc >= 0.5 else "confab-LOW(inverted)",
-            "n_sessions": (n_pos, n_neg), "verdict": verdict}
+            "n_sessions": (n_pos, n_neg), "n_shared_sessions": len(set(pos_s) & set(neg_s)),
+            "verdict": verdict}
 
 
 def analyze(scored_path):
@@ -319,7 +358,8 @@ def _print_report(report):
             if study in r:
                 s = r[study]
                 print(f"   {study}: session AUC={s['auc_session']} (moment {s['auc_moment']}) "
-                      f"strength={s['strength']} CI95={s['ci95']} sessions={s['n_sessions']} "
+                      f"strength={s['strength']} signed-CI95={s['ci95_signed']} "
+                      f"sessions={s['n_sessions']} shared={s['n_shared_sessions']} "
                       f"({s['direction']}) -> {s['verdict']}")
 
 
@@ -343,13 +383,39 @@ def selftest():
         _write(p, powered(2.0, 0.5))
         v = analyze(p)["4B"]["CONFAB_vs_CLEAN"]
         assert v["auc_session"] == 1.0 and v["direction"] == "confab-high" and v["verdict"] == "STAGE-c20", v
-        assert v["ci95"] and v["ci95"][0] > 0.5, "bootstrap CI reported and clear of 0.5"
+        assert v["ci95_signed"] and v["ci95_signed"][0] > 0.5, "signed CI clear of 0.5 above"
 
-        # (2) INVERTED signal (confidently-wrong quadrant), powered -> still STAGE
+        # (2) INVERTED signal (confidently-wrong quadrant), powered -> still STAGE:
+        # the SIGNED CI excludes 0.5 from BELOW
         p = os.path.join(td, "b.jsonl")
         _write(p, powered(0.1, 0.9))
         v = analyze(p)["4B"]["CONFAB_vs_CLEAN"]
         assert v["auc_session"] == 0.0 and v["strength"] == 1.0 and "inverted" in v["direction"] and v["verdict"] == "STAGE-c20", v
+        assert v["ci95_signed"][1] < 0.5, "inverted detector: CI below 0.5"
+
+        # (2b) NULL-DATA REGRESSION (audit-2): pure noise, well-powered — the old
+        # folded-statistic CI (max(AUC,1-AUC) >= 0.5 by construction) would often
+        # bless this; the signed CI must include 0.5 and the verdict must reject.
+        import random as _rnd
+        _r = _rnd.Random(42)
+        p = os.path.join(td, "null.jsonl")
+        _write(p, [row("CONFAB", _r.gauss(1.0, 0.3), sub="CONFAB_COPY", sess=f"p{i}") for i in range(30)] +
+                  [row("CLEAN", _r.gauss(1.0, 0.3), sess=f"n{i}") for i in range(30)])
+        v = analyze(p)["4B"]["CONFAB_vs_CLEAN"]
+        assert v["verdict"] == "re-reject", f"null data must not stage: {v}"
+        assert v["ci95_signed"][0] <= 0.5 <= v["ci95_signed"][1], f"signed CI must straddle 0.5 on null: {v['ci95_signed']}"
+
+        # (2c) SHARED SESSIONS (audit-2): one session contributing BOTH classes —
+        # cluster bootstrap handles it; n_shared_sessions reported.
+        p = os.path.join(td, "shared.jsonl")
+        rows_sh = []
+        for i in range(24):
+            rows_sh.append(row("CONFAB", 2.0 + i * 0.001, sub="CONFAB_COPY", sess=f"s{i}"))
+            rows_sh.append(row("CLEAN", 0.5 + i * 0.001, sess=f"s{i}"))  # SAME session
+        _write(p, rows_sh)
+        v = analyze(p)["4B"]["CONFAB_vs_CLEAN"]
+        assert v["n_shared_sessions"] == 24, v["n_shared_sessions"]
+        assert v["verdict"] == "STAGE-c20", v
 
         # (3) UNDERPOWERED: perfect separation on too few sessions must NOT stage —
         # this kills the "four 35B confabs yield a perfect AUC" failure mode (audit).
@@ -445,6 +511,7 @@ if __name__ == "__main__":
             n = score(sys.argv[2], _arg("--model", "4B"), out, ctx,
                       clean_stride=int(_arg("--clean-stride", "1")))
             print(f"scored {n} moments -> {out}")
+            print(f"alignment: {ctx.get('align_stats', {})}")
     else:
         raise SystemExit("usage: score_moments.py analyze <scored.jsonl> | shapecheck <moments.jsonl> | "
                          "smoke/score <moments.jsonl> --lens L.gguf [--model 4B] [-o out] | --selftest")
