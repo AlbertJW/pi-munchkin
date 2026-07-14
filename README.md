@@ -1,5 +1,9 @@
 # pi_munchkin
 
+<p align="center">
+  <img src="assets/pi-munchkin.png" alt="pi-munchkin mascot: a grinning gap-toothed munchkin knight in mismatched armor, oversized sword in hand, healing potion and a rubber chicken on the belt" width="340">
+</p>
+
 Harness extensions for the [pi](https://github.com/earendil-works/pi) coding agent, plus a
 **measurement-gated, significance-aware self-improvement loop** for tuning them against small,
 locally-served LLMs.
