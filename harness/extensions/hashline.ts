@@ -175,25 +175,47 @@ export default function (pi: ExtensionAPI) {
 			// serialize edits: two parallel patches to the same file would race read→write
 			executionMode: "sequential",
 			async execute(_id, params, _signal, _onUpdate, ctx) {
-				const sections = parsePatch(params.input);
-				const out: string[] = [];
-				let firstChanged: number | undefined;
+				const parsed = parsePatch(params.input);
+				// Merge CONSECUTIVE same-(path, tag) sections: they were composed against
+				// the SAME source state, so one applyHunks pass is exact — self-relocation
+				// (pre-existing) fails when the sections sit within ±2 lines of each other.
+				const sections: typeof parsed = [];
+				for (const sec of parsed) {
+					const last = sections[sections.length - 1];
+					if (last && last.path === sec.path && last.tag === sec.tag) last.hunks = last.hunks.concat(sec.hunks);
+					else sections.push({ ...sec, hunks: [...sec.hunks] });
+				}
+				// TWO-PHASE apply (all-or-nothing multi-file): PHASE 1 reads, resolves tags,
+				// and computes every section IN MEMORY — any failure throws before a byte lands.
+				// PHASE 2 writes only once every section validated. Old code wrote inside the
+				// loop, half-applying earlier files when a later section failed.
+				type Planned = { abs: string; disp: string; finalText: string; res: ReturnType<typeof applyHunks>; hunkCount: number };
+				const planned: Planned[] = [];
+				// Working buffers: same-file sections chain onto the prior result.
+				const buffers = new Map<string, { text: string; style: ReturnType<typeof detectStyle> }>();
+				const originals = new Map<string, string>(); // pristine bytes per file, for rollback + honesty
+				try {
 				for (const sec of sections) {
 					const abs = isAbsolute(sec.path) ? sec.path : resolve(ctx.cwd, sec.path);
 					const disp = displayPath(ctx.cwd, abs);
-					let raw: string;
-					try {
-						raw = await readFile(abs, "utf8");
-					} catch (e) {
-						if ((e as NodeJS.ErrnoException)?.code === "ENOENT") {
-							throw new Error(
-								`file not found: ${disp}. Use the file's real relative path and the #TAG from your last read — the tool description's header is a placeholder, not a real file. To create a new file use write, not edit.`,
-							);
+					let buf = buffers.get(abs);
+					if (!buf) {
+						let raw: string;
+						try {
+							raw = await readFile(abs, "utf8");
+						} catch (e) {
+							if ((e as NodeJS.ErrnoException)?.code === "ENOENT") {
+								throw new Error(
+									`file not found: ${disp}. Use the file's real relative path and the #TAG from your last read — the tool description's header is a placeholder, not a real file. To create a new file use write, not edit.`,
+								);
+							}
+							throw e;
 						}
-						throw e;
+						originals.set(abs, raw); // pristine bytes for phase-2 rollback
+						buf = { text: raw, style: detectStyle(raw) }; // style restored on write — a one-line edit must not rewrite the whole file
+						buffers.set(abs, buf);
 					}
-					const style = detectStyle(raw); // restore CRLF/BOM on write — a one-line edit must not rewrite the whole file
-					const live = normalizeText(raw);
+					const live = normalizeText(buf.text);
 					const liveTag = fileTag(live);
 					let hunks = sec.hunks;
 					if (sec.tag !== liveTag) {
@@ -206,16 +228,51 @@ export default function (pi: ExtensionAPI) {
 						hunks = relocateHunks(snap.text, live, hunks);
 					}
 					const res = applyHunks(live, hunks);
-					await writeFile(abs, restoreStyle(res.newText, style), "utf8");
-					const newText = normalizeText(res.newText);
-					const newTag = recordSnapshot(abs, newText);
-					firstChanged = firstChanged ?? res.firstChangedLine;
+					const finalText = restoreStyle(res.newText, buf.style);
+					buf.text = finalText; // chain: a later same-file section edits this result
+					planned.push({ abs, disp, finalText, res, hunkCount: hunks.length });
+				}
+				} catch (e) {
+					// All-or-nothing honesty: a model that has seen "Applied…" replies may
+					// assume earlier sections landed — say explicitly that none did.
+					if (sections.length > 1 && e instanceof Error) {
+						e.message += " NOTE: this patch had multiple sections and NONE were applied — fix the error and re-emit the ENTIRE patch.";
+					}
+					throw e;
+				}
+
+				// PHASE 2a — commit all writes. If the OS rejects one mid-way (perms,
+				// disk full), best-effort restore every file already written from its
+				// pristine bytes so the I/O layer cannot re-open the half-applied hole.
+				const written: string[] = [];
+				try {
+					for (const p of planned) {
+						await writeFile(p.abs, p.finalText, "utf8");
+						if (!written.includes(p.abs)) written.push(p.abs);
+					}
+				} catch (e) {
+					for (const abs of written) {
+						try {
+							await writeFile(abs, originals.get(abs) ?? "", "utf8");
+						} catch { /* rollback is best-effort; the original error wins */ }
+					}
+					if (e instanceof Error) e.message += " NOTE: write failed — all files restored to their pre-patch state, nothing applied.";
+					throw e;
+				}
+
+				// PHASE 2b — everything is on disk; record snapshots and build the output.
+				const out: string[] = [];
+				let firstChanged: number | undefined;
+				for (const p of planned) {
+					const newText = normalizeText(p.finalText);
+					const newTag = recordSnapshot(p.abs, newText);
+					firstChanged = firstChanged ?? p.res.firstChangedLine;
 
 					// Re-grounding aid: ±3 renumbered lines around each change under the
 					// new tag, so the next edit needs no re-read.
 					const newLines = newText.replace(/\n$/, "").split("\n");
 					const windows: [number, number][] = [];
-					for (const c of res.changed) {
+					for (const c of p.res.changed) {
 						const s = Math.max(1, c.line - 3);
 						const e = Math.min(newLines.length, c.line + Math.max(c.count, 1) - 1 + 3);
 						const last = windows[windows.length - 1];
@@ -225,10 +282,10 @@ export default function (pi: ExtensionAPI) {
 					const ground = windows
 						.map(([s, e]) => annotate(newLines.slice(s - 1, e), s))
 						.join("\n…\n");
-					const c = res.counts;
+					const c = p.res.counts;
 					out.push(
-						`Applied ${hunks.length} hunk(s) to ${disp} (${c.replaced} replace, ${c.inserted} insert, ${c.deleted} delete).\n` +
-							`[${disp}#${newTag}]\n${ground}\nNumbers above are CURRENT (tag ${newTag}). Old tag/numbers are dead.`,
+						`Applied ${p.hunkCount} hunk(s) to ${p.disp} (${c.replaced} replace, ${c.inserted} insert, ${c.deleted} delete).\n` +
+							`[${p.disp}#${newTag}]\n${ground}\nNumbers above are CURRENT (tag ${newTag}). Old tag/numbers are dead.`,
 					);
 				}
 				return { content: [{ type: "text" as const, text: out.join("\n\n") }], details: { firstChangedLine: firstChanged } };

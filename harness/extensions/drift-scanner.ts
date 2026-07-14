@@ -34,6 +34,11 @@ const FRESH_SECS = 300; // HEAD older than this wasn't the commit this turn just
 export default function (pi: ExtensionAPI) {
 	if (!ENABLED) return;
 
+	// HEAD hashes already handled (reviewed or skipped), per cwd: a commit ATTEMPT
+	// that a pre-commit hook aborted leaves HEAD unmoved — the freshness window
+	// alone would re-review the previous turn's commit (audit 2026-07-13).
+	const handledHead = new Map<string, string>();
+
 	pi.on("turn_end", async (event, ctx) => {
 		const msg = event.message;
 		if (msg.role !== "assistant") return;
@@ -57,10 +62,15 @@ export default function (pi: ExtensionAPI) {
 			// Confirm a commit actually landed this turn: HEAD must be fresh. This
 			// rejects pre-commit-hook aborts and empty-stage no-ops (which leave a
 			// stale prior HEAD), so `git show HEAD` is exactly what was just committed.
-			const ct = await pi.exec("git", ["show", "-s", "--format=%ct", "HEAD"], { cwd: ctx.cwd, timeout: 10_000 });
-			const committedAt = Number((ct.stdout || "").trim());
-			if (!Number.isFinite(committedAt)) return; // no repo / no HEAD / parse fail
+			const ct = await pi.exec("git", ["show", "-s", "--format=%ct %H", "HEAD"], { cwd: ctx.cwd, timeout: 10_000 });
+			const [ctsRaw, headHash] = (ct.stdout || "").trim().split(/\s+/);
+			const committedAt = Number(ctsRaw);
+			if (!Number.isFinite(committedAt) || !headHash) return; // no repo / no HEAD / parse fail
+			// HEAD didn't move since we last handled it -> this turn's commit attempt
+			// failed (hook abort / empty stage); do NOT re-review the previous commit.
+			if (handledHead.get(ctx.cwd) === headHash) return;
 			if (Math.floor(Date.now() / 1000) - committedAt > FRESH_SECS) return; // no commit landed this turn
+			handledHead.set(ctx.cwd, headHash);
 
 			const show = await pi.exec("git", ["show", "--format=", "HEAD"], { cwd: ctx.cwd, timeout: 10_000 });
 			const diff = (show.stdout || "").trim();

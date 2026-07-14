@@ -1,7 +1,7 @@
 {
   "name": "pi-munchkin",
-  "version": "0.1.0",
-  "description": "Harness extensions for the pi coding agent (anti-loop breaker, verify gate, plan runner, hashline edits, guards, span tools, /reflect, telemetry) — installable as a pi extension.",
+  "version": "0.2.0",
+  "description": "Harness extensions for the pi coding agent (hashline edits, anti-loop breaker, verify gate, plan runner, /reflect, guards, span tools, telemetry) — installable as a pi extension.",
   "keywords": ["pi", "pi-coding-agent", "pi-extension", "coding-agent", "llm", "local-llm", "agent-harness"],
   "homepage": "https://github.com/AlbertJW/pi-munchkin",
   "repository": { "type": "git", "url": "git+https://github.com/AlbertJW/pi-munchkin.git" },
@@ -19,6 +19,7 @@
       "harness/extensions/context-watcher.ts",
       "harness/extensions/span-tools.ts",
       "harness/extensions/compact-tool.ts",
+      "harness/extensions/micro-gate.ts",
       "harness/extensions/ketch.ts"
     ]
   },

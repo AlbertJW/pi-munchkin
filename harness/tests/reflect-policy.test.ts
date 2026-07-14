@@ -35,6 +35,16 @@ test("sc voting: recurring findings survive, one-off hallucinations die, all-CLE
 	assert.equal(METHODS.sc.samples, 3);
 });
 
+test("sc voting: votes are per-sample — one sample repeating itself is ONE vote", () => {
+	const halluc = "- [VERIFY] missing commit step: add a git commit before shipping";
+	const hallucReworded = "- [VERIFY] commit step missing: add git commit before the ship step";
+	// one rambling sample states the same finding twice; no other sample agrees ->
+	// must NOT reach a 2-vote quorum (pre-fix it counted 2 votes from one voter)
+	assert.equal(voteFindings([`${halluc}\n${hallucReworded}`, null, null], 2), null);
+	// the same two lines split across two samples ARE two independent votes
+	assert.ok(voteFindings([halluc, hallucReworded, null], 2));
+});
+
 test("sc voting: step references anchor identity across wild rephrasings and formats", () => {
 	// from live DD samples: same flaw, prose-numbered vs dashed, near-zero word overlap
 	const s0 = "1. **Step 3 is YAGNI/over-engineering.** A dynamic plugin system for hypothetical future exporters adds massive overhead.";

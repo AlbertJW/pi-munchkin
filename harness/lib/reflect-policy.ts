@@ -105,13 +105,17 @@ function similar(a: Set<string>, b: Set<string>): boolean {
 // Vote across samples: null samples (CLEAN) contribute no findings. Returns the
 // surviving findings (first-seen wording) or null when nothing reaches minVotes.
 export function voteFindings(samples: Array<string | null>, minVotes: number): string | null {
-	type Bucket = { tag: string; words: Set<string>; steps: Set<string>; line: string; votes: number };
+	// voters = which SAMPLES contributed: a sample repeating the same finding twice
+	// is one vote, not two — votes must be independent across samples, or a single
+	// rambling review can self-certify its own hallucination past the quorum.
+	type Bucket = { tag: string; words: Set<string>; steps: Set<string>; line: string; voters: Set<number> };
 	const buckets: Bucket[] = [];
 	// A finding line in ANY of the model's observed formats: "- x", "* x", "1. x",
 	// "**x**". Small local reviewers ignore the dash contract often enough that a
 	// dash-only parser zeroes out REAL findings and votes a flawed plan CLEAN.
 	const findingLine = /^\s*(?:[-*]|\d+\.|\*\*)/;
-	for (const s of samples) {
+	for (let si = 0; si < samples.length; si++) {
+		const s = samples[si];
 		if (!s) continue;
 		for (const line of s.split("\n")) {
 			if (!findingLine.test(line) || line.trim().length < 20) continue;
@@ -124,10 +128,10 @@ export function voteFindings(samples: Array<string | null>, minVotes: number): s
 				const tagOk = b.tag === tag || b.tag === "?" || tag === "?";
 				return stepHit || (tagOk && similar(b.words, words));
 			});
-			if (hit) hit.votes++;
-			else buckets.push({ tag, words, steps, line: line.trim(), votes: 1 });
+			if (hit) hit.voters.add(si);
+			else buckets.push({ tag, words, steps, line: line.trim(), voters: new Set([si]) });
 		}
 	}
-	const kept = buckets.filter((b) => b.votes >= minVotes).map((b) => b.line);
+	const kept = buckets.filter((b) => b.voters.size >= minVotes).map((b) => b.line);
 	return kept.length ? kept.join("\n") : null;
 }
