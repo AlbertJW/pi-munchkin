@@ -91,7 +91,7 @@ def make_model_ctx(lens_path, native_url="http://127.0.0.1:8091", late_frac=LATE
     lens = JacobianLensGGUF.load(lens_path)
     readout = LensReadout(weights, lens)
     n_layers = weights.n_layers
-    late = [l for l in lens.layers if l >= int(late_frac * n_layers)] or [max(lens.layers)]
+    late = [l for l in lens.source_layers if l >= int(late_frac * n_layers)] or [max(lens.source_layers)]
     return {"client": client, "readout": readout, "late_layers": late}
 
 
@@ -138,18 +138,25 @@ def model_of(sdir):
             else "mellum" if "mellum" in d else "35B" if ("35b" in d or "qwen36" in d) else "other")
 
 
-def score(moments_path, model_tag, out_path, model_ctx):
+def score(moments_path, model_tag, out_path, model_ctx, clean_stride=1):
     """Carry turn + session + prefix_len alongside noise so analyze can test the
     position/non-independence confounds — noise correlates with confab ONLY if it
     isn't just tracking 'late in a doomed session'. sublabel (CONFAB_COPY vs
     CONFAB_BLIND) passes through so analyze can study the true tag-copy-failure
-    population separately from blind invention."""
+    population separately from blind invention. clean_stride: deterministic
+    subsample of the (plentiful) CLEAN controls — every Nth row, declared before
+    scoring; confab classes are always scored in full."""
     n = 0
+    clean_i = 0
     with open(out_path, "w") as out:
         for line in open(moments_path):
             mo = json.loads(line)
             if model_of(mo.get("sdir")) != model_tag:
                 continue
+            if mo["label"] == "CLEAN":
+                clean_i += 1
+                if (clean_i - 1) % clean_stride:
+                    continue
             noise = jlens_entropy(mo, model_ctx)
             if noise is None:  # no locatable tag span (e.g. malformed call input) — not scoreable
                 continue
@@ -435,7 +442,8 @@ if __name__ == "__main__":
                 print(f"  {key}: noise={jlens_entropy(mo, ctx)}  (session {mo.get('session', '?')[:40]})")
         else:
             out = _arg("-o") or sys.exit("-o scored.jsonl required")
-            n = score(sys.argv[2], _arg("--model", "4B"), out, ctx)
+            n = score(sys.argv[2], _arg("--model", "4B"), out, ctx,
+                      clean_stride=int(_arg("--clean-stride", "1")))
             print(f"scored {n} moments -> {out}")
     else:
         raise SystemExit("usage: score_moments.py analyze <scored.jsonl> | shapecheck <moments.jsonl> | "
