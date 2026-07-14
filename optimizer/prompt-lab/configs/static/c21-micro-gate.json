@@ -1,0 +1,5 @@
+{
+  "name": "micro-gate",
+  "prediction": "post-edit parse/compile checks on changed files convert the edit-noop/bad-edit flail class into 1-observation fixes (gt2 baseline: the 4B spent 9 turns / ~16k tokens recovering an unnoticed bad edit). Expect pass-rate neutral-to-up with LOWER tokens on failing-edit-heavy tasks; telemetry micro-gate.fired counts the mechanism. Risk: false-positive checks on intermediate states could add noise turns - the Fisher question.",
+  "thresholds": { "MICRO_GATE": "on" }
+}

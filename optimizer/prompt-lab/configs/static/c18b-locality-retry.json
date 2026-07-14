@@ -1,0 +1,5 @@
+{
+  "name": "locality-retry",
+  "prediction": "vs c18 fresh-retry: the constrained localize->one-patch->verify handoff converts MORE aborts than the open-ended fresh note, specifically on the re-read-then-different-approach failure class the gauntlet showed small models never perform unprompted (gt2: stale-tag/edit-noop/perm-denied all unrecovered on the 2B). Mechanism metric: retried:1 rows' pass rate, c18b arm vs c18 arm.",
+  "thresholds": { "RETRY_FRESH": "on", "RETRY_MODE": "locality" }
+}

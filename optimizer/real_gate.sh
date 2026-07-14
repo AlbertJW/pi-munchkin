@@ -17,15 +17,15 @@ set -uo pipefail
 
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 GEN="${GEN:-rg0}"; N="${N:-3}"
-DD="${DD:-}"; PI_TIMEOUT="${PI_TIMEOUT:-1800}"
+DD="${DD:-qwen36-35b-iq3s}"; PI_TIMEOUT="${PI_TIMEOUT:-1800}"
 PI_MODEL="${PI_MODEL:-}"   # pi model id for the sessions (else pi uses its default — beware external defaults)
 BASE="${BASE:-$HERE/prompt-lab/configs/baseline.json}"
 CAND="${CAND:-$HERE/prompt-lab/configs/cand-cot.json}"
-FIXTURE="${FIXTURE:-$HERE/pi-test}"; TASKS_DIR="$HERE/ab-symbolect/tasks"; T3_FILES="$HERE/ab-symbolect/t3-files"
+FIXTURE="$HOME/LLM/pi-test"; TASKS_DIR="$HERE/ab-symbolect/tasks"; T3_FILES="$HERE/ab-symbolect/t3-files"
 FIXTURES="$HERE/real-gate-fixtures"
 CONFIG="$HERE/prompt-lab/config.py"; METRICS="$HERE/ab-machinery/metrics.py"
 RESULTS="$HERE/prompt-lab/results/$GEN.jsonl"
-RUNS="${RUNS:-$HERE/real-gate-runs}"
+RUNS="$HOME/LLM/real-gate-runs"
 
 DRY=0; HARD=0; CALIB=0; TASKS=()
 for a in "$@"; do
@@ -88,10 +88,18 @@ fi
 
 CHILD=""
 LOW_TOK_STREAK=0
+# Kill a process AND its descendants. Scoped to OUR tree only — a global
+# pkill -f on the pi cmdline pattern killed sibling fleet wings sharing the
+# same PI_TIMEOUT (audit 2026-07-13).
+kill_tree() {
+	local p
+	for p in $(pgrep -P "$1" 2>/dev/null); do kill_tree "$p"; done
+	kill "$1" 2>/dev/null
+}
 cleanup() {
-	[[ -n "$CHILD" ]] && kill "$CHILD" 2>/dev/null
-	pkill -P $$ 2>/dev/null
-	pkill -f "timeout $PI_TIMEOUT pi -p --approve" 2>/dev/null
+	[[ -n "$CHILD" ]] && kill_tree "$CHILD"
+	local p
+	for p in $(pgrep -P $$ 2>/dev/null); do kill_tree "$p"; done
 }
 trap 'echo "[real_gate] interrupted — tearing down in-flight pi" >&2; cleanup; exit 130' INT TERM
 
@@ -104,13 +112,17 @@ else
 	MODEL="$(loaded_alias)"; [[ -n "$MODEL" ]] || MODEL=unknown
 	MODEL="$(basename "$MODEL" .gguf)"; MODEL="${MODEL//[^a-zA-Z0-9._-]/-}"  # alias-less servers report the gguf path
 fi
-[[ -n "$DD" && "$MODEL" != "$DD" ]] && echo "[real_gate] WARNING: loaded model '$MODEL' != expected '$DD'" >&2
+[[ "$MODEL" != "$DD" ]] && echo "[real_gate] WARNING: loaded model '$MODEL' != daily driver '$DD'" >&2
 mkdir -p "$RUNS"
-echo "== real_gate: model=$MODEL  N=$N  tasks=${TASKS[*]} =="
+# Unique run id: workdir basenames feed telemetry sk, so re-running a gen label
+# used to aggregate the OLD run's events into the new verdict (audit 2026-07-13).
+# The id lands in workdir names (-> sk) and every result row (-> exact joins).
+RUNID="${RUNID:-$(python3 -c 'import uuid; print(uuid.uuid4().hex[:6])')}"
+echo "== real_gate: model=$MODEL  N=$N  run=$RUNID  tasks=${TASKS[*]} =="
 
-run_one() {  # $1=config-path  $2=pattern(base|cand)  $3=task  $4=rep
-	local cfg="$1" pat="$2" task="$3" rep="$4"
-	local wd="$RUNS/$GEN-$MODEL-$pat-$task-$rep"
+run_one() {  # $1=config-path  $2=pattern(base|cand)  $3=task  $4=rep  [$5=split]
+	local cfg="$1" pat="$2" task="$3" rep="$4" split="${5:-val}"
+	local wd="$RUNS/$GEN-$RUNID-$MODEL-$pat-$task-$rep"
 	local fix; fix="$(fixture_for "$task")"
 	rm -rf "$wd"; mkdir -p "$wd"
 	cp -R "$fix/src" "$fix/test" "$fix/package.json" "$wd/"
@@ -131,6 +143,14 @@ run_one() {  # $1=config-path  $2=pattern(base|cand)  $3=task  $4=rep
 	# apply the config: writes $wd/.pi/APPEND_SYSTEM.md, returns env lines
 	local envlines; envlines="$(python3 "$CONFIG" --apply "$cfg" --workdir "$wd")"
 	local tools="read,edit,bash"; [[ "$task" == "t4" ]] && tools="read,edit,bash,subagent"
+	# Candidate env the PARENT shell must see: the exports below happen inside the pi
+	# subshell only, so checking ${RETRY_FRESH} out here read the parent's env and the
+	# c18 retry never fired for candidates that enable it (audit 2026-07-13 — the f4
+	# c18 arm measured nothing). Parse the values straight from envlines instead.
+	local env_retry_fresh; env_retry_fresh="$(sed -n 's/^RETRY_FRESH=//p' <<< "$envlines" | tail -1)"
+	env_retry_fresh="${env_retry_fresh:-${RETRY_FRESH:-off}}"
+	local env_retry_mode; env_retry_mode="$(sed -n 's/^RETRY_MODE=//p' <<< "$envlines" | tail -1)"
+	env_retry_mode="${env_retry_mode:-${RETRY_MODE:-fresh}}"
 
 	# jail: render the per-run Seatbelt profile (absolute paths; Seatbelt has no env)
 	local sbx=()
@@ -162,17 +182,41 @@ run_one() {  # $1=config-path  $2=pattern(base|cand)  $3=task  $4=rep
 	# handoff instead of the raw pile. Fires only where the alternative was certain fail.
 	local retried=0
 	local telfile="${TELEMETRY_FILE:-$HOME/.pi/agent/telemetry/events.jsonl}"
-	if [[ "${RETRY_FRESH:-off}" == "on" ]] && \
+	if [[ "$env_retry_fresh" == "on" ]] && \
 	   grep -Eq "\"sk\":\"$(basename "$wd")\".*\"kind\":\"(outcome-)?abort\"" "$telfile" 2>/dev/null; then
 		retried=1
-		echo "  $pat/$task rep$rep aborted — RETRY_FRESH second session" >&2
+		local retry_prompt
+		if [[ "$env_retry_mode" == "locality" ]]; then
+			# c18b: Agentless-style constrained handoff — the fresh session gets the
+			# task + the ACTUAL failing verification output + an exact verify command
+			# and a localize -> one bounded patch -> verify protocol, instead of an
+			# open-ended second attempt. Targets the measured perm-denied/ghost
+			# failure class (gt2: re-read-then-different-approach never happens
+			# unprompted on small models).
+			local failout
+			failout="$( (cd "$wd" && timeout 60 node --test 2>&1 | tail -20) 2>/dev/null )"
+			echo "  $pat/$task rep$rep aborted — RETRY locality second session" >&2
+			retry_prompt="$(cat "$TASKS_DIR/$task.txt")
+
+A previous attempt in this workdir was stopped; its partial work is present. Follow this protocol EXACTLY:
+1. LOCALIZE: from the failing output below, identify the ONE file and smallest span responsible.
+2. REPAIR: make ONE bounded edit to that span.
+3. VERIFY: run exactly \`node --test\` and read its output.
+Repeat only if verification still fails. Do not restructure anything else.
+
+Most recent failing verification output:
+$failout"
+		else
+			echo "  $pat/$task rep$rep aborted — RETRY_FRESH second session" >&2
+			retry_prompt="$(cat "$TASKS_DIR/$task.txt")
+
+NOTE: a previous attempt in this workdir was stopped for repeating the same failing approach. The partial work is present. Inspect the current state first, then take a DIFFERENT approach to whatever kept failing."
+		fi
 		( cd "$wd"
 		  while IFS= read -r line; do [[ "$line" == *=* && "$line" != ENDPOINT=* && "$line" != LABEL=* ]] && export "${line?}"; done <<< "$envlines"
 		  [[ "${SPAN_TOOLS:-}" == "on" ]] && tools="$tools,search_spans,read_span"
 		  ${sbx[@]+"${sbx[@]}"} timeout "$PI_TIMEOUT" pi -p --approve ${PI_MODEL:+--model "$PI_MODEL"} --tools "$tools" \
-		    "$(cat "$TASKS_DIR/$task.txt")
-
-NOTE: a previous attempt in this workdir was stopped for repeating the same failing approach. The partial work is present. Inspect the current state first, then take a DIFFERENT approach to whatever kept failing." ) >> "$wd/run.log" 2>&1 &
+		    "$retry_prompt" ) >> "$wd/run.log" 2>&1 &
 		CHILD=$!; wait "$CHILD" || true; CHILD=""
 	fi
 
@@ -191,7 +235,15 @@ NOTE: a previous attempt in this workdir was stopped for repeating the same fail
 	# t2's own tests pass on an untouched fixture — node --test alone scores a no-op as
 	# success. The F2P grader asserts the behavior the task actually asks for.
 	[[ "$task" == "t2" ]] && ! ( cd "$wd" && node "$FIXTURES/t2-check.mjs" ) >/dev/null 2>&1 && gate=0
-	local tout; tout="$(python3 "$METRICS" "$wd" | cut -f7)"; [[ -n "$tout" ]] || tout=0
+	# c23 trajectory assertion (grader integrity): a passing END STATE reached by a
+	# lucky broken PATH is still a failure (e.g. bigdata answered from a head-peek,
+	# never scanning the file). Opt-in for calibration: TRAJECTORY=on ANDs it in;
+	# base-off vs base-on delta = the lucky-pass rate. Only ever ADDS strictness.
+	[[ "${TRAJECTORY:-off}" == "on" && "$gate" == 1 ]] && ! python3 "$HERE/prompt-lab/trajectory_check.py" "$wd" "$task" && gate=0
+	local mrow; mrow="$(python3 "$METRICS" "$wd")"
+	local tin tout
+	tin="$(cut -f6 <<< "$mrow")"; [[ -n "$tin" ]] || tin=0
+	tout="$(cut -f7 <<< "$mrow")"; [[ -n "$tout" ]] || tout=0
 
 	# Degraded-model tripwire: a server can keep serving HTTP while the model behind it
 	# is broken (hot-swap/reload) — sessions then return near-zero tokens and the
@@ -206,23 +258,61 @@ NOTE: a previous attempt in this workdir was stopped for repeating the same fail
 		LOW_TOK_STREAK=0
 	fi
 
-	python3 - "$RESULTS" "$MODEL" "$pat" "$task" "$rep" "$gate" "$tout" "$retried" <<'PY'
+	python3 - "$RESULTS" "$MODEL" "$pat" "$task" "$rep" "$gate" "$tout" "$retried" "$RUNID" "$tin" "$split" <<'PY'
 import json,sys
-out,model,pat,task,rep,gate,tout,retried=sys.argv[1:9]
-rec={"task":task,"pattern":pat,"rep":int(rep),"model":model,"split":"val",
-     "score":int(gate),"out_chars":int(tout),"think_chars":0,"retried":int(retried)}
+out,model,pat,task,rep,gate,tout,retried,runid,tin,split=sys.argv[1:12]
+# in_tok/out_tok are the unambiguous names (audit 2026-07-13); out_chars kept for
+# older readers. Remote llamacpp sessions may record zero usage -> in_tok 0 there.
+rec={"task":task,"pattern":pat,"rep":int(rep),"model":model,"split":split,
+     "score":int(gate),"out_chars":int(tout),"think_chars":0,"retried":int(retried),
+     "run":runid,"in_tok":int(tin),"out_tok":int(tout)}
 open(out,"a").write(json.dumps(rec)+"\n")
 PY
 	echo "  $pat/$task rep$rep -> gate=$gate (out_tok=$tout)"
 }
 
 SPECS=("base:$BASE" "cand:$CAND"); [[ "$CALIB" == 1 ]] && SPECS=("base:$BASE")
-for spec in "${SPECS[@]}"; do
-	pat="${spec%%:*}"; cfg="${spec#*:}"
-	for task in "${TASKS[@]}"; do
-		for rep in $(seq 1 "$N"); do run_one "$cfg" "$pat" "$task" "$rep"; done
+if [[ ${#SPECS[@]} -eq 1 || "${INTERLEAVE:-on}" == "off" ]]; then
+	# single-arm (calibrate/munchkin) or explicit legacy ordering
+	for spec in "${SPECS[@]}"; do
+		pat="${spec%%:*}"; cfg="${spec#*:}"
+		for task in "${TASKS[@]}"; do
+			for rep in $(seq 1 "$N"); do run_one "$cfg" "$pat" "$task" "$rep"; done
+		done
 	done
-done
+else
+	# Interleaved + counterbalanced (audit: sequential arm blocks confound the
+	# comparison with anything drifting over the run — server state, cache,
+	# thermal). Both arms run ADJACENTLY per (task, rep) cell, alternating which
+	# goes first, so drift hits both arms symmetrically. INTERLEAVE=off restores
+	# block order.
+	cell=0
+	for task in "${TASKS[@]}"; do
+		for rep in $(seq 1 "$N"); do
+			if (( cell % 2 == 0 )); then order=(0 1); else order=(1 0); fi
+			for i in "${order[@]}"; do
+				spec="${SPECS[$i]}"; pat="${spec%%:*}"; cfg="${spec#*:}"
+				run_one "$cfg" "$pat" "$task" "$rep"
+			done
+			cell=$((cell + 1))
+		done
+	done
+fi
+
+# HELD-OUT tasks (audit: the overfit gate was inactive because every row was
+# split "val"). HELDOUT="rle saddle" runs those tasks AFTER the main sweep with
+# split=heldout — they must NEVER appear in TASKS or be used for candidate
+# selection; fleet_report's val->heldout gap + decide()'s overfit gate reactivate
+# when these rows exist. Opt-in per round (adds len(HELDOUT) x N sessions/arm).
+if [[ -n "${HELDOUT:-}" ]]; then
+	for spec in "${SPECS[@]}"; do
+		pat="${spec%%:*}"; cfg="${spec#*:}"
+		for task in ${HELDOUT}; do
+			case " ${TASKS[*]} " in *" $task "*) echo "[real_gate] $task is in TASKS — a held-out task must not be; skipping" >&2; continue ;; esac
+			for rep in $(seq 1 "$N"); do run_one "$cfg" "$pat" "$task" "$rep" heldout; done
+		done
+	done
+fi
 
 echo; echo "rows -> $RESULTS"
 if [[ "$CALIB" == 1 ]]; then

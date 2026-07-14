@@ -1,134 +1,146 @@
 {
-  "_doc": "Search space for the munchkin optimizer. A config picks one value per dimension, held PER capability tier (small/mid/large). Evidence-pruned: personas and emoji-encoding are EXCLUDED (personas cost -3 to -5pts on knowledge tasks per Wharton/USC; emoji-encoding rejected by our own AB_SYMBOLECT.md + tokenization waste). Register-tint stays the single measured glyph candidate (promptlab pattern R).",
-  "dimensions": {
-    "prompt_variant": {
-      "kind": "prompt",
-      "safe": true,
-      "values": [
-        "A",
-        "F"
-      ],
-      "_note": "A = live governor/role prompt; F = none. Candidate files (from propose.py) are passed as a path and override A."
-    },
-    "format": {
-      "kind": "prompt",
-      "safe": true,
-      "tiered": true,
-      "values": [
-        "md",
-        "xml",
-        "json"
-      ],
-      "_note": "How the system prompt is structured. Real but MODEL-DEPENDENT (up to 40% variance; gpt3.5~json, gpt4~md, claude~xml) -> tiered. Coarse wrap for now."
-    },
-    "scaffold": {
-      "kind": "prompt",
-      "safe": true,
-      "tiered": true,
-      "values": [
-        "none",
-        "cot",
-        "decompose",
-        "pause"
-      ],
-      "_note": "Reasoning scaffold appended to the system prompt. Strongly capability-tiered (small models gain most; CoT barely emerges <100B)."
-    },
-    "optillm": {
-      "kind": "inference",
-      "safe": false,
-      "tiered": true,
-      "values": [
-        "none",
-        "bon",
-        "moa",
-        "sc",
-        "re2"
-      ],
-      "_note": "Inference-time technique via the OptiLLM proxy (Phase 3). safe=false: routing change is structural -> human-gated. Cost-gated by the token ceiling."
-    },
-    "decoding": {
-      "kind": "server",
-      "safe": true,
-      "_note": "Server launch params (require a relaunch -> deep-run only). Emitted as env consumed by run-*.sh.",
-      "fields": {
-        "TEMP": [
-          0.6,
-          0.7,
-          0.8
-        ],
-        "TOP_P": [
-          0.9,
-          0.95
-        ],
-        "MIN_P": [
-          0.0,
-          0.05
-        ],
-        "REPEAT_PENALTY": [
-          1.0,
-          1.1
-        ],
-        "REASONING_BUDGET": [
-          2048,
-          4096,
-          8192
-        ]
-      }
-    },
-    "thresholds": {
-      "kind": "env",
-      "safe": true,
-      "_note": "Loop-breaker / verify-gate knobs, emitted as env (live-overridable, no relaunch).",
-      "fields": {
-        "LB_REPEAT_T1": [
-          2,
-          3
-        ],
-        "LB_STREAK_SOFT": [
-          8,
-          12
-        ],
-        "VERIFY_GATE_MAX_FIRES": [
-          2,
-          3
-        ],
-        "VERIFY_GATE": [
-          "on",
-          "off"
-        ],
-        "SPAN_TOOLS": [
-          "on",
-          "off"
-        ],
-        "HASHLINE_TAG": [
-          "hex",
-          "slug"
-        ],
-        "RETRY_FRESH": [
-          "on",
-          "off"
-        ]
-      }
-    },
-    "messages": {
-      "kind": "env",
-      "safe": true,
-      "freeform": true,
-      "_note": "Steer-text templates (lib/steer-texts.ts). Values are FREEFORM strings <=400 chars ({var} placeholders per template) \u2014 munchkin validates key membership + length, not enumerated values. Emitted as env, no relaunch.",
-      "fields": [
-        "PI_MSG_LB_T1_TOOL",
-        "PI_MSG_LB_T1_REASON",
-        "PI_MSG_LB_T1_STREAK",
-        "PI_MSG_LB_T2",
-        "PI_MSG_LB_T3",
-        "PI_MSG_LB_OUTCOME",
-        "PI_MSG_VG_STEER",
-        "PI_MSG_VG_STEER_FAILED"
-      ]
-    }
+ "_doc": "Search space for the munchkin optimizer. A config picks one value per dimension, held PER capability tier (small/mid/large). Evidence-pruned: personas and emoji-encoding are EXCLUDED (personas cost -3 to -5pts on knowledge tasks per Wharton/USC; emoji-encoding rejected by our own AB_SYMBOLECT.md + tokenization waste). Register-tint stays the single measured glyph candidate (promptlab pattern R).",
+ "dimensions": {
+  "prompt_variant": {
+   "kind": "prompt",
+   "safe": true,
+   "values": [
+    "A",
+    "F"
+   ],
+   "_note": "A = live governor/role prompt; F = none. Candidate files (from propose.py) are passed as a path and override A."
   },
-  "excluded": {
-    "persona": "measured -3 to -5pts on knowledge accuracy (Wharton/USC) \u2014 tone only, not correctness",
-    "emoji_encoding": "rejected by AB_SYMBOLECT.md; glyphs aren't the active ingredient; tokenization waste"
+  "format": {
+   "kind": "prompt",
+   "safe": true,
+   "tiered": true,
+   "values": [
+    "md",
+    "xml",
+    "json"
+   ],
+   "_note": "How the system prompt is structured. Real but MODEL-DEPENDENT (up to 40% variance; gpt3.5~json, gpt4~md, claude~xml) -> tiered. Coarse wrap for now."
+  },
+  "scaffold": {
+   "kind": "prompt",
+   "safe": true,
+   "tiered": true,
+   "values": [
+    "none",
+    "cot",
+    "decompose",
+    "pause"
+   ],
+   "_note": "Reasoning scaffold appended to the system prompt. Strongly capability-tiered (small models gain most; CoT barely emerges <100B)."
+  },
+  "optillm": {
+   "kind": "inference",
+   "safe": false,
+   "tiered": true,
+   "values": [
+    "none",
+    "bon",
+    "moa",
+    "sc",
+    "re2"
+   ],
+   "_note": "Inference-time technique via the OptiLLM proxy (Phase 3). safe=false: routing change is structural -> human-gated. Cost-gated by the token ceiling."
+  },
+  "decoding": {
+   "kind": "server",
+   "safe": true,
+   "_note": "Server launch params (require a relaunch -> deep-run only). Emitted as env consumed by run-*.sh.",
+   "fields": {
+    "TEMP": [
+     0.6,
+     0.7,
+     0.8
+    ],
+    "TOP_P": [
+     0.9,
+     0.95
+    ],
+    "MIN_P": [
+     0.0,
+     0.05
+    ],
+    "REPEAT_PENALTY": [
+     1.0,
+     1.1
+    ],
+    "REASONING_BUDGET": [
+     2048,
+     4096,
+     8192
+    ]
+   }
+  },
+  "thresholds": {
+   "kind": "env",
+   "safe": true,
+   "_note": "Loop-breaker / verify-gate knobs, emitted as env (live-overridable, no relaunch).",
+   "fields": {
+    "LB_REPEAT_T1": [
+     2,
+     3
+    ],
+    "LB_STREAK_SOFT": [
+     8,
+     12
+    ],
+    "VERIFY_GATE_MAX_FIRES": [
+     2,
+     3
+    ],
+    "VERIFY_GATE": [
+     "on",
+     "off"
+    ],
+    "SPAN_TOOLS": [
+     "on",
+     "off"
+    ],
+    "HASHLINE_TAG": [
+     "hex",
+     "slug"
+    ],
+    "RETRY_FRESH": [
+     "on",
+     "off"
+    ],
+    "RETRY_MODE": [
+     "fresh",
+     "locality"
+    ],
+    "MICRO_GATE": [
+     "on",
+     "off"
+    ],
+    "TRAJECTORY": [
+     "on",
+     "off"
+    ]
+   }
+  },
+  "messages": {
+   "kind": "env",
+   "safe": true,
+   "freeform": true,
+   "_note": "Steer-text templates (lib/steer-texts.ts). Values are FREEFORM strings <=400 chars ({var} placeholders per template) \u2014 munchkin validates key membership + length, not enumerated values. Emitted as env, no relaunch.",
+   "fields": [
+    "PI_MSG_LB_T1_TOOL",
+    "PI_MSG_LB_T1_REASON",
+    "PI_MSG_LB_T1_STREAK",
+    "PI_MSG_LB_T2",
+    "PI_MSG_LB_T3",
+    "PI_MSG_LB_OUTCOME",
+    "PI_MSG_VG_STEER",
+    "PI_MSG_VG_STEER_FAILED"
+   ]
   }
+ },
+ "excluded": {
+  "persona": "measured -3 to -5pts on knowledge accuracy (Wharton/USC) \u2014 tone only, not correctness",
+  "emoji_encoding": "rejected by AB_SYMBOLECT.md; glyphs aren't the active ingredient; tokenization waste"
+ }
 }

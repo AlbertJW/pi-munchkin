@@ -8,7 +8,9 @@ vs a candidate across the fleet, and decides using Wilson confidence intervals
   per model, classify candidate vs baseline as better / worse / neutral by CI overlap.
   REJECT   if the daily driver significantly regresses (hard gate),
            or any model significantly regresses (do-no-harm),
-           or val→held-out gap > 10% (overfit).
+           or val→held-out gap > 10% (overfit — decide() supports it, but the gate
+           currently emits val-only rows; inactive until a real held-out task set
+           lands (queued), and the report no longer displays the vacuous column).
   NEUTRAL  if no model significantly changes — within noise; raise n (deep run).
   ADOPT-IF-BUDGET  if there's a significant gain but it costs > the token ceiling.
   ADOPT-TIERED     if smaller models gain and the daily driver is within noise.
@@ -84,42 +86,57 @@ def decide(stats, cost=None, dd_model=DD, gap=0.0, tiers=TIERS, cost_ceiling=COS
 # ---------- report ----------
 
 def arm(rows, model, pattern, split):
-    """-> (k, n, tokens) for one (model, pattern, split) cell."""
+    """-> (k, n, tokens) for one (model, pattern, split) cell. Tokens = in_tok+out_tok
+    when rows carry the explicit fields (post-audit rows), else the historic
+    out_chars(+think) — which measured OUTPUT only and was blind to the input-side
+    cost the governor work targets (audit 2026-07-13)."""
     sel = [r for r in rows if r.get("model") == model and r["pattern"] == pattern and r.get("split") == split]
     k = sum(r["score"] for r in sel)
-    toks = sum(r.get("out_chars", 0) + r.get("think_chars", 0) for r in sel)
+    toks = sum((r["in_tok"] + r["out_tok"]) if "in_tok" in r else (r.get("out_chars", 0) + r.get("think_chars", 0))
+               for r in sel)
     return k, len(sel), toks
 
 def report(gen, baseline, candidate):
+    # Held-out honesty: the always-empty column was removed (audit 2026-07-13); the
+    # gap + decide()'s overfit gate REACTIVATE only when real split="heldout" rows
+    # exist (real_gate HELDOUT="rle saddle", 2026-07-14) — displayed iff measured.
     path = os.path.join(LAB, "results", gen + ".jsonl")
     rows = [json.loads(l) for l in open(path) if l.strip()]
     models = sorted({r.get("model") for r in rows if r.get("model")})
 
     lines = [f"# fleet_report {gen} — {candidate} vs {baseline} (daily driver: {DD})\n",
-             "| model | tier | base (val) | cand (val) | Δ | sig | held-out |", "|---|---|---|---|---|---|---|"]
+             "| model | tier | base (val) | cand (val) | Δ | sig |", "|---|---|---|---|---|---|"]
     stats, base_tok, cand_tok = {}, 0, 0
     for m in models:
         bk, bn, bt = arm(rows, m, baseline, "val")
         ck, cn, ct = arm(rows, m, candidate, "val")
-        hk, hn, _ = arm(rows, m, candidate, "heldout")
         if bn == 0 or cn == 0:
             continue
         stats[m] = (bk, bn, ck, cn)
         base_tok += bt; cand_tok += ct
         label, d = classify(bk, bn, ck, cn)
         _, clo, chi = wilson(ck, cn)
-        ha = (hk / hn) if hn else None
         lines.append(f"| {m} | {TIERS.get(m,'?')} | {bk/bn:.0%} (n{bn}) | {ck/cn:.0%} ({clo:.0%}–{chi:.0%}) | "
-                     f"{d:+.0%} | {label} | {('%.0f%%'%(ha*100)) if ha is not None else '—'} |")
+                     f"{d:+.0%} | {label} |")
 
-    cv = [r["score"] for r in rows if r["pattern"] == candidate and r.get("split") == "val"]
-    ch = [r["score"] for r in rows if r["pattern"] == candidate and r.get("split") == "heldout"]
-    gap = (sum(cv)/len(cv) - sum(ch)/len(ch)) if cv and ch else 0.0
     ratio = (cand_tok / base_tok) if base_tok else 1.0
+    # per-SUCCESS mean cost (audit-2): total-over-total made a candidate that
+    # succeeds MORE OFTEN look more expensive at identical per-success cost
+    def _tok(r): return (r["in_tok"] + r["out_tok"]) if "in_tok" in r else (r.get("out_chars", 0) + r.get("think_chars", 0))
+    pb = [_tok(r) for r in rows if r["pattern"] == baseline and r["score"] == 1]
+    pc = [_tok(r) for r in rows if r["pattern"] == candidate and r["score"] == 1]
+    per_success = (sum(pc) / len(pc)) / (sum(pb) / len(pb)) if pb and pc else None
+
+    gap = 0.0
+    hv = [r["score"] for r in rows if r["pattern"] == candidate and r.get("split") == "heldout"]
+    if hv:
+        cv = [r["score"] for r in rows if r["pattern"] == candidate and r.get("split") == "val"]
+        gap = (sum(cv) / len(cv) - sum(hv) / len(hv)) if cv else 0.0
+        lines += ["", f"val→held-out gap (candidate): {gap:+.0%} on {len(hv)} held-out sessions"]
 
     verdict, why = decide(stats, cost=(base_tok, cand_tok), gap=gap)
-    lines += ["", f"val→held-out gap (candidate, pooled): {gap:+.0%}",
-              f"cost (candidate/baseline tokens): {ratio:.2f}×", "",
+    lines += ["", f"cost (candidate/baseline tokens, all sessions): {ratio:.2f}×",
+              f"cost (mean tokens per PASSING session, cand/base): {('%.2fx' % per_success) if per_success else '—'}", "",
               f"## VERDICT: {verdict}", f"{why}"]
     out = "\n".join(lines) + "\n"
     with open(os.path.join(LAB, "results", gen + "-FLEET.md"), "w") as f:

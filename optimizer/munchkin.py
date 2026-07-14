@@ -30,8 +30,7 @@ RUNS = os.path.join(HERE, "real-gate-runs")
 REAL_GATE = os.path.join(HERE, "real_gate.sh")
 TASKS_DIR = os.path.join(HERE, "ab-symbolect", "tasks")
 JOURNAL = os.path.join(RESULTS, "munchkin-journal.jsonl")
-LIVE_GOV = os.path.expanduser(os.environ.get(
-    "GOVERNOR", os.path.join(HERE, "..", "harness", "APPEND_SYSTEM.md")))
+LIVE_GOV = os.path.expanduser("~/.pi/agent/APPEND_SYSTEM.md")
 SATURATED = 0.85
 PLATEAU_STOP = 2
 JOURNAL_CTX = 24  # prior experiments shown to the proposer
@@ -109,6 +108,7 @@ def journal_persist(entries):
 # pi sessions — the model may be remote, the harness always runs here) inside that
 # window, so a candidate's prediction is checkable against measured behavior.
 GATE_WINDOWS = {}
+RUN_IDS = {}  # gen -> unique run id: exact sk joins; a reused gen label no longer inherits stale events
 CURRENT_GATE = None  # active real_gate Popen; the signal handler kills it on the way out
 TELEMETRY_FILE = os.path.expanduser(os.environ.get("TELEMETRY_FILE", "~/.pi/agent/telemetry/events.jsonl"))
 
@@ -118,9 +118,13 @@ def _utc_z():
 
 def telemetry_enrich(gen):
     """Per-gate mechanism counts. Events carry a session key (sk = workdir basename,
-    `$GEN-...`) since 2026-07-13 — an EXACT join immune to concurrent runs. Events
-    without sk (older data) fall back to the gate's wall-clock window."""
+    `$GEN-$RUNID-...` since 2026-07-13) — an EXACT join immune to concurrent runs AND
+    to gen-label reuse (a bare `{gen}-` prefix matched stale events from any earlier
+    run of the same label — audit 2026-07-13). Events without sk (older data) fall
+    back to the gate's wall-clock window."""
     win = GATE_WINDOWS.get(gen)
+    runid = RUN_IDS.get(gen)
+    sk_prefix = f"{gen}-{runid}-" if runid else f"{gen}-"
     if not os.path.exists(TELEMETRY_FILE):
         return {}
     counts = {}
@@ -131,7 +135,7 @@ def telemetry_enrich(gen):
             continue
         sk = e.get("sk")
         if sk is not None:
-            if not sk.startswith(f"{gen}-"):
+            if not sk.startswith(sk_prefix):
                 continue
         elif not (win and win[0] <= e.get("ts", "") <= win[1]):  # legacy rows: UTC Z strings, lexical compare
             continue
@@ -189,7 +193,9 @@ def real_gate_one(cand, tasks, n, gen):
     out = os.path.join(RESULTS, gen + ".jsonl")
     if os.path.exists(out):
         os.remove(out)
-    env = {**os.environ, "GEN": gen, "BASE": cfg_path, "N": str(n)}
+    import uuid
+    RUN_IDS[gen] = uuid.uuid4().hex[:6]
+    env = {**os.environ, "GEN": gen, "BASE": cfg_path, "N": str(n), "RUNID": RUN_IDS[gen]}
     t0 = _utc_z()
     # Popen (not run) so a signal handler can kill the gate: killing munchkin alone
     # orphans the bash gate, which keeps writing rows into the next run's files
@@ -472,6 +478,20 @@ def main():
     if static:
         paths = [os.path.expanduser(p) for p in static.split(",")]
         rounds = (len(paths) + k - 1) // k  # exactly enough rounds to gate every spec
+        # MANIFEST=path: declare this gen's expected candidates up front (audit-3 —
+        # fleet_verdict can't know from ledgers what a gen was SUPPOSED to run).
+        # Merged, so each wing of a fleet round appends itself to one shared file.
+        mpath = os.environ.get("MANIFEST")
+        if mpath and "--dry" not in args:  # a dry run must not declare intent it never executes
+            names = [json.load(open(p)).get("name", os.path.basename(p)) for p in paths]
+            man = json.load(open(mpath)) if os.path.exists(mpath) else {"candidates": {}}
+            for nm in names:
+                man["candidates"].setdefault(nm, [])
+                if gen not in man["candidates"][nm]:
+                    man["candidates"][nm].append(gen)
+            with open(mpath, "w") as f:
+                json.dump(man, f, indent=1)
+            print(f"manifest: {mpath} += {names} x {gen}")
     sessions = (1 + rounds * k) * len(tasks) * n
     print(f"plan: gen={gen} rounds={rounds} candidates={k} n={n} tasks={tasks}")
     print(f"GPU cost estimate: ~{sessions} agentic sessions on the loaded model (each up to {os.environ.get('PI_TIMEOUT','1800')}s).")
