@@ -20,13 +20,13 @@ Usage:  munchkin.py [--gen m0] [--rounds 3] [--candidates 2] [--n 4] [--tasks t1
         munchkin.py --selftest   # offline loop proof
 GPU cost ≈ rounds × candidates × (tasks × n) agentic sessions on the model — keep small.
 """
-import glob, hashlib, json, os, subprocess, sys
+import glob, hashlib, json, os, subprocess, sys, tempfile
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 LAB = os.path.join(HERE, "prompt-lab")
 PROPOSALS = os.path.join(LAB, "proposals")
 RESULTS = os.path.join(LAB, "results")
-RUNS = os.path.join(HERE, "real-gate-runs")
+RUNS = os.path.expanduser(os.environ.get("REAL_GATE_RUNS", "~/.pi/real-gate-runs"))
 REAL_GATE = os.path.join(HERE, "real_gate.sh")
 TASKS_DIR = os.path.join(HERE, "ab-symbolect", "tasks")
 JOURNAL = os.path.join(RESULTS, "munchkin-journal.jsonl")
@@ -100,6 +100,36 @@ def journal_persist(entries):
     with open(JOURNAL, "a") as f:
         for e in entries:
             f.write(json.dumps(e) + "\n")
+
+
+def update_manifest(path, names, gen):
+    """Lock + atomically replace the shared fleet manifest.
+
+    Parallel model wings used to race a read-modify-write and could lose another
+    wing's declarations or leave partial JSON after interruption.
+    """
+    import fcntl
+    path = os.path.abspath(path)
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    with open(path + ".lock", "a+") as lock:
+        fcntl.flock(lock, fcntl.LOCK_EX)
+        man = json.load(open(path)) if os.path.exists(path) else {"candidates": {}}
+        for name in names:
+            man["candidates"].setdefault(name, [])
+            if gen not in man["candidates"][name]:
+                man["candidates"][name].append(gen)
+                man["candidates"][name].sort()
+        fd, tmp = tempfile.mkstemp(prefix=".manifest-", suffix=".json", dir=os.path.dirname(path))
+        try:
+            with os.fdopen(fd, "w") as f:
+                json.dump(man, f, indent=1)
+                f.write("\n")
+                f.flush()
+                os.fsync(f.fileno())
+            os.replace(tmp, path)
+        finally:
+            if os.path.exists(tmp):
+                os.remove(tmp)
 
 # ---------- real implementations (NOT exercised in --selftest) ----------
 
@@ -436,6 +466,13 @@ def selftest():
         nc = static_propose([s4])(base, [], 1, 0, [])
         assert nc[0]["gov"] == "", "empty gov_file must yield an EMPTY governor, not the baseline"
 
+        # shared manifest updates merge instead of clobbering prior wings
+        mp = os.path.join(td, "manifest.json")
+        update_manifest(mp, ["evidence"], "wing-a")
+        update_manifest(mp, ["evidence", "cot"], "wing-b")
+        man = json.load(open(mp))
+        assert man["candidates"] == {"evidence": ["wing-a", "wing-b"], "cot": ["wing-b"]}, man
+
         def stub_enrich(label):
             return {"telemetry": {"loop-breaker.steer": 2}}
         _, led2, jr2 = optimize(base, ["t1"], 4, rounds=1, k=2,
@@ -484,13 +521,7 @@ def main():
         mpath = os.environ.get("MANIFEST")
         if mpath and "--dry" not in args:  # a dry run must not declare intent it never executes
             names = [json.load(open(p)).get("name", os.path.basename(p)) for p in paths]
-            man = json.load(open(mpath)) if os.path.exists(mpath) else {"candidates": {}}
-            for nm in names:
-                man["candidates"].setdefault(nm, [])
-                if gen not in man["candidates"][nm]:
-                    man["candidates"][nm].append(gen)
-            with open(mpath, "w") as f:
-                json.dump(man, f, indent=1)
+            update_manifest(mpath, names, gen)
             print(f"manifest: {mpath} += {names} x {gen}")
     sessions = (1 + rounds * k) * len(tasks) * n
     print(f"plan: gen={gen} rounds={rounds} candidates={k} n={n} tasks={tasks}")

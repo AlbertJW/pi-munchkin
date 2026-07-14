@@ -12,7 +12,7 @@ Usage:  metrics.py <workdir>     # prints a TSV row (see COLS)
 """
 import json, os, sys, glob
 
-COLS = ["turns", "edits", "edit_err", "reads", "subag", "in_tok", "out_tok", "lb_fires", "vg_fires"]
+COLS = ["turns", "edits", "edit_err", "reads", "subag", "in_tok", "out_tok", "lb_fires", "vg_fires", "usage_exact"]
 
 def _text_of(content):
     """Collect text from a message's content (string, or list of blocks)."""
@@ -57,11 +57,12 @@ def parse_session(lines):
         elif role in ("toolResult", "tool"):
             err = m.get("isError") or any(c.get("isError") for c in (m.get("content") or []) if isinstance(c, dict))
             if err and last_call == "edit": edit_err += 1
-    # ponytail: remote-llamacpp sessions record all-zero usage; fall back to
-    # chars of assistant output (text+thinking+toolCall args) so A/B still compares cost.
-    if tout == 0:
+    # ponytail: remote-llamacpp sessions record all-zero usage; keep a character
+    # proxy for degraded-session detection, but mark it ineligible for token cost.
+    usage_exact = int(tin > 0 and tout > 0)
+    if not usage_exact:
         tout = out_chars
-    return dict(zip(COLS, [turns, edits, edit_err, reads, subag, tin, tout, lb, vg]))
+    return dict(zip(COLS, [turns, edits, edit_err, reads, subag, tin, tout, lb, vg, usage_exact]))
 
 def session_file_for(workdir):
     """Newest session jsonl whose session dir mentions this run (ab-symbolect rule)."""
@@ -93,15 +94,16 @@ def selftest():
     ]
     c = parse_session(syn)
     exp = {"turns": 3, "edits": 1, "edit_err": 1, "reads": 2, "subag": 1,
-           "in_tok": 30, "out_tok": 13, "lb_fires": 1, "vg_fires": 1}
+           "in_tok": 30, "out_tok": 13, "lb_fires": 1, "vg_fires": 1, "usage_exact": 1}
     assert c == exp, f"{c} != {exp}"
-    assert as_tsv(c) == "3\t1\t1\t2\t1\t30\t13\t1\t1", as_tsv(c)
+    assert as_tsv(c) == "3\t1\t1\t2\t1\t30\t13\t1\t1\t1", as_tsv(c)
     # zero-usage session (remote-llamacpp) -> out_tok falls back to chars
     zu = [json.dumps({"type": "message", "message": {"role": "assistant", "usage": {"input": 0, "output": 0},
           "content": [{"type": "thinking", "thinking": "hm"},
                       {"type": "toolCall", "name": "edit", "arguments": {"path": "x"}}]}})]
     z = parse_session(zu)
     assert z["out_tok"] == 2 + len(str({"path": "x"})), z
+    assert z["usage_exact"] == 0, z
     print("metrics selftest: OK", as_tsv(c))
 
 def main():

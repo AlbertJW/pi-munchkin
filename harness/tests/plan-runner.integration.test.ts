@@ -137,7 +137,7 @@ test("integration: agent_end with open items writes the abort-observability trac
 	assert.ok(trace.includes("ended_without_completion"), "open-items end is observable in the trace");
 });
 
-test("integration: micro-gate fires a followUp on a REAL broken edit (would catch the exitCode-vs-code bug)", async () => {
+test("integration: micro-gate steers immediately on a REAL broken edit (would catch delivery/API-shape bugs)", async () => {
 	const fp = makeFakePi();
 	microGate(fp.pi as any);
 	const cwd = tmp();
@@ -149,6 +149,7 @@ test("integration: micro-gate fires a followUp on a REAL broken edit (would catc
 	}, { cwd });
 	assert.equal(fp.sent.length, 1, "micro-gate must FIRE on a file that fails node --check");
 	assert.ok(fp.sent[0].includes("[micro-gate]") && fp.sent[0].includes("broken.js"), fp.sent[0]);
+	assert.equal(fp.deliveries[0].deliverAs, "steer", "parse failure must reach the next model call, not wait as a follow-up");
 
 	// clean edit -> silent
 	writeFileSync(join(cwd, "fine.js"), "export const x = 1;\n");
@@ -157,5 +158,15 @@ test("integration: micro-gate fires a followUp on a REAL broken edit (would catc
 			{ type: "toolCall", name: "edit", arguments: { input: "[fine.js#B2C3]\n@@\n-a\n+b" } },
 		] },
 	}, { cwd });
-	assert.equal(fp.sent.length, 1, "no followUp for a parsing file");
+	assert.equal(fp.sent.length, 1, "no steer for a parsing file");
+
+	// Python syntax checking must be side-effect free (py_compile created
+	// __pycache__ in the candidate worktree).
+	writeFileSync(join(cwd, "fine.py"), "x = 1\n");
+	await fire(fp, "turn_end", {
+		message: { role: "assistant", content: [
+			{ type: "toolCall", name: "write", arguments: { path: "fine.py", content: "x = 1\n" } },
+		] },
+	}, { cwd });
+	assert.equal(existsSync(join(cwd, "__pycache__")), false, "ast.parse must not create bytecode residue");
 });

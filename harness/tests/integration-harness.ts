@@ -12,6 +12,7 @@ export function makeFakePi() {
 	const commands = new Map<string, any>();
 	const handlers = new Map<string, any[]>();
 	const sent: string[] = [];
+	const deliveries: Array<{ text: string; deliverAs: unknown }> = [];
 	const entries: Array<{ type: string; data: unknown }> = [];
 	const pi = {
 		registerTool: (t: any) => tools.set(t.name, t),
@@ -24,13 +25,14 @@ export function makeFakePi() {
 					resolve({ stdout: String(stdout), stderr: String(stderr), code, killed: Boolean((err as any)?.killed) });
 				});
 			}),
-		sendUserMessage: (text: string, _opts?: unknown) => {
+		sendUserMessage: (text: string, opts?: { deliverAs?: unknown }) => {
 			sent.push(text);
+			deliveries.push({ text, deliverAs: opts?.deliverAs });
 		},
 		getActiveTools: () => [] as string[],
 		appendEntry: (type: string, data: unknown) => entries.push({ type, data }),
 	};
-	return { pi, tools, commands, handlers, sent, entries };
+	return { pi, tools, commands, handlers, sent, deliveries, entries };
 }
 
 export function makeCtx(cwd: string) {

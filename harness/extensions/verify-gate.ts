@@ -212,7 +212,7 @@ export default function (pi: ExtensionAPI) {
 			st.fires += 1;
 			st.sessionFires += 1;
 			record("verify-gate", "steer", { failed: verifyFailedThisTurn, fires: st.fires, sessionFires: st.sessionFires, turnIndex: event.turnIndex });
-			pi.sendUserMessage(steer(verifyFailedThisTurn), { deliverAs: "followUp" });
+			pi.sendUserMessage(steer(verifyFailedThisTurn), { deliverAs: "steer" });
 		}
 	});
 

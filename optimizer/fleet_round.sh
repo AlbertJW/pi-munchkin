@@ -25,6 +25,13 @@ CAND="${CAND:-}"
 # would keep spawning sessions nothing collects — seen live, fleet sweep 07-13).
 trap 'pkill -P $$ 2>/dev/null; exit 130' INT TERM
 
+# One round owns one clean result file. Individual model blocks append to it.
+# A restarted round therefore cannot inherit rows from an earlier invocation.
+RESULTS="$HERE/prompt-lab/results/$GEN.jsonl"
+mkdir -p "$(dirname "$RESULTS")"
+: > "$RESULTS"
+export FLEET_EXPECTED_MODELS="$MODELS"
+
 for model in $MODELS; do
 	echo "=== fleet: $model ($MODE) ==="
 	# one warm-up completion so the swap cost lands outside the first session
@@ -32,10 +39,10 @@ for model in $MODELS; do
 		-H 'Content-Type: application/json' "$LLAMA_URL/v1/chat/completions" \
 		-d "{\"model\":\"$model\",\"messages\":[{\"role\":\"user\",\"content\":\"warm\"}],\"max_tokens\":2}" >/dev/null 2>&1
 	if [[ "$MODE" == "calibrate" ]]; then
-		GEN="$GEN" N="$N" LLAMA_URL="$LLAMA_URL" PI_MODEL="$model" HEALTH_WAIT="${HEALTH_WAIT:-3600}" \
+		GEN="$GEN" N="$N" RESULTS_MODE=append LLAMA_URL="$LLAMA_URL" PI_MODEL="$model" HEALTH_WAIT="${HEALTH_WAIT:-3600}" \
 			"$HERE/real_gate.sh" --calibrate $TASKS || { echo "[fleet] $model block failed — continuing with next model" >&2; }
 	else
-		GEN="$GEN" N="$N" LLAMA_URL="$LLAMA_URL" PI_MODEL="$model" HEALTH_WAIT="${HEALTH_WAIT:-3600}" \
+		GEN="$GEN" N="$N" RESULTS_MODE=append LLAMA_URL="$LLAMA_URL" PI_MODEL="$model" HEALTH_WAIT="${HEALTH_WAIT:-3600}" \
 			CAND="$CAND" "$HERE/real_gate.sh" $TASKS || { echo "[fleet] $model block failed — continuing with next model" >&2; }
 	fi
 done

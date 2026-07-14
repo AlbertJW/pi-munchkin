@@ -7,6 +7,8 @@ test("changedPaths: hashline headers, builtin path arg, junk is empty", () => {
 		["src/a.js", "src/b.py"]);
 	assert.deepEqual(changedPaths("edit", { path: "src/c.json", edits: [] }), ["src/c.json"]);
 	assert.deepEqual(changedPaths("write", { path: "out.js", content: "x" }), ["out.js"]);
+	assert.deepEqual(changedPaths("bash", { command: "sed -i '' 's/x/y/' src/a.py" }), ["src/a.py"]);
+	assert.deepEqual(changedPaths("bash", { command: "head src/a.py" }), [], "read-only shell commands are not mutations");
 	assert.deepEqual(changedPaths("edit", { input: "no headers here" }), []);
 	assert.deepEqual(changedPaths("edit", null), []);
 });

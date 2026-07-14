@@ -8,9 +8,8 @@ vs a candidate across the fleet, and decides using Wilson confidence intervals
   per model, classify candidate vs baseline as better / worse / neutral by CI overlap.
   REJECT   if the daily driver significantly regresses (hard gate),
            or any model significantly regresses (do-no-harm),
-           or val→held-out gap > 10% (overfit — decide() supports it, but the gate
-           currently emits val-only rows; inactive until a real held-out task set
-           lands (queued), and the report no longer displays the vacuous column).
+           or candidate uplift decays by >10pp from validation to held-out
+           (difference-in-differences, never raw accuracy across different tasks).
   NEUTRAL  if no model significantly changes — within noise; raise n (deep run).
   ADOPT-IF-BUDGET  if there's a significant gain but it costs > the token ceiling.
   ADOPT-TIERED     if smaller models gain and the daily driver is within noise.
@@ -20,7 +19,7 @@ Usage:  fleet_report.py <gen> [--baseline A] [--candidate F]
         fleet_report.py --selftest
 Env: FLEET_DD (daily driver), FLEET_COST_CEILING (max cand/base token ratio, default 1.5).
 """
-import json, math, os, sys
+import collections, json, math, os, sys
 
 LAB = os.path.dirname(os.path.abspath(__file__))
 DD = os.environ.get("FLEET_DD", "qwen36-35b-iq3s")
@@ -57,10 +56,16 @@ def classify(bk, bn, ck, cn):
     if _fisher_greater(c, d, a, b) < ALPHA: return "worse", delta
     return "neutral", delta
 
+
+def uplift_decay(bvk, bvn, cvk, cvn, bhk, bhn, chk, chn):
+    """Validation candidate uplift minus held-out candidate uplift."""
+    return ((cvk / cvn) - (bvk / bvn)) - ((chk / chn) - (bhk / bhn))
+
 def decide(stats, cost=None, dd_model=DD, gap=0.0, tiers=TIERS, cost_ceiling=COST_CEILING):
     """stats: {model: (base_k, base_n, cand_k, cand_n)} on the val split.
     cost: (base_tokens, cand_tokens) pooled for the candidate vs baseline, or None.
-    gap: candidate val_acc - heldout_acc (overfit signal)."""
+    gap: max per-model decay in candidate-vs-baseline uplift from validation to
+         held-out (difference-in-differences overfit signal)."""
     if dd_model not in stats:
         return "REJECT", f"daily driver {dd_model} not evaluated"
     cls = {m: classify(*s) for m, s in stats.items()}
@@ -71,7 +76,7 @@ def decide(stats, cost=None, dd_model=DD, gap=0.0, tiers=TIERS, cost_ceiling=COS
     if worse:
         return "REJECT", f"{', '.join(worse)} significantly regress(es) — do-no-harm"
     if gap > OVERFIT_GAP:
-        return "REJECT", f"val→held-out gap {gap:+.0%} > {OVERFIT_GAP:.0%} (overfit)"
+        return "REJECT", f"validation→held-out uplift decay {gap:+.0%} > {OVERFIT_GAP:.0%} (overfit)"
     better = [m for m, (l, _) in cls.items() if l == "better"]
     if not better:
         return "NEUTRAL", "no significant change across the fleet — within noise; raise n (deep run) or try a bigger change"
@@ -86,57 +91,115 @@ def decide(stats, cost=None, dd_model=DD, gap=0.0, tiers=TIERS, cost_ceiling=COS
 # ---------- report ----------
 
 def arm(rows, model, pattern, split):
-    """-> (k, n, tokens) for one (model, pattern, split) cell. Tokens = in_tok+out_tok
-    when rows carry the explicit fields (post-audit rows), else the historic
-    out_chars(+think) — which measured OUTPUT only and was blind to the input-side
-    cost the governor work targets (audit 2026-07-13)."""
+    """-> (k, n, tokens) for one arm. `tokens` is None unless every row carries
+    exact provider usage. Character fallbacks remain useful as health telemetry
+    but are dimensionally invalid for a token-budget adoption gate."""
     sel = [r for r in rows if r.get("model") == model and r["pattern"] == pattern and r.get("split") == split]
     k = sum(r["score"] for r in sel)
-    toks = sum((r["in_tok"] + r["out_tok"]) if "in_tok" in r else (r.get("out_chars", 0) + r.get("think_chars", 0))
-               for r in sel)
+    exact = bool(sel) and all(r.get("token_usage_exact") is True for r in sel)
+    toks = sum(r["in_tok"] + r["out_tok"] for r in sel) if exact else None
     return k, len(sel), toks
 
+
+def integrity_errors(rows, baseline, candidate):
+    """Reject stale/partial/duplicated invocations before computing a verdict."""
+    errors = []
+    models = sorted({r.get("model") for r in rows if r.get("model")})
+    declarations = {tuple(r.get("fleet_expected_models", [])) for r in rows if r.get("fleet_expected_models")}
+    if len(declarations) > 1:
+        errors.append("fleet expected-model declarations disagree across rows")
+    elif declarations:
+        missing_models = sorted(set(next(iter(declarations))) - set(models))
+        if missing_models:
+            errors.append(f"fleet is missing declared model(s): {', '.join(missing_models)}")
+    has_heldout = any(r.get("split") == "heldout" for r in rows)
+    for model in models:
+        for split in (["val", "heldout"] if has_heldout else ["val"]):
+            arms = {}
+            for pat in (baseline, candidate):
+                arm_rows = [r for r in rows if r.get("model") == model and r.get("pattern") == pat and r.get("split") == split]
+                arms[pat] = arm_rows
+                if not arm_rows:
+                    errors.append(f"{model}/{split}/{pat}: no rows")
+                    continue
+                cells = collections.Counter((r.get("task"), r.get("rep")) for r in arm_rows)
+                dup = [c for c, n in cells.items() if n != 1]
+                if dup:
+                    errors.append(f"{model}/{split}/{pat}: duplicate cells {dup[:3]}")
+                runs = {r.get("run") for r in arm_rows}
+                if None in runs or len(runs) != 1:
+                    errors.append(f"{model}/{split}/{pat}: rows do not carry one exact run id")
+            if all(arms.values()):
+                bc = collections.Counter((r["task"], r["rep"]) for r in arms[baseline])
+                cc = collections.Counter((r["task"], r["rep"]) for r in arms[candidate])
+                if bc != cc:
+                    errors.append(f"{model}/{split}: baseline/candidate cell grids differ")
+                br = {r.get("run") for r in arms[baseline]}
+                cr = {r.get("run") for r in arms[candidate]}
+                if br != cr:
+                    errors.append(f"{model}/{split}: baseline/candidate came from different invocations")
+    return errors
+
 def report(gen, baseline, candidate):
-    # Held-out honesty: the always-empty column was removed (audit 2026-07-13); the
-    # gap + decide()'s overfit gate REACTIVATE only when real split="heldout" rows
-    # exist (real_gate HELDOUT="rle saddle", 2026-07-14) — displayed iff measured.
+    # Held-out honesty: the overfit gate activates only for a complete base+candidate
+    # split="heldout" grid (real_gate HELDOUT="rle saddle").
     path = os.path.join(LAB, "results", gen + ".jsonl")
     rows = [json.loads(l) for l in open(path) if l.strip()]
     models = sorted({r.get("model") for r in rows if r.get("model")})
 
+    problems = integrity_errors(rows, baseline, candidate)
+    if problems:
+        out = (f"# fleet_report {gen} — {candidate} vs {baseline}\n\n"
+               "## VERDICT: INCOMPLETE\n" + "\n".join(f"- {p}" for p in problems) + "\n")
+        with open(os.path.join(LAB, "results", gen + "-FLEET.md"), "w") as f:
+            f.write(out)
+        print(out)
+        return
+
     lines = [f"# fleet_report {gen} — {candidate} vs {baseline} (daily driver: {DD})\n",
              "| model | tier | base (val) | cand (val) | Δ | sig |", "|---|---|---|---|---|---|"]
-    stats, base_tok, cand_tok = {}, 0, 0
+    stats, base_tok, cand_tok, all_cost_exact = {}, 0, 0, True
     for m in models:
         bk, bn, bt = arm(rows, m, baseline, "val")
         ck, cn, ct = arm(rows, m, candidate, "val")
         if bn == 0 or cn == 0:
             continue
         stats[m] = (bk, bn, ck, cn)
-        base_tok += bt; cand_tok += ct
+        if bt is not None and ct is not None:
+            base_tok += bt; cand_tok += ct
+        else:
+            all_cost_exact = False
         label, d = classify(bk, bn, ck, cn)
         _, clo, chi = wilson(ck, cn)
         lines.append(f"| {m} | {TIERS.get(m,'?')} | {bk/bn:.0%} (n{bn}) | {ck/cn:.0%} ({clo:.0%}–{chi:.0%}) | "
                      f"{d:+.0%} | {label} |")
 
-    ratio = (cand_tok / base_tok) if base_tok else 1.0
+    ratio = (cand_tok / base_tok) if all_cost_exact and base_tok else None
     # per-SUCCESS mean cost (audit-2): total-over-total made a candidate that
     # succeeds MORE OFTEN look more expensive at identical per-success cost
-    def _tok(r): return (r["in_tok"] + r["out_tok"]) if "in_tok" in r else (r.get("out_chars", 0) + r.get("think_chars", 0))
-    pb = [_tok(r) for r in rows if r["pattern"] == baseline and r["score"] == 1]
-    pc = [_tok(r) for r in rows if r["pattern"] == candidate and r["score"] == 1]
+    def _tok(r): return r["in_tok"] + r["out_tok"]
+    pb = [_tok(r) for r in rows if r["pattern"] == baseline and r.get("split") == "val" and r["score"] == 1 and r.get("token_usage_exact") is True]
+    pc = [_tok(r) for r in rows if r["pattern"] == candidate and r.get("split") == "val" and r["score"] == 1 and r.get("token_usage_exact") is True]
+    exact_val = all(r.get("token_usage_exact") is True for r in rows
+                    if r.get("split") == "val" and r.get("pattern") in (baseline, candidate))
     per_success = (sum(pc) / len(pc)) / (sum(pb) / len(pb)) if pb and pc else None
 
     gap = 0.0
-    hv = [r["score"] for r in rows if r["pattern"] == candidate and r.get("split") == "heldout"]
-    if hv:
-        cv = [r["score"] for r in rows if r["pattern"] == candidate and r.get("split") == "val"]
-        gap = (sum(cv) / len(cv) - sum(hv) / len(hv)) if cv else 0.0
-        lines += ["", f"val→held-out gap (candidate): {gap:+.0%} on {len(hv)} held-out sessions"]
+    if any(r.get("split") == "heldout" for r in rows):
+        gaps = {}
+        for m in stats:
+            bk, bn, _ = arm(rows, m, baseline, "val"); ck, cn, _ = arm(rows, m, candidate, "val")
+            hbk, hbn, _ = arm(rows, m, baseline, "heldout"); hck, hcn, _ = arm(rows, m, candidate, "heldout")
+            gaps[m] = uplift_decay(bk, bn, ck, cn, hbk, hbn, hck, hcn)
+        gap = max(gaps.values(), default=0.0)
+        lines += ["", "held-out uplift decay (difference-in-differences): " +
+                  ", ".join(f"{m} {g:+.0%}" for m, g in gaps.items())]
 
-    verdict, why = decide(stats, cost=(base_tok, cand_tok), gap=gap)
-    lines += ["", f"cost (candidate/baseline tokens, all sessions): {ratio:.2f}×",
-              f"cost (mean tokens per PASSING session, cand/base): {('%.2fx' % per_success) if per_success else '—'}", "",
+    cost = (base_tok, cand_tok) if exact_val and all_cost_exact else None
+    verdict, why = decide(stats, cost=cost, gap=gap)
+    cost_all = f"{ratio:.2f}×" if ratio is not None else "unavailable (provider usage absent; char proxy excluded)"
+    lines += ["", f"cost (candidate/baseline exact tokens, validation): {cost_all}",
+              f"cost (mean exact tokens per PASSING validation session, cand/base): {('%.2fx' % per_success) if exact_val and per_success else '—'}", "",
               f"## VERDICT: {verdict}", f"{why}"]
     out = "\n".join(lines) + "\n"
     with open(os.path.join(LAB, "results", gen + "-FLEET.md"), "w") as f:
@@ -173,6 +236,21 @@ def selftest():
     assert v == "ADOPT-IF-BUDGET", v
     # same gain within the cost ceiling -> real adoption
     assert decide(big, cost=(1000, 1200), tiers=t)[0] == "ADOPT-UNIVERSAL"
+    assert abs(uplift_decay(10, 20, 16, 20, 8, 20, 10, 20) - 0.20) < 1e-9
+    # Result integrity: one invocation, exact cells passes; duplicates, missing
+    # held-out arms, and cross-run arm mixtures fail closed.
+    def rr(pat, task, rep, split="val", run="r1"):
+        return {"model": dd, "pattern": pat, "task": task, "rep": rep,
+                "split": split, "run": run, "score": 1}
+    clean = [rr(p, tsk, rep) for tsk in ("a", "b") for rep in (1, 2) for p in ("base", "cand")]
+    assert not integrity_errors(clean, "base", "cand")
+    assert any("duplicate" in e for e in integrity_errors(clean + [rr("cand", "a", 1)], "base", "cand"))
+    cross_run = [dict(r, run="r2") if r["pattern"] == "cand" else r for r in clean]
+    assert any("different invocations" in e for e in integrity_errors(cross_run, "base", "cand"))
+    partial_held = clean + [rr("cand", "h", 1, "heldout")]
+    assert any("heldout/base: no rows" in e for e in integrity_errors(partial_held, "base", "cand"))
+    missing_fleet = [dict(r, fleet_expected_models=[dd, "small-model"]) for r in clean]
+    assert any("small-model" in e for e in integrity_errors(missing_fleet, "base", "cand"))
     print("fleet_report selftest: OK (sig hard-gate, do-no-harm, neutral-band, overfit, cost-ceiling, universal, tiered)")
 
 def main():

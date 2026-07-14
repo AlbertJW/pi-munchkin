@@ -27,6 +27,16 @@ export function changedPaths(toolName: string, input: unknown): string[] {
 		for (const m of args.input.matchAll(HEADER_RE)) out.add(m[1]);
 		if (out.size) return [...out];
 	}
+	if (toolName === "bash" && typeof args.command === "string") {
+		// Conservative shell mutation coverage. Capture explicit source/config
+		// paths from common in-place writes; do not pretend arbitrary scripts are
+		// statically knowable.
+		const cmd = args.command;
+		if (!/(?:\bsed\s+-[^\n;]*i|\bperl\s+-[^\n;]*i|\btee\b|>>?|\bmv\b|\bcp\b)/.test(cmd)) return [];
+		const out = new Set<string>();
+		for (const m of cmd.matchAll(/(?:^|[\s'"=])([^\s'";|<>]+\.(?:[cm]?js|py|json))(?:$|[\s'";|])/g)) out.add(m[1]);
+		return [...out];
+	}
 	if (typeof args.path === "string" && args.path) return [args.path];
 	return [];
 }

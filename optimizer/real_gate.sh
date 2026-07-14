@@ -25,7 +25,7 @@ FIXTURE="$HOME/LLM/pi-test"; TASKS_DIR="$HERE/ab-symbolect/tasks"; T3_FILES="$HE
 FIXTURES="$HERE/real-gate-fixtures"
 CONFIG="$HERE/prompt-lab/config.py"; METRICS="$HERE/ab-machinery/metrics.py"
 RESULTS="$HERE/prompt-lab/results/$GEN.jsonl"
-RUNS="$HOME/LLM/real-gate-runs"
+RUNS="${REAL_GATE_RUNS:-$HOME/.pi/real-gate-runs}"
 
 DRY=0; HARD=0; CALIB=0; TASKS=()
 for a in "$@"; do
@@ -67,12 +67,23 @@ HEALTH_WAIT="${HEALTH_WAIT:-1800}"                # max seconds to wait out a mi
 health() { curl -fsS -m 5 "$LLAMA_URL/health" >/dev/null 2>&1; }
 
 # Seatbelt write-jail for the headless pi sessions (r/PiCodingAgent agent-lock pattern,
-# macOS-native): kernel-denies writes outside {workdir, tmp, ~/.pi}. Reads/exec/network
-# untouched. SANDBOX=off to disable; auto-off when not on macOS / sandbox-exec missing.
+# macOS-native): kernel-denies writes outside {workdir, tmp, ~/.pi} and reads of
+# the entire harness repository (including graders and Git objects). SANDBOX=off disables BOTH protections and makes
+# hidden-task results invalid; auto-off when macOS sandbox-exec is unavailable.
 SANDBOX="${SANDBOX:-on}"
 GATE_SB="$HERE/real-gate-fixtures/gate.sb"
 if [[ "$SANDBOX" == "on" ]] && { [[ "$(uname)" != "Darwin" ]] || ! command -v sandbox-exec >/dev/null 2>&1 || [[ ! -f "$GATE_SB" ]]; }; then
 	SANDBOX=off
+fi
+# The hidden-test claim is invalid without read isolation. Refuse rather than
+# emit benchmark-shaped rows that can inspect graders or recover them from Git.
+if [[ "$SANDBOX" != "on" ]]; then
+	for task in "${TASKS[@]}" ${HELDOUT:-}; do
+		if is_hidden "$task"; then
+			echo "[real_gate] hidden task '$task' requires SANDBOX=on with sandbox-exec; refusing an invalid run" >&2
+			exit 2
+		fi
+	done
 fi
 loaded_alias() { curl -fsS -m 5 "$LLAMA_URL/v1/models" 2>/dev/null | python3 -c 'import sys,json;d=json.load(sys.stdin)["data"];print(d[0]["id"] if d else "")' 2>/dev/null; }
 
@@ -114,6 +125,16 @@ else
 fi
 [[ "$MODEL" != "$DD" ]] && echo "[real_gate] WARNING: loaded model '$MODEL' != daily driver '$DD'" >&2
 mkdir -p "$RUNS"
+# A direct invocation owns its result file and starts clean. Fleet orchestration
+# explicitly selects append mode after truncating once at the round boundary.
+# This prevents a reused GEN or rerun model from silently contaminating a verdict.
+RESULTS_MODE="${RESULTS_MODE:-truncate}"
+mkdir -p "$(dirname "$RESULTS")"
+case "$RESULTS_MODE" in
+	truncate) : > "$RESULTS" ;;
+	append) touch "$RESULTS" ;;
+	*) echo "[real_gate] invalid RESULTS_MODE=$RESULTS_MODE (truncate|append)" >&2; exit 2 ;;
+esac
 # Unique run id: workdir basenames feed telemetry sk, so re-running a gen label
 # used to aggregate the OLD run's events into the new verdict (audit 2026-07-13).
 # The id lands in workdir names (-> sk) and every result row (-> exact joins).
@@ -155,7 +176,8 @@ run_one() {  # $1=config-path  $2=pattern(base|cand)  $3=task  $4=rep  [$5=split
 	# jail: render the per-run Seatbelt profile (absolute paths; Seatbelt has no env)
 	local sbx=()
 	if [[ "$SANDBOX" == "on" ]]; then
-		sed -e "s|__WORKDIR__|$wd|" -e "s|__PI_STATE__|$HOME/.pi|" "$GATE_SB" > "$wd/.gate.sb"
+		sed -e "s|__WORKDIR__|$wd|" -e "s|__PI_STATE__|$HOME/.pi|" \
+			-e "s|__HARNESS__|$HERE|" "$GATE_SB" > "$wd/.gate.sb"
 		sbx=(sandbox-exec -f "$wd/.gate.sb")
 	fi
 
@@ -241,9 +263,10 @@ NOTE: a previous attempt in this workdir was stopped for repeating the same fail
 	# base-off vs base-on delta = the lucky-pass rate. Only ever ADDS strictness.
 	[[ "${TRAJECTORY:-off}" == "on" && "$gate" == 1 ]] && ! python3 "$HERE/prompt-lab/trajectory_check.py" "$wd" "$task" && gate=0
 	local mrow; mrow="$(python3 "$METRICS" "$wd")"
-	local tin tout
+	local tin tout usage_exact
 	tin="$(cut -f6 <<< "$mrow")"; [[ -n "$tin" ]] || tin=0
 	tout="$(cut -f7 <<< "$mrow")"; [[ -n "$tout" ]] || tout=0
+	usage_exact="$(cut -f10 <<< "$mrow")"; [[ -n "$usage_exact" ]] || usage_exact=0
 
 	# Degraded-model tripwire: a server can keep serving HTTP while the model behind it
 	# is broken (hot-swap/reload) — sessions then return near-zero tokens and the
@@ -258,14 +281,17 @@ NOTE: a previous attempt in this workdir was stopped for repeating the same fail
 		LOW_TOK_STREAK=0
 	fi
 
-	python3 - "$RESULTS" "$MODEL" "$pat" "$task" "$rep" "$gate" "$tout" "$retried" "$RUNID" "$tin" "$split" <<'PY'
+	python3 - "$RESULTS" "$MODEL" "$pat" "$task" "$rep" "$gate" "$tout" "$retried" "$RUNID" "$tin" "$split" "$usage_exact" "${FLEET_EXPECTED_MODELS:-}" <<'PY'
 import json,sys
-out,model,pat,task,rep,gate,tout,retried,runid,tin,split=sys.argv[1:12]
+out,model,pat,task,rep,gate,tout,retried,runid,tin,split,usage_exact,expected_models=sys.argv[1:14]
 # in_tok/out_tok are the unambiguous names (audit 2026-07-13); out_chars kept for
 # older readers. Remote llamacpp sessions may record zero usage -> in_tok 0 there.
 rec={"task":task,"pattern":pat,"rep":int(rep),"model":model,"split":split,
      "score":int(gate),"out_chars":int(tout),"think_chars":0,"retried":int(retried),
-     "run":runid,"in_tok":int(tin),"out_tok":int(tout)}
+     "run":runid,"in_tok":int(tin),"out_tok":int(tout),
+     "token_usage_exact":bool(int(usage_exact))}
+if expected_models:
+    rec["fleet_expected_models"] = sorted(expected_models.split())
 open(out,"a").write(json.dumps(rec)+"\n")
 PY
 	echo "  $pat/$task rep$rep -> gate=$gate (out_tok=$tout)"
@@ -302,14 +328,21 @@ fi
 # HELD-OUT tasks (audit: the overfit gate was inactive because every row was
 # split "val"). HELDOUT="rle saddle" runs those tasks AFTER the main sweep with
 # split=heldout — they must NEVER appear in TASKS or be used for candidate
-# selection; fleet_report's val->heldout gap + decide()'s overfit gate reactivate
+# selection; fleet_report's uplift-decay gap + decide()'s overfit gate reactivate
 # when these rows exist. Opt-in per round (adds len(HELDOUT) x N sessions/arm).
 if [[ -n "${HELDOUT:-}" ]]; then
-	for spec in "${SPECS[@]}"; do
-		pat="${spec%%:*}"; cfg="${spec#*:}"
-		for task in ${HELDOUT}; do
-			case " ${TASKS[*]} " in *" $task "*) echo "[real_gate] $task is in TASKS — a held-out task must not be; skipping" >&2; continue ;; esac
-			for rep in $(seq 1 "$N"); do run_one "$cfg" "$pat" "$task" "$rep" heldout; done
+	held_cell=0
+	for task in ${HELDOUT}; do
+		case " ${TASKS[*]} " in *" $task "*) echo "[real_gate] $task is in TASKS — held-out contamination; aborting" >&2; exit 2 ;; esac
+		for rep in $(seq 1 "$N"); do
+			if [[ ${#SPECS[@]} -eq 1 || "${INTERLEAVE:-on}" == "off" ]]; then
+				order=(); for i in "${!SPECS[@]}"; do order+=("$i"); done
+			elif (( held_cell % 2 == 0 )); then order=(0 1); else order=(1 0); fi
+			for i in "${order[@]}"; do
+				spec="${SPECS[$i]}"; pat="${spec%%:*}"; cfg="${spec#*:}"
+				run_one "$cfg" "$pat" "$task" "$rep" heldout
+			done
+			held_cell=$((held_cell + 1))
 		done
 	done
 fi

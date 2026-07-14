@@ -312,7 +312,7 @@ export default function (pi: ExtensionAPI) {
 				// till green" steer contradicts this "stop, change approach" one.
 				(globalThis as Record<string, unknown>).__pi_lb_outcome_at = Date.now();
 				record("loop-breaker", "outcome-steer", { n, turnIndex: event.turnIndex });
-				pi.sendUserMessage(outcomeMessage(n, outcomeLabels.get(fp) ?? r.toolName), { deliverAs: "followUp" });
+				pi.sendUserMessage(outcomeMessage(n, outcomeLabels.get(fp) ?? r.toolName), { deliverAs: "steer" });
 			} else if (action === "escalate") {
 				// Two ignored steers and the identical failing outcome STILL repeating:
 				// a grinder (seen live: 23-48 identical edit failures post-silence).
@@ -326,7 +326,7 @@ export default function (pi: ExtensionAPI) {
 					return;
 				}
 				record("loop-breaker", "outcome-steer", { n, final: true, turnIndex: event.turnIndex });
-				pi.sendUserMessage(outcomeMessage(n, outcomeLabels.get(fp) ?? r.toolName), { deliverAs: "followUp" });
+				pi.sendUserMessage(outcomeMessage(n, outcomeLabels.get(fp) ?? r.toolName), { deliverAs: "steer" });
 			}
 		}
 
@@ -390,14 +390,14 @@ export default function (pi: ExtensionAPI) {
 		const label = ep.labels.get(worstFp) ?? "the same action";
 
 		if (tier === 1) {
-			pi.sendUserMessage(tier1Message(label, repeat, ep.streak, d.byToolRepeat, d.byReasonRepeat), { deliverAs: "followUp" });
+			pi.sendUserMessage(tier1Message(label, repeat, ep.streak, d.byToolRepeat, d.byReasonRepeat), { deliverAs: "steer" });
 			return;
 		}
 
 		if (tier === 2) {
 			const didBlock = d.blockWorst && !!worstFp;
 			if (didBlock) ep.blocked.add(worstFp);
-			pi.sendUserMessage(tier2Message(label, ep.streak, didBlock), { deliverAs: "followUp" });
+			pi.sendUserMessage(tier2Message(label, ep.streak, didBlock), { deliverAs: "steer" });
 			return;
 		}
 
@@ -406,14 +406,15 @@ export default function (pi: ExtensionAPI) {
 			if (n >= REPEAT_T1) ep.blocked.add(fp);
 		}
 		if (HARD_STOP_MODE === "shutdown") {
-			pi.sendUserMessage(tier3Message(ep.streak), { deliverAs: "followUp" });
+			pi.sendUserMessage(tier3Message(ep.streak), { deliverAs: "steer" });
 			ctx.ui.notify("loop-breaker: hard stop — shutting down pi", "error");
 			ctx.shutdown();
 			return;
 		}
 		if (HARD_STOP_MODE === "abort") {
-			// NO followUp here: a queued follow-up user message would restart the run
-			// we are aborting (self-defeating). Notify the UI, arm the mid-turn
+			// NO steer here: a corrective user message would fight the abort and can
+			// restart the run if the abort lands first.
+			// Notify the UI, arm the mid-turn
 			// backstop, and stop.
 			record("loop-breaker", "abort", { streak: ep.streak, turnIndex: event.turnIndex });
 			ctx.ui.notify(`loop-breaker: hard stop — aborting run (${ep.streak} turns, no progress)`, "error");
@@ -428,7 +429,7 @@ export default function (pi: ExtensionAPI) {
 		}
 		// "block" mode: steer + wall, run continues. Reset counters (keep walls) so
 		// continued looping can escalate again instead of latching silent forever.
-		pi.sendUserMessage(tier3Message(ep.streak), { deliverAs: "followUp" });
+		pi.sendUserMessage(tier3Message(ep.streak), { deliverAs: "steer" });
 		const blocked = ep.blocked;
 		ep = newEpisode();
 		ep.blocked = blocked;

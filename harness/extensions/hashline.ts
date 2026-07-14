@@ -244,19 +244,35 @@ export default function (pi: ExtensionAPI) {
 				// PHASE 2a — commit all writes. If the OS rejects one mid-way (perms,
 				// disk full), best-effort restore every file already written from its
 				// pristine bytes so the I/O layer cannot re-open the half-applied hole.
-				const written: string[] = [];
 				try {
 					for (const p of planned) {
 						await writeFile(p.abs, p.finalText, "utf8");
-						if (!written.includes(p.abs)) written.push(p.abs);
 					}
 				} catch (e) {
-					for (const abs of written) {
+					// Restore EVERY target, including the write that rejected: writeFile
+					// may truncate or partially write before surfacing an I/O failure.
+					const rollbackFailures: string[] = [];
+					for (const abs of new Set(planned.map((p) => p.abs))) {
 						try {
 							await writeFile(abs, originals.get(abs) ?? "", "utf8");
-						} catch { /* rollback is best-effort; the original error wins */ }
+						} catch (rollbackError) {
+							// A read-only target commonly rejects both the original commit and
+							// rollback without ever changing. Verify bytes before declaring the
+							// rollback incomplete.
+							try {
+								if (await readFile(abs, "utf8") !== (originals.get(abs) ?? "")) {
+									rollbackFailures.push(`${abs}: ${rollbackError instanceof Error ? rollbackError.message : String(rollbackError)}`);
+								}
+							} catch {
+								rollbackFailures.push(`${abs}: ${rollbackError instanceof Error ? rollbackError.message : String(rollbackError)}`);
+							}
+						}
 					}
-					if (e instanceof Error) e.message += " NOTE: write failed — all files restored to their pre-patch state, nothing applied.";
+					if (e instanceof Error) {
+						e.message += rollbackFailures.length === 0
+							? " NOTE: write failed — every target was restored to its pre-patch state; nothing remains applied."
+							: ` NOTE: write failed AND rollback was incomplete (${rollbackFailures.join("; ")}). Inspect every target before continuing.`;
+					}
 					throw e;
 				}
 

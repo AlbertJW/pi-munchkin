@@ -23,7 +23,7 @@ Corpus note (2026-07-14): the 4B lens was fitted on a local Gutenberg prose corp
 port's wikitext default) was persistently 503; same generic-prose role, recorded
 as a recipe deviation.
 """
-import collections, json, math, os, sys
+import collections, hashlib, json, math, os, sys, tempfile
 
 # Late-layer window + top-K, matching the community study (L30-34 avg, top-50).
 # Overridable because layer count is model-specific (a 4B != the study's setup).
@@ -190,31 +190,72 @@ def score(moments_path, model_tag, out_path, model_ctx, clean_session_mod=1):
     silent exclusions could differ by class and fake separation — analyze gates
     the verdict on the drop-rate difference)."""
     n = 0
-    stats = collections.defaultdict(lambda: {"attempted": 0, "scored": 0, "dropped": 0})
-    with open(out_path, "w", buffering=1) as out:  # line-buffered: progress visible mid-run
-        for line in open(moments_path):
-            mo = json.loads(line)
-            if model_of(mo.get("sdir")) != model_tag:
-                continue
-            if mo["label"] == "CLEAN" and not clean_session_selected(mo.get("session"), clean_session_mod):
-                continue  # outside the declared sampling frame — not an exclusion
-            key = mo.get("sublabel") or mo["label"]
-            stats[key]["attempted"] += 1
-            noise = jlens_entropy(mo, model_ctx)
-            if noise is None:  # unscoreable (no locatable tag / trim would cut it)
-                stats[key]["dropped"] += 1
-                continue
-            stats[key]["scored"] += 1
-            prefix_len = sum(len(c.get("text", "")) for c in mo.get("context", []))
-            out.write(json.dumps({"label": mo["label"], "sublabel": mo.get("sublabel"),
-                                  "model": model_tag, "noise": noise,
-                                  "turn": mo.get("turn"), "session": mo.get("session"),
-                                  "prefix_len": prefix_len,
-                                  "context_truncated": mo.get("context_truncated")}) + "\n")
-            n += 1
-    with open(out_path + ".stats.json", "w") as f:
-        json.dump({"model": model_tag, "clean_session_mod": clean_session_mod,
-                   "classes": dict(stats)}, f, indent=1)
+    stats = collections.defaultdict(lambda: {"attempted": 0, "scored": 0, "dropped": 0,
+                                              "attempted_sessions": set(), "scored_sessions": set(), "dropped_sessions": set()})
+    sidecar = out_path + ".stats.json"
+    # Invalidate metadata BEFORE work starts. An interrupted rerun may leave the
+    # previous complete score file, but it can never be paired with stale stats.
+    if os.path.exists(sidecar):
+        os.remove(sidecar)
+    out_dir = os.path.dirname(os.path.abspath(out_path))
+    fd, tmp_out = tempfile.mkstemp(prefix=".jnoise-score-", suffix=".jsonl", dir=out_dir)
+    try:
+        with os.fdopen(fd, "w", buffering=1) as out:
+            for line in open(moments_path):
+                mo = json.loads(line)
+                if model_of(mo.get("sdir")) != model_tag:
+                    continue
+                if mo["label"] == "CLEAN" and not clean_session_selected(mo.get("session"), clean_session_mod):
+                    continue  # outside the declared sampling frame — not an exclusion
+                key = mo.get("sublabel") or mo["label"]
+                session = mo.get("session") or "?"
+                stats[key]["attempted"] += 1
+                stats[key]["attempted_sessions"].add(session)
+                noise = jlens_entropy(mo, model_ctx)
+                if noise is None:  # unscoreable (no locatable tag / trim would cut it)
+                    stats[key]["dropped"] += 1
+                    stats[key]["dropped_sessions"].add(session)
+                    continue
+                stats[key]["scored"] += 1
+                stats[key]["scored_sessions"].add(session)
+                prefix_len = sum(len(c.get("text", "")) for c in mo.get("context", []))
+                out.write(json.dumps({"label": mo["label"], "sublabel": mo.get("sublabel"),
+                                      "model": model_tag, "noise": noise,
+                                      "turn": mo.get("turn"), "session": mo.get("session"),
+                                      "prefix_len": prefix_len,
+                                      "context_truncated": mo.get("context_truncated")}) + "\n")
+                n += 1
+            out.flush()
+            os.fsync(out.fileno())
+        os.replace(tmp_out, out_path)
+    finally:
+        if os.path.exists(tmp_out):
+            os.remove(tmp_out)
+
+    classes = {}
+    for key, values in stats.items():
+        attempted_s = values.pop("attempted_sessions")
+        scored_s = values.pop("scored_sessions")
+        any_drop_s = values.pop("dropped_sessions")
+        classes[key] = {**values,
+                        "attempted_sessions": len(attempted_s),
+                        "scored_sessions": len(scored_s),
+                        "dropped_sessions": len(attempted_s - scored_s),
+                        "partially_dropped_sessions": len(any_drop_s & scored_s)}
+    identity = _artifact_identity(out_path)
+    payload = {"schema": 2, "model": model_tag, "clean_session_mod": clean_session_mod,
+               "artifact": identity, "classes": classes}
+    fd, tmp_stats = tempfile.mkstemp(prefix=".jnoise-stats-", suffix=".json", dir=out_dir)
+    try:
+        with os.fdopen(fd, "w") as f:
+            json.dump(payload, f, indent=1)
+            f.write("\n")
+            f.flush()
+            os.fsync(f.fileno())
+        os.replace(tmp_stats, sidecar)
+    finally:
+        if os.path.exists(tmp_stats):
+            os.remove(tmp_stats)
     return n
 
 
@@ -311,7 +352,18 @@ def _exclusion_check(stats, primary):
     return (f"drop rates: {primary} {rp:.1%} vs CLEAN {rc:.1%}", abs(rp - rc) > EXCLUSION_MAX_DIFF)
 
 
-def analyze(scored_path, stats_path=None):
+def _artifact_identity(path):
+    h = hashlib.sha256()
+    rows = 0
+    with open(path, "rb") as f:
+        for line in f:
+            h.update(line)
+            if line.strip():
+                rows += 1
+    return {"sha256": h.hexdigest(), "rows": rows}
+
+
+def analyze(scored_path, stats_path=None, require_stats=True):
     """Per model, bucketed by sublabel where available (CONFAB_COPY / CONFAB_BLIND)
     else falling back to the plain label (backward-compat with pre-sublabel data):
 
@@ -334,6 +386,16 @@ def analyze(scored_path, stats_path=None):
     if stats_path is None and os.path.exists(scored_path + ".stats.json"):
         stats_path = scored_path + ".stats.json"
     stats = json.load(open(stats_path)) if stats_path and os.path.exists(stats_path) else None
+    metadata_error = None
+    if require_stats:
+        if stats is None:
+            metadata_error = "missing score stats sidecar"
+        elif stats.get("schema") != 2 or stats.get("artifact") != _artifact_identity(scored_path):
+            metadata_error = "score stats sidecar is stale or does not identify this exact scored artifact"
+        else:
+            row_models = {r.get("model") for r in rows}
+            if len(row_models) != 1 or stats.get("model") not in row_models:
+                metadata_error = "score stats model identity does not match the scored rows"
     by_model = {}
     for r in rows:
         key = r.get("sublabel") or r["label"]
@@ -344,17 +406,29 @@ def analyze(scored_path, stats_path=None):
         res = {"n": {k: len(v) for k, v in d.items()}}
         primary = "CONFAB_COPY" if d.get("CONFAB_COPY") else "CONFAB"  # fallback: pre-sublabel data
         res["CONFAB_vs_CLEAN"] = _directional(d.get(primary, []), d.get("CLEAN", []))
-        if stats and stats.get("model") in (None, model):
-            rates, biased = _exclusion_check(stats, primary)
-            res["exclusions"] = rates
-            if biased and res["CONFAB_vs_CLEAN"]["verdict"] == "STAGE-c20":
-                res["CONFAB_vs_CLEAN"]["verdict"] = f"EXCLUSION-BIAS ({rates}) — fix scoreability before staging"
-        elif stats is None:
-            res["exclusions"] = "no stats sidecar — exclusion gate not evaluated (pre-audit-3 scored file)"
         if d.get("CONFAB_BLIND"):
             res["BLIND_vs_CLEAN"] = _directional(d["CONFAB_BLIND"], d.get("CLEAN", []))
         if d.get("CONFAB_EXACT"):
             res["EXACT_vs_CLEAN"] = _directional(d["CONFAB_EXACT"], d.get("CLEAN", []))
+        if stats and not metadata_error and stats.get("model") in (None, model):
+            exclusions = []
+            for study, cls_name in (("CONFAB_vs_CLEAN", primary),
+                                    ("BLIND_vs_CLEAN", "CONFAB_BLIND"),
+                                    ("EXACT_vs_CLEAN", "CONFAB_EXACT")):
+                if study not in res:
+                    continue
+                rates, biased = _exclusion_check(stats, cls_name)
+                exclusions.append(rates)
+                if biased and res[study]["verdict"] == "STAGE-c20":
+                    res[study]["verdict"] = f"EXCLUSION-BIAS ({rates}) — fix scoreability before staging"
+            res["exclusions"] = "; ".join(exclusions)
+        elif metadata_error:
+            res["exclusions"] = f"not evaluated: {metadata_error}"
+        if metadata_error:
+            res["score_metadata"] = f"INVALID: {metadata_error}"
+            for study in ("CONFAB_vs_CLEAN", "BLIND_vs_CLEAN", "EXACT_vs_CLEAN"):
+                if study in res and res[study]["verdict"] == "STAGE-c20":
+                    res[study]["verdict"] = f"INVALID-SCORE-METADATA ({metadata_error})"
         # confound: how well does TURN NUMBER alone separate the classes? If this
         # rivals the noise AUC, the "signal" is position, not confabulation.
         res["turn_confound_auc"] = round(roc_auc(turn(primary), turn("CLEAN")) or 0.5, 3) if d.get(primary) else None
@@ -431,7 +505,7 @@ def selftest():
         # (1) separable, confab HIGH, powered -> STAGE with session-level verdict
         p = os.path.join(td, "a.jsonl")
         _write(p, powered(2.0, 0.5))
-        v = analyze(p)["4B"]["CONFAB_vs_CLEAN"]
+        v = analyze(p, require_stats=False)["4B"]["CONFAB_vs_CLEAN"]
         assert v["auc_session"] == 1.0 and v["direction"] == "confab-high" and v["verdict"] == "STAGE-c20", v
         assert v["ci95_signed"] and v["ci95_signed"][0] > 0.5, "signed CI clear of 0.5 above"
 
@@ -439,7 +513,7 @@ def selftest():
         # the SIGNED CI excludes 0.5 from BELOW
         p = os.path.join(td, "b.jsonl")
         _write(p, powered(0.1, 0.9))
-        v = analyze(p)["4B"]["CONFAB_vs_CLEAN"]
+        v = analyze(p, require_stats=False)["4B"]["CONFAB_vs_CLEAN"]
         assert v["auc_session"] == 0.0 and v["strength"] == 1.0 and "inverted" in v["direction"] and v["verdict"] == "STAGE-c20", v
         assert v["ci95_signed"][1] < 0.5, "inverted detector: CI below 0.5"
 
@@ -451,7 +525,7 @@ def selftest():
         p = os.path.join(td, "null.jsonl")
         _write(p, [row("CONFAB", _r.gauss(1.0, 0.3), sub="CONFAB_COPY", sess=f"p{i}") for i in range(30)] +
                   [row("CLEAN", _r.gauss(1.0, 0.3), sess=f"n{i}") for i in range(30)])
-        v = analyze(p)["4B"]["CONFAB_vs_CLEAN"]
+        v = analyze(p, require_stats=False)["4B"]["CONFAB_vs_CLEAN"]
         assert v["verdict"] == "re-reject", f"null data must not stage: {v}"
         assert v["ci95_signed"][0] <= 0.5 <= v["ci95_signed"][1], f"signed CI must straddle 0.5 on null: {v['ci95_signed']}"
 
@@ -463,7 +537,7 @@ def selftest():
             rows_sh.append(row("CONFAB", 2.0 + i * 0.001, sub="CONFAB_COPY", sess=f"s{i}"))
             rows_sh.append(row("CLEAN", 0.5 + i * 0.001, sess=f"s{i}"))  # SAME session
         _write(p, rows_sh)
-        v = analyze(p)["4B"]["CONFAB_vs_CLEAN"]
+        v = analyze(p, require_stats=False)["4B"]["CONFAB_vs_CLEAN"]
         assert v["n_shared_sessions"] == 24, v["n_shared_sessions"]
         assert v["verdict"] == "STAGE-c20", v
 
@@ -472,7 +546,7 @@ def selftest():
         p = os.path.join(td, "c.jsonl")
         _write(p, [row("CONFAB", 2.0 + i * 0.01, sub="CONFAB_COPY", sess=f"p{i}") for i in range(4)] +
                   [row("CLEAN", 0.5 + i * 0.01, sess=f"n{i}") for i in range(30)])
-        v = analyze(p)["4B"]["CONFAB_vs_CLEAN"]
+        v = analyze(p, require_stats=False)["4B"]["CONFAB_vs_CLEAN"]
         assert v["verdict"].startswith("UNDERPOWERED"), v["verdict"]
         assert v["auc_session"] == 1.0, "AUC still reported for transparency"
 
@@ -483,7 +557,7 @@ def selftest():
         _write(p, [row("CONFAB", 2.0 + i * 0.001, sub="CONFAB_COPY", sess="doomed") for i in range(60)] +
                   [row("CONFAB", 2.1, sub="CONFAB_COPY", sess="p2")] +
                   [row("CLEAN", 0.5 + i * 0.001, sess=f"n{i}") for i in range(30)])
-        v = analyze(p)["4B"]["CONFAB_vs_CLEAN"]
+        v = analyze(p, require_stats=False)["4B"]["CONFAB_vs_CLEAN"]
         assert v["n_sessions"][0] == 2, v["n_sessions"]
         assert v["verdict"].startswith("UNDERPOWERED"), v["verdict"]
         assert v["auc_moment"] == 1.0, "moment AUC kept as reference"
@@ -496,20 +570,20 @@ def selftest():
             rows.append(row("CONFAB", lv, sub="CONFAB_COPY", sess=f"p{i}"))
             rows.append(row("CLEAN", lv, sess=f"n{i}"))
         _write(p, rows)
-        assert analyze(p)["4B"]["CONFAB_vs_CLEAN"]["verdict"] == "re-reject"
+        assert analyze(p, require_stats=False)["4B"]["CONFAB_vs_CLEAN"]["verdict"] == "re-reject"
 
         # (6) position confound exposed: noise separates BUT so does turn
         p = os.path.join(td, "f.jsonl")
         _write(p, [row("CONFAB", 2.0, turn=20, sub="CONFAB_COPY", sess=f"p{i}") for i in range(3)] +
                   [row("CLEAN", 0.5, turn=2, sess=f"n{i}") for i in range(3)])
-        r = analyze(p)["4B"]
+        r = analyze(p, require_stats=False)["4B"]
         assert r["CONFAB_vs_CLEAN"]["auc_moment"] == 1.0 and r["turn_confound_auc"] == 1.0, r
 
         # (7) STALE counted, never studied; BLIND/EXACT reported separately from primary
         p = os.path.join(td, "g.jsonl")
         _write(p, [row("CONFAB", 2.0, sub="CONFAB_COPY"), row("CONFAB", 1.7, sub="CONFAB_BLIND"),
                    row("CONFAB_EXACT", 1.5), row("STALE", 1.6), row("CLEAN", 0.5), row("CLEAN", 0.6, sess="s2")])
-        r = analyze(p)["4B"]
+        r = analyze(p, require_stats=False)["4B"]
         assert r["n"]["STALE"] == 1 and not any("STALE" in k for k in r if k.endswith("_vs_CLEAN"))
         assert "EXACT_vs_CLEAN" in r and "BLIND_vs_CLEAN" in r
         assert r["CONFAB_vs_CLEAN"]["auc_moment"] == 1.0, "primary study isolates CONFAB_COPY"
@@ -518,25 +592,28 @@ def selftest():
         p = os.path.join(td, "h.jsonl")
         _write(p, [{"label": "CONFAB", "model": "4B", "noise": 2.0, "turn": 1, "session": "a"},
                    {"label": "CLEAN", "model": "4B", "noise": 0.5, "turn": 1, "session": "b"}])
-        assert analyze(p)["4B"]["CONFAB_vs_CLEAN"]["auc_moment"] == 1.0
+        assert analyze(p, require_stats=False)["4B"]["CONFAB_vs_CLEAN"]["auc_moment"] == 1.0
 
     # (9) EXCLUSION-BIAS gate (audit-3): a STAGE-worthy separation whose primary
     # class dropped far more moments than CLEAN must NOT stage.
     with tempfile.TemporaryDirectory() as td:
         p = os.path.join(td, "x.jsonl")
         _write(p, powered(2.0, 0.5))
+        def write_stats(classes):
+            with open(p + ".stats.json", "w") as f:
+                json.dump({"schema": 2, "model": "4B", "artifact": _artifact_identity(p), "classes": classes}, f)
         with open(p + ".stats.json", "w") as f:
-            json.dump({"model": "4B", "classes": {
+            json.dump({"schema": 2, "model": "4B", "artifact": _artifact_identity(p), "classes": {
                 "CONFAB_COPY": {"attempted": 48, "scored": 24, "dropped": 24},   # 50% dropped
                 "CLEAN": {"attempted": 25, "scored": 24, "dropped": 1}}}, f)     # 4% dropped
         v = analyze(p)["4B"]
         assert v["CONFAB_vs_CLEAN"]["verdict"].startswith("EXCLUSION-BIAS"), v["CONFAB_vs_CLEAN"]["verdict"]
         # same data, balanced drops -> stages normally
-        with open(p + ".stats.json", "w") as f:
-            json.dump({"model": "4B", "classes": {
-                "CONFAB_COPY": {"attempted": 25, "scored": 24, "dropped": 1},
-                "CLEAN": {"attempted": 25, "scored": 24, "dropped": 1}}}, f)
+        write_stats({"CONFAB_COPY": {"attempted": 25, "scored": 24, "dropped": 1},
+                     "CLEAN": {"attempted": 25, "scored": 24, "dropped": 1}})
         assert analyze(p)["4B"]["CONFAB_vs_CLEAN"]["verdict"] == "STAGE-c20"
+        os.remove(p + ".stats.json")
+        assert analyze(p)["4B"]["CONFAB_vs_CLEAN"]["verdict"].startswith("INVALID-SCORE-METADATA")
 
     # (10) session-hash CLEAN sampling: whole sessions in or out, deterministic
     kept = {s for s in (f"sess{i}" for i in range(600)) if clean_session_selected(s, 6)}
@@ -544,6 +621,35 @@ def selftest():
     assert kept == kept2, "deterministic"
     assert 40 <= len(kept) <= 160, f"~1/6 of 600 sessions, got {len(kept)}"
     assert all(clean_session_selected(s, 1) for s in ("a", "b")), "mod=1 keeps everything"
+
+    # (11) score lifecycle: publish score+identity atomically; an interrupted
+    # rerun invalidates the sidecar without truncating the last complete score.
+    with tempfile.TemporaryDirectory() as td:
+        moments = os.path.join(td, "moments.jsonl")
+        scored = os.path.join(td, "scored.jsonl")
+        _write(moments, [
+            {"label": "CONFAB", "sublabel": "CONFAB_COPY", "sdir": "model-4b", "session": "p1", "context": [], "call_args": {}},
+            {"label": "CLEAN", "sdir": "model-4b", "session": "n1", "context": [], "call_args": {}},
+        ])
+        global jlens_entropy
+        real_entropy = jlens_entropy
+        try:
+            jlens_entropy = lambda _mo, _ctx: 1.0
+            assert score(moments, "4B", scored, {}) == 2
+            complete_bytes = open(scored, "rb").read()
+            meta = json.load(open(scored + ".stats.json"))
+            assert meta["schema"] == 2 and meta["artifact"] == _artifact_identity(scored), meta
+            assert meta["classes"]["CLEAN"]["attempted_sessions"] == 1
+            jlens_entropy = lambda _mo, _ctx: (_ for _ in ()).throw(RuntimeError("simulated interruption"))
+            try:
+                score(moments, "4B", scored, {})
+                assert False, "interrupted score must raise"
+            except RuntimeError:
+                pass
+            assert not os.path.exists(scored + ".stats.json"), "stale sidecar must be invalidated at start"
+            assert open(scored, "rb").read() == complete_bytes, "last complete score survives interrupted rerun"
+        finally:
+            jlens_entropy = real_entropy
 
     # entropy sanity: uniform top-k = ln k ; a spike ~ 0
     assert abs(topk_entropy([0.0] * 50) - math.log(50)) < 1e-9

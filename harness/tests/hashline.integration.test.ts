@@ -107,7 +107,7 @@ test("hashline: phase-2 WRITE failure rolls earlier files back (I/O atomicity)",
 	const patch =
 		`[f1.txt#${tagOf(join(cwd, "f1.txt"))}]\nreplace 1..1:\n+AAA\n` +
 		`[f2.txt#${tagOf(join(cwd, "f2.txt"))}]\nreplace 1..1:\n+BBB\n`;
-	await assert.rejects(() => callTool(fp, "edit", { input: patch }, cwd), /restored to their pre-patch state/);
+	await assert.rejects(() => callTool(fp, "edit", { input: patch }, cwd), /every target was restored to its pre-patch state/);
 	assert.equal(readFileSync(join(cwd, "f1.txt"), "utf8"), "aaa\n",
 		"f1 was written in phase 2, then ROLLED BACK when f2's write failed");
 	chmodSync(join(cwd, "f2.txt"), 0o644);

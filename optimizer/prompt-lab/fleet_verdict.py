@@ -31,7 +31,7 @@ import collections, json, os, sys
 
 LAB = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, LAB)
-from fleet_report import classify, decide  # noqa: E402
+from fleet_report import classify, decide, uplift_decay  # noqa: E402
 
 RESULTS = os.path.join(LAB, "results")
 TELEMETRY = os.environ.get("TELEMETRY_FILE", os.path.expanduser("~/.pi/agent/telemetry/events.jsonl"))
@@ -52,8 +52,9 @@ def ledger_candidates(gen, results_dir=RESULTS):
     return out
 
 
-def arm_stats(rows):
+def arm_stats(rows, split="val"):
     """(passes, total, retried_fired, retried_converted) for a result file's rows."""
+    rows = [r for r in rows if r.get("split", "val") == split]
     k = sum(r["score"] for r in rows)
     rf = [r for r in rows if r.get("retried")]
     return k, len(rows), len(rf), sum(r["score"] for r in rf)
@@ -106,6 +107,8 @@ def _tel_prefix(g, arm, rows):
 def task_regressions(brows, crows):
     """(model-agnostic) tasks where the candidate SIGNIFICANTLY regresses within-task
     — the Simpson guard. Returns [(task, bk, bn, ck, cn)]."""
+    brows = [r for r in brows if r.get("split", "val") == "val"]
+    crows = [r for r in crows if r.get("split", "val") == "val"]
     hits = []
     for task in sorted({r["task"] for r in brows}):
         bt = [r for r in brows if r["task"] == task]
@@ -167,13 +170,15 @@ def verdicts(gens, results_dir=RESULTS, telemetry_file=TELEMETRY, manifest=None)
         for name, mgens in (manifest.get("candidates") or {}).items():
             seen_gens = set(cand_rows.get(name, {})) | {r.split(":", 1)[0] for r in incomplete.get(name, [])}
             for g in mgens:
-                if g in gens and g not in seen_gens:
+                if g not in gens:
+                    incomplete[name].append(f"{g}: manifest requires this gen but it was omitted from the command")
+                elif g not in seen_gens:
                     incomplete[name].append(f"{g}: manifest declares this candidate but the gen's ledger has no trace of it")
     multi_candidate_round = len(set(cand_rows) | set(incomplete)) > 1
     out = {}
     for name in sorted(set(cand_rows) | set(incomplete)):
         per_gen = cand_rows.get(name, {})
-        stats, mech, task_hits = {}, {}, []
+        stats, mech, task_hits, heldout_gaps = {}, {}, [], []
         for g, (idx, rows) in per_gen.items():
             if g not in base:
                 continue
@@ -181,6 +186,13 @@ def verdicts(gens, results_dir=RESULTS, telemetry_file=TELEMETRY, manifest=None)
             bk, bn, _, _ = arm_stats(brows)
             ck, cn, rf, rc = arm_stats(rows)
             stats[model] = (bk, bn, ck, cn)
+            hb = arm_stats(brows, "heldout")
+            hc = arm_stats(rows, "heldout")
+            if hb[1] or hc[1]:
+                if not hb[1] or not hc[1]:
+                    incomplete[name].append(f"{g}: held-out split exists in only one arm")
+                else:
+                    heldout_gaps.append(uplift_decay(bk, bn, ck, cn, hb[0], hb[1], hc[0], hc[1]))
             task_hits += [(model, *h) for h in task_regressions(brows, rows)]
             m = {"retry_fired": rf, "retry_converted": rc} if rf else {}
             tel = telemetry_counts(_tel_prefix(g, f"c{idx}", rows), telemetry_file)
@@ -202,7 +214,7 @@ def verdicts(gens, results_dir=RESULTS, telemetry_file=TELEMETRY, manifest=None)
             # decide() wants a "daily driver" hard-gate; in fleet context the ANCHOR
             # model (first gen listed) plays that role — its regression is a hard
             # reject, everyone else is covered by the do-no-harm clause anyway.
-            label, why = decide(stats, dd_model=next(iter(stats), "?"))
+            label, why = decide(stats, dd_model=next(iter(stats), "?"), gap=max(heldout_gaps, default=0.0))
             if label.startswith("ADOPT") and downs > 0:
                 label, why = "MIXED-SIGNS", (f"gain exists but {downs} model(s) moved down — "
                                              f"cross-model sign consistency gates adoption; was: {label} ({why})")
@@ -343,6 +355,8 @@ def selftest():
         man = {"candidates": {"mf": ["gN", "gO"]}}
         v = verdicts(["gN", "gO"], results_dir=td, telemetry_file=tel, manifest=man)
         assert v["mf"]["decision"][0] == "INCOMPLETE" and "no trace" in v["mf"]["decision"][1], v["mf"]["decision"]
+        v = verdicts(["gN"], results_dir=td, telemetry_file=tel, manifest=man)
+        assert v["mf"]["decision"][0] == "INCOMPLETE" and "omitted from the command" in v["mf"]["decision"][1], v["mf"]["decision"]
         # without the manifest, the same data yields a verdict on the subset (the audit-3 gap)
         v = verdicts(["gN", "gO"], results_dir=td, telemetry_file=tel)
         assert v["mf"]["decision"][0] != "INCOMPLETE", "ledger-only view cannot know gO was expected"
@@ -355,12 +369,23 @@ if __name__ == "__main__":
     if "--selftest" in sys.argv:
         selftest()
     else:
-        gens = [a for a in sys.argv[1:] if not a.startswith("-")]
+        args = sys.argv[1:]
+        manifest_path = None
+        if "--manifest" in args:
+            i = args.index("--manifest")
+            if i + 1 >= len(args):
+                raise SystemExit("--manifest requires a path")
+            manifest_path = args[i + 1]
+            del args[i:i + 2]
+        unknown = [a for a in args if a.startswith("-")]
+        if unknown:
+            raise SystemExit(f"unknown option(s): {' '.join(unknown)}")
+        gens = args
         if not gens:
             raise SystemExit("usage: fleet_verdict.py <gen> [gen...] [--manifest m.json] | --selftest")
         manifest = None
-        if "--manifest" in sys.argv:
-            manifest = json.load(open(sys.argv[sys.argv.index("--manifest") + 1]))
+        if manifest_path:
+            manifest = json.load(open(manifest_path))
         else:
             print("[fleet_verdict] no --manifest: completeness is relative to what the ledgers declare only")
         render(verdicts(gens, manifest=manifest))
