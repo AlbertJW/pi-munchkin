@@ -1,0 +1,47 @@
+{
+  "name": "pi-munchkin",
+  "version": "0.1.0",
+  "description": "Harness extensions for the pi coding agent (anti-loop breaker, verify gate, plan runner, hashline edits, guards, span tools, /reflect, telemetry) — installable as a pi extension.",
+  "keywords": ["pi", "pi-coding-agent", "pi-extension", "coding-agent", "llm", "local-llm", "agent-harness"],
+  "homepage": "https://github.com/AlbertJW/pi-munchkin",
+  "repository": { "type": "git", "url": "git+https://github.com/AlbertJW/pi-munchkin.git" },
+  "license": "MIT",
+  "pi": {
+    "extensions": [
+      "harness/extensions/hashline.ts",
+      "harness/extensions/loop-breaker.ts",
+      "harness/extensions/verify-gate.ts",
+      "harness/extensions/plan-runner.ts",
+      "harness/extensions/reflect.ts",
+      "harness/extensions/drift-scanner.ts",
+      "harness/extensions/git-guard.ts",
+      "harness/extensions/context-inlet-guard.ts",
+      "harness/extensions/context-watcher.ts",
+      "harness/extensions/span-tools.ts",
+      "harness/extensions/compact-tool.ts",
+      "harness/extensions/ketch.ts"
+    ]
+  },
+  "dependencies": {
+    "typebox": "^1.1.0"
+  },
+  "peerDependencies": {
+    "@earendil-works/pi-coding-agent": "*",
+    "@earendil-works/pi-ai": "*"
+  },
+  "peerDependenciesMeta": {
+    "@earendil-works/pi-coding-agent": { "optional": false },
+    "@earendil-works/pi-ai": { "optional": true }
+  },
+  "files": [
+    "harness/extensions",
+    "harness/lib",
+    "harness/agents",
+    "harness/vendor",
+    "harness/APPEND_SYSTEM.md",
+    "harness/models.example.json",
+    "harness/settings.example.json",
+    "docs",
+    "NOTICE.md"
+  ]
+}

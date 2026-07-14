@@ -78,14 +78,34 @@ rows into the next run's files. Each has a dedicated guard now (`t2-check` fail-
 connection-error abort, a degraded-model token tripwire, gate-process reaping) — budget as much
 effort for instrument integrity as for candidates.
 
-## Setup
+## Install the harness (as a pi extension)
 
-1. Install [pi](https://github.com/earendil-works/pi) (`@earendil-works/pi-coding-agent`).
-2. Serve one model on an OpenAI-compatible endpoint at `:8080` — e.g. llama.cpp's `llama-server`
+The `harness/` half is a pi extension package (`package.json` at the repo root carries the pi
+`extensions` manifest). Install it through pi's package manager — it runs npm under the hood, so
+the dependency (`typebox`) is pulled automatically; `@earendil-works/pi-coding-agent` is a peer,
+already provided by your pi install:
+
+```sh
+pi package install github:AlbertJW/pi-munchkin     # from git (works today)
+# or, once published to npm:
+pi package install pi-munchkin
+```
+
+pi discovers the 12 extensions from the manifest and loads them (`.ts` runs directly — no build
+step). List/update/remove with `pi package list|update|remove`.
+
+Manual alternative (no package manager): symlink/copy `harness/extensions` + `harness/lib` into
+`~/.pi/agent/extensions/`, and `npm i typebox`.
+
+The optional `harness/vendor/pi-subagent` (bundled) adds the `subagent` tool that `plan-runner`/
+`reflect` use when present; they degrade gracefully without it.
+
+## Setup (for the optimizer)
+
+1. Serve one model on an OpenAI-compatible endpoint at `:8080` — e.g. llama.cpp's `llama-server`
    (see `examples/run-model.example.sh`). Copy `harness/models.example.json` /
    `settings.example.json` into your pi config and point them at it.
-3. Point pi at the extensions in `harness/` (and `harness/vendor/pi-subagent`).
-4. For `propose`/`munchkin`, set `FRONTIER_BASE_URL` + `FRONTIER_API_KEY` (any
+2. For `propose`/`munchkin`, set `FRONTIER_BASE_URL` + `FRONTIER_API_KEY` (any
    OpenAI-compatible frontier model, used only to *suggest* edits).
 
 `GOVERNOR=/path/to/your/APPEND_SYSTEM.md` overrides which governor the optimizer reads (defaults to
@@ -107,43 +127,8 @@ python3 ab-machinery/metrics.py --selftest
 
 ## Research notes
 
-Approaches evaluated for this substrate — recorded so the reasoning isn't re-litigated:
-
-- **AgentBench** (THUDM) — rejected as a task source: wrong skill axis (bash/SQL agency, not
-  library edits), non-hermetic grading (live Docker + MySQL per task), and the published numbers
-  put small models at the floor (3–12%), not in the band.
-- **design.md** (Google Labs) — not adopted (frontend-specific, no benchmarks). Pocketed two
-  ideas: a *design-fidelity task class* (edge-case-rich, deterministically lintable — candidate
-  in-band fuel for models that saturate clean single-function tasks) and the `add-rationale`
-  operator hypothesis (see Queued candidates in `optimizer/docs/HARNESS_SELF_IMPROVEMENT.md`).
-- **nuclear-grade-context-engineering** (FlyFission) — rejected wholesale: it encodes discipline
-  as process prose for the model to follow, while this harness encodes the same load-bearing
-  ideas as mechanisms the model can't bypass (hidden tests = independent checker, verify-gate =
-  evidence before done, human-gated adoption = explicit verdict). Its evidence is author-judged
-  only. One nugget queued: the evidence-first claim rule as a governor candidate.
-- **Verified in code** (corrects an earlier unverified review finding): subagents DO load the
-  global governor — the child `pi` appends the role prompt (`--append-system-prompt`), it does
-  not replace `APPEND_SYSTEM.md`. No `subagent_governor` search dimension is needed.
-- **pi ecosystem finds** (r/PiCodingAgent unreachable from tooling; verified via npm/GitHub):
-  *pi-lean-ctx* (Apache-2.0) does token-saving tool-output routing — evaluate it before
-  building an equivalent; *oh-my-pi* (16k-star fork) independently uses hash-anchored edits,
-  validating this repo's hashline approach.
-- **Gate-session write jail** (r/PiCodingAgent's agent-lock pattern) — the Linux-only BPF-LSM
-  tool itself doesn't fit, but it flagged a real gap: headless gate sessions ran unrestricted
-  bash. Adopted natively via macOS Seatbelt (`sandbox-exec`) fencing writes to the task
-  workdir; kernel-enforced, no model-visible prose.
-- **"Applications" / scoped agent views** (r/LocalLLaMA) — not adopted: the menu-verb idea
-  (model never retypes exact strings) is what hashline already does for edits, and subagents
-  cover scoped-context isolation. Pocketed one telemetry-gated candidate: the thread's
-  anti-signal that a tail-pinned persistent plan block made a small model avoid its planning
-  tools — test plan-injection placement if telemetry shows plan-steer non-compliance.
-- **jlens / J-Space** (Anthropic's global-workspace paper, `anthropics/jacobian-lens`) —
-  rejected: needs HF safetensors + a CUDA GPU (fleet is GGUF on llama.cpp; no CUDA box),
-  base→fine-tune lens transfer unvalidated, and the readout is a cleaner view of known
-  intermediate-layer representations rather than a new capability. Pocketed for a hardware
-  change: J-space probe as a cheap steer-wording pre-screen ahead of the real gate (Fisher
-  remains the adoption authority); pre-fitted lenses exist at HF `neuronpedia/jacobian-lens`
-  for the fleet's Qwen bases.
+Approaches evaluated for this substrate (and why each was adopted, pocketed, or rejected) live in
+[`docs/RESEARCH-NOTES.md`](docs/RESEARCH-NOTES.md) — recorded so the reasoning isn't re-litigated.
 
 ## License
 
