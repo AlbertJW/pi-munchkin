@@ -16,7 +16,7 @@ GEN="${GEN:-fleet0}"
 N="${N:-4}"
 MODELS="${MODELS:?space-separated router model ids}"
 TASKS="${TASKS:-parens equil bigdata}"
-LLAMA_URL="${LLAMA_URL:-http://172.16.16.122:8080}"
+LLAMA_URL="${LLAMA_URL:-http://127.0.0.1:8080}"
 CAND="${CAND:-}"
 
 [[ "$MODE" == "ab" && -z "$CAND" ]] && { echo "ab mode needs CAND=<config.json>" >&2; exit 1; }
