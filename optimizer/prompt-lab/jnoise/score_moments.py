@@ -11,9 +11,17 @@ Two stages, split so the ANALYSIS is testable offline without jlens installed:
   2. analyze — pure: CSV/JSONL of scored rows -> per-model ROC-AUC + threshold
                sweep + the pre-registered AUC>=0.70 verdict. No deps beyond stdlib.
 
-  ./score_moments.py score   moments.jsonl --model MODELTAG --lens L.gguf --gguf M.gguf -o scored.jsonl
-  ./score_moments.py analyze scored.jsonl
-  ./score_moments.py --selftest
+  # score/smoke need the jlens venv python + a running jlens-server:
+  #   ~/LLM/jlens-gguf/native/jlens-server -m MODEL.gguf   (port 8091)
+  ~/LLM/jlens-gguf/.venv/bin/python score_moments.py smoke   moments.jsonl --lens L.gguf
+  ~/LLM/jlens-gguf/.venv/bin/python score_moments.py score   moments.jsonl --model 4B --lens L.gguf -o scored.jsonl
+  ./score_moments.py analyze scored.jsonl        # stdlib only
+  ./score_moments.py --selftest                  # stdlib only
+
+Corpus note (2026-07-14): the 4B lens was fitted on a local Gutenberg prose corpus
+(corpus/pg1342.txt, 100 blocks) because the HF datasets-server rows API (the
+port's wikitext default) was persistently 503; same generic-prose role, recorded
+as a recipe deviation.
 """
 import collections, json, math, os, sys
 
@@ -42,12 +50,86 @@ def topk_entropy(logits, k=TOPK):
 
 # ---- stage 1: jlens boundary (the ONLY part needing the installed tool) --------
 
+JLENS_ROOT = os.path.expanduser(os.environ.get("JLENS_ROOT", "~/LLM/jlens-gguf"))
+TAG_IN_CALL_RE = None  # compiled lazily (re import kept local to stdlib-only analyze)
+
+
+def render_moment(moment):
+    """(prompt_text, tag_char_span) — the teacher-forced text and the char span of
+    the FIRST emitted tag inside the call. Context renders as a plain role-tagged
+    transcript (NOT the exact chat template — a consistent distortion across both
+    classes, documented in the study notes)."""
+    import re
+    global TAG_IN_CALL_RE
+    if TAG_IN_CALL_RE is None:
+        TAG_IN_CALL_RE = re.compile(r"\[([^\[\]#\n]+)#([0-9A-Za-z\-]+)\]")
+    prefix = "".join(f"{c['role']}: {c['text']}\n\n" for c in moment.get("context", []))
+    call_input = str((moment.get("call_args") or {}).get("input", ""))
+    call_text = f"assistant: edit\n{call_input}"
+    m = TAG_IN_CALL_RE.search(call_text)
+    if not m:
+        return None, None
+    start = len(prefix) + m.start(2)  # the TAG itself, not the path
+    end = len(prefix) + m.end(2)
+    return prefix + call_text, (start, end)
+
+
+def make_model_ctx(lens_path, native_url="http://127.0.0.1:8091", late_frac=LATE_FRAC):
+    """Connect to a running jlens-server (native/jlens-server -m MODEL.gguf) and
+    load model readout weights + the fitted lens. Run under the jlens venv python
+    (needs numpy/requests/gguf)."""
+    sys.path.insert(0, JLENS_ROOT)
+    from jlens_gguf.client import NativeClient
+    from jlens_gguf.lens import JacobianLensGGUF
+    from jlens_gguf.model_reader import ReadoutWeights
+    from jlens_gguf.readout import LensReadout
+    client = NativeClient(native_url)
+    if not client.health():
+        raise SystemExit(f"no jlens-server at {native_url} — start: {JLENS_ROOT}/native/jlens-server -m MODEL.gguf")
+    model_path = client.props().get("model_path") or client.props().get("model")
+    weights = ReadoutWeights.from_gguf(model_path)
+    lens = JacobianLensGGUF.load(lens_path)
+    readout = LensReadout(weights, lens)
+    n_layers = weights.n_layers
+    late = [l for l in lens.layers if l >= int(late_frac * n_layers)] or [max(lens.layers)]
+    return {"client": client, "readout": readout, "late_layers": late}
+
+
 def jlens_entropy(moment, model_ctx):
-    """RETURNS mean late-layer top-K entropy at the tag positions of this moment.
-    model_ctx wraps the jlens-gguf handle (lens + gguf). Implemented against the
-    real API at install — the exact call surface (batch eval vs module) is verified
-    then. Kept behind this seam so analyze/selftest run without the tool."""
-    raise NotImplementedError("wire to jlens-gguf at install; see README verify step")
+    """Mean late-layer top-K entropy at the moment's TAG-generation positions.
+
+    Teacher-forces the rendered prompt through jlens-server, maps the tag's char
+    span to token positions via the tokenizer's pieces, and reads lens logits at
+    the PREDICTION positions (residual at p-1 predicts token p). Returns None when
+    the moment has no locatable tag (analyze drops None noise rows upstream)."""
+    text, span = render_moment(moment)
+    if text is None:
+        return None
+    client, readout, late = model_ctx["client"], model_ctx["readout"], model_ctx["late_layers"]
+    toks, pieces = client.tokenize_with_pieces(text, add_special=True)
+    # char offset of each token's END (specials render as empty/marker pieces)
+    tag_positions = []
+    off = 0
+    for i, p in enumerate(pieces):
+        start_off = off
+        off += len(p)
+        if start_off < span[1] and off > span[0]:  # token overlaps the tag span
+            tag_positions.append(i)
+    if not tag_positions:
+        return None
+    pred_positions = sorted({max(0, i - 1) for i in tag_positions})
+    fr = client.forward(toks, capture_layers=late, capture=True)
+    ents = []
+    for layer in late:
+        acts = fr.activations.get(layer)
+        if acts is None:
+            continue
+        for p in pred_positions:
+            if p >= len(acts):
+                continue
+            logits = readout.lens_logits(acts[p], layer)
+            ents.append(topk_entropy(sorted(map(float, logits), reverse=True)[:TOPK]))
+    return (sum(ents) / len(ents)) if ents else None
 
 
 def model_of(sdir):
@@ -69,6 +151,8 @@ def score(moments_path, model_tag, out_path, model_ctx):
             if model_of(mo.get("sdir")) != model_tag:
                 continue
             noise = jlens_entropy(mo, model_ctx)
+            if noise is None:  # no locatable tag span (e.g. malformed call input) — not scoreable
+                continue
             prefix_len = sum(len(c.get("text", "")) for c in mo.get("context", []))
             out.write(json.dumps({"label": mo["label"], "sublabel": mo.get("sublabel"),
                                   "model": model_tag, "noise": noise,
@@ -330,7 +414,29 @@ if __name__ == "__main__":
         n, report = shapecheck(sys.argv[2])
         print(f"shapecheck: {n} REAL moments mock-scored (noise is content-hash, NOT jlens — plumbing proof only)")
         _print_report(report)
-    elif len(sys.argv) > 2 and sys.argv[1] == "score":
-        raise SystemExit("score: wire jlens_entropy() to the installed jlens-gguf first (see module docstring)")
+    elif len(sys.argv) > 2 and sys.argv[1] in ("score", "smoke"):
+        def _arg(flag, default=None):
+            return sys.argv[sys.argv.index(flag) + 1] if flag in sys.argv else default
+        lens = _arg("--lens") or sys.exit("--lens LENS.gguf required")
+        url = _arg("--url", "http://127.0.0.1:8091")
+        ctx = make_model_ctx(lens, native_url=url)
+        print(f"late layers: {ctx['late_layers']}")
+        if sys.argv[1] == "smoke":
+            # one CONFAB_COPY + one CLEAN moment -> two entropy numbers, no verdict
+            picked = {}
+            for line in open(sys.argv[2]):
+                mo = json.loads(line)
+                key = mo.get("sublabel") or mo["label"]
+                if key in ("CONFAB_COPY", "CLEAN") and key not in picked and model_of(mo.get("sdir")) == _arg("--model", "4B"):
+                    picked[key] = mo
+                if len(picked) == 2:
+                    break
+            for key, mo in picked.items():
+                print(f"  {key}: noise={jlens_entropy(mo, ctx)}  (session {mo.get('session', '?')[:40]})")
+        else:
+            out = _arg("-o") or sys.exit("-o scored.jsonl required")
+            n = score(sys.argv[2], _arg("--model", "4B"), out, ctx)
+            print(f"scored {n} moments -> {out}")
     else:
-        raise SystemExit("usage: score_moments.py analyze <scored.jsonl> | shapecheck <moments.jsonl> | --selftest")
+        raise SystemExit("usage: score_moments.py analyze <scored.jsonl> | shapecheck <moments.jsonl> | "
+                         "smoke/score <moments.jsonl> --lens L.gguf [--model 4B] [-o out] | --selftest")
