@@ -21,18 +21,21 @@ DD="${DD:-qwen36-35b-iq3s}"; PI_TIMEOUT="${PI_TIMEOUT:-1800}"
 PI_MODEL="${PI_MODEL:-}"   # pi model id for the sessions (else pi uses its default — beware external defaults)
 BASE="${BASE:-$HERE/prompt-lab/configs/baseline.json}"
 CAND="${CAND:-$HERE/prompt-lab/configs/cand-cot.json}"
-FIXTURE="$HOME/LLM/pi-test"; TASKS_DIR="$HERE/ab-symbolect/tasks"; T3_FILES="$HERE/ab-symbolect/t3-files"
+FIXTURE="$HOME/LLM/pi-test"; T3_FILES="$HERE/ab-symbolect/t3-files"
 FIXTURES="$HERE/real-gate-fixtures"
 CONFIG="$HERE/prompt-lab/config.py"; METRICS="$HERE/ab-machinery/metrics.py"
+FIXTURE_META="$HERE/prompt-lab/eval_fixture.py"; FINGERPRINT="$HERE/prompt-lab/serving_fingerprint.py"
 RESULTS="$HERE/prompt-lab/results/$GEN.jsonl"
 RUNS="${REAL_GATE_RUNS:-$HOME/.pi/real-gate-runs}"
 
-DRY=0; HARD=0; CALIB=0; TASKS=()
+DRY=0; HARD=0; CALIB=0; ROBUSTNESS=0; EXPLORATORY=0; TASKS=()
 for a in "$@"; do
 	case "$a" in
 		--dry) DRY=1 ;;
 		--hard) HARD=1 ;;        # the hidden-test, harder tasks
 		--calibrate) CALIB=1 ;;  # base config only (measure per-task difficulty; halves cost)
+		--robustness) ROBUSTNESS=1 ;; # canonical + 3 equivalent prompts and one-shot controls
+		--exploratory) EXPLORATORY=1 ;; # permit unapproved/expired/drifted fixtures; rows cannot affect verdicts
 		*) TASKS+=("$a") ;;
 	esac
 done
@@ -65,6 +68,33 @@ install_tests() {  # $1=task $2=workdir
 LLAMA_URL="${LLAMA_URL:-http://127.0.0.1:8080}"   # point at a remote llama-server (e.g. http://192.168.1.50:8080)
 HEALTH_WAIT="${HEALTH_WAIT:-1800}"                # max seconds to wait out a mid-sweep server outage (e.g. OOM restart)
 health() { curl -fsS -m 5 "$LLAMA_URL/health" >/dev/null 2>&1; }
+MODEL_ENDPOINT="$(python3 - "$LLAMA_URL" <<'PY'
+import socket,sys,urllib.parse
+u=urllib.parse.urlparse(sys.argv[1])
+if not u.hostname: raise SystemExit("LLAMA_URL has no host")
+print(socket.getaddrinfo(u.hostname, None, type=socket.SOCK_STREAM)[0][4][0], u.port or (443 if u.scheme == 'https' else 80))
+PY
+)" || { echo "[real_gate] cannot resolve LLAMA_URL=$LLAMA_URL" >&2; exit 2; }
+read -r MODEL_IP MODEL_PORT <<< "$MODEL_ENDPOINT"
+# Seatbelt network host for the model endpoint. Loopback stays pinned to
+# "localhost" (the tight default). A remote model resolves to a routable IP —
+# Seatbelt cannot match a raw IP literal in `remote ip` (verified), so the
+# tightest achievable allow is a PORT-PINNED wildcard host; everything off that
+# one port stays denied. Widen only when actually targeting a remote box.
+case "$MODEL_IP" in
+	127.*|::1|0.0.0.0) MODEL_HOST="localhost" ;;
+	*) MODEL_HOST="*" ;;
+esac
+
+# Evaluation rows are fail-closed: absent human approval, expiry, instability,
+# or artifact drift excludes a fixture unless the operator explicitly asks for
+# exploratory rows (which reports ignore for verdicts).
+for task in "${TASKS[@]}" ${HELDOUT:-}; do
+	if ! python3 "$FIXTURE_META" state "$task" >/dev/null 2>&1 && [[ "$EXPLORATORY" != 1 ]]; then
+		echo "[real_gate] fixture '$task' is non-authoritative; run fixture_admission.py check/review-packet/approve, or use --exploratory" >&2
+		exit 2
+	fi
+done
 
 # Seatbelt write-jail for the headless pi sessions (r/PiCodingAgent agent-lock pattern,
 # macOS-native): kernel-denies writes outside {workdir, tmp, ~/.pi} and reads of
@@ -74,6 +104,15 @@ SANDBOX="${SANDBOX:-on}"
 GATE_SB="$HERE/real-gate-fixtures/gate.sb"
 if [[ "$SANDBOX" == "on" ]] && { [[ "$(uname)" != "Darwin" ]] || ! command -v sandbox-exec >/dev/null 2>&1 || [[ ! -f "$GATE_SB" ]]; }; then
 	SANDBOX=off
+fi
+# macOS Seatbelt can constrain a remote port but only recognizes `localhost` as
+# a host predicate. A remote box is therefore reached via a PORT-PINNED WILDCARD
+# host (MODEL_HOST=* above): the tradeoff is that any host on that ONE port is
+# permitted (benchmark lookup on :$MODEL_PORT is not blocked). Deliberately
+# accepted for box runs (operator decision 2026-07-15); read-isolation of the
+# harness/graders is unaffected and stays fully enforced below.
+if [[ "$SANDBOX" == "on" && "$MODEL_IP" != "127.0.0.1" && "$MODEL_IP" != "::1" ]]; then
+	echo "[real_gate] SANDBOX=on + remote model $MODEL_IP: network widened to wildcard *:$MODEL_PORT (read-isolation intact)" >&2
 fi
 # The hidden-test claim is invalid without read isolation. Refuse rather than
 # emit benchmark-shaped rows that can inspect graders or recover them from Git.
@@ -85,7 +124,18 @@ if [[ "$SANDBOX" != "on" ]]; then
 		fi
 	done
 fi
-loaded_alias() { curl -fsS -m 5 "$LLAMA_URL/v1/models" 2>/dev/null | python3 -c 'import sys,json;d=json.load(sys.stdin)["data"];print(d[0]["id"] if d else "")' 2>/dev/null; }
+# Authenticated endpoints (e.g. the box router) need a bearer token; /health is
+# open so health() stays keyless. LLAMA_API_KEY empty -> no header (local zoo).
+AUTH=(); [[ -n "${LLAMA_API_KEY:-}" ]] && AUTH=(-H "Authorization: Bearer $LLAMA_API_KEY")
+loaded_alias() { curl -fsS -m 5 "${AUTH[@]}" "$LLAMA_URL/v1/models" 2>/dev/null | python3 -c 'import sys,json;d=json.load(sys.stdin)["data"];print(d[0]["id"] if d else "")' 2>/dev/null; }
+ensure_model_loaded() {
+	local state
+	state="$(curl -fsS -m 5 "${AUTH[@]}" "$LLAMA_URL/v1/models" 2>/dev/null | python3 -c 'import json,sys; m=sys.argv[1]; d=json.load(sys.stdin).get("data",[]); print(next((str((x.get("status") or {}).get("value", "")) for x in d if x.get("id")==m), ""))' "$MODEL" 2>/dev/null)"
+	[[ "$state" == "loaded" || "$state" == "running" ]] && return 0
+	echo "[real_gate] warming $MODEL so the pre-row fingerprint describes the loaded backend" >&2
+	curl -fsS --max-time "$HEALTH_WAIT" "${AUTH[@]}" "$LLAMA_URL/v1/chat/completions" -H 'Content-Type: application/json' \
+		-d "$(python3 -c 'import json,sys; print(json.dumps({"model":sys.argv[1],"messages":[{"role":"user","content":"Reply OK."}],"max_tokens":1,"temperature":0}))' "$MODEL")" >/dev/null
+}
 
 if [[ "$DRY" == 1 ]]; then
 	echo "== real_gate DRY ==  GEN=$GEN  N=$N  base=$(basename "$BASE")  cand=$(basename "$CAND")"
@@ -93,6 +143,7 @@ if [[ "$DRY" == 1 ]]; then
 	cfgs="[base, cand]"; nextcmd="./prompt-lab/fleet_report.py $GEN --baseline base --candidate cand"
 	[[ "$CALIB" == 1 ]] && cfgs="[base only]" && nextcmd="./prompt-lab/calibrate.py $GEN"
 	echo "would run, per config in $cfgs:  ${TASKS[*]}  x ${N} reps  -> gate-pass rows -> $RESULTS"
+	[[ "$ROBUSTNESS" == 1 ]] && echo "robustness: canonical + 3 equivalent prompts; eligible one-shot arms (one request each)"
 	echo "then: $nextcmd"
 	exit 0
 fi
@@ -141,10 +192,16 @@ esac
 RUNID="${RUNID:-$(python3 -c 'import uuid; print(uuid.uuid4().hex[:6])')}"
 echo "== real_gate: model=$MODEL  N=$N  run=$RUNID  tasks=${TASKS[*]} =="
 
-run_one() {  # $1=config-path  $2=pattern(base|cand)  $3=task  $4=rep  [$5=split]
-	local cfg="$1" pat="$2" task="$3" rep="$4" split="${5:-val}"
+run_one() {  # $1=config $2=arm $3=task $4=rep [$5=split] [$6=prompt-variant]
+	local cfg="$1" pat="$2" task="$3" rep="$4" split="${5:-val}" variant="${6:-canonical}"
+	local variant_slug="${variant//[^a-zA-Z0-9._-]/-}"
 	local wd="$RUNS/$GEN-$RUNID-$MODEL-$pat-$task-$rep"
+	[[ "$variant" != "canonical" ]] && wd="$wd-$variant_slug"
 	local fix; fix="$(fixture_for "$task")"
+	local rowctx="$wd.row-context.json"
+	local context_args=(); [[ "$EXPLORATORY" == 1 ]] && context_args+=(--exploratory)
+	python3 "$FIXTURE_META" row-context "$task" --variant "$variant" "${context_args[@]}" > "$rowctx"
+	local task_prompt; task_prompt="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["prompt_text"])' "$rowctx")"
 	rm -rf "$wd"; mkdir -p "$wd"
 	cp -R "$fix/src" "$fix/test" "$fix/package.json" "$wd/"
 	[[ -d "$fix/data" ]] && cp -R "$fix/data" "$wd/"   # data-backed tasks (e.g. bigdata) ship their corpus
@@ -163,7 +220,14 @@ run_one() {  # $1=config-path  $2=pattern(base|cand)  $3=task  $4=rep  [$5=split
 
 	# apply the config: writes $wd/.pi/APPEND_SYSTEM.md, returns env lines
 	local envlines; envlines="$(python3 "$CONFIG" --apply "$cfg" --workdir "$wd")"
+	local env_span_tools; env_span_tools="$(sed -n 's/^SPAN_TOOLS=//p' <<< "$envlines" | tail -1)"
+	env_span_tools="${env_span_tools:-${SPAN_TOOLS:-off}}"
+	if [[ "${TRAJECTORY:-off}" == "on" && "$env_span_tools" != "on" ]]; then
+		echo "[real_gate] TRAJECTORY=on requires SPAN_TOOLS=on for $pat/$task; refusing argument-only evidence" >&2
+		exit 2
+	fi
 	local tools="read,edit,bash"; [[ "$task" == "t4" ]] && tools="read,edit,bash,subagent"
+	[[ "$env_span_tools" == "on" ]] && tools="$tools,search_spans,read_span"
 	# Candidate env the PARENT shell must see: the exports below happen inside the pi
 	# subshell only, so checking ${RETRY_FRESH} out here read the parent's env and the
 	# c18 retry never fired for candidates that enable it (audit 2026-07-13 — the f4
@@ -177,16 +241,19 @@ run_one() {  # $1=config-path  $2=pattern(base|cand)  $3=task  $4=rep  [$5=split
 	local sbx=()
 	if [[ "$SANDBOX" == "on" ]]; then
 		sed -e "s|__WORKDIR__|$wd|" -e "s|__PI_STATE__|$HOME/.pi|" \
-			-e "s|__HARNESS__|$HERE|" "$GATE_SB" > "$wd/.gate.sb"
+			-e "s|__HARNESS__|$HERE|" -e "s|__MODEL_PORT__|$MODEL_PORT|" \
+			-e "s|__MODEL_HOST__|$MODEL_HOST|" \
+			"$GATE_SB" > "$wd/.gate.sb"
 		sbx=(sandbox-exec -f "$wd/.gate.sb")
 	fi
 
+	ensure_model_loaded || { echo "[real_gate] could not load $MODEL for fingerprinting" >&2; exit 1; }
+	python3 "$FINGERPRINT" capture --endpoint "$LLAMA_URL" --model "$MODEL" --output "$wd/fingerprint-pre.json"
 	# run pi in the background + wait, so the INT trap can kill it instantly
-	( cd "$wd"
+	( cd "$wd" || exit
 	  while IFS= read -r line; do [[ "$line" == *=* && "$line" != ENDPOINT=* && "$line" != LABEL=* ]] && export "${line?}"; done <<< "$envlines"
-	  # config-enabled extension tools must also be in the --tools palette
-	  [[ "${SPAN_TOOLS:-}" == "on" ]] && tools="$tools,search_spans,read_span"
-	  ${sbx[@]+"${sbx[@]}"} timeout "$PI_TIMEOUT" pi -p --approve ${PI_MODEL:+--model "$PI_MODEL"} --tools "$tools" "$(cat "$TASKS_DIR/$task.txt")" ) > "$wd/run.log" 2>&1 &
+	  # config-enabled extension tools are already reflected in the palette.
+	  ${sbx[@]+"${sbx[@]}"} timeout "$PI_TIMEOUT" pi -p --approve ${PI_MODEL:+--model "$PI_MODEL"} --tools "$tools" "$task_prompt" ) > "$wd/run.log" 2>&1 &
 	CHILD=$!; wait "$CHILD" || true; CHILD=""
 
 	# HARNESS error != MODEL failure. If pi never reached the model, scoring this run
@@ -218,7 +285,7 @@ run_one() {  # $1=config-path  $2=pattern(base|cand)  $3=task  $4=rep  [$5=split
 			local failout
 			failout="$( (cd "$wd" && timeout 60 node --test 2>&1 | tail -20) 2>/dev/null )"
 			echo "  $pat/$task rep$rep aborted — RETRY locality second session" >&2
-			retry_prompt="$(cat "$TASKS_DIR/$task.txt")
+			retry_prompt="$task_prompt
 
 A previous attempt in this workdir was stopped; its partial work is present. Follow this protocol EXACTLY:
 1. LOCALIZE: from the failing output below, identify the ONE file and smallest span responsible.
@@ -230,23 +297,24 @@ Most recent failing verification output:
 $failout"
 		else
 			echo "  $pat/$task rep$rep aborted — RETRY_FRESH second session" >&2
-			retry_prompt="$(cat "$TASKS_DIR/$task.txt")
+			retry_prompt="$task_prompt
 
 NOTE: a previous attempt in this workdir was stopped for repeating the same failing approach. The partial work is present. Inspect the current state first, then take a DIFFERENT approach to whatever kept failing."
 		fi
-		( cd "$wd"
+		( cd "$wd" || exit
 		  while IFS= read -r line; do [[ "$line" == *=* && "$line" != ENDPOINT=* && "$line" != LABEL=* ]] && export "${line?}"; done <<< "$envlines"
-		  [[ "${SPAN_TOOLS:-}" == "on" ]] && tools="$tools,search_spans,read_span"
 		  ${sbx[@]+"${sbx[@]}"} timeout "$PI_TIMEOUT" pi -p --approve ${PI_MODEL:+--model "$PI_MODEL"} --tools "$tools" \
 		    "$retry_prompt" ) >> "$wd/run.log" 2>&1 &
 		CHILD=$!; wait "$CHILD" || true; CHILD=""
 	fi
+	python3 "$FINGERPRINT" capture --endpoint "$LLAMA_URL" --model "$MODEL" --output "$wd/fingerprint-post.json"
 
 	# grading: restore authoritative tests so the model can't have tampered with them
 	if is_hidden "$task"; then
 		rm -f "$wd"/test/*.test.js                       # drop any model-added/edited tests
 		cp "$fix"/test/*.test.js "$wd/test/"             # pristine Pass-to-Pass set
 		cp "$FIXTURES/hidden/$task.test.js" "$wd/test/"  # the HIDDEN Fail-to-Pass grader
+		[[ "$task" == "bigdata" ]] && cp "$fix/data/events.jsonl" "$wd/data/events.jsonl"
 	else
 		install_tests "$task" "$wd"                      # shown-test anti-tamper
 	fi
@@ -263,38 +331,93 @@ NOTE: a previous attempt in this workdir was stopped for repeating the same fail
 	# base-off vs base-on delta = the lucky-pass rate. Only ever ADDS strictness.
 	[[ "${TRAJECTORY:-off}" == "on" && "$gate" == 1 ]] && ! python3 "$HERE/prompt-lab/trajectory_check.py" "$wd" "$task" && gate=0
 	local mrow; mrow="$(python3 "$METRICS" "$wd")"
-	local tin tout usage_exact
+	local tin tout usage_exact output_chars health_output
 	tin="$(cut -f6 <<< "$mrow")"; [[ -n "$tin" ]] || tin=0
 	tout="$(cut -f7 <<< "$mrow")"; [[ -n "$tout" ]] || tout=0
 	usage_exact="$(cut -f10 <<< "$mrow")"; [[ -n "$usage_exact" ]] || usage_exact=0
+	output_chars="$(cut -f11 <<< "$mrow")"; [[ -n "$output_chars" ]] || output_chars=0
 
 	# Degraded-model tripwire: a server can keep serving HTTP while the model behind it
 	# is broken (hot-swap/reload) — sessions then return near-zero tokens and the
 	# connection-error guard never fires. Two consecutive near-empty sessions = abort.
-	if [[ "$tout" -lt "${MIN_SESSION_TOKENS:-100}" ]]; then
+	health_output="$tout"; [[ "$usage_exact" != 1 ]] && health_output="$output_chars"
+	if [[ "$health_output" -lt "${MIN_SESSION_OUTPUT:-100}" ]]; then
 		LOW_TOK_STREAK=$((LOW_TOK_STREAK + 1))
 		if [[ "$LOW_TOK_STREAK" -ge 2 ]]; then
-			echo "[real_gate] $LOW_TOK_STREAK consecutive sessions under ${MIN_SESSION_TOKENS:-100} output tokens — model looks degraded, aborting (this row not written)." >&2
+			echo "[real_gate] $LOW_TOK_STREAK consecutive sessions under ${MIN_SESSION_OUTPUT:-100} output units (exact tokens or character proxy) — model looks degraded, aborting (this row not written)." >&2
 			exit 1
 		fi
 	else
 		LOW_TOK_STREAK=0
 	fi
 
-	python3 - "$RESULTS" "$MODEL" "$pat" "$task" "$rep" "$gate" "$tout" "$retried" "$RUNID" "$tin" "$split" "$usage_exact" "${FLEET_EXPECTED_MODELS:-}" <<'PY'
+	python3 - "$RESULTS" "$MODEL" "$pat" "$task" "$rep" "$gate" "$retried" "$RUNID" "$tin" "$tout" "$output_chars" "$split" "$usage_exact" "${FLEET_EXPECTED_MODELS:-}" "$rowctx" "$wd/fingerprint-pre.json" "$wd/fingerprint-post.json" <<'PY'
 import json,sys
-out,model,pat,task,rep,gate,tout,retried,runid,tin,split,usage_exact,expected_models=sys.argv[1:14]
-# in_tok/out_tok are the unambiguous names (audit 2026-07-13); out_chars kept for
-# older readers. Remote llamacpp sessions may record zero usage -> in_tok 0 there.
-rec={"task":task,"pattern":pat,"rep":int(rep),"model":model,"split":split,
-     "score":int(gate),"out_chars":int(tout),"think_chars":0,"retried":int(retried),
-     "run":runid,"in_tok":int(tin),"out_tok":int(tout),
-     "token_usage_exact":bool(int(usage_exact))}
+out,model,pat,task,rep,gate,retried,runid,tin,tout,outchars,split,usage_exact,expected_models,ctxpath,prepath,postpath=sys.argv[1:18]
+ctx=json.load(open(ctxpath)); pre=json.load(open(prepath)); post=json.load(open(postpath))
+stable=pre.get("fingerprint_sha256") == post.get("fingerprint_sha256")
+serving_complete=pre.get("status") == post.get("status") == "complete"
+authoritative=bool(ctx["authoritative"] and stable and serving_complete)
+status="complete" if authoritative else ("exploratory" if ctx.get("exploratory_override") else "incomplete")
+exact=bool(int(usage_exact))
+usage={"source":"provider" if exact else "char_proxy", "exact":exact,
+       "input_tokens":int(tin) if exact else None, "output_tokens":int(tout) if exact else None,
+       "output_chars":int(outchars)}
+rec={"schema":"pi.eval-row/v2", "task":task,"pattern":pat,"arm":pat,"rep":int(rep),
+     "repetition":int(rep),"model":model,"split":split,"score":int(gate),
+     "retried":int(retried),"run":runid,"fixture":{"cohort":ctx["cohort"],"version":ctx["version"]},
+     "authoritative":authoritative,"status":status,"authority_reason":ctx["authority_reason"],
+     "prompt":{"variant":ctx["prompt_variant"],"semantic_group":ctx["semantic_group"],"sha256":ctx["prompt_sha256"]},
+     "serving":{"pre":pre,"post":post,"stable":stable},"usage":usage,
+     # compatibility aliases for historical readers; dimensions stay honest.
+     "out_chars":int(outchars),"think_chars":0,"in_tok":int(tin) if exact else 0,
+     "out_tok":int(tout) if exact else 0,"token_usage_exact":exact}
 if expected_models:
     rec["fleet_expected_models"] = sorted(expected_models.split())
 open(out,"a").write(json.dumps(rec)+"\n")
 PY
-	echo "  $pat/$task rep$rep -> gate=$gate (out_tok=$tout)"
+	echo "  $pat/$task rep$rep/$variant -> gate=$gate (out_tok=$tout output_chars=$output_chars)"
+}
+
+run_one_shot() { # $1=task $2=rep $3=variant; always diagnostic robustness split
+	local task="$1" rep="$2" variant="$3" pat="one-shot" split="robustness"
+	local slug="${variant//[^a-zA-Z0-9._-]/-}"
+	local wd="$RUNS/$GEN-$RUNID-$MODEL-$pat-$task-$rep-$slug"
+	rm -rf "$wd"; mkdir -p "$wd"
+	local rowctx="$wd/row-context.json" result="$wd/control.json"
+	local context_args=(); [[ "$EXPLORATORY" == 1 ]] && context_args+=(--exploratory)
+	python3 "$FIXTURE_META" row-context "$task" --variant "$variant" "${context_args[@]}" > "$rowctx"
+	local eligible; eligible="$(python3 -c 'import json,sys; print(int(json.load(open(sys.argv[1]))["one_shot"]["eligible"]))' "$rowctx")"
+	python3 "$FINGERPRINT" capture --endpoint "$LLAMA_URL" --model "$MODEL" --output "$wd/fingerprint-pre.json"
+	if [[ "$eligible" == 1 ]]; then
+		python3 "$HERE/prompt-lab/one_shot_control.py" "$task" --variant "$variant" --endpoint "$LLAMA_URL" --model "$MODEL" --output "$result" >/dev/null || true
+	else
+		python3 - "$result" <<'PY'
+import json,sys
+json.dump({"score":0,"requests":0,"error":"fixture context exceeds 48 KiB or is explicitly ineligible",
+           "usage":{"source":"missing","exact":False,"input_tokens":None,"output_tokens":None,"output_chars":0}},open(sys.argv[1],"w"))
+PY
+	fi
+	python3 "$FINGERPRINT" capture --endpoint "$LLAMA_URL" --model "$MODEL" --output "$wd/fingerprint-post.json"
+	python3 - "$RESULTS" "$MODEL" "$task" "$rep" "$RUNID" "$rowctx" "$result" "$wd/fingerprint-pre.json" "$wd/fingerprint-post.json" "$eligible" <<'PY'
+import json,sys
+out,model,task,rep,runid,ctxp,resultp,prep,postp,eligible=sys.argv[1:11]
+ctx=json.load(open(ctxp)); result=json.load(open(resultp)); pre=json.load(open(prep)); post=json.load(open(postp))
+stable=pre.get("fingerprint_sha256")==post.get("fingerprint_sha256")
+complete=pre.get("status")==post.get("status")=="complete"
+authoritative=bool(ctx["authoritative"] and stable and complete and eligible=="1")
+status="ineligible" if eligible!="1" else "complete" if authoritative else "exploratory" if ctx.get("exploratory_override") else "incomplete"
+usage=result["usage"]
+rec={"schema":"pi.eval-row/v2","task":task,"pattern":"one-shot","arm":"one-shot","rep":int(rep),"repetition":int(rep),
+     "model":model,"split":"robustness","score":int(result["score"]),"run":runid,
+     "fixture":{"cohort":ctx["cohort"],"version":ctx["version"]},"authoritative":authoritative,"status":status,
+     "authority_reason":ctx["authority_reason"],"prompt":{"variant":ctx["prompt_variant"],"semantic_group":ctx["semantic_group"],"sha256":ctx["prompt_sha256"]},
+     "serving":{"pre":pre,"post":post,"stable":stable},"usage":usage,"control":{"requests":result["requests"],"error":result.get("error")},
+     "out_chars":usage["output_chars"],"in_tok":usage["input_tokens"] or 0,"out_tok":usage["output_tokens"] or 0,
+     "token_usage_exact":usage["exact"]}
+open(out,"a").write(json.dumps(rec)+"\n")
+PY
+	echo "  one-shot/$task rep$rep/$variant -> recorded"
 }
 
 SPECS=("base:$BASE" "cand:$CAND"); [[ "$CALIB" == 1 ]] && SPECS=("base:$BASE")
@@ -345,6 +468,23 @@ if [[ -n "${HELDOUT:-}" ]]; then
 			held_cell=$((held_cell + 1))
 		done
 	done
+fi
+
+# Explicit robustness sweep. Canonical harness cells above remain the only val
+# evidence. Equivalent wording rows are split=robustness, and the one-shot arm
+# is diagnostic only, so neither can inflate adoption Fisher sample sizes.
+if [[ "$ROBUSTNESS" == 1 ]]; then
+	for task in "${TASKS[@]}"; do
+		for rep in $(seq 1 "$N"); do
+			for variant in equivalent-1 equivalent-2 equivalent-3; do
+				for spec in "${SPECS[@]}"; do
+					pat="${spec%%:*}"; cfg="${spec#*:}"; run_one "$cfg" "$pat" "$task" "$rep" robustness "$variant"
+				done
+			done
+			for variant in canonical equivalent-1 equivalent-2 equivalent-3; do run_one_shot "$task" "$rep" "$variant"; done
+		done
+	done
+	python3 "$HERE/prompt-lab/robustness_report.py" "$GEN" --baseline base --candidate cand
 fi
 
 echo; echo "rows -> $RESULTS"
