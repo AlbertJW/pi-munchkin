@@ -68,14 +68,12 @@ export default function (pi: ExtensionAPI) {
 			record("micro-gate", checked ? "passed" : "skipped", { files: paths.length, checked });
 			return;
 		}
-		record("micro-gate", "fired", { files: paths.length });
-		pi.sendUserMessage(
-			steerText(
-				"MICRO_GATE_MSG",
-				"[micro-gate] The file you just edited does not parse/compile — fix this BEFORE anything else:\n{err}",
-				{ err },
-			),
-			{ deliverAs: "steer" },
+		const msg = steerText(
+			"MICRO_GATE_MSG",
+			"[micro-gate] The file you just edited does not parse/compile — fix this BEFORE anything else:\n{err}",
+			{ err },
 		);
+		record("micro-gate", "fired", { files: paths.length, injected_chars: msg.length });
+		pi.sendUserMessage(msg, { deliverAs: "steer" });
 	});
 }

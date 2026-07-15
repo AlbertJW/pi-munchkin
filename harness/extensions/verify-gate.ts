@@ -211,8 +211,9 @@ export default function (pi: ExtensionAPI) {
 		if (wrappingUp && st.mutated && !st.verifiedOk && st.fires < MAX_FIRES && st.sessionFires < MAX_FIRES * 3 && !planPhaseActive() && !outcomeActive) {
 			st.fires += 1;
 			st.sessionFires += 1;
-			record("verify-gate", "steer", { failed: verifyFailedThisTurn, fires: st.fires, sessionFires: st.sessionFires, turnIndex: event.turnIndex });
-			pi.sendUserMessage(steer(verifyFailedThisTurn), { deliverAs: "steer" });
+			const msg = steer(verifyFailedThisTurn);
+			record("verify-gate", "steer", { failed: verifyFailedThisTurn, fires: st.fires, sessionFires: st.sessionFires, injected_chars: msg.length, turnIndex: event.turnIndex });
+			pi.sendUserMessage(msg, { deliverAs: "steer" });
 		}
 	});
 

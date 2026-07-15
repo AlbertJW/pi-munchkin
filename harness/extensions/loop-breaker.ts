@@ -311,8 +311,11 @@ export default function (pi: ExtensionAPI) {
 				// Flag for verify-gate: while an outcome loop is active, its "re-run
 				// till green" steer contradicts this "stop, change approach" one.
 				(globalThis as Record<string, unknown>).__pi_lb_outcome_at = Date.now();
-				record("loop-breaker", "outcome-steer", { n, turnIndex: event.turnIndex });
-				pi.sendUserMessage(outcomeMessage(n, outcomeLabels.get(fp) ?? r.toolName), { deliverAs: "steer" });
+				{
+					const msg = outcomeMessage(n, outcomeLabels.get(fp) ?? r.toolName);
+					record("loop-breaker", "outcome-steer", { n, injected_chars: msg.length, turnIndex: event.turnIndex });
+					pi.sendUserMessage(msg, { deliverAs: "steer" });
+				}
 			} else if (action === "escalate") {
 				// Two ignored steers and the identical failing outcome STILL repeating:
 				// a grinder (seen live: 23-48 identical edit failures post-silence).
@@ -325,8 +328,11 @@ export default function (pi: ExtensionAPI) {
 					ctx.abort();
 					return;
 				}
-				record("loop-breaker", "outcome-steer", { n, final: true, turnIndex: event.turnIndex });
-				pi.sendUserMessage(outcomeMessage(n, outcomeLabels.get(fp) ?? r.toolName), { deliverAs: "steer" });
+				{
+					const msg = outcomeMessage(n, outcomeLabels.get(fp) ?? r.toolName);
+					record("loop-breaker", "outcome-steer", { n, final: true, injected_chars: msg.length, turnIndex: event.turnIndex });
+					pi.sendUserMessage(msg, { deliverAs: "steer" });
+				}
 			}
 		}
 
@@ -382,22 +388,29 @@ export default function (pi: ExtensionAPI) {
 		if (tier === 0 || ep.steered.has(tier)) return;
 		for (let l = 1; l <= tier; l++) ep.steered.add(l);
 		ep.lastSteerTurn = event.turnIndex;
-		record("loop-breaker", "steer", {
-			tier, byTool: d.byToolRepeat, byReason: d.byReasonRepeat,
-			repeat, streak: ep.streak, turnIndex: event.turnIndex,
-		});
 
 		const label = ep.labels.get(worstFp) ?? "the same action";
+		// Pre-build the steer text so its size is logged with the event. Abort mode
+		// (tier 3) injects nothing, so its injected_chars is honestly 0.
+		const didBlock = tier === 2 && d.blockWorst && !!worstFp;
+		let steerMsg = "";
+		if (tier === 1) steerMsg = tier1Message(label, repeat, ep.streak, d.byToolRepeat, d.byReasonRepeat);
+		else if (tier === 2) steerMsg = tier2Message(label, ep.streak, didBlock);
+		else if (HARD_STOP_MODE !== "abort") steerMsg = tier3Message(ep.streak);
+
+		record("loop-breaker", "steer", {
+			tier, byTool: d.byToolRepeat, byReason: d.byReasonRepeat,
+			repeat, streak: ep.streak, injected_chars: steerMsg.length, turnIndex: event.turnIndex,
+		});
 
 		if (tier === 1) {
-			pi.sendUserMessage(tier1Message(label, repeat, ep.streak, d.byToolRepeat, d.byReasonRepeat), { deliverAs: "steer" });
+			pi.sendUserMessage(steerMsg, { deliverAs: "steer" });
 			return;
 		}
 
 		if (tier === 2) {
-			const didBlock = d.blockWorst && !!worstFp;
 			if (didBlock) ep.blocked.add(worstFp);
-			pi.sendUserMessage(tier2Message(label, ep.streak, didBlock), { deliverAs: "steer" });
+			pi.sendUserMessage(steerMsg, { deliverAs: "steer" });
 			return;
 		}
 
@@ -406,7 +419,7 @@ export default function (pi: ExtensionAPI) {
 			if (n >= REPEAT_T1) ep.blocked.add(fp);
 		}
 		if (HARD_STOP_MODE === "shutdown") {
-			pi.sendUserMessage(tier3Message(ep.streak), { deliverAs: "steer" });
+			pi.sendUserMessage(steerMsg, { deliverAs: "steer" });
 			ctx.ui.notify("loop-breaker: hard stop — shutting down pi", "error");
 			ctx.shutdown();
 			return;
