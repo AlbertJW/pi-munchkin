@@ -127,13 +127,13 @@ fi
 # Authenticated endpoints (e.g. the box router) need a bearer token; /health is
 # open so health() stays keyless. LLAMA_API_KEY empty -> no header (local zoo).
 AUTH=(); [[ -n "${LLAMA_API_KEY:-}" ]] && AUTH=(-H "Authorization: Bearer $LLAMA_API_KEY")
-loaded_alias() { curl -fsS -m 5 "${AUTH[@]}" "$LLAMA_URL/v1/models" 2>/dev/null | python3 -c 'import sys,json;d=json.load(sys.stdin)["data"];print(d[0]["id"] if d else "")' 2>/dev/null; }
+loaded_alias() { curl -fsS -m 5 ${AUTH[@]+"${AUTH[@]}"} "$LLAMA_URL/v1/models" 2>/dev/null | python3 -c 'import sys,json;d=json.load(sys.stdin)["data"];print(d[0]["id"] if d else "")' 2>/dev/null; }
 ensure_model_loaded() {
 	local state
-	state="$(curl -fsS -m 5 "${AUTH[@]}" "$LLAMA_URL/v1/models" 2>/dev/null | python3 -c 'import json,sys; m=sys.argv[1]; d=json.load(sys.stdin).get("data",[]); print(next((str((x.get("status") or {}).get("value", "")) for x in d if x.get("id")==m), ""))' "$MODEL" 2>/dev/null)"
+	state="$(curl -fsS -m 5 ${AUTH[@]+"${AUTH[@]}"} "$LLAMA_URL/v1/models" 2>/dev/null | python3 -c 'import json,sys; m=sys.argv[1]; d=json.load(sys.stdin).get("data",[]); print(next((str((x.get("status") or {}).get("value", "")) for x in d if x.get("id")==m), ""))' "$MODEL" 2>/dev/null)"
 	[[ "$state" == "loaded" || "$state" == "running" ]] && return 0
 	echo "[real_gate] warming $MODEL so the pre-row fingerprint describes the loaded backend" >&2
-	curl -fsS --max-time "$HEALTH_WAIT" "${AUTH[@]}" "$LLAMA_URL/v1/chat/completions" -H 'Content-Type: application/json' \
+	curl -fsS --max-time "$HEALTH_WAIT" ${AUTH[@]+"${AUTH[@]}"} "$LLAMA_URL/v1/chat/completions" -H 'Content-Type: application/json' \
 		-d "$(python3 -c 'import json,sys; print(json.dumps({"model":sys.argv[1],"messages":[{"role":"user","content":"Reply OK."}],"max_tokens":1,"temperature":0}))' "$MODEL")" >/dev/null
 }
 
@@ -159,7 +159,9 @@ kill_tree() {
 	kill "$1" 2>/dev/null
 }
 cleanup() {
-	[[ -n "$CHILD" ]] && kill_tree "$CHILD"
+	# Group-kill first: a reparented orphan (node grandchild after `timeout` kills
+	# pi) keeps its PGID but escapes a parent-based walk, so kill the whole group.
+	[[ -n "$CHILD" ]] && { kill -- -"$CHILD" 2>/dev/null; kill_tree "$CHILD"; }
 	local p
 	for p in $(pgrep -P $$ 2>/dev/null); do kill_tree "$p"; done
 }
@@ -192,6 +194,54 @@ esac
 RUNID="${RUNID:-$(python3 -c 'import uuid; print(uuid.uuid4().hex[:6])')}"
 echo "== real_gate: model=$MODEL  N=$N  run=$RUNID  tasks=${TASKS[*]} =="
 
+# Per-session resource guard. A pi session's model runs REMOTELY, but the tools it
+# invokes (node/awk/bash — bigdata literally asks it to write+run node aggregators)
+# execute LOCALLY. `timeout` kills pi but its node/bash grandchildren get reparented
+# and can keep running + ballooning RAM unattended (seen 2026-07-16: an overnight
+# bigdata gate reached 50 GB and forced a restart). Fix: run each session in its OWN
+# process group with (a) a memory watchdog that kills the group past a cap and
+# (b) a guaranteed group sweep on exit so nothing orphans. PI_MEM_CAP_GB=0 disables.
+PI_MEM_CAP_GB="${PI_MEM_CAP_GB:-12}"
+# $1 = prompt, $2 = redirect op (">" fresh session, ">>" retry-append). Sets CHILD.
+run_guarded_session() {
+	local prompt=$1 redir=${2:->}
+	local cap_kb=$(( PI_MEM_CAP_GB * 1024 * 1024 ))
+	set -m   # monitor mode: the backgrounded subshell becomes its own process-group leader
+	if [[ "$redir" == ">>" ]]; then
+		( cd "$wd" || exit
+		  while IFS= read -r line; do [[ "$line" == *=* && "$line" != ENDPOINT=* && "$line" != LABEL=* ]] && export "${line?}"; done <<< "$envlines"
+		  ${sbx[@]+"${sbx[@]}"} timeout -k 30 "$PI_TIMEOUT" pi -p --approve ${PI_MODEL:+--model "$PI_MODEL"} --tools "$tools" "$prompt" ) >> "$wd/run.log" 2>&1 &
+	else
+		( cd "$wd" || exit
+		  while IFS= read -r line; do [[ "$line" == *=* && "$line" != ENDPOINT=* && "$line" != LABEL=* ]] && export "${line?}"; done <<< "$envlines"
+		  ${sbx[@]+"${sbx[@]}"} timeout -k 30 "$PI_TIMEOUT" pi -p --approve ${PI_MODEL:+--model "$PI_MODEL"} --tools "$tools" "$prompt" ) > "$wd/run.log" 2>&1 &
+	fi
+	CHILD=$!
+	set +m
+	local watchdog=""
+	if (( cap_kb > 0 )); then
+		( while kill -0 "$CHILD" 2>/dev/null; do
+			local pids rss
+			pids=$(pgrep -g "$CHILD" 2>/dev/null | tr '\n' ',')
+			pids=${pids%,}
+			if [[ -n "$pids" ]]; then
+				rss=$(ps -o rss= -p "$pids" 2>/dev/null | awk '{s+=$1} END{print s+0}')
+				if (( rss > cap_kb )); then
+					echo "[real_gate] MEMORY CAP: session $(basename "$wd") group hit $((rss/1024))MB > ${PI_MEM_CAP_GB}GB — killing" >&2
+					kill -KILL -- -"$CHILD" 2>/dev/null
+					break
+				fi
+			fi
+			sleep 5
+		done ) &
+		watchdog=$!
+	fi
+	wait "$CHILD" 2>/dev/null || true
+	kill -- -"$CHILD" 2>/dev/null                 # sweep any orphaned grandchildren in the group
+	[[ -n "$watchdog" ]] && { kill "$watchdog" 2>/dev/null; wait "$watchdog" 2>/dev/null || true; }
+	CHILD=""
+}
+
 run_one() {  # $1=config $2=arm $3=task $4=rep [$5=split] [$6=prompt-variant]
 	local cfg="$1" pat="$2" task="$3" rep="$4" split="${5:-val}" variant="${6:-canonical}"
 	local variant_slug="${variant//[^a-zA-Z0-9._-]/-}"
@@ -200,7 +250,7 @@ run_one() {  # $1=config $2=arm $3=task $4=rep [$5=split] [$6=prompt-variant]
 	local fix; fix="$(fixture_for "$task")"
 	local rowctx="$wd.row-context.json"
 	local context_args=(); [[ "$EXPLORATORY" == 1 ]] && context_args+=(--exploratory)
-	python3 "$FIXTURE_META" row-context "$task" --variant "$variant" "${context_args[@]}" > "$rowctx"
+	python3 "$FIXTURE_META" row-context "$task" --variant "$variant" ${context_args[@]+"${context_args[@]}"} > "$rowctx"
 	local task_prompt; task_prompt="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["prompt_text"])' "$rowctx")"
 	rm -rf "$wd"; mkdir -p "$wd"
 	cp -R "$fix/src" "$fix/test" "$fix/package.json" "$wd/"
@@ -249,12 +299,9 @@ run_one() {  # $1=config $2=arm $3=task $4=rep [$5=split] [$6=prompt-variant]
 
 	ensure_model_loaded || { echo "[real_gate] could not load $MODEL for fingerprinting" >&2; exit 1; }
 	python3 "$FINGERPRINT" capture --endpoint "$LLAMA_URL" --model "$MODEL" --output "$wd/fingerprint-pre.json"
-	# run pi in the background + wait, so the INT trap can kill it instantly
-	( cd "$wd" || exit
-	  while IFS= read -r line; do [[ "$line" == *=* && "$line" != ENDPOINT=* && "$line" != LABEL=* ]] && export "${line?}"; done <<< "$envlines"
-	  # config-enabled extension tools are already reflected in the palette.
-	  ${sbx[@]+"${sbx[@]}"} timeout "$PI_TIMEOUT" pi -p --approve ${PI_MODEL:+--model "$PI_MODEL"} --tools "$tools" "$task_prompt" ) > "$wd/run.log" 2>&1 &
-	CHILD=$!; wait "$CHILD" || true; CHILD=""
+	# run pi in the background (own process group + memory watchdog) so the INT trap
+	# can kill it instantly and no model-spawned grandchild can orphan/balloon.
+	run_guarded_session "$task_prompt" ">"
 
 	# HARNESS error != MODEL failure. If pi never reached the model, scoring this run
 	# would record a task result for a measurement that never happened (a no-op scores
@@ -301,11 +348,7 @@ $failout"
 
 NOTE: a previous attempt in this workdir was stopped for repeating the same failing approach. The partial work is present. Inspect the current state first, then take a DIFFERENT approach to whatever kept failing."
 		fi
-		( cd "$wd" || exit
-		  while IFS= read -r line; do [[ "$line" == *=* && "$line" != ENDPOINT=* && "$line" != LABEL=* ]] && export "${line?}"; done <<< "$envlines"
-		  ${sbx[@]+"${sbx[@]}"} timeout "$PI_TIMEOUT" pi -p --approve ${PI_MODEL:+--model "$PI_MODEL"} --tools "$tools" \
-		    "$retry_prompt" ) >> "$wd/run.log" 2>&1 &
-		CHILD=$!; wait "$CHILD" || true; CHILD=""
+		run_guarded_session "$retry_prompt" ">>"
 	fi
 	python3 "$FINGERPRINT" capture --endpoint "$LLAMA_URL" --model "$MODEL" --output "$wd/fingerprint-post.json"
 
@@ -386,7 +429,7 @@ run_one_shot() { # $1=task $2=rep $3=variant; always diagnostic robustness split
 	rm -rf "$wd"; mkdir -p "$wd"
 	local rowctx="$wd/row-context.json" result="$wd/control.json"
 	local context_args=(); [[ "$EXPLORATORY" == 1 ]] && context_args+=(--exploratory)
-	python3 "$FIXTURE_META" row-context "$task" --variant "$variant" "${context_args[@]}" > "$rowctx"
+	python3 "$FIXTURE_META" row-context "$task" --variant "$variant" ${context_args[@]+"${context_args[@]}"} > "$rowctx"
 	local eligible; eligible="$(python3 -c 'import json,sys; print(int(json.load(open(sys.argv[1]))["one_shot"]["eligible"]))' "$rowctx")"
 	python3 "$FINGERPRINT" capture --endpoint "$LLAMA_URL" --model "$MODEL" --output "$wd/fingerprint-pre.json"
 	if [[ "$eligible" == 1 ]]; then
