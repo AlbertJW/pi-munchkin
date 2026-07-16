@@ -8,23 +8,27 @@
 #   GEN=rg0 BASE=configs/baseline.json CAND=configs/cand-cot.json N=3 ./real_gate.sh [t1..t4]
 #   ./real_gate.sh --dry
 #
-# Server must already be up (one model; auto-detected via /v1/models). Focused on the
-# DAILY DRIVER (DD) — bring it up, run this. Honors live knobs (prompt, scaffold,
-# LB_*/VERIFY_GATE_* env); decoding/optillm need a relaunch/proxy (Phase 3).
-# Robust: health-checks before each task (fails fast if the server died mid-run) and
-# traps INT/TERM to kill the in-flight pi child, so Ctrl-C actually stops it.
+# MODEL_CONTROL=llama expects an already-running OpenAI-compatible server;
+# MODEL_CONTROL=pi-native delegates transport to Pi's provider registry. The default
+# GATE_NETWORK=open restores cloud/network access but produces exploratory rows.
+# Endpoint-restricted loopback runs can remain authoritative. Traps INT/TERM kill the
+# in-flight Pi process group so Ctrl-C also cleans up tool grandchildren.
 set -uo pipefail
 
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 GEN="${GEN:-rg0}"; N="${N:-3}"
 DD="${DD:-qwen36-35b-iq3s}"; PI_TIMEOUT="${PI_TIMEOUT:-1800}"
 PI_MODEL="${PI_MODEL:-}"   # pi model id for the sessions (else pi uses its default — beware external defaults)
+PI_PROVIDER="${PI_PROVIDER:-}"
+GATE_NETWORK="${GATE_NETWORK:-open}"       # open (exploratory) | endpoint (loopback can be authoritative)
+MODEL_CONTROL="${MODEL_CONTROL:-llama}"    # llama | pi-native
 BASE="${BASE:-$HERE/prompt-lab/configs/baseline.json}"
 CAND="${CAND:-$HERE/prompt-lab/configs/cand-cot.json}"
 FIXTURE="$HOME/LLM/pi-test"; T3_FILES="$HERE/ab-symbolect/t3-files"
 FIXTURES="$HERE/real-gate-fixtures"
 CONFIG="$HERE/prompt-lab/config.py"; METRICS="$HERE/ab-machinery/metrics.py"
 FIXTURE_META="$HERE/prompt-lab/eval_fixture.py"; FINGERPRINT="$HERE/prompt-lab/serving_fingerprint.py"
+EXEC_POLICY="$HERE/prompt-lab/execution_policy.py"
 RESULTS="$HERE/prompt-lab/results/$GEN.jsonl"
 RUNS="${REAL_GATE_RUNS:-$HOME/.pi/real-gate-runs}"
 
@@ -68,23 +72,30 @@ install_tests() {  # $1=task $2=workdir
 LLAMA_URL="${LLAMA_URL:-http://127.0.0.1:8080}"   # point at a remote llama-server (e.g. http://192.168.1.50:8080)
 HEALTH_WAIT="${HEALTH_WAIT:-1800}"                # max seconds to wait out a mid-sweep server outage (e.g. OOM restart)
 health() { curl -fsS -m 5 "$LLAMA_URL/health" >/dev/null 2>&1; }
-MODEL_ENDPOINT="$(python3 - "$LLAMA_URL" <<'PY'
+case "$GATE_NETWORK" in open|endpoint) ;; *) echo "[real_gate] invalid GATE_NETWORK=$GATE_NETWORK (open|endpoint)" >&2; exit 2 ;; esac
+case "$MODEL_CONTROL" in llama|pi-native) ;; *) echo "[real_gate] invalid MODEL_CONTROL=$MODEL_CONTROL (llama|pi-native)" >&2; exit 2 ;; esac
+if [[ "$MODEL_CONTROL" == "pi-native" && -z "$PI_MODEL" ]]; then
+	echo "[real_gate] MODEL_CONTROL=pi-native requires PI_MODEL (provider-qualified is recommended)" >&2
+	exit 2
+fi
+if [[ "$MODEL_CONTROL" == "pi-native" && "$GATE_NETWORK" != "open" ]]; then
+	echo "[real_gate] MODEL_CONTROL=pi-native requires GATE_NETWORK=open; provider traffic cannot use the llama endpoint jail" >&2
+	exit 2
+fi
+
+MODEL_IP="managed"; MODEL_PORT="0"; MODEL_HOST="*"
+if [[ "$MODEL_CONTROL" == "llama" ]]; then
+	MODEL_ENDPOINT="$(python3 - "$LLAMA_URL" <<'PY'
 import socket,sys,urllib.parse
 u=urllib.parse.urlparse(sys.argv[1])
 if not u.hostname: raise SystemExit("LLAMA_URL has no host")
 print(socket.getaddrinfo(u.hostname, None, type=socket.SOCK_STREAM)[0][4][0], u.port or (443 if u.scheme == 'https' else 80))
 PY
-)" || { echo "[real_gate] cannot resolve LLAMA_URL=$LLAMA_URL" >&2; exit 2; }
-read -r MODEL_IP MODEL_PORT <<< "$MODEL_ENDPOINT"
-# Seatbelt network host for the model endpoint. Loopback stays pinned to
-# "localhost" (the tight default). A remote model resolves to a routable IP —
-# Seatbelt cannot match a raw IP literal in `remote ip` (verified), so the
-# tightest achievable allow is a PORT-PINNED wildcard host; everything off that
-# one port stays denied. Widen only when actually targeting a remote box.
-case "$MODEL_IP" in
-	127.*|::1|0.0.0.0) MODEL_HOST="localhost" ;;
-	*) MODEL_HOST="*" ;;
-esac
+	)" || { echo "[real_gate] cannot resolve LLAMA_URL=$LLAMA_URL" >&2; exit 2; }
+	read -r MODEL_IP MODEL_PORT <<< "$MODEL_ENDPOINT"
+	# Seatbelt recognizes localhost but not a raw remote IP in this predicate.
+	case "$MODEL_IP" in 127.*|::1|0.0.0.0) MODEL_HOST="localhost" ;; *) MODEL_HOST="*" ;; esac
+fi
 
 # Evaluation rows are fail-closed: absent human approval, expiry, instability,
 # or artifact drift excludes a fixture unless the operator explicitly asks for
@@ -101,18 +112,20 @@ done
 # the entire harness repository (including graders and Git objects). SANDBOX=off disables BOTH protections and makes
 # hidden-task results invalid; auto-off when macOS sandbox-exec is unavailable.
 SANDBOX="${SANDBOX:-on}"
-GATE_SB="$HERE/real-gate-fixtures/gate.sb"
+if [[ "$GATE_NETWORK" == "open" ]]; then
+	GATE_SB="$HERE/real-gate-fixtures/gate-open.sb"
+else
+	GATE_SB="$HERE/real-gate-fixtures/gate.sb"
+fi
 if [[ "$SANDBOX" == "on" ]] && { [[ "$(uname)" != "Darwin" ]] || ! command -v sandbox-exec >/dev/null 2>&1 || [[ ! -f "$GATE_SB" ]]; }; then
 	SANDBOX=off
 fi
-# macOS Seatbelt can constrain a remote port but only recognizes `localhost` as
-# a host predicate. A remote box is therefore reached via a PORT-PINNED WILDCARD
-# host (MODEL_HOST=* above): the tradeoff is that any host on that ONE port is
-# permitted (benchmark lookup on :$MODEL_PORT is not blocked). Deliberately
-# accepted for box runs (operator decision 2026-07-15); read-isolation of the
-# harness/graders is unaffected and stays fully enforced below.
-if [[ "$SANDBOX" == "on" && "$MODEL_IP" != "127.0.0.1" && "$MODEL_IP" != "::1" ]]; then
-	echo "[real_gate] SANDBOX=on + remote model $MODEL_IP: network widened to wildcard *:$MODEL_PORT (read-isolation intact)" >&2
+# Filesystem isolation is independent of egress authority. Open networking and
+# remote endpoint wildcards are permitted, but their rows are exploratory.
+if [[ "$SANDBOX" == "on" && "$GATE_NETWORK" == "open" ]]; then
+	echo "[real_gate] GATE_NETWORK=open: unrestricted egress enabled; rows are non-authoritative (read-isolation intact)" >&2
+elif [[ "$SANDBOX" == "on" && "$MODEL_IP" != "127.0.0.1" && "$MODEL_IP" != "::1" && "$MODEL_IP" != "0.0.0.0" ]]; then
+	echo "[real_gate] endpoint mode + remote model $MODEL_IP: wildcard *:$MODEL_PORT; rows are non-authoritative" >&2
 fi
 # The hidden-test claim is invalid without read isolation. Refuse rather than
 # emit benchmark-shaped rows that can inspect graders or recover them from Git.
@@ -139,7 +152,12 @@ ensure_model_loaded() {
 
 if [[ "$DRY" == 1 ]]; then
 	echo "== real_gate DRY ==  GEN=$GEN  N=$N  base=$(basename "$BASE")  cand=$(basename "$CAND")"
-	echo "server: $(health && loaded_alias || echo DOWN)"
+	echo "execution: network=$GATE_NETWORK model_control=$MODEL_CONTROL provider=${PI_PROVIDER:-auto} model=${PI_MODEL:-auto}"
+	if [[ "$MODEL_CONTROL" == "llama" ]]; then
+		echo "server: $(health && loaded_alias || echo DOWN)"
+	else
+		echo "server: pi-native (llama health/warm-up bypassed)"
+	fi
 	cfgs="[base, cand]"; nextcmd="./prompt-lab/fleet_report.py $GEN --baseline base --candidate cand"
 	[[ "$CALIB" == 1 ]] && cfgs="[base only]" && nextcmd="./prompt-lab/calibrate.py $GEN"
 	echo "would run, per config in $cfgs:  ${TASKS[*]}  x ${N} reps  -> gate-pass rows -> $RESULTS"
@@ -167,7 +185,9 @@ cleanup() {
 }
 trap 'echo "[real_gate] interrupted — tearing down in-flight pi" >&2; cleanup; exit 130' INT TERM
 
-health || { echo "no server on :8080" >&2; exit 1; }
+if [[ "$MODEL_CONTROL" == "llama" ]]; then
+	health || { echo "[real_gate] no llama-compatible server at $LLAMA_URL" >&2; exit 1; }
+fi
 # Behind a router (llama-swap) /v1/models lists the whole zoo — [0] would mislabel
 # every row. PI_MODEL is the requested member; it IS the row label there.
 if [[ -n "$PI_MODEL" ]]; then
@@ -176,6 +196,22 @@ else
 	MODEL="$(loaded_alias)"; [[ -n "$MODEL" ]] || MODEL=unknown
 	MODEL="$(basename "$MODEL" .gguf)"; MODEL="${MODEL//[^a-zA-Z0-9._-]/-}"  # alias-less servers report the gguf path
 fi
+MODEL_SLUG="${MODEL//[^a-zA-Z0-9._-]/-}"
+
+# Resolve metadata without exposing credentials. Native providers are identified
+# from PI_PROVIDER, a provider-qualified PI_MODEL, or the custom models registry.
+POLICY_JSON="$(python3 "$EXEC_POLICY" --network-mode "$GATE_NETWORK" --model-control "$MODEL_CONTROL" \
+	--model "$MODEL" --provider "$PI_PROVIDER" --llama-url "$LLAMA_URL" --model-ip "$MODEL_IP" \
+	--models-path "${PI_CODING_AGENT_DIR:-$HOME/.pi/agent}/models.json")" || exit 2
+policy_field() { python3 -c 'import json,sys; v=json.loads(sys.argv[1])[sys.argv[2]]; print(int(v) if isinstance(v,bool) else v)' "$POLICY_JSON" "$1"; }
+MODEL_PROVIDER_RESOLVED="$(policy_field provider)"
+ENDPOINT_IDENTITY_SHA256="$(policy_field endpoint_identity_sha256)"
+FINGERPRINT_ENDPOINT="$(policy_field fingerprint_endpoint)"
+NETWORK_AUTHORITATIVE="$(policy_field network_authoritative)"
+NETWORK_AUTHORITY_REASON="$(policy_field authority_reason)"
+PI_SELECT=()
+[[ -n "$PI_PROVIDER" ]] && PI_SELECT+=(--provider "$PI_PROVIDER")
+[[ -n "$PI_MODEL" ]] && PI_SELECT+=(--model "$PI_MODEL")
 [[ "$MODEL" != "$DD" ]] && echo "[real_gate] WARNING: loaded model '$MODEL' != daily driver '$DD'" >&2
 mkdir -p "$RUNS"
 # A direct invocation owns its result file and starts clean. Fleet orchestration
@@ -192,7 +228,7 @@ esac
 # used to aggregate the OLD run's events into the new verdict (audit 2026-07-13).
 # The id lands in workdir names (-> sk) and every result row (-> exact joins).
 RUNID="${RUNID:-$(python3 -c 'import uuid; print(uuid.uuid4().hex[:6])')}"
-echo "== real_gate: model=$MODEL  N=$N  run=$RUNID  tasks=${TASKS[*]} =="
+echo "== real_gate: model=$MODEL provider=$MODEL_PROVIDER_RESOLVED network=$GATE_NETWORK control=$MODEL_CONTROL N=$N run=$RUNID tasks=${TASKS[*]} =="
 
 # Per-session resource guard. A pi session's model runs REMOTELY, but the tools it
 # invokes (node/awk/bash — bigdata literally asks it to write+run node aggregators)
@@ -202,6 +238,18 @@ echo "== real_gate: model=$MODEL  N=$N  run=$RUNID  tasks=${TASKS[*]} =="
 # process group with (a) a memory watchdog that kills the group past a cap and
 # (b) a guaranteed group sweep on exit so nothing orphans. PI_MEM_CAP_GB=0 disables.
 PI_MEM_CAP_GB="${PI_MEM_CAP_GB:-12}"
+
+# INSTRUMENT PROPERTY — do not move this into prompt-lab/configs/*.json.
+# pi-observational-memory void-launches a consolidation AGENT LOOP on agent_start and
+# turn_end with no signal and no timeout (consolidation-trigger.ts:99-105,137). It is
+# uncancellable and outlives pi: the abandoned request keeps generating on the server.
+# Against a single-request-at-a-time endpoint that means the PREVIOUS session's ghost
+# holds the slot when the next one opens -> 58/164 r6 sessions died on their first
+# request with a 24-byte 429, and the main loop queueing behind one idles out at
+# retry.provider.timeoutMs (20m) until PI_TIMEOUT kills it at 30m.
+# PASSIVE=1 short-circuits maybeLaunchConsolidation (consolidation-trigger.ts:120).
+# It must apply IDENTICALLY to both arms (it is the instrument, not a candidate
+# dimension munchkin may flip), hence here and not in a config. Interactive pi keeps OM.
 # $1 = prompt, $2 = redirect op (">" fresh session, ">>" retry-append). Sets CHILD.
 run_guarded_session() {
 	local prompt=$1 redir=${2:->}
@@ -209,12 +257,14 @@ run_guarded_session() {
 	set -m   # monitor mode: the backgrounded subshell becomes its own process-group leader
 	if [[ "$redir" == ">>" ]]; then
 		( cd "$wd" || exit
+		  export PI_OBSERVATIONAL_MEMORY_PASSIVE=1
 		  while IFS= read -r line; do [[ "$line" == *=* && "$line" != ENDPOINT=* && "$line" != LABEL=* ]] && export "${line?}"; done <<< "$envlines"
-		  ${sbx[@]+"${sbx[@]}"} timeout -k 30 "$PI_TIMEOUT" pi -p --approve ${PI_MODEL:+--model "$PI_MODEL"} --tools "$tools" "$prompt" ) >> "$wd/run.log" 2>&1 &
+		  ${sbx[@]+"${sbx[@]}"} timeout -k 30 "$PI_TIMEOUT" pi -p --approve ${PI_SELECT[@]+"${PI_SELECT[@]}"} --tools "$tools" "$prompt" ) >> "$wd/run.log" 2>&1 &
 	else
 		( cd "$wd" || exit
+		  export PI_OBSERVATIONAL_MEMORY_PASSIVE=1
 		  while IFS= read -r line; do [[ "$line" == *=* && "$line" != ENDPOINT=* && "$line" != LABEL=* ]] && export "${line?}"; done <<< "$envlines"
-		  ${sbx[@]+"${sbx[@]}"} timeout -k 30 "$PI_TIMEOUT" pi -p --approve ${PI_MODEL:+--model "$PI_MODEL"} --tools "$tools" "$prompt" ) > "$wd/run.log" 2>&1 &
+		  ${sbx[@]+"${sbx[@]}"} timeout -k 30 "$PI_TIMEOUT" pi -p --approve ${PI_SELECT[@]+"${PI_SELECT[@]}"} --tools "$tools" "$prompt" ) > "$wd/run.log" 2>&1 &
 	fi
 	CHILD=$!
 	set +m
@@ -245,7 +295,7 @@ run_guarded_session() {
 run_one() {  # $1=config $2=arm $3=task $4=rep [$5=split] [$6=prompt-variant]
 	local cfg="$1" pat="$2" task="$3" rep="$4" split="${5:-val}" variant="${6:-canonical}"
 	local variant_slug="${variant//[^a-zA-Z0-9._-]/-}"
-	local wd="$RUNS/$GEN-$RUNID-$MODEL-$pat-$task-$rep"
+	local wd="$RUNS/$GEN-$RUNID-$MODEL_SLUG-$pat-$task-$rep"
 	[[ "$variant" != "canonical" ]] && wd="$wd-$variant_slug"
 	local fix; fix="$(fixture_for "$task")"
 	local rowctx="$wd.row-context.json"
@@ -261,12 +311,14 @@ run_one() {  # $1=config $2=arm $3=task $4=rep [$5=split] [$6=prompt-variant]
 	# server died mid-sweep (e.g. OOM): wait for it to come back (server side should
 	# auto-restart) instead of killing a multi-hour sweep; abort only past HEALTH_WAIT.
 	local waited=0
-	while ! health; do
-		[[ "$waited" -eq 0 ]] && echo "[real_gate] $LLAMA_URL down before $pat/$task — waiting up to ${HEALTH_WAIT}s for recovery" >&2
-		[[ "$waited" -ge "$HEALTH_WAIT" ]] && { echo "[real_gate] server still down after ${waited}s — aborting" >&2; exit 1; }
-		sleep 30; waited=$((waited + 30))
-	done
-	[[ "$waited" -gt 0 ]] && echo "[real_gate] server back after ~${waited}s — resuming" >&2
+	if [[ "$MODEL_CONTROL" == "llama" ]]; then
+		while ! health; do
+			[[ "$waited" -eq 0 ]] && echo "[real_gate] $LLAMA_URL down before $pat/$task — waiting up to ${HEALTH_WAIT}s for recovery" >&2
+			[[ "$waited" -ge "$HEALTH_WAIT" ]] && { echo "[real_gate] server still down after ${waited}s — aborting" >&2; exit 1; }
+			sleep 30; waited=$((waited + 30))
+		done
+		[[ "$waited" -gt 0 ]] && echo "[real_gate] server back after ~${waited}s — resuming" >&2
+	fi
 
 	# apply the config: writes $wd/.pi/APPEND_SYSTEM.md, returns env lines
 	local envlines; envlines="$(python3 "$CONFIG" --apply "$cfg" --workdir "$wd")"
@@ -297,8 +349,10 @@ run_one() {  # $1=config $2=arm $3=task $4=rep [$5=split] [$6=prompt-variant]
 		sbx=(sandbox-exec -f "$wd/.gate.sb")
 	fi
 
-	ensure_model_loaded || { echo "[real_gate] could not load $MODEL for fingerprinting" >&2; exit 1; }
-	python3 "$FINGERPRINT" capture --endpoint "$LLAMA_URL" --model "$MODEL" --output "$wd/fingerprint-pre.json"
+	if [[ "$MODEL_CONTROL" == "llama" ]]; then
+		ensure_model_loaded || { echo "[real_gate] could not load $MODEL for fingerprinting" >&2; exit 1; }
+	fi
+	python3 "$FINGERPRINT" capture --endpoint "$FINGERPRINT_ENDPOINT" --model "$MODEL" --output "$wd/fingerprint-pre.json"
 	# run pi in the background (own process group + memory watchdog) so the INT trap
 	# can kill it instantly and no model-spawned grandchild can orphan/balloon.
 	run_guarded_session "$task_prompt" ">"
@@ -308,7 +362,21 @@ run_one() {  # $1=config $2=arm $3=task $4=rep [$5=split] [$6=prompt-variant]
 	# whatever the pristine fixture scores). Abort loudly; munchkin hard-stops on it.
 	if grep -q "Connection error." "$wd/run.log" 2>/dev/null; then
 		echo "[real_gate] pi could not reach the model ($pat/$task rep$rep) — aborting, no rows written." >&2
-		echo "[real_gate]   check: LLAMA_URL=$LLAMA_URL reachable from node (macOS Local Network permission?)" >&2
+		echo "[real_gate]   check the selected Pi provider/model credentials and network policy" >&2
+		exit 1
+	fi
+	# A rejected request is a SERVING failure, not a model failure. Left unguarded it
+	# scores the endpoint's concurrency limit as the model's competence: a 429 session
+	# emits ~24 output chars, which trips the low-output check but does NOT abort (only
+	# two CONSECUTIVE near-empty sessions do), so the row fell through and was written
+	# gate=0 — 58/164 r6 rows were this. Refuse the row instead.
+	# Pattern is deliberately the MESSAGE shape, never a bare "429": bigdata aggregates
+	# 4000 numeric records and could legitimately print 429, and a false abort kills a
+	# good run. Observed live content is exactly: 429 "Too many requests"
+	if grep -Eq 'Too many requests|HTTP 429|status[": ]+429|rate.?limit(ed|ing)?\b' "$wd/run.log" 2>/dev/null; then
+		echo "[real_gate] model endpoint rejected the request (429/rate-limit) at $pat/$task rep$rep — aborting, no rows written." >&2
+		echo "[real_gate]   the endpoint serves one request at a time; check for a concurrent caller" >&2
+		echo "[real_gate]   (pi-observational-memory consolidation is the known offender — PASSIVE=1 is set for gate sessions)" >&2
 		exit 1
 	fi
 
@@ -350,7 +418,7 @@ NOTE: a previous attempt in this workdir was stopped for repeating the same fail
 		fi
 		run_guarded_session "$retry_prompt" ">>"
 	fi
-	python3 "$FINGERPRINT" capture --endpoint "$LLAMA_URL" --model "$MODEL" --output "$wd/fingerprint-post.json"
+	python3 "$FINGERPRINT" capture --endpoint "$FINGERPRINT_ENDPOINT" --model "$MODEL" --output "$wd/fingerprint-post.json"
 
 	# grading: restore authoritative tests so the model can't have tampered with them
 	if is_hidden "$task"; then
@@ -394,14 +462,16 @@ NOTE: a previous attempt in this workdir was stopped for repeating the same fail
 		LOW_TOK_STREAK=0
 	fi
 
-	python3 - "$RESULTS" "$MODEL" "$pat" "$task" "$rep" "$gate" "$retried" "$RUNID" "$tin" "$tout" "$output_chars" "$split" "$usage_exact" "${FLEET_EXPECTED_MODELS:-}" "$rowctx" "$wd/fingerprint-pre.json" "$wd/fingerprint-post.json" <<'PY'
-import json,sys
-out,model,pat,task,rep,gate,retried,runid,tin,tout,outchars,split,usage_exact,expected_models,ctxpath,prepath,postpath=sys.argv[1:18]
+	python3 - "$RESULTS" "$MODEL" "$pat" "$task" "$rep" "$gate" "$retried" "$RUNID" "$tin" "$tout" "$output_chars" "$split" "$usage_exact" "${FLEET_EXPECTED_MODELS:-}" "$rowctx" "$wd/fingerprint-pre.json" "$wd/fingerprint-post.json" "$GATE_NETWORK" "$MODEL_CONTROL" "$MODEL_PROVIDER_RESOLVED" "$ENDPOINT_IDENTITY_SHA256" "$NETWORK_AUTHORITATIVE" "$NETWORK_AUTHORITY_REASON" "$EXEC_POLICY" <<'PY'
+import importlib.util,json,sys
+out,model,pat,task,rep,gate,retried,runid,tin,tout,outchars,split,usage_exact,expected_models,ctxpath,prepath,postpath,network_mode,model_control,provider,endpoint_sha,network_auth,network_reason,policy_path=sys.argv[1:25]
 ctx=json.load(open(ctxpath)); pre=json.load(open(prepath)); post=json.load(open(postpath))
 stable=pre.get("fingerprint_sha256") == post.get("fingerprint_sha256")
 serving_complete=pre.get("status") == post.get("status") == "complete"
-authoritative=bool(ctx["authoritative"] and stable and serving_complete)
-status="complete" if authoritative else ("exploratory" if ctx.get("exploratory_override") else "incomplete")
+execution_authoritative=bool(int(network_auth))
+spec=importlib.util.spec_from_file_location("execution_policy", policy_path); policy=importlib.util.module_from_spec(spec); spec.loader.exec_module(policy)
+authoritative,status,authority_reason=policy.row_decision(ctx["authoritative"],ctx["authority_reason"],stable,serving_complete,
+    execution_authoritative,network_reason,ctx.get("exploratory_override",False))
 exact=bool(int(usage_exact))
 usage={"source":"provider" if exact else "char_proxy", "exact":exact,
        "input_tokens":int(tin) if exact else None, "output_tokens":int(tout) if exact else None,
@@ -409,7 +479,9 @@ usage={"source":"provider" if exact else "char_proxy", "exact":exact,
 rec={"schema":"pi.eval-row/v2", "task":task,"pattern":pat,"arm":pat,"rep":int(rep),
      "repetition":int(rep),"model":model,"split":split,"score":int(gate),
      "retried":int(retried),"run":runid,"fixture":{"cohort":ctx["cohort"],"version":ctx["version"]},
-     "authoritative":authoritative,"status":status,"authority_reason":ctx["authority_reason"],
+     "authoritative":authoritative,"status":status,"authority_reason":authority_reason,
+     "execution":{"network_mode":network_mode,"model_control":model_control,"provider":provider,
+                  "endpoint_identity_sha256":endpoint_sha,"network_authoritative":execution_authoritative},
      "prompt":{"variant":ctx["prompt_variant"],"semantic_group":ctx["semantic_group"],"sha256":ctx["prompt_sha256"]},
      "serving":{"pre":pre,"post":post,"stable":stable},"usage":usage,
      # compatibility aliases for historical readers; dimensions stay honest.
@@ -425,36 +497,42 @@ PY
 run_one_shot() { # $1=task $2=rep $3=variant; always diagnostic robustness split
 	local task="$1" rep="$2" variant="$3" pat="one-shot" split="robustness"
 	local slug="${variant//[^a-zA-Z0-9._-]/-}"
-	local wd="$RUNS/$GEN-$RUNID-$MODEL-$pat-$task-$rep-$slug"
+	local wd="$RUNS/$GEN-$RUNID-$MODEL_SLUG-$pat-$task-$rep-$slug"
 	rm -rf "$wd"; mkdir -p "$wd"
 	local rowctx="$wd/row-context.json" result="$wd/control.json"
 	local context_args=(); [[ "$EXPLORATORY" == 1 ]] && context_args+=(--exploratory)
 	python3 "$FIXTURE_META" row-context "$task" --variant "$variant" ${context_args[@]+"${context_args[@]}"} > "$rowctx"
 	local eligible; eligible="$(python3 -c 'import json,sys; print(int(json.load(open(sys.argv[1]))["one_shot"]["eligible"]))' "$rowctx")"
-	python3 "$FINGERPRINT" capture --endpoint "$LLAMA_URL" --model "$MODEL" --output "$wd/fingerprint-pre.json"
+	[[ "$MODEL_CONTROL" == "pi-native" ]] && eligible=0
+	python3 "$FINGERPRINT" capture --endpoint "$FINGERPRINT_ENDPOINT" --model "$MODEL" --output "$wd/fingerprint-pre.json"
 	if [[ "$eligible" == 1 ]]; then
-		python3 "$HERE/prompt-lab/one_shot_control.py" "$task" --variant "$variant" --endpoint "$LLAMA_URL" --model "$MODEL" --output "$result" >/dev/null || true
+		python3 "$HERE/prompt-lab/one_shot_control.py" "$task" --variant "$variant" --endpoint "$FINGERPRINT_ENDPOINT" --model "$MODEL" --output "$result" >/dev/null || true
 	else
-		python3 - "$result" <<'PY'
+		python3 - "$result" "$MODEL_CONTROL" <<'PY'
 import json,sys
-json.dump({"score":0,"requests":0,"error":"fixture context exceeds 48 KiB or is explicitly ineligible",
+reason="pi-native providers are not supported by the true direct one-shot arm" if sys.argv[2]=="pi-native" else "fixture context exceeds 48 KiB or is explicitly ineligible"
+json.dump({"score":0,"requests":0,"error":reason,
            "usage":{"source":"missing","exact":False,"input_tokens":None,"output_tokens":None,"output_chars":0}},open(sys.argv[1],"w"))
 PY
 	fi
-	python3 "$FINGERPRINT" capture --endpoint "$LLAMA_URL" --model "$MODEL" --output "$wd/fingerprint-post.json"
-	python3 - "$RESULTS" "$MODEL" "$task" "$rep" "$RUNID" "$rowctx" "$result" "$wd/fingerprint-pre.json" "$wd/fingerprint-post.json" "$eligible" <<'PY'
-import json,sys
-out,model,task,rep,runid,ctxp,resultp,prep,postp,eligible=sys.argv[1:11]
+	python3 "$FINGERPRINT" capture --endpoint "$FINGERPRINT_ENDPOINT" --model "$MODEL" --output "$wd/fingerprint-post.json"
+	python3 - "$RESULTS" "$MODEL" "$task" "$rep" "$RUNID" "$rowctx" "$result" "$wd/fingerprint-pre.json" "$wd/fingerprint-post.json" "$eligible" "$GATE_NETWORK" "$MODEL_CONTROL" "$MODEL_PROVIDER_RESOLVED" "$ENDPOINT_IDENTITY_SHA256" "$NETWORK_AUTHORITATIVE" "$NETWORK_AUTHORITY_REASON" "$EXEC_POLICY" <<'PY'
+import importlib.util,json,sys
+out,model,task,rep,runid,ctxp,resultp,prep,postp,eligible,network_mode,model_control,provider,endpoint_sha,network_auth,network_reason,policy_path=sys.argv[1:18]
 ctx=json.load(open(ctxp)); result=json.load(open(resultp)); pre=json.load(open(prep)); post=json.load(open(postp))
 stable=pre.get("fingerprint_sha256")==post.get("fingerprint_sha256")
 complete=pre.get("status")==post.get("status")=="complete"
-authoritative=bool(ctx["authoritative"] and stable and complete and eligible=="1")
-status="ineligible" if eligible!="1" else "complete" if authoritative else "exploratory" if ctx.get("exploratory_override") else "incomplete"
+execution_authoritative=bool(int(network_auth))
+spec=importlib.util.spec_from_file_location("execution_policy", policy_path); policy=importlib.util.module_from_spec(spec); spec.loader.exec_module(policy)
+authoritative,status,authority_reason=policy.row_decision(ctx["authoritative"],ctx["authority_reason"],stable,complete,
+    execution_authoritative,network_reason,ctx.get("exploratory_override",False),eligible=="1")
 usage=result["usage"]
 rec={"schema":"pi.eval-row/v2","task":task,"pattern":"one-shot","arm":"one-shot","rep":int(rep),"repetition":int(rep),
      "model":model,"split":"robustness","score":int(result["score"]),"run":runid,
      "fixture":{"cohort":ctx["cohort"],"version":ctx["version"]},"authoritative":authoritative,"status":status,
-     "authority_reason":ctx["authority_reason"],"prompt":{"variant":ctx["prompt_variant"],"semantic_group":ctx["semantic_group"],"sha256":ctx["prompt_sha256"]},
+     "authority_reason":authority_reason,"prompt":{"variant":ctx["prompt_variant"],"semantic_group":ctx["semantic_group"],"sha256":ctx["prompt_sha256"]},
+     "execution":{"network_mode":network_mode,"model_control":model_control,"provider":provider,
+                  "endpoint_identity_sha256":endpoint_sha,"network_authoritative":execution_authoritative},
      "serving":{"pre":pre,"post":post,"stable":stable},"usage":usage,"control":{"requests":result["requests"],"error":result.get("error")},
      "out_chars":usage["output_chars"],"in_tok":usage["input_tokens"] or 0,"out_tok":usage["output_tokens"] or 0,
      "token_usage_exact":usage["exact"]}

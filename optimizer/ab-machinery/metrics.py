@@ -12,7 +12,7 @@ Usage:  metrics.py <workdir>     # prints a TSV row (see COLS)
 """
 import json, os, sys, glob
 
-COLS = ["turns", "edits", "edit_err", "reads", "subag", "in_tok", "out_tok", "lb_fires", "vg_fires", "usage_exact"]
+COLS = ["turns", "edits", "edit_err", "reads", "subag", "in_tok", "out_tok", "lb_fires", "vg_fires", "usage_exact", "output_chars"]
 
 def _text_of(content):
     """Collect text from a message's content (string, or list of blocks)."""
@@ -57,12 +57,10 @@ def parse_session(lines):
         elif role in ("toolResult", "tool"):
             err = m.get("isError") or any(c.get("isError") for c in (m.get("content") or []) if isinstance(c, dict))
             if err and last_call == "edit": edit_err += 1
-    # ponytail: remote-llamacpp sessions record all-zero usage; keep a character
-    # proxy for degraded-session detection, but mark it ineligible for token cost.
+    # Remote llama.cpp sessions may record all-zero usage. Characters remain a
+    # health proxy in their own dimension; they must never occupy a token field.
     usage_exact = int(tin > 0 and tout > 0)
-    if not usage_exact:
-        tout = out_chars
-    return dict(zip(COLS, [turns, edits, edit_err, reads, subag, tin, tout, lb, vg, usage_exact]))
+    return dict(zip(COLS, [turns, edits, edit_err, reads, subag, tin, tout, lb, vg, usage_exact, out_chars]))
 
 def session_file_for(workdir):
     """Newest session jsonl whose session dir mentions this run (ab-symbolect rule)."""
@@ -94,15 +92,18 @@ def selftest():
     ]
     c = parse_session(syn)
     exp = {"turns": 3, "edits": 1, "edit_err": 1, "reads": 2, "subag": 1,
-           "in_tok": 30, "out_tok": 13, "lb_fires": 1, "vg_fires": 1, "usage_exact": 1}
+           "in_tok": 30, "out_tok": 13, "lb_fires": 1, "vg_fires": 1, "usage_exact": 1,
+           "output_chars": len(str({})) * 0}
+    # The synthetic calls have no arguments/text, hence zero output characters.
     assert c == exp, f"{c} != {exp}"
-    assert as_tsv(c) == "3\t1\t1\t2\t1\t30\t13\t1\t1\t1", as_tsv(c)
-    # zero-usage session (remote-llamacpp) -> out_tok falls back to chars
+    assert as_tsv(c) == "3\t1\t1\t2\t1\t30\t13\t1\t1\t1\t0", as_tsv(c)
+    # zero-usage session keeps token counts at zero and reports a char proxy separately
     zu = [json.dumps({"type": "message", "message": {"role": "assistant", "usage": {"input": 0, "output": 0},
           "content": [{"type": "thinking", "thinking": "hm"},
                       {"type": "toolCall", "name": "edit", "arguments": {"path": "x"}}]}})]
     z = parse_session(zu)
-    assert z["out_tok"] == 2 + len(str({"path": "x"})), z
+    assert z["out_tok"] == 0, z
+    assert z["output_chars"] == 2 + len(str({"path": "x"})), z
     assert z["usage_exact"] == 0, z
     print("metrics selftest: OK", as_tsv(c))
 

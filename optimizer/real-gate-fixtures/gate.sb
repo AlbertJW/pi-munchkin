@@ -1,12 +1,20 @@
 ;; Seatbelt write-jail for headless GATE pi sessions (real_gate.sh run_one).
 ;; Pattern from r/PiCodingAgent's agent-lock (BPF-LSM, Linux-only) adopted macOS-native.
-;; Philosophy: allow ordinary reads/exec/network/signals, fence WRITES to the task
+;; Philosophy: allow ordinary reads/exec/signals, fence WRITES to the task
 ;; workdir + tmp + pi's own state, and kernel-deny reads of the entire evaluation
-;; harness (including hidden graders AND Git objects). Rendered per run: real_gate.sh substitutes the absolute paths below
+;; harness (including hidden graders AND Git objects). Network is denied except
+;; for the model endpoint. Only a loopback endpoint is contamination-resistant;
+;; remote hosts require a port-scoped wildcard and are marked non-authoritative.
+;; Rendered per run: real_gate.sh substitutes the absolute paths below
 ;; (Seatbelt has no env vars).
 (version 1)
 (allow default)
 (deny file-read* (subpath "__HARNESS__"))
+(deny network*)
+;; __MODEL_HOST__ is "localhost" for a loopback model (tight default) and "*"
+;; for a remote model — Seatbelt cannot pin a raw IP literal, so a remote box is
+;; reached via a PORT-PINNED wildcard host; all other destinations stay denied.
+(allow network-outbound (remote ip "__MODEL_HOST__:__MODEL_PORT__"))
 (deny file-write*)
 (allow file-write*
   (subpath "__WORKDIR__")

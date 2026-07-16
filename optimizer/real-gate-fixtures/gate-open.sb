@@ -1,0 +1,17 @@
+;; Seatbelt filesystem jail for exploratory real_gate sessions that require
+;; unrestricted network access (native cloud providers, DNS, HTTPS, network tools).
+;; Network is deliberately left at the profile's default allow. Result rows using
+;; this profile are always non-authoritative.
+(version 1)
+(allow default)
+(deny file-read* (subpath "__HARNESS__"))
+(deny file-write*)
+(allow file-write*
+  (subpath "__WORKDIR__")
+  (subpath "/private/tmp")
+  (subpath "/private/var/folders")
+  (subpath "__PI_STATE__")
+  (literal "/dev/null")
+  (literal "/dev/dtracehelper")
+  (subpath "/dev/fd")
+  (literal "/dev/tty"))

@@ -1,8 +1,9 @@
-import { readFile } from "node:fs/promises";
+import { createHash } from "node:crypto";
+import { readFile, realpath, stat } from "node:fs/promises";
 import { Type } from "typebox";
 import { defineTool, type ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { resolveReadPath } from "../lib/context-inlet.ts";
-import { MAX_MATCHES, MAX_SPAN_LINES, readSpan, searchSpans } from "../lib/span-index.ts";
+import { buildSearchReceipt, MAX_MATCHES, MAX_SPAN_LINES, readSpan, searchSpans } from "../lib/span-index.ts";
 import { record } from "../lib/telemetry.ts";
 
 // span-tools: the map-reduce MINIMAL prototype (targeted-question path only).
@@ -16,16 +17,23 @@ import { record } from "../lib/telemetry.ts";
 
 const ENABLED = process.env.SPAN_TOOLS === "on";
 
-const cache = new Map<string, { mtimeMs: number; text: string }>();
+type LoadedFile = { mtimeMs: number; text: string; normalizedPath: string; size: number; sha256: string };
+const cache = new Map<string, LoadedFile>();
 
-async function load(path: string): Promise<string> {
-	const { stat } = await import("node:fs/promises");
+async function load(path: string): Promise<LoadedFile> {
 	const info = await stat(path);
 	const hit = cache.get(path);
-	if (hit && hit.mtimeMs === info.mtimeMs) return hit.text;
-	const text = await readFile(path, "utf8");
-	cache.set(path, { mtimeMs: info.mtimeMs, text });
-	return text;
+	if (hit && hit.mtimeMs === info.mtimeMs && hit.size === info.size) return hit;
+	const bytes = await readFile(path);
+	const value: LoadedFile = {
+		mtimeMs: info.mtimeMs,
+		text: bytes.toString("utf8"),
+		normalizedPath: await realpath(path),
+		size: bytes.byteLength,
+		sha256: createHash("sha256").update(bytes).digest("hex"),
+	};
+	cache.set(path, value);
+	return value;
 }
 
 export default function (pi: ExtensionAPI) {
@@ -50,11 +58,23 @@ export default function (pi: ExtensionAPI) {
 			}),
 			async execute(_id, params, _signal, _onUpdate, ctx) {
 				const path = resolveReadPath(ctx.cwd, params.path);
-				const text = await load(path);
-				const { matches, total } = searchSpans(text, params.pattern);
+				const loaded = await load(path);
+				const { matches, total, totalLinesScanned, complete } = searchSpans(loaded.text, params.pattern);
+				const receipt = buildSearchReceipt({
+					requested_file: params.path,
+					normalized_file: loaded.normalizedPath,
+					sha256: loaded.sha256,
+					size_bytes: loaded.size,
+					bytes_examined: loaded.size,
+					total_lines_scanned: totalLinesScanned,
+					matches: total,
+					shown_matches: matches.length,
+					complete,
+				});
 				record("span-tools", "search", { total, shown: matches.length });
 				const body = matches.map((m) => `${m.line}:${m.text}`).join("\n");
-				return { content: [{ type: "text" as const, text: `[${total} matches, showing ${matches.length}]\n${body}` }], details: {} };
+				const header = `[receipt ${receipt.schema} sha256=${receipt.sha256.slice(0, 12)} bytes=${receipt.bytes_examined}/${receipt.size_bytes} lines=${receipt.total_lines_scanned} complete=${receipt.complete}; ${total} matches, showing ${matches.length}]`;
+				return { content: [{ type: "text" as const, text: `${header}\n${body}` }], details: { receipt } };
 			},
 		}),
 	);
@@ -74,8 +94,8 @@ export default function (pi: ExtensionAPI) {
 			}),
 			async execute(_id, params, _signal, _onUpdate, ctx) {
 				const path = resolveReadPath(ctx.cwd, params.path);
-				const text = await load(path);
-				const { header, body, start, end } = readSpan(text, params.start_line, params.end_line);
+				const loaded = await load(path);
+				const { header, body, start, end } = readSpan(loaded.text, params.start_line, params.end_line);
 				record("span-tools", "read", { start, end });
 				return { content: [{ type: "text" as const, text: `${header}\n${body}` }], details: {} };
 			},

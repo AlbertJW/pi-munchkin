@@ -129,10 +129,13 @@ def report(gen_prefix, results_dir=RESULTS, telemetry_file=TELEMETRY, sessions_d
             run = r.get("run", "")
             sk = f"{gen}-{run}-{r.get('model')}-{r.get('pattern')}-{r.get('task')}-{r.get('rep')}"
             tel = telemetry_counts(sk, telemetry_file)
+            exact = (r.get("usage") or {}).get("exact", r.get("token_usage_exact")) is True
             d = {"recovered": r["score"], "injected": tel.get("chaos.injected", 0),
                  "lb": sum(v for k, v in tel.items() if k.startswith("loop-breaker.")),
                  "aborted": sum(v for k, v in tel.items() if k.endswith("outcome-abort")),
-                 "turns_to_rec": None, "tokens": r.get("in_tok", 0) + r.get("out_tok", r.get("out_chars", 0)),
+                 "turns_to_rec": None,
+                 "tokens": (r.get("in_tok", 0) + r.get("out_tok", 0)) if exact else None,
+                 "output_chars": r.get("out_chars", (r.get("usage") or {}).get("output_chars", 0)),
                  "task": r.get("task"), "rep": r.get("rep")}
             if fault in CHAOS_FAULTS:
                 tool, snippet = CHAOS_FAULTS[fault]
@@ -177,9 +180,13 @@ def render(rows):
             lb = sum(d["lb"] for d in valid)
             if lb:
                 bits.append(f"lb={lb}")
-            toks = [d["tokens"] for d in valid]
+            toks = [d["tokens"] for d in valid if d["tokens"] is not None]
             if toks:
                 bits.append(f"tok(mean)={sum(toks) // len(toks)}")
+            else:
+                chars = [d["output_chars"] for d in valid]
+                if chars:
+                    bits.append(f"output-chars(mean)={sum(chars) // len(chars)} [health proxy]")
             flag = f"  [{n_inv} INVALID rep(s): fault never fired]" if n_inv else ""
             print(f"   {f:13} {'  '.join(bits)}{flag}")
 

@@ -14,10 +14,41 @@ export function contentTag(text: string): string {
 
 export type SpanMatch = { line: number; text: string };
 
+export type SpanSearch = {
+	matches: SpanMatch[];
+	total: number;
+	totalLinesScanned: number;
+	complete: boolean;
+};
+
+export type ToolReceiptV1 = {
+	schema: "pi.tool-receipt/v1";
+	operation: "search_spans";
+	requested_file: string;
+	normalized_file: string;
+	sha256: string;
+	size_bytes: number;
+	bytes_examined: number;
+	total_lines_scanned: number;
+	matches: number;
+	shown_matches: number;
+	complete: boolean;
+};
+
+export function buildSearchReceipt(meta: Omit<ToolReceiptV1, "schema" | "operation">): ToolReceiptV1 {
+	return { schema: "pi.tool-receipt/v1", operation: "search_spans", ...meta };
+}
+
+function searchableLines(text: string): string[] {
+	if (text.length === 0) return [];
+	const body = text.endsWith("\n") ? text.slice(0, -1) : text;
+	return body.split("\n");
+}
+
 // Regex search over lines; capped matches, capped per-line excerpt, capped total bytes.
-export function searchSpans(text: string, pattern: string, maxMatches = MAX_MATCHES): { matches: SpanMatch[]; total: number } {
+export function searchSpans(text: string, pattern: string, maxMatches = MAX_MATCHES): SpanSearch {
 	const re = new RegExp(pattern);
-	const lines = text.split("\n");
+	const lines = searchableLines(text);
 	const matches: SpanMatch[] = [];
 	let total = 0;
 	let bytes = 0;
@@ -26,11 +57,12 @@ export function searchSpans(text: string, pattern: string, maxMatches = MAX_MATC
 		total++;
 		if (matches.length >= maxMatches) continue; // keep counting total, stop collecting
 		const excerpt = lines[i].length > MATCH_TEXT_CHARS ? `${lines[i].slice(0, MATCH_TEXT_CHARS)}…` : lines[i];
-		bytes += excerpt.length;
-		if (bytes > MAX_OUT_BYTES) break;
+		const excerptBytes = Buffer.byteLength(excerpt, "utf8");
+		if (bytes + excerptBytes > MAX_OUT_BYTES) continue; // keep scanning and counting
+		bytes += excerptBytes;
 		matches.push({ line: i + 1, text: excerpt });
 	}
-	return { matches, total };
+	return { matches, total, totalLinesScanned: lines.length, complete: true };
 }
 
 // Bounded slice with provenance. 1-indexed inclusive; clamps to caps and file bounds.

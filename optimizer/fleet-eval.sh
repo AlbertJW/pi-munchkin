@@ -19,7 +19,7 @@ VARIANTS="${VARIANTS:-A,F}"          # A = live prompts, F = none (governor on v
 N="${N:-4}"                          # promptlab reps per cell
 HEALTH_TIMEOUT="${HEALTH_TIMEOUT:-300}"
 
-DEFAULT_FLEET=(qwen36-35b-iq3s mellum2-12b-thinking)
+DEFAULT_FLEET=(qwen36-35b-iq3s)
 BASE="${BASE:-$HERE/prompt-lab/configs/baseline.json}"
 CAND="${CAND:-$HERE/prompt-lab/configs/cand-cot.json}"
 DRY=0; NOLAUNCH=0; RT=0; RG=0; FLEET=()
@@ -35,6 +35,14 @@ done
 [[ ${#FLEET[@]} -eq 0 ]] && FLEET=("${DEFAULT_FLEET[@]}")
 
 LLAMA_URL="${LLAMA_URL:-http://127.0.0.1:8080}"
+
+# fleet-eval drives launchers directly on :8080 — the llama-swap router must not be up.
+if pgrep -f "bin/llama-swap" >/dev/null 2>&1; then
+	echo "llama-swap router is running and owns :8080. Stop it first:" >&2
+	echo "  $HERE/run-llama-swap.sh stop     (restart after the sweep: run-llama-swap.sh)" >&2
+	exit 1
+fi
+
 health() { curl -fsS -m 5 "$LLAMA_URL/health" >/dev/null 2>&1; }
 loaded_alias() { curl -fsS -m 5 "$LLAMA_URL/v1/models" 2>/dev/null | python3 -c 'import sys,json;d=json.load(sys.stdin)["data"];print(d[0]["id"] if d else "")' 2>/dev/null; }
 

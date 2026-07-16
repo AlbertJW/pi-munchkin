@@ -1,139 +1,154 @@
 #!/usr/bin/env python3
-"""trajectory_check: assert the agent took a SANE PATH, not just that the final
-state passed. A gate that scores only the end file state can be fooled by a lucky
-broken trajectory — the model infers an answer it never actually derived (Pydantic
-Evals' HasMatchingSpan point, 2026-07-14 disposition). This asserts against the
-session jsonl (the tool sequence the agent actually ran), per task.
+"""Fail-closed trajectory assertions backed only by execution-time receipts.
 
-Currently the sharp case is `bigdata` (the map-reduce task): a 305KB JSONL query
-that MUST be answered by scanning the whole file. A model that reads head/tail and
-guesses can hit the recomputing grader by luck; the trajectory assertion requires a
-real full-file scan (rg/awk/wc/jq/python over the data dir), not a peek.
-
-Grader-integrity feature (like t2-check.mjs), not an A/B candidate: TRAJECTORY=on
-in real_gate ANDs this into the gate. Run base off-vs-on once and the pass-rate
-delta IS the lucky-pass rate; adopt as default if material.
-
-  trajectory_check.py <workdir> <task>   # exit 0 = sane path (or no rule), 1 = violated
-  trajectory_check.py --selftest
+`search_spans` records a `pi.tool-receipt/v1` object in the matching tool-result
+row.  Call arguments, visible headers, and arbitrary shell strings are not
+evidence.  c23 currently requires an exhaustive receipt for bigdata's corpus.
 """
-import json, os, re, sys
+from __future__ import annotations
+
+import hashlib
+import json
+import os
+import sys
+import tempfile
+from pathlib import Path
 
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "ab-machinery"))
-from metrics import session_file_for  # reuse the exact workdir->session resolution  # noqa: E402
-
-# A full-file scan: a streaming/aggregating operation over a path, NOT merely the
-# presence of an executable name. `python -c 'open(x).readline()'` and
-# `head x | wc -l` were false receipts under the old lexical test.
-SHELL_SCAN_RE = re.compile(r"\b(cat|rg|grep|awk|wc|jq|sort|uniq)\b[^\n;]*\b(?:data/[^\s|;]+|[^\s|;]+\.jsonl)\b")
-PY_FULL_RE = re.compile(r"\b(open|Path)\s*\([^)]*(?:data/|\.jsonl)[^)]*\)\s*\.(?:read|read_text|read_bytes)\s*\(")
-PY_ITER_RE = re.compile(r"\bfor\s+\w+\s+in\s+open\s*\([^)]*(?:data/|\.jsonl)")
-NODE_FULL_RE = re.compile(r"\breadFileSync\s*\([^)]*(?:data/|\.jsonl)")
-PEEK_ONLY_RE = re.compile(r"\b(head|tail|sed\s+-n|less|more)\b")
+from metrics import session_file_for  # noqa: E402
 
 
-def _bash_commands(msgs):
-    for m in msgs:
-        if m.get("role") != "assistant":
+def file_facts(path: Path) -> dict:
+    data = path.read_bytes()
+    if not data:
+        lines = 0
+    else:
+        lines = data.count(b"\n") + (0 if data.endswith(b"\n") else 1)
+    return {
+        "path": str(path.resolve()),
+        "sha256": hashlib.sha256(data).hexdigest(),
+        "size": len(data),
+        "lines": lines,
+    }
+
+
+def _calls_and_results(msgs):
+    calls = {}
+    results = []
+    for msg in msgs:
+        role = msg.get("role")
+        if role == "assistant":
+            for item in msg.get("content") or []:
+                if isinstance(item, dict) and item.get("type") == "toolCall":
+                    calls[str(item.get("id", ""))] = {
+                        "name": str(item.get("name", "")).lower(),
+                        "arguments": item.get("arguments") or {},
+                    }
+        elif role == "toolResult":
+            results.append(msg)
+    return calls, results
+
+
+def validate_search_receipt(call, result, expected):
+    if not call or call.get("name") != "search_spans":
+        return False, "result has no matching search_spans call id"
+    if result.get("isError"):
+        return False, "search_spans result is an error"
+    receipt = ((result.get("details") or {}).get("receipt") or {})
+    if receipt.get("schema") != "pi.tool-receipt/v1" or receipt.get("operation") != "search_spans":
+        return False, "missing pi.tool-receipt/v1 execution receipt"
+    checks = {
+        "normalized file": receipt.get("normalized_file") == expected["path"],
+        "sha256": receipt.get("sha256") == expected["sha256"],
+        "size": receipt.get("size_bytes") == expected["size"],
+        "bytes examined": receipt.get("bytes_examined") == expected["size"],
+        "line count": receipt.get("total_lines_scanned") == expected["lines"],
+        "complete": receipt.get("complete") is True,
+    }
+    failed = [name for name, ok in checks.items() if not ok]
+    if failed:
+        return False, "receipt mismatch: " + ", ".join(failed)
+    return True, "verified exhaustive search_spans receipt"
+
+
+def check_bigdata(msgs, corpus: Path, expected_corpus: Path | None = None):
+    if not corpus.is_file():
+        return False, f"expected corpus missing: {corpus}"
+    expected = file_facts(expected_corpus or corpus)
+    expected["path"] = str(corpus.resolve())
+    calls, results = _calls_and_results(msgs)
+    reasons = []
+    for result in results:
+        call = calls.get(str(result.get("toolCallId", "")))
+        if not call or call.get("name") != "search_spans":
             continue
-        for c in m.get("content") or []:
-            if isinstance(c, dict) and c.get("type") == "toolCall" and (c.get("name") or "").lower() == "bash":
-                yield str((c.get("arguments") or {}).get("command", ""))
-
-
-def _tool_calls(msgs):
-    for m in msgs:
-        if m.get("role") != "assistant":
-            continue
-        for c in m.get("content") or []:
-            if isinstance(c, dict) and c.get("type") == "toolCall":
-                yield (c.get("name") or "").lower(), c.get("arguments") or {}
-
-
-def command_scans(cmd):
-    """Conservative proof predicate: false negatives are preferable to lucky-pass
-    false positives because this is an opt-in grader-integrity assertion."""
-    if PEEK_ONLY_RE.search(cmd):
-        return False
-    if SHELL_SCAN_RE.search(cmd):
-        return True
-    if re.search(r"\bpython3?\b", cmd) and (PY_FULL_RE.search(cmd) or PY_ITER_RE.search(cmd)):
-        return True
-    return bool(re.search(r"\bnode\b", cmd) and NODE_FULL_RE.search(cmd))
-
-
-def check_bigdata(msgs):
-    """Pass iff SOME bash command scans the data file (not merely peeks). A run that
-    only ever head/tail'd the data and still passed the grader was lucky."""
-    if any(command_scans(cmd) for cmd in _bash_commands(msgs)):
-        return True, "scanned the data file"
-    # Span search is itself an exhaustive rg-style scan and may replace bash in
-    # candidate palettes. A bounded read/read_span is intentionally not enough.
-    for name, args in _tool_calls(msgs):
-        path = str(args.get("path", ""))
-        if name == "search_spans" and ("data/" in path or path.endswith(".jsonl")):
-            return True, "searched the data file exhaustively with search_spans"
-    return False, "no full-file scan of the data — answer likely inferred from a head/tail peek"
-
-
-CHECKS = {"bigdata": check_bigdata}
+        ok, why = validate_search_receipt(call, result, expected)
+        if ok:
+            return True, why
+        reasons.append(why)
+    if reasons:
+        return False, reasons[-1]
+    return False, "no successful receipt-backed search_spans result for the corpus"
 
 
 def load_msgs(session_path):
     msgs = []
-    for line in open(session_path):
-        try:
-            d = json.loads(line)
-        except ValueError:
-            continue
-        if d.get("type") == "message":
-            msgs.append(d["message"])
+    with open(session_path, encoding="utf-8") as fh:
+        for line in fh:
+            try:
+                row = json.loads(line)
+            except ValueError:
+                continue
+            if row.get("type") == "message":
+                msgs.append(row["message"])
     return msgs
 
 
 def check(workdir, task):
-    """(ok, reason). No rule for a task -> ok (the check only ever ADDS strictness)."""
-    fn = CHECKS.get(task)
-    if fn is None:
+    if task != "bigdata":
         return True, "no trajectory rule for this task"
     session = session_file_for(workdir)
     if not session:
         return False, "no session found — trajectory evidence unavailable (fail closed)"
-    return fn(load_msgs(session))
+    canonical = Path(__file__).resolve().parents[1] / "real-gate-fixtures/bigdata/data/events.jsonl"
+    return check_bigdata(load_msgs(session), Path(workdir) / "data/events.jsonl", canonical)
 
 
 def selftest():
-    def msgs_with(cmds):
-        return [{"role": "assistant", "content": [
-            {"type": "toolCall", "name": "bash", "arguments": {"command": c}}]} for c in cmds]
+    with tempfile.TemporaryDirectory() as td:
+        corpus = Path(td) / "events.jsonl"
+        corpus.write_text('{"x":"é"}\n{"x":2}\n', encoding="utf-8")
+        facts = file_facts(corpus)
+        call_id = "call-1"
 
-    # scanned the whole file -> pass
-    ok, _ = check_bigdata(msgs_with(["wc -l data/big.jsonl", "cat src/index.js"]))
-    assert ok
-    ok, _ = check_bigdata(msgs_with(["python3 -c 'import json; [json.loads(l) for l in open(\"data/big.jsonl\")]'"]))
-    assert ok
-    ok, _ = check_bigdata(msgs_with(["rg 'error' data/big.jsonl | wc -l"]))
-    assert ok
+        def messages(receipt=None, *, result=True, call=True, error=False):
+            out = []
+            if call:
+                out.append({"role": "assistant", "content": [{
+                    "type": "toolCall", "id": call_id, "name": "search_spans",
+                    "arguments": {"path": "data/events.jsonl", "pattern": "."},
+                }]})
+            if result:
+                out.append({"role": "toolResult", "toolCallId": call_id, "toolName": "search_spans",
+                            "details": {"receipt": receipt or {}}, "isError": error})
+            return out
 
-    # executable-name false positives from the prototype must stay rejected
-    ok, _ = check_bigdata(msgs_with(["python3 -c 'print(open(\"data/big.jsonl\").readline())'"]))
-    assert not ok
-    ok, _ = check_bigdata(msgs_with(["head data/big.jsonl | wc -l"]))
-    assert not ok
-
-    # only peeked -> FAIL (the lucky-trajectory case)
-    ok, why = check_bigdata(msgs_with(["head -20 data/big.jsonl", "sed -n '1,5p' data/big.jsonl"]))
-    assert not ok and "peek" in why, why
-    # no data interaction at all -> FAIL
-    ok, _ = check_bigdata(msgs_with(["ls", "cat package.json"]))
-    assert not ok
-
-    # unknown task -> always ok (only adds strictness where a rule exists)
-    ok, why = check("/nonexistent/wd", "t1")
-    assert ok and "no trajectory rule" in why
-    ok, why = check("/nonexistent/wd", "bigdata")
-    assert not ok and "fail closed" in why
-    print("trajectory_check selftest: OK (bigdata scan-vs-peek, no-rule pass-through)")
+        valid = {"schema": "pi.tool-receipt/v1", "operation": "search_spans",
+                 "normalized_file": facts["path"], "sha256": facts["sha256"],
+                 "size_bytes": facts["size"], "bytes_examined": facts["size"],
+                 "total_lines_scanned": facts["lines"], "complete": True}
+        assert check_bigdata(messages(valid), corpus)[0]
+        for field, value in (("sha256", "0" * 64), ("size_bytes", 1),
+                             ("bytes_examined", facts["size"] - 1),
+                             ("total_lines_scanned", 1), ("complete", False),
+                             ("normalized_file", str(Path(td) / "wrong.jsonl"))):
+            bad = dict(valid); bad[field] = value
+            assert not check_bigdata(messages(bad), corpus)[0], field
+        assert not check_bigdata(messages(valid, result=False), corpus)[0]  # argument-only forgery
+        assert not check_bigdata(messages(valid, call=False), corpus)[0]  # orphan result
+        assert not check_bigdata(messages(valid, error=True), corpus)[0]
+        assert check("/missing", "t1")[0]
+    print("trajectory_check selftest: OK (receipt binding, UTF-8 bytes, stale/partial/wrong-file rejection)")
 
 
 if __name__ == "__main__":
@@ -143,6 +158,6 @@ if __name__ == "__main__":
         ok, why = check(sys.argv[1], sys.argv[2])
         if not ok:
             sys.stderr.write(f"[trajectory] {sys.argv[2]}: {why}\n")
-        sys.exit(0 if ok else 1)
+        raise SystemExit(0 if ok else 1)
     else:
         raise SystemExit("usage: trajectory_check.py <workdir> <task> | --selftest")

@@ -20,7 +20,7 @@ Usage:  munchkin.py [--gen m0] [--rounds 3] [--candidates 2] [--n 4] [--tasks t1
         munchkin.py --selftest   # offline loop proof
 GPU cost ≈ rounds × candidates × (tasks × n) agentic sessions on the model — keep small.
 """
-import glob, hashlib, json, os, subprocess, sys, tempfile
+import glob, hashlib, json, os, re, subprocess, sys, tempfile
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 LAB = os.path.join(HERE, "prompt-lab")
@@ -34,6 +34,11 @@ LIVE_GOV = os.path.expanduser("~/.pi/agent/APPEND_SYSTEM.md")
 SATURATED = 0.85
 PLATEAU_STOP = 2
 JOURNAL_CTX = 24  # prior experiments shown to the proposer
+
+def robustness_due(gen_label):
+    """Every fourth candidate round (r3, r7, ...) gets wording + one-shot controls."""
+    match = re.search(r"-r(\d+)-c\d+$", gen_label)
+    return bool(match and (int(match.group(1)) + 1) % 4 == 0)
 
 def _classify(bk, bn, ck, cn):
     sys.path.insert(0, LAB)
@@ -231,14 +236,20 @@ def real_gate_one(cand, tasks, n, gen):
     # orphans the bash gate, which keeps writing rows into the next run's files
     # (seen live: 22 duplicated (task,rep) rows + workdir rm -rf collisions).
     global CURRENT_GATE
-    CURRENT_GATE = subprocess.Popen(["bash", REAL_GATE, "--calibrate", *tasks], env=env, cwd=HERE)
+    gate_args = ["bash", REAL_GATE, "--calibrate"]
+    if robustness_due(gen):
+        gate_args.append("--robustness")
+        print(f"[munchkin] {gen}: scheduled fourth-round robustness + one-shot sweep")
+    gate_args.extend(tasks)
+    CURRENT_GATE = subprocess.Popen(gate_args, env=env, cwd=HERE)
     rc = CURRENT_GATE.wait()
     CURRENT_GATE = None
     GATE_WINDOWS[gen] = (t0, _utc_z())
     if rc != 0:  # aborted gate (server down past HEALTH_WAIT, ^C): never verdict on partial arms
         raise SystemExit(f"[munchkin] gate {gen} aborted (exit {rc}) — fix the server and rerun; no verdict written")
     rows = [json.loads(l) for l in open(out)] if os.path.exists(out) else []
-    base = [r for r in rows if r.get("pattern") == "base"]
+    base = [r for r in rows if r.get("pattern") == "base" and r.get("split", "val") == "val"
+            and (r.get("prompt") or {}).get("variant", "canonical") == "canonical"]
     k = sum(r["score"] for r in base)
     failures = []
     for r in base:
@@ -392,6 +403,8 @@ def _write_outputs(gen, best, ledger, base_cand, new_journal):
 def selftest():
     live_hash_before = hashlib.sha1(open(LIVE_GOV, "rb").read()).hexdigest() if os.path.exists(LIVE_GOV) else None
     dims = load_schema_dims()
+    assert robustness_due("m-r3-c0") and robustness_due("m-r7-c2")
+    assert not robustness_due("m-r2-c0") and not robustness_due("m-r0-base")
 
     # schema guard: out-of-schema / unsafe deltas are dropped, in-schema survive
     clean, dropped = sanitize_delta(
@@ -523,9 +536,14 @@ def main():
             names = [json.load(open(p)).get("name", os.path.basename(p)) for p in paths]
             update_manifest(mpath, names, gen)
             print(f"manifest: {mpath} += {names} x {gen}")
-    sessions = (1 + rounds * k) * len(tasks) * n
+    scheduled = sum(1 for r in range(rounds) if (r + 1) % 4 == 0)
+    # normal candidate=1 session/cell; scheduled candidate adds 3 prompt variants
+    # plus 4 one-shot controls (=7 additional sessions/cell).
+    sessions = (1 + rounds * k + scheduled * k * 7) * len(tasks) * n
     print(f"plan: gen={gen} rounds={rounds} candidates={k} n={n} tasks={tasks}")
     print(f"GPU cost estimate: ~{sessions} agentic sessions on the loaded model (each up to {os.environ.get('PI_TIMEOUT','1800')}s).")
+    if scheduled:
+        print(f"robustness: {scheduled} scheduled candidate round(s), every fourth round")
     if "--dry" in args:
         print("(--dry: nothing run)"); return
     if not os.path.exists(LIVE_GOV):

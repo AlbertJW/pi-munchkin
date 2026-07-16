@@ -25,7 +25,7 @@ LAB = os.path.dirname(os.path.abspath(__file__))
 DD = os.environ.get("FLEET_DD", "qwen36-35b-iq3s")
 OVERFIT_GAP = 0.10
 COST_CEILING = float(os.environ.get("FLEET_COST_CEILING", "1.5"))
-TIERS = {"mellum2-12b-thinking": "small", "qwen36-35b-iq3s": "large"}
+TIERS = {"qwen36-35b-iq3s": "large"}
 
 def wilson(k, n, z=1.96):
     if n == 0: return (0.0, 0.0, 1.0)
@@ -96,7 +96,7 @@ def arm(rows, model, pattern, split):
     but are dimensionally invalid for a token-budget adoption gate."""
     sel = [r for r in rows if r.get("model") == model and r["pattern"] == pattern and r.get("split") == split]
     k = sum(r["score"] for r in sel)
-    exact = bool(sel) and all(r.get("token_usage_exact") is True for r in sel)
+    exact = bool(sel) and all((r.get("usage") or {}).get("exact", r.get("token_usage_exact")) is True for r in sel)
     toks = sum(r["in_tok"] + r["out_tok"] for r in sel) if exact else None
     return k, len(sel), toks
 
@@ -104,6 +104,17 @@ def arm(rows, model, pattern, split):
 def integrity_errors(rows, baseline, candidate):
     """Reject stale/partial/duplicated invocations before computing a verdict."""
     errors = []
+    is_v2 = any(r.get("schema") == "pi.eval-row/v2" for r in rows)
+    if is_v2:
+        if any(r.get("schema") != "pi.eval-row/v2" for r in rows):
+            errors.append("historical and pi.eval-row/v2 rows cannot be combined")
+        for r in rows:
+            cell = f"{r.get('model')}/{r.get('task')}/{r.get('pattern')}/rep{r.get('rep')}"
+            if not r.get("authoritative") or r.get("status") != "complete":
+                errors.append(f"{cell}: row is non-authoritative or incomplete")
+            serving = r.get("serving") or {}
+            if not serving.get("stable") or (serving.get("pre") or {}).get("status") != "complete" or (serving.get("post") or {}).get("status") != "complete":
+                errors.append(f"{cell}: serving fingerprint incomplete or changed during row")
     models = sorted({r.get("model") for r in rows if r.get("model")})
     declarations = {tuple(r.get("fleet_expected_models", [])) for r in rows if r.get("fleet_expected_models")}
     if len(declarations) > 1:
@@ -138,16 +149,38 @@ def integrity_errors(rows, baseline, candidate):
                 cr = {r.get("run") for r in arms[candidate]}
                 if br != cr:
                     errors.append(f"{model}/{split}: baseline/candidate came from different invocations")
+                if is_v2:
+                    bfp = {(r["task"], r["rep"]): (r.get("serving", {}).get("pre") or {}).get("fingerprint_sha256") for r in arms[baseline]}
+                    cfp = {(r["task"], r["rep"]): (r.get("serving", {}).get("pre") or {}).get("fingerprint_sha256") for r in arms[candidate]}
+                    if bfp != cfp:
+                        errors.append(f"{model}/{split}: paired arms have different serving fingerprints")
     return errors
+
+
+def adoption_rows(rows, baseline, candidate):
+    has_v2 = any(r.get("schema") == "pi.eval-row/v2" for r in rows)
+    return [r for r in rows if r.get("pattern") in (baseline, candidate)
+            and r.get("split") in ("val", "heldout")
+            and (not has_v2 or (r.get("prompt") or {}).get("variant") == "canonical")]
 
 def report(gen, baseline, candidate):
     # Held-out honesty: the overfit gate activates only for a complete base+candidate
     # split="heldout" grid (real_gate HELDOUT="rle saddle").
     path = os.path.join(LAB, "results", gen + ".jsonl")
-    rows = [json.loads(l) for l in open(path) if l.strip()]
+    all_rows = [json.loads(l) for l in open(path) if l.strip()]
+    has_v2 = any(r.get("schema") == "pi.eval-row/v2" for r in all_rows)
+    # Adoption inference is canonical-only. Robustness and one-shot rows are
+    # deliberately excluded so they cannot inflate Fisher sample sizes.
+    rows = adoption_rows(all_rows, baseline, candidate)
     models = sorted({r.get("model") for r in rows if r.get("model")})
 
-    problems = integrity_errors(rows, baseline, candidate)
+    problems = []
+    if has_v2 and any(r.get("schema") != "pi.eval-row/v2" and r.get("pattern") in (baseline, candidate)
+                      and r.get("split") in ("val", "heldout") for r in all_rows):
+        problems.append("historical and pi.eval-row/v2 adoption rows cannot be combined")
+    if has_v2 and not rows:
+        problems.append("no canonical pi.eval-row/v2 adoption rows")
+    problems += integrity_errors(rows, baseline, candidate)
     if problems:
         out = (f"# fleet_report {gen} — {candidate} vs {baseline}\n\n"
                "## VERDICT: INCOMPLETE\n" + "\n".join(f"- {p}" for p in problems) + "\n")
@@ -177,10 +210,11 @@ def report(gen, baseline, candidate):
     ratio = (cand_tok / base_tok) if all_cost_exact and base_tok else None
     # per-SUCCESS mean cost (audit-2): total-over-total made a candidate that
     # succeeds MORE OFTEN look more expensive at identical per-success cost
+    def _exact(r): return (r.get("usage") or {}).get("exact", r.get("token_usage_exact")) is True
     def _tok(r): return r["in_tok"] + r["out_tok"]
-    pb = [_tok(r) for r in rows if r["pattern"] == baseline and r.get("split") == "val" and r["score"] == 1 and r.get("token_usage_exact") is True]
-    pc = [_tok(r) for r in rows if r["pattern"] == candidate and r.get("split") == "val" and r["score"] == 1 and r.get("token_usage_exact") is True]
-    exact_val = all(r.get("token_usage_exact") is True for r in rows
+    pb = [_tok(r) for r in rows if r["pattern"] == baseline and r.get("split") == "val" and r["score"] == 1 and _exact(r)]
+    pc = [_tok(r) for r in rows if r["pattern"] == candidate and r.get("split") == "val" and r["score"] == 1 and _exact(r)]
+    exact_val = all(_exact(r) for r in rows
                     if r.get("split") == "val" and r.get("pattern") in (baseline, candidate))
     per_success = (sum(pc) / len(pc)) / (sum(pb) / len(pb)) if pb and pc else None
 
@@ -209,22 +243,22 @@ def report(gen, baseline, candidate):
 # ---------- selftest (no server, no network) ----------
 
 def selftest():
-    t = {"mellum2-12b-thinking": "small", "qwen36-35b-iq3s": "large"}
+    t = {"small-model": "small", "qwen36-35b-iq3s": "large"}
     dd = "qwen36-35b-iq3s"
     # daily driver significantly regresses -> REJECT
-    v, _ = decide({dd: (19, 20, 10, 20), "mellum2-12b-thinking": (10, 20, 15, 20)}, tiers=t)
+    v, _ = decide({dd: (19, 20, 10, 20), "small-model": (10, 20, 15, 20)}, tiers=t)
     assert v == "REJECT", v
     # a non-daily model significantly regresses -> REJECT
-    v, _ = decide({dd: (18, 20, 19, 20), "mellum2-12b-thinking": (18, 20, 8, 20)}, tiers=t)
+    v, _ = decide({dd: (18, 20, 19, 20), "small-model": (18, 20, 8, 20)}, tiers=t)
     assert v == "REJECT", v
     # significant gain everywhere incl. daily -> UNIVERSAL
-    big = {dd: (10, 20, 19, 20), "mellum2-12b-thinking": (10, 20, 19, 20)}
+    big = {dd: (10, 20, 19, 20), "small-model": (10, 20, 19, 20)}
     assert decide(big, tiers=t)[0] == "ADOPT-UNIVERSAL"
     # smaller model gains, daily within noise -> TIERED
-    v, _ = decide({dd: (18, 20, 19, 20), "mellum2-12b-thinking": (8, 20, 18, 20)}, tiers=t)
+    v, _ = decide({dd: (18, 20, 19, 20), "small-model": (8, 20, 18, 20)}, tiers=t)
     assert v == "ADOPT-TIERED", v
     # everything within noise (the n=20 +5% case) -> NEUTRAL, not a verdict
-    v, _ = decide({dd: (18, 20, 17, 20), "mellum2-12b-thinking": (18, 20, 19, 20)}, tiers=t)
+    v, _ = decide({dd: (18, 20, 17, 20), "small-model": (18, 20, 19, 20)}, tiers=t)
     assert v == "NEUTRAL", v
     # Fisher catches a real flip at small n that CI-non-overlap missed; a 1-of-20 wobble stays noise
     assert classify(2, 8, 7, 8)[0] == "better", "2/8 -> 7/8 is significant (Fisher)"
@@ -251,6 +285,20 @@ def selftest():
     assert any("heldout/base: no rows" in e for e in integrity_errors(partial_held, "base", "cand"))
     missing_fleet = [dict(r, fleet_expected_models=[dd, "small-model"]) for r in clean]
     assert any("small-model" in e for e in integrity_errors(missing_fleet, "base", "cand"))
+    def v2(r, fp="fp"):
+        return dict(r, schema="pi.eval-row/v2", authoritative=True, status="complete",
+                    prompt={"variant": "canonical"}, serving={"stable": True,
+                    "pre": {"status": "complete", "fingerprint_sha256": fp},
+                    "post": {"status": "complete", "fingerprint_sha256": fp}})
+    clean_v2 = [v2(r) for r in clean]
+    assert not integrity_errors(clean_v2, "base", "cand")
+    bad_fp = [v2(r, "other") if r["pattern"] == "cand" and r["task"] == "a" and r["rep"] == 1 else v2(r) for r in clean]
+    assert any("different serving fingerprints" in e for e in integrity_errors(bad_fp, "base", "cand"))
+    incomplete = [dict(v2(r), status="incomplete", authoritative=False) if r is clean[0] else v2(r) for r in clean]
+    assert any("non-authoritative" in e for e in integrity_errors(incomplete, "base", "cand"))
+    extra = clean_v2 + [dict(clean_v2[0], split="robustness", prompt={"variant": "equivalent-1"}),
+                        dict(clean_v2[0], pattern="one-shot", arm="one-shot", split="robustness")]
+    assert len(adoption_rows(extra, "base", "cand")) == len(clean_v2), "robustness/control rows inflated adoption"
     print("fleet_report selftest: OK (sig hard-gate, do-no-harm, neutral-band, overfit, cost-ceiling, universal, tiered)")
 
 def main():

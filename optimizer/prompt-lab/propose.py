@@ -18,8 +18,7 @@ import json, os, re, sys
 
 LAB = os.path.dirname(os.path.abspath(__file__))
 PROPOSALS = os.path.join(LAB, "proposals")
-DEFAULT_PROMPT = os.path.expanduser(os.environ.get(
-    "GOVERNOR", os.path.join(LAB, "..", "..", "harness", "APPEND_SYSTEM.md")))
+DEFAULT_PROMPT = os.path.expanduser("~/.pi/agent/APPEND_SYSTEM.md")
 
 OPERATORS = ["add-constraint", "add-negative-example", "restructure",
              "tighten", "remove-bloat", "add-counterexample",

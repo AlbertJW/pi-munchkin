@@ -24,9 +24,9 @@ HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 HDRS="$HERE/ab-symbolect/sym-headers"
 TASKS_DIR="$HERE/ab-symbolect/tasks"
 T3_FILES="$HERE/ab-symbolect/t3-files"
-FIXTURE="${FIXTURE:-$HERE/pi-test}"
-AGENT_DIR="${AGENT_DIR:-$HOME/.pi/agent}"   # the live harness this A/B swaps prompts in
-RUNS_ROOT="${RUNS_ROOT:-$HERE/ab-symbolect-runs}"   # gitignored
+FIXTURE="$HOME/LLM/pi-test"
+AGENT_DIR="$HOME/.pi/agent"
+RUNS_ROOT="$HOME/LLM/ab-symbolect-runs"   # under trusted root; gitignored
 
 STAMP="$(date +%Y%m%d-%H%M%S)"
 TASKS=("${@:-}"); [[ -z "${TASKS[0]}" ]] && TASKS=(t1 t2 t3 t4)

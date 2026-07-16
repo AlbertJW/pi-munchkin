@@ -43,6 +43,30 @@ def load_rows(path):
     return [json.loads(l) for l in open(path) if l.strip()]
 
 
+def adoption_rows(rows):
+    """Drop one-shot/perturbation evidence while preserving canonical held-out rows."""
+    if not any(r.get("schema") == "pi.eval-row/v2" for r in rows):
+        return rows
+    return [r for r in rows if r.get("schema") == "pi.eval-row/v2"
+            and r.get("pattern") == "base"
+            and (r.get("prompt") or {}).get("variant") == "canonical"
+            and r.get("split") in ("val", "heldout")]
+
+
+def row_integrity(rows):
+    if not rows:
+        return "no canonical adoption rows"
+    if not any(r.get("schema") == "pi.eval-row/v2" for r in rows):
+        return None  # historical calibration remains readable
+    for r in rows:
+        serving = r.get("serving") or {}
+        if not r.get("authoritative") or r.get("status") != "complete":
+            return "non-authoritative or incomplete pi.eval-row/v2 row"
+        if not serving.get("stable") or (serving.get("pre") or {}).get("status") != "complete" or (serving.get("post") or {}).get("status") != "complete":
+            return "serving fingerprint incomplete or unstable"
+    return None
+
+
 def ledger_candidates(gen, results_dir=RESULTS):
     """[(cand_idx, name)] from the gen's munchkin ledger."""
     out = []
@@ -135,7 +159,7 @@ def verdicts(gens, results_dir=RESULTS, telemetry_file=TELEMETRY, manifest=None)
     # baseline per gen (each gen = one model)
     base = {}  # gen -> (model, rows)
     for g in gens:
-        rows = load_rows(os.path.join(results_dir, f"{g}-r0-base.jsonl"))
+        rows = adoption_rows(load_rows(os.path.join(results_dir, f"{g}-r0-base.jsonl")))
         if rows:
             base[g] = (rows[0]["model"], rows)
     # candidate name -> {gen: rows}; ledger-declared arms with missing/mismatched
@@ -144,7 +168,7 @@ def verdicts(gens, results_dir=RESULTS, telemetry_file=TELEMETRY, manifest=None)
     incomplete = collections.defaultdict(list)  # name -> [reason]
     for g in gens:
         for idx, name in ledger_candidates(g, results_dir):
-            rows = load_rows(os.path.join(results_dir, f"{g}-r0-c{idx}.jsonl"))
+            rows = adoption_rows(load_rows(os.path.join(results_dir, f"{g}-r0-c{idx}.jsonl")))
             if not rows:
                 incomplete[name].append(f"{g}: ledger declares c{idx} but no rows")
                 continue
@@ -152,6 +176,10 @@ def verdicts(gens, results_dir=RESULTS, telemetry_file=TELEMETRY, manifest=None)
                 # audit-2: a candidate with rows but NO baseline gen was silently
                 # skipped later — it must be a named incompleteness, not an omission
                 incomplete[name].append(f"{g}: candidate rows exist but the gen has no baseline rows")
+                continue
+            integrity = row_integrity(rows) or row_integrity(base[g][1])
+            if integrity:
+                incomplete[name].append(f"{g}: {integrity}")
                 continue
             rc, bc = run_consistency(rows), run_consistency(base[g][1])
             if rc != "ok" or bc != "ok":
@@ -164,6 +192,12 @@ def verdicts(gens, results_dir=RESULTS, telemetry_file=TELEMETRY, manifest=None)
                 extra = sum((cells(rows) - cells(base[g][1])).values())
                 incomplete[name].append(f"{g}: cells mismatch base (missing {missing}, extra/dup {extra})")
                 continue
+            if any(r.get("schema") == "pi.eval-row/v2" for r in rows):
+                bfp = {(r["task"], r["rep"]): (r.get("serving", {}).get("pre") or {}).get("fingerprint_sha256") for r in base[g][1]}
+                cfp = {(r["task"], r["rep"]): (r.get("serving", {}).get("pre") or {}).get("fingerprint_sha256") for r in rows}
+                if bfp != cfp:
+                    incomplete[name].append(f"{g}: paired arms have different serving fingerprints")
+                    continue
             cand_rows[name][g] = (idx, rows)
     # manifest check: declared (candidate, gen) pairs the ledgers never mention
     if manifest:
