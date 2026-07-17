@@ -19,7 +19,7 @@ demonstrably need them.
   ./canary.py --selftest
 Writes results/canary-<model>.json (raw responses kept for inspection).
 """
-import json, os, sys, urllib.error, urllib.request
+import json, os, sys, time, urllib.error, urllib.request
 
 LAB = os.path.dirname(os.path.abspath(__file__))
 URL = os.environ.get("LLAMA_URL", "http://127.0.0.1:8080")
@@ -186,6 +186,8 @@ def call_server(model, messages, tools):
                        "temperature": 0, "max_tokens": 2048}).encode()
     req = urllib.request.Request(f"{URL}/v1/chat/completions", data=body,
                                  headers={"Content-Type": "application/json",
+                                          # bare urllib UA gets Cloudflare-blocked (403 code 1010, Cerebras)
+                                          "User-Agent": "prompt-lab-canary/1",
                                           **({"Authorization": f"Bearer {KEY}"} if KEY else {})})
     try:
         with urllib.request.urlopen(req, timeout=TIMEOUT) as r:
@@ -201,7 +203,11 @@ def run_model(model):
     # fault and an HTTP error on tool history doesn't PROVE a template defect —
     # attribution is a triage hint pending raw-generation/server evidence.
     out = {"model": model, "url": URL, "cases": {}}
+    # CANARY_SLEEP: seconds between cases, for RPM-limited endpoints (Cerebras).
+    pace = float(os.environ.get("CANARY_SLEEP", "0") or 0)
     for name, messages, tools, judge in CASES:
+        if pace:
+            time.sleep(pace)
         resp, err = call_server(model, messages, tools)
         if err:
             layer = "template" if any(m.get("role") == "tool" for m in messages) else "server"
