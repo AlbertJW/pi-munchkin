@@ -256,13 +256,20 @@ export default function (pi: ExtensionAPI) {
 			await save(ctx.cwd);
 			record("plan-weaver", "done", { done: plan.items.filter((i) => i.status === "done").length,
 				blocked: blocked.length, inline: inline.length });
-			const msg = steerText("WEAVE_HANDOFF_MSG",
-				"MODE: RUN. Dispatch finished.\n{log}\n{blocked}{inline}Finish the remaining work; for a BLOCKED item propose ONE bounded fix for that item only (do not rewrite the plan).",
-				{
-					log: log.length ? "Dispatched items:\n" + log.map((l) => "- " + l).join("\n") : "(no dispatched items)",
-					blocked: blocked.length ? "BLOCKED:\n" + blocked.map((b) => `- ${b.id}: ${b.note}`).join("\n") + "\n" : "",
-					inline: inline.length ? "Inline items for you:\n" + inline.map((i) => `- ${i.id}: ${i.title}${i.gate ? ` (gate: ${i.gate})` : ""}`).join("\n") + "\n" : "",
-				});
+			const logText = log.length ? "Dispatched items:\n" + log.map((l) => "- " + l).join("\n") : "(no dispatched items)";
+			const msg = plan.phase === "done"
+				// everything done: demand ONE self-contained final report — findings live
+				// scattered in child results the user never sees.
+				? steerText("WEAVE_HANDOFF_DONE_MSG",
+					"MODE: RUN. All plan items are done.\n{log}\nIn your reply NOW, restate the complete results — every finding, analysis, and deliverable in full, as one self-contained report. The user does not read plan state or earlier tool output; anything not in this reply is lost.",
+					{ log: logText })
+				: steerText("WEAVE_HANDOFF_MSG",
+					"MODE: RUN. Dispatch finished.\n{log}\n{blocked}{inline}Finish the remaining work; for a BLOCKED item propose ONE bounded fix for that item only (do not rewrite the plan). When everything is done, end with one self-contained report of all findings and deliverables.",
+					{
+						log: logText,
+						blocked: blocked.length ? "BLOCKED:\n" + blocked.map((b) => `- ${b.id}: ${b.note}`).join("\n") + "\n" : "",
+						inline: inline.length ? "Inline items for you:\n" + inline.map((i) => `- ${i.id}: ${i.title}${i.gate ? ` (gate: ${i.gate})` : ""}`).join("\n") + "\n" : "",
+					});
 			record("plan-weaver", "handoff", { injected_chars: msg.length });
 			pi.sendUserMessage(msg);
 		},

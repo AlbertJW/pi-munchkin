@@ -547,7 +547,7 @@ const planWrite = defineTool({
 	async execute(_toolCallId, params, _signal, _onUpdate, ctx) {
 		const aid = actionId();
 
-		const { state, newlyBlocked, gateMsgs, integrity, newlyDone } = await mutatePlan(ctx.cwd, async (prev) => {
+		const { state, newlyBlocked, gateMsgs, integrity, newlyDone, prevCompleted } = await mutatePlan(ctx.cwd, async (prev) => {
 			const items = reconcileItems(prev?.items, params.items as any);
 			const prevById = new Map((prev?.items ?? []).map((i) => [i.id, i]));
 			const prevBlocked = new Set((prev?.items ?? []).filter((i) => i.status === "blocked").map((i) => i.id));
@@ -635,7 +635,8 @@ const planWrite = defineTool({
 				? { ...prev, request: params.request ?? prev.request, summary: params.summary ?? prev.summary, items, phase: prev.phase === "planned" ? "planned" : "executing", updated_at: isoNow() }
 				: newState(params.request ?? "", params.summary ?? "", "lean", items);
 			const newlyBlocked = items.filter((i) => i.status === "blocked" && !prevBlocked.has(i.id));
-			return { state: next, result: { state: next, newlyBlocked, gateMsgs, integrity: { reattached, preservedOpen, yieldedOpen }, newlyDone } };
+			const prevCompleted = prev ? derivedStatus(prev) === "completed" : false;
+			return { state: next, result: { state: next, newlyBlocked, gateMsgs, integrity: { reattached, preservedOpen, yieldedOpen }, newlyDone, prevCompleted } };
 		});
 
 		// Trace each newly blocked item through the repeated-failure guard.
@@ -744,8 +745,19 @@ const planWrite = defineTool({
 			});
 		}
 
+		// On the TRANSITION to completed: the model's analyses/findings are scattered
+		// between tool calls across the run — demand one self-contained final report
+		// (user report 2026-07-17: results left interspersed with tool calls).
+		let finalReport = "";
+		if (newlyDone > 0 && !prevCompleted && derivedStatus(state) === "completed") {
+			finalReport = "\n" + steerText(
+				"PLAN_FINAL_REPORT_MSG",
+				"All items are done. In your reply NOW, restate the complete results of this plan — every finding, analysis, and deliverable in full, as one self-contained report. The user does not re-read earlier messages or tool output; anything not in this reply is lost.",
+				{},
+			);
+		}
 		const gateNote = gateMsgs.length ? `\n${gateMsgs.join("\n")}` : "";
-		const body = `Plan updated (${state.items.length} items, status: ${derivedStatus(state)}).${cur ? `\nNext open: ${cur.title}` : "\nNo open items remain."}${warning}${askNow}${integrityWarn}${thrashWarn}${gateNote}`;
+		const body = `Plan updated (${state.items.length} items, status: ${derivedStatus(state)}).${cur ? `\nNext open: ${cur.title}` : "\nNo open items remain."}${warning}${askNow}${finalReport}${integrityWarn}${thrashWarn}${gateNote}`;
 		return {
 			content: [{ type: "text", text: body }],
 			details: { tool_name: "plan_write", action_id: aid, success: true },

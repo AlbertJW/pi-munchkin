@@ -188,3 +188,26 @@ test("integration: a needs-input block VOICES the question (tool result) + agent
 	assert.ok(notes.some((n) => n.includes("waiting on you") && n.includes("staging or prod")),
 		`agent_end notify surfaces the parked question (notes: ${JSON.stringify(notes)})`);
 });
+
+test("integration: completing the FINAL item demands a self-contained report; mid-plan does not", async () => {
+	const fp = freshPlanRunner();
+	const cwd = tmp();
+	const { ctx } = makeCtx(cwd);
+	await fp.commands.get("plan").handler("two step task", ctx);
+	const mid = await callTool(fp, "plan_write", { items: [
+		{ id: "a", title: "step one", status: "done" },
+		{ id: "b", title: "step two", status: "in_progress" },
+	] }, cwd);
+	assert.ok(!mid.content[0].text.includes("self-contained report"), "no report demand mid-plan");
+	const fin = await callTool(fp, "plan_write", { items: [
+		{ id: "a", title: "step one", status: "done" },
+		{ id: "b", title: "step two", status: "done" },
+	] }, cwd);
+	assert.ok(fin.content[0].text.includes("self-contained report"), "completion demands the report");
+	// idempotence: rewriting an already-completed plan must not re-demand
+	const again = await callTool(fp, "plan_write", { items: [
+		{ id: "a", title: "step one", status: "done" },
+		{ id: "b", title: "step two", status: "done" },
+	] }, cwd);
+	assert.ok(!again.content[0].text.includes("self-contained report"), "no re-demand on rewrite");
+});

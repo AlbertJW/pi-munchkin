@@ -126,11 +126,12 @@ take `--model`/`--patterns` so a fleet sweep stays cheap and distinguishable.
 
 **The do-no-harm decision rule** (`fleet_report.py`, pure `decide()` + Wilson CIs):
 - **REJECT** if the daily driver regresses at all (HARD GATE), or any model regresses > do-no-harm threshold
-  (`FLEET_DONO`, default 3%), or win-rate < 60%, or val→held-out gap > 10% (overfit).
+  (`FLEET_DONO`, default 3%), or win-rate < 60%, or validation→held-out uplift decay > 10% (overfit).
 - else **ADOPT-TIERED** if the gain tracks capability (smaller models gain, daily flat) — maps onto
   loop-breaker's existing `thresh()` tiers; else **ADOPT-UNIVERSAL**.
-- Overfit guard via the **held-out split** (6/20 SQL questions marked `heldout`): the rule compares the
-  candidate's val vs held-out accuracy.
+- Overfit guard via the **held-out split** (6/20 SQL questions marked `heldout`): the rule compares
+  candidate-vs-baseline uplift across splits: `(cand−base)_val − (cand−base)_heldout`. Raw validation
+  vs held-out accuracy is not comparable when the splits contain different tasks.
 
 **Universal vs capability-tiered surfaces** (what may vary by model):
 - **UNIVERSAL** (one setting, validated across the fleet): the governor (`APPEND_SYSTEM.md`), role prompts
@@ -171,11 +172,158 @@ From the emoji-glyph guide, reconciled with our own measurement:
   the fleet: `./fleet-eval.sh --rt` → `fleet_report.py <gen>-rt --baseline A --candidate R`. **Adopt only if it
   wins under the do-no-harm rule.** Prior (symbolect) is negative, so the bar is real.
 
+## 7b. Failure-class instruments (gauntlet + canaries, 2026-07-14)
+
+The reviewer-roadmap pivot: optimize less for "another useful instruction," more for
+which deterministic control transition follows each observable failure class. Two
+permanent instruments (both selftested; chaos.ts dormant without CHAOS=):
+
+- **canary.py** — 9-case tool-protocol battery, failures attributed to a
+  SUSPECTED layer (model/parser/serialization/template — triage hints, not proof;
+  audit-2 wording). Scores below are from the STRICT judges (audit-2: value
+  verification — wrong cities, missing requested prose, repeated-malformed args
+  and Paris-twice all now fail; the 07-13 numbers were permissive):
+  **4B 8/9** — the 07-13 "multi-turn tool-history 502s (template)" receipt DID NOT
+  REPRODUCE post-power-trip: it was transient server state, not a stable template
+  defect (the audit's attribution caution proven with data; per-combo artifacts
+  now keyed canary-<model>@<host-port>). Only nested-JSON fails.
+  **2B 5/9** — apologizes instead of retrying after tool errors (×2), omits the
+  requested prose in text-then-call, mangles nested JSON.
+  **gemma-4-e2b qat-q4 6/9** — apologizes after errors (×2), nested-JSON artifact.
+  ALL THREE mangle the nested-JSON roundtrip, each differently — the one stable
+  cross-model serialization receipt (c17's target list).
+- **gauntlet.sh + gauntlet_report.py** — one deterministic fault per known-solvable
+  session (5 chaos faults via ~/.pi/agent/extensions/chaos.ts + lying/ghost
+  deception fixtures); reports recovery, turns-to-recovery, injection integrity
+  (rows whose fault never fired are INVALID, not data), false aborts. N>1 reps
+  aggregate (audit-2) and telemetry is per-row EXACT-sk since audit-3 (a gen-run
+  prefix pooled reps: one rep's injection could validate an uninjected sibling).
+  Methodology lesson from gt1 (caught by the INVALID flags): the chaos task must be
+  edit-rich AND in-band — on t1 the 4B renamed via bash/sed and never called edit.
+
+**gt2 baseline (equil, N=1 — directional; both control rows drew fails, so read
+TOOL-level recovery + the deception rows, not task pass):**
+
+| fault | 4B | 2B | gemma-4-e2b (qat-q4-mtp) |
+|---|---|---|---|
+| control | fail (n=1 wobble) | fail (40% task) | **pass** |
+| stale-tag | tool back in 8 turns, passed | tool NEVER recovered | passed via TOOL-SWITCH (edit abandoned) |
+| edit-noop | tool back in 9 turns, passed | tool NEVER recovered | tool never recovered, failed |
+| perm-denied | tool back in 6 turns, failed | tool NEVER recovered | never recovered |
+| missing-file | (INVALID gt2; 2-turn rec in gt1) | tool back in 2 turns | INVALID (routed via bash, never read) |
+| disconnect | retry in 1 turn | retry in 1 turn | retry in 2 turns |
+| lying (deception) | **DETECTED** (twice incl. gt1) | **DETECTED** | **FOOLED** (trusts exit 0; 20k tok) |
+| ghost (phantom file) | failed both rounds | **PASSED** | failed |
+
+Findings: (1) recoveries are EXPENSIVE — 6-9 turns and 10-20k tokens even when they
+succeed; (2) the 2B's recovery ceiling is protocol-simple faults only (retry-shaped);
+anything needing a re-read-then-different-approach protocol (stale-tag, edit-noop,
+perm-denied) never comes back; (3) genuine cross-model INVERSIONS everywhere: the 2B
+(opus-reasoning distill) beat the 4B on reality-reconciliation (ghost) while losing
+protocol recovery; the e2b — best CANARY protocol scores — is the only model FOOLED
+by the lying test, so protocol fidelity and epistemic vigilance are separate axes;
+(4) metric nuance: the e2b "recovered" stale-tag by ABANDONING the edit tool for
+bash — turns_to_rec only counts same-tool recovery, so read recovered-vs-turns
+together. Candidate implications queued in §8: c18b targets the perm-denied/ghost
+class; c21's cheap post-edit check directly attacks the 9-turn edit-noop flail;
+anti-deception steers matter for the gemma tier specifically, not the Qwens.
+
 ## 8. Queued candidates (untested — awaiting an in-band task set)
 
 Ideas that survived research triage but are **not adopted** — each is one munchkin/A-B candidate,
 blocked only on a (model, task) pairing in the discriminating band (see calibrate.py; as of
 2026-07 the sole known in-band pairing is qwopus35-9b-coder × h1).
+
+- **From the external audit (2026-07-13)** — measurement-critical items fixed same day
+  (gate env scoping, sibling-safe cleanup, run ids, INCOMPLETE/MIXED-SIGNS/TASK-REGRESSION
+  verdict gates, honest in/out cost, jnoise file-matched labels + session inference); these
+  four were the deferred remainder (all harness support is now built; experimental runs remain where noted):
+  1. *Randomized dd1 confirmation* — re-run the governor gradient with arm order
+     randomized/interleaved and a contemporaneous baseline; until then "prose harmful on
+     capable models" stays a working hypothesis (§dd1 verdicts, scoped 2026-07-13).
+     **Harness support LANDED (2026-07-14)**: real_gate's two-arm mode now interleaves +
+     counterbalances per (task, rep) cell by default (INTERLEAVE=off for legacy blocks) —
+     the confirmation round just needs scheduling. Also landed: munchkin MANIFEST=path
+     auto-declares each gen's candidates for fleet_verdict --manifest.
+  2. *Real held-out task set* — **BUILT (2026-07-14)**: `HELDOUT="rle saddle"` runs those
+     never-selected-on tasks after the main sweep with split="heldout" (refuses tasks that
+     appear in TASKS); fleet_report shows held-out uplift decay (difference-in-differences) and
+     reactivates the overfit gate ONLY for a complete base+candidate held-out grid. Arms are
+     interleaved/counterbalanced just like validation. Opt-in per round (adds |HELDOUT|×N
+     sessions/arm). rle+saddle chosen because their fixtures+hidden graders already exist
+     and no fleet candidate was ever selected on them.
+  3. *Plan-runner integration tests* — **BUILT (2026-07-14, fe80488)**: fake-ExtensionAPI
+     harness with REAL exec (genuine ExecResult shape), 7 end-to-end tests covering /plan
+     mutation-block arming, plan_write persistence + /plan-go, real-shell gates incl.
+     GATE_MAX escalation + mutating-gate rejection, done-omission reattach, agent_end
+     abort trace, and micro-gate firing. Writing it caught micro-gate reading r.exitCode
+     where ExecResult carries r.code — a would-be silent no-op candidate (c18 class),
+     fixed before it cost a measurement round. Suite 119/119.
+  4. *Hashline multi-file transactionality* — **DONE (2026-07-14, 799997c; I/O honesty hardened
+     2026-07-14)**: apply is now
+     two-phase (validate+compute all sections in memory, then commit) so a stale tag / bad
+     hunk in a later section leaves earlier files UNTOUCHED. All-or-nothing chosen over a
+     partial-apply report (a half-written workdir confuses small models more than it helps).
+     Same-file chaining preserved via an in-memory buffer. Integration tests prove atomicity
+     (both cases fail on the old sequential-write loop); suite 123/123.
+- **From the reviewer roadmap (2026-07-14, instruments shipped — see §7b):**
+  1. *c18b locality fallback* — **BUILT (dormant), awaiting measurement**: RETRY_MODE=
+     locality in real_gate gives the fresh session task + actual failing `node --test`
+     output + an exact localize→one-patch→verify protocol; spec c18b-locality-retry.json
+     predicts it beats c18's open-ended note on the re-read-then-different-approach class.
+  2. *c21 post-edit micro-gate* — **BUILT (dormant), awaiting measurement**: MICRO_GATE=on
+     pi extension (micro-gate.ts + tested policy lib) parse-checks JUST the changed files
+     at turn end (node --check / side-effect-free `ast.parse` / JSON.parse, ≤3 files, first actionable error
+     as followUp, never the suite). It covers edit/write and statically identifiable shell writes,
+     and emits passed/skipped/checker-error telemetry so a candidate cannot be a silent no-op;
+     spec c21-micro-gate.json targets the 9-turn edit-noop
+     flail. Both measurable in round 5 alongside the still-unmeasured c13/c14/c18 —
+     interleaved arms + MANIFEST now standard (see below).
+  2b. *c23 trajectory-gate* — **BUILT (dormant), grader-integrity calibration (NOT an A/B)**:
+     TRAJECTORY=on ANDs prompt-lab/trajectory_check.py into the gate (bigdata: assert a real
+     full-file scan, not a head-peek). Missing session evidence fails closed; executable-name
+     heuristics, `readline()`, and `head | wc` do not count as scans. Run base with TRAJECTORY off vs on on the SAME
+     bigdata sessions — the pass-rate DROP is the lucky-pass rate. If material, adopt as the
+     default grader (do NOT feed through fleet do-no-harm; a stricter honest grader lowering
+     the number is the point). One cheap calibration block, not a fleet round. See the
+     Pydantic-Evals disposition below.
+  3. *Cache observability* — **phase-0 probe DONE (2026-07-14, box router receipts):**
+     llama-swap passes `timings` through, incl. `cache_n`. Findings: (a) byte-identical
+     back-to-back requests reuse ZERO prefix tokens unless the request sets
+     `cache_prompt: true` (then 9/25 reused); (b) `grep cache_prompt` over pi's installed
+     code: ABSENT — pi never sets it, so every session on this box build re-evaluates the
+     full prompt every turn; (c) even with the flag, conversation-EXTENSION requests stall
+     at the 9-token system head (cache_n 9 / prompt_n 27) — reuse does not follow the
+     conversation, suspect slot config on the box launcher (flags live on the box).
+     c22 INVESTIGATION DONE (2026-07-14): pi-ai has an `onPayload` request hook but
+     pi-coding-agent never wires it — NO pi-side path to inject cache_prompt exists.
+     POST-UPGRADE PROBES (box now b10002-a7312ae94, 1 slot): the new build reuses
+     EXCELLENTLY when asked — identical request with cache_prompt:true reuses 21/25
+     tokens (prompt_n 25→4; old build managed 9) — but STILL zero without the flag,
+     and llama-swap provably doesn't rewrite bodies (explicit flag passed through).
+     Granite caveat: hybrid-SSM models can't rewind recurrent state — zero reuse there
+     is architectural, don't use them as cache probes.
+     RESOLVED (2026-07-14, user set the box launcher default): pi now gets prefix
+     reuse with NO client flag. Conversation-extension probe (the real agent shape):
+     old build stuck at cache_n 9; now 32/36 (prefill 27→4). Growing-conversation
+     steady state: reuse climbs 39%→51%→65% across turns as the shared prefix grows —
+     i.e. every turn after the first stops re-evaluating history. c22 CLOSED as a win;
+     no pi-side wiring or shim needed. (First request after a model swap is still cold
+     — cache_n 0 — expected.)
+  3b. *Read-only memoization* — **REJECTED BY MEASUREMENT (2026-07-14)**: of 4,888
+     archived read/search calls, 1,193 (24%) are exact duplicates BUT only 162 (3.3%)
+     have no intervening mutation — the rest are hashline-legitimate re-reads after
+     edits. An extension + invalidation machinery to save 3% of read calls fails
+     cost/benefit. (The reviewer's measure-first rule, applied to the reviewer's item.)
+  4. *Palette-fidelity arm* — minimal vs live vs phase-scoped tool palettes; build dynamic
+     routing only if the full-palette arm measurably hurts.
+  5. *Read-only memoization* — only after telemetry shows duplicate read/search cost.
+  6. *Incident → reviewed regression fixture* pipeline — every new production failure
+     becomes a minimized, human-approved gauntlet member (the loop learns by expanding
+     falsifiable evaluations, not accumulating model-written advice).
+  7. *2B gauntlet wing* — gt2 re-run for qwen35-2b-opus-reasoning when the box returns
+     (all 8 rows aborted on "no server"; command: MODELS=qwen35-2b-opus-reasoning
+     GEN_PREFIX=gt2 GTASK=equil ./gauntlet.sh).
 
 - **Evidence-first claim rule** (from nuclear-grade-context-engineering; operator
   `add-constraint`). Governor line: *"State a result only with the command output that proves
@@ -183,6 +331,22 @@ blocked only on a (model, task) pairing in the discriminating band (see calibrat
 - **`add-rationale` operator** (from Google Labs design.md's dual-layer format). Append a
   one-line *why* to each governor constraint; hypothesis: rationale improves a small model's
   judgment in applying the rule. Candidate addition to `propose.py` OPERATORS.
+- **c24 did-you-mean** (built dark 2026-07-17, DID_YOU_MEAN=on): deterministic
+  "closest existing path" appended to read/edit file-not-found errors via the tool_result
+  hook. Lens: r/AI_Agents 1uysfe3 "target agents, not humans" — the thread otherwise
+  CONFIRMS existing doctrine (deterministic wrenches over prose skills). Targets the
+  measured #1 failure trigger (missing-file → wander, b1/r6 traces); the cwd anchor
+  treated the wandering (prose), this removes the trigger (mechanical). Must win a round.
+- **pi-tasks (@tintinweb, 2026-07-17): pocketed, one candidate extracted.** Not adopted as
+  planner substrate — mature task UX + DAG cascade but ZERO verification layer (cascade
+  trusts completion claims; plan-weaver's engine-run gates are the point). Pocketed
+  candidate: Claude-Code-parity tool names/specs (TaskCreate et al.) — familiar tool shapes
+  from training data may raise small-model compliance vs bespoke schemas. A/B-able.
+- **evalt (Bryley, 2026-07-17): rejected** for munchkin runs — v0.1.0/2 commits, no
+  statistics (no Fisher/A-B/do-no-harm), no fixture admission/provenance, cage sandbox
+  self-describes as not-a-security-sandbox (vs kernel Seatbelt + grader read-deny); its
+  two-tier model (asserts + LLM reviewer) = real_gate + judge.py already. Watch for its
+  multi-harness adapters someday.
 - **Plan-block placement/pressure** (anti-signal from r/LocalLLaMA 1unobl4, 2026-07: a Gemma-4
   26B *avoided* its planning tools when a persistent plan block was pinned at the tail of
   context). Evidence-gated: if telemetry shows plan-runner steer non-compliance or plan_write
@@ -202,7 +366,9 @@ blocked only on a (model, task) pairing in the discriminating band (see calibrat
   adopt with telemetry, not the gate): *aider-style repo map* (tree-sitter+PageRank — our biggest
   genuine gap), *phase-gated tool palette* (statewright; needs pi 0.80 dynamic tools), *pi-lens*
   (LSP feedback in-loop; token-flood risk on 4B). Maintenance: pi 0.80 `/compat` migration
-  (audited: one import — see ~/.pi/agent/UPGRADE-0.80.md); 0.80.3 fixes llama-server-relevant
+  **DONE 2026-07-08** (drift-scanner had been silently broken since the un-checklisted 0.80.3
+  bump; .typecheck pins refreshed to 0.80.3 so tsc now catches SDK drift — see
+  ~/.pi/agent/UPGRADE-0.80.md status note); 0.80.3 fixes llama-server-relevant
   compaction bug. Negative result adopted as candidate c5: agent-written tests don't improve
   resolution (2602.07900). Methodology: munchkin candidates now carry a falsifiable `prediction`
   checked against per-gate telemetry windows in the journal (2604.25850).
@@ -228,6 +394,237 @@ blocked only on a (model, task) pairing in the discriminating band (see calibrat
     right bet. Pattern-mine read-only (not an extension; no vendoring).
   - pi-caveman (~75% output-token compression) = the caveman skill already here; gate-irrelevant
     (we grade code, not prose). qualisero/awesome-pi-agent (1093★, archived) = the real tool index.
+- **jlens-gguf disposition (2026-07-13, two user-pasted threads, repos verified;
+  github.com/igorbarshteyn/jlens-gguf + github.com/dasjoms/jspace-hallucination-eval —
+  URLs recorded after the first pass lost them to compaction).** The GGUF-
+  native port (Apache-2.0, built-in CPU ridge-regression lens fitting, 60 tests) kills the
+  hardware/weights reasons behind the 07-08 jlens rejection. The hallucination-eval stress test
+  kills the naive use (thresholds break on derivation-shaped tasks — coding sessions are
+  GSM8K-shaped). Survives: **phase-0 within-context discrimination study** — does late-layer
+  J-noise at hashline TAG-generation positions separate invented tags from correct copies,
+  same-task-structure controls? Corpus census REVISED by the audit-driven relabel (2026-07-13,
+  file-matched COPY: a tag for the TARGET file must precede the call): **160 CONFAB_COPY +
+  755 CONFAB_BLIND + 106 CONFAB_EXACT + 81 STALE + 3672 CLEAN** — 83% of the naive census's
+  "copy failures" were blind inventions, and the primary study is TIGHTER than first claimed
+  (4B: 80 COPY moments / 21 sessions, barely clears the 20-session floor; 2B: 65/14, under).
+  Pre-registered bar: session-level strength ≥0.70 (bootstrap CI clear of 0.5, ≥20 sessions
+  per class; sessions are the inference unit) → c20 in-loop veto design study; below →
+  re-rejected on our own data.
+  **PHASE-0 VERDICT (2026-07-14, 4B, 504 moments scored, alignment 504/504 exact,
+  0 dropped in the scored classes, turn-confound null 0.505):**
+  - **PRIMARY (CONFAB_COPY vs CLEAN): RE-REJECTED.** Session AUC 0.614, signed CI
+    [0.436, 0.791] straddles 0.5 (21 vs 87 sessions, drop rates 0%/0%). Copying a
+    seen-but-wrong tag does NOT carry a detectable late-layer noise signature — the
+    copy act looks confident either way. The original c14-mechanism hypothesis dies
+    on our own data, receipt delivered.
+  - **SECONDARY (CONFAB_BLIND vs CLEAN): session AUC 0.953, signed CI [0.903, 0.992],
+    39 vs 87 sessions → clears the pre-registered bar.** INVENTING a tag with no
+    source in context — the true epistemic-guessing act — is highly separable.
+    Caveats stated: (a) 137/180 BLIND moments were unscoreable (no locatable tag in
+    the malformed call) — the scored 43 are the well-formed-invention subset; this
+    matches the DEPLOYMENT population (an in-loop veto scores tags the model actually
+    emits, which by construction exist), but the AUC claims nothing about unscoreable
+    calls; (b) one model, one lens, and this was one of three studies in the round —
+    per our own multiplicity rule the finding is EXPLORATORY: c20 design study may
+    proceed, but confirmation on a fresh corpus (and ideally the blind-heavy 2B,
+    528 blind moments) is required before any in-loop adoption.
+  Previously BLOCKED ON:
+  jlens-gguf host (observe = local mmap replay, NOT live interception — must run where the
+  GGUF lives: box install [user, recommended] or granted Mac window). REJECTED regardless:
+  live steering/abliteration (serving-stack risk, attention-collapse, prose>surgery evidence),
+  quant repair. Also REJECTED (2026-07-14, user-asked): Extraltodeus/J-Wash — permanent
+  weight surgery ("baked into exported weights"), CUDA-only, unavailable on quantized
+  weights (our whole fleet), 18 commits/no releases; violates measure-don't-modify AND
+  harness model-independence. Carve-out on record: iff phase-0 finds a discriminating
+  direction, a clearly-labeled edited-model ARM is a valid future experiment — needs CUDA
+  we don't have. Scoring waits for f4 completion + host.
+- **stunspot-collection disposition (2026-07-13, user-pasted 40-prompt analysis).** Adopted into
+  measurable surfaces: `/reflect premortem` (their 5/5 pre-mortem, contract-adapted: prospective
+  failure imagination → [RISK]+preventative edits — a different detection axis than the
+  retrospective scan), `pause` scaffold + c19 spec (the user's own empirically-favored
+  deliberation primer, now a Fisher question on local tiers), /reflect method discoverability
+  ('/reflect help' + dynamic description). REJECTED with citations: the persona/always-on class
+  (Planner, ThoughtStream, Metagenius, Unified Reasoning — dd1 measured that class harmful;
+  symbolect/stunspot engine port already rejected at +29% tokens), ICEBREAKER (theater, analysis
+  agrees). Personal-workflow prompts (Comparative Evaluator, Goal Architect, Sharper Questions)
+  = out of harness scope, fine as private pi skills. Noted: Goal Architect's anti-goal ≈ our
+  anti-growth clause, independently converged.
+- **loop-engineering research disposition (2026-07-13, three user-pastes + 12-factor-agents
+  anchor).** Scorecard: most of the canon already built AND measured here (minimal prompts=dd1,
+  deterministic gates, bounded tool output, subagent firewalls, event ledger w/ provenance, git
+  as change ledger, stateless gates). Adopted: **session-keyed telemetry** (sk = workdir
+  basename in every event; enrichment joins exactly instead of by time window — the class that
+  contaminated m2s retro-analysis and forced per-router file splits is dead) and **c18
+  fresh-retry** (one fresh-context session after a loop-breaker abort, same workdir, 3-line
+  distilled handoff — poisoning removal as a mechanism, the minimum viable test of the
+  role-pipeline idea; structurally do-no-harm, fires only where the alternative was certain
+  failure; retried:1 rows carry the mechanism metric). REJECTED as builds: agent.db (JSONL+git+
+  queries already serve it — SQLite is shape, not capability), full role-pipeline (contingent
+  on c18), intent-rows/resume-reconciliation (N/A — gates are stateless by design).
+- **constrained-decoding disposition (2026-07-13, Zilliz talk user-paste): c17-grammar-tools
+  staged.** The concept (grammar-guided sampling) hits three named targets in our own records:
+  the mellum verdict ("needs structural help (grammar-constrained tool calls), not prompt
+  headers" — prescribed, never built), the prose-only exclusions (marco/DISTILL2 — grammars
+  could re-enfranchise them), and hashline's patch grammar (OMP ships grammar.lark prior art).
+  Deepest mechanisms-over-prose move: invalid output becomes unrepresentable at the logits.
+  NOT adopted from the article: Outlines/BAML (HF-Python stack, jlens-shaped incompatibility)
+  and all vector-DB content (vendor marketing). Native path: llama.cpp GBNF / lazy tool-call
+  grammars under --jinja (lazy = thinking stays unconstrained — critical, format constraints
+  measurably degrade reasoning per literature). Phases: (0) post-sweep probe of what current
+  builds already enforce; (1) per-model llama-swap config delta, fleet A/B with mellum as
+  anchor; (2) hashline patch-body GBNF (separate, harder). PRE-REGISTERED two-sided prediction:
+  edit_err drops AND pass holds — errors vanishing while pass drops = constraints pushing
+  failures underground (forced-valid-but-wrong calls evade the loop-breaker), reject.
+  **PHASE-1 PASSTHROUGH RESOLVED (2026-07-14, box b10002 probes):** (a) the router passes
+  grammar / grammar_lazy / grammar_triggers through WITHOUT stripping or erroring; (b)
+  whole-output GBNF still lands in reasoning_content on thinking models (phase-0 reproduces
+  — unusable, confirms lazy is mandatory); (c) DECISIVE — the native --jinja tool path is
+  ALREADY ACTIVE and ALREADY does the lazy-grammar thing: a tools request returns thinking
+  (reasoning_content present) AND a structured tool_call together. So c17's original premise
+  ("add lazy tool grammars") is largely already shipped server-side. REFRAME: the real gap
+  is the canary receipt — nested-JSON arg mangling happens DESPITE the active tool grammar,
+  so c17 phase-1 narrows to "is the tool schema compiled to a tight GBNF or only
+  prompt-guided, and where does the nested value round-trip break (grammar vs chat-template
+  serialization)?" — a far smaller investigation than a fresh grammar build. hashline
+  patch-body GBNF (phase 2) is untouched by this and remains the real net-new grammar work.
+- **Pydantic-Evals disposition (2026-07-14, coles.codes user-paste): FRAMEWORK REJECTED,
+  c23 trajectory-gate staged, judge-calibration parked.** The post's staged-trust model
+  (structured outputs → Pydantic Evals → calibrated LLM-judge) maps onto machinery we
+  already have, mostly MORE rigorously: structured outputs = c17 (already largely shipped,
+  above); Cases/Dataset/Evaluator + `repeat=N` + pass-rate threshold = real_gate tasks +
+  hidden graders + N reps/cell + fleet_report/fleet_verdict. Their own "what it doesn't do"
+  list (no pass@k, no CIs, no significance testing, manual judge-bias mitigation) is exactly
+  the three-audit-round machinery here (Fisher, Wilson, bootstrap cluster CI, sign-consistency,
+  task-strata Simpson guard, exclusion gate). Adopting the framework = a statistics DOWNGRADE
+  plus a Pydantic-AI/Bedrock cloud stack in a llama.cpp-native model-independent harness —
+  same shape as the Outlines/BAML rejection; the DSPy/PromptBreeder over-build the §3 table
+  already refuses. The ONE genuinely new atom: **HasMatchingSpan → assert on the TRAJECTORY,
+  not just the final state.** Our gate scores end file state; a lucky broken path (bigdata
+  answered from a head-peek, never scanning the file — the exact map-reduce-audit worry) passes.
+  → **c23 trajectory-gate (BUILT 2026-07-14, dormant): prompt-lab/trajectory_check.py asserts
+  the session's tool sequence per task (bigdata: a real full-file scan, not a peek), ANDed into
+  the gate behind TRAJECTORY=on.** Grader-integrity feature like t2-check, NOT an A/B candidate:
+  run base off-vs-on once and the pass-rate DELTA = the lucky-pass rate; adopt as default if
+  material (do NOT run it through do-no-harm — a stricter honest grader is SUPPOSED to lower the
+  number). Extend CHECKS{} per task as lucky-path cases surface. PARKED (note, not staged):
+  calibrate judge.py against a small human-labeled set before trusting its numbers — the
+  post's core LLM-judge caveat, and our own lgtmaybe-shaped uncalibrated-reviewer lesson;
+  low priority since judge.py isn't in the adoption critical path.
+- **wordslugs disposition (2026-07-12, r/AI_Agents user-paste): c14 slug-tags staged.** The
+  post's core (semantic slugs beat opaque IDs for model-retyped identifiers) maps to exactly one
+  surface here: hashline's 8-hex version tag — the documented dominant small-model failure
+  (invented tags, "#main" seen live; prompt mitigation is prose covering a mechanical problem).
+  HASHLINE_TAG=slug encodes the hash's top 24 bits as three words (256-word embedded list;
+  snapshot tag+text dedupe + relocation cover the bit-width delta); parser takes both encodings
+  any-case (test-writing caught a parse-side uppercasing that would have broken every slug edit).
+  Default hex; c14 spec measures edit_err + pass on the 4B in round 5. NOT adopted from the
+  post: yaml registries / OKF / memory-graph slugs — no other model-retyped IDs exist in this
+  harness (plan items are small numerals; pi tool-call ids aren't model-echoed).
+- **/reflect phase 1 shipped (2026-07-12).** Fresh-context adversarial plan review — drift-scanner's
+  out-of-band pattern, NOT in-context self-refine (measured weakest: dd1 prose-harm, 4B
+  capability-bound, self-refine grows plans). Contract: BLOCKER/RISK/CUT/VERIFY findings only,
+  adding scope forbidden, CLEAN sentinel, 2-round cap, manual re-invocation. Live validation on
+  the DD: reviewer substance excellent (planted flaws caught every run), CLEAN sentinel
+  unreliable (invents defects on trivial plans; 2 prompt iterations didn't fix it — model
+  behavior, not wording) → session model is the materiality judge via explicit-reject injection;
+  telemetry records clean-rate (watch it; if ~0 in practice, tune or retire). **Phase 2
+  (corrected per user): reasoning methods as PROMPT STRATEGIES, not optillm/proxy infra.**
+  `/reflect <method>` selects a reviewer strategy implemented as N completeSimple calls + pure
+  merge logic: `sc` (self-consistency: 3 samples at temp, keep findings recurring in ≥2 —
+  directly attacks the measured unreliable-CLEAN pathology: hallucinated nitpicks shouldn't
+  recur, real flaws recurred every run in validation), `debate` (prover defends / attacker
+  prosecutes / judge rules — PVG-shaped), extensible registry for plan-search/rstar-LIKE
+  decomposition later. No new deps, each method measurable on the same flawed/tight plan
+  fixtures.
+- **pi-lean-ctx A/B verdict (2026-07-12): REJECTED — architecturally incompatible.** Its
+  value-delivering replace mode removes every tool named read/bash/grep/find/ls, INCLUDING
+  hashline's read — and hashline's edit depends on the version tags that read produces. Result
+  across 10 sessions (two configs, HASHLINE=off and on): the 4B falls back to byte-exact builtin
+  edits and fails them 31-48× per session (0 passes, 2.2× tokens, 7× wall-clock). Additive mode
+  not pursued (pure schema bloat a small model ignores). Uninstalled; package pin removed;
+  health PASS. Corollary finding, the strongest hashline validation to date: **hashline is
+  load-bearing for weak-model editing** — remove it and the 4B floors outright. Consequence per
+  the staged decision rule: the map-reduce minimal prototype (manifest + search_spans/read_span)
+  moves UP the queue; A1 result-pruner stays cancelled-unless-needed. Pocketed c11: loop-breaker
+  missed 48 same-class edit failures (args differ → fingerprints differ) — error-CLASS outcome
+  detection is a legitimate candidate.
+- **dd1 verdicts — THE universality round (2026-07-12, DD qwen36-35b-iq3s @65k, n=36/arm,
+  parens/roman/titlecase).** Governor gradient is monotonic: full 5.2KB 30/36 (83%) → lean 1.6KB
+  32/36 (89%, p=.367) → **EMPTY 35/36 (97%, p=.053)**. The full governor drove **9 loop-breaker
+  aborts** (vs 1/3 in trimmed arms). Claim scoped honestly (audit 2026-07-13): removing prose
+  produced a large, consistent improvement IN THIS ORDERED RUN (arms ran sequentially, same
+  baseline, tasks pooled) — strong enough for the reversible minimal-governor adoption, not a
+  causal law. A randomized/interleaved confirmation round is queued before "behavioral prose is
+  harmful on capable models" graduates from working hypothesis.
+  Universality answered: mechanisms are PRODUCTIVE on a capable model, not idle — steers convert
+  (progress-after-steer 24/33 in the winning arm; verify-gate 29 steers → 3 unverified-ends).
+  c10's premise (drop verify-gate) is thereby REFUTED for the DD — the gate converts here; c10
+  stays a small-model question only. Adoption: `proposals/dd1-minimal-governor.md` (safety gates
+  + feature docs kept — unmeasurable by the gate; ALL behavioral prose deleted — measured) for
+  HUMAN review/apply. Caveat honestly: 83% baseline = near band ceiling, so wins are compressed;
+  the abort-rate delta is the strongest signal, pass-rate the corroborating one.
+- **pi-context-prompt-engineering-audit disposition** (2026-07-11): ~70% convergent with work
+  already done or in flight (governor A/B = dd1; compaction measurement = queued w/ live
+  instrument; bounded intake = closed; spawn-first = adopted). Adopted: **bigdata gate task**
+  (large-structured-file query class — 305KB deterministic JSONL fixture + recomputing hidden
+  grader; closes the gate's code-tasks-only blind spot, makes retrieval-layer A/Bs like
+  pi-lean-ctx measurable on their actual value axis) and **c10 no-verify-gate candidate**
+  (audit's ranked exp #5, backed by m6: 4B fires don't convert; schema gains
+  thresholds.VERIFY_GATE on/off). Folded into the queued compaction item: its comparison matrix
+  (native+watcher / native+obsmem / all three). Noted-no-action: ketch sanitization
+  (off-by-default mitigates; unmeasurable on the gate), extension ordering opacity,
+  structured-nudge steer formats (class measured neutral 2×).
+- **large-file-map-reduce-audit disposition** (2026-07-11; gaps verified in code before acting).
+  Fixed same-day: risky-file explicit-limit hole — any positive `limit` skipped all inlet checks
+  and hashline honors big explicit limits, so JSONL/logs could be pulled at 50KiB/call vs the
+  8KiB gate; huge limits on risky paths now block with a narrow-page steer
+  (CTX_GUARD_RISKY_LINES, default 200). Verified already-covered: bash intake is RTK-truncated
+  at 12k chars (tighter than the read path); fork context copy is by-design (concurrency now 1).
+  Noted, no mechanism: image reads up to 4MiB (rare, user-driven, vision model only). Queued:
+  the audit's own minimal first experiment — deterministic manifest + `search_spans`/`read_span`
+  on one JSONL type, NO LLM mapper, its stated accept/rollback criteria — placed BEHIND the
+  pi-lean-ctx A/B (adopt-vs-build: don't build a retrieval layer before measuring the maintained
+  Apache-2.0 one; targeted-question path ≈ rg + bounded read, both already exist and are
+  governor-mandated). Corpus-coverage map-reduce (map artifacts, hash caching, conflict-
+  preserving reduce) deferred outright: no current workload, unmeasurable on 5-file gate
+  fixtures; revisit only if large-corpus interrogation becomes a daily-driver need.
+- **m6 verdicts (2026-07-10, 4B @16k, clean instrument: n=16/task parens+equil, all guards armed).**
+  Baseline 12/32 (38%). **c3 patient-streak RETIRED**: 9/32, p=0.857 — and telemetry shows the
+  mechanism never fired (loop-breaker.steer 0–1 per arm at 16k; sessions too short to hit any
+  streak threshold). Its three earlier positive deltas were noise. **c7 verify-gate-steer
+  NEUTRAL, prediction refuted**: 13/32, p=0.500; steers 18→42 while unverified-ends ROSE 14→17 —
+  the model complies with "run the gate" but cannot turn red green. Verify-gate failures on this
+  model class are **capability-bound, not compliance-bound**: steer-wording tuning on the
+  verify-gate is a dead end. Round 3 targets orthogonal objectives: c6 taxonomy-steers
+  (outcome-loops still fire ~11/arm) + c8 lean-governor (same pass rate on fewer prompt tokens;
+  munchkin gained `gov_file` full-replacement specs for it).
+- **pi-local-model-audit disposition** (2026-07-10; external no-edit audit, every checked claim
+  verified true in code). Applied same-day (ops/config, reversible, no behavior claim):
+  subagent concurrency env-overridable default 1 (`PI_SUBAGENT_CONCURRENCY`; llama-server is
+  single-concurrency — parallel children only queue + thrash cache), ketch flipped to opt-in
+  (`KETCH=on` for research sessions; 4 fewer tools per local prompt), packages pinned
+  (pi-rtk-optimizer@0.9.0, pi-observational-memory@3.0.3), MODELS.md defaultModel note
+  (intentional cloud default — resolved, not drift). Queued with instruments:
+  - **c8 lean-governor candidate** (audit #6): never hand-trim the 5.7KB globals — write a
+    trimmed APPEND_SYSTEM.md as a `prompt_variant` munchkin candidate in round 3. Prediction:
+    pass-rate holds, tokens/session drop.
+  - **Compaction consolidation** (audit #2): deferred until ~a week of daily-driver
+    `compacted{reason,willRetry}` telemetry (instrument wired 2026-07-08). The audit's
+    107-resets stat is tiny-model gate data, not DD evidence. Then: native + at most one
+    proactive layer, cut from data.
+  - **Ketch research skill + Barebrowse**: separate project, queued behind pi-lean-ctx/readseek.
+    Audit's own trial design is sound (Ketch-only baseline → skill overlay → Barebrowse only for
+    proven browser-shaped gaps; dedicated profile, no eval, no uploads).
+  - Keep-as-is confirmed: compat flags, plaintext-HTTP-on-LAN (never port-forward), hashline,
+    inlet guard, loop-breaker, RTK truncation.
+- **jlens / J-Space** (Anthropic global-workspace paper + anthropics/jacobian-lens, 2026-07) —
+  **rejected** (user call): no CUDA box in the fleet (jlens needs HF safetensors + GPU backward
+  passes; Mac is MPS, remote box unsuitable), Qwopus fine-tunes are GGUF-only (base-model lens
+  proxy unvalidated), and the community read (r/LocalLLaMA) is that it's a cleaner readout of
+  known intermediate-layer representations, not a new capability. Pocketed if hardware changes:
+  J-space probe as a cheap candidate PRE-SCREEN (rank steer wordings by workspace shift at the
+  decision point, send only survivors to the real gate; Fisher stays the adoption authority).
+  Pre-fitted lenses exist at HF `neuronpedia/jacobian-lens` (qwen3.5-4b/9b-pt/27b).
 
 Test path for both: encode as a governor variant → `prompt_variant` config →
 `real_gate.sh` → `fleet_report.classify` (Fisher, do-no-harm). Adopt only on a significant win.
