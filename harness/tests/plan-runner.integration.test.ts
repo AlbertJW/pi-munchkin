@@ -170,3 +170,21 @@ test("integration: micro-gate steers immediately on a REAL broken edit (would ca
 	}, { cwd });
 	assert.equal(existsSync(join(cwd, "__pycache__")), false, "ast.parse must not create bytecode residue");
 });
+
+test("integration: a needs-input block VOICES the question (tool result) + agent_end backstop notify", async () => {
+	const fp = freshPlanRunner();
+	const cwd = tmp();
+	const { ctx, notes } = makeCtx(cwd);
+	await fp.commands.get("plan").handler("do something ambiguous", ctx);
+	const r = await callTool(fp, "plan_write", { items: [
+		{ id: "i1", title: "Pick the deploy target", status: "blocked",
+		  failure_class: "blocked_needs_input", note: "Which environment: staging or prod?" },
+	] }, cwd);
+	const body = r.content[0].text;
+	assert.ok(body.includes("blocked on the user"), "tool result carries the ask-now steer");
+	assert.ok(/ask the user/i.test(body), "steer instructs asking in plain text");
+	// backstop: run ends without the model asking -> UI notify carries the question
+	await fire(fp, "agent_end", {}, ctx);
+	assert.ok(notes.some((n) => n.includes("waiting on you") && n.includes("staging or prod")),
+		`agent_end notify surfaces the parked question (notes: ${JSON.stringify(notes)})`);
+});

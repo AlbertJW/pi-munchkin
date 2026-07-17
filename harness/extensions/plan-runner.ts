@@ -7,6 +7,7 @@ import { Type } from "typebox";
 import { assertVerifyGateAllowed, classifyBashCommand } from "../lib/command-policy.ts";
 import { planIntegrity, executionUnderway, normalizeTitle, preserveDecision, reconcileItems as libReconcile, type ReconciledItem, type IncomingItem } from "../lib/plan-integrity.ts";
 import { nextReplanStreak, parseTodoLine } from "../lib/plan-progress.ts";
+import { steerText } from "../lib/steer-texts.ts";
 import { record } from "../lib/telemetry.ts";
 
 // plan-runner v3 — model-owned TODO list (Claude Code TodoWrite pattern).
@@ -656,6 +657,20 @@ const planWrite = defineTool({
 				warning = `\n⚠ "${item.title}" failed ${count}× with the same signature. Change strategy, inspect state, or leave it blocked and stop — do not retry identically.`;
 			}
 		}
+		// An item blocked ON THE USER is invisible unless they run /plan-status — the
+		// question must be VOICED, not filed (user report 2026-07-17: "I don't see the
+		// question if I don't type plan-status").
+		const blockedOnUser = newlyBlocked.filter(
+			(i) => i.failure_class === "blocked_needs_input" || i.failure_class === "user_action_required",
+		);
+		let askNow = "";
+		if (blockedOnUser.length > 0) {
+			askNow = "\n" + steerText(
+				"PLAN_ASK_MSG",
+				'⚠ "{title}" is blocked on the user, and the user does NOT see plan notes. In your reply RIGHT NOW, ask the user the exact question (or name the exact action you need from them) in plain text, then stop and wait.',
+				{ title: blockedOnUser[0].title },
+			);
+		}
 		// Plan-integrity guard: a rewrite that omitted work — completed items are always
 		// re-attached; open items are re-attached once execution is underway (omission ≠
 		// deletion; restatus to drop). Surfaced + traced so it's observable and trips the
@@ -730,7 +745,7 @@ const planWrite = defineTool({
 		}
 
 		const gateNote = gateMsgs.length ? `\n${gateMsgs.join("\n")}` : "";
-		const body = `Plan updated (${state.items.length} items, status: ${derivedStatus(state)}).${cur ? `\nNext open: ${cur.title}` : "\nNo open items remain."}${warning}${integrityWarn}${thrashWarn}${gateNote}`;
+		const body = `Plan updated (${state.items.length} items, status: ${derivedStatus(state)}).${cur ? `\nNext open: ${cur.title}` : "\nNo open items remain."}${warning}${askNow}${integrityWarn}${thrashWarn}${gateNote}`;
 		return {
 			content: [{ type: "text", text: body }],
 			details: { tool_name: "plan_write", action_id: aid, success: true },
@@ -892,11 +907,20 @@ export default function (pi: ExtensionAPI) {
 
 	// Observability only: if the agent goes idle with open items, record it.
 	// No prompt re-injection (that was the fragile part of v2).
-	pi.on("agent_end", async () => {
+	pi.on("agent_end", async (_event, ctx) => {
 		setPlanning(false); // planning run ended (well-behaved or not) — disarm
 		const cwd = lastCwd;
 		if (!cwd) return;
 		const state = await readState(cwd);
+		// Backstop for a silently-parked question: if the run ends blocked ON THE USER,
+		// surface it in the UI even when the model failed to voice it (any phase).
+		const waiting = state?.items.find(
+			(i) => i.status === "blocked" &&
+				(i.failure_class === "blocked_needs_input" || i.failure_class === "user_action_required"),
+		);
+		if (waiting) {
+			ctx.ui.notify(`plan is waiting on you — ${waiting.title}${waiting.note ? `: ${waiting.note}` : ""}`.slice(0, 200), "warning");
+		}
 		if (!state || state.phase !== "executing") return;
 		const open = state.items.some((i) => i.status === "pending" || i.status === "in_progress");
 		if (!open) return;

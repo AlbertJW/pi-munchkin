@@ -226,7 +226,8 @@ export default function (pi: ExtensionAPI) {
 				"MODE: PLAN. Design the full plan for the request below and submit it in ONE weave_compile call. " +
 				"Decompose into 2-8 items; every edit is an `execute` item with a read-only gate; lookups are `explore`; " +
 				"final acceptance is a `verify` item; use `inline` ONLY where main-context judgment is unavoidable. " +
-				"Do not edit anything now.\n\nRequest: {request}", { request }));
+				"Do not edit anything now. If anything essential is ambiguous, ASK the user in plain text and wait — " +
+				"never park a question inside a plan item; the user does not read plan state.\n\nRequest: {request}", { request }));
 		},
 	});
 
