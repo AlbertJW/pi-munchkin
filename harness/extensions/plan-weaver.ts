@@ -89,8 +89,11 @@ async function runChild(exec: Exec, cwd: string, role: string, brief: string):
 	const args = ["-p", "--approve", "--no-session", "--tools", ROLES[role].tools];
 	if (prompt) args.push("--append-system-prompt", prompt);
 	args.push(brief);
-	// env wrapper: pi.exec has no env option; PI_OFFLINE=1 matches the vendored runner.
-	const r = await exec("env", ["PI_OFFLINE=1", "pi", ...args], {
+	// exec </dev/null: pi -p waits forever on an OPEN stdin pipe (measured: open pipe
+	// = infinite hang, closed = 25s reply). Whatever stdio the host exec uses, the
+	// shell-level redirect guarantees a closed stdin. "$@" passes the brief unquoted.
+	// PI_OFFLINE=1 matches the vendored subagent runner.
+	const r = await exec("bash", ["-c", 'exec </dev/null env PI_OFFLINE=1 pi "$@"', "bash", ...args], {
 		cwd, timeout: CHILD_TIMEOUT_S * 1000,
 	});
 	return { ok: r.code === 0, text: (r.stdout || "").trim() || (r.stderr || "").trim() };
