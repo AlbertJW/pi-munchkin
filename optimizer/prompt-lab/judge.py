@@ -42,6 +42,8 @@ def frontier_call(system, user):
     req = urllib.request.Request(base.rstrip("/") + "/chat/completions",
                                  data=json.dumps(body).encode(),
                                  headers={"Content-Type": "application/json",
+                                          # bare urllib UA gets Cloudflare-blocked (Cerebras, 403 code 1010)
+                                          "User-Agent": "prompt-lab-judge/1",
                                           "Authorization": f"Bearer {key}"})
     with urllib.request.urlopen(req, timeout=120) as r:
         d = json.load(r)
