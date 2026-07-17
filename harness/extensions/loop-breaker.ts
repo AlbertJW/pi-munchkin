@@ -253,6 +253,9 @@ function tier3Message(streak: number): string {
 }
 
 export default function (pi: ExtensionAPI) {
+	// Kill switch (mirrors VERIFY_GATE=off): needed by the harness-off measurement
+	// arm (U3b) — does the harness's steering actually buy anything?
+	if (process.env.LOOP_BREAKER === "off") return;
 	pi.on("session_start", async () => {
 		resetEpisode();
 		resetOutcomes();

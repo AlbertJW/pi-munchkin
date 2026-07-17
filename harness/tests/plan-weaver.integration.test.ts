@@ -143,3 +143,31 @@ test("inline items skip dispatch and land in the handoff for the main loop", asy
 	assert.ok(handoff.includes("judgment call"));
 	rmSync(cwd, { recursive: true, force: true });
 });
+
+test("GATE MODE (PLAN_MODE=v4): auto-engage at agent_start, auto-dispatch on compile", async () => {
+	process.env.PLAN_MODE = "v4";
+	try {
+		const cwd = mkdtempSync(join(tmpdir(), "weave-gate-"));
+		mkdirSync(join(cwd, ".pi"), { recursive: true });
+		const fp = makeFakePi();
+		const mod = await import(`../extensions/plan-weaver.ts?g=${Date.now()}-${Math.random()}`);
+		mod.default(fp.pi);
+		// agent_start injects the planning prompt (once)
+		for (const fn of fp.handlers.get("agent_start") ?? []) await fn({}, { cwd });
+		for (const fn of fp.handlers.get("agent_start") ?? []) await fn({}, { cwd });
+		assert.equal(fp.sent.filter((s) => s.includes("MODE: PLAN")).length, 1, "engages exactly once");
+		assert.ok(fp.sent[0].includes("TASK ABOVE"));
+		// compile triggers dispatch inline; handoff arrives IN the tool result
+		const r = await callTool(fp, "weave_compile", { items: [
+			{ id: "s1", title: "make-out file", mode: "execute", deliverable: "d", gate: "test -f out.txt" },
+		] }, cwd);
+		assert.ok(!r.isError);
+		assert.ok(r.content[0].text.includes("s1 done (gate green)"), r.content[0].text.slice(0, 200));
+		assert.ok(r.content[0].text.includes("self-contained report"), "done-branch handoff in tool result");
+		const state = JSON.parse(readFileSync(join(cwd, ".pi", "weave-state.json"), "utf8"));
+		assert.equal(state.phase, "done");
+		rmSync(cwd, { recursive: true, force: true });
+	} finally {
+		delete process.env.PLAN_MODE;
+	}
+});

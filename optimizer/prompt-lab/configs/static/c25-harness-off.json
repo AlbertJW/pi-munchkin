@@ -1,0 +1,5 @@
+{
+  "name": "harness-off",
+  "prediction": "U3b control arm: with loop-breaker and verify-gate OFF, pass rate drops on tasks where steering demonstrably rescued sessions and is unchanged where the harness was inert — quantifies what the ~1.7% injected footprint actually buys (harness_roi denominator). If pass rates are UNCHANGED, the steering layer is not earning its keep on this fleet.",
+  "thresholds": { "LOOP_BREAKER": "off", "VERIFY_GATE": "off", "DRIFT_SCANNER": "off" }
+}

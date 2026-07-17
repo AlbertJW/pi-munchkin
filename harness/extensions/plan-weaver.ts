@@ -33,6 +33,9 @@ import {
 import { steerText } from "../lib/steer-texts.ts";
 import { record } from "../lib/telemetry.ts";
 
+// PLAN_MODE=v4: gate mode — auto-engage at agent start, auto-dispatch on compile
+// (headless sessions have no slash commands). Dark unless a config sets it.
+const GATE_MODE = process.env.PLAN_MODE === "v4";
 const GATE_TIMEOUT_MS = Number.parseInt(process.env.WEAVE_GATE_TIMEOUT_MS || "60000", 10);
 const CHILD_TIMEOUT_S = Number.parseInt(process.env.WEAVE_CHILD_TIMEOUT_S || "600", 10);
 const AGENT_DIR = process.env.PI_CODING_AGENT_DIR || join(homedir(), ".pi", "agent");
@@ -207,6 +210,11 @@ export default function (pi: ExtensionAPI) {
 				record("plan-weaver", "plan-compiled", { items: plan.items.length,
 					dispatched: plan.items.filter((i) => i.mode !== "inline").length });
 				const lines = plan.items.map((i) => `  ${i.id} [${i.mode}] ${i.title}${i.gate ? ` (gate: ${i.gate})` : ""}`);
+				if (GATE_MODE) {
+					// headless: no /weave-go exists — dispatch NOW, hand back in the tool result
+					const handoff = await dispatchAll({ cwd: ctx.cwd });
+					return { content: [{ type: "text" as const, text: `Plan compiled (${plan.items.length} items):\n${lines.join("\n")}\n\n${handoff}` }], details: {} };
+				}
 				return { content: [{ type: "text" as const, text: `Plan compiled (${plan.items.length} items):\n${lines.join("\n")}\nSTOP — wait for /weave-go.` }], details: {} };
 			},
 		}),
@@ -231,47 +239,78 @@ export default function (pi: ExtensionAPI) {
 		},
 	});
 
+	// Engine-owned dispatch, shared by /weave-go (interactive) and gate mode
+	// (PLAN_MODE=v4 auto-dispatch). Returns the handoff text.
+	async function dispatchAll(ctx: { cwd: string; ui?: { notify(m: string, l?: string): void } }): Promise<string> {
+		if (!plan) throw new Error("no plan");
+		plan.phase = "dispatching";
+		const log: string[] = [];
+		for (;;) {
+			const it = nextReady(plan);
+			if (!it) break;
+			if (it.mode === "inline") { it.status = "blocked"; it.note = "inline — handed to main loop"; continue; }
+			const line = await dispatchItem(pi.exec.bind(pi), ctx.cwd, it);
+			log.push(line);
+			await save(ctx.cwd);
+			ctx.ui?.notify(`weave: ${line.slice(0, 100)}`, it.status === "done" ? "info" : "warning");
+		}
+		// hand back: one distilled message — results, blocked items needing a bounded
+		// replan, and any inline items for main-context judgment.
+		const inline = plan.items.filter((i) => i.note === "inline — handed to main loop");
+		for (const i of inline) { i.status = "pending"; i.note = undefined; } // they're the model's now
+		const blocked = plan.items.filter((i) => i.status === "blocked");
+		plan.phase = stalled(plan) || blocked.length || inline.length ? "handed_off" : "done";
+		await save(ctx.cwd);
+		record("plan-weaver", "done", { done: plan.items.filter((i) => i.status === "done").length,
+			blocked: blocked.length, inline: inline.length });
+		const logText = log.length ? "Dispatched items:\n" + log.map((l) => "- " + l).join("\n") : "(no dispatched items)";
+		const msg = plan.phase === "done"
+			// everything done: demand ONE self-contained final report — findings live
+			// scattered in child results the user never sees.
+			? steerText("WEAVE_HANDOFF_DONE_MSG",
+				"MODE: RUN. All plan items are done.\n{log}\nIn your reply NOW, restate the complete results — every finding, analysis, and deliverable in full, as one self-contained report. The user does not read plan state or earlier tool output; anything not in this reply is lost.",
+				{ log: logText })
+			: steerText("WEAVE_HANDOFF_MSG",
+				"MODE: RUN. Dispatch finished.\n{log}\n{blocked}{inline}Finish the remaining work; for a BLOCKED item propose ONE bounded fix for that item only (do not rewrite the plan). When everything is done, end with one self-contained report of all findings and deliverables.",
+				{
+					log: logText,
+					blocked: blocked.length ? "BLOCKED:\n" + blocked.map((b) => `- ${b.id}: ${b.note}`).join("\n") + "\n" : "",
+					inline: inline.length ? "Inline items for you:\n" + inline.map((i) => `- ${i.id}: ${i.title}${i.gate ? ` (gate: ${i.gate})` : ""}`).join("\n") + "\n" : "",
+				});
+		record("plan-weaver", "handoff", { injected_chars: msg.length });
+		return msg;
+	}
+
 	pi.registerCommand("weave-go", {
 		description: "dispatch the compiled weave plan (engine-owned)",
 		handler: async (_args, ctx) => {
 			if (!plan || plan.items.length === 0) plan = await loadExisting(ctx.cwd);
 			if (!plan || plan.items.length === 0) { ctx.ui.notify("no compiled weave plan", "warning"); return; }
-			plan.phase = "dispatching";
-			const log: string[] = [];
-			for (;;) {
-				const it = nextReady(plan);
-				if (!it) break;
-				if (it.mode === "inline") { it.status = "blocked"; it.note = "inline — handed to main loop"; continue; }
-				const line = await dispatchItem(pi.exec.bind(pi), ctx.cwd, it);
-				log.push(line);
-				await save(ctx.cwd);
-				ctx.ui.notify(`weave: ${line.slice(0, 100)}`, it.status === "done" ? "info" : "warning");
-			}
-			// hand back: one distilled message — results, blocked items needing a bounded
-			// replan, and any inline items for main-context judgment.
-			const inline = plan.items.filter((i) => i.note === "inline — handed to main loop");
-			for (const i of inline) { i.status = "pending"; i.note = undefined; } // they're the model's now
-			const blocked = plan.items.filter((i) => i.status === "blocked");
-			plan.phase = stalled(plan) || blocked.length || inline.length ? "handed_off" : "done";
-			await save(ctx.cwd);
-			record("plan-weaver", "done", { done: plan.items.filter((i) => i.status === "done").length,
-				blocked: blocked.length, inline: inline.length });
-			const logText = log.length ? "Dispatched items:\n" + log.map((l) => "- " + l).join("\n") : "(no dispatched items)";
-			const msg = plan.phase === "done"
-				// everything done: demand ONE self-contained final report — findings live
-				// scattered in child results the user never sees.
-				? steerText("WEAVE_HANDOFF_DONE_MSG",
-					"MODE: RUN. All plan items are done.\n{log}\nIn your reply NOW, restate the complete results — every finding, analysis, and deliverable in full, as one self-contained report. The user does not read plan state or earlier tool output; anything not in this reply is lost.",
-					{ log: logText })
-				: steerText("WEAVE_HANDOFF_MSG",
-					"MODE: RUN. Dispatch finished.\n{log}\n{blocked}{inline}Finish the remaining work; for a BLOCKED item propose ONE bounded fix for that item only (do not rewrite the plan). When everything is done, end with one self-contained report of all findings and deliverables.",
-					{
-						log: logText,
-						blocked: blocked.length ? "BLOCKED:\n" + blocked.map((b) => `- ${b.id}: ${b.note}`).join("\n") + "\n" : "",
-						inline: inline.length ? "Inline items for you:\n" + inline.map((i) => `- ${i.id}: ${i.title}${i.gate ? ` (gate: ${i.gate})` : ""}`).join("\n") + "\n" : "",
-					});
-			record("plan-weaver", "handoff", { injected_chars: msg.length });
-			pi.sendUserMessage(msg);
+			pi.sendUserMessage(await dispatchAll(ctx));
 		},
 	});
+
+	// GATE MODE (PLAN_MODE=v4, dark otherwise): headless sessions have no slash
+	// commands, so v4 auto-engages — the planning prompt is injected at agent
+	// start (referencing the task ABOVE it), and a successful weave_compile
+	// dispatches immediately instead of waiting for /weave-go. This is what
+	// makes the weaver A/B-able in the gate (c22): PLAN_MODE flows in as a
+	// config threshold like every other candidate dimension.
+	if (GATE_MODE) {
+		let engaged = false;
+		pi.on("agent_start", async (_event, ctx) => {
+			if (engaged) return;
+			engaged = true;
+			plan = { schema_version: 1, request: "(gate task — see the task message above)",
+				created_at: new Date().toISOString(), updated_at: new Date().toISOString(),
+				phase: "compiled", items: [] };
+			compiling = true;
+			await save(ctx.cwd);
+			pi.sendUserMessage(steerText("WEAVE_GATE_PLAN_MSG",
+				"MODE: PLAN. Design the full plan for the TASK ABOVE and submit it in ONE weave_compile call. " +
+				"Decompose into 2-6 items; every edit is an `execute` item with a read-only gate (e.g. `node --test`); " +
+				"lookups are `explore`; use `inline` ONLY where main-context judgment is unavoidable. " +
+				"Do not edit anything before compiling.", {}));
+		});
+	}
 }
