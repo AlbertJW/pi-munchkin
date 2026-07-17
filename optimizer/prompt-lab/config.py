@@ -41,6 +41,20 @@ def wrap_format(text, fmt):
         return json.dumps({"system_instructions": text}, ensure_ascii=False, indent=2)
     raise ValueError(f"unknown format {fmt!r}")
 
+# INSTRUMENT TEXT — appended to EVERY variant (A, F, candidate files) so no
+# prompt_variant mutation can drop it (munchkin.py rewrites prompt_variant; a line
+# placed only in the live governor would vanish for governor candidates / variant F).
+# Same rationale as PI_OBSERVATIONAL_MEMORY_PASSIVE in real_gate.sh: it is the
+# instrument, not a candidate dimension. Kept to ~3 lines (dd1: prose harms the DD).
+# Targets the measured wander patterns: cd $HOME x73, cd into foreign project copies,
+# missing-file -> search-elsewhere (b1 + r6-c21 trace catalog, 2026-07-16).
+CWD_ANCHOR = """
+
+## Working directory
+Do all work in the directory you started in; every task path (src/, test/, data/) is
+relative to it. Never cd to $HOME or into other projects. If a file seems missing, run
+`pwd` and `ls` first — do not search outside the working directory."""
+
 def render_prompt(config, base_text=None):
     """Resolve the system-prompt text for a config (no I/O if base_text given)."""
     pv = config.get("prompt_variant", "A")
@@ -53,6 +67,7 @@ def render_prompt(config, base_text=None):
             base_text = open(os.path.expanduser(pv)).read()
     elif pv == "F":
         base_text = ""
+    base_text = base_text.rstrip() + CWD_ANCHOR
     text = wrap_format(base_text, config.get("format", "md"))
     return text + SCAFFOLD[config.get("scaffold", "none")]
 

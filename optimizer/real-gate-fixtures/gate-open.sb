@@ -5,12 +5,20 @@
 (version 1)
 (allow default)
 (deny file-read* (subpath "__HARNESS__"))
+;; The public mirror duplicates the fixtures INCLUDING hidden graders outside
+;; __HARNESS__; sessions have been observed wandering into it (r6-c21).
+(deny file-read* (subpath "__MIRROR__"))
 (deny file-write*)
+;; Write set matches gate.sb — see the rationale there; keep the profiles in lockstep.
 (allow file-write*
   (subpath "__WORKDIR__")
   (subpath "/private/tmp")
   (subpath "/private/var/folders")
-  (subpath "__PI_STATE__")
+  (subpath "__PI_AGENT__/sessions")
+  (subpath "__PI_AGENT__/telemetry")
+  (subpath "__PI_AGENT__/settings.json.lock")
+  (subpath "__PI_AGENT__/auth.json.lock")
+  (subpath "__PI_AGENT__/models.json.lock")
   (literal "/dev/null")
   (literal "/dev/dtracehelper")
   (subpath "/dev/fd")

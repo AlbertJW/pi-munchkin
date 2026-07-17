@@ -214,6 +214,9 @@ PI_SELECT=()
 [[ -n "$PI_MODEL" ]] && PI_SELECT+=(--model "$PI_MODEL")
 [[ "$MODEL" != "$DD" ]] && echo "[real_gate] WARNING: loaded model '$MODEL' != daily driver '$DD'" >&2
 mkdir -p "$RUNS"
+# The narrowed write-jail allows only these two ~/.pi subpaths; creating THEM would
+# need a write on ~/.pi/agent (denied), so ensure they exist before any session starts.
+mkdir -p "$HOME/.pi/agent/sessions" "$HOME/.pi/agent/telemetry"
 # A direct invocation owns its result file and starts clean. Fleet orchestration
 # explicitly selects append mode after truncating once at the round boundary.
 # This prevents a reused GEN or rerun model from silently contaminating a verdict.
@@ -342,7 +345,9 @@ run_one() {  # $1=config $2=arm $3=task $4=rep [$5=split] [$6=prompt-variant]
 	# jail: render the per-run Seatbelt profile (absolute paths; Seatbelt has no env)
 	local sbx=()
 	if [[ "$SANDBOX" == "on" ]]; then
-		sed -e "s|__WORKDIR__|$wd|" -e "s|__PI_STATE__|$HOME/.pi|" \
+		sed -e "s|__WORKDIR__|$wd|" \
+			-e "s|__PI_AGENT__|$HOME/.pi/agent|" \
+			-e "s|__MIRROR__|${GATE_MIRROR_DENY:-$HOME/pi_munchkin}|" \
 			-e "s|__HARNESS__|$HERE|" -e "s|__MODEL_PORT__|$MODEL_PORT|" \
 			-e "s|__MODEL_HOST__|$MODEL_HOST|" \
 			"$GATE_SB" > "$wd/.gate.sb"

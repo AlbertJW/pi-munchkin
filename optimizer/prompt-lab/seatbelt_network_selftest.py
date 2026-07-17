@@ -26,10 +26,14 @@ class Handler(http.server.BaseHTTPRequestHandler):
         pass
 
 
-def render(source, destination, work, harness, state, port, model_host="localhost"):
+def render(source, destination, work, harness, state, port, model_host="localhost", mirror=None):
+    # state is the parent (stand-in for ~/.pi/agent): only its sessions/ and
+    # telemetry/ children are write-allowed, mirroring real_gate.sh's render.
     text = source.read_text(encoding="utf-8")
     replacements = {
-        "__WORKDIR__": str(work), "__HARNESS__": str(harness), "__PI_STATE__": str(state),
+        "__WORKDIR__": str(work), "__HARNESS__": str(harness),
+        "__PI_AGENT__": str(state),
+        "__MIRROR__": str(mirror if mirror is not None else Path(state).parent / "mirror"),
         "__MODEL_HOST__": model_host, "__MODEL_PORT__": str(port),
     }
     for old, new in replacements.items():
@@ -54,7 +58,11 @@ def main():
     assert "(deny network*)" in endpoint_source.read_text()
     with tempfile.TemporaryDirectory(prefix=".pi-seatbelt-network-", dir=ROOT) as td:
         root = Path(td).resolve(); work = root / "work"; harness = root / "harness"; state = root / "state"
-        work.mkdir(); harness.mkdir(); state.mkdir(); (harness / "secret").write_text("hidden")
+        mirror = root / "mirror"
+        work.mkdir(); harness.mkdir(); state.mkdir(); mirror.mkdir()
+        (state / "sessions").mkdir(); (state / "telemetry").mkdir()
+        (harness / "secret").write_text("hidden")
+        (mirror / "grader").write_text("hidden-grader-copy")
         server = http.server.ThreadingHTTPServer(("127.0.0.1", 0), Handler)
         thread = threading.Thread(target=server.serve_forever, daemon=True); thread.start()
         port = server.server_address[1]
@@ -70,6 +78,15 @@ def main():
             assert run(open_profile, "/bin/cat", str(harness / "secret")).returncode != 0
             assert run(open_profile, "/usr/bin/touch", str(root / "outside")).returncode != 0
             assert run(open_profile, "/usr/bin/touch", str(work / "inside")).returncode == 0
+            # mirror read-deny: a public-mirror grader copy must be unreadable
+            assert run(open_profile, "/bin/cat", str(mirror / "grader")).returncode != 0
+            assert run(endpoint_profile, "/bin/cat", str(mirror / "grader")).returncode != 0
+            # narrowed ~/.pi write-jail: sessions/ + telemetry/ + *.json.lock writable, parent NOT
+            assert run(open_profile, "/usr/bin/touch", str(state / "sessions" / "s.jsonl")).returncode == 0
+            assert run(open_profile, "/usr/bin/touch", str(state / "telemetry" / "events.jsonl")).returncode == 0
+            assert run(open_profile, "/bin/mkdir", str(state / "settings.json.lock")).returncode == 0
+            assert run(open_profile, "/usr/bin/touch", str(state / "settings.json")).returncode != 0
+            assert run(endpoint_profile, "/usr/bin/touch", str(state / "debris.js")).returncode != 0
             if args.remote_url:
                 parsed = urlsplit(args.remote_url)
                 remote_port = parsed.port or (443 if parsed.scheme == "https" else 80)
@@ -81,7 +98,7 @@ def main():
         finally:
             server.shutdown(); server.server_close(); thread.join(timeout=2)
     suffix = " + remote endpoint" if args.remote_url else ""
-    print(f"seatbelt_network_selftest: OK (open/mock-cloud/DNS + endpoint isolation + filesystem jail{suffix})")
+    print(f"seatbelt_network_selftest: OK (open/mock-cloud/DNS + endpoint isolation + filesystem jail + mirror deny + narrowed pi-state{suffix})")
 
 
 if __name__ == "__main__":
