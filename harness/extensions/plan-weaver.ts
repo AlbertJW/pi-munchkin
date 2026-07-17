@@ -305,6 +305,10 @@ export default function (pi: ExtensionAPI) {
 				created_at: new Date().toISOString(), updated_at: new Date().toISOString(),
 				phase: "compiled", items: [] };
 			compiling = true;
+			// arm the shared plan-phase flag (as /weave does): plan-runner's mutation
+			// block + the loop-breaker/verify-gate planning suppressions all read it —
+			// without this a gate-mode model can edit BEFORE compiling, unblocked.
+			(globalThis as Record<string, unknown>).__pi_plan_phase_active = true;
 			await save(ctx.cwd);
 			pi.sendUserMessage(steerText("WEAVE_GATE_PLAN_MSG",
 				"MODE: PLAN. Design the full plan for the TASK ABOVE and submit it in ONE weave_compile call. " +

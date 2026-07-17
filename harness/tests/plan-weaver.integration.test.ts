@@ -156,6 +156,8 @@ test("GATE MODE (PLAN_MODE=v4): auto-engage at agent_start, auto-dispatch on com
 		for (const fn of fp.handlers.get("agent_start") ?? []) await fn({}, { cwd });
 		for (const fn of fp.handlers.get("agent_start") ?? []) await fn({}, { cwd });
 		assert.equal(fp.sent.filter((s) => s.includes("MODE: PLAN")).length, 1, "engages exactly once");
+		assert.equal((globalThis as Record<string, unknown>).__pi_plan_phase_active, true,
+			"gate-mode planning arms the shared plan-phase flag (mutation block)");
 		assert.ok(fp.sent[0].includes("TASK ABOVE"));
 		// compile triggers dispatch inline; handoff arrives IN the tool result
 		const r = await callTool(fp, "weave_compile", { items: [
@@ -164,6 +166,8 @@ test("GATE MODE (PLAN_MODE=v4): auto-engage at agent_start, auto-dispatch on com
 		assert.ok(!r.isError);
 		assert.ok(r.content[0].text.includes("s1 done (gate green)"), r.content[0].text.slice(0, 200));
 		assert.ok(r.content[0].text.includes("self-contained report"), "done-branch handoff in tool result");
+		assert.equal((globalThis as Record<string, unknown>).__pi_plan_phase_active, false,
+			"compile disarms the plan-phase flag before dispatch");
 		const state = JSON.parse(readFileSync(join(cwd, ".pi", "weave-state.json"), "utf8"));
 		assert.equal(state.phase, "done");
 		rmSync(cwd, { recursive: true, force: true });

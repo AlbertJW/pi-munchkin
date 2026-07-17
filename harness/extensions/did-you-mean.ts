@@ -25,6 +25,6 @@ export default function (pi: ExtensionAPI) {
 		if (!suggestion) return;
 		const hint = `\nclosest existing path: ${suggestion}`;
 		record("did-you-mean", "hint", { tool: event.toolName, injected_chars: hint.length });
-		return { content: [...event.content, { type: "text" as const, text: hint }] };
+		return { content: [...(event.content ?? []), { type: "text" as const, text: hint }] };
 	});
 }
