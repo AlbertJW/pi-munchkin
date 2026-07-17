@@ -262,12 +262,12 @@ run_guarded_session() {
 		( cd "$wd" || exit
 		  export PI_OBSERVATIONAL_MEMORY_PASSIVE=1
 		  while IFS= read -r line; do [[ "$line" == *=* && "$line" != ENDPOINT=* && "$line" != LABEL=* ]] && export "${line?}"; done <<< "$envlines"
-		  ${sbx[@]+"${sbx[@]}"} timeout -k 30 "$PI_TIMEOUT" pi -p --approve ${PI_SELECT[@]+"${PI_SELECT[@]}"} --tools "$tools" "$prompt" ) >> "$wd/run.log" 2>&1 &
+		  ${sbx[@]+"${sbx[@]}"} timeout -k 30 "$PI_TIMEOUT" pi -p --approve ${PI_SELECT[@]+"${PI_SELECT[@]}"} --tools "$tools" "$prompt" ) </dev/null >> "$wd/run.log" 2>&1 &
 	else
 		( cd "$wd" || exit
 		  export PI_OBSERVATIONAL_MEMORY_PASSIVE=1
 		  while IFS= read -r line; do [[ "$line" == *=* && "$line" != ENDPOINT=* && "$line" != LABEL=* ]] && export "${line?}"; done <<< "$envlines"
-		  ${sbx[@]+"${sbx[@]}"} timeout -k 30 "$PI_TIMEOUT" pi -p --approve ${PI_SELECT[@]+"${PI_SELECT[@]}"} --tools "$tools" "$prompt" ) > "$wd/run.log" 2>&1 &
+		  ${sbx[@]+"${sbx[@]}"} timeout -k 30 "$PI_TIMEOUT" pi -p --approve ${PI_SELECT[@]+"${PI_SELECT[@]}"} --tools "$tools" "$prompt" ) </dev/null > "$wd/run.log" 2>&1 &
 	fi
 	CHILD=$!
 	set +m
