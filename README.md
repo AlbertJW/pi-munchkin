@@ -121,6 +121,13 @@ winner → proposals/ for HUMAN review  (never auto-edits your live harness)
 ```sh
 cd optimizer
 
+# 0. admit the task fixtures (fail-closed: unapproved fixtures refuse to run).
+#    Once per task; approval names a human reviewer and expires after 90 days.
+#    In a hurry? add --exploratory to real_gate/fleet_round — rows are then
+#    marked non-authoritative and excluded from verdicts.
+python3 prompt-lab/fixture_admission.py check parens
+python3 prompt-lab/fixture_admission.py approve parens --reviewer "Your Name"
+
 # 1. find a model's discriminating band (skip tasks it always/never passes)
 MODELS="my-model" TASKS="parens equil" N=4 ./fleet_round.sh calibrate
 python3 prompt-lab/calibrate.py <gen>
@@ -137,6 +144,23 @@ python3 prompt-lab/fleet_verdict.py r1
 change), `REJECT` (do-no-harm regression), plus fleet guards `INCOMPLETE` / `MIXED-SIGNS` /
 `TASK-REGRESSION`. Full options, task classes, and the candidate queue are in
 [`optimizer/docs/HARNESS_SELF_IMPROVEMENT.md`](optimizer/docs/HARNESS_SELF_IMPROVEMENT.md).
+
+### Operational guards
+
+All automatic inside `real_gate.sh`; listed so you know they exist (each one paid for itself):
+
+- **Seatbelt jail** (macOS): sessions can write only their workdir + pi's sessions/telemetry
+  dirs, and cannot read the harness, the hidden graders, or a public clone of this repo.
+  Auto-off where `sandbox-exec` is unavailable — hidden tasks then refuse to run.
+- **Memory watchdog** — each session runs in its own process group; past `PI_MEM_CAP_GB`
+  (default 12) the whole group is killed. Model-spawned `node` can't orphan or balloon.
+- **Single-slot serving protections** — observational-memory consolidation is forced passive
+  in gate sessions (a detached one holds a one-request-at-a-time endpoint and 429s the next
+  session), and any 429/rate-limit aborts the rep with **no row written** — the endpoint's
+  concurrency limit must never be scored as the model's competence.
+- **Execution policy** — `GATE_NETWORK=open|endpoint`, `MODEL_CONTROL=llama|pi-native`.
+  Open networking or a remote (non-loopback) endpoint ⇒ rows are non-authoritative;
+  only a loopback endpoint jail can produce authoritative rows.
 
 ### Verify offline (no GPU, no network)
 
@@ -160,6 +184,10 @@ python3 prompt-lab/config.py --selftest
   pocketed, or rejected.
 - **[Full methodology & candidate queue](optimizer/docs/HARNESS_SELF_IMPROVEMENT.md)** — the living
   design doc: surfaces, statistics, instrument-integrity incidents, every candidate's disposition.
+- **[Benchmark integrity](optimizer/prompt-lab/BENCHMARK-INTEGRITY.md)** — fixture admission,
+  provenance schemas, serving fingerprints, and what "authoritative" means.
+- `optimizer/prompt-lab/harness_roi.py` — measures the harness's *own* injected footprint
+  (steer text as % of model output, per model, split by pass/fail).
 
 ## License
 

@@ -39,3 +39,25 @@ Approaches evaluated for the pi-munchkin substrate — recorded so the reasoning
   remains the adoption authority); pre-fitted lenses exist at HF `neuronpedia/jacobian-lens`
   for the fleet's Qwen bases.
 
+
+## 2026-07-16 — the instrument matters more than the candidate
+
+A full A/B round was voided and re-run this week; every lesson was about the measurement, not
+the candidates:
+
+- **A one-request-at-a-time endpoint turns any concurrent caller into arm bias.** An installed
+  memory extension void-launched an uncancellable consolidation agent loop on `turn_end`; the
+  abandoned request outlived pi and held the serving slot. 58/164 sessions died on their FIRST
+  request with a 429 — and were recorded as `gate=0`, i.e. the server's concurrency limit was
+  scored as the model's competence. Longer candidate sessions fire more `turn_end`s, so the
+  damage was asymmetric across arms. Fixes now in the gate: consolidation forced passive in
+  gate sessions; 429/rate-limit aborts the rep with no row written.
+- **Proxies lie; controls catch them.** Three failure-attribution claims died in one day, each
+  a cheap proxy (empty log = hang; touched-a-429 = killed-by-429; decoy path in transcript =
+  poisoned-by-decoy). Each was killed the same way: running the detector on the PASSING
+  population, and reading the actual bytes of the hits. The discipline is now house style:
+  control group first, content over proxies, and an explicit "unclassified" bucket instead of
+  a forced story.
+- **A clean instrument moved the baseline more than any candidate has.** Post-fix, the target
+  model saturated a task (8/8) whose "failures" had all been serving artifacts. Calibration
+  before candidates is not optional.
