@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Fail-closed fixture admission for pi.fixture/v1 manifests."""
+"""Fail-closed fixture admission and read-only verification for pi.fixture/v1 manifests."""
 from __future__ import annotations
 
 import argparse
@@ -148,6 +148,7 @@ def all_fail(rows):
 
 
 def check_one(task, write=True):
+    """Run automated checks; optionally record their evidence in the manifest."""
     path, m = load_manifest(task)
     drift = artifact_drift(m)
     result = {"checked_at": iso(utcnow()), "runs_per_state": RUNS, "hash_drift": drift, "states": {}, "passed": False}
@@ -233,19 +234,23 @@ def authoritative(m, now=None):
 def main():
     ap = argparse.ArgumentParser()
     sub = ap.add_subparsers(dest="command", required=True)
-    check = sub.add_parser("check"); check.add_argument("task", nargs="?"); check.add_argument("--all", action="store_true")
+    check = sub.add_parser("check", help="run checks and record admission evidence")
+    check.add_argument("task", nargs="?"); check.add_argument("--all", action="store_true")
+    verify = sub.add_parser("verify", help="run the same checks without modifying manifests or review packets")
+    verify.add_argument("task", nargs="?"); verify.add_argument("--all", action="store_true")
     packet = sub.add_parser("review-packet"); packet.add_argument("task")
     approval = sub.add_parser("approve"); approval.add_argument("task"); approval.add_argument("--reviewer", required=True)
     args = ap.parse_args()
     try:
-        if args.command == "check":
+        if args.command in ("check", "verify"):
             tasks = sorted(p.stem for p in MANIFESTS.glob("*.json")) if args.all else [args.task]
             if not tasks or tasks == [None]:
                 raise AdmissionError("provide <task> or --all")
             failed = False
             for task in tasks:
-                result = check_one(task)
-                print(f"{task}: {'PASS' if result['passed'] else 'FAIL'}")
+                result = check_one(task, write=args.command == "check")
+                suffix = "" if args.command == "check" else " (read-only; manifest unchanged)"
+                print(f"{task}: {'PASS' if result['passed'] else 'FAIL'}{suffix}")
                 failed |= not result["passed"]
             raise SystemExit(1 if failed else 0)
         if args.command == "review-packet":

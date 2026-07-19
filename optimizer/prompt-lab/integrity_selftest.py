@@ -7,6 +7,7 @@ import datetime as dt
 import json
 import os
 import subprocess
+import sys
 import tempfile
 import argparse
 from pathlib import Path
@@ -49,6 +50,19 @@ def test_admission_catalog():
     try: admission.validate_contract(broken)
     except admission.AdmissionError: pass
     else: raise AssertionError("missing sufficiency mapping accepted")
+
+
+def test_fixture_verify_read_only():
+    manifest = admission.MANIFESTS / "t1.json"
+    before = manifest.read_bytes()
+    before_hash = admission.sha256(manifest)
+    cli = Path(admission.__file__)
+    proc = subprocess.run([sys.executable, str(cli), "verify", "t1"], cwd=admission.ROOT,
+                          capture_output=True, text=True, timeout=120)
+    assert proc.returncode == 0, proc.stderr
+    assert proc.stdout == "t1: PASS (read-only; manifest unchanged)\n", proc.stdout
+    assert manifest.read_bytes() == before, "verify modified manifest bytes"
+    assert admission.sha256(manifest) == before_hash, "verify modified manifest hash"
 
 
 def test_fingerprint():
@@ -221,8 +235,8 @@ def test_incident_rotation():
 
 
 def main():
-    test_admission_catalog(); test_fingerprint(); test_one_shot(); test_execution_policy(); test_runner_dry_modes(); test_robustness_and_usage(); test_schedule(); test_incident_rotation()
-    print("integrity_selftest: OK (admission, expiry/drift/approval, fingerprint, one-shot, execution policy, robustness, usage, scheduling)")
+    test_admission_catalog(); test_fixture_verify_read_only(); test_fingerprint(); test_one_shot(); test_execution_policy(); test_runner_dry_modes(); test_robustness_and_usage(); test_schedule(); test_incident_rotation()
+    print("integrity_selftest: OK (admission + read-only verify, expiry/drift/approval, fingerprint, one-shot, execution policy, robustness, usage, scheduling)")
 
 
 if __name__ == "__main__": main()

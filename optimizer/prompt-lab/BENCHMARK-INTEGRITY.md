@@ -6,11 +6,22 @@ authoritative only when triple-run admission passes, artifact hashes match, the
 90-day expiry has not elapsed, and a named human reviewer has approved it.
 
 ```sh
+# Read-only health check: runs all automated fixture checks and changes no files.
+python3 prompt-lab/fixture_admission.py verify t1
+python3 prompt-lab/fixture_admission.py verify --all
+
+# Admission operation: records fresh automated evidence in each manifest.
 python3 prompt-lab/fixture_admission.py check t1
 python3 prompt-lab/fixture_admission.py check --all
 python3 prompt-lab/fixture_admission.py review-packet t1
 python3 prompt-lab/fixture_admission.py approve t1 --reviewer "Name"
 ```
+
+`verify` and `check` execute the same artifact-drift, pristine, gold-patch, and
+shortcut-mutant checks. `verify` is strictly read-only: it does not update the
+manifest's automated-admission evidence or create a review packet. `check` is
+the evidence-recording admission operation to run before human review and
+approval.
 
 Approval also approves the three reviewed semantic prompt perturbations and
 sets expiry to 90 days from review. Expired fixtures cannot be reactivated; make
