@@ -1,11 +1,23 @@
 {
   "name": "pi-munchkin",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "Harness extensions for the pi coding agent (hashline edits, anti-loop breaker, verify gate, plan runner, /reflect, guards, span tools, telemetry) — installable as a pi extension.",
   "keywords": ["pi", "pi-coding-agent", "pi-extension", "coding-agent", "llm", "local-llm", "agent-harness"],
   "homepage": "https://github.com/AlbertJW/pi-munchkin",
   "repository": { "type": "git", "url": "git+https://github.com/AlbertJW/pi-munchkin.git" },
   "license": "MIT",
+  "type": "module",
+  "engines": {
+    "node": ">=22.6.0"
+  },
+  "scripts": {
+    "test": "node --experimental-strip-types --test harness/tests/*.test.ts",
+    "typecheck": "tsc -p harness/.typecheck/tsconfig.json --noEmit",
+    "health": "bash harness/scripts/pi-health.sh",
+    "pack:smoke": "node harness/scripts/package-smoke.mjs",
+    "verify:optimizer": "bash scripts/verify-optimizer.sh",
+    "verify": "npm run test && npm run typecheck && npm run health && npm run pack:smoke && npm run verify:optimizer"
+  },
   "pi": {
     "extensions": [
       "harness/extensions/hashline.ts",
@@ -20,23 +32,62 @@
       "harness/extensions/span-tools.ts",
       "harness/extensions/compact-tool.ts",
       "harness/extensions/micro-gate.ts",
-      "harness/extensions/ketch.ts"
+      "harness/extensions/ketch.ts",
+      "harness/extensions/plan-weaver.ts",
+      "harness/extensions/did-you-mean.ts",
+      "harness/vendor/pi-subagent/index.ts"
     ]
   },
   "dependencies": {
-    "typebox": "^1.1.0"
+    "typebox": "1.1.38"
+  },
+  "devDependencies": {
+    "@earendil-works/pi-agent-core": "0.80.6",
+    "@earendil-works/pi-ai": "0.80.6",
+    "@earendil-works/pi-coding-agent": "0.80.6",
+    "@earendil-works/pi-tui": "0.80.6",
+    "@types/node": "25.2.3",
+    "typescript": "5.9.3"
   },
   "peerDependencies": {
-    "@earendil-works/pi-coding-agent": "*",
-    "@earendil-works/pi-ai": "*"
-  },
-  "peerDependenciesMeta": {
-    "@earendil-works/pi-coding-agent": { "optional": false },
-    "@earendil-works/pi-ai": { "optional": true }
+    "@earendil-works/pi-coding-agent": ">=0.80.6 <0.81.0",
+    "@earendil-works/pi-ai": ">=0.80.6 <0.81.0"
   },
   "files": [
-    "harness/extensions",
-    "harness/lib",
+    "harness/extensions/hashline.ts",
+    "harness/extensions/loop-breaker.ts",
+    "harness/extensions/verify-gate.ts",
+    "harness/extensions/plan-runner.ts",
+    "harness/extensions/reflect.ts",
+    "harness/extensions/drift-scanner.ts",
+    "harness/extensions/git-guard.ts",
+    "harness/extensions/context-inlet-guard.ts",
+    "harness/extensions/context-watcher.ts",
+    "harness/extensions/span-tools.ts",
+    "harness/extensions/compact-tool.ts",
+    "harness/extensions/micro-gate.ts",
+    "harness/extensions/ketch.ts",
+    "harness/extensions/plan-weaver.ts",
+    "harness/extensions/did-you-mean.ts",
+    "harness/lib/bash-mutations.ts",
+    "harness/lib/command-policy.ts",
+    "harness/lib/context-inlet.ts",
+    "harness/lib/context-watch.ts",
+    "harness/lib/did-you-mean.ts",
+    "harness/lib/drift-policy.ts",
+    "harness/lib/gate-runtime.ts",
+    "harness/lib/hashline-core.ts",
+    "harness/lib/loop-outcome.ts",
+    "harness/lib/micro-gate-policy.ts",
+    "harness/lib/plan-contract.ts",
+    "harness/lib/plan-integrity.ts",
+    "harness/lib/plan-progress.ts",
+    "harness/lib/public-url.ts",
+    "harness/lib/reflect-policy.ts",
+    "harness/lib/span-index.ts",
+    "harness/lib/steer-texts.ts",
+    "harness/lib/tag-words.ts",
+    "harness/lib/telemetry.ts",
     "harness/agents",
     "harness/vendor",
     "harness/APPEND_SYSTEM.md",

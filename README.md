@@ -41,6 +41,9 @@ Pi extensions. Load them once; most work automatically, a few add commands or en
 | **compact-tool** | `/compact` — summarize and prune older context mid-task |
 | **micro-gate** | *(opt-in)* parse/compile-checks just-edited files at turn end |
 | **ketch** | web / code / docs search |
+| **plan-weaver** | compiles an explicit, gated execution DAG before work starts |
+| **did-you-mean** | suggests the nearest on-disk path after a mistyped file access |
+| **pi-subagent** | bundled `subagent` tool for isolated exploration, execution, and review |
 
 Plus a **governor** (`harness/APPEND_SYSTEM.md`) — a minimal system-prompt core (safety gates +
 feature docs, no behavioral prose; the loop found prose *hurts* capable models).
@@ -48,9 +51,9 @@ feature docs, no behavioral prose; the loop found prose *hurts* capable models).
 ### Install
 
 The harness is a pi extension package (the repo-root `package.json` carries the pi manifest). Pi's
-package manager runs npm under the hood, so the one dependency (`typebox`) installs automatically;
-`@earendil-works/pi-coding-agent` is a peer your pi install already provides. Extensions are
-TypeScript and load directly — no build step.
+package manager runs npm under the hood, so the runtime dependency (`typebox`) installs
+automatically; `@earendil-works/pi-coding-agent` is a peer your pi install already provides.
+Extensions are TypeScript and load directly — no build step. Node.js 22.6 or newer is required.
 
 ```sh
 pi package install pi-munchkin                    # once published to npm
@@ -60,8 +63,11 @@ pi package install github:AlbertJW/pi-munchkin    # or straight from git
 Manage with `pi package list | update | remove`. Manual alternative: copy `harness/extensions` +
 `harness/lib` into `~/.pi/agent/extensions/` and `npm i typebox`.
 
-The optional bundled `harness/vendor/pi-subagent` adds the `subagent` tool that `plan-runner` and
-`reflect` use when present (they degrade gracefully without it).
+The bundled `harness/vendor/pi-subagent` adds the `subagent` tool that `plan-runner` and `reflect`
+use. The harness still degrades gracefully if an installation chooses not to load that entry point.
+
+The published package deliberately excludes `harness/extensions/chaos.ts`: it is a benchmark-only
+fault injector and is never part of the default runtime manifest.
 
 ### Use
 
@@ -82,6 +88,32 @@ Behavior knobs (all optional env vars, sensible defaults):
 | `HASHLINE_TAG=hex\|slug` | edit tag style (word-slugs can copy better on tiny models) |
 | `SPAN_TOOLS=on` | expose the bounded large-file tools |
 | `DRIFT_SCANNER=off` | disable post-commit review |
+
+### Platform and security notes
+
+- Supported release platforms are Linux and macOS on Node.js 22.6 or newer; both run in CI.
+- Extensions execute with the permissions of the pi process. Review the manifest and keep API keys,
+  tokens, and machine-specific paths out of tracked settings.
+- `ketch` can invoke external search backends. Model/provider traffic remains governed by your pi
+  configuration.
+- Report vulnerabilities privately using [the security policy](.github/SECURITY.md).
+
+### Verify a checkout or release candidate
+
+Install exactly the locked development graph, then run the canonical verification lane:
+
+```sh
+npm ci
+npm run verify
+```
+
+`verify` runs the complete Node test suite, a portable full-harness TypeScript check, the read-only
+health check, an `npm pack` smoke test that verifies package contents and imports every manifest
+extension, plus all offline optimizer self-tests, shell syntax checks, fixture tests, admission
+integrity checks, and the documented `real_gate.sh --dry` wiring smoke. The health check automatically uses `harness/*.example.json` in a clean clone
+and local `settings.json` / `models.json` when run from an installed harness. Individual lanes are
+available as `npm test`, `npm run typecheck`, `npm run health`, `npm run pack:smoke`, and
+`npm run verify:optimizer`.
 
 ---
 
@@ -150,8 +182,12 @@ change), `REJECT` (do-no-harm regression), plus fleet guards `INCOMPLETE` / `MIX
 All automatic inside `real_gate.sh`; listed so you know they exist (each one paid for itself):
 
 - **Seatbelt jail** (macOS): sessions can write only their workdir + pi's sessions/telemetry
-  dirs, and cannot read the harness, the hidden graders, or a public clone of this repo.
+  dirs, use a private per-run temp directory, and cannot read the harness, hidden graders,
+  public mirror, or common host credential stores.
   Auto-off where `sandbox-exec` is unavailable — hidden tasks then refuse to run.
+- **Reduced child environment** — headless Pi starts under `env -i`; unrelated frontier/cloud,
+  SSH-agent, npm, and shell-hook secrets are removed. `PI_GATE_PASSTHROUGH_ENV=name,...`
+  explicitly passes exceptional provider variables and forces exploratory-only rows.
 - **Memory watchdog** — each session runs in its own process group; past `PI_MEM_CAP_GB`
   (default 12) the whole group is killed. Model-spawned `node` can't orphan or balloon.
 - **Single-slot serving protections** — observational-memory consolidation is forced passive
