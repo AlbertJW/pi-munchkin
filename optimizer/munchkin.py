@@ -12,15 +12,15 @@ prompt-lab/configs/schema.json: only safe, no-relaunch, in-schema values ever ru
 config) is written to prompt-lab/proposals/ for review; this NEVER edits the live governor.
 
 The loop is pure + injectable (gate_fn/propose_fn, in-memory journal), so --selftest proves
-it offline (no GPU/network). Live run needs llama-server up (:8080) and
-FRONTIER_BASE_URL/FRONTIER_API_KEY.
+it offline (no GPU/network). Live run defaults to an endpoint-restricted loopback
+llama-server (:8080) and needs FRONTIER_BASE_URL/FRONTIER_API_KEY.
 
 Usage:  munchkin.py [--gen m0] [--rounds 3] [--candidates 2] [--n 4] [--tasks parens,equil,bigdata]
         munchkin.py --dry        # print the session-count estimate, run nothing
         munchkin.py --selftest   # offline loop proof
 GPU cost ≈ rounds × candidates × (tasks × n) agentic sessions on the model — keep small.
 """
-import glob, hashlib, json, os, re, subprocess, sys, tempfile
+import glob, hashlib, ipaddress, json, os, re, shutil, subprocess, sys, tempfile, urllib.parse
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 LAB = os.path.join(HERE, "prompt-lab")
@@ -215,6 +215,40 @@ def session_tail(wd, limit=800):
     except Exception:
         return ""
 
+def _authoritative_gate_env(source=None, *, platform_name=None, sandbox_exec=None,
+                            profile_exists=None):
+    """Materialize Munchkin's authoritative transport defaults or reject preflight."""
+    env = dict(os.environ if source is None else source)
+    env["GATE_NETWORK"] = env.get("GATE_NETWORK") or "endpoint"
+    env["MODEL_CONTROL"] = env.get("MODEL_CONTROL") or "llama"
+    env["LLAMA_URL"] = env.get("LLAMA_URL") or "http://127.0.0.1:8080"
+    env["SANDBOX"] = env.get("SANDBOX") or "on"
+    if env["GATE_NETWORK"] != "endpoint":
+        raise ValueError("GATE_NETWORK must be endpoint (open rows are exploratory)")
+    if env["MODEL_CONTROL"] != "llama":
+        raise ValueError("MODEL_CONTROL must be llama (pi-native rows require open networking)")
+    parsed = urllib.parse.urlparse(env["LLAMA_URL"])
+    host = (parsed.hostname or "").rstrip(".").lower()
+    try:
+        loopback = ipaddress.ip_address(host).is_loopback
+    except ValueError:
+        loopback = host == "localhost"
+    if parsed.scheme not in ("http", "https") or not loopback:
+        raise ValueError("LLAMA_URL must be an http(s) loopback endpoint")
+    if env["SANDBOX"] != "on":
+        raise ValueError("SANDBOX must be on for authoritative filesystem isolation")
+    platform_name = sys.platform if platform_name is None else platform_name
+    sandbox_exec = shutil.which("sandbox-exec") if sandbox_exec is None else sandbox_exec
+    profile_exists = os.path.isfile(os.path.join(HERE, "real-gate-fixtures", "gate.sb")) \
+        if profile_exists is None else profile_exists
+    if platform_name != "darwin" or not sandbox_exec or not profile_exists:
+        raise ValueError("authoritative filesystem isolation requires macOS sandbox-exec and gate.sb")
+    if env.get("LLAMA_API_KEY"):
+        raise ValueError("LLAMA_API_KEY is exposed to child tools, making rows exploratory")
+    if env.get("PI_GATE_PASSTHROUGH_ENV"):
+        raise ValueError("PI_GATE_PASSTHROUGH_ENV makes rows exploratory")
+    return env
+
 def _validated_canonical_val_rows(rows, tasks, n):
     """Return the exact authoritative, complete canonical val surface or fail closed."""
     expected = {(task, rep) for task in tasks for rep in range(1, n + 1)}
@@ -243,6 +277,10 @@ def _validated_canonical_val_rows(rows, tasks, n):
 
 def real_gate_one(cand, tasks, n, gen):
     """Gate one candidate (base config only) → (passes, total, failing_traces)."""
+    try:
+        gate_env = _authoritative_gate_env()
+    except ValueError as e:
+        raise SystemExit(f"[munchkin] authoritative gate preflight failed: {e}")
     os.makedirs(PROPOSALS, exist_ok=True)
     gov_path = os.path.join(PROPOSALS, gen + ".gov.md")
     cfg_path = os.path.join(PROPOSALS, gen + ".config.json")
@@ -257,7 +295,7 @@ def real_gate_one(cand, tasks, n, gen):
         os.remove(out)
     import uuid
     RUN_IDS[gen] = uuid.uuid4().hex[:6]
-    env = {**os.environ, "GEN": gen, "BASE": cfg_path, "N": str(n), "RUNID": RUN_IDS[gen]}
+    env = {**gate_env, "GEN": gen, "BASE": cfg_path, "N": str(n), "RUNID": RUN_IDS[gen]}
     t0 = _utc_z()
     # Popen (not run) so a signal handler can kill the gate: killing munchkin alone
     # orphans the bash gate, which keeps writing rows into the next run's files
@@ -435,6 +473,55 @@ def selftest():
     assert robustness_due("m-r3-c0") and robustness_due("m-r7-c2")
     assert not robustness_due("m-r2-c0") and not robustness_due("m-r0-base")
     assert DEFAULT_TASKS == ("parens", "equil", "bigdata"), DEFAULT_TASKS
+
+    # Munchkin must never spend sessions on a transport that can only emit
+    # exploratory rows. Capability probes are injected so this remains offline.
+    probe = {"UNRELATED": "kept"}
+    authoritative_env = _authoritative_gate_env(
+        probe, platform_name="darwin", sandbox_exec="/usr/bin/sandbox-exec", profile_exists=True)
+    assert probe == {"UNRELATED": "kept"}, "preflight must not mutate its input"
+    assert {k: authoritative_env[k] for k in ("GATE_NETWORK", "MODEL_CONTROL", "LLAMA_URL", "SANDBOX")} == {
+        "GATE_NETWORK": "endpoint", "MODEL_CONTROL": "llama",
+        "LLAMA_URL": "http://127.0.0.1:8080", "SANDBOX": "on"}
+
+    def rejects_transport(overrides, message, **probes):
+        try:
+            _authoritative_gate_env(overrides, platform_name=probes.get("platform_name", "darwin"),
+                                    sandbox_exec=probes.get("sandbox_exec", "/usr/bin/sandbox-exec"),
+                                    profile_exists=probes.get("profile_exists", True))
+        except ValueError as e:
+            assert message in str(e), e
+        else:
+            raise AssertionError(f"transport preflight should reject: {overrides}")
+
+    rejects_transport({"GATE_NETWORK": "open"}, "must be endpoint")
+    rejects_transport({"MODEL_CONTROL": "pi-native"}, "must be llama")
+    rejects_transport({"LLAMA_URL": "http://model-box:8080"}, "loopback endpoint")
+    rejects_transport({"SANDBOX": "off"}, "SANDBOX must be on")
+    rejects_transport({}, "requires macOS", platform_name="linux")
+    rejects_transport({}, "requires macOS", sandbox_exec="")
+    rejects_transport({}, "requires macOS", profile_exists=False)
+    rejects_transport({"LLAMA_API_KEY": "secret"}, "LLAMA_API_KEY")
+    rejects_transport({"PI_GATE_PASSTHROUGH_ENV": "TOKEN"}, "PI_GATE_PASSTHROUGH_ENV")
+
+    # Integration boundary: an explicit exploratory setting exits before Popen.
+    old_network = os.environ.get("GATE_NETWORK")
+    old_popen = subprocess.Popen
+    os.environ["GATE_NETWORK"] = "open"
+    subprocess.Popen = lambda *a, **kw: (_ for _ in ()).throw(AssertionError("gate launched"))
+    try:
+        try:
+            real_gate_one(make_cand("x"), ["t"], 1, "preflight-selftest")
+        except SystemExit as e:
+            assert "authoritative gate preflight failed" in str(e), e
+        else:
+            raise AssertionError("real_gate_one accepted exploratory transport")
+    finally:
+        subprocess.Popen = old_popen
+        if old_network is None:
+            os.environ.pop("GATE_NETWORK", None)
+        else:
+            os.environ["GATE_NETWORK"] = old_network
 
     # real-gate authority boundary: count only an exact, authoritative and complete
     # pi.eval-row/v2 canonical val surface; missing/malformed rows fail closed.
