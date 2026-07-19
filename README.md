@@ -14,6 +14,9 @@
 2. **[The self-improvement loop](#the-self-improvement-loop)** — a measurement-gated optimizer that
    A/B-tests harness/governor changes and keeps only the ones that pass a statistical test.
 
+The active research and experiment backlog is maintained in
+[the small-model improvement roadmap](optimizer/docs/SMALL_MODEL_IMPROVEMENT_ROADMAP.md).
+
 > **Status — a validated loop with measured wins.** Headline result (n=36/arm, local 35B): pass
 > rate rose *monotonically as governor prose was removed* — 5.2 KB governor 83%, lean 89%,
 > **empty 97%** — so the shipped governor is a 1.4 KB minimal core. The same machinery rejected
