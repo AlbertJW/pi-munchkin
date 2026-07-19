@@ -530,10 +530,10 @@ Use single mode for one task, parallel mode when tasks are independent and can r
 
         let forkSessionSnapshotJsonl: string | undefined;
         if (delegationMode === "fork") {
-          forkSessionSnapshotJsonl = buildForkSessionSnapshotJsonl(
+          const snapshot = buildForkSessionSnapshotJsonl(
             ctx.sessionManager,
           );
-          if (!forkSessionSnapshotJsonl) {
+          if (!snapshot) {
             return {
               content: [
                 {
@@ -545,6 +545,7 @@ Use single mode for one task, parallel mode when tasks are independent and can r
               isError: true,
             };
           }
+          forkSessionSnapshotJsonl = snapshot;
         }
 
         // Validate: exactly one invocation shape must be specified

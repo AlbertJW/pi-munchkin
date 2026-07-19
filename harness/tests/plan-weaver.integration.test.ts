@@ -25,6 +25,8 @@ echo "CALL \$brief" | head -c 300 >> stub-calls.log; echo >> stub-calls.log
 if [[ "\$brief" == *make-out* ]]; then touch out.txt; echo "RESULT: done — created out.txt"; echo "CHANGED: out.txt"; exit 0; fi
 if [[ "\$brief" == *lie* ]]; then echo "RESULT: done — definitely finished (nothing was done)"; exit 0; fi
 if [[ "\$brief" == *no-result* ]]; then echo "I feel great about this work."; exit 0; fi
+if [[ "\$brief" == *exit-fail* ]]; then echo "RESULT: done — lying before exit"; exit 7; fi
+if [[ "\$brief" == *hang-child* ]]; then sleep 3; echo "RESULT: done — too late"; exit 0; fi
 echo "RESULT: done — ok"
 `);
 	chmodSync(join(stubDir, "pi"), 0o755);
@@ -63,7 +65,7 @@ test("compile rejects ungated execute; accepts after fix (one mechanical retry)"
 	assert.ok(bad.isError);
 	assert.ok(bad.content[0].text.includes("Worked example"));
 	const good = await callTool(fp, "weave_compile", { items: [
-		{ id: "s1", title: "edit", mode: "execute", deliverable: "d", gate: "true" },
+		{ id: "s1", title: "edit", mode: "execute", deliverable: "d", gate: "test -d ." },
 	] }, cwd);
 	assert.ok(!good.isError);
 	assert.ok(good.content[0].text.includes("Plan compiled"));
@@ -125,6 +127,33 @@ test("gateless child with no RESULT line is blocked (never trust silence)", asyn
 	const state = JSON.parse(readFileSync(join(cwd, ".pi", "weave-state.json"), "utf8"));
 	assert.equal(state.items[0].status, "blocked");
 	rmSync(cwd, { recursive: true, force: true });
+});
+
+test("nonzero child cannot pass a green gate from stale workspace state", async () => {
+	const { fp, cwd } = await freshWeaver();
+	writeFileSync(join(cwd, "already.txt"), "stale");
+	await compile(fp, cwd, [{ id: "s1", title: "exit-fail child", mode: "execute", deliverable: "d", gate: "test -f already.txt" }]);
+	const { ctx } = makeCtx(cwd);
+	await fp.commands.get("weave-go").handler("", ctx);
+	const state = JSON.parse(readFileSync(join(cwd, ".pi", "weave-state.json"), "utf8"));
+	assert.equal(state.items[0].status, "blocked");
+	assert.equal(state.items[0].gate_fails, 3);
+	rmSync(cwd, { recursive: true, force: true });
+});
+
+test("timed-out child is failed and terminated instead of accepted", async () => {
+	process.env.WEAVE_CHILD_TIMEOUT_S = "1";
+	try {
+		const { fp, cwd } = await freshWeaver();
+		writeFileSync(join(cwd, "already.txt"), "stale");
+		await compile(fp, cwd, [{ id: "s1", title: "hang-child", mode: "execute", deliverable: "d", gate: "test -f already.txt" }]);
+		const { ctx } = makeCtx(cwd);
+		await fp.commands.get("weave-go").handler("", ctx);
+		const state = JSON.parse(readFileSync(join(cwd, ".pi", "weave-state.json"), "utf8"));
+		assert.equal(state.items[0].status, "blocked");
+		assert.match(state.items[0].note, /timed out|child failed/i);
+		rmSync(cwd, { recursive: true, force: true });
+	} finally { process.env.WEAVE_CHILD_TIMEOUT_S = "20"; }
 });
 
 test("inline items skip dispatch and land in the handoff for the main loop", async () => {

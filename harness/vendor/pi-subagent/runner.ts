@@ -12,6 +12,7 @@ import type { AgentToolResult } from "@earendil-works/pi-agent-core";
 import type { AgentConfig } from "./agents.js";
 import { parseInheritedCliArgs } from "./runner-cli.js";
 import { processPiJsonLine } from "./runner-events.js";
+import { buildSubagentEnv } from "./runner-env.js";
 import {
   type DelegationMode,
   type SingleResult,
@@ -29,6 +30,7 @@ const SUBAGENT_MAX_DEPTH_ENV = "PI_SUBAGENT_MAX_DEPTH";
 const SUBAGENT_STACK_ENV = "PI_SUBAGENT_STACK";
 const SUBAGENT_PREVENT_CYCLES_ENV = "PI_SUBAGENT_PREVENT_CYCLES";
 const PI_OFFLINE_ENV = "PI_OFFLINE";
+const DEFAULT_SUBAGENT_TIMEOUT_MS = 600_000;
 
 type OnUpdateCallback = (partial: AgentToolResult<SubagentDetails>) => void;
 
@@ -163,6 +165,8 @@ export interface RunAgentOptions {
   sessionModel?: string;
   /** Abort signal for cancellation. */
   signal?: AbortSignal;
+  /** Hard wall-clock limit for the child process. */
+  timeoutMs?: number;
   /** Streaming update callback. */
   onUpdate?: OnUpdateCallback;
   /** Factory to wrap results into SubagentDetails. */
@@ -189,6 +193,7 @@ export async function runAgent(opts: RunAgentOptions): Promise<SingleResult> {
     preventCycles,
     sessionModel,
     signal,
+    timeoutMs,
     onUpdate,
     makeDetails,
   } = opts;
@@ -278,6 +283,7 @@ export async function runAgent(opts: RunAgentOptions): Promise<SingleResult> {
       sessionModel,
     );
     let wasAborted = false;
+    let wasTimedOut = false;
 
     const exitCode = await new Promise<number>((resolve) => {
       const nextDepth = Math.max(0, Math.floor(parentDepth)) + 1;
@@ -288,8 +294,9 @@ export async function runAgent(opts: RunAgentOptions): Promise<SingleResult> {
         cwd: taskCwd ?? cwd,
         shell: false,
         stdio: ["pipe", "pipe", "pipe"],
+        detached: !isWindows,
         env: {
-          ...process.env,
+          ...buildSubagentEnv(),
           [SUBAGENT_DEPTH_ENV]: String(nextDepth),
           [SUBAGENT_MAX_DEPTH_ENV]: String(propagatedMaxDepth),
           [SUBAGENT_STACK_ENV]: JSON.stringify(propagatedStack),
@@ -308,6 +315,7 @@ export async function runAgent(opts: RunAgentOptions): Promise<SingleResult> {
       let settled = false;
       let abortHandler: (() => void) | undefined;
       let semanticCompletionTimer: NodeJS.Timeout | undefined;
+      let hardTimeout: NodeJS.Timeout | undefined;
 
       const clearSemanticCompletionTimer = () => {
         if (semanticCompletionTimer) {
@@ -327,9 +335,13 @@ export async function runAgent(opts: RunAgentOptions): Promise<SingleResult> {
           return;
         }
 
-        proc.kill("SIGTERM");
+        if (proc.pid !== undefined) {
+          try { process.kill(-proc.pid, "SIGTERM"); } catch { proc.kill("SIGTERM"); }
+        }
         const sigkillTimer = setTimeout(() => {
-          if (!didClose) proc.kill("SIGKILL");
+          if (!didClose && proc.pid !== undefined) {
+            try { process.kill(-proc.pid, "SIGKILL"); } catch { proc.kill("SIGKILL"); }
+          }
         }, SIGKILL_TIMEOUT_MS);
         sigkillTimer.unref();
       };
@@ -338,6 +350,7 @@ export async function runAgent(opts: RunAgentOptions): Promise<SingleResult> {
         if (settled) return;
         settled = true;
         clearSemanticCompletionTimer();
+        if (hardTimeout) clearTimeout(hardTimeout);
         if (signal && abortHandler) {
           signal.removeEventListener("abort", abortHandler);
         }
@@ -386,10 +399,15 @@ export async function runAgent(opts: RunAgentOptions): Promise<SingleResult> {
       proc.stdout.on("data", onStdoutData);
       proc.stderr.on("data", onStderrData);
 
-      proc.on("close", (code) => {
+      proc.on("close", (code, closeSignal) => {
         didClose = true;
         if (buffer.trim()) flushBufferedLines(buffer);
-        finish(code ?? 0);
+        if (closeSignal && !wasAborted && !wasTimedOut) {
+          result.stopReason = "error";
+          result.errorMessage = `Subagent terminated by signal ${closeSignal}.`;
+          if (!result.stderr.trim()) result.stderr = result.errorMessage;
+        }
+        finish(code ?? (closeSignal ? 128 : 1));
       });
 
       proc.on("error", (err) => {
@@ -407,9 +425,22 @@ export async function runAgent(opts: RunAgentOptions): Promise<SingleResult> {
         if (signal.aborted) abortHandler();
         else signal.addEventListener("abort", abortHandler, { once: true });
       }
+
+      const envTimeout = Number.parseInt(process.env.PI_SUBAGENT_TIMEOUT_MS || "", 10);
+      const configuredTimeout = timeoutMs ?? (Number.isFinite(envTimeout) && envTimeout > 0 ? envTimeout : DEFAULT_SUBAGENT_TIMEOUT_MS);
+      hardTimeout = setTimeout(() => {
+        if (didClose || settled) return;
+        wasTimedOut = true;
+        result.stopReason = "error";
+        result.errorMessage = `Subagent timed out after ${configuredTimeout}ms.`;
+        if (!result.stderr.trim()) result.stderr = result.errorMessage;
+        terminateChild();
+      }, Math.max(1, configuredTimeout));
+      hardTimeout.unref();
     });
 
     result.exitCode = exitCode;
+    if (wasTimedOut) result.exitCode = 124;
     return normalizeCompletedResult(result, wasAborted);
   } finally {
     cleanupTempDir(promptTmpDir);

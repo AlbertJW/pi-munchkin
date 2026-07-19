@@ -60,7 +60,9 @@ function normalizeDelegationMode(raw: unknown): DelegationMode {
 	return raw === "fork" ? "fork" : DEFAULT_DELEGATION_MODE;
 }
 
-type ThemeFg = (color: string, text: string) => string;
+// The host Theme narrows color to its ThemeColor union. Rendering only forwards
+// known theme tokens, so accept that callable without widening it contravariantly.
+type ThemeFg = (color: any, text: string) => string;
 
 function formatToolCall(toolName: string, args: Record<string, unknown>, fg: ThemeFg): string {
 	const pathArg = (args.file_path || args.path || "...") as string;

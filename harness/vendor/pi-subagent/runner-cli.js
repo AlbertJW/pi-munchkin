@@ -145,7 +145,6 @@ export function parseInheritedCliArgs(argv) {
     if (
       [
         "--provider",
-        "--api-key",
         "--system-prompt",
         "--models",
       ].includes(flagName)
@@ -155,6 +154,15 @@ export function parseInheritedCliArgs(argv) {
       i += skip;
       continue;
     }
+
+		// Never copy credentials into a child's argv: process listings and crash
+		// reports expose argv. Providers should use their credential store or the
+		// narrowly inherited environment assembled by runner.ts.
+		if (flagName === "--api-key") {
+			const [, skip] = getValue();
+			i += skip;
+			continue;
+		}
 
     if (
       [

@@ -26,6 +26,7 @@ import { homedir } from "node:os";
 import { Type } from "typebox";
 import { defineTool, type ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { assertVerifyGateAllowed } from "../lib/command-policy.ts";
+import { gateEnvironment, runReadonlyGate } from "../lib/gate-runtime.ts";
 import {
 	compilePlan, localityBrief, nextReady, normalizeInput, parseChildResult, stalled,
 	type WeaveItem, type WeavePlan,
@@ -96,17 +97,23 @@ async function runChild(exec: Exec, cwd: string, role: string, brief: string):
 	// = infinite hang, closed = 25s reply). Whatever stdio the host exec uses, the
 	// shell-level redirect guarantees a closed stdin. "$@" passes the brief unquoted.
 	// PI_OFFLINE=1 matches the vendored subagent runner.
-	const r = await exec("bash", ["-c", 'exec </dev/null env PI_OFFLINE=1 pi "$@"', "bash", ...args], {
-		cwd, timeout: CHILD_TIMEOUT_S * 1000,
-	});
-	return { ok: r.code === 0, text: (r.stdout || "").trim() || (r.stderr || "").trim() };
+	try {
+		const r = await exec("/usr/bin/env", ["-i", ...gateEnvironment(), "PI_OFFLINE=1", "bash", "--noprofile", "--norc", "-c",
+			'exec </dev/null; exec pi "$@"', "bash", ...args], { cwd, timeout: CHILD_TIMEOUT_S * 1000 });
+		const text = (r.stdout || "").trim() || (r.stderr || "").trim();
+		if (r.code !== 0 || r.killed) {
+			return { ok: false, text: text || (r.killed ? `child timed out after ${CHILD_TIMEOUT_S}s` : `child exited ${r.code}`) };
+		}
+		return { ok: true, text };
+	} catch (err) {
+		return { ok: false, text: `child execution failed: ${err instanceof Error ? err.message : String(err)}` };
+	}
 }
 
 /** Engine-side gate run — read-only enforced, never trusts the child. */
 async function runGate(exec: Exec, cwd: string, gate: string):
 	Promise<{ pass: boolean; output: string }> {
-	const r = await exec("bash", ["-c", gate], { cwd, timeout: GATE_TIMEOUT_MS });
-	return { pass: r.code === 0, output: (r.stdout + "\n" + r.stderr).trim() };
+	return runReadonlyGate(exec, cwd, gate, GATE_TIMEOUT_MS);
 }
 
 /** Dispatch ONE item through the failure ladder. Mutates item status/rung. */
@@ -119,15 +126,20 @@ async function dispatchItem(exec: Exec, cwd: string, it: WeaveItem): Promise<str
 
 	// explore/verify have no gate: the parsed contract IS the outcome.
 	if (!it.gate) {
-		it.status = parsed.result === "done" ? "done" : "blocked";
-		it.note = parsed.line;
+		it.status = child.ok && parsed.result === "done" ? "done" : "blocked";
+		it.note = child.ok ? parsed.line : `child failed: ${child.text.slice(-300)}`;
 		record("plan-weaver", "gate", { id: it.id, pass: it.status === "done", gated: false });
 		return `${it.id} ${it.status}: ${parsed.line}`;
 	}
 
-	// execute: ladder around the ENGINE-run gate.
+	// execute: the child result and engine gate are BOTH required. A timeout,
+	// signal, non-zero exit, or RESULT: blocked consumes a ladder attempt and can
+	// never be laundered into success by stale workspace state.
 	for (;;) {
-		const gate = await runGate(exec, cwd, it.gate);
+		const childSucceeded = child.ok && parsed.result === "done";
+		const gate = childSucceeded
+			? await runGate(exec, cwd, it.gate)
+			: { pass: false, output: child.ok ? parsed.line : `child failed: ${child.text}` };
 		record("plan-weaver", "gate", { id: it.id, pass: gate.pass, fails: it.gate_fails, gated: true });
 		if (gate.pass) {
 			it.status = "done";
@@ -152,7 +164,7 @@ async function dispatchItem(exec: Exec, cwd: string, it: WeaveItem): Promise<str
 			// rung 3 — blocked; the main model gets a bounded replan request in the handoff.
 			it.ladder_rung = 3;
 			it.status = "blocked";
-			it.note = `gate red x${it.gate_fails}; last child: ${parsed.line}; gate tail: ${gate.output.slice(-300)}`;
+			it.note = `attempt failed x${it.gate_fails}; last child: ${child.ok ? parsed.line : child.text.slice(-200)}; check tail: ${gate.output.slice(-300)}`;
 			return `${it.id} BLOCKED after ladder: ${it.note.slice(0, 160)}`;
 		}
 	}
@@ -187,9 +199,8 @@ export default function (pi: ExtensionAPI) {
 				// gates must be read-only BEFORE compile accepts them
 				for (const it of params.items ?? []) {
 					if (it.gate) {
-						try { assertVerifyGateAllowed(it.gate); } catch (e) {
-							return { content: [{ type: "text" as const, text: `item ${it.id ?? it.title}: gate rejected (${(e as Error).message}) — gates must be read-only checks.` }], details: {}, isError: true };
-						}
+						const allowed = assertVerifyGateAllowed(it.gate);
+						if (!allowed.ok) return { content: [{ type: "text" as const, text: `item ${it.id ?? it.title}: gate rejected (${allowed.reason}) — gates must be read-only checks.` }], details: {}, isError: true };
 					}
 				}
 				const out = compilePlan(params, plan.request, new Date().toISOString());

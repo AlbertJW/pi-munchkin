@@ -81,9 +81,10 @@ export function hasSemanticCompletion(r: Pick<SingleResult, "messages" | "sawAge
 
 /** Whether a result should be treated as successful by the wrapper/UI. */
 export function isResultSuccess(r: SingleResult): boolean {
-	if (r.exitCode === -1) return false;
-	if (hasSemanticCompletion(r)) return true;
-	return r.exitCode === 0 && r.stopReason !== "error" && r.stopReason !== "aborted";
+	if (r.exitCode !== 0 || r.stopReason === "error" || r.stopReason === "aborted") return false;
+	// A clean process exit is necessary; semantic completion is stronger evidence
+	// when present, but can never erase a timeout/signal/non-zero failure.
+	return hasSemanticCompletion(r) || r.exitCode === 0;
 }
 
 /** Whether a result represents an error. */
@@ -94,36 +95,18 @@ export function isResultError(r: SingleResult): boolean {
 
 /** Reconcile process exit status with semantic completion observed from Pi's event stream. */
 export function normalizeCompletedResult(result: SingleResult, wasAborted: boolean): SingleResult {
-	const hasSemanticSuccess = hasSemanticCompletion(result);
-
 	if (wasAborted) {
-		if (hasSemanticSuccess) {
-			result.exitCode = 0;
-			if (result.stopReason === "aborted") result.stopReason = undefined;
-			if (result.errorMessage === "Subagent was aborted.") {
-				result.errorMessage = undefined;
-			}
-		} else {
-			result.exitCode = 130;
-			result.stopReason = "aborted";
-			result.errorMessage = "Subagent was aborted.";
-			if (!result.stderr.trim()) result.stderr = "Subagent was aborted.";
-		}
+		result.exitCode = 130;
+		result.stopReason = "aborted";
+		result.errorMessage = "Subagent was aborted.";
+		if (!result.stderr.trim()) result.stderr = "Subagent was aborted.";
 		return result;
 	}
 
 	if (result.exitCode > 0) {
-		if (hasSemanticSuccess) {
-			result.exitCode = 0;
-			if (result.stopReason === "error") result.stopReason = undefined;
-			if (result.errorMessage === result.stderr.trim()) {
-				result.errorMessage = undefined;
-			}
-		} else {
-			if (!result.stopReason) result.stopReason = "error";
-			if (!result.errorMessage && result.stderr.trim()) {
-				result.errorMessage = result.stderr.trim();
-			}
+		if (!result.stopReason) result.stopReason = "error";
+		if (!result.errorMessage && result.stderr.trim()) {
+			result.errorMessage = result.stderr.trim();
 		}
 	}
 
