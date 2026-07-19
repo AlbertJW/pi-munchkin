@@ -15,7 +15,7 @@ The loop is pure + injectable (gate_fn/propose_fn, in-memory journal), so --self
 it offline (no GPU/network). Live run needs llama-server up (:8080) and
 FRONTIER_BASE_URL/FRONTIER_API_KEY.
 
-Usage:  munchkin.py [--gen m0] [--rounds 3] [--candidates 2] [--n 4] [--tasks t1,t2,t3]
+Usage:  munchkin.py [--gen m0] [--rounds 3] [--candidates 2] [--n 4] [--tasks parens,equil,bigdata]
         munchkin.py --dry        # print the session-count estimate, run nothing
         munchkin.py --selftest   # offline loop proof
 GPU cost ≈ rounds × candidates × (tasks × n) agentic sessions on the model — keep small.
@@ -34,6 +34,7 @@ LIVE_GOV = os.path.expanduser("~/.pi/agent/APPEND_SYSTEM.md")
 SATURATED = 0.85
 PLATEAU_STOP = 2
 JOURNAL_CTX = 24  # prior experiments shown to the proposer
+DEFAULT_TASKS = ("parens", "equil", "bigdata")
 
 def robustness_due(gen_label):
     """Every fourth candidate round (r3, r7, ...) gets wording + one-shot controls."""
@@ -433,6 +434,7 @@ def selftest():
     dims = load_schema_dims()
     assert robustness_due("m-r3-c0") and robustness_due("m-r7-c2")
     assert not robustness_due("m-r2-c0") and not robustness_due("m-r0-base")
+    assert DEFAULT_TASKS == ("parens", "equil", "bigdata"), DEFAULT_TASKS
 
     # real-gate authority boundary: count only an exact, authoritative and complete
     # pi.eval-row/v2 canonical val surface; missing/malformed rows fail closed.
@@ -580,7 +582,7 @@ def main():
     def opt(flag, d):
         return args[args.index(flag) + 1] if flag in args else d
     gen = opt("--gen", "m0"); rounds = int(opt("--rounds", "3")); k = int(opt("--candidates", "2"))
-    n = int(opt("--n", "4")); tasks = opt("--tasks", "t1,t2,t3").split(",")
+    n = int(opt("--n", "4")); tasks = opt("--tasks", ",".join(DEFAULT_TASKS)).split(",")
     static = opt("--static", "")  # comma-separated candidate spec JSONs -> no frontier needed
     if static:
         paths = [os.path.expanduser(p) for p in static.split(",")]

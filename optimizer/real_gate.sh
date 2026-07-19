@@ -5,7 +5,7 @@
 # + task checks). Emits fleet_report-compatible rows {model, pattern, task, rep, score,
 # split, out_chars} so the SAME significance/do-no-harm rule decides adoption.
 #
-#   GEN=rg0 BASE=configs/baseline.json CAND=configs/cand-cot.json N=3 ./real_gate.sh [t1..t4]
+#   GEN=rg0 BASE=configs/baseline.json CAND=configs/cand-cot.json N=3 ./real_gate.sh [parens equil bigdata]
 #   ./real_gate.sh --dry
 #
 # MODEL_CONTROL=llama expects an already-running OpenAI-compatible server;
@@ -34,6 +34,7 @@ RESULTS="$HERE/prompt-lab/results/$GEN.jsonl"
 RUNS="${REAL_GATE_RUNS:-$HOME/.pi/real-gate-runs}"
 
 DRY=0; HARD=0; CALIB=0; ROBUSTNESS=0; EXPLORATORY=0; TASKS=()
+DEFAULT_TASKS=(parens equil bigdata)
 for a in "$@"; do
 	case "$a" in
 		--dry) DRY=1 ;;
@@ -53,7 +54,7 @@ if [[ ${#TASKS[@]} -eq 0 ]]; then
 		# every hidden task is one $FIXTURES/hidden/<id>.test.js — derive the list, no hardcoding
 		TASKS=(); for f in "$FIXTURES"/hidden/*.test.js; do [[ -e "$f" ]] && TASKS+=("$(basename "$f" .test.js)"); done
 	else
-		TASKS=(t1 t2 t3 t4 t5 t6)
+		TASKS=("${DEFAULT_TASKS[@]}")
 	fi
 fi
 
