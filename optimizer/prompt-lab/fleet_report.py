@@ -163,6 +163,81 @@ def adoption_rows(rows, baseline, candidate):
             and r.get("split") in ("val", "heldout")
             and (not has_v2 or (r.get("prompt") or {}).get("variant") == "canonical")]
 
+
+def task_reliability(rows, model, pattern, split):
+    """Observed pass^k-style reliability, stratified by each task's exact rep count.
+
+    Returns ``(strata, total_groups, invalid_groups)`` where strata maps observed k
+    to ``(all_pass_groups, eligible_groups)``. A task group is excluded rather than
+    padded when reps are duplicated, missing an id between the observed endpoints,
+    or lack an id. Different observed k values remain separate: a two-rep task is
+    never silently mixed into or scored as a three-rep task.
+    """
+    selected = [r for r in rows if r.get("model") == model and r.get("pattern") == pattern
+                and r.get("split") == split]
+    groups = collections.defaultdict(list)
+    for row in selected:
+        # Run identity is part of a repeated-trial group. Pooling the same task
+        # across invocations can manufacture an all-k result that no run produced.
+        groups[(row.get("run"), row.get("task"))].append(row)
+
+    strata = collections.defaultdict(lambda: [0, 0])
+    invalid = 0
+    for (run, _task), group in groups.items():
+        reps = [r.get("rep") for r in group]
+        if run is None or any(rep is None for rep in reps) or len(set(reps)) != len(reps):
+            invalid += 1
+            continue
+        try:
+            ordered = sorted(reps)
+            contiguous = all(b == a + 1 for a, b in zip(ordered, ordered[1:]))
+        except TypeError:  # mixed/non-orderable rep identifiers are not a k-trial group
+            contiguous = False
+        if not contiguous:
+            invalid += 1
+            continue
+        k = len(group)
+        strata[k][1] += 1
+        if all(r.get("score") == 1 for r in group):
+            strata[k][0] += 1
+    return {k: tuple(v) for k, v in sorted(strata.items())}, len(groups), invalid
+
+
+def reliability_lines(rows, baseline, candidate, models):
+    """Markdown reliability table. Descriptive only; never feeds adoption logic."""
+    splits = [s for s in ("val", "heldout") if any(r.get("split") == s for r in rows)]
+    lines = ["## Task-stratified all-k reliability",
+             "",
+             "Fraction of task groups where every observed trial passed. Groups are separated by exact observed k; "
+             "coverage is eligible groups / all observed task groups. Invalid or gapped rep groups are excluded, never padded as passes or failures.",
+             "",
+             "| model | split | k | baseline all-pass | candidate all-pass |",
+             "|---|---|---:|---|---|"]
+
+    def cell(result, k):
+        strata, total, invalid = result
+        passed, eligible = strata.get(k, (0, 0))
+        score = f"{passed / eligible:.0%} ({passed}/{eligible})" if eligible else "—"
+        suffix = f"coverage {eligible}/{total}"
+        if invalid:
+            suffix += f", invalid {invalid}"
+        return f"{score}; {suffix}"
+
+    emitted = False
+    for model in models:
+        for split in splits:
+            base = task_reliability(rows, model, baseline, split)
+            cand = task_reliability(rows, model, candidate, split)
+            ks = sorted(set(base[0]) | set(cand[0]))
+            if not ks and (base[1] or cand[1]):
+                ks = [0]  # expose arms containing only invalid/missing-rep groups
+            for k in ks:
+                emitted = True
+                lines.append(f"| {model} | {split} | {k if k else '—'} | {cell(base, k)} | {cell(cand, k)} |")
+    if not emitted:
+        lines.append("| — | — | — | no repeated task groups | no repeated task groups |")
+    return lines
+
 def report(gen, baseline, candidate):
     # Held-out honesty: the overfit gate activates only for a complete base+candidate
     # split="heldout" grid (real_gate HELDOUT="rle saddle").
@@ -182,7 +257,9 @@ def report(gen, baseline, candidate):
         problems.append("no canonical pi.eval-row/v2 adoption rows")
     problems += integrity_errors(rows, baseline, candidate)
     if problems:
+        descriptive = reliability_lines(rows, baseline, candidate, models)
         out = (f"# fleet_report {gen} — {candidate} vs {baseline}\n\n"
+               + "\n".join(descriptive) + "\n\n"
                "## VERDICT: INCOMPLETE\n" + "\n".join(f"- {p}" for p in problems) + "\n")
         with open(os.path.join(LAB, "results", gen + "-FLEET.md"), "w") as f:
             f.write(out)
@@ -206,6 +283,8 @@ def report(gen, baseline, candidate):
         _, clo, chi = wilson(ck, cn)
         lines.append(f"| {m} | {TIERS.get(m,'?')} | {bk/bn:.0%} (n{bn}) | {ck/cn:.0%} ({clo:.0%}–{chi:.0%}) | "
                      f"{d:+.0%} | {label} |")
+
+    lines += [""] + reliability_lines(rows, baseline, candidate, models)
 
     ratio = (cand_tok / base_tok) if all_cost_exact and base_tok else None
     # per-SUCCESS mean cost (audit-2): total-over-total made a candidate that
@@ -299,7 +378,40 @@ def selftest():
     extra = clean_v2 + [dict(clean_v2[0], split="robustness", prompt={"variant": "equivalent-1"}),
                         dict(clean_v2[0], pattern="one-shot", arm="one-shot", split="robustness")]
     assert len(adoption_rows(extra, "base", "cand")) == len(clean_v2), "robustness/control rows inflated adoption"
-    print("fleet_report selftest: OK (sig hard-gate, do-no-harm, neutral-band, overfit, cost-ceiling, universal, tiered)")
+    # Task-stratified all-k reliability: exact k groups stay separate and missing,
+    # duplicated, or gapped reps are disclosed rather than padded into the metric.
+    reliability = [rr("base", "all-green", rep) for rep in (1, 2, 3)]
+    reliability += [dict(rr("base", "one-red", rep), score=0 if rep == 2 else 1) for rep in (1, 2, 3)]
+    reliability += [rr("base", "short", rep) for rep in (1, 2)]
+    strata, total, invalid = task_reliability(reliability, dd, "base", "val")
+    assert strata == {2: (1, 1), 3: (1, 2)}, strata
+    assert (total, invalid) == (3, 0)
+    gapped = [rr("cand", "gap", rep) for rep in (0, 2)]
+    duplicated = [rr("cand", "dup", 0), rr("cand", "dup", 0)]
+    strata, total, invalid = task_reliability(gapped + duplicated, dd, "cand", "val")
+    assert strata == {} and (total, invalid) == (2, 2), (strata, total, invalid)
+    unequal = reliability + [rr("cand", "all-green", rep) for rep in (1, 2)]
+    rendered = "\n".join(reliability_lines(unequal, "base", "cand", [dd]))
+    assert "coverage 1/3" in rendered and "coverage 1/1" in rendered, rendered
+    cross_run_reliability = [rr("base", "same-task", rep, run="r1") for rep in (1, 2)]
+    cross_run_reliability += [dict(rr("base", "same-task", rep, run="r2"), score=0 if rep == 2 else 1)
+                              for rep in (1, 2)]
+    strata, total, invalid = task_reliability(cross_run_reliability, dd, "base", "val")
+    assert strata == {2: (1, 2)} and (total, invalid) == (2, 0), (strata, total, invalid)
+    missing_run = [dict(rr("base", "unknown-run", rep), run=None) for rep in (1, 2)]
+    assert task_reliability(missing_run, dd, "base", "val") == ({}, 1, 1)
+
+    # Schema contract: agentic arms require complete trajectory data, while the
+    # deliberately non-agentic one-shot control remains exempt.
+    schema_path = os.path.join(LAB, "..", "real-gate-fixtures", "schemas", "pi.eval-row-v2.schema.json")
+    schema = json.load(open(schema_path))
+    required_trajectory = schema["properties"]["trajectory"]["required"]
+    assert "unique_reads" in required_trajectory
+    conditional = schema["allOf"][0]
+    assert conditional["if"]["properties"]["arm"] == {"not": {"const": "one-shot"}}
+    assert conditional["then"]["required"] == ["trajectory"]
+    assert "trajectory" not in schema["required"], "one-shot must remain trajectory-exempt"
+    print("fleet_report selftest: OK (sig gates, integrity, run-scoped all-k reliability, v2 trajectory contract)")
 
 def main():
     args = sys.argv[1:]

@@ -17,6 +17,31 @@
     "prompt": {"type": "object", "required": ["variant", "semantic_group", "sha256"]},
     "serving": {"type": "object", "required": ["pre", "post", "stable"]},
     "usage": {"type": "object", "required": ["source", "exact", "input_tokens", "output_tokens", "output_chars"]},
+    "trajectory": {
+      "type": "object",
+      "required": ["turns", "tool_calls", "tool_errors", "reads", "unique_reads", "repeat_calls", "repeat_reads", "tool_result_chars", "first_mutation_turn", "compactions"],
+      "properties": {
+        "turns": {"type": "integer", "minimum": 0},
+        "tool_calls": {"type": "integer", "minimum": 0},
+        "tool_errors": {"type": "integer", "minimum": 0},
+        "reads": {"type": "integer", "minimum": 0},
+        "unique_reads": {"type": "integer", "minimum": 0},
+        "repeat_calls": {"type": "integer", "minimum": 0},
+        "repeat_reads": {"type": "integer", "minimum": 0},
+        "tool_result_chars": {"type": "integer", "minimum": 0},
+        "first_mutation_turn": {"type": "integer", "minimum": 0},
+        "compactions": {"type": "integer", "minimum": 0}
+      }
+    },
     "status": {"enum": ["complete", "incomplete", "exploratory", "ineligible"]}
-  }
+  },
+  "allOf": [
+    {
+      "if": {
+        "required": ["arm"],
+        "properties": {"arm": {"not": {"const": "one-shot"}}}
+      },
+      "then": {"required": ["trajectory"]}
+    }
+  ]
 }

@@ -549,9 +549,9 @@ NOTE: a previous attempt in this workdir was stopped for repeating the same fail
 		LOW_TOK_STREAK=0
 	fi
 
-	python3 - "$RESULTS" "$MODEL" "$pat" "$task" "$rep" "$gate" "$retried" "$RUNID" "$tin" "$tout" "$output_chars" "$split" "$usage_exact" "${FLEET_EXPECTED_MODELS:-}" "$rowctx" "$wd/fingerprint-pre.json" "$wd/fingerprint-post.json" "$GATE_NETWORK" "$MODEL_CONTROL" "$MODEL_PROVIDER_RESOLVED" "$ENDPOINT_IDENTITY_SHA256" "$NETWORK_AUTHORITATIVE" "$NETWORK_AUTHORITY_REASON" "$SANDBOX_AUTHORITATIVE" "$SANDBOX_AUTHORITY_REASON" "$EXEC_POLICY" <<'PY'
+	python3 - "$RESULTS" "$MODEL" "$pat" "$task" "$rep" "$gate" "$retried" "$RUNID" "$tin" "$tout" "$output_chars" "$split" "$usage_exact" "${FLEET_EXPECTED_MODELS:-}" "$rowctx" "$wd/fingerprint-pre.json" "$wd/fingerprint-post.json" "$GATE_NETWORK" "$MODEL_CONTROL" "$MODEL_PROVIDER_RESOLVED" "$ENDPOINT_IDENTITY_SHA256" "$NETWORK_AUTHORITATIVE" "$NETWORK_AUTHORITY_REASON" "$SANDBOX_AUTHORITATIVE" "$SANDBOX_AUTHORITY_REASON" "$EXEC_POLICY" "$mrow" <<'PY'
 import importlib.util,json,sys
-out,model,pat,task,rep,gate,retried,runid,tin,tout,outchars,split,usage_exact,expected_models,ctxpath,prepath,postpath,network_mode,model_control,provider,endpoint_sha,network_auth,network_reason,sandbox_auth,sandbox_reason,policy_path=sys.argv[1:27]
+out,model,pat,task,rep,gate,retried,runid,tin,tout,outchars,split,usage_exact,expected_models,ctxpath,prepath,postpath,network_mode,model_control,provider,endpoint_sha,network_auth,network_reason,sandbox_auth,sandbox_reason,policy_path,mrow=sys.argv[1:28]
 ctx=json.load(open(ctxpath)); pre=json.load(open(prepath)); post=json.load(open(postpath))
 stable=pre.get("fingerprint_sha256") == post.get("fingerprint_sha256")
 serving_complete=pre.get("status") == post.get("status") == "complete"
@@ -564,6 +564,14 @@ exact=bool(int(usage_exact))
 usage={"source":"provider" if exact else "char_proxy", "exact":exact,
        "input_tokens":int(tin) if exact else None, "output_tokens":int(tout) if exact else None,
        "output_chars":int(outchars)}
+metric_names=("turns","edits","edit_err","reads","subag","in_tok","out_tok","lb_fires","vg_fires","usage_exact","output_chars",
+              "tool_calls","tool_errors","repeat_calls","repeat_reads","tool_result_chars","first_mutation_turn","compactions","unique_reads")
+metric_values=mrow.split("\t")
+if len(metric_values) != len(metric_names):
+    raise SystemExit(f"metrics row has {len(metric_values)} fields, expected {len(metric_names)}")
+metrics={name:int(value) for name,value in zip(metric_names,metric_values)}
+trajectory={name:metrics[name] for name in ("turns","tool_calls","tool_errors","reads","unique_reads","repeat_calls","repeat_reads",
+                                             "tool_result_chars","first_mutation_turn","compactions")}
 rec={"schema":"pi.eval-row/v2", "task":task,"pattern":pat,"arm":pat,"rep":int(rep),
      "repetition":int(rep),"model":model,"split":split,"score":int(gate),
      "retried":int(retried),"run":runid,"fixture":{"cohort":ctx["cohort"],"version":ctx["version"]},
@@ -572,7 +580,7 @@ rec={"schema":"pi.eval-row/v2", "task":task,"pattern":pat,"arm":pat,"rep":int(re
                   "endpoint_identity_sha256":endpoint_sha,"network_authoritative":bool(int(network_auth)),
                   "sandboxed":bool(int(sandbox_auth)),"authoritative":execution_authoritative},
      "prompt":{"variant":ctx["prompt_variant"],"semantic_group":ctx["semantic_group"],"sha256":ctx["prompt_sha256"]},
-     "serving":{"pre":pre,"post":post,"stable":stable},"usage":usage,
+     "serving":{"pre":pre,"post":post,"stable":stable},"usage":usage,"trajectory":trajectory,
      # compatibility aliases for historical readers; dimensions stay honest.
      "out_chars":int(outchars),"think_chars":0,"in_tok":int(tin) if exact else 0,
      "out_tok":int(tout) if exact else 0,"token_usage_exact":exact}
