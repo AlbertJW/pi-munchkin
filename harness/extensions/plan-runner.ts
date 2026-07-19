@@ -5,6 +5,7 @@ import { createHash, randomUUID } from "node:crypto";
 import { defineTool, withFileMutationQueue, type ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { Type } from "typebox";
 import { assertVerifyGateAllowed, classifyBashCommand } from "../lib/command-policy.ts";
+import { runReadonlyGate } from "../lib/gate-runtime.ts";
 import { planIntegrity, executionUnderway, normalizeTitle, preserveDecision, reconcileItems as libReconcile, type ReconciledItem, type IncomingItem } from "../lib/plan-integrity.ts";
 import { nextReplanStreak, parseTodoLine } from "../lib/plan-progress.ts";
 import { steerText } from "../lib/steer-texts.ts";
@@ -574,16 +575,9 @@ const planWrite = defineTool({
 					gateMsgs.push(`gate for "${it.title}" dropped (not a verify/test command): ${gateAllowed.reason}. Use just verify / npm test / npx tsx --test, or pass gate:"" to clear.`);
 					continue;
 				}
-				let code = 1;
-				let out = "";
-				try {
-					const r = await api.exec("bash", ["-c", it.gate], { cwd: ctx.cwd, timeout: GATE_TIMEOUT_MS });
-					code = r.code;
-					out = (r.stderr?.trim() || r.stdout?.trim() || `exit ${r.code}`);
-				} catch (e) {
-					out = e instanceof Error ? e.message : String(e);
-				}
-				if (code === 0) {
+				const gateResult = await runReadonlyGate(api.exec.bind(api), ctx.cwd, it.gate, GATE_TIMEOUT_MS);
+				const out = gateResult.output;
+				if (gateResult.pass) {
 					it.gate_fails = 0;
 					// A green plan gate IS a passing verify. Share it (one-shot flag,
 					// same-process globalThis idiom) so verify-gate doesn't nag the

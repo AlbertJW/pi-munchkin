@@ -27,13 +27,13 @@ const CMD_POS = String.raw`(?:^|[;&|(]\s*|\b(?:sudo|xargs|env|do|then|timeout\s+
 
 export const VERIFY_COMMAND_RE = new RegExp(
 	CMD_POS +
-		String.raw`(?:just\s+(?:verify|check|test)|npm\s+(?:test|run\s+(?:test|check|lint|typecheck|verify))|yarn\s+(?:test|check|lint)|pnpm\s+(?:test|run\s+(?:test|check|lint|typecheck|verify))|pytest|python(?:3)?\s+-m\s+pytest|cargo\s+test|go\s+test|make\s+(?:test|check|verify)|tsc(?:\s+--noEmit)?|bash\s+-n|ruff(?:\s+check)?|eslint|node\s+--test|(?:npx\s+(?:-y\s+)?)?tsx\s+--test|(?:npx\s+(?:-y\s+)?)?(?:vitest|jest))\b`,
+		String.raw`(?:test\b|\[\s|just\s+(?:verify|check|test)|npm\s+(?:test|run\s+(?:test|check|lint|typecheck|verify))|yarn\s+(?:test|check|lint)|pnpm\s+(?:test|run\s+(?:test|check|lint|typecheck|verify))|pytest|python(?:3)?\s+-m\s+pytest|cargo\s+test|go\s+test|make\s+(?:test|check|verify)|tsc\s+--noEmit|bash\s+-n|ruff(?:\s+check)?|eslint|node\s+--test|(?:npx\s+(?:-y\s+)?)?tsx\s+--test|(?:npx\s+(?:-y\s+)?)?(?:vitest|jest))\b`,
 	"i",
 );
 
 const MUTATION_RE = new RegExp(
 	CMD_POS +
-		String.raw`(?:tee|sed\s+(?:-[a-zA-Z]+\s+)*(?:-i|--in-place)|perl\s+-[a-zA-Z]*i\b|cp|mv|mkdir|touch|ln|dd|install|truncate|chmod|chown|git\s+(?:add|commit|mv|rm|apply|restore|checkout|reset))\b`,
+		String.raw`(?:tee|sed\s+(?:-[a-zA-Z]+\s+)*(?:-i|--in-place)|perl\s+-[a-zA-Z]*i\b|cp|mv|mkdir|touch|ln|dd|install|truncate|chmod|chown|git\s+(?:add|commit|mv|rm|apply|restore|checkout|reset)|(?:eslint|ruff)\b[^;&|\n]*\s--fix\b|find\b[^;&|\n]*\s-(?:exec|execdir|ok|okdir))\b`,
 	"i",
 );
 
@@ -60,10 +60,70 @@ function stripHarmlessRedirects(cmd: string): string {
 	return cmd.replace(SAFE_REDIRECT_RE, " ");
 }
 
-export function isBashMutation(cmd: string): boolean {
+// Shell is an execution language, not a list of trusted binaries. Anything we
+// do not positively recognize as inspection/verification is a mutation risk.
+// This closes the old fail-open class (`sh script`, `curl -o`, `ruby -e`, a
+// project-local executable, aliases/functions, ...). It intentionally favors a
+// clear false-positive over silently letting an unknown executable bypass plan
+// mode and the verify gate.
+const READ_ONLY_HEADS = new Set([
+	"[", "basename", "cat", "cd", "cmp", "cut", "diff", "dirname", "du", "echo",
+	"false", "file", "find", "git", "grep", "head", "jq", "ls", "man", "printf",
+	"pwd", "readlink", "realpath", "rg", "sort", "stat", "tail", "test", "tr",
+	"true", "uniq", "wc", "which",
+]);
+const SHELL_CONTROL_HEADS = new Set(["do", "done", "elif", "else", "fi", "if", "then", "while", "until"]);
+
+function shellCommandHeads(cmd: string): string[] {
+	// Strip quoted strings so separators/words inside `echo "rm -rf"` do not
+	// become fake commands. Unterminated/dynamic shell is deliberately unknown.
+	let plain = "";
+	let quote = "";
+	let escaped = false;
+	for (const ch of cmd) {
+		if (escaped) { plain += quote ? " " : ch; escaped = false; continue; }
+		if (ch === "\\") { escaped = true; plain += " "; continue; }
+		if (quote) { if (ch === quote) quote = ""; plain += " "; continue; }
+		if (ch === "'" || ch === '"') { quote = ch; plain += " "; continue; }
+		plain += ch;
+	}
+	if (quote || escaped || /`|\$\(/.test(cmd)) return ["<dynamic-shell>"];
+	const heads: string[] = [];
+	for (const raw of plain.split(/(?:&&|\|\||[;|\n])/)) {
+		let words = raw.trim().replace(/^\(+/, "").split(/\s+/).filter(Boolean);
+		while (words.length && (/^[A-Za-z_]\w*=/.test(words[0]) || SHELL_CONTROL_HEADS.has(words[0]))) words.shift();
+		while (words.length && ["command", "env", "exec", "nohup", "sudo", "time", "timeout", "xargs"].includes(words[0])) {
+			const prefix = words.shift();
+			if (prefix === "timeout" && words.length) words.shift();
+			while (words.length && (words[0].startsWith("-") || /^[A-Za-z_]\w*=/.test(words[0]))) words.shift();
+		}
+		if (words[0]) heads.push(words[0].replace(/^.*\//, ""));
+	}
+	return heads;
+}
+
+function containsUnknownCommand(cmd: string): boolean {
+	return shellCommandHeads(cmd).some((head) => {
+		if (READ_ONLY_HEADS.has(head)) return false;
+		if (["cargo", "eslint", "go", "jest", "just", "make", "npm", "npx", "pnpm", "pytest", "ruff", "tsc", "tsx", "vitest", "yarn"].includes(head) && VERIFY_COMMAND_RE.test(cmd)) return false;
+		if (head === "bash" && /\bbash\s+-n\b/.test(cmd)) return false;
+		if (/^python(?:3(?:\.\d+)?)?$/.test(head)) {
+			return !(/\s-m\s+pytest\b/.test(cmd) || (/\s-c\b/.test(cmd) && !INTERP_WRITE_RE.test(cmd)));
+		}
+		if (head === "node") return !(/\s--test\b/.test(cmd) || (/\s(?:-e|--eval)\b/.test(cmd) && !INTERP_WRITE_RE.test(cmd)));
+		return true;
+	});
+}
+
+function isExplicitBashMutation(cmd: string): boolean {
 	const c = stripHarmlessRedirects(cmd);
 	if (/>>?\s*[^&\s]/.test(c)) return true;
 	return MUTATION_RE.test(c) || inlineInterpreterWrites(c) || DESTRUCTIVE_RE.test(c);
+}
+
+export function isBashMutation(cmd: string): boolean {
+	const c = stripHarmlessRedirects(cmd);
+	return isExplicitBashMutation(c) || containsUnknownCommand(c);
 }
 
 export function isDestructiveCommand(cmd: string): boolean {
@@ -73,7 +133,7 @@ export function isDestructiveCommand(cmd: string): boolean {
 // Ops/infra commands that change dependency / container / VCS / env state but NOT
 // source code: package installs, docker/k8s, git, venv/service setup.
 const OPS_COMMAND_RE =
-	/\b(?:docker|podman|nerdctl|kubectl|helm|minikube|colima|npm|pnpm|yarn|bun|pip3?|uv|pdm|poetry|conda|mamba|cargo|rustup|brew|apt(?:-get)?|dnf|yum|apk|pacman|gem|bundle|corepack|virtualenv|systemctl|launchctl|service|git)\b|\bpython3?\s+-m\s+(?:pip|venv)\b|\bdocker[- ]compose\b/i;
+	/\b(?:docker|podman|nerdctl|kubectl|helm|minikube|colima|npm|pnpm|yarn|bun|pip3?|uv|pdm|poetry|conda|mamba|cargo|rustup|brew|apt(?:-get)?|dnf|yum|apk|pacman|gem|bundle|corepack|virtualenv|systemctl|launchctl|service|git)\b|\bpython(?:3(?:\.\d+)?)?\s+-m\s+(?:pip|venv)\b|\bdocker[- ]compose\b/i;
 
 // Commands that write file CONTENT (so they touch source even inside a compound
 // that also looks like ops, e.g. `git commit && sed -i ... src.py`).
@@ -109,8 +169,9 @@ export function classifyBashCommand(cmd: string, extraVerifyCommands: readonly s
 		};
 	}
 	const destructive = isDestructiveCommand(trimmed);
-	const mutates = isBashMutation(trimmed);
 	const verifyLike = isVerifyCommand(trimmed, extraVerifyCommands);
+	const explicitlyAllowed = extraVerifyCommands.some((allowed) => allowed.trim() === trimmed);
+	const mutates = explicitlyAllowed ? isExplicitBashMutation(trimmed) : isBashMutation(trimmed);
 	if (destructive) {
 		return { risk: "destructive", mutates: true, destructive: true, verifyLike, readOnly: false, reason: "destructive/high-risk command" };
 	}
@@ -158,7 +219,8 @@ const DISCARD_GIT_RES: readonly RegExp[] = [
 // reset --hard`, `git -c k=v checkout -- .`, --git-dir/--work-tree) so the
 // discard patterns above see a normalized `git <subcommand> …`.
 function normalizeGitGlobals(cmd: string): string {
-	return cmd.replace(/\bgit\s+(?:(?:-C\s+\S+|-c\s+\S+|--git-dir(?:=|\s+)\S+|--work-tree(?:=|\s+)\S+)\s+)+/gi, "git ");
+	const value = String.raw`(?:"[^"]*"|'[^']*'|\S+)`;
+	return cmd.replace(new RegExp(String.raw`\bgit\s+(?:(?:-C\s+${value}|-c\s+${value}|--git-dir(?:=|\s+)${value}|--work-tree(?:=|\s+)${value})\s+)+`, "gi"), "git ");
 }
 
 export function discardsUncommittedWork(cmd: string): boolean {
@@ -168,27 +230,96 @@ export function discardsUncommittedWork(cmd: string): boolean {
 	return DISCARD_GIT_RES.some((re) => re.test(c));
 }
 
-// Where would a discarding git command actually run? The guard's dirty check
-// must look at THAT repo, not blindly at ctx.cwd — `cd /other/repo && git reset
-// --hard` was judged against the wrong tree (usually clean → fail-open →
-// allowed). Honors `git -C <dir>` and the last `cd <dir>` before the git
-// command; `~` expands against home, relative paths resolve against cwd.
-export function discardWorkdir(cmd: string, cwd: string, home: string): string {
-	const resolve = (dir: string): string => {
-		let d = dir.replace(/^["']|["']$/g, "");
-		if (d === "~") d = home;
-		else if (d.startsWith("~/")) d = home + d.slice(1);
-		if (!d.startsWith("/")) d = `${cwd.replace(/\/$/, "")}/${d}`;
-		return d;
-	};
-	const dashC = /\bgit\s+-C\s+(\S+)/i.exec(cmd);
-	if (dashC) return resolve(dashC[1]);
-	// last `cd <dir>` that precedes the git command
-	let lastCd: string | null = null;
-	const cdRe = /(?:^|[;&|]\s*)cd\s+([^\s;&|]+)/g;
-	const gitAt = cmd.search(/\bgit\s/i);
-	for (let m = cdRe.exec(cmd); m; m = cdRe.exec(cmd)) {
-		if (gitAt >= 0 && m.index < gitAt) lastCd = m[1];
+export type DiscardGitTarget = { cwd: string; gitGlobals: string[] };
+export type DiscardTargetAnalysis =
+	| { ok: true; targets: DiscardGitTarget[] }
+	| { ok: false; reason: string };
+
+function shellSegments(cmd: string): string[][] | null {
+	const segments: string[][] = [[]];
+	let word = "", quote = "", escaped = false;
+	const pushWord = () => { if (word) { segments[segments.length - 1].push(word); word = ""; } };
+	const pushSegment = () => { pushWord(); if (segments.at(-1)!.length) segments.push([]); };
+	for (let i = 0; i < cmd.length; i++) {
+		const ch = cmd[i];
+		if (escaped) { word += ch; escaped = false; continue; }
+		if (ch === "\\") { escaped = true; continue; }
+		if (quote) { if (ch === quote) quote = ""; else word += ch; continue; }
+		if (ch === "'" || ch === '"') { quote = ch; continue; }
+		if (ch === "`" || (ch === "$" && cmd[i + 1] === "(")) return null;
+		if (/\s/.test(ch)) { pushWord(); continue; }
+		if (ch === ";" || ch === "|" || ch === "&" || ch === "\n") { pushSegment(); continue; }
+		word += ch;
 	}
-	return lastCd ? resolve(lastCd) : cwd;
+	if (quote || escaped) return null;
+	pushWord();
+	return segments.filter((s) => s.length);
+}
+
+function resolveShellDir(base: string, raw: string, home: string): string | null {
+	if (!raw || raw.includes("$") || raw.includes("*")) return null;
+	let dir = raw;
+	if (dir === "~") dir = home;
+	else if (dir.startsWith("~/")) dir = home + dir.slice(1);
+	if (dir.startsWith("/")) return dir;
+	const parts = `${base.replace(/\/$/, "")}/${dir}`.split("/");
+	const out: string[] = [];
+	for (const part of parts) {
+		if (!part || part === ".") continue;
+		if (part === "..") out.pop(); else out.push(part);
+	}
+	return "/" + out.join("/");
+}
+
+/** Resolve every destructive git invocation, preserving git globals so the
+ * guard executes `git <same target globals> status`. Ambiguous shell expansion
+ * is rejected; a destructive guard must never guess the repository and pass. */
+export function discardGitTargets(cmd: string, cwd: string, home: string): DiscardTargetAnalysis {
+	const segments = shellSegments(cmd);
+	if (!segments) return { ok: false, reason: "dynamic or malformed shell syntax prevents resolving the git target" };
+	let activeCwd = cwd;
+	const targets: DiscardGitTarget[] = [];
+	for (const words of segments) {
+		let start = 0;
+		while (start < words.length && /^[A-Za-z_]\w*=/.test(words[start])) start++;
+		if (words[start] === "cd") {
+			const next = resolveShellDir(activeCwd, words[start + 1] ?? home, home);
+			if (!next) return { ok: false, reason: "could not resolve cd target before destructive git command" };
+			activeCwd = next;
+			continue;
+		}
+		const gitIndex = words.indexOf("git", start);
+		if (gitIndex < 0) continue;
+		const globals: string[] = [];
+		let i = gitIndex + 1;
+		while (i < words.length) {
+			const token = words[i];
+			if (token === "-C" || token === "-c" || token === "--git-dir" || token === "--work-tree") {
+				const value = words[i + 1];
+				if (!value || value.includes("$") || value.includes("*")) return { ok: false, reason: `unresolved git ${token} target` };
+				globals.push(token, value); i += 2; continue;
+			}
+			if (/^-(?:C|c).+/.test(token) || /^--(?:git-dir|work-tree)=/.test(token)) {
+				if (token.includes("$") || token.includes("*")) return { ok: false, reason: "unresolved inline git target" };
+				globals.push(token); i++; continue;
+			}
+			break;
+		}
+		if (!discardsUncommittedWork(`git ${words.slice(i).join(" ")}`)) continue;
+		targets.push({ cwd: activeCwd, gitGlobals: globals });
+	}
+	if (!targets.length && discardsUncommittedWork(cmd)) {
+		return { ok: false, reason: "destructive git command could not be isolated for target inspection" };
+	}
+	return { ok: true, targets };
+}
+
+// Compatibility helper for policy consumers that only need the first cwd.
+export function discardWorkdir(cmd: string, cwd: string, home: string): string {
+	const analysis = discardGitTargets(cmd, cwd, home);
+	if (!analysis.ok || !analysis.targets[0]) return cwd;
+	const dashC = analysis.targets[0].gitGlobals.findIndex((v) => v === "-C");
+	if (dashC >= 0) return resolveShellDir(analysis.targets[0].cwd, analysis.targets[0].gitGlobals[dashC + 1], home) ?? cwd;
+	const inlineC = analysis.targets[0].gitGlobals.find((v) => /^-C.+/.test(v));
+	return inlineC ? resolveShellDir(analysis.targets[0].cwd, inlineC.slice(2), home) ?? cwd : analysis.targets[0].cwd;
 }

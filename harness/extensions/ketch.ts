@@ -1,5 +1,6 @@
 import { defineTool, type ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { Type } from "typebox";
+import { resolvePublicHttpUrl } from "../lib/public-url.ts";
 
 // Web / code / docs search for pi via `ketch` (1broseidon/ketch) — a fast,
 // stateless search+scrape CLI built for agents. Gives the LOCAL models (which
@@ -91,7 +92,10 @@ export default function (pi: ExtensionAPI) {
 				max_chars: Type.Optional(Type.Number({ description: "Truncate output to N chars (default 12000)." })),
 			}),
 			async execute(_id, params, signal) {
-				return runKetch(pi, ["scrape", params.url, "--max-chars", String(params.max_chars ?? 12000)], signal);
+				let safeUrl: string;
+				try { safeUrl = await resolvePublicHttpUrl(params.url); }
+				catch (err) { return text(`web_scrape blocked: ${err instanceof Error ? err.message : String(err)}`); }
+				return runKetch(pi, ["scrape", safeUrl, "--max-chars", String(params.max_chars ?? 12000)], signal);
 			},
 		}),
 	);

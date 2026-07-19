@@ -1,6 +1,6 @@
 import { homedir } from "node:os";
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
-import { discardsUncommittedWork, discardWorkdir } from "../lib/command-policy.ts";
+import { discardGitTargets } from "../lib/command-policy.ts";
 import { record } from "../lib/telemetry.ts";
 
 // Dangerous-git guard: confirm before a bash command DISCARDS uncommitted work.
@@ -24,20 +24,31 @@ export default function (pi: ExtensionAPI) {
 	pi.on("tool_call", async (event, ctx) => {
 		if (event.toolName !== "bash") return;
 		const command = String((event.input as Record<string, unknown> | undefined)?.command ?? "");
-		if (!discardsUncommittedWork(command)) return;
 
 		// Only intervene if there's actually uncommitted work to lose — checked in
 		// the repo the command actually targets (`cd X && …` / `git -C X …`), not
 		// blindly in ctx.cwd.
-		const wd = discardWorkdir(command, ctx.cwd, homedir());
-		let dirty: string;
-		try {
-			const r = await pi.exec("git", ["status", "--porcelain"], { cwd: wd, timeout: 5000 });
-			dirty = (r.stdout || "").trim();
-		} catch {
-			return; // not a repo / git unavailable → nothing to guard, fail open
+		const analysis = discardGitTargets(command, ctx.cwd, homedir());
+		if (!analysis.ok) {
+			record("git-guard", "blocked-unresolved-target", { reason: analysis.reason });
+			return { block: true, reason: `failure_class=safety_guard. Refusing destructive git command: ${analysis.reason}.` };
 		}
-		if (!dirty) return; // clean tree → the command can't discard anything
+		if (!analysis.targets.length) return;
+		let dirty = "";
+		for (const target of analysis.targets) {
+			try {
+				const r = await pi.exec("git", [...target.gitGlobals, "status", "--porcelain"], { cwd: target.cwd, timeout: 5000 });
+				if (r.code !== 0) {
+					return { block: true, reason: `failure_class=safety_guard. Could not verify destructive git target (status exit ${r.code}); refusing fail-closed.` };
+				}
+				dirty += (r.stdout || "").trim() + "\n";
+			} catch (err) {
+				const message = err instanceof Error ? err.message : String(err);
+				return { block: true, reason: `failure_class=safety_guard. Could not inspect destructive git target (${message}); refusing fail-closed.` };
+			}
+		}
+		dirty = dirty.trim();
+		if (!dirty) return; // every resolved target is clean
 
 		const n = dirty.split("\n").filter(Boolean).length;
 		const approved = await ctx.ui.confirm(

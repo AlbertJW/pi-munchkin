@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { assertVerifyGateAllowed, classifyBashCommand, discardWorkdir, discardsUncommittedWork, isBashMutation, isSourceMutation, looksFailingOutput } from "../lib/command-policy.ts";
+import { assertVerifyGateAllowed, classifyBashCommand, discardGitTargets, discardWorkdir, discardsUncommittedWork, isBashMutation, isSourceMutation, looksFailingOutput } from "../lib/command-policy.ts";
 
 test("isSourceMutation: ops/infra churn does NOT arm the verify gate", () => {
 	// ops/infra — change deps/containers/VCS/env, not source → must not arm
@@ -39,6 +39,15 @@ test("classifies read-only commands", () => {
 	assert.equal(isBashMutation("grep -R foo . > /dev/null"), false);
 });
 
+test("unknown shell executables fail closed instead of bypassing mutation guards", () => {
+	for (const c of ["./script.sh", "bash script.sh", "sh -c do-stuff", "curl https://example.com", "ruby -e do_stuff", "source ./env.sh", "my-project-tool run", "npm run dev", "make deploy", "npx arbitrary-tool", "find . -exec ./mutator {} ;"]) {
+		assert.equal(classifyBashCommand(c).mutates, true, `unknown command must fail closed: ${c}`);
+	}
+	for (const c of ["cat file", "rg TODO src", "git status", "node -e \"console.log(1)\"", "python3 -c \"print(1)\""]) {
+		assert.equal(classifyBashCommand(c).mutates, false, `known inspection remains read-only: ${c}`);
+	}
+});
+
 test("classifies normal file mutations", () => {
 	assert.equal(classifyBashCommand("sed -i '' s/a/b/ file.txt").risk, "mutating");
 	assert.equal(classifyBashCommand("python3 -c \"open('x','w').write('y')\"").mutates, true);
@@ -63,6 +72,8 @@ test("plan gates allow verify commands only", () => {
 	assert.equal(assertVerifyGateAllowed("echo ok").ok, false);
 	assert.equal(assertVerifyGateAllowed("touch sentinel").ok, false);
 	assert.equal(assertVerifyGateAllowed("rm -rf tmp").ok, false);
+	assert.equal(assertVerifyGateAllowed("tsc").ok, false, "emitting tsc is not a read-only gate");
+	assert.equal(assertVerifyGateAllowed("eslint --fix src").ok, false);
 });
 
 test("detects textual failures even when exit status is zero", () => {
@@ -167,6 +178,7 @@ test("discardsUncommittedWork: covers the bypass forms the review found", () => 
 	for (const c of [
 		"git reset --hard",
 		"git -C /tmp/repo reset --hard",
+		`git -C "repo one" reset --hard`,
 		"git -c core.editor=true checkout -- .",
 		"git checkout HEAD -- .",
 		"git checkout main --force",
@@ -203,4 +215,17 @@ test("discardWorkdir: dirty check targets the repo the command actually hits", (
 	// ~ expansion
 	assert.equal(discardWorkdir("cd ~/proj && git clean -fd", cwd, home), "/Users/me/proj");
 	assert.equal(discardWorkdir("git -C ~ reset --hard", cwd, home), "/Users/me");
+});
+
+test("discardGitTargets: preserves quoted globals, all targets, and rejects dynamic targets", () => {
+	const a = discardGitTargets(`cd "/repo one" && git -c core.editor=true reset --hard; git -C '../repo two' clean -fd`, "/work", "/home/me");
+	assert.equal(a.ok, true);
+	if (a.ok) {
+		assert.deepEqual(a.targets, [
+			{ cwd: "/repo one", gitGlobals: ["-c", "core.editor=true"] },
+			{ cwd: "/repo one", gitGlobals: ["-C", "../repo two"] },
+		]);
+	}
+	const dynamic = discardGitTargets("git -C $TARGET reset --hard", "/work", "/home/me");
+	assert.equal(dynamic.ok, false, "dynamic target must block rather than inspect the wrong repo");
 });
