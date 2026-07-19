@@ -30,7 +30,34 @@
         "repeat_reads": {"type": "integer", "minimum": 0},
         "tool_result_chars": {"type": "integer", "minimum": 0},
         "first_mutation_turn": {"type": "integer", "minimum": 0},
-        "compactions": {"type": "integer", "minimum": 0}
+        "compactions": {"type": "integer", "minimum": 0},
+        "search_spans": {"type": "integer", "minimum": 0},
+        "read_span": {"type": "integer", "minimum": 0}
+      }
+    },
+    "span_receipt_success": {"type": "boolean"},
+    "config": {
+      "type": "object",
+      "required": ["sha256", "declared_env"],
+      "properties": {
+        "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+        "declared_env": {"type": "object", "additionalProperties": {"type": "string"}}
+      }
+    },
+    "experiment": {
+      "type": ["object", "null"],
+      "required": ["manifest_sha256", "cell"],
+      "properties": {
+        "manifest_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+        "cell": {"type": "string", "minLength": 1}
+      }
+    },
+    "harness": {
+      "type": "object",
+      "required": ["surface_sha256", "hash_blocker"],
+      "properties": {
+        "surface_sha256": {"type": ["string", "null"], "pattern": "^[0-9a-f]{64}$"},
+        "hash_blocker": {"type": "string"}
       }
     },
     "status": {"enum": ["complete", "incomplete", "exploratory", "ineligible"]}
@@ -42,6 +69,18 @@
         "properties": {"arm": {"not": {"const": "one-shot"}}}
       },
       "then": {"required": ["trajectory"]}
+    },
+    {
+      "if": {
+        "required": ["experiment"],
+        "properties": {"experiment": {"type": "object"}}
+      },
+      "then": {
+        "required": ["span_receipt_success", "config", "experiment", "harness", "trajectory"],
+        "properties": {
+          "trajectory": {"required": ["search_spans", "read_span"]}
+        }
+      }
     }
   ]
 }

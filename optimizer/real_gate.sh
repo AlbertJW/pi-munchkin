@@ -32,6 +32,18 @@ FIXTURE_META="$HERE/prompt-lab/eval_fixture.py"; FINGERPRINT="$HERE/prompt-lab/s
 EXEC_POLICY="$HERE/prompt-lab/execution_policy.py"
 RESULTS="$HERE/prompt-lab/results/$GEN.jsonl"
 RUNS="${REAL_GATE_RUNS:-$HOME/.pi/real-gate-runs}"
+EXPERIMENT_MANIFEST="${EXPERIMENT_MANIFEST:-}"
+EXPERIMENT_MANIFEST_SHA256="${EXPERIMENT_MANIFEST_SHA256:-}"
+EXPERIMENT_BASE_CELL="${EXPERIMENT_BASE_CELL:-base}"
+EXPERIMENT_CAND_CELL="${EXPERIMENT_CAND_CELL:-cand}"
+HARNESS_HASH_BLOCKER="Pi does not expose the actually loaded extension/lib set; repository hashes may describe a different installation."
+if [[ -n "$EXPERIMENT_MANIFEST" ]]; then
+	[[ -f "$EXPERIMENT_MANIFEST" ]] || { echo "[real_gate] experiment manifest not found: $EXPERIMENT_MANIFEST" >&2; exit 2; }
+	manifest_actual="$(python3 -c 'import hashlib,sys; print(hashlib.sha256(open(sys.argv[1],"rb").read()).hexdigest())' "$EXPERIMENT_MANIFEST")"
+	[[ -n "$EXPERIMENT_MANIFEST_SHA256" && "$manifest_actual" == "$EXPERIMENT_MANIFEST_SHA256" ]] || {
+		echo "[real_gate] experiment manifest hash mismatch" >&2; exit 2;
+	}
+fi
 
 DRY=0; HARD=0; CALIB=0; ROBUSTNESS=0; EXPLORATORY=0; TASKS=()
 DEFAULT_TASKS=(parens equil bigdata)
@@ -530,6 +542,12 @@ NOTE: a previous attempt in this workdir was stopped for repeating the same fail
 	# base-off vs base-on delta = the lucky-pass rate. Only ever ADDS strictness.
 	[[ "${TRAJECTORY:-off}" == "on" && "$gate" == 1 ]] && ! python3 "$HERE/prompt-lab/trajectory_check.py" "$wd" "$task" && gate=0
 	local mrow; mrow="$(python3 "$METRICS" "$wd")"
+	# Diagnostic-only treatment compliance. This receipt check never changes the
+	# task score; span_screen.py decides whether the experiment was actually exposed.
+	local span_receipt_success=0
+	if [[ "$task" == "bigdata" ]] && python3 "$HERE/prompt-lab/trajectory_check.py" "$wd" "$task" >/dev/null 2>&1; then
+		span_receipt_success=1
+	fi
 	local tin tout usage_exact output_chars health_output
 	tin="$(cut -f6 <<< "$mrow")"; [[ -n "$tin" ]] || tin=0
 	tout="$(cut -f7 <<< "$mrow")"; [[ -n "$tout" ]] || tout=0
@@ -550,9 +568,12 @@ NOTE: a previous attempt in this workdir was stopped for repeating the same fail
 		LOW_TOK_STREAK=0
 	fi
 
-	python3 - "$RESULTS" "$MODEL" "$pat" "$task" "$rep" "$gate" "$retried" "$RUNID" "$tin" "$tout" "$output_chars" "$split" "$usage_exact" "${FLEET_EXPECTED_MODELS:-}" "$rowctx" "$wd/fingerprint-pre.json" "$wd/fingerprint-post.json" "$GATE_NETWORK" "$MODEL_CONTROL" "$MODEL_PROVIDER_RESOLVED" "$ENDPOINT_IDENTITY_SHA256" "$NETWORK_AUTHORITATIVE" "$NETWORK_AUTHORITY_REASON" "$SANDBOX_AUTHORITATIVE" "$SANDBOX_AUTHORITY_REASON" "$EXEC_POLICY" "$mrow" <<'PY'
-import importlib.util,json,sys
-out,model,pat,task,rep,gate,retried,runid,tin,tout,outchars,split,usage_exact,expected_models,ctxpath,prepath,postpath,network_mode,model_control,provider,endpoint_sha,network_auth,network_reason,sandbox_auth,sandbox_reason,policy_path,mrow=sys.argv[1:28]
+	python3 - "$RESULTS" "$MODEL" "$pat" "$task" "$rep" "$gate" "$retried" "$RUNID" "$tin" "$tout" "$output_chars" "$split" "$usage_exact" "${FLEET_EXPECTED_MODELS:-}" "$rowctx" "$wd/fingerprint-pre.json" "$wd/fingerprint-post.json" "$GATE_NETWORK" "$MODEL_CONTROL" "$MODEL_PROVIDER_RESOLVED" "$ENDPOINT_IDENTITY_SHA256" "$NETWORK_AUTHORITATIVE" "$NETWORK_AUTHORITY_REASON" "$SANDBOX_AUTHORITATIVE" "$SANDBOX_AUTHORITY_REASON" "$EXEC_POLICY" "$mrow" "$span_receipt_success" "$cfg" "$CONFIG" "$EXPERIMENT_MANIFEST" "$EXPERIMENT_MANIFEST_SHA256" "$EXPERIMENT_BASE_CELL" "$EXPERIMENT_CAND_CELL" "$HARNESS_HASH_BLOCKER" <<'PY'
+import hashlib,importlib.util,json,sys
+(out,model,pat,task,rep,gate,retried,runid,tin,tout,outchars,split,usage_exact,expected_models,
+ ctxpath,prepath,postpath,network_mode,model_control,provider,endpoint_sha,network_auth,network_reason,
+ sandbox_auth,sandbox_reason,policy_path,mrow,span_receipt,cfg_path,config_path,experiment_manifest,
+ experiment_sha,base_cell,cand_cell,harness_blocker)=sys.argv[1:36]
 ctx=json.load(open(ctxpath)); pre=json.load(open(prepath)); post=json.load(open(postpath))
 stable=pre.get("fingerprint_sha256") == post.get("fingerprint_sha256")
 serving_complete=pre.get("status") == post.get("status") == "complete"
@@ -566,13 +587,24 @@ usage={"source":"provider" if exact else "char_proxy", "exact":exact,
        "input_tokens":int(tin) if exact else None, "output_tokens":int(tout) if exact else None,
        "output_chars":int(outchars)}
 metric_names=("turns","edits","edit_err","reads","subag","in_tok","out_tok","lb_fires","vg_fires","usage_exact","output_chars",
-              "tool_calls","tool_errors","repeat_calls","repeat_reads","tool_result_chars","first_mutation_turn","compactions","unique_reads")
+              "tool_calls","tool_errors","repeat_calls","repeat_reads","tool_result_chars","first_mutation_turn","compactions","unique_reads",
+              "search_spans","read_span")
 metric_values=mrow.split("\t")
 if len(metric_values) != len(metric_names):
     raise SystemExit(f"metrics row has {len(metric_values)} fields, expected {len(metric_names)}")
 metrics={name:int(value) for name,value in zip(metric_names,metric_values)}
 trajectory={name:metrics[name] for name in ("turns","tool_calls","tool_errors","reads","unique_reads","repeat_calls","repeat_reads",
-                                             "tool_result_chars","first_mutation_turn","compactions")}
+                                             "tool_result_chars","first_mutation_turn","compactions","search_spans","read_span")}
+cfg_bytes=open(cfg_path,"rb").read(); cfg=json.loads(cfg_bytes)
+cspec=importlib.util.spec_from_file_location("prompt_lab_config",config_path)
+cmod=importlib.util.module_from_spec(cspec); cspec.loader.exec_module(cmod)
+config_binding={"sha256":hashlib.sha256(cfg_bytes).hexdigest(),"declared_env":cmod.config_env(cfg)}
+experiment=None
+if experiment_manifest:
+    manifest_bytes=open(experiment_manifest,"rb").read()
+    actual=hashlib.sha256(manifest_bytes).hexdigest()
+    if actual != experiment_sha: raise SystemExit("experiment manifest hash drift while writing row")
+    experiment={"manifest_sha256":actual,"cell":base_cell if pat=="base" else cand_cell}
 rec={"schema":"pi.eval-row/v2", "task":task,"pattern":pat,"arm":pat,"rep":int(rep),
      "repetition":int(rep),"model":model,"split":split,"score":int(gate),
      "retried":int(retried),"run":runid,"fixture":{"cohort":ctx["cohort"],"version":ctx["version"]},
@@ -582,6 +614,8 @@ rec={"schema":"pi.eval-row/v2", "task":task,"pattern":pat,"arm":pat,"rep":int(re
                   "sandboxed":bool(int(sandbox_auth)),"authoritative":execution_authoritative},
      "prompt":{"variant":ctx["prompt_variant"],"semantic_group":ctx["semantic_group"],"sha256":ctx["prompt_sha256"]},
      "serving":{"pre":pre,"post":post,"stable":stable},"usage":usage,"trajectory":trajectory,
+     "span_receipt_success":bool(int(span_receipt)),"config":config_binding,"experiment":experiment,
+     "harness":{"surface_sha256":None,"hash_blocker":harness_blocker},
      # compatibility aliases for historical readers; dimensions stay honest.
      "out_chars":int(outchars),"think_chars":0,"in_tok":int(tin) if exact else 0,
      "out_tok":int(tout) if exact else 0,"token_usage_exact":exact}

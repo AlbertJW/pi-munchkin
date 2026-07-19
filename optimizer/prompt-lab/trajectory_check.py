@@ -15,7 +15,7 @@ import tempfile
 from pathlib import Path
 
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "ab-machinery"))
-from metrics import session_file_for  # noqa: E402
+from metrics import session_files_for  # noqa: E402
 
 
 def file_facts(path: Path) -> dict:
@@ -104,14 +104,25 @@ def load_msgs(session_path):
     return msgs
 
 
+def check_session_files(session_paths, corpus: Path, expected_corpus: Path | None = None):
+    """Validate attempts independently so reused toolCallIds cannot cross-bind."""
+    reasons = []
+    for session in session_paths:
+        ok, why = check_bigdata(load_msgs(session), corpus, expected_corpus)
+        if ok:
+            return True, why
+        reasons.append(f"{Path(session).name}: {why}")
+    return False, "; ".join(reasons) if reasons else "no session attempts"
+
+
 def check(workdir, task):
     if task != "bigdata":
         return True, "no trajectory rule for this task"
-    session = session_file_for(workdir)
-    if not session:
+    sessions = session_files_for(workdir)
+    if not sessions:
         return False, "no session found — trajectory evidence unavailable (fail closed)"
     canonical = Path(__file__).resolve().parents[1] / "real-gate-fixtures/bigdata/data/events.jsonl"
-    return check_bigdata(load_msgs(session), Path(workdir) / "data/events.jsonl", canonical)
+    return check_session_files(sessions, Path(workdir) / "data/events.jsonl", canonical)
 
 
 def selftest():
@@ -147,6 +158,18 @@ def selftest():
         assert not check_bigdata(messages(valid, result=False), corpus)[0]  # argument-only forgery
         assert not check_bigdata(messages(valid, call=False), corpus)[0]  # orphan result
         assert not check_bigdata(messages(valid, error=True), corpus)[0]
+        # Fresh retries create another JSONL. Receipt evidence from either attempt
+        # remains valid treatment-compliance evidence for the combined row.
+        attempts = messages({**valid, "complete": False}) + messages(valid)
+        assert check_bigdata(attempts, corpus)[0]
+        first = Path(td) / "attempt-1.jsonl"; second = Path(td) / "attempt-2.jsonl"
+        first.write_text("\n".join(json.dumps({"type": "message", "message": msg})
+                                         for msg in messages({**valid, "complete": False})) + "\n")
+        # Reuse the same call id in the retry. Independent validation must accept
+        # its valid receipt without cross-binding to the first attempt.
+        second.write_text("\n".join(json.dumps({"type": "message", "message": msg})
+                                          for msg in messages(valid)) + "\n")
+        assert check_session_files([first, second], corpus)[0]
         assert check("/missing", "t1")[0]
     print("trajectory_check selftest: OK (receipt binding, UTF-8 bytes, stale/partial/wrong-file rejection)")
 

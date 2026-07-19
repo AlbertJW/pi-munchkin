@@ -1,0 +1,64 @@
+{
+  "schema": "pi.span-screen/v1",
+  "name": "span-tools-bigdata-screen",
+  "hypothesis": "Exposing bounded span tools improves bigdata evidence retrieval while preserving correctness.",
+  "defaults": {
+    "task": "bigdata",
+    "reps": 6,
+    "gen_prefix": "span-screen",
+    "execution": {
+      "GATE_NETWORK": "endpoint",
+      "MODEL_CONTROL": "llama",
+      "LLAMA_URL": "http://127.0.0.1:8080",
+      "INTERLEAVE": "on",
+      "SANDBOX": "on",
+      "SPAN_TOOLS": "off",
+      "TRAJECTORY": "off",
+      "HELDOUT": "",
+      "RESULTS_MODE": "truncate",
+      "FLEET_ALPHA": "0.05"
+    }
+  },
+  "metrics": [
+    "pass_rate",
+    "all_k_reliability",
+    "turns",
+    "tool_calls",
+    "tool_errors",
+    "reads",
+    "unique_reads",
+    "repeat_calls",
+    "repeat_reads",
+    "tool_result_chars",
+    "first_mutation_turn",
+    "compactions",
+    "search_spans",
+    "read_span",
+    "span_receipt_success",
+    "in_tok",
+    "out_tok",
+    "token_usage_exact"
+  ],
+  "rollback": [
+    "candidate significantly regresses correctness",
+    "candidate has zero span-tool exposure",
+    "any candidate row lacks an exhaustive bigdata search receipt",
+    "baseline unexpectedly exposes span tools"
+  ],
+  "provenance": {
+    "harness_surface_sha256": null,
+    "harness_hash_blocker": "Pi does not expose the actually loaded extension/lib set; hashing the repository copy could falsely identify a different live installation."
+  },
+  "cells": [
+    {
+      "id": "span-off",
+      "arm": "base",
+      "config": "baseline.json"
+    },
+    {
+      "id": "span-on",
+      "arm": "cand",
+      "config": "static/span-screen-on.json"
+    }
+  ]
+}

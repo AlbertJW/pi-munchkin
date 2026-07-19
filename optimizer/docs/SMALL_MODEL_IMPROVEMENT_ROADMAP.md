@@ -62,6 +62,16 @@ Primary references:
    - Observational memory: live-aligned arm versus gate-passive arm.
    - Tasks: `bigdata` plus a long, independently rooted multi-file task.
    - Measure: pass rate, all-*k* reliability, overflow, compaction requester and compression ratio, rereads, returned characters, wall time, and lost-evidence failures.
+   - **Blocked:** the watcher factorial needs an approved context-pressure fixture plus watcher
+     requester/threshold telemetry. `bigdata` is not evidence for watcher behavior; historical
+     bigdata span exposure was 0/181 sessions.
+   - Valid precursor: [`span-screen.json`](../prompt-lab/configs/span-screen.json) and
+     [`span_screen.py`](../prompt-lab/span_screen.py) run one span-tools off/on A/B on approved
+     `bigdata` (n=6, α=0.05). Receipt-backed treatment compliance is mandatory and diagnostic-only;
+     zero candidate exposure, missing exhaustive receipts, provenance drift, or baseline exposure
+     makes the screen `INELIGIBLE` rather than changing task scores. Because Pi does not expose the
+     actually loaded extension/lib set, `ELIGIBLE` means same-run screen only; require a fresh
+     confirmation after live/package parity and loaded-surface identity are proven.
 
 5. **Skill disclosure and distractor load**
    - Compare a five-skill shortlist with the full visible global inventory.
@@ -106,4 +116,3 @@ New gate rows retain a `trajectory` object alongside outcome and usage:
 `turns`, `tool_calls`, `tool_errors`, `reads`, `unique_reads`, `repeat_calls`, `repeat_reads`, `tool_result_chars`, `first_mutation_turn`, and `compactions`.
 
 The original TSV metric positions remain stable for compatibility. Fleet reports now add descriptive task-stratified all-*k* reliability; Fisher-based adoption logic remains unchanged until the paired-inference experiment proves a replacement.
-

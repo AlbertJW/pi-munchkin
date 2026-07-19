@@ -127,6 +127,24 @@ makes a model write better code, and adopts only changes that pass Fisher's exac
 **human-gated**: a winning governor is written to `proposals/` for you to review and apply — it
 never edits your live `~/.pi/agent/`.
 
+The current bounded-retrieval screen is checked in as
+[`prompt-lab/configs/span-screen.json`](optimizer/prompt-lab/configs/span-screen.json).
+Preview or run its single interleaved span-tools off/on comparison:
+
+```sh
+python3 optimizer/prompt-lab/span_screen.py --dry
+python3 optimizer/prompt-lab/span_screen.py
+```
+
+It uses the approved `bigdata` fixture, six reps/arm, and ordinary single-comparison α=0.05.
+Candidate rows must actually call the span tools and carry an exhaustive receipt; otherwise the
+aggregate mechanism report is `INELIGIBLE` and the command exits nonzero. Config and experiment
+hashes bind each row even when prompt hashes match. The actually loaded Pi extension set cannot yet
+be hashed reliably, so rows record that provenance blocker instead of claiming the repository copy
+was loaded. Even an eligible result is a same-run screen only; require a fresh confirmation after
+live/package parity and loaded-surface identity are proven. Credentialed endpoints and explicit
+credential passthrough are refused.
+
 ```
 gate baseline governor  ──►  if saturated (≥85% pass): stop, no headroom
         │

@@ -1,0 +1,10 @@
+{
+  "name": "span-screen-on",
+  "prediction": "Candidate rows expose search_spans/read_span, carry exhaustive bigdata receipts, and reduce ordinary read volume without regressing pass rate.",
+  "prompt_variant": "A",
+  "format": "md",
+  "scaffold": "none",
+  "thresholds": {
+    "SPAN_TOOLS": "on"
+  }
+}

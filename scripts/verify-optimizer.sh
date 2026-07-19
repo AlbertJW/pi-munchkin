@@ -23,6 +23,7 @@ selftests=(
   prompt-lab/calibrate.py
   prompt-lab/canary.py
   prompt-lab/config.py
+  prompt-lab/span_screen.py
   prompt-lab/execution_policy.py
   prompt-lab/fleet_report.py
   prompt-lab/fleet_verdict.py
@@ -38,6 +39,7 @@ selftests=(
   prompt-lab/trajectory_check.py
 )
 for script in "${selftests[@]}"; do python3 "$OPT/$script" --selftest; done
+python3 -m unittest "$OPT/prompt-lab/test_span_screen.py"
 python3 "$OPT/prompt-lab/integrity_selftest.py"
 python3 "$OPT/prompt-lab/seatbelt_network_selftest.py"
 

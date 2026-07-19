@@ -21,6 +21,9 @@ COLS = [
     # final binary score as the only signal.
     "tool_calls", "tool_errors", "repeat_calls", "repeat_reads",
     "tool_result_chars", "first_mutation_turn", "compactions", "unique_reads",
+    # Treatment-compliance metrics for the span-tools screen. Appended so every
+    # historical TSV position remains stable.
+    "search_spans", "read_span",
 ]
 DEFAULT_READ_OFFSET = 1
 DEFAULT_READ_LIMIT = 2000
@@ -72,6 +75,7 @@ def _read_span(arguments, workdir=None):
 def parse_session(lines, workdir=None):
     turns = edits = edit_err = reads = subag = tin = tout = lb = vg = 0
     tool_calls = tool_errors = repeat_calls = repeat_reads = tool_result_chars = compactions = 0
+    search_spans = read_span_calls = 0
     out_chars = 0
     first_mutation_turn = 0
     calls_by_id = {}
@@ -121,6 +125,8 @@ def parse_session(lines, workdir=None):
                     elif n == "read":
                         reads += 1
                         read_targets.add(_read_span(args, workdir))
+                    elif n == "search_spans": search_spans += 1
+                    elif n == "read_span": read_span_calls += 1
                     elif n == "subagent": subag += 1
                     if first_mutation_turn == 0 and (n in ("edit", "write", "plan_write") or (n == "bash" and _bash_mutates(args))):
                         first_mutation_turn = turns
@@ -136,7 +142,7 @@ def parse_session(lines, workdir=None):
     usage_exact = int(tin > 0 and tout > 0)
     values = [turns, edits, edit_err, reads, subag, tin, tout, lb, vg, usage_exact, out_chars,
               tool_calls, tool_errors, repeat_calls, repeat_reads, tool_result_chars,
-              first_mutation_turn, compactions, len(read_targets)]
+              first_mutation_turn, compactions, len(read_targets), search_spans, read_span_calls]
     return dict(zip(COLS, values))
 
 def session_files_for(workdir, sessions_home=None):
@@ -195,7 +201,8 @@ def selftest():
            "in_tok": 30, "out_tok": 13, "lb_fires": 1, "vg_fires": 1, "usage_exact": 1,
            "output_chars": 2 * len(str({"path": "a"})), "tool_calls": 4, "tool_errors": 1,
            "repeat_calls": 1, "repeat_reads": 1, "tool_result_chars": len("stale tag"),
-           "first_mutation_turn": 2, "compactions": 1, "unique_reads": 1}
+           "first_mutation_turn": 2, "compactions": 1, "unique_reads": 1,
+           "search_spans": 0, "read_span": 0}
     assert c == exp, f"{c} != {exp}"
     assert as_tsv(c).split("\t")[:11] == ["3", "1", "1", "2", "1", "30", "13", "1", "1", "1", str(exp["output_chars"])], as_tsv(c)
     # zero-usage session keeps token counts at zero and reports a char proxy separately
@@ -223,6 +230,12 @@ def selftest():
     sc = parse_session(span_lines, workdir="/tmp/metrics-span-run")
     assert sc["reads"] == 3 and sc["unique_reads"] == 2 and sc["repeat_reads"] == 1, sc
 
+    treatment_lines = [json.dumps({"type": "message", "message": {"role": "assistant",
+                       "content": [{"type": "toolCall", "name": name, "arguments": {"path": "data/events.jsonl"}}]}})
+                       for name in ("search_spans", "read_span", "search_spans")]
+    tc = parse_session(treatment_lines)
+    assert tc["search_spans"] == 2 and tc["read_span"] == 1, tc
+
     # A retry creates another JSONL for the same workdir. Both attempts must
     # contribute to totals, and a cross-attempt re-read must remain visible.
     with tempfile.TemporaryDirectory() as td:
@@ -232,21 +245,23 @@ def selftest():
         session_dir = os.path.join(sessions, os.path.abspath(work).replace("/", "-") + "-")
         os.makedirs(session_dir)
         attempts = [
-            ("attempt-1.jsonl", 10, 2, {"path": "src/a.js"}),
-            ("attempt-2.jsonl", 20, 4, {"path": "./src/a.js", "offset": 1, "limit": 2000}),
+            ("attempt-1.jsonl", 10, 2, "search_spans", {"path": "src/a.js"}),
+            ("attempt-2.jsonl", 20, 4, "read_span", {"path": "./src/a.js", "offset": 1, "limit": 2000}),
         ]
-        for i, (name, itok, otok, args) in enumerate(attempts, 1):
+        for i, (name, itok, otok, tool_name, args) in enumerate(attempts, 1):
             path = os.path.join(session_dir, name)
             with open(path, "w", encoding="utf-8") as fh:
                 fh.write(json.dumps({"type": "message", "message": {"role": "assistant",
                     "usage": {"input": itok, "output": otok}, "content": [
-                        {"type": "toolCall", "id": f"r{i}", "name": "read", "arguments": args}]}}) + "\n")
+                        {"type": "toolCall", "id": f"ordinary{i}", "name": "read", "arguments": args},
+                        {"type": "toolCall", "id": f"r{i}", "name": tool_name, "arguments": args}]}}) + "\n")
             os.utime(path, (i, i))
         files = session_files_for(work, sessions)
         assert [os.path.basename(f) for f in files] == ["attempt-1.jsonl", "attempt-2.jsonl"], files
         agg = metrics_for_workdir(work, sessions)
         assert agg["turns"] == 2 and agg["in_tok"] == 30 and agg["out_tok"] == 6, agg
         assert agg["reads"] == 2 and agg["unique_reads"] == 1 and agg["repeat_reads"] == 1, agg
+        assert agg["search_spans"] == 1 and agg["read_span"] == 1, agg
     print("metrics selftest: OK", as_tsv(c))
 
 def main():

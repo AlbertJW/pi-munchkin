@@ -407,10 +407,20 @@ def selftest():
     schema = json.load(open(schema_path))
     required_trajectory = schema["properties"]["trajectory"]["required"]
     assert "unique_reads" in required_trajectory
+    trajectory_properties = schema["properties"]["trajectory"]["properties"]
+    assert "search_spans" in trajectory_properties and "read_span" in trajectory_properties
+    assert schema["properties"]["span_receipt_success"] == {"type": "boolean"}
+    assert schema["properties"]["config"]["required"] == ["sha256", "declared_env"]
+    assert schema["properties"]["experiment"]["required"] == ["manifest_sha256", "cell"]
+    assert schema["properties"]["harness"]["required"] == ["surface_sha256", "hash_blocker"]
     conditional = schema["allOf"][0]
     assert conditional["if"]["properties"]["arm"] == {"not": {"const": "one-shot"}}
     assert conditional["then"]["required"] == ["trajectory"]
     assert "trajectory" not in schema["required"], "one-shot must remain trajectory-exempt"
+    experiment_conditional = schema["allOf"][1]
+    assert experiment_conditional["if"]["properties"]["experiment"] == {"type": "object"}
+    assert experiment_conditional["then"]["required"] == ["span_receipt_success", "config", "experiment", "harness", "trajectory"]
+    assert experiment_conditional["then"]["properties"]["trajectory"]["required"] == ["search_spans", "read_span"]
     print("fleet_report selftest: OK (sig gates, integrity, run-scoped all-k reliability, v2 trajectory contract)")
 
 def main():
