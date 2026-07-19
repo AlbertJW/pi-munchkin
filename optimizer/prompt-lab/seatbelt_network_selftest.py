@@ -26,7 +26,7 @@ class Handler(http.server.BaseHTTPRequestHandler):
         pass
 
 
-def render(source, destination, work, harness, state, port, model_host="localhost", mirror=None):
+def render(source, destination, work, harness, state, port, model_host="localhost", mirror=None, home=None):
     # state is the parent (stand-in for ~/.pi/agent): only its sessions/ and
     # telemetry/ children are write-allowed, mirroring real_gate.sh's render.
     text = source.read_text(encoding="utf-8")
@@ -35,6 +35,8 @@ def render(source, destination, work, harness, state, port, model_host="localhos
         "__PI_AGENT__": str(state),
         "__MIRROR__": str(mirror if mirror is not None else Path(state).parent / "mirror"),
         "__MODEL_HOST__": model_host, "__MODEL_PORT__": str(port),
+        "__TMPDIR__": str(Path(tempfile.gettempdir()).resolve()),
+        "__HOME__": str(home if home is not None else Path(state).parent / "home"),
     }
     for old, new in replacements.items():
         text = text.replace(old, new)
@@ -56,10 +58,13 @@ def main():
     endpoint_source = ROOT / "real-gate-fixtures/gate.sb"
     assert "(deny network*)" not in open_source.read_text()
     assert "(deny network*)" in endpoint_source.read_text()
+    # Keep the synthetic work/state tree outside the real macOS TMPDIR so the
+    # assertions distinguish explicit work/state grants from the temp grant.
     with tempfile.TemporaryDirectory(prefix=".pi-seatbelt-network-", dir=ROOT) as td:
         root = Path(td).resolve(); work = root / "work"; harness = root / "harness"; state = root / "state"
-        mirror = root / "mirror"
-        work.mkdir(); harness.mkdir(); state.mkdir(); mirror.mkdir()
+        mirror = root / "mirror"; home = root / "home"
+        work.mkdir(); harness.mkdir(); state.mkdir(); mirror.mkdir(); home.mkdir()
+        (home / ".ssh").mkdir(); (home / ".ssh" / "sentinel").write_text("host-secret")
         (state / "sessions").mkdir(); (state / "telemetry").mkdir()
         (harness / "secret").write_text("hidden")
         (mirror / "grader").write_text("hidden-grader-copy")
@@ -67,8 +72,8 @@ def main():
         thread = threading.Thread(target=server.serve_forever, daemon=True); thread.start()
         port = server.server_address[1]
         open_profile = root / "open.sb"; endpoint_profile = root / "endpoint.sb"
-        render(open_source, open_profile, work, harness, state, port)
-        render(endpoint_source, endpoint_profile, work, harness, state, port)
+        render(open_source, open_profile, work, harness, state, port, home=home)
+        render(endpoint_source, endpoint_profile, work, harness, state, port, home=home)
         try:
             url = f"http://127.0.0.1:{port}/"
             assert run(open_profile, "/usr/bin/curl", "-fsS", url).stdout == "mock-cloud-ok"
@@ -81,6 +86,8 @@ def main():
             # mirror read-deny: a public-mirror grader copy must be unreadable
             assert run(open_profile, "/bin/cat", str(mirror / "grader")).returncode != 0
             assert run(endpoint_profile, "/bin/cat", str(mirror / "grader")).returncode != 0
+            assert run(open_profile, "/bin/cat", str(home / ".ssh" / "sentinel")).returncode != 0
+            assert run(endpoint_profile, "/bin/cat", str(home / ".ssh" / "sentinel")).returncode != 0
             # narrowed ~/.pi write-jail: sessions/ + telemetry/ + *.json.lock writable, parent NOT
             assert run(open_profile, "/usr/bin/touch", str(state / "sessions" / "s.jsonl")).returncode == 0
             assert run(open_profile, "/usr/bin/touch", str(state / "telemetry" / "events.jsonl")).returncode == 0
@@ -91,7 +98,7 @@ def main():
                 parsed = urlsplit(args.remote_url)
                 remote_port = parsed.port or (443 if parsed.scheme == "https" else 80)
                 remote_profile = root / "remote-endpoint.sb"
-                render(endpoint_source, remote_profile, work, harness, state, remote_port, "*")
+                render(endpoint_source, remote_profile, work, harness, state, remote_port, "*", home=home)
                 health_url = args.remote_url.rstrip("/") + "/health"
                 assert run(open_profile, "/usr/bin/curl", "-fsS", "-m", "5", health_url).returncode == 0
                 assert run(remote_profile, "/usr/bin/curl", "-fsS", "-m", "5", health_url).returncode == 0

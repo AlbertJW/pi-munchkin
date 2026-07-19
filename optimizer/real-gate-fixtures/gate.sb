@@ -13,6 +13,19 @@
 ;; The public mirror duplicates the fixtures INCLUDING hidden graders outside
 ;; __HARNESS__; sessions have been observed wandering into it (r6-c21).
 (deny file-read* (subpath "__MIRROR__"))
+;; Pi does not need interactive shell/cloud credentials for local benchmark
+;; tools. Keep common host credential stores outside the approved model's read
+;; surface even though the profile otherwise permits ordinary runtime reads.
+(deny file-read*
+  (subpath "__HOME__/.ssh")
+  (subpath "__HOME__/.aws")
+  (subpath "__HOME__/.azure")
+  (subpath "__HOME__/.config/gcloud")
+  (subpath "__HOME__/.kube")
+  (subpath "__HOME__/.docker")
+  (literal "__HOME__/.npmrc")
+  (literal "__HOME__/.netrc")
+  (literal "__HOME__/.git-credentials"))
 (deny network*)
 ;; __MODEL_HOST__ is "localhost" for a loopback model (tight default) and "*"
 ;; for a remote model — Seatbelt cannot pin a raw IP literal, so a remote box is
@@ -29,8 +42,7 @@
 ;; ($wd sits under ~/.pi/real-gate-runs but is covered by the __WORKDIR__ rule.)
 (allow file-write*
   (subpath "__WORKDIR__")
-  (subpath "/private/tmp")
-  (subpath "/private/var/folders")
+  (subpath "__TMPDIR__")
   (subpath "__PI_AGENT__/sessions")
   (subpath "__PI_AGENT__/telemetry")
   (subpath "__PI_AGENT__/settings.json.lock")

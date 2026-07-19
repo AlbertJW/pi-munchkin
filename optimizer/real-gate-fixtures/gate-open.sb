@@ -8,12 +8,21 @@
 ;; The public mirror duplicates the fixtures INCLUDING hidden graders outside
 ;; __HARNESS__; sessions have been observed wandering into it (r6-c21).
 (deny file-read* (subpath "__MIRROR__"))
+(deny file-read*
+  (subpath "__HOME__/.ssh")
+  (subpath "__HOME__/.aws")
+  (subpath "__HOME__/.azure")
+  (subpath "__HOME__/.config/gcloud")
+  (subpath "__HOME__/.kube")
+  (subpath "__HOME__/.docker")
+  (literal "__HOME__/.npmrc")
+  (literal "__HOME__/.netrc")
+  (literal "__HOME__/.git-credentials"))
 (deny file-write*)
 ;; Write set matches gate.sb — see the rationale there; keep the profiles in lockstep.
 (allow file-write*
   (subpath "__WORKDIR__")
-  (subpath "/private/tmp")
-  (subpath "/private/var/folders")
+  (subpath "__TMPDIR__")
   (subpath "__PI_AGENT__/sessions")
   (subpath "__PI_AGENT__/telemetry")
   (subpath "__PI_AGENT__/settings.json.lock")

@@ -16,6 +16,7 @@
 set -uo pipefail
 
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="$(git -C "$HERE" rev-parse --show-toplevel 2>/dev/null || dirname "$HERE")"
 GEN="${GEN:-rg0}"; N="${N:-3}"
 DD="${DD:-qwen36-35b-iq3s}"; PI_TIMEOUT="${PI_TIMEOUT:-1800}"
 PI_MODEL="${PI_MODEL:-}"   # pi model id for the sessions (else pi uses its default — beware external defaults)
@@ -24,7 +25,7 @@ GATE_NETWORK="${GATE_NETWORK:-open}"       # open (exploratory) | endpoint (loop
 MODEL_CONTROL="${MODEL_CONTROL:-llama}"    # llama | pi-native
 BASE="${BASE:-$HERE/prompt-lab/configs/baseline.json}"
 CAND="${CAND:-$HERE/prompt-lab/configs/cand-cot.json}"
-FIXTURE="$HOME/LLM/pi-test"; T3_FILES="$HERE/ab-symbolect/t3-files"
+FIXTURE="${PI_TEST_FIXTURE:-$HERE/pi-test}"; T3_FILES="$HERE/ab-symbolect/t3-files"
 FIXTURES="$HERE/real-gate-fixtures"
 CONFIG="$HERE/prompt-lab/config.py"; METRICS="$HERE/ab-machinery/metrics.py"
 FIXTURE_META="$HERE/prompt-lab/eval_fixture.py"; FINGERPRINT="$HERE/prompt-lab/serving_fingerprint.py"
@@ -43,6 +44,10 @@ for a in "$@"; do
 		*) TASKS+=("$a") ;;
 	esac
 done
+# Dry-run validates wiring only and emits no evaluation row, so fixture approval
+# cannot affect authority. Treat it as exploratory to keep the documented
+# offline smoke command usable in a fresh clone.
+[[ "$DRY" == 1 ]] && EXPLORATORY=1
 if [[ ${#TASKS[@]} -eq 0 ]]; then
 	if [[ "$HARD" == 1 ]]; then
 		# every hidden task is one $FIXTURES/hidden/<id>.test.js — derive the list, no hardcoding
@@ -112,6 +117,7 @@ done
 # the entire harness repository (including graders and Git objects). SANDBOX=off disables BOTH protections and makes
 # hidden-task results invalid; auto-off when macOS sandbox-exec is unavailable.
 SANDBOX="${SANDBOX:-on}"
+case "$SANDBOX" in on|off) ;; *) echo "[real_gate] invalid SANDBOX=$SANDBOX (on|off)" >&2; exit 2 ;; esac
 if [[ "$GATE_NETWORK" == "open" ]]; then
 	GATE_SB="$HERE/real-gate-fixtures/gate-open.sb"
 else
@@ -119,6 +125,16 @@ else
 fi
 if [[ "$SANDBOX" == "on" ]] && { [[ "$(uname)" != "Darwin" ]] || ! command -v sandbox-exec >/dev/null 2>&1 || [[ ! -f "$GATE_SB" ]]; }; then
 	SANDBOX=off
+fi
+SANDBOX_AUTHORITATIVE=1
+SANDBOX_AUTHORITY_REASON="filesystem read isolation enabled"
+if [[ "$SANDBOX" != "on" ]]; then
+	SANDBOX_AUTHORITATIVE=0
+	SANDBOX_AUTHORITY_REASON="filesystem sandbox unavailable or explicitly disabled"
+	echo "[real_gate] ================================================================" >&2
+	echo "[real_gate] WARNING: SANDBOX=off; public-task rows are EXPLORATORY ONLY" >&2
+	echo "[real_gate] Hidden graders remain blocked because read isolation is absent." >&2
+	echo "[real_gate] ================================================================" >&2
 fi
 # Filesystem isolation is independent of egress authority. Open networking and
 # remote endpoint wildcards are permitted, but their rows are exploratory.
@@ -231,7 +247,7 @@ esac
 # used to aggregate the OLD run's events into the new verdict (audit 2026-07-13).
 # The id lands in workdir names (-> sk) and every result row (-> exact joins).
 RUNID="${RUNID:-$(python3 -c 'import uuid; print(uuid.uuid4().hex[:6])')}"
-echo "== real_gate: model=$MODEL provider=$MODEL_PROVIDER_RESOLVED network=$GATE_NETWORK control=$MODEL_CONTROL N=$N run=$RUNID tasks=${TASKS[*]} =="
+echo "== real_gate: model=$MODEL provider=$MODEL_PROVIDER_RESOLVED network=$GATE_NETWORK sandbox=$SANDBOX control=$MODEL_CONTROL N=$N run=$RUNID tasks=${TASKS[*]} =="
 
 # Per-session resource guard. A pi session's model runs REMOTELY, but the tools it
 # invokes (node/awk/bash — bigdata literally asks it to write+run node aggregators)
@@ -241,6 +257,20 @@ echo "== real_gate: model=$MODEL provider=$MODEL_PROVIDER_RESOLVED network=$GATE
 # process group with (a) a memory watchdog that kills the group past a cap and
 # (b) a guaranteed group sweep on exit so nothing orphans. PI_MEM_CAP_GB=0 disables.
 PI_MEM_CAP_GB="${PI_MEM_CAP_GB:-12}"
+TIMEOUT_TOOL="$(command -v timeout 2>/dev/null || command -v gtimeout 2>/dev/null || true)"
+run_with_timeout() { # $1=seconds $2=kill grace, remaining args=command
+	local limit="$1" grace="$2" pid timer rc; shift 2
+	if [[ -n "$TIMEOUT_TOOL" ]]; then
+		"$TIMEOUT_TOOL" -k "$grace" "$limit" "$@"
+		return $?
+	fi
+	set +m # keep fallback children in the session process group for watchdog/cleanup
+	"$@" & pid=$!
+	( sleep "$limit"; kill -TERM "$pid" 2>/dev/null; sleep "$grace"; kill -KILL "$pid" 2>/dev/null ) & timer=$!
+	wait "$pid"; rc=$?
+	kill "$timer" 2>/dev/null; wait "$timer" 2>/dev/null || true
+	return "$rc"
+}
 
 # INSTRUMENT PROPERTY — do not move this into prompt-lab/configs/*.json.
 # pi-observational-memory void-launches a consolidation AGENT LOOP on agent_start and
@@ -260,14 +290,14 @@ run_guarded_session() {
 	set -m   # monitor mode: the backgrounded subshell becomes its own process-group leader
 	if [[ "$redir" == ">>" ]]; then
 		( cd "$wd" || exit
-		  export PI_OBSERVATIONAL_MEMORY_PASSIVE=1
-		  while IFS= read -r line; do [[ "$line" == *=* && "$line" != ENDPOINT=* && "$line" != LABEL=* ]] && export "${line?}"; done <<< "$envlines"
-		  ${sbx[@]+"${sbx[@]}"} timeout -k 30 "$PI_TIMEOUT" pi -p --approve ${PI_SELECT[@]+"${PI_SELECT[@]}"} --tools "$tools" "$prompt" ) </dev/null >> "$wd/run.log" 2>&1 &
+		  run_with_timeout "$PI_TIMEOUT" 30 ${sbx[@]+"${sbx[@]}"} /usr/bin/env -i \
+		    "${session_env[@]}" "${session_base_env[@]}" PI_OBSERVATIONAL_MEMORY_PASSIVE=1 \
+		    pi -p --approve ${PI_SELECT[@]+"${PI_SELECT[@]}"} --tools "$tools" "$prompt" ) </dev/null >> "$wd/run.log" 2>&1 &
 	else
 		( cd "$wd" || exit
-		  export PI_OBSERVATIONAL_MEMORY_PASSIVE=1
-		  while IFS= read -r line; do [[ "$line" == *=* && "$line" != ENDPOINT=* && "$line" != LABEL=* ]] && export "${line?}"; done <<< "$envlines"
-		  ${sbx[@]+"${sbx[@]}"} timeout -k 30 "$PI_TIMEOUT" pi -p --approve ${PI_SELECT[@]+"${PI_SELECT[@]}"} --tools "$tools" "$prompt" ) </dev/null > "$wd/run.log" 2>&1 &
+		  run_with_timeout "$PI_TIMEOUT" 30 ${sbx[@]+"${sbx[@]}"} /usr/bin/env -i \
+		    "${session_env[@]}" "${session_base_env[@]}" PI_OBSERVATIONAL_MEMORY_PASSIVE=1 \
+		    pi -p --approve ${PI_SELECT[@]+"${PI_SELECT[@]}"} --tools "$tools" "$prompt" ) </dev/null > "$wd/run.log" 2>&1 &
 	fi
 	CHILD=$!
 	set +m
@@ -323,9 +353,14 @@ run_one() {  # $1=config $2=arm $3=task $4=rep [$5=split] [$6=prompt-variant]
 		[[ "$waited" -gt 0 ]] && echo "[real_gate] server back after ~${waited}s — resuming" >&2
 	fi
 
-	# apply the config: writes $wd/.pi/APPEND_SYSTEM.md, returns env lines
-	local envlines; envlines="$(python3 "$CONFIG" --apply "$cfg" --workdir "$wd")"
-	local env_span_tools; env_span_tools="$(sed -n 's/^SPAN_TOOLS=//p' <<< "$envlines" | tail -1)"
+	# Apply the config and load its validated NUL-delimited environment. Arrays preserve
+	# multiline steering text without eval or line-oriented export injection.
+	local envfile="$wd/.config-env" entry
+	local session_env=()
+	python3 "$CONFIG" --apply "$cfg" --workdir "$wd" --env-null > "$envfile" || exit 2
+	while IFS= read -r -d '' entry; do session_env+=("$entry"); done < "$envfile"
+	local env_span_tools=""
+	for entry in "${session_env[@]}"; do [[ "$entry" == SPAN_TOOLS=* ]] && env_span_tools="${entry#*=}"; done
 	env_span_tools="${env_span_tools:-${SPAN_TOOLS:-off}}"
 	if [[ "${TRAJECTORY:-off}" == "on" && "$env_span_tools" != "on" ]]; then
 		echo "[real_gate] TRAJECTORY=on requires SPAN_TOOLS=on for $pat/$task; refusing argument-only evidence" >&2
@@ -336,21 +371,55 @@ run_one() {  # $1=config $2=arm $3=task $4=rep [$5=split] [$6=prompt-variant]
 	# Candidate env the PARENT shell must see: the exports below happen inside the pi
 	# subshell only, so checking ${RETRY_FRESH} out here read the parent's env and the
 	# c18 retry never fired for candidates that enable it (audit 2026-07-13 — the f4
-	# c18 arm measured nothing). Parse the values straight from envlines instead.
-	local env_retry_fresh; env_retry_fresh="$(sed -n 's/^RETRY_FRESH=//p' <<< "$envlines" | tail -1)"
+	# c18 arm measured nothing). Parse the values from the validated array instead.
+	local env_retry_fresh=""
+	for entry in "${session_env[@]}"; do [[ "$entry" == RETRY_FRESH=* ]] && env_retry_fresh="${entry#*=}"; done
 	env_retry_fresh="${env_retry_fresh:-${RETRY_FRESH:-off}}"
-	local env_retry_mode; env_retry_mode="$(sed -n 's/^RETRY_MODE=//p' <<< "$envlines" | tail -1)"
+	local env_retry_mode=""
+	for entry in "${session_env[@]}"; do [[ "$entry" == RETRY_MODE=* ]] && env_retry_mode="${entry#*=}"; done
 	env_retry_mode="${env_retry_mode:-${RETRY_MODE:-fresh}}"
+
+	# Child tools receive a deliberately minimal environment. Frontier, cloud,
+	# SSH-agent, npm, and shell-hook secrets never enter the fully-approved Pi
+	# process. Operators may explicitly pass a provider variable by name when a
+	# non-default transport requires it; LLAMA_API_KEY is the only automatic
+	# credential because the configured llama endpoint may require bearer auth.
+	local gate_tmpdir="$wd/.tmp" key value
+	mkdir -p "$gate_tmpdir"
+	local session_base_env=("HOME=$HOME" "PATH=$PATH" "TMPDIR=$gate_tmpdir")
+	for key in LANG LC_ALL SYSTEMROOT WINDIR PI_CODING_AGENT_DIR XDG_CONFIG_HOME; do
+		[[ -n "${!key:-}" ]] && session_base_env+=("$key=${!key}")
+	done
+	if [[ -n "${LLAMA_API_KEY:-}" ]]; then
+		session_base_env+=("LLAMA_API_KEY=$LLAMA_API_KEY")
+		echo "[real_gate] WARNING: LLAMA_API_KEY is required by the selected endpoint and visible to child tools; rows are exploratory" >&2
+		SANDBOX_AUTHORITATIVE=0
+		SANDBOX_AUTHORITY_REASON="endpoint credential is present in the approved child environment"
+	fi
+	local -a passthrough_keys=()
+	IFS=',' read -r -a passthrough_keys <<< "${PI_GATE_PASSTHROUGH_ENV:-}"
+	for key in "${passthrough_keys[@]}"; do
+		[[ -z "$key" ]] && continue
+		[[ "$key" =~ ^[A-Za-z_][A-Za-z0-9_]*$ ]] || { echo "[real_gate] invalid PI_GATE_PASSTHROUGH_ENV name: $key" >&2; exit 2; }
+		value="${!key-}"; session_base_env+=("$key=$value")
+		echo "[real_gate] WARNING: explicitly passing $key into approved child tools; rows are exploratory" >&2
+		SANDBOX_AUTHORITATIVE=0
+		SANDBOX_AUTHORITY_REASON="operator passed credential/environment variable into child tools"
+	done
 
 	# jail: render the per-run Seatbelt profile (absolute paths; Seatbelt has no env)
 	local sbx=()
 	if [[ "$SANDBOX" == "on" ]]; then
-		sed -e "s|__WORKDIR__|$wd|" \
-			-e "s|__PI_AGENT__|$HOME/.pi/agent|" \
-			-e "s|__MIRROR__|${GATE_MIRROR_DENY:-$HOME/pi_munchkin}|" \
-			-e "s|__HARNESS__|$HERE|" -e "s|__MODEL_PORT__|$MODEL_PORT|" \
-			-e "s|__MODEL_HOST__|$MODEL_HOST|" \
-			"$GATE_SB" > "$wd/.gate.sb"
+		python3 - "$GATE_SB" "$wd/.gate.sb" "$wd" "$HOME/.pi/agent" "${GATE_MIRROR_DENY:-$REPO_ROOT}" "$REPO_ROOT" "$MODEL_PORT" "$MODEL_HOST" "$gate_tmpdir" "$HOME" <<'PY'
+import json,sys
+src,dst,*values=sys.argv[1:]
+tokens=("__WORKDIR__","__PI_AGENT__","__MIRROR__","__HARNESS__","__MODEL_PORT__","__MODEL_HOST__","__TMPDIR__","__HOME__")
+text=open(src,encoding="utf-8").read()
+for token,value in zip(tokens,values):
+    if "\x00" in value or "\n" in value: raise SystemExit(f"unsafe Seatbelt substitution for {token}")
+    text=text.replace(f'"{token}"',json.dumps(value))
+open(dst,"w",encoding="utf-8").write(text)
+PY
 		sbx=(sandbox-exec -f "$wd/.gate.sb")
 	fi
 
@@ -403,7 +472,7 @@ run_one() {  # $1=config $2=arm $3=task $4=rep [$5=split] [$6=prompt-variant]
 			# failure class (gt2: re-read-then-different-approach never happens
 			# unprompted on small models).
 			local failout
-			failout="$( (cd "$wd" && timeout 60 node --test 2>&1 | tail -20) 2>/dev/null )"
+			failout="$( (cd "$wd" && run_with_timeout 60 5 node --test 2>&1 | tail -20) 2>/dev/null )"
 			echo "  $pat/$task rep$rep aborted — RETRY locality second session" >&2
 			retry_prompt="$task_prompt
 
@@ -467,16 +536,17 @@ NOTE: a previous attempt in this workdir was stopped for repeating the same fail
 		LOW_TOK_STREAK=0
 	fi
 
-	python3 - "$RESULTS" "$MODEL" "$pat" "$task" "$rep" "$gate" "$retried" "$RUNID" "$tin" "$tout" "$output_chars" "$split" "$usage_exact" "${FLEET_EXPECTED_MODELS:-}" "$rowctx" "$wd/fingerprint-pre.json" "$wd/fingerprint-post.json" "$GATE_NETWORK" "$MODEL_CONTROL" "$MODEL_PROVIDER_RESOLVED" "$ENDPOINT_IDENTITY_SHA256" "$NETWORK_AUTHORITATIVE" "$NETWORK_AUTHORITY_REASON" "$EXEC_POLICY" <<'PY'
+	python3 - "$RESULTS" "$MODEL" "$pat" "$task" "$rep" "$gate" "$retried" "$RUNID" "$tin" "$tout" "$output_chars" "$split" "$usage_exact" "${FLEET_EXPECTED_MODELS:-}" "$rowctx" "$wd/fingerprint-pre.json" "$wd/fingerprint-post.json" "$GATE_NETWORK" "$MODEL_CONTROL" "$MODEL_PROVIDER_RESOLVED" "$ENDPOINT_IDENTITY_SHA256" "$NETWORK_AUTHORITATIVE" "$NETWORK_AUTHORITY_REASON" "$SANDBOX_AUTHORITATIVE" "$SANDBOX_AUTHORITY_REASON" "$EXEC_POLICY" <<'PY'
 import importlib.util,json,sys
-out,model,pat,task,rep,gate,retried,runid,tin,tout,outchars,split,usage_exact,expected_models,ctxpath,prepath,postpath,network_mode,model_control,provider,endpoint_sha,network_auth,network_reason,policy_path=sys.argv[1:25]
+out,model,pat,task,rep,gate,retried,runid,tin,tout,outchars,split,usage_exact,expected_models,ctxpath,prepath,postpath,network_mode,model_control,provider,endpoint_sha,network_auth,network_reason,sandbox_auth,sandbox_reason,policy_path=sys.argv[1:27]
 ctx=json.load(open(ctxpath)); pre=json.load(open(prepath)); post=json.load(open(postpath))
 stable=pre.get("fingerprint_sha256") == post.get("fingerprint_sha256")
 serving_complete=pre.get("status") == post.get("status") == "complete"
-execution_authoritative=bool(int(network_auth))
+execution_authoritative=bool(int(network_auth)) and bool(int(sandbox_auth))
+execution_reason=network_reason if bool(int(sandbox_auth)) else f"{network_reason}; {sandbox_reason}"
 spec=importlib.util.spec_from_file_location("execution_policy", policy_path); policy=importlib.util.module_from_spec(spec); spec.loader.exec_module(policy)
 authoritative,status,authority_reason=policy.row_decision(ctx["authoritative"],ctx["authority_reason"],stable,serving_complete,
-    execution_authoritative,network_reason,ctx.get("exploratory_override",False))
+    execution_authoritative,execution_reason,ctx.get("exploratory_override",False))
 exact=bool(int(usage_exact))
 usage={"source":"provider" if exact else "char_proxy", "exact":exact,
        "input_tokens":int(tin) if exact else None, "output_tokens":int(tout) if exact else None,
@@ -486,7 +556,8 @@ rec={"schema":"pi.eval-row/v2", "task":task,"pattern":pat,"arm":pat,"rep":int(re
      "retried":int(retried),"run":runid,"fixture":{"cohort":ctx["cohort"],"version":ctx["version"]},
      "authoritative":authoritative,"status":status,"authority_reason":authority_reason,
      "execution":{"network_mode":network_mode,"model_control":model_control,"provider":provider,
-                  "endpoint_identity_sha256":endpoint_sha,"network_authoritative":execution_authoritative},
+                  "endpoint_identity_sha256":endpoint_sha,"network_authoritative":bool(int(network_auth)),
+                  "sandboxed":bool(int(sandbox_auth)),"authoritative":execution_authoritative},
      "prompt":{"variant":ctx["prompt_variant"],"semantic_group":ctx["semantic_group"],"sha256":ctx["prompt_sha256"]},
      "serving":{"pre":pre,"post":post,"stable":stable},"usage":usage,
      # compatibility aliases for historical readers; dimensions stay honest.
@@ -521,23 +592,25 @@ json.dump({"score":0,"requests":0,"error":reason,
 PY
 	fi
 	python3 "$FINGERPRINT" capture --endpoint "$FINGERPRINT_ENDPOINT" --model "$MODEL" --output "$wd/fingerprint-post.json"
-	python3 - "$RESULTS" "$MODEL" "$task" "$rep" "$RUNID" "$rowctx" "$result" "$wd/fingerprint-pre.json" "$wd/fingerprint-post.json" "$eligible" "$GATE_NETWORK" "$MODEL_CONTROL" "$MODEL_PROVIDER_RESOLVED" "$ENDPOINT_IDENTITY_SHA256" "$NETWORK_AUTHORITATIVE" "$NETWORK_AUTHORITY_REASON" "$EXEC_POLICY" <<'PY'
+	python3 - "$RESULTS" "$MODEL" "$task" "$rep" "$RUNID" "$rowctx" "$result" "$wd/fingerprint-pre.json" "$wd/fingerprint-post.json" "$eligible" "$GATE_NETWORK" "$MODEL_CONTROL" "$MODEL_PROVIDER_RESOLVED" "$ENDPOINT_IDENTITY_SHA256" "$NETWORK_AUTHORITATIVE" "$NETWORK_AUTHORITY_REASON" "$SANDBOX_AUTHORITATIVE" "$SANDBOX_AUTHORITY_REASON" "$EXEC_POLICY" <<'PY'
 import importlib.util,json,sys
-out,model,task,rep,runid,ctxp,resultp,prep,postp,eligible,network_mode,model_control,provider,endpoint_sha,network_auth,network_reason,policy_path=sys.argv[1:18]
+out,model,task,rep,runid,ctxp,resultp,prep,postp,eligible,network_mode,model_control,provider,endpoint_sha,network_auth,network_reason,sandbox_auth,sandbox_reason,policy_path=sys.argv[1:20]
 ctx=json.load(open(ctxp)); result=json.load(open(resultp)); pre=json.load(open(prep)); post=json.load(open(postp))
 stable=pre.get("fingerprint_sha256")==post.get("fingerprint_sha256")
 complete=pre.get("status")==post.get("status")=="complete"
-execution_authoritative=bool(int(network_auth))
+execution_authoritative=bool(int(network_auth)) and bool(int(sandbox_auth))
+execution_reason=network_reason if bool(int(sandbox_auth)) else f"{network_reason}; {sandbox_reason}"
 spec=importlib.util.spec_from_file_location("execution_policy", policy_path); policy=importlib.util.module_from_spec(spec); spec.loader.exec_module(policy)
 authoritative,status,authority_reason=policy.row_decision(ctx["authoritative"],ctx["authority_reason"],stable,complete,
-    execution_authoritative,network_reason,ctx.get("exploratory_override",False),eligible=="1")
+    execution_authoritative,execution_reason,ctx.get("exploratory_override",False),eligible=="1")
 usage=result["usage"]
 rec={"schema":"pi.eval-row/v2","task":task,"pattern":"one-shot","arm":"one-shot","rep":int(rep),"repetition":int(rep),
      "model":model,"split":"robustness","score":int(result["score"]),"run":runid,
      "fixture":{"cohort":ctx["cohort"],"version":ctx["version"]},"authoritative":authoritative,"status":status,
      "authority_reason":authority_reason,"prompt":{"variant":ctx["prompt_variant"],"semantic_group":ctx["semantic_group"],"sha256":ctx["prompt_sha256"]},
      "execution":{"network_mode":network_mode,"model_control":model_control,"provider":provider,
-                  "endpoint_identity_sha256":endpoint_sha,"network_authoritative":execution_authoritative},
+                  "endpoint_identity_sha256":endpoint_sha,"network_authoritative":bool(int(network_auth)),
+                  "sandboxed":bool(int(sandbox_auth)),"authoritative":execution_authoritative},
      "serving":{"pre":pre,"post":post,"stable":stable},"usage":usage,"control":{"requests":result["requests"],"error":result.get("error")},
      "out_chars":usage["output_chars"],"in_tok":usage["input_tokens"] or 0,"out_tok":usage["output_tokens"] or 0,
      "token_usage_exact":usage["exact"]}

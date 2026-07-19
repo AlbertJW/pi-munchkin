@@ -28,6 +28,10 @@ returns `INCOMPLETE`. `--robustness` adds the three reviewed prompt forms and a
 single-request, tool-free one-shot control for context packs no larger than 48
 KiB. Only canonical `val` rows contribute to adoption statistics.
 
+The default reusable fixture is the repository's `pi-test/`. Set
+`PI_TEST_FIXTURE=/absolute/path/to/fixture` only when intentionally evaluating
+another compatible checkout; no private home-directory checkout is assumed.
+
 ```sh
 ./real_gate.sh --robustness t1 t2
 ./real_gate.sh --exploratory --robustness t1
@@ -57,6 +61,12 @@ retaining the filesystem jail. Such rows are always marked non-authoritative.
 Seatbelt cannot pin a raw remote IP, so a remote endpoint uses a port-scoped
 wildcard and is also non-authoritative. Only an endpoint-restricted loopback or
 localhost tunnel can produce authoritative rows.
+
+On macOS, `SANDBOX=on` uses `sandbox-exec` for filesystem read/write isolation.
+If Seatbelt is unavailable or `SANDBOX=off` is selected, public tasks may still
+run but are prominently warned and forced to exploratory status. Hidden tasks
+are refused outright without read isolation. `GATE_MIRROR_DENY` may name an
+additional fixture mirror whose graders must also be unreadable.
 
 `MODEL_CONTROL=llama` retains `/health`, `/v1/models`, warm-up, and serving
 fingerprint behaviour. `MODEL_CONTROL=pi-native` requires `PI_MODEL`, accepts an
