@@ -214,6 +214,32 @@ def session_tail(wd, limit=800):
     except Exception:
         return ""
 
+def _validated_canonical_val_rows(rows, tasks, n):
+    """Return the exact authoritative, complete canonical val surface or fail closed."""
+    expected = {(task, rep) for task in tasks for rep in range(1, n + 1)}
+    found = {}
+    for r in rows:
+        prompt = r.get("prompt")
+        if (r.get("pattern") != "base" or r.get("split") != "val"
+                or not isinstance(prompt, dict) or prompt.get("variant") != "canonical"):
+            continue
+        cell = (r.get("task"), r.get("rep"))
+        if cell not in expected:
+            raise ValueError(f"unexpected canonical val cell: {cell!r}")
+        if cell in found:
+            raise ValueError(f"duplicate canonical val cell: {cell!r}")
+        if r.get("schema") != "pi.eval-row/v2":
+            raise ValueError(f"{cell!r}: expected pi.eval-row/v2 row")
+        if r.get("authoritative") is not True or r.get("status") != "complete":
+            raise ValueError(f"{cell!r}: row is non-authoritative or incomplete")
+        if type(r.get("score")) is not int or r["score"] not in (0, 1):
+            raise ValueError(f"{cell!r}: malformed score")
+        found[cell] = r
+    missing = expected - set(found)
+    if missing:
+        raise ValueError(f"missing canonical val cells: {sorted(missing)!r}")
+    return [found[(task, rep)] for task in tasks for rep in range(1, n + 1)]
+
 def real_gate_one(cand, tasks, n, gen):
     """Gate one candidate (base config only) → (passes, total, failing_traces)."""
     os.makedirs(PROPOSALS, exist_ok=True)
@@ -248,8 +274,10 @@ def real_gate_one(cand, tasks, n, gen):
     if rc != 0:  # aborted gate (server down past HEALTH_WAIT, ^C): never verdict on partial arms
         raise SystemExit(f"[munchkin] gate {gen} aborted (exit {rc}) — fix the server and rerun; no verdict written")
     rows = [json.loads(l) for l in open(out)] if os.path.exists(out) else []
-    base = [r for r in rows if r.get("pattern") == "base" and r.get("split", "val") == "val"
-            and (r.get("prompt") or {}).get("variant", "canonical") == "canonical"]
+    try:
+        base = _validated_canonical_val_rows(rows, tasks, n)
+    except ValueError as e:
+        raise SystemExit(f"[munchkin] gate {gen} rejected invalid result surface: {e}")
     k = sum(r["score"] for r in base)
     failures = []
     for r in base:
@@ -405,6 +433,35 @@ def selftest():
     dims = load_schema_dims()
     assert robustness_due("m-r3-c0") and robustness_due("m-r7-c2")
     assert not robustness_due("m-r2-c0") and not robustness_due("m-r0-base")
+
+    # real-gate authority boundary: count only an exact, authoritative and complete
+    # pi.eval-row/v2 canonical val surface; missing/malformed rows fail closed.
+    def gate_row(task, rep, **changes):
+        row = {"schema": "pi.eval-row/v2", "task": task, "rep": rep,
+               "pattern": "base", "split": "val", "prompt": {"variant": "canonical"},
+               "authoritative": True, "status": "complete", "score": rep % 2}
+        row.update(changes)
+        return row
+
+    valid_gate_rows = [gate_row(task, rep) for task in ("t1", "t2") for rep in (1, 2)]
+    assert len(_validated_canonical_val_rows(valid_gate_rows, ["t1", "t2"], 2)) == 4
+
+    def rejects(rows, message):
+        try:
+            _validated_canonical_val_rows(rows, ["t1", "t2"], 2)
+        except ValueError as e:
+            assert message in str(e), e
+        else:
+            raise AssertionError(f"gate surface should reject: {message}")
+
+    rejects(valid_gate_rows[:-1], "missing canonical val cells")
+    rejects([dict(r, authoritative=False) if r is valid_gate_rows[0] else r
+             for r in valid_gate_rows], "non-authoritative or incomplete")
+    rejects([dict(r, status="incomplete") if r is valid_gate_rows[0] else r
+             for r in valid_gate_rows], "non-authoritative or incomplete")
+    rejects([dict(r, prompt="canonical") if r is valid_gate_rows[0] else r
+             for r in valid_gate_rows], "missing canonical val cells")
+    rejects(valid_gate_rows + [dict(valid_gate_rows[0])], "duplicate canonical val cell")
 
     # schema guard: out-of-schema / unsafe deltas are dropped, in-schema survive
     clean, dropped = sanitize_delta(
