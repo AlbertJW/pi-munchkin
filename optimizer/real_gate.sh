@@ -411,13 +411,26 @@ run_one() {  # $1=config $2=arm $3=task $4=rep [$5=split] [$6=prompt-variant]
 	local sbx=()
 	if [[ "$SANDBOX" == "on" ]]; then
 		python3 - "$GATE_SB" "$wd/.gate.sb" "$wd" "$HOME/.pi/agent" "${GATE_MIRROR_DENY:-$REPO_ROOT}" "$REPO_ROOT" "$MODEL_PORT" "$MODEL_HOST" "$gate_tmpdir" "$HOME" <<'PY'
-import json,sys
+import json,re,sys
 src,dst,*values=sys.argv[1:]
 tokens=("__WORKDIR__","__PI_AGENT__","__MIRROR__","__HARNESS__","__MODEL_PORT__","__MODEL_HOST__","__TMPDIR__","__HOME__")
 text=open(src,encoding="utf-8").read()
+escaped={}
 for token,value in zip(tokens,values):
     if "\x00" in value or "\n" in value: raise SystemExit(f"unsafe Seatbelt substitution for {token}")
-    text=text.replace(f'"{token}"',json.dumps(value))
+    # Tokens can be either the whole Seatbelt string or a substring such as
+    # "__MODEL_HOST__:__MODEL_PORT__".  Insert a JSON-escaped string fragment
+    # so both forms remain one valid, injection-safe Seatbelt string.
+    escaped[token]=json.dumps(value,ensure_ascii=True)[1:-1]
+placeholder=re.compile(r"__[A-Z][A-Z0-9_]*__")
+def substitute(match):
+    token=match.group(0)
+    if token not in escaped:
+        raise SystemExit(f"unresolved Seatbelt placeholder(s): {token}")
+    return escaped[token]
+# One pass over the original template: placeholder-looking text inside a
+# replacement value is data and must never be substituted again.
+text=placeholder.sub(substitute,text)
 open(dst,"w",encoding="utf-8").write(text)
 PY
 		sbx=(sandbox-exec -f "$wd/.gate.sb")

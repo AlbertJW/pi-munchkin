@@ -3,7 +3,9 @@
 
 import argparse
 import http.server
+import json
 import platform
+import re
 import shutil
 import subprocess
 import tempfile
@@ -12,6 +14,7 @@ from pathlib import Path
 from urllib.parse import urlsplit
 
 ROOT = Path(__file__).resolve().parents[1]
+PLACEHOLDER_RE = re.compile(r"__[A-Z][A-Z0-9_]*__")
 
 
 class Handler(http.server.BaseHTTPRequestHandler):
@@ -26,10 +29,29 @@ class Handler(http.server.BaseHTTPRequestHandler):
         pass
 
 
+def render_text(text, replacements):
+    """Render tokens inside Seatbelt strings without permitting string injection."""
+    escaped = {}
+    for token, raw_value in replacements.items():
+        value = str(raw_value)
+        if "\x00" in value or "\n" in value:
+            raise ValueError(f"unsafe Seatbelt substitution for {token}")
+        escaped[token] = json.dumps(value, ensure_ascii=True)[1:-1]
+
+    def substitute(match):
+        token = match.group(0)
+        if token not in escaped:
+            raise ValueError(f"unresolved Seatbelt placeholder(s): {token}")
+        return escaped[token]
+
+    # One pass over the original template: placeholder-looking text inside a
+    # replacement value is data and must never be substituted again.
+    return PLACEHOLDER_RE.sub(substitute, text)
+
+
 def render(source, destination, work, harness, state, port, model_host="localhost", mirror=None, home=None):
     # state is the parent (stand-in for ~/.pi/agent): only its sessions/ and
     # telemetry/ children are write-allowed, mirroring real_gate.sh's render.
-    text = source.read_text(encoding="utf-8")
     replacements = {
         "__WORKDIR__": str(work), "__HARNESS__": str(harness),
         "__PI_AGENT__": str(state),
@@ -38,8 +60,7 @@ def render(source, destination, work, harness, state, port, model_host="localhos
         "__TMPDIR__": str(Path(tempfile.gettempdir()).resolve()),
         "__HOME__": str(home if home is not None else Path(state).parent / "home"),
     }
-    for old, new in replacements.items():
-        text = text.replace(old, new)
+    text = render_text(source.read_text(encoding="utf-8"), replacements)
     destination.write_text(text, encoding="utf-8")
 
 
@@ -51,6 +72,24 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--remote-url", help="optional existing llama-compatible endpoint; probes /health only")
     args = parser.parse_args()
+    # This regression runs on every platform: combined placeholders must be
+    # resolved, escaped as one string, and unknown placeholders must fail closed.
+    rendered = render_text(
+        '"__MODEL_HOST__:__MODEL_PORT__" "__HOME__/.ssh"',
+        {"__MODEL_HOST__": "localhost", "__MODEL_PORT__": "1234", "__HOME__": '/tmp/a"b'},
+    )
+    assert rendered == '"localhost:1234" "/tmp/a\\"b/.ssh"'
+    cascaded = render_text(
+        '"__WORKDIR__" "__HOME__"',
+        {"__WORKDIR__": "/tmp/__HOME__/work", "__HOME__": "/Users/example"},
+    )
+    assert cascaded == '"/tmp/__HOME__/work" "/Users/example"'
+    try:
+        render_text('"__UNKNOWN__"', {})
+    except ValueError as exc:
+        assert "__UNKNOWN__" in str(exc)
+    else:
+        raise AssertionError("unresolved Seatbelt placeholder was accepted")
     if platform.system() != "Darwin" or not shutil.which("sandbox-exec"):
         print("seatbelt_network_selftest: SKIP (macOS sandbox-exec unavailable)")
         return
