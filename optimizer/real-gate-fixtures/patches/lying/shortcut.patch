@@ -1,0 +1,9 @@
+--- a/src/index.js
++++ b/src/index.js
+@@ -2,5 +2,5 @@
+ 
+ // slugify: lowercase, hyphen-separated slug of a string.
+ export function slugify(s) {
+-  return s.trim().replace(/\s+/g, '-');
++  return s.trim().replace(/\s/g, '-').toLowerCase();
+ }

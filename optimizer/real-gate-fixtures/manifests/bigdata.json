@@ -1,0 +1,242 @@
+{
+  "admission": {
+    "approved": true,
+    "approved_prompt_hashes": [
+      "efdda06695414d2c5b9bbbc4134f8294ba9fc15b1ac1245da59b3a00819e50f7",
+      "c1d9e180cf3c16bbdf99f7aba35bcefdac274703f13614bcc80c32dded4e7374",
+      "f4fa8eb62df76e5ccd72d927767bc482e0267f2f338b50ac307b1bf6ef5ce508"
+    ],
+    "automated": {
+      "checked_at": "2026-07-14T21:01:12Z",
+      "hash_drift": [],
+      "passed": true,
+      "runs_per_state": 3,
+      "states": {
+        "gold_fail_to_pass": [
+          {
+            "output_tail": "",
+            "passed": true,
+            "returncode": 0
+          },
+          {
+            "output_tail": "",
+            "passed": true,
+            "returncode": 0
+          },
+          {
+            "output_tail": "",
+            "passed": true,
+            "returncode": 0
+          }
+        ],
+        "gold_pass_to_pass": [
+          {
+            "output_tail": "",
+            "passed": true,
+            "returncode": 0
+          },
+          {
+            "output_tail": "",
+            "passed": true,
+            "returncode": 0
+          },
+          {
+            "output_tail": "",
+            "passed": true,
+            "returncode": 0
+          }
+        ],
+        "mutant:shortcut": {
+          "fail_to_pass": [
+            {
+              "output_tail": "'user_16'\n          ^\n  \n      at TestContext.<anonymous> (file:///private/var/folders/3r/nc7qhtpn56j7rt5nwg0rqw600000gn/T/pi-admit-bigdata-i9a0hny6/work/test/fail-to-pass.test.js:25:12)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.start (node:internal/test_runner/test:1242:17)\n      at startSubtestAfterBootstrap (node:internal/test_runner/harness:387:17) {\n    generatedMessage: false,\n    code: 'ERR_ASSERTION',\n    actual: 'user_06',\n    expected: 'user_16',\n    operator: 'strictEqual',\n    diff: 'simple'\n  }\n",
+              "passed": false,
+              "returncode": 1
+            },
+            {
+              "output_tail": "'user_16'\n          ^\n  \n      at TestContext.<anonymous> (file:///private/var/folders/3r/nc7qhtpn56j7rt5nwg0rqw600000gn/T/pi-admit-bigdata-75l56o0u/work/test/fail-to-pass.test.js:25:12)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.start (node:internal/test_runner/test:1242:17)\n      at startSubtestAfterBootstrap (node:internal/test_runner/harness:387:17) {\n    generatedMessage: false,\n    code: 'ERR_ASSERTION',\n    actual: 'user_06',\n    expected: 'user_16',\n    operator: 'strictEqual',\n    diff: 'simple'\n  }\n",
+              "passed": false,
+              "returncode": 1
+            },
+            {
+              "output_tail": "'user_16'\n          ^\n  \n      at TestContext.<anonymous> (file:///private/var/folders/3r/nc7qhtpn56j7rt5nwg0rqw600000gn/T/pi-admit-bigdata-f8w36vca/work/test/fail-to-pass.test.js:25:12)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.start (node:internal/test_runner/test:1242:17)\n      at startSubtestAfterBootstrap (node:internal/test_runner/harness:387:17) {\n    generatedMessage: false,\n    code: 'ERR_ASSERTION',\n    actual: 'user_06',\n    expected: 'user_16',\n    operator: 'strictEqual',\n    diff: 'simple'\n  }\n",
+              "passed": false,
+              "returncode": 1
+            }
+          ],
+          "pass_to_pass": [
+            {
+              "output_tail": "",
+              "passed": true,
+              "returncode": 0
+            },
+            {
+              "output_tail": "",
+              "passed": true,
+              "returncode": 0
+            },
+            {
+              "output_tail": "",
+              "passed": true,
+              "returncode": 0
+            }
+          ]
+        },
+        "pristine_fail_to_pass": [
+          {
+            "output_tail": "ENOENT: no such file or directory, open 'src/top3.json'\n      at readFileSync (node:fs:436:20)\n      at TestContext.<anonymous> (file:///private/var/folders/3r/nc7qhtpn56j7rt5nwg0rqw600000gn/T/pi-admit-bigdata-r4v7ht54/work/test/fail-to-pass.test.js:21:26)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.start (node:internal/test_runner/test:1242:17)\n      at startSubtestAfterBootstrap (node:internal/test_runner/harness:387:17) {\n    errno: -2,\n    code: 'ENOENT',\n    syscall: 'open',\n    path: 'src/top3.json'\n  }\n",
+            "passed": false,
+            "returncode": 1
+          },
+          {
+            "output_tail": "ENOENT: no such file or directory, open 'src/top3.json'\n      at readFileSync (node:fs:436:20)\n      at TestContext.<anonymous> (file:///private/var/folders/3r/nc7qhtpn56j7rt5nwg0rqw600000gn/T/pi-admit-bigdata-i93os1i6/work/test/fail-to-pass.test.js:21:26)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.start (node:internal/test_runner/test:1242:17)\n      at startSubtestAfterBootstrap (node:internal/test_runner/harness:387:17) {\n    errno: -2,\n    code: 'ENOENT',\n    syscall: 'open',\n    path: 'src/top3.json'\n  }\n",
+            "passed": false,
+            "returncode": 1
+          },
+          {
+            "output_tail": "ENOENT: no such file or directory, open 'src/top3.json'\n      at readFileSync (node:fs:436:20)\n      at TestContext.<anonymous> (file:///private/var/folders/3r/nc7qhtpn56j7rt5nwg0rqw600000gn/T/pi-admit-bigdata-v4431vcr/work/test/fail-to-pass.test.js:21:26)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.start (node:internal/test_runner/test:1242:17)\n      at startSubtestAfterBootstrap (node:internal/test_runner/harness:387:17) {\n    errno: -2,\n    code: 'ENOENT',\n    syscall: 'open',\n    path: 'src/top3.json'\n  }\n",
+            "passed": false,
+            "returncode": 1
+          }
+        ],
+        "pristine_pass_to_pass": [
+          {
+            "output_tail": "",
+            "passed": true,
+            "returncode": 0
+          },
+          {
+            "output_tail": "",
+            "passed": true,
+            "returncode": 0
+          },
+          {
+            "output_tail": "",
+            "passed": true,
+            "returncode": 0
+          }
+        ]
+      }
+    },
+    "reviewed_at": "2026-07-15T17:01:34Z",
+    "reviewer": "Albert"
+  },
+  "artifacts": [
+    {
+      "path": "ab-symbolect/tasks/bigdata.txt",
+      "sha256": "43e0909f99dd67b551a692206da65285f9d65dc99a242d81504ec854ab0660e3"
+    },
+    {
+      "path": "real-gate-fixtures/bigdata/data/events.jsonl",
+      "sha256": "8c701eaf3b51923e9396b11cb9fd23c8048c2d0df78392aa7e34a26482012d72"
+    },
+    {
+      "path": "real-gate-fixtures/bigdata/package.json",
+      "sha256": "cec43607952a177bf7faa2a52e5e2b32ad4da982a63a9b8097d734c6ad4c93ad"
+    },
+    {
+      "path": "real-gate-fixtures/bigdata/src/index.js",
+      "sha256": "8357ac3100354994685ed68405402081170e44107278e4f19a702d43b8ba78f3"
+    },
+    {
+      "path": "real-gate-fixtures/bigdata/test/sanity.test.js",
+      "sha256": "69c8c11df37f1da68d3cb2b089feb0454f1a8dc25cab05870715b3eaafbcb02d"
+    },
+    {
+      "path": "real-gate-fixtures/hidden/bigdata.test.js",
+      "sha256": "4727f217f6f3210bfca85480480d7738fe5c23e07a12d3add9cdebcb2bada196"
+    },
+    {
+      "path": "real-gate-fixtures/patches/bigdata/gold.patch",
+      "sha256": "5ce8fd5afce12ebad84433a511c4d07a41ba2abb95d4e64a716baaac5b662053"
+    },
+    {
+      "path": "real-gate-fixtures/patches/bigdata/shortcut.patch",
+      "sha256": "62b73c9921b777ef0a81bb502a0c9f481242251c716ee8cd8404f233e28baf8f"
+    }
+  ],
+  "cohort_id": "2026-07",
+  "fixture": {
+    "root": "real-gate-fixtures/bigdata",
+    "stage_copy": []
+  },
+  "fixture_version": "2026-07.1",
+  "one_shot": {
+    "context_files": [
+      "src/index.js",
+      "test/sanity.test.js"
+    ],
+    "eligible": false,
+    "max_context_bytes": 49152
+  },
+  "patches": {
+    "gold": "real-gate-fixtures/patches/bigdata/gold.patch",
+    "shortcut_mutants": [
+      "real-gate-fixtures/patches/bigdata/shortcut.patch"
+    ]
+  },
+  "prompts": {
+    "canonical": {
+      "sha256": "104100143a812ac0941adfb029da659118ac73974281e8748712ca16f75936d4",
+      "text": "data/events.jsonl holds ~4000 event records (one JSON object per line: id, user, amount, status, ts). Compute the 3 users with the highest total `amount` summed over their status:\"ok\" events only. Write the result to src/top3.json as a JSON array of exactly three objects [{\"user\": \"...\", \"total\": ...}, ...] sorted by total descending, totals rounded to 2 decimals. The file is large \u2014 query it rather than reading it whole. When `search_spans` is available, call it on data/events.jsonl so its exhaustive execution receipt proves full-corpus coverage; then use node or awk to aggregate. Run node --test and ensure the existing tests still pass."
+    },
+    "perturbations": [
+      {
+        "approved": false,
+        "id": "equivalent-1",
+        "sha256": "efdda06695414d2c5b9bbbc4134f8294ba9fc15b1ac1245da59b3a00819e50f7",
+        "text": "Complete the following repository task. Preserve existing behavior and verify the tests.\n\ndata/events.jsonl holds ~4000 event records (one JSON object per line: id, user, amount, status, ts). Compute the 3 users with the highest total `amount` summed over their status:\"ok\" events only. Write the result to src/top3.json as a JSON array of exactly three objects [{\"user\": \"...\", \"total\": ...}, ...] sorted by total descending, totals rounded to 2 decimals. The file is large \u2014 query it rather than reading it whole. When `search_spans` is available, call it on data/events.jsonl so its exhaustive execution receipt proves full-corpus coverage; then use node or awk to aggregate. Run node --test and ensure the existing tests still pass."
+      },
+      {
+        "approved": false,
+        "id": "equivalent-2",
+        "sha256": "c1d9e180cf3c16bbdf99f7aba35bcefdac274703f13614bcc80c32dded4e7374",
+        "text": "Repository change request:\ndata/events.jsonl holds ~4000 event records (one JSON object per line: id, user, amount, status, ts). Compute the 3 users with the highest total `amount` summed over their status:\"ok\" events only. Write the result to src/top3.json as a JSON array of exactly three objects [{\"user\": \"...\", \"total\": ...}, ...] sorted by total descending, totals rounded to 2 decimals. The file is large \u2014 query it rather than reading it whole. When `search_spans` is available, call it on data/events.jsonl so its exhaustive execution receipt proves full-corpus coverage; then use node or awk to aggregate. Run node --test and ensure the existing tests still pass.\n\nUse the smallest correct change and confirm the test suite."
+      },
+      {
+        "approved": false,
+        "id": "equivalent-3",
+        "sha256": "f4fa8eb62df76e5ccd72d927767bc482e0267f2f338b50ac307b1bf6ef5ce508",
+        "text": "Please solve this task in the supplied checkout, retaining all stated edge cases:\n\ndata/events.jsonl holds ~4000 event records (one JSON object per line: id, user, amount, status, ts). Compute the 3 users with the highest total `amount` summed over their status:\"ok\" events only. Write the result to src/top3.json as a JSON array of exactly three objects [{\"user\": \"...\", \"total\": ...}, ...] sorted by total descending, totals rounded to 2 decimals. The file is large \u2014 query it rather than reading it whole. When `search_spans` is available, call it on data/events.jsonl so its exhaustive execution receipt proves full-corpus coverage; then use node or awk to aggregate. Run node --test and ensure the existing tests still pass."
+      }
+    ],
+    "semantic_group": "bigdata:2026-07.1"
+  },
+  "schema": "pi.fixture/v1",
+  "sufficiency": [
+    {
+      "assertion": "src/top3.json holds the top-3 users by total ok-amount, descending",
+      "prompt_evidence": "data/events.jsonl holds ~4000 event records (one JSON object per line: id, user, amount, status, ts). Compute the 3 users with the highest total `amount` summed over their status:\"ok\" events only. Write the result to src/top3.json as a JSON array of exactly three objects [{\"user\": \"...\", \"total\": ...}, ...] sorted by total descending, totals rounded to 2 decimals. The file is large \u2014 query it rather than reading it whole. When `search_spans` is available, call it on data/events.jsonl so its exhaustive execution receipt proves full-corpus coverage; then use node or awk to aggregate. Run node --test and ensure the existing tests still pass."
+    }
+  ],
+  "task_id": "bigdata",
+  "tests": {
+    "fail_to_pass": {
+      "command": [
+        "node",
+        "--test",
+        "test/fail-to-pass.test.js"
+      ],
+      "overlays": [
+        {
+          "dest": "test/fail-to-pass.test.js",
+          "source": "real-gate-fixtures/hidden/bigdata.test.js"
+        }
+      ],
+      "timeout_seconds": 60
+    },
+    "pass_to_pass": {
+      "command": [
+        "node",
+        "--test"
+      ],
+      "overlays": [],
+      "timeout_seconds": 60
+    }
+  },
+  "timestamps": {
+    "admitted_at": "2026-07-15T17:01:34Z",
+    "created_at": "2026-07-14T00:00:00Z",
+    "expires_at": "2026-10-13T17:01:34Z"
+  }
+}

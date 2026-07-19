@@ -24,9 +24,9 @@ HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 HDRS="$HERE/ab-symbolect/sym-headers"
 TASKS_DIR="$HERE/ab-symbolect/tasks"
 T3_FILES="$HERE/ab-symbolect/t3-files"
-FIXTURE="$HOME/LLM/pi-test"
+FIXTURE="${PI_TEST_FIXTURE:-$HERE/pi-test}"
 AGENT_DIR="$HOME/.pi/agent"
-RUNS_ROOT="$HOME/LLM/ab-symbolect-runs"   # under trusted root; gitignored
+RUNS_ROOT="${AB_SYMBOLECT_RUNS:-$HOME/.pi/ab-symbolect-runs}"
 
 STAMP="$(date +%Y%m%d-%H%M%S)"
 TASKS=("${@:-}"); [[ -z "${TASKS[0]}" ]] && TASKS=(t1 t2 t3 t4)

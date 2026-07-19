@@ -1,0 +1,16 @@
+--- a/src/index.js
++++ b/src/index.js
+@@ -75,3 +75,13 @@
+ export function csvToJson(data) {
+   return JSON.stringify(data, null, 2);
+ }
++
++export function toCSV(rows) {
++  if (rows.length === 0) return '';
++  const keys = Object.keys(rows[0]);
++  const escape = (value) => {
++    const text = String(value ?? '');
++    return /[,"\n]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
++  };
++  return [keys.map(escape).join(','), ...rows.map((row) => keys.map((key) => escape(row[key])).join(','))].join('\n');
++}

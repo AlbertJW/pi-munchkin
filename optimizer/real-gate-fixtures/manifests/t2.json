@@ -1,0 +1,247 @@
+{
+  "admission": {
+    "approved": false,
+    "automated": {
+      "checked_at": "2026-07-14T18:49:06Z",
+      "hash_drift": [],
+      "passed": true,
+      "runs_per_state": 3,
+      "states": {
+        "gold_fail_to_pass": [
+          {
+            "output_tail": "",
+            "passed": true,
+            "returncode": 0
+          },
+          {
+            "output_tail": "",
+            "passed": true,
+            "returncode": 0
+          },
+          {
+            "output_tail": "",
+            "passed": true,
+            "returncode": 0
+          }
+        ],
+        "gold_pass_to_pass": [
+          {
+            "output_tail": "",
+            "passed": true,
+            "returncode": 0
+          },
+          {
+            "output_tail": "",
+            "passed": true,
+            "returncode": 0
+          },
+          {
+            "output_tail": "",
+            "passed": true,
+            "returncode": 0
+          }
+        ],
+        "mutant:shortcut": {
+          "fail_to_pass": [
+            {
+              "output_tail": "node:internal/modules/run_main:107\n    triggerUncaughtException(\n    ^\n\nAssertionError [ERR_ASSERTION]: csvToJson must use 4-space indentation\n+ actual - expected\n\n+ '[\\n  {\\n    \"a\": \"1\"\\n  }\\n]'\n- '[\\n    {\\n        \"a\": \"1\"\\n    }\\n]'\n        ^\n\n    at file:///private/var/folders/3r/nc7qhtpn56j7rt5nwg0rqw600000gn/T/pi-admit-t2-6ebw2800/work/test/fail-to-pass.mjs:18:8 {\n  generatedMessage: false,\n  code: 'ERR_ASSERTION',\n  actual: '[\\n  {\\n    \"a\": \"1\"\\n  }\\n]',\n  expected: '[\\n    {\\n        \"a\": \"1\"\\n    }\\n]',\n  operator: 'strictEqual',\n  diff: 'simple'\n}\n\nNode.js v26.3.0\n",
+              "passed": false,
+              "returncode": 1
+            },
+            {
+              "output_tail": "node:internal/modules/run_main:107\n    triggerUncaughtException(\n    ^\n\nAssertionError [ERR_ASSERTION]: csvToJson must use 4-space indentation\n+ actual - expected\n\n+ '[\\n  {\\n    \"a\": \"1\"\\n  }\\n]'\n- '[\\n    {\\n        \"a\": \"1\"\\n    }\\n]'\n        ^\n\n    at file:///private/var/folders/3r/nc7qhtpn56j7rt5nwg0rqw600000gn/T/pi-admit-t2-1h94nmty/work/test/fail-to-pass.mjs:18:8 {\n  generatedMessage: false,\n  code: 'ERR_ASSERTION',\n  actual: '[\\n  {\\n    \"a\": \"1\"\\n  }\\n]',\n  expected: '[\\n    {\\n        \"a\": \"1\"\\n    }\\n]',\n  operator: 'strictEqual',\n  diff: 'simple'\n}\n\nNode.js v26.3.0\n",
+              "passed": false,
+              "returncode": 1
+            },
+            {
+              "output_tail": "node:internal/modules/run_main:107\n    triggerUncaughtException(\n    ^\n\nAssertionError [ERR_ASSERTION]: csvToJson must use 4-space indentation\n+ actual - expected\n\n+ '[\\n  {\\n    \"a\": \"1\"\\n  }\\n]'\n- '[\\n    {\\n        \"a\": \"1\"\\n    }\\n]'\n        ^\n\n    at file:///private/var/folders/3r/nc7qhtpn56j7rt5nwg0rqw600000gn/T/pi-admit-t2-os1v7hnf/work/test/fail-to-pass.mjs:18:8 {\n  generatedMessage: false,\n  code: 'ERR_ASSERTION',\n  actual: '[\\n  {\\n    \"a\": \"1\"\\n  }\\n]',\n  expected: '[\\n    {\\n        \"a\": \"1\"\\n    }\\n]',\n  operator: 'strictEqual',\n  diff: 'simple'\n}\n\nNode.js v26.3.0\n",
+              "passed": false,
+              "returncode": 1
+            }
+          ],
+          "pass_to_pass": [
+            {
+              "output_tail": "",
+              "passed": true,
+              "returncode": 0
+            },
+            {
+              "output_tail": "",
+              "passed": true,
+              "returncode": 0
+            },
+            {
+              "output_tail": "",
+              "passed": true,
+              "returncode": 0
+            }
+          ]
+        },
+        "pristine_fail_to_pass": [
+          {
+            "output_tail": "node:internal/modules/run_main:107\n    triggerUncaughtException(\n    ^\n\nAssertionError [ERR_ASSERTION]: parseCSV must skip interior blank lines\n\n3 !== 2\n\n    at file:///private/var/folders/3r/nc7qhtpn56j7rt5nwg0rqw600000gn/T/pi-admit-t2-zs0xeft4/work/test/fail-to-pass.mjs:13:8 {\n  generatedMessage: false,\n  code: 'ERR_ASSERTION',\n  actual: 3,\n  expected: 2,\n  operator: 'strictEqual',\n  diff: 'simple'\n}\n\nNode.js v26.3.0\n",
+            "passed": false,
+            "returncode": 1
+          },
+          {
+            "output_tail": "node:internal/modules/run_main:107\n    triggerUncaughtException(\n    ^\n\nAssertionError [ERR_ASSERTION]: parseCSV must skip interior blank lines\n\n3 !== 2\n\n    at file:///private/var/folders/3r/nc7qhtpn56j7rt5nwg0rqw600000gn/T/pi-admit-t2-eteiv_sq/work/test/fail-to-pass.mjs:13:8 {\n  generatedMessage: false,\n  code: 'ERR_ASSERTION',\n  actual: 3,\n  expected: 2,\n  operator: 'strictEqual',\n  diff: 'simple'\n}\n\nNode.js v26.3.0\n",
+            "passed": false,
+            "returncode": 1
+          },
+          {
+            "output_tail": "node:internal/modules/run_main:107\n    triggerUncaughtException(\n    ^\n\nAssertionError [ERR_ASSERTION]: parseCSV must skip interior blank lines\n\n3 !== 2\n\n    at file:///private/var/folders/3r/nc7qhtpn56j7rt5nwg0rqw600000gn/T/pi-admit-t2-mc5aw2vb/work/test/fail-to-pass.mjs:13:8 {\n  generatedMessage: false,\n  code: 'ERR_ASSERTION',\n  actual: 3,\n  expected: 2,\n  operator: 'strictEqual',\n  diff: 'simple'\n}\n\nNode.js v26.3.0\n",
+            "passed": false,
+            "returncode": 1
+          }
+        ],
+        "pristine_pass_to_pass": [
+          {
+            "output_tail": "",
+            "passed": true,
+            "returncode": 0
+          },
+          {
+            "output_tail": "",
+            "passed": true,
+            "returncode": 0
+          },
+          {
+            "output_tail": "",
+            "passed": true,
+            "returncode": 0
+          }
+        ]
+      }
+    },
+    "reviewed_at": null,
+    "reviewer": null
+  },
+  "artifacts": [
+    {
+      "path": "ab-symbolect/tasks/t2.txt",
+      "sha256": "8102ffe28bd8d75606931a3c48d37925d14353c1973e56550253f9ae9518ba3f"
+    },
+    {
+      "path": "pi-test/package.json",
+      "sha256": "17de85e51f8083835bc1fd697e21080d2a2592d73a8343a5e9a467f47fbc5d62"
+    },
+    {
+      "path": "pi-test/src/index.js",
+      "sha256": "ef9288b55ee398a3067b8348aff635a5adb47421ab5ba01f3fefaeb84072f19b"
+    },
+    {
+      "path": "pi-test/test/csvParser.test.js",
+      "sha256": "15904d6a11ab0e020b4e0bb338bc0ed13f2592d5a0e9b5e2a070eb5ebf1aebd2"
+    },
+    {
+      "path": "pi-test/test/edgeCases.test.js",
+      "sha256": "a9453014d8f9b74780285cb52e854e55fd6e110b59e2188e5fea47e68bf7899d"
+    },
+    {
+      "path": "pi-test/test/integration.test.js",
+      "sha256": "96f35d0212d4a2ab2faf16d1153734de239feda5f2bc87bf605715ef9e4c3f84"
+    },
+    {
+      "path": "pi-test/test/jsonConverter.test.js",
+      "sha256": "2bf7dcec60873577e2902b462d0eb0f5a0f022152091b2e91d8c12eae58f25d2"
+    },
+    {
+      "path": "real-gate-fixtures/patches/t2/gold.patch",
+      "sha256": "4ab668c5caa3bed72d7940f59ce42b54a11bb09577ccfc74a4563a7b1604083b"
+    },
+    {
+      "path": "real-gate-fixtures/patches/t2/shortcut.patch",
+      "sha256": "3d63d3275279e2d1a4e65b83f29471b652655067744b3b9e53ce7e69818e7455"
+    },
+    {
+      "path": "real-gate-fixtures/t2-check.mjs",
+      "sha256": "701ab992b81d3c56090f4070cd199b2bbdb150f0780c3e5f9823514f5264e366"
+    }
+  ],
+  "cohort_id": "2026-07",
+  "fixture": {
+    "root": "pi-test",
+    "stage_copy": []
+  },
+  "fixture_version": "2026-07.1",
+  "one_shot": {
+    "context_files": [
+      "src/index.js",
+      "test/csvParser.test.js",
+      "test/edgeCases.test.js",
+      "test/integration.test.js",
+      "test/jsonConverter.test.js"
+    ],
+    "eligible": true,
+    "max_context_bytes": 49152
+  },
+  "patches": {
+    "gold": "real-gate-fixtures/patches/t2/gold.patch",
+    "shortcut_mutants": [
+      "real-gate-fixtures/patches/t2/shortcut.patch"
+    ]
+  },
+  "prompts": {
+    "canonical": {
+      "sha256": "e1bf74e34e5c73514b3103c3a9d26c651d1fdd407b79eedbb5bdb8c15d843715",
+      "text": "Make three precise changes: 1) parseCSV must skip blank lines anywhere in the CSV input, not just at the ends. 2) csvToJson must emit 4-space JSON indentation instead of 2. 3) Update only the tests that assert the old behavior. Run node --test and ensure all tests pass."
+    },
+    "perturbations": [
+      {
+        "approved": false,
+        "id": "equivalent-1",
+        "sha256": "31dcfd9380a0abfe34fe04476ed266d82cdb6859d88b0d570caeb06025f1edb5",
+        "text": "Complete the following repository task. Preserve existing behavior and verify the tests.\n\nMake three precise changes: 1) parseCSV must skip blank lines anywhere in the CSV input, not just at the ends. 2) csvToJson must emit 4-space JSON indentation instead of 2. 3) Update only the tests that assert the old behavior. Run node --test and ensure all tests pass."
+      },
+      {
+        "approved": false,
+        "id": "equivalent-2",
+        "sha256": "23ecf805bf9f2a3067c54602ad81f548091637eb678892da032e8e5e998c1d1a",
+        "text": "Repository change request:\nMake three precise changes: 1) parseCSV must skip blank lines anywhere in the CSV input, not just at the ends. 2) csvToJson must emit 4-space JSON indentation instead of 2. 3) Update only the tests that assert the old behavior. Run node --test and ensure all tests pass.\n\nUse the smallest correct change and confirm the test suite."
+      },
+      {
+        "approved": false,
+        "id": "equivalent-3",
+        "sha256": "1617335446109550735a701c7d27eae155dc93e75186967edd0a0b4297d8dd04",
+        "text": "Please solve this task in the supplied checkout, retaining all stated edge cases:\n\nMake three precise changes: 1) parseCSV must skip blank lines anywhere in the CSV input, not just at the ends. 2) csvToJson must emit 4-space JSON indentation instead of 2. 3) Update only the tests that assert the old behavior. Run node --test and ensure all tests pass."
+      }
+    ],
+    "semantic_group": "t2:2026-07.1"
+  },
+  "schema": "pi.fixture/v1",
+  "sufficiency": [
+    {
+      "assertion": "FAIL_TO_PASS behavior and stated edge cases",
+      "prompt_evidence": "Make three precise changes: 1) parseCSV must skip blank lines anywhere in the CSV input, not just at the ends. 2) csvToJson must emit 4-space JSON indentation instead of 2. 3) Update only the tests that assert the old behavior. Run node --test and ensure all tests pass."
+    }
+  ],
+  "task_id": "t2",
+  "tests": {
+    "fail_to_pass": {
+      "command": [
+        "node",
+        "test/fail-to-pass.mjs"
+      ],
+      "overlays": [
+        {
+          "dest": "test/fail-to-pass.mjs",
+          "source": "real-gate-fixtures/t2-check.mjs"
+        }
+      ],
+      "timeout_seconds": 60
+    },
+    "pass_to_pass": {
+      "command": [
+        "node",
+        "--test"
+      ],
+      "overlays": [],
+      "timeout_seconds": 60
+    }
+  },
+  "timestamps": {
+    "admitted_at": null,
+    "created_at": "2026-07-14T00:00:00Z",
+    "expires_at": null
+  }
+}

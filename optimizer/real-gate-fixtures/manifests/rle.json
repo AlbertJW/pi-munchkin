@@ -1,0 +1,255 @@
+{
+  "admission": {
+    "approved": false,
+    "automated": {
+      "checked_at": "2026-07-14T18:51:28Z",
+      "hash_drift": [],
+      "passed": true,
+      "runs_per_state": 3,
+      "states": {
+        "gold_fail_to_pass": [
+          {
+            "output_tail": "",
+            "passed": true,
+            "returncode": 0
+          },
+          {
+            "output_tail": "",
+            "passed": true,
+            "returncode": 0
+          },
+          {
+            "output_tail": "",
+            "passed": true,
+            "returncode": 0
+          }
+        ],
+        "gold_pass_to_pass": [
+          {
+            "output_tail": "",
+            "passed": true,
+            "returncode": 0
+          },
+          {
+            "output_tail": "",
+            "passed": true,
+            "returncode": 0
+          },
+          {
+            "output_tail": "",
+            "passed": true,
+            "returncode": 0
+          }
+        ],
+        "mutant:shortcut": {
+          "fail_to_pass": [
+            {
+              "output_tail": "k62kfhh/work/test/fail-to-pass.test.js:7:45)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n      at Test.postRun (node:internal/test_runner/test:1522:19)\n      at Test.run (node:internal/test_runner/test:1447:12)\n      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3) {\n    generatedMessage: true,\n    code: 'ERR_ASSERTION',\n    actual: '2A',\n    expected: 'AAAAAAAAAAAA',\n    operator: 'strictEqual',\n    diff: 'simple'\n  }\n",
+              "passed": false,
+              "returncode": 1
+            },
+            {
+              "output_tail": "26xxq_y/work/test/fail-to-pass.test.js:7:45)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n      at Test.postRun (node:internal/test_runner/test:1522:19)\n      at Test.run (node:internal/test_runner/test:1447:12)\n      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3) {\n    generatedMessage: true,\n    code: 'ERR_ASSERTION',\n    actual: '2A',\n    expected: 'AAAAAAAAAAAA',\n    operator: 'strictEqual',\n    diff: 'simple'\n  }\n",
+              "passed": false,
+              "returncode": 1
+            },
+            {
+              "output_tail": "j7eu1u2/work/test/fail-to-pass.test.js:7:45)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n      at Test.postRun (node:internal/test_runner/test:1522:19)\n      at Test.run (node:internal/test_runner/test:1447:12)\n      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3) {\n    generatedMessage: true,\n    code: 'ERR_ASSERTION',\n    actual: '2A',\n    expected: 'AAAAAAAAAAAA',\n    operator: 'strictEqual',\n    diff: 'simple'\n  }\n",
+              "passed": false,
+              "returncode": 1
+            }
+          ],
+          "pass_to_pass": [
+            {
+              "output_tail": "",
+              "passed": true,
+              "returncode": 0
+            },
+            {
+              "output_tail": "",
+              "passed": true,
+              "returncode": 0
+            },
+            {
+              "output_tail": "",
+              "passed": true,
+              "returncode": 0
+            }
+          ]
+        },
+        "pristine_fail_to_pass": [
+          {
+            "output_tail": "T/pi-admit-rle-mifgzgjr/work/src/index.js:2:9)\n      at TestContext.<anonymous> (file:///private/var/folders/3r/nc7qhtpn56j7rt5nwg0rqw600000gn/T/pi-admit-rle-mifgzgjr/work/test/fail-to-pass.test.js:9:77)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n      at Test.postRun (node:internal/test_runner/test:1522:19)\n      at Test.run (node:internal/test_runner/test:1447:12)\n      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7)\n",
+            "passed": false,
+            "returncode": 1
+          },
+          {
+            "output_tail": "T/pi-admit-rle-4q4d2wbo/work/src/index.js:2:9)\n      at TestContext.<anonymous> (file:///private/var/folders/3r/nc7qhtpn56j7rt5nwg0rqw600000gn/T/pi-admit-rle-4q4d2wbo/work/test/fail-to-pass.test.js:9:77)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n      at Test.postRun (node:internal/test_runner/test:1522:19)\n      at Test.run (node:internal/test_runner/test:1447:12)\n      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7)\n",
+            "passed": false,
+            "returncode": 1
+          },
+          {
+            "output_tail": "T/pi-admit-rle-vglzy5u_/work/src/index.js:2:9)\n      at TestContext.<anonymous> (file:///private/var/folders/3r/nc7qhtpn56j7rt5nwg0rqw600000gn/T/pi-admit-rle-vglzy5u_/work/test/fail-to-pass.test.js:9:77)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n      at Test.postRun (node:internal/test_runner/test:1522:19)\n      at Test.run (node:internal/test_runner/test:1447:12)\n      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7)\n",
+            "passed": false,
+            "returncode": 1
+          }
+        ],
+        "pristine_pass_to_pass": [
+          {
+            "output_tail": "",
+            "passed": true,
+            "returncode": 0
+          },
+          {
+            "output_tail": "",
+            "passed": true,
+            "returncode": 0
+          },
+          {
+            "output_tail": "",
+            "passed": true,
+            "returncode": 0
+          }
+        ]
+      }
+    },
+    "reviewed_at": null,
+    "reviewer": null
+  },
+  "artifacts": [
+    {
+      "path": "ab-symbolect/tasks/rle.txt",
+      "sha256": "e83360039692794906e061e419f44c40f7d7494645c617b610c8c9fff05b1b5d"
+    },
+    {
+      "path": "real-gate-fixtures/admission-tests/rle-pass-to-pass.test.mjs",
+      "sha256": "852c4bcda50536049713da8338b3d2055b875c1d546ebd31eeaeccde14a25f00"
+    },
+    {
+      "path": "real-gate-fixtures/hidden/rle.test.js",
+      "sha256": "4e7ee3f0e65d96493bea2d76624b79e86c6552d887049a660e186cb337b86874"
+    },
+    {
+      "path": "real-gate-fixtures/patches/rle/gold.patch",
+      "sha256": "668c8c62a5f296f0ec062b9a8e92bc461c2cf7c5aeeedbc0db991b9827e20c9f"
+    },
+    {
+      "path": "real-gate-fixtures/patches/rle/shortcut.patch",
+      "sha256": "519f2ec496d99e8822eda62f8abd704f0462740f0fb78d130ab447717f8b450f"
+    },
+    {
+      "path": "real-gate-fixtures/rle/package.json",
+      "sha256": "b6692286f8967eb53d5ffa460ae6ca10663950c4b34f262041b7780eb1916902"
+    },
+    {
+      "path": "real-gate-fixtures/rle/src/index.js",
+      "sha256": "57be6f3abede66b2cf5d01ab2c9e91cdcc03f7e2fc6d3e2e5db4c8c64d4b41db"
+    },
+    {
+      "path": "real-gate-fixtures/rle/test/visible.test.js",
+      "sha256": "6e2537fc4318fa453e12537271e3828ed22756ff5191f11bb9e617f8c47e15cc"
+    }
+  ],
+  "cohort_id": "2026-07",
+  "fixture": {
+    "root": "real-gate-fixtures/rle",
+    "stage_copy": []
+  },
+  "fixture_version": "2026-07.1",
+  "one_shot": {
+    "context_files": [
+      "src/index.js",
+      "test/visible.test.js"
+    ],
+    "eligible": true,
+    "max_context_bytes": 49152
+  },
+  "patches": {
+    "gold": "real-gate-fixtures/patches/rle/gold.patch",
+    "shortcut_mutants": [
+      "real-gate-fixtures/patches/rle/shortcut.patch"
+    ]
+  },
+  "prompts": {
+    "canonical": {
+      "sha256": "d06ffc49f8a3bc619845fbbf6a2e52e35fa8bfa954a68f659bb1a9afe28f305c",
+      "text": "Implement encode(s) and decode(s) in src/index.js for run-length encoding. encode replaces\neach run of 2 or more identical consecutive characters with the count followed by the\ncharacter; single characters are left as-is: encode(\"AABCCCDEEEE\") -> \"2AB3CD4E\". decode is\nthe exact inverse: decode(\"2AB3CD4E\") -> \"AABCCCDEEEE\". Counts may be multiple digits.\nencode(\"\") -> \"\". Input strings contain non-digit characters; decimal digits are reserved\nfor run counts. A round trip decode(encode(s)) must return s for any input in that domain. Run node\n--test until all tests pass."
+    },
+    "perturbations": [
+      {
+        "approved": false,
+        "id": "equivalent-1",
+        "sha256": "c4b8d1b4418ab238a1eb535cc2f1ebdb238bca8588d85015e955b1419db2a8c0",
+        "text": "Complete the following repository task. Preserve existing behavior and verify the tests.\n\nImplement encode(s) and decode(s) in src/index.js for run-length encoding. encode replaces\neach run of 2 or more identical consecutive characters with the count followed by the\ncharacter; single characters are left as-is: encode(\"AABCCCDEEEE\") -> \"2AB3CD4E\". decode is\nthe exact inverse: decode(\"2AB3CD4E\") -> \"AABCCCDEEEE\". Counts may be multiple digits.\nencode(\"\") -> \"\". Input strings contain non-digit characters; decimal digits are reserved\nfor run counts. A round trip decode(encode(s)) must return s for any input in that domain. Run node\n--test until all tests pass."
+      },
+      {
+        "approved": false,
+        "id": "equivalent-2",
+        "sha256": "23fb9ab1683cc31263b5aa0a025b25db94f21485869f009fc5638c995c8310d1",
+        "text": "Repository change request:\nImplement encode(s) and decode(s) in src/index.js for run-length encoding. encode replaces\neach run of 2 or more identical consecutive characters with the count followed by the\ncharacter; single characters are left as-is: encode(\"AABCCCDEEEE\") -> \"2AB3CD4E\". decode is\nthe exact inverse: decode(\"2AB3CD4E\") -> \"AABCCCDEEEE\". Counts may be multiple digits.\nencode(\"\") -> \"\". Input strings contain non-digit characters; decimal digits are reserved\nfor run counts. A round trip decode(encode(s)) must return s for any input in that domain. Run node\n--test until all tests pass.\n\nUse the smallest correct change and confirm the test suite."
+      },
+      {
+        "approved": false,
+        "id": "equivalent-3",
+        "sha256": "7789f06d86c301141fd142d213950fa64354a9a7173356fdc47c4a4a05d674cd",
+        "text": "Please solve this task in the supplied checkout, retaining all stated edge cases:\n\nImplement encode(s) and decode(s) in src/index.js for run-length encoding. encode replaces\neach run of 2 or more identical consecutive characters with the count followed by the\ncharacter; single characters are left as-is: encode(\"AABCCCDEEEE\") -> \"2AB3CD4E\". decode is\nthe exact inverse: decode(\"2AB3CD4E\") -> \"AABCCCDEEEE\". Counts may be multiple digits.\nencode(\"\") -> \"\". Input strings contain non-digit characters; decimal digits are reserved\nfor run counts. A round trip decode(encode(s)) must return s for any input in that domain. Run node\n--test until all tests pass."
+      }
+    ],
+    "semantic_group": "rle:2026-07.1"
+  },
+  "schema": "pi.fixture/v1",
+  "sufficiency": [
+    {
+      "assertion": "multi-digit run encode",
+      "prompt_evidence": "Implement encode(s) and decode(s) in src/index.js for run-length encoding. encode replaces\neach run of 2 or more identical consecutive characters with the count followed by the\ncharacter; single characters are left as-is: encode(\"AABCCCDEEEE\") -> \"2AB3CD4E\". decode is\nthe exact inverse: decode(\"2AB3CD4E\") -> \"AABCCCDEEEE\". Counts may be multiple digits.\nencode(\"\") -> \"\". Input strings contain non-digit characters; decimal digits are reserved\nfor run counts. A round trip decode(encode(s)) must return s for any input in that domain. Run node\n--test until all tests pass."
+    },
+    {
+      "assertion": "multi-digit run decode",
+      "prompt_evidence": "Implement encode(s) and decode(s) in src/index.js for run-length encoding. encode replaces\neach run of 2 or more identical consecutive characters with the count followed by the\ncharacter; single characters are left as-is: encode(\"AABCCCDEEEE\") -> \"2AB3CD4E\". decode is\nthe exact inverse: decode(\"2AB3CD4E\") -> \"AABCCCDEEEE\". Counts may be multiple digits.\nencode(\"\") -> \"\". Input strings contain non-digit characters; decimal digits are reserved\nfor run counts. A round trip decode(encode(s)) must return s for any input in that domain. Run node\n--test until all tests pass."
+    },
+    {
+      "assertion": "no runs unchanged",
+      "prompt_evidence": "Implement encode(s) and decode(s) in src/index.js for run-length encoding. encode replaces\neach run of 2 or more identical consecutive characters with the count followed by the\ncharacter; single characters are left as-is: encode(\"AABCCCDEEEE\") -> \"2AB3CD4E\". decode is\nthe exact inverse: decode(\"2AB3CD4E\") -> \"AABCCCDEEEE\". Counts may be multiple digits.\nencode(\"\") -> \"\". Input strings contain non-digit characters; decimal digits are reserved\nfor run counts. A round trip decode(encode(s)) must return s for any input in that domain. Run node\n--test until all tests pass."
+    },
+    {
+      "assertion": "round trip",
+      "prompt_evidence": "Implement encode(s) and decode(s) in src/index.js for run-length encoding. encode replaces\neach run of 2 or more identical consecutive characters with the count followed by the\ncharacter; single characters are left as-is: encode(\"AABCCCDEEEE\") -> \"2AB3CD4E\". decode is\nthe exact inverse: decode(\"2AB3CD4E\") -> \"AABCCCDEEEE\". Counts may be multiple digits.\nencode(\"\") -> \"\". Input strings contain non-digit characters; decimal digits are reserved\nfor run counts. A round trip decode(encode(s)) must return s for any input in that domain. Run node\n--test until all tests pass."
+    }
+  ],
+  "task_id": "rle",
+  "tests": {
+    "fail_to_pass": {
+      "command": [
+        "node",
+        "--test",
+        "test/fail-to-pass.test.js"
+      ],
+      "overlays": [
+        {
+          "dest": "test/fail-to-pass.test.js",
+          "source": "real-gate-fixtures/hidden/rle.test.js"
+        }
+      ],
+      "timeout_seconds": 60
+    },
+    "pass_to_pass": {
+      "command": [
+        "node",
+        "--test",
+        "test/pass-to-pass.test.mjs"
+      ],
+      "overlays": [
+        {
+          "dest": "test/pass-to-pass.test.mjs",
+          "source": "real-gate-fixtures/admission-tests/rle-pass-to-pass.test.mjs"
+        }
+      ],
+      "timeout_seconds": 60
+    }
+  },
+  "timestamps": {
+    "admitted_at": null,
+    "created_at": "2026-07-14T00:00:00Z",
+    "expires_at": null
+  }
+}

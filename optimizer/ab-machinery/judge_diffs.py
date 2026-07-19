@@ -13,7 +13,8 @@ Usage:  judge_diffs.py <arm_a_workdir> <arm_b_workdir> --task <taskfile>
 import difflib, os, sys
 
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "prompt-lab"))
-FIXTURE_SRC = os.path.expanduser("~/LLM/pi-test/src")
+HERE = os.path.dirname(os.path.abspath(__file__))
+FIXTURE_SRC = os.path.join(os.path.expanduser(os.environ.get("PI_TEST_FIXTURE", os.path.join(HERE, "..", "pi-test"))), "src")
 
 def dir_diff(orig, new):
     """Unified diff between two {relpath: content} maps. Stdlib, testable off-disk."""

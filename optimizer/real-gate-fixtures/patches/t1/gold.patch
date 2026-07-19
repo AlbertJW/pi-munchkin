@@ -1,0 +1,137 @@
+--- a/src/index.js
++++ b/src/index.js
+@@ -48,7 +48,7 @@
+  * @param {string} csv - CSV content
+  * @returns {Array<Object>} Array of row objects
+  */
+-export function parseCSV(csv) {
++export function parseCsv(csv) {
+   const lines = csv.trim().split('\n');
+   if (lines.length === 0) return [];
+ 
+--- a/test/csvParser.test.js
++++ b/test/csvParser.test.js
+@@ -1,10 +1,10 @@
+-import { parseCSV } from '../src/index.js';
++import { parseCsv } from '../src/index.js';
+ import { test } from 'node:test';
+ import assert from 'node:assert/strict';
+ 
+ test('parses simple CSV with headers', () => {
+   const csv = 'name,age\nJohn,30\nJane,25';
+-  const result = parseCSV(csv);
++  const result = parseCsv(csv);
+   assert.deepStrictEqual(result, [
+     { name: 'John', age: '30' },
+     { name: 'Jane', age: '25' }
+@@ -13,14 +13,14 @@
+ 
+ test('handles quoted fields with commas', () => {
+   const csv = 'name,address\n"John Doe","123 Main St, Apt 4"\n"Jane Smith","456 Oak St"';
+-  const result = parseCSV(csv);
++  const result = parseCsv(csv);
+   assert.strictEqual(result[0].address, '123 Main St, Apt 4');
+   assert.strictEqual(result[1].address, '456 Oak St');
+ });
+ 
+ test('handles empty values', () => {
+   const csv = 'name,age\nJohn,\nJane,30\n,25';
+-  const result = parseCSV(csv);
++  const result = parseCsv(csv);
+   assert.strictEqual(result[0].age, '');
+   assert.strictEqual(result[1].name, 'Jane');
+   assert.strictEqual(result[2].name, '');
+--- a/test/edgeCases.test.js
++++ b/test/edgeCases.test.js
+@@ -1,15 +1,15 @@
+-import { parseCSV, csvToJson } from '../src/index.js';
++import { parseCsv, csvToJson } from '../src/index.js';
+ import { test } from 'node:test';
+ import assert from 'node:assert/strict';
+ 
+ test('handles single row with no data', () => {
+-  const result = parseCSV('name,age');
++  const result = parseCsv('name,age');
+   assert.deepStrictEqual(result, []);
+ });
+ 
+ test('handles CSV with extra whitespace', () => {
+   const csv = ' name , age \n John , 30 \n Jane , 25 ';
+-  const result = parseCSV(csv);
++  const result = parseCsv(csv);
+   assert.deepStrictEqual(result, [
+     { name: 'John', age: '30' },
+     { name: 'Jane', age: '25' }
+@@ -18,7 +18,7 @@
+ 
+ test('handles single column CSV', () => {
+   const csv = 'name\nJohn\nJane';
+-  const result = parseCSV(csv);
++  const result = parseCsv(csv);
+   assert.deepStrictEqual(result, [
+     { name: 'John' },
+     { name: 'Jane' }
+@@ -27,26 +27,26 @@
+ 
+ test('handles malformed CSV with extra columns', () => {
+   const csv = 'name,age\nJohn,30,extra\nJane,25';
+-  const result = parseCSV(csv);
++  const result = parseCsv(csv);
+   assert.deepStrictEqual(result[0].name, 'John');
+   assert.deepStrictEqual(result[0].age, '30');
+ });
+ 
+ test('handles malformed CSV with fewer columns', () => {
+   const csv = 'name,age\nJohn\nJane,25';
+-  const result = parseCSV(csv);
++  const result = parseCsv(csv);
+   assert.deepStrictEqual(result[0].name, 'John');
+   assert.strictEqual(result[0].age, '');
+ });
+ 
+ test('handles single quoted field', () => {
+   const csv = 'name\n"John"';
+-  const result = parseCSV(csv);
++  const result = parseCsv(csv);
+   assert.deepStrictEqual(result, [{ name: 'John' }]);
+ });
+ 
+ test('handles escaped quotes in CSV', () => {
+   const csv = 'name\n"John ""The Great"" Doe"';
+-  const result = parseCSV(csv);
++  const result = parseCsv(csv);
+   assert.deepStrictEqual(result, [{ name: 'John "The Great" Doe' }]);
+ });
+--- a/test/integration.test.js
++++ b/test/integration.test.js
+@@ -1,10 +1,10 @@
+-import { parseCSV, csvToJson } from '../src/index.js';
++import { parseCsv, csvToJson } from '../src/index.js';
+ import { test } from 'node:test';
+ import assert from 'node:assert/strict';
+ 
+ test('end-to-end: CSV string to JSON string', () => {
+   const csv = 'name,age\nJohn,30\nJane,25';
+-  const parsed = parseCSV(csv);
++  const parsed = parseCsv(csv);
+   const json = csvToJson(parsed);
+   const result = JSON.parse(json);
+   assert.deepStrictEqual(result, [
+@@ -15,7 +15,7 @@
+ 
+ test('end-to-end: complex CSV with quoted fields', () => {
+   const csv = 'name,address\n"John Doe","123 Main St, Apt 4"\n"Jane Smith","456 Oak St"';
+-  const parsed = parseCSV(csv);
++  const parsed = parseCsv(csv);
+   const json = csvToJson(parsed);
+   const result = JSON.parse(json);
+   assert.strictEqual(result[0].address, '123 Main St, Apt 4');
+@@ -24,7 +24,7 @@
+ 
+ test('end-to-end: empty values', () => {
+   const csv = 'name,age\nJohn,\nJane,30\n,25';
+-  const parsed = parseCSV(csv);
++  const parsed = parseCsv(csv);
+   const json = csvToJson(parsed);
+   const result = JSON.parse(json);
+   assert.strictEqual(result[0].age, '');

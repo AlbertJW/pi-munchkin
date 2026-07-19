@@ -8,7 +8,7 @@ eval (sql_eval --prompt-file, promptlab, ab-machinery env, OptiLLM endpoint).
 
 Usage:  config.py --selftest        # no network, no GPU
 """
-import hashlib, json, os, sys
+import hashlib, json, os, re, sys
 
 LAB = os.path.dirname(os.path.abspath(__file__))
 SCHEMA = os.path.join(LAB, "configs", "schema.json")
@@ -74,6 +74,8 @@ def render_prompt(config, base_text=None):
 # ---------- env + endpoint ----------
 
 def config_env(config):
+    schema = load_schema()["dimensions"]
+    allowed = set(schema["decoding"]["fields"]) | set(schema["thresholds"]["fields"]) | set(schema["messages"]["fields"])
     env = {}
     for k, v in (config.get("decoding") or {}).items():
         env[k] = str(v)
@@ -81,6 +83,11 @@ def config_env(config):
         env[k] = str(v)
     for k, v in (config.get("messages") or {}).items():  # steer-text templates (PI_MSG_*)
         env[k] = str(v)
+    for key, value in env.items():
+        if key not in allowed or not re.fullmatch(r"[A-Z][A-Z0-9_]*", key):
+            raise ValueError(f"config contains unsupported environment key {key!r}")
+        if "\x00" in value:
+            raise ValueError(f"config environment value for {key} contains NUL")
     return env
 
 def config_endpoint(config):
@@ -113,7 +120,7 @@ def selftest():
     a = apply(c1, base_text=base, out_dir="/tmp/cfg-selftest")
     b = apply(c1, base_text=base, out_dir="/tmp/cfg-selftest")
     assert a == b, "apply must be deterministic"
-    assert a["prompt_text"] == base + "", "md leaves base unchanged, no scaffold"
+    assert a["prompt_text"] == base + CWD_ANCHOR, "md appends the invariant working-directory anchor"
     assert a["env"] == {"LB_REPEAT_T1": "2", "TEMP": "0.6", "PI_MSG_LB_T2": "act now: {act}"}, a["env"]
     assert a["endpoint"] == DIRECT
 
@@ -121,11 +128,19 @@ def selftest():
     xml = render_prompt({"format": "xml", "scaffold": "none"}, base_text=base)
     assert xml.startswith("<system_instructions>") and base in xml
     js = render_prompt({"format": "json", "scaffold": "none"}, base_text=base)
-    assert json.loads(js)["system_instructions"] == base
+    assert json.loads(js)["system_instructions"] == base + CWD_ANCHOR
 
     # scaffold appends; F empties the base
     assert render_prompt({"format": "md", "scaffold": "cot"}, base_text=base).endswith("final answer.")
-    assert render_prompt({"prompt_variant": "F", "format": "md", "scaffold": "none"}, base_text=base) == ""
+    assert render_prompt({"prompt_variant": "F", "format": "md", "scaffold": "none"}, base_text=base) == CWD_ANCHOR
+    try:
+        config_env({"thresholds": {"BASH_ENV": "/tmp/inject"}})
+    except ValueError:
+        pass
+    else:
+        raise AssertionError("unsupported environment keys must be rejected")
+    multiline = "first line\nsecond=line"
+    assert config_env({"messages": {"PI_MSG_LB_T2": multiline}})["PI_MSG_LB_T2"] == multiline
 
     # optillm routes to the proxy; safe-vs-structural flags exist in the schema
     assert config_endpoint({"optillm": "bon"}) == OPTILLM
@@ -151,10 +166,14 @@ def main():
         cfg = json.load(open(sys.argv[sys.argv.index("--apply") + 1]))
         wd = sys.argv[sys.argv.index("--workdir") + 1] if "--workdir" in sys.argv else "."
         env, endpoint, lab = apply_to_workdir(cfg, wd)
-        for k, v in env.items():
-            print(f"{k}={v}")
-        print(f"ENDPOINT={endpoint}")
-        print(f"LABEL={lab}")
+        if "--env-null" in sys.argv:
+            for k, v in env.items():
+                sys.stdout.buffer.write(f"{k}={v}".encode("utf-8") + b"\0")
+        else:
+            for k, v in env.items():
+                print(f"{k}={v}")
+            print(f"ENDPOINT={endpoint}")
+            print(f"LABEL={lab}")
         return
     raise SystemExit("config.py: run --selftest, --apply <cfg.json> --workdir <wd>, or import apply()")
 

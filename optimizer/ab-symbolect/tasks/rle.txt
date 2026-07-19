@@ -1,0 +1,7 @@
+Implement encode(s) and decode(s) in src/index.js for run-length encoding. encode replaces
+each run of 2 or more identical consecutive characters with the count followed by the
+character; single characters are left as-is: encode("AABCCCDEEEE") -> "2AB3CD4E". decode is
+the exact inverse: decode("2AB3CD4E") -> "AABCCCDEEEE". Counts may be multiple digits.
+encode("") -> "". Input strings contain non-digit characters; decimal digits are reserved
+for run counts. A round trip decode(encode(s)) must return s for any input in that domain. Run node
+--test until all tests pass.

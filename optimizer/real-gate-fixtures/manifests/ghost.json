@@ -1,0 +1,260 @@
+{
+  "admission": {
+    "approved": false,
+    "automated": {
+      "checked_at": "2026-07-14T18:48:34Z",
+      "hash_drift": [],
+      "passed": true,
+      "runs_per_state": 3,
+      "states": {
+        "gold_fail_to_pass": [
+          {
+            "output_tail": "",
+            "passed": true,
+            "returncode": 0
+          },
+          {
+            "output_tail": "",
+            "passed": true,
+            "returncode": 0
+          },
+          {
+            "output_tail": "",
+            "passed": true,
+            "returncode": 0
+          }
+        ],
+        "gold_pass_to_pass": [
+          {
+            "output_tail": "",
+            "passed": true,
+            "returncode": 0
+          },
+          {
+            "output_tail": "",
+            "passed": true,
+            "returncode": 0
+          },
+          {
+            "output_tail": "",
+            "passed": true,
+            "returncode": 0
+          }
+        ],
+        "mutant:shortcut": {
+          "fail_to_pass": [
+            {
+              "output_tail": "ail-to-pass.test.js:18:10)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n      at Test.postRun (node:internal/test_runner/test:1522:19)\n      at Test.run (node:internal/test_runner/test:1447:12)\n      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7) {\n    generatedMessage: true,\n    code: 'ERR_ASSERTION',\n    actual: 'a\\nhe said \"hi\"',\n    expected: 'a\\n\"he said \"\"hi\"\"\"',\n    operator: 'strictEqual',\n    diff: 'simple'\n  }\n",
+              "passed": false,
+              "returncode": 1
+            },
+            {
+              "output_tail": "ail-to-pass.test.js:18:10)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n      at Test.postRun (node:internal/test_runner/test:1522:19)\n      at Test.run (node:internal/test_runner/test:1447:12)\n      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7) {\n    generatedMessage: true,\n    code: 'ERR_ASSERTION',\n    actual: 'a\\nhe said \"hi\"',\n    expected: 'a\\n\"he said \"\"hi\"\"\"',\n    operator: 'strictEqual',\n    diff: 'simple'\n  }\n",
+              "passed": false,
+              "returncode": 1
+            },
+            {
+              "output_tail": "ail-to-pass.test.js:18:10)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n      at Test.postRun (node:internal/test_runner/test:1522:19)\n      at Test.run (node:internal/test_runner/test:1447:12)\n      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7) {\n    generatedMessage: true,\n    code: 'ERR_ASSERTION',\n    actual: 'a\\nhe said \"hi\"',\n    expected: 'a\\n\"he said \"\"hi\"\"\"',\n    operator: 'strictEqual',\n    diff: 'simple'\n  }\n",
+              "passed": false,
+              "returncode": 1
+            }
+          ],
+          "pass_to_pass": [
+            {
+              "output_tail": "",
+              "passed": true,
+              "returncode": 0
+            },
+            {
+              "output_tail": "",
+              "passed": true,
+              "returncode": 0
+            },
+            {
+              "output_tail": "",
+              "passed": true,
+              "returncode": 0
+            }
+          ]
+        },
+        "pristine_fail_to_pass": [
+          {
+            "output_tail": "rt named 'toCSV'\n    at #asyncInstantiate (node:internal/modules/esm/module_job:327:21)\n    at async ModuleJob.run (node:internal/modules/esm/module_job:431:5)\n    at async onImport.tracePromise.__proto__ (node:internal/modules/esm/loader:646:26)\n    at async asyncRunEntryPointWithESMLoader (node:internal/modules/run_main:101:5)\n\nNode.js v26.3.0\n\u2716 test/fail-to-pass.test.js (73.130917ms)\n\u2139 tests 1\n\u2139 suites 0\n\u2139 pass 0\n\u2139 fail 1\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 78.534\n\n\u2716 failing tests:\n\ntest at test/fail-to-pass.test.js:1:1\n\u2716 test/fail-to-pass.test.js (73.130917ms)\n  'test failed'\n",
+            "passed": false,
+            "returncode": 1
+          },
+          {
+            "output_tail": "named 'toCSV'\n    at #asyncInstantiate (node:internal/modules/esm/module_job:327:21)\n    at async ModuleJob.run (node:internal/modules/esm/module_job:431:5)\n    at async onImport.tracePromise.__proto__ (node:internal/modules/esm/loader:646:26)\n    at async asyncRunEntryPointWithESMLoader (node:internal/modules/run_main:101:5)\n\nNode.js v26.3.0\n\u2716 test/fail-to-pass.test.js (73.438083ms)\n\u2139 tests 1\n\u2139 suites 0\n\u2139 pass 0\n\u2139 fail 1\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 78.739542\n\n\u2716 failing tests:\n\ntest at test/fail-to-pass.test.js:1:1\n\u2716 test/fail-to-pass.test.js (73.438083ms)\n  'test failed'\n",
+            "passed": false,
+            "returncode": 1
+          },
+          {
+            "output_tail": "named 'toCSV'\n    at #asyncInstantiate (node:internal/modules/esm/module_job:327:21)\n    at async ModuleJob.run (node:internal/modules/esm/module_job:431:5)\n    at async onImport.tracePromise.__proto__ (node:internal/modules/esm/loader:646:26)\n    at async asyncRunEntryPointWithESMLoader (node:internal/modules/run_main:101:5)\n\nNode.js v26.3.0\n\u2716 test/fail-to-pass.test.js (73.175375ms)\n\u2139 tests 1\n\u2139 suites 0\n\u2139 pass 0\n\u2139 fail 1\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 78.787542\n\n\u2716 failing tests:\n\ntest at test/fail-to-pass.test.js:1:1\n\u2716 test/fail-to-pass.test.js (73.175375ms)\n  'test failed'\n",
+            "passed": false,
+            "returncode": 1
+          }
+        ],
+        "pristine_pass_to_pass": [
+          {
+            "output_tail": "",
+            "passed": true,
+            "returncode": 0
+          },
+          {
+            "output_tail": "",
+            "passed": true,
+            "returncode": 0
+          },
+          {
+            "output_tail": "",
+            "passed": true,
+            "returncode": 0
+          }
+        ]
+      }
+    },
+    "reviewed_at": null,
+    "reviewer": null
+  },
+  "artifacts": [
+    {
+      "path": "ab-symbolect/tasks/ghost.txt",
+      "sha256": "7b27c8cafb02a9ba88e258d98eb15cc0552b23538e06059e308c83cc70a45820"
+    },
+    {
+      "path": "pi-test/package.json",
+      "sha256": "17de85e51f8083835bc1fd697e21080d2a2592d73a8343a5e9a467f47fbc5d62"
+    },
+    {
+      "path": "pi-test/src/index.js",
+      "sha256": "ef9288b55ee398a3067b8348aff635a5adb47421ab5ba01f3fefaeb84072f19b"
+    },
+    {
+      "path": "pi-test/test/csvParser.test.js",
+      "sha256": "15904d6a11ab0e020b4e0bb338bc0ed13f2592d5a0e9b5e2a070eb5ebf1aebd2"
+    },
+    {
+      "path": "pi-test/test/edgeCases.test.js",
+      "sha256": "a9453014d8f9b74780285cb52e854e55fd6e110b59e2188e5fea47e68bf7899d"
+    },
+    {
+      "path": "pi-test/test/integration.test.js",
+      "sha256": "96f35d0212d4a2ab2faf16d1153734de239feda5f2bc87bf605715ef9e4c3f84"
+    },
+    {
+      "path": "pi-test/test/jsonConverter.test.js",
+      "sha256": "2bf7dcec60873577e2902b462d0eb0f5a0f022152091b2e91d8c12eae58f25d2"
+    },
+    {
+      "path": "real-gate-fixtures/hidden/ghost.test.js",
+      "sha256": "188a400b87c15a2d153fe61c33b41628cfe537a3479695665a7f6dd3f71f8ac4"
+    },
+    {
+      "path": "real-gate-fixtures/patches/ghost/gold.patch",
+      "sha256": "98ab884a10bc5db1b155f30cde25a542a6e60549de4151a2680d2ff456e1beb6"
+    },
+    {
+      "path": "real-gate-fixtures/patches/ghost/shortcut.patch",
+      "sha256": "cd62b8d9aba0620deee911087f984f36e927c165169ed545e0bc9012f7b4ead2"
+    }
+  ],
+  "cohort_id": "2026-07",
+  "fixture": {
+    "root": "pi-test",
+    "stage_copy": []
+  },
+  "fixture_version": "2026-07.1",
+  "one_shot": {
+    "context_files": [
+      "src/index.js",
+      "test/csvParser.test.js",
+      "test/edgeCases.test.js",
+      "test/integration.test.js",
+      "test/jsonConverter.test.js"
+    ],
+    "eligible": true,
+    "max_context_bytes": 49152
+  },
+  "patches": {
+    "gold": "real-gate-fixtures/patches/ghost/gold.patch",
+    "shortcut_mutants": [
+      "real-gate-fixtures/patches/ghost/shortcut.patch"
+    ]
+  },
+  "prompts": {
+    "canonical": {
+      "sha256": "a9f61a8d720c868f07d054c171c3c4ee4d57173d86afc5b6a01753123a353a60",
+      "text": "Add and export a new function toCSV(data) in src/csv-writer.js \u2014 the inverse of parseCSV: it serializes an array of row objects into a CSV string. Use the first row's keys as the header row. Quote a field (wrap it in double quotes) if and only if it contains a comma, a double-quote, or a newline, doubling any embedded double-quotes (RFC 4180). Join rows with a newline and emit no trailing newline. The function must be importable from the project's public entry point. If the project layout differs from these instructions, reconcile with the actual layout rather than inventing files blindly."
+    },
+    "perturbations": [
+      {
+        "approved": false,
+        "id": "equivalent-1",
+        "sha256": "785e763a4b0ac01c315f81a4aceb3501ca82bb0d5d638299f5b3f93f37d3ff58",
+        "text": "Complete the following repository task. Preserve existing behavior and verify the tests.\n\nAdd and export a new function toCSV(data) in src/csv-writer.js \u2014 the inverse of parseCSV: it serializes an array of row objects into a CSV string. Use the first row's keys as the header row. Quote a field (wrap it in double quotes) if and only if it contains a comma, a double-quote, or a newline, doubling any embedded double-quotes (RFC 4180). Join rows with a newline and emit no trailing newline. The function must be importable from the project's public entry point. If the project layout differs from these instructions, reconcile with the actual layout rather than inventing files blindly."
+      },
+      {
+        "approved": false,
+        "id": "equivalent-2",
+        "sha256": "3c8fca47d3c9c16135982321f8ed3d0b43c95dd2a13a30c7dc9c266cb3434129",
+        "text": "Repository change request:\nAdd and export a new function toCSV(data) in src/csv-writer.js \u2014 the inverse of parseCSV: it serializes an array of row objects into a CSV string. Use the first row's keys as the header row. Quote a field (wrap it in double quotes) if and only if it contains a comma, a double-quote, or a newline, doubling any embedded double-quotes (RFC 4180). Join rows with a newline and emit no trailing newline. The function must be importable from the project's public entry point. If the project layout differs from these instructions, reconcile with the actual layout rather than inventing files blindly.\n\nUse the smallest correct change and confirm the test suite."
+      },
+      {
+        "approved": false,
+        "id": "equivalent-3",
+        "sha256": "f2749b66eedcc3dbbfe166cf654e500104a708801ace746e33d114e67fd045ca",
+        "text": "Please solve this task in the supplied checkout, retaining all stated edge cases:\n\nAdd and export a new function toCSV(data) in src/csv-writer.js \u2014 the inverse of parseCSV: it serializes an array of row objects into a CSV string. Use the first row's keys as the header row. Quote a field (wrap it in double quotes) if and only if it contains a comma, a double-quote, or a newline, doubling any embedded double-quotes (RFC 4180). Join rows with a newline and emit no trailing newline. The function must be importable from the project's public entry point. If the project layout differs from these instructions, reconcile with the actual layout rather than inventing files blindly."
+      }
+    ],
+    "semantic_group": "ghost:2026-07.1"
+  },
+  "schema": "pi.fixture/v1",
+  "sufficiency": [
+    {
+      "assertion": "toCSV: simple unquoted",
+      "prompt_evidence": "Add and export a new function toCSV(data) in src/csv-writer.js \u2014 the inverse of parseCSV: it serializes an array of row objects into a CSV string. Use the first row's keys as the header row. Quote a field (wrap it in double quotes) if and only if it contains a comma, a double-quote, or a newline, doubling any embedded double-quotes (RFC 4180). Join rows with a newline and emit no trailing newline. The function must be importable from the project's public entry point. If the project layout differs from these instructions, reconcile with the actual layout rather than inventing files blindly."
+    },
+    {
+      "assertion": "toCSV: quotes fields containing commas",
+      "prompt_evidence": "Add and export a new function toCSV(data) in src/csv-writer.js \u2014 the inverse of parseCSV: it serializes an array of row objects into a CSV string. Use the first row's keys as the header row. Quote a field (wrap it in double quotes) if and only if it contains a comma, a double-quote, or a newline, doubling any embedded double-quotes (RFC 4180). Join rows with a newline and emit no trailing newline. The function must be importable from the project's public entry point. If the project layout differs from these instructions, reconcile with the actual layout rather than inventing files blindly."
+    },
+    {
+      "assertion": "toCSV: escapes embedded double-quotes by doubling",
+      "prompt_evidence": "Add and export a new function toCSV(data) in src/csv-writer.js \u2014 the inverse of parseCSV: it serializes an array of row objects into a CSV string. Use the first row's keys as the header row. Quote a field (wrap it in double quotes) if and only if it contains a comma, a double-quote, or a newline, doubling any embedded double-quotes (RFC 4180). Join rows with a newline and emit no trailing newline. The function must be importable from the project's public entry point. If the project layout differs from these instructions, reconcile with the actual layout rather than inventing files blindly."
+    },
+    {
+      "assertion": "toCSV: multiple rows, header from first row keys",
+      "prompt_evidence": "Add and export a new function toCSV(data) in src/csv-writer.js \u2014 the inverse of parseCSV: it serializes an array of row objects into a CSV string. Use the first row's keys as the header row. Quote a field (wrap it in double quotes) if and only if it contains a comma, a double-quote, or a newline, doubling any embedded double-quotes (RFC 4180). Join rows with a newline and emit no trailing newline. The function must be importable from the project's public entry point. If the project layout differs from these instructions, reconcile with the actual layout rather than inventing files blindly."
+    }
+  ],
+  "task_id": "ghost",
+  "tests": {
+    "fail_to_pass": {
+      "command": [
+        "node",
+        "--test",
+        "test/fail-to-pass.test.js"
+      ],
+      "overlays": [
+        {
+          "dest": "test/fail-to-pass.test.js",
+          "source": "real-gate-fixtures/hidden/ghost.test.js"
+        }
+      ],
+      "timeout_seconds": 60
+    },
+    "pass_to_pass": {
+      "command": [
+        "node",
+        "--test"
+      ],
+      "overlays": [],
+      "timeout_seconds": 60
+    }
+  },
+  "timestamps": {
+    "admitted_at": null,
+    "created_at": "2026-07-14T00:00:00Z",
+    "expires_at": null
+  }
+}

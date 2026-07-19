@@ -1,0 +1,246 @@
+{
+  "admission": {
+    "approved": true,
+    "approved_prompt_hashes": [
+      "abd055456ea3e19bfe5f6fd20a4d6bbaa114194d3902e03f8f8fa5bfe0cd7d23",
+      "99a9214f825b3e71b76f9f91372543a830492bc6bb9e70661a5970fd94ad3723",
+      "83f0f18d9df2404d0719b8cb28a9f668c7ccd7f48c179d3eca0f2e91bf5883d0"
+    ],
+    "automated": {
+      "checked_at": "2026-07-14T21:01:06Z",
+      "hash_drift": [],
+      "passed": true,
+      "runs_per_state": 3,
+      "states": {
+        "gold_fail_to_pass": [
+          {
+            "output_tail": "",
+            "passed": true,
+            "returncode": 0
+          },
+          {
+            "output_tail": "",
+            "passed": true,
+            "returncode": 0
+          },
+          {
+            "output_tail": "",
+            "passed": true,
+            "returncode": 0
+          }
+        ],
+        "gold_pass_to_pass": [
+          {
+            "output_tail": "",
+            "passed": true,
+            "returncode": 0
+          },
+          {
+            "output_tail": "",
+            "passed": true,
+            "returncode": 0
+          },
+          {
+            "output_tail": "",
+            "passed": true,
+            "returncode": 0
+          }
+        ],
+        "mutant:shortcut": {
+          "fail_to_pass": [
+            {
+              "output_tail": "/pi-admit-parens-8dr9jhxr/work/test/fail-to-pass.test.js:8:58)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n      at Test.postRun (node:internal/test_runner/test:1522:19)\n      at Test.run (node:internal/test_runner/test:1447:12)\n      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7) {\n    generatedMessage: true,\n    code: 'ERR_ASSERTION',\n    actual: 1,\n    expected: 0,\n    operator: 'strictEqual',\n    diff: 'simple'\n  }\n",
+              "passed": false,
+              "returncode": 1
+            },
+            {
+              "output_tail": "/pi-admit-parens-_f1fb3u2/work/test/fail-to-pass.test.js:8:58)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n      at Test.postRun (node:internal/test_runner/test:1522:19)\n      at Test.run (node:internal/test_runner/test:1447:12)\n      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7) {\n    generatedMessage: true,\n    code: 'ERR_ASSERTION',\n    actual: 1,\n    expected: 0,\n    operator: 'strictEqual',\n    diff: 'simple'\n  }\n",
+              "passed": false,
+              "returncode": 1
+            },
+            {
+              "output_tail": "/pi-admit-parens-t1bpx9yh/work/test/fail-to-pass.test.js:8:58)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n      at Test.postRun (node:internal/test_runner/test:1522:19)\n      at Test.run (node:internal/test_runner/test:1447:12)\n      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7) {\n    generatedMessage: true,\n    code: 'ERR_ASSERTION',\n    actual: 1,\n    expected: 0,\n    operator: 'strictEqual',\n    diff: 'simple'\n  }\n",
+              "passed": false,
+              "returncode": 1
+            }
+          ],
+          "pass_to_pass": [
+            {
+              "output_tail": "",
+              "passed": true,
+              "returncode": 0
+            },
+            {
+              "output_tail": "",
+              "passed": true,
+              "returncode": 0
+            },
+            {
+              "output_tail": "",
+              "passed": true,
+              "returncode": 0
+            }
+          ]
+        },
+        "pristine_fail_to_pass": [
+          {
+            "output_tail": "/pi-admit-parens-85ti6erk/work/test/fail-to-pass.test.js:8:58)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n      at Test.postRun (node:internal/test_runner/test:1522:19)\n      at Test.run (node:internal/test_runner/test:1447:12)\n      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7) {\n    generatedMessage: true,\n    code: 'ERR_ASSERTION',\n    actual: 1,\n    expected: 0,\n    operator: 'strictEqual',\n    diff: 'simple'\n  }\n",
+            "passed": false,
+            "returncode": 1
+          },
+          {
+            "output_tail": "/pi-admit-parens-0oiqiucn/work/test/fail-to-pass.test.js:8:58)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n      at Test.postRun (node:internal/test_runner/test:1522:19)\n      at Test.run (node:internal/test_runner/test:1447:12)\n      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7) {\n    generatedMessage: true,\n    code: 'ERR_ASSERTION',\n    actual: 1,\n    expected: 0,\n    operator: 'strictEqual',\n    diff: 'simple'\n  }\n",
+            "passed": false,
+            "returncode": 1
+          },
+          {
+            "output_tail": "/pi-admit-parens-evrrp68_/work/test/fail-to-pass.test.js:8:58)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n      at Test.postRun (node:internal/test_runner/test:1522:19)\n      at Test.run (node:internal/test_runner/test:1447:12)\n      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7) {\n    generatedMessage: true,\n    code: 'ERR_ASSERTION',\n    actual: 1,\n    expected: 0,\n    operator: 'strictEqual',\n    diff: 'simple'\n  }\n",
+            "passed": false,
+            "returncode": 1
+          }
+        ],
+        "pristine_pass_to_pass": [
+          {
+            "output_tail": "",
+            "passed": true,
+            "returncode": 0
+          },
+          {
+            "output_tail": "",
+            "passed": true,
+            "returncode": 0
+          },
+          {
+            "output_tail": "",
+            "passed": true,
+            "returncode": 0
+          }
+        ]
+      }
+    },
+    "reviewed_at": "2026-07-15T17:01:34Z",
+    "reviewer": "Albert"
+  },
+  "artifacts": [
+    {
+      "path": "ab-symbolect/tasks/parens.txt",
+      "sha256": "6a3237169502a33031c807befb6de85389e719c883f23c2247a22d55860906ac"
+    },
+    {
+      "path": "real-gate-fixtures/hidden/parens.test.js",
+      "sha256": "4121fb4d169321d0e61cec28835d7634cadfb82b1f2b00d342d45310211206ed"
+    },
+    {
+      "path": "real-gate-fixtures/parens/package.json",
+      "sha256": "b6692286f8967eb53d5ffa460ae6ca10663950c4b34f262041b7780eb1916902"
+    },
+    {
+      "path": "real-gate-fixtures/parens/src/index.js",
+      "sha256": "34bbd4be7893087c0b0fc7f115c5703e7fb893d7e80ef9d21b26585183751331"
+    },
+    {
+      "path": "real-gate-fixtures/parens/test/visible.test.js",
+      "sha256": "3e7c2d76ce48573f2d2170cec791d5f134379e812362308e602dc4fd05a06482"
+    },
+    {
+      "path": "real-gate-fixtures/patches/parens/gold.patch",
+      "sha256": "9803db13ee8f062647c8441897c596f5ef696e72e621daf155bb864734d97d3e"
+    },
+    {
+      "path": "real-gate-fixtures/patches/parens/shortcut.patch",
+      "sha256": "7cc459a4f5e3180ad55a6a802f076c4fa6d9658dad7e3b0f4e4c031e3f307d3e"
+    }
+  ],
+  "cohort_id": "2026-07",
+  "fixture": {
+    "root": "real-gate-fixtures/parens",
+    "stage_copy": []
+  },
+  "fixture_version": "2026-07.1",
+  "one_shot": {
+    "context_files": [
+      "src/index.js",
+      "test/visible.test.js"
+    ],
+    "eligible": true,
+    "max_context_bytes": 49152
+  },
+  "patches": {
+    "gold": "real-gate-fixtures/patches/parens/gold.patch",
+    "shortcut_mutants": [
+      "real-gate-fixtures/patches/parens/shortcut.patch"
+    ]
+  },
+  "prompts": {
+    "canonical": {
+      "sha256": "2224b86b74f3f0c04a01a2b52a8e21a4c75e6494f0368ea0164db210c8c34c73",
+      "text": "Implement firstUnmatched(s) in src/index.js. Return the index of the first unmatched\nparenthesis in s: for an unmatched closing ')', its own index; for an unmatched opening\n'(', the index of the FIRST '(' that is never closed (not where scanning stopped). If\nevery parenthesis is matched, return s.length. Only '(' and ')' matter; ignore all other\ncharacters. Examples: \")ab\" -> 0, \"(a)\" -> 3, \"ab\" -> 2. Run node --test until all tests pass."
+    },
+    "perturbations": [
+      {
+        "approved": false,
+        "id": "equivalent-1",
+        "sha256": "abd055456ea3e19bfe5f6fd20a4d6bbaa114194d3902e03f8f8fa5bfe0cd7d23",
+        "text": "Complete the following repository task. Preserve existing behavior and verify the tests.\n\nImplement firstUnmatched(s) in src/index.js. Return the index of the first unmatched\nparenthesis in s: for an unmatched closing ')', its own index; for an unmatched opening\n'(', the index of the FIRST '(' that is never closed (not where scanning stopped). If\nevery parenthesis is matched, return s.length. Only '(' and ')' matter; ignore all other\ncharacters. Examples: \")ab\" -> 0, \"(a)\" -> 3, \"ab\" -> 2. Run node --test until all tests pass."
+      },
+      {
+        "approved": false,
+        "id": "equivalent-2",
+        "sha256": "99a9214f825b3e71b76f9f91372543a830492bc6bb9e70661a5970fd94ad3723",
+        "text": "Repository change request:\nImplement firstUnmatched(s) in src/index.js. Return the index of the first unmatched\nparenthesis in s: for an unmatched closing ')', its own index; for an unmatched opening\n'(', the index of the FIRST '(' that is never closed (not where scanning stopped). If\nevery parenthesis is matched, return s.length. Only '(' and ')' matter; ignore all other\ncharacters. Examples: \")ab\" -> 0, \"(a)\" -> 3, \"ab\" -> 2. Run node --test until all tests pass.\n\nUse the smallest correct change and confirm the test suite."
+      },
+      {
+        "approved": false,
+        "id": "equivalent-3",
+        "sha256": "83f0f18d9df2404d0719b8cb28a9f668c7ccd7f48c179d3eca0f2e91bf5883d0",
+        "text": "Please solve this task in the supplied checkout, retaining all stated edge cases:\n\nImplement firstUnmatched(s) in src/index.js. Return the index of the first unmatched\nparenthesis in s: for an unmatched closing ')', its own index; for an unmatched opening\n'(', the index of the FIRST '(' that is never closed (not where scanning stopped). If\nevery parenthesis is matched, return s.length. Only '(' and ')' matter; ignore all other\ncharacters. Examples: \")ab\" -> 0, \"(a)\" -> 3, \"ab\" -> 2. Run node --test until all tests pass."
+      }
+    ],
+    "semantic_group": "parens:2026-07.1"
+  },
+  "schema": "pi.fixture/v1",
+  "sufficiency": [
+    {
+      "assertion": "first unclosed open, nested",
+      "prompt_evidence": "Implement firstUnmatched(s) in src/index.js. Return the index of the first unmatched\nparenthesis in s: for an unmatched closing ')', its own index; for an unmatched opening\n'(', the index of the FIRST '(' that is never closed (not where scanning stopped). If\nevery parenthesis is matched, return s.length. Only '(' and ')' matter; ignore all other\ncharacters. Examples: \")ab\" -> 0, \"(a)\" -> 3, \"ab\" -> 2. Run node --test until all tests pass."
+    },
+    {
+      "assertion": "first unclosed among several",
+      "prompt_evidence": "Implement firstUnmatched(s) in src/index.js. Return the index of the first unmatched\nparenthesis in s: for an unmatched closing ')', its own index; for an unmatched opening\n'(', the index of the FIRST '(' that is never closed (not where scanning stopped). If\nevery parenthesis is matched, return s.length. Only '(' and ')' matter; ignore all other\ncharacters. Examples: \")ab\" -> 0, \"(a)\" -> 3, \"ab\" -> 2. Run node --test until all tests pass."
+    },
+    {
+      "assertion": "first unclosed, two opens one close",
+      "prompt_evidence": "Implement firstUnmatched(s) in src/index.js. Return the index of the first unmatched\nparenthesis in s: for an unmatched closing ')', its own index; for an unmatched opening\n'(', the index of the FIRST '(' that is never closed (not where scanning stopped). If\nevery parenthesis is matched, return s.length. Only '(' and ')' matter; ignore all other\ncharacters. Examples: \")ab\" -> 0, \"(a)\" -> 3, \"ab\" -> 2. Run node --test until all tests pass."
+    }
+  ],
+  "task_id": "parens",
+  "tests": {
+    "fail_to_pass": {
+      "command": [
+        "node",
+        "--test",
+        "test/fail-to-pass.test.js"
+      ],
+      "overlays": [
+        {
+          "dest": "test/fail-to-pass.test.js",
+          "source": "real-gate-fixtures/hidden/parens.test.js"
+        }
+      ],
+      "timeout_seconds": 60
+    },
+    "pass_to_pass": {
+      "command": [
+        "node",
+        "--test"
+      ],
+      "overlays": [],
+      "timeout_seconds": 60
+    }
+  },
+  "timestamps": {
+    "admitted_at": "2026-07-15T17:01:34Z",
+    "created_at": "2026-07-14T00:00:00Z",
+    "expires_at": "2026-10-13T17:01:34Z"
+  }
+}

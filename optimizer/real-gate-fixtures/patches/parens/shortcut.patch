@@ -1,0 +1,14 @@
+--- a/src/index.js
++++ b/src/index.js
+@@ -1,9 +1,9 @@
+ export function firstUnmatched(s) {
+   // BUG: for an unclosed '(', returns the LAST open index, not the first.
+-  let depth = 0, lastOpen = -1;
++  let depth = 0, lastOpen = -1; // track unmatched opens
+   for (let i = 0; i < s.length; i++) {
+     if (s[i] === '(') { depth++; lastOpen = i; }
+     else if (s[i] === ')') { if (depth === 0) return i; depth--; }
+   }
+-  return depth > 0 ? lastOpen : s.length;
++  return depth > 0 ? lastOpen : s.length; // partial stack-like fix
+ }

@@ -1,0 +1,17 @@
+--- a/src/top3.json
++++ b/src/top3.json
+@@ -0,0 +1,14 @@
++[
++  {
++    "user": "user_06",
++    "total": 30947.25
++  },
++  {
++    "user": "user_09",
++    "total": 30339.59
++  },
++  {
++    "user": "user_28",
++    "total": 29337.22
++  }
++]

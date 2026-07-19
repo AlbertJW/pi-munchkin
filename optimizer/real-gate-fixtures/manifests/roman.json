@@ -1,0 +1,249 @@
+{
+  "admission": {
+    "approved": false,
+    "automated": {
+      "checked_at": "2026-07-14T18:48:57Z",
+      "hash_drift": [],
+      "passed": true,
+      "runs_per_state": 3,
+      "states": {
+        "gold_fail_to_pass": [
+          {
+            "output_tail": "",
+            "passed": true,
+            "returncode": 0
+          },
+          {
+            "output_tail": "",
+            "passed": true,
+            "returncode": 0
+          },
+          {
+            "output_tail": "",
+            "passed": true,
+            "returncode": 0
+          }
+        ],
+        "gold_pass_to_pass": [
+          {
+            "output_tail": "",
+            "passed": true,
+            "returncode": 0
+          },
+          {
+            "output_tail": "",
+            "passed": true,
+            "returncode": 0
+          },
+          {
+            "output_tail": "",
+            "passed": true,
+            "returncode": 0
+          }
+        ],
+        "mutant:shortcut": {
+          "fail_to_pass": [
+            {
+              "output_tail": "-admit-roman-5l4qox68/work/test/fail-to-pass.test.js:9:32)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n      at Test.postRun (node:internal/test_runner/test:1522:19)\n      at Test.run (node:internal/test_runner/test:1447:12)\n      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7) {\n    generatedMessage: true,\n    code: 'ERR_ASSERTION',\n    actual: 49,\n    expected: null,\n    operator: 'strictEqual',\n    diff: 'simple'\n  }\n",
+              "passed": false,
+              "returncode": 1
+            },
+            {
+              "output_tail": "-admit-roman-aurwv_n1/work/test/fail-to-pass.test.js:9:32)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n      at Test.postRun (node:internal/test_runner/test:1522:19)\n      at Test.run (node:internal/test_runner/test:1447:12)\n      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7) {\n    generatedMessage: true,\n    code: 'ERR_ASSERTION',\n    actual: 49,\n    expected: null,\n    operator: 'strictEqual',\n    diff: 'simple'\n  }\n",
+              "passed": false,
+              "returncode": 1
+            },
+            {
+              "output_tail": "-admit-roman-r1ptwrtb/work/test/fail-to-pass.test.js:9:32)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n      at Test.postRun (node:internal/test_runner/test:1522:19)\n      at Test.run (node:internal/test_runner/test:1447:12)\n      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7) {\n    generatedMessage: true,\n    code: 'ERR_ASSERTION',\n    actual: 49,\n    expected: null,\n    operator: 'strictEqual',\n    diff: 'simple'\n  }\n",
+              "passed": false,
+              "returncode": 1
+            }
+          ],
+          "pass_to_pass": [
+            {
+              "output_tail": "",
+              "passed": true,
+              "returncode": 0
+            },
+            {
+              "output_tail": "",
+              "passed": true,
+              "returncode": 0
+            },
+            {
+              "output_tail": "",
+              "passed": true,
+              "returncode": 0
+            }
+          ]
+        },
+        "pristine_fail_to_pass": [
+          {
+            "output_tail": "-admit-roman-hnp25pl2/work/test/fail-to-pass.test.js:9:32)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n      at Test.postRun (node:internal/test_runner/test:1522:19)\n      at Test.run (node:internal/test_runner/test:1447:12)\n      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7) {\n    generatedMessage: true,\n    code: 'ERR_ASSERTION',\n    actual: 49,\n    expected: null,\n    operator: 'strictEqual',\n    diff: 'simple'\n  }\n",
+            "passed": false,
+            "returncode": 1
+          },
+          {
+            "output_tail": "-admit-roman-wnyk8v6z/work/test/fail-to-pass.test.js:9:32)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n      at Test.postRun (node:internal/test_runner/test:1522:19)\n      at Test.run (node:internal/test_runner/test:1447:12)\n      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7) {\n    generatedMessage: true,\n    code: 'ERR_ASSERTION',\n    actual: 49,\n    expected: null,\n    operator: 'strictEqual',\n    diff: 'simple'\n  }\n",
+            "passed": false,
+            "returncode": 1
+          },
+          {
+            "output_tail": "-admit-roman-l2m3ibsb/work/test/fail-to-pass.test.js:9:32)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n      at Test.postRun (node:internal/test_runner/test:1522:19)\n      at Test.run (node:internal/test_runner/test:1447:12)\n      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7) {\n    generatedMessage: true,\n    code: 'ERR_ASSERTION',\n    actual: 49,\n    expected: null,\n    operator: 'strictEqual',\n    diff: 'simple'\n  }\n",
+            "passed": false,
+            "returncode": 1
+          }
+        ],
+        "pristine_pass_to_pass": [
+          {
+            "output_tail": "",
+            "passed": true,
+            "returncode": 0
+          },
+          {
+            "output_tail": "",
+            "passed": true,
+            "returncode": 0
+          },
+          {
+            "output_tail": "",
+            "passed": true,
+            "returncode": 0
+          }
+        ]
+      }
+    },
+    "reviewed_at": null,
+    "reviewer": null
+  },
+  "artifacts": [
+    {
+      "path": "ab-symbolect/tasks/roman.txt",
+      "sha256": "fe4a5dc0ab8e0a7676bbd75c2612dc76bb3e435e082e2faea54b8bb37ef348ff"
+    },
+    {
+      "path": "real-gate-fixtures/hidden/roman.test.js",
+      "sha256": "ee28267098e35d99acf653e3e232fdc593e4ac6a0f74c87ae0b608a9372dcd1e"
+    },
+    {
+      "path": "real-gate-fixtures/patches/roman/gold.patch",
+      "sha256": "770b30a7c2e57d3a6a3523f36513c30ae915b6b4ebe55953481e036464e0a439"
+    },
+    {
+      "path": "real-gate-fixtures/patches/roman/shortcut.patch",
+      "sha256": "1b39ab88058ee2e0ef3fcbd8430f85e66e9a9281517c9c385e06c22843f15665"
+    },
+    {
+      "path": "real-gate-fixtures/roman/package.json",
+      "sha256": "b6692286f8967eb53d5ffa460ae6ca10663950c4b34f262041b7780eb1916902"
+    },
+    {
+      "path": "real-gate-fixtures/roman/src/index.js",
+      "sha256": "9f0124f28db762056a0c7e2205552fc423c21fb5846dbf2e8b9d2b81bb6aeeda"
+    },
+    {
+      "path": "real-gate-fixtures/roman/test/visible.test.js",
+      "sha256": "1b5222c4b0b554559fecf3dea2badad83aa407bb072a210b61818f34536981f5"
+    }
+  ],
+  "cohort_id": "2026-07",
+  "fixture": {
+    "root": "real-gate-fixtures/roman",
+    "stage_copy": []
+  },
+  "fixture_version": "2026-07.1",
+  "one_shot": {
+    "context_files": [
+      "src/index.js",
+      "test/visible.test.js"
+    ],
+    "eligible": true,
+    "max_context_bytes": 49152
+  },
+  "patches": {
+    "gold": "real-gate-fixtures/patches/roman/gold.patch",
+    "shortcut_mutants": [
+      "real-gate-fixtures/patches/roman/shortcut.patch"
+    ]
+  },
+  "prompts": {
+    "canonical": {
+      "sha256": "9f2a9b47e63fc925a2747f77f0334a7c8405fc9a5bfa49a8ce2ff95363d5de6e",
+      "text": "Implement fromRoman(s) in src/index.js. Parse a Roman numeral string and return its integer\nvalue, or return null if s is NOT a valid Roman numeral. Validity matters: \"IIX\", \"VV\",\n\"IL\", and \"IIII\" are all invalid and must return null. Valid examples: fromRoman(\"XIV\") ->\n14, fromRoman(\"MCMXCIV\") -> 1994, fromRoman(\"XL\") -> 40. A plain left-to-right subtractive\nsum is not enough \u2014 you must reject malformed numerals. Run node --test until all tests pass."
+    },
+    "perturbations": [
+      {
+        "approved": false,
+        "id": "equivalent-1",
+        "sha256": "28f6a27aa5309629d88e1a5832c070431ac366b74d45f8fd57c59a009e2695b9",
+        "text": "Complete the following repository task. Preserve existing behavior and verify the tests.\n\nImplement fromRoman(s) in src/index.js. Parse a Roman numeral string and return its integer\nvalue, or return null if s is NOT a valid Roman numeral. Validity matters: \"IIX\", \"VV\",\n\"IL\", and \"IIII\" are all invalid and must return null. Valid examples: fromRoman(\"XIV\") ->\n14, fromRoman(\"MCMXCIV\") -> 1994, fromRoman(\"XL\") -> 40. A plain left-to-right subtractive\nsum is not enough \u2014 you must reject malformed numerals. Run node --test until all tests pass."
+      },
+      {
+        "approved": false,
+        "id": "equivalent-2",
+        "sha256": "b7a251ff27319e1e5fb88edd87a2bfc7e0b6fa154622ef07160abb632cf29c7f",
+        "text": "Repository change request:\nImplement fromRoman(s) in src/index.js. Parse a Roman numeral string and return its integer\nvalue, or return null if s is NOT a valid Roman numeral. Validity matters: \"IIX\", \"VV\",\n\"IL\", and \"IIII\" are all invalid and must return null. Valid examples: fromRoman(\"XIV\") ->\n14, fromRoman(\"MCMXCIV\") -> 1994, fromRoman(\"XL\") -> 40. A plain left-to-right subtractive\nsum is not enough \u2014 you must reject malformed numerals. Run node --test until all tests pass.\n\nUse the smallest correct change and confirm the test suite."
+      },
+      {
+        "approved": false,
+        "id": "equivalent-3",
+        "sha256": "1c7d99a511757ca06a171314fb788b0bd761c53428898f621200146f8e1bb1c9",
+        "text": "Please solve this task in the supplied checkout, retaining all stated edge cases:\n\nImplement fromRoman(s) in src/index.js. Parse a Roman numeral string and return its integer\nvalue, or return null if s is NOT a valid Roman numeral. Validity matters: \"IIX\", \"VV\",\n\"IL\", and \"IIII\" are all invalid and must return null. Valid examples: fromRoman(\"XIV\") ->\n14, fromRoman(\"MCMXCIV\") -> 1994, fromRoman(\"XL\") -> 40. A plain left-to-right subtractive\nsum is not enough \u2014 you must reject malformed numerals. Run node --test until all tests pass."
+      }
+    ],
+    "semantic_group": "roman:2026-07.1"
+  },
+  "schema": "pi.fixture/v1",
+  "sufficiency": [
+    {
+      "assertion": "reject IIX",
+      "prompt_evidence": "Implement fromRoman(s) in src/index.js. Parse a Roman numeral string and return its integer\nvalue, or return null if s is NOT a valid Roman numeral. Validity matters: \"IIX\", \"VV\",\n\"IL\", and \"IIII\" are all invalid and must return null. Valid examples: fromRoman(\"XIV\") ->\n14, fromRoman(\"MCMXCIV\") -> 1994, fromRoman(\"XL\") -> 40. A plain left-to-right subtractive\nsum is not enough \u2014 you must reject malformed numerals. Run node --test until all tests pass."
+    },
+    {
+      "assertion": "reject VV",
+      "prompt_evidence": "Implement fromRoman(s) in src/index.js. Parse a Roman numeral string and return its integer\nvalue, or return null if s is NOT a valid Roman numeral. Validity matters: \"IIX\", \"VV\",\n\"IL\", and \"IIII\" are all invalid and must return null. Valid examples: fromRoman(\"XIV\") ->\n14, fromRoman(\"MCMXCIV\") -> 1994, fromRoman(\"XL\") -> 40. A plain left-to-right subtractive\nsum is not enough \u2014 you must reject malformed numerals. Run node --test until all tests pass."
+    },
+    {
+      "assertion": "reject IIII",
+      "prompt_evidence": "Implement fromRoman(s) in src/index.js. Parse a Roman numeral string and return its integer\nvalue, or return null if s is NOT a valid Roman numeral. Validity matters: \"IIX\", \"VV\",\n\"IL\", and \"IIII\" are all invalid and must return null. Valid examples: fromRoman(\"XIV\") ->\n14, fromRoman(\"MCMXCIV\") -> 1994, fromRoman(\"XL\") -> 40. A plain left-to-right subtractive\nsum is not enough \u2014 you must reject malformed numerals. Run node --test until all tests pass."
+    },
+    {
+      "assertion": "reject IL",
+      "prompt_evidence": "Implement fromRoman(s) in src/index.js. Parse a Roman numeral string and return its integer\nvalue, or return null if s is NOT a valid Roman numeral. Validity matters: \"IIX\", \"VV\",\n\"IL\", and \"IIII\" are all invalid and must return null. Valid examples: fromRoman(\"XIV\") ->\n14, fromRoman(\"MCMXCIV\") -> 1994, fromRoman(\"XL\") -> 40. A plain left-to-right subtractive\nsum is not enough \u2014 you must reject malformed numerals. Run node --test until all tests pass."
+    },
+    {
+      "assertion": "still parses valid CMXLIV",
+      "prompt_evidence": "Implement fromRoman(s) in src/index.js. Parse a Roman numeral string and return its integer\nvalue, or return null if s is NOT a valid Roman numeral. Validity matters: \"IIX\", \"VV\",\n\"IL\", and \"IIII\" are all invalid and must return null. Valid examples: fromRoman(\"XIV\") ->\n14, fromRoman(\"MCMXCIV\") -> 1994, fromRoman(\"XL\") -> 40. A plain left-to-right subtractive\nsum is not enough \u2014 you must reject malformed numerals. Run node --test until all tests pass."
+    }
+  ],
+  "task_id": "roman",
+  "tests": {
+    "fail_to_pass": {
+      "command": [
+        "node",
+        "--test",
+        "test/fail-to-pass.test.js"
+      ],
+      "overlays": [
+        {
+          "dest": "test/fail-to-pass.test.js",
+          "source": "real-gate-fixtures/hidden/roman.test.js"
+        }
+      ],
+      "timeout_seconds": 60
+    },
+    "pass_to_pass": {
+      "command": [
+        "node",
+        "--test"
+      ],
+      "overlays": [],
+      "timeout_seconds": 60
+    }
+  },
+  "timestamps": {
+    "admitted_at": null,
+    "created_at": "2026-07-14T00:00:00Z",
+    "expires_at": null
+  }
+}

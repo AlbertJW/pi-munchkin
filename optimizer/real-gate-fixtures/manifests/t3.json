@@ -1,0 +1,270 @@
+{
+  "admission": {
+    "approved": false,
+    "automated": {
+      "checked_at": "2026-07-14T18:49:09Z",
+      "hash_drift": [],
+      "passed": true,
+      "runs_per_state": 3,
+      "states": {
+        "gold_fail_to_pass": [
+          {
+            "output_tail": "",
+            "passed": true,
+            "returncode": 0
+          },
+          {
+            "output_tail": "",
+            "passed": true,
+            "returncode": 0
+          },
+          {
+            "output_tail": "",
+            "passed": true,
+            "returncode": 0
+          }
+        ],
+        "gold_pass_to_pass": [
+          {
+            "output_tail": "",
+            "passed": true,
+            "returncode": 0
+          },
+          {
+            "output_tail": "",
+            "passed": true,
+            "returncode": 0
+          },
+          {
+            "output_tail": "",
+            "passed": true,
+            "returncode": 0
+          }
+        ],
+        "mutant:shortcut": {
+          "fail_to_pass": [
+            {
+              "output_tail": "-t3-4p4wag1p/work/test/fail-to-pass.test.js:14:10)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n      at Test.postRun (node:internal/test_runner/test:1522:19)\n      at Test.run (node:internal/test_runner/test:1447:12)\n      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7) {\n    generatedMessage: true,\n    code: 'ERR_ASSERTION',\n    actual: '  ab ',\n    expected: ' ab  ',\n    operator: 'strictEqual',\n    diff: 'simple'\n  }\n",
+              "passed": false,
+              "returncode": 1
+            },
+            {
+              "output_tail": "-t3-yayt43dk/work/test/fail-to-pass.test.js:14:10)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n      at Test.postRun (node:internal/test_runner/test:1522:19)\n      at Test.run (node:internal/test_runner/test:1447:12)\n      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7) {\n    generatedMessage: true,\n    code: 'ERR_ASSERTION',\n    actual: '  ab ',\n    expected: ' ab  ',\n    operator: 'strictEqual',\n    diff: 'simple'\n  }\n",
+              "passed": false,
+              "returncode": 1
+            },
+            {
+              "output_tail": "-t3-_wqmkw8i/work/test/fail-to-pass.test.js:14:10)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n      at Test.postRun (node:internal/test_runner/test:1522:19)\n      at Test.run (node:internal/test_runner/test:1447:12)\n      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7) {\n    generatedMessage: true,\n    code: 'ERR_ASSERTION',\n    actual: '  ab ',\n    expected: ' ab  ',\n    operator: 'strictEqual',\n    diff: 'simple'\n  }\n",
+              "passed": false,
+              "returncode": 1
+            }
+          ],
+          "pass_to_pass": [
+            {
+              "output_tail": "",
+              "passed": true,
+              "returncode": 0
+            },
+            {
+              "output_tail": "",
+              "passed": true,
+              "returncode": 0
+            },
+            {
+              "output_tail": "",
+              "passed": true,
+              "returncode": 0
+            }
+          ]
+        },
+        "pristine_fail_to_pass": [
+          {
+            "output_tail": "-t3-mi31qj42/work/test/fail-to-pass.test.js:14:10)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n      at Test.postRun (node:internal/test_runner/test:1522:19)\n      at Test.run (node:internal/test_runner/test:1447:12)\n      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7) {\n    generatedMessage: true,\n    code: 'ERR_ASSERTION',\n    actual: '  ab ',\n    expected: ' ab  ',\n    operator: 'strictEqual',\n    diff: 'simple'\n  }\n",
+            "passed": false,
+            "returncode": 1
+          },
+          {
+            "output_tail": "-t3-o7r71lg0/work/test/fail-to-pass.test.js:14:10)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n      at Test.postRun (node:internal/test_runner/test:1522:19)\n      at Test.run (node:internal/test_runner/test:1447:12)\n      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7) {\n    generatedMessage: true,\n    code: 'ERR_ASSERTION',\n    actual: '  ab ',\n    expected: ' ab  ',\n    operator: 'strictEqual',\n    diff: 'simple'\n  }\n",
+            "passed": false,
+            "returncode": 1
+          },
+          {
+            "output_tail": "-t3-ia_cio0s/work/test/fail-to-pass.test.js:14:10)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n      at Test.postRun (node:internal/test_runner/test:1522:19)\n      at Test.run (node:internal/test_runner/test:1447:12)\n      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7) {\n    generatedMessage: true,\n    code: 'ERR_ASSERTION',\n    actual: '  ab ',\n    expected: ' ab  ',\n    operator: 'strictEqual',\n    diff: 'simple'\n  }\n",
+            "passed": false,
+            "returncode": 1
+          }
+        ],
+        "pristine_pass_to_pass": [
+          {
+            "output_tail": "",
+            "passed": true,
+            "returncode": 0
+          },
+          {
+            "output_tail": "",
+            "passed": true,
+            "returncode": 0
+          },
+          {
+            "output_tail": "",
+            "passed": true,
+            "returncode": 0
+          }
+        ]
+      }
+    },
+    "reviewed_at": null,
+    "reviewer": null
+  },
+  "artifacts": [
+    {
+      "path": "ab-symbolect/t3-files/align.js",
+      "sha256": "aebe7529b1448e54d84db5384103bc14b3d7d55149ee00890877b6f0fe446ddc"
+    },
+    {
+      "path": "ab-symbolect/t3-files/align.test.js",
+      "sha256": "290c3698a5e7fd71313a8b2046afccdb7badbe35123031cc34bff4df3f3172de"
+    },
+    {
+      "path": "ab-symbolect/tasks/t3.txt",
+      "sha256": "58f580fd288aaebe8596490d0338f0ba857cf64be7109814ce55618e828fce59"
+    },
+    {
+      "path": "pi-test/package.json",
+      "sha256": "17de85e51f8083835bc1fd697e21080d2a2592d73a8343a5e9a467f47fbc5d62"
+    },
+    {
+      "path": "pi-test/src/index.js",
+      "sha256": "ef9288b55ee398a3067b8348aff635a5adb47421ab5ba01f3fefaeb84072f19b"
+    },
+    {
+      "path": "pi-test/test/csvParser.test.js",
+      "sha256": "15904d6a11ab0e020b4e0bb338bc0ed13f2592d5a0e9b5e2a070eb5ebf1aebd2"
+    },
+    {
+      "path": "pi-test/test/edgeCases.test.js",
+      "sha256": "a9453014d8f9b74780285cb52e854e55fd6e110b59e2188e5fea47e68bf7899d"
+    },
+    {
+      "path": "pi-test/test/integration.test.js",
+      "sha256": "96f35d0212d4a2ab2faf16d1153734de239feda5f2bc87bf605715ef9e4c3f84"
+    },
+    {
+      "path": "pi-test/test/jsonConverter.test.js",
+      "sha256": "2bf7dcec60873577e2902b462d0eb0f5a0f022152091b2e91d8c12eae58f25d2"
+    },
+    {
+      "path": "real-gate-fixtures/patches/t3/gold.patch",
+      "sha256": "b2214ff79dfa3a471a05cc0efe1f03a06ebad985890b692524c7bd906ed8c534"
+    },
+    {
+      "path": "real-gate-fixtures/patches/t3/shortcut.patch",
+      "sha256": "557a3139becd8323df70a6bf2e997cb8003a9e8b41c9dfdd9c8bf67ed71ec0c1"
+    }
+  ],
+  "cohort_id": "2026-07",
+  "fixture": {
+    "root": "pi-test",
+    "stage_copy": [
+      {
+        "dest": "src/align.js",
+        "source": "ab-symbolect/t3-files/align.js"
+      }
+    ]
+  },
+  "fixture_version": "2026-07.1",
+  "one_shot": {
+    "context_files": [
+      "src/index.js",
+      "test/csvParser.test.js",
+      "test/edgeCases.test.js",
+      "test/integration.test.js",
+      "test/jsonConverter.test.js",
+      "src/align.js"
+    ],
+    "eligible": true,
+    "max_context_bytes": 49152
+  },
+  "patches": {
+    "gold": "real-gate-fixtures/patches/t3/gold.patch",
+    "shortcut_mutants": [
+      "real-gate-fixtures/patches/t3/shortcut.patch"
+    ]
+  },
+  "prompts": {
+    "canonical": {
+      "sha256": "a8401e35f2efd38145b7b600788dfd27f9d3db4936d13bb569a33acb13068c17",
+      "text": "Two of the tests in test/align.test.js fail. Fix the bugs in src/align.js with minimal edits \u2014 preserve the file's tab indentation exactly. Do not modify any tests. Run node --test until all tests pass."
+    },
+    "perturbations": [
+      {
+        "approved": false,
+        "id": "equivalent-1",
+        "sha256": "4da99a8eb861f3497028eb8e7c83fe0009e7c1a7c5690875fdd4057b33786ce0",
+        "text": "Complete the following repository task. Preserve existing behavior and verify the tests.\n\nTwo of the tests in test/align.test.js fail. Fix the bugs in src/align.js with minimal edits \u2014 preserve the file's tab indentation exactly. Do not modify any tests. Run node --test until all tests pass."
+      },
+      {
+        "approved": false,
+        "id": "equivalent-2",
+        "sha256": "4dd2db166929343f42adf624d51fc5dd04f1dd52e95cef7581a22c5c120a5012",
+        "text": "Repository change request:\nTwo of the tests in test/align.test.js fail. Fix the bugs in src/align.js with minimal edits \u2014 preserve the file's tab indentation exactly. Do not modify any tests. Run node --test until all tests pass.\n\nUse the smallest correct change and confirm the test suite."
+      },
+      {
+        "approved": false,
+        "id": "equivalent-3",
+        "sha256": "e1cc43aa991dfa1e24bd6f09178dce307a6d20eab7253940b6ffd066c811f143",
+        "text": "Please solve this task in the supplied checkout, retaining all stated edge cases:\n\nTwo of the tests in test/align.test.js fail. Fix the bugs in src/align.js with minimal edits \u2014 preserve the file's tab indentation exactly. Do not modify any tests. Run node --test until all tests pass."
+      }
+    ],
+    "semantic_group": "t3:2026-07.1"
+  },
+  "schema": "pi.fixture/v1",
+  "sufficiency": [
+    {
+      "assertion": "alignLeft pads on the right",
+      "prompt_evidence": "Two of the tests in test/align.test.js fail. Fix the bugs in src/align.js with minimal edits \u2014 preserve the file's tab indentation exactly. Do not modify any tests. Run node --test until all tests pass."
+    },
+    {
+      "assertion": "alignRight pads on the left",
+      "prompt_evidence": "Two of the tests in test/align.test.js fail. Fix the bugs in src/align.js with minimal edits \u2014 preserve the file's tab indentation exactly. Do not modify any tests. Run node --test until all tests pass."
+    },
+    {
+      "assertion": "center puts the smaller pad on the left",
+      "prompt_evidence": "Two of the tests in test/align.test.js fail. Fix the bugs in src/align.js with minimal edits \u2014 preserve the file's tab indentation exactly. Do not modify any tests. Run node --test until all tests pass."
+    },
+    {
+      "assertion": "value at or above width returns unchanged",
+      "prompt_evidence": "Two of the tests in test/align.test.js fail. Fix the bugs in src/align.js with minimal edits \u2014 preserve the file's tab indentation exactly. Do not modify any tests. Run node --test until all tests pass."
+    }
+  ],
+  "task_id": "t3",
+  "tests": {
+    "fail_to_pass": {
+      "command": [
+        "node",
+        "--test",
+        "test/fail-to-pass.test.js"
+      ],
+      "overlays": [
+        {
+          "dest": "test/fail-to-pass.test.js",
+          "source": "ab-symbolect/t3-files/align.test.js"
+        }
+      ],
+      "timeout_seconds": 60
+    },
+    "pass_to_pass": {
+      "command": [
+        "node",
+        "--test"
+      ],
+      "overlays": [],
+      "timeout_seconds": 60
+    }
+  },
+  "timestamps": {
+    "admitted_at": null,
+    "created_at": "2026-07-14T00:00:00Z",
+    "expires_at": null
+  }
+}

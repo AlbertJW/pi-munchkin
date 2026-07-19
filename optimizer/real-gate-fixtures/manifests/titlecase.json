@@ -1,0 +1,241 @@
+{
+  "admission": {
+    "approved": false,
+    "automated": {
+      "checked_at": "2026-07-14T18:49:23Z",
+      "hash_drift": [],
+      "passed": true,
+      "runs_per_state": 3,
+      "states": {
+        "gold_fail_to_pass": [
+          {
+            "output_tail": "",
+            "passed": true,
+            "returncode": 0
+          },
+          {
+            "output_tail": "",
+            "passed": true,
+            "returncode": 0
+          },
+          {
+            "output_tail": "",
+            "passed": true,
+            "returncode": 0
+          }
+        ],
+        "gold_pass_to_pass": [
+          {
+            "output_tail": "",
+            "passed": true,
+            "returncode": 0
+          },
+          {
+            "output_tail": "",
+            "passed": true,
+            "returncode": 0
+          },
+          {
+            "output_tail": "",
+            "passed": true,
+            "returncode": 0
+          }
+        ],
+        "mutant:shortcut": {
+          "fail_to_pass": [
+            {
+              "output_tail": "t/fail-to-pass.test.js:7:52)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n      at Test.postRun (node:internal/test_runner/test:1522:19)\n      at Test.run (node:internal/test_runner/test:1447:12)\n      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3) {\n    generatedMessage: true,\n    code: 'ERR_ASSERTION',\n    actual: 'Well-Known Fact',\n    expected: 'Well-known Fact',\n    operator: 'strictEqual',\n    diff: 'simple'\n  }\n",
+              "passed": false,
+              "returncode": 1
+            },
+            {
+              "output_tail": "t/fail-to-pass.test.js:7:52)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n      at Test.postRun (node:internal/test_runner/test:1522:19)\n      at Test.run (node:internal/test_runner/test:1447:12)\n      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3) {\n    generatedMessage: true,\n    code: 'ERR_ASSERTION',\n    actual: 'Well-Known Fact',\n    expected: 'Well-known Fact',\n    operator: 'strictEqual',\n    diff: 'simple'\n  }\n",
+              "passed": false,
+              "returncode": 1
+            },
+            {
+              "output_tail": "t/fail-to-pass.test.js:7:52)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n      at Test.postRun (node:internal/test_runner/test:1522:19)\n      at Test.run (node:internal/test_runner/test:1447:12)\n      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3) {\n    generatedMessage: true,\n    code: 'ERR_ASSERTION',\n    actual: 'Well-Known Fact',\n    expected: 'Well-known Fact',\n    operator: 'strictEqual',\n    diff: 'simple'\n  }\n",
+              "passed": false,
+              "returncode": 1
+            }
+          ],
+          "pass_to_pass": [
+            {
+              "output_tail": "",
+              "passed": true,
+              "returncode": 0
+            },
+            {
+              "output_tail": "",
+              "passed": true,
+              "returncode": 0
+            },
+            {
+              "output_tail": "",
+              "passed": true,
+              "returncode": 0
+            }
+          ]
+        },
+        "pristine_fail_to_pass": [
+          {
+            "output_tail": "d__/work/test/fail-to-pass.test.js:8:47)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n      at Test.postRun (node:internal/test_runner/test:1522:19)\n      at Test.run (node:internal/test_runner/test:1447:12)\n      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7) {\n    generatedMessage: true,\n    code: 'ERR_ASSERTION',\n    actual: \"Don'T Stop\",\n    expected: \"Don't Stop\",\n    operator: 'strictEqual',\n    diff: 'simple'\n  }\n",
+            "passed": false,
+            "returncode": 1
+          },
+          {
+            "output_tail": "xb1/work/test/fail-to-pass.test.js:8:47)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n      at Test.postRun (node:internal/test_runner/test:1522:19)\n      at Test.run (node:internal/test_runner/test:1447:12)\n      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7) {\n    generatedMessage: true,\n    code: 'ERR_ASSERTION',\n    actual: \"Don'T Stop\",\n    expected: \"Don't Stop\",\n    operator: 'strictEqual',\n    diff: 'simple'\n  }\n",
+            "passed": false,
+            "returncode": 1
+          },
+          {
+            "output_tail": "ft9/work/test/fail-to-pass.test.js:8:47)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n      at Test.postRun (node:internal/test_runner/test:1522:19)\n      at Test.run (node:internal/test_runner/test:1447:12)\n      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7) {\n    generatedMessage: true,\n    code: 'ERR_ASSERTION',\n    actual: \"Don'T Stop\",\n    expected: \"Don't Stop\",\n    operator: 'strictEqual',\n    diff: 'simple'\n  }\n",
+            "passed": false,
+            "returncode": 1
+          }
+        ],
+        "pristine_pass_to_pass": [
+          {
+            "output_tail": "",
+            "passed": true,
+            "returncode": 0
+          },
+          {
+            "output_tail": "",
+            "passed": true,
+            "returncode": 0
+          },
+          {
+            "output_tail": "",
+            "passed": true,
+            "returncode": 0
+          }
+        ]
+      }
+    },
+    "reviewed_at": null,
+    "reviewer": null
+  },
+  "artifacts": [
+    {
+      "path": "ab-symbolect/tasks/titlecase.txt",
+      "sha256": "65a84f0ef7bd1254f2ed00a133cdcf4a3a2fe4dc0a5d3094b49a2babaf501c75"
+    },
+    {
+      "path": "real-gate-fixtures/hidden/titlecase.test.js",
+      "sha256": "b50ddb3ef07c97c6245a2a2a23c7234e7bb69f17673388f26527aca8a422934c"
+    },
+    {
+      "path": "real-gate-fixtures/patches/titlecase/gold.patch",
+      "sha256": "96d229d8e7fd5c586936e47247548762d97582c3211aa32fcb4d3ddfde96fe11"
+    },
+    {
+      "path": "real-gate-fixtures/patches/titlecase/shortcut.patch",
+      "sha256": "49460312f819f939835bd6a1e580c1082c74617c0d71ccb36c748a026fde65b1"
+    },
+    {
+      "path": "real-gate-fixtures/titlecase/package.json",
+      "sha256": "b6692286f8967eb53d5ffa460ae6ca10663950c4b34f262041b7780eb1916902"
+    },
+    {
+      "path": "real-gate-fixtures/titlecase/src/index.js",
+      "sha256": "cd024447fa1eef76dfa8ca006beea9b6d78844a78137db084df49c4b4acb5427"
+    },
+    {
+      "path": "real-gate-fixtures/titlecase/test/visible.test.js",
+      "sha256": "1cbea6e89329ca40913c966b441e5e2125f7968043bae65867754f86deb36d30"
+    }
+  ],
+  "cohort_id": "2026-07",
+  "fixture": {
+    "root": "real-gate-fixtures/titlecase",
+    "stage_copy": []
+  },
+  "fixture_version": "2026-07.1",
+  "one_shot": {
+    "context_files": [
+      "src/index.js",
+      "test/visible.test.js"
+    ],
+    "eligible": true,
+    "max_context_bytes": 49152
+  },
+  "patches": {
+    "gold": "real-gate-fixtures/patches/titlecase/gold.patch",
+    "shortcut_mutants": [
+      "real-gate-fixtures/patches/titlecase/shortcut.patch"
+    ]
+  },
+  "prompts": {
+    "canonical": {
+      "sha256": "0c84c5658d8e7d4066f1046607640afaab3fa6fa09711cfed6dd17cae9924581",
+      "text": "Fix titleCase(s) in src/index.js. It must capitalize the first letter of each word and\nlowercase the rest of that word. Words are separated by SPACES ONLY \u2014 an apostrophe or a\nhyphen does NOT start a new word. So \"i don't know\" -> \"I Don't Know\", \"well-known fact\" ->\n\"Well-known Fact\", and \"HELLO WORLD\" -> \"Hello World\". The current code capitalizes the\nletter after every non-letter character, which is wrong. Fix it without breaking the\nexisting visible tests. Run node --test until all tests pass."
+    },
+    "perturbations": [
+      {
+        "approved": false,
+        "id": "equivalent-1",
+        "sha256": "8a5b66d3d4f0d50550de71469d296930a0a3763af0b4518c4d2025a24fe3c297",
+        "text": "Complete the following repository task. Preserve existing behavior and verify the tests.\n\nFix titleCase(s) in src/index.js. It must capitalize the first letter of each word and\nlowercase the rest of that word. Words are separated by SPACES ONLY \u2014 an apostrophe or a\nhyphen does NOT start a new word. So \"i don't know\" -> \"I Don't Know\", \"well-known fact\" ->\n\"Well-known Fact\", and \"HELLO WORLD\" -> \"Hello World\". The current code capitalizes the\nletter after every non-letter character, which is wrong. Fix it without breaking the\nexisting visible tests. Run node --test until all tests pass."
+      },
+      {
+        "approved": false,
+        "id": "equivalent-2",
+        "sha256": "5c907144ea5de341f5542b2ab2779a671dcf76a79605cf36f8517846c689b137",
+        "text": "Repository change request:\nFix titleCase(s) in src/index.js. It must capitalize the first letter of each word and\nlowercase the rest of that word. Words are separated by SPACES ONLY \u2014 an apostrophe or a\nhyphen does NOT start a new word. So \"i don't know\" -> \"I Don't Know\", \"well-known fact\" ->\n\"Well-known Fact\", and \"HELLO WORLD\" -> \"Hello World\". The current code capitalizes the\nletter after every non-letter character, which is wrong. Fix it without breaking the\nexisting visible tests. Run node --test until all tests pass.\n\nUse the smallest correct change and confirm the test suite."
+      },
+      {
+        "approved": false,
+        "id": "equivalent-3",
+        "sha256": "5421921899e2ca1fe201485cf1c23d972825925b807c5855bf934716f434f7a7",
+        "text": "Please solve this task in the supplied checkout, retaining all stated edge cases:\n\nFix titleCase(s) in src/index.js. It must capitalize the first letter of each word and\nlowercase the rest of that word. Words are separated by SPACES ONLY \u2014 an apostrophe or a\nhyphen does NOT start a new word. So \"i don't know\" -> \"I Don't Know\", \"well-known fact\" ->\n\"Well-known Fact\", and \"HELLO WORLD\" -> \"Hello World\". The current code capitalizes the\nletter after every non-letter character, which is wrong. Fix it without breaking the\nexisting visible tests. Run node --test until all tests pass."
+      }
+    ],
+    "semantic_group": "titlecase:2026-07.1"
+  },
+  "schema": "pi.fixture/v1",
+  "sufficiency": [
+    {
+      "assertion": "apostrophe is not a word boundary",
+      "prompt_evidence": "Fix titleCase(s) in src/index.js. It must capitalize the first letter of each word and\nlowercase the rest of that word. Words are separated by SPACES ONLY \u2014 an apostrophe or a\nhyphen does NOT start a new word. So \"i don't know\" -> \"I Don't Know\", \"well-known fact\" ->\n\"Well-known Fact\", and \"HELLO WORLD\" -> \"Hello World\". The current code capitalizes the\nletter after every non-letter character, which is wrong. Fix it without breaking the\nexisting visible tests. Run node --test until all tests pass."
+    },
+    {
+      "assertion": "hyphen is not a word boundary",
+      "prompt_evidence": "Fix titleCase(s) in src/index.js. It must capitalize the first letter of each word and\nlowercase the rest of that word. Words are separated by SPACES ONLY \u2014 an apostrophe or a\nhyphen does NOT start a new word. So \"i don't know\" -> \"I Don't Know\", \"well-known fact\" ->\n\"Well-known Fact\", and \"HELLO WORLD\" -> \"Hello World\". The current code capitalizes the\nletter after every non-letter character, which is wrong. Fix it without breaking the\nexisting visible tests. Run node --test until all tests pass."
+    },
+    {
+      "assertion": "all-caps with apostrophe",
+      "prompt_evidence": "Fix titleCase(s) in src/index.js. It must capitalize the first letter of each word and\nlowercase the rest of that word. Words are separated by SPACES ONLY \u2014 an apostrophe or a\nhyphen does NOT start a new word. So \"i don't know\" -> \"I Don't Know\", \"well-known fact\" ->\n\"Well-known Fact\", and \"HELLO WORLD\" -> \"Hello World\". The current code capitalizes the\nletter after every non-letter character, which is wrong. Fix it without breaking the\nexisting visible tests. Run node --test until all tests pass."
+    }
+  ],
+  "task_id": "titlecase",
+  "tests": {
+    "fail_to_pass": {
+      "command": [
+        "node",
+        "--test",
+        "test/fail-to-pass.test.js"
+      ],
+      "overlays": [
+        {
+          "dest": "test/fail-to-pass.test.js",
+          "source": "real-gate-fixtures/hidden/titlecase.test.js"
+        }
+      ],
+      "timeout_seconds": 60
+    },
+    "pass_to_pass": {
+      "command": [
+        "node",
+        "--test"
+      ],
+      "overlays": [],
+      "timeout_seconds": 60
+    }
+  },
+  "timestamps": {
+    "admitted_at": null,
+    "created_at": "2026-07-14T00:00:00Z",
+    "expires_at": null
+  }
+}

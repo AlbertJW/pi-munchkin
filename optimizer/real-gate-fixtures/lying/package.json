@@ -1,0 +1,1 @@
+{"name": "slug-util", "version": "1.0.0", "description": "slug utility", "main": "src/index.js", "type": "module", "scripts": {"test": "node test/check.js"}, "license": "MIT"}

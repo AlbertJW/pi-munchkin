@@ -1,0 +1,22 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "pi.fixture/v1",
+  "type": "object",
+  "required": ["schema", "task_id", "cohort_id", "fixture_version", "timestamps", "prompts", "fixture", "tests", "patches", "sufficiency", "one_shot", "admission", "artifacts"],
+  "properties": {
+    "schema": {"const": "pi.fixture/v1"},
+    "task_id": {"type": "string", "minLength": 1},
+    "cohort_id": {"type": "string", "pattern": "^[0-9]{4}-[0-9]{2}$"},
+    "fixture_version": {"type": "string", "minLength": 1},
+    "timestamps": {"type": "object", "required": ["created_at", "admitted_at", "expires_at"]},
+    "prompts": {"type": "object", "required": ["semantic_group", "canonical", "perturbations"]},
+    "fixture": {"type": "object", "required": ["root"]},
+    "tests": {"type": "object", "required": ["pass_to_pass", "fail_to_pass"]},
+    "patches": {"type": "object", "required": ["gold", "shortcut_mutants"]},
+    "sufficiency": {"type": "array", "minItems": 1},
+    "one_shot": {"type": "object", "required": ["eligible", "context_files", "max_context_bytes"]},
+    "admission": {"type": "object", "required": ["approved", "reviewer", "reviewed_at", "automated"]},
+    "artifacts": {"type": "array", "minItems": 1}
+  },
+  "additionalProperties": false
+}

@@ -1,0 +1,5 @@
+Implement firstUnmatched(s) in src/index.js. Return the index of the first unmatched
+parenthesis in s: for an unmatched closing ')', its own index; for an unmatched opening
+'(', the index of the FIRST '(' that is never closed (not where scanning stopped). If
+every parenthesis is matched, return s.length. Only '(' and ')' matter; ignore all other
+characters. Examples: ")ab" -> 0, "(a)" -> 3, "ab" -> 2. Run node --test until all tests pass.

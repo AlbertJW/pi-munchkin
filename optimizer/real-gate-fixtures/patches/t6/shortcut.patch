@@ -1,0 +1,23 @@
+--- a/src/index.js
++++ b/src/index.js
+@@ -9,6 +9,7 @@
+   const fields = [];
+   let current = '';
+   let inQuotes = false;
++  let quoted = false;
+ 
+   for (let i = 0; i < line.length; i++) {
+     const char = line[i];
+@@ -28,9 +29,11 @@
+     } else {
+       if (char === '"') {
+         inQuotes = true;
++        quoted = true;
+       } else if (char === ',') {
+-        fields.push(current.trim());
++        fields.push(quoted ? current : current.trim());
+         current = '';
++        quoted = false;
+       } else {
+         current += char;
+       }

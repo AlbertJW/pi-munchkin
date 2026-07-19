@@ -159,14 +159,19 @@ def test_runner_dry_modes():
     runner = admission.ROOT / "real_gate.sh"
     env = dict(os.environ, MODEL_CONTROL="pi-native", GATE_NETWORK="open",
                PI_PROVIDER="anthropic", PI_MODEL="claude-test")
-    native = subprocess.run([str(runner), "--dry", "parens"], cwd=admission.ROOT,
+    env["SANDBOX"] = "off"
+    native = subprocess.run([str(runner), "--dry", "--exploratory", "t1"], cwd=admission.ROOT,
                             env=env, capture_output=True, text=True, timeout=15)
     assert native.returncode == 0, native.stderr
     assert "server: pi-native (llama health/warm-up bypassed)" in native.stdout
     assert "provider=anthropic model=claude-test" in native.stdout
-    invalid = subprocess.run([str(runner), "--dry", "parens"], cwd=admission.ROOT,
+    assert "EXPLORATORY ONLY" in native.stderr
+    invalid = subprocess.run([str(runner), "--dry", "--exploratory", "t1"], cwd=admission.ROOT,
                              env={**env, "GATE_NETWORK": "endpoint"}, capture_output=True, text=True, timeout=15)
     assert invalid.returncode == 2 and "requires GATE_NETWORK=open" in invalid.stderr
+    hidden = subprocess.run([str(runner), "--dry", "--exploratory", "parens"], cwd=admission.ROOT,
+                            env=env, capture_output=True, text=True, timeout=15)
+    assert hidden.returncode == 2 and "requires SANDBOX=on" in hidden.stderr
 
 
 def test_robustness_and_usage():

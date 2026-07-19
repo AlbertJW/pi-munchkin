@@ -1,0 +1,11 @@
+--- a/src/depth.js
++++ b/src/depth.js
+@@ -2,7 +2,7 @@
+ export function maxDepth(s) {
+   let depth = 0, max = 0;
+   for (const c of s) {
+-    if (c === '[') { depth++; if (depth + 1 > max) max = depth + 1; }
++    if (c === '[') { depth++; if (depth > max) max = depth; }
+     else if (c === ']') depth--;
+   }
+   return max;

@@ -1,0 +1,64 @@
+--- a/src/index.js
++++ b/src/index.js
+@@ -5,7 +5,7 @@
+  * @param {string} line - A single CSV line
+  * @returns {Array<string>} Array of field values
+  */
+-function splitCSVLine(line) {
++function splitCSVLine(line, trim = true) {
+   const fields = [];
+   let current = '';
+   let inQuotes = false;
+@@ -29,7 +29,7 @@
+       if (char === '"') {
+         inQuotes = true;
+       } else if (char === ',') {
+-        fields.push(current.trim());
++        fields.push(trim ? current.trim() : current);
+         current = '';
+       } else {
+         current += char;
+@@ -38,7 +38,7 @@
+   }
+ 
+   // Add the last field
+-  fields.push(current.trim());
++  fields.push(trim ? current.trim() : current);
+ 
+   return fields;
+ }
+@@ -48,15 +48,15 @@
+  * @param {string} csv - CSV content
+  * @returns {Array<Object>} Array of row objects
+  */
+-export function parseCSV(csv) {
+-  const lines = csv.trim().split('\n');
++export function parseCSV(csv, { trim = true } = {}) {
++  const lines = (trim ? csv.trim() : csv).split('\n');
+   if (lines.length === 0) return [];
+ 
+-  const headers = splitCSVLine(lines[0]);
++  const headers = splitCSVLine(lines[0], trim);
+   const rows = [];
+ 
+   for (let i = 1; i < lines.length; i++) {
+-    const values = splitCSVLine(lines[i]);
++    const values = splitCSVLine(lines[i], trim);
+     const row = {};
+     headers.forEach((header, idx) => {
+       row[header] = values[idx] || '';
+--- a/test/trim-option.test.js
++++ b/test/trim-option.test.js
+@@ -0,0 +1,12 @@
++import test from "node:test";
++import assert from "node:assert/strict";
++import { parseCSV } from "../src/index.js";
++
++test("trim false preserves unquoted field whitespace", () => {
++  assert.deepEqual(parseCSV(" name , age \n John , 30 ", { trim: false }),
++                   [{ " name ": " John ", " age ": " 30 " }]);
++});
++
++test("default remains trimmed", () => {
++  assert.deepEqual(parseCSV(" name , age \n John , 30 "), [{ name: "John", age: "30" }]);
++});

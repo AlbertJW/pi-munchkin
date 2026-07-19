@@ -1,0 +1,11 @@
+--- a/src/index.js
++++ b/src/index.js
+@@ -48,7 +48,7 @@
+  * @param {string} csv - CSV content
+  * @returns {Array<Object>} Array of row objects
+  */
+-export function parseCSV(csv) {
++export function parseCSV(csv, _options = {}) {
+   const lines = csv.trim().split('\n');
+   if (lines.length === 0) return [];
+ 

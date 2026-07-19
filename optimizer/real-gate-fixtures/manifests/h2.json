@@ -1,0 +1,256 @@
+{
+  "admission": {
+    "approved": false,
+    "automated": {
+      "checked_at": "2026-07-14T18:50:48Z",
+      "hash_drift": [],
+      "passed": true,
+      "runs_per_state": 3,
+      "states": {
+        "gold_fail_to_pass": [
+          {
+            "output_tail": "",
+            "passed": true,
+            "returncode": 0
+          },
+          {
+            "output_tail": "",
+            "passed": true,
+            "returncode": 0
+          },
+          {
+            "output_tail": "",
+            "passed": true,
+            "returncode": 0
+          }
+        ],
+        "gold_pass_to_pass": [
+          {
+            "output_tail": "",
+            "passed": true,
+            "returncode": 0
+          },
+          {
+            "output_tail": "",
+            "passed": true,
+            "returncode": 0
+          },
+          {
+            "output_tail": "",
+            "passed": true,
+            "returncode": 0
+          }
+        ],
+        "mutant:shortcut": {
+          "fail_to_pass": [
+            {
+              "output_tail": "6/work/test/fail-to-pass.test.js:30:10)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n      at Test.postRun (node:internal/test_runner/test:1522:19)\n      at Test.run (node:internal/test_runner/test:1447:12)\n      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7) {\n    generatedMessage: true,\n    code: 'ERR_ASSERTION',\n    actual: 'a, b\\\\nc, d',\n    expected: 'a, b\\nc, d',\n    operator: 'strictEqual',\n    diff: 'simple'\n  }\n",
+              "passed": false,
+              "returncode": 1
+            },
+            {
+              "output_tail": "7/work/test/fail-to-pass.test.js:30:10)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n      at Test.postRun (node:internal/test_runner/test:1522:19)\n      at Test.run (node:internal/test_runner/test:1447:12)\n      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7) {\n    generatedMessage: true,\n    code: 'ERR_ASSERTION',\n    actual: 'a, b\\\\nc, d',\n    expected: 'a, b\\nc, d',\n    operator: 'strictEqual',\n    diff: 'simple'\n  }\n",
+              "passed": false,
+              "returncode": 1
+            },
+            {
+              "output_tail": "9/work/test/fail-to-pass.test.js:30:10)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n      at Test.postRun (node:internal/test_runner/test:1522:19)\n      at Test.run (node:internal/test_runner/test:1447:12)\n      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7) {\n    generatedMessage: true,\n    code: 'ERR_ASSERTION',\n    actual: 'a, b\\\\nc, d',\n    expected: 'a, b\\nc, d',\n    operator: 'strictEqual',\n    diff: 'simple'\n  }\n",
+              "passed": false,
+              "returncode": 1
+            }
+          ],
+          "pass_to_pass": [
+            {
+              "output_tail": "",
+              "passed": true,
+              "returncode": 0
+            },
+            {
+              "output_tail": "",
+              "passed": true,
+              "returncode": 0
+            },
+            {
+              "output_tail": "",
+              "passed": true,
+              "returncode": 0
+            }
+          ]
+        },
+        "pristine_fail_to_pass": [
+          {
+            "output_tail": "n/T/pi-admit-h2-kj54p2kg/work/test/fail-to-pass.test.js:29:10)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n      at Test.postRun (node:internal/test_runner/test:1522:19)\n      at Test.run (node:internal/test_runner/test:1447:12)\n      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7) {\n    generatedMessage: true,\n    code: 'ERR_ASSERTION',\n    actual: 2,\n    expected: 1,\n    operator: 'strictEqual',\n    diff: 'simple'\n  }\n",
+            "passed": false,
+            "returncode": 1
+          },
+          {
+            "output_tail": "n/T/pi-admit-h2-fnwynrtk/work/test/fail-to-pass.test.js:29:10)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n      at Test.postRun (node:internal/test_runner/test:1522:19)\n      at Test.run (node:internal/test_runner/test:1447:12)\n      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7) {\n    generatedMessage: true,\n    code: 'ERR_ASSERTION',\n    actual: 2,\n    expected: 1,\n    operator: 'strictEqual',\n    diff: 'simple'\n  }\n",
+            "passed": false,
+            "returncode": 1
+          },
+          {
+            "output_tail": "n/T/pi-admit-h2-hvax1odm/work/test/fail-to-pass.test.js:29:10)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n      at Test.postRun (node:internal/test_runner/test:1522:19)\n      at Test.run (node:internal/test_runner/test:1447:12)\n      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7) {\n    generatedMessage: true,\n    code: 'ERR_ASSERTION',\n    actual: 2,\n    expected: 1,\n    operator: 'strictEqual',\n    diff: 'simple'\n  }\n",
+            "passed": false,
+            "returncode": 1
+          }
+        ],
+        "pristine_pass_to_pass": [
+          {
+            "output_tail": "",
+            "passed": true,
+            "returncode": 0
+          },
+          {
+            "output_tail": "",
+            "passed": true,
+            "returncode": 0
+          },
+          {
+            "output_tail": "",
+            "passed": true,
+            "returncode": 0
+          }
+        ]
+      }
+    },
+    "reviewed_at": null,
+    "reviewer": null
+  },
+  "artifacts": [
+    {
+      "path": "ab-symbolect/tasks/h2.txt",
+      "sha256": "3850f90bb61a49fa88a543003bdb1120f593fc50667667681ede90938dc91e36"
+    },
+    {
+      "path": "pi-test/package.json",
+      "sha256": "17de85e51f8083835bc1fd697e21080d2a2592d73a8343a5e9a467f47fbc5d62"
+    },
+    {
+      "path": "pi-test/src/index.js",
+      "sha256": "ef9288b55ee398a3067b8348aff635a5adb47421ab5ba01f3fefaeb84072f19b"
+    },
+    {
+      "path": "pi-test/test/csvParser.test.js",
+      "sha256": "15904d6a11ab0e020b4e0bb338bc0ed13f2592d5a0e9b5e2a070eb5ebf1aebd2"
+    },
+    {
+      "path": "pi-test/test/edgeCases.test.js",
+      "sha256": "a9453014d8f9b74780285cb52e854e55fd6e110b59e2188e5fea47e68bf7899d"
+    },
+    {
+      "path": "pi-test/test/integration.test.js",
+      "sha256": "96f35d0212d4a2ab2faf16d1153734de239feda5f2bc87bf605715ef9e4c3f84"
+    },
+    {
+      "path": "pi-test/test/jsonConverter.test.js",
+      "sha256": "2bf7dcec60873577e2902b462d0eb0f5a0f022152091b2e91d8c12eae58f25d2"
+    },
+    {
+      "path": "real-gate-fixtures/hidden/h2.test.js",
+      "sha256": "26c8691e61b6fd92674f601aae7bbab373c0e733d6d3de9b49f7e9e59f438179"
+    },
+    {
+      "path": "real-gate-fixtures/patches/h2/gold.patch",
+      "sha256": "d8f4fbb1fe4a7cdfe8751528b6258e3d7e26a5189e73a5b3229e47c76652ae0e"
+    },
+    {
+      "path": "real-gate-fixtures/patches/h2/shortcut.patch",
+      "sha256": "0870edbecd54d44d090c2abf854a0437c69ddad51dd5c209b3d86caddbdd5065"
+    }
+  ],
+  "cohort_id": "2026-07",
+  "fixture": {
+    "root": "pi-test",
+    "stage_copy": []
+  },
+  "fixture_version": "2026-07.1",
+  "one_shot": {
+    "context_files": [
+      "src/index.js",
+      "test/csvParser.test.js",
+      "test/edgeCases.test.js",
+      "test/integration.test.js",
+      "test/jsonConverter.test.js"
+    ],
+    "eligible": true,
+    "max_context_bytes": 49152
+  },
+  "patches": {
+    "gold": "real-gate-fixtures/patches/h2/gold.patch",
+    "shortcut_mutants": [
+      "real-gate-fixtures/patches/h2/shortcut.patch"
+    ]
+  },
+  "prompts": {
+    "canonical": {
+      "sha256": "2a7a00fd5048c48bcda2abd6d1e61e60970b0c75ee9639734fe5e4fad36a3729",
+      "text": "Bug: parseCSV in src/index.js mishandles records whose quoted fields contain a newline. A quoted field may span what looks like multiple lines, and the whole quoted value (including the newline) belongs to one field in one record. For example, parsing 'name,note\\n\"Alice\",\"line1\\nline2\"\\n\"Bob\",\"ok\"' must yield exactly two rows, with the first row's note equal to 'line1\\nline2'. Currently the record gets split at the newline. Fix src/index.js so quoted newlines are handled correctly, without breaking any existing tests. Run node --test until all tests pass."
+    },
+    "perturbations": [
+      {
+        "approved": false,
+        "id": "equivalent-1",
+        "sha256": "ae29b499b96ca688d8baf627d709fdcc6b41d22e3568e9abc0aab4097dec15fb",
+        "text": "Complete the following repository task. Preserve existing behavior and verify the tests.\n\nBug: parseCSV in src/index.js mishandles records whose quoted fields contain a newline. A quoted field may span what looks like multiple lines, and the whole quoted value (including the newline) belongs to one field in one record. For example, parsing 'name,note\\n\"Alice\",\"line1\\nline2\"\\n\"Bob\",\"ok\"' must yield exactly two rows, with the first row's note equal to 'line1\\nline2'. Currently the record gets split at the newline. Fix src/index.js so quoted newlines are handled correctly, without breaking any existing tests. Run node --test until all tests pass."
+      },
+      {
+        "approved": false,
+        "id": "equivalent-2",
+        "sha256": "2994bbc2c83a9344533f2fb13bd315305ef30d76e8311ebd1838ec1499f77ef1",
+        "text": "Repository change request:\nBug: parseCSV in src/index.js mishandles records whose quoted fields contain a newline. A quoted field may span what looks like multiple lines, and the whole quoted value (including the newline) belongs to one field in one record. For example, parsing 'name,note\\n\"Alice\",\"line1\\nline2\"\\n\"Bob\",\"ok\"' must yield exactly two rows, with the first row's note equal to 'line1\\nline2'. Currently the record gets split at the newline. Fix src/index.js so quoted newlines are handled correctly, without breaking any existing tests. Run node --test until all tests pass.\n\nUse the smallest correct change and confirm the test suite."
+      },
+      {
+        "approved": false,
+        "id": "equivalent-3",
+        "sha256": "16374b597597b5057395f3235851a37d4335880ce2f441015aff61bad4313c3c",
+        "text": "Please solve this task in the supplied checkout, retaining all stated edge cases:\n\nBug: parseCSV in src/index.js mishandles records whose quoted fields contain a newline. A quoted field may span what looks like multiple lines, and the whole quoted value (including the newline) belongs to one field in one record. For example, parsing 'name,note\\n\"Alice\",\"line1\\nline2\"\\n\"Bob\",\"ok\"' must yield exactly two rows, with the first row's note equal to 'line1\\nline2'. Currently the record gets split at the newline. Fix src/index.js so quoted newlines are handled correctly, without breaking any existing tests. Run node --test until all tests pass."
+      }
+    ],
+    "semantic_group": "h2:2026-07.1"
+  },
+  "schema": "pi.fixture/v1",
+  "sufficiency": [
+    {
+      "assertion": "h2: quoted field containing a newline stays one field",
+      "prompt_evidence": "Bug: parseCSV in src/index.js mishandles records whose quoted fields contain a newline. A quoted field may span what looks like multiple lines, and the whole quoted value (including the newline) belongs to one field in one record. For example, parsing 'name,note\\n\"Alice\",\"line1\\nline2\"\\n\"Bob\",\"ok\"' must yield exactly two rows, with the first row's note equal to 'line1\\nline2'. Currently the record gets split at the newline. Fix src/index.js so quoted newlines are handled correctly, without breaking any existing tests. Run node --test until all tests pass."
+    },
+    {
+      "assertion": "h2: multiple newlines inside one quoted field",
+      "prompt_evidence": "Bug: parseCSV in src/index.js mishandles records whose quoted fields contain a newline. A quoted field may span what looks like multiple lines, and the whole quoted value (including the newline) belongs to one field in one record. For example, parsing 'name,note\\n\"Alice\",\"line1\\nline2\"\\n\"Bob\",\"ok\"' must yield exactly two rows, with the first row's note equal to 'line1\\nline2'. Currently the record gets split at the newline. Fix src/index.js so quoted newlines are handled correctly, without breaking any existing tests. Run node --test until all tests pass."
+    },
+    {
+      "assertion": "h2: quoted newline combined with quoted comma",
+      "prompt_evidence": "Bug: parseCSV in src/index.js mishandles records whose quoted fields contain a newline. A quoted field may span what looks like multiple lines, and the whole quoted value (including the newline) belongs to one field in one record. For example, parsing 'name,note\\n\"Alice\",\"line1\\nline2\"\\n\"Bob\",\"ok\"' must yield exactly two rows, with the first row's note equal to 'line1\\nline2'. Currently the record gets split at the newline. Fix src/index.js so quoted newlines are handled correctly, without breaking any existing tests. Run node --test until all tests pass."
+    }
+  ],
+  "task_id": "h2",
+  "tests": {
+    "fail_to_pass": {
+      "command": [
+        "node",
+        "--test",
+        "test/fail-to-pass.test.js"
+      ],
+      "overlays": [
+        {
+          "dest": "test/fail-to-pass.test.js",
+          "source": "real-gate-fixtures/hidden/h2.test.js"
+        }
+      ],
+      "timeout_seconds": 60
+    },
+    "pass_to_pass": {
+      "command": [
+        "node",
+        "--test"
+      ],
+      "overlays": [],
+      "timeout_seconds": 60
+    }
+  },
+  "timestamps": {
+    "admitted_at": null,
+    "created_at": "2026-07-14T00:00:00Z",
+    "expires_at": null
+  }
+}

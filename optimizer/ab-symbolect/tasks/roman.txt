@@ -1,0 +1,5 @@
+Implement fromRoman(s) in src/index.js. Parse a Roman numeral string and return its integer
+value, or return null if s is NOT a valid Roman numeral. Validity matters: "IIX", "VV",
+"IL", and "IIII" are all invalid and must return null. Valid examples: fromRoman("XIV") ->
+14, fromRoman("MCMXCIV") -> 1994, fromRoman("XL") -> 40. A plain left-to-right subtractive
+sum is not enough — you must reject malformed numerals. Run node --test until all tests pass.

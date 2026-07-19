@@ -1,0 +1,11 @@
+--- a/src/align.js
++++ b/src/align.js
+@@ -4,7 +4,7 @@
+ 	if (s.length >= width) {	
+ 		return s;
+ 	}
+-	return s + ' '.repeat(width - s.length);
++	return ' '.repeat(width - s.length) + s;
+ }
+ 
+ export function alignRight(s, width) {

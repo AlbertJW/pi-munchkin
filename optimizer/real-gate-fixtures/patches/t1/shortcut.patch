@@ -1,0 +1,17 @@
+--- a/src/index.js
++++ b/src/index.js
+@@ -48,7 +48,7 @@
+  * @param {string} csv - CSV content
+  * @returns {Array<Object>} Array of row objects
+  */
+-export function parseCSV(csv) {
++export function parseCsv(csv) {
+   const lines = csv.trim().split('\n');
+   if (lines.length === 0) return [];
+ 
+@@ -75,3 +75,5 @@
+ export function csvToJson(data) {
+   return JSON.stringify(data, null, 2);
+ }
++
++export const parseCSV = parseCsv;

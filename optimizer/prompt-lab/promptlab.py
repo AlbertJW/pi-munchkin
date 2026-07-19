@@ -151,7 +151,8 @@ ALIGN_FAILS = """✖ alignRight pads on the left
   AssertionError: Expected ' ab  ' but got '  ab '   (center('ab', 5))"""
 
 INDEX_READ_LINES = []
-with open(os.path.expanduser("~/LLM/pi-test/src/index.js")) as _f:
+_fixture = os.path.expanduser(os.environ.get("PI_TEST_FIXTURE", os.path.join(LAB, "..", "pi-test")))
+with open(os.path.join(_fixture, "src", "index.js")) as _f:
     for _i, _l in enumerate(_f.read().rstrip("\n").split("\n"), 1):
         INDEX_READ_LINES.append(f"{_i}:{_l}")
 INDEX_READ = "[src/index.js#5B8C2D1F]\n" + "\n".join(INDEX_READ_LINES)

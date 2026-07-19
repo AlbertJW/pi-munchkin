@@ -1,0 +1,5 @@
+Implement saddlePoints(matrix) in src/index.js. matrix is an array of rows (arrays of
+numbers). A saddle point is a cell that is the MAXIMUM in its row and the MINIMUM in its
+column. Return an array of { row, col } objects with 1-BASED indices, in row-major order
+(row by row, left to right). An empty matrix returns []. There may be zero, one, or many
+saddle points. Run node --test until all tests pass.

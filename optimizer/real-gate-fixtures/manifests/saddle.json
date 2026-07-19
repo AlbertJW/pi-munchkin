@@ -1,0 +1,251 @@
+{
+  "admission": {
+    "approved": false,
+    "automated": {
+      "checked_at": "2026-07-14T18:49:00Z",
+      "hash_drift": [],
+      "passed": true,
+      "runs_per_state": 3,
+      "states": {
+        "gold_fail_to_pass": [
+          {
+            "output_tail": "",
+            "passed": true,
+            "returncode": 0
+          },
+          {
+            "output_tail": "",
+            "passed": true,
+            "returncode": 0
+          },
+          {
+            "output_tail": "",
+            "passed": true,
+            "returncode": 0
+          }
+        ],
+        "gold_pass_to_pass": [
+          {
+            "output_tail": "",
+            "passed": true,
+            "returncode": 0
+          },
+          {
+            "output_tail": "",
+            "passed": true,
+            "returncode": 0
+          },
+          {
+            "output_tail": "",
+            "passed": true,
+            "returncode": 0
+          }
+        ],
+        "mutant:shortcut": {
+          "fail_to_pass": [
+            {
+              "output_tail": "ss.test.js:8:39)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n      at Test.postRun (node:internal/test_runner/test:1522:19)\n      at Test.run (node:internal/test_runner/test:1447:12)\n      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7) {\n    generatedMessage: true,\n    code: 'ERR_ASSERTION',\n    actual: [ { row: 0, col: 2 } ],\n    expected: [ { row: 1, col: 3 } ],\n    operator: 'deepStrictEqual',\n    diff: 'simple'\n  }\n",
+              "passed": false,
+              "returncode": 1
+            },
+            {
+              "output_tail": "ss.test.js:8:39)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n      at Test.postRun (node:internal/test_runner/test:1522:19)\n      at Test.run (node:internal/test_runner/test:1447:12)\n      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7) {\n    generatedMessage: true,\n    code: 'ERR_ASSERTION',\n    actual: [ { row: 0, col: 2 } ],\n    expected: [ { row: 1, col: 3 } ],\n    operator: 'deepStrictEqual',\n    diff: 'simple'\n  }\n",
+              "passed": false,
+              "returncode": 1
+            },
+            {
+              "output_tail": "ss.test.js:8:39)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n      at Test.postRun (node:internal/test_runner/test:1522:19)\n      at Test.run (node:internal/test_runner/test:1447:12)\n      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7) {\n    generatedMessage: true,\n    code: 'ERR_ASSERTION',\n    actual: [ { row: 0, col: 2 } ],\n    expected: [ { row: 1, col: 3 } ],\n    operator: 'deepStrictEqual',\n    diff: 'simple'\n  }\n",
+              "passed": false,
+              "returncode": 1
+            }
+          ],
+          "pass_to_pass": [
+            {
+              "output_tail": "",
+              "passed": true,
+              "returncode": 0
+            },
+            {
+              "output_tail": "",
+              "passed": true,
+              "returncode": 0
+            },
+            {
+              "output_tail": "",
+              "passed": true,
+              "returncode": 0
+            }
+          ]
+        },
+        "pristine_fail_to_pass": [
+          {
+            "output_tail": "dmit-saddle-h28tvtsh/work/src/index.js:2:9)\n      at TestContext.<anonymous> (file:///private/var/folders/3r/nc7qhtpn56j7rt5nwg0rqw600000gn/T/pi-admit-saddle-h28tvtsh/work/test/fail-to-pass.test.js:8:49)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n      at Test.postRun (node:internal/test_runner/test:1522:19)\n      at Test.run (node:internal/test_runner/test:1447:12)\n      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7)\n",
+            "passed": false,
+            "returncode": 1
+          },
+          {
+            "output_tail": "dmit-saddle-w8z82zup/work/src/index.js:2:9)\n      at TestContext.<anonymous> (file:///private/var/folders/3r/nc7qhtpn56j7rt5nwg0rqw600000gn/T/pi-admit-saddle-w8z82zup/work/test/fail-to-pass.test.js:8:49)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n      at Test.postRun (node:internal/test_runner/test:1522:19)\n      at Test.run (node:internal/test_runner/test:1447:12)\n      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7)\n",
+            "passed": false,
+            "returncode": 1
+          },
+          {
+            "output_tail": "dmit-saddle-4wp11igi/work/src/index.js:2:9)\n      at TestContext.<anonymous> (file:///private/var/folders/3r/nc7qhtpn56j7rt5nwg0rqw600000gn/T/pi-admit-saddle-4wp11igi/work/test/fail-to-pass.test.js:8:49)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n      at Test.postRun (node:internal/test_runner/test:1522:19)\n      at Test.run (node:internal/test_runner/test:1447:12)\n      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7)\n",
+            "passed": false,
+            "returncode": 1
+          }
+        ],
+        "pristine_pass_to_pass": [
+          {
+            "output_tail": "",
+            "passed": true,
+            "returncode": 0
+          },
+          {
+            "output_tail": "",
+            "passed": true,
+            "returncode": 0
+          },
+          {
+            "output_tail": "",
+            "passed": true,
+            "returncode": 0
+          }
+        ]
+      }
+    },
+    "reviewed_at": null,
+    "reviewer": null
+  },
+  "artifacts": [
+    {
+      "path": "ab-symbolect/tasks/saddle.txt",
+      "sha256": "6988c4f75c473bfa2064c6182dd95c564c08d24b1f28a884f6ea0c80a3a7077c"
+    },
+    {
+      "path": "real-gate-fixtures/admission-tests/saddle-pass-to-pass.test.mjs",
+      "sha256": "a5172de415df70c58af73fe4c5709202fffb4e2f30cd64455431df947e74982c"
+    },
+    {
+      "path": "real-gate-fixtures/hidden/saddle.test.js",
+      "sha256": "16c8231c1141b6f68fcfe8aba4f42c079ff221abfdc48ab876a748ea6c5fe28d"
+    },
+    {
+      "path": "real-gate-fixtures/patches/saddle/gold.patch",
+      "sha256": "a2ca916552029824832127fb0353ab64a656b6dd6fa78f78dd088dc2733f742d"
+    },
+    {
+      "path": "real-gate-fixtures/patches/saddle/shortcut.patch",
+      "sha256": "caa9bf6ac0f4998cad264cb7320b7c4ea01c033e95c150b739b5031b50dd2b7d"
+    },
+    {
+      "path": "real-gate-fixtures/saddle/package.json",
+      "sha256": "b6692286f8967eb53d5ffa460ae6ca10663950c4b34f262041b7780eb1916902"
+    },
+    {
+      "path": "real-gate-fixtures/saddle/src/index.js",
+      "sha256": "e5e2445af7ac7d1cf54d35e37d526d7c244c846af6ff273d45644ad7506e6cd1"
+    },
+    {
+      "path": "real-gate-fixtures/saddle/test/visible.test.js",
+      "sha256": "a6806395f5d1bbb3e875e517ab1707ff24f88e639270328a0e63b9dc1373ff4c"
+    }
+  ],
+  "cohort_id": "2026-07",
+  "fixture": {
+    "root": "real-gate-fixtures/saddle",
+    "stage_copy": []
+  },
+  "fixture_version": "2026-07.1",
+  "one_shot": {
+    "context_files": [
+      "src/index.js",
+      "test/visible.test.js"
+    ],
+    "eligible": true,
+    "max_context_bytes": 49152
+  },
+  "patches": {
+    "gold": "real-gate-fixtures/patches/saddle/gold.patch",
+    "shortcut_mutants": [
+      "real-gate-fixtures/patches/saddle/shortcut.patch"
+    ]
+  },
+  "prompts": {
+    "canonical": {
+      "sha256": "810261e65780249259a3acd4fb28293aacd49dfafe853c83b26d9e2502401c49",
+      "text": "Implement saddlePoints(matrix) in src/index.js. matrix is an array of rows (arrays of\nnumbers). A saddle point is a cell that is the MAXIMUM in its row and the MINIMUM in its\ncolumn. Return an array of { row, col } objects with 1-BASED indices, in row-major order\n(row by row, left to right). An empty matrix returns []. There may be zero, one, or many\nsaddle points. Run node --test until all tests pass."
+    },
+    "perturbations": [
+      {
+        "approved": false,
+        "id": "equivalent-1",
+        "sha256": "8cafbb5151391c5e73076ee821da57642ffdfc886503106e8a30e6e945eb4ded",
+        "text": "Complete the following repository task. Preserve existing behavior and verify the tests.\n\nImplement saddlePoints(matrix) in src/index.js. matrix is an array of rows (arrays of\nnumbers). A saddle point is a cell that is the MAXIMUM in its row and the MINIMUM in its\ncolumn. Return an array of { row, col } objects with 1-BASED indices, in row-major order\n(row by row, left to right). An empty matrix returns []. There may be zero, one, or many\nsaddle points. Run node --test until all tests pass."
+      },
+      {
+        "approved": false,
+        "id": "equivalent-2",
+        "sha256": "b8e4381207cae86f347543f4650d073dc55160a0a547e16d2a39afcac7f32ea6",
+        "text": "Repository change request:\nImplement saddlePoints(matrix) in src/index.js. matrix is an array of rows (arrays of\nnumbers). A saddle point is a cell that is the MAXIMUM in its row and the MINIMUM in its\ncolumn. Return an array of { row, col } objects with 1-BASED indices, in row-major order\n(row by row, left to right). An empty matrix returns []. There may be zero, one, or many\nsaddle points. Run node --test until all tests pass.\n\nUse the smallest correct change and confirm the test suite."
+      },
+      {
+        "approved": false,
+        "id": "equivalent-3",
+        "sha256": "e85883facf742831e98605a0f8713544c68e731717a8aa6d0ac1692147a3f7e1",
+        "text": "Please solve this task in the supplied checkout, retaining all stated edge cases:\n\nImplement saddlePoints(matrix) in src/index.js. matrix is an array of rows (arrays of\nnumbers). A saddle point is a cell that is the MAXIMUM in its row and the MINIMUM in its\ncolumn. Return an array of { row, col } objects with 1-BASED indices, in row-major order\n(row by row, left to right). An empty matrix returns []. There may be zero, one, or many\nsaddle points. Run node --test until all tests pass."
+      }
+    ],
+    "semantic_group": "saddle:2026-07.1"
+  },
+  "schema": "pi.fixture/v1",
+  "sufficiency": [
+    {
+      "assertion": "no saddle point",
+      "prompt_evidence": "Implement saddlePoints(matrix) in src/index.js. matrix is an array of rows (arrays of\nnumbers). A saddle point is a cell that is the MAXIMUM in its row and the MINIMUM in its\ncolumn. Return an array of { row, col } objects with 1-BASED indices, in row-major order\n(row by row, left to right). An empty matrix returns []. There may be zero, one, or many\nsaddle points. Run node --test until all tests pass."
+    },
+    {
+      "assertion": "empty matrix",
+      "prompt_evidence": "Implement saddlePoints(matrix) in src/index.js. matrix is an array of rows (arrays of\nnumbers). A saddle point is a cell that is the MAXIMUM in its row and the MINIMUM in its\ncolumn. Return an array of { row, col } objects with 1-BASED indices, in row-major order\n(row by row, left to right). An empty matrix returns []. There may be zero, one, or many\nsaddle points. Run node --test until all tests pass."
+    },
+    {
+      "assertion": "row-major single",
+      "prompt_evidence": "Implement saddlePoints(matrix) in src/index.js. matrix is an array of rows (arrays of\nnumbers). A saddle point is a cell that is the MAXIMUM in its row and the MINIMUM in its\ncolumn. Return an array of { row, col } objects with 1-BASED indices, in row-major order\n(row by row, left to right). An empty matrix returns []. There may be zero, one, or many\nsaddle points. Run node --test until all tests pass."
+    }
+  ],
+  "task_id": "saddle",
+  "tests": {
+    "fail_to_pass": {
+      "command": [
+        "node",
+        "--test",
+        "test/fail-to-pass.test.js"
+      ],
+      "overlays": [
+        {
+          "dest": "test/fail-to-pass.test.js",
+          "source": "real-gate-fixtures/hidden/saddle.test.js"
+        }
+      ],
+      "timeout_seconds": 60
+    },
+    "pass_to_pass": {
+      "command": [
+        "node",
+        "--test",
+        "test/pass-to-pass.test.mjs"
+      ],
+      "overlays": [
+        {
+          "dest": "test/pass-to-pass.test.mjs",
+          "source": "real-gate-fixtures/admission-tests/saddle-pass-to-pass.test.mjs"
+        }
+      ],
+      "timeout_seconds": 60
+    }
+  },
+  "timestamps": {
+    "admitted_at": null,
+    "created_at": "2026-07-14T00:00:00Z",
+    "expires_at": null
+  }
+}

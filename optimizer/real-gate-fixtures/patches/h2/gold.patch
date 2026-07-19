@@ -1,0 +1,39 @@
+--- a/src/index.js
++++ b/src/index.js
+@@ -49,22 +49,21 @@
+  * @returns {Array<Object>} Array of row objects
+  */
+ export function parseCSV(csv) {
+-  const lines = csv.trim().split('\n');
+-  if (lines.length === 0) return [];
+-
+-  const headers = splitCSVLine(lines[0]);
+-  const rows = [];
+-
+-  for (let i = 1; i < lines.length; i++) {
+-    const values = splitCSVLine(lines[i]);
+-    const row = {};
+-    headers.forEach((header, idx) => {
+-      row[header] = values[idx] || '';
+-    });
+-    rows.push(row);
++  const records = []; let row = [], field = '', quoted = false;
++  for (let i = 0; i < csv.length; i++) {
++    const c = csv[i];
++    if (quoted) {
++      if (c === '"' && csv[i + 1] === '"') { field += '"'; i++; }
++      else if (c === '"') quoted = false;
++      else field += c;
++    } else if (c === '"') quoted = true;
++    else if (c === ',') { row.push(field.trim()); field = ''; }
++    else if (c === '\n') { row.push(field.trim()); records.push(row); row = []; field = ''; }
++    else field += c;
+   }
+-
+-  return rows;
++  row.push(field.trim()); records.push(row);
++  const [headers, ...data] = records;
++  return data.filter((r) => r.some((v) => v !== '')).map((values) => Object.fromEntries(headers.map((key, i) => [key, values[i] || ''])));
+ }
+ 
+ /**

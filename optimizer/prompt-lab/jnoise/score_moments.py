@@ -11,10 +11,10 @@ Two stages, split so the ANALYSIS is testable offline without jlens installed:
   2. analyze — pure: CSV/JSONL of scored rows -> per-model ROC-AUC + threshold
                sweep + the pre-registered AUC>=0.70 verdict. No deps beyond stdlib.
 
-  # score/smoke need the jlens venv python + a running jlens-server:
-  #   ~/LLM/jlens-gguf/native/jlens-server -m MODEL.gguf   (port 8091)
-  ~/LLM/jlens-gguf/.venv/bin/python score_moments.py smoke   moments.jsonl --lens L.gguf
-  ~/LLM/jlens-gguf/.venv/bin/python score_moments.py score   moments.jsonl --model 4B --lens L.gguf -o scored.jsonl
+  # score/smoke need JLENS_ROOT, its venv python, and a running jlens-server:
+  #   $JLENS_ROOT/native/jlens-server -m MODEL.gguf   (port 8091)
+  $JLENS_ROOT/.venv/bin/python score_moments.py smoke moments.jsonl --lens L.gguf
+  $JLENS_ROOT/.venv/bin/python score_moments.py score moments.jsonl --model 4B --lens L.gguf -o scored.jsonl
   ./score_moments.py analyze scored.jsonl        # stdlib only
   ./score_moments.py --selftest                  # stdlib only
 
@@ -50,7 +50,7 @@ def topk_entropy(logits, k=TOPK):
 
 # ---- stage 1: jlens boundary (the ONLY part needing the installed tool) --------
 
-JLENS_ROOT = os.path.expanduser(os.environ.get("JLENS_ROOT", "~/LLM/jlens-gguf"))
+JLENS_ROOT = os.path.expanduser(os.environ.get("JLENS_ROOT", ""))
 TAG_IN_CALL_RE = None  # compiled lazily (re import kept local to stdlib-only analyze)
 
 
@@ -78,6 +78,8 @@ def make_model_ctx(lens_path, native_url="http://127.0.0.1:8091", late_frac=LATE
     """Connect to a running jlens-server (native/jlens-server -m MODEL.gguf) and
     load model readout weights + the fitted lens. Run under the jlens venv python
     (needs numpy/requests/gguf)."""
+    if not JLENS_ROOT:
+        raise SystemExit("JLENS_ROOT is required for smoke/score mode")
     sys.path.insert(0, JLENS_ROOT)
     from jlens_gguf.client import NativeClient
     from jlens_gguf.lens import JacobianLensGGUF

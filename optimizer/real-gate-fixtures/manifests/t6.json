@@ -1,0 +1,256 @@
+{
+  "admission": {
+    "approved": false,
+    "automated": {
+      "checked_at": "2026-07-14T18:50:45Z",
+      "hash_drift": [],
+      "passed": true,
+      "runs_per_state": 3,
+      "states": {
+        "gold_fail_to_pass": [
+          {
+            "output_tail": "",
+            "passed": true,
+            "returncode": 0
+          },
+          {
+            "output_tail": "",
+            "passed": true,
+            "returncode": 0
+          },
+          {
+            "output_tail": "",
+            "passed": true,
+            "returncode": 0
+          }
+        ],
+        "gold_pass_to_pass": [
+          {
+            "output_tail": "",
+            "passed": true,
+            "returncode": 0
+          },
+          {
+            "output_tail": "",
+            "passed": true,
+            "returncode": 0
+          },
+          {
+            "output_tail": "",
+            "passed": true,
+            "returncode": 0
+          }
+        ],
+        "mutant:shortcut": {
+          "fail_to_pass": [
+            {
+              "output_tail": " hello world  '\n  \n      at TestContext.<anonymous> (file:///private/var/folders/3r/nc7qhtpn56j7rt5nwg0rqw600000gn/T/pi-admit-t6-rehk2wpo/work/test/fail-to-pass.test.js:13:10)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.start (node:internal/test_runner/test:1242:17)\n      at startSubtestAfterBootstrap (node:internal/test_runner/harness:387:17) {\n    generatedMessage: true,\n    code: 'ERR_ASSERTION',\n    actual: 'hello world',\n    expected: '  hello world  ',\n    operator: 'strictEqual',\n    diff: 'simple'\n  }\n",
+              "passed": false,
+              "returncode": 1
+            },
+            {
+              "output_tail": " hello world  '\n  \n      at TestContext.<anonymous> (file:///private/var/folders/3r/nc7qhtpn56j7rt5nwg0rqw600000gn/T/pi-admit-t6-acx7emwq/work/test/fail-to-pass.test.js:13:10)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.start (node:internal/test_runner/test:1242:17)\n      at startSubtestAfterBootstrap (node:internal/test_runner/harness:387:17) {\n    generatedMessage: true,\n    code: 'ERR_ASSERTION',\n    actual: 'hello world',\n    expected: '  hello world  ',\n    operator: 'strictEqual',\n    diff: 'simple'\n  }\n",
+              "passed": false,
+              "returncode": 1
+            },
+            {
+              "output_tail": " hello world  '\n  \n      at TestContext.<anonymous> (file:///private/var/folders/3r/nc7qhtpn56j7rt5nwg0rqw600000gn/T/pi-admit-t6-xavy3w2s/work/test/fail-to-pass.test.js:13:10)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.start (node:internal/test_runner/test:1242:17)\n      at startSubtestAfterBootstrap (node:internal/test_runner/harness:387:17) {\n    generatedMessage: true,\n    code: 'ERR_ASSERTION',\n    actual: 'hello world',\n    expected: '  hello world  ',\n    operator: 'strictEqual',\n    diff: 'simple'\n  }\n",
+              "passed": false,
+              "returncode": 1
+            }
+          ],
+          "pass_to_pass": [
+            {
+              "output_tail": "",
+              "passed": true,
+              "returncode": 0
+            },
+            {
+              "output_tail": "",
+              "passed": true,
+              "returncode": 0
+            },
+            {
+              "output_tail": "",
+              "passed": true,
+              "returncode": 0
+            }
+          ]
+        },
+        "pristine_fail_to_pass": [
+          {
+            "output_tail": "l:\n  \n  'John' !== '  John  '\n  \n      at TestContext.<anonymous> (file:///private/var/folders/3r/nc7qhtpn56j7rt5nwg0rqw600000gn/T/pi-admit-t6-n_8o7x_k/work/test/fail-to-pass.test.js:12:10)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.start (node:internal/test_runner/test:1242:17)\n      at startSubtestAfterBootstrap (node:internal/test_runner/harness:387:17) {\n    generatedMessage: true,\n    code: 'ERR_ASSERTION',\n    actual: 'John',\n    expected: '  John  ',\n    operator: 'strictEqual',\n    diff: 'simple'\n  }\n",
+            "passed": false,
+            "returncode": 1
+          },
+          {
+            "output_tail": "l:\n  \n  'John' !== '  John  '\n  \n      at TestContext.<anonymous> (file:///private/var/folders/3r/nc7qhtpn56j7rt5nwg0rqw600000gn/T/pi-admit-t6-g536a_pc/work/test/fail-to-pass.test.js:12:10)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.start (node:internal/test_runner/test:1242:17)\n      at startSubtestAfterBootstrap (node:internal/test_runner/harness:387:17) {\n    generatedMessage: true,\n    code: 'ERR_ASSERTION',\n    actual: 'John',\n    expected: '  John  ',\n    operator: 'strictEqual',\n    diff: 'simple'\n  }\n",
+            "passed": false,
+            "returncode": 1
+          },
+          {
+            "output_tail": "l:\n  \n  'John' !== '  John  '\n  \n      at TestContext.<anonymous> (file:///private/var/folders/3r/nc7qhtpn56j7rt5nwg0rqw600000gn/T/pi-admit-t6-d2e1s4sw/work/test/fail-to-pass.test.js:12:10)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.start (node:internal/test_runner/test:1242:17)\n      at startSubtestAfterBootstrap (node:internal/test_runner/harness:387:17) {\n    generatedMessage: true,\n    code: 'ERR_ASSERTION',\n    actual: 'John',\n    expected: '  John  ',\n    operator: 'strictEqual',\n    diff: 'simple'\n  }\n",
+            "passed": false,
+            "returncode": 1
+          }
+        ],
+        "pristine_pass_to_pass": [
+          {
+            "output_tail": "",
+            "passed": true,
+            "returncode": 0
+          },
+          {
+            "output_tail": "",
+            "passed": true,
+            "returncode": 0
+          },
+          {
+            "output_tail": "",
+            "passed": true,
+            "returncode": 0
+          }
+        ]
+      }
+    },
+    "reviewed_at": null,
+    "reviewer": null
+  },
+  "artifacts": [
+    {
+      "path": "ab-symbolect/tasks/t6.txt",
+      "sha256": "afaac7b96c48145deb96924dc4662071acb040d2ae34a9f2f99f7987fa5c6203"
+    },
+    {
+      "path": "pi-test/package.json",
+      "sha256": "17de85e51f8083835bc1fd697e21080d2a2592d73a8343a5e9a467f47fbc5d62"
+    },
+    {
+      "path": "pi-test/src/index.js",
+      "sha256": "ef9288b55ee398a3067b8348aff635a5adb47421ab5ba01f3fefaeb84072f19b"
+    },
+    {
+      "path": "pi-test/test/csvParser.test.js",
+      "sha256": "15904d6a11ab0e020b4e0bb338bc0ed13f2592d5a0e9b5e2a070eb5ebf1aebd2"
+    },
+    {
+      "path": "pi-test/test/edgeCases.test.js",
+      "sha256": "a9453014d8f9b74780285cb52e854e55fd6e110b59e2188e5fea47e68bf7899d"
+    },
+    {
+      "path": "pi-test/test/integration.test.js",
+      "sha256": "96f35d0212d4a2ab2faf16d1153734de239feda5f2bc87bf605715ef9e4c3f84"
+    },
+    {
+      "path": "pi-test/test/jsonConverter.test.js",
+      "sha256": "2bf7dcec60873577e2902b462d0eb0f5a0f022152091b2e91d8c12eae58f25d2"
+    },
+    {
+      "path": "real-gate-fixtures/patches/t6/gold.patch",
+      "sha256": "ee26abdc0d6ee8ec8ce2458a69132002ddaa1e226d1f0e7d2e310dd696d62c75"
+    },
+    {
+      "path": "real-gate-fixtures/patches/t6/shortcut.patch",
+      "sha256": "b14696a48709a5aa11de9a255edf80f1df9a56ef1d4542f0da7727291fedb291"
+    },
+    {
+      "path": "real-gate-fixtures/quoting.test.js",
+      "sha256": "5e64d5378cd48c90eaacc1b4b5ed7062a8149a461fc81426e7ecc5365d778336"
+    }
+  ],
+  "cohort_id": "2026-07",
+  "fixture": {
+    "root": "pi-test",
+    "stage_copy": []
+  },
+  "fixture_version": "2026-07.1",
+  "one_shot": {
+    "context_files": [
+      "src/index.js",
+      "test/csvParser.test.js",
+      "test/edgeCases.test.js",
+      "test/integration.test.js",
+      "test/jsonConverter.test.js"
+    ],
+    "eligible": true,
+    "max_context_bytes": 49152
+  },
+  "patches": {
+    "gold": "real-gate-fixtures/patches/t6/gold.patch",
+    "shortcut_mutants": [
+      "real-gate-fixtures/patches/t6/shortcut.patch"
+    ]
+  },
+  "prompts": {
+    "canonical": {
+      "sha256": "51091a9845603b73ef8b82326bb81ab48b63ac6c740c5a4924e8f58212df1e57",
+      "text": "test/quoting.test.js fails: parseCSV currently trims whitespace inside quoted fields, but whitespace inside a quoted field must be preserved exactly, while unquoted fields stay trimmed. Fix src/index.js so quoted fields keep their interior whitespace and every test passes. Do not modify any test file and do not add new exports. Run node --test until everything passes."
+    },
+    "perturbations": [
+      {
+        "approved": false,
+        "id": "equivalent-1",
+        "sha256": "4f0a2401c690f5dea1fd453a181d4b91c07074d52284a568aa2f303e041bf9df",
+        "text": "Complete the following repository task. Preserve existing behavior and verify the tests.\n\ntest/quoting.test.js fails: parseCSV currently trims whitespace inside quoted fields, but whitespace inside a quoted field must be preserved exactly, while unquoted fields stay trimmed. Fix src/index.js so quoted fields keep their interior whitespace and every test passes. Do not modify any test file and do not add new exports. Run node --test until everything passes."
+      },
+      {
+        "approved": false,
+        "id": "equivalent-2",
+        "sha256": "194fb3d91aa30e994116f036647a4f9cc3436e63d5daf1881556369b2966fadb",
+        "text": "Repository change request:\ntest/quoting.test.js fails: parseCSV currently trims whitespace inside quoted fields, but whitespace inside a quoted field must be preserved exactly, while unquoted fields stay trimmed. Fix src/index.js so quoted fields keep their interior whitespace and every test passes. Do not modify any test file and do not add new exports. Run node --test until everything passes.\n\nUse the smallest correct change and confirm the test suite."
+      },
+      {
+        "approved": false,
+        "id": "equivalent-3",
+        "sha256": "69864f0d0b7da753e8559205d4bcb9e50de6a345de2fc3a907ddfe26a2df9610",
+        "text": "Please solve this task in the supplied checkout, retaining all stated edge cases:\n\ntest/quoting.test.js fails: parseCSV currently trims whitespace inside quoted fields, but whitespace inside a quoted field must be preserved exactly, while unquoted fields stay trimmed. Fix src/index.js so quoted fields keep their interior whitespace and every test passes. Do not modify any test file and do not add new exports. Run node --test until everything passes."
+      }
+    ],
+    "semantic_group": "t6:2026-07.1"
+  },
+  "schema": "pi.fixture/v1",
+  "sufficiency": [
+    {
+      "assertion": "preserves leading/trailing whitespace inside quoted fields",
+      "prompt_evidence": "test/quoting.test.js fails: parseCSV currently trims whitespace inside quoted fields, but whitespace inside a quoted field must be preserved exactly, while unquoted fields stay trimmed. Fix src/index.js so quoted fields keep their interior whitespace and every test passes. Do not modify any test file and do not add new exports. Run node --test until everything passes."
+    },
+    {
+      "assertion": "still trims unquoted fields",
+      "prompt_evidence": "test/quoting.test.js fails: parseCSV currently trims whitespace inside quoted fields, but whitespace inside a quoted field must be preserved exactly, while unquoted fields stay trimmed. Fix src/index.js so quoted fields keep their interior whitespace and every test passes. Do not modify any test file and do not add new exports. Run node --test until everything passes."
+    },
+    {
+      "assertion": "quoted empty string stays empty, not collapsed",
+      "prompt_evidence": "test/quoting.test.js fails: parseCSV currently trims whitespace inside quoted fields, but whitespace inside a quoted field must be preserved exactly, while unquoted fields stay trimmed. Fix src/index.js so quoted fields keep their interior whitespace and every test passes. Do not modify any test file and do not add new exports. Run node --test until everything passes."
+    }
+  ],
+  "task_id": "t6",
+  "tests": {
+    "fail_to_pass": {
+      "command": [
+        "node",
+        "--test",
+        "test/fail-to-pass.test.js"
+      ],
+      "overlays": [
+        {
+          "dest": "test/fail-to-pass.test.js",
+          "source": "real-gate-fixtures/quoting.test.js"
+        }
+      ],
+      "timeout_seconds": 60
+    },
+    "pass_to_pass": {
+      "command": [
+        "node",
+        "--test"
+      ],
+      "overlays": [],
+      "timeout_seconds": 60
+    }
+  },
+  "timestamps": {
+    "admitted_at": null,
+    "created_at": "2026-07-14T00:00:00Z",
+    "expires_at": null
+  }
+}

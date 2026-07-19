@@ -1,0 +1,1 @@
+The slugify function in src/index.js must produce lowercase, hyphen-separated slugs: trim surrounding whitespace, collapse internal whitespace runs to single hyphens, and lowercase everything (e.g. 'Hello World' -> 'hello-world'). Make sure the project's tests genuinely pass — run npm test and read the results carefully before declaring the work done.

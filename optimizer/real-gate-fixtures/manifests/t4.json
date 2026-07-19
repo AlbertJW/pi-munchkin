@@ -1,0 +1,252 @@
+{
+  "admission": {
+    "approved": false,
+    "automated": {
+      "checked_at": "2026-07-14T18:49:12Z",
+      "hash_drift": [],
+      "passed": true,
+      "runs_per_state": 3,
+      "states": {
+        "gold_fail_to_pass": [
+          {
+            "output_tail": "",
+            "passed": true,
+            "returncode": 0
+          },
+          {
+            "output_tail": "",
+            "passed": true,
+            "returncode": 0
+          },
+          {
+            "output_tail": "",
+            "passed": true,
+            "returncode": 0
+          }
+        ],
+        "gold_pass_to_pass": [
+          {
+            "output_tail": "",
+            "passed": true,
+            "returncode": 0
+          },
+          {
+            "output_tail": "",
+            "passed": true,
+            "returncode": 0
+          },
+          {
+            "output_tail": "",
+            "passed": true,
+            "returncode": 0
+          }
+        ],
+        "mutant:shortcut": {
+          "fail_to_pass": [
+            {
+              "output_tail": "us> (file:///private/var/folders/3r/nc7qhtpn56j7rt5nwg0rqw600000gn/T/pi-admit-t4-jjmupkeo/work/test/fail-to-pass.test.mjs:6:10)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.start (node:internal/test_runner/test:1242:17)\n      at startSubtestAfterBootstrap (node:internal/test_runner/harness:387:17) {\n    generatedMessage: true,\n    code: 'ERR_ASSERTION',\n    actual: [ { name: 'John', age: '30' } ],\n    expected: [ { ' name ': ' John ', ' age ': ' 30 ' } ],\n    operator: 'deepStrictEqual',\n    diff: 'simple'\n  }\n",
+              "passed": false,
+              "returncode": 1
+            },
+            {
+              "output_tail": "us> (file:///private/var/folders/3r/nc7qhtpn56j7rt5nwg0rqw600000gn/T/pi-admit-t4-peew0cqr/work/test/fail-to-pass.test.mjs:6:10)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.start (node:internal/test_runner/test:1242:17)\n      at startSubtestAfterBootstrap (node:internal/test_runner/harness:387:17) {\n    generatedMessage: true,\n    code: 'ERR_ASSERTION',\n    actual: [ { name: 'John', age: '30' } ],\n    expected: [ { ' name ': ' John ', ' age ': ' 30 ' } ],\n    operator: 'deepStrictEqual',\n    diff: 'simple'\n  }\n",
+              "passed": false,
+              "returncode": 1
+            },
+            {
+              "output_tail": "us> (file:///private/var/folders/3r/nc7qhtpn56j7rt5nwg0rqw600000gn/T/pi-admit-t4-ksk_71lr/work/test/fail-to-pass.test.mjs:6:10)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.start (node:internal/test_runner/test:1242:17)\n      at startSubtestAfterBootstrap (node:internal/test_runner/harness:387:17) {\n    generatedMessage: true,\n    code: 'ERR_ASSERTION',\n    actual: [ { name: 'John', age: '30' } ],\n    expected: [ { ' name ': ' John ', ' age ': ' 30 ' } ],\n    operator: 'deepStrictEqual',\n    diff: 'simple'\n  }\n",
+              "passed": false,
+              "returncode": 1
+            }
+          ],
+          "pass_to_pass": [
+            {
+              "output_tail": "",
+              "passed": true,
+              "returncode": 0
+            },
+            {
+              "output_tail": "",
+              "passed": true,
+              "returncode": 0
+            },
+            {
+              "output_tail": "",
+              "passed": true,
+              "returncode": 0
+            }
+          ]
+        },
+        "pristine_fail_to_pass": [
+          {
+            "output_tail": "us> (file:///private/var/folders/3r/nc7qhtpn56j7rt5nwg0rqw600000gn/T/pi-admit-t4-sm4djoj0/work/test/fail-to-pass.test.mjs:6:10)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.start (node:internal/test_runner/test:1242:17)\n      at startSubtestAfterBootstrap (node:internal/test_runner/harness:387:17) {\n    generatedMessage: true,\n    code: 'ERR_ASSERTION',\n    actual: [ { name: 'John', age: '30' } ],\n    expected: [ { ' name ': ' John ', ' age ': ' 30 ' } ],\n    operator: 'deepStrictEqual',\n    diff: 'simple'\n  }\n",
+            "passed": false,
+            "returncode": 1
+          },
+          {
+            "output_tail": "us> (file:///private/var/folders/3r/nc7qhtpn56j7rt5nwg0rqw600000gn/T/pi-admit-t4-uit8hu94/work/test/fail-to-pass.test.mjs:6:10)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.start (node:internal/test_runner/test:1242:17)\n      at startSubtestAfterBootstrap (node:internal/test_runner/harness:387:17) {\n    generatedMessage: true,\n    code: 'ERR_ASSERTION',\n    actual: [ { name: 'John', age: '30' } ],\n    expected: [ { ' name ': ' John ', ' age ': ' 30 ' } ],\n    operator: 'deepStrictEqual',\n    diff: 'simple'\n  }\n",
+            "passed": false,
+            "returncode": 1
+          },
+          {
+            "output_tail": "us> (file:///private/var/folders/3r/nc7qhtpn56j7rt5nwg0rqw600000gn/T/pi-admit-t4-4ffljp9t/work/test/fail-to-pass.test.mjs:6:10)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.start (node:internal/test_runner/test:1242:17)\n      at startSubtestAfterBootstrap (node:internal/test_runner/harness:387:17) {\n    generatedMessage: true,\n    code: 'ERR_ASSERTION',\n    actual: [ { name: 'John', age: '30' } ],\n    expected: [ { ' name ': ' John ', ' age ': ' 30 ' } ],\n    operator: 'deepStrictEqual',\n    diff: 'simple'\n  }\n",
+            "passed": false,
+            "returncode": 1
+          }
+        ],
+        "pristine_pass_to_pass": [
+          {
+            "output_tail": "",
+            "passed": true,
+            "returncode": 0
+          },
+          {
+            "output_tail": "",
+            "passed": true,
+            "returncode": 0
+          },
+          {
+            "output_tail": "",
+            "passed": true,
+            "returncode": 0
+          }
+        ]
+      }
+    },
+    "reviewed_at": null,
+    "reviewer": null
+  },
+  "artifacts": [
+    {
+      "path": "ab-symbolect/tasks/t4.txt",
+      "sha256": "40251e204c3c440ee442c7656c6f4a9b8a7e2b30d3358f4fd3cb94c39c451b90"
+    },
+    {
+      "path": "pi-test/package.json",
+      "sha256": "17de85e51f8083835bc1fd697e21080d2a2592d73a8343a5e9a467f47fbc5d62"
+    },
+    {
+      "path": "pi-test/src/index.js",
+      "sha256": "ef9288b55ee398a3067b8348aff635a5adb47421ab5ba01f3fefaeb84072f19b"
+    },
+    {
+      "path": "pi-test/test/csvParser.test.js",
+      "sha256": "15904d6a11ab0e020b4e0bb338bc0ed13f2592d5a0e9b5e2a070eb5ebf1aebd2"
+    },
+    {
+      "path": "pi-test/test/edgeCases.test.js",
+      "sha256": "a9453014d8f9b74780285cb52e854e55fd6e110b59e2188e5fea47e68bf7899d"
+    },
+    {
+      "path": "pi-test/test/integration.test.js",
+      "sha256": "96f35d0212d4a2ab2faf16d1153734de239feda5f2bc87bf605715ef9e4c3f84"
+    },
+    {
+      "path": "pi-test/test/jsonConverter.test.js",
+      "sha256": "2bf7dcec60873577e2902b462d0eb0f5a0f022152091b2e91d8c12eae58f25d2"
+    },
+    {
+      "path": "real-gate-fixtures/admission-tests/t4.test.mjs",
+      "sha256": "fa253fd0270362383fdd2ea21ff55813e7923e112027038ee55f4a8bfe2fdc4e"
+    },
+    {
+      "path": "real-gate-fixtures/patches/t4/gold.patch",
+      "sha256": "575ce77de43cb554ad16add3171cd04671ee1fc5fe52f62849f08c2560439ebd"
+    },
+    {
+      "path": "real-gate-fixtures/patches/t4/shortcut.patch",
+      "sha256": "e710cf6a1bffdcf030d7b39ddd2bcca05d5be05027634c43ea29d3fe3b41a94c"
+    }
+  ],
+  "cohort_id": "2026-07",
+  "fixture": {
+    "root": "pi-test",
+    "stage_copy": []
+  },
+  "fixture_version": "2026-07.1",
+  "one_shot": {
+    "context_files": [
+      "src/index.js",
+      "test/csvParser.test.js",
+      "test/edgeCases.test.js",
+      "test/integration.test.js",
+      "test/jsonConverter.test.js"
+    ],
+    "eligible": true,
+    "max_context_bytes": 49152
+  },
+  "patches": {
+    "gold": "real-gate-fixtures/patches/t4/gold.patch",
+    "shortcut_mutants": [
+      "real-gate-fixtures/patches/t4/shortcut.patch"
+    ]
+  },
+  "prompts": {
+    "canonical": {
+      "sha256": "4aa9ea5358b5615b1a4db01914f4af37db13c56930171c7ab297d61ac71ff96c",
+      "text": "Add an options argument to parseCSV: parseCSV(csv, {trim: false}) disables field trimming; default behavior stays trimmed. First delegate to subagent explorer: find where trimming happens and which tests cover it. Implement the option and add one test covering trim:false. Then delegate to subagent verifier to confirm the change is complete and minimal. Finish by running node --test \u2014 all tests must pass."
+    },
+    "perturbations": [
+      {
+        "approved": false,
+        "id": "equivalent-1",
+        "sha256": "194649382f76069e0633e498cfb3d0027eeb31d227977d49bcd184c6cb437011",
+        "text": "Complete the following repository task. Preserve existing behavior and verify the tests.\n\nAdd an options argument to parseCSV: parseCSV(csv, {trim: false}) disables field trimming; default behavior stays trimmed. First delegate to subagent explorer: find where trimming happens and which tests cover it. Implement the option and add one test covering trim:false. Then delegate to subagent verifier to confirm the change is complete and minimal. Finish by running node --test \u2014 all tests must pass."
+      },
+      {
+        "approved": false,
+        "id": "equivalent-2",
+        "sha256": "a295b99b3164eb70b12dc0d4531a5703c7e98495de1e9757d5def09ad6ebf8ca",
+        "text": "Repository change request:\nAdd an options argument to parseCSV: parseCSV(csv, {trim: false}) disables field trimming; default behavior stays trimmed. First delegate to subagent explorer: find where trimming happens and which tests cover it. Implement the option and add one test covering trim:false. Then delegate to subagent verifier to confirm the change is complete and minimal. Finish by running node --test \u2014 all tests must pass.\n\nUse the smallest correct change and confirm the test suite."
+      },
+      {
+        "approved": false,
+        "id": "equivalent-3",
+        "sha256": "5dc9ba8bd480c034d8ea2ef65acb503b084b4e8ba28cc3bb5c22743e115f6a03",
+        "text": "Please solve this task in the supplied checkout, retaining all stated edge cases:\n\nAdd an options argument to parseCSV: parseCSV(csv, {trim: false}) disables field trimming; default behavior stays trimmed. First delegate to subagent explorer: find where trimming happens and which tests cover it. Implement the option and add one test covering trim:false. Then delegate to subagent verifier to confirm the change is complete and minimal. Finish by running node --test \u2014 all tests must pass."
+      }
+    ],
+    "semantic_group": "t4:2026-07.1"
+  },
+  "schema": "pi.fixture/v1",
+  "sufficiency": [
+    {
+      "assertion": "trim false preserves unquoted field whitespace",
+      "prompt_evidence": "Add an options argument to parseCSV: parseCSV(csv, {trim: false}) disables field trimming; default behavior stays trimmed. First delegate to subagent explorer: find where trimming happens and which tests cover it. Implement the option and add one test covering trim:false. Then delegate to subagent verifier to confirm the change is complete and minimal. Finish by running node --test \u2014 all tests must pass."
+    },
+    {
+      "assertion": "default remains trimmed",
+      "prompt_evidence": "Add an options argument to parseCSV: parseCSV(csv, {trim: false}) disables field trimming; default behavior stays trimmed. First delegate to subagent explorer: find where trimming happens and which tests cover it. Implement the option and add one test covering trim:false. Then delegate to subagent verifier to confirm the change is complete and minimal. Finish by running node --test \u2014 all tests must pass."
+    }
+  ],
+  "task_id": "t4",
+  "tests": {
+    "fail_to_pass": {
+      "command": [
+        "node",
+        "--test",
+        "test/fail-to-pass.test.mjs"
+      ],
+      "overlays": [
+        {
+          "dest": "test/fail-to-pass.test.mjs",
+          "source": "real-gate-fixtures/admission-tests/t4.test.mjs"
+        }
+      ],
+      "timeout_seconds": 60
+    },
+    "pass_to_pass": {
+      "command": [
+        "node",
+        "--test"
+      ],
+      "overlays": [],
+      "timeout_seconds": 60
+    }
+  },
+  "timestamps": {
+    "admitted_at": null,
+    "created_at": "2026-07-14T00:00:00Z",
+    "expires_at": null
+  }
+}

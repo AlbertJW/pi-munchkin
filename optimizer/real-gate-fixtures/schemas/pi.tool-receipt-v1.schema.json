@@ -1,0 +1,17 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "pi.tool-receipt/v1",
+  "type": "object",
+  "required": ["schema", "operation", "requested_file", "normalized_file", "sha256", "size_bytes", "bytes_examined", "total_lines_scanned", "matches", "shown_matches", "complete"],
+  "properties": {
+    "schema": {"const": "pi.tool-receipt/v1"},
+    "operation": {"const": "search_spans"},
+    "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "size_bytes": {"type": "integer", "minimum": 0},
+    "bytes_examined": {"type": "integer", "minimum": 0},
+    "total_lines_scanned": {"type": "integer", "minimum": 0},
+    "matches": {"type": "integer", "minimum": 0},
+    "shown_matches": {"type": "integer", "minimum": 0},
+    "complete": {"type": "boolean"}
+  }
+}

@@ -1,0 +1,20 @@
+--- a/src/align.js
++++ b/src/align.js
+@@ -11,7 +11,7 @@
+ 	if (s.length >= width) {	
+ 		return s;
+ 	}
+-	return s + ' '.repeat(width - s.length);
++	return ' '.repeat(width - s.length) + s;
+ }
+ 
+ export function center(s, width) {
+@@ -19,7 +19,7 @@
+ 		return s;
+ 	}
+ 	const extra = width - s.length;
+-	const left = Math.ceil(extra / 2);
++	const left = Math.floor(extra / 2);
+ 	const right = extra - left;
+ 	return ' '.repeat(left) + s + ' '.repeat(right);
+ }

@@ -1,0 +1,251 @@
+{
+  "admission": {
+    "approved": false,
+    "automated": {
+      "checked_at": "2026-07-14T18:48:45Z",
+      "hash_drift": [],
+      "passed": true,
+      "runs_per_state": 3,
+      "states": {
+        "gold_fail_to_pass": [
+          {
+            "output_tail": "",
+            "passed": true,
+            "returncode": 0
+          },
+          {
+            "output_tail": "",
+            "passed": true,
+            "returncode": 0
+          },
+          {
+            "output_tail": "",
+            "passed": true,
+            "returncode": 0
+          }
+        ],
+        "gold_pass_to_pass": [
+          {
+            "output_tail": "",
+            "passed": true,
+            "returncode": 0
+          },
+          {
+            "output_tail": "",
+            "passed": true,
+            "returncode": 0
+          },
+          {
+            "output_tail": "",
+            "passed": true,
+            "returncode": 0
+          }
+        ],
+        "mutant:shortcut": {
+          "fail_to_pass": [
+            {
+              "output_tail": "n/T/pi-admit-h3-gf2r5otd/work/test/fail-to-pass.test.js:16:10)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n      at Test.postRun (node:internal/test_runner/test:1522:19)\n      at Test.run (node:internal/test_runner/test:1447:12)\n      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7) {\n    generatedMessage: true,\n    code: 'ERR_ASSERTION',\n    actual: 2,\n    expected: 1,\n    operator: 'strictEqual',\n    diff: 'simple'\n  }\n",
+              "passed": false,
+              "returncode": 1
+            },
+            {
+              "output_tail": "n/T/pi-admit-h3-49_h8z94/work/test/fail-to-pass.test.js:16:10)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n      at Test.postRun (node:internal/test_runner/test:1522:19)\n      at Test.run (node:internal/test_runner/test:1447:12)\n      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7) {\n    generatedMessage: true,\n    code: 'ERR_ASSERTION',\n    actual: 2,\n    expected: 1,\n    operator: 'strictEqual',\n    diff: 'simple'\n  }\n",
+              "passed": false,
+              "returncode": 1
+            },
+            {
+              "output_tail": "n/T/pi-admit-h3-_z54lu20/work/test/fail-to-pass.test.js:16:10)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n      at Test.postRun (node:internal/test_runner/test:1522:19)\n      at Test.run (node:internal/test_runner/test:1447:12)\n      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7) {\n    generatedMessage: true,\n    code: 'ERR_ASSERTION',\n    actual: 2,\n    expected: 1,\n    operator: 'strictEqual',\n    diff: 'simple'\n  }\n",
+              "passed": false,
+              "returncode": 1
+            }
+          ],
+          "pass_to_pass": [
+            {
+              "output_tail": "",
+              "passed": true,
+              "returncode": 0
+            },
+            {
+              "output_tail": "",
+              "passed": true,
+              "returncode": 0
+            },
+            {
+              "output_tail": "",
+              "passed": true,
+              "returncode": 0
+            }
+          ]
+        },
+        "pristine_fail_to_pass": [
+          {
+            "output_tail": "n/T/pi-admit-h3-y_t0vf6q/work/test/fail-to-pass.test.js:16:10)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n      at Test.postRun (node:internal/test_runner/test:1522:19)\n      at Test.run (node:internal/test_runner/test:1447:12)\n      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7) {\n    generatedMessage: true,\n    code: 'ERR_ASSERTION',\n    actual: 2,\n    expected: 1,\n    operator: 'strictEqual',\n    diff: 'simple'\n  }\n",
+            "passed": false,
+            "returncode": 1
+          },
+          {
+            "output_tail": "n/T/pi-admit-h3-wf4lsh2m/work/test/fail-to-pass.test.js:16:10)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n      at Test.postRun (node:internal/test_runner/test:1522:19)\n      at Test.run (node:internal/test_runner/test:1447:12)\n      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7) {\n    generatedMessage: true,\n    code: 'ERR_ASSERTION',\n    actual: 2,\n    expected: 1,\n    operator: 'strictEqual',\n    diff: 'simple'\n  }\n",
+            "passed": false,
+            "returncode": 1
+          },
+          {
+            "output_tail": "n/T/pi-admit-h3-k6ahxwyh/work/test/fail-to-pass.test.js:16:10)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n      at Test.postRun (node:internal/test_runner/test:1522:19)\n      at Test.run (node:internal/test_runner/test:1447:12)\n      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7) {\n    generatedMessage: true,\n    code: 'ERR_ASSERTION',\n    actual: 2,\n    expected: 1,\n    operator: 'strictEqual',\n    diff: 'simple'\n  }\n",
+            "passed": false,
+            "returncode": 1
+          }
+        ],
+        "pristine_pass_to_pass": [
+          {
+            "output_tail": "",
+            "passed": true,
+            "returncode": 0
+          },
+          {
+            "output_tail": "",
+            "passed": true,
+            "returncode": 0
+          },
+          {
+            "output_tail": "",
+            "passed": true,
+            "returncode": 0
+          }
+        ]
+      }
+    },
+    "reviewed_at": null,
+    "reviewer": null
+  },
+  "artifacts": [
+    {
+      "path": "ab-symbolect/tasks/h3.txt",
+      "sha256": "991aa3c0f155eb4b281ef974f8435838a3f36ee31984f552b637ab1d08637c64"
+    },
+    {
+      "path": "real-gate-fixtures/hard-bracket/package.json",
+      "sha256": "78425304c1840150b05ce076fef6195103047833f661be6134c34a1c4301273d"
+    },
+    {
+      "path": "real-gate-fixtures/hard-bracket/src/balance.js",
+      "sha256": "599bc119edd822b9cc91fe1e6faf12164c1184417198f4a2fdca556bac4510ee"
+    },
+    {
+      "path": "real-gate-fixtures/hard-bracket/src/depth.js",
+      "sha256": "38bc0d4c07ad02d37ddd9e7683828d92776ab55981030b9d7b1b629311e0ffb2"
+    },
+    {
+      "path": "real-gate-fixtures/hard-bracket/src/index.js",
+      "sha256": "ca270daba4a0d36c4a0d60f4db3c769af64e05a368f6b922b8d0963229ca910f"
+    },
+    {
+      "path": "real-gate-fixtures/hard-bracket/test/analyze.test.js",
+      "sha256": "cf3b2e5b9dc0373c34399e78241c617b605b075bfb204cee26021210846d7475"
+    },
+    {
+      "path": "real-gate-fixtures/hidden/h3.test.js",
+      "sha256": "69575966fd9052ae275ac1c01d0ebb7548a55d86206d87938adbd7b6eb3f64ee"
+    },
+    {
+      "path": "real-gate-fixtures/patches/h3/gold.patch",
+      "sha256": "b3a688e2429a1266bd6030deb1a5024fbf9959da3d860f6a683d8b3418bc1bd7"
+    },
+    {
+      "path": "real-gate-fixtures/patches/h3/shortcut.patch",
+      "sha256": "dbcd88c22f447941242d4f95c4df388d752608afd4f845bb4dc6ee51006598b7"
+    }
+  ],
+  "cohort_id": "2026-07",
+  "fixture": {
+    "root": "real-gate-fixtures/hard-bracket",
+    "stage_copy": []
+  },
+  "fixture_version": "2026-07.1",
+  "one_shot": {
+    "context_files": [
+      "src/balance.js",
+      "src/depth.js",
+      "src/index.js",
+      "test/analyze.test.js"
+    ],
+    "eligible": true,
+    "max_context_bytes": 49152
+  },
+  "patches": {
+    "gold": "real-gate-fixtures/patches/h3/gold.patch",
+    "shortcut_mutants": [
+      "real-gate-fixtures/patches/h3/shortcut.patch"
+    ]
+  },
+  "prompts": {
+    "canonical": {
+      "sha256": "08f7e288a2a9a958927db60f5dc0fca3f19422ee5aa2c587de189db111863807",
+      "text": "Bug: analyze(s) in src/index.js reports the wrong maxDepth (maximum bracket nesting depth) for nested input \u2014 it overstates the depth. For '[]' maxDepth should be 1, for '[[]]' it should be 2, and for '[][]' it should be 1. Balanced detection is correct and must stay correct. Explore the codebase, find the cause, and fix it so maxDepth is correct for any input without breaking existing tests. Run node --test until all tests pass."
+    },
+    "perturbations": [
+      {
+        "approved": false,
+        "id": "equivalent-1",
+        "sha256": "5f2ca37f28060704047087ac200cca994f1dd92ef07e8bb044c2aaa11fa439e7",
+        "text": "Complete the following repository task. Preserve existing behavior and verify the tests.\n\nBug: analyze(s) in src/index.js reports the wrong maxDepth (maximum bracket nesting depth) for nested input \u2014 it overstates the depth. For '[]' maxDepth should be 1, for '[[]]' it should be 2, and for '[][]' it should be 1. Balanced detection is correct and must stay correct. Explore the codebase, find the cause, and fix it so maxDepth is correct for any input without breaking existing tests. Run node --test until all tests pass."
+      },
+      {
+        "approved": false,
+        "id": "equivalent-2",
+        "sha256": "6f6d22fea902ca9b9f9463b4b0121d7e0c8272f346bd79b27ad702ba4db17443",
+        "text": "Repository change request:\nBug: analyze(s) in src/index.js reports the wrong maxDepth (maximum bracket nesting depth) for nested input \u2014 it overstates the depth. For '[]' maxDepth should be 1, for '[[]]' it should be 2, and for '[][]' it should be 1. Balanced detection is correct and must stay correct. Explore the codebase, find the cause, and fix it so maxDepth is correct for any input without breaking existing tests. Run node --test until all tests pass.\n\nUse the smallest correct change and confirm the test suite."
+      },
+      {
+        "approved": false,
+        "id": "equivalent-3",
+        "sha256": "7fdb9f6984feebb652006bce7cc418da2aaa1a06ea7711b46a7180558489c728",
+        "text": "Please solve this task in the supplied checkout, retaining all stated edge cases:\n\nBug: analyze(s) in src/index.js reports the wrong maxDepth (maximum bracket nesting depth) for nested input \u2014 it overstates the depth. For '[]' maxDepth should be 1, for '[[]]' it should be 2, and for '[][]' it should be 1. Balanced detection is correct and must stay correct. Explore the codebase, find the cause, and fix it so maxDepth is correct for any input without breaking existing tests. Run node --test until all tests pass."
+      }
+    ],
+    "semantic_group": "h3:2026-07.1"
+  },
+  "schema": "pi.fixture/v1",
+  "sufficiency": [
+    {
+      "assertion": "h3: maxDepth of a flat pair is 1",
+      "prompt_evidence": "Bug: analyze(s) in src/index.js reports the wrong maxDepth (maximum bracket nesting depth) for nested input \u2014 it overstates the depth. For '[]' maxDepth should be 1, for '[[]]' it should be 2, and for '[][]' it should be 1. Balanced detection is correct and must stay correct. Explore the codebase, find the cause, and fix it so maxDepth is correct for any input without breaking existing tests. Run node --test until all tests pass."
+    },
+    {
+      "assertion": "h3: maxDepth of nested pairs",
+      "prompt_evidence": "Bug: analyze(s) in src/index.js reports the wrong maxDepth (maximum bracket nesting depth) for nested input \u2014 it overstates the depth. For '[]' maxDepth should be 1, for '[[]]' it should be 2, and for '[][]' it should be 1. Balanced detection is correct and must stay correct. Explore the codebase, find the cause, and fix it so maxDepth is correct for any input without breaking existing tests. Run node --test until all tests pass."
+    },
+    {
+      "assertion": "h3: siblings do not add depth",
+      "prompt_evidence": "Bug: analyze(s) in src/index.js reports the wrong maxDepth (maximum bracket nesting depth) for nested input \u2014 it overstates the depth. For '[]' maxDepth should be 1, for '[[]]' it should be 2, and for '[][]' it should be 1. Balanced detection is correct and must stay correct. Explore the codebase, find the cause, and fix it so maxDepth is correct for any input without breaking existing tests. Run node --test until all tests pass."
+    }
+  ],
+  "task_id": "h3",
+  "tests": {
+    "fail_to_pass": {
+      "command": [
+        "node",
+        "--test",
+        "test/fail-to-pass.test.js"
+      ],
+      "overlays": [
+        {
+          "dest": "test/fail-to-pass.test.js",
+          "source": "real-gate-fixtures/hidden/h3.test.js"
+        }
+      ],
+      "timeout_seconds": 60
+    },
+    "pass_to_pass": {
+      "command": [
+        "node",
+        "--test"
+      ],
+      "overlays": [],
+      "timeout_seconds": 60
+    }
+  },
+  "timestamps": {
+    "admitted_at": null,
+    "created_at": "2026-07-14T00:00:00Z",
+    "expires_at": null
+  }
+}
