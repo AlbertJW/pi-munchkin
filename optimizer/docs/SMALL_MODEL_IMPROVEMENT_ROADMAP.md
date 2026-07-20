@@ -14,7 +14,7 @@ A read-only scan of the live Pi history on 2026-07-19 found 1,709 sessions, 35,4
 
 Telemetry contained 1,124 verify-gate steers, 850 unverified endings, 651 outcome-loop steers, and only 51 micro-gate fires. These are mixed historical populations: they identify experiment targets but cannot justify a live policy change until provenance and per-session joins are complete.
 
-The live and published harnesses also differ in three matching extensions (`git-guard`, `ketch`, and `plan-runner`), while the live tree lacks the published shared gate/URL policy modules. Establish deployment parity before attributing an A/B result to the published harness.
+Live/repository extension and library parity was established on 2026-07-19. The repository-only `surface-walk.ts` is launcher support: the launcher computes the complete live surface before Pi starts, and the running `surface-receipt` extension corroborates it through authenticated telemetry. A row is blocked only when that signed receipt is absent or invalid.
 
 ## Research principles
 
@@ -39,13 +39,13 @@ Primary references:
 ### P0 — trust the measurement system
 
 1. **Deployment parity and safety contract**
-   - Hash the loaded live extensions and the packaged manifest at startup/health check.
-   - Remove the live YOLO instruction that says destructive work may proceed directly; autonomy can remove routine check-ins, never safety approval.
+   - Hash the loaded live extensions and the packaged manifest at startup/health check. **Implemented:** launcher hash plus authenticated in-process receipt.
+   - Autonomy can remove routine check-ins, never safety approval. **Implemented:** lean and YOLO share the same deletion, destructive Git, deploy, migration, restart, secrets, permission, and irreversible-effect boundary.
    - Acceptance: zero unexplained live/package hash drift and 100% approval behavior across destructive Git, deployment, restart, credential, and external-side-effect scenarios.
 
 2. **Telemetry provenance**
-   - Add harness version/hash, model/provider, run/session ID, config hash, and `interactive|gate|test` source.
-   - Tests must write only to a temporary telemetry file.
+   - Add harness version/hash, model/provider, run/session ID, config hash, and `interactive|gate|test` source. **Implemented in `pi.harness-event/v2`.**
+   - Tests must write only to a temporary telemetry file. **Implemented with live-file size/mtime/SHA invariance.**
    - Acceptance: the test suite changes live telemetry by zero bytes; every gate row has an exact event join.
 
 3. **Authoritative optimizer defaults**
@@ -64,15 +64,18 @@ Primary references:
    - Measure: pass rate, all-*k* reliability, overflow, compaction requester and compression ratio, rereads, returned characters, wall time, and lost-evidence failures.
    - Watcher requester/threshold telemetry is now captured per gate workdir and joined by the
      exact session key, including watcher-disabled native compactions and pre/post estimates.
-     The factorial remains blocked on an approved context-pressure fixture; `bigdata` is not
-     evidence for watcher behavior (historical bigdata span exposure was 0/181 sessions).
+     The approved, root-disjoint `context-pressure` fixture now supplies 319 KB of deterministic
+     partitioned evidence, a red-to-green repair, exact-identifier retention assertions, and
+     hashed validation/held-out surfaces. Run the one-at-a-time experiments before promoting any
+     compaction or pruning behavior; `bigdata` alone is not evidence for watcher behavior.
    - Valid precursor: [`span-screen.json`](../prompt-lab/configs/span-screen.json) and
      [`span_screen.py`](../prompt-lab/span_screen.py) run one span-tools off/on A/B on approved
      `bigdata` (n=6, α=0.05). Receipt-backed treatment compliance is mandatory and diagnostic-only;
      zero candidate exposure, missing exhaustive receipts, provenance drift, or baseline exposure
-     makes the screen `INELIGIBLE` rather than changing task scores. Because Pi does not expose the
-     actually loaded extension/lib set, `ELIGIBLE` means same-run screen only; require a fresh
-     confirmation after live/package parity and loaded-surface identity are proven.
+     makes the screen `INELIGIBLE` rather than changing task scores. The launcher-computed surface
+     is corroborated by a signed receipt from the running harness; only rows lacking that valid
+     receipt retain a provenance blocker. Fresh confirmation remains a promotion requirement,
+     not a workaround for unknown extension identity.
      The screen binds the fleet report's daily-driver gate to the single model
      proven by its result rows, so endpoint-resolved small models cannot inherit
      the historical qwen36 fallback and receive a false rejection.
@@ -121,8 +124,15 @@ New gate rows retain a `trajectory` object alongside outcome and usage:
 
 The original TSV metric positions remain stable for compatibility. Fleet reports now add descriptive task-stratified all-*k* reliability; Fisher-based adoption logic remains unchanged until the paired-inference experiment proves a replacement.
 
-Rows may also carry authenticated `context` (`pi.context-telemetry/v1`): the exact
+Rows may also carry authenticated `context` (`pi.context-telemetry/v2`, with legacy v1 read compatibility): the exact
 workdir/session key, content SHA-256, watcher configuration, requester/reason compaction
-counts, and watcher request completion/failure estimates. Gate telemetry travels over an
+counts, watcher completion/failure estimates, and passive context-surface aggregates for
+concentration, duplication, stale evidence, and size. Gate telemetry travels over an
 unlinked inherited descriptor and every event is HMAC-verified; evaluated tools cannot
 write that descriptor. The field is optional so historical v2 rows remain valid.
+
+Optimizer proposals now use `pi.optimizer-candidate/v1`. Each candidate declares one registered
+operator, exactly one governor/config/message surface, a predicted mechanism metric and direction,
+a concrete falsifier and rollback condition, parent/candidate surface hashes, and validation-trace
+provenance. Mixed and no-op candidates are preserved as append-only journal rejections; held-out
+material remains unavailable until final admission.

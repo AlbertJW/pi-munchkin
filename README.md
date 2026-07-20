@@ -40,6 +40,7 @@ Pi extensions. Load them once; most work automatically, a few add commands or en
 | **git-guard** | confirms before any command that would discard uncommitted work |
 | **context-inlet-guard** | bounds oversized file reads before they flood context |
 | **context-watcher** | observes every compaction and, when enabled, auto-compacts at `CTX_WATCH_PCT` (default 70) |
+| **context-surface** | passively hashes and aggregates the exact provider-bound context; never rewrites messages |
 | **span-tools** | `search_spans` / `read_span` — bounded retrieval over large files |
 | **compact-tool** | `compact_context` — model-requested structured compaction with one explicit post-compaction resume |
 | **micro-gate** | *(opt-in)* parse/compile-checks just-edited files at turn end |
@@ -110,7 +111,8 @@ npm ci
 npm run verify
 ```
 
-`verify` runs the complete Node test suite, a portable full-harness TypeScript check, the read-only
+`verify` runs the complete Node test suite from a unique temporary telemetry sink and fails if the
+default live telemetry file changes, plus a portable full-harness TypeScript check, the read-only
 health check, an `npm pack` smoke test that verifies package contents and imports every manifest
 extension, plus all offline optimizer self-tests, shell syntax checks, fixture tests, admission
 integrity checks, and the documented `real_gate.sh --dry` wiring smoke. The health check automatically uses `harness/*.example.json` in a clean clone
@@ -139,17 +141,16 @@ python3 optimizer/prompt-lab/span_screen.py
 It uses the approved `bigdata` fixture, six reps/arm, and ordinary single-comparison α=0.05.
 Candidate rows must actually call the span tools and carry an exhaustive receipt; otherwise the
 aggregate mechanism report is `INELIGIBLE` and the command exits nonzero. Config and experiment
-hashes bind each row even when prompt hashes match. The actually loaded Pi extension set cannot yet
-be hashed reliably, so rows record that provenance blocker instead of claiming the repository copy
-was loaded. Even an eligible result is a same-run screen only; require a fresh confirmation after
-live/package parity and loaded-surface identity are proven. Credentialed endpoints and explicit
-credential passthrough are refused.
+hashes bind each row even when prompt hashes match. The launcher computes the live extension/lib
+surface before the session, and the running harness corroborates it with an authenticated receipt;
+rows lacking that valid receipt remain blocked. Credentialed endpoints and explicit credential
+passthrough are refused, and fresh confirmation remains mandatory before promotion.
 
 ```
 gate baseline governor  ──►  if saturated (≥85% pass): stop, no headroom
         │
         ▼
-frontier model proposes K minimal governor edits from the FAILING traces
+frontier model proposes K one-surface candidates from VALIDATION failures
         │
         ▼
 gate each candidate  ──►  Fisher's exact test vs. baseline (do-no-harm)
@@ -158,7 +159,7 @@ gate each candidate  ──►  Fisher's exact test vs. baseline (do-no-harm)
 adopt only a significantly-better candidate  ──►  repeat until plateau
         │
         ▼
-winner → proposals/ for HUMAN review  (never auto-edits your live harness)
+winner → proposals/ for HUMAN review + confirmation/canary  (never auto-edits your live harness)
 ```
 
 ### Setup
@@ -197,6 +198,16 @@ python3 prompt-lab/fleet_verdict.py r1
 change), `REJECT` (do-no-harm regression), plus fleet guards `INCOMPLETE` / `MIXED-SIGNS` /
 `TASK-REGRESSION`. Full options, task classes, and the candidate queue are in
 [`optimizer/docs/HARNESS_SELF_IMPROVEMENT.md`](optimizer/docs/HARNESS_SELF_IMPROVEMENT.md).
+
+Generated candidates carry a `pi.optimizer-candidate/v1` sidecar and append-only journal entry.
+Exactly one contiguous governor diff, one config leaf, or one message-template leaf is allowed;
+mixed/no-op/unknown candidates are recorded and rejected before evaluation. LLM judging is
+diagnostic only and cannot override deterministic task outcomes or the held-out admission gates.
+
+The admitted `context-pressure` fixture uses disjoint validation and held-out roots, generates
+319 KB of hashed partitioned evidence, forces a red-to-green repair, and checks exact identifier
+retention. It is the prerequisite for watcher, compaction, result-pruning, observational-memory,
+and output-cap experiments; none of those message-changing behaviors is promoted by default.
 
 ### Operational guards
 
