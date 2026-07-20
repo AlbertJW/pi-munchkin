@@ -10,7 +10,7 @@ A/B them across the fleet:  sql_eval --prompt-file C=proposals/<file>  ->  fleet
 Adoption stays MANUAL + statistical (the do-no-harm rule in fleet_report). This only
 proposes.
 
-Usage:  propose.py <gen> [--prompt ~/.pi/agent/APPEND_SYSTEM.md] [--n 3] [--max-traces 12]
+Usage:  propose.py <gen> [--prompt ~/.pi/agent/APPEND_SYSTEM.md] [--n 3] [--max-traces 12] [--distill]
         propose.py --selftest          # no network
 Needs FRONTIER_BASE_URL / FRONTIER_API_KEY (reused from judge.py).
 """
@@ -58,6 +58,92 @@ def failing_traces(gen, max_traces):
             out.append({"question": q["question"], "gold": q["gold_sql"],
                         "wrong": r.get("sql", ""), "model": r.get("model", "?")})
     return out[:max_traces]
+
+def load_gate_rows(gen):
+    """Rows from a real-gate round (schema pi.eval-row*). Tolerates the sql-row
+    shape by filtering on schema, so --distill on a sql gen is a clean no-op."""
+    path = os.path.join(LAB, "results", gen + ".jsonl")
+    if not os.path.exists(path):
+        return []
+    rows = [json.loads(l) for l in open(path) if l.strip()]
+    return [r for r in rows if str(r.get("schema", "")).startswith("pi.eval-row")]
+
+def distill_evidence(rows, max_bytes=4096):
+    """Bounded, deterministic evidence pack distilled from gate rows: aggregate
+    signals only (pass rates, failure clusters, winner-vs-loser deltas) — never
+    raw session text, so nothing model-generated leaks into candidate prompts.
+    Winners = passing rows in the cheapest tercile (turns + tool_errors)."""
+    def traj(r, k):
+        v = (r.get("trajectory") or {}).get(k)
+        return v if isinstance(v, (int, float)) and not isinstance(v, bool) else None
+    def surface(r, keys):
+        node = ((r.get("context") or {}).get("surface")) or {}
+        for k in keys:
+            node = node.get(k) if isinstance(node, dict) else None
+        return node if isinstance(node, (int, float)) and not isinstance(node, bool) else None
+    def mean(vals):
+        vals = [v for v in vals if v is not None]
+        return sum(vals) / len(vals) if vals else None
+
+    lines = [f"rows={len(rows)}"]
+    cells = {}
+    for r in rows:
+        key = (str(r.get("task")), str(r.get("arm")))
+        cells.setdefault(key, [0, 0])
+        cells[key][1] += 1
+        if r.get("score") == 1:
+            cells[key][0] += 1
+    lines.append("PASS RATES (task/arm):")
+    for task, arm in sorted(cells):
+        p, t = cells[(task, arm)]
+        lines.append(f"  {task}/{arm}: {p}/{t}")
+
+    passing = [r for r in rows if r.get("score") == 1]
+    losers = [r for r in rows if r.get("score") == 0]
+    cost = lambda r: (traj(r, "turns") or 0) + (traj(r, "tool_errors") or 0)
+    winners = sorted(passing, key=cost)[:max(1, len(passing) // 3)] if passing else []
+
+    cluster = {}
+    for r in losers:
+        keys = []
+        if r.get("status") not in (None, "complete"):
+            keys.append(f"status={r.get('status')}")
+        if (traj(r, "tool_errors") or 0) >= 3:
+            keys.append("high_tool_errors(>=3)")
+        if (traj(r, "repeat_reads") or 0) > 0:
+            keys.append("repeat_reads>0")
+        if (traj(r, "compactions") or 0) > 0:
+            keys.append("compactions>0")
+        for k in keys:
+            cluster[k] = cluster.get(k, 0) + 1
+    lines.append(f"LOSER CLUSTERS ({len(losers)} failing rows):")
+    for k in sorted(cluster):
+        lines.append(f"  {k}: {cluster[k]}")
+
+    lines.append("EFFICIENT-WINNER vs LOSER means:")
+    for name, fn in (
+        ("turns", lambda r: traj(r, "turns")),
+        ("tool_errors", lambda r: traj(r, "tool_errors")),
+        ("repeat_reads", lambda r: traj(r, "repeat_reads")),
+        ("exact_dup_share", lambda r: surface(r, ("duplication", "exact_block", "mean"))),
+        ("near_dup_share", lambda r: surface(r, ("duplication", "near_block", "mean"))),
+        ("stale_result_share", lambda r: surface(r, ("stale_tool_result", "mean"))),
+    ):
+        w, l = mean([fn(r) for r in winners]), mean([fn(r) for r in losers])
+        if w is None and l is None:
+            continue
+        fmt = lambda v: "n/a" if v is None else f"{v:.3f}"
+        lines.append(f"  {name}: winners={fmt(w)} losers={fmt(l)}")
+
+    out, size = [], 0
+    for line in lines:
+        b = len(line.encode()) + 1
+        if size + b > max_bytes:
+            out.append("...[truncated]")
+            break
+        out.append(line)
+        size += b
+    return "\n".join(out)
 
 def build_user(prompt_text, traces):
     blocks = "\n\n".join(
@@ -251,21 +337,31 @@ def write_candidates(gen, cands, out_dir=PROPOSALS):
 
 # ---------- run ----------
 
-def run(gen, prompt_path, n, max_traces):
+def run(gen, prompt_path, n, max_traces, distill=False):
     from judge import frontier_call  # reuse the frontier endpoint plumbing
-    traces = failing_traces(gen, max_traces)
-    if not traces:
-        print(f"no failing traces in results/{gen}.jsonl — nothing to propose"); return
     prompt_text = open(prompt_path).read()
-    reply = frontier_call(PROPOSE_SYS.format(n=n), build_user(prompt_text, traces))
-    trace_ids = [hashlib.sha256(json.dumps(trace, sort_keys=True).encode()).hexdigest() for trace in traces]
+    if distill:
+        rows = load_gate_rows(gen)
+        if not rows:
+            print(f"no gate rows in results/{gen}.jsonl — nothing to distill"); return
+        evidence = distill_evidence(rows)
+        user = (f"CURRENT PROMPT:\n```\n{prompt_text}\n```\n\n"
+                f"EVIDENCE PACK (aggregated from {len(rows)} gate sessions):\n{evidence}")
+        trace_ids = sorted(hashlib.sha256(json.dumps(r, sort_keys=True).encode()).hexdigest() for r in rows)[:24]
+    else:
+        traces = failing_traces(gen, max_traces)
+        if not traces:
+            print(f"no failing traces in results/{gen}.jsonl — nothing to propose"); return
+        user = build_user(prompt_text, traces)
+        trace_ids = [hashlib.sha256(json.dumps(trace, sort_keys=True).encode()).hexdigest() for trace in traces]
+    reply = frontier_call(PROPOSE_SYS.format(n=n), user)
     parent_id = "parent-" + hashlib.sha256(prompt_text.encode()).hexdigest()[:16]
     cands, rejected = parse_candidate_manifests(reply, prompt_text, parent_id, trace_ids, {})
     append_candidate_journal(cands + rejected)
     if not cands:
         print("frontier returned no well-formed candidates; raw reply:\n" + reply[:800]); return
     paths = write_candidates(gen, cands)
-    print(f"{len(traces)} failing traces -> {len(cands)} candidate(s):")
+    print(f"{len(trace_ids)} evidence hashes -> {len(cands)} candidate(s):")
     for cand, p in zip(cands, paths):
         print(f"  [{cand['operator']}] {p}")
     print(f"\nA/B them:  ./sql_eval.py {gen}-ab --variants A,C --prompt-file C=<path>  then  ./fleet_report.py {gen}-ab --candidate C")
@@ -338,7 +434,35 @@ def selftest():
         assert open(paths[0]).read().strip() == "You are precise. Output ONE SQL statement."
     finally:
         shutil.rmtree(d)
-    print("propose selftest: OK (v1 manifests; one-surface/one-leaf enforcement; append-only provenance)")
+    # --distill: deterministic, bounded, aggregate-only evidence pack
+    gate_rows = [
+        {"schema": "pi.eval-row/v2", "task": "parens", "arm": "base", "score": 1,
+         "trajectory": {"turns": 4, "tool_errors": 0, "repeat_reads": 0, "compactions": 0},
+         "context": {"surface": {"duplication": {"exact_block": {"mean": 0.05}, "near_block": {"mean": 0.02}}, "stale_tool_result": {"mean": 0.1}}}},
+        {"schema": "pi.eval-row/v2", "task": "parens", "arm": "cand", "score": 1,
+         "trajectory": {"turns": 9, "tool_errors": 2, "repeat_reads": 1, "compactions": 0},
+         "context": {"surface": {"duplication": {"exact_block": {"mean": 0.2}, "near_block": {"mean": 0.1}}, "stale_tool_result": {"mean": 0.3}}}},
+        {"schema": "pi.eval-row/v2", "task": "equil", "arm": "base", "score": 0, "status": "incomplete",
+         "trajectory": {"turns": 14, "tool_errors": 5, "repeat_reads": 3, "compactions": 1},
+         "context": {"surface": {"duplication": {"exact_block": {"mean": 0.4}, "near_block": {"mean": 0.2}}, "stale_tool_result": {"mean": 0.5}}}},
+        {"schema": "pi.sql-row/v1", "task": "q1", "score": 0},  # non-gate row must be ignored by load_gate_rows semantics
+    ]
+    pack_a = distill_evidence(gate_rows)
+    pack_b = distill_evidence(list(gate_rows))
+    assert pack_a == pack_b, "evidence pack must be deterministic"
+    assert "PASS RATES" in pack_a and "parens/base: 1/1" in pack_a, pack_a
+    assert "LOSER CLUSTERS" in pack_a and "high_tool_errors(>=3): 1" in pack_a and "status=incomplete: 1" in pack_a
+    assert "EFFICIENT-WINNER vs LOSER" in pack_a and "near_dup_share" in pack_a
+    assert len(pack_a.encode()) <= 4096
+    tiny = distill_evidence(gate_rows, max_bytes=64)
+    assert len(tiny.encode()) <= 64 + len("...[truncated]") + 1 and tiny.endswith("...[truncated]")
+    # a --distill-built provenance passes candidate_manifest
+    distill_ids = sorted(hashlib.sha256(json.dumps(r, sort_keys=True).encode()).hexdigest() for r in gate_rows)
+    manifest, rejection = candidate_manifest("base prompt", "tighten", "base prompt tightened", {},
+        {"parent_id": "parent-x", "hypothesis": "h", "mechanism": "m", "predicted_metric": "turns",
+         "direction": "decrease", "falsifier": "f", "rollback_condition": "r", "validation_traces": distill_ids})
+    assert rejection is None and manifest["validation_traces"] == distill_ids
+    print("propose selftest: OK (v1 manifests; one-surface/one-leaf enforcement; append-only provenance; distill evidence pack)")
 
 def main():
     args = sys.argv[1:]
@@ -348,7 +472,7 @@ def main():
     prompt_path = os.path.expanduser(args[args.index("--prompt") + 1]) if "--prompt" in args else DEFAULT_PROMPT
     n = int(args[args.index("--n") + 1]) if "--n" in args else 3
     max_traces = int(args[args.index("--max-traces") + 1]) if "--max-traces" in args else 12
-    run(gen, prompt_path, n, max_traces)
+    run(gen, prompt_path, n, max_traces, distill="--distill" in args)
 
 if __name__ == "__main__":
     main()

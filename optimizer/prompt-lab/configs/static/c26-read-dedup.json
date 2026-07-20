@@ -1,0 +1,5 @@
+{
+  "name": "read-dedup",
+  "prediction": "repeated identical read results are collapsed to one-line back-references in the provider-visible context: context.surface.duplication.exact_block drops on the cand arm (mechanism metric — context-surface measures the post-dedup view), in_tok drops, pass rate neutral-to-up on tasks with repeat_reads>0 in baseline (gitlord read-dedup port, 2026-07-20). context-dedup.dedup telemetry confirms actual firing; prefix_stable must NOT regress (later-copy replacement is append-safe by design).",
+  "thresholds": { "READ_DEDUP": "on" }
+}

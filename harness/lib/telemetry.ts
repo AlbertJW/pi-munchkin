@@ -108,7 +108,7 @@ function normalizeDetail(detail: Record<string, unknown>): { detail: Record<stri
 	const errors: string[] = [];
 	for (const [key, value] of Object.entries(detail)) {
 		if (RESERVED_FIELDS.has(key)) continue;
-		const safePromptAggregate = key === "system_prompt_sha256" || key === "system_prompt_bytes";
+		const safePromptAggregate = key === "system_prompt_sha256" || key === "system_prompt_bytes" || key === "system_prompt_changed";
 		if (!safePromptAggregate && FORBIDDEN_DETAIL_FIELD.test(key)) {
 			errors.push(`forbidden field ${key}`);
 			continue;

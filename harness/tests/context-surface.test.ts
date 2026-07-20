@@ -22,8 +22,8 @@ const baseMessages = () => [
 test("context receipt is deterministic for Unicode, images, custom messages, tool errors, and mutation boundaries", () => {
 	const messages = baseMessages();
 	const system = systemPromptReceipt("system π");
-	const a = buildContextSurfaceReceipt(messages, system, { tokens: 123, contextWindow: 4096, percent: 3 }, { compactionGeneration: 2, planRunId: "plan-1", planItemId: "item-1" });
-	const b = buildContextSurfaceReceipt(structuredClone(messages), system, { tokens: 123, contextWindow: 4096, percent: 3 }, { compactionGeneration: 2, planRunId: "plan-1", planItemId: "item-1" });
+	const a = buildContextSurfaceReceipt(messages, system, { tokens: 123, contextWindow: 4096, percent: 3 }, { compactionGeneration: 2, planRunId: "plan-1", planItemId: "item-1" }).receipt;
+	const b = buildContextSurfaceReceipt(structuredClone(messages), system, { tokens: 123, contextWindow: 4096, percent: 3 }, { compactionGeneration: 2, planRunId: "plan-1", planItemId: "item-1" }).receipt;
 	assert.deepEqual(a, b);
 	assert.match(a.surface_sha256, /^[0-9a-f]{64}$/);
 	assert.equal(a.image_count, 1);
@@ -38,13 +38,13 @@ test("context receipt is deterministic for Unicode, images, custom messages, too
 test("exact duplicate blocks increase duplicate share and changed content changes the receipt", () => {
 	const system = systemPromptReceipt("s");
 	const repeated = [{ role: "user", content: [{ type: "text", text: "same block" }, { type: "text", text: "same block" }] }];
-	const a = buildContextSurfaceReceipt(repeated, system, undefined);
-	const b = buildContextSurfaceReceipt([{ role: "user", content: [{ type: "text", text: "different" }] }], system, undefined);
+	const a = buildContextSurfaceReceipt(repeated, system, undefined).receipt;
+	const b = buildContextSurfaceReceipt([{ role: "user", content: [{ type: "text", text: "different" }] }], system, undefined).receipt;
 	assert.ok(a.exact_duplicate_block_share > 0);
 	assert.notEqual(a.surface_sha256, b.surface_sha256);
 	const metadataOnly = structuredClone(repeated);
 	(metadataOnly[0] as Record<string, unknown>).customMetadata = { exact: "surface field" };
-	assert.notEqual(a.surface_sha256, buildContextSurfaceReceipt(metadataOnly, system, undefined).surface_sha256,
+	assert.notEqual(a.surface_sha256, buildContextSurfaceReceipt(metadataOnly, system, undefined).receipt.surface_sha256,
 		"the receipt must bind every provider-visible message field, not only known content blocks");
 });
 
@@ -56,7 +56,7 @@ test("read-only bash is not a mutation boundary and largest tool-result share is
 		{ role: "toolResult", toolCallId: "b", toolName: "bash", content: [{ type: "text", text: "12" }], isError: false },
 		{ role: "toolResult", toolCallId: "r2", toolName: "read", content: [{ type: "text", text: "12" }], isError: false },
 	];
-	const receipt = buildContextSurfaceReceipt(messages, systemPromptReceipt("s"), undefined);
+	const { receipt } = buildContextSurfaceReceipt(messages, systemPromptReceipt("s"), undefined);
 	assert.equal(receipt.stale_tool_result_share, 0, "read-only bash must not create a successful-mutation boundary");
 	assert.equal(receipt.largest_tool_result_share, 0.5, "share is the largest individual result, not a per-tool aggregate");
 });
@@ -91,4 +91,56 @@ test("context extension observes without replacing or mutating the original mess
 		if (priorSource === undefined) delete process.env.TELEMETRY_SOURCE; else process.env.TELEMETRY_SOURCE = priorSource;
 		rmSync(dir, { recursive: true, force: true });
 	}
+});
+
+test("KV-cache invariants: append-only sequences are prefix_stable, mutations and truncations are detected", () => {
+	const system = systemPromptReceipt("s");
+	const msgs = (texts: string[]) => texts.map((text) => ({ role: "user", content: [{ type: "text", text }] }));
+	const first = buildContextSurfaceReceipt(msgs(["a", "b"]), system, undefined);
+	assert.equal(first.receipt.prefix_stable, null, "no prior on the first call");
+	assert.equal(first.receipt.appended_only, null);
+	assert.equal(first.receipt.system_prompt_changed, null);
+	const prior = { blockHashes: first.blockHashes, systemSha: system.sha256 };
+
+	const appended = buildContextSurfaceReceipt(msgs(["a", "b", "c"]), system, undefined, {}, prior);
+	assert.equal(appended.receipt.prefix_stable, true);
+	assert.equal(appended.receipt.appended_only, true);
+	assert.equal(appended.receipt.system_prompt_changed, false);
+
+	const mutated = buildContextSurfaceReceipt(msgs(["a", "CHANGED", "c"]), system, undefined, {}, prior);
+	assert.equal(mutated.receipt.prefix_stable, false, "an edited early block breaks the cacheable prefix");
+	assert.equal(mutated.receipt.appended_only, false);
+
+	const truncated = buildContextSurfaceReceipt(msgs(["a"]), system, undefined, {}, prior);
+	assert.equal(truncated.receipt.prefix_stable, true, "the surviving prefix is unchanged");
+	assert.equal(truncated.receipt.appended_only, false, "but blocks were removed, not appended");
+
+	const newSystem = systemPromptReceipt("different");
+	const swapped = buildContextSurfaceReceipt(msgs(["a", "b"]), newSystem, undefined, {}, prior);
+	assert.equal(swapped.receipt.system_prompt_changed, true);
+});
+
+test("near-duplicate share: almost-identical large blocks count, exact repeats and small/unrelated blocks do not", () => {
+	const system = systemPromptReceipt("s");
+	const big = "The quick brown fox jumps over the lazy dog while reading configuration files. ".repeat(8); // ~640 bytes
+	const nearCopy = big.replace("lazy dog", "sleepy dog");
+	const unrelated = "Completely different content about database migrations and indexes altogether here. ".repeat(8);
+	const wrap = (texts: string[]) => texts.map((text) => ({ role: "user", content: [{ type: "text", text }] }));
+
+	const near = buildContextSurfaceReceipt(wrap([big, nearCopy]), system, undefined).receipt;
+	assert.ok(near.near_duplicate_block_share > 0, `near-copy must register: ${near.near_duplicate_block_share}`);
+	assert.equal(near.exact_duplicate_block_share, 0, "not an exact duplicate");
+
+	const exact = buildContextSurfaceReceipt(wrap([big, big]), system, undefined).receipt;
+	assert.equal(exact.near_duplicate_block_share, 0, "exact repeats belong to the exact share only");
+	assert.ok(exact.exact_duplicate_block_share > 0);
+
+	const distinct = buildContextSurfaceReceipt(wrap([big, unrelated]), system, undefined).receipt;
+	assert.equal(distinct.near_duplicate_block_share, 0);
+
+	const small = buildContextSurfaceReceipt(wrap(["tiny a", "tiny b"]), system, undefined).receipt;
+	assert.equal(small.near_duplicate_block_share, 0, "sub-256-byte blocks are ignored");
+
+	const again = buildContextSurfaceReceipt(wrap([big, nearCopy]), system, undefined).receipt;
+	assert.deepEqual(near, again, "deterministic");
 });

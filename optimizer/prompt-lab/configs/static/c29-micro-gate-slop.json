@@ -1,0 +1,5 @@
+{
+  "name": "micro-gate-slop",
+  "prediction": "shortcut patterns in just-edited files (error swallowing, type escapes, suppression comments, lazy asserts) draw one steer at turn end: shortcut-tainted final patches drop, pass rate on hidden-grader tasks rises or holds, no added turns on clean sessions (loopgate anti-slop port, 2026-07-20). micro-gate.slop-fired telemetry confirms firing; measured ALONE (MICRO_GATE stays off) so the leaf is causal.",
+  "thresholds": { "MICRO_GATE_SLOP": "on" }
+}

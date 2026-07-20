@@ -1,7 +1,7 @@
-import { existsSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { isAbsolute, join } from "node:path";
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
-import { changedPaths, checksFor, firstError } from "../lib/micro-gate-policy.ts";
+import { changedPaths, checksFor, firstError, formatSlop, jsSlopFindings, PYTHON_SLOP_SCRIPT, slopKindFor } from "../lib/micro-gate-policy.ts";
 import { steerText } from "../lib/steer-texts.ts";
 import { record } from "../lib/telemetry.ts";
 
@@ -10,12 +10,18 @@ import { record } from "../lib/telemetry.ts";
 // (node --check / ast.parse / JSON.parse) and inject the first actionable
 // error as an immediate steer. Debounced naturally to once per turn (turn_end).
 // Never runs the project test suite. Candidate spec: c21-micro-gate.json.
+//
+// MICRO_GATE_SLOP=on (c29, independent leaf): additionally scan just-edited
+// files for shortcut patterns small models overproduce (loopgate's anti-slop
+// idea) — Python via stdlib ast, JS/TS via honest line regexes. Steer only,
+// never a block: some hits are legitimate; the point is a reconsider nudge.
 
-const ENABLED = process.env.MICRO_GATE === "on";
+const PARSE_ENABLED = process.env.MICRO_GATE === "on";
+const SLOP_ENABLED = process.env.MICRO_GATE_SLOP === "on";
 const CHECK_TIMEOUT = 5_000;
 
 export default function (pi: ExtensionAPI) {
-	if (!ENABLED) return;
+	if (!PARSE_ENABLED && !SLOP_ENABLED) return;
 
 	pi.on("turn_end", async (event, ctx) => {
 		const msg = event.message;
@@ -33,6 +39,9 @@ export default function (pi: ExtensionAPI) {
 			record("micro-gate", "skipped", { reason: "no-statically-known-path" });
 			return;
 		}
+
+		if (SLOP_ENABLED) await slopPass(pi, ctx.cwd, paths);
+		if (!PARSE_ENABLED) return;
 
 		const outputs: Array<{ file: string; err: string }> = [];
 		let checked = 0;
@@ -76,4 +85,52 @@ export default function (pi: ExtensionAPI) {
 		record("micro-gate", "fired", { files: paths.length, injected_chars: steerMsg.length });
 		pi.sendUserMessage(steerMsg, { deliverAs: "steer" });
 	});
+
+	async function slopPass(api: ExtensionAPI, cwd: string, paths: string[]): Promise<void> {
+		const outputs: Array<{ file: string; findings: string[] }> = [];
+		let checked = 0;
+		const seen = new Set<string>();
+		for (const file of paths) {
+			if (seen.has(file)) continue;
+			seen.add(file);
+			const kind = slopKindFor(file);
+			if (!kind) continue;
+			const abs = isAbsolute(file) ? file : join(cwd, file);
+			if (!existsSync(abs)) continue;
+			try {
+				if (kind === "python") {
+					// Findings on stdout, exit 0 always — a non-zero code means the
+					// CHECKER failed (missing python3, timeout), not a dirty file.
+					const r = await api.exec("python3", ["-c", PYTHON_SLOP_SCRIPT, abs], { cwd, timeout: CHECK_TIMEOUT });
+					if (r.code !== 0) {
+						record("micro-gate", "slop-checker-error", { file, error: r.stderr || "checker exited non-zero" });
+						continue;
+					}
+					const findings = r.stdout.split("\n").map((line) => line.trim()).filter(Boolean);
+					checked += 1;
+					if (findings.length) outputs.push({ file, findings });
+				} else {
+					const findings = jsSlopFindings(readFileSync(abs, "utf8"));
+					checked += 1;
+					if (findings.length) outputs.push({ file, findings });
+				}
+			} catch (error) {
+				// fail open: the slop gate must never become its own fault
+				record("micro-gate", "slop-checker-error", { file, error: error instanceof Error ? error.message : String(error) });
+			}
+			if (checked >= 3) break;
+		}
+		const findings = formatSlop(outputs);
+		if (!findings) {
+			if (checked) record("micro-gate", "slop-passed", { files: paths.length, checked });
+			return;
+		}
+		const steerMsg = steerText(
+			"MICRO_GATE_SLOP_MSG",
+			"[micro-gate] Possible shortcuts in the file you just edited (line:pattern) — reconsider before proceeding; suppressions and error-swallowing usually hide the real bug:\n{findings}",
+			{ findings },
+		);
+		record("micro-gate", "slop-fired", { files: paths.length, findings: outputs.reduce((n, o) => n + o.findings.length, 0), injected_chars: steerMsg.length });
+		api.sendUserMessage(steerMsg, { deliverAs: "steer" });
+	}
 }

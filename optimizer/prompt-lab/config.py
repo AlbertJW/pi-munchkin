@@ -163,7 +163,18 @@ def selftest():
             pass
         else:
             raise AssertionError(f"out-of-schema watcher setting accepted: {invalid}")
-    print("config selftest: OK (deterministic apply; format/scaffold/F; env; endpoint; safe-flags; exclusions)")
+    # Every checked-in static config must survive config_env — a threshold key
+    # missing from the schema means real_gate.sh exits 2 the moment that
+    # candidate is applied (bit c24/c25 on 2026-07-20: DID_YOU_MEAN and
+    # PLAN_SUBAGENT_ONLY were never registered here).
+    static_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "configs", "static")
+    for name in sorted(os.listdir(static_dir)):
+        if not name.endswith(".json"):
+            continue
+        with open(os.path.join(static_dir, name)) as f:
+            static_cfg = json.load(f)
+        config_env(static_cfg)  # raises ValueError on any unsupported key
+    print("config selftest: OK (deterministic apply; format/scaffold/F; env; endpoint; safe-flags; exclusions; static-config env keys)")
 
 def apply_to_workdir(config, workdir):
     """For the agentic real-gate: write <workdir>/.pi/APPEND_SYSTEM.md (always, even

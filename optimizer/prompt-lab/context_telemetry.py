@@ -92,6 +92,10 @@ def aggregate(path, session_key, key=None):
             "mean": (sum(values) / len(values)) if values else None,
         }
 
+    def bool_rate(field):
+        values = [e.get(field) for e in context_surfaces if isinstance(e.get(field), bool)]
+        return (sum(values) / len(values)) if values else None
+
     message_bytes = []
     for event in context_surfaces:
         values = [event.get(name) for name in ("user_text_bytes", "assistant_text_bytes", "tool_text_bytes", "custom_text_bytes")]
@@ -137,8 +141,14 @@ def aggregate(path, session_key, key=None):
             "duplication": {
                 "exact_block": stats("exact_duplicate_block_share"),
                 "five_token_shingle": stats("repeated_five_token_shingle_share"),
+                "near_block": stats("near_duplicate_block_share"),
             },
             "stale_tool_result": stats("stale_tool_result_share"),
+            "kv_cache": {
+                "prefix_stable_rate": bool_rate("prefix_stable"),
+                "appended_only_rate": bool_rate("appended_only"),
+                "system_prompt_changes": sum(e.get("system_prompt_changed") is True for e in context_surfaces),
+            },
             "context": {
                 "max_bytes": max(message_bytes) if message_bytes else None,
                 "mean_bytes": (sum(message_bytes) / len(message_bytes)) if message_bytes else None,

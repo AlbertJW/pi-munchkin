@@ -28,10 +28,13 @@ const expectedExtensions = [
   "harness/extensions/micro-gate.ts",
   "harness/extensions/ketch.ts",
   "harness/extensions/did-you-mean.ts",
+  "harness/extensions/teach-hints.ts",
   "harness/extensions/surface-receipt.ts",
   "harness/vendor/pi-subagent/index.ts",
   // Must observe after every prompt-contributing extension so its receipt binds
   // the final provider-visible system prompt, not an intermediate prompt.
+  "harness/extensions/context-brief.ts",
+  "harness/extensions/context-dedup.ts",
   "harness/extensions/context-surface.ts",
 ];
 assert.deepEqual(extensions, expectedExtensions, "pi.extensions must expose the complete ordered production surface");

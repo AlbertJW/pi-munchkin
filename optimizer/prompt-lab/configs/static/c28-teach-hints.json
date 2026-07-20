@@ -1,0 +1,5 @@
+{
+  "name": "teach-hints",
+  "prediction": "terse tool errors gain one deterministic teaching line (missing command -> what IS available; unresolved import -> check relative path/extension; malformed patch -> the grammar): blind same-command retries drop (trajectory.tool_errors and loop-breaker steers fall on the cand arm), pass rate neutral-to-up (Bojie Li teaching-error-strings port, 2026-07-20). teach-hints.hint telemetry confirms firing and ranks rules for the next iteration.",
+  "thresholds": { "TEACH_HINTS": "on" }
+}

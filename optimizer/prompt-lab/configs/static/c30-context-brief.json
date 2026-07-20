@@ -1,0 +1,5 @@
+{
+  "name": "context-brief",
+  "prediction": "a bounded pre-computed environment brief (file tree, scripts, test command, git state) rides the system prompt: discovery turns vanish, so trajectory.turns, tool_calls, and first_mutation_turn drop on the cand arm with pass rate neutral-to-up (lemma context-brief port, 2026-07-20). context-brief.injected telemetry confirms; system_prompt stays session-stable (cached once) so prefix_stable must not regress within sessions.",
+  "thresholds": { "CONTEXT_BRIEF": "on" }
+}

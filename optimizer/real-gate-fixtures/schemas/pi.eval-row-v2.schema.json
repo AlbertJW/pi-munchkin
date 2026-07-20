@@ -126,7 +126,7 @@
         },
         "surface": {
           "type": "object",
-          "required": ["calls", "concentration", "duplication", "stale_tool_result", "context"],
+          "required": ["calls", "concentration", "duplication", "stale_tool_result", "kv_cache", "context"],
           "additionalProperties": false,
           "properties": {
             "calls": {"type": "integer", "minimum": 0},
@@ -138,13 +138,22 @@
               }
             },
             "duplication": {
-              "type": "object", "required": ["exact_block", "five_token_shingle"], "additionalProperties": false,
+              "type": "object", "required": ["exact_block", "five_token_shingle", "near_block"], "additionalProperties": false,
               "properties": {
                 "exact_block": {"$ref": "#/$defs/nullableStats"},
-                "five_token_shingle": {"$ref": "#/$defs/nullableStats"}
+                "five_token_shingle": {"$ref": "#/$defs/nullableStats"},
+                "near_block": {"$ref": "#/$defs/nullableStats"}
               }
             },
             "stale_tool_result": {"$ref": "#/$defs/nullableStats"},
+            "kv_cache": {
+              "type": "object", "required": ["prefix_stable_rate", "appended_only_rate", "system_prompt_changes"], "additionalProperties": false,
+              "properties": {
+                "prefix_stable_rate": {"type": ["number", "null"], "minimum": 0, "maximum": 1},
+                "appended_only_rate": {"type": ["number", "null"], "minimum": 0, "maximum": 1},
+                "system_prompt_changes": {"type": "integer", "minimum": 0}
+              }
+            },
             "context": {
               "type": "object", "required": ["max_bytes", "mean_bytes", "tokens"], "additionalProperties": false,
               "properties": {

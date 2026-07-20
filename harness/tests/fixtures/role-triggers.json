@@ -1,0 +1,26 @@
+{
+  "_doc": "Trigger surface for the lexical role-routing eval (role-routing.test.ts). Positives must route to their labeled role with margin >= 1; negatives must have no strong winner. Keep prompts phrased the way the MAIN MODEL would phrase a delegation, since the role description is matched against that phrasing.",
+  "positives": {
+    "explorer": [
+      "where is the retry ladder defined and how is it used",
+      "search the codebase for every usage of steerText and distill what each one does",
+      "read through these large files and answer what the compaction flow does",
+      "find where the config schema lookup happens"
+    ],
+    "executor": [
+      "make this one bounded edit: rename the flag in plan-runner",
+      "apply the specified single change to the parser file and report exact changed files",
+      "do this fully-specified edit off the main window using mode=fork"
+    ],
+    "verifier": [
+      "try to refute the claim that the fix handles empty input",
+      "check the just-made change and return a verdict with evidence",
+      "run the tests to verify this claim before the plan accepts it"
+    ]
+  },
+  "negatives": [
+    "hello there",
+    "what a nice day",
+    "thanks, looks good"
+  ]
+}

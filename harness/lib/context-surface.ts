@@ -5,6 +5,18 @@ const MAX_TEXT_BYTES = 4 * 1024 * 1024;
 const MAX_SHINGLES = 100_000;
 const MUTATION_TOOLS = new Set(["edit", "write", "multiedit", "hashline_edit"]);
 
+// Near-duplicate detection (bottom-k sketch, not banded MinHash: one 32-bit
+// FNV hash per 3-char shingle + keep the k smallest, instead of k hash
+// functions per shingle — ~64x cheaper, and this runs on EVERY model call).
+// Similarity = |sketchA ∩ sketchB| / k, an adequate Jaccard estimate for a
+// telemetry share. Blocks under 256 bytes are noise; blocks are sketched on
+// their first 8 KB only; candidate count bounded.
+const SKETCH_K = 64;
+const SKETCH_MIN_BLOCK_BYTES = 256;
+const SKETCH_MAX_BLOCK_BYTES = 8192;
+const SKETCH_MAX_BLOCKS = 512;
+const NEAR_DUP_SIMILARITY = 0.5;
+
 type ContentBlock = Record<string, unknown>;
 type ContextMessage = Record<string, unknown>;
 
@@ -31,6 +43,10 @@ export type ContextSurfaceReceipt = {
 	exact_duplicate_block_share: number;
 	repeated_five_token_shingle_share: number;
 	stale_tool_result_share: number;
+	near_duplicate_block_share: number;
+	prefix_stable: boolean | null;
+	appended_only: boolean | null;
+	system_prompt_changed: boolean | null;
 	context_tokens: number | null;
 	context_window: number | null;
 	context_pct: number | null;
@@ -38,6 +54,11 @@ export type ContextSurfaceReceipt = {
 	plan_run_id: string | null;
 	plan_item_id: string | null;
 };
+
+// Cross-call comparison anchor for the KV-cache invariants: the previous
+// call's block-hash sequence + system-prompt sha. Held by the extension in
+// module state, reset on session start/compaction.
+export type ContextSurfacePrior = { blockHashes: string[]; systemSha: string };
 
 function sha256(value: string | Buffer): string {
 	return createHash("sha256").update(value).digest("hex");
@@ -89,6 +110,37 @@ export function systemPromptReceipt(systemPrompt: string): SystemPromptReceipt {
 	return { sha256: sha256(systemPrompt), bytes: utf8Bytes(systemPrompt) };
 }
 
+// 32-bit FNV-1a over a 3-char shingle starting at `from`.
+function shingleHash(text: string, from: number): number {
+	let hash = 0x811c9dc5;
+	for (let i = from; i < from + 3; i += 1) {
+		hash ^= text.charCodeAt(i);
+		hash = Math.imul(hash, 0x01000193);
+	}
+	return hash >>> 0;
+}
+
+// Bottom-k sketch of a block's 3-char shingle set: the k smallest distinct
+// shingle hashes, sorted ascending.
+function bottomKSketch(text: string): number[] {
+	const bounded = text.length > SKETCH_MAX_BLOCK_BYTES ? text.slice(0, SKETCH_MAX_BLOCK_BYTES) : text;
+	const hashes = new Set<number>();
+	for (let i = 0; i + 3 <= bounded.length; i += 1) hashes.add(shingleHash(bounded, i));
+	return [...hashes].sort((a, b) => a - b).slice(0, SKETCH_K);
+}
+
+// |a ∩ b| / k over two sorted sketches.
+function sketchSimilarity(a: number[], b: number[]): number {
+	let i = 0, j = 0, shared = 0;
+	while (i < a.length && j < b.length) {
+		if (a[i] === b[j]) { shared += 1; i += 1; j += 1; }
+		else if (a[i] < b[j]) i += 1;
+		else j += 1;
+	}
+	const k = Math.min(a.length, b.length) || 1;
+	return shared / k;
+}
+
 function contentOf(message: ContextMessage): unknown[] {
 	const content = message.content;
 	return Array.isArray(content) ? content : typeof content === "string" ? [{ type: "text", text: content }] : [];
@@ -106,7 +158,8 @@ export function buildContextSurfaceReceipt(
 	system: SystemPromptReceipt,
 	usage: { tokens: number | null; contextWindow: number; percent: number | null } | undefined,
 	meta: { compactionGeneration?: number; planRunId?: string; planItemId?: string } = {},
-): ContextSurfaceReceipt {
+	prior?: ContextSurfacePrior | null,
+): { receipt: ContextSurfaceReceipt; blockHashes: string[] } {
 	const roleMessages = { user: 0, assistant: 0, tool: 0, custom: 0 };
 	const roleBytes = { user: 0, assistant: 0, tool: 0, custom: 0 };
 	const messageBytes: number[] = [];
@@ -120,6 +173,7 @@ export function buildContextSurfaceReceipt(
 	let imageBytes = 0;
 	let scannedTextBytes = 0;
 	const mutatingCalls = new Set<string>();
+	const sketchCandidates: Array<{ hash: string; text: string; bytes: number }> = [];
 
 	for (let index = 0; index < messages.length; index += 1) {
 		const message = (messages[index] ?? {}) as ContextMessage;
@@ -136,6 +190,9 @@ export function buildContextSurfaceReceipt(
 				bytes += size;
 				blockBytes.push(size);
 				blockHashes.push(sha256(`${type}\0${text}`));
+				if (size >= SKETCH_MIN_BLOCK_BYTES && sketchCandidates.length < SKETCH_MAX_BLOCKS) {
+					sketchCandidates.push({ hash: blockHashes[blockHashes.length - 1], text, bytes: size });
+				}
 				if (scannedTextBytes < MAX_TEXT_BYTES) {
 					const remaining = MAX_TEXT_BYTES - scannedTextBytes;
 					const bounded = Buffer.from(text, "utf8").subarray(0, remaining).toString("utf8");
@@ -209,7 +266,40 @@ export function buildContextSurfaceReceipt(
 		.reduce((sum, result) => sum + result.bytes, 0);
 	const sortedTools = [...toolBytes.entries()].sort(([a], [b]) => a < b ? -1 : a > b ? 1 : 0);
 
-	return {
+	// Near-duplicates: a later block whose sketch matches an EARLIER block at
+	// ≥ NEAR_DUP_SIMILARITY but whose exact hash differs — "near but not exact",
+	// deliberately disjoint from exact_duplicate_block_share so the two fields
+	// decompose the redundancy rather than double-count it.
+	let nearDupBytes = 0;
+	{
+		const seenExact = new Set<string>();
+		const keptSketches: number[][] = [];
+		for (const cand of sketchCandidates) {
+			if (seenExact.has(cand.hash)) continue; // exact repeat — counted in the exact share
+			seenExact.add(cand.hash);
+			const sketch = bottomKSketch(cand.text);
+			if (keptSketches.some((prev) => sketchSimilarity(prev, sketch) >= NEAR_DUP_SIMILARITY)) {
+				nearDupBytes += cand.bytes;
+			} else {
+				keptSketches.push(sketch);
+			}
+		}
+	}
+
+	// KV-cache invariants vs the previous call: an unchanged shared region
+	// (prefix_stable) and pure appends (appended_only) are what llama.cpp's
+	// prefix cache can reuse; a mutated early block forces a re-prefill.
+	let prefixStable: boolean | null = null;
+	let appendedOnly: boolean | null = null;
+	let systemPromptChanged: boolean | null = null;
+	if (prior) {
+		const shared = Math.min(prior.blockHashes.length, blockHashes.length);
+		prefixStable = prior.blockHashes.slice(0, shared).every((hash, index) => hash === blockHashes[index]);
+		appendedOnly = prefixStable && blockHashes.length >= prior.blockHashes.length;
+		systemPromptChanged = prior.systemSha !== system.sha256;
+	}
+
+	const receipt: ContextSurfaceReceipt = {
 		surface_sha256: stableHash({ system, messages }),
 		system_prompt_sha256: system.sha256,
 		system_prompt_bytes: system.bytes,
@@ -231,6 +321,10 @@ export function buildContextSurfaceReceipt(
 		exact_duplicate_block_share: roundShare(totalMessageBytes ? duplicateBytes / totalMessageBytes : 0),
 		repeated_five_token_shingle_share: roundShare(shingleTotal ? shingleRepeated / shingleTotal : 0),
 		stale_tool_result_share: roundShare(totalToolBytes ? staleBytes / totalToolBytes : 0),
+		near_duplicate_block_share: roundShare(totalMessageBytes ? nearDupBytes / totalMessageBytes : 0),
+		prefix_stable: prefixStable,
+		appended_only: appendedOnly,
+		system_prompt_changed: systemPromptChanged,
 		context_tokens: usage?.tokens ?? null,
 		context_window: usage?.contextWindow ?? null,
 		context_pct: usage?.percent ?? null,
@@ -238,4 +332,5 @@ export function buildContextSurfaceReceipt(
 		plan_run_id: meta.planRunId ?? null,
 		plan_item_id: meta.planItemId ?? null,
 	};
+	return { receipt, blockHashes };
 }
