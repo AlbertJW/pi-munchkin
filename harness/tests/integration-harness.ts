@@ -42,7 +42,11 @@ export function makeFakePi() {
 export function makeCtx(cwd: string) {
 	const notes: string[] = [];
 	return {
-		ctx: { cwd, ui: { notify: (m: string, _l?: string) => notes.push(m), confirm: async () => true } },
+		ctx: {
+			cwd,
+			model: { provider: "test-provider", id: "test-model" },
+			ui: { notify: (m: string, _l?: string) => notes.push(m), confirm: async () => true },
+		},
 		notes,
 	};
 }
@@ -51,7 +55,10 @@ export function makeCtx(cwd: string) {
 export async function callTool(fp: FakePi, name: string, params: unknown, cwd: string) {
 	const tool = fp.tools.get(name);
 	if (!tool) throw new Error(`tool not registered: ${name}`);
-	return tool.execute("tc-test", params, undefined, undefined, { cwd });
+	return tool.execute("tc-test", params, undefined, undefined, {
+		cwd,
+		model: { provider: "test-provider", id: "test-model" },
+	});
 }
 
 // Fire an event through all registered handlers; returns the first non-undefined result

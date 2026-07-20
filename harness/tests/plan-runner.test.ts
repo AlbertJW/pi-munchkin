@@ -1,6 +1,8 @@
 import assert from "node:assert/strict";
+import { execFileSync } from "node:child_process";
 import test from "node:test";
-import { reconcileItems } from "../lib/plan-integrity.ts";
+import { reconcileItems, validateDeps } from "../lib/plan-integrity.ts";
+import { processWriterMarker } from "../lib/process-writer.ts";
 
 let seq = 0;
 const id = () => `item-${++seq}`;
@@ -35,4 +37,37 @@ test("reconcileItems: preserves item id across a cosmetic rename", () => {
 	const prev = reconcileItems(undefined, [{ title: "Fix `parseCSV`", status: "in_progress" }], id);
 	const next = reconcileItems(prev, [{ title: "fix parsecsv", status: "done" }], id); // case/backtick jitter
 	assert.equal(next[0].id, prev[0].id, "normalized-title match keeps the id");
+});
+
+test("validateDeps: rejects duplicate normalized titles", () => {
+	const errors = validateDeps([
+		{ title: "Fix `parseCSV`" },
+		{ title: "  fix parsecsv  " },
+	]);
+	assert.ok(errors.some((error) => error.includes("duplicate normalized title")), errors.join("\n"));
+});
+
+test("validateDeps: rejects duplicate normalized references in one depends_on list", () => {
+	const errors = validateDeps([
+		{ title: "build" },
+		{ title: "ship", depends_on: ["build", " `BUILD` "] },
+	]);
+	assert.ok(errors.some((error) => error.includes("repeats dependency")), errors.join("\n"));
+});
+
+test("process writer marker survives extension-style module reloads", async () => {
+	const first = processWriterMarker();
+	const reloaded = await import(`../lib/process-writer.ts?reload=${Date.now()}-${Math.random()}`);
+	assert.equal(reloaded.processWriterMarker(), first);
+});
+
+test("process writer marker is fresh in a genuinely new OS process", () => {
+	const current = processWriterMarker();
+	const child = execFileSync(process.execPath, [
+		"--experimental-strip-types",
+		"--input-type=module",
+		"--eval",
+		'import { processWriterMarker } from "./harness/lib/process-writer.ts"; process.stdout.write(processWriterMarker());',
+	], { cwd: process.cwd(), encoding: "utf8" });
+	assert.notEqual(child, current);
 });

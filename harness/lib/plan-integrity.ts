@@ -102,16 +102,30 @@ export function executionUnderway(prev: IntegrityItem[]): boolean {
 // before any state is written.
 export function validateDeps(items: Array<{ title: string; depends_on?: string[] }>): string[] {
 	const errors: string[] = [];
-	const titles = new Set(items.map((i) => normalizeTitle(i.title)));
+	const titles = new Set<string>();
+	const titleOwners = new Map<string, string>();
+	for (const item of items) {
+		const normalized = normalizeTitle(item.title);
+		const prior = titleOwners.get(normalized);
+		if (prior !== undefined) {
+			errors.push(`duplicate normalized title "${item.title}" collides with "${prior}"`);
+		} else {
+			titleOwners.set(normalized, item.title);
+			titles.add(normalized);
+		}
+	}
 	const deps = new Map<string, string[]>();
 	for (const it of items) {
 		const key = normalizeTitle(it.title);
 		const resolved: string[] = [];
+		const seen = new Set<string>();
 		for (const dep of it.depends_on ?? []) {
 			const depKey = normalizeTitle(dep);
-			if (!titles.has(depKey)) errors.push(`"${it.title}" depends on unknown item "${dep}"`);
+			if (seen.has(depKey)) errors.push(`"${it.title}" repeats dependency "${dep}"`);
+			else if (!titles.has(depKey)) errors.push(`"${it.title}" depends on unknown item "${dep}"`);
 			else if (depKey === key) errors.push(`"${it.title}" depends on itself`);
 			else resolved.push(depKey);
+			seen.add(depKey);
 		}
 		deps.set(key, resolved);
 	}

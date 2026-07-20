@@ -13,7 +13,9 @@ import { callTool, fire, makeCtx, makeFakePi } from "./integration-harness.ts";
 // module-load envs BEFORE importing the extensions
 process.env.PLAN_GATE_MAX = "2";
 process.env.MICRO_GATE = "on";
-const planRunner = (await import("../extensions/plan-runner.ts")).default;
+const planRunnerModule = await import("../extensions/plan-runner.ts");
+const planRunner = planRunnerModule.default;
+const policyBlock = planRunnerModule.policyBlock;
 const microGate = (await import("../extensions/micro-gate.ts")).default;
 
 const tmp = () => mkdtempSync(join(tmpdir(), "pi-int-"));
@@ -23,6 +25,55 @@ function freshPlanRunner() {
 	planRunner(fp.pi as any);
 	return fp;
 }
+
+test("lean and YOLO differ in pacing, never in safety authority", () => {
+	const lean = policyBlock("lean", false);
+	const yolo = policyBlock("yolo", false);
+	const safety = "ask before deletion, destructive git, deployment, migration, restart/kill, secrets or permissions, and irreversible external effects";
+	assert.ok(lean.toLowerCase().includes(safety), lean);
+	assert.ok(yolo.toLowerCase().includes(safety), yolo);
+	assert.ok(yolo.includes("without routine progress check-ins"));
+	assert.ok(!yolo.includes("Risky/destructive → act directly"));
+});
+
+test("runtime status distinguishes active override from configured default", async () => {
+	const fp = freshPlanRunner();
+	const cwd = tmp();
+	const { ctx, notes } = makeCtx(cwd);
+	await fp.commands.get("runtime-status").handler("", ctx);
+	assert.ok(notes.at(-1)?.includes("Active provider: test-provider"), notes.at(-1));
+	assert.ok(notes.at(-1)?.includes("Active model: test-model"), notes.at(-1));
+	assert.ok(notes.at(-1)?.includes("Configured default provider:"), notes.at(-1));
+});
+
+test("plan telemetry and traces carry the active model override plus run id", async () => {
+	const fp = freshPlanRunner();
+	const cwd = tmp();
+	const telemetry = join(cwd, "telemetry.jsonl");
+	const priorFile = process.env.TELEMETRY_FILE;
+	const priorSource = process.env.TELEMETRY_SOURCE;
+	process.env.TELEMETRY_FILE = telemetry;
+	process.env.TELEMETRY_SOURCE = "test";
+	try {
+		const { ctx } = makeCtx(cwd);
+		await fp.commands.get("plan").handler("model override test", ctx);
+		await callTool(fp, "plan_write", {
+			items: [{ title: "one", status: "pending" }], request: "model override test", summary: "one",
+		}, cwd);
+		await fire(fp, "tool_result", { toolName: "plan_write", isError: true, content: [{ type: "text", text: "raw invalid args" }] }, ctx);
+		const rows = readFileSync(telemetry, "utf8").trim().split("\n").map((line) => JSON.parse(line));
+		const planRows = rows.filter((row) => row.ext === "plan-runner");
+		assert.ok(planRows.length > 0);
+		assert.ok(planRows.every((row) => row.run_id && row.provider === "test-provider" && row.model === "test-model"));
+		assert.ok(planRows.some((row) => row.kind === "write-rejected" && row.reason_class === "schema_or_execution"));
+		assert.doesNotMatch(JSON.stringify(planRows), /raw invalid args/);
+		const traces = readFileSync(join(cwd, ".pi", "traces", "plan-runner.jsonl"), "utf8").trim().split("\n").map((line) => JSON.parse(line));
+		assert.ok(traces.every((row) => row.model.provider === "test-provider" && row.model.id === "test-model"));
+	} finally {
+		if (priorFile === undefined) delete process.env.TELEMETRY_FILE; else process.env.TELEMETRY_FILE = priorFile;
+		if (priorSource === undefined) delete process.env.TELEMETRY_SOURCE; else process.env.TELEMETRY_SOURCE = priorSource;
+	}
+});
 
 test("integration: /plan arms plan mode — mutations blocked, persistence written, prompt sent", async () => {
 	const fp = freshPlanRunner();
@@ -319,6 +370,22 @@ test("integration: plan_write with a broken dependency graph is rejected, state 
 	assert.equal(cycle.isError, true, "cycle rejects the call");
 	assert.ok(cycle.content[0].text.includes("cycle"), cycle.content[0].text);
 	assert.ok(!existsSync(join(cwd, ".pi", "plan-state.json")), "still no state written");
+
+	const duplicateTitle = await callTool(fp, "plan_write", {
+		items: [
+			{ title: "Fix `Parser`", status: "pending" },
+			{ title: " fix parser ", status: "pending" },
+		], request: "r", summary: "s",
+	}, cwd);
+	assert.equal(duplicateTitle.isError, true, "normalized title collision rejects the call");
+
+	const duplicateDep = await callTool(fp, "plan_write", {
+		items: [
+			{ title: "build", status: "pending" },
+			{ title: "ship", status: "pending", depends_on: ["build", "BUILD"] },
+		], request: "r", summary: "s",
+	}, cwd);
+	assert.equal(duplicateDep.isError, true, "duplicate dependency rejects the call");
 });
 
 test("integration: valid deps stored, rendered in TODO.md, unmet-dep work warned (advisory)", async () => {
@@ -408,4 +475,23 @@ test("integration: a state written by THIS process triggers no resume machinery"
 	assert.equal(notes.length, 0, "no interrupted-plan notice for our own state");
 	await fp.commands.get("plan-go").handler("", ctx);
 	assert.ok(!fp.sent.at(-1)!.includes("PARTIAL WORK"), "no partial-work block for our own state");
+});
+
+test("integration: reloading the extension in the same process does not invent an interrupted plan", async () => {
+	const cwd = tmp();
+	const first = makeFakePi();
+	const firstModule = await import(`../extensions/plan-runner.ts?reload-first=${Date.now()}-${Math.random()}`);
+	firstModule.default(first.pi as any);
+	await callTool(first, "plan_write", {
+		items: [{ title: "reload-safe work", status: "in_progress" }], request: "r", summary: "s",
+	}, cwd);
+
+	const reloaded = makeFakePi();
+	const secondModule = await import(`../extensions/plan-runner.ts?reload-second=${Date.now()}-${Math.random()}`);
+	secondModule.default(reloaded.pi as any);
+	const { ctx, notes } = makeCtx(cwd);
+	await fire(reloaded, "session_start", { reason: "extension-reload" }, ctx);
+	assert.equal(notes.length, 0, "same-process reload must retain the process writer identity");
+	await reloaded.commands.get("plan-go").handler("", ctx);
+	assert.ok(!reloaded.sent.at(-1)!.includes("PARTIAL WORK"), "same-process reload is not a crash resume");
 });

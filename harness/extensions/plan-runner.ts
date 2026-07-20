@@ -8,6 +8,7 @@ import { assertVerifyGateAllowed, classifyBashCommand } from "../lib/command-pol
 import { runReadonlyGate } from "../lib/gate-runtime.ts";
 import { planIntegrity, executionUnderway, normalizeTitle, preserveDecision, validateDeps, unmetDeps, reconcileItems as libReconcile, type ReconciledItem, type IncomingItem } from "../lib/plan-integrity.ts";
 import { nextReplanStreak, parseTodoLine } from "../lib/plan-progress.ts";
+import { processWriterMarker } from "../lib/process-writer.ts";
 import { steerText } from "../lib/steer-texts.ts";
 import { record } from "../lib/telemetry.ts";
 
@@ -37,6 +38,22 @@ let replanStreak = 0;
 // never run /plan-go).
 let resumeNotified = false;
 let partialWorkNoted = false;
+type ModelIdentity = { provider: string; id: string };
+let activeModel: ModelIdentity = { provider: "unknown", id: "unknown" };
+
+function rememberModel(ctx: { model?: { provider?: string; id?: string } }): ModelIdentity {
+	if (ctx.model?.provider && ctx.model?.id) activeModel = { provider: ctx.model.provider, id: ctx.model.id };
+	return activeModel;
+}
+
+function planEvent(kind: string, runId: string, detail: Record<string, unknown> = {}): void {
+	record("plan-runner", kind, {
+		run_id: runId,
+		provider: activeModel.provider,
+		model: activeModel.id,
+		...detail,
+	});
+}
 // B yields an omitted open item after this many consecutive preserves (persistent
 // omission = intent; e.g. a parent the model replaced with sub-items). R1 (done) never yields.
 const PRESERVE_MAX = Math.max(2, Number.parseInt(process.env.PLAN_PRESERVE_MAX || "3", 10) || 3);
@@ -143,16 +160,6 @@ function compactValue(value: unknown): unknown {
 	return value;
 }
 
-async function runtimeSnapshot(): Promise<{ provider: string; id: string }> {
-	const settingsFile = join(homedir(), ".pi", "agent", "settings.json");
-	try {
-		const parsed = JSON.parse(await readFile(settingsFile, "utf8"));
-		return { provider: parsed.defaultProvider ?? "unknown", id: parsed.defaultModel ?? "unknown" };
-	} catch {
-		return { provider: "unknown", id: "unknown" };
-	}
-}
-
 // ---------- trace + repeated-failure guard (preserved from v2) ----------
 
 function stableStringify(value: unknown): string {
@@ -221,7 +228,7 @@ async function appendTrace(cwd: string, event: TraceEvent): Promise<number | und
 	const repeatedRecovery = "Same failed action repeated without changed observed_state or required_state; change strategy, inspect state, or mark blocked.";
 	const withDefaults = {
 		timestamp: isoNow(),
-		model: event.model ?? await runtimeSnapshot(),
+		model: event.model ?? activeModel,
 		...event,
 		failure_class: failureClass,
 		action_fingerprint: fingerprint,
@@ -243,11 +250,11 @@ function getSection(markdown: string, heading: string): string {
 	return match ? match[1].trim() : "";
 }
 
-function newState(request: string, summary: string, autonomy: Autonomy, items: PlanItem[]): PlanState {
+function newState(request: string, summary: string, autonomy: Autonomy, items: PlanItem[], runId?: string): PlanState {
 	const now = isoNow();
 	return {
 		schema_version: 3,
-		run_id: `plan-${timestamp()}`,
+		run_id: runId ?? `plan-${timestamp()}`,
 		request,
 		summary,
 		autonomy,
@@ -366,7 +373,7 @@ function renderTodo(state: PlanState): string {
 // isn't THIS process was left by a previous (crashed/aborted) session, so its
 // in_progress items may hold partial work on disk. Pre-upgrade files have no
 // writer field, which correctly reads as "another process".
-const PROC_MARK = randomUUID();
+const PROC_MARK = processWriterMarker();
 
 function staleInProgress(state: PlanState): PlanItem[] {
 	return state.writer === PROC_MARK ? [] : state.items.filter((i) => i.status === "in_progress");
@@ -379,6 +386,10 @@ async function writeStateAndTodo(cwd: string, state: PlanState): Promise<void> {
 	await mkdir(dirname(sp), { recursive: true });
 	await writeFile(sp, `${JSON.stringify(state, null, 2)}\n`, "utf8");
 	await writeFile(todoPath(cwd), renderTodo(state), "utf8");
+	(globalThis as Record<string, unknown>).__pi_active_plan_context = {
+		run_id: state.run_id,
+		item_id: currentItem(state)?.id,
+	};
 }
 
 async function mutatePlan<T>(cwd: string, fn: (state: PlanState | undefined) => Promise<{ state?: PlanState; result: T }>): Promise<T> {
@@ -448,17 +459,19 @@ Delegate to keep this window clean (subagent returns only a compact result):
 - Isolated, fully-scoped edit → subagent(executor, …, mode=fork). You own the plan; trivial edits yourself.`;
 }
 
-function policyBlock(autonomy: Autonomy, subagentAvailable: boolean): string {
+export function policyBlock(autonomy: Autonomy, subagentAvailable: boolean): string {
 	if (autonomy === "yolo") {
 		return `YOLO:
-- Run to completion. No check-ins.
+- Run to completion without routine progress check-ins.
 - Blocked item → re-plan (plan_write rewrites the list), continue.
-- Risky/destructive → act directly.
+- Continue autonomously through ordinary reversible work.
+- Still ask before deletion, destructive Git, deployment, migration, restart/kill, secrets or permissions, and irreversible external effects.
 - Repeat failure → change strategy, retry; quit only if truly stuck.${delegationBlock(subagentAvailable)}`;
 	}
 	return `LEAN:
 - Do a chunk, report, pause for check-in.
 - Blocked item → mark blocked via plan_write, stop, report. Don't push past.
+- Ask before deletion, destructive Git, deployment, migration, restart/kill, secrets or permissions, and irreversible external effects.
 - Same action failed twice (see plan_write warning) → stop, mark blocked, change strategy.${delegationBlock(subagentAvailable)}`;
 }
 
@@ -519,17 +532,20 @@ ${executeBlock(state.autonomy, subagentAvailable)}`;
 
 // ---------- runtime status (preserved) ----------
 
-async function runtimeStatusText(): Promise<string> {
+async function runtimeStatusText(ctx: { model?: { provider?: string; id?: string } }): Promise<string> {
 	const settingsFile = join(homedir(), ".pi", "agent", "settings.json");
 	const modelsFile = join(homedir(), ".pi", "agent", "models.json");
 	const settings = (await exists(settingsFile)) ? JSON.parse(await readFile(settingsFile, "utf8")) : {};
 	const models = (await exists(modelsFile)) ? JSON.parse(await readFile(modelsFile, "utf8")) : {};
-	const provider = settings.defaultProvider ?? "unknown";
-	const model = settings.defaultModel ?? "unknown";
-	const providerCfg = models.providers?.[provider];
+	const configuredProvider = settings.defaultProvider ?? "unknown";
+	const configuredModel = settings.defaultModel ?? "unknown";
+	const selected = rememberModel(ctx);
+	const providerCfg = models.providers?.[selected.provider] ?? models.providers?.[configuredProvider];
 	return [
-		`Provider: ${provider}`,
-		`Model: ${model}`,
+		`Active provider: ${selected.provider}`,
+		`Active model: ${selected.id}`,
+		`Configured default provider: ${configuredProvider}`,
+		`Configured default model: ${configuredModel}`,
 		`Base URL: ${providerCfg?.baseUrl ?? "not configured for selected provider"}`,
 		`API: ${providerCfg?.api ?? "unknown"}`,
 		`Default thinking: ${settings.defaultThinkingLevel ?? "unknown"}`,
@@ -585,13 +601,15 @@ const planWrite = defineTool({
 	}),
 	async execute(_toolCallId, params, _signal, _onUpdate, ctx) {
 		const aid = actionId();
+		rememberModel(ctx);
 
 		// A structurally broken dependency graph (unknown ref, self-dep, cycle) is a
 		// plan-authoring error — reject before ANY state is written so the model
 		// fixes and resends rather than persisting a graph no one can order.
 		const depErrors = validateDeps(params.items);
 		if (depErrors.length > 0) {
-			record("plan-runner", "deps-rejected", { errors: depErrors.length });
+			const existing = await readState(ctx.cwd);
+			planEvent("deps-rejected", existing?.run_id ?? `rejected-${aid}`, { errors: depErrors.length });
 			return {
 				content: [{ type: "text" as const, text:
 					"plan_write rejected:\n- " + depErrors.join("\n- ") +
@@ -602,7 +620,8 @@ const planWrite = defineTool({
 			};
 		}
 
-		const { state, newlyBlocked, gateMsgs, integrity, newlyDone, prevCompleted, stalePrev } = await mutatePlan(ctx.cwd, async (prev) => {
+		const { state, newlyBlocked, gateMsgs, integrity, newlyDone, prevCompleted, stalePrev, wasRewrite } = await mutatePlan(ctx.cwd, async (prev) => {
+			const eventRunId = prev?.run_id ?? `plan-${timestamp()}`;
 			const items = reconcileItems(prev?.items, params.items as any);
 			const prevById = new Map((prev?.items ?? []).map((i) => [i.id, i]));
 			const prevBlocked = new Set((prev?.items ?? []).filter((i) => i.status === "blocked").map((i) => i.id));
@@ -637,7 +656,8 @@ const planWrite = defineTool({
 					// same-process globalThis idiom) so verify-gate doesn't nag the
 					// wrap-up to verify again after the gate already ran green.
 					(globalThis as Record<string, unknown>).__pi_gate_green = true;
-					record("plan-runner", "gate", { pass: true });
+					const priorFails = prevById.get(it.id)?.gate_fails ?? 0;
+					planEvent("gate", eventRunId, { pass: true, recovered: priorFails > 0, prior_fails: priorFails });
 					continue;
 				}
 				const fails = (prevById.get(it.id)?.gate_fails ?? 0) + 1;
@@ -646,7 +666,7 @@ const planWrite = defineTool({
 				// fresh subagent, or at least a fresh approach), rung 3 = blocked. The
 				// same fix path retried verbatim in the same context rarely converges.
 				const rung = fails >= GATE_MAX ? 3 : fails === 1 ? 1 : 2;
-				record("plan-runner", "gate", { pass: false, fails, rung });
+				planEvent("gate", eventRunId, { pass: false, fails, rung, terminal: rung === 3 });
 				const tail = out.split("\n").slice(-4).join(" / ").slice(0, 300);
 				const longTail = out.slice(-500);
 				it.gate_fails = fails;
@@ -706,13 +726,13 @@ const planWrite = defineTool({
 
 			const next: PlanState = prev
 				? { ...prev, request: params.request ?? prev.request, summary: params.summary ?? prev.summary, items, phase: prev.phase === "planned" ? "planned" : "executing", updated_at: isoNow() }
-				: newState(params.request ?? "", params.summary ?? "", "lean", items);
+				: newState(params.request ?? "", params.summary ?? "", "lean", items, eventRunId);
 			const newlyBlocked = items.filter((i) => i.status === "blocked" && !prevBlocked.has(i.id));
 			const prevCompleted = prev ? derivedStatus(prev) === "completed" : false;
 			// Captured BEFORE this write stamps us as the writer — a foreign-writer
 			// state with in_progress items is a headless resume (no /plan-go ran).
 			const stalePrev = prev ? staleInProgress(prev) : [];
-			return { state: next, result: { state: next, newlyBlocked, gateMsgs, integrity: { reattached, preservedOpen, yieldedOpen }, newlyDone, prevCompleted, stalePrev } };
+			return { state: next, result: { state: next, newlyBlocked, gateMsgs, integrity: { reattached, preservedOpen, yieldedOpen }, newlyDone, prevCompleted, stalePrev, wasRewrite: Boolean(prev) } };
 		});
 
 		// Trace each newly blocked item through the repeated-failure guard.
@@ -763,7 +783,7 @@ const planWrite = defineTool({
 			if (integrity.preservedOpen.length) segs.push(`kept ${integrity.preservedOpen.length} open item(s) you omitted (${integrity.preservedOpen.map((i) => i.title).join("; ").slice(0, 160)}) — to drop one, mark it done/blocked, don't leave it out`);
 			if (integrity.yieldedOpen.length) segs.push(`released ${integrity.yieldedOpen.length} open item(s) you've omitted ${PRESERVE_MAX}× — treating as intentional removal`);
 			integrityWarn = `\n⚠ plan integrity: ${segs.join("; ")}. Re-emit the ENTIRE list each call.`;
-			record("plan-runner", "integrity", {
+			planEvent("integrity", state.run_id, {
 				reattached: integrity.reattached.length,
 				preserved: integrity.preservedOpen.length,
 				yielded: integrity.yieldedOpen.length,
@@ -795,7 +815,7 @@ const planWrite = defineTool({
 		// Don't fire "stop re-planning, execute now" in the same call that just told
 		// the model to stop and wait for the user — the two steers directly contradict.
 		const thrashFired = replanWarn && !!cur && !askNow;
-		if (thrashFired) record("plan-runner", "thrash-warn", { streak: replanStreak });
+		if (thrashFired) planEvent("thrash-warn", state.run_id, { streak: replanStreak });
 		let thrashWarn = "";
 		if (thrashFired) {
 			thrashWarn = `\n⚠ re-planned ${replanStreak}× with no item completed — stop re-planning; execute "${cur!.title}" now, or mark it blocked.`;
@@ -840,6 +860,19 @@ const planWrite = defineTool({
 			.filter((i) => i.status === "in_progress" && unmetDeps(i, state.items).length > 0)
 			.map((i) => `\n⚠ "${i.title}" depends on unfinished: ${unmetDeps(i, state.items).join("; ")} — ordering is advisory; finish those first or restatus them.`);
 		const depWarn = depWarns.join("");
+		const declaredDeps = state.items.reduce((sum, item) => sum + (item.depends_on?.length ?? 0), 0);
+		const unmetDependencyCount = state.items
+			.filter((item) => item.status === "in_progress")
+			.reduce((sum, item) => sum + unmetDeps(item, state.items).length, 0);
+		planEvent("write", state.run_id, {
+			items: state.items.length,
+			newly_done: newlyDone,
+			rewrite: wasRewrite,
+			declared_dependencies: declaredDeps,
+			unmet_dependencies: unmetDependencyCount,
+			dependency_compliant: unmetDependencyCount === 0,
+			context_tokens: ctx.getContextUsage?.()?.tokens ?? null,
+		});
 		// One-shot partial-work note for headless resumes: first plan_write of this
 		// process against a state another process left with in_progress items.
 		let resumeWarn = "";
@@ -859,7 +892,8 @@ const planWrite = defineTool({
 
 // ---------- commands ----------
 
-async function startPlanCommand(args: string, ctx: { cwd: string; ui: { notify(m: string, l?: string): void } }, pi: ExtensionAPI) {
+async function startPlanCommand(args: string, ctx: { cwd: string; model?: { provider?: string; id?: string }; ui: { notify(m: string, l?: string): void } }, pi: ExtensionAPI) {
+	rememberModel(ctx);
 	const yolo = /(^|\s)yolo$/i.test(args);
 	const request = args.replace(/(^|\s)yolo$/i, "").trim();
 	if (!request) {
@@ -883,7 +917,8 @@ async function startPlanCommand(args: string, ctx: { cwd: string; ui: { notify(m
 	pi.sendUserMessage(yolo ? planAndExecutePrompt(request, subagentAvailable) : planOnlyPrompt(request));
 }
 
-async function goCommand(args: string, ctx: { cwd: string; ui: { notify(m: string, l?: string): void } }, pi: ExtensionAPI) {
+async function goCommand(args: string, ctx: { cwd: string; model?: { provider?: string; id?: string }; ui: { notify(m: string, l?: string): void } }, pi: ExtensionAPI) {
+	rememberModel(ctx);
 	setPlanning(false); // execution starts — disarm the plan-mode mutation block
 	replanStreak = 0; // execution start — reset thrash counter so planning drafts don't carry in
 	const state = await readState(ctx.cwd);
@@ -946,6 +981,7 @@ export default function (pi: ExtensionAPI) {
 	// items is an interrupted plan — surface it once so the user can inspect,
 	// resume, or replace instead of never learning it exists.
 	pi.on("session_start", async (_event, ctx) => {
+		rememberModel(ctx);
 		if (resumeNotified) return;
 		resumeNotified = true;
 		const state = await readState(ctx.cwd);
@@ -953,7 +989,7 @@ export default function (pi: ExtensionAPI) {
 		const open = state.items.filter((i) => i.status === "pending" || i.status === "in_progress" || i.status === "blocked");
 		if (open.length === 0) return;
 		const inProgress = state.items.filter((i) => i.status === "in_progress").length;
-		record("plan-runner", "resume-found", { open: open.length, in_progress: inProgress });
+		planEvent("resume-found", state.run_id, { open: open.length, in_progress: inProgress });
 		ctx.ui.notify(
 			`Interrupted plan from a previous session: "${state.request}" — ${open.length} open item(s)${inProgress ? `, ${inProgress} in_progress (may have partial work)` : ""}. /plan-status to inspect, /plan-go to resume, /plan <request> to replace.`,
 			"info",
@@ -961,6 +997,18 @@ export default function (pi: ExtensionAPI) {
 	});
 
 	pi.registerTool(planWrite);
+
+	// Pi's argument validator can reject a plan_write before execute() runs. Observe
+	// that result without retaining the validator's raw message or malformed payload.
+	pi.on("tool_result", async (event, ctx) => {
+		if (event.toolName !== "plan_write" || !event.isError) return;
+		rememberModel(ctx);
+		const state = await readState(ctx.cwd);
+		planEvent("write-rejected", state?.run_id ?? `rejected-${actionId()}`, {
+			reason_class: "schema_or_execution",
+			context_tokens: ctx.getContextUsage?.()?.tokens ?? null,
+		});
+	});
 
 	pi.registerCommand("plan", {
 		description: "Plan a request. Lean: plan then stop for /plan-go. Add 'yolo' to plan+run without routine pauses.",
@@ -988,7 +1036,7 @@ export default function (pi: ExtensionAPI) {
 	});
 	pi.registerCommand("runtime-status", {
 		description: "Show provider/model runtime status.",
-		handler: async (_args, ctx) => ctx.ui.notify(await runtimeStatusText(), "info"),
+		handler: async (_args, ctx) => ctx.ui.notify(await runtimeStatusText(ctx), "info"),
 	});
 
 	// Reactive context prune: rewind the window to the plan node (stamped at
@@ -1039,7 +1087,8 @@ export default function (pi: ExtensionAPI) {
 			if (isMutation) {
 				const state = await readState(ctx.cwd);
 				if (state?.phase === "executing") {
-					record("plan-runner", "subagent-only-block", { toolName: event.toolName });
+					rememberModel(ctx);
+					planEvent("subagent-only-block", state.run_id, { toolName: event.toolName });
 					// Only point at subagent(executor, ...) when it's genuinely available —
 					// real_gate.sh's tool list must include it whenever this threshold is
 					// on, but don't assume that wiring is correct; check, don't promise.
@@ -1058,6 +1107,7 @@ export default function (pi: ExtensionAPI) {
 	// Observability only: if the agent goes idle with open items, record it.
 	// No prompt re-injection (that was the fragile part of v2).
 	pi.on("agent_end", async (_event, ctx) => {
+		rememberModel(ctx);
 		setPlanning(false); // planning run ended (well-behaved or not) — disarm
 		const cwd = ctx.cwd;
 		const state = await readState(cwd);
