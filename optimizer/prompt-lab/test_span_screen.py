@@ -54,7 +54,8 @@ class SpanScreenTests(unittest.TestCase):
                     "span_receipt_success": bool(arm == "cand" and receipts),
                     "experiment": {"manifest_sha256": "0" * 64 if drift else self.manifest["manifest_sha256"],
                                    "cell": cell["id"]},
-                    "config": {"sha256": cell["config_sha256"], "declared_env": cell["declared_env"]},
+                    "config": {"sha256": cell["config_sha256"], "declared_env": cell["declared_env"],
+                               "rendered_governor_sha256": "d" * 64},
                     "harness": {"surface_sha256": None, "hash_blocker": "loaded surface unavailable"},
                     "context": {
                         "schema": "pi.context-telemetry/v1", "authenticated": True,
@@ -118,6 +119,20 @@ class SpanScreenTests(unittest.TestCase):
         self.assertFalse(eligible); self.assertIn("INELIGIBLE", text)
         self.assertIn("zero span-tool exposure", text)
         self.assertIn("lack exhaustive", text)
+
+    def test_missing_rendered_governor_hash_is_ineligible(self):
+        rows = self.rows()
+        del rows[0]["config"]["rendered_governor_sha256"]
+        text, eligible = screen.mechanism_report(rows, self.manifest)
+        self.assertFalse(eligible)
+        self.assertIn("rendered_governor_sha256 missing or malformed", text)
+
+    def test_malformed_rendered_governor_hash_is_ineligible(self):
+        rows = self.rows()
+        rows[0]["config"]["rendered_governor_sha256"] = "not-a-hash"
+        text, eligible = screen.mechanism_report(rows, self.manifest)
+        self.assertFalse(eligible)
+        self.assertIn("rendered_governor_sha256 missing or malformed", text)
 
     def test_default_rows_report_same_run_screen_only(self):
         text, eligible = screen.mechanism_report(self.rows(), self.manifest)

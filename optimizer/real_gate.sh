@@ -402,7 +402,13 @@ run_one() {  # $1=config $2=arm $3=task $4=rep [$5=split] [$6=prompt-variant]
 		echo "[real_gate] TRAJECTORY=on requires SPAN_TOOLS=on for $pat/$task; refusing argument-only evidence" >&2
 		exit 2
 	fi
-	local tools="read,edit,bash"; [[ "$task" == "t4" ]] && tools="read,edit,bash,subagent"
+	# PLAN_SUBAGENT_ONLY blocks direct edits and points the model at subagent(executor,
+	# ...) instead — the escape hatch must actually exist in the session's tool list,
+	# not just t4's, or the candidate is instructing an unavailable tool.
+	local env_plan_subagent_only=""
+	for entry in "${session_env[@]}"; do [[ "$entry" == PLAN_SUBAGENT_ONLY=* ]] && env_plan_subagent_only="${entry#*=}"; done
+	local tools="read,edit,bash"
+	[[ "$task" == "t4" || "$env_plan_subagent_only" == "1" ]] && tools="read,edit,bash,subagent"
 	[[ "$env_span_tools" == "on" ]] && tools="$tools,search_spans,read_span"
 	# Candidate env the PARENT shell must see: the exports below happen inside the pi
 	# subshell only, so checking ${RETRY_FRESH} out here read the parent's env and the

@@ -240,6 +240,13 @@ def mechanism_report(rows: list[dict[str, Any]], manifest: dict[str, Any]) -> tu
             binding = row.get("config") or {}
             if binding.get("sha256") != expected_cell["config_sha256"] or binding.get("declared_env") != expected_cell["declared_env"]:
                 reasons.append(f"{arm} config provenance drift")
+            # The schema requires this on every v2 row, but nothing checked it here
+            # — a missing or malformed value passed silently. Presence + shape only:
+            # the rendered file is written fresh per gate run, not a static value to
+            # compare against the manifest the way config.sha256 is.
+            rendered_gov = binding.get("rendered_governor_sha256")
+            if not (isinstance(rendered_gov, str) and len(rendered_gov) == 64 and all(c in "0123456789abcdef" for c in rendered_gov)):
+                reasons.append(f"{arm} config.rendered_governor_sha256 missing or malformed")
             harness = row.get("harness") or {}
             surface = harness.get("surface_sha256")
             if surface is not None:
@@ -302,7 +309,7 @@ def mechanism_report(rows: list[dict[str, Any]], manifest: dict[str, Any]) -> tu
         lines.append(f"| {metric} | {aggregate('base', metric)} | {aggregate('cand', metric)} |")
     if harness_verified:
         lines += ["", "## HARNESS SURFACE", "",
-                  "Every row's loaded-harness hash was present and corroborated by that row's own authenticated telemetry — this comparison ran under a proven, identical harness surface (first-party code, active npm packages, and role prompts) on both arms.", ""]
+                  "Every row's loaded-harness hash was present and corroborated by that row's own authenticated telemetry, on both arms. First-party code and role prompts are verified by content hash. Active npm packages are verified by matching lockfile-pinned identity (name, version, resolved URL, integrity) — not by re-hashing installed file bytes, so a locally modified installed package would not be caught.", ""]
     else:
         lines += ["", "## REPRODUCIBILITY BLOCKER", "",
                   manifest["provenance"]["harness_hash_blocker"],

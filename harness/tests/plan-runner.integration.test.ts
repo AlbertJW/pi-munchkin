@@ -65,7 +65,7 @@ test("integration: plan_write persists items; /plan-go disarms the block and pro
 	assert.equal(edit, undefined, "mutation block disarmed after /plan-go");
 });
 
-test("integration: PLAN_SUBAGENT_ONLY blocks direct edits during execution (not during planning)", async () => {
+test("integration: PLAN_SUBAGENT_ONLY blocks direct edits AND mutating bash during execution, points at subagent only when it's actually available", async () => {
 	process.env.PLAN_SUBAGENT_ONLY = "1";
 	try {
 		const fp = makeFakePi();
@@ -87,13 +87,28 @@ test("integration: PLAN_SUBAGENT_ONLY blocks direct edits during execution (not 
 		}, cwd);
 		await fp.commands.get("plan-go").handler("", ctx);
 
-		const edit = await fire(fp, "tool_call", { toolName: "edit", input: {} }, ctx);
-		assert.equal(edit?.block, true, "direct edit blocked during execution under PLAN_SUBAGENT_ONLY");
-		assert.ok(edit.reason.includes("PLAN_SUBAGENT_ONLY"));
-		assert.ok(edit.reason.includes("subagent(executor"));
+		// fake harness defaults getActiveTools() to [] — subagent not available here.
+		const editNoSubagent = await fire(fp, "tool_call", { toolName: "edit", input: {} }, ctx);
+		assert.equal(editNoSubagent?.block, true, "direct edit blocked during execution under PLAN_SUBAGENT_ONLY");
+		assert.ok(editNoSubagent.reason.includes("PLAN_SUBAGENT_ONLY"));
+		assert.ok(!editNoSubagent.reason.includes("subagent(executor"),
+			"must not tell the model to use a tool that isn't actually available");
+		assert.ok(editNoSubagent.reason.includes("no subagent tool is available"));
+
+		const bashMut = await fire(fp, "tool_call", { toolName: "bash", input: { command: "sed -i s/a/b/ file" } }, ctx);
+		assert.equal(bashMut?.block, true, "mutating bash blocked too, not just edit/write/multiedit");
+
+		const bashReadonly = await fire(fp, "tool_call", { toolName: "bash", input: { command: "cat file" } }, ctx);
+		assert.equal(bashReadonly, undefined, "read-only bash stays allowed");
 
 		const read = await fire(fp, "tool_call", { toolName: "read", input: { path: "x" } }, ctx);
 		assert.equal(read, undefined, "read-only tool calls stay allowed");
+
+		// now with subagent genuinely available: the reason should point at it.
+		fp.pi.getActiveTools = () => ["subagent"];
+		const editWithSubagent = await fire(fp, "tool_call", { toolName: "edit", input: {} }, ctx);
+		assert.equal(editWithSubagent?.block, true);
+		assert.ok(editWithSubagent.reason.includes("subagent(executor"));
 	} finally {
 		delete process.env.PLAN_SUBAGENT_ONLY;
 	}

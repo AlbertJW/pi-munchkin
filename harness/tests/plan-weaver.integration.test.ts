@@ -242,6 +242,24 @@ test("an aborted dispatch pauses resumably instead of marking untouched items pe
 	rmSync(cwd, { recursive: true, force: true });
 });
 
+test("aborting an ungated (explore/verify) item MID-FLIGHT leaves it pending, not permanently blocked", async () => {
+	// Unlike the pre-aborted case above (nothing ever dispatched), this aborts
+	// WHILE the ungated item's child is genuinely running — runChild resolves
+	// {ok:false} exactly like a real failure would, so the ungated branch must
+	// check the signal itself rather than trusting child.ok alone.
+	const { fp, cwd } = await freshWeaver();
+	await compile(fp, cwd, [
+		{ id: "s1", title: "hang-child", mode: "explore", deliverable: "notes" },
+	]);
+	const { ctx } = makeCtx(cwd);
+	const controller = new AbortController();
+	setTimeout(() => controller.abort(), 200); // the stub's hang-child sleeps 3s
+	await fp.commands.get("weave-go").handler("", { ...ctx, signal: controller.signal });
+	const state = JSON.parse(readFileSync(join(cwd, ".pi", "weave-state.json"), "utf8"));
+	assert.equal(state.items[0].status, "pending", "aborted mid-flight ungated item stays pending, not blocked");
+	rmSync(cwd, { recursive: true, force: true });
+});
+
 test("a plan resumed from disk (not freshly compiled) tells the first dispatch partial work may exist", async () => {
 	const { fp, cwd } = await freshWeaver();
 	await compile(fp, cwd, [

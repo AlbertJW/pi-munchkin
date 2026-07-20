@@ -129,6 +129,14 @@ def integrity_errors(rows, baseline, candidate):
                     errors.append(f"{cell}: loaded-harness hash present but not corroborated by authenticated telemetry")
             elif not harness.get("hash_blocker"):
                 errors.append(f"{cell}: loaded-harness provenance missing both hash and blocker text")
+            # The schema requires config.rendered_governor_sha256 on every v2 row,
+            # but nothing enforced that promise at the row-validation layer — a row
+            # missing it, or carrying a malformed value, passed silently. Presence +
+            # shape only (not equality against a fixed value: the rendered file is
+            # written fresh per gate run, not a static, precomputable quantity).
+            rendered_gov = (r.get("config") or {}).get("rendered_governor_sha256")
+            if not (isinstance(rendered_gov, str) and len(rendered_gov) == 64 and all(c in "0123456789abcdef" for c in rendered_gov)):
+                errors.append(f"{cell}: config.rendered_governor_sha256 missing or malformed")
     models = sorted({r.get("model") for r in rows if r.get("model")})
     declarations = {tuple(r.get("fleet_expected_models", [])) for r in rows if r.get("fleet_expected_models")}
     if len(declarations) > 1:
@@ -385,7 +393,7 @@ def selftest():
     assert any("heldout/base: no rows" in e for e in integrity_errors(partial_held, "base", "cand"))
     missing_fleet = [dict(r, fleet_expected_models=[dd, "small-model"]) for r in clean]
     assert any("small-model" in e for e in integrity_errors(missing_fleet, "base", "cand"))
-    def v2(r, fp="fp", surface_sha=None):
+    def v2(r, fp="fp", surface_sha=None, rendered_gov="d" * 64):
         # Default: no hash, just the blocker — matches every real row before a
         # loaded-surface receipt is available. Pass surface_sha for a
         # self-consistent corroborated row (harness + context agree).
@@ -393,11 +401,12 @@ def selftest():
         if surface_sha is not None:
             context["harness_surface_sha256"] = surface_sha
         harness = {"surface_sha256": surface_sha, "hash_blocker": "" if surface_sha else "blocked"}
+        config = {"sha256": "e" * 64, "declared_env": {}, "rendered_governor_sha256": rendered_gov}
         return dict(r, schema="pi.eval-row/v2", authoritative=True, status="complete",
                     prompt={"variant": "canonical"}, serving={"stable": True,
                     "pre": {"status": "complete", "fingerprint_sha256": fp},
                     "post": {"status": "complete", "fingerprint_sha256": fp}},
-                    harness=harness, context=context)
+                    harness=harness, context=context, config=config)
     clean_v2 = [v2(r) for r in clean]
     assert not integrity_errors(clean_v2, "base", "cand")
     # Loaded-harness provenance: general adoption path enforces it too now, not
@@ -410,6 +419,10 @@ def selftest():
     assert any("missing both hash and blocker" in e for e in integrity_errors(missing_both, "base", "cand"))
     mismatched_arms = [v2(r, surface_sha="b" * 64) if r["pattern"] == "base" else v2(r, surface_sha="c" * 64) for r in clean]
     assert any("different loaded-harness surfaces" in e for e in integrity_errors(mismatched_arms, "base", "cand"))
+    missing_gov = [dict(v2(r), config={"sha256": "e" * 64, "declared_env": {}}) for r in clean]
+    assert any("rendered_governor_sha256 missing or malformed" in e for e in integrity_errors(missing_gov, "base", "cand"))
+    malformed_gov = [v2(r, rendered_gov="not-a-hash") for r in clean]
+    assert any("rendered_governor_sha256 missing or malformed" in e for e in integrity_errors(malformed_gov, "base", "cand"))
     bad_fp = [v2(r, "other") if r["pattern"] == "cand" and r["task"] == "a" and r["rep"] == 1 else v2(r) for r in clean]
     assert any("different serving fingerprints" in e for e in integrity_errors(bad_fp, "base", "cand"))
     incomplete = [dict(v2(r), status="incomplete", authoritative=False) if r is clean[0] else v2(r) for r in clean]

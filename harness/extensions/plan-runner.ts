@@ -921,14 +921,27 @@ export default function (pi: ExtensionAPI) {
 		// PLAN_SUBAGENT_ONLY candidate: during execution (not planning), force every
 		// scoped edit through a fresh subagent instead of leaving delegation advisory
 		// — the same process-isolation weave gets from spawning a fresh pi per item.
-		if (PLAN_SUBAGENT_ONLY && PLAN_MUTATION_TOOLS.has(event.toolName)) {
-			const state = await readState(ctx.cwd);
-			if (state?.phase === "executing") {
-				return {
-					block: true,
-					reason:
-						"failure_class=plan_mode_violation. Direct edits are disabled under PLAN_SUBAGENT_ONLY — use subagent(executor, ..., mode=fork) for this scoped edit instead.",
-				};
+		// Covers bash mutations too (sed -i, cat >, ...), not just edit/write/multiedit
+		// — a mutating bash call is exactly as much a direct edit as those tools.
+		if (PLAN_SUBAGENT_ONLY) {
+			const isMutation =
+				PLAN_MUTATION_TOOLS.has(event.toolName) ||
+				(event.toolName === "bash" && classifyBashCommand(String((event.input as Record<string, unknown> | undefined)?.command ?? "")).mutates);
+			if (isMutation) {
+				const state = await readState(ctx.cwd);
+				if (state?.phase === "executing") {
+					record("plan-runner", "subagent-only-block", { toolName: event.toolName });
+					// Only point at subagent(executor, ...) when it's genuinely available —
+					// real_gate.sh's tool list must include it whenever this threshold is
+					// on, but don't assume that wiring is correct; check, don't promise.
+					const subagentAvailable = pi.getActiveTools().includes("subagent");
+					return {
+						block: true,
+						reason: subagentAvailable
+							? "failure_class=plan_mode_violation. Direct mutation is disabled under PLAN_SUBAGENT_ONLY — use subagent(executor, ..., mode=fork) for this scoped edit instead."
+							: "failure_class=plan_mode_violation. Direct mutation is disabled under PLAN_SUBAGENT_ONLY, and no subagent tool is available in this session — mark the item blocked and stop rather than retry.",
+					};
+				}
 			}
 		}
 	});

@@ -163,8 +163,16 @@ async function dispatchItem(exec: Exec, cwd: string, it: WeaveItem, signal?: Abo
 	let child = await runChild(exec, cwd, it.mode, childBrief(cwd, it, resumeNote), signal);
 	let parsed = parseChildResult(child.text);
 
-	// explore/verify have no gate: the parsed contract IS the outcome.
+	// explore/verify have no gate: the parsed contract IS the outcome. But an
+	// aborted child also resolves with ok:false, indistinguishable from a genuine
+	// failure by that field alone — check the signal first so a cancellation
+	// leaves the item resumable ("pending"), matching the gated ladder's handling,
+	// instead of collapsing it into a permanent "blocked".
 	if (!it.gate) {
+		if (signal?.aborted) {
+			it.status = "pending";
+			return `${it.id} aborted; left pending for resume`;
+		}
 		it.status = child.ok && parsed.result === "done" ? "done" : "blocked";
 		it.note = child.ok ? parsed.line : `child failed: ${child.text.slice(-300)}`;
 		record("plan-weaver", "gate", { id: it.id, pass: it.status === "done", gated: false });
