@@ -47,7 +47,7 @@
   ],
   "provenance": {
     "harness_surface_sha256": null,
-    "harness_hash_blocker": "Pi does not expose the actually loaded extension/lib set; hashing the repository copy could falsely identify a different live installation."
+    "harness_hash_blocker": "Only rows without a valid authenticated launcher-computed surface receipt are blocked; the running extension corroborates the receipt in signed telemetry."
   },
   "cells": [
     {

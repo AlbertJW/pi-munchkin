@@ -84,7 +84,8 @@ class SpanScreenTests(unittest.TestCase):
         for field in ("span_receipt_success", "config", "experiment", "harness"):
             self.assertIn(field, schema["properties"])
             self.assertNotIn(field, schema["required"])
-        conditional = schema["allOf"][1]
+        conditional = next(item for item in schema["allOf"]
+                           if "experiment" in item.get("if", {}).get("properties", {}))
         self.assertEqual({"type": "object"}, conditional["if"]["properties"]["experiment"])
         self.assertEqual(["search_spans", "read_span"],
                          conditional["then"]["properties"]["trajectory"]["required"])
@@ -134,12 +135,12 @@ class SpanScreenTests(unittest.TestCase):
         self.assertFalse(eligible)
         self.assertIn("rendered_governor_sha256 missing or malformed", text)
 
-    def test_default_rows_report_same_run_screen_only(self):
+    def test_default_rows_report_unverified_surface_blocker(self):
         text, eligible = screen.mechanism_report(self.rows(), self.manifest)
         self.assertTrue(eligible)
-        self.assertIn("SAME-RUN SCREEN ONLY", text)
+        self.assertIn("UNVERIFIED HARNESS SURFACE", text)
         self.assertIn("REPRODUCIBILITY BLOCKER", text)
-        self.assertNotIn("VERIFIED HARNESS SURFACE", text)
+        self.assertNotIn("## HARNESS SURFACE", text)
 
     def test_fully_corroborated_harness_hash_reports_verified_not_blocked(self):
         rows = self.rows()

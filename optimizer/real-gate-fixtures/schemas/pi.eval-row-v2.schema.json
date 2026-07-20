@@ -65,7 +65,7 @@
       "type": "object",
       "required": ["schema", "authenticated", "content_sha256", "session_key", "events", "harness_surface_sha256", "config", "compactions", "watcher"],
       "properties": {
-        "schema": {"const": "pi.context-telemetry/v1"},
+        "schema": {"enum": ["pi.context-telemetry/v1", "pi.context-telemetry/v2"]},
         "authenticated": {"const": true},
         "content_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
         "session_key": {"type": "string", "minLength": 1},
@@ -123,13 +123,59 @@
               }
             }
           }
+        },
+        "surface": {
+          "type": "object",
+          "required": ["calls", "concentration", "duplication", "stale_tool_result", "context"],
+          "additionalProperties": false,
+          "properties": {
+            "calls": {"type": "integer", "minimum": 0},
+            "concentration": {
+              "type": "object", "required": ["largest_message", "largest_tool_result"], "additionalProperties": false,
+              "properties": {
+                "largest_message": {"$ref": "#/$defs/nullableStats"},
+                "largest_tool_result": {"$ref": "#/$defs/nullableStats"}
+              }
+            },
+            "duplication": {
+              "type": "object", "required": ["exact_block", "five_token_shingle"], "additionalProperties": false,
+              "properties": {
+                "exact_block": {"$ref": "#/$defs/nullableStats"},
+                "five_token_shingle": {"$ref": "#/$defs/nullableStats"}
+              }
+            },
+            "stale_tool_result": {"$ref": "#/$defs/nullableStats"},
+            "context": {
+              "type": "object", "required": ["max_bytes", "mean_bytes", "tokens"], "additionalProperties": false,
+              "properties": {
+                "max_bytes": {"type": ["number", "null"], "minimum": 0},
+                "mean_bytes": {"type": ["number", "null"], "minimum": 0},
+                "tokens": {"$ref": "#/$defs/nullableStats"}
+              }
+            }
+          }
         }
       },
       "additionalProperties": false
     },
     "status": {"enum": ["complete", "incomplete", "exploratory", "ineligible"]}
   },
+  "$defs": {
+    "nullableStats": {
+      "type": "object",
+      "required": ["max", "mean"],
+      "additionalProperties": false,
+      "properties": {
+        "max": {"type": ["number", "null"], "minimum": 0},
+        "mean": {"type": ["number", "null"], "minimum": 0}
+      }
+    }
+  },
   "allOf": [
+    {
+      "if": {"required": ["context"], "properties": {"context": {"properties": {"schema": {"const": "pi.context-telemetry/v2"}}}}},
+      "then": {"properties": {"context": {"required": ["surface"]}}}
+    },
     {
       "if": {
         "required": ["arm"],

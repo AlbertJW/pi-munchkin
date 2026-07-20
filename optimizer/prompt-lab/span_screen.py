@@ -185,7 +185,7 @@ def mechanism_report(rows: list[dict[str, Any]], manifest: dict[str, Any]) -> tu
         if row.get("authoritative") is not True or row.get("status") != "complete":
             reasons.append(f"{arm}: row is non-authoritative or incomplete")
         context = row.get("context") or {}
-        if (context.get("schema") != "pi.context-telemetry/v1" or
+        if (context.get("schema") not in ("pi.context-telemetry/v1", "pi.context-telemetry/v2") or
                 context.get("authenticated") is not True or
                 not isinstance(context.get("session_key"), str) or
                 not isinstance(context.get("events"), int) or context.get("events", 0) < 1 or
@@ -278,7 +278,7 @@ def mechanism_report(rows: list[dict[str, Any]], manifest: dict[str, Any]) -> tu
     reasons = list(dict.fromkeys(reasons))
     eligible = not reasons
     status = ("ELIGIBLE — VERIFIED HARNESS SURFACE" if eligible and harness_verified
-               else "ELIGIBLE — SAME-RUN SCREEN ONLY" if eligible else "INELIGIBLE")
+               else "ELIGIBLE — UNVERIFIED HARNESS SURFACE" if eligible else "INELIGIBLE")
     lines = [f"# span-tools mechanism report — {status}", "",
              "## Treatment compliance", "",
              "| arm | rows | search_spans | read_span | exhaustive receipts |",
@@ -313,7 +313,7 @@ def mechanism_report(rows: list[dict[str, Any]], manifest: dict[str, Any]) -> tu
     else:
         lines += ["", "## REPRODUCIBILITY BLOCKER", "",
                   manifest["provenance"]["harness_hash_blocker"],
-                  "An eligible result is a same-run screen only. Fresh confirmation is required after live/package parity and loaded-surface identity are proven.", ""]
+                  "This row set lacks a valid authenticated surface receipt and cannot be promoted. Rerun through the surface-hashing launcher, then perform the normal fresh confirmation.", ""]
     if reasons: lines += ["## Reasons", ""] + [f"- {reason}" for reason in reasons]
     else: lines += ["Treatment exposure, exhaustive receipts, config binding, and experiment provenance passed."]
     return "\n".join(lines) + "\n", eligible

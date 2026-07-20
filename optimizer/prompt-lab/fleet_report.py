@@ -465,11 +465,13 @@ def selftest():
     assert schema["properties"]["config"]["required"] == ["sha256", "declared_env", "rendered_governor_sha256"]
     assert schema["properties"]["experiment"]["required"] == ["manifest_sha256", "cell"]
     assert schema["properties"]["harness"]["required"] == ["surface_sha256", "hash_blocker"]
-    conditional = schema["allOf"][0]
+    conditional = next(item for item in schema["allOf"]
+                       if "arm" in item.get("if", {}).get("properties", {}))
     assert conditional["if"]["properties"]["arm"] == {"not": {"const": "one-shot"}}
     assert conditional["then"]["required"] == ["trajectory"]
     assert "trajectory" not in schema["required"], "one-shot must remain trajectory-exempt"
-    experiment_conditional = schema["allOf"][1]
+    experiment_conditional = next(item for item in schema["allOf"]
+                                  if "experiment" in item.get("if", {}).get("properties", {}))
     assert experiment_conditional["if"]["properties"]["experiment"] == {"type": "object"}
     assert experiment_conditional["then"]["required"] == ["span_receipt_success", "config", "experiment", "harness", "trajectory", "context"]
     assert experiment_conditional["then"]["properties"]["trajectory"]["required"] == ["search_spans", "read_span"]
