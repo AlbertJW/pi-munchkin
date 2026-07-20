@@ -63,11 +63,14 @@ test("process writer marker survives extension-style module reloads", async () =
 
 test("process writer marker is fresh in a genuinely new OS process", () => {
 	const current = processWriterMarker();
+	// Absolute file URL, not a cwd-relative path — the live ~/.pi/agent tree is
+	// flat (lib/ at top level) while the repo nests under harness/.
+	const libUrl = new URL("../lib/process-writer.ts", import.meta.url).href;
 	const child = execFileSync(process.execPath, [
 		"--experimental-strip-types",
 		"--input-type=module",
 		"--eval",
-		'import { processWriterMarker } from "./harness/lib/process-writer.ts"; process.stdout.write(processWriterMarker());',
-	], { cwd: process.cwd(), encoding: "utf8" });
+		`import { processWriterMarker } from "${libUrl}"; process.stdout.write(processWriterMarker());`,
+	], { encoding: "utf8" });
 	assert.notEqual(child, current);
 });

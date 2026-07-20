@@ -5,7 +5,9 @@ import test from "node:test";
 import { catalogHas, EVENT_CATALOG, validateCatalogDetail } from "../lib/telemetry-catalog.ts";
 
 test("every literal telemetry emission is represented in the event catalog", () => {
-	const extensionDir = join(process.cwd(), "harness", "extensions");
+	// Resolve from this test file, not cwd — the live ~/.pi/agent tree is flat
+	// (extensions/ at top level) while the repo nests under harness/.
+	const extensionDir = join(import.meta.dirname, "..", "extensions");
 	const missing = new Set<string>();
 	for (const name of readdirSync(extensionDir).filter((file) => file.endsWith(".ts"))) {
 		const source = readFileSync(join(extensionDir, name), "utf8");
