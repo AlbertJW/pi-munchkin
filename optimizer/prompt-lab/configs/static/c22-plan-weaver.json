@@ -1,5 +1,0 @@
-{
-  "name": "plan-weaver",
-  "prediction": "engine-owned plan+dispatch raises multi-step pass rate on small models (fewer in-context decision points; plan-once/VeriMAP evidence) and is neutral-to-noise on single-file tasks; plan-weaver telemetry (plan-compiled/dispatch/ladder) confirms engagement; watch the plan-avoidance anti-signal and total wall-clock (children serialize on a single-slot box).",
-  "thresholds": { "PLAN_MODE": "v4" }
-}

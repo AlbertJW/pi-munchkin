@@ -339,7 +339,7 @@ blocked only on a (model, task) pairing in the discriminating band (see calibrat
   treated the wandering (prose), this removes the trigger (mechanical). Must win a round.
 - **pi-tasks (@tintinweb, 2026-07-17): pocketed, one candidate extracted.** Not adopted as
   planner substrate — mature task UX + DAG cascade but ZERO verification layer (cascade
-  trusts completion claims; plan-weaver's engine-run gates are the point). Pocketed
+  trusts completion claims; plan-runner's engine-run item gates are the point). Pocketed
   candidate: Claude-Code-parity tool names/specs (TaskCreate et al.) — familiar tool shapes
   from training data may raise small-model compliance vs bespoke schemas. A/B-able.
 - **evalt (Bryley, 2026-07-17): rejected** for munchkin runs — v0.1.0/2 commits, no

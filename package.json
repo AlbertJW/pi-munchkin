@@ -33,7 +33,6 @@
       "harness/extensions/compact-tool.ts",
       "harness/extensions/micro-gate.ts",
       "harness/extensions/ketch.ts",
-      "harness/extensions/plan-weaver.ts",
       "harness/extensions/did-you-mean.ts",
       "harness/extensions/surface-receipt.ts",
       "harness/vendor/pi-subagent/index.ts"
@@ -68,7 +67,6 @@
     "harness/extensions/compact-tool.ts",
     "harness/extensions/micro-gate.ts",
     "harness/extensions/ketch.ts",
-    "harness/extensions/plan-weaver.ts",
     "harness/extensions/did-you-mean.ts",
     "harness/extensions/surface-receipt.ts",
     "harness/lib/bash-mutations.ts",
@@ -82,7 +80,6 @@
     "harness/lib/hashline-core.ts",
     "harness/lib/loop-outcome.ts",
     "harness/lib/micro-gate-policy.ts",
-    "harness/lib/plan-contract.ts",
     "harness/lib/plan-integrity.ts",
     "harness/lib/plan-progress.ts",
     "harness/lib/public-url.ts",

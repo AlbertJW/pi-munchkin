@@ -44,7 +44,6 @@ Pi extensions. Load them once; most work automatically, a few add commands or en
 | **compact-tool** | `compact_context` — model-requested structured compaction with one explicit post-compaction resume |
 | **micro-gate** | *(opt-in)* parse/compile-checks just-edited files at turn end |
 | **ketch** | web / code / docs search |
-| **plan-weaver** | compiles an explicit, gated execution DAG before work starts |
 | **did-you-mean** | suggests the nearest on-disk path after a mistyped file access |
 | **pi-subagent** | bundled `subagent` tool for isolated exploration, execution, and review |
 

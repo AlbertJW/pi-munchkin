@@ -105,3 +105,79 @@ test("F3 preserveDecision: mixed batch splits correctly", () => {
 	assert.deepEqual(preserve.map((i) => i.title), ["fresh"]);
 	assert.deepEqual(yielded.map((i) => i.title), ["old"]);
 });
+
+// ---------- depends_on: validateDeps / unmetDeps / reconcile preservation ----------
+
+import { validateDeps, unmetDeps, reconcileItems } from "../lib/plan-integrity.ts";
+
+test("validateDeps: a valid DAG passes", () => {
+	const errors = validateDeps([
+		{ title: "a" },
+		{ title: "b", depends_on: ["a"] },
+		{ title: "c", depends_on: ["a", "b"] },
+	]);
+	assert.deepEqual(errors, []);
+});
+
+test("validateDeps: unknown ref and self-dep are errors", () => {
+	const errors = validateDeps([
+		{ title: "a", depends_on: ["ghost"] },
+		{ title: "b", depends_on: ["b"] },
+	]);
+	assert.equal(errors.length, 2);
+	assert.ok(errors[0].includes('unknown item "ghost"'));
+	assert.ok(errors[1].includes("depends on itself"));
+});
+
+test("validateDeps: 2-node and 3-node cycles are caught", () => {
+	const two = validateDeps([
+		{ title: "a", depends_on: ["b"] },
+		{ title: "b", depends_on: ["a"] },
+	]);
+	assert.ok(two.some((e) => e.includes("cycle")));
+	const three = validateDeps([
+		{ title: "a", depends_on: ["c"] },
+		{ title: "b", depends_on: ["a"] },
+		{ title: "c", depends_on: ["b"] },
+	]);
+	assert.ok(three.some((e) => e.includes("cycle")));
+});
+
+test("validateDeps: refs match via normalized titles (backticks, case, spacing)", () => {
+	const errors = validateDeps([
+		{ title: "Run `just verify`" },
+		{ title: "ship", depends_on: ["run just   VERIFY"] },
+	]);
+	assert.deepEqual(errors, []);
+});
+
+test("unmetDeps: dep not done is unmet; done dep and vanished dep target are satisfied", () => {
+	const items = [
+		{ title: "a", status: "done" },
+		{ title: "b", status: "pending" },
+		{ title: "c", status: "in_progress", depends_on: ["a", "b", "gone"] },
+	];
+	assert.deepEqual(unmetDeps(items[2], items), ["b"]); // a done, "gone" fail-open
+});
+
+test("reconcileItems: depends_on carried, preserved when omitted on rewrite, cleared on []", () => {
+	let n = 0;
+	const mkId = () => `id-${n++}`;
+	const first = reconcileItems(undefined, [
+		{ title: "a", status: "pending" },
+		{ title: "b", status: "pending", depends_on: ["a"] },
+	], mkId);
+	assert.deepEqual(first[1].depends_on, ["a"]);
+	// rewrite omitting the field → preserved
+	const second = reconcileItems(first, [
+		{ title: "a", status: "done" },
+		{ title: "b", status: "pending" },
+	], mkId);
+	assert.deepEqual(second[1].depends_on, ["a"]);
+	// explicit [] → cleared
+	const third = reconcileItems(second, [
+		{ title: "a", status: "done" },
+		{ title: "b", status: "pending", depends_on: [] },
+	], mkId);
+	assert.equal(third[1].depends_on, undefined);
+});

@@ -314,12 +314,12 @@ run_guarded_session() {
 	set -m   # monitor mode: the backgrounded subshell becomes its own process-group leader
 	if [[ "$redir" == ">>" ]]; then
 		# The only caller that genuinely knows it's re-running the SAME interrupted
-		# task in the SAME workdir — safe to let plan-weaver's GATE_MODE resume
-		# whatever .pi/weave-state.json the aborted first session left behind.
+		# task in the SAME workdir; plan-runner's session-start resume notice
+		# surfaces any .pi/plan-state.json the aborted first session left behind.
 		( cd "$wd" || exit
 		  exec 3<<<"$telemetry_key"
 		  run_with_timeout "$PI_TIMEOUT" 30 ${sbx[@]+"${sbx[@]}"} /usr/bin/env -i \
-		    "${session_env[@]}" "${session_base_env[@]}" PI_OBSERVATIONAL_MEMORY_PASSIVE=1 WEAVE_GATE_RESUME=1 \
+		    "${session_env[@]}" "${session_base_env[@]}" PI_OBSERVATIONAL_MEMORY_PASSIVE=1 \
 		    pi -p --approve ${PI_SELECT[@]+"${PI_SELECT[@]}"} --tools "$tools" "$prompt" ) </dev/null >> "$wd/run.log" 2>&1 &
 	else
 		( cd "$wd" || exit

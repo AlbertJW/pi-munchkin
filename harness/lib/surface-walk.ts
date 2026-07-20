@@ -74,8 +74,8 @@ export async function resolveNpmPackageIdentity(agentDir: string, packageSpec: s
 /** Entry points for a live agent-dir install (no package.json there): every
  * top-level extensions/*.ts (matching pi's directory-scan auto-load), plus each
  * non-`npm:`-prefixed settings.json `packages` entry's own package.json
- * `pi.extensions`, plus every `agents/*.md` role prompt (read by plan-weaver.ts's
- * agentPromptPath and appended as each child's system prompt — behavior-bearing,
+ * `pi.extensions`, plus every `agents/*.md` role prompt (appended by the subagent
+ * tool as each child's system prompt — behavior-bearing,
  * but not `.ts`/`.js` so walkRelativeImports's regex can never reach them; added
  * as leaves directly, no import-walking needed). Each `npm:`-prefixed entry
  * resolves to a lockfile-pinned identity instead (see resolveNpmPackageIdentity)

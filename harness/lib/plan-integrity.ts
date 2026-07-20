@@ -32,8 +32,9 @@ export type ReconciledItem = {
 	failure_class?: string;
 	gate?: string;
 	gate_fails?: number;
+	depends_on?: string[];
 };
-export type IncomingItem = { title: string; status: string; note?: string; failure_class?: string; gate?: string };
+export type IncomingItem = { title: string; status: string; note?: string; failure_class?: string; gate?: string; depends_on?: string[] };
 
 export function reconcileItems(
 	prev: ReconciledItem[] | undefined,
@@ -44,6 +45,9 @@ export function reconcileItems(
 	return incoming.map((inc) => {
 		const p = byTitle.get(normalizeTitle(inc.title));
 		const gate = inc.gate === "" ? undefined : (inc.gate ?? p?.gate); // model can set/update/clear
+		// Same omission-safety rule as gate: a rewrite that drops the field keeps
+		// the prior ordering; an explicit [] clears it.
+		const depends_on = inc.depends_on?.length === 0 ? undefined : (inc.depends_on ?? p?.depends_on);
 		return {
 			id: p?.id ?? makeId(),
 			title: inc.title,
@@ -52,6 +56,7 @@ export function reconcileItems(
 			failure_class: inc.status === "blocked" ? (inc.failure_class ?? "unknown") : undefined,
 			gate,
 			gate_fails: gate === p?.gate ? p?.gate_fails : 0, // preserved while the resolved gate is unchanged
+			depends_on,
 		};
 	});
 }
@@ -90,6 +95,59 @@ export function executionUnderway(prev: IntegrityItem[]): boolean {
 // incremented here and reset elsewhere when the model re-includes the item — NOT
 // the action fingerprint, which churns as the plan grows. R1 (done-preserve) never
 // reaches this path: completed work is never yielded.
+// depends_on validation for a submitted whole list. Entries reference OTHER
+// items' titles in the same list (normalized-title matched — the model never
+// sees engine-assigned ids). Advisory ordering, but a structurally broken graph
+// (unknown ref, self-dep, cycle) is a plan-authoring error worth rejecting
+// before any state is written.
+export function validateDeps(items: Array<{ title: string; depends_on?: string[] }>): string[] {
+	const errors: string[] = [];
+	const titles = new Set(items.map((i) => normalizeTitle(i.title)));
+	const deps = new Map<string, string[]>();
+	for (const it of items) {
+		const key = normalizeTitle(it.title);
+		const resolved: string[] = [];
+		for (const dep of it.depends_on ?? []) {
+			const depKey = normalizeTitle(dep);
+			if (!titles.has(depKey)) errors.push(`"${it.title}" depends on unknown item "${dep}"`);
+			else if (depKey === key) errors.push(`"${it.title}" depends on itself`);
+			else resolved.push(depKey);
+		}
+		deps.set(key, resolved);
+	}
+	// Cycle check via DFS with colors (0 unvisited, 1 in-stack, 2 done).
+	const color = new Map<string, number>();
+	const inCycle = (key: string): boolean => {
+		if (color.get(key) === 2) return false;
+		if (color.get(key) === 1) return true;
+		color.set(key, 1);
+		for (const dep of deps.get(key) ?? []) if (inCycle(dep)) return true;
+		color.set(key, 2);
+		return false;
+	};
+	for (const key of deps.keys()) {
+		if (color.get(key) === undefined && inCycle(key)) {
+			errors.push(`dependency cycle involving "${key}"`);
+			break; // one cycle report is enough to demand a rewrite
+		}
+	}
+	return errors;
+}
+
+// Titles of an item's unmet deps: dep present in the list with status ≠ done.
+// A dep whose target vanished (preserved item from a prior rewrite) counts as
+// satisfied — fail-open, ordering is advisory.
+export function unmetDeps(
+	item: { depends_on?: string[] },
+	items: Array<{ title: string; status: string }>,
+): string[] {
+	const byTitle = new Map(items.map((i) => [normalizeTitle(i.title), i]));
+	return (item.depends_on ?? []).filter((dep) => {
+		const target = byTitle.get(normalizeTitle(dep));
+		return target !== undefined && target.status !== "done";
+	});
+}
+
 export function preserveDecision<T extends { preserve_count?: number }>(
 	droppedOpen: T[],
 	max: number,

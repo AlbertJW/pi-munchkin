@@ -6,7 +6,7 @@ import { defineTool, withFileMutationQueue, type ExtensionAPI } from "@earendil-
 import { Type } from "typebox";
 import { assertVerifyGateAllowed, classifyBashCommand } from "../lib/command-policy.ts";
 import { runReadonlyGate } from "../lib/gate-runtime.ts";
-import { planIntegrity, executionUnderway, normalizeTitle, preserveDecision, reconcileItems as libReconcile, type ReconciledItem, type IncomingItem } from "../lib/plan-integrity.ts";
+import { planIntegrity, executionUnderway, normalizeTitle, preserveDecision, validateDeps, unmetDeps, reconcileItems as libReconcile, type ReconciledItem, type IncomingItem } from "../lib/plan-integrity.ts";
 import { nextReplanStreak, parseTodoLine } from "../lib/plan-progress.ts";
 import { steerText } from "../lib/steer-texts.ts";
 import { record } from "../lib/telemetry.ts";
@@ -31,12 +31,18 @@ const GATE_MAX = Math.max(1, Number.parseInt(process.env.PLAN_GATE_MAX || "3", 1
 // /plan-go, and any call that newly marks an item done.
 const REPLAN_MAX = Math.max(2, Number.parseInt(process.env.PLAN_REPLAN_MAX || "3", 10) || 3);
 let replanStreak = 0;
+// One-shot resume flags (reset by /plan starting a fresh plan): the interrupted-
+// plan notice fires at most once per process, as does the partial-work note on
+// the first plan_write against a foreign-writer state (headless resumes that
+// never run /plan-go).
+let resumeNotified = false;
+let partialWorkNoted = false;
 // B yields an omitted open item after this many consecutive preserves (persistent
 // omission = intent; e.g. a parent the model replaced with sub-items). R1 (done) never yields.
 const PRESERVE_MAX = Math.max(2, Number.parseInt(process.env.PLAN_PRESERVE_MAX || "3", 10) || 3);
 // Candidate (dark, A/B via real_gate.sh): force every scoped edit through a fresh
 // subagent instead of leaving delegation advisory. Trades per-edit spawn overhead
-// for the same process-isolation weave gets — measure, don't assume, the tradeoff.
+// for full process isolation of each edit — measure, don't assume, the tradeoff.
 const PLAN_SUBAGENT_ONLY = process.env.PLAN_SUBAGENT_ONLY === "1";
 
 type ItemStatus = "pending" | "in_progress" | "done" | "blocked";
@@ -56,6 +62,7 @@ type PlanItem = {
 	gate?: string; // read-only verify/check command that must exit 0 before status can be "done"
 	gate_fails?: number; // consecutive gate failures (escalates to blocked at GATE_MAX)
 	preserve_count?: number; // consecutive times B re-attached this omitted open item (yields at PRESERVE_MAX)
+	depends_on?: string[]; // titles of items that must be done first (advisory ordering)
 };
 
 type PlanState = {
@@ -68,6 +75,7 @@ type PlanState = {
 	created_at: string;
 	updated_at: string;
 	items: PlanItem[];
+	writer?: string; // process marker of the last writer (cross-session resume detection)
 };
 
 type TraceEvent = {
@@ -307,7 +315,13 @@ async function readState(cwd: string): Promise<PlanState | undefined> {
 }
 
 function currentItem(state: PlanState): PlanItem | undefined {
-	return state.items.find((i) => i.status === "in_progress") ?? state.items.find((i) => i.status === "pending");
+	// Prefer the first pending item whose deps are all satisfied (nextReady
+	// spirit); fall back to plain list order if none qualifies.
+	return (
+		state.items.find((i) => i.status === "in_progress") ??
+		state.items.find((i) => i.status === "pending" && unmetDeps(i, state.items).length === 0) ??
+		state.items.find((i) => i.status === "pending")
+	);
 }
 
 function derivedStatus(state: PlanState): string {
@@ -323,7 +337,8 @@ function renderTodo(state: PlanState): string {
 	const line = (i: PlanItem) => {
 		const tail = i.note ? ` — ${i.note.split("\n")[0]}` : "";
 		const fc = i.status === "blocked" && i.failure_class ? ` [${i.failure_class}]` : "";
-		return `- [${MARK[i.status]}] ${i.title}${tail}${fc}`;
+		const deps = i.depends_on?.length && i.status !== "done" ? ` (after: ${i.depends_on.join("; ")})` : "";
+		return `- [${MARK[i.status]}] ${i.title}${deps}${tail}${fc}`;
 	};
 	return [
 		"# Active Request",
@@ -347,8 +362,19 @@ function renderTodo(state: PlanState): string {
 	].join("\n");
 }
 
+// Process marker for cross-session resume detection: a state file whose writer
+// isn't THIS process was left by a previous (crashed/aborted) session, so its
+// in_progress items may hold partial work on disk. Pre-upgrade files have no
+// writer field, which correctly reads as "another process".
+const PROC_MARK = randomUUID();
+
+function staleInProgress(state: PlanState): PlanItem[] {
+	return state.writer === PROC_MARK ? [] : state.items.filter((i) => i.status === "in_progress");
+}
+
 async function writeStateAndTodo(cwd: string, state: PlanState): Promise<void> {
 	state.updated_at = isoNow();
+	state.writer = PROC_MARK;
 	const sp = statePath(cwd);
 	await mkdir(dirname(sp), { recursive: true });
 	await writeFile(sp, `${JSON.stringify(state, null, 2)}\n`, "utf8");
@@ -544,6 +570,7 @@ const itemSchema = Type.Object({
 		Type.Literal("unknown"),
 	])),
 	gate: Type.Optional(Type.String({ description: "Read-only verify/check command (e.g. 'just verify', the test/typecheck cmd). Mutating/destructive gates are rejected. Must exit 0 to accept this item done; a red gate reverts it so you fix + re-run." })),
+	depends_on: Type.Optional(Type.Array(Type.String(), { description: "Titles of other items in this list that must be done first (advisory ordering)." })),
 });
 
 const planWrite = defineTool({
@@ -559,7 +586,23 @@ const planWrite = defineTool({
 	async execute(_toolCallId, params, _signal, _onUpdate, ctx) {
 		const aid = actionId();
 
-		const { state, newlyBlocked, gateMsgs, integrity, newlyDone, prevCompleted } = await mutatePlan(ctx.cwd, async (prev) => {
+		// A structurally broken dependency graph (unknown ref, self-dep, cycle) is a
+		// plan-authoring error — reject before ANY state is written so the model
+		// fixes and resends rather than persisting a graph no one can order.
+		const depErrors = validateDeps(params.items);
+		if (depErrors.length > 0) {
+			record("plan-runner", "deps-rejected", { errors: depErrors.length });
+			return {
+				content: [{ type: "text" as const, text:
+					"plan_write rejected:\n- " + depErrors.join("\n- ") +
+					"\nFix depends_on (reference exact titles of other items in THIS list) and resend the ENTIRE list." }],
+				details: { tool_name: "plan_write", action_id: aid, success: false },
+				isError: true,
+				terminate: false,
+			};
+		}
+
+		const { state, newlyBlocked, gateMsgs, integrity, newlyDone, prevCompleted, stalePrev } = await mutatePlan(ctx.cwd, async (prev) => {
 			const items = reconcileItems(prev?.items, params.items as any);
 			const prevById = new Map((prev?.items ?? []).map((i) => [i.id, i]));
 			const prevBlocked = new Set((prev?.items ?? []).filter((i) => i.status === "blocked").map((i) => i.id));
@@ -598,18 +641,43 @@ const planWrite = defineTool({
 					continue;
 				}
 				const fails = (prevById.get(it.id)?.gate_fails ?? 0) + 1;
-				record("plan-runner", "gate", { pass: false, fails });
+				// Retry ladder: rung 1 = locality protocol (bounded single-span repair
+				// against the failing output), rung 2 = dumb-zone escape (delegate to a
+				// fresh subagent, or at least a fresh approach), rung 3 = blocked. The
+				// same fix path retried verbatim in the same context rarely converges.
+				const rung = fails >= GATE_MAX ? 3 : fails === 1 ? 1 : 2;
+				record("plan-runner", "gate", { pass: false, fails, rung });
 				const tail = out.split("\n").slice(-4).join(" / ").slice(0, 300);
+				const longTail = out.slice(-500);
 				it.gate_fails = fails;
-				if (fails >= GATE_MAX) {
+				if (rung === 3) {
 					it.status = "blocked";
 					it.failure_class = "blocked_other";
 					it.note = `gate failed ${fails}×: ${tail}`;
 					gateMsgs.push(`✗ gate for "${it.title}" failed ${fails}× → blocked: ${tail}`);
+				} else if (rung === 1) {
+					it.status = "in_progress";
+					it.note = `gate failed (${fails}/${GATE_MAX}): ${tail}`;
+					gateMsgs.push(steerText(
+						"PLAN_GATE_LADDER1_MSG",
+						"✗ gate for \"{title}\" failed ({fails}/{max}). Follow this protocol EXACTLY: 1. LOCALIZE — from the failing output below, identify the ONE file and smallest span responsible. 2. REPAIR — make ONE bounded edit to that span. 3. VERIFY — mark the item done again; the gate re-runs `{gate}`. Do not restructure anything else.\nFailing output (tail): {tail}",
+						{ title: it.title, fails, max: GATE_MAX, gate: it.gate, tail: longTail },
+					));
 				} else {
 					it.status = "in_progress";
 					it.note = `gate failed (${fails}/${GATE_MAX}): ${tail}`;
-					gateMsgs.push(`✗ gate for "${it.title}" failed (${fails}/${GATE_MAX}) — fix and re-run, do not mark done. ${tail}`);
+					const subagentOk = api.getActiveTools().includes("subagent");
+					gateMsgs.push(subagentOk
+						? steerText(
+							"PLAN_GATE_LADDER2_MSG",
+							"✗ gate for \"{title}\" failed again ({fails}/{max}) — the same fix path is not working. Delegate the repair to subagent(executor, ..., mode=fork): brief it with the item, the gate command `{gate}`, and the failing output below, then mark the item done to re-run the gate.\nFailing output (tail): {tail}",
+							{ title: it.title, fails, max: GATE_MAX, gate: it.gate, tail: longTail },
+						)
+						: steerText(
+							"PLAN_GATE_LADDER2_SOLO_MSG",
+							"✗ gate for \"{title}\" failed again ({fails}/{max}) — the same fix path is not working. Step back, re-read the failing output below fresh, and take a DIFFERENT approach than your previous attempts, then mark the item done to re-run the gate.\nFailing output (tail): {tail}",
+							{ title: it.title, fails, max: GATE_MAX, gate: it.gate, tail: longTail },
+						));
 				}
 			}
 
@@ -641,7 +709,10 @@ const planWrite = defineTool({
 				: newState(params.request ?? "", params.summary ?? "", "lean", items);
 			const newlyBlocked = items.filter((i) => i.status === "blocked" && !prevBlocked.has(i.id));
 			const prevCompleted = prev ? derivedStatus(prev) === "completed" : false;
-			return { state: next, result: { state: next, newlyBlocked, gateMsgs, integrity: { reattached, preservedOpen, yieldedOpen }, newlyDone, prevCompleted } };
+			// Captured BEFORE this write stamps us as the writer — a foreign-writer
+			// state with in_progress items is a headless resume (no /plan-go ran).
+			const stalePrev = prev ? staleInProgress(prev) : [];
+			return { state: next, result: { state: next, newlyBlocked, gateMsgs, integrity: { reattached, preservedOpen, yieldedOpen }, newlyDone, prevCompleted, stalePrev } };
 		});
 
 		// Trace each newly blocked item through the repeated-failure guard.
@@ -763,8 +834,21 @@ const planWrite = defineTool({
 				{},
 			);
 		}
+		// Advisory dependency warn: working an item whose deps aren't done yet.
+		// Ordering is advisory — no status reversion, just a nudge.
+		const depWarns = state.items
+			.filter((i) => i.status === "in_progress" && unmetDeps(i, state.items).length > 0)
+			.map((i) => `\n⚠ "${i.title}" depends on unfinished: ${unmetDeps(i, state.items).join("; ")} — ordering is advisory; finish those first or restatus them.`);
+		const depWarn = depWarns.join("");
+		// One-shot partial-work note for headless resumes: first plan_write of this
+		// process against a state another process left with in_progress items.
+		let resumeWarn = "";
+		if (stalePrev.length > 0 && !partialWorkNoted) {
+			partialWorkNoted = true;
+			resumeWarn = `\n⚠ Resumed from a previous session. Previously in_progress item(s) may have PARTIAL WORK on disk: ${stalePrev.map((i) => i.title).join("; ")}. Inspect current state (git status/diff, read the touched files) before continuing — do not trust it done and do not redo it blind.`;
+		}
 		const gateNote = gateMsgs.length ? `\n${gateMsgs.join("\n")}` : "";
-		const body = `Plan updated (${state.items.length} items, status: ${derivedStatus(state)}).${cur ? `\nNext open: ${cur.title}` : "\nNo open items remain."}${warning}${askNow}${finalReport}${integrityWarn}${thrashWarn}${gateNote}`;
+		const body = `Plan updated (${state.items.length} items, status: ${derivedStatus(state)}).${cur ? `\nNext open: ${cur.title}` : "\nNo open items remain."}${warning}${askNow}${finalReport}${integrityWarn}${thrashWarn}${depWarn}${resumeWarn}${gateNote}`;
 		return {
 			content: [{ type: "text", text: body }],
 			details: { tool_name: "plan_write", action_id: aid, success: true },
@@ -784,6 +868,8 @@ async function startPlanCommand(args: string, ctx: { cwd: string; ui: { notify(m
 	}
 	const autonomy: Autonomy = yolo ? "yolo" : "lean";
 	replanStreak = 0; // fresh plan — reset thrash counter
+	resumeNotified = true; // a fresh plan supersedes any interrupted one — no resume notice
+	partialWorkNoted = false; // ...but a later foreign-writer state may still warrant the note
 	await mutatePlan(ctx.cwd, async () => {
 		await archiveExistingTodo(ctx.cwd);
 		const state = newState(request, "Planning pending. The model will call plan_write.", autonomy, []);
@@ -816,13 +902,18 @@ async function goCommand(args: string, ctx: { cwd: string; ui: { notify(m: strin
 	if (mode) state.autonomy = mode;
 
 	const resuming = state.phase === "executing";
+	// Capture BEFORE writeStateAndTodo stamps this process as the writer.
+	const stale = staleInProgress(state);
 	state.phase = "executing";
 	await writeStateAndTodo(ctx.cwd, state);
 	pi.appendEntry("plan_spine", { run_id: state.run_id }); // mark this node for /collapse
 	await appendTrace(ctx.cwd, { run_id: state.run_id, action_type: "command", tool_name: "plan-go", success: true, output_summary: `${resuming ? "resume" : "execute"}${mode ? ` autonomy=${mode}` : ""}` });
 
 	const subagentAvailable = pi.getActiveTools().includes("subagent");
-	pi.sendUserMessage(executePrompt(state, subagentAvailable));
+	const resumeNote = stale.length
+		? `\n\nRESUMED from a previous session. Previously in_progress item(s) may have PARTIAL WORK on disk: ${stale.map((i) => i.title).join("; ")}. Inspect current state (git status/diff, read the touched files) before continuing — do not trust it done and do not redo it blind.`
+		: "";
+	pi.sendUserMessage(executePrompt(state, subagentAvailable) + resumeNote);
 }
 
 async function statusCommand(ctx: { cwd: string; ui: { notify(m: string, l?: string): void } }) {
@@ -850,6 +941,24 @@ async function traceCommand(args: string, ctx: { cwd: string; ui: { notify(m: st
 
 export default function (pi: ExtensionAPI) {
 	api = pi; // let the module-scope plan_write tool run shell gates via pi.exec
+
+	// Crash/abort resume: a plan-state file left by ANOTHER process with open
+	// items is an interrupted plan — surface it once so the user can inspect,
+	// resume, or replace instead of never learning it exists.
+	pi.on("session_start", async (_event, ctx) => {
+		if (resumeNotified) return;
+		resumeNotified = true;
+		const state = await readState(ctx.cwd);
+		if (!state || state.writer === PROC_MARK) return;
+		const open = state.items.filter((i) => i.status === "pending" || i.status === "in_progress" || i.status === "blocked");
+		if (open.length === 0) return;
+		const inProgress = state.items.filter((i) => i.status === "in_progress").length;
+		record("plan-runner", "resume-found", { open: open.length, in_progress: inProgress });
+		ctx.ui.notify(
+			`Interrupted plan from a previous session: "${state.request}" — ${open.length} open item(s)${inProgress ? `, ${inProgress} in_progress (may have partial work)` : ""}. /plan-status to inspect, /plan-go to resume, /plan <request> to replace.`,
+			"info",
+		);
+	});
 
 	pi.registerTool(planWrite);
 
@@ -920,7 +1029,7 @@ export default function (pi: ExtensionAPI) {
 		}
 		// PLAN_SUBAGENT_ONLY candidate: during execution (not planning), force every
 		// scoped edit through a fresh subagent instead of leaving delegation advisory
-		// — the same process-isolation weave gets from spawning a fresh pi per item.
+		// — full process isolation for each scoped edit.
 		// Covers bash mutations too (sed -i, cat >, ...), not just edit/write/multiedit
 		// — a mutating bash call is exactly as much a direct edit as those tools.
 		if (PLAN_SUBAGENT_ONLY) {

@@ -41,7 +41,7 @@ export function closestExistingPath(cwd: string, attempted: string): string | nu
 		}
 	}
 
-	// exact basename elsewhere, shallow walk (same rule as plan-contract normalizeInput)
+	// exact basename elsewhere, shallow walk
 	const hits: string[] = [];
 	const walk = (dir: string, depth: number) => {
 		if (depth > 2 || hits.length > 1) return;

@@ -14,7 +14,6 @@ const manifest = JSON.parse(await readFile(resolve(root, "package.json"), "utf8"
 const extensions = manifest.pi?.extensions ?? [];
 
 for (const required of [
-  "harness/extensions/plan-weaver.ts",
   "harness/extensions/did-you-mean.ts",
   "harness/vendor/pi-subagent/index.ts",
 ]) {

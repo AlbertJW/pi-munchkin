@@ -136,7 +136,9 @@ test("integration: gate runs a REAL shell command — green keeps done, red reve
 	const bad = state.items.find((i: any) => i.title === "bad work");
 	assert.equal(bad.status, "in_progress", "red gate reverts done");
 	assert.equal(bad.gate_fails, 1);
-	assert.ok(r1.content[0].text.includes("fix and re-run"), r1.content[0].text);
+	// ladder rung 1: locality protocol with the actual failing output embedded
+	assert.ok(r1.content[0].text.includes("LOCALIZE"), r1.content[0].text);
+	assert.ok(r1.content[0].text.includes("Failing output"), r1.content[0].text);
 
 	// second red -> blocked at GATE_MAX=2
 	await callTool(fp, "plan_write", {
@@ -259,4 +261,151 @@ test("integration: completing the FINAL item demands a self-contained report; mi
 		{ id: "b", title: "step two", status: "done" },
 	] }, cwd);
 	assert.ok(!again.content[0].text.includes("self-contained report"), "no re-demand on rewrite");
+});
+
+test("integration: gate ladder rung 2 — subagent delegation when available, fresh-approach otherwise", async () => {
+	// rung 2 needs 2 <= fails < GATE_MAX, so re-import with a higher cap than the
+	// module-load PLAN_GATE_MAX=2 pin.
+	process.env.PLAN_GATE_MAX = "4";
+	try {
+		const fp = makeFakePi();
+		const mod = await import(`../extensions/plan-runner.ts?ladder=${Date.now()}-${Math.random()}`);
+		mod.default(fp.pi as any);
+		const cwd = tmp();
+		writeFileSync(join(cwd, "bad.sh"), "if [ ; then fi\n"); // bash -n fails
+		const failOnce = () => callTool(fp, "plan_write", {
+			items: [{ title: "bad work", status: "done", gate: "bash -n bad.sh" }], request: "r", summary: "s",
+		}, cwd);
+
+		const r1 = await failOnce();
+		assert.ok(r1.content[0].text.includes("LOCALIZE"), `rung 1 first: ${r1.content[0].text}`);
+
+		// fake harness getActiveTools() defaults to [] — solo wording, no false tool pointer
+		const r2 = await failOnce();
+		assert.ok(r2.content[0].text.includes("DIFFERENT approach"), `rung 2 solo: ${r2.content[0].text}`);
+		assert.ok(!r2.content[0].text.includes("subagent(executor"),
+			"must not point at a subagent tool that isn't available");
+
+		// with subagent available the rung-2 steer delegates
+		fp.pi.getActiveTools = () => ["subagent"];
+		const r3 = await failOnce();
+		assert.ok(r3.content[0].text.includes("subagent(executor"), `rung 2 delegate: ${r3.content[0].text}`);
+
+		// terminal rung: blocked at GATE_MAX=4
+		await failOnce();
+		const state = JSON.parse(readFileSync(join(cwd, ".pi", "plan-state.json"), "utf8"));
+		assert.equal(state.items[0].status, "blocked", "escalates at GATE_MAX");
+	} finally {
+		process.env.PLAN_GATE_MAX = "2";
+	}
+});
+
+test("integration: plan_write with a broken dependency graph is rejected, state untouched", async () => {
+	const fp = freshPlanRunner();
+	const cwd = tmp();
+	const bad = await callTool(fp, "plan_write", {
+		items: [{ title: "a", status: "pending", depends_on: ["ghost"] }], request: "r", summary: "s",
+	}, cwd);
+	assert.equal(bad.isError, true, "unknown dep ref rejects the call");
+	assert.ok(bad.content[0].text.includes("ghost"), bad.content[0].text);
+	assert.ok(!existsSync(join(cwd, ".pi", "plan-state.json")), "no state written on rejection");
+
+	const cycle = await callTool(fp, "plan_write", {
+		items: [
+			{ title: "a", status: "pending", depends_on: ["b"] },
+			{ title: "b", status: "pending", depends_on: ["a"] },
+		], request: "r", summary: "s",
+	}, cwd);
+	assert.equal(cycle.isError, true, "cycle rejects the call");
+	assert.ok(cycle.content[0].text.includes("cycle"), cycle.content[0].text);
+	assert.ok(!existsSync(join(cwd, ".pi", "plan-state.json")), "still no state written");
+});
+
+test("integration: valid deps stored, rendered in TODO.md, unmet-dep work warned (advisory)", async () => {
+	const fp = freshPlanRunner();
+	const cwd = tmp();
+	await callTool(fp, "plan_write", {
+		items: [
+			{ title: "build", status: "pending" },
+			{ title: "ship", status: "pending", depends_on: ["build"] },
+		], request: "r", summary: "s",
+	}, cwd);
+	const state = JSON.parse(readFileSync(join(cwd, ".pi", "plan-state.json"), "utf8"));
+	assert.deepEqual(state.items[1].depends_on, ["build"]);
+	assert.ok(readFileSync(join(cwd, ".pi", "TODO.md"), "utf8").includes("(after: build)"), "TODO shows ordering");
+
+	// working the dependent while its dep is open → advisory warn, NO reversion
+	const r = await callTool(fp, "plan_write", {
+		items: [
+			{ title: "build", status: "pending" },
+			{ title: "ship", status: "in_progress", depends_on: ["build"] },
+		], request: "r", summary: "s",
+	}, cwd);
+	assert.ok(r.content[0].text.includes("depends on unfinished"), r.content[0].text);
+	const after = JSON.parse(readFileSync(join(cwd, ".pi", "plan-state.json"), "utf8"));
+	assert.equal(after.items[1].status, "in_progress", "advisory only — status untouched");
+});
+
+test("integration: interrupted plan from another process — session_start notice, /plan-go partial-work block, plan_write one-shot warn", async () => {
+	const fp = makeFakePi();
+	const mod = await import(`../extensions/plan-runner.ts?resume=${Date.now()}-${Math.random()}`);
+	mod.default(fp.pi as any);
+	const cwd = tmp();
+	const { ctx, notes } = makeCtx(cwd);
+	const foreignState = () => JSON.stringify({
+		schema_version: 3, run_id: "prev-run", request: "half-done refactor", summary: "s",
+		autonomy: "lean", phase: "executing", created_at: "2026-07-20T00:00:00Z",
+		updated_at: "2026-07-20T00:00:00Z", writer: "other-process",
+		items: [
+			{ id: "i1", title: "rename module", status: "in_progress" },
+			{ id: "i2", title: "update callers", status: "pending" },
+		],
+	});
+	mkdirSync(join(cwd, ".pi"), { recursive: true });
+	writeFileSync(join(cwd, ".pi", "plan-state.json"), foreignState());
+
+	await fire(fp, "session_start", { reason: "startup" }, ctx);
+	assert.ok(notes.some((n) => n.includes("Interrupted plan") && n.includes("/plan-status")),
+		`session_start surfaces the interrupted plan (notes: ${JSON.stringify(notes)})`);
+	assert.ok(notes[0].includes("may have partial work"), notes[0]);
+	notes.length = 0;
+	await fire(fp, "session_start", { reason: "startup" }, ctx);
+	assert.equal(notes.length, 0, "notice fires once per process");
+
+	// /plan-go: execute prompt carries the partial-work inspection block
+	await fp.commands.get("plan-go").handler("", ctx);
+	assert.ok(fp.sent.at(-1)!.includes("PARTIAL WORK") && fp.sent.at(-1)!.includes("rename module"),
+		`resume prompt flags partial work: ${fp.sent.at(-1)}`);
+
+	// headless path: restore a foreign-writer state, first plan_write carries the one-shot warn
+	writeFileSync(join(cwd, ".pi", "plan-state.json"), foreignState());
+	const r = await callTool(fp, "plan_write", {
+		items: [
+			{ title: "rename module", status: "in_progress" },
+			{ title: "update callers", status: "pending" },
+		], request: "half-done refactor", summary: "s",
+	}, cwd);
+	assert.ok(r.content[0].text.includes("PARTIAL WORK"), r.content[0].text);
+	const again = await callTool(fp, "plan_write", {
+		items: [
+			{ title: "rename module", status: "done" },
+			{ title: "update callers", status: "in_progress" },
+		], request: "half-done refactor", summary: "s",
+	}, cwd);
+	assert.ok(!again.content[0].text.includes("PARTIAL WORK"), "one-shot: not repeated");
+});
+
+test("integration: a state written by THIS process triggers no resume machinery", async () => {
+	const fp = makeFakePi();
+	const mod = await import(`../extensions/plan-runner.ts?ownwriter=${Date.now()}-${Math.random()}`);
+	mod.default(fp.pi as any);
+	const cwd = tmp();
+	const { ctx, notes } = makeCtx(cwd);
+	await callTool(fp, "plan_write", {
+		items: [{ title: "own work", status: "in_progress" }], request: "r", summary: "s",
+	}, cwd);
+	await fire(fp, "session_start", { reason: "startup" }, ctx);
+	assert.equal(notes.length, 0, "no interrupted-plan notice for our own state");
+	await fp.commands.get("plan-go").handler("", ctx);
+	assert.ok(!fp.sent.at(-1)!.includes("PARTIAL WORK"), "no partial-work block for our own state");
 });

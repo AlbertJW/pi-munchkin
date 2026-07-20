@@ -14,7 +14,7 @@ A read-only scan of the live Pi history on 2026-07-19 found 1,709 sessions, 35,4
 
 Telemetry contained 1,124 verify-gate steers, 850 unverified endings, 651 outcome-loop steers, and only 51 micro-gate fires. These are mixed historical populations: they identify experiment targets but cannot justify a live policy change until provenance and per-session joins are complete.
 
-The live and published harnesses also differ in four matching extensions (`git-guard`, `ketch`, `plan-runner`, and `plan-weaver`), while the live tree lacks the published shared gate/URL policy modules. Establish deployment parity before attributing an A/B result to the published harness.
+The live and published harnesses also differ in three matching extensions (`git-guard`, `ketch`, and `plan-runner`), while the live tree lacks the published shared gate/URL policy modules. Establish deployment parity before attributing an A/B result to the published harness.
 
 ## Research principles
 

@@ -2,6 +2,14 @@
 
 All notable changes to pi-munchkin are documented here. Releases follow semantic versioning.
 
+## Unreleased
+
+### Removed
+
+- The `plan-weaver` (v4) extension and its `plan-contract` lib. Its gate retry
+  ladder, item dependencies, and crash-resume mechanics are ported into
+  `plan-runner` (plan mode) instead.
+
 ## 0.3.0 - 2026-07-19
 
 ### Added
