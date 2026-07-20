@@ -11,7 +11,7 @@
     "node": ">=22.6.0"
   },
   "scripts": {
-    "test": "node --experimental-strip-types --test harness/tests/*.test.ts",
+    "test": "node harness/scripts/run-tests.mjs",
     "typecheck": "tsc -p harness/.typecheck/tsconfig.json --noEmit",
     "health": "bash harness/scripts/pi-health.sh",
     "pack:smoke": "node --experimental-strip-types harness/scripts/package-smoke.mjs",
@@ -35,7 +35,8 @@
       "harness/extensions/ketch.ts",
       "harness/extensions/did-you-mean.ts",
       "harness/extensions/surface-receipt.ts",
-      "harness/vendor/pi-subagent/index.ts"
+      "harness/vendor/pi-subagent/index.ts",
+      "harness/extensions/context-surface.ts"
     ]
   },
   "dependencies": {
@@ -63,6 +64,7 @@
     "harness/extensions/git-guard.ts",
     "harness/extensions/context-inlet-guard.ts",
     "harness/extensions/context-watcher.ts",
+    "harness/extensions/context-surface.ts",
     "harness/extensions/span-tools.ts",
     "harness/extensions/compact-tool.ts",
     "harness/extensions/micro-gate.ts",
@@ -74,6 +76,7 @@
     "harness/lib/compaction-coordinator.ts",
     "harness/lib/context-inlet.ts",
     "harness/lib/context-watch.ts",
+    "harness/lib/context-surface.ts",
     "harness/lib/did-you-mean.ts",
     "harness/lib/drift-policy.ts",
     "harness/lib/gate-runtime.ts",
@@ -82,6 +85,7 @@
     "harness/lib/micro-gate-policy.ts",
     "harness/lib/plan-integrity.ts",
     "harness/lib/plan-progress.ts",
+    "harness/lib/process-writer.ts",
     "harness/lib/public-url.ts",
     "harness/lib/reflect-policy.ts",
     "harness/lib/span-index.ts",
@@ -89,6 +93,7 @@
     "harness/lib/surface-walk.ts",
     "harness/lib/tag-words.ts",
     "harness/lib/telemetry.ts",
+    "harness/lib/telemetry-catalog.ts",
     "harness/agents",
     "harness/vendor",
     "harness/APPEND_SYSTEM.md",

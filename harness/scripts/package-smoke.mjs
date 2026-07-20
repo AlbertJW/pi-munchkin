@@ -13,12 +13,28 @@ const root = resolve(import.meta.dirname, "../..");
 const manifest = JSON.parse(await readFile(resolve(root, "package.json"), "utf8"));
 const extensions = manifest.pi?.extensions ?? [];
 
-for (const required of [
+const expectedExtensions = [
+  "harness/extensions/hashline.ts",
+  "harness/extensions/loop-breaker.ts",
+  "harness/extensions/verify-gate.ts",
+  "harness/extensions/plan-runner.ts",
+  "harness/extensions/reflect.ts",
+  "harness/extensions/drift-scanner.ts",
+  "harness/extensions/git-guard.ts",
+  "harness/extensions/context-inlet-guard.ts",
+  "harness/extensions/context-watcher.ts",
+  "harness/extensions/span-tools.ts",
+  "harness/extensions/compact-tool.ts",
+  "harness/extensions/micro-gate.ts",
+  "harness/extensions/ketch.ts",
   "harness/extensions/did-you-mean.ts",
+  "harness/extensions/surface-receipt.ts",
   "harness/vendor/pi-subagent/index.ts",
-]) {
-  assert(extensions.includes(required), `pi.extensions is missing ${required}`);
-}
+  // Must observe after every prompt-contributing extension so its receipt binds
+  // the final provider-visible system prompt, not an intermediate prompt.
+  "harness/extensions/context-surface.ts",
+];
+assert.deepEqual(extensions, expectedExtensions, "pi.extensions must expose the complete ordered production surface");
 assert(!extensions.includes("harness/extensions/chaos.ts"), "chaos must not be enabled in the release manifest");
 
 const work = await mkdtemp(resolve(tmpdir(), "pi-munchkin-pack-"));
@@ -26,6 +42,15 @@ const cache = resolve(work, "npm-cache");
 const packDir = resolve(work, "pack");
 const project = resolve(work, "consumer");
 const agentDir = resolve(work, "home", ".pi", "agent");
+const processEnv = {
+  PATH: process.env.PATH,
+  HOME: resolve(work, "home"),
+  TMPDIR: work,
+  npm_config_cache: cache,
+};
+for (const key of ["LANG", "LC_ALL", "SYSTEMROOT", "WINDIR"]) {
+  if (process.env[key]) processEnv[key] = process.env[key];
+}
 await mkdir(packDir, { recursive: true });
 await mkdir(project, { recursive: true });
 await mkdir(agentDir, { recursive: true });
@@ -35,7 +60,7 @@ try {
   packed = JSON.parse(execFileSync("npm", ["pack", "--json", "--ignore-scripts", "--pack-destination", packDir], {
     cwd: root,
     encoding: "utf8",
-    env: { ...process.env, npm_config_cache: cache },
+    env: processEnv,
   }));
   assert.equal(packed.length, 1, "npm pack must describe exactly one package");
   const files = new Set(packed[0].files.map(({ path }) => path));
@@ -63,7 +88,7 @@ try {
   execFileSync("npm", ["install", "--ignore-scripts", "--no-audit", "--no-fund", "--no-package-lock", tarball], {
     cwd: project,
     stdio: "pipe",
-    env: { ...process.env, HOME: resolve(work, "home"), npm_config_cache: cache },
+    env: processEnv,
   });
   const installedRoot = resolve(project, "node_modules", manifest.name);
   const installedManifest = JSON.parse(await readFile(resolve(installedRoot, "package.json"), "utf8"));

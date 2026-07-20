@@ -8,10 +8,11 @@
 // (TELEMETRY=off). TELEMETRY_FILE overrides the path (tests); rotation keeps
 // one .old generation at TELEMETRY_MAX_BYTES (default 5MB).
 
-import { createHmac } from "node:crypto";
+import { createHash, createHmac } from "node:crypto";
 import { appendFileSync, mkdirSync, readFileSync, renameSync, statSync } from "node:fs";
 import { homedir } from "node:os";
 import { dirname, join } from "node:path";
+import { validateCatalogDetail } from "./telemetry-catalog.ts";
 
 
 function targetFile(): string | number {
@@ -68,6 +69,62 @@ function resolveMacKey(): Buffer | undefined {
 }
 const MAC_KEY = resolveMacKey();
 
+const SEQUENCE_CACHE_FLAG = "__pi_telemetry_sequence_v2";
+function nextSequence(): number {
+	const shared = globalThis as Record<string, unknown>;
+	const previous = typeof shared[SEQUENCE_CACHE_FLAG] === "number" ? shared[SEQUENCE_CACHE_FLAG] as number : 0;
+	const next = previous + 1;
+	shared[SEQUENCE_CACHE_FLAG] = next;
+	return next;
+}
+
+export type TelemetrySource = "test" | "gate" | "interactive" | "unknown";
+const KNOWN_SOURCES = new Set<TelemetrySource>(["test", "gate", "interactive"]);
+
+export function telemetrySource(env = process.env): TelemetrySource {
+	const source = (env.TELEMETRY_SOURCE || "interactive") as TelemetrySource;
+	return KNOWN_SOURCES.has(source) ? source : "unknown";
+}
+
+function sha256(value: string): string {
+	return createHash("sha256").update(value).digest("hex");
+}
+
+function classifyError(value: string): string {
+	if (/auth|credential|api.?key|unauthor/i.test(value)) return "auth";
+	if (/timeout|timed.?out/i.test(value)) return "timeout";
+	if (/abort|cancel/i.test(value)) return "aborted";
+	if (/permission|denied|eacces/i.test(value)) return "permission";
+	if (/not found|enoent/i.test(value)) return "not_found";
+	if (/spawn|child process/i.test(value)) return "spawn";
+	return "unknown";
+}
+
+const FORBIDDEN_DETAIL_FIELD = /(prompt|tool.?output|file.?content|\bcontent\b|url|header|credential|secret|api.?key|exception)/i;
+const RESERVED_FIELDS = new Set(["run_id", "provider", "model"]);
+
+function normalizeDetail(detail: Record<string, unknown>): { detail: Record<string, unknown>; errors: string[] } {
+	const normalized: Record<string, unknown> = {};
+	const errors: string[] = [];
+	for (const [key, value] of Object.entries(detail)) {
+		if (RESERVED_FIELDS.has(key)) continue;
+		const safePromptAggregate = key === "system_prompt_sha256" || key === "system_prompt_bytes";
+		if (!safePromptAggregate && FORBIDDEN_DETAIL_FIELD.test(key)) {
+			errors.push(`forbidden field ${key}`);
+			continue;
+		}
+		if (key === "error") {
+			const raw = typeof value === "string" ? value : String(value);
+			normalized.error_class = classifyError(raw);
+			normalized.error_length = Buffer.byteLength(raw, "utf8");
+			normalized.error_sha256 = sha256(raw);
+			continue;
+		}
+		normalized[key] = value;
+	}
+	return { detail: normalized, errors };
+}
+
 export function encodeTelemetryRow(row: Record<string, unknown>, key?: string | Buffer): string {
 	const payload = JSON.stringify(row);
 	if (!key) return payload;
@@ -75,22 +132,61 @@ export function encodeTelemetryRow(row: Record<string, unknown>, key?: string | 
 	return `${payload.slice(0, -1)},"mac":"${mac}"}`;
 }
 
+export function isAuthoritativeTelemetryRow(row: Record<string, unknown>): boolean {
+	if (row.schema === "pi.harness-event/v2") return row.source === "gate" && typeof row.mac === "string";
+	return typeof row.mac === "string"; // legacy authenticated rows remain readable
+}
+
 function maxBytes(): number {
 	const n = Number.parseInt(process.env.TELEMETRY_MAX_BYTES || "", 10);
 	return Number.isFinite(n) && n > 0 ? n : 5 * 1024 * 1024;
 }
 
+function appendRow(row: Record<string, unknown>): void {
+	const file = targetFile();
+	if (typeof file === "string") {
+		mkdirSync(dirname(file), { recursive: true });
+		try {
+			if (statSync(file).size > maxBytes()) renameSync(file, `${file}.old`);
+		} catch {} // no file yet — fine
+	}
+	appendFileSync(file, `${encodeTelemetryRow(row, MAC_KEY)}\n`);
+}
+
+function envelope(ext: string, kind: string, detail: Record<string, unknown>): Record<string, unknown> {
+	return {
+		schema: "pi.harness-event/v2",
+		ts: new Date().toISOString(),
+		seq: nextSequence(),
+		source: telemetrySource(),
+		sk: SESSION_KEY,
+		run_id: typeof detail.run_id === "string" ? detail.run_id : (process.env.PI_RUN_ID || SESSION_KEY),
+		provider: typeof detail.provider === "string" ? detail.provider : (process.env.PI_MODEL_PROVIDER || null),
+		model: typeof detail.model === "string" ? detail.model : (process.env.PI_MODEL_ID || null),
+		harness_surface_sha256: process.env.HARNESS_SURFACE_SHA256 || null,
+		config_sha256: process.env.HARNESS_CONFIG_SHA256 || null,
+		ext,
+		kind,
+	};
+}
+
 export function record(ext: string, kind: string, detail: Record<string, unknown> = {}): void {
 	if (process.env.TELEMETRY === "off") return; // read per-call (testable, toggleable live)
+	const normalized = normalizeDetail(detail);
+	const validationErrors = [...normalized.errors, ...validateCatalogDetail(ext, kind, normalized.detail)];
+	if (process.env.TELEMETRY_STRICT === "1" && validationErrors.length > 0) {
+		throw new Error(`telemetry schema rejected ${ext}/${kind}: ${validationErrors.join("; ")}`);
+	}
 	try {
-		const file = targetFile();
-		if (typeof file === "string") {
-			mkdirSync(dirname(file), { recursive: true });
-			try {
-				if (statSync(file).size > maxBytes()) renameSync(file, `${file}.old`);
-			} catch {} // no file yet — fine
+		if (validationErrors.length > 0) {
+			appendRow({
+				...envelope("telemetry", "schema-reject", {}),
+				rejected_count: 1,
+				reason_class: validationErrors.some((error) => error.startsWith("unknown event")) ? "unknown_event" : "invalid_detail",
+			});
+			return;
 		}
-		appendFileSync(file, `${encodeTelemetryRow({ ts: new Date().toISOString(), sk: SESSION_KEY, ext, kind, ...detail }, MAC_KEY)}\n`);
+		appendRow({ ...envelope(ext, kind, detail), ...normalized.detail });
 	} catch {
 		// fail open: telemetry must never break the harness
 	}

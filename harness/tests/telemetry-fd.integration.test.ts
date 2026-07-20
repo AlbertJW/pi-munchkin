@@ -68,8 +68,8 @@ test("two independent module instances of telemetry.ts (jiti's per-extension mod
 		const source = [
 			`import { record as recordA } from ${JSON.stringify(`${telemetryUrl}?instance=a`)};`,
 			`import { record as recordB } from ${JSON.stringify(`${telemetryUrl}?instance=b`)};`,
-			`recordA("ext-a", "first", {});`,
-			`recordB("ext-b", "second", {});`,
+			`recordA("verify-gate", "gate-green-consumed", {});`,
+			`recordB("verify-gate", "gate-green-consumed", {});`,
 		].join("\n");
 		const child = spawnSync(process.execPath, ["--experimental-strip-types", "--input-type=module", "-e", source], {
 			env: { ...process.env, TELEMETRY: "on", TELEMETRY_HMAC_FD: "3", TELEMETRY_FD: "8" },
