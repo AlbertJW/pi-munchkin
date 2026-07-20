@@ -28,7 +28,7 @@ def _decode_line(line, number, key=None):
     if key is not None:
         match = MAC_SUFFIX.search(line)
         if not match:
-            raise ValueError(f"unsigned telemetry JSON at line {number}")
+            raise ValueError(f"unsigned telemetry JSON at line {number}: {line[:200]!r}")
         payload = line[:match.start()] + b"}"
         expected = hmac.new(key, payload, hashlib.sha256).hexdigest().encode()
         if not hmac.compare_digest(match.group(1), expected):

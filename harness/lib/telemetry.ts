@@ -35,16 +35,38 @@ const SESSION_KEY = (() => {
 // Authoritative gates pass a random key through a pre-opened descriptor. Pi's
 // tool subprocesses do not inherit extra descriptors, and the key never appears
 // in argv/environment. Interactive telemetry remains unsigned and diagnostic.
-const MAC_KEY = (() => {
+//
+// pi's extension loader gives each extension its OWN jiti instance with module
+// caching disabled (dist/core/extensions/loader.js: `createJiti(..., {
+// moduleCache: false })`, called fresh per extension) — so THIS module's
+// top-level code runs once PER EXTENSION, not once per process. Reading the key
+// fd directly here would drain it on whichever extension imports this file
+// first, leaving every other extension's copy silently unsigned for the rest of
+// the run (reproduced live: a context-watcher.ts event went out unsigned while
+// later signed events from other extensions succeeded in the same session).
+// Resolve the key once and cache it on globalThis — the one thing genuinely
+// shared across independently-loaded module instances in the same process —
+// the same __pi_* flag-bus idiom already used elsewhere for cross-extension state.
+const MAC_KEY_CACHE_FLAG = "__pi_telemetry_mac_key";
+function resolveMacKey(): Buffer | undefined {
+	const g = globalThis as Record<string, unknown>;
+	if (MAC_KEY_CACHE_FLAG in g) {
+		const cached = g[MAC_KEY_CACHE_FLAG];
+		return cached instanceof Buffer ? cached : undefined;
+	}
 	const raw = process.env.TELEMETRY_HMAC_FD;
-	if (!raw || !/^\d+$/.test(raw)) return undefined;
+	if (!raw || !/^\d+$/.test(raw)) { g[MAC_KEY_CACHE_FLAG] = null; return undefined; }
 	try {
 		const key = Buffer.from(readFileSync(Number(raw), "utf8").trim(), "utf8");
-		return key.length >= 32 ? key : undefined;
+		if (key.length >= 32) { g[MAC_KEY_CACHE_FLAG] = key; return key; }
+		g[MAC_KEY_CACHE_FLAG] = null;
+		return undefined;
 	} catch {
+		g[MAC_KEY_CACHE_FLAG] = null;
 		return undefined;
 	}
-})();
+}
+const MAC_KEY = resolveMacKey();
 
 export function encodeTelemetryRow(row: Record<string, unknown>, key?: string | Buffer): string {
 	const payload = JSON.stringify(row);
