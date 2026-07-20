@@ -100,7 +100,7 @@ test("KV-cache invariants: append-only sequences are prefix_stable, mutations an
 	assert.equal(first.receipt.prefix_stable, null, "no prior on the first call");
 	assert.equal(first.receipt.appended_only, null);
 	assert.equal(first.receipt.system_prompt_changed, null);
-	const prior = { blockHashes: first.blockHashes, systemSha: system.sha256 };
+	const prior = { messageHashes: first.messageHashes, systemSha: system.sha256 };
 
 	const appended = buildContextSurfaceReceipt(msgs(["a", "b", "c"]), system, undefined, {}, prior);
 	assert.equal(appended.receipt.prefix_stable, true);
@@ -118,6 +118,48 @@ test("KV-cache invariants: append-only sequences are prefix_stable, mutations an
 	const newSystem = systemPromptReceipt("different");
 	const swapped = buildContextSurfaceReceipt(msgs(["a", "b"]), newSystem, undefined, {}, prior);
 	assert.equal(swapped.receipt.system_prompt_changed, true);
+});
+
+test("KV-cache invariants bind the WHOLE message, not just content blocks (reviewer repro class)", () => {
+	const system = systemPromptReceipt("s");
+	const base = [
+		{ role: "assistant", content: [{ type: "toolCall", id: "r1", name: "read", arguments: { path: "a" } }] },
+		{ role: "toolResult", toolCallId: "r1", toolName: "read", content: [{ type: "text", text: "data" }], isError: false },
+	];
+	const first = buildContextSurfaceReceipt(base, system, undefined);
+	const prior = { messageHashes: first.messageHashes, systemSha: system.sha256 };
+
+	// metadata-only mutation: same content blocks, flipped isError
+	const meta = structuredClone(base);
+	(meta[1] as Record<string, unknown>).isError = true;
+	assert.equal(buildContextSurfaceReceipt(meta, system, undefined, {}, prior).receipt.prefix_stable, false,
+		"toolResult metadata change must break prefix stability");
+
+	// role swap with identical content
+	const role = structuredClone(base);
+	(role[0] as Record<string, unknown>).role = "user";
+	assert.equal(buildContextSurfaceReceipt(role, system, undefined, {}, prior).receipt.prefix_stable, false,
+		"role change must break prefix stability");
+
+	// bashExecution field change (no recognized content blocks at all)
+	const bashA = [{ role: "bashExecution", command: "ls", output: "a.txt" }];
+	const bashFirst = buildContextSurfaceReceipt(bashA, system, undefined);
+	const bashPrior = { messageHashes: bashFirst.messageHashes, systemSha: system.sha256 };
+	const bashB = [{ role: "bashExecution", command: "ls", output: "CHANGED" }];
+	assert.equal(buildContextSurfaceReceipt(bashB, system, undefined, {}, bashPrior).receipt.prefix_stable, false,
+		"bashExecution output change must break prefix stability");
+});
+
+test("near-dup similarity rejects containment and low-entropy sketches (reviewer probe)", () => {
+	const system = systemPromptReceipt("s");
+	const wrap = (texts: string[]) => texts.map((text) => ({ role: "user", content: [{ type: "text", text }] }));
+	// a short low-entropy block whose shingles are CONTAINED in a big unrelated
+	// block must not read as a near-duplicate
+	const contained = "abcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabc";
+	const big = contained + " entirely different narrative about parser diagnostics and cache eviction policies with plenty of additional distinct vocabulary to dominate the shingle space of this much larger block of text. ".repeat(3);
+	const probe = buildContextSurfaceReceipt(wrap([big, contained]), system, undefined).receipt;
+	assert.equal(probe.near_duplicate_block_share, 0,
+		`containment must not read as near-duplication (got ${probe.near_duplicate_block_share})`);
 });
 
 test("near-duplicate share: almost-identical large blocks count, exact repeats and small/unrelated blocks do not", () => {

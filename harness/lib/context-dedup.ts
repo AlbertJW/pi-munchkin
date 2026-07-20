@@ -65,8 +65,13 @@ export function dedupReadResults(
 			"[read {path}: identical to the result at message #{kept} — content unchanged; do not re-read]",
 			{ path, kept },
 		);
+		// Only ever SHRINK the context: a stub longer than the tiny result it
+		// replaces would enlarge the window, and savedBytes stays non-negative
+		// by construction.
+		const saved = Buffer.byteLength(text, "utf8") - Buffer.byteLength(stub, "utf8");
+		if (saved <= 0) return raw;
 		replaced += 1;
-		savedBytes += Buffer.byteLength(text, "utf8") - Buffer.byteLength(stub, "utf8");
+		savedBytes += saved;
 		return { ...message, content: [{ type: "text", text: stub }] };
 	});
 	return replaced > 0 ? { messages: out, replaced, savedBytes } : null;

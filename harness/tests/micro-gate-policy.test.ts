@@ -108,3 +108,43 @@ test("formatSlop bounds to 3 findings across files", () => {
 	]);
 	assert.equal(out, "a.ts:1:as-any\na.ts:2:empty-catch\nb.py:3:lazy-assert");
 });
+
+test("M8: a file that fails parse gets ONE steer (the parse error), slop skips it", async () => {
+	const { makeFakePi, fire } = await import("./integration-harness.ts");
+	const dir = mkdtempSync(join(tmpdir(), "mg-both-"));
+	process.env.TELEMETRY_FILE = join(dir, "events.jsonl");
+	process.env.TELEMETRY_SOURCE = "test";
+	process.env.MICRO_GATE = "on";
+	process.env.MICRO_GATE_SLOP = "on";
+	try {
+		// invalid syntax AND a suppression marker — the old order emitted both steers
+		writeFileSync(join(dir, "broken.js"), "// @ts-ignore\nfunction f( {\n");
+		const fp = makeFakePi();
+		(await import(`../extensions/micro-gate.ts?both=${Date.now()}-${Math.random()}`)).default(fp.pi as any);
+		await fire(fp, "turn_end", {
+			message: { role: "assistant", content: [
+				{ type: "toolCall", name: "write", arguments: { path: "broken.js", content: "x" } },
+			] },
+		}, { cwd: dir });
+		assert.equal(fp.sent.length, 1, `exactly one steer, got ${fp.sent.length}: ${JSON.stringify(fp.sent)}`);
+		assert.match(fp.sent[0], /does not parse/, "the parse steer wins");
+
+		// clean-parsing file with slop still gets the slop steer
+		writeFileSync(join(dir, "sloppy.js"), "// @ts-ignore\nconst x = 1;\n");
+		const fp2 = makeFakePi();
+		(await import(`../extensions/micro-gate.ts?slop2=${Date.now()}-${Math.random()}`)).default(fp2.pi as any);
+		await fire(fp2, "turn_end", {
+			message: { role: "assistant", content: [
+				{ type: "toolCall", name: "write", arguments: { path: "sloppy.js", content: "x" } },
+			] },
+		}, { cwd: dir });
+		assert.equal(fp2.sent.length, 1);
+		assert.match(fp2.sent[0], /Possible shortcuts/);
+	} finally {
+		delete process.env.MICRO_GATE;
+		delete process.env.MICRO_GATE_SLOP;
+		delete process.env.TELEMETRY_FILE;
+		delete process.env.TELEMETRY_SOURCE;
+		rmSync(dir, { recursive: true, force: true });
+	}
+});

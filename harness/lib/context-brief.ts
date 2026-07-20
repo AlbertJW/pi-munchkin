@@ -22,9 +22,19 @@ export const realBriefFs: BriefFs = {
 const SKIP_DIRS = new Set(["node_modules", "__pycache__", "dist", "build", "target", "venv"]);
 const MAX_TREE_ENTRIES = 40;
 const DEFAULT_MAX_BYTES = 2048;
+const TRUNCATION_MARKER = "...[truncated]";
 
 function skippable(name: string): boolean {
 	return name.startsWith(".") || SKIP_DIRS.has(name);
+}
+
+// Repository-controlled strings (filenames, package-script keys) end up in
+// the SYSTEM prompt — an injection boundary. Neutralize: printable ASCII
+// only (newlines/control chars/unicode → "?"), no backticks or braces that
+// could break out of the fenced data block, hard per-name length cap.
+export function sanitizeName(name: string): string {
+	const cleaned = name.replace(/[^ -~]/g, "?").replace(/[`{}]/g, "?");
+	return cleaned.length > 64 ? `${cleaned.slice(0, 61)}...` : cleaned;
 }
 
 export function buildBrief(
@@ -48,15 +58,15 @@ export function buildBrief(
 			let children: string[] = [];
 			try { children = fs.readdir(full).filter((child) => !skippable(child)).sort(); } catch { children = []; }
 			const files = children.filter((child) => !fs.isDirectory(join(full, child)));
-			lines.push(`  ${name}/ (${children.length} entries)`);
+			lines.push(`  ${sanitizeName(name)}/ (${children.length} entries)`);
 			entries += 1;
 			for (const child of files.slice(0, 6)) {
 				if (entries >= MAX_TREE_ENTRIES) break;
-				lines.push(`    ${child}`);
+				lines.push(`    ${sanitizeName(child)}`);
 				entries += 1;
 			}
 		} else {
-			lines.push(`  ${name}`);
+			lines.push(`  ${sanitizeName(name)}`);
 			entries += 1;
 		}
 	}
@@ -64,7 +74,7 @@ export function buildBrief(
 	// 2. package scripts + detected test command
 	try {
 		const pkg = JSON.parse(fs.readFile(join(cwd, "package.json")));
-		const scripts = Object.keys(pkg.scripts ?? {}).sort();
+		const scripts = Object.keys(pkg.scripts ?? {}).sort().map(sanitizeName);
 		if (scripts.length) lines.push(`NPM SCRIPTS: ${scripts.join(", ")}`);
 		if (pkg.scripts?.test) lines.push(`TEST COMMAND: npm test`);
 	} catch {
@@ -75,15 +85,17 @@ export function buildBrief(
 
 	// 3. git summary — passed in by the extension (computed via pi.exec,
 	// fail-open); the lib never shells out.
-	if (opts.gitSummary) lines.push(`GIT: ${opts.gitSummary}`);
+	if (opts.gitSummary) lines.push(`GIT: ${sanitizeName(opts.gitSummary)}`);
 
-	// hard byte cap, line-boundary truncation
+	// HARD byte cap: the marker's own bytes are reserved up front, so the
+	// emitted total can never exceed maxBytes even when truncation fires.
 	let truncated = false;
 	const out: string[] = [];
 	let size = 0;
+	const budget = maxBytes - Buffer.byteLength(TRUNCATION_MARKER, "utf8") - 1;
 	for (const line of lines) {
 		const bytes = Buffer.byteLength(line, "utf8") + 1;
-		if (size + bytes > maxBytes) { truncated = true; out.push("...[truncated]"); break; }
+		if (size + bytes > budget) { truncated = true; out.push(TRUNCATION_MARKER); break; }
 		out.push(line);
 		size += bytes;
 	}

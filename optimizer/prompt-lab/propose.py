@@ -60,13 +60,20 @@ def failing_traces(gen, max_traces):
     return out[:max_traces]
 
 def load_gate_rows(gen):
-    """Rows from a real-gate round (schema pi.eval-row*). Tolerates the sql-row
-    shape by filtering on schema, so --distill on a sql gen is a clean no-op."""
+    """Rows from a real-gate round eligible to feed candidate generation:
+    schema pi.eval-row*, split "val" ONLY (heldout/robustness rows must never
+    contaminate proposals — manifests declare held-out material unavailable),
+    authoritative, and complete — the same authority bar fleet_report enforces.
+    Tolerates the sql-row shape by filtering on schema."""
     path = os.path.join(LAB, "results", gen + ".jsonl")
     if not os.path.exists(path):
         return []
     rows = [json.loads(l) for l in open(path) if l.strip()]
-    return [r for r in rows if str(r.get("schema", "")).startswith("pi.eval-row")]
+    return [r for r in rows
+            if str(r.get("schema", "")).startswith("pi.eval-row")
+            and r.get("split") == "val"
+            and r.get("authoritative") is True
+            and r.get("status") == "complete"]
 
 def distill_evidence(rows, max_bytes=4096):
     """Bounded, deterministic evidence pack distilled from gate rows: aggregate
@@ -98,10 +105,8 @@ def distill_evidence(rows, max_bytes=4096):
         p, t = cells[(task, arm)]
         lines.append(f"  {task}/{arm}: {p}/{t}")
 
-    passing = [r for r in rows if r.get("score") == 1]
     losers = [r for r in rows if r.get("score") == 0]
     cost = lambda r: (traj(r, "turns") or 0) + (traj(r, "tool_errors") or 0)
-    winners = sorted(passing, key=cost)[:max(1, len(passing) // 3)] if passing else []
 
     cluster = {}
     for r in losers:
@@ -120,20 +125,39 @@ def distill_evidence(rows, max_bytes=4096):
     for k in sorted(cluster):
         lines.append(f"  {k}: {cluster[k]}")
 
-    lines.append("EFFICIENT-WINNER vs LOSER means:")
-    for name, fn in (
+    # Matched comparison ONLY: a global cheapest-tercile-vs-all-losers pool
+    # lets task difficulty and arm mix masquerade as mechanism movement. Each
+    # (task, arm) cell that has BOTH passes and failures contributes one
+    # winners-minus-losers delta per metric; cells without both sides are out.
+    metrics = (
         ("turns", lambda r: traj(r, "turns")),
         ("tool_errors", lambda r: traj(r, "tool_errors")),
         ("repeat_reads", lambda r: traj(r, "repeat_reads")),
         ("exact_dup_share", lambda r: surface(r, ("duplication", "exact_block", "mean"))),
         ("near_dup_share", lambda r: surface(r, ("duplication", "near_block", "mean"))),
         ("stale_result_share", lambda r: surface(r, ("stale_tool_result", "mean"))),
-    ):
-        w, l = mean([fn(r) for r in winners]), mean([fn(r) for r in losers])
-        if w is None and l is None:
+    )
+    by_cell = {}
+    for r in rows:
+        by_cell.setdefault((str(r.get("task")), str(r.get("arm"))), []).append(r)
+    deltas = {name: [] for name, _ in metrics}
+    matched_cells = 0
+    for key in sorted(by_cell):
+        cell_passes = [r for r in by_cell[key] if r.get("score") == 1]
+        cell_fails = [r for r in by_cell[key] if r.get("score") == 0]
+        if not cell_passes or not cell_fails:
             continue
-        fmt = lambda v: "n/a" if v is None else f"{v:.3f}"
-        lines.append(f"  {name}: winners={fmt(w)} losers={fmt(l)}")
+        matched_cells += 1
+        cheap = sorted(cell_passes, key=cost)[:max(1, len(cell_passes) // 3)]
+        for name, fn in metrics:
+            w, l = mean([fn(r) for r in cheap]), mean([fn(r) for r in cell_fails])
+            if w is not None and l is not None:
+                deltas[name].append(w - l)
+    lines.append(f"MATCHED WINNER-LOSER DELTAS (same task+arm; matched_cells={matched_cells}):")
+    for name, _ in metrics:
+        values = deltas[name]
+        if values:
+            lines.append(f"  {name}: mean_delta={sum(values) / len(values):+.3f} over {len(values)} cell(s)")
 
     out, size = [], 0
     for line in lines:
@@ -347,7 +371,8 @@ def run(gen, prompt_path, n, max_traces, distill=False):
         evidence = distill_evidence(rows)
         user = (f"CURRENT PROMPT:\n```\n{prompt_text}\n```\n\n"
                 f"EVIDENCE PACK (aggregated from {len(rows)} gate sessions):\n{evidence}")
-        trace_ids = sorted(hashlib.sha256(json.dumps(r, sort_keys=True).encode()).hexdigest() for r in rows)[:24]
+        # provenance must cover EVERY row the evidence was derived from — no cap
+        trace_ids = sorted(hashlib.sha256(json.dumps(r, sort_keys=True).encode()).hexdigest() for r in rows)
     else:
         traces = failing_traces(gen, max_traces)
         if not traces:
@@ -434,8 +459,11 @@ def selftest():
         assert open(paths[0]).read().strip() == "You are precise. Output ONE SQL statement."
     finally:
         shutil.rmtree(d)
-    # --distill: deterministic, bounded, aggregate-only evidence pack
-    gate_rows = [
+    # --distill: deterministic, bounded, aggregate-only evidence pack.
+    # Rows carry the authority fields load_gate_rows now REQUIRES.
+    def eligible(r):
+        return dict(r, split="val", authoritative=True, status=r.get("status", "complete"))
+    gate_rows_raw = [
         {"schema": "pi.eval-row/v2", "task": "parens", "arm": "base", "score": 1,
          "trajectory": {"turns": 4, "tool_errors": 0, "repeat_reads": 0, "compactions": 0},
          "context": {"surface": {"duplication": {"exact_block": {"mean": 0.05}, "near_block": {"mean": 0.02}}, "stale_tool_result": {"mean": 0.1}}}},
@@ -447,12 +475,44 @@ def selftest():
          "context": {"surface": {"duplication": {"exact_block": {"mean": 0.4}, "near_block": {"mean": 0.2}}, "stale_tool_result": {"mean": 0.5}}}},
         {"schema": "pi.sql-row/v1", "task": "q1", "score": 0},  # non-gate row must be ignored by load_gate_rows semantics
     ]
+    gate_rows = [eligible(r) for r in gate_rows_raw]
+    # load_gate_rows: heldout / non-authoritative / incomplete rows never feed proposals
+    import tempfile
+    with tempfile.TemporaryDirectory() as td:
+        results_dir = os.path.join(LAB, "results")
+        probe = os.path.join(results_dir, "distill-selftest-probe.jsonl")
+        contaminated = gate_rows + [
+            dict(gate_rows[0], split="heldout"),
+            dict(gate_rows[0], split="robustness"),
+            dict(gate_rows[0], authoritative=False),
+            dict(gate_rows[0], status="incomplete"),
+        ]
+        try:
+            with open(probe, "w") as f:
+                for r in contaminated:
+                    f.write(json.dumps(r) + "\n")
+            loaded = load_gate_rows("distill-selftest-probe")
+            # 2 of the 3 eval rows survive: the status="incomplete" synthetic is
+            # itself excluded by the authority bar, as are all 4 contaminants.
+            assert len(loaded) == 2, f"only val+authoritative+complete gate rows load, got {len(loaded)}"
+            assert all(r.get("split") == "val" for r in loaded)
+            ids = sorted(hashlib.sha256(json.dumps(r, sort_keys=True).encode()).hexdigest() for r in loaded)
+            assert len(ids) == len(loaded), "provenance covers every consumed row (no cap)"
+        finally:
+            os.unlink(probe)
     pack_a = distill_evidence(gate_rows)
     pack_b = distill_evidence(list(gate_rows))
     assert pack_a == pack_b, "evidence pack must be deterministic"
     assert "PASS RATES" in pack_a and "parens/base: 1/1" in pack_a, pack_a
     assert "LOSER CLUSTERS" in pack_a and "high_tool_errors(>=3): 1" in pack_a and "status=incomplete: 1" in pack_a
-    assert "EFFICIENT-WINNER vs LOSER" in pack_a and "near_dup_share" in pack_a
+    assert "MATCHED WINNER-LOSER DELTAS" in pack_a
+    # confound guard: parens has only passes, equil only failures -> NO matched
+    # cell exists, so the pack must claim zero matched cells instead of
+    # manufacturing a cross-task comparison (the old global-pool bug).
+    assert "matched_cells=0" in pack_a, pack_a
+    matched_rows = gate_rows + [dict(eligible(gate_rows_raw[2]), task="parens", arm="base")]
+    pack_m = distill_evidence(matched_rows)
+    assert "matched_cells=1" in pack_m and "turns: mean_delta=" in pack_m, pack_m
     assert len(pack_a.encode()) <= 4096
     tiny = distill_evidence(gate_rows, max_bytes=64)
     assert len(tiny.encode()) <= 64 + len("...[truncated]") + 1 and tiny.endswith("...[truncated]")

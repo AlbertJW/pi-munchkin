@@ -51,6 +51,14 @@ test("different content for the same path, errored reads, and other tools are un
 		{ role: "toolResult", toolCallId: "b2", toolName: "bash", content: [{ type: "text", text: fileText }], isError: false },
 	];
 	assert.equal(dedupReadResults(bash), null, "v1 scope is the read tool only");
+
+	// M5: a tiny repeated result must NOT be replaced by a longer stub —
+	// dedup only ever shrinks the context, so savedBytes stays non-negative.
+	const tiny = [
+		...readPair("r1", "v", "1"),
+		...readPair("r2", "v", "1"),
+	];
+	assert.equal(dedupReadResults(tiny), null, "stub larger than the result -> no replacement");
 });
 
 test("dedup output measurably lowers the surface's exact-duplicate share and keeps prefix_stable", () => {
@@ -65,7 +73,7 @@ test("dedup output measurably lowers the surface's exact-duplicate share and kee
 	// cross-call prefix stability: call N deduped, call N+1 = same + appended turn
 	const callN = buildContextSurfaceReceipt(deduped.messages, system, undefined);
 	const appended = [...deduped.messages, { role: "user", content: [{ type: "text", text: "next" }] }];
-	const callN1 = buildContextSurfaceReceipt(appended, system, undefined, {}, { blockHashes: callN.blockHashes, systemSha: system.sha256 });
+	const callN1 = buildContextSurfaceReceipt(appended, system, undefined, {}, { messageHashes: callN.messageHashes, systemSha: system.sha256 });
 	assert.equal(callN1.receipt.prefix_stable, true, "later-copy replacement must stay append-safe across calls");
 });
 
@@ -106,6 +114,13 @@ test("integration: READ_DEDUP=on transforms the context view; off leaves it alon
 		(globalThis as Record<string, unknown>).__pi_ctx_redundancy_pct = 10;
 		await fire(nudgeFp, "turn_end", { turnIndex: 20 }, {});
 		assert.equal(nudgeFp.sent.length, 1, "below threshold stays silent");
+
+		// M7: a new session resets the cooldown — turn indices restart at 0,
+		// so a stale lastNudgeTurn must not suppress the first nudge.
+		(globalThis as Record<string, unknown>).__pi_ctx_redundancy_pct = 80;
+		await fire(nudgeFp, "session_start", { reason: "new" }, {});
+		await fire(nudgeFp, "turn_end", { turnIndex: 0 }, {});
+		assert.equal(nudgeFp.sent.length, 2, "cooldown resets across sessions");
 	} finally {
 		delete process.env.READ_DEDUP;
 		delete process.env.CTX_REDUNDANCY_NUDGE;

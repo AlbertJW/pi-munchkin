@@ -40,10 +40,15 @@ export default function (pi: ExtensionAPI) {
 			return;
 		}
 
-		if (SLOP_ENABLED) await slopPass(pi, ctx.cwd, paths);
-		if (!PARSE_ENABLED) return;
-
+		// Parse checks run FIRST: a file that doesn't parse gets exactly ONE
+		// steer (the parse error) — running slop on it too would emit two
+		// competing corrections in the same turn.
+		const parseFailed = new Set<string>();
 		const outputs: Array<{ file: string; err: string }> = [];
+		if (!PARSE_ENABLED) {
+			if (SLOP_ENABLED) await slopPass(pi, ctx.cwd, paths, parseFailed);
+			return;
+		}
 		let checked = 0;
 		for (const check of checksFor(paths)) {
 			const abs = isAbsolute(check.file) ? check.file : join(ctx.cwd, check.file);
@@ -66,12 +71,16 @@ export default function (pi: ExtensionAPI) {
 						{ cwd: ctx.cwd, timeout: CHECK_TIMEOUT });
 				}
 				checked += 1;
-				if (r.code !== 0) outputs.push({ file: check.file, err: r.stderr || r.stdout || "check failed" });
+				if (r.code !== 0) {
+					outputs.push({ file: check.file, err: r.stderr || r.stdout || "check failed" });
+					parseFailed.add(check.file);
+				}
 			} catch (error) {
 				// checker unavailable/timeout: the micro-gate must never become its own fault
 				record("micro-gate", "checker-error", { file: check.file, error: error instanceof Error ? error.message : String(error) });
 			}
 		}
+		if (SLOP_ENABLED) await slopPass(pi, ctx.cwd, paths, parseFailed);
 		const err = firstError(outputs);
 		if (!err) {
 			record("micro-gate", checked ? "passed" : "skipped", { files: paths.length, checked });
@@ -86,12 +95,12 @@ export default function (pi: ExtensionAPI) {
 		pi.sendUserMessage(steerMsg, { deliverAs: "steer" });
 	});
 
-	async function slopPass(api: ExtensionAPI, cwd: string, paths: string[]): Promise<void> {
+	async function slopPass(api: ExtensionAPI, cwd: string, paths: string[], parseFailed: ReadonlySet<string>): Promise<void> {
 		const outputs: Array<{ file: string; findings: string[] }> = [];
 		let checked = 0;
 		const seen = new Set<string>();
 		for (const file of paths) {
-			if (seen.has(file)) continue;
+			if (seen.has(file) || parseFailed.has(file)) continue;
 			seen.add(file);
 			const kind = slopKindFor(file);
 			if (!kind) continue;
@@ -110,7 +119,8 @@ export default function (pi: ExtensionAPI) {
 					checked += 1;
 					if (findings.length) outputs.push({ file, findings });
 				} else {
-					const findings = jsSlopFindings(readFileSync(abs, "utf8"));
+					// bounded read: slop scanning must never slurp a huge generated file
+					const findings = jsSlopFindings(readFileSync(abs, "utf8").slice(0, 512 * 1024));
 					checked += 1;
 					if (findings.length) outputs.push({ file, findings });
 				}

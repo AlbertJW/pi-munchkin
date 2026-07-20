@@ -56,9 +56,13 @@ export type ContextSurfaceReceipt = {
 };
 
 // Cross-call comparison anchor for the KV-cache invariants: the previous
-// call's block-hash sequence + system-prompt sha. Held by the extension in
-// module state, reset on session start/compaction.
-export type ContextSurfacePrior = { blockHashes: string[]; systemSha: string };
+// call's PER-MESSAGE hash sequence + system-prompt sha. Message-level, via
+// the same stableHash that binds surface_sha256, so roles, boundaries,
+// toolResult metadata, bashExecution/summary fields, and unknown block types
+// are all covered by construction — content-block hashing alone provably
+// missed metadata-only changes. Held by the extension in module state, reset
+// on session start/compaction.
+export type ContextSurfacePrior = { messageHashes: string[]; systemSha: string };
 
 function sha256(value: string | Buffer): string {
 	return createHash("sha256").update(value).digest("hex");
@@ -129,16 +133,22 @@ function bottomKSketch(text: string): number[] {
 	return [...hashes].sort((a, b) => a - b).slice(0, SKETCH_K);
 }
 
-// |a ∩ b| / k over two sorted sketches.
+// Bottom-k Jaccard estimate: of the k smallest hashes in the UNION of the
+// two sketches, the fraction present in both. Dividing by the smaller sketch
+// (the naive choice) makes containment read as identity — a one-shingle
+// block "inside" a big unrelated block would score 100%. Sketches below a
+// minimum cardinality are too low-entropy to compare at all.
+const SKETCH_MIN_CARDINALITY = 16;
 function sketchSimilarity(a: number[], b: number[]): number {
-	let i = 0, j = 0, shared = 0;
-	while (i < a.length && j < b.length) {
-		if (a[i] === b[j]) { shared += 1; i += 1; j += 1; }
-		else if (a[i] < b[j]) i += 1;
+	if (a.length < SKETCH_MIN_CARDINALITY || b.length < SKETCH_MIN_CARDINALITY) return 0;
+	let i = 0, j = 0, shared = 0, unionSeen = 0;
+	while (unionSeen < SKETCH_K && (i < a.length || j < b.length)) {
+		if (i < a.length && j < b.length && a[i] === b[j]) { shared += 1; i += 1; j += 1; }
+		else if (j >= b.length || (i < a.length && a[i] < b[j])) i += 1;
 		else j += 1;
+		unionSeen += 1;
 	}
-	const k = Math.min(a.length, b.length) || 1;
-	return shared / k;
+	return unionSeen === 0 ? 0 : shared / unionSeen;
 }
 
 function contentOf(message: ContextMessage): unknown[] {
@@ -159,7 +169,7 @@ export function buildContextSurfaceReceipt(
 	usage: { tokens: number | null; contextWindow: number; percent: number | null } | undefined,
 	meta: { compactionGeneration?: number; planRunId?: string; planItemId?: string } = {},
 	prior?: ContextSurfacePrior | null,
-): { receipt: ContextSurfaceReceipt; blockHashes: string[] } {
+): { receipt: ContextSurfaceReceipt; messageHashes: string[] } {
 	const roleMessages = { user: 0, assistant: 0, tool: 0, custom: 0 };
 	const roleBytes = { user: 0, assistant: 0, tool: 0, custom: 0 };
 	const messageBytes: number[] = [];
@@ -288,14 +298,16 @@ export function buildContextSurfaceReceipt(
 
 	// KV-cache invariants vs the previous call: an unchanged shared region
 	// (prefix_stable) and pure appends (appended_only) are what llama.cpp's
-	// prefix cache can reuse; a mutated early block forces a re-prefill.
+	// prefix cache can reuse; a mutated early message forces a re-prefill.
+	// Whole-message hashes, so metadata-only mutations are caught too.
+	const messageHashes = messages.map((message) => stableHash(message));
 	let prefixStable: boolean | null = null;
 	let appendedOnly: boolean | null = null;
 	let systemPromptChanged: boolean | null = null;
 	if (prior) {
-		const shared = Math.min(prior.blockHashes.length, blockHashes.length);
-		prefixStable = prior.blockHashes.slice(0, shared).every((hash, index) => hash === blockHashes[index]);
-		appendedOnly = prefixStable && blockHashes.length >= prior.blockHashes.length;
+		const shared = Math.min(prior.messageHashes.length, messageHashes.length);
+		prefixStable = prior.messageHashes.slice(0, shared).every((hash, index) => hash === messageHashes[index]);
+		appendedOnly = prefixStable && messageHashes.length >= prior.messageHashes.length;
 		systemPromptChanged = prior.systemSha !== system.sha256;
 	}
 
@@ -332,5 +344,5 @@ export function buildContextSurfaceReceipt(
 		plan_run_id: meta.planRunId ?? null,
 		plan_item_id: meta.planItemId ?? null,
 	};
-	return { receipt, blockHashes };
+	return { receipt, messageHashes };
 }

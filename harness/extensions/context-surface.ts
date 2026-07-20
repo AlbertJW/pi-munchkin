@@ -27,12 +27,12 @@ export default function (pi: ExtensionAPI): void {
 
 	pi.on("context", async (event, ctx) => {
 		const plan = (globalThis as Record<string, unknown>).__pi_active_plan_context as { run_id?: string; item_id?: string } | undefined;
-		const { receipt, blockHashes } = buildContextSurfaceReceipt(event.messages, system, ctx.getContextUsage?.(), {
+		const { receipt, messageHashes } = buildContextSurfaceReceipt(event.messages, system, ctx.getContextUsage?.(), {
 			compactionGeneration,
 			planRunId: plan?.run_id,
 			planItemId: plan?.item_id,
 		}, prior);
-		prior = { blockHashes, systemSha: system.sha256 };
+		prior = { messageHashes, systemSha: system.sha256 };
 		// Flag-bus publish (same-process idiom as __pi_gate_green): the combined
 		// duplicate share of the surface the provider will actually see, for
 		// context-dedup's redundancy nudge — no recompute, no direct coupling.

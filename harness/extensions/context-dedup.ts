@@ -34,6 +34,11 @@ export default function (pi: ExtensionAPI): void {
 
 	if (NUDGE) {
 		let lastNudgeTurn = -Infinity;
+		// turn indices restart per session — an un-reset cooldown from a late
+		// turn would wrongly suppress the next session's first nudge.
+		pi.on("session_start", async () => {
+			lastNudgeTurn = -Infinity;
+		});
 		pi.on("turn_end", async (event) => {
 			const share = (globalThis as Record<string, unknown>).__pi_ctx_redundancy_pct;
 			if (typeof share !== "number" || share < NUDGE_PCT) return;
