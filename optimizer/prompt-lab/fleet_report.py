@@ -419,7 +419,7 @@ def selftest():
     assert "trajectory" not in schema["required"], "one-shot must remain trajectory-exempt"
     experiment_conditional = schema["allOf"][1]
     assert experiment_conditional["if"]["properties"]["experiment"] == {"type": "object"}
-    assert experiment_conditional["then"]["required"] == ["span_receipt_success", "config", "experiment", "harness", "trajectory"]
+    assert experiment_conditional["then"]["required"] == ["span_receipt_success", "config", "experiment", "harness", "trajectory", "context"]
     assert experiment_conditional["then"]["properties"]["trajectory"]["required"] == ["search_spans", "read_span"]
     print("fleet_report selftest: OK (sig gates, integrity, run-scoped all-k reliability, v2 trajectory contract)")
 

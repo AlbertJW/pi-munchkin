@@ -23,6 +23,7 @@ selftests=(
   prompt-lab/calibrate.py
   prompt-lab/canary.py
   prompt-lab/config.py
+  prompt-lab/context_telemetry.py
   prompt-lab/span_screen.py
   prompt-lab/execution_policy.py
   prompt-lab/fleet_report.py
@@ -44,6 +45,8 @@ python3 "$OPT/prompt-lab/integrity_selftest.py"
 python3 "$OPT/prompt-lab/seatbelt_network_selftest.py"
 
 node --test "$OPT"/pi-test/test/*.test.js
-(cd "$OPT" && ./real_gate.sh --dry)
+dry_output="$(cd "$OPT" && ./real_gate.sh --dry)"
+printf '%s\n' "$dry_output"
+grep -q 'execution: network=endpoint model_control=llama' <<< "$dry_output"
 
 echo "optimizer verification: PASS"

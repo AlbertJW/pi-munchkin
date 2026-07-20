@@ -10,8 +10,9 @@
 #
 # MODEL_CONTROL=llama expects an already-running OpenAI-compatible server;
 # MODEL_CONTROL=pi-native delegates transport to Pi's provider registry. The default
-# GATE_NETWORK=open restores cloud/network access but produces exploratory rows.
-# Endpoint-restricted loopback runs can remain authoritative. Traps INT/TERM kill the
+# GATE_NETWORK=endpoint is the fail-closed default and permits only the selected
+# loopback model endpoint. GATE_NETWORK=open is an explicit exploratory override.
+# Traps INT/TERM kill the
 # in-flight Pi process group so Ctrl-C also cleans up tool grandchildren.
 set -uo pipefail
 
@@ -21,7 +22,7 @@ GEN="${GEN:-rg0}"; N="${N:-3}"
 DD="${DD:-qwen36-35b-iq3s}"; PI_TIMEOUT="${PI_TIMEOUT:-1800}"
 PI_MODEL="${PI_MODEL:-}"   # pi model id for the sessions (else pi uses its default — beware external defaults)
 PI_PROVIDER="${PI_PROVIDER:-}"
-GATE_NETWORK="${GATE_NETWORK:-open}"       # open (exploratory) | endpoint (loopback can be authoritative)
+GATE_NETWORK="${GATE_NETWORK:-endpoint}"   # endpoint (authoritative loopback default) | open (exploratory)
 MODEL_CONTROL="${MODEL_CONTROL:-llama}"    # llama | pi-native
 BASE="${BASE:-$HERE/prompt-lab/configs/baseline.json}"
 CAND="${CAND:-$HERE/prompt-lab/configs/cand-cot.json}"
@@ -303,11 +304,13 @@ run_guarded_session() {
 	set -m   # monitor mode: the backgrounded subshell becomes its own process-group leader
 	if [[ "$redir" == ">>" ]]; then
 		( cd "$wd" || exit
+		  exec 3<<<"$telemetry_key"
 		  run_with_timeout "$PI_TIMEOUT" 30 ${sbx[@]+"${sbx[@]}"} /usr/bin/env -i \
 		    "${session_env[@]}" "${session_base_env[@]}" PI_OBSERVATIONAL_MEMORY_PASSIVE=1 \
 		    pi -p --approve ${PI_SELECT[@]+"${PI_SELECT[@]}"} --tools "$tools" "$prompt" ) </dev/null >> "$wd/run.log" 2>&1 &
 	else
 		( cd "$wd" || exit
+		  exec 3<<<"$telemetry_key"
 		  run_with_timeout "$PI_TIMEOUT" 30 ${sbx[@]+"${sbx[@]}"} /usr/bin/env -i \
 		    "${session_env[@]}" "${session_base_env[@]}" PI_OBSERVATIONAL_MEMORY_PASSIVE=1 \
 		    pi -p --approve ${PI_SELECT[@]+"${PI_SELECT[@]}"} --tools "$tools" "$prompt" ) </dev/null > "$wd/run.log" 2>&1 &
@@ -369,6 +372,13 @@ run_one() {  # $1=config $2=arm $3=task $4=rep [$5=split] [$6=prompt-variant]
 	# Apply the config and load its validated NUL-delimited environment. Arrays preserve
 	# multiline steering text without eval or line-oriented export injection.
 	local envfile="$wd/.config-env" entry
+	local telfile="$wd/context-telemetry.jsonl"
+	local telemetry_key; telemetry_key="$(python3 -c 'import secrets; print(secrets.token_hex(32))')"
+	# Keep raw telemetry in an unlinked parent-owned descriptor. Pi inherits fd 8,
+	# while evaluated tool subprocesses receive only stdio and cannot open,
+	# truncate, replay, or forge the evidence by pathname. HMAC is a second
+	# fail-closed boundary if descriptor behavior ever regresses.
+	: > "$telfile"; exec 8<>"$telfile"; rm -f "$telfile"
 	local session_env=()
 	python3 "$CONFIG" --apply "$cfg" --workdir "$wd" --env-null > "$envfile" || exit 2
 	while IFS= read -r -d '' entry; do session_env+=("$entry"); done < "$envfile"
@@ -399,7 +409,10 @@ run_one() {  # $1=config $2=arm $3=task $4=rep [$5=split] [$6=prompt-variant]
 	# credential because the configured llama endpoint may require bearer auth.
 	local gate_tmpdir="$wd/.tmp" key value
 	mkdir -p "$gate_tmpdir"
-	local session_base_env=("HOME=$HOME" "PATH=$PATH" "TMPDIR=$gate_tmpdir")
+	# Each session owns an authenticated telemetry descriptor. This prevents
+	# concurrent gates, interactive Pi activity, and evaluated code from
+	# contaminating retries or result-row joins.
+	local session_base_env=("HOME=$HOME" "PATH=$PATH" "TMPDIR=$gate_tmpdir" "TELEMETRY=on" "TELEMETRY_HMAC_FD=3" "TELEMETRY_FD=8")
 	for key in LANG LC_ALL SYSTEMROOT WINDIR PI_CODING_AGENT_DIR XDG_CONFIG_HOME; do
 		[[ -n "${!key:-}" ]] && session_base_env+=("$key=${!key}")
 	done
@@ -485,9 +498,15 @@ PY
 	# grants ONE fresh session in the SAME workdir (work done persists) with a distilled
 	# handoff instead of the raw pile. Fires only where the alternative was certain fail.
 	local retried=0
-	local telfile="${TELEMETRY_FILE:-$HOME/.pi/agent/telemetry/events.jsonl}"
-	if [[ "$env_retry_fresh" == "on" ]] && \
-	   grep -Eq "\"sk\":\"$(basename "$wd")\".*\"kind\":\"(outcome-)?abort\"" "$telfile" 2>/dev/null; then
+	local abort_evidence=3
+	if [[ "$env_retry_fresh" == "on" ]]; then
+		python3 "$HERE/prompt-lab/context_telemetry.py" "fd:8" "$(basename "$wd")" --has-abort --key-stdin <<<"$telemetry_key"
+		abort_evidence=$?
+		[[ "$abort_evidence" == 0 || "$abort_evidence" == 3 ]] || {
+			echo "[real_gate] authenticated telemetry verification failed before retry decision" >&2; exit 1;
+		}
+	fi
+	if [[ "$env_retry_fresh" == "on" && "$abort_evidence" == 0 ]]; then
 		retried=1
 		local retry_prompt
 		if [[ "$env_retry_mode" == "locality" ]]; then
@@ -542,6 +561,11 @@ NOTE: a previous attempt in this workdir was stopped for repeating the same fail
 	# base-off vs base-on delta = the lucky-pass rate. Only ever ADDS strictness.
 	[[ "${TRAJECTORY:-off}" == "on" && "$gate" == 1 ]] && ! python3 "$HERE/prompt-lab/trajectory_check.py" "$wd" "$task" && gate=0
 	local mrow; mrow="$(python3 "$METRICS" "$wd")"
+	local context_telemetry="$wd/context-telemetry.json"
+	python3 "$HERE/prompt-lab/context_telemetry.py" "fd:8" "$(basename "$wd")" --key-stdin <<<"$telemetry_key" > "$context_telemetry" || {
+		echo "[real_gate] authenticated context telemetry verification failed" >&2; exec 8>&-; exit 1;
+	}
+	exec 8>&-
 	# Diagnostic-only treatment compliance. This receipt check never changes the
 	# task score; span_screen.py decides whether the experiment was actually exposed.
 	local span_receipt_success=0
@@ -568,12 +592,12 @@ NOTE: a previous attempt in this workdir was stopped for repeating the same fail
 		LOW_TOK_STREAK=0
 	fi
 
-	python3 - "$RESULTS" "$MODEL" "$pat" "$task" "$rep" "$gate" "$retried" "$RUNID" "$tin" "$tout" "$output_chars" "$split" "$usage_exact" "${FLEET_EXPECTED_MODELS:-}" "$rowctx" "$wd/fingerprint-pre.json" "$wd/fingerprint-post.json" "$GATE_NETWORK" "$MODEL_CONTROL" "$MODEL_PROVIDER_RESOLVED" "$ENDPOINT_IDENTITY_SHA256" "$NETWORK_AUTHORITATIVE" "$NETWORK_AUTHORITY_REASON" "$SANDBOX_AUTHORITATIVE" "$SANDBOX_AUTHORITY_REASON" "$EXEC_POLICY" "$mrow" "$span_receipt_success" "$cfg" "$CONFIG" "$EXPERIMENT_MANIFEST" "$EXPERIMENT_MANIFEST_SHA256" "$EXPERIMENT_BASE_CELL" "$EXPERIMENT_CAND_CELL" "$HARNESS_HASH_BLOCKER" <<'PY'
+	python3 - "$RESULTS" "$MODEL" "$pat" "$task" "$rep" "$gate" "$retried" "$RUNID" "$tin" "$tout" "$output_chars" "$split" "$usage_exact" "${FLEET_EXPECTED_MODELS:-}" "$rowctx" "$wd/fingerprint-pre.json" "$wd/fingerprint-post.json" "$GATE_NETWORK" "$MODEL_CONTROL" "$MODEL_PROVIDER_RESOLVED" "$ENDPOINT_IDENTITY_SHA256" "$NETWORK_AUTHORITATIVE" "$NETWORK_AUTHORITY_REASON" "$SANDBOX_AUTHORITATIVE" "$SANDBOX_AUTHORITY_REASON" "$EXEC_POLICY" "$mrow" "$span_receipt_success" "$cfg" "$CONFIG" "$EXPERIMENT_MANIFEST" "$EXPERIMENT_MANIFEST_SHA256" "$EXPERIMENT_BASE_CELL" "$EXPERIMENT_CAND_CELL" "$HARNESS_HASH_BLOCKER" "$context_telemetry" <<'PY'
 import hashlib,importlib.util,json,sys
 (out,model,pat,task,rep,gate,retried,runid,tin,tout,outchars,split,usage_exact,expected_models,
  ctxpath,prepath,postpath,network_mode,model_control,provider,endpoint_sha,network_auth,network_reason,
  sandbox_auth,sandbox_reason,policy_path,mrow,span_receipt,cfg_path,config_path,experiment_manifest,
- experiment_sha,base_cell,cand_cell,harness_blocker)=sys.argv[1:36]
+ experiment_sha,base_cell,cand_cell,harness_blocker,context_telemetry_path)=sys.argv[1:37]
 ctx=json.load(open(ctxpath)); pre=json.load(open(prepath)); post=json.load(open(postpath))
 stable=pre.get("fingerprint_sha256") == post.get("fingerprint_sha256")
 serving_complete=pre.get("status") == post.get("status") == "complete"
@@ -616,6 +640,7 @@ rec={"schema":"pi.eval-row/v2", "task":task,"pattern":pat,"arm":pat,"rep":int(re
      "serving":{"pre":pre,"post":post,"stable":stable},"usage":usage,"trajectory":trajectory,
      "span_receipt_success":bool(int(span_receipt)),"config":config_binding,"experiment":experiment,
      "harness":{"surface_sha256":None,"hash_blocker":harness_blocker},
+     "context":json.load(open(context_telemetry_path)),
      # compatibility aliases for historical readers; dimensions stay honest.
      "out_chars":int(outchars),"think_chars":0,"in_tok":int(tin) if exact else 0,
      "out_tok":int(tout) if exact else 0,"token_usage_exact":exact}

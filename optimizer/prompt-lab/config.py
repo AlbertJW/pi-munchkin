@@ -80,6 +80,9 @@ def config_env(config):
     for k, v in (config.get("decoding") or {}).items():
         env[k] = str(v)
     for k, v in (config.get("thresholds") or {}).items():
+        choices = schema["thresholds"]["fields"].get(k)
+        if choices is not None and not any(type(v) is type(choice) and v == choice for choice in choices):
+            raise ValueError(f"config threshold {k!r} has out-of-schema value {v!r}")
         env[k] = str(v)
     for k, v in (config.get("messages") or {}).items():  # steer-text templates (PI_MSG_*)
         env[k] = str(v)
@@ -148,6 +151,18 @@ def selftest():
     assert sch["dimensions"]["optillm"]["safe"] is False, "optillm must be human-gated (structural)"
     assert sch["dimensions"]["format"]["safe"] is True
     assert "persona" in sch["excluded"] and "emoji_encoding" in sch["excluded"]
+    watcher = sch["dimensions"]["thresholds"]["fields"]
+    assert watcher["CONTEXT_WATCHER"] == ["on", "off"]
+    assert watcher["CTX_WATCH_PCT"] == [60, 70, 80]
+    assert config_env({"thresholds": {"CONTEXT_WATCHER": "off", "CTX_WATCH_PCT": 80}}) == {
+        "CONTEXT_WATCHER": "off", "CTX_WATCH_PCT": "80"}
+    for invalid in ({"CONTEXT_WATCHER": "maybe"}, {"CTX_WATCH_PCT": 75}, {"CTX_WATCH_PCT": "70"}):
+        try:
+            config_env({"thresholds": invalid})
+        except ValueError:
+            pass
+        else:
+            raise AssertionError(f"out-of-schema watcher setting accepted: {invalid}")
     print("config selftest: OK (deterministic apply; format/scaffold/F; env; endpoint; safe-flags; exclusions)")
 
 def apply_to_workdir(config, workdir):

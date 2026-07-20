@@ -60,6 +60,71 @@
         "hash_blocker": {"type": "string"}
       }
     },
+    "context": {
+      "type": "object",
+      "required": ["schema", "authenticated", "content_sha256", "session_key", "events", "config", "compactions", "watcher"],
+      "properties": {
+        "schema": {"const": "pi.context-telemetry/v1"},
+        "authenticated": {"const": true},
+        "content_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+        "session_key": {"type": "string", "minLength": 1},
+        "events": {"type": "integer", "minimum": 0},
+        "config": {
+          "type": ["object", "null"],
+          "required": ["enabled", "thresholdPct", "rearmPct"],
+          "additionalProperties": false,
+          "properties": {
+            "enabled": {"type": "boolean"},
+            "thresholdPct": {"type": "integer", "minimum": 1, "maximum": 99},
+            "rearmPct": {"type": "integer", "minimum": 1, "maximum": 99}
+          }
+        },
+        "compactions": {
+          "type": "object",
+          "required": ["total", "watcher", "pi", "compact_tool", "manual_unknown", "extension_content", "threshold", "overflow", "manual", "will_retry"],
+          "additionalProperties": false,
+          "properties": {
+            "total": {"type": "integer", "minimum": 0},
+            "watcher": {"type": "integer", "minimum": 0},
+            "pi": {"type": "integer", "minimum": 0},
+            "compact_tool": {"type": "integer", "minimum": 0},
+            "manual_unknown": {"type": "integer", "minimum": 0},
+            "extension_content": {"type": "integer", "minimum": 0},
+            "threshold": {"type": "integer", "minimum": 0},
+            "overflow": {"type": "integer", "minimum": 0},
+            "manual": {"type": "integer", "minimum": 0},
+            "will_retry": {"type": "integer", "minimum": 0}
+          }
+        },
+        "watcher": {
+          "type": "object",
+          "required": ["requests", "completed", "failed", "thrash_silenced", "resume_required", "estimates"],
+          "additionalProperties": false,
+          "properties": {
+            "requests": {"type": "integer", "minimum": 0},
+            "completed": {"type": "integer", "minimum": 0},
+            "failed": {"type": "integer", "minimum": 0},
+            "thrash_silenced": {"type": "integer", "minimum": 0},
+            "resume_required": {"type": "integer", "minimum": 0},
+            "estimates": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "required": ["preTokens", "tokensBefore", "estimatedTokensAfter", "postTokens"],
+                "additionalProperties": false,
+                "properties": {
+                  "preTokens": {"type": ["integer", "null"], "minimum": 0},
+                  "tokensBefore": {"type": ["integer", "null"], "minimum": 0},
+                  "estimatedTokensAfter": {"type": ["integer", "null"], "minimum": 0},
+                  "postTokens": {"type": ["integer", "null"], "minimum": 0}
+                }
+              }
+            }
+          }
+        }
+      },
+      "additionalProperties": false
+    },
     "status": {"enum": ["complete", "incomplete", "exploratory", "ineligible"]}
   },
   "allOf": [
@@ -76,7 +141,7 @@
         "properties": {"experiment": {"type": "object"}}
       },
       "then": {
-        "required": ["span_receipt_success", "config", "experiment", "harness", "trajectory"],
+        "required": ["span_receipt_success", "config", "experiment", "harness", "trajectory", "context"],
         "properties": {
           "trajectory": {"required": ["search_spans", "read_span"]}
         }

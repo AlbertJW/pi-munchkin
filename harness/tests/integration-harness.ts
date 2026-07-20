@@ -13,6 +13,7 @@ export function makeFakePi() {
 	const handlers = new Map<string, any[]>();
 	const sent: string[] = [];
 	const deliveries: Array<{ text: string; deliverAs: unknown }> = [];
+	const customDeliveries: Array<{ message: unknown; triggerTurn: unknown; deliverAs: unknown }> = [];
 	const entries: Array<{ type: string; data: unknown }> = [];
 	const pi = {
 		registerTool: (t: any) => tools.set(t.name, t),
@@ -29,10 +30,13 @@ export function makeFakePi() {
 			sent.push(text);
 			deliveries.push({ text, deliverAs: opts?.deliverAs });
 		},
+		sendMessage: (message: unknown, opts?: { triggerTurn?: unknown; deliverAs?: unknown }) => {
+			customDeliveries.push({ message, triggerTurn: opts?.triggerTurn, deliverAs: opts?.deliverAs });
+		},
 		getActiveTools: () => [] as string[],
 		appendEntry: (type: string, data: unknown) => entries.push({ type, data }),
 	};
-	return { pi, tools, commands, handlers, sent, deliveries, entries };
+	return { pi, tools, commands, handlers, sent, deliveries, customDeliveries, entries };
 }
 
 export function makeCtx(cwd: string) {

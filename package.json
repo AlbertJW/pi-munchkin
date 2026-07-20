@@ -71,6 +71,7 @@
     "harness/extensions/did-you-mean.ts",
     "harness/lib/bash-mutations.ts",
     "harness/lib/command-policy.ts",
+    "harness/lib/compaction-coordinator.ts",
     "harness/lib/context-inlet.ts",
     "harness/lib/context-watch.ts",
     "harness/lib/did-you-mean.ts",

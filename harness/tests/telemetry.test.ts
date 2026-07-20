@@ -3,7 +3,8 @@ import { mkdtempSync, readFileSync, rmSync, existsSync, writeFileSync } from "no
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
-import { record } from "../lib/telemetry.ts";
+import { createHmac } from "node:crypto";
+import { encodeTelemetryRow, record } from "../lib/telemetry.ts";
 
 function withFile<T>(fn: (file: string) => T): T {
 	const dir = mkdtempSync(join(tmpdir(), "tele-"));
@@ -73,4 +74,14 @@ test("events carry the session key (exact enrichment join)", () => {
 	const row = JSON.parse(readFileSync(f, "utf8").trim());
 	assert.ok(typeof row.sk === "string" && row.sk.length > 0, "sk key present");
 	delete process.env.TELEMETRY_FILE;
+});
+
+test("authenticated rows MAC the exact flat JSON payload", () => {
+	const key = "k".repeat(32);
+	const line = encodeTelemetryRow({ sk: "gate-a", ext: "context-watcher", kind: "compact-requested" }, key);
+	const match = line.match(/^(.*),"mac":"([0-9a-f]{64})"}$/);
+	assert.ok(match);
+	const payload = `${match[1]}}`;
+	assert.equal(match[2], createHmac("sha256", key).update(payload).digest("hex"));
+	assert.deepEqual(JSON.parse(line), { sk: "gate-a", ext: "context-watcher", kind: "compact-requested", mac: match[2] });
 });

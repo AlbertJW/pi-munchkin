@@ -56,6 +56,16 @@ class SpanScreenTests(unittest.TestCase):
                                    "cell": cell["id"]},
                     "config": {"sha256": cell["config_sha256"], "declared_env": cell["declared_env"]},
                     "harness": {"surface_sha256": None, "hash_blocker": "loaded surface unavailable"},
+                    "context": {
+                        "schema": "pi.context-telemetry/v1", "authenticated": True,
+                        "content_sha256": "c" * 64, "session_key": "run-a", "events": 1,
+                        "config": {"enabled": True, "thresholdPct": 70, "rearmPct": 55},
+                        "compactions": {"total": 0, "watcher": 0, "pi": 0, "compact_tool": 0,
+                                         "manual_unknown": 0, "extension_content": 0, "threshold": 0,
+                                         "overflow": 0, "manual": 0, "will_retry": 0},
+                        "watcher": {"requests": 0, "completed": 0, "failed": 0,
+                                    "thrash_silenced": 0, "resume_required": 0, "estimates": []},
+                    },
                 })
         return rows
 
@@ -77,6 +87,7 @@ class SpanScreenTests(unittest.TestCase):
         self.assertEqual({"type": "object"}, conditional["if"]["properties"]["experiment"])
         self.assertEqual(["search_spans", "read_span"],
                          conditional["then"]["properties"]["trajectory"]["required"])
+        self.assertIn("context", conditional["then"]["required"])
 
     def test_treatment_counts_across_attempts(self):
         lines = []
@@ -174,6 +185,7 @@ class SpanScreenTests(unittest.TestCase):
         env = calls[0][1]["env"]
         self.assertEqual("endpoint", env["GATE_NETWORK"]); self.assertEqual("0.05", env["FLEET_ALPHA"])
         self.assertNotIn("SPAN_TEST_SECRET", env); self.assertNotIn("MIN_SESSION_OUTPUT", env)
+        self.assertEqual("model-a", calls[1][1]["env"]["FLEET_DD"])
         self.assertNotIn("shell", calls[0][1]); self.assertNotIn("shell", calls[1][1])
 
     def test_dry_has_no_writes_and_paths_fail_closed(self):

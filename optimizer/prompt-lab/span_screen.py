@@ -184,6 +184,13 @@ def mechanism_report(rows: list[dict[str, Any]], manifest: dict[str, Any]) -> tu
             reasons.append(f"{arm}: row is not canonical bigdata val evidence")
         if row.get("authoritative") is not True or row.get("status") != "complete":
             reasons.append(f"{arm}: row is non-authoritative or incomplete")
+        context = row.get("context") or {}
+        if (context.get("schema") != "pi.context-telemetry/v1" or
+                context.get("authenticated") is not True or
+                not isinstance(context.get("session_key"), str) or
+                not isinstance(context.get("events"), int) or context.get("events", 0) < 1 or
+                not isinstance(context.get("config"), dict)):
+            reasons.append(f"{arm}: missing authenticated context telemetry")
         if type(row.get("score")) is not int or row.get("score") not in (0, 1):
             reasons.append(f"{arm}: score is not binary")
         execution = row.get("execution") or {}; serving = row.get("serving") or {}
@@ -316,7 +323,12 @@ def execute(manifest: dict[str, Any], gen: str, dry: bool,
     if not eligible:
         _atomic_write(fleet_path, "# fleet_report — INELIGIBLE\n\nMechanism evidence failed; no adoption verdict was computed.\n")
         raise ScreenIneligible(f"screen is INELIGIBLE; see {mechanism_path}")
-    run_command(report, cwd=OPTIMIZER, env=child, check=True)
+    # The mechanism contract above requires one stable model across every row.
+    # Bind fleet_report's daily-driver gate to that measured model instead of its
+    # historical qwen36 fallback (which falsely rejected screens on other small
+    # models when PI_MODEL was resolved by the endpoint at runtime).
+    report_env = {**child, "FLEET_DD": rows[0]["model"]}
+    run_command(report, cwd=OPTIMIZER, env=report_env, check=True)
     return True
 
 

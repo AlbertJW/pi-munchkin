@@ -62,9 +62,10 @@ Primary references:
    - Observational memory: live-aligned arm versus gate-passive arm.
    - Tasks: `bigdata` plus a long, independently rooted multi-file task.
    - Measure: pass rate, all-*k* reliability, overflow, compaction requester and compression ratio, rereads, returned characters, wall time, and lost-evidence failures.
-   - **Blocked:** the watcher factorial needs an approved context-pressure fixture plus watcher
-     requester/threshold telemetry. `bigdata` is not evidence for watcher behavior; historical
-     bigdata span exposure was 0/181 sessions.
+   - Watcher requester/threshold telemetry is now captured per gate workdir and joined by the
+     exact session key, including watcher-disabled native compactions and pre/post estimates.
+     The factorial remains blocked on an approved context-pressure fixture; `bigdata` is not
+     evidence for watcher behavior (historical bigdata span exposure was 0/181 sessions).
    - Valid precursor: [`span-screen.json`](../prompt-lab/configs/span-screen.json) and
      [`span_screen.py`](../prompt-lab/span_screen.py) run one span-tools off/on A/B on approved
      `bigdata` (n=6, α=0.05). Receipt-backed treatment compliance is mandatory and diagnostic-only;
@@ -72,6 +73,9 @@ Primary references:
      makes the screen `INELIGIBLE` rather than changing task scores. Because Pi does not expose the
      actually loaded extension/lib set, `ELIGIBLE` means same-run screen only; require a fresh
      confirmation after live/package parity and loaded-surface identity are proven.
+     The screen binds the fleet report's daily-driver gate to the single model
+     proven by its result rows, so endpoint-resolved small models cannot inherit
+     the historical qwen36 fallback and receive a false rejection.
 
 5. **Skill disclosure and distractor load**
    - Compare a five-skill shortlist with the full visible global inventory.
@@ -116,3 +120,9 @@ New gate rows retain a `trajectory` object alongside outcome and usage:
 `turns`, `tool_calls`, `tool_errors`, `reads`, `unique_reads`, `repeat_calls`, `repeat_reads`, `tool_result_chars`, `first_mutation_turn`, and `compactions`.
 
 The original TSV metric positions remain stable for compatibility. Fleet reports now add descriptive task-stratified all-*k* reliability; Fisher-based adoption logic remains unchanged until the paired-inference experiment proves a replacement.
+
+Rows may also carry authenticated `context` (`pi.context-telemetry/v1`): the exact
+workdir/session key, content SHA-256, watcher configuration, requester/reason compaction
+counts, and watcher request completion/failure estimates. Gate telemetry travels over an
+unlinked inherited descriptor and every event is HMAC-verified; evaluated tools cannot
+write that descriptor. The field is optional so historical v2 rows remain valid.

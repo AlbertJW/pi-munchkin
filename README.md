@@ -39,9 +39,9 @@ Pi extensions. Load them once; most work automatically, a few add commands or en
 | **drift-scanner** | after a commit, flags dead refs / stale docs the change introduced |
 | **git-guard** | confirms before any command that would discard uncommitted work |
 | **context-inlet-guard** | bounds oversized file reads before they flood context |
-| **context-watcher** | auto-compacts when context crosses a threshold |
+| **context-watcher** | observes every compaction and, when enabled, auto-compacts at `CTX_WATCH_PCT` (default 70) |
 | **span-tools** | `search_spans` / `read_span` — bounded retrieval over large files |
-| **compact-tool** | `/compact` — summarize and prune older context mid-task |
+| **compact-tool** | `compact_context` — model-requested structured compaction with one explicit post-compaction resume |
 | **micro-gate** | *(opt-in)* parse/compile-checks just-edited files at turn end |
 | **ketch** | web / code / docs search |
 | **plan-weaver** | compiles an explicit, gated execution DAG before work starts |
@@ -90,6 +90,7 @@ Behavior knobs (all optional env vars, sensible defaults):
 | `MICRO_GATE=on` | enable the post-edit parse check |
 | `HASHLINE_TAG=hex\|slug` | edit tag style (word-slugs can copy better on tiny models) |
 | `SPAN_TOOLS=on` | expose the bounded large-file tools |
+| `CONTEXT_WATCHER=on\|off`, `CTX_WATCH_PCT=60\|70\|80` | enable and tune proactive compaction; telemetry remains active when disabled |
 | `DRIFT_SCANNER=off` | disable post-commit review |
 
 ### Platform and security notes

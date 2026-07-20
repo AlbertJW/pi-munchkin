@@ -66,9 +66,9 @@ GATE_NETWORK=endpoint MODEL_CONTROL=llama \
   LLAMA_URL=http://127.0.0.1:8080 PI_MODEL=model ./real_gate.sh parens
 ```
 
-`GATE_NETWORK=open` is the default and leaves network operations allowed while
-retaining the filesystem jail. Such rows are always marked non-authoritative.
-`GATE_NETWORK=endpoint` denies all egress except the rendered model endpoint.
+`GATE_NETWORK=endpoint` is the default and denies all egress except the rendered
+loopback model endpoint. `GATE_NETWORK=open` is an explicit override that retains
+the filesystem jail but always produces non-authoritative rows.
 Seatbelt cannot pin a raw remote IP, so a remote endpoint uses a port-scoped
 wildcard and is also non-authoritative. Only an endpoint-restricted loopback or
 localhost tunnel can produce authoritative rows.

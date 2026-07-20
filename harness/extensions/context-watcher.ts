@@ -1,5 +1,6 @@
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
-import { decide } from "../lib/context-watch.ts";
+import { decide, readWatcherConfig, usageDetail, type WatcherConfig } from "../lib/context-watch.ts";
+import { beginCompaction, currentCompactionOwner, finishCompaction, resetCompactionCoordinator } from "../lib/compaction-coordinator.ts";
 import { record } from "../lib/telemetry.ts";
 
 // Active context-watcher: proactively compacts before the window fills.
@@ -22,28 +23,41 @@ import { record } from "../lib/telemetry.ts";
 //
 // Disable with CONTEXT_WATCHER=off. Tune with CTX_WATCH_PCT (default 70).
 
-const ENABLED = process.env.CONTEXT_WATCHER !== "off";
-const THRESHOLD = (() => {
-	const n = Number.parseInt(process.env.CTX_WATCH_PCT || "70", 10);
-	return Number.isFinite(n) && n > 0 && n < 100 ? n : 70;
-})();
-const REARM = Math.max(10, THRESHOLD - 15); // hysteresis band below the trigger
-
 const FOCUS =
-	"Summarise older turns; keep the plan, recent edits with their file paths/#tags, the active task, and any unresolved error.";
+	"Create a concise recall-first capsule with: active task and constraints; decisions; changed paths and exact identifiers; verified state and commands; unresolved errors or blockers; and the single next action. Retain the most recent raw evidence needed to continue.";
+const RESUME =
+	"Context compaction interrupted a tool-bearing turn. Resume the active task from the compacted state; inspect current results before taking the next bounded action.";
+const RESUME_AFTER_FAILURE =
+	"Context compaction failed after interrupting a tool-bearing turn. Resume the active task from current state; inspect the last tool result and take one bounded next action.";
 
-let armed = true;
-// Thrash guard: if compaction can't shrink usage below THRESHOLD, don't refire
-// forever — after 2 consecutive fires without dropping under REARM, go quiet and
-// let pi's reserveTokens auto-compaction be the net. Resets under REARM.
-let consecutiveFires = 0;
+export function registerContextWatcher(
+	pi: ExtensionAPI,
+	config: WatcherConfig = readWatcherConfig(),
+	recordEvent: typeof record = record,
+): void {
+	const { enabled, thresholdPct, rearmPct } = config;
+	let armed = true;
+	// Thrash guard: if compaction cannot shrink usage below the threshold, do not
+	// refire forever. Reset after usage falls below the re-arm band.
+	let consecutiveFires = 0;
+	let watcherRequestPending = false;
+	let resumePending = false;
+	let watcherRequestSettled = false;
 
-export default function (pi: ExtensionAPI) {
-	if (!ENABLED) return;
-
-	pi.on("session_start", async () => {
+	pi.on("session_start", async (event, ctx) => {
+		resetCompactionCoordinator();
 		armed = true;
 		consecutiveFires = 0;
+		watcherRequestPending = false;
+		resumePending = false;
+		watcherRequestSettled = false;
+		recordEvent("context-watcher", "session-config", {
+			enabled,
+			thresholdPct,
+			rearmPct,
+			startReason: event.reason,
+			...usageDetail(ctx.getContextUsage?.()),
+		});
 	});
 
 	// If compaction lands BETWEEN REARM and THRESHOLD, decide()'s hysteresis
@@ -51,34 +65,154 @@ export default function (pi: ExtensionAPI) {
 	// permanently disarmed after its first fire. Re-arm after any compaction
 	// that ends below the trigger; the thrash guard bounds refiring.
 	pi.on("session_compact", async (event, ctx) => {
-		const pct = ctx.getContextUsage?.()?.percent ?? null;
-		if (pct !== null && pct < THRESHOLD) armed = true;
-		// 0.79.10+ metadata: distinguishes our proactive fires ("manual", fromExtension)
-		// from pi's reserveTokens net ("threshold"/"overflow") in the telemetry.
-		const e = event as { reason?: string; willRetry?: boolean };
-		record("context-watcher", "compacted", { reason: e.reason ?? "unknown", willRetry: e.willRetry ?? false, pct: pct === null ? -1 : Math.round(pct) });
+		const usage = ctx.getContextUsage?.();
+		const pct = usage?.percent ?? null;
+		if (pct !== null && pct < thresholdPct) armed = true;
+		// Pi's `fromExtension` means a session_before_compact hook supplied the
+		// summary content; it does NOT identify who requested compaction. The
+		// pending latch is our exact watcher receipt. Threshold/overflow are Pi;
+		// another manual caller is intentionally left unknown rather than guessed.
+		const managedOwner = currentCompactionOwner();
+		const requester = event.reason === "threshold" || event.reason === "overflow"
+			? "pi"
+			: watcherRequestPending
+				? "context-watcher"
+				: managedOwner ?? "manual-unknown";
+		recordEvent("context-watcher", "compacted", {
+			requester,
+			contentProvider: event.fromExtension ? "extension" : "pi",
+			reason: event.reason,
+			willRetry: event.willRetry,
+			enabled,
+			thresholdPct,
+			rearmPct,
+			tokensBefore: event.compactionEntry.tokensBefore,
+			...usageDetail(usage),
+		});
 	});
 
 	pi.on("turn_end", async (event, ctx) => {
 		const usage = ctx.getContextUsage?.();
 		const percent = usage?.percent ?? null;
-		if (percent !== null && percent < REARM) consecutiveFires = 0;
-		const d = decide(percent, armed, THRESHOLD, REARM);
+		if (percent !== null && percent < rearmPct) consecutiveFires = 0;
+		if (!enabled) return;
+		const d = decide(percent, armed, thresholdPct, rearmPct);
 		armed = d.armed;
 		if (d.compact && consecutiveFires < 2) {
 			consecutiveFires += 1;
-			record("context-watcher", "compact", { pct: Math.round(percent ?? 0), consecutive: consecutiveFires });
+			const token = beginCompaction("context-watcher");
+			if (!token) {
+				armed = true;
+				consecutiveFires -= 1;
+				recordEvent("context-watcher", "compact-suppressed", {
+					reason: "another pi-munchkin compaction is active",
+					activeOwner: currentCompactionOwner(), enabled, thresholdPct, rearmPct,
+					...usageDetail(usage),
+				});
+				return;
+			}
+			watcherRequestPending = true;
+			watcherRequestSettled = false;
+			resumePending = event.toolResults.length > 0;
+			const pre = usageDetail(usage);
+			recordEvent("context-watcher", "compact-requested", {
+				requester: "context-watcher",
+				enabled,
+				thresholdPct,
+				rearmPct,
+				consecutive: consecutiveFires,
+				resumePending,
+				...pre,
+			});
+			try {
 			ctx.compact({
 				customInstructions: FOCUS,
+				onComplete: (result) => {
+					if (watcherRequestSettled || !finishCompaction(token)) return;
+					watcherRequestSettled = true;
+					const post = usageDetail(ctx.getContextUsage?.());
+					recordEvent("context-watcher", "compact-completed", {
+						requester: "context-watcher",
+						enabled,
+						thresholdPct,
+						rearmPct,
+						preTokens: pre.contextTokens,
+						preContextWindow: pre.contextWindow,
+						prePct: pre.contextPct,
+						tokensBefore: result.tokensBefore,
+						estimatedTokensAfter: result.estimatedTokensAfter ?? null,
+						postTokens: post.contextTokens,
+						postContextWindow: post.contextWindow,
+						postPct: post.contextPct,
+					});
+					watcherRequestPending = false;
+					if (resumePending) {
+						resumePending = false;
+						pi.sendMessage(
+							{ customType: "context-watcher-resume", content: RESUME, display: false },
+							{ triggerTurn: true, deliverAs: "followUp" },
+						);
+					}
+				},
 				onError: (e) => {
+					if (watcherRequestSettled || !finishCompaction(token)) return;
+					watcherRequestSettled = true;
 					armed = true; // failed compaction must not disarm the watcher — retry next turn
-					record("context-watcher", "compact-failed", { error: e.message.slice(0, 200) });
+					const post = usageDetail(ctx.getContextUsage?.());
+					recordEvent("context-watcher", "compact-failed", {
+						requester: "context-watcher",
+						enabled,
+						thresholdPct,
+						rearmPct,
+						preTokens: pre.contextTokens,
+						preContextWindow: pre.contextWindow,
+						prePct: pre.contextPct,
+						postTokens: post.contextTokens,
+						postContextWindow: post.contextWindow,
+						postPct: post.contextPct,
+						error: e.message.slice(0, 200),
+					});
+					watcherRequestPending = false;
+					if (resumePending) {
+						resumePending = false;
+						pi.sendMessage(
+							{ customType: "context-watcher-resume", content: RESUME_AFTER_FAILURE, display: false },
+							{ triggerTurn: true, deliverAs: "followUp" },
+						);
+					}
 					ctx.ui.notify(`context-watcher: compact failed: ${e.message}`, "warning");
 				},
 			});
+			} catch (error) {
+				const message = error instanceof Error ? error.message : String(error);
+				finishCompaction(token);
+				watcherRequestSettled = true;
+				watcherRequestPending = false;
+				resumePending = false;
+				armed = true;
+				consecutiveFires -= 1;
+				recordEvent("context-watcher", "compact-failed", {
+					requester: "context-watcher", enabled, thresholdPct, rearmPct,
+					preTokens: pre.contextTokens, preContextWindow: pre.contextWindow,
+					prePct: pre.contextPct, postTokens: pre.contextTokens,
+					postContextWindow: pre.contextWindow, postPct: pre.contextPct,
+					error: message.slice(0, 200), synchronous: true,
+				});
+				ctx.ui.notify(`context-watcher: compact could not start: ${message}`, "warning");
+				return;
+			}
 			ctx.ui.notify(`context-watcher: compacting at ${Math.round(percent ?? 0)}% of context`, "info");
 		} else if (d.compact) {
-			record("context-watcher", "thrash-silenced", { pct: Math.round(percent ?? 0) });
+			recordEvent("context-watcher", "thrash-silenced", {
+				enabled,
+				thresholdPct,
+				rearmPct,
+				...usageDetail(usage),
+			});
 		}
 	});
+}
+
+export default function (pi: ExtensionAPI): void {
+	registerContextWatcher(pi);
 }
