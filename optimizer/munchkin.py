@@ -335,7 +335,7 @@ def real_gate_one(cand, tasks, n, gen):
 def real_propose(best, failures, k, r, journal):
     sys.path.insert(0, LAB)
     from judge import frontier_call
-    from propose import parse_candidates, OPERATORS
+    from propose import append_candidate_journal, parse_candidate_manifests, OPERATORS
     dims = load_schema_dims()
     space = (f"format: {dims['format']['values']}; scaffold: {dims['scaffold']['values']}; "
              f"thresholds: {json.dumps(dims['thresholds']['fields'])}; "
@@ -349,27 +349,47 @@ def real_propose(best, failures, k, r, journal):
         f"TASK {f['task']} (prose: {open(os.path.join(TASKS_DIR, f['task']+'.txt')).read().strip()[:200]})\n"
         f"what the model did (tail):\n{f['log_tail'][:400]}" for f in failures[:6])
     sysmsg = ("You run autoresearch on a coding-agent harness so a small local model completes "
-              f"agentic coding tasks. Propose {k} DISTINCT candidates. Each candidate may revise the "
-              "system prompt (the 'governor') AND/OR move harness config dimensions. Searchable "
+              f"agentic coding tasks. Propose {k} DISTINCT candidates. Each candidate changes EXACTLY ONE "
+              "surface: one contiguous governor span, one config leaf, or one message-template leaf. Searchable "
               f"config space (exact allowed values): {space}. Each candidate uses one operator from: "
               f"{', '.join(OPERATORS)}. Keep prompt edits small + general (do not overfit). "
-              f"AT LEAST ONE of the {k} candidates must change a config dimension via CONFIG. "
+              "Never combine prompt and config changes. Never change two config/message leaves. "
               "Study the prior experiments: build on winners, do not repeat failures.\n"
-              "Output each EXACTLY as:\n### CANDIDATE\nOPERATOR: <one>\nRATIONALE: <one line>\n"
+              "Output each EXACTLY as:\n### CANDIDATE\nOPERATOR: <one>\nHYPOTHESIS: <one line>\n"
+              "MECHANISM: <one line>\nMETRIC: <telemetry metric>\nDIRECTION: <increase|decrease>\n"
+              "FALSIFIER: <concrete validation observation>\nROLLBACK: <concrete regression condition>\n"
               "CONFIG: <single-line JSON delta, or omit this line>\n"
               "--- PROMPT ---\n<the FULL revised governor, or exactly UNCHANGED>\n--- END ---")
     user = (f"CURRENT GOVERNOR (config {json.dumps(cand_summary(best))}):\n```\n{best['gov']}\n```\n\n"
             f"PRIOR EXPERIMENTS:\n{hist}\n\nFAILING TASKS:\n{fails}")
+    trace_ids = [hashlib.sha256(json.dumps(failure, sort_keys=True).encode()).hexdigest() for failure in failures]
+    parent_id = "parent-" + hashlib.sha256(
+        json.dumps(cand_summary(best), sort_keys=True).encode() + best["gov"].encode()).hexdigest()[:16]
+    baseline_config = {key: best[key] for key in ("format", "scaffold", "thresholds", "messages")}
+    accepted, rejected = parse_candidate_manifests(
+        frontier_call(sysmsg, user), best["gov"], parent_id, trace_ids, baseline_config)
     out = []
-    for op, body, delta in parse_candidates(frontier_call(sysmsg, user)):
+    journal_rows = list(rejected)
+    for parsed in accepted:
+        op, body, delta = parsed["operator"], parsed["body"], parsed["delta"]
         clean, dropped = sanitize_delta(delta, dims)
         if dropped:
             print(f"[munchkin] dropped out-of-schema delta keys: {dropped}")
+            rejection = dict(parsed["manifest"])
+            rejection["status"] = "rejected"
+            rejection["rejection_reasons"] = [f"out-of-schema delta: {key}" for key in dropped]
+            journal_rows.append({"manifest": rejection})
+            continue
         if body == "UNCHANGED" and not clean:
             continue  # no-op candidate
         c = make_cand(best["gov"] if body == "UNCHANGED" else body, clean)
         c["_op"] = op
+        c["_pred"] = (f"{parsed['manifest']['predicted_mechanism_metric']} "
+                      f"{parsed['manifest']['predicted_direction']}: {parsed['manifest']['hypothesis']}")
+        c["_manifest"] = parsed["manifest"]
         out.append(c)
+        journal_rows.append(parsed)
+    append_candidate_journal(journal_rows)
     return out
 
 def static_propose(spec_paths):
@@ -420,6 +440,12 @@ def optimize(base_cand, tasks, n, rounds, k, gate_fn, propose_fn, gen, journal=N
         ledger.append({"event": "stop", "why": f"baseline saturated ({bk}/{bn}) — no headroom"})
         return best, ledger, journal
     plateau = 0
+    def mechanism_value(observation, metric):
+        if not metric:
+            return None
+        if metric in observation:
+            return observation[metric]
+        return (observation.get("telemetry") or {}).get(metric)
     for r in range(rounds):
         cands = propose_fn(best, failures, k, r, journal)
         scored = []
@@ -427,10 +453,22 @@ def optimize(base_cand, tasks, n, rounds, k, gate_fn, propose_fn, gen, journal=N
             ck, cn, cf = gate_fn(cg, tasks, n, f"{gen}-r{r}-c{i}")
             label, delta = _classify(bk, bn, ck, cn)
             obs = enrich_fn(f"{gen}-r{r}-c{i}") if enrich_fn else {}
+            manifest = cg.get("_manifest") or {}
+            metric = manifest.get("predicted_mechanism_metric")
+            baseline_metric = mechanism_value(base_obs, metric)
+            observed_metric = mechanism_value(obs, metric)
+            direction = manifest.get("predicted_direction")
+            direction_confirmed = None
+            if isinstance(baseline_metric, (int, float)) and isinstance(observed_metric, (int, float)):
+                direction_confirmed = observed_metric > baseline_metric if direction == "increase" else observed_metric < baseline_metric
             entry = {"round": r, "cand": i, "pass": f"{ck}/{cn}", "label": label,
                      "delta": round(delta, 3), "operator": cg.get("_op", "?"),
                      "prediction": cg.get("_pred", ""),
-                     "config": cand_summary(cg), **obs}
+                     "config": cand_summary(cg),
+                     "candidate_id": manifest.get("candidate_id"),
+                     "predicted_mechanism_metric": metric,
+                     "observed_mechanism_metric": observed_metric,
+                     "predicted_direction_confirmed": direction_confirmed, **obs}
             ledger.append(entry)
             journal.append({"gen": gen, **entry})
             scored.append((label, ck, cn, cg, cf))
