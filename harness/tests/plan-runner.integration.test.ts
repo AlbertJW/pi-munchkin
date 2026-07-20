@@ -132,7 +132,7 @@ test("integration: agent_end with open items writes the abort-observability trac
 	const { ctx } = makeCtx(cwd);
 	await fp.commands.get("plan").handler("thing yolo", ctx); // yolo -> phase executing immediately
 	await callTool(fp, "plan_write", { items: [{ title: "open item", status: "in_progress" }], request: "r", summary: "s" }, cwd);
-	await fire(fp, "agent_end", {});
+	await fire(fp, "agent_end", {}, ctx);
 	const trace = readFileSync(join(cwd, ".pi", "traces", "plan-runner.jsonl"), "utf8");
 	assert.ok(trace.includes("ended_without_completion"), "open-items end is observable in the trace");
 });

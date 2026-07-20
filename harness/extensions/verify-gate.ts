@@ -164,19 +164,6 @@ export default function (pi: ExtensionAPI) {
 			}
 		}
 
-		// Track SOURCE mutations only. A new source edit invalidates any prior pass
-		// (re-arms the gate). Ops/infra churn (installs, docker up/down, git, venv)
-		// must NOT re-arm — otherwise bringing up a stack or tearing it down keeps
-		// re-nagging "verify" after a genuine pass (esp. for containerized projects).
-		if (
-			toolCalls.some((c) => MUTATION_TOOLS.has(c.name)) ||
-			toolCalls.some((c) => c.name === "bash" && isSourceMutation(String(c.args.command ?? "")))
-		) {
-			st.mutated = true;
-			st.verifiedOk = false;
-			st.fires = 0; // new edit episode: the gate may steer again
-		}
-
 		// A green plan-runner gate this turn IS a passing verify (one-shot flag,
 		// set by plan-runner when an item's gate exits 0) — consume it so the
 		// wrap-up isn't double-nagged after a gate already ran green.
@@ -185,6 +172,23 @@ export default function (pi: ExtensionAPI) {
 			g.__pi_gate_green = undefined;
 			st.verifiedOk = true;
 			record("verify-gate", "gate-green-consumed", {});
+		}
+
+		// Track SOURCE mutations only. A new source edit invalidates any prior pass
+		// (re-arms the gate) — checked AFTER the gate-green consume above so an edit
+		// in the SAME turn as an (unrelated) passing gate always re-arms; consuming
+		// gate-green first and mutation-checking after would let that edit slip
+		// through marked "verified" by a gate that never covered it. Ops/infra churn
+		// (installs, docker up/down, git, venv) must NOT re-arm — otherwise bringing
+		// up a stack or tearing it down keeps re-nagging "verify" after a genuine
+		// pass (esp. for containerized projects).
+		if (
+			toolCalls.some((c) => MUTATION_TOOLS.has(c.name)) ||
+			toolCalls.some((c) => c.name === "bash" && isSourceMutation(String(c.args.command ?? "")))
+		) {
+			st.mutated = true;
+			st.verifiedOk = false;
+			st.fires = 0; // new edit episode: the gate may steer again
 		}
 
 		// Track verify: a verify-pattern bash command whose own result looks green.

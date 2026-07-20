@@ -710,7 +710,9 @@ const planWrite = defineTool({
 			replanStreak = r.streak;
 			replanWarn = r.warn;
 		}
-		const thrashFired = replanWarn && !!cur;
+		// Don't fire "stop re-planning, execute now" in the same call that just told
+		// the model to stop and wait for the user — the two steers directly contradict.
+		const thrashFired = replanWarn && !!cur && !askNow;
 		if (thrashFired) record("plan-runner", "thrash-warn", { streak: replanStreak });
 		let thrashWarn = "";
 		if (thrashFired) {
@@ -837,35 +839,30 @@ async function traceCommand(args: string, ctx: { cwd: string; ui: { notify(m: st
 
 export default function (pi: ExtensionAPI) {
 	api = pi; // let the module-scope plan_write tool run shell gates via pi.exec
-	let lastCwd: string | undefined;
 
 	pi.registerTool(planWrite);
 
 	pi.registerCommand("plan", {
 		description: "Plan a request. Lean: plan then stop for /plan-go. Add 'yolo' to plan+run without routine pauses.",
 		handler: async (args, ctx) => {
-			lastCwd = ctx.cwd;
 			await startPlanCommand(args, ctx, pi);
 		},
 	});
 	pi.registerCommand("plan-go", {
 		description: "Run or resume the plan. Add 'yolo' to finish without routine pauses, 'lean' to pause per step.",
 		handler: async (args, ctx) => {
-			lastCwd = ctx.cwd;
 			await goCommand(args, ctx, pi);
 		},
 	});
 	pi.registerCommand("plan-status", {
 		description: "Show the current plan.",
 		handler: async (_args, ctx) => {
-			lastCwd = ctx.cwd;
 			return statusCommand(ctx);
 		},
 	});
 	pi.registerCommand("plan-trace", {
 		description: "Show recent plan trace entries.",
 		handler: async (args, ctx) => {
-			lastCwd = ctx.cwd;
 			return traceCommand(args, ctx);
 		},
 	});
@@ -915,8 +912,7 @@ export default function (pi: ExtensionAPI) {
 	// No prompt re-injection (that was the fragile part of v2).
 	pi.on("agent_end", async (_event, ctx) => {
 		setPlanning(false); // planning run ended (well-behaved or not) — disarm
-		const cwd = lastCwd;
-		if (!cwd) return;
+		const cwd = ctx.cwd;
 		const state = await readState(cwd);
 		// Backstop for a silently-parked question: if the run ends blocked ON THE USER,
 		// surface it in the UI even when the model failed to voice it (any phase).

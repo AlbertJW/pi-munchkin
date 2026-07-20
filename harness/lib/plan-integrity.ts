@@ -62,20 +62,25 @@ export function planIntegrity<T extends IntegrityItem>(
 ): { reattached: T[]; droppedOpen: T[] } {
 	const titles = new Set(reconciled.map((i) => normalizeTitle(i.title)));
 	const reattached = prev.filter((i) => i.status === "done" && !titles.has(normalizeTitle(i.title)));
+	// "blocked" carries an open question (e.g. blocked_needs_input) that must not be
+	// silently discarded — it needs the SAME omission-safety net as pending/in_progress,
+	// not none at all (a dropped blocked item deletes a parked user question and can
+	// flip derivedStatus to "completed" while it was never answered).
 	const droppedOpen = prev.filter(
-		(i) => (i.status === "pending" || i.status === "in_progress") && !titles.has(normalizeTitle(i.title)),
+		(i) => (i.status === "pending" || i.status === "in_progress" || i.status === "blocked") && !titles.has(normalizeTitle(i.title)),
 	);
 	return { reattached, droppedOpen };
 }
 
 // Has execution begun? Defined by the unambiguous signal — at least one item is
-// done or in_progress — so it's robust to the phase label (which is buggy for
-// pure /plan-yolo). Once work exists, an omitted open item is almost certainly a
-// reproduction failure, not a deliberate prune, so the caller preserves it
-// (omission ≠ deletion; to drop an item, restatus it). While still all-pending
-// (drafting), the model keeps free full-replace.
+// done, in_progress, or blocked (a blocked item implies an attempt was made) — so
+// it's robust to the phase label (which is buggy for pure /plan-yolo). Once work
+// exists, an omitted open item is almost certainly a reproduction failure, not a
+// deliberate prune, so the caller preserves it (omission ≠ deletion; to drop an
+// item, restatus it). While still all-pending (drafting), the model keeps free
+// full-replace.
 export function executionUnderway(prev: IntegrityItem[]): boolean {
-	return prev.some((i) => i.status === "done" || i.status === "in_progress");
+	return prev.some((i) => i.status === "done" || i.status === "in_progress" || i.status === "blocked");
 }
 
 // B (omission-safe execution) protects against ACCIDENTAL loss but must defer to

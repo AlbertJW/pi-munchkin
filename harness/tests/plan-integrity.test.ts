@@ -30,12 +30,12 @@ test("the 2026-06-22 shape: 9→2 rewrite preserves done, flags dropped open", (
 	assert.deepEqual(droppedOpen.map((i) => i.title), ["j4", "j7", "j8", "j9"]); // open work flagged
 });
 
-test("blocked items are neither preserved nor flagged (they carry their own signal)", () => {
+test("blocked items are treated as open work — flagged for the caller's preserve/yield net, not silently dropped", () => {
 	const prev = [item("a", "done"), item("b", "blocked")];
 	const reconciled = [item("c", "pending")];
 	const { reattached, droppedOpen } = planIntegrity(prev, reconciled);
 	assert.deepEqual(reattached.map((i) => i.title), ["a"]);
-	assert.equal(droppedOpen.length, 0);
+	assert.deepEqual(droppedOpen.map((i) => i.title), ["b"]);
 });
 
 test("first plan (no prev) is clean", () => {

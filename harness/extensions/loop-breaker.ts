@@ -167,6 +167,10 @@ function resetOutcomes(): void {
 	outcomeCounts = new Map();
 	outcomeLabels = new Map();
 	outcomeFired = new Map();
+	// verify-gate reads this cross-extension flag by wall-clock TTL, not by session —
+	// clear it here too (session_start), else a stale timestamp from a prior session
+	// in the same process can suppress verify-gate's nag in an unrelated new session.
+	delete (globalThis as Record<string, unknown>).__pi_lb_outcome_at;
 }
 
 // Planning in flight? (flag set by plan-runner on /plan, cleared on /plan-go /
@@ -353,6 +357,10 @@ export default function (pi: ExtensionAPI) {
 				record("loop-breaker", "progress-after-steer", { turns_since: event.turnIndex - ep.lastSteerTurn });
 			}
 			resetEpisode();
+			// A mutation/final-answer turn means the model moved past whatever it was
+			// stuck on — stop suppressing verify-gate's nag for the rest of the 120s
+			// window on an outcome loop that's no longer active.
+			delete (globalThis as Record<string, unknown>).__pi_lb_outcome_at;
 			return;
 		}
 

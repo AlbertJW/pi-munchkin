@@ -173,6 +173,49 @@ test("inline items skip dispatch and land in the handoff for the main loop", asy
 	rmSync(cwd, { recursive: true, force: true });
 });
 
+test("an item depending on an inline item is surfaced as blocked, not silently stranded", async () => {
+	const { fp, cwd } = await freshWeaver();
+	await compile(fp, cwd, [
+		{ id: "s1", title: "judgment call", mode: "inline" },
+		{ id: "s2", title: "make-out file", mode: "execute", deliverable: "d", gate: "test -f out.txt", depends_on: ["s1"] },
+	]);
+	const { ctx } = makeCtx(cwd);
+	await fp.commands.get("weave-go").handler("", ctx);
+	const state = JSON.parse(readFileSync(join(cwd, ".pi", "weave-state.json"), "utf8"));
+	assert.equal(state.items.find((i: { id: string }) => i.id === "s1").status, "pending"); // model's now
+	const s2 = state.items.find((i: { id: string }) => i.id === "s2");
+	assert.equal(s2.status, "blocked");
+	assert.match(s2.note, /stranded/);
+	const handoff = fp.sent[fp.sent.length - 1];
+	assert.ok(handoff.includes("s2"), "s2 is surfaced in the handoff, not silently dropped");
+	rmSync(cwd, { recursive: true, force: true });
+});
+
+test("GATE MODE: repeated compile rejection disarms the plan-phase flag after the cap", async () => {
+	process.env.PLAN_MODE = "v4";
+	try {
+		const cwd = mkdtempSync(join(tmpdir(), "weave-gate-cap-"));
+		mkdirSync(join(cwd, ".pi"), { recursive: true });
+		const fp = makeFakePi();
+		const mod = await import(`../extensions/plan-weaver.ts?gc=${Date.now()}-${Math.random()}`);
+		mod.default(fp.pi);
+		for (const fn of fp.handlers.get("agent_start") ?? []) await fn({}, { cwd });
+		// ungated execute item — compilePlan rejects this every time.
+		const badItems = { items: [{ id: "s1", title: "edit", mode: "execute", deliverable: "d" }] };
+		let last: Awaited<ReturnType<typeof callTool>> | undefined;
+		for (let i = 0; i < 3; i++) {
+			last = await callTool(fp, "weave_compile", badItems, cwd);
+			assert.ok(last.isError);
+		}
+		assert.ok(last!.content[0].text.includes("giving up"), last!.content[0].text.slice(0, 200));
+		assert.equal((globalThis as Record<string, unknown>).__pi_plan_phase_active, false,
+			"disarmed after repeated compile rejection — edits are no longer blocked");
+		rmSync(cwd, { recursive: true, force: true });
+	} finally {
+		delete process.env.PLAN_MODE;
+	}
+});
+
 test("GATE MODE (PLAN_MODE=v4): auto-engage at agent_start, auto-dispatch on compile", async () => {
 	process.env.PLAN_MODE = "v4";
 	try {

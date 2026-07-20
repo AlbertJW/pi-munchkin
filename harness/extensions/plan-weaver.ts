@@ -50,6 +50,27 @@ const ROLES: Record<string, { file: string; tools: string }> = {
 
 let plan: WeavePlan | null = null;
 let compiling = false;
+// weave_compile rejections (bad gate, compilePlan errors) never cleared `compiling`,
+// so a model that can't land a valid compile left edit/write/multiedit blocked for
+// the rest of the run with no way out. Cap attempts and disarm past the cap.
+const MAX_COMPILE_ATTEMPTS = 3;
+let compileAttempts = 0;
+
+async function rejectCompile(cwd: string, reason: string) {
+	compileAttempts += 1;
+	if (compileAttempts >= MAX_COMPILE_ATTEMPTS) {
+		compiling = false;
+		(globalThis as Record<string, unknown>).__pi_plan_phase_active = false;
+		record("plan-weaver", "compile-abandoned", { attempts: compileAttempts });
+		await save(cwd);
+		return {
+			content: [{ type: "text" as const, text:
+				`${reason}\n\nPlan compile rejected ${compileAttempts}x — giving up on the plan. Proceed directly on the task without weave_compile.` }],
+			details: {}, isError: true,
+		};
+	}
+	return { content: [{ type: "text" as const, text: reason }], details: {}, isError: true };
+}
 
 const statePath = (cwd: string) => join(cwd, ".pi", "weave-state.json");
 
@@ -85,7 +106,7 @@ function childBrief(cwd: string, it: WeaveItem, extra?: string): string {
 type Exec = ExtensionAPI["exec"];
 
 /** One child run (fresh pi process, vendored subagent arg pattern). Returns final text. */
-async function runChild(exec: Exec, cwd: string, role: string, brief: string):
+async function runChild(exec: Exec, cwd: string, role: string, brief: string, signal?: AbortSignal):
 	Promise<{ ok: boolean; text: string }> {
 	const prompt = agentPromptPath(role);
 	// --approve: children run in throwaway/workdir cwds that pi does not trust; without
@@ -99,7 +120,7 @@ async function runChild(exec: Exec, cwd: string, role: string, brief: string):
 	// PI_OFFLINE=1 matches the vendored subagent runner.
 	try {
 		const r = await exec("/usr/bin/env", ["-i", ...gateEnvironment(), "PI_OFFLINE=1", "bash", "--noprofile", "--norc", "-c",
-			'exec </dev/null; exec pi "$@"', "bash", ...args], { cwd, timeout: CHILD_TIMEOUT_S * 1000 });
+			'exec </dev/null; exec pi "$@"', "bash", ...args], { cwd, timeout: CHILD_TIMEOUT_S * 1000, signal });
 		const text = (r.stdout || "").trim() || (r.stderr || "").trim();
 		if (r.code !== 0 || r.killed) {
 			return { ok: false, text: text || (r.killed ? `child timed out after ${CHILD_TIMEOUT_S}s` : `child exited ${r.code}`) };
@@ -111,17 +132,17 @@ async function runChild(exec: Exec, cwd: string, role: string, brief: string):
 }
 
 /** Engine-side gate run — read-only enforced, never trusts the child. */
-async function runGate(exec: Exec, cwd: string, gate: string):
+async function runGate(exec: Exec, cwd: string, gate: string, signal?: AbortSignal):
 	Promise<{ pass: boolean; output: string }> {
-	return runReadonlyGate(exec, cwd, gate, GATE_TIMEOUT_MS);
+	return runReadonlyGate(exec, cwd, gate, GATE_TIMEOUT_MS, signal);
 }
 
 /** Dispatch ONE item through the failure ladder. Mutates item status/rung. */
-async function dispatchItem(exec: Exec, cwd: string, it: WeaveItem): Promise<string> {
+async function dispatchItem(exec: Exec, cwd: string, it: WeaveItem, signal?: AbortSignal): Promise<string> {
 	it.status = "running";
 	record("plan-weaver", "dispatch", { id: it.id, mode: it.mode, rung: it.ladder_rung });
 
-	let child = await runChild(exec, cwd, it.mode, childBrief(cwd, it));
+	let child = await runChild(exec, cwd, it.mode, childBrief(cwd, it), signal);
 	let parsed = parseChildResult(child.text);
 
 	// explore/verify have no gate: the parsed contract IS the outcome.
@@ -138,7 +159,7 @@ async function dispatchItem(exec: Exec, cwd: string, it: WeaveItem): Promise<str
 	for (;;) {
 		const childSucceeded = child.ok && parsed.result === "done";
 		const gate = childSucceeded
-			? await runGate(exec, cwd, it.gate)
+			? await runGate(exec, cwd, it.gate, signal)
 			: { pass: false, output: child.ok ? parsed.line : `child failed: ${child.text}` };
 		record("plan-weaver", "gate", { id: it.id, pass: gate.pass, fails: it.gate_fails, gated: true });
 		if (gate.pass) {
@@ -152,13 +173,13 @@ async function dispatchItem(exec: Exec, cwd: string, it: WeaveItem): Promise<str
 		if (it.ladder_rung === 0) {
 			// rung 1 — c18b locality retry: same role, brief embeds the failing output.
 			it.ladder_rung = 1;
-			child = await runChild(exec, cwd, it.mode, childBrief(cwd, it, localityBrief(it.gate, gate.output)));
+			child = await runChild(exec, cwd, it.mode, childBrief(cwd, it, localityBrief(it.gate, gate.output)), signal);
 			parsed = parseChildResult(child.text);
 		} else if (it.ladder_rung === 1) {
 			// rung 2 — fresh child, fresh framing (c18: a poisoned context can't rescue itself).
 			it.ladder_rung = 2;
 			child = await runChild(exec, cwd, it.mode, childBrief(cwd, it,
-				"A previous attempt left partial work in this directory. Inspect the current state first, then take a DIFFERENT approach to whatever kept failing."));
+				"A previous attempt left partial work in this directory. Inspect the current state first, then take a DIFFERENT approach to whatever kept failing."), signal);
 			parsed = parseChildResult(child.text);
 		} else {
 			// rung 3 — blocked; the main model gets a bounded replan request in the handoff.
@@ -192,7 +213,7 @@ export default function (pi: ExtensionAPI) {
 					depends_on: Type.Optional(Type.Array(Type.String())),
 				})),
 			}),
-			async execute(_id, params, _signal, _onUpdate, ctx) {
+			async execute(_id, params, signal, _onUpdate, ctx) {
 				if (!compiling || !plan) {
 					return { content: [{ type: "text" as const, text: "No /weave in progress — run /weave <request> first." }], details: {}, isError: true };
 				}
@@ -200,21 +221,18 @@ export default function (pi: ExtensionAPI) {
 				for (const it of params.items ?? []) {
 					if (it.gate) {
 						const allowed = assertVerifyGateAllowed(it.gate);
-						if (!allowed.ok) return { content: [{ type: "text" as const, text: `item ${it.id ?? it.title}: gate rejected (${allowed.reason}) — gates must be read-only checks.` }], details: {}, isError: true };
+						if (!allowed.ok) return rejectCompile(ctx.cwd, `item ${it.id ?? it.title}: gate rejected (${allowed.reason}) — gates must be read-only checks.`);
 					}
 				}
 				const out = compilePlan(params, plan.request, new Date().toISOString());
 				if (!out.ok) {
 					record("plan-weaver", "compile-rejected", { errors: out.errors.length });
-					return {
-						content: [{ type: "text" as const, text:
-							"Plan rejected:\n- " + out.errors.join("\n- ") +
-							'\n\nWorked example item: {"id":"s1","title":"add toCSV quoting","mode":"execute","inputs":["src/index.js"],"deliverable":"toCSV quotes fields containing commas","gate":"node --test","depends_on":[]}' }],
-						details: {},
-						isError: true,
-					};
+					return rejectCompile(ctx.cwd,
+						"Plan rejected:\n- " + out.errors.join("\n- ") +
+						'\n\nWorked example item: {"id":"s1","title":"add toCSV quoting","mode":"execute","inputs":["src/index.js"],"deliverable":"toCSV quotes fields containing commas","gate":"node --test","depends_on":[]}');
 				}
 				plan = out.plan;
+				compileAttempts = 0;
 				compiling = false;
 				(globalThis as Record<string, unknown>).__pi_plan_phase_active = false;
 				await save(ctx.cwd);
@@ -223,7 +241,7 @@ export default function (pi: ExtensionAPI) {
 				const lines = plan.items.map((i) => `  ${i.id} [${i.mode}] ${i.title}${i.gate ? ` (gate: ${i.gate})` : ""}`);
 				if (GATE_MODE) {
 					// headless: no /weave-go exists — dispatch NOW, hand back in the tool result
-					const handoff = await dispatchAll({ cwd: ctx.cwd });
+					const handoff = await dispatchAll({ cwd: ctx.cwd, signal });
 					return { content: [{ type: "text" as const, text: `Plan compiled (${plan.items.length} items):\n${lines.join("\n")}\n\n${handoff}` }], details: {} };
 				}
 				return { content: [{ type: "text" as const, text: `Plan compiled (${plan.items.length} items):\n${lines.join("\n")}\nSTOP — wait for /weave-go.` }], details: {} };
@@ -252,18 +270,30 @@ export default function (pi: ExtensionAPI) {
 
 	// Engine-owned dispatch, shared by /weave-go (interactive) and gate mode
 	// (PLAN_MODE=v4 auto-dispatch). Returns the handoff text.
-	async function dispatchAll(ctx: { cwd: string; ui?: { notify(m: string, l?: string): void } }): Promise<string> {
+	async function dispatchAll(ctx: { cwd: string; ui?: { notify(m: string, l?: string): void }; signal?: AbortSignal }): Promise<string> {
 		if (!plan) throw new Error("no plan");
 		plan.phase = "dispatching";
 		const log: string[] = [];
 		for (;;) {
+			if (ctx.signal?.aborted) break;
 			const it = nextReady(plan);
 			if (!it) break;
 			if (it.mode === "inline") { it.status = "blocked"; it.note = "inline — handed to main loop"; continue; }
-			const line = await dispatchItem(pi.exec.bind(pi), ctx.cwd, it);
+			const line = await dispatchItem(pi.exec.bind(pi), ctx.cwd, it, ctx.signal);
 			log.push(line);
 			await save(ctx.cwd);
 			ctx.ui?.notify(`weave: ${line.slice(0, 100)}`, it.status === "done" ? "info" : "warning");
+		}
+		// Loop invariant: any item still "pending" here has an unmet dependency —
+		// nextReady would otherwise have picked it up — almost always a dependent of
+		// an inline or ladder-blocked item. Surface it explicitly so it isn't silently
+		// missing from both the `inline` and `blocked` handoff lists below.
+		const done = new Set(plan.items.filter((i) => i.status === "done").map((i) => i.id));
+		for (const it of plan.items) {
+			if (it.status !== "pending") continue;
+			const unmet = it.depends_on.filter((d) => !done.has(d));
+			it.status = "blocked";
+			it.note = `stranded — depends on unfinished item(s): ${unmet.join(", ")}`;
 		}
 		// hand back: one distilled message — results, blocked items needing a bounded
 		// replan, and any inline items for main-context judgment.
@@ -295,8 +325,16 @@ export default function (pi: ExtensionAPI) {
 	pi.registerCommand("weave-go", {
 		description: "dispatch the compiled weave plan (engine-owned)",
 		handler: async (_args, ctx) => {
+			const freshlyCompiled = !!plan && plan.items.length > 0;
 			if (!plan || plan.items.length === 0) plan = await loadExisting(ctx.cwd);
 			if (!plan || plan.items.length === 0) { ctx.ui.notify("no compiled weave plan", "warning"); return; }
+			// A plan loaded from disk (not compiled this session) that's already
+			// "done" is a stale prior-session result, not fresh work — dispatching it
+			// would order the model to restate results it never saw.
+			if (!freshlyCompiled && plan.phase === "done") {
+				ctx.ui.notify("saved weave plan is already done (from a previous session) — run /weave <request> to start a new one.", "info");
+				return;
+			}
 			pi.sendUserMessage(await dispatchAll(ctx));
 		},
 	});
