@@ -1,0 +1,324 @@
+{
+  "admission": {
+    "approved": true,
+    "approved_prompt_hashes": [
+      "8edb957fb08bf4f56ad9ca7ae625ac3fe531f5242d53e99744c4e2af2bf5ebfe",
+      "c5e61dd0c660d3094913904c49468a81578387cd91578f458f5c755f398ec112",
+      "f6f1d8c0f53f6fd38bb3e4136e2a34e2fad47002bea7335e75528348065ed639"
+    ],
+    "automated": {
+      "checked_at": "2026-07-20T17:41:16Z",
+      "hash_drift": [],
+      "passed": true,
+      "runs_per_state": 3,
+      "states": {
+        "gold_fail_to_pass": [
+          {
+            "output_tail": "",
+            "passed": true,
+            "returncode": 0
+          },
+          {
+            "output_tail": "",
+            "passed": true,
+            "returncode": 0
+          },
+          {
+            "output_tail": "",
+            "passed": true,
+            "returncode": 0
+          }
+        ],
+        "gold_pass_to_pass": [
+          {
+            "output_tail": "",
+            "passed": true,
+            "returncode": 0
+          },
+          {
+            "output_tail": "",
+            "passed": true,
+            "returncode": 0
+          },
+          {
+            "output_tail": "",
+            "passed": true,
+            "returncode": 0
+          }
+        ],
+        "mutant:shortcut": {
+          "fail_to_pass": [
+            {
+              "output_tail": "terBootstrap (node:internal/test_runner/harness:387:17) {\n    generatedMessage: true,\n    code: 'ERR_ASSERTION',\n    actual: { project: 'KITE-731', owner: 'north-star', checkpoint: 'quartz-19', mode: 'strict-json', rollback: 'amber-44', state: 'ready', invariant: 'preserve-leading-zeroes', next: 'run-readonly-canary' },\n    expected: { project: 'KITE-731', owner: 'north-star', checkpoint: 'quartz-19', mode: 'strict-json', rollback: 'amber-44', state: 'ready-for-canary', invariant: 'preserve-leading-zeroes', next: 'run-readonly-canary' },\n    operator: 'deepStrictEqual',\n    diff: 'simple'\n  }\n",
+              "passed": false,
+              "returncode": 1
+            },
+            {
+              "output_tail": "terBootstrap (node:internal/test_runner/harness:387:17) {\n    generatedMessage: true,\n    code: 'ERR_ASSERTION',\n    actual: { project: 'KITE-731', owner: 'north-star', checkpoint: 'quartz-19', mode: 'strict-json', rollback: 'amber-44', state: 'ready', invariant: 'preserve-leading-zeroes', next: 'run-readonly-canary' },\n    expected: { project: 'KITE-731', owner: 'north-star', checkpoint: 'quartz-19', mode: 'strict-json', rollback: 'amber-44', state: 'ready-for-canary', invariant: 'preserve-leading-zeroes', next: 'run-readonly-canary' },\n    operator: 'deepStrictEqual',\n    diff: 'simple'\n  }\n",
+              "passed": false,
+              "returncode": 1
+            },
+            {
+              "output_tail": "terBootstrap (node:internal/test_runner/harness:387:17) {\n    generatedMessage: true,\n    code: 'ERR_ASSERTION',\n    actual: { project: 'KITE-731', owner: 'north-star', checkpoint: 'quartz-19', mode: 'strict-json', rollback: 'amber-44', state: 'ready', invariant: 'preserve-leading-zeroes', next: 'run-readonly-canary' },\n    expected: { project: 'KITE-731', owner: 'north-star', checkpoint: 'quartz-19', mode: 'strict-json', rollback: 'amber-44', state: 'ready-for-canary', invariant: 'preserve-leading-zeroes', next: 'run-readonly-canary' },\n    operator: 'deepStrictEqual',\n    diff: 'simple'\n  }\n",
+              "passed": false,
+              "returncode": 1
+            }
+          ],
+          "pass_to_pass": [
+            {
+              "output_tail": "",
+              "passed": true,
+              "returncode": 0
+            },
+            {
+              "output_tail": "",
+              "passed": true,
+              "returncode": 0
+            },
+            {
+              "output_tail": "",
+              "passed": true,
+              "returncode": 0
+            }
+          ]
+        },
+        "pristine_fail_to_pass": [
+          {
+            "output_tail": "rBootstrap (node:internal/test_runner/harness:387:17) {\n    generatedMessage: true,\n    code: 'ERR_ASSERTION',\n    actual: { project: 'KITE-731', owner: 'north-star', checkpoint: 'quartz-19', mode: 'strict-json', rollback: 'amber-44', state: 'pending', invariant: 'preserve-leading-zeroes', next: 'run-readonly-canary' },\n    expected: { project: 'KITE-731', owner: 'north-star', checkpoint: 'quartz-19', mode: 'strict-json', rollback: 'amber-44', state: 'ready-for-canary', invariant: 'preserve-leading-zeroes', next: 'run-readonly-canary' },\n    operator: 'deepStrictEqual',\n    diff: 'simple'\n  }\n",
+            "passed": false,
+            "returncode": 1
+          },
+          {
+            "output_tail": "rBootstrap (node:internal/test_runner/harness:387:17) {\n    generatedMessage: true,\n    code: 'ERR_ASSERTION',\n    actual: { project: 'KITE-731', owner: 'north-star', checkpoint: 'quartz-19', mode: 'strict-json', rollback: 'amber-44', state: 'pending', invariant: 'preserve-leading-zeroes', next: 'run-readonly-canary' },\n    expected: { project: 'KITE-731', owner: 'north-star', checkpoint: 'quartz-19', mode: 'strict-json', rollback: 'amber-44', state: 'ready-for-canary', invariant: 'preserve-leading-zeroes', next: 'run-readonly-canary' },\n    operator: 'deepStrictEqual',\n    diff: 'simple'\n  }\n",
+            "passed": false,
+            "returncode": 1
+          },
+          {
+            "output_tail": "rBootstrap (node:internal/test_runner/harness:387:17) {\n    generatedMessage: true,\n    code: 'ERR_ASSERTION',\n    actual: { project: 'KITE-731', owner: 'north-star', checkpoint: 'quartz-19', mode: 'strict-json', rollback: 'amber-44', state: 'pending', invariant: 'preserve-leading-zeroes', next: 'run-readonly-canary' },\n    expected: { project: 'KITE-731', owner: 'north-star', checkpoint: 'quartz-19', mode: 'strict-json', rollback: 'amber-44', state: 'ready-for-canary', invariant: 'preserve-leading-zeroes', next: 'run-readonly-canary' },\n    operator: 'deepStrictEqual',\n    diff: 'simple'\n  }\n",
+            "passed": false,
+            "returncode": 1
+          }
+        ],
+        "pristine_pass_to_pass": [
+          {
+            "output_tail": "",
+            "passed": true,
+            "returncode": 0
+          },
+          {
+            "output_tail": "",
+            "passed": true,
+            "returncode": 0
+          },
+          {
+            "output_tail": "",
+            "passed": true,
+            "returncode": 0
+          }
+        ]
+      }
+    },
+    "reviewed_at": "2026-07-20T17:41:34Z",
+    "reviewer": "Albert Wessels (implementation-plan approval)"
+  },
+  "artifacts": [
+    {
+      "path": "ab-symbolect/tasks/context-pressure.txt",
+      "sha256": "cca613e3b48b1cd129072a07a32eb01d3a9045d4bb9f5ccc798d47ed23a5df35"
+    },
+    {
+      "path": "real-gate-fixtures/context-pressure-val/package.json",
+      "sha256": "a5d62c93950400cf086f91a158374e8e2660bfc0fad326aca88958449efd8dad"
+    },
+    {
+      "path": "real-gate-fixtures/context-pressure-val/scripts/generate-evidence.mjs",
+      "sha256": "4f0db5c03eff723fefea7453d81d4e7576a961783f3a53dc0c0f665c95e4b593"
+    },
+    {
+      "path": "real-gate-fixtures/context-pressure-val/src/capsule.js",
+      "sha256": "fee6f0e42da887c000a923afddce44a9b303a8b57fb9aeb01cc14893c8907ac3"
+    },
+    {
+      "path": "real-gate-fixtures/context-pressure-val/test/visible.test.js",
+      "sha256": "a857e0387078ff60dbfba10ccb445add2035f81c5f40d3ace790672b2bb05a85"
+    },
+    {
+      "path": "real-gate-fixtures/context-pressure-heldout/context-pressure.test.js",
+      "sha256": "69d4f3391787025d205d5896cde7c303feeb348181718ad975c399eaebc24868"
+    },
+    {
+      "path": "real-gate-fixtures/patches/context-pressure/gold.patch",
+      "sha256": "0c24c1b5dada4879cc848c7a1390c186543d39eb67263838abca335520f95263"
+    },
+    {
+      "path": "real-gate-fixtures/patches/context-pressure/shortcut.patch",
+      "sha256": "8b4088c52306095e744509044819375c1b407824b154cc28d363938f84e95d82"
+    }
+  ],
+  "cohort_id": "2026-07-context",
+  "context_pressure": {
+    "context_retention_assertions": [
+      "KITE-731",
+      "north-star",
+      "quartz-19",
+      "strict-json",
+      "amber-44",
+      "ready-for-canary",
+      "preserve-leading-zeroes",
+      "run-readonly-canary"
+    ],
+    "expected_changed_paths": [
+      "src/capsule.js"
+    ],
+    "expected_gate": "npm test",
+    "generated_artifacts": [
+      {
+        "path": "evidence/part-1.txt",
+        "sha256": "1a995e16a4982c0b1715ae703e5fa255bbcf4ed5248d20c738e9679b3c69bd06"
+      },
+      {
+        "path": "evidence/part-2.txt",
+        "sha256": "4812b0665e405910e716b3bcea87aa98840d80f8458a9eb1d235f784187e5d87"
+      },
+      {
+        "path": "evidence/part-3.txt",
+        "sha256": "04dd0e371a9597d491bbb6d7c41a6b524a9b7f006d83f31b4d0679bdece2245d"
+      },
+      {
+        "path": "evidence/part-4.txt",
+        "sha256": "a24c8c1b68f8a6d858449043aabd329476c8144e9f853e13a2b3d260eb2f0be5"
+      },
+      {
+        "path": "evidence/part-5.txt",
+        "sha256": "b5d2a333dd4a8791de5386639084d1fc0e6f6d206476b4f8a97066ebf95e2ee5"
+      },
+      {
+        "path": "evidence/part-6.txt",
+        "sha256": "7ed5e3c56889ef6603de15e8b960a5bcd4cda51ee2e5a551c4994e1b23fed656"
+      },
+      {
+        "path": "evidence/part-7.txt",
+        "sha256": "4150d2118b9efb6ae30fa900ed02e283cebb6faea2e04a6f631b127fb4fb15fa"
+      },
+      {
+        "path": "evidence/part-8.txt",
+        "sha256": "2ed4bb53358eb142773f69def744356e5e0feb63136a86484c61947ad99ddf71"
+      }
+    ],
+    "generator_command": [
+      "node",
+      "scripts/generate-evidence.mjs"
+    ],
+    "held_out_root": "real-gate-fixtures/context-pressure-heldout",
+    "observational_memory": [
+      "off",
+      "on"
+    ],
+    "output_caps": [
+      "off",
+      8192,
+      12288
+    ],
+    "result_pruning_recency": [
+      "off",
+      3,
+      5,
+      8
+    ],
+    "roots_disjoint": true,
+    "schema": "pi.context-pressure/v1",
+    "threshold_experiments": [
+      60,
+      70,
+      80
+    ],
+    "validation_root": "real-gate-fixtures/context-pressure-val"
+  },
+  "fixture": {
+    "root": "real-gate-fixtures/context-pressure-val",
+    "stage_copy": []
+  },
+  "fixture_version": "2026-07.1",
+  "one_shot": {
+    "context_files": [],
+    "eligible": false,
+    "max_context_bytes": 0
+  },
+  "patches": {
+    "gold": "real-gate-fixtures/patches/context-pressure/gold.patch",
+    "shortcut_mutants": [
+      "real-gate-fixtures/patches/context-pressure/shortcut.patch"
+    ]
+  },
+  "prompts": {
+    "canonical": {
+      "sha256": "686f508eab761e1bb9d22351bc8fce1086846782841b0165e36a5e4f33fc4b6e",
+      "text": "Run `npm test` once to establish the failing baseline; this also materializes eight deterministic evidence files. Inspect every `evidence/part-1.txt` through `part-8.txt` using bounded reads or targeted searches, retaining each exact `AUTHORITATIVE KEY=value` identifier. Fix only `src/capsule.js` so the visible and hidden tests pass. Preserve every exact identifier and constraint across any context compaction. Do not edit tests, evidence, package scripts, or generated files. Finish by running `npm test`, and report the changed path and passing command."
+    },
+    "perturbations": [
+      {
+        "approved": false,
+        "id": "equivalent-1",
+        "sha256": "8edb957fb08bf4f56ad9ca7ae625ac3fe531f5242d53e99744c4e2af2bf5ebfe",
+        "text": "Establish the red baseline with `npm test`, then inspect all eight generated evidence parts with bounded reads. Retain every exact `AUTHORITATIVE KEY=value` pair across compaction. Change only `src/capsule.js`, do not modify tests or evidence, and finish with a passing `npm test` plus changed-path evidence."
+      },
+      {
+        "approved": false,
+        "id": "equivalent-2",
+        "sha256": "c5e61dd0c660d3094913904c49468a81578387cd91578f458f5c755f398ec112",
+        "text": "This is a long-horizon retention repair. Run `npm test`; examine `evidence/part-1.txt` through `part-8.txt` without dumping them wholesale; keep all exact authoritative identifiers. Make the smallest fix in `src/capsule.js`, preserve constraints through compaction, and verify `npm test` passes without changing tests or generated data."
+      },
+      {
+        "approved": false,
+        "id": "equivalent-3",
+        "sha256": "f6f1d8c0f53f6fd38bb3e4136e2a34e2fad47002bea7335e75528348065ed639",
+        "text": "Reproduce the failure first. Use bounded inspection across each of the eight evidence files and remember every authoritative key/value exactly. Repair only `src/capsule.js`; tests, scripts, and evidence are immutable. After any compaction, retain the identifiers and constraints, then prove the final filesystem state with `npm test` and the changed path."
+      }
+    ],
+    "semantic_group": "context-pressure:2026-07.1"
+  },
+  "schema": "pi.fixture/v1",
+  "sufficiency": [
+    {
+      "assertion": "reads eight bounded evidence partitions and retains exact identifiers",
+      "prompt_evidence": "The prompt names all eight evidence files and requires every exact AUTHORITATIVE KEY=value identifier to survive compaction."
+    },
+    {
+      "assertion": "performs a mutation after a failing baseline and recovers to a deterministic passing test",
+      "prompt_evidence": "The prompt requires npm test before the one-file repair and again after it."
+    },
+    {
+      "assertion": "changes only src/capsule.js and preserves immutable fixture material",
+      "prompt_evidence": "The prompt explicitly forbids edits to tests, evidence, package scripts, and generated files."
+    }
+  ],
+  "task_id": "context-pressure",
+  "tests": {
+    "fail_to_pass": {
+      "command": [
+        "npm",
+        "test"
+      ],
+      "overlays": [
+        {
+          "dest": "test/context-pressure.test.js",
+          "source": "real-gate-fixtures/context-pressure-heldout/context-pressure.test.js"
+        }
+      ],
+      "timeout_seconds": 60
+    },
+    "pass_to_pass": {
+      "command": [
+        "npm",
+        "test"
+      ],
+      "overlays": [],
+      "timeout_seconds": 60
+    }
+  },
+  "timestamps": {
+    "admitted_at": "2026-07-20T17:41:34Z",
+    "created_at": "2026-07-20T00:00:00Z",
+    "expires_at": "2026-10-18T17:41:34Z"
+  }
+}

@@ -37,6 +37,9 @@ def row_context(task, variant, exploratory=False):
         "authority_reason": reason,
         "exploratory_override": bool(exploratory and not ok),
         "one_shot": manifest["one_shot"],
+        "fixture_root": manifest["fixture"]["root"],
+        "hidden_test": ((manifest.get("tests", {}).get("fail_to_pass", {}).get("overlays") or [{}])[0].get("source")
+                        if manifest.get("context_pressure") else None),
     }
 
 
@@ -45,11 +48,19 @@ def main():
     state = sub.add_parser("state"); state.add_argument("task")
     prompt = sub.add_parser("prompt"); prompt.add_argument("task"); prompt.add_argument("--variant", default="canonical")
     row = sub.add_parser("row-context"); row.add_argument("task"); row.add_argument("--variant", default="canonical"); row.add_argument("--exploratory", action="store_true")
+    fixture_root = sub.add_parser("fixture-root"); fixture_root.add_argument("task")
+    hidden_test = sub.add_parser("hidden-test"); hidden_test.add_argument("task")
     args = ap.parse_args()
     if args.command == "state":
         _, manifest = load_manifest(args.task); ok, why = authoritative(manifest)
         print(json.dumps({"authoritative": ok, "reason": why})); raise SystemExit(0 if ok else 1)
-    if args.command == "prompt":
+    if args.command == "fixture-root":
+        _, manifest = load_manifest(args.task); print(manifest["fixture"]["root"])
+    elif args.command == "hidden-test":
+        _, manifest = load_manifest(args.task)
+        overlay = (manifest.get("tests", {}).get("fail_to_pass", {}).get("overlays") or [{}])[0]
+        print(overlay.get("source", "") if manifest.get("context_pressure") else "")
+    elif args.command == "prompt":
         _, manifest = load_manifest(args.task); print(prompt_record(manifest, args.variant)["text"])
     else:
         print(json.dumps(row_context(args.task, args.variant, args.exploratory), sort_keys=True))

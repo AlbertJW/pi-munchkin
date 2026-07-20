@@ -17,7 +17,7 @@ import fixture_admission as admission
 
 def test_admission_catalog():
     manifests = sorted(admission.MANIFESTS.glob("*.json"))
-    assert len(manifests) == 18, len(manifests)
+    assert len(manifests) == 19, len(manifests)
     for path in manifests:
         manifest = json.loads(path.read_text())
         admission.validate_contract(manifest)
@@ -63,6 +63,30 @@ def test_fixture_verify_read_only():
     assert proc.stdout == "t1: PASS (read-only; manifest unchanged)\n", proc.stdout
     assert manifest.read_bytes() == before, "verify modified manifest bytes"
     assert admission.sha256(manifest) == before_hash, "verify modified manifest hash"
+
+
+def test_context_pressure_contract():
+    _, manifest = admission.load_manifest("context-pressure")
+    assert admission.artifact_drift(manifest) == []
+    pressure = manifest["context_pressure"]
+    validation = admission.safe_root(pressure["validation_root"])
+    held_out = admission.safe_root(pressure["held_out_root"])
+    assert validation != held_out and validation not in held_out.parents and held_out not in validation.parents
+    cli = admission.ROOT / "prompt-lab" / "eval_fixture.py"
+    fixture = subprocess.run([sys.executable, str(cli), "fixture-root", "context-pressure"],
+                             cwd=admission.ROOT, capture_output=True, text=True, timeout=30)
+    hidden = subprocess.run([sys.executable, str(cli), "hidden-test", "context-pressure"],
+                            cwd=admission.ROOT, capture_output=True, text=True, timeout=30)
+    assert fixture.returncode == 0 and fixture.stdout.strip() == pressure["validation_root"]
+    assert hidden.returncode == 0 and hidden.stdout.strip().startswith(pressure["held_out_root"] + "/")
+
+    drifted = copy.deepcopy(manifest)
+    drifted["context_pressure"]["generated_artifacts"][0]["sha256"] = "0" * 64
+    assert any(error.startswith("generated:hash:") for error in admission.artifact_drift(drifted))
+    with tempfile.TemporaryDirectory() as td:
+        env = admission.verification_env(Path(td))
+        assert "OPENROUTER_API_KEY" not in env and "ANTHROPIC_API_KEY" not in env
+        assert Path(env["HOME"]).is_relative_to(Path(td)) and Path(env["TMPDIR"]).is_relative_to(Path(td))
 
 
 def test_fingerprint():
@@ -235,7 +259,7 @@ def test_incident_rotation():
 
 
 def main():
-    test_admission_catalog(); test_fixture_verify_read_only(); test_fingerprint(); test_one_shot(); test_execution_policy(); test_runner_dry_modes(); test_robustness_and_usage(); test_schedule(); test_incident_rotation()
+    test_admission_catalog(); test_fixture_verify_read_only(); test_context_pressure_contract(); test_fingerprint(); test_one_shot(); test_execution_policy(); test_runner_dry_modes(); test_robustness_and_usage(); test_schedule(); test_incident_rotation()
     print("integrity_selftest: OK (admission + read-only verify, expiry/drift/approval, fingerprint, one-shot, execution policy, robustness, usage, scheduling)")
 
 

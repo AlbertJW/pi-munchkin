@@ -1,0 +1,13 @@
+diff --git a/src/capsule.js b/src/capsule.js
+index b333b7b..9e4d212 100644
+--- a/src/capsule.js
++++ b/src/capsule.js
+@@ -6,7 +6,7 @@ export function buildCapsule(records) {
+	  checkpoint: records.CHECKPOINT,
+	  mode: records.OUTPUT_MODE,
+	  rollback: records.ROLLBACK_TOKEN,
+-	  state: "pending",
++	  state: "ready",
+	  invariant: records.INVARIANT,
+	  next: records.NEXT_ACTION,
+	};

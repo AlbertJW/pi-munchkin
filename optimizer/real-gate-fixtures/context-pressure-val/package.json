@@ -1,0 +1,9 @@
+{
+  "name": "pi-context-pressure-fixture",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "pretest": "node scripts/generate-evidence.mjs",
+    "test": "node --test test/*.test.js"
+  }
+}

@@ -39,6 +39,25 @@ def sha256(path: Path):
     return h.hexdigest()
 
 
+def verification_env(temp_root: Path):
+    """Minimal deterministic environment for executable fixture commands."""
+    home = temp_root / "home"
+    scratch = temp_root / "tmp"
+    home.mkdir(parents=True, exist_ok=True)
+    scratch.mkdir(parents=True, exist_ok=True)
+    env = {
+        "CI": "1",
+        "HOME": str(home),
+        "PATH": os.environ.get("PATH", "/usr/bin:/bin"),
+        "TMPDIR": str(scratch),
+        "npm_config_cache": str(temp_root / "npm-cache"),
+    }
+    for key in ("LANG", "LC_ALL", "SYSTEMROOT", "WINDIR"):
+        if os.environ.get(key):
+            env[key] = os.environ[key]
+    return env
+
+
 def manifest_path(task):
     path = MANIFESTS / f"{task}.json"
     if not path.is_file():
@@ -67,6 +86,19 @@ def validate_contract(m):
         raise AdmissionError("every hidden assertion needs prompt sufficiency evidence")
     if not m["patches"].get("gold") or not m["patches"].get("shortcut_mutants"):
         raise AdmissionError("gold and shortcut-mutant patches are required")
+    pressure = m.get("context_pressure")
+    if pressure:
+        if pressure.get("schema") != "pi.context-pressure/v1":
+            raise AdmissionError("invalid context-pressure contract")
+        validation = safe_root(pressure.get("validation_root", ""))
+        held_out = safe_root(pressure.get("held_out_root", ""))
+        if (not validation.is_dir() or not held_out.is_dir() or validation == held_out
+                or validation in held_out.parents or held_out in validation.parents):
+            raise AdmissionError("context-pressure validation and held-out roots must exist and be disjoint")
+        if pressure.get("roots_disjoint") is not True:
+            raise AdmissionError("context-pressure contract must declare disjoint roots")
+        if not pressure.get("generator_command") or not pressure.get("generated_artifacts"):
+            raise AdmissionError("context-pressure generator and generated artifact hashes are required")
 
 
 def safe_root(relative):
@@ -84,6 +116,25 @@ def artifact_drift(m):
             errors.append(f"missing:{item['path']}")
         elif sha256(path) != item["sha256"]:
             errors.append(f"hash:{item['path']}")
+    pressure = m.get("context_pressure")
+    if pressure and not errors:
+        try:
+            with tempfile.TemporaryDirectory(prefix=f"pi-generated-{m['task_id']}-") as td:
+                work = stage(m, Path(td))
+                proc = subprocess.run(pressure["generator_command"], cwd=work, text=True,
+                                      capture_output=True, timeout=60,
+                                      env=verification_env(Path(td)))
+                if proc.returncode:
+                    errors.append(f"generated:command:{proc.returncode}")
+                else:
+                    for item in pressure["generated_artifacts"]:
+                        generated = (work / item["path"]).resolve()
+                        if not generated.is_relative_to(work.resolve()) or not generated.is_file():
+                            errors.append(f"generated:missing:{item['path']}")
+                        elif sha256(generated) != item["sha256"]:
+                            errors.append(f"generated:hash:{item['path']}")
+        except (OSError, subprocess.SubprocessError) as exc:
+            errors.append(f"generated:execution:{type(exc).__name__}")
     return errors
 
 
@@ -132,7 +183,8 @@ def run_state(m, patch, suite):
                 apply_patch(work, patch)
             install_overlays(work, spec.get("overlays", []))
             proc = subprocess.run(spec["command"], cwd=work, text=True, capture_output=True,
-                                  timeout=spec.get("timeout_seconds", 60), env={**os.environ, "CI": "1"})
+                                  timeout=spec.get("timeout_seconds", 60),
+                                  env=verification_env(Path(td)))
             passed = proc.returncode == 0
             outcomes.append({"passed": passed, "returncode": proc.returncode,
                              "output_tail": "" if passed else (proc.stdout + proc.stderr)[-600:]})

@@ -37,7 +37,7 @@ EXPERIMENT_MANIFEST="${EXPERIMENT_MANIFEST:-}"
 EXPERIMENT_MANIFEST_SHA256="${EXPERIMENT_MANIFEST_SHA256:-}"
 EXPERIMENT_BASE_CELL="${EXPERIMENT_BASE_CELL:-base}"
 EXPERIMENT_CAND_CELL="${EXPERIMENT_CAND_CELL:-cand}"
-HARNESS_HASH_BLOCKER="Pi does not expose the actually loaded extension/lib set; repository hashes may describe a different installation."
+HARNESS_HASH_BLOCKER="No valid launcher-computed surface receipt is available; this row cannot be promoted until the running extension corroborates one in authenticated telemetry."
 HARNESS_SURFACE_SHA256=""
 # Computed here, before any `pi` session exists — the running session cannot
 # influence this number. Only clears the static blocker on success; a computation
@@ -85,8 +85,16 @@ fi
 # grading test; the fixture's own test/ is the visible Pass-to-Pass set, and the hidden
 # Fail-to-Pass test is installed only at grading. Data-driven: a task is hidden iff it has a
 # hidden grader, and uses its own fixture dir $FIXTURES/<id>/ if one exists (else the default).
-is_hidden() { [[ -f "$FIXTURES/hidden/$1.test.js" ]]; }
-fixture_for() { case "$1" in h3) echo "$FIXTURES/hard-bracket" ;; *) [[ -d "$FIXTURES/$1" ]] && echo "$FIXTURES/$1" || echo "$FIXTURE" ;; esac; }
+hidden_test_for() {
+	if [[ -f "$FIXTURES/hidden/$1.test.js" ]]; then echo "$FIXTURES/hidden/$1.test.js"; return; fi
+	local relative; relative="$(python3 "$FIXTURE_META" hidden-test "$1" 2>/dev/null)"
+	[[ -n "$relative" ]] && echo "$HERE/$relative"
+}
+is_hidden() { [[ -n "$(hidden_test_for "$1")" ]]; }
+fixture_for() {
+	local relative; relative="$(python3 "$FIXTURE_META" fixture-root "$1" 2>/dev/null)"
+	[[ -n "$relative" && -d "$HERE/$relative" ]] && echo "$HERE/$relative" || echo "$FIXTURE"
+}
 
 # Shown-test tasks: (re)install the authoritative test — before the run (model sees the
 # spec) AND after (anti-tamper). Hidden tasks are handled separately at grading time.
@@ -367,6 +375,7 @@ run_one() {  # $1=config $2=arm $3=task $4=rep [$5=split] [$6=prompt-variant]
 	rm -rf "$wd"; mkdir -p "$wd"
 	cp -R "$fix/src" "$fix/test" "$fix/package.json" "$wd/"
 	[[ -d "$fix/data" ]] && cp -R "$fix/data" "$wd/"   # data-backed tasks (e.g. bigdata) ship their corpus
+	[[ -d "$fix/scripts" ]] && cp -R "$fix/scripts" "$wd/" # deterministic fixture generators
 	[[ "$task" == "t3" ]] && cp "$T3_FILES/align.js" "$wd/src/"   # the buggy source to fix (before only)
 	is_hidden "$task" || install_tests "$task" "$wd"             # shown tasks only; hidden tasks withhold the test
 
@@ -431,7 +440,7 @@ run_one() {  # $1=config $2=arm $3=task $4=rep [$5=split] [$6=prompt-variant]
 	# Each session owns an authenticated telemetry descriptor. This prevents
 	# concurrent gates, interactive Pi activity, and evaluated code from
 	# contaminating retries or result-row joins.
-	local session_base_env=("HOME=$HOME" "PATH=$PATH" "TMPDIR=$gate_tmpdir" "TELEMETRY=on" "TELEMETRY_HMAC_FD=3" "TELEMETRY_FD=8")
+	local session_base_env=("HOME=$HOME" "PATH=$PATH" "TMPDIR=$gate_tmpdir" "TELEMETRY=on" "TELEMETRY_SOURCE=gate" "TELEMETRY_HMAC_FD=3" "TELEMETRY_FD=8")
 	[[ -n "$HARNESS_SURFACE_SHA256" ]] && session_base_env+=("HARNESS_SURFACE_SHA256=$HARNESS_SURFACE_SHA256")
 	for key in LANG LC_ALL SYSTEMROOT WINDIR PI_CODING_AGENT_DIR XDG_CONFIG_HOME; do
 		[[ -n "${!key:-}" ]] && session_base_env+=("$key=${!key}")
@@ -563,7 +572,7 @@ NOTE: a previous attempt in this workdir was stopped for repeating the same fail
 	if is_hidden "$task"; then
 		rm -f "$wd"/test/*.test.js                       # drop any model-added/edited tests
 		cp "$fix"/test/*.test.js "$wd/test/"             # pristine Pass-to-Pass set
-		cp "$FIXTURES/hidden/$task.test.js" "$wd/test/"  # the HIDDEN Fail-to-Pass grader
+		cp "$(hidden_test_for "$task")" "$wd/test/"  # the HIDDEN Fail-to-Pass grader
 		[[ "$task" == "bigdata" ]] && cp "$fix/data/events.jsonl" "$wd/data/events.jsonl"
 	else
 		install_tests "$task" "$wd"                      # shown-test anti-tamper

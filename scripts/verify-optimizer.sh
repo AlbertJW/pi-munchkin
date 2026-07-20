@@ -2,6 +2,7 @@
 # Complete offline optimizer verification. No model, GPU, network, or live pi
 # configuration is required; all scratch state is created under temporary dirs.
 set -euo pipefail
+export PYTHONDONTWRITEBYTECODE=1
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 OPT="$ROOT/optimizer"
