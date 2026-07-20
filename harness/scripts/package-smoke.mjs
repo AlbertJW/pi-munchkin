@@ -3,11 +3,11 @@
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
 import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
-import { existsSync } from "node:fs";
 import { resolve } from "node:path";
-import { dirname, relative } from "node:path";
+import { relative } from "node:path";
 import { tmpdir } from "node:os";
 import { discoverAndLoadExtensions } from "@earendil-works/pi-coding-agent";
+import { walkRelativeImports } from "../lib/surface-walk.ts";
 
 const root = resolve(import.meta.dirname, "../..");
 const manifest = JSON.parse(await readFile(resolve(root, "package.json"), "utf8"));
@@ -50,22 +50,10 @@ try {
 
   // Follow every relative import from each manifest entry so a packed extension
   // cannot load from the checkout while a transitive source file is absent.
-  const pending = extensions.map((entry) => resolve(root, entry));
-  const visited = new Set();
-  while (pending.length) {
-    const sourcePath = pending.pop();
-    if (visited.has(sourcePath)) continue;
-    visited.add(sourcePath);
+  const visited = await walkRelativeImports(extensions.map((entry) => resolve(root, entry)));
+  for (const sourcePath of visited) {
     const packagePath = relative(root, sourcePath).split("\\").join("/");
     assert(files.has(packagePath), `packed artifact is missing imported source ${packagePath}`);
-    const source = await readFile(sourcePath, "utf8");
-    for (const match of source.matchAll(/(?:from\s+|import\s*)["'](\.{1,2}\/[^"']+)["']/g)) {
-      let imported = resolve(dirname(sourcePath), match[1]);
-      if (!existsSync(imported) && imported.endsWith(".js") && existsSync(`${imported.slice(0, -3)}.ts`)) {
-        imported = `${imported.slice(0, -3)}.ts`;
-      }
-      if (existsSync(imported)) pending.push(imported);
-    }
   }
 
   // Install the produced tarball into an isolated consumer and temporary HOME.

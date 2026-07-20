@@ -38,6 +38,16 @@ EXPERIMENT_MANIFEST_SHA256="${EXPERIMENT_MANIFEST_SHA256:-}"
 EXPERIMENT_BASE_CELL="${EXPERIMENT_BASE_CELL:-base}"
 EXPERIMENT_CAND_CELL="${EXPERIMENT_CAND_CELL:-cand}"
 HARNESS_HASH_BLOCKER="Pi does not expose the actually loaded extension/lib set; repository hashes may describe a different installation."
+HARNESS_SURFACE_SHA256=""
+# Computed here, before any `pi` session exists — the running session cannot
+# influence this number. Only clears the static blocker on success; a computation
+# failure keeps the honest blocker text rather than guessing.
+if HARNESS_SURFACE_SHA256="$(node --experimental-strip-types "$REPO_ROOT/harness/scripts/surface-hash.ts" "${PI_CODING_AGENT_DIR:-$HOME/.pi/agent}" 2>/dev/null)"; then
+	HARNESS_HASH_BLOCKER=""
+else
+	HARNESS_SURFACE_SHA256=""
+	echo "[real_gate] WARNING: harness surface hash computation failed; rows keep the explicit blocker" >&2
+fi
 if [[ -n "$EXPERIMENT_MANIFEST" ]]; then
 	[[ -f "$EXPERIMENT_MANIFEST" ]] || { echo "[real_gate] experiment manifest not found: $EXPERIMENT_MANIFEST" >&2; exit 2; }
 	manifest_actual="$(python3 -c 'import hashlib,sys; print(hashlib.sha256(open(sys.argv[1],"rb").read()).hexdigest())' "$EXPERIMENT_MANIFEST")"
@@ -413,6 +423,7 @@ run_one() {  # $1=config $2=arm $3=task $4=rep [$5=split] [$6=prompt-variant]
 	# concurrent gates, interactive Pi activity, and evaluated code from
 	# contaminating retries or result-row joins.
 	local session_base_env=("HOME=$HOME" "PATH=$PATH" "TMPDIR=$gate_tmpdir" "TELEMETRY=on" "TELEMETRY_HMAC_FD=3" "TELEMETRY_FD=8")
+	[[ -n "$HARNESS_SURFACE_SHA256" ]] && session_base_env+=("HARNESS_SURFACE_SHA256=$HARNESS_SURFACE_SHA256")
 	for key in LANG LC_ALL SYSTEMROOT WINDIR PI_CODING_AGENT_DIR XDG_CONFIG_HOME; do
 		[[ -n "${!key:-}" ]] && session_base_env+=("$key=${!key}")
 	done
@@ -599,6 +610,12 @@ import hashlib,importlib.util,json,sys
  sandbox_auth,sandbox_reason,policy_path,mrow,span_receipt,cfg_path,config_path,experiment_manifest,
  experiment_sha,base_cell,cand_cell,harness_blocker,context_telemetry_path)=sys.argv[1:37]
 ctx=json.load(open(ctxpath)); pre=json.load(open(prepath)); post=json.load(open(postpath))
+# Loaded once and reused for both "harness" and "context" below — the surface hash
+# in the row is pulled ONLY from this already-HMAC-verified blob, never from the
+# raw HARNESS_SURFACE_SHA256 env var directly, so no code path can launder an
+# unverified value into a row.
+context_data=json.load(open(context_telemetry_path))
+harness_surface_sha256=context_data.get("harness_surface_sha256")
 stable=pre.get("fingerprint_sha256") == post.get("fingerprint_sha256")
 serving_complete=pre.get("status") == post.get("status") == "complete"
 execution_authoritative=bool(int(network_auth)) and bool(int(sandbox_auth))
@@ -639,8 +656,9 @@ rec={"schema":"pi.eval-row/v2", "task":task,"pattern":pat,"arm":pat,"rep":int(re
      "prompt":{"variant":ctx["prompt_variant"],"semantic_group":ctx["semantic_group"],"sha256":ctx["prompt_sha256"]},
      "serving":{"pre":pre,"post":post,"stable":stable},"usage":usage,"trajectory":trajectory,
      "span_receipt_success":bool(int(span_receipt)),"config":config_binding,"experiment":experiment,
-     "harness":{"surface_sha256":None,"hash_blocker":harness_blocker},
-     "context":json.load(open(context_telemetry_path)),
+     "harness":{"surface_sha256":harness_surface_sha256,
+                "hash_blocker":harness_blocker if harness_surface_sha256 is None else ""},
+     "context":context_data,
      # compatibility aliases for historical readers; dimensions stay honest.
      "out_chars":int(outchars),"think_chars":0,"in_tok":int(tin) if exact else 0,
      "out_tok":int(tout) if exact else 0,"token_usage_exact":exact}

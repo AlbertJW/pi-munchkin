@@ -39,14 +39,14 @@ def _decode_line(line, number, key=None):
         raise ValueError(f"invalid telemetry JSON at line {number}: {exc.msg}") from exc
 
 
-def exact_events(path, session_key, key=None):
+def exact_events(path, session_key, ext, key=None):
     raw = _read_raw(path)
     selected = []
     for number, line in enumerate(raw.splitlines(), 1):
         if not line.strip():
             continue
         event = _decode_line(line, number, key)
-        if event.get("sk") == session_key and event.get("ext") == "context-watcher":
+        if event.get("sk") == session_key and event.get("ext") == ext:
             selected.append(event)
     return raw, selected
 
@@ -63,7 +63,13 @@ def has_abort(path, session_key, key=None):
 
 
 def aggregate(path, session_key, key=None):
-    raw, selected = exact_events(path, session_key, key)
+    raw, selected = exact_events(path, session_key, "context-watcher", key)
+    _, surface_events = exact_events(path, session_key, "surface-receipt", key)
+    harness_surface_sha256 = None
+    if surface_events:
+        candidate = surface_events[-1].get("sha256")
+        if isinstance(candidate, str) and re.fullmatch(r"[0-9a-f]{64}", candidate):
+            harness_surface_sha256 = candidate
 
     configs = [e for e in selected if e.get("kind") == "session-config"]
     compactions = [e for e in selected if e.get("kind") == "compacted"]
@@ -80,6 +86,7 @@ def aggregate(path, session_key, key=None):
         "content_sha256": hashlib.sha256(raw).hexdigest(),
         "session_key": session_key,
         "events": len(selected),
+        "harness_surface_sha256": harness_surface_sha256,
         "config": config,
         "compactions": {
             "total": len(compactions),
@@ -114,6 +121,7 @@ def selftest():
         {"ts":"x","sk":"run-a","ext":"context-watcher","kind":"compacted","requester":"pi","contentProvider":"pi","reason":"threshold","willRetry":False,"tokensBefore":800},
         {"ts":"x","sk":"run-a","ext":"context-watcher","kind":"compact-requested","resumePending":True},
         {"ts":"x","sk":"run-a","ext":"context-watcher","kind":"compact-completed","preTokens":750,"tokensBefore":750,"estimatedTokensAfter":300,"postTokens":None},
+        {"ts":"x","sk":"run-a","ext":"surface-receipt","kind":"surface","sha256":"a"*64},
     ]
     with tempfile.TemporaryDirectory() as td:
         path = os.path.join(td, "events.jsonl")
@@ -129,7 +137,9 @@ def selftest():
         assert row["events"] == 4 and row["config"]["enabled"] is False
         assert row["compactions"]["pi"] == 1 and row["compactions"]["overflow"] == 0
         assert row["watcher"]["completed"] == 1 and row["watcher"]["resume_required"] == 1
+        assert row["harness_surface_sha256"] == "a" * 64
         assert aggregate(os.path.join(td, "missing"), "run-a", key)["events"] == 0
+        assert aggregate(os.path.join(td, "missing"), "run-a", key)["harness_surface_sha256"] is None
         assert not has_abort(path, "run-a", key)
         with open(path, "ab") as f:
             f.write(signed({"sk":"run-a-extra","kind":"abort"}))
@@ -143,6 +153,11 @@ def selftest():
             assert "unsigned" in str(exc)
         else:
             raise AssertionError("unsigned telemetry was trusted")
+        # a validly-signed but malformed (non-hex-64) sha256 must never surface —
+        # the format guard, not just the signature, gates what becomes evidence.
+        malformed = os.path.join(td, "malformed.jsonl")
+        open(malformed, "wb").write(signed({"sk":"run-a","ext":"surface-receipt","kind":"surface","sha256":"not-a-hash"}))
+        assert aggregate(malformed, "run-a", key)["harness_surface_sha256"] is None
         schema_path = os.path.join(os.path.dirname(__file__), "..", "real-gate-fixtures", "schemas", "pi.eval-row-v2.schema.json")
         context_schema = json.load(open(schema_path))["properties"]["context"]
         assert set(context_schema["properties"]["compactions"]["required"]) == set(row["compactions"])

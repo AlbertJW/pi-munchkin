@@ -191,6 +191,54 @@ test("an item depending on an inline item is surfaced as blocked, not silently s
 	rmSync(cwd, { recursive: true, force: true });
 });
 
+test("a plan resumed from disk (not freshly compiled) tells the first dispatch partial work may exist", async () => {
+	const { fp, cwd } = await freshWeaver();
+	await compile(fp, cwd, [
+		{ id: "s1", title: "make-out file", mode: "execute", deliverable: "d", gate: "test -f out.txt" },
+	]);
+	// Fresh module instance so in-memory `plan` is null — /weave-go must fall back
+	// to loadExisting, exercising the resumed-from-disk path.
+	const fp2 = makeFakePi();
+	const mod2 = await import(`../extensions/plan-weaver.ts?resume=${Date.now()}-${Math.random()}`);
+	mod2.default(fp2.pi);
+	const { ctx } = makeCtx(cwd);
+	await fp2.commands.get("weave-go").handler("", ctx);
+	const calls = readFileSync(join(cwd, "stub-calls.log"), "utf8");
+	assert.match(calls, /resumed from a previous session/);
+	rmSync(cwd, { recursive: true, force: true });
+});
+
+test("GATE MODE resumes an interrupted (non-done) plan on restart instead of discarding it", async () => {
+	process.env.PLAN_MODE = "v4";
+	try {
+		const cwd = mkdtempSync(join(tmpdir(), "weave-gate-resume-"));
+		mkdirSync(join(cwd, ".pi"), { recursive: true });
+		// Pre-seed weave-state.json as if a prior GATE_MODE run compiled a plan and
+		// then crashed before finishing dispatch (item left "pending" on disk).
+		const priorPlan = {
+			schema_version: 1, request: "(gate task — see the task message above)",
+			created_at: new Date().toISOString(), updated_at: new Date().toISOString(),
+			phase: "dispatching",
+			items: [{ id: "s1", title: "make-out file", mode: "execute", deliverable: "d",
+				gate: "test -f out.txt", inputs: [], depends_on: [], status: "pending", ladder_rung: 0, gate_fails: 0 }],
+		};
+		writeFileSync(join(cwd, ".pi", "weave-state.json"), JSON.stringify(priorPlan, null, 2));
+		const fp = makeFakePi();
+		const mod = await import(`../extensions/plan-weaver.ts?gr=${Date.now()}-${Math.random()}`);
+		mod.default(fp.pi);
+		for (const fn of fp.handlers.get("agent_start") ?? []) await fn({}, { cwd });
+		assert.ok(!fp.sent.some((s) => s.includes("MODE: PLAN")), "resumed instead of re-planning from scratch");
+		const state = JSON.parse(readFileSync(join(cwd, ".pi", "weave-state.json"), "utf8"));
+		assert.equal(state.items[0].status, "done");
+		assert.equal(state.phase, "done");
+		const calls = readFileSync(join(cwd, "stub-calls.log"), "utf8");
+		assert.match(calls, /resumed from a previous session/);
+		rmSync(cwd, { recursive: true, force: true });
+	} finally {
+		delete process.env.PLAN_MODE;
+	}
+});
+
 test("GATE MODE: repeated compile rejection disarms the plan-phase flag after the cap", async () => {
 	process.env.PLAN_MODE = "v4";
 	try {

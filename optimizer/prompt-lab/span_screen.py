@@ -236,8 +236,21 @@ def mechanism_report(rows: list[dict[str, Any]], manifest: dict[str, Any]) -> tu
             if binding.get("sha256") != expected_cell["config_sha256"] or binding.get("declared_env") != expected_cell["declared_env"]:
                 reasons.append(f"{arm} config provenance drift")
             harness = row.get("harness") or {}
-            if harness.get("surface_sha256") is not None or not harness.get("hash_blocker"):
-                reasons.append(f"{arm} loaded-harness provenance was falsely claimed or omitted")
+            surface = harness.get("surface_sha256")
+            if surface is not None:
+                # A real hash is only trusted when it's corroborated by THIS row's
+                # own authenticated telemetry blob (context.harness_surface_sha256,
+                # populated ONLY from an HMAC-verified surface-receipt event) — the
+                # same write-jail trust argument already relied on elsewhere in this
+                # function for endpoint_identity_sha256/network_authoritative. Reads
+                # row.get("context") directly rather than reusing the `context`
+                # variable from the earlier per-row loop above, which would hold a
+                # different row's value here.
+                row_context = row.get("context") or {}
+                if row_context.get("authenticated") is not True or surface != row_context.get("harness_surface_sha256"):
+                    reasons.append(f"{arm} loaded-harness hash present but not corroborated by authenticated telemetry")
+            elif not harness.get("hash_blocker"):
+                reasons.append(f"{arm} loaded-harness provenance missing both hash and blocker text")
             if arm == "base" and row.get("span_receipt_success") is not False:
                 reasons.append("baseline span_receipt_success must be exactly false")
     if totals["cand"]["search_spans"] + totals["cand"]["read_span"] == 0:

@@ -13,6 +13,7 @@
   "include": [
     "../extensions/**/*.ts",
     "../lib/**/*.ts",
+    "../scripts/**/*.ts",
     "../tests/**/*.ts",
     "../vendor/**/*.ts"
   ]

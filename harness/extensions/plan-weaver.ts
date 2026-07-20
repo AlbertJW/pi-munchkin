@@ -50,6 +50,12 @@ const ROLES: Record<string, { file: string; tools: string }> = {
 
 let plan: WeavePlan | null = null;
 let compiling = false;
+// True when the in-memory `plan` came from a resumed .pi/weave-state.json rather
+// than a fresh weave_compile this session — an item dispatched under a resumed plan
+// may have been left mid-work by a crash (the engine never persists "running" to
+// disk, so a crashed item is retried from scratch, not stalled — but the child gets
+// no signal that partial work might already exist unless we tell it).
+let planResumedFromDisk = false;
 // weave_compile rejections (bad gate, compilePlan errors) never cleared `compiling`,
 // so a model that can't land a valid compile left edit/write/multiedit blocked for
 // the rest of the run with no way out. Cap attempts and disarm past the cap.
@@ -142,7 +148,10 @@ async function dispatchItem(exec: Exec, cwd: string, it: WeaveItem, signal?: Abo
 	it.status = "running";
 	record("plan-weaver", "dispatch", { id: it.id, mode: it.mode, rung: it.ladder_rung });
 
-	let child = await runChild(exec, cwd, it.mode, childBrief(cwd, it), signal);
+	const resumeNote = planResumedFromDisk
+		? "This plan was resumed from a previous session; partial work may already exist in this directory from an interrupted attempt. Inspect the current state before starting."
+		: undefined;
+	let child = await runChild(exec, cwd, it.mode, childBrief(cwd, it, resumeNote), signal);
 	let parsed = parseChildResult(child.text);
 
 	// explore/verify have no gate: the parsed contract IS the outcome.
@@ -232,6 +241,7 @@ export default function (pi: ExtensionAPI) {
 						'\n\nWorked example item: {"id":"s1","title":"add toCSV quoting","mode":"execute","inputs":["src/index.js"],"deliverable":"toCSV quotes fields containing commas","gate":"node --test","depends_on":[]}');
 				}
 				plan = out.plan;
+				planResumedFromDisk = false;
 				compileAttempts = 0;
 				compiling = false;
 				(globalThis as Record<string, unknown>).__pi_plan_phase_active = false;
@@ -326,7 +336,10 @@ export default function (pi: ExtensionAPI) {
 		description: "dispatch the compiled weave plan (engine-owned)",
 		handler: async (_args, ctx) => {
 			const freshlyCompiled = !!plan && plan.items.length > 0;
-			if (!plan || plan.items.length === 0) plan = await loadExisting(ctx.cwd);
+			if (!plan || plan.items.length === 0) {
+				plan = await loadExisting(ctx.cwd);
+				if (plan && plan.items.length > 0) planResumedFromDisk = true;
+			}
 			if (!plan || plan.items.length === 0) { ctx.ui.notify("no compiled weave plan", "warning"); return; }
 			// A plan loaded from disk (not compiled this session) that's already
 			// "done" is a stale prior-session result, not fresh work — dispatching it
@@ -350,6 +363,21 @@ export default function (pi: ExtensionAPI) {
 		pi.on("agent_start", async (_event, ctx) => {
 			if (engaged) return;
 			engaged = true;
+			// Resume an interrupted plan instead of always discarding it: a prior
+			// GATE_MODE run that crashed mid-dispatch leaves .pi/weave-state.json with
+			// real, unfinished work. A "done" or empty plan still falls through to
+			// starting fresh — this is the mirror image of /weave-go's stale-done-plan
+			// guard, not a duplicate of it.
+			const existing = await loadExisting(ctx.cwd);
+			if (existing && existing.items.length > 0 && existing.phase !== "done") {
+				plan = existing;
+				planResumedFromDisk = true;
+				compiling = false;
+				(globalThis as Record<string, unknown>).__pi_plan_phase_active = false;
+				record("plan-weaver", "gate-resume", { items: plan.items.length, phase: plan.phase });
+				pi.sendUserMessage(await dispatchAll({ cwd: ctx.cwd }));
+				return;
+			}
 			plan = { schema_version: 1, request: "(gate task — see the task message above)",
 				created_at: new Date().toISOString(), updated_at: new Date().toISOString(),
 				phase: "compiled", items: [] };

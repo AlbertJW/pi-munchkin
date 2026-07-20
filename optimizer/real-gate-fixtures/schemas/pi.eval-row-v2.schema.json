@@ -62,13 +62,14 @@
     },
     "context": {
       "type": "object",
-      "required": ["schema", "authenticated", "content_sha256", "session_key", "events", "config", "compactions", "watcher"],
+      "required": ["schema", "authenticated", "content_sha256", "session_key", "events", "harness_surface_sha256", "config", "compactions", "watcher"],
       "properties": {
         "schema": {"const": "pi.context-telemetry/v1"},
         "authenticated": {"const": true},
         "content_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
         "session_key": {"type": "string", "minLength": 1},
         "events": {"type": "integer", "minimum": 0},
+        "harness_surface_sha256": {"type": ["string", "null"], "pattern": "^[0-9a-f]{64}$"},
         "config": {
           "type": ["object", "null"],
           "required": ["enabled", "thresholdPct", "rearmPct"],

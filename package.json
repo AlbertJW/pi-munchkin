@@ -14,7 +14,7 @@
     "test": "node --experimental-strip-types --test harness/tests/*.test.ts",
     "typecheck": "tsc -p harness/.typecheck/tsconfig.json --noEmit",
     "health": "bash harness/scripts/pi-health.sh",
-    "pack:smoke": "node harness/scripts/package-smoke.mjs",
+    "pack:smoke": "node --experimental-strip-types harness/scripts/package-smoke.mjs",
     "verify:optimizer": "bash scripts/verify-optimizer.sh",
     "verify": "npm run test && npm run typecheck && npm run health && npm run pack:smoke && npm run verify:optimizer"
   },
@@ -35,6 +35,7 @@
       "harness/extensions/ketch.ts",
       "harness/extensions/plan-weaver.ts",
       "harness/extensions/did-you-mean.ts",
+      "harness/extensions/surface-receipt.ts",
       "harness/vendor/pi-subagent/index.ts"
     ]
   },
@@ -69,6 +70,7 @@
     "harness/extensions/ketch.ts",
     "harness/extensions/plan-weaver.ts",
     "harness/extensions/did-you-mean.ts",
+    "harness/extensions/surface-receipt.ts",
     "harness/lib/bash-mutations.ts",
     "harness/lib/command-policy.ts",
     "harness/lib/compaction-coordinator.ts",
@@ -87,6 +89,7 @@
     "harness/lib/reflect-policy.ts",
     "harness/lib/span-index.ts",
     "harness/lib/steer-texts.ts",
+    "harness/lib/surface-walk.ts",
     "harness/lib/tag-words.ts",
     "harness/lib/telemetry.ts",
     "harness/agents",
