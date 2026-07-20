@@ -73,6 +73,31 @@ test("compile rejects ungated execute; accepts after fix (one mechanical retry)"
 	rmSync(cwd, { recursive: true, force: true });
 });
 
+test("a fresh /weave on a new request resets the compile-attempt counter", async () => {
+	const { fp, cwd } = await freshWeaver();
+	const { ctx } = makeCtx(cwd);
+	const bad = { items: [{ id: "s1", title: "edit", mode: "execute", deliverable: "d" }] }; // no gate -> rejected
+
+	// request A: two rejected attempts, not yet at the cap
+	await fp.commands.get("weave").handler("request A", ctx);
+	const a1 = await callTool(fp, "weave_compile", bad, cwd);
+	assert.ok(a1.isError);
+	const a2 = await callTool(fp, "weave_compile", bad, cwd);
+	assert.ok(a2.isError);
+	assert.ok(!a2.content[0].text.includes("giving up"), "not yet at the cap after two attempts on A");
+
+	// request B: a genuinely new /weave must reset the counter, not inherit A's count
+	await fp.commands.get("weave").handler("request B", ctx);
+	assert.equal((globalThis as Record<string, unknown>).__pi_plan_phase_active, true, "still armed for the new request");
+	const b1 = await callTool(fp, "weave_compile", bad, cwd);
+	assert.ok(!b1.content[0].text.includes("giving up"), "first rejection on B must not inherit A's near-cap count");
+	const b2 = await callTool(fp, "weave_compile", bad, cwd);
+	assert.ok(!b2.content[0].text.includes("giving up"), "second rejection on B still under B's own cap");
+	const b3 = await callTool(fp, "weave_compile", bad, cwd);
+	assert.ok(b3.content[0].text.includes("giving up"), "third rejection on B hits B's own fresh cap");
+	rmSync(cwd, { recursive: true, force: true });
+});
+
 test("happy path: DAG dispatch, engine-run gate green, one distilled handoff", async () => {
 	const { fp, cwd } = await freshWeaver();
 	const r = await compile(fp, cwd, [
@@ -191,6 +216,32 @@ test("an item depending on an inline item is surfaced as blocked, not silently s
 	rmSync(cwd, { recursive: true, force: true });
 });
 
+test("an aborted dispatch pauses resumably instead of marking untouched items permanently blocked", async () => {
+	const { fp, cwd } = await freshWeaver();
+	await compile(fp, cwd, [
+		{ id: "s1", title: "make-out file", mode: "execute", deliverable: "d", gate: "test -f out.txt" },
+	]);
+	const { ctx } = makeCtx(cwd);
+	const controller = new AbortController();
+	controller.abort();
+	const sentBefore = fp.sent.length;
+	await fp.commands.get("weave-go").handler("", { ...ctx, signal: controller.signal });
+
+	const state = JSON.parse(readFileSync(join(cwd, ".pi", "weave-state.json"), "utf8"));
+	assert.equal(state.items[0].status, "pending", "untouched item stays pending, not blocked");
+	assert.equal(state.phase, "paused");
+	assert.equal(fp.sent.length, sentBefore, "a cancellation must not send a follow-up handoff message");
+	// no child ever ran — the abort was observed before dispatching anything
+	assert.equal(existsSync(join(cwd, "stub-calls.log")), false);
+
+	// a later, non-aborted /weave-go resumes cleanly from the paused state
+	await fp.commands.get("weave-go").handler("", ctx);
+	const resumed = JSON.parse(readFileSync(join(cwd, ".pi", "weave-state.json"), "utf8"));
+	assert.equal(resumed.items[0].status, "done");
+	assert.equal(resumed.phase, "done");
+	rmSync(cwd, { recursive: true, force: true });
+});
+
 test("a plan resumed from disk (not freshly compiled) tells the first dispatch partial work may exist", async () => {
 	const { fp, cwd } = await freshWeaver();
 	await compile(fp, cwd, [
@@ -208,21 +259,25 @@ test("a plan resumed from disk (not freshly compiled) tells the first dispatch p
 	rmSync(cwd, { recursive: true, force: true });
 });
 
-test("GATE MODE resumes an interrupted (non-done) plan on restart instead of discarding it", async () => {
+function priorGatePlan() {
+	return {
+		schema_version: 1, request: "(gate task — see the task message above)",
+		created_at: new Date().toISOString(), updated_at: new Date().toISOString(),
+		phase: "dispatching",
+		items: [{ id: "s1", title: "make-out file", mode: "execute", deliverable: "d",
+			gate: "test -f out.txt", inputs: [], depends_on: [], status: "pending", ladder_rung: 0, gate_fails: 0 }],
+	};
+}
+
+test("GATE MODE resumes an interrupted (non-done) plan only when WEAVE_GATE_RESUME=1", async () => {
 	process.env.PLAN_MODE = "v4";
+	process.env.WEAVE_GATE_RESUME = "1";
 	try {
 		const cwd = mkdtempSync(join(tmpdir(), "weave-gate-resume-"));
 		mkdirSync(join(cwd, ".pi"), { recursive: true });
 		// Pre-seed weave-state.json as if a prior GATE_MODE run compiled a plan and
 		// then crashed before finishing dispatch (item left "pending" on disk).
-		const priorPlan = {
-			schema_version: 1, request: "(gate task — see the task message above)",
-			created_at: new Date().toISOString(), updated_at: new Date().toISOString(),
-			phase: "dispatching",
-			items: [{ id: "s1", title: "make-out file", mode: "execute", deliverable: "d",
-				gate: "test -f out.txt", inputs: [], depends_on: [], status: "pending", ladder_rung: 0, gate_fails: 0 }],
-		};
-		writeFileSync(join(cwd, ".pi", "weave-state.json"), JSON.stringify(priorPlan, null, 2));
+		writeFileSync(join(cwd, ".pi", "weave-state.json"), JSON.stringify(priorGatePlan(), null, 2));
 		const fp = makeFakePi();
 		const mod = await import(`../extensions/plan-weaver.ts?gr=${Date.now()}-${Math.random()}`);
 		mod.default(fp.pi);
@@ -233,6 +288,28 @@ test("GATE MODE resumes an interrupted (non-done) plan on restart instead of dis
 		assert.equal(state.phase, "done");
 		const calls = readFileSync(join(cwd, "stub-calls.log"), "utf8");
 		assert.match(calls, /resumed from a previous session/);
+		rmSync(cwd, { recursive: true, force: true });
+	} finally {
+		delete process.env.PLAN_MODE;
+		delete process.env.WEAVE_GATE_RESUME;
+	}
+});
+
+test("GATE MODE: without WEAVE_GATE_RESUME, a stale plan is ignored and a fresh plan starts (safe default)", async () => {
+	process.env.PLAN_MODE = "v4";
+	try {
+		const cwd = mkdtempSync(join(tmpdir(), "weave-gate-noresume-"));
+		mkdirSync(join(cwd, ".pi"), { recursive: true });
+		writeFileSync(join(cwd, ".pi", "weave-state.json"), JSON.stringify(priorGatePlan(), null, 2));
+		const fp = makeFakePi();
+		const mod = await import(`../extensions/plan-weaver.ts?gnr=${Date.now()}-${Math.random()}`);
+		mod.default(fp.pi);
+		for (const fn of fp.handlers.get("agent_start") ?? []) await fn({}, { cwd });
+		assert.ok(fp.sent.some((s) => s.includes("MODE: PLAN")), "starts fresh planning, does not silently resume");
+		const state = JSON.parse(readFileSync(join(cwd, ".pi", "weave-state.json"), "utf8"));
+		assert.equal(state.items.length, 0, "the stale plan's item was never touched or dispatched");
+		assert.equal(state.phase, "compiled");
+		assert.equal(existsSync(join(cwd, "stub-calls.log")), false, "no child ever ran against the stale plan");
 		rmSync(cwd, { recursive: true, force: true });
 	} finally {
 		delete process.env.PLAN_MODE;

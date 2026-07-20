@@ -37,6 +37,15 @@ import { record } from "../lib/telemetry.ts";
 // PLAN_MODE=v4: gate mode — auto-engage at agent start, auto-dispatch on compile
 // (headless sessions have no slash commands). Dark unless a config sets it.
 const GATE_MODE = process.env.PLAN_MODE === "v4";
+// A resumed non-done .pi/weave-state.json can't be trusted as "the same task" by
+// default: every gate-mode `pi -p` invocation is a fresh OS process, so there's no
+// session-identity signal (SessionStartEvent.reason is always "startup" here,
+// verified against the SDK's own emission sites) to distinguish a legitimate
+// same-task retry from an unrelated task that happens to reuse the workdir.
+// Starting fresh is the safe default; only the one caller that KNOWS it's
+// re-running the same interrupted task (real_gate.sh's locality-retry path) should
+// ever set this.
+const GATE_RESUME = process.env.WEAVE_GATE_RESUME === "1";
 const GATE_TIMEOUT_MS = Number.parseInt(process.env.WEAVE_GATE_TIMEOUT_MS || "60000", 10);
 const CHILD_TIMEOUT_S = Number.parseInt(process.env.WEAVE_CHILD_TIMEOUT_S || "600", 10);
 const AGENT_DIR = process.env.PI_CODING_AGENT_DIR || join(homedir(), ".pi", "agent");
@@ -179,6 +188,14 @@ async function dispatchItem(exec: Exec, cwd: string, it: WeaveItem, signal?: Abo
 		}
 		it.gate_fails += 1;
 		record("plan-weaver", "ladder", { id: it.id, rung: it.ladder_rung + 1, fails: it.gate_fails });
+		// Check before starting the NEXT retry child, not the one already in flight
+		// (which can't be stopped synchronously once started). A mid-ladder abort
+		// resets to "pending" rather than consuming the ladder as a real exhaustion
+		// — the item is genuinely resumable, not stuck.
+		if (signal?.aborted) {
+			it.status = "pending";
+			return `${it.id} aborted mid-ladder; left pending for resume`;
+		}
 		if (it.ladder_rung === 0) {
 			// rung 1 — c18b locality retry: same role, brief embeds the failing output.
 			it.ladder_rung = 1;
@@ -252,7 +269,8 @@ export default function (pi: ExtensionAPI) {
 				if (GATE_MODE) {
 					// headless: no /weave-go exists — dispatch NOW, hand back in the tool result
 					const handoff = await dispatchAll({ cwd: ctx.cwd, signal });
-					return { content: [{ type: "text" as const, text: `Plan compiled (${plan.items.length} items):\n${lines.join("\n")}\n\n${handoff}` }], details: {} };
+					const tail = handoff ?? "Dispatch paused (cancelled) — resumable; re-engage to continue.";
+					return { content: [{ type: "text" as const, text: `Plan compiled (${plan.items.length} items):\n${lines.join("\n")}\n\n${tail}` }], details: {} };
 				}
 				return { content: [{ type: "text" as const, text: `Plan compiled (${plan.items.length} items):\n${lines.join("\n")}\nSTOP — wait for /weave-go.` }], details: {} };
 			},
@@ -267,6 +285,7 @@ export default function (pi: ExtensionAPI) {
 			plan = { schema_version: 1, request, created_at: new Date().toISOString(),
 				updated_at: new Date().toISOString(), phase: "compiled", items: [] };
 			compiling = true;
+			compileAttempts = 0; // a genuinely new request always gets a fresh attempt budget
 			(globalThis as Record<string, unknown>).__pi_plan_phase_active = true;
 			await save(ctx.cwd);
 			pi.sendUserMessage(steerText("WEAVE_PLAN_MSG",
@@ -280,12 +299,13 @@ export default function (pi: ExtensionAPI) {
 
 	// Engine-owned dispatch, shared by /weave-go (interactive) and gate mode
 	// (PLAN_MODE=v4 auto-dispatch). Returns the handoff text.
-	async function dispatchAll(ctx: { cwd: string; ui?: { notify(m: string, l?: string): void }; signal?: AbortSignal }): Promise<string> {
+	async function dispatchAll(ctx: { cwd: string; ui?: { notify(m: string, l?: string): void }; signal?: AbortSignal }): Promise<string | null> {
 		if (!plan) throw new Error("no plan");
 		plan.phase = "dispatching";
 		const log: string[] = [];
+		let aborted = false;
 		for (;;) {
-			if (ctx.signal?.aborted) break;
+			if (ctx.signal?.aborted) { aborted = true; break; }
 			const it = nextReady(plan);
 			if (!it) break;
 			if (it.mode === "inline") { it.status = "blocked"; it.note = "inline — handed to main loop"; continue; }
@@ -293,6 +313,15 @@ export default function (pi: ExtensionAPI) {
 			log.push(line);
 			await save(ctx.cwd);
 			ctx.ui?.notify(`weave: ${line.slice(0, 100)}`, it.status === "done" ? "info" : "warning");
+		}
+		if (aborted) {
+			// A cancellation, not a natural stop: leave every untouched item exactly as
+			// it is (genuinely resumable — not stuck on an unmet dependency, just not
+			// yet reached) and don't steer the model about an event it didn't cause.
+			plan.phase = "paused";
+			await save(ctx.cwd);
+			record("plan-weaver", "paused", { pending: plan.items.filter((i) => i.status === "pending").length });
+			return null;
 		}
 		// Loop invariant: any item still "pending" here has an unmet dependency —
 		// nextReady would otherwise have picked it up — almost always a dependent of
@@ -348,7 +377,8 @@ export default function (pi: ExtensionAPI) {
 				ctx.ui.notify("saved weave plan is already done (from a previous session) — run /weave <request> to start a new one.", "info");
 				return;
 			}
-			pi.sendUserMessage(await dispatchAll(ctx));
+			const handoff = await dispatchAll(ctx);
+			if (handoff !== null) pi.sendUserMessage(handoff);
 		},
 	});
 
@@ -363,25 +393,29 @@ export default function (pi: ExtensionAPI) {
 		pi.on("agent_start", async (_event, ctx) => {
 			if (engaged) return;
 			engaged = true;
-			// Resume an interrupted plan instead of always discarding it: a prior
-			// GATE_MODE run that crashed mid-dispatch leaves .pi/weave-state.json with
-			// real, unfinished work. A "done" or empty plan still falls through to
-			// starting fresh — this is the mirror image of /weave-go's stale-done-plan
+			// Resume an interrupted plan ONLY when explicitly told to (WEAVE_GATE_RESUME=1)
+			// — see the constant's comment: there's no way to prove a stale
+			// .pi/weave-state.json belongs to THIS task rather than a different one
+			// that happened to reuse the same workdir, so silently auto-resuming is
+			// unsafe. A "done" or empty plan still falls through to starting fresh
+			// regardless — this is the mirror image of /weave-go's stale-done-plan
 			// guard, not a duplicate of it.
-			const existing = await loadExisting(ctx.cwd);
+			const existing = GATE_RESUME ? await loadExisting(ctx.cwd) : null;
 			if (existing && existing.items.length > 0 && existing.phase !== "done") {
 				plan = existing;
 				planResumedFromDisk = true;
 				compiling = false;
 				(globalThis as Record<string, unknown>).__pi_plan_phase_active = false;
 				record("plan-weaver", "gate-resume", { items: plan.items.length, phase: plan.phase });
-				pi.sendUserMessage(await dispatchAll({ cwd: ctx.cwd }));
+				const handoff = await dispatchAll({ cwd: ctx.cwd });
+				if (handoff !== null) pi.sendUserMessage(handoff);
 				return;
 			}
 			plan = { schema_version: 1, request: "(gate task — see the task message above)",
 				created_at: new Date().toISOString(), updated_at: new Date().toISOString(),
 				phase: "compiled", items: [] };
 			compiling = true;
+			compileAttempts = 0; // a genuinely new plan always gets a fresh attempt budget
 			// arm the shared plan-phase flag (as /weave does): plan-runner's mutation
 			// block + the loop-breaker/verify-gate planning suppressions all read it —
 			// without this a gate-mode model can edit BEFORE compiling, unblocked.

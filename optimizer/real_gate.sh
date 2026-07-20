@@ -313,10 +313,13 @@ run_guarded_session() {
 	local cap_kb=$(( PI_MEM_CAP_GB * 1024 * 1024 ))
 	set -m   # monitor mode: the backgrounded subshell becomes its own process-group leader
 	if [[ "$redir" == ">>" ]]; then
+		# The only caller that genuinely knows it's re-running the SAME interrupted
+		# task in the SAME workdir — safe to let plan-weaver's GATE_MODE resume
+		# whatever .pi/weave-state.json the aborted first session left behind.
 		( cd "$wd" || exit
 		  exec 3<<<"$telemetry_key"
 		  run_with_timeout "$PI_TIMEOUT" 30 ${sbx[@]+"${sbx[@]}"} /usr/bin/env -i \
-		    "${session_env[@]}" "${session_base_env[@]}" PI_OBSERVATIONAL_MEMORY_PASSIVE=1 \
+		    "${session_env[@]}" "${session_base_env[@]}" PI_OBSERVATIONAL_MEMORY_PASSIVE=1 WEAVE_GATE_RESUME=1 \
 		    pi -p --approve ${PI_SELECT[@]+"${PI_SELECT[@]}"} --tools "$tools" "$prompt" ) </dev/null >> "$wd/run.log" 2>&1 &
 	else
 		( cd "$wd" || exit
@@ -603,12 +606,12 @@ NOTE: a previous attempt in this workdir was stopped for repeating the same fail
 		LOW_TOK_STREAK=0
 	fi
 
-	python3 - "$RESULTS" "$MODEL" "$pat" "$task" "$rep" "$gate" "$retried" "$RUNID" "$tin" "$tout" "$output_chars" "$split" "$usage_exact" "${FLEET_EXPECTED_MODELS:-}" "$rowctx" "$wd/fingerprint-pre.json" "$wd/fingerprint-post.json" "$GATE_NETWORK" "$MODEL_CONTROL" "$MODEL_PROVIDER_RESOLVED" "$ENDPOINT_IDENTITY_SHA256" "$NETWORK_AUTHORITATIVE" "$NETWORK_AUTHORITY_REASON" "$SANDBOX_AUTHORITATIVE" "$SANDBOX_AUTHORITY_REASON" "$EXEC_POLICY" "$mrow" "$span_receipt_success" "$cfg" "$CONFIG" "$EXPERIMENT_MANIFEST" "$EXPERIMENT_MANIFEST_SHA256" "$EXPERIMENT_BASE_CELL" "$EXPERIMENT_CAND_CELL" "$HARNESS_HASH_BLOCKER" "$context_telemetry" <<'PY'
+	python3 - "$RESULTS" "$MODEL" "$pat" "$task" "$rep" "$gate" "$retried" "$RUNID" "$tin" "$tout" "$output_chars" "$split" "$usage_exact" "${FLEET_EXPECTED_MODELS:-}" "$rowctx" "$wd/fingerprint-pre.json" "$wd/fingerprint-post.json" "$GATE_NETWORK" "$MODEL_CONTROL" "$MODEL_PROVIDER_RESOLVED" "$ENDPOINT_IDENTITY_SHA256" "$NETWORK_AUTHORITATIVE" "$NETWORK_AUTHORITY_REASON" "$SANDBOX_AUTHORITATIVE" "$SANDBOX_AUTHORITY_REASON" "$EXEC_POLICY" "$mrow" "$span_receipt_success" "$cfg" "$CONFIG" "$EXPERIMENT_MANIFEST" "$EXPERIMENT_MANIFEST_SHA256" "$EXPERIMENT_BASE_CELL" "$EXPERIMENT_CAND_CELL" "$HARNESS_HASH_BLOCKER" "$context_telemetry" "$wd/.pi/APPEND_SYSTEM.md" <<'PY'
 import hashlib,importlib.util,json,sys
 (out,model,pat,task,rep,gate,retried,runid,tin,tout,outchars,split,usage_exact,expected_models,
  ctxpath,prepath,postpath,network_mode,model_control,provider,endpoint_sha,network_auth,network_reason,
  sandbox_auth,sandbox_reason,policy_path,mrow,span_receipt,cfg_path,config_path,experiment_manifest,
- experiment_sha,base_cell,cand_cell,harness_blocker,context_telemetry_path)=sys.argv[1:37]
+ experiment_sha,base_cell,cand_cell,harness_blocker,context_telemetry_path,rendered_governor_path)=sys.argv[1:38]
 ctx=json.load(open(ctxpath)); pre=json.load(open(prepath)); post=json.load(open(postpath))
 # Loaded once and reused for both "harness" and "context" below — the surface hash
 # in the row is pulled ONLY from this already-HMAC-verified blob, never from the
@@ -639,7 +642,14 @@ trajectory={name:metrics[name] for name in ("turns","tool_calls","tool_errors","
 cfg_bytes=open(cfg_path,"rb").read(); cfg=json.loads(cfg_bytes)
 cspec=importlib.util.spec_from_file_location("prompt_lab_config",config_path)
 cmod=importlib.util.module_from_spec(cspec); cspec.loader.exec_module(cmod)
-config_binding={"sha256":hashlib.sha256(cfg_bytes).hexdigest(),"declared_env":cmod.config_env(cfg)}
+# config.py's apply_to_workdir() always writes this file (empty for a governor-less
+# variant) BEFORE the session starts, so it's always present here. The JSON config
+# hash alone doesn't prove which BYTES actually loaded — a changed live governor, or
+# a modified candidate file at the same path, changes behavior with no change to
+# the config hash. Hash the rendered file too, not just its JSON source.
+rendered_governor_sha256=hashlib.sha256(open(rendered_governor_path,"rb").read()).hexdigest()
+config_binding={"sha256":hashlib.sha256(cfg_bytes).hexdigest(),"declared_env":cmod.config_env(cfg),
+                "rendered_governor_sha256":rendered_governor_sha256}
 experiment=None
 if experiment_manifest:
     manifest_bytes=open(experiment_manifest,"rb").read()

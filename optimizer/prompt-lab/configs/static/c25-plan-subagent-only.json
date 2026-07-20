@@ -1,0 +1,5 @@
+{
+  "name": "plan-subagent-only",
+  "prediction": "forcing every scoped edit through a fresh subagent (mechanical, not advisory) raises multi-step pass rate on small models by keeping the main window free of per-edit context pollution and hallucinated 'done' claims, at the cost of latency/tokens from per-edit process spawn; neutral-to-negative on single-edit tasks where the isolation buys nothing but still pays the spawn cost. Watch: wall-clock, subagent-call rate, and whether small models actually comply with the steer instead of retrying blocked edits.",
+  "thresholds": { "PLAN_SUBAGENT_ONLY": "1" }
+}

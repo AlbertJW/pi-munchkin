@@ -34,7 +34,7 @@ export type WeavePlan = {
 	request: string;
 	created_at: string;
 	updated_at: string;
-	phase: "compiled" | "dispatching" | "handed_off" | "done";
+	phase: "compiled" | "dispatching" | "handed_off" | "done" | "paused";
 	items: WeaveItem[];
 };
 

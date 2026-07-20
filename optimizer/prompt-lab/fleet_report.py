@@ -115,6 +115,20 @@ def integrity_errors(rows, baseline, candidate):
             serving = r.get("serving") or {}
             if not serving.get("stable") or (serving.get("pre") or {}).get("status") != "complete" or (serving.get("post") or {}).get("status") != "complete":
                 errors.append(f"{cell}: serving fingerprint incomplete or changed during row")
+            # Loaded-harness provenance: the general adoption path must enforce this
+            # too, not just span_screen.py's narrower screen — a non-null hash is
+            # only trusted when corroborated by this row's own authenticated
+            # telemetry (same write-jail trust argument as endpoint_identity_sha256);
+            # otherwise the row must at least carry the explicit blocker text.
+            # Mirrors span_screen.py's per-row check — keep both in sync if either changes.
+            harness = r.get("harness") or {}
+            surface = harness.get("surface_sha256")
+            context = r.get("context") or {}
+            if surface is not None:
+                if context.get("authenticated") is not True or surface != context.get("harness_surface_sha256"):
+                    errors.append(f"{cell}: loaded-harness hash present but not corroborated by authenticated telemetry")
+            elif not harness.get("hash_blocker"):
+                errors.append(f"{cell}: loaded-harness provenance missing both hash and blocker text")
     models = sorted({r.get("model") for r in rows if r.get("model")})
     declarations = {tuple(r.get("fleet_expected_models", [])) for r in rows if r.get("fleet_expected_models")}
     if len(declarations) > 1:
@@ -154,6 +168,13 @@ def integrity_errors(rows, baseline, candidate):
                     cfp = {(r["task"], r["rep"]): (r.get("serving", {}).get("pre") or {}).get("fingerprint_sha256") for r in arms[candidate]}
                     if bfp != cfp:
                         errors.append(f"{model}/{split}: paired arms have different serving fingerprints")
+                    # A hash mismatch between paired arms means the comparison is
+                    # confounded by a harness difference, not just a config
+                    # difference — never silently promotable.
+                    bhash = {(r["task"], r["rep"]): (r.get("harness") or {}).get("surface_sha256") for r in arms[baseline]}
+                    chash = {(r["task"], r["rep"]): (r.get("harness") or {}).get("surface_sha256") for r in arms[candidate]}
+                    if bhash != chash:
+                        errors.append(f"{model}/{split}: paired arms ran under different loaded-harness surfaces")
     return errors
 
 
@@ -364,13 +385,31 @@ def selftest():
     assert any("heldout/base: no rows" in e for e in integrity_errors(partial_held, "base", "cand"))
     missing_fleet = [dict(r, fleet_expected_models=[dd, "small-model"]) for r in clean]
     assert any("small-model" in e for e in integrity_errors(missing_fleet, "base", "cand"))
-    def v2(r, fp="fp"):
+    def v2(r, fp="fp", surface_sha=None):
+        # Default: no hash, just the blocker — matches every real row before a
+        # loaded-surface receipt is available. Pass surface_sha for a
+        # self-consistent corroborated row (harness + context agree).
+        context = {"authenticated": True}
+        if surface_sha is not None:
+            context["harness_surface_sha256"] = surface_sha
+        harness = {"surface_sha256": surface_sha, "hash_blocker": "" if surface_sha else "blocked"}
         return dict(r, schema="pi.eval-row/v2", authoritative=True, status="complete",
                     prompt={"variant": "canonical"}, serving={"stable": True,
                     "pre": {"status": "complete", "fingerprint_sha256": fp},
-                    "post": {"status": "complete", "fingerprint_sha256": fp}})
+                    "post": {"status": "complete", "fingerprint_sha256": fp}},
+                    harness=harness, context=context)
     clean_v2 = [v2(r) for r in clean]
     assert not integrity_errors(clean_v2, "base", "cand")
+    # Loaded-harness provenance: general adoption path enforces it too now, not
+    # just span_screen.py's narrower screen.
+    corroborated = [v2(r, surface_sha="b" * 64) for r in clean]
+    assert not integrity_errors(corroborated, "base", "cand"), "a fully corroborated hash on every row must not error"
+    uncorroborated = [dict(v2(r), harness={"surface_sha256": "a" * 64, "hash_blocker": ""}, context={"authenticated": True}) for r in clean]
+    assert any("not corroborated" in e for e in integrity_errors(uncorroborated, "base", "cand"))
+    missing_both = [dict(v2(r), harness={"surface_sha256": None, "hash_blocker": ""}) for r in clean]
+    assert any("missing both hash and blocker" in e for e in integrity_errors(missing_both, "base", "cand"))
+    mismatched_arms = [v2(r, surface_sha="b" * 64) if r["pattern"] == "base" else v2(r, surface_sha="c" * 64) for r in clean]
+    assert any("different loaded-harness surfaces" in e for e in integrity_errors(mismatched_arms, "base", "cand"))
     bad_fp = [v2(r, "other") if r["pattern"] == "cand" and r["task"] == "a" and r["rep"] == 1 else v2(r) for r in clean]
     assert any("different serving fingerprints" in e for e in integrity_errors(bad_fp, "base", "cand"))
     incomplete = [dict(v2(r), status="incomplete", authoritative=False) if r is clean[0] else v2(r) for r in clean]
@@ -410,7 +449,7 @@ def selftest():
     trajectory_properties = schema["properties"]["trajectory"]["properties"]
     assert "search_spans" in trajectory_properties and "read_span" in trajectory_properties
     assert schema["properties"]["span_receipt_success"] == {"type": "boolean"}
-    assert schema["properties"]["config"]["required"] == ["sha256", "declared_env"]
+    assert schema["properties"]["config"]["required"] == ["sha256", "declared_env", "rendered_governor_sha256"]
     assert schema["properties"]["experiment"]["required"] == ["manifest_sha256", "cell"]
     assert schema["properties"]["harness"]["required"] == ["surface_sha256", "hash_blocker"]
     conditional = schema["allOf"][0]

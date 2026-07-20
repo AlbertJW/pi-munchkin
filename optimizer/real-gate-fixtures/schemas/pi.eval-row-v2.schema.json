@@ -38,10 +38,11 @@
     "span_receipt_success": {"type": "boolean"},
     "config": {
       "type": "object",
-      "required": ["sha256", "declared_env"],
+      "required": ["sha256", "declared_env", "rendered_governor_sha256"],
       "properties": {
         "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
-        "declared_env": {"type": "object", "additionalProperties": {"type": "string"}}
+        "declared_env": {"type": "object", "additionalProperties": {"type": "string"}},
+        "rendered_governor_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"}
       }
     },
     "experiment": {

@@ -34,6 +34,10 @@ let replanStreak = 0;
 // B yields an omitted open item after this many consecutive preserves (persistent
 // omission = intent; e.g. a parent the model replaced with sub-items). R1 (done) never yields.
 const PRESERVE_MAX = Math.max(2, Number.parseInt(process.env.PLAN_PRESERVE_MAX || "3", 10) || 3);
+// Candidate (dark, A/B via real_gate.sh): force every scoped edit through a fresh
+// subagent instead of leaving delegation advisory. Trades per-edit spawn overhead
+// for the same process-isolation weave gets — measure, don't assume, the tradeoff.
+const PLAN_SUBAGENT_ONLY = process.env.PLAN_SUBAGENT_ONLY === "1";
 
 type ItemStatus = "pending" | "in_progress" | "done" | "blocked";
 type Phase = "planned" | "executing";
@@ -404,6 +408,13 @@ Reply with ONLY the plan_write call — no prose plan. Set request (exact), summ
 
 function delegationBlock(subagentAvailable: boolean): string {
 	if (!subagentAvailable) return "";
+	if (PLAN_SUBAGENT_ONLY) {
+		return `
+Every edit routes through a subagent — this is enforced, not advisory:
+- Heavy lookup (big file, wide search) → subagent(explorer, …). Don't pull big files in here.
+- Non-trivial claim or change → subagent(verifier, …); accept only on VERDICT: confirmed.
+- ANY edit, however small → subagent(executor, …, mode=fork). Direct edit/write/multiedit calls are blocked during execution.`;
+	}
 	return `
 Delegate to keep this window clean (subagent returns only a compact result):
 - Heavy lookup (big file, wide search) → subagent(explorer, …). Don't pull big files in here.
@@ -895,17 +906,31 @@ export default function (pi: ExtensionAPI) {
 	// Structural plan-mode stop: while the /plan-started run is in flight, block
 	// real mutations. The prompt's "no edits" is now enforced, not just stated.
 	// Read-only bash stays allowed — planning needs investigation.
-	pi.on("tool_call", async (event) => {
-		if (!isPlanning()) return;
-		const isMutation =
-			PLAN_MUTATION_TOOLS.has(event.toolName) ||
-			(event.toolName === "bash" && classifyBashCommand(String((event.input as Record<string, unknown> | undefined)?.command ?? "")).mutates);
-		if (!isMutation) return;
-		return {
-			block: true,
-			reason:
-				"failure_class=plan_mode_violation. PLAN phase — no edits. Finish the plan (plan_write), end your turn. /plan-go starts execution.",
-		};
+	pi.on("tool_call", async (event, ctx) => {
+		if (isPlanning()) {
+			const isMutation =
+				PLAN_MUTATION_TOOLS.has(event.toolName) ||
+				(event.toolName === "bash" && classifyBashCommand(String((event.input as Record<string, unknown> | undefined)?.command ?? "")).mutates);
+			if (!isMutation) return;
+			return {
+				block: true,
+				reason:
+					"failure_class=plan_mode_violation. PLAN phase — no edits. Finish the plan (plan_write), end your turn. /plan-go starts execution.",
+			};
+		}
+		// PLAN_SUBAGENT_ONLY candidate: during execution (not planning), force every
+		// scoped edit through a fresh subagent instead of leaving delegation advisory
+		// — the same process-isolation weave gets from spawning a fresh pi per item.
+		if (PLAN_SUBAGENT_ONLY && PLAN_MUTATION_TOOLS.has(event.toolName)) {
+			const state = await readState(ctx.cwd);
+			if (state?.phase === "executing") {
+				return {
+					block: true,
+					reason:
+						"failure_class=plan_mode_violation. Direct edits are disabled under PLAN_SUBAGENT_ONLY — use subagent(executor, ..., mode=fork) for this scoped edit instead.",
+				};
+			}
+		}
 	});
 
 	// Observability only: if the agent goes idle with open items, record it.

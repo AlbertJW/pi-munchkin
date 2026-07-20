@@ -65,6 +65,40 @@ test("integration: plan_write persists items; /plan-go disarms the block and pro
 	assert.equal(edit, undefined, "mutation block disarmed after /plan-go");
 });
 
+test("integration: PLAN_SUBAGENT_ONLY blocks direct edits during execution (not during planning)", async () => {
+	process.env.PLAN_SUBAGENT_ONLY = "1";
+	try {
+		const fp = makeFakePi();
+		const mod = await import(`../extensions/plan-runner.ts?so=${Date.now()}-${Math.random()}`);
+		mod.default(fp.pi);
+		const cwd = tmp();
+		const { ctx } = makeCtx(cwd);
+		await fp.commands.get("plan").handler("add a widget", ctx);
+
+		// still planning: the ordinary plan-mode block fires first, subagent-only
+		// branch is never reached.
+		const duringPlan = await fire(fp, "tool_call", { toolName: "edit", input: {} }, ctx);
+		assert.equal(duringPlan?.block, true, "plan-mode block still fires while planning");
+		assert.ok(duringPlan.reason.includes("plan_mode_violation"));
+
+		await callTool(fp, "plan_write", {
+			items: [{ title: "step one", status: "pending" }],
+			request: "add a widget", summary: "one step",
+		}, cwd);
+		await fp.commands.get("plan-go").handler("", ctx);
+
+		const edit = await fire(fp, "tool_call", { toolName: "edit", input: {} }, ctx);
+		assert.equal(edit?.block, true, "direct edit blocked during execution under PLAN_SUBAGENT_ONLY");
+		assert.ok(edit.reason.includes("PLAN_SUBAGENT_ONLY"));
+		assert.ok(edit.reason.includes("subagent(executor"));
+
+		const read = await fire(fp, "tool_call", { toolName: "read", input: { path: "x" } }, ctx);
+		assert.equal(read, undefined, "read-only tool calls stay allowed");
+	} finally {
+		delete process.env.PLAN_SUBAGENT_ONLY;
+	}
+});
+
 test("integration: gate runs a REAL shell command — green keeps done, red reverts then blocks at GATE_MAX", async () => {
 	const fp = freshPlanRunner();
 	const cwd = tmp();

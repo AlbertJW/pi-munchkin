@@ -119,6 +119,38 @@ class SpanScreenTests(unittest.TestCase):
         self.assertIn("zero span-tool exposure", text)
         self.assertIn("lack exhaustive", text)
 
+    def test_default_rows_report_same_run_screen_only(self):
+        text, eligible = screen.mechanism_report(self.rows(), self.manifest)
+        self.assertTrue(eligible)
+        self.assertIn("SAME-RUN SCREEN ONLY", text)
+        self.assertIn("REPRODUCIBILITY BLOCKER", text)
+        self.assertNotIn("VERIFIED HARNESS SURFACE", text)
+
+    def test_fully_corroborated_harness_hash_reports_verified_not_blocked(self):
+        rows = self.rows()
+        for row in rows:
+            row["harness"] = {"surface_sha256": "b" * 64, "hash_blocker": ""}
+            row["context"]["harness_surface_sha256"] = "b" * 64
+        text, eligible = screen.mechanism_report(rows, self.manifest)
+        self.assertTrue(eligible)
+        self.assertIn("VERIFIED HARNESS SURFACE", text)
+        self.assertIn("## HARNESS SURFACE", text)
+        self.assertNotIn("REPRODUCIBILITY BLOCKER", text)
+
+    def test_one_row_with_broken_corroboration_is_ineligible(self):
+        # A hash present but not matching the row's own authenticated telemetry is
+        # rejected outright (existing per-row check) — confirms a single broken row
+        # among otherwise-corroborated ones still fails the whole comparison, not
+        # just silently downgrading the report's status.
+        rows = self.rows()
+        for row in rows:
+            row["harness"] = {"surface_sha256": "b" * 64, "hash_blocker": ""}
+            row["context"]["harness_surface_sha256"] = "b" * 64
+        rows[0]["context"]["harness_surface_sha256"] = "c" * 64  # one row's corroboration breaks
+        text, eligible = screen.mechanism_report(rows, self.manifest)
+        self.assertFalse(eligible)
+        self.assertIn("not corroborated by authenticated telemetry", text)
+
     def test_provenance_hash_drift_is_ineligible(self):
         text, eligible = screen.mechanism_report(self.rows(drift=True), self.manifest)
         self.assertFalse(eligible); self.assertIn("manifest provenance drift", text)
