@@ -1,0 +1,5 @@
+{
+  "name": "plan-item-guidance-v2",
+  "prediction": "The legacy \"5-10 ordered items\" line is an unenforced numeric bound (plan_write's schema has no maxItems, only minItems:1) that the model already routinely ignores. Replacing it with non-numeric, need-sized guidance (still anti-padding, anti-fake-split) should be pass-rate neutral while letting item counts track real task granularity instead of clustering at the 5-10 boundary.",
+  "thresholds": { "PLAN_ITEM_GUIDANCE_V2": "on" }
+}

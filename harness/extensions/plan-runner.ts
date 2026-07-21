@@ -68,6 +68,11 @@ const PLAN_UNCERTAINTY = process.env.PLAN_UNCERTAINTY === "on";
 // Dark candidate c32: verify commit SHAs the model writes into notes/summary
 // actually exist (git cat-file -e) — catches confabulated provenance.
 const PLAN_SHA_GUARD = process.env.PLAN_SHA_GUARD === "on";
+// Dark candidate c34: the legacy "5-10 ordered items" line is an unenforced
+// numeric bound (plan_write's schema has no maxItems) — replace with
+// non-numeric, need-sized guidance that keeps the same anti-padding /
+// anti-fake-split intent.
+const PLAN_ITEM_GUIDANCE_V2 = process.env.PLAN_ITEM_GUIDANCE_V2 === "on";
 
 type ItemStatus = "pending" | "in_progress" | "done" | "blocked";
 type Phase = "planned" | "executing";
@@ -445,7 +450,7 @@ Answer in → clear? plan. Still vague → next ONE question. Hard cap 3 total; 
 	return `Plan only. No edits, no shell writes, no other work.
 ${vague}
 Risky REQ, or several viable approaches → in thinking only: draft a minimal-safe plan and a thorough plan, then merge — keep each item that buys real risk coverage, drop the rest. Emit only the merged plan. Clear simple REQ → skip the comparison, plan straight.
-Break REQ into 5-10 ordered items. Small steps, no fake splits.
+${PLAN_ITEM_GUIDANCE_V2 ? "Decompose REQ into ordered steps sized to the real work — no padding, no fake splits." : "Break REQ into 5-10 ordered items. Small steps, no fake splits."}
 Prefer vertical slices — each item leaves something working/verifiable.
 Each item names its done-check: an observable result, or a \`gate\` command that proves it complete. Vague boundary → it will drift.
 Reply with ONLY the plan_write call — no prose plan. Set request (exact), summary (1 line), items (each status="pending").`;

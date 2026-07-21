@@ -614,3 +614,27 @@ test("c32 dark: flag off — a fake SHA note passes without any git probe", asyn
 	}, cwd);
 	assert.ok(!r.content[0].text.includes("never fabricate"));
 });
+
+test("c34: flag on swaps the legacy 5-10 item bound for non-numeric guidance", async () => {
+	process.env.PLAN_ITEM_GUIDANCE_V2 = "on";
+	try {
+		const fp = makeFakePi();
+		const mod = await import(`../extensions/plan-runner.ts?items=${Date.now()}-${Math.random()}`);
+		mod.default(fp.pi as any);
+		const cwd = tmp();
+		const { ctx } = makeCtx(cwd);
+		await fp.commands.get("plan").handler("add a widget", ctx);
+		assert.ok(!fp.sent[0].includes("5-10 ordered items"), "legacy numeric bound must be gone");
+		assert.ok(fp.sent[0].includes("no padding, no fake splits"), fp.sent[0]);
+	} finally {
+		delete process.env.PLAN_ITEM_GUIDANCE_V2;
+	}
+});
+
+test("c34 dark: flag off — legacy 5-10 item wording unchanged", async () => {
+	const fp = freshPlanRunner(); // module-load env has no PLAN_ITEM_GUIDANCE_V2
+	const cwd = tmp();
+	const { ctx } = makeCtx(cwd);
+	await fp.commands.get("plan").handler("add a widget", ctx);
+	assert.ok(fp.sent[0].includes("Break REQ into 5-10 ordered items."), fp.sent[0]);
+});
