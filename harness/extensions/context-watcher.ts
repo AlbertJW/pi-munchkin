@@ -130,24 +130,32 @@ export function registerContextWatcher(
 				onComplete: (result) => {
 					if (watcherRequestSettled || !finishCompaction(token)) return;
 					watcherRequestSettled = true;
-					const post = usageDetail(ctx.getContextUsage?.());
-					recordEvent("context-watcher", "compact-completed", {
-						requester: "context-watcher",
-						enabled,
-						thresholdPct,
-						rearmPct,
-						preTokens: pre.contextTokens,
-						preContextWindow: pre.contextWindow,
-						prePct: pre.contextPct,
-						tokensBefore: result.tokensBefore,
-						estimatedTokensAfter: result.estimatedTokensAfter ?? null,
-						postTokens: post.contextTokens,
-						postContextWindow: post.contextWindow,
-						postPct: post.contextPct,
-					});
 					watcherRequestPending = false;
-					if (resumePending) {
-						resumePending = false;
+					const shouldResume = resumePending;
+					resumePending = false;
+					// ctx.compact() can replace/reload the session before this callback
+					// fires, leaving the captured `ctx` stale — any method on it then
+					// throws (assertActive). That must never crash the whole process;
+					// the compaction itself already completed, there's just nothing
+					// further to read/report in that case.
+					try {
+						const post = usageDetail(ctx.getContextUsage?.());
+						recordEvent("context-watcher", "compact-completed", {
+							requester: "context-watcher",
+							enabled,
+							thresholdPct,
+							rearmPct,
+							preTokens: pre.contextTokens,
+							preContextWindow: pre.contextWindow,
+							prePct: pre.contextPct,
+							tokensBefore: result.tokensBefore,
+							estimatedTokensAfter: result.estimatedTokensAfter ?? null,
+							postTokens: post.contextTokens,
+							postContextWindow: post.contextWindow,
+							postPct: post.contextPct,
+						});
+					} catch { /* stale ctx post-compaction; nothing further to report */ }
+					if (shouldResume) {
 						pi.sendMessage(
 							{ customType: "context-watcher-resume", content: RESUME, display: false },
 							{ triggerTurn: true, deliverAs: "followUp" },
@@ -158,29 +166,35 @@ export function registerContextWatcher(
 					if (watcherRequestSettled || !finishCompaction(token)) return;
 					watcherRequestSettled = true;
 					armed = true; // failed compaction must not disarm the watcher — retry next turn
-					const post = usageDetail(ctx.getContextUsage?.());
-					recordEvent("context-watcher", "compact-failed", {
-						requester: "context-watcher",
-						enabled,
-						thresholdPct,
-						rearmPct,
-						preTokens: pre.contextTokens,
-						preContextWindow: pre.contextWindow,
-						prePct: pre.contextPct,
-						postTokens: post.contextTokens,
-						postContextWindow: post.contextWindow,
-						postPct: post.contextPct,
-						error: e.message.slice(0, 200),
-					});
 					watcherRequestPending = false;
-					if (resumePending) {
-						resumePending = false;
+					const shouldResume = resumePending;
+					resumePending = false;
+					// Same stale-ctx risk as onComplete above — compact() can leave ctx
+					// stale even on its own error path. Never let reporting the failure
+					// itself crash the process; armed=true above already recovers.
+					try {
+						const post = usageDetail(ctx.getContextUsage?.());
+						recordEvent("context-watcher", "compact-failed", {
+							requester: "context-watcher",
+							enabled,
+							thresholdPct,
+							rearmPct,
+							preTokens: pre.contextTokens,
+							preContextWindow: pre.contextWindow,
+							prePct: pre.contextPct,
+							postTokens: post.contextTokens,
+							postContextWindow: post.contextWindow,
+							postPct: post.contextPct,
+							error: e.message.slice(0, 200),
+						});
+						ctx.ui.notify(`context-watcher: compact failed: ${e.message}`, "warning");
+					} catch { /* stale ctx post-compaction; nothing further to report */ }
+					if (shouldResume) {
 						pi.sendMessage(
 							{ customType: "context-watcher-resume", content: RESUME_AFTER_FAILURE, display: false },
 							{ triggerTurn: true, deliverAs: "followUp" },
 						);
 					}
-					ctx.ui.notify(`context-watcher: compact failed: ${e.message}`, "warning");
 				},
 			});
 			} catch (error) {

@@ -158,6 +158,44 @@ test("watcher failure resumes a tool-bearing turn exactly once", async () => {
 	assert.equal(telemetry.filter((kind) => kind === "compact-failed").length, 1);
 });
 
+test("onComplete survives a stale ctx (session replaced mid-callback) without crashing", async () => {
+	const { api, handlers, sent } = mockPi();
+	registerContextWatcher(api as never, { enabled: true, thresholdPct: 70, rearmPct: 55 }, () => {});
+	let options: { onComplete?: (r: unknown) => void } | undefined;
+	let calls = 0;
+	const ctx = {
+		getContextUsage: () => {
+			calls += 1;
+			if (calls > 1) throw new Error("This extension ctx is stale after session replacement or reload.");
+			return { tokens: 750, contextWindow: 1000, percent: 75 };
+		},
+		compact: (o: typeof options) => { options = o; },
+		ui: { notify() {} },
+	};
+	await handlers.get("turn_end")?.({ toolResults: [{}] }, ctx);
+	assert.doesNotThrow(() => options?.onComplete?.({ tokensBefore: 750, estimatedTokensAfter: 300 }));
+	assert.equal(sent.length, 1, "resume still fires even when the post-compaction usage read fails");
+});
+
+test("onError survives a stale ctx (session replaced mid-callback) without crashing", async () => {
+	const { api, handlers, sent } = mockPi();
+	registerContextWatcher(api as never, { enabled: true, thresholdPct: 70, rearmPct: 55 }, () => {});
+	let options: { onError?: (e: Error) => void } | undefined;
+	let calls = 0;
+	const ctx = {
+		getContextUsage: () => {
+			calls += 1;
+			if (calls > 1) throw new Error("This extension ctx is stale after session replacement or reload.");
+			return { tokens: 750, contextWindow: 1000, percent: 75 };
+		},
+		compact: (o: typeof options) => { options = o; },
+		ui: { notify() {} },
+	};
+	await handlers.get("turn_end")?.({ toolResults: [{}] }, ctx);
+	assert.doesNotThrow(() => options?.onError?.(new Error("Request was aborted.")));
+	assert.equal(sent.length, 1, "resume still fires even when the post-compaction usage read fails");
+});
+
 test("watcher ignores an old compaction callback after session replacement", async () => {
 	const { api, handlers, sent } = mockPi();
 	registerContextWatcher(api as never, { enabled: true, thresholdPct: 70, rearmPct: 55 }, () => {});

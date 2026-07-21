@@ -187,14 +187,17 @@ if [[ "$SANDBOX" != "on" ]]; then
 fi
 # Authenticated endpoints (e.g. the box router) need a bearer token; /health is
 # open so health() stays keyless. LLAMA_API_KEY empty -> no header (local zoo).
-AUTH=(); [[ -n "${LLAMA_API_KEY:-}" ]] && AUTH=(-H "Authorization: Bearer $LLAMA_API_KEY")
-loaded_alias() { curl -fsS -m 5 ${AUTH[@]+"${AUTH[@]}"} "$LLAMA_URL/v1/models" 2>/dev/null | python3 -c 'import sys,json;d=json.load(sys.stdin)["data"];print(d[0]["id"] if d else "")' 2>/dev/null; }
+# The token is passed via a fresh `-K <(...)` process substitution at each call
+# site (never as a literal -H argv token) so it never appears in `ps aux`; a
+# pre-built array reusing one process substitution across calls would also
+# fail (each is a one-shot pipe).
+loaded_alias() { curl -fsS -m 5 ${LLAMA_API_KEY:+-K <(printf 'header = "Authorization: Bearer %s"\n' "$LLAMA_API_KEY")} "$LLAMA_URL/v1/models" 2>/dev/null | python3 -c 'import sys,json;d=json.load(sys.stdin)["data"];print(d[0]["id"] if d else "")' 2>/dev/null; }
 ensure_model_loaded() {
 	local state
-	state="$(curl -fsS -m 5 ${AUTH[@]+"${AUTH[@]}"} "$LLAMA_URL/v1/models" 2>/dev/null | python3 -c 'import json,sys; m=sys.argv[1]; d=json.load(sys.stdin).get("data",[]); print(next((str((x.get("status") or {}).get("value", "")) for x in d if x.get("id")==m), ""))' "$MODEL" 2>/dev/null)"
+	state="$(curl -fsS -m 5 ${LLAMA_API_KEY:+-K <(printf 'header = "Authorization: Bearer %s"\n' "$LLAMA_API_KEY")} "$LLAMA_URL/v1/models" 2>/dev/null | python3 -c 'import json,sys; m=sys.argv[1]; d=json.load(sys.stdin).get("data",[]); print(next((str((x.get("status") or {}).get("value", "")) for x in d if x.get("id")==m), ""))' "$MODEL" 2>/dev/null)"
 	[[ "$state" == "loaded" || "$state" == "running" ]] && return 0
 	echo "[real_gate] warming $MODEL so the pre-row fingerprint describes the loaded backend" >&2
-	curl -fsS --max-time "$HEALTH_WAIT" ${AUTH[@]+"${AUTH[@]}"} "$LLAMA_URL/v1/chat/completions" -H 'Content-Type: application/json' \
+	curl -fsS --max-time "$HEALTH_WAIT" ${LLAMA_API_KEY:+-K <(printf 'header = "Authorization: Bearer %s"\n' "$LLAMA_API_KEY")} "$LLAMA_URL/v1/chat/completions" -H 'Content-Type: application/json' \
 		-d "$(python3 -c 'import json,sys; print(json.dumps({"model":sys.argv[1],"messages":[{"role":"user","content":"Reply OK."}],"max_tokens":1,"temperature":0}))' "$MODEL")" >/dev/null
 }
 
@@ -320,21 +323,32 @@ run_guarded_session() {
 	local prompt=$1 redir=${2:->}
 	local cap_kb=$(( PI_MEM_CAP_GB * 1024 * 1024 ))
 	set -m   # monitor mode: the backgrounded subshell becomes its own process-group leader
+	# LLAMA_API_KEY (when present) is handed to the child via FD 4 + an export
+	# inside a tiny bash -c wrapper, never as a literal env-var token on env -i's
+	# own argv — that argv is fully visible to `ps aux` for the whole session
+	# lifetime (unlike a curl call, this child runs for minutes). The child
+	# process's actual environment still gets LLAMA_API_KEY (child tools may
+	# legitimately need it, per the WARNING above) — only the ps-visible argv
+	# leak is closed.
 	if [[ "$redir" == ">>" ]]; then
 		# The only caller that genuinely knows it's re-running the SAME interrupted
 		# task in the SAME workdir; plan-runner's session-start resume notice
 		# surfaces any .pi/plan-state.json the aborted first session left behind.
 		( cd "$wd" || exit
 		  exec 3<<<"$telemetry_key"
+		  exec 4<<<"${LLAMA_API_KEY:-}"
 		  run_with_timeout "$PI_TIMEOUT" 30 ${sbx[@]+"${sbx[@]}"} /usr/bin/env -i \
 		    "${session_env[@]}" "${session_base_env[@]}" PI_OBSERVATIONAL_MEMORY_PASSIVE=1 \
-		    pi -p --approve ${PI_SELECT[@]+"${PI_SELECT[@]}"} --tools "$tools" "$prompt" ) </dev/null >> "$wd/run.log" 2>&1 &
+		    bash -c 'k="$(cat <&4)"; [[ -n "$k" ]] && export LLAMA_API_KEY="$k"; exec pi -p --approve "$@"' _ \
+		    ${PI_SELECT[@]+"${PI_SELECT[@]}"} --tools "$tools" "$prompt" ) </dev/null >> "$wd/run.log" 2>&1 &
 	else
 		( cd "$wd" || exit
 		  exec 3<<<"$telemetry_key"
+		  exec 4<<<"${LLAMA_API_KEY:-}"
 		  run_with_timeout "$PI_TIMEOUT" 30 ${sbx[@]+"${sbx[@]}"} /usr/bin/env -i \
 		    "${session_env[@]}" "${session_base_env[@]}" PI_OBSERVATIONAL_MEMORY_PASSIVE=1 \
-		    pi -p --approve ${PI_SELECT[@]+"${PI_SELECT[@]}"} --tools "$tools" "$prompt" ) </dev/null > "$wd/run.log" 2>&1 &
+		    bash -c 'k="$(cat <&4)"; [[ -n "$k" ]] && export LLAMA_API_KEY="$k"; exec pi -p --approve "$@"' _ \
+		    ${PI_SELECT[@]+"${PI_SELECT[@]}"} --tools "$tools" "$prompt" ) </dev/null > "$wd/run.log" 2>&1 &
 	fi
 	CHILD=$!
 	set +m
@@ -446,7 +460,9 @@ run_one() {  # $1=config $2=arm $3=task $4=rep [$5=split] [$6=prompt-variant]
 		[[ -n "${!key:-}" ]] && session_base_env+=("$key=${!key}")
 	done
 	if [[ -n "${LLAMA_API_KEY:-}" ]]; then
-		session_base_env+=("LLAMA_API_KEY=$LLAMA_API_KEY")
+		# Delivered to the child via FD 4 + export in run_guarded_session's bash -c
+		# wrapper, not appended here — session_base_env's array becomes literal
+		# env -i argv, which `ps aux` can read for the child's entire lifetime.
 		echo "[real_gate] WARNING: LLAMA_API_KEY is required by the selected endpoint and visible to child tools; rows are exploratory" >&2
 		SANDBOX_AUTHORITATIVE=0
 		SANDBOX_AUTHORITY_REASON="endpoint credential is present in the approved child environment"
