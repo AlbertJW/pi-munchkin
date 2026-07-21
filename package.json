@@ -40,6 +40,9 @@
       "harness/extensions/context-brief.ts",
       "harness/extensions/context-dedup.ts",
       "harness/extensions/context-surface.ts"
+    ],
+    "skills": [
+      "skills/deep-research"
     ]
   },
   "dependencies": {
@@ -103,8 +106,10 @@
     "harness/lib/tag-words.ts",
     "harness/lib/telemetry.ts",
     "harness/lib/telemetry-catalog.ts",
+    "harness/lib/ketch-runtime.ts",
     "harness/agents",
     "harness/vendor",
+    "skills/deep-research",
     "harness/APPEND_SYSTEM.md",
     "harness/models.example.json",
     "harness/settings.example.json",

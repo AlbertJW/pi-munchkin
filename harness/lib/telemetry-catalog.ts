@@ -60,6 +60,14 @@ export const EVENT_CATALOG = {
 	"reflect/review": { round: "number", clean: "boolean", chars: "number" },
 	"span-tools/search": { total: "number", shown: "number" },
 	"span-tools/read": { start: "number", end: "number" },
+	"ketch/search": {
+		mode: "string", backends: "string[]", attempts: "number", results: "number", chars: "number",
+		duration_ms: "number", truncated: "boolean", outcome: "string",
+	},
+	"ketch/read": {
+		sources: "number", succeeded: "number", failed: "number", chars: "number",
+		duration_ms: "number", truncated: "boolean", outcome: "string",
+	},
 	"context-watcher/session-config": { ...watcher, startReason: "string" },
 	"context-watcher/compacted": { ...watcher, requester: "string", contentProvider: "string", reason: "string", willRetry: "boolean", tokensBefore: "number" },
 	"context-watcher/compact-suppressed": { ...watcher, reason: "string", activeOwner: ["string", "null"] },

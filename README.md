@@ -44,7 +44,7 @@ Pi extensions. Load them once; most work automatically, a few add commands or en
 | **span-tools** | `search_spans` / `read_span` — bounded retrieval over large files |
 | **compact-tool** | `compact_context` — model-requested structured compaction with one explicit post-compaction resume |
 | **micro-gate** | *(opt-in)* parse/compile-checks just-edited files at turn end |
-| **ketch** | web / code / docs search |
+| **ketch** | always-on `web_search` / `web_read` for bounded public research; `KETCH=off` disables it |
 | **did-you-mean** | suggests the nearest on-disk path after a mistyped file access |
 | **pi-subagent** | bundled `subagent` tool for isolated exploration, execution, and review |
 
@@ -64,7 +64,8 @@ pi package install github:AlbertJW/pi-munchkin    # or straight from git
 ```
 
 Manage with `pi package list | update | remove`. Manual alternative: copy `harness/extensions` +
-`harness/lib` into `~/.pi/agent/extensions/` and `npm i typebox`.
+`harness/lib` into `~/.pi/agent/extensions/`, copy `skills/deep-research` into
+`~/.pi/agent/skills/deep-research`, and run `npm i typebox` in the agent directory.
 
 The bundled `harness/vendor/pi-subagent` adds the `subagent` tool that `plan-runner` and `reflect`
 use. The harness still degrades gracefully if an installation chooses not to load that entry point.
@@ -80,6 +81,8 @@ Most extensions are automatic once loaded. The surfaces you invoke:
   (`/plan <request> yolo` plans and runs in one shot).
 - **`/reflect`** — adversarial review of the current plan or last answer (`/reflect help` lists modes).
 - **`/compact`** — prune context mid-task.
+- **`/skill:deep-research <question>`** — bounded multi-source research with inline citations.
+- **`/ketch-status`** — show the installed Ketch version and backend health.
 
 Behavior knobs (all optional env vars, sensible defaults):
 
@@ -90,6 +93,8 @@ Behavior knobs (all optional env vars, sensible defaults):
 | `MICRO_GATE=on` | enable the post-edit parse check |
 | `HASHLINE_TAG=hex\|slug` | edit tag style (word-slugs can copy better on tiny models) |
 | `SPAN_TOOLS=on` | expose the bounded large-file tools |
+| `KETCH=off` | remove the default-on web tools for offline/private sessions |
+| `KETCH_BACKEND`, `KETCH_MULTI_BACKENDS` | quick backend (default `ddg`) and broad-search set (default `ddg,exa,keenable`) |
 | `CONTEXT_WATCHER=on\|off`, `CTX_WATCH_PCT=60\|70\|80` | enable and tune proactive compaction; telemetry remains active when disabled |
 | `DRIFT_SCANNER=off` | disable post-commit review |
 
@@ -98,8 +103,11 @@ Behavior knobs (all optional env vars, sensible defaults):
 - Supported release platforms are Linux and macOS on Node.js 22.6 or newer; both run in CI.
 - Extensions execute with the permissions of the pi process. Review the manifest and keep API keys,
   tokens, and machine-specific paths out of tracked settings.
-- `ketch` can invoke external search backends. Model/provider traffic remains governed by your pi
-  configuration.
+- Ketch `0.12.0` or newer must be installed separately (`brew install 1broseidon/tap/ketch`). The extension
+  exposes only two compact tools: search finds leads and read fetches a selected public source set.
+  Results are bounded and untrusted; material claims still need source URLs. Ketch runs with a
+  reduced child environment that does not inherit model-provider credentials. Run `ketch config set backend
+  ddg` for the keyless default, or `/ketch-status` to inspect backend health.
 - Report vulnerabilities privately using [the security policy](.github/SECURITY.md).
 
 ### Verify a checkout or release candidate

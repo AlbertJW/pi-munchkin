@@ -6,12 +6,13 @@ import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import { relative } from "node:path";
 import { tmpdir } from "node:os";
-import { discoverAndLoadExtensions } from "@earendil-works/pi-coding-agent";
+import { discoverAndLoadExtensions, loadSkillsFromDir } from "@earendil-works/pi-coding-agent";
 import { walkRelativeImports } from "../lib/surface-walk.ts";
 
 const root = resolve(import.meta.dirname, "../..");
 const manifest = JSON.parse(await readFile(resolve(root, "package.json"), "utf8"));
 const extensions = manifest.pi?.extensions ?? [];
+const skills = manifest.pi?.skills ?? [];
 
 const expectedExtensions = [
   "harness/extensions/hashline.ts",
@@ -39,6 +40,7 @@ const expectedExtensions = [
 ];
 assert.deepEqual(extensions, expectedExtensions, "pi.extensions must expose the complete ordered production surface");
 assert(!extensions.includes("harness/extensions/chaos.ts"), "chaos must not be enabled in the release manifest");
+assert.deepEqual(skills, ["skills/deep-research"], "pi.skills must expose the bounded deep-research workflow");
 
 const work = await mkdtemp(resolve(tmpdir(), "pi-munchkin-pack-"));
 const cache = resolve(work, "npm-cache");
@@ -68,7 +70,7 @@ try {
   assert.equal(packed.length, 1, "npm pack must describe exactly one package");
   const files = new Set(packed[0].files.map(({ path }) => path));
 
-  for (const expected of ["README.md", "LICENSE", "NOTICE.md", "harness/APPEND_SYSTEM.md", ...extensions]) {
+  for (const expected of ["README.md", "LICENSE", "NOTICE.md", "harness/APPEND_SYSTEM.md", "skills/deep-research/SKILL.md", ...extensions]) {
     assert(files.has(expected), `packed artifact is missing ${expected}`);
   }
   for (const forbidden of ["harness/extensions/chaos.ts", "harness/lib/chaos-policy.ts", "optimizer/munchkin.py"]) {
@@ -96,6 +98,7 @@ try {
   const installedRoot = resolve(project, "node_modules", manifest.name);
   const installedManifest = JSON.parse(await readFile(resolve(installedRoot, "package.json"), "utf8"));
   assert.deepEqual(installedManifest.pi?.extensions, extensions, "installed manifest extension list drifted");
+  assert.deepEqual(installedManifest.pi?.skills, skills, "installed manifest skill list drifted");
   const loaded = await discoverAndLoadExtensions(
     extensions.map((entry) => resolve(installedRoot, entry)),
     installedRoot,
@@ -103,8 +106,11 @@ try {
   );
   assert.deepEqual(loaded.errors, [], `installed extension load errors:\n${loaded.errors.map(({ path, error }) => `${path}: ${error}`).join("\n")}`);
   assert.equal(loaded.extensions.length, extensions.length, "pi must load every installed manifest extension");
+  const loadedSkills = loadSkillsFromDir({ dir: resolve(installedRoot, "skills"), source: "package" });
+  assert.deepEqual(loadedSkills.diagnostics, [], `installed skill diagnostics: ${JSON.stringify(loadedSkills.diagnostics)}`);
+  assert.deepEqual(loadedSkills.skills.map(({ name }) => name), ["deep-research"], "installed tarball must discover deep-research");
 
-  console.log(`package smoke: ${files.size} files; installed tarball loads ${extensions.length} extension entry points`);
+  console.log(`package smoke: ${files.size} files; installed tarball loads ${extensions.length} extension entry points and ${loadedSkills.skills.length} skill`);
 } finally {
   await rm(work, { recursive: true, force: true });
 }

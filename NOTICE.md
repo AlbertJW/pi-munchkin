@@ -16,3 +16,10 @@ MIT-licensed third-party software:
   Copyright (c) 2025 Mario Zechner. MIT License.
   Source: https://github.com/earendil-works/pi
   The harness extensions here import from this package; install it separately.
+
+## Runtime prerequisite (not bundled)
+
+- **Ketch** — public web search and extraction CLI
+  Copyright its contributors. MIT License.
+  Source: https://github.com/1broseidon/ketch
+  The harness invokes Ketch as an external executable; no Ketch source or binary is bundled.

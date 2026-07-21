@@ -2,7 +2,7 @@ import { lookup } from "node:dns/promises";
 
 export type LookupAddress = { address: string; family: number };
 export type DnsLookup = (host: string) => Promise<LookupAddress[]>;
-export type RedirectFetch = (url: string) => Promise<{ status: number; location: string | null; close(): Promise<void> }>;
+export type RedirectFetch = (url: string, signal?: AbortSignal) => Promise<{ status: number; location: string | null; close(): Promise<void> }>;
 
 function ipv4Number(value: string): number | null {
 	const parts = value.split(".");
@@ -30,11 +30,12 @@ async function defaultLookup(host: string): Promise<LookupAddress[]> {
 	return lookup(host, { all: true, verbatim: true });
 }
 
-async function defaultRedirectFetch(url: string) {
+async function defaultRedirectFetch(url: string, signal?: AbortSignal) {
 	const response = await fetch(url, {
 		method: "GET",
 		redirect: "manual",
 		headers: { Range: "bytes=0-0", "User-Agent": "pi-munchkin-url-guard/1" },
+		signal,
 	});
 	return {
 		status: response.status,
@@ -61,19 +62,24 @@ async function validateHop(raw: string, dnsLookup: DnsLookup): Promise<URL> {
 	return url;
 }
 
-/** Validate DNS and every redirect hop, returning the final public URL. This is
- * a preflight defense around a third-party scraper; callers must pass the
- * returned final URL rather than the original redirector. */
+/** Validate DNS and every redirect hop, returning the final public URL.
+ *
+ * BEST-EFFORT PREFLIGHT ONLY. This blocks naive private/loopback/credentialed
+ * destinations and validates the redirect hops IT can see, but it cannot
+ * prevent DNS rebinding or a differential response: any downstream fetcher
+ * (e.g. the ketch scraper) re-resolves DNS and re-follows redirects on its own
+ * socket, so end-to-end SSRF safety depends on that fetcher's own hardening,
+ * not on this guard. Pass `signal` so the preflight is bounded/cancellable. */
 export async function resolvePublicHttpUrl(
 	raw: string,
-	options: { lookup?: DnsLookup; fetchRedirect?: RedirectFetch; maxRedirects?: number } = {},
+	options: { lookup?: DnsLookup; fetchRedirect?: RedirectFetch; maxRedirects?: number; signal?: AbortSignal } = {},
 ): Promise<string> {
 	const dnsLookup = options.lookup ?? defaultLookup;
 	const fetchRedirect = options.fetchRedirect ?? defaultRedirectFetch;
 	const maxRedirects = options.maxRedirects ?? 5;
 	let current = (await validateHop(raw, dnsLookup)).toString();
 	for (let redirects = 0; ; redirects++) {
-		const response = await fetchRedirect(current);
+		const response = await fetchRedirect(current, options.signal);
 		try {
 			if (response.status < 300 || response.status >= 400) return current;
 			if (!response.location) throw new Error(`redirect ${response.status} omitted Location`);
