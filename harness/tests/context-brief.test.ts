@@ -130,3 +130,31 @@ test("M6: the byte cap is HARD — marker included, total never exceeds maxBytes
 		rmSync(dir, { recursive: true, force: true });
 	}
 });
+
+test("G2: Unicode line/paragraph separators (U+2028/U+2029/U+0085) are escaped, never raw", async () => {
+	const LS = "\u2028", PS = "\u2029", NEL = "\u0085";
+	const dir = mkdtempSync(join(tmpdir(), "brief-sep-"));
+	const tdir = mkdtempSync(join(tmpdir(), "brief-sep-t-"));
+	process.env.TELEMETRY_FILE = join(tdir, "events.jsonl");
+	process.env.TELEMETRY_SOURCE = "test";
+	process.env.CONTEXT_BRIEF = "on";
+	try {
+		writeFileSync(join(dir, `ls${LS}sep.md`), "x");
+		writeFileSync(join(dir, `ps${PS}sep.md`), "x");
+		writeFileSync(join(dir, `nel${NEL}sep.md`), "x");
+		const fp = makeFakePi();
+		(await import(`../extensions/context-brief.ts?sep=${Date.now()}-${Math.random()}`)).default(fp.pi as any);
+		const result = await fire(fp, "before_agent_start", { systemPrompt: "base" }, { cwd: dir });
+		const brief = (result!.systemPrompt as string).split("## Environment brief")[1] ?? "";
+		assert.ok(!new RegExp(`[${LS}${PS}${NEL}]`).test(brief),
+			"no raw Unicode line separator may survive into the brief");
+		assert.ok(brief.includes("\\u2028") && brief.includes("\\u2029") && brief.includes("\\u0085"),
+			"separators arrive as literal escape text");
+	} finally {
+		delete process.env.CONTEXT_BRIEF;
+		delete process.env.TELEMETRY_FILE;
+		delete process.env.TELEMETRY_SOURCE;
+		rmSync(dir, { recursive: true, force: true });
+		rmSync(tdir, { recursive: true, force: true });
+	}
+});

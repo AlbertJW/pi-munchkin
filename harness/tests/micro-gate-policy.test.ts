@@ -31,7 +31,7 @@ test("firstError: first non-empty, bounded to actionable size", () => {
 
 import { formatSlop, jsSlopFindings, PYTHON_SLOP_SCRIPT, slopKindFor } from "../lib/micro-gate-policy.ts";
 import { execFileSync } from "node:child_process";
-import { closeSync, mkdtempSync, openSync, readSync, rmSync, writeFileSync } from "node:fs";
+import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -163,24 +163,45 @@ test("M8: a file that fails parse gets ONE steer (the parse error), slop skips i
 	}
 });
 
-test("F4: reads are truly bounded — slop beyond 512 KiB is invisible, oversized python is skipped", () => {
+test("G5: bounded reads proven through the REAL extension — oversized slop is invisible, small slop still fires", async () => {
+	const { makeFakePi, fire } = await import("./integration-harness.ts");
 	const dir = mkdtempSync(join(tmpdir(), "slop-bound-"));
+	process.env.TELEMETRY_FILE = join(dir, "events.jsonl");
+	process.env.TELEMETRY_SOURCE = "test";
+	process.env.MICRO_GATE_SLOP = "on"; // parse gate OFF — slop path alone
 	try {
-		// JS: filler past the cap, slop marker only AFTER it — bounded read must not see it
+		// JS: filler past the 512 KiB cap, the ONLY slop marker sits after it.
+		// If micro-gate ever reverts to an unbounded read, the marker becomes
+		// visible and a steer fires — failing this test.
 		const filler = "const filler_line_padding_content = 1;\n".repeat(15000); // ~585 KB
 		writeFileSync(join(dir, "big.js"), filler + "// @ts-ignore\n");
-		// jsSlopFindings itself is pure — emulate the extension's bounded read
-		const fd = openSync(join(dir, "big.js"), "r");
-		const buf = Buffer.alloc(512 * 1024);
-		const n = readSync(fd, buf, 0, buf.length, 0);
-		closeSync(fd);
-		assert.deepEqual(jsSlopFindings(buf.subarray(0, n).toString("utf8")), [], "slop beyond the cap is not scanned");
+		const fp = makeFakePi();
+		(await import(`../extensions/micro-gate.ts?bound=${Date.now()}-${Math.random()}`)).default(fp.pi as any);
+		await fire(fp, "turn_end", {
+			message: { role: "assistant", content: [
+				{ type: "toolCall", name: "write", arguments: { path: "big.js", content: "x" } },
+			] },
+		}, { cwd: dir });
+		assert.equal(fp.sent.length, 0, `slop beyond the cap must be invisible to the real extension: ${JSON.stringify(fp.sent)}`);
 
-		// Python: oversized file exits 0 with no findings
+		// small sloppy file through the SAME extension instance still fires
+		writeFileSync(join(dir, "small.js"), "// @ts-ignore\nconst x = 1;\n");
+		await fire(fp, "turn_end", {
+			message: { role: "assistant", content: [
+				{ type: "toolCall", name: "write", arguments: { path: "small.js", content: "x" } },
+			] },
+		}, { cwd: dir });
+		assert.equal(fp.sent.length, 1, "the bounded pass still detects in-range slop");
+		assert.match(fp.sent[0], /Possible shortcuts/);
+
+		// Python: oversized file exits 0 with no findings (size guard)
 		writeFileSync(join(dir, "big.py"), "x = 1\n".repeat(100000) + "assert True\n"); // ~600 KB
 		const out = execFileSync("python3", ["-c", PYTHON_SLOP_SCRIPT, join(dir, "big.py")], { encoding: "utf8" });
 		assert.equal(out.trim(), "", "oversized python file is skipped honestly");
 	} finally {
+		delete process.env.MICRO_GATE_SLOP;
+		delete process.env.TELEMETRY_FILE;
+		delete process.env.TELEMETRY_SOURCE;
 		rmSync(dir, { recursive: true, force: true });
 	}
 });

@@ -37,7 +37,14 @@ function skippable(name: string): boolean {
 // structure in the prompt. Length-capped BEFORE encoding, marked when cut.
 export function encodeName(name: string): string {
 	const capped = name.length > 64 ? `${name.slice(0, 63)}\u2026` : name;
-	return JSON.stringify(capped);
+	// JSON.stringify leaves U+2028 (LS), U+2029 (PS), and U+0085 (NEL) as
+	// literal characters — legal inside JSON strings, but renderers and
+	// tokenizers can treat them as line breaks, violating the one-line
+	// invariant. Escape them explicitly.
+	return JSON.stringify(capped)
+		.replace(/\u2028/g, "\\u2028")
+		.replace(/\u2029/g, "\\u2029")
+		.replace(/\u0085/g, "\\u0085");
 }
 
 export function buildBrief(

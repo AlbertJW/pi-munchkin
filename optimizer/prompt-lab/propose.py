@@ -60,33 +60,109 @@ def failing_traces(gen, max_traces):
     return out[:max_traces]
 
 ROW_SCHEMA_ID = "pi.eval-row/v2"
-_ROW_REQUIRED_CACHE = None
+_ROW_SCHEMA_CACHE = None
 
-def row_required_keys():
-    """Top-level `required` list from the checked-in v2 row schema — ties row
-    eligibility to the real contract instead of a hand-maintained key list
-    (stdlib-only; no schema-validation library by design)."""
-    global _ROW_REQUIRED_CACHE
-    if _ROW_REQUIRED_CACHE is None:
+def row_schema():
+    global _ROW_SCHEMA_CACHE
+    if _ROW_SCHEMA_CACHE is None:
         schema_path = os.path.join(LAB, "..", "real-gate-fixtures", "schemas", "pi.eval-row-v2.schema.json")
-        _ROW_REQUIRED_CACHE = tuple(json.load(open(schema_path))["required"])
-    return _ROW_REQUIRED_CACHE
+        _ROW_SCHEMA_CACHE = json.load(open(schema_path))
+    return _ROW_SCHEMA_CACHE
 
-def load_gate_rows(gen):
+# Minimal recursive JSON-Schema validator for the checked-in v2 row contract
+# (stdlib-only by design — no schema library). Supports exactly the keyword
+# set the schema uses, and FAILS CLOSED: any other constraining keyword in
+# the schema raises, so future schema evolution can never silently
+# under-validate a row. Presence-only key checking previously admitted a row
+# whose every field was {"stub": true}.
+_SCHEMA_DESCRIPTIVE_KEYS = {"$schema", "$id", "title", "description", "_doc", "$defs"}
+_SCHEMA_SUPPORTED_KEYS = {"type", "required", "properties", "const", "enum", "pattern",
+                          "minimum", "maximum", "minLength", "items",
+                          "additionalProperties", "$ref", "allOf", "if", "then", "not"}
+
+def _type_ok(value, expected):
+    if isinstance(expected, list):
+        return any(_type_ok(value, t) for t in expected)
+    if expected == "object": return isinstance(value, dict)
+    if expected == "array": return isinstance(value, list)
+    if expected == "string": return isinstance(value, str)
+    if expected == "boolean": return isinstance(value, bool)
+    if expected == "integer": return isinstance(value, int) and not isinstance(value, bool)
+    if expected == "number": return isinstance(value, (int, float)) and not isinstance(value, bool)
+    if expected == "null": return value is None
+    raise ValueError(f"unsupported schema type {expected!r}")
+
+def validate_row(instance, schema, defs, path="$"):
+    """Errors list; empty = valid. `defs` = the root schema's $defs."""
+    unknown = set(schema) - _SCHEMA_SUPPORTED_KEYS - _SCHEMA_DESCRIPTIVE_KEYS
+    if unknown:
+        raise ValueError(f"unsupported schema keyword(s) {sorted(unknown)} at {path} — extend validate_row before trusting rows")
+    errors = []
+    if "$ref" in schema:
+        ref = schema["$ref"]
+        if not ref.startswith("#/$defs/"):
+            raise ValueError(f"unsupported $ref {ref!r} at {path}")
+        return validate_row(instance, defs[ref[len("#/$defs/"):]], defs, path)
+    if "const" in schema and instance != schema["const"]:
+        errors.append(f"{path}: expected const {schema['const']!r}")
+    if "enum" in schema and instance not in schema["enum"]:
+        errors.append(f"{path}: {instance!r} not in enum")
+    if "type" in schema and not _type_ok(instance, schema["type"]):
+        errors.append(f"{path}: wrong type (expected {schema['type']})")
+    if "pattern" in schema and isinstance(instance, str) and not re.search(schema["pattern"], instance):
+        errors.append(f"{path}: does not match pattern")
+    if "minLength" in schema and isinstance(instance, str) and len(instance) < schema["minLength"]:
+        errors.append(f"{path}: shorter than minLength")
+    if "minimum" in schema and isinstance(instance, (int, float)) and not isinstance(instance, bool) and instance < schema["minimum"]:
+        errors.append(f"{path}: below minimum {schema['minimum']}")
+    if "maximum" in schema and isinstance(instance, (int, float)) and not isinstance(instance, bool) and instance > schema["maximum"]:
+        errors.append(f"{path}: above maximum {schema['maximum']}")
+    if "not" in schema and not validate_row(instance, schema["not"], defs, path):
+        errors.append(f"{path}: matches forbidden subschema")
+    if isinstance(instance, dict):
+        for key in schema.get("required", []):
+            if key not in instance:
+                errors.append(f"{path}.{key}: missing required key")
+        props = schema.get("properties", {})
+        for key, sub in props.items():
+            if key in instance:
+                errors.extend(validate_row(instance[key], sub, defs, f"{path}.{key}"))
+        if schema.get("additionalProperties") is False:
+            for key in instance:
+                if key not in props:
+                    errors.append(f"{path}.{key}: unexpected key")
+    elif "required" in schema and not isinstance(instance, dict):
+        errors.append(f"{path}: expected object with required keys")
+    if isinstance(instance, list) and "items" in schema:
+        for index, item in enumerate(instance):
+            errors.extend(validate_row(item, schema["items"], defs, f"{path}[{index}]"))
+    for branch in schema.get("allOf", []):
+        errors.extend(validate_row(instance, branch, defs, path))
+    if "if" in schema:
+        if not validate_row(instance, schema["if"], defs, path):
+            errors.extend(validate_row(instance, schema.get("then", {}), defs, path))
+    return errors
+
+def row_validation_errors(row):
+    schema = row_schema()
+    return validate_row(row, schema, schema.get("$defs", {}))
+
+def load_gate_rows(gen, results_dir=None):
     """Rows from a real-gate round eligible to feed candidate generation:
-    EXACT v2 schema (a prefix match admitted forged pi.eval-row-* variants),
-    every schema-required top-level key present, split "val" ONLY (heldout/
-    robustness rows must never contaminate proposals — manifests declare
-    held-out material unavailable), authoritative, and complete — the same
-    authority bar fleet_report enforces."""
-    path = os.path.join(LAB, "results", gen + ".jsonl")
+    EXACT v2 schema, FULLY schema-valid (types, patterns, nested and
+    conditional requirements — presence-only checking admitted all-stub
+    rows), split "val" ONLY (heldout/robustness rows must never contaminate
+    proposals — manifests declare held-out material unavailable),
+    authoritative, and complete — the same authority bar fleet_report
+    enforces. `results_dir` is injectable so the selftest never touches the
+    repo's results/ directory."""
+    path = os.path.join(results_dir or os.path.join(LAB, "results"), gen + ".jsonl")
     if not os.path.exists(path):
         return []
     rows = [json.loads(l) for l in open(path) if l.strip()]
-    required = row_required_keys()
     return [r for r in rows
             if r.get("schema") == ROW_SCHEMA_ID
-            and all(key in r for key in required)
+            and not row_validation_errors(r)
             and r.get("split") == "val"
             and r.get("authoritative") is True
             and r.get("status") == "complete"]
@@ -476,54 +552,98 @@ def selftest():
     finally:
         shutil.rmtree(d)
     # --distill: deterministic, bounded, aggregate-only evidence pack.
-    # Rows carry the authority fields load_gate_rows now REQUIRES.
-    def eligible(r):
-        stamped = dict(r, split="val", authoritative=True, status=r.get("status", "complete"))
-        for key in row_required_keys():
-            stamped.setdefault(key, {"stub": True})
-        return stamped
-    gate_rows_raw = [
-        {"schema": "pi.eval-row/v2", "task": "parens", "arm": "base", "score": 1,
-         "trajectory": {"turns": 4, "tool_errors": 0, "repeat_reads": 0, "compactions": 0},
-         "context": {"surface": {"duplication": {"exact_block": {"mean": 0.05}, "near_block": {"mean": 0.02}}, "stale_tool_result": {"mean": 0.1}}}},
-        {"schema": "pi.eval-row/v2", "task": "parens", "arm": "cand", "score": 1,
-         "trajectory": {"turns": 9, "tool_errors": 2, "repeat_reads": 1, "compactions": 0},
-         "context": {"surface": {"duplication": {"exact_block": {"mean": 0.2}, "near_block": {"mean": 0.1}}, "stale_tool_result": {"mean": 0.3}}}},
-        {"schema": "pi.eval-row/v2", "task": "equil", "arm": "base", "score": 0, "status": "incomplete",
-         "trajectory": {"turns": 14, "tool_errors": 5, "repeat_reads": 3, "compactions": 1},
-         "context": {"surface": {"duplication": {"exact_block": {"mean": 0.4}, "near_block": {"mean": 0.2}}, "stale_tool_result": {"mean": 0.5}}}},
-        {"schema": "pi.sql-row/v1", "task": "q1", "score": 0},  # non-gate row must be ignored by load_gate_rows semantics
+    # canonical_row is a GENUINELY schema-valid v2 row — validate_row must
+    # accept it, which couples this selftest to the real checked-in contract
+    # (the previous stub-stamping helper enshrined all-stub rows as valid).
+    def _stats(value=0.0):
+        return {"max": value, "mean": value}
+
+    def _traj(turns=4, tool_errors=0, repeat_reads=0, compactions=0):
+        return {"turns": turns, "tool_calls": turns, "tool_errors": tool_errors,
+                "reads": 2, "unique_reads": 2, "repeat_calls": 0,
+                "repeat_reads": repeat_reads, "tool_result_chars": 100,
+                "first_mutation_turn": 1, "compactions": compactions}
+
+    def _ctx(exact=0.05, near=0.02, stale=0.1):
+        return {"schema": "pi.context-telemetry/v2", "authenticated": True,
+                "content_sha256": "b" * 64, "session_key": "run-0000-parens-base-1",
+                "events": 3, "harness_surface_sha256": "c" * 64,
+                "config": {"enabled": True, "thresholdPct": 70, "rearmPct": 55},
+                "compactions": {"total": 0, "watcher": 0, "pi": 0, "compact_tool": 0,
+                                "manual_unknown": 0, "extension_content": 0,
+                                "threshold": 0, "overflow": 0, "manual": 0, "will_retry": 0},
+                "watcher": {"requests": 0, "completed": 0, "failed": 0,
+                            "thrash_silenced": 0, "resume_required": 0, "estimates": []},
+                "surface": {"calls": 1,
+                            "concentration": {"largest_message": _stats(0.4), "largest_tool_result": _stats(0.4)},
+                            "duplication": {"exact_block": _stats(exact), "five_token_shingle": _stats(0.1), "near_block": _stats(near)},
+                            "stale_tool_result": _stats(stale),
+                            "kv_cache": {"prefix_stable_rate": 1.0, "appended_only_rate": 1.0, "system_prompt_changes": 0},
+                            "context": {"max_bytes": 100, "mean_bytes": 100.0, "tokens": _stats(50)}}}
+
+    def canonical_row(**overrides):
+        row = {
+            "schema": "pi.eval-row/v2", "task": "parens", "model": "qwen36-35b-iq3s",
+            "arm": "base", "repetition": 1, "score": 1, "split": "val",
+            "run": "run-0000", "fixture": {"cohort": "default", "version": "v1"},
+            "authoritative": True,
+            "prompt": {"variant": "A", "semantic_group": "canonical", "sha256": "a" * 64},
+            "serving": {"pre": {"model": "m"}, "post": {"model": "m"}, "stable": True},
+            "usage": {"source": "server", "exact": True, "input_tokens": 10,
+                      "output_tokens": 5, "output_chars": 20},
+            "status": "complete",
+            "trajectory": _traj(),
+            "context": _ctx(),
+        }
+        row.update(overrides)
+        return row
+    assert row_validation_errors(canonical_row()) == [], row_validation_errors(canonical_row())
+    # full validation, not presence: types, patterns, and conditionals bite
+    assert row_validation_errors(canonical_row(task={"stub": True})), "object-typed task must be invalid"
+    assert row_validation_errors(canonical_row(score=7)), "score outside 0..1 must be invalid"
+    assert row_validation_errors(canonical_row(serving={"pre": {}, "stable": True})), "serving missing nested required key"
+    no_traj = canonical_row(); del no_traj["trajectory"]
+    assert row_validation_errors(no_traj), "arm != one-shot without trajectory must be invalid (conditional)"
+    no_surface = canonical_row(context={"schema": "pi.context-telemetry/v2"})
+    assert row_validation_errors(no_surface), "v2 context without surface must be invalid (conditional)"
+    all_stub = {k: {"stub": True} for k in row_schema()["required"]}
+    all_stub["schema"] = "pi.eval-row/v2"
+    assert row_validation_errors(all_stub), "the all-stub row that presence-checking accepted must be invalid"
+
+    gate_rows = [
+        canonical_row(),
+        canonical_row(arm="cand", trajectory=_traj(turns=9, tool_errors=2, repeat_reads=1),
+                      context=_ctx(exact=0.2, near=0.1, stale=0.3)),
+        canonical_row(task="equil", score=0, status="incomplete",
+                      trajectory=_traj(turns=14, tool_errors=5, repeat_reads=3, compactions=1),
+                      context=_ctx(exact=0.4, near=0.2, stale=0.5)),
+        {"schema": "pi.sql-row/v1", "task": "q1", "score": 0},  # non-gate row must be ignored
     ]
-    gate_rows = [eligible(r) for r in gate_rows_raw]
-    # load_gate_rows: heldout / non-authoritative / incomplete rows never feed proposals
+    # load_gate_rows: forged schemas, schema-invalid rows, heldout/robustness,
+    # non-authoritative, and incomplete rows never feed proposals. The probe
+    # lives in a TEMP dir — canonical verification must not create repo state
+    # and must pass under a read-only checkout.
     import tempfile
     with tempfile.TemporaryDirectory() as td:
-        results_dir = os.path.join(LAB, "results")
-        probe = os.path.join(results_dir, "distill-selftest-probe.jsonl")
-        forged = dict(gate_rows[0], schema="pi.eval-row-forged")
-        missing_key = {k: v for k, v in gate_rows[0].items() if k != "serving"}
+        probe = os.path.join(td, "distill-selftest-probe.jsonl")
         contaminated = gate_rows + [
             dict(gate_rows[0], split="heldout"),
             dict(gate_rows[0], split="robustness"),
             dict(gate_rows[0], authoritative=False),
-            dict(gate_rows[0], status="incomplete"),
-            forged,
-            missing_key,
+            dict(gate_rows[0], schema="pi.eval-row-forged"),
+            {k: v for k, v in gate_rows[0].items() if k != "serving"},
+            all_stub | {"split": "val", "authoritative": True, "status": "complete"},
         ]
-        try:
-            with open(probe, "w") as f:
-                for r in contaminated:
-                    f.write(json.dumps(r) + "\n")
-            loaded = load_gate_rows("distill-selftest-probe")
-            # 2 of the 3 eval rows survive: the status="incomplete" synthetic is
-            # itself excluded by the authority bar, as are all 4 contaminants.
-            assert len(loaded) == 2, f"only exact-v2, schema-complete, val+authoritative+complete rows load, got {len(loaded)}"
-            assert all(r.get("schema") == ROW_SCHEMA_ID for r in loaded)
-            assert all(r.get("split") == "val" for r in loaded)
-            ids = sorted(hashlib.sha256(json.dumps(r, sort_keys=True).encode()).hexdigest() for r in loaded)
-            assert len(ids) == len(loaded), "provenance covers every consumed row (no cap)"
-        finally:
-            os.unlink(probe)
+        with open(probe, "w") as f:
+            for r in contaminated:
+                f.write(json.dumps(r) + "\n")
+        loaded = load_gate_rows("distill-selftest-probe", results_dir=td)
+        # 2 of the 3 eval rows survive (the incomplete synthetic is excluded by
+        # the authority bar), and every contaminant is rejected.
+        assert len(loaded) == 2, f"only schema-VALID val+authoritative+complete rows load, got {len(loaded)}"
+        assert all(r.get("schema") == ROW_SCHEMA_ID and not row_validation_errors(r) for r in loaded)
+        ids = sorted(hashlib.sha256(json.dumps(r, sort_keys=True).encode()).hexdigest() for r in loaded)
+        assert len(ids) == len(loaded), "provenance covers every consumed row (no cap)"
     pack_a = distill_evidence(gate_rows)
     pack_b = distill_evidence(list(gate_rows))
     assert pack_a == pack_b, "evidence pack must be deterministic"
@@ -534,7 +654,7 @@ def selftest():
     # cell exists, so the pack must claim zero matched cells instead of
     # manufacturing a cross-task comparison (the old global-pool bug).
     assert "matched_cells=0" in pack_a, pack_a
-    matched_rows = gate_rows + [dict(eligible(gate_rows_raw[2]), task="parens", arm="base")]
+    matched_rows = gate_rows + [dict(gate_rows[2], task="parens", arm="base")]
     pack_m = distill_evidence(matched_rows)
     assert "matched_cells=1" in pack_m and "turns: mean_delta=" in pack_m, pack_m
     assert len(pack_a.encode()) <= 4096
