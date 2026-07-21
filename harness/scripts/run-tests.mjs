@@ -1,27 +1,20 @@
 #!/usr/bin/env node
 
-import { createHash } from "node:crypto";
-import { existsSync, mkdtempSync, readFileSync, readdirSync, rmSync, statSync } from "node:fs";
-import { homedir, tmpdir } from "node:os";
+import { mkdirSync, mkdtempSync, readdirSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { spawnSync } from "node:child_process";
 
-const liveFile = join(homedir(), ".pi", "agent", "telemetry", "events.jsonl");
 const tempDir = mkdtempSync(join(tmpdir(), "pi-munchkin-tests-"));
 const testFile = join(tempDir, "telemetry", "events.jsonl");
+// Isolation by construction: test children get a throwaway HOME, so even
+// fallback telemetry paths (~/.pi/agent/telemetry) resolve inside the temp
+// tree. The previous approach — snapshotting the LIVE telemetry file and
+// blaming any change on the tests — false-failed whenever a concurrent
+// interactive pi session appended its own legitimate rows mid-run.
+const tempHome = join(tempDir, "home");
+mkdirSync(join(tempHome, ".config"), { recursive: true });
 
-function snapshot(path) {
-	if (!existsSync(path)) return { exists: false };
-	const stat = statSync(path);
-	return {
-		exists: true,
-		size: stat.size,
-		mtimeMs: stat.mtimeMs,
-		sha256: createHash("sha256").update(readFileSync(path)).digest("hex"),
-	};
-}
-
-const before = snapshot(liveFile);
 const tests = readdirSync(join(process.cwd(), "harness", "tests"))
 	.filter((name) => name.endsWith(".test.ts"))
 	.sort()
@@ -38,10 +31,11 @@ Object.assign(childEnv, {
 	TELEMETRY_FILE: testFile,
 	TELEMETRY_SOURCE: "test",
 	TELEMETRY_STRICT: "1",
+	HOME: tempHome,
+	XDG_CONFIG_HOME: join(tempHome, ".config"),
 });
-let result;
 try {
-	result = spawnSync(
+	const result = spawnSync(
 		process.execPath,
 		["--experimental-strip-types", "--test", ...tests],
 		{
@@ -50,13 +44,7 @@ try {
 			stdio: "inherit",
 		},
 	);
-	const after = snapshot(liveFile);
-	if (JSON.stringify(before) !== JSON.stringify(after)) {
-		console.error(`test telemetry isolation failure: live telemetry changed: ${liveFile}`);
-		process.exitCode = 1;
-	} else {
-		process.exitCode = result.status ?? 1;
-	}
+	process.exitCode = result.status ?? 1;
 } finally {
 	rmSync(tempDir, { recursive: true, force: true });
 }

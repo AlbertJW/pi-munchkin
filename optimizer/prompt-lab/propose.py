@@ -59,18 +59,34 @@ def failing_traces(gen, max_traces):
                         "wrong": r.get("sql", ""), "model": r.get("model", "?")})
     return out[:max_traces]
 
+ROW_SCHEMA_ID = "pi.eval-row/v2"
+_ROW_REQUIRED_CACHE = None
+
+def row_required_keys():
+    """Top-level `required` list from the checked-in v2 row schema — ties row
+    eligibility to the real contract instead of a hand-maintained key list
+    (stdlib-only; no schema-validation library by design)."""
+    global _ROW_REQUIRED_CACHE
+    if _ROW_REQUIRED_CACHE is None:
+        schema_path = os.path.join(LAB, "..", "real-gate-fixtures", "schemas", "pi.eval-row-v2.schema.json")
+        _ROW_REQUIRED_CACHE = tuple(json.load(open(schema_path))["required"])
+    return _ROW_REQUIRED_CACHE
+
 def load_gate_rows(gen):
     """Rows from a real-gate round eligible to feed candidate generation:
-    schema pi.eval-row*, split "val" ONLY (heldout/robustness rows must never
-    contaminate proposals — manifests declare held-out material unavailable),
-    authoritative, and complete — the same authority bar fleet_report enforces.
-    Tolerates the sql-row shape by filtering on schema."""
+    EXACT v2 schema (a prefix match admitted forged pi.eval-row-* variants),
+    every schema-required top-level key present, split "val" ONLY (heldout/
+    robustness rows must never contaminate proposals — manifests declare
+    held-out material unavailable), authoritative, and complete — the same
+    authority bar fleet_report enforces."""
     path = os.path.join(LAB, "results", gen + ".jsonl")
     if not os.path.exists(path):
         return []
     rows = [json.loads(l) for l in open(path) if l.strip()]
+    required = row_required_keys()
     return [r for r in rows
-            if str(r.get("schema", "")).startswith("pi.eval-row")
+            if r.get("schema") == ROW_SCHEMA_ID
+            and all(key in r for key in required)
             and r.get("split") == "val"
             and r.get("authoritative") is True
             and r.get("status") == "complete"]
@@ -462,7 +478,10 @@ def selftest():
     # --distill: deterministic, bounded, aggregate-only evidence pack.
     # Rows carry the authority fields load_gate_rows now REQUIRES.
     def eligible(r):
-        return dict(r, split="val", authoritative=True, status=r.get("status", "complete"))
+        stamped = dict(r, split="val", authoritative=True, status=r.get("status", "complete"))
+        for key in row_required_keys():
+            stamped.setdefault(key, {"stub": True})
+        return stamped
     gate_rows_raw = [
         {"schema": "pi.eval-row/v2", "task": "parens", "arm": "base", "score": 1,
          "trajectory": {"turns": 4, "tool_errors": 0, "repeat_reads": 0, "compactions": 0},
@@ -481,11 +500,15 @@ def selftest():
     with tempfile.TemporaryDirectory() as td:
         results_dir = os.path.join(LAB, "results")
         probe = os.path.join(results_dir, "distill-selftest-probe.jsonl")
+        forged = dict(gate_rows[0], schema="pi.eval-row-forged")
+        missing_key = {k: v for k, v in gate_rows[0].items() if k != "serving"}
         contaminated = gate_rows + [
             dict(gate_rows[0], split="heldout"),
             dict(gate_rows[0], split="robustness"),
             dict(gate_rows[0], authoritative=False),
             dict(gate_rows[0], status="incomplete"),
+            forged,
+            missing_key,
         ]
         try:
             with open(probe, "w") as f:
@@ -494,7 +517,8 @@ def selftest():
             loaded = load_gate_rows("distill-selftest-probe")
             # 2 of the 3 eval rows survive: the status="incomplete" synthetic is
             # itself excluded by the authority bar, as are all 4 contaminants.
-            assert len(loaded) == 2, f"only val+authoritative+complete gate rows load, got {len(loaded)}"
+            assert len(loaded) == 2, f"only exact-v2, schema-complete, val+authoritative+complete rows load, got {len(loaded)}"
+            assert all(r.get("schema") == ROW_SCHEMA_ID for r in loaded)
             assert all(r.get("split") == "val" for r in loaded)
             ids = sorted(hashlib.sha256(json.dumps(r, sort_keys=True).encode()).hexdigest() for r in loaded)
             assert len(ids) == len(loaded), "provenance covers every consumed row (no cap)"

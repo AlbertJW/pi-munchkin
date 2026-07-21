@@ -83,7 +83,9 @@ export function slopKindFor(path: string): "python" | "js" | null {
 // findings live on stdout so a crashed checker (non-zero) is distinguishable
 // from a clean file. Stdlib ast only.
 export const PYTHON_SLOP_SCRIPT = `
-import ast, sys
+import ast, os, sys
+if os.path.getsize(sys.argv[1]) > 524288:
+    sys.exit(0)  # honest bound: oversized files are skipped, not partially parsed
 try:
     tree = ast.parse(open(sys.argv[1], encoding="utf-8").read(), filename=sys.argv[1])
 except Exception:

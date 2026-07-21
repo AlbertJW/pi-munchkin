@@ -31,7 +31,7 @@ test("firstError: first non-empty, bounded to actionable size", () => {
 
 import { formatSlop, jsSlopFindings, PYTHON_SLOP_SCRIPT, slopKindFor } from "../lib/micro-gate-policy.ts";
 import { execFileSync } from "node:child_process";
-import { mkdtempSync, writeFileSync, rmSync } from "node:fs";
+import { closeSync, mkdtempSync, openSync, readSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -129,6 +129,20 @@ test("M8: a file that fails parse gets ONE steer (the parse error), slop skips i
 		assert.equal(fp.sent.length, 1, `exactly one steer, got ${fp.sent.length}: ${JSON.stringify(fp.sent)}`);
 		assert.match(fp.sent[0], /does not parse/, "the parse steer wins");
 
+		// F3: broken file + a DIFFERENT clean-but-sloppy file in the SAME turn —
+		// any parse failure suppresses the whole slop pass, still ONE steer.
+		writeFileSync(join(dir, "alsosloppy.js"), "const y = v as any;\nconst z = 1;\n");
+		const fpBoth = makeFakePi();
+		(await import(`../extensions/micro-gate.ts?pair=${Date.now()}-${Math.random()}`)).default(fpBoth.pi as any);
+		await fire(fpBoth, "turn_end", {
+			message: { role: "assistant", content: [
+				{ type: "toolCall", name: "write", arguments: { path: "broken.js", content: "x" } },
+				{ type: "toolCall", name: "write", arguments: { path: "alsosloppy.js", content: "x" } },
+			] },
+		}, { cwd: dir });
+		assert.equal(fpBoth.sent.length, 1, `parse failure must suppress slop for the whole turn, got: ${JSON.stringify(fpBoth.sent)}`);
+		assert.match(fpBoth.sent[0], /does not parse/);
+
 		// clean-parsing file with slop still gets the slop steer
 		writeFileSync(join(dir, "sloppy.js"), "// @ts-ignore\nconst x = 1;\n");
 		const fp2 = makeFakePi();
@@ -145,6 +159,28 @@ test("M8: a file that fails parse gets ONE steer (the parse error), slop skips i
 		delete process.env.MICRO_GATE_SLOP;
 		delete process.env.TELEMETRY_FILE;
 		delete process.env.TELEMETRY_SOURCE;
+		rmSync(dir, { recursive: true, force: true });
+	}
+});
+
+test("F4: reads are truly bounded — slop beyond 512 KiB is invisible, oversized python is skipped", () => {
+	const dir = mkdtempSync(join(tmpdir(), "slop-bound-"));
+	try {
+		// JS: filler past the cap, slop marker only AFTER it — bounded read must not see it
+		const filler = "const filler_line_padding_content = 1;\n".repeat(15000); // ~585 KB
+		writeFileSync(join(dir, "big.js"), filler + "// @ts-ignore\n");
+		// jsSlopFindings itself is pure — emulate the extension's bounded read
+		const fd = openSync(join(dir, "big.js"), "r");
+		const buf = Buffer.alloc(512 * 1024);
+		const n = readSync(fd, buf, 0, buf.length, 0);
+		closeSync(fd);
+		assert.deepEqual(jsSlopFindings(buf.subarray(0, n).toString("utf8")), [], "slop beyond the cap is not scanned");
+
+		// Python: oversized file exits 0 with no findings
+		writeFileSync(join(dir, "big.py"), "x = 1\n".repeat(100000) + "assert True\n"); // ~600 KB
+		const out = execFileSync("python3", ["-c", PYTHON_SLOP_SCRIPT, join(dir, "big.py")], { encoding: "utf8" });
+		assert.equal(out.trim(), "", "oversized python file is skipped honestly");
+	} finally {
 		rmSync(dir, { recursive: true, force: true });
 	}
 });
