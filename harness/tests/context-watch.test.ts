@@ -196,6 +196,43 @@ test("onError survives a stale ctx (session replaced mid-callback) without crash
 	assert.equal(sent.length, 1, "resume still fires even when the post-compaction usage read fails");
 });
 
+test("onComplete survives a stale pi.sendMessage (session replaced mid-callback) without crashing", async () => {
+	// Reproduces the exact production crash: ctx.getContextUsage succeeds, but
+	// pi.sendMessage itself throws the same "stale after session replacement"
+	// error — a distinct failure point from ctx, requiring its own try/catch.
+	const handlers = new Map<string, Function>();
+	const api = {
+		on(name: string, handler: Function) { handlers.set(name, handler); },
+		sendMessage() { throw new Error("This extension ctx is stale after session replacement or reload."); },
+	};
+	registerContextWatcher(api as never, { enabled: true, thresholdPct: 70, rearmPct: 55 }, () => {});
+	let options: { onComplete?: (r: unknown) => void } | undefined;
+	const ctx = {
+		getContextUsage: () => ({ tokens: 750, contextWindow: 1000, percent: 75 }),
+		compact: (o: typeof options) => { options = o; },
+		ui: { notify() {} },
+	};
+	await handlers.get("turn_end")?.({ toolResults: [{}] }, ctx);
+	assert.doesNotThrow(() => options?.onComplete?.({ tokensBefore: 750, estimatedTokensAfter: 300 }));
+});
+
+test("onError survives a stale pi.sendMessage (session replaced mid-callback) without crashing", async () => {
+	const handlers = new Map<string, Function>();
+	const api = {
+		on(name: string, handler: Function) { handlers.set(name, handler); },
+		sendMessage() { throw new Error("This extension ctx is stale after session replacement or reload."); },
+	};
+	registerContextWatcher(api as never, { enabled: true, thresholdPct: 70, rearmPct: 55 }, () => {});
+	let options: { onError?: (e: Error) => void } | undefined;
+	const ctx = {
+		getContextUsage: () => ({ tokens: 750, contextWindow: 1000, percent: 75 }),
+		compact: (o: typeof options) => { options = o; },
+		ui: { notify() {} },
+	};
+	await handlers.get("turn_end")?.({ toolResults: [{}] }, ctx);
+	assert.doesNotThrow(() => options?.onError?.(new Error("Request was aborted.")));
+});
+
 test("watcher ignores an old compaction callback after session replacement", async () => {
 	const { api, handlers, sent } = mockPi();
 	registerContextWatcher(api as never, { enabled: true, thresholdPct: 70, rearmPct: 55 }, () => {});

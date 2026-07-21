@@ -134,10 +134,11 @@ export function registerContextWatcher(
 					const shouldResume = resumePending;
 					resumePending = false;
 					// ctx.compact() can replace/reload the session before this callback
-					// fires, leaving the captured `ctx` stale — any method on it then
-					// throws (assertActive). That must never crash the whole process;
-					// the compaction itself already completed, there's just nothing
-					// further to read/report in that case.
+					// fires, leaving the captured `ctx` — and `pi` itself — stale. ANY
+					// call into either then throws (assertActive; confirmed in
+					// production for both ctx.getContextUsage AND pi.sendMessage, not
+					// just one). That must never crash the whole process; the
+					// compaction itself already completed either way.
 					try {
 						const post = usageDetail(ctx.getContextUsage?.());
 						recordEvent("context-watcher", "compact-completed", {
@@ -155,11 +156,15 @@ export function registerContextWatcher(
 							postPct: post.contextPct,
 						});
 					} catch { /* stale ctx post-compaction; nothing further to report */ }
+					// Separate try: a stale ctx above must not skip this independent
+					// best-effort attempt (and vice versa) — each can fail on its own.
 					if (shouldResume) {
-						pi.sendMessage(
-							{ customType: "context-watcher-resume", content: RESUME, display: false },
-							{ triggerTurn: true, deliverAs: "followUp" },
-						);
+						try {
+							pi.sendMessage(
+								{ customType: "context-watcher-resume", content: RESUME, display: false },
+								{ triggerTurn: true, deliverAs: "followUp" },
+							);
+						} catch { /* stale pi post-compaction; nothing further to do */ }
 					}
 				},
 				onError: (e) => {
@@ -169,9 +174,8 @@ export function registerContextWatcher(
 					watcherRequestPending = false;
 					const shouldResume = resumePending;
 					resumePending = false;
-					// Same stale-ctx risk as onComplete above — compact() can leave ctx
-					// stale even on its own error path. Never let reporting the failure
-					// itself crash the process; armed=true above already recovers.
+					// Same stale-ctx/pi risk as onComplete above. Never let reporting the
+					// failure itself crash the process; armed=true above already recovers.
 					try {
 						const post = usageDetail(ctx.getContextUsage?.());
 						recordEvent("context-watcher", "compact-failed", {
@@ -189,11 +193,15 @@ export function registerContextWatcher(
 						});
 						ctx.ui.notify(`context-watcher: compact failed: ${e.message}`, "warning");
 					} catch { /* stale ctx post-compaction; nothing further to report */ }
+					// Separate try: a stale ctx above must not skip this independent
+					// best-effort attempt (and vice versa) — each can fail on its own.
 					if (shouldResume) {
-						pi.sendMessage(
-							{ customType: "context-watcher-resume", content: RESUME_AFTER_FAILURE, display: false },
-							{ triggerTurn: true, deliverAs: "followUp" },
-						);
+						try {
+							pi.sendMessage(
+								{ customType: "context-watcher-resume", content: RESUME_AFTER_FAILURE, display: false },
+								{ triggerTurn: true, deliverAs: "followUp" },
+							);
+						} catch { /* stale pi post-compaction; nothing further to do */ }
 					}
 				},
 			});
