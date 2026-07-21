@@ -169,6 +169,18 @@
     "DRIFT_SCANNER": [
      "on",
      "off"
+    ],
+    "PLAN_UNCERTAINTY": [
+     "on",
+     "off"
+    ],
+    "PLAN_SHA_GUARD": [
+     "on",
+     "off"
+    ],
+    "SUBAGENT_DEFAULT_MODE": [
+     "spawn",
+     "fork"
     ]
    }
   },

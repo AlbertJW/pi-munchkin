@@ -35,6 +35,8 @@ export const EVENT_CATALOG = {
 	"plan-runner/resume-found": { open: "number", in_progress: "number" },
 	"plan-runner/subagent-only-block": { toolName: "string" },
 	"plan-runner/write": { items: "number", newly_done: "number", rewrite: "boolean", declared_dependencies: "number", unmet_dependencies: "number", dependency_compliant: "boolean", context_tokens: ["number", "null"] },
+	"plan-runner/uncertainty-hold": { count: "number", gate: "string" },
+	"plan-runner/sha-guard": { checked: "number", missing: "number" },
 	"plan-runner/write-rejected": { reason_class: "string", context_tokens: ["number", "null"] },
 	"git-guard/blocked-unresolved-target": { reason: "string" },
 	"git-guard/confirm": { approved: "boolean", changes: "number" },

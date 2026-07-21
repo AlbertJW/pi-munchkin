@@ -495,3 +495,122 @@ test("integration: reloading the extension in the same process does not invent a
 	await reloaded.commands.get("plan-go").handler("", ctx);
 	assert.ok(!reloaded.sent.at(-1)!.includes("PARTIAL WORK"), "same-process reload is not a crash resume");
 });
+
+test("c31: uncertainties hold execution — write steer, /plan-go block, clear-with-[] release, omission-safe", async () => {
+	process.env.PLAN_UNCERTAINTY = "on";
+	try {
+		const fp = makeFakePi();
+		const mod = await import(`../extensions/plan-runner.ts?unc=${Date.now()}-${Math.random()}`);
+		mod.default(fp.pi as any);
+		const cwd = tmp();
+		const { ctx, notes } = makeCtx(cwd);
+		await fp.commands.get("plan").handler("ambiguous request", ctx);
+
+		const r1 = await callTool(fp, "plan_write", {
+			items: [{ title: "step one", status: "pending" }],
+			request: "ambiguous request", summary: "s",
+			uncertainties: ["Which database should this target?", "Is backwards compat required?"],
+		}, cwd);
+		assert.ok(r1.content[0].text.includes("unresolved uncertaint"), r1.content[0].text);
+		assert.ok(r1.content[0].text.includes("Which database"), "questions are listed verbatim");
+		let state = JSON.parse(readFileSync(join(cwd, ".pi", "plan-state.json"), "utf8"));
+		assert.equal(state.uncertainties.length, 2, "persisted");
+
+		// /plan-go is deterministically held
+		notes.length = 0;
+		await fp.commands.get("plan-go").handler("", ctx);
+		assert.ok(notes.some((n) => n.includes("Execution held")), `blocked: ${JSON.stringify(notes)}`);
+		assert.ok(!fp.sent.some((s) => s.includes("MODE: RUN")), "no execute prompt while held");
+		state = JSON.parse(readFileSync(join(cwd, ".pi", "plan-state.json"), "utf8"));
+		assert.equal(state.phase, "planned", "phase must not flip while held");
+
+		// omission preserves (small models drop optional fields on rewrite)
+		await callTool(fp, "plan_write", {
+			items: [{ title: "step one", status: "pending" }], request: "ambiguous request", summary: "s",
+		}, cwd);
+		state = JSON.parse(readFileSync(join(cwd, ".pi", "plan-state.json"), "utf8"));
+		assert.equal(state.uncertainties.length, 2, "omitted field preserves prior uncertainties");
+
+		// explicit [] clears and releases the gate
+		const r3 = await callTool(fp, "plan_write", {
+			items: [{ title: "step one", status: "pending" }], request: "ambiguous request", summary: "s",
+			uncertainties: [],
+		}, cwd);
+		assert.ok(!r3.content[0].text.includes("unresolved uncertaint"), "steer gone once cleared");
+		state = JSON.parse(readFileSync(join(cwd, ".pi", "plan-state.json"), "utf8"));
+		assert.equal(state.uncertainties, undefined, "cleared");
+		await fp.commands.get("plan-go").handler("", ctx);
+		assert.ok(fp.sent.some((s) => s.includes("MODE: RUN")), "execution released after clearing");
+
+		// agent_end backstop: re-add and end the run
+		await callTool(fp, "plan_write", {
+			items: [{ title: "step one", status: "in_progress" }], request: "ambiguous request", summary: "s",
+			uncertainties: ["Still unresolved?"],
+		}, cwd);
+		notes.length = 0;
+		await fire(fp, "agent_end", {}, ctx);
+		assert.ok(notes.some((n) => n.includes("Still unresolved?")), `backstop notify: ${JSON.stringify(notes)}`);
+	} finally {
+		delete process.env.PLAN_UNCERTAINTY;
+	}
+});
+
+test("c31 dark: flag off — no schema field, no steer, no gate", async () => {
+	const fp = freshPlanRunner(); // module-load env has no PLAN_UNCERTAINTY
+	const cwd = tmp();
+	const tool = fp.tools.get("plan_write");
+	assert.ok(!JSON.stringify(tool.parameters).includes("uncertainties"),
+		"dark sessions must see a byte-identical tool schema");
+	const r = await callTool(fp, "plan_write", {
+		items: [{ title: "a", status: "pending" }], request: "r", summary: "s",
+	}, cwd);
+	assert.ok(!r.content[0].text.includes("uncertaint"));
+});
+
+test("c32: fabricated commit SHA in a note draws a steer; real SHA passes; non-repo fails open", async () => {
+	process.env.PLAN_SHA_GUARD = "on";
+	try {
+		const fp = makeFakePi();
+		const mod = await import(`../extensions/plan-runner.ts?sha=${Date.now()}-${Math.random()}`);
+		mod.default(fp.pi as any);
+		const cwd = tmp();
+		// real repo with one real commit
+		const { execFileSync } = await import("node:child_process");
+		const git = (...args: string[]) => execFileSync("git", args, { cwd, encoding: "utf8" });
+		git("init", "-q");
+		git("-c", "user.email=t@t", "-c", "user.name=t", "commit", "-q", "--allow-empty", "-m", "seed");
+		const realSha = git("rev-parse", "HEAD").trim();
+
+		const fake = await callTool(fp, "plan_write", {
+			items: [{ title: "ship it", status: "done", note: "committed as 1234abc" }],
+			request: "r", summary: "s",
+		}, cwd);
+		assert.ok(fake.content[0].text.includes("1234abc"), fake.content[0].text);
+		assert.ok(fake.content[0].text.includes("never fabricate"), "fabricated SHA draws the steer");
+
+		const real = await callTool(fp, "plan_write", {
+			items: [{ title: "ship it", status: "done", note: `committed as ${realSha.slice(0, 10)}` }],
+			request: "r", summary: "s",
+		}, cwd);
+		assert.ok(!real.content[0].text.includes("never fabricate"), "real SHA passes silently");
+
+		// fail-open: not a git repo
+		const bare = tmp();
+		const open = await callTool(fp, "plan_write", {
+			items: [{ title: "x", status: "done", note: "committed as 9876fed" }],
+			request: "r", summary: "s",
+		}, bare);
+		assert.ok(!open.content[0].text.includes("never fabricate"), "non-repo cwd fails open, never punishes");
+	} finally {
+		delete process.env.PLAN_SHA_GUARD;
+	}
+});
+
+test("c32 dark: flag off — a fake SHA note passes without any git probe", async () => {
+	const fp = freshPlanRunner();
+	const cwd = tmp();
+	const r = await callTool(fp, "plan_write", {
+		items: [{ title: "a", status: "done", note: "committed as 1234abc" }], request: "r", summary: "s",
+	}, cwd);
+	assert.ok(!r.content[0].text.includes("never fabricate"));
+});

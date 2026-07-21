@@ -1,0 +1,5 @@
+{
+  "name": "plan-uncertainty",
+  "prediction": "the model declares blocking uncertainties in plan_write instead of guessing past ambiguity: execution is deterministically held (write-steer + /plan-go block + agent_end backstop) until the user answers and the field is cleared. Wrong-direction executions on ambiguous tasks drop; blocked_needs_input surfaces earlier; pass rate neutral-to-up (npcsh loop_plan port, 2026-07-21). uncertainty-hold telemetry proves firing; if the model never populates the field, the candidate is inert and rejected.",
+  "thresholds": { "PLAN_UNCERTAINTY": "on" }
+}

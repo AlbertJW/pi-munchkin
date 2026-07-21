@@ -25,6 +25,7 @@ import {
   type SubagentDetails,
   DEFAULT_DELEGATION_MODE,
   emptyUsage,
+  parseDelegationMode,
   isResultError,
   isResultSuccess,
 } from "./types.js";
@@ -121,16 +122,6 @@ interface DelegationDepthConfig {
 interface SessionSnapshotSource {
   getHeader: () => unknown;
   getBranch: () => unknown[];
-}
-
-function parseDelegationMode(raw: unknown): DelegationMode | null {
-  if (raw === undefined) return DEFAULT_DELEGATION_MODE;
-  if (typeof raw !== "string") return null;
-  const normalized = raw.trim().toLowerCase();
-  if (normalized === "spawn" || normalized === "fork") {
-    return normalized;
-  }
-  return null;
 }
 
 function buildForkSessionSnapshotJsonl(

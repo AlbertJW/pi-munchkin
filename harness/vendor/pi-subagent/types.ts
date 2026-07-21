@@ -11,6 +11,22 @@ export type DelegationMode = "spawn" | "fork";
 /** Default context mode for delegated runs. */
 export const DEFAULT_DELEGATION_MODE: DelegationMode = "spawn";
 
+export function parseDelegationMode(raw: unknown): DelegationMode | null {
+  if (raw === undefined) {
+    // Dark candidate c33 (SUBAGENT_DEFAULT_MODE=fork): default ALL delegations
+    // to fork so every child re-primes the parent's KV prefix on a single-slot
+    // server instead of evicting it with a fresh tiny prompt. An explicit mode
+    // from the model always wins; any other env value keeps the shipped default.
+    return process.env.SUBAGENT_DEFAULT_MODE === "fork" ? "fork" : DEFAULT_DELEGATION_MODE;
+  }
+  if (typeof raw !== "string") return null;
+  const normalized = raw.trim().toLowerCase();
+  if (normalized === "spawn" || normalized === "fork") {
+    return normalized;
+  }
+  return null;
+}
+
 /** Aggregated token usage from a subagent run. */
 export interface UsageStats {
 	input: number;

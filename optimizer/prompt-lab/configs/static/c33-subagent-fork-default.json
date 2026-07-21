@@ -1,0 +1,5 @@
+{
+  "name": "subagent-fork-default",
+  "prediction": "ALL subagent delegations (explorer/verifier too, not just executor advice) default to mode=fork: each child re-primes the parent's KV prefix on the single-slot server instead of evicting it with a tiny fresh prompt. context.surface.kv_cache.prefix_stable_rate rises and wall-clock falls on delegation-heavy tasks (t4) with pass rate neutral; if in_tok inflation from the snapshot outweighs the cache win, reject (pi-for-each shared-prefix port, 2026-07-21).",
+  "thresholds": { "SUBAGENT_DEFAULT_MODE": "fork" }
+}

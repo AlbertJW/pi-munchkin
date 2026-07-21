@@ -181,3 +181,22 @@ test("reconcileItems: depends_on carried, preserved when omitted on rewrite, cle
 	], mkId);
 	assert.equal(third[1].depends_on, undefined);
 });
+
+// ---------- c32: shaCandidates ----------
+
+import { shaCandidates } from "../lib/plan-integrity.ts";
+
+test("shaCandidates: context-gated short hashes, bare sha1, sha256 excluded, dedup + cap", () => {
+	assert.deepEqual(shaCandidates("committed as abc1234 and pushed def5678 upstream"), ["abc1234", "def5678"]);
+	assert.deepEqual(shaCandidates("see deadbeefdeadbeefdeadbeefdeadbeefdeadbeef"),
+		["deadbeefdeadbeefdeadbeefdeadbeefdeadbeef"], "bare 40-hex is sha1-shaped, no context word needed");
+	assert.deepEqual(shaCandidates("content hash " + "a".repeat(64) + " recorded"), [],
+		"64-hex sha256 content hashes are deliberately excluded");
+	assert.deepEqual(shaCandidates("added parens to cafe and 1234567 items"), [],
+		"a bare short hex-ish token without commit context stays silent");
+	assert.deepEqual(shaCandidates("commit abc1234; commit abc1234 again"), ["abc1234"], "dedup");
+	const many = ["c0ffee1", "c0ffee2", "c0ffee3", "c0ffee4", "c0ffee5", "c0ffee6"]
+		.map((sha) => `commit ${sha}`).join("; ");
+	assert.equal(shaCandidates(many).length, 4, "capped at 4 checks per call");
+	assert.deepEqual(shaCandidates("HEAD is now at 1a2b3c4"), ["1a2b3c4"], "HEAD context counts");
+});

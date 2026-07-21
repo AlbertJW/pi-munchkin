@@ -162,6 +162,26 @@ export function unmetDeps(
 	});
 }
 
+// c32 (confabulated-SHA guard): hex tokens in model-written text that look
+// like git commit references. Two admission routes: (a) 7-40 hex chars within
+// ~40 chars after a commit-context word, (b) a bare exactly-40-hex token
+// anywhere (sha1-shaped; 64-hex content hashes are deliberately excluded —
+// this codebase is full of legitimate sha256 strings). Pure so it unit-tests
+// without git; the caller does the actual `git cat-file -e` existence check.
+const SHA_CONTEXT_RE = /(?:commit(?:ted)?|sha|push(?:ed)?|merged?|\brev\b|HEAD)[^\n]{0,40}?\b([0-9a-f]{7,40})\b/gi;
+const BARE_SHA1_RE = /\b[0-9a-f]{40}\b/g;
+
+export function shaCandidates(text: string, cap = 4): string[] {
+	const found = new Set<string>();
+	for (const match of text.matchAll(SHA_CONTEXT_RE)) {
+		if (match[1].length !== 64) found.add(match[1].toLowerCase());
+	}
+	for (const match of text.matchAll(BARE_SHA1_RE)) {
+		found.add(match[0].toLowerCase());
+	}
+	return [...found].slice(0, cap);
+}
+
 export function preserveDecision<T extends { preserve_count?: number }>(
 	droppedOpen: T[],
 	max: number,

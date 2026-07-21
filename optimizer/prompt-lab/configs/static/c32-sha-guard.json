@@ -1,0 +1,5 @@
+{
+  "name": "sha-guard",
+  "prediction": "SHA-shaped tokens the model writes into plan notes/summary are verified against git (cat-file -e, fail-open): fabricated commit hashes draw an immediate correction steer instead of surviving as false provenance. Pass rate neutral; sha-guard telemetry measures the failure mode's real frequency — if missing stays 0 across rounds, the guard documents a non-problem and should be dropped (reddit checkpointed-development port, 2026-07-21).",
+  "thresholds": { "PLAN_SHA_GUARD": "on" }
+}

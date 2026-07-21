@@ -6,7 +6,7 @@ import { defineTool, withFileMutationQueue, type ExtensionAPI } from "@earendil-
 import { Type } from "typebox";
 import { assertVerifyGateAllowed, classifyBashCommand } from "../lib/command-policy.ts";
 import { runReadonlyGate } from "../lib/gate-runtime.ts";
-import { planIntegrity, executionUnderway, normalizeTitle, preserveDecision, validateDeps, unmetDeps, reconcileItems as libReconcile, type ReconciledItem, type IncomingItem } from "../lib/plan-integrity.ts";
+import { planIntegrity, executionUnderway, normalizeTitle, preserveDecision, shaCandidates, validateDeps, unmetDeps, reconcileItems as libReconcile, type ReconciledItem, type IncomingItem } from "../lib/plan-integrity.ts";
 import { nextReplanStreak, parseTodoLine } from "../lib/plan-progress.ts";
 import { processWriterMarker } from "../lib/process-writer.ts";
 import { steerText } from "../lib/steer-texts.ts";
@@ -61,6 +61,13 @@ const PRESERVE_MAX = Math.max(2, Number.parseInt(process.env.PLAN_PRESERVE_MAX |
 // subagent instead of leaving delegation advisory. Trades per-edit spawn overhead
 // for full process isolation of each edit — measure, don't assume, the tradeoff.
 const PLAN_SUBAGENT_ONLY = process.env.PLAN_SUBAGENT_ONLY === "1";
+// Dark candidate c31: a plan-level uncertainties[] field with a structural
+// pause — a model that surfaces uncertainty must be stopped from guessing
+// past it (deterministic gate, no LLM judgment call). npcsh loop_plan port.
+const PLAN_UNCERTAINTY = process.env.PLAN_UNCERTAINTY === "on";
+// Dark candidate c32: verify commit SHAs the model writes into notes/summary
+// actually exist (git cat-file -e) — catches confabulated provenance.
+const PLAN_SHA_GUARD = process.env.PLAN_SHA_GUARD === "on";
 
 type ItemStatus = "pending" | "in_progress" | "done" | "blocked";
 type Phase = "planned" | "executing";
@@ -93,6 +100,7 @@ type PlanState = {
 	updated_at: string;
 	items: PlanItem[];
 	writer?: string; // process marker of the last writer (cross-session resume detection)
+	uncertainties?: string[]; // c31: unresolved questions; execution is held while any remain
 };
 
 type TraceEvent = {
@@ -598,6 +606,11 @@ const planWrite = defineTool({
 		items: Type.Array(itemSchema, { minItems: 1 }),
 		request: Type.Optional(Type.String()),
 		summary: Type.Optional(Type.String()),
+		// Only part of the model-visible schema when the c31 candidate is armed —
+		// dark sessions must see a byte-identical tool schema.
+		...(PLAN_UNCERTAINTY ? {
+			uncertainties: Type.Optional(Type.Array(Type.String(), { description: "Unresolved questions blocking confident execution. Execution will NOT start while any remain. Ask the user, then clear with []." })),
+		} : {}),
 	}),
 	async execute(_toolCallId, params, _signal, _onUpdate, ctx) {
 		const aid = actionId();
@@ -724,9 +737,16 @@ const planWrite = defineTool({
 			// Computed after the reattach so preserved already-done items don't count.
 			const newlyDone = items.filter((i) => i.status === "done" && prevById.get(i.id)?.status !== "done").length;
 
+			// c31: same omission-safety rule as summary — omitted preserves, [] clears.
+			const incomingUncertainties = (params as { uncertainties?: string[] }).uncertainties;
 			const next: PlanState = prev
 				? { ...prev, request: params.request ?? prev.request, summary: params.summary ?? prev.summary, items, phase: prev.phase === "planned" ? "planned" : "executing", updated_at: isoNow() }
 				: newState(params.request ?? "", params.summary ?? "", "lean", items, eventRunId);
+			if (PLAN_UNCERTAINTY) {
+				const resolved = (incomingUncertainties ?? prev?.uncertainties ?? []).map((u) => String(u).slice(0, 300)).slice(0, 8);
+				if (resolved.length) next.uncertainties = resolved;
+				else delete next.uncertainties;
+			}
 			const newlyBlocked = items.filter((i) => i.status === "blocked" && !prevBlocked.has(i.id));
 			const prevCompleted = prev ? derivedStatus(prev) === "completed" : false;
 			// Captured BEFORE this write stamps us as the writer — a foreign-writer
@@ -767,6 +787,19 @@ const planWrite = defineTool({
 				'⚠ "{title}" is blocked on the user, and the user does NOT see plan notes. In your reply RIGHT NOW, ask the user the exact question (or name the exact action you need from them) in plain text, then stop and wait.',
 				{ title: blockedOnUser[0].title },
 			);
+		}
+		// c31: outstanding uncertainties demand the question be VOICED now, and
+		// hold execution (the /plan-go gate below enforces the hold). askNow takes
+		// precedence — both steers say "ask the user", one per result is enough.
+		let uncertaintyWarn = "";
+		if (PLAN_UNCERTAINTY && (state.uncertainties?.length ?? 0) > 0 && !askNow) {
+			const list = (state.uncertainties ?? []).map((u) => `- ${u}`).join("\n");
+			uncertaintyWarn = "\n" + steerText(
+				"PLAN_UNCERTAINTY_MSG",
+				"⚠ {count} unresolved uncertaint(y/ies) — execution will NOT start while any remain. In your reply RIGHT NOW, ask the user these EXACT questions in plain text, then stop and wait. Clear them with uncertainties: [] once answered:\n{list}",
+				{ count: state.uncertainties!.length, list },
+			);
+			planEvent("uncertainty-hold", state.run_id, { count: state.uncertainties!.length, gate: "write-steer" });
 		}
 		// Plan-integrity guard: a rewrite that omitted work — completed items are always
 		// re-attached; open items are re-attached once execution is underway (omission ≠
@@ -814,7 +847,8 @@ const planWrite = defineTool({
 		}
 		// Don't fire "stop re-planning, execute now" in the same call that just told
 		// the model to stop and wait for the user — the two steers directly contradict.
-		const thrashFired = replanWarn && !!cur && !askNow;
+		// Never pair "execute now" with "stop and ask the user" in one result.
+		const thrashFired = replanWarn && !!cur && !askNow && !uncertaintyWarn;
 		if (thrashFired) planEvent("thrash-warn", state.run_id, { streak: replanStreak });
 		let thrashWarn = "";
 		if (thrashFired) {
@@ -880,8 +914,42 @@ const planWrite = defineTool({
 			partialWorkNoted = true;
 			resumeWarn = `\n⚠ Resumed from a previous session. Previously in_progress item(s) may have PARTIAL WORK on disk: ${stalePrev.map((i) => i.title).join("; ")}. Inspect current state (git status/diff, read the touched files) before continuing — do not trust it done and do not redo it blind.`;
 		}
+		// c32: SHA-shaped tokens the model wrote into notes/summary must reference
+		// commits that actually exist. Runs AFTER the state write (never blocks
+		// persistence), fail-open on any git error, steer-only.
+		let shaWarn = "";
+		if (PLAN_SHA_GUARD && api) {
+			const written = [params.summary ?? "", ...params.items.map((item) => item.note ?? "")].join("\n");
+			const candidates = shaCandidates(written);
+			if (candidates.length) {
+				const missing: string[] = [];
+				// A missing object and a missing REPOSITORY both exit 128 from
+				// cat-file, so establish "this is a repo" first; outside a repo (or
+				// with git absent) the guard fails open and never accuses.
+				let inRepo = false;
+				try {
+					inRepo = (await api.exec("git", ["rev-parse", "--git-dir"], { cwd: ctx.cwd, timeout: 2000 })).code === 0;
+				} catch { /* git absent — fail open */ }
+				for (const sha of inRepo ? candidates : []) {
+					try {
+						const probe = await api.exec("git", ["cat-file", "-e", `${sha}^{commit}`], { cwd: ctx.cwd, timeout: 2000 });
+						if (probe.code !== 0) missing.push(sha);
+					} catch {
+						// timeout — fail open, never punish
+					}
+				}
+				planEvent("sha-guard", state.run_id, { checked: candidates.length, missing: missing.length });
+				if (missing.length) {
+					shaWarn = "\n" + steerText(
+						"PLAN_SHA_GUARD_MSG",
+						"⚠ {shas} do(es) not exist in this repository — never fabricate commit hashes. Run `git log --oneline -1` and record the REAL hash, or remove the reference.",
+						{ shas: missing.join(", ") },
+					);
+				}
+			}
+		}
 		const gateNote = gateMsgs.length ? `\n${gateMsgs.join("\n")}` : "";
-		const body = `Plan updated (${state.items.length} items, status: ${derivedStatus(state)}).${cur ? `\nNext open: ${cur.title}` : "\nNo open items remain."}${warning}${askNow}${finalReport}${integrityWarn}${thrashWarn}${depWarn}${resumeWarn}${gateNote}`;
+		const body = `Plan updated (${state.items.length} items, status: ${derivedStatus(state)}).${cur ? `\nNext open: ${cur.title}` : "\nNo open items remain."}${warning}${askNow}${finalReport}${integrityWarn}${thrashWarn}${depWarn}${uncertaintyWarn}${resumeWarn}${shaWarn}${gateNote}`;
 		return {
 			content: [{ type: "text", text: body }],
 			details: { tool_name: "plan_write", action_id: aid, success: true },
@@ -929,6 +997,16 @@ async function goCommand(args: string, ctx: { cwd: string; model?: { provider?: 
 	const open = state.items.filter((i) => i.status === "pending" || i.status === "in_progress");
 	if (open.length === 0) {
 		ctx.ui.notify("Plan is complete — no open items. Start a new plan with /plan <request>.", "info");
+		return;
+	}
+	// c31: deterministic hold — execution cannot start while the model's own
+	// declared uncertainties remain. No LLM judgment; clear them via plan_write.
+	if (PLAN_UNCERTAINTY && (state.uncertainties?.length ?? 0) > 0) {
+		planEvent("uncertainty-hold", state.run_id, { count: state.uncertainties!.length, gate: "plan-go-block" });
+		ctx.ui.notify(
+			`Execution held — ${state.uncertainties!.length} unresolved uncertaint(y/ies):\n${state.uncertainties!.map((u) => `- ${u}`).join("\n")}\nAnswer them, have the model clear the field (plan_write uncertainties: []), then /plan-go again.`,
+			"warning",
+		);
 		return;
 	}
 
@@ -1119,6 +1197,15 @@ export default function (pi: ExtensionAPI) {
 		);
 		if (waiting) {
 			ctx.ui.notify(`plan is waiting on you — ${waiting.title}${waiting.note ? `: ${waiting.note}` : ""}`.slice(0, 200), "warning");
+		}
+		// c31 backstop: the run ended with declared-but-unresolved uncertainties —
+		// the user must always see the parked questions, voiced or not.
+		if (PLAN_UNCERTAINTY && state && (state.uncertainties?.length ?? 0) > 0) {
+			planEvent("uncertainty-hold", state.run_id, { count: state.uncertainties!.length, gate: "agent-end" });
+			ctx.ui.notify(
+				`plan has ${state.uncertainties!.length} unresolved uncertaint(y/ies):\n${state.uncertainties!.map((u) => `- ${u}`).join("\n").slice(0, 400)}`,
+				"warning",
+			);
 		}
 		if (!state || state.phase !== "executing") return;
 		const open = state.items.some((i) => i.status === "pending" || i.status === "in_progress");
