@@ -641,4 +641,331 @@ whitelisted). Harness telemetry (`lib/telemetry.ts` → `~/.pi/agent/telemetry/e
 `scripts/telemetry-report.sh`) records every steer/block/abort/compaction + steer→progress
 compliance, giving future fitness signals beyond binary gate-pass.
 
+## 9. Round 5+: the c25–c37 candidate ledger and the delegation-decomposition pivot (2026-07-21 → 2026-07-22)
+
+The queue below picks up where §8 leaves off. Where §8 is largely a research-triage log —
+*should we even build this* — this section is a ledger of things that were actually built,
+in what state each one currently sits (dark-and-unmeasured, exploratory-tested, or locally
+authoritative), and, at its close, an account of a deliberate architectural pivot the whole
+back half of the ledger now serves. Read it as a diary of the project's central epistemic
+discipline in action: every candidate below ships **dark** (inert unless its env flag is set),
+is registered in `configs/schema.json` (the `config.py --selftest` check exists specifically
+because two candidates once shipped with an unregistered threshold and silently exited the
+gate with code 2 — see the c24/c25 note above), and is adopted only after it *wins* a round
+against the do-no-harm rule, never on the strength of its author's confidence in the mechanism.
+
+**c25 — subagent-only edits (`PLAN_SUBAGENT_ONLY=1`).** The first candidate to make delegation
+*mandatory* rather than merely advisory. While `plan-runner`'s ordinary prompt already suggests
+routing an isolated edit through `subagent(executor, …)`, nothing stopped the model from editing
+directly, and small models reliably take the path of least resistance. Under this flag, the
+`tool_call` handler blocks every `edit`/`write`/`multiedit` call — and, critically, every
+*mutating* `bash` invocation too (`sed -i`, `cat >`, and anything else `command-policy.ts`'s
+`classifyBashCommand` flags as a mutation; a shell one-liner is exactly as much a direct edit as
+a call to the `edit` tool, and a candidate that only closed the front door would be trivially
+routed around) — during the execution phase of a plan, steering the model to delegate the work
+to a freshly spawned `subagent(executor, …, mode=fork)` instead. If no `subagent` tool is present
+in the session at all, the block reason degrades honestly to "mark the item blocked and stop,"
+rather than pointing the model at machinery it cannot actually reach. This mechanical hardening
+(bash-mutation coverage, the subagent-tool-presence check, and a `plan-runner/subagent-only-block`
+telemetry event so a future round can see the block rate directly) was itself a same-session
+repair — the original cut only covered the three named mutation tools and was silently
+inert against a scripted `sed -i`.
+
+**c26 — read deduplication (`READ_DEDUP=on`).** A `context` event transform, not a message
+mutation: when the exact same file content is read twice in a session, the second (and every
+subsequent) occurrence collapses to a one-line back-reference in the *per-call view* the
+provider actually sees, while the underlying transcript is left completely untouched. This is
+the one candidate in the whole ledger with a purely transient effect — nothing is rewritten in
+history, so a compaction or a `/collapse` sees the original reads exactly as they happened. Run
+once, exploratory, on the remote 4B: 17 of 18 sessions passed (the lone miss was the model
+writing its own syntactically invalid test file — a genuine capability miss, not a harness
+defect), and the fleet report returned `VERDICT: INCOMPLETE`, which at the time was read as
+"inconclusive" but is now understood to be *structural* to any remote endpoint (see the
+authoritative-verdict discussion two paragraphs below) rather than a property of this specific
+candidate or round.
+
+**c27 — redundancy nudge (`CTX_REDUNDANCY_NUDGE=on`, `CTX_REDUNDANCY_PCT`, default 50).** Where
+c26 quietly fixes duplication, c27 tells the model about it: once `context-surface`'s passive
+duplicate-share telemetry crosses the configured percentage, a `turn_end` steer ("~N% of your
+context is duplicate — call `compact_context`") fires, gated by an eight-turn cooldown so it
+cannot nag every turn. Also run once, exploratory, on the remote 4B: 15 of 18 passed (three
+misses, spread across both arms on an unrelated edge case in the `parens` fixture, plus one
+`bigdata` floating-point rounding miss confined to the baseline arm) — again `VERDICT:
+INCOMPLETE`. By this point in the session, three consecutive remote-box rounds (c28 below, c26,
+c27) had all landed `INCOMPLETE`, which is what motivated the pivot to local testing described
+below rather than continuing to spend box time on a verdict class that structurally cannot
+resolve.
+
+**c28 — teach-hints (`TEACH_HINTS=on`).** Three narrowly deterministic rules — a missing-command
+error, a module-not-found error, and a malformed-patch error — each of which, on a match, appends
+exactly one fixed teaching line to the offending tool's error result via the `tool_result` hook.
+First rule to match wins; no rule ever fires on a *successful* result. This is the candidate that
+finally broke the `INCOMPLETE` streak, because it was the first one re-run against the **local**
+daily driver (`qwen36-35b-iq3s` via `local-llamacpp`, `127.0.0.1:8080`) rather than the remote
+box — no `LLAMA_API_KEY` in play, hence no non-authoritative flag, hence a verdict the fleet
+report will actually commit to. The first local attempt, at N=3, surfaced a real and separately
+interesting finding before it could even measure the candidate: `qwen36-35b-iq3s` intermittently
+emits a malformed pseudo-tool-call as literal assistant *text* (`<tool_call></tool_call>\n
+<function=bash>…`) rather than a genuine API tool call, ending the session on the spot with zero
+work done. This was not a new bug — it is an already-documented trade-off recorded in
+`run-qwen36-35b-iq3s.sh`'s own launch comments: the q8 KV cache plus `batch=2048`/`ubatch=1024`
+configuration was chosen deliberately for prefill throughput and answer quality, at a measured
+cost of "more malformed tool/edit calls" versus the more conservative `q4_0` / `512`/`256`
+alternative, which the launcher keeps wired as an explicit escape hatch
+(`BATCH=512 UBATCH=256 CACHE_K=q4_0 CACHE_V=q4_0`) should the trade ever stop being worth it.
+Rather than change the launcher, the round was simply re-run at N=6 (36 sessions total), large
+enough to average the artifact out: **`VERDICT: NEUTRAL`** — base 100% (18/18) against candidate
+89% (17/18, the single miss being that same well-understood artifact recurring, not a genuine
+regression the candidate introduced). This was the queue's first authoritative, non-`INCOMPLETE`
+result, and it fixed the going-forward template: local daily-driver rounds produce real
+verdicts; remote-box rounds are directional and exploratory only, useful for finding harness bugs
+(three were found and fixed this way — twice in `context-watcher`'s stale-context handling, once
+in `ketch`'s `maxLength` drift) but never for an adopt/reject decision.
+
+**c29 — micro-gate slop detection (`MICRO_GATE_SLOP=on`).** A heuristic companion to the existing
+`micro-gate` parse/compile check: after an edit, a lightweight scan of the diff for likely
+corner-cutting (stubbed branches, suspiciously empty error handlers, and similar shapes) produces
+a short "possible shortcuts" steer naming up to three offending files, suppressed on any turn
+where the stricter parse-error check already fired (never stack two competing steers about the
+same edit in the same turn).
+
+**c30 — context brief (`CONTEXT_BRIEF=on`, `CONTEXT_BRIEF_BYTES`, default 2048, clamped to
+256–16384).** A `before_agent_start` hook appending a compact, explicitly untrusted-data-framed
+"## Environment brief" section — a cached repository inventory — to the system prompt, computed
+once at session start and held stable for the session's whole KV-cache lifetime rather than
+recomputed per turn. This is a port of an external "environment brief" concept, review-hardened
+through four adversarial passes before it shipped, on the theory that some of what a model
+otherwise spends several exploratory `read`/`ls`/`grep` turns discovering can instead be handed
+to it for free, cheaply, and without the KV-cache churn of a per-turn recomputation.
+
+**c31 — plan uncertainty (`PLAN_UNCERTAINTY=on`).** A port of the npcsh `loop_plan` pattern: a
+plan gains an optional `uncertainties[]` field, and once the model has declared one, execution is
+*structurally* paused — not merely advised to stop — until the uncertainty is explicitly cleared
+(writing an empty list back). The distinguishing design choice is that this is a **deterministic
+gate**, not an LLM judgment call layered on top of one: the harness does not attempt to assess
+whether an uncertainty the model surfaced is *genuine*; it simply refuses to let execution proceed
+past a declared one, on the theory that a model honest enough to name its own uncertainty should
+never be allowed to then guess past it in the same breath. Tested end-to-end: the write produces
+the expected steer, `/plan-go` is deterministically blocked while an uncertainty is outstanding,
+clearing the list with `[]` releases it, and the omission-safe reattach logic (shared with the
+plan-integrity machinery generally) preserves the field correctly across a rewrite that forgets to
+echo it back.
+
+**c32 — commit-SHA guard (`PLAN_SHA_GUARD=on`).** A narrow, mechanical honesty check: whenever
+the model writes a commit SHA into a plan item's note or the run summary, the guard verifies with
+`git cat-file -e` that the SHA actually exists in the repository before letting the claim stand,
+catching confabulated provenance — a plausible-looking hash the model invented rather than one
+that came from a real `git commit` it ran. Tested: a fabricated SHA in a note reliably draws a
+steer; a genuine SHA passes silently; and, correctly, the guard fails *open* (does nothing) when
+the working directory is not a git repository at all, rather than raising a spurious complaint
+about a concept — commit provenance — that does not apply there.
+
+**c33 — subagent fork-by-default (`SUBAGENT_DEFAULT_MODE=fork`).** `vendor/pi-subagent`'s
+delegation-mode parser defaults an *unspecified* mode to `spawn` (a fresh, nearly empty context
+for the child); this candidate flips that default to `fork` (the child instead receives a full
+snapshot of the parent's entire session, replayed as its own history) whenever the model omits an
+explicit mode. An *explicit* mode from the model always wins regardless of the flag — this is a
+default only, never an override. The motivating hypothesis was narrowly about a single-slot
+local `llama-server`: a forked child re-primes the parent's already-warm KV-cache prefix, where a
+`spawn`ed child evicts it and starts cold, so on hardware where only one request can be served at
+a time, the fork default might trade a larger per-request prompt for a cheaper prefill. **This
+candidate is now in direct philosophical tension with the c36/c37 pivot below** and should almost
+certainly be dropped from the active queue rather than measured — running an A/B round to adopt
+`fork`-by-default at the same time the project is deliberately moving delegation guidance the
+other way, toward `spawn`-by-default plus explicitly self-contained tasks, would be testing two
+opposed hypotheses under the same roof. It is recorded here rather than deleted only because the
+KV-cache-reuse rationale it was built on remains a coherent, distinct idea that might warrant its
+own re-litigation later, on its own terms, separately from the direction the rest of this ledger
+has since taken.
+
+**c34 — non-numeric plan-item guidance (`PLAN_ITEM_GUIDANCE_V2=on`).** The smallest candidate in
+the ledger by diff size and arguably the most carefully reasoned by rationale: the legacy planning
+prompt told the model to "break REQ into 5-10 ordered items," a bound the `plan_write` tool's own
+JSON schema never actually enforced (it declares only `minItems: 1`, no ceiling), so the number
+was decorative at best and, worse, an invitation to pad a three-item task to five or to jam a
+fifteen-item task into ten via artificial merges. The replacement text — "decompose REQ into
+ordered steps sized to the real work — no padding, no fake splits" — keeps both anti-patterns the
+original line guarded against while dropping the unenforced, misleading numeral. This is
+explicitly framed as *compression*, not elaboration: the swap is deliberately one precise phrase
+for another at equal-or-fewer tokens, never a verbose rewrite, a distinction the project settled
+on after weighing two things against each other — the general instinct that careful, exact
+wording is good, against the specific, measured finding (dd1, §8 above: full governor 83% pass,
+lean 89%, empty 97%, strictly monotonic) that *behavioral prose actively harms a capable model* on
+this harness's own data. External literature agrees with the empirical result: Anthropic's own
+context-engineering guidance on finding the "right altitude," research on position bias in long
+prompts, and Schreiter et al. 2025 (arXiv:2505.17037, the one controlled study of vocabulary
+specificity effects on instruction-following) all converge on plain, information-dense, imperative
+phrasing over elaborate or rare-word phrasing — rare words earn their keep only when they
+disambiguate, never for register alone. Adding ornate wording to chase a hypothesis (register
+correlates with better compliance) that both our own instrument and the outside literature argue
+against would have been exactly the mistake the project's discipline exists to prevent.
+
+**c35 — bash output guard (`BASH_OUTPUT_GUARD=on`, `BASH_OUTPUT_MAX_CHARS`, default 8000).** The
+harness's `context-inlet-guard` has bounded oversized `read` calls since early in the project by
+`stat()`-ing the target file *before* it is ever opened and refusing to read anything implausibly
+large — but there is no `stat()` equivalent for an arbitrary shell command's future output, so
+nothing analogous existed for `bash`. This candidate closes that gap with a `tool_result` hook
+(the earliest point a command's actual output size becomes knowable) that, on an oversized result,
+withholds the real content entirely and substitutes a bounded diagnostic plus a steer, rather than
+truncating and showing a partial view — the same "block, don't truncate" philosophy `context-inlet-guard`
+already uses, on the reasoning that a partial view of a wide `find` or `grep` result risks the model
+drawing confidently wrong conclusions from an arbitrary cutoff point, which is arguably worse than
+being told plainly that the output was too large to use. A cheap heuristic
+(`looksLikeCwdEscape`: a bare `$HOME`, a bare `~`, or an absolute path outside the working
+directory anywhere in the command text) only sharpens the wording of the steer when it fires — it
+never changes whether the block itself fires, so a false positive or negative in the heuristic
+only costs a slightly less specific message, never an incorrect decision. The motivating incident
+was a live one, discovered by accident: once LFM2.5-8B-A1B's *unrelated* tool-call-formatting bug
+had been fixed server-side (confirmed independently by reading a real, successfully executed
+`tool_call` out of a session's own transcript), the model went on, in the very next reasonable
+turn, to run an entirely unscoped `find` that walked straight out of its assigned working
+directory and into `~/LLM/real-gate-runs/` — a directory holding thousands of files left behind by
+unrelated historical gate rounds spanning many old experiment prefixes — and got back roughly
+63,000 characters of irrelevant listing for its trouble, after which the session simply sat idle
+for the remainder of its turn budget, having apparently exhausted whatever it was trying to do
+with a result it had no productive way to use. The telemetry path needed a companion fix before
+the candidate could even be verified in the field: `context_telemetry.py` extracted
+`context-watcher`, `surface-receipt`, and `context-surface` events into a gate row's `context`
+field, but never `bash-output-guard`'s own `withheld` event, so a completed gate round had no way
+to confirm after the fact whether the guard had fired at all versus simply never having been
+exercised. That gap is now closed (a `context.bash_output_guard.{withheld,cwd_escape_suspected}`
+field, registered in the eval-row schema as an optional addition so historical rows without it
+remain valid). Measured across four rounds — remote 4B, remote 9B (`qwopus35-9b-coder-q4-k-m`, the
+newest addition to the box's model zoo, discovered and registered mid-session), remote LFM25, and
+finally the local daily driver — the guard has, notably, never once actually fired: no session, on
+any of the four models, ever produced a single `bash` result anywhere near the 8,000-character
+threshold in the tasks tested. The local round returned the ledger's second authoritative,
+non-`INCOMPLETE` verdict: `VERDICT: NEUTRAL`, base and candidate both at 89% pass (n=9/arm) — safe,
+in that turning the guard on cost nothing measurable, but not yet *proven* useful, in that its
+actual triggering mechanism remains unexercised by anything in the current gate task set. Two
+further, separate findings surfaced in the course of chasing this candidate on LFM25 specifically,
+worth recording here because they are easy to conflate with c35 itself but are not the same bug:
+first, the exact cwd-escape-and-stall scenario recurred twice, reproducibly, in live gate rounds
+even with the guard active, and a stack sample of the stalled process (via macOS `sample`) showed
+its event loop and every worker thread genuinely idle — parked in `kevent`/`uv_cond_wait`, zero
+CPU, no open network connection to the remote endpoint — waiting on some internal signal that
+never arrived, with the guard's own telemetry showing zero firings on the affected row; five
+standalone attempts to reproduce this outside the gate harness, including one built with the exact
+byte-identical rendered governor prompt the gate itself sends (verified via `config.py --apply`
+plus a direct diff against a real gate rundir's `.pi/APPEND_SYSTEM.md`) and a fully wiped
+`env -i` environment matching the gate's, never once reproduced the stall — all five collapsed
+instead into the second, separate finding: LFM25 emitting a malformed pseudo-tool-call as plain
+text rather than a genuine API call, on every single attempt, a considerably higher failure rate
+than the one successfully-executed real tool call that had earlier confirmed the server-side
+formatting fix actually worked at all. Both findings are recorded as open and unresolved; neither
+is a defect in c35's own logic, and both point outward at the remote endpoint's serving
+configuration rather than inward at the harness.
+
+### The many-small-contexts pivot: c36 and c37
+
+Roughly two-thirds of the way through this same working session, the project's owner articulated
+a deliberate change of architectural direction, worth quoting rather than paraphrasing, because
+the exact framing shaped both candidates that followed it directly: *"I need more, separate LLM
+calls, to play to lower contexts, instead of complicating LLM calls as they are. I don't mind the
+slowdown on the wallclock."* The diagnosis behind the request is straightforward and consistent
+with everything measured elsewhere in this ledger: small local models degrade as their context
+grows, and the harness's instinct up to this point — visible in nearly every candidate above,
+from `teach-hints`'s appended error-result lines to `plan-runner`'s escalating gate-ladder
+steers — has been to keep one session alive longer by coaching it more elaborately when it
+struggles, rather than to end that session early and hand the remaining work to a fresh one.
+Wall-clock time was explicitly declared a currency the project is willing to spend more of in
+exchange for smaller, cleaner contexts per call.
+
+A survey of the existing decomposition machinery, conducted before either candidate was designed,
+turned up an encouraging asymmetry: the right primitive already existed, but the harness's own
+guidance consistently pointed away from it. The bundled `subagent` tool's `spawn` mode is exactly
+the shape of thing the new direction asks for — a genuinely separate OS process, started with
+nothing but its role's system prompt (on the order of one to one-and-a-half kilobytes for
+`explorer`, `executor`, and `verifier`) plus a single task string, whose result is clamped to
+12,000 characters before it is ever handed back to the parent (`runner-events.js`'s own comment
+on the clamp: an unbounded child answer would otherwise dump tens of thousands of tokens into a
+thirty-thousand-token window). But every place in the harness that actually *recommends*
+delegation — the `executor.md` role description, `plan-runner`'s delegation-guidance prose, the
+gate-repair ladder's second rung, and c25's own block-and-steer reason — recommended `fork` mode
+instead, in which the child receives not a small fresh prompt but a complete snapshot of the
+parent's entire accumulated session, replayed as its own history: precisely the large-context
+shape the new direction wants less of. Compounding the mismatch, candidate c33, still sitting
+dark and unmeasured in the queue at that point, would have made `fork` the *default* delegation
+mode fleet-wide had it ever been armed and won a round. Separately, nothing in the harness routed
+*ordinary*, non-edit plan items — exploration, verification, anything that was not specifically a
+scoped edit — through any kind of isolated call at all; c25's enforcement, the closest existing
+mechanism, covered mutations exclusively.
+
+Two candidates were built in direct response, deliberately scoped as two rather than one so each
+could be measured, adopted, or rejected independently of the other.
+
+**c36 — spawn-over-fork delegation (`SPAWN_DELEGATION=on`).** Wherever the harness previously
+recommended `mode=fork`, this candidate flips the recommendation to `mode=spawn`, paired with an
+explicit instruction that the delegated task string must be fully self-contained — the child will
+see nothing beyond the text of the task itself, so anything the parent has not written into that
+string is simply unavailable to it. Three sites in `plan-runner.ts` carry the change: the general
+delegation-guidance block (both its `PLAN_SUBAGENT_ONLY`-armed wording and its ordinary advisory
+wording), the gate-repair ladder's second rung, and c25's own block reason when a subagent is
+available to point the model at. Each site is written so that with the flag off, the resolved
+text is byte-for-byte identical to what shipped before — a pair of small constants resolve to
+either the legacy fork-mode phrase or the new spawn-mode phrase plus its self-containment
+reminder, and an empty string in the flag-off case, so no test needs to distinguish "the flag is
+off" from "the flag doesn't exist yet." The fourth site required a different tactic entirely: the
+`executor.md` role file's own description — "Use mode=fork so it has surrounding context" — is a
+static markdown file on disk, shared unmodified across every arm of every A/B round and parsed
+directly by the role-routing tests, so editing it on disk was never an option (it would either
+break those tests or make the file's on-disk content stop describing what actually ships in the
+default arm). Instead, the sentence is rewritten at the moment the role list is injected into the
+system prompt — a small exported helper, `agentDescriptionForPrompt`, performs one exact-string
+replacement of that specific sentence with its spawn-mode equivalent, reads the flag live at call
+time rather than at module load (matching the pattern the harness's other env-overridable steer
+templates already use), and leaves every other role's description — `explorer` and `verifier`
+never mention fork mode at all — completely untouched. This candidate is deliberately the
+photographic negative of c33 above: where c33 would default the mode to fork, c36 argues, in
+every place the model is given advice at all, for the opposite. The two should never be armed in
+the same round.
+
+**c37 — delegate every plan item (`PLAN_DELEGATE_ALL=on`).** Where c25 mechanically forces only
+*edits* through a subagent, this candidate extends the same enforcement discipline to
+*everything*: once execution has begun, the main session's own tool palette shrinks to exactly
+two entries, `plan_write` and `subagent` — every other direct tool call
+(`read`, `grep`, `find`, `ls`, `bash`, `edit`, `write`, `multiedit`) is mechanically blocked and
+the block reason steers the model toward a role-matched, spawn-mode subagent instead: a read-shaped
+call routes to `explorer`, an edit-shaped call or a mutating shell command routes to `executor`,
+and a merely read-only shell command (a `cat`, a `grep`, anything `classifyBashCommand` does not
+flag as mutating) routes to `verifier`, on the reasoning that each role's own tool grant is already
+capability-correct for the work being asked of it — `explorer` has no `bash` at all, `verifier`
+has read-only `bash` for checks, and only `executor` carries both `bash` and the mutation tools.
+Because c37's blocked set is a strict superset of c25's narrower edit-only set, and its branch in
+the `tool_call` handler is checked first, the two compose without any explicit interlock code:
+whenever both flags happen to be armed together, every call c25 would also have blocked instead
+receives c37's reason, simply by virtue of running first — precedence by code ordering, not by any
+purpose-built resolution logic. One category of work is deliberately left outside the enforcement
+entirely: a plan item's `gate` command is executed by the engine itself, inside the `plan_write`
+tool's own handler, never as a model-issued `bash` tool call, so it was never subject to blocking
+in the first place and required no carve-out to preserve — the orchestrator's own deterministic
+verification channel stays exactly as it was, and only a model's *own, additional* attempt to run
+a verification command by hand gets redirected to `verifier`. The delegation-guidance prompt text
+gains a new, short, list-shaped first branch under the flag ("every item = one subagent call…"),
+and two lines of the general execution-discipline block are branched as well, for a very concrete
+reason rather than mere tidiness: the legacy text told the model to derive completion evidence
+from `git status`/`git diff`, which under this flag is now a blocked `bash` call — leaving that
+line unchanged would have manufactured a guaranteed block loop, steering the model straight into
+exactly the tool the flag has just taken away, so the flag-on variant instead tells it to cite the
+`CHANGED`/`VERIFY` lines a subagent's own result already reports. One accepted, deliberately
+undecided-against edge case is worth naming plainly: under `/plan <req> yolo`, the plan's phase is
+`executing` from its very first moment, so even the initial exploratory reads a model would
+ordinarily do for itself before writing a plan must, under this flag, be delegated to an
+`explorer` subagent instead — which is not a carve-out oversight but is understood to be exactly
+the candidate's own thesis playing out at its widest scope, and is flagged in the config's own
+prediction text as the thing worth watching most closely for stalls. New telemetry
+(`plan-runner/delegate-all-block`, keyed by the blocked tool name, and
+`plan-runner/delegate-all-subagent`, keyed by which agent and mode the model actually chose) gives
+a future round's report a direct compliance ratio — delegated calls against blocked-and-presumably-retried
+ones — as the candidate's own mechanism metric, independent of whatever the gate's pass rate ends
+up showing.
+
+Both candidates ship dark, register their thresholds in `configs/schema.json`, and their
+flag-off code paths are asserted byte-identical to the pre-existing behavior by dedicated tests —
+the same discipline every candidate in this ledger is held to. Neither has yet won, or even run, a
+gate round as of this writing; c37 in particular is the more direct test of the pivot's own
+central thesis and is the natural next round to fire, on the local daily driver, once the
+`INCOMPLETE`-versus-authoritative lesson from c28 and c35 above is applied from the outset rather
+than relearned.
+
 *Companion: `LOCAL_LLM_HARNESS_RESEARCH.md` (the playbook + gap analysis this builds on).*

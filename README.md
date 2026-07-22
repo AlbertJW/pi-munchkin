@@ -7,6 +7,19 @@
 > Make a small, locally-served LLM a competent [pi](https://github.com/earendil-works/pi) coding
 > agent — and prove that every change to the harness actually earns its place.
 
+A small local model is not a miniature frontier model; it is a different kind of instrument
+entirely, one that forgets, wanders, invents file paths it never read, and declares victory the
+instant its own output merely *resembles* success. Coaxing competent agentic behavior out of such
+a thing by prose alone — a longer system prompt, a sterner admonition, one more paragraph of
+"please remember to" — turns out, on this project's own repeatedly gathered evidence, to make
+matters *worse* far more often than it helps: the harness's central, hard-won finding is that
+**mechanism beats persuasion**. Where persuasion is unavoidable, keep it terse to the point of
+austerity; where a mechanism can enforce the same discipline instead, prefer the mechanism every
+time, and measure whether it actually earned its keep before you believe your own hypothesis about
+it. pi-munchkin is the accumulated apparatus for practicing exactly that discipline — a harness
+that supplies the mechanisms, and a measurement loop that keeps the harness honest about which of
+them are worth keeping.
+
 **pi-munchkin is two halves you can use independently:**
 
 1. **[The harness](#the-harness)** — pi extensions that make a small model edit code reliably
@@ -21,13 +34,22 @@ The active research and experiment backlog is maintained in
 > rate rose *monotonically as governor prose was removed* — 5.2 KB governor 83%, lean 89%,
 > **empty 97%** — so the shipped governor is a 1.4 KB minimal core. The same machinery rejected
 > six plausible candidates that measured as noise. A tuning loop that mostly says **no** is the
-> point — see [the honest finding](docs/THE-HONEST-FINDING.md).
+> point — see [the honest finding](docs/THE-HONEST-FINDING.md). A dozen further dark candidates
+> (c25 through c37; see the [self-improvement ledger](optimizer/docs/HARNESS_SELF_IMPROVEMENT.md))
+> sit built and mostly still unmeasured behind their own env flags, the newest pair (`SPAWN_DELEGATION`,
+> `PLAN_DELEGATE_ALL`) serving a deliberate ongoing pivot toward *more, smaller-context delegated
+> calls in place of one long coached session* — the loop's job on all of them is unchanged: prove
+> it, or reject it.
 
 ---
 
 ## The harness
 
-Pi extensions. Load them once; most work automatically, a few add commands or env knobs.
+Pi extensions. Load them once; most work automatically, a few add commands or env knobs. Each one
+below exists because a specific, observed small-model failure mode demanded it — not because it
+seemed generally prudent — and each is held to the same standard the rest of this project applies
+to itself: if it cannot be shown, on real sessions, to earn its place, it does not belong here
+armed by default.
 
 | Extension | What it does |
 |---|---|
@@ -38,18 +60,41 @@ Pi extensions. Load them once; most work automatically, a few add commands or en
 | **reflect** | `/reflect` — a fresh-context adversarial review of the current plan |
 | **drift-scanner** | after a commit, flags dead refs / stale docs the change introduced |
 | **git-guard** | confirms before any command that would discard uncommitted work |
-| **context-inlet-guard** | bounds oversized file reads before they flood context |
+| **context-inlet-guard** | bounds oversized file reads before they flood context (blocks, never truncates — a partial view of a huge file is worse than none) |
+| **bash-output-guard** | the same block-not-truncate discipline applied to shell output: withholds an oversized `bash` result and substitutes a bounded diagnostic, since `bash` has no `stat()`-style way to predict its own output size in advance |
 | **context-watcher** | observes every compaction and, when enabled, auto-compacts at `CTX_WATCH_PCT` (default 70) |
+| **context-dedup** | collapses a file already read verbatim this session down to a one-line back-reference in the model's *view only* — the transcript itself is never rewritten |
+| **context-brief** | a cached, once-per-session repository inventory appended to the system prompt, so the model spends fewer turns re-discovering what a brief could just tell it |
 | **context-surface** | passively hashes and aggregates the exact provider-bound context; never rewrites messages |
 | **span-tools** | `search_spans` / `read_span` — bounded retrieval over large files |
 | **compact-tool** | `compact_context` — model-requested structured compaction with one explicit post-compaction resume |
 | **micro-gate** | *(opt-in)* parse/compile-checks just-edited files at turn end |
-| **ketch** | always-on `web_search` / `web_read` for bounded public research; `KETCH=off` disables it |
+| **teach-hints** | a small, fixed table of deterministic teaching lines appended to specific, recognized tool-error shapes (a missing command, an absent module, a malformed patch) |
 | **did-you-mean** | suggests the nearest on-disk path after a mistyped file access |
-| **pi-subagent** | bundled `subagent` tool for isolated exploration, execution, and review |
+| **ketch** | always-on `web_search` / `web_read` for bounded public research; `KETCH=off` disables it |
+| **pi-subagent** | bundled `subagent` tool for isolated exploration, execution, and review — the harness's primary lever for keeping a small model's own context small by handing bounded sub-tasks to fresh, disposable processes |
+| **surface-receipt** | records the exact loaded extension/lib surface's hash as a signed telemetry row, so a gate round can prove after the fact which harness code actually ran it |
 
 Plus a **governor** (`harness/APPEND_SYSTEM.md`) — a minimal system-prompt core (safety gates +
-feature docs, no behavioral prose; the loop found prose *hurts* capable models).
+feature docs, no behavioral prose; the loop found prose *hurts* capable models). Its present
+1.4 KB shape is not a starting assumption but a measured conclusion: an earlier, considerably more
+verbose 5.2 KB governor was gated head-to-head against a trimmed 1.6 KB "lean" variant and against
+no governor prose at all, on the same daily-driver model across three dozen repetitions per arm,
+and the pass rate rose *monotonically* as the prose was removed — full governor 83%, lean 89%,
+empty 97% — a result documented in full, with its caveats honestly stated, in
+[the honest finding](docs/THE-HONEST-FINDING.md).
+
+A number of the extensions above are not, in fact, always active. Several — `micro-gate`'s slop
+heuristic, `context-brief`, `context-dedup`'s redundancy nudge, `teach-hints`, `bash-output-guard`,
+and a family of `plan-runner` behaviors (mandatory subagent delegation, uncertainty pauses,
+commit-SHA verification, and more besides) — ship dark, gated behind an environment variable that
+defaults to off, precisely because this project does not trust its own intuition about whether a
+mechanism helps until that mechanism has won a measured, statistically adjudicated comparison
+against not having it at all. The living ledger of every such candidate — what it does, what
+config activates it, what round (if any) it has been measured in, and what that round found — is
+kept in
+[the harness self-improvement doc](optimizer/docs/HARNESS_SELF_IMPROVEMENT.md), which is the
+closest thing this repository has to a laboratory notebook.
 
 ### Install
 
@@ -84,7 +129,10 @@ Most extensions are automatic once loaded. The surfaces you invoke:
 - **`/skill:deep-research <question>`** — bounded multi-source research with inline citations.
 - **`/ketch-status`** — show the installed Ketch version and backend health.
 
-Behavior knobs (all optional env vars, sensible defaults):
+Behavior knobs (all optional env vars, sensible defaults). The first block below is stable,
+always-available tuning; the second is the current roster of dark, unadopted A/B candidates —
+present in the codebase, inert unless explicitly armed, and each one's measurement status is
+tracked in the self-improvement ledger rather than repeated here:
 
 | Env | Effect |
 |---|---|
@@ -97,6 +145,22 @@ Behavior knobs (all optional env vars, sensible defaults):
 | `KETCH_BACKEND`, `KETCH_MULTI_BACKENDS` | quick backend (default `ddg`) and broad-search set (default `ddg,exa,keenable`) |
 | `CONTEXT_WATCHER=on\|off`, `CTX_WATCH_PCT=60\|70\|80` | enable and tune proactive compaction; telemetry remains active when disabled |
 | `DRIFT_SCANNER=off` | disable post-commit review |
+
+| Dark candidate env | Effect | Status |
+|---|---|---|
+| `BASH_OUTPUT_GUARD=on`, `BASH_OUTPUT_MAX_CHARS` (default 8000) | withhold an oversized `bash` result rather than truncate it | measured NEUTRAL locally; the guard's own trigger has yet to fire in any tested task |
+| `TEACH_HINTS=on` | append the fixed teaching line to a matching tool error | measured NEUTRAL locally (first authoritative win of the queue) |
+| `CONTEXT_BRIEF=on`, `CONTEXT_BRIEF_BYTES` (default 2048) | inject the cached repository-inventory brief | built, review-hardened, awaiting a gate round |
+| `READ_DEDUP=on` | collapse a repeated identical read to a back-reference in the view only | tested exploratory-only (remote endpoint; structurally non-authoritative) |
+| `CTX_REDUNDANCY_NUDGE=on`, `CTX_REDUNDANCY_PCT` (default 50) | steer toward `compact_context` past a duplication threshold | tested exploratory-only |
+| `MICRO_GATE_SLOP=on` | heuristic "possible shortcuts" steer after an edit | built, awaiting a gate round |
+| `PLAN_SUBAGENT_ONLY=1` | force every scoped edit through a fresh subagent | mechanically hardened; awaiting a gate round |
+| `PLAN_UNCERTAINTY=on` | a declared plan uncertainty structurally pauses execution until cleared | built and unit-tested; awaiting a gate round |
+| `PLAN_SHA_GUARD=on` | verify any commit SHA the model writes actually exists | built and unit-tested; awaiting a gate round |
+| `PLAN_ITEM_GUIDANCE_V2=on` | swap the unenforced "5-10 items" line for non-numeric, need-sized guidance | built; a deliberate compression, not an elaboration |
+| `SUBAGENT_DEFAULT_MODE=fork` | default an unspecified delegation to a full-context fork instead of a fresh spawn | **now philosophically opposed to `SPAWN_DELEGATION` below — do not arm both** |
+| `SPAWN_DELEGATION=on` | recommend `mode=spawn` + a self-contained task everywhere the harness previously suggested `mode=fork` | built; awaiting a gate round |
+| `PLAN_DELEGATE_ALL=on` | during execution, only `plan_write` and `subagent` remain callable directly — everything else is blocked and routed to a role-matched fresh subagent | built; the most direct test of the "many small contexts" thesis; awaiting a gate round |
 
 ### Platform and security notes
 
@@ -134,6 +198,20 @@ available as `npm test`, `npm run typecheck`, `npm run health`, `npm run pack:sm
 ---
 
 ## The self-improvement loop
+
+Every extension in the section above began life as a plausible idea, and plausible ideas about
+small-model behavior are, on this project's own repeated experience, wrong often enough that
+shipping them on conviction alone would be reckless. The optimizer exists to close that gap: it is
+the falsification machinery that stands between "this seems like it should help" and "this
+extension is armed by default." A candidate is measured against a genuine baseline, on real
+agentic tasks, over enough repetitions to distinguish signal from the considerable noise a small
+local model produces session to session, and it is adopted only if it clears a statistical bar —
+never on the strength of a compelling mechanism story, and never by majority vote of how many
+people find the reasoning persuasive. The project's own headline finding — that a smaller,
+plainer governor consistently *outperforms* a longer, more careful one — is exactly the kind of
+result this loop exists to catch, because it directly contradicts the intuition most engineers
+would bring to writing prompts, and no amount of intuition would have caught it without the
+measurement.
 
 The optimizer (`optimizer/`, Python) measures whether a change to the harness/governor actually
 makes a model write better code, and adopts only changes that pass Fisher's exact test. It is
