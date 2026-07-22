@@ -39,7 +39,8 @@
       "harness/vendor/pi-subagent/index.ts",
       "harness/extensions/context-brief.ts",
       "harness/extensions/context-dedup.ts",
-      "harness/extensions/context-surface.ts"
+      "harness/extensions/context-surface.ts",
+      "harness/extensions/bash-output-guard.ts"
     ],
     "skills": [
       "skills/deep-research"
@@ -80,7 +81,9 @@
     "harness/extensions/did-you-mean.ts",
     "harness/extensions/teach-hints.ts",
     "harness/extensions/surface-receipt.ts",
+    "harness/extensions/bash-output-guard.ts",
     "harness/lib/bash-mutations.ts",
+    "harness/lib/bash-output.ts",
     "harness/lib/command-policy.ts",
     "harness/lib/compaction-coordinator.ts",
     "harness/lib/context-inlet.ts",

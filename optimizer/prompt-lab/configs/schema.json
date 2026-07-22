@@ -185,6 +185,10 @@
     "PLAN_ITEM_GUIDANCE_V2": [
      "on",
      "off"
+    ],
+    "BASH_OUTPUT_GUARD": [
+     "on",
+     "off"
     ]
    }
   },

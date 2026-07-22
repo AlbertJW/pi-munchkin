@@ -1,0 +1,5 @@
+{
+  "name": "bash-output-guard",
+  "prediction": "an oversized bash result (default >8000 chars) is withheld and replaced with a bounded diagnostic + steer instead of flooding context — bash-output-guard.withheld telemetry confirms firing; sessions that would have stalled on a runaway/wandering command (a wide find/grep that escaped the working directory) instead get a narrow, actionable nudge and can recover within the same turn. Targets the LFM25-8B-A1B finding (2026-07-22): a 63K-char find result walked into an unrelated project and the session went idle for the rest of its budget. Pass rate neutral-to-up on tasks where an unbounded scan is plausible; reject if the withhold itself blocks legitimate large-but-in-scope output more than it saves.",
+  "thresholds": { "BASH_OUTPUT_GUARD": "on" }
+}

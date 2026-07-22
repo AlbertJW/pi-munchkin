@@ -88,6 +88,7 @@ export const EVENT_CATALOG = {
 	"micro-gate/slop-passed": { files: "number", checked: "number" },
 	"micro-gate/slop-checker-error": { file: "string", ...failure },
 	"context-brief/injected": { brief_bytes: "number", entries: "number", truncated: "boolean" },
+	"bash-output-guard/withheld": { chars: "number", max_chars: "number", cwd_escape_suspected: "boolean" },
 	"context-dedup/dedup": { replaced: "number", saved_bytes: "number" },
 	"context-dedup/nudge": { share_pct: "number", injected_chars: "number", turnIndex: "number" },
 	"context-surface/receipt": {
