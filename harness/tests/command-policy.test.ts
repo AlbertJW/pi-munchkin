@@ -229,3 +229,26 @@ test("discardGitTargets: preserves quoted globals, all targets, and rejects dyna
 	const dynamic = discardGitTargets("git -C $TARGET reset --hard", "/work", "/home/me");
 	assert.equal(dynamic.ok, false, "dynamic target must block rather than inspect the wrong repo");
 });
+
+test("discardGitTargets: a command with no git anywhere is never blocked, even if unparseable", () => {
+	// 2026-07-21: this exact class of command (a for-loop with $(...) command
+	// substitution, zero git anywhere) was refused as a "destructive git
+	// command" — shellSegments bails on `$(` before the per-segment git-token
+	// search ever runs. No git token in the raw text -> nothing to protect.
+	const forLoop = discardGitTargets(
+		`for d in inbox/*/; do status=$(cat "$d/manifest.json" 2>/dev/null); if [ "$status" = "" ]; then basename "$d"; fi; done`,
+		"/work", "/home/me",
+	);
+	assert.deepEqual(forLoop, { ok: true, targets: [] });
+
+	const backtick = discardGitTargets(`echo "count: \`wc -l file.txt\`"`, "/work", "/home/me");
+	assert.deepEqual(backtick, { ok: true, targets: [] });
+});
+
+test("discardGitTargets: still fails closed when git IS present but the syntax is unparseable", () => {
+	// Unquoted $(...) — the tokenizer bails on this regardless of position;
+	// a QUOTED "$(git ...)" is a single opaque word to the tokenizer (no bail),
+	// so this uses an unquoted substitution to actually exercise the null path.
+	const withGit = discardGitTargets(`git reset --hard $(cat target.txt)`, "/work", "/home/me");
+	assert.equal(withGit.ok, false, "a git-involving command substitution must still fail closed");
+});

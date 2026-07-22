@@ -273,8 +273,15 @@ function resolveShellDir(base: string, raw: string, home: string): string | null
 
 /** Resolve every destructive git invocation, preserving git globals so the
  * guard executes `git <same target globals> status`. Ambiguous shell expansion
- * is rejected; a destructive guard must never guess the repository and pass. */
+ * is rejected; a destructive guard must never guess the repository and pass.
+ * A command with no `git` token anywhere has nothing for this guard to
+ * protect against — checked BEFORE tokenization so a command substitution or
+ * for-loop the tokenizer can't parse (shellSegments returns null on `` ` ``
+ * or `$(`) doesn't fail closed on commands that were never git in the first
+ * place (observed 2026-07-21: a plain `for … do status=$(cat … ); …` loop
+ * with zero git anywhere was refused as a "destructive git command"). */
 export function discardGitTargets(cmd: string, cwd: string, home: string): DiscardTargetAnalysis {
+	if (!/\bgit\b/.test(cmd)) return { ok: true, targets: [] };
 	const segments = shellSegments(cmd);
 	if (!segments) return { ok: false, reason: "dynamic or malformed shell syntax prevents resolving the git target" };
 	let activeCwd = cwd;
