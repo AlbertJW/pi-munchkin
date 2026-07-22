@@ -61,6 +61,13 @@ const PRESERVE_MAX = Math.max(2, Number.parseInt(process.env.PLAN_PRESERVE_MAX |
 // subagent instead of leaving delegation advisory. Trades per-edit spawn overhead
 // for full process isolation of each edit — measure, don't assume, the tradeoff.
 const PLAN_SUBAGENT_ONLY = process.env.PLAN_SUBAGENT_ONLY === "1";
+// Dark candidate c37: extends c25 from edits-only to EVERYTHING — during
+// execution the main session is a thin orchestrator: every plan item is done
+// via ONE spawn-mode subagent call (explorer/executor/verifier); the main
+// window accumulates only clamped subagent results (runner-events.js caps each
+// at 12000 chars). The model decides delegation; the harness only blocks+steers
+// (c25 precedent — no engine dispatch).
+const PLAN_DELEGATE_ALL = process.env.PLAN_DELEGATE_ALL === "on";
 // Dark candidate c31: a plan-level uncertainties[] field with a structural
 // pause — a model that surfaces uncertainty must be stopped from guessing
 // past it (deterministic gate, no LLM judgment call). npcsh loop_plan port.
@@ -73,6 +80,10 @@ const PLAN_SHA_GUARD = process.env.PLAN_SHA_GUARD === "on";
 // non-numeric, need-sized guidance that keeps the same anti-padding /
 // anti-fake-split intent.
 const PLAN_ITEM_GUIDANCE_V2 = process.env.PLAN_ITEM_GUIDANCE_V2 === "on";
+// Dark candidate c36: everywhere delegation guidance recommends mode=fork for
+// executor work, recommend mode=spawn + an explicitly SELF-CONTAINED task —
+// each child starts with a small fresh context instead of a parent snapshot.
+const SPAWN_DELEGATION = process.env.SPAWN_DELEGATION === "on";
 
 type ItemStatus = "pending" | "in_progress" | "done" | "blocked";
 type Phase = "planned" | "executing";
@@ -456,20 +467,34 @@ Each item names its done-check: an observable result, or a \`gate\` command that
 Reply with ONLY the plan_write call — no prose plan. Set request (exact), summary (1 line), items (each status="pending").`;
 }
 
+// c36 (dark): flag off → these resolve to the legacy strings / empty string, so
+// flag-off output stays byte-identical by construction.
+const EXECUTOR_CALL = SPAWN_DELEGATION ? "subagent(executor, …, mode=spawn)" : "subagent(executor, …, mode=fork)";
+const SPAWN_NOTE = SPAWN_DELEGATION ? " Task SELF-CONTAINED — the child sees ONLY the task text." : "";
+
 function delegationBlock(subagentAvailable: boolean): string {
 	if (!subagentAvailable) return "";
+	if (PLAN_DELEGATE_ALL) {
+		return `
+Every item = ONE subagent call — enforced, not advisory:
+- lookup/explore item → subagent(explorer, …)
+- edit item → subagent(executor, …)
+- verify/check item → subagent(verifier, …)
+Always mode=spawn; task SELF-CONTAINED (paths, exact change, done-check) — the child sees ONLY the task text.
+In this window: only plan_write + subagent. Direct read/grep/find/ls/bash/edit calls are blocked during execution.`;
+	}
 	if (PLAN_SUBAGENT_ONLY) {
 		return `
 Every edit routes through a subagent — this is enforced, not advisory:
 - Heavy lookup (big file, wide search) → subagent(explorer, …). Don't pull big files in here.
 - Non-trivial claim or change → subagent(verifier, …); accept only on VERDICT: confirmed.
-- ANY edit, however small → subagent(executor, …, mode=fork). Direct edit/write/multiedit calls are blocked during execution.`;
+- ANY edit, however small → ${EXECUTOR_CALL}.${SPAWN_NOTE} Direct edit/write/multiedit calls are blocked during execution.`;
 	}
 	return `
 Delegate to keep this window clean (subagent returns only a compact result):
 - Heavy lookup (big file, wide search) → subagent(explorer, …). Don't pull big files in here.
 - Non-trivial claim or change → subagent(verifier, …); accept only on VERDICT: confirmed.
-- Isolated, fully-scoped edit → subagent(executor, …, mode=fork). You own the plan; trivial edits yourself.`;
+- Isolated, fully-scoped edit → ${EXECUTOR_CALL}.${SPAWN_NOTE} You own the plan; trivial edits yourself.`;
 }
 
 export function policyBlock(autonomy: Autonomy, subagentAvailable: boolean): string {
@@ -489,11 +514,14 @@ export function policyBlock(autonomy: Autonomy, subagentAvailable: boolean): str
 }
 
 function executionDisciplineBlock(): string {
+	// c37: the legacy subagent line contradicts thin-orchestrator mode, and the
+	// legacy completion-claims line steers into git-status bash calls that
+	// PLAN_DELEGATE_ALL blocks — a guaranteed block-loop for a small model.
 	return `Execution discipline:
 - Big files: size-check first. Sample for shape/schema only. CSV/JSONL/logs/generated reports → query whole file with rg/awk/jq/Python, return only relevant rows/counts. Don't infer global state from head/tail. (Prefer subagent(explorer).)
-- Subagents: explorer/verifier read-only, return distilled results — keep this window clean. Main loop owns the plan + final verify.
+- ${PLAN_DELEGATE_ALL ? "Subagents do the work; you only plan_write, delegate, and relay distilled results. Main loop owns only the plan." : "Subagents: explorer/verifier read-only, return distilled results — keep this window clean. Main loop owns the plan + final verify."}
 - No-ops: unneeded item → mark done, note "skipped/no-op" + evidence, or re-plan away with a note.
-- Completion claims: before final summary, derive changed-file evidence from tools (git status/diff, else filesystem). No claim a file changed without tool evidence.`;
+- ${PLAN_DELEGATE_ALL ? "Completion claims: cite the CHANGED/VERIFY lines from subagent results — no claim without them." : "Completion claims: before final summary, derive changed-file evidence from tools (git status/diff, else filesystem). No claim a file changed without tool evidence."}`;
 }
 
 function executeBlock(autonomy: Autonomy, subagentAvailable: boolean): string {
@@ -708,7 +736,9 @@ const planWrite = defineTool({
 					gateMsgs.push(subagentOk
 						? steerText(
 							"PLAN_GATE_LADDER2_MSG",
-							"✗ gate for \"{title}\" failed again ({fails}/{max}) — the same fix path is not working. Delegate the repair to subagent(executor, ..., mode=fork): brief it with the item, the gate command `{gate}`, and the failing output below, then mark the item done to re-run the gate.\nFailing output (tail): {tail}",
+							SPAWN_DELEGATION
+								? "✗ gate for \"{title}\" failed again ({fails}/{max}) — the same fix path is not working. Delegate the repair to subagent(executor, ..., mode=spawn) with a SELF-CONTAINED task — the item, the gate command `{gate}`, and the failing output below; the child sees nothing else. Then mark the item done to re-run the gate.\nFailing output (tail): {tail}"
+								: "✗ gate for \"{title}\" failed again ({fails}/{max}) — the same fix path is not working. Delegate the repair to subagent(executor, ..., mode=fork): brief it with the item, the gate command `{gate}`, and the failing output below, then mark the item done to re-run the gate.\nFailing output (tail): {tail}",
 							{ title: it.title, fails, max: GATE_MAX, gate: it.gate, tail: longTail },
 						)
 						: steerText(
@@ -1158,6 +1188,41 @@ export default function (pi: ExtensionAPI) {
 					"failure_class=plan_mode_violation. PLAN phase — no edits. Finish the plan (plan_write), end your turn. /plan-go starts execution.",
 			};
 		}
+		// c37 PLAN_DELEGATE_ALL: thin-orchestrator enforcement. Checked BEFORE
+		// PLAN_SUBAGENT_ONLY — its blocked set is a strict superset of c25's, so
+		// with both flags on every blocked call gets THIS reason (c37 supersedes c25).
+		if (PLAN_DELEGATE_ALL && event.toolName === "subagent") {
+			const state = await readState(ctx.cwd);
+			if (state?.phase === "executing") {
+				const input = event.input as Record<string, unknown> | undefined;
+				planEvent("delegate-all-subagent", state.run_id, {
+					agent: String(input?.agent ?? "parallel"),
+					mode: String(input?.mode ?? "default"),
+				});
+			}
+			return; // observe only, never block
+		}
+		const DELEGATE_ALL_TOOLS = new Set(["read", "grep", "find", "ls", "bash", "edit", "write", "multiedit"]);
+		if (PLAN_DELEGATE_ALL && DELEGATE_ALL_TOOLS.has(event.toolName)) {
+			const state = await readState(ctx.cwd);
+			if (state?.phase === "executing") {
+				rememberModel(ctx);
+				planEvent("delegate-all-block", state.run_id, { toolName: event.toolName });
+				const subagentAvailable = pi.getActiveTools().includes("subagent");
+				// Role fit is capability-correct: explorer has read/grep/find/ls (no
+				// bash); verifier has bash for read-only checks; executor has bash+edit.
+				const role = PLAN_MUTATION_TOOLS.has(event.toolName) ? "executor"
+					: event.toolName === "bash"
+						? (classifyBashCommand(String((event.input as Record<string, unknown> | undefined)?.command ?? "")).mutates ? "executor" : "verifier")
+						: "explorer";
+				return {
+					block: true,
+					reason: subagentAvailable
+						? `failure_class=plan_mode_violation. Direct ${event.toolName} is disabled under PLAN_DELEGATE_ALL — delegate this item's work via subagent(${role}, …, mode=spawn) with a SELF-CONTAINED task (the child sees only the task text).`
+						: "failure_class=plan_mode_violation. Direct tool use is disabled under PLAN_DELEGATE_ALL, and no subagent tool is available in this session — mark the item blocked and stop rather than retry.",
+				};
+			}
+		}
 		// PLAN_SUBAGENT_ONLY candidate: during execution (not planning), force every
 		// scoped edit through a fresh subagent instead of leaving delegation advisory
 		// — full process isolation for each scoped edit.
@@ -1179,7 +1244,9 @@ export default function (pi: ExtensionAPI) {
 					return {
 						block: true,
 						reason: subagentAvailable
-							? "failure_class=plan_mode_violation. Direct mutation is disabled under PLAN_SUBAGENT_ONLY — use subagent(executor, ..., mode=fork) for this scoped edit instead."
+							? (SPAWN_DELEGATION
+								? "failure_class=plan_mode_violation. Direct mutation is disabled under PLAN_SUBAGENT_ONLY — use subagent(executor, ..., mode=spawn) with a self-contained task (the child sees only the task text) for this scoped edit instead."
+								: "failure_class=plan_mode_violation. Direct mutation is disabled under PLAN_SUBAGENT_ONLY — use subagent(executor, ..., mode=fork) for this scoped edit instead.")
 							: "failure_class=plan_mode_violation. Direct mutation is disabled under PLAN_SUBAGENT_ONLY, and no subagent tool is available in this session — mark the item blocked and stop rather than retry.",
 					};
 				}

@@ -638,3 +638,234 @@ test("c34 dark: flag off — legacy 5-10 item wording unchanged", async () => {
 	await fp.commands.get("plan").handler("add a widget", ctx);
 	assert.ok(fp.sent[0].includes("Break REQ into 5-10 ordered items."), fp.sent[0]);
 });
+
+test("c36: SPAWN_DELEGATION=on swaps fork advice for spawn + self-contained everywhere", async () => {
+	process.env.SPAWN_DELEGATION = "on";
+	process.env.PLAN_SUBAGENT_ONLY = "1";
+	process.env.PLAN_GATE_MAX = "4";
+	try {
+		const fp = makeFakePi();
+		const mod = await import(`../extensions/plan-runner.ts?c36=${Date.now()}-${Math.random()}`);
+		mod.default(fp.pi as any);
+
+		// delegation block (both the c25 wording and the advisory wording route
+		// through the same consts; assert via the exported policyBlock)
+		const policy = mod.policyBlock("lean", true);
+		assert.ok(policy.includes("subagent(executor, …, mode=spawn)"), policy);
+		assert.ok(policy.includes("SELF-CONTAINED"), policy);
+		assert.ok(!policy.includes("mode=fork"), policy);
+
+		const cwd = tmp();
+		const { ctx } = makeCtx(cwd);
+		await fp.commands.get("plan").handler("add a widget", ctx);
+		await callTool(fp, "plan_write", {
+			items: [{ title: "step one", status: "pending" }], request: "add a widget", summary: "one",
+		}, cwd);
+		await fp.commands.get("plan-go").handler("", ctx);
+		fp.pi.getActiveTools = () => ["subagent"];
+
+		// c25 block reason carries spawn wording under the flag
+		const edit = await fire(fp, "tool_call", { toolName: "edit", input: {} }, ctx);
+		assert.equal(edit?.block, true);
+		assert.ok(edit.reason.includes("mode=spawn"), edit.reason);
+		assert.ok(edit.reason.includes("self-contained"), edit.reason);
+		assert.ok(!edit.reason.includes("mode=fork"), edit.reason);
+
+		// gate ladder rung 2 delegates with spawn wording
+		writeFileSync(join(cwd, "bad.sh"), "if [ ; then fi\n"); // bash -n fails
+		const failOnce = () => callTool(fp, "plan_write", {
+			items: [{ title: "bad work", status: "done", gate: "bash -n bad.sh" }], request: "r", summary: "s",
+		}, cwd);
+		await failOnce(); // rung 1 (LOCALIZE)
+		const r2 = await failOnce();
+		assert.ok(r2.content[0].text.includes("mode=spawn"), r2.content[0].text);
+		assert.ok(r2.content[0].text.includes("SELF-CONTAINED"), r2.content[0].text);
+		assert.ok(!r2.content[0].text.includes("mode=fork"), r2.content[0].text);
+	} finally {
+		delete process.env.SPAWN_DELEGATION;
+		delete process.env.PLAN_SUBAGENT_ONLY;
+		process.env.PLAN_GATE_MAX = "2";
+	}
+});
+
+test("c36 dark: flag off — legacy fork wording byte-identical", () => {
+	// module-level import was loaded without SPAWN_DELEGATION
+	const policy = policyBlock("lean", true);
+	assert.ok(policy.includes("subagent(executor, …, mode=fork). You own the plan; trivial edits yourself."), policy);
+	assert.ok(!policy.includes("SELF-CONTAINED"), policy);
+});
+
+test("c37: PLAN_DELEGATE_ALL blocks read/grep/find/ls/bash and edits during execution, steers to role-matched spawn subagents", async () => {
+	process.env.PLAN_DELEGATE_ALL = "on";
+	try {
+		const fp = makeFakePi();
+		const mod = await import(`../extensions/plan-runner.ts?c37=${Date.now()}-${Math.random()}`);
+		mod.default(fp.pi as any);
+		const cwd = tmp();
+		const { ctx } = makeCtx(cwd);
+		await fp.commands.get("plan").handler("add a widget", ctx);
+
+		// planning phase: read still allowed, edit gets the plain plan-mode reason
+		const duringPlanRead = await fire(fp, "tool_call", { toolName: "read", input: { path: "x" } }, ctx);
+		assert.equal(duringPlanRead, undefined, "read allowed while planning");
+		const duringPlanEdit = await fire(fp, "tool_call", { toolName: "edit", input: {} }, ctx);
+		assert.ok(duringPlanEdit?.reason.includes("PLAN phase"), duringPlanEdit?.reason);
+
+		await callTool(fp, "plan_write", {
+			items: [{ title: "step one", status: "pending" }], request: "add a widget", summary: "one",
+		}, cwd);
+		await fp.commands.get("plan-go").handler("", ctx);
+		fp.pi.getActiveTools = () => ["subagent"];
+
+		const read = await fire(fp, "tool_call", { toolName: "read", input: { path: "x" } }, ctx);
+		assert.equal(read?.block, true, "read blocked during execution");
+		assert.ok(read.reason.includes("subagent(explorer"), read.reason);
+
+		const edit = await fire(fp, "tool_call", { toolName: "edit", input: {} }, ctx);
+		assert.equal(edit?.block, true);
+		assert.ok(edit.reason.includes("subagent(executor"), edit.reason);
+
+		const bashRead = await fire(fp, "tool_call", { toolName: "bash", input: { command: "cat file" } }, ctx);
+		assert.equal(bashRead?.block, true, "even read-only bash blocked");
+		assert.ok(bashRead.reason.includes("subagent(verifier"), bashRead.reason);
+
+		const bashMut = await fire(fp, "tool_call", { toolName: "bash", input: { command: "sed -i s/a/b/ file" } }, ctx);
+		assert.equal(bashMut?.block, true);
+		assert.ok(bashMut.reason.includes("subagent(executor"), bashMut.reason);
+
+		const sub = await fire(fp, "tool_call", { toolName: "subagent", input: { agent: "executor", task: "x" } }, ctx);
+		assert.equal(sub, undefined, "subagent calls are never blocked");
+	} finally {
+		delete process.env.PLAN_DELEGATE_ALL;
+	}
+});
+
+test("c37: no subagent tool — block reason steers to mark the item blocked", async () => {
+	process.env.PLAN_DELEGATE_ALL = "on";
+	try {
+		const fp = makeFakePi();
+		const mod = await import(`../extensions/plan-runner.ts?c37solo=${Date.now()}-${Math.random()}`);
+		mod.default(fp.pi as any);
+		const cwd = tmp();
+		const { ctx } = makeCtx(cwd);
+		await fp.commands.get("plan").handler("r", ctx);
+		await callTool(fp, "plan_write", {
+			items: [{ title: "s", status: "pending" }], request: "r", summary: "s",
+		}, cwd);
+		await fp.commands.get("plan-go").handler("", ctx);
+		// fake harness getActiveTools() defaults to [] — no subagent
+		const read = await fire(fp, "tool_call", { toolName: "read", input: { path: "x" } }, ctx);
+		assert.equal(read?.block, true);
+		assert.ok(read.reason.includes("no subagent tool is available"), read.reason);
+		assert.ok(!read.reason.includes("subagent(explorer"), read.reason);
+	} finally {
+		delete process.env.PLAN_DELEGATE_ALL;
+	}
+});
+
+test("c37 + c25 both on: blocked mutation carries the PLAN_DELEGATE_ALL reason (precedence)", async () => {
+	process.env.PLAN_DELEGATE_ALL = "on";
+	process.env.PLAN_SUBAGENT_ONLY = "1";
+	try {
+		const fp = makeFakePi();
+		const mod = await import(`../extensions/plan-runner.ts?c37c25=${Date.now()}-${Math.random()}`);
+		mod.default(fp.pi as any);
+		const cwd = tmp();
+		const { ctx } = makeCtx(cwd);
+		await fp.commands.get("plan").handler("r", ctx);
+		await callTool(fp, "plan_write", {
+			items: [{ title: "s", status: "pending" }], request: "r", summary: "s",
+		}, cwd);
+		await fp.commands.get("plan-go").handler("", ctx);
+		fp.pi.getActiveTools = () => ["subagent"];
+		const edit = await fire(fp, "tool_call", { toolName: "edit", input: {} }, ctx);
+		assert.equal(edit?.block, true);
+		assert.ok(edit.reason.includes("PLAN_DELEGATE_ALL"), edit.reason);
+		assert.ok(!edit.reason.includes("PLAN_SUBAGENT_ONLY"), edit.reason);
+	} finally {
+		delete process.env.PLAN_DELEGATE_ALL;
+		delete process.env.PLAN_SUBAGENT_ONLY;
+	}
+});
+
+test("c37: telemetry — delegate-all-block and delegate-all-subagent recorded", async () => {
+	process.env.PLAN_DELEGATE_ALL = "on";
+	const cwd = tmp();
+	const telemetry = join(cwd, "telemetry.jsonl");
+	const priorFile = process.env.TELEMETRY_FILE;
+	const priorSource = process.env.TELEMETRY_SOURCE;
+	process.env.TELEMETRY_FILE = telemetry;
+	process.env.TELEMETRY_SOURCE = "test";
+	try {
+		const fp = makeFakePi();
+		const mod = await import(`../extensions/plan-runner.ts?c37tel=${Date.now()}-${Math.random()}`);
+		mod.default(fp.pi as any);
+		const { ctx } = makeCtx(cwd);
+		await fp.commands.get("plan").handler("r", ctx);
+		await callTool(fp, "plan_write", {
+			items: [{ title: "s", status: "pending" }], request: "r", summary: "s",
+		}, cwd);
+		await fp.commands.get("plan-go").handler("", ctx);
+		fp.pi.getActiveTools = () => ["subagent"];
+		await fire(fp, "tool_call", { toolName: "read", input: { path: "x" } }, ctx);
+		await fire(fp, "tool_call", { toolName: "subagent", input: { agent: "executor", mode: "spawn", task: "x" } }, ctx);
+		const rows = readFileSync(telemetry, "utf8").trim().split("\n").map((line) => JSON.parse(line));
+		const block = rows.find((row) => row.ext === "plan-runner" && row.kind === "delegate-all-block");
+		assert.ok(block, "delegate-all-block recorded");
+		assert.equal(block.toolName, "read");
+		const sub = rows.find((row) => row.ext === "plan-runner" && row.kind === "delegate-all-subagent");
+		assert.ok(sub, "delegate-all-subagent recorded");
+		assert.equal(sub.agent, "executor");
+		assert.equal(sub.mode, "spawn");
+	} finally {
+		delete process.env.PLAN_DELEGATE_ALL;
+		if (priorFile === undefined) delete process.env.TELEMETRY_FILE; else process.env.TELEMETRY_FILE = priorFile;
+		if (priorSource === undefined) delete process.env.TELEMETRY_SOURCE; else process.env.TELEMETRY_SOURCE = priorSource;
+	}
+});
+
+test("c37 dark: flag off — direct tools pass during execution; legacy delegation wording", async () => {
+	// module-level import was loaded without PLAN_DELEGATE_ALL
+	const fp = freshPlanRunner();
+	const cwd = tmp();
+	const { ctx } = makeCtx(cwd);
+	await fp.commands.get("plan").handler("r", ctx);
+	await callTool(fp, "plan_write", {
+		items: [{ title: "s", status: "pending" }], request: "r", summary: "s",
+	}, cwd);
+	await fp.commands.get("plan-go").handler("", ctx);
+	for (const call of [
+		{ toolName: "read", input: { path: "x" } },
+		{ toolName: "bash", input: { command: "cat file" } },
+		{ toolName: "edit", input: {} },
+	]) {
+		assert.equal(await fire(fp, "tool_call", call, ctx), undefined, `${call.toolName} passes with flag off`);
+	}
+	const policy = policyBlock("lean", true);
+	assert.ok(policy.includes("Delegate to keep this window clean"), policy);
+	assert.ok(!policy.includes("PLAN_DELEGATE_ALL"), policy);
+});
+
+test("c37: gates still run engine-side under the flag", async () => {
+	process.env.PLAN_DELEGATE_ALL = "on";
+	try {
+		const fp = makeFakePi();
+		const mod = await import(`../extensions/plan-runner.ts?c37gate=${Date.now()}-${Math.random()}`);
+		mod.default(fp.pi as any);
+		const cwd = tmp();
+		writeFileSync(join(cwd, "good.sh"), "echo ok\n");
+		const { ctx } = makeCtx(cwd);
+		await fp.commands.get("plan").handler("r", ctx);
+		await callTool(fp, "plan_write", {
+			items: [{ title: "s", status: "pending" }], request: "r", summary: "s",
+		}, cwd);
+		await fp.commands.get("plan-go").handler("", ctx);
+		await callTool(fp, "plan_write", {
+			items: [{ title: "s", status: "done", gate: "bash -n good.sh" }], request: "r", summary: "s",
+		}, cwd);
+		const state = JSON.parse(readFileSync(join(cwd, ".pi", "plan-state.json"), "utf8"));
+		assert.equal(state.items[0].status, "done", "green gate executed engine-side and kept done");
+	} finally {
+		delete process.env.PLAN_DELEGATE_ALL;
+	}
+});

@@ -1,0 +1,5 @@
+{
+  "name": "spawn-delegation",
+  "prediction": "everywhere the harness recommended mode=fork for executor delegation (delegation block, gate ladder rung 2, PLAN_SUBAGENT_ONLY block reason, executor role description at injection time) it now recommends mode=spawn with an explicitly SELF-CONTAINED task string: each child runs on a small fresh context instead of a snapshot of the parent's accumulated window. Child in_tok per executor delegation drops sharply; delegated-edit success on small models holds or rises because the child never sees the degraded long context. Failure mode to watch: executor RESULT: blocked rate rising because parents write under-specified task strings. Direct opposite of c33 (subagent-fork-default) — never arm both.",
+  "thresholds": { "SPAWN_DELEGATION": "on" }
+}

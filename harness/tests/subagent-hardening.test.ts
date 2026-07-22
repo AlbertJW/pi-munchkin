@@ -46,3 +46,27 @@ test("c33: SUBAGENT_DEFAULT_MODE=fork flips the default; explicit mode always wi
 		else process.env.SUBAGENT_DEFAULT_MODE = previous;
 	}
 });
+
+test("c36: executor description rewritten to spawn at injection time; other roles and flag-off untouched", async () => {
+	const { agentDescriptionForPrompt } = await import("../vendor/pi-subagent/types.ts");
+	const executor = "Isolated single-change worker. Delegate ONE bounded, fully-specified edit here when you want it done off the main window. Use mode=fork so it has surrounding context. Reports exact changed files. Prefer doing trivial edits yourself.";
+	const explorer = "Read-only context gatherer. Returns distilled facts.";
+	const previous = process.env.SPAWN_DELEGATION;
+	try {
+		process.env.SPAWN_DELEGATION = "on";
+		const rewritten = agentDescriptionForPrompt(executor);
+		assert.ok(rewritten.includes("Use mode=spawn with a fully self-contained task — the child sees nothing else."), rewritten);
+		assert.ok(!rewritten.includes("mode=fork"), rewritten);
+		assert.equal(agentDescriptionForPrompt(explorer), explorer, "roles without the fork sentence pass through");
+
+		delete process.env.SPAWN_DELEGATION;
+		assert.equal(agentDescriptionForPrompt(executor), executor, "flag off is identity");
+		process.env.SPAWN_DELEGATION = "off";
+		assert.equal(agentDescriptionForPrompt(executor), executor, "off is identity");
+		process.env.SPAWN_DELEGATION = "banana";
+		assert.equal(agentDescriptionForPrompt(executor), executor, "junk env is identity");
+	} finally {
+		if (previous === undefined) delete process.env.SPAWN_DELEGATION;
+		else process.env.SPAWN_DELEGATION = previous;
+	}
+});

@@ -189,6 +189,14 @@
     "BASH_OUTPUT_GUARD": [
      "on",
      "off"
+    ],
+    "SPAWN_DELEGATION": [
+     "on",
+     "off"
+    ],
+    "PLAN_DELEGATE_ALL": [
+     "on",
+     "off"
     ]
    }
   },

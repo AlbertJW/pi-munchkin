@@ -1,0 +1,5 @@
+{
+  "name": "plan-delegate-all",
+  "prediction": "extends c25 from edits-only to everything: during execution the main session may only plan_write and subagent — read/grep/find/ls/bash/edit/write/multiedit are mechanically blocked and steered to role-matched spawn-mode subagents (explorer/executor/verifier), so agent work decomposes into many separate small-context LLM calls and the orchestrator window accumulates only clamped subagent results (<=12000 chars each; gates still run engine-side inside plan_write). Main-window context_tokens at end-of-run fall and multi-step pass rate on small models rises; wall-clock rises (accepted). Watch plan-runner.delegate-all-block vs delegate-all-subagent for compliance — a model that retries blocked tools instead of delegating, or that must delegate even yolo-mode exploration and stalls, converts the isolation win into a stall.",
+  "thresholds": { "PLAN_DELEGATE_ALL": "on" }
+}

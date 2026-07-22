@@ -24,6 +24,7 @@ import {
   type SingleResult,
   type SubagentDetails,
   DEFAULT_DELEGATION_MODE,
+  agentDescriptionForPrompt,
   emptyUsage,
   parseDelegationMode,
   isResultError,
@@ -419,7 +420,7 @@ export default function (pi: ExtensionAPI) {
     if (discoveredAgents.length === 0) return;
 
     const agentList = discoveredAgents
-      .map((a) => `- **${a.name}**: ${a.description}`)
+      .map((a) => `- **${a.name}**: ${agentDescriptionForPrompt(a.description)}`)
       .join("\n");
     return {
       systemPrompt:
