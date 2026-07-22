@@ -163,6 +163,15 @@
               }
             }
           }
+        },
+        "bash_output_guard": {
+          "type": "object",
+          "required": ["withheld", "cwd_escape_suspected"],
+          "additionalProperties": false,
+          "properties": {
+            "withheld": {"type": "integer", "minimum": 0},
+            "cwd_escape_suspected": {"type": "integer", "minimum": 0}
+          }
         }
       },
       "additionalProperties": false

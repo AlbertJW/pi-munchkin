@@ -70,6 +70,7 @@ def aggregate(path, session_key, key=None):
     raw, selected = exact_events(path, session_key, "context-watcher", key)
     _, surface_events = exact_events(path, session_key, "surface-receipt", key)
     _, context_surfaces = exact_events(path, session_key, "context-surface", key)
+    _, guard_events = exact_events(path, session_key, "bash-output-guard", key)
     harness_surface_sha256 = None
     if surface_events:
         candidate = surface_events[-1].get("sha256")
@@ -106,7 +107,7 @@ def aggregate(path, session_key, key=None):
         "authenticated": key is not None,
         "content_sha256": hashlib.sha256(raw).hexdigest(),
         "session_key": session_key,
-        "events": len(selected) + len(context_surfaces),
+        "events": len(selected) + len(context_surfaces) + len(guard_events),
         "harness_surface_sha256": harness_surface_sha256,
         "config": config,
         "compactions": {
@@ -155,6 +156,10 @@ def aggregate(path, session_key, key=None):
                 "tokens": stats("context_tokens"),
             },
         },
+        "bash_output_guard": {
+            "withheld": len(guard_events),
+            "cwd_escape_suspected": sum(bool(e.get("cwd_escape_suspected")) for e in guard_events),
+        },
     }
 
 
@@ -170,6 +175,9 @@ def selftest():
          "largest_tool_result_share":0.7,"exact_duplicate_block_share":0.2,"repeated_five_token_shingle_share":0.1,
          "stale_tool_result_share":0.4,"user_text_bytes":10,"assistant_text_bytes":20,"tool_text_bytes":30,
          "custom_text_bytes":0,"context_tokens":100},
+        {"ts":"x","sk":"run-a","ext":"bash-output-guard","kind":"withheld","chars":9000,"max_chars":8000,"cwd_escape_suspected":True},
+        {"ts":"x","sk":"run-a","ext":"bash-output-guard","kind":"withheld","chars":15000,"max_chars":8000,"cwd_escape_suspected":False},
+        {"ts":"x","sk":"other","ext":"bash-output-guard","kind":"withheld","chars":9000,"max_chars":8000,"cwd_escape_suspected":True},
     ]
     with tempfile.TemporaryDirectory() as td:
         path = os.path.join(td, "events.jsonl")
@@ -183,12 +191,14 @@ def selftest():
         row = aggregate(path, "run-a", key)
         assert row["content_sha256"] == hashlib.sha256(content).hexdigest()
         assert row["schema"] == "pi.context-telemetry/v2"
-        assert row["events"] == 5 and row["config"]["enabled"] is False
+        assert row["events"] == 7 and row["config"]["enabled"] is False
         assert row["compactions"]["pi"] == 1 and row["compactions"]["overflow"] == 0
         assert row["watcher"]["completed"] == 1 and row["watcher"]["resume_required"] == 1
         assert row["harness_surface_sha256"] == "a" * 64
         assert row["surface"]["calls"] == 1 and row["surface"]["context"]["max_bytes"] == 60
         assert row["surface"]["concentration"]["largest_message"]["mean"] == 0.6
+        assert row["bash_output_guard"]["withheld"] == 2, "only run-a's two events, not the other session's"
+        assert row["bash_output_guard"]["cwd_escape_suspected"] == 1
         assert aggregate(os.path.join(td, "missing"), "run-a", key)["events"] == 0
         assert aggregate(os.path.join(td, "missing"), "run-a", key)["harness_surface_sha256"] is None
         assert not has_abort(path, "run-a", key)
@@ -229,6 +239,7 @@ def selftest():
         assert set(context_schema["properties"]["compactions"]["required"]) == set(row["compactions"])
         assert set(context_schema["properties"]["watcher"]["required"]) == set(row["watcher"])
         assert set(context_schema["properties"]["surface"]["required"]) == set(row["surface"])
+        assert set(context_schema["properties"]["bash_output_guard"]["required"]) == set(row["bash_output_guard"])
     print("context_telemetry selftest: OK (exact key; v2 surface aggregates; content sha256)")
 
 
