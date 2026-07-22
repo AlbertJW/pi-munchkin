@@ -103,7 +103,10 @@ Behavior knobs (all optional env vars, sensible defaults):
 - Supported release platforms are Linux and macOS on Node.js 22.6 or newer; both run in CI.
 - Extensions execute with the permissions of the pi process. Review the manifest and keep API keys,
   tokens, and machine-specific paths out of tracked settings.
-- Ketch `0.12.0` or newer must be installed separately (`brew install 1broseidon/tap/ketch`). The extension
+- Ketch `0.12.0` or newer must be installed separately — macOS: `brew install 1broseidon/tap/ketch`;
+  any platform: `bash scripts/install-deps.sh` (downloads the correct release binary from
+  [ketch's releases](https://github.com/1broseidon/ketch/releases) and verifies its checksum; also
+  checks the Node.js version requirement). The extension
   exposes only two compact tools: search finds leads and read fetches a selected public source set.
   Results are bounded and untrusted; material claims still need source URLs. Ketch runs with a
   reduced child environment that does not inherit model-provider credentials. Run `ketch config set backend

@@ -6,6 +6,7 @@ import {
 	formatReadResults,
 	formatSearchResults,
 	ketchFailureClass,
+	ketchInstallHint,
 	MIN_KETCH_VERSION,
 	parseReadResults,
 	parseSearchResults,
@@ -68,11 +69,11 @@ async function checkVersion(): Promise<string | null> {
 				timeoutMs: 5_000,
 				env: buildKetchEnv(),
 			});
-			if (result.spawnError) return "Ketch is not installed. Install it with: brew install 1broseidon/tap/ketch";
+			if (result.spawnError) return `Ketch is not installed. Install it with: ${ketchInstallHint("install")}`;
 			if (result.code !== 0 || result.timedOut || result.aborted) return "Ketch version check failed. Run: ketch version";
 			const version = parseSemver(result.stdout);
 			if (!version || !versionAtLeast(version)) {
-				return `Ketch ${MIN_KETCH_VERSION}+ is required. Upgrade with: brew upgrade 1broseidon/tap/ketch`;
+				return `Ketch ${MIN_KETCH_VERSION}+ is required. Upgrade with: ${ketchInstallHint("upgrade")}`;
 			}
 			return null;
 		})();

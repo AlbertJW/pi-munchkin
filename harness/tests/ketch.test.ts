@@ -7,6 +7,7 @@ import {
 	buildKetchEnv,
 	formatReadResults,
 	formatSearchResults,
+	ketchInstallHint,
 	parseReadResults,
 	parseSearchResults,
 	parseSemver,
@@ -91,6 +92,18 @@ test("Ketch child environment excludes unrelated model and shell credentials", (
 	assert.equal(env.OPENROUTER_API_KEY, undefined);
 	assert.equal(env.AWS_SECRET_ACCESS_KEY, undefined);
 	assert.equal(env.BASH_ENV, undefined);
+});
+
+test("ketchInstallHint: brew on macOS, the cross-platform script everywhere else", () => {
+	// 2026-07-22: a Linux install hit "Install it with: brew install ..." — a
+	// dead end with no brew. macOS keeps the brew instructions unchanged.
+	assert.equal(ketchInstallHint("install", "darwin"), "brew install 1broseidon/tap/ketch");
+	assert.equal(ketchInstallHint("upgrade", "darwin"), "brew upgrade 1broseidon/tap/ketch");
+	for (const platform of ["linux", "win32", "freebsd"]) {
+		const hint = ketchInstallHint("install", platform);
+		assert.ok(!hint.includes("brew"), `${platform} hint must not suggest brew: ${hint}`);
+		assert.ok(hint.includes("install-deps.sh"), `${platform} hint must point at the install script: ${hint}`);
+	}
 });
 
 test("bounded process reports timeout and spawn errors instead of semantic success", async () => {

@@ -3,6 +3,15 @@ import { spawn } from "node:child_process";
 export const MIN_KETCH_VERSION = "0.12.0";
 export const DEFAULT_SEARCH_BACKENDS = ["ddg", "exa", "keenable"] as const;
 
+// Homebrew is the natural default on macOS, but pointing Linux/other users at
+// `brew install` produces a confusing "brew: command not found" dead end.
+// Ketch ships prebuilt linux/darwin/windows release binaries; scripts/install-deps.sh
+// downloads and checksum-verifies the right one.
+export function ketchInstallHint(action: "install" | "upgrade", platform: string = process.platform): string {
+	if (platform === "darwin") return `brew ${action} 1broseidon/tap/ketch`;
+	return "bash scripts/install-deps.sh (or see https://github.com/1broseidon/ketch#installation)";
+}
+
 const OUTPUT_CAPTURE_BYTES = 1024 * 1024;
 const KILL_GRACE_MS = 1_000;
 
