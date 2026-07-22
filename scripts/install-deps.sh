@@ -1,11 +1,20 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# install-deps.sh — install/verify pi-munchkin's external (non-npm) runtime
-# prerequisites: Node.js and the Ketch CLI. npm dependencies (typebox) are
-# handled automatically by `pi package install` / `npm i` — not this script's
-# job. Idempotent: safe to re-run, skips anything already satisfied. Installs
-# to a user-local path, never requires sudo.
+# install-deps.sh — check/install every external (non-npm) prerequisite
+# pi-munchkin's harness needs or uses:
+#   - node, npm      required — hard failure if missing/too old.
+#   - ketch          required (KETCH is on by default) — installed
+#                     automatically: GitHub release binary + checksum verify,
+#                     or brew on macOS if available.
+#   - git, python3   optional — several extensions shell out to them and are
+#                     explicitly designed to fail-open/skip silently without
+#                     them; this only warns, since a missing one degrades a
+#                     feature rather than breaking anything.
+# npm package dependencies (typebox) are handled automatically by
+# `pi package install` / `npm i` — not this script's job.
+# Idempotent: safe to re-run, skips anything already satisfied. Installs to
+# a user-local path, never requires sudo.
 #
 # Ketch ships prebuilt release binaries for linux/darwin/windows on
 # amd64/arm64 (https://github.com/1broseidon/ketch/releases) — this downloads
@@ -159,9 +168,55 @@ check_ketch() {
 	log "ketch $have ready"
 }
 
+# ---------- npm ----------
+# Bundled with virtually every Node.js install (nvm, official installer,
+# system packages), but not guaranteed by a minimal/custom build — and
+# `npm i typebox` is a required step for the manual (non-`pi package`)
+# install path documented in README.md.
+check_npm() {
+	if ! command -v npm >/dev/null 2>&1; then
+		die "npm not found alongside node. Required for 'pi package install' and the manual 'npm i typebox' install step (README.md). Reinstall Node.js with npm bundled, or install npm separately."
+	fi
+	log "npm $(npm --version) OK"
+}
+
+# ---------- optional: git ----------
+# Several extensions shell out to git and are explicitly designed to
+# fail-open (never block a run) when it's missing or the cwd isn't a repo —
+# so a missing git is never a hard error, but it silently makes some
+# features inert rather than erroring loudly, which is worth surfacing:
+# git-guard's dirty-tree confirmation (extensions/git-guard.ts), context-brief's
+# git-status section (extensions/context-brief.ts), drift-scanner's post-commit
+# review (extensions/drift-scanner.ts), and plan-runner's c32 SHA-guard dark
+# candidate (extensions/plan-runner.ts) all silently no-op without it.
+check_git_optional() {
+	if command -v git >/dev/null 2>&1; then
+		log "git $(git --version | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1) OK (optional; several extensions degrade gracefully without it)"
+	else
+		warn "git not found — optional, but git-guard's dirty-tree check, context-brief's git-status section, drift-scanner, and plan-runner's SHA-guard (c32) will all silently do nothing instead of erroring. Install git if you want those features active."
+	fi
+}
+
+# ---------- optional: python3 ----------
+# micro-gate's Python-specific post-edit parse/slop checks (extensions/micro-gate.ts,
+# opt-in via MICRO_GATE=on) shell out to python3 and are explicitly designed
+# to record a telemetry breadcrumb and skip silently — never block — if it's
+# missing. JS/TS files are unaffected either way (checked via node, already
+# required above).
+check_python_optional() {
+	if command -v python3 >/dev/null 2>&1; then
+		log "python3 $(python3 --version 2>&1 | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1) OK (optional; only used by micro-gate's Python-file checks)"
+	else
+		warn "python3 not found — optional, but micro-gate's Python-file parse/slop checks (when MICRO_GATE=on) will silently skip Python files instead of checking them. JS/TS checking is unaffected."
+	fi
+}
+
 main() {
 	check_node
+	check_npm
 	check_ketch
+	check_git_optional
+	check_python_optional
 	log "all dependencies satisfied."
 }
 
