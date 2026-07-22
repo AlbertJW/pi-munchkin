@@ -425,13 +425,24 @@ run_one() {  # $1=config $2=arm $3=task $4=rep [$5=split] [$6=prompt-variant]
 		echo "[real_gate] TRAJECTORY=on requires SPAN_TOOLS=on for $pat/$task; refusing argument-only evidence" >&2
 		exit 2
 	fi
-	# PLAN_SUBAGENT_ONLY blocks direct edits and points the model at subagent(executor,
-	# ...) instead — the escape hatch must actually exist in the session's tool list,
-	# not just t4's, or the candidate is instructing an unavailable tool.
-	local env_plan_subagent_only=""
-	for entry in "${session_env[@]}"; do [[ "$entry" == PLAN_SUBAGENT_ONLY=* ]] && env_plan_subagent_only="${entry#*=}"; done
+	# PLAN_SUBAGENT_ONLY / PLAN_DELEGATE_ALL block direct tool calls and point the
+	# model at subagent(...) instead; SPAWN_DELEGATION only rewords delegation
+	# advice, but the advice is meaningless if there is no subagent tool to advise
+	# toward. Any of the three needs the escape hatch to actually exist in the
+	# session's tool list, not just t4's, or the candidate is instructing an
+	# unavailable tool (c37's own remote-box round measured nothing useful before
+	# this was caught — every blocked call fell through to the no-subagent path).
+	local env_plan_subagent_only="" env_plan_delegate_all="" env_spawn_delegation=""
+	for entry in "${session_env[@]}"; do
+		[[ "$entry" == PLAN_SUBAGENT_ONLY=* ]] && env_plan_subagent_only="${entry#*=}"
+		[[ "$entry" == PLAN_DELEGATE_ALL=* ]] && env_plan_delegate_all="${entry#*=}"
+		[[ "$entry" == SPAWN_DELEGATION=* ]] && env_spawn_delegation="${entry#*=}"
+	done
 	local tools="read,edit,bash"
-	[[ "$task" == "t4" || "$env_plan_subagent_only" == "1" ]] && tools="read,edit,bash,subagent"
+	if [[ "$task" == "t4" || "$env_plan_subagent_only" == "1" || \
+	      "$env_plan_delegate_all" == "on" || "$env_spawn_delegation" == "on" ]]; then
+		tools="read,edit,bash,subagent"
+	fi
 	[[ "$env_span_tools" == "on" ]] && tools="$tools,search_spans,read_span"
 	# Candidate env the PARENT shell must see: the exports below happen inside the pi
 	# subshell only, so checking ${RETRY_FRESH} out here read the parent's env and the
