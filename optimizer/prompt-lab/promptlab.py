@@ -9,11 +9,19 @@ and written to results/<gen>-REPORT.md.
 Usage:  ./promptlab.py [gen0] [--n 8] [--dry]
 Server: http://127.0.0.1:8080 (override LLAMA_URL).
 """
-import json, os, re, sys, time, math, urllib.request
+import hashlib, json, os, re, sys, time, math, urllib.request
 
 BASE = os.environ.get("LLAMA_URL", "http://127.0.0.1:8080")
 LAB = os.path.dirname(os.path.abspath(__file__))
-AGENT = os.path.expanduser("~/.pi/agent")
+REPO_ROOT = os.path.dirname(os.path.dirname(LAB))  # optimizer/prompt-lab -> optimizer -> repo root
+# Reproducibility: default to the repo's own version-controlled harness/ dir, not the
+# mutable live ~/.pi/agent installation every consumer of GOV/EXPLORER/VERIFIER used
+# to silently bind to at import time (verified byte-identical to ~/.pi/agent at the
+# time this was written, 2026-07-23 -- the two can drift apart during normal dev
+# iteration, which is exactly the silent-drift this default now avoids). PI_AGENT_ROOT
+# still overrides explicitly, e.g. to point at the live install when that's genuinely
+# what's needed.
+AGENT = os.path.expanduser(os.environ.get("PI_AGENT_ROOT", os.path.join(REPO_ROOT, "harness")))
 
 # ---------- llama-server ----------
 
@@ -56,6 +64,13 @@ def strip_frontmatter(text):
 
 EXPLORER = strip_frontmatter(read(os.path.join(AGENT, "agents", "explorer.md")))
 VERIFIER = strip_frontmatter(read(os.path.join(AGENT, "agents", "verifier.md")))
+
+# Resolved-surface binding: hash of the actual AGENT-sourced content this run
+# used (governor + role prompts), so a results row can be checked against a
+# specific AGENT tree instead of trusting the path alone.
+AGENT_SURFACE_SHA256 = hashlib.sha256(json.dumps(
+    {"APPEND_SYSTEM.md": GOV, "agents/explorer.md": EXPLORER, "agents/verifier.md": VERIFIER},
+    sort_keys=True).encode()).hexdigest()
 
 AGENT_LINES = {
     "explorer": {"B": "explorer ≡ ⟨🔍📖⟩ ∩ 🔒 → ⟨🎯💎⟩",
@@ -317,7 +332,8 @@ def main():
             rec = {"task": t, "pattern": p, "rep": rep, "model": tag, "split": "val",
                    "score": score, "detail": detail,
                    "wall": r["wall"], "content": r["content"][:2000],
-                   "out_chars": len(r["content"]), "think_chars": len(r["reasoning"])}
+                   "out_chars": len(r["content"]), "think_chars": len(r["reasoning"]),
+                   "agent_root": AGENT, "agent_surface_sha256": AGENT_SURFACE_SHA256}
             f.write(json.dumps(rec, ensure_ascii=False) + "\n"); f.flush()
             print(f"[{i+1}/{len(todo)}] {t:18} {p} {tag} rep{rep} -> {score} ({r['wall']}s) {detail[:50]}")
     # summary: one score matrix per model
