@@ -1,11 +1,30 @@
 --- a/src/index.js
 +++ b/src/index.js
-@@ -48,7 +48,7 @@
+@@ -46,9 +46,27 @@
+ /**
+  * Parse CSV string into array of objects
   * @param {string} csv - CSV content
++ * @param {Object} [options]
++ * @param {boolean} [options.trim=true] - when false, disables field trimming
   * @returns {Array<Object>} Array of row objects
   */
 -export function parseCSV(csv) {
-+export function parseCSV(csv, _options = {}) {
++export function parseCSV(csv, options = {}) {
++  if (options.trim === false) {
++    const lines = csv.split('\n');
++    if (lines.length === 0) return [];
++    const headers = lines[0].split(',');
++    const rows = [];
++    for (let i = 1; i < lines.length; i++) {
++      const values = lines[i].split(',');
++      const row = {};
++      headers.forEach((header, idx) => {
++        row[header] = values[idx] || '';
++      });
++      rows.push(row);
++    }
++    return rows;
++  }
++
    const lines = csv.trim().split('\n');
    if (lines.length === 0) return [];
- 

@@ -1,0 +1,241 @@
+{
+  "admission": {
+    "approved": false,
+    "automated": {
+      "checked_at": "2026-07-23T10:03:01Z",
+      "hash_drift": [],
+      "passed": true,
+      "runs_per_state": 3,
+      "states": {
+        "gold_fail_to_pass": [
+          {
+            "output_tail": "",
+            "passed": true,
+            "returncode": 0
+          },
+          {
+            "output_tail": "",
+            "passed": true,
+            "returncode": 0
+          },
+          {
+            "output_tail": "",
+            "passed": true,
+            "returncode": 0
+          }
+        ],
+        "gold_pass_to_pass": [
+          {
+            "output_tail": "",
+            "passed": true,
+            "returncode": 0
+          },
+          {
+            "output_tail": "",
+            "passed": true,
+            "returncode": 0
+          },
+          {
+            "output_tail": "",
+            "passed": true,
+            "returncode": 0
+          }
+        ],
+        "mutant:shortcut": {
+          "fail_to_pass": [
+            {
+              "output_tail": "r-swallow-v0bwxi5n/work/test/fail-to-pass.test.js:115:10)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n      at Test.postRun (node:internal/test_runner/test:1522:19)\n      at Test.run (node:internal/test_runner/test:1447:12)\n      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3) {\n    generatedMessage: false,\n    code: 'ERR_ASSERTION',\n    actual: 31,\n    expected: 60,\n    operator: 'strictEqual',\n    diff: 'simple'\n  }\n",
+              "passed": false,
+              "returncode": 1
+            },
+            {
+              "output_tail": "r-swallow-pbzl_ruu/work/test/fail-to-pass.test.js:115:10)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n      at Test.postRun (node:internal/test_runner/test:1522:19)\n      at Test.run (node:internal/test_runner/test:1447:12)\n      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3) {\n    generatedMessage: false,\n    code: 'ERR_ASSERTION',\n    actual: 31,\n    expected: 60,\n    operator: 'strictEqual',\n    diff: 'simple'\n  }\n",
+              "passed": false,
+              "returncode": 1
+            },
+            {
+              "output_tail": "r-swallow-fy_nv0dm/work/test/fail-to-pass.test.js:115:10)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n      at Test.postRun (node:internal/test_runner/test:1522:19)\n      at Test.run (node:internal/test_runner/test:1447:12)\n      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3) {\n    generatedMessage: false,\n    code: 'ERR_ASSERTION',\n    actual: 31,\n    expected: 60,\n    operator: 'strictEqual',\n    diff: 'simple'\n  }\n",
+              "passed": false,
+              "returncode": 1
+            }
+          ],
+          "pass_to_pass": [
+            {
+              "output_tail": "",
+              "passed": true,
+              "returncode": 0
+            },
+            {
+              "output_tail": "",
+              "passed": true,
+              "returncode": 0
+            },
+            {
+              "output_tail": "",
+              "passed": true,
+              "returncode": 0
+            }
+          ]
+        },
+        "pristine_fail_to_pass": [
+          {
+            "output_tail": "k6ld/work/src/index.js:12:22)\n      at TestContext.<anonymous> (file:///private/var/folders/3r/nc7qhtpn56j7rt5nwg0rqw600000gn/T/pi-admit-qs-error-swallow-onmlk6ld/work/test/fail-to-pass.test.js:114:26)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n      at Test.postRun (node:internal/test_runner/test:1522:19)\n      at Test.run (node:internal/test_runner/test:1447:12)\n      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3)\n",
+            "passed": false,
+            "returncode": 1
+          },
+          {
+            "output_tail": "d1ji/work/src/index.js:12:22)\n      at TestContext.<anonymous> (file:///private/var/folders/3r/nc7qhtpn56j7rt5nwg0rqw600000gn/T/pi-admit-qs-error-swallow-b46pd1ji/work/test/fail-to-pass.test.js:114:26)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n      at Test.postRun (node:internal/test_runner/test:1522:19)\n      at Test.run (node:internal/test_runner/test:1447:12)\n      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3)\n",
+            "passed": false,
+            "returncode": 1
+          },
+          {
+            "output_tail": "ebmc/work/src/index.js:12:22)\n      at TestContext.<anonymous> (file:///private/var/folders/3r/nc7qhtpn56j7rt5nwg0rqw600000gn/T/pi-admit-qs-error-swallow-bna_ebmc/work/test/fail-to-pass.test.js:114:26)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n      at Test.postRun (node:internal/test_runner/test:1522:19)\n      at Test.run (node:internal/test_runner/test:1447:12)\n      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3)\n",
+            "passed": false,
+            "returncode": 1
+          }
+        ],
+        "pristine_pass_to_pass": [
+          {
+            "output_tail": "",
+            "passed": true,
+            "returncode": 0
+          },
+          {
+            "output_tail": "",
+            "passed": true,
+            "returncode": 0
+          },
+          {
+            "output_tail": "",
+            "passed": true,
+            "returncode": 0
+          }
+        ]
+      }
+    },
+    "reviewed_at": null,
+    "reviewer": null
+  },
+  "artifacts": [
+    {
+      "path": "ab-symbolect/tasks/qs-error-swallow.txt",
+      "sha256": "9e7d93be3bf8a50dc2dd316f723d305663d9585b5f0efcfdbdef13da9b2bce63"
+    },
+    {
+      "path": "real-gate-fixtures/hidden/qs-error-swallow.test.js",
+      "sha256": "060bc29c1b945bacc302800d4e23518f450c2a16b580b4fa7ec1611a0bae6d82"
+    },
+    {
+      "path": "real-gate-fixtures/patches/qs-error-swallow/gold.patch",
+      "sha256": "fa8d006031db91687b1dcf2461896b8fe0f73ed54309bb2d1fe73e191f5905ae"
+    },
+    {
+      "path": "real-gate-fixtures/patches/qs-error-swallow/shortcut.patch",
+      "sha256": "aff0cf9597c31568f0c4f9df6d3d795efabb5a556b8359ee49ba31d0c31febd8"
+    },
+    {
+      "path": "real-gate-fixtures/qs-error-swallow/package.json",
+      "sha256": "b6692286f8967eb53d5ffa460ae6ca10663950c4b34f262041b7780eb1916902"
+    },
+    {
+      "path": "real-gate-fixtures/qs-error-swallow/src/index.js",
+      "sha256": "79914b578294c9c6fa634610d0448a6ab2a2976cfe571f45e15dae02a71de496"
+    },
+    {
+      "path": "real-gate-fixtures/qs-error-swallow/test/visible.test.js",
+      "sha256": "d2e2293db5f9f7badf0212fa52b974fdf79d64e1f969e4b97bfd8f49e9da601f"
+    }
+  ],
+  "cohort_id": "2026-07",
+  "fixture": {
+    "root": "real-gate-fixtures/qs-error-swallow",
+    "stage_copy": []
+  },
+  "fixture_version": "2026-07.1",
+  "one_shot": {
+    "context_files": [
+      "src/index.js",
+      "test/visible.test.js"
+    ],
+    "eligible": true,
+    "max_context_bytes": 49152
+  },
+  "patches": {
+    "gold": "real-gate-fixtures/patches/qs-error-swallow/gold.patch",
+    "shortcut_mutants": [
+      "real-gate-fixtures/patches/qs-error-swallow/shortcut.patch"
+    ]
+  },
+  "prompts": {
+    "canonical": {
+      "sha256": "c2e868fbaee37bf40054d1889b4e4078c4874208bb518b9315670c353e4a9c18",
+      "text": "parseLedger(lines) in src/index.js is supposed to turn raw ledger lines into two\nlists: `ok` (valid transactions) and `errors` (malformed lines, reported for\nfollow-up). Each line should JSON-decode to an object {id, amount, currency}.\nRight now a malformed line makes the whole batch throw instead of being\nrecorded. Fix this: for each line, in order, exactly ONE of the following\nhappens -- (1) if the line is not valid JSON, push {index, line, reason:\n'invalid-json'} onto `errors`; (2) if it decodes but `id` is not a non-empty\nstring, push reason 'missing-field'; (3) if `amount` is not a finite number,\npush reason 'bad-amount'; (4) if `currency` is not one of USD, EUR, GBP, JPY,\npush reason 'bad-currency'; (5) otherwise push {id, amount rounded to 2\ndecimals, currency} onto `ok`. Never throw on a bad line, and never drop a\nline silently -- every line must land in exactly one of `ok` or `errors`. Run\nnode --test until all tests pass."
+    },
+    "perturbations": [
+      {
+        "approved": false,
+        "id": "equivalent-1",
+        "sha256": "14383ddefcdc3481e650fd6f2cd49939ec2fd2a434e5eb3e2619d9b3c2df8d8d",
+        "text": "Complete the following repository task. Preserve existing behavior and verify the tests.\n\nparseLedger(lines) in src/index.js is supposed to turn raw ledger lines into two\nlists: `ok` (valid transactions) and `errors` (malformed lines, reported for\nfollow-up). Each line should JSON-decode to an object {id, amount, currency}.\nRight now a malformed line makes the whole batch throw instead of being\nrecorded. Fix this: for each line, in order, exactly ONE of the following\nhappens -- (1) if the line is not valid JSON, push {index, line, reason:\n'invalid-json'} onto `errors`; (2) if it decodes but `id` is not a non-empty\nstring, push reason 'missing-field'; (3) if `amount` is not a finite number,\npush reason 'bad-amount'; (4) if `currency` is not one of USD, EUR, GBP, JPY,\npush reason 'bad-currency'; (5) otherwise push {id, amount rounded to 2\ndecimals, currency} onto `ok`. Never throw on a bad line, and never drop a\nline silently -- every line must land in exactly one of `ok` or `errors`. Run\nnode --test until all tests pass."
+      },
+      {
+        "approved": false,
+        "id": "equivalent-2",
+        "sha256": "b417fd8baee0b46b4b4f4dc939b20b7cf528ecba34795a0b307815afa8449b54",
+        "text": "Repository change request:\nparseLedger(lines) in src/index.js is supposed to turn raw ledger lines into two\nlists: `ok` (valid transactions) and `errors` (malformed lines, reported for\nfollow-up). Each line should JSON-decode to an object {id, amount, currency}.\nRight now a malformed line makes the whole batch throw instead of being\nrecorded. Fix this: for each line, in order, exactly ONE of the following\nhappens -- (1) if the line is not valid JSON, push {index, line, reason:\n'invalid-json'} onto `errors`; (2) if it decodes but `id` is not a non-empty\nstring, push reason 'missing-field'; (3) if `amount` is not a finite number,\npush reason 'bad-amount'; (4) if `currency` is not one of USD, EUR, GBP, JPY,\npush reason 'bad-currency'; (5) otherwise push {id, amount rounded to 2\ndecimals, currency} onto `ok`. Never throw on a bad line, and never drop a\nline silently -- every line must land in exactly one of `ok` or `errors`. Run\nnode --test until all tests pass.\n\nUse the smallest correct change and confirm the test suite."
+      },
+      {
+        "approved": false,
+        "id": "equivalent-3",
+        "sha256": "95d94a3144038fa2dbd2ea9c86abb12d93028e276ef16cee4a895ff864bd7dd7",
+        "text": "Please solve this task in the supplied checkout, retaining all stated edge cases:\n\nparseLedger(lines) in src/index.js is supposed to turn raw ledger lines into two\nlists: `ok` (valid transactions) and `errors` (malformed lines, reported for\nfollow-up). Each line should JSON-decode to an object {id, amount, currency}.\nRight now a malformed line makes the whole batch throw instead of being\nrecorded. Fix this: for each line, in order, exactly ONE of the following\nhappens -- (1) if the line is not valid JSON, push {index, line, reason:\n'invalid-json'} onto `errors`; (2) if it decodes but `id` is not a non-empty\nstring, push reason 'missing-field'; (3) if `amount` is not a finite number,\npush reason 'bad-amount'; (4) if `currency` is not one of USD, EUR, GBP, JPY,\npush reason 'bad-currency'; (5) otherwise push {id, amount rounded to 2\ndecimals, currency} onto `ok`. Never throw on a bad line, and never drop a\nline silently -- every line must land in exactly one of `ok` or `errors`. Run\nnode --test until all tests pass."
+      }
+    ],
+    "semantic_group": "qs-error-swallow:2026-07.1"
+  },
+  "schema": "pi.fixture/v1",
+  "sufficiency": [
+    {
+      "assertion": "malformed JSON is reported as reason invalid-json, never thrown or crashing the batch",
+      "prompt_evidence": "parseLedger(lines) in src/index.js is supposed to turn raw ledger lines into two\nlists: `ok` (valid transactions) and `errors` (malformed lines, reported for\nfollow-up). Each line should JSON-decode to an object {id, amount, currency}.\nRight now a malformed line makes the whole batch throw instead of being\nrecorded. Fix this: for each line, in order, exactly ONE of the following\nhappens -- (1) if the line is not valid JSON, push {index, line, reason:\n'invalid-json'} onto `errors`; (2) if it decodes but `id` is not a non-empty\nstring, push reason 'missing-field'; (3) if `amount` is not a finite number,\npush reason 'bad-amount'; (4) if `currency` is not one of USD, EUR, GBP, JPY,\npush reason 'bad-currency'; (5) otherwise push {id, amount rounded to 2\ndecimals, currency} onto `ok`. Never throw on a bad line, and never drop a\nline silently -- every line must land in exactly one of `ok` or `errors`. Run\nnode --test until all tests pass."
+    },
+    {
+      "assertion": "every line lands in exactly one of ok or errors -- no silent drops",
+      "prompt_evidence": "parseLedger(lines) in src/index.js is supposed to turn raw ledger lines into two\nlists: `ok` (valid transactions) and `errors` (malformed lines, reported for\nfollow-up). Each line should JSON-decode to an object {id, amount, currency}.\nRight now a malformed line makes the whole batch throw instead of being\nrecorded. Fix this: for each line, in order, exactly ONE of the following\nhappens -- (1) if the line is not valid JSON, push {index, line, reason:\n'invalid-json'} onto `errors`; (2) if it decodes but `id` is not a non-empty\nstring, push reason 'missing-field'; (3) if `amount` is not a finite number,\npush reason 'bad-amount'; (4) if `currency` is not one of USD, EUR, GBP, JPY,\npush reason 'bad-currency'; (5) otherwise push {id, amount rounded to 2\ndecimals, currency} onto `ok`. Never throw on a bad line, and never drop a\nline silently -- every line must land in exactly one of `ok` or `errors`. Run\nnode --test until all tests pass."
+    },
+    {
+      "assertion": "structural validation (missing-field / bad-amount / bad-currency) is unaffected by the parse-safety fix",
+      "prompt_evidence": "parseLedger(lines) in src/index.js is supposed to turn raw ledger lines into two\nlists: `ok` (valid transactions) and `errors` (malformed lines, reported for\nfollow-up). Each line should JSON-decode to an object {id, amount, currency}.\nRight now a malformed line makes the whole batch throw instead of being\nrecorded. Fix this: for each line, in order, exactly ONE of the following\nhappens -- (1) if the line is not valid JSON, push {index, line, reason:\n'invalid-json'} onto `errors`; (2) if it decodes but `id` is not a non-empty\nstring, push reason 'missing-field'; (3) if `amount` is not a finite number,\npush reason 'bad-amount'; (4) if `currency` is not one of USD, EUR, GBP, JPY,\npush reason 'bad-currency'; (5) otherwise push {id, amount rounded to 2\ndecimals, currency} onto `ok`. Never throw on a bad line, and never drop a\nline silently -- every line must land in exactly one of `ok` or `errors`. Run\nnode --test until all tests pass."
+    }
+  ],
+  "task_id": "qs-error-swallow",
+  "tests": {
+    "fail_to_pass": {
+      "command": [
+        "node",
+        "--test",
+        "test/fail-to-pass.test.js"
+      ],
+      "overlays": [
+        {
+          "dest": "test/fail-to-pass.test.js",
+          "source": "real-gate-fixtures/hidden/qs-error-swallow.test.js"
+        }
+      ],
+      "timeout_seconds": 60
+    },
+    "pass_to_pass": {
+      "command": [
+        "node",
+        "--test"
+      ],
+      "overlays": [],
+      "timeout_seconds": 60
+    }
+  },
+  "timestamps": {
+    "admitted_at": null,
+    "created_at": "2026-07-23T00:00:00Z",
+    "expires_at": null
+  }
+}

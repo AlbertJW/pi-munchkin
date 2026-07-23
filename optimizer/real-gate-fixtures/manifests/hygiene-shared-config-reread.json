@@ -1,0 +1,265 @@
+{
+  "admission": {
+    "approved": false,
+    "automated": {
+      "checked_at": "2026-07-23T10:02:51Z",
+      "hash_drift": [],
+      "passed": true,
+      "runs_per_state": 3,
+      "states": {
+        "gold_fail_to_pass": [
+          {
+            "output_tail": "",
+            "passed": true,
+            "returncode": 0
+          },
+          {
+            "output_tail": "",
+            "passed": true,
+            "returncode": 0
+          },
+          {
+            "output_tail": "",
+            "passed": true,
+            "returncode": 0
+          }
+        ],
+        "gold_pass_to_pass": [
+          {
+            "output_tail": "",
+            "passed": true,
+            "returncode": 0
+          },
+          {
+            "output_tail": "",
+            "passed": true,
+            "returncode": 0
+          },
+          {
+            "output_tail": "",
+            "passed": true,
+            "returncode": 0
+          }
+        ],
+        "mutant:shortcut": {
+          "fail_to_pass": [
+            {
+              "output_tail": "-reread-9vhrmotz/work/test/fail-to-pass.test.js:42:12)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n      at Test.postRun (node:internal/test_runner/test:1522:19)\n      at Test.run (node:internal/test_runner/test:1447:12)\n      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7) {\n    generatedMessage: false,\n    code: 'ERR_ASSERTION',\n    actual: true,\n    expected: false,\n    operator: 'strictEqual',\n    diff: 'simple'\n  }\n",
+              "passed": false,
+              "returncode": 1
+            },
+            {
+              "output_tail": "-reread-xlws8tg1/work/test/fail-to-pass.test.js:42:12)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n      at Test.postRun (node:internal/test_runner/test:1522:19)\n      at Test.run (node:internal/test_runner/test:1447:12)\n      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7) {\n    generatedMessage: false,\n    code: 'ERR_ASSERTION',\n    actual: true,\n    expected: false,\n    operator: 'strictEqual',\n    diff: 'simple'\n  }\n",
+              "passed": false,
+              "returncode": 1
+            },
+            {
+              "output_tail": "-reread-msuwoeg7/work/test/fail-to-pass.test.js:42:12)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n      at Test.postRun (node:internal/test_runner/test:1522:19)\n      at Test.run (node:internal/test_runner/test:1447:12)\n      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7) {\n    generatedMessage: false,\n    code: 'ERR_ASSERTION',\n    actual: true,\n    expected: false,\n    operator: 'strictEqual',\n    diff: 'simple'\n  }\n",
+              "passed": false,
+              "returncode": 1
+            }
+          ],
+          "pass_to_pass": [
+            {
+              "output_tail": "",
+              "passed": true,
+              "returncode": 0
+            },
+            {
+              "output_tail": "",
+              "passed": true,
+              "returncode": 0
+            },
+            {
+              "output_tail": "",
+              "passed": true,
+              "returncode": 0
+            }
+          ]
+        },
+        "pristine_fail_to_pass": [
+          {
+            "output_tail": "-reread-_vley6of/work/test/fail-to-pass.test.js:42:12)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n      at Test.postRun (node:internal/test_runner/test:1522:19)\n      at Test.run (node:internal/test_runner/test:1447:12)\n      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7) {\n    generatedMessage: false,\n    code: 'ERR_ASSERTION',\n    actual: false,\n    expected: true,\n    operator: 'strictEqual',\n    diff: 'simple'\n  }\n",
+            "passed": false,
+            "returncode": 1
+          },
+          {
+            "output_tail": "-reread-qdib2unx/work/test/fail-to-pass.test.js:42:12)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n      at Test.postRun (node:internal/test_runner/test:1522:19)\n      at Test.run (node:internal/test_runner/test:1447:12)\n      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7) {\n    generatedMessage: false,\n    code: 'ERR_ASSERTION',\n    actual: false,\n    expected: true,\n    operator: 'strictEqual',\n    diff: 'simple'\n  }\n",
+            "passed": false,
+            "returncode": 1
+          },
+          {
+            "output_tail": "-reread-t_18deu7/work/test/fail-to-pass.test.js:42:12)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n      at Test.postRun (node:internal/test_runner/test:1522:19)\n      at Test.run (node:internal/test_runner/test:1447:12)\n      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7) {\n    generatedMessage: false,\n    code: 'ERR_ASSERTION',\n    actual: false,\n    expected: true,\n    operator: 'strictEqual',\n    diff: 'simple'\n  }\n",
+            "passed": false,
+            "returncode": 1
+          }
+        ],
+        "pristine_pass_to_pass": [
+          {
+            "output_tail": "",
+            "passed": true,
+            "returncode": 0
+          },
+          {
+            "output_tail": "",
+            "passed": true,
+            "returncode": 0
+          },
+          {
+            "output_tail": "",
+            "passed": true,
+            "returncode": 0
+          }
+        ]
+      }
+    },
+    "reviewed_at": null,
+    "reviewer": null
+  },
+  "artifacts": [
+    {
+      "path": "real-gate-fixtures/hygiene-shared-config-reread/package.json",
+      "sha256": "b6692286f8967eb53d5ffa460ae6ca10663950c4b34f262041b7780eb1916902"
+    },
+    {
+      "path": "real-gate-fixtures/hygiene-shared-config-reread/config/schema.json",
+      "sha256": "02193dabd8f8866442494f943be00e8a253257c996ae35318d4fe33662c8d2ae"
+    },
+    {
+      "path": "real-gate-fixtures/hygiene-shared-config-reread/src/validators/sku.js",
+      "sha256": "4dcd3f13303203b1d59b7254a9f38a9e32bdeeee460a90772adc50cbd65f4f53"
+    },
+    {
+      "path": "real-gate-fixtures/hygiene-shared-config-reread/src/validators/price.js",
+      "sha256": "8311c07b972e8eb3aabeea60f4d98b91b02c974a4889847d84611c57dfcc1894"
+    },
+    {
+      "path": "real-gate-fixtures/hygiene-shared-config-reread/src/validators/qty.js",
+      "sha256": "fb497ed08460186169b994e6d1318fec9a2d9436775389e53663d54f8e7896f5"
+    },
+    {
+      "path": "real-gate-fixtures/hygiene-shared-config-reread/src/validators/category.js",
+      "sha256": "22ff7018a7b3c31e539f298a8215566cfc9cbabef8f2948958bf19787594805c"
+    },
+    {
+      "path": "real-gate-fixtures/hygiene-shared-config-reread/test/visible.test.js",
+      "sha256": "6c5937a8effc705709b2708e8f5ad9e70c54143d615c9fa3b2edb46466415aea"
+    },
+    {
+      "path": "real-gate-fixtures/hidden/hygiene-shared-config-reread.test.js",
+      "sha256": "b62e65221c4978373e7d9c77c13c02405bcb29a5bd252d984ccb106b15191b04"
+    },
+    {
+      "path": "real-gate-fixtures/patches/hygiene-shared-config-reread/gold.patch",
+      "sha256": "73547e084493b59c01ac2ff0e6cc883b008fe5196caed8fd7a26c7ae2458e824"
+    },
+    {
+      "path": "real-gate-fixtures/patches/hygiene-shared-config-reread/shortcut.patch",
+      "sha256": "c4b546f1cc54606faff046131a0f3816ab3efddedf4f18f08f7b063975d4cbdc"
+    }
+  ],
+  "cohort_id": "2026-07",
+  "fixture": {
+    "root": "real-gate-fixtures/hygiene-shared-config-reread",
+    "stage_copy": []
+  },
+  "fixture_version": "2026-07.1",
+  "one_shot": {
+    "context_files": [
+      "config/schema.json",
+      "src/validators/sku.js",
+      "src/validators/price.js",
+      "src/validators/qty.js",
+      "src/validators/category.js",
+      "test/visible.test.js"
+    ],
+    "eligible": false,
+    "max_context_bytes": 49152
+  },
+  "patches": {
+    "gold": "real-gate-fixtures/patches/hygiene-shared-config-reread/gold.patch",
+    "shortcut_mutants": [
+      "real-gate-fixtures/patches/hygiene-shared-config-reread/shortcut.patch"
+    ]
+  },
+  "prompts": {
+    "canonical": {
+      "sha256": "cdf785ee956e573b87a9d2068883866aa3c09b9282353673b415af87510cd592",
+      "text": "config/schema.json is the single authoritative source of field rules; each validator in\nsrc/validators/ (sku.js, price.js, qty.js, category.js) hardcodes its own copy of those\nrules and has drifted out of sync with it. Fix each validator so it exactly matches\nconfig/schema.json: sku's length must be within [minLength, maxLength] inclusive; price\nmust be >= min; qty must be an integer within [min, max] inclusive; category must accept\nexactly the values in enum, no others. Check config/schema.json for the current numbers\nbefore fixing each file -- the old hardcoded bounds are stale and do not match it. Run\nnode --test until all tests pass."
+    },
+    "perturbations": [
+      {
+        "approved": false,
+        "id": "equivalent-1",
+        "sha256": "7c6b639b025512eae07cd4151ae8373bbc0ddc5580e128fc545ff2b6bce0f044",
+        "text": "Complete the following repository task. Preserve existing behavior and verify the tests.\n\nconfig/schema.json is the single authoritative source of field rules; each validator in\nsrc/validators/ (sku.js, price.js, qty.js, category.js) hardcodes its own copy of those\nrules and has drifted out of sync with it. Fix each validator so it exactly matches\nconfig/schema.json: sku's length must be within [minLength, maxLength] inclusive; price\nmust be >= min; qty must be an integer within [min, max] inclusive; category must accept\nexactly the values in enum, no others. Check config/schema.json for the current numbers\nbefore fixing each file -- the old hardcoded bounds are stale and do not match it. Run\nnode --test until all tests pass."
+      },
+      {
+        "approved": false,
+        "id": "equivalent-2",
+        "sha256": "dd0939ad3d5303ad761ba9091cfd3f6e7acade6543efb0c96254b917a43481c2",
+        "text": "Repository change request:\nconfig/schema.json is the single authoritative source of field rules; each validator in\nsrc/validators/ (sku.js, price.js, qty.js, category.js) hardcodes its own copy of those\nrules and has drifted out of sync with it. Fix each validator so it exactly matches\nconfig/schema.json: sku's length must be within [minLength, maxLength] inclusive; price\nmust be >= min; qty must be an integer within [min, max] inclusive; category must accept\nexactly the values in enum, no others. Check config/schema.json for the current numbers\nbefore fixing each file -- the old hardcoded bounds are stale and do not match it. Run\nnode --test until all tests pass.\n\nUse the smallest correct change and confirm the test suite."
+      },
+      {
+        "approved": false,
+        "id": "equivalent-3",
+        "sha256": "a21945deae4735701655f09762066cb53848b4ddae4dc2b4883338a22ef2315f",
+        "text": "Please solve this task in the supplied checkout, retaining all stated edge cases:\n\nconfig/schema.json is the single authoritative source of field rules; each validator in\nsrc/validators/ (sku.js, price.js, qty.js, category.js) hardcodes its own copy of those\nrules and has drifted out of sync with it. Fix each validator so it exactly matches\nconfig/schema.json: sku's length must be within [minLength, maxLength] inclusive; price\nmust be >= min; qty must be an integer within [min, max] inclusive; category must accept\nexactly the values in enum, no others. Check config/schema.json for the current numbers\nbefore fixing each file -- the old hardcoded bounds are stale and do not match it. Run\nnode --test until all tests pass."
+      }
+    ],
+    "semantic_group": "hygiene-shared-config-reread:2026-07.1"
+  },
+  "schema": "pi.fixture/v1",
+  "sufficiency": [
+    {
+      "assertion": "sku length bound matches config/schema.json's minLength/maxLength inclusive",
+      "prompt_evidence": "sku's length must be within [minLength, maxLength] inclusive"
+    },
+    {
+      "assertion": "price lower bound matches config/schema.json's min inclusive",
+      "prompt_evidence": "must be >= min"
+    },
+    {
+      "assertion": "qty is validated as an integer within config/schema.json's min/max inclusive",
+      "prompt_evidence": "qty must be an integer within [min, max] inclusive"
+    },
+    {
+      "assertion": "category accepts exactly config/schema.json's enum values, no others",
+      "prompt_evidence": "exactly the values in enum, no others"
+    },
+    {
+      "assertion": "the fix must be read from config/schema.json, not guessed or left at old hardcoded bounds",
+      "prompt_evidence": "Check config/schema.json for the current numbers\nbefore fixing each file -- the old hardcoded bounds are stale and do not match it."
+    }
+  ],
+  "task_id": "hygiene-shared-config-reread",
+  "tests": {
+    "fail_to_pass": {
+      "command": [
+        "node",
+        "--test",
+        "test/fail-to-pass.test.js"
+      ],
+      "overlays": [
+        {
+          "dest": "test/fail-to-pass.test.js",
+          "source": "real-gate-fixtures/hidden/hygiene-shared-config-reread.test.js"
+        }
+      ],
+      "timeout_seconds": 60
+    },
+    "pass_to_pass": {
+      "command": [
+        "node",
+        "--test"
+      ],
+      "overlays": [],
+      "timeout_seconds": 60
+    }
+  },
+  "timestamps": {
+    "admitted_at": null,
+    "created_at": "2026-07-23T00:00:00Z",
+    "expires_at": null
+  }
+}

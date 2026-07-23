@@ -87,6 +87,14 @@ fi
 # hidden grader, and uses its own fixture dir $FIXTURES/<id>/ if one exists (else the default).
 hidden_test_for() {
 	if [[ -f "$FIXTURES/hidden/$1.test.js" ]]; then echo "$FIXTURES/hidden/$1.test.js"; return; fi
+	# t4 predates the hidden/<task>.test.js convention; its grader still lives at
+	# admission-tests/t4.test.mjs (also the source fixture_admission.py's own
+	# manifest-overlay path uses). Named explicitly rather than folded into the
+	# generic eval_fixture.py fallback below, which is scoped to context_pressure
+	# manifests only — broadening it would wrongly reclassify t1/t2/t3/t5/t6 (which
+	# also carry a tests.fail_to_pass overlay for admission, but are graded here via
+	# their own install_tests()/bespoke-check path, not the hidden-task path) as hidden.
+	if [[ "$1" == "t4" && -f "$FIXTURES/admission-tests/t4.test.mjs" ]]; then echo "$FIXTURES/admission-tests/t4.test.mjs"; return; fi
 	local relative; relative="$(python3 "$FIXTURE_META" hidden-test "$1" 2>/dev/null)"
 	[[ -n "$relative" ]] && echo "$HERE/$relative"
 }
@@ -607,7 +615,12 @@ NOTE: a previous attempt in this workdir was stopped for repeating the same fail
 	local gate=1
 	( cd "$wd" && node --test ) > "$wd/gate.log" 2>&1 || gate=0
 	[[ "$task" == "t1" ]] && grep -rq "parseCSV" "$wd/src" "$wd/test" && gate=0
-	[[ "$task" == "t4" ]] && ! grep -rq "trim" "$wd/test" && gate=0
+	# t4's real correctness check is now the hidden fail-to-pass grader installed
+	# above (is_hidden() recognizes t4 via admission-tests/t4.test.mjs) and scored
+	# by the `node --test` a few lines up. The grep this replaced was a tautology:
+	# it merely checked the literal word "trim" appears somewhere under test/,
+	# trivially satisfied by the model naming a test/comment after the prompt's
+	# own vocabulary regardless of whether the trim option actually works.
 	# t2's own tests pass on an untouched fixture — node --test alone scores a no-op as
 	# success. The F2P grader asserts the behavior the task actually asks for.
 	[[ "$task" == "t2" ]] && ! ( cd "$wd" && node "$FIXTURES/t2-check.mjs" ) >/dev/null 2>&1 && gate=0

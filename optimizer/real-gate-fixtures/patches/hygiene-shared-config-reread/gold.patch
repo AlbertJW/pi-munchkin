@@ -1,0 +1,36 @@
+--- a/src/validators/category.js
++++ b/src/validators/category.js
+@@ -1,5 +1,5 @@
+ // Mirrors the "category" rule in config/schema.json; keep this list in sync with that file.
+-const CATEGORIES = ["electronics", "books", "toys", "clothing"];
++const CATEGORIES = ["electronics", "books", "toys", "food"];
+ export function validateCategory(value) {
+   return CATEGORIES.includes(value);
+ }
+--- a/src/validators/price.js
++++ b/src/validators/price.js
+@@ -1,5 +1,5 @@
+ // Mirrors the "price" rule in config/schema.json; keep this bound in sync with that file.
+ export function validatePrice(value) {
+   if (typeof value !== "number" || Number.isNaN(value)) return false;
+-  return value >= 0;
++  return value >= 0.01;
+ }
+--- a/src/validators/qty.js
++++ b/src/validators/qty.js
+@@ -1,5 +1,5 @@
+ // Mirrors the "qty" rule in config/schema.json; keep these bounds in sync with that file.
+ export function validateQty(value) {
+   if (typeof value !== "number" || !Number.isInteger(value)) return false;
+-  return value >= 0 && value <= 999;
++  return value >= 1 && value <= 500;
+ }
+--- a/src/validators/sku.js
++++ b/src/validators/sku.js
+@@ -1,5 +1,5 @@
+ // Mirrors the "sku" rule in config/schema.json; keep these bounds in sync with that file.
+ export function validateSku(value) {
+   if (typeof value !== "string") return false;
+-  return value.length >= 2 && value.length <= 10;
++  return value.length >= 3 && value.length <= 12;
+ }

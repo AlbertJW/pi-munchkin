@@ -1,0 +1,39 @@
+--- a/src/records.js
++++ b/src/records.js
+@@ -4,5 +4,5 @@
+ // Parses one CSV line into a record object.
+ export function parseRecord(line) {
+   const [id, category, amount, status] = line.split(",");
+-  return { id, category, amount, status };
++  return { id, category, amount: Number(amount), status };
+ }
+--- a/src/summary.js
++++ b/src/summary.js
+@@ -1,8 +1,14 @@
+ // Caller: builds the per-category report from parsed records (src/records.js).
+ 
+-// TODO: once parseRecord returns numeric amounts, sum them per category for
+-// status:"active" records only, round to 2 decimals, sort by total
+-// descending, and write to src/summary.json.
++// Sums amount per category for status:"active" records only, rounds each
++// total to 2 decimals, and sorts by total descending.
+ export function summarizeByCategory(records) {
+-  throw new Error("not implemented");
++  const totals = new Map();
++  for (const r of records) {
++    if (r.status !== "active") continue;
++    totals.set(r.category, (totals.get(r.category) ?? 0) + r.amount);
++  }
++  return [...totals.entries()]
++    .map(([category, total]) => ({ category, total: Math.round(total * 100) / 100 }))
++    .sort((a, b) => b.total - a.total || a.category.localeCompare(b.category));
+ }
+--- /dev/null
++++ b/src/summary.json
+@@ -0,0 +1,6 @@
++[
++  { "category": "electronics", "total": 710.49 },
++  { "category": "grocery", "total": 135.65 },
++  { "category": "toys", "total": 87.57 },
++  { "category": "books", "total": 68.97 }
++]

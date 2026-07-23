@@ -1,0 +1,8 @@
+{
+  "fields": {
+    "sku": { "type": "string", "minLength": 3, "maxLength": 12 },
+    "price": { "type": "number", "min": 0.01 },
+    "qty": { "type": "integer", "min": 1, "max": 500 },
+    "category": { "type": "string", "enum": ["electronics", "books", "toys", "food"] }
+  }
+}

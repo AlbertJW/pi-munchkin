@@ -1,0 +1,13 @@
+parseLedger(lines) in src/index.js is supposed to turn raw ledger lines into two
+lists: `ok` (valid transactions) and `errors` (malformed lines, reported for
+follow-up). Each line should JSON-decode to an object {id, amount, currency}.
+Right now a malformed line makes the whole batch throw instead of being
+recorded. Fix this: for each line, in order, exactly ONE of the following
+happens -- (1) if the line is not valid JSON, push {index, line, reason:
+'invalid-json'} onto `errors`; (2) if it decodes but `id` is not a non-empty
+string, push reason 'missing-field'; (3) if `amount` is not a finite number,
+push reason 'bad-amount'; (4) if `currency` is not one of USD, EUR, GBP, JPY,
+push reason 'bad-currency'; (5) otherwise push {id, amount rounded to 2
+decimals, currency} onto `ok`. Never throw on a bad line, and never drop a
+line silently -- every line must land in exactly one of `ok` or `errors`. Run
+node --test until all tests pass.

@@ -115,7 +115,102 @@ def check_session_files(session_paths, corpus: Path, expected_corpus: Path | Non
     return False, "; ".join(reasons) if reasons else "no session attempts"
 
 
+def _subagent_agents(call):
+    """Agent name(s) a `subagent` toolCall's own recorded arguments name — single
+    mode ({agent: "..."}) or parallel mode ({tasks: [{agent: "..."}, ...]})."""
+    if call.get("name") != "subagent":
+        return []
+    args = call.get("arguments") or {}
+    names = []
+    if isinstance(args.get("agent"), str):
+        names.append(args["agent"].strip().lower())
+    for item in args.get("tasks") or []:
+        if isinstance(item, dict) and isinstance(item.get("agent"), str):
+            names.append(item["agent"].strip().lower())
+    return names
+
+
+def check_t4(msgs):
+    """t4's canonical prompt mandates delegate-to-explorer THEN delegate-to-verifier.
+    A subagent toolCall's own recorded arguments are direct, unforgeable evidence —
+    the harness itself only writes one when the tool actually ran — unlike bigdata's
+    search_spans case, where call arguments alone are trivially fakeable and a signed
+    execution receipt is required instead. No receipt machinery needed here."""
+    calls, results = _calls_and_results(msgs)
+    results_by_call = {str(r.get("toolCallId", "")): r for r in results}
+    explorer_seen = False
+    for call_id, call in calls.items():
+        names = _subagent_agents(call)
+        if not names:
+            continue
+        result = results_by_call.get(call_id)
+        if not result or result.get("isError"):
+            continue  # only a completed, non-error invocation counts as delegation
+        if "explorer" in names:
+            explorer_seen = True
+        if "verifier" in names and explorer_seen:
+            return True, "verified subagent(explorer) preceded subagent(verifier)"
+    if not explorer_seen:
+        return False, "no successful subagent(agent=explorer) call found"
+    return False, "subagent(agent=explorer) found but no later successful subagent(agent=verifier) call"
+
+
+def check_t4_sessions(session_paths):
+    reasons = []
+    for session in session_paths:
+        ok, why = check_t4(load_msgs(session))
+        if ok:
+            return True, why
+        reasons.append(f"{Path(session).name}: {why}")
+    return False, "; ".join(reasons) if reasons else "no session attempts"
+
+
+def check_sv_ambiguous_spec(msgs):
+    """c31 (PLAN_UNCERTAINTY): sv-ambiguous-spec's prompt names two equally-active,
+    concretely-specified tie-breaking conventions and withholds which one refunds
+    should follow — a genuine fork, not a gap fillable by reading the repo harder.
+    The candidate's claim is that the model surfaces this as a blocking uncertainty
+    (plan_write's uncertainties[] field) instead of picking one and guessing. A
+    plan_write toolCall's own recorded arguments are direct, unforgeable evidence —
+    the harness itself only writes a matching toolResult when the call actually ran
+    — unlike bigdata's search_spans case, where call arguments alone are trivially
+    fakeable and a signed execution receipt is required instead. No receipt
+    machinery needed here (same reasoning as check_t4)."""
+    calls, results = _calls_and_results(msgs)
+    results_by_call = {str(r.get("toolCallId", "")): r for r in results}
+    for call_id, call in calls.items():
+        if call.get("name") != "plan_write":
+            continue
+        result = results_by_call.get(call_id)
+        if not result or result.get("isError"):
+            continue  # only a completed, non-error invocation counts as a declaration
+        uncertainties = (call.get("arguments") or {}).get("uncertainties")
+        if isinstance(uncertainties, list) and any(str(u).strip() for u in uncertainties):
+            return True, "verified plan_write declared a non-empty uncertainties[] entry"
+    return False, "no successful plan_write call declared a blocking uncertainty"
+
+
+def check_sv_ambiguous_spec_sessions(session_paths):
+    reasons = []
+    for session in session_paths:
+        ok, why = check_sv_ambiguous_spec(load_msgs(session))
+        if ok:
+            return True, why
+        reasons.append(f"{Path(session).name}: {why}")
+    return False, "; ".join(reasons) if reasons else "no session attempts"
+
+
 def check(workdir, task):
+    if task == "t4":
+        sessions = session_files_for(workdir)
+        if not sessions:
+            return False, "no session found — trajectory evidence unavailable (fail closed)"
+        return check_t4_sessions(sessions)
+    if task == "sv-ambiguous-spec":
+        sessions = session_files_for(workdir)
+        if not sessions:
+            return False, "no session found — trajectory evidence unavailable (fail closed)"
+        return check_sv_ambiguous_spec_sessions(sessions)
     if task != "bigdata":
         return True, "no trajectory rule for this task"
     sessions = session_files_for(workdir)
@@ -171,7 +266,55 @@ def selftest():
                                           for msg in messages(valid)) + "\n")
         assert check_session_files([first, second], corpus)[0]
         assert check("/missing", "t1")[0]
-    print("trajectory_check selftest: OK (receipt binding, UTF-8 bytes, stale/partial/wrong-file rejection)")
+
+        def subagent_call(call_id, agent, *, error=False, skip_result=False, tasks=None):
+            args = {"tasks": tasks} if tasks else {"agent": agent, "task": "..."}
+            out = [{"role": "assistant", "content": [{"type": "toolCall", "id": call_id,
+                                                        "name": "subagent", "arguments": args}]}]
+            if not skip_result:
+                out.append({"role": "toolResult", "toolCallId": call_id, "toolName": "subagent",
+                            "details": {}, "isError": error})
+            return out
+
+        explore_then_verify = subagent_call("c1", "explorer") + subagent_call("c2", "verifier")
+        assert check_t4(explore_then_verify)[0]
+        verify_then_explore = subagent_call("c1", "verifier") + subagent_call("c2", "explorer")
+        assert not check_t4(verify_then_explore)[0]  # wrong order
+        assert not check_t4(subagent_call("c1", "explorer"))[0]  # no verifier at all
+        assert not check_t4([])[0]  # no delegation at all
+        failed_explore = subagent_call("c1", "explorer", error=True) + subagent_call("c2", "verifier")
+        assert not check_t4(failed_explore)[0]  # errored explorer call doesn't count
+        unresulted_explore = subagent_call("c1", "explorer", skip_result=True) + subagent_call("c2", "verifier")
+        assert not check_t4(unresulted_explore)[0]  # call with no matching result doesn't count
+        parallel = subagent_call("c1", None, tasks=[{"agent": "explorer", "task": "x"}]) + \
+            subagent_call("c2", None, tasks=[{"agent": "verifier", "task": "y"}])
+        assert check_t4(parallel)[0]  # parallel-mode {tasks:[{agent,...}]} shape also counts
+
+        def plan_write_call(call_id, uncertainties=None, *, error=False, skip_result=False):
+            args = {"items": [{"title": "x", "status": "pending"}]}
+            if uncertainties is not None:
+                args["uncertainties"] = uncertainties
+            out = [{"role": "assistant", "content": [{"type": "toolCall", "id": call_id,
+                                                        "name": "plan_write", "arguments": args}]}]
+            if not skip_result:
+                out.append({"role": "toolResult", "toolCallId": call_id, "toolName": "plan_write",
+                            "details": {}, "isError": error})
+            return out
+
+        assert check_sv_ambiguous_spec(plan_write_call("p1", ["which rounding rule applies to refunds?"]))[0]
+        assert not check_sv_ambiguous_spec(plan_write_call("p1"))[0]  # no uncertainties field at all
+        assert not check_sv_ambiguous_spec(plan_write_call("p1", []))[0]  # cleared/never populated
+        assert not check_sv_ambiguous_spec(plan_write_call("p1", ["   "]))[0]  # blank-only entry
+        assert not check_sv_ambiguous_spec([])[0]  # no plan_write call at all
+        failed_declare = plan_write_call("p1", ["which rule?"], error=True)
+        assert not check_sv_ambiguous_spec(failed_declare)[0]  # errored call doesn't count
+        unresulted_declare = plan_write_call("p1", ["which rule?"], skip_result=True)
+        assert not check_sv_ambiguous_spec(unresulted_declare)[0]  # call with no matching result doesn't count
+        # A later clearing call ([]) doesn't erase the earlier declaration as evidence.
+        declare_then_clear = plan_write_call("p1", ["which rule?"]) + plan_write_call("p2", [])
+        assert check_sv_ambiguous_spec(declare_then_clear)[0]
+    print("trajectory_check selftest: OK (receipt binding, UTF-8 bytes, stale/partial/wrong-file rejection, "
+          "t4 delegation ordering, sv-ambiguous-spec uncertainty declaration)")
 
 
 if __name__ == "__main__":

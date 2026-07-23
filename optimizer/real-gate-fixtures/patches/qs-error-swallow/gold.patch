@@ -1,0 +1,19 @@
+--- a/src/index.js
++++ b/src/index.js
+@@ -7,9 +7,13 @@
+   const errors = [];
+   for (let i = 0; i < lines.length; i++) {
+     const raw = lines[i];
+-    // BUG: JSON.parse is not guarded -- a malformed line throws and aborts
+-    // the whole batch instead of being reported as a per-line error.
+-    const obj = JSON.parse(raw);
++    let obj;
++    try {
++      obj = JSON.parse(raw);
++    } catch {
++      errors.push({ index: i, line: raw, reason: 'invalid-json' });
++      continue;
++    }
+     if (obj === null || typeof obj !== 'object' || typeof obj.id !== 'string' || obj.id.length === 0) {
+       errors.push({ index: i, line: raw, reason: 'missing-field' });
+       continue;

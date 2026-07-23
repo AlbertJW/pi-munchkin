@@ -2,7 +2,7 @@
   "admission": {
     "approved": false,
     "automated": {
-      "checked_at": "2026-07-14T18:49:12Z",
+      "checked_at": "2026-07-23T09:47:11Z",
       "hash_drift": [],
       "passed": true,
       "runs_per_state": 3,
@@ -44,17 +44,17 @@
         "mutant:shortcut": {
           "fail_to_pass": [
             {
-              "output_tail": "us> (file:///private/var/folders/3r/nc7qhtpn56j7rt5nwg0rqw600000gn/T/pi-admit-t4-jjmupkeo/work/test/fail-to-pass.test.mjs:6:10)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.start (node:internal/test_runner/test:1242:17)\n      at startSubtestAfterBootstrap (node:internal/test_runner/harness:387:17) {\n    generatedMessage: true,\n    code: 'ERR_ASSERTION',\n    actual: [ { name: 'John', age: '30' } ],\n    expected: [ { ' name ': ' John ', ' age ': ' 30 ' } ],\n    operator: 'deepStrictEqual',\n    diff: 'simple'\n  }\n",
+              "output_tail": "ks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n      at Test.postRun (node:internal/test_runner/test:1522:19)\n      at Test.run (node:internal/test_runner/test:1447:12)\n      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7) {\n    generatedMessage: true,\n    code: 'ERR_ASSERTION',\n    actual: [ { name: '\"John Doe\"', address: '\"123 Main St' } ],\n    expected: [ { name: 'John Doe', address: '123 Main St, Apt 4' } ],\n    operator: 'deepStrictEqual',\n    diff: 'simple'\n  }\n",
               "passed": false,
               "returncode": 1
             },
             {
-              "output_tail": "us> (file:///private/var/folders/3r/nc7qhtpn56j7rt5nwg0rqw600000gn/T/pi-admit-t4-peew0cqr/work/test/fail-to-pass.test.mjs:6:10)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.start (node:internal/test_runner/test:1242:17)\n      at startSubtestAfterBootstrap (node:internal/test_runner/harness:387:17) {\n    generatedMessage: true,\n    code: 'ERR_ASSERTION',\n    actual: [ { name: 'John', age: '30' } ],\n    expected: [ { ' name ': ' John ', ' age ': ' 30 ' } ],\n    operator: 'deepStrictEqual',\n    diff: 'simple'\n  }\n",
+              "output_tail": "ks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n      at Test.postRun (node:internal/test_runner/test:1522:19)\n      at Test.run (node:internal/test_runner/test:1447:12)\n      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7) {\n    generatedMessage: true,\n    code: 'ERR_ASSERTION',\n    actual: [ { name: '\"John Doe\"', address: '\"123 Main St' } ],\n    expected: [ { name: 'John Doe', address: '123 Main St, Apt 4' } ],\n    operator: 'deepStrictEqual',\n    diff: 'simple'\n  }\n",
               "passed": false,
               "returncode": 1
             },
             {
-              "output_tail": "us> (file:///private/var/folders/3r/nc7qhtpn56j7rt5nwg0rqw600000gn/T/pi-admit-t4-ksk_71lr/work/test/fail-to-pass.test.mjs:6:10)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.start (node:internal/test_runner/test:1242:17)\n      at startSubtestAfterBootstrap (node:internal/test_runner/harness:387:17) {\n    generatedMessage: true,\n    code: 'ERR_ASSERTION',\n    actual: [ { name: 'John', age: '30' } ],\n    expected: [ { ' name ': ' John ', ' age ': ' 30 ' } ],\n    operator: 'deepStrictEqual',\n    diff: 'simple'\n  }\n",
+              "output_tail": "ks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n      at Test.postRun (node:internal/test_runner/test:1522:19)\n      at Test.run (node:internal/test_runner/test:1447:12)\n      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7) {\n    generatedMessage: true,\n    code: 'ERR_ASSERTION',\n    actual: [ { name: '\"John Doe\"', address: '\"123 Main St' } ],\n    expected: [ { name: 'John Doe', address: '123 Main St, Apt 4' } ],\n    operator: 'deepStrictEqual',\n    diff: 'simple'\n  }\n",
               "passed": false,
               "returncode": 1
             }
@@ -79,17 +79,17 @@
         },
         "pristine_fail_to_pass": [
           {
-            "output_tail": "us> (file:///private/var/folders/3r/nc7qhtpn56j7rt5nwg0rqw600000gn/T/pi-admit-t4-sm4djoj0/work/test/fail-to-pass.test.mjs:6:10)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.start (node:internal/test_runner/test:1242:17)\n      at startSubtestAfterBootstrap (node:internal/test_runner/harness:387:17) {\n    generatedMessage: true,\n    code: 'ERR_ASSERTION',\n    actual: [ { name: 'John', age: '30' } ],\n    expected: [ { ' name ': ' John ', ' age ': ' 30 ' } ],\n    operator: 'deepStrictEqual',\n    diff: 'simple'\n  }\n",
+            "output_tail": "us> (file:///private/var/folders/3r/nc7qhtpn56j7rt5nwg0rqw600000gn/T/pi-admit-t4-zmahmikl/work/test/fail-to-pass.test.mjs:6:10)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.start (node:internal/test_runner/test:1242:17)\n      at startSubtestAfterBootstrap (node:internal/test_runner/harness:387:17) {\n    generatedMessage: true,\n    code: 'ERR_ASSERTION',\n    actual: [ { name: 'John', age: '30' } ],\n    expected: [ { ' name ': ' John ', ' age ': ' 30 ' } ],\n    operator: 'deepStrictEqual',\n    diff: 'simple'\n  }\n",
             "passed": false,
             "returncode": 1
           },
           {
-            "output_tail": "us> (file:///private/var/folders/3r/nc7qhtpn56j7rt5nwg0rqw600000gn/T/pi-admit-t4-uit8hu94/work/test/fail-to-pass.test.mjs:6:10)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.start (node:internal/test_runner/test:1242:17)\n      at startSubtestAfterBootstrap (node:internal/test_runner/harness:387:17) {\n    generatedMessage: true,\n    code: 'ERR_ASSERTION',\n    actual: [ { name: 'John', age: '30' } ],\n    expected: [ { ' name ': ' John ', ' age ': ' 30 ' } ],\n    operator: 'deepStrictEqual',\n    diff: 'simple'\n  }\n",
+            "output_tail": "us> (file:///private/var/folders/3r/nc7qhtpn56j7rt5nwg0rqw600000gn/T/pi-admit-t4-vrwfm54b/work/test/fail-to-pass.test.mjs:6:10)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.start (node:internal/test_runner/test:1242:17)\n      at startSubtestAfterBootstrap (node:internal/test_runner/harness:387:17) {\n    generatedMessage: true,\n    code: 'ERR_ASSERTION',\n    actual: [ { name: 'John', age: '30' } ],\n    expected: [ { ' name ': ' John ', ' age ': ' 30 ' } ],\n    operator: 'deepStrictEqual',\n    diff: 'simple'\n  }\n",
             "passed": false,
             "returncode": 1
           },
           {
-            "output_tail": "us> (file:///private/var/folders/3r/nc7qhtpn56j7rt5nwg0rqw600000gn/T/pi-admit-t4-4ffljp9t/work/test/fail-to-pass.test.mjs:6:10)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.start (node:internal/test_runner/test:1242:17)\n      at startSubtestAfterBootstrap (node:internal/test_runner/harness:387:17) {\n    generatedMessage: true,\n    code: 'ERR_ASSERTION',\n    actual: [ { name: 'John', age: '30' } ],\n    expected: [ { ' name ': ' John ', ' age ': ' 30 ' } ],\n    operator: 'deepStrictEqual',\n    diff: 'simple'\n  }\n",
+            "output_tail": "us> (file:///private/var/folders/3r/nc7qhtpn56j7rt5nwg0rqw600000gn/T/pi-admit-t4-xtvlsoqk/work/test/fail-to-pass.test.mjs:6:10)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.start (node:internal/test_runner/test:1242:17)\n      at startSubtestAfterBootstrap (node:internal/test_runner/harness:387:17) {\n    generatedMessage: true,\n    code: 'ERR_ASSERTION',\n    actual: [ { name: 'John', age: '30' } ],\n    expected: [ { ' name ': ' John ', ' age ': ' 30 ' } ],\n    operator: 'deepStrictEqual',\n    diff: 'simple'\n  }\n",
             "passed": false,
             "returncode": 1
           }
@@ -147,7 +147,7 @@
     },
     {
       "path": "real-gate-fixtures/admission-tests/t4.test.mjs",
-      "sha256": "fa253fd0270362383fdd2ea21ff55813e7923e112027038ee55f4a8bfe2fdc4e"
+      "sha256": "7bc72ef248eca0ddb5d72ef1165f0a56c7c09d78de9df963a62e0ac16a59cd0c"
     },
     {
       "path": "real-gate-fixtures/patches/t4/gold.patch",
@@ -155,7 +155,7 @@
     },
     {
       "path": "real-gate-fixtures/patches/t4/shortcut.patch",
-      "sha256": "e710cf6a1bffdcf030d7b39ddd2bcca05d5be05027634c43ea29d3fe3b41a94c"
+      "sha256": "830fdc836a860512290ba513df4d4c5746c7f8d1baa9fd75041eeae3efa12c3d"
     }
   ],
   "cohort_id": "2026-07",
@@ -163,7 +163,7 @@
     "root": "pi-test",
     "stage_copy": []
   },
-  "fixture_version": "2026-07.1",
+  "fixture_version": "2026-07.3",
   "one_shot": {
     "context_files": [
       "src/index.js",
@@ -206,7 +206,7 @@
         "text": "Please solve this task in the supplied checkout, retaining all stated edge cases:\n\nAdd an options argument to parseCSV: parseCSV(csv, {trim: false}) disables field trimming; default behavior stays trimmed. First delegate to subagent explorer: find where trimming happens and which tests cover it. Implement the option and add one test covering trim:false. Then delegate to subagent verifier to confirm the change is complete and minimal. Finish by running node --test \u2014 all tests must pass."
       }
     ],
-    "semantic_group": "t4:2026-07.1"
+    "semantic_group": "t4:2026-07.3"
   },
   "schema": "pi.fixture/v1",
   "sufficiency": [
@@ -217,6 +217,14 @@
     {
       "assertion": "default remains trimmed",
       "prompt_evidence": "Add an options argument to parseCSV: parseCSV(csv, {trim: false}) disables field trimming; default behavior stays trimmed. First delegate to subagent explorer: find where trimming happens and which tests cover it. Implement the option and add one test covering trim:false. Then delegate to subagent verifier to confirm the change is complete and minimal. Finish by running node --test \u2014 all tests must pass."
+    },
+    {
+      "assertion": "delegation to subagent explorer occurs before delegation to subagent verifier (the task's own trajectory, not just its end state, must show real explore-then-verify delegation)",
+      "prompt_evidence": "First delegate to subagent explorer: find where trimming happens and which tests cover it. Implement the option and add one test covering trim:false. Then delegate to subagent verifier to confirm the change is complete and minimal."
+    },
+    {
+      "assertion": "trim:false does not regress quote-aware parsing: a quoted field containing an embedded comma still comes back as one field, comma and all, with the surrounding quotes stripped, exactly like the default trim:true path already does",
+      "prompt_evidence": "The prompt scopes the change to trimming only ('parseCSV(csv, {trim: false}) disables field trimming; default behavior stays trimmed') and requires 'running node --test \u2014 all tests must pass', which already includes pre-existing pass-to-pass coverage for quoted fields with embedded commas (test/csvParser.test.js: 'handles quoted fields with commas'; test/edgeCases.test.js: 'handles single quoted field', 'handles escaped quotes in CSV'). A correct trim:false implementation must keep that existing quote-handling contract intact, not just add whitespace-preservation for plain unquoted fields; a solution that special-cases trim:false with a naive comma-split instead of reusing the shared quote-aware splitCSVLine passes every visible test and the two whitespace-only hidden assertions while still being wrong on this exact case."
     }
   ],
   "task_id": "t4",

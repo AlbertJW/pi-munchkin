@@ -1,0 +1,17 @@
+--- a/src/refund.js
++++ b/src/refund.js
+@@ -1,6 +1,10 @@
+-// TODO: refund cents need their own rounding -- the project has two existing
+-// conventions (see discountCalc.js and taxCalc.js) and this hasn't been
+-// wired up to either yet.
++// Refund-cent rounding follows the tax convention: exact .5 ties round to
++// even (banker's rounding), per the stakeholder decision for how refunds
++// should reconcile against the ledger.
+ export function roundRefundCents(cents) {
+-  throw new Error('roundRefundCents not implemented');
++  const floor = Math.floor(cents);
++  const diff = cents - floor;
++  if (diff < 0.5) return floor;
++  if (diff > 0.5) return floor + 1;
++  return floor % 2 === 0 ? floor : floor + 1;
+ }

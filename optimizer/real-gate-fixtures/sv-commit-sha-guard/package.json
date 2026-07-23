@@ -1,0 +1,1 @@
+{"name": "records-report", "version": "1.0.0", "description": "Two-step records summary task (data-layer parse fix, then caller-side aggregation)", "main": "src/records.js", "type": "module", "scripts": {"test": "node --test"}, "license": "MIT"}
