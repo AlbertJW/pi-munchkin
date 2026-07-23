@@ -8,6 +8,7 @@ optimizer/prompt-lab/configs/applied/
 # staged for a future session, not yet reviewed for commit
 /AUDIT_FINDINGS.md
 /REDDIT_HARNESS_FINDINGS.md
+/UPGRADE_MAP.md
 
 # never track
 **/__pycache__/
