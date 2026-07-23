@@ -6,7 +6,8 @@
 // existing convention files still gets graded against this fixed reference.
 import test from "node:test";
 import assert from "node:assert/strict";
-import { roundRefundCents } from "../src/refund.js";
+import { roundRefundCents, computeLineRefund } from "../src/refund.js";
+import { summarizeBatchRefund } from "../src/refundBatch.js";
 
 function expectedRoundHalfEven(cents) {
   const floor = Math.floor(cents);
@@ -26,4 +27,22 @@ test("roundRefundCents follows the tax-style half-to-even tie convention", () =>
   for (const cents of CASES) {
     assert.equal(roundRefundCents(cents), expectedRoundHalfEven(cents), `cents=${cents}`);
   }
+});
+
+// Non-tie inputs (no exact .5 cent amount) so these two only check that the
+// new functions are wired to roundRefundCents and do their own arithmetic
+// correctly -- they don't re-litigate which tie convention applies, that's
+// CASES above.
+test("computeLineRefund applies quantity and percentage discount before rounding", () => {
+  assert.equal(computeLineRefund({ unitPriceCents: 333, quantity: 1, discountPercent: 10 }), 300);
+});
+
+test("summarizeBatchRefund sums line refunds and reports the line count", () => {
+  const lines = [
+    { unitPriceCents: 333, quantity: 1, discountPercent: 10 },
+    { unitPriceCents: 1000, quantity: 2, discountPercent: 0 },
+  ];
+  const result = summarizeBatchRefund(lines);
+  assert.equal(result.totalCents, 2300);
+  assert.equal(result.count, 2);
 });

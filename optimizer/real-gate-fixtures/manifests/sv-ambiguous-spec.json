@@ -1,13 +1,9 @@
 {
   "admission": {
-    "approved": true,
-    "approved_prompt_hashes": [
-      "47189791bf7997067a6da667a6c772584ccd7c1067b1069460b9d6b780fe73e3",
-      "38d735f64b192dccb5c0bc445f7402a5a59bc2d334d6ff84a5a7fe238ee28053",
-      "da0b624dad9b353fb48f6e831842ec8d26ad52b93d37a6df66362f6e90ef1f52"
-    ],
+    "approved": false,
+    "approved_prompt_hashes": [],
     "automated": {
-      "checked_at": "2026-07-23T10:03:00Z",
+      "checked_at": "2026-07-23T11:29:34Z",
       "hash_drift": [],
       "passed": true,
       "runs_per_state": 3,
@@ -49,17 +45,17 @@
         "mutant:shortcut": {
           "fail_to_pass": [
             {
-              "output_tail": "cents=12.5\n  \n  13 !== 12\n  \n      at TestContext.<anonymous> (file:///private/var/folders/3r/nc7qhtpn56j7rt5nwg0rqw600000gn/T/pi-admit-sv-ambiguous-spec-k2mhgqh2/work/test/fail-to-pass.test.js:27:12)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.start (node:internal/test_runner/test:1242:17)\n      at startSubtestAfterBootstrap (node:internal/test_runner/harness:387:17) {\n    generatedMessage: false,\n    code: 'ERR_ASSERTION',\n    actual: 13,\n    expected: 12,\n    operator: 'strictEqual',\n    diff: 'simple'\n  }\n",
+              "output_tail": "cents=12.5\n  \n  13 !== 12\n  \n      at TestContext.<anonymous> (file:///private/var/folders/3r/nc7qhtpn56j7rt5nwg0rqw600000gn/T/pi-admit-sv-ambiguous-spec-u9062jgh/work/test/fail-to-pass.test.js:28:12)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.start (node:internal/test_runner/test:1242:17)\n      at startSubtestAfterBootstrap (node:internal/test_runner/harness:387:17) {\n    generatedMessage: false,\n    code: 'ERR_ASSERTION',\n    actual: 13,\n    expected: 12,\n    operator: 'strictEqual',\n    diff: 'simple'\n  }\n",
               "passed": false,
               "returncode": 1
             },
             {
-              "output_tail": "cents=12.5\n  \n  13 !== 12\n  \n      at TestContext.<anonymous> (file:///private/var/folders/3r/nc7qhtpn56j7rt5nwg0rqw600000gn/T/pi-admit-sv-ambiguous-spec-nebrez19/work/test/fail-to-pass.test.js:27:12)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.start (node:internal/test_runner/test:1242:17)\n      at startSubtestAfterBootstrap (node:internal/test_runner/harness:387:17) {\n    generatedMessage: false,\n    code: 'ERR_ASSERTION',\n    actual: 13,\n    expected: 12,\n    operator: 'strictEqual',\n    diff: 'simple'\n  }\n",
+              "output_tail": "cents=12.5\n  \n  13 !== 12\n  \n      at TestContext.<anonymous> (file:///private/var/folders/3r/nc7qhtpn56j7rt5nwg0rqw600000gn/T/pi-admit-sv-ambiguous-spec-jqcgsaf0/work/test/fail-to-pass.test.js:28:12)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.start (node:internal/test_runner/test:1242:17)\n      at startSubtestAfterBootstrap (node:internal/test_runner/harness:387:17) {\n    generatedMessage: false,\n    code: 'ERR_ASSERTION',\n    actual: 13,\n    expected: 12,\n    operator: 'strictEqual',\n    diff: 'simple'\n  }\n",
               "passed": false,
               "returncode": 1
             },
             {
-              "output_tail": "cents=12.5\n  \n  13 !== 12\n  \n      at TestContext.<anonymous> (file:///private/var/folders/3r/nc7qhtpn56j7rt5nwg0rqw600000gn/T/pi-admit-sv-ambiguous-spec-fw3drfoz/work/test/fail-to-pass.test.js:27:12)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.start (node:internal/test_runner/test:1242:17)\n      at startSubtestAfterBootstrap (node:internal/test_runner/harness:387:17) {\n    generatedMessage: false,\n    code: 'ERR_ASSERTION',\n    actual: 13,\n    expected: 12,\n    operator: 'strictEqual',\n    diff: 'simple'\n  }\n",
+              "output_tail": "cents=12.5\n  \n  13 !== 12\n  \n      at TestContext.<anonymous> (file:///private/var/folders/3r/nc7qhtpn56j7rt5nwg0rqw600000gn/T/pi-admit-sv-ambiguous-spec-zgqzfwxi/work/test/fail-to-pass.test.js:28:12)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.start (node:internal/test_runner/test:1242:17)\n      at startSubtestAfterBootstrap (node:internal/test_runner/harness:387:17) {\n    generatedMessage: false,\n    code: 'ERR_ASSERTION',\n    actual: 13,\n    expected: 12,\n    operator: 'strictEqual',\n    diff: 'simple'\n  }\n",
               "passed": false,
               "returncode": 1
             }
@@ -84,17 +80,17 @@
         },
         "pristine_fail_to_pass": [
           {
-            "output_tail": "Cents not implemented\n      at roundRefundCents (file:///private/var/folders/3r/nc7qhtpn56j7rt5nwg0rqw600000gn/T/pi-admit-sv-ambiguous-spec-n3gryb82/work/src/refund.js:5:9)\n      at TestContext.<anonymous> (file:///private/var/folders/3r/nc7qhtpn56j7rt5nwg0rqw600000gn/T/pi-admit-sv-ambiguous-spec-n3gryb82/work/test/fail-to-pass.test.js:27:18)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.start (node:internal/test_runner/test:1242:17)\n      at startSubtestAfterBootstrap (node:internal/test_runner/harness:387:17)\n",
+            "output_tail": "i/work/src/refundBatch.js:9:19)\n      at TestContext.<anonymous> (file:///private/var/folders/3r/nc7qhtpn56j7rt5nwg0rqw600000gn/T/pi-admit-sv-ambiguous-spec-w7j2arni/work/test/fail-to-pass.test.js:45:18)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n      at Test.postRun (node:internal/test_runner/test:1522:19)\n      at Test.run (node:internal/test_runner/test:1447:12)\n      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7)\n",
             "passed": false,
             "returncode": 1
           },
           {
-            "output_tail": "Cents not implemented\n      at roundRefundCents (file:///private/var/folders/3r/nc7qhtpn56j7rt5nwg0rqw600000gn/T/pi-admit-sv-ambiguous-spec-oud1su2b/work/src/refund.js:5:9)\n      at TestContext.<anonymous> (file:///private/var/folders/3r/nc7qhtpn56j7rt5nwg0rqw600000gn/T/pi-admit-sv-ambiguous-spec-oud1su2b/work/test/fail-to-pass.test.js:27:18)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.start (node:internal/test_runner/test:1242:17)\n      at startSubtestAfterBootstrap (node:internal/test_runner/harness:387:17)\n",
+            "output_tail": "n/work/src/refundBatch.js:9:19)\n      at TestContext.<anonymous> (file:///private/var/folders/3r/nc7qhtpn56j7rt5nwg0rqw600000gn/T/pi-admit-sv-ambiguous-spec-g_sjdi9n/work/test/fail-to-pass.test.js:45:18)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n      at Test.postRun (node:internal/test_runner/test:1522:19)\n      at Test.run (node:internal/test_runner/test:1447:12)\n      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7)\n",
             "passed": false,
             "returncode": 1
           },
           {
-            "output_tail": "Cents not implemented\n      at roundRefundCents (file:///private/var/folders/3r/nc7qhtpn56j7rt5nwg0rqw600000gn/T/pi-admit-sv-ambiguous-spec-7iyowizz/work/src/refund.js:5:9)\n      at TestContext.<anonymous> (file:///private/var/folders/3r/nc7qhtpn56j7rt5nwg0rqw600000gn/T/pi-admit-sv-ambiguous-spec-7iyowizz/work/test/fail-to-pass.test.js:27:18)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.start (node:internal/test_runner/test:1242:17)\n      at startSubtestAfterBootstrap (node:internal/test_runner/harness:387:17)\n",
+            "output_tail": "8/work/src/refundBatch.js:9:19)\n      at TestContext.<anonymous> (file:///private/var/folders/3r/nc7qhtpn56j7rt5nwg0rqw600000gn/T/pi-admit-sv-ambiguous-spec-2gfmuk58/work/test/fail-to-pass.test.js:45:18)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n      at Test.postRun (node:internal/test_runner/test:1522:19)\n      at Test.run (node:internal/test_runner/test:1447:12)\n      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7)\n",
             "passed": false,
             "returncode": 1
           }
@@ -118,13 +114,13 @@
         ]
       }
     },
-    "reviewed_at": "2026-07-23T09:58:31Z",
-    "reviewer": "Albert"
+    "reviewed_at": null,
+    "reviewer": null
   },
   "artifacts": [
     {
       "path": "real-gate-fixtures/hidden/sv-ambiguous-spec.test.js",
-      "sha256": "d6cb904c2f9cb41f374fcb2a91f95e5c11b968b8fb6f79269081c132018abc16"
+      "sha256": "1b9052322337694fa6bbc3a7677bc28be99ccdfb226f047f5a0bfbc0059d51c3"
     },
     {
       "path": "real-gate-fixtures/sv-ambiguous-spec/package.json",
@@ -140,7 +136,11 @@
     },
     {
       "path": "real-gate-fixtures/sv-ambiguous-spec/src/refund.js",
-      "sha256": "6fdb1d4071ff56dc460f734a879eac8eb4c734c41d687b57cbc29f842f3fea82"
+      "sha256": "e63e148d76cc70cd616ef9de78586fbb50df64d7fd3643c4c6f8701f30b4e6f7"
+    },
+    {
+      "path": "real-gate-fixtures/sv-ambiguous-spec/src/refundBatch.js",
+      "sha256": "b0db5281e36fc6fe35b5cd5fa7592858963dabb2d52a391d2ec92cc2a83bb2f8"
     },
     {
       "path": "real-gate-fixtures/sv-ambiguous-spec/test/visible.test.js",
@@ -160,7 +160,7 @@
     "root": "real-gate-fixtures/sv-ambiguous-spec",
     "stage_copy": []
   },
-  "fixture_version": "2026-07.1",
+  "fixture_version": "2026-07.2",
   "one_shot": {
     "context_files": [
       "src/discountCalc.js",
@@ -179,40 +179,48 @@
   },
   "prompts": {
     "canonical": {
-      "sha256": "21b8b9acc9b4543b1ad09913c29684fa627bb090c9f564503209242090a1fc28",
-      "text": "This project rounds currency cents in two places already, each with its own tie-breaking rule for exact .5 amounts: src/discountCalc.js rounds discount cents with ties rounding up (away from zero), and src/taxCalc.js rounds tax cents with ties rounding to even (banker's rounding). Implement roundRefundCents(cents) in src/refund.js: round cents to the nearest whole cent, following this project's existing convention for handling exact .5 ties. Run node --test until all tests pass."
+      "sha256": "5650894a3eedcd51e166bc3d0ab1663e9cf8d03a367d07d73d9e0c7d53a02431",
+      "text": "This project rounds currency cents in two places already, each with its own tie-breaking rule for exact .5 amounts: src/discountCalc.js rounds discount cents with ties rounding up (away from zero), and src/taxCalc.js rounds tax cents with ties rounding to even (banker's rounding). Do this in three steps: (1) Implement roundRefundCents(cents) in src/refund.js: round cents to the nearest whole cent, following this project's existing convention for handling exact .5 ties. (2) In the same file, implement computeLineRefund({unitPriceCents, quantity, discountPercent}): apply the percentage discount to unitPriceCents * quantity, then round the result with roundRefundCents. (3) Create src/refundBatch.js exporting summarizeBatchRefund(lines): sum computeLineRefund(line) across the given array of line items and return {totalCents, count}. Run node --test until all tests pass."
     },
     "perturbations": [
       {
         "approved": false,
         "id": "equivalent-1",
-        "sha256": "47189791bf7997067a6da667a6c772584ccd7c1067b1069460b9d6b780fe73e3",
-        "text": "Complete the following repository task. Preserve existing behavior and verify the tests.\n\nThis project rounds currency cents in two places already, each with its own tie-breaking rule for exact .5 amounts: src/discountCalc.js rounds discount cents with ties rounding up (away from zero), and src/taxCalc.js rounds tax cents with ties rounding to even (banker's rounding). Implement roundRefundCents(cents) in src/refund.js: round cents to the nearest whole cent, following this project's existing convention for handling exact .5 ties. Run node --test until all tests pass."
+        "sha256": "f42a9b8457c374cb61386d3a257560919e5e0f254fc3ce2cbbd0667026f44f93",
+        "text": "Complete the following repository task. Preserve existing behavior and verify the tests.\n\nThis project rounds currency cents in two places already, each with its own tie-breaking rule for exact .5 amounts: src/discountCalc.js rounds discount cents with ties rounding up (away from zero), and src/taxCalc.js rounds tax cents with ties rounding to even (banker's rounding). Do this in three steps: (1) Implement roundRefundCents(cents) in src/refund.js: round cents to the nearest whole cent, following this project's existing convention for handling exact .5 ties. (2) In the same file, implement computeLineRefund({unitPriceCents, quantity, discountPercent}): apply the percentage discount to unitPriceCents * quantity, then round the result with roundRefundCents. (3) Create src/refundBatch.js exporting summarizeBatchRefund(lines): sum computeLineRefund(line) across the given array of line items and return {totalCents, count}. Run node --test until all tests pass."
       },
       {
         "approved": false,
         "id": "equivalent-2",
-        "sha256": "38d735f64b192dccb5c0bc445f7402a5a59bc2d334d6ff84a5a7fe238ee28053",
-        "text": "Repository change request:\nThis project rounds currency cents in two places already, each with its own tie-breaking rule for exact .5 amounts: src/discountCalc.js rounds discount cents with ties rounding up (away from zero), and src/taxCalc.js rounds tax cents with ties rounding to even (banker's rounding). Implement roundRefundCents(cents) in src/refund.js: round cents to the nearest whole cent, following this project's existing convention for handling exact .5 ties. Run node --test until all tests pass.\n\nUse the smallest correct change and confirm the test suite."
+        "sha256": "58451808f1198cd4c324e5bea2652212acad0b026e582f61bc077b9c5e409cef",
+        "text": "Repository change request:\nThis project rounds currency cents in two places already, each with its own tie-breaking rule for exact .5 amounts: src/discountCalc.js rounds discount cents with ties rounding up (away from zero), and src/taxCalc.js rounds tax cents with ties rounding to even (banker's rounding). Do this in three steps: (1) Implement roundRefundCents(cents) in src/refund.js: round cents to the nearest whole cent, following this project's existing convention for handling exact .5 ties. (2) In the same file, implement computeLineRefund({unitPriceCents, quantity, discountPercent}): apply the percentage discount to unitPriceCents * quantity, then round the result with roundRefundCents. (3) Create src/refundBatch.js exporting summarizeBatchRefund(lines): sum computeLineRefund(line) across the given array of line items and return {totalCents, count}. Run node --test until all tests pass.\n\nUse the smallest correct change and confirm the test suite."
       },
       {
         "approved": false,
         "id": "equivalent-3",
-        "sha256": "da0b624dad9b353fb48f6e831842ec8d26ad52b93d37a6df66362f6e90ef1f52",
-        "text": "Please solve this task in the supplied checkout, retaining all stated edge cases:\n\nThis project rounds currency cents in two places already, each with its own tie-breaking rule for exact .5 amounts: src/discountCalc.js rounds discount cents with ties rounding up (away from zero), and src/taxCalc.js rounds tax cents with ties rounding to even (banker's rounding). Implement roundRefundCents(cents) in src/refund.js: round cents to the nearest whole cent, following this project's existing convention for handling exact .5 ties. Run node --test until all tests pass."
+        "sha256": "3a52fba7568f45051b1949c7b44b22c431fcd83c9e1e2e85ef74bb4c029a9198",
+        "text": "Please solve this task in the supplied checkout, retaining all stated edge cases:\n\nThis project rounds currency cents in two places already, each with its own tie-breaking rule for exact .5 amounts: src/discountCalc.js rounds discount cents with ties rounding up (away from zero), and src/taxCalc.js rounds tax cents with ties rounding to even (banker's rounding). Do this in three steps: (1) Implement roundRefundCents(cents) in src/refund.js: round cents to the nearest whole cent, following this project's existing convention for handling exact .5 ties. (2) In the same file, implement computeLineRefund({unitPriceCents, quantity, discountPercent}): apply the percentage discount to unitPriceCents * quantity, then round the result with roundRefundCents. (3) Create src/refundBatch.js exporting summarizeBatchRefund(lines): sum computeLineRefund(line) across the given array of line items and return {totalCents, count}. Run node --test until all tests pass."
       }
     ],
-    "semantic_group": "sv-ambiguous-spec:2026-07.1"
+    "semantic_group": "sv-ambiguous-spec:2026-07.2"
   },
   "schema": "pi.fixture/v1",
   "sufficiency": [
     {
       "assertion": "roundRefundCents(cents) must resolve exact .5 ties by following one of this project's two already-established, equally-active conventions -- not an unrelated third rule, and not a rule invented from scratch.",
-      "prompt_evidence": "This project rounds currency cents in two places already, each with its own tie-breaking rule for exact .5 amounts: src/discountCalc.js rounds discount cents with ties rounding up (away from zero), and src/taxCalc.js rounds tax cents with ties rounding to even (banker's rounding). Implement roundRefundCents(cents) in src/refund.js: round cents to the nearest whole cent, following this project's existing convention for handling exact .5 ties. Run node --test until all tests pass."
+      "prompt_evidence": "This project rounds currency cents in two places already, each with its own tie-breaking rule for exact .5 amounts: src/discountCalc.js rounds discount cents with ties rounding up (away from zero), and src/taxCalc.js rounds tax cents with ties rounding to even (banker's rounding). Do this in three steps: (1) Implement roundRefundCents(cents) in src/refund.js: round cents to the nearest whole cent, following this project's existing convention for handling exact .5 ties."
     },
     {
       "assertion": "the two candidate conventions are both named and both concretely specified in the prompt itself (discountCalc.js: ties round up; taxCalc.js: ties round to even) -- a model reading only the prompt already knows the fork exists and knows both rules well enough to implement either one; what it cannot know from the prompt or the repo is which of the two applies to refunds specifically.",
-      "prompt_evidence": "This project rounds currency cents in two places already, each with its own tie-breaking rule for exact .5 amounts: src/discountCalc.js rounds discount cents with ties rounding up (away from zero), and src/taxCalc.js rounds tax cents with ties rounding to even (banker's rounding). Implement roundRefundCents(cents) in src/refund.js: round cents to the nearest whole cent, following this project's existing convention for handling exact .5 ties. Run node --test until all tests pass."
+      "prompt_evidence": "This project rounds currency cents in two places already, each with its own tie-breaking rule for exact .5 amounts: src/discountCalc.js rounds discount cents with ties rounding up (away from zero), and src/taxCalc.js rounds tax cents with ties rounding to even (banker's rounding)."
+    },
+    {
+      "assertion": "computeLineRefund({unitPriceCents, quantity, discountPercent}) applies the percentage discount to unitPriceCents * quantity, then rounds the result via roundRefundCents -- not a structurally different computation, and not a re-implementation of the rounding logic inline.",
+      "prompt_evidence": "(2) In the same file, implement computeLineRefund({unitPriceCents, quantity, discountPercent}): apply the percentage discount to unitPriceCents * quantity, then round the result with roundRefundCents."
+    },
+    {
+      "assertion": "summarizeBatchRefund(lines) in the new file src/refundBatch.js sums computeLineRefund across every given line item and reports the correct count -- multi-file wiring, not just a single-function change.",
+      "prompt_evidence": "(3) Create src/refundBatch.js exporting summarizeBatchRefund(lines): sum computeLineRefund(line) across the given array of line items and return {totalCents, count}."
     }
   ],
   "task_id": "sv-ambiguous-spec",
@@ -241,8 +249,8 @@
     }
   },
   "timestamps": {
-    "admitted_at": "2026-07-23T09:58:31Z",
+    "admitted_at": null,
     "created_at": "2026-07-23T00:00:00Z",
-    "expires_at": "2026-10-21T09:58:31Z"
+    "expires_at": null
   }
 }
