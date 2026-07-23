@@ -1,9 +1,13 @@
 {
   "admission": {
-    "approved": false,
-    "approved_prompt_hashes": [],
+    "approved": true,
+    "approved_prompt_hashes": [
+      "f42a9b8457c374cb61386d3a257560919e5e0f254fc3ce2cbbd0667026f44f93",
+      "58451808f1198cd4c324e5bea2652212acad0b026e582f61bc077b9c5e409cef",
+      "3a52fba7568f45051b1949c7b44b22c431fcd83c9e1e2e85ef74bb4c029a9198"
+    ],
     "automated": {
-      "checked_at": "2026-07-23T11:29:34Z",
+      "checked_at": "2026-07-23T15:17:29Z",
       "hash_drift": [],
       "passed": true,
       "runs_per_state": 3,
@@ -45,17 +49,17 @@
         "mutant:shortcut": {
           "fail_to_pass": [
             {
-              "output_tail": "cents=12.5\n  \n  13 !== 12\n  \n      at TestContext.<anonymous> (file:///private/var/folders/3r/nc7qhtpn56j7rt5nwg0rqw600000gn/T/pi-admit-sv-ambiguous-spec-u9062jgh/work/test/fail-to-pass.test.js:28:12)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.start (node:internal/test_runner/test:1242:17)\n      at startSubtestAfterBootstrap (node:internal/test_runner/harness:387:17) {\n    generatedMessage: false,\n    code: 'ERR_ASSERTION',\n    actual: 13,\n    expected: 12,\n    operator: 'strictEqual',\n    diff: 'simple'\n  }\n",
+              "output_tail": "cents=12.5\n  \n  13 !== 12\n  \n      at TestContext.<anonymous> (file:///private/var/folders/3r/nc7qhtpn56j7rt5nwg0rqw600000gn/T/pi-admit-sv-ambiguous-spec-wjv1gk4_/work/test/fail-to-pass.test.js:28:12)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.start (node:internal/test_runner/test:1242:17)\n      at startSubtestAfterBootstrap (node:internal/test_runner/harness:387:17) {\n    generatedMessage: false,\n    code: 'ERR_ASSERTION',\n    actual: 13,\n    expected: 12,\n    operator: 'strictEqual',\n    diff: 'simple'\n  }\n",
               "passed": false,
               "returncode": 1
             },
             {
-              "output_tail": "cents=12.5\n  \n  13 !== 12\n  \n      at TestContext.<anonymous> (file:///private/var/folders/3r/nc7qhtpn56j7rt5nwg0rqw600000gn/T/pi-admit-sv-ambiguous-spec-jqcgsaf0/work/test/fail-to-pass.test.js:28:12)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.start (node:internal/test_runner/test:1242:17)\n      at startSubtestAfterBootstrap (node:internal/test_runner/harness:387:17) {\n    generatedMessage: false,\n    code: 'ERR_ASSERTION',\n    actual: 13,\n    expected: 12,\n    operator: 'strictEqual',\n    diff: 'simple'\n  }\n",
+              "output_tail": "cents=12.5\n  \n  13 !== 12\n  \n      at TestContext.<anonymous> (file:///private/var/folders/3r/nc7qhtpn56j7rt5nwg0rqw600000gn/T/pi-admit-sv-ambiguous-spec-wmowy9g2/work/test/fail-to-pass.test.js:28:12)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.start (node:internal/test_runner/test:1242:17)\n      at startSubtestAfterBootstrap (node:internal/test_runner/harness:387:17) {\n    generatedMessage: false,\n    code: 'ERR_ASSERTION',\n    actual: 13,\n    expected: 12,\n    operator: 'strictEqual',\n    diff: 'simple'\n  }\n",
               "passed": false,
               "returncode": 1
             },
             {
-              "output_tail": "cents=12.5\n  \n  13 !== 12\n  \n      at TestContext.<anonymous> (file:///private/var/folders/3r/nc7qhtpn56j7rt5nwg0rqw600000gn/T/pi-admit-sv-ambiguous-spec-zgqzfwxi/work/test/fail-to-pass.test.js:28:12)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.start (node:internal/test_runner/test:1242:17)\n      at startSubtestAfterBootstrap (node:internal/test_runner/harness:387:17) {\n    generatedMessage: false,\n    code: 'ERR_ASSERTION',\n    actual: 13,\n    expected: 12,\n    operator: 'strictEqual',\n    diff: 'simple'\n  }\n",
+              "output_tail": "cents=12.5\n  \n  13 !== 12\n  \n      at TestContext.<anonymous> (file:///private/var/folders/3r/nc7qhtpn56j7rt5nwg0rqw600000gn/T/pi-admit-sv-ambiguous-spec-kje90ovf/work/test/fail-to-pass.test.js:28:12)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.start (node:internal/test_runner/test:1242:17)\n      at startSubtestAfterBootstrap (node:internal/test_runner/harness:387:17) {\n    generatedMessage: false,\n    code: 'ERR_ASSERTION',\n    actual: 13,\n    expected: 12,\n    operator: 'strictEqual',\n    diff: 'simple'\n  }\n",
               "passed": false,
               "returncode": 1
             }
@@ -80,17 +84,17 @@
         },
         "pristine_fail_to_pass": [
           {
-            "output_tail": "i/work/src/refundBatch.js:9:19)\n      at TestContext.<anonymous> (file:///private/var/folders/3r/nc7qhtpn56j7rt5nwg0rqw600000gn/T/pi-admit-sv-ambiguous-spec-w7j2arni/work/test/fail-to-pass.test.js:45:18)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n      at Test.postRun (node:internal/test_runner/test:1522:19)\n      at Test.run (node:internal/test_runner/test:1447:12)\n      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7)\n",
+            "output_tail": "x/work/src/refundBatch.js:9:19)\n      at TestContext.<anonymous> (file:///private/var/folders/3r/nc7qhtpn56j7rt5nwg0rqw600000gn/T/pi-admit-sv-ambiguous-spec-_ev3nyyx/work/test/fail-to-pass.test.js:45:18)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n      at Test.postRun (node:internal/test_runner/test:1522:19)\n      at Test.run (node:internal/test_runner/test:1447:12)\n      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7)\n",
             "passed": false,
             "returncode": 1
           },
           {
-            "output_tail": "n/work/src/refundBatch.js:9:19)\n      at TestContext.<anonymous> (file:///private/var/folders/3r/nc7qhtpn56j7rt5nwg0rqw600000gn/T/pi-admit-sv-ambiguous-spec-g_sjdi9n/work/test/fail-to-pass.test.js:45:18)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n      at Test.postRun (node:internal/test_runner/test:1522:19)\n      at Test.run (node:internal/test_runner/test:1447:12)\n      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7)\n",
+            "output_tail": "s/work/src/refundBatch.js:9:19)\n      at TestContext.<anonymous> (file:///private/var/folders/3r/nc7qhtpn56j7rt5nwg0rqw600000gn/T/pi-admit-sv-ambiguous-spec-b2z6qtis/work/test/fail-to-pass.test.js:45:18)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n      at Test.postRun (node:internal/test_runner/test:1522:19)\n      at Test.run (node:internal/test_runner/test:1447:12)\n      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7)\n",
             "passed": false,
             "returncode": 1
           },
           {
-            "output_tail": "8/work/src/refundBatch.js:9:19)\n      at TestContext.<anonymous> (file:///private/var/folders/3r/nc7qhtpn56j7rt5nwg0rqw600000gn/T/pi-admit-sv-ambiguous-spec-2gfmuk58/work/test/fail-to-pass.test.js:45:18)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n      at Test.postRun (node:internal/test_runner/test:1522:19)\n      at Test.run (node:internal/test_runner/test:1447:12)\n      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7)\n",
+            "output_tail": "e/work/src/refundBatch.js:9:19)\n      at TestContext.<anonymous> (file:///private/var/folders/3r/nc7qhtpn56j7rt5nwg0rqw600000gn/T/pi-admit-sv-ambiguous-spec-1kpp2xwe/work/test/fail-to-pass.test.js:45:18)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n      at Test.postRun (node:internal/test_runner/test:1522:19)\n      at Test.run (node:internal/test_runner/test:1447:12)\n      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7)\n",
             "passed": false,
             "returncode": 1
           }
@@ -114,8 +118,8 @@
         ]
       }
     },
-    "reviewed_at": null,
-    "reviewer": null
+    "reviewed_at": "2026-07-23T15:17:31Z",
+    "reviewer": "Albert"
   },
   "artifacts": [
     {
@@ -249,8 +253,8 @@
     }
   },
   "timestamps": {
-    "admitted_at": null,
+    "admitted_at": "2026-07-23T15:17:31Z",
     "created_at": "2026-07-23T00:00:00Z",
-    "expires_at": null
+    "expires_at": "2026-10-21T15:17:31Z"
   }
 }
