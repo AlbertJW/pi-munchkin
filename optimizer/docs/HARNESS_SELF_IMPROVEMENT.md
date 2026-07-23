@@ -985,16 +985,28 @@ subsequent local round confirmed `--tools read,edit,bash,subagent` on the candid
 c36's independently-verified grant on the same code path.
 
 **Local round (`c36-35b`, n=3): `VERDICT: NEUTRAL`** (above). **Local round (`c37-35b`, n=3):
-`VERDICT: NEUTRAL` — but 18/18 clean on both arms**, the standout result of the whole ledger:
-every single session succeeded under the "only `plan_write` and `subagent` allowed during
-execution" constraint, and `cand`'s tool-call counts ran markedly higher than `base`'s on the
-`bigdata` task specifically (34 and 43 calls vs. base's 16 and 16) — indirect but real evidence the
-delegation mechanism was actually engaging, not sitting inert. The direct compliance metric
-(`plan_runner_delegation.{blocked,delegated}`) wasn't yet wired into the eval row at the time this
-round ran — fixed immediately after (`context_telemetry.py` now extracts
-`plan-runner/delegate-all-{block,subagent}` the same way `bash-output-guard`'s `withheld` event
-was wired earlier), so the *next* c37 round will carry the precise ratio directly in the row instead
-of needing to infer engagement from tool-call counts.
+`VERDICT: NEUTRAL`, 18/18 clean on both arms**, originally read here as "the standout result of
+the whole ledger" — `cand`'s higher tool-call counts on `bigdata` (34/43 vs base's 16/16) were
+taken as indirect evidence the delegation mechanism was engaging. **That reading was wrong,
+corrected 2026-07-23 (later the same night):** building an instrument-consistency check
+(UPGRADE_MAP.md Tier 1) surfaced a second tool-grant bug — the `task==t4`/`PLAN_SUBAGENT_ONLY`/
+`PLAN_DELEGATE_ALL`/`SPAWN_DELEGATION` branch in `real_gate.sh` replaced `--tools` wholesale
+instead of appending, silently dropping `plan_write` from this exact c37 round too (not just
+c31/c38's confound). Fixed and re-run clean: 18/18 again, but a direct check of every cand-arm
+session (this round plus the re-run, 18 total) found **zero `plan_write` and zero `subagent`
+calls in every single one** — the higher tool-call counts were the model doing more direct
+read/edit/bash work, not delegation. Deeper investigation (two independent adversarial verify
+passes) found the real cause: `plan-runner.ts`'s `PLAN_DELEGATE_ALL`/`PLAN_SUBAGENT_ONLY`
+blocking logic gates on `state.phase === "executing"`, which can *only* be set by the `/plan-go`
+or `/plan ... yolo` **slash commands** — `plan_write` itself can never self-originate that phase.
+`real_gate.sh` never issues a slash command (`pi -p --approve "$prompt"` passes raw task text
+only), so this mechanism has **no activation path in any `real_gate.sh` session at all**,
+independent of tool grants, task, or model — corroborated by a third channel, the harness's own
+`context_telemetry.json` aggregate (`plan_runner_delegation: {blocked: 0, delegated: 0}`,
+18/18). c25 (`PLAN_SUBAGENT_ONLY`) shares the identical gate and was confirmed to have the same
+zero-engagement result, pre- and post-fix. Both candidates need a new activation path reachable
+from autonomous `-p` mode, or should be acknowledged as interactive-only and retired from this
+ledger — not decided here.
 
 **Reading the whole ledger honestly**: every one of the thirteen candidates tested tonight —
 c25-c34 plus c36-c37 — came back `NEUTRAL`. That is the correct, expected shape of a clean
