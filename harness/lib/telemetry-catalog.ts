@@ -41,6 +41,8 @@ export const EVENT_CATALOG = {
 	"plan-runner/uncertainty-hold": { count: "number", gate: "string" },
 	"plan-runner/sha-guard": { checked: "number", missing: "number" },
 	"plan-runner/write-rejected": { reason_class: "string", context_tokens: ["number", "null"] },
+	"plan-runner/go": { resumed: "boolean", stale: "number" },
+	"plan-runner/go-blocked": { reason: "string" },
 	"git-guard/blocked-unresolved-target": { reason: "string" },
 	"git-guard/confirm": { approved: "boolean", changes: "number" },
 	"context-inlet-guard/block": { risky: "boolean", bytes: "number", n: "number", bigLimit: "boolean" },

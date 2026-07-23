@@ -968,3 +968,171 @@ test("c38: telemetry — force-plan-write-block recorded on the gated first muta
 		if (priorSource === undefined) delete process.env.TELEMETRY_SOURCE; else process.env.TELEMETRY_SOURCE = priorSource;
 	}
 });
+
+test("c39 dark: PLAN_TOOL_GO off — plan_go is not registered", () => {
+	const fp = freshPlanRunner(); // module-load env has no PLAN_TOOL_GO
+	assert.equal(fp.tools.get("plan_go"), undefined, "plan_go must not exist when the flag is off");
+	const planWrite = fp.tools.get("plan_write");
+	assert.ok(!JSON.stringify({ description: planWrite.description, promptSnippet: planWrite.promptSnippet }).includes("plan_go"),
+		"plan_write's own schema/description must stay untouched by this flag");
+});
+
+test("c39: plan_go blocked — no plan exists", async () => {
+	process.env.PLAN_TOOL_GO = "on";
+	const cwd = tmp();
+	const telemetry = join(cwd, "telemetry.jsonl");
+	const priorFile = process.env.TELEMETRY_FILE;
+	const priorSource = process.env.TELEMETRY_SOURCE;
+	process.env.TELEMETRY_FILE = telemetry;
+	process.env.TELEMETRY_SOURCE = "test";
+	try {
+		const fp = makeFakePi();
+		const mod = await import(`../extensions/plan-runner.ts?c39noplan=${Date.now()}-${Math.random()}`);
+		mod.default(fp.pi as any);
+		const r = await callTool(fp, "plan_go", {}, cwd);
+		assert.equal(r.isError, true);
+		assert.ok(r.content[0].text.includes("plan_write"), r.content[0].text);
+		assert.equal(existsSync(join(cwd, ".pi", "plan-state.json")), false, "no state file must be created");
+		const rows = readFileSync(telemetry, "utf8").trim().split("\n").map((line) => JSON.parse(line));
+		const blocked = rows.find((row) => row.ext === "plan-runner" && row.kind === "go-blocked");
+		assert.ok(blocked, "go-blocked telemetry recorded");
+		assert.equal(blocked.reason, "no-plan");
+	} finally {
+		delete process.env.PLAN_TOOL_GO;
+		if (priorFile === undefined) delete process.env.TELEMETRY_FILE; else process.env.TELEMETRY_FILE = priorFile;
+		if (priorSource === undefined) delete process.env.TELEMETRY_SOURCE; else process.env.TELEMETRY_SOURCE = priorSource;
+	}
+});
+
+test("c39: plan_go blocked — plan exists but has no open items", async () => {
+	process.env.PLAN_TOOL_GO = "on";
+	const cwd = tmp();
+	const telemetry = join(cwd, "telemetry.jsonl");
+	const priorFile = process.env.TELEMETRY_FILE;
+	const priorSource = process.env.TELEMETRY_SOURCE;
+	process.env.TELEMETRY_FILE = telemetry;
+	process.env.TELEMETRY_SOURCE = "test";
+	try {
+		const fp = makeFakePi();
+		const mod = await import(`../extensions/plan-runner.ts?c39noopen=${Date.now()}-${Math.random()}`);
+		mod.default(fp.pi as any);
+		await callTool(fp, "plan_write", {
+			items: [{ title: "already done", status: "done" }], request: "r", summary: "s",
+		}, cwd);
+		const r = await callTool(fp, "plan_go", {}, cwd);
+		assert.equal(r.isError, true);
+		assert.ok(r.content[0].text.includes("complete"), r.content[0].text);
+		const state = JSON.parse(readFileSync(join(cwd, ".pi", "plan-state.json"), "utf8"));
+		assert.equal(state.phase, "planned", "phase must not flip with no open items");
+		const rows = readFileSync(telemetry, "utf8").trim().split("\n").map((line) => JSON.parse(line));
+		const blocked = rows.find((row) => row.ext === "plan-runner" && row.kind === "go-blocked");
+		assert.ok(blocked, "go-blocked telemetry recorded");
+		assert.equal(blocked.reason, "no-open-items");
+	} finally {
+		delete process.env.PLAN_TOOL_GO;
+		if (priorFile === undefined) delete process.env.TELEMETRY_FILE; else process.env.TELEMETRY_FILE = priorFile;
+		if (priorSource === undefined) delete process.env.TELEMETRY_SOURCE; else process.env.TELEMETRY_SOURCE = priorSource;
+	}
+});
+
+test("c39: plan_go blocked under a PLAN_UNCERTAINTY hold, does not flip phase", async () => {
+	process.env.PLAN_TOOL_GO = "on";
+	process.env.PLAN_UNCERTAINTY = "on";
+	const cwd = tmp();
+	const telemetry = join(cwd, "telemetry.jsonl");
+	const priorFile = process.env.TELEMETRY_FILE;
+	const priorSource = process.env.TELEMETRY_SOURCE;
+	process.env.TELEMETRY_FILE = telemetry;
+	process.env.TELEMETRY_SOURCE = "test";
+	try {
+		const fp = makeFakePi();
+		const mod = await import(`../extensions/plan-runner.ts?c39hold=${Date.now()}-${Math.random()}`);
+		mod.default(fp.pi as any);
+		await callTool(fp, "plan_write", {
+			items: [{ title: "step one", status: "pending" }], request: "r", summary: "s",
+			uncertainties: ["Which environment: staging or prod?"],
+		}, cwd);
+		const r = await callTool(fp, "plan_go", {}, cwd);
+		assert.equal(r.isError, true);
+		assert.ok(r.content[0].text.includes("Which environment: staging or prod?"), r.content[0].text);
+		const state = JSON.parse(readFileSync(join(cwd, ".pi", "plan-state.json"), "utf8"));
+		assert.equal(state.phase, "planned", "phase must not flip while uncertainties remain");
+		const rows = readFileSync(telemetry, "utf8").trim().split("\n").map((line) => JSON.parse(line));
+		const hold = rows.find((row) => row.ext === "plan-runner" && row.kind === "uncertainty-hold" && row.gate === "plan-go-tool");
+		assert.ok(hold, "uncertainty-hold telemetry recorded with gate=plan-go-tool");
+	} finally {
+		delete process.env.PLAN_TOOL_GO;
+		delete process.env.PLAN_UNCERTAINTY;
+		if (priorFile === undefined) delete process.env.TELEMETRY_FILE; else process.env.TELEMETRY_FILE = priorFile;
+		if (priorSource === undefined) delete process.env.TELEMETRY_SOURCE; else process.env.TELEMETRY_SOURCE = priorSource;
+	}
+});
+
+test("c39: plan_go transitions phase to executing and disarms isPlanning()", async () => {
+	process.env.PLAN_TOOL_GO = "on";
+	const cwd = tmp();
+	const telemetry = join(cwd, "telemetry.jsonl");
+	const priorFile = process.env.TELEMETRY_FILE;
+	const priorSource = process.env.TELEMETRY_SOURCE;
+	process.env.TELEMETRY_FILE = telemetry;
+	process.env.TELEMETRY_SOURCE = "test";
+	try {
+		const fp = makeFakePi();
+		const mod = await import(`../extensions/plan-runner.ts?c39go=${Date.now()}-${Math.random()}`);
+		mod.default(fp.pi as any);
+		const { ctx } = makeCtx(cwd);
+		await fp.commands.get("plan").handler("add a widget", ctx); // lean -> arms isPlanning()
+		await callTool(fp, "plan_write", {
+			items: [{ title: "step one", status: "pending" }], request: "add a widget", summary: "one",
+		}, cwd);
+
+		// still planning: the ordinary plan-mode block fires before plan_go ever runs
+		const duringPlan = await fire(fp, "tool_call", { toolName: "edit", input: {} }, ctx);
+		assert.equal(duringPlan?.block, true, "plan-mode block still fires before plan_go");
+
+		const r = await callTool(fp, "plan_go", {}, cwd);
+		assert.equal(r.isError, undefined, r.content?.[0]?.text);
+		const state = JSON.parse(readFileSync(join(cwd, ".pi", "plan-state.json"), "utf8"));
+		assert.equal(state.phase, "executing");
+		assert.ok(fp.entries.some((e) => e.type === "plan_spine"), "plan_spine entry recorded");
+		const trace = readFileSync(join(cwd, ".pi", "traces", "plan-runner.jsonl"), "utf8").trim().split("\n").map((l) => JSON.parse(l));
+		assert.ok(trace.some((row) => row.tool_name === "plan_go" && row.success === true), "plan_go trace row recorded");
+		const rows = readFileSync(telemetry, "utf8").trim().split("\n").map((line) => JSON.parse(line));
+		assert.ok(rows.some((row) => row.ext === "plan-runner" && row.kind === "go" && row.resumed === false), "plan-runner/go telemetry recorded");
+
+		// isPlanning() must actually be disarmed -- not just phase reading correctly on disk
+		const afterGo = await fire(fp, "tool_call", { toolName: "edit", input: {} }, ctx);
+		assert.equal(afterGo, undefined, "structural plan-mode block must be genuinely disarmed after plan_go");
+	} finally {
+		delete process.env.PLAN_TOOL_GO;
+		if (priorFile === undefined) delete process.env.TELEMETRY_FILE; else process.env.TELEMETRY_FILE = priorFile;
+		if (priorSource === undefined) delete process.env.TELEMETRY_SOURCE; else process.env.TELEMETRY_SOURCE = priorSource;
+	}
+});
+
+test("c39 + c25: plan_go unlocks PLAN_SUBAGENT_ONLY's block on a direct edit — pure tool-only session, no slash commands", async () => {
+	process.env.PLAN_TOOL_GO = "on";
+	process.env.PLAN_SUBAGENT_ONLY = "1";
+	try {
+		const fp = makeFakePi();
+		const mod = await import(`../extensions/plan-runner.ts?c39c25=${Date.now()}-${Math.random()}`);
+		mod.default(fp.pi as any);
+		const cwd = tmp();
+		const { ctx } = makeCtx(cwd);
+
+		// deliberately never calling /plan or /plan-go -- mirrors a real real_gate.sh
+		// `pi -p` session, which never dispatches a slash command at all.
+		await callTool(fp, "plan_write", {
+			items: [{ title: "step one", status: "pending" }], request: "r", summary: "s",
+		}, cwd);
+		const go = await callTool(fp, "plan_go", {}, cwd);
+		assert.equal(go.isError, undefined, go.content?.[0]?.text);
+
+		const edit = await fire(fp, "tool_call", { toolName: "edit", input: {} }, ctx);
+		assert.equal(edit?.block, true, "PLAN_SUBAGENT_ONLY must now block a direct edit -- purely via tool calls, no slash command ever dispatched");
+		assert.ok(edit.reason.includes("PLAN_SUBAGENT_ONLY"), edit.reason);
+	} finally {
+		delete process.env.PLAN_TOOL_GO;
+		delete process.env.PLAN_SUBAGENT_ONLY;
+	}
+});

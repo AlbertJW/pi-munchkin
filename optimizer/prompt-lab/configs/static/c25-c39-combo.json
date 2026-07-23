@@ -1,0 +1,5 @@
+{
+  "name": "c25-c39-combo",
+  "prediction": "Investigation config, not a new independent candidate -- ANDs PLAN_SUBAGENT_ONLY (c25, blocks direct edits during execution, forces subagent(executor,...)) with PLAN_TOOL_GO (c39, gives the model the plan_go tool to actually reach phase==='executing') so c25's block can finally activate under real_gate.sh's one-shot pi -p sessions, which never dispatch the /plan-go slash command c25 has always structurally depended on. Prior c25-alone rounds measured zero activations (plan_runner_delegation: blocked=0, delegated=0 in 18/18 sessions) -- this round is the first chance to see whether forced per-edit subagent isolation has any real effect once it can actually fire.",
+  "thresholds": { "PLAN_SUBAGENT_ONLY": "1", "PLAN_TOOL_GO": "on" }
+}

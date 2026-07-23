@@ -1,0 +1,5 @@
+{
+  "name": "c37-c39-combo",
+  "prediction": "Investigation config, not a new independent candidate -- ANDs PLAN_DELEGATE_ALL (c37, thin-orchestrator: every plan item done via one spawn-mode subagent call, direct read/grep/find/ls/bash/edit blocked during execution) with PLAN_TOOL_GO (c39, gives the model the plan_go tool to actually reach phase==='executing') so c37's block can finally activate under real_gate.sh's one-shot pi -p sessions, which never dispatch the /plan-go slash command c37 has always structurally depended on. Prior c37-alone rounds measured zero activations for the same reason as c25 -- this round is the first chance to see whether the full thin-orchestrator mechanism has any real effect once it can actually fire.",
+  "thresholds": { "PLAN_DELEGATE_ALL": "on", "PLAN_TOOL_GO": "on" }
+}

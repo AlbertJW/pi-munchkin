@@ -442,6 +442,7 @@ run_one() {  # $1=config $2=arm $3=task $4=rep [$5=split] [$6=prompt-variant]
 	# this was caught — every blocked call fell through to the no-subagent path).
 	local env_plan_subagent_only="" env_plan_delegate_all="" env_spawn_delegation=""
 	local env_force_plan_write="" env_plan_uncertainty="" env_plan_sha_guard="" env_plan_item_guidance_v2=""
+	local env_plan_tool_go="" # c39: standalone flag, not folded into the subagent-family branch below
 	for entry in ${session_env[@]+"${session_env[@]}"}; do
 		[[ "$entry" == PLAN_SUBAGENT_ONLY=* ]] && env_plan_subagent_only="${entry#*=}"
 		[[ "$entry" == PLAN_DELEGATE_ALL=* ]] && env_plan_delegate_all="${entry#*=}"
@@ -450,6 +451,7 @@ run_one() {  # $1=config $2=arm $3=task $4=rep [$5=split] [$6=prompt-variant]
 		[[ "$entry" == PLAN_UNCERTAINTY=* ]] && env_plan_uncertainty="${entry#*=}"
 		[[ "$entry" == PLAN_SHA_GUARD=* ]] && env_plan_sha_guard="${entry#*=}"
 		[[ "$entry" == PLAN_ITEM_GUIDANCE_V2=* ]] && env_plan_item_guidance_v2="${entry#*=}"
+		[[ "$entry" == PLAN_TOOL_GO=* ]] && env_plan_tool_go="${entry#*=}"
 	done
 	# plan_write is part of the standard harness surface in every real
 	# interactive session; omitting it here measured a harness that doesn't
@@ -471,6 +473,9 @@ run_one() {  # $1=config $2=arm $3=task $4=rep [$5=split] [$6=prompt-variant]
 		# SPAWN_DELEGATION round ever run, exactly like tonight's original bug.
 		tools="$tools,subagent"
 	fi
+	# c39: standalone activation tool for state.phase="executing" — deliberately
+	# its own append, not merged into the subagent-family branch above.
+	[[ "$env_plan_tool_go" == "on" ]] && tools="$tools,plan_go"
 	[[ "$env_span_tools" == "on" ]] && tools="$tools,search_spans,read_span"
 	# Instrument-consistency check (UPGRADE_MAP.md Tier 1 #1): every candidate flag that
 	# steers the model toward a specific tool must have that tool actually granted in
@@ -502,6 +507,10 @@ run_one() {  # $1=config $2=arm $3=task $4=rep [$5=split] [$6=prompt-variant]
 	        "$env_plan_sha_guard" == "on" || "$env_plan_item_guidance_v2" == "on" ) && \
 	      ",$tools," != *",plan_write,"* ]]; then
 		echo "[real_gate] FORCE_PLAN_WRITE/PLAN_UNCERTAINTY/PLAN_SHA_GUARD/PLAN_ITEM_GUIDANCE_V2 requires 'plan_write' but --tools resolved to '$tools' for $pat/$task — refusing to measure a nonexistent harness surface" >&2
+		exit 2
+	fi
+	if [[ "$env_plan_tool_go" == "on" && ",$tools," != *",plan_go,"* ]]; then
+		echo "[real_gate] PLAN_TOOL_GO=on requires 'plan_go' but --tools resolved to '$tools' for $pat/$task — refusing to measure a nonexistent harness surface" >&2
 		exit 2
 	fi
 	# Candidate env the PARENT shell must see: the exports below happen inside the pi

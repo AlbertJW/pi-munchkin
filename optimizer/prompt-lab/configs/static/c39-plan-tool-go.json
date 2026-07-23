@@ -1,0 +1,5 @@
+{
+  "name": "plan-tool-go",
+  "prediction": "Gives the model a plan_go TOOL (not a slash command) to flip plan-state.json phase from planned to executing itself -- the only prior path (goCommand, the /plan-go handler) is dispatched exclusively from a literal top-level '/'-prefixed prompt, which real_gate.sh's one-shot pi -p sessions never send, so this flag on its own should be near behavior-neutral: nothing else in the harness reads phase==='executing' unless PLAN_SUBAGENT_ONLY/PLAN_DELEGATE_ALL are also armed (see c25-c39-combo / c37-c39-combo). Measures whether merely exposing the tool changes anything by itself (adoption rate, whether the model calls it at all, pass-rate delta) before using it to unlock c25/c37 measurement.",
+  "thresholds": { "PLAN_TOOL_GO": "on" }
+}

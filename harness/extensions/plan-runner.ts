@@ -91,6 +91,16 @@ const SPAWN_DELEGATION = process.env.SPAWN_DELEGATION === "on";
 // FIRST plan_write call before any mutation; once state exists this never
 // fires again, so re-planning/updating later is unaffected.
 const FORCE_PLAN_WRITE = process.env.FORCE_PLAN_WRITE === "on";
+// Dark candidate c39: gives the model a TOOL (plan_go) to flip
+// state.phase "planned" -> "executing" itself, mirroring goCommand's exact
+// validation (no plan / no open items / c31 uncertainty hold) but routed
+// through mutatePlan (not goCommand's racier bare readState+writeStateAndTodo).
+// Exists because real_gate.sh's one-shot `pi -p` sessions never dispatch a
+// literal "/"-prefixed slash command, so /plan-go — and therefore every
+// phase==="executing"-gated candidate (c25, c37, any future one) — can never
+// activate under measurement. This is the activation path, not a mechanism
+// of its own; PLAN_TOOL_GO alone should be near behavior-neutral.
+const PLAN_TOOL_GO = process.env.PLAN_TOOL_GO === "on";
 
 type ItemStatus = "pending" | "in_progress" | "done" | "blocked";
 type Phase = "planned" | "executing";
@@ -1117,6 +1127,111 @@ export default function (pi: ExtensionAPI) {
 	});
 
 	pi.registerTool(planWrite);
+
+	// c39 PLAN_TOOL_GO: model-callable twin of /plan-go — see the env-flag
+	// comment above. Registration itself is the dark-candidate gate (scoped to
+	// just this one call — plan_write + the commands + hooks below register
+	// unconditionally, so a whole-function guard would silently drop those too).
+	if (PLAN_TOOL_GO) {
+		type GoOutcome =
+			| { ok: true; state: PlanState; resuming: boolean; stale: PlanItem[] }
+			| { ok: false; reason: "no-plan" }
+			| { ok: false; reason: "no-open-items"; runId: string }
+			| { ok: false; reason: "uncertainty-hold"; state: PlanState };
+
+		pi.registerTool(
+			defineTool({
+				name: "plan_go",
+				label: "Start Plan Execution",
+				description:
+					"Begin executing the current plan — the same transition the /plan-go command performs " +
+					"(phase: \"planned\" -> \"executing\"). Requires a saved plan (call plan_write first) with " +
+					"at least one open (pending/in_progress) item" +
+					(PLAN_UNCERTAINTY ? "; execution is held while any plan_write uncertainties remain unresolved" : "") +
+					". Call this once planning is done and you're ready to do the work. Safe to call again to resume.",
+				promptSnippet: "plan_go(): begin executing the current plan (planned -> executing).",
+				parameters: Type.Object({}),
+				async execute(_toolCallId, _params, _signal, _onUpdate, ctx) {
+					const aid = actionId();
+					rememberModel(ctx);
+
+					const outcome: GoOutcome = await mutatePlan(ctx.cwd, async (prev) => {
+						if (!prev || prev.items.length === 0) {
+							return { result: { ok: false, reason: "no-plan" } as GoOutcome };
+						}
+						const open = prev.items.filter((i) => i.status === "pending" || i.status === "in_progress");
+						if (open.length === 0) {
+							return { result: { ok: false, reason: "no-open-items", runId: prev.run_id } as GoOutcome };
+						}
+						if (PLAN_UNCERTAINTY && (prev.uncertainties?.length ?? 0) > 0) {
+							return { result: { ok: false, reason: "uncertainty-hold", state: prev } as GoOutcome };
+						}
+						const resuming = prev.phase === "executing";
+						const stale = staleInProgress(prev);
+						const next: PlanState = { ...prev, phase: "executing" };
+						return { state: next, result: { ok: true, state: next, resuming, stale } as GoOutcome };
+					});
+
+					if (!outcome.ok) {
+						if (outcome.reason === "no-plan") {
+							planEvent("go-blocked", `no-plan-${aid}`, { reason: "no-plan" });
+							return {
+								content: [{ type: "text" as const, text: "plan_go: no plan to run. Call plan_write first to create one, then call plan_go." }],
+								details: { tool_name: "plan_go", action_id: aid, success: false },
+								isError: true,
+								terminate: false,
+							};
+						}
+						if (outcome.reason === "no-open-items") {
+							planEvent("go-blocked", outcome.runId, { reason: "no-open-items" });
+							return {
+								content: [{ type: "text" as const, text: "plan_go: plan is complete — no open items. Nothing to execute; call plan_write to add more work first." }],
+								details: { tool_name: "plan_go", action_id: aid, success: false },
+								isError: true,
+								terminate: false,
+							};
+						}
+						const state = outcome.state;
+						planEvent("uncertainty-hold", state.run_id, { count: state.uncertainties!.length, gate: "plan-go-tool" });
+						return {
+							content: [{ type: "text" as const, text:
+								`plan_go: execution held — ${state.uncertainties!.length} unresolved uncertaint(y/ies):\n` +
+								`${state.uncertainties!.map((u) => `- ${u}`).join("\n")}\n` +
+								"Ask the user these exact questions, then clear them via plan_write (uncertainties: []) and call plan_go again." }],
+							details: { tool_name: "plan_go", action_id: aid, success: false },
+							isError: true,
+							terminate: false,
+						};
+					}
+
+					setPlanning(false);
+					replanStreak = 0;
+					const { state, resuming, stale } = outcome;
+					pi.appendEntry("plan_spine", { run_id: state.run_id });
+					await appendTrace(ctx.cwd, {
+						run_id: state.run_id,
+						action_type: "tool",
+						tool_name: "plan_go",
+						action_id: aid,
+						success: true,
+						output_summary: resuming ? "resume" : "execute",
+						final_status: derivedStatus(state),
+					});
+					planEvent("go", state.run_id, { resumed: resuming, stale: stale.length });
+
+					const subagentAvailable = pi.getActiveTools().includes("subagent");
+					const resumeNote = stale.length
+						? `\n\nRESUMED from a previous session. Previously in_progress item(s) may have PARTIAL WORK on disk: ${stale.map((i) => i.title).join("; ")}. Inspect current state (git status/diff, read the touched files) before continuing — do not trust it done and do not redo it blind.`
+						: "";
+					return {
+						content: [{ type: "text" as const, text: `plan_go: execution started (run_id=${state.run_id}).\n\n${executePrompt(state, subagentAvailable)}${resumeNote}` }],
+						details: { tool_name: "plan_go", action_id: aid, success: true },
+						terminate: false,
+					};
+				},
+			}),
+		);
+	}
 
 	// Pi's argument validator can reject a plan_write before execute() runs. Observe
 	// that result without retaining the validator's raw message or malformed payload.

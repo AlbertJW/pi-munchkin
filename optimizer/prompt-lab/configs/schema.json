@@ -201,6 +201,10 @@
     "FORCE_PLAN_WRITE": [
      "on",
      "off"
+    ],
+    "PLAN_TOOL_GO": [
+     "on",
+     "off"
     ]
    }
   },
