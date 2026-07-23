@@ -1076,4 +1076,26 @@ Full fleet: `nanbeige42-3b-q6-k` 3/3, `qwopus35-4b-mtp` 3/3, `qwopus35-9b-coder-
 3/3 models saturate `parens` — their next measurement needs a harder task to land in the
 discriminating band.
 
+**c39 PLAN_TOOL_GO (2026-07-24): the activation-path gap is fixed, and that reveals a second,
+separate gap.** The 2026-07-23 finding that `PLAN_SUBAGENT_ONLY`/`PLAN_DELEGATE_ALL` have no
+activation path under `real_gate.sh` (`state.phase==="executing"` reachable only via the
+`/plan-go` slash command, never dispatched by a one-shot `pi -p` session) is now fixed: a new
+model-callable `plan_go` tool (dark behind `PLAN_TOOL_GO`) mirrors `goCommand`'s exact validation
+(no plan / no open items / c31 uncertainty hold) through `mutatePlan`, disarming the separate
+`isPlanning()` block on success. Proven correct end-to-end by a dedicated unit test — a session
+that calls only `plan_write` then `plan_go`, never a slash command, correctly gets its next direct
+edit blocked by `PLAN_SUBAGENT_ONLY`.
+
+Live measurement (`c39-sanity` standalone: `NEUTRAL`, 18/18, near behavior-neutral as predicted;
+`c25-c39-combo` and `c37-c39-combo`: both `NEUTRAL`, 18/18 and 17/18) confirms the fix is safe, but
+also surfaces the real limit: **in every cand-arm session of both combo rounds (18 sessions
+total), the model never called `plan_write` at all.** With no plan ever drafted, `phase` never had
+a chance to reach `"executing"`, so `PLAN_SUBAGENT_ONLY`/`PLAN_DELEGATE_ALL` still show zero
+real-world engagement — not the architecture gap (now closed), but the identical
+voluntary-planning gap already documented for c31 (`parens`/`equil`/`bigdata` don't induce this
+model to plan on its own). c31 needed `FORCE_PLAN_WRITE` (c38) to get its own mechanism to fire at
+all; c25 and c37 will very likely need the same. Not built this session — a three-way
+`PLAN_SUBAGENT_ONLY`+`PLAN_TOOL_GO`+`FORCE_PLAN_WRITE` (and the c37 equivalent) combo is the
+obvious next step, flagged for a future session rather than built unprompted here.
+
 *Companion: `LOCAL_LLM_HARNESS_RESEARCH.md` (the playbook + gap analysis this builds on).*
