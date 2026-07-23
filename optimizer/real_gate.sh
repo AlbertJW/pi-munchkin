@@ -441,10 +441,15 @@ run_one() {  # $1=config $2=arm $3=task $4=rep [$5=split] [$6=prompt-variant]
 	# unavailable tool (c37's own remote-box round measured nothing useful before
 	# this was caught — every blocked call fell through to the no-subagent path).
 	local env_plan_subagent_only="" env_plan_delegate_all="" env_spawn_delegation=""
+	local env_force_plan_write="" env_plan_uncertainty="" env_plan_sha_guard="" env_plan_item_guidance_v2=""
 	for entry in ${session_env[@]+"${session_env[@]}"}; do
 		[[ "$entry" == PLAN_SUBAGENT_ONLY=* ]] && env_plan_subagent_only="${entry#*=}"
 		[[ "$entry" == PLAN_DELEGATE_ALL=* ]] && env_plan_delegate_all="${entry#*=}"
 		[[ "$entry" == SPAWN_DELEGATION=* ]] && env_spawn_delegation="${entry#*=}"
+		[[ "$entry" == FORCE_PLAN_WRITE=* ]] && env_force_plan_write="${entry#*=}"
+		[[ "$entry" == PLAN_UNCERTAINTY=* ]] && env_plan_uncertainty="${entry#*=}"
+		[[ "$entry" == PLAN_SHA_GUARD=* ]] && env_plan_sha_guard="${entry#*=}"
+		[[ "$entry" == PLAN_ITEM_GUIDANCE_V2=* ]] && env_plan_item_guidance_v2="${entry#*=}"
 	done
 	# plan_write is part of the standard harness surface in every real
 	# interactive session; omitting it here measured a harness that doesn't
@@ -456,9 +461,49 @@ run_one() {  # $1=config $2=arm $3=task $4=rep [$5=split] [$6=prompt-variant]
 	local tools="read,edit,bash,plan_write"
 	if [[ "$task" == "t4" || "$env_plan_subagent_only" == "1" || \
 	      "$env_plan_delegate_all" == "on" || "$env_spawn_delegation" == "on" ]]; then
-		tools="read,edit,bash,subagent"
+		# APPEND, not replace — this used to overwrite $tools wholesale, silently
+		# dropping plan_write for c25/c36/c37 too (not just t4): confirmed live via
+		# two independent adversarial reproductions during the Tier 1 instrument-
+		# consistency-check build (2026-07-23). Neither c25/c36/c37's own
+		# static configs happened to also set a plan_write-family flag, so this
+		# never tripped the new regression guard below — it silently measured a
+		# harness without plan_write in every PLAN_SUBAGENT_ONLY/PLAN_DELEGATE_ALL/
+		# SPAWN_DELEGATION round ever run, exactly like tonight's original bug.
+		tools="$tools,subagent"
 	fi
 	[[ "$env_span_tools" == "on" ]] && tools="$tools,search_spans,read_span"
+	# Instrument-consistency check (UPGRADE_MAP.md Tier 1 #1): every candidate flag that
+	# steers the model toward a specific tool must have that tool actually granted in
+	# $tools, checked HERE — at the exact point $tools is finalized, on every real
+	# invocation — not in a separate static-analysis script that can drift out of sync
+	# with this file's own logic. This is the general form of tonight's bug: plan_write
+	# silently missing from every gate session's --tools while c31/c34/c38 steered the
+	# model straight at it, caught only via a live transcript after wasted box time (the
+	# model itself reported "plan_write is not in my available tools list" after
+	# retry-looping a block 76/102 times). Fails closed: a flag pointing at a tool the
+	# session doesn't actually have means the row would measure a harness that doesn't
+	# exist, exactly like c37/c38 were confounded.
+	if [[ ( "$task" == "t4" || "$env_plan_subagent_only" == "1" || \
+	        "$env_plan_delegate_all" == "on" || "$env_spawn_delegation" == "on" ) && \
+	      ",$tools," != *",subagent,"* ]]; then
+		echo "[real_gate] task==t4/PLAN_SUBAGENT_ONLY/PLAN_DELEGATE_ALL/SPAWN_DELEGATION requires 'subagent' but --tools resolved to '$tools' for $pat/$task — refusing to measure a nonexistent harness surface" >&2
+		exit 2
+	fi
+	if [[ "$env_span_tools" == "on" && ( ",$tools," != *",search_spans,"* || ",$tools," != *",read_span,"* ) ]]; then
+		echo "[real_gate] SPAN_TOOLS=on requires 'search_spans,read_span' but --tools resolved to '$tools' for $pat/$task — refusing to measure a nonexistent harness surface" >&2
+		exit 2
+	fi
+	# plan_write is meant to be unconditional in the base list above (now that the
+	# t4/subagent branch appends instead of replacing), so this should never actually
+	# trip today — it exists as a regression guard against exactly the kind of silent
+	# drift that caused tonight's bug: a future edit re-gating plan_write, or a new
+	# branch that replaces $tools wholesale instead of appending, would trip it.
+	if [[ ( "$env_force_plan_write" == "on" || "$env_plan_uncertainty" == "on" || \
+	        "$env_plan_sha_guard" == "on" || "$env_plan_item_guidance_v2" == "on" ) && \
+	      ",$tools," != *",plan_write,"* ]]; then
+		echo "[real_gate] FORCE_PLAN_WRITE/PLAN_UNCERTAINTY/PLAN_SHA_GUARD/PLAN_ITEM_GUIDANCE_V2 requires 'plan_write' but --tools resolved to '$tools' for $pat/$task — refusing to measure a nonexistent harness surface" >&2
+		exit 2
+	fi
 	# Candidate env the PARENT shell must see: the exports below happen inside the pi
 	# subshell only, so checking ${RETRY_FRESH} out here read the parent's env and the
 	# c18 retry never fired for candidates that enable it (audit 2026-07-13 — the f4
