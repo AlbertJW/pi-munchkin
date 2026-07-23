@@ -132,10 +132,12 @@ def _subagent_agents(call):
 
 def check_t4(msgs):
     """t4's canonical prompt mandates delegate-to-explorer THEN delegate-to-verifier.
-    A subagent toolCall's own recorded arguments are direct, unforgeable evidence —
-    the harness itself only writes one when the tool actually ran — unlike bigdata's
-    search_spans case, where call arguments alone are trivially fakeable and a signed
-    execution receipt is required instead. No receipt machinery needed here."""
+    A subagent toolCall's own recorded arguments are harness-recorded evidence: strong
+    evidence of invocation and execution (the harness only writes a matching result
+    when the tool call actually ran), but not proof the resulting work was correct —
+    unlike bigdata's search_spans case, where call arguments alone are trivially
+    fakeable and a signed execution receipt is required instead. No receipt machinery
+    needed here."""
     calls, results = _calls_and_results(msgs)
     results_by_call = {str(r.get("toolCallId", "")): r for r in results}
     explorer_seen = False
@@ -191,11 +193,12 @@ def check_sv_ambiguous_spec(msgs):
     should follow — a genuine fork, not a gap fillable by reading the repo harder.
     The candidate's claim is that the model surfaces this as a blocking uncertainty
     (plan_write's uncertainties[] field) instead of picking one and guessing. A
-    plan_write toolCall's own recorded arguments are direct, unforgeable evidence —
-    the harness itself only writes a matching toolResult when the call actually ran
-    — unlike bigdata's search_spans case, where call arguments alone are trivially
-    fakeable and a signed execution receipt is required instead. No receipt
-    machinery needed here (same reasoning as check_t4).
+    plan_write toolCall's own recorded arguments are harness-recorded evidence:
+    strong evidence of invocation and execution (the harness itself only writes a
+    matching toolResult when the call actually ran), but not proof the resulting
+    work was correct — unlike bigdata's search_spans case, where call arguments
+    alone are trivially fakeable and a signed execution receipt is required
+    instead. No receipt machinery needed here (same reasoning as check_t4).
 
     Fallback: plan_write's uncertainties[] field only exists in the model-visible
     tool schema when plan_write is actually called — on tasks small enough that a
