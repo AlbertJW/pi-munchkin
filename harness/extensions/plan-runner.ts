@@ -1203,7 +1203,12 @@ export default function (pi: ExtensionAPI) {
 			const isMutation =
 				PLAN_MUTATION_TOOLS.has(event.toolName) ||
 				(event.toolName === "bash" && classifyBashCommand(String((event.input as Record<string, unknown> | undefined)?.command ?? "")).mutates);
-			if (isMutation) {
+			// Fail open when plan_write isn't in the session's active tool set —
+			// blocking with no escape hatch is a deadlock, proven live: a --tools
+			// list without plan_write left the model retry-looping the block for
+			// 15 minutes ("plan_write is not in my available tools list") before
+			// giving up. Same check pattern as subagentAvailable in c25/c37.
+			if (isMutation && pi.getActiveTools().includes("plan_write")) {
 				const state = await readState(ctx.cwd);
 				if (!state) {
 					rememberModel(ctx);

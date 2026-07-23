@@ -878,7 +878,8 @@ test("c38: FORCE_PLAN_WRITE blocks the first mutation before any plan_write call
 		mod.default(fp.pi as any);
 		const cwd = tmp();
 		const { ctx } = makeCtx(cwd);
-		// no /plan, no plan_write yet — a model reaching straight for an edit
+		fp.pi.getActiveTools = () => ["plan_write"];
+		// no /plan, no plan_write call yet — a model reaching straight for an edit
 
 		const read = await fire(fp, "tool_call", { toolName: "read", input: { path: "x" } }, ctx);
 		assert.equal(read, undefined, "reads are never gated by this candidate");
@@ -915,6 +916,23 @@ test("c38: once plan_write has been called even once, later mutations are unaffe
 	}
 });
 
+test("c38: fails open when plan_write is not an active tool — no deadlock", async () => {
+	process.env.FORCE_PLAN_WRITE = "on";
+	try {
+		const fp = makeFakePi();
+		const mod = await import(`../extensions/plan-runner.ts?c38noplantool=${Date.now()}-${Math.random()}`);
+		mod.default(fp.pi as any);
+		const cwd = tmp();
+		const { ctx } = makeCtx(cwd);
+		// fake harness getActiveTools() defaults to [] — plan_write absent, exactly
+		// the deadlock scenario a --tools list without plan_write produced live
+		const edit = await fire(fp, "tool_call", { toolName: "edit", input: {} }, ctx);
+		assert.equal(edit, undefined, "mutation NOT blocked when the demanded tool cannot be called");
+	} finally {
+		delete process.env.FORCE_PLAN_WRITE;
+	}
+});
+
 test("c38 dark: flag off — the very first mutation proceeds with no plan_write required", async () => {
 	const fp = makeFakePi();
 	const mod = await import(`../extensions/plan-runner.ts?c38dark=${Date.now()}-${Math.random()}`);
@@ -938,6 +956,7 @@ test("c38: telemetry — force-plan-write-block recorded on the gated first muta
 		const mod = await import(`../extensions/plan-runner.ts?c38tel=${Date.now()}-${Math.random()}`);
 		mod.default(fp.pi as any);
 		const { ctx } = makeCtx(cwd);
+		fp.pi.getActiveTools = () => ["plan_write"];
 		await fire(fp, "tool_call", { toolName: "write", input: {} }, ctx);
 		const rows = readFileSync(telemetry, "utf8").trim().split("\n").map((line) => JSON.parse(line));
 		const block = rows.find((row) => row.ext === "plan-runner" && row.kind === "force-plan-write-block");

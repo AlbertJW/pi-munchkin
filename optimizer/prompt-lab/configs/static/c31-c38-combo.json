@@ -1,0 +1,5 @@
+{
+  "name": "c31-c38-combo",
+  "prediction": "Investigation config, not a new independent candidate -- ANDs two already-shipped dark flags (c31 PLAN_UNCERTAINTY, c38 FORCE_PLAN_WRITE) to test whether forcing the first plan_write call is what the expanded (fixture_version 2026-07.2) sv-ambiguous-spec needs to actually get PLAN_UNCERTAINTY to fire, as a follow-up to a c31-alone round against the same expanded fixture. If c31-alone already gets plan_write called (0/6 -> something >0), this round asks whether forcing pushes the uncertainty declaration rate higher still.",
+  "thresholds": { "PLAN_UNCERTAINTY": "on", "FORCE_PLAN_WRITE": "on" }
+}

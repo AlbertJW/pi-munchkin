@@ -1006,6 +1006,62 @@ drop below 20%, ideal 30-70%) is the formal version of exactly this critique, an
 candidates has ever been measured against a task landing in that band *for the specific branch it
 touches*. That gap is the direct segue into the next phase of work: designing (and, where existing
 unadmitted fixtures already fit, hardening) task sets purpose-built to stress each of these
-mechanisms, described in a forthcoming section of this ledger once that work lands.
+mechanisms, described in the section below.
+
+## The stress-fixture round, the plan_write confound, and the fleet re-baseline (2026-07-23, cont.)
+
+The fixture-stress work landed the same day: five fixtures built/hardened and admission-checked
+(`sv-ambiguous-spec` for c31, `sv-commit-sha-guard` for c32, `qs-error-swallow` for c29,
+`hygiene-shared-config-reread` for c26/c27/c30, plus a t4 delegation-trajectory hardening), and
+`trajectory_check.py` gained `check_t4()` and `check_sv_ambiguous_spec()` — both reading a
+toolCall's own harness-recorded arguments as unforgeable trajectory evidence.
+
+**The first live c31 round against `sv-ambiguous-spec` produced the session's most instructive
+false conclusion.** All 6 sessions (both arms) showed zero `plan_write` calls, which was initially
+read as "the model skips planning on small tasks." Two fixes were built on that reading — the
+fixture was expanded to 2 files / 3 steps, and c38 (`FORCE_PLAN_WRITE`, blocking the first
+mutation until `plan_write` has been called) was shipped as a dark candidate. The re-runs then
+showed the expanded fixture changing nothing and the c38 arm producing enormous sessions
+(88-131K chars) in which the model retry-looped the block dozens of times (76 of 102 tool calls
+in one rep) without ever calling `plan_write` — initially read as "the model can't recover from
+blocks."
+
+**Both readings were wrong. The instrument was broken**: `real_gate.sh` launched every gate
+session with `--tools read,edit,bash(,subagent)(,search_spans,read_span)` — and pi's `--tools`
+flag is an allowlist over *all* tools, extension-registered ones included
+(`agent-session.js` `_refreshToolRegistry` filters extension tools through the same
+`isAllowedTool` check as builtins). `plan_write`, registered correctly by `plan-runner.ts`, was
+silently filtered out of every gate session ever run. The c38 transcript is unambiguous — the
+model diagnosed the deadlock itself, four times: *"plan_write is not in my available tools list
+(only read, edit, bash are available)"* — then spent 15 minutes on `cat >`/`tee` workarounds
+before giving up. Reasonable behavior against an unsatisfiable constraint. This is the second
+candidate burned by the exact same bug class in one day (c37's subagent grant was the first);
+the general rule is now: **any mechanism that steers toward a tool must verify that tool is in
+the session's `--tools` list, and the gate's tool list must mirror the real harness surface.**
+Fixes: `plan_write` added to the gate's base tool list unconditionally on both arms (it is
+standard harness surface, like read/edit/bash; plan gates still run engine-side inside
+`plan_write`, so nothing is bypassed), and c38's block now fails open when `plan_write` is not
+an active tool — blocking with no escape hatch is a deadlock, proven live. Every
+plan-runner-dependent row recorded before this fix (both c31 rounds, the c38 combo, arguably
+c34's round) is confounded and superseded by post-fix re-runs.
+
+Three smaller same-day instrument findings, recorded so they aren't relearned: **(1)**
+`real_gate.sh` crashed under macOS system bash 3.2 (`#!/usr/bin/env bash` resolves by `$PATH`
+order) on `local arr=()` arrays populated only by maybe-zero-iteration loops — under `set -u`,
+bash 3.2 treats such arrays as genuinely unbound; fixed with the `${arr[@]+"${arr[@]}"}` idiom
+on `session_env` and `passthrough_keys`. **(2)** `CALIB` was CLI-flag-only (`--calibrate`);
+setting it as an env var was silently ignored (one recheck round paid a redundant second arm) —
+now `CALIB=${CALIB:-0}` honors the env form. **(3)** The `gate=` summary line AND-gates
+code-correctness over trajectory: a trajectory mechanism can fire perfectly and still print
+`gate=0`, so trajectory questions must be answered from the session transcripts (via
+`trajectory_check.py`'s own `load_msgs` — the raw JSONL wraps each message in
+`{"type":"message","message":{...}}`, which naive parsing misses entirely).
+
+**Remote box re-baseline (post-server-upgrade, all rows exploratory, `parens` n=3)**: LFM25's
+malformed-tool-call collapse dropped from ~67% (12/18) to 1/6 — much improved, not proven gone.
+Full fleet: `nanbeige42-3b-q6-k` 3/3, `qwopus35-4b-mtp` 3/3, `qwopus35-9b-coder-q4-k-m` 3/3,
+`g9v3-3b-q8-0` 2/3, `qwen35-2b-opus-reasoning` 1/3, `gemma-4-e2b-it-qat-q4-mtp` 0/3. The three
+3/3 models saturate `parens` — their next measurement needs a harder task to land in the
+discriminating band.
 
 *Companion: `LOCAL_LLM_HARNESS_RESEARCH.md` (the playbook + gap analysis this builds on).*

@@ -56,7 +56,7 @@ if [[ -n "$EXPERIMENT_MANIFEST" ]]; then
 	}
 fi
 
-DRY=0; HARD=0; CALIB=0; ROBUSTNESS=0; EXPLORATORY=0; TASKS=()
+DRY=0; HARD=0; CALIB="${CALIB:-0}"; ROBUSTNESS=0; EXPLORATORY=0; TASKS=()
 DEFAULT_TASKS=(parens equil bigdata)
 for a in "$@"; do
 	case "$a" in
@@ -446,7 +446,14 @@ run_one() {  # $1=config $2=arm $3=task $4=rep [$5=split] [$6=prompt-variant]
 		[[ "$entry" == PLAN_DELEGATE_ALL=* ]] && env_plan_delegate_all="${entry#*=}"
 		[[ "$entry" == SPAWN_DELEGATION=* ]] && env_spawn_delegation="${entry#*=}"
 	done
-	local tools="read,edit,bash"
+	# plan_write is part of the standard harness surface in every real
+	# interactive session; omitting it here measured a harness that doesn't
+	# exist — the c31/c38 rounds of 2026-07-23 were confounded exactly this way
+	# (the model diagnosed "plan_write is not in my available tools list" and
+	# deadlocked against c38's block). Unconditional on BOTH arms: flag-gating
+	# it would recreate the c36-style asymmetry. Plan gates still run
+	# engine-side inside plan_write, so this grants no verification bypass.
+	local tools="read,edit,bash,plan_write"
 	if [[ "$task" == "t4" || "$env_plan_subagent_only" == "1" || \
 	      "$env_plan_delegate_all" == "on" || "$env_spawn_delegation" == "on" ]]; then
 		tools="read,edit,bash,subagent"
