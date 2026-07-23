@@ -346,7 +346,7 @@ run_guarded_session() {
 		  exec 3<<<"$telemetry_key"
 		  exec 4<<<"${LLAMA_API_KEY:-}"
 		  run_with_timeout "$PI_TIMEOUT" 30 ${sbx[@]+"${sbx[@]}"} /usr/bin/env -i \
-		    "${session_env[@]}" "${session_base_env[@]}" PI_OBSERVATIONAL_MEMORY_PASSIVE=1 \
+		    ${session_env[@]+"${session_env[@]}"} "${session_base_env[@]}" PI_OBSERVATIONAL_MEMORY_PASSIVE=1 \
 		    bash -c 'k="$(cat <&4)"; [[ -n "$k" ]] && export LLAMA_API_KEY="$k"; exec pi -p --approve "$@"' _ \
 		    ${PI_SELECT[@]+"${PI_SELECT[@]}"} --tools "$tools" "$prompt" ) </dev/null >> "$wd/run.log" 2>&1 &
 	else
@@ -354,7 +354,7 @@ run_guarded_session() {
 		  exec 3<<<"$telemetry_key"
 		  exec 4<<<"${LLAMA_API_KEY:-}"
 		  run_with_timeout "$PI_TIMEOUT" 30 ${sbx[@]+"${sbx[@]}"} /usr/bin/env -i \
-		    "${session_env[@]}" "${session_base_env[@]}" PI_OBSERVATIONAL_MEMORY_PASSIVE=1 \
+		    ${session_env[@]+"${session_env[@]}"} "${session_base_env[@]}" PI_OBSERVATIONAL_MEMORY_PASSIVE=1 \
 		    bash -c 'k="$(cat <&4)"; [[ -n "$k" ]] && export LLAMA_API_KEY="$k"; exec pi -p --approve "$@"' _ \
 		    ${PI_SELECT[@]+"${PI_SELECT[@]}"} --tools "$tools" "$prompt" ) </dev/null > "$wd/run.log" 2>&1 &
 	fi
@@ -427,7 +427,7 @@ run_one() {  # $1=config $2=arm $3=task $4=rep [$5=split] [$6=prompt-variant]
 	python3 "$CONFIG" --apply "$cfg" --workdir "$wd" --env-null > "$envfile" || exit 2
 	while IFS= read -r -d '' entry; do session_env+=("$entry"); done < "$envfile"
 	local env_span_tools=""
-	for entry in "${session_env[@]}"; do [[ "$entry" == SPAN_TOOLS=* ]] && env_span_tools="${entry#*=}"; done
+	for entry in ${session_env[@]+"${session_env[@]}"}; do [[ "$entry" == SPAN_TOOLS=* ]] && env_span_tools="${entry#*=}"; done
 	env_span_tools="${env_span_tools:-${SPAN_TOOLS:-off}}"
 	if [[ "${TRAJECTORY:-off}" == "on" && "$env_span_tools" != "on" ]]; then
 		echo "[real_gate] TRAJECTORY=on requires SPAN_TOOLS=on for $pat/$task; refusing argument-only evidence" >&2
@@ -441,7 +441,7 @@ run_one() {  # $1=config $2=arm $3=task $4=rep [$5=split] [$6=prompt-variant]
 	# unavailable tool (c37's own remote-box round measured nothing useful before
 	# this was caught — every blocked call fell through to the no-subagent path).
 	local env_plan_subagent_only="" env_plan_delegate_all="" env_spawn_delegation=""
-	for entry in "${session_env[@]}"; do
+	for entry in ${session_env[@]+"${session_env[@]}"}; do
 		[[ "$entry" == PLAN_SUBAGENT_ONLY=* ]] && env_plan_subagent_only="${entry#*=}"
 		[[ "$entry" == PLAN_DELEGATE_ALL=* ]] && env_plan_delegate_all="${entry#*=}"
 		[[ "$entry" == SPAWN_DELEGATION=* ]] && env_spawn_delegation="${entry#*=}"
@@ -457,10 +457,10 @@ run_one() {  # $1=config $2=arm $3=task $4=rep [$5=split] [$6=prompt-variant]
 	# c18 retry never fired for candidates that enable it (audit 2026-07-13 — the f4
 	# c18 arm measured nothing). Parse the values from the validated array instead.
 	local env_retry_fresh=""
-	for entry in "${session_env[@]}"; do [[ "$entry" == RETRY_FRESH=* ]] && env_retry_fresh="${entry#*=}"; done
+	for entry in ${session_env[@]+"${session_env[@]}"}; do [[ "$entry" == RETRY_FRESH=* ]] && env_retry_fresh="${entry#*=}"; done
 	env_retry_fresh="${env_retry_fresh:-${RETRY_FRESH:-off}}"
 	local env_retry_mode=""
-	for entry in "${session_env[@]}"; do [[ "$entry" == RETRY_MODE=* ]] && env_retry_mode="${entry#*=}"; done
+	for entry in ${session_env[@]+"${session_env[@]}"}; do [[ "$entry" == RETRY_MODE=* ]] && env_retry_mode="${entry#*=}"; done
 	env_retry_mode="${env_retry_mode:-${RETRY_MODE:-fresh}}"
 
 	# Child tools receive a deliberately minimal environment. Frontier, cloud,
@@ -488,7 +488,7 @@ run_one() {  # $1=config $2=arm $3=task $4=rep [$5=split] [$6=prompt-variant]
 	fi
 	local -a passthrough_keys=()
 	IFS=',' read -r -a passthrough_keys <<< "${PI_GATE_PASSTHROUGH_ENV:-}"
-	for key in "${passthrough_keys[@]}"; do
+	for key in ${passthrough_keys[@]+"${passthrough_keys[@]}"}; do
 		[[ -z "$key" ]] && continue
 		[[ "$key" =~ ^[A-Za-z_][A-Za-z0-9_]*$ ]] || { echo "[real_gate] invalid PI_GATE_PASSTHROUGH_ENV name: $key" >&2; exit 2; }
 		value="${!key-}"; session_base_env+=("$key=$value")
