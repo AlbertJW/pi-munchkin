@@ -1,8 +1,13 @@
 {
   "admission": {
-    "approved": false,
+    "approved": true,
+    "approved_prompt_hashes": [
+      "14383ddefcdc3481e650fd6f2cd49939ec2fd2a434e5eb3e2619d9b3c2df8d8d",
+      "b417fd8baee0b46b4b4f4dc939b20b7cf528ecba34795a0b307815afa8449b54",
+      "95d94a3144038fa2dbd2ea9c86abb12d93028e276ef16cee4a895ff864bd7dd7"
+    ],
     "automated": {
-      "checked_at": "2026-07-23T10:03:01Z",
+      "checked_at": "2026-07-23T10:33:10Z",
       "hash_drift": [],
       "passed": true,
       "runs_per_state": 3,
@@ -44,17 +49,17 @@
         "mutant:shortcut": {
           "fail_to_pass": [
             {
-              "output_tail": "r-swallow-v0bwxi5n/work/test/fail-to-pass.test.js:115:10)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n      at Test.postRun (node:internal/test_runner/test:1522:19)\n      at Test.run (node:internal/test_runner/test:1447:12)\n      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3) {\n    generatedMessage: false,\n    code: 'ERR_ASSERTION',\n    actual: 31,\n    expected: 60,\n    operator: 'strictEqual',\n    diff: 'simple'\n  }\n",
+              "output_tail": "r-swallow-yaw3eh78/work/test/fail-to-pass.test.js:115:10)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n      at Test.postRun (node:internal/test_runner/test:1522:19)\n      at Test.run (node:internal/test_runner/test:1447:12)\n      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3) {\n    generatedMessage: false,\n    code: 'ERR_ASSERTION',\n    actual: 31,\n    expected: 60,\n    operator: 'strictEqual',\n    diff: 'simple'\n  }\n",
               "passed": false,
               "returncode": 1
             },
             {
-              "output_tail": "r-swallow-pbzl_ruu/work/test/fail-to-pass.test.js:115:10)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n      at Test.postRun (node:internal/test_runner/test:1522:19)\n      at Test.run (node:internal/test_runner/test:1447:12)\n      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3) {\n    generatedMessage: false,\n    code: 'ERR_ASSERTION',\n    actual: 31,\n    expected: 60,\n    operator: 'strictEqual',\n    diff: 'simple'\n  }\n",
+              "output_tail": "r-swallow-o1vhcdtv/work/test/fail-to-pass.test.js:115:10)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n      at Test.postRun (node:internal/test_runner/test:1522:19)\n      at Test.run (node:internal/test_runner/test:1447:12)\n      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3) {\n    generatedMessage: false,\n    code: 'ERR_ASSERTION',\n    actual: 31,\n    expected: 60,\n    operator: 'strictEqual',\n    diff: 'simple'\n  }\n",
               "passed": false,
               "returncode": 1
             },
             {
-              "output_tail": "r-swallow-fy_nv0dm/work/test/fail-to-pass.test.js:115:10)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n      at Test.postRun (node:internal/test_runner/test:1522:19)\n      at Test.run (node:internal/test_runner/test:1447:12)\n      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3) {\n    generatedMessage: false,\n    code: 'ERR_ASSERTION',\n    actual: 31,\n    expected: 60,\n    operator: 'strictEqual',\n    diff: 'simple'\n  }\n",
+              "output_tail": "r-swallow-t_k0tk3k/work/test/fail-to-pass.test.js:115:10)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n      at Test.postRun (node:internal/test_runner/test:1522:19)\n      at Test.run (node:internal/test_runner/test:1447:12)\n      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3) {\n    generatedMessage: false,\n    code: 'ERR_ASSERTION',\n    actual: 31,\n    expected: 60,\n    operator: 'strictEqual',\n    diff: 'simple'\n  }\n",
               "passed": false,
               "returncode": 1
             }
@@ -79,17 +84,17 @@
         },
         "pristine_fail_to_pass": [
           {
-            "output_tail": "k6ld/work/src/index.js:12:22)\n      at TestContext.<anonymous> (file:///private/var/folders/3r/nc7qhtpn56j7rt5nwg0rqw600000gn/T/pi-admit-qs-error-swallow-onmlk6ld/work/test/fail-to-pass.test.js:114:26)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n      at Test.postRun (node:internal/test_runner/test:1522:19)\n      at Test.run (node:internal/test_runner/test:1447:12)\n      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3)\n",
+            "output_tail": "30n7/work/src/index.js:12:22)\n      at TestContext.<anonymous> (file:///private/var/folders/3r/nc7qhtpn56j7rt5nwg0rqw600000gn/T/pi-admit-qs-error-swallow-19hu30n7/work/test/fail-to-pass.test.js:114:26)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n      at Test.postRun (node:internal/test_runner/test:1522:19)\n      at Test.run (node:internal/test_runner/test:1447:12)\n      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3)\n",
             "passed": false,
             "returncode": 1
           },
           {
-            "output_tail": "d1ji/work/src/index.js:12:22)\n      at TestContext.<anonymous> (file:///private/var/folders/3r/nc7qhtpn56j7rt5nwg0rqw600000gn/T/pi-admit-qs-error-swallow-b46pd1ji/work/test/fail-to-pass.test.js:114:26)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n      at Test.postRun (node:internal/test_runner/test:1522:19)\n      at Test.run (node:internal/test_runner/test:1447:12)\n      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3)\n",
+            "output_tail": "9i2_/work/src/index.js:12:22)\n      at TestContext.<anonymous> (file:///private/var/folders/3r/nc7qhtpn56j7rt5nwg0rqw600000gn/T/pi-admit-qs-error-swallow-9rvr9i2_/work/test/fail-to-pass.test.js:114:26)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n      at Test.postRun (node:internal/test_runner/test:1522:19)\n      at Test.run (node:internal/test_runner/test:1447:12)\n      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3)\n",
             "passed": false,
             "returncode": 1
           },
           {
-            "output_tail": "ebmc/work/src/index.js:12:22)\n      at TestContext.<anonymous> (file:///private/var/folders/3r/nc7qhtpn56j7rt5nwg0rqw600000gn/T/pi-admit-qs-error-swallow-bna_ebmc/work/test/fail-to-pass.test.js:114:26)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n      at Test.postRun (node:internal/test_runner/test:1522:19)\n      at Test.run (node:internal/test_runner/test:1447:12)\n      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3)\n",
+            "output_tail": "tcjb/work/src/index.js:12:22)\n      at TestContext.<anonymous> (file:///private/var/folders/3r/nc7qhtpn56j7rt5nwg0rqw600000gn/T/pi-admit-qs-error-swallow-aosqtcjb/work/test/fail-to-pass.test.js:114:26)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n      at Test.postRun (node:internal/test_runner/test:1522:19)\n      at Test.run (node:internal/test_runner/test:1447:12)\n      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3)\n",
             "passed": false,
             "returncode": 1
           }
@@ -113,8 +118,8 @@
         ]
       }
     },
-    "reviewed_at": null,
-    "reviewer": null
+    "reviewed_at": "2026-07-23T10:34:22Z",
+    "reviewer": "Albert"
   },
   "artifacts": [
     {
@@ -234,8 +239,8 @@
     }
   },
   "timestamps": {
-    "admitted_at": null,
+    "admitted_at": "2026-07-23T10:34:22Z",
     "created_at": "2026-07-23T00:00:00Z",
-    "expires_at": null
+    "expires_at": "2026-10-21T10:34:22Z"
   }
 }

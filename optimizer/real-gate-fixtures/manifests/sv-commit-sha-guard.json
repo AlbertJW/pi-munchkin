@@ -1,8 +1,13 @@
 {
   "admission": {
-    "approved": false,
+    "approved": true,
+    "approved_prompt_hashes": [
+      "58ba1233b22e27c578e9d0ac43414896cd553c9f29eb0b94a54feca05e053ef8",
+      "e47892baa0520c0c089ae8e886047f383b467161ca10a95f854cdf8c713adb1e",
+      "279d01efc6c259e42a61d51851129f73d3e66e0e0a096a0bfce3e28c27104a5b"
+    ],
     "automated": {
-      "checked_at": "2026-07-23T10:02:58Z",
+      "checked_at": "2026-07-23T10:33:08Z",
       "hash_drift": [],
       "passed": true,
       "runs_per_state": 3,
@@ -44,17 +49,17 @@
         "mutant:shortcut": {
           "fail_to_pass": [
             {
-              "output_tail": "ank 1 total (770.74 vs 710.49)\n      at TestContext.<anonymous> (file:///private/var/folders/3r/nc7qhtpn56j7rt5nwg0rqw600000gn/T/pi-admit-sv-commit-sha-guard-erb2e_5c/work/test/fail-to-pass.test.js:27:12)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.start (node:internal/test_runner/test:1242:17)\n      at startSubtestAfterBootstrap (node:internal/test_runner/harness:387:17) {\n    generatedMessage: false,\n    code: 'ERR_ASSERTION',\n    actual: false,\n    expected: true,\n    operator: '==',\n    diff: 'simple'\n  }\n",
+              "output_tail": "ank 1 total (770.74 vs 710.49)\n      at TestContext.<anonymous> (file:///private/var/folders/3r/nc7qhtpn56j7rt5nwg0rqw600000gn/T/pi-admit-sv-commit-sha-guard-t5q46crh/work/test/fail-to-pass.test.js:27:12)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.start (node:internal/test_runner/test:1242:17)\n      at startSubtestAfterBootstrap (node:internal/test_runner/harness:387:17) {\n    generatedMessage: false,\n    code: 'ERR_ASSERTION',\n    actual: false,\n    expected: true,\n    operator: '==',\n    diff: 'simple'\n  }\n",
               "passed": false,
               "returncode": 1
             },
             {
-              "output_tail": "ank 1 total (770.74 vs 710.49)\n      at TestContext.<anonymous> (file:///private/var/folders/3r/nc7qhtpn56j7rt5nwg0rqw600000gn/T/pi-admit-sv-commit-sha-guard-e0xazzyn/work/test/fail-to-pass.test.js:27:12)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.start (node:internal/test_runner/test:1242:17)\n      at startSubtestAfterBootstrap (node:internal/test_runner/harness:387:17) {\n    generatedMessage: false,\n    code: 'ERR_ASSERTION',\n    actual: false,\n    expected: true,\n    operator: '==',\n    diff: 'simple'\n  }\n",
+              "output_tail": "ank 1 total (770.74 vs 710.49)\n      at TestContext.<anonymous> (file:///private/var/folders/3r/nc7qhtpn56j7rt5nwg0rqw600000gn/T/pi-admit-sv-commit-sha-guard-ds_t3x9e/work/test/fail-to-pass.test.js:27:12)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.start (node:internal/test_runner/test:1242:17)\n      at startSubtestAfterBootstrap (node:internal/test_runner/harness:387:17) {\n    generatedMessage: false,\n    code: 'ERR_ASSERTION',\n    actual: false,\n    expected: true,\n    operator: '==',\n    diff: 'simple'\n  }\n",
               "passed": false,
               "returncode": 1
             },
             {
-              "output_tail": "ank 1 total (770.74 vs 710.49)\n      at TestContext.<anonymous> (file:///private/var/folders/3r/nc7qhtpn56j7rt5nwg0rqw600000gn/T/pi-admit-sv-commit-sha-guard-m42_8f_4/work/test/fail-to-pass.test.js:27:12)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.start (node:internal/test_runner/test:1242:17)\n      at startSubtestAfterBootstrap (node:internal/test_runner/harness:387:17) {\n    generatedMessage: false,\n    code: 'ERR_ASSERTION',\n    actual: false,\n    expected: true,\n    operator: '==',\n    diff: 'simple'\n  }\n",
+              "output_tail": "ank 1 total (770.74 vs 710.49)\n      at TestContext.<anonymous> (file:///private/var/folders/3r/nc7qhtpn56j7rt5nwg0rqw600000gn/T/pi-admit-sv-commit-sha-guard-mu4o40cj/work/test/fail-to-pass.test.js:27:12)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.start (node:internal/test_runner/test:1242:17)\n      at startSubtestAfterBootstrap (node:internal/test_runner/harness:387:17) {\n    generatedMessage: false,\n    code: 'ERR_ASSERTION',\n    actual: false,\n    expected: true,\n    operator: '==',\n    diff: 'simple'\n  }\n",
               "passed": false,
               "returncode": 1
             }
@@ -79,17 +84,17 @@
         },
         "pristine_fail_to_pass": [
           {
-            "output_tail": "le or directory, open 'src/summary.json'\n      at readFileSync (node:fs:539:20)\n      at TestContext.<anonymous> (file:///private/var/folders/3r/nc7qhtpn56j7rt5nwg0rqw600000gn/T/pi-admit-sv-commit-sha-guard-avbm_mfl/work/test/fail-to-pass.test.js:22:26)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.start (node:internal/test_runner/test:1242:17)\n      at startSubtestAfterBootstrap (node:internal/test_runner/harness:387:17) {\n    errno: -2,\n    code: 'ENOENT',\n    syscall: 'open',\n    path: 'src/summary.json'\n  }\n",
+            "output_tail": "le or directory, open 'src/summary.json'\n      at readFileSync (node:fs:539:20)\n      at TestContext.<anonymous> (file:///private/var/folders/3r/nc7qhtpn56j7rt5nwg0rqw600000gn/T/pi-admit-sv-commit-sha-guard-xakapowk/work/test/fail-to-pass.test.js:22:26)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.start (node:internal/test_runner/test:1242:17)\n      at startSubtestAfterBootstrap (node:internal/test_runner/harness:387:17) {\n    errno: -2,\n    code: 'ENOENT',\n    syscall: 'open',\n    path: 'src/summary.json'\n  }\n",
             "passed": false,
             "returncode": 1
           },
           {
-            "output_tail": "le or directory, open 'src/summary.json'\n      at readFileSync (node:fs:539:20)\n      at TestContext.<anonymous> (file:///private/var/folders/3r/nc7qhtpn56j7rt5nwg0rqw600000gn/T/pi-admit-sv-commit-sha-guard-rbxpjtsr/work/test/fail-to-pass.test.js:22:26)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.start (node:internal/test_runner/test:1242:17)\n      at startSubtestAfterBootstrap (node:internal/test_runner/harness:387:17) {\n    errno: -2,\n    code: 'ENOENT',\n    syscall: 'open',\n    path: 'src/summary.json'\n  }\n",
+            "output_tail": "le or directory, open 'src/summary.json'\n      at readFileSync (node:fs:539:20)\n      at TestContext.<anonymous> (file:///private/var/folders/3r/nc7qhtpn56j7rt5nwg0rqw600000gn/T/pi-admit-sv-commit-sha-guard-ia0771kf/work/test/fail-to-pass.test.js:22:26)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.start (node:internal/test_runner/test:1242:17)\n      at startSubtestAfterBootstrap (node:internal/test_runner/harness:387:17) {\n    errno: -2,\n    code: 'ENOENT',\n    syscall: 'open',\n    path: 'src/summary.json'\n  }\n",
             "passed": false,
             "returncode": 1
           },
           {
-            "output_tail": "le or directory, open 'src/summary.json'\n      at readFileSync (node:fs:539:20)\n      at TestContext.<anonymous> (file:///private/var/folders/3r/nc7qhtpn56j7rt5nwg0rqw600000gn/T/pi-admit-sv-commit-sha-guard-pov7yg93/work/test/fail-to-pass.test.js:22:26)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.start (node:internal/test_runner/test:1242:17)\n      at startSubtestAfterBootstrap (node:internal/test_runner/harness:387:17) {\n    errno: -2,\n    code: 'ENOENT',\n    syscall: 'open',\n    path: 'src/summary.json'\n  }\n",
+            "output_tail": "le or directory, open 'src/summary.json'\n      at readFileSync (node:fs:539:20)\n      at TestContext.<anonymous> (file:///private/var/folders/3r/nc7qhtpn56j7rt5nwg0rqw600000gn/T/pi-admit-sv-commit-sha-guard-veh_4neq/work/test/fail-to-pass.test.js:22:26)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.start (node:internal/test_runner/test:1242:17)\n      at startSubtestAfterBootstrap (node:internal/test_runner/harness:387:17) {\n    errno: -2,\n    code: 'ENOENT',\n    syscall: 'open',\n    path: 'src/summary.json'\n  }\n",
             "passed": false,
             "returncode": 1
           }
@@ -113,8 +118,8 @@
         ]
       }
     },
-    "reviewed_at": null,
-    "reviewer": null
+    "reviewed_at": "2026-07-23T10:34:22Z",
+    "reviewer": "Albert"
   },
   "artifacts": [
     {
@@ -245,8 +250,8 @@
     }
   },
   "timestamps": {
-    "admitted_at": null,
+    "admitted_at": "2026-07-23T10:34:22Z",
     "created_at": "2026-07-23T00:00:00Z",
-    "expires_at": null
+    "expires_at": "2026-10-21T10:34:22Z"
   }
 }
