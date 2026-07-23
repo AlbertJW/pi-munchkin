@@ -669,7 +669,8 @@ rather than pointing the model at machinery it cannot actually reach. This mecha
 (bash-mutation coverage, the subagent-tool-presence check, and a `plan-runner/subagent-only-block`
 telemetry event so a future round can see the block rate directly) was itself a same-session
 repair — the original cut only covered the three named mutation tools and was silently
-inert against a scripted `sed -i`.
+inert against a scripted `sed -i`. **Local round (`c25-35b`, n=3): `VERDICT: NEUTRAL`** — clean,
+authoritative, nothing broken by the mandatory-delegation enforcement on the current task set.
 
 **c26 — read deduplication (`READ_DEDUP=on`).** A `context` event transform, not a message
 mutation: when the exact same file content is read twice in a session, the second (and every
@@ -682,7 +683,8 @@ writing its own syntactically invalid test file — a genuine capability miss, n
 defect), and the fleet report returned `VERDICT: INCOMPLETE`, which at the time was read as
 "inconclusive" but is now understood to be *structural* to any remote endpoint (see the
 authoritative-verdict discussion two paragraphs below) rather than a property of this specific
-candidate or round.
+candidate or round. **Local round (`c26-35b`, n=3): `VERDICT: NEUTRAL`** — the authoritative
+re-run the exploratory result above was waiting on.
 
 **c27 — redundancy nudge (`CTX_REDUNDANCY_NUDGE=on`, `CTX_REDUNDANCY_PCT`, default 50).** Where
 c26 quietly fixes duplication, c27 tells the model about it: once `context-surface`'s passive
@@ -694,7 +696,7 @@ misses, spread across both arms on an unrelated edge case in the `parens` fixtur
 INCOMPLETE`. By this point in the session, three consecutive remote-box rounds (c28 below, c26,
 c27) had all landed `INCOMPLETE`, which is what motivated the pivot to local testing described
 below rather than continuing to spend box time on a verdict class that structurally cannot
-resolve.
+resolve. **Local round (`c27-35b`, n=3): `VERDICT: NEUTRAL`.**
 
 **c28 — teach-hints (`TEACH_HINTS=on`).** Three narrowly deterministic rules — a missing-command
 error, a module-not-found error, and a malformed-patch error — each of which, on a match, appends
@@ -727,7 +729,7 @@ in `ketch`'s `maxLength` drift) but never for an adopt/reject decision.
 corner-cutting (stubbed branches, suspiciously empty error handlers, and similar shapes) produces
 a short "possible shortcuts" steer naming up to three offending files, suppressed on any turn
 where the stricter parse-error check already fired (never stack two competing steers about the
-same edit in the same turn).
+same edit in the same turn). **Local round (`c29-35b`, n=3): `VERDICT: NEUTRAL`.**
 
 **c30 — context brief (`CONTEXT_BRIEF=on`, `CONTEXT_BRIEF_BYTES`, default 2048, clamped to
 256–16384).** A `before_agent_start` hook appending a compact, explicitly untrusted-data-framed
@@ -737,6 +739,7 @@ recomputed per turn. This is a port of an external "environment brief" concept, 
 through four adversarial passes before it shipped, on the theory that some of what a model
 otherwise spends several exploratory `read`/`ls`/`grep` turns discovering can instead be handed
 to it for free, cheaply, and without the KV-cache churn of a per-turn recomputation.
+**Local round (`c30-35b`, n=3): `VERDICT: NEUTRAL`.**
 
 **c31 — plan uncertainty (`PLAN_UNCERTAINTY=on`).** A port of the npcsh `loop_plan` pattern: a
 plan gains an optional `uncertainties[]` field, and once the model has declared one, execution is
@@ -749,7 +752,7 @@ never be allowed to then guess past it in the same breath. Tested end-to-end: th
 the expected steer, `/plan-go` is deterministically blocked while an uncertainty is outstanding,
 clearing the list with `[]` releases it, and the omission-safe reattach logic (shared with the
 plan-integrity machinery generally) preserves the field correctly across a rewrite that forgets to
-echo it back.
+echo it back. **Local round (`c31-35b`, n=3): `VERDICT: NEUTRAL`.**
 
 **c32 — commit-SHA guard (`PLAN_SHA_GUARD=on`).** A narrow, mechanical honesty check: whenever
 the model writes a commit SHA into a plan item's note or the run summary, the guard verifies with
@@ -758,7 +761,8 @@ catching confabulated provenance — a plausible-looking hash the model invented
 that came from a real `git commit` it ran. Tested: a fabricated SHA in a note reliably draws a
 steer; a genuine SHA passes silently; and, correctly, the guard fails *open* (does nothing) when
 the working directory is not a git repository at all, rather than raising a spurious complaint
-about a concept — commit provenance — that does not apply there.
+about a concept — commit provenance — that does not apply there. **Local round (`c32-35b`, n=3):
+`VERDICT: NEUTRAL`.**
 
 **c33 — subagent fork-by-default (`SUBAGENT_DEFAULT_MODE=fork`).** `vendor/pi-subagent`'s
 delegation-mode parser defaults an *unspecified* mode to `spawn` (a fresh, nearly empty context
@@ -776,7 +780,9 @@ other way, toward `spawn`-by-default plus explicitly self-contained tasks, would
 opposed hypotheses under the same roof. It is recorded here rather than deleted only because the
 KV-cache-reuse rationale it was built on remains a coherent, distinct idea that might warrant its
 own re-litigation later, on its own terms, separately from the direction the rest of this ledger
-has since taken.
+has since taken. Run anyway in the full local ledger sweep despite the above recommendation — cheap
+to include, and the data costs nothing to have: **local round (`c33-35b`, n=3):
+`VERDICT: NEUTRAL`.**
 
 **c34 — non-numeric plan-item guidance (`PLAN_ITEM_GUIDANCE_V2=on`).** The smallest candidate in
 the ledger by diff size and arguably the most carefully reasoned by rationale: the legacy planning
@@ -799,6 +805,7 @@ phrasing over elaborate or rare-word phrasing — rare words earn their keep onl
 disambiguate, never for register alone. Adding ornate wording to chase a hypothesis (register
 correlates with better compliance) that both our own instrument and the outside literature argue
 against would have been exactly the mistake the project's discipline exists to prevent.
+**Local round (`c34-35b`, n=3): `VERDICT: NEUTRAL`.**
 
 **c35 — bash output guard (`BASH_OUTPUT_GUARD=on`, `BASH_OUTPUT_MAX_CHARS`, default 8000).** The
 harness's `context-inlet-guard` has bounded oversized `read` calls since early in the project by
@@ -918,7 +925,9 @@ templates already use), and leaves every other role's description — `explorer`
 never mention fork mode at all — completely untouched. This candidate is deliberately the
 photographic negative of c33 above: where c33 would default the mode to fork, c36 argues, in
 every place the model is given advice at all, for the opposite. The two should never be armed in
-the same round.
+the same round. **Local round (`c36-35b`, n=3): `VERDICT: NEUTRAL`** — with the `subagent` tool
+genuinely present in the candidate arm this time (see the `real_gate.sh` fix below), so this is a
+real measurement, not a vacuous one.
 
 **c37 — delegate every plan item (`PLAN_DELEGATE_ALL=on`).** Where c25 mechanically forces only
 *edits* through a subagent, this candidate extends the same enforcement discipline to
@@ -962,10 +971,41 @@ up showing.
 
 Both candidates ship dark, register their thresholds in `configs/schema.json`, and their
 flag-off code paths are asserted byte-identical to the pre-existing behavior by dedicated tests —
-the same discipline every candidate in this ledger is held to. Neither has yet won, or even run, a
-gate round as of this writing; c37 in particular is the more direct test of the pivot's own
-central thesis and is the natural next round to fire, on the local daily driver, once the
-`INCOMPLETE`-versus-authoritative lesson from c28 and c35 above is applied from the outset rather
-than relearned.
+the same discipline every candidate in this ledger is held to.
+
+**A real measurement bug was caught and fixed before either pivot candidate could be tested
+meaningfully.** `real_gate.sh` only ever granted the `subagent` tool when `task=="t4"` or
+`PLAN_SUBAGENT_ONLY=1` — it never checked `PLAN_DELEGATE_ALL` or `SPAWN_DELEGATION`. c37's first
+attempt (remote, against LFM25) ran with no `subagent` tool at all, meaning every blocked call fell
+through to the "no subagent available, mark blocked and stop" path regardless of what the model
+would otherwise have done — the round measured nothing about the candidate, only the missing tool
+grant, compounded by LFM25's own severe instability that round. Fixed same-session: the tool-grant
+conditional now checks all three delegation flags. **Direct evidence of the fix working**: c37's
+subsequent local round confirmed `--tools read,edit,bash,subagent` on the candidate arm, matching
+c36's independently-verified grant on the same code path.
+
+**Local round (`c36-35b`, n=3): `VERDICT: NEUTRAL`** (above). **Local round (`c37-35b`, n=3):
+`VERDICT: NEUTRAL` — but 18/18 clean on both arms**, the standout result of the whole ledger:
+every single session succeeded under the "only `plan_write` and `subagent` allowed during
+execution" constraint, and `cand`'s tool-call counts ran markedly higher than `base`'s on the
+`bigdata` task specifically (34 and 43 calls vs. base's 16 and 16) — indirect but real evidence the
+delegation mechanism was actually engaging, not sitting inert. The direct compliance metric
+(`plan_runner_delegation.{blocked,delegated}`) wasn't yet wired into the eval row at the time this
+round ran — fixed immediately after (`context_telemetry.py` now extracts
+`plan-runner/delegate-all-{block,subagent}` the same way `bash-output-guard`'s `withheld` event
+was wired earlier), so the *next* c37 round will carry the precise ratio directly in the row instead
+of needing to infer engagement from tool-call counts.
+
+**Reading the whole ledger honestly**: every one of the thirteen candidates tested tonight —
+c25-c34 plus c36-c37 — came back `NEUTRAL`. That is the correct, expected shape of a clean
+do-no-harm gate at n=3 with nothing broken; it is explicitly *not* the same as "proven to work."
+The task set doing the grading (`parens`, `equil`, `bigdata`) is too easy and too small to give
+most of these mechanisms — mandatory delegation, uncertainty pauses, SHA verification, redundancy
+nudging — anything real to do; `calibrate.py`'s own discriminating-band logic (drop above 85% pass,
+drop below 20%, ideal 30-70%) is the formal version of exactly this critique, and none of these
+candidates has ever been measured against a task landing in that band *for the specific branch it
+touches*. That gap is the direct segue into the next phase of work: designing (and, where existing
+unadmitted fixtures already fit, hardening) task sets purpose-built to stress each of these
+mechanisms, described in a forthcoming section of this ledger once that work lands.
 
 *Companion: `LOCAL_LLM_HARNESS_RESEARCH.md` (the playbook + gap analysis this builds on).*

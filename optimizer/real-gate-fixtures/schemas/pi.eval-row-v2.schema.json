@@ -172,6 +172,15 @@
             "withheld": {"type": "integer", "minimum": 0},
             "cwd_escape_suspected": {"type": "integer", "minimum": 0}
           }
+        },
+        "plan_runner_delegation": {
+          "type": "object",
+          "required": ["blocked", "delegated"],
+          "additionalProperties": false,
+          "properties": {
+            "blocked": {"type": "integer", "minimum": 0},
+            "delegated": {"type": "integer", "minimum": 0}
+          }
         }
       },
       "additionalProperties": false

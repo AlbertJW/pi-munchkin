@@ -71,6 +71,9 @@ def aggregate(path, session_key, key=None):
     _, surface_events = exact_events(path, session_key, "surface-receipt", key)
     _, context_surfaces = exact_events(path, session_key, "context-surface", key)
     _, guard_events = exact_events(path, session_key, "bash-output-guard", key)
+    _, plan_events = exact_events(path, session_key, "plan-runner", key)
+    delegate_blocks = [e for e in plan_events if e.get("kind") == "delegate-all-block"]
+    delegate_subagents = [e for e in plan_events if e.get("kind") == "delegate-all-subagent"]
     harness_surface_sha256 = None
     if surface_events:
         candidate = surface_events[-1].get("sha256")
@@ -107,7 +110,7 @@ def aggregate(path, session_key, key=None):
         "authenticated": key is not None,
         "content_sha256": hashlib.sha256(raw).hexdigest(),
         "session_key": session_key,
-        "events": len(selected) + len(context_surfaces) + len(guard_events),
+        "events": len(selected) + len(context_surfaces) + len(guard_events) + len(delegate_blocks) + len(delegate_subagents),
         "harness_surface_sha256": harness_surface_sha256,
         "config": config,
         "compactions": {
@@ -160,6 +163,10 @@ def aggregate(path, session_key, key=None):
             "withheld": len(guard_events),
             "cwd_escape_suspected": sum(bool(e.get("cwd_escape_suspected")) for e in guard_events),
         },
+        "plan_runner_delegation": {
+            "blocked": len(delegate_blocks),
+            "delegated": len(delegate_subagents),
+        },
     }
 
 
@@ -178,6 +185,11 @@ def selftest():
         {"ts":"x","sk":"run-a","ext":"bash-output-guard","kind":"withheld","chars":9000,"max_chars":8000,"cwd_escape_suspected":True},
         {"ts":"x","sk":"run-a","ext":"bash-output-guard","kind":"withheld","chars":15000,"max_chars":8000,"cwd_escape_suspected":False},
         {"ts":"x","sk":"other","ext":"bash-output-guard","kind":"withheld","chars":9000,"max_chars":8000,"cwd_escape_suspected":True},
+        {"ts":"x","sk":"run-a","ext":"plan-runner","kind":"delegate-all-block","toolName":"read"},
+        {"ts":"x","sk":"run-a","ext":"plan-runner","kind":"delegate-all-block","toolName":"bash"},
+        {"ts":"x","sk":"run-a","ext":"plan-runner","kind":"delegate-all-subagent","agent":"executor","mode":"spawn"},
+        {"ts":"x","sk":"run-a","ext":"plan-runner","kind":"write","items":1},  # unrelated plan-runner kind — must not be counted
+        {"ts":"x","sk":"other","ext":"plan-runner","kind":"delegate-all-block","toolName":"edit"},
     ]
     with tempfile.TemporaryDirectory() as td:
         path = os.path.join(td, "events.jsonl")
@@ -191,7 +203,7 @@ def selftest():
         row = aggregate(path, "run-a", key)
         assert row["content_sha256"] == hashlib.sha256(content).hexdigest()
         assert row["schema"] == "pi.context-telemetry/v2"
-        assert row["events"] == 7 and row["config"]["enabled"] is False
+        assert row["events"] == 10 and row["config"]["enabled"] is False
         assert row["compactions"]["pi"] == 1 and row["compactions"]["overflow"] == 0
         assert row["watcher"]["completed"] == 1 and row["watcher"]["resume_required"] == 1
         assert row["harness_surface_sha256"] == "a" * 64
@@ -199,6 +211,8 @@ def selftest():
         assert row["surface"]["concentration"]["largest_message"]["mean"] == 0.6
         assert row["bash_output_guard"]["withheld"] == 2, "only run-a's two events, not the other session's"
         assert row["bash_output_guard"]["cwd_escape_suspected"] == 1
+        assert row["plan_runner_delegation"]["blocked"] == 2, "only run-a's delegate-all-block events, not other's edit or run-a's own write"
+        assert row["plan_runner_delegation"]["delegated"] == 1
         assert aggregate(os.path.join(td, "missing"), "run-a", key)["events"] == 0
         assert aggregate(os.path.join(td, "missing"), "run-a", key)["harness_surface_sha256"] is None
         assert not has_abort(path, "run-a", key)
@@ -240,6 +254,7 @@ def selftest():
         assert set(context_schema["properties"]["watcher"]["required"]) == set(row["watcher"])
         assert set(context_schema["properties"]["surface"]["required"]) == set(row["surface"])
         assert set(context_schema["properties"]["bash_output_guard"]["required"]) == set(row["bash_output_guard"])
+        assert set(context_schema["properties"]["plan_runner_delegation"]["required"]) == set(row["plan_runner_delegation"])
     print("context_telemetry selftest: OK (exact key; v2 surface aggregates; content sha256)")
 
 
