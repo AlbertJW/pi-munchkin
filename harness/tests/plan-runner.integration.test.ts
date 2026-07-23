@@ -869,3 +869,83 @@ test("c37: gates still run engine-side under the flag", async () => {
 		delete process.env.PLAN_DELEGATE_ALL;
 	}
 });
+
+test("c38: FORCE_PLAN_WRITE blocks the first mutation before any plan_write call, allows reads", async () => {
+	process.env.FORCE_PLAN_WRITE = "on";
+	try {
+		const fp = makeFakePi();
+		const mod = await import(`../extensions/plan-runner.ts?c38=${Date.now()}-${Math.random()}`);
+		mod.default(fp.pi as any);
+		const cwd = tmp();
+		const { ctx } = makeCtx(cwd);
+		// no /plan, no plan_write yet — a model reaching straight for an edit
+
+		const read = await fire(fp, "tool_call", { toolName: "read", input: { path: "x" } }, ctx);
+		assert.equal(read, undefined, "reads are never gated by this candidate");
+
+		const edit = await fire(fp, "tool_call", { toolName: "edit", input: {} }, ctx);
+		assert.equal(edit?.block, true);
+		assert.ok(edit.reason.includes("Call plan_write first"), edit.reason);
+
+		const bashMut = await fire(fp, "tool_call", { toolName: "bash", input: { command: "sed -i s/a/b/ file" } }, ctx);
+		assert.equal(bashMut?.block, true, "mutating bash blocked same as edit");
+
+		const bashRead = await fire(fp, "tool_call", { toolName: "bash", input: { command: "cat file" } }, ctx);
+		assert.equal(bashRead, undefined, "read-only bash not gated");
+	} finally {
+		delete process.env.FORCE_PLAN_WRITE;
+	}
+});
+
+test("c38: once plan_write has been called even once, later mutations are unaffected", async () => {
+	process.env.FORCE_PLAN_WRITE = "on";
+	try {
+		const fp = makeFakePi();
+		const mod = await import(`../extensions/plan-runner.ts?c38after=${Date.now()}-${Math.random()}`);
+		mod.default(fp.pi as any);
+		const cwd = tmp();
+		const { ctx } = makeCtx(cwd);
+		await callTool(fp, "plan_write", {
+			items: [{ title: "s", status: "pending" }], request: "r", summary: "s",
+		}, cwd);
+		const edit = await fire(fp, "tool_call", { toolName: "edit", input: {} }, ctx);
+		assert.equal(edit, undefined, "plan_write already happened — no block, this candidate never re-arms");
+	} finally {
+		delete process.env.FORCE_PLAN_WRITE;
+	}
+});
+
+test("c38 dark: flag off — the very first mutation proceeds with no plan_write required", async () => {
+	const fp = makeFakePi();
+	const mod = await import(`../extensions/plan-runner.ts?c38dark=${Date.now()}-${Math.random()}`);
+	mod.default(fp.pi as any);
+	const cwd = tmp();
+	const { ctx } = makeCtx(cwd);
+	const edit = await fire(fp, "tool_call", { toolName: "edit", input: {} }, ctx);
+	assert.equal(edit, undefined, "legacy behavior: no plan_write requirement when the flag is off");
+});
+
+test("c38: telemetry — force-plan-write-block recorded on the gated first mutation", async () => {
+	process.env.FORCE_PLAN_WRITE = "on";
+	const cwd = tmp();
+	const telemetry = join(cwd, "telemetry.jsonl");
+	const priorFile = process.env.TELEMETRY_FILE;
+	const priorSource = process.env.TELEMETRY_SOURCE;
+	process.env.TELEMETRY_FILE = telemetry;
+	process.env.TELEMETRY_SOURCE = "test";
+	try {
+		const fp = makeFakePi();
+		const mod = await import(`../extensions/plan-runner.ts?c38tel=${Date.now()}-${Math.random()}`);
+		mod.default(fp.pi as any);
+		const { ctx } = makeCtx(cwd);
+		await fire(fp, "tool_call", { toolName: "write", input: {} }, ctx);
+		const rows = readFileSync(telemetry, "utf8").trim().split("\n").map((line) => JSON.parse(line));
+		const block = rows.find((row) => row.ext === "plan-runner" && row.kind === "force-plan-write-block");
+		assert.ok(block, "force-plan-write-block recorded");
+		assert.equal(block.toolName, "write");
+	} finally {
+		delete process.env.FORCE_PLAN_WRITE;
+		if (priorFile === undefined) delete process.env.TELEMETRY_FILE; else process.env.TELEMETRY_FILE = priorFile;
+		if (priorSource === undefined) delete process.env.TELEMETRY_SOURCE; else process.env.TELEMETRY_SOURCE = priorSource;
+	}
+});

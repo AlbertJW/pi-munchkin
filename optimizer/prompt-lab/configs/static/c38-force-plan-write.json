@@ -1,0 +1,5 @@
+{
+  "name": "force-plan-write",
+  "prediction": "closes the c31 measurement gap: on tasks small enough that a model skips planning entirely, plan_write-gated mechanisms (c31's uncertainty pause included) never get a chance to fire -- measured directly, 0/6 sessions called plan_write at all in the first live c31 round against sv-ambiguous-spec. Blocks the FIRST mutation (edit/write/multiedit/mutating-bash) of a session until at least one plan_write call has happened; once state exists this never fires again, so a real, deliberately-tiny task pays a one-time plan_write detour instead of skipping planning outright. Watch plan-runner.force-plan-write-block: it should fire at most once per session (any more suggests the model isn't reliably recovering by calling plan_write after the block) and should co-occur with a genuine plan_write call recorded immediately after.",
+  "thresholds": { "FORCE_PLAN_WRITE": "on" }
+}

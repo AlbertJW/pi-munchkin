@@ -197,6 +197,10 @@
     "PLAN_DELEGATE_ALL": [
      "on",
      "off"
+    ],
+    "FORCE_PLAN_WRITE": [
+     "on",
+     "off"
     ]
    }
   },

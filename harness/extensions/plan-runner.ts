@@ -84,6 +84,13 @@ const PLAN_ITEM_GUIDANCE_V2 = process.env.PLAN_ITEM_GUIDANCE_V2 === "on";
 // executor work, recommend mode=spawn + an explicitly SELF-CONTAINED task —
 // each child starts with a small fresh context instead of a parent snapshot.
 const SPAWN_DELEGATION = process.env.SPAWN_DELEGATION === "on";
+// Dark candidate c38: every mechanism gated behind a plan_write call (c31's
+// uncertainty pause included) has no surface to fire on when a model skips
+// planning entirely — measured directly: 0/6 sessions called plan_write at
+// all in the first live c31 round against sv-ambiguous-spec. Forces the
+// FIRST plan_write call before any mutation; once state exists this never
+// fires again, so re-planning/updating later is unaffected.
+const FORCE_PLAN_WRITE = process.env.FORCE_PLAN_WRITE === "on";
 
 type ItemStatus = "pending" | "in_progress" | "done" | "blocked";
 type Phase = "planned" | "executing";
@@ -1187,6 +1194,27 @@ export default function (pi: ExtensionAPI) {
 				reason:
 					"failure_class=plan_mode_violation. PLAN phase — no edits. Finish the plan (plan_write), end your turn. /plan-go starts execution.",
 			};
+		}
+		// c38 FORCE_PLAN_WRITE: checked before c37/c25 — those key off
+		// state?.phase === "executing", which can't be true before the first
+		// plan_write anyway, so ordering doesn't change their behavior; this
+		// just gives the earliest, most specific reason when no plan exists yet.
+		if (FORCE_PLAN_WRITE) {
+			const isMutation =
+				PLAN_MUTATION_TOOLS.has(event.toolName) ||
+				(event.toolName === "bash" && classifyBashCommand(String((event.input as Record<string, unknown> | undefined)?.command ?? "")).mutates);
+			if (isMutation) {
+				const state = await readState(ctx.cwd);
+				if (!state) {
+					rememberModel(ctx);
+					planEvent("force-plan-write-block", `no-plan-${actionId()}`, { toolName: event.toolName });
+					return {
+						block: true,
+						reason:
+							"failure_class=plan_mode_violation. Call plan_write first — write at least a one-item plan before making any edits. Then retry this call.",
+					};
+				}
+			}
 		}
 		// c37 PLAN_DELEGATE_ALL: thin-orchestrator enforcement. Checked BEFORE
 		// PLAN_SUBAGENT_ONLY — its blocked set is a strict superset of c25's, so

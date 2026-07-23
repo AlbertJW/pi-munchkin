@@ -36,6 +36,7 @@ export const EVENT_CATALOG = {
 	"plan-runner/subagent-only-block": { toolName: "string" },
 	"plan-runner/delegate-all-block": { toolName: "string" },
 	"plan-runner/delegate-all-subagent": { agent: "string", mode: "string" },
+	"plan-runner/force-plan-write-block": { toolName: "string" },
 	"plan-runner/write": { items: "number", newly_done: "number", rewrite: "boolean", declared_dependencies: "number", unmet_dependencies: "number", dependency_compliant: "boolean", context_tokens: ["number", "null"] },
 	"plan-runner/uncertainty-hold": { count: "number", gate: "string" },
 	"plan-runner/sha-guard": { checked: "number", missing: "number" },
