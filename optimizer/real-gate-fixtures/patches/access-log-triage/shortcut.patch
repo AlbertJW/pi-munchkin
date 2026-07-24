@@ -1,0 +1,23 @@
+--- a/src/report.js
++++ b/src/report.js
+@@ -1,8 +1,16 @@
+ import { parseRecord } from './parseLog.js';
+ 
+-// TODO: build the access-log report. See docs/fields.md for the malformed
+-// reason codes -- malformed counts must be broken out per code, and every
+-// input line must land in exactly one place (ok or malformed).
+ export function summarizeAccessLog(lines) {
+-  throw new Error('summarizeAccessLog not implemented');
++  const ok = [];
++  const malformed = {};
++  for (const line of lines) {
++    let rec;
++    try {
++      rec = parseRecord(line);
++    } catch (e) {}
++    if (!rec) continue;
++    if (rec.ok) ok.push(rec);
++    else malformed[rec.reason] = (malformed[rec.reason] || 0) + 1;
++  }
++  return { ok, malformed, total: lines.length };
+ }

@@ -1,0 +1,35 @@
+--- a/src/parseLog.js
++++ b/src/parseLog.js
+@@ -1,7 +1,12 @@
+ // parseRecord: decode one JSON-line from data/access.log. See docs/fields.md
+ // for the field layout and malformed reason codes.
+ export function parseRecord(line) {
+-  const obj = JSON.parse(line); // BUG: throws on invalid JSON; nothing catches it
++  let obj;
++  try {
++    obj = JSON.parse(line);
++  } catch {
++    return { ok: false, reason: 'invalid-json' };
++  }
+   if (typeof obj.status !== 'number' || !Number.isInteger(obj.status) || obj.status < 100 || obj.status > 599) {
+     return { ok: false, reason: 'bad-status' };
+   }
+--- a/src/report.js
++++ b/src/report.js
+@@ -1,8 +1,12 @@
+ import { parseRecord } from './parseLog.js';
+ 
+-// TODO: build the access-log report. See docs/fields.md for the malformed
+-// reason codes -- malformed counts must be broken out per code, and every
+-// input line must land in exactly one place (ok or malformed).
+ export function summarizeAccessLog(lines) {
+-  throw new Error('summarizeAccessLog not implemented');
++  const ok = [];
++  const malformed = {};
++  for (const line of lines) {
++    const rec = parseRecord(line);
++    if (rec.ok) ok.push(rec);
++    else malformed[rec.reason] = (malformed[rec.reason] || 0) + 1;
++  }
++  return { ok, malformed, total: lines.length };
+ }

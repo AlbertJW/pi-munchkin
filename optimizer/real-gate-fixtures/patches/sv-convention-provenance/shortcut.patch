@@ -1,0 +1,7 @@
+--- /dev/null
++++ b/src/handleTruncate.js
+@@ -0,0 +1,4 @@
++export function truncateHandle(text, maxLen) {
++  if (text.length <= maxLen) return text;
++  return text.slice(0, maxLen) + '…';
++}

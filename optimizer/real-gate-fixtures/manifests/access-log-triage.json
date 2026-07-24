@@ -1,0 +1,252 @@
+{
+  "admission": {
+    "approved": false,
+    "automated": {
+      "checked_at": "2026-07-24T12:41:14Z",
+      "hash_drift": [],
+      "passed": true,
+      "runs_per_state": 3,
+      "states": {
+        "gold_fail_to_pass": [
+          {
+            "output_tail": "",
+            "passed": true,
+            "returncode": 0
+          },
+          {
+            "output_tail": "",
+            "passed": true,
+            "returncode": 0
+          },
+          {
+            "output_tail": "",
+            "passed": true,
+            "returncode": 0
+          }
+        ],
+        "gold_pass_to_pass": [
+          {
+            "output_tail": "",
+            "passed": true,
+            "returncode": 0
+          },
+          {
+            "output_tail": "",
+            "passed": true,
+            "returncode": 0
+          },
+          {
+            "output_tail": "",
+            "passed": true,
+            "returncode": 0
+          }
+        ],
+        "mutant:shortcut": {
+          "fail_to_pass": [
+            {
+              "output_tail": "cess-log-triage-tf0dg0bs/work/test/fail-to-pass.test.js:60:10)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n      at Test.postRun (node:internal/test_runner/test:1522:19)\n      at Test.run (node:internal/test_runner/test:1447:12)\n      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7) {\n    generatedMessage: true,\n    code: 'ERR_ASSERTION',\n    actual: 4,\n    expected: 5,\n    operator: 'strictEqual',\n    diff: 'simple'\n  }\n",
+              "passed": false,
+              "returncode": 1
+            },
+            {
+              "output_tail": "cess-log-triage-xbktncto/work/test/fail-to-pass.test.js:60:10)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n      at Test.postRun (node:internal/test_runner/test:1522:19)\n      at Test.run (node:internal/test_runner/test:1447:12)\n      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7) {\n    generatedMessage: true,\n    code: 'ERR_ASSERTION',\n    actual: 4,\n    expected: 5,\n    operator: 'strictEqual',\n    diff: 'simple'\n  }\n",
+              "passed": false,
+              "returncode": 1
+            },
+            {
+              "output_tail": "cess-log-triage-djrn0ulj/work/test/fail-to-pass.test.js:60:10)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n      at Test.postRun (node:internal/test_runner/test:1522:19)\n      at Test.run (node:internal/test_runner/test:1447:12)\n      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7) {\n    generatedMessage: true,\n    code: 'ERR_ASSERTION',\n    actual: 4,\n    expected: 5,\n    operator: 'strictEqual',\n    diff: 'simple'\n  }\n",
+              "passed": false,
+              "returncode": 1
+            }
+          ],
+          "pass_to_pass": [
+            {
+              "output_tail": "",
+              "passed": true,
+              "returncode": 0
+            },
+            {
+              "output_tail": "",
+              "passed": true,
+              "returncode": 0
+            },
+            {
+              "output_tail": "",
+              "passed": true,
+              "returncode": 0
+            }
+          ]
+        },
+        "pristine_fail_to_pass": [
+          {
+            "output_tail": "ouzexi4/work/src/report.js:7:9)\n      at TestContext.<anonymous> (file:///private/var/folders/3r/nc7qhtpn56j7rt5nwg0rqw600000gn/T/pi-admit-access-log-triage-5ouzexi4/work/test/fail-to-pass.test.js:58:18)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n      at Test.postRun (node:internal/test_runner/test:1522:19)\n      at Test.run (node:internal/test_runner/test:1447:12)\n      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7)\n",
+            "passed": false,
+            "returncode": 1
+          },
+          {
+            "output_tail": "dl517rj/work/src/report.js:7:9)\n      at TestContext.<anonymous> (file:///private/var/folders/3r/nc7qhtpn56j7rt5nwg0rqw600000gn/T/pi-admit-access-log-triage-1dl517rj/work/test/fail-to-pass.test.js:58:18)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n      at Test.postRun (node:internal/test_runner/test:1522:19)\n      at Test.run (node:internal/test_runner/test:1447:12)\n      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7)\n",
+            "passed": false,
+            "returncode": 1
+          },
+          {
+            "output_tail": "ovyovdd/work/src/report.js:7:9)\n      at TestContext.<anonymous> (file:///private/var/folders/3r/nc7qhtpn56j7rt5nwg0rqw600000gn/T/pi-admit-access-log-triage-novyovdd/work/test/fail-to-pass.test.js:58:18)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n      at Test.postRun (node:internal/test_runner/test:1522:19)\n      at Test.run (node:internal/test_runner/test:1447:12)\n      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7)\n",
+            "passed": false,
+            "returncode": 1
+          }
+        ],
+        "pristine_pass_to_pass": [
+          {
+            "output_tail": "",
+            "passed": true,
+            "returncode": 0
+          },
+          {
+            "output_tail": "",
+            "passed": true,
+            "returncode": 0
+          },
+          {
+            "output_tail": "",
+            "passed": true,
+            "returncode": 0
+          }
+        ]
+      }
+    },
+    "reviewed_at": "",
+    "reviewer": ""
+  },
+  "artifacts": [
+    {
+      "path": "real-gate-fixtures/access-log-triage/package.json",
+      "sha256": "e40ce67f9651d4d5218b99561ab184bc5be8b76cd35523106875cf0cb390a69e"
+    },
+    {
+      "path": "real-gate-fixtures/access-log-triage/docs/fields.md",
+      "sha256": "f54455b8f854437cf63beac89f144e26001a1035990091f29f4c966b6d282158"
+    },
+    {
+      "path": "real-gate-fixtures/access-log-triage/data/access.log",
+      "sha256": "03241d6e2ecfc454ce3ab408242c84d5ae8947da09a5caf2bdf6450b7e8c5862"
+    },
+    {
+      "path": "real-gate-fixtures/access-log-triage/src/parseLog.js",
+      "sha256": "bf0790397559f521984e42499ac972b9580bcd4dd2618d37ea5b2bb0d843eed6"
+    },
+    {
+      "path": "real-gate-fixtures/access-log-triage/src/report.js",
+      "sha256": "651241c5174b69614c8a08e91235bef98eed24be5cb1dab0c11806e099dcbaff"
+    },
+    {
+      "path": "real-gate-fixtures/access-log-triage/test/visible.test.js",
+      "sha256": "3a0639b4058de5e8999ed783437b4bbde99bcd397881d8aea68e63d05bd98039"
+    },
+    {
+      "path": "real-gate-fixtures/hidden/access-log-triage.test.js",
+      "sha256": "5016f714bed4fbeafdee49a9d48e9786248ba21bea1cc31c4b95d26079558c5b"
+    },
+    {
+      "path": "real-gate-fixtures/patches/access-log-triage/gold.patch",
+      "sha256": "530e359f26f15e5adb28ec9b3445b01231867a5889c4a947facbc52c71330338"
+    },
+    {
+      "path": "real-gate-fixtures/patches/access-log-triage/shortcut.patch",
+      "sha256": "cec1659f56ba9e7ec4f7ca9fc236ba8fe7ce6952898e53f4362c83c0705813e1"
+    }
+  ],
+  "cohort_id": "2026-07",
+  "fixture": {
+    "root": "real-gate-fixtures/access-log-triage",
+    "stage_copy": []
+  },
+  "fixture_version": "2026-07.1",
+  "one_shot": {
+    "context_files": [
+      "docs/fields.md",
+      "data/access.log",
+      "src/parseLog.js",
+      "src/report.js",
+      "test/visible.test.js"
+    ],
+    "eligible": false,
+    "max_context_bytes": 49152
+  },
+  "patches": {
+    "gold": "real-gate-fixtures/patches/access-log-triage/gold.patch",
+    "shortcut_mutants": [
+      "real-gate-fixtures/patches/access-log-triage/shortcut.patch"
+    ]
+  },
+  "prompts": {
+    "canonical": {
+      "sha256": "31ad78b29aafc10323472bc111aacafc05c892f4cc6cfd68632ded85e2c06d28",
+      "text": "This repo processes an access log for a small internal dashboard. docs/fields.md is the\nauthoritative reference for the JSON-line format in data/access.log and the three ways a line can\nbe malformed (invalid-json, bad-status, bad-bytes) -- consult it, since both src files need to\nagree with it exactly. Two gaps: (1) src/parseLog.js's parseRecord(line) already validates status\nand bytes correctly, but a malformed (non-JSON) line currently throws instead of being classified\n-- fix it to return the right result per docs/fields.md instead of throwing. (2) src/report.js's\nsummarizeAccessLog(lines) is unimplemented -- build it using parseRecord: valid lines go in `ok`,\nand every malformed line must be counted under its exact reason code in `malformed` (one counter\nper code that occurs), with every input line landing in exactly one place. Return { ok, malformed,\ntotal }. Run node --test until all tests pass."
+    },
+    "perturbations": [
+      {
+        "approved": false,
+        "id": "equivalent-1",
+        "sha256": "c8e3a163c03a18e613d4b6d20b8d14c89e439504b6227f716b21bf54418c7bcf",
+        "text": "Complete the following repository task. Preserve existing behavior and verify the tests.\n\nThis repo processes an access log for a small internal dashboard. docs/fields.md is the\nauthoritative reference for the JSON-line format in data/access.log and the three ways a line can\nbe malformed (invalid-json, bad-status, bad-bytes) -- consult it, since both src files need to\nagree with it exactly. Two gaps: (1) src/parseLog.js's parseRecord(line) already validates status\nand bytes correctly, but a malformed (non-JSON) line currently throws instead of being classified\n-- fix it to return the right result per docs/fields.md instead of throwing. (2) src/report.js's\nsummarizeAccessLog(lines) is unimplemented -- build it using parseRecord: valid lines go in `ok`,\nand every malformed line must be counted under its exact reason code in `malformed` (one counter\nper code that occurs), with every input line landing in exactly one place. Return { ok, malformed,\ntotal }. Run node --test until all tests pass."
+      },
+      {
+        "approved": false,
+        "id": "equivalent-2",
+        "sha256": "0867f3bd0cf045cca8e10ab0ab0c4d1be1a87adb10b9f3e30eebd76fdd49a7fd",
+        "text": "Repository change request:\nThis repo processes an access log for a small internal dashboard. docs/fields.md is the\nauthoritative reference for the JSON-line format in data/access.log and the three ways a line can\nbe malformed (invalid-json, bad-status, bad-bytes) -- consult it, since both src files need to\nagree with it exactly. Two gaps: (1) src/parseLog.js's parseRecord(line) already validates status\nand bytes correctly, but a malformed (non-JSON) line currently throws instead of being classified\n-- fix it to return the right result per docs/fields.md instead of throwing. (2) src/report.js's\nsummarizeAccessLog(lines) is unimplemented -- build it using parseRecord: valid lines go in `ok`,\nand every malformed line must be counted under its exact reason code in `malformed` (one counter\nper code that occurs), with every input line landing in exactly one place. Return { ok, malformed,\ntotal }. Run node --test until all tests pass.\n\nUse the smallest correct change and confirm the test suite."
+      },
+      {
+        "approved": false,
+        "id": "equivalent-3",
+        "sha256": "b3df6c592e1c6c51d55650d3dac08c92ea7d3ed8592dca471e231a369a8372c6",
+        "text": "Please solve this task in the supplied checkout, retaining all stated edge cases:\n\nThis repo processes an access log for a small internal dashboard. docs/fields.md is the\nauthoritative reference for the JSON-line format in data/access.log and the three ways a line can\nbe malformed (invalid-json, bad-status, bad-bytes) -- consult it, since both src files need to\nagree with it exactly. Two gaps: (1) src/parseLog.js's parseRecord(line) already validates status\nand bytes correctly, but a malformed (non-JSON) line currently throws instead of being classified\n-- fix it to return the right result per docs/fields.md instead of throwing. (2) src/report.js's\nsummarizeAccessLog(lines) is unimplemented -- build it using parseRecord: valid lines go in `ok`,\nand every malformed line must be counted under its exact reason code in `malformed` (one counter\nper code that occurs), with every input line landing in exactly one place. Return { ok, malformed,\ntotal }. Run node --test until all tests pass."
+      }
+    ],
+    "semantic_group": "access-log-triage:2026-07.1"
+  },
+  "schema": "pi.fixture/v1",
+  "sufficiency": [
+    {
+      "assertion": "parseRecord returns {ok:false, reason:'invalid-json'} for malformed JSON (curated + fuzzed), never throws.",
+      "prompt_evidence": "a malformed (non-JSON) line currently throws instead of being classified\n-- fix it to return the right result per docs/fields.md instead of throwing"
+    },
+    {
+      "assertion": "summarizeAccessLog's malformed object breaks out counts per exact reason code that occurred.",
+      "prompt_evidence": "every malformed line must be counted under its exact reason code in `malformed` (one counter\nper code that occurs)"
+    },
+    {
+      "assertion": "Every input line lands in exactly one place (ok.length + sum(malformed) === total), none silently dropped.",
+      "prompt_evidence": "with every input line landing in exactly one place"
+    }
+  ],
+  "task_id": "access-log-triage",
+  "tests": {
+    "fail_to_pass": {
+      "command": [
+        "node",
+        "--test",
+        "test/fail-to-pass.test.js"
+      ],
+      "overlays": [
+        {
+          "dest": "test/fail-to-pass.test.js",
+          "source": "real-gate-fixtures/hidden/access-log-triage.test.js"
+        }
+      ],
+      "timeout_seconds": 60
+    },
+    "pass_to_pass": {
+      "command": [
+        "node",
+        "--test"
+      ],
+      "overlays": [],
+      "timeout_seconds": 60
+    }
+  },
+  "timestamps": {
+    "admitted_at": "",
+    "created_at": "2026-07-24T00:00:00Z",
+    "expires_at": ""
+  }
+}
