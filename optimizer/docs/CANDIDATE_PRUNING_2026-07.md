@@ -109,6 +109,42 @@ No `optimizer/real_gate.sh` change needed — `SUBAGENT_DEFAULT_MODE` never appe
 tool-grant logic. `harness/lib/telemetry-catalog.ts` needs no change either — c33 never emitted its
 own telemetry kind.
 
+## New fixtures, first data on a second model (2026-07-24, qwopus35-4b, all exploratory)
+
+Two new fixtures (`optimizer/real-gate-fixtures/{access-log-triage,sv-convention-provenance}/`),
+purpose-built and calibrated for the discriminating band (unlike `parens`/`equil`/`bigdata`'s
+frequent ceiling saturation), run locally against `qwopus35-4b` — the actual local-Mac 4B (not
+`qwopus35-4b-mtp`, which is a different, remote-box registry entry prior memory conflated with
+it; this was the first-ever local gate round against this exact model+provider combination). Both
+fixtures pass all 5 `fixture_admission.py` gates but are **not yet approved** — every row below is
+`--exploratory`/non-authoritative regardless of correctness, same as every other exploratory round
+in this ledger.
+
+**`access-log-triage`** (c26 READ_DEDUP + c27 CTX_REDUNDANCY_NUDGE + c29 MICRO_GATE_SLOP):
+- vs c29: base 1/3, cand 2/3.
+- vs c26: base 3/3 (SATURATED per `calibrate.py`), cand 1/3.
+- vs c27: base 3/3, cand 2/3.
+- Base arm across all three independent n=3 samples: 1/3, 3/3, 3/3 (7/9 aggregate, 78%) — high
+  variance at n=3 on this model; the first sample's 33% reading was likely an outlier, not the
+  fixture's true difficulty. Worth a deeper n=9+ run before trusting any single-round number here.
+
+**`sv-convention-provenance`** (c31 PLAN_UNCERTAINTY + c32 PLAN_SHA_GUARD):
+- vs c31: base 2/3, cand 2/3. The model called `plan_write` voluntarily in **all 3** cand
+  sessions (a first for this candidate — every prior c31 round, on both the 35B and this model's
+  earlier sanity check, got zero calls) but never once populated `uncertainties` — confirms c31's
+  own steering text, not voluntary planning, is the actual weak link, now on a second model too.
+- vs c32: base 1/3, cand 2/3. The model cited commit SHAs in 2/3 cand sessions — **the first time
+  all session** this has happened for c32 on any model/fixture. Directly verified against each
+  session's real `git log`: every cited SHA (`64c41c9`, `32c57c1`, `abcf651`, `e405805`) was a
+  genuine commit, not fabricated — `plan-runner/sha-guard` telemetry correctly stayed silent (no
+  violation to report). Real progress on getting the mechanism exercised at all, though this still
+  means the guard's actual *detection* capability (catching a genuinely fabricated SHA) remains
+  unproven — zero fabrication events observed anywhere in this ledger to date.
+
+**Next step, not done here**: get both fixtures through `fixture_admission.py approve` (needs
+Albert's sign-off) and run a proper authoritative round at higher n before any of this feeds into
+a real win/retire decision for c26/c27/c29/c31/c32.
+
 ## Summary of statuses
 
 - **1 standing removal recommendation** (c33 — already-opposed, no timeframe needed)
