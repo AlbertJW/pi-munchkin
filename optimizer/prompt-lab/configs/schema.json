@@ -78,7 +78,7 @@
   "thresholds": {
    "kind": "env",
    "safe": true,
-   "_note": "Loop-breaker / verify-gate knobs, emitted as env (live-overridable, no relaunch).",
+   "_note": "Loop-breaker / verify-gate knobs, emitted as env (live-overridable, no relaunch). NOTE: TRAJECTORY is grader-integrity infrastructure (enables trajectory_check.py verification), not an A/B candidate -- it shares this bucket for env-plumbing convenience only; see optimizer/docs/HARNESS_SELF_IMPROVEMENT.md.",
    "fields": {
     "LB_REPEAT_T1": [
      2,

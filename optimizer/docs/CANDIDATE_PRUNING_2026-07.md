@@ -70,6 +70,45 @@ carry.
 | **c38-force-plan-write** (`force-plan-write`) | Cleanly measured post-fix (2026-07-23, `c31-c38-v3` combo): fully working — forces `plan_write` cleanly (4/2/3 successful calls across 3 reps, zero errors, zero retry-looping) | Win a discriminating round by 2026-09-03 or retire | Working as designed; c31's own steering text (not c38's forcing mechanism) is the actual weak link — see `HARNESS_SELF_IMPROVEMENT.md`. Also the natural next dependency for c25/c39 and c37/c39 (see those rows) |
 | **c39-plan-tool-go** (`plan-tool-go`, new 2026-07-24) | `NEUTRAL`, 18/18 standalone (`c39-sanity`) — near behavior-neutral as its own prediction expected. Gives the model a `plan_go` **tool** to reach `phase==="executing"` itself, closing the architecture gap that made c25/c37 structurally unmeasurable under `real_gate.sh`'s one-shot `pi -p` invocation (no slash-command dispatch). The fix is proven correct end-to-end by a dedicated unit test (`plan-runner.integration.test.ts`, "plan_go unlocks PLAN_SUBAGENT_ONLY's block... pure tool-only session, no slash commands") — but live combo rounds (`c25-c39-combo`, `c37-c39-combo`) show zero `plan_write` calls, so the newly-open activation path was never exercised in practice on this task set | Win a discriminating round by 2026-09-03 or retire, but really gated on the c25/c37+c38 three-way combo actually getting built first | Standalone tool addition, dark by default (registration itself is the gate — zero surface when off); no engine-owned dispatch (model alone decides to call it) |
 
+## First retirement dry-run: c33-subagent-fork-default (PROPOSED, awaiting sign-off)
+
+Per `optimizer/docs/adr/0006-candidate-graduation-and-retirement-playbook.md`'s retirement
+checklist, applied here as its first real exercise — no dark candidate registered in this doc's
+roster has ever actually been retired, so this is deliberately the lowest-controversy candidate to
+prove the mechanics on first. **Nothing below has been executed.** This is the exact, reviewable
+diff — present for Albert's explicit sign-off before any of it lands.
+
+1. **Delete** `optimizer/prompt-lab/configs/static/c33-subagent-fork-default.json` (the whole
+   5-line file).
+2. **Remove** the `"SUBAGENT_DEFAULT_MODE": ["spawn", "fork"]` entry from
+   `optimizer/prompt-lab/configs/schema.json`'s `thresholds.fields` (currently lines 181-184).
+3. **Collapse the gated branch** in `harness/vendor/pi-subagent/types.ts:14-21`'s
+   `parseDelegationMode` — this file is core subagent infrastructure, not c33-dedicated, so only
+   the `if (raw === undefined) { ... }` body changes, from:
+   ```ts
+   if (raw === undefined) {
+     // Dark candidate c33 (SUBAGENT_DEFAULT_MODE=fork): ...
+     return process.env.SUBAGENT_DEFAULT_MODE === "fork" ? "fork" : DEFAULT_DELEGATION_MODE;
+   }
+   ```
+   to:
+   ```ts
+   if (raw === undefined) {
+     return DEFAULT_DELEGATION_MODE;
+   }
+   ```
+4. **Delete** the entire dedicated test at `harness/tests/subagent-hardening.test.ts:29-48`
+   (`test("c33: SUBAGENT_DEFAULT_MODE=fork flips the default...")`) — every assertion in it exists
+   solely to test the flag being removed in step 3.
+5. **Update `README.md`**: remove the `SUBAGENT_DEFAULT_MODE=fork` row (currently line 161) from
+   its dark-candidate table.
+6. **Update this doc**: remove the c33 row from "The roster" table above and its count from
+   "Summary of statuses" below, once the deletion actually lands.
+
+No `optimizer/real_gate.sh` change needed — `SUBAGENT_DEFAULT_MODE` never appears in that file's
+tool-grant logic. `harness/lib/telemetry-catalog.ts` needs no change either — c33 never emitted its
+own telemetry kind.
+
 ## Summary of statuses
 
 - **1 standing removal recommendation** (c33 — already-opposed, no timeframe needed)

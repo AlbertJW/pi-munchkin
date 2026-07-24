@@ -46,6 +46,10 @@ export function thresh(name: string, cloudDef: number, localDef: number, isLocal
 }
 
 const MIN_REASON_LEN = envInt("LB_MIN_REASON_LEN", 40);
+// Deployment/ops scope knob, not an A/B candidate -- deliberately absent from
+// schema.json's thresholds.fields (real_gate.sh's static configs test WHETHER a
+// mechanism helps; this only decides WHERE loop-breaker runs at all). Set
+// directly in a session's env, not via a candidate config.
 const LOCAL_ONLY = process.env.LB_LOCAL_ONLY === "1";
 // Tier-3 action. Default "abort" — gracefully stop the looping run (return to idle,
 // pi stays alive, the outer ralph/gate or the user takes over). "shutdown" kills pi;
