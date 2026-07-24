@@ -17,7 +17,7 @@ import fixture_admission as admission
 
 def test_admission_catalog():
     manifests = sorted(admission.MANIFESTS.glob("*.json"))
-    assert len(manifests) == 19, len(manifests)
+    assert len(manifests) == 25, len(manifests)
     for path in manifests:
         manifest = json.loads(path.read_text())
         admission.validate_contract(manifest)

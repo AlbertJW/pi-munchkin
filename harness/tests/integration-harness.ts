@@ -15,6 +15,8 @@ export function makeFakePi() {
 	const deliveries: Array<{ text: string; deliverAs: unknown }> = [];
 	const customDeliveries: Array<{ message: unknown; triggerTurn: unknown; deliverAs: unknown }> = [];
 	const entries: Array<{ type: string; data: unknown }> = [];
+	const busHandlers = new Map<string, Set<(data: unknown) => void>>();
+	let activeTools: string[] = [];
 	const pi = {
 		registerTool: (t: any) => tools.set(t.name, t),
 		registerCommand: (name: string, def: any) => commands.set(name, def),
@@ -33,10 +35,32 @@ export function makeFakePi() {
 		sendMessage: (message: unknown, opts?: { triggerTurn?: unknown; deliverAs?: unknown }) => {
 			customDeliveries.push({ message, triggerTurn: opts?.triggerTurn, deliverAs: opts?.deliverAs });
 		},
-		getActiveTools: () => [] as string[],
+		getActiveTools: () => activeTools,
+		setActiveTools: (names: string[]) => { activeTools = [...names]; },
+		getAllTools: () => [...tools.values()].map((tool) => ({
+			name: tool.name,
+			description: tool.description ?? "",
+			sourceInfo: tool.sourceInfo ?? { source: "test", path: "test" },
+		})),
+		getCommands: () => [...commands.entries()].map(([name, command]) => ({
+			name,
+			description: command.description ?? "",
+			sourceInfo: { source: "test", path: "test" },
+		})),
+		events: {
+			emit: (channel: string, data: unknown) => {
+				for (const handler of busHandlers.get(channel) ?? []) handler(data);
+			},
+			on: (channel: string, handler: (data: unknown) => void) => {
+				const current = busHandlers.get(channel) ?? new Set();
+				current.add(handler);
+				busHandlers.set(channel, current);
+				return () => current.delete(handler);
+			},
+		},
 		appendEntry: (type: string, data: unknown) => entries.push({ type, data }),
 	};
-	return { pi, tools, commands, handlers, sent, deliveries, customDeliveries, entries };
+	return { pi, tools, commands, handlers, sent, deliveries, customDeliveries, entries, busHandlers };
 }
 
 export function makeCtx(cwd: string) {

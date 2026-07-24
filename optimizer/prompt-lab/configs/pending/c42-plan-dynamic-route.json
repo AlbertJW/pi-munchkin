@@ -1,0 +1,9 @@
+{
+  "name": "c42-plan-dynamic-route",
+  "prediction": "Model-owned legal route selection with capability refresh, lexicographic alternatives, anomaly checkpoints, backtracking, and stale cascades improves recovery on jump-to-unblock and backtrack-on-reveal without route churn. Falsifier: legal recovery does not rise, churn/blocks rise materially, or the scheduler dispatches work itself.",
+  "thresholds": {
+    "PLAN_SYNTHESIS_V1": "on",
+    "PLAN_TDD_EVIDENCE": "on",
+    "PLAN_DYNAMIC_ROUTE": "on"
+  }
+}

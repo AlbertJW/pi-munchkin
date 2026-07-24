@@ -205,6 +205,27 @@
     "PLAN_TOOL_GO": [
      "on",
      "off"
+    ],
+    "PLAN_SYNTHESIS_V1": [
+     "on",
+     "off"
+    ],
+    "PLAN_TDD_EVIDENCE": [
+     "on",
+     "off"
+    ],
+    "PLAN_DYNAMIC_ROUTE": [
+     "on",
+     "off"
+    ],
+    "PLAN_PLANNOTATOR_BRIDGE": [
+     "on",
+     "off"
+    ],
+    "PLAN_STEP_CONTEXT": [
+     "off",
+     "current",
+     "spawn"
     ]
    }
   },

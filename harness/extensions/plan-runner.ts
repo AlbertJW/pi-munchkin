@@ -1,4 +1,5 @@
 import { appendFile, mkdir, readFile, rename, stat, writeFile } from "node:fs/promises";
+import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { homedir } from "node:os";
 import { createHash, randomUUID } from "node:crypto";
@@ -11,6 +12,7 @@ import { nextReplanStreak, parseTodoLine } from "../lib/plan-progress.ts";
 import { processWriterMarker } from "../lib/process-writer.ts";
 import { steerText } from "../lib/steer-texts.ts";
 import { record } from "../lib/telemetry.ts";
+import { registerPlanV4 } from "../lib/plan-v4-runtime.ts";
 
 // plan-runner v3 — model-owned TODO list (Claude Code TodoWrite pattern).
 // One tool (plan_write) rewrites the whole list each call: re-planning,
@@ -101,6 +103,28 @@ const FORCE_PLAN_WRITE = process.env.FORCE_PLAN_WRITE === "on";
 // activate under measurement. This is the activation path, not a mechanism
 // of its own; PLAN_TOOL_GO alone should be near behavior-neutral.
 const PLAN_TOOL_GO = process.env.PLAN_TOOL_GO === "on";
+// Dark candidate c40: new plans use capability-aware reflection and schema-v4
+// artifacts. Flag-off retains the complete v3 registration path below.
+const PLAN_SYNTHESIS_V1 = process.env.PLAN_SYNTHESIS_V1 === "on";
+
+export function usePlanV4Runtime(cwd: string, synthesisEnabled: boolean): boolean {
+	if (!synthesisEnabled) return false;
+	try {
+		const raw = JSON.parse(readFileSync(join(cwd, ".pi", "plan-state.json"), "utf8"));
+		// Enabling c40 may resume v4, but it never migrates an older canonical
+		// plan. Existing v2/v3 state remains on the legacy reader/writer path.
+		if (raw?.schema_version === 4) return true;
+		if (Number.isInteger(raw?.schema_version)) return false;
+	} catch {
+		// A missing state is not enough to discard a legacy TODO projection.
+	}
+	try {
+		if (/^- \[[ xX]\]/m.test(readFileSync(join(cwd, ".pi", "TODO.md"), "utf8"))) return false;
+	} catch {
+		// No legacy artifacts: a subsequent /plan may create schema v4.
+	}
+	return true;
+}
 
 type ItemStatus = "pending" | "in_progress" | "done" | "blocked";
 type Phase = "planned" | "executing";
@@ -1105,6 +1129,10 @@ async function traceCommand(args: string, ctx: { cwd: string; ui: { notify(m: st
 // ---------- registration ----------
 
 export default function (pi: ExtensionAPI) {
+	if (usePlanV4Runtime(process.cwd(), PLAN_SYNTHESIS_V1)) {
+		registerPlanV4(pi);
+		return;
+	}
 	api = pi; // let the module-scope plan_write tool run shell gates via pi.exec
 
 	// Crash/abort resume: a plan-state file left by ANOTHER process with open

@@ -24,6 +24,9 @@ test("every literal telemetry emission is represented in the event catalog", () 
 	assert.deepEqual([...missing], []);
 	assert.ok(catalogHas("micro-gate", "passed"));
 	assert.ok(catalogHas("micro-gate", "skipped"));
+	for (const kind of ["reflection", "v4-write", "route", "tdd", "capability-refresh", "review", "step-context"]) {
+		assert.ok(catalogHas("plan-runner", kind), `missing plan-runner/${kind}`);
+	}
 });
 
 test("catalog rejects unknown kinds, fields, and invalid field types", () => {
