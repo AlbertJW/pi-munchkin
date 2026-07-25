@@ -592,6 +592,7 @@ def selftest():
             "usage": {"source": "server", "exact": True, "input_tokens": 10,
                       "output_tokens": 5, "output_chars": 20},
             "status": "complete",
+            "exposure": {"mode": "configuration", "status": "control", "target_count": 0, "counts": {}},
             "trajectory": _traj(),
             "context": _ctx(),
         }

@@ -10,6 +10,9 @@ Usage:  config.py --selftest        # no network, no GPU
 """
 import hashlib, json, os, re, sys
 
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from exposure import validate_spec
+
 LAB = os.path.dirname(os.path.abspath(__file__))
 SCHEMA = os.path.join(LAB, "configs", "schema.json")
 APPLIED = os.path.join(LAB, "configs", "applied")
@@ -20,6 +23,18 @@ OPTILLM = "http://127.0.0.1:8000"
 def load_schema():
     with open(SCHEMA) as f:
         return json.load(f)
+
+def validate_config(config):
+    """Validate the config envelope, including optional mechanism exposure."""
+    if not isinstance(config, dict):
+        raise ValueError("config must be an object")
+    allowed = {"name", "prediction", "prompt_variant", "format", "scaffold", "optillm",
+               "decoding", "thresholds", "messages", "gov_file", "gov_append", "exposure"}
+    unknown = set(config) - allowed
+    if unknown:
+        raise ValueError(f"config contains unsupported top-level key(s): {', '.join(sorted(unknown))}")
+    validate_spec(config.get("exposure"))
+    return config
 
 # ---------- prompt rendering ----------
 
@@ -74,6 +89,7 @@ def render_prompt(config, base_text=None):
 # ---------- env + endpoint ----------
 
 def config_env(config):
+    validate_config(config)
     schema = load_schema()["dimensions"]
     allowed = set(schema["decoding"]["fields"]) | set(schema["thresholds"]["fields"]) | set(schema["messages"]["fields"])
     env = {}
@@ -105,6 +121,7 @@ def label(config):
 
 def apply(config, base_text=None, out_dir=APPLIED):
     """-> {prompt_file, env, endpoint, label}. Deterministic: same config -> same output."""
+    validate_config(config)
     text = render_prompt(config, base_text)
     os.makedirs(out_dir, exist_ok=True)
     path = os.path.join(out_dir, label(config) + ".md")

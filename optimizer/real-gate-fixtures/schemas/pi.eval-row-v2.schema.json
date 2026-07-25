@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "pi.eval-row/v2",
   "type": "object",
-  "required": ["schema", "task", "model", "arm", "repetition", "score", "split", "run", "fixture", "authoritative", "prompt", "serving", "usage", "status"],
+  "required": ["schema", "task", "model", "arm", "repetition", "score", "split", "run", "fixture", "authoritative", "prompt", "serving", "usage", "status", "exposure"],
   "properties": {
     "schema": {"const": "pi.eval-row/v2"},
     "task": {"type": "string"},
@@ -51,6 +51,17 @@
       "properties": {
         "manifest_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
         "cell": {"type": "string", "minLength": 1}
+      }
+    },
+    "exposure": {
+      "type": "object",
+      "required": ["mode", "status", "target_count", "counts"],
+      "additionalProperties": false,
+      "properties": {
+        "mode": {"enum": ["configuration", "telemetry"]},
+        "status": {"enum": ["control", "targeted", "engaged_only", "unexposed"]},
+        "target_count": {"type": "integer", "minimum": 0},
+        "counts": {"type": "object", "additionalProperties": {"type": "integer", "minimum": 0}}
       }
     },
     "harness": {

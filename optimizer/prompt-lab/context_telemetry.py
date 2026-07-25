@@ -66,7 +66,26 @@ def has_abort(path, session_key, key=None):
     return False
 
 
-def aggregate(path, session_key, key=None):
+def exposure_counts(path, session_key, event_keys, key=None):
+    """Count only declared ext/kind pairs for one authenticated session."""
+    wanted = {event for event in event_keys if isinstance(event, str) and "/" in event}
+    counts = {event: 0 for event in sorted(wanted)}
+    raw = _read_raw(path)
+    for number, line in enumerate(raw.splitlines(), 1):
+        if not line.strip():
+            continue
+        event = _decode_line(line, number, key)
+        if key is not None and event.get("schema") == "pi.harness-event/v2" and event.get("source") != "gate":
+            raise ValueError(f"non-gate telemetry source in authoritative stream at line {number}")
+        if event.get("sk") != session_key:
+            continue
+        name = f"{event.get('ext', '')}/{event.get('kind', '')}"
+        if name in counts:
+            counts[name] += 1
+    return counts
+
+
+def aggregate(path, session_key, key=None, exposure_events=None):
     raw, selected = exact_events(path, session_key, "context-watcher", key)
     _, surface_events = exact_events(path, session_key, "surface-receipt", key)
     _, context_surfaces = exact_events(path, session_key, "context-surface", key)
@@ -154,7 +173,7 @@ def aggregate(path, session_key, key=None):
     def count_status(events, status):
         return sum(event.get("status") == status for event in events)
 
-    return {
+    result = {
         "schema": "pi.context-telemetry/v2",
         "authenticated": key is not None,
         "content_sha256": hashlib.sha256(raw).hexdigest(),
@@ -276,6 +295,9 @@ def aggregate(path, session_key, key=None):
             },
         },
     }
+    if exposure_events:
+        result["exposure"] = exposure_counts(path, session_key, exposure_events, key)
+    return result
 
 
 def selftest():
@@ -338,6 +360,8 @@ def selftest():
         assert row["plan_runner_v4"]["routing"]["stale_revalidated"] == 1
         assert row["plan_runner_v4"]["tdd"]["compliant_steps"] == 1
         assert row["plan_runner_v4"]["step_context"]["child_input"] == 20
+        exposure = exposure_counts(path, "run-a", ["plan-runner/route", "fake/event"], key)
+        assert exposure["plan-runner/route"] == 1 and exposure["fake/event"] == 0
         assert aggregate(os.path.join(td, "missing"), "run-a", key)["events"] == 0
         assert aggregate(os.path.join(td, "missing"), "run-a", key)["harness_surface_sha256"] is None
         assert not has_abort(path, "run-a", key)
@@ -391,6 +415,7 @@ def main():
     parser.add_argument("--selftest", action="store_true")
     parser.add_argument("--has-abort", action="store_true")
     parser.add_argument("--key-stdin", action="store_true")
+    parser.add_argument("--exposure-event", action="append", default=[])
     args = parser.parse_args()
     if args.selftest:
         selftest()
@@ -402,7 +427,7 @@ def main():
         parser.error("--key-stdin requires at least 32 key bytes")
     if args.has_abort:
         raise SystemExit(0 if has_abort(args.telemetry_file, args.session_key, key) else 3)
-    print(json.dumps(aggregate(args.telemetry_file, args.session_key, key), sort_keys=True, separators=(",", ":")))
+    print(json.dumps(aggregate(args.telemetry_file, args.session_key, key, args.exposure_event), sort_keys=True, separators=(",", ":")))
 
 
 if __name__ == "__main__":

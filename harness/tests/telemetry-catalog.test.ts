@@ -35,3 +35,8 @@ test("catalog rejects unknown kinds, fields, and invalid field types", () => {
 	assert.match(validateCatalogDetail("verify-gate", "steer", { fires: "one" })[0], /expected number/);
 	assert.ok(Object.keys(EVENT_CATALOG).length >= 40, "catalog covers the complete extension surface");
 });
+
+test("machine-readable exposure catalog stays in lockstep with TypeScript catalog", () => {
+	const mirror = JSON.parse(readFileSync(join(import.meta.dirname, "..", "lib", "telemetry-event-catalog.json"), "utf8"));
+	assert.deepEqual(new Set(mirror.events), new Set(Object.keys(EVENT_CATALOG)));
+});
