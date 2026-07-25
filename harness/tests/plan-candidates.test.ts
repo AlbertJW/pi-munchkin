@@ -7,9 +7,13 @@ import { usePlanV4Runtime } from "../extensions/plan-runner.ts";
 
 const root = new URL("../../optimizer/prompt-lab/configs/", import.meta.url);
 const schema = JSON.parse(readFileSync(new URL("schema.json", root), "utf8"));
-const load = (name: string) => JSON.parse(readFileSync(new URL(`pending/${name}.json`, root), "utf8"));
+const promoted = new Set(["c40-plan-synthesis-v1"]);
+const load = (name: string) => JSON.parse(readFileSync(new URL(
+	`${promoted.has(name) ? "static" : "pending"}/${name}.json`,
+	root,
+), "utf8"));
 
-test("c40-c45 flags are schema-registered but configs remain outside the live roster during the sweep", () => {
+test("c40-c45 flags are schema-registered and only explicitly promoted configs enter the static roster", () => {
 	const fields = schema.dimensions.thresholds.fields;
 	for (const key of [
 		"PLAN_SYNTHESIS_V1",
@@ -28,7 +32,8 @@ test("c40-c45 flags are schema-registered but configs remain outside the live ro
 		"c44-plan-context-current",
 		"c45-plan-context-spawn",
 	]) {
-		assert.equal(existsSync(new URL(`static/${name}.json`, root)), false, `${name} must not join the active roster mid-sweep`);
+		assert.equal(existsSync(new URL(`static/${name}.json`, root)), promoted.has(name), `${name} roster location drifted`);
+		assert.equal(existsSync(new URL(`pending/${name}.json`, root)), !promoted.has(name), `${name} pending location drifted`);
 		assert.ok(load(name).prediction.includes("Falsifier"), `${name} has an explicit falsifier`);
 	}
 });

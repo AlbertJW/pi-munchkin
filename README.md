@@ -161,6 +161,7 @@ tracked in the self-improvement ledger rather than repeated here:
 | `SUBAGENT_DEFAULT_MODE=fork` | default an unspecified delegation to a full-context fork instead of a fresh spawn | **now philosophically opposed to `SPAWN_DELEGATION` below — do not arm both** |
 | `SPAWN_DELEGATION=on` | recommend `mode=spawn` + a self-contained task everywhere the harness previously suggested `mode=fork` | built; awaiting a gate round |
 | `PLAN_DELEGATE_ALL=on` | during execution, only `plan_write` and `subagent` remain callable directly — everything else is blocked and routed to a role-matched fresh subagent | built; the most direct test of the "many small contexts" thesis; awaiting a gate round |
+| `PLAN_SYNTHESIS_V1=on` | use capability snapshots, bounded structured reflection, requirement coverage, and schema-v4 micro-plan artifacts for newly created plans; existing v3 plans stay on the legacy path | c40, dark and unmeasured; gate grants `plan_reflect`, `plan_write`, and `plan_go` consistently |
 
 ### Platform and security notes
 
