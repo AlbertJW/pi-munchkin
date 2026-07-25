@@ -1098,4 +1098,34 @@ all; c25 and c37 will very likely need the same. Not built this session — a th
 `PLAN_SUBAGENT_ONLY`+`PLAN_TOOL_GO`+`FORCE_PLAN_WRITE` (and the c37 equivalent) combo is the
 obvious next step, flagged for a future session rather than built unprompted here.
 
+## Reflective planner and adaptive routing candidates (2026-07-25)
+
+The reserved c40-c45 range now contains one dark, composable planner family rather than six
+unrelated prompt variants:
+
+- **c40 `PLAN_SYNTHESIS_V1`** adds a compact capability inventory, bounded structured reflection,
+  schema-v4 plan state, coverage validation, and durable micro-step plan files.
+- **c41 `PLAN_TDD_EVIDENCE`** observes active-step test calls and requires a matching failed RED
+  receipt before a successful GREEN receipt may complete a behavior step.
+- **c42 `PLAN_DYNAMIC_ROUTE`** adds partial-order eligibility, model-selected legal jumps,
+  checkpointing, backtracking, transitive stale-dependent invalidation, and bounded route churn.
+- **c43 `PLAN_PLANNOTATOR_BRIDGE`** is an explicit, optional asynchronous review bridge. It does
+  not install or import Plannotator and remains off in headless gate profiles.
+- **c44 `PLAN_STEP_CONTEXT=current`** composes c40+c41+c42 with parent-context execution.
+- **c45 `PLAN_STEP_CONTEXT=spawn`** uses the identical core but requires one explicit
+  `subagent(executor, ..., mode=spawn)` call and blocks parent mutation while that child step is
+  active.
+
+All six candidates remain **dark, unadopted, and unmeasured**. Their static configs include
+hypotheses and falsifiers; the real gate admits their flags and records content-free
+`plan_runner_v4` metrics, including reflection, coverage, RED/GREEN, routing, stale cascades,
+review state, and child receipts. c45 additionally requires the `subagent` tool in candidate
+admission and tool-consistency checks.
+
+Five deterministic scenario definitions exist for capability fit, jump-to-unblock,
+backtrack-on-reveal, TDD trajectory, and context isolation. They are harness test fixtures only:
+they have not been admitted as authoritative real-gate tasks and must not be represented as live
+evidence. Promotion, Plannotator installation, live-default changes, and retirement all remain
+separate human decisions. Existing schema-v3 plans continue on their legacy execution path.
+
 *Companion: `LOCAL_LLM_HARNESS_RESEARCH.md` (the playbook + gap analysis this builds on).*
