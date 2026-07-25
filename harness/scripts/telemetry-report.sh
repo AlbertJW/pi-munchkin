@@ -6,7 +6,8 @@
 #   TELEMETRY_FILE=<path> overrides the events file (matches lib/telemetry.ts).
 set -euo pipefail
 
-FILE="${TELEMETRY_FILE:-$HOME/.pi/agent/telemetry/events.jsonl}"
+PI_AGENT_DIR="${PI_CODING_AGENT_DIR:-$HOME/.pi/agent}"
+FILE="${TELEMETRY_FILE:-$PI_AGENT_DIR/telemetry/events.jsonl}"
 DAYS="${2:-0}"; [[ "${1:-}" == "--days" ]] && DAYS="$2"
 [[ -f "$FILE" ]] || { echo "no telemetry yet: $FILE"; exit 0; }
 

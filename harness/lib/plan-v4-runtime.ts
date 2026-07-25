@@ -1,7 +1,6 @@
 import { appendFile, mkdir, readFile, writeFile } from "node:fs/promises";
 import { createHash, randomUUID } from "node:crypto";
 import { dirname, isAbsolute, join, normalize, sep } from "node:path";
-import { homedir } from "node:os";
 import { defineTool, withFileMutationQueue, type ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { Type } from "typebox";
 import { classifyBashCommand } from "./command-policy.ts";
@@ -31,6 +30,7 @@ import {
 } from "./plan-router.ts";
 import { processWriterMarker } from "./process-writer.ts";
 import { record } from "./telemetry.ts";
+import { agentDir } from "./agent-dir.ts";
 
 type Autonomy = "lean" | "yolo";
 type Phase = "reflecting" | "planned" | "executing";
@@ -248,8 +248,8 @@ async function readV4(cwd: string): Promise<PlanStateV4 | undefined> {
 async function runtimeStatusText(ctx: { model?: { provider?: string; id?: string } }): Promise<string> {
 	let settings: any = {};
 	let models: any = {};
-	try { settings = JSON.parse(await readFile(join(homedir(), ".pi", "agent", "settings.json"), "utf8")); } catch {}
-	try { models = JSON.parse(await readFile(join(homedir(), ".pi", "agent", "models.json"), "utf8")); } catch {}
+	try { settings = JSON.parse(await readFile(join(agentDir(), "settings.json"), "utf8")); } catch {}
+	try { models = JSON.parse(await readFile(join(agentDir(), "models.json"), "utf8")); } catch {}
 	const provider = ctx.model?.provider ?? settings.defaultProvider ?? "unknown";
 	const model = ctx.model?.id ?? settings.defaultModel ?? "unknown";
 	const providerCfg = models.providers?.[provider];

@@ -10,15 +10,15 @@
 
 import { createHash, createHmac } from "node:crypto";
 import { appendFileSync, mkdirSync, readFileSync, renameSync, statSync } from "node:fs";
-import { homedir } from "node:os";
 import { dirname, join } from "node:path";
 import { validateCatalogDetail } from "./telemetry-catalog.ts";
+import { agentDir } from "./agent-dir.ts";
 
 
 function targetFile(): string | number {
 	const fd = process.env.TELEMETRY_FD;
 	if (fd && /^\d+$/.test(fd)) return Number(fd);
-	return process.env.TELEMETRY_FILE || join(homedir(), ".pi", "agent", "telemetry", "events.jsonl");
+	return process.env.TELEMETRY_FILE || join(agentDir(), "telemetry", "events.jsonl");
 }
 
 // Exact session attribution: the workdir basename is unique per gate rep

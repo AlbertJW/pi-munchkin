@@ -89,6 +89,7 @@ fi
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(git -C "$HERE" rev-parse --show-toplevel 2>/dev/null || dirname "$HERE")"
 GEN="${GEN:-rg0}"; N="${N:-3}"
+ARM="${ARM:-both}"                 # base | cand | both
 DD="${DD:-qwen36-35b-iq3s}"; PI_TIMEOUT="${PI_TIMEOUT:-1800}"
 PI_MODEL="${PI_MODEL:-}"   # pi model id for the sessions (else pi uses its default — beware external defaults)
 PI_PROVIDER="${PI_PROVIDER:-}"
@@ -109,6 +110,11 @@ EXPERIMENT_BASE_CELL="${EXPERIMENT_BASE_CELL:-base}"
 EXPERIMENT_CAND_CELL="${EXPERIMENT_CAND_CELL:-cand}"
 HARNESS_HASH_BLOCKER="No valid launcher-computed surface receipt is available; this row cannot be promoted until the running extension corroborates one in authenticated telemetry."
 HARNESS_SURFACE_SHA256=""
+AGENT_DIR="${PI_CODING_AGENT_DIR:-$HOME/.pi/agent}"
+AGENT_MODELS_SHA256=""
+if [[ -f "$AGENT_DIR/models.json" ]]; then
+	AGENT_MODELS_SHA256="$(python3 -c 'import hashlib,sys; print(hashlib.sha256(open(sys.argv[1],"rb").read()).hexdigest())' "$AGENT_DIR/models.json")"
+fi
 # Computed here, before any `pi` session exists — the running session cannot
 # influence this number. Only clears the static blocker on success; a computation
 # failure keeps the honest blocker text rather than guessing.
@@ -127,10 +133,14 @@ if [[ -n "$EXPERIMENT_MANIFEST" ]]; then
 fi
 
 DRY=0; HARD=0; CALIB="${CALIB:-0}"; ROBUSTNESS=0; EXPLORATORY=0; TASKS=()
+ARM_NEXT=0
 DEFAULT_TASKS=(parens equil bigdata)
 for a in "$@"; do
+	if [[ "$ARM_NEXT" == 1 ]]; then ARM="$a"; ARM_NEXT=0; continue; fi
 	case "$a" in
 		--dry) DRY=1 ;;
+		--arm) ARM_NEXT=1 ;;
+		--arm=*) ARM="${a#*=}" ;;
 		--hard) HARD=1 ;;        # the hidden-test, harder tasks
 		--calibrate) CALIB=1 ;;  # base config only (measure per-task difficulty; halves cost)
 		--robustness) ROBUSTNESS=1 ;; # canonical + 3 equivalent prompts and one-shot controls
@@ -263,6 +273,8 @@ if [[ "$SANDBOX" != "on" ]]; then
 		fi
 	done
 fi
+[[ "$ARM_NEXT" == 0 ]] || { echo "[real_gate] --arm requires base, cand, or both" >&2; exit 2; }
+case "$ARM" in base|cand|both) ;; *) echo "[real_gate] invalid ARM=$ARM (base|cand|both)" >&2; exit 2 ;; esac
 # Authenticated endpoints (e.g. the box router) need a bearer token; /health is
 # open so health() stays keyless. LLAMA_API_KEY empty -> no header (local zoo).
 # The token is passed via a fresh `-K <(...)` process substitution at each call
@@ -289,6 +301,7 @@ if [[ "$DRY" == 1 ]]; then
 	fi
 	cfgs="[base, cand]"; nextcmd="./prompt-lab/fleet_report.py $GEN --baseline base --candidate cand"
 	[[ "$CALIB" == 1 ]] && cfgs="[base only]" && nextcmd="./prompt-lab/calibrate.py $GEN"
+	[[ "$ARM" != "both" ]] && cfgs="[$ARM only]"
 	echo "would run, per config in $cfgs:  ${TASKS[*]}  x ${N} reps  -> gate-pass rows -> $RESULTS"
 	[[ "$ROBUSTNESS" == 1 ]] && echo "robustness: canonical + 3 equivalent prompts; eligible one-shot arms (one request each)"
 	echo "then: $nextcmd"
@@ -345,7 +358,7 @@ PI_SELECT=()
 mkdir -p "$RUNS"
 # The narrowed write-jail allows only these two ~/.pi subpaths; creating THEM would
 # need a write on ~/.pi/agent (denied), so ensure they exist before any session starts.
-mkdir -p "$HOME/.pi/agent/sessions" "$HOME/.pi/agent/telemetry"
+mkdir -p "$AGENT_DIR/sessions" "$AGENT_DIR/telemetry"
 # A direct invocation owns its result file and starts clean. Fleet orchestration
 # explicitly selects append mode after truncating once at the round boundary.
 # This prevents a reused GEN or rerun model from silently contaminating a verdict.
@@ -495,6 +508,19 @@ run_one() {  # $1=config $2=arm $3=task $4=rep [$5=split] [$6=prompt-variant]
 	: > "$telfile"; exec 8<>"$telfile"; rm -f "$telfile"
 	local session_env=()
 	python3 "$CONFIG" --apply "$cfg" --workdir "$wd" --env-null > "$envfile" || exit 2
+	# Exposure is declared by the candidate config and counted for both arms. Keep
+	# only event names in the child-visible spec; payloads remain behind the
+	# authenticated telemetry reducer.
+	local exposure_events_file="$wd/.exposure-events"
+	python3 - "$CAND" "$exposure_events_file" <<'PY'
+import json,sys
+cfg=json.load(open(sys.argv[1], encoding="utf-8"))
+spec=cfg.get("exposure") or {}
+events=list(spec.get("target") or []) + list(spec.get("diagnostic") or [])
+open(sys.argv[2], "w", encoding="utf-8").write("".join(f"{event}\n" for event in events))
+PY
+	local exposure_args=()
+	while IFS= read -r entry; do [[ -n "$entry" ]] && exposure_args+=(--exposure-event "$entry"); done < "$exposure_events_file"
 	while IFS= read -r -d '' entry; do session_env+=("$entry"); done < "$envfile"
 	local env_span_tools=""
 	for entry in ${session_env[@]+"${session_env[@]}"}; do [[ "$entry" == SPAN_TOOLS=* ]] && env_span_tools="${entry#*=}"; done
@@ -646,7 +672,7 @@ run_one() {  # $1=config $2=arm $3=task $4=rep [$5=split] [$6=prompt-variant]
 	# jail: render the per-run Seatbelt profile (absolute paths; Seatbelt has no env)
 	local sbx=()
 	if [[ "$SANDBOX" == "on" ]]; then
-		python3 - "$GATE_SB" "$wd/.gate.sb" "$wd" "$HOME/.pi/agent" "${GATE_MIRROR_DENY:-$REPO_ROOT}" "$REPO_ROOT" "$MODEL_PORT" "$MODEL_HOST" "$gate_tmpdir" "$HOME" <<'PY'
+		python3 - "$GATE_SB" "$wd/.gate.sb" "$wd" "$AGENT_DIR" "${GATE_MIRROR_DENY:-$REPO_ROOT}" "$REPO_ROOT" "$MODEL_PORT" "$MODEL_HOST" "$gate_tmpdir" "$HOME" <<'PY'
 import json,re,sys
 src,dst,*values=sys.argv[1:]
 tokens=("__WORKDIR__","__PI_AGENT__","__MIRROR__","__HARNESS__","__MODEL_PORT__","__MODEL_HOST__","__TMPDIR__","__HOME__")
@@ -777,7 +803,7 @@ NOTE: a previous attempt in this workdir was stopped for repeating the same fail
 	[[ "${TRAJECTORY:-off}" == "on" && "$gate" == 1 ]] && ! python3 "$HERE/prompt-lab/trajectory_check.py" "$wd" "$task" && gate=0
 	local mrow; mrow="$(python3 "$METRICS" "$wd")"
 	local context_telemetry="$wd/context-telemetry.json"
-	python3 "$HERE/prompt-lab/context_telemetry.py" "fd:8" "$(basename "$wd")" --key-stdin <<<"$telemetry_key" > "$context_telemetry" || {
+	python3 "$HERE/prompt-lab/context_telemetry.py" "fd:8" "$(basename "$wd")" --key-stdin ${exposure_args[@]+"${exposure_args[@]}"} <<<"$telemetry_key" > "$context_telemetry" || {
 		echo "[real_gate] authenticated context telemetry verification failed" >&2; exec 8>&-; exit 1;
 	}
 	exec 8>&-
@@ -792,6 +818,10 @@ NOTE: a previous attempt in this workdir was stopped for repeating the same fail
 	tout="$(cut -f7 <<< "$mrow")"; [[ -n "$tout" ]] || tout=0
 	usage_exact="$(cut -f10 <<< "$mrow")"; [[ -n "$usage_exact" ]] || usage_exact=0
 	output_chars="$(cut -f11 <<< "$mrow")"; [[ -n "$output_chars" ]] || output_chars=0
+	if [[ "${REQUIRE_EXACT_USAGE:-0}" == "1" && "$usage_exact" != "1" ]]; then
+		echo "[real_gate] exact provider usage is required for this batch, but $pat/$task rep$rep has no exact usage; refusing the row" >&2
+		exit 2
+	fi
 
 	# Degraded-model tripwire: a server can keep serving HTTP while the model behind it
 	# is broken (hot-swap/reload) — sessions then return near-zero tokens and the
@@ -807,12 +837,12 @@ NOTE: a previous attempt in this workdir was stopped for repeating the same fail
 		LOW_TOK_STREAK=0
 	fi
 
-	python3 - "$RESULTS" "$MODEL" "$pat" "$task" "$rep" "$gate" "$retried" "$RUNID" "$tin" "$tout" "$output_chars" "$split" "$usage_exact" "${FLEET_EXPECTED_MODELS:-}" "$rowctx" "$wd/fingerprint-pre.json" "$wd/fingerprint-post.json" "$GATE_NETWORK" "$MODEL_CONTROL" "$MODEL_PROVIDER_RESOLVED" "$ENDPOINT_IDENTITY_SHA256" "$NETWORK_AUTHORITATIVE" "$NETWORK_AUTHORITY_REASON" "$SANDBOX_AUTHORITATIVE" "$SANDBOX_AUTHORITY_REASON" "$EXEC_POLICY" "$mrow" "$span_receipt_success" "$cfg" "$CONFIG" "$EXPERIMENT_MANIFEST" "$EXPERIMENT_MANIFEST_SHA256" "$EXPERIMENT_BASE_CELL" "$EXPERIMENT_CAND_CELL" "$HARNESS_HASH_BLOCKER" "$context_telemetry" "$wd/.pi/APPEND_SYSTEM.md" <<'PY'
+	python3 - "$RESULTS" "$MODEL" "$pat" "$task" "$rep" "$gate" "$retried" "$RUNID" "$tin" "$tout" "$output_chars" "$split" "$usage_exact" "${FLEET_EXPECTED_MODELS:-}" "$rowctx" "$wd/fingerprint-pre.json" "$wd/fingerprint-post.json" "$GATE_NETWORK" "$MODEL_CONTROL" "$MODEL_PROVIDER_RESOLVED" "$ENDPOINT_IDENTITY_SHA256" "$NETWORK_AUTHORITATIVE" "$NETWORK_AUTHORITY_REASON" "$SANDBOX_AUTHORITATIVE" "$SANDBOX_AUTHORITY_REASON" "$EXEC_POLICY" "$mrow" "$span_receipt_success" "$cfg" "$CONFIG" "$EXPERIMENT_MANIFEST" "$EXPERIMENT_MANIFEST_SHA256" "$EXPERIMENT_BASE_CELL" "$EXPERIMENT_CAND_CELL" "$HARNESS_HASH_BLOCKER" "$context_telemetry" "$wd/.pi/APPEND_SYSTEM.md" "${AGENT_MODELS_SHA256:-}" <<'PY'
 import hashlib,importlib.util,json,sys
 (out,model,pat,task,rep,gate,retried,runid,tin,tout,outchars,split,usage_exact,expected_models,
  ctxpath,prepath,postpath,network_mode,model_control,provider,endpoint_sha,network_auth,network_reason,
  sandbox_auth,sandbox_reason,policy_path,mrow,span_receipt,cfg_path,config_path,experiment_manifest,
- experiment_sha,base_cell,cand_cell,harness_blocker,context_telemetry_path,rendered_governor_path)=sys.argv[1:38]
+ experiment_sha,base_cell,cand_cell,harness_blocker,context_telemetry_path,rendered_governor_path,agent_models_sha) = sys.argv[1:39]
 ctx=json.load(open(ctxpath)); pre=json.load(open(prepath)); post=json.load(open(postpath))
 # Loaded once and reused for both "harness" and "context" below — the surface hash
 # in the row is pulled ONLY from this already-HMAC-verified blob, never from the
@@ -863,7 +893,8 @@ rec={"schema":"pi.eval-row/v2", "task":task,"pattern":pat,"arm":pat,"rep":int(re
      "authoritative":authoritative,"status":status,"authority_reason":authority_reason,
      "execution":{"network_mode":network_mode,"model_control":model_control,"provider":provider,
                   "endpoint_identity_sha256":endpoint_sha,"network_authoritative":bool(int(network_auth)),
-                  "sandboxed":bool(int(sandbox_auth)),"authoritative":execution_authoritative},
+                  "sandboxed":bool(int(sandbox_auth)),"authoritative":execution_authoritative,
+                  "agent_models_sha256":agent_models_sha or None},
      "prompt":{"variant":ctx["prompt_variant"],"semantic_group":ctx["semantic_group"],"sha256":ctx["prompt_sha256"]},
      "serving":{"pre":pre,"post":post,"stable":stable},"usage":usage,"trajectory":trajectory,
      "span_receipt_success":bool(int(span_receipt)),"config":config_binding,"experiment":experiment,
@@ -873,10 +904,26 @@ rec={"schema":"pi.eval-row/v2", "task":task,"pattern":pat,"arm":pat,"rep":int(re
      # compatibility aliases for historical readers; dimensions stay honest.
      "out_chars":int(outchars),"think_chars":0,"in_tok":int(tin) if exact else 0,
      "out_tok":int(tout) if exact else 0,"token_usage_exact":exact}
+exposure_spec=cfg.get("exposure") or {"mode":"configuration","target":[],"diagnostic":[]}
+counts=context_data.get("exposure") or {}
+if pat == "base":
+    exposure_status="control"
+elif exposure_spec.get("mode") == "configuration":
+    exposure_status="targeted"
+else:
+    target_count=sum(int(counts.get(event, 0)) for event in exposure_spec.get("target", []))
+    diagnostic_count=sum(int(counts.get(event, 0)) for event in exposure_spec.get("diagnostic", []))
+    exposure_status="targeted" if target_count else ("engaged_only" if diagnostic_count else "unexposed")
+exposure_counts={event:int(counts.get(event, 0)) for event in (exposure_spec.get("target", []) + exposure_spec.get("diagnostic", []))}
+rec["exposure"]={"mode":exposure_spec.get("mode", "configuration"), "status":exposure_status,
+                  "target_count":sum(exposure_counts.get(event, 0) for event in exposure_spec.get("target", [])),
+                  "counts":exposure_counts}
 if expected_models:
     rec["fleet_expected_models"] = sorted(expected_models.split())
 open(out,"a").write(json.dumps(rec)+"\n")
 PY
+	local row_writer_rc=$?
+	[[ "$row_writer_rc" == 0 ]] || { echo "[real_gate] row writer failed for $pat/$task rep$rep; refusing silent measurement loss" >&2; exit "$row_writer_rc"; }
 	echo "  $pat/$task rep$rep/$variant -> gate=$gate (out_tok=$tout output_chars=$output_chars)"
 }
 
@@ -929,7 +976,12 @@ PY
 	echo "  one-shot/$task rep$rep/$variant -> recorded"
 }
 
-SPECS=("base:$BASE" "cand:$CAND"); [[ "$CALIB" == 1 ]] && SPECS=("base:$BASE")
+case "$ARM" in
+	base) SPECS=("base:$BASE") ;;
+	cand) SPECS=("cand:$CAND") ;;
+	both) SPECS=("base:$BASE" "cand:$CAND") ;;
+esac
+[[ "$CALIB" == 1 ]] && SPECS=("base:$BASE")
 if [[ ${#SPECS[@]} -eq 1 || "${INTERLEAVE:-on}" == "off" ]]; then
 	# single-arm (calibrate/munchkin) or explicit legacy ordering
 	for spec in "${SPECS[@]}"; do

@@ -148,7 +148,9 @@ def parse_session(lines, workdir=None):
 def session_files_for(workdir, sessions_home=None):
     """All attempt JSONLs for a run, oldest first."""
     munged = os.path.abspath(workdir).replace("/", "-")
-    home = sessions_home or os.path.expanduser("~/.pi/agent/sessions")
+    home = sessions_home or os.path.join(
+        os.environ.get("PI_CODING_AGENT_DIR", os.path.expanduser("~/.pi/agent")), "sessions"
+    )
     # boundary match ("...parens-1" must not grab "...parens-10"'s dir)
     cands = [d for d in glob.glob(home + "/*")
              if os.path.basename(d).rstrip("-").endswith((munged, os.path.basename(workdir)))]

@@ -1,7 +1,6 @@
 import { appendFile, mkdir, readFile, rename, stat, writeFile } from "node:fs/promises";
 import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
-import { homedir } from "node:os";
 import { createHash, randomUUID } from "node:crypto";
 import { defineTool, withFileMutationQueue, type ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { Type } from "typebox";
@@ -12,6 +11,7 @@ import { nextReplanStreak, parseTodoLine } from "../lib/plan-progress.ts";
 import { processWriterMarker } from "../lib/process-writer.ts";
 import { steerText } from "../lib/steer-texts.ts";
 import { record } from "../lib/telemetry.ts";
+import { agentDir } from "../lib/agent-dir.ts";
 import { registerPlanV4 } from "../lib/plan-v4-runtime.ts";
 
 // plan-runner v3 — model-owned TODO list (Claude Code TodoWrite pattern).
@@ -615,8 +615,8 @@ ${executeBlock(state.autonomy, subagentAvailable)}`;
 // ---------- runtime status (preserved) ----------
 
 async function runtimeStatusText(ctx: { model?: { provider?: string; id?: string } }): Promise<string> {
-	const settingsFile = join(homedir(), ".pi", "agent", "settings.json");
-	const modelsFile = join(homedir(), ".pi", "agent", "models.json");
+	const settingsFile = join(agentDir(), "settings.json");
+	const modelsFile = join(agentDir(), "models.json");
 	const settings = (await exists(settingsFile)) ? JSON.parse(await readFile(settingsFile, "utf8")) : {};
 	const models = (await exists(modelsFile)) ? JSON.parse(await readFile(modelsFile, "utf8")) : {};
 	const configuredProvider = settings.defaultProvider ?? "unknown";
