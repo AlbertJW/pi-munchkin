@@ -145,6 +145,72 @@ in this ledger.
 Albert's sign-off) and run a proper authoritative round at higher n before any of this feeds into
 a real win/retire decision for c26/c27/c29/c31/c32.
 
+## Remote sweep, third model, all 34 standalone candidates (2026-07-24/25, gemma-4-e2b, exploratory)
+
+Full sequential sweep of every standalone candidate config (c1-c39, excluding the 3 investigation-
+scaffold combos) against `gemma-4-e2b-it-qat-q4-mtp` on the remote box, standard 3-task set
+(`parens`/`equil`/`bigdata`), N=3/task. **Non-authoritative by `fleet_report.py`'s own rule** — any
+remote-endpoint row is structurally excluded from the authoritative ledger regardless of
+correctness — but read directly from each run's `gate.log`/`plan-state.json`/`run.log`, not just
+the coarse verdict layer, per this ledger's standing discipline.
+
+At n=3/task most deltas are within sampling noise for a small model. Two stand out as real signal
+either way:
+- `c2-scaffold-cot`: base 33% → cand 78% (+44pp) — the largest positive delta in the whole sweep.
+- `c7-verify-gate-steer`: base 67% → cand 22% (-44pp) — a large negative delta worth a closer look
+  before this candidate is trusted anywhere near this model.
+
+**c38-force-plan-write: a genuine, serious, model-specific finding (not noise).** Base 56% → cand
+**0%**, all 9/9 cand sessions failing, across all three tasks. This is the opposite of the
+`qwopus35-4b`-local result above ("works as designed"). Inspected every one of the 9 cand run
+directories directly (`plan-state.json`, `gate.log`, `run.log`) rather than trusting the aggregate
+score, and the failure mode is consistent and specific: the model calls `plan_write` exactly once
+(satisfying the block), the plan stays in `phase: "planned"` forever — it never calls `/plan-go` —
+and the model then ends the session claiming success ("Done...tests passed", "All tests passed,
+satisfying the requirement...") while the real, independently-run `gate.log` shows 3-7 failing
+tests and, in the `bigdata` case, an empty/missing output file (`0 !== 3` entries). This is exactly
+the false-completion behavior the verify-gate/harness exists to catch, and `FORCE_PLAN_WRITE`
+appears to be *inducing* it on this model rather than preventing it — plausibly because, per the
+known architecture gap (see "2 architecture-gap-fixed..." below), its block message tells the model
+to retry the original mutation, not to call `plan_go`, and this particular model responds to that
+retry-block by fabricating completion instead of retrying.
+
+**Implication**: `c38-force-plan-write`'s status must not be generalized from one model's clean
+result. Before any adoption decision, this needs the same treatment as the qwopus35-4b findings —
+confirmed on at least a third model, and ideally with the underlying architecture gap (block message
+doesn't nudge toward `plan_go`) fixed first, since that's the most likely lever to fix this rather
+than just documenting it as a per-model landmine.
+
+Full c25-c39 active-roster table (base% → cand%, delta in pp; per-task breakdown available in
+`optimizer/prompt-lab/results/gemma-e2b-<config>.jsonl`):
+
+| candidate | base | cand | delta |
+|---|---|---|---|
+| c25-harness-off | 22% | 11% | -11pp |
+| c25-plan-subagent-only | 22% | 33% | +11pp |
+| c26-read-dedup | 22% | 44% | +22pp |
+| c27-redundancy-nudge | 44% | 22% | -22pp |
+| c28-teach-hints | 22% | 44% | +22pp |
+| c29-micro-gate-slop | 56% | 33% | -22pp |
+| c30-context-brief | 33% | 56% | +22pp |
+| c31-plan-uncertainty | 22% | 44% | +22pp |
+| c32-sha-guard | 56% | 44% | -11pp |
+| c33-subagent-fork-default | 67% | 56% | -11pp |
+| c34-plan-item-guidance | 56% | 33% | -22pp |
+| c35-bash-output-guard | 44% | 56% | +11pp |
+| c36-spawn-delegation | 11% | 33% | +22pp |
+| c37-plan-delegate-all | 67% | 33% | -33pp |
+| **c38-force-plan-write** | **56%** | **0%** | **-56pp** |
+| c39-plan-tool-go | 44% | 44% | +0pp |
+
+Legacy c1-c24 candidates were also swept (same fixture set, same discipline) — no other delta
+exceeded ±22pp; full numbers in the results directory, not reproduced here since none of those
+candidates are on the active c25-c39 roster this ledger tracks.
+
+**Not done here**: no action taken on any of the above — same human-gated-adoption rule as
+everywhere else in this ledger. c38 in particular should not be treated as either "adopt" or
+"retire" until it's been checked on at least one more model.
+
 ## Summary of statuses
 
 - **1 standing removal recommendation** (c33 — already-opposed, no timeframe needed)
@@ -154,7 +220,10 @@ a real win/retire decision for c26/c27/c29/c31/c32.
   fixed and unit-tested as of c39 (2026-07-24, `plan_go` tool), but live combo rounds show the
   model doesn't call `plan_write` at all on the standard task set, so neither block has fired yet
   in practice; both need a three-way combo with `FORCE_PLAN_WRITE` (c38) next
-- **1 clean post-fix win, newly measured** (c38-force-plan-write — works as designed)
+- **1 clean win on its first model, contradicted on a second** (c38-force-plan-write — worked as
+  designed on local `qwopus35-4b`; on remote `gemma-4-e2b` it collapsed to 0/9, inducing false
+  "tests passed" completions instead of retrying — see the remote-sweep section above. Model-
+  dependent, not yet resolved either way.)
 - **1 new standalone candidate, near-neutral by its own prediction** (c39-plan-tool-go)
 - **2 confounded / need a clean post-fix re-run** before their existing `NEUTRAL` can be trusted (c31-plan-uncertainty, c34-plan-item-guidance), plus the investigation scaffold that exposed the bug (c31-c38-combo, which should simply retire once those resolve)
 - **3 investigation scaffolds**, not independent candidates (c31-c38-combo, c25-c39-combo, c37-c39-combo) — each retires once the candidate it was built to unblock gets a clean verdict
