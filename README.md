@@ -165,6 +165,7 @@ tracked in the self-improvement ledger rather than repeated here:
 | `PLAN_TDD_EVIDENCE=on` | require observed, matching failed RED evidence before later GREEN evidence can complete behavior steps; implementation edits before RED remain allowed | c41, dark and unmeasured; final read-only validation still gates completion |
 | `PLAN_DYNAMIC_ROUTE=on` | expose model-owned `plan_route` checkpoints with partial-order eligibility, legal soft-order jumps, bounded churn, backtracking, and transitive stale-dependent revalidation | c42, dark and unmeasured; the scheduler validates and ranks but never dispatches work |
 | `PLAN_PLANNOTATOR_BRIDGE=on` | enable explicitly requested, content-SHA-bound asynchronous browser review over Plannotator's shared event API; no package installation is required | c43, interactive-only and unmeasured; headless `real_gate.sh` refuses this flag rather than measuring an absent listener |
+| `PLAN_STEP_CONTEXT=current` | execute each selected c40+c41+c42 micro-step in the parent context, preserving cross-step discoveries and avoiding child bootstrap cost | c44 half of the paired context experiment; dark and unmeasured |
 
 ### Platform and security notes
 
