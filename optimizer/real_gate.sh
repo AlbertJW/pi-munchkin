@@ -63,11 +63,13 @@ plan_gate_wiring_selftest() {
 	local tools="read,edit,bash,plan_write"
 	tools="$(append_gate_tool "$tools" plan_reflect)"
 	tools="$(append_gate_tool "$tools" plan_go)"
-	validate_v4_gate_wiring "$tools" on off off off off c40-test
+	# Positive cases MUST be checked: an unchecked call cannot fail the selftest,
+	# which silently green-lit every c40/c42/c45 grant regression until 2026-07-25.
+	validate_v4_gate_wiring "$tools" on off off off off c40-test || { echo "c40 profile failed validation" >&2; return 1; }
 	tools="$(append_gate_tool "$tools" plan_route)"
-	validate_v4_gate_wiring "$tools" on on on off current c44-test
+	validate_v4_gate_wiring "$tools" on on on off current c44-test || { echo "c44 profile failed validation" >&2; return 1; }
 	tools="$(append_gate_tool "$tools" subagent)"
-	validate_v4_gate_wiring "$tools" on on on off spawn c45-test
+	validate_v4_gate_wiring "$tools" on on on off spawn c45-test || { echo "c45 profile failed validation" >&2; return 1; }
 	[[ "$(append_gate_tool "$tools" subagent)" == "$tools" ]] || { echo "duplicate tool append" >&2; return 1; }
 	if validate_v4_gate_wiring "read,edit,bash,plan_write" on off off off off missing-c40 >/dev/null 2>&1; then
 		echo "missing c40 tools passed validation" >&2; return 1
@@ -111,9 +113,18 @@ EXPERIMENT_CAND_CELL="${EXPERIMENT_CAND_CELL:-cand}"
 HARNESS_HASH_BLOCKER="No valid launcher-computed surface receipt is available; this row cannot be promoted until the running extension corroborates one in authenticated telemetry."
 HARNESS_SURFACE_SHA256=""
 AGENT_DIR="${PI_CODING_AGENT_DIR:-$HOME/.pi/agent}"
+# An orchestrator (batch_screen.py) may PIN the registry hash it resolved when it
+# built the run-private overlay. Recomputing unconditionally made that pin dead
+# env — the row silently recorded whatever models.json said at gate time, so an
+# overlay mutated between resolve and run went undetected. Verify instead.
+AGENT_MODELS_SHA256_PIN="${AGENT_MODELS_SHA256:-}"
 AGENT_MODELS_SHA256=""
 if [[ -f "$AGENT_DIR/models.json" ]]; then
 	AGENT_MODELS_SHA256="$(python3 -c 'import hashlib,sys; print(hashlib.sha256(open(sys.argv[1],"rb").read()).hexdigest())' "$AGENT_DIR/models.json")"
+fi
+if [[ -n "$AGENT_MODELS_SHA256_PIN" && "$AGENT_MODELS_SHA256_PIN" != "$AGENT_MODELS_SHA256" ]]; then
+	echo "[real_gate] pinned AGENT_MODELS_SHA256 does not match $AGENT_DIR/models.json — the model registry changed since the caller resolved it; refusing to measure a moved instrument" >&2
+	exit 2
 fi
 # Computed here, before any `pi` session exists — the running session cannot
 # influence this number. Only clears the static blocker on success; a computation

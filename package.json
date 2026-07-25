@@ -82,6 +82,7 @@
     "harness/extensions/teach-hints.ts",
     "harness/extensions/surface-receipt.ts",
     "harness/extensions/bash-output-guard.ts",
+    "harness/lib/agent-dir.ts",
     "harness/lib/bash-mutations.ts",
     "harness/lib/bash-output.ts",
     "harness/lib/command-policy.ts",

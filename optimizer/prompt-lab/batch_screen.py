@@ -19,6 +19,7 @@ RESULTS = LAB / "results"
 REAL_GATE = OPT / "real_gate.sh"
 OVERLAY = Path(os.environ.get("REAL_GATE_RUNS", str(Path.home() / ".pi" / "real-gate-runs"))) / "batch-overlays"
 DEFAULT_MANIFEST = LAB / "configs" / "qwopus35-4b-mtp-legacy-signal.json"
+ENDPOINT_ENV = "LLAMA_URL"
 
 
 class BatchError(RuntimeError):
@@ -41,7 +42,20 @@ def load_manifest(path: Path) -> dict:
         config = LAB / "configs" / spec["config"]
         if not config.is_file():
             raise BatchError(f"missing candidate config for {candidate}: {spec['config']}")
+    if "endpoint" in data:
+        raise BatchError("manifest must not hardcode an endpoint; set the "
+                         f"{ENDPOINT_ENV} environment variable instead")
     return data
+
+
+def endpoint_for(manifest: dict) -> str:
+    """Private box addresses stay out of this public repo — resolve them at run time."""
+    name = manifest.get("endpoint_env") or ENDPOINT_ENV
+    url = os.environ.get(name, "").strip()
+    if not url:
+        raise BatchError(f"{name} is not set; export the serving endpoint for "
+                         f"{manifest['model']} before running a batch")
+    return url
 
 
 def manifest_hash(path: Path) -> str:
@@ -79,7 +93,7 @@ def get_health(url: str) -> None:
 
 
 def preflight(manifest: dict) -> dict:
-    endpoint = manifest["endpoint"].rstrip("/")
+    endpoint = endpoint_for(manifest).rstrip("/")
     get_health(endpoint + "/health")
     models = get_json(endpoint + "/v1/models")
     entries = models.get("data") or []
@@ -138,9 +152,10 @@ def complete(path: Path, arm: str, task: str, reps: int) -> bool:
 def run_gate(manifest_path: Path, manifest: dict, gen: str, *, task: str, arm: str, reps: int,
              candidate: str | None = None, exact: bool = False, stage: str) -> None:
     output = result_file(gen)
-    if complete(output, "base" if arm == "base" else "cand", task, reps) or (
-        arm == "both" and complete(output, "base", task, reps) and complete(output, "cand", task, reps)
-    ):
+    # Every arm this cell owes must be complete before the cell is skipped. Testing
+    # "cand" first and OR-ing let a cand-complete/base-partial cell resume as done.
+    required_arms = ("base", "cand") if arm == "both" else (arm,)
+    if all(complete(output, one, task, reps) for one in required_arms):
         print(f"resume: {gen}/{task} already complete")
         return
     overlay, model_hash = ensure_overlay(manifest)
@@ -155,7 +170,7 @@ def run_gate(manifest_path: Path, manifest: dict, gen: str, *, task: str, arm: s
         "ARM": arm,
         "PI_PROVIDER": manifest["provider"],
         "PI_MODEL": manifest["model"],
-        "LLAMA_URL": manifest["endpoint"],
+        ENDPOINT_ENV: endpoint_for(manifest),
         "GATE_NETWORK": "endpoint",
         "MODEL_CONTROL": "llama",
         "EXPLORATORY": "1",
@@ -290,11 +305,11 @@ def main() -> None:
     if args.command == "preflight":
         from usage_probe import probe
         details = preflight(manifest)
-        usage = probe(manifest["endpoint"], manifest["model"])
+        usage = probe(endpoint_for(manifest), manifest["model"])
         overlay_path, overlay_hash = ensure_overlay(manifest)
         details = {**details, "overlay": {"agent_dir": str(overlay_path), "models_sha256": overlay_hash}}
         if usage.get("supported"):
-            catalog_after = get_json(manifest["endpoint"].rstrip("/") + "/v1/models")
+            catalog_after = get_json(endpoint_for(manifest).rstrip("/") + "/v1/models")
             selected_after = next((item for item in catalog_after.get("data") or []
                                    if item.get("id") == manifest["model"]), {})
             status_after = (selected_after.get("status") or {}).get("value")
