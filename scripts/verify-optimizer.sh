@@ -25,6 +25,9 @@ selftests=(
   prompt-lab/canary.py
   prompt-lab/config.py
   prompt-lab/context_telemetry.py
+  prompt-lab/exposure.py
+  prompt-lab/usage_probe.py
+  prompt-lab/agent_overlay.py
   prompt-lab/span_screen.py
   prompt-lab/execution_policy.py
   prompt-lab/fleet_report.py
@@ -42,6 +45,7 @@ selftests=(
 )
 for script in "${selftests[@]}"; do python3 "$OPT/$script" --selftest; done
 python3 -m unittest "$OPT/prompt-lab/test_span_screen.py"
+python3 -m unittest "$OPT/prompt-lab/test_batch_screen.py"
 python3 "$OPT/prompt-lab/integrity_selftest.py"
 python3 "$OPT/prompt-lab/seatbelt_network_selftest.py"
 
