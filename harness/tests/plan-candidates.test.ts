@@ -7,7 +7,7 @@ import { usePlanV4Runtime } from "../extensions/plan-runner.ts";
 
 const root = new URL("../../optimizer/prompt-lab/configs/", import.meta.url);
 const schema = JSON.parse(readFileSync(new URL("schema.json", root), "utf8"));
-const promoted = new Set(["c40-plan-synthesis-v1", "c41-plan-tdd-evidence"]);
+const promoted = new Set(["c40-plan-synthesis-v1", "c41-plan-tdd-evidence", "c42-plan-dynamic-route"]);
 const load = (name: string) => JSON.parse(readFileSync(new URL(
 	`${promoted.has(name) ? "static" : "pending"}/${name}.json`,
 	root,
