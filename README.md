@@ -166,6 +166,7 @@ tracked in the self-improvement ledger rather than repeated here:
 | `PLAN_DYNAMIC_ROUTE=on` | expose model-owned `plan_route` checkpoints with partial-order eligibility, legal soft-order jumps, bounded churn, backtracking, and transitive stale-dependent revalidation | c42, dark and unmeasured; the scheduler validates and ranks but never dispatches work |
 | `PLAN_PLANNOTATOR_BRIDGE=on` | enable explicitly requested, content-SHA-bound asynchronous browser review over Plannotator's shared event API; no package installation is required | c43, interactive-only and unmeasured; headless `real_gate.sh` refuses this flag rather than measuring an absent listener |
 | `PLAN_STEP_CONTEXT=current` | execute each selected c40+c41+c42 micro-step in the parent context, preserving cross-step discoveries and avoiding child bootstrap cost | c44 half of the paired context experiment; dark and unmeasured |
+| `PLAN_STEP_CONTEXT=spawn` | require one explicit, self-contained `subagent(executor, …, mode=spawn)` call per selected c40+c41+c42 micro-step; direct parent mutation is blocked while that child step is active | c45 paired against c44; dark and unmeasured, with parent and child usage recorded separately |
 
 ### Platform and security notes
 

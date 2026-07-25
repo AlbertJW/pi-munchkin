@@ -13,6 +13,7 @@ const promoted = new Set([
 	"c42-plan-dynamic-route",
 	"c43-plan-plannotator-bridge",
 	"c44-plan-context-current",
+	"c45-plan-context-spawn",
 ]);
 const load = (name: string) => JSON.parse(readFileSync(new URL(
 	`${promoted.has(name) ? "static" : "pending"}/${name}.json`,
