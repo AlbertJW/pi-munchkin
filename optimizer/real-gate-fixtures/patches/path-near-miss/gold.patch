@@ -1,0 +1,16 @@
+--- a/src/normalise-route.js
++++ b/src/normalise-route.js
+@@ -1,5 +1,11 @@
+ // The near-miss task names src/normalize-route.js; this is the real checkout path.
+ export function normaliseRoute(path) {
+-  // BUG: the route is returned unchanged instead of canonicalised.
+-  return path;
++  const value = String(path ?? '');
++  const queryAt = value.indexOf('?');
++  const pathname = queryAt < 0 ? value : value.slice(0, queryAt);
++  const query = queryAt < 0 ? '' : value.slice(queryAt);
++  const compact = pathname.replace(/[/]+/g, '/');
++  const rooted = compact.startsWith('/') ? compact : `/${compact}`;
++  const trimmed = rooted.replace(/\/$/, '');
++  return (trimmed || '/') + query;
+ }

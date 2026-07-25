@@ -1,0 +1,9 @@
+--- a/src/normalise-route.js
++++ b/src/normalise-route.js
+@@ -1,5 +1,4 @@
+ // The near-miss task names src/normalize-route.js; this is the real checkout path.
+ export function normaliseRoute(path) {
+-  // BUG: the route is returned unchanged instead of canonicalised.
+-  return path;
++  return `/${String(path ?? '').replace(/[/]+/g, '/')}`;
+ }
