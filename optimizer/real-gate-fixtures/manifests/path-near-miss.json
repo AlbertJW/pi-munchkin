@@ -1,68 +1,203 @@
 {
-  "schema": "pi.fixture/v1",
-  "task_id": "path-near-miss",
-  "cohort_id": "2026-07-exploratory",
-  "fixture_version": "2026-07.1",
-  "timestamps": {
-    "created_at": "2026-07-25T00:00:00Z",
-    "admitted_at": null,
-    "expires_at": "2026-10-23T00:00:00Z"
+  "admission": {
+    "approved": true,
+    "approved_prompt_hashes": [
+      "3d80f587f1df92df7c7f0e037423e5f00ce5765b6ea20300aad2e866d9a07459",
+      "f001560438d2c02acd059b0a4a3f35725b13113c95c45aa4b8273b1bc946f437",
+      "8bbe862c6c4cdf78a4c91da2f575ebb99a96c6d13858ad8762b008fb7bb71a7d"
+    ],
+    "automated": {
+      "checked_at": "2026-07-25T00:00:00Z",
+      "hash_drift": [],
+      "passed": true,
+      "runs_per_state": 3,
+      "states": {
+        "gold_fail_to_pass": [
+          {
+            "passed": true
+          },
+          {
+            "passed": true
+          },
+          {
+            "passed": true
+          }
+        ],
+        "gold_pass_to_pass": [
+          {
+            "passed": true
+          },
+          {
+            "passed": true
+          },
+          {
+            "passed": true
+          }
+        ],
+        "mutant:shortcut": {
+          "fail_to_pass": [
+            {
+              "passed": false
+            },
+            {
+              "passed": false
+            },
+            {
+              "passed": false
+            }
+          ],
+          "pass_to_pass": [
+            {
+              "passed": true
+            },
+            {
+              "passed": true
+            },
+            {
+              "passed": true
+            }
+          ]
+        },
+        "pristine_fail_to_pass": [
+          {
+            "passed": false
+          },
+          {
+            "passed": false
+          },
+          {
+            "passed": false
+          }
+        ],
+        "pristine_pass_to_pass": [
+          {
+            "passed": true
+          },
+          {
+            "passed": true
+          },
+          {
+            "passed": true
+          }
+        ]
+      }
+    },
+    "reviewed_at": "2026-07-25T12:28:38Z",
+    "reviewer": "Albert"
   },
-  "fixture": {"root": "real-gate-fixtures/path-near-miss", "stage_copy": []},
+  "artifacts": [
+    {
+      "path": "real-gate-fixtures/path-near-miss/package.json",
+      "sha256": "878da7628bacccc709ed067b80f01ad3d988a93363a92b240010c7dbc833d5d4"
+    },
+    {
+      "path": "real-gate-fixtures/path-near-miss/src/normalise-route.js",
+      "sha256": "f54998893ef9fb3bfcd56fad881fe794518bb41c05157f711e392c11c800463f"
+    },
+    {
+      "path": "real-gate-fixtures/path-near-miss/test/visible.test.js",
+      "sha256": "53dfce82b656875a265b8a5d489185d1d4df8a136b1557cf49485a4973ec44de"
+    },
+    {
+      "path": "real-gate-fixtures/hidden/path-near-miss.test.js",
+      "sha256": "cfc12a0f8ee407b12cd2b23228ea00cdfa4c7dc9869912df7d5a9ad890f15fd2"
+    },
+    {
+      "path": "real-gate-fixtures/patches/path-near-miss/gold.patch",
+      "sha256": "db5e638e553fcb9be6b5a91c757336edb0f25fd5a1e8c9007f9835bbf60f186e"
+    },
+    {
+      "path": "real-gate-fixtures/patches/path-near-miss/shortcut.patch",
+      "sha256": "b3f54a7977ab18f14dad53903093c9d0f2fa9db1bceb95a8930e6fd1b71d30db"
+    }
+  ],
+  "cohort_id": "2026-07-exploratory",
+  "fixture": {
+    "root": "real-gate-fixtures/path-near-miss",
+    "stage_copy": []
+  },
+  "fixture_version": "2026-07.1",
+  "one_shot": {
+    "context_files": [
+      "src/normalise-route.js",
+      "test/visible.test.js"
+    ],
+    "eligible": true,
+    "max_context_bytes": 49152
+  },
+  "patches": {
+    "gold": "real-gate-fixtures/patches/path-near-miss/gold.patch",
+    "shortcut_mutants": [
+      "real-gate-fixtures/patches/path-near-miss/shortcut.patch"
+    ]
+  },
   "prompts": {
     "canonical": {
       "sha256": "8d511fc4bddf14839d0dbe568d97993665fd39126e4acbb10d57494a47f85f35",
       "text": "Update the route normalizer in src/normalize-route.js. Canonicalise a route string by adding a leading slash, collapsing repeated slashes, and removing a trailing slash except for the root route. Preserve the query string exactly. Empty input becomes /. Keep the public function and module API intact. Run node --test until all tests pass."
     },
     "perturbations": [
-      {"id": "equivalent-1", "sha256": "3d80f587f1df92df7c7f0e037423e5f00ce5765b6ea20300aad2e866d9a07459", "text": "Complete this repository task with the smallest correct change and verify it.\n\nUpdate the route normalizer in src/normalize-route.js. Canonicalise a route string by adding a leading slash, collapsing repeated slashes, and removing a trailing slash except for the root route. Preserve the query string exactly. Empty input becomes /. Keep the public function and module API intact. Run node --test until all tests pass."},
-      {"id": "equivalent-2", "sha256": "f001560438d2c02acd059b0a4a3f35725b13113c95c45aa4b8273b1bc946f437", "text": "Repository change request:\nUpdate the route normalizer in src/normalize-route.js. Canonicalise a route string by adding a leading slash, collapsing repeated slashes, and removing a trailing slash except for the root route. Preserve the query string exactly. Empty input becomes /. Keep the public function and module API intact. Run node --test until all tests pass.\n\nUse the smallest correct change and confirm the test suite."},
-      {"id": "equivalent-3", "sha256": "8bbe862c6c4cdf78a4c91da2f575ebb99a96c6d13858ad8762b008fb7bb71a7d", "text": "Please solve this task in the supplied checkout, retaining every stated edge case:\n\nUpdate the route normalizer in src/normalize-route.js. Canonicalise a route string by adding a leading slash, collapsing repeated slashes, and removing a trailing slash except for the root route. Preserve the query string exactly. Empty input becomes /. Keep the public function and module API intact. Run node --test until all tests pass."}
+      {
+        "id": "equivalent-1",
+        "sha256": "3d80f587f1df92df7c7f0e037423e5f00ce5765b6ea20300aad2e866d9a07459",
+        "text": "Complete this repository task with the smallest correct change and verify it.\n\nUpdate the route normalizer in src/normalize-route.js. Canonicalise a route string by adding a leading slash, collapsing repeated slashes, and removing a trailing slash except for the root route. Preserve the query string exactly. Empty input becomes /. Keep the public function and module API intact. Run node --test until all tests pass."
+      },
+      {
+        "id": "equivalent-2",
+        "sha256": "f001560438d2c02acd059b0a4a3f35725b13113c95c45aa4b8273b1bc946f437",
+        "text": "Repository change request:\nUpdate the route normalizer in src/normalize-route.js. Canonicalise a route string by adding a leading slash, collapsing repeated slashes, and removing a trailing slash except for the root route. Preserve the query string exactly. Empty input becomes /. Keep the public function and module API intact. Run node --test until all tests pass.\n\nUse the smallest correct change and confirm the test suite."
+      },
+      {
+        "id": "equivalent-3",
+        "sha256": "8bbe862c6c4cdf78a4c91da2f575ebb99a96c6d13858ad8762b008fb7bb71a7d",
+        "text": "Please solve this task in the supplied checkout, retaining every stated edge case:\n\nUpdate the route normalizer in src/normalize-route.js. Canonicalise a route string by adding a leading slash, collapsing repeated slashes, and removing a trailing slash except for the root route. Preserve the query string exactly. Empty input becomes /. Keep the public function and module API intact. Run node --test until all tests pass."
+      }
     ],
     "semantic_group": "path-near-miss:2026-07.1"
   },
+  "schema": "pi.fixture/v1",
   "sufficiency": [
-    {"assertion": "leading and repeated slashes are canonicalised", "prompt_evidence": "Canonicalise a route string by adding a leading slash and collapsing repeated slashes."},
-    {"assertion": "trailing slash and empty root behavior are explicit", "prompt_evidence": "Remove a trailing slash except for the root route; empty input becomes /."},
-    {"assertion": "query strings survive path normalisation", "prompt_evidence": "Preserve the query string exactly."}
+    {
+      "assertion": "leading and repeated slashes are canonicalised",
+      "prompt_evidence": "Canonicalise a route string by adding a leading slash and collapsing repeated slashes."
+    },
+    {
+      "assertion": "trailing slash and empty root behavior are explicit",
+      "prompt_evidence": "Remove a trailing slash except for the root route; empty input becomes /."
+    },
+    {
+      "assertion": "query strings survive path normalisation",
+      "prompt_evidence": "Preserve the query string exactly."
+    }
   ],
-  "patches": {
-    "gold": "real-gate-fixtures/patches/path-near-miss/gold.patch",
-    "shortcut_mutants": ["real-gate-fixtures/patches/path-near-miss/shortcut.patch"]
-  },
+  "task_id": "path-near-miss",
   "tests": {
-    "pass_to_pass": {"command": ["node", "--test"], "overlays": [], "timeout_seconds": 60},
-    "fail_to_pass": {"command": ["node", "--test", "test/fail-to-pass.test.js"], "overlays": [{"dest": "test/fail-to-pass.test.js", "source": "real-gate-fixtures/hidden/path-near-miss.test.js"}], "timeout_seconds": 60}
-  },
-  "one_shot": {"context_files": ["src/normalise-route.js", "test/visible.test.js"], "eligible": true, "max_context_bytes": 49152},
-  "admission": {
-    "approved": false,
-    "approved_prompt_hashes": [],
-    "reviewer": null,
-    "reviewed_at": null,
-    "automated": {
-      "checked_at": "2026-07-25T00:00:00Z",
-      "runs_per_state": 3,
-      "hash_drift": [],
-      "passed": true,
-      "states": {
-        "pristine_pass_to_pass": [{"passed": true}, {"passed": true}, {"passed": true}],
-        "pristine_fail_to_pass": [{"passed": false}, {"passed": false}, {"passed": false}],
-        "gold_pass_to_pass": [{"passed": true}, {"passed": true}, {"passed": true}],
-        "gold_fail_to_pass": [{"passed": true}, {"passed": true}, {"passed": true}],
-        "mutant:shortcut": {
-          "pass_to_pass": [{"passed": true}, {"passed": true}, {"passed": true}],
-          "fail_to_pass": [{"passed": false}, {"passed": false}, {"passed": false}]
+    "fail_to_pass": {
+      "command": [
+        "node",
+        "--test",
+        "test/fail-to-pass.test.js"
+      ],
+      "overlays": [
+        {
+          "dest": "test/fail-to-pass.test.js",
+          "source": "real-gate-fixtures/hidden/path-near-miss.test.js"
         }
-      }
+      ],
+      "timeout_seconds": 60
+    },
+    "pass_to_pass": {
+      "command": [
+        "node",
+        "--test"
+      ],
+      "overlays": [],
+      "timeout_seconds": 60
     }
   },
-  "artifacts": [
-    {"path": "real-gate-fixtures/path-near-miss/package.json", "sha256": "878da7628bacccc709ed067b80f01ad3d988a93363a92b240010c7dbc833d5d4"},
-    {"path": "real-gate-fixtures/path-near-miss/src/normalise-route.js", "sha256": "f54998893ef9fb3bfcd56fad881fe794518bb41c05157f711e392c11c800463f"},
-    {"path": "real-gate-fixtures/path-near-miss/test/visible.test.js", "sha256": "53dfce82b656875a265b8a5d489185d1d4df8a136b1557cf49485a4973ec44de"},
-    {"path": "real-gate-fixtures/hidden/path-near-miss.test.js", "sha256": "cfc12a0f8ee407b12cd2b23228ea00cdfa4c7dc9869912df7d5a9ad890f15fd2"},
-    {"path": "real-gate-fixtures/patches/path-near-miss/gold.patch", "sha256": "db5e638e553fcb9be6b5a91c757336edb0f25fd5a1e8c9007f9835bbf60f186e"},
-    {"path": "real-gate-fixtures/patches/path-near-miss/shortcut.patch", "sha256": "b3f54a7977ab18f14dad53903093c9d0f2fa9db1bceb95a8930e6fd1b71d30db"}
-  ]
+  "timestamps": {
+    "admitted_at": "2026-07-25T12:28:38Z",
+    "created_at": "2026-07-25T00:00:00Z",
+    "expires_at": "2026-10-23T12:28:38Z"
+  }
 }
