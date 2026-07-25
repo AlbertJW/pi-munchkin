@@ -128,6 +128,10 @@ function compactText(value: unknown, max = 500): string {
 	return String(value ?? "").replace(/\s+/g, " ").trim().slice(0, max);
 }
 
+function identifierSha256(value: string): string {
+	return createHash("sha256").update(value).digest("hex");
+}
+
 function textContent(content: Array<{ type?: string; text?: string }>): string {
 	return content.filter((item) => item.type === "text").map((item) => item.text ?? "").join("\n");
 }
@@ -837,6 +841,10 @@ export function registerPlanV4(pi: ExtensionAPI): void {
 					steps: params.items.length,
 					behavior: params.items.filter((step: any) => step.kind === "behavior").length,
 					support: params.items.filter((step: any) => step.kind === "support").length,
+					requirements: new Set(existing.reflections.flatMap((record) => record.requirements).map((value) => compactText(value).toLowerCase())).size,
+					covered_requirements: new Set(params.items.flatMap((step: any) => Array.isArray(step.covers) ? step.covers : []).map((value: unknown) => compactText(value).toLowerCase())).size,
+					acceptance_criteria: params.items.reduce((sum: number, step: any) => sum + (Array.isArray(step.acceptance) ? step.acceptance.length : 0), 0),
+					required_capabilities: new Set(params.items.flatMap((step: any) => Array.isArray(step.required_capabilities) ? step.required_capabilities : []).map((value: unknown) => compactText(value))).size,
 					coverage_errors: outcome.errors.filter((error: string) => error.includes("requirement")).length,
 					capability_errors: outcome.errors.filter((error: string) => error.includes("capability")).length,
 					accepted: false,
@@ -852,6 +860,10 @@ export function registerPlanV4(pi: ExtensionAPI): void {
 				steps: outcome.state.items.length,
 				behavior: outcome.state.items.filter((step: PlanStepV4) => step.kind === "behavior").length,
 				support: outcome.state.items.filter((step: PlanStepV4) => step.kind === "support").length,
+				requirements: new Set(outcome.state.reflections.flatMap((record: ReflectionRecord) => record.requirements).map((value: string) => compactText(value).toLowerCase())).size,
+				covered_requirements: new Set(outcome.state.items.flatMap((step: PlanStepV4) => step.covers).map((value: string) => compactText(value).toLowerCase())).size,
+				acceptance_criteria: outcome.state.items.reduce((sum: number, step: PlanStepV4) => sum + step.acceptance.length, 0),
+				required_capabilities: new Set(outcome.state.items.flatMap((step: PlanStepV4) => step.required_capabilities).map((value: string) => compactText(value))).size,
 				coverage_errors: 0,
 				capability_errors: 0,
 				accepted: true,
@@ -1032,6 +1044,8 @@ export function registerPlanV4(pi: ExtensionAPI): void {
 					eligible: Number(outcome.eligible_count ?? rankEligibleSteps(state.items, state.capability_snapshot, state.route.invalidated_assumptions, state.route.selected_step_id).length),
 					selected_rank: Number(outcome.selected_rank ?? 0),
 					stale: outcome.stale?.length ?? 0,
+					stale_item_sha256: (outcome.stale ?? []).map((id: string) => identifierSha256(id)),
+					target_sha256: params.target_step ? identifierSha256(compactText(params.target_step, 80)) : undefined,
 					streak: state.route.no_progress_streak,
 					context_mode: CONTEXT_MODE,
 					accepted: outcome.ok,
@@ -1384,7 +1398,12 @@ export function registerPlanV4(pi: ExtensionAPI): void {
 				return { state: current, result: current };
 			});
 			if (state) {
-				telemetry("tdd", state, { phase: testCall.stepId === "__final__" ? "final" : exitCode === 0 ? "green" : "red", pass: exitCode === 0, exit_code: exitCode });
+				telemetry("tdd", state, {
+					phase: testCall.stepId === "__final__" ? "final" : exitCode === 0 ? "green" : "red",
+					pass: exitCode === 0,
+					exit_code: exitCode,
+					item_sha256: identifierSha256(testCall.stepId),
+				});
 				await appendReceipt(testCall.cwd, state, "plan_tdd", {
 					success: exitCode === 0,
 					item_id: testCall.stepId,
@@ -1444,7 +1463,12 @@ export function registerPlanV4(pi: ExtensionAPI): void {
 					const phase = completedStep?.kind === "behavior"
 						? receipt.exit_code === 0 ? "green" : "red"
 						: "validation";
-					telemetry("tdd", state, { phase, pass: receipt.exit_code === 0, exit_code: receipt.exit_code });
+					telemetry("tdd", state, {
+						phase,
+						pass: receipt.exit_code === 0,
+						exit_code: receipt.exit_code,
+						item_sha256: identifierSha256(subagentCall.stepId),
+					});
 					await appendReceipt(subagentCall.cwd, state, "plan_tdd", {
 						success: receipt.exit_code === 0,
 						item_id: subagentCall.stepId,

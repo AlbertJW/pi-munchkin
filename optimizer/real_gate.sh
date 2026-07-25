@@ -16,6 +16,76 @@
 # in-flight Pi process group so Ctrl-C also cleans up tool grandchildren.
 set -uo pipefail
 
+append_gate_tool() { # $1=list $2=tool
+	local list="$1" tool="$2"
+	[[ ",$list," == *",$tool,"* ]] && { printf '%s\n' "$list"; return; }
+	printf '%s,%s\n' "$list" "$tool"
+}
+
+validate_v4_gate_wiring() { # tools synthesis tdd dynamic plannotator context label
+	local tools="$1" synthesis="${2:-off}" tdd="${3:-off}" dynamic="${4:-off}"
+	local plannotator="${5:-off}" context="${6:-off}" label="${7:-unknown}"
+	local feature_on=0
+	[[ "$tdd" == "on" || "$dynamic" == "on" || "$plannotator" == "on" || "$context" != "off" ]] && feature_on=1
+	if [[ "$feature_on" == 1 && "$synthesis" != "on" ]]; then
+		echo "[real_gate] PLAN_TDD_EVIDENCE/PLAN_DYNAMIC_ROUTE/PLAN_PLANNOTATOR_BRIDGE/PLAN_STEP_CONTEXT requires PLAN_SYNTHESIS_V1=on for $label" >&2
+		return 2
+	fi
+	if [[ "$context" != "off" && ( "$tdd" != "on" || "$dynamic" != "on" ) ]]; then
+		echo "[real_gate] PLAN_STEP_CONTEXT=$context requires the identical c44/c45 core (PLAN_TDD_EVIDENCE=on and PLAN_DYNAMIC_ROUTE=on) for $label" >&2
+		return 2
+	fi
+	# Browser review has no meaningful listener in `pi -p` gate sessions. Refuse
+	# rather than silently measure c43 with an absent interactive capability.
+	if [[ "$plannotator" == "on" ]]; then
+		echo "[real_gate] PLAN_PLANNOTATOR_BRIDGE=on is interactive-only; headless real_gate profiles keep it off for $label" >&2
+		return 2
+	fi
+	if [[ "$synthesis" == "on" ]]; then
+		for required in plan_reflect plan_write plan_go; do
+			if [[ ",$tools," != *",$required,"* ]]; then
+				echo "[real_gate] PLAN_SYNTHESIS_V1=on requires '$required' but --tools resolved to '$tools' for $label — refusing to measure a nonexistent harness surface" >&2
+				return 2
+			fi
+		done
+	fi
+	if [[ "$dynamic" == "on" && ",$tools," != *",plan_route,"* ]]; then
+		echo "[real_gate] PLAN_DYNAMIC_ROUTE=on requires 'plan_route' but --tools resolved to '$tools' for $label — refusing to measure a nonexistent harness surface" >&2
+		return 2
+	fi
+	if [[ "$context" == "spawn" && ",$tools," != *",subagent,"* ]]; then
+		echo "[real_gate] PLAN_STEP_CONTEXT=spawn requires 'subagent' but --tools resolved to '$tools' for $label — refusing to measure a nonexistent harness surface" >&2
+		return 2
+	fi
+}
+
+plan_gate_wiring_selftest() {
+	local tools="read,edit,bash,plan_write"
+	tools="$(append_gate_tool "$tools" plan_reflect)"
+	tools="$(append_gate_tool "$tools" plan_go)"
+	validate_v4_gate_wiring "$tools" on off off off off c40-test
+	tools="$(append_gate_tool "$tools" plan_route)"
+	validate_v4_gate_wiring "$tools" on on on off current c44-test
+	tools="$(append_gate_tool "$tools" subagent)"
+	validate_v4_gate_wiring "$tools" on on on off spawn c45-test
+	[[ "$(append_gate_tool "$tools" subagent)" == "$tools" ]] || { echo "duplicate tool append" >&2; return 1; }
+	if validate_v4_gate_wiring "read,edit,bash,plan_write" on off off off off missing-c40 >/dev/null 2>&1; then
+		echo "missing c40 tools passed validation" >&2; return 1
+	fi
+	if validate_v4_gate_wiring "$tools" on on on on current c43-headless >/dev/null 2>&1; then
+		echo "headless Plannotator profile passed validation" >&2; return 1
+	fi
+	if validate_v4_gate_wiring "$tools" off on on off spawn missing-core >/dev/null 2>&1; then
+		echo "dependent v4 flags passed without synthesis" >&2; return 1
+	fi
+	echo "real_gate planner wiring selftest: OK"
+}
+
+if [[ "${1:-}" == "--wiring-selftest" ]]; then
+	plan_gate_wiring_selftest
+	exit $?
+fi
+
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(git -C "$HERE" rev-parse --show-toplevel 2>/dev/null || dirname "$HERE")"
 GEN="${GEN:-rg0}"; N="${N:-3}"
@@ -443,6 +513,7 @@ run_one() {  # $1=config $2=arm $3=task $4=rep [$5=split] [$6=prompt-variant]
 	local env_plan_subagent_only="" env_plan_delegate_all="" env_spawn_delegation=""
 	local env_force_plan_write="" env_plan_uncertainty="" env_plan_sha_guard="" env_plan_item_guidance_v2=""
 	local env_plan_tool_go="" # c39: standalone flag, not folded into the subagent-family branch below
+	local env_plan_synthesis="" env_plan_tdd="" env_plan_dynamic="" env_plan_plannotator="" env_plan_step_context=""
 	for entry in ${session_env[@]+"${session_env[@]}"}; do
 		[[ "$entry" == PLAN_SUBAGENT_ONLY=* ]] && env_plan_subagent_only="${entry#*=}"
 		[[ "$entry" == PLAN_DELEGATE_ALL=* ]] && env_plan_delegate_all="${entry#*=}"
@@ -452,7 +523,13 @@ run_one() {  # $1=config $2=arm $3=task $4=rep [$5=split] [$6=prompt-variant]
 		[[ "$entry" == PLAN_SHA_GUARD=* ]] && env_plan_sha_guard="${entry#*=}"
 		[[ "$entry" == PLAN_ITEM_GUIDANCE_V2=* ]] && env_plan_item_guidance_v2="${entry#*=}"
 		[[ "$entry" == PLAN_TOOL_GO=* ]] && env_plan_tool_go="${entry#*=}"
+		[[ "$entry" == PLAN_SYNTHESIS_V1=* ]] && env_plan_synthesis="${entry#*=}"
+		[[ "$entry" == PLAN_TDD_EVIDENCE=* ]] && env_plan_tdd="${entry#*=}"
+		[[ "$entry" == PLAN_DYNAMIC_ROUTE=* ]] && env_plan_dynamic="${entry#*=}"
+		[[ "$entry" == PLAN_PLANNOTATOR_BRIDGE=* ]] && env_plan_plannotator="${entry#*=}"
+		[[ "$entry" == PLAN_STEP_CONTEXT=* ]] && env_plan_step_context="${entry#*=}"
 	done
+	env_plan_step_context="${env_plan_step_context:-off}"
 	# plan_write is part of the standard harness surface in every real
 	# interactive session; omitting it here measured a harness that doesn't
 	# exist — the c31/c38 rounds of 2026-07-23 were confounded exactly this way
@@ -477,6 +554,12 @@ run_one() {  # $1=config $2=arm $3=task $4=rep [$5=split] [$6=prompt-variant]
 	# its own append, not merged into the subagent-family branch above.
 	[[ "$env_plan_tool_go" == "on" ]] && tools="$tools,plan_go"
 	[[ "$env_span_tools" == "on" ]] && tools="$tools,search_spans,read_span"
+	if [[ "$env_plan_synthesis" == "on" ]]; then
+		tools="$(append_gate_tool "$tools" plan_reflect)"
+		tools="$(append_gate_tool "$tools" plan_go)"
+	fi
+	[[ "$env_plan_dynamic" == "on" ]] && tools="$(append_gate_tool "$tools" plan_route)"
+	[[ "$env_plan_step_context" == "spawn" ]] && tools="$(append_gate_tool "$tools" subagent)"
 	# Instrument-consistency check (UPGRADE_MAP.md Tier 1 #1): every candidate flag that
 	# steers the model toward a specific tool must have that tool actually granted in
 	# $tools, checked HERE — at the exact point $tools is finalized, on every real
@@ -513,6 +596,8 @@ run_one() {  # $1=config $2=arm $3=task $4=rep [$5=split] [$6=prompt-variant]
 		echo "[real_gate] PLAN_TOOL_GO=on requires 'plan_go' but --tools resolved to '$tools' for $pat/$task — refusing to measure a nonexistent harness surface" >&2
 		exit 2
 	fi
+	validate_v4_gate_wiring "$tools" "$env_plan_synthesis" "$env_plan_tdd" "$env_plan_dynamic" \
+		"$env_plan_plannotator" "$env_plan_step_context" "$pat/$task" || exit 2
 	# Candidate env the PARENT shell must see: the exports below happen inside the pi
 	# subshell only, so checking ${RETRY_FRESH} out here read the parent's env and the
 	# c18 retry never fired for candidates that enable it (audit 2026-07-13 — the f4

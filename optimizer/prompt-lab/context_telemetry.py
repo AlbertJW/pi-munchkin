@@ -74,6 +74,11 @@ def aggregate(path, session_key, key=None):
     _, plan_events = exact_events(path, session_key, "plan-runner", key)
     delegate_blocks = [e for e in plan_events if e.get("kind") == "delegate-all-block"]
     delegate_subagents = [e for e in plan_events if e.get("kind") == "delegate-all-subagent"]
+    v4_kinds = {
+        "reflection", "v4-write", "route", "tdd", "capability-refresh",
+        "review", "step-context",
+    }
+    v4_events = [e for e in plan_events if e.get("kind") in v4_kinds]
     harness_surface_sha256 = None
     if surface_events:
         candidate = surface_events[-1].get("sha256")
@@ -105,12 +110,56 @@ def aggregate(path, session_key, key=None):
         values = [event.get(name) for name in ("user_text_bytes", "assistant_text_bytes", "tool_text_bytes", "custom_text_bytes")]
         if all(isinstance(value, int) and not isinstance(value, bool) for value in values):
             message_bytes.append(sum(values))
+
+    reflections = [e for e in v4_events if e.get("kind") == "reflection"]
+    writes = [e for e in v4_events if e.get("kind") == "v4-write"]
+    accepted_writes = [e for e in writes if e.get("accepted") is True]
+    rejected_writes = [e for e in writes if e.get("accepted") is False]
+    latest_accepted_write = accepted_writes[-1] if accepted_writes else {}
+    routes = [e for e in v4_events if e.get("kind") == "route"]
+    tdd_events = [e for e in v4_events if e.get("kind") == "tdd"]
+    capability_events = [e for e in v4_events if e.get("kind") == "capability-refresh"]
+    review_events = [e for e in v4_events if e.get("kind") == "review"]
+    step_context_events = [e for e in v4_events if e.get("kind") == "step-context"]
+
+    seen_red = set()
+    compliant_green = set()
+    green_without_red = 0
+    stale_pending = set()
+    stale_observed = set()
+    stale_revalidated = set()
+    for event in plan_events:
+        if event.get("kind") == "route":
+            for item_hash in event.get("stale_item_sha256") or []:
+                if isinstance(item_hash, str):
+                    stale_pending.add(item_hash)
+                    stale_observed.add(item_hash)
+        if event.get("kind") != "tdd":
+            continue
+        item_hash = event.get("item_sha256")
+        phase = event.get("phase")
+        if not isinstance(item_hash, str):
+            continue
+        if phase == "red":
+            seen_red.add(item_hash)
+        elif phase == "green":
+            if item_hash in seen_red:
+                compliant_green.add(item_hash)
+            else:
+                green_without_red += 1
+            if item_hash in stale_pending:
+                stale_revalidated.add(item_hash)
+                stale_pending.discard(item_hash)
+
+    def count_status(events, status):
+        return sum(event.get("status") == status for event in events)
+
     return {
         "schema": "pi.context-telemetry/v2",
         "authenticated": key is not None,
         "content_sha256": hashlib.sha256(raw).hexdigest(),
         "session_key": session_key,
-        "events": len(selected) + len(context_surfaces) + len(guard_events) + len(delegate_blocks) + len(delegate_subagents),
+        "events": len(selected) + len(context_surfaces) + len(guard_events) + len(delegate_blocks) + len(delegate_subagents) + len(v4_events),
         "harness_surface_sha256": harness_surface_sha256,
         "config": config,
         "compactions": {
@@ -167,6 +216,65 @@ def aggregate(path, session_key, key=None):
             "blocked": len(delegate_blocks),
             "delegated": len(delegate_subagents),
         },
+        "plan_runner_v4": {
+            "events": len(v4_events),
+            "reflection": {
+                "passes": len(reflections),
+                "max_pass": max((int(e.get("pass", 0)) for e in reflections), default=0),
+                "requirements": max((int(e.get("requirements", 0)) for e in reflections), default=0),
+                "uncertainties": sum(int(e.get("uncertainties", 0)) for e in reflections),
+            },
+            "writes": {
+                "total": len(writes),
+                "accepted": len(accepted_writes),
+                "rejected": len(rejected_writes),
+                "rejection_rate": (len(rejected_writes) / len(writes)) if writes else None,
+                "coverage_errors": sum(int(e.get("coverage_errors", 0)) for e in rejected_writes),
+                "capability_errors": sum(int(e.get("capability_errors", 0)) for e in rejected_writes),
+                "requirements": int(latest_accepted_write.get("requirements", 0)),
+                "covered_requirements": int(latest_accepted_write.get("covered_requirements", 0)),
+                "acceptance_criteria": int(latest_accepted_write.get("acceptance_criteria", 0)),
+                "required_capabilities": int(latest_accepted_write.get("required_capabilities", 0)),
+            },
+            "routing": {
+                "total": len(routes),
+                "accepted": sum(e.get("accepted") is True for e in routes),
+                "rejected": sum(e.get("accepted") is False for e in routes),
+                "jumps": sum(e.get("accepted") is True and int(e.get("selected_rank", 0)) > 1 for e in routes),
+                "backtracks": sum(e.get("accepted") is True and e.get("action") == "backtrack" for e in routes),
+                "blocks": sum(e.get("action") == "block" for e in routes),
+                "stale": sum(int(e.get("stale", 0)) for e in routes),
+                "churn_peak": max((int(e.get("streak", 0)) for e in routes), default=0),
+                "stale_items": len(stale_observed),
+                "stale_revalidated": len(stale_revalidated),
+            },
+            "tdd": {
+                "red": sum(e.get("phase") == "red" for e in tdd_events),
+                "green": sum(e.get("phase") == "green" for e in tdd_events),
+                "final": sum(e.get("phase") == "final" and e.get("pass") is True for e in tdd_events),
+                "compliant_steps": len(compliant_green),
+                "green_without_red": green_without_red,
+            },
+            "capabilities": {
+                "refreshes": len(capability_events),
+                "changes": sum(e.get("changed") is True for e in capability_events),
+            },
+            "review": {
+                "events": len(review_events),
+                "unavailable": count_status(review_events, "unavailable"),
+                "pending": count_status(review_events, "pending"),
+                "approved": count_status(review_events, "approved"),
+                "rejected": count_status(review_events, "rejected"),
+            },
+            "step_context": {
+                "events": len(step_context_events),
+                "delegated": sum(e.get("delegated") is True for e in step_context_events),
+                "successful": sum(e.get("success") is True for e in step_context_events),
+                "parent_input": sum(int(e.get("parent_input", 0)) for e in step_context_events),
+                "child_input": sum(int(e.get("child_input", 0)) for e in step_context_events),
+                "child_output": sum(int(e.get("child_output", 0)) for e in step_context_events),
+            },
+        },
     }
 
 
@@ -189,6 +297,17 @@ def selftest():
         {"ts":"x","sk":"run-a","ext":"plan-runner","kind":"delegate-all-block","toolName":"bash"},
         {"ts":"x","sk":"run-a","ext":"plan-runner","kind":"delegate-all-subagent","agent":"executor","mode":"spawn"},
         {"ts":"x","sk":"run-a","ext":"plan-runner","kind":"write","items":1},  # unrelated plan-runner kind — must not be counted
+        {"ts":"x","sk":"run-a","ext":"plan-runner","kind":"reflection","stage":"interpretation","pass":1,"next":"evidence","requirements":2,"uncertainties":1},
+        {"ts":"x","sk":"run-a","ext":"plan-runner","kind":"v4-write","accepted":False,"coverage_errors":1,"capability_errors":0},
+        {"ts":"x","sk":"run-a","ext":"plan-runner","kind":"v4-write","accepted":True,"coverage_errors":0,"capability_errors":0,
+         "requirements":2,"covered_requirements":2,"acceptance_criteria":3,"required_capabilities":1},
+        {"ts":"x","sk":"run-a","ext":"plan-runner","kind":"route","action":"backtrack","accepted":True,"selected_rank":1,
+         "stale":1,"streak":0,"stale_item_sha256":["b"*64]},
+        {"ts":"x","sk":"run-a","ext":"plan-runner","kind":"tdd","phase":"red","pass":False,"item_sha256":"b"*64},
+        {"ts":"x","sk":"run-a","ext":"plan-runner","kind":"tdd","phase":"green","pass":True,"item_sha256":"b"*64},
+        {"ts":"x","sk":"run-a","ext":"plan-runner","kind":"capability-refresh","changed":True},
+        {"ts":"x","sk":"run-a","ext":"plan-runner","kind":"step-context","delegated":True,"success":True,
+         "parent_input":100,"child_input":20,"child_output":5},
         {"ts":"x","sk":"other","ext":"plan-runner","kind":"delegate-all-block","toolName":"edit"},
     ]
     with tempfile.TemporaryDirectory() as td:
@@ -203,7 +322,7 @@ def selftest():
         row = aggregate(path, "run-a", key)
         assert row["content_sha256"] == hashlib.sha256(content).hexdigest()
         assert row["schema"] == "pi.context-telemetry/v2"
-        assert row["events"] == 10 and row["config"]["enabled"] is False
+        assert row["events"] == 18 and row["config"]["enabled"] is False
         assert row["compactions"]["pi"] == 1 and row["compactions"]["overflow"] == 0
         assert row["watcher"]["completed"] == 1 and row["watcher"]["resume_required"] == 1
         assert row["harness_surface_sha256"] == "a" * 64
@@ -213,6 +332,12 @@ def selftest():
         assert row["bash_output_guard"]["cwd_escape_suspected"] == 1
         assert row["plan_runner_delegation"]["blocked"] == 2, "only run-a's delegate-all-block events, not other's edit or run-a's own write"
         assert row["plan_runner_delegation"]["delegated"] == 1
+        assert row["plan_runner_v4"]["writes"]["rejection_rate"] == 0.5
+        assert row["plan_runner_v4"]["writes"]["covered_requirements"] == 2
+        assert row["plan_runner_v4"]["routing"]["backtracks"] == 1
+        assert row["plan_runner_v4"]["routing"]["stale_revalidated"] == 1
+        assert row["plan_runner_v4"]["tdd"]["compliant_steps"] == 1
+        assert row["plan_runner_v4"]["step_context"]["child_input"] == 20
         assert aggregate(os.path.join(td, "missing"), "run-a", key)["events"] == 0
         assert aggregate(os.path.join(td, "missing"), "run-a", key)["harness_surface_sha256"] is None
         assert not has_abort(path, "run-a", key)
@@ -255,6 +380,7 @@ def selftest():
         assert set(context_schema["properties"]["surface"]["required"]) == set(row["surface"])
         assert set(context_schema["properties"]["bash_output_guard"]["required"]) == set(row["bash_output_guard"])
         assert set(context_schema["properties"]["plan_runner_delegation"]["required"]) == set(row["plan_runner_delegation"])
+        assert set(context_schema["properties"]["plan_runner_v4"]["required"]) == set(row["plan_runner_v4"])
     print("context_telemetry selftest: OK (exact key; v2 surface aggregates; content sha256)")
 
 

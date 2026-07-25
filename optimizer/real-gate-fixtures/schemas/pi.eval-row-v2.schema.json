@@ -181,6 +181,105 @@
             "blocked": {"type": "integer", "minimum": 0},
             "delegated": {"type": "integer", "minimum": 0}
           }
+        },
+        "plan_runner_v4": {
+          "type": "object",
+          "required": ["events", "reflection", "writes", "routing", "tdd", "capabilities", "review", "step_context"],
+          "additionalProperties": false,
+          "properties": {
+            "events": {"type": "integer", "minimum": 0},
+            "reflection": {
+              "type": "object",
+              "required": ["passes", "max_pass", "requirements", "uncertainties"],
+              "additionalProperties": false,
+              "properties": {
+                "passes": {"type": "integer", "minimum": 0},
+                "max_pass": {"type": "integer", "minimum": 0, "maximum": 3},
+                "requirements": {"type": "integer", "minimum": 0},
+                "uncertainties": {"type": "integer", "minimum": 0}
+              }
+            },
+            "writes": {
+              "type": "object",
+              "required": ["total", "accepted", "rejected", "rejection_rate", "coverage_errors", "capability_errors", "requirements", "covered_requirements", "acceptance_criteria", "required_capabilities"],
+              "additionalProperties": false,
+              "properties": {
+                "total": {"type": "integer", "minimum": 0},
+                "accepted": {"type": "integer", "minimum": 0},
+                "rejected": {"type": "integer", "minimum": 0},
+                "rejection_rate": {"type": ["number", "null"], "minimum": 0, "maximum": 1},
+                "coverage_errors": {"type": "integer", "minimum": 0},
+                "capability_errors": {"type": "integer", "minimum": 0},
+                "requirements": {"type": "integer", "minimum": 0},
+                "covered_requirements": {"type": "integer", "minimum": 0},
+                "acceptance_criteria": {"type": "integer", "minimum": 0},
+                "required_capabilities": {"type": "integer", "minimum": 0}
+              }
+            },
+            "routing": {
+              "type": "object",
+              "required": ["total", "accepted", "rejected", "jumps", "backtracks", "blocks", "stale", "churn_peak", "stale_items", "stale_revalidated"],
+              "additionalProperties": false,
+              "properties": {
+                "total": {"type": "integer", "minimum": 0},
+                "accepted": {"type": "integer", "minimum": 0},
+                "rejected": {"type": "integer", "minimum": 0},
+                "jumps": {"type": "integer", "minimum": 0},
+                "backtracks": {"type": "integer", "minimum": 0},
+                "blocks": {"type": "integer", "minimum": 0},
+                "stale": {"type": "integer", "minimum": 0},
+                "churn_peak": {"type": "integer", "minimum": 0},
+                "stale_items": {"type": "integer", "minimum": 0},
+                "stale_revalidated": {"type": "integer", "minimum": 0}
+              }
+            },
+            "tdd": {
+              "type": "object",
+              "required": ["red", "green", "final", "compliant_steps", "green_without_red"],
+              "additionalProperties": false,
+              "properties": {
+                "red": {"type": "integer", "minimum": 0},
+                "green": {"type": "integer", "minimum": 0},
+                "final": {"type": "integer", "minimum": 0},
+                "compliant_steps": {"type": "integer", "minimum": 0},
+                "green_without_red": {"type": "integer", "minimum": 0}
+              }
+            },
+            "capabilities": {
+              "type": "object",
+              "required": ["refreshes", "changes"],
+              "additionalProperties": false,
+              "properties": {
+                "refreshes": {"type": "integer", "minimum": 0},
+                "changes": {"type": "integer", "minimum": 0}
+              }
+            },
+            "review": {
+              "type": "object",
+              "required": ["events", "unavailable", "pending", "approved", "rejected"],
+              "additionalProperties": false,
+              "properties": {
+                "events": {"type": "integer", "minimum": 0},
+                "unavailable": {"type": "integer", "minimum": 0},
+                "pending": {"type": "integer", "minimum": 0},
+                "approved": {"type": "integer", "minimum": 0},
+                "rejected": {"type": "integer", "minimum": 0}
+              }
+            },
+            "step_context": {
+              "type": "object",
+              "required": ["events", "delegated", "successful", "parent_input", "child_input", "child_output"],
+              "additionalProperties": false,
+              "properties": {
+                "events": {"type": "integer", "minimum": 0},
+                "delegated": {"type": "integer", "minimum": 0},
+                "successful": {"type": "integer", "minimum": 0},
+                "parent_input": {"type": "integer", "minimum": 0},
+                "child_input": {"type": "integer", "minimum": 0},
+                "child_output": {"type": "integer", "minimum": 0}
+              }
+            }
+          }
         }
       },
       "additionalProperties": false
