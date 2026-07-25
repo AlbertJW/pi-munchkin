@@ -194,6 +194,17 @@ def calibration(manifest_path: Path, manifest: dict) -> dict[str, float]:
     return rates
 
 
+def recorded_calibration(manifest: dict) -> dict[str, float]:
+    """Read only completed calibration cells; never launch work for reporting."""
+    rates: dict[str, float] = {}
+    for task in manifest["calibration_tasks"]:
+        path = result_file(f"{manifest['name']}-cal-{task}")
+        selected = [row for row in rows(path) if row.get("pattern") == "base" and row.get("task") == task]
+        if len(selected) == manifest["calibration_reps"]:
+            rates[task] = sum(int(row.get("score", 0)) for row in selected) / len(selected)
+    return rates
+
+
 def eligible_tasks(manifest: dict, rates: dict[str, float], candidate: str) -> list[str]:
     allowed = set(manifest["eligible_passes"])
     def admitted_for_screen(task: str) -> bool:
@@ -291,6 +302,12 @@ def main() -> None:
                 usage = {**usage, "supported": False, "reason": f"model_not_stably_serving:{status_after}"}
         print(json.dumps({**details, "usage": usage}, sort_keys=True))
         raise SystemExit(0 if usage.get("supported") else 2)
+    if args.command == "report":
+        rates = recorded_calibration(manifest)
+        selected = {candidate: eligible_tasks(manifest, rates, candidate)
+                    for candidate in manifest["candidates"]}
+        report(manifest, selected)
+        return
     rates = calibration(manifest_path, manifest)
     if args.command == "calibrate":
         print(json.dumps(rates, sort_keys=True))
