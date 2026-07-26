@@ -161,8 +161,7 @@ either way:
   before this candidate is trusted anywhere near this model.
 
 **c38-force-plan-write: a genuine, serious, model-specific finding (not noise).** Base 56% → cand
-**0%**, all 9/9 cand sessions failing, across all three tasks. This is the opposite of the
-`qwopus35-4b`-local result above ("works as designed"). Inspected every one of the 9 cand run
+**0%**, all 9/9 cand sessions failing, across all three tasks. Inspected every one of the 9 cand run
 directories directly (`plan-state.json`, `gate.log`, `run.log`) rather than trusting the aggregate
 score, and the failure mode is consistent and specific: the model calls `plan_write` exactly once
 (satisfying the block), the plan stays in `phase: "planned"` forever — it never calls `/plan-go` —
@@ -175,11 +174,23 @@ known architecture gap (see "2 architecture-gap-fixed..." below), its block mess
 to retry the original mutation, not to call `plan_go`, and this particular model responds to that
 retry-block by fabricating completion instead of retrying.
 
-**Implication**: `c38-force-plan-write`'s status must not be generalized from one model's clean
-result. Before any adoption decision, this needs the same treatment as the qwopus35-4b findings —
-confirmed on at least a third model, and ideally with the underlying architecture gap (block message
-doesn't nudge toward `plan_go`) fixed first, since that's the most likely lever to fix this rather
-than just documenting it as a per-model landmine.
+**What the prior c38 evidence actually is** (corrected 2026-07-26 — an earlier revision of this
+section wrongly described a "`qwopus35-4b`-local result (works as designed)"; **c38 has never been
+run on any `qwopus35-4b`**). The only pre-existing c38 rows are:
+- `results/c31-c38-combo.jsonl` and `results/c31-c38-v3.jsonl` — model **`qwen36-35b-iq3s`**,
+  fixture `sv-ambiguous-spec`, **0/3 pass in both arms**. The documented "clean post-fix win" was a
+  *mechanism* result only (`plan_write` called 4/2/3 times across reps, no deadlock, block fires
+  once), never a pass-rate win.
+- `results/gemma-e2b-c38-force-plan-write.jsonl` — the 0/9 collapse above.
+
+So there is exactly one pass-rate datapoint for c38 anywhere, and it is the collapse. The two
+prior rounds also used different fixtures (`sv-ambiguous-spec` vs `parens`/`equil`/`bigdata`), so
+they are not directly comparable.
+
+**Implication**: c38's status cannot be settled from this. It needs a real pass-rate measurement on
+at least one more model against the same task set where it collapsed, and ideally with the
+underlying architecture gap (block message doesn't nudge toward `plan_go`) fixed first, since
+that's the most likely lever to fix this rather than just documenting it as a per-model landmine.
 
 Full c25-c39 active-roster table (base% → cand%, delta in pp; per-task breakdown available in
 `optimizer/prompt-lab/results/gemma-e2b-<config>.jsonl`):
@@ -207,6 +218,18 @@ Legacy c1-c24 candidates were also swept (same fixture set, same discipline) —
 exceeded ±22pp; full numbers in the results directory, not reproduced here since none of those
 candidates are on the active c25-c39 roster this ledger tracks.
 
+## Provenance for the 2026-07-26 remote 4B run (in progress)
+
+Recorded before any sessions start, so the instrument is pinned independently of the results.
+
+- **Harness surface sha256**: `d117b90fb570b81a9fa3a1a821c682f943619a730bbd382489d38db61ad44f6a`
+  (live `~/.pi/agent` at commit `84ea525`). This differs from every earlier round — it now includes
+  `lib/agent-dir.ts`, the plan-v4 telemetry field additions, and a new `npm:browser-goblin` package
+  in `settings.json`. Any comparison against older `qwopus35-4b-mtp` data is therefore
+  **cross-surface** and must be labelled as such, not read as a like-for-like delta.
+- **Endpoint**: resolved from `$LLAMA_URL` at run time; the batch manifest no longer carries one.
+- Rows will be exploratory / non-authoritative, as every remote-endpoint row is.
+
 **Not done here**: no action taken on any of the above — same human-gated-adoption rule as
 everywhere else in this ledger. c38 in particular should not be treated as either "adopt" or
 "retire" until it's been checked on at least one more model.
@@ -220,10 +243,11 @@ everywhere else in this ledger. c38 in particular should not be treated as eithe
   fixed and unit-tested as of c39 (2026-07-24, `plan_go` tool), but live combo rounds show the
   model doesn't call `plan_write` at all on the standard task set, so neither block has fired yet
   in practice; both need a three-way combo with `FORCE_PLAN_WRITE` (c38) next
-- **1 clean win on its first model, contradicted on a second** (c38-force-plan-write — worked as
-  designed on local `qwopus35-4b`; on remote `gemma-4-e2b` it collapsed to 0/9, inducing false
-  "tests passed" completions instead of retrying — see the remote-sweep section above. Model-
-  dependent, not yet resolved either way.)
+- **1 mechanism-only result, plus one pass-rate collapse** (c38-force-plan-write — the earlier
+  "clean win" was `qwen36-35b-iq3s`/`sv-ambiguous-spec` showing the mechanism firing correctly at
+  0/3 pass in *both* arms, not a pass-rate win, and never on a `qwopus35-4b`; on remote
+  `gemma-4-e2b` it collapsed to 0/9, inducing false "tests passed" completions instead of
+  retrying. See the remote-sweep section above. Unresolved; needs a real pass-rate measurement.)
 - **1 new standalone candidate, near-neutral by its own prediction** (c39-plan-tool-go)
 - **2 confounded / need a clean post-fix re-run** before their existing `NEUTRAL` can be trusted (c31-plan-uncertainty, c34-plan-item-guidance), plus the investigation scaffold that exposed the bug (c31-c38-combo, which should simply retire once those resolve)
 - **3 investigation scaffolds**, not independent candidates (c31-c38-combo, c25-c39-combo, c37-c39-combo) — each retires once the candidate it was built to unblock gets a clean verdict
