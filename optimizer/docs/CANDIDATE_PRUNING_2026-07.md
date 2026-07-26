@@ -218,6 +218,50 @@ Legacy c1-c24 candidates were also swept (same fixture set, same discipline) —
 exceeded ±22pp; full numbers in the results directory, not reproduced here since none of those
 candidates are on the active c25-c39 roster this ledger tracks.
 
+## c38 on the remote 4B — the gemma collapse does NOT reproduce (2026-07-26, exploratory)
+
+`GEN=q4b-c38-confirm`, `qwopus35-4b-mtp` on the remote box, baseline vs `c38-force-plan-write`,
+`parens`/`equil`/`bigdata`, N=3, 18/18 rows. Surface hash `d117b90f…` (see provenance below).
+First pass-rate measurement of c38 on any 4B.
+
+| task | base | cand | (gemma-4-e2b for contrast) |
+|---|---|---|---|
+| parens | 2/3 | 2/3 | 1/3 → 0/3 |
+| equil | 3/3 | 3/3 | 3/3 → 0/3 |
+| bigdata | 3/3 | 3/3 | 1/3 → 0/3 |
+| **total** | **8/9 (89%)** | **8/9 (89%)** | 5/9 → **0/9** |
+
+**Verdict: exactly neutral (+0pp), no collapse.** gemma-4-e2b's 0/9 is model-specific, not a
+property of the candidate.
+
+**But the structural state is identical across both models**, which is the more useful finding.
+Checked all 9 cand run dirs directly: every session called `plan_write` (1–4×), every session ended
+with `phase: "planned"`, and **`plan_go` was never called once** — the same never-activated plan
+that gemma showed. What differs is only the consequence:
+
+- On `qwopus35-4b-mtp` the model then just does the work directly and passes. The one RED session
+  (`parens` rep2, 7 failing test lines) **did not** claim success; the 6 sessions whose output
+  claimed success were all genuinely green. No false completions.
+- On `gemma-4-e2b` the same dead-plan state led to fabricated "tests passed" claims over red gates.
+
+So the c39/`plan_go` activation gap is universal, and c38's danger is a *model-specific reaction*
+to it rather than something c38 does on its own. That argues for fixing the block message (nudge
+toward `plan_go`) rather than treating c38 as a per-model landmine.
+
+**Instrumentation gap found and fixed.** How often the block actually fired is **not answerable
+from this round**: `plan-runner/force-plan-write-block` is not extracted by
+`context_telemetry.py`, and c38 declared no `exposure` spec, so its row carries
+`{"mode":"configuration","status":"targeted","counts":{}}` — vacuously "targeted" with nothing
+counted. We therefore cannot distinguish "the block fired once and the model recovered" from "the
+model planned voluntarily and the block never fired at all". c38 now declares a telemetry exposure
+spec targeting `plan-runner/force-plan-write-block`; the next c38 round will answer it. The same
+vacuous-configuration-mode caveat still applies to c40–c45.
+
+**Usage note**: rows are `usage.source: char_proxy`, `exact: false` — the live registry sets
+`supportsUsageInStreaming: false`, so pi never requests usage. The box itself *does* support it
+(`usage_probe.py` → `{"supported":true,"input_tokens":13,"output_tokens":1}`), which is what the
+batch overlay's compat flip enables.
+
 ## Provenance for the 2026-07-26 remote 4B run (in progress)
 
 Recorded before any sessions start, so the instrument is pinned independently of the results.
