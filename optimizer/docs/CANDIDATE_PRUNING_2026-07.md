@@ -218,6 +218,67 @@ Legacy c1-c24 candidates were also swept (same fixture set, same discipline) —
 exceeded ±22pp; full numbers in the results directory, not reproduced here since none of those
 candidates are on the active c25-c39 roster this ledger tracks.
 
+## Legacy-signal batch screen on the remote 4B (2026-07-26/27, exploratory)
+
+`batch_screen.py` against `qwopus35-4b-mtp`, run-private overlay
+(`models_sha256 f5581fab…`), surface hash `d117b90f…`. 144 sessions: 36 calibration, 12 pilot,
+96 screen. Zero failures; **96/96 screen rows carry exact provider usage**, so the
+`REQUIRE_EXACT_USAGE=1` gate never had to refuse a row.
+
+### Calibration pruned a third of the fixture set
+
+| task | base | | verdict |
+|---|---|---|---|
+| qs-error-swallow | 4/6 | 67% | KEEP |
+| parens | 3/6 | 50% | KEEP |
+| path-near-miss | 2/6 | 33% | KEEP |
+| sv-commit-sha-guard | 2/6 | 33% | KEEP |
+| sv-ambiguous-spec | 1/6 | 17% | IMPOSSIBLE |
+| hygiene-shared-config-reread | 0/6 | 0% | IMPOSSIBLE |
+
+`hygiene-shared-config-reread` (0/6) and `sv-ambiguous-spec` (1/6) are **beyond this model**.
+That retroactively reframes earlier rounds: any A/B run against this model on those two fixtures
+was measuring a floor, so a "no difference" result there could never have shown a difference.
+
+### Screen dispositions
+
+| cell | base→cand | delta | targeted | disposition |
+|---|---|---|---|---|
+| **c24 / path-near-miss** | 4/6 → **6/6** | **+2** | 6/6 | **PROMOTE_TO_LOCAL_CONFIRMATION** |
+| **c7 / qs-error-swallow** | **6/6 → 3/6** | **−3** | 3/6 | **SAFETY_HOLD** |
+| c21 / parens | — | +0 | 5/6 | PARK_EXPOSED_NO_SIGNAL |
+| c21 / qs-error-swallow | — | +0 | 3/6 | PARK_EXPOSED_NO_SIGNAL |
+| c2 / parens | 5/6 → 4/6 | −1 | 6/6 (vacuous) | PARK_EXPOSED_NO_SIGNAL |
+| c2 / qs-error-swallow | — | −1 | 6/6 (vacuous) | PARK_EXPOSED_NO_SIGNAL |
+| c7 / parens | — | +1 | **0/6** | UNEXPOSED |
+| c24 / parens | — | +1 | **0/6** | UNEXPOSED |
+
+**c24-did-you-mean is the one promotion.** `did-you-mean/hint` fired exactly once in every cand
+rep (6/6), and the cand arm went 6/6 against a 4/6 base. Mechanism-confirmed, not a pass-rate
+coincidence. It earns an *authoritative local confirmation round*, not adoption — remote rows
+remain non-authoritative.
+
+**c7-verify-gate-steer is the one safety hold, and the trigger was not the predicted one.** It
+fired on the pass-rate rule (delta ≤ −2): base **6/6 → cand 3/6** on a task the model otherwise
+solves perfectly. The `verify-gate/unverified-end ≥ 2` rule did **not** fire —
+`unverified-end` was **0** across the entire cand arm, while `verify-gate/steer` fired 4 times.
+So on this model c7 is not failing to verify; the steer engages and the work gets *worse*. That is
+a different, more direct harm than the gemma sweep's −44pp suggested, and it now has
+mechanism evidence behind it on a second model.
+
+**Exposure earned its cost twice.** `c24/parens` and `c7/parens` both scored a superficially
+encouraging +1 while firing **zero** mechanism events — without exposure counts, two confident
+nulls (or worse, two false positives) would have entered the ledger. The `c24/parens` pilot
+predicted this exactly (0/2 targeted), so the 12 screen sessions it spent were knowably
+uninformative in advance; wiring pilot exposure into task selection would reclaim them.
+
+**c21-micro-gate** fires reliably (5/6 and 3/6 targeted) and is exactly neutral (+0, +0) — clean
+do-no-harm, still no demonstrated benefit. **c2-scaffold-cot** is flat-to-negative here (−1, −1),
+which does not reproduce its +44pp in the gemma sweep — the single largest apparent effect in that
+sweep failing to survive a doubled sample on another model is a useful reminder of what n=3 buys.
+
+**Nothing adopted or retired.** Screening dispositions feed a decision; they are not one.
+
 ## c38 on the remote 4B — the gemma collapse does NOT reproduce (2026-07-26, exploratory)
 
 `GEN=q4b-c38-confirm`, `qwopus35-4b-mtp` on the remote box, baseline vs `c38-force-plan-write`,
