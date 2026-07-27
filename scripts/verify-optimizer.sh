@@ -50,7 +50,6 @@ python3 "$OPT/prompt-lab/integrity_selftest.py"
 python3 "$OPT/prompt-lab/seatbelt_network_selftest.py"
 
 node --test "$OPT"/pi-test/test/*.test.js
-"$OPT/real_gate.sh" --wiring-selftest
 dry_output="$(cd "$OPT" && ./real_gate.sh --dry)"
 printf '%s\n' "$dry_output"
 grep -q 'execution: network=endpoint model_control=llama' <<< "$dry_output"

@@ -1,10 +1,21 @@
 {
   "name": "pi-munchkin",
   "version": "0.3.0",
-  "description": "Harness extensions for the pi coding agent (hashline edits, anti-loop breaker, verify gate, plan runner, /reflect, guards, span tools, telemetry) — installable as a pi extension.",
-  "keywords": ["pi", "pi-coding-agent", "pi-extension", "coding-agent", "llm", "local-llm", "agent-harness"],
+  "description": "Harness extensions for the pi coding agent (hashline edits, anti-loop breaker, verify gate, plan runner, /reflect, guards, span tools, telemetry) \u2014 installable as a pi extension.",
+  "keywords": [
+    "pi",
+    "pi-coding-agent",
+    "pi-extension",
+    "coding-agent",
+    "llm",
+    "local-llm",
+    "agent-harness"
+  ],
   "homepage": "https://github.com/AlbertJW/pi-munchkin",
-  "repository": { "type": "git", "url": "git+https://github.com/AlbertJW/pi-munchkin.git" },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/AlbertJW/pi-munchkin.git"
+  },
   "license": "MIT",
   "type": "module",
   "engines": {
@@ -100,9 +111,6 @@
     "harness/lib/micro-gate-policy.ts",
     "harness/lib/plan-integrity.ts",
     "harness/lib/plan-progress.ts",
-    "harness/lib/plan-synthesis.ts",
-    "harness/lib/plan-router.ts",
-    "harness/lib/plan-v4-runtime.ts",
     "harness/lib/process-writer.ts",
     "harness/lib/public-url.ts",
     "harness/lib/reflect-policy.ts",
