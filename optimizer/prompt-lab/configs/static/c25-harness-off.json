@@ -7,8 +7,12 @@
     "DRIFT_SCANNER": "off"
   },
   "exposure": {
-    "mode": "configuration",
-    "target": [],
+    "mode": "suppression",
+    "target": [
+      "loop-breaker/steer",
+      "verify-gate/steer",
+      "drift-scanner/advisory"
+    ],
     "diagnostic": []
   }
 }

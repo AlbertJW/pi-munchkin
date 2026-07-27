@@ -5,8 +5,11 @@
     "VERIFY_GATE": "off"
   },
   "exposure": {
-    "mode": "configuration",
-    "target": [],
+    "mode": "suppression",
+    "target": [
+      "verify-gate/steer",
+      "verify-gate/unverified-end"
+    ],
     "diagnostic": []
   }
 }

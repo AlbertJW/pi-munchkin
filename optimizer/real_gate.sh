@@ -849,7 +849,7 @@ NOTE: a previous attempt in this workdir was stopped for repeating the same fail
 	fi
 
 	python3 - "$RESULTS" "$MODEL" "$pat" "$task" "$rep" "$gate" "$retried" "$RUNID" "$tin" "$tout" "$output_chars" "$split" "$usage_exact" "${FLEET_EXPECTED_MODELS:-}" "$rowctx" "$wd/fingerprint-pre.json" "$wd/fingerprint-post.json" "$GATE_NETWORK" "$MODEL_CONTROL" "$MODEL_PROVIDER_RESOLVED" "$ENDPOINT_IDENTITY_SHA256" "$NETWORK_AUTHORITATIVE" "$NETWORK_AUTHORITY_REASON" "$SANDBOX_AUTHORITATIVE" "$SANDBOX_AUTHORITY_REASON" "$EXEC_POLICY" "$mrow" "$span_receipt_success" "$cfg" "$CONFIG" "$EXPERIMENT_MANIFEST" "$EXPERIMENT_MANIFEST_SHA256" "$EXPERIMENT_BASE_CELL" "$EXPERIMENT_CAND_CELL" "$HARNESS_HASH_BLOCKER" "$context_telemetry" "$wd/.pi/APPEND_SYSTEM.md" "${AGENT_MODELS_SHA256:-}" <<'PY'
-import hashlib,importlib.util,json,sys
+import hashlib,importlib.util,json,os,sys
 (out,model,pat,task,rep,gate,retried,runid,tin,tout,outchars,split,usage_exact,expected_models,
  ctxpath,prepath,postpath,network_mode,model_control,provider,endpoint_sha,network_auth,network_reason,
  sandbox_auth,sandbox_reason,policy_path,mrow,span_receipt,cfg_path,config_path,experiment_manifest,
@@ -915,20 +915,14 @@ rec={"schema":"pi.eval-row/v2", "task":task,"pattern":pat,"arm":pat,"rep":int(re
      # compatibility aliases for historical readers; dimensions stay honest.
      "out_chars":int(outchars),"think_chars":0,"in_tok":int(tin) if exact else 0,
      "out_tok":int(tout) if exact else 0,"token_usage_exact":exact}
-exposure_spec=cfg.get("exposure") or {"mode":"configuration","target":[],"diagnostic":[]}
-counts=context_data.get("exposure") or {}
-if pat == "base":
-    exposure_status="control"
-elif exposure_spec.get("mode") == "configuration":
-    exposure_status="targeted"
-else:
-    target_count=sum(int(counts.get(event, 0)) for event in exposure_spec.get("target", []))
-    diagnostic_count=sum(int(counts.get(event, 0)) for event in exposure_spec.get("diagnostic", []))
-    exposure_status="targeted" if target_count else ("engaged_only" if diagnostic_count else "unexposed")
-exposure_counts={event:int(counts.get(event, 0)) for event in (exposure_spec.get("target", []) + exposure_spec.get("diagnostic", []))}
-rec["exposure"]={"mode":exposure_spec.get("mode", "configuration"), "status":exposure_status,
-                  "target_count":sum(exposure_counts.get(event, 0) for event in exposure_spec.get("target", [])),
-                  "counts":exposure_counts}
+# Import the single source of truth rather than reimplementing it. This block used to
+# duplicate exposure.py's status logic, which silently inverts the moment a mode is added
+# (suppression arms would have recorded "targeted" for a mechanism that still fired).
+sys.path.insert(0, os.path.dirname(os.path.abspath(config_path)))
+import exposure as _exposure
+exposure_spec=_exposure.validate_spec(cfg.get("exposure"))
+rec["exposure"]=_exposure.row_exposure(exposure_spec, pat, context_data.get("exposure") or {},
+                                       configured=(pat != "base"))
 if expected_models:
     rec["fleet_expected_models"] = sorted(expected_models.split())
 open(out,"a").write(json.dumps(rec)+"\n")

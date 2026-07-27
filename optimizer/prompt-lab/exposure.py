@@ -7,7 +7,13 @@ from pathlib import Path
 from typing import Any
 
 CATALOG = Path(__file__).resolve().parents[2] / "harness" / "lib" / "telemetry-event-catalog.json"
-MODES = {"configuration", "telemetry"}
+# configuration: the treatment IS the config (prompt/wording). Firing is not observable;
+#                status "targeted" means "config applied", never "mechanism fired".
+# telemetry:     a declared target event firing proves the mechanism acted.
+# suppression:   the candidate turns a mechanism OFF. The treatment landing is the target
+#                event going to ZERO in the cand arm -- an absence cannot be observed as a
+#                firing, so the sense of `target` is inverted for this mode.
+MODES = {"configuration", "telemetry", "suppression"}
 STATUSES = {"control", "targeted", "engaged_only", "unexposed"}
 
 
@@ -36,8 +42,8 @@ def validate_spec(spec: Any) -> dict[str, Any]:
     declared = set(target) | set(diagnostic)
     if mode == "configuration" and declared:
         raise ValueError("configuration exposure cannot declare telemetry events")
-    if mode == "telemetry" and not target:
-        raise ValueError("telemetry exposure requires at least one target event")
+    if mode in ("telemetry", "suppression") and not target:
+        raise ValueError(f"{mode} exposure requires at least one target event")
     unknown = declared - catalog_events()
     if unknown:
         raise ValueError(f"unknown exposure event(s): {', '.join(sorted(unknown))}")
@@ -51,11 +57,26 @@ def status_for(spec: dict[str, Any], arm: str, counts: dict[str, int], *, config
         return "targeted" if configured else "unexposed"
     target_count = sum(counts.get(event, 0) for event in spec["target"])
     diagnostic_count = sum(counts.get(event, 0) for event in spec["diagnostic"])
+    if spec["mode"] == "suppression":
+        # Inverted: the disabled mechanism firing at all means the treatment did NOT land.
+        # Zero is necessary but NOT sufficient -- an event that never fires in the base arm
+        # either proves nothing. Use suppression_confirmed() for the paired verdict.
+        return "unexposed" if target_count else "targeted"
     if target_count:
         return "targeted"
     if diagnostic_count:
         return "engaged_only"
     return "unexposed"
+
+
+def suppression_confirmed(base_target_total: int, cand_target_total: int) -> tuple[bool, str]:
+    """Paired verdict for a suppression arm. Row-level status cannot see the other arm,
+    and 0-in-cand is meaningless if the event never fired in base either."""
+    if base_target_total == 0:
+        return False, "unexercised: the disabled mechanism never fired in the base arm either"
+    if cand_target_total > 0:
+        return False, f"suppression failed: still fired {cand_target_total}x with the flag off"
+    return True, f"suppression confirmed: {base_target_total}x in base, 0x in cand"
 
 
 def row_exposure(spec: dict[str, Any], arm: str, counts: dict[str, int], *, configured: bool = False) -> dict[str, Any]:
@@ -81,7 +102,24 @@ def selftest() -> None:
         pass
     else:
         raise AssertionError("fake telemetry event accepted")
-    print("exposure selftest: OK")
+    # suppression: sense of `target` is inverted -- firing means the treatment did NOT land
+    supp = validate_spec({"mode": "suppression", "target": ["verify-gate/steer"], "diagnostic": []})
+    assert row_exposure(supp, "base", {"verify-gate/steer": 3})["status"] == "control"
+    assert row_exposure(supp, "cand", {"verify-gate/steer": 0})["status"] == "targeted", "silence = suppressed"
+    assert row_exposure(supp, "cand", {"verify-gate/steer": 2})["status"] == "unexposed", "still firing = failed"
+    ok, why = suppression_confirmed(5, 0)
+    assert ok and "confirmed" in why, why
+    ok, why = suppression_confirmed(0, 0)
+    assert not ok and "unexercised" in why, why      # zero in BOTH arms proves nothing
+    ok, why = suppression_confirmed(5, 2)
+    assert not ok and "failed" in why, why
+    try:
+        validate_spec({"mode": "suppression", "target": [], "diagnostic": []})
+    except ValueError:
+        pass
+    else:
+        raise AssertionError("suppression without a target accepted")
+    print("exposure selftest: OK (configuration | telemetry | suppression)")
 
 
 if __name__ == "__main__":
