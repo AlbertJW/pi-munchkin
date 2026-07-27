@@ -4,5 +4,14 @@
   "thresholds": {
     "PLAN_SYNTHESIS_V1": "on",
     "PLAN_PLANNOTATOR_BRIDGE": "on"
+  },
+  "exposure": {
+    "mode": "telemetry",
+    "target": [
+      "plan-runner/review"
+    ],
+    "diagnostic": [
+      "plan-runner/v4-write"
+    ]
   }
 }

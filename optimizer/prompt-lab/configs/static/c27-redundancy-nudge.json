@@ -1,5 +1,16 @@
 {
   "name": "redundancy-nudge",
   "prediction": "when exact+near duplicate share of the live context exceeds CTX_REDUNDANCY_PCT (default 50), one cooldown-limited steer points the model at compact_context: compactions rise on redundant sessions, context.surface.duplication means fall after the nudge, pass rate neutral-to-up (contextops redundancy-signal port, 2026-07-20). context-dedup.nudge telemetry confirms firing; if sessions ignore the nudge (no compaction follows), reject.",
-  "thresholds": { "CTX_REDUNDANCY_NUDGE": "on" }
+  "thresholds": {
+    "CTX_REDUNDANCY_NUDGE": "on"
+  },
+  "exposure": {
+    "mode": "telemetry",
+    "target": [
+      "context-dedup/nudge"
+    ],
+    "diagnostic": [
+      "context-dedup/dedup"
+    ]
+  }
 }

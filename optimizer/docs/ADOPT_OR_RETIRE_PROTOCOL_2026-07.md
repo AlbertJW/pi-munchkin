@@ -142,3 +142,49 @@ PARK_EXPOSED_NO_SIGNAL. The gate bit could not see a 64% reduction in tool error
 (Fisher's floor here is +25pp), but it is the one thing S3's do-no-harm guard exists to catch, so
 c21 needs its second task before adoption — exactly as the protocol requires. It is not yet a
 finished decision.
+
+## Stage 0 — EXECUTED 2026-07-27
+
+**1. Exposure specs: done. All 45 candidates now declare one.**
+
+| | before | after |
+|---|---|---|
+| telemetry mode (firing observable) | 5 | **28** |
+| configuration mode (firing NOT observable) | 0 | **17** |
+| no exposure at all | 40 | **0** |
+
+Specs were derived from the code, not guessed: every `record()`/`planEvent()`/`telemetry()`
+emission was extracted per file and matched to the flag that guards it. Battery green
+(`verify` + `verify:optimizer`), every config passes fail-closed `validate_config`, and every
+declared event resolves against `telemetry-event-catalog.json`.
+
+**The 17 configuration-mode candidates are an honest negative result, not an oversight.** No
+dedicated firing event exists for them, so S1 cannot be run on them as specified:
+
+- *prompt/governor variants* — c1, c5, c8, c9, c15, c19, c46, c47
+- *wording-only threshold changes* — c14, c18, c18b, c33, c34, c36
+- *mechanism-OFF arms* — c10-no-verify-gate, c25-harness-off. An absence cannot be observed as a
+  firing; for these the correct S1 evidence is the **inverse** (the disabled event must drop to
+  zero in the cand arm), which the current `status_for` logic does not express.
+
+For all 17, `status: "targeted"` means **"config was applied"** and must never be read as
+"mechanism fired". This is the same vacuousness previously flagged for c2 and c40–c45 — now
+explicit in every affected config rather than implied by absence.
+
+**2. Retirements: PROPOSED, not executed.** Deletion is human-gated, so nothing was removed.
+Awaiting sign-off:
+
+| candidate | ground |
+|---|---|
+| `c43-plan-plannotator-bridge` | interactive-only; `real_gate.sh` refuses it by design. Unmeasurable in this harness at any n. |
+| `c25-c39-combo`, `c31-c38-combo`, `c37-c39-combo` | investigation scaffolds, not independent candidates by their own config text |
+| `c33-subagent-fork-default` | standing recommendation; opposed to the c36 spawn direction |
+
+**3. `c25-harness-off` reclassified** as a permanent control instrument (harness ROI denominator),
+not a candidate. It is never adopted or retired. Recorded here rather than in the config, because
+`validate_config`'s fail-closed key allowlist correctly rejects a free-text `disposition` field —
+the schema refusing to carry a decision is the right behaviour.
+
+**Consequence for S1:** the probe covers **28 candidates**, not 40. The other 17 need either a new
+firing event added to their mechanism, an inverse-exposure rule for OFF-arms, or acceptance that
+they can only ever be judged on outcome rather than engagement.

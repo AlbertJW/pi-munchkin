@@ -1,4 +1,16 @@
 {
   "name": "patient-streak",
-  "thresholds": { "LB_STREAK_SOFT": 12 }
+  "thresholds": {
+    "LB_STREAK_SOFT": 12
+  },
+  "exposure": {
+    "mode": "telemetry",
+    "target": [
+      "loop-breaker/steer"
+    ],
+    "diagnostic": [
+      "loop-breaker/abort",
+      "loop-breaker/progress-after-steer"
+    ]
+  }
 }

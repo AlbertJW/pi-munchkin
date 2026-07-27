@@ -1,5 +1,10 @@
 {
   "name": "prompt-yaml",
   "prediction": "FORMAT-only arm: the live governor's content restructured as YAML, held semantically identical so it isolates format from c46's content change. Measured ceiling is tiny -- governor is 6.9% of session context and the YAML rendering is -5% bytes but +9 lines, so ~0.34% of context (~19 tokens) at best, and newline/indent tokenization likely erases even that. Prior art is negative: AB_SYMBOLECT.md measured a dense-notation reformat as equal correctness, MORE edit errors, +32% bytes. Predict NEUTRAL on pass rate and effort; the informative outcome is whether structured markup degrades edit accuracy on a small model the way symbolect did.",
-  "prompt_variant": "optimizer/prompt-lab/configs/static/governor-yaml-2026-07.yaml"
+  "prompt_variant": "optimizer/prompt-lab/configs/static/governor-yaml-2026-07.yaml",
+  "exposure": {
+    "mode": "configuration",
+    "target": [],
+    "diagnostic": []
+  }
 }

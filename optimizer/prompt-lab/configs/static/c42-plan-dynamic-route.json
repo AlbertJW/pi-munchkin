@@ -5,5 +5,15 @@
     "PLAN_SYNTHESIS_V1": "on",
     "PLAN_TDD_EVIDENCE": "on",
     "PLAN_DYNAMIC_ROUTE": "on"
+  },
+  "exposure": {
+    "mode": "telemetry",
+    "target": [
+      "plan-runner/route"
+    ],
+    "diagnostic": [
+      "plan-runner/tdd",
+      "plan-runner/v4-write"
+    ]
   }
 }

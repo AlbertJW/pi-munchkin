@@ -6,5 +6,15 @@
     "PLAN_TDD_EVIDENCE": "on",
     "PLAN_DYNAMIC_ROUTE": "on",
     "PLAN_STEP_CONTEXT": "spawn"
+  },
+  "exposure": {
+    "mode": "telemetry",
+    "target": [
+      "plan-runner/step-context"
+    ],
+    "diagnostic": [
+      "plan-runner/route",
+      "plan-runner/tdd"
+    ]
   }
 }

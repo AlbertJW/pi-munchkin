@@ -1,5 +1,10 @@
 {
   "name": "prompt-lean",
   "prediction": "ponytail applied to the governor with evidence, not taste: the plan-workflow block is cut down to the part that functions autonomously. /plan-go is a slash command no headless session issues -- 18/18 sessions across two models ended stranded at phase:\"planned\", and plan_runner_delegation.{blocked,delegated} are 0 across 1,465 sessions, so the model was authoring plans nothing consumed. Expect neutral-to-up pass rate with FEWER turns and tokens (the dead handoff stops being described). Risk: removing the /plan-go affordance could suppress plan_write entirely -- watch turns and whether any plan is written at all. Every other section is byte-identical to live, so a delta is attributable to the plan block.",
-  "prompt_variant": "optimizer/prompt-lab/configs/static/governor-lean-2026-07.md"
+  "prompt_variant": "optimizer/prompt-lab/configs/static/governor-lean-2026-07.md",
+  "exposure": {
+    "mode": "configuration",
+    "target": [],
+    "diagnostic": []
+  }
 }
