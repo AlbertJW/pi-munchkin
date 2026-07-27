@@ -15,8 +15,9 @@ from __future__ import annotations
 import argparse
 import json
 import os
+from collections import Counter
 from itertools import combinations
-from math import comb
+from math import comb, erf, sqrt
 from pathlib import Path
 
 RESULTS = Path(__file__).resolve().parent / "results"
@@ -50,27 +51,44 @@ def median(values):
     return s[n // 2] if n % 2 else (s[n // 2 - 1] + s[n // 2]) / 2
 
 
+EXACT_BUDGET = 200_000  # C(n1+n2, n1) above this -> normal approximation
+
+
+def _u_of(x, y):
+    return sum((1.0 if xi > yj else 0.5 if xi == yj else 0.0) for xi in x for yj in y)
+
+
 def mannwhitney_u(a, b):
-    """Exact two-sided Mann-Whitney U. Returns (U_a, p). Ties get half credit."""
+    """Two-sided Mann-Whitney U. Exact while enumeration is affordable, else a
+    tie-corrected normal approximation -- exact enumeration at n=20/arm is
+    C(40,20) = 1.4e11 splits, which would hang the very round this tool exists
+    to score."""
     n1, n2 = len(a), len(b)
     if not n1 or not n2:
         return None, None
-    def u_of(x, y):
-        return sum((1.0 if xi > yj else 0.5 if xi == yj else 0.0) for xi in x for yj in y)
-    obs = u_of(a, b)
-    # Enumerate every assignment of the pooled values into a group of size n1.
+    obs = _u_of(a, b)
     pool = list(a) + list(b)
-    extreme = total = 0
     centre = n1 * n2 / 2
-    for idx in combinations(range(n1 + n2), n1):
-        pick = set(idx)
-        ga = [pool[i] for i in idx]
-        gb = [pool[i] for i in range(n1 + n2) if i not in pick]
-        u = u_of(ga, gb)
-        total += 1
-        if abs(u - centre) >= abs(obs - centre) - 1e-9:
-            extreme += 1
-    return obs, extreme / total
+    if comb(n1 + n2, n1) <= EXACT_BUDGET:
+        extreme = total = 0
+        for idx in combinations(range(n1 + n2), n1):
+            pick = set(idx)
+            u = _u_of([pool[i] for i in idx], [pool[i] for i in range(n1 + n2) if i not in pick])
+            total += 1
+            if abs(u - centre) >= abs(obs - centre) - 1e-9:
+                extreme += 1
+        return obs, extreme / total
+    # normal approximation with tie correction
+    counts = Counter(pool)
+    n = n1 + n2
+    tie = sum(t ** 3 - t for t in counts.values())
+    var = n1 * n2 / 12 * ((n + 1) - tie / (n * (n - 1))) if n > 1 else 0.0
+    if var <= 0:
+        return obs, 1.0
+    z = (abs(obs - centre) - 0.5) / sqrt(var)          # continuity correction
+    if z < 0:
+        z = 0.0
+    return obs, 2 * (1 - 0.5 * (1 + erf(z / sqrt(2))))
 
 
 def rows(gen):
@@ -120,6 +138,42 @@ def render(res):
               f" {pct:>12} {m['p']:>8.3f}{star}")
 
 
+def sweep(min_rows=8):
+    """Re-score every paired round on effort. SHORTLIST GENERATOR, NOT FINDINGS --
+    ~7 metrics x ~90 rounds is ~650 comparisons, so low p-values are expected by
+    chance alone. Rank by consistency of direction, then confirm with a fresh round."""
+    out = []
+    for path in sorted(RESULTS.glob("*.jsonl")):
+        gen = path.stem
+        try:
+            data = rows(gen)
+        except SystemExit:
+            continue
+        arms = {r.get("pattern") for r in data}
+        if not {"base", "cand"} <= arms or len(data) < min_rows:
+            continue
+        res = analyse(gen)
+        if not res["metrics"]:
+            continue
+        better = sum(1 for m in res["metrics"] if m["direction"] == "better")
+        worse = sum(1 for m in res["metrics"] if m["direction"] == "worse")
+        pcts = [m["pct"] for m in res["metrics"] if m["pct"] is not None]
+        out.append({
+            "gen": gen, "n": len(data), "better": better, "worse": worse,
+            "total": len(res["metrics"]),
+            "median_pct": median(pcts) if pcts else 0.0,
+            "min_p": min((m["p"] for m in res["metrics"] if m["p"] is not None), default=1.0),
+        })
+    # consistency first (how many metrics agree), then effect size
+    out.sort(key=lambda r: (-(r["better"] - r["worse"]), r["median_pct"]))
+    print("SHORTLIST ONLY — ~650 comparisons; low p is expected by chance. Confirm before believing.\n")
+    print(f"  {'round':<44} {'n':>4} {'agree':>7} {'median':>8} {'min p':>7}")
+    for r in out:
+        print(f"  {r['gen']:<44} {r['n']:>4} {r['better']:>3}/{r['total']:<3} "
+              f"{r['median_pct']:>7.0f}% {r['min_p']:>7.3f}")
+    return out
+
+
 def selftest():
     # exact MWU against known values: complete separation at 6v6 is the floor
     _, p = mannwhitney_u([1, 2, 3, 4, 5, 6], [7, 8, 9, 10, 11, 12])
@@ -133,7 +187,16 @@ def selftest():
     assert median([3, 1, 2]) == 2 and median([4, 1, 2, 3]) == 2.5
     assert dig({"a": {"b": 5}}, ("a", "b")) == 5
     assert dig({"a": {"b": True}}, ("a", "b")) is None  # bools are not measurements
-    print("effort_report selftest: OK")
+    # the approximation path must terminate and agree with exact near the boundary
+    big_a = list(range(20)); big_b = list(range(100, 120))
+    _, p = mannwhitney_u(big_a, big_b)
+    assert p is not None and p < 0.001, p
+    _, p = mannwhitney_u(list(range(20)), list(range(20)))
+    assert p > 0.9, p
+    # exact and approx should roughly agree on the same separated data at n=9
+    _, pe = mannwhitney_u(list(range(9)), list(range(50, 59)))
+    assert pe < 0.01, pe
+    print("effort_report selftest: OK (exact + normal-approx paths)")
 
 
 if __name__ == "__main__":
@@ -141,10 +204,13 @@ if __name__ == "__main__":
     ap.add_argument("gen", nargs="?")
     ap.add_argument("--only-passing", action="store_true")
     ap.add_argument("--json", action="store_true")
+    ap.add_argument("--sweep", action="store_true")
     ap.add_argument("--selftest", action="store_true")
     args = ap.parse_args()
     if args.selftest:
         selftest()
+    elif args.sweep:
+        sweep()
     elif not args.gen:
         ap.error("gen is required")
     else:

@@ -20,6 +20,22 @@ LIVE_GOV = os.path.expanduser("~/.pi/agent/APPEND_SYSTEM.md")
 DIRECT = os.environ.get("LLAMA_URL", "http://127.0.0.1:8080")
 OPTILLM = "http://127.0.0.1:8000"
 
+def resolve_prompt_path(pv):
+    """Candidate prompt files are addressed by path. real_gate.sh invokes config.py
+    from optimizer/, munchkin/propose from elsewhere, so a repo-relative path in a
+    config resolves differently per caller. Try as given, then relative to this
+    file's lab dir and the repo root, so a config is portable across callers."""
+    direct = os.path.expanduser(pv)
+    if os.path.isfile(direct):
+        return direct
+    repo_root = os.path.dirname(os.path.dirname(LAB))
+    for base in (LAB, os.path.dirname(LAB), repo_root):
+        cand = os.path.join(base, pv)
+        if os.path.isfile(cand):
+            return cand
+    raise FileNotFoundError(f"prompt_variant file not found from any known base: {pv}")
+
+
 def load_schema():
     with open(SCHEMA) as f:
         return json.load(f)
@@ -79,7 +95,7 @@ def render_prompt(config, base_text=None):
         elif pv == "A":
             base_text = open(LIVE_GOV).read()
         else:  # a candidate prompt file path
-            base_text = open(os.path.expanduser(pv)).read()
+            base_text = open(resolve_prompt_path(pv)).read()
     elif pv == "F":
         base_text = ""
     base_text = base_text.rstrip() + CWD_ANCHOR
