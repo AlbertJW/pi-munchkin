@@ -1,5 +1,4 @@
 import { appendFile, mkdir, readFile, rename, stat, writeFile } from "node:fs/promises";
-import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { createHash, randomUUID } from "node:crypto";
 import { defineTool, withFileMutationQueue, type ExtensionAPI } from "@earendil-works/pi-coding-agent";

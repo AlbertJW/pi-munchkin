@@ -169,12 +169,6 @@ tracked in the self-improvement ledger rather than repeated here.
 | `SUBAGENT_DEFAULT_MODE=fork` | default an unspecified delegation to a full-context fork instead of a fresh spawn | **now philosophically opposed to `SPAWN_DELEGATION` below — do not arm both** |
 | `SPAWN_DELEGATION=on` | recommend `mode=spawn` + a self-contained task everywhere the harness previously suggested `mode=fork` | built; awaiting a gate round |
 | `PLAN_DELEGATE_ALL=on` | during execution, only `plan_write` and `subagent` remain callable directly — everything else is blocked and routed to a role-matched fresh subagent | built; the most direct test of the "many small contexts" thesis; awaiting a gate round |
-| `PLAN_SYNTHESIS_V1=on` | use capability snapshots, bounded structured reflection, requirement coverage, and schema-v4 micro-plan artifacts for newly created plans; existing v3 plans stay on the legacy path | c40, dark and unmeasured; gate grants `plan_reflect`, `plan_write`, and `plan_go` consistently |
-| `PLAN_TDD_EVIDENCE=on` | require observed, matching failed RED evidence before later GREEN evidence can complete behavior steps; implementation edits before RED remain allowed | c41, dark and unmeasured; final read-only validation still gates completion |
-| `PLAN_DYNAMIC_ROUTE=on` | expose model-owned `plan_route` checkpoints with partial-order eligibility, legal soft-order jumps, bounded churn, backtracking, and transitive stale-dependent revalidation | c42, dark and unmeasured; the scheduler validates and ranks but never dispatches work |
-| `PLAN_PLANNOTATOR_BRIDGE=on` | enable explicitly requested, content-SHA-bound asynchronous browser review over Plannotator's shared event API; no package installation is required | c43, interactive-only and unmeasured; headless `real_gate.sh` refuses this flag rather than measuring an absent listener |
-| `PLAN_STEP_CONTEXT=current` | execute each selected c40+c41+c42 micro-step in the parent context, preserving cross-step discoveries and avoiding child bootstrap cost | c44 half of the paired context experiment; dark and unmeasured |
-| `PLAN_STEP_CONTEXT=spawn` | require one explicit, self-contained `subagent(executor, …, mode=spawn)` call per selected c40+c41+c42 micro-step; direct parent mutation is blocked while that child step is active | c45 paired against c44; dark and unmeasured, with parent and child usage recorded separately |
 
 ### Platform and security notes
 

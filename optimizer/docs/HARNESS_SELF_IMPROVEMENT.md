@@ -1121,6 +1121,8 @@ obvious next step, flagged for a future session rather than built unprompted her
 The reserved c40-c45 range now contains one dark, composable planner family rather than six
 unrelated prompt variants:
 
+> **DELETED 2026-07-27.** The whole c40–c45 family was removed from the codebase (commit `f366cf9`): all 21 of its telemetry counters read zero across 1,465 sessions, so it never ran once, and planning ceremony is the wrong shape for a small model that fails from too many turns and too much context. The descriptions below are kept as history — the flags no longer exist.
+
 - **c40 `PLAN_SYNTHESIS_V1`** adds a compact capability inventory, bounded structured reflection,
   schema-v4 plan state, coverage validation, and durable micro-step plan files.
 - **c41 `PLAN_TDD_EVIDENCE`** observes active-step test calls and requires a matching failed RED
