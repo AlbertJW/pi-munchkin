@@ -1,0 +1,110 @@
+# Measurement methodology: what a 2026-07-27 audit changed
+
+This project's optimizer was built to be *trustworthy* — HMAC'd telemetry, surface hashes, serving
+fingerprints, fixture admission gates, authority rules. All of that works. An audit of the full
+1,466-row catalogue found the rigor was aimed at the wrong risk: it made every number defensible
+without ever asking whether the number **could move**.
+
+Five findings, each reproducible from data already in `optimizer/prompt-lab/results/`.
+
+## 1. The detection floor — most rounds could not have found a win
+
+Smallest pass-rate improvement reaching p<0.05 by Fisher's exact test, at the sample sizes actually
+used:
+
+| n per arm | smallest detectable improvement |
+|---|---|
+| **3** (the 34-candidate sweep) | **none — no effect of any size** |
+| **6** (the batch screen) | +83pp |
+| 9 (most candidate rounds) | +56pp |
+| 18 | +28pp |
+| 20 | +25pp |
+
+No harness intervention plausibly delivers +56pp. **A large fraction of the ledger's `NEUTRAL`
+verdicts were guaranteed before the round started.** The 34-candidate gemma sweep at n=3 could not
+have produced a significant result at any effect size, so every delta it reported — including the
+headline ±44pp — sits below its own design's detection floor.
+
+Reproduce: `effort_report.py` docstring, or the Fisher enumeration in `CANDIDATE_PRUNING_2026-07.md`.
+
+## 2. Pass/fail is the wrong outcome variable
+
+Almost every candidate targets **efficiency** — less flailing, fewer wasted turns, fewer bad edits.
+The gate measures **capability** — can the model solve this task at all. Those come apart
+completely.
+
+c21-micro-gate stated its own signature in its config, before any of this:
+
+> *"Expect pass-rate neutral-to-up with LOWER tokens… micro-gate.fired counts the mechanism."*
+
+It delivered exactly that, and the screening rule filed it `PARK_EXPOSED_NO_SIGNAL` because it read
+only the gate bit. At n=20/arm the same candidate shows −26% turns, −64% tool errors, −75% repeat
+calls, five metrics at p<0.05. **One bit per session cannot see that.**
+
+Every session already records `trajectory.{turns,tool_calls,tool_errors,repeat_calls,
+tool_result_chars}` and `usage.{input,output}_tokens`. Score them: `effort_report.py <gen>`.
+
+## 3. Variance is the binding constraint, not sample size
+
+Effort metrics have far more power than a binary, but session-to-session variance on a small model
+is enormous — c21/parens base turns were `4, 25, 35, 56, 56, 119`, a 30× spread. Bootstrapped power
+for the **largest effect in the entire dataset**:
+
+| n/arm | power |
+|---|---|
+| 6 | **22%** |
+| 20 | 58% |
+| 40 | 84% |
+
+A real 4× efficiency win is missed ~78% of the time at n=6. Budget for variance, not for optics.
+
+## 4. You must be able to prove the mechanism fired
+
+Before this audit, **40 of 45 candidates declared no `exposure` spec**, so `NEUTRAL` was
+indistinguishable from *"the mechanism never engaged."* This is not hypothetical: in the batch
+screen, `c24/parens` and `c7/parens` both scored a superficially encouraging **+1/6 while firing
+zero events**. Without exposure counts, two non-measurements would have entered the ledger as mild
+positives.
+
+Related, and worse: across 1,465 sessions, **53 of 68 mechanism counters are identically zero** —
+including all 21 counters of the c40–c45 planner family, and `plan_runner_delegation.{blocked,
+delegated}` for the entire delegation cluster.
+
+## 5. Exposure has three modes, and two of them are not "did it fire"
+
+| mode | meaning | `targeted` means |
+|---|---|---|
+| `telemetry` | a declared event firing proves the mechanism acted | mechanism fired |
+| `suppression` | candidate turns a mechanism **off**; sense of `target` is **inverted** | target event went to **zero** |
+| `configuration` | the treatment *is* the config (prompt/wording); no firing exists | **config applied — NOT "fired"** |
+
+`configuration` mode is vacuously `targeted` by construction. Reading it as engagement is the
+single easiest way to fool yourself with this system.
+
+Suppression rows are also **not self-interpreting**: zero firings in cand proves nothing if base was
+zero too. Use `exposure.suppression_confirmed(base_total, cand_total)` for the paired verdict, which
+distinguishes *confirmed* from *unexercised*.
+
+## What follows from this
+
+- **Score effort by default**, pass rate as a do-no-harm guard. `effort_report.py`.
+- **Declare exposure on every candidate.** A candidate that cannot prove it fired cannot be
+  retired for failing to help.
+- **Adoption needs power; retirement usually doesn't.** A mechanism that never fires on a fixture
+  built to trigger it is retireable on six sessions with no statistics. This asymmetry is what
+  makes a full roster verdict affordable — see `ADOPT_OR_RETIRE_PROTOCOL_2026-07.md`.
+- **Pre-register decision rules.** A 650-comparison re-score (`effort_report.py --sweep`) is a
+  shortlist generator; anything chosen after seeing results is hypothesis, not finding.
+- **Check the fixture can express the effect.** `hygiene-shared-config-reread` (0/6) and
+  `sv-ambiguous-spec` (1/6) are floors on the 4B — a null there was never capable of being anything
+  else.
+
+## The reframing
+
+"0 of 44 candidates adopted" was read for weeks as evidence the candidates don't work. It is
+better explained as the expected output of a design that could not see its own results. The roster
+is a backlog of **untested** ideas, not rejected ones — which is why the first properly powered
+round produced a candidate with 7/7 metrics moving the right way.
+
+Defensibility and informativeness are different properties. This project had the first and,
+for a long time, not the second.

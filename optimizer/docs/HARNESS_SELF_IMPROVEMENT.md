@@ -11,6 +11,24 @@ was missing is **standard, hard-to-game benchmarks** plugged into the evaluator,
 for the surfaces execution can't grade. This doc adds the first deterministic benchmark (text-to-SQL) and a
 frontier pairwise judge.
 
+> ## ⚠️ Read this before trusting any verdict below (added 2026-07-27)
+>
+> A full audit of the 1,466-row catalogue found that **the statistics in this ledger were applied
+> to an outcome variable that could not move, at sample sizes that could not detect it.**
+>
+> - n=3/arm (the 34-candidate sweep) → **no effect of any size** reaches p<0.05. n=9/arm → +56pp.
+> - Nearly every candidate targets **efficiency**; the gate scored **capability** (pass/fail).
+> - 40 of 45 candidates could not prove their mechanism fired, so `NEUTRAL` was indistinguishable
+>   from "never engaged" — and 53 of 68 mechanism counters are identically zero catalogue-wide.
+>
+> **Every `NEUTRAL` predating 2026-07-27 should be read as `UNTESTED`, not as evidence of no
+> effect.** The first properly powered round (c21, n=20/arm, scored on effort) produced 7/7 metrics
+> moving the right way with five at p<0.05 — on a candidate this ledger had filed as no-signal.
+>
+> Method and remedies: **[MEASUREMENT_METHODOLOGY_2026-07.md](MEASUREMENT_METHODOLOGY_2026-07.md)**.
+> Path to a real verdict per candidate:
+> **[ADOPT_OR_RETIRE_PROTOCOL_2026-07.md](ADOPT_OR_RETIRE_PROTOCOL_2026-07.md)**.
+
 ---
 
 ## 1. The rule that governs everything: the benchmark class decides the surface

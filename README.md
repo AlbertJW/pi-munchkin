@@ -132,7 +132,15 @@ Most extensions are automatic once loaded. The surfaces you invoke:
 Behavior knobs (all optional env vars, sensible defaults). The first block below is stable,
 always-available tuning; the second is the current roster of dark, unadopted A/B candidates —
 present in the codebase, inert unless explicitly armed, and each one's measurement status is
-tracked in the self-improvement ledger rather than repeated here:
+tracked in the self-improvement ledger rather than repeated here.
+
+> **These are untested ideas, not rejected ones.** A 2026-07-27 audit of all 45 candidates found
+> exactly **one** had ever been decisively tested. Eight had never been run at all; four cannot
+> fire in a headless session (they need `phase:"executing"`, which no autonomous session reaches);
+> the remaining 32 were run only at sample sizes where no realistic effect could have been
+> detected. "Dark and unmeasured" here means *unmeasured* — it is not a verdict. The
+> [adopt-or-retire protocol](optimizer/docs/ADOPT_OR_RETIRE_PROTOCOL_2026-07.md) is the plan for
+> reaching a real verdict on each.
 
 | Env | Effect |
 |---|---|
@@ -219,8 +227,20 @@ result this loop exists to catch, because it directly contradicts the intuition 
 would bring to writing prompts, and no amount of intuition would have caught it without the
 measurement.
 
+**A correction earned the hard way (2026-07-27).** A statistical bar is necessary but not
+sufficient, and for a long stretch this loop had the bar without the two things that make it mean
+anything. A 1,466-row audit found most rounds ran at sample sizes where **no effect of any size
+could reach significance** (n=3/arm), or where only an implausible +56pp could (n=9/arm) — and that
+the outcome scored was pass/fail, when nearly every candidate targets *efficiency* rather than
+capability. The candidate that eventually produced this project's clearest result had predicted its
+own signature in its config — *"pass-rate neutral-to-up with LOWER tokens"* — and was filed as
+no-signal by a rule reading only the gate bit. Rigor spent on provenance while the design cannot
+detect a realistic effect buys defensibility, not knowledge. See
+**[measurement methodology](optimizer/docs/MEASUREMENT_METHODOLOGY_2026-07.md)**.
+
 The optimizer (`optimizer/`, Python) measures whether a change to the harness/governor actually
-makes a model write better code, and adopts only changes that pass Fisher's exact test. It is
+makes a model write better code, and adopts only changes that pass Fisher's exact test **on an
+outcome the change can plausibly move, at a sample size that can detect it**. It is
 **human-gated**: a winning governor is written to `proposals/` for you to review and apply — it
 never edits your live `~/.pi/agent/`.
 
@@ -349,6 +369,14 @@ python3 prompt-lab/config.py --selftest
   design doc: surfaces, statistics, instrument-integrity incidents, every candidate's disposition.
 - **[Benchmark integrity](optimizer/prompt-lab/BENCHMARK-INTEGRITY.md)** — fixture admission,
   provenance schemas, serving fingerprints, and what "authoritative" means.
+- **[Measurement methodology](optimizer/docs/MEASUREMENT_METHODOLOGY_2026-07.md)** — detection
+  floors by sample size, why pass/fail is the wrong outcome for efficiency candidates, variance as
+  the binding constraint, and the three exposure modes. **Read before designing a round.**
+- **[Adopt-or-retire protocol](optimizer/docs/ADOPT_OR_RETIRE_PROTOCOL_2026-07.md)** — the
+  pre-registered S1→S3 funnel for reaching a verdict on every dark candidate at payable cost.
+- `optimizer/prompt-lab/effort_report.py` — scores a round on continuous per-session effort
+  (turns, tool errors, repeat calls, tokens) with exact Mann-Whitney. `--sweep` re-scores every
+  paired round in the catalogue as a **shortlist**, not as findings.
 - `optimizer/prompt-lab/harness_roi.py` — measures the harness's *own* injected footprint
   (steer text as % of model output, per model, split by pass/fail).
 
