@@ -141,7 +141,7 @@ PARK_EXPOSED_NO_SIGNAL. The gate bit could not see a 64% reduction in tool error
 **Caveat carried forward:** pass rate is nominally down 2/20 (15→13). Well inside noise at this n
 (Fisher's floor here is +25pp), but it is the one thing S3's do-no-harm guard exists to catch, so
 c21 needs its second task before adoption — exactly as the protocol requires. It is not yet a
-finished decision.
+finished decision. **(Resolved below: the second task failed the bar. c21 stays dark.)**
 
 ## Stage 0 — EXECUTED 2026-07-27
 
@@ -212,3 +212,30 @@ adding a firing event and re-entering at S1 is strictly cheaper than an S2 round
 self-interpreting: zero firings in cand proves nothing if base was also zero. S1 for c10 and
 c25-harness-off must therefore run **both arms** (n=6 each, 12 sessions) rather than cand-only.
 Revised S1 cost: 28 × 6 + 2 × 12 = **192 sessions ≈ 13 h**.
+
+## c21 VERDICT: does not meet the bar (2026-07-27)
+
+The second task landed and c21 **fails the rule that was pre-registered before the numbers existed**.
+
+| | `parens` (n=20) | `qs-error-swallow` (n=18) |
+|---|---|---|
+| effort metrics better | **7/7** | **4/7** |
+| worse | — | output_tokens; **input_tokens +72%, p=0.038** |
+| pass rate | 15→13 | 13→12 |
+| mechanism fired | 14/20 | 15/18 |
+
+Rule required ≥5/7 better **on both tasks** and non-inferior pass rate. It gets 4/7 on the second,
+is *significantly worse* on input tokens, and pass rate is down on both. **PARK — stays dark.**
+
+The `parens` result was task-specific, not a general property. This matters beyond c21: it was the
+single most promising thing in the entire 1,505-session catalogue, ranked #1 and #2 by the effort
+sweep, and it still did not replicate. Treat one-task effort wins as hypotheses, always.
+
+**Pre-registration is the only reason this reads as a rejection.** The author (me) had spent the
+day arguing c21 was the one candidate that worked, and 4/7-with-a-significant-regression is
+exactly the shape that gets rationalised into a win when the rule is written afterwards.
+
+**Also note the protocol's own S1 stage never ran.** It was superseded by a first-principles pass
+that retired ~20 candidates on mechanism grounds — planning ceremony adds turns and context to a
+model failing from too many turns and too much context — rather than spending 13 h probing them.
+The funnel remains the right shape for anything that survives that reasoning.

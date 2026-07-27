@@ -35,11 +35,12 @@ The active research and experiment backlog is maintained in
 > **empty 97%** — so the shipped governor is a 1.4 KB minimal core. The same machinery rejected
 > six plausible candidates that measured as noise. A tuning loop that mostly says **no** is the
 > point — see [the honest finding](docs/THE-HONEST-FINDING.md). A dozen further dark candidates
-> (c25 through c37; see the [self-improvement ledger](optimizer/docs/HARNESS_SELF_IMPROVEMENT.md))
-> sit built and mostly still unmeasured behind their own env flags, the newest pair (`SPAWN_DELEGATION`,
-> `PLAN_DELEGATE_ALL`) serving a deliberate ongoing pivot toward *more, smaller-context delegated
-> calls in place of one long coached session* — the loop's job on all of them is unchanged: prove
-> it, or reject it.
+> (see the [self-improvement ledger](optimizer/docs/HARNESS_SELF_IMPROVEMENT.md)) sit built and
+> **untested** behind their own env flags — a 2026-07-27 audit of all 45 found exactly one had ever
+> been decisively tested, and that one (`MICRO_GATE`) then **failed** its own pre-registered bar on a
+> second task. The v4 planner family was deleted outright: 2,832 lines whose 21 telemetry counters
+> read zero across 1,465 sessions. The loop's job is unchanged: prove it, or reject it — and lately
+> it mostly rejects.
 
 ---
 
@@ -54,7 +55,7 @@ armed by default.
 | Extension | What it does |
 |---|---|
 | **hashline** | line/tag-anchored edits instead of brittle exact-text matching — removes the #1 small-model edit failure; multi-file patches are transactional |
-| **loop-breaker** | detects call / reason / outcome repetition, steers, then aborts a runaway |
+| **loop-breaker** | detects call / reason / outcome repetition, steers, then aborts a runaway. A separate session-cumulative counter catches *grinding* (fail, fail, fail, one edit, repeat) that the since-progress counters reset away — measured as 43% of all wasted tool calls |
 | **verify-gate** | blocks a "done" claim until there is tool evidence for it |
 | **plan-runner** | `/plan` — a model-owned TODO list with per-item verify gates |
 | **reflect** | `/reflect` — a fresh-context adversarial review of the current plan |
@@ -145,6 +146,7 @@ tracked in the self-improvement ledger rather than repeated here.
 | Env | Effect |
 |---|---|
 | `LB_REPEAT_T1`, `LB_STREAK_SOFT` | loop-breaker sensitivity |
+| `LB_SESSION_REPEAT` | session-cumulative repeat limit before a single steer (default 25) |
 | `VERIFY_GATE=on\|off` | require evidence before "done" |
 | `MICRO_GATE=on` | enable the post-edit parse check |
 | `HASHLINE_TAG=hex\|slug` | edit tag style (word-slugs can copy better on tiny models) |

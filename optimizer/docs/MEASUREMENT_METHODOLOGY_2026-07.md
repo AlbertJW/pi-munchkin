@@ -5,7 +5,7 @@ fingerprints, fixture admission gates, authority rules. All of that works. An au
 1,466-row catalogue found the rigor was aimed at the wrong risk: it made every number defensible
 without ever asking whether the number **could move**.
 
-Five findings, each reproducible from data already in `optimizer/prompt-lab/results/`.
+Seven findings, each reproducible from data already in `optimizer/prompt-lab/results/`.
 
 ## 1. The detection floor — most rounds could not have found a win
 
@@ -40,6 +40,10 @@ c21-micro-gate stated its own signature in its config, before any of this:
 It delivered exactly that, and the screening rule filed it `PARK_EXPOSED_NO_SIGNAL` because it read
 only the gate bit. At n=20/arm the same candidate shows −26% turns, −64% tool errors, −75% repeat
 calls, five metrics at p<0.05. **One bit per session cannot see that.**
+
+That the effect then failed to replicate on a second task (§7) does not weaken the point — the gate
+bit was blind to a large, real, mechanism-confirmed change either way. Scoring effort is what made
+both the apparent win *and* its non-replication visible at all.
 
 Every session already records `trajectory.{turns,tool_calls,tool_errors,repeat_calls,
 tool_result_chars}` and `usage.{input,output}_tokens`. Score them: `effort_report.py <gen>`.
@@ -104,7 +108,46 @@ distinguishes *confirmed* from *unexercised*.
 "0 of 44 candidates adopted" was read for weeks as evidence the candidates don't work. It is
 better explained as the expected output of a design that could not see its own results. The roster
 is a backlog of **untested** ideas, not rejected ones — which is why the first properly powered
-round produced a candidate with 7/7 metrics moving the right way.
+round produced a candidate with 7/7 metrics moving the right way. That candidate then failed on a
+second task (§7), so the corrected reading is narrower and more useful: the roster is untested, and
+testing it properly mostly produces rejections — but *earned* ones.
 
 Defensibility and informativeness are different properties. This project had the first and,
 for a long time, not the second.
+
+## 6. The real binding constraint is repeat spirals, not context (2026-07-27)
+
+Re-derived from 1,505 sessions when the goal was restated as *"small models effective over long
+multi-turn tasks, minimal context"*:
+
+| | median | p90 | p99 | max |
+|---|---|---|---|---|
+| turns | 11 | 33 | 89 | **203** |
+| tool errors | 3 | 12 | 34 | **150** |
+| context tokens | 4,908 | 19,425 | 43,779 | 47,832 |
+
+**Context is not the constraint.** The median session uses 4,908 tokens; the governor is 6.9% of
+that. Minimal-context work on prompts optimises a rounding error.
+
+**Repeat spirals are.** Errors in the longest decile: median 14; in the shortest half: 1. Repeat
+calls track errors ~1:1 in the tail (150 errors / 164 repeats; 76/68; 62/49). The top 10% of
+sessions carry **43% of all 7,673 wasted tool calls**.
+
+And the cause was a live defect, not a missing feature: `loop-breaker` reset its episode on *any*
+progress — including a turn with no tool calls — so `fail, fail, fail, one edit, repeat` never
+tripped a tier. **8 of the 24 worst sessions passed.** They were not stuck, they were grinding.
+Fixed in `64103be` with a session-cumulative counter.
+
+**Consequence for candidate design:** an intervention that adds turns or context to a model failing
+from too many turns and too much context is wrong by construction, regardless of how it measures.
+That reasoning retired ~20 planning/delegation candidates and deleted the v4 family outright —
+cheaper and more reliable than 13 h of probing would have been.
+
+## 7. Pre-registration earned its keep immediately
+
+c21-micro-gate was the single most promising candidate in the catalogue — ranked #1 **and** #2 by
+the effort sweep, 7/7 metrics better at n=20 on `parens`. On its second task it managed 4/7 with
+input tokens significantly *worse*, and pass rate down on both. It stays dark.
+
+The rule was written a day before those numbers existed. Written afterwards, 4/7-with-a-regression
+is exactly the shape that becomes "directionally positive, adopt with monitoring".
