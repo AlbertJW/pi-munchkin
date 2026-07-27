@@ -188,3 +188,27 @@ the schema refusing to carry a decision is the right behaviour.
 **Consequence for S1:** the probe covers **28 candidates**, not 40. The other 17 need either a new
 firing event added to their mechanism, an inverse-exposure rule for OFF-arms, or acceptance that
 they can only ever be judged on outcome rather than engagement.
+
+## Amendment (2026-07-27): S1 entry rules by exposure mode
+
+S0 established that the 45 candidates split three ways. S1 asks "does the mechanism fire", which
+is only a meaningful question for two of them.
+
+| mode | count | S1 | rationale |
+|---|---|---|---|
+| `telemetry` | 28 | **runs** | a declared event firing proves the mechanism acted |
+| `suppression` | 2 | **runs, inverted** | treatment lands when the target event drops to **zero**; verdict needs the paired base arm via `suppression_confirmed()` |
+| `configuration` | 15 | **SKIPPED — enter at S2** | the treatment *is* the config; there is no firing to observe |
+
+**S1 therefore covers 30 candidates, not 45.**
+
+The 15 skippers are prompt/governor variants (c1, c5, c8, c9, c15, c19, c46, c47) and wording-only
+threshold changes (c14, c18, c18b, c33, c34, c36). Skipping S1 is not leniency — they forfeit the
+cheap retirement path and must earn their verdict on **outcome** at S2, where a null is a real
+result rather than an unreadable one. Where a mechanism could plausibly be instrumented later,
+adding a firing event and re-entering at S1 is strictly cheaper than an S2 round.
+
+**Suppression arms need their base arm.** Unlike telemetry mode, a suppression row is not
+self-interpreting: zero firings in cand proves nothing if base was also zero. S1 for c10 and
+c25-harness-off must therefore run **both arms** (n=6 each, 12 sessions) rather than cand-only.
+Revised S1 cost: 28 × 6 + 2 × 12 = **192 sessions ≈ 13 h**.
