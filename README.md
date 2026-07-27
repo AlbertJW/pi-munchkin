@@ -357,6 +357,8 @@ python3 prompt-lab/config.py --selftest
 
 ## Docs
 
+- **[HANDOVER.md](HANDOVER.md)** — start here if you are picking this up: current state, what
+  today's audit changed, standing constraints, gotchas, and what is open.
 - **[The honest finding](docs/THE-HONEST-FINDING.md)** — why the *instrument*, not the optimizer,
   is the hard part.
 - **[Research notes](docs/RESEARCH-NOTES.md)** — approaches evaluated, and why each was adopted,
