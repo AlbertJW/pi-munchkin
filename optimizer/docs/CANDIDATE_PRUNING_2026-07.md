@@ -365,3 +365,52 @@ or modified in producing this document. Every removal criterion above is a propo
 review, not an executed action — per this codebase's standing rule that adoption and deletion of
 any dark candidate are always human-gated. Any actual removal of a flag, its config file, its
 `schema.json` entry, or its telemetry registration requires Albert's explicit sign-off.
+
+## Why 0/44 adopted: the design was underpowered by construction (2026-07-27)
+
+Re-analysis of rounds already paid for, prompted by "so our harness optimization failed".
+Tool: `optimizer/prompt-lab/effort_report.py` (exact Mann-Whitney on continuous outcomes).
+
+**Pass/fail cannot resolve a realistic win at the n we used.** Smallest improvement reaching
+p<0.05 by Fisher's exact:
+
+| n/arm | smallest detectable improvement |
+|---|---|
+| 3 (the 34-candidate sweep) | **none — no effect of any size** |
+| 6 (the batch screen) | base 0/6 → cand 5/6 (**+83pp**) |
+| 9 | +56pp |
+| 20 | +25pp |
+
+The 34-candidate gemma sweep could not have produced a significant result. Every delta reported
+from it — including c2's +44pp and c7's −44pp — is below the detection floor of its own design.
+
+**Continuous outcomes help but do not rescue n=6.** Median effort deltas are large yet
+non-significant, because session-to-session variance is enormous (c21/parens base turns:
+4, 25, 35, 56, 56, 119 — a 30× spread):
+
+| cell | turns | tool_errors | p (turns) |
+|---|---|---|---|
+| c21/parens | 46 → 12 (−74%) | 13 → 3 (−77%) | 0.299 |
+| c24/path-near-miss | 24 → 36 (+53%) | 4 → 9 (+100%) | 0.394 |
+| c7/qs-error-swallow | 31 → 28 (−8%) | 6 → 14 (+125%) | 0.699 |
+
+Bootstrap power for the **largest effect in the whole dataset** (c21/parens turns, ~4× median
+reduction): **22% at n=6**, 58% at n=20, 84% at n=40. A real 4× efficiency win is missed ~78% of
+the time by the design that has been in use.
+
+**So "0/44 adopted" is not evidence the candidates don't work.** It is the expected output of a
+program that cannot see its own results. The rigor went into provenance (HMAC telemetry, surface
+hashes, serving fingerprints, admission gates) while the statistical design stayed at n=3–6.
+
+**Largest fixable variance source: decoding is never pinned.** `configs/baseline.json` sets no
+decoding fields, so `config_env()` emits `{}` and every session inherits the server's sampling
+defaults. `configs/schema.json` offers `TEMP: [0.6, 0.7, 0.8]` — **no deterministic option exists**,
+so a low-variance A/B is currently unconfigurable.
+
+**Recommended order of work (cheapest first), none executed:**
+1. **Pair the arms.** base and cand currently draw independent samples. Running both against a
+   fixed seed and comparing with Wilcoxon signed-rank removes between-session variance at zero
+   extra session cost. Needs a check that the provider path can pass a seed through.
+2. **Allow deterministic decoding** for A/B rounds (extend the `TEMP` enum downward).
+3. **Report effort, not just the gate bit** — `effort_report.py`, already built.
+4. **Only then** raise n. 60–80 sessions/cell is the alternative to 1–3, and it is the expensive one.
