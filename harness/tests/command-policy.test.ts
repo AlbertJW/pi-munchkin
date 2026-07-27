@@ -252,3 +252,24 @@ test("discardGitTargets: still fails closed when git IS present but the syntax i
 	const withGit = discardGitTargets(`git reset --hard $(cat target.txt)`, "/work", "/home/me");
 	assert.equal(withGit.ok, false, "a git-involving command substitution must still fail closed");
 });
+
+test("find -exec is classified by the exec'd command, not blanket-blocked", () => {
+	// Plan mode uses `mutates` to decide what to block. A blanket find-exec rule made
+	// `find … -exec grep -l` a violation while the equivalent `find … | xargs grep -l`
+	// passed — arbitrary from the model's side, and it cost a real planning session that
+	// could not count files to size its own plan (2026-07-27).
+	for (const ro of [
+		"find . -name manifest.json -exec grep -l unprocessed {} +",
+		"find . -name '*.ts' -exec wc -l {} +",
+		"find . -exec cat {} +",
+	]) assert.equal(classifyBashCommand(ro).mutates, false, ro);
+
+	for (const mut of [
+		"find . -name '*.log' -exec rm {} +",
+		"find . -name '*.ts' -exec sed -i '' s/a/b/ {} +",
+		"find . -type f -exec mv {} /tmp \;",
+		"find . -exec chmod 777 {} +",
+		"find . -exec git commit -m x \;",
+		"find . -name '*.o' -delete",           // no CMD to inspect — keeps its own rule
+	]) assert.equal(classifyBashCommand(mut).mutates, true, mut);
+});

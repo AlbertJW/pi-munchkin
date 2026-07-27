@@ -205,15 +205,7 @@
         "PLAN_TOOL_GO": [
           "on",
           "off"
-        ],
-        "PLAN_INSPECT_HINT": {
-          "values": [
-            "off",
-            "on"
-          ],
-          "default": "off",
-          "_note": "c48: plan-mode bash blocks name the read-only alternative instead of saying 'no edits'."
-        }
+        ]
       }
     },
     "messages": {

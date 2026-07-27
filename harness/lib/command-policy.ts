@@ -33,7 +33,7 @@ export const VERIFY_COMMAND_RE = new RegExp(
 
 const MUTATION_RE = new RegExp(
 	CMD_POS +
-		String.raw`(?:tee|sed\s+(?:-[a-zA-Z]+\s+)*(?:-i|--in-place)|perl\s+-[a-zA-Z]*i\b|cp|mv|mkdir|touch|ln|dd|install|truncate|chmod|chown|git\s+(?:add|commit|mv|rm|apply|restore|checkout|reset)|(?:eslint|ruff)\b[^;&|\n]*\s--fix\b|find\b[^;&|\n]*\s-(?:exec|execdir|ok|okdir))\b`,
+		String.raw`(?:tee|sed\s+(?:-[a-zA-Z]+\s+)*(?:-i|--in-place)|perl\s+-[a-zA-Z]*i\b|cp|mv|mkdir|touch|ln|dd|install|truncate|chmod|chown|git\s+(?:add|commit|mv|rm|apply|restore|checkout|reset)|(?:eslint|ruff)\b[^;&|\n]*\s--fix\b|find\b[^;&|\n]*\s-delete\b)`,
 	"i",
 );
 
@@ -60,6 +60,12 @@ function stripHarmlessRedirects(cmd: string): string {
 	return cmd.replace(SAFE_REDIRECT_RE, " ");
 }
 
+// `find -exec CMD` is classified by CMD itself, not blanket-blocked: CMD_POS above
+// already treats `-exec ` as a command position, so `-exec rm` is caught by the rm rule
+// while `-exec grep` stays read-only. The old blanket rule contradicted CMD_POS and made
+// plan-mode reject the recon a planner needs (`find … -exec grep -l` blocked, the
+// equivalent `find … | xargs grep -l` allowed). `find -delete` has no CMD to inspect, so
+// it keeps an explicit rule.
 // Shell is an execution language, not a list of trusted binaries. Anything we
 // do not positively recognize as inspection/verification is a mutation risk.
 // This closes the old fail-open class (`sh script`, `curl -o`, `ruby -e`, a
@@ -98,6 +104,13 @@ function shellCommandHeads(cmd: string): string[] {
 			while (words.length && (words[0].startsWith("-") || /^[A-Za-z_]\w*=/.test(words[0]))) words.shift();
 		}
 		if (words[0]) heads.push(words[0].replace(/^.*\//, ""));
+		// `find … -exec CMD …` runs CMD, so CMD is a command head too. Without this the
+		// segment head is only `find` (read-only) and an unknown binary rides in behind
+		// -exec. CMD_POS already treats -exec as a command position for MUTATION_RE; this
+		// makes the unknown-binary fail-closed path agree with it.
+		for (const m of raw.matchAll(/\s-(?:exec|execdir|ok|okdir)\s+([^\s;]+)/g)) {
+			heads.push(m[1].replace(/^.*\//, ""));
+		}
 	}
 	return heads;
 }

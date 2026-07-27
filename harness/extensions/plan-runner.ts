@@ -101,7 +101,6 @@ const FORCE_PLAN_WRITE = process.env.FORCE_PLAN_WRITE === "on";
 // activate under measurement. This is the activation path, not a mechanism
 // of its own; PLAN_TOOL_GO alone should be near behavior-neutral.
 const PLAN_TOOL_GO = process.env.PLAN_TOOL_GO === "on";
-const PLAN_INSPECT_HINT = process.env.PLAN_INSPECT_HINT === "on";
 
 type ItemStatus = "pending" | "in_progress" | "done" | "blocked";
 type Phase = "planned" | "executing";
@@ -476,7 +475,7 @@ function planBlock(autonomy: Autonomy): string {
 		? `REQ vague → take the most defensible reading, note assumptions in summary, plan.`
 		: `REQ vague/ambiguous → unfold it: ask ONE question — the one whose answer narrows the work most. End your turn, wait.
 Answer in → clear? plan. Still vague → next ONE question. Hard cap 3 total; at the cap, plan and put open assumptions in summary.`;
-	return `Plan only. No edits, no shell writes, no other work.
+	return `Plan only — only file changes are blocked. Investigate first: read/grep/find/ls and read-only bash all work while planning. Sizing the work beats guessing at it.
 ${vague}
 Risky REQ, or several viable approaches → in thinking only: draft a minimal-safe plan and a thorough plan, then merge — keep each item that buys real risk coverage, drop the rest. Emit only the merged plan. Clear simple REQ → skip the comparison, plan straight.
 ${PLAN_ITEM_GUIDANCE_V2 ? "Decompose REQ into ordered steps sized to the real work — no padding, no fake splits." : "Break REQ into 5-10 ordered items. Small steps, no fake splits."}
@@ -1305,7 +1304,7 @@ export default function (pi: ExtensionAPI) {
 				&& classifyBashCommand(String((event.input as Record<string, unknown> | undefined)?.command ?? "")).mutates;
 			const isMutation = PLAN_MUTATION_TOOLS.has(event.toolName) || bashMutates;
 			if (!isMutation) return;
-			// c48 PLAN_INSPECT_HINT: a bash block here is usually NOT an attempted edit.
+			// A bash block here is usually NOT an attempted edit.
 			// command-policy deliberately favours false positives ("anything not
 			// positively recognised as inspection is a mutation risk"), so read-only
 			// recon — `find -exec grep`, a status script, an unknown task runner — trips
@@ -1314,11 +1313,11 @@ export default function (pi: ExtensionAPI) {
 			// row before the model abandoned a plan it could not size without counting.
 			const kind = bashMutates && !PLAN_MUTATION_TOOLS.has(event.toolName) ? "inspect" : "edit";
 			planEvent("plan-mode-block", `plan-mode-${actionId()}`, { toolName: event.toolName, kind });
-			if (PLAN_INSPECT_HINT && kind === "inspect") {
+			if (kind === "inspect") {
 				return {
 					block: true,
 					reason: steerText("PLAN_INSPECT_BLOCK",
-						"failure_class=plan_mode_violation. PLAN phase. That bash command is not recognised as read-only (no -exec, no script files, no unknown binaries). Inspect with the read/grep/find tools instead — they are allowed while planning. To change files: plan_write, end your turn, /plan-go executes.",
+						"failure_class=plan_mode_violation. PLAN phase blocks file CHANGES, not investigation — but this bash command is not recognised as read-only (a script file, or an unknown binary, whose contents cannot be checked). Use the read/grep/find/ls tools, or a plain read-only command. To change files: plan_write, end your turn, /plan-go executes.",
 						{ tool: event.toolName }),
 				};
 			}
