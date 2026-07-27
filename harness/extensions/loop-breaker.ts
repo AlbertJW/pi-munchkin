@@ -134,6 +134,33 @@ let ep = newEpisode();
 // Tier-3 "abort" backstop: armed when a loop is confirmed, fires on the next looping
 // tool call (turn_end is ~idle, so its own abort may no-op — this guarantees the stop).
 let abortArmed = false;
+
+// SESSION-CUMULATIVE repeat counter — deliberately NOT cleared by resetEpisode().
+//
+// The episode counters measure repetition *since the last progress*, and progress
+// includes a turn with no tool calls at all. That catches a model stuck in place but
+// is blind to one that GRINDS: fail, fail, fail, one edit, repeat — every cycle resets
+// the episode. Measured over 1,505 sessions, grinding is where the waste actually is:
+// the worst session logged 164 repeated calls / 150 tool errors and still PASSED, and
+// the top decile of sessions carries 43% of all 7,673 wasted tool calls. Every one of
+// those episodes was reset away before it could trip a tier.
+const SESSION_REPEAT_LIMIT = envInt("LB_SESSION_REPEAT", 25); // ~p95 of observed repeats
+const sessionSeenCalls = new Set<string>();
+let sessionRepeats = 0;
+let sessionRepeatFired = false;
+
+/** How many of these calls have been seen before this session. Mutates `seen`.
+ *  Pure and exported so the grinding case is unit-testable without a live pi. */
+export function tallySessionRepeats(seen: Set<string>, calls: Array<{ name: string; args: Record<string, unknown> }>): number {
+	let repeats = 0;
+	for (const c of calls) {
+		const fp = fpKey(c.name, c.args);
+		if (seen.has(fp)) repeats += 1;
+		else seen.add(fp);
+	}
+	return repeats;
+}
+
 function resetEpisode(): void {
 	ep = newEpisode();
 	abortArmed = false;
@@ -345,6 +372,23 @@ export default function (pi: ExtensionAPI) {
 					pi.sendUserMessage(msg, { deliverAs: "steer" });
 				}
 			}
+		}
+
+		// Count session-cumulative repeats BEFORE the progress check below can reset
+		// the episode — grinding is exactly the pattern that resets every few turns.
+		// Uses fpKey so read pagination (offset 0, 2000, 4000…) is not a repeat.
+		sessionRepeats += tallySessionRepeats(sessionSeenCalls, toolCalls);
+		if (!sessionRepeatFired && sessionRepeats >= SESSION_REPEAT_LIMIT) {
+			sessionRepeatFired = true; // steer once per session, never nag
+			record("loop-breaker", "session-repeat", { repeats: sessionRepeats, turnIndex: event.turnIndex });
+			const msg = steerText(
+				"LB_SESSION_REPEAT",
+				"[loop-breaker] You have repeated {repeats} tool calls this session. Repeating them is not " +
+					"working. Stop, state what you actually know, and either change approach or report Blocked " +
+					"with what you tried.",
+				{ repeats: sessionRepeats },
+			);
+			pi.sendUserMessage(msg, { deliverAs: "steer" });
 		}
 
 		// Progress = an edit/write/plan_write tool, a file-mutating bash command,

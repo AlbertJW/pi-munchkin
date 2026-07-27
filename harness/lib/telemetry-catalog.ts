@@ -43,6 +43,7 @@ export const EVENT_CATALOG = {
 	"plan-runner/write-rejected": { reason_class: "string", context_tokens: ["number", "null"] },
 	"plan-runner/go": { resumed: "boolean", stale: "number" },
 	"plan-runner/go-blocked": { reason: "string" },
+	"plan-runner/plan-mode-block": { toolName: "string", kind: "string" },
 	"plan-runner/reflection": { stage: "string", pass: "number", next: "string", requirements: "number", uncertainties: "number" },
 	"plan-runner/v4-write": {
 		steps: "number", behavior: "number", support: "number", requirements: "number",
@@ -63,6 +64,7 @@ export const EVENT_CATALOG = {
 	"context-inlet-guard/block": { risky: "boolean", bytes: "number", n: "number", bigLimit: "boolean" },
 	"surface-receipt/surface": { sha256: "string" },
 	"loop-breaker/compact-reset": { streak: "number", blocked: "number" },
+	"loop-breaker/session-repeat": { repeats: "number", turnIndex: "number" },
 	"loop-breaker/outcome-steer": { n: "number", final: "boolean", injected_chars: "number", turnIndex: "number" },
 	"loop-breaker/outcome-abort": { n: "number", turnIndex: "number" },
 	"loop-breaker/progress-after-steer": { turns_since: "number" },

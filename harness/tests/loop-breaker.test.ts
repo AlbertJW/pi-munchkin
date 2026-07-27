@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { thresh, resolveStopMode, fpKey, decideTier, type Thresholds } from "../extensions/loop-breaker.ts";
+import { thresh, resolveStopMode, fpKey, decideTier, tallySessionRepeats, type Thresholds } from "../extensions/loop-breaker.ts";
 
 const TH: Thresholds = { t1: 2, t2: 3, t3: 5, streakSoft: 8, streakHard: 20 }; // local defaults
 
@@ -76,4 +76,34 @@ test("resolveStopMode: default is abort (graceful run-stop); env overrides", () 
 	assert.equal(resolveStopMode("shutdown"), "shutdown");
 	assert.equal(resolveStopMode("block"), "block"); // opt back into old soft behavior
 	assert.equal(resolveStopMode("garbage"), "abort");
+});
+
+test("session repeats survive the progress reset that clears an episode", () => {
+	// The grinding pattern from the field: fail, fail, fail, one edit, repeat.
+	// Every `edit` turn calls resetEpisode(), so the since-progress counters never
+	// reach a tier — which is why a real session logged 164 repeats and 150 tool
+	// errors and still passed. The cumulative counter must see straight through it.
+	const seen = new Set<string>();
+	let repeats = 0;
+	for (let cycle = 0; cycle < 10; cycle++) {
+		for (let i = 0; i < 3; i++) {
+			repeats += tallySessionRepeats(seen, [{ name: "bash", args: { command: "npm test" } }]);
+		}
+		// progress turn — in the extension this calls resetEpisode()
+		repeats += tallySessionRepeats(seen, [{ name: "edit", args: { path: `f${cycle}.ts` } }]);
+	}
+	assert.equal(repeats, 29, "3 repeats/cycle after the first call, across 10 cycles");
+	assert.ok(repeats >= 25, "trips the default LB_SESSION_REPEAT limit the episode counter never reaches");
+});
+
+test("session repeats do NOT count read pagination or genuinely new work", () => {
+	const seen = new Set<string>();
+	let repeats = 0;
+	repeats += tallySessionRepeats(seen, [{ name: "read", args: { path: "big.ts", offset: 0 } }]);
+	repeats += tallySessionRepeats(seen, [{ name: "read", args: { path: "big.ts", offset: 2000 } }]);
+	repeats += tallySessionRepeats(seen, [{ name: "read", args: { path: "big.ts", offset: 4000 } }]);
+	repeats += tallySessionRepeats(seen, [{ name: "bash", args: { command: "npm test" } }]);
+	assert.equal(repeats, 0, "paginating a large file and doing new work is not grinding");
+	repeats += tallySessionRepeats(seen, [{ name: "read", args: { path: "big.ts", offset: 2000 } }]);
+	assert.equal(repeats, 1, "a verbatim re-read IS a repeat");
 });

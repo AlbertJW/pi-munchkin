@@ -103,6 +103,7 @@ const FORCE_PLAN_WRITE = process.env.FORCE_PLAN_WRITE === "on";
 // activate under measurement. This is the activation path, not a mechanism
 // of its own; PLAN_TOOL_GO alone should be near behavior-neutral.
 const PLAN_TOOL_GO = process.env.PLAN_TOOL_GO === "on";
+const PLAN_INSPECT_HINT = process.env.PLAN_INSPECT_HINT === "on";
 // Dark candidate c40: new plans use capability-aware reflection and schema-v4
 // artifacts. Flag-off retains the complete v3 registration path below.
 const PLAN_SYNTHESIS_V1 = process.env.PLAN_SYNTHESIS_V1 === "on";
@@ -1328,10 +1329,27 @@ export default function (pi: ExtensionAPI) {
 	// Read-only bash stays allowed — planning needs investigation.
 	pi.on("tool_call", async (event, ctx) => {
 		if (isPlanning()) {
-			const isMutation =
-				PLAN_MUTATION_TOOLS.has(event.toolName) ||
-				(event.toolName === "bash" && classifyBashCommand(String((event.input as Record<string, unknown> | undefined)?.command ?? "")).mutates);
+			const bashMutates = event.toolName === "bash"
+				&& classifyBashCommand(String((event.input as Record<string, unknown> | undefined)?.command ?? "")).mutates;
+			const isMutation = PLAN_MUTATION_TOOLS.has(event.toolName) || bashMutates;
 			if (!isMutation) return;
+			// c48 PLAN_INSPECT_HINT: a bash block here is usually NOT an attempted edit.
+			// command-policy deliberately favours false positives ("anything not
+			// positively recognised as inspection is a mutation risk"), so read-only
+			// recon — `find -exec grep`, a status script, an unknown task runner — trips
+			// it. The legacy message says "no edits", which misdiagnoses that model and
+			// names no alternative; observed live 2026-07-27, five blocked attempts in a
+			// row before the model abandoned a plan it could not size without counting.
+			const kind = bashMutates && !PLAN_MUTATION_TOOLS.has(event.toolName) ? "inspect" : "edit";
+			planEvent("plan-mode-block", `plan-mode-${actionId()}`, { toolName: event.toolName, kind });
+			if (PLAN_INSPECT_HINT && kind === "inspect") {
+				return {
+					block: true,
+					reason: steerText("PLAN_INSPECT_BLOCK",
+						"failure_class=plan_mode_violation. PLAN phase. That bash command is not recognised as read-only (no -exec, no script files, no unknown binaries). Inspect with the read/grep/find tools instead — they are allowed while planning. To change files: plan_write, end your turn, /plan-go executes.",
+						{ tool: event.toolName }),
+				};
+			}
 			return {
 				block: true,
 				reason:
