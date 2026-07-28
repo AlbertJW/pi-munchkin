@@ -149,6 +149,10 @@
         "read_span": {
           "type": "integer",
           "minimum": 0
+        },
+        "subagent_calls": {
+          "type": "integer",
+          "minimum": 0
         }
       }
     },
@@ -252,6 +256,12 @@
         },
         "hash_blocker": {
           "type": "string"
+        },
+        "tools": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
         }
       }
     },

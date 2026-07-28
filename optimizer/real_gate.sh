@@ -26,6 +26,11 @@ HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(git -C "$HERE" rev-parse --show-toplevel 2>/dev/null || dirname "$HERE")"
 GEN="${GEN:-rg0}"; N="${N:-3}"
 ARM="${ARM:-both}"                 # base | cand | both
+# The unconditional tool surface of EVERY gate session, both arms. This must match
+# the live agent's standard surface (minus deliberate exclusions) or rounds measure
+# a harness that doesn't exist — see the resolution block in run_one() for the
+# 2026-07-23 (plan_write) and 2026-07-28 (subagent, write) incidents this encodes.
+GATE_BASE_TOOLS="read,edit,write,bash,plan_write,subagent"
 DD="${DD:-qwen36-35b-iq3s}"; PI_TIMEOUT="${PI_TIMEOUT:-1800}"
 PI_MODEL="${PI_MODEL:-}"   # pi model id for the sessions (else pi uses its default — beware external defaults)
 PI_PROVIDER="${PI_PROVIDER:-}"
@@ -239,6 +244,7 @@ ensure_model_loaded() {
 if [[ "$DRY" == 1 ]]; then
 	echo "== real_gate DRY ==  GEN=$GEN  N=$N  base=$(basename "$BASE")  cand=$(basename "$CAND")"
 	echo "execution: network=$GATE_NETWORK model_control=$MODEL_CONTROL provider=${PI_PROVIDER:-auto} model=${PI_MODEL:-auto}"
+	echo "tools: $GATE_BASE_TOOLS (+flag-gated: plan_go, search_spans/read_span)"
 	if [[ "$MODEL_CONTROL" == "llama" ]]; then
 		echo "server: $(health && loaded_alias || echo DOWN)"
 	else
@@ -501,23 +507,35 @@ PY
 	# deadlocked against c38's block). Unconditional on BOTH arms: flag-gating
 	# it would recreate the c36-style asymmetry. Plan gates still run
 	# engine-side inside plan_write, so this grants no verification bypass.
-	local tools="read,edit,bash,plan_write"
-	if [[ "$task" == "t4" || "$env_plan_subagent_only" == "1" || \
-	      "$env_plan_delegate_all" == "on" || "$env_spawn_delegation" == "on" ]]; then
-		# APPEND, not replace — this used to overwrite $tools wholesale, silently
-		# dropping plan_write for c25/c36/c37 too (not just t4): confirmed live via
-		# two independent adversarial reproductions during the Tier 1 instrument-
-		# consistency-check build (2026-07-23). Neither c25/c36/c37's own
-		# static configs happened to also set a plan_write-family flag, so this
-		# never tripped the new regression guard below — it silently measured a
-		# harness without plan_write in every PLAN_SUBAGENT_ONLY/PLAN_DELEGATE_ALL/
-		# SPAWN_DELEGATION round ever run, exactly like tonight's original bug.
-		tools="$tools,subagent"
-	fi
+	# 2026-07-28: subagent and write joined the unconditional base list
+	# (GATE_BASE_TOOLS, defined at the top of this file) by the same principle
+	# as plan_write above — both are standard live surface: real interactive
+	# sessions call write routinely and delegate via subagent (observed live
+	# 2026-07-27), yet subagent used to be appended only under delegation
+	# flags, so ZERO baseline delegations were recorded across 1,466 rows and
+	# the explorer was never measured once (EXPLORER_BACKSTOP_RESEARCH_2026-07.md
+	# blocker 1), while write's absence pushed models to bash heredocs the live
+	# agent never needs. Deliberate exclusions from the base surface: web tools
+	# (network nondeterminism) and dark-candidate tools (plan_go, span tools —
+	# flag-gated below). The t4/c25/c36/c37 conditional append this replaces is
+	# covered by the instrument-consistency guards below, which stay.
+	local tools="$GATE_BASE_TOOLS"
 	# c39: standalone activation tool for state.phase="executing" — deliberately
 	# its own append, not merged into the subagent-family branch above.
 	[[ "$env_plan_tool_go" == "on" ]] && tools="$tools,plan_go"
 	[[ "$env_span_tools" == "on" ]] && tools="$tools,search_spans,read_span"
+	# Base-surface regression guard (unconditional, both arms, checked at the point
+	# $tools is finalized): a future edit that re-gates a base tool or replaces
+	# $tools wholesale must fail loudly here instead of silently measuring a harness
+	# that doesn't exist — the exact failure mode of the plan_write (2026-07-23) and
+	# subagent/write (2026-07-28) incidents.
+	local required_tool
+	for required_tool in read edit write bash plan_write subagent; do
+		if [[ ",$tools," != *",$required_tool,"* ]]; then
+			echo "[real_gate] base surface tool '$required_tool' missing from --tools '$tools' for $pat/$task — refusing to measure a nonexistent harness surface" >&2
+			exit 2
+		fi
+	done
 	# Instrument-consistency check (UPGRADE_MAP.md Tier 1 #1): every candidate flag that
 	# steers the model toward a specific tool must have that tool actually granted in
 	# $tools, checked HERE — at the exact point $tools is finalized, on every real
@@ -767,12 +785,12 @@ NOTE: a previous attempt in this workdir was stopped for repeating the same fail
 		LOW_TOK_STREAK=0
 	fi
 
-	python3 - "$RESULTS" "$MODEL" "$pat" "$task" "$rep" "$gate" "$retried" "$RUNID" "$tin" "$tout" "$output_chars" "$split" "$usage_exact" "${FLEET_EXPECTED_MODELS:-}" "$rowctx" "$wd/fingerprint-pre.json" "$wd/fingerprint-post.json" "$GATE_NETWORK" "$MODEL_CONTROL" "$MODEL_PROVIDER_RESOLVED" "$ENDPOINT_IDENTITY_SHA256" "$NETWORK_AUTHORITATIVE" "$NETWORK_AUTHORITY_REASON" "$SANDBOX_AUTHORITATIVE" "$SANDBOX_AUTHORITY_REASON" "$EXEC_POLICY" "$mrow" "$span_receipt_success" "$cfg" "$CONFIG" "$EXPERIMENT_MANIFEST" "$EXPERIMENT_MANIFEST_SHA256" "$EXPERIMENT_BASE_CELL" "$EXPERIMENT_CAND_CELL" "$HARNESS_HASH_BLOCKER" "$context_telemetry" "$wd/.pi/APPEND_SYSTEM.md" "${AGENT_MODELS_SHA256:-}" <<'PY'
+	python3 - "$RESULTS" "$MODEL" "$pat" "$task" "$rep" "$gate" "$retried" "$RUNID" "$tin" "$tout" "$output_chars" "$split" "$usage_exact" "${FLEET_EXPECTED_MODELS:-}" "$rowctx" "$wd/fingerprint-pre.json" "$wd/fingerprint-post.json" "$GATE_NETWORK" "$MODEL_CONTROL" "$MODEL_PROVIDER_RESOLVED" "$ENDPOINT_IDENTITY_SHA256" "$NETWORK_AUTHORITATIVE" "$NETWORK_AUTHORITY_REASON" "$SANDBOX_AUTHORITATIVE" "$SANDBOX_AUTHORITY_REASON" "$EXEC_POLICY" "$mrow" "$span_receipt_success" "$cfg" "$CONFIG" "$EXPERIMENT_MANIFEST" "$EXPERIMENT_MANIFEST_SHA256" "$EXPERIMENT_BASE_CELL" "$EXPERIMENT_CAND_CELL" "$HARNESS_HASH_BLOCKER" "$context_telemetry" "$wd/.pi/APPEND_SYSTEM.md" "${AGENT_MODELS_SHA256:-}" "$tools" <<'PY'
 import hashlib,importlib.util,json,os,sys
 (out,model,pat,task,rep,gate,retried,runid,tin,tout,outchars,split,usage_exact,expected_models,
  ctxpath,prepath,postpath,network_mode,model_control,provider,endpoint_sha,network_auth,network_reason,
  sandbox_auth,sandbox_reason,policy_path,mrow,span_receipt,cfg_path,config_path,experiment_manifest,
- experiment_sha,base_cell,cand_cell,harness_blocker,context_telemetry_path,rendered_governor_path,agent_models_sha) = sys.argv[1:39]
+ experiment_sha,base_cell,cand_cell,harness_blocker,context_telemetry_path,rendered_governor_path,agent_models_sha,tools_csv) = sys.argv[1:40]
 ctx=json.load(open(ctxpath)); pre=json.load(open(prepath)); post=json.load(open(postpath))
 # Loaded once and reused for both "harness" and "context" below — the surface hash
 # in the row is pulled ONLY from this already-HMAC-verified blob, never from the
@@ -800,6 +818,9 @@ if len(metric_values) != len(metric_names):
 metrics={name:int(value) for name,value in zip(metric_names,metric_values)}
 trajectory={name:metrics[name] for name in ("turns","tool_calls","tool_errors","reads","unique_reads","repeat_calls","repeat_reads",
                                              "tool_result_chars","first_mutation_turn","compactions","search_spans","read_span")}
+# subag was always extracted by metrics.py but dropped here — with subagent now on
+# the base surface, delegation usage is a first-class trajectory dimension.
+trajectory["subagent_calls"]=metrics["subag"]
 cfg_bytes=open(cfg_path,"rb").read(); cfg=json.loads(cfg_bytes)
 cspec=importlib.util.spec_from_file_location("prompt_lab_config",config_path)
 cmod=importlib.util.module_from_spec(cspec); cspec.loader.exec_module(cmod)
@@ -829,7 +850,10 @@ rec={"schema":"pi.eval-row/v2", "task":task,"pattern":pat,"arm":pat,"rep":int(re
      "serving":{"pre":pre,"post":post,"stable":stable},"usage":usage,"trajectory":trajectory,
      "span_receipt_success":bool(int(span_receipt)),"config":config_binding,"experiment":experiment,
      "harness":{"surface_sha256":harness_surface_sha256,
-                "hash_blocker":harness_blocker if harness_surface_sha256 is None else ""},
+                "hash_blocker":harness_blocker if harness_surface_sha256 is None else "",
+                # The resolved --tools list, verbatim: the subagent gap hid for
+                # 1,466 rows precisely because no row said which surface it measured.
+                "tools":tools_csv.split(",")},
      "context":context_data,
      # compatibility aliases for historical readers; dimensions stay honest.
      "out_chars":int(outchars),"think_chars":0,"in_tok":int(tin) if exact else 0,

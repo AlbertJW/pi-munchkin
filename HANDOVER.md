@@ -146,10 +146,12 @@ this reads as a rejection.
    compaction owns the job — ledger entry in `HARNESS_SELF_IMPROVEMENT.md`). The `plan-runner.ts`
    flags were assessed and deliberately kept: they back active-roster candidates with
    pre-registered 2026-09-03 win-or-retire deadlines and the pending c25/c37+c38+c39 combo.
-3. **The gate measures a different agent than the live one.** `subagent` is **not** in the gate's
-   base tool list (`real_gate.sh`, appended only under a delegation flag), so 0 delegations across
-   1,466 rows. The real agent has it. Until that's fixed, gate results may not transfer.
-   See `optimizer/docs/EXPLORER_BACKSTOP_RESEARCH_2026-07.md`.
+3. ~~Gate measures a different agent~~ **Resolved 2026-07-28.** `subagent` and `write` (same
+   defect, found during the fix — live sessions use both routinely) are now in the gate's
+   unconditional base list (`GATE_BASE_TOOLS`), guarded against regression; each row records its
+   resolved `--tools` (`harness.tools`) and `trajectory.subagent_calls`. Note: rows from before
+   this date measured the narrower surface — effort comparisons across the boundary carry that
+   caveat.
 4. **`q4b-c21-effort-qs` stopped at 36/60 rows** — Albert halted the box deliberately. The verdict
    is already decided against adoption; finishing it is optional.
 5. Five retirements proposed but **not executed** (human-gated): c43, the three investigation

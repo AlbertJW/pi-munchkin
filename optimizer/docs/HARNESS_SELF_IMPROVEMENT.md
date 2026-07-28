@@ -1186,3 +1186,35 @@ deliberately **left alone**: c25/c31/c32/c34/c36/c37/c38/c39 are all on the acti
 pre-registered win-or-retire deadlines of 2026-09-03 and a pending c25/c37+c38+c39 three-way
 combo. Deleting them early on a mechanism argument would be the c21 lesson applied in reverse;
 the deadline retires them cleanly if nothing wins.
+
+## The gate now measures the live agent's tool surface (2026-07-28)
+
+Open item 3 from the 2026-07-27 handover, plus one same-class defect found during the fix:
+
+- **`subagent` joined the unconditional base list.** It was appended only under delegation flags
+  (`t4`/c25/c36/c37), so **zero baseline delegations were ever recorded across 1,466 rows** — the
+  explorer has literally never been measured (`EXPLORER_BACKSTOP_RESEARCH_2026-07.md`, blocker 1,
+  now cleared). Candidate-arm transcripts prove the tool *works* in the gate environment (completed
+  spawns on the e2b c25 round), and they surface a failure mode baselines have never been able to
+  show: gemma-4-e2b burned turns hallucinating agent names (`gsd-fast`, `ponytail`, `gsd-health`)
+  before finding the real three — repeat-spiral shape, invisible while the tool was flag-gated.
+- **`write` was missing by the same mechanism, since the initial commit, with no recorded
+  rationale.** Live sessions call it routinely (checked against `~/Documents/AlbertWork` sessions,
+  2026-07-22..27); gate models were silently pushed to bash heredocs instead. A tool absent from
+  `--tools` is never declared, so this produced no errors — only unmeasured behavioral divergence.
+- **Every row now records the surface it measured**: `harness.tools` (the resolved `--tools`,
+  verbatim) — the gap survived 1,466 rows precisely because no row said what it granted — and
+  `trajectory.subagent_calls` (`metrics.py` always extracted `subag`; row assembly dropped it).
+- **Guards**: a new unconditional base-surface check (read/edit/write/bash/plan_write/subagent,
+  both arms, at the point `$tools` is finalized) joins the existing flag-conditional
+  instrument-consistency checks; `--dry` prints the surface. Deliberate exclusions, documented in
+  the resolution block: web tools (network nondeterminism), dark-candidate tools (`plan_go`,
+  span tools — still flag-gated).
+
+Verified end-to-end: `npm run verify` green; one exploratory `parens` baseline session
+(`tools-surface-smoke`, gemma4-26b-it, gate=1) produced a row carrying the full six-tool surface
+that `fleet_report.py` accepts with the correct `INCOMPLETE`/non-authoritative exploratory verdict.
+
+**Comparability caveat, stated once here**: rows dated before 2026-07-28 measured the narrower
+surface. Effort comparisons that span the boundary inherit that difference; `harness.tools` makes
+the boundary machine-checkable from now on.

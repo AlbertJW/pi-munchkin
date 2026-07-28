@@ -87,3 +87,12 @@ Not useful yet, and the reason is worth more than the answer: **we cannot evalua
 backstop because we have never evaluated the explorer.** Step 1 is a one-line tool grant plus a
 measurement round, and it unblocks span-tools, the delegation cluster (c25/c36/c37) and any future
 repo map at the same time.
+
+---
+
+**Update 2026-07-28: blocker 1 cleared.** `subagent` (and `write`, missing by the same mechanism)
+joined `real_gate.sh`'s unconditional base tool list (`GATE_BASE_TOOLS`), both arms; the resolved
+`--tools` list is now recorded per row (`harness.tools`) and delegation counts are a first-class
+trajectory dimension (`trajectory.subagent_calls` — `metrics.py` always extracted it; the row
+assembly dropped it). Baseline explorer usage data accumulates from the next round onward.
+Blockers 2 (no large-repo fixture) and 3 (ISONGraph maturity) stand.
