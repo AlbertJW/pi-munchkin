@@ -54,10 +54,22 @@ invalidates provenance.
 
 ## State today
 
-- **21 extensions, 31 libs, 7,344 lines.** 39 dark candidates.
+- **21 extensions, 30 libs, 7,084 lines.** 42 static configs on disk (incl. 5 investigation
+  combos); the active roster is c25-c39 per `CANDIDATE_PRUNING_2026-07.md`.
 - **Live by default:** loop-breaker, verify-gate, drift-scanner, ketch, hashline, git-guard, the
-  context guards, plan-runner v3.
+  context guards, plan-runner v3. context-watcher is passive telemetry only as of 2026-07-28.
 - **Dark:** everything `cNN`, including `MICRO_GATE`.
+
+### Landed 2026-07-28 (4 commits, `7ad9fbc`..`9c82acf`)
+
+1. **context-watcher demoted to passive observer** — 0 fires in 1,505 gate rows, 0 completions
+   ever; pi-native compaction owns the job (`reserveTokens` 4096→16384 in live settings).
+2. **The gate now grants the live surface**: `subagent` + `write` unconditional both arms,
+   `harness.tools` + `trajectory.subagent_calls` recorded per row, base-surface guard fails
+   closed. Pre-2026-07-28 rows measured the narrower surface — comparability caveat in the ledger.
+3. **Three-way combos built and run** (35B + local 4B): delegation cluster activates at last.
+   c25-on-4B is the live shortlist signal (needs a pre-registered n≥20 round); c37 0-for-2 with
+   adverse effort; 1 voluntary delegation in 36 baseline sessions across 3 models.
 
 ### Landed 2026-07-27 (14 commits, `d09ab1d`..`d3c61c4`)
 
@@ -138,6 +150,11 @@ this reads as a rejection.
 
 ## Open, in rough priority order
 
+0. **Design and run the pre-registered powered round for c25 on the local 4B** (n≥20/arm,
+   effort-scored, decision rule written before data — see the 2026-07-28 section of
+   `CANDIDATE_PRUNING_2026-07.md` and `check-detection-floor` discipline). This is the one live
+   shortlist signal; do not adopt c25 without it. Related: c38 still needs a third-model
+   pass-rate datapoint before its own status settles.
 1. **Verify the loop-breaker fix works in the wild.** It is live, reasoned, and unit-tested, but
    `LB_SESSION_REPEAT=25` is a p95 estimate, not a measured optimum. Watch for
    `loop-breaker/session-repeat` firing on legitimately long sessions.
