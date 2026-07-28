@@ -414,3 +414,41 @@ so a low-variance A/B is currently unconfigurable.
 2. **Allow deterministic decoding** for A/B rounds (extend the `TEMP` enum downward).
 3. **Report effort, not just the gate bit** — `effort_report.py`, already built.
 4. **Only then** raise n. 60–80 sessions/cell is the alternative to 1–3, and it is the expensive one.
+
+## The three-way combo rounds: c25/c37 + c38 + c39 finally activate (2026-07-28)
+
+The combos both c25 and c37 rows above name as their required next step were built
+(`c25-c38-c39-combo`, `c37-c38-c39-combo`) and run same-day on the local 35B DD and the local
+`qwopus35-4b` (a deckard-19B attempt was operator-halted at 0/3 on parens — model floor, partial
+rows kept in `results/combo3-c25-deckard.jsonl`). All rounds ran on the corrected gate surface
+(subagent + write granted both arms, same-day change — rows carry `harness.tools`).
+
+**Activation: the structural dead-end is gone on every model measured.** Every cand arm fired the
+full chain (force-plan-write → plan_write → plan_go → blocks), with `targeted` exposure rows on
+each model: c25 got its first `subagent-only-block` firings ever (1/9 sessions on the 35B, 4/9 on
+the 4B, 12 block events there), c37 fired `delegate-all-block` 13×/11× with 21 and 33-34
+delegations per round. Zero `go-blocked` anywhere — the c39 path is clean.
+
+**Effort/pass reads (n=9/arm, exposure rounds — nothing here is a verdict):**
+
+| round | pass base→cand | effort direction (passing only) |
+|---|---|---|
+| c25 / 35B | 9/9 → 9/9 | neutral (+10% turns, −50% repeats n.s.) |
+| c37 / 35B | 8/9 → 9/9 | adverse: +70% turns, +200% tool_errors (p=.074), 2× context |
+| c25 / 4B  | 5/9 → 7/9 | **all five metrics better; tool_result_chars −44% (p=.030)** |
+| c37 / 4B  | 9/9 → 7/9 | mildly adverse (+8% turns, +200% repeats n.s.) |
+
+**Interpretation, disciplined:** c25-on-the-4B is a legitimate shortlist signal — the capability
+band plus a starred context reduction fits the many-small-contexts hypothesis — but it is exactly
+the c21 shape (first-round promise, post-hoc metric selection); the next step is a pre-registered,
+powered round (n≥20/arm) on the 4B, rule written before data. c37 is now 0-for-2 models with
+directionally adverse effort both times, consistent with the first-principles objection on record;
+its 2026-09-03 clock is running with real, unconfounded evidence against it for the first time.
+
+**Baseline delegation, three models, 36 base sessions: one voluntary subagent call** (4B, c37
+round). With the tool granted everywhere, small models simply do not delegate unprompted —
+the explorer's baseline usage rate is ~3%, which reframes the backstop question: adoption of any
+delegation architecture is a *forcing* question, not an affordance question.
+
+**Instrument note:** 4B base pass was 5/9 and 9/9 in back-to-back same-config rounds — a
+live illustration of the session-variance point in `MEASUREMENT_METHODOLOGY_2026-07.md` §3.

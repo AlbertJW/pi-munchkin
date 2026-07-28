@@ -1218,3 +1218,15 @@ that `fleet_report.py` accepts with the correct `INCOMPLETE`/non-authoritative e
 **Comparability caveat, stated once here**: rows dated before 2026-07-28 measured the narrower
 surface. Effort comparisons that span the boundary inherit that difference; `harness.tools` makes
 the boundary machine-checkable from now on.
+
+## Three-way combo rounds: delegation cluster measurable at last (2026-07-28)
+
+Same-day follow-through on the gate-surface fix: `c25-c38-c39-combo` and `c37-c38-c39-combo`
+built and run on the 35B DD and local `qwopus35-4b` (deckard-19B halted at 0/3 parens — floor).
+Full numbers and the disciplined read: `CANDIDATE_PRUNING_2026-07.md`, 2026-07-28 section.
+Headlines: activation confirmed on every model (first `subagent-only-block` and
+`delegate-all-block` firings ever recorded); c25-on-4B is a genuine shortlist signal
+(pass 5/9→7/9, all effort metrics better, tool_result_chars −44% p=.030 — c21-shaped, needs a
+pre-registered n≥20 round before it means anything); c37 is 0-for-2 models with adverse effort
+both times; and across 36 baseline sessions on three models there was exactly one voluntary
+delegation — the explorer is a forcing question, not an affordance question.
