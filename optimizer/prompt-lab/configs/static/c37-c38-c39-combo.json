@@ -1,0 +1,22 @@
+{
+  "name": "c37-c38-c39-combo",
+  "prediction": "Investigation config, not a new independent candidate -- the three-way combo CANDIDATE_PRUNING_2026-07.md's c37 row names as the required next step, mirroring c25-c38-c39-combo. ANDs PLAN_DELEGATE_ALL (c37, thin-orchestrator enforcement: main loop may only plan and delegate) with FORCE_PLAN_WRITE (c38) and PLAN_TOOL_GO (c39). The c37-c39 round (2026-07-24) confirmed the activation path but recorded zero plan_write calls in all 9 cand sessions -- same voluntary-planning gap, same fix. Activation question first: does plan-runner/delegate-all-block fire at all, and do delegations (plan-runner/delegate-all-subagent) actually happen once the model is forced into the planned path?",
+  "thresholds": {
+    "PLAN_DELEGATE_ALL": "on",
+    "FORCE_PLAN_WRITE": "on",
+    "PLAN_TOOL_GO": "on"
+  },
+  "exposure": {
+    "mode": "telemetry",
+    "target": [
+      "plan-runner/delegate-all-block"
+    ],
+    "diagnostic": [
+      "plan-runner/delegate-all-subagent",
+      "plan-runner/force-plan-write-block",
+      "plan-runner/write",
+      "plan-runner/go",
+      "plan-runner/go-blocked"
+    ]
+  }
+}

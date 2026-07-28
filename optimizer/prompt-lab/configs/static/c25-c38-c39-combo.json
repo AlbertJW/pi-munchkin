@@ -1,0 +1,21 @@
+{
+  "name": "c25-c38-c39-combo",
+  "prediction": "Investigation config, not a new independent candidate -- the three-way combo CANDIDATE_PRUNING_2026-07.md's c25 row names as the required next step. ANDs PLAN_SUBAGENT_ONLY (c25, blocks direct edits during execution and forces subagent(executor,...)) with FORCE_PLAN_WRITE (c38, forces the first plan_write call these models otherwise never make on parens/equil/bigdata) and PLAN_TOOL_GO (c39, the plan_go tool that reaches phase==='executing' under real_gate.sh's one-shot pi -p sessions). The c25-c39 round (2026-07-24) proved the activation path works but recorded zero plan_write calls in all 9 cand sessions -- the voluntary-planning gap c38 exists to close. Activation question first: does plan-runner/subagent-only-block fire at all once planning is forced and execution is reachable? Note the 2026-07-28 gate surface change: subagent is now granted on BOTH arms, so the base arm can delegate voluntarily too.",
+  "thresholds": {
+    "PLAN_SUBAGENT_ONLY": "1",
+    "FORCE_PLAN_WRITE": "on",
+    "PLAN_TOOL_GO": "on"
+  },
+  "exposure": {
+    "mode": "telemetry",
+    "target": [
+      "plan-runner/subagent-only-block"
+    ],
+    "diagnostic": [
+      "plan-runner/force-plan-write-block",
+      "plan-runner/write",
+      "plan-runner/go",
+      "plan-runner/go-blocked"
+    ]
+  }
+}
