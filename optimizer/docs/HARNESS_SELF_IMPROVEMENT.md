@@ -1149,3 +1149,40 @@ evidence. Promotion, Plannotator installation, live-default changes, and retirem
 separate human decisions. Existing schema-v3 plans continue on their legacy execution path.
 
 *Companion: `LOCAL_LLM_HARNESS_RESEARCH.md` (the playbook + gap analysis this builds on).*
+
+## Context-watcher demoted to passive telemetry (2026-07-28)
+
+The active context-watcher — proactive `ctx.compact()` once pi's estimated usage crossed
+`CTX_WATCH_PCT` — was removed; the extension is now a ~40-line passive observer that records every
+compaction with requester attribution (`pi` / `compact-tool` / `manual-unknown`), which is the only
+part the gate pipeline ever consumed. Evidence, in the methodology-audit style (content, not
+proxies):
+
+- **Zero fires in the entire gate corpus.** All 1,505 rows carry `context.watcher`; `requested`
+  sums to 0. Only 2 compactions of any kind ever occurred in gate sessions.
+- **Five fires ever in live telemetry, zero completions.** `~/.pi/agent/telemetry/events.jsonl`
+  holds 4 old-schema `compact` events and exactly 1 `compact-requested` (2026-07-20, on a 272k
+  window), plus 1 `compact-failed` ("Nothing to compact"). There is no `compact-completed` event
+  anywhere — no evidence the watcher ever successfully compacted a session.
+- **Pi-native compaction demonstrably owns the job.** 24 observed `compacted` events live,
+  including repeated `reason:"overflow"` recoveries in the final week *with the watcher enabled
+  and silent at 70%*. The watcher shared pi's undercounting char estimate, so it structurally
+  could not preempt the wall (the original 400-overflow incident) it was built to prevent.
+- **Its stated safety net did not exist.** The header comment claimed a "widened `reserveTokens`
+  (settings.json)"; the live value was 4096 — narrower than pi's 16384 default, putting the native
+  trigger at ~94% of the 65k window. Removal was paired with restoring `reserveTokens` to 16384
+  (native trigger ~75%, roughly where the watcher aimed; at a 4.9k-token median session the
+  reserved headroom costs nothing).
+
+Removed with it: the `context-watch` decision lib, the `CONTEXT_WATCHER`/`CTX_WATCH_PCT` knobs from
+the experiment schema (no static config ever set them), and 6 of the 7 catalog events. The
+`context-watcher/compacted` event and extension name were kept so `context_telemetry.py` and the
+eval-row schema remain valid unchanged — `context.config` becomes `null`, which the schema allows.
+Same first-principles shape as the v4 planner deletion: a mechanism that never completes cannot be
+carrying the load, and the constraint it targeted (context) is not the binding one.
+
+The neighbouring open item — the ~10 dark env flags in `plan-runner.ts` — was assessed and
+deliberately **left alone**: c25/c31/c32/c34/c36/c37/c38/c39 are all on the active roster with
+pre-registered win-or-retire deadlines of 2026-09-03 and a pending c25/c37+c38+c39 three-way
+combo. Deleting them early on a mechanism argument would be the c21 lesson applied in reverse;
+the deadline retires them cleanly if nothing wins.

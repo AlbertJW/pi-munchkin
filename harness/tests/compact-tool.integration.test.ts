@@ -1,7 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import compactTool from "../extensions/compact-tool.ts";
-import { registerContextWatcher } from "../extensions/context-watcher.ts";
 import { resetCompactionCoordinator } from "../lib/compaction-coordinator.ts";
 import { fire, makeFakePi } from "./integration-harness.ts";
 
@@ -77,36 +76,6 @@ test("session replacement clears an orphaned in-flight latch", async () => {
 	assert.equal(h.calls, 2);
 	h.options.onComplete({ tokensBefore: 6000, estimatedTokensAfter: 2000 });
 	assert.equal(h.fp.customDeliveries.length, 1);
-});
-
-test("compact tool and watcher share one process-wide compaction slot", async () => {
-	const h = setup();
-	const events: string[] = [];
-	registerContextWatcher(
-		h.fp.pi as any,
-		{ enabled: true, thresholdPct: 70, rearmPct: 55 },
-		(_ext, kind) => { events.push(kind); },
-	);
-	await fire(h.fp, "session_start", { reason: "startup" }, {
-		getContextUsage: () => ({ tokens: 0, contextWindow: 1000, percent: 0 }),
-	});
-	await h.execute();
-	let watcherCalls = 0;
-	await fire(h.fp, "turn_end", { toolResults: [{}] }, {
-		getContextUsage: () => ({ tokens: 750, contextWindow: 1000, percent: 75 }),
-		compact: () => { watcherCalls += 1; },
-		ui: { notify() {} },
-	});
-	assert.equal(h.calls, 1);
-	assert.equal(watcherCalls, 0);
-	assert.equal(events.filter((kind) => kind === "compact-suppressed").length, 1);
-	h.options.onError(new Error("summary backend unavailable"));
-	await fire(h.fp, "turn_end", { toolResults: [] }, {
-		getContextUsage: () => ({ tokens: 750, contextWindow: 1000, percent: 75 }),
-		compact: () => { watcherCalls += 1; },
-		ui: { notify() {} },
-	});
-	assert.equal(watcherCalls, 1, "suppression must not permanently disarm watcher after another caller fails");
 });
 
 test("synchronous compact failure releases the shared slot", async () => {

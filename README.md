@@ -63,7 +63,7 @@ armed by default.
 | **git-guard** | confirms before any command that would discard uncommitted work |
 | **context-inlet-guard** | bounds oversized file reads before they flood context (blocks, never truncates — a partial view of a huge file is worse than none) |
 | **bash-output-guard** | the same block-not-truncate discipline applied to shell output: withholds an oversized `bash` result and substitutes a bounded diagnostic, since `bash` has no `stat()`-style way to predict its own output size in advance |
-| **context-watcher** | observes every compaction and, when enabled, auto-compacts at `CTX_WATCH_PCT` (default 70) |
+| **context-watcher** | records every compaction with requester attribution (pi / compact-tool / manual) — passive telemetry only; the proactive auto-compact-at-threshold behavior was removed 2026-07-28 after never once completing a compaction (pi-native compaction owns the job) |
 | **context-dedup** | collapses a file already read verbatim this session down to a one-line back-reference in the model's *view only* — the transcript itself is never rewritten |
 | **context-brief** | a cached, once-per-session repository inventory appended to the system prompt, so the model spends fewer turns re-discovering what a brief could just tell it |
 | **context-surface** | passively hashes and aggregates the exact provider-bound context; never rewrites messages |
@@ -153,7 +153,6 @@ tracked in the self-improvement ledger rather than repeated here.
 | `SPAN_TOOLS=on` | expose the bounded large-file tools |
 | `KETCH=off` | remove the default-on web tools for offline/private sessions |
 | `KETCH_BACKEND`, `KETCH_MULTI_BACKENDS` | quick backend (default `ddg`) and broad-search set (default `ddg,exa,keenable`) |
-| `CONTEXT_WATCHER=on\|off`, `CTX_WATCH_PCT=60\|70\|80` | enable and tune proactive compaction; telemetry remains active when disabled |
 | `DRIFT_SCANNER=off` | disable post-commit review |
 
 | Dark candidate env | Effect | Status |

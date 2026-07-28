@@ -141,9 +141,11 @@ this reads as a rejection.
 1. **Verify the loop-breaker fix works in the wild.** It is live, reasoned, and unit-tested, but
    `LB_SESSION_REPEAT=25` is a p95 estimate, not a measured optimum. Watch for
    `loop-breaker/session-repeat` firing on legitimately long sessions.
-2. **~10 ceremony flags remain inside `plan-runner.ts`** (c31/c32/c38/c39) and `context-watcher`
-   (240 lines, may duplicate pi's native auto-compaction — check `docs/compaction.md` first).
-   Same reasoning as the v4 deletion, but entangled rather than self-contained.
+2. ~~Ceremony-flag / context-watcher cleanup~~ **Resolved 2026-07-28.** `context-watcher` is now a
+   passive compaction observer (0 fires in all 1,505 gate rows, 0 completions ever; pi-native
+   compaction owns the job — ledger entry in `HARNESS_SELF_IMPROVEMENT.md`). The `plan-runner.ts`
+   flags were assessed and deliberately kept: they back active-roster candidates with
+   pre-registered 2026-09-03 win-or-retire deadlines and the pending c25/c37+c38+c39 combo.
 3. **The gate measures a different agent than the live one.** `subagent` is **not** in the gate's
    base tool list (`real_gate.sh`, appended only under a delegation flag), so 0 delegations across
    1,466 rows. The real agent has it. Until that's fixed, gate results may not transfer.

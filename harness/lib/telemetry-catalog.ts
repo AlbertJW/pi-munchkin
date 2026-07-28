@@ -8,13 +8,6 @@ const usage = {
 	contextPct: ["number", "null"],
 } as const;
 
-const watcher = {
-	enabled: "boolean",
-	thresholdPct: "number",
-	rearmPct: "number",
-	...usage,
-} as const;
-
 const failure = {
 	error_class: "string",
 	error_length: "number",
@@ -77,19 +70,7 @@ export const EVENT_CATALOG = {
 		sources: "number", succeeded: "number", failed: "number", chars: "number",
 		duration_ms: "number", truncated: "boolean", outcome: "string",
 	},
-	"context-watcher/session-config": { ...watcher, startReason: "string" },
-	"context-watcher/compacted": { ...watcher, requester: "string", contentProvider: "string", reason: "string", willRetry: "boolean", tokensBefore: "number" },
-	"context-watcher/compact-suppressed": { ...watcher, reason: "string", activeOwner: ["string", "null"] },
-	"context-watcher/compact-requested": { ...watcher, requester: "string", consecutive: "number", resumePending: "boolean" },
-	"context-watcher/compact-completed": {
-		...watcher, requester: "string", preTokens: ["number", "null"], preContextWindow: ["number", "null"], prePct: ["number", "null"],
-		tokensBefore: "number", estimatedTokensAfter: ["number", "null"], postTokens: ["number", "null"], postContextWindow: ["number", "null"], postPct: ["number", "null"],
-	},
-	"context-watcher/compact-failed": {
-		...watcher, requester: "string", preTokens: ["number", "null"], preContextWindow: ["number", "null"], prePct: ["number", "null"],
-		postTokens: ["number", "null"], postContextWindow: ["number", "null"], postPct: ["number", "null"], synchronous: "boolean", ...failure,
-	},
-	"context-watcher/thrash-silenced": watcher,
+	"context-watcher/compacted": { ...usage, requester: "string", contentProvider: "string", reason: "string", willRetry: "boolean", tokensBefore: "number" },
 	"teach-hints/hint": { rule: "string", tool: "string", injected_chars: "number" },
 	"micro-gate/slop-fired": { files: "number", findings: "number", injected_chars: "number" },
 	"micro-gate/slop-passed": { files: "number", checked: "number" },

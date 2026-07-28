@@ -184,18 +184,17 @@ def selftest():
     assert sch["dimensions"]["optillm"]["safe"] is False, "optillm must be human-gated (structural)"
     assert sch["dimensions"]["format"]["safe"] is True
     assert "persona" in sch["excluded"] and "emoji_encoding" in sch["excluded"]
-    watcher = sch["dimensions"]["thresholds"]["fields"]
-    assert watcher["CONTEXT_WATCHER"] == ["on", "off"]
-    assert watcher["CTX_WATCH_PCT"] == [60, 70, 80]
-    assert config_env({"thresholds": {"CONTEXT_WATCHER": "off", "CTX_WATCH_PCT": 80}}) == {
-        "CONTEXT_WATCHER": "off", "CTX_WATCH_PCT": "80"}
-    for invalid in ({"CONTEXT_WATCHER": "maybe"}, {"CTX_WATCH_PCT": 75}, {"CTX_WATCH_PCT": "70"}):
+    thresholds = sch["dimensions"]["thresholds"]["fields"]
+    # Watcher knobs removed 2026-07-28 with the active watcher (extension is
+    # passive telemetry now); configs naming them must be rejected, not applied.
+    assert "CONTEXT_WATCHER" not in thresholds and "CTX_WATCH_PCT" not in thresholds
+    for invalid in ({"CONTEXT_WATCHER": "off"}, {"CTX_WATCH_PCT": 70}, {"MICRO_GATE": "maybe"}):
         try:
             config_env({"thresholds": invalid})
         except ValueError:
             pass
         else:
-            raise AssertionError(f"out-of-schema watcher setting accepted: {invalid}")
+            raise AssertionError(f"out-of-schema threshold setting accepted: {invalid}")
     # Every checked-in static config must survive config_env — a threshold key
     # missing from the schema means real_gate.sh exits 2 the moment that
     # candidate is applied (bit c24/c25 on 2026-07-20: DID_YOU_MEAN and

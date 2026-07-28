@@ -99,7 +99,6 @@
     "harness/lib/command-policy.ts",
     "harness/lib/compaction-coordinator.ts",
     "harness/lib/context-inlet.ts",
-    "harness/lib/context-watch.ts",
     "harness/lib/context-brief.ts",
     "harness/lib/context-dedup.ts",
     "harness/lib/context-surface.ts",

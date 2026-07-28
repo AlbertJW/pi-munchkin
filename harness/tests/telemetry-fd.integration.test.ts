@@ -20,7 +20,7 @@ test("gate telemetry uses inherited authenticated fds that tool children cannot 
 		const source = [
 			`import { spawnSync } from "node:child_process";`,
 			`import { record } from ${JSON.stringify(telemetryUrl)};`,
-			`record("context-watcher", "session-config", { enabled: false });`,
+			`record("context-watcher", "compacted", { requester: "pi", contentProvider: "pi", reason: "threshold", willRetry: false, tokensBefore: 1, contextTokens: null, contextWindow: null, contextPct: null });`,
 			`const attempted = spawnSync("/bin/sh", ["-c", "printf forged >&8"], { encoding: "utf8" });`,
 			`if (attempted.status === 0) process.exit(42);`,
 		].join("\n");
