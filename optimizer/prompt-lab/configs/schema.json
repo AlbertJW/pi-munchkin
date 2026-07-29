@@ -180,10 +180,6 @@
           "on",
           "off"
         ],
-        "SUBAGENT_DEFAULT_MODE": [
-          "spawn",
-          "fork"
-        ],
         "PLAN_ITEM_GUIDANCE_V2": [
           "on",
           "off"
