@@ -41,6 +41,7 @@ const expectedExtensions = [
   "harness/extensions/session-blackboard.ts",
   "harness/extensions/context-surface.ts",
   "harness/extensions/bash-output-guard.ts",
+  "harness/extensions/payload-audit.ts",
 ];
 assert.deepEqual(extensions, expectedExtensions, "pi.extensions must expose the complete ordered production surface");
 assert(!extensions.includes("harness/extensions/chaos.ts"), "chaos must not be enabled in the release manifest");

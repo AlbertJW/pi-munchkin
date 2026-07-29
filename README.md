@@ -63,6 +63,7 @@ armed by default.
 | **git-guard** | confirms before any command that would discard uncommitted work |
 | **context-inlet-guard** | bounds oversized file reads before they flood context (blocks, never truncates — a partial view of a huge file is worse than none) |
 | **bash-output-guard** | the same block-not-truncate discipline applied to shell output: withholds an oversized `bash` result and substitutes a bounded diagnostic, since `bash` has no `stat()`-style way to predict its own output size in advance |
+| **payload-audit** | dark instrument (`PAYLOAD_AUDIT=on`): records wire-truth per provider request to `.pi/traces/payload-audit.jsonl` — prefix stability, system/tools hashes, thinking-replay presence, lens position |
 | **context-watcher** | records every compaction with requester attribution (pi / compact-tool / manual) — passive telemetry only; the proactive auto-compact-at-threshold behavior was removed 2026-07-28 after never once completing a compaction (pi-native compaction owns the job) |
 | **context-dedup** | collapses a file already read verbatim this session down to a one-line back-reference in the model's *view only* — the transcript itself is never rewritten |
 | **session-blackboard** | ground-truth working memory derived from harness events: a human-only cockpit artifact (`artifacts/session-cockpit.html` + TUI widget, `/blackboard`), and — dark, `STATE_LENS` (c48) — a non-accumulating state lens injected into the model's per-call view (attempted+failing actions, verify state, open plan, repeats) |

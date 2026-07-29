@@ -52,7 +52,8 @@
       "harness/extensions/context-dedup.ts",
       "harness/extensions/session-blackboard.ts",
       "harness/extensions/context-surface.ts",
-      "harness/extensions/bash-output-guard.ts"
+      "harness/extensions/bash-output-guard.ts",
+      "harness/extensions/payload-audit.ts"
     ],
     "skills": [
       "skills/deep-research",
@@ -96,6 +97,7 @@
     "harness/extensions/teach-hints.ts",
     "harness/extensions/surface-receipt.ts",
     "harness/extensions/bash-output-guard.ts",
+    "harness/extensions/payload-audit.ts",
     "harness/lib/agent-dir.ts",
     "harness/lib/bash-mutations.ts",
     "harness/lib/blackboard.ts",

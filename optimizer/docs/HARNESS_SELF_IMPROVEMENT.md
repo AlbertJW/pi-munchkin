@@ -1392,3 +1392,49 @@ Read forge's guardrails source (nudges.py, error_tracker.py) and module layout i
   SlidingWindow (pi compaction), proxy mode (breaks endpoint-identity provenance). Their
   26-scenario eval tiers (OG-18 + advanced_reasoning) noted as fixture prior art — scenario
   list not web-readable, clone the repo if we want the details.
+
+## Community/article sweep #2 + payload-audit instrument (2026-07-29, cont.)
+
+Sources: four Reddit threads (pi pastime / pi-nvim / pi-vs-CC / build-your-own-agent), the
+Thoughtworks "harness engineering" article (Böckeler), cache-hunter, pi-for-each, barebrowse.
+
+**Built: `payload-audit`** (dark, `PAYLOAD_AUDIT=on`, pure observation) — cache-hunter proved
+every harness it tested silently breaks prefix caches, but a MITM proxy can't run under the
+gate sandbox; pi's `before_provider_request` gives the same wire truth in-process. Per request:
+prefix-divergence index, system/tools sha, thinking-replay presence (answers the open
+forge-prompted question), lens position (proves or falsifies c48's tail-injection promise).
+Audit runs queued for after the current chain.
+
+**c49 second design option:** rescue-by-constrained-reformat — a schema-locked one-shot
+completion converting malformed pseudo-tool-call text into a valid call (community two-pass
+repair measured ~33%→~75%); same-model one-shot avoids a second resident model on the
+single-slot box. Alternative or escalation to rescue-by-steer.
+
+**Design rule adopted (Böckeler):** every sensor message carries its own self-correction
+instruction — the 2026-07-27 plan-block fix, generalized and now stated. Her "sensors that
+never fire: quality or inadequate detection?" is our exposure discipline, independently
+formulated.
+
+**Harness coverage table** (measured failure classes → sensor):
+
+| failure class (measured) | sensor | status |
+|---|---|---|
+| repeat-call spirals (43% of waste) | loop-breaker tiers + session-repeat | armed, validated |
+| false completion claims (c38/e2b) | verify-gate | armed |
+| oversized reads / bash floods | context-inlet-guard / bash-output-guard | armed (guard unexercised) |
+| destructive git | git-guard | armed |
+| stale docs/refs post-commit | drift-scanner | armed |
+| edit-anchor failures | hashline | armed (mechanism, not sensor) |
+| malformed pseudo-tool-calls (serving artifact) | — | **GAP → c49** |
+| spec/convention guessing (retry-trap 12/12) | — | **GAP → future spec-adherence steer** |
+| context junk carry (stale results 37.5%) | dedup (dark c26) + c48 lens | dark, under test |
+
+**Recorded, no build:** Ars/Augment semantic-index debate → the large-repo fixture should
+support a future grep-vs-provided-map comparison arm. pi-for-each's fork-per-iteration
+(user-owned loops, hidden from the LLM) = prior art for many-small-contexts — distinct from
+banned engine-owned dispatch because the human writes the loop. Live-UX options left to
+Albert: pi-for-each, @undreren/pi-checkpoint, barebrowse (context-economy browser backend),
+cache-hunter (interactive cache UI). No-takes, with reasons: CC-system-prompt cloning (dd1:
+prose measured harmful), tool narrowing/lazy brokers (third appearance; KV churn + not our
+constraint), oh-my-pi (we are the opinionated bundle, with measurements), ralph loops
+(superseded by plan-runner + blackboard persistence).
