@@ -26,27 +26,6 @@ test("abort and signal/nonzero failures cannot be overridden by semantic output"
 	assert.equal(aborted.stopReason, "aborted");
 });
 
-test("c33: SUBAGENT_DEFAULT_MODE=fork flips the default; explicit mode always wins; junk env is inert", async () => {
-	const previous = process.env.SUBAGENT_DEFAULT_MODE;
-	try {
-		delete process.env.SUBAGENT_DEFAULT_MODE;
-		const base = await import(`../vendor/pi-subagent/types.ts?mode1=${Date.now()}-${Math.random()}`);
-		assert.equal(base.parseDelegationMode(undefined), "spawn", "shipped default is spawn");
-
-		process.env.SUBAGENT_DEFAULT_MODE = "fork";
-		assert.equal(base.parseDelegationMode(undefined), "fork", "env flips the default");
-		assert.equal(base.parseDelegationMode("spawn"), "spawn", "explicit model choice beats the env default");
-		assert.equal(base.parseDelegationMode("fork"), "fork");
-
-		process.env.SUBAGENT_DEFAULT_MODE = "banana";
-		assert.equal(base.parseDelegationMode(undefined), "spawn", "unknown env value keeps the shipped default");
-		assert.equal(base.parseDelegationMode(42), null, "non-string explicit mode still rejected");
-	} finally {
-		if (previous === undefined) delete process.env.SUBAGENT_DEFAULT_MODE;
-		else process.env.SUBAGENT_DEFAULT_MODE = previous;
-	}
-});
-
 test("c36: executor description rewritten to spawn at injection time; other roles and flag-off untouched", async () => {
 	const { agentDescriptionForPrompt } = await import("../vendor/pi-subagent/types.ts");
 	const executor = "Isolated single-change worker. Delegate ONE bounded, fully-specified edit here when you want it done off the main window. Use mode=fork so it has surrounding context. Reports exact changed files. Prefer doing trivial edits yourself.";

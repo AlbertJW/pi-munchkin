@@ -167,7 +167,6 @@ tracked in the self-improvement ledger rather than repeated here.
 | `PLAN_UNCERTAINTY=on` | a declared plan uncertainty structurally pauses execution until cleared | built and unit-tested; awaiting a gate round |
 | `PLAN_SHA_GUARD=on` | verify any commit SHA the model writes actually exists | built and unit-tested; awaiting a gate round |
 | `PLAN_ITEM_GUIDANCE_V2=on` | swap the unenforced "5-10 items" line for non-numeric, need-sized guidance | built; a deliberate compression, not an elaboration |
-| `SUBAGENT_DEFAULT_MODE=fork` | default an unspecified delegation to a full-context fork instead of a fresh spawn | **now philosophically opposed to `SPAWN_DELEGATION` below — do not arm both** |
 | `SPAWN_DELEGATION=on` | recommend `mode=spawn` + a self-contained task everywhere the harness previously suggested `mode=fork` | built; awaiting a gate round |
 | `PLAN_DELEGATE_ALL=on` | during execution, only `plan_write` and `subagent` remain callable directly — everything else is blocked and routed to a role-matched fresh subagent | built; the most direct test of the "many small contexts" thesis; awaiting a gate round |
 

@@ -66,3 +66,11 @@ to the ledger as hypothesis for a future pre-registered round.
   `real_gate.sh` mid-run corrupts the running script).
 - Rows appended by extension (if EXTEND-ONCE fires) must carry the identical surface hash and
   config shas; a surface change during extension voids the round.
+
+## Conduct addendum (2026-07-29, before any further rows)
+
+The round was operator-paused at 2 rows on 2026-07-29 (box needed for model work). Those 2
+rows were then **deleted** rather than resumed: a same-day gate-surface change (`--no-skills`,
+closing the unhashed-skills provenance gap) means resumed rows would mix surfaces under one
+GEN — the exact confound the c26-4b precedent forbids. The round restarts from zero,
+unchanged in design, when the box frees up. The decision rule above is untouched.

@@ -452,3 +452,32 @@ delegation architecture is a *forcing* question, not an affordance question.
 
 **Instrument note:** 4B base pass was 5/9 and 9/9 in back-to-back same-config rounds — a
 live illustration of the session-variance point in `MEASUREMENT_METHODOLOGY_2026-07.md` §3.
+
+## Retirement batch 2026-07-28 (PROPOSED, working-tree diff staged, awaiting sign-off)
+
+Prepared per the c33 dry-run recipe above and the 2026-07-27 handover's five-item list.
+Everything is sitting UNCOMMITTED in the working tree for Albert's review; nothing lands
+without sign-off.
+
+- **c33-subagent-fork-default** — recipe above executed: config deleted, `parseDelegationMode`
+  branch collapsed, dedicated test removed, README row removed. **One hunk deliberately
+  deferred**: the `SUBAGENT_DEFAULT_MODE` entry in `configs/schema.json` — the powered c25
+  round (`c25-4b-powered`) re-reads that file every session, so the hunk lands when the round
+  ends (a stale schema field with no config using it is harmless in the interim).
+- **c25-c39-combo, c31-c38-combo, c37-c39-combo** (investigation configs) — deleted. Their own
+  roster rows named the retire condition "once superseded by the three-way combo"; the
+  three-way combos exist (`c25-c38-c39-combo`, `c37-c38-c39-combo`) and produced the
+  activation data (2026-07-28 section above). No optimizer code references them; historical
+  results files keep their rows.
+- **c43** — nothing left to retire: it left the codebase with the c40–c45 family deletion
+  (`f366cf9`); today's sweep found no config, flag, test, or doc row (the "c43" grep hits in
+  fixture manifests are sha-string substrings). Recorded here so the five-item list closes.
+- **c37-plan-delegate-all — retirement case drafted, NOT executed** (clock runs to
+  2026-09-03 per the pre-registered deadline): 0-for-2 models with directionally adverse
+  effort in both activated rounds (35B: +70% turns, +200% tool_errors p=.074, 2× context;
+  4B: pass 9/9→7/9 with 34 delegations), consistent with the first-principles objection that
+  thin-orchestrator ceremony adds turns/context to models that fail from turns/context. If
+  no discriminating win lands by the deadline, the executable diff mirrors c25's shape:
+  config, `PLAN_DELEGATE_ALL` branches in `plan-runner.ts` (ordered before c25's — mind the
+  strict-superset precedence comment), `delegate-all-{block,subagent}` catalog entries, its
+  tests, README row, and the schema field.

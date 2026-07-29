@@ -54,7 +54,8 @@
       "harness/extensions/bash-output-guard.ts"
     ],
     "skills": [
-      "skills/deep-research"
+      "skills/deep-research",
+      "skills/lavish-review"
     ]
   },
   "dependencies": {
@@ -124,6 +125,7 @@
     "harness/agents",
     "harness/vendor",
     "skills/deep-research",
+    "skills/lavish-review",
     "harness/APPEND_SYSTEM.md",
     "harness/models.example.json",
     "harness/settings.example.json",

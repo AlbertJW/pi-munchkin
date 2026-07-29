@@ -41,7 +41,7 @@ const expectedExtensions = [
 ];
 assert.deepEqual(extensions, expectedExtensions, "pi.extensions must expose the complete ordered production surface");
 assert(!extensions.includes("harness/extensions/chaos.ts"), "chaos must not be enabled in the release manifest");
-assert.deepEqual(skills, ["skills/deep-research"], "pi.skills must expose the bounded deep-research workflow");
+assert.deepEqual(skills, ["skills/deep-research", "skills/lavish-review"], "pi.skills must expose exactly the shipped skill set");
 
 const work = await mkdtemp(resolve(tmpdir(), "pi-munchkin-pack-"));
 const cache = resolve(work, "npm-cache");
@@ -109,7 +109,7 @@ try {
   assert.equal(loaded.extensions.length, extensions.length, "pi must load every installed manifest extension");
   const loadedSkills = loadSkillsFromDir({ dir: resolve(installedRoot, "skills"), source: "package" });
   assert.deepEqual(loadedSkills.diagnostics, [], `installed skill diagnostics: ${JSON.stringify(loadedSkills.diagnostics)}`);
-  assert.deepEqual(loadedSkills.skills.map(({ name }) => name), ["deep-research"], "installed tarball must discover deep-research");
+  assert.deepEqual(loadedSkills.skills.map(({ name }) => name), ["deep-research", "lavish-review"], "installed tarball must discover the shipped skill set");
 
   console.log(`package smoke: ${files.size} files; installed tarball loads ${extensions.length} extension entry points and ${loadedSkills.skills.length} skill`);
 } finally {

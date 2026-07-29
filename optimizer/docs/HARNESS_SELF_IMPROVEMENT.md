@@ -1230,3 +1230,36 @@ Headlines: activation confirmed on every model (first `subagent-only-block` and
 pre-registered n≥20 round before it means anything); c37 is 0-for-2 models with adverse effort
 both times; and across 36 baseline sessions on three models there was exactly one voluntary
 delegation — the explorer is a forcing question, not an affordance question.
+
+## Visual-loop tooling: lavish-review skill, and the skills provenance gap (2026-07-29)
+
+Albert's live agent has grown two UX packages (`pi-tldraw` canvases, `browser-goblin` real-
+browser QA); `lavish-axi` (external, MIT) closes the loop on the human side — element-level
+annotation of agent-authored HTML artifacts, returned to the session as structured JSON via
+long-polling. Integration shipped as **`skills/lavish-review`** (SKILL.md + a zero-dep
+`render-plan.mjs` that turns `.pi/plan-state.json` into a reviewable HTML artifact with a
+Mermaid dependency graph): the highest-leverage insertion point is the plan gate — human
+feedback lands BEFORE execution burns turns, arriving at tool-call boundaries as bounded
+`plan_write` revisions. Runtime `npx -y lavish-axi`; no harness extension, nothing in the
+model's ambient context beyond the one skill-list line (and gate sessions no longer see even
+that — below).
+
+**Provenance gap found and closed while integrating:** global skills (`~/.pi/agent/skills/`)
+inject their descriptions into every session's context, but `surface-hash.ts` walks only
+extensions/lib — so a skill edit could silently change every gate session with no
+`HARNESS_SURFACE_SHA256` trace. Seven skills already sat there unhashed. Fixed by `--no-skills`
+on both gate `pi` invocations: the gate measures the hashed surface; skills are interactive-UX
+tooling, excluded by design. This is a (small) gate-surface change — the paused
+`c25-4b-powered` round's 2 partial rows were deleted per the c26-4b never-mix-surfaces
+precedent (prereg conduct addendum records it; design untouched; restarts from zero when the
+box frees).
+
+**Evaluated for "help the models think better," decided against building now** (recorded so
+it isn't re-litigated): (1) canvas/diagram-as-external-model-state (tldraw round-trips as
+working memory) — wrong side of the turns budget for models that fail from turns, and plan-
+state.json + hashline already externalize state textually; dark-candidate material only if a
+fixture ever demonstrates state-loss failures. (2) browser-goblin screenshots as verify-gate
+evidence receipts — right shape for the coming web-UI work, but ships only as a dark candidate
+once web fixtures exist; no gate fixture can currently exercise it. Boundary decision made
+explicit: live-agent UX tools (canvas/browser/skills) are OUT of gate measurement scope;
+`harness.tools` per row plus `--no-skills` make the boundary machine-checkable.

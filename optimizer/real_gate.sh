@@ -376,13 +376,18 @@ run_guarded_session() {
 		# The only caller that genuinely knows it's re-running the SAME interrupted
 		# task in the SAME workdir; plan-runner's session-start resume notice
 		# surfaces any .pi/plan-state.json the aborted first session left behind.
+		# --no-skills (2026-07-29): global skills (~/.pi/agent/skills) are model-visible
+		# context but OUTSIDE the harness surface hash (surface-hash.ts walks
+		# extensions/lib only), so a skill edit could silently change every gate
+		# session with no provenance trace. The gate measures the hashed surface;
+		# skills are interactive-UX tooling, excluded by design.
 		( cd "$wd" || exit
 		  exec 3<<<"$telemetry_key"
 		  exec 4<<<"${LLAMA_API_KEY:-}"
 		  run_with_timeout "$PI_TIMEOUT" 30 ${sbx[@]+"${sbx[@]}"} /usr/bin/env -i \
 		    ${session_env[@]+"${session_env[@]}"} "${session_base_env[@]}" PI_OBSERVATIONAL_MEMORY_PASSIVE=1 \
 		    bash -c 'k="$(cat <&4)"; [[ -n "$k" ]] && export LLAMA_API_KEY="$k"; exec pi -p --approve "$@"' _ \
-		    ${PI_SELECT[@]+"${PI_SELECT[@]}"} --tools "$tools" "$prompt" ) </dev/null >> "$wd/run.log" 2>&1 &
+		    ${PI_SELECT[@]+"${PI_SELECT[@]}"} --no-skills --tools "$tools" "$prompt" ) </dev/null >> "$wd/run.log" 2>&1 &
 	else
 		( cd "$wd" || exit
 		  exec 3<<<"$telemetry_key"
@@ -390,7 +395,7 @@ run_guarded_session() {
 		  run_with_timeout "$PI_TIMEOUT" 30 ${sbx[@]+"${sbx[@]}"} /usr/bin/env -i \
 		    ${session_env[@]+"${session_env[@]}"} "${session_base_env[@]}" PI_OBSERVATIONAL_MEMORY_PASSIVE=1 \
 		    bash -c 'k="$(cat <&4)"; [[ -n "$k" ]] && export LLAMA_API_KEY="$k"; exec pi -p --approve "$@"' _ \
-		    ${PI_SELECT[@]+"${PI_SELECT[@]}"} --tools "$tools" "$prompt" ) </dev/null > "$wd/run.log" 2>&1 &
+		    ${PI_SELECT[@]+"${PI_SELECT[@]}"} --no-skills --tools "$tools" "$prompt" ) </dev/null > "$wd/run.log" 2>&1 &
 	fi
 	CHILD=$!
 	set +m
