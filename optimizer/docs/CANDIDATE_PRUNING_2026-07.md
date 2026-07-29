@@ -501,3 +501,58 @@ fixture):
   a **spec-adherence steer** is the obvious sibling candidate, recorded here as an idea only
   (WIP limit: nothing new until c25 and c48 resolve). (3) retry-trap remains valid for models
   that can read-then-fix; on the 4B it measures spec-adherence, not spiral-escape.
+
+## c49 + c50 built; registration bundle DEFERRED to round-end (2026-07-29)
+
+Two new dark candidates close the two named gaps in the ledger's harness coverage table.
+Extensions, tests, catalog entries, README rows, and the c50 prereg are committed; the
+**registration bundle below is deliberately NOT applied** while `c25-4b-powered` runs
+(`configs/schema.json` + `config.py` are live-read per session; `configs/static/` is walked
+by the verify battery). Apply verbatim at round-end, then verify → commit → mirror.
+
+- **c49-tool-call-rescue** (`TOOL_CALL_RESCUE=on`) — corrective re-emit steer for the
+  pseudo-tool-call-as-text serving artifact (forge-seeded wording; max 2/session; `detected`
+  records occurrence even when the damper is exhausted). First round is EXPLORATORY
+  (`c49-nat-35b`, standard 3 tasks, N=9/arm, DD): the trigger's base rate is
+  serving-config-dependent and unknown — measure occurrence + revival before designing power.
+  v2 recorded: schema-locked one-shot reformat escalation.
+- **c50-unread-spec-steer** (`SPEC_ADHERENCE=on`) — prompt-named on-disk reference files
+  never read + ≥2 failing mutations → one read-this steer per path. First round is
+  PRE-REGISTERED (`PREREG_C50_RETRYTRAP_2026-07-29.md`): retry-trap's 0/12 floor makes pass
+  rate primary with real Fisher power at n=9/arm.
+
+### Registration bundle (apply at round-end, verbatim)
+
+`optimizer/prompt-lab/configs/static/c49-tool-call-rescue.json`:
+```json
+{
+  "name": "c49-tool-call-rescue",
+  "prediction": "Rescues sessions that die on the malformed pseudo-tool-call-as-text serving artifact (qwen36-35b: 4/6 equil sessions in one measured round; LFM25 collapse class). Expect pass rate UP specifically in sessions where tool-call-rescue/detected fires, effort neutral elsewhere; detected-rate itself is the first clean measurement of the artifact's frequency. steered counts the mechanism.",
+  "thresholds": { "TOOL_CALL_RESCUE": "on" },
+  "exposure": {
+    "mode": "telemetry",
+    "target": ["tool-call-rescue/steered"],
+    "diagnostic": ["tool-call-rescue/detected"]
+  }
+}
+```
+
+`optimizer/prompt-lab/configs/static/c50-unread-spec-steer.json`:
+```json
+{
+  "name": "c50-unread-spec-steer",
+  "prediction": "Closes the measured guesses-conventions-instead-of-reading-the-named-spec class (retry-trap: 12/12 sessions on the 4B edited the right file with invented mappings while docs/naming.md sat unread). Inert when the prompt names no on-disk files (zero surface on parens/equil/bigdata). Expect retry-trap pass 0 -> up; armed is the exposure denominator, steered the mechanism.",
+  "thresholds": { "SPEC_ADHERENCE": "on" },
+  "exposure": {
+    "mode": "telemetry",
+    "target": ["spec-adherence/steered"],
+    "diagnostic": ["spec-adherence/armed"]
+  }
+}
+```
+
+`configs/schema.json` thresholds gain `"TOOL_CALL_RESCUE": ["on","off"]` and
+`"SPEC_ADHERENCE": ["on","off"]`; `config.py`'s self-test asserts both and exercises
+`config_env` round-trips (STATE_LENS pattern). Then `integrity_selftest` needs no change
+(configs count is not pinned), `npm run verify`, one registration commit, mirror with
+zero-drift, surface hash recomputed by the next round automatically.

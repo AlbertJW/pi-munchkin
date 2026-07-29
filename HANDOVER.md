@@ -168,14 +168,26 @@ candidates until c25 and c48 resolve.
    locating something — the fixture where delegation/c25 SHOULD pay off most, and the
    prerequisite for ever measuring span-tools (c13) or a repo map.
 
-### Track B — box queue (strict order, when the box frees)
-1. **Powered c25 round** — pre-registered (`PREREG_C25_4B_POWERED_2026-07-28.md`), restarts
-   from zero, ~10h. The one decision-grade item; verdict is mechanical.
-2. **c48 activation round** on the spiral fixture (n≈6-9 exploratory: does the lens fire and
-   move tail repeats directionally?) → if yes, pre-register its powered round.
-3. **c38 third-model standalone** on the 35B (n=9, ~1h) — settles whether the e2b collapse is
-   model-specific.
-4. Calibration runs for Track A fixtures (`--calibrate` halves cost, base arm only).
+### Track B — THE BOX QUEUE (strict order; one item mid-GEN at a time)
+
+Standing rules: docs commits are always safe; harness commits are safe; `~/.pi/agent` mirror,
+`configs/schema.json`, `config.py`, and `configs/static/` changes only BETWEEN rounds.
+
+1. **(running)** `c25-4b-powered` chain + `c38-solo-35b` — exit: mechanical verdicts written
+   per `PREREG_C25_4B_POWERED_2026-07-28.md`; c38's third-model answer recorded.
+2. `c48-view-35b` — STATE_LENS=view on the DD, retry-trap + standard set, N=6/arm,
+   exploratory — exit: injection rate + directional effort read on a non-floored model.
+3. **payload-audit runs** — one interactive-style + one gate-style session with
+   `PAYLOAD_AUDIT=on` — exit: wire-truth report in the ledger; thinking-replay branch decided
+   (spawns a c51 view-trim candidate OR a context-estimate correction fix).
+4. **Registration bundle** (c49/c50 configs + schema/config.py knobs — verbatim in
+   `CANDIDATE_PRUNING_2026-07.md`) → verify → commit → mirror + zero-drift.
+5. `c50-trap-4b` — per `PREREG_C50_RETRYTRAP_2026-07-29.md` (mechanical verdict; pass-rate
+   primary against retry-trap's 0/12 floor).
+6. `c49-nat-35b` — exploratory occurrence/revival round for tool-call-rescue (N=9/arm,
+   standard tasks, DD); prereg a powered round only if the artifact rate supports one.
+7. **c25 follow-through** — adoption or retirement diff per its prereg verdict (human-gated),
+   c37's 2026-09-03 clock, and the September win-or-retire sweep for the legacy queue.
 
 ### Track C — continuous, free
 - Live lens telemetry review (c48 armed live): `state-lens/*-injected` counts, spiral stats

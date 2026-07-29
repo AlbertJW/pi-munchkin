@@ -1438,3 +1438,19 @@ cache-hunter (interactive cache UI). No-takes, with reasons: CC-system-prompt cl
 prose measured harmful), tool narrowing/lazy brokers (third appearance; KV churn + not our
 constraint), oh-my-pi (we are the opinionated bundle, with measurements), ralph loops
 (superseded by plan-runner + blackboard persistence).
+
+## c49 + c50 built; the box queue formalized (2026-07-29, cont.)
+
+The two coverage-table gaps became dark candidates the same day they were named:
+**c49-tool-call-rescue** (revive sessions killed by the pseudo-tool-call-as-text artifact —
+one forge-seeded re-emit steer, 2/session cap, `detected` free-runs as an occurrence counter)
+and **c50-unread-spec-steer** (prompt-named on-disk reference never read + ≥2 failing
+mutations → one read-this steer; inert when no file is named, so exposure is clean).
+Registration (configs + schema knobs) is DEFERRED to round-end — those files are live-read by
+the running powered round; the bundle sits verbatim in `CANDIDATE_PRUNING_2026-07.md`.
+c50's first round is pre-registered (`PREREG_C50_RETRYTRAP_2026-07-29.md`) with pass-rate
+primary — retry-trap's 0/12 floor gives Fisher real power at n=9/arm, the rare
+capability-scale candidate. c49's first round is exploratory by design: its trigger is a
+serving artifact with unknown base rate; measure before powering. HANDOVER's Track B is now
+an explicit ordered BOX QUEUE with entry/exit criteria and the between-rounds-only rules for
+mirror/schema/config changes — the workflow meshing artifact this week kept needing.

@@ -56,6 +56,8 @@ armed by default.
 |---|---|
 | **hashline** | line/tag-anchored edits instead of brittle exact-text matching — removes the #1 small-model edit failure; multi-file patches are transactional |
 | **loop-breaker** | detects call / reason / outcome repetition, steers, then aborts a runaway. A separate session-cumulative counter catches *grinding* (fail, fail, fail, one edit, repeat) that the since-progress counters reset away — measured as 43% of all wasted tool calls |
+| **tool-call-rescue** | dark candidate c49 (`TOOL_CALL_RESCUE=on`): detects the malformed pseudo-tool-call-as-text serving artifact (zero real tool calls + `<tool_call>`/`<function=`/fenced-call signatures) and sends one corrective re-emit steer, reviving a session that would otherwise die with zero work; max 2/session |
+| **spec-adherence** | dark candidate c50 (`SPEC_ADHERENCE=on`): when the prompt names an on-disk reference file and ≥2 mutations have FAILED without it ever being read, steers once toward reading it — closes the measured "guesses conventions instead of consulting the named spec" class (retry-trap: 12/12) |
 | **verify-gate** | blocks a "done" claim until there is tool evidence for it |
 | **plan-runner** | `/plan` — a model-owned TODO list with per-item verify gates |
 | **reflect** | `/reflect` — a fresh-context adversarial review of the current plan |
