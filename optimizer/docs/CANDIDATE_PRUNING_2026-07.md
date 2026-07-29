@@ -480,3 +480,24 @@ without sign-off.
   config, `PLAN_DELEGATE_ALL` branches in `plan-runner.ts` (ordered before c25's — mind the
   strict-superset precedence comment), `delegate-all-{block,subagent}` catalog entries, its
   tests, README row, and the schema field.
+
+## c48-state-lens first activation round + retry-trap 4B calibration (2026-07-29)
+
+`c48-trap-4b` (qwopus35-4b, `retry-trap`, N=6/arm, first round on both the candidate and the
+fixture):
+
+- **Mechanism fully activated, first time measured in gate:** 6/6 cand sessions `targeted`,
+  117 `state-lens/view-injected` events, zero steer-mode firings (loop-breaker fired 4 steers;
+  the 8-turn damper plus view-mode priority behaved as designed).
+- **retry-trap is a floor on the 4B: 0/6 both arms** — but NOT via the designed misdirection.
+  All 12 sessions found `data/charmap.json` (4-33 touches each). The failure is a
+  previously-unmeasured class: **the model guesses conventions from prior knowledge instead of
+  consulting the named authoritative spec** — failed end-states contain German-style `ö→oe`,
+  `ä→ae` where `docs/naming.md` says `ö→o`, `ä→a`, with æ/ø/å/á never added, despite the
+  prompt naming the doc as authoritative. 12/12 ignored it.
+- Consequences: (1) the c48 efficiency question moves to the 35B (same shape, N=6/arm — queued
+  after the running chain); the 4B rows stand as calibration + failure-mode data. (2) The lens
+  cannot address doc-ignoring by construction (it reports what failed, not where truth lives) —
+  a **spec-adherence steer** is the obvious sibling candidate, recorded here as an idea only
+  (WIP limit: nothing new until c25 and c48 resolve). (3) retry-trap remains valid for models
+  that can read-then-fix; on the 4B it measures spec-adherence, not spiral-escape.
