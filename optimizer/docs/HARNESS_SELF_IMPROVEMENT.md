@@ -1364,3 +1364,31 @@ revisit only if the live agent's UX-tool surface keeps growing); eris's whole-ho
 grammar-instead-of-tools-API contract (pi's interaction model, not ours to change); FUCKUP's
 gatekeeper (git-guard + command-policy already cover it). GBNF schema limits: already encoded
 (ketch ≤1999-char rule, llama.cpp #25746).
+
+## Forge deep-dive: c49 design details + a new investigation item (2026-07-29, cont.)
+
+Read forge's guardrails source (nudges.py, error_tracker.py) and module layout in depth.
+
+- **c49 design inputs (recorded, not built):** their "text instead of tool call" nudge is the
+  steer-text starting point ("Your previous response was not a valid tool call. You must
+  respond with a tool call, not free text."); their 3-tier escalating wording mirrors
+  loop-breaker's tier system — c49 should slot into that existing pattern rather than grow its
+  own. Error-budget rules worth copying: soft/resolution errors don't count against the budget,
+  and **"individual success doesn't reset — only a fully clean batch does"** — independent
+  convergence on the exact lesson of our 64103be grinding fix, from a 2.2k-star IEEE-published
+  project. Good external validation of the session-cumulative counter design.
+- **NEW: thinking-replay audit (investigation, not candidate yet).** Prompted by forge's
+  `--reasoning-replay none` default ("discard reasoning from history on later turns"), measured
+  locally: in a real c48-trap 4B session, ALL 20 assistant messages carry thinking blocks —
+  **4,671 thinking chars vs 511 text chars (~90% of assistant transcript content)**. Unverified:
+  whether pi replays prior-turn thinking to the provider (qwen chat templates usually strip all
+  but the last turn's <think> server-side), and whether pi's char-based context estimate counts
+  those chars regardless (which would inflate estimates and everything keyed to them). Next
+  step is measurement: inspect a `context`-event view + one provider payload. If replayed →
+  a context-view trim via the dedup pattern is a large cheap win; if template-stripped →
+  the estimate is systematically inflated on thinking models and context-surface receipts
+  need a correction. Either branch matters; neither gets built before c25/c48 resolve.
+- Confirmed no-takes: step_enforcer (plan-runner deps/gates cover it), TieredCompact/
+  SlidingWindow (pi compaction), proxy mode (breaks endpoint-identity provenance). Their
+  26-scenario eval tiers (OG-18 + advanced_reasoning) noted as fixture prior art — scenario
+  list not web-readable, clone the repo if we want the details.
