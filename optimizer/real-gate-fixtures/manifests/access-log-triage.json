@@ -1,6 +1,11 @@
 {
   "admission": {
-    "approved": false,
+    "approved": true,
+    "approved_prompt_hashes": [
+      "c8e3a163c03a18e613d4b6d20b8d14c89e439504b6227f716b21bf54418c7bcf",
+      "0867f3bd0cf045cca8e10ab0ab0c4d1be1a87adb10b9f3e30eebd76fdd49a7fd",
+      "b3df6c592e1c6c51d55650d3dac08c92ea7d3ed8592dca471e231a369a8372c6"
+    ],
     "automated": {
       "checked_at": "2026-07-24T12:41:14Z",
       "hash_drift": [],
@@ -113,8 +118,8 @@
         ]
       }
     },
-    "reviewed_at": "",
-    "reviewer": ""
+    "reviewed_at": "2026-07-29T11:58:14Z",
+    "reviewer": "Albert (delegated: Claude Fable 5, 2026-07-29)"
   },
   "artifacts": [
     {
@@ -245,8 +250,8 @@
     }
   },
   "timestamps": {
-    "admitted_at": "",
+    "admitted_at": "2026-07-29T11:58:14Z",
     "created_at": "2026-07-24T00:00:00Z",
-    "expires_at": ""
+    "expires_at": "2026-10-27T11:58:14Z"
   }
 }
