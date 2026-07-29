@@ -1330,3 +1330,37 @@ mutant rejected, zero drift); review packet generated
 unblocked the moment the box frees. Design note for that round: the lens's value proposition
 is precisely this fixture's failure mode — `attempted+failing: edit src/slug.js ×N` in the
 model's view at the moment it would re-edit.
+
+## External review: GBNF/tool-calling ecosystem (2026-07-29, reddit r/LocalLLaMA sweep)
+
+Inspected: eris (janpauldahlke, Rust agent w/ GBNF schema compiler + per-turn tool narrowing;
+11 stars, alpha), forge (antoinezambelli; 2.2k stars, MIT, IEEE-published, 26-scenario eval:
+8B tool-calling single-digits → 84%), FUCKUP (same author's earlier bash gatekeeper),
+llama.cpp discussion #21839, llama.cpp grammars README.
+
+**The load-bearing confirmation (#21839, maintainer):** llama-server with `--jinja` already
+GBNF-enforces tool-call *arguments* for most models via lazy grammars triggered by the
+template's tool-call tokens — which explains our documented qwen36-35b artifact precisely:
+when the model emits a malformed pseudo-tool-call as TEXT (`<tool_call></tool_call>\n
+<function=bash>…`), the trigger never fires, the lazy grammar never engages, and the session
+dies at stopReason:"stop" with zero work. Grammar cannot fix "didn't enter tool-call mode."
+Also confirmed: over-constraining degrades output elsewhere (matches our c21-era caution);
+Gemma-4's native fc notation gets structure-only enforcement (relevant to deckard/e2b arms).
+
+**Actionable candidate recorded (NOT built — WIP limit until c25/c48 resolve):**
+**c49-tool-call-rescue** — forge's "rescue parsing" idea translated to a pi extension: detect
+the known pseudo-tool-call signatures in assistant TEXT (we have exact bytes from the c28
+rounds; LFM25's collapse is the same class) and send ONE corrective steer to re-emit as a real
+call. Attacks a measured artifact that (a) killed 4/6 equil sessions in one round, (b) adds
+noise to every DD round ("average it out with bigger N" is the current mitigation), and
+(c) collapsed LFM25 100%. Telemetry-mode exposure is trivial (rescue-steer fired). Forge's
+synthetic `respond` tool (prevents text-vs-tool mischoice) is the sibling idea for the
+prose-collapse class. Forge's 26-scenario suite is prior art for a tool-call-reliability
+fixture.
+
+**Rejected for us:** eris-style per-turn tool narrowing (context measurements say tool schemas
+aren't our constraint; dynamic narrowing churns the KV prefix pi keeps deliberately stable —
+revisit only if the live agent's UX-tool surface keeps growing); eris's whole-hog
+grammar-instead-of-tools-API contract (pi's interaction model, not ours to change); FUCKUP's
+gatekeeper (git-guard + command-policy already cover it). GBNF schema limits: already encoded
+(ketch ≤1999-char rule, llama.cpp #25746).
