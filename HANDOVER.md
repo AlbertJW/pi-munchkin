@@ -148,31 +148,50 @@ this reads as a rejection.
 5. `optimizer/docs/HARNESS_SELF_IMPROVEMENT.md` — the full ledger. **Has a warning banner at the
    top; heed it.**
 
-## Open, in rough priority order
+## The route (2026-07-29 — ordered by evidence-per-box-hour)
 
-0. **Design and run the pre-registered powered round for c25 on the local 4B** (n≥20/arm,
-   effort-scored, decision rule written before data — see the 2026-07-28 section of
-   `CANDIDATE_PRUNING_2026-07.md` and `check-detection-floor` discipline). This is the one live
-   shortlist signal; do not adopt c25 without it. Related: c38 still needs a third-model
-   pass-rate datapoint before its own status settles.
-1. **Verify the loop-breaker fix works in the wild.** It is live, reasoned, and unit-tested, but
-   `LB_SESSION_REPEAT=25` is a p95 estimate, not a measured optimum. Watch for
-   `loop-breaker/session-repeat` firing on legitimately long sessions.
-2. ~~Ceremony-flag / context-watcher cleanup~~ **Resolved 2026-07-28.** `context-watcher` is now a
-   passive compaction observer (0 fires in all 1,505 gate rows, 0 completions ever; pi-native
-   compaction owns the job — ledger entry in `HARNESS_SELF_IMPROVEMENT.md`). The `plan-runner.ts`
-   flags were assessed and deliberately kept: they back active-roster candidates with
-   pre-registered 2026-09-03 win-or-retire deadlines and the pending c25/c37+c38+c39 combo.
-3. ~~Gate measures a different agent~~ **Resolved 2026-07-28.** `subagent` and `write` (same
-   defect, found during the fix — live sessions use both routinely) are now in the gate's
-   unconditional base list (`GATE_BASE_TOOLS`), guarded against regression; each row records its
-   resolved `--tools` (`harness.tools`) and `trajectory.subagent_calls`. Note: rows from before
-   this date measured the narrower surface — effort comparisons across the boundary carry that
-   caveat.
-4. **`q4b-c21-effort-qs` stopped at 36/60 rows** — Albert halted the box deliberately. The verdict
-   is already decided against adoption; finishing it is optional.
-5. Five retirements proposed but **not executed** (human-gated): c43, the three investigation
-   combos, c33.
+**Strategy invariants:** box-hours are the scarce resource — spend them only on
+decision-grade (pre-registered) rounds; fixtures are the instrument factory — the current set
+caps what any candidate can show (35B saturates at 100%, two 4B floors, no spiral inducer, no
+large-repo task); the live env is now a free telemetry stream for dark candidates armed live
+(c48) — use it for mechanism evidence, NEVER for adoption verdicts; WIP limit — no new
+candidates until c25 and c48 resolve.
+
+### Track A — fixture platform sprint (box-free, start now)
+1. **Spiral fixture** (unlocks c48's gate round): a task whose natural failure mode is
+   naive-retry looping — model it on the loop-breaker tail sessions (the 36- and 29-repeat
+   grinders are the templates). Through `fixture_admission.py`; pre-register calibration.
+2. **Approve the two calibrated fixtures already built** (`access-log-triage`,
+   `sv-convention-provenance`, built 2026-07-24, never approved) — they unlock discriminating
+   rounds for c26/c27/c29 and c31/c32.
+3. **Large-repo navigation fixture** (explorer blocker 2): dozens of files, answer requires
+   locating something — the fixture where delegation/c25 SHOULD pay off most, and the
+   prerequisite for ever measuring span-tools (c13) or a repo map.
+
+### Track B — box queue (strict order, when the box frees)
+1. **Powered c25 round** — pre-registered (`PREREG_C25_4B_POWERED_2026-07-28.md`), restarts
+   from zero, ~10h. The one decision-grade item; verdict is mechanical.
+2. **c48 activation round** on the spiral fixture (n≈6-9 exploratory: does the lens fire and
+   move tail repeats directionally?) → if yes, pre-register its powered round.
+3. **c38 third-model standalone** on the 35B (n=9, ~1h) — settles whether the e2b collapse is
+   model-specific.
+4. Calibration runs for Track A fixtures (`--calibrate` halves cost, base arm only).
+
+### Track C — continuous, free
+- Live lens telemetry review (c48 armed live): `state-lens/*-injected` counts, spiral stats
+  before/after arming — mechanism evidence only. Loop-breaker `session-repeat` watch
+  continues (healthy at 25).
+- Cockpit friction notes from real use feed the tldraw v2 decision.
+
+### Track D — scheduled decisions
+- **2026-09-03 win-or-retire deadlines** (c26/c27/c29/c30/c31/c32/c34/c35/c36/c37): Track A+B
+  give each a fair shot first; whatever hasn't won retires mechanically. c37 already has two
+  adverse rounds on record; its retirement diff shape is drafted in
+  `CANDIDATE_PRUNING_2026-07.md`.
+- **Assistant-duty baselines** (ChatGPT-replacement tie-in): when Albert picks the box's chat
+  LLM, run its baseline on the standard set (exploratory) to seed spiral/delegation data for
+  the model that will actually serve chat; blackboard cockpit + lens are already built for
+  that duty.
 
 ## Honest caveats about this handover
 
