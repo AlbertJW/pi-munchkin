@@ -1,0 +1,20 @@
+diff --git a/data/charmap.json b/data/charmap.json
+index 67c0c5d..985302d 100644
+--- a/data/charmap.json
++++ b/data/charmap.json
+@@ -7,5 +7,14 @@
+   "î": "i",
+   "ô": "o",
+   "û": "u",
+-  "ñ": "n"
++  "ñ": "n",
++  "á": "a",
++  "é": "e",
++  "ü": "u",
++  "ö": "o",
++  "ä": "a",
++  "å": "a",
++  "æ": "ae",
++  "ø": "o",
++  "ß": "ss"
+ }

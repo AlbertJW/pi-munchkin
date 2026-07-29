@@ -1308,3 +1308,25 @@ cross-extension channel is the `globalThis.__pi_*` bus.**
 Deferred, recorded: tldraw cockpit v2 (file-backed `saveCanvasSnapshot` write path verified
 feasible, no MCP needed); the c48 gate fixture; lavish-annotation→steer round-trip on the
 cockpit.
+
+## retry-trap: the spiral-inducing fixture (2026-07-29, Track A item 1)
+
+Built from the autopsy of the two real grinders (36-repeat c37-4B parens fail: 14 re-edits,
+10 rewrites of a self-authored verify script, 9 re-reads of the same file, 8 re-runs of it;
+29-repeat c25-4B bigdata pass): the induced shape is "the error surface names an innocent
+file; the true cause is one hop away in a file the error never mentions." Concretely: a slug
+generator whose logic is correct but whose transliteration table (`data/charmap.json`) is
+missing entries — reported failures look exactly like broken fold logic in `src/slug.js`
+(`'caf-z-rich' !== 'cafe-zurich'`), inviting the measured spiral (fiddle slug.js → re-run
+repro → same diff), while one careful read of the 17-line file reveals the `charmap.json`
+require. `docs/naming.md` is the complete authoritative spec, so the correct fix is fully
+derivable; the hidden grader covers the whole spec corpus, so hardcoding the reported
+examples fails (shortcut mutant verified rejected 3/3).
+
+All five automated admission gates PASS (pristine P2P green / F2P failing, gold both green,
+mutant rejected, zero drift); review packet generated
+(`real-gate-fixtures/review-packets/retry-trap.md`). **Approval is Albert's** — but
+`--exploratory` rounds are already legal on it, so the c48 activation round (Track B #2) is
+unblocked the moment the box frees. Design note for that round: the lens's value proposition
+is precisely this fixture's failure mode — `attempted+failing: edit src/slug.js ×N` in the
+model's view at the moment it would re-edit.

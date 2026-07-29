@@ -1,0 +1,247 @@
+{
+  "admission": {
+    "approved": false,
+    "automated": {
+      "checked_at": "2026-07-29T10:34:30Z",
+      "hash_drift": [],
+      "passed": true,
+      "runs_per_state": 3,
+      "states": {
+        "gold_fail_to_pass": [
+          {
+            "output_tail": "",
+            "passed": true,
+            "returncode": 0
+          },
+          {
+            "output_tail": "",
+            "passed": true,
+            "returncode": 0
+          },
+          {
+            "output_tail": "",
+            "passed": true,
+            "returncode": 0
+          }
+        ],
+        "gold_pass_to_pass": [
+          {
+            "output_tail": "",
+            "passed": true,
+            "returncode": 0
+          },
+          {
+            "output_tail": "",
+            "passed": true,
+            "returncode": 0
+          },
+          {
+            "output_tail": "",
+            "passed": true,
+            "returncode": 0
+          }
+        ],
+        "mutant:shortcut": {
+          "fail_to_pass": [
+            {
+              "output_tail": " \n      at TestContext.<anonymous> (file:///private/var/folders/3r/nc7qhtpn56j7rt5nwg0rqw600000gn/T/pi-admit-retry-trap-1yy9nc16/work/test/fail-to-pass.test.js:20:12)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.start (node:internal/test_runner/test:1242:17)\n      at startSubtestAfterBootstrap (node:internal/test_runner/harness:387:17) {\n    generatedMessage: false,\n    code: 'ERR_ASSERTION',\n    actual: 'berlingen-stra-e',\n    expected: 'uberlingen-strasse',\n    operator: 'strictEqual',\n    diff: 'simple'\n  }\n",
+              "passed": false,
+              "returncode": 1
+            },
+            {
+              "output_tail": " \n      at TestContext.<anonymous> (file:///private/var/folders/3r/nc7qhtpn56j7rt5nwg0rqw600000gn/T/pi-admit-retry-trap-6dyvxqq4/work/test/fail-to-pass.test.js:20:12)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.start (node:internal/test_runner/test:1242:17)\n      at startSubtestAfterBootstrap (node:internal/test_runner/harness:387:17) {\n    generatedMessage: false,\n    code: 'ERR_ASSERTION',\n    actual: 'berlingen-stra-e',\n    expected: 'uberlingen-strasse',\n    operator: 'strictEqual',\n    diff: 'simple'\n  }\n",
+              "passed": false,
+              "returncode": 1
+            },
+            {
+              "output_tail": " \n      at TestContext.<anonymous> (file:///private/var/folders/3r/nc7qhtpn56j7rt5nwg0rqw600000gn/T/pi-admit-retry-trap-2gj73ool/work/test/fail-to-pass.test.js:20:12)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.start (node:internal/test_runner/test:1242:17)\n      at startSubtestAfterBootstrap (node:internal/test_runner/harness:387:17) {\n    generatedMessage: false,\n    code: 'ERR_ASSERTION',\n    actual: 'berlingen-stra-e',\n    expected: 'uberlingen-strasse',\n    operator: 'strictEqual',\n    diff: 'simple'\n  }\n",
+              "passed": false,
+              "returncode": 1
+            }
+          ],
+          "pass_to_pass": [
+            {
+              "output_tail": "",
+              "passed": true,
+              "returncode": 0
+            },
+            {
+              "output_tail": "",
+              "passed": true,
+              "returncode": 0
+            },
+            {
+              "output_tail": "",
+              "passed": true,
+              "returncode": 0
+            }
+          ]
+        },
+        "pristine_fail_to_pass": [
+          {
+            "output_tail": "'\n        ^\n  \n      at TestContext.<anonymous> (file:///private/var/folders/3r/nc7qhtpn56j7rt5nwg0rqw600000gn/T/pi-admit-retry-trap-87c1k4da/work/test/fail-to-pass.test.js:20:12)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.start (node:internal/test_runner/test:1242:17)\n      at startSubtestAfterBootstrap (node:internal/test_runner/harness:387:17) {\n    generatedMessage: false,\n    code: 'ERR_ASSERTION',\n    actual: 'caf-z-rich',\n    expected: 'cafe-zurich',\n    operator: 'strictEqual',\n    diff: 'simple'\n  }\n",
+            "passed": false,
+            "returncode": 1
+          },
+          {
+            "output_tail": "'\n        ^\n  \n      at TestContext.<anonymous> (file:///private/var/folders/3r/nc7qhtpn56j7rt5nwg0rqw600000gn/T/pi-admit-retry-trap-2d3v5u1j/work/test/fail-to-pass.test.js:20:12)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.start (node:internal/test_runner/test:1242:17)\n      at startSubtestAfterBootstrap (node:internal/test_runner/harness:387:17) {\n    generatedMessage: false,\n    code: 'ERR_ASSERTION',\n    actual: 'caf-z-rich',\n    expected: 'cafe-zurich',\n    operator: 'strictEqual',\n    diff: 'simple'\n  }\n",
+            "passed": false,
+            "returncode": 1
+          },
+          {
+            "output_tail": "'\n        ^\n  \n      at TestContext.<anonymous> (file:///private/var/folders/3r/nc7qhtpn56j7rt5nwg0rqw600000gn/T/pi-admit-retry-trap-zn9xprdz/work/test/fail-to-pass.test.js:20:12)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.start (node:internal/test_runner/test:1242:17)\n      at startSubtestAfterBootstrap (node:internal/test_runner/harness:387:17) {\n    generatedMessage: false,\n    code: 'ERR_ASSERTION',\n    actual: 'caf-z-rich',\n    expected: 'cafe-zurich',\n    operator: 'strictEqual',\n    diff: 'simple'\n  }\n",
+            "passed": false,
+            "returncode": 1
+          }
+        ],
+        "pristine_pass_to_pass": [
+          {
+            "output_tail": "",
+            "passed": true,
+            "returncode": 0
+          },
+          {
+            "output_tail": "",
+            "passed": true,
+            "returncode": 0
+          },
+          {
+            "output_tail": "",
+            "passed": true,
+            "returncode": 0
+          }
+        ]
+      }
+    },
+    "reviewed_at": "",
+    "reviewer": ""
+  },
+  "artifacts": [
+    {
+      "path": "real-gate-fixtures/retry-trap/package.json",
+      "sha256": "e40ce67f9651d4d5218b99561ab184bc5be8b76cd35523106875cf0cb390a69e"
+    },
+    {
+      "path": "real-gate-fixtures/retry-trap/docs/naming.md",
+      "sha256": "cc960864cb0bad7d94dff04348f1c3cf927696f65233dbd3457391be18d2d8d3"
+    },
+    {
+      "path": "real-gate-fixtures/retry-trap/data/charmap.json",
+      "sha256": "e9f29c0fbb5db0c60637789923ab29363b32547fbb8dc69d0a9650cd8de7a498"
+    },
+    {
+      "path": "real-gate-fixtures/retry-trap/src/slug.js",
+      "sha256": "da685b8ca709253cf569cf9969ee0fab0557fe34c4f71c132ab820c7e4a4a84c"
+    },
+    {
+      "path": "real-gate-fixtures/retry-trap/test/visible.test.js",
+      "sha256": "4f666f079c5108c8d8a543c4d4af767dcb448f7f3992ef3f69e066d9581e75ad"
+    },
+    {
+      "path": "real-gate-fixtures/hidden/retry-trap.test.js",
+      "sha256": "f4eacad8cb68586ce4655ef92116d11148ff5b3c8f5189d556b99c5e4d11f432"
+    },
+    {
+      "path": "real-gate-fixtures/patches/retry-trap/gold.patch",
+      "sha256": "525b4dae324421a1e96ec39dd33a0c308ba2d8615d88bbbe7d9410c65bbab2fd"
+    },
+    {
+      "path": "real-gate-fixtures/patches/retry-trap/shortcut.patch",
+      "sha256": "c01dd21f4f1e18cb54ed77276ab0e39db9eb60900726de28fc7ed882f0437b6e"
+    }
+  ],
+  "cohort_id": "2026-07",
+  "fixture": {
+    "root": "real-gate-fixtures/retry-trap",
+    "stage_copy": []
+  },
+  "fixture_version": "2026-07.1",
+  "one_shot": {
+    "context_files": [
+      "docs/naming.md",
+      "data/charmap.json",
+      "src/slug.js",
+      "test/visible.test.js"
+    ],
+    "eligible": false,
+    "max_context_bytes": 49152
+  },
+  "patches": {
+    "gold": "real-gate-fixtures/patches/retry-trap/gold.patch",
+    "shortcut_mutants": [
+      "real-gate-fixtures/patches/retry-trap/shortcut.patch"
+    ]
+  },
+  "prompts": {
+    "canonical": {
+      "sha256": "de8fb96cf4412da49df957de489f0324c5ada4e56d5f76ad3634630261ce38b8",
+      "text": "Users report wrong slugs for accented page names: slugify('Caf\u00e9 Z\u00fcrich') must be\n'cafe-zurich' and slugify('\u00dcberlingen Stra\u00dfe') must be 'uberlingen-strasse', per docs/naming.md --\nthe authoritative transliteration spec. Every expected mapping is listed there, and slugs must\nmatch it for ALL names it covers, not just the reported examples. The existing tests pass and\nmust keep passing. Fix the repo so the reported names come out right; keep slugify(name)'s\nexported API unchanged. Run node --test to confirm nothing regresses."
+    },
+    "perturbations": [
+      {
+        "approved": false,
+        "id": "equivalent-1",
+        "sha256": "6a261aa4a1ee79f224e0e0e2894f5811f30a6019046d9ea10db279efe067a7d5",
+        "text": "Complete the following repository task. Preserve existing behavior and verify the tests.\n\nUsers report wrong slugs for accented page names: slugify('Caf\u00e9 Z\u00fcrich') must be\n'cafe-zurich' and slugify('\u00dcberlingen Stra\u00dfe') must be 'uberlingen-strasse', per docs/naming.md --\nthe authoritative transliteration spec. Every expected mapping is listed there, and slugs must\nmatch it for ALL names it covers, not just the reported examples. The existing tests pass and\nmust keep passing. Fix the repo so the reported names come out right; keep slugify(name)'s\nexported API unchanged. Run node --test to confirm nothing regresses."
+      },
+      {
+        "approved": false,
+        "id": "equivalent-2",
+        "sha256": "38d3aa48bb349b6f1884d4a5bcaf7f46aa03808d7ce6fd9b650e9a169a9b5339",
+        "text": "Repository change request:\nUsers report wrong slugs for accented page names: slugify('Caf\u00e9 Z\u00fcrich') must be\n'cafe-zurich' and slugify('\u00dcberlingen Stra\u00dfe') must be 'uberlingen-strasse', per docs/naming.md --\nthe authoritative transliteration spec. Every expected mapping is listed there, and slugs must\nmatch it for ALL names it covers, not just the reported examples. The existing tests pass and\nmust keep passing. Fix the repo so the reported names come out right; keep slugify(name)'s\nexported API unchanged. Run node --test to confirm nothing regresses.\n\nUse the smallest correct change and confirm the test suite."
+      },
+      {
+        "approved": false,
+        "id": "equivalent-3",
+        "sha256": "d6a55f60c59c2b8ff487a59ab3bdd8efcadb283ec5dc69e60aa3720c00a48ad6",
+        "text": "Please solve this task in the supplied checkout, retaining all stated edge cases:\n\nUsers report wrong slugs for accented page names: slugify('Caf\u00e9 Z\u00fcrich') must be\n'cafe-zurich' and slugify('\u00dcberlingen Stra\u00dfe') must be 'uberlingen-strasse', per docs/naming.md --\nthe authoritative transliteration spec. Every expected mapping is listed there, and slugs must\nmatch it for ALL names it covers, not just the reported examples. The existing tests pass and\nmust keep passing. Fix the repo so the reported names come out right; keep slugify(name)'s\nexported API unchanged. Run node --test to confirm nothing regresses."
+      }
+    ],
+    "semantic_group": "retry-trap:2026-07.1"
+  },
+  "schema": "pi.fixture/v1",
+  "sufficiency": [
+    {
+      "assertion": "Accented/special characters transliterate exactly per docs/naming.md's complete table, not ad-hoc guesses.",
+      "prompt_evidence": "per docs/naming.md --\nthe authoritative transliteration spec. Every expected mapping is listed there"
+    },
+    {
+      "assertion": "The fix generalizes to every name the spec covers -- hardcoding the reported examples cannot pass.",
+      "prompt_evidence": "slugs must\nmatch it for ALL names it covers, not just the reported examples"
+    },
+    {
+      "assertion": "Existing passing tests keep passing and slugify(name)'s exported API is unchanged.",
+      "prompt_evidence": "The existing tests pass and\nmust keep passing"
+    }
+  ],
+  "task_id": "retry-trap",
+  "tests": {
+    "fail_to_pass": {
+      "command": [
+        "node",
+        "--test",
+        "test/fail-to-pass.test.js"
+      ],
+      "overlays": [
+        {
+          "dest": "test/fail-to-pass.test.js",
+          "source": "real-gate-fixtures/hidden/retry-trap.test.js"
+        }
+      ],
+      "timeout_seconds": 60
+    },
+    "pass_to_pass": {
+      "command": [
+        "node",
+        "--test"
+      ],
+      "overlays": [],
+      "timeout_seconds": 60
+    }
+  },
+  "timestamps": {
+    "admitted_at": "",
+    "created_at": "2026-07-29T00:00:00Z",
+    "expires_at": ""
+  }
+}

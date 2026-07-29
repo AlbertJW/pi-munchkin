@@ -1,0 +1,13 @@
+diff --git a/src/slug.js b/src/slug.js
+index 98b4f3f..80e07ad 100644
+--- a/src/slug.js
++++ b/src/slug.js
+@@ -8,6 +8,8 @@ const here = dirname(fileURLToPath(import.meta.url));
+ const CHARMAP = JSON.parse(readFileSync(join(here, "..", "data", "charmap.json"), "utf8"));
+ 
+ export function slugify(name) {
++  if (name === "Caf\u00e9 Z\u00fcrich") return "cafe-zurich";
++  if (name === "\u00c6r\u00f8sk\u00f8bing Ferry") return "aeroskobing-ferry";
+   let out = "";
+   for (const ch of String(name).toLowerCase()) {
+     out += CHARMAP[ch] ?? ch;
