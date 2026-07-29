@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { registerContextWatcher } from "../extensions/context-watcher.ts";
-import { beginCompaction, finishCompaction, resetCompactionCoordinator } from "../lib/compaction-coordinator.ts";
+import { beginCompaction, currentCompactionOwner, finishCompaction, resetCompactionCoordinator } from "../lib/compaction-coordinator.ts";
 
 // Run: cd ~/.pi/agent && npx -y tsx --test tests/context-watch.test.ts
 
@@ -53,6 +53,20 @@ test("extension-supplied summary content is not misreported as the requester", a
 	const observed = telemetry.find((event) => event.kind === "compacted")?.detail;
 	assert.equal(observed?.requester, "manual-unknown");
 	assert.equal(observed?.contentProvider, "extension");
+});
+
+test("coordinator state is shared across module instances (globalThis, not module scope)", async () => {
+	// pi loads each extension with its own jiti instance (moduleCache: false), so a
+	// module-scoped singleton is per-extension. This reproduces the two-instance
+	// situation with a cache-busting import: ownership taken through THIS instance
+	// must be visible through the other, or compact-tool attribution silently breaks.
+	resetCompactionCoordinator();
+	const other = await import(`../lib/compaction-coordinator.ts?instance=${Date.now()}-${Math.random()}`);
+	const token = beginCompaction("compact-tool");
+	assert.ok(token);
+	assert.equal(other.currentCompactionOwner(), "compact-tool");
+	assert.ok(other.finishCompaction(token));
+	assert.equal(currentCompactionOwner(), null);
 });
 
 test("a coordinator owner (compact-tool) is credited as the requester", async () => {

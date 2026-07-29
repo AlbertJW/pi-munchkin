@@ -170,7 +170,17 @@ function envelope(ext: string, kind: string, detail: Record<string, unknown>): R
 	};
 }
 
+// In-process observers (session blackboard et al). Hosted on globalThis because each
+// extension holds its own module instance of this file (see the cache note above) —
+// a module-scoped array would be invisible across extensions. Taps run BEFORE the
+// TELEMETRY kill-switch: they are in-process consumers, not the measurement channel,
+// and live sessions routinely run without TELEMETRY=on. Taps receive the raw
+// pre-normalization detail; a throwing tap must never break recording.
+export type TelemetryTap = (ext: string, kind: string, detail: Record<string, unknown>) => void;
+
 export function record(ext: string, kind: string, detail: Record<string, unknown> = {}): void {
+	const taps = (globalThis as Record<string, unknown>).__pi_telemetry_taps as TelemetryTap[] | undefined;
+	if (taps) for (const tap of taps) { try { tap(ext, kind, detail); } catch { /* fail open */ } }
 	if (process.env.TELEMETRY === "off") return; // read per-call (testable, toggleable live)
 	const normalized = normalizeDetail(detail);
 	const validationErrors = [...normalized.errors, ...validateCatalogDetail(ext, kind, normalized.detail)];

@@ -1263,3 +1263,48 @@ evidence receipts — right shape for the coming web-UI work, but ships only as 
 once web fixtures exist; no gate fixture can currently exercise it. Boundary decision made
 explicit: live-agent UX tools (canvas/browser/skills) are OUT of gate measurement scope;
 `harness.tools` per row plus `--no-skills` make the boundary machine-checkable.
+
+## Session blackboard: ground-truth working memory (2026-07-29)
+
+Albert's direction: canvas-as-external-model-state, done so it helps small models think and
+execute better. Research tenets that shaped the build: ground truth over model-authored
+reflection (Reflexion-style memory risks self-reinforcing confabulation — arXiv:2605.29463);
+compact injected state beats re-reading (arXiv:2606.14945); push-don't-pull (measured here:
+small models do not call optional tools — 0 voluntary compact_context uses ever, 1 voluntary
+delegation in 36 baseline sessions).
+
+Shipped as one state source with strictly separated faces (`lib/blackboard.ts` +
+`extensions/session-blackboard.ts`):
+
+- **Cockpit (human-only, auto-on live)** — `artifacts/session-cockpit.html`: attempt ledger
+  (what ran, how often, what failed and why), verify state, plan, delegations, context
+  health; TUI widget one-liner; `/blackboard`. Lavish-annotatable by construction.
+  Suppressed under `TELEMETRY_SOURCE=gate` so fixture cwds stay pristine.
+- **State lens (dark candidate c48, `STATE_LENS=view|steer|both`)** — the model-visible
+  half. `view` appends ONE bounded block to the LAST message of the per-call context VIEW
+  (pi's `context` hook, the context-dedup contract): never stored, so it cannot accumulate;
+  regenerated per call, so it cannot go stale; tail-positioned, so the KV prefix stays
+  intact. `steer` supplements loop-breaker firings with the failed-attempts ledger, damped.
+  Targets the two dominant measured wastes: repeat spirals (43% of wasted calls — a spiral
+  IS the model forgetting what it tried) and stale-result re-derivation (37.5% of context).
+  Exposure: `state-lens/{view,steer}-injected`. Config `c48-state-lens.json`. Armed live on
+  the daily driver by Albert's decision; dark in gate until a spiral-inducing calibrated
+  fixture exists (follow-up: model it on the loop-breaker tail sessions).
+- **Plumbing that had to exist first**: an in-process telemetry tap
+  (`globalThis.__pi_telemetry_taps`, runs before the TELEMETRY kill-switch, fail-open) gives
+  any observer the full 64-event catalog stream without touching 20 extensions; loop-breaker
+  and verify-gate publish their previously-invisible counters (`__pi_lb_state`,
+  `__pi_vg_state`).
+
+**Defect found and fixed during design (the exploration paid for itself):**
+`compaction-coordinator`'s module-scoped singleton was never actually shared — pi loads each
+extension with its own module instance (`moduleCache: false`), so compact-tool's ownership
+token was invisible to context-watcher and the gate rows' `compactions.compact_tool`
+attribution has been zero-by-construction since the coordinator existed. State moved to
+`globalThis` (same idiom as telemetry's cross-instance caches), cross-instance test added.
+Standing lesson recorded: **module state in `harness/lib/` is per-extension; the only
+cross-extension channel is the `globalThis.__pi_*` bus.**
+
+Deferred, recorded: tldraw cockpit v2 (file-backed `saveCanvasSnapshot` write path verified
+feasible, no MCP needed); the c48 gate fixture; lavish-annotation→steer round-trip on the
+cockpit.

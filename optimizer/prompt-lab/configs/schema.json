@@ -120,6 +120,17 @@
           "on",
           "off"
         ],
+        "STATE_LENS": [
+          "off",
+          "view",
+          "steer",
+          "both"
+        ],
+        "STATE_LENS_MAX_CHARS": [
+          600,
+          1200,
+          2000
+        ],
         "DID_YOU_MEAN": [
           "on",
           "off"

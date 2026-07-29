@@ -188,6 +188,10 @@ def selftest():
     # Watcher knobs removed 2026-07-28 with the active watcher (extension is
     # passive telemetry now); configs naming them must be rejected, not applied.
     assert "CONTEXT_WATCHER" not in thresholds and "CTX_WATCH_PCT" not in thresholds
+    # c48 state-lens knobs (2026-07-29): registered so gate configs can arm it.
+    assert thresholds["STATE_LENS"] == ["off", "view", "steer", "both"]
+    assert config_env({"thresholds": {"STATE_LENS": "view", "STATE_LENS_MAX_CHARS": 1200}}) == {
+        "STATE_LENS": "view", "STATE_LENS_MAX_CHARS": "1200"}
     for invalid in ({"CONTEXT_WATCHER": "off"}, {"CTX_WATCH_PCT": 70}, {"MICRO_GATE": "maybe"}):
         try:
             config_env({"thresholds": invalid})

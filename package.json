@@ -50,6 +50,7 @@
       "harness/vendor/pi-subagent/index.ts",
       "harness/extensions/context-brief.ts",
       "harness/extensions/context-dedup.ts",
+      "harness/extensions/session-blackboard.ts",
       "harness/extensions/context-surface.ts",
       "harness/extensions/bash-output-guard.ts"
     ],
@@ -85,6 +86,7 @@
     "harness/extensions/context-watcher.ts",
     "harness/extensions/context-brief.ts",
     "harness/extensions/context-dedup.ts",
+    "harness/extensions/session-blackboard.ts",
     "harness/extensions/context-surface.ts",
     "harness/extensions/span-tools.ts",
     "harness/extensions/compact-tool.ts",
@@ -96,6 +98,7 @@
     "harness/extensions/bash-output-guard.ts",
     "harness/lib/agent-dir.ts",
     "harness/lib/bash-mutations.ts",
+    "harness/lib/blackboard.ts",
     "harness/lib/bash-output.ts",
     "harness/lib/command-policy.ts",
     "harness/lib/compaction-coordinator.ts",

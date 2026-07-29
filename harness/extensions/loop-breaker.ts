@@ -378,6 +378,9 @@ export default function (pi: ExtensionAPI) {
 		// the episode — grinding is exactly the pattern that resets every few turns.
 		// Uses fpKey so read pagination (offset 0, 2000, 4000…) is not a repeat.
 		sessionRepeats += tallySessionRepeats(sessionSeenCalls, toolCalls);
+		// Published for the session blackboard (globalThis bus — module state is
+		// per-extension under pi's loader, see __pi_lb_outcome_at above).
+		(globalThis as Record<string, unknown>).__pi_lb_state = { sessionRepeats, seen: sessionSeenCalls.size, streak: ep.streak };
 		if (!sessionRepeatFired && sessionRepeats >= SESSION_REPEAT_LIMIT) {
 			sessionRepeatFired = true; // steer once per session, never nag
 			record("loop-breaker", "session-repeat", { repeats: sessionRepeats, turnIndex: event.turnIndex });

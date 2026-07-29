@@ -65,6 +65,7 @@ armed by default.
 | **bash-output-guard** | the same block-not-truncate discipline applied to shell output: withholds an oversized `bash` result and substitutes a bounded diagnostic, since `bash` has no `stat()`-style way to predict its own output size in advance |
 | **context-watcher** | records every compaction with requester attribution (pi / compact-tool / manual) — passive telemetry only; the proactive auto-compact-at-threshold behavior was removed 2026-07-28 after never once completing a compaction (pi-native compaction owns the job) |
 | **context-dedup** | collapses a file already read verbatim this session down to a one-line back-reference in the model's *view only* — the transcript itself is never rewritten |
+| **session-blackboard** | ground-truth working memory derived from harness events: a human-only cockpit artifact (`artifacts/session-cockpit.html` + TUI widget, `/blackboard`), and — dark, `STATE_LENS` (c48) — a non-accumulating state lens injected into the model's per-call view (attempted+failing actions, verify state, open plan, repeats) |
 | **context-brief** | a cached, once-per-session repository inventory appended to the system prompt, so the model spends fewer turns re-discovering what a brief could just tell it |
 | **context-surface** | passively hashes and aggregates the exact provider-bound context; never rewrites messages |
 | **span-tools** | `search_spans` / `read_span` — bounded retrieval over large files |
@@ -154,6 +155,8 @@ tracked in the self-improvement ledger rather than repeated here.
 | `KETCH=off` | remove the default-on web tools for offline/private sessions |
 | `KETCH_BACKEND`, `KETCH_MULTI_BACKENDS` | quick backend (default `ddg`) and broad-search set (default `ddg,exa,keenable`) |
 | `DRIFT_SCANNER=off` | disable post-commit review |
+| `BLACKBOARD=off` | disable the session blackboard entirely (cockpit + lens) |
+| `STATE_LENS=view\|steer\|both`, `STATE_LENS_MAX_CHARS` | dark candidate c48: arm the ground-truth state lens (view = per-call tail block, steer = loop-breaker supplement) |
 
 | Dark candidate env | Effect | Status |
 |---|---|---|

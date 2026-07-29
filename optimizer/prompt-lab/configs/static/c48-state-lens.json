@@ -1,0 +1,18 @@
+{
+  "name": "c48-state-lens",
+  "prediction": "Ground-truth session-state lens (blackboard-derived, harness-observed -- the model never authors its own memory, so no Reflexion-style confabulation). STATE_LENS=view appends one non-accumulating tail block per LLM call via the context view hook: attempted+failing actions with counts, verify state, open plan items, session repeats. Targets the two biggest measured constraints: repeat spirals (43% of wasted calls -- a spiral is the model forgetting what it already tried) and stale tool results (37.5% of context -- the lens replaces re-derivation without growing the transcript). Expect repeat_calls and tool_errors DOWN in tail sessions, tool_result_chars flat-to-down, pass rate neutral. state-lens/view-injected counts the mechanism; a round on fixtures that never fail tools will show zero injections by design (lens skips when the ledger is empty).",
+  "thresholds": {
+    "STATE_LENS": "view"
+  },
+  "exposure": {
+    "mode": "telemetry",
+    "target": [
+      "state-lens/view-injected"
+    ],
+    "diagnostic": [
+      "state-lens/steer-injected",
+      "loop-breaker/session-repeat",
+      "loop-breaker/steer"
+    ]
+  }
+}

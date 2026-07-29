@@ -168,6 +168,9 @@ export default function (pi: ExtensionAPI) {
 		// set by plan-runner when an item's gate exits 0) — consume it so the
 		// wrap-up isn't double-nagged after a gate already ran green.
 		const g = globalThis as Record<string, unknown>;
+		// Published for the session blackboard (globalThis bus; module state is
+		// per-extension under pi's loader).
+		g.__pi_vg_state = { gateCmd, mutated: st.mutated, verifiedOk: st.verifiedOk, fires: st.fires, sessionFires: st.sessionFires };
 		if (g.__pi_gate_green === true) {
 			g.__pi_gate_green = undefined;
 			st.verifiedOk = true;

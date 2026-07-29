@@ -36,6 +36,9 @@ const expectedExtensions = [
   // the final provider-visible system prompt, not an intermediate prompt.
   "harness/extensions/context-brief.ts",
   "harness/extensions/context-dedup.ts",
+  // session-blackboard's context hook must run BEFORE context-surface so
+  // receipts measure the post-lens view (same ordering rule as context-dedup).
+  "harness/extensions/session-blackboard.ts",
   "harness/extensions/context-surface.ts",
   "harness/extensions/bash-output-guard.ts",
 ];
