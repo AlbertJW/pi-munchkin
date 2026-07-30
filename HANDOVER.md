@@ -150,6 +150,12 @@ this reads as a rejection.
 
 ## The route (2026-07-29 — ordered by evidence-per-box-hour)
 
+> **2026-07-30 re-aim:** read `RETROSPECTIVE_2026-07-30.md` before adding any candidate. The
+> standard task set is SATURATED (4B base 93%); pass-rate neutrals there measure the fixtures,
+> not the candidate. Instrument v2 (graded subscores, `audit-sweep` long fixture, calibrated
+> quality judge) and the graded HARNESS-ROI round supersede further candidate rounds on the
+> old set. Candidate admission now requires an observed failure class with a named sensor gap.
+
 **Strategy invariants:** box-hours are the scarce resource — spend them only on
 decision-grade (pre-registered) rounds; fixtures are the instrument factory — the current set
 caps what any candidate can show (35B saturates at 100%, two 4B floors, no spiral inducer, no

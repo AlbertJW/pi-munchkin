@@ -1454,3 +1454,17 @@ capability-scale candidate. c49's first round is exploratory by design: its trig
 serving artifact with unknown base rate; measure before powering. HANDOVER's Track B is now
 an explicit ordered BOX QUEUE with entry/exit criteria and the between-rounds-only rules for
 mirror/schema/config changes — the workflow meshing artifact this week kept needing.
+
+## Standing policy: discovery engine / confirmation engine (2026-07-30)
+
+Adopted after the c25 powered round and recorded in full in `RETROSPECTIVE_2026-07-30.md`:
+the neutrals were structurally guaranteed (saturated task set — 4B base 93%, 35B ~100%;
+binary outcomes on 11-turn-median tasks vs long-multi-turn goals; empty discriminating band).
+Policy from here: **transcript mining is the discovery engine** (recurring ledger pass over
+worst live+gate sessions — the practice that found the grinding bug, the spec-guessing class,
+and the pseudo-tool-call artifact); **the gate is the confirmation engine**, run on fixtures
+that can express an effect, with graded outcomes and pre-registered rules. Candidates enter
+the roster ONLY from an observed failure class with a named sensor gap (c49/c50 template).
+No new ambient/steering candidates. Legacy queue resolves at the 2026-09-03 sweep.
+Instrument v2 (graded subscores, audit-sweep fixture, calibrated quality judge, tool-accuracy
+rate) and the graded HARNESS-ROI round are the active re-aim work.
