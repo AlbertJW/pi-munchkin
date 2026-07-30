@@ -151,3 +151,28 @@ input tokens significantly *worse*, and pass rate down on both. It stays dark.
 
 The rule was written a day before those numbers existed. Written afterwards, 4/7-with-a-regression
 is exactly the shape that becomes "directionally positive, adopt with monitoring".
+
+## 8. A comparability boundary in `tool_errors` (2026-07-30)
+
+`ab-machinery/metrics.py` derives `tool_errors` from `isError` on each toolResult message.
+Until 2026-07-30, `plan_write` and `plan_go` signalled their semantic rejections by *returning*
+`{isError: true}` — and pi only sets that flag when `execute()` **throws** ("returning a value
+never sets the error flag regardless of what properties you include", extensions.md:1959). So
+every plan-tool rejection was recorded as a *successful* tool call.
+
+**Consequence, stated precisely**: pre-2026-07-30 rows **under-count** `tool_errors`, and they
+do so *asymmetrically* — only in arms where plan tools actually run and get rejected, i.e. the
+plan-heavy candidate arms (`FORCE_PLAN_WRITE`, the c25/c31/c37/c38/c39 family and their
+combos). Baseline arms, which rarely call `plan_write` at all, are essentially unaffected. A
+cross-boundary comparison of `tool_errors` between a pre-fix candidate arm and a post-fix one
+would therefore show an increase that is pure instrumentation, not behaviour.
+
+**Rule**: rows remain valid *within* their own round — both arms of any single round were
+measured on one surface, so every published verdict stands. Do not make `tool_errors` claims
+that span the boundary. The boundary is machine-checkable: rows carry
+`harness.surface_sha256`, and the post-fix surface is `642902d5503d…`.
+
+Partial rows from the rounds interrupted by this work (`c48-view-35b`, 36 rows;
+`c50-trap-4b`, 15 rows) were **discarded** rather than kept, because they straddle the change
+— the same never-mix-surfaces rule that voided the partial `c26-4b` round. Both rounds re-run
+from zero on the post-fix surface; their pre-registrations are unchanged and still valid.
