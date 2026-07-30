@@ -556,3 +556,35 @@ by the verify battery). Apply verbatim at round-end, then verify → commit → 
 `config_env` round-trips (STATE_LENS pattern). Then `integrity_selftest` needs no change
 (configs count is not pinned), `npm run verify`, one registration commit, mirror with
 zero-drift, surface hash recomputed by the next round automatically.
+
+---
+
+## Queued, NOT built: `c51-plan-thrash-escalation` (found 2026-07-30, not yet justified)
+
+The adjudicated review established a real coverage gap while checking something else:
+**loop-breaker cannot see plan-tool rejections at all**, and the throw-based fix did not
+change that.
+
+- `loop-breaker.ts:335` filters on `OUTCOME_TOOLS` (`:174` — bash/edit/write/multiedit)
+  **before** reading `r.isError` at `:337`, so `plan_write`/`plan_go` never reach the
+  outcome detector whether they throw or return.
+- Worse, `plan_write` is in `PROGRESS_TOOLS` (`:64`), and `hasProgress` (`:400-404`) is
+  computed from tool **names** harvested off the assistant message (`:325-330`), never from
+  results. A rejected `plan_write` therefore still calls `resetEpisode()` at `:410` — it
+  actively *clears* the thrash counter it should be feeding.
+
+So a model that rewrites an invalid plan ten times in a row reads to the anti-loop
+escalation as ten turns of healthy progress.
+
+**Why this is queued and not fixed.** Widening `OUTCOME_TOOLS` and gating the `:404`
+progress reset on result success is a model-visible change to escalation behaviour, which
+under the standing rule ships dark behind an env flag and a numbered config — never as a
+silent edit, and never mid-round. It also has no measurement behind it yet: nobody has shown
+plan-thrash-by-rejection actually occurs at a rate worth catching. The honest sequence is
+**instrument first** — `plan-runner`'s `write-rejected` observer finally fires as of
+2026-07-30, so the next rounds will produce the first real rejection counts. If those counts
+are ~0, this candidate dies without costing a round; the comment in `plan-runner.ts` already
+records the gap for the next reader either way.
+
+Pre-registration blocker: needs a fixture where repeated plan rejection is the *measured*
+failure, not a hypothesis. `retry-trap` induces spirals on file edits, not on plan writes.
