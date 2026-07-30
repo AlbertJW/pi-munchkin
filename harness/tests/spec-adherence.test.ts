@@ -1,6 +1,20 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { extractSpecPaths, steerMessage } from "../extensions/spec-adherence.ts";
+
+// Hermetic fixture: the extension resolves prompt-named paths against the SESSION cwd,
+// so the tests must own that directory rather than depend on ambient repo files
+// (an earlier version asserted README.md existed in cwd — true in pi_munchkin, false
+// in ~/.pi/agent, so the mirrored copy failed).
+function specWorkdir(): string {
+	const dir = mkdtempSync(join(tmpdir(), "spec-adherence-"));
+	mkdirSync(join(dir, "docs"), { recursive: true });
+	writeFileSync(join(dir, "docs", "naming.md"), "# spec\nAuthoritative mappings.\n");
+	return dir;
+}
 
 // Run: cd ~/.pi/agent && npx -y tsx --test tests/spec-adherence.test.ts
 
@@ -27,6 +41,7 @@ test("extension lifecycle: arm → fail twice → steer once per unread spec, da
 		sendUserMessage: (text: string) => sent.push(text),
 	};
 	const prev = process.env.SPEC_ADHERENCE;
+	let work = "";
 	try {
 		delete process.env.SPEC_ADHERENCE;
 		const off = await import(`../extensions/spec-adherence.ts?off=${Date.now()}-${Math.random()}`);
@@ -36,9 +51,9 @@ test("extension lifecycle: arm → fail twice → steer once per unread spec, da
 		process.env.SPEC_ADHERENCE = "on";
 		const mod = await import(`../extensions/spec-adherence.ts?on=${Date.now()}-${Math.random()}`);
 		mod.default(fakePi as never);
-		// cwd = repo root so a real file (README.md) exists for extraction.
-		await handlers.get("session_start")!({}, { cwd: `${process.cwd()}` });
-		await handlers.get("before_agent_start")!({ prompt: "Fix slugs per README.md, the authoritative spec." });
+		work = specWorkdir();
+		await handlers.get("session_start")!({}, { cwd: work });
+		await handlers.get("before_agent_start")!({ prompt: "Fix slugs per docs/naming.md, the authoritative spec." });
 
 		const failEdit = { toolName: "edit", args: { path: "src/x.ts" }, isError: true };
 		await handlers.get("turn_end")!({ turnIndex: 1 });
@@ -51,12 +66,13 @@ test("extension lifecycle: arm → fail twice → steer once per unread spec, da
 		await handlers.get("tool_execution_end")!(failEdit);
 		await handlers.get("turn_end")!({ turnIndex: 3 });
 		assert.equal(sent.length, 1, "two failing mutations + unread spec → steer");
-		assert.match(sent[0], /README\.md/);
+		assert.match(sent[0], /docs\/naming\.md/);
 
 		await handlers.get("turn_end")!({ turnIndex: 4 });
 		assert.equal(sent.length, 1, "once per path — no repeat");
 	} finally {
 		if (prev === undefined) delete process.env.SPEC_ADHERENCE; else process.env.SPEC_ADHERENCE = prev;
+		if (work) rmSync(work, { recursive: true, force: true });
 	}
 });
 
@@ -69,17 +85,19 @@ test("reading the spec (read tool or bash cat) suppresses the steer", async () =
 	};
 	const prev = process.env.SPEC_ADHERENCE;
 	process.env.SPEC_ADHERENCE = "on";
+	const work = specWorkdir();
 	try {
 		const mod = await import(`../extensions/spec-adherence.ts?read=${Date.now()}-${Math.random()}`);
 		mod.default(fakePi as never);
-		await handlers.get("session_start")!({}, { cwd: `${process.cwd()}` });
-		await handlers.get("before_agent_start")!({ prompt: "Follow README.md exactly." });
-		await handlers.get("tool_execution_end")!({ toolName: "bash", args: { command: "cat README.md | head -50" }, isError: false });
+		await handlers.get("session_start")!({}, { cwd: work });
+		await handlers.get("before_agent_start")!({ prompt: "Follow docs/naming.md exactly." });
+		await handlers.get("tool_execution_end")!({ toolName: "bash", args: { command: "cat docs/naming.md | head -50" }, isError: false });
 		await handlers.get("tool_execution_end")!({ toolName: "edit", args: {}, isError: true });
 		await handlers.get("tool_execution_end")!({ toolName: "edit", args: {}, isError: true });
 		await handlers.get("turn_end")!({ turnIndex: 3 });
 		assert.equal(sent.length, 0, "spec was read via bash cat — no steer");
 	} finally {
 		if (prev === undefined) delete process.env.SPEC_ADHERENCE; else process.env.SPEC_ADHERENCE = prev;
+		rmSync(work, { recursive: true, force: true });
 	}
 });

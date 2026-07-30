@@ -1,0 +1,16 @@
+{
+  "name": "c49-tool-call-rescue",
+  "prediction": "Rescues sessions that die on the malformed pseudo-tool-call-as-text serving artifact (qwen36-35b: 4/6 equil sessions in one measured round; LFM25 collapse class). Expect pass rate UP specifically in sessions where tool-call-rescue/detected fires, effort neutral elsewhere; detected-rate itself is the first clean measurement of the artifact's frequency. steered counts the mechanism.",
+  "thresholds": {
+    "TOOL_CALL_RESCUE": "on"
+  },
+  "exposure": {
+    "mode": "telemetry",
+    "target": [
+      "tool-call-rescue/steered"
+    ],
+    "diagnostic": [
+      "tool-call-rescue/detected"
+    ]
+  }
+}

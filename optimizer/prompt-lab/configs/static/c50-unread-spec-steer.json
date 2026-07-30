@@ -1,0 +1,16 @@
+{
+  "name": "c50-unread-spec-steer",
+  "prediction": "Closes the measured guesses-conventions-instead-of-reading-the-named-spec class (retry-trap: 12/12 sessions on the 4B edited the right file with invented mappings while docs/naming.md sat unread). Inert when the prompt names no on-disk files (zero surface on parens/equil/bigdata). Expect retry-trap pass 0 -> up; armed is the exposure denominator, steered the mechanism.",
+  "thresholds": {
+    "SPEC_ADHERENCE": "on"
+  },
+  "exposure": {
+    "mode": "telemetry",
+    "target": [
+      "spec-adherence/steered"
+    ],
+    "diagnostic": [
+      "spec-adherence/armed"
+    ]
+  }
+}

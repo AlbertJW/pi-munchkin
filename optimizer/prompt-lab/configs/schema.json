@@ -203,6 +203,14 @@
         "PLAN_TOOL_GO": [
           "on",
           "off"
+        ],
+        "TOOL_CALL_RESCUE": [
+          "on",
+          "off"
+        ],
+        "SPEC_ADHERENCE": [
+          "on",
+          "off"
         ]
       }
     },

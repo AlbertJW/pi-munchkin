@@ -74,3 +74,65 @@ rows were then **deleted** rather than resumed: a same-day gate-surface change (
 closing the unhashed-skills provenance gap) means resumed rows would mix surfaces under one
 GEN — the exact confound the c26-4b precedent forbids. The round restarts from zero,
 unchanged in design, when the box frees up. The decision rule above is untouched.
+
+---
+
+# RESULT (2026-07-30): INVALID — exposure floor failed; effect absent at high power
+
+Round completed 120/120 rows, all authoritative, all `complete`, single uniform surface hash
+(`37fad84abd8d…`). Rule applied mechanically, guards first.
+
+## Guards
+
+| guard | threshold | measured | outcome |
+|---|---|---|---|
+| Exposure floor | ≥50% of cand sessions with `subagent-only-block`≥1 **or** `subagent_calls`≥1 | **25/60 = 41.7%** (by task: parens 7/20, equil 7/20, bigdata 11/20) | **FAIL** |
+| Do-no-harm (pass) | cand not significantly worse | base 56/60 (93%) vs cand 57/60 (95%), p=0.781 | pass |
+
+Per the pre-registered rule, a failed exposure floor makes the round **INVALID (mechanism
+unexercised)** — *not* a negative verdict on c25. Mechanism did engage substantially (24
+blocks, 133 delegations, 341 `plan_write` calls, zero `go-blocked`), just below the line I
+committed to before seeing data. The line stands.
+
+## Primary metric, recorded for the record (NOT a verdict — guard failed first)
+
+`effort_report.py c25-4b-powered --only-passing` (base n=56, cand n=57):
+
+| metric | base | cand | change | p |
+|---|---|---|---|---|
+| turns | 18 | 16 | −11% | 0.739 |
+| tool_calls | 17 | 15 | −12% | 0.679 |
+| tool_errors | 4 | 3 | −25% | 0.675 |
+| repeat_calls | 3 | 3 | +0% | 0.912 |
+| **tool_result_chars** (primary) | 5742 | 4963 | **−14%** | **0.665** |
+
+**The shortlist signal did not replicate.** The 2026-07-28 round reported −44% at p=0.030 on
+n=5-vs-7 passing sessions; at n=56-vs-57 the same metric moves −14% at p=0.665. Directionally
+consistent, statistically absent, and an order of magnitude more powered.
+
+## The load-bearing discovery: the "discriminating band" was a sampling artifact
+
+Base pass rate on this task set, same model, same config:
+
+| round | base pass |
+|---|---|
+| `combo3-c25-4b` (2026-07-28, n=9) | 5/9 = **56%** |
+| `combo3-c37-4b` (2026-07-28, n=9) | 9/9 = **100%** |
+| `c25-4b-powered` (n=60) | 56/60 = **93%** |
+
+The 4B's true pass rate on parens/equil/bigdata is ~93%. The 5/9 that made c25 look like it
+was operating in a discriminating band was a low draw, and the 5/9→7/9 "pass improvement" was
+noise around a saturated ceiling. This is `MEASUREMENT_METHODOLOGY_2026-07.md` §3 (variance is
+the binding constraint) demonstrated on our own most-promising candidate — and it is exactly
+why the powered round was worth 11 hours of box time even though it produced no adoption.
+
+## Disposition
+
+- **c25 is NOT adopted and NOT retired.** Its 2026-09-03 win-or-retire clock continues.
+- **Do not re-run this design.** parens/equil/bigdata is saturated for the 4B (93% base
+  ceiling): no pass-rate effect is detectable, and the effort effect is now bounded well below
+  the shortlist estimate. Any future c25 round needs the discriminating-band fixtures
+  (`retry-trap`, `access-log-triage`, `sv-convention-provenance`) or a harder task set.
+- **Methodology note for the ledger**: an exposure floor set from a 9-session pilot is itself
+  a noisy estimate. Future floors should be stated as "mechanism engaged in ≥1 session per
+  task" plus an absolute event count, not a session percentage calibrated on n=9.

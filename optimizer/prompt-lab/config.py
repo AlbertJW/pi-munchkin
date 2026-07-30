@@ -192,6 +192,11 @@ def selftest():
     assert thresholds["STATE_LENS"] == ["off", "view", "steer", "both"]
     assert config_env({"thresholds": {"STATE_LENS": "view", "STATE_LENS_MAX_CHARS": 1200}}) == {
         "STATE_LENS": "view", "STATE_LENS_MAX_CHARS": "1200"}
+    # c49/c50 (2026-07-30): sensor candidates for the two coverage-table gaps.
+    assert thresholds["TOOL_CALL_RESCUE"] == ["on", "off"]
+    assert thresholds["SPEC_ADHERENCE"] == ["on", "off"]
+    assert config_env({"thresholds": {"TOOL_CALL_RESCUE": "on", "SPEC_ADHERENCE": "on"}}) == {
+        "TOOL_CALL_RESCUE": "on", "SPEC_ADHERENCE": "on"}
     for invalid in ({"CONTEXT_WATCHER": "off"}, {"CTX_WATCH_PCT": 70}, {"MICRO_GATE": "maybe"}):
         try:
             config_env({"thresholds": invalid})
