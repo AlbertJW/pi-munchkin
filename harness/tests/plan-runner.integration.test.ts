@@ -60,7 +60,14 @@ test("plan telemetry and traces carry the active model override plus run id", as
 		await callTool(fp, "plan_write", {
 			items: [{ title: "one", status: "pending" }], request: "model override test", summary: "one",
 		}, cwd);
-		await fire(fp, "tool_result", { toolName: "plan_write", isError: true, content: [{ type: "text", text: "raw invalid args" }] }, ctx);
+		// A REAL rejection, not a hand-built event: the previous version fabricated a
+		// tool_result that pi never emits (validation failures produce no tool_result
+		// at all), so it proved the observer fires on an impossible input. Driving it
+		// through the actual throwing path is what the observer really covers.
+		await expectToolError(fp, "plan_write", {
+			items: [{ title: "x", status: "pending", depends_on: ["nonexistent"] }],
+			request: "model override test", summary: "one",
+		}, cwd, /plan_write rejected/);
 		const rows = readFileSync(telemetry, "utf8").trim().split("\n").map((line) => JSON.parse(line));
 		const planRows = rows.filter((row) => row.ext === "plan-runner");
 		assert.ok(planRows.length > 0);

@@ -79,7 +79,10 @@ test("context extension observes without replacing or mutating the original mess
 			model: { provider: "test-provider", id: "test-model" },
 			getContextUsage: () => ({ tokens: 10, contextWindow: 100, percent: 10 }),
 		});
-		assert.equal(result, undefined);
+		// pi's emitContext ALWAYS returns the (cloned) array, even when every handler
+		// is observer-only — it never returns undefined (runner.js:771).
+		assert.ok(Array.isArray(result), "context always yields an array");
+		assert.deepEqual(result, messages, "an observer must not alter the view");
 		assert.deepEqual(messages, before);
 		const row = JSON.parse(readFileSync(file, "utf8").trim());
 		assert.equal(row.ext, "context-surface");

@@ -1595,3 +1595,40 @@ the same reason — it now imports the extension rather than only the pure lib. 
 authoritative suite is `npm run verify` in pi_munchkin (310 pass, typecheck clean); the mirror
 is a deployment target, not a test runner.** Same class as the documented
 `vendor/pi-subagent/index.ts` bare-node import gotcha.
+
+### The double was itself wrong in seven ways — adversarial review, 2026-07-30
+
+The conformance double was built from a single contract-extraction pass. A read-only
+adversarial review (four independent lenses against pi's shipped `runner.js`, not the docs)
+refuted **seven** of its claims. Every one was re-verified against source here before acting;
+all seven held. Corrections:
+
+| # | what the double claimed | what runner.js actually does |
+|---|---|---|
+| 1 | `before_provider_request` merges `content/details/isError/usage` | `:786-789` the handler's **entire return replaces the payload** — the double returned `{}` for any real payload handler |
+| 2 | `tool_call` and `session_before_*` share one strategy | mirror images: `tool_call` (`:707`) short-circuits on **`block` only** and does **not** catch handler throws; `session_before_*` (`:586-591`) short-circuits on **`cancel` only** and **does** catch them |
+| 3 | `context` returns `{messages}`, or `undefined` when untouched | `:771` returns the **bare array, always** |
+| 4 | `message_end` returns `{message}` | `:644` returns the **bare message** |
+| 5 | `tool_result` patch = only fields a handler set | `:688-696` returns **all four fields** when modified, carrying untouched ones through (my earlier "fix" for teach-hints was itself wrong) |
+| 6 | `project_trust` is first-truthy-wins | `:71-73` a truthy `{trusted:"undecided"}` is **skipped** — first *decisive* wins |
+| 7 | `input` and `resources_discover` covered | `input` was **absent from the table** (silently "discard", though pi chains it with a `handled` short-circuit); `resources_discover` was labelled accumulate but the branch only handled `message`/`systemPrompt`, so it always returned nothing |
+
+Plus a gap the review implied and testing confirmed: **`callTool` never fired the `tool_result`
+chain**, though pi runs it after `execute()` settles on *both* the return and throw paths. That
+is why `plan-runner`'s `write-rejected` observer was unreachable through a normal tool call —
+and why its test had been hand-firing an event pi may never emit. Both fixed; the fabricated
+event is replaced by driving the real throwing path.
+
+Also corrected from the same review: the `write-rejected` comment I wrote that morning claimed
+the observer catches validator rejections **and** thrown ones. It cannot — pi emits no
+`tool_result` at all for validation failures, blocked calls, or unknown tools. The comment now
+says so, and explains why the counter read zero for its entire life.
+
+Lesson recorded plainly: **a conformance double is only as good as its last verification
+against source.** The first version was derived from one extraction pass and was wrong seven
+times; it took an adversarial pass reading the shipped runner to find that. Re-derive on every
+pi upgrade, and treat the double's own test suite (now 16 tests) as the tripwire.
+
+Open, not yet addressed: `drift-scanner` awaits a 90-second LLM review inside a `turn_end`
+handler, and pi awaits extension handlers serially inside the agent loop — so every reviewable
+commit can freeze the session for up to 90s. Confirmed blocking; queued as a defect.

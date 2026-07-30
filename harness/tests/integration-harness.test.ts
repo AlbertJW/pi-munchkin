@@ -95,7 +95,8 @@ test("context CHAINS and the caller's array is never mutated", async () => {
 	fp.pi.on("context", async (e: any) => ({ messages: [...e.messages, { role: "user", content: "two" }] }));
 	const original = [{ role: "user", content: "orig" }];
 	const out: any = await fire(fp, "context", { messages: original });
-	assert.equal(out.messages.length, 3, "both context handlers compose");
+	assert.ok(Array.isArray(out), "context returns the BARE array, not {messages} (runner.js:771)");
+	assert.equal(out.length, 3, "both context handlers compose");
 	assert.equal(original.length, 1, "input is structuredCloned (RUNNER:746)");
 });
 
@@ -143,4 +144,28 @@ test("resetPiGlobals clears the cross-extension bus", () => {
 	(globalThis as Record<string, unknown>).__pi_test_marker = 1;
 	resetPiGlobals();
 	assert.equal((globalThis as Record<string, unknown>).__pi_test_marker, undefined);
+});
+
+test("callTool fires the tool_result chain on BOTH the return and throw paths", async () => {
+	// pi runs finalizeExecutedToolCall after execute() settles either way, so a
+	// tool_result observer must be reachable through a normal tool call. Omitting
+	// this made plan-runner's write-rejected observer unreachable except by
+	// hand-firing an event pi may never emit.
+	const seen: Array<{ isError: boolean; name: string }> = [];
+	const fp = makeFakePi();
+	fp.pi.registerTool({ name: "ok", execute: async () => ({ content: [{ type: "text", text: "fine" }] }) } as never);
+	fp.pi.registerTool({ name: "bad", execute: async () => { throw new Error("nope"); } } as never);
+	fp.pi.on("tool_result", async (e: any) => { seen.push({ isError: e.isError, name: e.toolName }); });
+
+	await callTool(fp, "ok", {}, "/tmp");
+	await callTool(fp, "bad", {}, "/tmp");
+	assert.deepEqual(seen, [{ isError: false, name: "ok" }, { isError: true, name: "bad" }]);
+});
+
+test("a tool_result handler's patch reaches the caller of callTool", async () => {
+	const fp = makeFakePi();
+	fp.pi.registerTool({ name: "t", execute: async () => ({ content: [{ type: "text", text: "raw" }] }) } as never);
+	fp.pi.on("tool_result", async (e: any) => ({ content: [...e.content, { type: "text", text: "appended" }] }));
+	const r = await callTool(fp, "t", {}, "/tmp");
+	assert.deepEqual(r.content.map((c: any) => c.text), ["raw", "appended"]);
 });

@@ -1248,10 +1248,14 @@ export default function (pi: ExtensionAPI) {
 		);
 	}
 
-	// Fires for BOTH rejection paths: pi's argument validator rejecting a plan_write
-	// before execute() runs, and execute() throwing via rejectPlanTool (since
-	// 2026-07-30 — before that, semantic rejections silently never reached here).
-	// Observed without retaining the validator's raw message or malformed payload.
+	// Fires for exactly ONE rejection path: execute() throwing via rejectPlanTool.
+	// It does NOT — and cannot — see argument-validator rejections, despite what an
+	// earlier version of this comment claimed: pi emits no tool_result at all for a
+	// call that fails validation, is blocked, or names an unknown tool (agent-loop
+	// routes those to an "immediate" preparation whose only events are
+	// tool_execution_start/end). That is why this observer, written for the
+	// validator case, recorded nothing until rejections started throwing on
+	// 2026-07-30. Observed without retaining the raw message or malformed payload.
 	pi.on("tool_result", async (event, ctx) => {
 		if (event.toolName !== "plan_write" || !event.isError) return;
 		rememberModel(ctx);

@@ -61,7 +61,10 @@ test("integration: dark by default; on, appends one text block and preserves isE
 		assert.ok(result?.content, "hint appended");
 		assert.equal(result.content.length, 2, "original error block preserved, one hint added");
 		assert.match(result.content[1].text, /is not on PATH/);
-		assert.equal(result.isError, undefined, "isError untouched (stays true on the event)");
+		// pi returns all four patch fields when anything was modified, carrying the
+		// untouched ones through (runner.js:688-696) — so isError arrives as the
+		// event's own value. teach-hints must not CHANGE it, which is what this pins.
+		assert.equal(result.isError, true, "isError carried through unchanged");
 
 		process.env.TEACH_HINT_MISSING_CMD = "off";
 		const killFp = makeFakePi();

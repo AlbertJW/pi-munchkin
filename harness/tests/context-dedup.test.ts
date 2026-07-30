@@ -88,7 +88,11 @@ test("integration: READ_DEDUP=on transforms the context view; off leaves it alon
 		const offFp = makeFakePi();
 		(await import(`../extensions/context-dedup.ts?off=${Date.now()}-${Math.random()}`)).default(offFp.pi as any);
 		const messages = [...readPair("r1", "a.ts", fileText), ...readPair("r2", "a.ts", fileText)];
-		assert.equal(await fire(offFp, "context", { messages }, {}), undefined, "dark by default");
+		// Dark means the VIEW IS UNCHANGED, not that pi returns nothing: emitContext
+		// always yields the (cloned) array regardless of what handlers do. Asserting
+		// `undefined` here pinned the old double's shape, not the extension's darkness.
+		assert.equal(offFp.handlers.has("context"), false, "dark by default — no handler registered");
+		assert.deepEqual(await fire(offFp, "context", { messages }, {}), messages, "view unchanged when dark");
 
 		// on: returns a transformed view, original array untouched
 		process.env.READ_DEDUP = "on";
@@ -96,9 +100,10 @@ test("integration: READ_DEDUP=on transforms the context view; off leaves it alon
 		(await import(`../extensions/context-dedup.ts?on=${Date.now()}-${Math.random()}`)).default(onFp.pi as any);
 		const before = structuredClone(messages);
 		const result = await fire(onFp, "context", { messages }, {});
-		assert.ok(result?.messages, "transformed view returned");
+		// pi's emitContext returns the BARE array (runner.js:771), not {messages}.
+		assert.ok(Array.isArray(result), "transformed view returned as a bare array");
 		assert.deepEqual(messages, before, "original array untouched");
-		assert.match(JSON.stringify(result.messages), /identical to the result at message/);
+		assert.match(JSON.stringify(result), /identical to the result at message/);
 
 		// nudge: fires over threshold, respects cooldown
 		process.env.CTX_REDUNDANCY_NUDGE = "on";
