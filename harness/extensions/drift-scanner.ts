@@ -38,6 +38,9 @@ export default function (pi: ExtensionAPI) {
 	// that a pre-commit hook aborted leaves HEAD unmoved — the freshness window
 	// alone would re-review the previous turn's commit (audit 2026-07-13).
 	const handledHead = new Map<string, string>();
+	// One review at a time per cwd. The review is now detached (below), so two
+	// commits in quick succession could otherwise overlap and double-inject.
+	const reviewing = new Set<string>();
 
 	pi.on("turn_end", async (event, ctx) => {
 		const msg = event.message;
@@ -79,6 +82,18 @@ export default function (pi: ExtensionAPI) {
 			const { text, truncated } = buildTruncatedDiff(diff);
 			const body = (truncated ? `[diff truncated to first ${MAX_DIFF} chars]\n\n` : "") + text;
 
+			// DETACHED from here on. pi awaits extension handlers serially inside the
+			// agent loop, so awaiting a 90-second local-model review here froze the
+			// whole session on every reviewable commit — no streaming, no tool calls,
+			// nothing, for up to a minute and a half (confirmed 2026-07-30). The review
+			// is advisory and non-blocking by design; its RESULT arrives as a followUp
+			// message whenever it is ready, which is exactly the semantics we want.
+			// Everything above stays awaited: the guards are cheap and handledHead must
+			// be set before we return, or the next turn re-reviews the same commit.
+			if (reviewing.has(ctx.cwd)) return; // a review for this cwd is already running
+			reviewing.add(ctx.cwd);
+			void (async () => {
+			try {
 			const auth = await ctx.modelRegistry.getApiKeyAndHeaders(model);
 			if (!auth.ok) {
 				record("drift-scanner", "review-skipped", { why: "auth" });
@@ -93,7 +108,12 @@ export default function (pi: ExtensionAPI) {
 				// thinking block (which extractFindings drops) instead of leaking it into
 				// the answer — without it, a small local reasoning model dumps its whole
 				// deliberation into the text channel. Verified: still catches real drift.
-				{ timeoutMs: TIMEOUT_MS, maxRetries: 0, reasoning: "minimal", signal: ctx.signal, apiKey: auth.apiKey, headers: auth.headers },
+				//
+				// ctx.signal is deliberately NOT passed now that this is detached: the
+				// signal is scoped to the agent run that triggered it, so a review still
+				// in flight when the run ends would be aborted precisely when it was
+				// about to deliver. timeoutMs remains the bound.
+				{ timeoutMs: TIMEOUT_MS, maxRetries: 0, reasoning: "minimal", apiKey: auth.apiKey, headers: auth.headers },
 			);
 			const findings = extractFindings(review.content as Array<{ type: string; text?: string }>, review.stopReason);
 			if (!findings) {
@@ -115,6 +135,14 @@ export default function (pi: ExtensionAPI) {
 					clamped,
 				{ deliverAs: "followUp" },
 			);
+			} catch (e) {
+				// Detached: nothing upstream can catch this, and a stale pi/ctx after
+				// session replacement throws here. Fail open silently, as before.
+				record("drift-scanner", "review-error", { error: String((e as Error)?.message ?? e).slice(0, 150) });
+			} finally {
+				reviewing.delete(ctx.cwd);
+			}
+			})();
 		} catch (e) {
 			record("drift-scanner", "review-error", { error: String((e as Error)?.message ?? e).slice(0, 150) });
 			return; // git error / endpoint down / timeout / aborted → fail open silently

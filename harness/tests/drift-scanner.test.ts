@@ -44,3 +44,52 @@ test("extractFindings: only posts complete, non-CLEAN reviews", () => {
 	// "clean" as a substring of real findings still posts (sentinel must be the whole reply).
 	assert.equal(extractFindings(txt("- a.js: cleanup() is now orphaned"), "stop"), "- a.js: cleanup() is now orphaned");
 });
+
+test("the review is DETACHED: turn_end returns without waiting for the model", async () => {
+	// pi awaits extension handlers serially inside the agent loop, so awaiting a
+	// 90-second local-model review here froze the entire session on every
+	// reviewable commit. turn_end must return promptly and deliver the advisory
+	// later, as a followUp.
+	const { execSync } = await import("node:child_process");
+	const { mkdtempSync } = await import("node:fs");
+	const { tmpdir } = await import("node:os");
+	const { join } = await import("node:path");
+	const { makeFakePi, fire } = await import("./integration-harness.ts");
+
+	const cwd = mkdtempSync(join(tmpdir(), "drift-detach-"));
+	execSync("git init -q . && git config user.email t@t && git config user.name t", { cwd, shell: "/bin/bash" });
+	execSync("echo hello > a.txt && git add -A && git commit -q -m 'feat: add a'", { cwd, shell: "/bin/bash" });
+
+	// A model call that never settles within the test's lifetime. If turn_end awaits
+	// it, the await below hangs and the test times out — which is the bug.
+	let modelCallStarted = false;
+	const neverSettles = new Promise(() => { modelCallStarted = true; });
+
+	const fp = makeFakePi();
+	const mod = await import(`../extensions/drift-scanner.ts?detach=${Date.now()}-${Math.random()}`);
+	mod.default(fp.pi as never);
+
+	const ctx = {
+		cwd,
+		model: { provider: "test", id: "test-model" },
+		modelRegistry: {
+			getApiKeyAndHeaders: async () => { modelCallStarted = true; await neverSettles; return { ok: true }; },
+		},
+		signal: undefined,
+	};
+	const event = {
+		turnIndex: 1,
+		message: {
+			role: "assistant",
+			content: [{ type: "toolCall", id: "t1", name: "bash", arguments: { command: "git commit -m 'feat: add a'" } }],
+		},
+	};
+
+	const started = Date.now();
+	await fire(fp, "turn_end", event, ctx);
+	const elapsed = Date.now() - started;
+
+	assert.ok(elapsed < 5000, `turn_end must not block on the review (took ${elapsed}ms)`);
+	assert.equal(modelCallStarted, true, "the review still starts — it is detached, not dropped");
+	assert.equal(fp.sent.length, 0, "nothing delivered yet; the advisory arrives later as followUp");
+});

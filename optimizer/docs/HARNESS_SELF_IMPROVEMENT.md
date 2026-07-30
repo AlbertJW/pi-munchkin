@@ -1632,3 +1632,26 @@ pi upgrade, and treat the double's own test suite (now 16 tests) as the tripwire
 Open, not yet addressed: `drift-scanner` awaits a 90-second LLM review inside a `turn_end`
 handler, and pi awaits extension handlers serially inside the agent loop — so every reviewable
 commit can freeze the session for up to 90s. Confirmed blocking; queued as a defect.
+
+### drift-scanner froze live sessions for up to 90 s per commit (fixed 2026-07-30)
+
+Found by the adversarial review, confirmed here. `drift-scanner` is **live by default**, and
+its `turn_end` handler **awaited** a local-model review bounded at `TIMEOUT_MS = 90_000`. pi
+awaits extension handlers serially inside the agent loop, so every turn containing a reviewable
+`git commit` stopped the entire session — no streaming, no tool calls, nothing — until the
+review returned or timed out. On the 35B daily driver that is routinely tens of seconds, and
+the worst case is ninety.
+
+The review is advisory and non-blocking *by intent*; only its implementation was blocking.
+Everything cheap stays awaited (the commit detection, the two 10 s git execs, and crucially
+`handledHead.set` — which must land before returning or the next turn re-reviews the same
+commit). From the auth call onward it is detached, with a per-cwd in-flight guard so two quick
+commits cannot overlap and double-inject. `ctx.signal` is deliberately no longer passed: it is
+scoped to the agent run that triggered the review, so a detached review still in flight when
+the run ends would be aborted exactly when it was about to deliver; `timeoutMs` remains the
+bound. Delivery is unchanged (`followUp`), so the advisory simply arrives when it is ready.
+
+The regression test discriminates: with a model call that never settles, the blocking form
+**hangs the test runner** (`timeout` exit 124, test cancelled) while the detached form returns
+in ~0.6 s and confirms the review still started. First attempt at that test passed under both
+forms — a tautology — because `$?` captured grep's exit status rather than the timeout's.
