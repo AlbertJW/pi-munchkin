@@ -95,7 +95,14 @@ function shellCommandHeads(cmd: string): string[] {
 	}
 	if (quote || escaped || /`|\$\(/.test(cmd)) return ["<dynamic-shell>"];
 	const heads: string[] = [];
-	for (const raw of plain.split(/(?:&&|\|\||[;|\n])/)) {
+	// Bare `&` is in CMD_POS (line 26) but was missing from this split class, so the
+	// fail-closed head extraction disagreed with the regexes it exists to back up:
+	// `ls & ./evil.sh` yielded heads ["ls"], a READ_ONLY head, and classified
+	// read_only/mutates=false while ./evil.sh ran. Consumers act on that verdict —
+	// plan-mode block (plan-runner:1349), verify-gate arming (verify-gate:190) and
+	// loop-breaker's progress signal (loop-breaker:403) — so a laundered mutation
+	// disarms all three. `&&` is listed first, so compounds still split correctly.
+	for (const raw of plain.split(/(?:&&|\|\||[;&|\n])/)) {
 		let words = raw.trim().replace(/^\(+/, "").split(/\s+/).filter(Boolean);
 		while (words.length && (/^[A-Za-z_]\w*=/.test(words[0]) || SHELL_CONTROL_HEADS.has(words[0]))) words.shift();
 		while (words.length && ["command", "env", "exec", "nohup", "sudo", "time", "timeout", "xargs"].includes(words[0])) {

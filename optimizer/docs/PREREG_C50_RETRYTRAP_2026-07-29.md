@@ -93,9 +93,24 @@ the trap working as designed — but only when the spec is readable.
 
 - c50 `spec-adherence` returns to **queued, unmeasured**. Its mechanism is untested, neither
   supported nor refuted. Do not count this round against it.
-- Re-run after the materialization fix lands, on the same pre-registered thresholds. No
-  changes to the candidate or the prereg are warranted by this round, because it produced no
-  information about either.
+- Re-run after the materialization fix lands, on the same pre-registered thresholds.
+
+> **AMENDED 2026-07-30 — this disposition was wrong and would have wasted the re-run.**
+> It originally said *"No changes to the candidate or the prereg are warranted by this round"*,
+> and the diagnosis above certified that *"the extension loads in the live agent and registers
+> all four handlers."* **Registering a handler is not the same as the handler working.** A deep
+> QA then found that `spec-adherence.ts` read `event.args` on `tool_execution_end`, and pi puts
+> `args` on `tool_execution_start`/`_update` but **not** on `_end` — it builds each event
+> explicitly (`agent-session.js:487-514`). Read-detection was therefore **dead code from the
+> start**: `readSpecs` could only ever be filled by the post-steer self-mark, so the steer
+> degraded into an unconditional "you have not read this" nag after two failing mutations —
+> false whenever the model *had* read the spec, and it would still have stamped
+> `spec-adherence/steered`, making the round read as properly exposed while measuring an
+> entirely different treatment. Fixed the same day (carry args from `_start` keyed by
+> `toolCallId`); both widening `as` casts deleted, since the cast is what hid this from `tsc`.
+> **Precondition for the re-run: that fix must be mirrored to `~/.pi/agent` and present in the
+> surface hash.** Verify `spec-adherence/armed > 0` on the candidate arm before reading any
+> delta — an unexposed round is still not a result.
 - Check the base arm's pass rate on the re-run **before** reading any delta: if base is still
   ~0/9 with the spec present, the fixture is too hard for the 4B and the round is powerless for
   a different reason (see `check-detection-floor` discipline).

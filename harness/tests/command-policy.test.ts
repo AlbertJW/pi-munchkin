@@ -48,6 +48,21 @@ test("unknown shell executables fail closed instead of bypassing mutation guards
 	}
 });
 
+test("bare & is a segment separator, not part of a command word", () => {
+	// CMD_POS treated `&` as a command position but the fail-closed head split did
+	// not, so the head list stopped at the read-only `ls` and an unknown binary rode
+	// in behind it — classified read_only/mutates=false while it ran. That verdict
+	// arms verify-gate, plan-mode's block and loop-breaker's progress signal.
+	const laundered = classifyBashCommand("ls & ./evil.sh");
+	assert.equal(laundered.mutates, true, "unknown binary after bare & must fail closed");
+	assert.notEqual(laundered.risk, "read_only");
+	// Backgrounding a genuinely read-only command stays read-only.
+	assert.equal(classifyBashCommand("rg TODO src & rg FIXME src").risk, "read_only");
+	// && and || compounds must still split as before (& is listed after &&).
+	assert.equal(classifyBashCommand("rg TODO src && rg FIXME src").risk, "read_only");
+	assert.equal(classifyBashCommand("rg TODO src && ./evil.sh").mutates, true);
+});
+
 test("classifies normal file mutations", () => {
 	assert.equal(classifyBashCommand("sed -i '' s/a/b/ file.txt").risk, "mutating");
 	assert.equal(classifyBashCommand("python3 -c \"open('x','w').write('y')\"").mutates, true);

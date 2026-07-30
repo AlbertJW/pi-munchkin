@@ -4,7 +4,7 @@ import { fire, makeFakePi } from "./integration-harness.ts";
 import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { extractSpecPaths, steerMessage } from "../extensions/spec-adherence.ts";
+import { extractSpecPaths, pathMatchesSpec, steerMessage } from "../extensions/spec-adherence.ts";
 
 // Hermetic fixture: the extension resolves prompt-named paths against the SESSION cwd,
 // so the tests must own that directory rather than depend on ambient repo files
@@ -17,6 +17,20 @@ function specWorkdir(): string {
 	return dir;
 }
 
+// pi carries `args` on tool_execution_START and _UPDATE but NOT on _END — the
+// emitter builds each event explicitly (agent-session.js:487-514). Tests MUST go
+// through this pair. The previous version hand-fired a single _end carrying
+// `args`, a shape pi never produces, and that fiction is what certified the
+// extension's read-detection as working while it was dead code for a whole
+// candidate cycle. Never hand-build an event shape without checking the emitter.
+async function toolCall(
+	fp: ReturnType<typeof makeFakePi>, toolCallId: string, toolName: string,
+	args: Record<string, unknown>, isError: boolean,
+): Promise<void> {
+	await fire(fp, "tool_execution_start", { toolCallId, toolName, args });
+	await fire(fp, "tool_execution_end", { toolCallId, toolName, result: {}, isError });
+}
+
 // Run: cd ~/.pi/agent && npx -y tsx --test tests/spec-adherence.test.ts
 
 test("extracts only prompt-named paths that exist under cwd", () => {
@@ -26,6 +40,16 @@ test("extracts only prompt-named paths that exist under cwd", () => {
 	assert.deepEqual(extractSpecPaths(prompt, "/w", exists), ["docs/naming.md", "data/charmap.json"]);
 	assert.deepEqual(extractSpecPaths("no paths here", "/w", exists), []);
 	assert.deepEqual(extractSpecPaths("./docs/naming.md twice, docs/naming.md again", "/w", exists), ["docs/naming.md"]);
+});
+
+test("a read only counts on a PATH BOUNDARY, not a bare suffix", () => {
+	// `.endsWith(spec)` alone marked docs/other-naming.md as satisfying naming.md,
+	// which would silently suppress a steer the model had earned.
+	assert.equal(pathMatchesSpec("docs/naming.md", "docs/naming.md"), true);
+	assert.equal(pathMatchesSpec("/abs/root/docs/naming.md", "docs/naming.md"), true);
+	assert.equal(pathMatchesSpec("naming.md", "naming.md"), true);
+	assert.equal(pathMatchesSpec("docs/other-naming.md", "naming.md"), false, "suffix without a separator is a different file");
+	assert.equal(pathMatchesSpec("docs/renaming.md", "naming.md"), false);
 });
 
 test("steer message names the path and the corrective action", () => {
@@ -52,15 +76,14 @@ test("extension lifecycle: arm → fail twice → steer once per unread spec, da
 		await fire(fp, "session_start", {}, { cwd: work });
 		await fire(fp, "before_agent_start", { prompt: "Fix slugs per docs/naming.md, the authoritative spec." });
 
-		const failEdit = { toolName: "edit", args: { path: "src/x.ts" }, isError: true };
 		await fire(fp, "turn_end", { turnIndex: 1 });
 		assert.equal(sent.length, 0, "no steer before failures accumulate");
 
-		await fire(fp, "tool_execution_end", failEdit);
+		await toolCall(fp, "tc1", "edit", { path: "src/x.ts" }, true);
 		await fire(fp, "turn_end", { turnIndex: 2 });
 		assert.equal(sent.length, 0, "one failure is not enough");
 
-		await fire(fp, "tool_execution_end", failEdit);
+		await toolCall(fp, "tc2", "edit", { path: "src/x.ts" }, true);
 		await fire(fp, "turn_end", { turnIndex: 3 });
 		assert.equal(sent.length, 1, "two failing mutations + unread spec → steer");
 		assert.match(sent[0], /docs\/naming\.md/);
@@ -86,9 +109,9 @@ test("reading the spec (read tool or bash cat) suppresses the steer", async () =
 		mod.default(fp.pi as never);
 		await fire(fp, "session_start", {}, { cwd: work });
 		await fire(fp, "before_agent_start", { prompt: "Follow docs/naming.md exactly." });
-		await fire(fp, "tool_execution_end", { toolName: "bash", args: { command: "cat docs/naming.md | head -50" }, isError: false });
-		await fire(fp, "tool_execution_end", { toolName: "edit", args: {}, isError: true });
-		await fire(fp, "tool_execution_end", { toolName: "edit", args: {}, isError: true });
+		await toolCall(fp, "tc1", "bash", { command: "cat docs/naming.md | head -50" }, false);
+		await toolCall(fp, "tc2", "edit", {}, true);
+		await toolCall(fp, "tc3", "edit", {}, true);
 		await fire(fp, "turn_end", { turnIndex: 3 });
 		assert.equal(sent.length, 0, "spec was read via bash cat — no steer");
 	} finally {

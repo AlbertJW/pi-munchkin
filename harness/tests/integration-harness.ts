@@ -31,6 +31,16 @@
 //     queue and no drain-at-next-prompt (SESSION:877-880), so "queued-next-turn"
 //     is a verdict label, not a modelled behaviour — nothing here proves the
 //     message is ever delivered.
+//  5. fire() does NOT project the event to its per-type shape. Whatever object a
+//     test hands in reaches the handler verbatim, so a test can invent a field pi
+//     never emits and the double will happily deliver it. This is how
+//     spec-adherence's read-detection was certified working while dead: the tests
+//     hand-fired `tool_execution_end` carrying `args`, but pi builds that event
+//     explicitly (SESSION:487-514) and copies `args` onto _start and _update ONLY.
+//     tsc is the real defence for this class (`on()` is typed per event, and
+//     `npm run typecheck` covers extensions) — it was defeated by an `as` cast,
+//     not by the double. So: never hand-build an event shape without reading the
+//     emitter, and treat a widening cast on an event as a defect in review.
 import { execFile } from "node:child_process";
 
 export type FakePi = ReturnType<typeof makeFakePi>;

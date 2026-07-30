@@ -34,11 +34,16 @@ export default function (pi: ExtensionAPI): void {
 
 	if (NUDGE) {
 		let lastNudgeTurn = -Infinity;
-		// turn indices restart per session — an un-reset cooldown from a late
-		// turn would wrongly suppress the next session's first nudge.
-		pi.on("session_start", async () => {
-			lastNudgeTurn = -Infinity;
-		});
+		// turnIndex restarts at 0 on every AGENT RUN, not just every session
+		// (agent-session.js:428-429 zeroes _turnIndex on agent_start, and agent-loop.js
+		// emits agent_start for continuations too — retry, overflow-compaction, a
+		// message queued by an agent_end handler). A mid-session restart makes
+		// `event.turnIndex - lastNudgeTurn` negative, which is always < the cooldown,
+		// latching this gate shut for the rest of the session. Reset on agent_start,
+		// not only session_start.
+		const resetCooldown = async () => { lastNudgeTurn = -Infinity; };
+		pi.on("session_start", resetCooldown);
+		pi.on("agent_start", resetCooldown);
 		pi.on("turn_end", async (event) => {
 			const share = (globalThis as Record<string, unknown>).__pi_ctx_redundancy_pct;
 			if (typeof share !== "number" || share < NUDGE_PCT) return;

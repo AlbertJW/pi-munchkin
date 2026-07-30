@@ -294,6 +294,21 @@ export default function (pi: ExtensionAPI) {
 	pi.on("session_start", async () => {
 		resetEpisode();
 		resetOutcomes();
+		// SESSION-scoped counters live at module scope, and pi's loader returns the
+		// CACHED factory across session replacement (loader.js:318-322 — the cache is
+		// only cleared on cwd change), so "module scope" really means "until the cwd
+		// changes", not "until the session ends". Without these resets a /new, /fork
+		// or same-cwd /resume inherited the previous session's repeat tallies, and
+		// sessionRepeatFired — assigned once and never cleared — permanently disabled
+		// the LB_SESSION_REPEAT steer for the rest of the process. The stale number is
+		// model-visible: blackboard.ts:127-128 copies __pi_lb_state into the c48 lens
+		// and renders it as "repeats this session: N", immediately after
+		// session-blackboard deliberately cleared the board to prevent exactly that.
+		// (No gate impact: real_gate.sh runs one session per pi process.)
+		sessionSeenCalls.clear();
+		sessionRepeats = 0;
+		sessionRepeatFired = false;
+		delete (globalThis as Record<string, unknown>).__pi_lb_state;
 	});
 
 	// Compaction erases file contents from the window: re-reading them afterward

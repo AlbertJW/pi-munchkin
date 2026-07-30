@@ -971,8 +971,13 @@ const planWrite = defineTool({
 		// On the TRANSITION to completed: the model's analyses/findings are scattered
 		// between tool calls across the run — demand one self-contained final report
 		// (user report 2026-07-17: results left interspersed with tool calls).
+		// ...but NOT when this same call released an unfinished item. yieldedOpen is
+		// dropped from `items` above, so derivedStatus reads "completed" over the
+		// SHRUNKEN list and the steer would open with "All items are done." while an
+		// item was just handed back unfinished. The other mutually-exclusive steers
+		// are de-conflicted explicitly (lines 886, 942); this one was not.
 		let finalReport = "";
-		if (newlyDone > 0 && !prevCompleted && derivedStatus(state) === "completed") {
+		if (newlyDone > 0 && !prevCompleted && integrity.yieldedOpen.length === 0 && derivedStatus(state) === "completed") {
 			finalReport = "\n" + steerText(
 				"PLAN_FINAL_REPORT_MSG",
 				"All items are done. In your reply NOW, restate the complete results of this plan — every finding, analysis, and deliverable in full, as one self-contained report. The user does not re-read earlier messages or tool output; anything not in this reply is lost.",

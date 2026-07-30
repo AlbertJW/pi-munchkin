@@ -86,6 +86,13 @@ export default function (pi: ExtensionAPI): void {
 		} catch { /* cockpit must never break a session */ }
 	}
 
+	// turnIndex restarts at 0 on every AGENT RUN, not only per session
+	// (agent-session.js:428-429 + agent-loop.js:49/67 — retries and continuations
+	// each emit agent_start). Without this, `state.turn - lastLensSteerTurn` goes
+	// negative after a mid-session restart and stays below STEER_MIN_TURN_GAP
+	// forever, silently latching the lens steer off for the rest of the session.
+	pi.on("agent_start", async () => { lastLensSteerTurn = -Infinity; });
+
 	pi.on("session_start", async (event, ctx) => {
 		cwd = ctx.cwd ?? process.cwd();
 		pendingArgs.clear();

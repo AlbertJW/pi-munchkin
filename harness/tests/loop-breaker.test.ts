@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { thresh, resolveStopMode, fpKey, decideTier, tallySessionRepeats, type Thresholds } from "../extensions/loop-breaker.ts";
+import { fire, makeFakePi } from "./integration-harness.ts";
 
 const TH: Thresholds = { t1: 2, t2: 3, t3: 5, streakSoft: 8, streakHard: 20 }; // local defaults
 
@@ -106,4 +107,50 @@ test("session repeats do NOT count read pagination or genuinely new work", () =>
 	assert.equal(repeats, 0, "paginating a large file and doing new work is not grinding");
 	repeats += tallySessionRepeats(seen, [{ name: "read", args: { path: "big.ts", offset: 2000 } }]);
 	assert.equal(repeats, 1, "a verbatim re-read IS a repeat");
+});
+
+test("session_start clears SESSION-cumulative state (no bleed across /new, /fork, /resume)", async () => {
+	// sessionSeenCalls/sessionRepeats/sessionRepeatFired live at MODULE scope, and
+	// pi returns the cached extension factory across session replacement
+	// (loader.js:318-322 — cleared only on cwd change). So module scope means
+	// "until the cwd changes", not "until the session ends": repeats bled into the
+	// next session, sessionRepeatFired latched the steer off for the whole process,
+	// and blackboard.ts:127-128 rendered the stale count into the c48 lens as
+	// "repeats this session: N" right after the board was deliberately cleared.
+	const g = globalThis as Record<string, unknown>;
+	const fp = makeFakePi();
+	const mod = await import(`../extensions/loop-breaker.ts?sess=${Date.now()}-${Math.random()}`);
+	mod.default(fp.pi as never);
+
+	const repeated = {
+		turnIndex: 1,
+		toolResults: [],
+		message: {
+			role: "assistant",
+			provider: "local-llama",
+			content: [
+				{ type: "toolCall", id: "a", name: "read", arguments: { path: "src/x.ts" } },
+				{ type: "toolCall", id: "b", name: "read", arguments: { path: "src/x.ts" } },
+			],
+		},
+	};
+	const ctx = { ui: { notify() {} }, abort() {}, cwd: "/tmp" };
+	const state = () => g.__pi_lb_state as { sessionRepeats: number; seen: number } | undefined;
+
+	await fire(fp, "session_start", {});
+	await fire(fp, "turn_end", repeated, ctx);
+	assert.deepEqual(fp.swallowedErrors, [], "no handler threw — a swallowed throw would fake a passing test");
+	const firstTurn = { ...state()! }; // the two identical calls in ONE turn are a legitimate repeat
+	await fire(fp, "turn_end", repeated, ctx);
+	const accumulated = { ...state()! };
+	assert.ok(accumulated.sessionRepeats > firstTurn.sessionRepeats, "repeats accumulate within a session");
+
+	// A new session through the SAME cached factory must land back on the first-turn
+	// numbers, not continue the previous session's tally.
+	await fire(fp, "session_start", {});
+	assert.equal(state(), undefined, "the published lens state must not survive session_start");
+	await fire(fp, "turn_end", repeated, ctx);
+	assert.deepEqual(state(), firstTurn,
+		`a fresh session's first turn must match the original first turn, not carry ${accumulated.sessionRepeats} repeats forward`);
+	delete g.__pi_lb_state;
 });
