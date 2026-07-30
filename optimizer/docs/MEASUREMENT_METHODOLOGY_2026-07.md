@@ -261,3 +261,41 @@ would only defer the next instance. Gold patches, hidden tests and review packet
 the fixture directory (`patches/`, `hidden/`, `review-packets/`), so copying the tree leaks
 nothing. Deferred while `c49-nat-35b` is mid-round: editing a running bash script is unsafe,
 and `real_gate.sh` must never change mid-round regardless.
+
+## §10 — c49-nat-35b: an INERT candidate measured −4%. That is the noise floor.
+
+`c49-nat-35b` (tool-call-rescue, qwen36-35b-iq3s, parens/equil/bigdata, N=9/arm) reported
+base **100% (27/27)**, candidate **96%**, Δ **−4%**, verdict NEUTRAL.
+
+**The candidate did nothing at all.** All 27 candidate rows are `status: "unexposed"` with
+`tool-call-rescue/detected = 0` and `tool-call-rescue/steered = 0`. The extension never fired
+once: the 35B does not emit pseudo-tool-calls on these tasks, which is the failure mode the
+candidate exists to catch. So the two arms were, mechanically, the same harness.
+
+This makes the round unusually valuable as a **calibration**, and it should be used that way
+rather than filed as another neutral:
+
+1. **Empirical noise floor.** A provably inert change produced a 4-point pass-rate swing (1
+   failure in 27) and moved task-stratified all-pass from 3/3 to 2/3. Any future single-round
+   delta of this size on a saturated fixture set is indistinguishable from nothing. The
+   all-pass metric is the more alarming one — it swung 33 points on one flipped session, so on
+   k=9 with 3 task groups it is far noisier than its precision suggests.
+2. **Saturation confirmed at the top.** Base 27/27 means parens/equil/bigdata cannot show
+   improvement on the 35B at all — only regression. Running a *helper* candidate against a
+   100% baseline can produce no positive result by construction. This is the retrospective's
+   central point, now with a clean number attached.
+3. **The verdict text is misleading here and should not be followed literally.** It advises
+   "raise n (deep run) or try a bigger change". Both are wrong for this round: with zero
+   mechanism events, more n measures the noise floor more precisely and a bigger change still
+   has nothing to act on. The correct response is a fixture where the targeted failure mode
+   actually occurs, or a model that exhibits it.
+
+**Disposition.** c49 `tool-call-rescue` is **not refuted** — it is untested on this fleet, for
+the specific and checkable reason that the behaviour it targets did not occur. Its real test
+needs a model that produces pseudo-tool-calls (the measured artifact came from smaller qwen
+variants, not the 35B). Do not carry the −4% forward as evidence against it.
+
+**Standing rule this supports.** Read `exposure.status` BEFORE reading any delta. Two of the
+three rounds run on 2026-07-30 (c49, c50) came back `unexposed`, and in both cases the pass-rate
+delta was pure noise around an inert arm. Without the exposure counter both would have entered
+the ledger as ordinary neutrals and been read as evidence about mechanisms that never ran.
