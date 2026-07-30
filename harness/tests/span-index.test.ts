@@ -56,7 +56,11 @@ test("span tools BLOCK oversized files instead of loading them (input bounding)"
 		const fp = makeFakePi();
 		const mod = await import(`../extensions/span-tools.ts?cap=${Date.now()}-${Math.random()}`);
 		await mod.default(fp.pi as never);
-		await expectToolError(fp, "search_spans", { path: big, pattern: "x" }, dir, /refuse files over/);
+		// Both figures EXACT and distinct. They used to be Math.round(bytes/1MB),
+		// which at this cap rendered the whole message as "refuse files over 0 MB
+		// — huge.log is 0 MB"; a bare /refuse files over/ match passed on it.
+		await expectToolError(fp, "search_spans", { path: big, pattern: "x" }, dir,
+			/refuse files over 65536 bytes — .*huge\.log is 65537 bytes/);
 		// Under the cap it works normally — the guard blocks, it does not disable.
 		writeFileSync(big, "hello\nworld\n");
 		const ok = await callTool(fp, "search_spans", { path: big, pattern: "world" }, dir);

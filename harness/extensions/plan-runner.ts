@@ -1,4 +1,4 @@
-import { appendFile, mkdir, readFile, rename, stat, writeFile } from "node:fs/promises";
+import { appendFile, mkdir, readFile, rename, stat, unlink, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { createHash, randomUUID } from "node:crypto";
 import { defineTool, withFileMutationQueue, type ExtensionAPI } from "@earendil-works/pi-coding-agent";
@@ -420,8 +420,11 @@ function staleInProgress(state: PlanState): PlanItem[] {
 	return state.writer === PROC_MARK ? [] : state.items.filter((i) => i.status === "in_progress");
 }
 
-// write-then-rename: rename(2) is atomic within a filesystem, so a crash or a
-// concurrent reader can never observe a half-written file. A TORN plan-state.json
+// write-then-rename: rename(2) is atomic within a filesystem, so a concurrent
+// READER can never observe a half-written file. (Crash durability is a weaker
+// claim and deliberately not made: there is no fsync of the temp handle or of
+// the directory, so a power loss can still lose the write entirely — it just
+// cannot leave a torn file behind.) A TORN plan-state.json
 // is unrecoverable (the plan is the session's spine), and a torn TODO.md misleads
 // the human. Order matters too and is deliberate: state (authoritative, read by
 // the model) lands BEFORE TODO.md (a rendered derivative). A crash between the two
@@ -430,7 +433,14 @@ function staleInProgress(state: PlanState): PlanItem[] {
 async function atomicWrite(path: string, contents: string): Promise<void> {
 	const tmp = `${path}.tmp-${process.pid}-${randomUUID().slice(0, 8)}`;
 	await writeFile(tmp, contents, "utf8");
-	await rename(tmp, path);
+	try {
+		await rename(tmp, path);
+	} catch (error) {
+		// Nothing sweeps .pi/ — a failed rename would otherwise leave the temp file
+		// beside plan-state.json forever, once per failure.
+		await unlink(tmp).catch(() => {});
+		throw error;
+	}
 }
 
 async function writeStateAndTodo(cwd: string, state: PlanState): Promise<void> {
@@ -475,10 +485,17 @@ function reconcileItems(prev: PlanItem[] | undefined, incoming: Array<{ title: s
 // flag regardless of what properties you include in the return object" — only a
 // THROWN error marks a tool result failed (docs/extensions.md:1959,2866). Every
 // semantic rejection below used to `return { isError: true }`, so rejections were
-// invisible to loop-breaker's outcome detection, to the write-rejected observer,
-// and to the gate's tool_errors metric (ab-machinery/metrics.py reads isError off
-// the toolResult message) — i.e. plan-heavy candidate arms under-counted their own
-// failures. Throw so a rejection reads as one. The instructive text becomes the
+// invisible to the write-rejected observer and to the gate's tool_errors metric
+// (ab-machinery/metrics.py:134 reads isError off the toolResult message that
+// agent-loop.js:541 populates) — i.e. plan-heavy candidate arms under-counted
+// their own failures. Throw so a rejection reads as one.
+// NOT fixed by this, despite the obvious guess: loop-breaker still cannot see
+// plan-tool rejections. Its outcome detector filters on OUTCOME_TOOLS
+// (loop-breaker.ts:174,335 — bash/edit/write/multiedit) before ever reading
+// isError, and plan_write is in PROGRESS_TOOLS (:64), whose hasProgress check
+// (:400-404) is computed from tool NAMES on the assistant message, never from
+// results — so a thrown plan_write still calls resetEpisode(). Plan-thrash by
+// repeated rejection is therefore NOT covered by the anti-loop escalation. The instructive text becomes the
 // error message the model sees; the specific telemetry event is always recorded
 // BEFORE the throw, so nothing is lost. (Albert's 2026-07-30 QA session.)
 function rejectPlanTool(text: string): never {
@@ -1086,29 +1103,36 @@ async function goCommand(args: string, ctx: { cwd: string; model?: { provider?: 
 
 	// Optional mode switch: /plan-go yolo  or  /plan-go lean
 	const mode = /(^|\s)yolo$/i.test(args) ? "yolo" : /(^|\s)lean$/i.test(args) ? "lean" : undefined;
-	if (mode) state.autonomy = mode;
 
-	const resuming = state.phase === "executing";
-	// Capture BEFORE writeStateAndTodo stamps this process as the writer.
-	const stale = staleInProgress(state);
 	// Through mutatePlan, NOT a bare write: this is the same file plan_write
 	// serialises on, and /plan-go used to skip the queue entirely — a concurrent
 	// plan_write could interleave and lose one of the two updates. The plan_go
 	// TOOL (c39) already went through the queue; the slash command did not.
-	await mutatePlan(ctx.cwd, async (prev) => {
-		const next: PlanState = { ...(prev ?? state), phase: "executing" };
-		if (mode) next.autonomy = mode;
-		return { state: next, result: undefined };
+	//
+	// Everything downstream reads `next`, never the pre-queue `state` snapshot.
+	// pi executes extension commands ABOVE the isStreaming guard (SESSION:792-828,
+	// "execute immediately, even during streaming"), so /plan-go typed during an
+	// in-flight plan_write blocks here on the queue that write holds — `prev` is
+	// then strictly newer than `state` by construction. Prompting from `state`
+	// would enumerate a stale item list, and if the interleaving command was
+	// /plan (a NEW run_id), the plan_spine entry and trace row would be filed
+	// under a superseded run_id — invisible corruption of /collapse and the
+	// gate's per-run joins, which is worse than a wrong prompt.
+	const { next, resuming, stale } = await mutatePlan(ctx.cwd, async (prev) => {
+		const base = prev ?? state;
+		const nextState: PlanState = { ...base, phase: "executing" };
+		if (mode) nextState.autonomy = mode;
+		// stale is read off `base` — BEFORE the write stamps this process as writer.
+		return { state: nextState, result: { next: nextState, resuming: base.phase === "executing", stale: staleInProgress(base) } };
 	});
-	state.phase = "executing";
-	pi.appendEntry("plan_spine", { run_id: state.run_id }); // mark this node for /collapse
-	await appendTrace(ctx.cwd, { run_id: state.run_id, action_type: "command", tool_name: "plan-go", success: true, output_summary: `${resuming ? "resume" : "execute"}${mode ? ` autonomy=${mode}` : ""}` });
+	pi.appendEntry("plan_spine", { run_id: next.run_id }); // mark this node for /collapse
+	await appendTrace(ctx.cwd, { run_id: next.run_id, action_type: "command", tool_name: "plan-go", success: true, output_summary: `${resuming ? "resume" : "execute"}${mode ? ` autonomy=${mode}` : ""}` });
 
 	const subagentAvailable = pi.getActiveTools().includes("subagent");
 	const resumeNote = stale.length
 		? `\n\nRESUMED from a previous session. Previously in_progress item(s) may have PARTIAL WORK on disk: ${stale.map((i) => i.title).join("; ")}. Inspect current state (git status/diff, read the touched files) before continuing — do not trust it done and do not redo it blind.`
 		: "";
-	pi.sendUserMessage(executePrompt(state, subagentAvailable) + resumeNote);
+	pi.sendUserMessage(executePrompt(next, subagentAvailable) + resumeNote);
 }
 
 async function statusCommand(ctx: { cwd: string; ui: { notify(m: string, l?: string): void } }) {

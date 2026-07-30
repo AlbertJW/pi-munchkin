@@ -1655,3 +1655,64 @@ The regression test discriminates: with a model call that never settles, the blo
 **hangs the test runner** (`timeout` exit 124, test cancelled) while the detached form returns
 in ~0.6 s and confirms the review still started. First attempt at that test passed under both
 forms — a tautology — because `$?` captured grep's exit status rather than the timeout's.
+
+### Second adversarial pass: 12 confirmed defects, 4 the first pass missed (2026-07-30)
+
+The first review corrected the double seven times. A second pass — two independent refuters
+plus an adjudicator that re-verified every claim against the shipped pi 0.83 source itself —
+found **twelve more real defects and cleared none**. Four of them (M1–M4) neither refuter
+found; they came out of the adjudicator's own reading. The lesson is not "review twice", it is
+that a claim survives only when someone re-derives it from source rather than from the previous
+reviewer's summary.
+
+**The systematic one (D1).** Every emitter in `runner.js` — `emit`, `emitToolResult`,
+`emitContext`, `emitMessageEnd`, `emitBeforeAgentStart`, `emitInput`, `emitResourcesDiscover`,
+`emitUserBash`, `emitBeforeProviderRequest`, `emitBeforeProviderHeaders` — wraps the handler in
+`try/catch → emitError → continue`. `emitToolCall` (`:698-716`) is the **sole** exception. The
+double had this exactly inverted on nine of eleven branches, and its own header generalised the
+wrong rule by calling `tool_call` and `session_before` "mirror images". Since `callTool` now
+fires `tool_result`, a throwing hint handler made `callTool()` itself reject — the test reports
+"the tool call broke" where pi reports "the handler was skipped and the tool succeeded". Fixed
+with one `safe()` wrapper used by every branch except `tool_call`, recording into
+`swallowedErrors` so tests can still assert raised-and-dropped.
+
+**M1 is D1's bug class in a second subsystem.** `event-bus.js:9-17` wraps every `pi.events`
+subscriber in an async `safeHandler`; the double looped naked and synchronously, so a throwing
+tap propagated out of `emit()` and starved every subscriber after it. Both refuters stopped at
+`runner.js`. When a defect is a *class*, grep for the class, not the instance.
+
+**M3 — the sharper variant of the `/plan-go` staleness.** Both refuters framed it as "the RUN
+prompt enumerates stale items", which is visible and recoverable. The adjudicator found the
+case that isn't: pi executes extension commands **above** the `isStreaming` guard
+(`agent-session.js:792-828`, pi's own comment: "execute immediately, even during streaming"),
+so `/plan-go` typed during an in-flight `plan_write` blocks on the same queue that write holds
+— making `prev` strictly newer than the snapshot by construction. If the interleaving command
+was `/plan` (a **new** `run_id`), the `plan_spine` entry and the trace row were filed under a
+superseded run_id, silently corrupting `/collapse` and the gate's per-run trace joins.
+
+**What was NOT fixed, and why.** `plan-runner`'s throw-based rejection comment claimed
+loop-breaker coverage it does not have: `OUTCOME_TOOLS` (`loop-breaker.ts:174,335`) filters to
+bash/edit/write/multiedit *before* reading `isError`, and `plan_write` sits in `PROGRESS_TOOLS`
+(`:64`) whose `hasProgress` check (`:400-404`) reads tool **names** off the assistant message,
+never results — so a thrown `plan_write` still calls `resetEpisode()`. Plan-thrash by repeated
+rejection is genuinely uncovered. The **comment** was corrected to say so; the behaviour was
+not, because widening `OUTCOME_TOOLS` is a model-visible escalation change and would need an
+env flag plus a numbered config, not a silent edit during a running round.
+
+**Four false alarms, recorded so they are not re-fixed.** (F1) D1's cited failure scenario
+named `teach-hints.ts:42-52` as a throw path; reading it, every dereference is guarded and no
+throw path exists — the mechanism was real, the instance invented, which is precisely the
+git-guard failure mode this project has already been burned by. (F2) "nothing breaks the retry
+because span tools are outside `OUTCOME_TOOLS`" — they are outside `PROGRESS_TOOLS` too, so a
+repeated `search_spans` is a non-progress turn that *does* feed the streak detector. (F3)
+severity inflation on two items with zero reachable call sites. (F4) a divergence claimed
+visible through `callTool` that is provably invisible there.
+
+Every one of the 14 fixes carries a counterfactual: the fix was reverted mechanically, the
+specific test re-run, and each failed (0 pass / 1 fail) before being restored. Suite: 315 → 329.
+
+The double's `KNOWN-UNFAITHFUL` header now names its four structural limits — no extension
+identity in `fire()`, `callTool` modelling only half the tool pipeline (never `tool_call`, so
+`{block:true}` and guard-handler throws are unmodelled), a two-field `ctx`, and streaming as a
+single boolean with no real queue. A double that documents its edges is honest; one that does
+not is the recorder again, wearing better comments.

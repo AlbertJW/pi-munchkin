@@ -13,6 +13,24 @@
 // implementation (RUNNER = dist/core/extensions/runner.js, SESSION =
 // dist/core/agent-session.js, LOOP = pi-agent-core/dist/agent-loop.js).
 // When pi upgrades, re-derive these rules before trusting this file again.
+//
+// KNOWN-UNFAITHFUL — the boundaries of what this double models. Named here so
+// the next author reads them instead of discovering them the expensive way:
+//  1. fire() has NO extension identity. It reads one flat handler map, so it
+//     cannot model emitError attribution, ordering across a mixed extension
+//     load, or the real `extensionPath` on resources_discover paths.
+//  2. callTool models only HALF the tool pipeline: it never fires tool_call /
+//     beforeToolCall. In pi a {block:true} return or a throwing tool_call
+//     handler becomes kind:"immediate" (LOOP:395-444) — an error result with NO
+//     tool_result event and NO afterToolCall. Guard extensions (git-guard) must
+//     be tested by hand-firing plus constructing pi's consequence by hand.
+//  3. callTool's ctx is {cwd, model} only — no ui/compact/exec/getContextUsage/
+//     getSystemPrompt. Tools needing those bypass callTool and hand-roll a
+//     richer ctx (see compact-tool.integration.test.ts).
+//  4. Streaming state is ONE boolean. There is no _pendingNextTurnMessages
+//     queue and no drain-at-next-prompt (SESSION:877-880), so "queued-next-turn"
+//     is a verdict label, not a modelled behaviour — nothing here proves the
+//     message is ever delivered.
 import { execFile } from "node:child_process";
 
 export type FakePi = ReturnType<typeof makeFakePi>;
@@ -36,13 +54,19 @@ export type CombineStrategy =
 	| "input"            // transform chains; `handled` short-circuits
 	| "first_decisive"   // project_trust: a truthy "undecided" does NOT win
 	| "first_wins"       // user_bash: first truthy return wins outright
+	| "headers"          // one shared object mutated in place; return ignored
 	| "discard";         // return value read and dropped
+
+/** Stand-in for the owning extension's path. fire() has no extension identity
+ *  (see KNOWN-UNFAITHFUL #1), so every tagged path gets this one. */
+export const TEST_EXTENSION_PATH = "test-extension";
 
 export const EVENT_STRATEGY: Record<string, CombineStrategy> = {
 	tool_result: "tool_result",              // runner.js:646-697
 	context: "context",                      // runner.js:744-772
 	message_end: "message_end",              // runner.js:607-644
 	before_provider_request: "replace_payload", // runner.js:783-790
+	before_provider_headers: "headers",      // runner.js:806-833 (mutate in place)
 	before_agent_start: "agent_start",       // runner.js:834-887
 	resources_discover: "resources",         // runner.js:888-925
 	tool_call: "tool_call",                  // runner.js:698-716 (no try/catch!)
@@ -66,7 +90,13 @@ export const EVENT_STRATEGY: Record<string, CombineStrategy> = {
 /** What actually happened to a message pi was asked to deliver. Tests assert on
  *  this rather than on the raw options, because several option combinations are
  *  silently ignored (SESSION:1075-1094). */
-export type DeliveryVerdict = "delivered" | "queued-next-turn" | "queued-steer" | "queued-follow-up" | "lost";
+export type DeliveryVerdict =
+	| "delivered"          // a turn ran immediately
+	| "appended-no-turn"   // pushed to state.messages; the model sees it, no turn runs
+	| "queued-next-turn"
+	| "queued-steer"
+	| "queued-follow-up"
+	| "lost";
 
 export type RecordedDelivery = {
 	api: "sendMessage" | "sendUserMessage";
@@ -107,14 +137,27 @@ export function makeFakePi(options: { streaming?: boolean } = {}) {
 		return "";
 	};
 
-	// SESSION:1075-1094 — the dispatch ladder, in pi's order. nextTurn is checked
-	// FIRST (so it wins even while streaming and never consults triggerTurn);
-	// while streaming, anything that is not "followUp" falls through to steer.
+	// sendMessage → sendCustomMessage (SESSION:1846-1852). Its ladder
+	// (SESSION:1075-1094) has FOUR outcomes: nextTurn is checked first (so it wins
+	// even while streaming and never consults triggerTurn); while streaming,
+	// anything not "followUp" falls to steer; otherwise a TRUTHY triggerTurn runs
+	// a real turn, and without one the message is only appended — no turn.
 	const classify = (deliverAs: unknown, triggerTurn: unknown): DeliveryVerdict => {
 		if (deliverAs === "nextTurn") return "queued-next-turn";
 		if (streaming) return deliverAs === "followUp" ? "queued-follow-up" : "queued-steer";
-		if (triggerTurn === true) return "delivered";
-		return "delivered";
+		if (triggerTurn) return "delivered";
+		return "appended-no-turn";
+	};
+
+	// sendUserMessage → prompt() (SESSION:1855-1862 → :1126-1131), a DIFFERENT
+	// ladder: `deliverAs` becomes `streamingBehavior`, `triggerTurn` is never
+	// passed, and _pendingNextTurnMessages is never touched. So "nextTurn" is not
+	// special here — while streaming it STEERS, and while idle it runs a turn
+	// immediately (":1097 Always triggers a turn"). Sharing classify() between the
+	// two APIs was wrong in opposite directions.
+	const classifyUserMessage = (deliverAs: unknown): DeliveryVerdict => {
+		if (!streaming) return "delivered";
+		return deliverAs === "followUp" ? "queued-follow-up" : "queued-steer";
 	};
 
 	const pi = {
@@ -141,11 +184,16 @@ export function makeFakePi(options: { streaming?: boolean } = {}) {
 				return;
 			}
 			sent.push(text);
-			deliveries.push({ api: "sendUserMessage", content, text, deliverAs, triggerTurn: opts?.triggerTurn, effective: classify(deliverAs, opts?.triggerTurn) });
+			deliveries.push({ api: "sendUserMessage", content, text, deliverAs, triggerTurn: opts?.triggerTurn, effective: classifyUserMessage(deliverAs) });
 		},
 		sendMessage: (message: unknown, opts?: { triggerTurn?: unknown; deliverAs?: unknown }) => {
+			const text = textOf((message as any)?.content ?? message);
+			// `sent` means "text that reached the model", from EITHER api — every
+			// verdict but "lost" ends up in the payload. Recording sendUserMessage
+			// only made `sent`-based assertions silently blind to sendMessage.
+			sent.push(text);
 			customDeliveries.push({
-				api: "sendMessage", content: message, message, text: textOf((message as any)?.content ?? message),
+				api: "sendMessage", content: message, message, text,
 				deliverAs: opts?.deliverAs, triggerTurn: opts?.triggerTurn,
 				effective: classify(opts?.deliverAs, opts?.triggerTurn),
 			});
@@ -163,8 +211,20 @@ export function makeFakePi(options: { streaming?: boolean } = {}) {
 			sourceInfo: { source: "test", path: "test" },
 		})),
 		events: {
+			// event-bus.js:9-17 wraps EVERY subscriber in an async safeHandler with
+			// try/catch, so one throwing tap can never break emit() or starve the
+			// subscribers registered after it.
 			emit: (channel: string, data: unknown) => {
-				for (const handler of busHandlers.get(channel) ?? []) handler(data);
+				for (const handler of busHandlers.get(channel) ?? []) {
+					try {
+						const r: any = handler(data);
+						if (r && typeof r.catch === "function") {
+							r.catch((error: unknown) => swallowedErrors.push(error instanceof Error ? error.message : String(error)));
+						}
+					} catch (error) {
+						swallowedErrors.push(error instanceof Error ? error.message : String(error));
+					}
+				}
 			},
 			on: (channel: string, handler: (data: unknown) => void) => {
 				const current = busHandlers.get(channel) ?? new Set();
@@ -208,6 +268,9 @@ export type PiToolResult = {
 	details: any;
 	isError: boolean;
 	terminate?: unknown;
+	/** LOOP:498 lands `afterResult.usage ?? result.usage` here — a tool_result
+	 *  handler can rewrite it, so it is part of the contract. */
+	usage?: unknown;
 };
 
 /**
@@ -224,8 +287,11 @@ export async function callTool(fp: FakePi, name: string, params: unknown, cwd: s
 	let result: PiToolResult;
 	try {
 		const raw = await tool.execute("tc-test", params, undefined, undefined, ctx);
-		// LOOP:466 hard-codes isError:false; LOOP:530-543 normalizes missing content to [].
-		result = { content: raw?.content ?? [], details: raw?.details, isError: false, terminate: raw?.terminate };
+		// LOOP:466 hard-codes isError:false. Content is left UNNORMALIZED here on
+		// purpose: pi normalizes at LOOP:537, i.e. AFTER the tool_result chain, so a
+		// handler doing `event.content.push(...)` throws in pi. Normalizing first
+		// would make the double quietly forgive that.
+		result = { content: raw?.content, details: raw?.details, isError: false, terminate: raw?.terminate, usage: raw?.usage } as PiToolResult;
 	} catch (error) {
 		const message = error instanceof Error ? error.message : String(error);
 		result = { content: [{ type: "text", text: message }], details: {}, isError: true };
@@ -235,15 +301,22 @@ export async function callTool(fp: FakePi, name: string, params: unknown, cwd: s
 	// (agent-loop.js:316,357). Omitting this made observers like plan-runner's
 	// write-rejected unreachable through callTool, so a test could only reach them
 	// by hand-firing an event pi may never emit. Fire it here, apply the patch.
+	// SESSION:240-249 is the full emitted shape — `type` and `usage` included. A
+	// handler that guards on `event.type === "tool_result"` (the habit every other
+	// pi event teaches) was a silent no-op here while running fine in production.
 	const patch: any = await fire(fp, "tool_result", {
+		type: "tool_result",
 		toolCallId: "tc-test", toolName: name, input: params,
-		content: result.content, details: result.details, isError: result.isError,
+		content: result.content, details: result.details, isError: result.isError, usage: result.usage,
 	}, ctx);
 	if (patch) {
 		if (patch.content !== undefined) result.content = patch.content;
 		if (patch.details !== undefined) result.details = patch.details;
 		if (patch.isError !== undefined) result.isError = patch.isError;
+		if (patch.usage !== undefined) result.usage = patch.usage;
 	}
+	// LOOP:530-543 — normalization happens after the chain, not before.
+	result.content = result.content ?? [];
 	return result;
 }
 
@@ -285,6 +358,21 @@ export async function fire(fp: FakePi, ev: string, event: unknown, ctx?: unknown
 	const fns = fp.handlers.get(ev) ?? [];
 	const strategy = EVENT_STRATEGY[ev] ?? "discard";
 
+	// EVERY emitter in runner.js except emitToolCall wraps the handler call in
+	// try/catch → emitError → continue: a throwing handler is skipped and the
+	// event proceeds as if it had returned undefined. `tool_call` alone
+	// (runner.js:698-716) has no try/catch, so a throw there propagates and
+	// blocks the call fail-safe. Every branch below routes through `safe` except
+	// that one — the asymmetry is the contract, not an oversight.
+	const safe = async (fn: any, ev2: unknown, c: unknown) => {
+		try {
+			return await fn(ev2, c);
+		} catch (error) {
+			fp.swallowedErrors.push(error instanceof Error ? error.message : String(error));
+			return undefined;
+		}
+	};
+
 	switch (strategy) {
 		case "tool_result": {
 			// runner.js:646-697. ONE object built before the loop and handed to every
@@ -294,11 +382,13 @@ export async function fire(fp: FakePi, ev: string, event: unknown, ctx?: unknown
 			const currentEvent: any = { ...(event as any) };
 			let modified = false;
 			for (const fn of fns) {
-				const r = await fn(currentEvent, ctx);
+				const r = await safe(fn, currentEvent, ctx);
 				if (!r) continue;
-				modified = true;
+				// runner.js:659-674 sets `modified` INSIDE each `!== undefined` block,
+				// so a return of `{}` — or of only keys pi ignores — leaves the event
+				// unmodified and the emitter still returns undefined.
 				for (const key of ["content", "details", "isError", "usage"]) {
-					if (r[key] !== undefined) currentEvent[key] = r[key];
+					if (r[key] !== undefined) { currentEvent[key] = r[key]; modified = true; }
 				}
 			}
 			if (!modified) return undefined;
@@ -314,7 +404,7 @@ export async function fire(fp: FakePi, ev: string, event: unknown, ctx?: unknown
 			// returned ALWAYS — never undefined, even when no handler acted.
 			let currentMessages = structuredClone((event as any)?.messages ?? []);
 			for (const fn of fns) {
-				const r = await fn({ ...(event as any), messages: currentMessages }, ctx);
+				const r = await safe(fn, { ...(event as any), messages: currentMessages }, ctx);
 				if (r && r.messages) currentMessages = r.messages;
 			}
 			return currentMessages;
@@ -325,7 +415,7 @@ export async function fire(fp: FakePi, ev: string, event: unknown, ctx?: unknown
 			let currentMessage: any = (event as any)?.message;
 			let modified = false;
 			for (const fn of fns) {
-				const r = await fn({ ...(event as any), message: currentMessage }, ctx);
+				const r = await safe(fn, { ...(event as any), message: currentMessage }, ctx);
 				if (!r || !r.message) continue;
 				if (r.message.role !== currentMessage?.role) continue; // rejected, loop continues
 				currentMessage = r.message;
@@ -337,7 +427,7 @@ export async function fire(fp: FakePi, ev: string, event: unknown, ctx?: unknown
 			// runner.js:783-790. The handler's ENTIRE return replaces the payload.
 			let currentPayload: any = (event as any)?.payload ?? event;
 			for (const fn of fns) {
-				const r = await fn({ type: "before_provider_request", payload: currentPayload }, ctx);
+				const r = await safe(fn, { type: "before_provider_request", payload: currentPayload }, ctx);
 				if (r !== undefined) currentPayload = r;
 			}
 			return currentPayload;
@@ -346,28 +436,40 @@ export async function fire(fp: FakePi, ev: string, event: unknown, ctx?: unknown
 			// runner.js:834-887. messages APPEND; systemPrompt CHAINS.
 			const messages: unknown[] = [];
 			let systemPrompt = (event as any)?.systemPrompt;
-			let touched = false;
+			let promptModified = false;
 			for (const fn of fns) {
-				const r = await fn({ ...(event as any), systemPrompt }, ctx);
+				const r = await safe(fn, { ...(event as any), systemPrompt }, ctx);
 				if (!r) continue;
-				if (r.message !== undefined) { messages.push(r.message); touched = true; }
-				if (r.systemPrompt !== undefined) { systemPrompt = r.systemPrompt; touched = true; }
+				// runner.js:859-861 pushes on TRUTHINESS (an empty-string message is
+				// dropped); :862-865 records the rewrite with a flag rather than by
+				// comparing values, so a no-op rewrite still counts as modified.
+				if (r.message) messages.push(r.message);
+				if (r.systemPrompt !== undefined) { systemPrompt = r.systemPrompt; promptModified = true; }
 			}
-			if (!touched) return undefined;
-			const out: Record<string, unknown> = {};
-			if (messages.length) out.messages = messages;
-			if (systemPrompt !== (event as any)?.systemPrompt) out.systemPrompt = systemPrompt;
-			return out;
+			if (!messages.length && !promptModified) return undefined;
+			// runner.js:880-885 — both keys are always PRESENT once anything acted,
+			// each undefined if that half was untouched.
+			return {
+				messages: messages.length > 0 ? messages : undefined,
+				systemPrompt: promptModified ? systemPrompt : undefined,
+			};
 		}
 		case "resources": {
-			// runner.js:888-925. Concatenates the three path lists across extensions.
+			// runner.js:888-925. Concatenates the three path lists, TAGGING each path
+			// with the owning extension: `.map((path) => ({path, extensionPath}))`.
+			// Handlers return bare strings; consumers never see them.
+			// KNOWN-UNFAITHFUL: fire() reads a flat handler map with no extension
+			// identity (see the header note), so every path is tagged with one
+			// placeholder rather than its real owner. Presence of the wrapper is
+			// modelled; per-extension attribution is not.
 			const skillPaths: unknown[] = [], promptPaths: unknown[] = [], themePaths: unknown[] = [];
+			const tag = (p: unknown) => ({ path: p, extensionPath: TEST_EXTENSION_PATH });
 			for (const fn of fns) {
-				const r = await fn(event, ctx);
+				const r = await safe(fn, event, ctx);
 				if (!r) continue;
-				for (const p of r.skillPaths ?? []) skillPaths.push(p);
-				for (const p of r.promptPaths ?? []) promptPaths.push(p);
-				for (const p of r.themePaths ?? []) themePaths.push(p);
+				for (const p of r.skillPaths ?? []) skillPaths.push(tag(p));
+				for (const p of r.promptPaths ?? []) promptPaths.push(tag(p));
+				for (const p of r.themePaths ?? []) themePaths.push(tag(p));
 			}
 			return { skillPaths, promptPaths, themePaths };
 		}
@@ -387,10 +489,8 @@ export async function fire(fp: FakePi, ev: string, event: unknown, ctx?: unknown
 			// caught (emitError) so the loop continues — the opposite of tool_call.
 			let result: any;
 			for (const fn of fns) {
-				try {
-					const r = await fn(event, ctx);
-					if (r) { result = r; if (r.cancel) return result; }
-				} catch { /* swallowed into emitError; pi proceeds */ }
+				const r = await safe(fn, event, ctx);
+				if (r) { result = r; if (r.cancel) return result; }
 			}
 			return result;
 		}
@@ -401,12 +501,14 @@ export async function fire(fp: FakePi, ev: string, event: unknown, ctx?: unknown
 			let text = original?.text;
 			let images = original?.images;
 			for (const fn of fns) {
-				const r = await fn({ ...original, text, images }, ctx);
+				const r = await safe(fn, { ...original, text, images }, ctx);
 				if (!r) continue;
 				if (r.action === "handled") return r;
 				if (r.action === "transform") {
-					if (r.text !== undefined) text = r.text;
-					if (r.images !== undefined) images = r.images;
+					// runner.js:947-948 — text is assigned UNCONDITIONALLY (a transform
+					// that omits it wipes the prompt), images only via `?? currentImages`.
+					text = r.text;
+					images = r.images ?? images;
 				}
 			}
 			if (text !== original?.text || images !== original?.images) {
@@ -417,21 +519,29 @@ export async function fire(fp: FakePi, ev: string, event: unknown, ctx?: unknown
 		case "first_decisive": {
 			// runner.js:68-76. A truthy {trusted:"undecided"} does NOT win — pi skips it.
 			for (const fn of fns) {
-				const r: any = await fn(event, ctx);
+				const r: any = await safe(fn, event, ctx);
 				if (r && r.trusted !== "undecided") return r;
 			}
 			return undefined;
 		}
 		case "first_wins": {
 			for (const fn of fns) {
-				const r = await fn(event, ctx);
+				const r = await safe(fn, event, ctx);
 				if (r) return r;
 			}
 			return undefined;
 		}
+		case "headers": {
+			// runner.js:806-833. One shared headers object is passed to every
+			// handler, which MUTATES IT IN PLACE; the return value is ignored and
+			// the same object comes back out.
+			const headers: any = (event as any)?.headers ?? {};
+			for (const fn of fns) await safe(fn, { type: "before_provider_headers", headers }, ctx);
+			return headers;
+		}
 		default: {
 			// Every handler runs; pi reads the return and drops it (runner.js:586).
-			for (const fn of fns) await fn(event, ctx);
+			for (const fn of fns) await safe(fn, event, ctx);
 			return undefined;
 		}
 	}

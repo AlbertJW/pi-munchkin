@@ -37,9 +37,11 @@ const MAX_FILE_BYTES = (() => {
 async function load(path: string): Promise<LoadedFile> {
 	const info = await stat(path);
 	if (info.size > MAX_FILE_BYTES) {
+		// Exact bytes, not rounded MB: SPAN_MAX_FILE_BYTES is configurable down to
+		// 64 KB, where rounding rendered this as "refuse files over 0 MB — x is 0 MB".
 		throw new Error(
-			`span tools refuse files over ${Math.round(MAX_FILE_BYTES / 1024 / 1024)} MB — ` +
-			`${path} is ${Math.round(info.size / 1024 / 1024)} MB. Narrow the target, or use ` +
+			`span tools refuse files over ${MAX_FILE_BYTES} bytes — ` +
+			`${path} is ${info.size} bytes. Narrow the target, or use ` +
 			"bash (grep -n / sed -n 'A,Bp') which streams instead of loading the whole file.",
 		);
 	}

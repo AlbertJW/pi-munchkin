@@ -5,7 +5,7 @@
 // field-name bug pure tests could not see).
 import assert from "node:assert/strict";
 import test from "node:test";
-import { mkdtempSync, readFileSync, writeFileSync, mkdirSync, existsSync, readdirSync } from "node:fs";
+import { mkdtempSync, readFileSync, writeFileSync, mkdirSync, existsSync, readdirSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { callTool, fire, makeCtx, makeFakePi , expectToolError } from "./integration-harness.ts";
@@ -1174,4 +1174,55 @@ test("persistence is ATOMIC: no reader can observe a torn plan-state.json", asyn
 	// And no temp files are left behind.
 	const strays = readdirSync(join(cwd, ".pi")).filter((f) => f.includes(".tmp-"));
 	assert.deepEqual(strays, [], "atomic writes must not leak temp files");
+});
+
+test("a FAILED rename cleans up its temp file instead of orphaning it in .pi/", async () => {
+	// The success-path test above cannot see this: it only ever renames
+	// successfully. Nothing sweeps .pi/, so a leak here is permanent and
+	// accumulates one file per failure. Forced by making the destination a
+	// DIRECTORY, which rename(2) refuses.
+	const fp = freshPlanRunner();
+	const cwd = tmp();
+	const { ctx } = makeCtx(cwd);
+	await fp.commands.get("plan").handler("do the thing", ctx);
+	rmSync(join(cwd, ".pi", "plan-state.json"), { force: true });
+	mkdirSync(join(cwd, ".pi", "plan-state.json"));
+
+	await expectToolError(fp, "plan_write", {
+		items: [{ title: "step one", status: "pending" }], request: "r", summary: "s",
+	}, cwd, /./);
+
+	const strays = readdirSync(join(cwd, ".pi")).filter((f) => f.includes(".tmp-"));
+	assert.deepEqual(strays, [], "a failed rename must unlink its temp file");
+});
+
+test("/plan-go prompts from the POST-queue state, not the snapshot it read first", async () => {
+	// pi runs extension commands above the isStreaming guard (SESSION:792-828,
+	// "execute immediately, even during streaming"), so /plan-go can be typed
+	// while a plan_write is in flight. goCommand read state ONCE up front, wrote
+	// through mutatePlan's queue (which re-reads), then built the RUN prompt and
+	// the plan_spine run_id from the stale snapshot — so the model was told to
+	// execute an item list that no longer matched the disk.
+	const fp = freshPlanRunner();
+	const cwd = tmp();
+	const { ctx } = makeCtx(cwd);
+	await fp.commands.get("plan").handler("do the thing", ctx);
+	await callTool(fp, "plan_write", {
+		items: [{ title: "alpha", status: "pending" }], request: "do the thing", summary: "one",
+	}, cwd);
+
+	// Interleave: a second plan_write is queued but NOT awaited, so /plan-go
+	// blocks on the same file queue and its `prev` is strictly newer.
+	const inflight = callTool(fp, "plan_write", {
+		items: [{ title: "alpha", status: "pending" }, { title: "beta", status: "pending" }],
+		request: "do the thing", summary: "two",
+	}, cwd);
+	await fp.commands.get("plan-go").handler("", ctx);
+	await inflight;
+
+	const prompt = fp.sent.at(-1)!;
+	assert.ok(prompt.includes("beta"), `RUN prompt must enumerate the item added while it waited:\n${prompt}`);
+	const state = JSON.parse(readFileSync(join(cwd, ".pi", "plan-state.json"), "utf8"));
+	assert.equal(state.phase, "executing");
+	assert.equal(state.items.length, 2, "and neither write was lost");
 });
