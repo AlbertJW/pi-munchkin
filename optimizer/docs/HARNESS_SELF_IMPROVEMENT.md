@@ -1755,3 +1755,58 @@ inert until you have watched it fail.
 **Rules this reinforces.** Never `git add -A` in a repo where another session may be writing —
 stage explicit paths, which is what the fixes in this session did. And when a tripwire fires,
 the tripwire is the evidence; the number is not the problem.
+
+### The gate withheld the spec it was testing whether models read (2026-07-30)
+
+The most consequential defect found in this project so far, and it invalidated a candidate whose
+entire premise it had also manufactured.
+
+`real_gate.sh:437-439` materializes a fixture by **allowlist** — `src`, `test`, `package.json`,
+`data`, `scripts`. `fixture_admission.py:141-147` materializes it with **`shutil.copytree`**.
+Two materialization paths, never compared. Any fixture directory outside the allowlist is
+validated at admission and then silently withheld from the model at measurement time.
+
+Four fixtures ship such a directory: `retry-trap/docs`, `audit-sweep/docs`,
+`access-log-triage/docs`, `hygiene-shared-config-reread/config`. All four prompts name the file
+inside it.
+
+**How it presented.** `c50-trap-4b` came back 0/9 in both arms with `spec-adherence/armed = 0`.
+The tempting read was "hard fixture, mechanism didn't help". The exposure counter is what
+refused that read — a candidate that never armed has not been tested, so there was nothing to
+interpret and the only honest move was to find out why.
+
+**Diagnosis by elimination, each step checked rather than argued.** Extension loads in the live
+agent and registers all four handlers (ran it). `extractSpecPaths` returns `['docs/naming.md']`
+against the *actual* run directory (ran it). `config.py` emits `SPEC_ADHERENCE=on` (ran it).
+Catalog entry present and correctly typed (read it). `c48-view-35b` logged 148 events from the
+same harness the same day, so telemetry works (checked it). What remained was the filesystem:
+`docs/` is **absent** from every base run directory, and in the candidate directories its mtime
+is *during* the run — the model created it.
+
+**The premise it manufactured.** c50 was justified by *"12/12 sessions edited the right file
+with invented mappings while docs/naming.md sat unread."* The models were not ignoring a spec.
+There was no spec. They invented mappings because nothing else was available, and the fixture
+deliberately specifies `ä å → a` / `ö ø → o` against the usual `ae`/`oe`, so convention-guessing
+is guaranteed to fail. A harness artifact wore the costume of a model failure — and it was
+believable precisely because it flattered a candidate we wanted to build.
+
+**Severity is not uniform, and the data says so.** `retry-trap` 1/42 and
+`hygiene-shared-config-reread` 3/24 are floored; their verdicts are unusable.
+`access-log-triage` is **12/18** — its doc was not required to pass, so those rows are
+confounded, not invalid. Writing off all 84 rows would have been the same overreach in the
+opposite direction.
+
+**Fix**: make the gate copy what admission copies. Extending the allowlist by one directory only
+defers the next instance — the next fixture to ship `schema/` or `spec/` hits the identical
+wall. Gold patches, hidden tests and review packets live outside the fixture root, and a scan
+confirmed no fixture root contains solution-shaped material, so a tree copy leaks nothing.
+
+**Guard**: `test_gate_materializes_everything_admission_does` is the first place the two
+materialization paths are compared. It fails on the unfixed gate naming all four fixtures, and
+it also asserts the new tree copy cannot carry solution material to the model.
+
+**What this says about the neutrals.** The retrospective concluded most NEUTRALs were
+structurally guaranteed by saturated fixtures and binary outcomes. This adds a third cause that
+is worse, because it is invisible rather than merely underpowered: fixtures that could not be
+passed at all. Before the next round, verify the model can *see* what the task refers to. A
+fixture is not admitted until the thing the prompt points at survives the trip into the workdir.

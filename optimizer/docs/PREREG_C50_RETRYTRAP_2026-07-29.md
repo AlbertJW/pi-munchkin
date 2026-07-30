@@ -47,3 +47,55 @@ No post-hoc metric substitution; anything interesting outside this rule is ledge
 
 Single round on the local box; no harness/gate/registration edits mid-round; rows must carry
 the post-bundle surface hash uniformly (a surface change voids and restarts, c26-4b precedent).
+
+---
+
+## RESULT (2026-07-30): INVALID — the fixture's spec was never on disk
+
+**Not neutral. Not a rejection of the mechanism. The round measured nothing.**
+
+Observed: `qwopus35-4b`, retry-trap, N=9/arm — base **0/9**, cand **0/9**.
+Exposure: `spec-adherence/armed` = **0**, `spec-adherence/steered` = **0**, status `unexposed`
+on all 9 candidate rows.
+
+### Why
+
+`real_gate.sh:437-439` materializes fixtures from an allowlist (`src`, `test`, `package.json`,
+`data`, `scripts`) that omits `docs/`. So `docs/naming.md` — the authoritative transliteration
+spec this fixture is built around and which the prompt names explicitly — **was absent from
+every session's working directory**. `spec-adherence` looks for prompt-named files that exist
+on disk, found none, and correctly never armed. See MEASUREMENT_METHODOLOGY §9.
+
+Diagnosis was by elimination, each step checked rather than assumed: the extension loads in the
+live agent and registers all four handlers; `extractSpecPaths` returns `['docs/naming.md']` when
+pointed at the real run directory; `SPEC_ADHERENCE=on` is correctly emitted by `config.py` into
+the child env; the telemetry catalog entry is present and correctly typed; and `c48-view-35b`
+recorded 148 events from the same harness on the same day, proving telemetry works. The
+remaining difference was the filesystem — `docs/` has an mtime *during* the run in the candidate
+dirs and is **absent entirely** from the base dirs, because the model created it itself.
+
+### The premise this retracts
+
+The pre-registration justified c50 with: *"retry-trap: 12/12 sessions on the 4B edited the right
+file with invented mappings while `docs/naming.md` sat unread."*
+
+**That is withdrawn.** The models did not leave an available spec unread — the harness never
+put one there. They invented mappings because inventing was the only option. The observed
+behaviour was a harness artifact wearing the costume of a model failure, and it is exactly the
+kind of story that is easy to believe because it flatters the candidate you already want to
+build.
+
+Compounding it: `docs/naming.md` deliberately specifies `ä å → a` and `ö ø → o`, contradicting
+the usual German `ae`/`oe`. A model reasoning from convention is *guaranteed* to fail. That is
+the trap working as designed — but only when the spec is readable.
+
+### Disposition
+
+- c50 `spec-adherence` returns to **queued, unmeasured**. Its mechanism is untested, neither
+  supported nor refuted. Do not count this round against it.
+- Re-run after the materialization fix lands, on the same pre-registered thresholds. No
+  changes to the candidate or the prereg are warranted by this round, because it produced no
+  information about either.
+- Check the base arm's pass rate on the re-run **before** reading any delta: if base is still
+  ~0/9 with the spec present, the fixture is too hard for the 4B and the round is powerless for
+  a different reason (see `check-detection-floor` discipline).

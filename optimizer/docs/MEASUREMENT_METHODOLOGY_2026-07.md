@@ -176,3 +176,88 @@ Partial rows from the rounds interrupted by this work (`c48-view-35b`, 36 rows;
 `c50-trap-4b`, 15 rows) were **discarded** rather than kept, because they straddle the change
 — the same never-mix-surfaces rule that voided the partial `c26-4b` round. Both rounds re-run
 from zero on the post-fix surface; their pre-registrations are unchanged and still valid.
+
+## §9 — INVALIDITY BOUNDARY: fixtures whose reference docs were never materialized (2026-07-30)
+
+**84 rows across 10 rounds are invalid, not neutral.** The gate never copied the reference
+material those tasks were built around, so the model was asked to conform to a specification
+that did not exist in its working directory.
+
+### The defect
+
+`real_gate.sh:437-439` materializes a fixture with an **allowlist**:
+
+```
+cp -R "$fix/src" "$fix/test" "$fix/package.json" "$wd/"
+[[ -d "$fix/data" ]] && cp -R "$fix/data" "$wd/"
+[[ -d "$fix/scripts" ]] && cp -R "$fix/scripts" "$wd/"
+```
+
+`docs/` and `config/` are not on it. `fixture_admission.py:141-147` materializes the **whole
+tree** via `shutil.copytree`. So every fixture is admitted against one filesystem and measured
+against a different, smaller one. Admission structurally cannot catch this class: it validates
+a world the model never sees.
+
+### Affected fixtures and rows
+
+| fixture | dropped | rows | rounds |
+|---|---|---:|---|
+| `retry-trap` | `docs/naming.md` | 42 | c48-trap-4b, c48-view-35b, c50-trap-4b |
+| `hygiene-shared-config-reread` | `config/` | 24 | c26-hygiene, c27-hygiene, c30-hygiene, legacy-signal-cal |
+| `access-log-triage` | `docs/fields.md` | 18 | alt-4b-c26, alt-4b-c27, alt-4b-c29 |
+| `audit-sweep` | `docs/audit-notes.md` | 0 | never run — would have been invalid identically |
+
+### Why these rows cannot be reinterpreted
+
+`retry-trap` is the clearest case and it is not merely "harder without the doc". The gold patch
+touches only `data/charmap.json`, and the required mappings live **exclusively** in
+`docs/naming.md` — which deliberately specifies `ä å → a` and `ö ø → o`, *contradicting* the
+usual German `ae`/`oe` convention. The fixture's whole design is that convention-guessing must
+fail and only reading the spec can succeed. Removing the spec makes it unpassable by anything
+but luck. `c50-trap-4b` scoring **0/9 in both arms** is exactly what that predicts.
+
+### The claim this retracts
+
+c50 (`spec-adherence`) was motivated by an observation recorded as *"12/12 sessions on the 4B
+edited the right file with invented mappings while `docs/naming.md` sat unread."* **That
+observation was an artifact.** The models did not ignore an available spec; the harness never
+gave them one. The candidate's entire premise is withdrawn pending a valid measurement, and its
+`unexposed` result is correctly read as "the mechanism could not arm because the file it looks
+for was absent", not as evidence about the mechanism.
+
+### Observed pass rates — the severity is NOT uniform
+
+Checked rather than assumed, because the theory ("no spec → unpassable") predicts a floor and
+one fixture does not show one:
+
+| fixture | observed | reading |
+|---|---|---|
+| `retry-trap` | **1/42** | floored. Matches "unguessable by design" exactly. Verdicts unusable. |
+| `hygiene-shared-config-reread` | **3/24** | floored. Verdicts unusable. |
+| `access-log-triage` | **12/18 (67%)** | **not floored** — `docs/fields.md` was not required to pass. |
+
+So `access-log-triage` rows are **confounded, not invalid**: the prompt named a file that did
+not exist, which can waste turns and distort trajectory metrics, but it did not prevent the
+task from being solved and its pass rates are not obviously meaningless. Treat its deltas with
+suspicion; do not throw them out.
+
+`retry-trap` and `hygiene-shared-config-reread` are the invalid ones. Their pass-rate verdicts
+must be discarded and the rounds re-run after the fix. This distinction matters: claiming all
+84 rows were invalid would have been the same overreach in the other direction, and the data
+does not support it.
+
+### Status of rows
+
+Rows stay on disk and remain valid **within their own round** for metrics that do not depend on
+the missing material (token counts, trajectory shape, tool-error rates). No pass-rate claim on
+`retry-trap` or `hygiene-shared-config-reread` may be made or carried forward across this
+boundary.
+
+### Fix
+
+Make the gate materialize what admission materializes — copy the fixture tree and exclude
+`node_modules`/`.git` — rather than extending the allowlist one directory at a time, which
+would only defer the next instance. Gold patches, hidden tests and review packets live outside
+the fixture directory (`patches/`, `hidden/`, `review-packets/`), so copying the tree leaks
+nothing. Deferred while `c49-nat-35b` is mid-round: editing a running bash script is unsafe,
+and `real_gate.sh` must never change mid-round regardless.
