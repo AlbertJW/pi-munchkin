@@ -1468,3 +1468,18 @@ the roster ONLY from an observed failure class with a named sensor gap (c49/c50 
 No new ambient/steering candidates. Legacy queue resolves at the 2026-09-03 sweep.
 Instrument v2 (graded subscores, audit-sweep fixture, calibrated quality judge, tool-accuracy
 rate) and the graded HARNESS-ROI round are the active re-aim work.
+
+## Anomaly: untracked audit-sweep files deleted by unidentified process (2026-07-30)
+
+Between `fixture_admission.py check audit-sweep` (files existed — the check hashed and staged
+them) and the commit attempt ~15 minutes later, the then-untracked fixture directory AND
+`hidden/audit-sweep.test.js` were deleted; the equally-untracked manifest, patches, and review
+packet survived. Concurrent activity: the c48/c50/c49 gate chain (round 1 mid-GEN) and one
+`npm run verify`. Restored from session state copies, **proven byte-exact against the manifest
+sha256s**, re-verified read-only (PASS), committed (containment: tracked files make any
+recurrence visible and reversible). Reproduction attempts: `npm run verify` with tracked
+files — clean; with untracked decoys in both affected directories — clean. Verify is
+exonerated. Remaining suspects: the concurrent gate chain (a session or cleanup step), or a
+once-taken path in the admission/approve tooling. Tripwire decoys planted for the chain's
+remainder (`zz-tripwire/`); check at chain end. Standing lesson either way: **commit fixture
+files before running admission checks alongside a live round** — untracked = unprotected.
