@@ -458,6 +458,20 @@ function reconcileItems(prev: PlanItem[] | undefined, incoming: Array<{ title: s
 // that file persists across sessions, so a stale phase:"planned" would block
 // normal work forever. Set on /plan, cleared on /plan-go, yolo, or agent_end:
 // it covers exactly the agent run the /plan command starts.
+// Pi 0.83 IGNORES a returned isError: "Returning a value never sets the error
+// flag regardless of what properties you include in the return object" — only a
+// THROWN error marks a tool result failed (docs/extensions.md:1959,2866). Every
+// semantic rejection below used to `return { isError: true }`, so rejections were
+// invisible to loop-breaker's outcome detection, to the write-rejected observer,
+// and to the gate's tool_errors metric (ab-machinery/metrics.py reads isError off
+// the toolResult message) — i.e. plan-heavy candidate arms under-counted their own
+// failures. Throw so a rejection reads as one. The instructive text becomes the
+// error message the model sees; the specific telemetry event is always recorded
+// BEFORE the throw, so nothing is lost. (Albert's 2026-07-30 QA session.)
+function rejectPlanTool(text: string): never {
+	throw new Error(text);
+}
+
 const PLAN_FLAG = "__pi_plan_phase_active";
 function setPlanning(on: boolean): void {
 	(globalThis as Record<string, unknown>)[PLAN_FLAG] = on;
@@ -673,14 +687,9 @@ const planWrite = defineTool({
 		if (depErrors.length > 0) {
 			const existing = await readState(ctx.cwd);
 			planEvent("deps-rejected", existing?.run_id ?? `rejected-${aid}`, { errors: depErrors.length });
-			return {
-				content: [{ type: "text" as const, text:
-					"plan_write rejected:\n- " + depErrors.join("\n- ") +
-					"\nFix depends_on (reference exact titles of other items in THIS list) and resend the ENTIRE list." }],
-				details: { tool_name: "plan_write", action_id: aid, success: false },
-				isError: true,
-				terminate: false,
-			};
+			rejectPlanTool(
+				"plan_write rejected:\n- " + depErrors.join("\n- ") +
+				"\nFix depends_on (reference exact titles of other items in THIS list) and resend the ENTIRE list.");
 		}
 
 		const { state, newlyBlocked, gateMsgs, integrity, newlyDone, prevCompleted, stalePrev, wasRewrite } = await mutatePlan(ctx.cwd, async (prev) => {
@@ -1175,33 +1184,18 @@ export default function (pi: ExtensionAPI) {
 					if (!outcome.ok) {
 						if (outcome.reason === "no-plan") {
 							planEvent("go-blocked", `no-plan-${aid}`, { reason: "no-plan" });
-							return {
-								content: [{ type: "text" as const, text: "plan_go: no plan to run. Call plan_write first to create one, then call plan_go." }],
-								details: { tool_name: "plan_go", action_id: aid, success: false },
-								isError: true,
-								terminate: false,
-							};
+							rejectPlanTool("plan_go: no plan to run. Call plan_write first to create one, then call plan_go.");
 						}
 						if (outcome.reason === "no-open-items") {
 							planEvent("go-blocked", outcome.runId, { reason: "no-open-items" });
-							return {
-								content: [{ type: "text" as const, text: "plan_go: plan is complete — no open items. Nothing to execute; call plan_write to add more work first." }],
-								details: { tool_name: "plan_go", action_id: aid, success: false },
-								isError: true,
-								terminate: false,
-							};
+							rejectPlanTool("plan_go: plan is complete — no open items. Nothing to execute; call plan_write to add more work first.");
 						}
 						const state = outcome.state;
 						planEvent("uncertainty-hold", state.run_id, { count: state.uncertainties!.length, gate: "plan-go-tool" });
-						return {
-							content: [{ type: "text" as const, text:
-								`plan_go: execution held — ${state.uncertainties!.length} unresolved uncertaint(y/ies):\n` +
-								`${state.uncertainties!.map((u) => `- ${u}`).join("\n")}\n` +
-								"Ask the user these exact questions, then clear them via plan_write (uncertainties: []) and call plan_go again." }],
-							details: { tool_name: "plan_go", action_id: aid, success: false },
-							isError: true,
-							terminate: false,
-						};
+						rejectPlanTool(
+							`plan_go: execution held — ${state.uncertainties!.length} unresolved uncertaint(y/ies):\n` +
+							`${state.uncertainties!.map((u) => `- ${u}`).join("\n")}\n` +
+							"Ask the user these exact questions, then clear them via plan_write (uncertainties: []) and call plan_go again.");
 					}
 
 					setPlanning(false);
@@ -1233,8 +1227,10 @@ export default function (pi: ExtensionAPI) {
 		);
 	}
 
-	// Pi's argument validator can reject a plan_write before execute() runs. Observe
-	// that result without retaining the validator's raw message or malformed payload.
+	// Fires for BOTH rejection paths: pi's argument validator rejecting a plan_write
+	// before execute() runs, and execute() throwing via rejectPlanTool (since
+	// 2026-07-30 — before that, semantic rejections silently never reached here).
+	// Observed without retaining the validator's raw message or malformed payload.
 	pi.on("tool_result", async (event, ctx) => {
 		if (event.toolName !== "plan_write" || !event.isError) return;
 		rememberModel(ctx);

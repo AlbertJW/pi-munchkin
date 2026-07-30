@@ -89,7 +89,12 @@ export default function (pi: ExtensionAPI): void {
 	pi.on("session_start", async (event, ctx) => {
 		cwd = ctx.cwd ?? process.cwd();
 		pendingArgs.clear();
-		if (event.reason === "new" || event.reason === "startup") resetBoard();
+		// ALWAYS reset first. The board lives on globalThis, so a resume/fork whose
+		// snapshot is missing or rejected would otherwise inherit the PREVIOUS
+		// session's ledger in the same process — and the state lens would then
+		// present another session's attempts as this session's ground truth, which
+		// is the one failure mode this design exists to rule out.
+		resetBoard();
 		if (event.reason === "resume" || event.reason === "fork") {
 			try {
 				const entries = ctx.sessionManager.getBranch();

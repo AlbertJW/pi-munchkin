@@ -171,3 +171,40 @@ test("cockpit HTML escapes hostile labels", () => {
 	assert.ok(!html.includes("<script>alert"));
 	assert.ok(!html.includes("<img onerror"));
 });
+
+test("resume/fork ALWAYS resets before restoring — no cross-session ledger bleed", async () => {
+	// The board lives on globalThis. A resume whose snapshot is missing must not
+	// inherit the previous session's ledger, or the state lens would present
+	// another session's attempts as this session's ground truth.
+	const handlers = new Map<string, (event: unknown, ctx?: unknown) => Promise<unknown>>();
+	const fakePi = {
+		on: (name: string, fn: never) => handlers.set(name, fn),
+		registerCommand: () => {},
+		sendUserMessage: () => {},
+		appendEntry: () => {},
+	};
+	const prev = process.env.BLACKBOARD;
+	delete process.env.BLACKBOARD;
+	try {
+		const mod = await import(`../extensions/session-blackboard.ts?bleed=${Date.now()}-${Math.random()}`);
+		mod.default(fakePi as never);
+		// Session A leaves state behind (start from a known board — the store is
+		// process-global, so sibling tests in this file share it).
+		resetBoard();
+		const stale = boardState();
+		stale.turn = 7;
+		noteTool(stale, { toolName: "bash", args: { command: "npm test" }, isError: true, errorText: "session A failure" });
+		assert.equal(Object.keys(boardState().attempts).length, 1);
+
+		// Session B resumes; the branch carries no blackboard entry.
+		await handlers.get("session_start")!(
+			{ reason: "resume" },
+			{ cwd: process.cwd(), sessionManager: { getBranch: () => [] } },
+		);
+		assert.deepEqual(boardState().attempts, {}, "stale ledger must not survive into the resumed session");
+		assert.equal(boardState().turn, 0);
+	} finally {
+		if (prev === undefined) delete process.env.BLACKBOARD; else process.env.BLACKBOARD = prev;
+		resetBoard();
+	}
+});

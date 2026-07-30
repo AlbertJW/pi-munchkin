@@ -70,3 +70,27 @@ Do not describe cross-platform *runtime* support (the harness itself runs on non
 equivalent cross-platform *evaluation integrity*. A run without the Seatbelt jail has no kernel-
 level read isolation and no write jail — it is a strictly weaker guarantee than a sandboxed run,
 and results must be labeled accordingly, matching what `real_gate.sh` already does mechanically.
+
+## Plan gates execute outside the tool guards (accepted risk, stated explicitly)
+
+Surfaced by Albert's 2026-07-30 QA session and verified here. `plan_write` accepts an
+`item.gate` command; `runReadonlyGate` (`harness/lib/gate-runtime.ts`) then runs it via
+`env -i … bash --noprofile --norc -c`. That execution does **not** pass through `tool_call`,
+so `git-guard`, plan-mode enforcement, `command-policy`'s bash classification, and every other
+tool-level guard never see what the gate does internally. `assertVerifyGateAllowed` and the
+destructive-command classifier vet the **command line only** — and a task runner named
+`just verify` or `npm test` can contain arbitrary writes, deletions, destructive git, network
+calls, or subprocesses.
+
+Existing mitigations: the gate command line must look verify-like; obviously destructive
+command lines are rejected and the item is blocked as `user_action_required`; the child gets a
+stripped environment (`gateEnvironment` keeps only HOME/LANG/LC_ALL/PATH/SYSTEMROOT/TEMP/TMP/
+TMPDIR/WINDIR — no API keys, cloud credentials, SSH agent, npm tokens, or shell hooks); stdin
+is closed; and the call is timeout-bounded.
+
+**Accepted, not fixed**, because the harness's threat model is a single trusted operator
+running local models against their own repositories, where the project's own `npm test` is
+already trusted to run in that shell. It is recorded here rather than left in a source comment
+so that the assumption is visible if that model ever changes (multi-user, untrusted repos, or
+autonomous unattended operation). Real fixes if it does: restrict gates to an operator-declared
+immutable allowlist, or run them in a filesystem/network sandbox.

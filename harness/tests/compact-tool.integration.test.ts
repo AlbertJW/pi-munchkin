@@ -35,7 +35,11 @@ test("compact_context deduplicates and resumes exactly once after completion", a
 	h.options.onError(new Error("late duplicate callback"));
 	assert.equal(h.fp.customDeliveries.length, 1);
 	assert.equal(h.fp.customDeliveries[0].triggerTurn, true);
-	assert.equal(h.fp.customDeliveries[0].deliverAs, "nextTurn");
+	// Contract, not implementation: pi ignores triggerTurn for "nextTurn" (docs
+	// extensions.md:1409), so nextTurn left the session idle after compaction while
+	// the tool's own description promised an automatic resume. This assertion
+	// previously pinned the bug — it now pins the fix.
+	assert.equal(h.fp.customDeliveries[0].deliverAs, "followUp");
 	assert.deepEqual((h.fp.customDeliveries[0].message as any).details,
 		{ status: "complete", tokensBefore: 9000, estimatedTokensAfter: 2500 });
 	assert.match((h.fp.customDeliveries[0].message as any).content, /Do not repeat completed work/);

@@ -64,9 +64,19 @@ export default function (pi: ExtensionAPI) {
 					if (settled || !finishCompaction(token)) return;
 					settled = true;
 					inFlight = false;
+					// MUST be followUp, not nextTurn: pi 0.83's docs (extensions.md:1408-1409)
+					// state nextTurn is "Queued for next user prompt. Does not interrupt or
+					// trigger anything" and that triggerTurn "Only applies to `steer` and
+					// `followUp` modes (ignored for `nextTurn`)". With nextTurn the tool
+					// aborted the operation, compacted, and then sat idle until the user
+					// typed — while its own description promised it "automatically resumes
+					// exactly once". followUp delivers once the agent has no more tool calls,
+					// which is exactly the post-compaction moment we want. (Found by Albert's
+					// 2026-07-30 QA session; it also explains why compact-tool completions
+					// were never observed live despite requests being recorded.)
 					pi.sendMessage(
 						{ customType: "pi-munchkin:compact-resume", content: RESUME, display: true, details: { status, ...detail } },
-						{ triggerTurn: true, deliverAs: "nextTurn" },
+						{ triggerTurn: true, deliverAs: "followUp" },
 					);
 				};
 				try {
