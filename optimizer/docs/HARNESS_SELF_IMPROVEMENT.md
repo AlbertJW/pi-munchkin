@@ -1810,3 +1810,81 @@ structurally guaranteed by saturated fixtures and binary outcomes. This adds a t
 is worse, because it is invisible rather than merely underpowered: fixtures that could not be
 passed at all. Before the next round, verify the model can *see* what the task refers to. A
 fixture is not admitted until the thing the prompt points at survives the trip into the workdir.
+
+### Deep QA: the c50 candidate had never worked (2026-07-30)
+
+A 25-agent adversarial review — 8 independent lenses, 48 raw findings, 16 adversarially refuted,
+11 survivors, then an adjudicator that re-derived every surviving claim from pi source. Nine
+distinct defects, all real. The headline one had been invisible to every previous check.
+
+**`spec-adherence` read-detection was dead code from the first commit.** It read `event.args` on
+`tool_execution_end`. pi copies `args` onto `tool_execution_start` and `tool_execution_update`
+but **not** onto `_end` — `agent-session.js:487-514` builds each event explicitly and the end
+branch carries only `toolCallId/toolName/result/isError`. The asymmetry is in the emitter, not
+just the type, and pinned 0.80.6 agrees with 0.83.
+
+Consequences, in order of how bad they get: `readSpecs` could only ever be filled by the
+post-steer self-mark, so the suppression half never ran; the steer therefore degraded into an
+unconditional *"you have not read this"* nag after two failing mutations, **false whenever the
+model had in fact read the spec**; and it would still have stamped `spec-adherence/steered`,
+so the re-run would have reported `targeted` exposure while measuring an unconditional nag
+rather than the designed treatment. The exposure instrumentation this project built specifically
+to stop it believing null results would have said "properly exercised" about the wrong thing.
+
+**Three separate safety nets failed, and it is worth being precise about which.**
+- `tsc` would have caught it — `on("tool_execution_end", …)` is typed, and `npm run typecheck`
+  covers extensions. It was defeated by an `as` cast. The cast is the defect; the second cast in
+  the same file (`(event as {prompt?: string}).prompt`) was never even needed, since
+  `BeforeAgentStartEvent.prompt` is a required string. A reflexive casting habit at one site is
+  what let a genuine type error through at the other. Both are deleted.
+- The tests certified it working because they **hand-fired `tool_execution_end` carrying
+  `args`** — a shape pi never emits. The conformance double passes hand-built events through
+  unprojected, so it cheerfully delivered the fiction. Now recorded as KNOWN-UNFAITHFUL #5, with
+  the honest note that tsc, not the double, is the real defence for this class.
+- The prereg's own diagnosis certified that *"the extension loads and registers all four
+  handlers"* and concluded *"no changes to the candidate are warranted"*. **Registering a handler
+  is not the same as the handler working.** That disposition would have protected the defect
+  straight through the re-run; it has been amended.
+
+**The other five fixed.** `command-policy`: bare `&` was a command position for `CMD_POS` but
+missing from the fail-closed head split, so `ls & ./evil.sh` classified `read_only`/`mutates=false`
+while it ran — and that verdict arms verify-gate, plan-mode's block and loop-breaker's progress
+signal, so a laundered mutation disarmed all three at once. `loop-breaker`: session counters at
+module scope were never reset and pi returns the **cached factory** across session replacement
+(`loader.js:318-322`), so "module scope" really means "until the cwd changes" — repeats bled
+across `/new`, `/fork` and `/resume`, `sessionRepeatFired` latched the steer off for the whole
+process, and the stale count rendered into the c48 lens as ground truth. `plan-runner`: "All
+items are done." could fire on a call that had just released an unfinished item.
+`session-blackboard` + `context-dedup`: `turnIndex` restarts per **agent run**, not per session,
+so turn-gap cooldowns went negative and latched shut. `spec-adherence`: read matching now
+requires a path boundary.
+
+**Deferred, with reasons rather than silence.**
+- `sv-ambiguous-spec` ships two of its three prompt steps already implemented, and the manifest
+  asserts sufficiency for work no model does ("the **new file** src/refundBatch.js" — it is not
+  new). Real, and admission structurally cannot catch it: `validate_contract` only checks that
+  sufficiency strings are non-empty, and the 4-state run applies a gold patch, so gold passing
+  proves nothing about whether a *model* could pass. Fixing it needs re-admission, which runs
+  tests — deferred until the box is free.
+- Gate transcripts are written by the measured session into a directory the sandbox leaves
+  writable, and `metrics.py` consumes them unconditionally and unsigned, while the harness
+  HMAC-signs its *telemetry* precisely because it does not trust in-band data. Under the
+  documented threat model (one trusted operator, local models) a 4B does not forge JSONL, and
+  `real_gate.sh:756` ANDs `trajectory_check` only when `gate==1`, so it cannot flip a fail to a
+  pass. Queued as hardening, not an emergency — but two docstrings in `trajectory_check.py`
+  assert a guarantee the jail does not enforce and should be corrected either way.
+- Collapsing `goCommand` and `plan_go` onto one queued validator is the single highest-value
+  refactor and is deliberately **not** done under time pressure: it is the fix for a class
+  (two paths that must agree, with nothing forcing them to) that has now produced two separate
+  defects in this file, and it deserves its own change with its own tests.
+
+**Coverage caveat, stated because silence would misrepresent it.** 32 of the 48 raw findings were
+below the top-16 severity cut and were **never adversarially verified**. They are not cleared —
+they are unexamined.
+
+**And the structural verdict, since that was the actual question asked.** Not spaghetti. The one
+real structural problem is that session-scoped state is expressed three ways with three
+lifetimes — module scope, factory-closure scope, and `globalThis` — layered on pi's cached-factory
+reload, so a `let` at module scope survives far longer than any reader assumes. Two of today's
+defects are the same misconception. The correct-sized fix was two `session_start` resets, not a
+session-state framework.
