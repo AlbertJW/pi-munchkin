@@ -1578,3 +1578,20 @@ rescue actually reaches the model rather than being silently dropped.
 
 310 tests pass, typecheck clean. The claim "npm run verify is green" is now a statement about
 the harness rather than about our fake.
+
+### Mirror status after the conformance work (2026-07-30)
+
+`harness/` mirrored to `~/.pi/agent` with **zero drift** across extensions/lib/tests/vendor;
+`npm run health` PASS (TS syntax, full typecheck, package resolution, model registry).
+New surface hash: `642902d5503d…` — bind it into the restarted rounds.
+
+Honest note on the mirror's own test run: `npx tsx --test tests/*.test.ts` executed *inside*
+`~/.pi/agent` reports 8 failures, all one pre-existing cause —
+`ERR_PACKAGE_PATH_NOT_EXPORTED` when a dynamically-imported extension pulls
+`@earendil-works/pi-coding-agent` under bare tsx in that directory (pi's own loader resolves
+it fine, which is why the live agent works). Verified pre-existing by checking out the prior
+mirror commit: ketch failed 4/8 there too. The new `span-index` guard test joins that set for
+the same reason — it now imports the extension rather than only the pure lib. **The
+authoritative suite is `npm run verify` in pi_munchkin (310 pass, typecheck clean); the mirror
+is a deployment target, not a test runner.** Same class as the documented
+`vendor/pi-subagent/index.ts` bare-node import gotcha.
