@@ -20,8 +20,29 @@ const ENABLED = process.env.SPAN_TOOLS === "on";
 type LoadedFile = { mtimeMs: number; text: string; normalizedPath: string; size: number; sha256: string };
 const cache = new Map<string, LoadedFile>();
 
+// These tools advertise themselves as safe on LARGE files, and their OUTPUT is
+// tightly bounded (20 matches / 8 KB) — but the INPUT was not: load() read the
+// whole file into memory and split it into a line array before any of that
+// bounding applied, so a pathological file could spike memory far beyond
+// anything the caller could observe in the result. Bound the input too, and
+// BLOCK rather than truncate (the context-inlet-guard rule: a silently partial
+// view of a file is worse than a clear refusal). Env-tunable, clamped.
+// (QA finding, 2026-07-30.)
+const MAX_FILE_BYTES = (() => {
+	const raw = process.env.SPAN_MAX_FILE_BYTES ?? "";
+	const parsed = /^\d+$/.test(raw) ? Number(raw) : 8 * 1024 * 1024;
+	return Math.min(64 * 1024 * 1024, Math.max(64 * 1024, parsed));
+})();
+
 async function load(path: string): Promise<LoadedFile> {
 	const info = await stat(path);
+	if (info.size > MAX_FILE_BYTES) {
+		throw new Error(
+			`span tools refuse files over ${Math.round(MAX_FILE_BYTES / 1024 / 1024)} MB — ` +
+			`${path} is ${Math.round(info.size / 1024 / 1024)} MB. Narrow the target, or use ` +
+			"bash (grep -n / sed -n 'A,Bp') which streams instead of loading the whole file.",
+		);
+	}
 	const hit = cache.get(path);
 	if (hit && hit.mtimeMs === info.mtimeMs && hit.size === info.size) return hit;
 	const bytes = await readFile(path);

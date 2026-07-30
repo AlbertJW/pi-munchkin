@@ -5,7 +5,7 @@
 // field-name bug pure tests could not see).
 import assert from "node:assert/strict";
 import test from "node:test";
-import { mkdtempSync, readFileSync, writeFileSync, mkdirSync, existsSync } from "node:fs";
+import { mkdtempSync, readFileSync, writeFileSync, mkdirSync, existsSync, readdirSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { callTool, fire, makeCtx, makeFakePi , expectToolError } from "./integration-harness.ts";
@@ -1129,4 +1129,42 @@ test("c39 + c25: plan_go unlocks PLAN_SUBAGENT_ONLY's block on a direct edit —
 		delete process.env.PLAN_TOOL_GO;
 		delete process.env.PLAN_SUBAGENT_ONLY;
 	}
+});
+
+test("persistence is ATOMIC: no reader can observe a torn plan-state.json", async () => {
+	// A torn state file loses the session's spine. rename(2) makes the swap atomic,
+	// so a reader sees either the old file or the new one — never a prefix.
+	const fp = freshPlanRunner();
+	const cwd = tmp();
+	await callTool(fp, "plan_write", {
+		items: [{ title: "first", status: "pending" }], request: "r", summary: "s",
+	}, cwd);
+
+	const statePath = join(cwd, ".pi", "plan-state.json");
+	let torn = 0;
+	let reads = 0;
+	// Poll the file while a large rewrite lands; every observed byte-image must parse.
+	const poller = setInterval(() => {
+		try {
+			const raw = readFileSync(statePath, "utf8");
+			reads += 1;
+			JSON.parse(raw);
+		} catch (error) {
+			if ((error as NodeJS.ErrnoException).code !== "ENOENT") torn += 1;
+		}
+	}, 1);
+	// Big enough that a plain writeFile cannot land in one syscall (~2 MB).
+	const bulky = Array.from({ length: 200 }, (_, i) => ({
+		title: `item ${i} ${"padding ".repeat(1200)}`, status: "pending" as const,
+	}));
+	for (let round = 0; round < 4; round++) {
+		await callTool(fp, "plan_write", { items: bulky, request: "r", summary: `round ${round}` }, cwd);
+	}
+	clearInterval(poller);
+	assert.ok(reads > 0, "the poller must actually have sampled the file");
+	assert.equal(torn, 0, "every observed state file parsed — no torn writes");
+
+	// And no temp files are left behind.
+	const strays = readdirSync(join(cwd, ".pi")).filter((f) => f.includes(".tmp-"));
+	assert.deepEqual(strays, [], "atomic writes must not leak temp files");
 });

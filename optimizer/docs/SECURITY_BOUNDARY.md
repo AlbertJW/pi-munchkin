@@ -94,3 +94,25 @@ already trusted to run in that shell. It is recorded here rather than left in a 
 so that the assumption is visible if that model ever changes (multi-user, untrusted repos, or
 autonomous unattended operation). Real fixes if it does: restrict gates to an operator-declared
 immutable allowlist, or run them in a filesystem/network sandbox.
+
+## `web_read` remains SSRF-capable through DNS rebinding / redirects (accepted, upstream)
+
+Surfaced by the 2026-07-30 QA session. `harness/lib/public-url.ts` validates a URL's host
+resolves to a public address *before* the fetch, but the actual retrieval happens in the
+external Ketch binary (`harness/extensions/ketch.ts`), which performs its **own** DNS
+resolution and follows its **own** redirects on a separate socket. The two resolutions are
+independent, so a hostile hostname can pass preflight and then resolve — or redirect — to
+loopback, link-local, cloud metadata (169.254.169.254), or a private service. The code
+comments already concede this; it is recorded here so the gap is visible rather than folklore.
+
+**Not fixable harness-side.** The preflight cannot bind the socket the fetch later opens.
+Real fixes, in preference order: (1) enforce public-address validation *inside* Ketch on every
+connection and every redirect hop; (2) perform the fetch in-process with DNS pinning
+(resolve once, connect to that literal IP, carry the Host header, re-validate each redirect);
+(3) run web retrieval in a network-namespaced sandbox that can only reach public routes.
+
+**Current mitigation and why the residual risk is accepted here**: retrieval is read-only and
+its output is bounded and surfaced to the model as untrusted data; the harness runs
+single-operator against a local model; `KETCH=off` disables the tools entirely. The exposure
+matters if this harness is ever run unattended, multi-user, or against untrusted prompts —
+at which point option (1) or (3) becomes a prerequisite, not an option.

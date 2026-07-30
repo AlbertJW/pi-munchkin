@@ -1,5 +1,9 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import { mkdtempSync, writeFileSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { callTool, expectToolError, makeFakePi } from "./integration-harness.ts";
 import { contentTag, MAX_MATCHES, MAX_OUT_BYTES, MAX_SPAN_LINES, readSpan, searchSpans } from "../lib/span-index.ts";
 
 const corpus = Array.from({ length: 500 }, (_, i) => `line ${i + 1} ${i % 7 === 0 ? "NEEDLE" : "hay"}`).join("\n");
@@ -37,4 +41,29 @@ test("readSpan byte cap trims the range and reports the honest end", () => {
 	assert.ok(body.length <= MAX_OUT_BYTES + 210);
 	assert.ok(end < 300);
 	assert.ok(header.includes(`1-${end}/300`));
+});
+
+test("span tools BLOCK oversized files instead of loading them (input bounding)", async () => {
+	const dir = mkdtempSync(join(tmpdir(), "span-cap-"));
+	const big = join(dir, "huge.log");
+	// One byte over the smallest permitted cap, with the cap pinned low for speed.
+	const prev = process.env.SPAN_MAX_FILE_BYTES;
+	const prevOn = process.env.SPAN_TOOLS;
+	process.env.SPAN_MAX_FILE_BYTES = "65536";
+	process.env.SPAN_TOOLS = "on";
+	try {
+		writeFileSync(big, "x".repeat(65536 + 1));
+		const fp = makeFakePi();
+		const mod = await import(`../extensions/span-tools.ts?cap=${Date.now()}-${Math.random()}`);
+		await mod.default(fp.pi as never);
+		await expectToolError(fp, "search_spans", { path: big, pattern: "x" }, dir, /refuse files over/);
+		// Under the cap it works normally — the guard blocks, it does not disable.
+		writeFileSync(big, "hello\nworld\n");
+		const ok = await callTool(fp, "search_spans", { path: big, pattern: "world" }, dir);
+		assert.equal(ok.isError, false);
+	} finally {
+		if (prev === undefined) delete process.env.SPAN_MAX_FILE_BYTES; else process.env.SPAN_MAX_FILE_BYTES = prev;
+		if (prevOn === undefined) delete process.env.SPAN_TOOLS; else process.env.SPAN_TOOLS = prevOn;
+		rmSync(dir, { recursive: true, force: true });
+	}
 });

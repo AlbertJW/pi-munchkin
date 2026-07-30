@@ -420,13 +420,26 @@ function staleInProgress(state: PlanState): PlanItem[] {
 	return state.writer === PROC_MARK ? [] : state.items.filter((i) => i.status === "in_progress");
 }
 
+// write-then-rename: rename(2) is atomic within a filesystem, so a crash or a
+// concurrent reader can never observe a half-written file. A TORN plan-state.json
+// is unrecoverable (the plan is the session's spine), and a torn TODO.md misleads
+// the human. Order matters too and is deliberate: state (authoritative, read by
+// the model) lands BEFORE TODO.md (a rendered derivative). A crash between the two
+// therefore leaves the model correct and only the human view stale — never the
+// reverse. (QA finding, 2026-07-30.)
+async function atomicWrite(path: string, contents: string): Promise<void> {
+	const tmp = `${path}.tmp-${process.pid}-${randomUUID().slice(0, 8)}`;
+	await writeFile(tmp, contents, "utf8");
+	await rename(tmp, path);
+}
+
 async function writeStateAndTodo(cwd: string, state: PlanState): Promise<void> {
 	state.updated_at = isoNow();
 	state.writer = PROC_MARK;
 	const sp = statePath(cwd);
 	await mkdir(dirname(sp), { recursive: true });
-	await writeFile(sp, `${JSON.stringify(state, null, 2)}\n`, "utf8");
-	await writeFile(todoPath(cwd), renderTodo(state), "utf8");
+	await atomicWrite(sp, `${JSON.stringify(state, null, 2)}\n`);
+	await atomicWrite(todoPath(cwd), renderTodo(state));
 	(globalThis as Record<string, unknown>).__pi_active_plan_context = {
 		run_id: state.run_id,
 		item_id: currentItem(state)?.id,
@@ -1078,8 +1091,16 @@ async function goCommand(args: string, ctx: { cwd: string; model?: { provider?: 
 	const resuming = state.phase === "executing";
 	// Capture BEFORE writeStateAndTodo stamps this process as the writer.
 	const stale = staleInProgress(state);
+	// Through mutatePlan, NOT a bare write: this is the same file plan_write
+	// serialises on, and /plan-go used to skip the queue entirely — a concurrent
+	// plan_write could interleave and lose one of the two updates. The plan_go
+	// TOOL (c39) already went through the queue; the slash command did not.
+	await mutatePlan(ctx.cwd, async (prev) => {
+		const next: PlanState = { ...(prev ?? state), phase: "executing" };
+		if (mode) next.autonomy = mode;
+		return { state: next, result: undefined };
+	});
 	state.phase = "executing";
-	await writeStateAndTodo(ctx.cwd, state);
 	pi.appendEntry("plan_spine", { run_id: state.run_id }); // mark this node for /collapse
 	await appendTrace(ctx.cwd, { run_id: state.run_id, action_type: "command", tool_name: "plan-go", success: true, output_summary: `${resuming ? "resume" : "execute"}${mode ? ` autonomy=${mode}` : ""}` });
 
