@@ -15,9 +15,40 @@ from pathlib import Path
 import fixture_admission as admission
 
 
+def test_manifest_artifacts_exist_on_disk():
+    """Every artifact a manifest claims must exist and still hash as recorded.
+
+    This exists because the count assertion below FAILED TO PROTECT ANYTHING on
+    2026-07-30: a concurrent `rm -rf` removed the whole audit-sweep fixture, a
+    `git add -A` staged the 20 deletions, the count check fired as designed —
+    and the count was edited 28 -> 27 to make the suite green again. The fixture
+    stayed deleted for two commits and `npm run verify` reported PASS the whole
+    time.
+
+    A bare count is adjustable, so under time pressure it gets adjusted. This
+    check is not: it fails with the missing PATH, which cannot be silenced by
+    editing a number, only by restoring the file or deliberately removing it
+    from the manifest.
+    """
+    missing, drifted = [], []
+    for path in sorted(admission.MANIFESTS.glob("*.json")):
+        manifest = json.loads(path.read_text())
+        for group in ("artifacts", "tests", "patches"):
+            for entry in manifest.get(group, []):
+                if not isinstance(entry, dict) or "path" not in entry or "sha256" not in entry:
+                    continue
+                target = admission.FIXTURES.parent / entry["path"]
+                if not target.exists():
+                    missing.append(f"{path.stem}: {entry['path']}")
+                elif admission.sha256(target) != entry["sha256"]:
+                    drifted.append(f"{path.stem}: {entry['path']}")
+    assert not missing, "manifest artifacts missing from disk:\n  " + "\n  ".join(missing)
+    assert not drifted, "manifest artifacts changed without a manifest update:\n  " + "\n  ".join(drifted)
+
+
 def test_admission_catalog():
     manifests = sorted(admission.MANIFESTS.glob("*.json"))
-    assert len(manifests) == 27, len(manifests)  # +retry-trap (2026-07-29)
+    assert len(manifests) == 28, len(manifests)  # +audit-sweep (2026-07-30)
     for path in manifests:
         manifest = json.loads(path.read_text())
         admission.validate_contract(manifest)
@@ -259,8 +290,8 @@ def test_incident_rotation():
 
 
 def main():
-    test_admission_catalog(); test_fixture_verify_read_only(); test_context_pressure_contract(); test_fingerprint(); test_one_shot(); test_execution_policy(); test_runner_dry_modes(); test_robustness_and_usage(); test_schedule(); test_incident_rotation()
-    print("integrity_selftest: OK (admission + read-only verify, expiry/drift/approval, fingerprint, one-shot, execution policy, robustness, usage, scheduling)")
+    test_manifest_artifacts_exist_on_disk(); test_admission_catalog(); test_fixture_verify_read_only(); test_context_pressure_contract(); test_fingerprint(); test_one_shot(); test_execution_policy(); test_runner_dry_modes(); test_robustness_and_usage(); test_schedule(); test_incident_rotation()
+    print("integrity_selftest: OK (artifacts on disk, admission + read-only verify, expiry/drift/approval, fingerprint, one-shot, execution policy, robustness, usage, scheduling)")
 
 
 if __name__ == "__main__": main()
