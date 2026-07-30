@@ -434,9 +434,18 @@ run_one() {  # $1=config $2=arm $3=task $4=rep [$5=split] [$6=prompt-variant]
 	python3 "$FIXTURE_META" row-context "$task" --variant "$variant" ${context_args[@]+"${context_args[@]}"} > "$rowctx"
 	local task_prompt; task_prompt="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["prompt_text"])' "$rowctx")"
 	rm -rf "$wd"; mkdir -p "$wd"
-	cp -R "$fix/src" "$fix/test" "$fix/package.json" "$wd/"
-	[[ -d "$fix/data" ]] && cp -R "$fix/data" "$wd/"   # data-backed tasks (e.g. bigdata) ship their corpus
-	[[ -d "$fix/scripts" ]] && cp -R "$fix/scripts" "$wd/" # deterministic fixture generators
+	# Materialize the WHOLE fixture tree, matching fixture_admission.py's copytree.
+	# This was an allowlist (src/test/package.json/data/scripts) until 2026-07-30, and it
+	# silently withheld docs/ and config/ from FOUR fixtures whose prompts name the file
+	# inside them -- admission validated a filesystem the model never saw. That floored
+	# retry-trap (1/42) and hygiene-shared-config-reread (3/24) and manufactured c50's
+	# entire premise. See MEASUREMENT_METHODOLOGY_2026-07.md section 9.
+	# An allowlist here is the defect, not the specific missing directory: extending it
+	# one dir at a time just defers the next instance. Gold patches, hidden tests and
+	# review packets live OUTSIDE the fixture root, so a tree copy leaks nothing --
+	# integrity_selftest.test_gate_materializes_everything_admission_does asserts both
+	# that the tree is copied and that no fixture root holds solution-shaped material.
+	tar -C "$fix" --exclude node_modules --exclude .git --exclude .DS_Store -cf - . | tar -C "$wd" -xf -
 	[[ "$task" == "t3" ]] && cp "$T3_FILES/align.js" "$wd/src/"   # the buggy source to fix (before only)
 	is_hidden "$task" || install_tests "$task" "$wd"             # shown tasks only; hidden tasks withhold the test
 

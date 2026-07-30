@@ -46,6 +46,46 @@ def test_manifest_artifacts_exist_on_disk():
     assert not drifted, "manifest artifacts changed without a manifest update:\n  " + "\n  ".join(drifted)
 
 
+def test_gate_materializes_everything_admission_does():
+    """The gate must give the model the same tree admission validated.
+
+    real_gate.sh used an allowlist (src/test/package.json/data/scripts) while
+    fixture_admission.py uses shutil.copytree. docs/ and config/ therefore never
+    reached the model's workdir, so four fixtures were admitted against one
+    filesystem and measured against a smaller one — 84 rows invalidated
+    (METHODOLOGY §9). Admission cannot catch this on its own: it validates a
+    world the model never sees. This test is the only place the two
+    materialization paths are compared.
+
+    Two properties, because the fix trades an allowlist for a whole-tree copy:
+      1. every top-level entry of every fixture actually reaches the workdir;
+      2. no fixture root contains solution material, since the tree copy would
+         now carry it to the model.
+    """
+    gate = (admission.ROOT / "real_gate.sh").read_text()
+    reserved = {"hidden", "manifests", "patches", "review-packets", "admission-tests", "schemas"}
+    fixtures = [d for d in admission.FIXTURES.iterdir()
+                if d.is_dir() and d.name not in reserved and not d.name.startswith("context-pressure")]
+
+    whole_tree = 'tar -C "$fix"' in gate
+    if not whole_tree:
+        # Still on the allowlist: name every entry it silently drops.
+        allow = {"src", "test", "package.json", "data", "scripts"}
+        dropped = [f"{d.name}/{e.name}" for d in fixtures for e in d.iterdir()
+                   if e.name not in allow and e.name != "node_modules"]
+        assert not dropped, (
+            "real_gate.sh materialization drops fixture content the model needs:\n  "
+            + "\n  ".join(sorted(dropped))
+            + "\nAdmission copies the whole tree; the gate must too (METHODOLOGY §9)."
+        )
+
+    leaks = [str(p.relative_to(admission.FIXTURES))
+             for d in fixtures for p in d.rglob("*")
+             if "node_modules" not in p.parts
+             and (p.suffix == ".patch" or any(w in p.name.lower() for w in ("gold", "solution", "answer", "hidden")))]
+    assert not leaks, "solution material inside a fixture root would be copied to the model:\n  " + "\n  ".join(sorted(leaks))
+
+
 def test_admission_catalog():
     manifests = sorted(admission.MANIFESTS.glob("*.json"))
     assert len(manifests) == 28, len(manifests)  # +audit-sweep (2026-07-30)
@@ -290,7 +330,7 @@ def test_incident_rotation():
 
 
 def main():
-    test_manifest_artifacts_exist_on_disk(); test_admission_catalog(); test_fixture_verify_read_only(); test_context_pressure_contract(); test_fingerprint(); test_one_shot(); test_execution_policy(); test_runner_dry_modes(); test_robustness_and_usage(); test_schedule(); test_incident_rotation()
+    test_manifest_artifacts_exist_on_disk(); test_gate_materializes_everything_admission_does(); test_admission_catalog(); test_fixture_verify_read_only(); test_context_pressure_contract(); test_fingerprint(); test_one_shot(); test_execution_policy(); test_runner_dry_modes(); test_robustness_and_usage(); test_schedule(); test_incident_rotation()
     print("integrity_selftest: OK (artifacts on disk, admission + read-only verify, expiry/drift/approval, fingerprint, one-shot, execution policy, robustness, usage, scheduling)")
 
 
