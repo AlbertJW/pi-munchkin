@@ -299,3 +299,47 @@ variants, not the 35B). Do not carry the −4% forward as evidence against it.
 three rounds run on 2026-07-30 (c49, c50) came back `unexposed`, and in both cases the pass-rate
 delta was pure noise around an inert arm. Without the exposure counter both would have entered
 the ledger as ordinary neutrals and been read as evidence about mechanisms that never ran.
+
+## §11 — The three 2026-07-30 rounds produced ZERO information. Why, precisely.
+
+All three completed, all three reported NEUTRAL, and none of them tested anything. The reasons
+differ, and the differences are the useful part.
+
+| round | candidate | exposure | fixtures | why it is uninformative |
+|---|---|---|---|---|
+| `c48-view-35b` | state lens | **targeted** (148 `view-injected`) | parens, equil, retry-trap | mechanism fired, but **saturated where valid** and **invalid where it moved** |
+| `c49-nat-35b` | tool-call-rescue | **unexposed** (0 detected) | parens, equil, bigdata | targeted failure mode never occurred; base 27/27 |
+| `c50-trap-4b` | spec-adherence | **unexposed** (0 armed) | retry-trap | spec withheld by the gate; and the mechanism was dead code anyway |
+
+**c48 deserves the closest reading, because it is the one that looks like a result.** Headline:
+67% → 72%, **+6%**. Split by fixture:
+
+```
+equil        base 6/6   cand 6/6
+parens       base 6/6   cand 6/6
+retry-trap   base 0/6   cand 1/6   <-- INVALID: docs/naming.md was never materialized
+```
+
+The two valid fixtures are **perfectly saturated in both arms** — 24 sessions carrying exactly
+zero information. The entire +6% is **one lucky session on a task that could not be passed**,
+because the spec it requires was absent from the workdir. A candidate whose mechanism
+demonstrably fired 148 times still produced a number built entirely from a broken fixture.
+
+This is the retrospective's thesis with all three failure modes in one day, and worth naming
+separately because they need different fixes:
+1. **Saturation** — the fixture cannot express improvement (c48 on parens/equil, c49 throughout).
+2. **Non-occurrence** — the mechanism is fine but its trigger never happens (c49).
+3. **Invalidity** — the task was impossible (c48's retry-trap rows, c50 entirely).
+
+Only (1) is fixed by harder fixtures. (2) needs a fixture or model that exhibits the behaviour.
+(3) needed the materialization bug fixed, which it now is.
+
+**Standing rule.** A fleet-level pass rate that mixes saturated and unsaturated fixtures hides
+which fixture moved. Before reading any headline delta, **split by fixture** — the one-liner is
+in this file's git history at §11. If every valid fixture is at 100% or 0% in both arms, the
+round produced no information regardless of what the aggregate says.
+
+**Dispositions.** c48 state-lens: untested (saturated + invalid), re-run needed on unsaturated
+valid fixtures. c49 tool-call-rescue: untested, needs a model that emits pseudo-tool-calls.
+c50 spec-adherence: untested, needs the mirrored `args` fix plus the materialization fix — both
+of which have now landed.
