@@ -1483,3 +1483,47 @@ exonerated. Remaining suspects: the concurrent gate chain (a session or cleanup 
 once-taken path in the admission/approve tooling. Tripwire decoys planted for the chain's
 remainder (`zz-tripwire/`); check at chain end. Standing lesson either way: **commit fixture
 files before running admission checks alongside a live round** — untracked = unprotected.
+
+### Anomaly RESOLVED: Albert's QA session deleted the files (2026-07-30)
+
+Not a harness defect and not the gate chain. Albert ran a deep-QA pi session from `$HOME`
+(`plan-2026-07-30T08-17-32`, autonomy `yolo`) concurrently with my fixture build. The session
+saw `audit-sweep` appear as untracked files it had not created, concluded "the read-only
+verifier unexpectedly created two untracked fixture paths", asked permission, was granted it,
+and ran `rm -rf` on exactly the two paths — then paused when *more* related files appeared
+(my manifest/patches/packet) and asked again rather than deleting unapproved work. Its safety
+behavior was correct throughout; its causal inference was wrong because it could not see the
+other agent. **Root cause: two agents writing the same repo with no visibility of each other.**
+The tripwire decoys are therefore expected to survive; they can be removed at chain end.
+Standing lesson (kept): commit fixture files immediately after admission — untracked is
+unprotected, and "untracked file I didn't create" reads as garbage to any other agent.
+
+### The QA session's own findings (verified before recording)
+
+Its subagent-driven audit produced 8 findings. Two verified line-by-line here:
+
+- **CONFIRMED, real bug — `compact_context` never auto-resumes.** `compact-tool.ts:67-70`
+  sends `{deliverAs:"nextTurn", triggerTurn:true}`; pi 0.83's own docs (`extensions.md:1409`)
+  state `triggerTurn` "Only applies to `steer` and `followUp` modes (ignored for `nextTurn`)"
+  and nextTurn "Does not interrupt or trigger anything." So the tool aborts the operation,
+  compacts, and the session sits idle until the user types. This ALSO explains the
+  compact-tool telemetry pattern (requests recorded, completions never observed live) that we
+  previously attributed to the tool simply going unused. **Fix: `deliverAs:"followUp"`** —
+  defect-fix class, not a candidate. Queued.
+- **CONFIRMED, by design, worth documenting — plan gates execute outside tool guards.**
+  `runReadonlyGate` runs `it.gate` via `env -i … bash -c`, so `git-guard`/plan-mode/etc never
+  see nested actions; `gate-runtime.ts:11-13` already says so in a comment ("Gates are
+  arbitrary executable code even when their command line looks read-only") and mitigates by
+  stripping the environment. `assertVerifyGateAllowed` + destructive-classification gate the
+  command line only. Accepted risk in a single-user local harness, but it should be stated in
+  SECURITY_BOUNDARY.md rather than living in a code comment.
+
+Recorded for triage (not yet verified by me): `web_read` SSRF via DNS rebinding/redirect
+(preflight and Ketch fetch resolve independently — the code comments acknowledge this);
+`plan_write`/`plan_go` returning `isError:true` when pi 0.83 only marks custom-tool errors on
+throw (would make semantic rejections invisible to the tool_result observer, loop-breaker, and
+telemetry); non-atomic dual-write of `plan-state.json` + `TODO.md` with `/plan-go` bypassing
+the mutation queue; blackboard globals not cleared before a resume/fork restore; span-tools
+loading whole files before bounding output. Also: `pi-tldraw`'s `tldraw_status` crashed pi by
+spawning missing `yarn` without handling the spawn error (upstream package defect, Albert's
+live env only).
