@@ -8,7 +8,7 @@ import test from "node:test";
 import { mkdtempSync, readFileSync, writeFileSync, mkdirSync, existsSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { callTool, fire, makeCtx, makeFakePi } from "./integration-harness.ts";
+import { callTool, fire, makeCtx, makeFakePi , expectToolError } from "./integration-harness.ts";
 
 // module-load envs BEFORE importing the extensions
 process.env.PLAN_GATE_MAX = "2";
@@ -357,32 +357,32 @@ test("integration: plan_write with a broken dependency graph is rejected, state 
 	// Rejections must THROW: pi 0.83 ignores a returned isError (docs
 	// extensions.md:1959), so asserting the return value tested our own test
 	// double rather than pi's contract — and hid the defect until 2026-07-30.
-	await assert.rejects(() => callTool(fp, "plan_write", {
+	await expectToolError(fp, "plan_write", {
 		items: [{ title: "a", status: "pending", depends_on: ["ghost"] }], request: "r", summary: "s",
-	}, cwd), /ghost/, "unknown dep ref rejects the call");
+	}, cwd, /ghost/);
 	assert.ok(!existsSync(join(cwd, ".pi", "plan-state.json")), "no state written on rejection");
 
-	await assert.rejects(() => callTool(fp, "plan_write", {
+	await expectToolError(fp, "plan_write", {
 		items: [
 			{ title: "a", status: "pending", depends_on: ["b"] },
 			{ title: "b", status: "pending", depends_on: ["a"] },
 		], request: "r", summary: "s",
-	}, cwd), /cycle/, "cycle rejects the call");
+	}, cwd, /cycle/);
 	assert.ok(!existsSync(join(cwd, ".pi", "plan-state.json")), "still no state written");
 
-	await assert.rejects(() => callTool(fp, "plan_write", {
+	await expectToolError(fp, "plan_write", {
 		items: [
 			{ title: "Fix `Parser`", status: "pending" },
 			{ title: " fix parser ", status: "pending" },
 		], request: "r", summary: "s",
-	}, cwd), /plan_write rejected/, "normalized title collision rejects the call");
+	}, cwd, /plan_write rejected/);
 
-	await assert.rejects(() => callTool(fp, "plan_write", {
+	await expectToolError(fp, "plan_write", {
 		items: [
 			{ title: "build", status: "pending" },
 			{ title: "ship", status: "pending", depends_on: ["build", "BUILD"] },
 		], request: "r", summary: "s",
-	}, cwd), /plan_write rejected/, "duplicate dependency rejects the call");
+	}, cwd, /plan_write rejected/);
 });
 
 test("integration: valid deps stored, rendered in TODO.md, unmet-dep work warned (advisory)", async () => {
@@ -987,7 +987,7 @@ test("c39: plan_go blocked — no plan exists", async () => {
 		const mod = await import(`../extensions/plan-runner.ts?c39noplan=${Date.now()}-${Math.random()}`);
 		mod.default(fp.pi as any);
 		// plan_go rejections THROW (pi ignores a returned isError — docs 1959).
-		await assert.rejects(() => callTool(fp, "plan_go", {}, cwd), /plan_write/);
+		await expectToolError(fp, "plan_go", {}, cwd, /plan_write/);
 		assert.equal(existsSync(join(cwd, ".pi", "plan-state.json")), false, "no state file must be created");
 		const rows = readFileSync(telemetry, "utf8").trim().split("\n").map((line) => JSON.parse(line));
 		const blocked = rows.find((row) => row.ext === "plan-runner" && row.kind === "go-blocked");
@@ -1015,7 +1015,7 @@ test("c39: plan_go blocked — plan exists but has no open items", async () => {
 		await callTool(fp, "plan_write", {
 			items: [{ title: "already done", status: "done" }], request: "r", summary: "s",
 		}, cwd);
-		await assert.rejects(() => callTool(fp, "plan_go", {}, cwd), /complete/);
+		await expectToolError(fp, "plan_go", {}, cwd, /complete/);
 		const state = JSON.parse(readFileSync(join(cwd, ".pi", "plan-state.json"), "utf8"));
 		assert.equal(state.phase, "planned", "phase must not flip with no open items");
 		const rows = readFileSync(telemetry, "utf8").trim().split("\n").map((line) => JSON.parse(line));
@@ -1046,7 +1046,7 @@ test("c39: plan_go blocked under a PLAN_UNCERTAINTY hold, does not flip phase", 
 			items: [{ title: "step one", status: "pending" }], request: "r", summary: "s",
 			uncertainties: ["Which environment: staging or prod?"],
 		}, cwd);
-		await assert.rejects(() => callTool(fp, "plan_go", {}, cwd), /Which environment: staging or prod\?/);
+		await expectToolError(fp, "plan_go", {}, cwd, /Which environment: staging or prod\?/);
 		const state = JSON.parse(readFileSync(join(cwd, ".pi", "plan-state.json"), "utf8"));
 		assert.equal(state.phase, "planned", "phase must not flip while uncertainties remain");
 		const rows = readFileSync(telemetry, "utf8").trim().split("\n").map((line) => JSON.parse(line));
@@ -1083,7 +1083,7 @@ test("c39: plan_go transitions phase to executing and disarms isPlanning()", asy
 		assert.equal(duringPlan?.block, true, "plan-mode block still fires before plan_go");
 
 		const r = await callTool(fp, "plan_go", {}, cwd);
-		assert.equal(r.isError, undefined, r.content?.[0]?.text);
+		assert.equal(r.isError, false, r.content?.[0]?.text);
 		const state = JSON.parse(readFileSync(join(cwd, ".pi", "plan-state.json"), "utf8"));
 		assert.equal(state.phase, "executing");
 		assert.ok(fp.entries.some((e) => e.type === "plan_spine"), "plan_spine entry recorded");
@@ -1118,7 +1118,9 @@ test("c39 + c25: plan_go unlocks PLAN_SUBAGENT_ONLY's block on a direct edit —
 			items: [{ title: "step one", status: "pending" }], request: "r", summary: "s",
 		}, cwd);
 		const go = await callTool(fp, "plan_go", {}, cwd);
-		assert.equal(go.isError, undefined, go.content?.[0]?.text);
+		// pi sets isError:false on every successful tool result — `undefined` was
+		// only ever true of the old double echoing the raw return value.
+		assert.equal(go.isError, false, go.content?.[0]?.text);
 
 		const edit = await fire(fp, "tool_call", { toolName: "edit", input: {} }, ctx);
 		assert.equal(edit?.block, true, "PLAN_SUBAGENT_ONLY must now block a direct edit -- purely via tool calls, no slash command ever dispatched");

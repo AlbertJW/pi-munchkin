@@ -8,7 +8,7 @@ import { chmodSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileTag, normalizeText } from "../lib/hashline-core.ts";
-import { callTool, makeFakePi } from "./integration-harness.ts";
+import { callTool, expectToolError, makeFakePi } from "./integration-harness.ts";
 
 const hashline = (await import("../extensions/hashline.ts")).default;
 const tmp = () => mkdtempSync(join(tmpdir(), "pi-hl-"));
@@ -51,7 +51,7 @@ test("hashline: ATOMIC — a bad tag in a later section leaves earlier files UNT
 	const patch =
 		`[f1.txt#${tagOf(join(cwd, "f1.txt"))}]\nreplace 1..1:\n+AAA\n` +
 		`[f2.txt#deadbeef]\nreplace 1..1:\n+BBB\n`;
-	await assert.rejects(() => callTool(fp, "edit", { input: patch }, cwd), /tag is not from this session/);
+	await expectToolError(fp, "edit", { input: patch }, cwd, /tag is not from this session/);
 	// the whole patch must have rolled back — f1 is NOT half-applied
 	assert.equal(readFileSync(join(cwd, "f1.txt"), "utf8"), "aaa\n", "earlier file must be untouched on a later-section failure");
 	assert.equal(readFileSync(join(cwd, "f2.txt"), "utf8"), "bbb\n");
@@ -95,7 +95,7 @@ test("hashline: multi-section failure message says NOTHING was applied", async (
 	const patch =
 		`[f1.txt#${tagOf(join(cwd, "f1.txt"))}]\nreplace 1..1:\n+AAA\n` +
 		`[f2.txt#deadbeef]\nreplace 1..1:\n+BBB\n`;
-	await assert.rejects(() => callTool(fp, "edit", { input: patch }, cwd), /NONE were applied.*re-emit the ENTIRE patch/);
+	await expectToolError(fp, "edit", { input: patch }, cwd, /NONE were applied.*re-emit the ENTIRE patch/);
 });
 
 test("hashline: phase-2 WRITE failure rolls earlier files back (I/O atomicity)", async () => {
@@ -107,7 +107,7 @@ test("hashline: phase-2 WRITE failure rolls earlier files back (I/O atomicity)",
 	const patch =
 		`[f1.txt#${tagOf(join(cwd, "f1.txt"))}]\nreplace 1..1:\n+AAA\n` +
 		`[f2.txt#${tagOf(join(cwd, "f2.txt"))}]\nreplace 1..1:\n+BBB\n`;
-	await assert.rejects(() => callTool(fp, "edit", { input: patch }, cwd), /every target was restored to its pre-patch state/);
+	await expectToolError(fp, "edit", { input: patch }, cwd, /every target was restored to its pre-patch state/);
 	assert.equal(readFileSync(join(cwd, "f1.txt"), "utf8"), "aaa\n",
 		"f1 was written in phase 2, then ROLLED BACK when f2's write failed");
 	chmodSync(join(cwd, "f2.txt"), 0o644);
@@ -121,6 +121,6 @@ test("hashline: ATOMIC — an out-of-range hunk in a later section rolls back th
 	const patch =
 		`[f1.txt#${tagOf(join(cwd, "f1.txt"))}]\nreplace 1..1:\n+AAA\n` +
 		`[f2.txt#${tagOf(join(cwd, "f2.txt"))}]\nreplace 5..9:\n+BBB\n`; // f2 has 1 line
-	await assert.rejects(() => callTool(fp, "edit", { input: patch }, cwd));
+	await expectToolError(fp, "edit", { input: patch }, cwd, /.?/);
 	assert.equal(readFileSync(join(cwd, "f1.txt"), "utf8"), "aaa\n", "earlier file untouched on a later apply error");
 });

@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import { fire, makeFakePi } from "./integration-harness.ts";
 import { detectPseudoToolCall, rescueMessage } from "../extensions/tool-call-rescue.ts";
 
 // Run: cd ~/.pi/agent && npx -y tsx --test tests/tool-call-rescue.test.ts
@@ -33,30 +34,26 @@ test("rescue message carries the self-correction instruction and tool name", () 
 });
 
 test("extension: dark by default; steers at most twice; detection keeps recording", async () => {
-	const handlers = new Map<string, (event: unknown) => Promise<void>>();
-	const sent: string[] = [];
-	const fakePi = {
-		on: (name: string, fn: never) => handlers.set(name, fn),
-		sendUserMessage: (text: string) => sent.push(text),
-	};
+	const fp = makeFakePi();
+	const sent = fp.sent;
 	const prev = process.env.TOOL_CALL_RESCUE;
 	try {
 		delete process.env.TOOL_CALL_RESCUE;
 		const off = await import(`../extensions/tool-call-rescue.ts?off=${Date.now()}-${Math.random()}`);
-		off.default(fakePi as never);
-		assert.equal(handlers.size, 0, "dark by default");
+		off.default(fp.pi as never);
+		assert.equal(fp.handlers.size, 0, "dark by default");
 
 		process.env.TOOL_CALL_RESCUE = "on";
 		const on = await import(`../extensions/tool-call-rescue.ts?on=${Date.now()}-${Math.random()}`);
-		on.default(fakePi as never);
-		await handlers.get("session_start")!({});
+		on.default(fp.pi as never);
+		await fire(fp, "session_start", {});
 		const pseudo = {
 			turnIndex: 1,
 			message: { role: "assistant", content: [{ type: "text", text: "<function=bash>ls</function>" }] },
 		};
-		await handlers.get("turn_end")!(pseudo);
-		await handlers.get("turn_end")!(pseudo);
-		await handlers.get("turn_end")!(pseudo); // damper: third detection, no steer
+		await fire(fp, "turn_end", pseudo);
+		await fire(fp, "turn_end", pseudo);
+		await fire(fp, "turn_end", pseudo); // damper: third detection, no steer
 		assert.equal(sent.length, 2, "max 2 rescues per session");
 
 		const real = {
@@ -69,12 +66,21 @@ test("extension: dark by default; steers at most twice; detection keeps recordin
 				],
 			},
 		};
-		await handlers.get("turn_end")!(real);
+		await fire(fp, "turn_end", real);
 		assert.equal(sent.length, 2, "real toolCall present — never fires");
 
-		await handlers.get("session_start")!({});
-		await handlers.get("turn_end")!(pseudo);
+		await fire(fp, "session_start", {});
+		await fire(fp, "turn_end", pseudo);
 		assert.equal(sent.length, 3, "damper resets per session");
+
+		// Now assertable for the first time: the inline fake dropped the options
+		// argument, so the rescue's DELIVERY MODE was never checked. A rescue that
+		// pi silently drops would revive nothing — the exact class of defect this
+		// candidate exists to fix.
+		for (const d of fp.deliveries) {
+			assert.equal(d.deliverAs, "steer");
+			assert.equal(d.effective, "delivered", "a rescue must actually reach the model");
+		}
 	} finally {
 		if (prev === undefined) delete process.env.TOOL_CALL_RESCUE; else process.env.TOOL_CALL_RESCUE = prev;
 	}

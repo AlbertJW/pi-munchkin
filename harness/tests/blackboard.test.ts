@@ -5,6 +5,7 @@ import {
 	renderLens, resetBoard, restore, snapshot,
 } from "../lib/blackboard.ts";
 import { record } from "../lib/telemetry.ts";
+import { fire, makeFakePi } from "./integration-harness.ts";
 
 // Run: cd ~/.pi/agent && npx -y tsx --test tests/blackboard.test.ts
 
@@ -97,35 +98,28 @@ test("telemetry tap: sees events across module instances, and a throwing tap nev
 });
 
 test("extension: BLACKBOARD=off registers nothing; STATE_LENS unset registers no context hook", async () => {
-	const handlers = new Map<string, unknown>();
-	const commands: string[] = [];
-	const fakePi = {
-		on: (name: string, fn: unknown) => handlers.set(name, fn),
-		registerCommand: (name: string) => commands.push(name),
-		sendUserMessage: () => {},
-		appendEntry: () => {},
-	};
+	const fp = makeFakePi();
 	const prevBb = process.env.BLACKBOARD;
 	const prevLens = process.env.STATE_LENS;
 	try {
 		process.env.BLACKBOARD = "off";
 		const off = await import(`../extensions/session-blackboard.ts?off=${Date.now()}-${Math.random()}`);
-		off.default(fakePi as never);
-		assert.equal(handlers.size, 0);
-		assert.equal(commands.length, 0);
+		off.default(fp.pi as never);
+		assert.equal(fp.handlers.size, 0);
+		assert.equal(fp.commands.size, 0);
 
 		delete process.env.BLACKBOARD;
 		delete process.env.STATE_LENS;
 		const on = await import(`../extensions/session-blackboard.ts?on=${Date.now()}-${Math.random()}`);
-		on.default(fakePi as never);
-		assert.ok(handlers.has("turn_end"));
-		assert.ok(!handlers.has("context"), "lens dark by default — no context hook at all");
+		on.default(fp.pi as never);
+		assert.ok(fp.handlers.has("turn_end"));
+		assert.ok(!fp.handlers.has("context"), "lens dark by default — no context hook at all");
 
-		handlers.clear();
+		fp.handlers.clear();
 		process.env.STATE_LENS = "view";
 		const lens = await import(`../extensions/session-blackboard.ts?lens=${Date.now()}-${Math.random()}`);
-		lens.default(fakePi as never);
-		assert.ok(handlers.has("context"), "STATE_LENS=view registers the view hook");
+		lens.default(fp.pi as never);
+		assert.ok(fp.handlers.has("context"), "STATE_LENS=view registers the view hook");
 	} finally {
 		if (prevBb === undefined) delete process.env.BLACKBOARD; else process.env.BLACKBOARD = prevBb;
 		if (prevLens === undefined) delete process.env.STATE_LENS; else process.env.STATE_LENS = prevLens;
@@ -133,19 +127,13 @@ test("extension: BLACKBOARD=off registers nothing; STATE_LENS unset registers no
 });
 
 test("lens view hook appends a tail block only when the lens is non-empty", async () => {
-	const handlers = new Map<string, (event: unknown, ctx: unknown) => Promise<unknown>>();
-	const fakePi = {
-		on: (name: string, fn: never) => handlers.set(name, fn),
-		registerCommand: () => {},
-		sendUserMessage: () => {},
-		appendEntry: () => {},
-	};
+	const fp = makeFakePi();
 	const prevLens = process.env.STATE_LENS;
 	process.env.STATE_LENS = "view";
 	try {
 		const mod = await import(`../extensions/session-blackboard.ts?viewhook=${Date.now()}-${Math.random()}`);
-		mod.default(fakePi as never);
-		const hook = handlers.get("context")!;
+		mod.default(fp.pi as never);
+		const hook = fp.handlers.get("context")![0];
 		resetBoard();
 		const emptyMessages = [{ role: "user", content: [{ type: "text", text: "hi" }] }];
 		assert.equal(await hook({ messages: emptyMessages }, {}), undefined, "empty board → untouched view");
@@ -176,18 +164,12 @@ test("resume/fork ALWAYS resets before restoring — no cross-session ledger ble
 	// The board lives on globalThis. A resume whose snapshot is missing must not
 	// inherit the previous session's ledger, or the state lens would present
 	// another session's attempts as this session's ground truth.
-	const handlers = new Map<string, (event: unknown, ctx?: unknown) => Promise<unknown>>();
-	const fakePi = {
-		on: (name: string, fn: never) => handlers.set(name, fn),
-		registerCommand: () => {},
-		sendUserMessage: () => {},
-		appendEntry: () => {},
-	};
+	const fp = makeFakePi();
 	const prev = process.env.BLACKBOARD;
 	delete process.env.BLACKBOARD;
 	try {
 		const mod = await import(`../extensions/session-blackboard.ts?bleed=${Date.now()}-${Math.random()}`);
-		mod.default(fakePi as never);
+		mod.default(fp.pi as never);
 		// Session A leaves state behind (start from a known board — the store is
 		// process-global, so sibling tests in this file share it).
 		resetBoard();
@@ -197,7 +179,7 @@ test("resume/fork ALWAYS resets before restoring — no cross-session ledger ble
 		assert.equal(Object.keys(boardState().attempts).length, 1);
 
 		// Session B resumes; the branch carries no blackboard entry.
-		await handlers.get("session_start")!(
+		await fire(fp, "session_start", 
 			{ reason: "resume" },
 			{ cwd: process.cwd(), sessionManager: { getBranch: () => [] } },
 		);

@@ -1527,3 +1527,54 @@ the mutation queue; blackboard globals not cleared before a resume/fork restore;
 loading whole files before bounding output. Also: `pi-tldraw`'s `tldraw_status` crashed pi by
 spawning missing `yarn` without handling the spawn error (upstream package defect, Albert's
 live env only).
+
+## The conformance double: making "the tests pass" mean something (2026-07-30)
+
+Two production defects in one day, neither caught by 295 passing tests, both *pinned* by those
+tests, forced the question: what else is fiction? Root cause was structural —
+`harness/tests/integration-harness.ts` was a **recorder**, not a simulator. It stored what
+extensions did and handed it back to assertions, so any behaviour pi silently ignores or
+transforms was invisible to the entire suite.
+
+**Rebuilt as a conformance double.** Every simulated behaviour now carries a citation to pi
+0.83's docs or shipped implementation, and its own 14-test suite
+(`integration-harness.test.ts`) pins each contract so a pi upgrade fails here first.
+
+The correction that mattered most: `fire()` returned the **first non-undefined** handler
+result for every event. pi actually uses **five different strategies** —
+
+| strategy | events |
+|---|---|
+| chain (middleware) | `tool_result`, `context`, `message_end`, `input`-transform, `before_provider_request` |
+| accumulate | `before_agent_start` (messages append, systemPrompt chains), `resources_discover` |
+| last-truthy-wins + short-circuit | `tool_call`, the four `session_before_*` |
+| first-truthy-wins | `user_bash`, `input`-`handled`, `project_trust` |
+| return discarded | ~17 incl. `session_start`, `turn_end`, `tool_execution_*` |
+
+— so "first-wins" was right for three events and wrong for the rest, and **multi-extension
+composition had never been tested at all**. Also modelled now: tool failure only via throw
+(returned `isError` ignored; a throw yields `content:[{text:err.message}]`, `details:{}`);
+`terminate` unpatchable from `tool_result`; pi's delivery ladder recorded as an `effective`
+verdict (delivered / queued-* / **lost**) instead of raw options; `sendUserMessage` while
+streaming without `deliverAs` silently lost; per-extension module instances; `globalThis` bus
+reset between tests.
+
+### Triage of all 13 failures the double exposed
+
+| # | failure | class | resolution |
+|---|---|---|---|
+| 1 | teach-hints "isError untouched" | **(c) double bug** | my chain returned event-inherited fields as if patched; now only handler-**set** fields form the patch |
+| 2-3 | compact-tool `.message.details` | **(c) double API** | added `message` alias for `sendMessage` entries |
+| 4-7 | hashline ×4 `assert.rejects(callTool)` | **(b) idiom** | callTool now applies pi's contract (pi never propagates the throw); new `expectToolError()` asserts the failure the *model* sees |
+| 8-11 | plan-runner ×4 dependency rejections | **(b) idiom** | same conversion |
+| 12-13 | plan-runner c39 `isError === undefined` | **(b) fiction** | pi sets `isError:false` on success; `undefined` was only ever the old double echoing the raw return |
+
+No new production defects — the two real ones had already been fixed that morning, and the
+double now proves the fixes rather than the fictions. All **6 inline hand-rolled fakes** (in
+`blackboard`, `payload-audit`, `spec-adherence`, `tool-call-rescue`, `context-watch`) are gone;
+several dropped the options argument entirely, which is why c49's and c50's steers had **no
+delivery-mode assertion at all** — they now assert `effective === "delivered"`, i.e. that a
+rescue actually reaches the model rather than being silently dropped.
+
+310 tests pass, typecheck clean. The claim "npm run verify is green" is now a statement about
+the harness rather than about our fake.

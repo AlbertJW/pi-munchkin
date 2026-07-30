@@ -3,6 +3,7 @@ import test from "node:test";
 import { readFileSync, mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { fire, makeFakePi } from "./integration-harness.ts";
 import { analyzePayload } from "../extensions/payload-audit.ts";
 
 // Run: cd ~/.pi/agent && npx -y tsx --test tests/payload-audit.test.ts
@@ -52,22 +53,21 @@ test("thinking replay and lens position are detected", () => {
 });
 
 test("extension: flag off registers nothing; flag on records rows to the trace file", async () => {
-	const handlers = new Map<string, (event: unknown, ctx?: unknown) => Promise<unknown>>();
-	const fakePi = { on: (name: string, fn: never) => handlers.set(name, fn) };
+	const fp = makeFakePi();
 	const prev = process.env.PAYLOAD_AUDIT;
 	const work = mkdtempSync(join(tmpdir(), "payload-audit-"));
 	try {
 		delete process.env.PAYLOAD_AUDIT;
 		const off = await import(`../extensions/payload-audit.ts?off=${Date.now()}-${Math.random()}`);
-		off.default(fakePi as never);
-		assert.equal(handlers.size, 0, "dark by default");
+		off.default(fp.pi as never);
+		assert.equal(fp.handlers.size, 0, "dark by default");
 
 		process.env.PAYLOAD_AUDIT = "on";
 		const on = await import(`../extensions/payload-audit.ts?on=${Date.now()}-${Math.random()}`);
-		on.default(fakePi as never);
-		await handlers.get("session_start")!({}, { cwd: work });
-		await handlers.get("before_provider_request")!({ payload: { model: "m", messages: [msg("user", "a")] } });
-		await handlers.get("before_provider_request")!({ payload: { model: "m", messages: [msg("user", "a"), msg("assistant", "b")] } });
+		on.default(fp.pi as never);
+		await fire(fp, "session_start", {}, { cwd: work });
+		await fire(fp, "before_provider_request", { payload: { model: "m", messages: [msg("user", "a")] } });
+		await fire(fp, "before_provider_request", { payload: { model: "m", messages: [msg("user", "a"), msg("assistant", "b")] } });
 		const rows = readFileSync(join(work, ".pi", "traces", "payload-audit.jsonl"), "utf8")
 			.trim().split("\n").map((l) => JSON.parse(l));
 		assert.equal(rows.length, 2);

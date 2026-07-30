@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import { fire, makeFakePi } from "./integration-harness.ts";
 import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -34,42 +35,40 @@ test("steer message names the path and the corrective action", () => {
 });
 
 test("extension lifecycle: arm → fail twice → steer once per unread spec, dark off", async () => {
-	const handlers = new Map<string, (event: unknown, ctx?: unknown) => Promise<unknown>>();
-	const sent: string[] = [];
-	const fakePi = {
-		on: (name: string, fn: never) => handlers.set(name, fn),
-		sendUserMessage: (text: string) => sent.push(text),
-	};
+	const fp = makeFakePi();
+	const sent = fp.sent;
 	const prev = process.env.SPEC_ADHERENCE;
 	let work = "";
 	try {
 		delete process.env.SPEC_ADHERENCE;
 		const off = await import(`../extensions/spec-adherence.ts?off=${Date.now()}-${Math.random()}`);
-		off.default(fakePi as never);
-		assert.equal(handlers.size, 0, "dark by default");
+		off.default(fp.pi as never);
+		assert.equal(fp.handlers.size, 0, "dark by default");
 
 		process.env.SPEC_ADHERENCE = "on";
 		const mod = await import(`../extensions/spec-adherence.ts?on=${Date.now()}-${Math.random()}`);
-		mod.default(fakePi as never);
+		mod.default(fp.pi as never);
 		work = specWorkdir();
-		await handlers.get("session_start")!({}, { cwd: work });
-		await handlers.get("before_agent_start")!({ prompt: "Fix slugs per docs/naming.md, the authoritative spec." });
+		await fire(fp, "session_start", {}, { cwd: work });
+		await fire(fp, "before_agent_start", { prompt: "Fix slugs per docs/naming.md, the authoritative spec." });
 
 		const failEdit = { toolName: "edit", args: { path: "src/x.ts" }, isError: true };
-		await handlers.get("turn_end")!({ turnIndex: 1 });
+		await fire(fp, "turn_end", { turnIndex: 1 });
 		assert.equal(sent.length, 0, "no steer before failures accumulate");
 
-		await handlers.get("tool_execution_end")!(failEdit);
-		await handlers.get("turn_end")!({ turnIndex: 2 });
+		await fire(fp, "tool_execution_end", failEdit);
+		await fire(fp, "turn_end", { turnIndex: 2 });
 		assert.equal(sent.length, 0, "one failure is not enough");
 
-		await handlers.get("tool_execution_end")!(failEdit);
-		await handlers.get("turn_end")!({ turnIndex: 3 });
+		await fire(fp, "tool_execution_end", failEdit);
+		await fire(fp, "turn_end", { turnIndex: 3 });
 		assert.equal(sent.length, 1, "two failing mutations + unread spec → steer");
 		assert.match(sent[0], /docs\/naming\.md/);
 
-		await handlers.get("turn_end")!({ turnIndex: 4 });
+		await fire(fp, "turn_end", { turnIndex: 4 });
 		assert.equal(sent.length, 1, "once per path — no repeat");
+		assert.equal(fp.deliveries[0].deliverAs, "steer");
+		assert.equal(fp.deliveries[0].effective, "delivered", "the steer must actually reach the model");
 	} finally {
 		if (prev === undefined) delete process.env.SPEC_ADHERENCE; else process.env.SPEC_ADHERENCE = prev;
 		if (work) rmSync(work, { recursive: true, force: true });
@@ -77,24 +76,20 @@ test("extension lifecycle: arm → fail twice → steer once per unread spec, da
 });
 
 test("reading the spec (read tool or bash cat) suppresses the steer", async () => {
-	const handlers = new Map<string, (event: unknown, ctx?: unknown) => Promise<unknown>>();
-	const sent: string[] = [];
-	const fakePi = {
-		on: (name: string, fn: never) => handlers.set(name, fn),
-		sendUserMessage: (text: string) => sent.push(text),
-	};
+	const fp = makeFakePi();
+	const sent = fp.sent;
 	const prev = process.env.SPEC_ADHERENCE;
 	process.env.SPEC_ADHERENCE = "on";
 	const work = specWorkdir();
 	try {
 		const mod = await import(`../extensions/spec-adherence.ts?read=${Date.now()}-${Math.random()}`);
-		mod.default(fakePi as never);
-		await handlers.get("session_start")!({}, { cwd: work });
-		await handlers.get("before_agent_start")!({ prompt: "Follow docs/naming.md exactly." });
-		await handlers.get("tool_execution_end")!({ toolName: "bash", args: { command: "cat docs/naming.md | head -50" }, isError: false });
-		await handlers.get("tool_execution_end")!({ toolName: "edit", args: {}, isError: true });
-		await handlers.get("tool_execution_end")!({ toolName: "edit", args: {}, isError: true });
-		await handlers.get("turn_end")!({ turnIndex: 3 });
+		mod.default(fp.pi as never);
+		await fire(fp, "session_start", {}, { cwd: work });
+		await fire(fp, "before_agent_start", { prompt: "Follow docs/naming.md exactly." });
+		await fire(fp, "tool_execution_end", { toolName: "bash", args: { command: "cat docs/naming.md | head -50" }, isError: false });
+		await fire(fp, "tool_execution_end", { toolName: "edit", args: {}, isError: true });
+		await fire(fp, "tool_execution_end", { toolName: "edit", args: {}, isError: true });
+		await fire(fp, "turn_end", { turnIndex: 3 });
 		assert.equal(sent.length, 0, "spec was read via bash cat — no steer");
 	} finally {
 		if (prev === undefined) delete process.env.SPEC_ADHERENCE; else process.env.SPEC_ADHERENCE = prev;
