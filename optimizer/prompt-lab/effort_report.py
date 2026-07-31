@@ -22,7 +22,29 @@ from pathlib import Path
 
 RESULTS = Path(__file__).resolve().parent / "results"
 
-# (row path, human label, lower_is_better)
+# GRADED OUTCOME. `score` is a strict binary gate bit, and at the sample sizes this
+# project uses that makes every round a one-sided regression detector: at n=9/arm from
+# base 5/9 only a flawless 9/9 reaches one-sided p<0.05, while regressions from a
+# ceiling are detectable (CANDIDATE_STRATEGY_2026-07-31.md §1). Partial credit is what
+# lets a round show improvement at all — so when a fixture's grader emits subscores,
+# the fraction it fixed is the primary outcome, not an effort metric.
+# HIGHER IS BETTER here, unlike every metric below it.
+def graded_rate(row):
+    sub = row.get("subscores")
+    if not isinstance(sub, dict):
+        return None
+    fixed, total = sub.get("fixed"), sub.get("total")
+    if not (isinstance(fixed, int) and isinstance(total, int)) or total <= 0:
+        return None
+    return fixed / total
+
+
+GRADED_METRICS = [
+    (graded_rate, "graded_rate", False),
+    ((("subscores", "fixed")), "graded_fixed", False),
+]
+
+# (row path OR callable, human label, lower_is_better)
 METRICS = [
     (("trajectory", "turns"), "turns", True),
     (("trajectory", "tool_calls"), "tool_calls", True),
@@ -35,6 +57,9 @@ METRICS = [
 
 
 def dig(row, path):
+    if callable(path):  # computed metric (see graded_rate)
+        v = path(row)
+        return v if isinstance(v, (int, float)) and not isinstance(v, bool) else None
     cur = row
     for key in path:
         if not isinstance(cur, dict) or key not in cur:
@@ -98,15 +123,22 @@ def rows(gen):
     return [json.loads(line) for line in path.read_text().splitlines() if line.strip()]
 
 
-def analyse(gen, only_passing=False):
+def analyse(gen, only_passing=False, graded=False):
     data = rows(gen)
     if only_passing:
         data = [r for r in data if r.get("score") == 1]
     base = [r for r in data if r.get("pattern") == "base"]
     cand = [r for r in data if r.get("pattern") == "cand"]
     out = {"gen": gen, "n_base": len(base), "n_cand": len(cand),
-           "only_passing": only_passing, "metrics": []}
-    for path, label, lower_better in METRICS:
+           "only_passing": only_passing, "graded": graded, "metrics": []}
+    metrics = METRICS
+    if graded:
+        # Coverage is reported, never silently assumed: a partially-graded round would
+        # otherwise compare two different populations without saying so.
+        out["graded_base"] = sum(1 for r in base if graded_rate(r) is not None)
+        out["graded_cand"] = sum(1 for r in cand if graded_rate(r) is not None)
+        metrics = GRADED_METRICS + METRICS
+    for path, label, lower_better in metrics:
         b = [v for v in (dig(r, path) for r in base) if v is not None]
         c = [v for v in (dig(r, path) for r in cand) if v is not None]
         if len(b) < 2 or len(c) < 2:
@@ -127,6 +159,15 @@ def analyse(gen, only_passing=False):
 def render(res):
     tag = " (passing sessions only)" if res["only_passing"] else ""
     print(f"\n{res['gen']}{tag}   base n={res['n_base']}  cand n={res['n_cand']}")
+    if res.get("graded"):
+        gb, gc = res.get("graded_base", 0), res.get("graded_cand", 0)
+        print(f"  graded coverage: base {gb}/{res['n_base']}  cand {gc}/{res['n_cand']}")
+        if gb == 0 and gc == 0:
+            print("  NO GRADED ROWS — this round's fixture emits no grader artifact, so the")
+            print("  graded metrics below are absent. Effort metrics are still shown.")
+        elif gb < res["n_base"] or gc < res["n_cand"]:
+            print("  WARNING: partially graded. The graded rows are a SUBSET and may not be")
+            print("  comparable to the full arm — check why the rest are missing before use.")
     if res["n_base"] < 2 or res["n_cand"] < 2:
         print("  too few rows to compare")
         return
@@ -134,7 +175,10 @@ def render(res):
     for m in res["metrics"]:
         pct = f"{m['pct']:+.0f}%" if m["pct"] is not None else "n/a"
         star = " *" if m["p"] is not None and m["p"] < 0.05 else ""
-        print(f"  {m['metric']:<20} {m['base_median']:>10.0f} {m['cand_median']:>10.0f}"
+        # graded_rate is a fraction; the integer format used for effort counts would
+        # print every value as 0 or 1.
+        fmt = "10.3f" if m["metric"] == "graded_rate" else "10.0f"
+        print(f"  {m['metric']:<20} {m['base_median']:>{fmt}} {m['cand_median']:>{fmt}}"
               f" {pct:>12} {m['p']:>8.3f}{star}")
 
 
@@ -196,7 +240,26 @@ def selftest():
     # exact and approx should roughly agree on the same separated data at n=9
     _, pe = mannwhitney_u(list(range(9)), list(range(50, 59)))
     assert pe < 0.01, pe
-    print("effort_report selftest: OK (exact + normal-approx paths)")
+
+    # --- graded outcome ---
+    assert graded_rate({"subscores": {"fixed": 5, "total": 8}}) == 0.625
+    assert graded_rate({"subscores": {"fixed": 0, "total": 8}}) == 0.0
+    assert graded_rate({}) is None                                     # ungraded round
+    assert graded_rate({"subscores": {"fixed": 5}}) is None             # no total
+    assert graded_rate({"subscores": {"fixed": 5, "total": 0}}) is None  # no div-by-zero
+    assert graded_rate({"subscores": "nope"}) is None
+    assert dig({"subscores": {"fixed": 5, "total": 8}}, graded_rate) == 0.625
+    assert dig({}, graded_rate) is None
+    # graded_rate must be flagged higher-is-better; every effort metric is lower-better.
+    assert [lb for _, label, lb in GRADED_METRICS if label == "graded_rate"] == [False]
+    assert all(lb for _, _, lb in METRICS), "effort metrics are lower-is-better"
+    # The discriminating property: partial credit separates two arms that the BINARY
+    # gate bit scores identically (all failing). This is the whole point of --graded.
+    a = [graded_rate({"subscores": {"fixed": f, "total": 8}}) for f in (1, 1, 2, 2, 1, 2)]
+    b = [graded_rate({"subscores": {"fixed": f, "total": 8}}) for f in (6, 7, 6, 7, 6, 7)]
+    _, pg = mannwhitney_u(b, a)
+    assert pg < 0.01, pg
+    print("effort_report selftest: OK (exact + normal-approx paths; graded outcome)")
 
 
 if __name__ == "__main__":
@@ -205,6 +268,9 @@ if __name__ == "__main__":
     ap.add_argument("--only-passing", action="store_true")
     ap.add_argument("--json", action="store_true")
     ap.add_argument("--sweep", action="store_true")
+    ap.add_argument("--graded", action="store_true",
+                    help="lead with the graded outcome (subscores.fixed/total) where the "
+                         "fixture's grader emits one; reports coverage explicitly")
     ap.add_argument("--selftest", action="store_true")
     args = ap.parse_args()
     if args.selftest:
@@ -214,5 +280,5 @@ if __name__ == "__main__":
     elif not args.gen:
         ap.error("gen is required")
     else:
-        res = analyse(args.gen, args.only_passing)
+        res = analyse(args.gen, args.only_passing, graded=args.graded)
         print(json.dumps(res, sort_keys=True)) if args.json else render(res)
