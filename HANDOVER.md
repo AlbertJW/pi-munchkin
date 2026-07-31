@@ -183,6 +183,32 @@ candidates until c25 and c48 resolve.
 
 ### Track B — THE BOX QUEUE (strict order; one item mid-GEN at a time)
 
+> **REPLACED 2026-07-31. Items 1-6 below are DONE or SUPERSEDED — kept only as history.**
+> All three rounds in the old queue ran and produced **zero information** (METHODOLOGY §11);
+> the registration bundle (item 4) landed; c50's premise was retracted and its mechanism was
+> dead code. Do not work this list.
+>
+> **The queue is now instrument-first, because no candidate round can return a positive result
+> until it is done** (METHODOLOGY §12 / `CANDIDATE_STRATEGY_2026-07-31.md` §1: at n=9/arm the
+> gate detects harm and essentially nothing else).
+>
+> **B1. Run `audit-sweep` once, base-arm only, on the local 4B.** It is graded, it has NEVER
+> been run (0 rows), and its band is unknown. The cheapest measurement available and it decides
+> the next three items. Exit: a base pass rate and a `graded_rate` distribution.
+> **B2. One LOCAL in-band fixture for the 4B** — the hard blocker. Today the only 30-70% base
+> fixtures are `path-near-miss` (50%) and `sv-commit-sha-guard` (33%), both REMOTE hence
+> non-authoritative, plus `sv-convention-provenance` (50%) local at n=6. B1 may supply this for
+> free; if not, port `path-near-miss` locally or extend `sv-convention-provenance`.
+> **B3. Judge rubric + calibration** (task #12) — code quality, which subscores do not capture.
+> Calibrate gold > shortcut on existing fixtures BEFORE trusting it.
+> **B4. Then, and only then, candidates** — c48 first (additive, so it cannot produce the harm
+> signature; an authoritative round already exists and was informationless only because its
+> fixtures were one floor plus two ceilings), then c21 **re-specified** with errors-per-call as
+> the pre-registered primary and a fixed turn budget.
+>
+> Re-baseline the noise floor with an inert positive control (c49's shape, or c9's) whenever the
+> instrument changes.
+
 Standing rules: docs commits are always safe; harness commits are safe; `~/.pi/agent` mirror,
 `configs/schema.json`, `config.py`, and `configs/static/` changes only BETWEEN rounds.
 

@@ -392,7 +392,17 @@ python3 prompt-lab/config.py --selftest
   pre-registered S1→S3 funnel for reaching a verdict on every dark candidate at payable cost.
 - `optimizer/prompt-lab/effort_report.py` — scores a round on continuous per-session effort
   (turns, tool errors, repeat calls, tokens) with exact Mann-Whitney. `--sweep` re-scores every
-  paired round in the catalogue as a **shortlist**, not as findings.
+  paired round in the catalogue as a **shortlist**, not as findings. `--graded` leads with the
+  graded outcome where a fixture emits one (below), and reports graded coverage explicitly.
+- **Graded outcomes (`subscores`).** A fixture's hidden grader may write
+  `.<name>-grade.json` = `{fixed, total, defects}` into the workdir; `real_gate.sh` copies it into
+  an **optional** `subscores` row block. `score` stays the strict binary gate bit, so historical
+  rows and cross-round pass-rate comparisons are unaffected. This exists because at the sample
+  sizes used to date the binary gate is a *one-sided regression detector* — at n=9/arm from a 5/9
+  base only a flawless 9/9 reaches significance, while regressions from a ceiling are detectable.
+  Partial credit is what lets a round show improvement at all. `audit-sweep` is the reference
+  implementation: pristine 0/8, shortcut mutant 2/8, gold 8/8 — the binary bit scores the first
+  two identically. See `optimizer/docs/MEASUREMENT_METHODOLOGY_2026-07.md` §12.
 - `optimizer/prompt-lab/harness_roi.py` — measures the harness's *own* injected footprint
   (steer text as % of model output, per model, split by pass/fail).
 

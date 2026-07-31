@@ -1963,3 +1963,59 @@ making the deployment's dependencies complete (or by moving the tests' documente
 to the repo), but that is a deployment question, not a harness one — queued, not silently
 tolerated. The rule this earns: **a mirror is verified by a before/after failure-set diff, not
 by a subset that passes.**
+
+### The roster was never rankable on outcome, and five candidates were never testable (2026-07-31)
+
+Asked to rank every dark candidate by "which might actually make a difference", the honest answer
+turned out to subsume the ranking.
+
+**Five candidates measured base against base.** `validate_config` accepted `gov_file`/`gov_append`;
+`render_prompt` reads only `prompt_variant`/`format`/`scaffold`. Those two keys appeared at exactly
+one line in the whole file — the whitelist that accepted them. Executing the render proves it:
+c1/c5/c8/c9/c15 all produce `sha=f688ebfebd08`, byte-identical to base, with an empty env.
+**`c9` is named "no-governor" and emitted the live governor verbatim**, measuring +0pp while real
+governor changes measure ±14pp. The tell sat in the ledger unread. Retired; `gov_*` removed from
+the allowed set, plus a second layer that rejects any NAMED config rendering identically to base
+with an empty env — catching shapes nobody has thought of. Scoped to *named* configs because
+`configs/baseline.json` is an unnamed control that is deliberately base-identical; the first
+version of the guard broke `span_screen.py`'s `span-off` arm, which is how that was found.
+
+**The instrument could only ever detect harm.** Fisher exact, computed directly: at n=9/arm from
+base 5/9 — the best in-band fixture that exists — only a flawless 9/9 reaches one-sided p<0.05
+(two-sided: nothing). From a 9/9 ceiling, regressions to 4–5/9 *are* detectable. At n=20 from
+15/20, even 19/20 is p=0.091. So every round could return NEUTRAL or HARMFUL and nothing else.
+That explains "8 decisively tested, 1 adopted" with no theory about candidate quality, and it
+predicts what the ledger shows: the only statistically significant candidate result anywhere is a
+**harm**. Corollary worth carrying: every measured harm in this corpus is a *blocking or steering*
+intervention, and the one change ever adopted was a *subtraction*.
+
+**Partial credit, built.** `audit-sweep`'s grader has been writing `.audit-grade.json` with eight
+per-defect checks since the day it was built, and nothing ever read it. Now: an optional
+`subscores` row block (`score` stays the strict binary bit, so no historical row or cross-round
+claim moves), a gate that reads any `.<name>-grade.json` by convention rather than hardcoding one
+fixture, and `effort_report --graded`. Proven on the real grader — pristine 0/8, shortcut 2/8,
+gold 8/8, so the two states the binary bit scores **identically** are 0.000 vs 0.250 graded.
+
+**Three of my own tiers were wrong, and an adversarial pass caught them.** c38 was ranked first;
+its own design comment says it exists to give c31/c25/c37 "a surface to fire on" — infrastructure,
+not an intervention — it fires once, induces no extra reading, and its only powered round is the
+−56pp collapse. c21's "7/7 metrics better" is count-not-rate: per tool call the error rate got
+*worse* in two of three rounds. c24 fails its own tier's criterion, firing 8/8 on its purpose-built
+fixture and 0/8 elsewhere, with two base draws of the identical config measuring 2/6 and 4/6 — a
+swing larger than the claimed effect.
+
+**Two methodological traps, both self-inflicted first.** "Failing sessions read less" is Simpson's
+paradox (the sign flips inside all four model strata) — **and the control I proposed to detect it
+does not work**; only the stratification did. And the mechanism-firing counts I quoted were exactly
+2× the truth (105 not 210, 265 not 530), propagated from a summary without recounting.
+
+**One alarm refuted before acting.** The review flagged that `loop-breaker`'s
+`isLocal = provider.startsWith("local")` might misclassify 1,387 rows and run cloud thresholds on
+local models. It does not: `msg.provider` comes from the model registry
+(`agent-session.js:1520`), and `models.json` files both daily drivers under `local-llamacpp`. The
+row field `execution.provider` (`"llama"`) is the gate's `MODEL_CONTROL` — a different value
+loop-breaker never sees. Recorded so it is not re-raised.
+
+**Standing rules earned:** compute the power before designing the round; stratify by model before
+believing any aggregate; normalize rate metrics by volume; a mechanism firing only on its own
+purpose-built fixture has not been shown to generalise; recount before citing a firing number.

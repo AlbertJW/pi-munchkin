@@ -343,3 +343,66 @@ round produced no information regardless of what the aggregate says.
 valid fixtures. c49 tool-call-rescue: untested, needs a model that emits pseudo-tool-calls.
 c50 spec-adherence: untested, needs the mirrored `args` fix plus the materialization fix — both
 of which have now landed.
+
+## §12 — The graded instrument: why a binary gate could never have shown a win
+
+Built 2026-07-31 (`31611d1`, `a37494a`). This section states the problem it solves, because the
+problem is the reason ~50 candidates produced one adoption.
+
+### The gate is a one-sided regression detector
+
+Fisher exact, one-sided, recomputed directly:
+
+| design | best case | p |
+|---|---|---|
+| n=9/arm, base **5/9** (the best in-band fixture that exists) | cand 9/9 | **0.041** (two-sided 0.082 — nothing) |
+| n=9/arm, base 5/9 | cand 8/9 | 0.147 |
+| n=9/arm, base **9/9** (most of the corpus) | cand 5/9 | **0.041 — a REGRESSION is detectable** |
+| n=20/arm, base 15/20 | cand 19/20 | 0.091 |
+
+From a ceiling only harm is visible; from the one in-band fixture only perfection is. **Every
+round could return NEUTRAL or HARMFUL and nothing else.** That explains "8 decisively tested, 1
+adopted" without any theory about candidate quality — and it predicts the observation that the
+only statistically significant candidate result in the whole ledger is a harm (c38 −56pp,
+p=0.029). See `CANDIDATE_STRATEGY_2026-07-31.md` §1.
+
+### What partial credit changes
+
+A fixture's hidden grader may emit `.<name>-grade.json` = `{fixed, total, defects}`.
+`real_gate.sh` reads it into an **optional** `subscores` row block; `score` remains the strict
+binary gate bit, so every historical row stays valid and no cross-round pass-rate claim moves.
+
+Demonstrated on `audit-sweep`'s real grader across its three admission states:
+
+| state | binary `score` | graded |
+|---|---|---|
+| pristine | 0 (fail) | **0/8 = 0.000** |
+| shortcut mutant | 0 (fail) | **2/8 = 0.250** |
+| gold | 1 (pass) | 8/8 = 1.000 |
+
+**The binary bit scores pristine and shortcut identically.** Graded separates them. That is the
+entire point: a candidate taking a floored fixture from 1/8 defects to 6/8 currently reads as
+NEUTRAL, and would read as a large, significant improvement under `--graded` (verified on a
+synthetic round where both arms score 0/9 and the graded view separates at p<0.001).
+
+### Rules for using it
+
+- **`graded_rate` (fixed/total) is the primary outcome where it exists; it is the only
+  HIGHER-is-better metric** in `effort_report.py`. Every effort metric is lower-is-better, and
+  mixing the two silently inverts a verdict.
+- **Coverage is reported, never assumed.** An ungraded round says so and still prints effort
+  metrics. A *partially* graded round warns that the graded rows are a subset which may not be
+  comparable to the full arm — find out why the rest are missing before using it.
+- `score` is unchanged. Do not restate a graded result as a pass rate, and do not compare a
+  graded round's `graded_rate` against another fixture's — `total` differs per fixture.
+- A graded round whose sessions all fail yields **zero rows under `--only-passing`**. Use
+  `--graded` without it, or the graded signal disappears exactly where it is most needed.
+
+### What this does NOT fix
+
+Graded scoring raises the ceiling on what a round can detect; it does not create a fixture that
+can express the effect. **The binding blocker is still that no fixture sits in a 30–70% band for
+the two models that matter, locally**: `path-near-miss` (50%) and `sv-commit-sha-guard` (33%) are
+remote (non-authoritative); `sv-convention-provenance` (50%) is local at n=6. `audit-sweep` is
+graded and has **never been run** — its band is unknown, and finding out is the cheapest next
+measurement available.
