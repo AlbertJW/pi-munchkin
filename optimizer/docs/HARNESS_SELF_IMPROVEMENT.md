@@ -1934,3 +1934,32 @@ its suppression graph documented at the concatenation site.
 The refuter batch for indices 15/23/25/27 ran during a safety-classifier outage; all four
 were re-verified by hand before any action (three fixed above, #27 queued), so nothing rests
 on an unreviewed agent's word.
+
+### The mirrored suite has always been partly red, and that was never checked (2026-07-30)
+
+Mirroring today's work surfaced something the zero-drift check never could: running the suite
+in `~/.pi/agent` gives **8 failures that have nothing to do with the code**. That deployment's
+`node_modules` is runtime-only — `@earendil-works/pi-coding-agent` has no `exports` main, and
+`@earendil-works/pi-ai` is absent entirely — so every test importing an extension that
+value-imports either package fails to resolve under `tsx`. Production is unaffected: pi loads
+extensions through its own jiti alias, which resolves both.
+
+The mistake worth recording is procedural. Test headers say *"Run: cd ~/.pi/agent && npx -y tsx
+--test tests/…"*, and previous mirrors were signed off by running a **subset** that happened to
+pass. Nobody had run the whole mirrored suite, so nobody knew a baseline of failures existed.
+A green subset was being read as a green mirror.
+
+Method used here, which should be the standing one: capture the failure set at the mirror's git
+HEAD **before** copying, capture it after, and compare **names with timings stripped** (a naive
+`comm` on raw lines diffs the millisecond counts and reports everything as new). Result: 9
+pre-existing failures, exactly 2 genuinely new, both the drift-scanner extension tests hitting
+the documented pi-ai/tsx gap that `lib/drift-policy.ts` has described since it was written.
+Those two now self-skip when `node_modules/@earendil-works/pi-ai` is absent, so the mirrored
+run reports 266 pass / 8 fail / 2 skipped instead of a red that means nothing — and the repo
+run, where they are authoritative, still executes them.
+
+The remaining 8 are pre-existing environmental failures, not defects. They are worth fixing by
+making the deployment's dependencies complete (or by moving the tests' documented run location
+to the repo), but that is a deployment question, not a harness one — queued, not silently
+tolerated. The rule this earns: **a mirror is verified by a before/after failure-set diff, not
+by a subset that passes.**

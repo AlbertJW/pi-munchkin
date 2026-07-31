@@ -1,5 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import { existsSync } from "node:fs";
+import { join } from "node:path";
 import { buildTruncatedDiff, extractFindings, isReviewableCommit, MAX_DIFF } from "../lib/drift-policy.ts";
 // Run: cd ~/.pi/agent && npx -y tsx --test tests/drift-scanner.test.ts
 
@@ -45,7 +47,20 @@ test("extractFindings: only posts complete, non-CLEAN reviews", () => {
 	assert.equal(extractFindings(txt("- a.js: cleanup() is now orphaned"), "stop"), "- a.js: cleanup() is now orphaned");
 });
 
-test("the review is DETACHED: turn_end returns without waiting for the model", async () => {
+// The two tests below import the EXTENSION, which value-imports
+// @earendil-works/pi-ai/compat. That resolves under pi's jiti alias in
+// production and under tsx in this repo (pi-ai is a devDependency), but NOT in
+// the mirrored ~/.pi/agent, whose node_modules is runtime-only — see the note
+// at the top of lib/drift-policy.ts. Skipping there keeps the mirrored suite
+// truthful instead of reporting a red that says nothing about the code; the
+// repo run (npm run verify) is where these two are authoritative.
+// Synchronous on purpose: a top-level await here fails to transform under
+// tsx's CJS output, which would break the file everywhere instead of skipping
+// two tests somewhere.
+const piAiResolvable = existsSync(join(process.cwd(), "node_modules", "@earendil-works", "pi-ai"));
+const extTest = piAiResolvable ? test : test.skip;
+
+extTest("the review is DETACHED: turn_end returns without waiting for the model", async () => {
 	// pi awaits extension handlers serially inside the agent loop, so awaiting a
 	// 90-second local-model review here froze the entire session on every
 	// reviewable commit. turn_end must return promptly and deliver the advisory
@@ -94,7 +109,7 @@ test("the review is DETACHED: turn_end returns without waiting for the model", a
 	assert.equal(fp.sent.length, 0, "nothing delivered yet; the advisory arrives later as followUp");
 });
 
-test("a commit landing during an in-flight review is NOT swallowed — it gets reviewed next turn", async () => {
+extTest("a commit landing during an in-flight review is NOT swallowed — it gets reviewed next turn", async () => {
 	// The detach fix originally marked handledHead BEFORE the in-flight guard, so
 	// a second commit arriving mid-review was recorded as handled on the way to
 	// the bail and then never reviewed at all (2026-07-30 triage #11). The mark
