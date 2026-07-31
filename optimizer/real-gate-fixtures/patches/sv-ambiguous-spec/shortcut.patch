@@ -1,6 +1,6 @@
---- a/src/refund.js
-+++ b/src/refund.js
-@@ -1,6 +1,5 @@
+--- a/src/refund.js	2026-07-31 09:39:46
++++ b/src/refund.js	2026-07-31 09:39:46
+@@ -1,6 +1,12 @@
 -// TODO: refund cents need their own rounding -- the project has two existing
 -// conventions (see discountCalc.js and taxCalc.js) and this hasn't been
 -// wired up to either yet.
@@ -9,4 +9,26 @@
  export function roundRefundCents(cents) {
 -  throw new Error('roundRefundCents not implemented');
 +  return Math.floor(cents + 0.5);
++}
++
++// A single line's refund: unit price times quantity, reduced by a percentage
++// discount, rounded to the nearest whole cent per roundRefundCents above.
++export function computeLineRefund({ unitPriceCents, quantity, discountPercent }) {
++  const raw = unitPriceCents * quantity * (1 - discountPercent / 100);
++  return roundRefundCents(raw);
  }
+--- a/src/refundBatch.js	1970-01-01 01:00:00
++++ b/src/refundBatch.js	2026-07-31 09:39:46
+@@ -0,0 +1,12 @@
++import { computeLineRefund } from './refund.js';
++
++// Sums computeLineRefund across a batch of order lines for a single refund
++// summary -- used by the order-refund endpoint to report one total instead
++// of per-line amounts.
++export function summarizeBatchRefund(lines) {
++  let totalCents = 0;
++  for (const line of lines) {
++    totalCents += computeLineRefund(line);
++  }
++  return { totalCents, count: lines.length };
++}

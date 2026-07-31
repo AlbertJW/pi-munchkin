@@ -7,7 +7,7 @@
       "3a52fba7568f45051b1949c7b44b22c431fcd83c9e1e2e85ef74bb4c029a9198"
     ],
     "automated": {
-      "checked_at": "2026-07-23T15:17:29Z",
+      "checked_at": "2026-07-31T08:40:25Z",
       "hash_drift": [],
       "passed": true,
       "runs_per_state": 3,
@@ -49,17 +49,17 @@
         "mutant:shortcut": {
           "fail_to_pass": [
             {
-              "output_tail": "cents=12.5\n  \n  13 !== 12\n  \n      at TestContext.<anonymous> (file:///private/var/folders/3r/nc7qhtpn56j7rt5nwg0rqw600000gn/T/pi-admit-sv-ambiguous-spec-wjv1gk4_/work/test/fail-to-pass.test.js:28:12)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.start (node:internal/test_runner/test:1242:17)\n      at startSubtestAfterBootstrap (node:internal/test_runner/harness:387:17) {\n    generatedMessage: false,\n    code: 'ERR_ASSERTION',\n    actual: 13,\n    expected: 12,\n    operator: 'strictEqual',\n    diff: 'simple'\n  }\n",
+              "output_tail": "cents=12.5\n  \n  13 !== 12\n  \n      at TestContext.<anonymous> (file:///private/var/folders/3r/nc7qhtpn56j7rt5nwg0rqw600000gn/T/pi-admit-sv-ambiguous-spec-gncd3n17/work/test/fail-to-pass.test.js:28:12)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.start (node:internal/test_runner/test:1242:17)\n      at startSubtestAfterBootstrap (node:internal/test_runner/harness:387:17) {\n    generatedMessage: false,\n    code: 'ERR_ASSERTION',\n    actual: 13,\n    expected: 12,\n    operator: 'strictEqual',\n    diff: 'simple'\n  }\n",
               "passed": false,
               "returncode": 1
             },
             {
-              "output_tail": "cents=12.5\n  \n  13 !== 12\n  \n      at TestContext.<anonymous> (file:///private/var/folders/3r/nc7qhtpn56j7rt5nwg0rqw600000gn/T/pi-admit-sv-ambiguous-spec-wmowy9g2/work/test/fail-to-pass.test.js:28:12)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.start (node:internal/test_runner/test:1242:17)\n      at startSubtestAfterBootstrap (node:internal/test_runner/harness:387:17) {\n    generatedMessage: false,\n    code: 'ERR_ASSERTION',\n    actual: 13,\n    expected: 12,\n    operator: 'strictEqual',\n    diff: 'simple'\n  }\n",
+              "output_tail": "cents=12.5\n  \n  13 !== 12\n  \n      at TestContext.<anonymous> (file:///private/var/folders/3r/nc7qhtpn56j7rt5nwg0rqw600000gn/T/pi-admit-sv-ambiguous-spec-yfjlulv8/work/test/fail-to-pass.test.js:28:12)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.start (node:internal/test_runner/test:1242:17)\n      at startSubtestAfterBootstrap (node:internal/test_runner/harness:387:17) {\n    generatedMessage: false,\n    code: 'ERR_ASSERTION',\n    actual: 13,\n    expected: 12,\n    operator: 'strictEqual',\n    diff: 'simple'\n  }\n",
               "passed": false,
               "returncode": 1
             },
             {
-              "output_tail": "cents=12.5\n  \n  13 !== 12\n  \n      at TestContext.<anonymous> (file:///private/var/folders/3r/nc7qhtpn56j7rt5nwg0rqw600000gn/T/pi-admit-sv-ambiguous-spec-kje90ovf/work/test/fail-to-pass.test.js:28:12)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.start (node:internal/test_runner/test:1242:17)\n      at startSubtestAfterBootstrap (node:internal/test_runner/harness:387:17) {\n    generatedMessage: false,\n    code: 'ERR_ASSERTION',\n    actual: 13,\n    expected: 12,\n    operator: 'strictEqual',\n    diff: 'simple'\n  }\n",
+              "output_tail": "cents=12.5\n  \n  13 !== 12\n  \n      at TestContext.<anonymous> (file:///private/var/folders/3r/nc7qhtpn56j7rt5nwg0rqw600000gn/T/pi-admit-sv-ambiguous-spec-waa8o014/work/test/fail-to-pass.test.js:28:12)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.start (node:internal/test_runner/test:1242:17)\n      at startSubtestAfterBootstrap (node:internal/test_runner/harness:387:17) {\n    generatedMessage: false,\n    code: 'ERR_ASSERTION',\n    actual: 13,\n    expected: 12,\n    operator: 'strictEqual',\n    diff: 'simple'\n  }\n",
               "passed": false,
               "returncode": 1
             }
@@ -84,17 +84,17 @@
         },
         "pristine_fail_to_pass": [
           {
-            "output_tail": "x/work/src/refundBatch.js:9:19)\n      at TestContext.<anonymous> (file:///private/var/folders/3r/nc7qhtpn56j7rt5nwg0rqw600000gn/T/pi-admit-sv-ambiguous-spec-_ev3nyyx/work/test/fail-to-pass.test.js:45:18)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n      at Test.postRun (node:internal/test_runner/test:1522:19)\n      at Test.run (node:internal/test_runner/test:1447:12)\n      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7)\n",
+            "output_tail": "s/esm/loader:610:35)\n    at ModuleJob.syncLink (node:internal/modules/esm/module_job:277:33)\n    at ModuleJob.link (node:internal/modules/esm/module_job:389:17) {\n  code: 'ERR_MODULE_NOT_FOUND',\n  url: 'file:///private/var/folders/3r/nc7qhtpn56j7rt5nwg0rqw600000gn/T/pi-admit-sv-ambiguous-spec-y0t3jwfn/work/src/refundBatch.js'\n}\n\nNode.js v26.5.0\n\u2716 test/fail-to-pass.test.js (43.27875ms)\n\u2139 tests 1\n\u2139 suites 0\n\u2139 pass 0\n\u2139 fail 1\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 47.777917\n\n\u2716 failing tests:\n\ntest at test/fail-to-pass.test.js:1:1\n\u2716 test/fail-to-pass.test.js (43.27875ms)\n  'test failed'\n",
             "passed": false,
             "returncode": 1
           },
           {
-            "output_tail": "s/work/src/refundBatch.js:9:19)\n      at TestContext.<anonymous> (file:///private/var/folders/3r/nc7qhtpn56j7rt5nwg0rqw600000gn/T/pi-admit-sv-ambiguous-spec-b2z6qtis/work/test/fail-to-pass.test.js:45:18)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n      at Test.postRun (node:internal/test_runner/test:1522:19)\n      at Test.run (node:internal/test_runner/test:1447:12)\n      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7)\n",
+            "output_tail": "esm/loader:610:35)\n    at ModuleJob.syncLink (node:internal/modules/esm/module_job:277:33)\n    at ModuleJob.link (node:internal/modules/esm/module_job:389:17) {\n  code: 'ERR_MODULE_NOT_FOUND',\n  url: 'file:///private/var/folders/3r/nc7qhtpn56j7rt5nwg0rqw600000gn/T/pi-admit-sv-ambiguous-spec-kxblv5s9/work/src/refundBatch.js'\n}\n\nNode.js v26.5.0\n\u2716 test/fail-to-pass.test.js (47.460458ms)\n\u2139 tests 1\n\u2139 suites 0\n\u2139 pass 0\n\u2139 fail 1\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 51.580958\n\n\u2716 failing tests:\n\ntest at test/fail-to-pass.test.js:1:1\n\u2716 test/fail-to-pass.test.js (47.460458ms)\n  'test failed'\n",
             "passed": false,
             "returncode": 1
           },
           {
-            "output_tail": "e/work/src/refundBatch.js:9:19)\n      at TestContext.<anonymous> (file:///private/var/folders/3r/nc7qhtpn56j7rt5nwg0rqw600000gn/T/pi-admit-sv-ambiguous-spec-1kpp2xwe/work/test/fail-to-pass.test.js:45:18)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n      at Test.postRun (node:internal/test_runner/test:1522:19)\n      at Test.run (node:internal/test_runner/test:1447:12)\n      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7)\n",
+            "output_tail": "/esm/loader:610:35)\n    at ModuleJob.syncLink (node:internal/modules/esm/module_job:277:33)\n    at ModuleJob.link (node:internal/modules/esm/module_job:389:17) {\n  code: 'ERR_MODULE_NOT_FOUND',\n  url: 'file:///private/var/folders/3r/nc7qhtpn56j7rt5nwg0rqw600000gn/T/pi-admit-sv-ambiguous-spec-g66sm_eu/work/src/refundBatch.js'\n}\n\nNode.js v26.5.0\n\u2716 test/fail-to-pass.test.js (42.261458ms)\n\u2139 tests 1\n\u2139 suites 0\n\u2139 pass 0\n\u2139 fail 1\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 46.47725\n\n\u2716 failing tests:\n\ntest at test/fail-to-pass.test.js:1:1\n\u2716 test/fail-to-pass.test.js (42.261458ms)\n  'test failed'\n",
             "passed": false,
             "returncode": 1
           }
@@ -118,8 +118,8 @@
         ]
       }
     },
-    "reviewed_at": "2026-07-23T15:17:31Z",
-    "reviewer": "Albert"
+    "reviewed_at": "2026-07-31T08:40:28Z",
+    "reviewer": "Albert (delegated: Claude Fable 5, 2026-07-30)"
   },
   "artifacts": [
     {
@@ -140,11 +140,7 @@
     },
     {
       "path": "real-gate-fixtures/sv-ambiguous-spec/src/refund.js",
-      "sha256": "e63e148d76cc70cd616ef9de78586fbb50df64d7fd3643c4c6f8701f30b4e6f7"
-    },
-    {
-      "path": "real-gate-fixtures/sv-ambiguous-spec/src/refundBatch.js",
-      "sha256": "b0db5281e36fc6fe35b5cd5fa7592858963dabb2d52a391d2ec92cc2a83bb2f8"
+      "sha256": "6fdb1d4071ff56dc460f734a879eac8eb4c734c41d687b57cbc29f842f3fea82"
     },
     {
       "path": "real-gate-fixtures/sv-ambiguous-spec/test/visible.test.js",
@@ -152,11 +148,11 @@
     },
     {
       "path": "real-gate-fixtures/patches/sv-ambiguous-spec/gold.patch",
-      "sha256": "9e2f3f7d62499392b56734dfbfaa723d140b185274d7b34cd15ab351c6006d76"
+      "sha256": "be6ba226a6b3dcb9930ed3e3ee2c20142370323f028e74908dfab0d7acd14c93"
     },
     {
       "path": "real-gate-fixtures/patches/sv-ambiguous-spec/shortcut.patch",
-      "sha256": "10660d88f65ac94efc457bb426fea81138fb6d52503fc9a7369e188e5c59fb0b"
+      "sha256": "f0e39c5ba2bb6cf8caac263848421008453785482be5f9d2397d3d11dab95063"
     }
   ],
   "cohort_id": "2026-07",
@@ -164,7 +160,7 @@
     "root": "real-gate-fixtures/sv-ambiguous-spec",
     "stage_copy": []
   },
-  "fixture_version": "2026-07.2",
+  "fixture_version": "2026-07.3",
   "one_shot": {
     "context_files": [
       "src/discountCalc.js",
@@ -209,6 +205,7 @@
     "semantic_group": "sv-ambiguous-spec:2026-07.2"
   },
   "schema": "pi.fixture/v1",
+  "semantic_group": "sv-ambiguous-spec:2026-07.3",
   "sufficiency": [
     {
       "assertion": "roundRefundCents(cents) must resolve exact .5 ties by following one of this project's two already-established, equally-active conventions -- not an unrelated third rule, and not a rule invented from scratch.",
@@ -253,8 +250,8 @@
     }
   },
   "timestamps": {
-    "admitted_at": "2026-07-23T15:17:31Z",
+    "admitted_at": "2026-07-31T08:40:28Z",
     "created_at": "2026-07-23T00:00:00Z",
-    "expires_at": "2026-10-21T15:17:31Z"
+    "expires_at": "2026-10-29T08:40:28Z"
   }
 }
