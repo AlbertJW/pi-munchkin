@@ -440,8 +440,16 @@ test("integration: interrupted plan from another process — session_start notic
 		`session_start surfaces the interrupted plan (notes: ${JSON.stringify(notes)})`);
 	assert.ok(notes[0].includes("may have partial work"), notes[0]);
 	notes.length = 0;
+	// A SECOND session in the same process (pi caches the extension factory) must
+	// re-surface a still-foreign interrupted plan. The old assertion here pinned
+	// "notice fires once per process" — which was the module-scope-lifetime bug
+	// (triage #26): /new, /fork and same-cwd /resume sessions never saw the
+	// notice at all. Per-session is the contract; the writer === PROC_MARK check
+	// is what suppresses it once THIS process takes the plan over.
 	await fire(fp, "session_start", { reason: "startup" }, ctx);
-	assert.equal(notes.length, 0, "notice fires once per process");
+	assert.ok(notes.some((n) => n.includes("Interrupted plan")),
+		"a new session re-surfaces a still-foreign interrupted plan");
+	notes.length = 0;
 
 	// /plan-go: execute prompt carries the partial-work inspection block
 	await fp.commands.get("plan-go").handler("", ctx);
@@ -1320,4 +1328,30 @@ test("/plan-go emits go/go-blocked telemetry with source:command (parity with th
 		if (priorSource === undefined) delete process.env.TELEMETRY_SOURCE; else process.env.TELEMETRY_SOURCE = priorSource;
 		resetPiGlobals();
 	}
+});
+
+test("/plan and /plan-go prompts survive a STREAMING session (steer, not lost)", async () => {
+	// pi executes extension commands even mid-stream, but sendUserMessage with no
+	// deliverAs THROWS while streaming and the throw is swallowed into emitError —
+	// so /plan-go typed mid-stream committed phase=executing and then silently
+	// lost the execute prompt (triage #0). deliverAs:"steer" queues it instead;
+	// while idle, prompt() ignores the option entirely.
+	const fp = makeFakePi({ streaming: true });
+	planRunner(fp.pi as any);
+	const cwd = tmp();
+	const { ctx } = makeCtx(cwd);
+	await fp.commands.get("plan").handler("do the thing", ctx);
+	await callTool(fp, "plan_write", {
+		items: [{ title: "step one", status: "pending" }], request: "do the thing", summary: "one",
+	}, cwd);
+	await fp.commands.get("plan-go").handler("", ctx);
+
+	assert.equal(fp.deliveries.filter((d) => d.effective === "lost").length, 0,
+		"no prompt may be swallowed while streaming");
+	const planDelivery = fp.deliveries.find((d) => d.text.includes("MODE: PLAN") || d.text.includes("plan"));
+	assert.ok(planDelivery, "the /plan prompt was delivered");
+	const goDelivery = fp.deliveries.find((d) => d.text.includes("MODE: RUN"));
+	assert.ok(goDelivery, "the execute prompt was delivered");
+	assert.equal(goDelivery.effective, "queued-steer", "mid-stream delivery queues as steer");
+	resetPiGlobals();
 });

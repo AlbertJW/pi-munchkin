@@ -162,8 +162,16 @@ export default function (pi: ExtensionAPI): void {
 			const lens = renderLens(state, LENS_MAX_CHARS);
 			if (!lens) return undefined;
 			// Append to the LAST message's content in the per-call VIEW: never stored,
-			// regenerated fresh each call (no accumulation, no staleness), and tail
-			// position leaves the KV prefix intact.
+			// regenerated fresh each call (no accumulation, no staleness).
+			// COST, stated honestly (triage #15): this does NOT leave the KV prefix
+			// intact, despite what this comment used to claim. On call N+1 the message
+			// that was last on call N has LOST its lens tail (the view is per-call),
+			// so the serving-side prefix diverges at that position every single call —
+			// llama.cpp re-prefills from there each turn. The alternative (persisting
+			// the tail) trades that for unbounded stale-lens accumulation in the
+			// transcript. Revisit only as a measured candidate revision; for now the
+			// re-prefill cost is accepted and must be remembered when reading c48
+			// token/latency numbers.
 			const messages = event.messages as { content?: unknown }[];
 			const last = messages[messages.length - 1];
 			if (!last || !Array.isArray(last.content)) return undefined;

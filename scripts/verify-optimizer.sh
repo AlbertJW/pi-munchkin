@@ -25,6 +25,7 @@ selftests=(
   prompt-lab/canary.py
   prompt-lab/config.py
   prompt-lab/context_telemetry.py
+  prompt-lab/effort_report.py
   prompt-lab/exposure.py
   prompt-lab/usage_probe.py
   prompt-lab/agent_overlay.py

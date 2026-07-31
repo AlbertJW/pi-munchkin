@@ -103,7 +103,6 @@
     "harness/extensions/bash-output-guard.ts",
     "harness/extensions/payload-audit.ts",
     "harness/lib/agent-dir.ts",
-    "harness/lib/bash-mutations.ts",
     "harness/lib/blackboard.ts",
     "harness/lib/bash-output.ts",
     "harness/lib/command-policy.ts",

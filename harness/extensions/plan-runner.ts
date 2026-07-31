@@ -36,7 +36,12 @@ let replanStreak = 0;
 // plan notice fires at most once per process, as does the partial-work note on
 // the first plan_write against a foreign-writer state (headless resumes that
 // never run /plan-go).
-let resumeNotified = false;
+// No resumeNotified flag: it was module-scoped, and pi caches the extension
+// factory across session replacement, so "notify once" silently meant "once
+// per PROCESS" — later /new, /fork or same-cwd /resume sessions never saw the
+// interrupted-plan notice at all (triage #26). session_start fires exactly
+// once per session, and the writer === PROC_MARK check self-suppresses the
+// notice as soon as this process touches the plan, so no flag is needed.
 let partialWorkNoted = false;
 type ModelIdentity = { provider: string; id: string };
 let activeModel: ModelIdentity = { provider: "unknown", id: "unknown" };
@@ -762,6 +767,13 @@ const planWrite = defineTool({
 					planEvent("gate", eventRunId, { pass: true, recovered: priorFails > 0, prior_fails: priorFails });
 					continue;
 				}
+				// A failing gate CLEARS the shared green latch. Without this, a
+				// multi-item plan_write whose FIRST item's gate passed and whose later
+				// item's gate failed left __pi_gate_green latched, and verify-gate
+				// then skipped its "files changed, no passing verify" steer for a call
+				// whose final gate state was red (triage #12). The flag means "gate
+				// activity most recently ended green", not "some gate was green once".
+				(globalThis as Record<string, unknown>).__pi_gate_green = undefined;
 				const fails = (prevById.get(it.id)?.gate_fails ?? 0) + 1;
 				// Retry ladder: rung 1 = locality protocol (bounded single-span repair
 				// against the failing output), rung 2 = dumb-zone escape (delegate to a
@@ -1122,8 +1134,7 @@ async function startPlanCommand(args: string, ctx: { cwd: string; model?: { prov
 	}
 	const autonomy: Autonomy = yolo ? "yolo" : "lean";
 	replanStreak = 0; // fresh plan — reset thrash counter
-	resumeNotified = true; // a fresh plan supersedes any interrupted one — no resume notice
-	partialWorkNoted = false; // ...but a later foreign-writer state may still warrant the note
+	partialWorkNoted = false; // a later foreign-writer state may still warrant the partial-work note
 	await mutatePlan(ctx.cwd, async () => {
 		await archiveExistingTodo(ctx.cwd);
 		const state = newState(request, "Planning pending. The model will call plan_write.", autonomy, []);
@@ -1134,7 +1145,11 @@ async function startPlanCommand(args: string, ctx: { cwd: string; model?: { prov
 	const subagentAvailable = pi.getActiveTools().includes("subagent");
 	if (yolo) pi.appendEntry("plan_spine", {}); // yolo executes immediately — mark the node for /collapse
 	setPlanning(!yolo); // arm the plan-mode mutation block for this agent run (yolo executes, so no block)
-	pi.sendUserMessage(yolo ? planAndExecutePrompt(request, subagentAvailable) : planOnlyPrompt(request));
+	// deliverAs steer: while idle prompt() ignores it and runs a normal turn;
+	// while STREAMING, omitting it makes pi throw and swallow the message into
+	// emitError — the plan state would be committed but the driving prompt lost
+	// (triage #0: /plan typed mid-stream). Steer is safe in both states.
+	pi.sendUserMessage(yolo ? planAndExecutePrompt(request, subagentAvailable) : planOnlyPrompt(request), { deliverAs: "steer" });
 }
 
 async function goCommand(args: string, ctx: { cwd: string; model?: { provider?: string; id?: string }; ui: { notify(m: string, l?: string): void } }, pi: ExtensionAPI) {
@@ -1173,7 +1188,11 @@ async function goCommand(args: string, ctx: { cwd: string; model?: { provider?: 
 	planEvent("go", next.run_id, { resumed: resuming, stale: stale.length, source: "command" });
 
 	const subagentAvailable = pi.getActiveTools().includes("subagent");
-	pi.sendUserMessage(executePrompt(next, subagentAvailable) + resumeNoteFor(stale));
+	// deliverAs steer for the same reason as startPlanCommand's send: a /plan-go
+	// typed mid-stream otherwise commits phase=executing, plan_spine and the trace
+	// row, then LOSES the execute prompt (pi swallows the missing-streamingBehavior
+	// throw into emitError; plan-runner never learns).
+	pi.sendUserMessage(executePrompt(next, subagentAvailable) + resumeNoteFor(stale), { deliverAs: "steer" });
 }
 
 async function statusCommand(ctx: { cwd: string; ui: { notify(m: string, l?: string): void } }) {
@@ -1207,8 +1226,6 @@ export default function (pi: ExtensionAPI) {
 	// resume, or replace instead of never learning it exists.
 	pi.on("session_start", async (_event, ctx) => {
 		rememberModel(ctx);
-		if (resumeNotified) return;
-		resumeNotified = true;
 		const state = await readState(ctx.cwd);
 		if (!state || state.writer === PROC_MARK) return;
 		const open = state.items.filter((i) => i.status === "pending" || i.status === "in_progress" || i.status === "blocked");

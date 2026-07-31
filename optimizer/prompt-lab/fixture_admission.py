@@ -215,7 +215,13 @@ def check_one(task, write=True):
             p2p = run_state(m, mutant, "pass_to_pass")
             f2p = run_state(m, mutant, "fail_to_pass")
             result["states"][f"mutant:{Path(mutant).stem}"] = {"pass_to_pass": p2p, "fail_to_pass": f2p}
-            mutant_ok = mutant_ok and all_fail(f2p)
+            # Both arms assert. f2p all-fail is the rejection (the shortcut must not
+            # pass the hidden grader); p2p all-PASS is what makes the mutant a
+            # meaningful decoy — a shortcut that breaks the visible suite is not a
+            # plausible model solution, so its rejection proves nothing. The p2p arm
+            # was recorded but never asserted until 2026-07-30 (triage #25); all
+            # existing manifests already satisfy it (checked before adding).
+            mutant_ok = mutant_ok and all_fail(f2p) and all_pass(p2p)
         result["passed"] = (all_pass(result["states"]["pristine_pass_to_pass"])
                             and all_fail(result["states"]["pristine_fail_to_pass"])
                             and all_pass(result["states"]["gold_pass_to_pass"])

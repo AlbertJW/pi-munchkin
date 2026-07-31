@@ -93,3 +93,53 @@ test("the review is DETACHED: turn_end returns without waiting for the model", a
 	assert.equal(modelCallStarted, true, "the review still starts — it is detached, not dropped");
 	assert.equal(fp.sent.length, 0, "nothing delivered yet; the advisory arrives later as followUp");
 });
+
+test("a commit landing during an in-flight review is NOT swallowed — it gets reviewed next turn", async () => {
+	// The detach fix originally marked handledHead BEFORE the in-flight guard, so
+	// a second commit arriving mid-review was recorded as handled on the way to
+	// the bail and then never reviewed at all (2026-07-30 triage #11). The mark
+	// must come after the guard: bail unmarked, pick the commit up next turn.
+	const { execSync } = await import("node:child_process");
+	const { mkdtempSync } = await import("node:fs");
+	const { tmpdir } = await import("node:os");
+	const { join } = await import("node:path");
+	const { makeFakePi, fire } = await import("./integration-harness.ts");
+
+	const cwd = mkdtempSync(join(tmpdir(), "drift-inflight-"));
+	execSync("git init -q . && git config user.email t@t && git config user.name t", { cwd, shell: "/bin/bash" });
+	execSync("echo one > a.txt && git add a.txt && git commit -q -m 'feat: one'", { cwd, shell: "/bin/bash" });
+
+	// First review holds `reviewing` until we release it.
+	let release!: () => void;
+	const gate = new Promise<void>((r) => { release = r; });
+	let authCalls = 0;
+	const fp = makeFakePi();
+	const mod = await import(`../extensions/drift-scanner.ts?inflight=${Date.now()}-${Math.random()}`);
+	mod.default(fp.pi as never);
+	const ctx = {
+		cwd,
+		model: { provider: "test", id: "test-model" },
+		modelRegistry: {
+			getApiKeyAndHeaders: async () => { authCalls += 1; await gate; return { ok: false }; }, // ok:false ends the review quietly after the gate
+		},
+		signal: undefined,
+	};
+	const commitEvent = (id: string) => ({
+		turnIndex: 1,
+		message: { role: "assistant", content: [{ type: "toolCall", id, name: "bash", arguments: { command: "git commit -m x" } }] },
+	});
+
+	await fire(fp, "turn_end", commitEvent("t1"), ctx); // starts review #1, which now blocks on `gate`
+	assert.equal(authCalls, 1, "first review started");
+
+	// Second commit lands while review #1 is in flight.
+	execSync("echo two > b.txt && git add b.txt && git commit -q -m 'feat: two'", { cwd, shell: "/bin/bash" });
+	await fire(fp, "turn_end", commitEvent("t2"), ctx); // must bail on the in-flight guard WITHOUT marking handled
+	assert.equal(authCalls, 1, "no overlapping second review");
+
+	release(); // review #1 completes
+	await new Promise((r) => setTimeout(r, 50)); // let the detached finally{} clear `reviewing`
+
+	await fire(fp, "turn_end", commitEvent("t3"), ctx); // next turn: the swallowed commit must now be reviewed
+	assert.equal(authCalls, 2, "the commit that landed mid-review is reviewed on the next turn, not silently skipped");
+});

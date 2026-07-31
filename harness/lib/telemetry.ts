@@ -179,8 +179,22 @@ function envelope(ext: string, kind: string, detail: Record<string, unknown>): R
 export type TelemetryTap = (ext: string, kind: string, detail: Record<string, unknown>) => void;
 
 export function record(ext: string, kind: string, detail: Record<string, unknown> = {}): void {
-	const taps = (globalThis as Record<string, unknown>).__pi_telemetry_taps as TelemetryTap[] | undefined;
-	if (taps) for (const tap of taps) { try { tap(ext, kind, detail); } catch { /* fail open */ } }
+	// Taps run AFTER the row is written, not before. Taps may themselves call
+	// record() (session-blackboard's lens does: loop-breaker/steer triggers
+	// state-lens/steer-injected), and running them first gave the CONSEQUENCE a
+	// lower seq than its CAUSE in the JSONL — every trace analysis that sorts by
+	// seq then reads the lens injection as preceding the steer that provoked it
+	// (triage #29). Kill-switch semantics are unchanged: taps stay in front of
+	// the TELEMETRY check so in-process observers work even with rows disabled.
+	try {
+		recordRow(ext, kind, detail);
+	} finally {
+		const taps = (globalThis as Record<string, unknown>).__pi_telemetry_taps as TelemetryTap[] | undefined;
+		if (taps) for (const tap of taps) { try { tap(ext, kind, detail); } catch { /* fail open */ } }
+	}
+}
+
+function recordRow(ext: string, kind: string, detail: Record<string, unknown>): void {
 	if (process.env.TELEMETRY === "off") return; // read per-call (testable, toggleable live)
 	const normalized = normalizeDetail(detail);
 	const validationErrors = [...normalized.errors, ...validateCatalogDetail(ext, kind, normalized.detail)];

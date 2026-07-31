@@ -341,7 +341,10 @@ export function discardGitTargets(cmd: string, cwd: string, home: string): Disca
 	return { ok: true, targets };
 }
 
-// Compatibility helper for policy consumers that only need the first cwd.
+// No production consumer as of 2026-07-30 (triage #31) — exercised only by its
+// own tests. Kept because it is the single-target projection of
+// discardGitTargets and the tests document that contract; do not add callers
+// without reading discardGitTargets first.
 export function discardWorkdir(cmd: string, cwd: string, home: string): string {
 	const analysis = discardGitTargets(cmd, cwd, home);
 	if (!analysis.ok || !analysis.targets[0]) return cwd;

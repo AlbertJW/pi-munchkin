@@ -1,8 +1,10 @@
 #!/usr/bin/env python3
 """ab-machinery session-jsonl metrics.
 
-Standalone copy of ab-symbolect.sh's inline parser (so that harness is left
-untouched), extended with the machinery-specific signal: lb_fires / vg_fires —
+THIS file is the authoritative session-jsonl parser. It began as a copy of
+ab-symbolect.sh's inline parser, but that script is retired and its copy has
+drifted — do not treat it as an original to reconcile against (triage #19).
+Extended with the machinery-specific signal: lb_fires / vg_fires —
 how many times loop-breaker / verify-gate steered. Those steers are delivered as
 followUp messages and recorded in the session, so we count messages whose text
 carries the "[loop-breaker]" / "[verify-gate]" tag.

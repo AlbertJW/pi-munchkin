@@ -33,15 +33,23 @@ def test_manifest_artifacts_exist_on_disk():
     missing, drifted = [], []
     for path in sorted(admission.MANIFESTS.glob("*.json")):
         manifest = json.loads(path.read_text())
-        for group in ("artifacts", "tests", "patches"):
-            for entry in manifest.get(group, []):
-                if not isinstance(entry, dict) or "path" not in entry or "sha256" not in entry:
-                    continue
-                target = admission.FIXTURES.parent / entry["path"]
-                if not target.exists():
-                    missing.append(f"{path.stem}: {entry['path']}")
-                elif admission.sha256(target) != entry["sha256"]:
-                    drifted.append(f"{path.stem}: {entry['path']}")
+        # artifacts[] is the manifest's ONE hashed file inventory — it already
+        # lists fixture files, patch files and hidden tests. The first version of
+        # this guard also iterated the top-level "tests" and "patches" keys, but
+        # those are CONFIG DICTS (fail_to_pass/pass_to_pass, gold/shortcut_mutants);
+        # iterating a dict yields string keys, the isinstance(entry, dict) filter
+        # skipped every one, and both arms were dead code from birth (triage #23).
+        # Guard the guard: artifacts must be a non-empty list of {path, sha256}.
+        artifacts = manifest.get("artifacts")
+        assert isinstance(artifacts, list) and artifacts, f"{path.stem}: manifest has no artifacts[] inventory"
+        for entry in artifacts:
+            assert isinstance(entry, dict) and "path" in entry and "sha256" in entry, \
+                f"{path.stem}: malformed artifacts[] entry {entry!r}"
+            target = admission.FIXTURES.parent / entry["path"]
+            if not target.exists():
+                missing.append(f"{path.stem}: {entry['path']}")
+            elif admission.sha256(target) != entry["sha256"]:
+                drifted.append(f"{path.stem}: {entry['path']}")
     assert not missing, "manifest artifacts missing from disk:\n  " + "\n  ".join(missing)
     assert not drifted, "manifest artifacts changed without a manifest update:\n  " + "\n  ".join(drifted)
 
@@ -330,8 +338,20 @@ def test_incident_rotation():
 
 
 def main():
-    test_manifest_artifacts_exist_on_disk(); test_gate_materializes_everything_admission_does(); test_admission_catalog(); test_fixture_verify_read_only(); test_context_pressure_contract(); test_fingerprint(); test_one_shot(); test_execution_policy(); test_runner_dry_modes(); test_robustness_and_usage(); test_schedule(); test_incident_rotation()
-    print("integrity_selftest: OK (artifacts on disk, admission + read-only verify, expiry/drift/approval, fingerprint, one-shot, execution policy, robustness, usage, scheduling)")
+    # AUTO-DISCOVERED, not a hand-maintained list. The list form silently
+    # skipped any test_* someone forgot to register — which is exactly how the
+    # artifacts-on-disk guard was inert on first landing (its author appended
+    # the function and never edited this line; caught only because its
+    # counterfactual produced no output). A test that exists but never runs is
+    # worse than no test: it reads as coverage. Alphabetical order; every
+    # test here is (and must remain) independent of execution order.
+    tests = sorted(
+        (name, fn) for name, fn in globals().items()
+        if name.startswith("test_") and callable(fn)
+    )
+    for _name, fn in tests:
+        fn()
+    print(f"integrity_selftest: OK ({len(tests)} checks: " + ", ".join(n[len("test_"):] for n, _ in tests) + ")")
 
 
 if __name__ == "__main__": main()

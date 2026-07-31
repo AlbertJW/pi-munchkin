@@ -73,6 +73,13 @@ export default function (pi: ExtensionAPI) {
 			// failed (hook abort / empty stage); do NOT re-review the previous commit.
 			if (handledHead.get(ctx.cwd) === headHash) return;
 			if (Math.floor(Date.now() / 1000) - committedAt > FRESH_SECS) return; // no commit landed this turn
+			// The in-flight guard must come BEFORE the handled-mark. In the original
+			// detach fix these were the other way around, so a commit landing while a
+			// review for the same cwd was still running got marked handled on the way
+			// to the bail — and was then never reviewed at all (2026-07-30 triage #11).
+			// Bailing UNMARKED means the next turn_end after the in-flight review
+			// finishes picks the commit up; the git checks it re-runs are cheap.
+			if (reviewing.has(ctx.cwd)) return; // a review for this cwd is already running
 			handledHead.set(ctx.cwd, headHash);
 
 			const show = await pi.exec("git", ["show", "--format=", "HEAD"], { cwd: ctx.cwd, timeout: 10_000 });
@@ -88,9 +95,9 @@ export default function (pi: ExtensionAPI) {
 			// nothing, for up to a minute and a half (confirmed 2026-07-30). The review
 			// is advisory and non-blocking by design; its RESULT arrives as a followUp
 			// message whenever it is ready, which is exactly the semantics we want.
-			// Everything above stays awaited: the guards are cheap and handledHead must
-			// be set before we return, or the next turn re-reviews the same commit.
-			if (reviewing.has(ctx.cwd)) return; // a review for this cwd is already running
+			// Everything above stays awaited: the guards are cheap, and handledHead is
+			// set before this point (with the in-flight bail ordered before the mark)
+			// so the started-review path never re-reviews the same commit.
 			reviewing.add(ctx.cwd);
 			void (async () => {
 			try {

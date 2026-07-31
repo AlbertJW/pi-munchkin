@@ -42,11 +42,18 @@ function planPhaseActive(): boolean {
 // gate). The detected/forced gate command is appended at session start so the
 // exact project command also counts.
 const CMD_POS = "(?:^|[;&|(]\\s*|\\b(?:sudo|xargs|env)\\s+)";
+// No loose script alternative here on purpose. This regex used to end with
+// `(?:\./|bash |sh )\S*test\S*`, which counted ANY green script whose path
+// merely contained "test" (./scripts/collect-test-data.sh, a model-written
+// ./mytest.sh that echoes ok) as a passing verify — silently disarming the
+// gate, whose whole job is catching unverified change claims (triage #16).
+// Script-based suites still count via the shared classifier's verifyLike or
+// by naming them in VERIFY_GATE_CMD; the failure mode left behind is a nag
+// after a genuinely green unregistered script, which is the safe direction.
 const VERIFY_BASE =
 	CMD_POS +
 	"(?:just (?:verify|check|test)|pytest\\b|python3? -m pytest\\b|npm test\\b|npm run (?:test|check|lint|typecheck|verify)\\b|" +
-	"yarn test\\b|tsc\\b|bash -n |go test\\b|cargo test\\b|make (?:test|check|verify)\\b|ruff\\b|eslint\\b|node --test\\b|" +
-	"(?:\\./|bash |sh )\\S*test\\S*)";
+	"yarn test\\b|tsc\\b|bash -n |go test\\b|cargo test\\b|make (?:test|check|verify)\\b|ruff\\b|eslint\\b|node --test\\b)";
 
 function escapeRegex(s: string): string {
 	return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
