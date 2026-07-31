@@ -337,6 +337,68 @@ def test_incident_rotation():
             corpus.INBOX, corpus.ARCHIVE, corpus.MANIFESTS = old
 
 
+def test_graded_subscores_passthrough():
+    """The gate's grader-artifact extraction: additive, and fail-safe on junk.
+
+    A fixture's hidden grader may emit `.<name>-grade.json` = {fixed,total,defects}.
+    real_gate.sh reads it into an OPTIONAL `subscores` row block; `score` stays the
+    strict binary gate bit so no historical row or cross-round pass-rate claim moves.
+    This exists because at n=9/arm the binary gate is a one-sided regression detector
+    (CANDIDATE_STRATEGY_2026-07-31.md section 1) -- partial credit is what lets a round
+    show improvement at all. Mirrors the extraction in real_gate.sh; if that changes,
+    change this together.
+    """
+    import glob as _glob, tempfile
+
+    def extract(workdir):
+        try:
+            hits = sorted(_glob.glob(os.path.join(workdir, ".*-grade.json")))
+            if not hits:
+                return None
+            g = json.loads(Path(hits[0]).read_text())
+            fixed, total = g.get("fixed"), g.get("total")
+            if not (isinstance(fixed, int) and isinstance(total, int) and total > 0 and 0 <= fixed <= total):
+                return None
+            out = {"fixed": fixed, "total": total, "source": os.path.basename(hits[0])}
+            d = g.get("defects")
+            if isinstance(d, dict) and all(isinstance(v, bool) for v in d.values()):
+                out["detail"] = d
+            return out
+        except Exception:
+            return None
+
+    cases = [
+        ({"fixed": 5, "total": 8, "defects": {"d1": True, "d2": False}}, True, True),
+        ({"fixed": 8, "total": 8, "defects": {}}, True, True),
+        ({"fixed": 3, "total": 8, "defects": {"d1": "yes"}}, True, False),   # bad detail dropped, row kept
+        ({"fixed": 9, "total": 8}, False, False),                            # fixed > total
+        ({"fixed": -1, "total": 8}, False, False),
+        ({"fixed": 0, "total": 0}, False, False),
+        ("NOT JSON", False, False),
+        (None, False, False),
+    ]
+    for payload, expect_row, expect_detail in cases:
+        with tempfile.TemporaryDirectory() as td:
+            if payload is not None:
+                body = payload if isinstance(payload, str) else json.dumps(payload)
+                Path(td, ".audit-grade.json").write_text(body)
+            got = extract(td)
+            assert (got is not None) == expect_row, f"{payload!r} -> {got!r}"
+            if got is not None:
+                assert ("detail" in got) == expect_detail, f"{payload!r} -> {got!r}"
+
+    # The schema must accept the block and must NOT require it.
+    schema = json.loads((admission.FIXTURES / "schemas" / "pi.eval-row-v2.schema.json").read_text())
+    assert "subscores" in schema["properties"], "subscores missing from the row schema"
+    assert "subscores" not in schema["required"], "subscores must stay OPTIONAL -- old rows are still valid"
+    props = schema["properties"]["subscores"]
+    assert set(props["required"]) == {"fixed", "total"}, props["required"]
+
+    # And the gate must actually wire it, or the schema is decoration.
+    gate = (admission.ROOT / "real_gate.sh").read_text()
+    assert '"subscores"' in gate or "rec[\"subscores\"]" in gate, "real_gate.sh does not populate subscores"
+
+
 def main():
     # AUTO-DISCOVERED, not a hand-maintained list. The list form silently
     # skipped any test_* someone forgot to register — which is exactly how the

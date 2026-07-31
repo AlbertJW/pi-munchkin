@@ -1,7 +1,753 @@
 {
-  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$defs": {
+    "nullableStats": {
+      "additionalProperties": false,
+      "properties": {
+        "max": {
+          "minimum": 0,
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "mean": {
+          "minimum": 0,
+          "type": [
+            "number",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "max",
+        "mean"
+      ],
+      "type": "object"
+    }
+  },
   "$id": "pi.eval-row/v2",
-  "type": "object",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "context": {
+            "properties": {
+              "schema": {
+                "const": "pi.context-telemetry/v2"
+              }
+            }
+          }
+        },
+        "required": [
+          "context"
+        ]
+      },
+      "then": {
+        "properties": {
+          "context": {
+            "required": [
+              "surface"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "arm": {
+            "not": {
+              "const": "one-shot"
+            }
+          }
+        },
+        "required": [
+          "arm"
+        ]
+      },
+      "then": {
+        "required": [
+          "trajectory"
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "experiment": {
+            "type": "object"
+          }
+        },
+        "required": [
+          "experiment"
+        ]
+      },
+      "then": {
+        "properties": {
+          "trajectory": {
+            "required": [
+              "search_spans",
+              "read_span"
+            ]
+          }
+        },
+        "required": [
+          "span_receipt_success",
+          "config",
+          "experiment",
+          "harness",
+          "trajectory",
+          "context"
+        ]
+      }
+    }
+  ],
+  "properties": {
+    "arm": {
+      "type": "string"
+    },
+    "authoritative": {
+      "type": "boolean"
+    },
+    "config": {
+      "properties": {
+        "declared_env": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "type": "object"
+        },
+        "rendered_governor_sha256": {
+          "pattern": "^[0-9a-f]{64}$",
+          "type": "string"
+        },
+        "sha256": {
+          "pattern": "^[0-9a-f]{64}$",
+          "type": "string"
+        }
+      },
+      "required": [
+        "sha256",
+        "declared_env",
+        "rendered_governor_sha256"
+      ],
+      "type": "object"
+    },
+    "context": {
+      "additionalProperties": false,
+      "properties": {
+        "authenticated": {
+          "const": true
+        },
+        "bash_output_guard": {
+          "additionalProperties": false,
+          "properties": {
+            "cwd_escape_suspected": {
+              "minimum": 0,
+              "type": "integer"
+            },
+            "withheld": {
+              "minimum": 0,
+              "type": "integer"
+            }
+          },
+          "required": [
+            "withheld",
+            "cwd_escape_suspected"
+          ],
+          "type": "object"
+        },
+        "compactions": {
+          "additionalProperties": false,
+          "properties": {
+            "compact_tool": {
+              "minimum": 0,
+              "type": "integer"
+            },
+            "extension_content": {
+              "minimum": 0,
+              "type": "integer"
+            },
+            "manual": {
+              "minimum": 0,
+              "type": "integer"
+            },
+            "manual_unknown": {
+              "minimum": 0,
+              "type": "integer"
+            },
+            "overflow": {
+              "minimum": 0,
+              "type": "integer"
+            },
+            "pi": {
+              "minimum": 0,
+              "type": "integer"
+            },
+            "threshold": {
+              "minimum": 0,
+              "type": "integer"
+            },
+            "total": {
+              "minimum": 0,
+              "type": "integer"
+            },
+            "watcher": {
+              "minimum": 0,
+              "type": "integer"
+            },
+            "will_retry": {
+              "minimum": 0,
+              "type": "integer"
+            }
+          },
+          "required": [
+            "total",
+            "watcher",
+            "pi",
+            "compact_tool",
+            "manual_unknown",
+            "extension_content",
+            "threshold",
+            "overflow",
+            "manual",
+            "will_retry"
+          ],
+          "type": "object"
+        },
+        "config": {
+          "additionalProperties": false,
+          "properties": {
+            "enabled": {
+              "type": "boolean"
+            },
+            "rearmPct": {
+              "maximum": 99,
+              "minimum": 1,
+              "type": "integer"
+            },
+            "thresholdPct": {
+              "maximum": 99,
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          "required": [
+            "enabled",
+            "thresholdPct",
+            "rearmPct"
+          ],
+          "type": [
+            "object",
+            "null"
+          ]
+        },
+        "content_sha256": {
+          "pattern": "^[0-9a-f]{64}$",
+          "type": "string"
+        },
+        "events": {
+          "minimum": 0,
+          "type": "integer"
+        },
+        "harness_surface_sha256": {
+          "pattern": "^[0-9a-f]{64}$",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "plan_runner_delegation": {
+          "additionalProperties": false,
+          "properties": {
+            "blocked": {
+              "minimum": 0,
+              "type": "integer"
+            },
+            "delegated": {
+              "minimum": 0,
+              "type": "integer"
+            }
+          },
+          "required": [
+            "blocked",
+            "delegated"
+          ],
+          "type": "object"
+        },
+        "schema": {
+          "enum": [
+            "pi.context-telemetry/v1",
+            "pi.context-telemetry/v2"
+          ]
+        },
+        "session_key": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "surface": {
+          "additionalProperties": false,
+          "properties": {
+            "calls": {
+              "minimum": 0,
+              "type": "integer"
+            },
+            "concentration": {
+              "additionalProperties": false,
+              "properties": {
+                "largest_message": {
+                  "$ref": "#/$defs/nullableStats"
+                },
+                "largest_tool_result": {
+                  "$ref": "#/$defs/nullableStats"
+                }
+              },
+              "required": [
+                "largest_message",
+                "largest_tool_result"
+              ],
+              "type": "object"
+            },
+            "context": {
+              "additionalProperties": false,
+              "properties": {
+                "max_bytes": {
+                  "minimum": 0,
+                  "type": [
+                    "number",
+                    "null"
+                  ]
+                },
+                "mean_bytes": {
+                  "minimum": 0,
+                  "type": [
+                    "number",
+                    "null"
+                  ]
+                },
+                "tokens": {
+                  "$ref": "#/$defs/nullableStats"
+                }
+              },
+              "required": [
+                "max_bytes",
+                "mean_bytes",
+                "tokens"
+              ],
+              "type": "object"
+            },
+            "duplication": {
+              "additionalProperties": false,
+              "properties": {
+                "exact_block": {
+                  "$ref": "#/$defs/nullableStats"
+                },
+                "five_token_shingle": {
+                  "$ref": "#/$defs/nullableStats"
+                },
+                "near_block": {
+                  "$ref": "#/$defs/nullableStats"
+                }
+              },
+              "required": [
+                "exact_block",
+                "five_token_shingle",
+                "near_block"
+              ],
+              "type": "object"
+            },
+            "kv_cache": {
+              "additionalProperties": false,
+              "properties": {
+                "appended_only_rate": {
+                  "maximum": 1,
+                  "minimum": 0,
+                  "type": [
+                    "number",
+                    "null"
+                  ]
+                },
+                "prefix_stable_rate": {
+                  "maximum": 1,
+                  "minimum": 0,
+                  "type": [
+                    "number",
+                    "null"
+                  ]
+                },
+                "system_prompt_changes": {
+                  "minimum": 0,
+                  "type": "integer"
+                }
+              },
+              "required": [
+                "prefix_stable_rate",
+                "appended_only_rate",
+                "system_prompt_changes"
+              ],
+              "type": "object"
+            },
+            "stale_tool_result": {
+              "$ref": "#/$defs/nullableStats"
+            }
+          },
+          "required": [
+            "calls",
+            "concentration",
+            "duplication",
+            "stale_tool_result",
+            "kv_cache",
+            "context"
+          ],
+          "type": "object"
+        },
+        "watcher": {
+          "additionalProperties": false,
+          "properties": {
+            "completed": {
+              "minimum": 0,
+              "type": "integer"
+            },
+            "estimates": {
+              "items": {
+                "additionalProperties": false,
+                "properties": {
+                  "estimatedTokensAfter": {
+                    "minimum": 0,
+                    "type": [
+                      "integer",
+                      "null"
+                    ]
+                  },
+                  "postTokens": {
+                    "minimum": 0,
+                    "type": [
+                      "integer",
+                      "null"
+                    ]
+                  },
+                  "preTokens": {
+                    "minimum": 0,
+                    "type": [
+                      "integer",
+                      "null"
+                    ]
+                  },
+                  "tokensBefore": {
+                    "minimum": 0,
+                    "type": [
+                      "integer",
+                      "null"
+                    ]
+                  }
+                },
+                "required": [
+                  "preTokens",
+                  "tokensBefore",
+                  "estimatedTokensAfter",
+                  "postTokens"
+                ],
+                "type": "object"
+              },
+              "type": "array"
+            },
+            "failed": {
+              "minimum": 0,
+              "type": "integer"
+            },
+            "requests": {
+              "minimum": 0,
+              "type": "integer"
+            },
+            "resume_required": {
+              "minimum": 0,
+              "type": "integer"
+            },
+            "thrash_silenced": {
+              "minimum": 0,
+              "type": "integer"
+            }
+          },
+          "required": [
+            "requests",
+            "completed",
+            "failed",
+            "thrash_silenced",
+            "resume_required",
+            "estimates"
+          ],
+          "type": "object"
+        }
+      },
+      "required": [
+        "schema",
+        "authenticated",
+        "content_sha256",
+        "session_key",
+        "events",
+        "harness_surface_sha256",
+        "config",
+        "compactions",
+        "watcher"
+      ],
+      "type": "object"
+    },
+    "experiment": {
+      "properties": {
+        "cell": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "manifest_sha256": {
+          "pattern": "^[0-9a-f]{64}$",
+          "type": "string"
+        }
+      },
+      "required": [
+        "manifest_sha256",
+        "cell"
+      ],
+      "type": [
+        "object",
+        "null"
+      ]
+    },
+    "exposure": {
+      "additionalProperties": false,
+      "properties": {
+        "counts": {
+          "additionalProperties": {
+            "minimum": 0,
+            "type": "integer"
+          },
+          "type": "object"
+        },
+        "mode": {
+          "enum": [
+            "configuration",
+            "telemetry"
+          ]
+        },
+        "status": {
+          "enum": [
+            "control",
+            "targeted",
+            "engaged_only",
+            "unexposed"
+          ]
+        },
+        "target_count": {
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "mode",
+        "status",
+        "target_count",
+        "counts"
+      ],
+      "type": "object"
+    },
+    "fixture": {
+      "required": [
+        "cohort",
+        "version"
+      ],
+      "type": "object"
+    },
+    "harness": {
+      "properties": {
+        "hash_blocker": {
+          "type": "string"
+        },
+        "surface_sha256": {
+          "pattern": "^[0-9a-f]{64}$",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "tools": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "surface_sha256",
+        "hash_blocker"
+      ],
+      "type": "object"
+    },
+    "model": {
+      "type": "string"
+    },
+    "prompt": {
+      "required": [
+        "variant",
+        "semantic_group",
+        "sha256"
+      ],
+      "type": "object"
+    },
+    "repetition": {
+      "minimum": 1,
+      "type": "integer"
+    },
+    "run": {
+      "type": "string"
+    },
+    "schema": {
+      "const": "pi.eval-row/v2"
+    },
+    "score": {
+      "maximum": 1,
+      "minimum": 0,
+      "type": "integer"
+    },
+    "serving": {
+      "required": [
+        "pre",
+        "post",
+        "stable"
+      ],
+      "type": "object"
+    },
+    "span_receipt_success": {
+      "type": "boolean"
+    },
+    "split": {
+      "enum": [
+        "val",
+        "heldout",
+        "robustness"
+      ]
+    },
+    "status": {
+      "enum": [
+        "complete",
+        "incomplete",
+        "exploratory",
+        "ineligible"
+      ]
+    },
+    "subscores": {
+      "description": "Graded partial credit from a fixture whose hidden grader emits one. OPTIONAL and additive: `score` stays the strict binary gate bit, so rows without subscores remain valid and cross-round pass-rate comparisons are unaffected. Written by real_gate.sh when the workdir contains a grader artifact (e.g. audit-sweep's .audit-grade.json).",
+      "properties": {
+        "detail": {
+          "additionalProperties": {
+            "type": "boolean"
+          },
+          "description": "per-check name -> bool, as the grader emitted it",
+          "type": "object"
+        },
+        "fixed": {
+          "description": "sub-checks the session actually passed",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "source": {
+          "description": "grader artifact the values came from, relative to the workdir",
+          "type": "string"
+        },
+        "total": {
+          "description": "sub-checks the grader ran",
+          "minimum": 1,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "fixed",
+        "total"
+      ],
+      "type": "object"
+    },
+    "task": {
+      "type": "string"
+    },
+    "trajectory": {
+      "properties": {
+        "compactions": {
+          "minimum": 0,
+          "type": "integer"
+        },
+        "first_mutation_turn": {
+          "minimum": 0,
+          "type": "integer"
+        },
+        "read_span": {
+          "minimum": 0,
+          "type": "integer"
+        },
+        "reads": {
+          "minimum": 0,
+          "type": "integer"
+        },
+        "repeat_calls": {
+          "minimum": 0,
+          "type": "integer"
+        },
+        "repeat_reads": {
+          "minimum": 0,
+          "type": "integer"
+        },
+        "search_spans": {
+          "minimum": 0,
+          "type": "integer"
+        },
+        "subagent_calls": {
+          "minimum": 0,
+          "type": "integer"
+        },
+        "tool_calls": {
+          "minimum": 0,
+          "type": "integer"
+        },
+        "tool_errors": {
+          "minimum": 0,
+          "type": "integer"
+        },
+        "tool_result_chars": {
+          "minimum": 0,
+          "type": "integer"
+        },
+        "turns": {
+          "minimum": 0,
+          "type": "integer"
+        },
+        "unique_reads": {
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "turns",
+        "tool_calls",
+        "tool_errors",
+        "reads",
+        "unique_reads",
+        "repeat_calls",
+        "repeat_reads",
+        "tool_result_chars",
+        "first_mutation_turn",
+        "compactions"
+      ],
+      "type": "object"
+    },
+    "usage": {
+      "required": [
+        "source",
+        "exact",
+        "input_tokens",
+        "output_tokens",
+        "output_chars"
+      ],
+      "type": "object"
+    }
+  },
   "required": [
     "schema",
     "task",
@@ -19,720 +765,5 @@
     "status",
     "exposure"
   ],
-  "properties": {
-    "schema": {
-      "const": "pi.eval-row/v2"
-    },
-    "task": {
-      "type": "string"
-    },
-    "model": {
-      "type": "string"
-    },
-    "arm": {
-      "type": "string"
-    },
-    "repetition": {
-      "type": "integer",
-      "minimum": 1
-    },
-    "score": {
-      "type": "integer",
-      "minimum": 0,
-      "maximum": 1
-    },
-    "split": {
-      "enum": [
-        "val",
-        "heldout",
-        "robustness"
-      ]
-    },
-    "run": {
-      "type": "string"
-    },
-    "fixture": {
-      "type": "object",
-      "required": [
-        "cohort",
-        "version"
-      ]
-    },
-    "authoritative": {
-      "type": "boolean"
-    },
-    "prompt": {
-      "type": "object",
-      "required": [
-        "variant",
-        "semantic_group",
-        "sha256"
-      ]
-    },
-    "serving": {
-      "type": "object",
-      "required": [
-        "pre",
-        "post",
-        "stable"
-      ]
-    },
-    "usage": {
-      "type": "object",
-      "required": [
-        "source",
-        "exact",
-        "input_tokens",
-        "output_tokens",
-        "output_chars"
-      ]
-    },
-    "trajectory": {
-      "type": "object",
-      "required": [
-        "turns",
-        "tool_calls",
-        "tool_errors",
-        "reads",
-        "unique_reads",
-        "repeat_calls",
-        "repeat_reads",
-        "tool_result_chars",
-        "first_mutation_turn",
-        "compactions"
-      ],
-      "properties": {
-        "turns": {
-          "type": "integer",
-          "minimum": 0
-        },
-        "tool_calls": {
-          "type": "integer",
-          "minimum": 0
-        },
-        "tool_errors": {
-          "type": "integer",
-          "minimum": 0
-        },
-        "reads": {
-          "type": "integer",
-          "minimum": 0
-        },
-        "unique_reads": {
-          "type": "integer",
-          "minimum": 0
-        },
-        "repeat_calls": {
-          "type": "integer",
-          "minimum": 0
-        },
-        "repeat_reads": {
-          "type": "integer",
-          "minimum": 0
-        },
-        "tool_result_chars": {
-          "type": "integer",
-          "minimum": 0
-        },
-        "first_mutation_turn": {
-          "type": "integer",
-          "minimum": 0
-        },
-        "compactions": {
-          "type": "integer",
-          "minimum": 0
-        },
-        "search_spans": {
-          "type": "integer",
-          "minimum": 0
-        },
-        "read_span": {
-          "type": "integer",
-          "minimum": 0
-        },
-        "subagent_calls": {
-          "type": "integer",
-          "minimum": 0
-        }
-      }
-    },
-    "span_receipt_success": {
-      "type": "boolean"
-    },
-    "config": {
-      "type": "object",
-      "required": [
-        "sha256",
-        "declared_env",
-        "rendered_governor_sha256"
-      ],
-      "properties": {
-        "sha256": {
-          "type": "string",
-          "pattern": "^[0-9a-f]{64}$"
-        },
-        "declared_env": {
-          "type": "object",
-          "additionalProperties": {
-            "type": "string"
-          }
-        },
-        "rendered_governor_sha256": {
-          "type": "string",
-          "pattern": "^[0-9a-f]{64}$"
-        }
-      }
-    },
-    "experiment": {
-      "type": [
-        "object",
-        "null"
-      ],
-      "required": [
-        "manifest_sha256",
-        "cell"
-      ],
-      "properties": {
-        "manifest_sha256": {
-          "type": "string",
-          "pattern": "^[0-9a-f]{64}$"
-        },
-        "cell": {
-          "type": "string",
-          "minLength": 1
-        }
-      }
-    },
-    "exposure": {
-      "type": "object",
-      "required": [
-        "mode",
-        "status",
-        "target_count",
-        "counts"
-      ],
-      "additionalProperties": false,
-      "properties": {
-        "mode": {
-          "enum": [
-            "configuration",
-            "telemetry"
-          ]
-        },
-        "status": {
-          "enum": [
-            "control",
-            "targeted",
-            "engaged_only",
-            "unexposed"
-          ]
-        },
-        "target_count": {
-          "type": "integer",
-          "minimum": 0
-        },
-        "counts": {
-          "type": "object",
-          "additionalProperties": {
-            "type": "integer",
-            "minimum": 0
-          }
-        }
-      }
-    },
-    "harness": {
-      "type": "object",
-      "required": [
-        "surface_sha256",
-        "hash_blocker"
-      ],
-      "properties": {
-        "surface_sha256": {
-          "type": [
-            "string",
-            "null"
-          ],
-          "pattern": "^[0-9a-f]{64}$"
-        },
-        "hash_blocker": {
-          "type": "string"
-        },
-        "tools": {
-          "type": "array",
-          "items": {
-            "type": "string"
-          }
-        }
-      }
-    },
-    "context": {
-      "type": "object",
-      "required": [
-        "schema",
-        "authenticated",
-        "content_sha256",
-        "session_key",
-        "events",
-        "harness_surface_sha256",
-        "config",
-        "compactions",
-        "watcher"
-      ],
-      "properties": {
-        "schema": {
-          "enum": [
-            "pi.context-telemetry/v1",
-            "pi.context-telemetry/v2"
-          ]
-        },
-        "authenticated": {
-          "const": true
-        },
-        "content_sha256": {
-          "type": "string",
-          "pattern": "^[0-9a-f]{64}$"
-        },
-        "session_key": {
-          "type": "string",
-          "minLength": 1
-        },
-        "events": {
-          "type": "integer",
-          "minimum": 0
-        },
-        "harness_surface_sha256": {
-          "type": [
-            "string",
-            "null"
-          ],
-          "pattern": "^[0-9a-f]{64}$"
-        },
-        "config": {
-          "type": [
-            "object",
-            "null"
-          ],
-          "required": [
-            "enabled",
-            "thresholdPct",
-            "rearmPct"
-          ],
-          "additionalProperties": false,
-          "properties": {
-            "enabled": {
-              "type": "boolean"
-            },
-            "thresholdPct": {
-              "type": "integer",
-              "minimum": 1,
-              "maximum": 99
-            },
-            "rearmPct": {
-              "type": "integer",
-              "minimum": 1,
-              "maximum": 99
-            }
-          }
-        },
-        "compactions": {
-          "type": "object",
-          "required": [
-            "total",
-            "watcher",
-            "pi",
-            "compact_tool",
-            "manual_unknown",
-            "extension_content",
-            "threshold",
-            "overflow",
-            "manual",
-            "will_retry"
-          ],
-          "additionalProperties": false,
-          "properties": {
-            "total": {
-              "type": "integer",
-              "minimum": 0
-            },
-            "watcher": {
-              "type": "integer",
-              "minimum": 0
-            },
-            "pi": {
-              "type": "integer",
-              "minimum": 0
-            },
-            "compact_tool": {
-              "type": "integer",
-              "minimum": 0
-            },
-            "manual_unknown": {
-              "type": "integer",
-              "minimum": 0
-            },
-            "extension_content": {
-              "type": "integer",
-              "minimum": 0
-            },
-            "threshold": {
-              "type": "integer",
-              "minimum": 0
-            },
-            "overflow": {
-              "type": "integer",
-              "minimum": 0
-            },
-            "manual": {
-              "type": "integer",
-              "minimum": 0
-            },
-            "will_retry": {
-              "type": "integer",
-              "minimum": 0
-            }
-          }
-        },
-        "watcher": {
-          "type": "object",
-          "required": [
-            "requests",
-            "completed",
-            "failed",
-            "thrash_silenced",
-            "resume_required",
-            "estimates"
-          ],
-          "additionalProperties": false,
-          "properties": {
-            "requests": {
-              "type": "integer",
-              "minimum": 0
-            },
-            "completed": {
-              "type": "integer",
-              "minimum": 0
-            },
-            "failed": {
-              "type": "integer",
-              "minimum": 0
-            },
-            "thrash_silenced": {
-              "type": "integer",
-              "minimum": 0
-            },
-            "resume_required": {
-              "type": "integer",
-              "minimum": 0
-            },
-            "estimates": {
-              "type": "array",
-              "items": {
-                "type": "object",
-                "required": [
-                  "preTokens",
-                  "tokensBefore",
-                  "estimatedTokensAfter",
-                  "postTokens"
-                ],
-                "additionalProperties": false,
-                "properties": {
-                  "preTokens": {
-                    "type": [
-                      "integer",
-                      "null"
-                    ],
-                    "minimum": 0
-                  },
-                  "tokensBefore": {
-                    "type": [
-                      "integer",
-                      "null"
-                    ],
-                    "minimum": 0
-                  },
-                  "estimatedTokensAfter": {
-                    "type": [
-                      "integer",
-                      "null"
-                    ],
-                    "minimum": 0
-                  },
-                  "postTokens": {
-                    "type": [
-                      "integer",
-                      "null"
-                    ],
-                    "minimum": 0
-                  }
-                }
-              }
-            }
-          }
-        },
-        "surface": {
-          "type": "object",
-          "required": [
-            "calls",
-            "concentration",
-            "duplication",
-            "stale_tool_result",
-            "kv_cache",
-            "context"
-          ],
-          "additionalProperties": false,
-          "properties": {
-            "calls": {
-              "type": "integer",
-              "minimum": 0
-            },
-            "concentration": {
-              "type": "object",
-              "required": [
-                "largest_message",
-                "largest_tool_result"
-              ],
-              "additionalProperties": false,
-              "properties": {
-                "largest_message": {
-                  "$ref": "#/$defs/nullableStats"
-                },
-                "largest_tool_result": {
-                  "$ref": "#/$defs/nullableStats"
-                }
-              }
-            },
-            "duplication": {
-              "type": "object",
-              "required": [
-                "exact_block",
-                "five_token_shingle",
-                "near_block"
-              ],
-              "additionalProperties": false,
-              "properties": {
-                "exact_block": {
-                  "$ref": "#/$defs/nullableStats"
-                },
-                "five_token_shingle": {
-                  "$ref": "#/$defs/nullableStats"
-                },
-                "near_block": {
-                  "$ref": "#/$defs/nullableStats"
-                }
-              }
-            },
-            "stale_tool_result": {
-              "$ref": "#/$defs/nullableStats"
-            },
-            "kv_cache": {
-              "type": "object",
-              "required": [
-                "prefix_stable_rate",
-                "appended_only_rate",
-                "system_prompt_changes"
-              ],
-              "additionalProperties": false,
-              "properties": {
-                "prefix_stable_rate": {
-                  "type": [
-                    "number",
-                    "null"
-                  ],
-                  "minimum": 0,
-                  "maximum": 1
-                },
-                "appended_only_rate": {
-                  "type": [
-                    "number",
-                    "null"
-                  ],
-                  "minimum": 0,
-                  "maximum": 1
-                },
-                "system_prompt_changes": {
-                  "type": "integer",
-                  "minimum": 0
-                }
-              }
-            },
-            "context": {
-              "type": "object",
-              "required": [
-                "max_bytes",
-                "mean_bytes",
-                "tokens"
-              ],
-              "additionalProperties": false,
-              "properties": {
-                "max_bytes": {
-                  "type": [
-                    "number",
-                    "null"
-                  ],
-                  "minimum": 0
-                },
-                "mean_bytes": {
-                  "type": [
-                    "number",
-                    "null"
-                  ],
-                  "minimum": 0
-                },
-                "tokens": {
-                  "$ref": "#/$defs/nullableStats"
-                }
-              }
-            }
-          }
-        },
-        "bash_output_guard": {
-          "type": "object",
-          "required": [
-            "withheld",
-            "cwd_escape_suspected"
-          ],
-          "additionalProperties": false,
-          "properties": {
-            "withheld": {
-              "type": "integer",
-              "minimum": 0
-            },
-            "cwd_escape_suspected": {
-              "type": "integer",
-              "minimum": 0
-            }
-          }
-        },
-        "plan_runner_delegation": {
-          "type": "object",
-          "required": [
-            "blocked",
-            "delegated"
-          ],
-          "additionalProperties": false,
-          "properties": {
-            "blocked": {
-              "type": "integer",
-              "minimum": 0
-            },
-            "delegated": {
-              "type": "integer",
-              "minimum": 0
-            }
-          }
-        }
-      },
-      "additionalProperties": false
-    },
-    "status": {
-      "enum": [
-        "complete",
-        "incomplete",
-        "exploratory",
-        "ineligible"
-      ]
-    }
-  },
-  "$defs": {
-    "nullableStats": {
-      "type": "object",
-      "required": [
-        "max",
-        "mean"
-      ],
-      "additionalProperties": false,
-      "properties": {
-        "max": {
-          "type": [
-            "number",
-            "null"
-          ],
-          "minimum": 0
-        },
-        "mean": {
-          "type": [
-            "number",
-            "null"
-          ],
-          "minimum": 0
-        }
-      }
-    }
-  },
-  "allOf": [
-    {
-      "if": {
-        "required": [
-          "context"
-        ],
-        "properties": {
-          "context": {
-            "properties": {
-              "schema": {
-                "const": "pi.context-telemetry/v2"
-              }
-            }
-          }
-        }
-      },
-      "then": {
-        "properties": {
-          "context": {
-            "required": [
-              "surface"
-            ]
-          }
-        }
-      }
-    },
-    {
-      "if": {
-        "required": [
-          "arm"
-        ],
-        "properties": {
-          "arm": {
-            "not": {
-              "const": "one-shot"
-            }
-          }
-        }
-      },
-      "then": {
-        "required": [
-          "trajectory"
-        ]
-      }
-    },
-    {
-      "if": {
-        "required": [
-          "experiment"
-        ],
-        "properties": {
-          "experiment": {
-            "type": "object"
-          }
-        }
-      },
-      "then": {
-        "required": [
-          "span_receipt_success",
-          "config",
-          "experiment",
-          "harness",
-          "trajectory",
-          "context"
-        ],
-        "properties": {
-          "trajectory": {
-            "required": [
-              "search_spans",
-              "read_span"
-            ]
-          }
-        }
-      }
-    }
-  ]
+  "type": "object"
 }

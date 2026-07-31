@@ -810,12 +810,13 @@ NOTE: a previous attempt in this workdir was stopped for repeating the same fail
 		LOW_TOK_STREAK=0
 	fi
 
-	python3 - "$RESULTS" "$MODEL" "$pat" "$task" "$rep" "$gate" "$retried" "$RUNID" "$tin" "$tout" "$output_chars" "$split" "$usage_exact" "${FLEET_EXPECTED_MODELS:-}" "$rowctx" "$wd/fingerprint-pre.json" "$wd/fingerprint-post.json" "$GATE_NETWORK" "$MODEL_CONTROL" "$MODEL_PROVIDER_RESOLVED" "$ENDPOINT_IDENTITY_SHA256" "$NETWORK_AUTHORITATIVE" "$NETWORK_AUTHORITY_REASON" "$SANDBOX_AUTHORITATIVE" "$SANDBOX_AUTHORITY_REASON" "$EXEC_POLICY" "$mrow" "$span_receipt_success" "$cfg" "$CONFIG" "$EXPERIMENT_MANIFEST" "$EXPERIMENT_MANIFEST_SHA256" "$EXPERIMENT_BASE_CELL" "$EXPERIMENT_CAND_CELL" "$HARNESS_HASH_BLOCKER" "$context_telemetry" "$wd/.pi/APPEND_SYSTEM.md" "${AGENT_MODELS_SHA256:-}" "$tools" <<'PY'
+	python3 - "$RESULTS" "$MODEL" "$pat" "$task" "$rep" "$gate" "$retried" "$RUNID" "$tin" "$tout" "$output_chars" "$split" "$usage_exact" "${FLEET_EXPECTED_MODELS:-}" "$rowctx" "$wd/fingerprint-pre.json" "$wd/fingerprint-post.json" "$GATE_NETWORK" "$MODEL_CONTROL" "$MODEL_PROVIDER_RESOLVED" "$ENDPOINT_IDENTITY_SHA256" "$NETWORK_AUTHORITATIVE" "$NETWORK_AUTHORITY_REASON" "$SANDBOX_AUTHORITATIVE" "$SANDBOX_AUTHORITY_REASON" "$EXEC_POLICY" "$mrow" "$span_receipt_success" "$cfg" "$CONFIG" "$EXPERIMENT_MANIFEST" "$EXPERIMENT_MANIFEST_SHA256" "$EXPERIMENT_BASE_CELL" "$EXPERIMENT_CAND_CELL" "$HARNESS_HASH_BLOCKER" "$context_telemetry" "$wd/.pi/APPEND_SYSTEM.md" "${AGENT_MODELS_SHA256:-}" "$tools" "$wd" <<'PY'
 import hashlib,importlib.util,json,os,sys
 (out,model,pat,task,rep,gate,retried,runid,tin,tout,outchars,split,usage_exact,expected_models,
  ctxpath,prepath,postpath,network_mode,model_control,provider,endpoint_sha,network_auth,network_reason,
  sandbox_auth,sandbox_reason,policy_path,mrow,span_receipt,cfg_path,config_path,experiment_manifest,
- experiment_sha,base_cell,cand_cell,harness_blocker,context_telemetry_path,rendered_governor_path,agent_models_sha,tools_csv) = sys.argv[1:40]
+ experiment_sha,base_cell,cand_cell,harness_blocker,context_telemetry_path,rendered_governor_path,agent_models_sha,tools_csv,
+ workdir) = sys.argv[1:41]
 ctx=json.load(open(ctxpath)); pre=json.load(open(prepath)); post=json.load(open(postpath))
 # Loaded once and reused for both "harness" and "context" below — the surface hash
 # in the row is pulled ONLY from this already-HMAC-verified blob, never from the
@@ -863,6 +864,26 @@ if experiment_manifest:
     actual=hashlib.sha256(manifest_bytes).hexdigest()
     if actual != experiment_sha: raise SystemExit("experiment manifest hash drift while writing row")
     experiment={"manifest_sha256":actual,"cell":base_cell if pat=="base" else cand_cell}
+# GRADED SUBSCORES (optional, additive). A fixture's hidden grader may emit a
+# `.<name>-grade.json` artifact of {fixed, total, defects} alongside its exit code.
+# `score` stays the strict binary gate bit, so rows without a grader are unchanged
+# and no cross-round pass-rate comparison shifts. This exists because the gate is a
+# one-sided regression detector on a binary outcome (CANDIDATE_STRATEGY_2026-07-31
+# section 1): partial credit is what lets a round show improvement at all.
+subscores=None
+try:
+    import glob as _glob
+    _hits=sorted(_glob.glob(os.path.join(workdir, ".*-grade.json")))
+    if _hits:
+        _g=json.load(open(_hits[0], encoding="utf-8"))
+        _fixed, _total = _g.get("fixed"), _g.get("total")
+        if isinstance(_fixed,int) and isinstance(_total,int) and _total > 0 and 0 <= _fixed <= _total:
+            subscores={"fixed":_fixed,"total":_total,"source":os.path.basename(_hits[0])}
+            _d=_g.get("defects")
+            if isinstance(_d,dict) and all(isinstance(v,bool) for v in _d.values()):
+                subscores["detail"]=_d
+except Exception:
+    subscores=None  # a malformed grader artifact must never fail a row
 rec={"schema":"pi.eval-row/v2", "task":task,"pattern":pat,"arm":pat,"rep":int(rep),
      "repetition":int(rep),"model":model,"split":split,"score":int(gate),
      "retried":int(retried),"run":runid,"fixture":{"cohort":ctx["cohort"],"version":ctx["version"]},
@@ -883,6 +904,8 @@ rec={"schema":"pi.eval-row/v2", "task":task,"pattern":pat,"arm":pat,"rep":int(re
      # compatibility aliases for historical readers; dimensions stay honest.
      "out_chars":int(outchars),"think_chars":0,"in_tok":int(tin) if exact else 0,
      "out_tok":int(tout) if exact else 0,"token_usage_exact":exact}
+if subscores is not None:
+    rec["subscores"]=subscores
 # Import the single source of truth rather than reimplementing it. This block used to
 # duplicate exposure.py's status logic, which silently inverts the moment a mode is added
 # (suppression arms would have recorded "targeted" for a mechanism that still fired).
