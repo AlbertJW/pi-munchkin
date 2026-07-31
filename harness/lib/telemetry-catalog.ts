@@ -34,14 +34,18 @@ export const EVENT_CATALOG = {
 	"plan-runner/uncertainty-hold": { count: "number", gate: "string" },
 	"plan-runner/sha-guard": { checked: "number", missing: "number" },
 	"plan-runner/write-rejected": { reason_class: "string", context_tokens: ["number", "null"] },
-	// `source` ("command"|"tool") added 2026-07-30 when /plan-go and the plan_go
+	// `activation` ("command"|"tool") added 2026-07-30 when /plan-go and the plan_go
 	// tool were unified: both now emit these. Rows before that date are all
 	// tool-path (the command emitted nothing). `go` still excludes yolo starts —
 	// /plan yolo flips phase in startPlanCommand without a go event, so this
 	// metric means "explicit go activation", not "execution started".
-	"plan-runner/go": { resumed: "boolean", stale: "number", source: "string" },
-	"plan-runner/go-blocked": { reason: "string", source: "string" },
-	"plan-runner/plan-mode-block": { toolName: "string", kind: "string" },
+	"plan-runner/go": { resumed: "boolean", stale: "number", activation: "string" },
+	"plan-runner/go-blocked": { reason: "string", activation: "string" },
+	// `block_kind`, not `kind`: a detail field named `kind` OVERWRITES the envelope's
+	// kind (the event name itself), so every row this ever wrote was labelled
+	// "inspect"/"mutate" instead of "plan-mode-block" and the event was unfindable
+	// by name. Caught 2026-07-31 by the reserved-field guard on its first run.
+	"plan-runner/plan-mode-block": { toolName: "string", block_kind: "string" },
 	"git-guard/blocked-unresolved-target": { reason: "string" },
 	"git-guard/confirm": { approved: "boolean", changes: "number" },
 	"context-inlet-guard/block": { risky: "boolean", bytes: "number", n: "number", bigLimit: "boolean" },
@@ -120,12 +124,28 @@ function valueType(value: unknown): TelemetryFieldType | "object" | "undefined" 
 	return type === "string" || type === "number" || type === "boolean" || type === "undefined" ? type : "object";
 }
 
+// Detail is spread OVER the envelope in telemetry.ts's appendRow, so a detail key
+// with one of these names silently REPLACES the envelope's value. That is not a
+// style issue: `source` carries TELEMETRY_SOURCE, and context_telemetry.py:49,62,78
+// discards every event whose source != "gate" — so a detail field named `source`
+// makes the event vanish from every gate round's extraction, reading as a mechanism
+// that never fired. Introduced and caught the same day (2026-07-31, plan-runner's
+// go/go-blocked `source`). run_id/provider/model are deliberately NOT reserved:
+// envelope() reads them from detail on purpose and writes back the same value.
+const RESERVED_ENVELOPE_FIELDS = new Set([
+	"schema", "ts", "seq", "source", "sk", "harness_surface_sha256", "config_sha256", "ext", "kind",
+]);
+
 export function validateCatalogDetail(ext: string, kind: string, detail: Record<string, unknown>): string[] {
 	const schema = EVENT_CATALOG[`${ext}/${kind}` as CatalogEventKey] as TelemetryDetailSchema | undefined;
 	if (!schema) return [`unknown event ${ext}/${kind}`];
 	const errors: string[] = [];
 	for (const [field, value] of Object.entries(detail)) {
 		if (value === undefined) continue;
+		if (RESERVED_ENVELOPE_FIELDS.has(field)) {
+			errors.push(`field ${field} shadows a telemetry envelope key`);
+			continue;
+		}
 		const expected = schema[field];
 		if (!expected) {
 			errors.push(`unknown field ${field}`);

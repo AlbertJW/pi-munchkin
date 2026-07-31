@@ -100,6 +100,33 @@ test("strict telemetry rejects unknown kinds and fields", () => {
 	});
 });
 
+test("a detail field may NOT shadow a telemetry envelope key", () => {
+	// appendRow spreads detail OVER the envelope, so a detail field named `source`
+	// silently replaces TELEMETRY_SOURCE — and context_telemetry.py drops every event
+	// whose source != "gate". A shadowing field therefore makes the event VANISH from
+	// gate extraction, reading as a mechanism that never fired. Introduced and caught
+	// the same day (2026-07-31: plan-runner's go/go-blocked used `source`, now
+	// `activation`). Guarded for every envelope key, not just the one that bit us.
+	withFile(() => {
+		process.env.TELEMETRY_STRICT = "1";
+		for (const field of ["source", "seq", "sk", "ts", "schema", "ext", "kind", "harness_surface_sha256", "config_sha256"]) {
+			assert.throws(() => record("verify-gate", "gate-green-consumed", { [field]: "x" }),
+				/shadows a telemetry envelope key/, `detail.${field} must be rejected`);
+		}
+	});
+	// run_id/provider/model are deliberately NOT reserved: envelope() reads them from
+	// detail on purpose and writes back the same value, so they must still be allowed.
+	withFile((file) => {
+		process.env.TELEMETRY_STRICT = "0";
+		record("plan-runner", "go", { resumed: false, stale: 0, activation: "command", run_id: "r1" });
+		const row = JSON.parse(readFileSync(file, "utf8").trim());
+		assert.equal(row.kind, "go", "a legitimate row must still be written");
+		assert.equal(row.run_id, "r1", "run_id is promoted, not shadowed");
+		assert.equal(row.activation, "command");
+		assert.notEqual(row.source, "command", "the envelope's source must survive");
+	});
+});
+
 test("production telemetry fails closed to a minimal schema-reject row", () => {
 	withFile((file) => {
 		process.env.TELEMETRY_STRICT = "0";

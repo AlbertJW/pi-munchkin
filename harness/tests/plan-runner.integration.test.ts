@@ -1293,7 +1293,7 @@ test("a HELD /plan-go (c31 uncertainty) must NOT disarm the plan-mode mutation b
 	}
 });
 
-test("/plan-go emits go/go-blocked telemetry with source:command (parity with the tool)", async () => {
+test("/plan-go emits go/go-blocked telemetry with activation:command (parity with the tool)", async () => {
 	// The slash path used to emit NOTHING on success or hard bails — only the
 	// tool did — so command-driven activations were invisible to exposure counts.
 	const fp = freshPlanRunner();
@@ -1318,11 +1318,11 @@ test("/plan-go emits go/go-blocked telemetry with source:command (parity with th
 		const blocked = rows.find((r) => r.ext === "plan-runner" && r.kind === "go-blocked");
 		assert.ok(blocked, "bail must be visible in telemetry");
 		assert.equal(blocked.reason, "no-plan");
-		assert.equal(blocked.source, "command");
+		assert.equal(blocked.activation, "command");
 		const go = rows.find((r) => r.ext === "plan-runner" && r.kind === "go");
 		assert.ok(go, "successful activation must be visible in telemetry");
 		assert.equal(go.resumed, false);
-		assert.equal(go.source, "command");
+		assert.equal(go.activation, "command");
 	} finally {
 		if (priorFile === undefined) delete process.env.TELEMETRY_FILE; else process.env.TELEMETRY_FILE = priorFile;
 		if (priorSource === undefined) delete process.env.TELEMETRY_SOURCE; else process.env.TELEMETRY_SOURCE = priorSource;

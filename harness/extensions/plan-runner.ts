@@ -1164,12 +1164,12 @@ async function goCommand(args: string, ctx: { cwd: string; model?: { provider?: 
 	const outcome = await goTransition(ctx.cwd, mode);
 	if (!outcome.ok) {
 		if (outcome.reason === "no-plan") {
-			planEvent("go-blocked", `no-plan-${actionId()}`, { reason: "no-plan", source: "command" });
+			planEvent("go-blocked", `no-plan-${actionId()}`, { reason: "no-plan", activation: "command" });
 			ctx.ui.notify("No plan to run. Start with /plan <request>.", "error");
 			return;
 		}
 		if (outcome.reason === "no-open-items") {
-			planEvent("go-blocked", outcome.runId, { reason: "no-open-items", source: "command" });
+			planEvent("go-blocked", outcome.runId, { reason: "no-open-items", activation: "command" });
 			ctx.ui.notify("Plan is complete — no open items. Start a new plan with /plan <request>.", "info");
 			return;
 		}
@@ -1185,7 +1185,7 @@ async function goCommand(args: string, ctx: { cwd: string; model?: { provider?: 
 	const { state: next, resuming, stale } = outcome;
 	pi.appendEntry("plan_spine", { run_id: next.run_id }); // mark this node for /collapse
 	await appendTrace(ctx.cwd, { run_id: next.run_id, action_type: "command", tool_name: "plan-go", success: true, output_summary: `${resuming ? "resume" : "execute"}${mode ? ` autonomy=${mode}` : ""}` });
-	planEvent("go", next.run_id, { resumed: resuming, stale: stale.length, source: "command" });
+	planEvent("go", next.run_id, { resumed: resuming, stale: stale.length, activation: "command" });
 
 	const subagentAvailable = pi.getActiveTools().includes("subagent");
 	// deliverAs steer for the same reason as startPlanCommand's send: a /plan-go
@@ -1269,11 +1269,11 @@ export default function (pi: ExtensionAPI) {
 
 					if (!outcome.ok) {
 						if (outcome.reason === "no-plan") {
-							planEvent("go-blocked", `no-plan-${aid}`, { reason: "no-plan", source: "tool" });
+							planEvent("go-blocked", `no-plan-${aid}`, { reason: "no-plan", activation: "tool" });
 							rejectPlanTool("plan_go: no plan to run. Call plan_write first to create one, then call plan_go.");
 						}
 						if (outcome.reason === "no-open-items") {
-							planEvent("go-blocked", outcome.runId, { reason: "no-open-items", source: "tool" });
+							planEvent("go-blocked", outcome.runId, { reason: "no-open-items", activation: "tool" });
 							rejectPlanTool("plan_go: plan is complete — no open items. Nothing to execute; call plan_write to add more work first.");
 						}
 						const state = outcome.state;
@@ -1295,7 +1295,7 @@ export default function (pi: ExtensionAPI) {
 						output_summary: resuming ? "resume" : "execute",
 						final_status: derivedStatus(state),
 					});
-					planEvent("go", state.run_id, { resumed: resuming, stale: stale.length, source: "tool" });
+					planEvent("go", state.run_id, { resumed: resuming, stale: stale.length, activation: "tool" });
 
 					const subagentAvailable = pi.getActiveTools().includes("subagent");
 					return {
@@ -1393,7 +1393,7 @@ export default function (pi: ExtensionAPI) {
 			// names no alternative; observed live 2026-07-27, five blocked attempts in a
 			// row before the model abandoned a plan it could not size without counting.
 			const kind = bashMutates && !PLAN_MUTATION_TOOLS.has(event.toolName) ? "inspect" : "edit";
-			planEvent("plan-mode-block", `plan-mode-${actionId()}`, { toolName: event.toolName, kind });
+			planEvent("plan-mode-block", `plan-mode-${actionId()}`, { toolName: event.toolName, block_kind: kind });
 			if (kind === "inspect") {
 				return {
 					block: true,
