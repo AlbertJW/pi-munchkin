@@ -40,6 +40,33 @@ def load_schema():
     with open(SCHEMA) as f:
         return json.load(f)
 
+def _declares_treatment(config):
+    """Does this config express a treatment on any channel that reaches a run?
+
+    Checked DECLARATIVELY, against apply()'s three outputs — prompt_file, env, endpoint.
+    The first version of this guard compared `render_prompt(config)` to `render_prompt({})`,
+    which for the default prompt_variant "A" opens LIVE_GOV = ~/.pi/agent/APPEND_SYSTEM.md —
+    an absolute path into the LIVE INSTALL. That made validate_config do I/O on every named
+    config and fail outright on any machine without a live pi (CI, a fresh clone, a
+    container). It also missed `optillm`, the endpoint channel, and would have falsely
+    rejected an optillm-only candidate as inert.
+
+    `decoding` counts as a treatment here: schema.json calls it server launch params
+    "consumed by run-*.sh", so it reaches a deep run even though real_gate.sh never
+    relaunches the server and a decoding-only config is therefore inert IN THE GATE.
+    That narrower gate-inertness is a round-design question, not a config-validity one.
+    """
+    if config.get("prompt_variant", "A") != "A":
+        return True
+    if config.get("format", "md") != "md":
+        return True
+    if config.get("scaffold", "none") != "none":
+        return True
+    if config.get("optillm", "none") != "none":
+        return True
+    return any(config.get(key) for key in ("thresholds", "decoding", "messages"))
+
+
 def validate_config(config):
     """Validate the config envelope, including optional mechanism exposure."""
     if not isinstance(config, dict):
@@ -58,20 +85,18 @@ def validate_config(config):
     if unknown:
         raise ValueError(f"config contains unsupported top-level key(s): {', '.join(sorted(unknown))}")
     # A NAMED config claims to be a candidate, so it must express its treatment through a
-    # channel that actually reaches the child: a non-base prompt render, or a non-empty
-    # env. Anything else is a no-op arm that burns a round measuring base against base.
+    # channel that actually reaches a run. Anything else is a no-op arm that burns a round
+    # measuring base against base (see the five retired 2026-07-31).
     # Scoped to named configs on purpose: `configs/baseline.json` and `cand-cot.json` are
     # raw arm specs with no `name`, and baseline is DELIBERATELY identical to base — that
     # is what makes it the control. (Not solved by tagging baseline.json, because its
     # sha256 is recorded as `config.sha256` on every base row; editing it would split the
     # baseline's provenance in two for no behavioural gain.)
-    # Uses _env_unchecked: config_env() calls back into validate_config() and would recurse.
-    if config.get("name") and set(config) - {"name", "prediction", "exposure"}:
-        if render_prompt(config) == render_prompt({}) and not _env_unchecked(config):
-            raise ValueError(
-                f"config '{config['name']}' declares a treatment but renders identically "
-                "to base with an empty env — it would measure base against base. Express the "
-                "treatment via prompt_variant/format/scaffold (prompt) or thresholds/decoding (env).")
+    if config.get("name") and not _declares_treatment(config):
+        raise ValueError(
+            f"config '{config['name']}' is named but declares no treatment on any channel — "
+            "it would measure base against base. Express it via prompt_variant/format/scaffold "
+            "(prompt), thresholds/messages/decoding (env), or optillm (endpoint).")
     validate_spec(config.get("exposure"))
     return config
 
@@ -244,6 +269,44 @@ def selftest():
         with open(os.path.join(static_dir, name)) as f:
             static_cfg = json.load(f)
         config_env(static_cfg)  # raises ValueError on any unsupported key
+    # --- the inert-candidate guard (added 166e94d, ASSERTED here 2026-07-31) ---
+    # It shipped with zero assertions: reverting both layers left this selftest green,
+    # which is the same "guard that is never exercised" class as the unregistered
+    # integrity test and the self-matching watcher. Pin both layers.
+    for retired_key in ("gov_file", "gov_append"):
+        try:
+            validate_config({"name": "x", retired_key: "y"})
+        except ValueError as exc:
+            assert "unsupported top-level key" in str(exc), exc
+        else:
+            raise AssertionError(f"{retired_key} must be rejected: it reaches neither render_prompt nor config_env")
+    # Layer 2: a NAMED config with no treatment on any channel.
+    for inert in ({"name": "hollow"},
+                  {"name": "hollow", "prediction": "p", "exposure": None},
+                  {"name": "hollow", "thresholds": {}},
+                  {"name": "hollow", "prompt_variant": "A", "format": "md", "scaffold": "none"}):
+        cfg = {k: v for k, v in inert.items() if v is not None}
+        try:
+            validate_config(cfg)
+        except ValueError as exc:
+            assert "declares no treatment" in str(exc), exc
+        else:
+            raise AssertionError(f"inert named config accepted: {cfg}")
+    # ...and every real channel must still pass, including the two the first version got
+    # wrong: optillm (endpoint) and an unnamed control.
+    for live in ({"name": "a", "thresholds": {"MICRO_GATE": "on"}},
+                 {"name": "b", "scaffold": "cot"},
+                 {"name": "c", "format": "xml"},
+                 {"name": "d", "prompt_variant": "prompts/x.md"},
+                 {"name": "e", "optillm": "moa"},
+                 {"name": "f", "messages": {"PI_MSG_LB_T2": "x"}},
+                 {"prompt_variant": "A", "format": "md", "scaffold": "none"}):
+        validate_config(live)
+    # The guard must not touch the filesystem: it ran render_prompt against the live
+    # install's governor, so it broke wherever that file is absent.
+    import unittest.mock as _mock
+    with _mock.patch("builtins.open", side_effect=AssertionError("validate_config must not do I/O")):
+        validate_config({"name": "no-io", "thresholds": {"MICRO_GATE": "on"}})
     print("config selftest: OK (deterministic apply; format/scaffold/F; env; endpoint; safe-flags; exclusions; static-config env keys)")
 
 def apply_to_workdir(config, workdir):
