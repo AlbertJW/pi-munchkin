@@ -384,17 +384,19 @@ run_guarded_session() {
 		( cd "$wd" || exit
 		  exec 3<<<"$telemetry_key"
 		  exec 4<<<"${LLAMA_API_KEY:-}"
+		  exec 5< "${passthrough_file:-/dev/null}"
 		  run_with_timeout "$PI_TIMEOUT" 30 ${sbx[@]+"${sbx[@]}"} /usr/bin/env -i \
 		    ${session_env[@]+"${session_env[@]}"} "${session_base_env[@]}" PI_OBSERVATIONAL_MEMORY_PASSIVE=1 \
-		    bash -c 'k="$(cat <&4)"; [[ -n "$k" ]] && export LLAMA_API_KEY="$k"; exec pi -p --approve "$@"' _ \
+		    bash -c 'k="$(cat <&4)"; [[ -n "$k" ]] && export LLAMA_API_KEY="$k"; while IFS= read -r -d "" kv <&5; do [[ -n "$kv" ]] && export "$kv"; done; exec pi -p --approve "$@"' _ \
 		    ${PI_SELECT[@]+"${PI_SELECT[@]}"} --no-skills --tools "$tools" "$prompt" ) </dev/null >> "$wd/run.log" 2>&1 &
 	else
 		( cd "$wd" || exit
 		  exec 3<<<"$telemetry_key"
 		  exec 4<<<"${LLAMA_API_KEY:-}"
+		  exec 5< "${passthrough_file:-/dev/null}"
 		  run_with_timeout "$PI_TIMEOUT" 30 ${sbx[@]+"${sbx[@]}"} /usr/bin/env -i \
 		    ${session_env[@]+"${session_env[@]}"} "${session_base_env[@]}" PI_OBSERVATIONAL_MEMORY_PASSIVE=1 \
-		    bash -c 'k="$(cat <&4)"; [[ -n "$k" ]] && export LLAMA_API_KEY="$k"; exec pi -p --approve "$@"' _ \
+		    bash -c 'k="$(cat <&4)"; [[ -n "$k" ]] && export LLAMA_API_KEY="$k"; while IFS= read -r -d "" kv <&5; do [[ -n "$kv" ]] && export "$kv"; done; exec pi -p --approve "$@"' _ \
 		    ${PI_SELECT[@]+"${PI_SELECT[@]}"} --no-skills --tools "$tools" "$prompt" ) </dev/null > "$wd/run.log" 2>&1 &
 	fi
 	CHILD=$!
@@ -620,12 +622,21 @@ PY
 		SANDBOX_AUTHORITATIVE=0
 		SANDBOX_AUTHORITY_REASON="endpoint credential is present in the approved child environment"
 	fi
+	# Passthrough VALUES go via FD 5 (null-delimited KEY=VALUE pairs exported
+	# inside the bash -c wrapper), NEVER onto session_base_env — that array is
+	# env -i's literal argv, readable in `ps aux` for the child's whole lifetime.
+	# This is the exact leak the LLAMA_API_KEY comment above describes; the first
+	# version of this loop reintroduced it for every passthrough variable
+	# (2026-07-30 triage #14). The staging file lives in the run's private tmpdir,
+	# mode 600, and is removed right after the child is launched.
+	local passthrough_file="$gate_tmpdir/.passthrough.env"
+	: > "$passthrough_file"; chmod 600 "$passthrough_file"
 	local -a passthrough_keys=()
 	IFS=',' read -r -a passthrough_keys <<< "${PI_GATE_PASSTHROUGH_ENV:-}"
 	for key in ${passthrough_keys[@]+"${passthrough_keys[@]}"}; do
 		[[ -z "$key" ]] && continue
 		[[ "$key" =~ ^[A-Za-z_][A-Za-z0-9_]*$ ]] || { echo "[real_gate] invalid PI_GATE_PASSTHROUGH_ENV name: $key" >&2; exit 2; }
-		value="${!key-}"; session_base_env+=("$key=$value")
+		value="${!key-}"; printf '%s=%s\0' "$key" "$value" >> "$passthrough_file"
 		echo "[real_gate] WARNING: explicitly passing $key into approved child tools; rows are exploratory" >&2
 		SANDBOX_AUTHORITATIVE=0
 		SANDBOX_AUTHORITY_REASON="operator passed credential/environment variable into child tools"

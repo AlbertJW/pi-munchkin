@@ -1888,3 +1888,49 @@ lifetimes — module scope, factory-closure scope, and `globalThis` — layered 
 reload, so a `let` at module scope survives far longer than any reader assumes. Two of today's
 defects are the same misconception. The correct-sized fix was two `session_start` resets, not a
 session-state framework.
+
+### The 32-finding tail: triaged, 13 fixed, the queue is now explicit (2026-07-30)
+
+The deep QA's 32 below-cut findings are no longer unexamined. 25 got adversarial refuter
+verdicts (SHA-pinned to 8b3e809/f261f4f so concurrent fixes could not race them); seven
+refuters and the adjudicator hit the session limit, so those seven were verified by hand and
+the adjudication was done inline — every fix below had its mechanism re-derived from source
+before any edit, and every behaviour fix carries a counterfactually verified test.
+
+**One refuted** (#21: telemetry env teardown — last-in-file placement makes it harmless).
+**Fixed (13):** the drift-scanner mid-review commit swallow (#11 — a defect in this morning's
+own detach fix); the artifacts guard's dead `tests`/`patches` arms (#23 — dict iteration
+yields keys; a defect in this morning's own guard); integrity_selftest auto-discovery (#18 —
+the hand list had already made one guard inert); verify-gate's loose `\S*test\S*` disarm
+(#16); the `__pi_gate_green` latch surviving a later red gate (#12); `/plan`+`/plan-go`
+prompts lost mid-stream (#0 — now `deliverAs:"steer"`); the once-per-process interrupted-plan
+notice (#26 — third instance of the cached-factory lifetime misconception, and its test had
+PINNED the bug); telemetry taps re-entrantly writing the consequence before its cause (#29);
+the never-asserted mutant pass-to-pass arm (#25); the unregistered effort_report selftest
+plus a registry-completeness guard so the hand-maintained list can never silently drop one
+again (#3/#17); `PI_GATE_PASSTHROUGH_ENV` values on ps-visible argv (#14 — the exact leak
+the LLAMA_API_KEY fd-passing closed, reintroduced one loop below it; now fd-5 null-delimited
+pairs, mechanism proven standalone); the metrics.py authoritative-parser docstring (#19); the
+false "KV prefix intact" claim in the c48 lens (#15 — the per-call tail forces a re-prefill
+every call; cost now stated, and it must be remembered when reading c48 token numbers); dead
+`bash-mutations.ts` deleted (#31).
+
+**Queued with reasons, not silently dropped:** #24 rle/saddle's pass-to-pass overlay asserts
+only `typeof api.encode === "function"` — vacuous regression arm, needs per-fixture invariant
+design; #7/#8 sv-commit-sha-guard's grader derives ground truth from a model-writable CSV and
+exercises neither prompt code step — fixture redesign; #5 one-shot control errors swallowed by
+`|| true` — gate change deserving its own careful pass; #10 plan gates discard the tool
+AbortSignal (Esc cannot stop a 60s-per-item gate run); #13 munchkin's telemetry_enrich reads
+the unauthenticated events.jsonl; #22 harness_roi's reconstructed session key omits the
+variant slug (fix before the HARNESS-ROI round, with task #13); #28 envelope's
+config_sha256/PI_* fallbacks read env vars nothing sets — wire from the gate for real
+provenance; #1/#4/#20 test-coverage gaps (double never emits tool_execution events;
+context-inlet-guard has no extension-level test; the redundancy-pct producer is untested);
+#27 isAuthoritativeTelemetryRow asserts authority from field presence (latent, test-only);
+#2 resetPiGlobals unused by production suites (latent); #6 effort_report applies none of
+fleet_report's adoption filters (resolve with task #13); #30 plan_write's steer matrix wants
+its suppression graph documented at the concatenation site.
+
+The refuter batch for indices 15/23/25/27 ran during a safety-classifier outage; all four
+were re-verified by hand before any action (three fixed above, #27 queued), so nothing rests
+on an unreviewed agent's word.

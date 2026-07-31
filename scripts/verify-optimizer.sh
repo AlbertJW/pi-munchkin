@@ -44,6 +44,32 @@ selftests=(
   prompt-lab/sql_eval.py
   prompt-lab/trajectory_check.py
 )
+# Completeness guard for the hand-maintained list above: any optimizer .py that
+# advertises --selftest must be registered here or named in the exclusion list
+# with a reason. effort_report.py sat unregistered for weeks — its selftest had
+# never once run under npm run verify (2026-07-30 triage #3/#17); a list a
+# human maintains needs a check a human cannot forget.
+python3 - "$OPT" "${selftests[@]}" <<'PY'
+import pathlib, sys
+root = pathlib.Path(sys.argv[1]); registered = set(sys.argv[2:])
+# Excluded with reasons: run by other verify steps or not selftest-shaped.
+excluded = {
+    "prompt-lab/integrity_selftest.py",   # run directly below, no --selftest flag
+    "prompt-lab/seatbelt_network_selftest.py",  # run directly below
+    "prompt-lab/fixture_admission.py",    # verify subcommand exercised by integrity_selftest
+}
+missing = []
+for path in sorted(root.rglob("*.py")):
+    rel = str(path.relative_to(root))
+    if rel in registered or rel in excluded or "__pycache__" in rel:
+        continue
+    text = path.read_text(errors="replace")
+    if "--selftest" in text and "def selftest" in text:
+        missing.append(rel)
+if missing:
+    sys.exit("selftests exist but are not registered in verify-optimizer.sh:\n  " + "\n  ".join(missing))
+print(f"selftest registry complete: {len(registered)} registered, {len(excluded)} excluded with reasons")
+PY
 for script in "${selftests[@]}"; do python3 "$OPT/$script" --selftest; done
 python3 -m unittest "$OPT/prompt-lab/test_span_screen.py"
 python3 -m unittest "$OPT/prompt-lab/test_batch_screen.py"
