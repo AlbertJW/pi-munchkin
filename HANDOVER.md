@@ -54,8 +54,15 @@ invalidates provenance.
 
 ## State today
 
-- **21 extensions, 30 libs, 7,084 lines.** 42 static configs on disk (incl. 5 investigation
-  combos); the active roster is c25-c39 per `CANDIDATE_PRUNING_2026-07.md`.
+- **25 extension files, 30 libs.** 36 static configs on disk (incl. 2 investigation combos);
+  exposure modes 24 telemetry / 9 configuration / 2 suppression / 1 none. Counts re-derived
+  from disk 2026-07-31 (were "21 extensions / 42 configs / 5 combos" — stale since the
+  `6192559` and `166e94d` deletions).
+- **Roster truth is `optimizer/docs/CANDIDATE_STRATEGY_2026-07-31.md`**, not the roster table in
+  `CANDIDATE_PRUNING_2026-07.md`, which is a 2026-07-28 snapshot kept as history. The strategy
+  doc supersedes the "active roster is c25-c39" framing: the binding constraint is that at
+  n=9/arm the gate can only detect harm, so no candidate is rankable on outcome until graded
+  scoring and an in-band fixture exist.
 - **Live by default:** loop-breaker, verify-gate, drift-scanner, ketch, hashline, git-guard, the
   context guards, plan-runner v3. context-watcher is passive telemetry only as of 2026-07-28.
 - **Dark:** everything `cNN`, including `MICRO_GATE`.

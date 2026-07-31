@@ -4,6 +4,17 @@ Goal: reach a **defensible adopt or retire decision on every candidate**, at a c
 actually payable. Written after the 2026-07-27 audit found that of 45 candidates, exactly **one**
 (c21) had ever been decisively tested.
 
+> **AMENDED 2026-07-31.** Two corrections to the arithmetic this protocol is built on.
+> (1) The roster is now **36 static configs**, not 45 — nine were deleted (`6192559`, `166e94d`),
+> and five of those nine (`c1`/`c5`/`c8`/`c9`/`c15`) were **structurally inert**: their cand arm
+> rendered byte-identically to base with an empty env, so they could never have been adopted or
+> retired on evidence. Exposure census is now 24 telemetry / 9 configuration / 2 suppression /
+> 1 none, so the "S1 covers 30" arithmetic below no longer matches disk.
+> (2) More seriously — the S1/S2 ladder assumes a round can return a positive result. At the
+> sample sizes it prescribes it cannot: at n=9/arm from base 5/9, only a flawless 9/9 reaches
+> one-sided p<0.05 (two-sided: nothing), while regressions from a ceiling ARE detectable.
+> **Read `CANDIDATE_STRATEGY_2026-07-31.md` §1 before costing any round against this protocol.**
+
 ## Why the obvious plan doesn't work
 
 A flat sweep at the sample size the power analysis demands:
@@ -145,7 +156,9 @@ finished decision. **(Resolved below: the second task failed the bar. c21 stays 
 
 ## Stage 0 — EXECUTED 2026-07-27
 
-**1. Exposure specs: done. All 45 candidates now declare one.**
+**1. Exposure specs: done. All 45 candidates declared one** (as of 2026-07-27; on disk today it
+is 35 of 36 — `span-screen-on.json` has none, correctly: it is a `span_screen.py` study arm,
+not a `real_gate` candidate).
 
 | | before | after |
 |---|---|---|

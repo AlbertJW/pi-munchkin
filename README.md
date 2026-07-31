@@ -174,7 +174,21 @@ tracked in the self-improvement ledger rather than repeated here.
 | `PLAN_SHA_GUARD=on` | verify any commit SHA the model writes actually exists | built and unit-tested; awaiting a gate round |
 | `PLAN_ITEM_GUIDANCE_V2=on` | swap the unenforced "5-10 items" line for non-numeric, need-sized guidance | built; a deliberate compression, not an elaboration |
 | `SPAWN_DELEGATION=on` | recommend `mode=spawn` + a self-contained task everywhere the harness previously suggested `mode=fork` | built; awaiting a gate round |
-| `PLAN_DELEGATE_ALL=on` | during execution, only `plan_write` and `subagent` remain callable directly — everything else is blocked and routed to a role-matched fresh subagent | built; the most direct test of the "many small contexts" thesis; awaiting a gate round |
+| `PLAN_DELEGATE_ALL=on` | during execution, only `plan_write` and `subagent` remain callable directly — everything else is blocked and routed to a role-matched fresh subagent | built; the most direct test of the "many small contexts" thesis; **0-for-2 with adverse effort** (+70% turns, +200% errors on the 35B) |
+| `FORCE_PLAN_WRITE=on` | block the FIRST mutation of a session until `plan_write` has been called once | an **enabler** for the flags above (they have no surface to fire on otherwise), not a standalone intervention; one round with real power gave 5/9 → **0/9** on gemma-4-e2b |
+| `PLAN_TOOL_GO=on` | register a model-callable `plan_go` tool (the gate's one-shot `pi -p` never dispatches `/plan-go`) | activation path; near-neutral by design |
+| `MICRO_GATE=on` | parse-check only the files just changed and inject the first actionable error | **REJECTED** against its pre-registration; its "7/7 effort metrics better" is count-not-rate (per tool call the error rate worsened in 2 of 3 rounds) |
+| `DID_YOU_MEAN=on` | append the closest existing path to an ENOENT tool result | fires 8/8 on its purpose-built fixture and **0/8** elsewhere — unproven off that fixture |
+| `SPAN_TOOLS=on`, `SPAN_MAX_FILE_BYTES` | register bounded `search_spans` / `read_span` for large files | built; never run on a large-repo fixture |
+| `HASHLINE_TAG=slug` | encode hashline's edit tag as words instead of hex | mechanism hypothesis independently **refuted** (jnoise AUC 0.614, CI straddles 0.5) |
+| `TOOL_CALL_RESCUE=on` | steer once when a turn emits a pseudo-tool-call as text and no real tool call | targets the collapse class; measured on the one model that does not collapse, so **0 detections** |
+| `SPEC_ADHERENCE=on` | steer toward a prompt-named on-disk file that has not been read | premise retracted and read-detection was dead code; both fixed, **wholly unmeasured** |
+| `LB_STREAK_SOFT`, `LB_REPEAT_T1`, … | loop-breaker tier thresholds | `LB_STREAK_SOFT=12` (c3) is a no-op on cloud and a real 8→12 change on local; its only round was remote |
+| `VERIFY_GATE_PATTERN` / `PI_MSG_VG_STEER` | override the verify-gate trigger or its steer text | **SAFETY HOLD** — the c7 steer-text variant measured 6/6 → 3/6 |
+
+**Read `optimizer/docs/CANDIDATE_STRATEGY_2026-07-31.md` before planning a round for any of
+these.** At the sample sizes used to date the gate can detect harm but essentially not help, so
+most "NEUTRAL" statuses above are better read as *untested*.
 
 ### Platform and security notes
 

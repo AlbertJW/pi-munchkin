@@ -10,6 +10,22 @@ removal criteria").
 
 ## Scope and roster
 
+> **SUPERSEDED 2026-07-31 — this section and the roster table below are a 2026-07-28 snapshot.**
+> Kept verbatim as history; do not read it as current state. Four configs listed here
+> (`c25-c39-combo`, `c31-c38-combo`, `c33-subagent-fork-default`, `c37-c39-combo`) were deleted
+> in `6192559`, and five more (`c1`, `c5`, `c8`, `c9`, `c15`) in `166e94d` — see "RETIRED
+> 2026-07-31" at the end of this file for why those five were never testable.
+> Several verdicts here are also stale: c25's "NEUTRAL 18/18" is superseded by
+> `PREREG_C25_4B_POWERED_2026-07-28.md` (round **INVALID**, exposure floor failed), and c48/c49/
+> c50 have no rows here at all — they are in `MEASUREMENT_METHODOLOGY_2026-07.md` §§9-11.
+>
+> **Current roster truth: `CANDIDATE_STRATEGY_2026-07-31.md`**, which also establishes why the
+> outcome verdicts in this table carry less information than they appear to (at n=9/arm the
+> gate is a one-sided regression detector).
+>
+> Disk as of 2026-07-31: **36 static configs** (2 investigation combos), exposure modes
+> 24 telemetry / 9 configuration / 2 suppression / 1 none.
+
 `ls optimizer/prompt-lab/configs/static/` was walked in full. In the c25–c39 numbering range,
 **19 files** exist on disk (three numbers are doubled: `c25` covers two unrelated candidates,
 `c31` covers both the standalone plan-uncertainty candidate and a later combo/investigation
