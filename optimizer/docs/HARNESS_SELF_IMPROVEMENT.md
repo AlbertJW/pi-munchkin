@@ -2019,3 +2019,41 @@ loop-breaker never sees. Recorded so it is not re-raised.
 **Standing rules earned:** compute the power before designing the round; stratify by model before
 believing any aggregate; normalize rate metrics by volume; a mechanism firing only on its own
 purpose-built fixture has not been shown to generalise; recount before citing a firing number.
+
+### The QA that did not run, and the two defects it found anyway (2026-07-31)
+
+A 26-agent deep QA over the day's work returned `survived: 0`. **That did not mean clean.** Its
+7 Find lenses completed and produced 40 findings; then **all 18 refuters and the adjudicator
+failed on a session limit**. `survived: 0` is an artifact of no refuter ever running.
+
+Recording this because the failure mode is seductive: a workflow that reports zero survivors
+looks exactly like a workflow that found nothing, and the summary field says so in the same
+words. Check `agents_error` before reading any workflow result. Here it was 18 of 26.
+
+**Two findings were verified by hand and fixed; one is mine from that morning.**
+
+`appendRow` spreads detail OVER the envelope, so a detail key named `source` replaces
+TELEMETRY_SOURCE — and `context_telemetry.py:49,62,78` discards every event whose
+`source != "gate"`. The `source: "command"|"tool"` added to `plan-runner/go` and `go-blocked`
+hours earlier would therefore have deleted both events from every gate round's extraction: a
+mechanism that fired, reading as zero. That is the same class as the c50 dead read-detection and
+the five inert configs — the third instance this week of *declared but silently inert*.
+
+Fixed generally rather than by renaming one field: `validateCatalogDetail` now rejects any
+detail key matching a reserved envelope key. `run_id`/`provider`/`model` are deliberately not
+reserved — `envelope()` reads them from detail on purpose.
+
+**The guard then caught a pre-existing defect on its first run.**
+`plan-runner/plan-mode-block` passed a detail field named `kind`, which overwrites the
+envelope's `kind` — the event name itself. Every row it ever wrote was labelled
+`"inspect"`/`"mutate"` instead of `"plan-mode-block"`. Confirmed against the corpus: no
+plan-mode-block counter appears anywhere in 1,839 rows, while six sibling plan-runner counters
+do. Renamed to `block_kind`.
+
+**The other 38 findings are preserved unverified** in `QA_FINDINGS_2026-07-31_UNVERIFIED.md`
+with an explicit banner. They are one lens's unchecked assertion each — this project's own
+history says roughly half of such findings are wrong, overstated, or unreachable, and the last
+three review rounds each found real defects in the *previous* round's fixes. The workflow is
+resumable (`resumeFromRunId`), so the Find phase replays from cache and only verification
+re-runs. Nineteen of the 40 are self-labelled instrument-class, including several against the
+graded path built the same day, so the verification is worth completing before the next round.
