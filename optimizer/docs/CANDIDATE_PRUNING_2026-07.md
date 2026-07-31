@@ -588,3 +588,59 @@ records the gap for the next reader either way.
 
 Pre-registration blocker: needs a fixture where repeated plan rejection is the *measured*
 failure, not a hypothesis. `retry-trap` induces spirals on file edits, not on plan writes.
+
+---
+
+## RETIRED 2026-07-31: five candidates whose cand arm WAS the base arm
+
+`c1-evidence-first`, `c5-no-new-tests`, `c8-lean-governor`, `c9-no-governor`,
+`c15-full-governor` — deleted. They were never testable.
+
+**Mechanism.** `config.py`'s `validate_config` accepted `gov_file` and `gov_append`, but those
+two keys appear at exactly ONE line in the entire file — that whitelist. `render_prompt` reads
+only `prompt_variant`, `format`, `scaffold`; `config_env` reads only `thresholds`, `decoding`,
+`messages`. Neither key reaches the child. Verified by executing the real code rather than
+reading it:
+
+```
+BASE render                     sha=f688ebfebd08 len=1662
+c1-evidence-first   INERT       sha=f688ebfebd08 len=1662 env={}
+c5-no-new-tests     INERT       sha=f688ebfebd08 len=1662 env={}
+c8-lean-governor    INERT       sha=f688ebfebd08 len=1662 env={}
+c9-no-governor      INERT       sha=f688ebfebd08 len=1662 env={}
+c15-full-governor   INERT       sha=f688ebfebd08 len=1662 env={}
+c2-scaffold-cot     LIVE        sha=25bb9aa71364 len=1714   (scaffold path works)
+c46-prompt-lean     LIVE        sha=7cd4b5bc0196 len=1534   (prompt_variant path works)
+```
+
+**`c9` is named "no-governor" and emitted the live governor byte-for-byte.** Its round duly
+measured base 4/9 = cand 4/9, **+0pp** — a *total governor removal* moving nothing, while real
+governor changes measure ±14pp on the 35B. That +0pp was the tell, sitting in the ledger
+unread since the gemma sweep. All five have been counted as "measured neutral" in every
+roster tally and every "0 of N adopted" claim.
+
+**Their rounds are void, not neutral.** `gemma-e2b-c1/c5/c8/c9/c15-*` measured base against
+base. Do not cite them.
+
+**Guard, two layers.** `gov_file`/`gov_append` are removed from the allowed key set with a
+comment naming this incident. Beyond that, `validate_config` now rejects any config that
+declares a treatment yet renders identically to base with an empty env — catching shapes
+nobody has thought of yet, not just these two keys. Counterfactually verified: c9- and
+c1-shaped configs are rejected, a config with only an empty `thresholds: {}` block is rejected
+by the second layer, and every real treatment (env or prompt) still passes. All 36 surviving
+configs validate.
+
+**Governor variation is still testable** — via `prompt_variant`, which genuinely works
+(c46/c47 render distinctly). That is the path to use.
+
+### Two near-misses spared after checking, worth recording
+
+- **`c3-patient-streak` is NOT inert.** `thresh("LB_STREAK_SOFT", cloudDef=12, localDef=8)`
+  (`loop-breaker.ts:333`) — setting 12 is a no-op on *cloud*, but `isLocal` is
+  `provider.startsWith("local")` and gate rows carry `local-llamacpp`, where the default is 8.
+  So c3 is a real change locally. Its one measured round was the **remote** gemma sweep
+  (`remote-llamacpp`), i.e. a venue where it is a no-op — which is why it read +0pp. c3 is a
+  live candidate that has never been measured anywhere it does anything.
+- **`span-screen-on.json` is NOT a stray duplicate.** It is the candidate arm of the
+  span-screen study, loaded by `span_screen.py:110-112` via `configs/span-screen.json:61`.
+  It has no `exposure` block because it is not a `real_gate` candidate. Leave it.

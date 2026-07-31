@@ -44,11 +44,34 @@ def validate_config(config):
     """Validate the config envelope, including optional mechanism exposure."""
     if not isinstance(config, dict):
         raise ValueError("config must be an object")
+    # `gov_file` / `gov_append` are DELIBERATELY absent. They were accepted here but
+    # read nowhere: render_prompt() consumes only prompt_variant/format/scaffold, and
+    # config_env() only thresholds/decoding — so a config whose sole treatment was a
+    # governor key rendered BYTE-IDENTICALLY to base with an empty env. Five candidates
+    # (c1/c5/c8/c9/c15) sat in the roster as "measured neutral" while their cand arm WAS
+    # the base arm; c9, named "no-governor", emitted the live governor verbatim and duly
+    # measured +0pp. Retired 2026-07-31. Governor variation has a working path —
+    # `prompt_variant` (see c46/c47) — use that.
     allowed = {"name", "prediction", "prompt_variant", "format", "scaffold", "optillm",
-               "decoding", "thresholds", "messages", "gov_file", "gov_append", "exposure"}
+               "decoding", "thresholds", "messages", "exposure"}
     unknown = set(config) - allowed
     if unknown:
         raise ValueError(f"config contains unsupported top-level key(s): {', '.join(sorted(unknown))}")
+    # A NAMED config claims to be a candidate, so it must express its treatment through a
+    # channel that actually reaches the child: a non-base prompt render, or a non-empty
+    # env. Anything else is a no-op arm that burns a round measuring base against base.
+    # Scoped to named configs on purpose: `configs/baseline.json` and `cand-cot.json` are
+    # raw arm specs with no `name`, and baseline is DELIBERATELY identical to base — that
+    # is what makes it the control. (Not solved by tagging baseline.json, because its
+    # sha256 is recorded as `config.sha256` on every base row; editing it would split the
+    # baseline's provenance in two for no behavioural gain.)
+    # Uses _env_unchecked: config_env() calls back into validate_config() and would recurse.
+    if config.get("name") and set(config) - {"name", "prediction", "exposure"}:
+        if render_prompt(config) == render_prompt({}) and not _env_unchecked(config):
+            raise ValueError(
+                f"config '{config['name']}' declares a treatment but renders identically "
+                "to base with an empty env — it would measure base against base. Express the "
+                "treatment via prompt_variant/format/scaffold (prompt) or thresholds/decoding (env).")
     validate_spec(config.get("exposure"))
     return config
 
@@ -106,6 +129,12 @@ def render_prompt(config, base_text=None):
 
 def config_env(config):
     validate_config(config)
+    return _env_unchecked(config)
+
+
+def _env_unchecked(config):
+    """config_env's body without the validate_config() call, so validate_config can
+    use it for the base-vs-base check without recursing back into itself."""
     schema = load_schema()["dimensions"]
     allowed = set(schema["decoding"]["fields"]) | set(schema["thresholds"]["fields"]) | set(schema["messages"]["fields"])
     env = {}
