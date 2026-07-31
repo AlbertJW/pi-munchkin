@@ -116,3 +116,35 @@ its output is bounded and surfaced to the model as untrusted data; the harness r
 single-operator against a local model; `KETCH=off` disables the tools entirely. The exposure
 matters if this harness is ever run unattended, multi-user, or against untrusted prompts —
 at which point option (1) or (3) becomes a prerequisite, not an option.
+
+## The gate transcript is writable by the session it measures (2026-07-30 deep QA) — accepted
+
+`gate.sb:46` grants `file-write*` on `__PI_AGENT__/sessions` after the blanket deny — pi has
+to persist its session transcript somewhere. But `sandbox-exec` governs the **whole process
+tree**: the model's `bash` (an unremovable base tool) inherits exactly the same grant, so the
+transcript that later feeds `ab-machinery/metrics.py` — token counts, `usage_exact`, the
+`REQUIRE_EXACT_USAGE` check and the degraded-model tripwire, unconditionally on every row —
+can in principle be edited by the very session being measured. The harness HMAC-signs its
+*telemetry* precisely because it refuses to trust in-band data; the transcript, a strictly
+more load-bearing input, is unsigned. That asymmetry is the finding.
+
+**Why the obvious fix does not work.** pi 0.83 supports `--session-dir` (highest precedence;
+`main.js:493-497`, `args.js:73-75`), so redirecting the transcript per-run is easy — and
+useless: any directory pi can write, bash can write, because they share one sandbox profile.
+Isolating the transcript from the model requires an observer **outside** the sandbox (a
+tail-and-hash process started before the child, or pi itself signing entries — an upstream
+feature), not a different directory inside it.
+
+**Why the residual risk is accepted.** The documented threat model is a single trusted
+operator measuring local models on their own repositories; a 4B does not forge JSONL
+transcripts to inflate its usage numbers. The exposure is bounded structurally:
+`real_gate.sh:756` ANDs `trajectory_check` only when `gate==1`, so trajectory forgery can
+downgrade a pass but can never turn a failing hidden grader into a pass — the gate bit itself
+comes from hidden tests re-run by the harness *after* the session ends, outside the child.
+The `trajectory_check.py` docstrings that used to state the pairing was mechanically enforced
+have been corrected (2026-07-30) so the guarantee is no longer folklore.
+
+**Becomes a prerequisite, not an option, if**: this harness ever measures untrusted or
+frontier models whose incentives include gaming their own evaluation, or runs multi-user.
+The fix then is the outside-the-sandbox observer, and `--session-dir` per run makes its
+scope trivial.

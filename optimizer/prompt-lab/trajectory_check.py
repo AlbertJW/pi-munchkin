@@ -132,12 +132,20 @@ def _subagent_agents(call):
 
 def check_t4(msgs):
     """t4's canonical prompt mandates delegate-to-explorer THEN delegate-to-verifier.
-    A subagent toolCall's own recorded arguments are harness-recorded evidence: strong
-    evidence of invocation and execution (the harness only writes a matching result
-    when the tool call actually ran), but not proof the resulting work was correct —
-    unlike bigdata's search_spans case, where call arguments alone are trivially
-    fakeable and a signed execution receipt is required instead. No receipt machinery
-    needed here."""
+
+    Evidence basis, stated honestly: the transcript is written by pi, but pi runs
+    INSIDE the same sandbox the model's bash runs in (gate.sb grants file-write on
+    the sessions dir to the whole process tree — sandbox-exec cannot give pi a
+    write grant that bash lacks), so "harness-recorded" is trust in the model not
+    editing its own transcript, not a mechanical guarantee. An earlier version of
+    this docstring claimed "the harness only writes a matching result when the
+    tool call actually ran" as if enforced; nothing enforces it. Accepted under
+    the single-operator/local-model threat model (SECURITY_BOUNDARY.md), and
+    bounded: real_gate.sh ANDs trajectory checks only when gate==1, so a forged
+    trajectory can downgrade a pass but can never convert a failing hidden grader
+    into a pass. Still stronger than bigdata's search_spans case, where call
+    arguments alone are trivially fakeable BY HONEST-PATH accident (an argument
+    is written whether or not the search ran) and a signed receipt is required."""
     calls, results = _calls_and_results(msgs)
     results_by_call = {str(r.get("toolCallId", "")): r for r in results}
     explorer_seen = False
@@ -193,12 +201,18 @@ def check_sv_ambiguous_spec(msgs):
     should follow — a genuine fork, not a gap fillable by reading the repo harder.
     The candidate's claim is that the model surfaces this as a blocking uncertainty
     (plan_write's uncertainties[] field) instead of picking one and guessing. A
-    plan_write toolCall's own recorded arguments are harness-recorded evidence:
-    strong evidence of invocation and execution (the harness itself only writes a
-    matching toolResult when the call actually ran), but not proof the resulting
-    work was correct — unlike bigdata's search_spans case, where call arguments
-    alone are trivially fakeable and a signed execution receipt is required
-    instead. No receipt machinery needed here (same reasoning as check_t4).
+    plan_write toolCall's recorded arguments are transcript evidence with the same
+    trust basis as check_t4's — pi-written, but inside the sandbox the model's own
+    bash shares, so it is trust under the documented threat model rather than a
+    mechanical guarantee (see check_t4's docstring; an earlier version here claimed
+    the matching-toolResult pairing was enforced — it is not). Bounded identically:
+    trajectory checks are ANDed only on gate==1.
+
+    NOTE on the text fallback below: the canonical prompt itself names BOTH
+    convention files (discountCalc.js and taxCalc.js), so a model that merely
+    echoes or paraphrases the prompt trips _mentions_both_conventions while still
+    guessing. The fallback is diagnostic-only by construction and must never be
+    promoted to primary evidence or compared across arms whose prompts differ.
 
     Fallback: plan_write's uncertainties[] field only exists in the model-visible
     tool schema when plan_write is actually called — on tasks small enough that a
