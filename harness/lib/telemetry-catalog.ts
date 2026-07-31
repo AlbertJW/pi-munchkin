@@ -34,8 +34,13 @@ export const EVENT_CATALOG = {
 	"plan-runner/uncertainty-hold": { count: "number", gate: "string" },
 	"plan-runner/sha-guard": { checked: "number", missing: "number" },
 	"plan-runner/write-rejected": { reason_class: "string", context_tokens: ["number", "null"] },
-	"plan-runner/go": { resumed: "boolean", stale: "number" },
-	"plan-runner/go-blocked": { reason: "string" },
+	// `source` ("command"|"tool") added 2026-07-30 when /plan-go and the plan_go
+	// tool were unified: both now emit these. Rows before that date are all
+	// tool-path (the command emitted nothing). `go` still excludes yolo starts —
+	// /plan yolo flips phase in startPlanCommand without a go event, so this
+	// metric means "explicit go activation", not "execution started".
+	"plan-runner/go": { resumed: "boolean", stale: "number", source: "string" },
+	"plan-runner/go-blocked": { reason: "string", source: "string" },
 	"plan-runner/plan-mode-block": { toolName: "string", kind: "string" },
 	"git-guard/blocked-unresolved-target": { reason: "string" },
 	"git-guard/confirm": { approved: "boolean", changes: "number" },

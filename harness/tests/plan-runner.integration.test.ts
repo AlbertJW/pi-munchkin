@@ -8,7 +8,7 @@ import test from "node:test";
 import { mkdtempSync, readFileSync, writeFileSync, mkdirSync, existsSync, readdirSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { callTool, fire, makeCtx, makeFakePi , expectToolError } from "./integration-harness.ts";
+import { callTool, fire, makeCtx, makeFakePi, expectToolError, resetPiGlobals } from "./integration-harness.ts";
 
 // module-load envs BEFORE importing the extensions
 process.env.PLAN_GATE_MAX = "2";
@@ -1217,6 +1217,15 @@ test("/plan-go prompts from the POST-queue state, not the snapshot it read first
 		items: [{ title: "alpha", status: "pending" }, { title: "beta", status: "pending" }],
 		request: "do the thing", summary: "two",
 	}, cwd);
+	// The intended interleaving is "the write is IN the queue before /plan-go
+	// enters". Whether that happens used to hinge on how many awaits each path
+	// performed before withFileMutationQueue — the unified goCommand does fewer
+	// than the old one, which exposed this as a scheduling race (observed flake:
+	// /plan-go occasionally won the queue and prompted the pre-write state, a
+	// legitimate ordering in production but not the one this test exists to pin).
+	// A few macrotask turns let plan_write's pre-queue awaits complete without
+	// awaiting its completion.
+	for (let i = 0; i < 5; i++) await new Promise((r) => setImmediate(r));
 	await fp.commands.get("plan-go").handler("", ctx);
 	await inflight;
 
@@ -1225,4 +1234,90 @@ test("/plan-go prompts from the POST-queue state, not the snapshot it read first
 	const state = JSON.parse(readFileSync(join(cwd, ".pi", "plan-state.json"), "utf8"));
 	assert.equal(state.phase, "executing");
 	assert.equal(state.items.length, 2, "and neither write was lost");
+});
+
+test("a bailed /plan-go (no plan written yet) must NOT disarm the plan-mode mutation block", async () => {
+	// goCommand used to run setPlanning(false)/replanStreak=0 BEFORE its guards,
+	// so the exact live sequence "user types /plan, then /plan-go before the model
+	// ever calls plan_write" silently disarmed the mutation block the /plan had
+	// just armed. goTransition now disarms only on the ok arm.
+	const fp = freshPlanRunner();
+	const cwd = tmp();
+	const { ctx, notes } = makeCtx(cwd);
+	try {
+		await fp.commands.get("plan").handler("add a widget", ctx); // arms isPlanning(); state has items: []
+		await fp.commands.get("plan-go").handler("", ctx);
+		assert.ok(notes.some((n) => n.includes("No plan to run")), "bail was notified");
+		assert.ok(!fp.sent.some((s) => s.includes("MODE: RUN")), "no execute prompt on a bail");
+		const edit: any = await fire(fp, "tool_call", { toolName: "edit", input: {} }, ctx);
+		assert.equal(edit?.block, true, "plan-mode block must survive a bailed /plan-go");
+		assert.ok(edit.reason.includes("plan_mode_violation"), edit.reason);
+	} finally {
+		resetPiGlobals(); // this test deliberately leaves planning armed — don't leak it
+	}
+});
+
+test("a HELD /plan-go (c31 uncertainty) must NOT disarm the plan-mode mutation block either", async () => {
+	// Same defect class, second arm: the pre-guard disarm also fired when the
+	// uncertainty hold then refused execution. New import so PLAN_UNCERTAINTY is
+	// read fresh at module load.
+	const prev = process.env.PLAN_UNCERTAINTY;
+	process.env.PLAN_UNCERTAINTY = "on";
+	const cwd = tmp();
+	try {
+		const fp = makeFakePi();
+		const mod = await import(`../extensions/plan-runner.ts?heldgo=${Date.now()}-${Math.random()}`);
+		mod.default(fp.pi as any);
+		const { ctx, notes } = makeCtx(cwd);
+		await fp.commands.get("plan").handler("deploy the service", ctx);
+		await callTool(fp, "plan_write", {
+			items: [{ title: "deploy", status: "pending" }],
+			request: "deploy the service", summary: "one step",
+			uncertainties: ["Which environment: staging or prod?"],
+		}, cwd);
+		await fp.commands.get("plan-go").handler("", ctx);
+		assert.ok(notes.some((n) => n.includes("Execution held")), "hold was notified");
+		const edit: any = await fire(fp, "tool_call", { toolName: "edit", input: {} }, ctx);
+		assert.equal(edit?.block, true, "plan-mode block must survive a held /plan-go");
+	} finally {
+		if (prev === undefined) delete process.env.PLAN_UNCERTAINTY; else process.env.PLAN_UNCERTAINTY = prev;
+		resetPiGlobals();
+	}
+});
+
+test("/plan-go emits go/go-blocked telemetry with source:command (parity with the tool)", async () => {
+	// The slash path used to emit NOTHING on success or hard bails — only the
+	// tool did — so command-driven activations were invisible to exposure counts.
+	const fp = freshPlanRunner();
+	const cwd = tmp();
+	const telemetry = join(cwd, "telemetry.jsonl");
+	const priorFile = process.env.TELEMETRY_FILE;
+	const priorSource = process.env.TELEMETRY_SOURCE;
+	process.env.TELEMETRY_FILE = telemetry;
+	process.env.TELEMETRY_SOURCE = "test";
+	try {
+		const { ctx } = makeCtx(cwd);
+		await fp.commands.get("plan-go").handler("", ctx); // no plan at all
+		await fp.commands.get("plan").handler("do the thing", ctx);
+		await callTool(fp, "plan_write", {
+			items: [{ title: "step one", status: "pending" }], request: "do the thing", summary: "one",
+		}, cwd);
+		await fp.commands.get("plan-go").handler("", ctx);
+
+		// Telemetry rows are FLAT: detail fields sit beside kind/ext (see the
+		// model-override test above), not under a `detail` key.
+		const rows = readFileSync(telemetry, "utf8").trim().split("\n").map((l) => JSON.parse(l));
+		const blocked = rows.find((r) => r.ext === "plan-runner" && r.kind === "go-blocked");
+		assert.ok(blocked, "bail must be visible in telemetry");
+		assert.equal(blocked.reason, "no-plan");
+		assert.equal(blocked.source, "command");
+		const go = rows.find((r) => r.ext === "plan-runner" && r.kind === "go");
+		assert.ok(go, "successful activation must be visible in telemetry");
+		assert.equal(go.resumed, false);
+		assert.equal(go.source, "command");
+	} finally {
+		if (priorFile === undefined) delete process.env.TELEMETRY_FILE; else process.env.TELEMETRY_FILE = priorFile;
+		if (priorSource === undefined) delete process.env.TELEMETRY_SOURCE; else process.env.TELEMETRY_SOURCE = priorSource;
+		resetPiGlobals();
+	}
 });

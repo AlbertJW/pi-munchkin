@@ -1054,6 +1054,62 @@ const planWrite = defineTool({
 	},
 });
 
+// ---------- go transition (shared by /plan-go and the plan_go tool) ----------
+
+type GoOutcome =
+	| { ok: true; state: PlanState; resuming: boolean; stale: PlanItem[] }
+	| { ok: false; reason: "no-plan" }
+	| { ok: false; reason: "no-open-items"; runId: string }
+	| { ok: false; reason: "uncertainty-hold"; state: PlanState };
+
+// One queued validator for BOTH activation paths. The slash command and the
+// tool used to be parallel implementations that drifted twice (the command ran
+// its guards on a pre-queue snapshot, and disarmed the plan-mode block BEFORE
+// its guards, so a bailed /plan-go still disarmed it). All three guards run
+// INSIDE mutatePlan against the post-queue `prev`, so a /plan-go typed during
+// an in-flight plan_write validates the state that write produced — including
+// uncertainties it may have just added. Reject arms omit `state`, so nothing
+// is persisted on a bail. `resuming`/`stale` are computed off `prev` BEFORE
+// writeStateAndTodo stamps this process as writer.
+// setPlanning(false)/replanStreak=0 fire ONLY on the ok arm: a bailed or held
+// go must not disarm the block or reset the thrash streak. agent_end's own
+// setPlanning(false) remains the deadlock-safety net for an armed flag.
+// Telemetry, trace, plan_spine and prompt delivery stay in the CALLERS — they
+// differ in gate discriminator, trace shape and delivery channel by design.
+async function goTransition(cwd: string, mode?: Autonomy): Promise<GoOutcome> {
+	const outcome = await mutatePlan<GoOutcome>(cwd, async (prev): Promise<{ state?: PlanState; result: GoOutcome }> => {
+		if (!prev || prev.items.length === 0) {
+			return { result: { ok: false, reason: "no-plan" } };
+		}
+		const open = prev.items.filter((i) => i.status === "pending" || i.status === "in_progress");
+		if (open.length === 0) {
+			return { result: { ok: false, reason: "no-open-items", runId: prev.run_id } };
+		}
+		// c31: deterministic hold — execution cannot start while the model's own
+		// declared uncertainties remain. No LLM judgment; clear them via plan_write.
+		if (PLAN_UNCERTAINTY && (prev.uncertainties?.length ?? 0) > 0) {
+			return { result: { ok: false, reason: "uncertainty-hold", state: prev } };
+		}
+		const resuming = prev.phase === "executing";
+		const stale = staleInProgress(prev); // pre-write state — writer not yet re-stamped
+		const next: PlanState = { ...prev, phase: "executing" };
+		if (mode) next.autonomy = mode;
+		return { state: next, result: { ok: true, state: next, resuming, stale } };
+	});
+	if (outcome.ok) {
+		setPlanning(false); // execution genuinely starts — NOW disarm
+		replanStreak = 0;
+	}
+	return outcome;
+}
+
+// "PARTIAL WORK" resume note — byte-identical in both callers; hoisted.
+function resumeNoteFor(stale: PlanItem[]): string {
+	return stale.length
+		? `\n\nRESUMED from a previous session. Previously in_progress item(s) may have PARTIAL WORK on disk: ${stale.map((i) => i.title).join("; ")}. Inspect current state (git status/diff, read the touched files) before continuing — do not trust it done and do not redo it blind.`
+		: "";
+}
+
 // ---------- commands ----------
 
 async function startPlanCommand(args: string, ctx: { cwd: string; model?: { provider?: string; id?: string }; ui: { notify(m: string, l?: string): void } }, pi: ExtensionAPI) {
@@ -1083,61 +1139,41 @@ async function startPlanCommand(args: string, ctx: { cwd: string; model?: { prov
 
 async function goCommand(args: string, ctx: { cwd: string; model?: { provider?: string; id?: string }; ui: { notify(m: string, l?: string): void } }, pi: ExtensionAPI) {
 	rememberModel(ctx);
-	setPlanning(false); // execution starts — disarm the plan-mode mutation block
-	replanStreak = 0; // execution start — reset thrash counter so planning drafts don't carry in
-	const state = await readState(ctx.cwd);
-	if (!state || state.items.length === 0) {
-		ctx.ui.notify("No plan to run. Start with /plan <request>.", "error");
-		return;
-	}
-	const open = state.items.filter((i) => i.status === "pending" || i.status === "in_progress");
-	if (open.length === 0) {
-		ctx.ui.notify("Plan is complete — no open items. Start a new plan with /plan <request>.", "info");
-		return;
-	}
-	// c31: deterministic hold — execution cannot start while the model's own
-	// declared uncertainties remain. No LLM judgment; clear them via plan_write.
-	if (PLAN_UNCERTAINTY && (state.uncertainties?.length ?? 0) > 0) {
-		planEvent("uncertainty-hold", state.run_id, { count: state.uncertainties!.length, gate: "plan-go-block" });
+	// Optional mode switch: /plan-go yolo  or  /plan-go lean
+	const mode = /(^|\s)yolo$/i.test(args) ? "yolo" : /(^|\s)lean$/i.test(args) ? "lean" : undefined;
+
+	// Guards, queueing, and the disarm-only-on-ok rule all live in goTransition
+	// (shared with the plan_go tool). This function only maps the outcome onto
+	// the command's channels: ui.notify for failures, sendUserMessage for the
+	// execute prompt, a "command"-shaped trace row.
+	const outcome = await goTransition(ctx.cwd, mode);
+	if (!outcome.ok) {
+		if (outcome.reason === "no-plan") {
+			planEvent("go-blocked", `no-plan-${actionId()}`, { reason: "no-plan", source: "command" });
+			ctx.ui.notify("No plan to run. Start with /plan <request>.", "error");
+			return;
+		}
+		if (outcome.reason === "no-open-items") {
+			planEvent("go-blocked", outcome.runId, { reason: "no-open-items", source: "command" });
+			ctx.ui.notify("Plan is complete — no open items. Start a new plan with /plan <request>.", "info");
+			return;
+		}
+		const held = outcome.state;
+		planEvent("uncertainty-hold", held.run_id, { count: held.uncertainties!.length, gate: "plan-go-block" });
 		ctx.ui.notify(
-			`Execution held — ${state.uncertainties!.length} unresolved uncertaint(y/ies):\n${state.uncertainties!.map((u) => `- ${u}`).join("\n")}\nAnswer them, have the model clear the field (plan_write uncertainties: []), then /plan-go again.`,
+			`Execution held — ${held.uncertainties!.length} unresolved uncertaint(y/ies):\n${held.uncertainties!.map((u) => `- ${u}`).join("\n")}\nAnswer them, have the model clear the field (plan_write uncertainties: []), then /plan-go again.`,
 			"warning",
 		);
 		return;
 	}
 
-	// Optional mode switch: /plan-go yolo  or  /plan-go lean
-	const mode = /(^|\s)yolo$/i.test(args) ? "yolo" : /(^|\s)lean$/i.test(args) ? "lean" : undefined;
-
-	// Through mutatePlan, NOT a bare write: this is the same file plan_write
-	// serialises on, and /plan-go used to skip the queue entirely — a concurrent
-	// plan_write could interleave and lose one of the two updates. The plan_go
-	// TOOL (c39) already went through the queue; the slash command did not.
-	//
-	// Everything downstream reads `next`, never the pre-queue `state` snapshot.
-	// pi executes extension commands ABOVE the isStreaming guard (SESSION:792-828,
-	// "execute immediately, even during streaming"), so /plan-go typed during an
-	// in-flight plan_write blocks here on the queue that write holds — `prev` is
-	// then strictly newer than `state` by construction. Prompting from `state`
-	// would enumerate a stale item list, and if the interleaving command was
-	// /plan (a NEW run_id), the plan_spine entry and trace row would be filed
-	// under a superseded run_id — invisible corruption of /collapse and the
-	// gate's per-run joins, which is worse than a wrong prompt.
-	const { next, resuming, stale } = await mutatePlan(ctx.cwd, async (prev) => {
-		const base = prev ?? state;
-		const nextState: PlanState = { ...base, phase: "executing" };
-		if (mode) nextState.autonomy = mode;
-		// stale is read off `base` — BEFORE the write stamps this process as writer.
-		return { state: nextState, result: { next: nextState, resuming: base.phase === "executing", stale: staleInProgress(base) } };
-	});
+	const { state: next, resuming, stale } = outcome;
 	pi.appendEntry("plan_spine", { run_id: next.run_id }); // mark this node for /collapse
 	await appendTrace(ctx.cwd, { run_id: next.run_id, action_type: "command", tool_name: "plan-go", success: true, output_summary: `${resuming ? "resume" : "execute"}${mode ? ` autonomy=${mode}` : ""}` });
+	planEvent("go", next.run_id, { resumed: resuming, stale: stale.length, source: "command" });
 
 	const subagentAvailable = pi.getActiveTools().includes("subagent");
-	const resumeNote = stale.length
-		? `\n\nRESUMED from a previous session. Previously in_progress item(s) may have PARTIAL WORK on disk: ${stale.map((i) => i.title).join("; ")}. Inspect current state (git status/diff, read the touched files) before continuing — do not trust it done and do not redo it blind.`
-		: "";
-	pi.sendUserMessage(executePrompt(next, subagentAvailable) + resumeNote);
+	pi.sendUserMessage(executePrompt(next, subagentAvailable) + resumeNoteFor(stale));
 }
 
 async function statusCommand(ctx: { cwd: string; ui: { notify(m: string, l?: string): void } }) {
@@ -1192,12 +1228,6 @@ export default function (pi: ExtensionAPI) {
 	// just this one call — plan_write + the commands + hooks below register
 	// unconditionally, so a whole-function guard would silently drop those too).
 	if (PLAN_TOOL_GO) {
-		type GoOutcome =
-			| { ok: true; state: PlanState; resuming: boolean; stale: PlanItem[] }
-			| { ok: false; reason: "no-plan" }
-			| { ok: false; reason: "no-open-items"; runId: string }
-			| { ok: false; reason: "uncertainty-hold"; state: PlanState };
-
 		pi.registerTool(
 			defineTool({
 				name: "plan_go",
@@ -1214,30 +1244,19 @@ export default function (pi: ExtensionAPI) {
 					const aid = actionId();
 					rememberModel(ctx);
 
-					const outcome: GoOutcome = await mutatePlan(ctx.cwd, async (prev) => {
-						if (!prev || prev.items.length === 0) {
-							return { result: { ok: false, reason: "no-plan" } as GoOutcome };
-						}
-						const open = prev.items.filter((i) => i.status === "pending" || i.status === "in_progress");
-						if (open.length === 0) {
-							return { result: { ok: false, reason: "no-open-items", runId: prev.run_id } as GoOutcome };
-						}
-						if (PLAN_UNCERTAINTY && (prev.uncertainties?.length ?? 0) > 0) {
-							return { result: { ok: false, reason: "uncertainty-hold", state: prev } as GoOutcome };
-						}
-						const resuming = prev.phase === "executing";
-						const stale = staleInProgress(prev);
-						const next: PlanState = { ...prev, phase: "executing" };
-						return { state: next, result: { ok: true, state: next, resuming, stale } as GoOutcome };
-					});
+					// Guards + queueing + disarm-on-ok live in goTransition (shared
+					// with /plan-go). This body only maps the outcome onto the tool's
+					// channels: planEvent + throw for failures, tool-result content
+					// for the execute prompt, a "tool"-shaped trace row.
+					const outcome = await goTransition(ctx.cwd);
 
 					if (!outcome.ok) {
 						if (outcome.reason === "no-plan") {
-							planEvent("go-blocked", `no-plan-${aid}`, { reason: "no-plan" });
+							planEvent("go-blocked", `no-plan-${aid}`, { reason: "no-plan", source: "tool" });
 							rejectPlanTool("plan_go: no plan to run. Call plan_write first to create one, then call plan_go.");
 						}
 						if (outcome.reason === "no-open-items") {
-							planEvent("go-blocked", outcome.runId, { reason: "no-open-items" });
+							planEvent("go-blocked", outcome.runId, { reason: "no-open-items", source: "tool" });
 							rejectPlanTool("plan_go: plan is complete — no open items. Nothing to execute; call plan_write to add more work first.");
 						}
 						const state = outcome.state;
@@ -1248,8 +1267,6 @@ export default function (pi: ExtensionAPI) {
 							"Ask the user these exact questions, then clear them via plan_write (uncertainties: []) and call plan_go again.");
 					}
 
-					setPlanning(false);
-					replanStreak = 0;
 					const { state, resuming, stale } = outcome;
 					pi.appendEntry("plan_spine", { run_id: state.run_id });
 					await appendTrace(ctx.cwd, {
@@ -1261,14 +1278,11 @@ export default function (pi: ExtensionAPI) {
 						output_summary: resuming ? "resume" : "execute",
 						final_status: derivedStatus(state),
 					});
-					planEvent("go", state.run_id, { resumed: resuming, stale: stale.length });
+					planEvent("go", state.run_id, { resumed: resuming, stale: stale.length, source: "tool" });
 
 					const subagentAvailable = pi.getActiveTools().includes("subagent");
-					const resumeNote = stale.length
-						? `\n\nRESUMED from a previous session. Previously in_progress item(s) may have PARTIAL WORK on disk: ${stale.map((i) => i.title).join("; ")}. Inspect current state (git status/diff, read the touched files) before continuing — do not trust it done and do not redo it blind.`
-						: "";
 					return {
-						content: [{ type: "text" as const, text: `plan_go: execution started (run_id=${state.run_id}).\n\n${executePrompt(state, subagentAvailable)}${resumeNote}` }],
+						content: [{ type: "text" as const, text: `plan_go: execution started (run_id=${state.run_id}).\n\n${executePrompt(state, subagentAvailable)}${resumeNoteFor(stale)}` }],
 						details: { tool_name: "plan_go", action_id: aid, success: true },
 						terminate: false,
 					};
