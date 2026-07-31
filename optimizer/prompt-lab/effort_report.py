@@ -34,6 +34,12 @@ def graded_rate(row):
     if not isinstance(sub, dict):
         return None
     fixed, total = sub.get("fixed"), sub.get("total")
+    # `not isinstance(x, bool)` is load-bearing: isinstance(True, int) is True in Python,
+    # so a grader emitting `fixed: true` would otherwise score 1/total. dig()'s tuple path
+    # already rejects bools ("bools are not measurements"); this keeps the callable path
+    # consistent with it rather than quietly disagreeing on the same row.
+    if isinstance(fixed, bool) or isinstance(total, bool):
+        return None
     if not (isinstance(fixed, int) and isinstance(total, int)) or total <= 0:
         return None
     return fixed / total
@@ -124,6 +130,13 @@ def rows(gen):
 
 
 def analyse(gen, only_passing=False, graded=False):
+    if graded and only_passing:
+        # Contradictory by construction: --graded exists to read partial credit from
+        # sessions the binary bit scores 0, and --only-passing deletes exactly those.
+        # Combined, they report full coverage of a population that excludes every row
+        # the graded outcome was built for.
+        raise SystemExit("--graded and --only-passing are contradictory: --only-passing drops "
+                         "the failing sessions partial credit exists to measure. Use one.")
     data = rows(gen)
     if only_passing:
         data = [r for r in data if r.get("score") == 1]
@@ -131,6 +144,13 @@ def analyse(gen, only_passing=False, graded=False):
     cand = [r for r in data if r.get("pattern") == "cand"]
     out = {"gen": gen, "n_base": len(base), "n_cand": len(cand),
            "only_passing": only_passing, "graded": graded, "metrics": []}
+    # Row COMPOSITION, always reported. analyse() selects on `pattern` alone, while
+    # fleet_report.py refuses non-authoritative/incomplete rows outright. Pooling the two
+    # populations is how the corpus-wide Simpson's paradox arose, and this tool now carries
+    # the graded verdict — so the mix is surfaced rather than silently filtered (filtering
+    # by default would move every historical effort number without warning).
+    out["non_authoritative"] = sum(1 for r in base + cand if not r.get("authoritative"))
+    out["incomplete"] = sum(1 for r in base + cand if r.get("status") not in (None, "complete"))
     metrics = METRICS
     if graded:
         # Coverage is reported, never silently assumed: a partially-graded round would
@@ -159,6 +179,10 @@ def analyse(gen, only_passing=False, graded=False):
 def render(res):
     tag = " (passing sessions only)" if res["only_passing"] else ""
     print(f"\n{res['gen']}{tag}   base n={res['n_base']}  cand n={res['n_cand']}")
+    na, inc = res.get("non_authoritative", 0), res.get("incomplete", 0)
+    if na or inc:
+        print(f"  COMPOSITION: {na} non-authoritative, {inc} incomplete row(s) INCLUDED — "
+              f"fleet_report.py refuses these; effort numbers here pool them.")
     if res.get("graded"):
         gb, gc = res.get("graded_base", 0), res.get("graded_cand", 0)
         print(f"  graded coverage: base {gb}/{res['n_base']}  cand {gc}/{res['n_cand']}")
@@ -259,6 +283,18 @@ def selftest():
     b = [graded_rate({"subscores": {"fixed": f, "total": 8}}) for f in (6, 7, 6, 7, 6, 7)]
     _, pg = mannwhitney_u(b, a)
     assert pg < 0.01, pg
+    # bools must be rejected, matching dig()'s tuple-path rule — isinstance(True, int)
+    # is True, so without the explicit check a grader emitting `fixed: true` scores 1/total.
+    assert graded_rate({"subscores": {"fixed": True, "total": 8}}) is None
+    assert graded_rate({"subscores": {"fixed": 5, "total": True}}) is None
+    # --graded and --only-passing must refuse to combine: --only-passing deletes exactly
+    # the failing sessions partial credit exists to measure, then reports full coverage.
+    try:
+        analyse("whatever", only_passing=True, graded=True)
+    except SystemExit as exc:
+        assert "contradictory" in str(exc), exc
+    else:
+        raise AssertionError("--graded --only-passing must be refused")
     print("effort_report selftest: OK (exact + normal-approx paths; graded outcome)")
 
 
