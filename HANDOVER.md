@@ -192,13 +192,15 @@ candidates until c25 and c48 resolve.
 > until it is done** (METHODOLOGY §12 / `CANDIDATE_STRATEGY_2026-07-31.md` §1: at n=9/arm the
 > gate detects harm and essentially nothing else).
 >
-> **B1. Run `audit-sweep` once, base-arm only, on the local 4B.** It is graded, it has NEVER
-> been run (0 rows), and its band is unknown. The cheapest measurement available and it decides
-> the next three items. Exit: a base pass rate and a `graded_rate` distribution.
-> **B2. One LOCAL in-band fixture for the 4B** — the hard blocker. Today the only 30-70% base
-> fixtures are `path-near-miss` (50%) and `sv-commit-sha-guard` (33%), both REMOTE hence
-> non-authoritative, plus `sv-convention-provenance` (50%) local at n=6. B1 may supply this for
-> free; if not, port `path-near-miss` locally or extend `sv-convention-provenance`.
+> **B1. Re-run `sv-convention-provenance` on the local 4B, base arm, n≥20.** CORRECTED
+> 2026-07-31 after the QA: this is already an in-band LOCAL venue (3/6 = 50%), and its rows are
+> non-authoritative only because the fixture was **unapproved when they were collected**
+> (`authority_reason: "missing expiry"`). It has been approved since 2026-07-29. Re-running it
+> today produces AUTHORITATIVE in-band rows — no new fixture needed. Exit: a base rate at n≥20
+> confirming the band holds (3/6 is one flipped session from 33% or 67%).
+> **B2. Run `audit-sweep` once, base-arm only, on the local 4B.** It is graded, has NEVER been
+> run (0 rows), and its band is unknown. Cheap, and the only way to learn whether the graded
+> instrument has a fixture that exercises it. Exit: base pass rate + `graded_rate` distribution.
 > **B3. Judge rubric + calibration** (task #12) — code quality, which subscores do not capture.
 > Calibrate gold > shortcut on existing fixtures BEFORE trusting it.
 > **B4. Then, and only then, candidates** — c48 first (additive, so it cannot produce the harm

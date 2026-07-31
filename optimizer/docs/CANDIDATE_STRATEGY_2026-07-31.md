@@ -147,12 +147,27 @@ completed compactions ever**.
 
 ### Tier A — The instrument. Above every candidate.
 Nothing below can return a positive result until this exists.
-1. **Graded outcome in rows.** `score` is binary in all 1,839 rows; there is no subscore
-   anywhere. Instrument v2 is unbuilt and it dominates everything.
+1. **Graded outcome in rows.** ~~`score` is binary in all 1,839 rows.~~ **DONE 2026-07-31**
+   (`31611d1`, `a37494a`): optional `subscores` in the row schema, gate passthrough for any
+   `.<name>-grade.json`, and `effort_report --graded`. Proven on audit-sweep's real grader —
+   pristine 0/8, shortcut 2/8, gold 8/8, so the two states the binary bit scores identically
+   are 0.000 vs 0.250 graded.
 2. **n ≥ 20/arm**, and a fixture in-band, or the round is a regression detector by construction.
-3. **One LOCAL in-band fixture for the 4B** — the hard blocker. Today: `path-near-miss` 50% and
-   `sv-commit-sha-guard` 33% are both **remote** (non-authoritative); `sv-convention-provenance`
-   50% is local but n=6. For the 35B nothing exists between 94–99% and 0–11%.
+3. **An in-band venue — CORRECTED 2026-07-31 (post-QA), and the news is good.** The first
+   version of this item called for building one and mislabelled the inventory. Recomputed over
+   every model×task cell with n≥6:
+
+   | cell | base | authority | recoverable? |
+   |---|---|---|---|
+   | gemma-4-e2b / `bigdata` | 71/102 = 69.6% | non-auth | **No** — remote endpoint, structural |
+   | 4b-mtp / `path-near-miss` | 6/12 = 50% | non-auth | **No** — remote, structural |
+   | 4b-mtp / `sv-commit-sha-guard` | 2/6 = 33% | non-auth | **No** — remote, structural |
+   | **qwopus35-4b (LOCAL) / `sv-convention-provenance`** | **3/6 = 50%** | non-auth | **YES** — the reason recorded on those rows is `"missing expiry"`: the fixture was *unapproved when they were collected*. It has been **approved since 2026-07-29**, expiring 2026-10-27. |
+
+   **So the venue already exists.** Re-running `sv-convention-provenance` on the local 4B today
+   yields authoritative in-band rows. The task is not "build a fixture", it is "re-run the one
+   we have at n large enough to trust the band" — 3/6 is one flipped session from 33% or 67%.
+   For the 35B nothing exists between 94–99% and 0–11%; that gap is real and unaddressed.
 
 ### Tier B — Safe to run once Tier A exists
 - **c48 state-lens (view)** — additive, no blocking mechanism, so it cannot produce the harm
