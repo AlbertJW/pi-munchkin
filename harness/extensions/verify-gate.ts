@@ -47,13 +47,16 @@ const CMD_POS = "(?:^|[;&|(]\\s*|\\b(?:sudo|xargs|env)\\s+)";
 // merely contained "test" (./scripts/collect-test-data.sh, a model-written
 // ./mytest.sh that echoes ok) as a passing verify — silently disarming the
 // gate, whose whole job is catching unverified change claims (triage #16).
-// Script-based suites still count via the shared classifier's verifyLike or
-// by naming them in VERIFY_GATE_CMD; the failure mode left behind is a nag
-// after a genuinely green unregistered script, which is the safe direction.
-const VERIFY_BASE =
-	CMD_POS +
-	"(?:just (?:verify|check|test)|pytest\\b|python3? -m pytest\\b|npm test\\b|npm run (?:test|check|lint|typecheck|verify)\\b|" +
-	"yarn test\\b|tsc\\b|bash -n |go test\\b|cargo test\\b|make (?:test|check|verify)\\b|ruff\\b|eslint\\b|node --test\\b)";
+// A script suite counts only when routed through a recognised runner (npm
+// test, just test, make test) or named in VERIFY_GATE_CMD — an earlier
+// version of this comment also claimed the shared classifier's `verifyLike`
+// covered bare scripts, which is FALSE: VERIFY_COMMAND_RE has no script
+// alternative at all (`./scripts/run_tests.sh` → verifyLike:false, measured).
+// The failure mode left behind is a nag after a genuinely green unregistered
+// script, which is the safe direction.
+const VERIFY_BODY =
+	"just (?:verify|check|test)|pytest\\b|python3? -m pytest\\b|npm test\\b|npm run (?:test|check|lint|typecheck|verify)\\b|" +
+	"yarn test\\b|tsc\\b|bash -n |go test\\b|cargo test\\b|make (?:test|check|verify)\\b|ruff\\b|eslint\\b|node --test\\b";
 
 function escapeRegex(s: string): string {
 	return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
@@ -119,7 +122,21 @@ let gateCmd: string | null = process.env.VERIFY_GATE_CMD || null;
 let composeProject = false;
 
 function buildRe(): RegExp {
-	return new RegExp(process.env.VERIFY_GATE_PATTERN || VERIFY_BASE + (gateCmd ? `|${escapeRegex(gateCmd)}` : ""), "i");
+	// The detected gate command goes INSIDE the CMD_POS group. It used to be appended
+	// after it — `VERIFY_BASE + "|" + escapeRegex(gateCmd)` — and `|` has the lowest
+	// precedence in a regex, so that parsed as `(CMD_POS(?:anchored…)) | (gateCmd
+	// ANYWHERE)`. detectGate returns "npm test" for every fixture here (they all ship a
+	// package.json with scripts.test), so `echo "Run npm test to verify" >> README.md`
+	// armed the gate as a mutation and disarmed it as a verify in the SAME turn, and in
+	// any pytest project `grep -rn pytest .` counted as a passing verify (both measured
+	// 2026-07-31). Folding it into the body gives it the same command-position anchor as
+	// every built-in alternative.
+	// VERIFY_GATE_PATTERN is a FULL override and is deliberately left unanchored: it is a
+	// documented operator escape hatch, and no gate config can set it (configs/schema.json
+	// exposes only VERIFY_GATE and VERIFY_GATE_MAX_FIRES). An operator supplying it owns
+	// their own anchoring.
+	if (process.env.VERIFY_GATE_PATTERN) return new RegExp(process.env.VERIFY_GATE_PATTERN, "i");
+	return new RegExp(`${CMD_POS}(?:${VERIFY_BODY}${gateCmd ? `|${escapeRegex(gateCmd)}` : ""})`, "i");
 }
 let verifyRe = buildRe();
 

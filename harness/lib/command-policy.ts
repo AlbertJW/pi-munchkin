@@ -27,7 +27,15 @@ const CMD_POS = String.raw`(?:^|[;&|(]\s*|\b(?:sudo|xargs|env|do|then|timeout\s+
 
 export const VERIFY_COMMAND_RE = new RegExp(
 	CMD_POS +
-		String.raw`(?:test\b|\[\s|just\s+(?:verify|check|test)|npm\s+(?:test|run\s+(?:test|check|lint|typecheck|verify))|yarn\s+(?:test|check|lint)|pnpm\s+(?:test|run\s+(?:test|check|lint|typecheck|verify))|pytest|python(?:3)?\s+-m\s+pytest|cargo\s+test|go\s+test|make\s+(?:test|check|verify)|tsc\s+--noEmit|bash\s+-n|ruff(?:\s+check)?|eslint|node\s+--test|(?:npx\s+(?:-y\s+)?)?tsx\s+--test|(?:npx\s+(?:-y\s+)?)?(?:vitest|jest))\b`,
+		// NO bare `test\b` / `[` here. Those match the POSIX FILE-TEST BUILTIN, not a test
+		// suite — and `verifyLike` is what verify-gate.ts consults FIRST, before its own
+		// regex, so `test -f dist/app.js && echo ok` exiting 0 marked the whole session
+		// verified and disarmed the gate (measured 2026-07-31: `test -f x && echo ok`,
+		// `test -d src` and `ls; test -d src` all returned verifyLike:true). The other
+		// consumer, assertVerifyGateAllowed, benefits identically: a file-existence check
+		// is not a plausible plan gate. `\[\s` was near-dead anyway — the group's trailing
+		// `\b` meant `[ -f a ]` never matched, only the rare `[ x = y ]` form did.
+		String.raw`(?:just\s+(?:verify|check|test)|npm\s+(?:test|run\s+(?:test|check|lint|typecheck|verify))|yarn\s+(?:test|check|lint)|pnpm\s+(?:test|run\s+(?:test|check|lint|typecheck|verify))|pytest|python(?:3)?\s+-m\s+pytest|cargo\s+test|go\s+test|make\s+(?:test|check|verify)|tsc\s+--noEmit|bash\s+-n|ruff(?:\s+check)?|eslint|node\s+--test|(?:npx\s+(?:-y\s+)?)?tsx\s+--test|(?:npx\s+(?:-y\s+)?)?(?:vitest|jest))\b`,
 	"i",
 );
 

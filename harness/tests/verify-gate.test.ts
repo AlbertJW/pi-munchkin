@@ -1,0 +1,114 @@
+import assert from "node:assert/strict";
+import test from "node:test";
+import { mkdtempSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { fire, makeFakePi, resetPiGlobals } from "./integration-harness.ts";
+import { classifyBashCommand } from "../lib/command-policy.ts";
+
+// Run: cd ~/.pi/agent && npx -y tsx --test tests/verify-gate.test.ts
+//
+// This file did not exist until 2026-07-31. verify-gate is DEFAULT-ON and runs in
+// every gate round, and it shipped two disarm defects with zero coverage — both
+// found by a deep-QA lens and both reachable in a live round. Every test below
+// pins one of them, or the mechanism they subverted.
+
+/** A project whose package.json has scripts.test, so detectGate() returns "npm test"
+ *  — which is what EVERY real-gate fixture looks like. */
+function projectWithNpmTest(): string {
+	const dir = mkdtempSync(join(tmpdir(), "vg-"));
+	writeFileSync(join(dir, "package.json"), JSON.stringify({ scripts: { test: "node --test" } }));
+	return dir;
+}
+
+async function loadVerifyGate(fp: ReturnType<typeof makeFakePi>, cwd: string) {
+	const mod = await import(`../extensions/verify-gate.ts?vg=${Date.now()}-${Math.random()}`);
+	mod.default(fp.pi as never);
+	await fire(fp, "session_start", {}, { cwd });
+	return mod;
+}
+
+const bashTurn = (command: string, output = "", isError = false) => ({
+	turnIndex: 1,
+	message: { role: "assistant", content: [{ type: "toolCall", id: "b1", name: "bash", arguments: { command } }] },
+	toolResults: [{ toolCallId: "b1", content: [{ type: "text", text: output }], isError }],
+});
+
+test("the POSIX `test` builtin is NOT a verify command", () => {
+	// verify-gate consults policy.verifyLike BEFORE its own regex, so anything
+	// classifyBashCommand calls verify-like marks the session verified. `test\b` was
+	// the FIRST alternative in VERIFY_COMMAND_RE, so `test -f dist/app.js && echo ok`
+	// exiting 0 disarmed the gate entirely.
+	for (const cmd of ["test -f dist/app.js && echo ok", "test -d src", "ls; test -d src", "[ x = y ]"]) {
+		assert.equal(classifyBashCommand(cmd).verifyLike, false, `file-test builtin must not be verifyLike: ${cmd}`);
+	}
+	// ...while every real suite still is, including via a registered gate command.
+	for (const cmd of ["npm test", "just verify", "pytest -q", "node --test", "make check"]) {
+		assert.equal(classifyBashCommand(cmd).verifyLike, true, `real suite must stay verifyLike: ${cmd}`);
+	}
+	assert.equal(classifyBashCommand("./scripts/run_tests.sh", ["./scripts/run_tests.sh"]).verifyLike, true,
+		"a script named in VERIFY_GATE_CMD counts via extraAllowed");
+	assert.equal(classifyBashCommand("./scripts/run_tests.sh").verifyLike, false,
+		"...but an UNREGISTERED script does not — VERIFY_COMMAND_RE has no script alternative");
+});
+
+// The gate's OBSERVABLE consequence is the wrap-up steer: it fires on a text-only
+// turn when files changed and nothing verified them. Assert on that, not on
+// __pi_vg_state — that global is published at the TOP of the handler, so it carries
+// the PREVIOUS turn's values and reading it after one turn tests nothing. (The first
+// draft of this file did exactly that and passed vacuously.)
+const wrapUpTurn = { turnIndex: 2, message: { role: "assistant", content: [{ type: "text", text: "All done." }] }, toolResults: [] };
+const ctxFor = (cwd: string) => ({ cwd, ui: { notify() {} } });
+
+async function steersAfter(cwd: string, first: ReturnType<typeof bashTurn>): Promise<boolean> {
+	const fp = makeFakePi();
+	await loadVerifyGate(fp, cwd);
+	await fire(fp, "turn_end", first, ctxFor(cwd));
+	await fire(fp, "turn_end", wrapUpTurn, ctxFor(cwd));
+	return fp.sent.some((m) => m.includes("verify"));
+}
+
+test("a command merely CONTAINING the detected gate command does not verify it", async () => {
+	// buildRe() used to append the gate command OUTSIDE the CMD_POS group. `|` has the
+	// lowest precedence, so the pattern became `(anchored…)|(gateCmd anywhere)` and the
+	// detected command matched mid-string. detectGate returns "npm test" for every
+	// fixture in this repo, so this was live in every arm of every round.
+	const cwd = projectWithNpmTest();
+	try {
+		assert.equal(await steersAfter(cwd, bashTurn('sed -i "" "s/foo/npm test/" src/app.ts')), true,
+			"an edit that merely MENTIONS the gate command must leave the gate armed and steering");
+	} finally {
+		resetPiGlobals();
+	}
+});
+
+test("a genuine passing gate command disarms the gate", async () => {
+	// The negative test above is only meaningful if the positive path still works.
+	const cwd = projectWithNpmTest();
+	try {
+		const fp = makeFakePi();
+		await loadVerifyGate(fp, cwd);
+		await fire(fp, "turn_end", bashTurn("edit src/app.ts", ""), ctxFor(cwd));
+		await fire(fp, "turn_end", { ...bashTurn("npm test", "12 passing"), turnIndex: 2 }, ctxFor(cwd));
+		await fire(fp, "turn_end", { ...wrapUpTurn, turnIndex: 3 }, ctxFor(cwd));
+		assert.equal(fp.sent.some((m) => m.includes("verify")), false,
+			"a real green gate command must suppress the wrap-up steer");
+	} finally {
+		resetPiGlobals();
+	}
+});
+
+test("a FAILING gate command leaves the gate armed", async () => {
+	const cwd = projectWithNpmTest();
+	try {
+		const fp = makeFakePi();
+		await loadVerifyGate(fp, cwd);
+		await fire(fp, "turn_end", bashTurn("edit src/app.ts", ""), ctxFor(cwd));
+		await fire(fp, "turn_end", { ...bashTurn("npm test", "1 failing\nAssertionError", true), turnIndex: 2 }, ctxFor(cwd));
+		await fire(fp, "turn_end", { ...wrapUpTurn, turnIndex: 3 }, ctxFor(cwd));
+		assert.equal(fp.sent.some((m) => m.includes("verify")), true,
+			"a red gate must NOT disarm — the wrap-up steer must still fire");
+	} finally {
+		resetPiGlobals();
+	}
+});
