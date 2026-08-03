@@ -1228,13 +1228,25 @@ export default function (pi: ExtensionAPI) {
 		// FIRST, ahead of both early returns below: this key is written by
 		// writeStateAndTodo and deleted nowhere, while pi's loader returns the CACHED
 		// factory across session replacement, so a /new, /fork or same-cwd /resume
-		// inherited the previous plan's run_id. Both readers (context-surface.ts:29,
-		// blackboard.ts:131) stamp it onto receipts, and telemetry.ts:162 lets
-		// detail.run_id WIN the envelope join key — so the new session's receipts filed
-		// under the dead plan's run_id. (No gate impact: one pi -p session per process.)
+		// inherited the previous plan's run_id. Both readers (context-surface.ts and
+		// blackboard.ts) stamp it onto receipts, and telemetry.ts lets detail.run_id WIN
+		// the envelope join key — so the new session's receipts filed under the dead
+		// plan's run_id. (No gate impact: one `pi -p` session per process.)
 		delete (globalThis as Record<string, unknown>).__pi_active_plan_context;
 		rememberModel(ctx);
 		const state = await readState(ctx.cwd);
+		// ...then RE-BIND to whatever plan this cwd actually has on disk. Clearing alone
+		// was a half-fix: a same-cwd /resume of a LIVE plan lost a run_id that had been
+		// correct, and receipts went unattributed until the next writeStateAndTodo. The
+		// truth is the state file, so derive from it rather than trusting or discarding
+		// the inherited global. Absent state leaves the key deleted; both readers treat
+		// that as "no active plan" rather than erroring.
+		if (state) {
+			(globalThis as Record<string, unknown>).__pi_active_plan_context = {
+				run_id: state.run_id,
+				item_id: currentItem(state)?.id,
+			};
+		}
 		if (!state || state.writer === PROC_MARK) return;
 		const open = state.items.filter((i) => i.status === "pending" || i.status === "in_progress" || i.status === "blocked");
 		if (open.length === 0) return;

@@ -1380,6 +1380,18 @@ test("session_start clears __pi_active_plan_context (no run_id bleed across /new
 		await fire(fp, "session_start", {}, makeCtx(tmp()).ctx);
 		assert.equal(g.__pi_active_plan_context, undefined,
 			`session_start must clear the plan context, still holding run_id ${first?.run_id}`);
+
+		// ...but a same-cwd /resume of a LIVE plan must RE-BIND, not stay blank. Clearing
+		// alone was a half-fix: it discarded a run_id that was correct, so receipts went
+		// unattributed until the next writeStateAndTodo.
+		await fire(fp, "session_start", {}, makeCtx(cwd).ctx);
+		const resumed = g.__pi_active_plan_context as { run_id?: string } | undefined;
+		assert.equal(resumed?.run_id, first.run_id,
+			"a same-cwd resume must re-bind to the plan on disk, not blank the run_id");
+
+		// And a cwd whose plan is gone must not resurrect it from the previous session.
+		await fire(fp, "session_start", {}, makeCtx(tmp()).ctx);
+		assert.equal(g.__pi_active_plan_context, undefined, "a planless cwd must leave the key cleared");
 	} finally {
 		delete g.__pi_active_plan_context;
 		resetPiGlobals();

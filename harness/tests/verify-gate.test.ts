@@ -112,3 +112,23 @@ test("a FAILING gate command leaves the gate armed", async () => {
 		resetPiGlobals();
 	}
 });
+
+test("the anchor's known false negatives stay false negatives (nag, never silent disarm)", () => {
+	// Regression pin for a real trade made on 2026-08-03. `time npm test` and
+	// `if npm test; then …` are NOT recognised as verifies by either classifier, so a
+	// session using them gets nagged despite having verified. That is deliberate: the
+	// only way to recognise them is to let a bare `npm test` match after `time`/`if`,
+	// which immediately re-matches `echo "it is time npm test should run" >> notes.md`
+	// and `grep -rn "if npm test" .` — a SILENT DISARM, the failure mode this gate
+	// exists to prevent. If you are here because you want `time npm test` to count,
+	// register it via VERIFY_GATE_CMD; do not widen CMD_POS.
+	for (const cmd of ["time npm test", "if npm test; then echo ok; fi"]) {
+		assert.equal(classifyBashCommand(cmd).verifyLike, false,
+			`if this ever becomes true, delete this test and the CMD_POS comment: ${cmd}`);
+	}
+	// ...while the shapes command-policy DOES anchor keep working, so the residual
+	// stays as small as it is: env assignments, `env`, and loop bodies.
+	for (const cmd of ["NODE_ENV=test npm test", "env CI=1 npm test", "for f in a b; do npm test; done"]) {
+		assert.equal(classifyBashCommand(cmd).verifyLike, true, `must stay recognised: ${cmd}`);
+	}
+});

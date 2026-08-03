@@ -42,6 +42,18 @@ function planPhaseActive(): boolean {
 // gate). The detected/forced gate command is appended at session start so the
 // exact project command also counts.
 const CMD_POS = "(?:^|[;&|(]\\s*|\\b(?:sudo|xargs|env)\\s+)";
+// KNOWN, ACCEPTED FALSE NEGATIVES — do NOT "fix" these by widening CMD_POS.
+// `time npm test` and `if npm test; then …` do not match here, and are not
+// verifyLike either (command-policy's CMD_POS has `do|then|timeout` and an
+// env-assignment prefix, but neither classifier has `time` or `if`). Before
+// 2026-08-03 the gate command was appended OUTSIDE this group, so an unanchored
+// `npm test` caught them by accident — along with `echo "run npm test" >> README`,
+// which is why the anchor exists.
+// Adding `time|if|then|while` back was measured: it re-matches
+// `echo "it is time npm test should run" >> notes.md` and `grep -rn "if npm test" .`
+// — i.e. it trades a NAG for a SILENT DISARM. For a gate whose entire job is
+// catching unverified change claims, the nag is the correct direction, the same
+// tradeoff the script-suite comment below already accepts. Pinned by a test.
 // No loose script alternative here on purpose. This regex used to end with
 // `(?:\./|bash |sh )\S*test\S*`, which counted ANY green script whose path
 // merely contained "test" (./scripts/collect-test-data.sh, a model-written
