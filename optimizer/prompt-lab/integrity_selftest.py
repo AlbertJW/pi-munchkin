@@ -326,6 +326,11 @@ def test_incident_rotation():
             corpus.intake(argparse.Namespace(id="t1", source="session-1", summary="regression"))
             source = Path(td) / "candidate.json"
             manifest = json.loads((admission.MANIFESTS / "t1.json").read_text())
+            # intake() stamps the CURRENT month, while the on-disk manifest carries a fixed
+            # cohort_id -- so this failed at the 2026-08 boundary and would fail at every one
+            # after. Rotation is what is under test here, not promote()'s cohort guard, so
+            # take the cohort from the intake record just written (promote's own glob).
+            manifest["cohort_id"] = json.loads(next(corpus.INBOX.glob("*/t1.json")).read_text())["cohort_id"]
             source.write_text(json.dumps(manifest))
             corpus.promote(argparse.Namespace(id="t1", manifest=str(source)))
             corpus.expire(argparse.Namespace(id="t1", reason="rotation"))
@@ -345,28 +350,17 @@ def test_graded_subscores_passthrough():
     strict binary gate bit so no historical row or cross-round pass-rate claim moves.
     This exists because at n=9/arm the binary gate is a one-sided regression detector
     (CANDIDATE_STRATEGY_2026-07-31.md section 1) -- partial credit is what lets a round
-    show improvement at all. Mirrors the extraction in real_gate.sh; if that changes,
-    change this together.
+    show improvement at all.
+
+    This calls the REAL extraction (prompt-lab/grade_artifact.py -- the same module the
+    gate's row builder imports). It used to reimplement it under a "if that changes, change
+    this together" comment, which is exactly how the multi-artifact case stayed untested
+    while the gate resolved it by lexicographic accident.
     """
-    import glob as _glob, tempfile
+    import grade_artifact
+    import eval_fixture
 
-    def extract(workdir):
-        try:
-            hits = sorted(_glob.glob(os.path.join(workdir, ".*-grade.json")))
-            if not hits:
-                return None
-            g = json.loads(Path(hits[0]).read_text())
-            fixed, total = g.get("fixed"), g.get("total")
-            if not (isinstance(fixed, int) and isinstance(total, int) and total > 0 and 0 <= fixed <= total):
-                return None
-            out = {"fixed": fixed, "total": total, "source": os.path.basename(hits[0])}
-            d = g.get("defects")
-            if isinstance(d, dict) and all(isinstance(v, bool) for v in d.values()):
-                out["detail"] = d
-            return out
-        except Exception:
-            return None
-
+    PIN = ".audit-grade.json"
     cases = [
         ({"fixed": 5, "total": 8, "defects": {"d1": True, "d2": False}}, True, True),
         ({"fixed": 8, "total": 8, "defects": {}}, True, True),
@@ -374,6 +368,8 @@ def test_graded_subscores_passthrough():
         ({"fixed": 9, "total": 8}, False, False),                            # fixed > total
         ({"fixed": -1, "total": 8}, False, False),
         ({"fixed": 0, "total": 0}, False, False),
+        ({"fixed": True, "total": 8}, False, False),                         # bool is a subclass of int
+        ({"fixed": 5, "total": True}, False, False),
         ("NOT JSON", False, False),
         (None, False, False),
     ]
@@ -381,11 +377,48 @@ def test_graded_subscores_passthrough():
         with tempfile.TemporaryDirectory() as td:
             if payload is not None:
                 body = payload if isinstance(payload, str) else json.dumps(payload)
-                Path(td, ".audit-grade.json").write_text(body)
-            got = extract(td)
+                Path(td, PIN).write_text(body)
+            got, blocked = grade_artifact.extract(td, PIN)
             assert (got is not None) == expect_row, f"{payload!r} -> {got!r}"
+            assert (got is None) == bool(blocked), f"{payload!r} -> {got!r} / {blocked!r}"
             if got is not None:
                 assert ("detail" in got) == expect_detail, f"{payload!r} -> {got!r}"
+                assert got["source"] == PIN, got
+
+    # THE DECOY CASE. The workdir is model-writable for the whole session and `.a-grade.json`
+    # sorts ahead of `.audit-grade.json`, so the old glob+sorted()[0] extraction would have
+    # scored the decoy's 8/8. Refusing rather than picking is the contract: a decoy costs the
+    # session its subscores, it never forges them.
+    with tempfile.TemporaryDirectory() as td:
+        Path(td, PIN).write_text(json.dumps({"fixed": 2, "total": 8}))
+        Path(td, ".a-grade.json").write_text(json.dumps({"fixed": 8, "total": 8}))
+        got, blocked = grade_artifact.extract(td, PIN)
+        assert got is None, f"a decoy alongside the pinned artifact must yield NO subscores, got {got!r}"
+        assert blocked == "ambiguous:2", blocked
+
+    # ...and the decoy alone forges nothing either, however it sorts.
+    with tempfile.TemporaryDirectory() as td:
+        Path(td, ".a-grade.json").write_text(json.dumps({"fixed": 8, "total": 8}))
+        assert grade_artifact.extract(td, PIN) == (None, "missing")
+        # An undeclared artifact on an ungraded fixture is refused AND surfaced, not ignored.
+        assert grade_artifact.extract(td, None) == (None, "unpinned:1")
+
+    # A fixture with no grader stays exactly as it was: no subscores, and nothing loud.
+    with tempfile.TemporaryDirectory() as td:
+        assert grade_artifact.extract(td, None) == (None, None)
+        assert grade_artifact.extract(td, PIN) == (None, "missing")
+
+    # The pin is a basename matched against the workdir's own listing, so it cannot escape it.
+    with tempfile.TemporaryDirectory() as td:
+        Path(td, PIN).write_text(json.dumps({"fixed": 8, "total": 8}))
+        assert grade_artifact.extract(td, "../" + PIN) == (None, "missing")
+
+    # The gate must take the name from the manifest, not hardcode it -- and the manifest must
+    # name the file the hidden grader actually writes.
+    assert eval_fixture.row_context("audit-sweep", "canonical")["grade_artifact"] == PIN, \
+        "row-context must carry grade_artifact -- it is how the pin reaches the gate's row builder"
+    hidden = (admission.FIXTURES / "hidden" / "audit-sweep.test.js").read_text()
+    assert f'writeFileSync("{PIN}"' in hidden, "the pin must be the name the hidden grader writes"
 
     # The schema must accept the block and must NOT require it.
     schema = json.loads((admission.FIXTURES / "schemas" / "pi.eval-row-v2.schema.json").read_text())
@@ -394,9 +427,14 @@ def test_graded_subscores_passthrough():
     props = schema["properties"]["subscores"]
     assert set(props["required"]) == {"fixed", "total"}, props["required"]
 
-    # And the gate must actually wire it, or the schema is decoration.
+    # And the gate must actually wire it -- to THIS module, and to the manifest's pin, or the
+    # cases above test a library nothing calls.
     gate = (admission.ROOT / "real_gate.sh").read_text()
-    assert '"subscores"' in gate or "rec[\"subscores\"]" in gate, "real_gate.sh does not populate subscores"
+    assert 'rec["subscores"]=subscores' in gate, "real_gate.sh does not populate subscores"
+    assert "import grade_artifact" in gate, "real_gate.sh must use the shared extraction, not its own copy"
+    assert 'ctx.get("grade_artifact")' in gate, "real_gate.sh must read the manifest's pin"
+    assert 'rec["subscores_blocked"]=subscores_blocked' in gate, "a refusal must reach the row"
+    assert ".*-grade.json" not in gate, "real_gate.sh must not glob for the artifact any more"
 
 
 def main():

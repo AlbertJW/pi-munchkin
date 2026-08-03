@@ -665,6 +665,10 @@
       ],
       "type": "object"
     },
+    "subscores_blocked": {
+      "type": "string",
+      "description": "Why graded subscores were REFUSED for this row: 'missing' (the manifest's pinned grade_artifact was not produced), 'ambiguous:<n>' (other .*-grade.json files were present alongside it -- the workdir is model-writable, so the gate refuses rather than picks), 'unpinned:<n>' (an artifact appeared that the fixture never declared), 'malformed', or 'error:<Type>'. Absent on the normal path. `score` is unaffected either way; see prompt-lab/grade_artifact.py."
+    },
     "task": {
       "type": "string"
     },

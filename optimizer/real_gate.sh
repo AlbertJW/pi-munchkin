@@ -870,20 +870,14 @@ if experiment_manifest:
 # and no cross-round pass-rate comparison shifts. This exists because the gate is a
 # one-sided regression detector on a binary outcome (CANDIDATE_STRATEGY_2026-07-31
 # section 1): partial credit is what lets a round show improvement at all.
-subscores=None
-try:
-    import glob as _glob
-    _hits=sorted(_glob.glob(os.path.join(workdir, ".*-grade.json")))
-    if _hits:
-        _g=json.load(open(_hits[0], encoding="utf-8"))
-        _fixed, _total = _g.get("fixed"), _g.get("total")
-        if isinstance(_fixed,int) and isinstance(_total,int) and _total > 0 and 0 <= _fixed <= _total:
-            subscores={"fixed":_fixed,"total":_total,"source":os.path.basename(_hits[0])}
-            _d=_g.get("defects")
-            if isinstance(_d,dict) and all(isinstance(v,bool) for v in _d.values()):
-                subscores["detail"]=_d
-except Exception:
-    subscores=None  # a malformed grader artifact must never fail a row
+#
+# The name is PINNED by the fixture manifest, not discovered by globbing: the workdir is
+# model-writable all session, so a decoy sorting ahead of the real artifact would have been
+# read instead. grade_artifact.extract refuses on anything that is not exactly the declared
+# file — see its module docstring for why `rm -f` before grading does not close the hole.
+sys.path.insert(0, os.path.dirname(os.path.abspath(config_path)))
+import grade_artifact as _grade_artifact
+subscores, subscores_blocked = _grade_artifact.extract(workdir, ctx.get("grade_artifact"))
 rec={"schema":"pi.eval-row/v2", "task":task,"pattern":pat,"arm":pat,"rep":int(rep),
      "repetition":int(rep),"model":model,"split":split,"score":int(gate),
      "retried":int(retried),"run":runid,"fixture":{"cohort":ctx["cohort"],"version":ctx["version"]},
@@ -906,10 +900,12 @@ rec={"schema":"pi.eval-row/v2", "task":task,"pattern":pat,"arm":pat,"rep":int(re
      "out_tok":int(tout) if exact else 0,"token_usage_exact":exact}
 if subscores is not None:
     rec["subscores"]=subscores
+if subscores_blocked:
+    # Loud, so a zero-graded round is never mistaken for a fixture that has no grader.
+    rec["subscores_blocked"]=subscores_blocked
 # Import the single source of truth rather than reimplementing it. This block used to
 # duplicate exposure.py's status logic, which silently inverts the moment a mode is added
 # (suppression arms would have recorded "targeted" for a mechanism that still fired).
-sys.path.insert(0, os.path.dirname(os.path.abspath(config_path)))
 import exposure as _exposure
 exposure_spec=_exposure.validate_spec(cfg.get("exposure"))
 rec["exposure"]=_exposure.row_exposure(exposure_spec, pat, context_data.get("exposure") or {},

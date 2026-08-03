@@ -40,6 +40,9 @@ def row_context(task, variant, exploratory=False):
         "fixture_root": manifest["fixture"]["root"],
         "hidden_test": ((manifest.get("tests", {}).get("fail_to_pass", {}).get("overlays") or [{}])[0].get("source")
                         if manifest.get("context_pressure") else None),
+        # The grader artifact the gate is allowed to read, pinned by the (admission-hashed)
+        # manifest. None for the fixtures that emit no graded subscores. See grade_artifact.py.
+        "grade_artifact": manifest.get("tests", {}).get("fail_to_pass", {}).get("grade_artifact"),
     }
 
 

@@ -7,7 +7,7 @@
       "cde1615a9375adfef39dc4f339c65fae1058d3e4fa7f352be5676303609334ca"
     ],
     "automated": {
-      "checked_at": "2026-07-30T09:00:03Z",
+      "checked_at": "2026-08-03T08:55:01Z",
       "hash_drift": [],
       "passed": true,
       "runs_per_state": 3,
@@ -118,8 +118,8 @@
         ]
       }
     },
-    "reviewed_at": "2026-07-30T09:00:25Z",
-    "reviewer": "Albert (delegated: Claude Fable 5, 2026-07-30)"
+    "reviewed_at": "2026-08-03T08:56:05Z",
+    "reviewer": "Albert (delegated: Claude Opus 5, 2026-08-03; re-admission for tests.fail_to_pass.grade_artifact pin)"
   },
   "artifacts": [
     {
@@ -276,6 +276,7 @@
         "node",
         "test/fail-to-pass.test.js"
       ],
+      "grade_artifact": ".audit-grade.json",
       "overlays": [
         {
           "dest": "test/fail-to-pass.test.js",
@@ -294,8 +295,8 @@
     }
   },
   "timestamps": {
-    "admitted_at": "2026-07-30T09:00:25Z",
+    "admitted_at": "2026-08-03T08:56:05Z",
     "created_at": "2026-07-30T00:00:00Z",
-    "expires_at": "2026-10-28T09:00:25Z"
+    "expires_at": "2026-11-01T08:56:05Z"
   }
 }

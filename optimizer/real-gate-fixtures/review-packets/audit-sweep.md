@@ -3,7 +3,7 @@
 - Schema: `pi.fixture/v1`
 - Cohort: `2026-07`
 - Version: `2026-07.1`
-- Expires: `set on approval`
+- Expires: `2026-10-28T09:00:25Z`
 
 ## Canonical prompt
 
@@ -62,9 +62,9 @@ node --test to confirm nothing regresses.
 ## Automated admission
 
 - Passed: `True`
-- Checked: `2026-07-30T09:00:03Z`
+- Checked: `2026-08-03T08:55:01Z`
 
 ## Human decision
 
-- Reviewer: `pending`
-- Approved: `False`
+- Reviewer: `Albert (delegated: Claude Fable 5, 2026-07-30)`
+- Approved: `True`
