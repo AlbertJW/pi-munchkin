@@ -47,7 +47,12 @@ def graded_rate(row):
 
 GRADED_METRICS = [
     (graded_rate, "graded_rate", False),
-    ((("subscores", "fixed")), "graded_fixed", False),
+    # graded_fixed (raw subscores.fixed) was removed 2026-08-03: with one grader it
+    # is a strictly monotone transform of graded_rate — dividing every value by the
+    # same positive total preserves every >/== relation, so Mann-Whitney U and p are
+    # IDENTICAL and the table showed two starred rows for one comparison. And with a
+    # second grader of a different total it would median raw counts across
+    # incommensurable denominators (analyse() pools all tasks). Rate is the metric.
 ]
 
 # (row path OR callable, human label, lower_is_better)
@@ -276,6 +281,11 @@ def selftest():
     assert dig({}, graded_rate) is None
     # graded_rate must be flagged higher-is-better; every effort metric is lower-better.
     assert [lb for _, label, lb in GRADED_METRICS if label == "graded_rate"] == [False]
+    # graded_rate is the ONLY graded metric: graded_fixed was a strictly monotone
+    # duplicate (identical U and p) that would double-count as evidence — and would
+    # median raw counts across incommensurable totals the moment a second grader
+    # exists. See the removal note on GRADED_METRICS.
+    assert [label for _, label, _ in GRADED_METRICS] == ["graded_rate"], GRADED_METRICS
     assert all(lb for _, _, lb in METRICS), "effort metrics are lower-is-better"
     # The discriminating property: partial credit separates two arms that the BINARY
     # gate bit scores identically (all failing). This is the whole point of --graded.

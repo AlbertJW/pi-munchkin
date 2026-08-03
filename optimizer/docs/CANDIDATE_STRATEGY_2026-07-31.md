@@ -28,7 +28,10 @@ Fisher exact, one-sided, computed directly (no scipy in this env; two-sided valu
 | **9/9** | **0.041** | **0.082** |
 
 A candidate would have to take a 56% task to a **flawless sweep** to reach one-sided
-significance — and two-sided, *nothing* is detectable.
+significance — and two-sided, no *improvement* is detectable (9/9 gives two-sided p=0.082).
+The qualifier matters: a *regression* from the same base IS two-sided-detectable — this
+document's own Tier D result is exactly that (5/9→0/9, two-sided p=0.029). An earlier version
+of this sentence said "nothing is detectable", which its own §4 contradicted.
 
 **n=9/arm, base 9/9** — the saturated case, which is most of the corpus:
 
@@ -41,7 +44,13 @@ significance — and two-sided, *nothing* is detectable.
 **n=20/arm, base 15/20:** even 19/20 is p=0.091. Only 20/20 (p=0.024) clears.
 
 So: from a ceiling, only regressions are visible; from the one in-band fixture, only perfection
-is. **Every round can return NEUTRAL or HARMFUL and nothing else.** That is the whole
+is *as an improvement* (regressions from 5/9 are detectable in both directions — see above).
+**Every round on the authoritative local venues can return NEUTRAL or HARMFUL and nothing
+else.** (Scope deliberate: the non-authoritative remote corpus does hold one genuinely in-band
+cell, `gemma-4-e2b`/`bigdata` at 71/102 = 69.6% — see the inventory in §3 — where an
+improvement to 19/20 from a 14/20 base would reach p≈0.046. It is non-authoritative, so it
+cannot carry an adoption verdict, but "no round anywhere could show a win" overstates the
+case.) That is the whole
 explanation for "8 decisively tested, 1 adopted" — and it predicts the observation that the
 only statistically significant candidate result anywhere in the top tiers is a *harm*
 (c38 −56pp, p=0.029).
@@ -83,7 +92,9 @@ control**, alongside c49.
 
 ### 2.2 "Failing sessions read less" is a composition artifact — and so was my check for it
 
-Pooled, passing sessions read more (median 3 vs 1). My first draft ranked candidates on the
+Pooled, passing sessions read more — median 3 vs 2 (`trajectory.reads`), 2 vs 1
+(`unique_reads`); an earlier draft said "3 vs 1", which matches neither metric and overstated
+the gap ~2×. My first draft ranked candidates on the
 implied "under-investigation" signature. **The direction inverts inside every model**, and the
 control I proposed (excluding <3-tool-call sessions) does *not* detect it — the collapse
 population is only 29 of 942 base sessions and does not move the medians. Mann-Whitney AUC

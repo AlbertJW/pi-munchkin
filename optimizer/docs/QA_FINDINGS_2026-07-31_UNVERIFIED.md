@@ -1,4 +1,4 @@
-# Deep-QA 2026-07-31 — RAW findings (refuters never ran); PARTIALLY CLOSED 2026-08-03
+# Deep-QA 2026-07-31 — RAW findings (refuters never ran); FULLY DISPOSITIONED 2026-08-03
 
 **Status: NOT a review result.** 7 Find lenses completed and returned 40 findings; all 18
 adversarial refuters AND the adjudicator failed on a session limit. The workflow's
@@ -8,13 +8,23 @@ of the file is the raw lens output, not a curated result.
 
 ## Disposition (read this before acting on anything below)
 
-**19 of 40 have since been examined. 17 were real and are fixed; 2 were refuted.**
+**CORRECTED 2026-08-03 (second pass): the earlier "19 examined / 21 never examined" split was
+an arithmetic count, not a content match.** Content-matching every heading against the fix
+commits shows the 40 headings cover fewer than 40 *defects* — two lenses independently wrote up
+the same bug five times — and a later pass corrected four doc findings without crediting them.
+The true ledger:
 
-| group | n | outcome | where the work is recorded |
-|---|---|---|---|
-| verified by hand, 2026-07-31 | 9 | all fixed | `HARNESS_SELF_IMPROVEMENT.md`, 2026-07-31 entry — telemetry envelope shadowing, the `plan-mode-block` `kind` collision it exposed, four `config.py` guard defects, three `effort_report` defects |
-| instrument-class, verified by three agents 2026-08-03 | 10 | **8 fixed, 1 refuted, 1 sub-claim refuted** | `HARNESS_SELF_IMPROVEMENT.md`, 2026-08-03 entry; commits `51b8792`, `5179f9b`, `b55065a`, `578e330` |
-| **never examined** | **21** | **unknown** | — |
+| group | n | outcome |
+|---|---|---|
+| verified by hand 2026-07-31 (`9016229`, `d0b519b`, `1a85df8`) | 9 | all fixed — telemetry `source` shadowing, the `plan-mode-block` `kind` collision, four `config.py` guard defects, three `effort_report` defects (incl. the bool rejection) |
+| instrument-class, three verification agents 2026-08-03 (`51b8792`, `5179f9b`, `b55065a`, `578e330`) | 10 | **8 fixed, 1 refuted, 1 sub-claim refuted** |
+| **corrected by the mothball pass (`1203544`, `ab9d4ee`) without credit** | 4 | the `block: true` count, "0 compactions ever", the c21 REJECTED citation, the in-band inventory line (its *conclusion* was re-scoped separately) |
+| **duplicate twins of already-fixed defects** | 5 | the LIVE_GOV read, the optillm false-reject, and the degenerate named-config gap (each written up twice); the grade-artifact glob and the `integrity_selftest` private-copy (second write-ups) |
+| **MOOT — precondition removed by `d0b519b`** | 2 | the widened `validate_config` exception contract and the ignored `base_text` — both only existed while `render_prompt` ran inside `validate_config`, which it no longer does |
+| genuinely open, fixed 2026-08-03 (second pass) | 10 | `__pi_gate_green` rejected-path latch; `__pi_vg_state` session leak; `__pi_vg_state` one-turn-stale publish; `partialWorkNoted` per-process lifetime (+ its stale comment); drift-scanner recovery comment; telemetry tap ordering comment; `graded_fixed` duplicate metric; `decoding` in the rejection message; "median 3 vs 1"; the un-scoped §1 absolutes + conclusion |
+| **still open, deliberately** | 0 | — |
+
+9 + 10 + 4 + 5 + 2 + 10 = 40. Nothing in this file is unexamined any more.
 
 The two refuted, so nobody re-derives them:
 
@@ -26,17 +36,13 @@ The two refuted, so nobody re-derives them:
   the group, so only `[ x = y ]` ever matched. The sibling claim about `test\b` *was* real and
   is fixed.
 
-**The remaining 21 are still unexamined** — a lens's unverified assertion, nothing more. This
-project's history is that roughly half of such findings are wrong, overstated, or unreachable,
-so do not act on any of them without re-deriving from source. Two of the ten that *were*
-examined turned out that way, which is the rate this file was written to expect.
-
-Re-run verification of the balance with:
-`Workflow({scriptPath: '.../deep-qa-2026-07-31-wf_987e917b-1e4.js', resumeFromRunId: 'wf_987e917b-1e4'})`
-— completed Find agents replay from cache, so only the refuters and adjudicator re-run. Note the
-run predates the 2026-08-03 fixes, so any cached finding about `real_gate.sh`, `verify-gate.ts`,
-`command-policy.ts`, `loop-breaker.ts`, `plan-runner.ts` or `telemetry-catalog.ts` describes code
-that has since changed — re-derive before believing a line number.
+**This file is now fully dispositioned; nothing below needs re-verification.** The resumable
+workflow (`resumeFromRunId: 'wf_987e917b-1e4'`) is kept for provenance only — its cached
+findings predate every 2026-08-03 fix, so any line number below into `real_gate.sh`,
+`verify-gate.ts`, `command-policy.ts`, `loop-breaker.ts`, `plan-runner.ts` or
+`telemetry-catalog.ts` describes code that has since changed. The bodies below are the RAW
+2026-07-31 lens output, preserved verbatim, including the five duplicates and the two refuted
+claims — read them as history, not as a worklist.
 
 ## lens: Do today's tests actually test anything?
 

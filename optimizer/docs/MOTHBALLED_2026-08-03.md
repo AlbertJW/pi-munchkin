@@ -60,7 +60,7 @@ This matters more than the results, because a future reader will otherwise repea
 | c21 "worse in 2 of 3 rounds" | **CHERRY-PICKED.** 7 pairings exist; per call it improves in 5 of 7, pooled −5.9%. Still Tier B — the truncation confound, not the sign, is what disqualifies it. |
 | Any pre-2026-07-27 `NEUTRAL` verdict | Read as **UNTESTED**. n=3/arm detects no effect of any size. |
 | "all five `block: true` sites are in plan-runner" | Wrong: 12 sites in 5 files. |
-| The 40 deep-QA findings are "closed" | **19 of 40 examined** (17 fixed, 2 refuted). **21 have never been read.** |
+| The 40 deep-QA findings are "closed" | **True as of the 2026-08-03 judgment pass** — all 40 dispositioned (27 fixed, 2 refuted, 4 pre-corrected, 5 duplicates, 2 moot). Earlier "closed" claims predated this and were false. |
 
 ## The one-way door: the surface moved
 
@@ -117,5 +117,5 @@ Not defects to fix on restart — decisions already taken, recorded so they are 
 | `MEASUREMENT_METHODOLOGY_2026-07.md` | §9 invalidity boundary, §10 noise floor, §11 why three rounds gave zero information, §12 the graded instrument, §13 the `prefix_stable` blindness |
 | `CANDIDATE_STRATEGY_2026-07-31.md` | §1 is the one-sided-detector argument; the tiered roster |
 | `HARNESS_SELF_IMPROVEMENT.md` | the full ledger, newest entry last |
-| `QA_FINDINGS_2026-07-31_UNVERIFIED.md` | 40 raw findings; disposition table at the top; **21 unread** |
+| `QA_FINDINGS_2026-07-31_UNVERIFIED.md` | 40 raw findings; fully dispositioned 2026-08-03 (reconciliation table at the top) |
 | `RETROSPECTIVE_2026-07-30.md` | why the standard task set is saturated |

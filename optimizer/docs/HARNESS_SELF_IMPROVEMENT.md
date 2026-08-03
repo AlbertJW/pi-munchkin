@@ -2069,10 +2069,12 @@ graded path built the same day, so the verification is worth completing before t
 The **instrument-class** findings above are now closed — not all 40. Nine were fixed on
 2026-07-31; three verification agents then checked ten more against source, and the outcome was
 **8 verified, 1 refuted empirically, 1 sub-claim refuted**. All 8 are fixed, each with a
-counterfactual (revert → the new test fails → restore). That is **19 of 40 examined; the other
-21 have never been read** — see the disposition table at the top of
-`QA_FINDINGS_2026-07-31_UNVERIFIED.md`. An earlier draft of this paragraph said "the 40 preserved
-findings above are now closed", which would have retired a live worklist.
+counterfactual (revert → the new test fails → restore). That was **19 of 40 examined** at the
+time; a 2026-08-03 judgment pass then dispositioned the balance (4 already corrected without
+credit, 5 duplicate twins, 2 moot, 10 genuinely open — all 10 fixed). **All 40 are now
+dispositioned** — reconciliation table at the top of `QA_FINDINGS_2026-07-31_UNVERIFIED.md`.
+An earlier draft of this paragraph said "the 40 preserved findings above are now closed" while
+21 were unread, which would have retired a live worklist; the closure is now real, not claimed.
 
 **The two that were live in every gate round were both in `verify-gate`, both shipped with
 zero coverage, and one of them was mine from the day before.**

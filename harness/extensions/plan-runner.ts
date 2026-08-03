@@ -32,16 +32,19 @@ const GATE_MAX = Math.max(1, Number.parseInt(process.env.PLAN_GATE_MAX || "3", 1
 // /plan-go, and any call that newly marks an item done.
 const REPLAN_MAX = Math.max(2, Number.parseInt(process.env.PLAN_REPLAN_MAX || "3", 10) || 3);
 let replanStreak = 0;
-// One-shot resume flags (reset by /plan starting a fresh plan): the interrupted-
-// plan notice fires at most once per process, as does the partial-work note on
-// the first plan_write against a foreign-writer state (headless resumes that
-// never run /plan-go).
 // No resumeNotified flag: it was module-scoped, and pi caches the extension
 // factory across session replacement, so "notify once" silently meant "once
 // per PROCESS" — later /new, /fork or same-cwd /resume sessions never saw the
 // interrupted-plan notice at all (triage #26). session_start fires exactly
 // once per session, and the writer === PROC_MARK check self-suppresses the
 // notice as soon as this process touches the plan, so no flag is needed.
+//
+// partialWorkNoted had the IDENTICAL lifetime bug and was left behind when
+// resumeNotified was removed (a stale comment above it still described both
+// flags as intentional one-per-process behaviour). It is per-SESSION state —
+// "this session has been told about half-finished work once" — so it must
+// reset on session_start, or session 2 after a /new or /fork is never warned
+// that partial work may sit on disk.
 let partialWorkNoted = false;
 type ModelIdentity = { provider: string; id: string };
 let activeModel: ModelIdentity = { provider: "unknown", id: "unknown" };
@@ -752,6 +755,14 @@ const planWrite = defineTool({
 						it.note = gateAllowed.reason;
 					}
 					it.gate = undefined; it.gate_fails = 0; // drop a rejected gate so it cannot re-trap the item
+					// A REJECTED gate also clears the shared green latch, same as a failing
+					// one below. This path used to `continue` without touching it, so a
+					// multi-item plan_write whose first gate passed and whose later gate
+					// was rejected left __pi_gate_green latched — and verify-gate marked
+					// the session verified on a call whose final gate state was "no gate
+					// ran". The flag means "gate activity most recently ended green"; a
+					// rejection is gate activity that did not.
+					(globalThis as Record<string, unknown>).__pi_gate_green = undefined;
 					gateMsgs.push(`gate for "${it.title}" dropped (not a verify/test command): ${gateAllowed.reason}. Use just verify / npm test / npx tsx --test, or pass gate:"" to clear.`);
 					continue;
 				}
@@ -1233,6 +1244,7 @@ export default function (pi: ExtensionAPI) {
 		// the envelope join key — so the new session's receipts filed under the dead
 		// plan's run_id. (No gate impact: one `pi -p` session per process.)
 		delete (globalThis as Record<string, unknown>).__pi_active_plan_context;
+		partialWorkNoted = false; // per-session, not per-process — see the declaration comment
 		rememberModel(ctx);
 		const state = await readState(ctx.cwd);
 		// ...then RE-BIND to whatever plan this cwd actually has on disk. Clearing alone

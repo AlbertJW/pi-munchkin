@@ -57,10 +57,12 @@ test("the POSIX `test` builtin is NOT a verify command", () => {
 });
 
 // The gate's OBSERVABLE consequence is the wrap-up steer: it fires on a text-only
-// turn when files changed and nothing verified them. Assert on that, not on
-// __pi_vg_state — that global is published at the TOP of the handler, so it carries
-// the PREVIOUS turn's values and reading it after one turn tests nothing. (The first
-// draft of this file did exactly that and passed vacuously.)
+// turn when files changed and nothing verified them. Assert on that where possible.
+// (Historical note: __pi_vg_state used to be published at the TOP of the handler,
+// carrying the PREVIOUS turn's values — the first draft of this file read it after
+// one turn and passed vacuously. The publish has since moved to the END of the
+// handler, and a test below pins that freshness, because the c48 lens renders this
+// snapshot to the model as ground truth.)
 const wrapUpTurn = { turnIndex: 2, message: { role: "assistant", content: [{ type: "text", text: "All done." }] }, toolResults: [] };
 const ctxFor = (cwd: string) => ({ cwd, ui: { notify() {} } });
 
@@ -134,5 +136,30 @@ test("the anchor's known false negatives stay false negatives (nag, never silent
 	// stays as small as it is: env assignments, `env`, and loop bodies.
 	for (const cmd of ["NODE_ENV=test npm test", "env CI=1 npm test", "for f in a b; do npm test; done"]) {
 		assert.equal(classifyBashCommand(cmd).verifyLike, true, `must stay recognised: ${cmd}`);
+	}
+});
+
+test("__pi_vg_state is fresh (published AFTER this turn's updates) and dies on session_start", async () => {
+	// Two leaks, one global. (1) The publish used to be the handler's first
+	// statement, so the snapshot predated this turn's mutation arming — the c48
+	// lens rendered verify state one full turn stale, as "ground truth". (2) It was
+	// never deleted on session_start, so a /new or /fork through pi's cached
+	// factory leaked the previous session's verdict into the next session's lens.
+	const g = globalThis as Record<string, unknown>;
+	const cwd = projectWithNpmTest();
+	try {
+		const fp = makeFakePi();
+		await loadVerifyGate(fp, cwd);
+		await fire(fp, "turn_end", bashTurn("edit src/app.ts", ""), ctxFor(cwd));
+		const snap = g.__pi_vg_state as { mutated?: boolean } | undefined;
+		assert.equal(snap?.mutated, true,
+			"the snapshot must reflect THIS turn's mutation, not last turn's state");
+
+		await fire(fp, "session_start", {}, ctxFor(cwd));
+		assert.equal(g.__pi_vg_state, undefined,
+			"session_start must delete the published state — the lens must not inherit a dead session's verdict");
+	} finally {
+		delete g.__pi_vg_state;
+		resetPiGlobals();
 	}
 });

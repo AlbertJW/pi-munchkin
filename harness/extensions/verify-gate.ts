@@ -181,6 +181,13 @@ export default function (pi: ExtensionAPI) {
 
 	pi.on("session_start", async (_event, ctx) => {
 		st = fresh();
+		// The published globalThis snapshot must die with the session, not just the
+		// module state: pi's loader returns the CACHED factory across session
+		// replacement, so without this a /new, /fork or same-cwd /resume leaked the
+		// PREVIOUS session's verify verdict into the c48 lens — which renders it to
+		// the model under a "ground truth from the harness" header. Same fix as
+		// loop-breaker's __pi_lb_state and plan-runner's __pi_active_plan_context.
+		delete (globalThis as Record<string, unknown>).__pi_vg_state;
 		const cwd = ctx?.cwd || process.cwd();
 		composeProject = await hasComposeFile(cwd);
 		if (!process.env.VERIFY_GATE_CMD) {
@@ -204,9 +211,6 @@ export default function (pi: ExtensionAPI) {
 		// set by plan-runner when an item's gate exits 0) — consume it so the
 		// wrap-up isn't double-nagged after a gate already ran green.
 		const g = globalThis as Record<string, unknown>;
-		// Published for the session blackboard (globalThis bus; module state is
-		// per-extension under pi's loader).
-		g.__pi_vg_state = { gateCmd, mutated: st.mutated, verifiedOk: st.verifiedOk, fires: st.fires, sessionFires: st.sessionFires };
 		if (g.__pi_gate_green === true) {
 			g.__pi_gate_green = undefined;
 			st.verifiedOk = true;
@@ -258,6 +262,15 @@ export default function (pi: ExtensionAPI) {
 			record("verify-gate", "steer", { failed: verifyFailedThisTurn, fires: st.fires, sessionFires: st.sessionFires, injected_chars: msg.length, turnIndex: event.turnIndex });
 			pi.sendUserMessage(msg, { deliverAs: "steer" });
 		}
+
+		// Published for the session blackboard (globalThis bus; module state is
+		// per-extension under pi's loader). LAST, deliberately: this used to be the
+		// first statement of the handler, so the by-value snapshot predated this
+		// turn's gate-green consume, mutation arming and verify tracking — and since
+		// verify-gate loads before session-blackboard, the c48 lens rendered verify
+		// state one full turn stale, as "ground truth". Publish after all updates so
+		// the lens describes THIS turn.
+		g.__pi_vg_state = { gateCmd, mutated: st.mutated, verifiedOk: st.verifiedOk, fires: st.fires, sessionFires: st.sessionFires };
 	});
 
 	pi.on("agent_end", async (_event, ctx) => {

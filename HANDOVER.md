@@ -92,8 +92,11 @@ invalidates provenance.
 
 The 2026-07-31 deep QA left 40 findings whose refuters all died on a session limit. Nine were
 verified by hand that day; the remaining ten instrument-class ones were checked by three agents
-on 08-03 — **8 real and fixed, 1 refuted, 1 sub-claim refuted**. Disposition table is at the top
-of `QA_FINDINGS_2026-07-31_UNVERIFIED.md`; **21 of the 40 are still unexamined.**
+on 08-03 — **8 real and fixed, 1 refuted, 1 sub-claim refuted**. A later judgment pass closed
+the balance: of the "21 unexamined", content-matching showed 4 already corrected, 5 duplicate
+twins of fixed defects, 2 moot, and 10 genuinely open — all 10 fixed 2026-08-03. **All 40 are
+now dispositioned**; the reconciliation table is at the top of
+`QA_FINDINGS_2026-07-31_UNVERIFIED.md`.
 
 1. **`verify-gate` had two disarm defects, both live in every gate round, both untested.**
    `buildRe()` appended the detected gate command outside the command-position group — `|` has

@@ -172,10 +172,13 @@ function envelope(ext: string, kind: string, detail: Record<string, unknown>): R
 
 // In-process observers (session blackboard et al). Hosted on globalThis because each
 // extension holds its own module instance of this file (see the cache note above) —
-// a module-scoped array would be invisible across extensions. Taps run BEFORE the
-// TELEMETRY kill-switch: they are in-process consumers, not the measurement channel,
-// and live sessions routinely run without TELEMETRY=on. Taps receive the raw
-// pre-normalization detail; a throwing tap must never break recording.
+// a module-scoped array would be invisible across extensions. Taps are INDEPENDENT
+// of the TELEMETRY kill-switch (they fire even with rows disabled — in-process
+// consumers, not the measurement channel), but they run AFTER the row write, not
+// before: see the ordering comment inside record(). An earlier version of this
+// comment said "before", which stopped being true as an ordering statement when the
+// cause-before-consequence seq fix moved taps into the finally (triage #29). Taps
+// receive the raw pre-normalization detail; a throwing tap must never break recording.
 export type TelemetryTap = (ext: string, kind: string, detail: Record<string, unknown>) => void;
 
 export function record(ext: string, kind: string, detail: Record<string, unknown> = {}): void {

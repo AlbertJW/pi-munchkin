@@ -77,8 +77,13 @@ export default function (pi: ExtensionAPI) {
 			// detach fix these were the other way around, so a commit landing while a
 			// review for the same cwd was still running got marked handled on the way
 			// to the bail — and was then never reviewed at all (2026-07-30 triage #11).
-			// Bailing UNMARKED means the next turn_end after the in-flight review
-			// finishes picks the commit up; the git checks it re-runs are cheap.
+			// Bailing UNMARKED gives the swallowed commit a chance at recovery — but
+			// only a chance, not a guarantee: the next turn_end re-reviews only if
+			// HEAD has not moved past it (the review always targets HEAD, and the
+			// bail above returns early when this turn ran no fresh commit). A commit
+			// swallowed mid-review and then FOLLOWED by another commit stays
+			// unreviewed. Accepted: drift-scanner is advisory, and reviewing only
+			// the latest commit is its normal behaviour elsewhere too.
 			if (reviewing.has(ctx.cwd)) return; // a review for this cwd is already running
 			handledHead.set(ctx.cwd, headHash);
 

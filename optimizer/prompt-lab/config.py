@@ -96,7 +96,9 @@ def validate_config(config):
         raise ValueError(
             f"config '{config['name']}' is named but declares no treatment on any channel — "
             "it would measure base against base. Express it via prompt_variant/format/scaffold "
-            "(prompt), thresholds/messages/decoding (env), or optillm (endpoint).")
+            "(prompt), thresholds/messages (env), decoding (env; deep runs ONLY — the gate "
+            "never relaunches the server, so a decoding-only candidate is inert there), "
+            "or optillm (endpoint).")
     validate_spec(config.get("exposure"))
     return config
 

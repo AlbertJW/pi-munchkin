@@ -1397,3 +1397,60 @@ test("session_start clears __pi_active_plan_context (no run_id bleed across /new
 		resetPiGlobals();
 	}
 });
+
+test("a REJECTED gate clears __pi_gate_green — verify-gate must not inherit a stale green", async () => {
+	// The failing-gate path cleared the latch (triage #12); the REJECTED path
+	// `continue`d without touching it. So a multi-item plan_write whose first gate
+	// ran green and whose second gate was rejected (not a verify command) left
+	// __pi_gate_green latched, and verify-gate marked the session verified on a
+	// call whose final gate state was "no gate ran".
+	const g = globalThis as Record<string, unknown>;
+	const fp = freshPlanRunner();
+	const cwd = tmp();
+	writeFileSync(join(cwd, "good.sh"), "echo ok\n");
+	try {
+		await callTool(fp, "plan_write", {
+			items: [
+				{ title: "good work", status: "done", gate: "bash -n good.sh" },
+				{ title: "sneaky", status: "done", gate: "npm install leftpad" },
+			], request: "r", summary: "s",
+		}, cwd);
+		assert.equal(g.__pi_gate_green, undefined,
+			"a rejected gate AFTER a green one must clear the latch — 'gate activity most recently ended green' is false");
+	} finally {
+		delete g.__pi_gate_green;
+		resetPiGlobals();
+	}
+});
+
+test("partialWorkNoted is per-SESSION: session_start re-arms the partial-work warning", async () => {
+	// Same lifetime bug as the removed resumeNotified: a module-scoped boolean under
+	// pi's cached factory means "once per PROCESS", so session 2 after a /new or
+	// /fork was never told half-finished work may sit on disk.
+	const fp = freshPlanRunner();
+	const foreignResume = (cwd: string) => {
+		const sp = join(cwd, ".pi", "plan-state.json");
+		const state = JSON.parse(readFileSync(sp, "utf8"));
+		state.writer = "some-other-process";
+		state.items[0].status = "in_progress";
+		writeFileSync(sp, JSON.stringify(state, null, 2));
+	};
+	const cwd1 = tmp();
+	try {
+		await callTool(fp, "plan_write", { items: [{ title: "one", status: "pending" }], request: "r", summary: "s" }, cwd1);
+		foreignResume(cwd1);
+		const r1 = await callTool(fp, "plan_write", { items: [{ title: "one", status: "in_progress" }], request: "r", summary: "s" }, cwd1);
+		assert.ok(r1.content[0].text.includes("PARTIAL WORK"), `first foreign resume must warn: ${r1.content[0].text}`);
+
+		// New session, new cwd, another foreign resume — the warning must re-arm.
+		const cwd2 = tmp();
+		await fire(fp, "session_start", {}, makeCtx(cwd2).ctx);
+		await callTool(fp, "plan_write", { items: [{ title: "two", status: "pending" }], request: "r", summary: "s" }, cwd2);
+		foreignResume(cwd2);
+		const r2 = await callTool(fp, "plan_write", { items: [{ title: "two", status: "in_progress" }], request: "r", summary: "s" }, cwd2);
+		assert.ok(r2.content[0].text.includes("PARTIAL WORK"),
+			"session 2 must be warned too — the note is per-session, not once per process");
+	} finally {
+		resetPiGlobals();
+	}
+});
