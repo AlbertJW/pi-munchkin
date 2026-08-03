@@ -45,16 +45,17 @@ test("integration: dark by default; on, appends one text block and preserves isE
 	process.env.TELEMETRY_FILE = join(dir, "events.jsonl");
 	process.env.TELEMETRY_SOURCE = "test";
 	try {
-		delete process.env.TEACH_HINTS;
+		// ADOPTED 2026-08-03: default-on (was dark candidate c28); "off" is the kill switch.
+		process.env.TEACH_HINTS = "off";
 		const offFp = makeFakePi();
 		(await import(`../extensions/teach-hints.ts?off=${Date.now()}-${Math.random()}`)).default(offFp.pi as any);
 		const errorEvent = () => ({
 			toolName: "bash", isError: true, input: { command: "pytest" },
 			content: [{ type: "text", text: "zsh: pytest: command not found" }],
 		});
-		assert.equal(await fire(offFp, "tool_result", errorEvent(), { cwd: dir }), undefined, "dark by default");
+		assert.equal(await fire(offFp, "tool_result", errorEvent(), { cwd: dir }), undefined, "TEACH_HINTS=off kills it");
 
-		process.env.TEACH_HINTS = "on";
+		delete process.env.TEACH_HINTS; // unset = default-on
 		const onFp = makeFakePi();
 		(await import(`../extensions/teach-hints.ts?on=${Date.now()}-${Math.random()}`)).default(onFp.pi as any);
 		const result = await fire(onFp, "tool_result", errorEvent(), { cwd: dir });

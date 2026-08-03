@@ -18,15 +18,14 @@ class BatchScreenTests(unittest.TestCase):
     def test_manifest_and_strict_band(self):
         manifest = batch.load_manifest(batch.DEFAULT_MANIFEST)
         self.assertEqual(manifest["eligible_passes"], [2, 3, 4])
-        self.assertEqual(batch.eligible_tasks(manifest, {"parens": 2 / 6, "qs-error-swallow": 5 / 6}, "c7"), ["parens"])
+        self.assertEqual(batch.eligible_tasks(manifest, {"parens": 2 / 6, "qs-error-swallow": 5 / 6}, "c21"), ["parens"])
 
     def test_dispositions_require_exact_usage_and_exposure(self):
         base = [row(0) for _ in range(6)]
         cand = [row(1) for _ in range(6)]
-        self.assertEqual(batch.screen_disposition("c7", base, cand), "PROMOTE_TO_LOCAL_CONFIRMATION")
-        self.assertEqual(batch.screen_disposition("c7", base, [row(1, status="unexposed") for _ in range(6)]), "UNEXPOSED")
-        self.assertEqual(batch.screen_disposition("c7", base, [row(1, exact=False) for _ in range(6)]), "INCOMPLETE_COST")
-        self.assertEqual(batch.screen_disposition("c7", base, [row(0, counts={"verify-gate/unverified-end": 1}) for _ in range(6)]), "SAFETY_HOLD")
+        self.assertEqual(batch.screen_disposition("c21", base, cand), "PROMOTE_TO_LOCAL_CONFIRMATION")
+        self.assertEqual(batch.screen_disposition("c21", base, [row(1, status="unexposed") for _ in range(6)]), "UNEXPOSED")
+        self.assertEqual(batch.screen_disposition("c21", base, [row(1, exact=False) for _ in range(6)]), "INCOMPLETE_COST")
 
     def test_resume_cell_validation_rejects_partial_and_unsafe_names(self):
         self.assertFalse(batch.complete(Path("/tmp/does-not-exist.jsonl"), "base", "parens", 6))

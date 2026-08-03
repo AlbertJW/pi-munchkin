@@ -5,7 +5,7 @@ import { defineTool, withFileMutationQueue, type ExtensionAPI } from "@earendil-
 import { Type } from "typebox";
 import { assertVerifyGateAllowed, classifyBashCommand } from "../lib/command-policy.ts";
 import { runReadonlyGate } from "../lib/gate-runtime.ts";
-import { planIntegrity, executionUnderway, normalizeTitle, preserveDecision, shaCandidates, validateDeps, unmetDeps, reconcileItems as libReconcile, type ReconciledItem, type IncomingItem } from "../lib/plan-integrity.ts";
+import { planIntegrity, executionUnderway, normalizeTitle, preserveDecision, validateDeps, unmetDeps, reconcileItems as libReconcile, type ReconciledItem, type IncomingItem } from "../lib/plan-integrity.ts";
 import { nextReplanStreak, parseTodoLine } from "../lib/plan-progress.ts";
 import { processWriterMarker } from "../lib/process-writer.ts";
 import { steerText } from "../lib/steer-texts.ts";
@@ -75,14 +75,12 @@ const PLAN_SUBAGENT_ONLY = process.env.PLAN_SUBAGENT_ONLY === "1";
 // window accumulates only clamped subagent results (runner-events.js caps each
 // at 12000 chars). The model decides delegation; the harness only blocks+steers
 // (c25 precedent — no engine dispatch).
-const PLAN_DELEGATE_ALL = process.env.PLAN_DELEGATE_ALL === "on";
 // Dark candidate c31: a plan-level uncertainties[] field with a structural
 // pause — a model that surfaces uncertainty must be stopped from guessing
 // past it (deterministic gate, no LLM judgment call). npcsh loop_plan port.
 const PLAN_UNCERTAINTY = process.env.PLAN_UNCERTAINTY === "on";
 // Dark candidate c32: verify commit SHAs the model writes into notes/summary
 // actually exist (git cat-file -e) — catches confabulated provenance.
-const PLAN_SHA_GUARD = process.env.PLAN_SHA_GUARD === "on";
 // Dark candidate c34: the legacy "5-10 ordered items" line is an unenforced
 // numeric bound (plan_write's schema has no maxItems) — replace with
 // non-numeric, need-sized guidance that keeps the same anti-padding /
@@ -543,15 +541,6 @@ const SPAWN_NOTE = SPAWN_DELEGATION ? " Task SELF-CONTAINED — the child sees O
 
 function delegationBlock(subagentAvailable: boolean): string {
 	if (!subagentAvailable) return "";
-	if (PLAN_DELEGATE_ALL) {
-		return `
-Every item = ONE subagent call — enforced, not advisory:
-- lookup/explore item → subagent(explorer, …)
-- edit item → subagent(executor, …)
-- verify/check item → subagent(verifier, …)
-Always mode=spawn; task SELF-CONTAINED (paths, exact change, done-check) — the child sees ONLY the task text.
-In this window: only plan_write + subagent. Direct read/grep/find/ls/bash/edit calls are blocked during execution.`;
-	}
 	if (PLAN_SUBAGENT_ONLY) {
 		return `
 Every edit routes through a subagent — this is enforced, not advisory:
@@ -583,14 +572,14 @@ export function policyBlock(autonomy: Autonomy, subagentAvailable: boolean): str
 }
 
 function executionDisciplineBlock(): string {
-	// c37: the legacy subagent line contradicts thin-orchestrator mode, and the
-	// legacy completion-claims line steers into git-status bash calls that
-	// PLAN_DELEGATE_ALL blocks — a guaranteed block-loop for a small model.
+	// (c37 thin-orchestrator mode retired 2026-08-03 — 0-for-2 with adverse
+	// effort on both models; DARK_CANDIDATE_VERDICTS_2026-08-03.md. The ternaries
+	// that switched these two lines under PLAN_DELEGATE_ALL went with it.)
 	return `Execution discipline:
 - Big files: size-check first. Sample for shape/schema only. CSV/JSONL/logs/generated reports → query whole file with rg/awk/jq/Python, return only relevant rows/counts. Don't infer global state from head/tail. (Prefer subagent(explorer).)
-- ${PLAN_DELEGATE_ALL ? "Subagents do the work; you only plan_write, delegate, and relay distilled results. Main loop owns only the plan." : "Subagents: explorer/verifier read-only, return distilled results — keep this window clean. Main loop owns the plan + final verify."}
+- Subagents: explorer/verifier read-only, return distilled results — keep this window clean. Main loop owns the plan + final verify.
 - No-ops: unneeded item → mark done, note "skipped/no-op" + evidence, or re-plan away with a note.
-- ${PLAN_DELEGATE_ALL ? "Completion claims: cite the CHANGED/VERIFY lines from subagent results — no claim without them." : "Completion claims: before final summary, derive changed-file evidence from tools (git status/diff, else filesystem). No claim a file changed without tool evidence."}`;
+- Completion claims: before final summary, derive changed-file evidence from tools (git status/diff, else filesystem). No claim a file changed without tool evidence.`;
 }
 
 function executeBlock(autonomy: Autonomy, subagentAvailable: boolean): string {
@@ -1033,42 +1022,8 @@ const planWrite = defineTool({
 			partialWorkNoted = true;
 			resumeWarn = `\n⚠ Resumed from a previous session. Previously in_progress item(s) may have PARTIAL WORK on disk: ${stalePrev.map((i) => i.title).join("; ")}. Inspect current state (git status/diff, read the touched files) before continuing — do not trust it done and do not redo it blind.`;
 		}
-		// c32: SHA-shaped tokens the model wrote into notes/summary must reference
-		// commits that actually exist. Runs AFTER the state write (never blocks
-		// persistence), fail-open on any git error, steer-only.
-		let shaWarn = "";
-		if (PLAN_SHA_GUARD && api) {
-			const written = [params.summary ?? "", ...params.items.map((item) => item.note ?? "")].join("\n");
-			const candidates = shaCandidates(written);
-			if (candidates.length) {
-				const missing: string[] = [];
-				// A missing object and a missing REPOSITORY both exit 128 from
-				// cat-file, so establish "this is a repo" first; outside a repo (or
-				// with git absent) the guard fails open and never accuses.
-				let inRepo = false;
-				try {
-					inRepo = (await api.exec("git", ["rev-parse", "--git-dir"], { cwd: ctx.cwd, timeout: 2000 })).code === 0;
-				} catch { /* git absent — fail open */ }
-				for (const sha of inRepo ? candidates : []) {
-					try {
-						const probe = await api.exec("git", ["cat-file", "-e", `${sha}^{commit}`], { cwd: ctx.cwd, timeout: 2000 });
-						if (probe.code !== 0) missing.push(sha);
-					} catch {
-						// timeout — fail open, never punish
-					}
-				}
-				planEvent("sha-guard", state.run_id, { checked: candidates.length, missing: missing.length });
-				if (missing.length) {
-					shaWarn = "\n" + steerText(
-						"PLAN_SHA_GUARD_MSG",
-						"⚠ {shas} do(es) not exist in this repository — never fabricate commit hashes. Run `git log --oneline -1` and record the REAL hash, or remove the reference.",
-						{ shas: missing.join(", ") },
-					);
-				}
-			}
-		}
 		const gateNote = gateMsgs.length ? `\n${gateMsgs.join("\n")}` : "";
-		const body = `Plan updated (${state.items.length} items, status: ${derivedStatus(state)}).${cur ? `\nNext open: ${cur.title}` : "\nNo open items remain."}${warning}${askNow}${finalReport}${integrityWarn}${thrashWarn}${depWarn}${uncertaintyWarn}${resumeWarn}${shaWarn}${gateNote}`;
+		const body = `Plan updated (${state.items.length} items, status: ${derivedStatus(state)}).${cur ? `\nNext open: ${cur.title}` : "\nNo open items remain."}${warning}${askNow}${finalReport}${integrityWarn}${thrashWarn}${depWarn}${uncertaintyWarn}${resumeWarn}${gateNote}`;
 		return {
 			content: [{ type: "text", text: body }],
 			details: { tool_name: "plan_write", action_id: aid, success: true },
@@ -1464,41 +1419,6 @@ export default function (pi: ExtensionAPI) {
 							"failure_class=plan_mode_violation. Call plan_write first — write at least a one-item plan before making any edits. Then retry this call.",
 					};
 				}
-			}
-		}
-		// c37 PLAN_DELEGATE_ALL: thin-orchestrator enforcement. Checked BEFORE
-		// PLAN_SUBAGENT_ONLY — its blocked set is a strict superset of c25's, so
-		// with both flags on every blocked call gets THIS reason (c37 supersedes c25).
-		if (PLAN_DELEGATE_ALL && event.toolName === "subagent") {
-			const state = await readState(ctx.cwd);
-			if (state?.phase === "executing") {
-				const input = event.input as Record<string, unknown> | undefined;
-				planEvent("delegate-all-subagent", state.run_id, {
-					agent: String(input?.agent ?? "parallel"),
-					mode: String(input?.mode ?? "default"),
-				});
-			}
-			return; // observe only, never block
-		}
-		const DELEGATE_ALL_TOOLS = new Set(["read", "grep", "find", "ls", "bash", "edit", "write", "multiedit"]);
-		if (PLAN_DELEGATE_ALL && DELEGATE_ALL_TOOLS.has(event.toolName)) {
-			const state = await readState(ctx.cwd);
-			if (state?.phase === "executing") {
-				rememberModel(ctx);
-				planEvent("delegate-all-block", state.run_id, { toolName: event.toolName });
-				const subagentAvailable = pi.getActiveTools().includes("subagent");
-				// Role fit is capability-correct: explorer has read/grep/find/ls (no
-				// bash); verifier has bash for read-only checks; executor has bash+edit.
-				const role = PLAN_MUTATION_TOOLS.has(event.toolName) ? "executor"
-					: event.toolName === "bash"
-						? (classifyBashCommand(String((event.input as Record<string, unknown> | undefined)?.command ?? "")).mutates ? "executor" : "verifier")
-						: "explorer";
-				return {
-					block: true,
-					reason: subagentAvailable
-						? `failure_class=plan_mode_violation. Direct ${event.toolName} is disabled under PLAN_DELEGATE_ALL — delegate this item's work via subagent(${role}, …, mode=spawn) with a SELF-CONTAINED task (the child sees only the task text).`
-						: "failure_class=plan_mode_violation. Direct tool use is disabled under PLAN_DELEGATE_ALL, and no subagent tool is available in this session — mark the item blocked and stop rather than retry.",
-				};
 			}
 		}
 		// PLAN_SUBAGENT_ONLY candidate: during execution (not planning), force every

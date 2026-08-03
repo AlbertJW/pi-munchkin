@@ -21,7 +21,6 @@ const expectedExtensions = [
   // loop-breaker publishes on the globalThis bus in ITS turn_end, and handler
   // order follows this list.
   "harness/extensions/tool-call-rescue.ts",
-  "harness/extensions/spec-adherence.ts",
   "harness/extensions/verify-gate.ts",
   "harness/extensions/plan-runner.ts",
   "harness/extensions/reflect.ts",

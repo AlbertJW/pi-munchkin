@@ -117,13 +117,21 @@ test("extension: BLACKBOARD=off registers nothing; STATE_LENS unset registers no
 		const on = await import(`../extensions/session-blackboard.ts?on=${Date.now()}-${Math.random()}`);
 		on.default(fp.pi as never);
 		assert.ok(fp.handlers.has("turn_end"));
-		assert.ok(!fp.handlers.has("context"), "lens dark by default — no context hook at all");
+		// ADOPTED 2026-08-03: the view lens is DEFAULT-ON (was dark candidate c48).
+		assert.ok(fp.handlers.has("context"), "lens view is default-on — unset registers the context hook");
+
+		fp.handlers.clear();
+		process.env.STATE_LENS = "off";
+		const lensOff = await import(`../extensions/session-blackboard.ts?lensoff=${Date.now()}-${Math.random()}`);
+		lensOff.default(fp.pi as never);
+		assert.ok(fp.handlers.has("turn_end"), "cockpit still runs with the lens killed");
+		assert.ok(!fp.handlers.has("context"), "STATE_LENS=off is the kill switch — no context hook");
 
 		fp.handlers.clear();
 		process.env.STATE_LENS = "view";
 		const lens = await import(`../extensions/session-blackboard.ts?lens=${Date.now()}-${Math.random()}`);
 		lens.default(fp.pi as never);
-		assert.ok(fp.handlers.has("context"), "STATE_LENS=view registers the view hook");
+		assert.ok(fp.handlers.has("context"), "explicit STATE_LENS=view still registers the view hook");
 	} finally {
 		if (prevBb === undefined) delete process.env.BLACKBOARD; else process.env.BLACKBOARD = prevBb;
 		if (prevLens === undefined) delete process.env.STATE_LENS; else process.env.STATE_LENS = prevLens;

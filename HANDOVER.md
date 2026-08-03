@@ -63,18 +63,23 @@ invalidates provenance.
 
 ## State today
 
-- **25 extension files, 30 libs.** 36 static configs on disk (incl. 2 investigation combos);
-  exposure modes 24 telemetry / 9 configuration / 2 suppression / 1 none. Counts re-derived
-  from disk 2026-07-31 (were "21 extensions / 42 configs / 5 combos" — stale since the
-  `6192559` and `166e94d` deletions).
+- **24 extension files, 29 libs.** 27 static configs on disk (incl. 1 investigation combo);
+  exposure modes 16 telemetry / 8 configuration / 2 suppression / 1 none. Counts re-derived
+  from disk 2026-08-03 after the judgment pass (`DARK_CANDIDATE_VERDICTS_2026-08-03.md`):
+  3 candidates **adopted** into the live default (c48-view, c28, c24 — their configs removed
+  because their cand arm became the base arm), 6 configs **retired** (c7, c14, c32, c37 + its
+  combo, c50; spec-adherence.ts and tag-words.ts deleted with them).
 - **Roster truth is `optimizer/docs/CANDIDATE_STRATEGY_2026-07-31.md`**, not the roster table in
   `CANDIDATE_PRUNING_2026-07.md`, which is a 2026-07-28 snapshot kept as history. The strategy
   doc supersedes the "active roster is c25-c39" framing: the binding constraint is that at
   n=9/arm the gate can only detect harm, so no candidate is rankable on outcome until graded
   scoring and an in-band fixture exist.
 - **Live by default:** loop-breaker, verify-gate, drift-scanner, ketch, hashline, git-guard, the
-  context guards, plan-runner v3. context-watcher is passive telemetry only as of 2026-07-28.
-- **Dark:** everything `cNN`, including `MICRO_GATE`.
+  context guards, plan-runner v3 — and, since 2026-08-03, the three adopted additives:
+  **state-lens view** (`STATE_LENS=off` kills), **teach-hints** (`TEACH_HINTS=off`),
+  **did-you-mean** (`DID_YOU_MEAN=off`). context-watcher is passive telemetry only.
+- **Dark:** every remaining `cNN`, including `MICRO_GATE`. Verdicts and per-candidate grounds:
+  `optimizer/docs/DARK_CANDIDATE_VERDICTS_2026-08-03.md`.
 - **Harness surface `0b37a62371f7…`** as of 2026-08-03 (moved — see below). `npm run verify` is
   green at 346 harness tests + 16 optimizer, plus the optimizer battery. The `~/.pi/agent` mirror
   is zero-drift, and its own suite runs 283 tests with **8 failures that are a tsx artifact, not

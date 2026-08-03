@@ -100,10 +100,6 @@
           "on",
           "off"
         ],
-        "HASHLINE_TAG": [
-          "hex",
-          "slug"
-        ],
         "RETRY_FRESH": [
           "on",
           "off"
@@ -176,10 +172,6 @@
           "on",
           "off"
         ],
-        "PLAN_SHA_GUARD": [
-          "on",
-          "off"
-        ],
         "PLAN_ITEM_GUIDANCE_V2": [
           "on",
           "off"
@@ -192,10 +184,6 @@
           "on",
           "off"
         ],
-        "PLAN_DELEGATE_ALL": [
-          "on",
-          "off"
-        ],
         "FORCE_PLAN_WRITE": [
           "on",
           "off"
@@ -205,10 +193,6 @@
           "off"
         ],
         "TOOL_CALL_RESCUE": [
-          "on",
-          "off"
-        ],
-        "SPEC_ADHERENCE": [
           "on",
           "off"
         ]

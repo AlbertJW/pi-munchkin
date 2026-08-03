@@ -1,14 +1,18 @@
-// teach-hints (DARK: TEACH_HINTS=on — munchkin candidate c28, not a default).
+// teach-hints (LIVE default-on since 2026-08-03; was dark candidate c28).
 // Appends one deterministic teaching line to matching tool ERROR results via
 // the tool_result hook (the did-you-mean shape: additive, isError stays true).
-// Per-rule kill switches: TEACH_HINT_<RULE-ID-UPPERCASED>=off (dashes → _).
+// ADOPTED by judgment (Albert-approved; grounds in
+// DARK_CANDIDATE_VERDICTS_2026-08-03.md): additive, cannot produce the harm
+// signature; largest authoritative n in its group (36 sessions) with no harm
+// signal; error spirals are the measured binding constraint. TEACH_HINTS=off is
+// the kill switch. Per-rule: TEACH_HINT_<RULE-ID-UPPERCASED>=off (dashes → _).
 import { execFileSync } from "node:child_process";
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { buildRules, hintFor } from "../lib/teach-hints.ts";
 import { record } from "../lib/telemetry.ts";
 import { steerText } from "../lib/steer-texts.ts";
 
-const ENABLED = process.env.TEACH_HINTS === "on";
+const ENABLED = process.env.TEACH_HINTS !== "off";
 
 function ruleEnabled(id: string): boolean {
 	return process.env[`TEACH_HINT_${id.toUpperCase().replace(/-/g, "_")}`] !== "off";

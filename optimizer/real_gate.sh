@@ -496,23 +496,21 @@ PY
 		echo "[real_gate] TRAJECTORY=on requires SPAN_TOOLS=on for $pat/$task; refusing argument-only evidence" >&2
 		exit 2
 	fi
-	# PLAN_SUBAGENT_ONLY / PLAN_DELEGATE_ALL block direct tool calls and point the
-	# model at subagent(...) instead; SPAWN_DELEGATION only rewords delegation
-	# advice, but the advice is meaningless if there is no subagent tool to advise
-	# toward. Any of the three needs the escape hatch to actually exist in the
+	# PLAN_SUBAGENT_ONLY blocks direct tool calls and points the model at
+	# subagent(...) instead; SPAWN_DELEGATION only rewords delegation advice, but
+	# the advice is meaningless if there is no subagent tool to advise toward.
+	# (PLAN_DELEGATE_ALL retired 2026-08-03.) Either needs the escape hatch in the
 	# session's tool list, not just t4's, or the candidate is instructing an
 	# unavailable tool (c37's own remote-box round measured nothing useful before
 	# this was caught — every blocked call fell through to the no-subagent path).
-	local env_plan_subagent_only="" env_plan_delegate_all="" env_spawn_delegation=""
-	local env_force_plan_write="" env_plan_uncertainty="" env_plan_sha_guard="" env_plan_item_guidance_v2=""
+	local env_plan_subagent_only="" env_spawn_delegation=""
+	local env_force_plan_write="" env_plan_uncertainty="" env_plan_item_guidance_v2=""
 	local env_plan_tool_go="" # c39: standalone flag, not folded into the subagent-family branch below
 	for entry in ${session_env[@]+"${session_env[@]}"}; do
 		[[ "$entry" == PLAN_SUBAGENT_ONLY=* ]] && env_plan_subagent_only="${entry#*=}"
-		[[ "$entry" == PLAN_DELEGATE_ALL=* ]] && env_plan_delegate_all="${entry#*=}"
 		[[ "$entry" == SPAWN_DELEGATION=* ]] && env_spawn_delegation="${entry#*=}"
 		[[ "$entry" == FORCE_PLAN_WRITE=* ]] && env_force_plan_write="${entry#*=}"
 		[[ "$entry" == PLAN_UNCERTAINTY=* ]] && env_plan_uncertainty="${entry#*=}"
-		[[ "$entry" == PLAN_SHA_GUARD=* ]] && env_plan_sha_guard="${entry#*=}"
 		[[ "$entry" == PLAN_ITEM_GUIDANCE_V2=* ]] && env_plan_item_guidance_v2="${entry#*=}"
 		[[ "$entry" == PLAN_TOOL_GO=* ]] && env_plan_tool_go="${entry#*=}"
 	done
@@ -564,9 +562,9 @@ PY
 	# session doesn't actually have means the row would measure a harness that doesn't
 	# exist, exactly like c37/c38 were confounded.
 	if [[ ( "$task" == "t4" || "$env_plan_subagent_only" == "1" || \
-	        "$env_plan_delegate_all" == "on" || "$env_spawn_delegation" == "on" ) && \
+	        "$env_spawn_delegation" == "on" ) && \
 	      ",$tools," != *",subagent,"* ]]; then
-		echo "[real_gate] task==t4/PLAN_SUBAGENT_ONLY/PLAN_DELEGATE_ALL/SPAWN_DELEGATION requires 'subagent' but --tools resolved to '$tools' for $pat/$task — refusing to measure a nonexistent harness surface" >&2
+		echo "[real_gate] task==t4/PLAN_SUBAGENT_ONLY/SPAWN_DELEGATION requires 'subagent' but --tools resolved to '$tools' for $pat/$task — refusing to measure a nonexistent harness surface" >&2
 		exit 2
 	fi
 	if [[ "$env_span_tools" == "on" && ( ",$tools," != *",search_spans,"* || ",$tools," != *",read_span,"* ) ]]; then
@@ -579,9 +577,9 @@ PY
 	# drift that caused tonight's bug: a future edit re-gating plan_write, or a new
 	# branch that replaces $tools wholesale instead of appending, would trip it.
 	if [[ ( "$env_force_plan_write" == "on" || "$env_plan_uncertainty" == "on" || \
-	        "$env_plan_sha_guard" == "on" || "$env_plan_item_guidance_v2" == "on" ) && \
+	        "$env_plan_item_guidance_v2" == "on" ) && \
 	      ",$tools," != *",plan_write,"* ]]; then
-		echo "[real_gate] FORCE_PLAN_WRITE/PLAN_UNCERTAINTY/PLAN_SHA_GUARD/PLAN_ITEM_GUIDANCE_V2 requires 'plan_write' but --tools resolved to '$tools' for $pat/$task — refusing to measure a nonexistent harness surface" >&2
+		echo "[real_gate] FORCE_PLAN_WRITE/PLAN_UNCERTAINTY/PLAN_ITEM_GUIDANCE_V2 requires 'plan_write' but --tools resolved to '$tools' for $pat/$task — refusing to measure a nonexistent harness surface" >&2
 		exit 2
 	fi
 	if [[ "$env_plan_tool_go" == "on" && ",$tools," != *",plan_go,"* ]]; then

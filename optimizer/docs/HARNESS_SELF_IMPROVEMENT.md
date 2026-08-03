@@ -2167,3 +2167,40 @@ Mirrored, zero drift both directions. `npm run verify` green at 346 + 16, optimi
 property of *(fixture version, harness surface, model)*. Before citing one, confirm all three
 still hold. Every false claim in the table above is the same mistake — quoting a number after
 the thing it measured had changed.
+
+---
+
+## 2026-08-03 (final) — the judgment pass: 3 adopted, 5 retired, roster dispositioned
+
+The QA ledger is fully closed (all 40 findings dispositioned — see the reconciliation table in
+`QA_FINDINGS_2026-07-31_UNVERIFIED.md`), and the dark roster received explicit verdicts:
+`DARK_CANDIDATE_VERDICTS_2026-08-03.md`. Albert approved the two irreversible halves before
+execution.
+
+**Adopted, default-on (additive class — cannot produce the harm signature):** c48 state-lens
+view (`STATE_LENS=off` kills), c28 teach-hints (`TEACH_HINTS=off`), c24 did-you-mean
+(`DID_YOU_MEAN=off`). Their configs are deleted — with the flag default-on each config's cand
+arm became the base arm, exactly the Tier 0 inert-config trap. Future measurement of an adopted
+mechanism is a suppression arm, not a re-run. These adoptions are judgment, not measurement,
+and the verdicts doc says so in as many words.
+
+**Retired, executed on each candidate's own pre-registered grounds:** c7 (measured harm ×2
+models), c14 (mechanism refuted), c32 (met its own retirement condition), c37 (0-for-2 adverse;
+the drafted diff executed — both plan-runner blocks, governor ternaries, catalog entries, 8
+tests, schema field), c50 (premise was a harness artifact; extension deleted). Plus the
+c37-c38-c39 combo. `shaCandidates` left `plan-integrity.ts` with c32; the slug tag path left
+`hashline-core.ts` with c14 (`tag-words.ts` deleted, hex zero-drift test kept).
+
+Sweep casualties found by the battery, all fixed: the legacy-signal batch spec still named
+c7/c24 (pruned, with an in-file note), `batch_screen.py`'s roster pin (now the surviving subset
+{c2, c21}, refusing resurrections), its c7-specific SAFETY_HOLD clause (unreachable → removed),
+and `config.py`'s selftest referencing SPEC_ADHERENCE.
+
+Counts, re-derived from disk: 24 extensions, 29 libs, 27 static configs
+(16 telemetry / 8 configuration / 2 suppression / 1 none). Harness suite 333 (the removed
+candidates took their tests with them), optimizer 16, battery PASS.
+
+**Left deliberately:** the loop-breaker rejected-`plan_write`-counts-as-progress blind spot —
+model-visible steering-timing, phenomenon never observed in a transcript, so per standing rule
+it would have to ship dark as a new candidate, which this pass exists to stop doing casually.
+Flagged in the verdicts doc.

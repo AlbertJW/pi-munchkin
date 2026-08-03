@@ -14,17 +14,17 @@ test("did-you-mean: appends hint to ENOENT read error when enabled; silent other
 		content: [{ type: "text", text: "ENOENT: no such file or directory, open 'src/utils.js'" }],
 		details: {}, isError: true,
 	});
-	// enabled
-	process.env.DID_YOU_MEAN = "on";
+	// ADOPTED 2026-08-03: default-on (was dark candidate c24) — unset must register.
+	delete process.env.DID_YOU_MEAN;
 	let fp = makeFakePi();
 	(await import(`../extensions/did-you-mean.ts?x=${Math.random()}`)).default(fp.pi);
 	const patched = await fire(fp, "tool_result", errEvent(), { cwd });
-	assert.ok(patched, "handler returned a patch");
+	assert.ok(patched, "handler returned a patch (default-on)");
 	assert.ok(JSON.stringify(patched.content).includes("closest existing path: src/util.js"));
-	// disabled -> no handler registered
-	process.env.DID_YOU_MEAN = "";
+	// kill switch -> no handler registered
+	process.env.DID_YOU_MEAN = "off";
 	fp = makeFakePi();
 	(await import(`../extensions/did-you-mean.ts?x=${Math.random()}`)).default(fp.pi);
 	const untouched = await fire(fp, "tool_result", errEvent(), { cwd });
-	assert.equal(untouched, undefined, "dark by default");
+	assert.equal(untouched, undefined, "DID_YOU_MEAN=off kills it");
 });

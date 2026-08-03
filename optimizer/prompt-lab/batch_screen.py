@@ -36,8 +36,13 @@ def load_manifest(path: Path) -> dict:
         raise BatchError("manifest reps must be 6/2/6")
     if data.get("eligible_passes") != [2, 3, 4]:
         raise BatchError("manifest must use the strict 30-70% calibration band")
-    if set(data.get("candidates", {})) != {"c2", "c7", "c21", "c24"}:
-        raise BatchError("manifest candidate roster is not c2/c7/c21/c24")
+    # Roster was pinned to the four 2026-07 screen candidates {c2, c7, c21, c24}.
+    # c7 was RETIRED and c24 ADOPTED on 2026-08-03 (DARK_CANDIDATE_VERDICTS), so the
+    # pin is now the surviving subset — a batch must not resurrect a retired config,
+    # and must not add candidates this dated study never pre-registered.
+    if not set(data.get("candidates", {})) <= {"c2", "c21"} or not data.get("candidates"):
+        raise BatchError("manifest candidate roster must be a non-empty subset of c2/c21 "
+                         "(c7 retired, c24 adopted, 2026-08-03)")
     for candidate, spec in data["candidates"].items():
         config = LAB / "configs" / spec["config"]
         if not config.is_file():
@@ -270,8 +275,10 @@ def screen_disposition(candidate: str, base: list[dict], cand: list[dict]) -> st
     if targeted < 3 and candidate != "c2":
         return "UNEXPOSED"
     delta = sum(row.get("score", 0) for row in cand) - sum(row.get("score", 0) for row in base)
-    unverified = sum(row.get("exposure", {}).get("counts", {}).get("verify-gate/unverified-end", 0) for row in cand)
-    if delta <= -2 or (candidate == "c7" and unverified >= 2):
+    # (The c7-specific unverified-end SAFETY_HOLD clause was removed with c7's
+    # retirement 2026-08-03 — the roster guard above can never admit c7 again, so
+    # the clause was unreachable. The generic delta hold below is unchanged.)
+    if delta <= -2:
         return "SAFETY_HOLD"
     if delta >= 2:
         return "PROMOTE_TO_LOCAL_CONFIRMATION"

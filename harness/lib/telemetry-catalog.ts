@@ -27,12 +27,9 @@ export const EVENT_CATALOG = {
 	"plan-runner/thrash-warn": { streak: "number" },
 	"plan-runner/resume-found": { open: "number", in_progress: "number" },
 	"plan-runner/subagent-only-block": { toolName: "string" },
-	"plan-runner/delegate-all-block": { toolName: "string" },
-	"plan-runner/delegate-all-subagent": { agent: "string", mode: "string" },
 	"plan-runner/force-plan-write-block": { toolName: "string" },
 	"plan-runner/write": { items: "number", newly_done: "number", rewrite: "boolean", declared_dependencies: "number", unmet_dependencies: "number", dependency_compliant: "boolean", context_tokens: ["number", "null"] },
 	"plan-runner/uncertainty-hold": { count: "number", gate: "string" },
-	"plan-runner/sha-guard": { checked: "number", missing: "number" },
 	"plan-runner/write-rejected": { reason_class: "string", context_tokens: ["number", "null"] },
 	// `activation` ("command"|"tool") added 2026-07-30 when /plan-go and the plan_go
 	// tool were unified: both now emit these. Rows before that date are all
@@ -86,8 +83,6 @@ export const EVENT_CATALOG = {
 	"state-lens/steer-injected": { chars: "number", turnIndex: "number" },
 	"tool-call-rescue/detected": { signature: "string", turnIndex: "number" },
 	"tool-call-rescue/steered": { signature: "string", turnIndex: "number" },
-	"spec-adherence/armed": { specs: "number" },
-	"spec-adherence/steered": { path: "string", turnIndex: "number" },
 	"teach-hints/hint": { rule: "string", tool: "string", injected_chars: "number" },
 	"micro-gate/slop-fired": { files: "number", findings: "number", injected_chars: "number" },
 	"micro-gate/slop-passed": { files: "number", checked: "number" },

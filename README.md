@@ -62,7 +62,6 @@ armed by default.
 | **hashline** | line/tag-anchored edits instead of brittle exact-text matching — removes the #1 small-model edit failure; multi-file patches are transactional |
 | **loop-breaker** | detects call / reason / outcome repetition, steers, then aborts a runaway. A separate session-cumulative counter catches *grinding* (fail, fail, fail, one edit, repeat) that the since-progress counters reset away — measured as 43% of all wasted tool calls |
 | **tool-call-rescue** | dark candidate c49 (`TOOL_CALL_RESCUE=on`): detects the malformed pseudo-tool-call-as-text serving artifact (zero real tool calls + `<tool_call>`/`<function=`/fenced-call signatures) and sends one corrective re-emit steer, reviving a session that would otherwise die with zero work; max 2/session |
-| **spec-adherence** | dark candidate c50 (`SPEC_ADHERENCE=on`): when the prompt names an on-disk reference file and ≥2 mutations have FAILED without it ever being read, steers once toward reading it — closes the measured "guesses conventions instead of consulting the named spec" class (retry-trap: 12/12) |
 | **verify-gate** | blocks a "done" claim until there is tool evidence for it |
 | **plan-runner** | `/plan` — a model-owned TODO list with per-item verify gates |
 | **reflect** | `/reflect` — a fresh-context adversarial review of the current plan |
@@ -73,7 +72,7 @@ armed by default.
 | **payload-audit** | dark instrument (`PAYLOAD_AUDIT=on`): records wire-truth per provider request to `.pi/traces/payload-audit.jsonl` — prefix stability, system/tools hashes, thinking-replay presence, lens position |
 | **context-watcher** | records every compaction with requester attribution (pi / compact-tool / manual) — passive telemetry only; the proactive auto-compact-at-threshold behavior was removed 2026-07-28 after never once completing a compaction (pi-native compaction owns the job) |
 | **context-dedup** | collapses a file already read verbatim this session down to a one-line back-reference in the model's *view only* — the transcript itself is never rewritten |
-| **session-blackboard** | ground-truth working memory derived from harness events: a human-only cockpit artifact (`artifacts/session-cockpit.html` + TUI widget, `/blackboard`), and — dark, `STATE_LENS` (c48) — a non-accumulating state lens injected into the model's per-call view (attempted+failing actions, verify state, open plan, repeats) |
+| **session-blackboard** | ground-truth working memory derived from harness events: a human-only cockpit artifact (`artifacts/session-cockpit.html` + TUI widget, `/blackboard`), and a non-accumulating state lens injected into the model's per-call view (attempted+failing actions, verify state, open plan, repeats) — **view mode default-on since 2026-08-03** (`STATE_LENS=off` to kill) |
 | **context-brief** | a cached, once-per-session repository inventory appended to the system prompt, so the model spends fewer turns re-discovering what a brief could just tell it |
 | **context-surface** | passively hashes and aggregates the exact provider-bound context; never rewrites messages |
 | **span-tools** | `search_spans` / `read_span` — bounded retrieval over large files |
@@ -158,38 +157,33 @@ tracked in the self-improvement ledger rather than repeated here.
 | `LB_SESSION_REPEAT` | session-cumulative repeat limit before a single steer (default 25) |
 | `VERIFY_GATE=on\|off` | require evidence before "done" |
 | `MICRO_GATE=on` | enable the post-edit parse check |
-| `HASHLINE_TAG=hex\|slug` | edit tag style (word-slugs can copy better on tiny models) |
 | `SPAN_TOOLS=on` | expose the bounded large-file tools |
 | `KETCH=off` | remove the default-on web tools for offline/private sessions |
 | `KETCH_BACKEND`, `KETCH_MULTI_BACKENDS` | quick backend (default `ddg`) and broad-search set (default `ddg,exa,keenable`) |
 | `DRIFT_SCANNER=off` | disable post-commit review |
 | `BLACKBOARD=off` | disable the session blackboard entirely (cockpit + lens) |
-| `STATE_LENS=view\|steer\|both`, `STATE_LENS_MAX_CHARS` | dark candidate c48: arm the ground-truth state lens (view = per-call tail block, steer = loop-breaker supplement) |
+| `STATE_LENS=off\|view\|steer\|both`, `STATE_LENS_MAX_CHARS` | ground-truth state lens — **`view` is DEFAULT-ON since 2026-08-03** (adopted, was c48); `off` kills it; `steer`/`both` stay opt-in dark |
+| `TEACH_HINTS=off`, `TEACH_HINT_<RULE>=off` | deterministic teaching line on matching tool errors — **default-on since 2026-08-03** (adopted, was c28) |
+| `DID_YOU_MEAN=off` | closest-existing-path hint on ENOENT results — **default-on since 2026-08-03** (adopted, was c24) |
 
 | Dark candidate env | Effect | Status |
 |---|---|---|
 | `BASH_OUTPUT_GUARD=on`, `BASH_OUTPUT_MAX_CHARS` (default 8000) | withhold an oversized `bash` result rather than truncate it | measured NEUTRAL locally; the guard's own trigger has yet to fire in any tested task |
-| `TEACH_HINTS=on` | append the fixed teaching line to a matching tool error | measured NEUTRAL locally (first authoritative win of the queue) |
 | `CONTEXT_BRIEF=on`, `CONTEXT_BRIEF_BYTES` (default 2048) | inject the cached repository-inventory brief | built, review-hardened, awaiting a gate round |
 | `READ_DEDUP=on` | collapse a repeated identical read to a back-reference in the view only | tested exploratory-only (remote endpoint; structurally non-authoritative) |
 | `CTX_REDUNDANCY_NUDGE=on`, `CTX_REDUNDANCY_PCT` (default 50) | steer toward `compact_context` past a duplication threshold | tested exploratory-only |
 | `MICRO_GATE_SLOP=on` | heuristic "possible shortcuts" steer after an edit | built, awaiting a gate round |
 | `PLAN_SUBAGENT_ONLY=1` | force every scoped edit through a fresh subagent | mechanically hardened; awaiting a gate round |
 | `PLAN_UNCERTAINTY=on` | a declared plan uncertainty structurally pauses execution until cleared | built and unit-tested; awaiting a gate round |
-| `PLAN_SHA_GUARD=on` | verify any commit SHA the model writes actually exists | built and unit-tested; awaiting a gate round |
 | `PLAN_ITEM_GUIDANCE_V2=on` | swap the unenforced "5-10 items" line for non-numeric, need-sized guidance | built; a deliberate compression, not an elaboration |
 | `SPAWN_DELEGATION=on` | recommend `mode=spawn` + a self-contained task everywhere the harness previously suggested `mode=fork` | built; awaiting a gate round |
-| `PLAN_DELEGATE_ALL=on` | during execution, only `plan_write` and `subagent` remain callable directly — everything else is blocked and routed to a role-matched fresh subagent | built; the most direct test of the "many small contexts" thesis; **0-for-2 with adverse effort** (+70% turns, +200% errors on the 35B) |
 | `FORCE_PLAN_WRITE=on` | block the FIRST mutation of a session until `plan_write` has been called once | an **enabler** for the flags above (they have no surface to fire on otherwise), not a standalone intervention; one round with real power gave 5/9 → **0/9** on gemma-4-e2b |
 | `PLAN_TOOL_GO=on` | register a model-callable `plan_go` tool (the gate's one-shot `pi -p` never dispatches `/plan-go`) | activation path; near-neutral by design |
 | `MICRO_GATE=on` | parse-check only the files just changed and inject the first actionable error | **REJECTED** against its pre-registration; its "7/7 effort metrics better" is count-not-rate — per tool call it improved in 5 of 7 pairings (pooled −5.9%), but on −31% call volume, and pass rate fell in both large-n rounds |
-| `DID_YOU_MEAN=on` | append the closest existing path to an ENOENT tool result | fires 8/8 on its purpose-built fixture and **0/8** elsewhere — unproven off that fixture |
 | `SPAN_TOOLS=on`, `SPAN_MAX_FILE_BYTES` | register bounded `search_spans` / `read_span` for large files | built; never run on a large-repo fixture |
-| `HASHLINE_TAG=slug` | encode hashline's edit tag as words instead of hex | mechanism hypothesis independently **refuted** (jnoise AUC 0.614, CI straddles 0.5) |
 | `TOOL_CALL_RESCUE=on` | steer once when a turn emits a pseudo-tool-call as text and no real tool call | targets the collapse class; measured on the one model that does not collapse, so **0 detections** |
-| `SPEC_ADHERENCE=on` | steer toward a prompt-named on-disk file that has not been read | premise retracted and read-detection was dead code; both fixed, **wholly unmeasured** |
 | `LB_STREAK_SOFT`, `LB_REPEAT_T1`, … | loop-breaker tier thresholds | `LB_STREAK_SOFT=12` (c3) is a no-op on cloud and a real 8→12 change on local; its only round was remote |
-| `VERIFY_GATE_PATTERN` / `PI_MSG_VG_STEER` | override the verify-gate trigger or its steer text | **SAFETY HOLD** — the c7 steer-text variant measured 6/6 → 3/6 |
+| `VERIFY_GATE_PATTERN` / `PI_MSG_VG_STEER` | override the verify-gate trigger or its steer text | generic operator overrides; the c7 steer-text *candidate* is **RETIRED** (measured harm on two models, 6/6→3/6 and −44pp) — do not resurrect that wording |
 
 **Read `optimizer/docs/CANDIDATE_STRATEGY_2026-07-31.md` before planning a round for any of
 these.** At the sample sizes used to date the gate can detect harm but essentially not help, so

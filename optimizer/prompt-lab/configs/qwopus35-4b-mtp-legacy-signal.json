@@ -1,21 +1,53 @@
 {
-  "schema": "pi.screen-batch/v1",
-  "name": "qwopus35-4b-mtp-legacy-signal",
-  "provider": "remote-llamacpp",
-  "model": "qwopus35-4b-mtp",
-  "endpoint_env": "LLAMA_URL",
-  "baseline": "baseline.json",
-  "candidates": {
-    "c2": {"config": "static/c2-scaffold-cot.json", "pilot": false, "priority": ["parens", "sv-ambiguous-spec", "hygiene-shared-config-reread", "qs-error-swallow", "sv-commit-sha-guard", "path-near-miss"]},
-    "c7": {"config": "static/c7-verify-gate-steer.json", "pilot": true, "priority": ["qs-error-swallow", "hygiene-shared-config-reread", "parens", "sv-ambiguous-spec", "sv-commit-sha-guard", "path-near-miss"]},
-    "c21": {"config": "static/c21-micro-gate.json", "pilot": true, "priority": ["hygiene-shared-config-reread", "qs-error-swallow", "parens", "sv-ambiguous-spec", "path-near-miss", "sv-commit-sha-guard"]},
-    "c24": {"config": "static/c24-did-you-mean.json", "pilot": true, "priority": ["path-near-miss", "parens", "hygiene-shared-config-reread", "qs-error-swallow", "sv-ambiguous-spec", "sv-commit-sha-guard"]}
+ "schema": "pi.screen-batch/v1",
+ "name": "qwopus35-4b-mtp-legacy-signal",
+ "provider": "remote-llamacpp",
+ "model": "qwopus35-4b-mtp",
+ "endpoint_env": "LLAMA_URL",
+ "baseline": "baseline.json",
+ "candidates": {
+  "c2": {
+   "config": "static/c2-scaffold-cot.json",
+   "pilot": false,
+   "priority": [
+    "parens",
+    "sv-ambiguous-spec",
+    "hygiene-shared-config-reread",
+    "qs-error-swallow",
+    "sv-commit-sha-guard",
+    "path-near-miss"
+   ]
   },
-  "calibration_tasks": ["parens", "hygiene-shared-config-reread", "qs-error-swallow", "sv-ambiguous-spec", "sv-commit-sha-guard", "path-near-miss"],
-  "calibration_reps": 6,
-  "pilot_reps": 2,
-  "screen_reps": 6,
-  "eligible_passes": [2, 3, 4],
-  "max_tasks_per_candidate": 2,
-  "exploratory": true
+  "c21": {
+   "config": "static/c21-micro-gate.json",
+   "pilot": true,
+   "priority": [
+    "hygiene-shared-config-reread",
+    "qs-error-swallow",
+    "parens",
+    "sv-ambiguous-spec",
+    "path-near-miss",
+    "sv-commit-sha-guard"
+   ]
+  }
+ },
+ "calibration_tasks": [
+  "parens",
+  "hygiene-shared-config-reread",
+  "qs-error-swallow",
+  "sv-ambiguous-spec",
+  "sv-commit-sha-guard",
+  "path-near-miss"
+ ],
+ "calibration_reps": 6,
+ "pilot_reps": 2,
+ "screen_reps": 6,
+ "eligible_passes": [
+  2,
+  3,
+  4
+ ],
+ "max_tasks_per_candidate": 2,
+ "exploratory": true,
+ "_note_2026_08_03": "Entries for retired/adopted candidates removed when their configs left the roster (judgment pass, DARK_CANDIDATE_VERDICTS_2026-08-03.md): c24, c7. Their completed rounds' result files are untouched history."
 }

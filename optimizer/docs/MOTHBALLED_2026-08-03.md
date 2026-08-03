@@ -81,8 +81,13 @@ Do these in order. Stop after step 2 if the answer is discouraging — that *is*
    0/6 was a harness artifact; it may be the in-band fixture the project spent months lacking.
 3. Only then candidates, c48 first (additive, cannot produce the harm signature).
 
-Do **not** start by writing a new candidate. The roster has ~36 configs and the binding
+Do **not** start by writing a new candidate. The roster has 27 configs and the binding
 constraint has never been candidate supply.
+
+**Post-mothball judgment pass (2026-08-03, later):** the roster was then dispositioned by
+judgment — 3 additive candidates adopted live (c48-view, c28, c24), 5 retired on their own
+pre-registered grounds (c7, c14, c32, c37, c50), the rest tiered with explicit reasoning. See
+`DARK_CANDIDATE_VERDICTS_2026-08-03.md`; the surface hash moved again with the adoptions.
 
 ## What is safe to leave running
 
