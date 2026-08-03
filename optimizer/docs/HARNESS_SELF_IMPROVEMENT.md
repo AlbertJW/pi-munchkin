@@ -2089,7 +2089,7 @@ zero coverage, and one of them was mine from the day before.**
 
 Both now covered by `harness/tests/verify-gate.test.ts` (new). **This changes the harness
 surface**: rows written before and after are on different surfaces and are not directly
-comparable. New surface hash: `0b37a62371f7…` — bind it into the next round and re-baseline;
+comparable. New surface hash: `e829c72dd1b8…` — bind it into the next round and re-baseline;
 do not pool across the boundary.
 
 The rest: the grader artifact is now **pinned by the manifest** and ambiguity is a refusal
@@ -2160,7 +2160,7 @@ decoy-at-another-name is closed, forgery-at-the-pinned-name is not — and the r
 The 8 `// Run:` test headers told you to run from `~/.pi/agent`, which appended **real rows** to
 the live telemetry stream tagged `source="interactive"`. Now they set `TELEMETRY_FILE`.
 
-**Surface moved again to `0b37a62371f7…`** (comments and the plan-runner re-bind changed bytes).
+**Surface moved again to `e829c72dd1b8…`** (comments and the plan-runner re-bind changed bytes).
 Mirrored, zero drift both directions. `npm run verify` green at 346 + 16, optimizer PASS.
 
 **Standing rule earned here, the third time this pattern has cost real work:** a pass rate is a
@@ -2204,3 +2204,8 @@ candidates took their tests with them), optimizer 16, battery PASS.
 model-visible steering-timing, phenomenon never observed in a transcript, so per standing rule
 it would have to ship dark as a new candidate, which this pass exists to stop doing casually.
 Flagged in the verdicts doc.
+
+Surface hash after the adoptions: `e829c72dd1b8…` (third move on 2026-08-03 — the QA fixes,
+then the judgment-pass flips; each is model-visible, so each re-baselines). Mirror zero-drift
+both directions including the three deletions; the live suite's failure set is byte-identical
+to before (the same 8 tsx CJS-transform artifacts), 277 tests.

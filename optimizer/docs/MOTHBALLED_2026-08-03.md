@@ -64,7 +64,7 @@ This matters more than the results, because a future reader will otherwise repea
 
 ## The one-way door: the surface moved
 
-`HARNESS_SURFACE_SHA256` is now **`0b37a62371f7…`**. The 2026-08-03 verify-gate fixes are
+`HARNESS_SURFACE_SHA256` is now **`e829c72dd1b8…`**. The 2026-08-03 verify-gate fixes are
 model-visible (defect fixes, so no `cNN` flag). **Rows before and after are on different
 surfaces.** Any restart re-baselines; it does not pool across that boundary. This is the single
 easiest way to silently produce a wrong result here.

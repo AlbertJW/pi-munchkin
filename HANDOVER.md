@@ -80,7 +80,7 @@ invalidates provenance.
   **did-you-mean** (`DID_YOU_MEAN=off`). context-watcher is passive telemetry only.
 - **Dark:** every remaining `cNN`, including `MICRO_GATE`. Verdicts and per-candidate grounds:
   `optimizer/docs/DARK_CANDIDATE_VERDICTS_2026-08-03.md`.
-- **Harness surface `0b37a62371f7…`** as of 2026-08-03 (moved — see below). `npm run verify` is
+- **Harness surface `e829c72dd1b8…`** as of 2026-08-03 (moved — see below). `npm run verify` is
   green at 346 harness tests + 16 optimizer, plus the optimizer battery. The `~/.pi/agent` mirror
   is zero-drift, and its own suite runs 283 tests with **8 failures that are a tsx artifact, not
   defects**: that directory has no `package.json`, so tsx transforms to CJS and every test file
@@ -91,7 +91,7 @@ invalidates provenance.
 
 ### Landed 2026-08-03 (5 commits, `51b8792`..`e5ad6a7`) — instrument fixes
 
-> **THE SURFACE HASH MOVED to `0b37a62371f7…`.** The verify-gate fixes below are model-visible
+> **THE SURFACE HASH MOVED to `e829c72dd1b8…`.** The verify-gate fixes below are model-visible
 > (defect fixes, so no `cNN` flag). Rows written before and after are on **different surfaces**:
 > re-baseline before the next round and do not pool across the boundary.
 
@@ -267,7 +267,7 @@ candidates until c25 and c48 resolve.
 > until it is done** (METHODOLOGY §12 / `CANDIDATE_STRATEGY_2026-07-31.md` §1: at n=9/arm the
 > gate detects harm and essentially nothing else).
 >
-> **Before B1: the surface changed on 2026-08-03** (`0b37a62371f7…`). Every pre-08-03 row is on
+> **Before B1: the surface changed on 2026-08-03** (`e829c72dd1b8…`). Every pre-08-03 row is on
 > the old surface, so the B1/B2 base rates must be collected fresh — do not compare them against
 > the historical `sv-convention-provenance` 3/6 as if it were the same instrument. The graded path
 > B2 exercises also changed: `subscores` now requires the manifest's `grade_artifact` pin, and a
