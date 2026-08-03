@@ -3,7 +3,11 @@ import test from "node:test";
 import { fire, makeFakePi } from "./integration-harness.ts";
 import { detectPseudoToolCall, rescueMessage } from "../extensions/tool-call-rescue.ts";
 
-// Run: cd ~/.pi/agent && npx -y tsx --test tests/tool-call-rescue.test.ts
+// Run: cd ~/.pi/agent && TELEMETRY_FILE=$(mktemp) TELEMETRY_SOURCE=test \
+//        npx -y tsx --test tests/tool-call-rescue.test.ts
+// (TELEMETRY_FILE is not optional: without it these tests append REAL rows to
+//  ~/.pi/agent/telemetry/events.jsonl tagged source=\"interactive\", polluting the
+//  live telemetry stream the harness is measured from.)
 
 test("detects the measured qwen artifact shapes", () => {
 	const qwen = detectPseudoToolCall('<tool_call></tool_call>\n<function=bash>{"command":"ls"}</function>');

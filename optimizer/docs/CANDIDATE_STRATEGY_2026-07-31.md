@@ -48,10 +48,17 @@ only statistically significant candidate result anywhere in the top tiers is a *
 
 **Corollary that should govern candidate design.** Every measured harm in this corpus is a
 *blocking or steering* intervention — c38 −56pp, c7 −44pp, c37 −33pp. The one change ever
-adopted was a **subtraction** (governor prose removal, 83%→89%→97%). All five `block: true`
-sites in the harness live in `plan-runner.ts`, the c25/c37/c38 family. Additive/inert
-mechanisms cannot show a win on this instrument but also cannot hurt; blocking ones are the
-only ones that have ever moved the number, downward.
+adopted was a **subtraction** (governor prose removal, 83%→89%→97%). Additive/inert mechanisms
+cannot show a win on this instrument but also cannot hurt; every measured harm so far came from
+a blocking or steering **candidate**.
+
+> **Correction 2026-08-03.** This paragraph used to assert "all five `block: true` sites in the
+> harness live in `plan-runner.ts`". There are **12, across five files**: `plan-runner.ts` 5 (the
+> c25/c37/c38 family), `git-guard.ts` 4, and one each in `loop-breaker.ts`,
+> `context-inlet-guard.ts` and `chaos.ts`. The count was wrong when written, not stale. The first
+> three of those are **live baseline, not candidates** — and loop-breaker is the project's one
+> credited win — while `chaos.ts` is dormant unless `CHAOS` is set. So "blocking mechanisms only
+> ever hurt" does not follow from the inventory; it holds only over the candidates measured.
 
 ---
 
@@ -130,8 +137,10 @@ before_agent_start ─┐   PREVENTIVE — shapes what the model sees before it 
 Nothing can see reasoning before it acts, force a tool call, or retry a turn. The harness's
 entire vocabulary is: block, reshape context, append to a result, send a message. Candidates
 requiring the model to *choose* (plan, delegate, compact) are asking, not making — and the
-corpus says asking does not work: **1 voluntary subagent call in 942 base sessions**, **0
-completed compactions ever**.
+corpus says asking does not work: **1 voluntary subagent call in 942 base sessions**, and
+**2 completed compactions in 1,839 rows** (recounted 2026-08-03; this said "0 ever", which was
+wrong — the two are in `c26-4b.jsonl` and `c35-9b.jsonl`. The argument is unaffected: 2/1,839 is
+still "essentially never").
 
 ---
 
@@ -203,7 +212,8 @@ Nothing below can return a positive result until this exists.
   **c21 stays in Tier B regardless**, because the correction does not touch the disqualifying
   confound: cand cuts call volume ~31%, so error *counts* fall largely by truncation, and pass
   rate fell in **both** large-n rounds (15/20→13/20 p=0.73; 13/18→12/18 p=1.0).
-  `RETROSPECTIVE_2026-07-30.md:24` records it **REJECTED**, not parked. Steelman that survives:
+  `RETROSPECTIVE_2026-07-30.md:18` records it **REJECTED**, not parked (this cited `:24`, which is
+  the c38 row). Steelman that survives:
   surfacing a parse error at `turn_end` instead of five turns later legitimately shortens
   sessions. Re-run only with **errors-per-call as the pre-registered primary** and a fixed turn
   budget to close the truncation channel.

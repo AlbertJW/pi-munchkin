@@ -109,8 +109,11 @@ PARK. **Adoption remains a human decision** — this produces the evidence, not 
 - **No sampling-parameter changes.** Decoding stays as it is. Variance is handled by sample size
   and by scoring effort instead of a single gate bit.
 - **Single-slot discipline.** One round per box at a time.
-- **Fixture honesty.** `hygiene-shared-config-reread` (0/6) and `sv-ambiguous-spec` (1/6) are
-  floors on the 4B — never use them to judge a candidate on that model.
+- **Fixture honesty.** Don't judge a candidate on a fixture that floors or ceilings for the model.
+  **The two this rule used to name are void and must not be re-cited** (`MEASUREMENT_METHODOLOGY`
+  §9 and §14): `hygiene-shared-config-reread` 0/6 was the gate failing to copy `config/`, not the
+  model failing the task, and `sv-ambiguous-spec` 1/6 predates the v3 rebuild (`f6318c4`). Both
+  are **uncalibrated**, not floors.
 - **Every round scored on effort, not just pass/fail.** The gate bit is one bit per session and is
   what hid c21 for weeks.
 

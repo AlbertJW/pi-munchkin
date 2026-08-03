@@ -2,7 +2,11 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { annotate, applyHunks, detectStyle, fileTag, normalizeText, parsePatch, relocateHunks, restoreStyle, tagWords } from "../lib/hashline-core.ts";
 
-// Run: cd ~/.pi/agent && npx -y tsx --test tests/hashline.test.ts
+// Run: cd ~/.pi/agent && TELEMETRY_FILE=$(mktemp) TELEMETRY_SOURCE=test \
+//        npx -y tsx --test tests/hashline.test.ts
+// (TELEMETRY_FILE is not optional: without it these tests append REAL rows to
+//  ~/.pi/agent/telemetry/events.jsonl tagged source=\"interactive\", polluting the
+//  live telemetry stream the harness is measured from.)
 // Imports ONLY the zero-dependency core (lives outside extensions/ — pi
 // auto-loads every extensions/*.ts, and the SDK doesn't resolve under tsx).
 

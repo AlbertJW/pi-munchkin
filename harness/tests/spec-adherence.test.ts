@@ -31,7 +31,11 @@ async function toolCall(
 	await fire(fp, "tool_execution_end", { toolCallId, toolName, result: {}, isError });
 }
 
-// Run: cd ~/.pi/agent && npx -y tsx --test tests/spec-adherence.test.ts
+// Run: cd ~/.pi/agent && TELEMETRY_FILE=$(mktemp) TELEMETRY_SOURCE=test \
+//        npx -y tsx --test tests/spec-adherence.test.ts
+// (TELEMETRY_FILE is not optional: without it these tests append REAL rows to
+//  ~/.pi/agent/telemetry/events.jsonl tagged source=\"interactive\", polluting the
+//  live telemetry stream the harness is measured from.)
 
 test("extracts only prompt-named paths that exist under cwd", () => {
 	const onDisk = new Set(["/w/docs/naming.md", "/w/data/charmap.json"]);

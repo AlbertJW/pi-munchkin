@@ -6,7 +6,11 @@ import { join } from "node:path";
 import { fire, makeFakePi } from "./integration-harness.ts";
 import { analyzePayload } from "../extensions/payload-audit.ts";
 
-// Run: cd ~/.pi/agent && npx -y tsx --test tests/payload-audit.test.ts
+// Run: cd ~/.pi/agent && TELEMETRY_FILE=$(mktemp) TELEMETRY_SOURCE=test \
+//        npx -y tsx --test tests/payload-audit.test.ts
+// (TELEMETRY_FILE is not optional: without it these tests append REAL rows to
+//  ~/.pi/agent/telemetry/events.jsonl tagged source=\"interactive\", polluting the
+//  live telemetry stream the harness is measured from.)
 
 const msg = (role: string, content: unknown, extra: Record<string, unknown> = {}) => ({ role, content, ...extra });
 

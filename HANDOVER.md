@@ -1,5 +1,14 @@
 # Handover — pi_munchkin, as of 2026-08-03
 
+> ## ⏸ THE OPTIMIZER IS MOTHBALLED (2026-08-03)
+> Read **`optimizer/docs/MOTHBALLED_2026-08-03.md` first.** It states why it stopped, which
+> published numbers are void, the one-way surface change, and the shortest path back to a real
+> answer if you restart. Nothing is broken and `npm run verify` is green — the measurement side
+> is parked because the next result costs more than it is worth, not because it failed.
+>
+> **The harness is NOT parked.** `harness/` → `~/.pi/agent` is live and in daily use. Everything
+> below still applies to it.
+
 You are picking up a harness + measurement project for making small local LLMs competent
 multi-turn coding agents. **Read this before touching anything**, because the project's own
 documentation was wrong in an important way until today, and some of it still reads as if the old
@@ -66,15 +75,18 @@ invalidates provenance.
 - **Live by default:** loop-breaker, verify-gate, drift-scanner, ketch, hashline, git-guard, the
   context guards, plan-runner v3. context-watcher is passive telemetry only as of 2026-07-28.
 - **Dark:** everything `cNN`, including `MICRO_GATE`.
-- **Harness surface `94293a7204de…`** as of 2026-08-03 (moved — see below). `npm run verify` is
-  green at 345 harness tests + 16 optimizer, plus the optimizer battery. The `~/.pi/agent` mirror
-  is zero-drift, and its own suite runs at 283 tests with **8 pre-existing failures** caused by
-  that tree's incomplete dev dependencies — a known gap, not a regression. Verify a mirror by
+- **Harness surface `0b37a62371f7…`** as of 2026-08-03 (moved — see below). `npm run verify` is
+  green at 346 harness tests + 16 optimizer, plus the optimizer battery. The `~/.pi/agent` mirror
+  is zero-drift, and its own suite runs 283 tests with **8 failures that are a tsx artifact, not
+  defects**: that directory has no `package.json`, so tsx transforms to CJS and every test file
+  using top-level `await` fails to load (`Top-level await is currently not supported with the
+  "cjs" output format`). The repo suite is authoritative. (This entry previously blamed
+  "incomplete dev dependencies" — measured 2026-08-03, that was wrong.) Verify a mirror by
   diffing the failure-set *by name* before and after, never by counting passes.
 
 ### Landed 2026-08-03 (5 commits, `51b8792`..`e5ad6a7`) — instrument fixes
 
-> **THE SURFACE HASH MOVED to `94293a7204de…`.** The verify-gate fixes below are model-visible
+> **THE SURFACE HASH MOVED to `0b37a62371f7…`.** The verify-gate fixes below are model-visible
 > (defect fixes, so no `cNN` flag). Rows written before and after are on **different surfaces**:
 > re-baseline before the next round and do not pool across the boundary.
 
@@ -184,8 +196,13 @@ this reads as a rejection.
   twice today. Use explicit line ranges, or `git checkout` and start over.
 - **`configuration`-mode exposure is vacuously `targeted`.** It means "config applied", *never*
   "mechanism fired". Easiest way to fool yourself here.
-- **Two fixtures are floors on the 4B**: `hygiene-shared-config-reread` (0/6) and
-  `sv-ambiguous-spec` (1/6). A null there could never have been anything else.
+- **The "two floors on the 4B" are NOT floors — both readings are void.** This entry used to say
+  `hygiene-shared-config-reread` (0/6) and `sv-ambiguous-spec` (1/6) could never have been
+  anything else. In fact the 0/6 came from the gate never copying `config/`, so the hidden grader
+  died on `readFileSync("config/schema.json")` for any model (`MEASUREMENT_METHODOLOGY` §9 forbids
+  carrying that pass rate forward), and the 1/6 predates the v3 rebuild that removed the
+  pre-implemented source (`f6318c4`). Both are **uncalibrated** since the tree-copy fix. Either
+  could be an in-band venue; nobody has looked.
 - `harness/vendor/pi-subagent/index.ts` fails a bare `node` import (imports `./agents.js` against a
   shipped `agents.ts`). **Pre-existing, not a bug** — pi's loader resolves it.
 
@@ -242,7 +259,7 @@ candidates until c25 and c48 resolve.
 > until it is done** (METHODOLOGY §12 / `CANDIDATE_STRATEGY_2026-07-31.md` §1: at n=9/arm the
 > gate detects harm and essentially nothing else).
 >
-> **Before B1: the surface changed on 2026-08-03** (`94293a7204de…`). Every pre-08-03 row is on
+> **Before B1: the surface changed on 2026-08-03** (`0b37a62371f7…`). Every pre-08-03 row is on
 > the old surface, so the B1/B2 base rates must be collected fresh — do not compare them against
 > the historical `sv-convention-provenance` 3/6 as if it were the same instrument. The graded path
 > B2 exercises also changed: `subscores` now requires the manifest's `grade_artifact` pin, and a

@@ -99,9 +99,13 @@ distinguishes *confirmed* from *unexercised*.
   makes a full roster verdict affordable — see `ADOPT_OR_RETIRE_PROTOCOL_2026-07.md`.
 - **Pre-register decision rules.** A 650-comparison re-score (`effort_report.py --sweep`) is a
   shortlist generator; anything chosen after seeing results is hypothesis, not finding.
-- **Check the fixture can express the effect.** `hygiene-shared-config-reread` (0/6) and
-  `sv-ambiguous-spec` (1/6) are floors on the 4B — a null there was never capable of being anything
-  else.
+- **Check the fixture can express the effect.** A null on a fixture that floors or ceilings was
+  never capable of being anything else. **Both examples this section used to name are now void,
+  for different reasons — see §9 and §14, and do not re-cite either number:**
+  `hygiene-shared-config-reread` (0/6) is a *harness artifact*, not a floor — the gate never
+  copied `config/`, so its hidden grader died on `readFileSync("config/schema.json")` regardless
+  of model; §9 forbids carrying that pass rate forward. `sv-ambiguous-spec` (1/6) was measured on
+  a fixture that no longer exists (v3 removed the pre-implemented `src/refund.js`, `f6318c4`).
 
 ## The reframing
 
@@ -446,3 +450,45 @@ that is equally wrong. What is required is a **lens-aware prefix metric** — on
 messages actually sent to the endpoint, after every `context` handler has run — before
 `prefix_stable` may serve as a guardrail for any context-injecting candidate. Until that exists,
 treat `prefix_stable_rate = 1.0` on a c48/c26/c30 arm as *unmeasured*, not as *stable*.
+
+---
+
+## §14 — Neither "floor" was a floor. Both readings are void.
+
+For weeks two fixtures were cited as proof that the local 4B floors, and used to excuse nulls:
+`hygiene-shared-config-reread` (0/6) and `sv-ambiguous-spec` (1/6). §2 of this document listed
+them under "check the fixture can express the effect". **Both numbers are void, for different
+reasons, and neither fixture has been calibrated in its working form.**
+
+### `hygiene-shared-config-reread` 0/6 — a harness artifact, not a model result
+
+The 0/6 came from `legacy-signal-cal`, one of the rounds §9 invalidates: the gate materialized
+fixtures through an allowlist (`src`, `test`, `package.json`, `data`, `scripts`) and **never
+copied `config/`**. The hidden grader opens `config/schema.json` on its first line. Replaying the
+old allowlist reproduces it exactly:
+
+```
+Error: ENOENT: no such file or directory, open 'config/schema.json'
+```
+
+That is a failure **no model could avoid** — the file was not on disk. §9 already forbids
+carrying this fixture's pass rate across the boundary; §2 was citing the number anyway, 140 lines
+earlier in the same file. The gate now copies the whole tree (`real_gate.sh`, `tar -C "$fix"`), so
+the fixture works — and has **never been run since**.
+
+### `sv-ambiguous-spec` 1/6 — measured on a fixture that no longer exists
+
+`f6318c4` (2026-07-31) rebuilt it to v3, removing the pre-implemented `src/refund.js` and
+`refundBatch.js` that let a session pass without doing the work. The 1/6 describes v2. Comparing
+a v3 round against it is comparing two different tasks.
+
+### The consequence
+
+The project's stated reason for having no in-band local venue was "the 4B floors on the only
+hard fixtures". **That reason does not survive.** Both may sit in the 30–70% band; nobody has
+looked. Re-calibrating `hygiene-shared-config-reread` is now the cheapest route to the in-band
+fixture the programme spent months believing it lacked — see `MOTHBALLED_2026-08-03.md`.
+
+**Rule.** A pass rate is a property of *(fixture version, harness surface, model)*. Before citing
+one as a floor or a ceiling, confirm all three still hold. Both failures here were the same
+mistake: quoting a number long after the thing it measured had changed.

@@ -4,7 +4,11 @@ import { fire, makeFakePi } from "./integration-harness.ts";
 import { registerContextWatcher } from "../extensions/context-watcher.ts";
 import { beginCompaction, currentCompactionOwner, finishCompaction, resetCompactionCoordinator } from "../lib/compaction-coordinator.ts";
 
-// Run: cd ~/.pi/agent && npx -y tsx --test tests/context-watch.test.ts
+// Run: cd ~/.pi/agent && TELEMETRY_FILE=$(mktemp) TELEMETRY_SOURCE=test \
+//        npx -y tsx --test tests/context-watch.test.ts
+// (TELEMETRY_FILE is not optional: without it these tests append REAL rows to
+//  ~/.pi/agent/telemetry/events.jsonl tagged source=\"interactive\", polluting the
+//  live telemetry stream the harness is measured from.)
 
 function observe() {
 	const fp = makeFakePi();

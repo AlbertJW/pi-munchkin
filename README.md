@@ -7,6 +7,11 @@
 > Make a small, locally-served LLM a competent [pi](https://github.com/earendil-works/pi) coding
 > agent — and prove that every change to the harness actually earns its place.
 
+> **⏸ The measurement side (`optimizer/`) is mothballed as of 2026-08-03** —
+> see [`optimizer/docs/MOTHBALLED_2026-08-03.md`](optimizer/docs/MOTHBALLED_2026-08-03.md) for why,
+> which published numbers are void, and how to restart. **The harness itself is live and
+> unaffected.** Nothing is broken; `npm run verify` is green.
+
 A small local model is not a miniature frontier model; it is a different kind of instrument
 entirely, one that forgets, wanders, invents file paths it never read, and declares victory the
 instant its own output merely *resembles* success. Coaxing competent agentic behavior out of such

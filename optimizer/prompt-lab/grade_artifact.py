@@ -17,6 +17,25 @@ them.
 Refusal is always fail-safe: no subscores block, `score` (the strict binary gate bit) is
 untouched, and the reason lands on the row as `subscores_blocked` so a silent zero-graded
 round is distinguishable from a fixture that simply has no grader.
+
+WHAT THIS DOES NOT DO (stated exactly, because an earlier version of this docstring claimed
+"a decoy must cost the session its subscores; it must never forge them", which overpromises).
+Pinning the NAME cannot authenticate CONTENT written to a path the adversary controls. Model
+code that writes the *pinned* name and then aborts the grader before it overwrites — any throw
+at import of model-authored `src/` — yields a forged `subscores` with no refusal. Demonstrated
+2026-08-03: prepending a `writeFileSync(".audit-grade.json", {fixed:8,total:8})` plus a throw to
+audit-sweep's `src/db.js` produced a full 8/8 with `blocked=None`.
+
+The obvious hardening does not work: an HMAC or an inherited fd cannot help, because
+model-authored `src/` is imported into the SAME node process as the grader and can read the key
+or write the fd (also measured). Closing it properly needs the grader to run somewhere the
+model's code does not — a separate process over a serialized result, which is a real change to
+`real_gate.sh` and out of scope for a parked instrument.
+
+So the guarantee is exactly: **decoy-at-another-name picking is closed; forgery at the pinned
+name is not.** That residual is accepted under the same threat model as the writable gate
+transcript (`docs/SECURITY_BOUNDARY.md`) — it needs deliberate adversarial behaviour from the
+measured model, and `audit-sweep` has never been run, so no existing measurement depends on it.
 """
 import glob
 import json

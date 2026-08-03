@@ -6,7 +6,11 @@ import { join } from "node:path";
 import { fire, makeFakePi, resetPiGlobals } from "./integration-harness.ts";
 import { classifyBashCommand } from "../lib/command-policy.ts";
 
-// Run: cd ~/.pi/agent && npx -y tsx --test tests/verify-gate.test.ts
+// Run: cd ~/.pi/agent && TELEMETRY_FILE=$(mktemp) TELEMETRY_SOURCE=test \
+//        npx -y tsx --test tests/verify-gate.test.ts
+// (TELEMETRY_FILE is not optional: without it these tests append REAL rows to
+//  ~/.pi/agent/telemetry/events.jsonl tagged source=\"interactive\", polluting the
+//  live telemetry stream the harness is measured from.)
 //
 // This file did not exist until 2026-07-31. verify-gate is DEFAULT-ON and runs in
 // every gate round, and it shipped two disarm defects with zero coverage — both

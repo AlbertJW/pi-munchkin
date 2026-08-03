@@ -311,7 +311,8 @@ export default function (pi: ExtensionAPI) {
 		delete (globalThis as Record<string, unknown>).__pi_lb_state;
 	});
 
-	// turnIndex is NOT monotonic across a session: agent-session.js:428-429 zeroes
+	// turnIndex is NOT monotonic across a session: agent-session.js's `_turnIndex = 0`
+	// in its agent_start path zeroes
 	// _turnIndex on every agent_start, and agent_start fires again on retry
 	// (retry.enabled), on auto-compaction, and on any message queued with
 	// triggerTurn (compact-tool does this). loop-breaker keeps its episode across

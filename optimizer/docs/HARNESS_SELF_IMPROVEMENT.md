@@ -2066,10 +2066,13 @@ graded path built the same day, so the verification is worth completing before t
 
 ## 2026-08-03 — the ten instrument findings verified and fixed; the surface moved
 
-The 40 preserved findings above are now closed. Nine were fixed on 2026-07-31; three
-verification agents then checked the remaining ten against source, and the outcome was **8
-verified, 1 refuted empirically, 1 sub-claim refuted**. All 8 are fixed, each with a
-counterfactual (revert → the new test fails → restore).
+The **instrument-class** findings above are now closed — not all 40. Nine were fixed on
+2026-07-31; three verification agents then checked ten more against source, and the outcome was
+**8 verified, 1 refuted empirically, 1 sub-claim refuted**. All 8 are fixed, each with a
+counterfactual (revert → the new test fails → restore). That is **19 of 40 examined; the other
+21 have never been read** — see the disposition table at the top of
+`QA_FINDINGS_2026-07-31_UNVERIFIED.md`. An earlier draft of this paragraph said "the 40 preserved
+findings above are now closed", which would have retired a live worklist.
 
 **The two that were live in every gate round were both in `verify-gate`, both shipped with
 zero coverage, and one of them was mine from the day before.**
@@ -2084,7 +2087,7 @@ zero coverage, and one of them was mine from the day before.**
 
 Both now covered by `harness/tests/verify-gate.test.ts` (new). **This changes the harness
 surface**: rows written before and after are on different surfaces and are not directly
-comparable. New surface hash: `94293a7204de…` — bind it into the next round and re-baseline;
+comparable. New surface hash: `0b37a62371f7…` — bind it into the next round and re-baseline;
 do not pool across the boundary.
 
 The rest: the grader artifact is now **pinned by the manifest** and ambiguity is a refusal
@@ -2107,3 +2110,58 @@ reserved-envelope-field guard landed.
 Mirrored to `~/.pi/agent` with zero drift both directions; the live suite's failure set is
 byte-identical before and after (the same 8 pre-existing failures from its incomplete dev
 dependencies), at 283 tests up from 277. `npm run verify` green at 345.
+
+---
+
+## 2026-08-03 (later) — final QA, then the optimizer is MOTHBALLED
+
+Closing entry. `optimizer/docs/MOTHBALLED_2026-08-03.md` is the document to read; this is the
+ledger record of what the last pass changed.
+
+**Two regressions that the 08-03 fixes introduced, caught by auditing my own commits.** Both
+matter more as a lesson than as bugs: each fix was verified, counterfactualled, and *still*
+broke something adjacent that its own test could not see.
+
+1. `verify-gate`'s new anchor was correct but lost `time npm test` and `if npm test; then …` —
+   the pre-fix unanchored branch had caught them by the same accident that made
+   `echo "run npm test" >> README` disarm the gate. Widening `CMD_POS` to recover them was
+   measured and **rejected**: it re-matches `grep -rn "if npm test" .`, trading a nag for a
+   silent disarm. Documented as an accepted false negative and pinned by a test.
+2. `plan-runner` cleared `__pi_active_plan_context` on `session_start`, which fixed the
+   dead-plan bleed but blanked a **correct** run_id on a same-cwd resume. It now re-binds from
+   the state file — the state file is the truth, so derive rather than discard.
+
+**Four false claims in this project's own documentation, all verified against ground truth
+before editing:**
+
+| claim | reality |
+|---|---|
+| "All five `block: true` sites live in `plan-runner.ts`" | **12 sites in 5 files.** Wrong when written, not stale. Three are live baseline, one is the project's credited win (loop-breaker) — so "blocking mechanisms only ever hurt" does not follow from the inventory. |
+| "0 completed compactions ever" | **2 in 1,839 rows.** Argument survives; the number did not. |
+| c21 REJECTED per `RETROSPECTIVE:24` | `:24` is the c38 row; c21 is `:18`. |
+| `~/.pi/agent`'s 8 failures are missing dev dependencies | **A tsx artifact.** No `package.json` there → CJS transform → every top-level `await` fails to load. |
+
+**And the one that actually costs the project something (§14, new).** Two fixtures were cited
+for weeks as floors justifying nulls on the local 4B. Neither reading survives:
+`hygiene-shared-config-reread` 0/6 was the gate never copying `config/` — the hidden grader died
+on `readFileSync("config/schema.json")` for **any** model, and §9 of the same document already
+forbade carrying that number forward while §2 kept citing it 140 lines earlier.
+`sv-ambiguous-spec` 1/6 was measured on a fixture v3 replaced. **The stated reason the project
+had no in-band local venue does not survive**, and re-calibrating that fixture is now the
+cheapest route to one.
+
+`grade_artifact.py`'s docstring claimed a decoy "must never forge" subscores. It can: model code
+imported by the grader runs in the same process and can write the *pinned* name. Reproduced. The
+HMAC-shaped fix is unsound for the same reason. Docstring now states the true guarantee —
+decoy-at-another-name is closed, forgery-at-the-pinned-name is not — and the residual is accepted.
+
+The 8 `// Run:` test headers told you to run from `~/.pi/agent`, which appended **real rows** to
+the live telemetry stream tagged `source="interactive"`. Now they set `TELEMETRY_FILE`.
+
+**Surface moved again to `0b37a62371f7…`** (comments and the plan-runner re-bind changed bytes).
+Mirrored, zero drift both directions. `npm run verify` green at 346 + 16, optimizer PASS.
+
+**Standing rule earned here, the third time this pattern has cost real work:** a pass rate is a
+property of *(fixture version, harness surface, model)*. Before citing one, confirm all three
+still hold. Every false claim in the table above is the same mistake — quoting a number after
+the thing it measured had changed.

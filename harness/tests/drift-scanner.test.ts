@@ -3,7 +3,11 @@ import test from "node:test";
 import { existsSync } from "node:fs";
 import { join } from "node:path";
 import { buildTruncatedDiff, extractFindings, isReviewableCommit, MAX_DIFF } from "../lib/drift-policy.ts";
-// Run: cd ~/.pi/agent && npx -y tsx --test tests/drift-scanner.test.ts
+// Run: cd ~/.pi/agent && TELEMETRY_FILE=$(mktemp) TELEMETRY_SOURCE=test \
+//        npx -y tsx --test tests/drift-scanner.test.ts
+// (TELEMETRY_FILE is not optional: without it these tests append REAL rows to
+//  ~/.pi/agent/telemetry/events.jsonl tagged source=\"interactive\", polluting the
+//  live telemetry stream the harness is measured from.)
 
 const txt = (s: string) => [{ type: "text", text: s }];
 
