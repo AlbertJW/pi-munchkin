@@ -1225,6 +1225,14 @@ export default function (pi: ExtensionAPI) {
 	// items is an interrupted plan — surface it once so the user can inspect,
 	// resume, or replace instead of never learning it exists.
 	pi.on("session_start", async (_event, ctx) => {
+		// FIRST, ahead of both early returns below: this key is written by
+		// writeStateAndTodo and deleted nowhere, while pi's loader returns the CACHED
+		// factory across session replacement, so a /new, /fork or same-cwd /resume
+		// inherited the previous plan's run_id. Both readers (context-surface.ts:29,
+		// blackboard.ts:131) stamp it onto receipts, and telemetry.ts:162 lets
+		// detail.run_id WIN the envelope join key — so the new session's receipts filed
+		// under the dead plan's run_id. (No gate impact: one pi -p session per process.)
+		delete (globalThis as Record<string, unknown>).__pi_active_plan_context;
 		rememberModel(ctx);
 		const state = await readState(ctx.cwd);
 		if (!state || state.writer === PROC_MARK) return;

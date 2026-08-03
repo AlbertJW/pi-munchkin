@@ -132,7 +132,9 @@ function valueType(value: unknown): TelemetryFieldType | "object" | "undefined" 
 // that never fired. Introduced and caught the same day (2026-07-31, plan-runner's
 // go/go-blocked `source`). run_id/provider/model are deliberately NOT reserved:
 // envelope() reads them from detail on purpose and writes back the same value.
-const RESERVED_ENVELOPE_FIELDS = new Set([
+// Exported so the static half of this guard (telemetry-catalog.test.ts) can assert
+// against the real set rather than a copy that drifts.
+export const RESERVED_ENVELOPE_FIELDS = new Set([
 	"schema", "ts", "seq", "source", "sk", "harness_surface_sha256", "config_sha256", "ext", "kind",
 ]);
 

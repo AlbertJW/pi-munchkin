@@ -311,6 +311,19 @@ export default function (pi: ExtensionAPI) {
 		delete (globalThis as Record<string, unknown>).__pi_lb_state;
 	});
 
+	// turnIndex is NOT monotonic across a session: agent-session.js:428-429 zeroes
+	// _turnIndex on every agent_start, and agent_start fires again on retry
+	// (retry.enabled), on auto-compaction, and on any message queued with
+	// triggerTurn (compact-tool does this). loop-breaker keeps its episode across
+	// those, so `event.turnIndex - ep.lastSteerTurn` below goes NEGATIVE — and
+	// nothing rejects it: the catalog types turns_since as a bare number and
+	// telemetry-report.sh takes its median. Drop the anchor instead, so a
+	// straddling steer emits no record rather than a nonsense delta. Same fix as
+	// context-dedup.ts:38-46 and session-blackboard.ts.
+	pi.on("agent_start", async () => {
+		ep.lastSteerTurn = null;
+	});
+
 	// Compaction erases file contents from the window: re-reading them afterward
 	// is NECESSARY, not a loop. Clear counters and walls (outcome state stays —
 	// a stuck failing result is still stuck after compaction).

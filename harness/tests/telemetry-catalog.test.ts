@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 import test from "node:test";
-import { catalogHas, EVENT_CATALOG, validateCatalogDetail } from "../lib/telemetry-catalog.ts";
+import { catalogHas, EVENT_CATALOG, RESERVED_ENVELOPE_FIELDS, validateCatalogDetail } from "../lib/telemetry-catalog.ts";
 
 test("every literal telemetry emission is represented in the event catalog", () => {
 	// Resolve from this test file, not cwd — the live ~/.pi/agent tree is flat
@@ -31,6 +31,23 @@ test("catalog rejects unknown kinds, fields, and invalid field types", () => {
 	assert.deepEqual(validateCatalogDetail("verify-gate", "gate-green-consumed", { leak: "x" }), ["unknown field leak"]);
 	assert.match(validateCatalogDetail("verify-gate", "steer", { fires: "one" })[0], /expected number/);
 	assert.ok(Object.keys(EVENT_CATALOG).length >= 40, "catalog covers the complete extension surface");
+});
+
+test("no catalog entry DECLARES a field that shadows an envelope key", () => {
+	// validateCatalogDetail rejects a shadowing field at runtime; this is the static
+	// half. A declared shadow fails CLOSED (the row is schema-rejected) rather than
+	// silently, so this is lint-grade — but it catches the mistake at authoring time
+	// instead of in a round. The one that shipped, plan-runner/go's `source`, would
+	// have made the event vanish from every gate extraction: context_telemetry.py
+	// discards every event whose source != "gate".
+	const violations: string[] = [];
+	for (const [event, schema] of Object.entries(EVENT_CATALOG)) {
+		for (const field of Object.keys(schema)) {
+			if (RESERVED_ENVELOPE_FIELDS.has(field)) violations.push(`${event}.${field}`);
+		}
+	}
+	assert.deepEqual(violations, [], "rename the field — envelope keys are not available to detail");
+	assert.ok(RESERVED_ENVELOPE_FIELDS.has("source"), "the set must still be the real one, not an empty stand-in");
 });
 
 test("machine-readable exposure catalog stays in lockstep with TypeScript catalog", () => {

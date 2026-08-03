@@ -1,5 +1,8 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import { existsSync, mkdtempSync, readFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { thresh, resolveStopMode, fpKey, decideTier, tallySessionRepeats, type Thresholds } from "../extensions/loop-breaker.ts";
 import { fire, makeFakePi } from "./integration-harness.ts";
 
@@ -153,4 +156,61 @@ test("session_start clears SESSION-cumulative state (no bleed across /new, /fork
 	assert.deepEqual(state(), firstTurn,
 		`a fresh session's first turn must match the original first turn, not carry ${accumulated.sessionRepeats} repeats forward`);
 	delete g.__pi_lb_state;
+});
+
+test("agent_start drops the steer anchor — turns_since can never go negative", async () => {
+	// turnIndex is NOT monotonic: agent-session.js:428-429 zeroes _turnIndex on every
+	// agent_start, which fires again on retry, on auto-compaction, and on any message
+	// queued with triggerTurn. loop-breaker keeps its episode across those, so a steer
+	// at turn 9 followed by a restart and progress at turn 1 recorded turns_since: -8.
+	// Nothing rejected it — the catalog types turns_since as a bare `number` and
+	// telemetry-report.sh takes its median.
+	const telemetry = join(mkdtempSync(join(tmpdir(), "lb-")), "telemetry.jsonl");
+	const prev = process.env.TELEMETRY_FILE;
+	process.env.TELEMETRY_FILE = telemetry;
+	const g = globalThis as Record<string, unknown>;
+	try {
+		const fp = makeFakePi();
+		const mod = await import(`../extensions/loop-breaker.ts?agentstart=${Date.now()}-${Math.random()}`);
+		mod.default(fp.pi as never);
+		const ctx = { ui: { notify() {} }, abort() {}, cwd: "/tmp" };
+		const repeatTurn = (turnIndex: number) => ({
+			turnIndex, toolResults: [],
+			message: { role: "assistant", provider: "local-llama", content: [
+				{ type: "toolCall", id: "a", name: "read", arguments: { path: "src/x.ts" } },
+				{ type: "toolCall", id: "b", name: "read", arguments: { path: "src/x.ts" } },
+			] },
+		});
+		// A mutation is "progress", which is what emits progress-after-steer.
+		const progressTurn = (turnIndex: number) => ({
+			turnIndex, toolResults: [],
+			message: { role: "assistant", provider: "local-llama", content: [
+				{ type: "toolCall", id: "m", name: "edit", arguments: { path: "src/x.ts" } },
+			] },
+		});
+
+		await fire(fp, "session_start", {});
+		// EXACTLY two repeat turns: tier 1 then tier 2, leaving lastSteerTurn = 2. A
+		// third would hit tier 3, whose abort resets the episode and clears the anchor —
+		// so a longer loop here makes this test vacuous (the first draft used six and
+		// passed with the fix reverted).
+		for (let t = 1; t <= 2; t++) await fire(fp, "turn_end", repeatTurn(t), ctx);
+		await fire(fp, "agent_start", {}, ctx);   // retry / compaction: turnIndex restarts
+		await fire(fp, "turn_end", progressTurn(1), ctx);
+		assert.deepEqual(fp.swallowedErrors, [], "no handler threw");
+
+		const rows = existsSync(telemetry)
+			? readFileSync(telemetry, "utf8").trim().split("\n").filter(Boolean).map((l) => JSON.parse(l))
+			: [];
+		assert.ok(rows.some((r) => r.ext === "loop-breaker" && r.kind === "steer"),
+			"the steer must actually land, or this test proves nothing about the anchor");
+		const deltas = rows.filter((r) => r.ext === "loop-breaker" && r.kind === "progress-after-steer")
+			.map((r) => r.turns_since);
+		// Without the reset this is exactly [-1] (steer at turn 2, progress at turn 1).
+		assert.deepEqual(deltas, [],
+			`a steer straddling agent_start must emit NO record, got turns_since ${JSON.stringify(deltas)}`);
+	} finally {
+		if (prev === undefined) delete process.env.TELEMETRY_FILE; else process.env.TELEMETRY_FILE = prev;
+		delete g.__pi_lb_state;
+	}
 });

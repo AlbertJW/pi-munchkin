@@ -1355,3 +1355,33 @@ test("/plan and /plan-go prompts survive a STREAMING session (steer, not lost)",
 	assert.equal(goDelivery.effective, "queued-steer", "mid-stream delivery queues as steer");
 	resetPiGlobals();
 });
+
+test("session_start clears __pi_active_plan_context (no run_id bleed across /new, /fork, /resume)", async () => {
+	// writeStateAndTodo publishes this key and NOTHING deleted it. pi's loader returns
+	// the CACHED factory across session replacement, so a later session in the same
+	// process inherited the dead plan's run_id — and telemetry.ts lets detail.run_id
+	// WIN the envelope join key, so the new session's receipts filed under the old
+	// plan. Both readers (context-surface.ts:29, blackboard.ts:131) stamp it verbatim.
+	// (No gate impact: real_gate.sh runs one `pi -p` session per process.)
+	const g = globalThis as Record<string, unknown>;
+	const fp = freshPlanRunner();
+	const cwd = tmp();
+	try {
+		const { ctx } = makeCtx(cwd);
+		await fp.commands.get("plan").handler("first plan", ctx);
+		await callTool(fp, "plan_write", {
+			items: [{ title: "one", status: "pending" }], request: "first plan", summary: "one",
+		}, cwd);
+		const first = g.__pi_active_plan_context as { run_id?: string } | undefined;
+		assert.ok(first?.run_id, "the plan must actually publish a context, or this test proves nothing");
+
+		// A second session through the same cached factory, in a DIFFERENT cwd so no
+		// state file is found — the path that used to leave the stale key in place.
+		await fire(fp, "session_start", {}, makeCtx(tmp()).ctx);
+		assert.equal(g.__pi_active_plan_context, undefined,
+			`session_start must clear the plan context, still holding run_id ${first?.run_id}`);
+	} finally {
+		delete g.__pi_active_plan_context;
+		resetPiGlobals();
+	}
+});
