@@ -81,8 +81,9 @@ invalidates provenance.
 - **Dark:** every remaining `cNN`, including `MICRO_GATE`. Verdicts and per-candidate grounds:
   `optimizer/docs/DARK_CANDIDATE_VERDICTS_2026-08-03.md`.
 - **Harness surface `e829c72dd1b8…`** as of 2026-08-03 (moved — see below). `npm run verify` is
-  green at 346 harness tests + 16 optimizer, plus the optimizer battery. The `~/.pi/agent` mirror
-  is zero-drift, and its own suite runs 283 tests with **8 failures that are a tsx artifact, not
+  green at 333 harness tests + 16 optimizer, plus the optimizer battery (the retired candidates
+  took their tests with them). The `~/.pi/agent` mirror
+  is zero-drift, and its own suite runs 277 tests with **8 failures that are a tsx artifact, not
   defects**: that directory has no `package.json`, so tsx transforms to CJS and every test file
   using top-level `await` fails to load (`Top-level await is currently not supported with the
   "cjs" output format`). The repo suite is authoritative. (This entry previously blamed

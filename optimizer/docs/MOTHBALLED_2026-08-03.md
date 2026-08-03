@@ -64,8 +64,9 @@ This matters more than the results, because a future reader will otherwise repea
 
 ## The one-way door: the surface moved
 
-`HARNESS_SURFACE_SHA256` is now **`e829c72dd1b8…`**. The 2026-08-03 verify-gate fixes are
-model-visible (defect fixes, so no `cNN` flag). **Rows before and after are on different
+`HARNESS_SURFACE_SHA256` is now **`e829c72dd1b8…`** (it moved three times on 2026-08-03: the
+verify-gate defect fixes, then the state-bug fixes, then the judgment-pass adoptions — every
+one model-visible). **Rows before and after are on different
 surfaces.** Any restart re-baselines; it does not pool across that boundary. This is the single
 easiest way to silently produce a wrong result here.
 
@@ -94,7 +95,9 @@ pre-registered grounds (c7, c14, c32, c37, c50), the rest tiered with explicit r
 - **The harness (`harness/` → `~/.pi/agent`) is live and unaffected by this.** loop-breaker,
   verify-gate, git-guard, hashline, ketch, plan-runner v3, the context guards. Mothballing the
   optimizer does not park the agent.
-- Everything `cNN` is **dark** by default. Nothing model-visible turns on by itself.
+- Every remaining `cNN` is **dark** by default. (Three former candidates — c48-view, c28, c24 —
+  are now adopted live baseline per `DARK_CANDIDATE_VERDICTS_2026-08-03.md`; each has an `=off`
+  kill switch.) Nothing else model-visible turns on by itself.
 - The gate, fixtures and admission tooling all still work. `npm run verify` covers them.
 
 ## Known, accepted, documented residuals
@@ -109,7 +112,7 @@ Not defects to fix on restart — decisions already taken, recorded so they are 
   disarm. Pinned by a test.
 - **The `~/.pi/agent` suite reports 8 failures.** This is a *tsx* artifact, not a defect: that
   directory has no `package.json`, so tsx transforms to CJS and every test file using top-level
-  `await` fails to load. The repo suite (346 tests) is authoritative. Adding
+  `await` fails to load. The repo suite (333 tests) is authoritative. Adding
   `{"type": "module"}` there would fix it, but it changes how the live agent resolves modules —
   verify pi still loads before doing it. (The ledger previously blamed "incomplete dev
   dependencies"; that was wrong.)
