@@ -112,13 +112,28 @@ def test_admission_catalog():
                 assert all(not x["passed"] for x in result["fail_to_pass"])
         if manifest["admission"].get("approved"):
             assert manifest["admission"].get("reviewer") and manifest["admission"].get("reviewed_at")
+            # The approval names the content it covered. Editing the manifest — the command,
+            # the overlay, the timeout, the grader — without re-approving turns this red.
+            assert manifest["admission"].get("manifest_sha256") == admission.manifest_digest(manifest), \
+                f"{path.stem}: approved under different manifest content"
         else:
             assert admission.authoritative(manifest)[0] is False  # human approval is mandatory
 
         approved = copy.deepcopy(manifest)
         approved["admission"].update(approved=True, reviewer="selftest", reviewed_at="2026-07-14T00:00:00Z")
         approved["timestamps"]["expires_at"] = "2099-01-01T00:00:00Z"
+        approved["admission"]["manifest_sha256"] = admission.manifest_digest(approved)
         assert admission.authoritative(approved)[0]
+
+        # Every field that defines the test is under the approval, not just the fixture files.
+        for field, mutate in (("command", lambda t: t["tests"]["fail_to_pass"].update(command=["true"])),
+                              ("overlays", lambda t: t["tests"]["fail_to_pass"].update(overlays=[])),
+                              ("timeout", lambda t: t["tests"]["fail_to_pass"].update(timeout_seconds=1)),
+                              ("grade_artifact", lambda t: t["tests"]["fail_to_pass"].update(grade_artifact="x")),
+                              ("expiry", lambda t: t["timestamps"].update(expires_at="2098-01-01T00:00:00Z"))):
+            tampered = copy.deepcopy(approved); mutate(tampered)
+            assert admission.authoritative(tampered) == (False, "manifest changed after approval"), \
+                f"{path.stem}: editing {field} did not revoke approval"
         approved["timestamps"]["expires_at"] = "2000-01-01T00:00:00Z"
         assert admission.authoritative(approved)[1] == "fixture expired"
         approved["timestamps"]["expires_at"] = "2099-01-01T00:00:00Z"

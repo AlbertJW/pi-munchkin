@@ -118,6 +118,7 @@
         ]
       }
     },
+    "manifest_sha256": "44b5312e0653274647c6505002f07203e00ae013fa74e7365f25f2d9e7d34db4",
     "reviewed_at": "2026-07-31T08:40:28Z",
     "reviewer": "Albert (delegated: Claude Fable 5, 2026-07-30)"
   },

@@ -118,6 +118,7 @@
         ]
       }
     },
+    "manifest_sha256": "c42b16fe8dbb97486c75e6fbf3c1a3ee37664f9b6c4f6ea15e3d3d89507412dd",
     "reviewed_at": "2026-08-03T08:56:05Z",
     "reviewer": "Albert (delegated: Claude Opus 5, 2026-08-03; re-admission for tests.fail_to_pass.grade_artifact pin)"
   },

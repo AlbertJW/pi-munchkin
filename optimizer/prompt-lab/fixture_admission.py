@@ -108,6 +108,21 @@ def safe_root(relative):
     return path
 
 
+def manifest_digest(m):
+    """Hash of everything the manifest defines — command, overlays, timeouts, grader,
+    prompts, expiry. The admission block itself is excluded so recording automation
+    evidence or the approval does not invalidate the approval."""
+    body = {k: v for k, v in m.items() if k != "admission"}
+    return hashlib.sha256(json.dumps(body, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
+
+
+def manifest_drift(m):
+    """An approval that no longer describes this manifest. Reported, never folded into
+    `passed`: editing then re-checking then re-approving is the intended repair path."""
+    stored = m["admission"].get("manifest_sha256")
+    return bool(stored) and stored != manifest_digest(m)
+
+
 def artifact_drift(m):
     errors = []
     for item in m["artifacts"]:
@@ -203,7 +218,8 @@ def check_one(task, write=True):
     """Run automated checks; optionally record their evidence in the manifest."""
     path, m = load_manifest(task)
     drift = artifact_drift(m)
-    result = {"checked_at": iso(utcnow()), "runs_per_state": RUNS, "hash_drift": drift, "states": {}, "passed": False}
+    result = {"checked_at": iso(utcnow()), "runs_per_state": RUNS, "hash_drift": drift,
+              "manifest_drift": manifest_drift(m), "states": {}, "passed": False}
     if not drift:
         result["states"]["pristine_pass_to_pass"] = run_state(m, None, "pass_to_pass")
         result["states"]["pristine_fail_to_pass"] = run_state(m, None, "fail_to_pass")
@@ -269,7 +285,8 @@ def approve(task, reviewer):
     m["timestamps"]["admitted_at"] = iso(now)
     m["timestamps"]["expires_at"] = iso(now + dt.timedelta(days=90))
     m["admission"].update({"approved": True, "reviewer": reviewer, "reviewed_at": iso(now),
-                           "approved_prompt_hashes": [v["sha256"] for v in m["prompts"]["perturbations"]]})
+                           "approved_prompt_hashes": [v["sha256"] for v in m["prompts"]["perturbations"]],
+                           "manifest_sha256": manifest_digest(m)})
     path.write_text(json.dumps(m, indent=2, sort_keys=True) + "\n", encoding="utf-8")
 
 
@@ -282,7 +299,10 @@ def authoritative(m, now=None):
     checks = ((m["admission"].get("automated", {}).get("passed"), "automation not passed"),
               (m["admission"].get("approved"), "human approval missing"),
               (not artifact_drift(m), "artifact hash drift"),
-              (expiry > now, "fixture expired"))
+              (expiry > now, "fixture expired"),
+              # Last, so the checks above keep their more specific reasons. Fail-closed on a
+              # missing hash: an approval that predates this field never covered the content.
+              (m["admission"].get("manifest_sha256") == manifest_digest(m), "manifest changed after approval"))
     for ok, reason in checks:
         if not ok:
             return False, reason
@@ -309,6 +329,8 @@ def main():
                 result = check_one(task, write=args.command == "check")
                 suffix = "" if args.command == "check" else " (read-only; manifest unchanged)"
                 print(f"{task}: {'PASS' if result['passed'] else 'FAIL'}{suffix}")
+                if result["manifest_drift"]:
+                    print(f"{task}: manifest edited since approval — not authoritative until re-approved")
                 failed |= not result["passed"]
             raise SystemExit(1 if failed else 0)
         if args.command == "review-packet":

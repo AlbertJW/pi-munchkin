@@ -118,6 +118,7 @@
         ]
       }
     },
+    "manifest_sha256": "69ec7fb559d0aceb2438f55c268a13177f7667d7cef346a4736eb2b59ba663b1",
     "reviewed_at": "2026-07-20T17:41:34Z",
     "reviewer": "Albert Wessels (implementation-plan approval)"
   },

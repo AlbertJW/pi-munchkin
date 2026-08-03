@@ -3,7 +3,8 @@
 `real_gate.sh` now consumes `pi.fixture/v1` manifests from
 `real-gate-fixtures/manifests/` and writes `pi.eval-row/v2` rows. A fixture is
 authoritative only when triple-run admission passes, artifact hashes match, the
-90-day expiry has not elapsed, and a named human reviewer has approved it.
+90-day expiry has not elapsed, and a named human reviewer has approved it —
+approved *this* manifest, pinned by `admission.manifest_sha256`.
 
 ```sh
 # Read-only health check: runs all automated fixture checks and changes no files.
@@ -24,7 +25,12 @@ the evidence-recording admission operation to run before human review and
 approval.
 
 Approval also approves the three reviewed semantic prompt perturbations and
-sets expiry to 90 days from review. Expired fixtures cannot be reactivated; make
+sets expiry to 90 days from review. It records `manifest_sha256` over the whole
+manifest except the `admission` block, so editing any field that defines the
+test — `tests.*.command`, `overlays`, `timeout_seconds`, `grade_artifact`,
+prompts, expiry — makes the fixture non-authoritative until it is re-approved.
+`check`/`verify` report the mismatch but still run and record evidence, which is
+what makes edit → `check` → `approve` the repair path. Expired fixtures cannot be reactivated; make
 a new version/cohort instead. Incident lifecycle commands are:
 
 ```sh
