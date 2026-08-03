@@ -173,15 +173,40 @@ Nothing below can return a positive result until this exists.
 - **c48 state-lens (view)** — additive, no blocking mechanism, so it cannot produce the harm
   signature; 265 injections; an authoritative round already exists (`c48-view-35b`) and was
   informationless only because its fixtures were one floor plus two ceilings. Cost to weigh:
-  the per-call tail breaks the KV prefix every call (`session-blackboard.ts:167-177`).
-- **c21 micro-gate, re-specified.** Its "7/7 metrics better" is a **count-not-rate artifact**:
-  normalized per tool call, the error rate got *worse* in two of three rounds
-  (parens −30.5%, qs +3.4%, screen +15.6%), and the headline −64% is mostly a −49.5% volume
-  reduction. Pass rate fell twice (15/20→13/20 p=0.73; 13/18→12/18 p=1.0), and
-  `RETROSPECTIVE_2026-07-30.md:24` records it **REJECTED**, not parked — my first draft had that
-  wrong. Steelman that survives: surfacing a parse error at `turn_end` instead of five turns
-  later legitimately shortens sessions. Re-run only with **errors-per-call as the pre-registered
-  primary** and a fixed turn budget to close the truncation channel.
+  the per-call tail breaks the KV prefix every call (`session-blackboard.ts:167-177`) — and
+  **`prefix_stable_rate` cannot see it**: it reads 1.0 on both arms of both c48 rounds despite 148
+  and 117 lens injections, because `context-surface` (readdir index 6) hashes the messages before
+  `session-blackboard` (index 19) appends. Read that 1.0 as *unmeasured*, not *stable*, and note
+  that c26/c30 name the same field as their non-regression guardrail
+  (`MEASUREMENT_METHODOLOGY_2026-07.md` §13).
+- **c21 micro-gate, re-specified.** Its "7/7 metrics better" is a **count-not-rate artifact** —
+  the headline −64% error count sits on a −31.3% call-volume reduction (1544 → 1060 calls), and
+  in the parens round alone volume fell −49.5%. But the first draft of this entry cited *three*
+  pairings ("worse in two of three rounds") when **seven** exist across five result files, and
+  all four it omitted favour c21 — including `c21-screen-qs-error-swallow`, the direct sibling of
+  the one `screen` round it did include. Every pairing, errors per tool call:
+
+  | round | task | n/arm | base err/call | cand err/call | Δ | pass base→cand |
+  |---|---|---|---|---|---|---|
+  | `gemma-e2b-c21-micro-gate` | bigdata | 3 | 0.536 | 0.471 | **−12.2%** | 3/3 → 3/3 |
+  | `gemma-e2b-c21-micro-gate` | equil | 3 | 0.714 | 0.568 | **−20.5%** | 1/3 → 1/3 |
+  | `gemma-e2b-c21-micro-gate` | parens | 3 | 0.750 | 0.500 | **−33.3%** | 0/3 → 1/3 |
+  | `q4b-c21-effort-qs` | qs-error-swallow | 18 | 0.311 | 0.322 | **+3.4%** | 13/18 → 12/18 |
+  | `q4b-c21-effort` | parens | 20 | 0.300 | 0.208 | **−30.5%** | 15/20 → 13/20 |
+  | `c21-screen-parens` | parens | 6 | 0.298 | 0.344 | **+15.6%** | 5/6 → 5/6 |
+  | `c21-screen-qs-error-swallow` | qs-error-swallow | 6 | 0.371 | 0.356 | **−4.2%** | 6/6 → 6/6 |
+
+  The three gemma cells are n=3/arm — below the noise floor (§10), listed for completeness, not
+  as evidence. Accurate summary: **improved in 5 of 7; pooled −5.9%** (520/1544 → 336/1060), or
+  **−4.2%** excluding the three n=3 cells.
+
+  **c21 stays in Tier B regardless**, because the correction does not touch the disqualifying
+  confound: cand cuts call volume ~31%, so error *counts* fall largely by truncation, and pass
+  rate fell in **both** large-n rounds (15/20→13/20 p=0.73; 13/18→12/18 p=1.0).
+  `RETROSPECTIVE_2026-07-30.md:24` records it **REJECTED**, not parked. Steelman that survives:
+  surfacing a parse error at `turn_end` instead of five turns later legitimately shortens
+  sessions. Re-run only with **errors-per-call as the pre-registered primary** and a fixed turn
+  budget to close the truncation channel.
 
 ### Tier C — Requires a behaviour the models do not exhibit
 `c25`, `c31`, `c32`, `c34`, `c36`, `c37`, `c39`. c37 is 0-for-2 with adverse effort. c32 has met
@@ -255,6 +280,9 @@ changed yet.
   obvious control failed to catch it.
 - **Normalize rate metrics by volume.** §4's c21 entry: a −64% error count under a −49.5% call
   count is not a −64% improvement.
+- **Enumerate every pairing, or cite none.** The correction above was itself selective: it quoted
+  3 of 7 c21 pairings and all 4 it dropped pointed the other way. Debunking a cherry-pick with a
+  cherry-pick is the same error with the sign flipped — count the cells first, then write.
 - **A mechanism that fires only on its own purpose-built fixture has not been shown to
   generalise.** §4's c24 entry.
 - **Recount before citing a mechanism-firing number** (§2.3 — the circulating figures were 2×).

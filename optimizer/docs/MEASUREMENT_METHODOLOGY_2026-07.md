@@ -406,3 +406,43 @@ the two models that matter, locally**: `path-near-miss` (50%) and `sv-commit-sha
 remote (non-authoritative); `sv-convention-provenance` (50%) is local at n=6. `audit-sweep` is
 graded and has **never been run** — its band is unknown, and finding out is the cheapest next
 measurement available.
+
+---
+
+## §13 — `prefix_stable` cannot see a context-injecting candidate. It reads 1.0 anyway.
+
+A deep-QA lens claimed `STATE_LENS=view` drives `prefix_stable_rate` to zero, making a required
+row metric a harness artifact. **Measured, and refuted** — but the truth is worse than the claim.
+
+| round | arm | lens injections | `prefix_stable_rate` | `appended_only_rate` |
+|---|---|---|---|---|
+| `c48-view-35b` | base (n=18) | 0 | 1.0 | 1.0 |
+| `c48-view-35b` | cand (n=18) | **148** | **1.0** | **1.0** |
+| `c48-trap-4b` | base (n=6) | 0 | 1.0 | 1.0 |
+| `c48-trap-4b` | cand (n=6) | **117** | **1.0** | **1.0** |
+
+The receipt is computed *before* the lens exists. The gate loads extensions by `readdir` from
+`~/.pi/agent/extensions`, where `context-surface.ts` is index 6 and `session-blackboard.ts` is
+index 19, so `context-surface` hashes the message array on its way past and the lens is appended
+afterwards. (`package.json`'s declared order is irrelevant — it is not the live venue.)
+
+**So the 1.0 is false reassurance, not a pass.** `session-blackboard.ts:164-172` states plainly
+that the lens *does* break the serving-side prefix on every call: the view is per-call, so on call
+N+1 the message that was last on call N has lost its lens tail and llama.cpp re-prefills from that
+position. The cost is real, accepted, and **structurally invisible to the metric named after it**.
+
+Consequences, in order of how much they can hurt:
+
+1. `c26` and `c30` both pre-register "`prefix_stable` must NOT regress" as their non-regression
+   guardrail (`configs/static/c26-read-dedup.json:3`, `c30-context-brief.json:3`). That guardrail
+   is blind to the one candidate *known* to violate it. Combining c48 with either is currently
+   unfalsifiable on the axis both preregs chose.
+2. Any c48 token or latency number carries an unmeasured re-prefill cost. Do not read c48's
+   `in_tok` as if the prefix were reused.
+
+**No reorder.** Moving `session-blackboard` after `context-surface` would change what the receipt
+measures without changing what the server does, trading an invisible cost for a visible number
+that is equally wrong. What is required is a **lens-aware prefix metric** — one computed on the
+messages actually sent to the endpoint, after every `context` handler has run — before
+`prefix_stable` may serve as a guardrail for any context-injecting candidate. Until that exists,
+treat `prefix_stable_rate = 1.0` on a c48/c26/c30 arm as *unmeasured*, not as *stable*.

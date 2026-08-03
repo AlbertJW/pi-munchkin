@@ -1999,8 +1999,12 @@ gold 8/8, so the two states the binary bit scores **identically** are 0.000 vs 0
 **Three of my own tiers were wrong, and an adversarial pass caught them.** c38 was ranked first;
 its own design comment says it exists to give c31/c25/c37 "a surface to fire on" — infrastructure,
 not an intervention — it fires once, induces no extra reading, and its only powered round is the
-−56pp collapse. c21's "7/7 metrics better" is count-not-rate: per tool call the error rate got
-*worse* in two of three rounds. c24 fails its own tier's criterion, firing 8/8 on its purpose-built
+−56pp collapse. c21's "7/7 metrics better" is count-not-rate: the −64% error count sits on −31%
+call volume, and pass rate fell in both large-n rounds. (My *correction* was then selective in
+turn — it cited 3 pairings when 7 exist and all 4 omitted favour c21; per call c21 improves in 5
+of 7, pooled −5.9%. The Tier B placement is unchanged: the truncation confound is what disqualifies
+it, not the sign. Full table: `CANDIDATE_STRATEGY_2026-07-31.md` §Tier B.)
+c24 fails its own tier's criterion, firing 8/8 on its purpose-built
 fixture and 0/8 elsewhere, with two base draws of the identical config measuring 2/6 and 4/6 — a
 swing larger than the claimed effect.
 
