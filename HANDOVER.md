@@ -1,4 +1,4 @@
-# Handover — pi_munchkin, as of 2026-07-27
+# Handover — pi_munchkin, as of 2026-08-03
 
 You are picking up a harness + measurement project for making small local LLMs competent
 multi-turn coding agents. **Read this before touching anything**, because the project's own
@@ -66,6 +66,45 @@ invalidates provenance.
 - **Live by default:** loop-breaker, verify-gate, drift-scanner, ketch, hashline, git-guard, the
   context guards, plan-runner v3. context-watcher is passive telemetry only as of 2026-07-28.
 - **Dark:** everything `cNN`, including `MICRO_GATE`.
+- **Harness surface `94293a7204de…`** as of 2026-08-03 (moved — see below). `npm run verify` is
+  green at 345 harness tests + 16 optimizer, plus the optimizer battery. The `~/.pi/agent` mirror
+  is zero-drift, and its own suite runs at 283 tests with **8 pre-existing failures** caused by
+  that tree's incomplete dev dependencies — a known gap, not a regression. Verify a mirror by
+  diffing the failure-set *by name* before and after, never by counting passes.
+
+### Landed 2026-08-03 (5 commits, `51b8792`..`e5ad6a7`) — instrument fixes
+
+> **THE SURFACE HASH MOVED to `94293a7204de…`.** The verify-gate fixes below are model-visible
+> (defect fixes, so no `cNN` flag). Rows written before and after are on **different surfaces**:
+> re-baseline before the next round and do not pool across the boundary.
+
+The 2026-07-31 deep QA left 40 findings whose refuters all died on a session limit. Nine were
+verified by hand that day; the remaining ten instrument-class ones were checked by three agents
+on 08-03 — **8 real and fixed, 1 refuted, 1 sub-claim refuted**. Disposition table is at the top
+of `QA_FINDINGS_2026-07-31_UNVERIFIED.md`; **21 of the 40 are still unexamined.**
+
+1. **`verify-gate` had two disarm defects, both live in every gate round, both untested.**
+   `buildRe()` appended the detected gate command outside the command-position group — `|` has
+   the lowest precedence, so the branch had no anchor and `echo "Run npm test to verify" >>
+   README.md` armed and disarmed the gate in one turn. And `VERIFY_COMMAND_RE` listed `test\b`
+   first, so the POSIX file-test builtin (`test -f dist/app.js && echo ok`) counted as a suite.
+   `harness/tests/verify-gate.test.ts` is new; there was **zero** coverage before.
+2. **The graded artifact is now pinned by the manifest** (`tests.fail_to_pass.grade_artifact`),
+   not found by globbing `.*-grade.json` and taking `sorted()[0]` out of a model-writable
+   workdir. Ambiguity is a refusal (`subscores_blocked` on the row), never a pick.
+   `prompt-lab/grade_artifact.py` is the single extraction; `integrity_selftest` calls it instead
+   of its own copy. `rm -f` before grading would NOT have closed this: `node --test` runs outside
+   the sandbox and imports model-authored `src/`, so model code runs during grading.
+3. `loop-breaker` drops its steer anchor on `agent_start` (turnIndex is not monotonic — pi zeroes
+   it on retry and compaction, so `turns_since` went negative); `plan-runner` clears
+   `__pi_active_plan_context` on `session_start`; the static half of the reserved-envelope-field
+   guard landed.
+4. **Two of this project's own claims were wrong and are corrected.** The c21 entry cited 3 of 7
+   base/cand pairings and all four it omitted favoured c21 — per tool call it improves in **5 of
+   7, pooled −5.9%**. Tier B is unchanged (the truncation confound disqualifies it, not the sign).
+   And `prefix_stable_rate` **cannot see a context-injecting candidate** — it reads 1.0 while the
+   lens breaks the serving prefix every call, and c26/c30 both name it as their guardrail
+   (METHODOLOGY §13).
 
 ### Landed 2026-07-28 (4 commits, `7ad9fbc`..`9c82acf`)
 
@@ -135,8 +174,12 @@ this reads as a rejection.
 
 - **Editing a running bash script corrupts it.** `real_gate.sh` is read by byte offset; editing it
   mid-round can make bash seek into shifted bytes. Kill and relaunch instead.
-- **`tsconfig` does not set `noUnusedLocals`** — dead imports survive typecheck *and* 289 tests.
+- **`tsconfig` does not set `noUnusedLocals`** — dead imports survive typecheck *and* 345 tests.
   Sweep by hand after a deletion.
+- **A regression test that passes is not yet evidence.** Revert the fix and confirm the test goes
+  red, every time. Four guards shipped vacuous this week — three found by others, one of mine
+  found only by running the counterfactual (a six-turn loop-breaker sequence reached tier 3,
+  whose abort cleared the very state under test, so the test passed with the fix removed).
 - **Regex surgery on structured files corrupts them.** Doing this to `context_telemetry.py` broke it
   twice today. Use explicit line ranges, or `git checkout` and start over.
 - **`configuration`-mode exposure is vacuously `targeted`.** It means "config applied", *never*
@@ -149,11 +192,18 @@ this reads as a rejection.
 ## Where to start
 
 1. `optimizer/docs/MEASUREMENT_METHODOLOGY_2026-07.md` — why the old verdicts don't hold.
-2. `optimizer/docs/ADOPT_OR_RETIRE_PROTOCOL_2026-07.md` — the S1→S3 funnel and the c21 verdict.
-3. `optimizer/docs/CANDIDATE_PRUNING_2026-07.md` — per-candidate history.
-4. `README.md` — the harness itself.
-5. `optimizer/docs/HARNESS_SELF_IMPROVEMENT.md` — the full ledger. **Has a warning banner at the
+   §9 invalidity boundary, §10 noise floor, §11 why three rounds yielded zero information,
+   §12 the graded instrument, **§13 why `prefix_stable` cannot be trusted as a guardrail**.
+2. `optimizer/docs/CANDIDATE_STRATEGY_2026-07-31.md` — the tiered roster and, in §1, the single
+   most important fact about this instrument: at n=9/arm the gate detects harm and almost
+   nothing else.
+3. `optimizer/docs/ADOPT_OR_RETIRE_PROTOCOL_2026-07.md` — the S1→S3 funnel and the c21 verdict.
+4. `optimizer/docs/CANDIDATE_PRUNING_2026-07.md` — per-candidate history (2026-07-28 snapshot).
+5. `README.md` — the harness itself.
+6. `optimizer/docs/HARNESS_SELF_IMPROVEMENT.md` — the full ledger. **Has a warning banner at the
    top; heed it.**
+7. `optimizer/docs/QA_FINDINGS_2026-07-31_UNVERIFIED.md` — raw QA output. Read its disposition
+   table first: 19 of 40 examined (17 fixed, 2 refuted), **21 never examined**.
 
 ## The route (2026-07-29 — ordered by evidence-per-box-hour)
 
@@ -191,6 +241,13 @@ candidates until c25 and c48 resolve.
 > **The queue is now instrument-first, because no candidate round can return a positive result
 > until it is done** (METHODOLOGY §12 / `CANDIDATE_STRATEGY_2026-07-31.md` §1: at n=9/arm the
 > gate detects harm and essentially nothing else).
+>
+> **Before B1: the surface changed on 2026-08-03** (`94293a7204de…`). Every pre-08-03 row is on
+> the old surface, so the B1/B2 base rates must be collected fresh — do not compare them against
+> the historical `sv-convention-provenance` 3/6 as if it were the same instrument. The graded path
+> B2 exercises also changed: `subscores` now requires the manifest's `grade_artifact` pin, and a
+> row that could not resolve it carries `subscores_blocked` instead of silently having no
+> subscores. Check that field before concluding a round is ungraded.
 >
 > **B1. Re-run `sv-convention-provenance` on the local 4B, base arm, n≥20.** CORRECTED
 > 2026-07-31 after the QA: this is already an in-band LOCAL venue (3/6 = 50%), and its rows are
@@ -253,6 +310,21 @@ Standing rules: docs commits are always safe; harness commits are safe; `~/.pi/a
 - The first-principles triage that retired ~20 planning candidates was **mechanism reasoning, not
   measurement**. It is well-grounded but it is an argument, not a result. If you disagree, the data
   is all in `optimizer/prompt-lab/results/*.jsonl`.
-- I made several mechanical errors today (dead import, corrupted file, a safety regression an
-  existing test caught). Everything is green now, but treat recent commits with the same suspicion
-  you'd apply to anyone's large mechanical change.
+- I made several mechanical errors on 2026-07-27 (dead import, corrupted file, a safety regression
+  an existing test caught). Everything is green now, but treat recent commits with the same
+  suspicion you'd apply to anyone's large mechanical change.
+
+**Added 2026-08-03:**
+
+- **The instrument fixes are unmeasured by construction.** All eight are defect fixes with
+  counterfactual-checked regression tests, but no A/B round has run on the new surface. "The
+  gate now measures what it claims to" is a reasoned assertion, not a result.
+- **21 of the 40 QA findings have never been examined.** They are not "clean" — they are
+  unread. Two of the ten that were examined turned out to be wrong, so expect roughly half of
+  the remainder to evaporate, and expect the other half to be real.
+- **The c21 correction was itself a cherry-pick, and I wrote both versions.** The first cited
+  the 3 pairings that made it look worst; there are 7. That is the second time in this project
+  a confident summary survived because nobody counted the cells. Count the cells.
+- **`prefix_stable` was believed to be a working guardrail for months.** It is not, for any
+  candidate that injects context — and c26 and c30 both pre-register it as theirs. Nothing
+  downstream of that has been re-examined.

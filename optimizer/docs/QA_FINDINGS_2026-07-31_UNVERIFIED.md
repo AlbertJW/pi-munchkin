@@ -1,18 +1,42 @@
-# Deep-QA 2026-07-31 — RAW, UNVERIFIED findings (refuters never ran)
+# Deep-QA 2026-07-31 — RAW findings (refuters never ran); PARTIALLY CLOSED 2026-08-03
 
 **Status: NOT a review result.** 7 Find lenses completed and returned 40 findings; all 18
 adversarial refuters AND the adjudicator failed on a session limit. The workflow's
-`survived: 0` therefore means *no refuter ran*, NOT *nothing survived*.
+`survived: 0` therefore means *no refuter ran*, NOT *nothing survived*. The 40 below are
+preserved **verbatim as first written** — including the ones later refuted — because the point
+of the file is the raw lens output, not a curated result.
 
-Two were verified BY HAND and fixed (commit 9016229): the telemetry `source` shadowing I
-introduced that morning, and the pre-existing `plan-mode-block` `kind` shadowing it surfaced.
-Everything else below is **unexamined** — a lens's unverified assertion, nothing more. This
-project's history is that roughly half of such findings are wrong or unreachable, so do not
-act on any of them without re-deriving from source.
+## Disposition (read this before acting on anything below)
 
-Re-run verification with:
+**19 of 40 have since been examined. 17 were real and are fixed; 2 were refuted.**
+
+| group | n | outcome | where the work is recorded |
+|---|---|---|---|
+| verified by hand, 2026-07-31 | 9 | all fixed | `HARNESS_SELF_IMPROVEMENT.md`, 2026-07-31 entry — telemetry envelope shadowing, the `plan-mode-block` `kind` collision it exposed, four `config.py` guard defects, three `effort_report` defects |
+| instrument-class, verified by three agents 2026-08-03 | 10 | **8 fixed, 1 refuted, 1 sub-claim refuted** | `HARNESS_SELF_IMPROVEMENT.md`, 2026-08-03 entry; commits `51b8792`, `5179f9b`, `b55065a`, `578e330` |
+| **never examined** | **21** | **unknown** | — |
+
+The two refuted, so nobody re-derives them:
+
+- **`STATE_LENS=view` drives `prefix_stable_rate` to zero** — measured false. It reads 1.0 on
+  both arms of both c48 rounds against 148 and 117 lens injections, because `context-surface`
+  loads before `session-blackboard`. The *inverse* is the real problem and is now documented as
+  `MEASUREMENT_METHODOLOGY_2026-07.md` §13: that 1.0 is false reassurance, not a pass.
+- **`\[\s` in `VERIFY_COMMAND_RE` is a live hole** — near-dead already; a trailing `\b` closes
+  the group, so only `[ x = y ]` ever matched. The sibling claim about `test\b` *was* real and
+  is fixed.
+
+**The remaining 21 are still unexamined** — a lens's unverified assertion, nothing more. This
+project's history is that roughly half of such findings are wrong, overstated, or unreachable,
+so do not act on any of them without re-deriving from source. Two of the ten that *were*
+examined turned out that way, which is the rate this file was written to expect.
+
+Re-run verification of the balance with:
 `Workflow({scriptPath: '.../deep-qa-2026-07-31-wf_987e917b-1e4.js', resumeFromRunId: 'wf_987e917b-1e4'})`
-— completed Find agents replay from cache, so only the refuters and adjudicator re-run.
+— completed Find agents replay from cache, so only the refuters and adjudicator re-run. Note the
+run predates the 2026-08-03 fixes, so any cached finding about `real_gate.sh`, `verify-gate.ts`,
+`command-policy.ts`, `loop-breaker.ts`, `plan-runner.ts` or `telemetry-catalog.ts` describes code
+that has since changed — re-derive before believing a line number.
 
 ## lens: Do today's tests actually test anything?
 
