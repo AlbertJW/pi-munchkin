@@ -2061,3 +2061,49 @@ three review rounds each found real defects in the *previous* round's fixes. The
 resumable (`resumeFromRunId`), so the Find phase replays from cache and only verification
 re-runs. Nineteen of the 40 are self-labelled instrument-class, including several against the
 graded path built the same day, so the verification is worth completing before the next round.
+
+---
+
+## 2026-08-03 — the ten instrument findings verified and fixed; the surface moved
+
+The 40 preserved findings above are now closed. Nine were fixed on 2026-07-31; three
+verification agents then checked the remaining ten against source, and the outcome was **8
+verified, 1 refuted empirically, 1 sub-claim refuted**. All 8 are fixed, each with a
+counterfactual (revert → the new test fails → restore).
+
+**The two that were live in every gate round were both in `verify-gate`, both shipped with
+zero coverage, and one of them was mine from the day before.**
+
+1. `buildRe()` appended the detected gate command *outside* the command-position group. `|` has
+   the lowest precedence, so the pattern parsed as `(anchored…)|(gateCmd anywhere)` and the
+   gate-command branch had no anchor at all. `detectGate` returns `"npm test"` for every fixture
+   in the repo, so `echo "Run npm test to verify" >> README.md` armed and disarmed the gate in
+   the same turn.
+2. `VERIFY_COMMAND_RE` listed `test\b` as its **first** alternative — the POSIX file-test
+   builtin, not a suite. `test -f dist/app.js && echo ok` set `verifiedOk`.
+
+Both now covered by `harness/tests/verify-gate.test.ts` (new). **This changes the harness
+surface**: rows written before and after are on different surfaces and are not directly
+comparable. New surface hash: `94293a7204de…` — bind it into the next round and re-baseline;
+do not pool across the boundary.
+
+The rest: the grader artifact is now **pinned by the manifest** and ambiguity is a refusal
+rather than a lexicographic pick (`prompt-lab/grade_artifact.py`, and `audit-sweep` re-admitted);
+`loop-breaker` drops its steer anchor on `agent_start` because `turnIndex` is not monotonic;
+`plan-runner` clears `__pi_active_plan_context` on `session_start`; and the static half of the
+reserved-envelope-field guard landed.
+
+**Two corrections to this document's own claims**, both found by the same pass:
+
+- The c21 entry was a cherry-pick. It cited 3 base/cand pairings when **7** exist, and all four
+  it omitted favour c21. Per tool call c21 improves in **5 of 7, pooled −5.9%**. Tier B is
+  unchanged — the truncation confound is what disqualifies it, not the sign — but the evidence
+  is now the full table. Debunking a cherry-pick with a cherry-pick is the same error inverted.
+- `prefix_stable_rate` **cannot see a context-injecting candidate**. It reads 1.0 on both arms of
+  both c48 rounds against 148 and 117 lens injections, because `context-surface` hashes the
+  messages before `session-blackboard` appends. c26 and c30 both pre-register that field as their
+  non-regression guardrail. See `MEASUREMENT_METHODOLOGY_2026-07.md` §13.
+
+Mirrored to `~/.pi/agent` with zero drift both directions; the live suite's failure set is
+byte-identical before and after (the same 8 pre-existing failures from its incomplete dev
+dependencies), at 283 tests up from 277. `npm run verify` green at 345.
