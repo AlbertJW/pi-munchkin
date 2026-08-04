@@ -2,9 +2,24 @@ import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { buildContextSurfaceReceipt, systemPromptReceipt, type ContextSurfacePrior, type SystemPromptReceipt } from "../lib/context-surface.ts";
 import { record } from "../lib/telemetry.ts";
 
-export default function (pi: ExtensionAPI): void {
+export type ContextSurfaceMode = "summary" | "full" | "off";
+
+export function contextSurfaceMode(env: NodeJS.ProcessEnv = process.env): ContextSurfaceMode {
+	if (env.TELEMETRY_SOURCE === "gate" || env.CTX_REDUNDANCY_NUDGE === "on") return "full";
+	return env.CONTEXT_SURFACE_MODE === "full" || env.CONTEXT_SURFACE_MODE === "off"
+		? env.CONTEXT_SURFACE_MODE : "summary";
+}
+
+export function installContextSurface(
+	pi: ExtensionAPI,
+	buildReceipt = buildContextSurfaceReceipt,
+): void {
+	const mode = contextSurfaceMode();
 	let system: SystemPromptReceipt = systemPromptReceipt("");
 	let compactionGeneration = 0;
+	let callCount = 0;
+	let summaryAfterCompaction = false;
+	const crossed = new Set<number>();
 	// Previous call's block hashes + system sha, for the KV-cache invariants
 	// (prefix_stable/appended_only/system_prompt_changed). Reset on session
 	// start AND compaction — a post-compaction array is legitimately
@@ -12,22 +27,44 @@ export default function (pi: ExtensionAPI): void {
 	let prior: ContextSurfacePrior | null = null;
 
 	pi.on("before_agent_start", async (event) => {
-		system = systemPromptReceipt(event.systemPrompt);
+		if (mode === "full") system = systemPromptReceipt(event.systemPrompt);
 	});
 
 	pi.on("session_start", async () => {
 		compactionGeneration = 0;
+		callCount = 0;
+		summaryAfterCompaction = false;
+		crossed.clear();
 		prior = null;
+		delete (globalThis as Record<string, unknown>).__pi_ctx_redundancy_pct;
 	});
 
 	pi.on("session_compact", async () => {
 		compactionGeneration += 1;
 		prior = null;
+		summaryAfterCompaction = true;
 	});
 
 	pi.on("context", async (event, ctx) => {
+		if (mode === "off") return;
+		callCount += 1;
+		if (mode === "summary") {
+			delete (globalThis as Record<string, unknown>).__pi_ctx_redundancy_pct;
+			const usage = ctx.getContextUsage?.();
+			const pct = usage?.percent ?? null;
+			const newlyCrossed = [60, 80, 90].filter((value) => pct != null && pct >= value && !crossed.has(value));
+			for (const value of newlyCrossed) crossed.add(value);
+			const threshold = newlyCrossed.at(-1);
+			const reason = callCount === 1 ? "first" : summaryAfterCompaction ? "compaction" : threshold != null ? `threshold-${threshold}` : callCount % 8 === 0 ? "eighth" : null;
+			if (reason) record("context-surface", "summary", {
+				call: callCount, context_tokens: usage?.tokens ?? null, context_window: usage?.contextWindow ?? null,
+				context_pct: pct, compaction_generation: compactionGeneration, reason,
+			});
+			summaryAfterCompaction = false;
+			return;
+		}
 		const plan = (globalThis as Record<string, unknown>).__pi_active_plan_context as { run_id?: string; item_id?: string } | undefined;
-		const { receipt, messageHashes } = buildContextSurfaceReceipt(event.messages, system, ctx.getContextUsage?.(), {
+		const { receipt, messageHashes } = buildReceipt(event.messages, system, ctx.getContextUsage?.(), {
 			compactionGeneration,
 			planRunId: plan?.run_id,
 			planItemId: plan?.item_id,
@@ -47,3 +84,5 @@ export default function (pi: ExtensionAPI): void {
 		// Observation-only: returning undefined preserves the exact original array.
 	});
 }
+
+export default installContextSurface;

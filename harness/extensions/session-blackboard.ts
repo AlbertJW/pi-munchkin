@@ -26,10 +26,8 @@ const ENABLED = process.env.BLACKBOARD !== "off";
 const IN_GATE = process.env.TELEMETRY_SOURCE === "gate";
 const LENS_MODE = ((): "off" | "view" | "steer" | "both" => {
 	// ADOPTED 2026-08-03 (judgment call, Albert-approved): default is now "view".
-	// Grounds in DARK_CANDIDATE_VERDICTS_2026-08-03.md — purely additive (appends a
-	// non-accumulating ground-truth tail; never blocks, never edits results), so it
-	// cannot produce the harm signature, and it targets repeat spirals, the measured
-	// binding constraint. Mechanism proven firing (265 injections over two rounds).
+	// Grounds in DARK_CANDIDATE_VERDICTS_2026-08-03.md. Default-on, reversible,
+	// mechanism-observed; benefit was not established by a powered trial.
 	// Accepted cost: the per-call tail breaks the serving KV prefix (see the honest-
 	// cost comment at the append site). STATE_LENS=off is the kill switch; "steer"
 	// and "both" remain opt-in dark modes.

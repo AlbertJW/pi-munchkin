@@ -11,12 +11,10 @@ import { record } from "../lib/telemetry.ts";
 // a deterministic gate can't catch. Surfaced as a non-blocking `followUp` so the
 // agent can make a fixup commit.
 //
-// Runs at `turn_end` (fires AFTER the turn's tools execute), not at the pre-exec
-// `tool_call`, so: the commit has actually happened, `git show HEAD` reflects
-// exactly what landed (including a compound `git add … && git commit`), and a
-// freshness check rejects commits an abort/pre-commit-hook never created. The
-// review is awaited here (the documented place for async model work, with
-// ctx.signal for Esc-cancel) so delivery is deterministic.
+// `turn_end` captures the landed HEAD and bounded diff. Model review starts only
+// after `agent_end`, and is aborted by the next `before_agent_start` or shutdown,
+// so an advisory review cannot contend with the coding run on a single-slot
+// local server. HEAD and session generation are rechecked before delivery.
 //
 // Reviewer = the live session model, so the diff only ever goes where the session
 // is already going (local→local, cloud→cloud — no new data egress). Auth is
@@ -34,13 +32,31 @@ const FRESH_SECS = 300; // HEAD older than this wasn't the commit this turn just
 export default function (pi: ExtensionAPI) {
 	if (!ENABLED) return;
 
-	// HEAD hashes already handled (reviewed or skipped), per cwd: a commit ATTEMPT
-	// that a pre-commit hook aborted leaves HEAD unmoved — the freshness window
-	// alone would re-review the previous turn's commit (audit 2026-07-13).
 	const handledHead = new Map<string, string>();
-	// One review at a time per cwd. The review is now detached (below), so two
-	// commits in quick succession could otherwise overlap and double-inject.
-	const reviewing = new Set<string>();
+	type Pending = {
+		cwd: string; headHash: string; body: string; truncated: boolean; generation: number;
+		model: any; modelRegistry: any;
+	};
+	const pending = new Map<string, Pending>();
+	let generation = 0;
+	let active: { controller: AbortController; generation: number } | null = null;
+
+	function abortBusy(): void {
+		if (!active || active.controller.signal.aborted) return;
+		active.controller.abort();
+		record("drift-scanner", "review-skipped", { why: "aborted-busy" });
+	}
+
+	pi.on("before_agent_start", async () => {
+		generation += 1;
+		abortBusy();
+	});
+
+	pi.on("session_shutdown", async () => {
+		generation += 1;
+		pending.clear();
+		abortBusy();
+	});
 
 	pi.on("turn_end", async (event, ctx) => {
 		const msg = event.message;
@@ -59,7 +75,7 @@ export default function (pi: ExtensionAPI) {
 		if (!committed) return;
 
 		const model = ctx.model;
-		if (!model) return; // no active model → nothing to review with
+		if (!model) return;
 
 		try {
 			// Confirm a commit actually landed this turn: HEAD must be fresh. This
@@ -73,18 +89,6 @@ export default function (pi: ExtensionAPI) {
 			// failed (hook abort / empty stage); do NOT re-review the previous commit.
 			if (handledHead.get(ctx.cwd) === headHash) return;
 			if (Math.floor(Date.now() / 1000) - committedAt > FRESH_SECS) return; // no commit landed this turn
-			// The in-flight guard must come BEFORE the handled-mark. In the original
-			// detach fix these were the other way around, so a commit landing while a
-			// review for the same cwd was still running got marked handled on the way
-			// to the bail — and was then never reviewed at all (2026-07-30 triage #11).
-			// Bailing UNMARKED gives the swallowed commit a chance at recovery — but
-			// only a chance, not a guarantee: the next turn_end re-reviews only if
-			// HEAD has not moved past it (the review always targets HEAD, and the
-			// bail above returns early when this turn ran no fresh commit). A commit
-			// swallowed mid-review and then FOLLOWED by another commit stays
-			// unreviewed. Accepted: drift-scanner is advisory, and reviewing only
-			// the latest commit is its normal behaviour elsewhere too.
-			if (reviewing.has(ctx.cwd)) return; // a review for this cwd is already running
 			handledHead.set(ctx.cwd, headHash);
 
 			const show = await pi.exec("git", ["show", "--format=", "HEAD"], { cwd: ctx.cwd, timeout: 10_000 });
@@ -94,39 +98,55 @@ export default function (pi: ExtensionAPI) {
 			const { text, truncated } = buildTruncatedDiff(diff);
 			const body = (truncated ? `[diff truncated to first ${MAX_DIFF} chars]\n\n` : "") + text;
 
-			// DETACHED from here on. pi awaits extension handlers serially inside the
-			// agent loop, so awaiting a 90-second local-model review here froze the
-			// whole session on every reviewable commit — no streaming, no tool calls,
-			// nothing, for up to a minute and a half (confirmed 2026-07-30). The review
-			// is advisory and non-blocking by design; its RESULT arrives as a followUp
-			// message whenever it is ready, which is exactly the semantics we want.
-			// Everything above stays awaited: the guards are cheap, and handledHead is
-			// set before this point (with the in-flight bail ordered before the mark)
-			// so the started-review path never re-reviews the same commit.
-			reviewing.add(ctx.cwd);
-			void (async () => {
+			// Capture only while the agent is active. Model work starts after agent_end,
+			// so it never contends with the coding run on a single-slot server.
+			pending.set(ctx.cwd, {
+				cwd: ctx.cwd, headHash, body, truncated, generation,
+				model, modelRegistry: ctx.modelRegistry,
+			});
+		} catch (e) {
+			record("drift-scanner", "review-error", { error: String((e as Error)?.message ?? e).slice(0, 150) });
+		}
+	});
+
+	pi.on("agent_end", async () => {
+		const next = [...pending.values()].at(-1);
+		if (!next) return;
+		pending.delete(next.cwd); // one shot: busy/abort/stale outcomes are not retried
+		if (active) {
+			record("drift-scanner", "review-skipped", { why: "aborted-busy" });
+			return;
+		}
+		const controller = new AbortController();
+		active = { controller, generation: next.generation };
+		void (async () => {
 			try {
-			const auth = await ctx.modelRegistry.getApiKeyAndHeaders(model);
+			const auth = await next.modelRegistry.getApiKeyAndHeaders(next.model);
+			if (controller.signal.aborted || generation !== next.generation) return;
 			if (!auth.ok) {
 				record("drift-scanner", "review-skipped", { why: "auth" });
-				return; // can't authenticate this model → fail open
+				return;
 			}
-			record("drift-scanner", "review-start", { diffChars: body.length, truncated });
+			record("drift-scanner", "review-start", { diffChars: next.body.length, truncated: next.truncated });
 
 			const review = await completeSimple(
-				model,
-				{ systemPrompt: REVIEW_PROMPT, messages: [{ role: "user", content: body, timestamp: Date.now() }] },
+				next.model,
+				{ systemPrompt: REVIEW_PROMPT, messages: [{ role: "user", content: next.body, timestamp: Date.now() }] },
 				// reasoning:"minimal" routes the model's chain-of-thought into a separate
 				// thinking block (which extractFindings drops) instead of leaking it into
 				// the answer — without it, a small local reasoning model dumps its whole
 				// deliberation into the text channel. Verified: still catches real drift.
 				//
-				// ctx.signal is deliberately NOT passed now that this is detached: the
-				// signal is scoped to the agent run that triggered it, so a review still
-				// in flight when the run ends would be aborted precisely when it was
-				// about to deliver. timeoutMs remains the bound.
-				{ timeoutMs: TIMEOUT_MS, maxRetries: 0, reasoning: "minimal", apiKey: auth.apiKey, headers: auth.headers },
+				// A review-owned signal lives beyond the completed coding run, but is
+				// aborted immediately when a new coding run begins.
+				{ timeoutMs: TIMEOUT_MS, maxRetries: 0, reasoning: "minimal", apiKey: auth.apiKey, headers: auth.headers, signal: controller.signal },
 			);
+			if (controller.signal.aborted || generation !== next.generation) return;
+			const current = await pi.exec("git", ["rev-parse", "HEAD"], { cwd: next.cwd, timeout: 10_000 });
+			if ((current.stdout || "").trim() !== next.headHash) {
+				record("drift-scanner", "review-skipped", { why: "stale-head" });
+				return;
+			}
 			const findings = extractFindings(review.content as Array<{ type: string; text?: string }>, review.stopReason);
 			if (!findings) {
 				const textLen = (review.content as Array<{ type: string; text?: string }>)
@@ -148,16 +168,11 @@ export default function (pi: ExtensionAPI) {
 				{ deliverAs: "followUp" },
 			);
 			} catch (e) {
-				// Detached: nothing upstream can catch this, and a stale pi/ctx after
-				// session replacement throws here. Fail open silently, as before.
+				if (controller.signal.aborted) return;
 				record("drift-scanner", "review-error", { error: String((e as Error)?.message ?? e).slice(0, 150) });
 			} finally {
-				reviewing.delete(ctx.cwd);
+				if (active?.controller === controller) active = null;
 			}
 			})();
-		} catch (e) {
-			record("drift-scanner", "review-error", { error: String((e as Error)?.message ?? e).slice(0, 150) });
-			return; // git error / endpoint down / timeout / aborted → fail open silently
-		}
 	});
 }

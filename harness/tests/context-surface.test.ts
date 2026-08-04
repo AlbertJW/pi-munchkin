@@ -5,6 +5,7 @@ import { join } from "node:path";
 import test from "node:test";
 import { buildContextSurfaceReceipt, systemPromptReceipt } from "../lib/context-surface.ts";
 import { fire, makeFakePi } from "./integration-harness.ts";
+import { contextSurfaceMode } from "../extensions/context-surface.ts";
 
 const baseMessages = () => [
 	{ role: "user", content: [{ type: "text", text: "Keep café_id exact and αβ stable" }], timestamp: 1 },
@@ -18,6 +19,13 @@ const baseMessages = () => [
 	{ role: "custom", customType: "note", content: [{ type: "image", data: Buffer.from("pixels").toString("base64"), mimeType: "image/png" }], timestamp: 6 },
 	{ role: "toolResult", toolCallId: "bad", toolName: "bash", content: [{ type: "text", text: "raw exception payload" }], isError: true, timestamp: 7 },
 ];
+
+test("context surface mode defaults summary and gate/nudge force full", () => {
+	assert.equal(contextSurfaceMode({}), "summary");
+	assert.equal(contextSurfaceMode({ CONTEXT_SURFACE_MODE: "off" }), "off");
+	assert.equal(contextSurfaceMode({ TELEMETRY_SOURCE: "gate", CONTEXT_SURFACE_MODE: "off" }), "full");
+	assert.equal(contextSurfaceMode({ CTX_REDUNDANCY_NUDGE: "on", CONTEXT_SURFACE_MODE: "summary" }), "full");
+});
 
 test("context receipt is deterministic for Unicode, images, custom messages, tool errors, and mutation boundaries", () => {
 	const messages = baseMessages();
@@ -66,8 +74,10 @@ test("context extension observes without replacing or mutating the original mess
 	const file = join(dir, "events.jsonl");
 	const priorFile = process.env.TELEMETRY_FILE;
 	const priorSource = process.env.TELEMETRY_SOURCE;
+	const priorMode = process.env.CONTEXT_SURFACE_MODE;
 	process.env.TELEMETRY_FILE = file;
 	process.env.TELEMETRY_SOURCE = "test";
+	process.env.CONTEXT_SURFACE_MODE = "full";
 	try {
 		const fp = makeFakePi();
 		const mod = await import(`../extensions/context-surface.ts?test=${Date.now()}-${Math.random()}`);
@@ -92,6 +102,43 @@ test("context extension observes without replacing or mutating the original mess
 	} finally {
 		if (priorFile === undefined) delete process.env.TELEMETRY_FILE; else process.env.TELEMETRY_FILE = priorFile;
 		if (priorSource === undefined) delete process.env.TELEMETRY_SOURCE; else process.env.TELEMETRY_SOURCE = priorSource;
+		if (priorMode === undefined) delete process.env.CONTEXT_SURFACE_MODE; else process.env.CONTEXT_SURFACE_MODE = priorMode;
+		rmSync(dir, { recursive: true, force: true });
+	}
+});
+
+test("summary and off modes never call the expensive receipt builder", async () => {
+	const dir = mkdtempSync(join(tmpdir(), "context-summary-"));
+	const file = join(dir, "events.jsonl");
+	const previous = {
+		mode: process.env.CONTEXT_SURFACE_MODE, source: process.env.TELEMETRY_SOURCE,
+		file: process.env.TELEMETRY_FILE, nudge: process.env.CTX_REDUNDANCY_NUDGE,
+	};
+	try {
+		process.env.TELEMETRY_SOURCE = "test";
+		process.env.TELEMETRY_FILE = file;
+		delete process.env.CTX_REDUNDANCY_NUDGE;
+		process.env.CONTEXT_SURFACE_MODE = "summary";
+		const fp = makeFakePi();
+		const mod = await import(`../extensions/context-surface.ts?summary=${Date.now()}-${Math.random()}`);
+		mod.installContextSurface(fp.pi as never, (() => { throw new Error("expensive builder called"); }) as never);
+		for (let call = 1; call <= 8; call++) {
+			await fire(fp, "context", { messages: baseMessages() }, { getContextUsage: () => ({ tokens: call * 10, contextWindow: 100, percent: call * 10 }) });
+		}
+		const rows = readFileSync(file, "utf8").trim().split("\n").map((line) => JSON.parse(line));
+		assert.deepEqual(rows.map((row) => row.reason), ["first", "threshold-60", "threshold-80"]);
+		assert.ok(rows.every((row) => row.kind === "summary" && row.surface_sha256 === undefined));
+
+		process.env.CONTEXT_SURFACE_MODE = "off";
+		const off = makeFakePi();
+		const offMod = await import(`../extensions/context-surface.ts?off=${Date.now()}-${Math.random()}`);
+		offMod.installContextSurface(off.pi as never, (() => { throw new Error("expensive builder called"); }) as never);
+		await fire(off, "context", { messages: baseMessages() }, { getContextUsage: () => ({ tokens: 90, contextWindow: 100, percent: 90 }) });
+	} finally {
+		for (const [key, value] of Object.entries(previous)) {
+			const envKey = key === "mode" ? "CONTEXT_SURFACE_MODE" : key === "source" ? "TELEMETRY_SOURCE" : key === "file" ? "TELEMETRY_FILE" : "CTX_REDUNDANCY_NUDGE";
+			if (value === undefined) delete process.env[envKey]; else process.env[envKey] = value;
+		}
 		rmSync(dir, { recursive: true, force: true });
 	}
 });

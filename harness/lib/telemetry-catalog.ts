@@ -81,6 +81,9 @@ export const EVENT_CATALOG = {
 	"blackboard/restored": { attempts: "number" },
 	"state-lens/view-injected": { chars: "number", turnIndex: "number" },
 	"state-lens/steer-injected": { chars: "number", turnIndex: "number" },
+	"tool-activation/deferred": { tool: "string", reason: "string" },
+	"tool-activation/activated": { tool: "string", reason: "string" },
+	"tool-activation/preserved-explicit": { tool: "string", reason: "string" },
 	"tool-call-rescue/detected": { signature: "string", turnIndex: "number" },
 	"tool-call-rescue/steered": { signature: "string", turnIndex: "number" },
 	"teach-hints/hint": { rule: "string", tool: "string", injected_chars: "number" },
@@ -102,6 +105,10 @@ export const EVENT_CATALOG = {
 		prefix_stable: ["boolean", "null"], appended_only: ["boolean", "null"], system_prompt_changed: ["boolean", "null"],
 		context_tokens: ["number", "null"], context_window: ["number", "null"], context_pct: ["number", "null"],
 		compaction_generation: "number", plan_run_id: ["string", "null"], plan_item_id: ["string", "null"],
+	},
+	"context-surface/summary": {
+		call: "number", context_tokens: ["number", "null"], context_window: ["number", "null"],
+		context_pct: ["number", "null"], compaction_generation: "number", reason: "string",
 	},
 } as const satisfies Readonly<Record<string, TelemetryDetailSchema>>;
 

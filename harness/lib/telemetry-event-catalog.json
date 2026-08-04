@@ -51,6 +51,9 @@
     "blackboard/restored",
     "state-lens/view-injected",
     "state-lens/steer-injected",
+    "tool-activation/deferred",
+    "tool-activation/activated",
+    "tool-activation/preserved-explicit",
     "tool-call-rescue/detected",
     "tool-call-rescue/steered",
     "teach-hints/hint",
@@ -61,6 +64,7 @@
     "bash-output-guard/withheld",
     "context-dedup/dedup",
     "context-dedup/nudge",
-    "context-surface/receipt"
+    "context-surface/receipt",
+    "context-surface/summary"
   ]
 }

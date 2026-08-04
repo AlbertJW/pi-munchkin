@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { existsSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { buildTruncatedDiff, extractFindings, isReviewableCommit, MAX_DIFF } from "../lib/drift-policy.ts";
 // Run: cd ~/.pi/agent && TELEMETRY_FILE=$(mktemp) TELEMETRY_SOURCE=test \
@@ -64,7 +64,7 @@ test("extractFindings: only posts complete, non-CLEAN reviews", () => {
 const piAiResolvable = existsSync(join(process.cwd(), "node_modules", "@earendil-works", "pi-ai"));
 const extTest = piAiResolvable ? test : test.skip;
 
-extTest("the review is DETACHED: turn_end returns without waiting for the model", async () => {
+extTest("turn_end captures only; review starts detached after agent_end", async () => {
 	// pi awaits extension handlers serially inside the agent loop, so awaiting a
 	// 90-second local-model review here froze the entire session on every
 	// reviewable commit. turn_end must return promptly and deliver the advisory
@@ -82,7 +82,7 @@ extTest("the review is DETACHED: turn_end returns without waiting for the model"
 	// A model call that never settles within the test's lifetime. If turn_end awaits
 	// it, the await below hangs and the test times out — which is the bug.
 	let modelCallStarted = false;
-	const neverSettles = new Promise(() => { modelCallStarted = true; });
+	const neverSettles = new Promise(() => {});
 
 	const fp = makeFakePi();
 	const mod = await import(`../extensions/drift-scanner.ts?detach=${Date.now()}-${Math.random()}`);
@@ -109,26 +109,32 @@ extTest("the review is DETACHED: turn_end returns without waiting for the model"
 	const elapsed = Date.now() - started;
 
 	assert.ok(elapsed < 5000, `turn_end must not block on the review (took ${elapsed}ms)`);
+	assert.equal(modelCallStarted, false, "turn_end only captures commit metadata and diff");
+	await fire(fp, "agent_end", {}, {});
 	assert.equal(modelCallStarted, true, "the review still starts — it is detached, not dropped");
 	assert.equal(fp.sent.length, 0, "nothing delivered yet; the advisory arrives later as followUp");
 });
 
-extTest("a commit landing during an in-flight review is NOT swallowed — it gets reviewed next turn", async () => {
-	// The detach fix originally marked handledHead BEFORE the in-flight guard, so
-	// a second commit arriving mid-review was recorded as handled on the way to
-	// the bail and then never reviewed at all (2026-07-30 triage #11). The mark
-	// must come after the guard: bail unmarked, pick the commit up next turn.
+extTest("a new agent run aborts a detached review and delivers no advisory", async (t) => {
 	const { execSync } = await import("node:child_process");
 	const { mkdtempSync } = await import("node:fs");
 	const { tmpdir } = await import("node:os");
 	const { join } = await import("node:path");
 	const { makeFakePi, fire } = await import("./integration-harness.ts");
 
-	const cwd = mkdtempSync(join(tmpdir(), "drift-inflight-"));
+	const cwd = mkdtempSync(join(tmpdir(), "drift-abort-"));
 	execSync("git init -q . && git config user.email t@t && git config user.name t", { cwd, shell: "/bin/bash" });
 	execSync("echo one > a.txt && git add a.txt && git commit -q -m 'feat: one'", { cwd, shell: "/bin/bash" });
+	const telemetry = join(cwd, "events.jsonl");
+	const previousFile = process.env.TELEMETRY_FILE;
+	const previousSource = process.env.TELEMETRY_SOURCE;
+	process.env.TELEMETRY_FILE = telemetry;
+	process.env.TELEMETRY_SOURCE = "test";
+	t.after(() => {
+		if (previousFile === undefined) delete process.env.TELEMETRY_FILE; else process.env.TELEMETRY_FILE = previousFile;
+		if (previousSource === undefined) delete process.env.TELEMETRY_SOURCE; else process.env.TELEMETRY_SOURCE = previousSource;
+	});
 
-	// First review holds `reviewing` until we release it.
 	let release!: () => void;
 	const gate = new Promise<void>((r) => { release = r; });
 	let authCalls = 0;
@@ -139,26 +145,23 @@ extTest("a commit landing during an in-flight review is NOT swallowed — it get
 		cwd,
 		model: { provider: "test", id: "test-model" },
 		modelRegistry: {
-			getApiKeyAndHeaders: async () => { authCalls += 1; await gate; return { ok: false }; }, // ok:false ends the review quietly after the gate
+			getApiKeyAndHeaders: async () => { authCalls += 1; await gate; return { ok: true, apiKey: "dummy", headers: {} }; },
 		},
 		signal: undefined,
 	};
-	const commitEvent = (id: string) => ({
+	const commitEvent = {
 		turnIndex: 1,
-		message: { role: "assistant", content: [{ type: "toolCall", id, name: "bash", arguments: { command: "git commit -m x" } }] },
-	});
+		message: { role: "assistant", content: [{ type: "toolCall", id: "t1", name: "bash", arguments: { command: "git commit -m x" } }] },
+	};
 
-	await fire(fp, "turn_end", commitEvent("t1"), ctx); // starts review #1, which now blocks on `gate`
-	assert.equal(authCalls, 1, "first review started");
-
-	// Second commit lands while review #1 is in flight.
-	execSync("echo two > b.txt && git add b.txt && git commit -q -m 'feat: two'", { cwd, shell: "/bin/bash" });
-	await fire(fp, "turn_end", commitEvent("t2"), ctx); // must bail on the in-flight guard WITHOUT marking handled
-	assert.equal(authCalls, 1, "no overlapping second review");
-
-	release(); // review #1 completes
-	await new Promise((r) => setTimeout(r, 50)); // let the detached finally{} clear `reviewing`
-
-	await fire(fp, "turn_end", commitEvent("t3"), ctx); // next turn: the swallowed commit must now be reviewed
-	assert.equal(authCalls, 2, "the commit that landed mid-review is reviewed on the next turn, not silently skipped");
+	await fire(fp, "before_agent_start", { systemPrompt: "s" }, ctx);
+	await fire(fp, "turn_end", commitEvent, ctx);
+	await fire(fp, "agent_end", {}, ctx);
+	assert.equal(authCalls, 1, "detached review reached authentication after agent_end");
+	await fire(fp, "before_agent_start", { systemPrompt: "s2" }, ctx);
+	const rows = readFileSync(telemetry, "utf8").trim().split("\n").map((line) => JSON.parse(line));
+	assert.ok(rows.some((row) => row.ext === "drift-scanner" && row.kind === "review-skipped" && row.why === "aborted-busy"));
+	release();
+	await new Promise((r) => setTimeout(r, 50));
+	assert.equal(fp.sent.length, 0, "aborted stale review cannot deliver advisory");
 });

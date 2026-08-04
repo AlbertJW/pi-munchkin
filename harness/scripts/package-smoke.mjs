@@ -46,6 +46,9 @@ const expectedExtensions = [
   "harness/extensions/context-surface.ts",
   "harness/extensions/bash-output-guard.ts",
   "harness/extensions/payload-audit.ts",
+  // Must register after compact_context and the vendor subagent. It makes its
+  // defer/preserve decision at session_start against the complete registry.
+  "harness/extensions/tool-activation.ts",
 ];
 assert.deepEqual(extensions, expectedExtensions, "pi.extensions must expose the complete ordered production surface");
 assert(!extensions.includes("harness/extensions/chaos.ts"), "chaos must not be enabled in the release manifest");
