@@ -10,20 +10,56 @@ function ipv4Number(value: string): number | null {
 	return parts.reduce((n, p) => (n << 8) + Number(p), 0) >>> 0;
 }
 
+function ipv6Number(value: string): bigint | null {
+	let input = value.toLowerCase().split("%", 1)[0];
+	if (input.startsWith("[") && input.endsWith("]")) input = input.slice(1, -1);
+	if (!input || (input.match(/::/g)?.length ?? 0) > 1) return null;
+	const dotted = /(^|:)(\d+\.\d+\.\d+\.\d+)$/.exec(input);
+	if (dotted) {
+		const v4 = ipv4Number(dotted[2]);
+		if (v4 === null) return null;
+		input = `${input.slice(0, dotted.index + dotted[1].length)}${(v4 >>> 16).toString(16)}:${(v4 & 0xffff).toString(16)}`;
+	}
+	const halves = input.split("::");
+	const left = halves[0] ? halves[0].split(":") : [];
+	const right = halves.length === 2 && halves[1] ? halves[1].split(":") : [];
+	if ([...left, ...right].some((part) => !/^[0-9a-f]{1,4}$/.test(part))) return null;
+	const missing = 8 - left.length - right.length;
+	if ((halves.length === 1 && missing !== 0) || (halves.length === 2 && missing < 1)) return null;
+	const parts = [...left, ...Array(Math.max(0, missing)).fill("0"), ...right];
+	if (parts.length !== 8) return null;
+	return parts.reduce((n, part) => (n << 16n) | BigInt(Number.parseInt(part, 16)), 0n);
+}
+
+function inV6(value: bigint, prefix: bigint, bits: number): boolean {
+	return bits === 0 || (value >> BigInt(128 - bits)) === (prefix >> BigInt(128 - bits));
+}
+
 export function isPrivateAddress(address: string): boolean {
 	const lower = address.toLowerCase().split("%")[0];
-	const mapped = /^::ffff:(\d+\.\d+\.\d+\.\d+)$/.exec(lower);
-	const v4 = ipv4Number(mapped?.[1] ?? lower);
+	const v4 = ipv4Number(lower);
 	if (v4 !== null) {
 		return (v4 >>> 24) === 0 || (v4 >>> 24) === 10 || (v4 >>> 24) === 127 ||
 			(v4 >>> 22) === 0x191 || // carrier-grade NAT 100.64/10
 			(v4 >>> 16) === 0xa9fe || (v4 >>> 20) === 0xac1 || (v4 >>> 16) === 0xc0a8 ||
-			(v4 >>> 8) === 0xc00000 || (v4 >>> 8) === 0xc00002 || (v4 >>> 15) === 0x18c24 ||
+			(v4 >>> 8) === 0xc00000 || (v4 >>> 8) === 0xc00002 || (v4 >>> 8) === 0xc05863 || (v4 >>> 15) === 0x18c24 ||
 			(v4 >>> 8) === 0xc63364 || (v4 >>> 8) === 0xcb0071 ||
 			(v4 >>> 24) >= 224 || v4 === 0xffffffff;
 	}
-	return lower === "::" || lower === "::1" || lower.startsWith("fc") || lower.startsWith("fd") ||
-		/^fe[89ab]/.test(lower) || lower.startsWith("ff") || lower.startsWith("2001:db8:");
+	const v6 = ipv6Number(lower);
+	if (v6 === null) return true; // malformed DNS data is never treated as public
+	const prefix = (s: string) => ipv6Number(s)!;
+	return !inV6(v6, prefix("2000::"), 3) || // only assigned global-unicast space can pass
+		v6 >> 32n === 0n || // unspecified, loopback, and IPv4-compatible ::/96
+		v6 >> 32n === 0xffffn || // IPv4-mapped ::ffff:0:0/96
+		inV6(v6, prefix("64:ff9b::"), 96) || inV6(v6, prefix("64:ff9b:1::"), 48) ||
+		inV6(v6, prefix("100::"), 64) || inV6(v6, prefix("2001::"), 32) ||
+		inV6(v6, prefix("2001:2::"), 48) || inV6(v6, prefix("2001:db8::"), 32) ||
+		inV6(v6, prefix("2001:10::"), 28) || inV6(v6, prefix("2001:20::"), 28) ||
+		inV6(v6, prefix("2002::"), 16) || inV6(v6, prefix("3fff::"), 20) ||
+		inV6(v6, prefix("5f00::"), 16) || inV6(v6, prefix("fc00::"), 7) ||
+		inV6(v6, prefix("fe80::"), 10) || inV6(v6, prefix("fec0::"), 10) ||
+		inV6(v6, prefix("ff00::"), 8);
 }
 
 async function defaultLookup(host: string): Promise<LookupAddress[]> {
@@ -53,12 +89,22 @@ async function validateHop(raw: string, dnsLookup: DnsLookup): Promise<URL> {
 		throw new Error("local hostnames are not allowed");
 	}
 	let addresses: LookupAddress[];
-	try { addresses = await dnsLookup(url.hostname); } catch (err) {
-		throw new Error(`DNS lookup failed for ${url.hostname}: ${err instanceof Error ? err.message : String(err)}`);
+	const literal = url.hostname.replace(/^\[|\]$/g, "");
+	const literalV4 = ipv4Number(literal);
+	const literalV6 = literal.includes(":") ? ipv6Number(literal) : null;
+	if (literalV4 !== null || literalV6 !== null) {
+		addresses = [{ address: literal, family: literalV4 !== null ? 4 : 6 }];
+	} else {
+		try { addresses = await dnsLookup(url.hostname); } catch {
+			throw new Error("DNS lookup failed");
+		}
 	}
-	if (!addresses.length) throw new Error(`DNS returned no addresses for ${url.hostname}`);
-	const blocked = addresses.find((a) => isPrivateAddress(a.address));
-	if (blocked) throw new Error(`host ${url.hostname} resolves to non-public address ${blocked.address}`);
+	if (!addresses.length) throw new Error("DNS returned no addresses");
+	const blocked = addresses.some((a) =>
+		(a.family !== 4 && a.family !== 6) ||
+		(a.family === 4 ? ipv4Number(a.address) === null : ipv6Number(a.address) === null) ||
+		isPrivateAddress(a.address));
+	if (blocked) throw new Error("host resolves to a non-public address");
 	return url;
 }
 

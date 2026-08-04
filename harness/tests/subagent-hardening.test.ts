@@ -11,8 +11,16 @@ test("subagent argv never inherits API keys", () => {
 });
 
 test("subagent environment is reduced and excludes unrelated secrets and shell injection", () => {
-	const env = buildSubagentEnv({ PATH: "/bin", HOME: "/home/u", OPENAI_API_KEY: "needed", AWS_SECRET_ACCESS_KEY: "drop", NODE_OPTIONS: "--require evil", SSH_AUTH_SOCK: "/sock" });
-	assert.deepEqual(env, { PATH: "/bin", HOME: "/home/u", OPENAI_API_KEY: "needed" });
+	const env = buildSubagentEnv({ PATH: "/bin", HOME: "/home/u", OPENAI_API_KEY: "needed", LLAMA_API_KEY: "dummy-llama", AWS_SECRET_ACCESS_KEY: "drop", NODE_OPTIONS: "--require evil", SSH_AUTH_SOCK: "/sock" });
+	assert.deepEqual(env, { PATH: "/bin", HOME: "/home/u", OPENAI_API_KEY: "needed", LLAMA_API_KEY: "dummy-llama" });
+});
+
+test("subagent explicit environment allowlist accepts valid names only", () => {
+	const env = buildSubagentEnv({
+		PATH: "/bin", PI_SUBAGENT_ENV_ALLOW: "CUSTOM_SENTINEL,bad-name, ALSO_OK ",
+		CUSTOM_SENTINEL: "dummy-one", ALSO_OK: "dummy-two", "bad-name": "drop",
+	});
+	assert.deepEqual(env, { PATH: "/bin", CUSTOM_SENTINEL: "dummy-one", ALSO_OK: "dummy-two" });
 });
 
 test("abort and signal/nonzero failures cannot be overridden by semantic output", () => {

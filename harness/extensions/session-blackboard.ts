@@ -1,4 +1,5 @@
-import { mkdirSync, writeFileSync } from "node:fs";
+import { createHash, randomUUID } from "node:crypto";
+import { chmod, mkdir, rename, unlink, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import {
@@ -7,6 +8,7 @@ import {
 } from "../lib/blackboard.ts";
 import { record } from "../lib/telemetry.ts";
 import type { TelemetryTap } from "../lib/telemetry.ts";
+import { agentDir } from "../lib/agent-dir.ts";
 
 // Session blackboard: ground-truth working memory (see lib/blackboard.ts).
 // Three faces, strictly separated:
@@ -50,6 +52,10 @@ export default function (pi: ExtensionAPI): void {
 	let lastRenderAt = 0;
 	let lastLensSteerTurn = -Infinity;
 	let cwd = process.cwd();
+	let artifactPath = cockpitPath(cwd);
+	let renderInFlight: Promise<void> | null = null;
+	let renderQueued = false;
+	let renderTimer: ReturnType<typeof setTimeout> | null = null;
 
 	// Telemetry tap: cross-extension facts (plan gates, context receipts,
 	// compactions, loop-breaker firings). Reload-safe: previous instances of this
@@ -79,20 +85,50 @@ export default function (pi: ExtensionAPI): void {
 	taps.push(tap);
 	g.__pi_telemetry_taps = taps;
 
-	function renderCockpit(force = false): void {
+	function cockpitPath(workdir: string): string {
+		const cwdHash = createHash("sha256").update(workdir).digest("hex");
+		return join(agentDir(), "artifacts", "session-cockpits", `${cwdHash}.html`);
+	}
+
+	async function writeCockpit(): Promise<void> {
 		if (IN_GATE) return;
-		const now = Date.now();
-		if (!force && now - lastRenderAt < RENDER_MIN_MS) return;
-		lastRenderAt = now;
 		const state = boardState();
 		syncBus(state);
+		const path = artifactPath;
+		const tmp = `${path}.${process.pid}.${randomUUID()}.tmp`;
 		try {
-			const path = join(cwd, "artifacts", "session-cockpit.html");
-			mkdirSync(dirname(path), { recursive: true });
+			await mkdir(dirname(path), { recursive: true, mode: 0o700 });
+			await chmod(dirname(path), 0o700);
 			const html = renderCockpitHtml(state, { cwd, renderedAt: new Date().toISOString() });
-			writeFileSync(path, html);
+			await writeFile(tmp, html, { encoding: "utf8", mode: 0o600 });
+			await rename(tmp, path);
+			await chmod(path, 0o600);
 			record("blackboard", "rendered", { chars: html.length, attempts: Object.keys(state.attempts).length });
-		} catch { /* cockpit must never break a session */ }
+		} catch { try { await unlink(tmp); } catch { /* absent temp */ } }
+	}
+
+	async function renderCockpit(force = false): Promise<void> {
+		if (IN_GATE) return;
+		if (renderInFlight) {
+			renderQueued = true;
+			if (force) await renderInFlight;
+			else return;
+		}
+		const remaining = RENDER_MIN_MS - (Date.now() - lastRenderAt);
+		if (!force && remaining > 0) {
+			renderQueued = true;
+			if (!renderTimer) renderTimer = setTimeout(() => {
+				renderTimer = null;
+				void renderCockpit(true);
+			}, remaining);
+			return;
+		}
+		if (renderTimer) { clearTimeout(renderTimer); renderTimer = null; }
+		renderQueued = false;
+		lastRenderAt = Date.now();
+		renderInFlight = writeCockpit().finally(() => { renderInFlight = null; });
+		await renderInFlight;
+		if (force && renderQueued) await renderCockpit(true);
 	}
 
 	// turnIndex restarts at 0 on every AGENT RUN, not only per session
@@ -104,6 +140,7 @@ export default function (pi: ExtensionAPI): void {
 
 	pi.on("session_start", async (event, ctx) => {
 		cwd = ctx.cwd ?? process.cwd();
+		artifactPath = cockpitPath(cwd);
 		pendingArgs.clear();
 		// ALWAYS reset first. The board lives on globalThis, so a resume/fork whose
 		// snapshot is missing or rejected would otherwise inherit the PREVIOUS
@@ -144,8 +181,9 @@ export default function (pi: ExtensionAPI): void {
 	pi.on("turn_end", async (event, ctx) => {
 		const state = boardState();
 		state.turn = event.turnIndex;
+		state.context.pct = ctx.getContextUsage()?.percent ?? state.context.pct;
 		syncBus(state);
-		renderCockpit();
+		void renderCockpit();
 		if (ctx.hasUI) {
 			const v = state.verify;
 			ctx.ui.setWidget("blackboard", [
@@ -158,7 +196,7 @@ export default function (pi: ExtensionAPI): void {
 	});
 
 	pi.on("agent_end", async () => {
-		renderCockpit(true);
+		await renderCockpit(true);
 		try {
 			pi.appendEntry(ENTRY_TYPE, snapshot(boardState()));
 		} catch { /* persistence is best-effort */ }
@@ -195,9 +233,9 @@ export default function (pi: ExtensionAPI): void {
 		handler: async (_args, ctx) => {
 			const state = boardState();
 			syncBus(state);
-			renderCockpit(true);
+			await renderCockpit(true);
 			const lens = renderLens(state, LENS_MAX_CHARS) || "(empty — no failures, mutations, or plan yet)";
-			const where = IN_GATE ? "(cockpit suppressed in gate)" : join(cwd, "artifacts", "session-cockpit.html");
+			const where = IN_GATE ? "(cockpit suppressed in gate)" : artifactPath;
 			if (ctx.hasUI) ctx.ui.notify(`${lens}\n→ ${where}`, "info");
 		},
 	});

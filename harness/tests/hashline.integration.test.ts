@@ -4,7 +4,7 @@
 // written before file 2's bad tag throws) and PASSES once apply is two-phase.
 import assert from "node:assert/strict";
 import test from "node:test";
-import { chmodSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import { chmodSync, mkdtempSync, readFileSync, truncateSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileTag, normalizeText } from "../lib/hashline-core.ts";
@@ -19,6 +19,18 @@ function fresh() {
 	hashline(fp.pi as any);
 	return fp;
 }
+
+test("hashline: oversized image and text are refused by stat preflight", async () => {
+	const fp = fresh();
+	const cwd = tmp();
+	writeFileSync(join(cwd, "huge.png"), "");
+	truncateSync(join(cwd, "huge.png"), 4 * 1024 * 1024 + 1);
+	await expectToolError(fp, "read", { path: "huge.png" }, cwd, /Image too large/);
+	writeFileSync(join(cwd, "huge.txt"), "");
+	truncateSync(join(cwd, "huge.txt"), 16 * 1024 * 1024 + 1);
+	await expectToolError(fp, "read", { path: "huge.txt", limit: 1 }, cwd, /limit parameter only bounds returned context/);
+	await expectToolError(fp, "edit", { input: "[huge.txt#deadbeef]\nreplace 1..1:\n+x\n" }, cwd, /purpose-built bounded span tool/);
+});
 
 test("hashline: single-file edit applies with the live tag", async () => {
 	const fp = fresh();

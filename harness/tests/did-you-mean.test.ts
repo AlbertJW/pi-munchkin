@@ -15,32 +15,41 @@ function tree() {
 	return d;
 }
 
-test("near-basename sibling in an existing parent", () => {
+test("near-basename sibling in an existing parent", async () => {
 	const d = tree();
 	try {
-		assert.equal(closestExistingPath(d, "src/utils.js"), "src/util.js");   // distance 1
+		assert.equal(await closestExistingPath(d, "src/utils.js"), "src/util.js");   // distance 1
 		// case slip: on case-insensitive APFS the path EXISTS (read succeeds, no
 		// ENOENT ever fires) -> correctly no suggestion. The d=0 branch still
 		// matters on case-sensitive volumes.
-		assert.equal(closestExistingPath(d, "src/Util.js"), null);
+		assert.equal(await closestExistingPath(d, "src/Util.js"), null);
 	} finally { rmSync(d, { recursive: true, force: true }); }
 });
 
-test("exact basename found via shallow walk when parent path is wrong", () => {
+test("exact basename found via shallow walk when parent path is wrong", async () => {
 	const d = tree();
 	try {
-		assert.equal(closestExistingPath(d, "conf/config.json"), "deep/nest/config.json");
+		assert.equal(await closestExistingPath(d, "conf/config.json"), "deep/nest/config.json");
 	} finally { rmSync(d, { recursive: true, force: true }); }
 });
 
-test("no suggestion when ambiguous, existing, or hopeless", () => {
+test("no suggestion when ambiguous, existing, or hopeless", async () => {
 	const d = tree();
 	try {
 		writeFileSync(join(d, "src/utila.js"), "");
 		writeFileSync(join(d, "src/utilb.js"), "");
-		assert.equal(closestExistingPath(d, "src/utilz.js"), null);            // tie -> never guess
-		assert.equal(closestExistingPath(d, "src/index.js"), null);            // exists -> nothing
-		assert.equal(closestExistingPath(d, "src/completely-different.md"), null);
+		assert.equal(await closestExistingPath(d, "src/utilz.js"), null);            // tie -> never guess
+		assert.equal(await closestExistingPath(d, "src/index.js"), null);            // exists -> nothing
+		assert.equal(await closestExistingPath(d, "src/completely-different.md"), null);
+	} finally { rmSync(d, { recursive: true, force: true }); }
+});
+
+test("entry-budget exhaustion returns no suggestion", async () => {
+	const d = mkdtempSync(join(tmpdir(), "dym-budget-"));
+	try {
+		for (let i = 0; i < 2049; i++) writeFileSync(join(d, `entry-${i}.txt`), "");
+		writeFileSync(join(d, "target.json"), "");
+		assert.equal(await closestExistingPath(d, "missing/target.json"), null);
 	} finally { rmSync(d, { recursive: true, force: true }); }
 });
 

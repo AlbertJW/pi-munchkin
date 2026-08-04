@@ -2,6 +2,9 @@
 // Pure reducer + renderers; the store lives on globalThis (pi gives each
 // extension its own module instance, so module scope cannot be shared — same
 // constraint as telemetry.ts's caches and compaction-coordinator's fix).
+import { createHash } from "node:crypto";
+import { basename, isAbsolute } from "node:path";
+
 // Nothing here is model-visible; the state-lens renderer's OUTPUT becomes
 // model-visible only when session-blackboard.ts injects it under STATE_LENS.
 
@@ -14,7 +17,7 @@ export type AttemptRecord = {
 };
 
 export type BlackboardState = {
-	v: 1;
+	v: 2;
 	turn: number;
 	compactions: number;
 	attempts: Record<string, AttemptRecord>;
@@ -32,7 +35,7 @@ export type BlackboardState = {
 
 export function emptyState(): BlackboardState {
 	return {
-		v: 1, turn: 0, compactions: 0, attempts: {}, delegations: [],
+		v: 2, turn: 0, compactions: 0, attempts: {}, delegations: [],
 		plan: { runId: null, itemId: null, lastGate: null, openItems: null },
 		verify: null, loop: null,
 		context: { pct: null, staleShare: null, dupShare: null },
@@ -41,8 +44,8 @@ export function emptyState(): BlackboardState {
 
 export function boardState(): BlackboardState {
 	const g = globalThis as Record<string, unknown>;
-	if (!g.__pi_blackboard_v1) g.__pi_blackboard_v1 = emptyState();
-	return g.__pi_blackboard_v1 as BlackboardState;
+	if (!g.__pi_blackboard_v2) g.__pi_blackboard_v2 = emptyState();
+	return g.__pi_blackboard_v2 as BlackboardState;
 }
 
 export function resetBoard(state: BlackboardState = boardState()): void {
@@ -51,30 +54,62 @@ export function resetBoard(state: BlackboardState = boardState()): void {
 
 const norm = (s: string) => s.trim().replace(/\s+/g, " ");
 const clip = (s: string, n: number) => (s.length <= n ? s : `${s.slice(0, n - 1)}…`);
+const safeAtom = (s: string) => clip(s.replace(/[^a-zA-Z0-9_.:@/-]/g, "?"), 40);
+const redact = (s: string) => s
+	.replace(/\b(?:sk|rk|pk|ghp|github_pat|xox[baprs])[-_][A-Za-z0-9_-]{6,}\b/gi, "[redacted]")
+	.replace(/\b(?:api[_-]?key|token|password|secret)\s*[:=]\s*\S+/gi, "$1=[redacted]")
+	.replace(/\/Users\/[^/\s]+|\/home\/[^/\s]+/g, "~");
+
+function canonical(value: unknown): string {
+	if (Array.isArray(value)) return `[${value.map(canonical).join(",")}]`;
+	if (value && typeof value === "object") {
+		return `{${Object.entries(value as Record<string, unknown>)
+			.sort(([a], [b]) => a.localeCompare(b))
+			.map(([k, v]) => `${JSON.stringify(k)}:${canonical(v)}`).join(",")}}`;
+	}
+	return JSON.stringify(value) ?? "null";
+}
+
+function displayPath(value: string): string {
+	const cleaned = redact(value);
+	return isAbsolute(value) ? `…/${safeAtom(basename(cleaned))}` : clip(cleaned, 60);
+}
+
+function bashSummary(command: string): string {
+	if (/^bash [a-z0-9_.:@-]+(?: [a-z0-9:_-]+)?$/i.test(command)) return command;
+	const segment = norm(command).split(/(?:&&|\|\||[;|])/u, 1)[0] ?? "";
+	const tokens = segment.match(/(?:[^\s"']+|"[^"]*"|'[^']*')+/g) ?? [];
+	while (tokens[0] && /^(?:sudo|env|command|timeout)$/i.test(tokens[0])) tokens.shift();
+	while (tokens[0] && /^[A-Za-z_][A-Za-z0-9_]*=/.test(tokens[0])) tokens.shift();
+	const executable = safeAtom((tokens.shift() ?? "command").replace(/^.*\//, ""));
+	const subcommandTools = new Set(["npm", "pnpm", "yarn", "git", "cargo", "go", "ruff", "python", "python3", "node", "just", "make"]);
+	const candidate = tokens.find((token) => !token.startsWith("-"))?.replace(/^['"]|['"]$/g, "");
+	const subcommand = subcommandTools.has(executable.toLowerCase()) && candidate && /^[a-z0-9:_-]{1,24}$/i.test(candidate)
+		? candidate : undefined;
+	return `bash ${executable}${subcommand ? ` ${safeAtom(subcommand)}` : ""}`;
+}
 
 // Ledger key: tool + its primary argument, normalized. Deliberately NOT
 // loop-breaker's fpKey (that would import an extension from a lib); the ledger
 // is an independent view and only needs stability, not parity.
 export function attemptKey(toolName: string, args: Record<string, unknown>): string {
-	if (toolName === "bash" && typeof args.command === "string") return `bash:${norm(args.command).toLowerCase()}`;
-	if ((toolName === "read" || toolName === "edit" || toolName === "write") && typeof args.path === "string") {
-		return `${toolName}:${args.path}`;
-	}
-	if (toolName === "subagent" && typeof args.agent === "string") return `subagent:${args.agent}`;
-	const blob = norm(JSON.stringify(Object.fromEntries(Object.entries(args).sort(([a], [b]) => a.localeCompare(b)))));
-	return `${toolName}:${clip(blob, 120)}`;
+	let identity: unknown = args;
+	if (toolName === "bash" && typeof args.command === "string") identity = { command: norm(args.command).toLowerCase() };
+	else if ((toolName === "read" || toolName === "edit" || toolName === "write") && typeof args.path === "string") identity = { path: norm(args.path) };
+	else if (toolName === "subagent" && typeof args.agent === "string") identity = { agent: norm(args.agent).toLowerCase() };
+	return createHash("sha256").update(`${toolName}\0${canonical(identity)}`).digest("hex");
 }
 
 export function attemptLabel(toolName: string, args: Record<string, unknown>): string {
-	if (toolName === "bash" && typeof args.command === "string") return `bash \`${clip(norm(args.command), 60)}\``;
-	if (typeof args.path === "string") return `${toolName} ${clip(String(args.path), 60)}`;
-	if (toolName === "subagent" && typeof args.agent === "string") return `subagent(${args.agent})`;
+	if (toolName === "bash" && typeof args.command === "string") return bashSummary(args.command);
+	if (typeof args.path === "string") return `${safeAtom(toolName)} ${displayPath(args.path)}`;
+	if (toolName === "subagent" && typeof args.agent === "string") return `subagent(${safeAtom(args.agent)})`;
 	return toolName;
 }
 
 function firstLine(text: unknown): string | null {
 	if (typeof text !== "string" || text.length === 0) return null;
-	return clip(norm(text.split("\n", 1)[0] ?? ""), 90) || null;
+	return clip(redact(norm(text.split("\n", 1)[0] ?? "")), 90) || null;
 }
 
 export function noteTool(
@@ -94,8 +129,8 @@ export function noteTool(
 	state.attempts[key] = rec;
 	if (call.toolName === "subagent") {
 		state.delegations.push({
-			agent: typeof call.args.agent === "string" ? call.args.agent : "?",
-			mode: typeof call.args.mode === "string" ? call.args.mode : "default",
+			agent: typeof call.args.agent === "string" ? safeAtom(call.args.agent) : "?",
+			mode: typeof call.args.mode === "string" ? safeAtom(call.args.mode) : "default",
 			ok: !call.isError,
 			turn: state.turn,
 		});
@@ -152,8 +187,8 @@ export function renderLens(state: BlackboardState, maxChars: number): string {
 	if (failing.length) parts.push(`attempted+failing: ${failing.join(" | ")}`);
 	if (state.verify) {
 		parts.push(state.verify.verifiedOk
-			? `verified: green${state.verify.gateCmd ? ` (${state.verify.gateCmd})` : ""}`
-			: state.verify.mutated ? `verified: NOT yet${state.verify.gateCmd ? ` — run ${state.verify.gateCmd}` : ""}` : "");
+			? `verified: green${state.verify.gateCmd ? ` (${bashSummary(state.verify.gateCmd)})` : ""}`
+			: state.verify.mutated ? `verified: NOT yet${state.verify.gateCmd ? ` — run ${bashSummary(state.verify.gateCmd)}` : ""}` : "");
 	}
 	if (state.plan.runId) {
 		parts.push(`plan: ${state.plan.itemId ?? "active"}${state.plan.openItems != null ? ` (${state.plan.openItems} open)` : ""}${state.plan.lastGate && !state.plan.lastGate.pass ? ` gate-fails:${state.plan.lastGate.fails}` : ""}`);
@@ -181,10 +216,10 @@ export function renderCockpitHtml(state: BlackboardState, meta: { cwd: string; r
 table{border-collapse:collapse;width:100%}td,th{border:1px solid #ccc;padding:.3rem .5rem;text-align:left}
 small{color:#666}.k{color:#444}</style></head><body>
 <h1>Session cockpit</h1>
-<p class="k">${esc(meta.cwd)} · turn ${state.turn} · rendered ${esc(meta.renderedAt)} · compactions ${state.compactions}</p>
+<p class="k">${esc(displayPath(meta.cwd))} · turn ${state.turn} · rendered ${esc(meta.renderedAt)} · compactions ${state.compactions}</p>
 <p>
  verify: <b>${state.verify ? (state.verify.verifiedOk ? "green" : state.verify.mutated ? "UNVERIFIED changes" : "no mutations") : "—"}</b>
- ${state.verify?.gateCmd ? ` <small>(${esc(state.verify.gateCmd)})</small>` : ""}
+ ${state.verify?.gateCmd ? ` <small>(${esc(bashSummary(state.verify.gateCmd))})</small>` : ""}
  · plan: <b>${esc(state.plan.itemId ?? state.plan.runId ?? "none")}</b>${state.plan.openItems != null ? ` <small>${state.plan.openItems} open</small>` : ""}
  · repeats: <b>${state.loop?.sessionRepeats ?? 0}</b>
  · ctx: <b>${ctx.pct != null ? `${Math.round(ctx.pct)}%` : "—"}</b>${ctx.staleShare != null ? ` <small>stale ${Math.round(ctx.staleShare * 100)}%</small>` : ""}
@@ -198,10 +233,28 @@ ${delegs ? `<h2>Delegations</h2><ul>${delegs}</ul>` : ""}
 }
 
 export function snapshot(state: BlackboardState): Record<string, unknown> {
-	return JSON.parse(JSON.stringify(state));
+	const copy = JSON.parse(JSON.stringify(state)) as BlackboardState;
+	if (copy.verify?.gateCmd) copy.verify.gateCmd = bashSummary(copy.verify.gateCmd);
+	return copy as unknown as Record<string, unknown>;
 }
 
 export function restore(data: unknown): void {
-	if (!data || typeof data !== "object" || (data as { v?: unknown }).v !== 1) return;
-	Object.assign(boardState(), emptyState(), data);
+	if (!data || typeof data !== "object") return;
+	const raw = data as Partial<BlackboardState> & { v?: unknown };
+	if (raw.v === 2) {
+		Object.assign(boardState(), emptyState(), raw);
+		return;
+	}
+	if (raw.v === 1) {
+		// v1 persisted raw commands, paths, delegation labels, and errors. Retain
+		// only validated aggregate state; intentionally reset the sensitive ledger.
+		const next = emptyState();
+		if (Number.isFinite(raw.turn)) next.turn = Number(raw.turn);
+		if (Number.isFinite(raw.compactions)) next.compactions = Number(raw.compactions);
+		if (raw.plan && typeof raw.plan === "object") next.plan = { ...next.plan, ...raw.plan };
+		if (raw.verify && typeof raw.verify === "object") next.verify = { ...raw.verify } as BlackboardState["verify"];
+		if (raw.loop && typeof raw.loop === "object") next.loop = { ...raw.loop } as BlackboardState["loop"];
+		if (raw.context && typeof raw.context === "object") next.context = { ...next.context, ...raw.context };
+		Object.assign(boardState(), next);
+	}
 }

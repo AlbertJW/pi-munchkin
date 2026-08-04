@@ -3,7 +3,12 @@ import test from "node:test";
 import { isPrivateAddress, resolvePublicHttpUrl, type DnsLookup } from "../lib/public-url.ts";
 
 test("private and special-use IP ranges are rejected", () => {
-	for (const ip of ["127.0.0.1", "10.0.0.1", "172.16.2.3", "192.168.1.1", "169.254.169.254", "100.64.0.1", "::1", "fc00::1", "fe80::1", "::ffff:127.0.0.1", "2001:db8::1"]) {
+	for (const ip of [
+		"127.0.0.1", "10.0.0.1", "172.16.2.3", "192.168.1.1", "169.254.169.254", "100.64.0.1",
+		"::", "0:0:0:0:0:0:0:0", "::1", "0:0:0:0:0:0:0:1", "fc00::1", "fe80::1", "ff02::1",
+		"::ffff:127.0.0.1", "::ffff:7f00:1", "0:0:0:0:0:ffff:7f00:1", "::127.0.0.1", "::7f00:1",
+		"2001:db8::1", "3fff::1", "not-an-address", "2001:::1",
+	]) {
 		assert.equal(isPrivateAddress(ip), true, ip);
 	}
 	assert.equal(isPrivateAddress("93.184.216.34"), false);
@@ -13,11 +18,17 @@ test("private and special-use IP ranges are rejected", () => {
 test("public URL guard rejects protocols, credentials, localhost, mixed DNS, and private redirects", async () => {
 	const publicDns: DnsLookup = async () => [{ address: "93.184.216.34", family: 4 }];
 	const noFetch = async () => { throw new Error("must not fetch"); };
-	for (const url of ["file:///etc/passwd", "http://u:p@example.com", "http://localhost/x"]) {
+	for (const url of ["file:///etc/passwd", "http://u:p@example.com", "http://localhost/x", "http://[0:0:0:0:0:ffff:7f00:1]/x"]) {
 		await assert.rejects(resolvePublicHttpUrl(url, { lookup: publicDns, fetchRedirect: noFetch }));
 	}
 	await assert.rejects(resolvePublicHttpUrl("https://example.com", {
 		lookup: async () => [{ address: "93.184.216.34", family: 4 }, { address: "127.0.0.1", family: 4 }], fetchRedirect: noFetch,
+	}), /non-public/);
+	await assert.rejects(resolvePublicHttpUrl("https://example.com", {
+		lookup: async () => [{ address: "93.184.216.34", family: 4 }, { address: "malformed", family: 6 }], fetchRedirect: noFetch,
+	}), (error: unknown) => error instanceof Error && /non-public/.test(error.message) && !error.message.includes("malformed"));
+	await assert.rejects(resolvePublicHttpUrl("https://example.com", {
+		lookup: async () => [{ address: "2606:2800:220:1:248:1893:25c8:1946", family: 6 }, { address: "::ffff:7f00:1", family: 6 }], fetchRedirect: noFetch,
 	}), /non-public/);
 	await assert.rejects(resolvePublicHttpUrl("https://example.com", {
 		lookup: async (host) => [{ address: host === "internal.test" ? "10.0.0.2" : "93.184.216.34", family: 4 }],

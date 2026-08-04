@@ -1,5 +1,8 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import { existsSync, mkdtempSync, readFileSync, readdirSync, statSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import {
 	attemptKey, boardState, emptyState, noteTelemetry, noteTool, renderCockpitHtml,
 	renderLens, resetBoard, restore, snapshot,
@@ -25,11 +28,11 @@ test("attempt ledger: counts, errors, labels, delegations", () => {
 	noteTool(s, { toolName: "bash", args: { command: "npm test" }, isError: true, errorText: "1 failing" });
 	noteTool(s, { toolName: "read", args: { path: "src/a.ts" }, isError: false });
 	noteTool(s, { toolName: "subagent", args: { agent: "executor", mode: "spawn" }, isError: false });
-	const bash = s.attempts["bash:npm test"];
+	const bash = s.attempts[attemptKey("bash", { command: "npm test" })];
 	assert.equal(bash.count, 2, "normalized command collapses case/whitespace variants");
 	assert.equal(bash.errors, 2);
 	assert.equal(bash.lastError, "1 failing", "first line only");
-	assert.equal(s.attempts["read:src/a.ts"].errors, 0);
+	assert.equal(s.attempts[attemptKey("read", { path: "src/a.ts" })].errors, 0);
 	assert.deepEqual(s.delegations, [{ agent: "executor", mode: "spawn", ok: true, turn: 3 }]);
 });
 
@@ -71,9 +74,24 @@ test("snapshot/restore round-trips through JSON; bad data is ignored", () => {
 	resetBoard();
 	assert.equal(Object.keys(boardState().attempts).length, 0);
 	restore(snap);
-	assert.equal(boardState().attempts["bash:ls"].count, 1);
+	assert.equal(boardState().attempts[attemptKey("bash", { command: "ls" })].count, 1);
 	restore({ v: 99, junk: true });
-	assert.equal(boardState().attempts["bash:ls"].count, 1, "wrong version ignored");
+	assert.equal(boardState().attempts[attemptKey("bash", { command: "ls" })].count, 1, "wrong version ignored");
+});
+
+test("v2 snapshots redact ledgers and v1 restore intentionally drops them", () => {
+	const s = fresh();
+	noteTool(s, { toolName: "bash", args: { command: "curl https://private.invalid API_KEY=dummy-secret-value" }, isError: true, errorText: "API_KEY=dummy-secret-value failed at /Users/private/work/x" });
+	const encoded = JSON.stringify(snapshot(s));
+	const surfaces = [encoded, renderLens(s, 1200), renderCockpitHtml(s, { cwd: "/Users/private/secret-project", renderedAt: "now" })].join("\n");
+	assert.equal(surfaces.includes("dummy-secret-value"), false);
+	assert.equal(surfaces.includes("private.invalid"), false);
+	assert.equal(surfaces.includes("/Users/private"), false);
+	assert.match(Object.keys(s.attempts)[0], /^[a-f0-9]{64}$/);
+	restore({ v: 1, turn: 9, compactions: 2, attempts: { raw: { label: "secret", count: 1 } }, delegations: [{ agent: "raw" }], plan: { runId: "r1", itemId: null, lastGate: null, openItems: 2 }, context: { pct: 40, staleShare: null, dupShare: null } });
+	assert.deepEqual(boardState().attempts, {});
+	assert.deepEqual(boardState().delegations, []);
+	assert.equal(boardState().plan.openItems, 2);
 });
 
 test("telemetry tap: sees events across module instances, and a throwing tap never breaks record()", async () => {
@@ -170,6 +188,29 @@ test("cockpit HTML escapes hostile labels", () => {
 	const html = renderCockpitHtml(s, { cwd: "/tmp/x", renderedAt: "now" });
 	assert.ok(!html.includes("<script>alert"));
 	assert.ok(!html.includes("<img onerror"));
+});
+
+test("cockpit is atomically rendered outside the project with private permissions", async () => {
+	const project = mkdtempSync(join(tmpdir(), "bb-project-"));
+	const agent = mkdtempSync(join(tmpdir(), "bb-agent-"));
+	const previous = process.env.PI_CODING_AGENT_DIR;
+	process.env.PI_CODING_AGENT_DIR = agent;
+	try {
+		const fp = makeFakePi();
+		const mod = await import(`../extensions/session-blackboard.ts?private=${Date.now()}-${Math.random()}`);
+		mod.default(fp.pi as never);
+		await fire(fp, "session_start", { reason: "new" }, { cwd: project, sessionManager: { getBranch: () => [] } });
+		await fire(fp, "agent_end", {}, {});
+		const dir = join(agent, "artifacts", "session-cockpits");
+		const files = readdirSync(dir);
+		assert.equal(files.length, 1);
+		assert.match(files[0], /^[a-f0-9]{64}\.html$/);
+		assert.equal(statSync(join(dir, files[0])).mode & 0o777, 0o600);
+		assert.equal(existsSync(join(project, "artifacts")), false);
+		assert.equal(readFileSync(join(dir, files[0]), "utf8").includes(project), false, "absolute cwd is not persisted");
+	} finally {
+		if (previous === undefined) delete process.env.PI_CODING_AGENT_DIR; else process.env.PI_CODING_AGENT_DIR = previous;
+	}
 });
 
 test("resume/fork ALWAYS resets before restoring — no cross-session ledger bleed", async () => {

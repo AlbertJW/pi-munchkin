@@ -1,4 +1,4 @@
-import { appendFile, mkdir, readFile, rename, stat, unlink, writeFile } from "node:fs/promises";
+import { appendFile, mkdir, open, readFile, rename, stat, unlink, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { createHash, randomUUID } from "node:crypto";
 import { defineTool, withFileMutationQueue, type ExtensionAPI } from "@earendil-works/pi-coding-agent";
@@ -231,12 +231,23 @@ function buildActionFingerprint(parts: {
 	return createHash("sha256").update(stableStringify(parts)).digest("hex").slice(0, 16);
 }
 
-async function tailLines(path: string, maxLines: number): Promise<string[]> {
+const TRACE_TAIL_MAX_BYTES = 64 * 1024;
+
+export async function tailLines(path: string, maxLines: number): Promise<string[]> {
+	let handle: Awaited<ReturnType<typeof open>> | null = null;
 	try {
-		const raw = await readFile(path, "utf8");
+		handle = await open(path, "r");
+		const info = await handle.stat();
+		const length = Math.min(info.size, TRACE_TAIL_MAX_BYTES);
+		const buffer = Buffer.alloc(length);
+		await handle.read(buffer, 0, length, info.size - length);
+		let raw = buffer.toString("utf8");
+		if (info.size > length) raw = raw.slice(Math.max(0, raw.indexOf("\n") + 1));
 		return raw.split("\n").filter((line) => line.trim().length > 0).slice(-maxLines);
 	} catch {
 		return [];
+	} finally {
+		await handle?.close().catch(() => undefined);
 	}
 }
 

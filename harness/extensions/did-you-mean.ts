@@ -26,7 +26,7 @@ export default function (pi: ExtensionAPI) {
 		if (!/ENOENT|file not found/i.test(text)) return;
 		const attempted = attemptedPathFrom(event.toolName, event.input, text);
 		if (!attempted) return;
-		const suggestion = closestExistingPath(ctx.cwd, attempted);
+		const suggestion = await closestExistingPath(ctx.cwd, attempted);
 		if (!suggestion) return;
 		const hint = `\nclosest existing path: ${suggestion}`;
 		record("did-you-mean", "hint", { tool: event.toolName, injected_chars: hint.length });

@@ -1,4 +1,4 @@
-import { readFile, writeFile } from "node:fs/promises";
+import { readFile, stat, writeFile } from "node:fs/promises";
 import { extname, isAbsolute, relative, resolve } from "node:path";
 import { defineTool, type ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { Type } from "typebox";
@@ -26,6 +26,21 @@ const MAX_LINES = 2000; // mirror built-in read defaults
 const MAX_BYTES = 50 * 1024;
 const SNAP_VERSIONS = 4;
 const SNAP_PATHS = 50;
+const IMAGE_MAX_BYTES = 4 * 1024 * 1024;
+
+function byteLimit(name: string, fallback: number): number {
+	const raw = process.env[name];
+	return raw && /^\d+$/.test(raw) && Number(raw) > 0 ? Number(raw) : fallback;
+}
+
+const MAX_READ_FILE_BYTES = byteLimit("HASHLINE_MAX_READ_BYTES", 16 * 1024 * 1024);
+const MAX_EDIT_FILE_BYTES = byteLimit("HASHLINE_MAX_EDIT_BYTES", 16 * 1024 * 1024);
+
+function oversizedMessage(kind: "read" | "edit", size: number, max: number): string {
+	return `File is too large for hashline ${kind} (${size} bytes > ${max} bytes). ` +
+		"The limit parameter only bounds returned context; it does not make allocating an oversized file safe. " +
+		"Use rg, head, tail, or a purpose-built bounded span tool.";
+}
 
 // ---------- snapshot store ----------
 
@@ -99,15 +114,15 @@ export default function (pi: ExtensionAPI) {
 				const abs = isAbsolute(params.path) ? params.path : resolve(ctx.cwd, params.path);
 				const disp = displayPath(ctx.cwd, abs);
 				const mime = IMAGE_MIME[extname(abs).toLowerCase()];
+				const info = await stat(abs);
 				if (mime) {
-					const buf = await readFile(abs);
-					// no resize pipeline here (built-in read has one) — cap instead of
-					// blowing the context with a multi-MB base64 blob
-					if (buf.length > 4 * 1024 * 1024) {
-						throw new Error(`Image too large to attach (${(buf.length / 1024 / 1024).toFixed(1)}MB > 4MB). Resize it externally first.`);
+					if (info.size > IMAGE_MAX_BYTES) {
+						throw new Error(`Image too large to attach (${info.size} bytes > ${IMAGE_MAX_BYTES} bytes). Resize it externally first.`);
 					}
+					const buf = await readFile(abs);
 					return { content: [{ type: "image" as const, data: buf.toString("base64"), mimeType: mime }], details: {} };
 				}
+				if (info.size > MAX_READ_FILE_BYTES) throw new Error(oversizedMessage("read", info.size, MAX_READ_FILE_BYTES));
 				const text = normalizeText(await readFile(abs, "utf8"));
 				const tag = recordSnapshot(abs, text);
 				if (text === "") {
@@ -202,6 +217,8 @@ export default function (pi: ExtensionAPI) {
 					if (!buf) {
 						let raw: string;
 						try {
+							const info = await stat(abs);
+							if (info.size > MAX_EDIT_FILE_BYTES) throw new Error(oversizedMessage("edit", info.size, MAX_EDIT_FILE_BYTES));
 							raw = await readFile(abs, "utf8");
 						} catch (e) {
 							if ((e as NodeJS.ErrnoException)?.code === "ENOENT") {
@@ -229,6 +246,9 @@ export default function (pi: ExtensionAPI) {
 					}
 					const res = applyHunks(live, hunks);
 					const finalText = restoreStyle(res.newText, buf.style);
+					if (Buffer.byteLength(finalText) > MAX_EDIT_FILE_BYTES) {
+						throw new Error(oversizedMessage("edit", Buffer.byteLength(finalText), MAX_EDIT_FILE_BYTES));
+					}
 					buf.text = finalText; // chain: a later same-file section edits this result
 					planned.push({ abs, disp, finalText, res, hunkCount: hunks.length });
 				}
