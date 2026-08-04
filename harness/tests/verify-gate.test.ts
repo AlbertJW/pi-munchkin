@@ -5,6 +5,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fire, makeFakePi, resetPiGlobals } from "./integration-harness.ts";
 import { classifyBashCommand } from "../lib/command-policy.ts";
+import { buildPlanGateReceipt, publishPlanGateReceipt } from "../lib/plan-gate-receipt.ts";
 
 // Run: cd ~/.pi/agent && TELEMETRY_FILE=$(mktemp) TELEMETRY_SOURCE=test \
 //        npx -y tsx --test tests/verify-gate.test.ts
@@ -114,6 +115,78 @@ test("a FAILING gate command leaves the gate armed", async () => {
 		await fire(fp, "turn_end", { ...wrapUpTurn, turnIndex: 3 }, ctxFor(cwd));
 		assert.equal(fp.sent.some((m) => m.includes("verify")), true,
 			"a red gate must NOT disarm — the wrap-up steer must still fire");
+	} finally {
+		resetPiGlobals();
+	}
+});
+
+test("setup and mismatched suites cannot silently disarm the detected project gate", async () => {
+	const cwd = projectWithNpmTest();
+	try {
+		for (const command of ["tsc --init", "ruff --version", "eslint --init", "npm run lint"]) {
+			const fp = makeFakePi();
+			await loadVerifyGate(fp, cwd);
+			await fire(fp, "turn_end", bashTurn("sed -i '' s/a/b/ src/app.ts"), ctxFor(cwd));
+			await fire(fp, "turn_end", { ...bashTurn(command, "ok"), turnIndex: 2 }, ctxFor(cwd));
+			await fire(fp, "turn_end", { ...wrapUpTurn, turnIndex: 3 }, ctxFor(cwd));
+			assert.equal(fp.sent.some((message) => message.includes("verify")), true, `${command} must leave npm test armed`);
+			resetPiGlobals();
+		}
+	} finally {
+		resetPiGlobals();
+	}
+});
+
+test("verification follows tool-call order within one turn", async () => {
+	const cwd = projectWithNpmTest();
+	const orderedTurn = (verifyFirst: boolean) => {
+		const verify = { type: "toolCall", id: "v", name: "bash", arguments: { command: "npm test" } };
+		const mutate = { type: "toolCall", id: "m", name: "edit", arguments: { path: "src/app.ts" } };
+		return {
+			turnIndex: 1,
+			message: { role: "assistant", content: verifyFirst ? [verify, mutate] : [mutate, verify] },
+			toolResults: [{ toolCallId: "v", content: [{ type: "text", text: "12 passing" }], isError: false }],
+		};
+	};
+	try {
+		const after = makeFakePi();
+		await loadVerifyGate(after, cwd);
+		await fire(after, "turn_end", orderedTurn(false), ctxFor(cwd));
+		await fire(after, "turn_end", wrapUpTurn, ctxFor(cwd));
+		assert.equal(after.sent.some((message) => message.includes("verify")), false, "mutation then green verifies current source");
+		resetPiGlobals();
+
+		const before = makeFakePi();
+		await loadVerifyGate(before, cwd);
+		await fire(before, "turn_end", orderedTurn(true), ctxFor(cwd));
+		await fire(before, "turn_end", wrapUpTurn, ctxFor(cwd));
+		assert.equal(before.sent.some((message) => message.includes("verify")), true, "a later mutation invalidates earlier evidence");
+	} finally {
+		resetPiGlobals();
+	}
+});
+
+test("plan gate receipts are aggregate, exact, one-shot, and cleared at session start", async () => {
+	const cwd = projectWithNpmTest();
+	const planTurn = { turnIndex: 1, message: { role: "assistant", content: [{ type: "toolCall", id: "p", name: "plan_write", arguments: {} }] }, toolResults: [] };
+	try {
+		const fp = makeFakePi();
+		await loadVerifyGate(fp, cwd);
+		await fire(fp, "turn_end", bashTurn("sed -i '' s/a/b/ src/app.ts"), ctxFor(cwd));
+		publishPlanGateReceipt(buildPlanGateReceipt("r1", [
+			{ command: "npm test", pass: true },
+			{ command: "ruff check", pass: false },
+		]));
+		await fire(fp, "turn_end", planTurn, ctxFor(cwd));
+		await fire(fp, "turn_end", wrapUpTurn, ctxFor(cwd));
+		assert.equal(fp.sent.some((message) => message.includes("verify")), true, "one red gate makes the aggregate red");
+
+		fp.sent.length = 0;
+		publishPlanGateReceipt(buildPlanGateReceipt("r2", [{ command: "npm test", pass: true }]));
+		await fire(fp, "session_start", {}, ctxFor(cwd));
+		await fire(fp, "turn_end", planTurn, ctxFor(cwd));
+		const state = (globalThis as Record<string, unknown>).__pi_vg_state as { verifiedOk?: boolean };
+		assert.equal(state.verifiedOk, false, "session_start clears a stale unconsumed receipt");
 	} finally {
 		resetPiGlobals();
 	}

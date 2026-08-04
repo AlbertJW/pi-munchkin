@@ -116,6 +116,7 @@
     "harness/lib/loop-outcome.ts",
     "harness/lib/micro-gate-policy.ts",
     "harness/lib/plan-integrity.ts",
+    "harness/lib/plan-gate-receipt.ts",
     "harness/lib/plan-progress.ts",
     "harness/lib/process-writer.ts",
     "harness/lib/public-url.ts",

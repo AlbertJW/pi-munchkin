@@ -28,7 +28,7 @@ export const EVENT_CATALOG = {
 	"plan-runner/resume-found": { open: "number", in_progress: "number" },
 	"plan-runner/subagent-only-block": { toolName: "string" },
 	"plan-runner/force-plan-write-block": { toolName: "string" },
-	"plan-runner/write": { items: "number", newly_done: "number", rewrite: "boolean", declared_dependencies: "number", unmet_dependencies: "number", dependency_compliant: "boolean", context_tokens: ["number", "null"] },
+	"plan-runner/write": { items: "number", open_items: "number", newly_done: "number", rewrite: "boolean", declared_dependencies: "number", unmet_dependencies: "number", dependency_compliant: "boolean", context_tokens: ["number", "null"] },
 	"plan-runner/uncertainty-hold": { count: "number", gate: "string" },
 	"plan-runner/write-rejected": { reason_class: "string", context_tokens: ["number", "null"] },
 	// `activation` ("command"|"tool") added 2026-07-30 when /plan-go and the plan_go

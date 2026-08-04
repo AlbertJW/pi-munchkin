@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { assertVerifyGateAllowed, classifyBashCommand, discardGitTargets, discardWorkdir, discardsUncommittedWork, isBashMutation, isSourceMutation, looksFailingOutput } from "../lib/command-policy.ts";
+import { assertVerifyGateAllowed, classifyBashCommand, discardGitTargets, discardWorkdir, discardsUncommittedWork, isBashMutation, isSourceMutation, looksFailingOutput, verificationEvidence } from "../lib/command-policy.ts";
 
 test("isSourceMutation: ops/infra churn does NOT arm the verify gate", () => {
 	// ops/infra — change deps/containers/VCS/env, not source → must not arm
@@ -80,6 +80,19 @@ test("recognizes verify-like commands", () => {
 	assert.equal(classifyBashCommand("tsc --noEmit").verifyLike, true);
 	assert.equal(classifyBashCommand("just verify").verifyLike, true);
 	assert.equal(classifyBashCommand("custom verify", ["custom verify"]).verifyLike, true);
+});
+
+test("verification evidence is exact when a project gate is known", () => {
+	assert.equal(verificationEvidence(" npm   test ", "npm test"), "project_gate");
+	assert.equal(verificationEvidence("npm run lint", "npm test"), "none");
+	assert.equal(verificationEvidence("npm run lint", null), "generic");
+	for (const command of ["tsc --init", "ruff", "ruff --version", "eslint --init", "eslint --version", "eslint --fix src", "eslint --config eslint.config.js"]) {
+		assert.equal(verificationEvidence(command, null), "none", `${command} must not be verification evidence`);
+	}
+	for (const command of ["tsc --noEmit", "ruff check", "eslint src", "npx eslint ."]) {
+		assert.equal(verificationEvidence(command, null), "generic", `${command} must remain a real suite`);
+		assert.equal(classifyBashCommand(command).risk, "verify", `${command} must not become an unknown mutation`);
+	}
 });
 
 test("plan gates allow verify commands only", () => {

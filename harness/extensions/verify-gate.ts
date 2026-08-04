@@ -1,7 +1,8 @@
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { readFile, readdir } from "node:fs/promises";
 import { join } from "node:path";
-import { classifyBashCommand, isSourceMutation, looksFailingOutput } from "../lib/command-policy.ts";
+import { classifyBashCommand, isSourceMutation, looksFailingOutput, verificationEvidence } from "../lib/command-policy.ts";
+import { clearPlanGateReceipt, consumePlanGateReceipt } from "../lib/plan-gate-receipt.ts";
 import { steerText } from "../lib/steer-texts.ts";
 import { record } from "../lib/telemetry.ts";
 
@@ -15,7 +16,7 @@ import { record } from "../lib/telemetry.ts";
 //
 // Project-agnostic: the gate command is AUTO-DETECTED per cwd at session start
 // (justfile / npm / make / pytest / cargo / go / tsc). Force it with
-// VERIFY_GATE_CMD; override the match regex with VERIFY_GATE_PATTERN. Disable
+// VERIFY_GATE_CMD. Disable
 // with VERIFY_GATE=off. State is in-memory, reset on session_start. Complements
 // the loop-breaker (caps n); this regenerates p at the boundary.
 
@@ -34,44 +35,6 @@ const MUTATION_TOOLS = new Set(["edit", "write", "multiedit"]);
 // executing or verifying anything. Don't nag it to verify during planning.
 function planPhaseActive(): boolean {
 	return (globalThis as Record<string, unknown>).__pi_plan_phase_active === true;
-}
-
-// Generic "ran a verify" regex. Tokens must appear at COMMAND POSITION (start of
-// command or after ; & | ( sudo …) — `cat tests/foo.py`, `npm run dev`, or
-// `echo pytest passed` must NOT count as a verify (that silently disarms the
-// gate). The detected/forced gate command is appended at session start so the
-// exact project command also counts.
-const CMD_POS = "(?:^|[;&|(]\\s*|\\b(?:sudo|xargs|env)\\s+)";
-// KNOWN, ACCEPTED FALSE NEGATIVES — do NOT "fix" these by widening CMD_POS.
-// `time npm test` and `if npm test; then …` do not match here, and are not
-// verifyLike either (command-policy's CMD_POS has `do|then|timeout` and an
-// env-assignment prefix, but neither classifier has `time` or `if`). Before
-// 2026-08-03 the gate command was appended OUTSIDE this group, so an unanchored
-// `npm test` caught them by accident — along with `echo "run npm test" >> README`,
-// which is why the anchor exists.
-// Adding `time|if|then|while` back was measured: it re-matches
-// `echo "it is time npm test should run" >> notes.md` and `grep -rn "if npm test" .`
-// — i.e. it trades a NAG for a SILENT DISARM. For a gate whose entire job is
-// catching unverified change claims, the nag is the correct direction, the same
-// tradeoff the script-suite comment below already accepts. Pinned by a test.
-// No loose script alternative here on purpose. This regex used to end with
-// `(?:\./|bash |sh )\S*test\S*`, which counted ANY green script whose path
-// merely contained "test" (./scripts/collect-test-data.sh, a model-written
-// ./mytest.sh that echoes ok) as a passing verify — silently disarming the
-// gate, whose whole job is catching unverified change claims (triage #16).
-// A script suite counts only when routed through a recognised runner (npm
-// test, just test, make test) or named in VERIFY_GATE_CMD — an earlier
-// version of this comment also claimed the shared classifier's `verifyLike`
-// covered bare scripts, which is FALSE: VERIFY_COMMAND_RE has no script
-// alternative at all (`./scripts/run_tests.sh` → verifyLike:false, measured).
-// The failure mode left behind is a nag after a genuinely green unregistered
-// script, which is the safe direction.
-const VERIFY_BODY =
-	"just (?:verify|check|test)|pytest\\b|python3? -m pytest\\b|npm test\\b|npm run (?:test|check|lint|typecheck|verify)\\b|" +
-	"yarn test\\b|tsc\\b|bash -n |go test\\b|cargo test\\b|make (?:test|check|verify)\\b|ruff\\b|eslint\\b|node --test\\b";
-
-function escapeRegex(s: string): string {
-	return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
 function hasRecipe(text: string, name: string): boolean {
@@ -133,25 +96,6 @@ let st = fresh();
 let gateCmd: string | null = process.env.VERIFY_GATE_CMD || null;
 let composeProject = false;
 
-function buildRe(): RegExp {
-	// The detected gate command goes INSIDE the CMD_POS group. It used to be appended
-	// after it — `VERIFY_BASE + "|" + escapeRegex(gateCmd)` — and `|` has the lowest
-	// precedence in a regex, so that parsed as `(CMD_POS(?:anchored…)) | (gateCmd
-	// ANYWHERE)`. detectGate returns "npm test" for every fixture here (they all ship a
-	// package.json with scripts.test), so `echo "Run npm test to verify" >> README.md`
-	// armed the gate as a mutation and disarmed it as a verify in the SAME turn, and in
-	// any pytest project `grep -rn pytest .` counted as a passing verify (both measured
-	// 2026-07-31). Folding it into the body gives it the same command-position anchor as
-	// every built-in alternative.
-	// VERIFY_GATE_PATTERN is a FULL override and is deliberately left unanchored: it is a
-	// documented operator escape hatch, and no gate config can set it (configs/schema.json
-	// exposes only VERIFY_GATE and VERIFY_GATE_MAX_FIRES). An operator supplying it owns
-	// their own anchoring.
-	if (process.env.VERIFY_GATE_PATTERN) return new RegExp(process.env.VERIFY_GATE_PATTERN, "i");
-	return new RegExp(`${CMD_POS}(?:${VERIFY_BODY}${gateCmd ? `|${escapeRegex(gateCmd)}` : ""})`, "i");
-}
-let verifyRe = buildRe();
-
 function steer(verifyFailed: boolean): string {
 	const g = gateCmd ? `\`${gateCmd}\`` : "your verify (tests/typecheck)";
 	// Containerized projects: tests usually need the stack, so run the gate inside
@@ -181,6 +125,7 @@ export default function (pi: ExtensionAPI) {
 
 	pi.on("session_start", async (_event, ctx) => {
 		st = fresh();
+		clearPlanGateReceipt();
 		// The published globalThis snapshot must die with the session, not just the
 		// module state: pi's loader returns the CACHED factory across session
 		// replacement, so without this a /new, /fork or same-cwd /resume leaked the
@@ -192,7 +137,6 @@ export default function (pi: ExtensionAPI) {
 		composeProject = await hasComposeFile(cwd);
 		if (!process.env.VERIFY_GATE_CMD) {
 			gateCmd = await detectGate(cwd);
-			verifyRe = buildRe();
 		}
 	});
 
@@ -207,44 +151,43 @@ export default function (pi: ExtensionAPI) {
 			}
 		}
 
-		// A green plan-runner gate this turn IS a passing verify (one-shot flag,
-		// set by plan-runner when an item's gate exits 0) — consume it so the
-		// wrap-up isn't double-nagged after a gate already ran green.
 		const g = globalThis as Record<string, unknown>;
-		if (g.__pi_gate_green === true) {
-			g.__pi_gate_green = undefined;
-			st.verifiedOk = true;
-			record("verify-gate", "gate-green-consumed", {});
-		}
-
-		// Track SOURCE mutations only. A new source edit invalidates any prior pass
-		// (re-arms the gate) — checked AFTER the gate-green consume above so an edit
-		// in the SAME turn as an (unrelated) passing gate always re-arms; consuming
-		// gate-green first and mutation-checking after would let that edit slip
-		// through marked "verified" by a gate that never covered it. Ops/infra churn
-		// (installs, docker up/down, git, venv) must NOT re-arm — otherwise bringing
-		// up a stack or tearing it down keeps re-nagging "verify" after a genuine
-		// pass (esp. for containerized projects).
-		if (
-			toolCalls.some((c) => MUTATION_TOOLS.has(c.name)) ||
-			toolCalls.some((c) => c.name === "bash" && isSourceMutation(String(c.args.command ?? "")))
-		) {
-			st.mutated = true;
-			st.verifiedOk = false;
-			st.fires = 0; // new edit episode: the gate may steer again
-		}
-
-		// Track verify: a verify-pattern bash command whose own result looks green.
+		const planReceipt = consumePlanGateReceipt();
 		let verifyFailedThisTurn = false;
 		for (const c of toolCalls) {
+			const sourceMutation = MUTATION_TOOLS.has(c.name) ||
+				(c.name === "bash" && isSourceMutation(String(c.args.command ?? "")));
+			if (sourceMutation) {
+				st.mutated = true;
+				st.verifiedOk = false;
+				st.fires = 0;
+			}
+
+			if (c.name === "plan_write" && planReceipt) {
+				const relevant = planReceipt.outcomes.some((outcome) =>
+					verificationEvidence(outcome.command, gateCmd) !== "none");
+				const accepted = planReceipt.outcomes.some((outcome) =>
+					outcome.pass && verificationEvidence(outcome.command, gateCmd) !== "none");
+				if (planReceipt.allPassed && accepted) {
+					st.verifiedOk = true;
+					record("verify-gate", "gate-green-consumed", {});
+				} else if (relevant) {
+					st.verifiedOk = false;
+					verifyFailedThisTurn = true;
+				}
+			}
+
 			if (c.name !== "bash") continue;
 			const command = String(c.args.command ?? "");
 			const policy = classifyBashCommand(command, gateCmd ? [gateCmd] : []);
-			if (!policy.verifyLike && !verifyRe.test(command)) continue;
+			if (policy.mutates || verificationEvidence(command, gateCmd) === "none") continue;
 			const result = event.toolResults.find((r) => r.toolCallId === c.id);
 			const output = result?.content.map((part) => ("text" in part ? part.text : "")).join(" ") ?? "";
 			if (result && !looksFailingOutput(output, result.isError)) st.verifiedOk = true;
-			else verifyFailedThisTurn = true;
+			else {
+				st.verifiedOk = false;
+				verifyFailedThisTurn = true;
+			}
 		}
 
 		// Fire on a wrap-up (text-only) turn when files changed but no passing verify.

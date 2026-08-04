@@ -3,8 +3,9 @@ import { dirname, join } from "node:path";
 import { createHash, randomUUID } from "node:crypto";
 import { defineTool, withFileMutationQueue, type ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { Type } from "typebox";
-import { assertVerifyGateAllowed, classifyBashCommand } from "../lib/command-policy.ts";
+import { assertVerifyGateAllowed, classifyBashCommand, normalizeVerificationCommand } from "../lib/command-policy.ts";
 import { runReadonlyGate } from "../lib/gate-runtime.ts";
+import { buildPlanGateReceipt, publishPlanGateReceipt, type PlanGateOutcome } from "../lib/plan-gate-receipt.ts";
 import { planIntegrity, executionUnderway, normalizeTitle, preserveDecision, validateDeps, unmetDeps, reconcileItems as libReconcile, type ReconciledItem, type IncomingItem } from "../lib/plan-integrity.ts";
 import { nextReplanStreak, parseTodoLine } from "../lib/plan-progress.ts";
 import { processWriterMarker } from "../lib/process-writer.ts";
@@ -706,6 +707,7 @@ const planWrite = defineTool({
 	async execute(_toolCallId, params, _signal, _onUpdate, ctx) {
 		const aid = actionId();
 		rememberModel(ctx);
+		publishPlanGateReceipt(null);
 
 		// A structurally broken dependency graph (unknown ref, self-dep, cycle) is a
 		// plan-authoring error — reject before ANY state is written so the model
@@ -719,7 +721,7 @@ const planWrite = defineTool({
 				"\nFix depends_on (reference exact titles of other items in THIS list) and resend the ENTIRE list.");
 		}
 
-		const { state, newlyBlocked, gateMsgs, integrity, newlyDone, prevCompleted, stalePrev, wasRewrite } = await mutatePlan(ctx.cwd, async (prev) => {
+		const { state, newlyBlocked, gateMsgs, gateOutcomes, integrity, newlyDone, prevCompleted, stalePrev, wasRewrite } = await mutatePlan(ctx.cwd, async (prev) => {
 			const eventRunId = prev?.run_id ?? `plan-${timestamp()}`;
 			const items = reconcileItems(prev?.items, params.items as any);
 			const prevById = new Map((prev?.items ?? []).map((i) => [i.id, i]));
@@ -729,11 +731,14 @@ const planWrite = defineTool({
 			// done; non-zero reverts (→ in_progress, then blocked at GATE_MAX). Opt-in via
 			// item.gate, so gateless items are unaffected.
 			const gateMsgs: string[] = [];
+			const gateOutcomes: PlanGateOutcome[] = [];
+			const gateCache = new Map<string, { pass: boolean; output: string }>();
 			for (const it of items) {
 				if (it.status !== "done" || !it.gate || !api) continue;
 				if (prevById.get(it.id)?.status === "done") continue; // already passed
 				const gateAllowed = assertVerifyGateAllowed(it.gate);
 				if (!gateAllowed.ok) {
+					gateOutcomes.push({ command: it.gate, pass: false, rejected: true });
 					it.gate_fails = prevById.get(it.id)?.gate_fails ?? 0;
 					if (classifyBashCommand(it.gate).destructive) {
 						it.status = "blocked";
@@ -744,36 +749,23 @@ const planWrite = defineTool({
 						it.note = gateAllowed.reason;
 					}
 					it.gate = undefined; it.gate_fails = 0; // drop a rejected gate so it cannot re-trap the item
-					// A REJECTED gate also clears the shared green latch, same as a failing
-					// one below. This path used to `continue` without touching it, so a
-					// multi-item plan_write whose first gate passed and whose later gate
-					// was rejected left __pi_gate_green latched — and verify-gate marked
-					// the session verified on a call whose final gate state was "no gate
-					// ran". The flag means "gate activity most recently ended green"; a
-					// rejection is gate activity that did not.
-					(globalThis as Record<string, unknown>).__pi_gate_green = undefined;
 					gateMsgs.push(`gate for "${it.title}" dropped (not a verify/test command): ${gateAllowed.reason}. Use just verify / npm test / npx tsx --test, or pass gate:"" to clear.`);
 					continue;
 				}
-				const gateResult = await runReadonlyGate(api.exec.bind(api), ctx.cwd, it.gate, GATE_TIMEOUT_MS);
+				const normalizedGate = normalizeVerificationCommand(it.gate);
+				let gateResult = gateCache.get(normalizedGate);
+				if (!gateResult) {
+					gateResult = await runReadonlyGate(api.exec.bind(api), ctx.cwd, it.gate, GATE_TIMEOUT_MS);
+					gateCache.set(normalizedGate, gateResult);
+				}
+				gateOutcomes.push({ command: normalizedGate, pass: gateResult.pass });
 				const out = gateResult.output;
 				if (gateResult.pass) {
 					it.gate_fails = 0;
-					// A green plan gate IS a passing verify. Share it (one-shot flag,
-					// same-process globalThis idiom) so verify-gate doesn't nag the
-					// wrap-up to verify again after the gate already ran green.
-					(globalThis as Record<string, unknown>).__pi_gate_green = true;
 					const priorFails = prevById.get(it.id)?.gate_fails ?? 0;
 					planEvent("gate", eventRunId, { pass: true, recovered: priorFails > 0, prior_fails: priorFails });
 					continue;
 				}
-				// A failing gate CLEARS the shared green latch. Without this, a
-				// multi-item plan_write whose FIRST item's gate passed and whose later
-				// item's gate failed left __pi_gate_green latched, and verify-gate
-				// then skipped its "files changed, no passing verify" steer for a call
-				// whose final gate state was red (triage #12). The flag means "gate
-				// activity most recently ended green", not "some gate was green once".
-				(globalThis as Record<string, unknown>).__pi_gate_green = undefined;
 				const fails = (prevById.get(it.id)?.gate_fails ?? 0) + 1;
 				// Retry ladder: rung 1 = locality protocol (bounded single-span repair
 				// against the failing output), rung 2 = dumb-zone escape (delegate to a
@@ -855,8 +847,9 @@ const planWrite = defineTool({
 			// Captured BEFORE this write stamps us as the writer — a foreign-writer
 			// state with in_progress items is a headless resume (no /plan-go ran).
 			const stalePrev = prev ? staleInProgress(prev) : [];
-			return { state: next, result: { state: next, newlyBlocked, gateMsgs, integrity: { reattached, preservedOpen, yieldedOpen }, newlyDone, prevCompleted, stalePrev, wasRewrite: Boolean(prev) } };
+			return { state: next, result: { state: next, newlyBlocked, gateMsgs, gateOutcomes, integrity: { reattached, preservedOpen, yieldedOpen }, newlyDone, prevCompleted, stalePrev, wasRewrite: Boolean(prev) } };
 		});
+		publishPlanGateReceipt(buildPlanGateReceipt(state.run_id, gateOutcomes));
 
 		// Trace each newly blocked item through the repeated-failure guard.
 		let warning = "";
@@ -1008,6 +1001,7 @@ const planWrite = defineTool({
 			.reduce((sum, item) => sum + unmetDeps(item, state.items).length, 0);
 		planEvent("write", state.run_id, {
 			items: state.items.length,
+			open_items: state.items.filter((item) => item.status === "pending" || item.status === "in_progress").length,
 			newly_done: newlyDone,
 			rewrite: wasRewrite,
 			declared_dependencies: declaredDeps,

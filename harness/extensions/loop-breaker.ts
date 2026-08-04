@@ -1,5 +1,5 @@
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
-import { isBashMutation, looksFailingOutput } from "../lib/command-policy.ts";
+import { classifyBashCommand, isBashMutation, looksFailingOutput } from "../lib/command-policy.ts";
 import { decideOutcomeAction } from "../lib/loop-outcome.ts";
 import { steerText } from "../lib/steer-texts.ts";
 import { record } from "../lib/telemetry.ts";
@@ -61,7 +61,7 @@ const HARD_STOP_MODE = resolveStopMode(process.env.LB_HARD_STOP);
 
 // Tools that count as progress (reset the loop episode). Everything else
 // (read, bash, grep, find, ls, ...) is non-progress.
-const PROGRESS_TOOLS = new Set(["edit", "write", "plan_write"]);
+const PROGRESS_TOOLS = new Set(["edit", "write"]);
 
 function normText(s: string): string {
 	return s.trim().replace(/\s+/g, " ").toLowerCase();
@@ -171,7 +171,16 @@ function resetEpisode(): void {
 // Only tools whose result is an OUTCOME (command output, apply result). Never
 // read/grep/find — their results are file CONTENT; a file containing "FAILED"
 // must not register as a failing outcome.
-const OUTCOME_TOOLS = new Set(["bash", "edit", "write", "multiedit"]);
+const OUTCOME_TOOLS = new Set(["bash", "edit", "write", "multiedit", "plan_write"]);
+
+function isFailingOutcome(toolName: string, text: string, isError: boolean, command = ""): boolean {
+	if (isError) return true;
+	if (toolName !== "bash") return false;
+	// Successful inspection output is content, not an outcome. Only recognised
+	// suites/build checks get the exit-0 textual-failure fallback.
+	if (!classifyBashCommand(command).verifyLike) return false;
+	return looksFailingOutput(text, false);
+}
 
 // Fingerprint a failing result: digits stripped so pids/durations/counts jitter
 // doesn't break equality ("FAIL: 1" ≈ "FAIL: 2" — same stuck outcome class).
@@ -291,6 +300,7 @@ export default function (pi: ExtensionAPI) {
 	// Kill switch (mirrors VERIFY_GATE=off): needed by the harness-off measurement
 	// arm (U3b) — does the harness's steering actually buy anything?
 	if (process.env.LOOP_BREAKER === "off") return;
+	const executionEnds = new Map<string, { toolName: string; isError: boolean; text: string }>();
 	pi.on("session_start", async () => {
 		resetEpisode();
 		resetOutcomes();
@@ -309,6 +319,13 @@ export default function (pi: ExtensionAPI) {
 		sessionRepeats = 0;
 		sessionRepeatFired = false;
 		delete (globalThis as Record<string, unknown>).__pi_lb_state;
+		executionEnds.clear();
+	});
+
+	pi.on("tool_execution_end", async (event) => {
+		const content = (event.result as { content?: Array<{ type?: string; text?: string }> } | undefined)?.content ?? [];
+		const text = content.filter((part) => part.type === "text").map((part) => part.text ?? "").join(" ");
+		executionEnds.set(event.toolCallId, { toolName: event.toolName, isError: event.isError === true, text });
 	});
 
 	// turnIndex is NOT monotonic across a session: agent-session.js's `_turnIndex = 0`
@@ -360,16 +377,31 @@ export default function (pi: ExtensionAPI) {
 
 		// Outcome-loop scan — BEFORE the progress reset (mutations are part of an
 		// outcome loop; this state deliberately survives them).
-		for (const r of event.toolResults) {
+		const resultCallIds = new Set(event.toolResults.map((result) => result.toolCallId));
+		const outcomes = event.toolResults.map((result) => ({
+			toolCallId: result.toolCallId,
+			toolName: result.toolName,
+			isError: result.isError === true,
+			text: result.content.map((part) => ("text" in part ? part.text : "")).join(" "),
+		}));
+		// Pi validation/execute throws can emit tool_execution_end without a
+		// tool_result. Bring those rejected plan writes into the same outcome ladder.
+		for (const call of toolCalls) {
+			const ended = executionEnds.get(call.id);
+			if (call.name === "plan_write" && ended?.isError && !resultCallIds.has(call.id)) {
+				outcomes.push({ toolCallId: call.id, toolName: "plan_write", isError: true, text: ended.text || "plan_write rejected" });
+			}
+		}
+		for (const r of outcomes) {
 			if (!OUTCOME_TOOLS.has(r.toolName)) continue;
-			const text = r.content.map((c) => ("text" in c ? c.text : "")).join(" ");
-			if (!looksFailingOutput(text, r.isError)) continue;
-			const fp = outcomeFp(r.toolName, text);
+			const call = toolCalls.find((candidate) => candidate.id === r.toolCallId);
+			const command = call?.name === "bash" ? String(call.args.command ?? "") : "";
+			if (!isFailingOutcome(r.toolName, r.text, r.isError, command)) continue;
+			const fp = outcomeFp(r.toolName, r.text);
 			const n = (outcomeCounts.get(fp) ?? 0) + 1;
 			outcomeCounts.set(fp, n);
 			if (!outcomeLabels.has(fp)) {
-				const call = toolCalls.find((c) => c.id === r.toolCallId);
-				outcomeLabels.set(fp, call ? labelFor(call.name, call.args) : r.toolName);
+				outcomeLabels.set(fp, r.toolName === "plan_write" ? "plan_write rejection" : call ? labelFor(call.name, call.args) : r.toolName);
 			}
 			const fired = outcomeFired.get(fp) ?? 0;
 			const action = decideOutcomeAction(n, fired, OUTCOME_T1);
@@ -429,7 +461,9 @@ export default function (pi: ExtensionAPI) {
 		const hasProgress =
 			toolCalls.length === 0 ||
 			toolCalls.some((c) => PROGRESS_TOOLS.has(c.name)) ||
+			toolCalls.some((c) => c.name === "plan_write" && executionEnds.get(c.id)?.isError === false) ||
 			toolCalls.some((c) => c.name === "bash" && isBashMutation(String(c.args.command ?? "")));
+		for (const call of toolCalls) executionEnds.delete(call.id);
 		if (hasProgress) {
 			// Compliance signal: the model made progress after being steered — how
 			// many turns did the steer take to land?

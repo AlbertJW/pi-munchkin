@@ -109,7 +109,9 @@ export function noteTelemetry(state: BlackboardState, ext: string, kind: string,
 		if (typeof detail.run_id === "string") state.plan.runId = detail.run_id;
 		if (kind === "gate") state.plan.lastGate = { pass: detail.pass === true, fails: Number(detail.fails ?? 0) || 0 };
 		if (kind === "write" && typeof detail.items === "number") {
-			state.plan.openItems = detail.items - (Number(detail.newly_done ?? 0) || 0);
+			state.plan.openItems = typeof detail.open_items === "number"
+				? detail.open_items
+				: detail.items - (Number(detail.newly_done ?? 0) || 0);
 		}
 	} else if (ext === "context-surface" && kind === "receipt") {
 		state.context = {

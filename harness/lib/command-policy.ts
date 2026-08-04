@@ -16,6 +16,8 @@ export type CommandPolicy = {
 	reason: string;
 };
 
+export type VerificationEvidence = "project_gate" | "generic" | "none";
+
 const SAFE_REDIRECT_RE = /\d*>>?\s*(?:\/dev\/null|&\s*\d)/g;
 
 // Command-position prefix: a token only counts when it starts a command — the
@@ -35,9 +37,41 @@ export const VERIFY_COMMAND_RE = new RegExp(
 		// consumer, assertVerifyGateAllowed, benefits identically: a file-existence check
 		// is not a plausible plan gate. `\[\s` was near-dead anyway — the group's trailing
 		// `\b` meant `[ -f a ]` never matched, only the rare `[ x = y ]` form did.
-		String.raw`(?:just\s+(?:verify|check|test)|npm\s+(?:test|run\s+(?:test|check|lint|typecheck|verify))|yarn\s+(?:test|check|lint)|pnpm\s+(?:test|run\s+(?:test|check|lint|typecheck|verify))|pytest|python(?:3)?\s+-m\s+pytest|cargo\s+test|go\s+test|make\s+(?:test|check|verify)|tsc\s+--noEmit|bash\s+-n|ruff(?:\s+check)?|eslint|node\s+--test|(?:npx\s+(?:-y\s+)?)?tsx\s+--test|(?:npx\s+(?:-y\s+)?)?(?:vitest|jest))\b`,
+		String.raw`(?:just\s+(?:verify|check|test)|npm\s+(?:test|run\s+(?:test|check|lint|typecheck|verify))|yarn\s+(?:test|check|lint)|pnpm\s+(?:test|run\s+(?:test|check|lint|typecheck|verify))|pytest|python(?:3)?\s+-m\s+pytest|cargo\s+test|go\s+test|make\s+(?:test|check|verify)|tsc\s+--noEmit|bash\s+-n|ruff\s+check|node\s+--test|(?:npx\s+(?:-y\s+)?)?tsx\s+--test|(?:npx\s+(?:-y\s+)?)?(?:vitest|jest))\b`,
 	"i",
 );
+
+const ESLINT_COMMAND_RE = new RegExp(
+	CMD_POS + String.raw`(?:(?:npx\s+(?:-y\s+)?)?eslint)\b([^;&|\n]*)`,
+	"gi",
+);
+
+export function normalizeVerificationCommand(command: string): string {
+	return command.trim().replace(/\s+/g, " ");
+}
+
+function isEslintVerification(command: string): boolean {
+	ESLINT_COMMAND_RE.lastIndex = 0;
+	for (const match of command.matchAll(ESLINT_COMMAND_RE)) {
+		const rest = String(match[1] ?? "").trim();
+		if (!rest || /(?:^|\s)(?:--init|--help|--version|--fix|-h|-v)(?:\s|$)/i.test(rest)) continue;
+		// Require a target-looking positional token. Values consumed by options are
+		// configuration, not evidence that project files were linted.
+		const valueOptions = new Set([
+			"--config", "-c", "--parser", "--plugin", "--rule", "--format", "-f",
+			"--resolve-plugins-relative-to", "--ignore-pattern", "--ext", "--global",
+		]);
+		const tokens = rest.split(/\s+/);
+		let consumesNext = false;
+		for (const token of tokens) {
+			if (consumesNext) { consumesNext = false; continue; }
+			if (valueOptions.has(token)) { consumesNext = true; continue; }
+			if (token.startsWith("-")) continue;
+			if (!/^\d+$/.test(token)) return true;
+		}
+	}
+	return false;
+}
 
 const MUTATION_RE = new RegExp(
 	CMD_POS +
@@ -133,7 +167,7 @@ function shellCommandHeads(cmd: string): string[] {
 function containsUnknownCommand(cmd: string): boolean {
 	return shellCommandHeads(cmd).some((head) => {
 		if (READ_ONLY_HEADS.has(head)) return false;
-		if (["cargo", "eslint", "go", "jest", "just", "make", "npm", "npx", "pnpm", "pytest", "ruff", "tsc", "tsx", "vitest", "yarn"].includes(head) && VERIFY_COMMAND_RE.test(cmd)) return false;
+		if (["cargo", "eslint", "go", "jest", "just", "make", "npm", "npx", "pnpm", "pytest", "ruff", "tsc", "tsx", "vitest", "yarn"].includes(head) && isVerifyCommand(cmd)) return false;
 		if (head === "bash" && /\bbash\s+-n\b/.test(cmd)) return false;
 		if (/^python(?:3(?:\.\d+)?)?$/.test(head)) {
 			return !(/\s-m\s+pytest\b/.test(cmd) || (/\s-c\b/.test(cmd) && !INTERP_WRITE_RE.test(cmd)));
@@ -178,10 +212,22 @@ export function isSourceMutation(cmd: string): boolean {
 }
 
 export function isVerifyCommand(cmd: string, extraAllowed: readonly string[] = []): boolean {
-	const normalized = cmd.trim();
+	const normalized = normalizeVerificationCommand(cmd);
 	if (!normalized) return false;
-	if (extraAllowed.some((allowed) => allowed.trim() === normalized)) return true;
-	return VERIFY_COMMAND_RE.test(normalized);
+	if (extraAllowed.some((allowed) => normalizeVerificationCommand(allowed) === normalized)) return true;
+	return VERIFY_COMMAND_RE.test(normalized) || isEslintVerification(normalized);
+}
+
+/** Evidence accepted by the handoff gate. When a project gate is known, only
+ * that exact normalized command counts; a different generic suite is useful,
+ * but cannot prove the detected project contract. */
+export function verificationEvidence(command: string, detectedGate: string | null): VerificationEvidence {
+	const normalized = normalizeVerificationCommand(command);
+	if (!normalized) return "none";
+	if (detectedGate) {
+		return normalized === normalizeVerificationCommand(detectedGate) ? "project_gate" : "none";
+	}
+	return isVerifyCommand(normalized) ? "generic" : "none";
 }
 
 export function classifyBashCommand(cmd: string, extraVerifyCommands: readonly string[] = []): CommandPolicy {

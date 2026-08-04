@@ -112,6 +112,74 @@ test("session repeats do NOT count read pagination or genuinely new work", () =>
 	assert.equal(repeats, 1, "a verbatim re-read IS a repeat");
 });
 
+test("successful read-only bash output containing FAILED is never an outcome loop", async () => {
+	const fp = makeFakePi();
+	const mod = await import(`../extensions/loop-breaker.ts?readonly-failed=${Date.now()}-${Math.random()}`);
+	mod.default(fp.pi as never);
+	let aborts = 0;
+	const ctx = { ui: { notify() {} }, abort() { aborts += 1; }, cwd: "/tmp" };
+	await fire(fp, "session_start", {});
+	for (let index = 0; index < 6; index++) {
+		await fire(fp, "turn_end", {
+			turnIndex: index,
+			message: { role: "assistant", provider: "local-llama", content: [
+				{ type: "toolCall", id: `rg-${index}`, name: "bash", arguments: { command: `rg FAILED logs-${index}.txt` } },
+			] },
+			toolResults: [{ toolCallId: `rg-${index}`, toolName: "bash", isError: false, content: [{ type: "text", text: "FAILED record" }] }],
+		}, ctx);
+	}
+	assert.equal(fp.sent.some((message) => message.includes("Same failing result")), false);
+	assert.equal(aborts, 0);
+});
+
+test("rejected plan_write participates in outcomes; successful plan_write resets the episode", async () => {
+	const fp = makeFakePi();
+	const mod = await import(`../extensions/loop-breaker.ts?plan-reject=${Date.now()}-${Math.random()}`);
+	mod.default(fp.pi as never);
+	const ctx = { ui: { notify() {} }, abort() {}, cwd: "/tmp" };
+	await fire(fp, "session_start", {});
+	for (let index = 0; index < 2; index++) {
+		const id = `bad-plan-${index}`;
+		await fire(fp, "tool_execution_end", {
+			toolCallId: id, toolName: "plan_write", isError: true,
+			result: { content: [{ type: "text", text: "plan_write rejected: unknown dependency" }] },
+		}, ctx);
+		await fire(fp, "turn_end", {
+			turnIndex: index,
+			message: { role: "assistant", provider: "local-llama", content: [
+				{ type: "toolCall", id, name: "plan_write", arguments: { items: [] } },
+			] },
+			toolResults: [],
+		}, ctx);
+	}
+	assert.equal(fp.sent.some((message) => message.includes("plan_write rejection")), true,
+		"execution-end-only rejection reaches the outcome ladder");
+
+	// Build an ordinary repeated-call episode, then prove a successful plan_write
+	// clears it: the next identical read starts again at count one.
+	await fire(fp, "session_start", {});
+	fp.sent.length = 0;
+	const readTurn = (id: string, turnIndex: number) => ({
+		turnIndex, toolResults: [],
+		message: { role: "assistant", provider: "local-llama", content: [
+			{ type: "toolCall", id, name: "read", arguments: { path: "src/x.ts" } },
+		] },
+	});
+	await fire(fp, "turn_end", readTurn("r1", 3), ctx);
+	await fire(fp, "turn_end", readTurn("r2", 4), ctx);
+	assert.ok(fp.sent.length > 0, "the repeated read episode actually steered");
+	fp.sent.length = 0;
+	await fire(fp, "tool_execution_end", { toolCallId: "good-plan", toolName: "plan_write", isError: false, result: { content: [] } }, ctx);
+	await fire(fp, "turn_end", {
+		turnIndex: 5, toolResults: [],
+		message: { role: "assistant", provider: "local-llama", content: [
+			{ type: "toolCall", id: "good-plan", name: "plan_write", arguments: { items: [] } },
+		] },
+	}, ctx);
+	await fire(fp, "turn_end", readTurn("r3", 6), ctx);
+	assert.equal(fp.sent.length, 0, "successful plan_write resets the repetition episode");
+});
+
 test("session_start clears SESSION-cumulative state (no bleed across /new, /fork, /resume)", async () => {
 	// sessionSeenCalls/sessionRepeats/sessionRepeatFired live at MODULE scope, and
 	// pi returns the cached extension factory across session replacement

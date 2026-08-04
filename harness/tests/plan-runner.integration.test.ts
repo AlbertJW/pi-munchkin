@@ -9,6 +9,7 @@ import { mkdtempSync, readFileSync, writeFileSync, mkdirSync, existsSync, readdi
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { callTool, fire, makeCtx, makeFakePi, expectToolError, resetPiGlobals } from "./integration-harness.ts";
+import { consumePlanGateReceipt } from "../lib/plan-gate-receipt.ts";
 
 // module-load envs BEFORE importing the extensions
 process.env.PLAN_GATE_MAX = "2";
@@ -1175,13 +1176,7 @@ test("session_start clears __pi_active_plan_context (no run_id bleed across /new
 	}
 });
 
-test("a REJECTED gate clears __pi_gate_green — verify-gate must not inherit a stale green", async () => {
-	// The failing-gate path cleared the latch (triage #12); the REJECTED path
-	// `continue`d without touching it. So a multi-item plan_write whose first gate
-	// ran green and whose second gate was rejected (not a verify command) left
-	// __pi_gate_green latched, and verify-gate marked the session verified on a
-	// call whose final gate state was "no gate ran".
-	const g = globalThis as Record<string, unknown>;
+test("plan gate receipt is aggregate and independent of green/red item order", async () => {
 	const fp = freshPlanRunner();
 	const cwd = tmp();
 	writeFileSync(join(cwd, "good.sh"), "echo ok\n");
@@ -1192,10 +1187,47 @@ test("a REJECTED gate clears __pi_gate_green — verify-gate must not inherit a 
 				{ title: "sneaky", status: "done", gate: "npm install leftpad" },
 			], request: "r", summary: "s",
 		}, cwd);
-		assert.equal(g.__pi_gate_green, undefined,
-			"a rejected gate AFTER a green one must clear the latch — 'gate activity most recently ended green' is false");
+		const first = consumePlanGateReceipt();
+		assert.equal(first?.allPassed, false, "one rejected gate makes green/rejected aggregate red");
+
+		const cwd2 = tmp();
+		writeFileSync(join(cwd2, "good.sh"), "echo ok\n");
+		await callTool(fp, "plan_write", {
+			items: [
+				{ title: "sneaky", status: "done", gate: "npm install leftpad" },
+				{ title: "good work", status: "done", gate: "bash -n good.sh" },
+			], request: "r", summary: "s",
+		}, cwd2);
+		const second = consumePlanGateReceipt();
+		assert.equal(second?.allPassed, false, "rejected/green must be red too");
 	} finally {
-		delete g.__pi_gate_green;
+		resetPiGlobals();
+	}
+});
+
+test("duplicate normalized plan gates execute once and fan out", async () => {
+	const fp = makeFakePi();
+	let executions = 0;
+	const realExec = fp.pi.exec;
+	fp.pi.exec = async (...args: Parameters<typeof realExec>) => {
+		executions += 1;
+		return realExec(...args);
+	};
+	planRunner(fp.pi as any);
+	const cwd = tmp();
+	writeFileSync(join(cwd, "good.sh"), "echo ok\n");
+	try {
+		await callTool(fp, "plan_write", {
+			items: [
+				{ title: "one", status: "done", gate: "bash -n good.sh" },
+				{ title: "two", status: "done", gate: "  bash   -n   good.sh  " },
+			], request: "r", summary: "s",
+		}, cwd);
+		assert.equal(executions, 1, "equivalent gates execute once");
+		const receipt = consumePlanGateReceipt();
+		assert.equal(receipt?.outcomes.length, 1, "receipt also deduplicates normalized commands");
+		assert.equal(receipt?.allPassed, true);
+	} finally {
 		resetPiGlobals();
 	}
 });
