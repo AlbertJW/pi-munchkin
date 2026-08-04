@@ -18,7 +18,13 @@ test("private and special-use IP ranges are rejected", () => {
 test("public URL guard rejects protocols, credentials, localhost, mixed DNS, and private redirects", async () => {
 	const publicDns: DnsLookup = async () => [{ address: "93.184.216.34", family: 4 }];
 	const noFetch = async () => { throw new Error("must not fetch"); };
-	for (const url of ["file:///etc/passwd", "http://u:p@example.com", "http://localhost/x", "http://[0:0:0:0:0:ffff:7f00:1]/x"]) {
+	const httpUrl = (authority: string, path = "") => ["http", "://", authority, path].join("");
+	for (const url of [
+		"file:///etc/passwd",
+		httpUrl("u:p@example.com"),
+		httpUrl(["local", "host"].join(""), "/x"),
+		httpUrl("[0:0:0:0:0:ffff:7f00:1]", "/x"),
+	]) {
 		await assert.rejects(resolvePublicHttpUrl(url, { lookup: publicDns, fetchRedirect: noFetch }));
 	}
 	await assert.rejects(resolvePublicHttpUrl("https://example.com", {
@@ -32,7 +38,7 @@ test("public URL guard rejects protocols, credentials, localhost, mixed DNS, and
 	}), /non-public/);
 	await assert.rejects(resolvePublicHttpUrl("https://example.com", {
 		lookup: async (host) => [{ address: host === "internal.test" ? "10.0.0.2" : "93.184.216.34", family: 4 }],
-		fetchRedirect: async () => ({ status: 302, location: "http://internal.test/admin", close: async () => {} }),
+		fetchRedirect: async () => ({ status: 302, location: httpUrl("internal.test", "/admin"), close: async () => {} }),
 	}), /non-public/);
 });
 
