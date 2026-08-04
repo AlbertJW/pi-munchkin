@@ -1,5 +1,8 @@
 # Candidate strategy: why the roster cannot be ranked on outcome yet
 
+> **HISTORICAL / UNSUPPORTED:** Recorded `NEUTRAL` labels predating 2026-07-27 are preserved as
+> historical data; their current interpretation is **UNTESTED**, not evidence of no effect.
+
 **2026-07-31.** Analysis of the whole dark-candidate roster against how the harness actually
 works, what the instrument can see, and what 1,839 eval rows actually say.
 

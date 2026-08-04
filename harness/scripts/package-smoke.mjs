@@ -2,7 +2,7 @@
 
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
-import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, rm, symlink } from "node:fs/promises";
 import { resolve } from "node:path";
 import { relative } from "node:path";
 import { tmpdir } from "node:os";
@@ -55,21 +55,19 @@ assert(!extensions.includes("harness/extensions/chaos.ts"), "chaos must not be e
 assert.deepEqual(skills, ["skills/deep-research", "skills/lavish-review"], "pi.skills must expose exactly the shipped skill set");
 
 const work = await mkdtemp(resolve(tmpdir(), "pi-munchkin-pack-"));
-const cache = resolve(work, "npm-cache");
 const packDir = resolve(work, "pack");
-const project = resolve(work, "consumer");
+const extractDir = resolve(work, "extract");
 const agentDir = resolve(work, "home", ".pi", "agent");
 const processEnv = {
   PATH: process.env.PATH,
   HOME: resolve(work, "home"),
   TMPDIR: work,
-  npm_config_cache: cache,
 };
 for (const key of ["LANG", "LC_ALL", "SYSTEMROOT", "WINDIR"]) {
   if (process.env[key]) processEnv[key] = process.env[key];
 }
 await mkdir(packDir, { recursive: true });
-await mkdir(project, { recursive: true });
+await mkdir(extractDir, { recursive: true });
 await mkdir(agentDir, { recursive: true });
 
 let packed;
@@ -82,10 +80,10 @@ try {
   assert.equal(packed.length, 1, "npm pack must describe exactly one package");
   const files = new Set(packed[0].files.map(({ path }) => path));
 
-  for (const expected of ["README.md", "LICENSE", "NOTICE.md", "harness/APPEND_SYSTEM.md", "skills/deep-research/SKILL.md", ...extensions]) {
+  for (const expected of ["README.md", "LICENSE", "NOTICE.md", "harness/APPEND_SYSTEM.md", "harness/lib/role-routing.ts", "examples/run-model.example.sh", "skills/deep-research/SKILL.md", ...extensions]) {
     assert(files.has(expected), `packed artifact is missing ${expected}`);
   }
-  for (const forbidden of ["harness/extensions/chaos.ts", "harness/lib/chaos-policy.ts", "optimizer/munchkin.py"]) {
+  for (const forbidden of ["harness/extensions/chaos.ts", "harness/lib/chaos-policy.ts", "harness/lib/tag-words.ts", "optimizer/munchkin.py"]) {
     assert(!files.has(forbidden), `packed artifact unexpectedly contains ${forbidden}`);
   }
 
@@ -97,17 +95,17 @@ try {
     assert(files.has(packagePath), `packed artifact is missing imported source ${packagePath}`);
   }
 
-  // Install the produced tarball into an isolated consumer and temporary HOME.
-  // This catches peer/dependency and package-layout failures that source-tree
-  // imports or `npm pack --dry-run` cannot detect.
-  await writeFile(resolve(project, "package.json"), JSON.stringify({ private: true }, null, 2));
+  // Extract locally and resolve peers through the checkout's already-installed
+  // development dependencies. This verifies the actual tarball without any
+  // registry access; the networked isolated-consumer matrix is a separate job.
   const tarball = resolve(packDir, packed[0].filename);
-  execFileSync("npm", ["install", "--ignore-scripts", "--no-audit", "--no-fund", "--no-package-lock", tarball], {
-    cwd: project,
+  execFileSync("tar", ["-xzf", tarball, "-C", extractDir], {
+    cwd: root,
     stdio: "pipe",
     env: processEnv,
   });
-  const installedRoot = resolve(project, "node_modules", manifest.name);
+  const installedRoot = resolve(extractDir, "package");
+  await symlink(resolve(root, "node_modules"), resolve(installedRoot, "node_modules"), "dir");
   const installedManifest = JSON.parse(await readFile(resolve(installedRoot, "package.json"), "utf8"));
   assert.deepEqual(installedManifest.pi?.extensions, extensions, "installed manifest extension list drifted");
   assert.deepEqual(installedManifest.pi?.skills, skills, "installed manifest skill list drifted");

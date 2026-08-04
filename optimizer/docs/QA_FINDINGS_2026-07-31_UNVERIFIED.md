@@ -1,5 +1,8 @@
 # Deep-QA 2026-07-31 — RAW findings (refuters never ran); FULLY DISPOSITIONED 2026-08-03
 
+> **HISTORICAL / UNSUPPORTED:** Recorded `NEUTRAL` labels predating 2026-07-27 are preserved as
+> historical data; their current interpretation is **UNTESTED**, not evidence of no effect.
+
 **Status: NOT a review result.** 7 Find lenses completed and returned 40 findings; all 18
 adversarial refuters AND the adjudicator failed on a session limit. The workflow's
 `survived: 0` therefore means *no refuter ran*, NOT *nothing survived*. The 40 below are
@@ -337,4 +340,3 @@ claims — read them as history, not as a worklist.
 - **evidence offered**: harness/tests/plan-runner.integration.test.ts:1305 (`process.env.TELEMETRY_SOURCE = "test"`) — so harness/lib/telemetry.ts:161 `telemetrySource()` returns "test" and the envelope's `source` is "test"; then :1318-1321 reads the row back off disk and asserts `assert.equal(blocked.source, "command")`, and :1324-1325 asserts `assert.equal(go.source, "command")`. Both assertions pass only if `normalized.detail.source` overwrote `envelope.source` (harness/lib/telemetry.ts:213).
 - **claimed impact**: The regression test intended to protect the new discriminator is the reason the defect shipped green: any correct fix (renaming the detail key, or reserving `source`) makes this test fail, which reads as the fix being wrong. It also means the suite cannot detect envelope corruption in general — the same shape of assertion would pass for a row whose `sk` or `kind` had been clobbered.
 - **proposed fix**: After renaming the detail key, assert BOTH: the renamed discriminator equals "command"/"tool" AND `row.source === "test"` (the envelope value), so the test fails if the envelope is ever shadowed again.
-

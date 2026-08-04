@@ -1,5 +1,8 @@
 # Adopt-or-retire protocol for the dark-candidate roster
 
+> **HISTORICAL / UNSUPPORTED:** Recorded `NEUTRAL` labels predating 2026-07-27 are preserved as
+> historical data; their current interpretation is **UNTESTED**, not evidence of no effect.
+
 Goal: reach a **defensible adopt or retire decision on every candidate**, at a cost that is
 actually payable. Written after the 2026-07-27 audit found that of 45 candidates, exactly **one**
 (c21) had ever been decisively tested.

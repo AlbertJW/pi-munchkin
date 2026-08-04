@@ -1,411 +1,190 @@
 # pi_munchkin
 
 <p align="center">
-  <img src="assets/pi-munchkin.png" alt="pi-munchkin mascot: a grinning gap-toothed munchkin knight in mismatched armor, oversized sword in hand, healing potion and a rubber chicken on the belt" width="320">
+  <img src="assets/pi-munchkin.png" alt="pi-munchkin mascot" width="320">
 </p>
 
-> Make a small, locally-served LLM a competent [pi](https://github.com/earendil-works/pi) coding
-> agent — and prove that every change to the harness actually earns its place.
+> A harness for making small, locally served LLMs competent multi-turn coding agents.
 
-> **⏸ The measurement side (`optimizer/`) is mothballed as of 2026-08-03** —
-> see [`optimizer/docs/MOTHBALLED_2026-08-03.md`](optimizer/docs/MOTHBALLED_2026-08-03.md) for why,
-> which published numbers are void, and how to restart. **The harness itself is live and
-> unaffected.** Nothing is broken; `npm run verify` is green.
+The limiting failure is not usually context size. Across 1,505 measured sessions, the median
+session used about 4.9k context tokens, while the longest 10% of sessions carried 43% of all
+wasted tool calls. The characteristic failure is a repeat-call spiral: retrying the same broken
+operation, making a token edit, then restarting the same episode.
 
-A small local model is not a miniature frontier model; it is a different kind of instrument
-entirely, one that forgets, wanders, invents file paths it never read, and declares victory the
-instant its own output merely *resembles* success. Coaxing competent agentic behavior out of such
-a thing by prose alone — a longer system prompt, a sterner admonition, one more paragraph of
-"please remember to" — turns out, on this project's own repeatedly gathered evidence, to make
-matters *worse* far more often than it helps: the harness's central, hard-won finding is that
-**mechanism beats persuasion**. Where persuasion is unavoidable, keep it terse to the point of
-austerity; where a mechanism can enforce the same discipline instead, prefer the mechanism every
-time, and measure whether it actually earned its keep before you believe your own hypothesis about
-it. pi-munchkin is the accumulated apparatus for practicing exactly that discipline — a harness
-that supplies the mechanisms, and a measurement loop that keeps the harness honest about which of
-them are worth keeping.
+Pi Munchkin therefore concentrates on runtime mechanisms: anchored edits, ordered verification
+evidence, bounded reads and output, structured plans, repeat detection, and additive tool
+activation. Every mechanism is reversible. A mechanism firing is evidence that its implementation
+works; it is not evidence that it improves outcomes.
 
-**pi-munchkin is two halves you can use independently:**
+> **Measurement correction (2026-07-27):** most historical A/B rounds used n=3–9 per arm,
+> scored pass/fail for interventions aimed at efficiency, and could not show that 40 of 45
+> candidate mechanisms fired. Every pre-2026-07-27 `NEUTRAL` is a historically recorded verdict
+> whose current status is **UNTESTED**, not rejected.
 
-1. **[The harness](#the-harness)** — pi extensions that make a small model edit code reliably
-   (tag-anchored edits, loop-breaking, verify-before-done, planning, guards).
-2. **[The self-improvement loop](#the-self-improvement-loop)** — a measurement-gated optimizer that
-   A/B-tests harness/governor changes and keeps only the ones that pass a statistical test.
+The optimizer is [archived in place](optimizer/docs/MOTHBALLED_2026-08-03.md). Its source, raw
+results, methodology, and tests are retained for audit and possible restart, but it is not part of
+the getting-started path. No optimizer candidate is adopted or deleted without a separate human
+decision.
 
-The active research and experiment backlog is maintained in
-[the small-model improvement roadmap](optimizer/docs/SMALL_MODEL_IMPROVEMENT_ROADMAP.md).
+## What the harness does
 
-> **Status — a validated loop with measured wins.** Headline result (n=36/arm, local 35B): pass
-> rate rose *monotonically as governor prose was removed* — 5.2 KB governor 83%, lean 89%,
-> **empty 97%** — so the shipped governor is a 1.4 KB minimal core. The same machinery rejected
-> six plausible candidates that measured as noise. A tuning loop that mostly says **no** is the
-> point — see [the honest finding](docs/THE-HONEST-FINDING.md). A dozen further dark candidates
-> (see the [self-improvement ledger](optimizer/docs/HARNESS_SELF_IMPROVEMENT.md)) sit built and
-> **untested** behind their own env flags — a 2026-07-27 audit of all 45 found exactly one had ever
-> been decisively tested, and that one (`MICRO_GATE`) then **failed** its own pre-registered bar on a
-> second task. The v4 planner family was deleted outright: 2,832 lines whose 21 telemetry counters
-> read zero across 1,465 sessions. The loop's job is unchanged: prove it, or reject it — and lately
-> it mostly rejects.
-
----
-
-## The harness
-
-Pi extensions. Load them once; most work automatically, a few add commands or env knobs. Each one
-below exists because a specific, observed small-model failure mode demanded it — not because it
-seemed generally prudent — and each is held to the same standard the rest of this project applies
-to itself: if it cannot be shown, on real sessions, to earn its place, it does not belong here
-armed by default.
-
-| Extension | What it does |
+| Surface | Role |
 |---|---|
-| **hashline** | line/tag-anchored edits instead of brittle exact-text matching — removes the #1 small-model edit failure; multi-file patches are transactional |
-| **loop-breaker** | detects call / reason / outcome repetition, steers, then aborts a runaway. A separate session-cumulative counter catches *grinding* (fail, fail, fail, one edit, repeat) that the since-progress counters reset away — measured as 43% of all wasted tool calls |
-| **tool-call-rescue** | dark candidate c49 (`TOOL_CALL_RESCUE=on`): detects the malformed pseudo-tool-call-as-text serving artifact (zero real tool calls + `<tool_call>`/`<function=`/fenced-call signatures) and sends one corrective re-emit steer, reviving a session that would otherwise die with zero work; max 2/session |
-| **verify-gate** | blocks a "done" claim until there is tool evidence for it |
-| **plan-runner** | `/plan` — a model-owned TODO list with per-item verify gates |
-| **reflect** | `/reflect` — a fresh-context adversarial review of the current plan |
-| **drift-scanner** | after a commit, flags dead refs / stale docs the change introduced |
-| **git-guard** | confirms before any command that would discard uncommitted work |
-| **context-inlet-guard** | bounds oversized file reads before they flood context (blocks, never truncates — a partial view of a huge file is worse than none) |
-| **bash-output-guard** | the same block-not-truncate discipline applied to shell output: withholds an oversized `bash` result and substitutes a bounded diagnostic, since `bash` has no `stat()`-style way to predict its own output size in advance |
-| **payload-audit** | dark instrument (`PAYLOAD_AUDIT=on`): records wire-truth per provider request to `.pi/traces/payload-audit.jsonl` — prefix stability, system/tools hashes, thinking-replay presence, lens position |
-| **context-watcher** | records every compaction with requester attribution (pi / compact-tool / manual) — passive telemetry only; the proactive auto-compact-at-threshold behavior was removed 2026-07-28 after never once completing a compaction (pi-native compaction owns the job) |
-| **context-dedup** | collapses a file already read verbatim this session down to a one-line back-reference in the model's *view only* — the transcript itself is never rewritten |
-| **session-blackboard** | ground-truth working memory derived from harness events: a human-only cockpit artifact (`artifacts/session-cockpit.html` + TUI widget, `/blackboard`), and a non-accumulating state lens injected into the model's per-call view (attempted+failing actions, verify state, open plan, repeats) — **view mode default-on since 2026-08-03** (`STATE_LENS=off` to kill) |
-| **context-brief** | a cached, once-per-session repository inventory appended to the system prompt, so the model spends fewer turns re-discovering what a brief could just tell it |
-| **context-surface** | passively hashes and aggregates the exact provider-bound context; never rewrites messages |
-| **span-tools** | `search_spans` / `read_span` — bounded retrieval over large files |
-| **compact-tool** | `compact_context` — model-requested structured compaction with one explicit post-compaction resume |
-| **micro-gate** | *(opt-in)* parse/compile-checks just-edited files at turn end |
-| **teach-hints** | a small, fixed table of deterministic teaching lines appended to specific, recognized tool-error shapes (a missing command, an absent module, a malformed patch) |
-| **did-you-mean** | suggests the nearest on-disk path after a mistyped file access |
-| **ketch** | always-on `web_search` / `web_read` for bounded public research; `KETCH=off` disables it |
-| **pi-subagent** | bundled `subagent` tool for isolated exploration, execution, and review — the harness's primary lever for keeping a small model's own context small by handing bounded sub-tasks to fresh, disposable processes |
-| **surface-receipt** | records the exact loaded extension/lib surface's hash as a signed telemetry row, so a gate round can prove after the fact which harness code actually ran it |
+| `hashline` | transactional tag-anchored edits; refuses oversized text and image input before allocation |
+| `loop-breaker` | detects repeated calls, reasoning, outcomes, thrown/rejected executions, and session-wide grinding |
+| `verify-gate` | accepts only ordered successful verification evidence after the latest source mutation |
+| `plan-runner` | model-owned structured work items with deduplicated one-shot gate receipts |
+| `git-guard` | confirms commands that could discard uncommitted work |
+| context and Bash guards | block oversized provider-bound input/output instead of silently truncating it |
+| blackboard | persists bounded redacted state and renders a private human cockpit outside repositories |
+| `ketch` | bounded public web search/read with URL and redirect validation |
+| `subagent` | isolated exploration, execution, and review with a constrained child environment |
+| `compact_context` | explicit structured compaction with one resume handoff |
+| dynamic activation | keeps expensive/large tools absent until evidence says the session needs them |
+| telemetry and surface receipts | bounded mechanism evidence and exact harness-surface provenance |
 
-Plus a **governor** (`harness/APPEND_SYSTEM.md`) — a minimal system-prompt core (safety gates +
-feature docs, no behavioral prose; the loop found prose *hurts* capable models). Its present
-1.4 KB shape is not a starting assumption but a measured conclusion: an earlier, considerably more
-verbose 5.2 KB governor was gated head-to-head against a trimmed 1.6 KB "lean" variant and against
-no governor prose at all, on the same daily-driver model across three dozen repetitions per arm,
-and the pass rate rose *monotonically* as the prose was removed — full governor 83%, lean 89%,
-empty 97% — a result documented in full, with its caveats honestly stated, in
-[the honest finding](docs/THE-HONEST-FINDING.md).
+Additional extensions provide span retrieval, reflection, drift review, teaching hints, path
+suggestions, context receipts, and experimental dark mechanisms. The authoritative ordered
+extension and skill surface is the `pi` manifest in [`package.json`](package.json).
 
-A number of the extensions above are not, in fact, always active. Several — `micro-gate`'s slop
-heuristic, `context-brief`, `context-dedup`'s redundancy nudge, `teach-hints`, `bash-output-guard`,
-and a family of `plan-runner` behaviors (mandatory subagent delegation, uncertainty pauses,
-commit-SHA verification, and more besides) — ship dark, gated behind an environment variable that
-defaults to off, precisely because this project does not trust its own intuition about whether a
-mechanism helps until that mechanism has won a measured, statistically adjudicated comparison
-against not having it at all. The living ledger of every such candidate — what it does, what
-config activates it, what round (if any) it has been measured in, and what that round found — is
-kept in
-[the harness self-improvement doc](optimizer/docs/HARNESS_SELF_IMPROVEMENT.md), which is the
-closest thing this repository has to a laboratory notebook.
+Default-on teaching hints, did-you-mean, and the state lens are reversible and
+mechanism-observed; their benefit has not been established by a powered trial.
 
-### Install
+## Install
 
-The harness is a pi extension package (the repo-root `package.json` carries the pi manifest). Pi's
-package manager runs npm under the hood, so the runtime dependency (`typebox`) installs
-automatically; `@earendil-works/pi-coding-agent` is a peer your pi install already provides.
-Extensions are TypeScript and load directly — no build step. Node.js 22.6 or newer is required.
+Node.js 22.6 or newer is required. Pi 0.80.6 through 0.83.x is supported.
 
 ```sh
-pi package install pi-munchkin                    # once published to npm
-pi package install github:AlbertJW/pi-munchkin    # or straight from git
+pi package install github:AlbertJW/pi-munchkin
 ```
 
-Manage with `pi package list | update | remove`. Manual alternative: copy `harness/extensions` +
-`harness/lib` into `~/.pi/agent/extensions/`, copy `skills/deep-research` into
-`~/.pi/agent/skills/deep-research`, and run `npm i typebox` in the agent directory.
+When published, `pi package install pi-munchkin` is equivalent. Package installation is strongly
+preferred: the manifest includes the vendor subagent, role prompts, `APPEND_SYSTEM.md`, examples,
+and both skills as well as extensions and libraries. A hand-maintained copy list is not a safe
+installation procedure because it can silently omit transitive behavior. If an operator must
+maintain a live unpacked mirror, derive it from the package manifest and validate it with:
 
-The bundled `harness/vendor/pi-subagent` adds the `subagent` tool that `plan-runner` and `reflect`
-use. The harness still degrades gracefully if an installation chooses not to load that entry point.
+```sh
+npm run mirror:check -- /absolute/path/to/.pi/agent
+```
 
-The published package deliberately excludes `harness/extensions/chaos.ts`: it is a benchmark-only
-fault injector and is never part of the default runtime manifest.
+The checker covers first-party extensions, libraries, vendor subagent code, role prompts,
+`APPEND_SYSTEM.md`, examples, and skills. Extra documented local-only files are ignored.
 
-### Use
+The benchmark-only `harness/extensions/chaos.ts` is deliberately absent from the release manifest
+and tarball.
 
-Most extensions are automatic once loaded. The surfaces you invoke:
+## Use
 
-- **`/plan <request>`** then **`/plan-go`** — plan, then execute with per-step verify gates
-  (`/plan <request> yolo` plans and runs in one shot).
-- **`/reflect`** — adversarial review of the current plan or last answer (`/reflect help` lists modes).
-- **`/compact`** — prune context mid-task.
-- **`/skill:deep-research <question>`** — bounded multi-source research with inline citations.
-- **`/ketch-status`** — show the installed Ketch version and backend health.
+Most behavior is automatic. The primary commands are:
 
-Behavior knobs (all optional env vars, sensible defaults). The first block below is stable,
-always-available tuning; the second is the current roster of dark, unadopted A/B candidates —
-present in the codebase, inert unless explicitly armed, and each one's measurement status is
-tracked in the self-improvement ledger rather than repeated here.
+- `/plan <request>` and `/plan-go` for structured execution with per-item gates.
+- `/reflect` for a fresh-context adversarial review.
+- `/compact` for explicit compaction.
+- `/blackboard` for current redacted state and the private cockpit path.
+- `/skill:deep-research <question>` for bounded research.
+- `/ketch-status` for public-search backend health.
 
-> **These are untested ideas, not rejected ones.** A 2026-07-27 audit of all 45 candidates found
-> exactly **one** had ever been decisively tested. Eight had never been run at all; four cannot
-> fire in a headless session (they need `phase:"executing"`, which no autonomous session reaches);
-> the remaining 32 were run only at sample sizes where no realistic effect could have been
-> detected. "Dark and unmeasured" here means *unmeasured* — it is not a verdict. The
-> [adopt-or-retire protocol](optimizer/docs/ADOPT_OR_RETIRE_PROTOCOL_2026-07.md) is the plan for
-> reaching a real verdict on each.
+### Current defaults and rollback controls
 
-| Env | Effect |
-|---|---|
-| `LB_REPEAT_T1`, `LB_STREAK_SOFT` | loop-breaker sensitivity |
-| `LB_SESSION_REPEAT` | session-cumulative repeat limit before a single steer (default 25) |
-| `VERIFY_GATE=on\|off` | require evidence before "done" |
-| `MICRO_GATE=on` | enable the post-edit parse check |
-| `SPAN_TOOLS=on` | expose the bounded large-file tools |
-| `KETCH=off` | remove the default-on web tools for offline/private sessions |
-| `KETCH_BACKEND`, `KETCH_MULTI_BACKENDS` | quick backend (default `ddg`) and broad-search set (default `ddg,exa,keenable`) |
-| `DRIFT_SCANNER=off` | disable post-commit review |
-| `BLACKBOARD=off` | disable the session blackboard entirely (cockpit + lens) |
-| `STATE_LENS=off\|view\|steer\|both`, `STATE_LENS_MAX_CHARS` | ground-truth state lens — **`view` is DEFAULT-ON since 2026-08-03** (adopted, was c48); `off` kills it; `steer`/`both` stay opt-in dark |
-| `TEACH_HINTS=off`, `TEACH_HINT_<RULE>=off` | deterministic teaching line on matching tool errors — **default-on since 2026-08-03** (adopted, was c28) |
-| `DID_YOU_MEAN=off` | closest-existing-path hint on ENOENT results — **default-on since 2026-08-03** (adopted, was c24) |
-
-| Dark candidate env | Effect | Status |
+| Environment option | Default and behavior | Rollback / alternative |
 |---|---|---|
-| `BASH_OUTPUT_GUARD=on`, `BASH_OUTPUT_MAX_CHARS` (default 8000) | withhold an oversized `bash` result rather than truncate it | measured NEUTRAL locally; the guard's own trigger has yet to fire in any tested task |
-| `CONTEXT_BRIEF=on`, `CONTEXT_BRIEF_BYTES` (default 2048) | inject the cached repository-inventory brief | built, review-hardened, awaiting a gate round |
-| `READ_DEDUP=on` | collapse a repeated identical read to a back-reference in the view only | tested exploratory-only (remote endpoint; structurally non-authoritative) |
-| `CTX_REDUNDANCY_NUDGE=on`, `CTX_REDUNDANCY_PCT` (default 50) | steer toward `compact_context` past a duplication threshold | tested exploratory-only |
-| `MICRO_GATE_SLOP=on` | heuristic "possible shortcuts" steer after an edit | built, awaiting a gate round |
-| `PLAN_SUBAGENT_ONLY=1` | force every scoped edit through a fresh subagent | mechanically hardened; awaiting a gate round |
-| `PLAN_UNCERTAINTY=on` | a declared plan uncertainty structurally pauses execution until cleared | built and unit-tested; awaiting a gate round |
-| `PLAN_ITEM_GUIDANCE_V2=on` | swap the unenforced "5-10 items" line for non-numeric, need-sized guidance | built; a deliberate compression, not an elaboration |
-| `SPAWN_DELEGATION=on` | recommend `mode=spawn` + a self-contained task everywhere the harness previously suggested `mode=fork` | built; awaiting a gate round |
-| `FORCE_PLAN_WRITE=on` | block the FIRST mutation of a session until `plan_write` has been called once | an **enabler** for the flags above (they have no surface to fire on otherwise), not a standalone intervention; one round with real power gave 5/9 → **0/9** on gemma-4-e2b |
-| `PLAN_TOOL_GO=on` | register a model-callable `plan_go` tool (the gate's one-shot `pi -p` never dispatches `/plan-go`) | activation path; near-neutral by design |
-| `MICRO_GATE=on` | parse-check only the files just changed and inject the first actionable error | **REJECTED** against its pre-registration; its "7/7 effort metrics better" is count-not-rate — per tool call it improved in 5 of 7 pairings (pooled −5.9%), but on −31% call volume, and pass rate fell in both large-n rounds |
-| `SPAN_TOOLS=on`, `SPAN_MAX_FILE_BYTES` | register bounded `search_spans` / `read_span` for large files | built; never run on a large-repo fixture |
-| `TOOL_CALL_RESCUE=on` | steer once when a turn emits a pseudo-tool-call as text and no real tool call | targets the collapse class; measured on the one model that does not collapse, so **0 detections** |
-| `LB_STREAK_SOFT`, `LB_REPEAT_T1`, … | loop-breaker tier thresholds | `LB_STREAK_SOFT=12` (c3) is a no-op on cloud and a real 8→12 change on local; its only round was remote |
-| `VERIFY_GATE_PATTERN` / `PI_MSG_VG_STEER` | override the verify-gate trigger or its steer text | generic operator overrides; the c7 steer-text *candidate* is **RETIRED** (measured harm on two models, 6/6→3/6 and −44pp) — do not resurrect that wording |
+| `MUNCHKIN_TOOL_ACTIVATION` | `dynamic`; defers `subagent` and `compact_context` only when Pi exposes the complete default registry | `ambient` leaves Pi's initial surface untouched |
+| dynamic `subagent` triggers | multi-item structured execution, second plan-gate failure, or loop-breaker tier two | once activated it stays active; one automatic attempt means a later manual `/tools` disable is respected |
+| dynamic `compact_context` trigger | first crossing of 60% context usage | same one-attempt/manual-disable rule |
+| `CONTEXT_SURFACE_MODE` | `summary`; samples usage on first call, each eighth call, threshold crossings, and compaction without transcript hashing | `full` retains receipt calculations; `off` disables; gate sessions force `full` |
+| `CTX_REDUNDANCY_NUDGE=on` | opt-in duplicate-analysis nudge | forces `CONTEXT_SURFACE_MODE=full` because its mechanism requires duplicate analysis |
+| `STATE_LENS` | `steer`; injects only on loop-breaker events with cooldown | `off` kills it; `view` restores per-call view injection; `both` enables both paths |
+| `STATE_LENS_MAX_CHARS` | bounds lens text | lower it to reduce model-visible state |
+| `BLACKBOARD` | `on`; bounded/redacted v2 persistence and cockpit | `off` disables cockpit and lens state |
+| `HASHLINE_MAX_READ_BYTES` | 16 MiB text preflight limit | set an explicit byte limit; `limit` still controls returned context, not file allocation |
+| `HASHLINE_MAX_EDIT_BYTES` | 16 MiB edit preflight limit | set an explicit byte limit |
+| image reads | fixed 4 MiB preflight limit | use a purpose-built image workflow for larger files |
+| `PI_SUBAGENT_ENV_ALLOW` | empty; comma-separated extra child environment variable names | names are validated; values are copied without logging |
+| subagent fixed allowlist | includes provider essentials and `LLAMA_API_KEY` | secrets are never included in telemetry or user-facing diagnostics |
+| `DRIFT_SCANNER` | active after `agent_end`, when idle | `off` disables; a new run aborts an in-flight review and stale findings are dropped |
+| `TEACH_HINTS`, `DID_YOU_MEAN` | default-on bounded hints | set either to `off` |
+| `KETCH` | default-on public search/read | `off` for offline/private sessions |
+| `VERIFY_GATE`, `LOOP_BREAKER`, `GIT_GUARD`, `HASHLINE` | default-on core mechanisms | each accepts its documented `off` kill switch |
 
-**Read `optimizer/docs/CANDIDATE_STRATEGY_2026-07-31.md` before planning a round for any of
-these.** At the sample sizes used to date the gate can detect harm but essentially not help, so
-most "NEUTRAL" statuses above are better read as *untested*.
+Oversized hashline refusals explain the distinction between the returned-context `limit` and the
+allocation cap. Use `rg`, `head`, `tail`, or a purpose-built span tool for oversized files.
 
-### Platform and security notes
+## Security and privacy boundaries
 
-- Supported release platforms are Linux and macOS on Node.js 22.6 or newer; both run in CI.
-- Extensions execute with the permissions of the pi process. Review the manifest and keep API keys,
-  tokens, and machine-specific paths out of tracked settings.
-- Ketch `0.12.0` or newer must be installed separately — macOS: `brew install 1broseidon/tap/ketch`;
-  any platform: `bash scripts/install-deps.sh` (downloads the correct release binary from
-  [ketch's releases](https://github.com/1broseidon/ketch/releases) and verifies its checksum; also
-  checks the Node.js version requirement). The extension
-  exposes only two compact tools: search finds leads and read fetches a selected public source set.
-  Results are bounded and untrusted; material claims still need source URLs. Ketch runs with a
-  reduced child environment that does not inherit model-provider credentials. Run `ketch config set backend
-  ddg` for the keyless default, or `/ketch-status` to inspect backend health.
-- Report vulnerabilities privately using [the security policy](.github/SECURITY.md).
+- Cockpits are written atomically with private permissions to
+  `${PI_CODING_AGENT_DIR}/artifacts/session-cockpits/<sha256(cwd)>.html`, outside the working
+  repository. The final render is awaited at `agent_end`.
+- Blackboard attempt keys are hashed. Persisted labels, errors, telemetry, and notifications are
+  redacted and bounded; v1 restores intentionally discard raw attempt/delegation ledgers.
+- URL checks canonicalize IPv4 and IPv6, reject non-global addresses, and validate every DNS and
+  redirect hop. DNS answers can still change between validation and the downstream client's
+  connection; this explicit DNS-rebinding/TOCTOU limitation is not a socket-level IP pin.
+- Subagents inherit only a fixed environment allowlist plus validated names explicitly added via
+  `PI_SUBAGENT_ENV_ALLOW`. Values are never logged.
+- `npm run secret-scan:diff` inspects staged, unstaged, and untracked added lines. Findings contain
+  only file, line, and pattern ID; matched text is never printed.
+- Extensions run with the Pi process's permissions. Keep machine settings, credentials, and
+  private endpoints out of this public repository.
 
-### Verify a checkout or release candidate
+See [`.github/SECURITY.md`](.github/SECURITY.md) for private vulnerability reporting.
 
-Install exactly the locked development graph, then run the canonical verification lane:
+## Verify and package
 
 ```sh
 npm ci
 npm run verify
 ```
 
-`verify` runs the complete Node test suite from a unique temporary telemetry sink and fails if the
-default live telemetry file changes, plus a portable full-harness TypeScript check, the read-only
-health check, an `npm pack` smoke test that verifies package contents and imports every manifest
-extension, plus all offline optimizer self-tests, shell syntax checks, fixture tests, admission
-integrity checks, and the documented `real_gate.sh --dry` wiring smoke. The health check automatically uses `harness/*.example.json` in a clean clone
-and local `settings.json` / `models.json` when run from an installed harness. Individual lanes are
-available as `npm test`, `npm run typecheck`, `npm run health`, `npm run pack:smoke`, and
-`npm run verify:optimizer`.
+`verify` is network-independent and runs the complete discovered Node test suite, TypeScript
+checking against the locked Pi 0.80.6 lower bound, health checks, a local pack/extract/load smoke,
+and the archived optimizer's offline integrity battery. Do not rely on a hard-coded test count;
+the command output is authoritative.
 
----
-
-## The self-improvement loop
-
-Every extension in the section above began life as a plausible idea, and plausible ideas about
-small-model behavior are, on this project's own repeated experience, wrong often enough that
-shipping them on conviction alone would be reckless. The optimizer exists to close that gap: it is
-the falsification machinery that stands between "this seems like it should help" and "this
-extension is armed by default." A candidate is measured against a genuine baseline, on real
-agentic tasks, over enough repetitions to distinguish signal from the considerable noise a small
-local model produces session to session, and it is adopted only if it clears a statistical bar —
-never on the strength of a compelling mechanism story, and never by majority vote of how many
-people find the reasoning persuasive. The project's own headline finding — that a smaller,
-plainer governor consistently *outperforms* a longer, more careful one — is exactly the kind of
-result this loop exists to catch, because it directly contradicts the intuition most engineers
-would bring to writing prompts, and no amount of intuition would have caught it without the
-measurement.
-
-**A correction earned the hard way (2026-07-27).** A statistical bar is necessary but not
-sufficient, and for a long stretch this loop had the bar without the two things that make it mean
-anything. A 1,466-row audit found most rounds ran at sample sizes where **no effect of any size
-could reach significance** (n=3/arm), or where only an implausible +56pp could (n=9/arm) — and that
-the outcome scored was pass/fail, when nearly every candidate targets *efficiency* rather than
-capability. The candidate that eventually produced this project's clearest result had predicted its
-own signature in its config — *"pass-rate neutral-to-up with LOWER tokens"* — and was filed as
-no-signal by a rule reading only the gate bit. Rigor spent on provenance while the design cannot
-detect a realistic effect buys defensibility, not knowledge. See
-**[measurement methodology](optimizer/docs/MEASUREMENT_METHODOLOGY_2026-07.md)**.
-
-The optimizer (`optimizer/`, Python) measures whether a change to the harness/governor actually
-makes a model write better code, and adopts only changes that pass Fisher's exact test **on an
-outcome the change can plausibly move, at a sample size that can detect it**. It is
-**human-gated**: a winning governor is written to `proposals/` for you to review and apply — it
-never edits your live `~/.pi/agent/`.
-
-The current bounded-retrieval screen is checked in as
-[`prompt-lab/configs/span-screen.json`](optimizer/prompt-lab/configs/span-screen.json).
-Preview or run its single interleaved span-tools off/on comparison:
+Useful lanes:
 
 ```sh
-python3 optimizer/prompt-lab/span_screen.py --dry
-python3 optimizer/prompt-lab/span_screen.py
+npm test
+npm run typecheck
+npm run health
+npm run pack:smoke
+npm run verify:optimizer
+npm run secret-scan:diff
 ```
 
-It uses the approved `bigdata` fixture, six reps/arm, and ordinary single-comparison α=0.05.
-Candidate rows must actually call the span tools and carry an exhaustive receipt; otherwise the
-aggregate mechanism report is `INELIGIBLE` and the command exits nonzero. Config and experiment
-hashes bind each row even when prompt hashes match. The launcher computes the live extension/lib
-surface before the session, and the running harness corroborates it with an authenticated receipt;
-rows lacking that valid receipt remain blocked. Credentialed endpoints and explicit credential
-passthrough are refused, and fresh confirmation remains mandatory before promotion.
+The registry-dependent CI matrix is deliberately separate from `verify`. It installs the packed
+tarball into isolated consumers using the latest available 0.80, 0.81, 0.82, and 0.83 releases,
+typechecks the shipped TypeScript, loads every extension, and discovers both skills. A separate
+job proves strict peer-install behavior below, at, within, and at the upper support boundary.
 
-```
-gate baseline governor  ──►  if saturated (≥85% pass): stop, no headroom
-        │
-        ▼
-frontier model proposes K one-surface candidates from VALIDATION failures
-        │
-        ▼
-gate each candidate  ──►  Fisher's exact test vs. baseline (do-no-harm)
-        │
-        ▼
-adopt only a significantly-better candidate  ──►  repeat until plateau
-        │
-        ▼
-winner → proposals/ for HUMAN review + confirmation/canary  (never auto-edits your live harness)
-```
+Before any public push: inspect the diff, run the non-echoing secret scan, run `npm run verify`,
+and confirm unrelated user changes are not staged. After an approved live rollout, run the mirror
+checker and load the live harness through the target Pi version. Never commit or push from the
+live harness repository.
 
-### Setup
+## Measurement archive
 
-1. Serve one model on an OpenAI-compatible endpoint at `:8080` — e.g. llama.cpp's `llama-server`
-   (see `examples/run-model.example.sh`); copy `harness/models.example.json` /
-   `settings.example.json` into your pi config and point them at it.
-2. For candidate *proposal*, set `FRONTIER_BASE_URL` + `FRONTIER_API_KEY` (any OpenAI-compatible
-   frontier model — used only to suggest edits, never to grade).
+The historical optimizer remains under [`optimizer/`](optimizer/). Preserve its source, raw
+results, preregistrations, methodology, and tests. It is an audit archive, not a source of current
+candidate verdicts.
 
-### Run a round
+Pass/fail is useful as a **harm guard**: at the historical sample sizes it could detect large
+regressions. Candidate decisions aimed at efficiency require continuous effort measures (tool
+calls, repeated calls, errors, turns, and tokens), explicit mechanism exposure, an in-band task,
+and adequate power. Measurements from different model-visible surface hashes must never be pooled.
 
-```sh
-cd optimizer
+Start with:
 
-# 0. admit the task fixtures (fail-closed: unapproved fixtures refuse to run).
-#    Once per task; approval names a human reviewer and expires after 90 days.
-#    In a hurry? add --exploratory to real_gate/fleet_round — rows are then
-#    marked non-authoritative and excluded from verdicts.
-python3 prompt-lab/fixture_admission.py check parens
-python3 prompt-lab/fixture_admission.py approve parens --reviewer "Your Name"
+- [`MEASUREMENT_METHODOLOGY_2026-07.md`](optimizer/docs/MEASUREMENT_METHODOLOGY_2026-07.md) — the
+  invalidity boundary and replacement method.
+- [`MOTHBALLED_2026-08-03.md`](optimizer/docs/MOTHBALLED_2026-08-03.md) — archive status and restart
+  conditions.
+- [`HARNESS_SELF_IMPROVEMENT.md`](optimizer/docs/HARNESS_SELF_IMPROVEMENT.md) — historical ledger,
+  with its unsupported-verdict warning.
 
-# 1. find a model's discriminating band (skip tasks it always/never passes)
-MODELS="my-model" TASKS="parens equil" N=4 ./fleet_round.sh calibrate
-python3 prompt-lab/calibrate.py <gen>
-
-# 2. A/B a set of candidate configs (one gate per candidate, base + candidates)
-PI_MODEL=my-model N=6 python3 munchkin.py --gen r1 --tasks parens,equil \
-  --candidates 2 --static prompt-lab/configs/static/c14-slug-tags.json,prompt-lab/configs/static/c21-micro-gate.json
-
-# 3. read the verdict (add --manifest for completeness enforcement across a fleet)
-python3 prompt-lab/fleet_verdict.py r1
-```
-
-**Verdicts:** `ADOPT-*` (significant gain), `NEUTRAL` (within noise — raise N or try a bigger
-change), `REJECT` (do-no-harm regression), plus fleet guards `INCOMPLETE` / `MIXED-SIGNS` /
-`TASK-REGRESSION`. Full options, task classes, and the candidate queue are in
-[`optimizer/docs/HARNESS_SELF_IMPROVEMENT.md`](optimizer/docs/HARNESS_SELF_IMPROVEMENT.md).
-
-Generated candidates carry a `pi.optimizer-candidate/v1` sidecar and append-only journal entry.
-Exactly one contiguous governor diff, one config leaf, or one message-template leaf is allowed;
-mixed/no-op/unknown candidates are recorded and rejected before evaluation. LLM judging is
-diagnostic only and cannot override deterministic task outcomes or the held-out admission gates.
-
-The admitted `context-pressure` fixture uses disjoint validation and held-out roots, generates
-319 KB of hashed partitioned evidence, forces a red-to-green repair, and checks exact identifier
-retention. It is the prerequisite for watcher, compaction, result-pruning, observational-memory,
-and output-cap experiments; none of those message-changing behaviors is promoted by default.
-
-### Operational guards
-
-All automatic inside `real_gate.sh`; listed so you know they exist (each one paid for itself):
-
-- **Seatbelt jail** (macOS): sessions can write only their workdir + pi's sessions/telemetry
-  dirs, use a private per-run temp directory, and cannot read the harness, hidden graders,
-  public mirror, or common host credential stores.
-  Auto-off where `sandbox-exec` is unavailable — hidden tasks then refuse to run.
-- **Reduced child environment** — headless Pi starts under `env -i`; unrelated frontier/cloud,
-  SSH-agent, npm, and shell-hook secrets are removed. `PI_GATE_PASSTHROUGH_ENV=name,...`
-  explicitly passes exceptional provider variables and forces exploratory-only rows.
-- **Memory watchdog** — each session runs in its own process group; past `PI_MEM_CAP_GB`
-  (default 12) the whole group is killed. Model-spawned `node` can't orphan or balloon.
-- **Single-slot serving protections** — observational-memory consolidation is forced passive
-  in gate sessions (a detached one holds a one-request-at-a-time endpoint and 429s the next
-  session), and any 429/rate-limit aborts the rep with **no row written** — the endpoint's
-  concurrency limit must never be scored as the model's competence.
-- **Execution policy** — `GATE_NETWORK=open|endpoint`, `MODEL_CONTROL=llama|pi-native`.
-  Open networking or a remote (non-loopback) endpoint ⇒ rows are non-authoritative;
-  only a loopback endpoint jail can produce authoritative rows.
-
-### Verify offline (no GPU, no network)
-
-```sh
-cd optimizer
-python3 munchkin.py --selftest
-python3 prompt-lab/fleet_report.py --selftest
-python3 prompt-lab/fleet_verdict.py --selftest
-python3 prompt-lab/config.py --selftest
-./real_gate.sh --dry
-./munchkin.py --dry          # prints the GPU session-count estimate
-```
-
----
-
-## Docs
-
-- **[HANDOVER.md](HANDOVER.md)** — start here if you are picking this up: current state, what
-  today's audit changed, standing constraints, gotchas, and what is open.
-- **[The honest finding](docs/THE-HONEST-FINDING.md)** — why the *instrument*, not the optimizer,
-  is the hard part.
-- **[Research notes](docs/RESEARCH-NOTES.md)** — approaches evaluated, and why each was adopted,
-  pocketed, or rejected.
-- **[Full methodology & candidate queue](optimizer/docs/HARNESS_SELF_IMPROVEMENT.md)** — the living
-  design doc: surfaces, statistics, instrument-integrity incidents, every candidate's disposition.
-- **[Benchmark integrity](optimizer/prompt-lab/BENCHMARK-INTEGRITY.md)** — fixture admission,
-  provenance schemas, serving fingerprints, and what "authoritative" means.
-- **[Measurement methodology](optimizer/docs/MEASUREMENT_METHODOLOGY_2026-07.md)** — detection
-  floors by sample size, why pass/fail is the wrong outcome for efficiency candidates, variance as
-  the binding constraint, and the three exposure modes. **Read before designing a round.**
-- **[Adopt-or-retire protocol](optimizer/docs/ADOPT_OR_RETIRE_PROTOCOL_2026-07.md)** — the
-  pre-registered S1→S3 funnel for reaching a verdict on every dark candidate at payable cost.
-- `optimizer/prompt-lab/effort_report.py` — scores a round on continuous per-session effort
-  (turns, tool errors, repeat calls, tokens) with exact Mann-Whitney. `--sweep` re-scores every
-  paired round in the catalogue as a **shortlist**, not as findings. `--graded` leads with the
-  graded outcome where a fixture emits one (below), and reports graded coverage explicitly.
-- **Graded outcomes (`subscores`).** A fixture's hidden grader may write
-  `.<name>-grade.json` = `{fixed, total, defects}` into the workdir; `real_gate.sh` copies it into
-  an **optional** `subscores` row block. `score` stays the strict binary gate bit, so historical
-  rows and cross-round pass-rate comparisons are unaffected. This exists because at the sample
-  sizes used to date the binary gate is a *one-sided regression detector* — at n=9/arm from a 5/9
-  base only a flawless 9/9 reaches significance, while regressions from a ceiling are detectable.
-  Partial credit is what lets a round show improvement at all. `audit-sweep` is the reference
-  implementation: pristine 0/8, shortcut mutant 2/8, gold 8/8 — the binary bit scores the first
-  two identically. See `optimizer/docs/MEASUREMENT_METHODOLOGY_2026-07.md` §12.
-- `optimizer/prompt-lab/harness_roi.py` — measures the harness's *own* injected footprint
-  (steer text as % of model output, per model, split by pass/fail).
+No gate round starts automatically. Only one round may run on a serving box at a time, and every
+adoption or deletion remains a human decision.
 
 ## License
 
-MIT (`LICENSE`). Bundles the MIT-licensed `pi-subagent`; peer-depends on MIT-licensed pi — see
-`NOTICE.md`.
+[MIT](LICENSE). Bundled third-party notices are in [NOTICE.md](NOTICE.md).

@@ -1,5 +1,8 @@
 # Candidate Pruning List — 2026-07
 
+> **HISTORICAL / UNSUPPORTED:** Recorded `NEUTRAL` labels predating 2026-07-27 are preserved as
+> historical data; their current interpretation is **UNTESTED**, not evidence of no effect.
+
 Draft removal recommendations for the dark-candidate roster under
 `optimizer/prompt-lab/configs/static/`. Companion to `optimizer/docs/HARNESS_SELF_IMPROVEMENT.md`
 (the full ledger — every status claim below is sourced from it) and Tier 1 item #5 of

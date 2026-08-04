@@ -1,5 +1,9 @@
 # The optimizer is mothballed — 2026-08-03
 
+> **HISTORICAL / UNSUPPORTED ARCHIVE:** Preserve the code, raw results, methodology, and tests,
+> but do not use this directory as a current recommendation engine. Recorded `NEUTRAL` labels
+> predating 2026-07-27 are historical; their current interpretation is **UNTESTED**.
+
 **Status: PARKED, not abandoned, not finished.** Nothing here is broken. `npm run verify` is
 green, the harness is live and in use, and the measurement side still runs. It is parked because
 the next real result costs more than it is worth right now, and this document says exactly why,
@@ -15,9 +19,8 @@ Read this before restarting anything. If you read only one section, read **"Why 
 
 At n=9/arm — the round size box-hours actually allow — Fisher's exact from a 5/9 base needs a
 flawless 9/9 to reach one-sided p<0.05, and from a 9/9 base a regression to 4-5/9 is detectable.
-That asymmetry is the whole story: **the gate is a one-sided regression detector.** Every round
-can return NEUTRAL or HARMFUL and nothing else. This explains "≈50 candidates, 8 decisively
-tested, **0 adopted**" without needing any theory about the candidates being bad.
+That asymmetry is the whole story: **the gate is primarily a one-sided regression detector at
+these sample sizes.** It can guard against large harm but cannot establish realistic benefit.
 
 Two things were built to break that deadlock, and both are done:
 
@@ -80,7 +83,8 @@ Do these in order. Stop after step 2 if the answer is discouraging — that *is*
    candidates. Cheap, and it is the fact everything else waits on.
 2. **Re-calibrate `hygiene-shared-config-reread`** now that the gate copies the whole tree. Its
    0/6 was a harness artifact; it may be the in-band fixture the project spent months lacking.
-3. Only then candidates, c48 first (additive, cannot produce the harm signature).
+3. Only then candidates. Default-on mechanisms remain reversible and mechanism-observed; benefit
+   still requires a powered trial on the correct outcome.
 
 Do **not** start by writing a new candidate. The roster has 27 configs and the binding
 constraint has never been candidate supply.
@@ -110,9 +114,9 @@ Not defects to fix on restart — decisions already taken, recorded so they are 
 - **`verify-gate` does not recognise `time npm test` or `if npm test; then …`.** Deliberate: the
   only way to match them also re-matches `grep -rn "if npm test" .`, trading a nag for a silent
   disarm. Pinned by a test.
-- **The `~/.pi/agent` suite reports 8 failures.** This is a *tsx* artifact, not a defect: that
+- **A historical `~/.pi/agent` suite run reported failures.** This was a *tsx* artifact, not a defect: that
   directory has no `package.json`, so tsx transforms to CJS and every test file using top-level
-  `await` fails to load. The repo suite (333 tests) is authoritative. Adding
+  `await` fails to load. The dynamically discovered repo suite is authoritative. Adding
   `{"type": "module"}` there would fix it, but it changes how the live agent resolves modules —
   verify pi still loads before doing it. (The ledger previously blamed "incomplete dev
   dependencies"; that was wrong.)

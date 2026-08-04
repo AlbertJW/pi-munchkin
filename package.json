@@ -26,6 +26,11 @@
     "typecheck": "tsc -p harness/.typecheck/tsconfig.json --noEmit",
     "health": "bash harness/scripts/pi-health.sh",
     "pack:smoke": "node --experimental-strip-types harness/scripts/package-smoke.mjs",
+    "compat:consumer": "node harness/scripts/compat-consumer.mjs",
+    "compat:peers": "node harness/scripts/peer-boundary-smoke.mjs",
+    "mirror:check": "node harness/scripts/live-mirror-check.mjs",
+    "surface:hash:source": "node --experimental-strip-types harness/scripts/source-surface-hash.mjs",
+    "secret-scan:diff": "node harness/scripts/secret-scan-diff.mjs",
     "verify:optimizer": "bash scripts/verify-optimizer.sh",
     "verify": "npm run test && npm run typecheck && npm run health && npm run pack:smoke && npm run verify:optimizer"
   },
@@ -74,8 +79,8 @@
     "typescript": "5.9.3"
   },
   "peerDependencies": {
-    "@earendil-works/pi-coding-agent": ">=0.80.6 <0.81.0",
-    "@earendil-works/pi-ai": ">=0.80.6 <0.81.0"
+    "@earendil-works/pi-coding-agent": ">=0.80.6 <0.84.0",
+    "@earendil-works/pi-ai": ">=0.80.6 <0.84.0"
   },
   "files": [
     "harness/extensions/hashline.ts",
@@ -116,6 +121,7 @@
     "harness/lib/gate-runtime.ts",
     "harness/lib/hashline-core.ts",
     "harness/lib/loop-outcome.ts",
+    "harness/lib/live-mirror.ts",
     "harness/lib/micro-gate-policy.ts",
     "harness/lib/plan-integrity.ts",
     "harness/lib/plan-gate-receipt.ts",
@@ -123,11 +129,12 @@
     "harness/lib/process-writer.ts",
     "harness/lib/public-url.ts",
     "harness/lib/reflect-policy.ts",
+    "harness/lib/role-routing.ts",
+    "harness/lib/secret-scan.ts",
     "harness/lib/span-index.ts",
     "harness/lib/steer-texts.ts",
     "harness/lib/teach-hints.ts",
     "harness/lib/surface-walk.ts",
-    "harness/lib/tag-words.ts",
     "harness/lib/telemetry.ts",
     "harness/lib/telemetry-catalog.ts",
     "harness/lib/ketch-runtime.ts",
@@ -138,6 +145,7 @@
     "harness/APPEND_SYSTEM.md",
     "harness/models.example.json",
     "harness/settings.example.json",
+    "examples",
     "docs",
     "NOTICE.md"
   ]

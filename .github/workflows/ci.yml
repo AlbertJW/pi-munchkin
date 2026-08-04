@@ -22,3 +22,29 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run verify
+
+  compatibility:
+    name: Pi ${{ matrix.pi }} isolated consumer
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        pi: ["0.80", "0.81", "0.82", "0.83"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: node harness/scripts/compat-consumer.mjs ${{ matrix.pi }}
+
+  peer-boundaries:
+    name: Peer dependency boundaries
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: node harness/scripts/peer-boundary-smoke.mjs

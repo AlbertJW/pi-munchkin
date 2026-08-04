@@ -1,5 +1,8 @@
 # Retrospective, 2026-07-30: why "we keep hitting neutral" — and what the neutrals were hiding
 
+> **HISTORICAL / UNSUPPORTED:** Recorded `NEUTRAL` labels predating 2026-07-27 are preserved as
+> historical data; their current interpretation is **UNTESTED**, not evidence of no effect.
+
 Written the morning after the c25 powered round, at Albert's prompt: *"It just feels like it
 has failed. I wanted to improve my harness for small models over long, multi-turn tasks, with
 tool accuracy and code quality and thoroughness being the observable metrics. But it just
