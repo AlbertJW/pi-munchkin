@@ -6,10 +6,9 @@ type DeferredTool = "subagent" | "compact_context";
 const DEFERRED: readonly DeferredTool[] = ["subagent", "compact_context"];
 const BASE_REGISTRY = ["read", "bash", "edit", "write"];
 
-// Rollout flag. The adoption checkpoint changes only this fallback from
-// ambient to dynamic; until then, installed sessions retain their current tool
-// surface byte-for-byte.
-const MODE = process.env.MUNCHKIN_TOOL_ACTIVATION === "dynamic" ? "dynamic" : "ambient";
+// Adopted 2026-08-04 after explicit human review. Ambient restores the prior
+// always-visible surface immediately.
+const MODE = process.env.MUNCHKIN_TOOL_ACTIVATION === "ambient" ? "ambient" : "dynamic";
 
 export default function (pi: ExtensionAPI): void {
 	if (MODE !== "dynamic") return;

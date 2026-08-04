@@ -81,9 +81,9 @@ test("a later trigger does not undo a manual subagent disable", async () => {
 	} finally { run.restore(); }
 });
 
-test("ambient mode leaves the tool surface untouched", async () => {
+test("ambient rollback mode leaves the tool surface untouched", async () => {
 	const previous = process.env.MUNCHKIN_TOOL_ACTIVATION;
-	delete process.env.MUNCHKIN_TOOL_ACTIVATION;
+	process.env.MUNCHKIN_TOOL_ACTIVATION = "ambient";
 	try {
 		const fp = makeFakePi();
 		let setCalls = 0;
@@ -92,5 +92,22 @@ test("ambient mode leaves the tool surface untouched", async () => {
 		mod.default(fp.pi as never);
 		assert.equal(fp.handlers.size, 0);
 		assert.equal(setCalls, 0);
+	} finally { if (previous === undefined) delete process.env.MUNCHKIN_TOOL_ACTIVATION; else process.env.MUNCHKIN_TOOL_ACTIVATION = previous; }
+});
+
+test("dynamic activation is the adopted default", async () => {
+	const previous = process.env.MUNCHKIN_TOOL_ACTIVATION;
+	delete process.env.MUNCHKIN_TOOL_ACTIVATION;
+	try {
+		const fp = makeFakePi();
+		let active = [...allTools];
+		(fp.pi as any).getAllTools = () => allTools.map((name) => ({ name, description: "", sourceInfo: { source: "test", path: "test" } }));
+		(fp.pi as any).getActiveTools = () => [...active];
+		(fp.pi as any).setActiveTools = (names: string[]) => { active = [...names]; };
+		const mod = await import(`../extensions/tool-activation.ts?default=${Date.now()}-${Math.random()}`);
+		mod.default(fp.pi as never);
+		await fire(fp, "session_start", { reason: "new" }, {});
+		assert.equal(active.includes("subagent"), false);
+		assert.equal(active.includes("compact_context"), false);
 	} finally { if (previous === undefined) delete process.env.MUNCHKIN_TOOL_ACTIVATION; else process.env.MUNCHKIN_TOOL_ACTIVATION = previous; }
 });

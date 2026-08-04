@@ -25,15 +25,16 @@ import { agentDir } from "../lib/agent-dir.ts";
 const ENABLED = process.env.BLACKBOARD !== "off";
 const IN_GATE = process.env.TELEMETRY_SOURCE === "gate";
 const LENS_MODE = ((): "off" | "view" | "steer" | "both" => {
-	// ADOPTED 2026-08-03 (judgment call, Albert-approved): default is now "view".
+	// ADOPTED 2026-08-04 (explicit human gate): default is now event-driven
+	// "steer", avoiding per-call context mutation. STATE_LENS=view|both restores
+	// the experimental per-call lens; STATE_LENS=off remains the kill switch.
 	// Grounds in DARK_CANDIDATE_VERDICTS_2026-08-03.md. Default-on, reversible,
 	// mechanism-observed; benefit was not established by a powered trial.
-	// Accepted cost: the per-call tail breaks the serving KV prefix (see the honest-
-	// cost comment at the append site). STATE_LENS=off is the kill switch; "steer"
-	// and "both" remain opt-in dark modes.
+	// The opt-in per-call tail breaks the serving KV prefix (see the honest-cost
+	// comment at the append site).
 	const raw = process.env.STATE_LENS;
 	if (raw === "off") return "off";
-	return raw === "view" || raw === "steer" || raw === "both" ? raw : "view";
+	return raw === "view" || raw === "steer" || raw === "both" ? raw : "steer";
 })();
 const LENS_MAX_CHARS = (() => {
 	const raw = process.env.STATE_LENS_MAX_CHARS ?? "";

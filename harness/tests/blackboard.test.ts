@@ -119,7 +119,7 @@ test("telemetry tap: sees events across module instances, and a throwing tap nev
 	}
 });
 
-test("extension: BLACKBOARD=off registers nothing; STATE_LENS unset registers no context hook", async () => {
+test("extension: BLACKBOARD=off registers nothing; default steer lens performs no per-call context mutation", async () => {
 	const fp = makeFakePi();
 	const prevBb = process.env.BLACKBOARD;
 	const prevLens = process.env.STATE_LENS;
@@ -135,8 +135,7 @@ test("extension: BLACKBOARD=off registers nothing; STATE_LENS unset registers no
 		const on = await import(`../extensions/session-blackboard.ts?on=${Date.now()}-${Math.random()}`);
 		on.default(fp.pi as never);
 		assert.ok(fp.handlers.has("turn_end"));
-		// ADOPTED 2026-08-03: the view lens is DEFAULT-ON (was dark candidate c48).
-		assert.ok(fp.handlers.has("context"), "lens view is default-on — unset registers the context hook");
+		assert.ok(!fp.handlers.has("context"), "default steer mode has no per-call context hook");
 
 		fp.handlers.clear();
 		process.env.STATE_LENS = "off";
