@@ -55,6 +55,22 @@ export const EVENT_CATALOG = {
 	"loop-breaker/steer": { tier: "number", byTool: "boolean", byReason: "boolean", repeat: "number", streak: "number", injected_chars: "number", turnIndex: "number" },
 	"loop-breaker/abort": { streak: "number", turnIndex: "number" },
 	"loop-breaker/block": { tool: "string", abortArmed: "boolean" },
+	"failure-episode/opened": {
+		episode_id: "string", failure_class: "string", tool_family: "string",
+		target_hash: "string", plan_item_hash: "string",
+	},
+	"failure-episode/observed": {
+		episode_id: "string", failure_class: "string", count: "number",
+		calls_after_second: "number", strategy_count: "number",
+	},
+	"failure-episode/recovered": {
+		episode_id: "string", failure_class: "string", count: "number",
+		calls_after_second: "number", recovery: "string",
+	},
+	"failure-episode/settled": {
+		total_episodes: "number", total_failures: "number", longest_episode: "number",
+		semantic_failure_overrun: "number", settled_without_recovery: "number",
+	},
 	"drift-scanner/review-skipped": { why: "string" },
 	"drift-scanner/review-start": { diffChars: "number", truncated: "boolean" },
 	"drift-scanner/review-null": { stopReason: "string", textLen: "number" },

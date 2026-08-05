@@ -1,5 +1,9 @@
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { classifyBashCommand, isBashMutation, looksFailingOutput } from "../lib/command-policy.ts";
+import {
+	boundedResultText, FailureEpisodeTracker, isFailureObservation,
+	type FailureEpisode, type FailureObservation, type RecoveryKind,
+} from "../lib/failure-episodes.ts";
 import { decideOutcomeAction } from "../lib/loop-outcome.ts";
 import { steerText } from "../lib/steer-texts.ts";
 import { record } from "../lib/telemetry.ts";
@@ -58,6 +62,8 @@ export function resolveStopMode(env: string | undefined): "block" | "abort" | "s
 	return env === "shutdown" ? "shutdown" : env === "block" ? "block" : "abort";
 }
 const HARD_STOP_MODE = resolveStopMode(process.env.LB_HARD_STOP);
+const EPISODE_MODE = process.env.LOOP_EPISODE_MODE === "off" ? "off" :
+	process.env.LOOP_EPISODE_MODE === "enforce" ? "enforce" : "shadow";
 
 // Tools that count as progress (reset the loop episode). Everything else
 // (read, bash, grep, find, ls, ...) is non-progress.
@@ -301,6 +307,88 @@ export default function (pi: ExtensionAPI) {
 	// arm (U3b) — does the harness's steering actually buy anything?
 	if (process.env.LOOP_BREAKER === "off") return;
 	const executionEnds = new Map<string, { toolName: string; isError: boolean; text: string }>();
+	const episodeTracker = new FailureEpisodeTracker();
+	const episodeArgs = new Map<string, Record<string, unknown>>();
+	const episodeProcessed = new Set<string>();
+	let providerRequest = 0;
+	let providerRecovered = true;
+
+	function activePlanItemId(): string | null {
+		const plan = (globalThis as Record<string, unknown>).__pi_active_plan_context as { item_id?: unknown } | undefined;
+		return typeof plan?.item_id === "string" ? plan.item_id : null;
+	}
+
+	function publishEpisodes(): void {
+		(globalThis as Record<string, unknown>).__pi_failure_episode_state = episodeTracker.snapshot();
+	}
+
+	function recordRecovery(episodes: FailureEpisode[]): void {
+		for (const episode of episodes) {
+			record("failure-episode", "recovered", {
+				episode_id: episode.id,
+				failure_class: episode.failureClass,
+				count: episode.count,
+				calls_after_second: episode.callsAfterSecond,
+				recovery: episode.recovery ?? "tool_success",
+			});
+		}
+		if (episodes.length > 0) publishEpisodes();
+	}
+
+	function processEpisodeResult(
+		callId: string,
+		toolName: string,
+		args: Record<string, unknown>,
+		isError: boolean,
+		text: string,
+	): void {
+		if (EPISODE_MODE === "off" || episodeProcessed.has(callId)) return;
+		episodeProcessed.add(callId);
+		const observation: FailureObservation = {
+			toolName, args, isError, text: text.slice(0, 2048), planItemId: activePlanItemId(),
+		};
+		if (!isFailureObservation(observation)) {
+			recordRecovery(episodeTracker.observeSuccess({ toolName, args }));
+			publishEpisodes();
+			return;
+		}
+		const { episode, opened } = episodeTracker.observeFailure(observation);
+		if (opened) {
+			record("failure-episode", "opened", {
+				episode_id: episode.id,
+				failure_class: episode.failureClass,
+				tool_family: episode.toolFamily,
+				target_hash: episode.targetHash,
+				plan_item_hash: episode.planItemHash,
+			});
+		}
+		record("failure-episode", "observed", {
+			episode_id: episode.id,
+			failure_class: episode.failureClass,
+			count: episode.count,
+			calls_after_second: episode.callsAfterSecond,
+			strategy_count: episode.strategyHashes.length,
+		});
+		publishEpisodes();
+	}
+
+	function reconcileExactGate(): void {
+		if (EPISODE_MODE === "off") return;
+		const state = (globalThis as Record<string, unknown>).__pi_vg_state as
+			{ gateCmd?: unknown; mutated?: unknown; verifiedOk?: unknown } | undefined;
+		if (state?.mutated !== true || state.verifiedOk !== true) return;
+		const command = typeof state.gateCmd === "string" ? state.gateCmd : "project gate";
+		recordRecovery(episodeTracker.observeSuccess(
+			{ toolName: "bash", args: { command }, verifiedExact: true }, "exact_gate",
+		));
+	}
+
+	function recoverProvider(kind: RecoveryKind = "provider_first_token"): void {
+		if (EPISODE_MODE === "off" || providerRecovered) return;
+		providerRecovered = true;
+		recordRecovery(episodeTracker.observeSuccess({ toolName: "provider", args: {} }, kind));
+	}
+
 	pi.on("session_start", async () => {
 		resetEpisode();
 		resetOutcomes();
@@ -320,12 +408,72 @@ export default function (pi: ExtensionAPI) {
 		sessionRepeatFired = false;
 		delete (globalThis as Record<string, unknown>).__pi_lb_state;
 		executionEnds.clear();
+		episodeTracker.reset();
+		episodeArgs.clear();
+		episodeProcessed.clear();
+		providerRequest = 0;
+		providerRecovered = true;
+		delete (globalThis as Record<string, unknown>).__pi_failure_episode_state;
+	});
+
+	pi.on("tool_execution_start", async (event) => {
+		if (EPISODE_MODE === "off") return;
+		episodeArgs.set(event.toolCallId, (event.args ?? {}) as Record<string, unknown>);
+		episodeTracker.noteToolCall();
+		publishEpisodes();
 	});
 
 	pi.on("tool_execution_end", async (event) => {
-		const content = (event.result as { content?: Array<{ type?: string; text?: string }> } | undefined)?.content ?? [];
-		const text = content.filter((part) => part.type === "text").map((part) => part.text ?? "").join(" ");
+		const text = boundedResultText(event.result);
 		executionEnds.set(event.toolCallId, { toolName: event.toolName, isError: event.isError === true, text });
+		const args = episodeArgs.get(event.toolCallId) ?? {};
+		episodeArgs.delete(event.toolCallId);
+		processEpisodeResult(event.toolCallId, event.toolName, args, event.isError === true, text);
+	});
+
+	pi.on("tool_result", async (event) => {
+		processEpisodeResult(
+			event.toolCallId,
+			event.toolName,
+			(event.input ?? {}) as Record<string, unknown>,
+			event.isError === true,
+			boundedResultText({ content: event.content }),
+		);
+	});
+
+	pi.on("before_provider_request", async () => {
+		providerRequest += 1;
+	});
+
+	pi.on("after_provider_response", async (event, ctx) => {
+		if (EPISODE_MODE === "off" || event.status < 400) return;
+		providerRecovered = false;
+		processEpisodeResult(
+			`provider-${providerRequest}`,
+			"provider",
+			{ provider: ctx.model?.provider ?? "unknown" },
+			true,
+			`provider HTTP ${event.status}`,
+		);
+	});
+
+	pi.on("message_update", async () => { recoverProvider(); });
+	pi.on("turn_start", async () => { reconcileExactGate(); });
+	pi.on("agent_settled", async () => {
+		reconcileExactGate();
+		if (EPISODE_MODE === "off") return;
+		episodeTracker.settle();
+		const summary = episodeTracker.snapshot();
+		record("failure-episode", "settled", {
+			total_episodes: summary.totalEpisodes,
+			total_failures: summary.totalFailures,
+			longest_episode: summary.longestEpisode,
+			semantic_failure_overrun: summary.semanticFailureOverrun,
+			settled_without_recovery: summary.settledWithoutRecovery,
+		});
+		publishEpisodes();
+		episodeArgs.clear();
+		episodeProcessed.clear();
 	});
 
 	// turnIndex is NOT monotonic across a session: agent-session.js's `_turnIndex = 0`

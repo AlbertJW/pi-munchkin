@@ -180,6 +180,60 @@ test("rejected plan_write participates in outcomes; successful plan_write resets
 	assert.equal(fp.sent.length, 0, "successful plan_write resets the repetition episode");
 });
 
+test("failure episodes include execution-end-only validation failures and deduplicate tool_result", async () => {
+	const g = globalThis as Record<string, unknown>;
+	const fp = makeFakePi();
+	const mod = await import(`../extensions/loop-breaker.ts?episode-dedupe=${Date.now()}-${Math.random()}`);
+	mod.default(fp.pi as never);
+	const ctx = { ui: { notify() {} }, abort() {}, cwd: "/tmp" };
+	await fire(fp, "session_start", {}, ctx);
+	await fire(fp, "tool_execution_start", {
+		toolCallId: "bad-plan", toolName: "plan_write",
+		args: { items: [], marker: "DUMMY_EPISODE_VALUE_DO_NOT_PERSIST" },
+	}, ctx);
+	await fire(fp, "tool_execution_end", {
+		toolCallId: "bad-plan", toolName: "plan_write", isError: true,
+		result: { content: [{ type: "text", text: "Invalid input: required property items" }] },
+	}, ctx);
+	await fire(fp, "tool_result", {
+		type: "tool_result", toolCallId: "bad-plan", toolName: "plan_write",
+		input: { items: [] }, isError: true, details: {},
+		content: [{ type: "text", text: "Invalid input: required property items" }],
+	}, ctx);
+	const snapshot = g.__pi_failure_episode_state as {
+		totalFailures: number; active: Array<{ failureClass: string }>;
+	};
+	assert.equal(snapshot.totalFailures, 1, "execution-end and tool_result describe one call");
+	assert.equal(snapshot.active[0]?.failureClass, "schema_validation");
+	assert.equal(JSON.stringify(snapshot).includes("DUMMY_EPISODE_VALUE_DO_NOT_PERSIST"), false);
+	delete g.__pi_failure_episode_state;
+});
+
+test("exact verification state recovers a semantic verification episode", async () => {
+	const g = globalThis as Record<string, unknown>;
+	const fp = makeFakePi();
+	const mod = await import(`../extensions/loop-breaker.ts?episode-gate=${Date.now()}-${Math.random()}`);
+	mod.default(fp.pi as never);
+	const ctx = { ui: { notify() {} }, abort() {}, cwd: "/tmp" };
+	await fire(fp, "session_start", {}, ctx);
+	await fire(fp, "tool_execution_start", {
+		toolCallId: "red", toolName: "bash", args: { command: "npm test" },
+	}, ctx);
+	await fire(fp, "tool_execution_end", {
+		toolCallId: "red", toolName: "bash", isError: true,
+		result: { content: [{ type: "text", text: "1 failing AssertionError" }] },
+	}, ctx);
+	g.__pi_vg_state = { gateCmd: "npm test", mutated: true, verifiedOk: true };
+	await fire(fp, "turn_start", { turnIndex: 2, timestamp: Date.now() }, ctx);
+	const snapshot = g.__pi_failure_episode_state as {
+		active: unknown[]; completed: Array<{ recovery: string }>;
+	};
+	assert.equal(snapshot.active.length, 0);
+	assert.equal(snapshot.completed.at(-1)?.recovery, "exact_gate");
+	delete g.__pi_vg_state;
+	delete g.__pi_failure_episode_state;
+});
+
 test("session_start clears SESSION-cumulative state (no bleed across /new, /fork, /resume)", async () => {
 	// sessionSeenCalls/sessionRepeats/sessionRepeatFired live at MODULE scope, and
 	// pi returns the cached extension factory across session replacement
