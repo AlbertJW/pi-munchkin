@@ -2209,3 +2209,26 @@ Surface hash after the adoptions: `e829c72dd1b8…` (third move on 2026-08-03 �
 then the judgment-pass flips; each is model-visible, so each re-baselines). Mirror zero-drift
 both directions including the three deletions; the live suite's failure set is byte-identical
 to before (the same 8 tsx CJS-transform artifacts), 277 tests.
+
+---
+
+## 2026-08-04/05 — the hardening wave (recorded here as a pointer, authored elsewhere)
+
+A four-branch, human-gated series landed 2026-08-04 (`36b3f80..deefe02`) after this ledger's
+close-out entry; it is documented in `HANDOVER.md` ("2026-08 hardening series") and
+`docs/SURFACE_BOUNDARIES.md`, which is now the **canonical surface-hash record** — the hash
+citations in earlier entries of this ledger are dated history. Highlights: the c48 lens default
+revised `view` → event-driven `steer` (same adoption, no per-call KV break); the new
+`tool-activation` extension (dynamic deferred tools); rejected `plan_write`s brought into the
+loop-breaker outcome ladder (closing the blind spot the 2026-08-03 entry flagged as
+deliberately left); `secret-scan:diff` and `mirror:check` automation; CI. Live loaded hash as
+of the rollout: `440796cf…` (see SURFACE_BOUNDARIES for the full table — do not pool across
+its rows).
+
+2026-08-05: hermes-agent and anneal surveyed against this corpus — verdicts and two recorded
+candidate seeds (cross-session transcript search; human-authored skill containers; the
+anneal-vs-single-session `audit-sweep` experiment) in the appendices of
+`DARK_CANDIDATE_VERDICTS_2026-08-03.md`. CHANGELOG brought current; the 2026-07-20 roadmap
+banner-marked SUPERSEDED; SECURITY_BOUNDARY's drifted `real_gate.sh` citation re-anchored to
+the pattern instead of a line number. Nothing model-visible changed on 08-05: the surface is
+unmoved.

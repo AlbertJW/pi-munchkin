@@ -138,7 +138,8 @@ feature), not a different directory inside it.
 **Why the residual risk is accepted.** The documented threat model is a single trusted
 operator measuring local models on their own repositories; a 4B does not forge JSONL
 transcripts to inflate its usage numbers. The exposure is bounded structurally:
-`real_gate.sh:756` ANDs `trajectory_check` only when `gate==1`, so trajectory forgery can
+`real_gate.sh` ANDs `trajectory_check` only when `gate==1` (the `TRAJECTORY=on && gate==1`
+line; :774 as of 2026-08-05 — cite the pattern, line numbers drift), so trajectory forgery can
 downgrade a pass but can never turn a failing hidden grader into a pass — the gate bit itself
 comes from hidden tests re-run by the harness *after* the session ends, outside the child.
 The `trajectory_check.py` docstrings that used to state the pairing was mechanically enforced

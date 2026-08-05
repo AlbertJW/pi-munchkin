@@ -16,6 +16,12 @@ steering candidate; the adopted three only ever append.
 
 ## ADOPTED — default-on in the live harness (Albert-approved)
 
+> **Revision 2026-08-04 (explicit human gate):** the c48 default was changed from per-call
+> `view` to event-driven **`steer`** — same adoption, lower cost point (no per-call KV-prefix
+> break). `STATE_LENS=view|both` restores the per-call lens; `off` still kills. The table row
+> below describes the 08-03 decision as made; the live default is `steer`. See
+> `docs/SURFACE_BOUNDARIES.md` for the resulting surface boundary.
+
 | c | mechanism | kill switch | grounds |
 |---|---|---|---|
 | **c48 state-lens (view)** | ground-truth session-state lens appended per LLM call at the `context` hook; non-accumulating; model never authors its own memory | `STATE_LENS=off` | Targets repeat spirals — the measured binding constraint (top 10% of sessions carry 43% of wasted calls). Mechanism proven firing: 265 injections over two rounds, 6/6 targeted. Purely additive. Accepted cost: per-call KV re-prefill (median session ~4.9k tokens; small, and the honest-cost comment stays at the append site). `prefix_stable_rate` cannot see it (§13) — treat that 1.0 as unmeasured. |
@@ -147,3 +153,32 @@ Its skill-injection mechanism is governor prose with a growth rate, and prose me
 Neither is built. Neither should be built casually — both add model-visible context, so both
 would ship dark behind flags with numbered configs, and the measured constraint (repeat
 spirals) argues neither is the next thing that matters.
+
+## Appendix (2026-08-05): anneal survey — the opposite prescription, same diagnosis
+
+`tinytownsoftware/anneal` — an external Python orchestrator over the SAME substrate (pi as a
+headless worker, local Qwen 30–35B-class models): decompose a goal into small tasks, spawn a
+fresh lean `pi -p` per task with `--no-extensions`, verify per task with bounded retries
+(default up to 100), controller owns git (model commits blocked by hook), state threads forward
+through git history instead of a context window. ~9 commits, no telemetry, no measurement.
+
+**Verdict: complementary layer, not a competitor — and not adoptable on current evidence.**
+It is "mechanism beats persuasion" applied at the *process* level: where c37/c25 asked the
+model to orchestrate (and measured 0-for-2 adverse), anneal never asks — deterministic code
+orchestrates. It is c18 fresh-retry promoted to the default, and our own gate is anneal-shaped.
+
+Against it, from this corpus: (a) **per-attempt amnesia** — 100 fresh retries with no
+cross-attempt repeat detection is the grinding failure class externalized, with no
+loop-breaker; (b) `--no-extensions` strips the evidence-backed layer (hashline, the adopted
+hints); (c) the v4 weave precedent — engine-owned dispatch was built here once, measured
+nothing, and was deleted 2026-07-20 (distinction: weave dispatched in-session and needed model
+cooperation; anneal is fully external and needs none — a reason it *might* work, not evidence);
+(d) zero rows.
+
+**The decisive observation:** anneal's claimed benefit lives exactly in this fixture set's
+blind spot. The corpus median is 11 turns / ~4.9k tokens — decomposition has nothing to buy
+there. The long-horizon venue where it should win is what `audit-sweep` was built for, and
+`audit-sweep` has 0 rows. **Best-shaped experiment available on restart:** anneal-orchestrated
+vs single-session on `audit-sweep`, graded; hybrid arm = anneal orchestration with workers
+pointed at `~/.pi/agent` (keeping hashline/hints/loop-breaker) instead of `--no-extensions`.
+Box-gated; recorded, not built.
