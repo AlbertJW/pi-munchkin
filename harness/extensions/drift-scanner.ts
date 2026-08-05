@@ -12,7 +12,7 @@ import { record } from "../lib/telemetry.ts";
 // agent can make a fixup commit.
 //
 // `turn_end` captures the landed HEAD and bounded diff. Model review starts only
-// after `agent_end`, and is aborted by the next `before_agent_start` or shutdown,
+// after `agent_settled`, and is aborted by the next `before_agent_start` or shutdown,
 // so an advisory review cannot contend with the coding run on a single-slot
 // local server. HEAD and session generation are rechecked before delivery.
 //
@@ -98,7 +98,7 @@ export default function (pi: ExtensionAPI) {
 			const { text, truncated } = buildTruncatedDiff(diff);
 			const body = (truncated ? `[diff truncated to first ${MAX_DIFF} chars]\n\n` : "") + text;
 
-			// Capture only while the agent is active. Model work starts after agent_end,
+			// Capture only while the agent is active. Model work starts after agent_settled,
 			// so it never contends with the coding run on a single-slot server.
 			pending.set(ctx.cwd, {
 				cwd: ctx.cwd, headHash, body, truncated, generation,
@@ -109,7 +109,7 @@ export default function (pi: ExtensionAPI) {
 		}
 	});
 
-	pi.on("agent_end", async () => {
+	pi.on("agent_settled", async () => {
 		const next = [...pending.values()].at(-1);
 		if (!next) return;
 		pending.delete(next.cwd); // one shot: busy/abort/stale outcomes are not retried

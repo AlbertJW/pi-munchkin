@@ -200,6 +200,9 @@ test("cockpit is atomically rendered outside the project with private permission
 		mod.default(fp.pi as never);
 		await fire(fp, "session_start", { reason: "new" }, { cwd: project, sessionManager: { getBranch: () => [] } });
 		await fire(fp, "agent_end", {}, {});
+		assert.equal(existsSync(join(agent, "artifacts", "session-cockpits")), false,
+			"agent_end may be followed by retry or compaction and is not final");
+		await fire(fp, "agent_settled", {}, {});
 		const dir = join(agent, "artifacts", "session-cockpits");
 		const files = readdirSync(dir);
 		assert.equal(files.length, 1);

@@ -194,7 +194,7 @@ export default function (pi: ExtensionAPI): void {
 		}
 	});
 
-	pi.on("agent_end", async () => {
+	pi.on("agent_settled", async () => {
 		await renderCockpit(true);
 		try {
 			pi.appendEntry(ENTRY_TYPE, snapshot(boardState()));

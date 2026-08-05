@@ -86,6 +86,8 @@ Most behavior is automatic. The primary commands are:
 - `/ketch-status` for public-search backend health.
 - `/loop-status` for a redacted failure-episode summary; `/loop-resume` clears exact episode
   walls and sends one deterministic recovery instruction.
+- `/munchkin-doctor` for redacted Pi/model capability, canonical tool-provenance, retry/timeout,
+  and declared sandbox posture.
 
 ### Current defaults and rollback controls
 
@@ -104,10 +106,11 @@ Most behavior is automatic. The primary commands are:
 | image reads | fixed 4 MiB preflight limit | use a purpose-built image workflow for larger files |
 | `PI_SUBAGENT_ENV_ALLOW` | empty; comma-separated extra child environment variable names | names are validated; values are copied without logging |
 | subagent fixed allowlist | includes provider essentials and `LLAMA_API_KEY` | secrets are never included in telemetry or user-facing diagnostics |
-| `DRIFT_SCANNER` | active after `agent_end`, when idle | `off` disables; a new run aborts an in-flight review and stale findings are dropped |
+| `DRIFT_SCANNER` | active after `agent_settled`, when Pi declares the run settled | `off` disables; a new run aborts an in-flight review and stale findings are dropped |
 | `LOOP_EPISODE_MODE` | `shadow`; records semantic episodes and the 7/11/28 session-tail tiers without steering or blocking | `off` disables collection; `enforce` enables the dark 2/4/6 semantic and 7/11/28 session ladders only after a separate adoption gate |
 | `LB_EPISODE_T1`, `LB_EPISODE_T2`, `LB_EPISODE_T3` | `2`, `4`, `6` semantic failures | explicit integer overrides; only exact previously repeated calls are walled |
 | `LB_SESSION_T1`, `LB_SESSION_T2`, `LB_SESSION_T3` | `7`, `11`, `28` cumulative repeats under enforcement | `LB_SESSION_REPEAT` remains the authoritative legacy 25-repeat steer in shadow mode and is a compatibility alias for enforced Tier 1 |
+| `PI_SANDBOX_POSTURE` | `unknown`; `/munchkin-doctor` accepts only `declared` or `host` as operator assertions | unset it to return to `unknown`; this label is observational and grants no isolation |
 | `TEACH_HINTS`, `DID_YOU_MEAN` | default-on bounded hints | set either to `off` |
 | `KETCH` | default-on public search/read | `off` for offline/private sessions |
 | `VERIFY_GATE`, `LOOP_BREAKER`, `GIT_GUARD`, `HASHLINE` | default-on core mechanisms | each accepts its documented `off` kill switch |
@@ -119,7 +122,8 @@ allocation cap. Use `rg`, `head`, `tail`, or a purpose-built span tool for overs
 
 - Cockpits are written atomically with private permissions to
   `${PI_CODING_AGENT_DIR}/artifacts/session-cockpits/<sha256(cwd)>.html`, outside the working
-  repository. The final render is awaited at `agent_end`.
+  repository. The final render is awaited exactly once at `agent_settled`; `agent_end` remains
+  available for per-run cleanup and may be followed by retry or compaction.
 - Blackboard attempt keys are hashed. Persisted labels, errors, telemetry, and notifications are
   redacted and bounded; v1 restores intentionally discard raw attempt/delegation ledgers.
 - Tier-three loop recovery receipts are atomically written with private permissions to
@@ -134,6 +138,13 @@ allocation cap. Use `rg`, `head`, `tail`, or a purpose-built span tool for overs
   only file, line, and pattern ID; matched text is never printed.
 - Extensions run with the Pi process's permissions. Keep machine settings, credentials, and
   private endpoints out of this public repository.
+- Provider timing rows are numeric and observational: request-to-headers, first token, stream
+  completion, and settlement. The harness does not retry or abort slow local inference; Pi's
+  configured retry and timeout behavior remains authoritative.
+- Shell command policy is not process isolation. Use Pi's upstream
+  [security guidance](https://github.com/earendil-works/pi/blob/main/packages/coding-agent/docs/security.md)
+  and [containerization guidance for OpenShell, Gondolin, and Docker](https://github.com/earendil-works/pi/blob/main/packages/coding-agent/docs/containerization.md)
+  when isolation is required.
 
 See [`.github/SECURITY.md`](.github/SECURITY.md) for private vulnerability reporting.
 

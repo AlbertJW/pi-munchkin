@@ -23,6 +23,7 @@
     "git-guard/confirm",
     "context-inlet-guard/block",
     "surface-receipt/surface",
+    "runtime/provider-timing",
     "loop-breaker/compact-reset",
     "loop-breaker/session-repeat",
     "loop-breaker/outcome-steer",

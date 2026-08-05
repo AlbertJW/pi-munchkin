@@ -64,7 +64,7 @@ test("extractFindings: only posts complete, non-CLEAN reviews", () => {
 const piAiResolvable = existsSync(join(process.cwd(), "node_modules", "@earendil-works", "pi-ai"));
 const extTest = piAiResolvable ? test : test.skip;
 
-extTest("turn_end captures only; review starts detached after agent_end", async () => {
+extTest("turn_end captures only; review starts detached after agent_settled", async () => {
 	// pi awaits extension handlers serially inside the agent loop, so awaiting a
 	// 90-second local-model review here froze the entire session on every
 	// reviewable commit. turn_end must return promptly and deliver the advisory
@@ -111,7 +111,11 @@ extTest("turn_end captures only; review starts detached after agent_end", async 
 	assert.ok(elapsed < 5000, `turn_end must not block on the review (took ${elapsed}ms)`);
 	assert.equal(modelCallStarted, false, "turn_end only captures commit metadata and diff");
 	await fire(fp, "agent_end", {}, {});
-	assert.equal(modelCallStarted, true, "the review still starts — it is detached, not dropped");
+	assert.equal(modelCallStarted, false, "agent_end can precede retry or compaction and is not final");
+	await fire(fp, "session_compact", { reason: "auto", tokensBefore: 1_000 }, {});
+	assert.equal(modelCallStarted, false, "compaction does not launch detached final work");
+	await fire(fp, "agent_settled", {}, {});
+	assert.equal(modelCallStarted, true, "the settled review still starts — it is detached, not dropped");
 	assert.equal(fp.sent.length, 0, "nothing delivered yet; the advisory arrives later as followUp");
 });
 
@@ -157,7 +161,9 @@ extTest("a new agent run aborts a detached review and delivers no advisory", asy
 	await fire(fp, "before_agent_start", { systemPrompt: "s" }, ctx);
 	await fire(fp, "turn_end", commitEvent, ctx);
 	await fire(fp, "agent_end", {}, ctx);
-	assert.equal(authCalls, 1, "detached review reached authentication after agent_end");
+	assert.equal(authCalls, 0, "agent_end does not launch final work");
+	await fire(fp, "agent_settled", {}, ctx);
+	assert.equal(authCalls, 1, "detached review reached authentication after agent_settled");
 	await fire(fp, "before_agent_start", { systemPrompt: "s2" }, ctx);
 	const rows = readFileSync(telemetry, "utf8").trim().split("\n").map((line) => JSON.parse(line));
 	assert.ok(rows.some((row) => row.ext === "drift-scanner" && row.kind === "review-skipped" && row.why === "aborted-busy"));

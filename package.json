@@ -60,7 +60,8 @@
       "harness/extensions/context-surface.ts",
       "harness/extensions/bash-output-guard.ts",
       "harness/extensions/payload-audit.ts",
-      "harness/extensions/tool-activation.ts"
+      "harness/extensions/tool-activation.ts",
+      "harness/extensions/runtime-truth.ts"
     ],
     "skills": [
       "skills/deep-research",
@@ -107,6 +108,7 @@
     "harness/extensions/bash-output-guard.ts",
     "harness/extensions/payload-audit.ts",
     "harness/extensions/tool-activation.ts",
+    "harness/extensions/runtime-truth.ts",
     "harness/lib/agent-dir.ts",
     "harness/lib/blackboard.ts",
     "harness/lib/bash-output.ts",
@@ -123,6 +125,7 @@
     "harness/lib/hashline-core.ts",
     "harness/lib/loop-outcome.ts",
     "harness/lib/loop-recovery.ts",
+    "harness/lib/runtime-doctor.ts",
     "harness/lib/live-mirror.ts",
     "harness/lib/micro-gate-policy.ts",
     "harness/lib/plan-integrity.ts",

@@ -11,6 +11,8 @@ const BASE_REGISTRY = ["read", "bash", "edit", "write"];
 const MODE = process.env.MUNCHKIN_TOOL_ACTIVATION === "ambient" ? "ambient" : "dynamic";
 
 export default function (pi: ExtensionAPI): void {
+	const g = globalThis as Record<string, unknown>;
+	g.__pi_tool_activation_state = { mode: MODE, preserved_explicit: false, reason: "startup" };
 	if (MODE !== "dynamic") return;
 	const deferred = new Set<DeferredTool>();
 	const attempted = new Set<DeferredTool>();
@@ -42,13 +44,13 @@ export default function (pi: ExtensionAPI): void {
 		}
 	};
 	tap.__toolActivation = true;
-	const g = globalThis as Record<string, unknown>;
 	const taps = ((g.__pi_telemetry_taps as TelemetryTap[] | undefined) ?? [])
 		.filter((candidate) => !(candidate as typeof tap).__toolActivation);
 	taps.push(tap);
 	g.__pi_telemetry_taps = taps;
 
 	pi.on("session_start", async () => {
+		g.__pi_tool_activation_state = { mode: MODE, preserved_explicit: false, reason: "dynamic-startup" };
 		deferred.clear();
 		attempted.clear();
 		lastOpenItems = 0;
@@ -60,6 +62,10 @@ export default function (pi: ExtensionAPI): void {
 		const complete = [...BASE_REGISTRY, ...DEFERRED].every((name) => allSet.has(name));
 		const explicit = activeSet.size !== allSet.size || all.some((name) => !activeSet.has(name));
 		if (!complete || explicit) {
+			g.__pi_tool_activation_state = {
+				mode: MODE, preserved_explicit: true,
+				reason: complete ? "narrowed-tools" : "incomplete-registry",
+			};
 			for (const tool of DEFERRED) record("tool-activation", "preserved-explicit", {
 				tool, reason: complete ? "narrowed-tools" : "incomplete-registry",
 			});

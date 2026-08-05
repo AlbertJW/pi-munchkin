@@ -47,6 +47,11 @@ export const EVENT_CATALOG = {
 	"git-guard/confirm": { approved: "boolean", changes: "number" },
 	"context-inlet-guard/block": { risky: "boolean", bytes: "number", n: "number", bigLimit: "boolean" },
 	"surface-receipt/surface": { sha256: "string" },
+	"runtime/provider-timing": {
+		request_seq: "number", request_to_headers_ms: ["number", "null"],
+		first_token_ms: ["number", "null"], stream_completion_ms: ["number", "null"],
+		settlement_ms: ["number", "null"], status: ["number", "null"],
+	},
 	"loop-breaker/compact-reset": { streak: "number", blocked: "number" },
 	"loop-breaker/session-repeat": { repeats: "number", turnIndex: "number" },
 	"loop-breaker/outcome-steer": { n: "number", final: "boolean", injected_chars: "number", turnIndex: "number" },
