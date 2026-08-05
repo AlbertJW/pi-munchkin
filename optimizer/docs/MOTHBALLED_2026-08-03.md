@@ -29,9 +29,11 @@ Two things were built to break that deadlock, and both are done:
   states the binary bit scores *identically* separate cleanly.
 - **`audit-sweep`**, a graded long-horizon fixture, admitted and approved.
 
-**Neither has ever been run against a model.** `audit-sweep` has **0 rows**. That single cheap
-measurement — one base-arm round on the local 4B — is the highest-value thing anyone can do
-here, and it was never done. It is B2 in `../../HANDOVER.md`.
+**Neither had ever been run against a model at mothball time.** (Update 2026-08-05:
+`audit-sweep` now has its first 9 rows — base-arm on `maple-20b`, all authoritative, graded
+0/8 across the board: a hard floor for that model, and end-to-end proof the graded instrument
+works. The **local-4B** run — the original B2 question in `../../HANDOVER.md` — is still
+unrun.)
 
 The blocker underneath is unchanged: **no fixture sits in a 30–70% band for the two models that
 matter, locally.** The 35B ceilings at 100%; the candidate 4B floors. A candidate cannot move a
@@ -77,10 +79,12 @@ easiest way to silently produce a wrong result here.
 
 Do these in order. Stop after step 2 if the answer is discouraging — that *is* a result.
 
-1. **Run `audit-sweep` base-arm only, local 4B, n≥9.** It is graded and has never run. Exit
-   criterion: base pass rate + the `graded_rate` distribution. If it floors or ceilings, the
-   graded instrument has no venue and the whole programme is blocked on fixture-building, not on
-   candidates. Cheap, and it is the fact everything else waits on.
+1. **Run `audit-sweep` base-arm only, local 4B, n≥9.** It is graded; exit criterion: base pass
+   rate + the `graded_rate` distribution. **Partially answered 2026-08-05** — run on `maple-20b`
+   (not the 4B): 0/9 gate, 0/8 graded on every rep, 0/72 sub-checks — a hard floor for that
+   model, with 5/9 sessions never mutating a file (ledger, `maple20b-audit-base`). The graded
+   instrument itself is proven end-to-end. **The 4B run — the original question — is still
+   open.** If the 4B also floors, the programme is blocked on fixture-building, not candidates.
 2. **Re-calibrate `hygiene-shared-config-reread`** now that the gate copies the whole tree. Its
    0/6 was a harness artifact; it may be the in-band fixture the project spent months lacking.
 3. Only then candidates. Default-on mechanisms remain reversible and mechanism-observed; benefit

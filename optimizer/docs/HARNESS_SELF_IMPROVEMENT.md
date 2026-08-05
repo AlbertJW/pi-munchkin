@@ -2232,3 +2232,38 @@ anneal-vs-single-session `audit-sweep` experiment) in the appendices of
 banner-marked SUPERSEDED; SECURITY_BOUNDARY's drifted `real_gate.sh` citation re-anchored to
 the pattern instead of a line number. Nothing model-visible changed on 08-05: the surface is
 unmoved.
+
+---
+
+## 2026-08-05 — B2 executed at last: audit-sweep's first rows ever. Verdict: FLOOR (on maple-20b)
+
+`maple20b-audit-base` — `audit-sweep` × 9, base arm only, `maple-20b` (DeepGrove Maple-Preview
+20B-A1B, official MLX runtime), network `endpoint`, the post-hardening live surface. The first
+graded rows in the project's history, and the first gate round on a non-llama.cpp backend
+(`serving_fingerprint` gained a first-class MLX branch for it, `c791d65` — full-artifact hash,
+runtime identity via lsof, same contract; every row came back **authoritative, serving stable,
+fingerprint complete**).
+
+**Result: 0/9 gate, and graded 0/8 on every rep — 0 of 72 sub-checks ever passed.** Not one of
+the eight seeded defects was fixed by any session. The dominant shape: **5 of 9 sessions never
+mutated a file at all** (read 3 files, re-read them, wrapped up at ~11 turns, ~1.3k ctx tokens);
+the other 4 mutated late (turns 9–36, one 42-turn/198k-char grinder) and still fixed nothing the
+grader checks. Clean tool calls throughout — no pseudo-call collapse, no serving artifacts. This
+is DeepGrove's own card caveat ("may underperform on agentic benchmarks") measured precisely:
+fast, correct, structurally clean tool use with **no sustained agency toward the task**.
+
+What this settles and doesn't:
+
+- **audit-sweep is OUT-OF-BAND (hard floor) for maple-20b.** No candidate round on this
+  (model, fixture) pair can show anything; do not run one.
+- **The graded instrument works end-to-end on real sessions** — pinned artifact read, no
+  refusals, per-defect detail on every row, `--graded` coverage 9/9. Instrument v2 is no longer
+  unexercised.
+- **B2 as originally specified (local 4B) remains unrun.** The 4B is the model whose band was
+  the actual question; maple answered a different, adjacent one.
+- Known row limitation: `usage.source: char_proxy` on all 9 — mlx_lm.server returns no token
+  counts on pi's streaming path, so token effort metrics are proxy-only for MLX backends.
+  Turns/calls/errors are exact.
+
+Corpus note: rows bind the maple fingerprint + the current live surface; comparable only within
+that pair. maple-20b's registry caveat ("weak on agentic per card") is now measured, not quoted.
