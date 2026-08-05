@@ -84,6 +84,8 @@ Most behavior is automatic. The primary commands are:
 - `/blackboard` for current redacted state and the private cockpit path.
 - `/skill:deep-research <question>` for bounded research.
 - `/ketch-status` for public-search backend health.
+- `/loop-status` for a redacted failure-episode summary; `/loop-resume` clears exact episode
+  walls and sends one deterministic recovery instruction.
 
 ### Current defaults and rollback controls
 
@@ -103,6 +105,9 @@ Most behavior is automatic. The primary commands are:
 | `PI_SUBAGENT_ENV_ALLOW` | empty; comma-separated extra child environment variable names | names are validated; values are copied without logging |
 | subagent fixed allowlist | includes provider essentials and `LLAMA_API_KEY` | secrets are never included in telemetry or user-facing diagnostics |
 | `DRIFT_SCANNER` | active after `agent_end`, when idle | `off` disables; a new run aborts an in-flight review and stale findings are dropped |
+| `LOOP_EPISODE_MODE` | `shadow`; records semantic episodes and the 7/11/28 session-tail tiers without steering or blocking | `off` disables collection; `enforce` enables the dark 2/4/6 semantic and 7/11/28 session ladders only after a separate adoption gate |
+| `LB_EPISODE_T1`, `LB_EPISODE_T2`, `LB_EPISODE_T3` | `2`, `4`, `6` semantic failures | explicit integer overrides; only exact previously repeated calls are walled |
+| `LB_SESSION_T1`, `LB_SESSION_T2`, `LB_SESSION_T3` | `7`, `11`, `28` cumulative repeats under enforcement | `LB_SESSION_REPEAT` remains the authoritative legacy 25-repeat steer in shadow mode and is a compatibility alias for enforced Tier 1 |
 | `TEACH_HINTS`, `DID_YOU_MEAN` | default-on bounded hints | set either to `off` |
 | `KETCH` | default-on public search/read | `off` for offline/private sessions |
 | `VERIFY_GATE`, `LOOP_BREAKER`, `GIT_GUARD`, `HASHLINE` | default-on core mechanisms | each accepts its documented `off` kill switch |
@@ -117,6 +122,9 @@ allocation cap. Use `rg`, `head`, `tail`, or a purpose-built span tool for overs
   repository. The final render is awaited at `agent_end`.
 - Blackboard attempt keys are hashed. Persisted labels, errors, telemetry, and notifications are
   redacted and bounded; v1 restores intentionally discard raw attempt/delegation ledgers.
+- Tier-three loop recovery receipts are atomically written with private permissions to
+  `${PI_CODING_AGENT_DIR}/artifacts/loop-recovery/<sha256(cwd)>.json`. They contain only safe
+  failure classes, bounded tool families, hashes, gate booleans, and the harness surface hash.
 - URL checks canonicalize IPv4 and IPv6, reject non-global addresses, and validate every DNS and
   redirect hop. DNS answers can still change between validation and the downstream client's
   connection; this explicit DNS-rebinding/TOCTOU limitation is not a socket-level IP pin.

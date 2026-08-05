@@ -37,6 +37,9 @@ export default function (pi: ExtensionAPI): void {
 			activate("subagent", "second-gate-failure");
 		}
 		if (ext === "loop-breaker" && kind === "steer" && detail.tier === 2) activate("subagent", "loop-tier-two");
+		if (ext === "failure-episode" && kind === "intervention" && detail.tier === 2) {
+			activate("subagent", "semantic-tier-two");
+		}
 	};
 	tap.__toolActivation = true;
 	const g = globalThis as Record<string, unknown>;

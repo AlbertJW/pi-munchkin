@@ -122,6 +122,7 @@
     "harness/lib/gate-runtime.ts",
     "harness/lib/hashline-core.ts",
     "harness/lib/loop-outcome.ts",
+    "harness/lib/loop-recovery.ts",
     "harness/lib/live-mirror.ts",
     "harness/lib/micro-gate-policy.ts",
     "harness/lib/plan-integrity.ts",

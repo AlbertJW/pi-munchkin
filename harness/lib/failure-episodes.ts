@@ -14,7 +14,7 @@ export type FailureClass =
 	| "edit_conflict"
 	| "unknown";
 
-export type RecoveryKind = "tool_success" | "exact_gate" | "provider_first_token";
+export type RecoveryKind = "tool_success" | "exact_gate" | "provider_first_token" | "manual_resume";
 export type EpisodeStatus = "active" | "recovered" | "settled";
 
 export type FailureObservation = {
@@ -265,6 +265,19 @@ export class FailureEpisodeTracker {
 
 	activeEpisodes(): FailureEpisode[] {
 		return [...this.active.values()].map(cloneEpisode);
+	}
+
+	clearActive(now = new Date().toISOString()): FailureEpisode[] {
+		const cleared: FailureEpisode[] = [];
+		for (const [key, episode] of this.active) {
+			episode.status = "recovered";
+			episode.recovery = "manual_resume";
+			episode.updatedAt = now;
+			this.active.delete(key);
+			this.pushCompleted(episode);
+			cleared.push(cloneEpisode(episode));
+		}
+		return cleared;
 	}
 
 	snapshot(): FailureEpisodeSnapshot {

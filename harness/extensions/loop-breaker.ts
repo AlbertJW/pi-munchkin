@@ -2,9 +2,14 @@ import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { classifyBashCommand, isBashMutation, looksFailingOutput } from "../lib/command-policy.ts";
 import {
 	boundedResultText, FailureEpisodeTracker, isFailureObservation,
+	planItemHash, sha256, strategyHash,
 	type FailureEpisode, type FailureObservation, type RecoveryKind,
 } from "../lib/failure-episodes.ts";
 import { decideOutcomeAction } from "../lib/loop-outcome.ts";
+import {
+	recoveryReceipt, tierForCount, writeLoopRecoveryReceipt,
+	type LoopTier,
+} from "../lib/loop-recovery.ts";
 import { steerText } from "../lib/steer-texts.ts";
 import { record } from "../lib/telemetry.ts";
 
@@ -151,9 +156,24 @@ let abortArmed = false;
 // the top decile of sessions carries 43% of all 7,673 wasted tool calls. Every one of
 // those episodes was reset away before it could trip a tier.
 const SESSION_REPEAT_LIMIT = envInt("LB_SESSION_REPEAT", 25); // ~p95 of observed repeats
+const EPISODE_T1 = envInt("LB_EPISODE_T1", 2);
+const EPISODE_T2 = Math.max(EPISODE_T1, envInt("LB_EPISODE_T2", 4));
+const EPISODE_T3 = Math.max(EPISODE_T2, envInt("LB_EPISODE_T3", 6));
+const SESSION_SHADOW_T1 = envInt("LB_SESSION_T1", 7);
+const SESSION_SHADOW_T2 = Math.max(SESSION_SHADOW_T1, envInt("LB_SESSION_T2", 11));
+const SESSION_SHADOW_T3 = Math.max(SESSION_SHADOW_T2, envInt("LB_SESSION_T3", 28));
 const sessionSeenCalls = new Set<string>();
+const sessionCallCounts = new Map<string, number>();
 let sessionRepeats = 0;
 let sessionRepeatFired = false;
+
+export function sessionEpisodeThresholds(env: NodeJS.ProcessEnv = process.env): [number, number, number] {
+	const explicitT1 = env.LB_SESSION_T1 ?? env.LB_SESSION_REPEAT;
+	const t1 = explicitT1 ? Math.max(2, Number.parseInt(explicitT1, 10) || 7) : 7;
+	const t2 = Math.max(t1, Number.parseInt(env.LB_SESSION_T2 ?? "11", 10) || 11);
+	const t3 = Math.max(t2, Number.parseInt(env.LB_SESSION_T3 ?? "28", 10) || 28);
+	return [t1, t2, t3];
+}
 
 /** How many of these calls have been seen before this session. Mutates `seen`.
  *  Pure and exported so the grinding case is unit-testable without a live pi. */
@@ -310,8 +330,19 @@ export default function (pi: ExtensionAPI) {
 	const episodeTracker = new FailureEpisodeTracker();
 	const episodeArgs = new Map<string, Record<string, unknown>>();
 	const episodeProcessed = new Set<string>();
+	const episodeTierFired = new Map<string, LoopTier>();
+	const exactStrategies = new Map<string, Map<string, { count: number; fp: string }>>();
+	const sessionTierFired = new Set<LoopTier>();
 	let providerRequest = 0;
 	let providerRecovered = true;
+	type PendingAction = {
+		tier: Exclude<LoopTier, 0>;
+		detector: "semantic" | "session" | "combined";
+		episode: FailureEpisode | null;
+		exactRepeatedFps: string[];
+		count: number;
+	};
+	let pendingAction: PendingAction | null = null;
 
 	function activePlanItemId(): string | null {
 		const plan = (globalThis as Record<string, unknown>).__pi_active_plan_context as { item_id?: unknown } | undefined;
@@ -324,6 +355,9 @@ export default function (pi: ExtensionAPI) {
 
 	function recordRecovery(episodes: FailureEpisode[]): void {
 		for (const episode of episodes) {
+			episodeTierFired.delete(episode.id);
+			exactStrategies.delete(episode.id);
+			if (pendingAction?.episode?.id === episode.id) pendingAction = null;
 			record("failure-episode", "recovered", {
 				episode_id: episode.id,
 				failure_class: episode.failureClass,
@@ -333,6 +367,49 @@ export default function (pi: ExtensionAPI) {
 			});
 		}
 		if (episodes.length > 0) publishEpisodes();
+	}
+
+	function mergePending(next: PendingAction): void {
+		if (!pendingAction) {
+			pendingAction = next;
+			return;
+		}
+		if (next.tier > pendingAction.tier) {
+			pendingAction = next;
+			return;
+		}
+		if (next.tier < pendingAction.tier) return;
+		pendingAction = {
+			...pendingAction,
+			detector: pendingAction.detector === next.detector ? next.detector : "combined",
+			episode: pendingAction.episode ?? next.episode,
+			exactRepeatedFps: [...new Set([...pendingAction.exactRepeatedFps, ...next.exactRepeatedFps])],
+			count: Math.max(pendingAction.count, next.count),
+		};
+	}
+
+	function observeSemanticTier(episode: FailureEpisode, toolName: string, args: Record<string, unknown>): void {
+		const strategy = strategyHash(toolName, args);
+		const strategies = exactStrategies.get(episode.id) ?? new Map<string, { count: number; fp: string }>();
+		const current = strategies.get(strategy);
+		if (current) current.count += 1;
+		else if (strategies.size < 16) strategies.set(strategy, { count: 1, fp: fpKey(toolName, args) });
+		exactStrategies.set(episode.id, strategies);
+
+		const tier = tierForCount(episode.count, EPISODE_T1, EPISODE_T2, EPISODE_T3);
+		const prior = episodeTierFired.get(episode.id) ?? 0;
+		if (tier === 0 || tier <= prior) return;
+		episodeTierFired.set(episode.id, tier);
+		record("failure-episode", "tier-observed", {
+			tier, detector: "semantic", mode: EPISODE_MODE,
+			failure_class: episode.failureClass, count: episode.count, session_repeats: sessionRepeats,
+		});
+		if (EPISODE_MODE !== "enforce") return;
+		mergePending({
+			tier, detector: "semantic", episode,
+			exactRepeatedFps: [...strategies.values()].filter((entry) => entry.count > 1).map((entry) => entry.fp),
+			count: episode.count,
+		});
 	}
 
 	function processEpisodeResult(
@@ -369,7 +446,57 @@ export default function (pi: ExtensionAPI) {
 			calls_after_second: episode.callsAfterSecond,
 			strategy_count: episode.strategyHashes.length,
 		});
+		observeSemanticTier(episode, toolName, args);
 		publishEpisodes();
+	}
+
+	async function applyPendingAction(ctx: {
+		cwd: string;
+		abort(): void;
+		ui: { notify(message: string, level?: "info" | "warning" | "error"): void };
+	}, turnIndex: number): Promise<LoopTier> {
+		const action = pendingAction;
+		pendingAction = null;
+		if (!action || EPISODE_MODE !== "enforce") return 0;
+		const failureClass = action.episode?.failureClass ?? "unknown";
+		let message = "";
+		if (action.tier === 1) {
+			message = `[loop-breaker] failure_class=${failureClass} repeated. Change strategy family, delegate, or report Blocked.`;
+		} else if (action.tier === 2) {
+			message = `[loop-breaker] failure_class=${failureClass} persists after a strategy change. Delegate or report Blocked; do not retry the same approach.`;
+		}
+		record("failure-episode", "intervention", {
+			tier: action.tier, detector: action.detector, failure_class: failureClass,
+			count: action.count, session_repeats: sessionRepeats, injected_chars: message.length,
+			turnIndex,
+		});
+		if (action.tier < 3) {
+			pi.sendUserMessage(message, { deliverAs: "steer" });
+			return action.tier;
+		}
+
+		for (const fp of action.exactRepeatedFps) ep.blocked.add(fp);
+		const gate = (globalThis as Record<string, unknown>).__pi_vg_state as
+			{ mutated?: unknown; verifiedOk?: unknown } | undefined;
+		const episode = action.episode ?? {
+			key: sha256(`session-repeat:${sessionRepeats}`),
+			planItemHash: planItemHash(activePlanItemId()),
+			failureClass: "unknown" as const,
+			toolFamily: "session_repeat",
+			strategyHashes: [],
+		};
+		const receipt = recoveryReceipt(episode, gate, process.env.HARNESS_SURFACE_SHA256);
+		let persisted = false;
+		try {
+			await writeLoopRecoveryReceipt(ctx.cwd, receipt);
+			persisted = true;
+			(globalThis as Record<string, unknown>).__pi_loop_recovery_receipt = receipt;
+		} catch { /* abort remains the safe outcome even if private persistence fails */ }
+		record("failure-episode", "receipt", { persisted, strategy_count: receipt.strategy_family_hashes.length });
+		abortArmed = true;
+		ctx.ui.notify(`loop-breaker: semantic tier 3 — aborting run (failure_class=${failureClass})`, "error");
+		ctx.abort();
+		return 3;
 	}
 
 	function reconcileExactGate(): void {
@@ -404,6 +531,7 @@ export default function (pi: ExtensionAPI) {
 		// session-blackboard deliberately cleared the board to prevent exactly that.
 		// (No gate impact: real_gate.sh runs one session per pi process.)
 		sessionSeenCalls.clear();
+		sessionCallCounts.clear();
 		sessionRepeats = 0;
 		sessionRepeatFired = false;
 		delete (globalThis as Record<string, unknown>).__pi_lb_state;
@@ -411,9 +539,43 @@ export default function (pi: ExtensionAPI) {
 		episodeTracker.reset();
 		episodeArgs.clear();
 		episodeProcessed.clear();
+		episodeTierFired.clear();
+		exactStrategies.clear();
+		sessionTierFired.clear();
+		pendingAction = null;
 		providerRequest = 0;
 		providerRecovered = true;
 		delete (globalThis as Record<string, unknown>).__pi_failure_episode_state;
+		delete (globalThis as Record<string, unknown>).__pi_loop_recovery_receipt;
+	});
+
+	pi.registerCommand("loop-status", {
+		description: "Show the redacted semantic failure-episode and repeat-tail state.",
+		handler: async (_args, ctx) => {
+			const active = episodeTracker.activeEpisodes();
+			const lines = [
+				`loop-status: mode=${EPISODE_MODE}; active=${active.length}; session_repeats=${sessionRepeats}; exact_walls=${ep.blocked.size}`,
+				...active.slice(0, 8).map((episode) =>
+					`- failure_class=${episode.failureClass}; tool_family=${episode.toolFamily}; attempts=${episode.count}; recovery=pending`),
+			];
+			ctx.ui.notify(lines.join("\n"), active.length > 0 ? "warning" : "info");
+		},
+	});
+
+	pi.registerCommand("loop-resume", {
+		description: "Clear semantic episode walls and send one deterministic recovery instruction.",
+		handler: async (_args, _ctx) => {
+			const blocked = ep.blocked.size;
+			ep.blocked.clear();
+			abortArmed = false;
+			pendingAction = null;
+			const cleared = episodeTracker.clearActive();
+			recordRecovery(cleared);
+			const message = "[loop-breaker] Recovery walls cleared. Re-ground from the current plan and exact-gate state; use a different strategy or report Blocked.";
+			record("failure-episode", "resumed", { cleared: cleared.length, blocked, injected_chars: message.length });
+			publishEpisodes();
+			pi.sendUserMessage(message, { deliverAs: "steer" });
+		},
 	});
 
 	pi.on("tool_execution_start", async (event) => {
@@ -462,7 +624,12 @@ export default function (pi: ExtensionAPI) {
 	pi.on("agent_settled", async () => {
 		reconcileExactGate();
 		if (EPISODE_MODE === "off") return;
-		episodeTracker.settle();
+		const settled = episodeTracker.settle();
+		for (const episode of settled) {
+			episodeTierFired.delete(episode.id);
+			exactStrategies.delete(episode.id);
+		}
+		pendingAction = null;
 		const summary = episodeTracker.snapshot();
 		record("failure-episode", "settled", {
 			total_episodes: summary.totalEpisodes,
@@ -587,10 +754,38 @@ export default function (pi: ExtensionAPI) {
 		// the episode — grinding is exactly the pattern that resets every few turns.
 		// Uses fpKey so read pagination (offset 0, 2000, 4000…) is not a repeat.
 		sessionRepeats += tallySessionRepeats(sessionSeenCalls, toolCalls);
+		for (const call of toolCalls) {
+			const fp = fpKey(call.name, call.args);
+			sessionCallCounts.set(fp, (sessionCallCounts.get(fp) ?? 0) + 1);
+		}
 		// Published for the session blackboard (globalThis bus — module state is
 		// per-extension under pi's loader, see __pi_lb_outcome_at above).
 		(globalThis as Record<string, unknown>).__pi_lb_state = { sessionRepeats, seen: sessionSeenCalls.size, streak: ep.streak };
-		if (!sessionRepeatFired && sessionRepeats >= SESSION_REPEAT_LIMIT) {
+		const sessionThresholds = EPISODE_MODE === "enforce"
+			? sessionEpisodeThresholds()
+			: [SESSION_SHADOW_T1, SESSION_SHADOW_T2, SESSION_SHADOW_T3] as [number, number, number];
+		const sessionTier = tierForCount(sessionRepeats, ...sessionThresholds);
+		let newSessionTier: LoopTier = 0;
+		for (const observedTier of [1, 2, 3] as const) {
+			if (observedTier > sessionTier || sessionTierFired.has(observedTier)) continue;
+			sessionTierFired.add(observedTier);
+			newSessionTier = observedTier;
+			record("failure-episode", "tier-observed", {
+				tier: observedTier, detector: "session", mode: EPISODE_MODE,
+				failure_class: "unknown", count: sessionRepeats, session_repeats: sessionRepeats,
+			});
+		}
+		if (EPISODE_MODE === "enforce" && newSessionTier > 0) {
+			mergePending({
+				tier: newSessionTier as Exclude<LoopTier, 0>, detector: "session", episode: null,
+				exactRepeatedFps: [...sessionCallCounts.entries()].filter(([, count]) => count > 1).map(([fp]) => fp),
+				count: sessionRepeats,
+			});
+		}
+		const episodeIntervention = await applyPendingAction(ctx, event.turnIndex);
+		if (episodeIntervention === 3) return;
+
+		if (EPISODE_MODE !== "enforce" && !sessionRepeatFired && sessionRepeats >= SESSION_REPEAT_LIMIT) {
 			sessionRepeatFired = true; // steer once per session, never nag
 			record("loop-breaker", "session-repeat", { repeats: sessionRepeats, turnIndex: event.turnIndex });
 			const msg = steerText(
@@ -657,6 +852,7 @@ export default function (pi: ExtensionAPI) {
 			t1: REPEAT_T1, t2: REPEAT_T2, t3: REPEAT_T3, streakSoft: STREAK_SOFT, streakHard: STREAK_HARD,
 		});
 		const tier = d.tier;
+		if (episodeIntervention > 0) return;
 
 		if (tier === 0 || ep.steered.has(tier)) return;
 		for (let l = 1; l <= tier; l++) ep.steered.add(l);

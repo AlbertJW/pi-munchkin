@@ -81,6 +81,24 @@ test("a later trigger does not undo a manual subagent disable", async () => {
 	} finally { run.restore(); }
 });
 
+test("semantic tier two activates additively once and respects a later manual disable", async () => {
+	const run = await dynamic();
+	try {
+		record("failure-episode", "intervention", {
+			tier: 2, detector: "semantic", failure_class: "permission", count: 4,
+			session_repeats: 3, injected_chars: 10, turnIndex: 2,
+		});
+		assert.ok(run.active().includes("subagent"));
+		assert.ok(run.active().includes("read"), "activation remains additive");
+		run.setActive(run.active().filter((name) => name !== "subagent"));
+		record("failure-episode", "intervention", {
+			tier: 2, detector: "semantic", failure_class: "permission", count: 5,
+			session_repeats: 4, injected_chars: 10, turnIndex: 3,
+		});
+		assert.equal(run.active().includes("subagent"), false);
+	} finally { run.restore(); }
+});
+
 test("ambient rollback mode leaves the tool surface untouched", async () => {
 	const previous = process.env.MUNCHKIN_TOOL_ACTIVATION;
 	process.env.MUNCHKIN_TOOL_ACTIVATION = "ambient";

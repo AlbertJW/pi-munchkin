@@ -71,6 +71,16 @@ export const EVENT_CATALOG = {
 		total_episodes: "number", total_failures: "number", longest_episode: "number",
 		semantic_failure_overrun: "number", settled_without_recovery: "number",
 	},
+	"failure-episode/tier-observed": {
+		tier: "number", detector: "string", mode: "string", failure_class: "string",
+		count: "number", session_repeats: "number",
+	},
+	"failure-episode/intervention": {
+		tier: "number", detector: "string", failure_class: "string", count: "number",
+		session_repeats: "number", injected_chars: "number", turnIndex: "number",
+	},
+	"failure-episode/receipt": { persisted: "boolean", strategy_count: "number" },
+	"failure-episode/resumed": { cleared: "number", blocked: "number", injected_chars: "number" },
 	"drift-scanner/review-skipped": { why: "string" },
 	"drift-scanner/review-start": { diffChars: "number", truncated: "boolean" },
 	"drift-scanner/review-null": { stopReason: "string", textLen: "number" },

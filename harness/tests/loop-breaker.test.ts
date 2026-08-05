@@ -3,7 +3,8 @@ import test from "node:test";
 import { existsSync, mkdtempSync, readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { thresh, resolveStopMode, fpKey, decideTier, tallySessionRepeats, type Thresholds } from "../extensions/loop-breaker.ts";
+import { thresh, resolveStopMode, fpKey, decideTier, sessionEpisodeThresholds, tallySessionRepeats, type Thresholds } from "../extensions/loop-breaker.ts";
+import { loopRecoveryPath } from "../lib/loop-recovery.ts";
 import { fire, makeFakePi } from "./integration-harness.ts";
 
 const TH: Thresholds = { t1: 2, t2: 3, t3: 5, streakSoft: 8, streakHard: 20 }; // local defaults
@@ -110,6 +111,11 @@ test("session repeats do NOT count read pagination or genuinely new work", () =>
 	assert.equal(repeats, 0, "paginating a large file and doing new work is not grinding");
 	repeats += tallySessionRepeats(seen, [{ name: "read", args: { path: "big.ts", offset: 2000 } }]);
 	assert.equal(repeats, 1, "a verbatim re-read IS a repeat");
+});
+
+test("LB_SESSION_REPEAT remains a compatibility alias for enforced tier one", () => {
+	assert.deepEqual(sessionEpisodeThresholds({ LB_SESSION_REPEAT: "9" } as NodeJS.ProcessEnv), [9, 11, 28]);
+	assert.deepEqual(sessionEpisodeThresholds({ LB_SESSION_T1: "8", LB_SESSION_REPEAT: "20" } as NodeJS.ProcessEnv), [8, 11, 28]);
 });
 
 test("successful read-only bash output containing FAILED is never an outcome loop", async () => {
@@ -334,5 +340,185 @@ test("agent_start drops the steer anchor — turns_since can never go negative",
 	} finally {
 		if (prev === undefined) delete process.env.TELEMETRY_FILE; else process.env.TELEMETRY_FILE = prev;
 		delete g.__pi_lb_state;
+	}
+});
+
+test("semantic tiers steer at two/four and abort silently at six with a private receipt", async () => {
+	const root = mkdtempSync(join(tmpdir(), "lb-enforce-"));
+	const cwd = join(root, "work");
+	const previous = { ...process.env };
+	process.env.LOOP_EPISODE_MODE = "enforce";
+	process.env.PI_CODING_AGENT_DIR = root;
+	process.env.LB_REPEAT_T1 = "99";
+	process.env.LB_REPEAT_T2 = "100";
+	process.env.LB_REPEAT_T3 = "101";
+	process.env.LB_OUTCOME_T1 = "99";
+	try {
+		const fp = makeFakePi();
+		const mod = await import(`../extensions/loop-breaker.ts?semantic-enforce=${Date.now()}-${Math.random()}`);
+		mod.default(fp.pi as never);
+		let aborts = 0;
+		const ctx = { cwd, ui: { notify() {} }, abort() { aborts += 1; } };
+		await fire(fp, "session_start", {}, ctx);
+		for (let index = 1; index <= 6; index++) {
+			const id = `gate-${index}`;
+			const command = index <= 2 ? "npm test -- --shard=repeat" : `npm test -- --shard=${index}`;
+			await fire(fp, "tool_execution_start", { toolCallId: id, toolName: "bash", args: { command } }, ctx);
+			await fire(fp, "tool_execution_end", {
+				toolCallId: id, toolName: "bash", isError: true,
+				result: { content: [{ type: "text", text: `error TS1234 DUMMY_FAILURE_${index}` }] },
+			}, ctx);
+			await fire(fp, "turn_end", {
+				turnIndex: index, toolResults: [],
+				message: { role: "assistant", provider: "local-llama", content: [
+					{ type: "toolCall", id, name: "bash", arguments: { command } },
+				] },
+			}, ctx);
+		}
+		assert.equal(fp.sent.length, 2, "tier three injects no automatic continuation");
+		assert.match(fp.sent[0]!, /failure_class=compile_or_lint/);
+		assert.match(fp.sent[1]!, /Delegate or report Blocked/);
+		assert.equal(aborts, 1);
+		const raw = readFileSync(loopRecoveryPath(cwd, process.env), "utf8");
+		assert.equal(raw.includes("npm test"), false);
+		assert.equal(raw.includes("DUMMY_FAILURE"), false);
+		assert.equal(raw.includes(cwd), false);
+		assert.equal(raw.includes("endpoint"), false);
+		const repeated = await fire(fp, "tool_call", {
+			toolName: "bash", input: { command: "npm test -- --shard=repeat" },
+		}, ctx) as { block?: boolean } | undefined;
+		const alternative = await fire(fp, "tool_call", {
+			toolName: "bash", input: { command: "npm test -- --shard=new-strategy" },
+		}, ctx) as { block?: boolean } | undefined;
+		assert.equal(repeated?.block, true, "only an exact previously repeated call is walled");
+		assert.equal(alternative, undefined, "a new call in the semantic family remains allowed");
+		await fp.commands.get("loop-resume").handler("", ctx);
+		assert.equal(await fire(fp, "tool_call", {
+			toolName: "bash", input: { command: "npm test -- --shard=repeat" },
+		}, ctx), undefined, "manual resume clears the exact-call wall");
+	} finally {
+		for (const key of ["LOOP_EPISODE_MODE", "PI_CODING_AGENT_DIR", "LB_REPEAT_T1", "LB_REPEAT_T2", "LB_REPEAT_T3", "LB_OUTCOME_T1"]) {
+			if (previous[key] === undefined) delete process.env[key]; else process.env[key] = previous[key];
+		}
+	}
+});
+
+test("coincident semantic and cumulative tiers produce one highest-tier intervention", async () => {
+	const previous = { ...process.env };
+	Object.assign(process.env, {
+		LOOP_EPISODE_MODE: "enforce", LB_EPISODE_T1: "3", LB_EPISODE_T2: "50", LB_EPISODE_T3: "60",
+		LB_SESSION_T1: "2", LB_SESSION_T2: "50", LB_SESSION_T3: "60",
+		LB_REPEAT_T1: "99", LB_REPEAT_T2: "100", LB_REPEAT_T3: "101", LB_OUTCOME_T1: "99",
+	});
+	try {
+		const fp = makeFakePi();
+		const mod = await import(`../extensions/loop-breaker.ts?coincident=${Date.now()}-${Math.random()}`);
+		mod.default(fp.pi as never);
+		const ctx = { cwd: "/tmp", ui: { notify() {} }, abort() {} };
+		await fire(fp, "session_start", {}, ctx);
+		for (let index = 1; index <= 3; index++) {
+			const id = `semantic-${index}`;
+			const command = `npm test -- --shard=${index}`;
+			await fire(fp, "tool_execution_start", { toolCallId: id, toolName: "bash", args: { command } }, ctx);
+			await fire(fp, "tool_execution_end", {
+				toolCallId: id, toolName: "bash", isError: true,
+				result: { content: [{ type: "text", text: "error TS1234" }] },
+			}, ctx);
+			await fire(fp, "turn_end", {
+				turnIndex: index, toolResults: [],
+				message: { role: "assistant", provider: "local-llama", content: [
+					{ type: "toolCall", id, name: "bash", arguments: { command } },
+					{ type: "toolCall", id: `read-${index}`, name: "read", arguments: { path: "same.ts" } },
+				] },
+			}, ctx);
+		}
+		assert.equal(fp.sent.length, 1);
+		assert.match(fp.sent[0]!, /failure_class=compile_or_lint/);
+		await fire(fp, "turn_end", {
+			turnIndex: 4, toolResults: [],
+			message: { role: "assistant", provider: "local-llama", content: [
+				{ type: "toolCall", id: "read-4", name: "read", arguments: { path: "same.ts" } },
+			] },
+		}, ctx);
+		assert.equal(fp.sent.length, 1, "a reached session tier intervenes once, not every later turn");
+	} finally {
+		for (const key of [
+			"LOOP_EPISODE_MODE", "LB_EPISODE_T1", "LB_EPISODE_T2", "LB_EPISODE_T3",
+			"LB_SESSION_T1", "LB_SESSION_T2", "LB_SESSION_T3",
+			"LB_REPEAT_T1", "LB_REPEAT_T2", "LB_REPEAT_T3", "LB_OUTCOME_T1",
+		]) {
+			if (previous[key] === undefined) delete process.env[key]; else process.env[key] = previous[key];
+		}
+	}
+});
+
+test("shadow mode observes the measured 7/11/28 session tail without intervening", async () => {
+	const telemetry = join(mkdtempSync(join(tmpdir(), "lb-shadow-")), "events.jsonl");
+	const previous = { ...process.env };
+	Object.assign(process.env, {
+		LOOP_EPISODE_MODE: "shadow", TELEMETRY_FILE: telemetry, LB_SESSION_REPEAT: "100",
+		LB_REPEAT_T1: "99", LB_REPEAT_T2: "100", LB_REPEAT_T3: "101",
+		LB_STREAK_SOFT: "99", LB_STREAK_HARD: "100",
+	});
+	delete process.env.LB_SESSION_T1;
+	delete process.env.LB_SESSION_T2;
+	delete process.env.LB_SESSION_T3;
+	try {
+		const fp = makeFakePi();
+		const mod = await import(`../extensions/loop-breaker.ts?shadow-tail=${Date.now()}-${Math.random()}`);
+		mod.default(fp.pi as never);
+		let aborts = 0;
+		const ctx = { cwd: "/tmp", ui: { notify() {} }, abort() { aborts += 1; } };
+		await fire(fp, "session_start", {}, ctx);
+		for (let index = 0; index < 29; index++) {
+			await fire(fp, "turn_end", {
+				turnIndex: index, toolResults: [],
+				message: { role: "assistant", provider: "local-llama", content: [
+					{ type: "toolCall", id: `read-${index}`, name: "read", arguments: { path: "same.ts" } },
+				] },
+			}, ctx);
+		}
+		const rows = readFileSync(telemetry, "utf8").trim().split("\n").map((line) => JSON.parse(line));
+		const observed = rows.filter((row) => row.ext === "failure-episode" && row.kind === "tier-observed" && row.detector === "session");
+		assert.deepEqual(observed.map((row) => [row.tier, row.count]), [[1, 7], [2, 11], [3, 28]]);
+		assert.equal(fp.sent.length, 0);
+		assert.equal(aborts, 0);
+	} finally {
+		for (const key of [
+			"LOOP_EPISODE_MODE", "TELEMETRY_FILE", "LB_SESSION_REPEAT", "LB_SESSION_T1", "LB_SESSION_T2", "LB_SESSION_T3",
+			"LB_REPEAT_T1", "LB_REPEAT_T2", "LB_REPEAT_T3",
+			"LB_STREAK_SOFT", "LB_STREAK_HARD",
+		]) {
+			if (previous[key] === undefined) delete process.env[key]; else process.env[key] = previous[key];
+		}
+	}
+});
+
+test("loop status is redacted and loop resume clears active episodes with one deterministic message", async () => {
+	const previous = process.env.LOOP_EPISODE_MODE;
+	process.env.LOOP_EPISODE_MODE = "shadow";
+	try {
+		const fp = makeFakePi();
+		const mod = await import(`../extensions/loop-breaker.ts?commands=${Date.now()}-${Math.random()}`);
+		mod.default(fp.pi as never);
+		const notices: string[] = [];
+		const ctx = { cwd: "/tmp", ui: { notify(message: string) { notices.push(message); } }, abort() {} };
+		await fire(fp, "session_start", {}, ctx);
+		await fire(fp, "tool_execution_start", {
+			toolCallId: "private", toolName: "edit", args: { path: "/private/DUMMY_SECRET_PATH" },
+		}, ctx);
+		await fire(fp, "tool_execution_end", {
+			toolCallId: "private", toolName: "edit", isError: true,
+			result: { content: [{ type: "text", text: "permission denied DUMMY_SECRET_ERROR" }] },
+		}, ctx);
+		await fp.commands.get("loop-status").handler("", ctx);
+		assert.match(notices.at(-1)!, /failure_class=permission/);
+		assert.equal(notices.at(-1)!.includes("DUMMY_SECRET"), false);
+		await fp.commands.get("loop-resume").handler("", ctx);
+		assert.equal(fp.sent.at(-1), "[loop-breaker] Recovery walls cleared. Re-ground from the current plan and exact-gate state; use a different strategy or report Blocked.");
+		const snapshot = (globalThis as Record<string, any>).__pi_failure_episode_state;
+		assert.equal(snapshot.active.length, 0);
+	} finally {
+		if (previous === undefined) delete process.env.LOOP_EPISODE_MODE; else process.env.LOOP_EPISODE_MODE = previous;
 	}
 });
