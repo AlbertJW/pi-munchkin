@@ -2267,3 +2267,50 @@ What this settles and doesn't:
 
 Corpus note: rows bind the maple fingerprint + the current live surface; comparable only within
 that pair. maple-20b's registry caveat ("weak on agentic per card") is now measured, not quoted.
+
+---
+
+## 2026-08-05 (later) — settlement/episode series landed; deep QA verdict: CLEAN
+
+Three commits (`0c44b09..5013e85`, ~1,700 lines) extended the loop-breaker with a **semantic
+failure-episode instrument** and added **runtime-truth**. Deep QA review, done sequentially
+against source with executed counterfactuals:
+
+**What the series is.** (1) `lib/failure-episodes.ts` + loop-breaker integration: failures are
+classified into a stable taxonomy (schema/policy/permission/not-found/timeout/provider/
+verification/edit-conflict/…), keyed by (class, tool family, hashed target, hashed plan item),
+and tracked as episodes with strategy-diversity counts. `LOOP_EPISODE_MODE=shadow` (default)
+**records only** — tier observations at the measured 7/11/28 session tail and 2/4/6 semantic
+ladder; `enforce` (dark, separate adoption gate) steers at tiers 1–2 and aborts at tier 3 with
+a private, fully-hashed recovery receipt (0600, atomic, under the agent dir). `/loop-status` and
+`/loop-resume` are the operator surface. (2) `runtime-truth.ts`: per-request provider timing
+(headers/first-token/stream/settlement ms + status only) emitted after `agent_settled`, plus
+`/munchkin-doctor` (redacted posture report). (3) drift-scanner and session-blackboard moved
+`agent_end` → `agent_settled`, aligning with Pi's settlement semantics.
+
+**QA findings:**
+
+- **The dark-discipline invariant is genuinely pinned, with defense in depth.** Removing either
+  single `enforce` guard (semantic-path merge, or the apply site) changes nothing — the other
+  guard absorbs it — and removing **both** guards on the session path makes the
+  "shadow mode … without intervening" test fail. Counterfactuals executed, restored, suite
+  green. This is the right structure: redundant guards plus a behavioural test on the invariant
+  rather than on any one guard.
+- **The c50 mistake is not repeated**: `tool_execution_start` genuinely carries `args` in
+  pi 0.83 (`agent-session.js` emit site read directly), and result processing is deduplicated
+  across `tool_execution_end`/`tool_result` by callId.
+- **Privacy posture is strong throughout**: episode state is hashes and class names only (a
+  test asserts no raw arguments/output in snapshots); the recovery receipt is bounded hashes +
+  booleans; runtime-truth records only timings and status codes; the doctor output is asserted
+  to contain no raw settings, paths, or endpoints; the one telemetry-validator widening
+  (`request_to_headers_ms`) is type-constrained to number|null.
+- **Rollout discipline held**: source is pushed, the live mirror deliberately does NOT have the
+  series (10 first-party files differ, the new files absent) — per SURFACE_BOUNDARIES a row is
+  appended only at an approved rollout. The failure-episode calibration prereg is marked
+  PREPARED, not approved.
+- Observations, no action: `classifyFailure`'s provider pattern matches the word "provider"
+  broadly (ordering makes real confusion unlikely; shadow-only today); `calls_after_second`
+  counts the failing call itself (consistent, worth knowing when reading the baseline);
+  `targetHash` normalizes doubled backslashes only (comment now says so).
+
+`npm run verify` green at **380 + 16**, optimizer PASS, secret scans clean.

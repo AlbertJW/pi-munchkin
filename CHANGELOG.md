@@ -10,6 +10,19 @@ candidates as dark). Net changes since 0.3.0; the full per-decision record is
 
 ### Added
 
+- **Semantic failure-episode instrument (2026-08-05):** failures classified into a stable
+  taxonomy and tracked as episodes keyed by (class, tool family, hashed target, hashed plan
+  item). `LOOP_EPISODE_MODE=shadow` (default) records tier observations only (7/11/28 session
+  tail, 2/4/6 semantic ladder); `enforce` stays dark behind a separate adoption gate.
+  `/loop-status`, `/loop-resume`; private hashed recovery receipts. Calibration prereg:
+  `optimizer/docs/PREREG_FAILURE_EPISODE_BASELINE_2026-08.md` (prepared, not approved).
+- **`runtime-truth` extension (2026-08-05):** per-request provider timing (headers /
+  first-token / stream / settlement ms + status only) after `agent_settled`, and
+  `/munchkin-doctor` — a redacted Pi/model/tool-provenance/sandbox posture report.
+- MLX serving backends are first-class in the optimizer's serving fingerprint
+  (`mlx_lm server`; full-artifact hash, runtime identity via lsof) — first exercised by
+  `audit-sweep`'s first-ever round (`maple20b-audit-base`, ledger 2026-08-05).
+
 - **Adopted, default-on (2026-08-03/04, human-gated):** `session-blackboard` state lens
   (default mode `steer` since 2026-08-04; `STATE_LENS=off|view|both`), `teach-hints`
   (`TEACH_HINTS=off`), `did-you-mean` (`DID_YOU_MEAN=off`), and `tool-activation`

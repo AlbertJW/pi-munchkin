@@ -105,8 +105,10 @@ export function targetHash(toolName: string, args: Record<string, unknown>): str
 	const path = typeof args.path === "string" ? args.path :
 		typeof args.file === "string" ? args.file :
 		typeof args.file_path === "string" ? args.file_path : null;
-	// Hash the complete normalized target so equal basenames in different directories
+	// Hash the complete target path so equal basenames in different directories
 	// cannot collapse into one episode. Only the digest is retained or emitted.
+	// (The replaceAll normalizes doubled backslashes — JSON-escaped Windows input —
+	// not single ones; on this POSIX-only deployment that is the whole population.)
 	if (path) return sha256(`path:${path.trim().replaceAll("\\\\", "/")}`);
 	if (toolName === "subagent" && typeof args.agent === "string") return sha256(`agent:${safeAtom(args.agent)}`);
 	return sha256(`family:${family}`);

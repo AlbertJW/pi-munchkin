@@ -24,6 +24,12 @@ adoption, deletion, live mirroring, and gate rounds are human-gated. Never touch
 
 ## 2026-08 hardening series
 
+> **2026-08-05 settlement/episode series** (`0c44b09..5013e85`, source-landed, **live rollout
+> pending its own human gate** — the mirror deliberately differs until then): semantic
+> failure-episode shadow instrument (`LOOP_EPISODE_MODE`, `/loop-status`, `/loop-resume`),
+> `runtime-truth` provider timings + `/munchkin-doctor`, drift/blackboard on `agent_settled`.
+> Deep-QA'd 2026-08-05 (ledger): clean; shadow-non-intervention counterfactually pinned.
+
 Four sequential, independently revertible branches implement the audit response:
 
 1. `codex/01-gates-loop-correctness` — `36b3f80`
@@ -59,7 +65,9 @@ across a live-mirror rollout. Record the loaded `HARNESS_SURFACE_SHA256` with ev
   experiments; `off` is the kill switch.
 - Teach hints and did-you-mean remain default-on, reversible, and mechanism-observed. No powered
   trial has established their benefit.
-- Drift review starts only after `agent_end`, aborts on a new run/shutdown, and drops stale advice.
+- Drift review starts only after the run settles (`agent_settled` as of the 2026-08-05 source
+  series; the pre-rollout live mirror still uses `agent_end`), aborts on a new run/shutdown, and
+  drops stale advice.
 - Cockpits live under `${PI_CODING_AGENT_DIR}/artifacts/session-cockpits/`, never in a project.
 - Text read/edit preflight defaults are 16 MiB (`HASHLINE_MAX_READ_BYTES`,
   `HASHLINE_MAX_EDIT_BYTES`); images above 4 MiB are refused before allocation.
