@@ -17,6 +17,7 @@ npm run surface:hash:source
 | 2026-08-04 | security, privacy, bounded I/O | `e3dfc0b` | `16b0e1495c5c708c991549c6b506d81d3993a7351a900be2d314609579ee06a0` | included in approved batch rollout; not measured separately |
 | 2026-08-04 | dynamic surface implementation | `5c0d2bc` | `48a4f31e7455a31d3320dd43f4231dd1c9ba340b6f371a13ddcbd99cab498fc8` | included in approved batch rollout; not measured separately |
 | 2026-08-04 | approved dynamic/state-lens defaults | `cbbc8fa` | `f678b84d7de71ea37daae836a70bb7e062d4f1cbf3a692eb4d2f3d25f7daf1e2` | rolled out; loaded live hash `440796cf2d555a4b09e9cfaaf8fb5f7ba451d0ce38efe2b7988bfd13c5e667ad` |
+| 2026-08-05 | settlement/episode series (semantic failure-episode shadow instrument, runtime-truth, agent_settled alignment) | `d6ed2c3` | `0336406d5547ae5842e50bc647f9745c78abed19d0c83af3d4090caf7b09b2da` | rolled out 2026-08-05; loaded live hash `ea87250f447b5c0f826ebbd5de2745b0b125a6ca3d5893b7d57294f5df7affd9` (mirror:check 82/82; live pi load confirmed) |
 
 PR 4 changes package, CI, operational tooling, and narrative. Its new mirror/secret-scan libraries
 are not imported by the runtime extension manifest, so it does not create a model-visible runtime

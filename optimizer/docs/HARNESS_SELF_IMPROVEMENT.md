@@ -2314,3 +2314,12 @@ a private, fully-hashed recovery receipt (0600, atomic, under the agent dir). `/
   `targetHash` normalizes doubled backslashes only (comment now says so).
 
 `npm run verify` green at **380 + 16**, optimizer PASS, secret scans clean.
+
+**Rollout (2026-08-05, same day, Albert-instructed):** the series merged to main (fast-forward,
+`d6ed2c3`) and rolled out per the checklist — mirror 82/82 first-party files, tests synced, a
+live `pi -p` load confirmed every extension registers cleanly (the runtime-truth `VERSION`
+value-import resolves under pi's ESM loader; the bare-tsx mirror-suite failures are the
+documented CJS-transform artifact, now 13 files instead of 8 — same class, more test files with
+value imports from the pi package). New loaded live hash recorded in `SURFACE_BOUNDARIES.md`
+(`ea87250f…`); do not pool rows across it. The shadow instrument is now collecting live
+failure-episode telemetry — the baseline the PREPARED calibration prereg needs.
