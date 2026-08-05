@@ -116,3 +116,34 @@ it a new candidate, which is what this document exists to stop doing casually.
   baseline events, like `loop-breaker/steer`.
 - `README.md` flag table, `HANDOVER.md` roster counts, and `MOTHBALLED_2026-08-03.md` updated
   to point here.
+
+---
+
+## Appendix (2026-08-05): external ideas noted, not built — hermes-agent survey
+
+Albert asked whether NousResearch's `hermes-agent` would supplement this harness. Verdict:
+**no as a framework** — it owns its own agent loop (replacement, not extension), and its core
+bet is *model-authored* memory/skills, the exact bet this corpus refuted for small models
+(blind-invention AUC 0.95; c38's fabricated completions; 1 voluntary subagent call in 942 base
+sessions). A small model curating its own skill library persists confabulation across sessions.
+Its skill-injection mechanism is governor prose with a growth rate, and prose measured harmful
+(83%→97% as it was removed).
+
+**Two ideas worth keeping as future candidate seeds, recorded here so they are not re-derived:**
+
+1. **Cross-session transcript search** (Hermes: FTS5 over past conversations + LLM summaries).
+   As a pi tool it would be bounded, deterministic retrieval — mechanism-shaped, span-tools-like.
+   Counterweight from our own corpus: it adds context to models that fail from turns and
+   context, and the median session uses ~4.9k tokens, so cross-session recall is not the
+   measured constraint. Shape: dark candidate, `SESSION_RECALL=on`, telemetry-mode exposure,
+   fires only on an explicit tool call. Plausibly useful for the *interactive* daily driver
+   before it is ever measurable on gate tasks.
+2. **The agentskills.io skill file format as a container for HUMAN-authored, trigger-scoped
+   snippets** — structurally teach-hints with a directory: deterministic trigger, fixed text,
+   per-skill kill switch. The self-improvement half (agent-curated skills) is explicitly
+   rejected; only the human-curated container shape is noted. Shape: an extension reading
+   `skills/*.md` with declarative trigger rules, dark until someone wants it.
+
+Neither is built. Neither should be built casually — both add model-visible context, so both
+would ship dark behind flags with numbered configs, and the measured constraint (repeat
+spirals) argues neither is the next thing that matters.
