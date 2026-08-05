@@ -144,6 +144,113 @@ def remote_document(model):
     return data
 
 
+def mlx_runtime_version(pid):
+    """mlx-lm version of the RUNNING server, via the site-packages it actually has
+    open (lsof). argv[0] is useless here: ps shows the resolved framework binary,
+    not the venv shim, so the venv is not recoverable from the command line
+    (measured on .venv-mlx / macOS). No code execution; read-only lsof + glob."""
+    try:
+        text = subprocess.check_output(["lsof", "-p", str(pid), "-Fn"], text=True,
+                                       stderr=subprocess.DEVNULL, timeout=10)
+    except (subprocess.SubprocessError, OSError):
+        return None
+    for line in text.splitlines():
+        if line.startswith("n") and "/site-packages/" in line:
+            sp = Path(line[1:].split("/site-packages/")[0] + "/site-packages")
+            for info in sp.glob("mlx_lm-*.dist-info"):
+                return info.name.removeprefix("mlx_lm-").removesuffix(".dist-info")
+    return None
+
+
+def mlx_fingerprint(backend, model, models, pid=None):
+    """Fingerprint an `mlx_lm server` backend into the SAME schema/contract as the
+    llama.cpp path, so pre/post stability and row authority work identically.
+
+    Field mapping is honest, not cosmetic:
+      gguf.*            -> the MLX model DIRECTORY: combined sha256 over config,
+                           tokenizer config, in-checkpoint model code (*.py) and every
+                           weight shard (all via the cached file_sha), total weight bytes
+      llama_cpp.*       -> runtime identity (key name kept for schema stability):
+                           build_info "mlx-lm==X", commit "pypi:X" — wheels carry no git
+      chat_template     -> tokenizer_config.json chat_template (or chat_template.jinja)
+      context_size      -> config.json max_position_embeddings
+      cache/mtp         -> the same "backend-default"/"disabled" idiom the llama path
+                           uses for absent flags (no KV-type or speculative flags exist)
+      decoding          -> from the server argv; repeat/presence penalty and seed are
+                           recorded at mlx_lm.server's effective defaults (1.0 / 0.0 /
+                           -1 unseeded) — the server exposes no flags for them, so the
+                           defaults ARE the serving truth, same as llama's /props
+    """
+    missing = []
+    model_dir = flag(backend, "--model")
+    artifact = {"basename": None, "size": None, "sha256": None}
+    template_digest = None
+    context_size = None
+    if model_dir and Path(model_dir).is_dir():
+        root = Path(model_dir)
+        parts, total = [], 0
+        names = sorted([q for q in root.iterdir()
+                        if q.suffix in (".safetensors", ".py", ".json") and q.is_file()],
+                       key=lambda q: q.name)
+        for q in names:
+            digest, st = file_sha(q)
+            parts.append({"name": q.name, "sha256": digest})
+            if q.suffix == ".safetensors":
+                total += st.st_size
+        artifact = {"basename": root.name, "size": total or None,
+                    "sha256": digest_json(parts) if parts else None}
+        try:
+            config = json.loads((root / "config.json").read_text())
+            context_size = config.get("max_position_embeddings")
+        except (OSError, ValueError):
+            missing.append("mlx config.json")
+        try:
+            tok = json.loads((root / "tokenizer_config.json").read_text())
+            template = tok.get("chat_template")
+            if not isinstance(template, str) and (root / "chat_template.jinja").is_file():
+                template = (root / "chat_template.jinja").read_text()
+            template_digest = digest_bytes(json.dumps(template, sort_keys=True).encode()) if template else None
+        except (OSError, ValueError):
+            pass
+    else:
+        missing.append("mlx model directory")
+    version = mlx_runtime_version(pid) if pid else None
+    decoding = {
+        "temperature": as_number(flag(backend, "--temp")),
+        "top_p": as_number(flag(backend, "--top-p")),
+        "top_k": as_number(flag(backend, "--top-k")),
+        "min_p": as_number(flag(backend, "--min-p")),
+        # mlx_lm.server exposes no server-level flags for these three; the recorded
+        # values are its effective behaviour (no penalties, unseeded), which is the
+        # same "serving truth" the llama path reads from /props defaults.
+        "repeat_penalty": 1.0,
+        "presence_penalty": 0.0,
+        "reasoning": "backend-default",
+        "reasoning_budget": "backend-default",
+        "seed": -1,
+    }
+    fingerprint = {
+        "schema": SCHEMA,
+        "runtime": "mlx-lm",
+        "model": model,
+        "requested_model": model,
+        "loaded_model": model_dir,
+        "loaded_models": sorted(str(x.get("id")) for x in models.get("data", []) if x.get("id")),
+        "gguf": artifact,
+        "llama_cpp": {"build_info": f"mlx-lm=={version}" if version else None,
+                      "commit": f"pypi:{version}" if version else None},
+        "chat_template_sha256": template_digest,
+        "router": {"type": None, "config_sha256": None},
+        "context_size": context_size,
+        "cache": {"key_type": "backend-default", "value_type": "backend-default", "ram": "backend-default"},
+        "mtp": {"type": "disabled", "depth": 0, "threshold": 0},
+        "decoding": decoding,
+        "launch_flags_sha256": digest_json(normalize_flags(backend)) if backend else None,
+        "missing": missing,
+    }
+    return fingerprint
+
+
 def capture(endpoint, model):
     if os.environ.get("SERVING_FINGERPRINT_FILE") or os.environ.get("SERVING_FINGERPRINT_URL"):
         return remote_document(model)
@@ -166,6 +273,31 @@ def capture(endpoint, model):
             backend = argv
             if alias == model:
                 break
+    if backend is None:
+        # No llama-server: an `mlx_lm server` process is a first-class backend too
+        # (maple-20b, 2026-08-05 — the zoo's first non-llama.cpp entry). Same schema,
+        # same contract, same pre/post stability semantics; see mlx_fingerprint.
+        mlx = next(((pid, argv) for pid, argv, _ in rows
+                    if "mlx_lm" in argv and "server" in argv and flag(argv, "--model")), None)
+        if mlx:
+            fingerprint = mlx_fingerprint(mlx[1], model, models, pid=mlx[0])
+            fingerprint["missing"] = sorted(set(missing + fingerprint["missing"]))
+            for _, argv, _ in rows:
+                if argv and "llama-swap" in Path(argv[0]).name:
+                    fingerprint["router"] = {"type": "llama-swap", "config_sha256": None}
+                    config = flag(argv, "--config")
+                    if config and Path(config).is_file():
+                        fingerprint["router"]["config_sha256"] = file_sha(config)[0]
+                    else:
+                        fingerprint["missing"].append("router config")
+                    break
+            else:
+                fingerprint["router"] = {"type": "direct", "config_sha256": digest_json({"type": "direct"})}
+            fingerprint["missing"] = sorted(set(fingerprint["missing"] + contract_missing(fingerprint)))
+            fingerprint["status"] = "complete" if not fingerprint["missing"] else "incomplete"
+            core = dict(fingerprint)
+            fingerprint["fingerprint_sha256"] = digest_json(core)
+            return fingerprint
     props = {}
     if backend:
         port = flag(backend, "--port")
