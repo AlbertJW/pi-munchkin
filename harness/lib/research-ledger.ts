@@ -59,6 +59,12 @@ export class PageCache {
 		return page;
 	}
 
+	/** All cached (url, page) pairs — for the cross-page quote lookup that
+	 *  auto-corrects a quote pasted from the wrong URL of a multi-read batch. */
+	entries(): [string, CachedPage][] {
+		return [...this.pages.entries()];
+	}
+
 	has(url: string): boolean {
 		return this.pages.has(url);
 	}
@@ -100,17 +106,39 @@ export function quoteContained(quote: string, pageText: string): boolean {
 	return normalizeForContainment(pageText).includes(needle);
 }
 
-export type NoteRejection = "url_not_read" | "quote_not_found";
+export type NoteRejection = "url_not_read" | "quote_not_found" | "quote_ambiguous";
 
-export function checkNote(
-	cache: PageCache,
-	url: string,
-	quote: string,
-): { ok: true; page: CachedPage } | { ok: false; reason: NoteRejection } {
-	const page = cache.get(url);
-	if (!page) return { ok: false, reason: "url_not_read" };
-	if (!quoteContained(quote, page.text)) return { ok: false, reason: "quote_not_found" };
-	return { ok: true, page };
+export type NoteVerdict =
+	| { ok: true; page: CachedPage; url: string; corrected: boolean }
+	| { ok: false; reason: "url_not_read" | "quote_not_found" }
+	| { ok: false; reason: "quote_ambiguous"; urls: string[] };
+
+/** The pipeline's verify-gate. A quote records only if it is verbatim (modulo
+ *  whitespace) in a page fetched this session — but WHICH page is decided by the
+ *  text, not by what the model typed. Run 2 measured a 62% refusal rate driven
+ *  by wrong-URL attribution: the model pasted a real quote from one page of a
+ *  multi-URL web_read batch and tagged it to a sibling URL. Per-URL containment
+ *  refused correctly but undiagnosably, and the model retried the identical
+ *  quote. So: if the quote is verbatim in the claimed page, record it there; if
+ *  it is instead in exactly ONE other fetched page, record it THERE and say so
+ *  (provenance stays true — the quote really is from a page fetched this
+ *  session); if it is in two or more pages the attribution is genuinely
+ *  ambiguous and we refuse, naming them; if it is in none, refuse. */
+export function checkNote(cache: PageCache, url: string, quote: string): NoteVerdict {
+	const claimed = cache.get(url);
+	if (claimed && quoteContained(quote, claimed.text)) {
+		return { ok: true, page: claimed, url, corrected: false };
+	}
+	const hits = cache.entries().filter(([hitUrl, page]) => hitUrl !== url && quoteContained(quote, page.text));
+	if (hits.length === 1) {
+		const [actualUrl, page] = hits[0];
+		return { ok: true, page, url: actualUrl, corrected: true };
+	}
+	if (hits.length >= 2) return { ok: false, reason: "quote_ambiguous", urls: hits.map(([u]) => u) };
+	// Nothing matched anywhere. Distinguish "never read that URL" from "read it,
+	// but this text isn't in it" for a more actionable message.
+	if (!claimed) return { ok: false, reason: "url_not_read" };
+	return { ok: false, reason: "quote_not_found" };
 }
 
 export function ledgerPath(cwd: string, startedAt: Date): string {

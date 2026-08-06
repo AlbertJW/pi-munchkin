@@ -1,13 +1,13 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { mkdtempSync, readFileSync } from "node:fs";
+import { chmodSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
 	appendToLedger, checkNote, ledgerPath, MAX_CACHE_BYTES, MAX_CACHED_PAGES,
 	normalizeForContainment, PageCache, quoteContained, renderNoteLine, sha256Hex,
 } from "../lib/research-ledger.ts";
-import { callToolRaw, fire, makeFakePi } from "./integration-harness.ts";
+import { callToolRaw, fire, makeFakePi, resetPiGlobals } from "./integration-harness.ts";
 
 // Run: cd ~/.pi/agent && TELEMETRY_FILE=$(mktemp) TELEMETRY_SOURCE=test \
 //        npx -y tsx --test tests/research-ledger.test.ts
@@ -98,4 +98,92 @@ test("research_note refuses a citation for a page never read this session", asyn
 		{ claim: "x", url: "https://ex/unread", quote: "some quote" }, dir) as { isError?: boolean; content: Array<{ text: string }> };
 	assert.equal(res.isError, true, "a note for an unread URL is refused");
 	assert.match(res.content[0].text, /was not read this session/);
+});
+
+// --- eval Run 2 fixes ---
+
+test("checkNote auto-corrects a quote pasted from the WRONG url of a batch (defect 1)", () => {
+	const cache = new PageCache();
+	cache.put("https://a", "Alpha page: the sky is blue on Tuesdays.");
+	cache.put("https://b", "Beta page: throughput was 80 tokens per second.");
+	// Model claims url=a but the quote is verbatim in b. This drove the 62% refusal storm.
+	const v = checkNote(cache, "https://a", "throughput was 80 tokens per second");
+	assert.equal(v.ok, true, "a quote verbatim in exactly one other fetched page records");
+	assert.equal(v.ok && v.url, "https://b", "recorded under the TRUE source, not the claimed url");
+	assert.equal(v.ok && v.corrected, true, "flagged as corrected");
+	// entries() exposes all cached pairs for the scan.
+	assert.equal(cache.entries().length, 2);
+});
+
+test("checkNote refuses a quote that appears in TWO pages as ambiguous, naming both", () => {
+	const cache = new PageCache();
+	cache.put("https://a", "shared boilerplate sentence here.");
+	cache.put("https://b", "shared boilerplate sentence here.");
+	const v = checkNote(cache, "https://a", "shared boilerplate sentence here");
+	// It IS verbatim in the claimed page 'a', so that path wins first — records, not ambiguous.
+	assert.equal(v.ok, true, "verbatim in the claimed page still records directly");
+	// But if claimed for a THIRD unread url, the two hits are ambiguous.
+	const v2 = checkNote(cache, "https://c", "shared boilerplate sentence here");
+	assert.equal(v2.ok, false);
+	assert.equal(!v2.ok && v2.reason, "quote_ambiguous");
+	assert.deepEqual(!v2.ok && "urls" in v2 ? v2.urls.sort() : [], ["https://a", "https://b"]);
+});
+
+test("a fabricated quote in NO fetched page is still refused (the anti-hallucination invariant holds)", () => {
+	const cache = new PageCache();
+	cache.put("https://a", "real content only.");
+	const v = checkNote(cache, "https://a", "invented text that appears nowhere");
+	assert.equal(v.ok, false);
+	assert.equal(!v.ok && v.reason, "quote_not_found");
+});
+
+/** A mock ketch binary whose scrape returns two distinct pages, so a real
+ *  web_read populates the cache and increments the reads counter offline. */
+function mockKetchBin(dir: string): string {
+	const file = join(dir, "ketch-mock");
+	writeFileSync(file, `#!/bin/sh
+case "$1" in
+  version) printf 'ketch v0.12.0\\n' ;;
+  scrape) printf '[{"url":"https://example.com/a","title":"A","markdown":"page a content"}]\\n' ;;
+  *) exit 2 ;;
+esac
+`);
+	chmodSync(file, 0o755);
+	return file;
+}
+
+test("wrap-up steer fires after reads with zero notes; silent once a note is recorded (defect 3)", async () => {
+	const dir = mkdtempSync(join(tmpdir(), "rl-steer-"));
+	const prevBin = process.env.KETCH_BIN;
+	process.env.KETCH_BIN = mockKetchBin(dir);
+	const ctxFor = { cwd: dir, ui: { notify() {} } };
+	const wrap = { turnIndex: 9, message: { role: "assistant", content: [{ type: "text", text: "Here's my answer." }] }, toolResults: [] };
+	try {
+		// Reads>0, notes=0 → steer on the text-only wrap-up.
+		const fp = await loadKetch(true);
+		delete (globalThis as Record<string, unknown>).__pi_ketch_version_checks_v1;
+		await fire(fp, "session_start", {}, ctxFor);
+		await callToolRaw(fp, "web_read", { urls: ["https://example.com/a"] }, dir); // reads -> 1
+		await fire(fp, "turn_end", wrap, ctxFor);
+		assert.ok(fp.sent.some((m) => m.includes("recorded no verified citations")),
+			"a wrap-up after reads with no notes must steer once");
+		// A second wrap-up must not nag again.
+		const before = fp.sent.length;
+		await fire(fp, "turn_end", { ...wrap, turnIndex: 10 }, ctxFor);
+		assert.equal(fp.sent.length, before, "steer fires at most once per session");
+		resetPiGlobals();
+
+		// Reads>0 AND a note recorded → no steer (don't nag a compliant run).
+		const fp2 = await loadKetch(true);
+		delete (globalThis as Record<string, unknown>).__pi_ketch_version_checks_v1;
+		await fire(fp2, "session_start", {}, ctxFor);
+		await callToolRaw(fp2, "web_read", { urls: ["https://example.com/a"] }, dir);
+		await callToolRaw(fp2, "research_note", { claim: "c", url: "https://example.com/a", quote: "page a content" }, dir);
+		await fire(fp2, "turn_end", wrap, ctxFor);
+		assert.equal(fp2.sent.some((m) => m.includes("recorded no verified citations")), false,
+			"a run that recorded a note is not nagged");
+	} finally {
+		if (prevBin === undefined) delete process.env.KETCH_BIN; else process.env.KETCH_BIN = prevBin;
+		resetPiGlobals();
+	}
 });

@@ -124,6 +124,8 @@ export const EVENT_CATALOG = {
 	// ledger_write_failed.
 	"research/note": { ok: "boolean", reason_class: "string", quote_chars: "number" },
 	"research/run-summary": { searches: "number", reads: "number", notes: "number", notes_rejected: "number", cache_hits: "number" },
+	// Fired once when an answer wraps up after web reads with zero recorded notes.
+	"research/wrap-steer": { reads: "number", notes: "number", injected_chars: "number" },
 	"micro-gate/slop-fired": { files: "number", findings: "number", injected_chars: "number" },
 	"micro-gate/slop-passed": { files: "number", checked: "number" },
 	"micro-gate/slop-checker-error": { file: "string", ...failure },

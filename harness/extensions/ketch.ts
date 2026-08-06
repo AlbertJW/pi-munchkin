@@ -131,6 +131,7 @@ export default function (pi: ExtensionAPI) {
 	let counts = { searches: 0, reads: 0, notes: 0, notesRejected: 0, cacheHits: 0 };
 	let noteCount = 0;
 	let activeLedgerPath: string | null = null;
+	let wrapSteerFired = false;
 	function publishResearchState(): void {
 		if (!LEDGER_ENABLED) return;
 		(globalThis as Record<string, unknown>).__pi_research_state = { ...counts };
@@ -145,7 +146,25 @@ export default function (pi: ExtensionAPI) {
 			counts = { searches: 0, reads: 0, notes: 0, notesRejected: 0, cacheHits: 0 };
 			noteCount = 0;
 			activeLedgerPath = null;
+			wrapSteerFired = false;
 			delete (globalThis as Record<string, unknown>).__pi_research_state;
+		});
+		// The opt-in hole (eval Run 2, defect 3): research_note is a tool the model
+		// must CHOOSE to call, and this corpus's finding is that small models don't
+		// choose (1 voluntary subagent call in 942 base sessions). On q8/B the model
+		// answered from unrecorded web reads and misattributed provenance, with the
+		// verifier never engaged. Make the ABSENCE visible: on a text-only wrap-up
+		// turn after reads with zero notes, steer once — the same shape as
+		// verify-gate's "files changed, nothing verified" nag. Additive, one fire
+		// per session, dark behind the flag.
+		pi.on("turn_end", async (event) => {
+			if (event.message?.role !== "assistant") return;
+			const hasToolCall = (event.message.content ?? []).some((b: { type?: unknown }) => b.type === "toolCall");
+			if (hasToolCall || wrapSteerFired || counts.reads === 0 || counts.notes > 0) return;
+			wrapSteerFired = true;
+			const msg = "You read web pages but recorded no verified citations. For each material claim, call research_note(claim, url, quote) with a short quote copied from the page — or mark the claim [unverified]. Do not present unrecorded web claims as established fact.";
+			record("research", "wrap-steer", { reads: counts.reads, notes: counts.notes, injected_chars: msg.length });
+			pi.sendUserMessage(msg, { deliverAs: "steer" });
 		});
 		pi.on("agent_settled", async () => {
 			if (counts.searches + counts.reads + counts.notes + counts.notesRejected === 0) return;
@@ -345,15 +364,22 @@ export default function (pi: ExtensionAPI) {
 					record("research", "note", { ok: false, reason_class: verdict.reason, quote_chars: params.quote.length });
 					const reason = verdict.reason === "url_not_read"
 						? "That URL was not read this session — web_read it first, then quote from what it returned."
-						: "Quote not found verbatim in the fetched text of that URL. Copy the quote exactly from the web_read output (whitespace differences are tolerated; wording differences are not).";
+						: verdict.reason === "quote_ambiguous"
+							? `That exact quote appears in more than one page you read (${verdict.urls.join(", ")}), so its source is ambiguous. Quote a longer, distinctive span that appears in only one of them.`
+							: "Quote not found verbatim in ANY page you read this session. Copy a short span exactly from the web_read output (whitespace differences are tolerated; wording differences are not). If you cannot, mark the claim [unverified] instead of retrying the same quote.";
 					return { content: [{ type: "text" as const, text: reason }], isError: true, details: { reason_class: verdict.reason } };
 				}
+				// The quote's TRUE source, which may differ from what the model typed
+				// (a quote pasted from the wrong URL of a multi-read batch). Record
+				// under the true source — provenance stays honest and the model stops
+				// retrying a "wrong" quote that was actually right.
+				const sourceUrl = verdict.url;
 				try {
 					if (!activeLedgerPath) activeLedgerPath = ledgerPath(ctx.cwd, new Date());
 					noteCount += 1;
 					appendToLedger(
 						activeLedgerPath,
-						renderNoteLine(noteCount, params.claim, params.url, params.quote, verdict.page),
+						renderNoteLine(noteCount, params.claim, sourceUrl, params.quote, verdict.page),
 						"# Research ledger\n\nEvery entry below passed the verbatim-quote check against a page fetched this session.\n\n",
 					);
 				} catch {
@@ -364,8 +390,11 @@ export default function (pi: ExtensionAPI) {
 				}
 				counts.notes += 1;
 				publishResearchState();
-				record("research", "note", { ok: true, reason_class: "ok", quote_chars: params.quote.length });
-				return text(`recorded #${noteCount} (${counts.notes} verified note${counts.notes === 1 ? "" : "s"} this session; ledger: ${activeLedgerPath})${budgetFooter()}`, { note: noteCount });
+				record("research", "note", { ok: true, reason_class: verdict.corrected ? "corrected" : "ok", quote_chars: params.quote.length });
+				const note = verdict.corrected
+					? `recorded #${noteCount} under ${sourceUrl} — that quote is from there, not the URL you typed; cite ${sourceUrl} for it. (${counts.notes} verified this session)`
+					: `recorded #${noteCount} (${counts.notes} verified note${counts.notes === 1 ? "" : "s"} this session; ledger: ${activeLedgerPath})`;
+				return text(note + budgetFooter(), { note: noteCount, corrected: verdict.corrected });
 			},
 		}),
 	);
