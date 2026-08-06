@@ -16,6 +16,9 @@ import {
 	type KetchProcessResult,
 } from "../lib/ketch-runtime.ts";
 import { resolvePublicHttpUrl } from "../lib/public-url.ts";
+import {
+	appendToLedger, checkNote, ledgerPath, PageCache, renderNoteLine, SKILL_BUDGET,
+} from "../lib/research-ledger.ts";
 import { record } from "../lib/telemetry.ts";
 
 // Ketch is the host-side network adapter for local models. The steady-state
@@ -23,6 +26,11 @@ import { record } from "../lib/telemetry.ts";
 // progressively-disclosed deep-research skill. Default-on, with one emergency
 // kill switch for offline/private sessions.
 const ENABLED = process.env.KETCH !== "off";
+// Dark (RESEARCH_LEDGER=on): the verified-citation pipeline — session page
+// cache, the research_note tool, budget footers, run-summary telemetry. With
+// the flag unset, ketch's behaviour is byte-identical to before the pipeline
+// existed (pinned by a test).
+const LEDGER_ENABLED = process.env.RESEARCH_LEDGER === "on";
 const KETCH_BIN = process.env.KETCH_BIN || "ketch";
 const PRIMARY_BACKEND = /^[a-z0-9_-]+$/i.test(process.env.KETCH_BACKEND || "")
 	? process.env.KETCH_BACKEND as string
@@ -118,6 +126,36 @@ async function invoke(args: string[], timeoutMs: number, signal?: AbortSignal): 
 export default function (pi: ExtensionAPI) {
 	if (!ENABLED) return;
 
+	// --- research-ledger session state (all inert unless RESEARCH_LEDGER=on) ---
+	const pageCache = new PageCache();
+	let counts = { searches: 0, reads: 0, notes: 0, notesRejected: 0, cacheHits: 0 };
+	let noteCount = 0;
+	let activeLedgerPath: string | null = null;
+	function publishResearchState(): void {
+		if (!LEDGER_ENABLED) return;
+		(globalThis as Record<string, unknown>).__pi_research_state = { ...counts };
+	}
+	function budgetFooter(): string {
+		if (!LEDGER_ENABLED) return "";
+		return `\n\nresearch budget: searches ${counts.searches}/${SKILL_BUDGET.searches} · reads ${counts.reads}/${SKILL_BUDGET.reads} · notes ${counts.notes}`;
+	}
+	if (LEDGER_ENABLED) {
+		pi.on("session_start", async () => {
+			pageCache.clear();
+			counts = { searches: 0, reads: 0, notes: 0, notesRejected: 0, cacheHits: 0 };
+			noteCount = 0;
+			activeLedgerPath = null;
+			delete (globalThis as Record<string, unknown>).__pi_research_state;
+		});
+		pi.on("agent_settled", async () => {
+			if (counts.searches + counts.reads + counts.notes + counts.notesRejected === 0) return;
+			record("research", "run-summary", {
+				searches: counts.searches, reads: counts.reads, notes: counts.notes,
+				notes_rejected: counts.notesRejected, cache_hits: counts.cacheHits,
+			});
+		});
+	}
+
 	pi.registerCommand("ketch-status", {
 		description: "Show Ketch version and configured backend health",
 		handler: async (_args, ctx) => {
@@ -181,7 +219,9 @@ export default function (pi: ExtensionAPI) {
 					const formatted = formatSearchResults(results, SEARCH_OUTPUT_CAP);
 					const backends = [...new Set(results.flatMap((result) => result.backends.length ? result.backends : [successful.backend]))];
 					record("ketch", "search", { mode, backends, attempts: attempts.length, results: results.length, chars: formatted.text.length, duration_ms: Date.now() - started, truncated: formatted.truncated || successful.result.truncated, outcome: "ok" });
-					return text(formatted.text, { mode, backends, result_count: results.length, truncated: formatted.truncated });
+					counts.searches += 1;
+					publishResearchState();
+					return text(formatted.text + budgetFooter(), { mode, backends, result_count: results.length, truncated: formatted.truncated });
 				} catch {
 					record("ketch", "search", { mode, backends: [successful.backend], attempts: attempts.length, results: 0, chars: 0, duration_ms: Date.now() - started, truncated: successful.result.truncated, outcome: "invalid_json" });
 					return text("Ketch returned malformed search data; treat this lookup as failed.", { outcome: "invalid_json" });
@@ -221,6 +261,20 @@ export default function (pi: ExtensionAPI) {
 				const resolved = await Promise.allSettled(params.urls.map((url) => resolvePublicHttpUrl(url, { signal: preflightSignal })));
 				const safeUrls = resolved.flatMap((entry) => entry.status === "fulfilled" ? [entry.value] : []);
 				const blockedCount = params.urls.length - safeUrls.length; // preflight-rejected: still real failures
+				// Full-batch session-cache hit: serve without refetching. A repeat
+				// web_read of already-fetched pages is the read-side spiral shape;
+				// serving the cache makes it free instead of a network round-trip.
+				// Partial hits still fetch the whole batch (mixed-source formatting
+				// and ketch's own batching stay untouched).
+				if (LEDGER_ENABLED && safeUrls.length > 0 && blockedCount === 0 && safeUrls.every((url) => pageCache.has(url))) {
+					const rows = safeUrls.map((url) => ({ url, title: "", markdown: pageCache.get(url)?.text ?? "", error: "" }));
+					const formatted = formatReadResults(rows, READ_OUTPUT_CAP);
+					counts.reads += 1;
+					counts.cacheHits += 1;
+					publishResearchState();
+					record("ketch", "read", { sources: params.urls.length, succeeded: rows.length, failed: 0, chars: formatted.text.length, duration_ms: Date.now() - started, truncated: formatted.truncated, outcome: "ok" });
+					return text(`${formatted.text}\n\n(served from session cache — pages fetched earlier this session)${budgetFooter()}`, { source_count: rows.length, failed: 0, truncated: formatted.truncated, cache: true });
+				}
 				if (safeUrls.length === 0) {
 					record("ketch", "read", { sources: params.urls.length, succeeded: 0, failed: params.urls.length, chars: 0, duration_ms: Date.now() - started, truncated: false, outcome: "blocked_url" });
 					return text("web_read blocked every URL as non-public, malformed, or an unsafe redirect.", { outcome: "blocked_url" });
@@ -239,11 +293,72 @@ export default function (pi: ExtensionAPI) {
 					const readFailed = rows.filter((row) => row.error || !row.markdown).length;
 					const failed = readFailed + blockedCount;
 					record("ketch", "read", { sources: params.urls.length, succeeded: rows.length - readFailed, failed, chars: formatted.text.length, duration_ms: Date.now() - started, truncated: formatted.truncated || result.truncated, outcome: "ok" });
-					return text(formatted.text, { source_count: rows.length, failed, truncated: formatted.truncated });
+					if (LEDGER_ENABLED) {
+						// Cache the PARSED page text (pre-format): the formatter's body
+						// truncation is an output bound, and quote verification should
+						// see everything ketch actually returned for the page.
+						for (const row of rows) {
+							if (!row.error && row.markdown) pageCache.put(row.url, row.markdown);
+						}
+						counts.reads += 1;
+						publishResearchState();
+					}
+					return text(formatted.text + budgetFooter(), { source_count: rows.length, failed, truncated: formatted.truncated });
 				} catch {
 					record("ketch", "read", { sources: params.urls.length, succeeded: 0, failed: params.urls.length, chars: 0, duration_ms: Date.now() - started, truncated: result.truncated, outcome: "invalid_json" });
 					return text("Ketch returned malformed page data; treat these sources as unread.", { outcome: "invalid_json" });
 				}
+			},
+		}),
+	);
+
+	if (!LEDGER_ENABLED) return;
+
+	pi.registerTool(
+		defineTool({
+			name: "research_note",
+			label: "Record a verified research note",
+			description: "Record one cited claim in the research ledger. The quote must appear verbatim in a page already read with web_read this session — unverifiable citations are refused.",
+			promptSnippet: "research_note(claim, url, quote): record a claim with its verbatim source quote, immediately after web_read.",
+			promptGuidelines: [
+				"Call this right after web_read, once per material claim, while the page text is in view. The quote must be copied exactly from the page.",
+			],
+			parameters: Type.Object({
+				claim: Type.String({ minLength: 1, maxLength: 500, description: "The factual claim, in one sentence." }),
+				// Same GBNF ceiling as web_read: nested string maxLength must stay < 2000
+				// (ggml-org/llama.cpp#25746).
+				url: Type.String({ minLength: 1, maxLength: 1_999, description: "The exact URL the quote comes from (must have been web_read this session)." }),
+				quote: Type.String({ minLength: 1, maxLength: 800, description: "A verbatim quote from that page supporting the claim." }),
+			}),
+			async execute(_id, params, _signal, _onUpdate, ctx) {
+				const verdict = checkNote(pageCache, params.url, params.quote);
+				if (!verdict.ok) {
+					counts.notesRejected += 1;
+					publishResearchState();
+					record("research", "note", { ok: false, reason_class: verdict.reason, quote_chars: params.quote.length });
+					const reason = verdict.reason === "url_not_read"
+						? "That URL was not read this session — web_read it first, then quote from what it returned."
+						: "Quote not found verbatim in the fetched text of that URL. Copy the quote exactly from the web_read output (whitespace differences are tolerated; wording differences are not).";
+					return { content: [{ type: "text" as const, text: reason }], isError: true, details: { reason_class: verdict.reason } };
+				}
+				try {
+					if (!activeLedgerPath) activeLedgerPath = ledgerPath(ctx.cwd, new Date());
+					noteCount += 1;
+					appendToLedger(
+						activeLedgerPath,
+						renderNoteLine(noteCount, params.claim, params.url, params.quote, verdict.page),
+						"# Research ledger\n\nEvery entry below passed the verbatim-quote check against a page fetched this session.\n\n",
+					);
+				} catch {
+					counts.notesRejected += 1;
+					publishResearchState();
+					record("research", "note", { ok: false, reason_class: "ledger_write_failed", quote_chars: params.quote.length });
+					return { content: [{ type: "text" as const, text: "Verified, but the ledger file could not be written. Keep the claim and citation inline in your answer." }], isError: true, details: { reason_class: "ledger_write_failed" } };
+				}
+				counts.notes += 1;
+				publishResearchState();
+				record("research", "note", { ok: true, reason_class: "ok", quote_chars: params.quote.length });
+				return text(`recorded #${noteCount} (${counts.notes} verified note${counts.notes === 1 ? "" : "s"} this session; ledger: ${activeLedgerPath})${budgetFooter()}`, { note: noteCount });
 			},
 		}),
 	);

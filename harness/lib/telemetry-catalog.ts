@@ -118,6 +118,12 @@ export const EVENT_CATALOG = {
 	"tool-call-rescue/detected": { signature: "string", turnIndex: "number" },
 	"tool-call-rescue/steered": { signature: "string", turnIndex: "number" },
 	"teach-hints/hint": { rule: "string", tool: "string", injected_chars: "number" },
+	// research-ledger (dark, RESEARCH_LEDGER=on). No URLs or queries, by design —
+	// normalizeDetail's FORBIDDEN_DETAIL_FIELD bans them, and the ledger FILE is
+	// where provenance lives. reason_class: ok | url_not_read | quote_not_found |
+	// ledger_write_failed.
+	"research/note": { ok: "boolean", reason_class: "string", quote_chars: "number" },
+	"research/run-summary": { searches: "number", reads: "number", notes: "number", notes_rejected: "number", cache_hits: "number" },
 	"micro-gate/slop-fired": { files: "number", findings: "number", injected_chars: "number" },
 	"micro-gate/slop-passed": { files: "number", checked: "number" },
 	"micro-gate/slop-checker-error": { file: "string", ...failure },
