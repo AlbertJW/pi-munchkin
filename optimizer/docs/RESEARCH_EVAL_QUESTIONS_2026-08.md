@@ -81,3 +81,43 @@ Adversarial to the pipeline (should surface honest uncertainty, not fabricate):
 Future work (not built): a record-replay ketch shim (captured backend responses replayed
 deterministically) would make research measurable inside the gate. Until then this procedure is
 the honest instrument.
+
+---
+
+## Run 1 — 2026-08-05 (deterministic half only; judge half blocked)
+
+**Environment:** DD `qwen36-35b-iq3s` loaded; ketch v0.12.0 healthy (ddg/exa/keenable ok);
+`FRONTIER_API_KEY` **not set** → `judge.py` synthesis-quality pairwise could not run. The
+model-driven 10-question A/B (20 interactive sessions, single-slot box) was not run — it is
+box-gated and depends on the judge. What ran is the **deterministic citation-fidelity half**,
+which the doc above states is the load-bearing claim and needs no model.
+
+**Method:** loaded the real `ketch` extension with `RESEARCH_LEDGER=on` and drove the tools
+against LIVE web on Q2 ("what license does the ketch CLI ship under?"): `web_search` (real,
+5 results, elision receipt correct) → `web_read` (fetched 6,224 chars from the GitHub repo) →
+`research_note` on (a) a verbatim phrase from the fetched page, (b) a fabricated quote, (c) an
+unread URL.
+
+**Result — the mechanism holds on real data:**
+
+| case | outcome |
+|---|---|
+| fabricated quote ("Released under the WTFPL…") | **REFUSED** — quote not verbatim in the fetched page |
+| note for a URL never `web_read` this session | **REFUSED** — url_not_read |
+| verbatim phrase copied from the fetched page | **RECORDED** (note #1, ledger written) |
+| run state | `{searches:1, reads:1, notes:1, notesRejected:2, cacheHits:0}` |
+
+**Seam check (the important QA finding):** the model quotes from the *formatted* `web_read`
+output it sees, while `research_note` verifies against the *cached raw markdown*. A phrase taken
+from the model-visible formatted body recorded cleanly, confirming these do not diverge — a
+quote copied from what the model sees passes the check, so the pipeline does not produce spurious
+refusals. (An initial "accept" failure was a harness bug: the test span straddled the
+header/body boundary, quoting formatted-only structure. Not a pipeline gap.)
+
+**Verdict on the load-bearing claim:** confirmed on live web. Fabricated citations cannot be
+recorded; real ones can; the check aligns with what the model actually sees. The comparison to
+the prior skill is not close and needs no judge — the old skill produces no ledger and no
+verifiable citation at all.
+
+**Still owed (needs a frontier judge endpoint + approved box time):** the synthesis-quality
+pairwise A/B across all 10 questions, on a model-driven `/skill:deep-research` run per arm.
