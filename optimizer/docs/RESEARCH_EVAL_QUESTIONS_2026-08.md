@@ -121,3 +121,58 @@ verifiable citation at all.
 
 **Still owed (needs a frontier judge endpoint + approved box time):** the synthesis-quality
 pairwise A/B across all 10 questions, on a model-driven `/skill:deep-research` run per arm.
+
+---
+
+## Run 2 — PRE-REGISTRATION (written and committed BEFORE any arm was executed)
+
+Albert directed the synthesis-quality half to run with **Claude Opus 5 (this session) as the
+judge**, standing in for the unavailable frontier endpoint. That creates a bias `judge.py`
+explicitly warns about, in its worst form, so the protocol below is fixed in advance and this
+section is committed before a single session runs.
+
+### Declared bias — read this before believing any verdict here
+
+**The judge designed arm B.** Self-preference bias is not a risk here, it is a certainty of
+unknown size. Worse, **blinding is impossible in principle**: arm B's deliverable cites
+recorded notes and arm A's cannot, so any competent judge identifies the arms instantly from
+their structure. I therefore pre-commit to these constraints:
+
+1. The rubric below is FINAL. I will not adjust it after seeing outputs.
+2. I will judge **only synthesis quality as written**, and will NOT award points for the
+   presence of the ledger, note numbers, or the verified-citation machinery — those are arm B's
+   mechanism, already measured deterministically in Run 1. Scoring them again here would be
+   double-counting my own design.
+3. A tie is the default verdict. I break a tie only for a difference I can quote from both
+   texts.
+4. Any arm-B answer that is *worse written* (padded, hedged, less direct) than arm A loses,
+   regardless of citations.
+5. Verdicts are reported as **weak evidence** and must never be cited as an adoption result.
+   Only a genuine third-party frontier judge can retire this caveat.
+
+### Rubric (fixed)
+
+`correctness (does it answer the question asked), directness (leads with the answer, no
+padding), attribution honesty (distinguishes what a source says from inference; flags what is
+unverified), and conflict handling (states disagreement rather than averaging it)`.
+
+Explicitly NOT scored: presence of a ledger, note-numbering, tool-call counts, response length.
+
+### Protocol
+
+- Questions: a pre-declared subset of 5 from the set above, spanning every mode —
+  **Q2** (current-fact), **Q3** (contested), **Q6** (comparative), **Q8** (fast-moving),
+  **Q9** (adversarial / should admit uncertainty).
+- Arms run in isolated `PI_CODING_AGENT_DIR` copies so the live agent is never mutated:
+  **A** = skill v1 + `RESEARCH_LEDGER` unset; **B** = skill v2 + `RESEARCH_LEDGER=on`.
+- Same model (`qwen36-35b-iq3s`), one session at a time, single-slot box.
+- Per-session cap 15 min; a session that times out is recorded as INCOMPLETE for its arm and is
+  NOT silently dropped.
+- Verdict per question: `A | B | tie` + one-sentence reason quoting both texts.
+
+### Pre-declared failure modes (what would make me report arm B as no better)
+
+- B pads answers with evidence scaffolding while answering the question less directly.
+- B's budget/notes discipline costs it coverage — fewer sources, thinner answer.
+- B produces refusals it never recovers from, ending with less content than A.
+- Both arms fail to complete a research loop on this model, making the comparison vacuous.
