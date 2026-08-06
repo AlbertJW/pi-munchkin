@@ -2325,3 +2325,21 @@ documented CJS-transform artifact, now 13 files instead of 8 — same class, mor
 value imports from the pi package). New loaded live hash recorded in `SURFACE_BOUNDARIES.md`
 (`ea87250f…`); do not pool rows across it. The shadow instrument is now collecting live
 failure-episode telemetry — the baseline the PREPARED calibration prereg needs.
+
+**Deep-research pipeline merged and rolled out (2026-08-05, same day, Albert-instructed).**
+`feat/research-ledger` fast-forwarded to main (`373597a..3581f1c`) and mirrored: 84/84
+first-party files, tests synced, live `pi -p` load confirming the dark discipline end-to-end —
+`research_note` is ABSENT by default and PRESENT under `RESEARCH_LEDGER=on`, no load errors.
+New loaded live hash in `SURFACE_BOUNDARIES.md` (`1b7aa081…`); do not pool across it.
+
+Model-visible footprint of this rollout is deliberately small: the always-on change is the
+skill v2 TEXT (progressively disclosed — it only enters context when `/skill:deep-research`
+runs) plus the `researcher` role description in the subagent block. Every mechanism —
+`research_note`, the page cache, budget footers, the lens research line — stays dark behind
+`RESEARCH_LEDGER`. Flipping that default is a separate decision and would need its own boundary
+row, exactly as the teach-hints/did-you-mean adoptions did.
+
+Evidence at rollout: eval Run 1 (deterministic citation-fidelity, live web) recorded in
+`RESEARCH_EVAL_QUESTIONS_2026-08.md` — fabricated quote refused, unread-URL note refused,
+verbatim quote recorded, and the formatted-vs-cached seam confirmed closed. The synthesis-quality
+pairwise half is still owed (needs a frontier judge endpoint and approved box time).
