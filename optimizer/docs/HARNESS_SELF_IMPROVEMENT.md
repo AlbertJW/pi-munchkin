@@ -2362,3 +2362,14 @@ fabrication-prevention against a fabricating baseline.
 Four named fixes and a "do not adopt yet" recommendation are recorded in
 `RESEARCH_EVAL_QUESTIONS_2026-08.md`. `RESEARCH_LEDGER` stays dark; the rollout of 2026-08-05
 shipped it dark and that decision now has evidence behind it.
+
+**Research-eval defects fixed 2026-08-05 (`64f8c8c`).** All four Run 2 findings addressed, still
+dark. The load-bearing one: `research_note` now decides a quote's source by the TEXT, not by the
+URL the model typed — a quote verbatim in exactly one fetched page records under THAT page
+(ambiguous only if in 2+). This targets the measured 62% refusal rate (mostly wrong-URL
+attribution in multi-page reads) at the root, and a live smoke confirms the exact Run 2 failure
+now records instead of refusing. Plus a verify-gate-shaped wrap-up steer that makes the ABSENCE
+of notes visible (the opt-in hole — the mechanism the model must choose to invoke, in a corpus
+that says small models don't). Both behaviour fixes counterfactually pinned; the full A/B re-run
+(Run 3) is the now-unblocked next gated step and the condition to keep before considering
+default-on. Details in `RESEARCH_EVAL_QUESTIONS_2026-08.md`.

@@ -10,6 +10,11 @@ candidates as dark). Net changes since 0.3.0; the full per-decision record is
 
 ### Added
 
+- **Deep-research pipeline hardened after eval Run 2 (still dark):** `research_note` now
+  auto-corrects a quote pasted from the wrong URL of a multi-page `web_read` (records under
+  the true source; ambiguous only if the quote is in 2+ pages) — targeting the measured 62%
+  refusal rate at its root; a wrap-up steer surfaces answers that ship after web reads with
+  zero recorded notes; skill guidance to quote short spans and never fabricate completion.
 - **Verified deep-research pipeline (dark, `RESEARCH_LEDGER=on`):** a session page cache
   (`web_read` results, 20 pages / 2 MiB LRU; full-batch re-reads served from cache), the
   `research_note(claim, url, quote)` tool that records a citation ONLY when the quote appears

@@ -251,3 +251,24 @@ a ~30B local model as built: it cost one complete answer (Q6), and its protectio
 exactly where it was needed (Q8). Fix defects 1–3 and re-run before considering adoption. The
 deterministic Run 1 result stands — the mechanism does what it claims *when it engages*; this run
 measured how often it engages, and the answer is "not reliably enough".
+
+---
+
+## Fixes applied 2026-08-05 (`fix/research-ledger-eval-defects`)
+
+All four Run 2 defects addressed; `RESEARCH_LEDGER` stays **dark by default** (Run 2's
+recommendation). Mapping:
+
+| defect | fix | verification |
+|---|---|---|
+| 1 — 62% refusal (wrong-URL attribution) | `checkNote` auto-corrects: a quote verbatim in exactly one *other* fetched page records under that page; 2+ pages → ambiguous refusal naming them; 0 → refused. Provenance stays true. | unit + counterfactual; **live smoke**: a LICENSE-page quote tagged to the repo URL now records under the LICENSE |
+| 2 — fabricated completion after refusal storm | skill: never claim a section/notes exist when they don't; write `[unverified]`; and defect 1 removes most of the refusals that caused the storm | skill text |
+| 3 — opt-in verification hole | `turn_end` wrap-up steer (dark): text-only wrap-up after reads with zero notes → one steer, verify-gate-shaped | unit + counterfactual |
+| 4 — budget mechanics leaked into prose | skill: lead with the answer; bookkeeping is for you, not the reader | skill text |
+| (contributing) long quotes cross source boundaries | skill: quote ONE short sentence, not a paragraph (accepted 89–239 chars; refused 471–759) | skill text |
+
+**Next gated step:** the full 5-question A/B **re-run** (Run 3) was the exit condition for
+defects 1–3 and is now unblocked. It needs a frontier judge endpoint for the synthesis half and
+approved box time; the deterministic citation-fidelity half can run any time. Until Run 3 shows
+the refusal rate down and no collapse, `RESEARCH_LEDGER` remains dark — the fixes are reasoned
+and unit-proven, not yet field-measured on a full model-driven run.
