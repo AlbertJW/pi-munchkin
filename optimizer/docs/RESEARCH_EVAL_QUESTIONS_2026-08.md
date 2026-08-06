@@ -176,3 +176,78 @@ Explicitly NOT scored: presence of a ledger, note-numbering, tool-call counts, r
 - B's budget/notes discipline costs it coverage — fewer sources, thinner answer.
 - B produces refusals it never recovers from, ending with less content than A.
 - Both arms fail to complete a research loop on this model, making the comparison vacuous.
+
+## Run 2 — RESULTS (2026-08-05, judge = Claude Opus 5; weak evidence by construction)
+
+10 sessions (5 questions × 2 arms), `qwen36-35b-iq3s`, isolated `PI_CODING_AGENT_DIR` per arm,
+sequential, all rc=0, none timed out. Judged against the rubric fixed in the pre-registration
+above; mechanism presence excluded from scoring as pre-committed.
+
+### Pairwise verdicts
+
+| Q | verdict | grounds |
+|---|---|---|
+| Q2 current-fact | **tie** | Both verbatim-correct vs independently fetched ground truth (MIT, "Copyright (c) 2026 George Dikeakos"); both one sentence; 189 B vs 222 B |
+| Q3 contested | **B** | The question said "summarize the disagreement, not a single view"; A led with a verdict and argued one side, B gave Position A/B + a table + "the disagreement is not which is better but which constraint binds first". B also flagged an unreadable source and scoped a claim's generalization. Against B: worse source quality (SEO blogs vs A's arXiv/EMNLP) and budget mechanics leaked into prose |
+| Q6 comparative | **A** | **B produced no answer at all** — 62 B: "Done. All 3 notes recorded. The comparison is complete above" with nothing above. A delivered 4.75 KB |
+| Q8 fast-moving | **B** | A did not answer the question (emitted "Gate result: N/A — no files changed"). B matched ground truth (Open, ~3 weeks, no assignee/label/PR) — but see the provenance defect below |
+| Q9 adversarial | **tie** | Both refused to invent an M3 Pro number, both correctly reported "not published" and cited the 218 tok/s M4 figure. Baseline model is honest under pressure |
+
+**Tally: B 2, A 1, ties 2.** This is 5 comparisons judged by the arm's own author. It is not an
+adoption result and must not be cited as one.
+
+### The findings that actually matter (deterministic, not judged)
+
+| arm B run | searches | reads | notes recorded | refused |
+|---|---|---|---|---|
+| q2 | 1 | 2 | 1 | 1 |
+| q3 | 2 | 6 | 6 | 9 |
+| q6 | 3 | 5 | 3 | 7 |
+| q8 | 4 | 1 | **0** | **0** |
+| q9 | 3 | 2 | 1 | 1 |
+| **total** | | | **11** | **18 — a 62% refusal rate** |
+
+**Defect 1 — the containment check is too brittle in practice (62% refusal).** The model retried
+*identical* quotes (250 chars ×3, 158 ×2) and never recovered. Accepted quotes skew short
+(89–239 chars); refused skew long (471, 759). Most probable dominant cause: `web_read` batches
+several URLs, containment is checked **per-URL**, and the model attributes a genuine quote to the
+wrong URL of the batch — the refusal is correct but undiagnosable from the message.
+*Fix:* on `quote_not_found`, scan the other cached pages and, if the quote is found there, name
+the correct URL.
+
+**Defect 2 — a refusal storm produces a fabricated completion claim.** q6/B burned its turns on 7
+refusals and shipped "the comparison is complete above" with no comparison. This is the c38
+pathology (fabricated completion) reproduced by my own mechanism.
+*Fix:* the skill must forbid completion claims and require writing the answer with `[unverified]`
+markers when notes will not record.
+
+**Defect 3 — the mechanism is opt-in, so it protects nothing when unused.** q8/B called
+`research_note` **zero times** — and that is exactly the answer containing a provenance error: it
+reported a real local commit (`4ee3800`, AlbertJW, verified present in this repo) as if it were
+activity on the public llama.cpp issue thread. Facts real, provenance fabricated, verification
+absent. This contradicts the project's own central finding — *1 voluntary subagent call in 942
+base sessions*; small models do not choose. I built a mechanism the model must choose to invoke.
+*Fix:* make the ABSENCE of notes visible — a wrap-up steer when an answer ships after web reads
+with zero notes, the same shape as verify-gate's "files changed, nothing verified".
+
+**Defect 4 — budget mechanics leak into deliverables.** q3/B opened with "I've hit my read budget
+(5/5) and have 6 verified notes."
+
+### Premise correction
+
+The eval refutes the assumption behind the design. **Arm A did not hallucinate citations.**
+Spot-check: A's `arXiv 2404.07647` claim (softmax bottleneck, "<1000 hidden dimensions",
+"degenerate latent representations in late pretraining") is exactly correct. The pipeline's value
+is therefore *not* "A fabricates and B doesn't" — it is that B's citations are **provable** while
+A's merely happen to be right and can only be checked by hand, one at a time.
+
+Arm A also showed its own instability: on Q8 it answered a coding-workflow question instead of the
+research question. That is baseline noise, not evidence for B.
+
+### Recommendation
+
+**Do NOT flip `RESEARCH_LEDGER` on by default.** On this evidence the pipeline is net-negative for
+a ~30B local model as built: it cost one complete answer (Q6), and its protection was absent
+exactly where it was needed (Q8). Fix defects 1–3 and re-run before considering adoption. The
+deterministic Run 1 result stands — the mechanism does what it claims *when it engages*; this run
+measured how often it engages, and the answer is "not reliably enough".

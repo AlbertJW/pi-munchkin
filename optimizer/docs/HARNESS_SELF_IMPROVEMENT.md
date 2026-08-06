@@ -2343,3 +2343,22 @@ Evidence at rollout: eval Run 1 (deterministic citation-fidelity, live web) reco
 `RESEARCH_EVAL_QUESTIONS_2026-08.md` — fabricated quote refused, unread-URL note refused,
 verbatim quote recorded, and the formatted-vs-cached seam confirmed closed. The synthesis-quality
 pairwise half is still owed (needs a frontier judge endpoint and approved box time).
+
+**Research eval Run 2 (2026-08-05) — the pipeline is NOT ready to be default-on.** 10 live A/B
+sessions on the DD, judged by the arm's own author (weak evidence, disclosed and pre-registered
+before running). Pairwise came out B 2 / A 1 / 2 ties, but the pairwise result is not the finding.
+The deterministic mechanism data is: **62% of citation attempts were refused (18 of 29)**, the
+model retried identical quotes and never recovered, one run collapsed to a 62-byte FABRICATED
+COMPLETION CLAIM ("the comparison is complete above" — nothing above; the c38 pathology
+reproduced by my own mechanism), and on the one run where `research_note` was never called the
+answer contained a provenance error (a real local commit reported as public issue-thread
+activity). Verification is opt-in, and this corpus's own finding is that small models do not opt
+in — 1 voluntary subagent call in 942 base sessions.
+
+Also corrected: the premise. **The old skill did not hallucinate citations** — a spot-checked
+arXiv citation from arm A was exactly right. The pipeline's value is provability, not
+fabrication-prevention against a fabricating baseline.
+
+Four named fixes and a "do not adopt yet" recommendation are recorded in
+`RESEARCH_EVAL_QUESTIONS_2026-08.md`. `RESEARCH_LEDGER` stays dark; the rollout of 2026-08-05
+shipped it dark and that decision now has evidence behind it.
