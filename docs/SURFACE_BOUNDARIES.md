@@ -33,3 +33,34 @@ The 2026-08-04 live hash includes the preserved local-only `extensions/chaos.ts`
 auto-discovers from an unpacked agent directory. It is excluded from the package manifest and is
 inert unless explicitly armed. Measurements must bind the loaded hash above, not the package-source
 hash.
+
+---
+
+## Data at rest: where a research session actually lands (2026-08-06)
+
+A surface hash bounds what the MODEL sees. It says nothing about what a session LEAVES. Those are
+different questions, and the second one had no written answer until now — which matters, because a
+deep-research run writes to **four** places and only one of them is the ledger everyone thinks of.
+Anyone auditing "what did this session leave behind" who stops at `.pi/research/` misses the
+actual corpus.
+
+| Location | Written by | Contains | Default |
+|---|---|---|---|
+| `<cwd>/.pi/research/<stamp>.md` | `ketch.ts` (`appendToLedger`) | verified notes: claim, source URL, re-attribution if any, quote, page sha256 | only `RESEARCH_LEDGER=on` |
+| `~/.pi/agent/sessions/<cwd-slug>/*.jsonl` | pi core | the parent transcript — **including each subagent's exact task text and the child's assistant messages** (thinking + tool-call arguments, so a `researcher` child's queries and URLs are here). Child *tool results* are not: `pi-subagent/runner-events.js:44` admits `role === "assistant"` only | always on |
+| `~/Library/Caches/ketch/cache.db` | the `ketch` binary, not the harness | **raw fetched page bodies and URLs** — 2 MiB bbolt store, mode 0600, user-global, no session scoping, no TTL the harness can see, no cleanup hook. Kept alive deliberately: `ketch-runtime.ts` forwards `XDG_CACHE_HOME` | always on |
+| `~/.pi/agent/telemetry/events.jsonl` | `telemetry.ts` | counts only — `FORBIDDEN_DETAIL_FIELD` bans any key matching `url`, so no queries or URLs, by construction | `TELEMETRY != off` |
+
+Three consequences worth stating plainly:
+
+1. **The in-memory `PageCache` is not the whole story.** The harness persists no page text; the
+   fetch layer beneath it does. "Nothing is written" is true of `research-ledger.ts` and false of
+   the session.
+2. **Subagent visibility and durability point in opposite directions.** The parent model sees only
+   the child's final string, while the disk keeps the child's reasoning and tool calls. That is the
+   right direction for auditability — and it is worth noting that pi_munchkin fails none of the
+   portability tests the way hosted multi-agent APIs do: the delegated task is readable plaintext
+   on disk, not a provider-sealed blob.
+3. **`.pi/` is not in `.gitignore`.** A ledger written into a repo cwd shows up as untracked
+   alongside `.pi/TODO.md` and `.pi/traces/`. Deliberate for now (the files are meant to be seen),
+   but it means a research run in a working tree is one `git add -A` away from being committed.
