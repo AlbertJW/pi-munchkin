@@ -113,6 +113,7 @@ Most behavior is automatic. The primary commands are:
 | `PI_SANDBOX_POSTURE` | `unknown`; `/munchkin-doctor` accepts only `declared` or `host` as operator assertions | unset it to return to `unknown`; this label is observational and grants no isolation |
 | `TEACH_HINTS`, `DID_YOU_MEAN` | default-on bounded hints | set either to `off` |
 | `KETCH` | default-on public search/read | `off` for offline/private sessions |
+| `RESEARCH_LEDGER` | dark (`on` enables the verified-citation research pipeline: session page cache, the `research_note` tool that refuses any quote not verbatim in a fetched page, budget footers, and a `.pi/research/<stamp>.md` ledger) | unset = byte-identical prior behaviour |
 | `VERIFY_GATE`, `LOOP_BREAKER`, `GIT_GUARD`, `HASHLINE` | default-on core mechanisms | each accepts its documented `off` kill switch |
 
 Oversized hashline refusals explain the distinction between the returned-context `limit` and the

@@ -143,6 +143,7 @@
     "harness/lib/telemetry.ts",
     "harness/lib/telemetry-catalog.ts",
     "harness/lib/ketch-runtime.ts",
+    "harness/lib/research-ledger.ts",
     "harness/agents",
     "harness/vendor",
     "skills/deep-research",

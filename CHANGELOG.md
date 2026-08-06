@@ -10,6 +10,17 @@ candidates as dark). Net changes since 0.3.0; the full per-decision record is
 
 ### Added
 
+- **Verified deep-research pipeline (dark, `RESEARCH_LEDGER=on`):** a session page cache
+  (`web_read` results, 20 pages / 2 MiB LRU; full-batch re-reads served from cache), the
+  `research_note(claim, url, quote)` tool that records a citation ONLY when the quote appears
+  verbatim (modulo whitespace) in a page fetched this session — hallucinated citations become
+  impossible to record — an append-only `.pi/research/<stamp>.md` ledger, additive budget
+  footers, a `web_search` elision receipt, and a `harness/agents/researcher.md` role. Skill v2
+  drives note-after-read + an advisory verifier subagent pass. `research/note` and
+  `research/run-summary` telemetry (no URLs/queries). Evaluation procedure in
+  `optimizer/docs/RESEARCH_EVAL_QUESTIONS_2026-08.md`.
+- Ketch failures now classify into the failure-episode taxonomy (`ketch upstream` → provider,
+  `ketch is unavailable` → command_missing) instead of falling through to `unknown`.
 - **Semantic failure-episode instrument (2026-08-05):** failures classified into a stable
   taxonomy and tracked as episodes keyed by (class, tool family, hashed target, hashed plan
   item). `LOOP_EPISODE_MODE=shadow` (default) records tier observations only (7/11/28 session

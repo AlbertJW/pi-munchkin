@@ -620,7 +620,9 @@ blocked only on a (model, task) pairing in the discriminating band (see calibrat
   verified true in code). Applied same-day (ops/config, reversible, no behavior claim):
   subagent concurrency env-overridable default 1 (`PI_SUBAGENT_CONCURRENCY`; llama-server is
   single-concurrency — parallel children only queue + thrash cache), ketch flipped to opt-in
-  (`KETCH=on` for research sessions; 4 fewer tools per local prompt), packages pinned
+  (`KETCH=on` for research sessions; 4 fewer tools per local prompt) — **SUPERSEDED: ketch is
+  default-on again (`KETCH=off` to disable); code and README agree, this dated line does not**,
+  packages pinned
   (pi-rtk-optimizer@0.9.0, pi-observational-memory@3.0.3), MODELS.md defaultModel note
   (intentional cloud default — resolved, not drift). Queued with instruments:
   - **c8 lean-governor candidate** (audit #6): never hand-trim the 5.7KB globals — write a

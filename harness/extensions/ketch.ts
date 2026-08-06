@@ -218,10 +218,17 @@ export default function (pi: ExtensionAPI) {
 					const results = parseSearchResults(successful.result.stdout).slice(0, limit);
 					const formatted = formatSearchResults(results, SEARCH_OUTPUT_CAP);
 					const backends = [...new Set(results.flatMap((result) => result.backends.length ? result.backends : [successful.backend]))];
+					// Elision receipt (span-tools parity): the model must know whether it
+					// is seeing everything. ketch reports no total-hit count, so we state
+					// only what is TRUE — how many came back against the limit asked for.
+					// At the limit, more may exist; below it, this is the whole result set.
+					const receipt = results.length >= limit
+						? `results ${results.length} (limit reached — narrow the query or raise limit for more) · backends: ${backends.join(", ")}\n\n`
+						: `results ${results.length} of all found for this query · backends: ${backends.join(", ")}\n\n`;
 					record("ketch", "search", { mode, backends, attempts: attempts.length, results: results.length, chars: formatted.text.length, duration_ms: Date.now() - started, truncated: formatted.truncated || successful.result.truncated, outcome: "ok" });
 					counts.searches += 1;
 					publishResearchState();
-					return text(formatted.text + budgetFooter(), { mode, backends, result_count: results.length, truncated: formatted.truncated });
+					return text(receipt + formatted.text + budgetFooter(), { mode, backends, result_count: results.length, truncated: formatted.truncated });
 				} catch {
 					record("ketch", "search", { mode, backends: [successful.backend], attempts: attempts.length, results: 0, chars: 0, duration_ms: Date.now() - started, truncated: successful.result.truncated, outcome: "invalid_json" });
 					return text("Ketch returned malformed search data; treat this lookup as failed.", { outcome: "invalid_json" });

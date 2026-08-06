@@ -31,6 +31,9 @@ export type BlackboardState = {
 	verify: { gateCmd: string | null; mutated: boolean; verifiedOk: boolean; fires: number; sessionFires: number } | null;
 	loop: { sessionRepeats: number; seen: number; streak: number } | null;
 	context: { pct: number | null; staleShare: number | null; dupShare: number | null };
+	// Deep-research counts only (RESEARCH_LEDGER=on). Counts, never URLs/queries —
+	// the provenance lives in the ledger FILE, and telemetry bans URL fields.
+	research: { searches: number; reads: number; notes: number; notesRejected: number; cacheHits: number } | null;
 };
 
 export function emptyState(): BlackboardState {
@@ -39,6 +42,7 @@ export function emptyState(): BlackboardState {
 		plan: { runId: null, itemId: null, lastGate: null, openItems: null },
 		verify: null, loop: null,
 		context: { pct: null, staleShare: null, dupShare: null },
+		research: null,
 	};
 }
 
@@ -170,6 +174,14 @@ export function syncBus(state: BlackboardState): void {
 		state.plan.runId = plan.run_id ?? state.plan.runId;
 		state.plan.itemId = plan.item_id ?? state.plan.itemId;
 	}
+	const research = g.__pi_research_state as
+		{ searches?: number; reads?: number; notes?: number; notesRejected?: number; cacheHits?: number } | undefined;
+	if (research) {
+		state.research = {
+			searches: research.searches ?? 0, reads: research.reads ?? 0, notes: research.notes ?? 0,
+			notesRejected: research.notesRejected ?? 0, cacheHits: research.cacheHits ?? 0,
+		};
+	}
 }
 
 // ---- state lens (model-visible ONLY when session-blackboard injects it) ----
@@ -182,9 +194,16 @@ export function renderLens(state: BlackboardState, maxChars: number): string {
 		.sort((a, b) => b.errors - a.errors || b.lastTurn - a.lastTurn)
 		.slice(0, 6)
 		.map((a) => `${a.label} ×${a.count}${a.errors ? ` FAIL(${a.lastError ?? "error"})` : ""}`);
-	if (failing.length === 0 && !state.verify?.mutated && state.plan.runId === null) return "";
+	const research = state.research;
+	const researchActive = research != null && (research.notes > 0 || research.notesRejected > 0);
+	if (failing.length === 0 && !state.verify?.mutated && state.plan.runId === null && !researchActive) return "";
 	const parts: string[] = [];
 	if (failing.length) parts.push(`attempted+failing: ${failing.join(" | ")}`);
+	// A rejected note means a citation was proposed with a quote that isn't in any
+	// fetched page — surfacing the count nudges re-quoting from the source.
+	if (researchActive) {
+		parts.push(`research: ${research.notes} verified note(s)${research.notesRejected > 0 ? `, ${research.notesRejected} refused (quote not in a fetched page — re-quote)` : ""}`);
+	}
 	if (state.verify) {
 		parts.push(state.verify.verifiedOk
 			? `verified: green${state.verify.gateCmd ? ` (${bashSummary(state.verify.gateCmd)})` : ""}`

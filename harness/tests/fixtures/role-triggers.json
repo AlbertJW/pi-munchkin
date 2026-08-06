@@ -16,6 +16,11 @@
       "try to refute the claim that the fix handles empty input",
       "check the just-made change and return a verdict with evidence",
       "run the tests to verify this claim before the plan accepts it"
+    ],
+    "researcher": [
+      "research these public web sources and distill findings for this subquestion",
+      "search the web and read the strongest pages, quoting each source",
+      "gather public web sources on this topic and return findings with URLs"
     ]
   },
   "negatives": [

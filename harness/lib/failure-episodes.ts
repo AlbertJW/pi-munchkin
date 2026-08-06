@@ -157,7 +157,12 @@ export function classifyFailure(observation: FailureObservation): FailureClass {
 	}
 	if (/permission denied|operation not permitted|\bEACCES\b|\bEPERM\b/i.test(text)) return "permission";
 	if (/timed? ?out|timeout|deadline exceeded/i.test(text)) return "timeout";
-	if (/provider|rate limit|\bHTTP\s+(?:4\d\d|5\d\d)\b|service unavailable|bad gateway/i.test(text)) return "provider";
+	// `ketch upstream` = a search/scrape backend failed (the web analogue of a
+	// provider outage); `ketch is unavailable` = the binary is missing/unhealthy,
+	// which is a missing command. Before 2026-08-05 both fell through to
+	// `unknown`, so web failures never joined the failure-episode instrument.
+	if (/provider|rate limit|\bHTTP\s+(?:4\d\d|5\d\d)\b|service unavailable|bad gateway|ketch upstream/i.test(text)) return "provider";
+	if (/ketch is unavailable/i.test(text)) return "command_missing";
 	if (/old (?:text|string).*not found|no exact match|ambiguous match|patch (?:failed|conflict)|edit conflict|has changed since/i.test(text)) {
 		return "edit_conflict";
 	}
