@@ -187,3 +187,60 @@ test("wrap-up steer fires after reads with zero notes; silent once a note is rec
 		resetPiGlobals();
 	}
 });
+
+// --- deep-QA defects (2026-08-06) ---
+
+test("the ledger records a re-attribution, so a corrected note is auditable (D2)", () => {
+	const dir = mkdtempSync(join(tmpdir(), "rl-attr-"));
+	const path = ledgerPath(dir, new Date("2026-08-06T10:11:12Z"));
+	const page = { text: "x", sha256: sha256Hex("x"), fetchedAt: "2026-08-06T10:00:00Z" };
+	// Direct note: no attribution line (claimed url === true source).
+	appendToLedger(path, renderNoteLine(1, "Direct", "https://ex/a", "q1", page, "https://ex/a"), "# L\n\n");
+	// Corrected note: the model typed /a, the quote came from /b.
+	appendToLedger(path, renderNoteLine(2, "Corrected", "https://ex/b", "q2", page, "https://ex/a"));
+	const body = readFileSync(path, "utf8");
+	assert.match(body, /### #2 Corrected\n- source: https:\/\/ex\/b\n- attributed-to: https:\/\/ex\/a \(auto-corrected/,
+		"a re-attributed note names the URL the model actually typed");
+	const direct = body.slice(body.indexOf("### #1"), body.indexOf("### #2"));
+	assert.equal(/attributed-to/.test(direct), false, "a first-try-correct note carries no attribution noise");
+});
+
+test("appendToLedger refuses rather than truncating when the ledger cannot be read (D3)", () => {
+	const dir = mkdtempSync(join(tmpdir(), "rl-eacces-"));
+	const path = ledgerPath(dir, new Date("2026-08-06T10:11:12Z"));
+	const page = { text: "x", sha256: sha256Hex("x"), fetchedAt: "2026-08-06T10:00:00Z" };
+	appendToLedger(path, renderNoteLine(1, "Precious", "https://ex/a", "q", page), "# L\n\n");
+	chmodSync(path, 0o000); // unreadable, but still there
+	try {
+		assert.throws(() => appendToLedger(path, renderNoteLine(2, "Second", "https://ex/b", "q2", page)),
+			"a non-ENOENT read failure must abort the append");
+	} finally {
+		chmodSync(path, 0o644);
+	}
+	assert.match(readFileSync(path, "utf8"), /### #1 Precious/, "the prior notes survived — nothing was truncated");
+});
+
+test("the ledger path rides the budget footer, so a corrected first note still finds it (D1)", async () => {
+	const dir = mkdtempSync(join(tmpdir(), "rl-path-"));
+	const prevBin = process.env.KETCH_BIN;
+	process.env.KETCH_BIN = mockKetchBin(dir);
+	try {
+		const fp = await loadKetch(true);
+		delete (globalThis as Record<string, unknown>).__pi_ketch_version_checks_v1;
+		await fire(fp, "session_start", {}, { cwd: dir, ui: { notify() {} } });
+		const read = await callToolRaw(fp, "web_read", { urls: ["https://example.com/a"] }, dir) as { content: Array<{ text: string }> };
+		assert.equal(/ledger /.test(read.content[0].text), false, "no ledger path before one exists");
+		// The model types a URL it never read; the quote is really from example.com/a.
+		const note = await callToolRaw(fp, "research_note",
+			{ claim: "c", url: "https://example.com/WRONG", quote: "page a content" }, dir) as { content: Array<{ text: string }> };
+		const out = note.content[0].text;
+		assert.match(out, /that quote is from there/, "the correction is announced");
+		assert.match(out, /ledger .*\.pi\/research\/.*\.md/, "a CORRECTED note still tells the model where the ledger is");
+		// And it persists on later results, so compaction cannot strand the verifier step.
+		const again = await callToolRaw(fp, "web_read", { urls: ["https://example.com/a"] }, dir) as { content: Array<{ text: string }> };
+		assert.match(again.content[0].text, /ledger .*\.pi\/research\//, "the path rides every later research result");
+	} finally {
+		if (prevBin === undefined) delete process.env.KETCH_BIN; else process.env.KETCH_BIN = prevBin;
+		resetPiGlobals();
+	}
+});

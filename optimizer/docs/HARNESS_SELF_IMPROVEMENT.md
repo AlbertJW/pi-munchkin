@@ -1294,7 +1294,7 @@ Shipped as one state source with strictly separated faces (`lib/blackboard.ts` +
   fixture exists (follow-up: model it on the loop-breaker tail sessions).
 - **Plumbing that had to exist first**: an in-process telemetry tap
   (`globalThis.__pi_telemetry_taps`, runs before the TELEMETRY kill-switch, fail-open) gives
-  any observer the full 64-event catalog stream without touching 20 extensions; loop-breaker
+  any observer the full catalog stream (78 events as of 2026-08-06) without touching 20 extensions; loop-breaker
   and verify-gate publish their previously-invisible counters (`__pi_lb_state`,
   `__pi_vg_state`).
 

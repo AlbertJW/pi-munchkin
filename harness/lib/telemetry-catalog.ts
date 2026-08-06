@@ -120,8 +120,12 @@ export const EVENT_CATALOG = {
 	"teach-hints/hint": { rule: "string", tool: "string", injected_chars: "number" },
 	// research-ledger (dark, RESEARCH_LEDGER=on). No URLs or queries, by design —
 	// normalizeDetail's FORBIDDEN_DETAIL_FIELD bans them, and the ledger FILE is
-	// where provenance lives. reason_class: ok | url_not_read | quote_not_found |
-	// ledger_write_failed.
+	// where provenance lives. reason_class, the FULL set (an analysis that buckets
+	// on `ok` is safe; one that buckets on reason_class must carry all six or it
+	// undercounts): ok | corrected | url_not_read | quote_not_found |
+	// quote_ambiguous | ledger_write_failed. `corrected` ships with ok:true — the
+	// quote was verbatim in a fetched page OTHER than the one the model named, so
+	// it recorded under the true source; `quote_ambiguous` ships with ok:false.
 	"research/note": { ok: "boolean", reason_class: "string", quote_chars: "number" },
 	"research/run-summary": { searches: "number", reads: "number", notes: "number", notes_rejected: "number", cache_hits: "number" },
 	// Fired once when an answer wraps up after web reads with zero recorded notes.

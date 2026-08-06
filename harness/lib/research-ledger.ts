@@ -152,12 +152,25 @@ export function renderNoteLine(
 	url: string,
 	quote: string,
 	page: CachedPage,
+	claimedUrl?: string,
 ): string {
 	// One entry per line-group; quotes kept verbatim inside a fence so page text
 	// can never forge the ledger's own line-oriented structure.
+	//
+	// `claimedUrl` is recorded ONLY when it differs from the true source — i.e.
+	// when checkNote re-attributed the quote. That distinction has to survive into
+	// the file: a corrected note is a WEAKER citation than a direct one, because
+	// the check verifies the quote, never the claim<->quote binding. So a quote
+	// really from page B can arrive carrying a claim the model formed on page A.
+	// Recording the re-attribution is what keeps that residual risk auditable
+	// instead of invisible.
+	const attribution = claimedUrl && claimedUrl !== url
+		? [`- attributed-to: ${claimedUrl} (auto-corrected: the quote is from the source above)`]
+		: [];
 	return [
 		`### #${n} ${claim.replace(/\s+/g, " ").trim()}`,
 		`- source: ${url}`,
+		...attribution,
 		`- retrieved: ${page.fetchedAt} (sha256:${page.sha256.slice(0, 12)})`,
 		"```quote",
 		quote.trim(),
@@ -173,7 +186,14 @@ export function appendToLedger(path: string, chunk: string, header?: string): vo
 	let existing = "";
 	try {
 		existing = readFileSync(path, "utf8");
-	} catch {
+	} catch (error) {
+		// ONLY "the file isn't there yet" may fall through to a fresh header. Any
+		// other read failure (EACCES, EMFILE, EIO) used to be swallowed here and
+		// then renamed over the original — silently discarding every prior note.
+		// For an append-only provenance record that is the wrong failure direction:
+		// refuse the append and let the caller tell the model to keep the citation
+		// inline (the ledger_write_failed path).
+		if ((error as NodeJS.ErrnoException)?.code !== "ENOENT") throw error;
 		existing = header ?? "";
 	}
 	const tmp = `${path}.${process.pid}.tmp`;

@@ -199,10 +199,15 @@ export function renderLens(state: BlackboardState, maxChars: number): string {
 	if (failing.length === 0 && !state.verify?.mutated && state.plan.runId === null && !researchActive) return "";
 	const parts: string[] = [];
 	if (failing.length) parts.push(`attempted+failing: ${failing.join(" | ")}`);
-	// A rejected note means a citation was proposed with a quote that isn't in any
-	// fetched page — surfacing the count nudges re-quoting from the source.
+	// A rejected note means a proposed citation did not record. The lens does NOT
+	// diagnose why: notesRejected covers three different causes (quote in no
+	// fetched page, quote ambiguous across 2+ pages, ledger write failed) whose
+	// remedies differ and even conflict — "re-quote" is actively wrong for the
+	// ambiguous case, where the fix is a LONGER, more distinctive span. The tool's
+	// own refusal text carries the specific reason; the lens just surfaces that it
+	// happened.
 	if (researchActive) {
-		parts.push(`research: ${research.notes} verified note(s)${research.notesRejected > 0 ? `, ${research.notesRejected} refused (quote not in a fetched page — re-quote)` : ""}`);
+		parts.push(`research: ${research.notes} verified note(s)${research.notesRejected > 0 ? `, ${research.notesRejected} refused (see each tool result for the reason)` : ""}`);
 	}
 	if (state.verify) {
 		parts.push(state.verify.verifiedOk

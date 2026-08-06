@@ -21,8 +21,8 @@ candidates as dark). Net changes since 0.3.0; the full per-decision record is
   verbatim (modulo whitespace) in a page fetched this session — hallucinated citations become
   impossible to record — an append-only `.pi/research/<stamp>.md` ledger, additive budget
   footers, a `web_search` elision receipt, and a `harness/agents/researcher.md` role. Skill v2
-  drives note-after-read + an advisory verifier subagent pass. `research/note` and
-  `research/run-summary` telemetry (no URLs/queries). Evaluation procedure in
+  drives note-after-read + an advisory verifier subagent pass. `research/note`, `research/run-summary` and
+  `research/wrap-steer` telemetry (no URLs/queries). Evaluation procedure in
   `optimizer/docs/RESEARCH_EVAL_QUESTIONS_2026-08.md`.
 - Ketch failures now classify into the failure-episode taxonomy (`ketch upstream` → provider,
   `ketch is unavailable` → command_missing) instead of falling through to `unknown`.

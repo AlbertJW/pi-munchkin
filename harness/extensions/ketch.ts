@@ -138,7 +138,14 @@ export default function (pi: ExtensionAPI) {
 	}
 	function budgetFooter(): string {
 		if (!LEDGER_ENABLED) return "";
-		return `\n\nresearch budget: searches ${counts.searches}/${SKILL_BUDGET.searches} · reads ${counts.reads}/${SKILL_BUDGET.reads} · notes ${counts.notes}`;
+		// The ledger path rides EVERY research tool result once a ledger exists, not
+		// just the one success message that happens to mention it. Two reasons: the
+		// corrected-note message doesn't repeat it, and compaction summarizes tool
+		// results away (only read/write/edit tool-call ARGUMENTS reach pi's
+		// structured survivor list, and a path in a tool RESULT is not one). The
+		// skill's verifier step needs this path by name, so it has to be durable.
+		const ledger = activeLedgerPath ? ` · ledger ${activeLedgerPath}` : "";
+		return `\n\nresearch budget: searches ${counts.searches}/${SKILL_BUDGET.searches} · reads ${counts.reads}/${SKILL_BUDGET.reads} · notes ${counts.notes}${ledger}`;
 	}
 	if (LEDGER_ENABLED) {
 		pi.on("session_start", async () => {
@@ -379,7 +386,7 @@ export default function (pi: ExtensionAPI) {
 					noteCount += 1;
 					appendToLedger(
 						activeLedgerPath,
-						renderNoteLine(noteCount, params.claim, sourceUrl, params.quote, verdict.page),
+						renderNoteLine(noteCount, params.claim, sourceUrl, params.quote, verdict.page, params.url),
 						"# Research ledger\n\nEvery entry below passed the verbatim-quote check against a page fetched this session.\n\n",
 					);
 				} catch {
@@ -391,9 +398,11 @@ export default function (pi: ExtensionAPI) {
 				counts.notes += 1;
 				publishResearchState();
 				record("research", "note", { ok: true, reason_class: verdict.corrected ? "corrected" : "ok", quote_chars: params.quote.length });
+				// The ledger path is NOT repeated here — budgetFooter() carries it on
+				// every research tool result, so both branches keep it.
 				const note = verdict.corrected
 					? `recorded #${noteCount} under ${sourceUrl} — that quote is from there, not the URL you typed; cite ${sourceUrl} for it. (${counts.notes} verified this session)`
-					: `recorded #${noteCount} (${counts.notes} verified note${counts.notes === 1 ? "" : "s"} this session; ledger: ${activeLedgerPath})`;
+					: `recorded #${noteCount} (${counts.notes} verified note${counts.notes === 1 ? "" : "s"} this session)`;
 				return text(note + budgetFooter(), { note: noteCount, corrected: verdict.corrected });
 			},
 		}),
