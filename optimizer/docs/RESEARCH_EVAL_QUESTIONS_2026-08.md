@@ -272,3 +272,21 @@ defects 1–3 and is now unblocked. It needs a frontier judge endpoint for the s
 approved box time; the deterministic citation-fidelity half can run any time. Until Run 3 shows
 the refusal rate down and no collapse, `RESEARCH_LEDGER` remains dark — the fixes are reasoned
 and unit-proven, not yet field-measured on a full model-driven run.
+
+### Post-fix QA, 2026-08-06 (read this before running Run 3)
+
+A deep review of the fix commit found five defects, three introduced by the fix itself; all are
+repaired in `add34a0`. Two bear directly on Run 3's instrument:
+
+- **`reason_class` now has six values**, not four: `ok | corrected | url_not_read |
+  quote_not_found | quote_ambiguous | ledger_write_failed`. `corrected` ships with `ok: true` and
+  `quote_ambiguous` with `ok: false`, so the verified/refused ratio prescribed above is still
+  correct — but any breakdown keyed on `reason_class` must carry all six or it will undercount
+  every auto-corrected note.
+- **`corrected` is the metric that answers whether Fix 1 worked.** Run 2's 62% refusal rate was
+  mostly wrong-URL attribution; those attempts should now appear as `ok:true, reason_class:
+  corrected` rather than as refusals. A Run 3 that shows refusals down but `corrected` near zero
+  means something else changed, not that the fix worked.
+- The ledger now records `- attributed-to:` on re-attributed notes, so **the file itself reports
+  how many citations needed correcting** — a deterministic, judge-free fidelity signal Run 2 did
+  not have.

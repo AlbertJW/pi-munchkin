@@ -2373,3 +2373,45 @@ of notes visible (the opt-in hole — the mechanism the model must choose to inv
 that says small models don't). Both behaviour fixes counterfactually pinned; the full A/B re-run
 (Run 3) is the now-unblocked next gated step and the condition to keep before considering
 default-on. Details in `RESEARCH_EVAL_QUESTIONS_2026-08.md`.
+
+### Candidates recorded 2026-08-06 from two outside sources (not built)
+
+Two documents were reviewed for ideas: the Earendil post *"The Session You Cannot Take With You"*
+(inference-API session portability) and the r/LocalLLaMA thread on PrimeIntellect's Prime Agent.
+Most of both restates findings this corpus already owns — harness gains proved on a frontier model
+don't transfer, "subagents are always just tool calls", a self-modifying harness is useless to
+models not trained on it (our number: 1 voluntary subagent call in 942 base sessions). Three items
+are genuinely new to us. None is a defect; all are recorded, none built.
+
+**C-cost — the gate cannot see a cost regression.** A commenter reported running openbench, which
+holds the model fixed and swaps only the harness: on one model, Prime Agent solved 8/8 tasks for
+4.17M tokens against another harness's 8/8 for 2.06M. *Same score, 2x cost.* `real_gate.sh`
+measures pass/fail and graded subscores and nothing else, so a change that holds the score and
+doubles the tokens is a regression it **cannot detect**. We have already been bitten by exactly
+this shape: the research pipeline's 62% refusal storm was a pure cost regression at unchanged
+scores, and it was found by reading transcripts, not by an instrument. For a project whose central
+finding is "the gate is a one-sided regression detector," a tokens/turns-per-solved-task column is
+the cheapest available widening of what "harm" means — and it is report-side only, so it does not
+reopen the mothballed measurement path. Highest-value item in either document.
+*Evidence status: a Reddit comment. Per our own skill text, a search result is a lead, not
+evidence — the openbench numbers are a hypothesis to verify, not a measurement to cite.*
+
+**C-codeact — programmatic tool calling.** The argument (also from the thread): Python is
+in-distribution for these models, while JSON tool-call schemas are a synthetic subset of training
+data, so letting a model express actions as code may beat making it emit protocol. This is
+mechanism-class, not persuasion, and this repo has the matching scar tissue (`tool-call-rescue`,
+the GBNF `maxLength` ceiling, c48's spec-guessing). **Entry condition, and it is free:** count
+`tool-call-rescue/detected` rows across the existing corpus. If the malformed-call rate is near
+zero there is no headroom and the candidate dies at zero cost. Check the detection floor first.
+
+**C-ledger-fidelity — the full-fidelity research export.** Earendil's five tests are Inspect /
+Export / Replay / Audit / Delete, and their explicit ask for hosted search is "a full-fidelity
+export mode containing queries, result metadata, retrieved passages, timestamps and retained
+contents." The ledger is half of that artifact: it records the cited notes and now the
+re-attributions (Audit), but omits the search queries, the result lists, the elision receipt, the
+pages read but never cited, and the session's own identity — so Export and Replay fail. The build
+would be a ledger session header (model, ketch version, surface hash) plus a searches/reads
+section, and optionally content-addressed page snapshots under `.pi/research/pages/<sha256>.md`
+(the sha256 is already computed and the cache is already capped at 2 MiB), which would make the
+ledger self-contained and the session replayable by another model. **Gated behind Run 3** — do not
+grow the artifact before measuring whether the current one earns its keep.
