@@ -30,7 +30,11 @@ ARM="${ARM:-both}"                 # base | cand | both
 # the live agent's standard surface (minus deliberate exclusions) or rounds measure
 # a harness that doesn't exist — see the resolution block in run_one() for the
 # 2026-07-23 (plan_write) and 2026-07-28 (subagent, write) incidents this encodes.
-GATE_BASE_TOOLS="read,edit,write,bash,plan_write,subagent"
+# 2026-08-07: plan_go + span tools joined the base list when their flags went
+# default-on in the harness (ADR-0001: gate tools must mirror the harness
+# surface). A suppression arm setting PLAN_TOOL_GO=off / SPAN_TOOLS=off strips
+# them again below, keeping --tools consistent with what the extension registers.
+GATE_BASE_TOOLS="read,edit,write,bash,plan_write,subagent,plan_go,search_spans,read_span"
 DD="${DD:-qwen36-35b-iq3s}"; PI_TIMEOUT="${PI_TIMEOUT:-1800}"
 PI_MODEL="${PI_MODEL:-}"   # pi model id for the sessions (else pi uses its default — beware external defaults)
 PI_PROVIDER="${PI_PROVIDER:-}"
@@ -244,7 +248,7 @@ ensure_model_loaded() {
 if [[ "$DRY" == 1 ]]; then
 	echo "== real_gate DRY ==  GEN=$GEN  N=$N  base=$(basename "$BASE")  cand=$(basename "$CAND")"
 	echo "execution: network=$GATE_NETWORK model_control=$MODEL_CONTROL provider=${PI_PROVIDER:-auto} model=${PI_MODEL:-auto}"
-	echo "tools: $GATE_BASE_TOOLS (+flag-gated: plan_go, search_spans/read_span)"
+	echo "tools: $GATE_BASE_TOOLS (PLAN_TOOL_GO=off / SPAN_TOOLS=off strip their tools)"
 	if [[ "$MODEL_CONTROL" == "llama" ]]; then
 		echo "server: $(health && loaded_alias || echo DOWN)"
 	else
@@ -491,9 +495,10 @@ PY
 	while IFS= read -r -d '' entry; do session_env+=("$entry"); done < "$envfile"
 	local env_span_tools=""
 	for entry in ${session_env[@]+"${session_env[@]}"}; do [[ "$entry" == SPAN_TOOLS=* ]] && env_span_tools="${entry#*=}"; done
-	env_span_tools="${env_span_tools:-${SPAN_TOOLS:-off}}"
-	if [[ "${TRAJECTORY:-off}" == "on" && "$env_span_tools" != "on" ]]; then
-		echo "[real_gate] TRAJECTORY=on requires SPAN_TOOLS=on for $pat/$task; refusing argument-only evidence" >&2
+	# Default flipped 2026-08-07 with the harness adoption: unset now means ON.
+	env_span_tools="${env_span_tools:-${SPAN_TOOLS:-on}}"
+	if [[ "${TRAJECTORY:-off}" == "on" && "$env_span_tools" == "off" ]]; then
+		echo "[real_gate] TRAJECTORY=on requires span tools (now default-on; this arm sets SPAN_TOOLS=off) for $pat/$task; refusing argument-only evidence" >&2
 		exit 2
 	fi
 	# PLAN_SUBAGENT_ONLY blocks direct tool calls and points the model at
@@ -530,14 +535,17 @@ PY
 	# the explorer was never measured once (EXPLORER_BACKSTOP_RESEARCH_2026-07.md
 	# blocker 1), while write's absence pushed models to bash heredocs the live
 	# agent never needs. Deliberate exclusions from the base surface: web tools
-	# (network nondeterminism) and dark-candidate tools (plan_go, span tools —
-	# flag-gated below). The t4/c25/c36/c37 conditional append this replaces is
-	# covered by the instrument-consistency guards below, which stay.
+	# (network nondeterminism). plan_go and span tools joined the base list
+	# 2026-08-07 when their harness flags went default-on (ADR-0001); an
+	# explicit =off suppression arm strips them here so --tools always mirrors
+	# what the extensions actually register under that arm's env.
 	local tools="$GATE_BASE_TOOLS"
-	# c39: standalone activation tool for state.phase="executing" — deliberately
-	# its own append, not merged into the subagent-family branch above.
-	[[ "$env_plan_tool_go" == "on" ]] && tools="$tools,plan_go"
-	[[ "$env_span_tools" == "on" ]] && tools="$tools,search_spans,read_span"
+	if [[ "$env_plan_tool_go" == "off" ]]; then
+		tools="${tools//,plan_go/}"
+	fi
+	if [[ "$env_span_tools" == "off" ]]; then
+		tools="${tools//,search_spans/}"; tools="${tools//,read_span/}"
+	fi
 	# Base-surface regression guard (unconditional, both arms, checked at the point
 	# $tools is finalized): a future edit that re-gates a base tool or replaces
 	# $tools wholesale must fail loudly here instead of silently measuring a harness
@@ -562,12 +570,12 @@ PY
 	# session doesn't actually have means the row would measure a harness that doesn't
 	# exist, exactly like c37/c38 were confounded.
 	if [[ ( "$task" == "t4" || "$env_plan_subagent_only" == "1" || \
-	        "$env_spawn_delegation" == "on" ) && \
+	        "$env_spawn_delegation" != "off" ) && \
 	      ",$tools," != *",subagent,"* ]]; then
 		echo "[real_gate] task==t4/PLAN_SUBAGENT_ONLY/SPAWN_DELEGATION requires 'subagent' but --tools resolved to '$tools' for $pat/$task — refusing to measure a nonexistent harness surface" >&2
 		exit 2
 	fi
-	if [[ "$env_span_tools" == "on" && ( ",$tools," != *",search_spans,"* || ",$tools," != *",read_span,"* ) ]]; then
+	if [[ "$env_span_tools" != "off" && ( ",$tools," != *",search_spans,"* || ",$tools," != *",read_span,"* ) ]]; then
 		echo "[real_gate] SPAN_TOOLS=on requires 'search_spans,read_span' but --tools resolved to '$tools' for $pat/$task — refusing to measure a nonexistent harness surface" >&2
 		exit 2
 	fi
@@ -576,13 +584,13 @@ PY
 	# trip today — it exists as a regression guard against exactly the kind of silent
 	# drift that caused tonight's bug: a future edit re-gating plan_write, or a new
 	# branch that replaces $tools wholesale instead of appending, would trip it.
-	if [[ ( "$env_force_plan_write" == "on" || "$env_plan_uncertainty" == "on" || \
-	        "$env_plan_item_guidance_v2" == "on" ) && \
+	if [[ ( "$env_force_plan_write" != "off" || "$env_plan_uncertainty" != "off" || \
+	        "$env_plan_item_guidance_v2" != "off" ) && \
 	      ",$tools," != *",plan_write,"* ]]; then
 		echo "[real_gate] FORCE_PLAN_WRITE/PLAN_UNCERTAINTY/PLAN_ITEM_GUIDANCE_V2 requires 'plan_write' but --tools resolved to '$tools' for $pat/$task — refusing to measure a nonexistent harness surface" >&2
 		exit 2
 	fi
-	if [[ "$env_plan_tool_go" == "on" && ",$tools," != *",plan_go,"* ]]; then
+	if [[ "$env_plan_tool_go" != "off" && ",$tools," != *",plan_go,"* ]]; then
 		echo "[real_gate] PLAN_TOOL_GO=on requires 'plan_go' but --tools resolved to '$tools' for $pat/$task — refusing to measure a nonexistent harness surface" >&2
 		exit 2
 	fi
