@@ -2422,3 +2422,22 @@ c39, c36, c49, c30, c26, c13 — all `!== "off"` now, all counterfactually pinne
 tests throughout, GATE_BASE_TOOLS extended per ADR-0001, configs deleted per the inert-config
 rule (schema fields kept for suppression arms). The honesty line stands on every one: benefit
 was not established by a powered trial. Details in the verdicts doc addendum.
+
+**jcode review, 2026-08-07 — verdict: validates more than it improves.** Deep review of
+1jehuang/jcode (~690k LOC Rust harness) found its five defensible weaknesses are holes THIS
+harness already guards: an unbounded turn loop with no stuck detection (our loop-breaker), a
+free-text telemetry field on the weaker consent gate (our FORBIDDEN_DETAIL_FIELD whitelist),
+unbounded per-session growth (our caches are bounded), a benchmark measuring a non-default
+config on empty sessions (our prereg/floor discipline), and a steer pointing at a path that
+truncates 21-105x harder than the path it replaces (the Run 3 lesson, already paid for).
+Two floor probes run against our own corpus (3,538 sessions, 64,539 assistant turns):
+(1) multi-tool-call turns = 4.5% — batch-class candidates not structurally dead but thin, and
+jcode's own batch-nudge misfire + truncation tension argues against; skip. (2) sessions ending
+on an EMPTY assistant turn = 19.8%, which DECOMPOSED to 475 stopReason=length (84% >21 days
+old — the July gate-round era; the 6 recent ones are all the deliberately-bounded maple20b
+audit sweep), 144 error, 48 genuine empty-stop (1.4%), 33 aborts. The apparent 13% availability
+hole died at the age check — a historical gate artifact, not a live problem. Residual: the 48
+empty-stop sessions are a c49 sibling (rescue an empty final turn the way pseudo-calls are
+rescued) — recorded, not built, at 1.4% and mostly historical. One reusable checklist item:
+before adopting any steer, verify the path it points at is not degraded relative to the path it
+replaces (jcode's batch nudge vs 50KB cap; our Run 3 research_note vs loop-breaker).
