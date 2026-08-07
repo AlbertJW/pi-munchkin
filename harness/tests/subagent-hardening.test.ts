@@ -40,6 +40,7 @@ test("c36: executor description rewritten to spawn at injection time; other role
 	const explorer = "Read-only context gatherer. Returns distilled facts.";
 	const previous = process.env.SPAWN_DELEGATION;
 	try {
+		// ADOPTED 2026-08-07: default-on (was dark candidate c36) — unset must rewrite.
 		process.env.SPAWN_DELEGATION = "on";
 		const rewritten = agentDescriptionForPrompt(executor);
 		assert.ok(rewritten.includes("Use mode=spawn with a fully self-contained task — the child sees nothing else."), rewritten);
@@ -47,11 +48,11 @@ test("c36: executor description rewritten to spawn at injection time; other role
 		assert.equal(agentDescriptionForPrompt(explorer), explorer, "roles without the fork sentence pass through");
 
 		delete process.env.SPAWN_DELEGATION;
-		assert.equal(agentDescriptionForPrompt(executor), executor, "flag off is identity");
-		process.env.SPAWN_DELEGATION = "off";
-		assert.equal(agentDescriptionForPrompt(executor), executor, "off is identity");
+		assert.equal(agentDescriptionForPrompt(executor), rewritten, "unset = default-on: rewrite");
 		process.env.SPAWN_DELEGATION = "banana";
-		assert.equal(agentDescriptionForPrompt(executor), executor, "junk env is identity");
+		assert.equal(agentDescriptionForPrompt(executor), rewritten, "junk env = default-on: rewrite");
+		process.env.SPAWN_DELEGATION = "off";
+		assert.equal(agentDescriptionForPrompt(executor), executor, "SPAWN_DELEGATION=off is the kill switch — identity");
 	} finally {
 		if (previous === undefined) delete process.env.SPAWN_DELEGATION;
 		else process.env.SPAWN_DELEGATION = previous;

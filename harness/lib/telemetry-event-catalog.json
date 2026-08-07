@@ -46,6 +46,7 @@
     "micro-gate/slop-passed",
     "plan-runner/deps-rejected",
     "plan-runner/force-plan-write-block",
+    "plan-runner/force-plan-write-skip",
     "plan-runner/gate",
     "plan-runner/go",
     "plan-runner/go-blocked",

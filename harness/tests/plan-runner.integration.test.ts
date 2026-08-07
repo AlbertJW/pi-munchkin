@@ -568,16 +568,28 @@ test("c31: uncertainties hold execution — write steer, /plan-go block, clear-w
 	}
 });
 
-test("c31 dark: flag off — no schema field, no steer, no gate", async () => {
-	const fp = freshPlanRunner(); // module-load env has no PLAN_UNCERTAINTY
-	const cwd = tmp();
-	const tool = fp.tools.get("plan_write");
-	assert.ok(!JSON.stringify(tool.parameters).includes("uncertainties"),
-		"dark sessions must see a byte-identical tool schema");
-	const r = await callTool(fp, "plan_write", {
-		items: [{ title: "a", status: "pending" }], request: "r", summary: "s",
-	}, cwd);
-	assert.ok(!r.content[0].text.includes("uncertaint"));
+// ADOPTED 2026-08-07: default-on (was dark candidate c31) — unset must advertise
+// the field; PLAN_UNCERTAINTY=off is the kill switch and restores the legacy schema.
+test("c31 default-on: unset advertises uncertainties; PLAN_UNCERTAINTY=off restores the legacy schema", async () => {
+	const fp = freshPlanRunner(); // module-load env has no PLAN_UNCERTAINTY -> default-on
+	assert.ok(JSON.stringify(fp.tools.get("plan_write").parameters).includes("uncertainties"),
+		"unset = default-on: the schema field is advertised");
+
+	process.env.PLAN_UNCERTAINTY = "off";
+	try {
+		const off = makeFakePi();
+		const mod = await import(`../extensions/plan-runner.ts?c31off=${Date.now()}-${Math.random()}`);
+		mod.default(off.pi as any);
+		const cwd = tmp();
+		assert.ok(!JSON.stringify(off.tools.get("plan_write").parameters).includes("uncertainties"),
+			"PLAN_UNCERTAINTY=off kills it — byte-identical legacy schema");
+		const r = await callTool(off, "plan_write", {
+			items: [{ title: "a", status: "pending" }], request: "r", summary: "s",
+		}, cwd);
+		assert.ok(!r.content[0].text.includes("uncertaint"));
+	} finally {
+		delete process.env.PLAN_UNCERTAINTY;
+	}
 });
 
 test("c34: flag on swaps the legacy 5-10 item bound for non-numeric guidance", async () => {
@@ -596,12 +608,28 @@ test("c34: flag on swaps the legacy 5-10 item bound for non-numeric guidance", a
 	}
 });
 
-test("c34 dark: flag off — legacy 5-10 item wording unchanged", async () => {
-	const fp = freshPlanRunner(); // module-load env has no PLAN_ITEM_GUIDANCE_V2
+// ADOPTED 2026-08-07: default-on (was dark candidate c34) — unset must use the
+// need-sized wording; PLAN_ITEM_GUIDANCE_V2=off restores the legacy numeric bound.
+test("c34 default-on: unset uses need-sized wording; =off restores the legacy 5-10 bound", async () => {
+	const fp = freshPlanRunner(); // module-load env has no PLAN_ITEM_GUIDANCE_V2 -> default-on
 	const cwd = tmp();
 	const { ctx } = makeCtx(cwd);
 	await fp.commands.get("plan").handler("add a widget", ctx);
-	assert.ok(fp.sent[0].includes("Break REQ into 5-10 ordered items."), fp.sent[0]);
+	assert.ok(!fp.sent[0].includes("5-10 ordered items"), "unset = default-on: numeric bound gone");
+	assert.ok(fp.sent[0].includes("sized to the real work"), fp.sent[0]);
+
+	process.env.PLAN_ITEM_GUIDANCE_V2 = "off";
+	try {
+		const off = makeFakePi();
+		const mod = await import(`../extensions/plan-runner.ts?c34off=${Date.now()}-${Math.random()}`);
+		mod.default(off.pi as any);
+		const { ctx: offCtx } = makeCtx(tmp());
+		await off.commands.get("plan").handler("add a widget", offCtx);
+		assert.ok(off.sent[0].includes("Break REQ into 5-10 ordered items."),
+			"PLAN_ITEM_GUIDANCE_V2=off restores the legacy wording");
+	} finally {
+		delete process.env.PLAN_ITEM_GUIDANCE_V2;
+	}
 });
 
 test("c36: SPAWN_DELEGATION=on swaps fork advice for spawn + self-contained everywhere", async () => {
@@ -653,11 +681,23 @@ test("c36: SPAWN_DELEGATION=on swaps fork advice for spawn + self-contained ever
 	}
 });
 
-test("c36 dark: flag off — legacy fork wording byte-identical", () => {
-	// module-level import was loaded without SPAWN_DELEGATION
+// ADOPTED 2026-08-07: default-on (was dark candidate c36) — unset must recommend
+// spawn; SPAWN_DELEGATION=off restores the byte-identical fork wording.
+test("c36 default-on: unset recommends spawn; =off restores the fork wording byte-identical", async () => {
+	// module-level import was loaded without SPAWN_DELEGATION -> default-on
 	const policy = policyBlock("lean", true);
-	assert.ok(policy.includes("subagent(executor, …, mode=fork). You own the plan; trivial edits yourself."), policy);
-	assert.ok(!policy.includes("SELF-CONTAINED"), policy);
+	assert.ok(policy.includes("subagent(executor, …, mode=spawn)"), policy);
+	assert.ok(policy.includes("SELF-CONTAINED"), policy);
+
+	process.env.SPAWN_DELEGATION = "off";
+	try {
+		const mod = await import(`../extensions/plan-runner.ts?c36off=${Date.now()}-${Math.random()}`);
+		const offPolicy = mod.policyBlock("lean", true);
+		assert.ok(offPolicy.includes("subagent(executor, …, mode=fork). You own the plan; trivial edits yourself."), offPolicy);
+		assert.ok(!offPolicy.includes("SELF-CONTAINED"), offPolicy);
+	} finally {
+		delete process.env.SPAWN_DELEGATION;
+	}
 });
 
 test("c38: FORCE_PLAN_WRITE blocks the first mutation before any plan_write call, allows reads", async () => {
@@ -676,7 +716,8 @@ test("c38: FORCE_PLAN_WRITE blocks the first mutation before any plan_write call
 
 		const edit = await fire(fp, "tool_call", { toolName: "edit", input: {} }, ctx);
 		assert.equal(edit?.block, true);
-		assert.ok(edit.reason.includes("Call plan_write first"), edit.reason);
+		assert.ok(edit.reason.includes("call plan_write"), edit.reason);
+		assert.ok(edit.reason.includes("plan_go"), "the block message must name the activation step (the gemma-collapse root cause was omitting it)");
 
 		const bashMut = await fire(fp, "tool_call", { toolName: "bash", input: { command: "sed -i s/a/b/ file" } }, ctx);
 		assert.equal(bashMut?.block, true, "mutating bash blocked same as edit");
@@ -723,14 +764,60 @@ test("c38: fails open when plan_write is not an active tool — no deadlock", as
 	}
 });
 
-test("c38 dark: flag off — the very first mutation proceeds with no plan_write required", async () => {
-	const fp = makeFakePi();
-	const mod = await import(`../extensions/plan-runner.ts?c38dark=${Date.now()}-${Math.random()}`);
-	mod.default(fp.pi as any);
+// ADOPTED 2026-08-07: default-on (was dark candidate c38) — the kill-switch case
+// pins plan_write as ACTIVE so it cannot pass vacuously through the fail-open path.
+test("c38 kill switch: FORCE_PLAN_WRITE=off — the very first mutation proceeds with no plan_write required", async () => {
+	process.env.FORCE_PLAN_WRITE = "off";
+	try {
+		const fp = makeFakePi();
+		const mod = await import(`../extensions/plan-runner.ts?c38off=${Date.now()}-${Math.random()}`);
+		mod.default(fp.pi as any);
+		const cwd = tmp();
+		const { ctx } = makeCtx(cwd);
+		fp.pi.getActiveTools = () => ["plan_write"]; // fail-open path unavailable — off must be the reason
+		const edit = await fire(fp, "tool_call", { toolName: "edit", input: {} }, ctx);
+		assert.equal(edit, undefined, "FORCE_PLAN_WRITE=off kills the gate");
+	} finally {
+		delete process.env.FORCE_PLAN_WRITE;
+	}
+});
+
+test("c38 default-on: unset blocks the first unplanned mutation; gemma-family models are skipped with a receipt", async () => {
+	// no FORCE_PLAN_WRITE in env -> default-on
 	const cwd = tmp();
-	const { ctx } = makeCtx(cwd);
-	const edit = await fire(fp, "tool_call", { toolName: "edit", input: {} }, ctx);
-	assert.equal(edit, undefined, "legacy behavior: no plan_write requirement when the flag is off");
+	const telemetry = join(cwd, "telemetry.jsonl");
+	const priorFile = process.env.TELEMETRY_FILE;
+	const priorSource = process.env.TELEMETRY_SOURCE;
+	process.env.TELEMETRY_FILE = telemetry;
+	process.env.TELEMETRY_SOURCE = "test";
+	try {
+		const fp = makeFakePi();
+		const mod = await import(`../extensions/plan-runner.ts?c38gemma=${Date.now()}-${Math.random()}`);
+		mod.default(fp.pi as any);
+		fp.pi.getActiveTools = () => ["plan_write"];
+
+		// Non-gemma model: blocked (default-on is live).
+		const { ctx } = makeCtx(cwd);
+		const blocked = await fire(fp, "tool_call", { toolName: "edit", input: {} }, ctx);
+		assert.equal(blocked?.block, true, "unset = default-on: unplanned mutation blocked");
+
+		// Gemma-family model: the standing verdict is honored in code — no block,
+		// and the skip leaves a telemetry receipt.
+		const gemmaCtx = {
+			cwd: tmp(),
+			model: { provider: "local-llamacpp", id: "gemma-4-e2b" },
+			ui: { notify: () => {}, confirm: async () => true },
+		};
+		const skipped = await fire(fp, "tool_call", { toolName: "edit", input: {} }, gemmaCtx);
+		assert.equal(skipped, undefined, "gemma family is never gated (measured 0/9 collapse)");
+		const rows = readFileSync(telemetry, "utf8").trim().split("\n").map((line) => JSON.parse(line));
+		const skip = rows.find((row) => row.ext === "plan-runner" && row.kind === "force-plan-write-skip");
+		assert.ok(skip, "force-plan-write-skip recorded");
+		assert.equal(skip.model_class, "gemma");
+	} finally {
+		if (priorFile === undefined) delete process.env.TELEMETRY_FILE; else process.env.TELEMETRY_FILE = priorFile;
+		if (priorSource === undefined) delete process.env.TELEMETRY_SOURCE; else process.env.TELEMETRY_SOURCE = priorSource;
+	}
 });
 
 test("c38: telemetry — force-plan-write-block recorded on the gated first mutation", async () => {
@@ -759,12 +846,24 @@ test("c38: telemetry — force-plan-write-block recorded on the gated first muta
 	}
 });
 
-test("c39 dark: PLAN_TOOL_GO off — plan_go is not registered", () => {
-	const fp = freshPlanRunner(); // module-load env has no PLAN_TOOL_GO
-	assert.equal(fp.tools.get("plan_go"), undefined, "plan_go must not exist when the flag is off");
+// ADOPTED 2026-08-07: default-on (was dark candidate c39) — unset must register
+// the tool; PLAN_TOOL_GO=off is the kill switch.
+test("c39 default-on: unset registers plan_go; PLAN_TOOL_GO=off removes it", async () => {
+	const fp = freshPlanRunner(); // module-load env has no PLAN_TOOL_GO -> default-on
+	assert.ok(fp.tools.get("plan_go"), "unset = default-on: plan_go is registered");
 	const planWrite = fp.tools.get("plan_write");
 	assert.ok(!JSON.stringify({ description: planWrite.description, promptSnippet: planWrite.promptSnippet }).includes("plan_go"),
-		"plan_write's own schema/description must stay untouched by this flag");
+		"plan_write's own schema/description stays untouched either way");
+
+	process.env.PLAN_TOOL_GO = "off";
+	try {
+		const off = makeFakePi();
+		const mod = await import(`../extensions/plan-runner.ts?c39off=${Date.now()}-${Math.random()}`);
+		mod.default(off.pi as any);
+		assert.equal(off.tools.get("plan_go"), undefined, "PLAN_TOOL_GO=off kills the tool");
+	} finally {
+		delete process.env.PLAN_TOOL_GO;
+	}
 });
 
 test("c39: plan_go blocked — no plan exists", async () => {

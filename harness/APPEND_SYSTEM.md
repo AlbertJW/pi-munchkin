@@ -20,7 +20,7 @@ Model owns the list: plan_write to add/remove/reorder/restatus. One item in_prog
 Push noisy work into subagents — they return only a distilled result:
 - context-heavy lookup → subagent(explorer, …) — read-only.
 - risky claim or non-trivial change → subagent(verifier, …).
-- one bounded, fully-specified edit → subagent(executor, …, fork).
+- one bounded, fully-specified edit → subagent(executor, …, spawn) — task self-contained.
 
 ## Reports
 

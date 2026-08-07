@@ -23,12 +23,13 @@ export function parseDelegationMode(raw: unknown): DelegationMode | null {
   return null;
 }
 
-// c36 (dark, SPAWN_DELEGATION=on): the executor role file recommends fork in
-// its description. Rewrite exactly that sentence at injection time — the file
-// on disk is shared with dark arms and must not change. Env is read at call
-// time (steerText's live-env pattern) so tests need no module reload.
+// c36 (LIVE default-on since 2026-08-07; was dark candidate): the executor
+// role file recommends fork in its description. Rewrite exactly that sentence
+// at injection time — the file on disk stays fork-worded so SPAWN_DELEGATION=off
+// arms need no file change. Env is read at call time (steerText's live-env
+// pattern) so tests need no module reload.
 export function agentDescriptionForPrompt(description: string): string {
-  if (process.env.SPAWN_DELEGATION !== "on") return description;
+  if (process.env.SPAWN_DELEGATION === "off") return description;
   return description.replace(
     "Use mode=fork so it has surrounding context.",
     "Use mode=spawn with a fully self-contained task — the child sees nothing else.",

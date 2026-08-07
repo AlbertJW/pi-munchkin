@@ -76,28 +76,45 @@ const PLAN_SUBAGENT_ONLY = process.env.PLAN_SUBAGENT_ONLY === "1";
 // window accumulates only clamped subagent results (runner-events.js caps each
 // at 12000 chars). The model decides delegation; the harness only blocks+steers
 // (c25 precedent — no engine dispatch).
-// Dark candidate c31: a plan-level uncertainties[] field with a structural
-// pause — a model that surfaces uncertainty must be stopped from guessing
-// past it (deterministic gate, no LLM judgment call). npcsh loop_plan port.
-const PLAN_UNCERTAINTY = process.env.PLAN_UNCERTAINTY === "on";
+// c31 (LIVE default-on since 2026-08-07; was dark candidate): a plan-level
+// uncertainties[] field with a structural pause — a model that surfaces
+// uncertainty must be stopped from guessing past it (deterministic gate, no
+// LLM judgment call). npcsh loop_plan port. ADOPTED by judgment
+// (Albert-approved; grounds in DARK_CANDIDATE_VERDICTS_2026-08-03.md
+// addendum): benefit was not established by a powered trial, and its own
+// round evidence says the field went unused when optional.
+// PLAN_UNCERTAINTY=off is the kill switch.
+const PLAN_UNCERTAINTY = process.env.PLAN_UNCERTAINTY !== "off";
 // Dark candidate c32: verify commit SHAs the model writes into notes/summary
 // actually exist (git cat-file -e) — catches confabulated provenance.
-// Dark candidate c34: the legacy "5-10 ordered items" line is an unenforced
-// numeric bound (plan_write's schema has no maxItems) — replace with
-// non-numeric, need-sized guidance that keeps the same anti-padding /
-// anti-fake-split intent.
-const PLAN_ITEM_GUIDANCE_V2 = process.env.PLAN_ITEM_GUIDANCE_V2 === "on";
-// Dark candidate c36: everywhere delegation guidance recommends mode=fork for
-// executor work, recommend mode=spawn + an explicitly SELF-CONTAINED task —
-// each child starts with a small fresh context instead of a parent snapshot.
-const SPAWN_DELEGATION = process.env.SPAWN_DELEGATION === "on";
-// Dark candidate c38: every mechanism gated behind a plan_write call (c31's
-// uncertainty pause included) has no surface to fire on when a model skips
-// planning entirely — measured directly: 0/6 sessions called plan_write at
-// all in the first live c31 round against sv-ambiguous-spec. Forces the
-// FIRST plan_write call before any mutation; once state exists this never
-// fires again, so re-planning/updating later is unaffected.
-const FORCE_PLAN_WRITE = process.env.FORCE_PLAN_WRITE === "on";
+// c34 (LIVE default-on since 2026-08-07; was dark candidate): the legacy
+// "5-10 ordered items" line is an unenforced numeric bound (plan_write's
+// schema has no maxItems) — replace with non-numeric, need-sized guidance
+// that keeps the same anti-padding / anti-fake-split intent. ADOPTED by
+// judgment (Albert-approved); benefit was not established by a powered trial.
+// PLAN_ITEM_GUIDANCE_V2=off restores the legacy wording.
+const PLAN_ITEM_GUIDANCE_V2 = process.env.PLAN_ITEM_GUIDANCE_V2 !== "off";
+// c36 (LIVE default-on since 2026-08-07; was dark candidate): everywhere
+// delegation guidance recommends mode=fork for executor work, recommend
+// mode=spawn + an explicitly SELF-CONTAINED task — each child starts with a
+// small fresh context instead of a parent snapshot. ADOPTED by judgment
+// (Albert-approved); benefit was not established by a powered trial.
+// SPAWN_DELEGATION=off restores the fork wording (second read site:
+// vendor/pi-subagent/types.ts, call-time).
+const SPAWN_DELEGATION = process.env.SPAWN_DELEGATION !== "off";
+// c38 (LIVE default-on since 2026-08-07; was dark candidate): every mechanism
+// gated behind a plan_write call (c31's uncertainty pause included) has no
+// surface to fire on when a model skips planning entirely — measured directly:
+// 0/6 sessions called plan_write at all in the first live c31 round against
+// sv-ambiguous-spec. Forces the FIRST plan_write call before any mutation;
+// once state exists this never fires again, so re-planning/updating later is
+// unaffected. ADOPTED by judgment (Albert-approved) WITH two mitigations for
+// the measured gemma collapse (0/9, fabricated completion claims — the
+// corpus's only p<0.05 harm): an in-code gemma model-family skip at the block
+// site, and a block message that names the full plan_write -> plan_go path
+// instead of "retry the mutation". Benefit on other models was not
+// established by a powered trial. FORCE_PLAN_WRITE=off is the kill switch.
+const FORCE_PLAN_WRITE = process.env.FORCE_PLAN_WRITE !== "off";
 // Dark candidate c39: gives the model a TOOL (plan_go) to flip
 // state.phase "planned" -> "executing" itself, mirroring goCommand's exact
 // validation (no plan / no open items / c31 uncertainty hold) but routed
@@ -107,7 +124,11 @@ const FORCE_PLAN_WRITE = process.env.FORCE_PLAN_WRITE === "on";
 // phase==="executing"-gated candidate (c25, c37, any future one) — can never
 // activate under measurement. This is the activation path, not a mechanism
 // of its own; PLAN_TOOL_GO alone should be near behavior-neutral.
-const PLAN_TOOL_GO = process.env.PLAN_TOOL_GO === "on";
+// (LIVE default-on since 2026-08-07; was dark candidate c39. ADOPTED by
+// judgment, Albert-approved — and required for c38's rewritten block message
+// to be honest. PLAN_TOOL_GO=off is the kill switch; gate rounds must keep
+// plan_go in GATE_BASE_TOOLS per ADR-0001.)
+const PLAN_TOOL_GO = process.env.PLAN_TOOL_GO !== "off";
 
 type ItemStatus = "pending" | "in_progress" | "done" | "blocked";
 type Phase = "planned" | "executing";
@@ -1405,24 +1426,40 @@ export default function (pi: ExtensionAPI) {
 		// plan_write anyway, so ordering doesn't change their behavior; this
 		// just gives the earliest, most specific reason when no plan exists yet.
 		if (FORCE_PLAN_WRITE) {
-			const isMutation =
-				PLAN_MUTATION_TOOLS.has(event.toolName) ||
-				(event.toolName === "bash" && classifyBashCommand(String((event.input as Record<string, unknown> | undefined)?.command ?? "")).mutates);
-			// Fail open when plan_write isn't in the session's active tool set —
-			// blocking with no escape hatch is a deadlock, proven live: a --tools
-			// list without plan_write left the model retry-looping the block for
-			// 15 minutes ("plan_write is not in my available tools list") before
-			// giving up. Same check pattern as subagentAvailable in c25/c37.
-			if (isMutation && pi.getActiveTools().includes("plan_write")) {
-				const state = await readState(ctx.cwd);
-				if (!state) {
-					rememberModel(ctx);
-					planEvent("force-plan-write-block", `no-plan-${actionId()}`, { toolName: event.toolName });
-					return {
-						block: true,
-						reason:
-							"failure_class=plan_mode_violation. Call plan_write first — write at least a one-item plan before making any edits. Then retry this call.",
-					};
+			// Gemma model-family skip — a deployment scope guard, not an A/B knob
+			// (same class as loop-breaker's LB_LOCAL_ONLY: decides WHERE this runs,
+			// deliberately absent from schema.json thresholds). Grounds: measured
+			// 0/9 on gemma-4-e2b with fabricated "tests passed" claims over red
+			// gates (CANDIDATE_PRUNING_2026-07.md) — the corpus's only p<0.05 harm.
+			// Standing verdict: never arm on that family. Read ctx.model directly:
+			// activeModel can still be {unknown} on a session's first tool call.
+			const model = rememberModel(ctx ?? {});
+			if (/gemma/i.test(model.id)) {
+				planEvent("force-plan-write-skip", `gemma-${actionId()}`, { model_class: "gemma" });
+			} else {
+				const isMutation =
+					PLAN_MUTATION_TOOLS.has(event.toolName) ||
+					(event.toolName === "bash" && classifyBashCommand(String((event.input as Record<string, unknown> | undefined)?.command ?? "")).mutates);
+				// Fail open when plan_write isn't in the session's active tool set —
+				// blocking with no escape hatch is a deadlock, proven live: a --tools
+				// list without plan_write left the model retry-looping the block for
+				// 15 minutes ("plan_write is not in my available tools list") before
+				// giving up. Same check pattern as subagentAvailable in c25/c37.
+				if (isMutation && pi.getActiveTools().includes("plan_write")) {
+					const state = await readState(ctx.cwd);
+					if (!state) {
+						planEvent("force-plan-write-block", `no-plan-${actionId()}`, { toolName: event.toolName });
+						// The message names the FULL path. The gemma collapse's root
+						// cause was this message ending "Then retry this call" — the
+						// model wrote one plan, never activated it, and fabricated
+						// completion. plan_go is default-on in the same adoption, so
+						// naming it is honest.
+						return {
+							block: true,
+							reason:
+								"failure_class=plan_mode_violation. No plan exists yet. First call plan_write with at least a one-item plan, then call plan_go to start executing, then retry this call.",
+						};
+					}
 				}
 			}
 		}
