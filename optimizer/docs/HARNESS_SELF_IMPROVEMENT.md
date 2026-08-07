@@ -2415,3 +2415,10 @@ section, and optionally content-addressed page snapshots under `.pi/research/pag
 (the sha256 is already computed and the cache is already capped at 2 MiB), which would make the
 ledger self-contained and the session replayable by another model. **Gated behind Run 3** — do not
 grow the artifact before measuring whether the current one earns its keep.
+
+**Nine-flag adoption, 2026-08-07 (human-gated, by judgment).** Albert directed the largest
+default flip since the trio: c38 (gemma-skipped, block message re-pointed at plan_go), c31, c34,
+c39, c36, c49, c30, c26, c13 — all `!== "off"` now, all counterfactually pinned, both-polarity
+tests throughout, GATE_BASE_TOOLS extended per ADR-0001, configs deleted per the inert-config
+rule (schema fields kept for suppression arms). The honesty line stands on every one: benefit
+was not established by a powered trial. Details in the verdicts doc addendum.

@@ -65,6 +65,12 @@ across a live-mirror rollout. Record the loaded `HARNESS_SURFACE_SHA256` with ev
   experiments; `off` is the kill switch.
 - Teach hints and did-you-mean remain default-on, reversible, and mechanism-observed. No powered
   trial has established their benefit.
+- 2026-08-07 (human-gated, judgment): nine more defaults — `FORCE_PLAN_WRITE` (with an in-code
+  gemma-family skip and a block message naming `plan_write` → `plan_go`), `PLAN_UNCERTAINTY`,
+  `PLAN_ITEM_GUIDANCE_V2`, `PLAN_TOOL_GO`, `SPAWN_DELEGATION`, `TOOL_CALL_RESCUE`,
+  `CONTEXT_BRIEF`, `READ_DEDUP`, `SPAN_TOOLS`. Each `X=off` is the kill switch. None passed a
+  powered trial; grounds and honesty box in `DARK_CANDIDATE_VERDICTS_2026-08-03.md`'s addendum.
+  Gate rounds carry `plan_go,search_spans,read_span` in `GATE_BASE_TOOLS` (ADR-0001).
 - Drift review starts only after the run settles (`agent_settled`), aborts on a new
   run/shutdown, and drops stale advice.
 - Cockpits live under `${PI_CODING_AGENT_DIR}/artifacts/session-cockpits/`, never in a project.

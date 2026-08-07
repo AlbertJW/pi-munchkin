@@ -182,3 +182,35 @@ there. The long-horizon venue where it should win is what `audit-sweep` was buil
 vs single-session on `audit-sweep`, graded; hybrid arm = anneal orchestration with workers
 pointed at `~/.pi/agent` (keeping hashline/hints/loop-breaker) instead of `--no-extensions`.
 Box-gated; recorded, not built.
+
+---
+
+## Addendum 2026-08-07 — nine flags adopted by judgment (Albert-approved)
+
+Albert directed adoption of: **c38** FORCE_PLAN_WRITE, **c49** TOOL_CALL_RESCUE, **c30**
+CONTEXT_BRIEF, **c26** READ_DEDUP, **c13** SPAN_TOOLS, **c31** PLAN_UNCERTAINTY, **c34**
+PLAN_ITEM_GUIDANCE_V2, **c39** PLAN_TOOL_GO, **c36** SPAWN_DELEGATION. All nine flipped to
+`!== "off"` defaults (template `579c32b`); every `X=off` is the kill switch; their candidate
+configs are deleted (the inert-config rule) while their schema fields remain so suppression arms
+stay expressible. Gate rounds now carry `plan_go,search_spans,read_span` in `GATE_BASE_TOOLS`
+per ADR-0001, with `=off` suppression stripping.
+
+**c38's standing "never arm on that model family" verdict is honored in code, not repealed:** the
+block site skips gemma-family model ids (leaving a `plan-runner/force-plan-write-skip` receipt),
+and the block message now names the full `plan_write` → `plan_go` → retry path — the documented
+root cause of the collapse was the old message pointing back at the mutation.
+
+**Honesty box.** None of these nine passed a powered trial; the gate (a one-sided regression
+detector at its n) established only that most produced no detectable harm, which is not evidence
+of benefit. Specific caveats carried forward: c38 measured 0/9 WITH fabricated completions on
+gemma (mitigated by the in-code skip, unmeasured with the new message); c31's own round evidence
+is that the model never voluntarily populated `uncertainties` when it was optional; c34's one
+sweep delta was −22pp at n=9 (band noise, but the sign was negative); c26 transforms the context
+view (one class riskier than pure-append) and its `prefix_stable` guardrail is blind under
+`STATE_LENS=view|both`; span tools feed loop-breaker's non-progress streak when paging. These
+adoptions are reversible deployments, not measured wins — a future round measuring any of them
+needs a suppression arm.
+
+Not adopted, unchanged: CTX_REDUNDANCY_NUDGE (retire-leaning), c25 PLAN_SUBAGENT_ONLY (dark;
+its activation path is now live by default via plan_go), BASH_OUTPUT_GUARD, RESEARCH_LEDGER
+(Run 3: refusal→abort), MICRO_GATE family, LOOP_EPISODE_MODE=enforce, PAYLOAD_AUDIT (instrument).

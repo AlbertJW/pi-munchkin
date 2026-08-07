@@ -39,13 +39,18 @@ candidates as dark). Net changes since 0.3.0; the full per-decision record is
   (`mlx_lm server`; full-artifact hash, runtime identity via lsof) — first exercised by
   `audit-sweep`'s first-ever round (`maple20b-audit-base`, ledger 2026-08-05).
 
+- **Adopted, default-on (2026-08-07, human-gated, by judgment):** `FORCE_PLAN_WRITE`
+  (in-code gemma-family skip + block message naming the `plan_write` → `plan_go` path),
+  `PLAN_UNCERTAINTY`, `PLAN_ITEM_GUIDANCE_V2`, `PLAN_TOOL_GO`, `SPAWN_DELEGATION`,
+  `TOOL_CALL_RESCUE`, `CONTEXT_BRIEF`, `READ_DEDUP`, `SPAN_TOOLS` — each `X=off` is the
+  kill switch; `plan_go`/`search_spans`/`read_span` joined `GATE_BASE_TOOLS` (ADR-0001);
+  none passed a powered trial.
 - **Adopted, default-on (2026-08-03/04, human-gated):** `session-blackboard` state lens
   (default mode `steer` since 2026-08-04; `STATE_LENS=off|view|both`), `teach-hints`
   (`TEACH_HINTS=off`), `did-you-mean` (`DID_YOU_MEAN=off`), and `tool-activation`
   (dynamic deferred `subagent`/`compact_context`; `MUNCHKIN_TOOL_ACTIVATION=ambient` reverts).
-- `session-blackboard` cockpit (human-only HTML/TUI), `tool-call-rescue` (dark,
-  `TOOL_CALL_RESCUE=on`), `bash-output-guard` (dark, `BASH_OUTPUT_GUARD=on`),
-  `SPAWN_DELEGATION` (dark).
+- `session-blackboard` cockpit (human-only HTML/TUI), `tool-call-rescue` (default-on since 2026-08-07), `bash-output-guard` (dark,
+  `BASH_OUTPUT_GUARD=on`).
 - Operational automation (2026-08-04): `npm run secret-scan:diff`, `npm run mirror:check`,
   `surface:hash:source`, compat/peer smoke checks, CI workflow, and
   `docs/SURFACE_BOUNDARIES.md` — the canonical surface-hash boundary ledger.

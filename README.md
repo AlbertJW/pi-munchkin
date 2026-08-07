@@ -112,12 +112,22 @@ Most behavior is automatic. The primary commands are:
 | `LB_SESSION_T1`, `LB_SESSION_T2`, `LB_SESSION_T3` | `7`, `11`, `28` cumulative repeats under enforcement | `LB_SESSION_REPEAT` remains the authoritative legacy 25-repeat steer in shadow mode and is a compatibility alias for enforced Tier 1 |
 | `PI_SANDBOX_POSTURE` | `unknown`; `/munchkin-doctor` accepts only `declared` or `host` as operator assertions | unset it to return to `unknown`; this label is observational and grants no isolation |
 | `TEACH_HINTS`, `DID_YOU_MEAN` | default-on bounded hints | set either to `off` |
+| `FORCE_PLAN_WRITE` | default-on; blocks the FIRST unplanned mutation with a message naming the `plan_write` → `plan_go` path; never re-arms once a plan exists; gemma-family models are skipped in code (measured collapse) | `off` |
+| `PLAN_UNCERTAINTY` | default-on; `plan_write` accepts `uncertainties[]` and execution holds while any remain (clear with `[]`) | `off` restores the legacy schema |
+| `PLAN_ITEM_GUIDANCE_V2` | default-on; need-sized plan-item wording | `off` restores the "5-10 ordered items" wording |
+| `PLAN_TOOL_GO` | default-on; the model-callable `plan_go` tool (same validation as `/plan-go`) | `off` removes the tool |
+| `SPAWN_DELEGATION` | default-on; delegation guidance recommends `mode=spawn` with self-contained tasks | `off` restores the fork wording |
+| `TOOL_CALL_RESCUE` | default-on; one corrective steer (max 2/session) when a session dies on a text-only pseudo tool call | `off` |
+| `CONTEXT_BRIEF` | default-on; a cached per-session environment brief appended to the system prompt (`CONTEXT_BRIEF_BYTES` bounds it) | `off` |
+| `READ_DEDUP` | default-on; later identical `read` results collapse to a back-reference in the per-call context view | `off` |
+| `SPAN_TOOLS` | default-on; `search_spans`/`read_span` for bounded work on large files | `off` removes both tools |
 | `KETCH` | default-on public search/read | `off` for offline/private sessions |
 | `RESEARCH_LEDGER` | dark (`on` enables the verified-citation research pipeline: session page cache, the `research_note` tool that refuses any quote not verbatim in a fetched page, budget footers, and a `.pi/research/<stamp>.md` ledger) | unset = byte-identical prior behaviour |
 | `VERIFY_GATE`, `LOOP_BREAKER`, `GIT_GUARD`, `HASHLINE` | default-on core mechanisms | each accepts its documented `off` kill switch |
 
 Oversized hashline refusals explain the distinction between the returned-context `limit` and the
-allocation cap. Use `rg`, `head`, `tail`, or a purpose-built span tool for oversized files.
+allocation cap. Use `search_spans`/`read_span` (default-on), or `rg`, `head`, `tail`, for
+oversized files.
 
 ## Security and privacy boundaries
 
