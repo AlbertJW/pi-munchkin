@@ -71,3 +71,24 @@ test("span tools BLOCK oversized files instead of loading them (input bounding)"
 		rmSync(dir, { recursive: true, force: true });
 	}
 });
+
+// ADOPTED 2026-08-07: default-on (was dark candidate c13) — unset registers both
+// tools; SPAN_TOOLS=off is the kill switch.
+test("span tools default-on: unset registers search_spans/read_span; SPAN_TOOLS=off removes both", async () => {
+	const prev = process.env.SPAN_TOOLS;
+	try {
+		delete process.env.SPAN_TOOLS; // unset = default-on
+		const fp = makeFakePi();
+		(await import(`../extensions/span-tools.ts?def=${Date.now()}-${Math.random()}`)).default(fp.pi as never);
+		assert.ok(fp.tools.get("search_spans"), "unset = default-on: search_spans registered");
+		assert.ok(fp.tools.get("read_span"), "unset = default-on: read_span registered");
+
+		process.env.SPAN_TOOLS = "off";
+		const off = makeFakePi();
+		(await import(`../extensions/span-tools.ts?off=${Date.now()}-${Math.random()}`)).default(off.pi as never);
+		assert.equal(off.tools.get("search_spans"), undefined, "SPAN_TOOLS=off kills both tools");
+		assert.equal(off.tools.get("read_span"), undefined);
+	} finally {
+		if (prev === undefined) delete process.env.SPAN_TOOLS; else process.env.SPAN_TOOLS = prev;
+	}
+});

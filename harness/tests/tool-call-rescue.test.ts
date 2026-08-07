@@ -42,12 +42,13 @@ test("extension: dark by default; steers at most twice; detection keeps recordin
 	const sent = fp.sent;
 	const prev = process.env.TOOL_CALL_RESCUE;
 	try {
-		delete process.env.TOOL_CALL_RESCUE;
+		// ADOPTED 2026-08-07: default-on (was dark candidate c49) — =off kills, unset registers.
+		process.env.TOOL_CALL_RESCUE = "off";
 		const off = await import(`../extensions/tool-call-rescue.ts?off=${Date.now()}-${Math.random()}`);
 		off.default(fp.pi as never);
-		assert.equal(fp.handlers.size, 0, "dark by default");
+		assert.equal(fp.handlers.size, 0, "TOOL_CALL_RESCUE=off kills it");
 
-		process.env.TOOL_CALL_RESCUE = "on";
+		delete process.env.TOOL_CALL_RESCUE; // unset = default-on
 		const on = await import(`../extensions/tool-call-rescue.ts?on=${Date.now()}-${Math.random()}`);
 		on.default(fp.pi as never);
 		await fire(fp, "session_start", {});

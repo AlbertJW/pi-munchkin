@@ -1,7 +1,8 @@
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { record } from "../lib/telemetry.ts";
 
-// Dark candidate c49 (TOOL_CALL_RESCUE=on): rescue sessions that die on the
+// tool-call-rescue (LIVE default-on since 2026-08-07; was dark candidate
+// c49). Rescues sessions that die on the
 // malformed pseudo-tool-call serving artifact — the model emits its tool call
 // as TEXT (`<tool_call></tool_call>\n<function=bash>…`, or a fenced lone JSON
 // call object), produces zero real toolCall blocks, and the session ends at
@@ -17,7 +18,10 @@ import { record } from "../lib/telemetry.ts";
 // (damper exhausted) still records `detected` — free occurrence-rate data.
 // v2 (recorded, not built): schema-locked one-shot reformat escalation.
 
-const ENABLED = process.env.TOOL_CALL_RESCUE === "on";
+// ADOPTED by judgment (Albert-approved); benefit was not established by a
+// powered trial. No cross-suppression with other steers — bounded by
+// MAX_RESCUES. TOOL_CALL_RESCUE=off is the kill switch.
+const ENABLED = process.env.TOOL_CALL_RESCUE !== "off";
 const MAX_RESCUES = 2;
 
 export type PseudoCallDetection = { signature: string; toolName: string | null };

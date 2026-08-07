@@ -1,5 +1,5 @@
-// context-brief (DARK: CONTEXT_BRIEF=on — munchkin candidate c30, not a
-// default). Appends a bounded, pre-computed environment brief to the system
+// context-brief (LIVE default-on since 2026-08-07; was dark candidate c30).
+// Appends a bounded, pre-computed environment brief to the system
 // prompt so the model skips discovery turns (ls/find/cat-package.json). The
 // brief is computed ONCE per session and cached — the system prompt (and so
 // the KV prefix and context-surface's system_prompt_sha256) stays stable
@@ -8,7 +8,12 @@ import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { buildBrief } from "../lib/context-brief.ts";
 import { record } from "../lib/telemetry.ts";
 
-const ENABLED = process.env.CONTEXT_BRIEF === "on";
+// LIVE default-on since 2026-08-07 (was dark candidate c30). ADOPTED by
+// judgment (Albert-approved); benefit was not established by a powered trial.
+// The brief stays cached per session, so the KV prefix remains stable within
+// a session. A missing git binary silently drops the git section (fail-open).
+// CONTEXT_BRIEF=off is the kill switch.
+const ENABLED = process.env.CONTEXT_BRIEF !== "off";
 // Clamped both ways: a runaway env value must not turn the brief into a
 // context flood any more than a tiny one may make it useless.
 const MAX_BYTES = Math.min(16384, Math.max(256, Number.parseInt(process.env.CONTEXT_BRIEF_BYTES || "2048", 10) || 2048));

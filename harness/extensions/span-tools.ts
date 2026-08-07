@@ -12,10 +12,13 @@ import { record } from "../lib/telemetry.ts";
 // provenance header). No LLM mapper, no reduce stage, no disk artifacts — the
 // corpus-coverage path stays deferred until this measures a gap.
 //
-// DORMANT by default: SPAN_TOOLS=on enables (a munchkin candidate is then a
-// pure env delta). Per-file cache keyed by (path, mtime) for the session.
-
-const ENABLED = process.env.SPAN_TOOLS === "on";
+// LIVE default-on since 2026-08-07 (was dark candidate c13; SPAN_TOOLS=off is
+// the kill switch). ADOPTED by judgment (Albert-approved); benefit was not
+// established by a powered trial. Per-file cache keyed by (path, mtime) for
+// the session. Known interaction, accepted: neither tool is in loop-breaker's
+// PROGRESS_TOOLS, so paging a large file feeds the non-progress streak.
+// Gate rounds must keep search_spans/read_span in GATE_BASE_TOOLS (ADR-0001).
+const ENABLED = process.env.SPAN_TOOLS !== "off";
 
 type LoadedFile = { mtimeMs: number; text: string; normalizedPath: string; size: number; sha256: string };
 const cache = new Map<string, LoadedFile>();

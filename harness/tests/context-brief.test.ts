@@ -57,12 +57,13 @@ test("integration: dark by default; on, appends to the system prompt once and st
 	process.env.TELEMETRY_FILE = join(tdir, "events.jsonl");
 	process.env.TELEMETRY_SOURCE = "test";
 	try {
-		delete process.env.CONTEXT_BRIEF;
+		// ADOPTED 2026-08-07: default-on (was dark candidate c30) — =off kills, unset appends.
+		process.env.CONTEXT_BRIEF = "off";
 		const offFp = makeFakePi();
 		(await import(`../extensions/context-brief.ts?off=${Date.now()}-${Math.random()}`)).default(offFp.pi as any);
-		assert.equal(await fire(offFp, "before_agent_start", { systemPrompt: "base" }, { cwd: dir }), undefined, "dark by default");
+		assert.equal(await fire(offFp, "before_agent_start", { systemPrompt: "base" }, { cwd: dir }), undefined, "CONTEXT_BRIEF=off kills it");
 
-		process.env.CONTEXT_BRIEF = "on";
+		delete process.env.CONTEXT_BRIEF; // unset = default-on
 		const onFp = makeFakePi();
 		(await import(`../extensions/context-brief.ts?on=${Date.now()}-${Math.random()}`)).default(onFp.pi as any);
 		const first = await fire(onFp, "before_agent_start", { systemPrompt: "base" }, { cwd: dir });

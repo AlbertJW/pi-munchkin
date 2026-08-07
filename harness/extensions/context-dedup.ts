@@ -1,4 +1,5 @@
-// Context read-dedup + redundancy nudge — both DARK A/B candidates.
+// Context read-dedup (LIVE default-on since 2026-08-07) + redundancy nudge
+// (still a DARK A/B candidate).
 //
 // READ_DEDUP=on (c26): a `context`-event view transform that collapses
 // repeated identical `read` results into a one-line back-reference (see
@@ -17,7 +18,13 @@ import { dedupReadResults } from "../lib/context-dedup.ts";
 import { steerText } from "../lib/steer-texts.ts";
 import { record } from "../lib/telemetry.ts";
 
-const READ_DEDUP = process.env.READ_DEDUP === "on";
+// READ_DEDUP: LIVE default-on since 2026-08-07 (was dark candidate c26).
+// ADOPTED by judgment (Albert-approved); benefit was not established by a
+// powered trial. One class riskier than pure-append adoptions (it TRANSFORMS
+// the view); its prefix_stable guardrail is blind only under STATE_LENS=view|
+// both (default steer keeps that artifact dormant). READ_DEDUP=off kills it.
+// The NUDGE below stays a dark candidate — independently gated, not adopted.
+const READ_DEDUP = process.env.READ_DEDUP !== "off";
 const NUDGE = process.env.CTX_REDUNDANCY_NUDGE === "on";
 const NUDGE_PCT = Math.min(95, Math.max(5, Number.parseInt(process.env.CTX_REDUNDANCY_PCT || "50", 10) || 50));
 const NUDGE_COOLDOWN_TURNS = 8;

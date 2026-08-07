@@ -82,20 +82,21 @@ test("integration: READ_DEDUP=on transforms the context view; off leaves it alon
 	process.env.TELEMETRY_FILE = join(dir, "events.jsonl");
 	process.env.TELEMETRY_SOURCE = "test";
 	try {
-		// off: handler not registered
-		delete process.env.READ_DEDUP;
+		// ADOPTED 2026-08-07: READ_DEDUP default-on (was dark candidate c26) —
+		// =off kills the handler; the NUDGE stays dark and is untouched by this.
+		process.env.READ_DEDUP = "off";
 		delete process.env.CTX_REDUNDANCY_NUDGE;
 		const offFp = makeFakePi();
 		(await import(`../extensions/context-dedup.ts?off=${Date.now()}-${Math.random()}`)).default(offFp.pi as any);
 		const messages = [...readPair("r1", "a.ts", fileText), ...readPair("r2", "a.ts", fileText)];
-		// Dark means the VIEW IS UNCHANGED, not that pi returns nothing: emitContext
+		// Off means the VIEW IS UNCHANGED, not that pi returns nothing: emitContext
 		// always yields the (cloned) array regardless of what handlers do. Asserting
 		// `undefined` here pinned the old double's shape, not the extension's darkness.
-		assert.equal(offFp.handlers.has("context"), false, "dark by default — no handler registered");
-		assert.deepEqual(await fire(offFp, "context", { messages }, {}), messages, "view unchanged when dark");
+		assert.equal(offFp.handlers.has("context"), false, "READ_DEDUP=off — no handler registered");
+		assert.deepEqual(await fire(offFp, "context", { messages }, {}), messages, "view unchanged when off");
 
-		// on: returns a transformed view, original array untouched
-		process.env.READ_DEDUP = "on";
+		// unset = default-on: returns a transformed view, original array untouched
+		delete process.env.READ_DEDUP;
 		const onFp = makeFakePi();
 		(await import(`../extensions/context-dedup.ts?on=${Date.now()}-${Math.random()}`)).default(onFp.pi as any);
 		const before = structuredClone(messages);
