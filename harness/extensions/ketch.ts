@@ -125,8 +125,13 @@ async function invoke(args: string[], timeoutMs: number, signal?: AbortSignal): 
 	return runKetchProcess(KETCH_BIN, args, { timeoutMs, signal, env: buildKetchEnv() });
 }
 
-export default function (pi: ExtensionAPI) {
+export type KetchDependencies = {
+	resolvePublicUrl?: typeof resolvePublicHttpUrl;
+};
+
+export function registerKetch(pi: ExtensionAPI, dependencies: KetchDependencies = {}) {
 	if (!ENABLED) return;
+	const resolvePublicUrl = dependencies.resolvePublicUrl ?? resolvePublicHttpUrl;
 
 	// --- research-ledger session state (all inert unless RESEARCH_LEDGER=on) ---
 	const pageCache = new PageCache();
@@ -296,7 +301,7 @@ export default function (pi: ExtensionAPI) {
 				// hang web_read minutes past READ_TIMEOUT. allSettled, not all: one
 				// blocked or transient URL must not discard the whole batch.
 				const preflightSignal = AbortSignal.any([AbortSignal.timeout(READ_TIMEOUT), ...(signal ? [signal] : [])]);
-				const resolved = await Promise.allSettled(params.urls.map((url) => resolvePublicHttpUrl(url, { signal: preflightSignal })));
+				const resolved = await Promise.allSettled(params.urls.map((url) => resolvePublicUrl(url, { signal: preflightSignal })));
 				const safeUrls = resolved.flatMap((entry) => entry.status === "fulfilled" ? [entry.value] : []);
 				const blockedCount = params.urls.length - safeUrls.length; // preflight-rejected: still real failures
 				// Full-batch session-cache hit: serve without refetching. A repeat
@@ -443,4 +448,8 @@ export default function (pi: ExtensionAPI) {
 			},
 		}),
 	);
+}
+
+export default function (pi: ExtensionAPI) {
+	return registerKetch(pi);
 }

@@ -149,7 +149,12 @@ async function loadKetch(ledger: boolean) {
 	if (ledger) process.env.RESEARCH_LEDGER = "on"; else delete process.env.RESEARCH_LEDGER;
 	const fp = makeFakePi();
 	const mod = await import(`../extensions/ketch.ts?rl=${ledger}-${Date.now()}-${Math.random()}`);
-	mod.default(fp.pi as never);
+	mod.registerKetch(fp.pi as never, {
+		// These tests exercise the parent-proof and persistence chain, not the URL
+		// boundary (covered independently by public-url.test.ts). Keep this suite
+		// deterministic and network-independent while retaining production's guard.
+		resolvePublicUrl: async (raw: string) => new URL(raw).toString(),
+	});
 	if (prev === undefined) delete process.env.RESEARCH_LEDGER; else process.env.RESEARCH_LEDGER = prev;
 	return fp;
 }
