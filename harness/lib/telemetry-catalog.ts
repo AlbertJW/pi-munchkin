@@ -56,6 +56,18 @@ export const EVENT_CATALOG = {
 		first_token_ms: ["number", "null"], stream_completion_ms: ["number", "null"],
 		settlement_ms: ["number", "null"], status: ["number", "null"],
 	},
+	"run-kernel/receipt": {
+		tool: "string", tool_family: "string", status: "string", mutation: "string",
+		verification: "string", failure_class: ["string", "null"], result_bytes: "number",
+		started_sequence: "number", ended_sequence: "number", had_start: "boolean", had_result: "boolean",
+	},
+	"run-kernel/transition": { from_phase: "string", to_phase: "string", reason: "string", sequence: "number" },
+	"run-kernel/legacy-disagreement": { dimension: "string", kernel_value: "boolean", legacy_value: "boolean" },
+	"run-kernel/settled": {
+		phase: "string", outcome: "string", lifecycle: "string", receipts: "number", failures: "number",
+		mutations: "number", verification_attempts: "number", valid_gates: "number", transitions: "number",
+		missing_start: "number", missing_result: "number", validation_errors: "number",
+	},
 	"loop-breaker/compact-reset": { streak: "number", blocked: "number" },
 	"loop-breaker/session-repeat": { repeats: "number", turnIndex: "number" },
 	"loop-breaker/outcome-steer": { n: "number", final: "boolean", injected_chars: "number", turnIndex: "number" },

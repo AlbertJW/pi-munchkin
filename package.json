@@ -61,7 +61,8 @@
       "harness/extensions/bash-output-guard.ts",
       "harness/extensions/payload-audit.ts",
       "harness/extensions/tool-activation.ts",
-      "harness/extensions/runtime-truth.ts"
+      "harness/extensions/runtime-truth.ts",
+      "harness/extensions/run-kernel.ts"
     ],
     "skills": [
       "skills/deep-research",
@@ -109,6 +110,7 @@
     "harness/extensions/payload-audit.ts",
     "harness/extensions/tool-activation.ts",
     "harness/extensions/runtime-truth.ts",
+    "harness/extensions/run-kernel.ts",
     "harness/lib/agent-dir.ts",
     "harness/lib/blackboard.ts",
     "harness/lib/bash-output.ts",
@@ -144,6 +146,11 @@
     "harness/lib/telemetry-catalog.ts",
     "harness/lib/ketch-runtime.ts",
     "harness/lib/research-ledger.ts",
+    "harness/lib/project-gate.ts",
+    "harness/lib/run-kernel-events.ts",
+    "harness/lib/run-kernel-receipts.ts",
+    "harness/lib/run-kernel-state.ts",
+    "harness/lib/run-kernel-types.ts",
     "harness/agents",
     "harness/vendor",
     "skills/deep-research",

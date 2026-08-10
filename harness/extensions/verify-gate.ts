@@ -1,8 +1,8 @@
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
-import { readFile, readdir } from "node:fs/promises";
-import { join } from "node:path";
+import { readdir } from "node:fs/promises";
 import { classifyBashCommand, isSourceMutation, looksFailingOutput, verificationEvidence } from "../lib/command-policy.ts";
 import { clearPlanGateReceipt, consumePlanGateReceipt } from "../lib/plan-gate-receipt.ts";
+import { clearDetectedProjectGate, detectProjectGate, publishDetectedProjectGate } from "../lib/project-gate.ts";
 import { steerText } from "../lib/steer-texts.ts";
 import { record } from "../lib/telemetry.ts";
 
@@ -37,10 +37,6 @@ function planPhaseActive(): boolean {
 	return (globalThis as Record<string, unknown>).__pi_plan_phase_active === true;
 }
 
-function hasRecipe(text: string, name: string): boolean {
-	return new RegExp(`^${name}:`, "m").test(text);
-}
-
 // A docker-compose project usually runs its tests inside a service container, so
 // the gate can't be run bare on the host (it needs the stack / env). Detect this
 // so the steer nudges the in-container path instead of a host command.
@@ -51,37 +47,6 @@ async function hasComposeFile(cwd: string): Promise<boolean> {
 	} catch {
 		return false;
 	}
-}
-
-// Best-effort: detect this project's gate command from cwd. Never throws.
-async function detectGate(cwd: string): Promise<string | null> {
-	try {
-		const files = new Set(await readdir(cwd));
-		for (const jf of ["justfile", "Justfile", ".justfile"]) {
-			if (files.has(jf)) {
-				const t = await readFile(join(cwd, jf), "utf8");
-				for (const r of ["verify", "check", "test"]) if (hasRecipe(t, r)) return `just ${r}`;
-			}
-		}
-		if (files.has("package.json")) {
-			try {
-				const p = JSON.parse(await readFile(join(cwd, "package.json"), "utf8"));
-				if (p?.scripts?.test) return "npm test";
-				if (p?.scripts?.check) return "npm run check";
-			} catch {}
-		}
-		for (const mk of ["Makefile", "makefile"]) {
-			if (files.has(mk)) {
-				const t = await readFile(join(cwd, mk), "utf8");
-				for (const r of ["verify", "check", "test"]) if (hasRecipe(t, r)) return `make ${r}`;
-			}
-		}
-		if (files.has("pyproject.toml") || files.has("pytest.ini") || files.has("tox.ini")) return "pytest";
-		if (files.has("Cargo.toml")) return "cargo test";
-		if (files.has("go.mod")) return "go test ./...";
-		if (files.has("tsconfig.json")) return "tsc --noEmit";
-	} catch {}
-	return null;
 }
 
 // fires counts per EDIT EPISODE (reset when a new source mutation re-arms the
@@ -126,6 +91,7 @@ export default function (pi: ExtensionAPI) {
 	pi.on("session_start", async (_event, ctx) => {
 		st = fresh();
 		clearPlanGateReceipt();
+		clearDetectedProjectGate();
 		// The published globalThis snapshot must die with the session, not just the
 		// module state: pi's loader returns the CACHED factory across session
 		// replacement, so without this a /new, /fork or same-cwd /resume leaked the
@@ -136,8 +102,9 @@ export default function (pi: ExtensionAPI) {
 		const cwd = ctx?.cwd || process.cwd();
 		composeProject = await hasComposeFile(cwd);
 		if (!process.env.VERIFY_GATE_CMD) {
-			gateCmd = await detectGate(cwd);
+			gateCmd = await detectProjectGate(cwd);
 		}
+		publishDetectedProjectGate(cwd, gateCmd);
 	});
 
 	pi.on("turn_end", async (event) => {

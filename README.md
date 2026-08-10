@@ -42,6 +42,7 @@ decision.
 | `compact_context` | explicit structured compaction with one resume handoff |
 | dynamic activation | keeps expensive/large tools absent until evidence says the session needs them |
 | telemetry and surface receipts | bounded mechanism evidence and exact harness-surface provenance |
+| shadow run kernel | canonicalizes Pi lifecycle/tool events into a typed, redacted per-run state machine without changing agent behavior |
 
 Additional extensions provide span retrieval, reflection, drift review, teaching hints, path
 suggestions, context receipts, and experimental dark mechanisms. The authoritative ordered
@@ -123,6 +124,7 @@ Most behavior is automatic. The primary commands are:
 | `SPAN_TOOLS` | default-on; `search_spans`/`read_span` for bounded work on large files | `off` removes both tools |
 | `KETCH` | default-on public search/read | `off` for offline/private sessions |
 | `RESEARCH_LEDGER` | dark (`on` enables the parent-verified citation pipeline: session page cache, genuine-error `research_note`, recovery-only `research_recall`, budget footers, and a private bounded v2 JSONL ledger under `${PI_CODING_AGENT_DIR}/artifacts/research-ledgers/`) | unset keeps both research-note tools absent; no project-local ledger is written |
+| `RUN_KERNEL` | `shadow`; observes canonical execution receipts, semantic phases, lifecycle settlement, and legacy-state disagreements | `off` registers no kernel handlers or event-bus subscriber; shadow mode never prompts, steers, blocks, activates tools, or persists a capsule |
 | `VERIFY_GATE`, `LOOP_BREAKER`, `GIT_GUARD`, `HASHLINE` | default-on core mechanisms | each accepts its documented `off` kill switch |
 
 Oversized hashline refusals explain the distinction between the returned-context `limit` and the
@@ -155,6 +157,9 @@ oversized files.
 - Provider timing rows are numeric and observational: request-to-headers, first token, stream
   completion, and settlement. The harness does not retry or abort slow local inference; Pi's
   configured retry and timeout behavior remains authoritative.
+- Run-kernel receipts and state contain hashes, bounded tool/failure classifications, counters,
+  and booleans only—never prompts, arguments, commands, output, errors, URLs, endpoints, or paths.
+  The PR 1 kernel is in-memory observation, not session memory and not trusted instructions.
 - Shell command policy is not process isolation. Use Pi's upstream
   [security guidance](https://github.com/earendil-works/pi/blob/main/packages/coding-agent/docs/security.md)
   and [containerization guidance for OpenShell, Gondolin, and Docker](https://github.com/earendil-works/pi/blob/main/packages/coding-agent/docs/containerization.md)

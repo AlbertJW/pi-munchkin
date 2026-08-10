@@ -51,6 +51,9 @@ const expectedExtensions = [
   "harness/extensions/tool-activation.ts",
   // Reads the activation manager's redacted state for /munchkin-doctor.
   "harness/extensions/runtime-truth.ts",
+  // Shadow-only observer is last so finalized tool_result middleware and
+  // legacy turn snapshots are visible before it records disagreements.
+  "harness/extensions/run-kernel.ts",
 ];
 assert.deepEqual(extensions, expectedExtensions, "pi.extensions must expose the complete ordered production surface");
 assert(!extensions.includes("harness/extensions/chaos.ts"), "chaos must not be enabled in the release manifest");

@@ -411,6 +411,14 @@ function currentItem(state: PlanState): PlanItem | undefined {
 	);
 }
 
+function openItemCount(state: PlanState): number {
+	return state.items.filter((item) => item.status !== "done").length;
+}
+
+function blockedItemCount(state: PlanState): number {
+	return state.items.filter((item) => item.status === "blocked").length;
+}
+
 function derivedStatus(state: PlanState): string {
 	if (state.items.length === 0) return "empty";
 	if (state.items.every((i) => i.status === "done")) return "completed";
@@ -492,6 +500,8 @@ async function writeStateAndTodo(cwd: string, state: PlanState): Promise<void> {
 	(globalThis as Record<string, unknown>).__pi_active_plan_context = {
 		run_id: state.run_id,
 		item_id: currentItem(state)?.id,
+		open_items: openItemCount(state),
+		blocked_items: blockedItemCount(state),
 	};
 }
 
@@ -1238,6 +1248,8 @@ export default function (pi: ExtensionAPI) {
 			(globalThis as Record<string, unknown>).__pi_active_plan_context = {
 				run_id: state.run_id,
 				item_id: currentItem(state)?.id,
+				open_items: openItemCount(state),
+				blocked_items: blockedItemCount(state),
 			};
 		}
 		if (!state || state.writer === PROC_MARK) return;

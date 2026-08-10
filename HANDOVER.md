@@ -24,6 +24,14 @@ adoption, deletion, live mirroring, and gate rounds are human-gated. Never touch
 
 ## 2026-08 hardening series
 
+> **2026-08-10 run-kernel PR 1** (`codex/run-kernel-shadow`, source review only): a typed,
+> behavior-neutral state reducer now consumes canonical execution receipts after all existing
+> middleware. `RUN_KERNEL=shadow` is observational; `off` registers nothing. It adds no prompt,
+> tool, command, steering, activation, blocking, persistence, live mirror, or gate run. The
+> lifecycle `idle` state is deliberately independent of semantic `complete`, and prompt text,
+> commands, arguments, outputs, paths, URLs, and errors never enter RunState. See
+> `docs/RUN_KERNEL_ARCHITECTURE_2026-08.md` and the counterfactual QA ledger before review.
+
 > **2026-08-05 settlement/episode series** (`0c44b09..5013e85`, merged to main and **ROLLED OUT
 > 2026-08-05** on Albert's instruction): semantic failure-episode shadow instrument
 > (`LOOP_EPISODE_MODE`, `/loop-status`, `/loop-resume`), `runtime-truth` provider timings +
