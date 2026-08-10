@@ -127,10 +127,13 @@ export const EVENT_CATALOG = {
 	// where provenance lives. reason_class, the FULL set (an analysis that buckets
 	// on `ok` is safe; one that buckets on reason_class must carry all six or it
 	// undercounts): ok | corrected | url_not_read | quote_not_found |
-	// quote_ambiguous | ledger_write_failed. `corrected` ships with ok:true — the
+	// quote_ambiguous | ledger_write_failed | ledger_full. `corrected` ships with ok:true — the
 	// quote was verbatim in a fetched page OTHER than the one the model named, so
 	// it recorded under the true source; `quote_ambiguous` ships with ok:false.
-	"research/note": { ok: "boolean", reason_class: "string", quote_chars: "number" },
+	// `failure_class` appears only on persistence/capacity failures; quote refusals
+	// are deterministically classified by failure-episodes from their fixed text.
+	"research/note": { ok: "boolean", reason_class: "string", failure_class: "string", quote_chars: "number" },
+	"research/recall": { shown: "number", omitted: "number", suffix_truncated: "boolean" },
 	"research/run-summary": { searches: "number", reads: "number", notes: "number", notes_rejected: "number", cache_hits: "number" },
 	// Fired once when an answer wraps up after web reads with zero recorded notes.
 	"research/wrap-steer": { reads: "number", notes: "number", injected_chars: "number" },

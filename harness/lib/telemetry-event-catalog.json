@@ -61,6 +61,7 @@
     "reflect/review",
     "reflect/review-error",
     "research/note",
+    "research/recall",
     "research/run-summary",
     "research/wrap-steer",
     "runtime/provider-timing",

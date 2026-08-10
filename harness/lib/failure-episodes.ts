@@ -148,6 +148,10 @@ export function classifyFailure(observation: FailureObservation): FailureClass {
 	const text = observation.text.slice(0, 2048);
 	const command = observation.toolName === "bash" ? String(observation.args.command ?? "") : "";
 	const verifyLike = observation.toolName === "bash" && classifyBashCommand(command).verifyLike;
+	if (observation.toolName === "research_note") {
+		if (/^Citation verification failed:/i.test(text)) return "verification_assertion";
+		if (/^Research ledger capacity reached/i.test(text)) return "policy_rejection";
+	}
 
 	if (/tool.?call|schema|validation|invalid (?:argument|input|parameter)|required (?:property|field)|expected (?:an? )?(?:array|object|string)|unknown dependenc/i.test(text)) {
 		return "schema_validation";
