@@ -1,0 +1,212 @@
+import { randomUUID } from "node:crypto";
+import { chmod, mkdir, open, readFile, readdir, rename, stat, unlink } from "node:fs/promises";
+import { join } from "node:path";
+import { sha256 } from "./failure-episodes.ts";
+import { validateRunStateSnapshot } from "./run-kernel-state.ts";
+import type { FailureClass } from "./failure-episodes.ts";
+import type { RunStateV1 } from "./run-kernel-types.ts";
+
+export const RUN_STATE_ENTRY_TYPE = "run_state_v1";
+export const RUN_STATE_MAX_BYTES = 64 * 1024;
+export const RUN_STATE_ENTRY_MAX_BYTES = 48 * 1024;
+const MAX_RUN_DIRECTORIES = 64;
+const UUID = /^[a-f0-9]{8}-[a-f0-9]{4}-[1-8][a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$/i;
+
+export type RunCapsuleMode = "off" | "shadow" | "recovery";
+export type RunStateEntryV1 = { v: 1; capsuleId: string; state: RunStateV1 };
+export type CapsuleWriteResult = {
+	ok: boolean;
+	stateBytes: number;
+	markdownBytes: number;
+	failureClass: Extract<FailureClass, "permission" | "timeout" | "unknown"> | null;
+};
+
+export function runCapsuleMode(env: NodeJS.ProcessEnv = process.env): RunCapsuleMode {
+	if (env.RUN_CAPSULE === "off" || env.RUN_CAPSULE === "recovery") return env.RUN_CAPSULE;
+	return "shadow";
+}
+
+export function newCapsuleId(): string {
+	return randomUUID();
+}
+
+function safeIoClass(error: unknown): CapsuleWriteResult["failureClass"] {
+	const code = error && typeof error === "object" ? String((error as { code?: unknown }).code ?? "") : "";
+	if (["EACCES", "EPERM", "EROFS"].includes(code)) return "permission";
+	if (["ETIMEDOUT", "ETIME"].includes(code)) return "timeout";
+	return "unknown";
+}
+
+function capsuleRoot(agentDirectory: string, cwd: string): string {
+	return join(agentDirectory, "artifacts", "run-capsules", sha256(`cwd:${cwd}`));
+}
+
+export function runCapsuleDirectory(agentDirectory: string, cwd: string, capsuleId: string): string {
+	if (!UUID.test(capsuleId)) throw new Error("invalid capsule identifier");
+	return join(capsuleRoot(agentDirectory, cwd), capsuleId);
+}
+
+function encodeState(state: RunStateV1): string {
+	const validation = validateRunStateSnapshot(state);
+	if (validation.length > 0) throw new Error("run state rejected");
+	const encoded = `${JSON.stringify(state)}\n`;
+	if (Buffer.byteLength(encoded, "utf8") > RUN_STATE_MAX_BYTES) throw new Error("run state exceeds cap");
+	return encoded;
+}
+
+async function writePrivate(path: string, text: string): Promise<void> {
+	const handle = await open(path, "wx", 0o600);
+	try {
+		await handle.writeFile(text, "utf8");
+		await handle.chmod(0o600);
+	} finally {
+		await handle.close();
+	}
+}
+
+export async function writeRunCapsule(input: {
+	agentDirectory: string;
+	cwd: string;
+	capsuleId: string;
+	state: RunStateV1;
+	markdown: string;
+}): Promise<CapsuleWriteResult> {
+	let stateText = "";
+	try {
+		stateText = encodeState(input.state);
+	} catch {
+		return { ok: false, stateBytes: 0, markdownBytes: 0, failureClass: "unknown" };
+	}
+	const markdownBytes = Buffer.byteLength(input.markdown, "utf8");
+	if (markdownBytes > 24 * 1024) return { ok: false, stateBytes: Buffer.byteLength(stateText), markdownBytes, failureClass: "unknown" };
+	const directory = runCapsuleDirectory(input.agentDirectory, input.cwd, input.capsuleId);
+	const statePath = join(directory, "state-v1.json");
+	const markdownPath = join(directory, "capsule.md");
+	const stateTmp = join(directory, `.state-${process.pid}-${randomUUID()}.tmp`);
+	const markdownTmp = join(directory, `.capsule-${process.pid}-${randomUUID()}.tmp`);
+	try {
+		for (const owned of [
+			join(input.agentDirectory, "artifacts", "run-capsules"),
+			capsuleRoot(input.agentDirectory, input.cwd),
+			directory,
+		]) {
+			await mkdir(owned, { recursive: true, mode: 0o700 });
+			await chmod(owned, 0o700);
+		}
+		await writePrivate(stateTmp, stateText);
+		await writePrivate(markdownTmp, input.markdown);
+		// Markdown is a projection; publish it first and the authoritative JSON last.
+		await rename(markdownTmp, markdownPath);
+		await rename(stateTmp, statePath);
+		await Promise.all([chmod(markdownPath, 0o600), chmod(statePath, 0o600)]);
+		return {
+			ok: true,
+			stateBytes: Buffer.byteLength(stateText, "utf8"),
+			markdownBytes,
+			failureClass: null,
+		};
+	} catch (error) {
+		await Promise.all([unlink(stateTmp).catch(() => {}), unlink(markdownTmp).catch(() => {})]);
+		return {
+			ok: false,
+			stateBytes: Buffer.byteLength(stateText, "utf8"),
+			markdownBytes,
+			failureClass: safeIoClass(error),
+		};
+	}
+}
+
+function validEntry(value: unknown): RunStateEntryV1 | null {
+	if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+	const item = value as Record<string, unknown>;
+	const keys = Object.keys(item);
+	if (keys.length !== 3 || !keys.every((key) => ["v", "capsuleId", "state"].includes(key)) ||
+		item.v !== 1 || typeof item.capsuleId !== "string" || !UUID.test(item.capsuleId) ||
+		validateRunStateSnapshot(item.state).length > 0) return null;
+	const entry = item as RunStateEntryV1;
+	return Buffer.byteLength(JSON.stringify(entry), "utf8") <= RUN_STATE_ENTRY_MAX_BYTES ? structuredClone(entry) : null;
+}
+
+export function makeRunStateEntry(capsuleId: string, state: RunStateV1): RunStateEntryV1 | null {
+	return validEntry({ v: 1, capsuleId, state });
+}
+
+export function latestRunStateEntry(entries: unknown[]): RunStateEntryV1 | null {
+	for (let index = entries.length - 1; index >= 0; index -= 1) {
+		const entry = entries[index] as { type?: unknown; customType?: unknown; data?: unknown } | undefined;
+		if (entry?.type !== "custom" || entry.customType !== RUN_STATE_ENTRY_TYPE) continue;
+		const parsed = validEntry(entry.data);
+		if (parsed) return parsed;
+	}
+	return null;
+}
+
+export async function readLatestRunCapsule(agentDirectory: string, cwd: string): Promise<RunStateEntryV1 | null> {
+	const root = capsuleRoot(agentDirectory, cwd);
+	try {
+		const directories = (await readdir(root, { withFileTypes: true }))
+			.filter((entry) => entry.isDirectory() && UUID.test(entry.name));
+		// Retention is manual in this release. If traversal would exceed the
+		// explicit restore budget, fail closed instead of selecting a stale run.
+		if (directories.length > MAX_RUN_DIRECTORIES) return null;
+		const candidates = await Promise.all(directories.map(async (entry) => {
+			const path = join(root, entry.name, "state-v1.json");
+			try {
+				const info = await stat(path);
+				return info.isFile() && info.size > 0 && info.size <= RUN_STATE_MAX_BYTES
+					? { capsuleId: entry.name, path, mtimeMs: info.mtimeMs } : null;
+			} catch { return null; }
+		}));
+		for (const candidate of candidates.filter((value): value is NonNullable<typeof value> => value !== null)
+			.sort((left, right) => right.mtimeMs - left.mtimeMs || right.capsuleId.localeCompare(left.capsuleId))) {
+			try {
+				const parsed = JSON.parse(await readFile(candidate.path, "utf8"));
+				const entry = validEntry({ v: 1, capsuleId: candidate.capsuleId, state: parsed });
+				if (entry) return entry;
+			} catch { /* malformed/incomplete candidates are ignored */ }
+		}
+	} catch { /* no private capsule root */ }
+	return null;
+}
+
+export class CapsuleCheckpointQueue {
+	private pending: RunStateV1 | null = null;
+	private scheduled = false;
+	private tail: Promise<void> = Promise.resolve();
+	private lastResult: CapsuleWriteResult | null = null;
+	private readonly writer: (state: RunStateV1) => Promise<CapsuleWriteResult>;
+
+	constructor(writer: (state: RunStateV1) => Promise<CapsuleWriteResult>) {
+		this.writer = writer;
+	}
+
+	request(state: RunStateV1): void {
+		this.pending = structuredClone(state);
+		this.schedule();
+	}
+
+	private schedule(): void {
+		if (this.scheduled) return;
+		this.scheduled = true;
+		queueMicrotask(() => {
+			this.tail = this.tail.then(() => this.drain(), () => this.drain());
+		});
+	}
+
+	private async drain(): Promise<void> {
+		this.scheduled = false;
+		const state = this.pending;
+		this.pending = null;
+		if (state) this.lastResult = await this.writer(state);
+		if (this.pending) this.schedule();
+	}
+
+	async flush(): Promise<CapsuleWriteResult | null> {
+		while (this.scheduled || this.pending) {
+			await Promise.resolve();
+			await this.tail;
+		}
+		await this.tail;
+		return this.lastResult;
+	}
+}

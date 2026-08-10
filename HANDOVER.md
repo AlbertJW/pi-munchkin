@@ -37,10 +37,16 @@ adoption, deletion, live mirroring, and gate rounds are human-gated. Never touch
 > truth are implemented behind explicit opt-in flags. Current live defaults remain unchanged
 > pending the separate adoption checkpoint. See `docs/RUN_KERNEL_PR2_CORRECTNESS_2026-08.md`.
 
-> **2026-08-10 run-kernel PR 3** (`codex/run-kernel-pr3-arbiter`, dark source work): one
+> **2026-08-10 run-kernel PR 3** (`0878777`, merged; not rolled out): one
 > turn-end control arbiter, typed domain signals replacing telemetry taps, and a bounded optional
 > async interactive telemetry writer. `CONTROL_ARBITER=shadow` and `TELEMETRY_WRITER=sync` retain
 > deployed behavior pending separate adoption. See `docs/RUN_KERNEL_PR3_CONTROL_2026-08.md`.
+
+> **2026-08-10 run-kernel PR 4** (`codex/run-kernel-pr4-capsule`, dark source work): private
+> per-run structured checkpoints, a bounded untrusted Markdown projection, custom-entry/private
+> restore, semantic settlement, and `/run-status`. `RUN_CAPSULE=shadow` persists audit state but
+> never injects it into ordinary model context. No live mirror or recovery adoption has occurred.
+> See `docs/RUN_KERNEL_PR4_CAPSULE_2026-08.md`.
 
 > **2026-08-05 settlement/episode series** (`0c44b09..5013e85`, merged to main and **ROLLED OUT
 > 2026-08-05** on Albert's instruction): semantic failure-episode shadow instrument

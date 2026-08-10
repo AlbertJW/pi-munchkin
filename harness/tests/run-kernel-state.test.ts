@@ -13,7 +13,8 @@ const legacy = {
 function session(sequence = 1): RunEventV1 {
 	return { v: 1, type: "run/session-started", sequence, atMs: sequence, sessionIdHash: H, runIdHash: H,
 		generation: 1, surfaceHash: H, piVersion: "0.83.2", provider: "local", model: "small",
-		activeToolCount: 4, allToolCount: 8, preservedExplicitTools: false, detectedGateHash: H, legacy };
+		activeToolCount: 4, allToolCount: 8, preservedExplicitTools: false, detectedGateHash: H,
+		sandboxPosture: "unknown", legacy };
 }
 
 function receipt(overrides: Partial<ExecutionReceiptV1> = {}): ExecutionReceiptV1 {
@@ -78,6 +79,28 @@ test("a fully closed structured plan can complete without conflating settlement"
 	apply(store, { v: 1, type: "run/cycle-settled", sequence: 6, atMs: 6 });
 	assert.equal(store.snapshot().outcome.status, "complete");
 	assert.equal(store.snapshot().workflow.phase, "complete");
+});
+
+test("a closed accepted plan completes without requiring a text-only marker", () => {
+	const store = new RunStateStoreV1();
+	apply(store, session());
+	apply(store, { v: 1, type: "run/plan-observed", sequence: 2, atMs: 2,
+		runIdHash: H, accepted: true, executionStarted: true, openItems: 0 });
+	apply(store, { v: 1, type: "run/cycle-ended", sequence: 3, atMs: 3, textOnly: false });
+	apply(store, { v: 1, type: "run/cycle-settled", sequence: 4, atMs: 4 });
+	assert.equal(store.snapshot().outcome.status, "complete");
+	assert.equal(store.snapshot().workflow.phase, "complete");
+});
+
+test("an active failure wall prevents semantic completion at settlement", () => {
+	const store = new RunStateStoreV1();
+	apply(store, session());
+	apply(store, { v: 1, type: "run/failure-state-observed", sequence: 2, atMs: 2,
+		activeWalls: 1, exposedEpisodes: 1, lastClass: "edit_conflict" });
+	apply(store, { v: 1, type: "run/cycle-ended", sequence: 3, atMs: 3, textOnly: true });
+	apply(store, { v: 1, type: "run/cycle-settled", sequence: 4, atMs: 4 });
+	assert.equal(store.snapshot().outcome.status, "paused");
+	assert.equal(store.snapshot().workflow.phase, "recovery");
 });
 
 test("text-only read-only run can complete and next cycle gets a new run", () => {

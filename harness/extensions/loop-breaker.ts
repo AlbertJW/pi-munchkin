@@ -383,7 +383,16 @@ export default function (pi: ExtensionAPI) {
 	}
 
 	function publishEpisodes(): void {
-		(globalThis as Record<string, unknown>).__pi_failure_episode_state = episodeTracker.snapshot();
+		const snapshot = episodeTracker.snapshot();
+		(globalThis as Record<string, unknown>).__pi_failure_episode_state = snapshot;
+		const latest = snapshot.active.at(-1);
+		emitHarnessSignal(pi.events, {
+			v: 1,
+			type: "failure/episodes",
+			activeWalls: snapshot.active.length + ep.blocked.size,
+			exposedEpisodes: snapshot.active.filter((episode) => episode.count >= 2).length,
+			lastClass: latest?.failureClass ?? null,
+		});
 	}
 
 	function recordRecovery(episodes: FailureEpisode[]): void {

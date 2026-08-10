@@ -263,6 +263,7 @@ export function makeCtx(cwd: string) {
 			cwd,
 			model: { provider: "test-provider", id: "test-model" },
 			ui: { notify: (m: string, _l?: string) => notes.push(m), confirm: async () => true },
+			sessionManager: { getBranch: (): unknown[] => [] },
 		},
 		notes,
 	};

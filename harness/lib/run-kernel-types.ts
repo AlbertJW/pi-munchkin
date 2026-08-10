@@ -89,6 +89,7 @@ export interface RunStateV1 {
 		allToolCount: number;
 		preservedExplicitTools: boolean;
 		detectedGateHash: string | null;
+		sandboxPosture: "declared" | "host" | "unknown";
 	};
 	plan: {
 		accepted: boolean;
@@ -112,9 +113,17 @@ export interface RunStateV1 {
 		lastPassed: boolean;
 		validAfterMutation: boolean;
 	};
+	evidence: {
+		facts: Array<{
+			hash: string;
+			provenance: "user" | "filesystem" | "gate" | "delegated_unverified" | "web_parent_verified";
+		}>;
+	};
 	failures: {
 		count: number;
 		lastClass: FailureClass | null;
+		activeWalls: number;
+		exposedEpisodes: number;
 	};
 	capabilities: {
 		activeToolCount: number;
@@ -133,7 +142,7 @@ export interface RunStateV1 {
 			mode: ControlDecisionV1["mode"];
 		};
 	};
-	context: { compactionGeneration: number };
+	context: { usagePct: number | null; compactionGeneration: number };
 	outcome: {
 		status: RunOutcome;
 		lastAssistantTextOnly: boolean;
@@ -166,6 +175,7 @@ export type RunEventV1 =
 		allToolCount: number;
 		preservedExplicitTools: boolean;
 		detectedGateHash: string | null;
+		sandboxPosture: "declared" | "host" | "unknown";
 		legacy: LegacyRunSnapshotV1;
 	})
 	| (RunEventBase & { type: "run/cycle-started"; cycleIdHash: string; runIdHash: string | null })
@@ -180,5 +190,8 @@ export type RunEventV1 =
 	| (RunEventBase & { type: "run/legacy-observed"; legacy: LegacyRunSnapshotV1 })
 	| (RunEventBase & { type: "run/control-proposed"; proposal: ControlProposalV1 })
 	| (RunEventBase & { type: "run/control-decided"; decision: ControlDecisionV1 })
+	| (RunEventBase & { type: "run/plan-observed"; runIdHash: string; accepted: boolean; executionStarted: boolean; openItems: number | null })
+	| (RunEventBase & { type: "run/context-observed"; usagePct: number | null })
+	| (RunEventBase & { type: "run/failure-state-observed"; activeWalls: number; exposedEpisodes: number; lastClass: FailureClass | null })
 	| (RunEventBase & { type: "run/session-shutdown" })
 	| (RunEventBase & { type: "run/phase-changed"; transition: RunTransitionV1 });

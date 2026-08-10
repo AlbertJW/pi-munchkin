@@ -65,6 +65,7 @@
       "harness/extensions/runtime-truth.ts",
       "harness/extensions/control-arbiter.ts",
       "harness/extensions/run-kernel.ts",
+      "harness/extensions/run-capsule.ts",
       "harness/extensions/telemetry-flush.ts"
     ],
     "skills": [
@@ -116,6 +117,7 @@
     "harness/extensions/runtime-truth.ts",
     "harness/extensions/control-arbiter.ts",
     "harness/extensions/run-kernel.ts",
+    "harness/extensions/run-capsule.ts",
     "harness/extensions/telemetry-flush.ts",
     "harness/lib/active-tool-prompts.ts",
     "harness/lib/agent-dir.ts",
@@ -158,8 +160,11 @@
     "harness/lib/ketch-runtime.ts",
     "harness/lib/research-ledger.ts",
     "harness/lib/project-gate.ts",
+    "harness/lib/run-capsule-renderer.ts",
+    "harness/lib/run-capsule-store.ts",
     "harness/lib/run-kernel-events.ts",
     "harness/lib/run-kernel-receipts.ts",
+    "harness/lib/run-kernel-snapshot.ts",
     "harness/lib/run-kernel-state.ts",
     "harness/lib/run-kernel-types.ts",
     "harness/lib/verification-order.ts",

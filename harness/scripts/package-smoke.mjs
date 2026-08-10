@@ -58,6 +58,9 @@ const expectedExtensions = [
   // Shadow observer sees finalized middleware, control decisions, and legacy
   // turn snapshots before disagreement recording.
   "harness/extensions/run-kernel.ts",
+  // Private state projection consumes finalized kernel snapshots and must
+  // checkpoint before the last-loaded telemetry durability boundary.
+  "harness/extensions/run-capsule.ts",
   // Durability boundary is registered last so settled/shutdown rows from every
   // first-party extension are queued before the final async flush.
   "harness/extensions/telemetry-flush.ts",

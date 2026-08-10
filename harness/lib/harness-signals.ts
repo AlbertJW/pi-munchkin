@@ -1,5 +1,6 @@
 import { createHash } from "node:crypto";
 import type { EventBus } from "@earendil-works/pi-coding-agent";
+import type { FailureClass } from "./failure-episodes.ts";
 
 export const HARNESS_SIGNAL_CHANNEL = "pi-munchkin/domain-signal/v1";
 
@@ -9,6 +10,7 @@ export type HarnessSignalV1 =
 	| (SignalBase & { type: "plan/go"; runIdHash: string })
 	| (SignalBase & { type: "plan/gate"; runIdHash: string; pass: boolean; fails: number })
 	| (SignalBase & { type: "loop/tier"; tier: 1 | 2 | 3; detector: "exact" | "outcome" | "semantic" | "session" })
+	| (SignalBase & { type: "failure/episodes"; activeWalls: number; exposedEpisodes: number; lastClass: FailureClass | null })
 	| (SignalBase & { type: "context/receipt"; contextPct: number | null; staleShare: number | null; duplicateShare: number | null })
 	| (SignalBase & { type: "context/compacted" });
 
@@ -35,6 +37,12 @@ export function isHarnessSignal(value: unknown): value is HarnessSignalV1 {
 			return exact("v", "type", "runIdHash", "pass", "fails") && HASH.test(String(item.runIdHash)) && typeof item.pass === "boolean" && integer(item.fails);
 		case "loop/tier":
 			return exact("v", "type", "tier", "detector") && [1, 2, 3].includes(Number(item.tier)) && ["exact", "outcome", "semantic", "session"].includes(String(item.detector));
+		case "failure/episodes":
+			return exact("v", "type", "activeWalls", "exposedEpisodes", "lastClass") && integer(item.activeWalls) &&
+				integer(item.exposedEpisodes) && (item.lastClass === null || [
+					"schema_validation", "policy_rejection", "permission", "not_found", "command_missing",
+					"timeout", "provider", "verification_assertion", "compile_or_lint", "edit_conflict", "unknown",
+				].includes(String(item.lastClass)));
 		case "context/receipt":
 			return exact("v", "type", "contextPct", "staleShare", "duplicateShare") && nullableNumber(item.contextPct) && nullableNumber(item.staleShare) && nullableNumber(item.duplicateShare);
 		case "context/compacted":

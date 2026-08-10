@@ -19,7 +19,7 @@ function initialState(): RunStateV1 {
 		environment: {
 			piVersion: "unknown", provider: "unknown", model: "unknown",
 			activeToolCount: 0, allToolCount: 0, preservedExplicitTools: false,
-			detectedGateHash: null,
+			detectedGateHash: null, sandboxPosture: "unknown",
 		},
 		plan: {
 			accepted: false, executionStarted: false, currentItemHash: null,
@@ -30,10 +30,11 @@ function initialState(): RunStateV1 {
 			attempts: 0, validGates: 0, lastKind: "none", lastStartedSequence: null,
 			lastEndedSequence: null, lastPassed: false, validAfterMutation: false,
 		},
-		failures: { count: 0, lastClass: null },
+		evidence: { facts: [] },
+		failures: { count: 0, lastClass: null, activeWalls: 0, exposedEpisodes: 0 },
 		capabilities: { activeToolCount: 0, allToolCount: 0, preservedExplicitTools: false },
 		control: { boundarySequence: 0, proposals: 0, collisions: 0, lastDecision: null },
-		context: { compactionGeneration: 0 },
+		context: { usagePct: null, compactionGeneration: 0 },
 		outcome: { status: "active", lastAssistantTextOnly: false },
 		counters: { receipts: 0, missingStart: 0, missingResult: 0 },
 		legacy: {
@@ -59,10 +60,20 @@ export type ApplyRunEventResult = { applied: boolean; transition: RunTransitionV
 export class RunStateStoreV1 {
 	private state = initialState();
 	private lastAppliedSequence = -1;
+	private restored = false;
 
 	reset(): void {
 		this.state = initialState();
 		this.lastAppliedSequence = -1;
+		this.restored = false;
+	}
+
+	restore(candidate: unknown): boolean {
+		if (validateRunStateSnapshot(candidate).length > 0) return false;
+		this.state = structuredClone(candidate as RunStateV1);
+		this.lastAppliedSequence = maxRunStateSequence(this.state);
+		this.restored = true;
+		return true;
 	}
 
 	snapshot(): RunStateV1 {
@@ -74,7 +85,8 @@ export class RunStateStoreV1 {
 			return { applied: false, transition: null };
 		}
 		if (event.type === "run/session-started") {
-			this.state = initialState();
+			const recovered = this.restored;
+			if (!recovered) this.state = initialState();
 			this.state.identity = {
 				sessionIdHash: event.sessionIdHash,
 				runIdHash: event.runIdHash,
@@ -90,6 +102,7 @@ export class RunStateStoreV1 {
 				allToolCount: event.allToolCount,
 				preservedExplicitTools: event.preservedExplicitTools,
 				detectedGateHash: event.detectedGateHash,
+				sandboxPosture: event.sandboxPosture,
 			};
 			this.state.capabilities = {
 				activeToolCount: event.activeToolCount,
@@ -97,10 +110,13 @@ export class RunStateStoreV1 {
 				preservedExplicitTools: event.preservedExplicitTools,
 			};
 			this.state.legacy = { ...event.legacy };
-			this.state.plan.accepted = event.legacy.planActive;
-			this.state.plan.currentItemHash = event.legacy.planItemHash;
-			this.state.plan.openItems = event.legacy.planOpenItems;
-			this.state.plan.blockedItems = event.legacy.planBlockedItems;
+			if (!recovered) {
+				this.state.plan.accepted = event.legacy.planActive;
+				this.state.plan.currentItemHash = event.legacy.planItemHash;
+				this.state.plan.openItems = event.legacy.planOpenItems;
+				this.state.plan.blockedItems = event.legacy.planBlockedItems;
+			}
+			this.restored = false;
 		}
 		this.lastAppliedSequence = event.sequence;
 		this.state.control.boundarySequence = event.sequence;
@@ -183,6 +199,19 @@ export class RunStateStoreV1 {
 					mode: event.decision.mode,
 				} : null;
 				break;
+			case "run/plan-observed":
+				this.state.plan.accepted = event.accepted;
+				this.state.plan.executionStarted = event.executionStarted || this.state.plan.executionStarted;
+				this.state.plan.openItems = event.openItems;
+				break;
+			case "run/context-observed":
+				this.state.context.usagePct = event.usagePct;
+				break;
+			case "run/failure-state-observed":
+				this.state.failures.activeWalls = event.activeWalls;
+				this.state.failures.exposedEpisodes = event.exposedEpisodes;
+				if (event.lastClass) this.state.failures.lastClass = event.lastClass;
+				break;
 			case "run/session-shutdown":
 				this.state.lifecycle = { state: "shutdown", lastTransitionSequence: event.sequence };
 				break;
@@ -241,12 +270,20 @@ export class RunStateStoreV1 {
 			this.state.outcome.status = "blocked";
 			return null;
 		}
+		if (this.state.failures.activeWalls > 0) {
+			this.state.outcome.status = "paused";
+			return this.transition("recovery", "active-failure-wall", sequence, atMs);
+		}
 		const hasMutation = this.state.mutation.lastCompletedSequence != null;
 		if (hasMutation && !this.state.verification.validAfterMutation) {
 			this.state.outcome.status = "unverified";
 			return null;
 		}
-		if (this.state.plan.accepted && this.state.plan.openItems !== 0) {
+		if (this.state.plan.accepted) {
+			if (this.state.plan.openItems === 0) {
+				this.state.outcome.status = "complete";
+				return this.transition("complete", "settled-plan-complete", sequence, atMs);
+			}
 			this.state.outcome.status = "paused";
 			return null;
 		}
@@ -292,16 +329,58 @@ export class RunStateStoreV1 {
 
 const FORBIDDEN_FIELD = /^(?:args?|arguments?|command|output|content|error|errors|url|urls|path|paths|endpoint|credential|credentials|secret|secrets|apiKey)$/i;
 const ABSOLUTE_PRIVATE_PATH = /^(?:\/(?:Users|home|private|var|tmp)\/|[A-Za-z]:[\\/])/;
+const SENSITIVE_VALUE = /(?:\b(?:sk|rk|pk|ghp|github_pat|xox[baprs])[-_][A-Za-z0-9_-]{6,}\b|\b(?:api[_-]?key|token|password|secret)\s*[:=]\s*\S+|https?:\/\/\S*[?#]\S*)/i;
+const SAFE_LABEL = /^[a-zA-Z0-9_.:-]+$/;
+const PHASES = new Set(["intake", "local_recon", "external_research", "preflight", "planning", "execution", "verification", "recovery", "blocked", "complete"]);
+const LIFECYCLES = new Set(["starting", "active", "settling", "idle", "shutdown"]);
+const OUTCOMES = new Set(["active", "complete", "blocked", "paused", "unverified"]);
+const VERIFICATIONS = new Set(["project_gate", "generic", "none"]);
+const FAILURE_CLASSES = new Set(["schema_validation", "policy_rejection", "permission", "not_found", "command_missing", "timeout", "provider", "verification_assertion", "compile_or_lint", "edit_conflict", "unknown"]);
+const PROVENANCE = new Set(["user", "filesystem", "gate", "delegated_unverified", "web_parent_verified"]);
+const CONTROL_KINDS = new Set(["safety_consequence", "safe_abort", "verification_required", "failure_recovery", "plan_resolution", "tool_rescue", "context_hint"]);
+const CONTROL_REASONS = new Set(["policy_rejection", "compile_or_lint", "code_quality", "loop_hard_stop", "semantic_tier", "outcome_repeat", "session_repeat", "exact_gate_missing", "loop_strategy_change", "plan_blocked", "pseudo_tool_call", "research_unverified", "state_lens"]);
+const CONTROL_SOURCES = new Set(["loop-breaker", "verify-gate", "tool-call-rescue", "session-blackboard", "plan-runner", "ketch", "context-dedup", "micro-gate"]);
+const CONTROL_MODES = new Set(["shadow", "enforce", "off"]);
 
-/** Defense-in-depth validator for the future persistence boundary. PR 1 does
- * not persist RunState, but unsafe fields are rejected before later PRs can. */
-export function validateRunStateSnapshot(state: RunStateV1): string[] {
+export function maxRunStateSequence(state: RunStateV1): number {
+	const candidates = [
+		state.lifecycle.lastTransitionSequence,
+		state.control.boundarySequence,
+		state.mutation.lastStartedSequence ?? 0,
+		state.mutation.lastCompletedSequence ?? 0,
+		state.verification.lastStartedSequence ?? 0,
+		state.verification.lastEndedSequence ?? 0,
+		...state.workflow.history.map((entry) => entry.sequence),
+	];
+	return Math.max(0, ...candidates);
+}
+
+/** Closed, non-echoing validator for the private persistence boundary. */
+export function validateRunStateSnapshot(state: unknown): string[] {
 	const errors: string[] = [];
+	const object = (value: unknown): Record<string, unknown> | null =>
+		value && typeof value === "object" && !Array.isArray(value) ? value as Record<string, unknown> : null;
+	const exact = (name: string, value: unknown, keys: string[]): Record<string, unknown> | null => {
+		const item = object(value);
+		if (!item) { errors.push(`${name}: object required`); return null; }
+		const actual = Object.keys(item);
+		if (actual.length !== keys.length || !actual.every((key) => keys.includes(key))) errors.push(`${name}: invalid shape`);
+		return item;
+	};
+	const integer = (value: unknown) => Number.isSafeInteger(value) && Number(value) >= 0;
+	const finite = (value: unknown) => typeof value === "number" && Number.isFinite(value) && value >= 0;
+	const hash = (value: unknown) => typeof value === "string" && SHA256_RE.test(value);
+	const nullableHash = (value: unknown) => value === null || hash(value);
+	const nullableInt = (value: unknown) => value === null || integer(value);
+	const bool = (value: unknown) => typeof value === "boolean";
+	const assert = (ok: boolean, code: string) => { if (!ok) errors.push(code); };
+
 	const visit = (value: unknown, key = "root", depth = 0): void => {
 		if (depth > 12) { errors.push(`${key}: depth exceeded`); return; }
 		if (typeof value === "string") {
 			if (value.length > 256) errors.push(`${key}: string too long`);
 			if (ABSOLUTE_PRIVATE_PATH.test(value)) errors.push(`${key}: absolute private path`);
+			if (SENSITIVE_VALUE.test(value)) errors.push(`${key}: sensitive value`);
 			if (/Hash$/i.test(key) && !SHA256_RE.test(value)) errors.push(`${key}: invalid hash`);
 			return;
 		}
@@ -317,6 +396,62 @@ export function validateRunStateSnapshot(state: RunStateV1): string[] {
 		}
 	};
 	visit(state);
-	if (state.workflow.history.length > MAX_TRANSITIONS) errors.push("workflow.history: too many transitions");
+	const root = exact("root", state, ["v", "mode", "identity", "lifecycle", "workflow", "objective", "environment", "plan", "mutation", "verification", "evidence", "failures", "capabilities", "control", "context", "outcome", "counters", "legacy"]);
+	if (!root) return errors;
+	assert(root.v === 1 && root.mode === "shadow", "root: invalid version or mode");
+
+	const identity = exact("identity", root.identity, ["sessionIdHash", "runIdHash", "cycleIdHash", "generation", "surfaceHash"]);
+	if (identity) {
+		assert(hash(identity.sessionIdHash) && hash(identity.runIdHash) && nullableHash(identity.cycleIdHash) && integer(identity.generation) && hash(identity.surfaceHash), "identity: invalid value");
+	}
+	const lifecycle = exact("lifecycle", root.lifecycle, ["state", "lastTransitionSequence"]);
+	if (lifecycle) assert(LIFECYCLES.has(String(lifecycle.state)) && integer(lifecycle.lastTransitionSequence), "lifecycle: invalid value");
+	const workflow = exact("workflow", root.workflow, ["phase", "previousPhase", "reason", "history"]);
+	if (workflow) {
+		assert(PHASES.has(String(workflow.phase)) && (workflow.previousPhase === null || PHASES.has(String(workflow.previousPhase))) && typeof workflow.reason === "string" && SAFE_LABEL.test(workflow.reason) && workflow.reason.length <= 64, "workflow: invalid value");
+		assert(Array.isArray(workflow.history) && workflow.history.length <= MAX_TRANSITIONS, "workflow.history: invalid length");
+		for (const [index, raw] of (Array.isArray(workflow.history) ? workflow.history : []).entries()) {
+			const entry = exact(`workflow.history[${index}]`, raw, ["sequence", "atMs", "from", "to", "reason"]);
+			if (entry) assert(integer(entry.sequence) && finite(entry.atMs) && PHASES.has(String(entry.from)) && PHASES.has(String(entry.to)) && typeof entry.reason === "string" && SAFE_LABEL.test(entry.reason) && entry.reason.length <= 64, `workflow.history[${index}]: invalid value`);
+		}
+	}
+	const objective = exact("objective", root.objective, ["hash", "label"]);
+	if (objective) assert(nullableHash(objective.hash) && (objective.label === null || (typeof objective.label === "string" && objective.label.length <= 160 && !/[\r\n`]/.test(objective.label))), "objective: invalid value");
+	const environment = exact("environment", root.environment, ["piVersion", "provider", "model", "activeToolCount", "allToolCount", "preservedExplicitTools", "detectedGateHash", "sandboxPosture"]);
+	if (environment) assert([environment.piVersion, environment.provider, environment.model].every((value) => typeof value === "string" && value.length > 0 && value.length <= 96 && SAFE_LABEL.test(value)) && integer(environment.activeToolCount) && integer(environment.allToolCount) && Number(environment.activeToolCount) <= Number(environment.allToolCount) && bool(environment.preservedExplicitTools) && nullableHash(environment.detectedGateHash) && ["declared", "host", "unknown"].includes(String(environment.sandboxPosture)), "environment: invalid value");
+	const plan = exact("plan", root.plan, ["accepted", "executionStarted", "currentItemHash", "openItems", "blockedItems"]);
+	if (plan) assert(bool(plan.accepted) && bool(plan.executionStarted) && nullableHash(plan.currentItemHash) && nullableInt(plan.openItems) && nullableInt(plan.blockedItems), "plan: invalid value");
+	const mutation = exact("mutation", root.mutation, ["count", "lastStartedSequence", "lastCompletedSequence", "lastTargetHash"]);
+	if (mutation) assert(integer(mutation.count) && nullableInt(mutation.lastStartedSequence) && nullableInt(mutation.lastCompletedSequence) && nullableHash(mutation.lastTargetHash), "mutation: invalid value");
+	const verification = exact("verification", root.verification, ["attempts", "validGates", "lastKind", "lastStartedSequence", "lastEndedSequence", "lastPassed", "validAfterMutation"]);
+	if (verification) assert(integer(verification.attempts) && integer(verification.validGates) && VERIFICATIONS.has(String(verification.lastKind)) && nullableInt(verification.lastStartedSequence) && nullableInt(verification.lastEndedSequence) && bool(verification.lastPassed) && bool(verification.validAfterMutation), "verification: invalid value");
+	const evidence = exact("evidence", root.evidence, ["facts"]);
+	if (evidence) {
+		assert(Array.isArray(evidence.facts) && evidence.facts.length <= 32, "evidence: invalid length");
+		for (const [index, raw] of (Array.isArray(evidence.facts) ? evidence.facts : []).entries()) {
+			const fact = exact(`evidence.facts[${index}]`, raw, ["hash", "provenance"]);
+			if (fact) assert(hash(fact.hash) && PROVENANCE.has(String(fact.provenance)), `evidence.facts[${index}]: invalid value`);
+		}
+	}
+	const failures = exact("failures", root.failures, ["count", "lastClass", "activeWalls", "exposedEpisodes"]);
+	if (failures) assert(integer(failures.count) && (failures.lastClass === null || FAILURE_CLASSES.has(String(failures.lastClass))) && integer(failures.activeWalls) && integer(failures.exposedEpisodes), "failures: invalid value");
+	const capabilities = exact("capabilities", root.capabilities, ["activeToolCount", "allToolCount", "preservedExplicitTools"]);
+	if (capabilities) assert(integer(capabilities.activeToolCount) && integer(capabilities.allToolCount) && Number(capabilities.activeToolCount) <= Number(capabilities.allToolCount) && bool(capabilities.preservedExplicitTools), "capabilities: invalid value");
+	const control = exact("control", root.control, ["boundarySequence", "proposals", "collisions", "lastDecision"]);
+	if (control) {
+		assert(integer(control.boundarySequence) && integer(control.proposals) && integer(control.collisions), "control: invalid counts");
+		if (control.lastDecision !== null) {
+			const decision = exact("control.lastDecision", control.lastDecision, ["kind", "reason", "source", "priority", "mode"]);
+			if (decision) assert(CONTROL_KINDS.has(String(decision.kind)) && CONTROL_REASONS.has(String(decision.reason)) && CONTROL_SOURCES.has(String(decision.source)) && CONTROL_MODES.has(String(decision.mode)) && integer(decision.priority), "control.lastDecision: invalid value");
+		}
+	}
+	const context = exact("context", root.context, ["usagePct", "compactionGeneration"]);
+	if (context) assert((context.usagePct === null || (finite(context.usagePct) && Number(context.usagePct) <= 100)) && integer(context.compactionGeneration), "context: invalid value");
+	const outcome = exact("outcome", root.outcome, ["status", "lastAssistantTextOnly"]);
+	if (outcome) assert(OUTCOMES.has(String(outcome.status)) && bool(outcome.lastAssistantTextOnly), "outcome: invalid value");
+	const counters = exact("counters", root.counters, ["receipts", "missingStart", "missingResult"]);
+	if (counters) assert(integer(counters.receipts) && integer(counters.missingStart) && integer(counters.missingResult), "counters: invalid value");
+	const legacy = exact("legacy", root.legacy, ["planActive", "planItemActive", "planItemHash", "planOpenItems", "planBlockedItems", "verifyKnown", "verifyMutated", "verifyOk"]);
+	if (legacy) assert(bool(legacy.planActive) && bool(legacy.planItemActive) && nullableHash(legacy.planItemHash) && nullableInt(legacy.planOpenItems) && nullableInt(legacy.planBlockedItems) && bool(legacy.verifyKnown) && bool(legacy.verifyMutated) && bool(legacy.verifyOk), "legacy: invalid value");
 	return errors;
 }

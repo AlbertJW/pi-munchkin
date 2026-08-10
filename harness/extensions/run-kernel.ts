@@ -5,12 +5,20 @@ import { clearDetectedProjectGate, detectProjectGate, readDetectedProjectGate } 
 import { emitRunEvent, onRunEvent } from "../lib/run-kernel-events.ts";
 import { ReceiptNormalizerV1 } from "../lib/run-kernel-receipts.ts";
 import { RunStateStoreV1, validateRunStateSnapshot } from "../lib/run-kernel-state.ts";
+import { maxRunStateSequence } from "../lib/run-kernel-state.ts";
 import type {
 	ExecutionReceiptV1, LegacyRunSnapshotV1, RunEventV1, RunKernelMode,
 	RunStateV1, RunTransitionV1,
 } from "../lib/run-kernel-types.ts";
 import { record } from "../lib/telemetry.ts";
 import { onControlDecision, onControlProposal } from "../lib/control-proposal.ts";
+import { emitRunStateSnapshot } from "../lib/run-kernel-snapshot.ts";
+import {
+	latestRunStateEntry, readLatestRunCapsule, runCapsuleMode,
+} from "../lib/run-capsule-store.ts";
+import { agentDir } from "../lib/agent-dir.ts";
+import { sandboxPosture } from "../lib/runtime-doctor.ts";
+import { onHarnessSignal } from "../lib/harness-signals.ts";
 
 export type RunKernelInstallOptions = {
 	mode?: RunKernelMode;
@@ -132,17 +140,24 @@ export function installRunKernel(pi: ExtensionAPI, options: RunKernelInstallOpti
 		applied.transition = null;
 		emitRunEvent(pi.events, event);
 		const transition = readAppliedTransition();
-		if (!transition) return;
-		record("run-kernel", "transition", {
-			from_phase: transition.from,
-			to_phase: transition.to,
-			reason: transition.reason,
-			sequence: transition.sequence,
-		});
-		emitRunEvent(pi.events, {
-			...nextBase(),
-			type: "run/phase-changed",
-			transition,
+		if (transition) {
+			record("run-kernel", "transition", {
+				from_phase: transition.from,
+				to_phase: transition.to,
+				reason: transition.reason,
+				sequence: transition.sequence,
+			});
+			emitRunEvent(pi.events, {
+				...nextBase(),
+				type: "run/phase-changed",
+				transition,
+			});
+		}
+		emitRunStateSnapshot(pi.events, {
+			v: 1,
+			reason: transition ? "phase" : "update",
+			sequence,
+			state: store.snapshot(),
 		});
 	}
 
@@ -192,15 +207,44 @@ export function installRunKernel(pi: ExtensionAPI, options: RunKernelInstallOpti
 	onControlDecision(pi.events, (decision) => {
 		dispatch({ ...nextBase(), type: "run/control-decided", decision });
 	});
+	onHarnessSignal(pi.events, (signal) => {
+		if (signal.type === "plan/write") {
+			dispatch({ ...nextBase(), type: "run/plan-observed", runIdHash: signal.runIdHash, accepted: true, executionStarted: false, openItems: signal.openItems });
+		} else if (signal.type === "plan/go") {
+			dispatch({ ...nextBase(), type: "run/plan-observed", runIdHash: signal.runIdHash, accepted: true, executionStarted: true, openItems: store.snapshot().plan.openItems });
+		} else if (signal.type === "context/receipt") {
+			dispatch({ ...nextBase(), type: "run/context-observed", usagePct: signal.contextPct });
+		} else if (signal.type === "failure/episodes") {
+			dispatch({ ...nextBase(), type: "run/failure-state-observed", activeWalls: signal.activeWalls, exposedEpisodes: signal.exposedEpisodes, lastClass: signal.lastClass });
+		}
+	});
 
-	pi.on("session_start", async (_event, ctx) => {
+	pi.on("session_start", async (event, ctx) => {
 		sequence = 0;
-		generation += 1;
 		normalizer.reset();
 		disagreementFingerprints.clear();
 		currentCycleIdHash = null;
 		settledCycleIdHash = null;
-		runIdHash = hashId(`run:${idFactory()}`);
+		let sessionIdHash = hashId(`session:${idFactory()}`);
+		let restoredSource: "custom" | "private" | "none" = "none";
+		let restoredSurfaceChanged = false;
+		if ((event.reason === "resume" || event.reason === "fork") && runCapsuleMode() !== "off") {
+			let entry = null;
+			try { entry = latestRunStateEntry(ctx.sessionManager.getBranch()); } catch { /* private fallback below */ }
+			if (entry) restoredSource = "custom";
+			else {
+				entry = await readLatestRunCapsule(agentDir(), ctx.cwd);
+				if (entry) restoredSource = "private";
+			}
+			if (entry && store.restore(entry.state)) {
+				sequence = maxRunStateSequence(entry.state);
+				generation = entry.state.identity.generation;
+				runIdHash = entry.state.identity.runIdHash;
+				restoredSurfaceChanged = entry.state.identity.surfaceHash !== surfaceHash();
+			} else restoredSource = "none";
+		}
+		generation += 1;
+		if (restoredSource === "none") runIdHash = hashId(`run:${idFactory()}`);
 		const sharedGate = options.detectGate || process.env.VERIFY_GATE === "off"
 			? { found: false as const }
 			: readDetectedProjectGate(ctx.cwd);
@@ -213,7 +257,7 @@ export function installRunKernel(pi: ExtensionAPI, options: RunKernelInstallOpti
 		dispatch({
 			...nextBase(),
 			type: "run/session-started",
-			sessionIdHash: hashId(`session:${idFactory()}`),
+			sessionIdHash,
 			runIdHash,
 			generation,
 			surfaceHash: surfaceHash(),
@@ -224,8 +268,16 @@ export function installRunKernel(pi: ExtensionAPI, options: RunKernelInstallOpti
 			allToolCount: allTools.length,
 			preservedExplicitTools: activation?.preserved_explicit === true,
 			detectedGateHash: detectedGate ? sha256(`gate:${detectedGate}`) : null,
+			sandboxPosture: sandboxPosture(),
 			legacy,
 		});
+		if (restoredSource !== "none") {
+			record("run-kernel", "restored", {
+				restore_source: restoredSource,
+				surface_changed: restoredSurfaceChanged,
+				sequence_floor: sequence,
+			});
+		}
 	});
 
 	pi.on("before_agent_start", async (event) => {
@@ -301,6 +353,7 @@ export function installRunKernel(pi: ExtensionAPI, options: RunKernelInstallOpti
 			lifecycle: state.lifecycle.state,
 			receipts: state.counters.receipts,
 			failures: state.failures.count,
+			active_walls: state.failures.activeWalls,
 			mutations: state.mutation.count,
 			verification_attempts: state.verification.attempts,
 			valid_gates: state.verification.validGates,

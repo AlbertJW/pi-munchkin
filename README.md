@@ -87,6 +87,7 @@ Most behavior is automatic. The primary commands are:
 - `/ketch-status` for public-search backend health.
 - `/loop-status` for a redacted failure-episode summary; `/loop-resume` clears exact episode
   walls and sends one deterministic recovery instruction.
+- `/run-status` for a bounded, read-only summary of the authoritative structured run state.
 - `/munchkin-doctor` for redacted Pi/model capability, canonical tool-provenance, retry/timeout,
   and declared sandbox posture.
 
@@ -125,6 +126,7 @@ Most behavior is automatic. The primary commands are:
 | `KETCH` | default-on public search/read | `off` for offline/private sessions |
 | `RESEARCH_LEDGER` | dark (`on` enables the parent-verified citation pipeline: session page cache, genuine-error `research_note`, recovery-only `research_recall`, budget footers, and a private bounded v2 JSONL ledger under `${PI_CODING_AGENT_DIR}/artifacts/research-ledgers/`) | unset keeps both research-note tools absent; no project-local ledger is written |
 | `RUN_KERNEL` | `shadow`; observes canonical execution receipts, semantic phases, lifecycle settlement, and legacy-state disagreements | `off` registers no kernel handlers or event-bus subscriber; shadow mode never prompts, steers, blocks, activates tools, or persists a capsule |
+| `RUN_CAPSULE` | `shadow`; checkpoints the closed RunState contract to a private per-run JSON authority plus an untrusted Markdown projection | `off` registers no capsule handlers or command; `recovery` is a dark compatibility mode and does not inject state into model context |
 | `VERIFY_EXECUTION_ORDER` | unset retains the deployed transcript-order gate while PR 2 is dark | `execution` uses Pi start/end order and rejects overlapping or missing-start verification; `legacy` explicitly selects the deployed path |
 | `ACTIVE_TOOL_PROMPTS` | unset retains the deployed ambient plan/delegation/compaction guidance while PR 2 is dark | `active` removes the ambient block and lets Pi include definition-owned guidance only for active tools; manual disable removes it |
 | `CONTROL_ARBITER` | `shadow`; records the single winning turn-end correction and collision count while legacy producers remain authoritative | `enforce` lets only the highest-priority proposal act; `off` removes the arbiter while typed plan/context/loop signals continue |
@@ -148,6 +150,11 @@ oversized files.
 - Research ledgers are private `0600` JSONL audit data outside the worktree. URL query strings and
   fragments are never persisted; recalled claim and quote fields remain untrusted evidence, never
   instructions. Delegated citations must be re-read by the parent before they can be recorded.
+- Run capsules use unique private directories below
+  `${PI_CODING_AGENT_DIR}/artifacts/run-capsules/<sha256(cwd)>/<run-uuid>/`. The `0600`
+  `state-v1.json` file and Pi `run_state_v1` custom entry are structured restore authorities;
+  `capsule.md` is only a deterministic, bounded, untrusted projection. Normal runs never inject
+  it into model context, paths are not exposed by `/run-status`, and retention is manual.
 - Tier-three loop recovery receipts are atomically written with private permissions to
   `${PI_CODING_AGENT_DIR}/artifacts/loop-recovery/<sha256(cwd)>.json`. They contain only safe
   failure classes, bounded tool families, hashes, gate booleans, and the harness surface hash.

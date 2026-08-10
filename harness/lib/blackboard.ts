@@ -4,6 +4,7 @@
 // constraint as telemetry.ts's caches and compaction-coordinator's fix).
 import { createHash } from "node:crypto";
 import type { HarnessSignalV1 } from "./harness-signals.ts";
+import type { RunStateV1 } from "./run-kernel-types.ts";
 import { basename, isAbsolute } from "node:path";
 
 // Nothing here is model-visible; the state-lens renderer's OUTPUT becomes
@@ -163,6 +164,25 @@ export function noteHarnessSignal(state: BlackboardState, signal: HarnessSignalV
 	} else if (signal.type === "context/compacted") {
 		state.compactions += 1;
 	}
+}
+
+/** Pure compatibility projection for human/read-only consumers. The deployed
+ * state lens does not call this in capsule shadow mode. */
+export function projectRunStateToBlackboard(state: BlackboardState, run: RunStateV1): BlackboardState {
+	const projected = structuredClone(state);
+	projected.plan.runId = run.identity.runIdHash;
+	projected.plan.itemId = run.plan.currentItemHash;
+	projected.plan.openItems = run.plan.openItems;
+	projected.verify = {
+		gateCmd: null,
+		mutated: run.mutation.count > 0,
+		verifiedOk: run.verification.validAfterMutation,
+		fires: state.verify?.fires ?? 0,
+		sessionFires: state.verify?.sessionFires ?? 0,
+	};
+	projected.context.pct = run.context.usagePct;
+	projected.compactions = run.context.compactionGeneration;
+	return projected;
 }
 
 export function syncBus(state: BlackboardState): void {

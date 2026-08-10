@@ -13,6 +13,9 @@ const RUN_EVENT_TYPES = new Set<RunEventV1["type"]>([
 	"run/legacy-observed",
 	"run/control-proposed",
 	"run/control-decided",
+	"run/plan-observed",
+	"run/context-observed",
+	"run/failure-state-observed",
 	"run/cycle-ended",
 	"run/cycle-settled",
 	"run/session-compacted",
@@ -121,11 +124,11 @@ export function isRunEventV1(value: unknown): value is RunEventV1 {
 	switch (event.type) {
 		case "run/session-started":
 			return exactKeys(event, [...base, "sessionIdHash", "runIdHash", "generation", "surfaceHash", "piVersion",
-				"provider", "model", "activeToolCount", "allToolCount", "preservedExplicitTools", "detectedGateHash", "legacy"]) &&
+				"provider", "model", "activeToolCount", "allToolCount", "preservedExplicitTools", "detectedGateHash", "sandboxPosture", "legacy"]) &&
 				hash(event.sessionIdHash) && hash(event.runIdHash) && integer(event.generation) && hash(event.surfaceHash) &&
 				safeLabel(event.piVersion) && safeLabel(event.provider) && safeLabel(event.model) && integer(event.activeToolCount) &&
 				integer(event.allToolCount) && typeof event.preservedExplicitTools === "boolean" &&
-				nullableHash(event.detectedGateHash) && isLegacy(event.legacy);
+				nullableHash(event.detectedGateHash) && ["declared", "host", "unknown"].includes(String(event.sandboxPosture)) && isLegacy(event.legacy);
 		case "run/cycle-started":
 			return exactKeys(event, [...base, "cycleIdHash", "runIdHash"]) && hash(event.cycleIdHash) && nullableHash(event.runIdHash);
 		case "run/objective-observed":
@@ -146,6 +149,16 @@ export function isRunEventV1(value: unknown): value is RunEventV1 {
 			return exactKeys(event, [...base, "proposal"]) && isControlProposal(event.proposal);
 		case "run/control-decided":
 			return exactKeys(event, [...base, "decision"]) && isControlDecision(event.decision);
+		case "run/plan-observed":
+			return exactKeys(event, [...base, "runIdHash", "accepted", "executionStarted", "openItems"]) &&
+				hash(event.runIdHash) && typeof event.accepted === "boolean" && typeof event.executionStarted === "boolean" &&
+				(event.openItems === null || integer(event.openItems));
+		case "run/context-observed":
+			return exactKeys(event, [...base, "usagePct"]) && (event.usagePct === null || finiteNumber(event.usagePct));
+		case "run/failure-state-observed":
+			return exactKeys(event, [...base, "activeWalls", "exposedEpisodes", "lastClass"]) &&
+				integer(event.activeWalls) && integer(event.exposedEpisodes) &&
+				(event.lastClass === null || FAILURE_CLASSES.has(String(event.lastClass)));
 		case "run/phase-changed":
 			return exactKeys(event, [...base, "transition"]) && isTransition(event.transition);
 		default:
