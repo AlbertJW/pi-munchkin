@@ -11,7 +11,7 @@ import {
 const episode: FailureEpisode = {
 	id: "safe-id", key: sha256("episode-key"), failureClass: "permission",
 	toolFamily: "file_mutation", targetHash: sha256("target"), planItemHash: sha256("plan"),
-	count: 6, callsAfterSecond: 4, strategyHashes: [sha256("strategy")],
+	count: 6, callsAfterSecond: 4, correlatedCallsAfterSecond: 3, strategyHashes: [sha256("strategy")],
 	openedAt: "2026-08-05T00:00:00.000Z", updatedAt: "2026-08-05T00:01:00.000Z",
 	status: "active", recovery: null,
 };

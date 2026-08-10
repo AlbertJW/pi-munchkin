@@ -4,6 +4,7 @@ import { existsSync, mkdtempSync, readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { thresh, resolveStopMode, fpKey, decideTier, sessionEpisodeThresholds, tallySessionRepeats, type Thresholds } from "../extensions/loop-breaker.ts";
+import { planItemHash } from "../lib/failure-episodes.ts";
 import { loopRecoveryPath } from "../lib/loop-recovery.ts";
 import { fire, makeFakePi } from "./integration-harness.ts";
 
@@ -237,6 +238,52 @@ test("exact verification state recovers a semantic verification episode", async 
 	assert.equal(snapshot.active.length, 0);
 	assert.equal(snapshot.completed.at(-1)?.recovery, "exact_gate");
 	delete g.__pi_vg_state;
+	delete g.__pi_failure_episode_state;
+});
+
+test("tool starts preserve plan-item correlation and status reports both overrun metrics", async () => {
+	const g = globalThis as Record<string, unknown>;
+	const fp = makeFakePi();
+	const mod = await import(`../extensions/loop-breaker.ts?episode-correlation=${Date.now()}-${Math.random()}`);
+	mod.default(fp.pi as never);
+	const notices: string[] = [];
+	const ctx = { cwd: "/tmp", ui: { notify(message: string) { notices.push(message); } }, abort() {} };
+	await fire(fp, "session_start", {}, ctx);
+	for (let attempt = 1; attempt <= 2; attempt++) {
+		g.__pi_active_plan_context = { item_id: "item-at-start" };
+		const id = `start-item-${attempt}`;
+		await fire(fp, "tool_execution_start", {
+			toolCallId: id, toolName: "bash", args: { command: attempt === 1 ? "npm test" : "pnpm test" },
+		}, ctx);
+		g.__pi_active_plan_context = { item_id: "item-after-start" };
+		await fire(fp, "tool_execution_end", {
+			toolCallId: id, toolName: "bash", isError: true,
+			result: { content: [{ type: "text", text: "1 failing AssertionError" }] },
+		}, ctx);
+	}
+	let snapshot = g.__pi_failure_episode_state as {
+		active: Array<{ count: number; planItemHash: string }>;
+		semanticFailureOverrun: number;
+		correlatedFailureOverrun: number;
+	};
+	assert.equal(snapshot.active.length, 1, "result-time plan changes must not split the episode");
+	assert.equal(snapshot.active[0]?.count, 2);
+	assert.equal(snapshot.active[0]?.planItemHash, planItemHash("item-at-start"));
+
+	g.__pi_active_plan_context = { item_id: "item-at-start" };
+	await fire(fp, "tool_execution_start", {
+		toolCallId: "unrelated", toolName: "read", args: { path: "src/other.ts" },
+	}, ctx);
+	await fire(fp, "tool_execution_start", {
+		toolCallId: "correlated", toolName: "bash", args: { command: "npm run test -- --new-strategy" },
+	}, ctx);
+	snapshot = g.__pi_failure_episode_state as typeof snapshot;
+	assert.equal(snapshot.semanticFailureOverrun, 2);
+	assert.equal(snapshot.correlatedFailureOverrun, 1);
+	await fp.commands.get("loop-status").handler("", ctx);
+	assert.match(notices.at(-1)!, /semantic_overrun=2; correlated_overrun=1/);
+	assert.deepEqual(fp.swallowedErrors, []);
+	delete g.__pi_active_plan_context;
 	delete g.__pi_failure_episode_state;
 });
 

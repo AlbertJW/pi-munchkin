@@ -32,6 +32,12 @@ export type SuccessObservation = {
 	verifiedExact?: boolean;
 };
 
+export type ToolCallObservation = {
+	toolName: string;
+	args: Record<string, unknown>;
+	planItemId?: string | null;
+};
+
 export type FailureEpisode = {
 	id: string;
 	key: string;
@@ -41,6 +47,7 @@ export type FailureEpisode = {
 	planItemHash: string;
 	count: number;
 	callsAfterSecond: number;
+	correlatedCallsAfterSecond: number;
 	strategyHashes: string[];
 	openedAt: string;
 	updatedAt: string;
@@ -49,11 +56,12 @@ export type FailureEpisode = {
 };
 
 export type FailureEpisodeSnapshot = {
-	v: 1;
+	v: 2;
 	totalEpisodes: number;
 	totalFailures: number;
 	longestEpisode: number;
 	semanticFailureOverrun: number;
+	correlatedFailureOverrun: number;
 	settledWithoutRecovery: number;
 	active: FailureEpisode[];
 	completed: FailureEpisode[];
@@ -61,6 +69,10 @@ export type FailureEpisodeSnapshot = {
 
 const MAX_COMPLETED = 64;
 const MAX_STRATEGIES = 16;
+const MAX_ARGUMENT_KEYS = 32;
+const MAX_ARGUMENT_STRING = 4096;
+const MAX_ARGUMENT_ARRAY = 32;
+const MAX_ARGUMENT_DEPTH = 3;
 
 export function sha256(value: string): string {
 	return createHash("sha256").update(value).digest("hex");
@@ -73,6 +85,23 @@ function canonical(value: unknown): string {
 		.filter(([, v]) => v !== undefined)
 		.sort(([a], [b]) => a.localeCompare(b))
 		.map(([k, v]) => `${JSON.stringify(k)}:${canonical(v)}`).join(",")}}`;
+}
+
+function boundedValue(value: unknown, depth: number): unknown {
+	if (typeof value === "string") return value.slice(0, MAX_ARGUMENT_STRING);
+	if (value === null || typeof value !== "object") return value;
+	if (depth >= MAX_ARGUMENT_DEPTH) return "[bounded]";
+	if (Array.isArray(value)) {
+		return value.slice(0, MAX_ARGUMENT_ARRAY).map((entry) => boundedValue(entry, depth + 1));
+	}
+	return Object.fromEntries(Object.entries(value as Record<string, unknown>)
+		.sort(([left], [right]) => left.localeCompare(right))
+		.slice(0, MAX_ARGUMENT_KEYS)
+		.map(([key, entry]) => [key.slice(0, 128), boundedValue(entry, depth + 1)]));
+}
+
+export function boundedArguments(args: Record<string, unknown>): Record<string, unknown> {
+	return boundedValue(args, 0) as Record<string, unknown>;
 }
 
 function safeAtom(value: string): string {
@@ -188,34 +217,54 @@ function cloneEpisode(episode: FailureEpisode): FailureEpisode {
 
 export class FailureEpisodeTracker {
 	private active = new Map<string, FailureEpisode>();
+	private exposed = new Set<string>();
 	private completed: FailureEpisode[] = [];
 	private totalEpisodes = 0;
 	private totalFailures = 0;
 	private longestEpisode = 0;
 	private semanticFailureOverrun = 0;
+	private correlatedFailureOverrun = 0;
 	private settledWithoutRecovery = 0;
 
 	reset(): void {
 		this.active.clear();
+		this.exposed.clear();
 		this.completed = [];
 		this.totalEpisodes = 0;
 		this.totalFailures = 0;
 		this.longestEpisode = 0;
 		this.semanticFailureOverrun = 0;
+		this.correlatedFailureOverrun = 0;
 		this.settledWithoutRecovery = 0;
 	}
 
-	noteToolCall(): void {
-		const overrun = [...this.active.values()].filter((episode) => episode.count >= 2);
-		if (overrun.length === 0) return;
+	noteToolCall(observation: ToolCallObservation): void {
+		// The normal path has no exposed episode. Return before inspecting args,
+		// hashing a target, or allocating a filtered episode array.
+		if (this.exposed.size === 0) return;
 		this.semanticFailureOverrun += 1;
-		for (const episode of overrun) episode.callsAfterSecond += 1;
+		const args = boundedArguments(observation.args);
+		const family = toolFamily(observation.toolName, args);
+		const target = targetHash(observation.toolName, args);
+		const item = planItemHash(observation.planItemId);
+		let correlated = false;
+		for (const key of this.exposed) {
+			const episode = this.active.get(key);
+			if (!episode) continue;
+			episode.callsAfterSecond += 1;
+			if (episode.toolFamily !== family || episode.targetHash !== target || episode.planItemHash !== item) continue;
+			episode.correlatedCallsAfterSecond += 1;
+			correlated = true;
+		}
+		if (correlated) this.correlatedFailureOverrun += 1;
 	}
 
 	observeFailure(observation: FailureObservation, now = new Date().toISOString()): { episode: FailureEpisode; opened: boolean } {
-		const failureClass = classifyFailure(observation);
-		const family = toolFamily(observation.toolName, observation.args);
-		const target = targetHash(observation.toolName, observation.args);
+		const args = boundedArguments(observation.args);
+		const boundedObservation = { ...observation, args };
+		const failureClass = classifyFailure(boundedObservation);
+		const family = toolFamily(observation.toolName, args);
+		const target = targetHash(observation.toolName, args);
 		const item = planItemHash(observation.planItemId);
 		const key = episodeKey({ failureClass, toolFamily: family, targetHash: target, planItemHash: item });
 		let episode = this.active.get(key);
@@ -223,15 +272,16 @@ export class FailureEpisodeTracker {
 		if (!episode) {
 			episode = {
 				id: key.slice(0, 16), key, failureClass, toolFamily: family, targetHash: target,
-				planItemHash: item, count: 0, callsAfterSecond: 0, strategyHashes: [],
+				planItemHash: item, count: 0, callsAfterSecond: 0, correlatedCallsAfterSecond: 0, strategyHashes: [],
 				openedAt: now, updatedAt: now, status: "active", recovery: null,
 			};
 			this.active.set(key, episode);
 			this.totalEpisodes += 1;
 		}
 		episode.count += 1;
+		if (episode.count === 2) this.exposed.add(key);
 		episode.updatedAt = now;
-		const strategy = strategyHash(observation.toolName, observation.args);
+		const strategy = strategyHash(observation.toolName, args);
 		if (!episode.strategyHashes.includes(strategy) && episode.strategyHashes.length < MAX_STRATEGIES) {
 			episode.strategyHashes.push(strategy);
 		}
@@ -241,8 +291,9 @@ export class FailureEpisodeTracker {
 	}
 
 	observeSuccess(observation: SuccessObservation, recovery: RecoveryKind = "tool_success", now = new Date().toISOString()): FailureEpisode[] {
-		const family = toolFamily(observation.toolName, observation.args);
-		const target = targetHash(observation.toolName, observation.args);
+		const args = boundedArguments(observation.args);
+		const family = toolFamily(observation.toolName, args);
+		const target = targetHash(observation.toolName, args);
 		const recovered: FailureEpisode[] = [];
 		for (const [key, episode] of this.active) {
 			const exactGateRecovery = observation.verifiedExact === true &&
@@ -254,8 +305,9 @@ export class FailureEpisodeTracker {
 			episode.status = "recovered";
 			episode.recovery = exactGateRecovery ? "exact_gate" : recovery;
 			episode.updatedAt = now;
-		this.active.delete(key);
-		this.pushCompleted(episode);
+			this.active.delete(key);
+			this.exposed.delete(key);
+			this.pushCompleted(episode);
 			recovered.push(cloneEpisode(episode));
 		}
 		return recovered;
@@ -267,6 +319,7 @@ export class FailureEpisodeTracker {
 			episode.status = "settled";
 			episode.updatedAt = now;
 			this.active.delete(key);
+			this.exposed.delete(key);
 			this.pushCompleted(episode);
 			this.settledWithoutRecovery += 1;
 			settled.push(cloneEpisode(episode));
@@ -285,6 +338,7 @@ export class FailureEpisodeTracker {
 			episode.recovery = "manual_resume";
 			episode.updatedAt = now;
 			this.active.delete(key);
+			this.exposed.delete(key);
 			this.pushCompleted(episode);
 			cleared.push(cloneEpisode(episode));
 		}
@@ -293,11 +347,12 @@ export class FailureEpisodeTracker {
 
 	snapshot(): FailureEpisodeSnapshot {
 		return {
-			v: 1,
+			v: 2,
 			totalEpisodes: this.totalEpisodes,
 			totalFailures: this.totalFailures,
 			longestEpisode: this.longestEpisode,
 			semanticFailureOverrun: this.semanticFailureOverrun,
+			correlatedFailureOverrun: this.correlatedFailureOverrun,
 			settledWithoutRecovery: this.settledWithoutRecovery,
 			active: this.activeEpisodes(),
 			completed: this.completed.map(cloneEpisode),

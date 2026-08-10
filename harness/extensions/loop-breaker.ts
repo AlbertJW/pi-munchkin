@@ -328,7 +328,7 @@ export default function (pi: ExtensionAPI) {
 	if (process.env.LOOP_BREAKER === "off") return;
 	const executionEnds = new Map<string, { toolName: string; isError: boolean; text: string }>();
 	const episodeTracker = new FailureEpisodeTracker();
-	const episodeArgs = new Map<string, Record<string, unknown>>();
+	const episodeCalls = new Map<string, { args: Record<string, unknown>; planItemId: string | null }>();
 	const episodeProcessed = new Set<string>();
 	const episodeTierFired = new Map<string, LoopTier>();
 	const exactStrategies = new Map<string, Map<string, { count: number; fp: string }>>();
@@ -363,6 +363,7 @@ export default function (pi: ExtensionAPI) {
 				failure_class: episode.failureClass,
 				count: episode.count,
 				calls_after_second: episode.callsAfterSecond,
+				correlated_calls_after_second: episode.correlatedCallsAfterSecond,
 				recovery: episode.recovery ?? "tool_success",
 			});
 		}
@@ -416,13 +417,14 @@ export default function (pi: ExtensionAPI) {
 		callId: string,
 		toolName: string,
 		args: Record<string, unknown>,
+		planItemId: string | null,
 		isError: boolean,
 		text: string,
 	): void {
 		if (EPISODE_MODE === "off" || episodeProcessed.has(callId)) return;
 		episodeProcessed.add(callId);
 		const observation: FailureObservation = {
-			toolName, args, isError, text: text.slice(0, 2048), planItemId: activePlanItemId(),
+			toolName, args, isError, text: text.slice(0, 2048), planItemId,
 		};
 		if (!isFailureObservation(observation)) {
 			recordRecovery(episodeTracker.observeSuccess({ toolName, args }));
@@ -444,6 +446,7 @@ export default function (pi: ExtensionAPI) {
 			failure_class: episode.failureClass,
 			count: episode.count,
 			calls_after_second: episode.callsAfterSecond,
+			correlated_calls_after_second: episode.correlatedCallsAfterSecond,
 			strategy_count: episode.strategyHashes.length,
 		});
 		observeSemanticTier(episode, toolName, args);
@@ -537,7 +540,7 @@ export default function (pi: ExtensionAPI) {
 		delete (globalThis as Record<string, unknown>).__pi_lb_state;
 		executionEnds.clear();
 		episodeTracker.reset();
-		episodeArgs.clear();
+		episodeCalls.clear();
 		episodeProcessed.clear();
 		episodeTierFired.clear();
 		exactStrategies.clear();
@@ -553,10 +556,11 @@ export default function (pi: ExtensionAPI) {
 		description: "Show the redacted semantic failure-episode and repeat-tail state.",
 		handler: async (_args, ctx) => {
 			const active = episodeTracker.activeEpisodes();
+			const summary = episodeTracker.snapshot();
 			const lines = [
-				`loop-status: mode=${EPISODE_MODE}; active=${active.length}; session_repeats=${sessionRepeats}; exact_walls=${ep.blocked.size}`,
+				`loop-status: mode=${EPISODE_MODE}; active=${active.length}; session_repeats=${sessionRepeats}; exact_walls=${ep.blocked.size}; semantic_overrun=${summary.semanticFailureOverrun}; correlated_overrun=${summary.correlatedFailureOverrun}`,
 				...active.slice(0, 8).map((episode) =>
-					`- failure_class=${episode.failureClass}; tool_family=${episode.toolFamily}; attempts=${episode.count}; recovery=pending`),
+					`- failure_class=${episode.failureClass}; tool_family=${episode.toolFamily}; attempts=${episode.count}; calls_after_second=${episode.callsAfterSecond}; correlated_after_second=${episode.correlatedCallsAfterSecond}; recovery=pending`),
 			];
 			ctx.ui.notify(lines.join("\n"), active.length > 0 ? "warning" : "info");
 		},
@@ -580,24 +584,38 @@ export default function (pi: ExtensionAPI) {
 
 	pi.on("tool_execution_start", async (event) => {
 		if (EPISODE_MODE === "off") return;
-		episodeArgs.set(event.toolCallId, (event.args ?? {}) as Record<string, unknown>);
-		episodeTracker.noteToolCall();
+		const call = {
+			args: (event.args ?? {}) as Record<string, unknown>,
+			planItemId: activePlanItemId(),
+		};
+		episodeCalls.set(event.toolCallId, call);
+		episodeTracker.noteToolCall({
+			toolName: event.toolName,
+			args: call.args,
+			planItemId: call.planItemId,
+		});
 		publishEpisodes();
 	});
 
 	pi.on("tool_execution_end", async (event) => {
 		const text = boundedResultText(event.result);
 		executionEnds.set(event.toolCallId, { toolName: event.toolName, isError: event.isError === true, text });
-		const args = episodeArgs.get(event.toolCallId) ?? {};
-		episodeArgs.delete(event.toolCallId);
-		processEpisodeResult(event.toolCallId, event.toolName, args, event.isError === true, text);
+		const call = episodeCalls.get(event.toolCallId) ?? { args: {}, planItemId: activePlanItemId() };
+		episodeCalls.delete(event.toolCallId);
+		processEpisodeResult(event.toolCallId, event.toolName, call.args, call.planItemId, event.isError === true, text);
 	});
 
 	pi.on("tool_result", async (event) => {
+		const call = episodeCalls.get(event.toolCallId) ?? {
+			args: (event.input ?? {}) as Record<string, unknown>,
+			planItemId: activePlanItemId(),
+		};
+		episodeCalls.delete(event.toolCallId);
 		processEpisodeResult(
 			event.toolCallId,
 			event.toolName,
-			(event.input ?? {}) as Record<string, unknown>,
+			call.args,
+			call.planItemId,
 			event.isError === true,
 			boundedResultText({ content: event.content }),
 		);
@@ -614,6 +632,7 @@ export default function (pi: ExtensionAPI) {
 			`provider-${providerRequest}`,
 			"provider",
 			{ provider: ctx.model?.provider ?? "unknown" },
+			activePlanItemId(),
 			true,
 			`provider HTTP ${event.status}`,
 		);
@@ -636,10 +655,11 @@ export default function (pi: ExtensionAPI) {
 			total_failures: summary.totalFailures,
 			longest_episode: summary.longestEpisode,
 			semantic_failure_overrun: summary.semanticFailureOverrun,
+			correlated_failure_overrun: summary.correlatedFailureOverrun,
 			settled_without_recovery: summary.settledWithoutRecovery,
 		});
 		publishEpisodes();
-		episodeArgs.clear();
+		episodeCalls.clear();
 		episodeProcessed.clear();
 	});
 

@@ -70,15 +70,15 @@ export const EVENT_CATALOG = {
 	},
 	"failure-episode/observed": {
 		episode_id: "string", failure_class: "string", count: "number",
-		calls_after_second: "number", strategy_count: "number",
+		calls_after_second: "number", correlated_calls_after_second: "number", strategy_count: "number",
 	},
 	"failure-episode/recovered": {
 		episode_id: "string", failure_class: "string", count: "number",
-		calls_after_second: "number", recovery: "string",
+		calls_after_second: "number", correlated_calls_after_second: "number", recovery: "string",
 	},
 	"failure-episode/settled": {
 		total_episodes: "number", total_failures: "number", longest_episode: "number",
-		semantic_failure_overrun: "number", settled_without_recovery: "number",
+		semantic_failure_overrun: "number", correlated_failure_overrun: "number", settled_without_recovery: "number",
 	},
 	"failure-episode/tier-observed": {
 		tier: "number", detector: "string", mode: "string", failure_class: "string",
