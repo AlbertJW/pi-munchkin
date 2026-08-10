@@ -107,7 +107,7 @@ Most behavior is automatic. The primary commands are:
 | `PI_SUBAGENT_ENV_ALLOW` | empty; comma-separated extra child environment variable names | names are validated; values are copied without logging |
 | subagent fixed allowlist | includes provider essentials and `LLAMA_API_KEY` | secrets are never included in telemetry or user-facing diagnostics |
 | `DRIFT_SCANNER` | active after `agent_settled`, when Pi declares the run settled | `off` disables; a new run aborts an in-flight review and stale findings are dropped |
-| `LOOP_EPISODE_MODE` | `shadow`; records semantic episodes and the 7/11/28 session-tail tiers without steering or blocking | `off` disables collection; `enforce` enables the dark 2/4/6 semantic and 7/11/28 session ladders only after a separate adoption gate |
+| `LOOP_EPISODE_MODE` | `shadow`; records semantic episodes, session-window and correlated overrun, and the 7/11/28 session-tail tiers without steering or blocking | `off` disables collection; `enforce` enables the dark 2/4/6 semantic and 7/11/28 session ladders only after a separate adoption gate |
 | `LB_EPISODE_T1`, `LB_EPISODE_T2`, `LB_EPISODE_T3` | `2`, `4`, `6` semantic failures | explicit integer overrides; only exact previously repeated calls are walled |
 | `LB_SESSION_T1`, `LB_SESSION_T2`, `LB_SESSION_T3` | `7`, `11`, `28` cumulative repeats under enforcement | `LB_SESSION_REPEAT` remains the authoritative legacy 25-repeat steer in shadow mode and is a compatibility alias for enforced Tier 1 |
 | `PI_SANDBOX_POSTURE` | `unknown`; `/munchkin-doctor` accepts only `declared` or `host` as operator assertions | unset it to return to `unknown`; this label is observational and grants no isolation |

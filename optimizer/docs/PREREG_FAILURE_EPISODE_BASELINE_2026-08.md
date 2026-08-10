@@ -28,7 +28,10 @@ For every session record the existing correctness and effort fields plus:
 - episode count and longest episode;
 - failures after the second attempt;
 - `semantic_failure_overrun` (tool calls after the second semantic failure until verified
-  recovery);
+  recovery, including the eventual recovery call while the episode is still open at call start);
+- `correlated_failure_overrun` (the subset of those calls whose pre-result tool family, target
+  hash, and active-plan-item hash match at least one exposed episode; failure class is deliberately
+  excluded because it is unknown before the result);
 - calls until recovery and settlement without recovery;
 - mechanism exposure, repeat calls, tool errors, turns, tokens, latency, and aborts.
 

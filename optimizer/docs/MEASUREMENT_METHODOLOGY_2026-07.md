@@ -495,3 +495,27 @@ fixture the programme spent months believing it lacked — see `MOTHBALLED_2026-
 **Rule.** A pass rate is a property of *(fixture version, harness surface, model)*. Before citing
 one as a floor or a ceiling, confirm all three still hold. Both failures here were the same
 mistake: quoting a number long after the thing it measured had changed.
+
+---
+
+## §15 — Semantic overrun has a fixed window and a correlated diagnostic
+
+The preregistered primary trajectory outcome remains `semantic_failure_overrun`. It increments
+once for every tool call that **starts while any semantic failure episode has already recorded at
+least two failures**. It is a session-window metric: unrelated recovery work counts, multiple
+simultaneously exposed episodes still count one call globally, and the eventual successful
+recovery call counts because its outcome is not known when it starts. The window closes only when
+the episode's defined recovery is observed, on settlement, reset, or manual `/loop-resume`.
+
+`correlated_failure_overrun` is a narrower diagnostic, not a replacement outcome. For each call in
+the same exposed window, it increments once when the call's pre-result **tool family + target hash
++ active-plan-item hash** matches at least one exposed episode. Failure class is intentionally
+absent: assigning it before the result would leak future information into the metric. Each matching
+episode also records `correlatedCallsAfterSecond`; a single global call is never multiplied merely
+because multiple episodes coexist.
+
+Both counters use tool-call start state and persist only hashes and counts. Calls made with no
+exposed episode return before argument bounding, hashing, or episode-array allocation. These are
+observational changes only: the 2/4/6 semantic tiers, exact-call walls, 7/11/28 cumulative tiers,
+and highest-tier collision rule are unchanged. Do not pool either metric across harness surface
+hashes, and do not reinterpret the correlated diagnostic as the preregistered primary outcome.
