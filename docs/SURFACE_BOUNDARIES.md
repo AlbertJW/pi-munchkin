@@ -23,6 +23,7 @@ npm run surface:hash:source
 | 2026-08-06 | research-ledger QA fixes (ledger path in the budget footer + re-attribution recorded + neutral lens wording — all dark behind `RESEARCH_LEDGER`, no always-on delta) | `88e4352` | `d9b7509c0bfeba13f2d99489dc787cb9ca928418d1041653df53dccdf7ff58ec` | rolled out 2026-08-06; loaded live hash `041d25c110c99afa8aa03d96aa8d989839286e467b0f245f8428af37e8379b92` (mirror:check 84/84; dark-absent / armed-present confirmed) |
 | 2026-08-07 | nine-flag adoption default-on (c31/c34/c36/c38/c39/c49/c30/c26/c13): plan_go + search_spans/read_span become always-visible tools, context-brief system-prompt append, plan/spawn wording, c38 block live (gemma-skipped) — ALL always-on model-visible deltas | `a739227` | `955bf23816fb3a1d6822fb0684ca14f66c0d6fe08d16be045dddba2ac3658b03` | rolled out 2026-08-07; loaded live hash `2b4ba598f5d928d66effadfdf3008791f354a7b1d34ef6333b587f7713ff1901` (mirror:check 84/84; live pi load: all three tools present unset, absent under =off; c38 block→plan_write→plan_go(tool)→write chain observed live on the DD) |
 | 2026-08-06 | deep-research skill: note/verify steps made conditional on the tool existing, retry capped (Run 3 abort finding) — ALWAYS-ON text change | `747cc92` | `d9b7509c0bfeba13f2d99489dc787cb9ca928418d1041653df53dccdf7ff58ec` | rolled out 2026-08-06; loaded live hash `041d25c110c99afa8aa03d96aa8d989839286e467b0f245f8428af37e8379b92` (mirror:check 84/84). Run 3 measured the PREVIOUS skill text; this row supersedes it. |
+| 2026-08-10 | parent-owned research proof: genuine tool errors, private v2 JSONL, bounded `research_recall`, parent re-read delegation contract, verifier subprocess removed | `90cb99c` | `aae53bd25df05b6f746ae52a302777f82c12c28b325a58cb521a61d59018dd47` | review only; not mirrored or loaded live; `RESEARCH_LEDGER` remains dark |
 
 PR 4 changes package, CI, operational tooling, and narrative. Its new mirror/secret-scan libraries
 are not imported by the runtime extension manifest, so it does not create a model-visible runtime
@@ -39,17 +40,16 @@ hash.
 
 ---
 
-## Data at rest: where a research session actually lands (2026-08-06)
+## Data at rest: where a research session actually lands (updated 2026-08-10)
 
 A surface hash bounds what the MODEL sees. It says nothing about what a session LEAVES. Those are
 different questions, and the second one had no written answer until now — which matters, because a
-deep-research run writes to **four** places and only one of them is the ledger everyone thinks of.
-Anyone auditing "what did this session leave behind" who stops at `.pi/research/` misses the
-actual corpus.
+deep-research run can write to **four** places. The harness ledger moved out of the project on
+2026-08-10; the fetch cache and Pi transcript remain separate persistence boundaries.
 
 | Location | Written by | Contains | Default |
 |---|---|---|---|
-| `<cwd>/.pi/research/<stamp>.md` | `ketch.ts` (`appendToLedger`) | verified notes: claim, source URL, re-attribution if any, quote, page sha256 | only `RESEARCH_LEDGER=on` |
+| `${PI_CODING_AGENT_DIR}/artifacts/research-ledgers/<sha256(cwd)>/<session-uuid>.jsonl` | `ketch.ts` (`appendToLedger`) | private bounded v2 records: normalized claim, verbatim quote, query-free display URL, exact-URL hash, re-attribution, retrieval time, page sha256 | only `RESEARCH_LEDGER=on`; directory `0700`, file `0600` |
 | `~/.pi/agent/sessions/<cwd-slug>/*.jsonl` | pi core | the parent transcript — **including each subagent's exact task text and the child's assistant messages** (thinking + tool-call arguments, so a `researcher` child's queries and URLs are here). Child *tool results* are not: `pi-subagent/runner-events.js:44` admits `role === "assistant"` only | always on |
 | `~/Library/Caches/ketch/cache.db` | the `ketch` binary, not the harness | **raw fetched page bodies and URLs** — 2 MiB bbolt store, mode 0600, user-global, no session scoping, no TTL the harness can see, no cleanup hook. Kept alive deliberately: `ketch-runtime.ts` forwards `XDG_CACHE_HOME` | always on |
 | `~/.pi/agent/telemetry/events.jsonl` | `telemetry.ts` | counts only — `FORBIDDEN_DETAIL_FIELD` bans any key matching `url`, so no queries or URLs, by construction | `TELEMETRY != off` |
@@ -64,6 +64,7 @@ Three consequences worth stating plainly:
    right direction for auditability — and it is worth noting that pi_munchkin fails none of the
    portability tests the way hosted multi-agent APIs do: the delegated task is readable plaintext
    on disk, not a provider-sealed blob.
-3. **`.pi/` is not in `.gitignore`.** A ledger written into a repo cwd shows up as untracked
-   alongside `.pi/TODO.md` and `.pi/traces/`. Deliberate for now (the files are meant to be seen),
-   but it means a research run in a working tree is one `git add -A` away from being committed.
+3. **The ledger is audit data, not prompt structure.** JSONL prevents page text from forging
+   Markdown sections, and `research_recall` validates and bounds records before returning them.
+   Claims and quotes are still untrusted evidence: neither the parent nor a delegated child may
+   follow instructions embedded in those fields. No automatic verifier subprocess reads them.

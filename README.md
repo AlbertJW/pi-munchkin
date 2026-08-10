@@ -122,7 +122,7 @@ Most behavior is automatic. The primary commands are:
 | `READ_DEDUP` | default-on; later identical `read` results collapse to a back-reference in the per-call context view | `off` |
 | `SPAN_TOOLS` | default-on; `search_spans`/`read_span` for bounded work on large files | `off` removes both tools |
 | `KETCH` | default-on public search/read | `off` for offline/private sessions |
-| `RESEARCH_LEDGER` | dark (`on` enables the verified-citation research pipeline: session page cache, the `research_note` tool that refuses any quote not verbatim in a fetched page, budget footers, and a `.pi/research/<stamp>.md` ledger) | unset = byte-identical prior behaviour |
+| `RESEARCH_LEDGER` | dark (`on` enables the parent-verified citation pipeline: session page cache, genuine-error `research_note`, recovery-only `research_recall`, budget footers, and a private bounded v2 JSONL ledger under `${PI_CODING_AGENT_DIR}/artifacts/research-ledgers/`) | unset keeps both research-note tools absent; no project-local ledger is written |
 | `VERIFY_GATE`, `LOOP_BREAKER`, `GIT_GUARD`, `HASHLINE` | default-on core mechanisms | each accepts its documented `off` kill switch |
 
 Oversized hashline refusals explain the distinction between the returned-context `limit` and the
@@ -137,6 +137,9 @@ oversized files.
   available for per-run cleanup and may be followed by retry or compaction.
 - Blackboard attempt keys are hashed. Persisted labels, errors, telemetry, and notifications are
   redacted and bounded; v1 restores intentionally discard raw attempt/delegation ledgers.
+- Research ledgers are private `0600` JSONL audit data outside the worktree. URL query strings and
+  fragments are never persisted; recalled claim and quote fields remain untrusted evidence, never
+  instructions. Delegated citations must be re-read by the parent before they can be recorded.
 - Tier-three loop recovery receipts are atomically written with private permissions to
   `${PI_CODING_AGENT_DIR}/artifacts/loop-recovery/<sha256(cwd)>.json`. They contain only safe
   failure classes, bounded tool families, hashes, gate booleans, and the harness surface hash.
