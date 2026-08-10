@@ -1,5 +1,6 @@
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { record } from "../lib/telemetry.ts";
+import { buildControlProposal, controlEnforces, emitControlProposal } from "../lib/control-proposal.ts";
 
 // tool-call-rescue (LIVE default-on since 2026-08-07; was dark candidate
 // c49). Rescues sessions that die on the
@@ -80,8 +81,20 @@ export default function (pi: ExtensionAPI): void {
 		if (rescues >= MAX_RESCUES) return;
 		rescues += 1;
 		record("tool-call-rescue", "steered", { signature: det.signature, turnIndex: event.turnIndex });
+		const message = rescueMessage(det);
+		const legacyActed = !controlEnforces(pi.events);
+		emitControlProposal(pi.events, buildControlProposal({
+			boundarySequence: event.turnIndex,
+			kind: "tool_rescue",
+			reason: "pseudo_tool_call",
+			source: "tool-call-rescue",
+			cooldownKey: `tool-rescue:${det.signature}`,
+			messageFactory: "tool-rescue",
+			legacyActed,
+		}), { message });
+		if (!legacyActed) return;
 		try {
-			pi.sendUserMessage(rescueMessage(det), { deliverAs: "steer" });
+			pi.sendUserMessage(message, { deliverAs: "steer" });
 		} catch { /* stale pi post-replacement — nothing to rescue anymore */ }
 	});
 }

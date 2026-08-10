@@ -1,6 +1,6 @@
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { record } from "../lib/telemetry.ts";
-import type { TelemetryTap } from "../lib/telemetry.ts";
+import { onHarnessSignal } from "../lib/harness-signals.ts";
 
 type DeferredTool = "subagent" | "compact_context";
 const DEFERRED: readonly DeferredTool[] = ["subagent", "compact_context"];
@@ -30,24 +30,14 @@ export default function (pi: ExtensionAPI): void {
 		} catch { /* incompatible runtime: fail open and never churn the surface */ }
 	}
 
-	const tap: TelemetryTap & { __toolActivation?: true } = (ext, kind, detail) => {
-		if (ext === "plan-runner" && kind === "write" && typeof detail.open_items === "number") {
-			lastOpenItems = detail.open_items;
+	onHarnessSignal(pi.events, (signal) => {
+		if (signal.type === "plan/write") lastOpenItems = signal.openItems;
+		if (signal.type === "plan/go" && lastOpenItems > 1) activate("subagent", "multi-item-execution");
+		if (signal.type === "plan/gate" && !signal.pass && signal.fails >= 2) activate("subagent", "second-gate-failure");
+		if (signal.type === "loop/tier" && signal.tier === 2) {
+			activate("subagent", signal.detector === "semantic" ? "semantic-tier-two" : "loop-tier-two");
 		}
-		if (ext === "plan-runner" && kind === "go" && lastOpenItems > 1) activate("subagent", "multi-item-execution");
-		if (ext === "plan-runner" && kind === "gate" && detail.pass === false && Number(detail.fails) >= 2) {
-			activate("subagent", "second-gate-failure");
-		}
-		if (ext === "loop-breaker" && kind === "steer" && detail.tier === 2) activate("subagent", "loop-tier-two");
-		if (ext === "failure-episode" && kind === "intervention" && detail.tier === 2) {
-			activate("subagent", "semantic-tier-two");
-		}
-	};
-	tap.__toolActivation = true;
-	const taps = ((g.__pi_telemetry_taps as TelemetryTap[] | undefined) ?? [])
-		.filter((candidate) => !(candidate as typeof tap).__toolActivation);
-	taps.push(tap);
-	g.__pi_telemetry_taps = taps;
+	});
 
 	pi.on("session_start", async () => {
 		g.__pi_tool_activation_state = { mode: MODE, preserved_explicit: false, reason: "dynamic-startup" };

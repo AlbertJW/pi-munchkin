@@ -4,6 +4,7 @@ import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { changedPaths, checksFor, firstError, formatSlop, jsSlopFindings, PYTHON_SLOP_SCRIPT, slopKindFor } from "../lib/micro-gate-policy.ts";
 import { steerText } from "../lib/steer-texts.ts";
 import { record } from "../lib/telemetry.ts";
+import { buildControlProposal, controlEnforces, emitControlProposal } from "../lib/control-proposal.ts";
 
 // micro-gate (c21) — DORMANT unless MICRO_GATE=on. After a turn that mutated
 // source files, run the cheapest deterministic check on JUST the changed files
@@ -59,7 +60,7 @@ export default function (pi: ExtensionAPI) {
 		// tree parses.
 		const outputs: Array<{ file: string; err: string }> = [];
 		if (!PARSE_ENABLED) {
-			if (SLOP_ENABLED) await slopPass(pi, ctx.cwd, paths);
+			if (SLOP_ENABLED) await slopPass(pi, ctx.cwd, paths, event.turnIndex);
 			return;
 		}
 		let checked = 0;
@@ -90,7 +91,7 @@ export default function (pi: ExtensionAPI) {
 				record("micro-gate", "checker-error", { file: check.file, error: error instanceof Error ? error.message : String(error) });
 			}
 		}
-		if (SLOP_ENABLED && outputs.length === 0) await slopPass(pi, ctx.cwd, paths);
+		if (SLOP_ENABLED && outputs.length === 0) await slopPass(pi, ctx.cwd, paths, event.turnIndex);
 		const err = firstError(outputs);
 		if (!err) {
 			record("micro-gate", checked ? "passed" : "skipped", { files: paths.length, checked });
@@ -102,10 +103,20 @@ export default function (pi: ExtensionAPI) {
 			{ err },
 		);
 		record("micro-gate", "fired", { files: paths.length, injected_chars: steerMsg.length });
-		pi.sendUserMessage(steerMsg, { deliverAs: "steer" });
+		const legacyActed = !controlEnforces(pi.events);
+		emitControlProposal(pi.events, buildControlProposal({
+			boundarySequence: event.turnIndex,
+			kind: "safety_consequence",
+			reason: "compile_or_lint",
+			source: "micro-gate",
+			cooldownKey: "micro-gate-parse",
+			messageFactory: "micro-gate-parse",
+			legacyActed,
+		}), { message: steerMsg });
+		if (legacyActed) pi.sendUserMessage(steerMsg, { deliverAs: "steer" });
 	});
 
-	async function slopPass(api: ExtensionAPI, cwd: string, paths: string[]): Promise<void> {
+	async function slopPass(api: ExtensionAPI, cwd: string, paths: string[], turnIndex: number): Promise<void> {
 		const outputs: Array<{ file: string; findings: string[] }> = [];
 		let checked = 0;
 		const seen = new Set<string>();
@@ -152,6 +163,16 @@ export default function (pi: ExtensionAPI) {
 			{ findings },
 		);
 		record("micro-gate", "slop-fired", { files: paths.length, findings: outputs.reduce((n, o) => n + o.findings.length, 0), injected_chars: steerMsg.length });
-		api.sendUserMessage(steerMsg, { deliverAs: "steer" });
+		const legacyActed = !controlEnforces(api.events);
+		emitControlProposal(api.events, buildControlProposal({
+			boundarySequence: turnIndex,
+			kind: "context_hint",
+			reason: "code_quality",
+			source: "micro-gate",
+			cooldownKey: "micro-gate-slop",
+			messageFactory: "micro-gate-slop",
+			legacyActed,
+		}), { message: steerMsg });
+		if (legacyActed) api.sendUserMessage(steerMsg, { deliverAs: "steer" });
 	}
 }

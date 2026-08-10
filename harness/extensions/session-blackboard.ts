@@ -3,12 +3,15 @@ import { chmod, mkdir, rename, unlink, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import {
-	boardState, noteTool, noteTelemetry, syncBus, renderLens, renderCockpitHtml,
+	boardState, noteTool, noteHarnessSignal, syncBus, renderLens, renderCockpitHtml,
 	resetBoard, restore, snapshot,
 } from "../lib/blackboard.ts";
 import { record } from "../lib/telemetry.ts";
-import type { TelemetryTap } from "../lib/telemetry.ts";
 import { agentDir } from "../lib/agent-dir.ts";
+import { onHarnessSignal } from "../lib/harness-signals.ts";
+import {
+	buildControlProposal, controlEnforces, emitControlProposal, onControlProposal,
+} from "../lib/control-proposal.ts";
 
 // Session blackboard: ground-truth working memory (see lib/blackboard.ts).
 // Three faces, strictly separated:
@@ -55,34 +58,39 @@ export default function (pi: ExtensionAPI): void {
 	let renderInFlight: Promise<void> | null = null;
 	let renderQueued = false;
 	let renderTimer: ReturnType<typeof setTimeout> | null = null;
+	let lastLensProposalBoundary = -Infinity;
 
-	// Telemetry tap: cross-extension facts (plan gates, context receipts,
-	// compactions, loop-breaker firings). Reload-safe: previous instances of this
-	// extension are evicted by name before pushing.
-	const tap: TelemetryTap & { __blackboard?: true } = (ext, kind, detail) => {
+	onHarnessSignal(pi.events, (signal) => noteHarnessSignal(boardState(), signal));
+	onControlProposal(pi.events, ({ proposal }) => {
+		if (proposal.source !== "loop-breaker" ||
+			!(["loop-tier", "loop-session"] as string[]).includes(proposal.messageFactory) ||
+			proposal.boundarySequence === lastLensProposalBoundary) return;
 		const state = boardState();
-		noteTelemetry(state, ext, kind, detail);
 		if ((LENS_MODE === "steer" || LENS_MODE === "both") &&
-			ext === "loop-breaker" && (kind === "steer" || kind === "session-repeat") &&
-			state.turn - lastLensSteerTurn >= STEER_MIN_TURN_GAP) {
+			proposal.boundarySequence - lastLensSteerTurn >= STEER_MIN_TURN_GAP) {
+			state.turn = proposal.boundarySequence;
 			syncBus(state);
 			const lens = renderLens(state, LENS_MAX_CHARS);
 			if (lens) {
-				lastLensSteerTurn = state.turn;
-				record("state-lens", "steer-injected", { chars: lens.length, turnIndex: state.turn });
-				try {
-					pi.sendUserMessage(lens, { deliverAs: "steer" });
-				} catch { /* streaming edge — next signal retries */ }
+				lastLensProposalBoundary = proposal.boundarySequence;
+				lastLensSteerTurn = proposal.boundarySequence;
+				const legacyActed = !controlEnforces(pi.events);
+				emitControlProposal(pi.events, buildControlProposal({
+					boundarySequence: proposal.boundarySequence,
+					kind: "context_hint",
+					reason: "state_lens",
+					source: "session-blackboard",
+					cooldownKey: "state-lens",
+					messageFactory: "state-lens",
+					legacyActed,
+				}), { message: lens });
+				if (legacyActed) {
+					record("state-lens", "steer-injected", { chars: lens.length, turnIndex: proposal.boundarySequence });
+					try { pi.sendUserMessage(lens, { deliverAs: "steer" }); } catch { /* stale session */ }
+				}
 			}
 		}
-	};
-	tap.__blackboard = true;
-	const g = globalThis as Record<string, unknown>;
-	const taps = ((g.__pi_telemetry_taps as TelemetryTap[] | undefined) ?? []).filter(
-		(t) => !(t as { __blackboard?: true }).__blackboard,
-	);
-	taps.push(tap);
-	g.__pi_telemetry_taps = taps;
+	});
 
 	function cockpitPath(workdir: string): string {
 		const cwdHash = createHash("sha256").update(workdir).digest("hex");
@@ -135,7 +143,10 @@ export default function (pi: ExtensionAPI): void {
 	// each emit agent_start). Without this, `state.turn - lastLensSteerTurn` goes
 	// negative after a mid-session restart and stays below STEER_MIN_TURN_GAP
 	// forever, silently latching the lens steer off for the rest of the session.
-	pi.on("agent_start", async () => { lastLensSteerTurn = -Infinity; });
+	pi.on("agent_start", async () => {
+		lastLensSteerTurn = -Infinity;
+		lastLensProposalBoundary = -Infinity;
+	});
 
 	pi.on("session_start", async (event, ctx) => {
 		cwd = ctx.cwd ?? process.cwd();

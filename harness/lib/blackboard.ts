@@ -3,6 +3,7 @@
 // extension its own module instance, so module scope cannot be shared — same
 // constraint as telemetry.ts's caches and compaction-coordinator's fix).
 import { createHash } from "node:crypto";
+import type { HarnessSignalV1 } from "./harness-signals.ts";
 import { basename, isAbsolute } from "node:path";
 
 // Nothing here is model-visible; the state-lens renderer's OUTPUT becomes
@@ -142,23 +143,24 @@ export function noteTool(
 	}
 }
 
-// Folds cross-extension facts arriving via the telemetry tap and globalThis bus.
-export function noteTelemetry(state: BlackboardState, ext: string, kind: string, detail: Record<string, unknown>): void {
-	if (ext === "plan-runner") {
-		if (typeof detail.run_id === "string") state.plan.runId = detail.run_id;
-		if (kind === "gate") state.plan.lastGate = { pass: detail.pass === true, fails: Number(detail.fails ?? 0) || 0 };
-		if (kind === "write" && typeof detail.items === "number") {
-			state.plan.openItems = typeof detail.open_items === "number"
-				? detail.open_items
-				: detail.items - (Number(detail.newly_done ?? 0) || 0);
-		}
-	} else if (ext === "context-surface" && kind === "receipt") {
+// Folds typed cross-extension facts. Telemetry is only a sink and can be
+// disabled without changing blackboard state or control behavior.
+export function noteHarnessSignal(state: BlackboardState, signal: HarnessSignalV1): void {
+	if (signal.type === "plan/write") {
+		state.plan.runId = signal.runIdHash;
+		state.plan.openItems = signal.openItems;
+	} else if (signal.type === "plan/go") {
+		state.plan.runId = signal.runIdHash;
+	} else if (signal.type === "plan/gate") {
+		state.plan.runId = signal.runIdHash;
+		state.plan.lastGate = { pass: signal.pass, fails: signal.fails };
+	} else if (signal.type === "context/receipt") {
 		state.context = {
-			pct: typeof detail.context_pct === "number" ? detail.context_pct : state.context.pct,
-			staleShare: typeof detail.stale_tool_result_share === "number" ? detail.stale_tool_result_share : state.context.staleShare,
-			dupShare: typeof detail.exact_duplicate_block_share === "number" ? detail.exact_duplicate_block_share : state.context.dupShare,
+			pct: signal.contextPct ?? state.context.pct,
+			staleShare: signal.staleShare ?? state.context.staleShare,
+			dupShare: signal.duplicateShare ?? state.context.dupShare,
 		};
-	} else if (ext === "context-watcher" && kind === "compacted") {
+	} else if (signal.type === "context/compacted") {
 		state.compactions += 1;
 	}
 }

@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { record } from "../lib/telemetry.ts";
+import { emitHarnessSignal, signalRunId } from "../lib/harness-signals.ts";
 import { fire, makeFakePi } from "./integration-harness.ts";
 
 const allTools = ["read", "bash", "edit", "write", "plan_write", "subagent", "compact_context"];
@@ -44,12 +44,12 @@ test("subagent activates additively for multi-item execution, second gate failur
 		const run = await dynamic();
 		try {
 			if (trigger === "plan") {
-				record("plan-runner", "write", { items: 3, open_items: 2, newly_done: 0, rewrite: false, declared_dependencies: 0, unresolved_dependencies: 0, run_id: "r" });
-				record("plan-runner", "go", { resumed: false, stale: 0, activation: "tool", run_id: "r" });
+				emitHarnessSignal(run.fp.pi.events as never, { v: 1, type: "plan/write", items: 3, openItems: 2, runIdHash: signalRunId("r") });
+				emitHarnessSignal(run.fp.pi.events as never, { v: 1, type: "plan/go", runIdHash: signalRunId("r") });
 			} else if (trigger === "gate") {
-				record("plan-runner", "gate", { pass: false, fails: 2, rung: 2, terminal: false, run_id: "r" });
+				emitHarnessSignal(run.fp.pi.events as never, { v: 1, type: "plan/gate", pass: false, fails: 2, runIdHash: signalRunId("r") });
 			} else {
-				record("loop-breaker", "steer", { tier: 2, byTool: true, byReason: false, repeat: 5, streak: 5, injected_chars: 1, turnIndex: 1 });
+				emitHarnessSignal(run.fp.pi.events as never, { v: 1, type: "loop/tier", tier: 2, detector: "exact" });
 			}
 			assert.ok(run.active().includes("subagent"), trigger);
 			assert.ok(run.active().includes("read"), "activation is additive");
@@ -73,10 +73,10 @@ test("compact_context activates at the first 60% crossing and manual disable is 
 test("a later trigger does not undo a manual subagent disable", async () => {
 	const run = await dynamic();
 	try {
-		record("plan-runner", "gate", { pass: false, fails: 2, rung: 2, terminal: false, run_id: "r" });
+		emitHarnessSignal(run.fp.pi.events as never, { v: 1, type: "plan/gate", pass: false, fails: 2, runIdHash: signalRunId("r") });
 		assert.ok(run.active().includes("subagent"));
 		run.setActive(run.active().filter((name) => name !== "subagent"));
-		record("loop-breaker", "steer", { tier: 2, byTool: true, byReason: false, repeat: 5, streak: 5, injected_chars: 1, turnIndex: 2 });
+		emitHarnessSignal(run.fp.pi.events as never, { v: 1, type: "loop/tier", tier: 2, detector: "exact" });
 		assert.equal(run.active().includes("subagent"), false);
 	} finally { run.restore(); }
 });
@@ -84,17 +84,11 @@ test("a later trigger does not undo a manual subagent disable", async () => {
 test("semantic tier two activates additively once and respects a later manual disable", async () => {
 	const run = await dynamic();
 	try {
-		record("failure-episode", "intervention", {
-			tier: 2, detector: "semantic", failure_class: "permission", count: 4,
-			session_repeats: 3, injected_chars: 10, turnIndex: 2,
-		});
+		emitHarnessSignal(run.fp.pi.events as never, { v: 1, type: "loop/tier", tier: 2, detector: "semantic" });
 		assert.ok(run.active().includes("subagent"));
 		assert.ok(run.active().includes("read"), "activation remains additive");
 		run.setActive(run.active().filter((name) => name !== "subagent"));
-		record("failure-episode", "intervention", {
-			tier: 2, detector: "semantic", failure_class: "permission", count: 5,
-			session_repeats: 4, injected_chars: 10, turnIndex: 3,
-		});
+		emitHarnessSignal(run.fp.pi.events as never, { v: 1, type: "loop/tier", tier: 2, detector: "semantic" });
 		assert.equal(run.active().includes("subagent"), false);
 	} finally { run.restore(); }
 });

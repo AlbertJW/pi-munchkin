@@ -1,6 +1,7 @@
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { currentCompactionOwner } from "../lib/compaction-coordinator.ts";
 import { record } from "../lib/telemetry.ts";
+import { emitHarnessSignal } from "../lib/harness-signals.ts";
 
 // Passive compaction observer. The active watcher (proactive ctx.compact() at a
 // percent threshold) was removed 2026-07-28: it never fired in any of the 1,505
@@ -32,6 +33,7 @@ export function registerContextWatcher(pi: ExtensionAPI, recordEvent: typeof rec
 			contextWindow: usage?.contextWindow ?? null,
 			contextPct: usage?.percent == null ? null : Math.round(usage.percent * 100) / 100,
 		});
+		emitHarnessSignal(pi.events, { v: 1, type: "context/compacted" });
 	});
 }
 

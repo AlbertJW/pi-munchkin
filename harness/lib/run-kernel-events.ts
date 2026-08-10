@@ -1,5 +1,6 @@
 import type { EventBus } from "@earendil-works/pi-coding-agent";
 import type { ExecutionReceiptV1, LegacyRunSnapshotV1, RunEventV1, RunTransitionV1 } from "./run-kernel-types.ts";
+import { isControlDecision, isControlProposal } from "./control-proposal.ts";
 
 export const RUN_EVENT_CHANNEL = "pi-munchkin/run-event/v1";
 
@@ -10,6 +11,8 @@ const RUN_EVENT_TYPES = new Set<RunEventV1["type"]>([
 	"run/tool-started",
 	"run/tool-finished",
 	"run/legacy-observed",
+	"run/control-proposed",
+	"run/control-decided",
 	"run/cycle-ended",
 	"run/cycle-settled",
 	"run/session-compacted",
@@ -139,6 +142,10 @@ export function isRunEventV1(value: unknown): value is RunEventV1 {
 			return exactKeys(event, [...base, "receipt"]) && isReceipt(event.receipt);
 		case "run/legacy-observed":
 			return exactKeys(event, [...base, "legacy"]) && isLegacy(event.legacy);
+		case "run/control-proposed":
+			return exactKeys(event, [...base, "proposal"]) && isControlProposal(event.proposal);
+		case "run/control-decided":
+			return exactKeys(event, [...base, "decision"]) && isControlDecision(event.decision);
 		case "run/phase-changed":
 			return exactKeys(event, [...base, "transition"]) && isTransition(event.transition);
 		default:

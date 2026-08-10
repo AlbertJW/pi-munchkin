@@ -16,6 +16,11 @@ const failure = {
 
 export const EVENT_CATALOG = {
 	"telemetry/schema-reject": { rejected_count: "number", reason_class: "string" },
+	"telemetry/writer-overflow": { dropped_rows: "number" },
+	"control-arbiter/decision": {
+		mode: "string", proposals: "number", collisions: "number", legacy_actions: "number",
+		winner_kind: "string", winner_source: "string", winner_reason: "string", boundary_sequence: "number",
+	},
 	"verify-gate/gate-green-consumed": {},
 	"verify-gate/gate-green-execution-ordered": { started_sequence: "number", ended_sequence: "number" },
 	"verify-gate/steer": { failed: "boolean", fires: "number", sessionFires: "number", injected_chars: "number", turnIndex: "number" },

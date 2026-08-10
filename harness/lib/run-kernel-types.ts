@@ -1,4 +1,5 @@
 import type { FailureClass } from "./failure-episodes.ts";
+import type { ControlDecisionV1, ControlProposalV1 } from "./control-proposal.ts";
 
 export type RunKernelMode = "shadow" | "off";
 export type RunLifecycle = "starting" | "active" | "settling" | "idle" | "shutdown";
@@ -120,7 +121,18 @@ export interface RunStateV1 {
 		allToolCount: number;
 		preservedExplicitTools: boolean;
 	};
-	control: { boundarySequence: number; lastDecision: null };
+	control: {
+		boundarySequence: number;
+		proposals: number;
+		collisions: number;
+		lastDecision: null | {
+			kind: ControlProposalV1["kind"];
+			reason: ControlProposalV1["reason"];
+			source: ControlProposalV1["source"];
+			priority: number;
+			mode: ControlDecisionV1["mode"];
+		};
+	};
 	context: { compactionGeneration: number };
 	outcome: {
 		status: RunOutcome;
@@ -166,5 +178,7 @@ export type RunEventV1 =
 	| (RunEventBase & { type: "run/tool-finished"; receipt: ExecutionReceiptV1 })
 	| (RunEventBase & { type: "run/session-compacted" })
 	| (RunEventBase & { type: "run/legacy-observed"; legacy: LegacyRunSnapshotV1 })
+	| (RunEventBase & { type: "run/control-proposed"; proposal: ControlProposalV1 })
+	| (RunEventBase & { type: "run/control-decided"; decision: ControlDecisionV1 })
 	| (RunEventBase & { type: "run/session-shutdown" })
 	| (RunEventBase & { type: "run/phase-changed"; transition: RunTransitionV1 });

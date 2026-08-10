@@ -12,6 +12,11 @@ import {
 } from "../lib/loop-recovery.ts";
 import { steerText } from "../lib/steer-texts.ts";
 import { record } from "../lib/telemetry.ts";
+import { emitHarnessSignal } from "../lib/harness-signals.ts";
+import {
+	buildControlProposal, controlEnforces, emitControlProposal,
+	type ControlEffect, type ControlReason, type MessageFactoryId,
+} from "../lib/control-proposal.ts";
 
 // Agentic loop-breaker.
 //
@@ -344,6 +349,34 @@ export default function (pi: ExtensionAPI) {
 	};
 	let pendingAction: PendingAction | null = null;
 
+	function publishTier(tier: Exclude<LoopTier, 0>, detector: "exact" | "outcome" | "semantic" | "session"): void {
+		emitHarnessSignal(pi.events, { v: 1, type: "loop/tier", tier, detector });
+	}
+
+	function proposeControl(input: {
+		turnIndex: number;
+		reason: ControlReason;
+		messageFactory: MessageFactoryId;
+		message?: string;
+		effect?: ControlEffect;
+		abort?: () => void;
+		shutdown?: () => void;
+		cooldownKey: string;
+	}): boolean {
+		const legacyActed = !controlEnforces(pi.events);
+		emitControlProposal(pi.events, buildControlProposal({
+			boundarySequence: input.turnIndex,
+			kind: input.effect === "abort" || input.effect === "shutdown" ? "safe_abort" : "failure_recovery",
+			reason: input.reason,
+			source: "loop-breaker",
+			cooldownKey: input.cooldownKey,
+			messageFactory: input.messageFactory,
+			effect: input.effect,
+			legacyActed,
+		}), { message: input.message, abort: input.abort, shutdown: input.shutdown });
+		return legacyActed;
+	}
+
 	function activePlanItemId(): string | null {
 		const plan = (globalThis as Record<string, unknown>).__pi_active_plan_context as { item_id?: unknown } | undefined;
 		return typeof plan?.item_id === "string" ? plan.item_id : null;
@@ -474,7 +507,11 @@ export default function (pi: ExtensionAPI) {
 			turnIndex,
 		});
 		if (action.tier < 3) {
-			pi.sendUserMessage(message, { deliverAs: "steer" });
+			publishTier(action.tier, action.detector === "session" ? "session" : "semantic");
+			if (proposeControl({
+				turnIndex, reason: "semantic_tier", messageFactory: "loop-semantic", message,
+				cooldownKey: `semantic:${action.tier}`,
+			})) pi.sendUserMessage(message, { deliverAs: "steer" });
 			return action.tier;
 		}
 
@@ -497,8 +534,12 @@ export default function (pi: ExtensionAPI) {
 		} catch { /* abort remains the safe outcome even if private persistence fails */ }
 		record("failure-episode", "receipt", { persisted, strategy_count: receipt.strategy_family_hashes.length });
 		abortArmed = true;
+		publishTier(3, action.detector === "session" ? "session" : "semantic");
 		ctx.ui.notify(`loop-breaker: semantic tier 3 — aborting run (failure_class=${failureClass})`, "error");
-		ctx.abort();
+		if (proposeControl({
+			turnIndex, reason: "semantic_tier", messageFactory: "loop-semantic", effect: "abort",
+			abort: () => ctx.abort(), cooldownKey: "semantic:3",
+		})) ctx.abort();
 		return 3;
 	}
 
@@ -748,7 +789,11 @@ export default function (pi: ExtensionAPI) {
 				{
 					const msg = outcomeMessage(n, outcomeLabels.get(fp) ?? r.toolName);
 					record("loop-breaker", "outcome-steer", { n, injected_chars: msg.length, turnIndex: event.turnIndex });
-					pi.sendUserMessage(msg, { deliverAs: "steer" });
+					publishTier(1, "outcome");
+					if (proposeControl({
+						turnIndex: event.turnIndex, reason: "outcome_repeat", messageFactory: "loop-outcome",
+						message: msg, cooldownKey: `outcome:${fp}:steer`,
+					})) pi.sendUserMessage(msg, { deliverAs: "steer" });
 				}
 			} else if (action === "escalate") {
 				// Two ignored steers and the identical failing outcome STILL repeating:
@@ -759,13 +804,21 @@ export default function (pi: ExtensionAPI) {
 					record("loop-breaker", "outcome-abort", { n, turnIndex: event.turnIndex });
 					ctx.ui.notify(`loop-breaker: hard stop — same failing outcome ${n}× (${outcomeLabels.get(fp) ?? r.toolName})`, "error");
 					abortArmed = true;
-					ctx.abort();
+					publishTier(3, "outcome");
+					if (proposeControl({
+						turnIndex: event.turnIndex, reason: "outcome_repeat", messageFactory: "loop-outcome",
+						effect: "abort", abort: () => ctx.abort(), cooldownKey: `outcome:${fp}:abort`,
+					})) ctx.abort();
 					return;
 				}
 				{
 					const msg = outcomeMessage(n, outcomeLabels.get(fp) ?? r.toolName);
 					record("loop-breaker", "outcome-steer", { n, final: true, injected_chars: msg.length, turnIndex: event.turnIndex });
-					pi.sendUserMessage(msg, { deliverAs: "steer" });
+					publishTier(3, "outcome");
+					if (proposeControl({
+						turnIndex: event.turnIndex, reason: "outcome_repeat", messageFactory: "loop-outcome",
+						message: msg, cooldownKey: `outcome:${fp}:final`,
+					})) pi.sendUserMessage(msg, { deliverAs: "steer" });
 				}
 			}
 		}
@@ -815,7 +868,11 @@ export default function (pi: ExtensionAPI) {
 					"with what you tried.",
 				{ repeats: sessionRepeats },
 			);
-			pi.sendUserMessage(msg, { deliverAs: "steer" });
+			publishTier(1, "session");
+			if (proposeControl({
+				turnIndex: event.turnIndex, reason: "session_repeat", messageFactory: "loop-session",
+				message: msg, cooldownKey: "session-repeat",
+			})) pi.sendUserMessage(msg, { deliverAs: "steer" });
 		}
 
 		// Progress = an edit/write/plan_write tool, a file-mutating bash command,
@@ -891,15 +948,22 @@ export default function (pi: ExtensionAPI) {
 			tier, byTool: d.byToolRepeat, byReason: d.byReasonRepeat,
 			repeat, streak: ep.streak, injected_chars: steerMsg.length, turnIndex: event.turnIndex,
 		});
+		publishTier(tier, "exact");
 
 		if (tier === 1) {
-			pi.sendUserMessage(steerMsg, { deliverAs: "steer" });
+			if (proposeControl({
+				turnIndex: event.turnIndex, reason: "loop_strategy_change", messageFactory: "loop-tier",
+				message: steerMsg, cooldownKey: "exact:1",
+			})) pi.sendUserMessage(steerMsg, { deliverAs: "steer" });
 			return;
 		}
 
 		if (tier === 2) {
 			if (didBlock) ep.blocked.add(worstFp);
-			pi.sendUserMessage(steerMsg, { deliverAs: "steer" });
+			if (proposeControl({
+				turnIndex: event.turnIndex, reason: "loop_strategy_change", messageFactory: "loop-tier",
+				message: steerMsg, cooldownKey: "exact:2",
+			})) pi.sendUserMessage(steerMsg, { deliverAs: "steer" });
 			return;
 		}
 
@@ -908,9 +972,14 @@ export default function (pi: ExtensionAPI) {
 			if (n >= REPEAT_T1) ep.blocked.add(fp);
 		}
 		if (HARD_STOP_MODE === "shutdown") {
-			pi.sendUserMessage(steerMsg, { deliverAs: "steer" });
 			ctx.ui.notify("loop-breaker: hard stop — shutting down pi", "error");
-			ctx.shutdown();
+			if (proposeControl({
+				turnIndex: event.turnIndex, reason: "loop_hard_stop", messageFactory: "loop-tier",
+				effect: "shutdown", shutdown: () => ctx.shutdown(), cooldownKey: "exact:3:shutdown",
+			})) {
+				pi.sendUserMessage(steerMsg, { deliverAs: "steer" });
+				ctx.shutdown();
+			}
 			return;
 		}
 		if (HARD_STOP_MODE === "abort") {
@@ -926,12 +995,19 @@ export default function (pi: ExtensionAPI) {
 			ep = newEpisode();
 			ep.blocked = blocked;
 			abortArmed = true; // backstop: abort on the next looping tool call (reliable mid-turn hook)
-			ctx.abort(); // best-effort stop now — no-op if already idle between turns
+			if (proposeControl({
+				turnIndex: event.turnIndex, reason: "loop_hard_stop", messageFactory: "loop-tier",
+				effect: "abort", abort: () => ctx.abort(), cooldownKey: "exact:3:abort",
+			})) ctx.abort(); // best-effort stop now — no-op if already idle between turns
 			return;
 		}
 		// "block" mode: steer + wall, run continues. Reset counters (keep walls) so
 		// continued looping can escalate again instead of latching silent forever.
-		pi.sendUserMessage(tier3Message(ep.streak), { deliverAs: "steer" });
+		const finalMessage = tier3Message(ep.streak);
+		if (proposeControl({
+			turnIndex: event.turnIndex, reason: "loop_hard_stop", messageFactory: "loop-tier",
+			message: finalMessage, cooldownKey: "exact:3:block",
+		})) pi.sendUserMessage(finalMessage, { deliverAs: "steer" });
 		const blocked = ep.blocked;
 		ep = newEpisode();
 		ep.blocked = blocked;

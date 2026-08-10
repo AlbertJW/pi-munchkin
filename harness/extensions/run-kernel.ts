@@ -10,6 +10,7 @@ import type {
 	RunStateV1, RunTransitionV1,
 } from "../lib/run-kernel-types.ts";
 import { record } from "../lib/telemetry.ts";
+import { onControlDecision, onControlProposal } from "../lib/control-proposal.ts";
 
 export type RunKernelInstallOptions = {
 	mode?: RunKernelMode;
@@ -184,6 +185,13 @@ export function installRunKernel(pi: ExtensionAPI, options: RunKernelInstallOpti
 			});
 		}
 	}
+
+	onControlProposal(pi.events, ({ proposal }) => {
+		dispatch({ ...nextBase(), type: "run/control-proposed", proposal });
+	});
+	onControlDecision(pi.events, (decision) => {
+		dispatch({ ...nextBase(), type: "run/control-decided", decision });
+	});
 
 	pi.on("session_start", async (_event, ctx) => {
 		sequence = 0;

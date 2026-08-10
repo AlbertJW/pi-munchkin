@@ -1,6 +1,7 @@
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { buildContextSurfaceReceipt, systemPromptReceipt, type ContextSurfacePrior, type SystemPromptReceipt } from "../lib/context-surface.ts";
 import { record } from "../lib/telemetry.ts";
+import { emitHarnessSignal } from "../lib/harness-signals.ts";
 
 export type ContextSurfaceMode = "summary" | "full" | "off";
 
@@ -80,6 +81,13 @@ export function installContextSurface(
 			provider: ctx.model?.provider,
 			model: ctx.model?.id,
 			run_id: plan?.run_id,
+		});
+		emitHarnessSignal(pi.events, {
+			v: 1,
+			type: "context/receipt",
+			contextPct: receipt.context_pct,
+			staleShare: receipt.stale_tool_result_share,
+			duplicateShare: receipt.exact_duplicate_block_share,
 		});
 		// Observation-only: returning undefined preserves the exact original array.
 	});

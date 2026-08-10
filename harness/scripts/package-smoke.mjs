@@ -52,9 +52,15 @@ const expectedExtensions = [
   "harness/extensions/tool-activation.ts",
   // Reads the activation manager's redacted state for /munchkin-doctor.
   "harness/extensions/runtime-truth.ts",
-  // Shadow-only observer is last so finalized tool_result middleware and
-  // legacy turn snapshots are visible before it records disagreements.
+  // Last intervention producer wins nothing directly in enforce mode: the
+  // arbiter is loaded after every producer and decides once at turn_end.
+  "harness/extensions/control-arbiter.ts",
+  // Shadow observer sees finalized middleware, control decisions, and legacy
+  // turn snapshots before disagreement recording.
   "harness/extensions/run-kernel.ts",
+  // Durability boundary is registered last so settled/shutdown rows from every
+  // first-party extension are queued before the final async flush.
+  "harness/extensions/telemetry-flush.ts",
 ];
 assert.deepEqual(extensions, expectedExtensions, "pi.extensions must expose the complete ordered production surface");
 assert(!extensions.includes("harness/extensions/chaos.ts"), "chaos must not be enabled in the release manifest");

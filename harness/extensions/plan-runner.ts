@@ -13,6 +13,7 @@ import { steerText } from "../lib/steer-texts.ts";
 import { record } from "../lib/telemetry.ts";
 import { agentDir } from "../lib/agent-dir.ts";
 import { ACTIVE_TOOL_PROMPTS } from "../lib/active-tool-prompts.ts";
+import { emitHarnessSignal, signalRunId } from "../lib/harness-signals.ts";
 
 // plan-runner v3 — model-owned TODO list (Claude Code TodoWrite pattern).
 // One tool (plan_write) rewrites the whole list each call: re-planning,
@@ -63,6 +64,18 @@ function planEvent(kind: string, runId: string, detail: Record<string, unknown> 
 		model: activeModel.id,
 		...detail,
 	});
+	if (!api) return;
+	const runIdHash = signalRunId(runId);
+	if (kind === "write" && typeof detail.items === "number" && typeof detail.open_items === "number") {
+		emitHarnessSignal(api.events, { v: 1, type: "plan/write", runIdHash, items: detail.items, openItems: detail.open_items });
+	} else if (kind === "go") {
+		emitHarnessSignal(api.events, { v: 1, type: "plan/go", runIdHash });
+	} else if (kind === "gate") {
+		emitHarnessSignal(api.events, {
+			v: 1, type: "plan/gate", runIdHash, pass: detail.pass === true,
+			fails: typeof detail.fails === "number" ? detail.fails : 0,
+		});
+	}
 }
 // B yields an omitted open item after this many consecutive preserves (persistent
 // omission = intent; e.g. a parent the model replaced with sub-items). R1 (done) never yields.

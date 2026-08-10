@@ -4,10 +4,10 @@ import { existsSync, mkdtempSync, readFileSync, readdirSync, statSync } from "no
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
-	attemptKey, boardState, emptyState, noteTelemetry, noteTool, renderCockpitHtml,
+	attemptKey, boardState, emptyState, noteHarnessSignal, noteTool, renderCockpitHtml,
 	renderLens, resetBoard, restore, snapshot,
 } from "../lib/blackboard.ts";
-import { record } from "../lib/telemetry.ts";
+import { emitHarnessSignal, onHarnessSignal, signalRunId } from "../lib/harness-signals.ts";
 import { fire, makeFakePi } from "./integration-harness.ts";
 
 // Run: cd ~/.pi/agent && TELEMETRY_FILE=$(mktemp) TELEMETRY_SOURCE=test \
@@ -56,13 +56,14 @@ test("lens: empty state renders empty; failures lead; clamp respected; determini
 	assert.ok(clamped.length <= 200);
 });
 
-test("noteTelemetry folds plan gates, context receipts, and compactions", () => {
+test("typed signals fold plan gates, context receipts, and compactions", () => {
 	const s = fresh();
-	noteTelemetry(s, "plan-runner", "gate", { pass: false, fails: 2, run_id: "r1" });
-	noteTelemetry(s, "context-surface", "receipt", { context_pct: 41.5, stale_tool_result_share: 0.4, exact_duplicate_block_share: 0.1 });
-	noteTelemetry(s, "context-watcher", "compacted", { requester: "pi" });
+	const runIdHash = signalRunId("r1");
+	noteHarnessSignal(s, { v: 1, type: "plan/gate", pass: false, fails: 2, runIdHash });
+	noteHarnessSignal(s, { v: 1, type: "context/receipt", contextPct: 41.5, staleShare: 0.4, duplicateShare: 0.1 });
+	noteHarnessSignal(s, { v: 1, type: "context/compacted" });
 	assert.deepEqual(s.plan.lastGate, { pass: false, fails: 2 });
-	assert.equal(s.plan.runId, "r1");
+	assert.equal(s.plan.runId, runIdHash);
 	assert.equal(s.context.pct, 41.5);
 	assert.equal(s.compactions, 1);
 });
@@ -94,29 +95,18 @@ test("v2 snapshots redact ledgers and v1 restore intentionally drops them", () =
 	assert.equal(boardState().plan.openItems, 2);
 });
 
-test("telemetry tap: sees events across module instances, and a throwing tap never breaks record()", async () => {
-	const g = globalThis as Record<string, unknown>;
-	const prevTaps = g.__pi_telemetry_taps;
+test("typed domain signals remain live when telemetry is disabled", () => {
+	const fp = makeFakePi();
 	const seen: string[] = [];
+	onHarnessSignal(fp.pi.events as never, (signal) => seen.push(signal.type));
+	const previous = process.env.TELEMETRY;
+	process.env.TELEMETRY = "off";
 	try {
-		g.__pi_telemetry_taps = [
-			() => { throw new Error("bad tap"); },
-			(ext: string, kind: string) => { seen.push(`${ext}/${kind}`); },
-		];
-		const prevTelemetry = process.env.TELEMETRY;
-		process.env.TELEMETRY = "off"; // taps must fire even with the sink disabled
-		try {
-			assert.doesNotThrow(() => record("blackboard", "rendered", { chars: 1, attempts: 0 }));
-			const other = await import(`../lib/telemetry.ts?tapinstance=${Date.now()}-${Math.random()}`);
-			other.record("blackboard", "restored", { attempts: 2 });
-		} finally {
-			if (prevTelemetry === undefined) delete process.env.TELEMETRY;
-			else process.env.TELEMETRY = prevTelemetry;
-		}
-		assert.deepEqual(seen, ["blackboard/rendered", "blackboard/restored"]);
+		emitHarnessSignal(fp.pi.events as never, { v: 1, type: "context/compacted" });
 	} finally {
-		g.__pi_telemetry_taps = prevTaps;
+		if (previous === undefined) delete process.env.TELEMETRY; else process.env.TELEMETRY = previous;
 	}
+	assert.deepEqual(seen, ["context/compacted"]);
 });
 
 test("extension: BLACKBOARD=off registers nothing; default steer lens performs no per-call context mutation", async () => {

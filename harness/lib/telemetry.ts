@@ -13,6 +13,10 @@ import { appendFileSync, mkdirSync, readFileSync, renameSync, statSync } from "n
 import { dirname, join } from "node:path";
 import { validateCatalogDetail } from "./telemetry-catalog.ts";
 import { agentDir } from "./agent-dir.ts";
+import {
+	acknowledgeDroppedTelemetryRows, enqueueTelemetryLine, flushTelemetryWriters,
+	pendingDroppedTelemetryRows,
+} from "./telemetry-writer.ts";
 
 
 function targetFile(): string | number {
@@ -145,13 +149,46 @@ function maxBytes(): number {
 
 function appendRow(row: Record<string, unknown>): void {
 	const file = targetFile();
+	const encoded = `${encodeTelemetryRow(row, MAC_KEY)}\n`;
+	if (typeof file === "string" && telemetryWriterMode() === "async") {
+		enqueueTelemetryLine(file, encoded);
+		return;
+	}
 	if (typeof file === "string") {
 		mkdirSync(dirname(file), { recursive: true });
 		try {
 			if (statSync(file).size > maxBytes()) renameSync(file, `${file}.old`);
 		} catch {} // no file yet — fine
 	}
-	appendFileSync(file, `${encodeTelemetryRow(row, MAC_KEY)}\n`);
+	appendFileSync(file, encoded);
+}
+
+export function telemetryWriterMode(env: NodeJS.ProcessEnv = process.env): "sync" | "async" {
+	if (env.TELEMETRY_FD || env.TELEMETRY_SOURCE === "gate") return "sync";
+	return env.TELEMETRY_WRITER === "async" ? "async" : "sync";
+}
+
+function enqueueOverflowReceipt(file: string): void {
+	const dropped = pendingDroppedTelemetryRows(file);
+	if (dropped <= 0) return;
+	const overflow = {
+		...envelope("telemetry", "writer-overflow", {}),
+		dropped_rows: dropped,
+	};
+	// A failed receipt enqueue is not itself an observational row loss;
+	// retain the existing count until capacity recovers.
+	if (enqueueTelemetryLine(file, `${encodeTelemetryRow(overflow, MAC_KEY)}\n`, false)) {
+		acknowledgeDroppedTelemetryRows(file, dropped);
+	}
+}
+
+export async function flushTelemetry(): Promise<void> {
+	await flushTelemetryWriters();
+	const file = targetFile();
+	if (typeof file === "string" && telemetryWriterMode() === "async") {
+		enqueueOverflowReceipt(file);
+		await flushTelemetryWriters();
+	}
 }
 
 function envelope(ext: string, kind: string, detail: Record<string, unknown>): Record<string, unknown> {
@@ -171,31 +208,8 @@ function envelope(ext: string, kind: string, detail: Record<string, unknown>): R
 	};
 }
 
-// In-process observers (session blackboard et al). Hosted on globalThis because each
-// extension holds its own module instance of this file (see the cache note above) —
-// a module-scoped array would be invisible across extensions. Taps are INDEPENDENT
-// of the TELEMETRY kill-switch (they fire even with rows disabled — in-process
-// consumers, not the measurement channel), but they run AFTER the row write, not
-// before: see the ordering comment inside record(). An earlier version of this
-// comment said "before", which stopped being true as an ordering statement when the
-// cause-before-consequence seq fix moved taps into the finally (triage #29). Taps
-// receive the raw pre-normalization detail; a throwing tap must never break recording.
-export type TelemetryTap = (ext: string, kind: string, detail: Record<string, unknown>) => void;
-
 export function record(ext: string, kind: string, detail: Record<string, unknown> = {}): void {
-	// Taps run AFTER the row is written, not before. Taps may themselves call
-	// record() (session-blackboard's lens does: loop-breaker/steer triggers
-	// state-lens/steer-injected), and running them first gave the CONSEQUENCE a
-	// lower seq than its CAUSE in the JSONL — every trace analysis that sorts by
-	// seq then reads the lens injection as preceding the steer that provoked it
-	// (triage #29). Kill-switch semantics are unchanged: taps stay in front of
-	// the TELEMETRY check so in-process observers work even with rows disabled.
-	try {
-		recordRow(ext, kind, detail);
-	} finally {
-		const taps = (globalThis as Record<string, unknown>).__pi_telemetry_taps as TelemetryTap[] | undefined;
-		if (taps) for (const tap of taps) { try { tap(ext, kind, detail); } catch { /* fail open */ } }
-	}
+	recordRow(ext, kind, detail);
 }
 
 function recordRow(ext: string, kind: string, detail: Record<string, unknown>): void {
@@ -206,6 +220,10 @@ function recordRow(ext: string, kind: string, detail: Record<string, unknown>): 
 		throw new Error(`telemetry schema rejected ${ext}/${kind}: ${validationErrors.join("; ")}`);
 	}
 	try {
+		const target = targetFile();
+		if (typeof target === "string" && telemetryWriterMode() === "async") {
+			enqueueOverflowReceipt(target);
+		}
 		if (validationErrors.length > 0) {
 			appendRow({
 				...envelope("telemetry", "schema-reject", {}),

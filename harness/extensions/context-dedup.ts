@@ -17,6 +17,7 @@ import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { dedupReadResults } from "../lib/context-dedup.ts";
 import { steerText } from "../lib/steer-texts.ts";
 import { record } from "../lib/telemetry.ts";
+import { buildControlProposal, controlEnforces, emitControlProposal } from "../lib/control-proposal.ts";
 
 // READ_DEDUP: LIVE default-on since 2026-08-07 (was dark candidate c26).
 // ADOPTED by judgment (Albert-approved); benefit was not established by a
@@ -62,7 +63,17 @@ export default function (pi: ExtensionAPI): void {
 				{ share: Math.round(share) },
 			);
 			record("context-dedup", "nudge", { share_pct: Math.round(share), injected_chars: msg.length, turnIndex: event.turnIndex });
-			pi.sendUserMessage(msg, { deliverAs: "steer" });
+			const legacyActed = !controlEnforces(pi.events);
+			emitControlProposal(pi.events, buildControlProposal({
+				boundarySequence: event.turnIndex,
+				kind: "context_hint",
+				reason: "state_lens",
+				source: "context-dedup",
+				cooldownKey: "context-redundancy",
+				messageFactory: "context-nudge",
+				legacyActed,
+			}), { message: msg });
+			if (legacyActed) pi.sendUserMessage(msg, { deliverAs: "steer" });
 		});
 	}
 }

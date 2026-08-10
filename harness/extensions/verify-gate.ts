@@ -7,6 +7,7 @@ import { boundedReceiptText } from "../lib/run-kernel-receipts.ts";
 import { steerText } from "../lib/steer-texts.ts";
 import { record } from "../lib/telemetry.ts";
 import { VerificationOrderClock, type OrderedCallKind } from "../lib/verification-order.ts";
+import { buildControlProposal, controlEnforces, emitControlProposal } from "../lib/control-proposal.ts";
 
 // Boundary verify gate ("the handoff is sacred").
 //
@@ -273,7 +274,17 @@ export default function (pi: ExtensionAPI) {
 			st.sessionFires += 1;
 			const msg = steer(verifyFailedThisTurn);
 			record("verify-gate", "steer", { failed: verifyFailedThisTurn, fires: st.fires, sessionFires: st.sessionFires, injected_chars: msg.length, turnIndex: event.turnIndex });
-			pi.sendUserMessage(msg, { deliverAs: "steer" });
+			const legacyActed = !controlEnforces(pi.events);
+			emitControlProposal(pi.events, buildControlProposal({
+				boundarySequence: event.turnIndex,
+				kind: "verification_required",
+				reason: "exact_gate_missing",
+				source: "verify-gate",
+				cooldownKey: "verify-wrap",
+				messageFactory: "verify-wrap",
+				legacyActed,
+			}), { message: msg });
+			if (legacyActed) pi.sendUserMessage(msg, { deliverAs: "steer" });
 		}
 
 		// Published for the session blackboard (globalThis bus; module state is

@@ -127,6 +127,10 @@ Most behavior is automatic. The primary commands are:
 | `RUN_KERNEL` | `shadow`; observes canonical execution receipts, semantic phases, lifecycle settlement, and legacy-state disagreements | `off` registers no kernel handlers or event-bus subscriber; shadow mode never prompts, steers, blocks, activates tools, or persists a capsule |
 | `VERIFY_EXECUTION_ORDER` | unset retains the deployed transcript-order gate while PR 2 is dark | `execution` uses Pi start/end order and rejects overlapping or missing-start verification; `legacy` explicitly selects the deployed path |
 | `ACTIVE_TOOL_PROMPTS` | unset retains the deployed ambient plan/delegation/compaction guidance while PR 2 is dark | `active` removes the ambient block and lets Pi include definition-owned guidance only for active tools; manual disable removes it |
+| `CONTROL_ARBITER` | `shadow`; records the single winning turn-end correction and collision count while legacy producers remain authoritative | `enforce` lets only the highest-priority proposal act; `off` removes the arbiter while typed plan/context/loop signals continue |
+| `TELEMETRY_WRITER` | `sync`; gate source and inherited-FD telemetry are always synchronous | `async` enables the bounded ordered interactive file writer; settlement and shutdown await its flush |
+| `TELEMETRY_ASYNC_MAX_ROWS`, `TELEMETRY_ASYNC_MAX_BYTES` | `1024` rows and `1 MiB`; cap queued observational telemetry | bounded to 8–65,536 rows and 4 KiB–64 MiB; overflow is dropped and later reported as a count only |
+| `TELEMETRY_ASYNC_BATCH_ROWS`, `TELEMETRY_ASYNC_BATCH_BYTES` | `64` rows and `64 KiB`; coalesce ordered writes without an unbounded timer | bounded to 1–512 rows and 1 KiB–1 MiB per batch |
 | `VERIFY_GATE`, `LOOP_BREAKER`, `GIT_GUARD`, `HASHLINE` | default-on core mechanisms | each accepts its documented `off` kill switch |
 
 Oversized hashline refusals explain the distinction between the returned-context `limit` and the

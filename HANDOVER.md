@@ -32,10 +32,15 @@ adoption, deletion, live mirroring, and gate rounds are human-gated. Never touch
 > commands, arguments, outputs, paths, URLs, and errors never enter RunState. See
 > `docs/RUN_KERNEL_ARCHITECTURE_2026-08.md` and the counterfactual QA ledger before review.
 
-> **2026-08-10 run-kernel PR 2** (`codex/run-kernel-pr2-correctness`, dark source work):
+> **2026-08-10 run-kernel PR 2** (`fb4b89a`, merged; not rolled out):
 > execution-order verification, per-file hashline mutation queues, and active-only tool prompt
 > truth are implemented behind explicit opt-in flags. Current live defaults remain unchanged
 > pending the separate adoption checkpoint. See `docs/RUN_KERNEL_PR2_CORRECTNESS_2026-08.md`.
+
+> **2026-08-10 run-kernel PR 3** (`codex/run-kernel-pr3-arbiter`, dark source work): one
+> turn-end control arbiter, typed domain signals replacing telemetry taps, and a bounded optional
+> async interactive telemetry writer. `CONTROL_ARBITER=shadow` and `TELEMETRY_WRITER=sync` retain
+> deployed behavior pending separate adoption. See `docs/RUN_KERNEL_PR3_CONTROL_2026-08.md`.
 
 > **2026-08-05 settlement/episode series** (`0c44b09..5013e85`, merged to main and **ROLLED OUT
 > 2026-08-05** on Albert's instruction): semantic failure-episode shadow instrument

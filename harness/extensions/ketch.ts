@@ -22,6 +22,7 @@ import {
 	ResearchLedgerCapacityError, SKILL_BUDGET, storedUrl,
 } from "../lib/research-ledger.ts";
 import { record } from "../lib/telemetry.ts";
+import { buildControlProposal, controlEnforces, emitControlProposal } from "../lib/control-proposal.ts";
 
 // Ketch is the host-side network adapter for local models. The steady-state
 // surface is deliberately only FIND + READ; deep orchestration lives in the
@@ -181,7 +182,17 @@ export function registerKetch(pi: ExtensionAPI, dependencies: KetchDependencies 
 			wrapSteerFired = true;
 			const msg = "You read web pages but recorded no verified citations. For each material claim, call research_note(claim, url, quote) with a short quote copied from the page — or mark the claim [unverified]. Do not present unrecorded web claims as established fact.";
 			record("research", "wrap-steer", { reads: counts.reads, notes: counts.notes, injected_chars: msg.length });
-			pi.sendUserMessage(msg, { deliverAs: "steer" });
+			const legacyActed = !controlEnforces(pi.events);
+			emitControlProposal(pi.events, buildControlProposal({
+				boundarySequence: event.turnIndex,
+				kind: "verification_required",
+				reason: "research_unverified",
+				source: "ketch",
+				cooldownKey: "research-wrap",
+				messageFactory: "research-wrap",
+				legacyActed,
+			}), { message: msg });
+			if (legacyActed) pi.sendUserMessage(msg, { deliverAs: "steer" });
 		});
 		pi.on("agent_settled", async () => {
 			if (counts.searches + counts.reads + counts.notes + counts.notesRejected === 0) return;

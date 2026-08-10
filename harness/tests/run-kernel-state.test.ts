@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { RunStateStoreV1, validateRunStateSnapshot } from "../lib/run-kernel-state.ts";
 import type { ExecutionReceiptV1, RunEventV1 } from "../lib/run-kernel-types.ts";
+import { buildControlProposal } from "../lib/control-proposal.ts";
 
 const H = "a".repeat(64);
 const legacy = {
@@ -141,4 +142,27 @@ test("transition history is bounded and duplicate sequences are ignored", () => 
 	}
 	assert.equal(store.snapshot().workflow.history.length, 32);
 	assert.equal(store.apply({ v: 1, type: "run/cycle-settled", sequence: 81, atMs: 81 }).applied, false);
+});
+
+test("control proposals and decisions enter RunState without message text", () => {
+	const store = new RunStateStoreV1();
+	apply(store, session());
+	const proposal = buildControlProposal({
+		boundarySequence: 7, kind: "verification_required", reason: "exact_gate_missing",
+		source: "verify-gate", cooldownKey: "verify", messageFactory: "verify-wrap", legacyActed: true,
+	});
+	apply(store, { v: 1, type: "run/control-proposed", sequence: 2, atMs: 2, proposal });
+	apply(store, {
+		v: 1, type: "run/control-decided", sequence: 3, atMs: 3,
+		decision: { v: 1, boundarySequence: 7, mode: "shadow", proposalCount: 2, collisionCount: 1, legacyActionCount: 2, winner: proposal },
+	});
+	const state = store.snapshot();
+	assert.equal(state.control.proposals, 1);
+	assert.equal(state.control.collisions, 1);
+	assert.equal(state.control.boundarySequence, 7);
+	assert.deepEqual(state.control.lastDecision, {
+		kind: "verification_required", reason: "exact_gate_missing", source: "verify-gate", priority: 500, mode: "shadow",
+	});
+	assert.deepEqual(validateRunStateSnapshot(state), []);
+	assert.equal(JSON.stringify(state).includes("message"), false);
 });

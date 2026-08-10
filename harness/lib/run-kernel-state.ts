@@ -32,7 +32,7 @@ function initialState(): RunStateV1 {
 		},
 		failures: { count: 0, lastClass: null },
 		capabilities: { activeToolCount: 0, allToolCount: 0, preservedExplicitTools: false },
-		control: { boundarySequence: 0, lastDecision: null },
+		control: { boundarySequence: 0, proposals: 0, collisions: 0, lastDecision: null },
 		context: { compactionGeneration: 0 },
 		outcome: { status: "active", lastAssistantTextOnly: false },
 		counters: { receipts: 0, missingStart: 0, missingResult: 0 },
@@ -161,6 +161,27 @@ export class RunStateStoreV1 {
 				if ((event.legacy.planBlockedItems ?? 0) > 0) {
 					transition = this.transition("blocked", "plan-item-blocked", event.sequence, event.atMs);
 				}
+				break;
+			case "run/control-proposed":
+				this.state.control.proposals += 1;
+				this.state.control.boundarySequence = Math.max(
+					this.state.control.boundarySequence,
+					event.proposal.boundarySequence,
+				);
+				break;
+			case "run/control-decided":
+				this.state.control.collisions += event.decision.collisionCount;
+				this.state.control.boundarySequence = Math.max(
+					this.state.control.boundarySequence,
+					event.decision.boundarySequence,
+				);
+				this.state.control.lastDecision = event.decision.winner ? {
+					kind: event.decision.winner.kind,
+					reason: event.decision.winner.reason,
+					source: event.decision.winner.source,
+					priority: event.decision.winner.priority,
+					mode: event.decision.mode,
+				} : null;
 				break;
 			case "run/session-shutdown":
 				this.state.lifecycle = { state: "shutdown", lastTransitionSequence: event.sequence };
