@@ -3,8 +3,10 @@ import { readdir } from "node:fs/promises";
 import { classifyBashCommand, isSourceMutation, looksFailingOutput, verificationEvidence } from "../lib/command-policy.ts";
 import { clearPlanGateReceipt, consumePlanGateReceipt } from "../lib/plan-gate-receipt.ts";
 import { clearDetectedProjectGate, detectProjectGate, publishDetectedProjectGate } from "../lib/project-gate.ts";
+import { boundedReceiptText } from "../lib/run-kernel-receipts.ts";
 import { steerText } from "../lib/steer-texts.ts";
 import { record } from "../lib/telemetry.ts";
+import { VerificationOrderClock, type OrderedCallKind } from "../lib/verification-order.ts";
 
 // Boundary verify gate ("the handoff is sacred").
 //
@@ -21,6 +23,7 @@ import { record } from "../lib/telemetry.ts";
 // the loop-breaker (caps n); this regenerates p at the boundary.
 
 const ENABLED = process.env.VERIFY_GATE !== "off";
+const EXECUTION_ORDER = process.env.VERIFY_EXECUTION_ORDER === "execution";
 const MAX_FIRES = (() => {
 	const n = Number.parseInt(process.env.VERIFY_GATE_MAX_FIRES || "3", 10);
 	return Number.isFinite(n) && n > 0 ? n : 3;
@@ -87,9 +90,43 @@ function steer(verifyFailed: boolean): string {
 
 export default function (pi: ExtensionAPI) {
 	if (!ENABLED) return;
+	const order = new VerificationOrderClock();
+	let failedSinceTurnEnd = false;
+
+	const classifyStart = (toolName: string, args: Record<string, unknown>): OrderedCallKind => {
+		const sourceMutation = MUTATION_TOOLS.has(toolName) ||
+			(toolName === "bash" && isSourceMutation(String(args.command ?? "")));
+		if (sourceMutation) return "source_mutation";
+		if (toolName !== "bash") return "other";
+		const command = String(args.command ?? "");
+		const policy = classifyBashCommand(command, gateCmd ? [gateCmd] : []);
+		return !policy.mutates && verificationEvidence(command, gateCmd) !== "none"
+			? "verification" : "other";
+	};
+
+	const applyOrderedOutcome = (outcome: ReturnType<VerificationOrderClock["finish"]>): void => {
+		if (!outcome) return;
+		if (outcome.mutationCompleted) {
+			st.mutated = true;
+			st.verifiedOk = false;
+			st.fires = 0;
+		}
+		if (!outcome.verificationAttempted) return;
+		st.verifiedOk = outcome.verificationValid;
+		if (outcome.verificationValid) {
+			record("verify-gate", "gate-green-execution-ordered", {
+				started_sequence: outcome.startedSequence,
+				ended_sequence: outcome.endedSequence,
+			});
+		} else {
+			failedSinceTurnEnd = true;
+		}
+	};
 
 	pi.on("session_start", async (_event, ctx) => {
 		st = fresh();
+		order.reset();
+		failedSinceTurnEnd = false;
 		clearPlanGateReceipt();
 		clearDetectedProjectGate();
 		// The published globalThis snapshot must die with the session, not just the
@@ -107,6 +144,45 @@ export default function (pi: ExtensionAPI) {
 		publishDetectedProjectGate(cwd, gateCmd);
 	});
 
+	pi.on("tool_execution_start", async (event) => {
+		if (!EXECUTION_ORDER) return;
+		const args = event.args && typeof event.args === "object"
+			? event.args as Record<string, unknown> : {};
+		const kind = classifyStart(event.toolName, args);
+		order.start({ callId: event.toolCallId, kind });
+	});
+
+	pi.on("tool_execution_end", async (event) => {
+		if (!EXECUTION_ORDER) return;
+		const kind = order.kindFor(event.toolCallId);
+		if (!kind) return; // A missing start can never manufacture verification.
+
+		let succeeded = !event.isError;
+		if (kind === "verification") {
+			succeeded = succeeded && !looksFailingOutput(boundedReceiptText(event.result), false);
+		}
+
+		let verificationOverride: "passed" | "failed" | "none" = "none";
+		if (event.toolName === "plan_write") {
+			const receipt = consumePlanGateReceipt();
+			if (receipt) {
+				const relevant = receipt.outcomes.some((outcome) =>
+					verificationEvidence(outcome.command, gateCmd) !== "none");
+				const accepted = receipt.outcomes.some((outcome) =>
+					outcome.pass && verificationEvidence(outcome.command, gateCmd) !== "none");
+				if (relevant) {
+					verificationOverride = succeeded && receipt.allPassed && accepted ? "passed" : "failed";
+				}
+			}
+		}
+
+		applyOrderedOutcome(order.finish({
+			callId: event.toolCallId,
+			succeeded,
+			verificationOverride,
+		}));
+	});
+
 	pi.on("turn_end", async (event) => {
 		const msg = event.message;
 		if (msg.role !== "assistant") return;
@@ -119,41 +195,68 @@ export default function (pi: ExtensionAPI) {
 		}
 
 		const g = globalThis as Record<string, unknown>;
-		const planReceipt = consumePlanGateReceipt();
-		let verifyFailedThisTurn = false;
-		for (const c of toolCalls) {
-			const sourceMutation = MUTATION_TOOLS.has(c.name) ||
-				(c.name === "bash" && isSourceMutation(String(c.args.command ?? "")));
-			if (sourceMutation) {
-				st.mutated = true;
-				st.verifiedOk = false;
-				st.fires = 0;
-			}
-
-			if (c.name === "plan_write" && planReceipt) {
-				const relevant = planReceipt.outcomes.some((outcome) =>
-					verificationEvidence(outcome.command, gateCmd) !== "none");
-				const accepted = planReceipt.outcomes.some((outcome) =>
-					outcome.pass && verificationEvidence(outcome.command, gateCmd) !== "none");
-				if (planReceipt.allPassed && accepted) {
-					st.verifiedOk = true;
-					record("verify-gate", "gate-green-consumed", {});
-				} else if (relevant) {
+		let verifyFailedThisTurn = failedSinceTurnEnd;
+		failedSinceTurnEnd = false;
+		if (EXECUTION_ORDER) {
+			// Execution events are authoritative. Transcript-only calls fail closed:
+			// a mutation still arms the boundary, while a verifier with no observed
+			// start/end can never provide green evidence.
+			for (const c of toolCalls) {
+				if (order.hasCompleted(c.id)) continue;
+				const kind = classifyStart(c.name, c.args);
+				if (kind === "source_mutation") {
+					st.mutated = true;
+					st.verifiedOk = false;
+					st.fires = 0;
+				} else if (kind === "verification") {
 					st.verifiedOk = false;
 					verifyFailedThisTurn = true;
 				}
+				if (c.name === "plan_write") {
+					const staleReceipt = consumePlanGateReceipt();
+					if (staleReceipt?.outcomes.some((outcome) =>
+						verificationEvidence(outcome.command, gateCmd) !== "none")) {
+						st.verifiedOk = false;
+						verifyFailedThisTurn = true;
+					}
+				}
 			}
+		} else {
+			const planReceipt = consumePlanGateReceipt();
+			for (const c of toolCalls) {
+				const sourceMutation = MUTATION_TOOLS.has(c.name) ||
+					(c.name === "bash" && isSourceMutation(String(c.args.command ?? "")));
+				if (sourceMutation) {
+					st.mutated = true;
+					st.verifiedOk = false;
+					st.fires = 0;
+				}
 
-			if (c.name !== "bash") continue;
-			const command = String(c.args.command ?? "");
-			const policy = classifyBashCommand(command, gateCmd ? [gateCmd] : []);
-			if (policy.mutates || verificationEvidence(command, gateCmd) === "none") continue;
-			const result = event.toolResults.find((r) => r.toolCallId === c.id);
-			const output = result?.content.map((part) => ("text" in part ? part.text : "")).join(" ") ?? "";
-			if (result && !looksFailingOutput(output, result.isError)) st.verifiedOk = true;
-			else {
-				st.verifiedOk = false;
-				verifyFailedThisTurn = true;
+				if (c.name === "plan_write" && planReceipt) {
+					const relevant = planReceipt.outcomes.some((outcome) =>
+						verificationEvidence(outcome.command, gateCmd) !== "none");
+					const accepted = planReceipt.outcomes.some((outcome) =>
+						outcome.pass && verificationEvidence(outcome.command, gateCmd) !== "none");
+					if (planReceipt.allPassed && accepted) {
+						st.verifiedOk = true;
+						record("verify-gate", "gate-green-consumed", {});
+					} else if (relevant) {
+						st.verifiedOk = false;
+						verifyFailedThisTurn = true;
+					}
+				}
+
+				if (c.name !== "bash") continue;
+				const command = String(c.args.command ?? "");
+				const policy = classifyBashCommand(command, gateCmd ? [gateCmd] : []);
+				if (policy.mutates || verificationEvidence(command, gateCmd) === "none") continue;
+				const result = event.toolResults.find((r) => r.toolCallId === c.id);
+				const output = result?.content.map((part) => ("text" in part ? part.text : "")).join(" ") ?? "";
+				if (result && !looksFailingOutput(output, result.isError)) st.verifiedOk = true;
+				else {
+					st.verifiedOk = false;
+					verifyFailedThisTurn = true;
+				}
 			}
 		}
 

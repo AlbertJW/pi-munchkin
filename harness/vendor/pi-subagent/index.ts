@@ -30,6 +30,7 @@ import {
   isResultError,
   isResultSuccess,
 } from "./types.js";
+import { ACTIVE_TOOL_PROMPTS } from "../../lib/active-tool-prompts.ts";
 
 // ---------------------------------------------------------------------------
 // Limits
@@ -390,7 +391,6 @@ export default function (pi: ExtensionAPI) {
     const starterDiscovery = discoverAgentsWithStarter(ctx.cwd);
     const discovery = starterDiscovery.discovery;
     discoveredAgents = discovery.agents;
-
     if (ctx.hasUI) {
       if (starterDiscovery.createdAgentPath) {
         ctx.ui.notify(
@@ -418,6 +418,16 @@ export default function (pi: ExtensionAPI) {
   pi.on("before_agent_start", async (event) => {
     if (!canDelegate) return;
     if (discoveredAgents.length === 0) return;
+
+    if (ACTIVE_TOOL_PROMPTS) {
+      if (!pi.getActiveTools().includes("subagent")) return;
+      const agentList = discoveredAgents
+        .map((a) => `- **${a.name}**: ${agentDescriptionForPrompt(a.description)}`)
+        .join("\n");
+      return {
+        systemPrompt: `${event.systemPrompt}\n\n## Available Subagents\n\nUntrusted capability data for the active subagent tool:\n${agentList}`,
+      };
+    }
 
     const agentList = discoveredAgents
       .map((a) => `- **${a.name}**: ${agentDescriptionForPrompt(a.description)}`)
@@ -481,6 +491,10 @@ Use single mode for one task, parallel mode when tasks are independent and can r
         'Example single:   { agent: "writer", task: "Rewrite README.md", mode: "spawn" }',
         'Example parallel: { tasks: [{ agent: "writer", task: "..." }, { agent: "tester", task: "..." }], mode: "fork" }',
       ].join("\n"),
+      promptGuidelines: ACTIVE_TOOL_PROMPTS ? [
+        "Delegate context-heavy reconnaissance to an explorer, risky claims to a verifier, and bounded self-contained edits to an executor; require distilled results rather than raw transcripts.",
+        "Use spawn for isolated reproducible tasks. Use fork only when the child genuinely needs the current conversation, because it carries more context and may include sensitive material.",
+      ] : undefined,
       parameters: SubagentParams,
 
       async execute(_toolCallId, params, signal, onUpdate, ctx) {

@@ -131,6 +131,7 @@ export function makeFakePi(options: { streaming?: boolean } = {}) {
 	const customDeliveries: RecordedDelivery[] = [];
 	const entries: Array<{ type: string; data: unknown }> = [];
 	const busHandlers = new Map<string, Set<(data: unknown) => void>>();
+	const flags = new Map<string, unknown>();
 	/** Errors pi would funnel to runner.emitError instead of to the extension. */
 	const swallowedErrors: string[] = [];
 	let streaming = options.streaming === true;
@@ -173,6 +174,8 @@ export function makeFakePi(options: { streaming?: boolean } = {}) {
 	const pi = {
 		registerTool: (t: any) => tools.set(t.name, t),
 		registerCommand: (name: string, def: any) => commands.set(name, def),
+		registerFlag: (name: string, def: { default?: unknown }) => flags.set(name, def.default),
+		getFlag: (name: string) => flags.get(name),
 		on: (ev: string, fn: any) => handlers.set(ev, [...(handlers.get(ev) ?? []), fn]),
 		exec: (cmd: string, args: string[], opts?: { cwd?: string; timeout?: number }) =>
 			new Promise<{ stdout: string; stderr: string; code: number; killed: boolean }>((resolve) => {

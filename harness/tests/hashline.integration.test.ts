@@ -4,10 +4,11 @@
 // written before file 2's bad tag throws) and PASSES once apply is two-phase.
 import assert from "node:assert/strict";
 import test from "node:test";
-import { chmodSync, mkdtempSync, readFileSync, truncateSync, writeFileSync } from "node:fs";
+import { chmodSync, mkdtempSync, readFileSync, symlinkSync, truncateSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileTag, normalizeText } from "../lib/hashline-core.ts";
+import { withMutationQueues } from "../extensions/hashline.ts";
 import { callTool, expectToolError, makeFakePi } from "./integration-harness.ts";
 
 const hashline = (await import("../extensions/hashline.ts")).default;
@@ -39,6 +40,103 @@ test("hashline: single-file edit applies with the live tag", async () => {
 	const patch = `[a.txt#${tagOf(join(cwd, "a.txt"))}]\nreplace 1..1:\n+HELLO\n`;
 	await callTool(fp, "edit", { input: patch }, cwd);
 	assert.equal(readFileSync(join(cwd, "a.txt"), "utf8"), "HELLO\n");
+});
+
+test("hashline: concurrent same-file edits are queued and preserve both changes", async () => {
+	const fp = fresh();
+	const cwd = tmp();
+	const path = join(cwd, "race.txt");
+	writeFileSync(path, "one\ntwo\nthree\nfour\nfive\n");
+	await callTool(fp, "read", { path: "race.txt" }, cwd); // records the shared baseline snapshot
+	const tag = tagOf(path);
+	const first = `[race.txt#${tag}]\nreplace 1..1:\n+ONE\n`;
+	const second = `[race.txt#${tag}]\nreplace 5..5:\n+FIVE\n`;
+	await Promise.all([
+		callTool(fp, "edit", { input: first }, cwd),
+		callTool(fp, "edit", { input: second }, cwd),
+	]);
+	assert.equal(readFileSync(path, "utf8"), "ONE\ntwo\nthree\nfour\nFIVE\n");
+});
+
+test("hashline counterfactual: the legacy unqueued read/write transaction loses one concurrent edit", async () => {
+	const cwd = tmp();
+	const path = join(cwd, "legacy-race.txt");
+	writeFileSync(path, "one\ntwo\nthree\nfour\nfive\n");
+	let ready = 0;
+	let release!: () => void;
+	const released = new Promise<void>((resolve) => { release = resolve; });
+	let bothReady!: () => void;
+	const readsComplete = new Promise<void>((resolve) => { bothReady = resolve; });
+	const legacyTransaction = async (replace: (text: string) => string) => {
+		const snapshot = readFileSync(path, "utf8");
+		ready += 1;
+		if (ready === 2) bothReady();
+		await released;
+		writeFileSync(path, replace(snapshot));
+	};
+	const first = legacyTransaction((text) => text.replace("one", "ONE"));
+	const second = legacyTransaction((text) => text.replace("five", "FIVE"));
+	await readsComplete;
+	release();
+	await Promise.all([first, second]);
+	assert.notEqual(readFileSync(path, "utf8"), "ONE\ntwo\nthree\nfour\nFIVE\n",
+		"both legacy transactions wrote from the same stale snapshot, so one update must be absent");
+});
+
+test("hashline: file queues serialize overlaps but leave disjoint targets parallel", async () => {
+	let releaseFirst!: () => void;
+	let firstEntered!: () => void;
+	let otherEnteredResolve!: () => void;
+	const entered = new Promise<void>((resolve) => { firstEntered = resolve; });
+	const otherEnteredPromise = new Promise<void>((resolve) => { otherEnteredResolve = resolve; });
+	const release = new Promise<void>((resolve) => { releaseFirst = resolve; });
+	let sameEntered = false;
+	let otherEntered = false;
+	const first = withMutationQueues(["/virtual/a"], async () => {
+		firstEntered();
+		await release;
+	});
+	await entered;
+	const same = withMutationQueues(["/virtual/a"], async () => { sameEntered = true; });
+	const other = withMutationQueues(["/virtual/b"], async () => { otherEntered = true; otherEnteredResolve(); });
+	await Promise.race([
+		otherEnteredPromise,
+		new Promise<never>((_resolve, reject) => setTimeout(() => reject(new Error("disjoint queue did not enter")), 1_000)),
+	]);
+	assert.equal(sameEntered, false, "an overlapping target must wait");
+	assert.equal(otherEntered, true, "a disjoint target must remain parallel");
+	releaseFirst();
+	await Promise.all([first, same, other]);
+	assert.equal(sameEntered, true);
+});
+
+test("hashline: file queues canonicalize symlink aliases before lock ordering", async () => {
+	const cwd = tmp();
+	const target = join(cwd, "target.txt");
+	const alias = join(cwd, "alias.txt");
+	const other = join(cwd, "other.txt");
+	writeFileSync(target, "x\n");
+	writeFileSync(other, "y\n");
+	symlinkSync(target, alias);
+	let release!: () => void;
+	let entered!: () => void;
+	const held = new Promise<void>((resolve) => { release = resolve; });
+	const firstEntered = new Promise<void>((resolve) => { entered = resolve; });
+	let aliasEntered = false;
+	const first = withMutationQueues([target], async () => { entered(); await held; });
+	await firstEntered;
+	const second = withMutationQueues([alias], async () => { aliasEntered = true; });
+	let otherEntered!: () => void;
+	const otherAdmission = new Promise<void>((resolve) => { otherEntered = resolve; });
+	const disjoint = withMutationQueues([other], async () => { otherEntered(); });
+	await Promise.race([
+		otherAdmission,
+		new Promise<never>((_resolve, reject) => setTimeout(() => reject(new Error("disjoint alias control did not enter")), 1_000)),
+	]);
+	assert.equal(aliasEntered, false, "two names for one file must share one queue");
+	release();
+	await Promise.all([first, second, disjoint]);
+	assert.equal(aliasEntered, true);
 });
 
 test("hashline: multi-file edit applies both sections", async () => {

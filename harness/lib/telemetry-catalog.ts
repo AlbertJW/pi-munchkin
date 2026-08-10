@@ -17,6 +17,7 @@ const failure = {
 export const EVENT_CATALOG = {
 	"telemetry/schema-reject": { rejected_count: "number", reason_class: "string" },
 	"verify-gate/gate-green-consumed": {},
+	"verify-gate/gate-green-execution-ordered": { started_sequence: "number", ended_sequence: "number" },
 	"verify-gate/steer": { failed: "boolean", fires: "number", sessionFires: "number", injected_chars: "number", turnIndex: "number" },
 	"verify-gate/unverified-end": { fires: "number", sessionFires: "number" },
 	"did-you-mean/hint": { tool: "string", injected_chars: "number" },

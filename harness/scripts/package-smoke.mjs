@@ -30,6 +30,7 @@ const expectedExtensions = [
   "harness/extensions/context-watcher.ts",
   "harness/extensions/span-tools.ts",
   "harness/extensions/compact-tool.ts",
+  "harness/extensions/active-tool-prompts.ts",
   "harness/extensions/micro-gate.ts",
   "harness/extensions/ketch.ts",
   "harness/extensions/did-you-mean.ts",

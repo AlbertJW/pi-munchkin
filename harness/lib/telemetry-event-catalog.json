@@ -82,6 +82,7 @@
     "tool-call-rescue/detected",
     "tool-call-rescue/steered",
     "verify-gate/gate-green-consumed",
+    "verify-gate/gate-green-execution-ordered",
     "verify-gate/steer",
     "verify-gate/unverified-end"
   ]

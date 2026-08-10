@@ -1,0 +1,46 @@
+import assert from "node:assert/strict";
+import test from "node:test";
+import { VerificationOrderClock } from "../lib/verification-order.ts";
+
+test("an overlapping verifier cannot verify a mutation that finishes after it starts", () => {
+	const clock = new VerificationOrderClock();
+	clock.start({ callId: "mutation", kind: "source_mutation" });
+	clock.start({ callId: "gate", kind: "verification" });
+	assert.equal(clock.finish({ callId: "mutation", succeeded: true })?.mutationCompleted, true);
+	const gate = clock.finish({ callId: "gate", succeeded: true });
+	assert.equal(gate?.verificationPassed, true);
+	assert.equal(gate?.verificationValid, false);
+});
+
+test("a verifier started after mutation completion is valid and a later mutation disarms it", () => {
+	const clock = new VerificationOrderClock();
+	clock.start({ callId: "mutation-1", kind: "source_mutation" });
+	clock.finish({ callId: "mutation-1", succeeded: true });
+	clock.start({ callId: "gate", kind: "verification" });
+	assert.equal(clock.finish({ callId: "gate", succeeded: true })?.verificationValid, true);
+	clock.start({ callId: "mutation-2", kind: "source_mutation" });
+	assert.equal(clock.finish({ callId: "mutation-2", succeeded: true })?.mutationCompleted, true);
+	clock.start({ callId: "gate-2", kind: "verification" });
+	assert.equal(clock.finish({ callId: "gate-2", succeeded: false })?.verificationValid, false);
+});
+
+test("missing starts and duplicate ends cannot manufacture verification", () => {
+	const clock = new VerificationOrderClock();
+	assert.equal(clock.finish({ callId: "missing", succeeded: true }), null);
+	clock.start({ callId: "gate", kind: "verification" });
+	assert.equal(clock.hasCompleted("gate"), false);
+	assert.equal(clock.finish({ callId: "gate", succeeded: true })?.verificationValid, true);
+	assert.equal(clock.hasCompleted("gate"), true);
+	assert.equal(clock.finish({ callId: "gate", succeeded: true }), null);
+});
+
+test("aggregate plan gates use the plan_write start boundary", () => {
+	const clock = new VerificationOrderClock();
+	clock.start({ callId: "mutation", kind: "source_mutation" });
+	clock.start({ callId: "plan", kind: "other" });
+	clock.finish({ callId: "mutation", succeeded: true });
+	assert.equal(clock.finish({ callId: "plan", succeeded: true, verificationOverride: "passed" })?.verificationValid, false);
+
+	clock.start({ callId: "plan-later", kind: "other" });
+	assert.equal(clock.finish({ callId: "plan-later", succeeded: true, verificationOverride: "passed" })?.verificationValid, true);
+});

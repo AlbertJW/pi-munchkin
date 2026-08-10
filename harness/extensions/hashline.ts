@@ -1,6 +1,6 @@
-import { readFile, stat, writeFile } from "node:fs/promises";
+import { readFile, realpath, stat, writeFile } from "node:fs/promises";
 import { extname, isAbsolute, relative, resolve } from "node:path";
-import { defineTool, type ExtensionAPI } from "@earendil-works/pi-coding-agent";
+import { defineTool, type ExtensionAPI, withFileMutationQueue } from "@earendil-works/pi-coding-agent";
 import { Type } from "typebox";
 import { annotate, applyHunks, detectStyle, fileTag, normalizeText, parsePatch, relocateHunks, restoreStyle } from "../lib/hashline-core.ts";
 
@@ -35,6 +35,24 @@ function byteLimit(name: string, fallback: number): number {
 
 const MAX_READ_FILE_BYTES = byteLimit("HASHLINE_MAX_READ_BYTES", 16 * 1024 * 1024);
 const MAX_EDIT_FILE_BYTES = byteLimit("HASHLINE_MAX_EDIT_BYTES", 16 * 1024 * 1024);
+
+export async function withMutationQueues<T>(paths: string[], work: () => Promise<T>): Promise<T> {
+	const canonical = await Promise.all(paths.map(async (path) => {
+		try {
+			return await realpath(path);
+		} catch (error) {
+			const code = (error as NodeJS.ErrnoException)?.code;
+			if (code === "ENOENT" || code === "ENOTDIR") return resolve(path);
+			throw error;
+		}
+	}));
+	const ordered = [...new Set(canonical)].sort();
+	const acquire = async (index: number): Promise<T> => {
+		if (index >= ordered.length) return work();
+		return withFileMutationQueue(ordered[index], () => acquire(index + 1));
+	};
+	return acquire(0);
+}
 
 function oversizedMessage(kind: "read" | "edit", size: number, max: number): string {
 	return `File is too large for hashline ${kind} (${size} bytes > ${max} bytes). ` +
@@ -187,8 +205,6 @@ export default function (pi: ExtensionAPI) {
 				if (o && typeof o._input === "string" && o.input === undefined) return { input: o._input };
 				return args as { input: string };
 			},
-			// serialize edits: two parallel patches to the same file would race read→write
-			executionMode: "sequential",
 			async execute(_id, params, _signal, _onUpdate, ctx) {
 				const parsed = parsePatch(params.input);
 				// Merge CONSECUTIVE same-(path, tag) sections: they were composed against
@@ -200,6 +216,9 @@ export default function (pi: ExtensionAPI) {
 					if (last && last.path === sec.path && last.tag === sec.tag) last.hunks = last.hunks.concat(sec.hunks);
 					else sections.push({ ...sec, hunks: [...sec.hunks] });
 				}
+				const lockedPaths = sections.map((section) =>
+					isAbsolute(section.path) ? section.path : resolve(ctx.cwd, section.path));
+				return withMutationQueues(lockedPaths, async () => {
 				// TWO-PHASE apply (all-or-nothing multi-file): PHASE 1 reads, resolves tags,
 				// and computes every section IN MEMORY — any failure throws before a byte lands.
 				// PHASE 2 writes only once every section validated. Old code wrote inside the
@@ -325,6 +344,7 @@ export default function (pi: ExtensionAPI) {
 					);
 				}
 				return { content: [{ type: "text" as const, text: out.join("\n\n") }], details: { firstChangedLine: firstChanged } };
+				});
 			},
 		}),
 	);

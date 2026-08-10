@@ -12,6 +12,7 @@ import { processWriterMarker } from "../lib/process-writer.ts";
 import { steerText } from "../lib/steer-texts.ts";
 import { record } from "../lib/telemetry.ts";
 import { agentDir } from "../lib/agent-dir.ts";
+import { ACTIVE_TOOL_PROMPTS } from "../lib/active-tool-prompts.ts";
 
 // plan-runner v3 — model-owned TODO list (Claude Code TodoWrite pattern).
 // One tool (plan_write) rewrites the whole list each call: re-planning,
@@ -736,6 +737,10 @@ const planWrite = defineTool({
 	label: "Write Plan",
 	description: "Create or update the plan TODO list. Pass the ENTIRE ordered list each call; it replaces the stored list. Plan, re-plan (add/remove/reorder), restatus items. Does not end your turn.",
 	promptSnippet: "Write/update the whole plan TODO list",
+	promptGuidelines: ACTIVE_TOOL_PROMPTS ? [
+		"Use plan_write for the complete initial plan and explicit replans. Pass the entire ordered list, keep at most one item in_progress, and preserve unresolved items until they are genuinely done or blocked.",
+		"For low-risk work use the plan's yolo autonomy; keep risky, uncertain, destructive, or user-review-sensitive work in lean mode until explicitly continued.",
+	] : undefined,
 	parameters: Type.Object({
 		items: Type.Array(itemSchema, { minItems: 1 }),
 		request: Type.Optional(Type.String()),
@@ -1281,6 +1286,9 @@ export default function (pi: ExtensionAPI) {
 					(PLAN_UNCERTAINTY ? "; execution is held while any plan_write uncertainties remain unresolved" : "") +
 					". Call this once planning is done and you're ready to do the work. Safe to call again to resume.",
 				promptSnippet: "plan_go(): begin executing the current plan (planned -> executing).",
+				promptGuidelines: ACTIVE_TOOL_PROMPTS ? [
+					"After plan_write has produced a complete executable plan with no unresolved uncertainties, call plan_go once to begin or resume execution.",
+				] : undefined,
 				parameters: Type.Object({}),
 				async execute(_toolCallId, _params, _signal, _onUpdate, ctx) {
 					const aid = actionId();

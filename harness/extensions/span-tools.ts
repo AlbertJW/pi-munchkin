@@ -5,6 +5,7 @@ import { defineTool, type ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { resolveReadPath } from "../lib/context-inlet.ts";
 import { buildSearchReceipt, MAX_MATCHES, MAX_SPAN_LINES, readSpan, searchSpans } from "../lib/span-index.ts";
 import { record } from "../lib/telemetry.ts";
+import { ACTIVE_TOOL_PROMPTS } from "../lib/active-tool-prompts.ts";
 
 // span-tools: the map-reduce MINIMAL prototype (targeted-question path only).
 // Two bounded tools for large structured files: search_spans (regex -> capped
@@ -78,6 +79,9 @@ export default function (pi: ExtensionAPI) {
 				"`line:excerpt` plus the TOTAL match count. Use this instead of reading big files; " +
 				"follow up with read_span on interesting line ranges.",
 			promptSnippet: "search_spans(path, pattern): capped line matches + total count for big files.",
+			promptGuidelines: ACTIVE_TOOL_PROMPTS ? [
+				"When a normal read is refused for size, use search_spans to locate relevant regions before requesting bounded read_span slices.",
+			] : undefined,
 			parameters: Type.Object({
 				path: Type.String({ description: "File to search (relative or absolute)." }),
 				pattern: Type.String({ description: "JavaScript regex (no flags; applied per line)." }),
@@ -113,6 +117,9 @@ export default function (pi: ExtensionAPI) {
 				`Read a bounded line range of a file (max ${MAX_SPAN_LINES} lines per call) with a ` +
 				"provenance header `[span #TAG lines a-b/total]`. Page through big files with this.",
 			promptSnippet: "read_span(path, start_line, end_line): bounded numbered slice of a big file.",
+			promptGuidelines: ACTIVE_TOOL_PROMPTS ? [
+				"Use read_span only for targeted ranges identified by search or other concrete evidence; do not page an entire large file without need.",
+			] : undefined,
 			parameters: Type.Object({
 				path: Type.String({ description: "File to read (relative or absolute)." }),
 				start_line: Type.Number({ minimum: 1, description: "1-indexed first line." }),

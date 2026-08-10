@@ -26,6 +26,11 @@ const runtimeEnv = { ...npmEnv };
 for (const key of Object.keys(runtimeEnv)) {
   if (/(?:API_KEY|TOKEN|SECRET|PASSWORD|CREDENTIAL)/i.test(key)) delete runtimeEnv[key];
 }
+Object.assign(runtimeEnv, {
+  ACTIVE_TOOL_PROMPTS: "active",
+  VERIFY_EXECUTION_ORDER: "execution",
+  TELEMETRY: "off",
+});
 
 try {
   await mkdir(packDir, { recursive: true });
@@ -80,6 +85,14 @@ try {
     const loaded = await discoverAndLoadExtensions(extensions.map((entry) => resolve(installedRoot, entry)), installedRoot, ${JSON.stringify(agentDir)});
     assert.deepEqual(loaded.errors, [], "every extension must load");
     assert.equal(loaded.extensions.length, extensions.length, "extension count must match manifest");
+    const definitions = new Map(loaded.extensions.flatMap((extension) =>
+      [...extension.tools.values()].map(({ definition }) => [definition.name, definition])));
+    for (const name of ["compact_context", "search_spans", "read_span", "plan_write", "plan_go", "subagent"]) {
+      const definition = definitions.get(name);
+      assert(definition, name + " must be present in the complete registry");
+      assert(Array.isArray(definition.promptGuidelines) && definition.promptGuidelines.length > 0,
+        name + " must carry active-only promptGuidelines");
+    }
     const skills = loadSkillsFromDir({ dir: resolve(installedRoot, "skills"), source: "package" });
     assert.deepEqual(skills.diagnostics, [], "skills must have no diagnostics");
     assert.deepEqual(skills.skills.map(({ name }) => name), ["deep-research", "lavish-review"]);

@@ -1,6 +1,7 @@
 import { defineTool, type ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { Type } from "typebox";
 import { beginCompaction, finishCompaction, resetCompactionCoordinator } from "../lib/compaction-coordinator.ts";
+import { ACTIVE_TOOL_PROMPTS } from "../lib/active-tool-prompts.ts";
 
 // Model-driven in-place context compaction.
 //
@@ -42,6 +43,9 @@ export default function (pi: ExtensionAPI) {
 				"Your in-place lever — /collapse (user) rewinds to the plan; auto-compaction is the backstop. " +
 				"This ends the current tool turn, compacts, then automatically resumes exactly once.",
 			promptSnippet: "compact_context(focus?): summarise your own older context in place when the window is heavy.",
+			promptGuidelines: ACTIVE_TOOL_PROMPTS ? [
+				"If the provider reports that context exceeds its window, call compact_context once with a focused preservation brief, then resume from current filesystem state.",
+			] : undefined,
 			parameters: Type.Object({
 				focus: Type.Optional(
 					Type.String({

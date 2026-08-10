@@ -26,8 +26,12 @@ function projectWithNpmTest(): string {
 	return dir;
 }
 
-async function loadVerifyGate(fp: ReturnType<typeof makeFakePi>, cwd: string) {
+async function loadVerifyGate(fp: ReturnType<typeof makeFakePi>, cwd: string, order: "legacy" | "execution" = "legacy") {
+	const previous = process.env.VERIFY_EXECUTION_ORDER;
+	process.env.VERIFY_EXECUTION_ORDER = order;
 	const mod = await import(`../extensions/verify-gate.ts?vg=${Date.now()}-${Math.random()}`);
+	if (previous === undefined) delete process.env.VERIFY_EXECUTION_ORDER;
+	else process.env.VERIFY_EXECUTION_ORDER = previous;
 	mod.default(fp.pi as never);
 	await fire(fp, "session_start", {}, { cwd });
 	return mod;
@@ -161,6 +165,118 @@ test("verification follows tool-call order within one turn", async () => {
 		await fire(before, "turn_end", orderedTurn(true), ctxFor(cwd));
 		await fire(before, "turn_end", wrapUpTurn, ctxFor(cwd));
 		assert.equal(before.sent.some((message) => message.includes("verify")), true, "a later mutation invalidates earlier evidence");
+	} finally {
+		resetPiGlobals();
+	}
+});
+
+test("execution-order mode rejects an overlapping same-turn gate and accepts a later gate", async () => {
+	const cwd = projectWithNpmTest();
+	const fp = makeFakePi();
+	try {
+		await loadVerifyGate(fp, cwd, "execution");
+		const ctx = ctxFor(cwd);
+		await fire(fp, "tool_execution_start", { toolCallId: "m1", toolName: "edit", args: { path: "src/app.ts" } }, ctx);
+		await fire(fp, "tool_execution_start", { toolCallId: "v1", toolName: "bash", args: { command: "npm test" } }, ctx);
+		await fire(fp, "tool_execution_end", { toolCallId: "m1", toolName: "edit", result: { content: [] }, isError: false }, ctx);
+		await fire(fp, "tool_execution_end", { toolCallId: "v1", toolName: "bash", result: { content: [{ type: "text", text: "12 passing" }] }, isError: false }, ctx);
+		await fire(fp, "turn_end", {
+			turnIndex: 1,
+			message: { role: "assistant", content: [
+				{ type: "toolCall", id: "m1", name: "edit", arguments: { path: "src/app.ts" } },
+				{ type: "toolCall", id: "v1", name: "bash", arguments: { command: "npm test" } },
+			] },
+			toolResults: [],
+		}, ctx);
+		await fire(fp, "turn_end", wrapUpTurn, ctx);
+		assert.equal(fp.sent.some((message) => message.includes("verify")), true,
+			"a gate that started before mutation completion must leave the boundary armed");
+
+		fp.sent.length = 0;
+		await fire(fp, "tool_execution_start", { toolCallId: "v2", toolName: "bash", args: { command: "npm test" } }, ctx);
+		await fire(fp, "tool_execution_end", { toolCallId: "v2", toolName: "bash", result: { content: [{ type: "text", text: "12 passing" }] }, isError: false }, ctx);
+		await fire(fp, "turn_end", {
+			turnIndex: 3,
+			message: { role: "assistant", content: [{ type: "toolCall", id: "v2", name: "bash", arguments: { command: "npm test" } }] },
+			toolResults: [],
+		}, ctx);
+		await fire(fp, "turn_end", { ...wrapUpTurn, turnIndex: 4 }, ctx);
+		assert.equal(fp.sent.some((message) => message.includes("verify")), false,
+			"a gate started after mutation completion verifies the current source");
+
+		fp.sent.length = 0;
+		await fire(fp, "tool_execution_start", { toolCallId: "m2", toolName: "write", args: { path: "src/new.ts", content: "x" } }, ctx);
+		await fire(fp, "tool_execution_end", { toolCallId: "m2", toolName: "write", result: { content: [] }, isError: false }, ctx);
+		await fire(fp, "turn_end", {
+			turnIndex: 5,
+			message: { role: "assistant", content: [{ type: "toolCall", id: "m2", name: "write", arguments: { path: "src/new.ts" } }] },
+			toolResults: [],
+		}, ctx);
+		await fire(fp, "turn_end", { ...wrapUpTurn, turnIndex: 6 }, ctx);
+		assert.equal(fp.sent.some((message) => message.includes("verify")), true,
+			"a later successful mutation invalidates earlier green evidence");
+	} finally {
+		resetPiGlobals();
+	}
+});
+
+test("execution-order mode never lets a mutating verifier verify itself", async () => {
+	const cwd = projectWithNpmTest();
+	const fp = makeFakePi();
+	try {
+		await loadVerifyGate(fp, cwd, "execution");
+		const ctx = ctxFor(cwd);
+		const command = "npm test; sed -i '' s/a/b/ src/app.ts";
+		await fire(fp, "tool_execution_start", { toolCallId: "mixed", toolName: "bash", args: { command } }, ctx);
+		await fire(fp, "tool_execution_end", { toolCallId: "mixed", toolName: "bash", result: { content: [{ type: "text", text: "12 passing" }] }, isError: false }, ctx);
+		await fire(fp, "turn_end", {
+			turnIndex: 1,
+			message: { role: "assistant", content: [{ type: "toolCall", id: "mixed", name: "bash", arguments: { command } }] },
+			toolResults: [],
+		}, ctx);
+		await fire(fp, "turn_end", wrapUpTurn, ctx);
+		assert.equal(fp.sent.some((message) => message.includes("verify")), true);
+	} finally {
+		resetPiGlobals();
+	}
+});
+
+test("execution-order mode fails closed when a verifier has no start event", async () => {
+	const cwd = projectWithNpmTest();
+	const fp = makeFakePi();
+	try {
+		await loadVerifyGate(fp, cwd, "execution");
+		const ctx = ctxFor(cwd);
+		await fire(fp, "tool_execution_start", { toolCallId: "m", toolName: "edit", args: { path: "src/app.ts" } }, ctx);
+		await fire(fp, "tool_execution_end", { toolCallId: "m", toolName: "edit", result: { content: [] }, isError: false }, ctx);
+		await fire(fp, "tool_execution_end", { toolCallId: "missing", toolName: "bash", result: { content: [{ type: "text", text: "12 passing" }] }, isError: false }, ctx);
+		await fire(fp, "turn_end", bashTurn("npm test", "12 passing"), ctx);
+		await fire(fp, "turn_end", wrapUpTurn, ctx);
+		assert.equal(fp.sent.some((message) => message.includes("verify")), true);
+	} finally {
+		resetPiGlobals();
+	}
+});
+
+test("execution-order mode fails closed when a started call has no end event", async () => {
+	const cwd = projectWithNpmTest();
+	const fp = makeFakePi();
+	try {
+		await loadVerifyGate(fp, cwd, "execution");
+		const ctx = ctxFor(cwd);
+		await fire(fp, "tool_execution_start", {
+			toolCallId: "pending-mutation", toolName: "edit", args: { path: "src/app.ts" },
+		}, ctx);
+		await fire(fp, "turn_end", {
+			turnIndex: 1,
+			message: { role: "assistant", content: [{
+				type: "toolCall", id: "pending-mutation", name: "edit", arguments: { path: "src/app.ts" },
+			}] },
+			toolResults: [],
+		}, ctx);
+		await fire(fp, "turn_end", wrapUpTurn, ctx);
+		assert.equal(fp.sent.some((message) => message.includes("verify")), true,
+			"a mutation with no completion evidence must arm the boundary");
 	} finally {
 		resetPiGlobals();
 	}
