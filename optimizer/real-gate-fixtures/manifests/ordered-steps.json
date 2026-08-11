@@ -119,8 +119,8 @@
         ]
       }
     },
-    "manifest_sha256": "5a9b0cd9d0957ab90650b3f2c7524e4898a7730181e93600cfd101e4dde3ce1c",
-    "reviewed_at": "2026-08-11T16:22:08Z",
+    "manifest_sha256": "8a1cc46bed9391b1ab2fb4e68d3d22667b0ab6c435e4e64a0b5200e98bfbee28",
+    "reviewed_at": "2026-08-11T20:44:51Z",
     "reviewer": "Albert Wessels (chat approval 2026-08-11)"
   },
   "artifacts": [
@@ -181,19 +181,16 @@
     },
     "perturbations": [
       {
-        "approved": false,
         "id": "equivalent-1",
         "sha256": "3f49d5a5380961fbf14affef8c211656f3b16e98ddefb3534e99676f3c4b7aa4",
         "text": "Complete the following repository task. Preserve existing behavior and verify the tests.\n\nThe community site publishes a member roster built by `buildRoster` in\nsrc/roster.js. Right now that function normalises and masks each member's email\naddress and passes their display name through, but it has no fallback when a\nmember left the display name blank on the signup form: those rows go out with an\nempty name, which the site will not accept.\n\nChange src/roster.js so that no published row ever has a blank name. When an\nentry supplies no name at all, or supplies one that is only whitespace, the\ndisplay name must instead be derived from the local part of the address that\nmember signed up with: split that local part on `.`, `_` and `-`, capitalise\neach piece, and join the pieces with single spaces. For example a member who\nsigned up as `grace_hopper@example.com` and typed no name must be published as\n`Grace Hopper`, and one who signed up as `Jean-Bartik@Example.com` must be\npublished as `Jean Bartik`.\n\nEverything already true of a published row must stay true: the row still has\nexactly the fields `id`, `email` and `name`; the email is still trimmed,\nlower-cased and masked the same way; a name the member actually typed is still\nused (trimmed) rather than replaced by a derived one; and the input entries are\nnot mutated. docs/roster.md describes the row format in full \u2014 read it before\nyou start.\n\nThe existing test suite in test/visible.test.js is a regression guard. Run the\ntests with `npm test` (which runs `node --test`) and make sure they all pass\nwhen you are done."
       },
       {
-        "approved": false,
         "id": "equivalent-2",
         "sha256": "d936cb22964b868392b853e14d698d6c43a40209b189f1d93d545a1e8f20cf34",
         "text": "Repository change request:\nThe community site publishes a member roster built by `buildRoster` in\nsrc/roster.js. Right now that function normalises and masks each member's email\naddress and passes their display name through, but it has no fallback when a\nmember left the display name blank on the signup form: those rows go out with an\nempty name, which the site will not accept.\n\nChange src/roster.js so that no published row ever has a blank name. When an\nentry supplies no name at all, or supplies one that is only whitespace, the\ndisplay name must instead be derived from the local part of the address that\nmember signed up with: split that local part on `.`, `_` and `-`, capitalise\neach piece, and join the pieces with single spaces. For example a member who\nsigned up as `grace_hopper@example.com` and typed no name must be published as\n`Grace Hopper`, and one who signed up as `Jean-Bartik@Example.com` must be\npublished as `Jean Bartik`.\n\nEverything already true of a published row must stay true: the row still has\nexactly the fields `id`, `email` and `name`; the email is still trimmed,\nlower-cased and masked the same way; a name the member actually typed is still\nused (trimmed) rather than replaced by a derived one; and the input entries are\nnot mutated. docs/roster.md describes the row format in full \u2014 read it before\nyou start.\n\nThe existing test suite in test/visible.test.js is a regression guard. Run the\ntests with `npm test` (which runs `node --test`) and make sure they all pass\nwhen you are done.\n\nUse the smallest correct change and confirm the test suite."
       },
       {
-        "approved": false,
         "id": "equivalent-3",
         "sha256": "9519dbb558301d70c085763da507fb314e199f659a1ec70b50dd20ffba936a39",
         "text": "Please solve this task in the supplied checkout, retaining all stated edge cases:\n\nThe community site publishes a member roster built by `buildRoster` in\nsrc/roster.js. Right now that function normalises and masks each member's email\naddress and passes their display name through, but it has no fallback when a\nmember left the display name blank on the signup form: those rows go out with an\nempty name, which the site will not accept.\n\nChange src/roster.js so that no published row ever has a blank name. When an\nentry supplies no name at all, or supplies one that is only whitespace, the\ndisplay name must instead be derived from the local part of the address that\nmember signed up with: split that local part on `.`, `_` and `-`, capitalise\neach piece, and join the pieces with single spaces. For example a member who\nsigned up as `grace_hopper@example.com` and typed no name must be published as\n`Grace Hopper`, and one who signed up as `Jean-Bartik@Example.com` must be\npublished as `Jean Bartik`.\n\nEverything already true of a published row must stay true: the row still has\nexactly the fields `id`, `email` and `name`; the email is still trimmed,\nlower-cased and masked the same way; a name the member actually typed is still\nused (trimmed) rather than replaced by a derived one; and the input entries are\nnot mutated. docs/roster.md describes the row format in full \u2014 read it before\nyou start.\n\nThe existing test suite in test/visible.test.js is a regression guard. Run the\ntests with `npm test` (which runs `node --test`) and make sure they all pass\nwhen you are done."
@@ -246,8 +243,8 @@
     }
   },
   "timestamps": {
-    "admitted_at": "2026-08-11T16:22:08Z",
+    "admitted_at": "2026-08-11T20:44:51Z",
     "created_at": "2026-08-11T00:00:00Z",
-    "expires_at": "2026-11-09T16:22:08Z"
+    "expires_at": "2026-11-09T20:44:51Z"
   }
 }

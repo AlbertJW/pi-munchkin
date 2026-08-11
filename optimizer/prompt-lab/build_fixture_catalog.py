@@ -143,7 +143,10 @@ def prompt_variants(text):
     variants = [f"Complete the following repository task. Preserve existing behavior and verify the tests.\n\n{text}",
                 f"Repository change request:\n{text}\n\nUse the smallest correct change and confirm the test suite.",
                 f"Please solve this task in the supplied checkout, retaining all stated edge cases:\n\n{text}"]
-    return [{"id": f"equivalent-{i+1}", "text": value, "sha256": h(value), "approved": False} for i, value in enumerate(variants)]
+    # No per-variant "approved" flag: approval is admission.approved_prompt_hashes
+    # (the only field the gate reads — eval_fixture.py), and a nested approved:false
+    # sitting beside a true top-level approval misled readers (2026-08-11 inspection).
+    return [{"id": f"equivalent-{i+1}", "text": value, "sha256": h(value)} for i, value in enumerate(variants)]
 
 
 def artifacts(task, gold, mutant, overlays, extras):

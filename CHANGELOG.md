@@ -103,12 +103,34 @@ candidates as dark). Net changes since 0.3.0; the full per-decision record is
 
 ### Fixed
 
+- **Second inspection, seven findings (2026-08-11, evening):** telemetry rows carry a true
+  per-process session id (`si`, globalThis-shared across pi's per-extension module instances);
+  `shadow_report.py` binds one surface hash, keys sessions on `si` only, excludes and counts
+  identity-less rows, and reports UNKNOWN instead of a rate for a population it cannot identify;
+  run-kernel plan-gate verification is order-independent (an unrelated item gate neither
+  verifies nor un-verifies the run; duplicate cached gates emit ONE kernel signal per
+  execution); the plan-review checkpoint survives `agent_end` — `plan_go` stays off the surface
+  and keeps rejecting until the human's actual `/plan-go`, restore never overrides an explicit
+  user tool change, and a restart mid-review re-arms the hold; adaptive `plan_update` runs the
+  same mature gate machinery as `plan_write` (dedupe cache, escalation ladder, `gate_sha256`
+  identity, failing output returned, honest non-success result); both judges fence untrusted
+  content with per-call nonces and reject contradictory/duplicate verdict lines, and
+  calibration writes a durable receipt binding judge model, rubric hash, label-set hash, and
+  (hashed) endpoint; watchdog persists flag NAMES only, deletes any report that missed
+  redaction on every exit path, and gained a committed regression suite
+  (`watchdog-redaction.test.ts`) including a real end-to-end stall capture. Fixture
+  approval-state contradictions reconciled everywhere (manifests' vestigial nested
+  `approved:false` removed at the generator, packets regenerated, HANDOVER/BAND docs state the
+  approved-then-calibrated truth).
 - **Albert's nine findings (2026-08-11):** watchdog bundles are now 0700/0600 with Node
   diagnostic reports redacted in place (no argv/env persisted — only stack, libuv, resource
   usage); pi 0.84 joins the supported peer range (`>=0.80.6 <0.85.0`, isolated battery + CI
-  matrix + boundary fence); `shadow_report.py` counts sessions, not working directories
-  (`run_id`, else `sk` + seq-reset epochs) — this CORRECTED episode exposure from 29% to 0%,
-  reversing the earlier "loop-intervention powerable" read; `agentic_judge.py` calibration can
+  matrix + boundary fence); `shadow_report.py` counts sessions, not working directories — the 29% episode-exposure
+  read was a cwd-collapse artifact and is retracted; the interim 0% replacement was ALSO
+  computed on an incoherent population (`run_id` falls back to the cwd key) and is retracted
+  too. Telemetry now emits a per-process `si` session id and the report binds one surface
+  hash, excludes identity-less rows, and reports UNKNOWN instead of a number until
+  identity-sound sessions accumulate. Episode exposure is currently UNKNOWN; `agentic_judge.py` calibration can
   no longer pass vacuously (per-dimension agreement gates, coverage and diversity minimums,
   `NA` never defaulted, nonce transcript fences); plan gates carry `gate_sha256` identity so a
   narrow plan-item gate no longer falsely verifies the run kernel (only the detected project

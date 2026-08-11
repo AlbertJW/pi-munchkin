@@ -2617,6 +2617,12 @@ one cwd counted as one), and the earlier "episode exposure above the 20% bar" re
 for calling loop-intervention powerable — is REVERSED. Current live evidence: no candidate has
 demonstrated exposure; the shadow-evidence phase must accumulate real sessions before any
 calibration conclusion.
+> **[Corrected same day, second inspection]:** the 0% figure above is ALSO retracted. `run_id`
+> falls back to the cwd key (telemetry.ts), so the "session-keyed" report was still counting an
+> incoherent population (1,604 pseudo-sessions, 4 with kernel receipts, no surface-hash filter).
+> Episode exposure is **UNKNOWN** until sessions carrying the new per-process `si` id accumulate
+> on one surface hash. Two wrong numbers from the same instrument in one day; the report now
+> refuses to print a rate for a population it cannot identify.
 
 **Mystery 1 closed — the startup wedge is fd-0 stdin, not the harness.** A live wedged specimen
 was finally captured at the JS level (SIGUSR1 → inspector → CDP): exactly one active handle, a
@@ -2656,3 +2662,52 @@ artifacts cannot report failure-episode exposure (the v2 context-telemetry summa
 episode counter) — add that counter before the loop-intervention calibration relies on it.
 Full numbers and diagnosis: `PREREG_FIXTURE_BAND_2026-08-11.md` (results appended below the
 unchanged prereg).
+
+## 2026-08-11 (late) — second inspection: four architectural defects, seven findings, all fixed
+
+Albert's second same-day inspection found the mechanically-healthy build was still not
+measurement-ready, and he was right on every count. The uncomfortable one first: **the 0%
+episode-exposure figure this ledger recorded hours earlier was the SECOND wrong number from the
+same instrument in one day** — `run_id` falls back to the cwd key, so the "session-keyed" report
+still counted an incoherent population (1,604 pseudo-sessions, 4 with kernel receipts, no
+surface filter). The fix is structural, not another keying heuristic: telemetry now writes a
+true per-process `si` id (globalThis-shared, so pi's per-extension jiti instances agree), and
+`shadow_report.py` binds a single surface hash, keys ONLY on `si`, counts-and-excludes
+identity-less rows, and prints UNKNOWN rather than a rate it cannot support. Counterfactual:
+re-keying on run_id fails the selftest ("run_id must not split one process into
+pseudo-sessions"). Episode exposure is UNKNOWN until si-bearing sessions accumulate.
+
+The other three architectural fixes, each with a both-polarity test proven by a targeted
+counterfactual: run-kernel gate verification was ORDER-DEPENDENT (each plan-gate signal
+overwrote `validAfterMutation`, so item order flipped the verdict — now an unrelated gate
+neither verifies nor un-verifies, and cached duplicate gates emit one kernel signal per
+execution, not per item); the plan-review checkpoint ENDED AT agent_end, before the human had
+seen the draft (the review hold now outlives the planning run, `plan_go` stays removed and
+rejecting until the actual `/plan-go`, restore refuses to override an explicit user tool change,
+and a mid-review restart re-arms the hold — the lifecycle test now fires agent_end where the old
+test proved an artificial topology); and adaptive `plan_update` had rebuilt the repeat-spiral
+(gates ran with no dedupe, no ladder, no identity signal, no failing output, and a "status
+updated" success message over a silently reverted item — it now runs plan_write's exact
+machinery, and the test proves repeat plan_update(done) escalates rung 1 → blocked instead of
+looping).
+
+Also hardened: both judges fence candidate content behind per-call nonces and treat
+contradictory or duplicated verdict lines as tie/no-data (never first-match or last-line-wins);
+judge calibration writes a durable receipt (judge model, rubric hash, label-set hash, hashed
+endpoint identity, thresholds); the watchdog no longer persists flag VALUES or dash-prefixed
+prompt text (names only, pattern-checked), deletes any report that missed redaction on every
+exit path, and finally has a committed regression suite — whose end-to-end case immediately
+taught a lesson in stub fidelity (a stub `pi` that spawns a child holds the capture pipe open
+after kill -9; real single-process pi does not). And the approval-state contradiction Albert
+called "especially hazardous for small models" is gone: the vestigial per-perturbation
+`approved: false` (never read by any tool — `approved_prompt_hashes` is the authority) is
+removed from the generator and the four band manifests, packets are regenerated, and
+HANDOVER/BAND docs now state the approved-then-calibrated-NOT-READY truth in one voice.
+Editing the manifests correctly invalidated their approval hash; they were re-approved under
+the same chat authorization and all four verify `authoritative`.
+
+Standing conclusion adopted verbatim: forced/shadow defaults remain suitable for continued
+observation; no calibration or candidate efficacy round starts until identity-sound,
+surface-bound telemetry has accumulated. (The fixture-band calibration above predates this rule
+and is unaffected: it used authoritative GATE rows, surface-bound per row, not the shadow
+report.)

@@ -119,8 +119,8 @@
         ]
       }
     },
-    "manifest_sha256": "f8a1f44fd850067976d81fb9790a58cc9ba9826a3df5e20a1ddf3dea83ad52ba",
-    "reviewed_at": "2026-08-11T16:22:08Z",
+    "manifest_sha256": "ffc443883902be0ecbfb4dfc36e2eb6ee363c18974abba903c71fcc9602ae20c",
+    "reviewed_at": "2026-08-11T20:44:51Z",
     "reviewer": "Albert Wessels (chat approval 2026-08-11)"
   },
   "artifacts": [
@@ -191,19 +191,16 @@
     },
     "perturbations": [
       {
-        "approved": false,
         "id": "equivalent-1",
         "sha256": "3c3b3f29e5e67c17c977bea17e155a99f4f78a0b5379a4aef95d8ba7766871fd",
         "text": "Complete the following repository task. Preserve existing behavior and verify the tests.\n\nThe settlement report in src/report.js currently assumes every entry's amount is\nwritten in our own plain decimal format, so it sends all of them through\nparseAmount from src/money.js.\n\nWe are now also fed entries that came out of a partner's ledger export. Those\nentries carry the field source: 'ledger', and their amount strings are written in\nthat export's accounting format rather than ours. Entries with no source field,\nor with source: 'strict', are our own rows and must keep behaving exactly as they\ndo today.\n\nChange buildReport in src/report.js so it handles both kinds of entry. It must\nstill return { lines, total } with the same line format as now and with total in\ninteger cents, and a ledger amount must contribute its correct signed value to\nboth the line and the total. An amount that cannot be read at all must still\nraise an error rather than quietly counting as zero.\n\nTwo constraints on how you get there:\n\n- The strict parser parseAmount in src/money.js must keep rejecting everything it\n  rejects today. Its strictness is relied on elsewhere, so do not widen it, and\n  do not route ledger amounts through it.\n- The repository's docs/ directory describes the amount formats this codebase\n  deals with and how each one is meant to be handled. Read it before you write\n  the change; the accounting format has a convention that is easy to get subtly\n  wrong.\n\nThe existing test suite in test/ must keep passing. Run the tests with\n`node --test` when you are done."
       },
       {
-        "approved": false,
         "id": "equivalent-2",
         "sha256": "47892486e0a31d7e11dc58a8a5185adada3327bc06c722eda86a9587e59843d0",
         "text": "Repository change request:\nThe settlement report in src/report.js currently assumes every entry's amount is\nwritten in our own plain decimal format, so it sends all of them through\nparseAmount from src/money.js.\n\nWe are now also fed entries that came out of a partner's ledger export. Those\nentries carry the field source: 'ledger', and their amount strings are written in\nthat export's accounting format rather than ours. Entries with no source field,\nor with source: 'strict', are our own rows and must keep behaving exactly as they\ndo today.\n\nChange buildReport in src/report.js so it handles both kinds of entry. It must\nstill return { lines, total } with the same line format as now and with total in\ninteger cents, and a ledger amount must contribute its correct signed value to\nboth the line and the total. An amount that cannot be read at all must still\nraise an error rather than quietly counting as zero.\n\nTwo constraints on how you get there:\n\n- The strict parser parseAmount in src/money.js must keep rejecting everything it\n  rejects today. Its strictness is relied on elsewhere, so do not widen it, and\n  do not route ledger amounts through it.\n- The repository's docs/ directory describes the amount formats this codebase\n  deals with and how each one is meant to be handled. Read it before you write\n  the change; the accounting format has a convention that is easy to get subtly\n  wrong.\n\nThe existing test suite in test/ must keep passing. Run the tests with\n`node --test` when you are done.\n\nUse the smallest correct change and confirm the test suite."
       },
       {
-        "approved": false,
         "id": "equivalent-3",
         "sha256": "76aec3e77c8f7bd1c2f291223526f0d304c6dd460313e7d6a19c2c491bc371c8",
         "text": "Please solve this task in the supplied checkout, retaining all stated edge cases:\n\nThe settlement report in src/report.js currently assumes every entry's amount is\nwritten in our own plain decimal format, so it sends all of them through\nparseAmount from src/money.js.\n\nWe are now also fed entries that came out of a partner's ledger export. Those\nentries carry the field source: 'ledger', and their amount strings are written in\nthat export's accounting format rather than ours. Entries with no source field,\nor with source: 'strict', are our own rows and must keep behaving exactly as they\ndo today.\n\nChange buildReport in src/report.js so it handles both kinds of entry. It must\nstill return { lines, total } with the same line format as now and with total in\ninteger cents, and a ledger amount must contribute its correct signed value to\nboth the line and the total. An amount that cannot be read at all must still\nraise an error rather than quietly counting as zero.\n\nTwo constraints on how you get there:\n\n- The strict parser parseAmount in src/money.js must keep rejecting everything it\n  rejects today. Its strictness is relied on elsewhere, so do not widen it, and\n  do not route ledger amounts through it.\n- The repository's docs/ directory describes the amount formats this codebase\n  deals with and how each one is meant to be handled. Read it before you write\n  the change; the accounting format has a convention that is easy to get subtly\n  wrong.\n\nThe existing test suite in test/ must keep passing. Run the tests with\n`node --test` when you are done."
@@ -260,8 +257,8 @@
     }
   },
   "timestamps": {
-    "admitted_at": "2026-08-11T16:22:08Z",
+    "admitted_at": "2026-08-11T20:44:51Z",
     "created_at": "2026-08-11T00:00:00Z",
-    "expires_at": "2026-11-09T16:22:08Z"
+    "expires_at": "2026-11-09T20:44:51Z"
   }
 }

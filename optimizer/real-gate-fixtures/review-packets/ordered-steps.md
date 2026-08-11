@@ -3,7 +3,7 @@
 - Schema: `pi.fixture/v1`
 - Cohort: `2026-08`
 - Version: `2026-08.1`
-- Expires: `set on approval`
+- Expires: `2026-11-09T20:44:51Z`
 
 ## Canonical prompt
 
@@ -140,5 +140,5 @@ when you are done.
 
 ## Human decision
 
-- Reviewer: `pending`
-- Approved: `False`
+- Reviewer: `Albert Wessels (chat approval 2026-08-11)`
+- Approved: `True`

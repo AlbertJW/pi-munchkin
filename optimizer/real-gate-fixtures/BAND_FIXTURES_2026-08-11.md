@@ -6,10 +6,12 @@ have already been traced to fixture defects rather than model behaviour
 (`MEASUREMENT_METHODOLOGY_2026-07.md` section 9).
 
 Selection rule and calibration procedure: `optimizer/docs/PREREG_FIXTURE_BAND_2026-08-11.md`,
-committed before any session was run. **All four are `approved: false`** — the automated
-admission evidence is recorded, human approval is a separate gate
-(`fixture_admission.py approve <task>`), and the review packets under `review-packets/` are the
-artifact to read when approving.
+committed before any session was run. **Status 2026-08-11: all four APPROVED by Albert
+(chat approval, recorded in the manifests) and the preregistered calibration RAN the same
+day — verdict NOT READY** (two saturated, one floored-genuine, one model-specific; the full
+result table and floor diagnosis are appended to the preregistration doc). The automated
+admission evidence and the review packets under `review-packets/` remain the record of what
+was approved.
 
 Each fixture ships a **shortcut mutant**: a plausible fix that passes the visible suite and fails
 the hidden one. Its purpose is to measure test-fitting directly rather than infer it. A fixture

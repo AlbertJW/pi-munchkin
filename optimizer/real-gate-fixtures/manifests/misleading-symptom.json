@@ -119,8 +119,8 @@
         ]
       }
     },
-    "manifest_sha256": "2181ee6bb6cf16d31ae37dd6d2f2cb85dc21298ec94b58bd1538d5d3ef491e46",
-    "reviewed_at": "2026-08-11T16:22:08Z",
+    "manifest_sha256": "ea5a50eacd400a6b6ff52c0a09c8f2a7cfe28e949e7f6689a2c902ca9ef9304d",
+    "reviewed_at": "2026-08-11T20:44:51Z",
     "reviewer": "Albert Wessels (chat approval 2026-08-11)"
   },
   "artifacts": [
@@ -186,19 +186,16 @@
     },
     "perturbations": [
       {
-        "approved": false,
         "id": "equivalent-1",
         "sha256": "182add835fa8f87bc9b46e0af7810b6c2be0f5ac0ef068d3794f295560c9d3ad",
         "text": "Complete the following repository task. Preserve existing behavior and verify the tests.\n\nA user reported a bug in the ledger reporting tool.\n\nTheir ledger file contains lines that leave off the trailing fields, like:\n\n    alpha|3\n    beta|2|2\n    gamma\n\nRunning buildReport (src/report.js) over that text prints NaN in the value\ncolumn and in the TOTAL row instead of numbers. Lines that spell out all three\nfields render fine, which is why the existing test suite is green.\n\nThe data format, the per-field defaults, and the guarantee that consumers of\nthe parsed entries are allowed to rely on are all written down in\ndocs/data-contract.md. Read it, then compare it against both source files:\nsrc/parse.js, which turns raw text into entry objects, and src/report.js,\nwhich formats them.\n\nFix the code so that:\n\n  * a line with omitted trailing fields produces exactly the same report as\n    the equivalent line with those fields written out explicitly, and\n  * both source files end up consistent with docs/data-contract.md \u2014 the\n    guarantee that document makes to consumers has to actually hold, and the\n    obligation it places on consumers has to be respected.\n\nDo not change the report's layout, the exported function signatures, or the\ntests in test/. Run `node --test` and make sure the suite passes."
       },
       {
-        "approved": false,
         "id": "equivalent-2",
         "sha256": "cba289f9cd410864c85f8fb4f40ed872f531f7041ef18488617bf4bf7c70ce26",
         "text": "Repository change request:\nA user reported a bug in the ledger reporting tool.\n\nTheir ledger file contains lines that leave off the trailing fields, like:\n\n    alpha|3\n    beta|2|2\n    gamma\n\nRunning buildReport (src/report.js) over that text prints NaN in the value\ncolumn and in the TOTAL row instead of numbers. Lines that spell out all three\nfields render fine, which is why the existing test suite is green.\n\nThe data format, the per-field defaults, and the guarantee that consumers of\nthe parsed entries are allowed to rely on are all written down in\ndocs/data-contract.md. Read it, then compare it against both source files:\nsrc/parse.js, which turns raw text into entry objects, and src/report.js,\nwhich formats them.\n\nFix the code so that:\n\n  * a line with omitted trailing fields produces exactly the same report as\n    the equivalent line with those fields written out explicitly, and\n  * both source files end up consistent with docs/data-contract.md \u2014 the\n    guarantee that document makes to consumers has to actually hold, and the\n    obligation it places on consumers has to be respected.\n\nDo not change the report's layout, the exported function signatures, or the\ntests in test/. Run `node --test` and make sure the suite passes.\n\nUse the smallest correct change and confirm the test suite."
       },
       {
-        "approved": false,
         "id": "equivalent-3",
         "sha256": "4b97518c1c42f5b127f3f3b2067e60f5cbbaa68e57bc8e85a30603e95a12697a",
         "text": "Please solve this task in the supplied checkout, retaining all stated edge cases:\n\nA user reported a bug in the ledger reporting tool.\n\nTheir ledger file contains lines that leave off the trailing fields, like:\n\n    alpha|3\n    beta|2|2\n    gamma\n\nRunning buildReport (src/report.js) over that text prints NaN in the value\ncolumn and in the TOTAL row instead of numbers. Lines that spell out all three\nfields render fine, which is why the existing test suite is green.\n\nThe data format, the per-field defaults, and the guarantee that consumers of\nthe parsed entries are allowed to rely on are all written down in\ndocs/data-contract.md. Read it, then compare it against both source files:\nsrc/parse.js, which turns raw text into entry objects, and src/report.js,\nwhich formats them.\n\nFix the code so that:\n\n  * a line with omitted trailing fields produces exactly the same report as\n    the equivalent line with those fields written out explicitly, and\n  * both source files end up consistent with docs/data-contract.md \u2014 the\n    guarantee that document makes to consumers has to actually hold, and the\n    obligation it places on consumers has to be respected.\n\nDo not change the report's layout, the exported function signatures, or the\ntests in test/. Run `node --test` and make sure the suite passes."
@@ -247,8 +244,8 @@
     }
   },
   "timestamps": {
-    "admitted_at": "2026-08-11T16:22:08Z",
+    "admitted_at": "2026-08-11T20:44:51Z",
     "created_at": "2026-08-11T00:00:00Z",
-    "expires_at": "2026-11-09T16:22:08Z"
+    "expires_at": "2026-11-09T20:44:51Z"
   }
 }

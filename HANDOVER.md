@@ -27,9 +27,11 @@ adoption, deletion, live mirroring, and gate rounds are human-gated. Never touch
 > **2026-08-11 EVENING CLOSE-OUT (newest first).** Albert's nine findings are ALL fixed,
 > committed (`fc2d4af..5e75469`), pushed, and mirrored (108/108, loaded hash in
 > `docs/SURFACE_BOUNDARIES.md`): watchdog privacy (0700/0600 + report redaction), pi 0.84
-> peer range, session-keyed `shadow_report.py` (episode exposure CORRECTED 29% → 0% — the old
-> number was a working-directory-collapse artifact; the "loop-intervention powerable" read is
-> reversed), non-vacuous judge calibration, `gate_sha256` identity on run-kernel verification,
+> peer range, session-identity rework (episode exposure is **UNKNOWN**: the 29% read was a
+> cwd-collapse artifact AND its 0% replacement was computed on an incoherent population —
+> telemetry now emits a per-process `si` id, `shadow_report.py` binds one surface hash and
+> refuses to number a mixed population; the "loop-intervention powerable" read stays
+> retracted), non-vacuous judge calibration, `gate_sha256` identity on run-kernel verification,
 > abandoned-episode terminal state, awaited adaptive rebind, `plan_go` off-surface during
 > review, transactional `mirror:apply`. The serving-truth probe is live-verified on the 35B
 > (`served 65536 / registry 61440 / ok`); smokes against the DEFAULT model prove nothing —
@@ -50,12 +52,16 @@ adoption, deletion, live mirroring, and gate rounds are human-gated. Never touch
 > unmanaged extensions; `optimizer/prompt-lab/agentic_judge.py` provides an anchored rubric with
 > a calibration gate (a judge may not be cited until it agrees with Albert's labels);
 > `optimizer/prompt-lab/shadow_report.py` answers the three shadow-evidence questions with
-> declared thresholds. FOUR new band fixtures pass `fixture_admission.py` but are
-> `approved: false` — human approval is the next gate (`fixture_admission.py approve <task>`;
-> read `real-gate-fixtures/review-packets/<task>.md`), then the n=6 calibration in
-> `optimizer/docs/PREREG_FIXTURE_BAND_2026-08-11.md` (committed BEFORE any run). Design intent,
-> traps and the verification record: `real-gate-fixtures/BAND_FIXTURES_2026-08-11.md`.
-> No live gate round has been run on them — that is the calibration, not a smoke test.
+> declared thresholds. The FOUR band fixtures were APPROVED by Albert (chat, 2026-08-11,
+> recorded in the manifests) and the preregistered n=6 calibration RAN the same evening:
+> **verdict NOT READY** — `misleading-symptom` and `documented-escape` saturated 6/6,
+> `ordered-steps` floored 0/6 (diagnosed genuine: all six end states pass visible/fail hidden,
+> the first in-the-wild shortcut-mutant observation), `second-test-guard` model-specific
+> (admitted for the 4B only, 0.33). Fewer than two in band → no candidate trial; next
+> authoring targets sit between `second-test-guard` and `ordered-steps` difficulty, plus a
+> ling3-tier instrument. Full results appended to
+> `optimizer/docs/PREREG_FIXTURE_BAND_2026-08-11.md`; design record in
+> `real-gate-fixtures/BAND_FIXTURES_2026-08-11.md`.
 >
 > **2026-08-11 SHADOW-SAFE BATCH ROLLOUT (supersedes the per-PR rollout-status notes below):**
 > the full PR 2–7 series was mirrored live at `461b1e9` with every new mechanism at its
