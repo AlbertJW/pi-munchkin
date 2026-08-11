@@ -170,12 +170,15 @@ export default function (pi: ExtensionAPI): void {
 	pi.on("agent_settled", async () => {
 		// Serving-truth, step 2: the run settled, the stream is finished, the
 		// model is loaded and idle — the only moment a single-slot router answers
-		// /props promptly. Still fire-and-forget: settling must not wait 3s.
+		// /props promptly. AWAITED, not fire-and-forget: `pi -p` exits right after
+		// settlement, and a detached probe lost that race every time (measured
+		// live — zero rows despite a working probe). The fetch is bounded at 3s
+		// and takes milliseconds against an idle local server; once per model.
 		if (pendingProbe && probedModelId !== pendingProbe.modelId) {
 			const probeTarget = pendingProbe;
 			pendingProbe = null;
 			probedModelId = probeTarget.modelId;
-			void probeServingTruth({ baseUrl: probeTarget.baseUrl, modelId: probeTarget.modelId }).then((probe) => {
+			await probeServingTruth({ baseUrl: probeTarget.baseUrl, modelId: probeTarget.modelId }).then((probe) => {
 				if (!probe) return; // non-probeable host or failed probe: silent
 				const verdict = computeServingVerdict(probe.served_n_ctx, probeTarget.registryCtx);
 				servingTruth = { served_n_ctx: probe.served_n_ctx, registry_ctx: probeTarget.registryCtx, verdict };
