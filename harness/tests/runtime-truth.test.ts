@@ -169,8 +169,11 @@ test("serving-truth wiring: probes once per model after a 2xx response, records 
 		await fire(fp, "before_provider_request", {}, ctx);
 		await fire(fp, "after_provider_response", { status: 200 }, ctx);
 		await fire(fp, "after_provider_response", { status: 200 }, ctx);
+		assert.equal(fetches, 0, "no fetch before settlement — a mid-stream /props queues behind the completion on a single-slot router");
+		await fire(fp, "agent_settled", {}, ctx);
+		await fire(fp, "agent_settled", {}, ctx);
 		await new Promise((resolve) => setTimeout(resolve, 0)); // flush the fire-and-forget probe
-		assert.equal(fetches, 1, "exactly one probe per model");
+		assert.equal(fetches, 1, "exactly one probe per model, at settlement");
 		const rows = readFileSync(telemetry, "utf8").trim().split("\n").map((line) => JSON.parse(line));
 		const row = rows.find((r) => r.ext === "runtime" && r.kind === "serving-truth");
 		assert.ok(row, "serving-truth telemetry row recorded");

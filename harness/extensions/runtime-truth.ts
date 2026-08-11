@@ -103,6 +103,7 @@ export default function (pi: ExtensionAPI): void {
 	// Latched by MODEL ID, not once-per-session: a mid-session /model switch
 	// re-probes for the new model instead of reporting the old model's numbers.
 	let probedModelId: string | null = null;
+	let pendingProbe: { modelId: string; baseUrl: string; registryCtx: number; notify: (message: string) => void } | null = null;
 
 	function closeCurrent(): void {
 		if (!current) return;
@@ -116,6 +117,7 @@ export default function (pi: ExtensionAPI): void {
 		completed = [];
 		servingTruth = null;
 		probedModelId = null;
+		pendingProbe = null;
 	}
 
 	pi.on("session_start", async () => { reset(); });
@@ -134,34 +136,21 @@ export default function (pi: ExtensionAPI): void {
 			current.headersAt ??= performance.now();
 			current.status = event.status;
 		}
-		// Serving-truth: probe once per model, only after a SUCCESSFUL response
-		// (the model is then guaranteed loaded, so the llama-swap /upstream
-		// fallback cannot trigger a swap). Fire-and-forget: handlers are awaited
-		// by pi, and a bounded 3s fetch must never sit between the response and
-		// its stream. ctx is optional-chained — tests fire this event bare.
+		// Serving-truth, step 1: after a SUCCESSFUL response, remember which model
+		// answered. Do NOT fetch here — this event fires BEFORE the response
+		// stream is consumed, and on the single-slot llama-swap router a /props
+		// request queues behind the in-flight completion until the probe's own
+		// timeout kills it (measured live: standalone probes succeeded while
+		// every in-session probe silently timed out). The fetch itself waits for
+		// agent_settled, when the stream is done and the model sits loaded+idle.
 		const model = ctx?.model as { id?: string; baseUrl?: string; contextWindow?: number } | undefined;
 		if (typeof event.status !== "number" || event.status >= 400) return;
 		if (!model?.id || !model.baseUrl || typeof model.contextWindow !== "number") return;
 		if (probedModelId === model.id) return;
-		probedModelId = model.id;
-		const registryCtx = model.contextWindow;
-		void probeServingTruth({ baseUrl: model.baseUrl, modelId: model.id }).then((probe) => {
-			if (!probe) return; // non-probeable host or failed probe: silent
-			const verdict = computeServingVerdict(probe.served_n_ctx, registryCtx);
-			servingTruth = { served_n_ctx: probe.served_n_ctx, registry_ctx: registryCtx, verdict };
-			record("runtime", "serving-truth", {
-				served_n_ctx: probe.served_n_ctx, registry_ctx: registryCtx, verdict,
-			});
-			if (verdict !== "ok") {
-				ctx?.ui?.notify?.(
-					`serving-truth: registry contextWindow ${registryCtx} vs served n_ctx ${probe.served_n_ctx} (${verdict}). ` +
-					(verdict === "registry_over_served"
-						? "The registry promises more context than the server serves — silent truncation risk."
-						: "The registry is far below what the server serves — sessions may die on a starved output budget (the ling3 failure)."),
-					"warning",
-				);
-			}
-		});
+		pendingProbe = {
+			modelId: model.id, baseUrl: model.baseUrl, registryCtx: model.contextWindow,
+			notify: (message) => { try { ctx?.ui?.notify?.(message, "warning"); } catch { /* stale ctx */ } },
+		};
 	});
 
 	pi.on("message_update", async (event) => {
@@ -179,6 +168,29 @@ export default function (pi: ExtensionAPI): void {
 	});
 
 	pi.on("agent_settled", async () => {
+		// Serving-truth, step 2: the run settled, the stream is finished, the
+		// model is loaded and idle — the only moment a single-slot router answers
+		// /props promptly. Still fire-and-forget: settling must not wait 3s.
+		if (pendingProbe && probedModelId !== pendingProbe.modelId) {
+			const probeTarget = pendingProbe;
+			pendingProbe = null;
+			probedModelId = probeTarget.modelId;
+			void probeServingTruth({ baseUrl: probeTarget.baseUrl, modelId: probeTarget.modelId }).then((probe) => {
+				if (!probe) return; // non-probeable host or failed probe: silent
+				const verdict = computeServingVerdict(probe.served_n_ctx, probeTarget.registryCtx);
+				servingTruth = { served_n_ctx: probe.served_n_ctx, registry_ctx: probeTarget.registryCtx, verdict };
+				record("runtime", "serving-truth", {
+					served_n_ctx: probe.served_n_ctx, registry_ctx: probeTarget.registryCtx, verdict,
+				});
+				if (verdict !== "ok") {
+					probeTarget.notify(
+						`serving-truth: registry contextWindow ${probeTarget.registryCtx} vs served n_ctx ${probe.served_n_ctx} (${verdict}). ` +
+						(verdict === "registry_over_served"
+							? "The registry promises more context than the server serves — silent truncation risk."
+							: "The registry is far below what the server serves — sessions may die on a starved output budget (the ling3 failure)."));
+				}
+			});
+		}
 		closeCurrent();
 		const settledAt = performance.now();
 		for (const timing of completed) {
