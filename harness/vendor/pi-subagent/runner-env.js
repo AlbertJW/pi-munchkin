@@ -20,8 +20,13 @@ const HARNESS_CONFIG_KEYS = [
   "CTX_GUARD_RISKY", "CTX_GUARD_RISKY_LINES", "CTX_REDUNDANCY_NUDGE", "CTX_REDUNDANCY_PCT",
   "DID_YOU_MEAN", "DRIFT_SCANNER", "FORCE_PLAN_WRITE", "GIT_GUARD",
   "HARNESS_CONFIG_SHA256", "HARNESS_SURFACE_SHA256", "HASHLINE",
+  "HASHLINE_MAX_EDIT_BYTES", "HASHLINE_MAX_READ_BYTES",
   "KETCH", "KETCH_BACKEND", "KETCH_BIN", "KETCH_MULTI_BACKENDS",
-  "LB_HARD_STOP", "LB_LOCAL_ONLY", "LB_SESSION_REPEAT", "LB_SESSION_T1", "LB_SESSION_T2", "LB_SESSION_T3",
+  "LB_EPISODE_T1", "LB_EPISODE_T2", "LB_EPISODE_T3",
+  "LB_HARD_STOP", "LB_LOCAL_ONLY", "LB_MIN_REASON_LEN", "LB_OUTCOME_T1",
+  "LB_REPEAT_T1", "LB_REPEAT_T2", "LB_REPEAT_T3",
+  "LB_SESSION_REPEAT", "LB_SESSION_T1", "LB_SESSION_T2", "LB_SESSION_T3",
+  "LB_STREAK_HARD", "LB_STREAK_SOFT",
   "LOOP_BREAKER", "LOOP_EPISODE_MODE", "MICRO_GATE", "MICRO_GATE_SLOP",
   "MUNCHKIN_TOOL_ACTIVATION", "PAYLOAD_AUDIT",
   "PLAN_GATE_MAX", "PLAN_GATE_TIMEOUT_MS", "PLAN_ITEM_GUIDANCE_V2", "PLAN_MODE",
@@ -31,8 +36,15 @@ const HARNESS_CONFIG_KEYS = [
   "SPAN_MAX_FILE_BYTES", "SPAN_TOOLS", "SPAWN_DELEGATION",
   "STATE_LENS", "STATE_LENS_MAX_CHARS", "TEACH_HINTS",
   "TELEMETRY", "TELEMETRY_FILE", "TELEMETRY_MAX_BYTES", "TELEMETRY_SOURCE", "TELEMETRY_STRICT", "TELEMETRY_WRITER",
+  "TELEMETRY_ASYNC_BATCH_BYTES", "TELEMETRY_ASYNC_BATCH_ROWS", "TELEMETRY_ASYNC_MAX_BYTES", "TELEMETRY_ASYNC_MAX_ROWS",
   "TOOL_CALL_RESCUE", "VERIFY_EXECUTION_ORDER", "VERIFY_GATE", "VERIFY_GATE_CMD", "VERIFY_GATE_MAX_FIRES",
 ];
+
+// Dynamic env FAMILIES read via template literals or prefix passthrough:
+// TEACH_HINT_<RULE> (teach-hints per-rule kill switches), PI_MSG_<NAME>
+// (steer-texts overrides), KETCH_* (ketch-runtime forwards the whole prefix).
+// Every var carrying one of these prefixes crosses into children.
+const HARNESS_CONFIG_PREFIXES = ["TEACH_HINT_", "PI_MSG_", "KETCH_"];
 
 // Read by harness code but deliberately NOT propagated to children:
 //   CHAOS               — gauntlet fault injection is armed per parent session;
@@ -44,9 +56,12 @@ const HARNESS_CONFIG_KEYS = [
 //   PI_MODEL_ID, PI_MODEL_PROVIDER, PI_RUN_ID, PI_SANDBOX_POSTURE
 //                       — per-process identity stamped by the launcher for the
 //                         parent; the child session derives its own.
+//   PI_SUBAGENT_DEPTH   — the runner sets the child's depth explicitly; a copied
+//                         parent value would double-count nesting.
 const EXCLUDED_HARNESS_ENV_KEYS = [
   "CHAOS", "TELEMETRY_FD", "TELEMETRY_HMAC_FD",
   "PI_MODEL_ID", "PI_MODEL_PROVIDER", "PI_RUN_ID", "PI_SANDBOX_POSTURE",
+  "PI_SUBAGENT_DEPTH",
 ];
 
 export function buildSubagentEnv(source = process.env) {
@@ -56,7 +71,12 @@ export function buildSubagentEnv(source = process.env) {
   for (const key of new Set([...CHILD_ENV_KEYS, ...HARNESS_CONFIG_KEYS, ...extra])) {
     if (source[key] !== undefined) env[key] = source[key];
   }
+  for (const key of Object.keys(source)) {
+    if (env[key] === undefined && HARNESS_CONFIG_PREFIXES.some((prefix) => key.startsWith(prefix))) {
+      env[key] = source[key];
+    }
+  }
   return env;
 }
 
-export { CHILD_ENV_KEYS, EXCLUDED_HARNESS_ENV_KEYS, HARNESS_CONFIG_KEYS };
+export { CHILD_ENV_KEYS, EXCLUDED_HARNESS_ENV_KEYS, HARNESS_CONFIG_KEYS, HARNESS_CONFIG_PREFIXES };

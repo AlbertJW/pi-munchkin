@@ -66,27 +66,56 @@ test("c36: executor description rewritten to spawn at injection time; other role
 test("every env key harness code reads is classified for subagent propagation", async () => {
 	const { readdirSync, readFileSync, statSync } = await import("node:fs");
 	const { join } = await import("node:path");
-	const { CHILD_ENV_KEYS, EXCLUDED_HARNESS_ENV_KEYS, HARNESS_CONFIG_KEYS } = await import("../vendor/pi-subagent/runner-env.js");
+	const { CHILD_ENV_KEYS, EXCLUDED_HARNESS_ENV_KEYS, HARNESS_CONFIG_KEYS, HARNESS_CONFIG_PREFIXES } =
+		await import("../vendor/pi-subagent/runner-env.js");
 	const classified = new Set([...CHILD_ENV_KEYS, ...HARNESS_CONFIG_KEYS, ...EXCLUDED_HARNESS_ENV_KEYS]);
 	for (const key of HARNESS_CONFIG_KEYS) {
 		assert.ok(!EXCLUDED_HARNESS_ENV_KEYS.includes(key), `${key} is both propagated and excluded`);
 	}
 	const roots = ["extensions", "lib", "vendor"].map((d) => join(import.meta.dirname, "..", d));
 	const unclassified = new Set<string>();
+	const flag = (key: string, file: string): void => {
+		if (classified.has(key)) return;
+		if (HARNESS_CONFIG_PREFIXES.some((prefix: string) => key.startsWith(prefix))) return;
+		unclassified.add(`${key} (${file})`);
+	};
 	const walk = (dir: string): void => {
 		for (const name of readdirSync(dir)) {
 			const path = join(dir, name);
 			if (statSync(path).isDirectory()) { walk(path); continue; }
 			if (!/\.(ts|js|mjs)$/.test(name)) continue;
 			const source = readFileSync(path, "utf8");
-			for (const match of source.matchAll(/env\.([A-Z][A-Z0-9_]{2,})/g)) {
-				if (!classified.has(match[1])) unclassified.add(`${match[1]} (${name})`);
+			// direct property reads: process.env.NAME / env.NAME
+			for (const match of source.matchAll(/env\.([A-Z][A-Z0-9_]{2,})/g)) flag(match[1], name);
+			// bracket reads with a literal: process.env["NAME"]
+			for (const match of source.matchAll(/env\[\s*["']([A-Z][A-Z0-9_]{2,})["']/g)) flag(match[1], name);
+			// bracket reads via a template-literal family: env[`PREFIX_${...}`]
+			for (const match of source.matchAll(/env\[\s*`([A-Z][A-Z0-9_]*_)\$\{/g)) {
+				if (!HARNESS_CONFIG_PREFIXES.includes(match[1])) unclassified.add(`${match[1]}* (${name})`);
+			}
+			// helper indirection: envInt("NAME"), thresh("NAME"), boundedEnvInt("NAME"),
+			// byteLimit("NAME") — the shapes the first version of this test missed.
+			for (const match of source.matchAll(/\b(?:envInt|thresh|boundedEnvInt|byteLimit)\(\s*["']([A-Z][A-Z0-9_]{2,})["']/g)) {
+				flag(match[1], name);
 			}
 		}
 	};
 	for (const root of roots) walk(root);
 	assert.deepEqual([...unclassified].sort(), [],
-		"new env reads must be added to HARNESS_CONFIG_KEYS (propagate to subagents) or EXCLUDED_HARNESS_ENV_KEYS (with a reason)");
+		"new env reads must be added to HARNESS_CONFIG_KEYS (propagate to subagents), EXCLUDED_HARNESS_ENV_KEYS (with a reason), or HARNESS_CONFIG_PREFIXES (families)");
+});
+
+test("prefix-family env vars cross into the subagent environment", () => {
+	const env = buildSubagentEnv({
+		PATH: "/bin",
+		TEACH_HINT_ANCHOR_FIRST: "off", PI_MSG_LOOP_TIER1: "custom", KETCH_TIMEOUT_MS: "9000",
+		TEACHER: "not-a-family-match", PI_SUBAGENT_DEPTH: "2",
+	});
+	assert.equal(env.TEACH_HINT_ANCHOR_FIRST, "off");
+	assert.equal(env.PI_MSG_LOOP_TIER1, "custom");
+	assert.equal(env.KETCH_TIMEOUT_MS, "9000");
+	assert.equal(env.TEACHER, undefined, "non-family names do not leak");
+	assert.equal(env.PI_SUBAGENT_DEPTH, undefined, "runner-managed depth never copies");
 });
 
 test("explicit =off suppression survives into the subagent environment", () => {
