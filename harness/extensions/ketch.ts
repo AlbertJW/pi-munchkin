@@ -22,6 +22,7 @@ import {
 	ResearchLedgerCapacityError, SKILL_BUDGET, storedUrl,
 } from "../lib/research-ledger.ts";
 import { record } from "../lib/telemetry.ts";
+import { emitHarnessSignal } from "../lib/harness-signals.ts";
 import { buildControlProposal, controlEnforces, emitControlProposal } from "../lib/control-proposal.ts";
 
 // Ketch is the host-side network adapter for local models. The steady-state
@@ -274,6 +275,7 @@ export function registerKetch(pi: ExtensionAPI, dependencies: KetchDependencies 
 						: `results ${results.length} of all found for this query · backends: ${backends.join(", ")}\n\n`;
 					record("ketch", "search", { mode, backends, attempts: attempts.length, results: results.length, chars: formatted.text.length, duration_ms: Date.now() - started, truncated: formatted.truncated || successful.result.truncated, outcome: "ok" });
 					counts.searches += 1;
+					emitHarnessSignal(pi.events, { v: 1, type: "capability/need", capability: "web_read", reason: "selected-search-result" });
 					publishResearchState();
 					return text(receipt + formatted.text + budgetFooter(), { mode, backends, result_count: results.length, truncated: formatted.truncated });
 				} catch {

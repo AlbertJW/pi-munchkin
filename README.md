@@ -96,6 +96,7 @@ Most behavior is automatic. The primary commands are:
 | Environment option | Default and behavior | Rollback / alternative |
 |---|---|---|
 | `MUNCHKIN_TOOL_ACTIVATION` | `dynamic`; defers `subagent` and `compact_context` only when Pi exposes the complete default registry | `ambient` leaves Pi's initial surface untouched |
+| `MUNCHKIN_TOOL_ACTIVATION=phase` | dark candidate; additionally defers `plan_go`, span tools, and post-search `web_read`, then activates them from structured phase/evidence signals | return to `dynamic` (deployed path) or `ambient`; explicit `--tools` selections are always preserved |
 | dynamic `subagent` triggers | multi-item structured execution, second plan-gate failure, or loop-breaker tier two | once activated it stays active; one automatic attempt means a later manual `/tools` disable is respected |
 | dynamic `compact_context` trigger | first crossing of 60% context usage | same one-attempt/manual-disable rule |
 | `CONTEXT_SURFACE_MODE` | `summary`; samples usage on first call, each eighth call, threshold crossings, and compaction without transcript hashing | `full` retains receipt calculations; `off` disables; gate sessions force `full` |

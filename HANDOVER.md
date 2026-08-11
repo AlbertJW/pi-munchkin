@@ -54,6 +54,13 @@ adoption, deletion, live mirroring, and gate rounds are human-gated. Never touch
 > unchanged and no automatic provider request is started by resume. See
 > `docs/RUN_KERNEL_PR5_RECOVERY_2026-08.md`.
 
+> **2026-08-11 run-kernel PR 6** (dark source work): phase-aware capability
+> activation is available only through `MUNCHKIN_TOOL_ACTIVATION=phase`. It
+> preserves explicit selections, defers optional plan/span/subagent/compact/
+> post-search web-read tools, and activates them only from typed evidence
+> signals. The deployed `dynamic` path and model-visible defaults are unchanged.
+> See `docs/RUN_KERNEL_PR6_CAPABILITY_2026-08.md` and its QA ledger.
+
 > **2026-08-05 settlement/episode series** (`0c44b09..5013e85`, merged to main and **ROLLED OUT
 > 2026-08-05** on Albert's instruction): semantic failure-episode shadow instrument
 > (`LOOP_EPISODE_MODE`, `/loop-status`, `/loop-resume`), `runtime-truth` provider timings +

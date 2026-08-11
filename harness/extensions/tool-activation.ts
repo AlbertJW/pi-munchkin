@@ -1,76 +1,145 @@
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
+import { measureActiveSurface, phaseDeferredTools, PHASE_CAPABILITY_TOOLS } from "../lib/capability-surface.ts";
 import { record } from "../lib/telemetry.ts";
-import { onHarnessSignal } from "../lib/harness-signals.ts";
+import { onHarnessSignal, type CapabilityName } from "../lib/harness-signals.ts";
 
+type Mode = "ambient" | "dynamic" | "phase";
 type DeferredTool = "subagent" | "compact_context";
-const DEFERRED: readonly DeferredTool[] = ["subagent", "compact_context"];
+const DYNAMIC_DEFERRED: readonly DeferredTool[] = ["subagent", "compact_context"];
 const BASE_REGISTRY = ["read", "bash", "edit", "write"];
+const MUTATING_TOOLS = new Set(["edit", "write", "bash"]);
 
-// Adopted 2026-08-04 after explicit human review. Ambient restores the prior
-// always-visible surface immediately.
-const MODE = process.env.MUNCHKIN_TOOL_ACTIVATION === "ambient" ? "ambient" : "dynamic";
+function modeFromEnvironment(): Mode {
+	const value = process.env.MUNCHKIN_TOOL_ACTIVATION;
+	return value === "ambient" || value === "phase" ? value : "dynamic";
+}
 
 export default function (pi: ExtensionAPI): void {
+	const mode = modeFromEnvironment();
 	const g = globalThis as Record<string, unknown>;
-	g.__pi_tool_activation_state = { mode: MODE, preserved_explicit: false, reason: "startup" };
-	if (MODE !== "dynamic") return;
-	const deferred = new Set<DeferredTool>();
-	const attempted = new Set<DeferredTool>();
+	const publish = (value: Record<string, unknown>) => { g.__pi_tool_activation_state = value; };
+	publish({ mode, preserved_explicit: false, reason: "startup", phase: mode === "phase" ? "phase-aware" : "ambient-or-dynamic" });
+	if (mode === "ambient") return;
+
+	const deferred = new Set<string>();
+	const attempted = new Set<CapabilityName>();
+	let allTools: any[] = [];
+	let explicit = false;
 	let lastOpenItems = 0;
 	let lastContextPct = 0;
+	let sessionStartedAt = 0;
+	let firstUsefulMutation = false;
 
-	function activate(tool: DeferredTool, reason: string): void {
-		if (!deferred.has(tool) || attempted.has(tool)) return;
-		attempted.add(tool); // one automatic attempt; later manual disables win
+	function activationState(extra: Record<string, unknown> = {}): void {
+		const current = (g.__pi_tool_activation_state && typeof g.__pi_tool_activation_state === "object")
+			? g.__pi_tool_activation_state as Record<string, unknown> : {};
+		publish({ ...current, ...extra, deferred: [...deferred].sort(), attempted: [...attempted].sort() });
+	}
+
+	function surfaceTelemetry(): void {
+		const active = pi.getActiveTools();
+		const measured = measureActiveSurface(allTools, active);
+		record("tool-activation", "surface", {
+			mode, active_tools: active.length, all_tools: allTools.length,
+			schema_bytes: measured.schemaBytes, guideline_bytes: measured.guidelineBytes,
+			deferred_tools: deferred.size, unavailable_attempts: 0,
+		});
+	}
+
+	function activateCapability(capability: CapabilityName, reason: string): void {
+		if (mode !== "phase" && capability !== "subagent" && capability !== "compact_context") return;
+		if (attempted.has(capability)) return;
+		const names = PHASE_CAPABILITY_TOOLS[capability];
+		const available = names.filter((name) => deferred.has(name));
+		if (available.length === 0) return;
+		attempted.add(capability); // one automatic attempt; later manual disables win
+		activationState();
+		const active = pi.getActiveTools();
+		const next = [...active, ...available.filter((name) => !active.includes(name))];
+		try {
+			pi.setActiveTools(next);
+			for (const tool of available) record("tool-activation", "activated", { tool, reason });
+			surfaceTelemetry();
+		} catch { /* incompatible runtime: fail open and never churn the surface */ }
+	}
+
+	function activateDynamic(tool: DeferredTool, reason: string): void {
+		if (mode !== "dynamic" || !deferred.has(tool) || attempted.has(tool)) return;
+		attempted.add(tool);
+		activationState();
 		const active = pi.getActiveTools();
 		if (active.includes(tool)) return;
 		try {
 			pi.setActiveTools([...active, tool]);
 			record("tool-activation", "activated", { tool, reason });
+			surfaceTelemetry();
 		} catch { /* incompatible runtime: fail open and never churn the surface */ }
 	}
 
+	function activate(capability: CapabilityName, reason: string): void {
+		if (mode === "phase") activateCapability(capability, reason);
+		else if (capability === "subagent" || capability === "compact_context") activateDynamic(capability, reason);
+	}
+
 	onHarnessSignal(pi.events, (signal) => {
-		if (signal.type === "plan/write") lastOpenItems = signal.openItems;
+		if (signal.type === "plan/write") {
+			lastOpenItems = signal.openItems;
+			if (mode === "phase") activate("plan_go", "accepted-plan");
+		}
 		if (signal.type === "plan/go" && lastOpenItems > 1) activate("subagent", "multi-item-execution");
 		if (signal.type === "plan/gate" && !signal.pass && signal.fails >= 2) activate("subagent", "second-gate-failure");
 		if (signal.type === "loop/tier" && signal.tier === 2) {
 			activate("subagent", signal.detector === "semantic" ? "semantic-tier-two" : "loop-tier-two");
 		}
+		if (signal.type === "capability/need") activate(signal.capability, signal.reason);
 	});
 
 	pi.on("session_start", async () => {
-		g.__pi_tool_activation_state = { mode: MODE, preserved_explicit: false, reason: "dynamic-startup" };
+		publish({ mode, preserved_explicit: false, reason: mode === "phase" ? "phase-start" : "dynamic-startup", phase: mode === "phase" ? "phase-aware" : "ambient-or-dynamic" });
 		deferred.clear();
 		attempted.clear();
 		lastOpenItems = 0;
 		lastContextPct = 0;
-		const all = pi.getAllTools().map((tool) => tool.name);
+		sessionStartedAt = performance.now();
+		firstUsefulMutation = false;
+		allTools = pi.getAllTools() as any[];
+		const all = allTools.map((tool) => String(tool.name));
 		const active = pi.getActiveTools();
 		const allSet = new Set(all);
 		const activeSet = new Set(active);
-		const complete = [...BASE_REGISTRY, ...DEFERRED].every((name) => allSet.has(name));
-		const explicit = activeSet.size !== allSet.size || all.some((name) => !activeSet.has(name));
+		const complete = [...BASE_REGISTRY, ...DYNAMIC_DEFERRED].every((name) => allSet.has(name));
+		explicit = activeSet.size !== allSet.size || all.some((name) => !activeSet.has(name));
+		const deferredNames = mode === "phase" ? phaseDeferredTools(all) : new Set(DYNAMIC_DEFERRED.filter((name) => allSet.has(name)));
 		if (!complete || explicit) {
-			g.__pi_tool_activation_state = {
-				mode: MODE, preserved_explicit: true,
-				reason: complete ? "narrowed-tools" : "incomplete-registry",
-			};
-			for (const tool of DEFERRED) record("tool-activation", "preserved-explicit", {
-				tool, reason: complete ? "narrowed-tools" : "incomplete-registry",
-			});
+			publish({ mode, preserved_explicit: true, reason: complete ? "narrowed-tools" : "incomplete-registry", phase: mode === "phase" ? "phase-aware" : "dynamic" });
+			for (const tool of deferredNames) record("tool-activation", "preserved-explicit", { tool, reason: complete ? "narrowed-tools" : "incomplete-registry" });
+			surfaceTelemetry();
 			return;
 		}
-		for (const tool of DEFERRED) {
+		for (const tool of deferredNames) {
 			deferred.add(tool);
-			record("tool-activation", "deferred", { tool, reason: "dynamic-startup" });
+			record("tool-activation", "deferred", { tool, reason: mode === "phase" ? "phase-start" : "dynamic-startup" });
 		}
-		pi.setActiveTools(active.filter((name) => !deferred.has(name as DeferredTool)));
+		pi.setActiveTools(active.filter((name) => !deferred.has(name)));
+		publish({ mode, preserved_explicit: false, reason: mode === "phase" ? "phase-start" : "dynamic-startup", phase: mode === "phase" ? "phase-aware" : "dynamic", deferred: [...deferred].sort(), attempted: [] });
+		surfaceTelemetry();
 	});
 
 	pi.on("context", async (_event, ctx) => {
 		const pct = ctx.getContextUsage()?.percent;
 		if (pct != null && lastContextPct < 60 && pct >= 60) activate("compact_context", "context-60");
 		if (pct != null) lastContextPct = pct;
+	});
+
+	pi.on("tool_call", async (event) => {
+		if (mode === "phase" && deferred.has(event.toolName) && !pi.getActiveTools().includes(event.toolName)) {
+			record("tool-activation", "unavailable", { tool: event.toolName, reason: "deferred-capability" });
+		}
+	});
+
+	pi.on("tool_result", async (event) => {
+		if (firstUsefulMutation || !MUTATING_TOOLS.has(event.toolName) || event.isError === true) return;
+		firstUsefulMutation = true;
+		record("tool-activation", "first-useful-mutation", { elapsed_ms: Math.max(0, Math.round(performance.now() - sessionStartedAt)), tool: event.toolName });
 	});
 }

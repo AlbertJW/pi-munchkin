@@ -151,6 +151,7 @@ export function renderDoctor(input: {
 	posture: RuntimePosture;
 	sandbox: "declared" | "host" | "unknown";
 	preservationReason?: string;
+	activation?: { mode?: unknown; phase?: unknown; deferred?: unknown[]; attempted?: unknown[] };
 }): string {
 	const surface = input.surfaceHash && /^[a-f0-9]{64}$/i.test(input.surfaceHash)
 		? input.surfaceHash.toLowerCase() : "unknown";
@@ -161,6 +162,7 @@ export function renderDoctor(input: {
 		`tools=${input.tools.active}/${input.tools.all} active/all; preserved_explicit=${input.tools.preservedExplicit}; preservation_reason=${boundedAtom(input.preservationReason, "none")}`,
 		`sources(sourceInfo.source|scope|origin): ${input.tools.sourceGroups.join(", ") || "none"}`,
 		`missing_first_party=${input.tools.missing.join(",") || "none"}; duplicates=${input.tools.duplicates.join(",") || "none"}; overrides=${input.tools.overrides.join(",") || "none"}`,
+		`capability_surface=mode:${boundedAtom(input.activation?.mode, "unknown")}; phase:${boundedAtom(input.activation?.phase, "unknown")}; deferred:${(input.activation?.deferred ?? []).map((value) => boundedAtom(value)).slice(0, 16).join(",") || "none"}; attempted:${(input.activation?.attempted ?? []).map((value) => boundedAtom(value)).slice(0, 16).join(",") || "none"}`,
 		`retry_enabled=${input.posture.retryEnabled}; retry_max=${input.posture.maxRetries}; retry_base_delay_ms=${input.posture.baseDelayMs}; http_idle_timeout_ms=${input.posture.httpIdleTimeoutMs}; provider_timeout_ms=${providerTimeout}; provider_max_retries=${input.posture.providerMaxRetries}; provider_max_retry_delay_ms=${input.posture.providerMaxRetryDelayMs}`,
 		`sandbox=${input.sandbox}; shell_policy=${input.posture.shellPolicyDeclared ? "declared" : "none"} (shell policy is not isolation)`,
 	].join("\n");

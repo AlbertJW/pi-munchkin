@@ -90,7 +90,7 @@ export default function (pi: ExtensionAPI): void {
 		description: "Report redacted Pi, model, tool-provenance, retry, timeout, and sandbox posture.",
 		handler: async (_args, ctx) => {
 			const activation = (globalThis as Record<string, unknown>).__pi_tool_activation_state as
-				{ preserved_explicit?: unknown; reason?: unknown } | undefined;
+				{ mode?: unknown; phase?: unknown; preserved_explicit?: unknown; reason?: unknown; deferred?: unknown; attempted?: unknown } | undefined;
 			const tools = summarizeToolSurface(
 				pi.getAllTools(), pi.getActiveTools(), activation?.preserved_explicit === true,
 			);
@@ -109,6 +109,12 @@ export default function (pi: ExtensionAPI): void {
 				posture,
 				sandbox: sandboxPosture(),
 				preservationReason: typeof activation?.reason === "string" ? activation.reason : undefined,
+				activation: {
+					mode: typeof activation?.mode === "string" ? activation.mode : "unknown",
+					phase: typeof activation?.phase === "string" ? activation.phase : "unknown",
+					deferred: Array.isArray(activation?.deferred) ? activation.deferred : [],
+					attempted: Array.isArray(activation?.attempted) ? activation.attempted : [],
+				},
 			}), "info");
 		},
 	});

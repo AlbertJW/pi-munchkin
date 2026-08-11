@@ -3,6 +3,7 @@ import { extname, isAbsolute, relative, resolve } from "node:path";
 import { defineTool, type ExtensionAPI, withFileMutationQueue } from "@earendil-works/pi-coding-agent";
 import { Type } from "typebox";
 import { annotate, applyHunks, detectStyle, fileTag, normalizeText, parsePatch, relocateHunks, restoreStyle } from "../lib/hashline-core.ts";
+import { emitHarnessSignal } from "../lib/harness-signals.ts";
 
 // Hashline edits — line-anchored patches instead of exact-text matching.
 //
@@ -135,12 +136,16 @@ export default function (pi: ExtensionAPI) {
 				const info = await stat(abs);
 				if (mime) {
 					if (info.size > IMAGE_MAX_BYTES) {
+						emitHarnessSignal(pi.events, { v: 1, type: "capability/need", capability: "span_tools", reason: "large-file" });
 						throw new Error(`Image too large to attach (${info.size} bytes > ${IMAGE_MAX_BYTES} bytes). Resize it externally first.`);
 					}
 					const buf = await readFile(abs);
 					return { content: [{ type: "image" as const, data: buf.toString("base64"), mimeType: mime }], details: {} };
 				}
-				if (info.size > MAX_READ_FILE_BYTES) throw new Error(oversizedMessage("read", info.size, MAX_READ_FILE_BYTES));
+				if (info.size > MAX_READ_FILE_BYTES) {
+					emitHarnessSignal(pi.events, { v: 1, type: "capability/need", capability: "span_tools", reason: "large-file" });
+					throw new Error(oversizedMessage("read", info.size, MAX_READ_FILE_BYTES));
+				}
 				const text = normalizeText(await readFile(abs, "utf8"));
 				const tag = recordSnapshot(abs, text);
 				if (text === "") {

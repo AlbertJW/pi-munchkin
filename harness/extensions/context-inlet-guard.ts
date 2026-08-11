@@ -3,6 +3,7 @@ import { basename, extname } from "node:path";
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { isPositiveNumber, limitBypassesRiskyGate, resolveReadPath, RISKY_MAX_LIMIT } from "../lib/context-inlet.ts";
 import { record } from "../lib/telemetry.ts";
+import { emitHarnessSignal } from "../lib/harness-signals.ts";
 
 type ReadInput = {
 	path?: unknown;
@@ -82,6 +83,7 @@ export default function (pi: ExtensionAPI) {
 		const n = (blockCounts.get(key) ?? 0) + 1;
 		blockCounts.set(key, n);
 		record("context-inlet-guard", "block", { risky, bytes, n, bigLimit });
+		emitHarnessSignal(pi.events, { v: 1, type: "capability/need", capability: "span_tools", reason: "inlet-refusal" });
 
 		const reason = bigLimit
 			? `failure_class=context_intake_risk. limit=${input.limit} on risky file ${input.path} (${bytes}B) defeats bounded intake — page it: limit ≤ ${RISKY_MAX_LIMIT} lines per read, or use rg/head/tail.`

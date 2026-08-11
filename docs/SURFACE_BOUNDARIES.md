@@ -30,6 +30,7 @@ npm run surface:hash:source
 | 2026-08-10 | run-kernel PR 3: shadow control arbiter, typed domain signals, bounded optional async telemetry writer | PR 3 implementation | `6548d5d9265ed5e9b7643e55a10ccb9df22381eafe3827209e72b5b993943f54` | dark source only; not mirrored; `CONTROL_ARBITER=shadow`, `TELEMETRY_WRITER=sync`; enforce/async require separate adoption |
 | 2026-08-10 | run-kernel PR 4: private structured run capsule, bounded Markdown projection, semantic settlement, and restore | PR 4 implementation | `3cee33fc7a093f3449a8aca5623ac13917e3780865ae91b4edab0e287bcf6809` | dark source only; not mirrored; `RUN_CAPSULE=shadow` persists private audit state without model-context injection; recovery use requires separate adoption |
 | 2026-08-11 | run-kernel PR 5: deterministic recovery brief and dark compaction/provider/manual recovery integration | PR 5 implementation | `9c76302193f461f17f08c3483359aa2dfe57d2cbf86dd65a6ade67ead3b2e391` | dark source only; `RUN_CAPSULE=shadow` remains unchanged; `recovery` is opt-in and no automatic model request is started |
+| 2026-08-11 | run-kernel PR 6: phase-aware capability surface | PR 6 implementation | `0bf088709cf3b0f20c155e238865e2262c4429d7b4ddbf5ba992e86c787b97d9` | dark source only; deployed `MUNCHKIN_TOOL_ACTIVATION=dynamic` unchanged; `phase` requires separate adoption |
 
 PR 4 changes package, CI, operational tooling, and narrative. Its new mirror/secret-scan libraries
 are not imported by the runtime extension manifest, so it does not create a model-visible runtime

@@ -122,6 +122,7 @@
     "harness/lib/active-tool-prompts.ts",
     "harness/lib/agent-dir.ts",
     "harness/lib/blackboard.ts",
+    "harness/lib/capability-surface.ts",
     "harness/lib/bash-output.ts",
     "harness/lib/command-policy.ts",
     "harness/lib/compaction-coordinator.ts",
