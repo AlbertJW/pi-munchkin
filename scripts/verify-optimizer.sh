@@ -29,6 +29,8 @@ selftests=(
   prompt-lab/exposure.py
   prompt-lab/usage_probe.py
   prompt-lab/agent_overlay.py
+  prompt-lab/agentic_judge.py
+  prompt-lab/shadow_report.py
   prompt-lab/span_screen.py
   prompt-lab/execution_policy.py
   prompt-lab/fleet_report.py
