@@ -41,4 +41,4 @@ recorded no raw request, command, path, endpoint, or secret.
 | secret scan | pending final staged scan |
 | protected paths | no `context-pressure*` path changed |
 
-Source surface hash: `a4d5692f6065f977402cfb1d37ea275aa2140e911c16bbe9d99d3fd64c79a0a4`.
+Source surface hash: `d7949d4d7292bc03b2a9e801da409416d97a20b7a4f2e540f5002cafad70cf3c`.
