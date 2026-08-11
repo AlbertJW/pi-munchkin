@@ -1,6 +1,8 @@
 import { isIP } from "node:net";
 import { VERSION, type ExtensionAPI } from "@earendil-works/pi-coding-agent";
+import { agentDir } from "../lib/agent-dir.ts";
 import { isPrivateAddress } from "../lib/public-url.ts";
+import { discoverEntryPoints, hashSurface, walkRelativeImports } from "../lib/surface-walk.ts";
 import {
 	readRuntimePosture, renderDoctor, sandboxPosture, summarizeToolSurface,
 } from "../lib/runtime-doctor.ts";
@@ -120,7 +122,22 @@ export default function (pi: ExtensionAPI): void {
 		pendingProbe = null;
 	}
 
-	pi.on("session_start", async () => { reset(); });
+	pi.on("session_start", async () => {
+		reset();
+		// Surface-bound telemetry for INTERACTIVE sessions (2026-08-11 second
+		// inspection): only gate rounds exported HARNESS_SURFACE_SHA256, so live
+		// rows could never be attributed to a surface and shadow evidence could
+		// never accumulate. Compute the loaded hash once per process; gate rounds
+		// keep their pre-set (pre-session, tamper-ordered) value untouched.
+		if (!process.env.HARNESS_SURFACE_SHA256) {
+			try {
+				const dir = agentDir();
+				const { entries, npmIdentities } = await discoverEntryPoints(dir);
+				const files = await walkRelativeImports(entries);
+				process.env.HARNESS_SURFACE_SHA256 = await hashSurface(dir, files, npmIdentities);
+			} catch { /* unhashable surface: rows stay unattributed and the report says so */ }
+		}
+	});
 	pi.on("session_shutdown", async () => { reset(); });
 
 	pi.on("before_provider_request", async () => {

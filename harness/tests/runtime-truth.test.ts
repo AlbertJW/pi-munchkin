@@ -198,3 +198,33 @@ test("serving-truth wiring: probes once per model after a 2xx response, records 
 		if (prior.source === undefined) delete process.env.TELEMETRY_SOURCE; else process.env.TELEMETRY_SOURCE = prior.source;
 	}
 });
+
+test("session_start stamps HARNESS_SURFACE_SHA256 for interactive sessions, never overwrites the gate's", async () => {
+	const { mkdirSync, mkdtempSync, rmSync, writeFileSync } = await import("node:fs");
+	const { tmpdir } = await import("node:os");
+	const { join } = await import("node:path");
+	const dir = mkdtempSync(join(tmpdir(), "rt-surface-"));
+	const priorAgent = process.env.PI_CODING_AGENT_DIR;
+	const priorHash = process.env.HARNESS_SURFACE_SHA256;
+	try {
+		writeFileSync(join(dir, "settings.json"), "{}");
+		mkdirSync(join(dir, "extensions"));
+		writeFileSync(join(dir, "extensions", "noop.ts"), "export default function () {}\n");
+		process.env.PI_CODING_AGENT_DIR = dir;
+		delete process.env.HARNESS_SURFACE_SHA256;
+		const fp = makeFakePi();
+		const mod = await import(`../extensions/runtime-truth.ts?surface=${Date.now()}-${Math.random()}`);
+		mod.default(fp.pi as never);
+		await fire(fp, "session_start", {});
+		const stamped = process.env.HARNESS_SURFACE_SHA256;
+		assert.match(stamped ?? "", /^[a-f0-9]{64}$/, "interactive rows get a surface hash to bind to");
+		// A gate's pre-set value is authoritative (set BEFORE pi starts) — never recomputed over it.
+		process.env.HARNESS_SURFACE_SHA256 = "f".repeat(64);
+		await fire(fp, "session_start", {});
+		assert.equal(process.env.HARNESS_SURFACE_SHA256, "f".repeat(64), "a pre-set hash is never overwritten");
+	} finally {
+		rmSync(dir, { recursive: true, force: true });
+		if (priorAgent === undefined) delete process.env.PI_CODING_AGENT_DIR; else process.env.PI_CODING_AGENT_DIR = priorAgent;
+		if (priorHash === undefined) delete process.env.HARNESS_SURFACE_SHA256; else process.env.HARNESS_SURFACE_SHA256 = priorHash;
+	}
+});
