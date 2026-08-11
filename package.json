@@ -187,6 +187,7 @@
     "NOTICE.md",
     "harness/scripts/verify-all.mjs",
     "harness/scripts/live-mirror-apply.mjs",
-    "harness/scripts/pi-watchdog.sh"
+    "harness/scripts/pi-watchdog.sh",
+    "harness/scripts/redact-node-report.mjs"
   ]
 }
