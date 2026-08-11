@@ -235,3 +235,39 @@ test("resume/fork ALWAYS resets before restoring — no cross-session ledger ble
 		resetBoard();
 	}
 });
+
+test("lens steer skips abort/shutdown proposals — hard stops must not be fought", async () => {
+	const { buildControlProposal, emitControlProposal } = await import("../lib/control-proposal.ts");
+	const fp = makeFakePi();
+	const prevLens = process.env.STATE_LENS;
+	delete process.env.STATE_LENS; // default steer mode
+	try {
+		const mod = await import(`../extensions/session-blackboard.ts?abortguard=${Date.now()}-${Math.random()}`);
+		mod.default(fp.pi as never);
+		resetBoard();
+		const s = boardState();
+		s.turn = 20;
+		noteTool(s, { toolName: "bash", args: { command: "npm test" }, isError: true, errorText: "fail" });
+
+		// tier-3 abort proposal (what loop-breaker emits in LB_HARD_STOP=abort):
+		// the lens must stay silent — a steer here fights the abort.
+		emitControlProposal(fp.pi.events as never, buildControlProposal({
+			boundarySequence: 20, kind: "safe_abort", reason: "loop_hard_stop",
+			source: "loop-breaker", cooldownKey: "exact:3:abort",
+			messageFactory: "loop-tier", effect: "abort",
+		}), { abort: () => {} });
+		assert.equal(fp.deliveries.length, 0, "no lens steer on an abort-effect proposal");
+
+		// same boundary, message-effect proposal: the lens DOES fire.
+		emitControlProposal(fp.pi.events as never, buildControlProposal({
+			boundarySequence: 20, kind: "failure_recovery", reason: "loop_strategy_change",
+			source: "loop-breaker", cooldownKey: "exact:1",
+			messageFactory: "loop-tier", effect: "message",
+		}), { message: "tier steer" });
+		assert.equal(fp.deliveries.length, 1, "message-effect proposal still gets a lens steer");
+		assert.match(fp.deliveries[0].text, /session-state/);
+	} finally {
+		if (prevLens === undefined) delete process.env.STATE_LENS; else process.env.STATE_LENS = prevLens;
+		resetBoard();
+	}
+});

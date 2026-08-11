@@ -62,7 +62,12 @@ export default function (pi: ExtensionAPI): void {
 
 	onHarnessSignal(pi.events, (signal) => noteHarnessSignal(boardState(), signal));
 	onControlProposal(pi.events, ({ proposal }) => {
+		// effect guard: abort/shutdown proposals are hard stops. Loop-breaker
+		// deliberately injects NO steer in those modes (a corrective user message
+		// fights the abort and can restart the run) — the lens must not reintroduce
+		// one through this side channel. Only message-bearing tiers get a lens.
 		if (proposal.source !== "loop-breaker" ||
+			proposal.effect !== "message" ||
 			!(["loop-tier", "loop-session"] as string[]).includes(proposal.messageFactory) ||
 			proposal.boundarySequence === lastLensProposalBoundary) return;
 		const state = boardState();
