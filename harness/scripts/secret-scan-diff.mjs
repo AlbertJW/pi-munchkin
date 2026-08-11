@@ -18,6 +18,22 @@ const diff = git(["diff", "HEAD", "--no-color", "--no-ext-diff", "--unified=0"])
 const added = parseUnifiedDiff(diff);
 let inspected = added.length;
 const findings = scanAddedLines(added);
+
+// Committed-but-unpushed range. The working-tree diff above cannot see content
+// that was already committed — a commit→scan→push sequence would report clean on
+// a live secret (this repo has a prior committed-endpoint incident). Three-dot
+// diff = our side since the merge-base, so together the two diffs cover
+// everything a push would publish. Skipped with a notice when origin/main is
+// absent (fresh clone, offline CI) rather than failing the scan outright.
+let rangeNote = "";
+try {
+  const rangeDiff = git(["diff", "origin/main...HEAD", "--no-color", "--no-ext-diff", "--unified=0"]);
+  const rangeAdded = parseUnifiedDiff(rangeDiff);
+  inspected += rangeAdded.length;
+  findings.push(...scanAddedLines(rangeAdded));
+} catch {
+  rangeNote = "; unpushed-commit range NOT scanned (origin/main unavailable)";
+}
 const untracked = git(["ls-files", "--others", "--exclude-standard", "-z"]).split("\0").filter(Boolean);
 for (const file of untracked) {
   const metadata = await stat(file);
@@ -39,5 +55,5 @@ if (findings.length) {
   console.error(`secret scan: ${findings.length} finding(s); matched text suppressed`);
   process.exitCode = 1;
 } else {
-  console.log(`secret scan: clean (${inspected} added line(s) inspected)`);
+  console.log(`secret scan: clean (${inspected} added line(s) inspected${rangeNote})`);
 }
