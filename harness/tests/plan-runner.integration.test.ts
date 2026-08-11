@@ -952,7 +952,14 @@ test("c39: plan_go blocked under a PLAN_UNCERTAINTY hold, does not flip phase", 
 	}
 });
 
-test("c39: plan_go transitions phase to executing and disarms isPlanning()", async () => {
+// REVISED 2026-08-11: this test used to assert that the plan_go TOOL disarms the
+// lean plan-mode block. That is the human checkpoint `/plan` exists to create, and
+// letting the model clear it is self-approval (Albert's inspection). The activation
+// path c39 was built for is unaffected: real_gate.sh dispatches no slash commands,
+// so isPlanning() is false in every gate session — see the c25 test below, which is
+// the tool-only case. What this test now pins is that the USER's /plan-go performs
+// exactly the transition the tool used to perform.
+test("c39: the user's /plan-go transitions phase to executing and disarms isPlanning()", async () => {
 	process.env.PLAN_TOOL_GO = "on";
 	const cwd = tmp();
 	const telemetry = join(cwd, "telemetry.jsonl");
@@ -974,20 +981,31 @@ test("c39: plan_go transitions phase to executing and disarms isPlanning()", asy
 		const duringPlan = await fire(fp, "tool_call", { toolName: "edit", input: {} }, ctx);
 		assert.equal(duringPlan?.block, true, "plan-mode block still fires before plan_go");
 
-		const r = await callTool(fp, "plan_go", {}, cwd);
-		assert.equal(r.isError, false, r.content?.[0]?.text);
+		// The model may NOT clear the user's review checkpoint itself.
+		await expectToolError(fp, "plan_go", {}, cwd, /awaiting the user's review/);
+		const stillPlanned = JSON.parse(readFileSync(join(cwd, ".pi", "plan-state.json"), "utf8"));
+		assert.equal(stillPlanned.phase, "planned", "the tool must not flip phase during review");
+
+		await fp.commands.get("plan-go").handler("", ctx);
 		const state = JSON.parse(readFileSync(join(cwd, ".pi", "plan-state.json"), "utf8"));
 		assert.equal(state.phase, "executing");
 		assert.ok(fp.entries.some((e) => e.type === "plan_spine"), "plan_spine entry recorded");
 		const trace = readFileSync(join(cwd, ".pi", "traces", "plan-runner.jsonl"), "utf8").trim().split("\n").map((l) => JSON.parse(l));
-		assert.ok(trace.some((row) => row.tool_name === "plan_go" && row.success === true), "plan_go trace row recorded");
+		assert.ok(trace.some((row) => row.tool_name === "plan" || row.tool_name === "plan-go"), "go trace row recorded");
 		const rows = readFileSync(telemetry, "utf8").trim().split("\n").map((line) => JSON.parse(line));
 		assert.ok(rows.some((row) => row.ext === "plan-runner" && row.kind === "go" && row.resumed === false), "plan-runner/go telemetry recorded");
 
 		// isPlanning() must actually be disarmed -- not just phase reading correctly on disk
 		const afterGo = await fire(fp, "tool_call", { toolName: "edit", input: {} }, ctx);
-		assert.equal(afterGo, undefined, "structural plan-mode block must be genuinely disarmed after plan_go");
+		assert.equal(afterGo, undefined, "structural plan-mode block must be genuinely disarmed after the user's /plan-go");
+
+		// ...and only now may the model use the tool (resume is idempotent).
+		const resumed = await callTool(fp, "plan_go", {}, cwd);
+		assert.equal(resumed.isError, false, resumed.content?.[0]?.text);
 	} finally {
+		// This flag is process-global: leaving it armed leaks the plan-mode block
+		// into every later test in this file (it did, before the guard existed).
+		delete (globalThis as Record<string, unknown>).__pi_plan_phase_active;
 		delete process.env.PLAN_TOOL_GO;
 		if (priorFile === undefined) delete process.env.TELEMETRY_FILE; else process.env.TELEMETRY_FILE = priorFile;
 		if (priorSource === undefined) delete process.env.TELEMETRY_SOURCE; else process.env.TELEMETRY_SOURCE = priorSource;
@@ -1005,7 +1023,10 @@ test("c39 + c25: plan_go unlocks PLAN_SUBAGENT_ONLY's block on a direct edit —
 		const { ctx } = makeCtx(cwd);
 
 		// deliberately never calling /plan or /plan-go -- mirrors a real real_gate.sh
-		// `pi -p` session, which never dispatches a slash command at all.
+		// `pi -p` session, which never dispatches a slash command at all. This is
+		// also the case that proves the 2026-08-11 review guard cannot touch a gate
+		// round: with no /plan, isPlanning() is false and plan_go activates freely.
+		delete (globalThis as Record<string, unknown>).__pi_plan_phase_active;
 		await callTool(fp, "plan_write", {
 			items: [{ title: "step one", status: "pending" }], request: "r", summary: "s",
 		}, cwd);
@@ -1360,5 +1381,52 @@ test("partialWorkNoted is per-SESSION: session_start re-arms the partial-work wa
 			"session 2 must be warned too — the note is per-session, not once per process");
 	} finally {
 		resetPiGlobals();
+	}
+});
+
+test("c39: plan_go cannot self-approve a plan that is awaiting the user's review", async () => {
+	process.env.PLAN_TOOL_GO = "on";
+	const cwd = tmp();
+	const telemetry = join(cwd, "telemetry.jsonl");
+	const priorFile = process.env.TELEMETRY_FILE;
+	const priorSource = process.env.TELEMETRY_SOURCE;
+	process.env.TELEMETRY_FILE = telemetry;
+	process.env.TELEMETRY_SOURCE = "test";
+	const g = globalThis as Record<string, unknown>;
+	try {
+		const fp = makeFakePi();
+		const mod = await import(`../extensions/plan-runner.ts?c39review=${Date.now()}-${Math.random()}`);
+		mod.default(fp.pi as any);
+		const { ctx } = makeCtx(cwd);
+		// /plan (lean) arms the human checkpoint: the user reviews, then runs /plan-go.
+		await fp.commands.get("plan").handler("build the thing", ctx);
+		assert.equal(g.__pi_plan_phase_active, true, "lean /plan arms the plan-mode block");
+		await callTool(fp, "plan_write", {
+			items: [{ title: "step one", status: "pending" }], request: "build the thing", summary: "s",
+		}, cwd);
+
+		// The model tries to start execution itself, in the same turn.
+		await expectToolError(fp, "plan_go", {}, cwd, /awaiting the user's review|\/plan-go/);
+		assert.equal(g.__pi_plan_phase_active, true, "the checkpoint stays armed — mutations remain blocked");
+		const held = JSON.parse(readFileSync(join(cwd, ".pi", "plan-state.json"), "utf8"));
+		assert.equal(held.phase, "planned", "phase must not flip without the user");
+		const rows = readFileSync(telemetry, "utf8").trim().split("\n").map((line) => JSON.parse(line));
+		const blocked = rows.filter((row) => row.ext === "plan-runner" && row.kind === "go-blocked");
+		assert.ok(blocked.some((row) => row.reason === "awaiting-user-review" && row.activation === "tool"),
+			"the refusal is recorded as a distinct reason");
+
+		// The USER's /plan-go still works, and the tool works once the flag is down.
+		await fp.commands.get("plan-go").handler("", ctx);
+		assert.equal(g.__pi_plan_phase_active, false, "the user's approval disarms the checkpoint");
+		const started = JSON.parse(readFileSync(join(cwd, ".pi", "plan-state.json"), "utf8"));
+		assert.equal(started.phase, "executing");
+		const resumed = await callTool(fp, "plan_go", {}, cwd);
+		assert.match(resumed.content[0].text, /execution started|resume/,
+			"outside review mode the tool behaves exactly as before");
+	} finally {
+		delete g.__pi_plan_phase_active;
+		delete process.env.PLAN_TOOL_GO;
+		if (priorFile === undefined) delete process.env.TELEMETRY_FILE; else process.env.TELEMETRY_FILE = priorFile;
+		if (priorSource === undefined) delete process.env.TELEMETRY_SOURCE; else process.env.TELEMETRY_SOURCE = priorSource;
 	}
 });

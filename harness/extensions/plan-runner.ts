@@ -1409,6 +1409,20 @@ export default function (pi: ExtensionAPI) {
 					const aid = actionId();
 					rememberModel(ctx);
 
+					// Human checkpoint. `/plan` (lean) arms the plan-mode mutation block
+					// precisely so the USER reviews the draft before any work starts;
+					// goTransition's ok arm disarms it. Without this guard the model can
+					// write a plan and call plan_go in the same turn, self-approving the
+					// review it was supposed to wait for. Only the `/plan` command ever
+					// sets this flag, so non-interactive runs (and the c38 block ->
+					// plan_write -> plan_go -> mutate chain) are untouched.
+					if (isPlanning()) {
+						planEvent("go-blocked", `planning-${aid}`, { reason: "awaiting-user-review", activation: "tool" });
+						rejectPlanTool(
+							"plan_go: this plan is awaiting the user's review. Present the plan and stop — " +
+							"the user starts execution with /plan-go. Do not call plan_go again for this plan.");
+					}
+
 					// Guards + queueing + disarm-on-ok live in goTransition (shared
 					// with /plan-go). This body only maps the outcome onto the tool's
 					// channels: planEvent + throw for failures, tool-result content
