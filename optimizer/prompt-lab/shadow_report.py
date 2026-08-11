@@ -57,13 +57,39 @@ def load(path, source):
     return rows
 
 
+def session_keys(rows):
+    """One key per SESSION, not per working directory.
+
+    `sk` is the cwd basename (telemetry.ts:32) — unique per gate rep, but every
+    interactive session in the same repository shares it, so keying on sk alone
+    collapsed forty runs into one observation and silently invalidated the
+    30-session floor. `seq` is a per-process counter (telemetry.ts:77) that
+    restarts with each pi process, and for the sessions this report counts a
+    process IS the session. Key: run_id when the row carries one (gate rows),
+    else sk + a process epoch that increments whenever seq stops increasing.
+    """
+    keys = []
+    epochs = collections.defaultdict(int)      # sk -> current epoch
+    last_seq = {}                              # sk -> last seq seen
+    for row in rows:
+        sk = row.get("sk") or "unknown"
+        run_id = row.get("run_id")
+        seq = row.get("seq")
+        if isinstance(seq, (int, float)):
+            if sk in last_seq and seq <= last_seq[sk]:
+                epochs[sk] += 1
+            last_seq[sk] = seq
+        keys.append(str(run_id) if run_id else f"{sk}#p{epochs[sk]}")
+    return keys
+
+
 def analyse(rows):
     sessions = collections.defaultdict(lambda: {
         "disagreements": collections.Counter(), "episodes_opened": 0,
         "episodes_exposed": 0, "recovered": 0, "settled": False, "kernel_receipts": 0,
     })
-    for row in rows:
-        key = row.get("sk") or row.get("run_id") or "unknown"
+    keys = session_keys(rows)
+    for key, row in zip(keys, rows):
         session = sessions[key]
         ext, kind = row.get("ext"), row.get("kind")
         if ext == "run-kernel" and kind == "legacy-disagreement":
@@ -161,8 +187,11 @@ def verdict_lines(report):
 
 
 def selftest():
+    seq_counter = {"n": 0}
+
     def row(sk, ext, kind, **extra):
-        return dict(sk=sk, ext=ext, kind=kind, source="interactive", **extra)
+        seq_counter["n"] += 1
+        return dict(sk=sk, ext=ext, kind=kind, source="interactive", seq=seq_counter["n"], **extra)
 
     assert analyse([])["sessions"] == 0
     rows = []
@@ -198,6 +227,20 @@ def selftest():
     assert 0.0 <= quiet_report["q3_settlement"]["share"] <= 1.0, "a share must be a share"
     assert quiet_report["q2_episode_exposure"]["sufficient"] is False
     assert any("UNDERPOWERED" in line for line in verdict_lines(quiet_report))
+    # SESSION keying, not working-directory keying (the forty-runs-one-repo bug):
+    # forty rows sharing one sk but carrying distinct run_ids are forty sessions.
+    forty = [dict(sk="myrepo", ext="run-kernel", kind="receipt", source="interactive",
+                  seq=i + 1, run_id=f"r{i}") for i in range(40)]
+    assert analyse(forty)["sessions"] == 40, "distinct run_ids must not collapse into one sk bucket"
+
+    # ...and without run_ids, a seq RESET marks a new pi process = new session.
+    resets = []
+    for process_index in range(3):
+        for seq in (1, 2, 3):
+            resets.append(dict(sk="myrepo", ext="run-kernel", kind="receipt",
+                               source="interactive", seq=seq))
+    assert analyse(resets)["sessions"] == 3, "seq resets are process/session boundaries"
+
     print("shadow_report selftest: ok")
 
 
