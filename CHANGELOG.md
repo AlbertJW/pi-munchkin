@@ -23,7 +23,9 @@ candidates as dark). Net changes since 0.3.0; the full per-decision record is
   `second-test-guard`, `documented-escape` — each with a hidden fail-to-pass suite and a
   *plausible* shortcut mutant that passes the visible suite, so test-fitting is measured rather
   than assumed. All four pass `fixture_admission.py`; all four are `approved: false` pending
-  human review. Selection rule preregistered in `PREREG_FIXTURE_BAND_2026-08-11.md`.
+  human review, with review packets generated for that gate. Selection rule preregistered in
+  `PREREG_FIXTURE_BAND_2026-08-11.md`; per-fixture design intent and the full verification record
+  in `real-gate-fixtures/BAND_FIXTURES_2026-08-11.md`.
 - **Run-kernel series, PR 1–7 (2026-08-10/11, mirrored live 2026-08-11 at conservative
   defaults):** a typed shadow run kernel over canonical execution receipts (`RUN_KERNEL=shadow`);
   execution-order verification and active-only tool prompts (dark, `VERIFY_EXECUTION_ORDER` /

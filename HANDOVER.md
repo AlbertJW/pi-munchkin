@@ -35,8 +35,11 @@ adoption, deletion, live mirroring, and gate rounds are human-gated. Never touch
 > a calibration gate (a judge may not be cited until it agrees with Albert's labels);
 > `optimizer/prompt-lab/shadow_report.py` answers the three shadow-evidence questions with
 > declared thresholds. FOUR new band fixtures pass `fixture_admission.py` but are
-> `approved: false` — human approval is the next gate, then the n=6 calibration in
-> `optimizer/docs/PREREG_FIXTURE_BAND_2026-08-11.md` (committed BEFORE any run).
+> `approved: false` — human approval is the next gate (`fixture_admission.py approve <task>`;
+> read `real-gate-fixtures/review-packets/<task>.md`), then the n=6 calibration in
+> `optimizer/docs/PREREG_FIXTURE_BAND_2026-08-11.md` (committed BEFORE any run). Design intent,
+> traps and the verification record: `real-gate-fixtures/BAND_FIXTURES_2026-08-11.md`.
+> No live gate round has been run on them — that is the calibration, not a smoke test.
 >
 > **2026-08-11 SHADOW-SAFE BATCH ROLLOUT (supersedes the per-PR rollout-status notes below):**
 > the full PR 2–7 series was mirrored live at `461b1e9` with every new mechanism at its

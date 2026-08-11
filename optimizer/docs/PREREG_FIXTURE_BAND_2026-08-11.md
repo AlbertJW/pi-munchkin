@@ -28,6 +28,10 @@ Four new fixtures, authored 2026-08-11, each built around one deliberate trap:
 | `second-test-guard` | the obvious fix for the stated requirement breaks a different visible test |
 | `documented-escape` | the obvious approach deterministically fails; a `docs/` file names the supported alternative |
 
+Per-fixture design intent, traps and the full verification record:
+`optimizer/real-gate-fixtures/BAND_FIXTURES_2026-08-11.md`. Review packets for the approval
+gate are under `optimizer/real-gate-fixtures/review-packets/`.
+
 Each ships a **shortcut mutant**: a plausible fix that passes the visible suite and fails the
 hidden one. Its purpose is to measure test-fitting directly rather than infer it.
 
