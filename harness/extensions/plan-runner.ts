@@ -54,6 +54,7 @@ let replanStreak = 0;
 let partialWorkNoted = false;
 let lastSessionCwd: string | null = null;
 let lastSessionNotify: ((message: string) => void) | null = null;
+let pendingRebind: Promise<void> | null = null;
 let resumeNoticeShown = false;
 
 // RE-BIND to whatever plan this cwd actually has on disk. Clearing alone was a
@@ -109,6 +110,7 @@ function planEvent(kind: string, runId: string, detail: Record<string, unknown> 
 		emitHarnessSignal(api.events, {
 			v: 1, type: "plan/gate", runIdHash, pass: detail.pass === true,
 			fails: typeof detail.fails === "number" ? detail.fails : 0,
+			gateHash: typeof detail.gate_sha256 === "string" && /^[a-f0-9]{64}$/.test(detail.gate_sha256) ? detail.gate_sha256 : null,
 		});
 	}
 }
@@ -615,8 +617,29 @@ function rejectPlanTool(text: string): never {
 }
 
 const PLAN_FLAG = "__pi_plan_phase_active";
+// M8 (Albert's inspection): while a plan awaits the user's review, plan_go is an
+// impossible call — its schema says "call once planning is done" while the review
+// guard throws until /plan-go. Humans reconcile that; small models follow the
+// visible schema and retry the failure. So the tool LEAVES the active surface
+// during review and returns when review ends. Restore only what we removed:
+// an explicit --tools selection that never included plan_go stays untouched.
+let planGoRemovedForReview = false;
+function syncPlanGoSurface(planning: boolean): void {
+	if (!api || !PLAN_TOOL_GO) return;
+	try {
+		const active = api.getActiveTools();
+		if (planning && active.includes("plan_go")) {
+			planGoRemovedForReview = true;
+			api.setActiveTools(active.filter((name) => name !== "plan_go"));
+		} else if (!planning && planGoRemovedForReview) {
+			planGoRemovedForReview = false;
+			if (!active.includes("plan_go")) api.setActiveTools([...active, "plan_go"]);
+		}
+	} catch { /* best-effort; the isPlanning() guard in execute still holds */ }
+}
 function setPlanning(on: boolean): void {
 	(globalThis as Record<string, unknown>)[PLAN_FLAG] = on;
+	syncPlanGoSurface(on);
 }
 function isPlanning(): boolean {
 	return (globalThis as Record<string, unknown>)[PLAN_FLAG] === true;
@@ -872,7 +895,7 @@ const planWrite = defineTool({
 				if (gateResult.pass) {
 					it.gate_fails = 0;
 					const priorFails = prevById.get(it.id)?.gate_fails ?? 0;
-					planEvent("gate", eventRunId, { pass: true, recovered: priorFails > 0, prior_fails: priorFails });
+					planEvent("gate", eventRunId, { pass: true, recovered: priorFails > 0, prior_fails: priorFails, gate_sha256: createHash("sha256").update(`gate:${normalizedGate}`).digest("hex") });
 					continue;
 				}
 				const fails = (prevById.get(it.id)?.gate_fails ?? 0) + 1;
@@ -881,7 +904,7 @@ const planWrite = defineTool({
 				// fresh subagent, or at least a fresh approach), rung 3 = blocked. The
 				// same fix path retried verbatim in the same context rarely converges.
 				const rung = fails >= GATE_MAX ? 3 : fails === 1 ? 1 : 2;
-				planEvent("gate", eventRunId, { pass: false, fails, rung, terminal: rung === 3 });
+				planEvent("gate", eventRunId, { pass: false, fails, rung, terminal: rung === 3, gate_sha256: createHash("sha256").update(`gate:${normalizedGate}`).digest("hex") });
 				const tail = out.split("\n").slice(-4).join(" / ").slice(0, 300);
 				const longTail = out.slice(-500);
 				it.gate_fails = fails;
@@ -1313,11 +1336,19 @@ export default function (pi: ExtensionAPI) {
 
 	// Adaptive storage races extension order: run-capsule publishes the private
 	// storage identity AFTER this extension's session_start ran, so the rebind
-	// above could only see the project-local fallback. Re-run it exactly once
-	// per identity announcement so an interrupted PRIVATE plan is found too.
+	// above could only see the project-local fallback. Re-run it once per
+	// identity announcement — and TRACK the promise: harness-signals discards
+	// handler results, so a bare `void` let pi reach before_agent_start while the
+	// private plan was still loading (Albert's M7). The next agent boundary
+	// awaits the pending rebind, closing the race without blocking the signal.
 	onHarnessSignal(pi.events, (signal) => {
 		if (signal.type !== "capsule/identity" || planStorageMode() !== "capsule" || !lastSessionCwd) return;
-		void rebindActivePlan(lastSessionCwd, lastSessionNotify ?? (() => {}));
+		pendingRebind = rebindActivePlan(lastSessionCwd, lastSessionNotify ?? (() => {}))
+			.catch(() => {}) // a failed rebind must not poison the awaited boundary
+			.finally(() => { pendingRebind = null; });
+	});
+	pi.on("before_agent_start", async () => {
+		if (pendingRebind) await pendingRebind;
 	});
 
 	pi.registerTool(planWrite);

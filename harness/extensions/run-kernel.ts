@@ -2,6 +2,7 @@ import { createHash, randomUUID } from "node:crypto";
 import { VERSION, type ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { planItemHash, sha256 } from "../lib/failure-episodes.ts";
 import { clearDetectedProjectGate, detectProjectGate, readDetectedProjectGate } from "../lib/project-gate.ts";
+import { normalizeVerificationCommand } from "../lib/command-policy.ts";
 import { emitRunEvent, onRunEvent } from "../lib/run-kernel-events.ts";
 import { ReceiptNormalizerV1 } from "../lib/run-kernel-receipts.ts";
 import { RunStateStoreV1, validateRunStateSnapshot } from "../lib/run-kernel-state.ts";
@@ -213,7 +214,7 @@ export function installRunKernel(pi: ExtensionAPI, options: RunKernelInstallOpti
 		} else if (signal.type === "plan/go") {
 			dispatch({ ...nextBase(), type: "run/plan-observed", runIdHash: signal.runIdHash, accepted: true, executionStarted: true, openItems: store.snapshot().plan.openItems });
 		} else if (signal.type === "plan/gate") {
-			dispatch({ ...nextBase(), type: "run/plan-gate-observed", runIdHash: signal.runIdHash, pass: signal.pass, fails: signal.fails });
+			dispatch({ ...nextBase(), type: "run/plan-gate-observed", runIdHash: signal.runIdHash, pass: signal.pass, fails: signal.fails, gateHash: signal.gateHash });
 		} else if (signal.type === "context/receipt") {
 			dispatch({ ...nextBase(), type: "run/context-observed", usagePct: signal.contextPct });
 		} else if (signal.type === "failure/episodes") {
@@ -271,7 +272,9 @@ export function installRunKernel(pi: ExtensionAPI, options: RunKernelInstallOpti
 			activeToolCount: activeTools.length,
 			allToolCount: allTools.length,
 			preservedExplicitTools: activation?.preserved_explicit === true,
-			detectedGateHash: detectedGate ? sha256(`gate:${detectedGate}`) : null,
+			// Normalized BEFORE hashing, with the same normalizer plan-runner uses for
+			// its plan/gate signal — the whole point of the hash is equality with it.
+			detectedGateHash: detectedGate ? sha256(`gate:${normalizeVerificationCommand(detectedGate)}`) : null,
 			sandboxPosture: sandboxPosture(),
 			legacy,
 		});

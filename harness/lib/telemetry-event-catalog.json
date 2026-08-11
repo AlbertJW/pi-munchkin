@@ -18,6 +18,7 @@
     "drift-scanner/review-null",
     "drift-scanner/review-skipped",
     "drift-scanner/review-start",
+    "failure-episode/abandoned",
     "failure-episode/intervention",
     "failure-episode/observed",
     "failure-episode/opened",

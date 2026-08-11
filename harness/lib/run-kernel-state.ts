@@ -204,19 +204,25 @@ export class RunStateStoreV1 {
 				this.state.plan.executionStarted = event.executionStarted || this.state.plan.executionStarted;
 				this.state.plan.openItems = event.openItems;
 				break;
-			case "run/plan-gate-observed":
+			case "run/plan-gate-observed": {
 				// A plan gate is real verification the kernel cannot see as a receipt:
 				// plan-runner runs it internally (runReadonlyGate), not through pi's
-				// tool pipeline. Without this input every plan-gated run emitted a
-				// verify_ok "legacy disagreement" that was a kernel blind spot rather
-				// than a legacy defect — and those rows are about to be used as
-				// evidence. A later source mutation resets validAfterMutation as usual,
-				// so gate-then-edit still reads as unverified.
+				// tool pipeline. But a gate only verifies the RUN when it is the
+				// detected project gate (or no project gate exists) — mirroring
+				// verify-gate's own mismatched-suite rule. Without the identity check
+				// a passing single-file item gate falsely verified the whole run,
+				// corrupting the exact legacy-agreement evidence this shadow exists
+				// to produce. A later source mutation resets validAfterMutation, so
+				// gate-then-edit still reads as unverified.
 				this.state.verification.attempts += 1;
 				this.state.verification.lastPassed = event.pass;
-				this.state.verification.validAfterMutation = event.pass;
-				if (event.pass) this.state.verification.validGates += 1;
+				const detected = this.state.environment.detectedGateHash;
+				const gateMatches = detected === null || (event.gateHash !== null && event.gateHash === detected);
+				const runVerified = event.pass && gateMatches;
+				this.state.verification.validAfterMutation = runVerified;
+				if (runVerified) this.state.verification.validGates += 1;
 				break;
+			}
 			case "run/context-observed":
 				// Clamp to the range the snapshot contract allows. Context usage is
 				// reported over 100% when a run exceeds its budget, and one such

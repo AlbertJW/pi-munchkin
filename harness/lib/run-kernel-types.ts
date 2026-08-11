@@ -191,7 +191,7 @@ export type RunEventV1 =
 	| (RunEventBase & { type: "run/control-proposed"; proposal: ControlProposalV1 })
 	| (RunEventBase & { type: "run/control-decided"; decision: ControlDecisionV1 })
 	| (RunEventBase & { type: "run/plan-observed"; runIdHash: string; accepted: boolean; executionStarted: boolean; openItems: number | null })
-	| (RunEventBase & { type: "run/plan-gate-observed"; runIdHash: string; pass: boolean; fails: number })
+	| (RunEventBase & { type: "run/plan-gate-observed"; runIdHash: string; pass: boolean; fails: number; gateHash: string | null })
 	| (RunEventBase & { type: "run/context-observed"; usagePct: number | null })
 	| (RunEventBase & { type: "run/failure-state-observed"; activeWalls: number; exposedEpisodes: number; lastClass: FailureClass | null })
 	| (RunEventBase & { type: "run/recovery-resumed"; cleared: number; blocked: number })

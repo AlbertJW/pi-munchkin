@@ -74,7 +74,7 @@ test("subagent activates additively for multi-item execution, second gate failur
 				emitHarnessSignal(run.fp.pi.events as never, { v: 1, type: "plan/write", items: 3, openItems: 2, runIdHash: signalRunId("r") });
 				emitHarnessSignal(run.fp.pi.events as never, { v: 1, type: "plan/go", runIdHash: signalRunId("r") });
 			} else if (trigger === "gate") {
-				emitHarnessSignal(run.fp.pi.events as never, { v: 1, type: "plan/gate", pass: false, fails: 2, runIdHash: signalRunId("r") });
+				emitHarnessSignal(run.fp.pi.events as never, { v: 1, type: "plan/gate", pass: false, fails: 2, runIdHash: signalRunId("r"), gateHash: null });
 			} else {
 				emitHarnessSignal(run.fp.pi.events as never, { v: 1, type: "loop/tier", tier: 2, detector: "exact" });
 			}
@@ -100,7 +100,7 @@ test("compact_context activates at the first 60% crossing and manual disable is 
 test("a later trigger does not undo a manual subagent disable", async () => {
 	const run = await dynamic();
 	try {
-		emitHarnessSignal(run.fp.pi.events as never, { v: 1, type: "plan/gate", pass: false, fails: 2, runIdHash: signalRunId("r") });
+		emitHarnessSignal(run.fp.pi.events as never, { v: 1, type: "plan/gate", pass: false, fails: 2, runIdHash: signalRunId("r"), gateHash: null });
 		assert.ok(run.active().includes("subagent"));
 		run.setActive(run.active().filter((name) => name !== "subagent"));
 		emitHarnessSignal(run.fp.pi.events as never, { v: 1, type: "loop/tier", tier: 2, detector: "exact" });

@@ -1398,9 +1398,12 @@ test("c39: plan_go cannot self-approve a plan that is awaiting the user's review
 		const mod = await import(`../extensions/plan-runner.ts?c39review=${Date.now()}-${Math.random()}`);
 		mod.default(fp.pi as any);
 		const { ctx } = makeCtx(cwd);
+		fp.pi.setActiveTools(["read", "bash", "edit", "write", "plan_write", "plan_go"]);
 		// /plan (lean) arms the human checkpoint: the user reviews, then runs /plan-go.
 		await fp.commands.get("plan").handler("build the thing", ctx);
 		assert.equal(g.__pi_plan_phase_active, true, "lean /plan arms the plan-mode block");
+		assert.equal(fp.pi.getActiveTools().includes("plan_go"), false,
+			"during review the impossible tool leaves the active surface (M8)");
 		await callTool(fp, "plan_write", {
 			items: [{ title: "step one", status: "pending" }], request: "build the thing", summary: "s",
 		}, cwd);
@@ -1418,6 +1421,8 @@ test("c39: plan_go cannot self-approve a plan that is awaiting the user's review
 		// The USER's /plan-go still works, and the tool works once the flag is down.
 		await fp.commands.get("plan-go").handler("", ctx);
 		assert.equal(g.__pi_plan_phase_active, false, "the user's approval disarms the checkpoint");
+		assert.equal(fp.pi.getActiveTools().includes("plan_go"), true,
+			"approval restores the tool we removed");
 		const started = JSON.parse(readFileSync(join(cwd, ".pi", "plan-state.json"), "utf8"));
 		assert.equal(started.phase, "executing");
 		const resumed = await callTool(fp, "plan_go", {}, cwd);

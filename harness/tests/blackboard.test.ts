@@ -59,7 +59,7 @@ test("lens: empty state renders empty; failures lead; clamp respected; determini
 test("typed signals fold plan gates, context receipts, and compactions", () => {
 	const s = fresh();
 	const runIdHash = signalRunId("r1");
-	noteHarnessSignal(s, { v: 1, type: "plan/gate", pass: false, fails: 2, runIdHash });
+	noteHarnessSignal(s, { v: 1, type: "plan/gate", pass: false, fails: 2, runIdHash, gateHash: null });
 	noteHarnessSignal(s, { v: 1, type: "context/receipt", contextPct: 41.5, staleShare: 0.4, duplicateShare: 0.1 });
 	noteHarnessSignal(s, { v: 1, type: "context/compacted" });
 	assert.deepEqual(s.plan.lastGate, { pass: false, fails: 2 });

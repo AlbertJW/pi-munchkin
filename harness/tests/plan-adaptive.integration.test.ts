@@ -95,7 +95,9 @@ test("adaptive rebind: a private interrupted plan is found when capsule identity
 		// run-capsule now publishes identity and announces it.
 		g.__pi_run_capsule_identity = { cwd, capsuleId };
 		emitHarnessSignal(fp.pi.events as never, { v: 1, type: "capsule/identity" });
-		await new Promise((resolve) => setTimeout(resolve, 20));
+		// No timed sleep: the CONTRACT is that the next agent boundary awaits the
+		// pending rebind. Firing before_agent_start must be sufficient.
+		await fp.handlers.get("before_agent_start")![0]({}, ctx);
 		const after = g.__pi_active_plan_context as { run_id?: string } | undefined;
 		assert.equal(after?.run_id, "r-private", "identity announced: the private interrupted plan is rebound");
 	} finally {

@@ -155,8 +155,9 @@ export function isRunEventV1(value: unknown): value is RunEventV1 {
 				hash(event.runIdHash) && typeof event.accepted === "boolean" && typeof event.executionStarted === "boolean" &&
 				(event.openItems === null || integer(event.openItems));
 		case "run/plan-gate-observed":
-			return exactKeys(event, [...base, "runIdHash", "pass", "fails"]) &&
-				hash(event.runIdHash) && typeof event.pass === "boolean" && integer(event.fails);
+			return exactKeys(event, [...base, "runIdHash", "pass", "fails", "gateHash"]) &&
+				hash(event.runIdHash) && typeof event.pass === "boolean" && integer(event.fails) &&
+				(event.gateHash === null || hash(event.gateHash));
 		case "run/context-observed":
 			return exactKeys(event, [...base, "usagePct"]) && (event.usagePct === null || finiteNumber(event.usagePct));
 		case "run/failure-state-observed":

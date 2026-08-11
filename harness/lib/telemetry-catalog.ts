@@ -28,7 +28,7 @@ export const EVENT_CATALOG = {
 	"did-you-mean/hint": { tool: "string", injected_chars: "number" },
 	"chaos/injected": { fault: "string", tool: "string", nth: "number" },
 	"plan-runner/deps-rejected": { errors: "number" },
-	"plan-runner/gate": { pass: "boolean", fails: "number", rung: "number", recovered: "boolean", prior_fails: "number", terminal: "boolean" },
+	"plan-runner/gate": { pass: "boolean", fails: "number", rung: "number", recovered: "boolean", prior_fails: "number", terminal: "boolean", gate_sha256: "string" },
 	"plan-runner/integrity": { reattached: "number", preserved: "number", yielded: "number" },
 	"plan-runner/thrash-warn": { streak: "number" },
 	"plan-runner/resume-found": { open: "number", in_progress: "number" },
@@ -104,6 +104,9 @@ export const EVENT_CATALOG = {
 		episode_id: "string", failure_class: "string", count: "number",
 		calls_after_second: "number", correlated_calls_after_second: "number", recovery: "string",
 	},
+	// Verification ABANDONED same-target episodes (degraded research_note):
+	// terminal, distinct from recovery — abandonment must never inflate recovery.
+	"failure-episode/abandoned": { episode_id: "string", failure_class: "string", count: "number" },
 	"failure-episode/settled": {
 		total_episodes: "number", total_failures: "number", longest_episode: "number",
 		semantic_failure_overrun: "number", correlated_failure_overrun: "number", settled_without_recovery: "number",
