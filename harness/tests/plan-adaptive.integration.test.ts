@@ -110,3 +110,74 @@ test("adaptive rebind: a private interrupted plan is found when capsule identity
 		if (previous.telemetry === undefined) delete process.env.TELEMETRY; else process.env.TELEMETRY = previous.telemetry;
 	}
 });
+
+test("plan_update runs the SAME mature gate machinery as plan_write: ladder, dedupe, identity, honest output", async () => {
+	const { writeFileSync } = await import("node:fs");
+	const previous = {
+		mode: process.env.PLAN_MODE,
+		agent: process.env.PI_CODING_AGENT_DIR,
+		capsule: process.env.RUN_CAPSULE,
+		telemetryFile: process.env.TELEMETRY_FILE,
+		telemetrySource: process.env.TELEMETRY_SOURCE,
+	};
+	const cwd = mkdtempSync(join(tmpdir(), "pi-adaptive-gate-"));
+	const agent = mkdtempSync(join(tmpdir(), "pi-adaptive-gate-agent-"));
+	const telemetry = join(agent, "telemetry.jsonl");
+	const capsuleId = "33333333-3333-4333-8333-333333333333";
+	process.env.PLAN_MODE = "adaptive";
+	process.env.PI_CODING_AGENT_DIR = agent;
+	process.env.RUN_CAPSULE = "shadow";
+	process.env.TELEMETRY_FILE = telemetry;
+	process.env.TELEMETRY_SOURCE = "test";
+	const previousGateMax = process.env.PLAN_GATE_MAX;
+	process.env.PLAN_GATE_MAX = "2";
+	(globalThis as Record<string, unknown>).__pi_run_capsule_identity = { cwd, capsuleId };
+	try {
+		const fp = makeFakePi();
+		const mod = await import(`../extensions/plan-runner.ts?adaptivegate=${Date.now()}-${Math.random()}`);
+		mod.default(fp.pi as never);
+		writeFileSync(join(cwd, "bad.sh"), "if [ ; then fi\n"); // bash -n fails
+		await callTool(fp, "plan_write", {
+			items: [
+				{ title: "alpha", status: "pending", gate: "bash -n bad.sh" },
+				{ title: "beta", status: "pending", gate: "bash -n bad.sh" },
+			], request: "r", summary: "s",
+		}, cwd);
+		const privateState = join(runCapsuleDirectory(agent, cwd, capsuleId), "plan-state.json");
+		const ids = JSON.parse(readFileSync(privateState, "utf8")).items.map((i: { id: string }) => i.id);
+
+		// First failure: rung 1 (locality protocol) with the FAILING OUTPUT returned
+		// to the model — the first version reported "status updated" here.
+		const first = await callTool(fp, "plan_update", { deltas: [{ item_id: ids[0], status: "done" }] }, cwd);
+		assert.ok(first.content[0].text.includes("LOCALIZE"), first.content[0].text);
+		assert.ok(first.content[0].text.includes("Failing output"), first.content[0].text);
+		assert.equal(first.details.success, false, "a failed gate is not a success");
+		let state = JSON.parse(readFileSync(privateState, "utf8"));
+		assert.equal(state.items[0].status, "in_progress");
+		assert.equal(state.items[0].gate_fails, 1, "the escalation ladder counts this failure");
+
+		// Repeating the exact same call ESCALATES instead of looping: rung 2, then blocked.
+		const second = await callTool(fp, "plan_update", { deltas: [{ item_id: ids[0], status: "done" }] }, cwd);
+		assert.match(second.content[0].text, /blocked|DIFFERENT approach|subagent/, second.content[0].text);
+		state = JSON.parse(readFileSync(privateState, "utf8"));
+		assert.equal(state.items[0].status, "blocked", "GATE_MAX blocks — repeat plan_update(done) cannot spiral");
+		assert.equal(state.items[0].gate_fails, 2);
+
+		// Identity + dedupe: gate telemetry rows carry gate_sha256; two items sharing
+		// one normalized gate in ONE call produce per-item rows but ONE kernel signal.
+		const rows = readFileSync(telemetry, "utf8").trim().split("\n").map((line) => JSON.parse(line));
+		const gateRows = rows.filter((row) => row.ext === "plan-runner" && row.kind === "gate");
+		assert.ok(gateRows.length >= 2, "plan_update gates emit gate telemetry");
+		assert.ok(gateRows.every((row) => /^[a-f0-9]{64}$/.test(row.gate_sha256)), "every gate row carries identity");
+	} finally {
+		resetPiGlobals();
+		rmSync(cwd, { recursive: true, force: true });
+		rmSync(agent, { recursive: true, force: true });
+		if (previous.mode === undefined) delete process.env.PLAN_MODE; else process.env.PLAN_MODE = previous.mode;
+		if (previous.agent === undefined) delete process.env.PI_CODING_AGENT_DIR; else process.env.PI_CODING_AGENT_DIR = previous.agent;
+		if (previous.capsule === undefined) delete process.env.RUN_CAPSULE; else process.env.RUN_CAPSULE = previous.capsule;
+		if (previous.telemetryFile === undefined) delete process.env.TELEMETRY_FILE; else process.env.TELEMETRY_FILE = previous.telemetryFile;
+		if (previous.telemetrySource === undefined) delete process.env.TELEMETRY_SOURCE; else process.env.TELEMETRY_SOURCE = previous.telemetrySource;
+		if (previousGateMax === undefined) delete process.env.PLAN_GATE_MAX; else process.env.PLAN_GATE_MAX = previousGateMax;
+	}
+});

@@ -250,6 +250,55 @@ test("a passing plan gate is verification the kernel can see, and a later mutati
 	assert.equal(open.snapshot().verification.validAfterMutation, true);
 });
 
+test("plan-gate verification is order-independent: unrelated gates never move the state", () => {
+	// The 2026-08-11 second inspection: each gate signal used to OVERWRITE
+	// validAfterMutation, so listing plan items in a different order flipped the
+	// verdict. An unrelated item gate must neither verify nor un-verify the run.
+	const OTHER = "b".repeat(64);
+	const gate = (pass: boolean, hash: string, sequence: number): RunEventV1 =>
+		({ v: 1, type: "run/plan-gate-observed", sequence, atMs: sequence, runIdHash: H, pass, fails: pass ? 0 : 1, gateHash: hash });
+
+	// Permutation A: project gate passes, THEN an unrelated gate (pass or fail)
+	// — verification must survive both.
+	const a = new RunStateStoreV1();
+	apply(a, session());
+	apply(a, gate(true, H, 4));
+	assert.equal(a.snapshot().verification.validAfterMutation, true);
+	apply(a, gate(true, OTHER, 5));
+	assert.equal(a.snapshot().verification.validAfterMutation, true, "a later unrelated PASSING gate must not clear verification");
+	apply(a, gate(false, OTHER, 6));
+	assert.equal(a.snapshot().verification.validAfterMutation, true, "a later unrelated FAILING gate must not clear verification");
+	assert.equal(a.snapshot().verification.validGates, 1, "only the project gate counts");
+
+	// Permutation B: unrelated failing gate first, then the project gate —
+	// same final state as permutation A.
+	const b = new RunStateStoreV1();
+	apply(b, session());
+	apply(b, gate(false, OTHER, 4));
+	assert.equal(b.snapshot().verification.validAfterMutation, false);
+	apply(b, gate(true, H, 5));
+	assert.equal(b.snapshot().verification.validAfterMutation, true, "order must not change the verdict");
+	assert.equal(b.snapshot().verification.validGates, a.snapshot().verification.validGates);
+
+	// Mixed red/green batch in one settle, both orders: the project gate's own
+	// result is what stands, red items around it notwithstanding.
+	for (const order of [[gate(false, OTHER, 4), gate(true, H, 5), gate(false, OTHER, 6)],
+	                     [gate(true, H, 4), gate(false, OTHER, 5), gate(false, OTHER, 6)]]) {
+		const store = new RunStateStoreV1();
+		apply(store, session());
+		let sequence = 4;
+		for (const event of order) apply(store, { ...event, sequence, atMs: sequence++ } as RunEventV1);
+		assert.equal(store.snapshot().verification.validAfterMutation, true, "mixed batch: project gate pass stands in every order");
+	}
+
+	// A FAILING project gate still invalidates, in any position.
+	const c = new RunStateStoreV1();
+	apply(c, session());
+	apply(c, gate(true, H, 4));
+	apply(c, gate(false, H, 5));
+	assert.equal(c.snapshot().verification.validAfterMutation, false, "the project gate failing invalidates");
+});
+
 test("an over-budget context reading is clamped instead of killing the snapshot channel", () => {
 	// Context usage is reported above 100% when a run exceeds its budget. The
 	// snapshot contract caps it at 100, so an unclamped reading made

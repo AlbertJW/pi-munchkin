@@ -1418,6 +1418,18 @@ test("c39: plan_go cannot self-approve a plan that is awaiting the user's review
 		assert.ok(blocked.some((row) => row.reason === "awaiting-user-review" && row.activation === "tool"),
 			"the refusal is recorded as a distinct reason");
 
+		// THE REAL LIFECYCLE (2026-08-11 second inspection): the planning agent run
+		// ENDS before the human has read the draft. agent_end disarms the mutation
+		// block (deadlock safety) but must NOT end the review checkpoint — with the
+		// old code the tool reappeared here and the model could self-approve on the
+		// next ordinary user turn.
+		await fire(fp, "agent_end", {}, ctx);
+		assert.equal(fp.pi.getActiveTools().includes("plan_go"), false,
+			"plan_go stays off the surface after agent_end — the human has not reviewed yet");
+		await expectToolError(fp, "plan_go", {}, cwd, /awaiting the user's review|\/plan-go/);
+		const stillHeld = JSON.parse(readFileSync(join(cwd, ".pi", "plan-state.json"), "utf8"));
+		assert.equal(stillHeld.phase, "planned", "the checkpoint survives the agent boundary");
+
 		// The USER's /plan-go still works, and the tool works once the flag is down.
 		await fp.commands.get("plan-go").handler("", ctx);
 		assert.equal(g.__pi_plan_phase_active, false, "the user's approval disarms the checkpoint");
@@ -1428,6 +1440,19 @@ test("c39: plan_go cannot self-approve a plan that is awaiting the user's review
 		const resumed = await callTool(fp, "plan_go", {}, cwd);
 		assert.match(resumed.content[0].text, /execution started|resume/,
 			"outside review mode the tool behaves exactly as before");
+
+		// A user's explicit tool change DURING review is intent the restore must
+		// not undo: start a fresh review, change the surface, approve — plan_go
+		// must NOT be silently re-added to a surface the user rearranged.
+		await fp.commands.get("plan").handler("second thing", ctx);
+		assert.equal(fp.pi.getActiveTools().includes("plan_go"), false);
+		fp.pi.setActiveTools(["read", "bash"]); // the user narrows the surface mid-review
+		await callTool(fp, "plan_write", {
+			items: [{ title: "only step", status: "pending" }], request: "second thing", summary: "s",
+		}, cwd);
+		await fp.commands.get("plan-go").handler("", ctx);
+		assert.equal(fp.pi.getActiveTools().includes("plan_go"), false,
+			"restore must not override an explicit user tool selection made during review");
 	} finally {
 		delete g.__pi_plan_phase_active;
 		delete process.env.PLAN_TOOL_GO;

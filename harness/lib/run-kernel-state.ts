@@ -218,9 +218,16 @@ export class RunStateStoreV1 {
 				this.state.verification.lastPassed = event.pass;
 				const detected = this.state.environment.detectedGateHash;
 				const gateMatches = detected === null || (event.gateHash !== null && event.gateHash === detected);
-				const runVerified = event.pass && gateMatches;
-				this.state.verification.validAfterMutation = runVerified;
-				if (runVerified) this.state.verification.validGates += 1;
+				// Order independence (2026-08-11 second inspection): a NON-matching
+				// item gate must neither verify nor UN-verify the run — the earlier
+				// unconditional overwrite made the result depend on plan-item order
+				// (project-gate-then-unrelated read false; unrelated-then-project-gate
+				// read true). Only the detected project gate moves this state: its
+				// pass verifies, its failure invalidates, everything else is noise.
+				if (gateMatches) {
+					this.state.verification.validAfterMutation = event.pass;
+					if (event.pass) this.state.verification.validGates += 1;
+				}
 				break;
 			}
 			case "run/context-observed":

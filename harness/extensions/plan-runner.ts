@@ -81,6 +81,9 @@ async function rebindActivePlan(cwd: string, notify: (message: string) => void):
 	const inProgress = state.items.filter((i) => i.status === "in_progress").length;
 	resumeNoticeShown = true;
 	planEvent("resume-found", state.run_id, { open: open.length, in_progress: inProgress });
+	// A restart mid-review must not launder the checkpoint: a draft that never
+	// received /plan-go is still awaiting it in the new process.
+	if (state.phase !== "executing") setAwaitingReview(true);
 	notify(
 		`Interrupted plan from a previous session: "${state.request}" — ${open.length} open item(s)${inProgress ? `, ${inProgress} in_progress (may have partial work)` : ""}. /plan-status to inspect, /plan-go to resume, /plan <request> to replace.`,
 	);
@@ -93,14 +96,14 @@ function rememberModel(ctx: { model?: { provider?: string; id?: string } }): Mod
 	return activeModel;
 }
 
-function planEvent(kind: string, runId: string, detail: Record<string, unknown> = {}): void {
+function planEvent(kind: string, runId: string, detail: Record<string, unknown> = {}, options: { suppressSignal?: boolean } = {}): void {
 	record("plan-runner", kind, {
 		run_id: runId,
 		provider: activeModel.provider,
 		model: activeModel.id,
 		...detail,
 	});
-	if (!api) return;
+	if (!api || options.suppressSignal) return;
 	const runIdHash = signalRunId(runId);
 	if (kind === "write" && typeof detail.items === "number" && typeof detail.open_items === "number") {
 		emitHarnessSignal(api.events, { v: 1, type: "plan/write", runIdHash, items: detail.items, openItems: detail.open_items });
@@ -624,22 +627,46 @@ const PLAN_FLAG = "__pi_plan_phase_active";
 // during review and returns when review ends. Restore only what we removed:
 // an explicit --tools selection that never included plan_go stays untouched.
 let planGoRemovedForReview = false;
-function syncPlanGoSurface(planning: boolean): void {
+// The exact toolset we left behind at removal: restore only when the surface is
+// still byte-identical, so a user's explicit tool change during review is never
+// silently undone (2026-08-11 second inspection).
+let planGoRemovalSnapshot: string[] | null = null;
+// The review checkpoint OUTLIVES the planning agent run: agent_end fires before
+// the human has even seen the draft, so a flag disarmed there let the model see
+// and call plan_go on the next ordinary turn — self-approving the review. This
+// flag holds from `/plan` until goTransition's ok arm (i.e. the human's
+// /plan-go, or a yolo restart) and is what the tool surface and the rejection
+// guard actually key on.
+let planAwaitingReview = false;
+function reviewHold(): boolean {
+	return isPlanning() || planAwaitingReview;
+}
+function syncPlanGoSurface(hold: boolean): void {
 	if (!api || !PLAN_TOOL_GO) return;
 	try {
 		const active = api.getActiveTools();
-		if (planning && active.includes("plan_go")) {
+		if (hold && active.includes("plan_go")) {
 			planGoRemovedForReview = true;
-			api.setActiveTools(active.filter((name) => name !== "plan_go"));
-		} else if (!planning && planGoRemovedForReview) {
+			const next = active.filter((name) => name !== "plan_go");
+			planGoRemovalSnapshot = next;
+			api.setActiveTools(next);
+		} else if (!hold && planGoRemovedForReview) {
 			planGoRemovedForReview = false;
-			if (!active.includes("plan_go")) api.setActiveTools([...active, "plan_go"]);
+			const snapshot = planGoRemovalSnapshot;
+			planGoRemovalSnapshot = null;
+			const untouched = snapshot !== null && active.length === snapshot.length &&
+				active.every((name, index) => name === snapshot[index]);
+			if (untouched && !active.includes("plan_go")) api.setActiveTools([...active, "plan_go"]);
 		}
-	} catch { /* best-effort; the isPlanning() guard in execute still holds */ }
+	} catch { /* best-effort; the reviewHold() guard in execute still holds */ }
 }
 function setPlanning(on: boolean): void {
 	(globalThis as Record<string, unknown>)[PLAN_FLAG] = on;
-	syncPlanGoSurface(on);
+	syncPlanGoSurface(reviewHold());
+}
+function setAwaitingReview(on: boolean): void {
+	planAwaitingReview = on;
+	syncPlanGoSurface(reviewHold());
 }
 function isPlanning(): boolean {
 	return (globalThis as Record<string, unknown>)[PLAN_FLAG] === true;
@@ -885,6 +912,11 @@ const planWrite = defineTool({
 					continue;
 				}
 				const normalizedGate = normalizeVerificationCommand(it.gate);
+				// A cached result is one gate EXECUTION shared by several items: the
+				// per-item telemetry rows stay (item bookkeeping), but the kernel-bound
+				// harness signal fires once per execution — duplicate signals inflated
+				// validGates and re-ran the identity check for runs that never happened.
+				const cachedExecution = gateCache.has(normalizedGate);
 				let gateResult = gateCache.get(normalizedGate);
 				if (!gateResult) {
 					gateResult = await runReadonlyGate(api.exec.bind(api), ctx.cwd, it.gate, GATE_TIMEOUT_MS);
@@ -895,7 +927,7 @@ const planWrite = defineTool({
 				if (gateResult.pass) {
 					it.gate_fails = 0;
 					const priorFails = prevById.get(it.id)?.gate_fails ?? 0;
-					planEvent("gate", eventRunId, { pass: true, recovered: priorFails > 0, prior_fails: priorFails, gate_sha256: createHash("sha256").update(`gate:${normalizedGate}`).digest("hex") });
+					planEvent("gate", eventRunId, { pass: true, recovered: priorFails > 0, prior_fails: priorFails, gate_sha256: createHash("sha256").update(`gate:${normalizedGate}`).digest("hex") }, { suppressSignal: cachedExecution });
 					continue;
 				}
 				const fails = (prevById.get(it.id)?.gate_fails ?? 0) + 1;
@@ -904,7 +936,7 @@ const planWrite = defineTool({
 				// fresh subagent, or at least a fresh approach), rung 3 = blocked. The
 				// same fix path retried verbatim in the same context rarely converges.
 				const rung = fails >= GATE_MAX ? 3 : fails === 1 ? 1 : 2;
-				planEvent("gate", eventRunId, { pass: false, fails, rung, terminal: rung === 3, gate_sha256: createHash("sha256").update(`gate:${normalizedGate}`).digest("hex") });
+				planEvent("gate", eventRunId, { pass: false, fails, rung, terminal: rung === 3, gate_sha256: createHash("sha256").update(`gate:${normalizedGate}`).digest("hex") }, { suppressSignal: cachedExecution });
 				const tail = out.split("\n").slice(-4).join(" / ").slice(0, 300);
 				const longTail = out.slice(-500);
 				it.gate_fails = fails;
@@ -1202,6 +1234,7 @@ async function goTransition(cwd: string, mode?: Autonomy): Promise<GoOutcome> {
 	});
 	if (outcome.ok) {
 		setPlanning(false); // execution genuinely starts — NOW disarm
+		setAwaitingReview(false); // ...and the human checkpoint is genuinely passed
 		replanStreak = 0;
 	}
 	return outcome;
@@ -1237,6 +1270,7 @@ async function startPlanCommand(args: string, ctx: { cwd: string; model?: { prov
 	const subagentAvailable = pi.getActiveTools().includes("subagent");
 	if (yolo) pi.appendEntry("plan_spine", {}); // yolo executes immediately — mark the node for /collapse
 	setPlanning(!yolo); // arm the plan-mode mutation block for this agent run (yolo executes, so no block)
+	setAwaitingReview(!yolo); // the human checkpoint: holds through agent_end until /plan-go
 	// deliverAs steer: while idle prompt() ignores it and runs a normal turn;
 	// while STREAMING, omitting it makes pi throw and swallow the message into
 	// emitError — the plan state would be committed but the driving prompt lost
@@ -1378,12 +1412,20 @@ export default function (pi: ExtensionAPI) {
 					const aid = actionId();
 					rememberModel(ctx);
 					const deltas = params.deltas as PlanDelta[];
+					// This gate loop MIRRORS plan_write's mature repeater above (dedupe
+					// cache, retry ladder, kernel-bound gate identity, failing output
+					// returned to the model). The first version ran gates without any
+					// of that and reported "status updated" over a silently reverted
+					// item — recreating the exact repeat-spiral failure mode this
+					// harness exists to prevent (2026-08-11 second inspection).
+					const gateMsgs: string[] = [];
 					const outcome = await mutatePlan(ctx.cwd, async (prev) => {
 						if (!prev) rejectPlanTool("plan_update rejected: no plan exists; call plan_write to create the plan first.");
 						const applied = applyPlanDeltas(prev.items, deltas);
 						if (!applied.ok) rejectPlanTool(`plan_update rejected: ${applied.errors.join("; ")}`);
 						const next = { ...prev, items: applied.items as typeof prev.items };
 						const gateOutcomes: PlanGateOutcome[] = [];
+						const gateCache = new Map<string, { pass: boolean; output: string }>();
 						for (const item of next.items) {
 							const before = prev.items.find((candidate) => candidate.id === item.id);
 							if (item.status !== "done" || before?.status === "done" || !item.gate || !api) continue;
@@ -1392,13 +1434,60 @@ export default function (pi: ExtensionAPI) {
 								gateOutcomes.push({ command: item.gate, pass: false, rejected: true });
 								item.status = "in_progress";
 								item.note = allowed.reason.slice(0, 300);
+								gateMsgs.push(`gate for "${item.title}" is not a verify/test command: ${allowed.reason}. The item stays open; fix the gate via plan_write.`);
 								continue;
 							}
-							const result = await runReadonlyGate(api.exec.bind(api), ctx.cwd, item.gate, GATE_TIMEOUT_MS);
-							gateOutcomes.push({ command: normalizeVerificationCommand(item.gate), pass: result.pass });
-							if (!result.pass) {
+							const normalizedGate = normalizeVerificationCommand(item.gate);
+							const cachedExecution = gateCache.has(normalizedGate);
+							let gateResult = gateCache.get(normalizedGate);
+							if (!gateResult) {
+								gateResult = await runReadonlyGate(api.exec.bind(api), ctx.cwd, item.gate, GATE_TIMEOUT_MS);
+								gateCache.set(normalizedGate, gateResult);
+							}
+							gateOutcomes.push({ command: normalizedGate, pass: gateResult.pass });
+							const out = gateResult.output;
+							if (gateResult.pass) {
+								item.gate_fails = 0;
+								const priorFails = before?.gate_fails ?? 0;
+								planEvent("gate", next.run_id, { pass: true, recovered: priorFails > 0, prior_fails: priorFails, gate_sha256: createHash("sha256").update(`gate:${normalizedGate}`).digest("hex") }, { suppressSignal: cachedExecution });
+								continue;
+							}
+							const fails = (before?.gate_fails ?? 0) + 1;
+							const rung = fails >= GATE_MAX ? 3 : fails === 1 ? 1 : 2;
+							planEvent("gate", next.run_id, { pass: false, fails, rung, terminal: rung === 3, gate_sha256: createHash("sha256").update(`gate:${normalizedGate}`).digest("hex") }, { suppressSignal: cachedExecution });
+							const tail = out.split("\n").slice(-4).join(" / ").slice(0, 300);
+							const longTail = out.slice(-500);
+							item.gate_fails = fails;
+							if (rung === 3) {
+								item.status = "blocked";
+								item.failure_class = "blocked_other";
+								item.note = `gate failed ${fails}×: ${tail}`;
+								gateMsgs.push(`✗ gate for "${item.title}" failed ${fails}× → blocked: ${tail}`);
+							} else if (rung === 1) {
 								item.status = "in_progress";
-								item.note = `gate failed: ${result.output.split("\n").slice(-1)[0]?.slice(0, 260) ?? "unknown"}`;
+								item.note = `gate failed (${fails}/${GATE_MAX}): ${tail}`;
+								gateMsgs.push(steerText(
+									"PLAN_GATE_LADDER1_MSG",
+									"✗ gate for \"{title}\" failed ({fails}/{max}). Follow this protocol EXACTLY: 1. LOCALIZE — from the failing output below, identify the ONE file and smallest span responsible. 2. REPAIR — make ONE bounded edit to that span. 3. VERIFY — mark the item done again; the gate re-runs `{gate}`. Do not restructure anything else.\nFailing output (tail): {tail}",
+									{ title: item.title, fails, max: GATE_MAX, gate: item.gate, tail: longTail },
+								));
+							} else {
+								item.status = "in_progress";
+								item.note = `gate failed (${fails}/${GATE_MAX}): ${tail}`;
+								const subagentOk = api.getActiveTools().includes("subagent");
+								gateMsgs.push(subagentOk
+									? steerText(
+										"PLAN_GATE_LADDER2_MSG",
+										SPAWN_DELEGATION
+											? "✗ gate for \"{title}\" failed again ({fails}/{max}) — the same fix path is not working. Delegate the repair to subagent(executor, ..., mode=spawn) with a SELF-CONTAINED task — the item, the gate command `{gate}`, and the failing output below; the child sees nothing else. Then mark the item done to re-run the gate.\nFailing output (tail): {tail}"
+											: "✗ gate for \"{title}\" failed again ({fails}/{max}) — the same fix path is not working. Delegate the repair to subagent(executor, ..., mode=fork): brief it with the item, the gate command `{gate}`, and the failing output below, then mark the item done to re-run the gate.\nFailing output (tail): {tail}",
+										{ title: item.title, fails, max: GATE_MAX, gate: item.gate, tail: longTail },
+									)
+									: steerText(
+										"PLAN_GATE_LADDER2_SOLO_MSG",
+										"✗ gate for \"{title}\" failed again ({fails}/{max}) — the same fix path is not working. Step back, re-read the failing output below fresh, and take a DIFFERENT approach than your previous attempts, then mark the item done to re-run the gate.\nFailing output (tail): {tail}",
+										{ title: item.title, fails, max: GATE_MAX, gate: item.gate, tail: longTail },
+									));
 							}
 						}
 						return { state: next, result: { state: next, applied, gateOutcomes } };
@@ -1406,9 +1495,14 @@ export default function (pi: ExtensionAPI) {
 					publishPlanGateReceipt(buildPlanGateReceipt(outcome.state.run_id, outcome.gateOutcomes));
 					const openItems = outcome.state.items.filter((item) => item.status !== "done").length;
 					planEvent("delta", outcome.state.run_id, { changed: outcome.applied.changed, idempotent: outcome.applied.idempotent, open_items: openItems });
+					// A failed gate means the item is NOT done — the result must lead
+					// with that evidence, never with a success summary the model will
+					// take as permission to repeat plan_update(done) unchanged.
+					const summary = `Plan status updated: ${outcome.applied.changed} changed, ${outcome.applied.idempotent} already current, ${openItems} open item(s).`;
+					const text = gateMsgs.length ? `${gateMsgs.join("\n\n")}\n\n${summary}` : summary;
 					return {
-						content: [{ type: "text" as const, text: `Plan status updated: ${outcome.applied.changed} changed, ${outcome.applied.idempotent} already current, ${openItems} open item(s).` }],
-						details: { tool_name: "plan_update", action_id: aid, success: true },
+						content: [{ type: "text" as const, text }],
+						details: { tool_name: "plan_update", action_id: aid, success: gateMsgs.length === 0 },
 						terminate: false,
 					};
 				},
@@ -1447,7 +1541,10 @@ export default function (pi: ExtensionAPI) {
 					// review it was supposed to wait for. Only the `/plan` command ever
 					// sets this flag, so non-interactive runs (and the c38 block ->
 					// plan_write -> plan_go -> mutate chain) are untouched.
-					if (isPlanning()) {
+					// reviewHold(), not isPlanning(): the planning flag disarms at
+					// agent_end (deadlock safety), but the human reviews AFTER that
+					// boundary — the checkpoint must hold until the actual /plan-go.
+					if (reviewHold()) {
 						planEvent("go-blocked", `planning-${aid}`, { reason: "awaiting-user-review", activation: "tool" });
 						rejectPlanTool(
 							"plan_go: this plan is awaiting the user's review. Present the plan and stop — " +
