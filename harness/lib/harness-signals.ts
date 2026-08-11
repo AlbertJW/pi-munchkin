@@ -11,6 +11,8 @@ export type HarnessSignalV1 =
 	| (SignalBase & { type: "plan/gate"; runIdHash: string; pass: boolean; fails: number })
 	| (SignalBase & { type: "loop/tier"; tier: 1 | 2 | 3; detector: "exact" | "outcome" | "semantic" | "session" })
 	| (SignalBase & { type: "failure/episodes"; activeWalls: number; exposedEpisodes: number; lastClass: FailureClass | null })
+	| (SignalBase & { type: "recovery/resume-requested"; origin: "run-command" })
+	| (SignalBase & { type: "recovery/resumed"; origin: "run-command" | "loop-command"; cleared: number; blocked: number })
 	| (SignalBase & { type: "context/receipt"; contextPct: number | null; staleShare: number | null; duplicateShare: number | null })
 	| (SignalBase & { type: "context/compacted" });
 
@@ -43,6 +45,11 @@ export function isHarnessSignal(value: unknown): value is HarnessSignalV1 {
 					"schema_validation", "policy_rejection", "permission", "not_found", "command_missing",
 					"timeout", "provider", "verification_assertion", "compile_or_lint", "edit_conflict", "unknown",
 				].includes(String(item.lastClass)));
+		case "recovery/resume-requested":
+			return exact("v", "type", "origin") && item.origin === "run-command";
+		case "recovery/resumed":
+			return exact("v", "type", "origin", "cleared", "blocked") &&
+				["run-command", "loop-command"].includes(String(item.origin)) && integer(item.cleared) && integer(item.blocked);
 		case "context/receipt":
 			return exact("v", "type", "contextPct", "staleShare", "duplicateShare") && nullableNumber(item.contextPct) && nullableNumber(item.staleShare) && nullableNumber(item.duplicateShare);
 		case "context/compacted":

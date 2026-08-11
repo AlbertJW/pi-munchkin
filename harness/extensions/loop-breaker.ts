@@ -12,7 +12,11 @@ import {
 } from "../lib/loop-recovery.ts";
 import { steerText } from "../lib/steer-texts.ts";
 import { record } from "../lib/telemetry.ts";
-import { emitHarnessSignal } from "../lib/harness-signals.ts";
+import { emitHarnessSignal, onHarnessSignal } from "../lib/harness-signals.ts";
+import { renderRecoveryBrief } from "../lib/recovery-brief.ts";
+import { onRunStateSnapshot } from "../lib/run-kernel-snapshot.ts";
+import { runCapsuleMode } from "../lib/run-capsule-store.ts";
+import type { RunStateV1 } from "../lib/run-kernel-types.ts";
 import {
 	buildControlProposal, controlEnforces, emitControlProposal,
 	type ControlEffect, type ControlReason, type MessageFactoryId,
@@ -348,6 +352,9 @@ export default function (pi: ExtensionAPI) {
 		count: number;
 	};
 	let pendingAction: PendingAction | null = null;
+	let recoveryState: RunStateV1 | null = null;
+
+	onRunStateSnapshot(pi.events, (event) => { recoveryState = event.state; });
 
 	function publishTier(tier: Exclude<LoopTier, 0>, detector: "exact" | "outcome" | "semantic" | "session"): void {
 		emitHarnessSignal(pi.events, { v: 1, type: "loop/tier", tier, detector });
@@ -393,6 +400,19 @@ export default function (pi: ExtensionAPI) {
 			exposedEpisodes: snapshot.active.filter((episode) => episode.count >= 2).length,
 			lastClass: latest?.failureClass ?? null,
 		});
+	}
+
+	function clearRecoveryWalls(origin: "run-command" | "loop-command"): void {
+		const blocked = ep.blocked.size;
+		ep.blocked.clear();
+		abortArmed = false;
+		pendingAction = null;
+		const cleared = episodeTracker.clearActive();
+		recordRecovery(cleared);
+		exactStrategies.clear();
+		episodeTierFired.clear();
+		publishEpisodes();
+		emitHarnessSignal(pi.events, { v: 1, type: "recovery/resumed", origin, cleared: cleared.length, blocked });
 	}
 
 	function recordRecovery(episodes: FailureEpisode[]): void {
@@ -510,6 +530,11 @@ export default function (pi: ExtensionAPI) {
 		} else if (action.tier === 2) {
 			message = `[loop-breaker] failure_class=${failureClass} persists after a strategy change. Delegate or report Blocked; do not retry the same approach.`;
 		}
+		if (runCapsuleMode() === "recovery" && recoveryState && action.tier < 3) {
+			message = renderRecoveryBrief(recoveryState, {
+				reason: "failure_tier", failureClass, strategyHashes: action.episode?.strategyHashes,
+			});
+		}
 		record("failure-episode", "intervention", {
 			tier: action.tier, detector: action.detector, failure_class: failureClass,
 			count: action.count, session_repeats: sessionRepeats, injected_chars: message.length,
@@ -570,6 +595,7 @@ export default function (pi: ExtensionAPI) {
 	}
 
 	pi.on("session_start", async () => {
+		recoveryState = null;
 		resetEpisode();
 		resetOutcomes();
 		// SESSION-scoped counters live at module scope, and pi's loader returns the
@@ -619,6 +645,10 @@ export default function (pi: ExtensionAPI) {
 	pi.registerCommand("loop-resume", {
 		description: "Clear semantic episode walls and send one deterministic recovery instruction.",
 		handler: async (_args, _ctx) => {
+			if (runCapsuleMode() === "recovery") {
+				clearRecoveryWalls("loop-command");
+				return;
+			}
 			const blocked = ep.blocked.size;
 			ep.blocked.clear();
 			abortArmed = false;
@@ -630,6 +660,11 @@ export default function (pi: ExtensionAPI) {
 			publishEpisodes();
 			pi.sendUserMessage(message, { deliverAs: "steer" });
 		},
+	});
+
+	onHarnessSignal(pi.events, (signal) => {
+		if (signal.type !== "recovery/resume-requested") return;
+		clearRecoveryWalls(signal.origin);
 	});
 
 	pi.on("tool_execution_start", async (event) => {

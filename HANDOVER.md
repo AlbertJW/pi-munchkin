@@ -48,6 +48,12 @@ adoption, deletion, live mirroring, and gate rounds are human-gated. Never touch
 > never injects it into ordinary model context. No live mirror or recovery adoption has occurred.
 > See `docs/RUN_KERNEL_PR4_CAPSULE_2026-08.md`.
 
+> **2026-08-11 run-kernel PR 5** (`codex/run-kernel-pr5-recovery`, dark source work): a
+> deterministic bounded recovery brief, post-compaction/provider-retry delivery, and explicit
+> `/run-resume` compatibility path. `RUN_CAPSULE=recovery` is opt-in; shadow/off behavior remains
+> unchanged and no automatic provider request is started by resume. See
+> `docs/RUN_KERNEL_PR5_RECOVERY_2026-08.md`.
+
 > **2026-08-05 settlement/episode series** (`0c44b09..5013e85`, merged to main and **ROLLED OUT
 > 2026-08-05** on Albert's instruction): semantic failure-episode shadow instrument
 > (`LOOP_EPISODE_MODE`, `/loop-status`, `/loop-resume`), `runtime-truth` provider timings +

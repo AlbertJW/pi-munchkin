@@ -16,6 +16,7 @@ const RUN_EVENT_TYPES = new Set<RunEventV1["type"]>([
 	"run/plan-observed",
 	"run/context-observed",
 	"run/failure-state-observed",
+	"run/recovery-resumed",
 	"run/cycle-ended",
 	"run/cycle-settled",
 	"run/session-compacted",
@@ -159,6 +160,8 @@ export function isRunEventV1(value: unknown): value is RunEventV1 {
 			return exactKeys(event, [...base, "activeWalls", "exposedEpisodes", "lastClass"]) &&
 				integer(event.activeWalls) && integer(event.exposedEpisodes) &&
 				(event.lastClass === null || FAILURE_CLASSES.has(String(event.lastClass)));
+		case "run/recovery-resumed":
+			return exactKeys(event, [...base, "cleared", "blocked"]) && integer(event.cleared) && integer(event.blocked);
 		case "run/phase-changed":
 			return exactKeys(event, [...base, "transition"]) && isTransition(event.transition);
 		default:

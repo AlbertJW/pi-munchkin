@@ -103,6 +103,20 @@ test("an active failure wall prevents semantic completion at settlement", () => 
 	assert.equal(store.snapshot().workflow.phase, "recovery");
 });
 
+test("manual recovery clears walls, reopens the run, and records a transition", () => {
+	const store = new RunStateStoreV1();
+	apply(store, session());
+	apply(store, { v: 1, type: "run/failure-state-observed", sequence: 2, atMs: 2,
+		activeWalls: 2, exposedEpisodes: 1, lastClass: "edit_conflict" });
+	const result = store.apply({ v: 1, type: "run/recovery-resumed", sequence: 3, atMs: 3, cleared: 1, blocked: 2 });
+	assert.equal(result.applied, true);
+	assert.equal(store.snapshot().failures.activeWalls, 0);
+	assert.equal(store.snapshot().failures.exposedEpisodes, 0);
+	assert.equal(store.snapshot().outcome.status, "active");
+	assert.equal(store.snapshot().workflow.reason, "manual-resume");
+	assert.equal(store.snapshot().workflow.history.at(-1)?.reason, "manual-resume");
+});
+
 test("text-only read-only run can complete and next cycle gets a new run", () => {
 	const store = new RunStateStoreV1();
 	apply(store, session());

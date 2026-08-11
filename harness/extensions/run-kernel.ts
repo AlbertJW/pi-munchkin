@@ -216,6 +216,8 @@ export function installRunKernel(pi: ExtensionAPI, options: RunKernelInstallOpti
 			dispatch({ ...nextBase(), type: "run/context-observed", usagePct: signal.contextPct });
 		} else if (signal.type === "failure/episodes") {
 			dispatch({ ...nextBase(), type: "run/failure-state-observed", activeWalls: signal.activeWalls, exposedEpisodes: signal.exposedEpisodes, lastClass: signal.lastClass });
+		} else if (signal.type === "recovery/resumed") {
+			dispatch({ ...nextBase(), type: "run/recovery-resumed", cleared: signal.cleared, blocked: signal.blocked });
 		}
 	});
 

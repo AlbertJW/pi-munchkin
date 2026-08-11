@@ -77,6 +77,7 @@ export const EVENT_CATALOG = {
 	},
 	"run-capsule/checkpoint": { ok: "boolean", state_bytes: "number", markdown_bytes: "number", failure_class: ["string", "null"] },
 	"run-capsule/entry": { ok: "boolean", failure_class: ["string", "null"], state_bytes: "number" },
+	"run-capsule/recovery-brief": { reason: "string", brief_bytes: "number", generation: "number" },
 	"loop-breaker/compact-reset": { streak: "number", blocked: "number" },
 	"loop-breaker/session-repeat": { repeats: "number", turnIndex: "number" },
 	"loop-breaker/outcome-steer": { n: "number", final: "boolean", injected_chars: "number", turnIndex: "number" },

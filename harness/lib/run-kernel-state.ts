@@ -212,6 +212,12 @@ export class RunStateStoreV1 {
 				this.state.failures.exposedEpisodes = event.exposedEpisodes;
 				if (event.lastClass) this.state.failures.lastClass = event.lastClass;
 				break;
+			case "run/recovery-resumed":
+				this.state.failures.activeWalls = 0;
+				this.state.failures.exposedEpisodes = 0;
+				this.state.outcome.status = "active";
+				transition = this.forceTransition("recovery", "manual-resume", event.sequence, event.atMs);
+				break;
 			case "run/session-shutdown":
 				this.state.lifecycle = { state: "shutdown", lastTransitionSequence: event.sequence };
 				break;
@@ -301,6 +307,17 @@ export class RunStateStoreV1 {
 			this.state.workflow.reason = reason;
 			return null;
 		}
+		const transition = { sequence, atMs, from, to, reason } satisfies RunTransitionV1;
+		this.state.workflow.previousPhase = from;
+		this.state.workflow.phase = to;
+		this.state.workflow.reason = reason;
+		this.state.workflow.history.push(transition);
+		if (this.state.workflow.history.length > MAX_TRANSITIONS) this.state.workflow.history.shift();
+		return transition;
+	}
+
+	private forceTransition(to: RunPhase, reason: string, sequence: number, atMs: number): RunTransitionV1 {
+		const from = this.state.workflow.phase;
 		const transition = { sequence, atMs, from, to, reason } satisfies RunTransitionV1;
 		this.state.workflow.previousPhase = from;
 		this.state.workflow.phase = to;

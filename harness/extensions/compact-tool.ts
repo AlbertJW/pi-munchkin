@@ -2,6 +2,10 @@ import { defineTool, type ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { Type } from "typebox";
 import { beginCompaction, finishCompaction, resetCompactionCoordinator } from "../lib/compaction-coordinator.ts";
 import { ACTIVE_TOOL_PROMPTS } from "../lib/active-tool-prompts.ts";
+import { runCapsuleMode } from "../lib/run-capsule-store.ts";
+import { onRunStateSnapshot } from "../lib/run-kernel-snapshot.ts";
+import { renderRecoveryBrief } from "../lib/recovery-brief.ts";
+import type { RunStateV1 } from "../lib/run-kernel-types.ts";
 
 // Model-driven in-place context compaction.
 //
@@ -28,9 +32,13 @@ const DEFAULT_FOCUS =
 
 export default function (pi: ExtensionAPI) {
 	let inFlight = false;
+	let recoveryState: RunStateV1 | null = null;
+	const recoveryMode = runCapsuleMode() === "recovery";
+	onRunStateSnapshot(pi.events, (event) => { recoveryState = event.state; });
 	pi.on("session_start", async () => {
 		resetCompactionCoordinator();
 		inFlight = false;
+		recoveryState = null;
 	});
 
 	pi.registerTool(
@@ -84,8 +92,11 @@ export default function (pi: ExtensionAPI) {
 					);
 				};
 				try {
+					const recovery = recoveryMode && recoveryState
+						? `\n\n${renderRecoveryBrief(recoveryState, { reason: "compaction" })}`
+						: "";
 					ctx.compact({
-						customInstructions: focus || DEFAULT_FOCUS,
+						customInstructions: `${focus || DEFAULT_FOCUS}${recovery}`,
 						onComplete: (r) => {
 							if (settled) return;
 							ctx.ui.notify(`context compacted (~${r.tokensBefore} tok before compaction)`, "info");

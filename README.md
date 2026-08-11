@@ -127,6 +127,7 @@ Most behavior is automatic. The primary commands are:
 | `RESEARCH_LEDGER` | dark (`on` enables the parent-verified citation pipeline: session page cache, genuine-error `research_note`, recovery-only `research_recall`, budget footers, and a private bounded v2 JSONL ledger under `${PI_CODING_AGENT_DIR}/artifacts/research-ledgers/`) | unset keeps both research-note tools absent; no project-local ledger is written |
 | `RUN_KERNEL` | `shadow`; observes canonical execution receipts, semantic phases, lifecycle settlement, and legacy-state disagreements | `off` registers no kernel handlers or event-bus subscriber; shadow mode never prompts, steers, blocks, activates tools, or persists a capsule |
 | `RUN_CAPSULE` | `shadow`; checkpoints the closed RunState contract to a private per-run JSON authority plus an untrusted Markdown projection | `off` registers no capsule handlers or command; `recovery` is a dark compatibility mode and does not inject state into model context |
+| `RUN_CAPSULE=recovery` recovery brief | disabled by the default `shadow`; emits one bounded brief only after compaction, an unsettled provider retry, an enforced semantic tier, or an explicit resume command | return to `shadow` or `off`; ordinary turns receive no capsule context and manual resume never starts a provider request |
 | `VERIFY_EXECUTION_ORDER` | unset retains the deployed transcript-order gate while PR 2 is dark | `execution` uses Pi start/end order and rejects overlapping or missing-start verification; `legacy` explicitly selects the deployed path |
 | `ACTIVE_TOOL_PROMPTS` | unset retains the deployed ambient plan/delegation/compaction guidance while PR 2 is dark | `active` removes the ambient block and lets Pi include definition-owned guidance only for active tools; manual disable removes it |
 | `CONTROL_ARBITER` | `shadow`; records the single winning turn-end correction and collision count while legacy producers remain authoritative | `enforce` lets only the highest-priority proposal act; `off` removes the arbiter while typed plan/context/loop signals continue |
@@ -155,6 +156,10 @@ oversized files.
   `state-v1.json` file and Pi `run_state_v1` custom entry are structured restore authorities;
   `capsule.md` is only a deterministic, bounded, untrusted projection. Normal runs never inject
   it into model context, paths are not exposed by `/run-status`, and retention is manual.
+- Recovery mode projects a deterministic brief of at most 2 KiB with fixed untrusted-data fences.
+  It is offered once after a compaction generation or an unsettled provider failure, and `/run-resume`
+  and `/loop-resume` append it with `triggerTurn=false`; they do not choose a model or start a
+  provider request. The brief is evidence, never a persisted model-generated summary.
 - Tier-three loop recovery receipts are atomically written with private permissions to
   `${PI_CODING_AGENT_DIR}/artifacts/loop-recovery/<sha256(cwd)>.json`. They contain only safe
   failure classes, bounded tool families, hashes, gate booleans, and the harness surface hash.

@@ -5,7 +5,9 @@ import {
 	readLatestRunCapsule, RUN_STATE_ENTRY_TYPE, runCapsuleMode, writeRunCapsule,
 } from "../lib/run-capsule-store.ts";
 import { renderRunCapsule, renderRunStatus } from "../lib/run-capsule-renderer.ts";
+import { renderRecoveryBrief } from "../lib/recovery-brief.ts";
 import { onRunStateSnapshot } from "../lib/run-kernel-snapshot.ts";
+import { emitHarnessSignal, onHarnessSignal } from "../lib/harness-signals.ts";
 import type { RunStateV1 } from "../lib/run-kernel-types.ts";
 import { record } from "../lib/telemetry.ts";
 
@@ -21,6 +23,8 @@ export default function (pi: ExtensionAPI): void {
 	let sessionReady = false;
 	let phaseDirty = false;
 	let lastEntryKey: string | null = null;
+	let pendingCompactionGeneration: number | null = null;
+	let pendingProviderRecovery = false;
 
 	function createQueue(): CapsuleCheckpointQueue {
 		const boundCwd = cwd;
@@ -78,6 +82,8 @@ export default function (pi: ExtensionAPI): void {
 		sessionReady = true;
 		phaseDirty = false;
 		lastEntryKey = null;
+		pendingCompactionGeneration = null;
+		pendingProviderRecovery = false;
 		if (latestState) queue.request(latestState);
 	});
 
@@ -92,7 +98,58 @@ export default function (pi: ExtensionAPI): void {
 	pi.on("tool_execution_start", flushPhase);
 	pi.on("tool_execution_end", flushPhase);
 	pi.on("turn_end", flushPhase);
-	pi.on("session_compact", flushPhase);
+	pi.on("session_compact", async () => {
+		await flushPhase();
+		if (mode === "recovery" && latestState) pendingCompactionGeneration = latestState.context.compactionGeneration;
+	});
+
+	pi.on("agent_end", async () => {
+		if (mode !== "recovery" || !latestState) return;
+		pendingProviderRecovery = latestState.lifecycle.state === "settling" && latestState.failures.lastClass === "provider";
+	});
+
+	pi.on("agent_settled", async () => {
+		pendingProviderRecovery = false;
+		pendingCompactionGeneration = null;
+	});
+
+	if (mode === "recovery") {
+		pi.on("context", async (event) => {
+			if (!latestState) return;
+			const reason = pendingCompactionGeneration !== null ? "compaction" : pendingProviderRecovery ? "provider_retry" : null;
+			if (!reason) return;
+			pendingCompactionGeneration = null;
+			pendingProviderRecovery = false;
+			const brief = renderRecoveryBrief(latestState, { reason });
+			record("run-capsule", "recovery-brief", { reason, brief_bytes: Buffer.byteLength(brief, "utf8"), generation: latestState.context.compactionGeneration });
+			return {
+				messages: [...event.messages, {
+					role: "custom" as const,
+					customType: "pi-munchkin:recovery-brief",
+					content: brief,
+					display: false,
+					details: { reason },
+					timestamp: Date.now(),
+				}] as typeof event.messages,
+			};
+		});
+	}
+
+	onHarnessSignal(pi.events, (signal) => {
+		if (mode !== "recovery" || signal.type !== "recovery/resumed" || !latestState) return;
+		const brief = renderRecoveryBrief(latestState, { reason: "manual_resume" });
+		try {
+			pi.sendMessage({
+				customType: "pi-munchkin:recovery-brief",
+				content: brief,
+				display: true,
+				details: { origin: signal.origin, cleared: signal.cleared, blocked: signal.blocked },
+			}, { triggerTurn: false, deliverAs: "nextTurn" });
+			record("run-capsule", "recovery-brief", { reason: "manual_resume", brief_bytes: Buffer.byteLength(brief, "utf8"), generation: latestState.context.compactionGeneration });
+		} catch {
+			record("run-capsule", "recovery-brief", { reason: "manual_resume", brief_bytes: 0, generation: latestState.context.compactionGeneration });
+		}
+	});
 
 	pi.on("agent_settled", async () => {
 		await queue?.flush();
@@ -138,4 +195,13 @@ export default function (pi: ExtensionAPI): void {
 			if (ctx.hasUI) ctx.ui.notify(text, "info");
 		},
 	});
+
+	if (mode === "recovery") {
+		pi.registerCommand("run-resume", {
+			description: "Clear recovery walls and append one deterministic private recovery brief without starting a model turn.",
+			handler: async () => {
+				emitHarnessSignal(pi.events, { v: 1, type: "recovery/resume-requested", origin: "run-command" });
+			},
+		});
+	}
 }

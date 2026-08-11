@@ -193,5 +193,6 @@ export type RunEventV1 =
 	| (RunEventBase & { type: "run/plan-observed"; runIdHash: string; accepted: boolean; executionStarted: boolean; openItems: number | null })
 	| (RunEventBase & { type: "run/context-observed"; usagePct: number | null })
 	| (RunEventBase & { type: "run/failure-state-observed"; activeWalls: number; exposedEpisodes: number; lastClass: FailureClass | null })
+	| (RunEventBase & { type: "run/recovery-resumed"; cleared: number; blocked: number })
 	| (RunEventBase & { type: "run/session-shutdown" })
 	| (RunEventBase & { type: "run/phase-changed"; transition: RunTransitionV1 });

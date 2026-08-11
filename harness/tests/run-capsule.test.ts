@@ -7,6 +7,7 @@ import { join } from "node:path";
 import test from "node:test";
 import { installRunKernel } from "../extensions/run-kernel.ts";
 import runCapsule from "../extensions/run-capsule.ts";
+import loopBreaker from "../extensions/loop-breaker.ts";
 import { emptyState, projectRunStateToBlackboard } from "../lib/blackboard.ts";
 import {
 	CapsuleCheckpointQueue, latestRunStateEntry, makeRunStateEntry, newCapsuleId,
@@ -318,5 +319,66 @@ test("default shadow registers no prompt-context handler", async () => {
 		assert.equal(fp.handlers.has("context"), false);
 		assert.equal(fp.handlers.has("before_agent_start"), false);
 		assert.deepEqual(fp.sent, []);
+	});
+});
+
+test("recovery mode injects one brief after compaction and none on ordinary context calls", async () => {
+	const agentDirectory = mkdtempSync(join(tmpdir(), "run-capsule-recovery-context-"));
+	const cwd = mkdtempSync(join(tmpdir(), "run-capsule-recovery-context-cwd-"));
+	await withEnv({ PI_CODING_AGENT_DIR: agentDirectory, RUN_CAPSULE: "recovery", TELEMETRY: "off" }, async () => {
+		const fp = makeFakePi();
+		installRunKernel(fp.pi as never, { idFactory: () => "recovery-context-id", detectGate: async () => null, surfaceHash: () => H });
+		runCapsule(fp.pi as never);
+		const { ctx } = makeCtx(cwd);
+		await fire(fp, "session_start", { reason: "new" }, ctx);
+		await fire(fp, "agent_start", {}, ctx);
+		await fire(fp, "session_compact", { reason: "manual", willRetry: false }, ctx);
+		const first = await fire(fp, "context", { messages: [{ role: "user", content: [{ type: "text", text: "continue" }] }] }, ctx);
+		const injected = first.at(-1) as { role?: string; customType?: string; content?: string };
+		assert.equal(injected.role, "custom");
+		assert.equal(injected.customType, "pi-munchkin:recovery-brief");
+		assert.match(String(injected.content), /recovery_reason: compaction/);
+		const second = await fire(fp, "context", { messages: [{ role: "user", content: [{ type: "text", text: "ordinary" }] }] }, ctx);
+		assert.equal(second.length, 1);
+	});
+});
+
+test("recovery provider failure injects only on the unsettled retry window", async () => {
+	const agentDirectory = mkdtempSync(join(tmpdir(), "run-capsule-recovery-provider-"));
+	const cwd = mkdtempSync(join(tmpdir(), "run-capsule-recovery-provider-cwd-"));
+	await withEnv({ PI_CODING_AGENT_DIR: agentDirectory, RUN_CAPSULE: "recovery", LOOP_EPISODE_MODE: "shadow", TELEMETRY: "off" }, async () => {
+		const fp = makeFakePi();
+		installRunKernel(fp.pi as never, { idFactory: () => "recovery-provider-id", detectGate: async () => null, surfaceHash: () => H });
+		loopBreaker(fp.pi as never);
+		runCapsule(fp.pi as never);
+		const { ctx } = makeCtx(cwd);
+		await fire(fp, "session_start", { reason: "new" }, ctx);
+		await fire(fp, "agent_start", {}, ctx);
+		await fire(fp, "after_provider_response", { status: 500, headers: {} }, ctx);
+		await fire(fp, "agent_end", { messages: [] }, ctx);
+		const retry = await fire(fp, "context", { messages: [] }, ctx);
+		assert.match(String((retry.at(-1) as { content?: unknown })?.content), /recovery_reason: provider_retry/);
+		await fire(fp, "agent_settled", {}, ctx);
+		const ordinary = await fire(fp, "context", { messages: [] }, ctx);
+		assert.equal(ordinary.length, 0);
+	});
+});
+
+test("recovery resume commands append one brief without starting a model turn", async () => {
+	const agentDirectory = mkdtempSync(join(tmpdir(), "run-capsule-recovery-resume-"));
+	const cwd = mkdtempSync(join(tmpdir(), "run-capsule-recovery-resume-cwd-"));
+	await withEnv({ PI_CODING_AGENT_DIR: agentDirectory, RUN_CAPSULE: "recovery", LOOP_EPISODE_MODE: "shadow", TELEMETRY: "off" }, async () => {
+		const fp = makeFakePi();
+		installRunKernel(fp.pi as never, { idFactory: () => "recovery-resume-id", detectGate: async () => null, surfaceHash: () => H });
+		loopBreaker(fp.pi as never);
+		runCapsule(fp.pi as never);
+		const { ctx } = makeCtx(cwd);
+		await fire(fp, "session_start", { reason: "new" }, ctx);
+		await fire(fp, "agent_start", {}, ctx);
+		await fp.commands.get("loop-resume")?.handler("", ctx);
+		await fp.commands.get("run-resume")?.handler("", ctx);
+		assert.equal(fp.customDeliveries.length, 2);
+		assert.equal(fp.customDeliveries.every((item) => item.api === "sendMessage" && item.triggerTurn === false && item.effective === "queued-next-turn"), true);
+		assert.equal(fp.deliveries.some((item) => item.api === "sendUserMessage"), false);
 	});
 });

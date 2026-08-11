@@ -162,6 +162,7 @@
     "harness/lib/project-gate.ts",
     "harness/lib/run-capsule-renderer.ts",
     "harness/lib/run-capsule-store.ts",
+    "harness/lib/recovery-brief.ts",
     "harness/lib/run-kernel-events.ts",
     "harness/lib/run-kernel-receipts.ts",
     "harness/lib/run-kernel-snapshot.ts",

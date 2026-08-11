@@ -68,6 +68,7 @@
     "runtime/provider-timing",
     "run-capsule/checkpoint",
     "run-capsule/entry",
+    "run-capsule/recovery-brief",
     "run-kernel/legacy-disagreement",
     "run-kernel/receipt",
     "run-kernel/restored",
