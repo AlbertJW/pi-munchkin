@@ -157,14 +157,21 @@ export async function readLatestRunCapsule(agentDirectory: string, cwd: string):
 					? { capsuleId: entry.name, path, mtimeMs: info.mtimeMs } : null;
 			} catch { return null; }
 		}));
-		for (const candidate of candidates.filter((value): value is NonNullable<typeof value> => value !== null)
-			.sort((left, right) => right.mtimeMs - left.mtimeMs || right.capsuleId.localeCompare(left.capsuleId))) {
+		// Fail closed on ambiguity: this fallback runs only when session metadata
+		// could not name the capsule, so "newest mtime" is a guess — with two
+		// concurrent or closely spaced runs, resuming run A could restore run B's
+		// state. One valid candidate is a fact; more than one is a coin flip, and
+		// the caller's answer to a refused restore is a fresh capsule, which is safe.
+		const valid: RunStateEntryV1[] = [];
+		for (const candidate of candidates.filter((value): value is NonNullable<typeof value> => value !== null)) {
 			try {
 				const parsed = JSON.parse(await readFile(candidate.path, "utf8"));
 				const entry = validEntry({ v: 1, capsuleId: candidate.capsuleId, state: parsed });
-				if (entry) return entry;
+				if (entry) valid.push(entry);
+				if (valid.length > 1) return null;
 			} catch { /* malformed/incomplete candidates are ignored */ }
 		}
+		if (valid.length === 1) return valid[0];
 	} catch { /* no private capsule root */ }
 	return null;
 }

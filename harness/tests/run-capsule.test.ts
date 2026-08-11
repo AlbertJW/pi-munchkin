@@ -80,6 +80,22 @@ test("concurrent runs use unique directories and remain independently restorable
 	assert.notEqual(first, second);
 	assert.equal(existsSync(join(runCapsuleDirectory(agentDirectory, cwd, first), "state-v1.json")), true);
 	assert.equal(existsSync(join(runCapsuleDirectory(agentDirectory, cwd, second), "state-v1.json")), true);
+
+	// The metadata-less fallback must REFUSE this ambiguity: with two valid
+	// capsules, "newest mtime" could restore the wrong run's state into a resume.
+	assert.equal(await readLatestRunCapsule(agentDirectory, cwd), null,
+		"two valid capsules → fail closed, caller starts a fresh capsule");
+});
+
+test("the metadata-less fallback restores a single unambiguous capsule", async () => {
+	const agentDirectory = mkdtempSync(join(tmpdir(), "run-capsule-single-"));
+	const cwd = mkdtempSync(join(tmpdir(), "run-capsule-single-project-"));
+	const capsuleId = newCapsuleId();
+	const state = validState();
+	await writeRunCapsule({ agentDirectory, cwd, capsuleId, state, markdown: renderRunCapsule(state) });
+	const restored = await readLatestRunCapsule(agentDirectory, cwd);
+	assert.ok(restored, "one candidate is a fact, not a guess");
+	assert.equal(restored.capsuleId, capsuleId);
 });
 
 test("Markdown is a bounded untrusted projection and is never restore authority", async () => {
