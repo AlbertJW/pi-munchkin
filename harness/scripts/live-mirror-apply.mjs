@@ -15,7 +15,7 @@
 //   node harness/scripts/live-mirror-apply.mjs [agent-dir] [--force]
 
 import { execFileSync } from "node:child_process";
-import { copyFile, mkdir, readFile } from "node:fs/promises";
+import { copyFile, mkdir, readFile, rename } from "node:fs/promises";
 import { homedir } from "node:os";
 import { dirname, resolve } from "node:path";
 import { buildLiveMirrorManifest, compareLiveMirror } from "../lib/live-mirror.ts";
@@ -29,6 +29,14 @@ const git = (...argv) => execFileSync("git", argv, { cwd: root, encoding: "utf8"
 
 if (!force) {
   const problems = [];
+  // A live pi reading the tree mid-copy would observe a mixed old/new surface.
+  // Whole-tree atomicity is not on offer from a filesystem, but refusing to
+  // roll out UNDER a running pi removes the realistic collision.
+  try {
+    const running = execFileSync("pgrep", ["-fl", "pi"], { encoding: "utf8" })  // broad; the filter below is the precise test
+      .split("\n").filter((line) => /(^|\/)pi( |$)/.test(line.replace(/^\d+\s+/, ""))).length;
+    if (running > 0) problems.push(`${running} running pi process(es) — a mid-copy load would see a mixed surface`);
+  } catch { /* pgrep exits 1 when nothing matches: that is the good case */ }
   try {
     if (git("status", "--porcelain")) problems.push("working tree is dirty");
     const head = git("rev-parse", "HEAD");
@@ -47,10 +55,16 @@ if (!force) {
 
 const manifest = JSON.parse(await readFile(resolve(root, "package.json"), "utf8"));
 const entries = await buildLiveMirrorManifest(root, manifest);
+// Per-file staging: write beside the target, then rename(2) over it. A crash or
+// disk error mid-rollout leaves stale .staging files and INTACT previous
+// versions — never a torn file. (Cross-file atomicity is documented as out of
+// scope; the running-pi refusal above covers the realistic mixed-read case.)
 for (const entry of entries) {
   const destination = resolve(agentDir, entry.destination);
   await mkdir(dirname(destination), { recursive: true });
-  await copyFile(resolve(root, entry.source), destination);
+  const staging = `${destination}.staging-${process.pid}`;
+  await copyFile(resolve(root, entry.source), staging);
+  await rename(staging, destination);
 }
 
 const drift = await compareLiveMirror(root, agentDir, entries);
