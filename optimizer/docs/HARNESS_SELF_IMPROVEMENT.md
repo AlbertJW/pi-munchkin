@@ -2466,3 +2466,31 @@ guard. Docs synced: README security/defaults rows, HANDOVER rollout box + 08-11 
 CHANGELOG run-kernel + Fixed sections. Deferred, recorded: the plan_go isPlanning bypass stays
 un-guarded (blocking-class change mid-shadow-collection; medium severity per the adversarial
 audit); research-ledger/ketch fleet findings stale after the 08-10 rework — fresh pass owed.
+
+**Ling3 evidence runs + Albert's six-finding inspection, 2026-08-11 (same session as the
+rollout).** Ling3-tiny first harness contact: pi's 23,357-token prompt (base + governor + 14
+tool schemas) is ~3x the registry's deliberate 8192 cap, so pi clamps output to ~3 tokens and
+every session dies at stopReason=length — the cap, not the model, is the binding constraint.
+With the window temporarily raised to 28672 (backup taken, RESTORED to 8192 after): T2
+fizzbuzz SUCCEEDED end-to-end on the 1.3B-active model, and the c38→c39 chain fired unprompted
+(blocked write → plan_write → plan_go → write → bash; force-plan-write-block row recorded).
+First-session shadow yield: run-kernel legacy-disagreement on verify_mutated (kernel false /
+legacy true), 2 failure episodes opened, verify-gate wrap steers ×3 — after which the model
+spiraled into consecutive length-stopped turns: Ling3's failure mode is UNBOUNDED THINKING on
+open-ended turns (14k chars without closing think; same prompt with enable_thinking:false →
+clean 583-token answer; moderate tasks close at ~218). Launcher lacks --reasoning-budget; the
+fork SUPPORTS it (LLAMA_ARG_THINK_BUDGET) — recommended before any calibration use. Fork
+envelope extended: two clean 20k+ prompt processings, correct generation after a 20,037-token
+prompt (26s) — the suspected ~20k hang did not manifest. Startup wedge recurred (~4/23 loads,
+pre-request, both models; both post-mirror FIRST loads among them; 6+6 kill-switch
+discriminator 12/12 clean — unattributed, sample+lsof on next occurrence). Then Albert's
+inspection landed six findings, all verified and fixed with counterfactual tests
+(`046bc4e..1fa020b`): lavish renderer XSS (allowlist labels — a High; artifacts before this
+fix are unsafe to open), adaptive-plan restore ordering (new capsule/identity signal, the
+test had pre-seeded the identity and hidden the race), subagent-env dynamic-read gaps (my
+own coverage test saw only literal reads — helper/template/bracket scans + prefix families
+added), provider false recovery (any message_update closed the episode; now first-token only
+— shadow stream was being corrupted), capsule mtime fallback (now fails closed on >1
+candidate), and skill SCRIPTS outside the surface hash (second epoch change in one day).
+Lesson against my own work, twice in one day: a coverage test only covers the access pattern
+it greps for, and a surface hash only bounds what it walks.
