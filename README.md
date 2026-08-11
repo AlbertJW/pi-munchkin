@@ -79,7 +79,8 @@ and tarball.
 
 Most behavior is automatic. The primary commands are:
 
-- `/plan <request>` and `/plan-go` for structured execution with per-item gates.
+- `/plan <request>` and `/plan-go` for structured execution with per-item gates. In lean plan
+  mode the model cannot start execution itself: `plan_go` refuses until you run `/plan-go`.
 - `/reflect` for a fresh-context adversarial review.
 - `/compact` for explicit compaction.
 - `/blackboard` for current redacted state and the private cockpit path.
@@ -126,7 +127,7 @@ Most behavior is automatic. The primary commands are:
 | `READ_DEDUP` | default-on; later identical `read` results collapse to a back-reference in the per-call context view | `off` |
 | `SPAN_TOOLS` | default-on; `search_spans`/`read_span` for bounded work on large files | `off` removes both tools |
 | `KETCH` | default-on public search/read | `off` for offline/private sessions |
-| `RESEARCH_LEDGER` | dark (`on` enables the parent-verified citation pipeline: session page cache, genuine-error `research_note`, recovery-only `research_recall`, budget footers, and a private bounded v2 JSONL ledger under `${PI_CODING_AGENT_DIR}/artifacts/research-ledgers/`) | unset keeps both research-note tools absent; no project-local ledger is written |
+| `RESEARCH_LEDGER` | dark. After three consecutive unverifiable citations, `research_note` stops returning errors and tells the model to cite inline — an uncapped refusal stream escalated loop-breaker to an abort and killed two Run 3 sessions outright. (`on` enables the parent-verified citation pipeline: session page cache, genuine-error `research_note`, recovery-only `research_recall`, budget footers, and a private bounded v2 JSONL ledger under `${PI_CODING_AGENT_DIR}/artifacts/research-ledgers/`) | unset keeps both research-note tools absent; no project-local ledger is written |
 | `RUN_KERNEL` | `shadow`; observes canonical execution receipts, semantic phases, lifecycle settlement, and legacy-state disagreements | `off` registers no kernel handlers or event-bus subscriber; shadow mode never prompts, steers, blocks, activates tools, or persists a capsule |
 | `RUN_CAPSULE` | `shadow`; checkpoints the closed RunState contract to a private per-run JSON authority plus an untrusted Markdown projection | `off` registers no capsule handlers or command; `recovery` is a dark compatibility mode and does not inject state into model context |
 | `RUN_CAPSULE=recovery` recovery brief | disabled by the default `shadow`; emits one bounded brief only after compaction, an unsettled provider retry, an enforced semantic tier, or an explicit resume command | return to `shadow` or `off`; ordinary turns receive no capsule context and manual resume never starts a provider request |
@@ -213,7 +214,18 @@ npm run health
 npm run pack:smoke
 npm run verify:optimizer
 npm run secret-scan:diff
+npm run verify -- --serial   # stages one at a time, if a concurrent failure is hard to read
+npm run mirror:apply         # copy the manifest's first-party files into a live agent dir
 ```
+
+`verify` runs its five independent stages concurrently (~13s rather than ~40s), capturing each
+stage's output and printing it grouped so a failure is always attributable. Every stage runs to
+completion even after one fails, so a single run reports every problem.
+
+`mirror:apply` refuses to run from a dirty or unpushed checkout: a live harness must be
+reproducible from the public repository. `mirror:check` now also fails when the live extensions
+directory holds a `.ts` file the manifest does not declare — pi auto-loads those, so an extension
+dropped from the manifest would otherwise keep running forever with the check still green.
 
 The registry-dependent CI matrix is deliberately separate from `verify`. It installs the packed
 tarball into isolated consumers using the latest available 0.80, 0.81, 0.82, and 0.83 releases,

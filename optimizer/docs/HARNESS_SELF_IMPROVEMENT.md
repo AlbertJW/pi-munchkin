@@ -2494,3 +2494,66 @@ added), provider false recovery (any message_update closed the episode; now firs
 candidate), and skill SCRIPTS outside the surface hash (second epoch change in one day).
 Lesson against my own work, twice in one day: a coverage test only covers the access pattern
 it greps for, and a surface hash only bounds what it walks.
+
+**Harness plan phases 0-3 executed, 2026-08-11.** Albert approved the five-phase plan and asked
+for it implemented, tested and QA'd in parallel. What landed:
+
+*Phase 0 (startup wedge).* `harness/scripts/pi-watchdog.sh` runs pi with `--report-on-signal`,
+detects a pre-request stall (established socket OR a transcript byte, both cheap), and on stall
+captures ps/lsof/sample plus a SIGUSR2 Node diagnostic report — the JS-side pending-handle picture
+the earlier native samples could never give. Building it produced three of its own bugs worth
+recording, because each is a general trap: (1) `lsof -p PID -iTCP -sTCP:ESTABLISHED` without `-a`
+ORs its selectors and matches ANY established socket on the machine — the watchdog would have
+reported "healthy" forever; (2) a recursive `find` over 3,300 session directories took longer than
+the poll interval and wedged the watchdog itself; (3) the capture called `pi --version` and hung
+against the very pi it was diagnosing, so every step is now bounded. Result: 55 instrumented
+loads across three batches (including a 6+6 touched-vs-plain probe testing the leading
+mirror-invalidation hypothesis) with **zero wedges**. Hypothesis unsupported; per the plan's own
+exit criterion the wedge is downgraded to rare/instrumented/non-blocking, and the next occurrence
+now yields evidence instead of a guess.
+
+*Phase 1 (review debt).* The `plan_go` self-approval gap is closed — and closing it exposed that
+the existing test asserted the DEFECT ("plan_go ... disarms isPlanning()"), plus a global-flag leak
+that made a neighbouring test only accidentally isolated. Both fixed. A 13-agent adversarial audit
+(5 lenses over the research pipeline and run-kernel, then 8 refutation agents, then 4 more for the
+high-severity claims that fell outside the first slice) returned **5 confirmed findings and 7
+refuted**, the refutations tracing into pi's own dist code to show why each was documented intent
+or unreachable. All 5 fixed with counterfactual tests: the research wrap-steer fired inside the
+tool-restricted `researcher` child where `research_note` does not exist (the c37/c38 allowlist
+class, third instance); refusals are now capped at 3 consecutive before degrading to a non-error,
+which finally cuts the Run 3 refusal→abort composition at its source rather than at loop-breaker;
+`verification_assertion` episodes can be recovered by a same-target success (previously only an
+exact project gate could close one, so every research session's refusal count was monotone); the
+kernel now observes plan gates (it had no receipt for them — plan-runner runs them internally — so
+EVERY plan-gated run emitted a false `verify_ok` "legacy disagreement", precisely the rows about to
+be used as evidence); and context usage is clamped to the kernel's own snapshot contract, where one
+over-100% reading previously killed the snapshot channel outright.
+
+*Phase 2 (measurement kit).* `verify` now runs its five independent stages concurrently: 40s → 13s,
+output captured per stage so a failure stays attributable, every stage run to completion so one
+pass reports every problem. `mirror:apply` finally makes the rollout copy a script instead of an
+ad-hoc command, and refuses a dirty or unpushed tree. `mirror:check` fails on unmanaged live
+extensions (the chaos.ts deletion-blindness class). `agentic_judge.py` supplies an anchored 0-3
+rubric plus the calibration gate that must pass — thresholds declared in the file, before data —
+before any judge score may be cited. Four band fixtures were authored by a 4-agent fleet and
+verified independently by me after the reviewer agents hit the usage limit: all 12 states behave
+(pristine visible-pass/hidden-fail, gold both-pass, shortcut visible-pass/hidden-fail), all pass
+`fixture_admission.py`, all sit at `approved: false` pending Albert. Two guards fired during this
+work and both were RIGHT: the manifest-count tripwire (updated only after proving the change was
+purely additive, per the 2026-07-30 lesson), and my own verbatim prompt-evidence check, which
+caught me paraphrasing prompt text in a sufficiency entry.
+
+*Phase 3 (evidence).* `shadow_report.py` answers the three checkpoint questions with declared
+thresholds and refuses to authorize anything by itself. Its first run against live telemetry
+immediately found a bug in its own arithmetic — a settlement "share" of 2.5, from dividing by
+kernel-observed sessions when settlement is also emitted by the capsule — now fixed with a
+selftest asserting shares stay in [0,1]. Current live read: 21 sessions (below the 30 floor, so
+noise), 29% episode exposure (above the 20% bar), and `verify_mutated` disagreement above
+threshold — which the plan-gate fix above may well explain, and which is exactly the "explain
+before arming" case the report is built to force.
+
+Two residuals recorded, not fixed, both from refuted-but-instructive verdicts: under
+`CONTROL_ARBITER=enforce` one outcome-escalate abort path could lose its stop permanently
+(adoption-checklist item, unreachable under the deployed shadow default), and a losing producer's
+telemetry overstates injections in enforce mode (recoverable by joining decision rows on
+boundary_sequence). Neither is reachable today; both must be settled before the arbiter is armed.

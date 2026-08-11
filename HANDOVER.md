@@ -24,6 +24,20 @@ adoption, deletion, live mirroring, and gate rounds are human-gated. Never touch
 
 ## 2026-08 hardening series
 
+> **2026-08-11 PLAN-EXECUTION STATUS (read this first).** Phases 0-3 of the harness plan are
+> built; phase 4 (candidate trials) is blocked only on human approval of the new fixtures.
+> Done: the startup wedge is instrumented (`harness/scripts/pi-watchdog.sh` captures a Node
+> diagnostic report — 55 instrumented loads, 0 wedges, downgraded to rare/non-blocking);
+> the `plan_go` self-approval gap is closed; a 13-agent adversarial audit of the research
+> pipeline and run-kernel produced 5 confirmed findings, all fixed with counterfactual tests,
+> and refuted 7 more; `verify` is concurrent (~13s); `mirror:apply` exists; `mirror:check` sees
+> unmanaged extensions; `optimizer/prompt-lab/agentic_judge.py` provides an anchored rubric with
+> a calibration gate (a judge may not be cited until it agrees with Albert's labels);
+> `optimizer/prompt-lab/shadow_report.py` answers the three shadow-evidence questions with
+> declared thresholds. FOUR new band fixtures pass `fixture_admission.py` but are
+> `approved: false` — human approval is the next gate, then the n=6 calibration in
+> `optimizer/docs/PREREG_FIXTURE_BAND_2026-08-11.md` (committed BEFORE any run).
+>
 > **2026-08-11 SHADOW-SAFE BATCH ROLLOUT (supersedes the per-PR rollout-status notes below):**
 > the full PR 2–7 series was mirrored live at `461b1e9` with every new mechanism at its
 > conservative default (`RUN_KERNEL=shadow`, `LOOP_EPISODE_MODE=shadow`, `RUN_CAPSULE=shadow`

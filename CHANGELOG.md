@@ -10,6 +10,20 @@ candidates as dark). Net changes since 0.3.0; the full per-decision record is
 
 ### Added
 
+- **Measurement and operations tooling (2026-08-11):** `harness/scripts/pi-watchdog.sh`
+  (captures ps/lsof/sample plus a Node diagnostic report when a session stalls before its first
+  request, instead of a blind kill); concurrent `npm run verify` (~40s to ~13s, with
+  `verify -- --serial` as the fallback); `npm run mirror:apply` (the rollout copy step finally
+  has a script, and it refuses a dirty or unpushed tree); `mirror:check` now fails on unmanaged
+  live extensions; `optimizer/prompt-lab/agentic_judge.py` (anchored 0-3 rubric for verification,
+  strategy change, scope discipline and honesty, plus the calibration gate that must pass before
+  any judge score is cited); `optimizer/prompt-lab/shadow_report.py` (the three shadow-evidence
+  checkpoint questions with thresholds declared in the file).
+- **Four discriminating-band gate fixtures (2026-08-11):** `misleading-symptom`, `ordered-steps`,
+  `second-test-guard`, `documented-escape` — each with a hidden fail-to-pass suite and a
+  *plausible* shortcut mutant that passes the visible suite, so test-fitting is measured rather
+  than assumed. All four pass `fixture_admission.py`; all four are `approved: false` pending
+  human review. Selection rule preregistered in `PREREG_FIXTURE_BAND_2026-08-11.md`.
 - **Run-kernel series, PR 1–7 (2026-08-10/11, mirrored live 2026-08-11 at conservative
   defaults):** a typed shadow run kernel over canonical execution receipts (`RUN_KERNEL=shadow`);
   execution-order verification and active-only tool prompts (dark, `VERIFY_EXECUTION_ORDER` /
@@ -75,6 +89,18 @@ candidates as dark). Net changes since 0.3.0; the full per-decision record is
   manifest content, the `audit-sweep` graded fixture.
 
 ### Fixed
+
+- **Audit fixes (2026-08-11, from a 13-agent adversarial review):** the research wrap-up steer no
+  longer fires where `research_note` is not an active tool (it fired inside the tool-restricted
+  `researcher` subagent, demanding an impossible call and replacing the child's return payload —
+  the c37/c38 allowlist class); `research_note` refusals degrade to a non-error after three
+  consecutive failures, cutting the fuel for the Run 3 refusal-to-abort composition at its source;
+  a same-target success now recovers a `verification_assertion` failure episode, which previously
+  only an exact project gate could close; the run kernel observes plan gates (it had no receipt for
+  them, so every plan-gated run emitted a false `verify_ok` legacy disagreement) and clamps context
+  usage to its own snapshot contract (an over-100% reading killed the snapshot channel outright);
+  `plan_go` can no longer self-approve a plan awaiting the user's `/plan-go`;
+  `fixture_admission.authoritative()` answers instead of raising for a never-approved manifest.
 
 - **Five QA fixes (2026-08-11, each counterfactually tested, mirrored live):** the state lens
   no longer steers at an abort/shutdown proposal boundary (a steer there fights loop-breaker's
