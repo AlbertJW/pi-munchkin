@@ -294,7 +294,13 @@ def authoritative(m, now=None):
     now = now or utcnow()
     try:
         expiry = dt.datetime.fromisoformat(m["timestamps"]["expires_at"].replace("Z", "+00:00"))
-    except (TypeError, ValueError, AttributeError):
+    except (KeyError, TypeError, ValueError, AttributeError):
+        # KeyError matters: expires_at is written only by `approve`, so a manifest
+        # that has never been approved has no such key at all. Without KeyError here
+        # this raised instead of answering, which is the one thing an authority
+        # check must not do — every caller asking "may this fixture be used?" about
+        # a brand-new fixture crashed. Surfaced 2026-08-11 by the first fixtures
+        # added since the check was written.
         return False, "missing expiry"
     checks = ((m["admission"].get("automated", {}).get("passed"), "automation not passed"),
               (m["admission"].get("approved"), "human approval missing"),
