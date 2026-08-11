@@ -143,6 +143,17 @@ export function registerKetch(pi: ExtensionAPI, dependencies: KetchDependencies 
 	let ledgerSessionId = randomUUID();
 	let ledgerWriteTail: Promise<void> = Promise.resolve();
 	let wrapSteerFired = false;
+	// Run 3 (PREREG_RUN3_4B_2026-08-06) measured the composition that kills a
+	// session: a refused citation is a genuine tool error, the model retries, and
+	// repeated failing outcomes escalate loop-breaker to a tier-3 abort that ends
+	// the run with no answer at all (2 of 5 arm-B sessions produced zero bytes).
+	// Cap the error stream at its SOURCE rather than touching loop-breaker: after
+	// this many consecutive refusals, verification degrades to a plain non-error
+	// result telling the model to cite inline, which removes the escalation fuel
+	// without blocking or steering anything.
+	const MAX_CONSECUTIVE_REFUSALS = 3;
+	let consecutiveRefusals = 0;
+	let verificationDegraded = false;
 	function publishResearchState(): void {
 		if (!LEDGER_ENABLED) return;
 		(globalThis as Record<string, unknown>).__pi_research_state = { ...counts };
@@ -166,6 +177,8 @@ export function registerKetch(pi: ExtensionAPI, dependencies: KetchDependencies 
 			ledgerSessionId = randomUUID();
 			ledgerWriteTail = Promise.resolve();
 			wrapSteerFired = false;
+			consecutiveRefusals = 0;
+			verificationDegraded = false;
 			delete (globalThis as Record<string, unknown>).__pi_research_state;
 		});
 		// The opt-in hole (eval Run 2, defect 3): research_note is a tool the model
@@ -180,6 +193,15 @@ export function registerKetch(pi: ExtensionAPI, dependencies: KetchDependencies 
 			if (event.message?.role !== "assistant") return;
 			const hasToolCall = (event.message.content ?? []).some((b: { type?: unknown }) => b.type === "toolCall");
 			if (hasToolCall || wrapSteerFired || counts.reads === 0 || counts.notes > 0) return;
+			// Never steer toward a tool this session cannot call. The `researcher`
+			// role pins `tools: web_search, web_read`, and pi's --tools allowlist
+			// filters EXTENSION tools too, so inside that child research_note does
+			// not exist — the steer would demand an impossible call and, worse, the
+			// extra turn replaces the child's structured return payload. Same class
+			// as the c37/c38 allowlist incident.
+			if (!pi.getActiveTools().includes("research_note")) return;
+			// Once verification has degraded, "record citations" is also unactionable.
+			if (verificationDegraded) return;
 			wrapSteerFired = true;
 			const msg = "You read web pages but recorded no verified citations. For each material claim, call research_note(claim, url, quote) with a short quote copied from the page — or mark the claim [unverified]. Do not present unrecorded web claims as established fact.";
 			record("research", "wrap-steer", { reads: counts.reads, notes: counts.notes, injected_chars: msg.length });
@@ -390,8 +412,27 @@ export function registerKetch(pi: ExtensionAPI, dependencies: KetchDependencies 
 				const verdict = checkNote(pageCache, params.url, params.quote);
 				if (!verdict.ok) {
 					counts.notesRejected += 1;
+					consecutiveRefusals += 1;
 					publishResearchState();
-					record("research", "note", { ok: false, reason_class: verdict.reason, quote_chars: params.quote.length });
+					const degrade = verificationDegraded || consecutiveRefusals > MAX_CONSECUTIVE_REFUSALS;
+					record("research", "note", {
+						ok: false,
+						reason_class: degrade ? "degraded" : verdict.reason,
+						quote_chars: params.quote.length,
+					});
+					if (degrade) {
+						// Non-error on purpose: this is the escalation cut-off. A tool
+						// error here is what feeds loop-breaker toward the abort that
+						// lost two Run 3 sessions outright.
+						verificationDegraded = true;
+						return text(
+							"Citation verification is unavailable for the rest of this session " +
+							`(${counts.notesRejected} attempts could not be verified). Stop calling research_note: ` +
+							"cite the source URL inline instead, and mark any claim you could not verify [unverified]." +
+							budgetFooter(),
+							{ degraded: true },
+						);
+					}
 					const reason = verdict.reason === "url_not_read"
 						? "Citation verification failed: that source was not read by this parent session. Use web_read here before recording it."
 						: verdict.reason === "quote_ambiguous"
@@ -420,13 +461,22 @@ export function registerKetch(pi: ExtensionAPI, dependencies: KetchDependencies 
 					const reasonClass = error instanceof ResearchLedgerCapacityError ? "ledger_full" : "ledger_write_failed";
 					record("research", "note", { ok: false, reason_class: reasonClass, failure_class: failureClass, quote_chars: params.quote.length });
 					if (error instanceof ResearchLedgerCapacityError) {
-						throw new Error("Research ledger capacity reached; keep remaining citations inline.");
+						// Permanent for the rest of the session: throwing here would
+						// guarantee an unbounded error stream, since every later call
+						// hits the same full ledger. Degrade instead.
+						verificationDegraded = true;
+						return text(
+							"Research ledger capacity reached; verification is closed for this session. " +
+							"Cite remaining sources inline and mark unverified claims [unverified]." + budgetFooter(),
+							{ degraded: true },
+						);
 					}
 					if (failureClass === "permission") throw new Error("Research ledger write failed: permission denied.");
 					if (failureClass === "timeout") throw new Error("Research ledger write failed: operation timed out.");
 					throw new Error("Research ledger write failed; keep the claim and citation inline.");
 				}
 				counts.notes += 1;
+				consecutiveRefusals = 0; // a recorded note proves the model can still verify
 				publishResearchState();
 				record("research", "note", { ok: true, reason_class: verdict.corrected ? "corrected" : "ok", quote_chars: params.quote.length });
 				const displaySource = storedUrl(sourceUrl).display;

@@ -325,6 +325,10 @@ test("wrap-up steer fires once after reads with zero notes and stays silent afte
 	try {
 		const fp = await loadKetch(true);
 		delete (globalThis as Record<string, unknown>).__pi_ketch_version_checks_v1;
+		// The steer is only legitimate where research_note can actually be called.
+		// Without this the fake harness reports an EMPTY active-tool set and the
+		// test would pass vacuously against the availability guard.
+		fp.pi.setActiveTools(["web_search", "web_read", "research_note"]);
 		await fire(fp, "session_start", {}, ctxFor);
 		await callToolRaw(fp, "web_read", { urls: ["https://example.com/a"] }, dir);
 		await fire(fp, "turn_end", wrap, ctxFor);
@@ -334,11 +338,25 @@ test("wrap-up steer fires once after reads with zero notes and stays silent afte
 		resetPiGlobals();
 		const fp2 = await loadKetch(true);
 		delete (globalThis as Record<string, unknown>).__pi_ketch_version_checks_v1;
+		fp2.pi.setActiveTools(["web_search", "web_read", "research_note"]);
 		await fire(fp2, "session_start", {}, ctxFor);
 		await callToolRaw(fp2, "web_read", { urls: ["https://example.com/a"] }, dir);
 		await callToolRaw(fp2, "research_note", { claim: "c", url: "https://example.com/a", quote: "page a content" }, dir);
 		await fire(fp2, "turn_end", wrap, ctxFor);
 		assert.equal(fp2.sent.length, 0);
+
+		// The `researcher` subagent pins `tools: web_search, web_read`, and pi's
+		// --tools allowlist filters extension tools too, so research_note does not
+		// exist there. Steering toward it would demand an impossible call AND the
+		// extra turn would replace the child's structured return payload.
+		resetPiGlobals();
+		const child = await loadKetch(true);
+		delete (globalThis as Record<string, unknown>).__pi_ketch_version_checks_v1;
+		child.pi.setActiveTools(["web_search", "web_read"]);
+		await fire(child, "session_start", {}, ctxFor);
+		await callToolRaw(child, "web_read", { urls: ["https://example.com/a"] }, dir);
+		await fire(child, "turn_end", wrap, ctxFor);
+		assert.equal(child.sent.length, 0, "no steer toward a tool this session cannot call");
 	} finally {
 		if (prevBin === undefined) delete process.env.KETCH_BIN; else process.env.KETCH_BIN = prevBin;
 		if (prevAgent === undefined) delete process.env.PI_CODING_AGENT_DIR; else process.env.PI_CODING_AGENT_DIR = prevAgent;
@@ -369,4 +387,76 @@ test("legacy counterfactual fixtures violate the new proof and serialization con
 		{ text: "x", sha256: sha256Hex("x"), fetchedAt: "2026-08-10T10:00:00Z" },
 	));
 	assert.equal(v2.split("\n").length, 1, "v2 keeps the same payload inside one JSON record");
+});
+
+test("refusals degrade to a non-error after the cap, removing the Run 3 abort fuel", async () => {
+	// PREREG_RUN3_4B_2026-08-06: a refused citation is a genuine tool error, the
+	// model retries, and repeated failing outcomes escalate loop-breaker to a
+	// tier-3 abort that ends the session with NO answer (2 of 5 arm-B sessions
+	// produced zero bytes). The cap cuts the error stream at its source.
+	const dir = mkdtempSync(join(tmpdir(), "rl-degrade-"));
+	const prevBin = process.env.KETCH_BIN;
+	const prevAgent = process.env.PI_CODING_AGENT_DIR;
+	process.env.KETCH_BIN = mockKetchBin(dir);
+	process.env.PI_CODING_AGENT_DIR = join(dir, "agent");
+	const ctxFor = { cwd: dir, ui: { notify() {} } };
+	try {
+		const fp = await loadKetch(true);
+		delete (globalThis as Record<string, unknown>).__pi_ketch_version_checks_v1;
+		fp.pi.setActiveTools(["web_search", "web_read", "research_note"]);
+		await fire(fp, "session_start", {}, ctxFor);
+		await callToolRaw(fp, "web_read", { urls: ["https://example.com/a"] }, dir);
+
+		const bad = { claim: "c", url: "https://example.com/a", quote: "words that are not on the page" };
+		for (let attempt = 1; attempt <= 3; attempt++) {
+			const refused = await callTool(fp, "research_note", bad, dir);
+			assert.equal(refused.isError, true, `attempt ${attempt} must still be a real error`);
+		}
+		const degraded = await callTool(fp, "research_note", bad, dir);
+		assert.equal(degraded.isError, false, "past the cap the tool stops producing errors");
+		assert.match(degraded.content[0].text, /cite the source URL inline|unavailable for the rest/i);
+		const again = await callTool(fp, "research_note", bad, dir);
+		assert.equal(again.isError, false, "degradation is sticky for the session");
+
+		// And with verification closed, the wrap-up steer must not demand notes.
+		await fire(fp, "turn_end", {
+			turnIndex: 9, toolResults: [],
+			message: { role: "assistant", content: [{ type: "text", text: "answer" }] },
+		}, ctxFor);
+		assert.equal(fp.sent.length, 0, "no steer toward a closed verification path");
+	} finally {
+		if (prevBin === undefined) delete process.env.KETCH_BIN; else process.env.KETCH_BIN = prevBin;
+		if (prevAgent === undefined) delete process.env.PI_CODING_AGENT_DIR; else process.env.PI_CODING_AGENT_DIR = prevAgent;
+		resetPiGlobals();
+	}
+});
+
+test("a successful note resets the refusal streak — only CONSECUTIVE failures degrade", async () => {
+	const dir = mkdtempSync(join(tmpdir(), "rl-reset-"));
+	const prevBin = process.env.KETCH_BIN;
+	const prevAgent = process.env.PI_CODING_AGENT_DIR;
+	process.env.KETCH_BIN = mockKetchBin(dir);
+	process.env.PI_CODING_AGENT_DIR = join(dir, "agent");
+	const ctxFor = { cwd: dir, ui: { notify() {} } };
+	try {
+		const fp = await loadKetch(true);
+		delete (globalThis as Record<string, unknown>).__pi_ketch_version_checks_v1;
+		fp.pi.setActiveTools(["web_search", "web_read", "research_note"]);
+		await fire(fp, "session_start", {}, ctxFor);
+		await callToolRaw(fp, "web_read", { urls: ["https://example.com/a"] }, dir);
+		const bad = { claim: "c", url: "https://example.com/a", quote: "not on the page at all" };
+		const good = { claim: "c", url: "https://example.com/a", quote: "page a content" };
+
+		for (let attempt = 1; attempt <= 3; attempt++) await callTool(fp, "research_note", bad, dir);
+		assert.equal((await callTool(fp, "research_note", good, dir)).isError, false);
+		// Streak reset: three more refusals are errors again, not a silent degrade.
+		for (let attempt = 1; attempt <= 3; attempt++) {
+			assert.equal((await callTool(fp, "research_note", bad, dir)).isError, true,
+				"a recorded note proves verification still works — the streak restarts");
+		}
+	} finally {
+		if (prevBin === undefined) delete process.env.KETCH_BIN; else process.env.KETCH_BIN = prevBin;
+		if (prevAgent === undefined) delete process.env.PI_CODING_AGENT_DIR; else process.env.PI_CODING_AGENT_DIR = prevAgent;
+		resetPiGlobals();
+	}
 });
