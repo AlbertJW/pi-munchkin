@@ -50,9 +50,15 @@ bounded() {
   return $status
 }
 
+# The bundle is a PRIVATE artifact: the Node diagnostic report carries the full
+# process environment (API keys) and command line (which may hold the prompt),
+# and lsof shows local endpoints. Private modes from birth — never chmod after
+# the fact — and the report is redacted below before the bundle is final.
+umask 077
 STAMP="$(date -u +%Y%m%dT%H%M%SZ)-$$"
 BUNDLE="$BUNDLE_ROOT/$STAMP"
-mkdir -p "$BUNDLE"
+mkdir -p "$BUNDLE_ROOT" && chmod 700 "$BUNDLE_ROOT"
+mkdir -m 700 -p "$BUNDLE"
 MARKER="$BUNDLE/.launch-marker"
 : > "$MARKER"
 
@@ -102,7 +108,9 @@ if [[ $WEDGED -eq 1 ]] && kill -0 "$PI_PID" 2>/dev/null; then
     echo "pid: $PI_PID"
     echo "cwd: $PWD"
     echo "stall_seconds: $STALL_SECONDS"
-    echo "argv: $*"
+    # argv may contain the full prompt text (pi -p "..."): record shape, not content.
+    echo "argc: $#"
+    echo "flags: $(for a in "$@"; do case "$a" in -*) printf '%s ' "$a";; esac; done)"
     echo "pi_version: $PI_VERSION"
   } > "$BUNDLE/context.txt"
   bounded 5 ps -p "$PI_PID" -o pid,ppid,stat,etime,time,%cpu,%mem > "$BUNDLE/ps.txt" 2>&1
@@ -110,6 +118,29 @@ if [[ $WEDGED -eq 1 ]] && kill -0 "$PI_PID" 2>/dev/null; then
   bounded 20 sample "$PI_PID" 3 -file "$BUNDLE/sample.txt" >/dev/null 2>&1
   # The point of the exercise: pending handles/requests from the JS side.
   kill -USR2 "$PI_PID" 2>/dev/null && sleep 3
+  # Redact the Node report IN PLACE: keep only the sections diagnosis needs
+  # (header subset, JS stack, libuv handles, resource usage). The raw report
+  # embeds environmentVariables (every API key) and the full commandLine — a
+  # diagnostic bundle must never be the most credential-dense file on the disk.
+  for report in "$BUNDLE"/report.*.json; do
+    [[ -f "$report" ]] || continue
+    bounded 10 node -e '
+      const fs = require("fs");
+      const path = process.argv[1];
+      try {
+        const full = JSON.parse(fs.readFileSync(path, "utf8"));
+        const h = full.header ?? {};
+        fs.writeFileSync(path, JSON.stringify({
+          redacted: "environmentVariables, commandLine, and all unlisted sections removed by pi-watchdog",
+          header: { event: h.event, trigger: h.trigger, nodejsVersion: h.nodejsVersion,
+                    platform: h.platform, arch: h.arch, dumpEventTime: h.dumpEventTime },
+          javascriptStack: full.javascriptStack ?? null,
+          libuv: full.libuv ?? null,
+          resourceUsage: full.resourceUsage ?? null,
+        }, null, 1));
+      } catch { fs.rmSync(path, { force: true }); } // unparsable: delete, never keep raw
+    ' "$report"
+  done
   ls -la "$BUNDLE" > "$BUNDLE/bundle-listing.txt" 2>&1
   kill "$PI_PID" 2>/dev/null
   wait "$PI_PID" 2>/dev/null
