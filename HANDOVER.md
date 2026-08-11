@@ -24,6 +24,22 @@ adoption, deletion, live mirroring, and gate rounds are human-gated. Never touch
 
 ## 2026-08 hardening series
 
+> **2026-08-11 EVENING CLOSE-OUT (newest first).** Albert's nine findings are ALL fixed,
+> committed (`fc2d4af..5e75469`), pushed, and mirrored (108/108, loaded hash in
+> `docs/SURFACE_BOUNDARIES.md`): watchdog privacy (0700/0600 + report redaction), pi 0.84
+> peer range, session-keyed `shadow_report.py` (episode exposure CORRECTED 29% → 0% — the old
+> number was a working-directory-collapse artifact; the "loop-intervention powerable" read is
+> reversed), non-vacuous judge calibration, `gate_sha256` identity on run-kernel verification,
+> abandoned-episode terminal state, awaited adaptive rebind, `plan_go` off-surface during
+> review, transactional `mirror:apply`. The serving-truth probe is live-verified on the 35B
+> (`served 65536 / registry 61440 / ok`); smokes against the DEFAULT model prove nothing —
+> pi's cloud path never fires `after_provider_response`, so always pass
+> `--model local-llamacpp/...`. The day-long startup-wedge mystery is CLOSED: fd-0 stdin
+> (non-TTY stdin that never EOFs; `pi -p` waits to append it to the prompt). Non-interactive
+> callers: redirect `< /dev/null`. Albert's hold ("no calibration, dark mechanisms, or
+> measurement-readiness claims until the five high findings are resolved") is satisfied;
+> his gates remain fixture approval, then the preregistered n=6 calibration.
+>
 > **2026-08-11 PLAN-EXECUTION STATUS (read this first).** Phases 0-3 of the harness plan are
 > built; phase 4 (candidate trials) is blocked only on human approval of the new fixtures.
 > Done: the startup wedge is instrumented (`harness/scripts/pi-watchdog.sh` captures a Node

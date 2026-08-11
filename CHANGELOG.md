@@ -10,6 +10,17 @@ candidates as dark). Net changes since 0.3.0; the full per-decision record is
 
 ### Added
 
+- **Serving-truth probe + dual-permutation judging (2026-08-11):** `runtime-truth.ts` probes the
+  local server's real `n_ctx` (`/props`, llama-swap `/upstream/<model>/props` fallback) once per
+  model at `agent_settled`, records `runtime/serving-truth`, shows a `serving_truth` line in
+  `/munchkin-doctor`, and warns (UI notify only, never model context) on a registry mismatch —
+  the runtime version of the ling3 8192-vs-32768 incident check; named hosts and public IPs are
+  never probed. Verified live on the clean mirror against the 35B: `served_n_ctx=65536,
+  registry_ctx=61440, verdict=ok`. Note: pi's cloud provider path does not fire
+  `after_provider_response`, so smokes against the default cloud model never produce a row.
+  `judge.py` now judges every pair in BOTH orders and scores a win only on strict agreement
+  (position bias becomes ties, 2× judge cost, selftest counterfactuals for both stub polarities).
+
 - **Measurement and operations tooling (2026-08-11):** `harness/scripts/pi-watchdog.sh`
   (captures ps/lsof/sample plus a Node diagnostic report when a session stalls before its first
   request, instead of a blind kill); concurrent `npm run verify` (~40s to ~13s, with
@@ -92,6 +103,27 @@ candidates as dark). Net changes since 0.3.0; the full per-decision record is
 
 ### Fixed
 
+- **Albert's nine findings (2026-08-11):** watchdog bundles are now 0700/0600 with Node
+  diagnostic reports redacted in place (no argv/env persisted — only stack, libuv, resource
+  usage); pi 0.84 joins the supported peer range (`>=0.80.6 <0.85.0`, isolated battery + CI
+  matrix + boundary fence); `shadow_report.py` counts sessions, not working directories
+  (`run_id`, else `sk` + seq-reset epochs) — this CORRECTED episode exposure from 29% to 0%,
+  reversing the earlier "loop-intervention powerable" read; `agentic_judge.py` calibration can
+  no longer pass vacuously (per-dimension agreement gates, coverage and diversity minimums,
+  `NA` never defaulted, nonce transcript fences); plan gates carry `gate_sha256` identity so a
+  narrow plan-item gate no longer falsely verifies the run kernel (only the detected project
+  gate counts); degraded research verification ABANDONS failure episodes as a distinct terminal
+  state instead of closing them as recovered; adaptive plan rebind is awaited at
+  `before_agent_start` (no async race); `plan_go` leaves the active-tool surface during plan
+  review instead of advertising a tool that refuses; `mirror:apply` refuses under a running pi
+  and stages per-file renames (never a torn file).
+- **Startup-wedge root cause CLOSED (2026-08-11):** `pi -p` with a non-TTY stdin that never
+  EOFs blocks forever before its first provider request (it waits to append piped stdin to the
+  prompt). Inspector-confirmed on a live wedged specimen: exactly one active handle, a Socket on
+  fd 0. Wedged pi also rewrites argv to just `pi`, which is why `pgrep -f "pi -p"` missed every
+  specimen. Watchdog-guarded runs were always immune because `pi "$@" &` in a non-interactive
+  script gets `/dev/null` stdin (POSIX async-list rule). Operational rule: non-interactive
+  callers redirect `< /dev/null`. Not a harness bug — no code change.
 - **Audit fixes (2026-08-11, from a 13-agent adversarial review):** the research wrap-up steer no
   longer fires where `research_note` is not an active tool (it fired inside the tool-restricted
   `researcher` subagent, demanding an impossible call and replacing the child's return payload —

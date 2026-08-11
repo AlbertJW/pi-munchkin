@@ -2586,3 +2586,53 @@ default-vs-default benchmark on frontier cloud models; our corpus shows the oppo
 local models — the c38->c39 chain measurably rescued the 4B and ling3 followed it unprompted).
 Honest sting kept visible: the ~23.4k fixed prompt is a real cost carried on faith until the
 phase-activation trial — a reason to reach candidate 4, not to jump the queue.
+
+## 2026-08-11 (evening) — both recorded candidates BUILT; Albert's nine findings fixed; two mysteries closed
+
+**The two Reddit-sweep candidates are implemented and live.** (1) Serving-truth probe
+(`runtime-truth.ts`): after the first successful response per model, the probe waits for
+`agent_settled` (a mid-stream `/props` queues behind the in-flight completion on the single-slot
+router — measured), then GETs `/props` with a llama-swap `/upstream/<model>/props` fallback,
+records `runtime/serving-truth`, renders a `/munchkin-doctor` line, and warns via UI notify on a
+mismatch under the pi-health convention (`served − 8192 ≤ registry ≤ served`). Named hosts and
+public IPs are never probed. Live verification on the clean mirror against the DD:
+`served_n_ctx=65536, registry_ctx=61440, verdict=ok`. (2) Dual-permutation judging (`judge.py`):
+both orders per pair, a win only on strict agreement, disagreement (including win+tie) scores a
+tie; selftests hold a position-bias stub to a tie and a content-sensitive stub to a win, each
+with a targeted counterfactual.
+
+**Albert's nine findings — all fixed, each with a both-polarity test proven by a targeted
+counterfactual** (`fc2d4af, 867aa91, a5e277b, f038bae, f892eee, 564a617, 5e75469`): watchdog
+bundle privacy (0700/0600, argv/env never persisted, Node reports redacted in place —
+canary-verified); pi 0.84 in the peer range with an isolated battery and CI matrix; session-keyed
+shadow report; non-vacuous judge calibration (per-dimension gates, coverage, diversity, NA,
+nonce fences); `gate_sha256` identity on plan gates so only the detected project gate verifies
+the run kernel; degraded research now ABANDONS episodes (terminal, never "recovered"); adaptive
+rebind awaited at `before_agent_start`; `plan_go` leaves the tool surface during plan review;
+`mirror:apply` refuses under a running pi and stages per-file renames.
+
+**Honest correction, material to the roadmap:** session-keying the shadow report dropped episode
+exposure from 29% to **0%**. The 29% was a working-directory-collapse artifact (many sessions in
+one cwd counted as one), and the earlier "episode exposure above the 20% bar" read — the basis
+for calling loop-intervention powerable — is REVERSED. Current live evidence: no candidate has
+demonstrated exposure; the shadow-evidence phase must accumulate real sessions before any
+calibration conclusion.
+
+**Mystery 1 closed — the startup wedge is fd-0 stdin, not the harness.** A live wedged specimen
+was finally captured at the JS level (SIGUSR1 → inspector → CDP): exactly one active handle, a
+`Socket` on fd 0, zero active requests. `pi -p` with a non-TTY stdin waits for EOF to append
+piped stdin to the prompt; when the caller hands it an idle unix socket (as this automation
+environment sometimes does), it blocks forever before the first provider request. Wedged pi
+rewrites argv to bare `pi`, which is why every `pgrep -f "pi -p"` sweep missed the specimens.
+Watchdog runs were immune by construction — a backgrounded `pi "$@" &` in a non-interactive
+shell gets `/dev/null` stdin (POSIX). Counterfactual: the same command with `< /dev/null`
+completes in seconds, reproducibly. Operational rule adopted: non-interactive pi invocations
+redirect stdin. No code change — the "wedge" was never in the harness.
+
+**Mystery 2 closed — serving-truth's "zero live rows" was a wrong-model smoke.** Every earlier
+smoke ran `pi -p` on the DEFAULT model — a cloud model, where (a) the host guard refuses to
+probe, by design, and (b) pi's cloud provider path never fires `after_provider_response` at all
+(live provider-timing rows show `status: null, request_to_headers_ms: null` while stream events
+fire). The probe had been correct for two commits; the measurement was pointed at the wrong arm.
+Lesson filed next to "measure content, not proxies": a live smoke must pin
+`--model local-llamacpp/...`, or it validates nothing about the local path.

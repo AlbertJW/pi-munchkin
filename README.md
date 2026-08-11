@@ -53,7 +53,7 @@ mechanism-observed; their benefit has not been established by a powered trial.
 
 ## Install
 
-Node.js 22.6 or newer is required. Pi 0.80.6 through 0.83.x is supported.
+Node.js 22.6 or newer is required. Pi 0.80.6 through 0.84.x is supported.
 
 ```sh
 pi package install github:AlbertJW/pi-munchkin
@@ -90,7 +90,9 @@ Most behavior is automatic. The primary commands are:
   walls and sends one deterministic recovery instruction.
 - `/run-status` for a bounded, read-only summary of the authoritative structured run state.
 - `/munchkin-doctor` for redacted Pi/model capability, canonical tool-provenance, retry/timeout,
-  and declared sandbox posture.
+  declared sandbox posture, and a `serving_truth` line comparing the local server's actual
+  served `n_ctx` against the registry's `contextWindow` (probed once per model after settlement;
+  local endpoints only — named hosts and public IPs are never probed).
 
 ### Current defaults and rollback controls
 
@@ -228,7 +230,8 @@ directory holds a `.ts` file the manifest does not declare — pi auto-loads tho
 dropped from the manifest would otherwise keep running forever with the check still green.
 
 The registry-dependent CI matrix is deliberately separate from `verify`. It installs the packed
-tarball into isolated consumers using the latest available 0.80, 0.81, 0.82, and 0.83 releases,
+tarball into isolated consumers using the latest available 0.80, 0.81, 0.82, 0.83, and 0.84
+releases,
 typechecks the shipped TypeScript, loads every extension, and discovers both skills. A separate
 job proves strict peer-install behavior below, at, within, and at the upper support boundary.
 

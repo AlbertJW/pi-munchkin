@@ -71,6 +71,11 @@ export NODE_OPTIONS="${NODE_OPTIONS:-} --report-on-signal --report-directory=$BU
 PI_VERSION="$(bounded 5 pi --version 2>/dev/null | head -1)"
 [[ -n "$PI_VERSION" ]] || PI_VERSION="unknown"
 
+# The `&` matters beyond backgrounding: POSIX gives an async command /dev/null
+# stdin in a non-interactive shell, and `pi -p` with a non-TTY stdin that never
+# EOFs blocks forever pre-request waiting to append it to the prompt (the
+# 2026-08-11 "startup wedge" — fd-0 Socket, inspector-confirmed). Any pi run
+# OUTSIDE this script from automation must redirect `< /dev/null` itself.
 pi "$@" &
 PI_PID=$!
 
