@@ -299,8 +299,14 @@ export class FailureEpisodeTracker {
 			const exactGateRecovery = observation.verifiedExact === true &&
 				["verification_assertion", "compile_or_lint", "unknown"].includes(episode.failureClass);
 			const providerRecovery = recovery === "provider_first_token" && episode.failureClass === "provider";
+			// verification_assertion belongs here too: a SAME-TARGET success is the
+			// direct evidence that the assertion now holds (the failing check passes,
+			// the refused citation verifies). Without it such an episode could only
+			// ever be closed by an exact project gate, so in any run without one —
+			// every research session — refusal counts were monotone for the whole
+			// session and the shadow episode stream over-reported unresolved failure.
 			const directRecovery = episode.toolFamily === family && episode.targetHash === target &&
-				(["schema_validation", "policy_rejection", "permission", "not_found", "command_missing", "edit_conflict"].includes(episode.failureClass));
+				(["schema_validation", "policy_rejection", "permission", "not_found", "command_missing", "edit_conflict", "verification_assertion"].includes(episode.failureClass));
 			if (!exactGateRecovery && !providerRecovery && !directRecovery) continue;
 			episode.status = "recovered";
 			episode.recovery = exactGateRecovery ? "exact_gate" : recovery;

@@ -257,3 +257,35 @@ test("provider episodes recover only on a real first token, never on start/done/
 		delete (globalThis as Record<string, unknown>).__pi_lb_state;
 	}
 });
+
+test("a same-target success recovers a verification_assertion episode, not only an exact gate", () => {
+	// Without this, the only closer for a failed assertion was a project gate, so
+	// a research session (which has none) accumulated refusal episodes monotonically
+	// and the shadow stream over-reported unresolved failure.
+	const tracker = new FailureEpisodeTracker();
+	const failing = {
+		toolName: "research_note",
+		args: { claim: "c", url: "https://example.com/a", quote: "not on the page" },
+		isError: true,
+		text: "Citation verification failed: quote not found verbatim in any parent-read source.",
+	};
+	assert.equal(classifyFailure(failing), "verification_assertion");
+	const opened = tracker.observeFailure(failing);
+	assert.equal(opened.episode.failureClass, "verification_assertion");
+	assert.equal(opened.episode.status, "active");
+
+	const recovered = tracker.observeSuccess({
+		toolName: "research_note",
+		args: { claim: "c", url: "https://example.com/a", quote: "page a content" },
+	});
+	assert.equal(recovered.length, 1, "the same-target success closes the episode");
+	assert.equal(recovered[0].failureClass, "verification_assertion");
+	assert.equal(recovered[0].status, "recovered");
+	assert.equal(recovered[0].recovery, "tool_success");
+
+	// A DIFFERENT target must not close it — recovery stays evidence, not optimism.
+	const other = new FailureEpisodeTracker();
+	other.observeFailure(failing);
+	const wrong = other.observeSuccess({ toolName: "bash", args: { command: "npm test" } });
+	assert.equal(wrong.length, 0);
+});
