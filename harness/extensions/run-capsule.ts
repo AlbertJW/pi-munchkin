@@ -85,6 +85,10 @@ export default function (pi: ExtensionAPI): void {
 		currentRunIdHash = latestState?.identity.runIdHash ?? null;
 		queue = createQueue();
 		publishIdentity();
+		// plan-runner's session_start ran BEFORE this handler (extension order), so
+		// its adaptive-mode disk rebind could not see the identity above. Announce
+		// it so private plan state gets one deterministic re-read.
+		emitHarnessSignal(pi.events, { v: 1, type: "capsule/identity" });
 		sessionReady = true;
 		phaseDirty = false;
 		lastEntryKey = null;

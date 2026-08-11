@@ -16,6 +16,7 @@ export type HarnessSignalV1 =
 	| (SignalBase & { type: "recovery/resumed"; origin: "run-command" | "loop-command"; cleared: number; blocked: number })
 	| (SignalBase & { type: "context/receipt"; contextPct: number | null; staleShare: number | null; duplicateShare: number | null })
 	| (SignalBase & { type: "context/compacted" })
+	| (SignalBase & { type: "capsule/identity" })
 	| (SignalBase & { type: "capability/need"; capability: CapabilityName; reason: "accepted-plan" | "large-file" | "inlet-refusal" | "selected-search-result" | "deep-research" | "recovery" });
 
 const HASH = /^[a-f0-9]{64}$/;
@@ -55,6 +56,10 @@ export function isHarnessSignal(value: unknown): value is HarnessSignalV1 {
 		case "context/receipt":
 			return exact("v", "type", "contextPct", "staleShare", "duplicateShare") && nullableNumber(item.contextPct) && nullableNumber(item.staleShare) && nullableNumber(item.duplicateShare);
 		case "context/compacted":
+			return exact("v", "type");
+		case "capsule/identity":
+			// Payload-free: the identity itself stays in the run-capsule global.
+			// Consumers (plan-runner's adaptive rebind) re-read it on delivery.
 			return exact("v", "type");
 		case "capability/need":
 			return exact("v", "type", "capability", "reason") &&

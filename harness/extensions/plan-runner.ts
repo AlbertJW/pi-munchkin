@@ -13,7 +13,7 @@ import { steerText } from "../lib/steer-texts.ts";
 import { record } from "../lib/telemetry.ts";
 import { agentDir } from "../lib/agent-dir.ts";
 import { ACTIVE_TOOL_PROMPTS } from "../lib/active-tool-prompts.ts";
-import { emitHarnessSignal, signalRunId } from "../lib/harness-signals.ts";
+import { emitHarnessSignal, onHarnessSignal, signalRunId } from "../lib/harness-signals.ts";
 import { applyPlanDeltas, type PlanDelta } from "../lib/plan-delta.ts";
 import { boundedDirectRequest, planMode, type PlanMode } from "../lib/plan-mode.ts";
 import { planStorageMode, privatePlanStatePath } from "../lib/plan-state-storage.ts";
@@ -52,6 +52,38 @@ let replanStreak = 0;
 // reset on session_start, or session 2 after a /new or /fork is never warned
 // that partial work may sit on disk.
 let partialWorkNoted = false;
+let lastSessionCwd: string | null = null;
+let lastSessionNotify: ((message: string) => void) | null = null;
+let resumeNoticeShown = false;
+
+// RE-BIND to whatever plan this cwd actually has on disk. Clearing alone was a
+// half-fix: a same-cwd /resume of a LIVE plan lost a run_id that had been
+// correct, and receipts went unattributed until the next writeStateAndTodo. The
+// truth is the state file, so derive from it rather than trusting or discarding
+// the inherited global. Absent state leaves the key deleted; both readers treat
+// that as "no active plan" rather than erroring. Called at session_start AND
+// again on capsule/identity (adaptive storage resolves its path lazily, so the
+// second call sees the PRIVATE plan the first one could not).
+async function rebindActivePlan(cwd: string, notify: (message: string) => void): Promise<void> {
+	const state = await readState(cwd);
+	if (state) {
+		(globalThis as Record<string, unknown>).__pi_active_plan_context = {
+			run_id: state.run_id,
+			item_id: currentItem(state)?.id,
+			open_items: openItemCount(state),
+			blocked_items: blockedItemCount(state),
+		};
+	}
+	if (!state || state.writer === PROC_MARK || resumeNoticeShown) return;
+	const open = state.items.filter((i) => i.status === "pending" || i.status === "in_progress" || i.status === "blocked");
+	if (open.length === 0) return;
+	const inProgress = state.items.filter((i) => i.status === "in_progress").length;
+	resumeNoticeShown = true;
+	planEvent("resume-found", state.run_id, { open: open.length, in_progress: inProgress });
+	notify(
+		`Interrupted plan from a previous session: "${state.request}" — ${open.length} open item(s)${inProgress ? `, ${inProgress} in_progress (may have partial work)` : ""}. /plan-status to inspect, /plan-go to resume, /plan <request> to replace.`,
+	);
+}
 type ModelIdentity = { provider: string; id: string };
 let activeModel: ModelIdentity = { provider: "unknown", id: "unknown" };
 
@@ -1273,30 +1305,19 @@ export default function (pi: ExtensionAPI) {
 		delete (globalThis as Record<string, unknown>).__pi_active_plan_context;
 		partialWorkNoted = false; // per-session, not per-process — see the declaration comment
 		rememberModel(ctx);
-		const state = await readState(ctx.cwd);
-		// ...then RE-BIND to whatever plan this cwd actually has on disk. Clearing alone
-		// was a half-fix: a same-cwd /resume of a LIVE plan lost a run_id that had been
-		// correct, and receipts went unattributed until the next writeStateAndTodo. The
-		// truth is the state file, so derive from it rather than trusting or discarding
-		// the inherited global. Absent state leaves the key deleted; both readers treat
-		// that as "no active plan" rather than erroring.
-		if (state) {
-			(globalThis as Record<string, unknown>).__pi_active_plan_context = {
-				run_id: state.run_id,
-				item_id: currentItem(state)?.id,
-				open_items: openItemCount(state),
-				blocked_items: blockedItemCount(state),
-			};
-		}
-		if (!state || state.writer === PROC_MARK) return;
-		const open = state.items.filter((i) => i.status === "pending" || i.status === "in_progress" || i.status === "blocked");
-		if (open.length === 0) return;
-		const inProgress = state.items.filter((i) => i.status === "in_progress").length;
-		planEvent("resume-found", state.run_id, { open: open.length, in_progress: inProgress });
-		ctx.ui.notify(
-			`Interrupted plan from a previous session: "${state.request}" — ${open.length} open item(s)${inProgress ? `, ${inProgress} in_progress (may have partial work)` : ""}. /plan-status to inspect, /plan-go to resume, /plan <request> to replace.`,
-			"info",
-		);
+		resumeNoticeShown = false;
+		lastSessionNotify = (message) => ctx.ui.notify(message, "info");
+		lastSessionCwd = ctx.cwd;
+		await rebindActivePlan(ctx.cwd, lastSessionNotify);
+	});
+
+	// Adaptive storage races extension order: run-capsule publishes the private
+	// storage identity AFTER this extension's session_start ran, so the rebind
+	// above could only see the project-local fallback. Re-run it exactly once
+	// per identity announcement so an interrupted PRIVATE plan is found too.
+	onHarnessSignal(pi.events, (signal) => {
+		if (signal.type !== "capsule/identity" || planStorageMode() !== "capsule" || !lastSessionCwd) return;
+		void rebindActivePlan(lastSessionCwd, lastSessionNotify ?? (() => {}));
 	});
 
 	pi.registerTool(planWrite);

@@ -56,3 +56,55 @@ test("adaptive mode stores new plans privately, exposes ID deltas, and exports e
 		if (previous.telemetry === undefined) delete process.env.TELEMETRY; else process.env.TELEMETRY = previous.telemetry;
 	}
 });
+
+test("adaptive rebind: a private interrupted plan is found when capsule identity arrives AFTER session_start", async () => {
+	const { mkdirSync, writeFileSync } = await import("node:fs");
+	const { emitHarnessSignal } = await import("../lib/harness-signals.ts");
+	const previous = {
+		mode: process.env.PLAN_MODE,
+		agent: process.env.PI_CODING_AGENT_DIR,
+		capsule: process.env.RUN_CAPSULE,
+		telemetry: process.env.TELEMETRY,
+	};
+	const cwd = mkdtempSync(join(tmpdir(), "pi-adaptive-order-"));
+	const agent = mkdtempSync(join(tmpdir(), "pi-adaptive-order-agent-"));
+	const capsuleId = "22222222-2222-4222-8222-222222222222";
+	process.env.PLAN_MODE = "adaptive";
+	process.env.PI_CODING_AGENT_DIR = agent;
+	process.env.RUN_CAPSULE = "shadow";
+	process.env.TELEMETRY = "off";
+	try {
+		// An interrupted PRIVATE plan from a previous process, unknown to this one.
+		const privateDir = runCapsuleDirectory(agent, cwd, capsuleId);
+		mkdirSync(privateDir, { recursive: true });
+		writeFileSync(join(privateDir, "plan-state.json"), JSON.stringify({
+			schema_version: 3, run_id: "r-private", request: "resume me", phase: "executing",
+			writer: "some-other-process", items: [{ id: "i1", title: "one", status: "pending" }],
+		}));
+
+		const fp = makeFakePi();
+		const mod = await import(`../extensions/plan-runner.ts?adaptiveorder=${Date.now()}-${Math.random()}`);
+		mod.default(fp.pi as never);
+		const { ctx } = makeCtx(cwd);
+		const g = globalThis as Record<string, unknown>;
+		// session_start fires BEFORE run-capsule publishes the identity (real load order).
+		await fp.handlers.get("session_start")![0]({ reason: "resume" }, ctx);
+		const before = g.__pi_active_plan_context as { run_id?: string } | undefined;
+		assert.notEqual(before?.run_id, "r-private", "identity absent: the private plan cannot be visible yet");
+
+		// run-capsule now publishes identity and announces it.
+		g.__pi_run_capsule_identity = { cwd, capsuleId };
+		emitHarnessSignal(fp.pi.events as never, { v: 1, type: "capsule/identity" });
+		await new Promise((resolve) => setTimeout(resolve, 20));
+		const after = g.__pi_active_plan_context as { run_id?: string } | undefined;
+		assert.equal(after?.run_id, "r-private", "identity announced: the private interrupted plan is rebound");
+	} finally {
+		resetPiGlobals();
+		rmSync(cwd, { recursive: true, force: true });
+		rmSync(agent, { recursive: true, force: true });
+		if (previous.mode === undefined) delete process.env.PLAN_MODE; else process.env.PLAN_MODE = previous.mode;
+		if (previous.agent === undefined) delete process.env.PI_CODING_AGENT_DIR; else process.env.PI_CODING_AGENT_DIR = previous.agent;
+		if (previous.capsule === undefined) delete process.env.RUN_CAPSULE; else process.env.RUN_CAPSULE = previous.capsule;
+		if (previous.telemetry === undefined) delete process.env.TELEMETRY; else process.env.TELEMETRY = previous.telemetry;
+	}
+});
