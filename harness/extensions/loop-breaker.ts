@@ -13,6 +13,7 @@ import {
 import { steerText } from "../lib/steer-texts.ts";
 import { record } from "../lib/telemetry.ts";
 import { emitHarnessSignal, onHarnessSignal } from "../lib/harness-signals.ts";
+import { isFirstTokenEvent } from "./runtime-truth.ts";
 import { renderRecoveryBrief } from "../lib/recovery-brief.ts";
 import { onRunStateSnapshot } from "../lib/run-kernel-snapshot.ts";
 import { runCapsuleMode } from "../lib/run-capsule-store.ts";
@@ -723,7 +724,12 @@ export default function (pi: ExtensionAPI) {
 		);
 	});
 
-	pi.on("message_update", async () => { recoverProvider(); });
+	// Only a REAL first token recovers a provider episode. start/empty/done/error
+	// updates arrive even on the same failed request — closing on any of them
+	// records a false recovery and corrupts the shadow episode stream.
+	pi.on("message_update", async (event) => {
+		if (isFirstTokenEvent((event as { assistantMessageEvent?: { type?: unknown; delta?: unknown } }).assistantMessageEvent ?? {})) recoverProvider();
+	});
 	pi.on("turn_start", async () => { reconcileExactGate(); });
 	pi.on("agent_settled", async () => {
 		reconcileExactGate();

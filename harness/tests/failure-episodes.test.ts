@@ -222,3 +222,38 @@ test("recovery, settlement, manual resume, and reset clear exposed state", () =>
 		completed: [],
 	});
 });
+
+test("provider episodes recover only on a real first token, never on start/done/error updates", async () => {
+	const { mkdtempSync, existsSync, readFileSync } = await import("node:fs");
+	const { tmpdir } = await import("node:os");
+	const { join } = await import("node:path");
+	const { fire, makeFakePi } = await import("./integration-harness.ts");
+	const telemetry = join(mkdtempSync(join(tmpdir(), "lb-provider-")), "telemetry.jsonl");
+	const prev = process.env.TELEMETRY_FILE;
+	process.env.TELEMETRY_FILE = telemetry;
+	try {
+		const fp = makeFakePi();
+		const mod = await import(`../extensions/loop-breaker.ts?providertoken=${Date.now()}-${Math.random()}`);
+		mod.default(fp.pi as never);
+		const ctx = { ui: { notify() {} }, abort() {}, cwd: "/tmp", model: { provider: "local-llama" } };
+		await fire(fp, "session_start", {}, ctx);
+		const recoveredRows = () => (existsSync(telemetry)
+			? readFileSync(telemetry, "utf8").trim().split("\n").filter(Boolean).map((l) => JSON.parse(l))
+			: []).filter((r) => r.ext === "failure-episode" && r.kind === "recovered");
+
+		await fire(fp, "after_provider_response", { status: 500 }, ctx);
+		// The same failed request still emits lifecycle updates — none of these is recovery.
+		for (const type of ["start", "done", "error"]) {
+			await fire(fp, "message_update", { assistantMessageEvent: { type } }, ctx);
+		}
+		await fire(fp, "message_update", { assistantMessageEvent: { type: "text_delta", delta: "" } }, ctx);
+		assert.equal(recoveredRows().length, 0, "no recovery without a real token");
+
+		await fire(fp, "message_update", { assistantMessageEvent: { type: "text_delta", delta: "hello" } }, ctx);
+		assert.equal(recoveredRows().length, 1, "a genuine first token recovers the episode");
+		assert.deepEqual(fp.swallowedErrors, []);
+	} finally {
+		if (prev === undefined) delete process.env.TELEMETRY_FILE; else process.env.TELEMETRY_FILE = prev;
+		delete (globalThis as Record<string, unknown>).__pi_lb_state;
+	}
+});
