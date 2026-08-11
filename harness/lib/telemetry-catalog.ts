@@ -41,6 +41,8 @@ export const EVENT_CATALOG = {
 	"plan-runner/write": { items: "number", open_items: "number", newly_done: "number", rewrite: "boolean", declared_dependencies: "number", unmet_dependencies: "number", dependency_compliant: "boolean", context_tokens: ["number", "null"] },
 	"plan-runner/uncertainty-hold": { count: "number", gate: "string" },
 	"plan-runner/write-rejected": { reason_class: "string", context_tokens: ["number", "null"] },
+	"plan-runner/delta": { changed: "number", idempotent: "number", open_items: "number" },
+	"plan-runner/direct": { request_bytes: "number", accepted: "boolean", reason: "string" },
 	// `activation` ("command"|"tool") added 2026-07-30 when /plan-go and the plan_go
 	// tool were unified: both now emit these. Rows before that date are all
 	// tool-path (the command emitted nothing). `go` still excludes yolo starts —

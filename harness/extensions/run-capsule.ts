@@ -26,6 +26,10 @@ export default function (pi: ExtensionAPI): void {
 	let pendingCompactionGeneration: number | null = null;
 	let pendingProviderRecovery = false;
 
+	function publishIdentity(): void {
+		(globalThis as Record<string, unknown>).__pi_run_capsule_identity = { cwd, capsuleId };
+	}
+
 	function createQueue(): CapsuleCheckpointQueue {
 		const boundCwd = cwd;
 		const boundCapsuleId = capsuleId;
@@ -60,6 +64,7 @@ export default function (pi: ExtensionAPI): void {
 			currentRunIdHash = snapshot.identity.runIdHash;
 			capsuleId = newCapsuleId();
 			queue = createQueue();
+			publishIdentity();
 		}
 		phaseDirty ||= phase;
 		(queue ??= createQueue()).request(snapshot);
@@ -79,6 +84,7 @@ export default function (pi: ExtensionAPI): void {
 		} else capsuleId = newCapsuleId();
 		currentRunIdHash = latestState?.identity.runIdHash ?? null;
 		queue = createQueue();
+		publishIdentity();
 		sessionReady = true;
 		phaseDirty = false;
 		lastEntryKey = null;

@@ -46,6 +46,8 @@
     "micro-gate/slop-fired",
     "micro-gate/slop-passed",
     "plan-runner/deps-rejected",
+	"plan-runner/delta",
+	"plan-runner/direct",
     "plan-runner/force-plan-write-block",
     "plan-runner/force-plan-write-skip",
     "plan-runner/gate",

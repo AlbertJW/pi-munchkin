@@ -14,6 +14,9 @@ import { record } from "../lib/telemetry.ts";
 import { agentDir } from "../lib/agent-dir.ts";
 import { ACTIVE_TOOL_PROMPTS } from "../lib/active-tool-prompts.ts";
 import { emitHarnessSignal, signalRunId } from "../lib/harness-signals.ts";
+import { applyPlanDeltas, type PlanDelta } from "../lib/plan-delta.ts";
+import { boundedDirectRequest, planMode, type PlanMode } from "../lib/plan-mode.ts";
+import { planStorageMode, privatePlanStatePath } from "../lib/plan-state-storage.ts";
 
 // plan-runner v3 — model-owned TODO list (Claude Code TodoWrite pattern).
 // One tool (plan_write) rewrites the whole list each call: re-planning,
@@ -143,6 +146,17 @@ const FORCE_PLAN_WRITE = process.env.FORCE_PLAN_WRITE !== "off";
 // to be honest. PLAN_TOOL_GO=off is the kill switch; gate rounds must keep
 // plan_go in GATE_BASE_TOOLS per ADR-0001.)
 const PLAN_TOOL_GO = process.env.PLAN_TOOL_GO !== "off";
+// PR7 is dark: forced preserves the deployed whole-plan behavior. Adaptive adds
+// stable-ID status deltas and an explicitly user-invoked bounded direct path.
+const PLAN_MODE: PlanMode = planMode();
+const ADAPTIVE_DIRECT_FLAG = "__pi_adaptive_direct_active";
+function adaptiveDirectActive(): boolean {
+	return (globalThis as Record<string, unknown>)[ADAPTIVE_DIRECT_FLAG] === true;
+}
+function setAdaptiveDirect(active: boolean): void {
+	if (active) (globalThis as Record<string, unknown>)[ADAPTIVE_DIRECT_FLAG] = true;
+	else delete (globalThis as Record<string, unknown>)[ADAPTIVE_DIRECT_FLAG];
+}
 
 type ItemStatus = "pending" | "in_progress" | "done" | "blocked";
 type Phase = "planned" | "executing";
@@ -203,8 +217,11 @@ type TraceEvent = {
 function todoPath(cwd: string): string {
 	return join(cwd, ".pi", "TODO.md");
 }
+function usesPrivatePlanStorage(cwd: string): boolean {
+	return planStorageMode() === "capsule" && privatePlanStatePath(cwd) !== null;
+}
 function statePath(cwd: string): string {
-	return join(cwd, ".pi", "plan-state.json");
+	return privatePlanStatePath(cwd) ?? join(cwd, ".pi", "plan-state.json");
 }
 function tracePath(cwd: string): string {
 	return join(cwd, ".pi", "traces", "plan-runner.jsonl");
@@ -510,7 +527,7 @@ async function writeStateAndTodo(cwd: string, state: PlanState): Promise<void> {
 	const sp = statePath(cwd);
 	await mkdir(dirname(sp), { recursive: true });
 	await atomicWrite(sp, `${JSON.stringify(state, null, 2)}\n`);
-	await atomicWrite(todoPath(cwd), renderTodo(state));
+	if (!usesPrivatePlanStorage(cwd)) await atomicWrite(todoPath(cwd), renderTodo(state));
 	(globalThis as Record<string, unknown>).__pi_active_plan_context = {
 		run_id: state.run_id,
 		item_id: currentItem(state)?.id,
@@ -1156,7 +1173,7 @@ async function startPlanCommand(args: string, ctx: { cwd: string; model?: { prov
 	replanStreak = 0; // fresh plan — reset thrash counter
 	partialWorkNoted = false; // a later foreign-writer state may still warrant the partial-work note
 	await mutatePlan(ctx.cwd, async () => {
-		await archiveExistingTodo(ctx.cwd);
+		if (!usesPrivatePlanStorage(ctx.cwd)) await archiveExistingTodo(ctx.cwd);
 		const state = newState(request, "Planning pending. The model will call plan_write.", autonomy, []);
 		if (yolo) state.phase = "executing"; // yolo plans + runs in one flow — no /plan-go to flip it; keep status honest
 		return { state, result: state };
@@ -1218,7 +1235,7 @@ async function goCommand(args: string, ctx: { cwd: string; model?: { provider?: 
 async function statusCommand(ctx: { cwd: string; ui: { notify(m: string, l?: string): void } }) {
 	const state = await readState(ctx.cwd);
 	if (!state) {
-		ctx.ui.notify("No .pi/plan-state.json or .pi/TODO.md found.", "info");
+		ctx.ui.notify("No private run-capsule plan or legacy .pi/plan-state.json/TODO.md found.", "info");
 		return;
 	}
 	ctx.ui.notify(renderTodo(state), "info");
@@ -1245,6 +1262,7 @@ export default function (pi: ExtensionAPI) {
 	// items is an interrupted plan — surface it once so the user can inspect,
 	// resume, or replace instead of never learning it exists.
 	pi.on("session_start", async (_event, ctx) => {
+		setAdaptiveDirect(false);
 		// FIRST, ahead of both early returns below: this key is written by
 		// writeStateAndTodo and deleted nowhere, while pi's loader returns the CACHED
 		// factory across session replacement, so a /new, /fork or same-cwd /resume
@@ -1282,6 +1300,69 @@ export default function (pi: ExtensionAPI) {
 	});
 
 	pi.registerTool(planWrite);
+
+	// PR7 dark candidate: routine progress uses stable IDs rather than replaying
+	// the entire plan. Creation, replan, membership, ordering, dependencies, and
+	// gates remain owned by plan_write; this tool can only mutate status metadata.
+	if (PLAN_MODE === "adaptive") {
+		pi.registerTool(
+			defineTool({
+				name: "plan_update",
+				label: "Update Plan Status",
+				description: "Update existing plan items by stable item_id only. This cannot add, remove, rename, reorder, or change dependencies; use plan_write for creation and explicit replans.",
+				promptSnippet: "plan_update(deltas): apply stable-ID status changes without replaying the whole plan.",
+				parameters: Type.Object({
+					deltas: Type.Array(Type.Object({
+						item_id: Type.String({ minLength: 1, maxLength: 96 }),
+						status: Type.Union([Type.Literal("pending"), Type.Literal("in_progress"), Type.Literal("done"), Type.Literal("blocked")]),
+						note: Type.Optional(Type.String({ maxLength: 300 })),
+						failure_class: Type.Optional(Type.Union([
+							Type.Literal("blocked_needs_input"), Type.Literal("blocked_other"),
+							Type.Literal("user_action_required"), Type.Literal("unknown"),
+						])),
+					}), { minItems: 1, maxItems: 16 }),
+				}),
+				async execute(_toolCallId, params, _signal, _onUpdate, ctx) {
+					const aid = actionId();
+					rememberModel(ctx);
+					const deltas = params.deltas as PlanDelta[];
+					const outcome = await mutatePlan(ctx.cwd, async (prev) => {
+						if (!prev) rejectPlanTool("plan_update rejected: no plan exists; call plan_write to create the plan first.");
+						const applied = applyPlanDeltas(prev.items, deltas);
+						if (!applied.ok) rejectPlanTool(`plan_update rejected: ${applied.errors.join("; ")}`);
+						const next = { ...prev, items: applied.items as typeof prev.items };
+						const gateOutcomes: PlanGateOutcome[] = [];
+						for (const item of next.items) {
+							const before = prev.items.find((candidate) => candidate.id === item.id);
+							if (item.status !== "done" || before?.status === "done" || !item.gate || !api) continue;
+							const allowed = assertVerifyGateAllowed(item.gate);
+							if (!allowed.ok) {
+								gateOutcomes.push({ command: item.gate, pass: false, rejected: true });
+								item.status = "in_progress";
+								item.note = allowed.reason.slice(0, 300);
+								continue;
+							}
+							const result = await runReadonlyGate(api.exec.bind(api), ctx.cwd, item.gate, GATE_TIMEOUT_MS);
+							gateOutcomes.push({ command: normalizeVerificationCommand(item.gate), pass: result.pass });
+							if (!result.pass) {
+								item.status = "in_progress";
+								item.note = `gate failed: ${result.output.split("\n").slice(-1)[0]?.slice(0, 260) ?? "unknown"}`;
+							}
+						}
+						return { state: next, result: { state: next, applied, gateOutcomes } };
+					});
+					publishPlanGateReceipt(buildPlanGateReceipt(outcome.state.run_id, outcome.gateOutcomes));
+					const openItems = outcome.state.items.filter((item) => item.status !== "done").length;
+					planEvent("delta", outcome.state.run_id, { changed: outcome.applied.changed, idempotent: outcome.applied.idempotent, open_items: openItems });
+					return {
+						content: [{ type: "text" as const, text: `Plan status updated: ${outcome.applied.changed} changed, ${outcome.applied.idempotent} already current, ${openItems} open item(s).` }],
+						details: { tool_name: "plan_update", action_id: aid, success: true },
+						terminate: false,
+					};
+				},
+			}),
+		);
+	}
 
 	// c39 PLAN_TOOL_GO: model-callable twin of /plan-go — see the env-flag
 	// comment above. Registration itself is the dark-candidate gate (scoped to
@@ -1378,6 +1459,25 @@ export default function (pi: ExtensionAPI) {
 			await startPlanCommand(args, ctx, pi);
 		},
 	});
+	if (PLAN_MODE === "adaptive") {
+		pi.registerCommand("plan-direct", {
+			description: "Adaptive dark candidate: run one explicitly bounded, low-risk objective without plan ceremony.",
+			handler: async (args, ctx) => {
+				const request = boundedDirectRequest(args);
+				if (!request) {
+					planEvent("direct", `direct-${actionId()}`, { request_bytes: Buffer.byteLength(args, "utf8"), accepted: false, reason: "empty-or-risky" });
+					ctx.ui.notify("Adaptive direct mode refused: provide one short, low-risk objective (no destructive, deployment, or secret operations).", "error");
+					return;
+				}
+				setAdaptiveDirect(true);
+				planEvent("direct", `direct-${actionId()}`, { request_bytes: Buffer.byteLength(request, "utf8"), accepted: true, reason: "explicit-bounded" });
+				pi.sendUserMessage(
+					`Adaptive direct mode for one bounded objective: ${request}\n\nWork directly with the available tools. Keep the change narrow; after any source mutation run the recognized project gate (or mark the objective blocked if no safe verification exists). Do not expand scope, re-plan, or perform destructive/deployment/secret operations.`,
+					{ deliverAs: "steer" },
+				);
+			},
+		});
+	}
 	pi.registerCommand("plan-go", {
 		description: "Run or resume the plan. Add 'yolo' to finish without routine pauses, 'lean' to pause per step.",
 		handler: async (args, ctx) => {
@@ -1390,6 +1490,18 @@ export default function (pi: ExtensionAPI) {
 			return statusCommand(ctx);
 		},
 	});
+	if (PLAN_MODE === "adaptive") {
+		pi.registerCommand("plan-export", {
+			description: "Explicitly export the private run-capsule plan as the human-readable .pi/TODO.md view.",
+			handler: async (_args, ctx) => {
+				const state = await readState(ctx.cwd);
+				if (!state) { ctx.ui.notify("No plan to export.", "info"); return; }
+				await mkdir(dirname(todoPath(ctx.cwd)), { recursive: true });
+				await atomicWrite(todoPath(ctx.cwd), renderTodo(state));
+				ctx.ui.notify("Plan exported for human review.", "info");
+			},
+		});
+	}
 	pi.registerCommand("plan-trace", {
 		description: "Show recent plan trace entries.",
 		handler: async (args, ctx) => {
@@ -1458,7 +1570,7 @@ export default function (pi: ExtensionAPI) {
 		// state?.phase === "executing", which can't be true before the first
 		// plan_write anyway, so ordering doesn't change their behavior; this
 		// just gives the earliest, most specific reason when no plan exists yet.
-		if (FORCE_PLAN_WRITE) {
+		if (FORCE_PLAN_WRITE && !adaptiveDirectActive()) {
 			// Gemma model-family skip — a deployment scope guard, not an A/B knob
 			// (same class as loop-breaker's LB_LOCAL_ONLY: decides WHERE this runs,
 			// deliberately absent from schema.json thresholds). Grounds: measured
@@ -1531,6 +1643,7 @@ export default function (pi: ExtensionAPI) {
 	// No prompt re-injection (that was the fragile part of v2).
 	pi.on("agent_end", async (_event, ctx) => {
 		rememberModel(ctx);
+		setAdaptiveDirect(false);
 		setPlanning(false); // planning run ended (well-behaved or not) — disarm
 		const cwd = ctx.cwd;
 		const state = await readState(cwd);
