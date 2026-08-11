@@ -54,8 +54,12 @@ if (missing.length) {
 console.log(`  ok    packages resolve: ${packages.join(", ") || "(none)"}`);
 JS
 
-# 4. Type-check the curated set if tsc is installed
-if [ -x "$REPO_ROOT/node_modules/.bin/tsc" ]; then
+# 4. Type-check the curated set if tsc is installed.
+# SKIP_TSC=1 is for callers that already ran `npm run typecheck` over the same
+# project (verify-all does). It removes a duplicate full tsc, not any coverage.
+if [ "${SKIP_TSC:-}" = "1" ]; then
+  echo "  skip  full TypeScript typecheck (SKIP_TSC=1; covered by npm run typecheck)"
+elif [ -x "$REPO_ROOT/node_modules/.bin/tsc" ]; then
   if "$REPO_ROOT/node_modules/.bin/tsc" -p .typecheck --noEmit >/dev/null 2>&1; then ok "full TypeScript typecheck"; else bad "full TypeScript typecheck (run 'npm run typecheck' for details)"; fi
 else
   echo "  skip  tsc not installed (run 'npm ci')"

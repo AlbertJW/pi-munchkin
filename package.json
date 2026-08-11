@@ -32,7 +32,9 @@
     "surface:hash:source": "node --experimental-strip-types harness/scripts/source-surface-hash.mjs",
     "secret-scan:diff": "node harness/scripts/secret-scan-diff.mjs",
     "verify:optimizer": "bash scripts/verify-optimizer.sh",
-    "verify": "npm run test && npm run typecheck && npm run health && npm run pack:smoke && npm run verify:optimizer"
+    "verify": "node harness/scripts/verify-all.mjs",
+    "verify:serial": "npm run test && npm run typecheck && npm run health && npm run pack:smoke && npm run verify:optimizer",
+    "mirror:apply": "node --experimental-strip-types harness/scripts/live-mirror-apply.mjs"
   },
   "pi": {
     "extensions": [
@@ -182,6 +184,9 @@
     "harness/settings.example.json",
     "examples",
     "docs",
-    "NOTICE.md"
+    "NOTICE.md",
+    "harness/scripts/verify-all.mjs",
+    "harness/scripts/live-mirror-apply.mjs",
+    "harness/scripts/pi-watchdog.sh"
   ]
 }
