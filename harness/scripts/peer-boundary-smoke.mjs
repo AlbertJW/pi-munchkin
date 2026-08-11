@@ -45,8 +45,8 @@ try {
   const tarball = resolve(packDir, packed[0].filename);
   await installCase("below-lower", "0.80.5", false, tarball);
   await installCase("at-lower", "0.80.6", true, tarball);
-  await installCase("inside-upper-minor", "0.83.99", true, tarball);
-  await installCase("at-upper", "0.84.0", false, tarball);
+  await installCase("inside-upper-minor", "0.84.99", true, tarball);
+  await installCase("at-upper", "0.85.0", false, tarball);
 } finally {
   await rm(work, { recursive: true, force: true });
 }

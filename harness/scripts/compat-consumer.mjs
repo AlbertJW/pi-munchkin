@@ -8,8 +8,8 @@ import { resolve } from "node:path";
 
 const root = resolve(import.meta.dirname, "../..");
 const minor = process.argv[2];
-if (!/^0\.(?:80|81|82|83)$/.test(minor ?? "")) {
-  console.error("usage: compat-consumer.mjs 0.80|0.81|0.82|0.83");
+if (!/^0\.(?:80|81|82|83|84)$/.test(minor ?? "")) {
+  console.error("usage: compat-consumer.mjs 0.80|0.81|0.82|0.83|0.84");
   process.exit(2);
 }
 
