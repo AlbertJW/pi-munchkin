@@ -72,6 +72,19 @@ def judge_pair(question, ans_a, ans_b, rubric=RUBRIC, order=None, call=frontier_
     winner_slot_is_a = (v == "1") == (order == "AB")
     return ("A" if winner_slot_is_a else "B"), v, order
 
+def judge_pair_balanced(question, ans_a, ans_b, rubric=RUBRIC, call=frontier_call):
+    """Judge BOTH permutations and count only consistent verdicts (2x judge cost).
+
+    A single randomized order cancels position bias only in expectation; judging
+    each pair in both slots makes it structural: a purely position-biased judge
+    (always slot 1) disagrees with itself across the two orders and scores a tie
+    instead of a win. Strict agreement — ANY disagreement, including win+tie,
+    is a tie. Returns (winner, {"AB": slot_verdict, "BA": slot_verdict})."""
+    winner_ab, slot_ab, _ = judge_pair(question, ans_a, ans_b, rubric=rubric, order="AB", call=call)
+    winner_ba, slot_ba, _ = judge_pair(question, ans_a, ans_b, rubric=rubric, order="BA", call=call)
+    winner = winner_ab if winner_ab == winner_ba else "tie"
+    return winner, {"AB": slot_ab, "BA": slot_ba}
+
 # ---------- run ----------
 
 def questions():
@@ -98,15 +111,16 @@ def run(gen, variants):
         for q in qs:
             ans_a = chat(variant_system(a), q["question"], model=tag)["content"]
             ans_b = chat(variant_system(b), q["question"], model=tag)["content"]
-            winner, slot, order = judge_pair(q["question"], ans_a, ans_b)
+            winner, slot_verdicts = judge_pair_balanced(q["question"], ans_a, ans_b)
             tally[winner] += 1
-            rec = {"task": q["id"], "model": tag, "a": a, "b": b, "winner": winner, "order": order,
+            rec = {"task": q["id"], "model": tag, "a": a, "b": b, "winner": winner,
+                   "slot_verdicts": slot_verdicts,
                    "a_chars": len(ans_a), "b_chars": len(ans_b)}
             f.write(json.dumps(rec, ensure_ascii=False) + "\n"); f.flush()
-            print(f"{q['id']}: {a}-vs-{b} -> {winner} (order {order})")
+            print(f"{q['id']}: {a}-vs-{b} -> {winner} (slots {slot_verdicts})")
     decided = tally["A"] + tally["B"]
     pr, lo, hi = wilson(tally["A"], decided) if decided else (0, 0, 1)
-    report = (f"# judge {gen} — pairwise {a} vs {b} (frontier judge, randomized order)\n\n"
+    report = (f"# judge {gen} — pairwise {a} vs {b} (frontier judge, both orders, strict agreement)\n\n"
               f"{a} wins: {tally['A']} · {b} wins: {tally['B']} · ties: {tally['tie']}\n\n"
               f"{a} win-rate among decided: {tally['A']}/{decided} = {pr:.0%} (Wilson {lo:.0%}–{hi:.0%})\n\n"
               f"Adopt {a} over {b} only if its win-rate CI sits clear of 50%.\n")
@@ -130,7 +144,18 @@ def selftest():
     assert parse_verdict("the answer is unclear") == "tie"   # malformed -> tie
     # randomized order is one of the two valid slots
     assert judge_pair("q", "x", "y", call=win1)[2] in ("AB", "BA")
-    print("judge selftest: OK (order round-trips A/B under both slottings; malformed -> tie)")
+    # balanced judging: a PURELY position-biased judge (always slot 1) must score
+    # a tie — this is the counterfactual; single-order judging scores it as a win.
+    winner, slots = judge_pair_balanced("q", "ansA", "ansB", call=win1)
+    assert winner == "tie", (winner, slots)
+    assert slots == {"AB": "1", "BA": "1"}
+    # a content-sensitive judge (prefers whichever slot holds ansA) wins both orders.
+    content = lambda s, u: "WINNER: 1\nWHY: stub" if "ansA" in u.split("Answer 2:")[0] else "WINNER: 2\nWHY: stub"
+    assert judge_pair_balanced("q", "ansA", "ansB", call=content)[0] == "A"
+    # win + tie disagreement is a tie, not a win.
+    half = lambda s, u: ("WINNER: 1\nWHY: stub" if "ansA" in u.split("Answer 2:")[0] else "WINNER: tie\nWHY: stub")
+    assert judge_pair_balanced("q", "ansA", "ansB", call=half)[0] == "tie"
+    print("judge selftest: OK (order round-trips; malformed -> tie; position bias -> tie under balancing)")
 
 # ---------- cli ----------
 
