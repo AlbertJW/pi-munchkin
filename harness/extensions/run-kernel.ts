@@ -212,6 +212,8 @@ export function installRunKernel(pi: ExtensionAPI, options: RunKernelInstallOpti
 			dispatch({ ...nextBase(), type: "run/plan-observed", runIdHash: signal.runIdHash, accepted: true, executionStarted: false, openItems: signal.openItems });
 		} else if (signal.type === "plan/go") {
 			dispatch({ ...nextBase(), type: "run/plan-observed", runIdHash: signal.runIdHash, accepted: true, executionStarted: true, openItems: store.snapshot().plan.openItems });
+		} else if (signal.type === "plan/gate") {
+			dispatch({ ...nextBase(), type: "run/plan-gate-observed", runIdHash: signal.runIdHash, pass: signal.pass, fails: signal.fails });
 		} else if (signal.type === "context/receipt") {
 			dispatch({ ...nextBase(), type: "run/context-observed", usagePct: signal.contextPct });
 		} else if (signal.type === "failure/episodes") {

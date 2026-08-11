@@ -203,3 +203,53 @@ test("control proposals and decisions enter RunState without message text", () =
 	assert.deepEqual(validateRunStateSnapshot(state), []);
 	assert.equal(JSON.stringify(state).includes("message"), false);
 });
+
+test("a passing plan gate is verification the kernel can see, and a later mutation invalidates it", () => {
+	// Plan gates run inside plan-runner (runReadonlyGate), never through pi's tool
+	// pipeline, so no receipt exists. Without this input the kernel reported
+	// verify_ok=false on every plan-gated run while legacy reported true — a
+	// blind spot published as a "legacy disagreement", i.e. false evidence.
+	const store = new RunStateStoreV1();
+	apply(store, session());
+	apply(store, { v: 1, type: "run/tool-finished", sequence: 5, atMs: 5,
+		receipt: receipt({ toolName: "write", toolFamily: "write", mutation: "source", startedSequence: 4, endedSequence: 5 }) });
+	assert.equal(store.snapshot().verification.validAfterMutation, false, "a mutation leaves the run unverified");
+
+	apply(store, { v: 1, type: "run/plan-gate-observed", sequence: 6, atMs: 6, runIdHash: H, pass: true, fails: 0 });
+	const verified = store.snapshot();
+	assert.equal(verified.verification.validAfterMutation, true, "a passing plan gate verifies the run");
+	assert.equal(verified.verification.validGates, 1);
+	assert.deepEqual(validateRunStateSnapshot(verified), []);
+
+	// Editing after the gate must invalidate it again — ordering still governs.
+	apply(store, { v: 1, type: "run/tool-finished", sequence: 8, atMs: 8,
+		receipt: receipt({ toolName: "edit", toolFamily: "edit", mutation: "source", startedSequence: 7, endedSequence: 8 }) });
+	assert.equal(store.snapshot().verification.validAfterMutation, false, "gate-then-edit is unverified again");
+
+	// A FAILING gate is not verification.
+	const failing = new RunStateStoreV1();
+	apply(failing, session());
+	apply(failing, { v: 1, type: "run/plan-gate-observed", sequence: 4, atMs: 4, runIdHash: H, pass: false, fails: 2 });
+	assert.equal(failing.snapshot().verification.validAfterMutation, false);
+	assert.equal(failing.snapshot().verification.validGates, 0);
+});
+
+test("an over-budget context reading is clamped instead of killing the snapshot channel", () => {
+	// Context usage is reported above 100% when a run exceeds its budget. The
+	// snapshot contract caps it at 100, so an unclamped reading made
+	// validateRunStateSnapshot reject the whole state — silently ending the
+	// evidence stream exactly when the run was in trouble.
+	const store = new RunStateStoreV1();
+	apply(store, session());
+	apply(store, { v: 1, type: "run/context-observed", sequence: 2, atMs: 2, usagePct: 137.5 });
+	const over = store.snapshot();
+	assert.equal(over.context.usagePct, 100);
+	assert.deepEqual(validateRunStateSnapshot(over), [], "the snapshot stays valid and keeps flowing");
+
+	apply(store, { v: 1, type: "run/context-observed", sequence: 3, atMs: 3, usagePct: -4 });
+	assert.equal(store.snapshot().context.usagePct, 0);
+	apply(store, { v: 1, type: "run/context-observed", sequence: 4, atMs: 4, usagePct: null });
+	assert.equal(store.snapshot().context.usagePct, null, "null still means unknown");
+	apply(store, { v: 1, type: "run/context-observed", sequence: 5, atMs: 5, usagePct: 42 });
+	assert.equal(store.snapshot().context.usagePct, 42, "ordinary readings pass through");
+});

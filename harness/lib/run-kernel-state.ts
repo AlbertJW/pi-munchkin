@@ -204,8 +204,28 @@ export class RunStateStoreV1 {
 				this.state.plan.executionStarted = event.executionStarted || this.state.plan.executionStarted;
 				this.state.plan.openItems = event.openItems;
 				break;
+			case "run/plan-gate-observed":
+				// A plan gate is real verification the kernel cannot see as a receipt:
+				// plan-runner runs it internally (runReadonlyGate), not through pi's
+				// tool pipeline. Without this input every plan-gated run emitted a
+				// verify_ok "legacy disagreement" that was a kernel blind spot rather
+				// than a legacy defect — and those rows are about to be used as
+				// evidence. A later source mutation resets validAfterMutation as usual,
+				// so gate-then-edit still reads as unverified.
+				this.state.verification.attempts += 1;
+				this.state.verification.lastPassed = event.pass;
+				this.state.verification.validAfterMutation = event.pass;
+				if (event.pass) this.state.verification.validGates += 1;
+				break;
 			case "run/context-observed":
-				this.state.context.usagePct = event.usagePct;
+				// Clamp to the range the snapshot contract allows. Context usage is
+				// reported over 100% when a run exceeds its budget, and one such
+				// reading used to make validateRunStateSnapshot reject the whole
+				// state — silently killing the snapshot channel for the rest of the
+				// run, which is exactly when the evidence matters most.
+				this.state.context.usagePct = event.usagePct === null
+					? null
+					: Math.max(0, Math.min(100, event.usagePct));
 				break;
 			case "run/failure-state-observed":
 				this.state.failures.activeWalls = event.activeWalls;
