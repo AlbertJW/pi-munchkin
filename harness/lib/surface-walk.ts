@@ -45,7 +45,10 @@ export async function walkRelativeImports(entryPoints: string[]): Promise<Set<st
 
 type PackageManifest = { pi?: { extensions?: string[] } };
 
-/** Every .md below `dir`, recursively; empty if the directory is absent. */
+/** Every regular file below `dir`, recursively; empty if the directory is absent.
+ * Deliberately NOT limited to .md: skill directories carry executable scripts
+ * (e.g. lavish-review's render-plan.mjs) whose behavior is part of the surface —
+ * an .md-only walk let a script change slip through without a new boundary. */
 export async function walkPromptFiles(dir: string): Promise<string[]> {
 	let names: import("node:fs").Dirent[];
 	try {
@@ -57,7 +60,7 @@ export async function walkPromptFiles(dir: string): Promise<string[]> {
 	for (const entry of names.sort((a, b) => a.name.localeCompare(b.name))) {
 		const child = join(dir, entry.name);
 		if (entry.isDirectory()) files.push(...await walkPromptFiles(child));
-		else if (entry.isFile() && entry.name.endsWith(".md")) files.push(child);
+		else if (entry.isFile()) files.push(child);
 	}
 	return files;
 }

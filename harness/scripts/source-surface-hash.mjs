@@ -11,8 +11,8 @@ const files = await walkRelativeImports(entries);
 for (const role of await readdir(resolve(root, "harness", "agents"))) {
   if (role.endsWith(".md")) files.add(resolve(root, "harness", "agents", role));
 }
-// Prompt surface outside the import graph: skill text + the governor append
-// (model-visible; excluded before 2026-08-11 — hashes across that date do not pool).
+// Surface outside the import graph: every skill file (text AND scripts) + the
+// governor append (excluded before 2026-08-11 — hashes across that date do not pool).
 for (const dir of manifest.pi?.skills ?? []) {
   for (const file of await walkPromptFiles(resolve(root, dir))) files.add(file);
 }
