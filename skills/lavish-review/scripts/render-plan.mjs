@@ -10,8 +10,10 @@ const out = process.argv[3] || "artifacts/plan-review.html";
 const plan = JSON.parse(readFileSync(src, "utf8"));
 
 const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`);
-// Mermaid node labels: quotes break the parser; keep labels short and quote-free.
-const mLabel = (s) => String(s ?? "").replace(/["`;]/g, "'").slice(0, 60);
+// Mermaid node labels sit inside raw HTML (<pre class="mermaid">), so they are an
+// HTML injection surface, not just a Mermaid-parser one. ALLOWLIST, never denylist:
+// a title like `</pre><img onerror=...>` must come out inert.
+const mLabel = (s) => String(s ?? "").replace(/[^A-Za-z0-9 ._/()+:-]/g, " ").replace(/\s+/g, " ").trim().slice(0, 60);
 
 const items = plan.items ?? [];
 const byTitle = new Map(items.map((it, i) => [it.title, `n${i}`]));
@@ -20,7 +22,7 @@ const STATUS_ICON = { done: "✅", in_progress: "🔄", blocked: "⛔", pending:
 const rows = items.map((it) => `<tr>
   <td>${STATUS_ICON[it.status] ?? "⬜"} ${esc(it.status)}</td>
   <td><b>${esc(it.title)}</b>${it.note ? `<br><small>${esc(it.note)}</small>` : ""}</td>
-  <td>${esc(it.gate ?? "")}${it.gate_fails ? ` <small>(fails: ${it.gate_fails})</small>` : ""}</td>
+  <td>${esc(it.gate ?? "")}${it.gate_fails ? ` <small>(fails: ${esc(it.gate_fails)})</small>` : ""}</td>
 </tr>`).join("\n");
 
 const edges = items.flatMap((it, i) =>
