@@ -57,10 +57,23 @@ bounded() {
 umask 077
 STAMP="$(date -u +%Y%m%dT%H%M%SZ)-$$"
 BUNDLE="$BUNDLE_ROOT/$STAMP"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 mkdir -p "$BUNDLE_ROOT" && chmod 700 "$BUNDLE_ROOT"
 mkdir -m 700 -p "$BUNDLE"
 MARKER="$BUNDLE/.launch-marker"
 : > "$MARKER"
+
+# An interrupted capture must not strand a raw (credential-bearing) report: any
+# report that never received the redactor's marker is deleted on the way out.
+cleanup_raw_reports() {
+  local r
+  for r in "$BUNDLE"/report.*.json; do
+    [[ -f "$r" ]] || continue
+    grep -q '"redacted"' "$r" 2>/dev/null || rm -f "$r"
+  done
+}
+trap 'cleanup_raw_reports' EXIT
+trap 'cleanup_raw_reports; exit 130' INT TERM
 
 # --report-on-signal arms SIGUSR2 -> JS-level diagnostic report. Appending keeps
 # any NODE_OPTIONS the caller already set.
@@ -113,9 +126,16 @@ if [[ $WEDGED -eq 1 ]] && kill -0 "$PI_PID" 2>/dev/null; then
     echo "pid: $PI_PID"
     echo "cwd: $PWD"
     echo "stall_seconds: $STALL_SECONDS"
-    # argv may contain the full prompt text (pi -p "..."): record shape, not content.
+    # argv may contain the full prompt text (pi -p "..."): record shape, not
+    # content. Flag NAMES only — "--option=secret" persisted its value verbatim,
+    # and prompt text beginning with a dash is not a flag at all (2026-08-11
+    # second inspection). Anything that does not look like a plain flag name
+    # after stripping "=..." is dropped.
     echo "argc: $#"
-    echo "flags: $(for a in "$@"; do case "$a" in -*) printf '%s ' "$a";; esac; done)"
+    echo "flags: $(for a in "$@"; do
+      n="${a%%=*}"
+      [[ "$n" =~ ^--?[A-Za-z0-9][A-Za-z0-9_-]{0,40}$ ]] && printf '%s ' "$n"
+    done)"
     echo "pi_version: $PI_VERSION"
   } > "$BUNDLE/context.txt"
   bounded 5 ps -p "$PI_PID" -o pid,ppid,stat,etime,time,%cpu,%mem > "$BUNDLE/ps.txt" 2>&1
@@ -129,23 +149,9 @@ if [[ $WEDGED -eq 1 ]] && kill -0 "$PI_PID" 2>/dev/null; then
   # diagnostic bundle must never be the most credential-dense file on the disk.
   for report in "$BUNDLE"/report.*.json; do
     [[ -f "$report" ]] || continue
-    bounded 10 node -e '
-      const fs = require("fs");
-      const path = process.argv[1];
-      try {
-        const full = JSON.parse(fs.readFileSync(path, "utf8"));
-        const h = full.header ?? {};
-        fs.writeFileSync(path, JSON.stringify({
-          redacted: "environmentVariables, commandLine, and all unlisted sections removed by pi-watchdog",
-          header: { event: h.event, trigger: h.trigger, nodejsVersion: h.nodejsVersion,
-                    platform: h.platform, arch: h.arch, dumpEventTime: h.dumpEventTime },
-          javascriptStack: full.javascriptStack ?? null,
-          libuv: full.libuv ?? null,
-          resourceUsage: full.resourceUsage ?? null,
-        }, null, 1));
-      } catch { fs.rmSync(path, { force: true }); } // unparsable: delete, never keep raw
-    ' "$report"
+    bounded 10 node "$SCRIPT_DIR/redact-node-report.mjs" "$report"
   done
+  cleanup_raw_reports  # a redactor that timed out or died must not leave a raw report behind
   ls -la "$BUNDLE" > "$BUNDLE/bundle-listing.txt" 2>&1
   kill "$PI_PID" 2>/dev/null
   wait "$PI_PID" 2>/dev/null

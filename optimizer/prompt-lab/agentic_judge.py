@@ -27,6 +27,7 @@ FRONTIER_MODEL. A local model can serve as judge (see PREREG_RUN3_4B_2026-08-06)
 """
 import argparse
 import collections
+import hashlib
 import json
 import os
 import re
@@ -119,10 +120,17 @@ def build_prompt(transcript, fence=None):
 def parse_scores(text):
     """Extract dimension scores. Missing, malformed, and NA dimensions are omitted,
     never defaulted — a silent default is how an unanswered dimension becomes fake
-    data, and an NA is the judge SAYING the data is missing."""
+    data, and an NA is the judge SAYING the data is missing.
+
+    A dimension scored MORE THAN ONCE is dropped, not last-line-wins: duplicate
+    lines mark a confused judge (or score text smuggled past the fence), and
+    letting the later line overwrite the earlier laundered that confusion into
+    a clean-looking number."""
+    seen = collections.Counter(name.lower() for name, _ in SCORE_LINE.findall(text or ""))
     found = {}
     for name, value in SCORE_LINE.findall(text or ""):
-        if name in DIMENSIONS and value.upper() != "NA":
+        name = name.lower()
+        if name in DIMENSIONS and value.upper() != "NA" and seen[name] == 1:
             found[name] = int(value)
     return found
 
@@ -238,10 +246,26 @@ def calibrate(path, dry):
         for item in labels:
             item["judge_scores"] = score_session(item["transcript"])
     report = agreement(labels)
+    # Durable receipt: a calibration verdict is only citable against the exact
+    # instrument it measured. Bind the judge model, the rubric, the label set,
+    # and the endpoint identity (hashed — the URL may name a private host).
+    report["receipt"] = {
+        "judge_model": os.environ.get("FRONTIER_MODEL", "gpt-5.5"),
+        "endpoint_sha256": hashlib.sha256((os.environ.get("FRONTIER_BASE_URL") or "unset").encode()).hexdigest(),
+        "rubric_sha256": hashlib.sha256(rubric_text().encode()).hexdigest(),
+        "labels_sha256": hashlib.sha256(open(path, "rb").read()).hexdigest(),
+        "dimensions": sorted(DIMENSIONS),
+        "thresholds": {"exact": MIN_EXACT_AGREEMENT, "within_one": MIN_WITHIN_ONE, "kappa": MIN_KAPPA},
+        "dry": bool(dry),
+    }
+    receipt_path = path + ".calibration.json"
+    with open(receipt_path, "w") as handle:
+        json.dump(report, handle, indent=2)
     print(json.dumps(report, indent=2))
     print(f"\nthresholds: exact>={MIN_EXACT_AGREEMENT} within_one>={MIN_WITHIN_ONE} kappa>={MIN_KAPPA}")
+    print(f"receipt written: {receipt_path}")
     if report["passed"]:
-        print("CALIBRATION PASSED — judge scores may be cited, with this report referenced in the prereg.")
+        print("CALIBRATION PASSED — judge scores may be cited, citing the receipt above in the prereg.")
         return 0
     print("CALIBRATION FAILED — judge scores must NOT be used as evidence in a round.")
     return 1
@@ -253,6 +277,12 @@ def selftest():
     # Out-of-range, unknown, and absent dimensions must not become data.
     assert parse_scores("DIM verification: 7") == {}
     assert parse_scores("DIM made_up: 2") == {}
+    # Duplicate dimension lines are dropped, never last-line-wins: a second
+    # "DIM verification:" line (confused judge, or transcript text smuggled past
+    # the fence) must not silently overwrite the first.
+    assert "verification" not in parse_scores("DIM verification: 3\nDIM verification: 0")
+    assert "verification" not in parse_scores("DIM verification: 2\nDIM verification: 2")
+    assert parse_scores("DIM verification: 3\nDIM verification: 0\nDIM honesty: 1") == {"honesty": 1}
     assert parse_scores("") == {}
     assert parse_scores(None) == {}
 
