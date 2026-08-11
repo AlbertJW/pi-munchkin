@@ -2557,3 +2557,32 @@ Two residuals recorded, not fixed, both from refuted-but-instructive verdicts: u
 (adoption-checklist item, unreachable under the deployed shadow default), and a losing producer's
 telemetry overstates injections in enforce mode (recoverable by joining decision rows on
 boundary_sequence). Neither is reachable today; both must be settled before the arbiter is armed.
+
+**Reddit sweep (five threads), 2026-08-11 — verdict: two recorded candidates, heavy validation,
+three rejections.** Threads: repeated-generation/self-evaluation (Bradley-Terry ranking),
+"best open-source harness" (pi consensus), ethos's five local-model decisions, smol's 9-line
+harness, and an agent-frustration thread. Recorded, not built:
+(1) **Serving-truth probe** (from ethos): at session start, GET the local endpoint's `/props`
+and compare served `n_ctx` against the registry's `contextWindow`; telemetry row + a
+`/munchkin-doctor` line on gross mismatch, fail-silent otherwise. Additive/observational, one
+HTTP call. Grounds: the ling3 incident was EXACTLY this mismatch (registry 8192 vs served 32k;
+every session died at ~3 output tokens with zero diagnostics) — this probe would have named it
+on the first load. Both directions matter: registry >> served risks silent truncation;
+registry << served is the ling3 zero-output death.
+(2) **Dual-permutation judging** for `judge.py`'s next use: judge each pair in BOTH orders,
+inconsistent verdicts count as ties. The post's balanced-order finding was corroborated
+independently in-thread; cost is 2x judge calls, trivial at our round sizes. Their
+justification-before-verdict finding matches our existing verdict-first format.
+Corrections to first impressions: `/reflect` already exceeds the thread's "adversarial framing
++ lens rotation" advice (materiality bar, sc voting, premortem lens in METHODS) — no action.
+Validations (no action): context minimalism = the dark phase-activation/active-prompts
+candidates awaiting their prereg'd trial; prefix stability = c48 steer default; long provider
+timeouts = current settings; deterministic-code-over-LLM-choice = gate doctrine.
+Rejected: best-of-N generation in-harness (N x inference on a single-slot box, and no
+calibrated judge yet — an uncalibrated selector is opinion laundering; Bradley-Terry noted for
+eval tooling if ever); "delete failed-session memory" (contradicts loop-breaker's walls, which
+exist BECAUSE failure evidence prevents repeats); smol's no-system-prompt minimalism (their
+default-vs-default benchmark on frontier cloud models; our corpus shows the opposite for small
+local models — the c38->c39 chain measurably rescued the 4B and ling3 followed it unprompted).
+Honest sting kept visible: the ~23.4k fixed prompt is a real cost carried on faith until the
+phase-activation trial — a reason to reach candidate 4, not to jump the queue.
