@@ -159,3 +159,28 @@ test("hashSurface: npm identities are folded in deterministically and change the
 	assert.notEqual(withNpm, changedIdentity, "a changed npm package version must change the digest");
 	await rm(dir, { recursive: true, force: true });
 });
+
+test("discoverEntryPoints: skills/**/*.md and APPEND_SYSTEM.md are prompt surface — in the hash, and content-sensitive", async () => {
+	const dir = await tmp();
+	await mkdir(join(dir, "extensions"), { recursive: true });
+	await writeFile(join(dir, "extensions", "foo.ts"), "export default function () {}\n");
+	await writeFile(join(dir, "settings.json"), JSON.stringify({ packages: [] }));
+	await mkdir(join(dir, "skills", "deep-research"), { recursive: true });
+	await writeFile(join(dir, "skills", "deep-research", "SKILL.md"), "# skill v1\n");
+	await writeFile(join(dir, "skills", "deep-research", "helper.py"), "# not .md: ignored\n");
+	await writeFile(join(dir, "APPEND_SYSTEM.md"), "governor text\n");
+
+	const { entries } = await discoverEntryPoints(dir);
+	assert.deepEqual(entries.sort(), [
+		join(dir, "APPEND_SYSTEM.md"),
+		join(dir, "extensions", "foo.ts"),
+		join(dir, "skills", "deep-research", "SKILL.md"),
+	].sort());
+
+	// The 2026-08-06 incident: a skill-text change must move the hash.
+	const before = await hashSurface(dir, entries);
+	await writeFile(join(dir, "skills", "deep-research", "SKILL.md"), "# skill v2 — changed\n");
+	const after = await hashSurface(dir, (await discoverEntryPoints(dir)).entries);
+	assert.notEqual(before, after, "skill edits are model-visible and must change the surface hash");
+	await rm(dir, { recursive: true, force: true });
+});

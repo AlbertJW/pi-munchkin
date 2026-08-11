@@ -45,6 +45,23 @@ export async function walkRelativeImports(entryPoints: string[]): Promise<Set<st
 
 type PackageManifest = { pi?: { extensions?: string[] } };
 
+/** Every .md below `dir`, recursively; empty if the directory is absent. */
+export async function walkPromptFiles(dir: string): Promise<string[]> {
+	let names: import("node:fs").Dirent[];
+	try {
+		names = await readdir(dir, { withFileTypes: true });
+	} catch {
+		return [];
+	}
+	const files: string[] = [];
+	for (const entry of names.sort((a, b) => a.name.localeCompare(b.name))) {
+		const child = join(dir, entry.name);
+		if (entry.isDirectory()) files.push(...await walkPromptFiles(child));
+		else if (entry.isFile() && entry.name.endsWith(".md")) files.push(child);
+	}
+	return files;
+}
+
 export type NpmPackageIdentity = { name: string; version: string; resolved: string; integrity: string };
 type LockPackageEntry = { version?: string; resolved?: string; integrity?: string };
 type PackageLock = { packages?: Record<string, LockPackageEntry> };
@@ -95,6 +112,15 @@ export async function discoverEntryPoints(agentDir: string): Promise<{ entries: 
 	} catch {
 		// no agents/ dir — role prompts are optional, nothing to add
 	}
+
+	// Skill text and the governor append are model-visible prompt surface, same
+	// class as agents/*.md. Before 2026-08-11 they were OUTSIDE the hash, which
+	// let two different model-visible changes share one hash (SURFACE_BOUNDARIES
+	// rows 2026-08-06 ×2 are the manifested case). Optional-if-missing, matching
+	// agents/ above; mirror:check separately proves presence.
+	entries.push(...await walkPromptFiles(join(agentDir, "skills")));
+	const appendPath = join(agentDir, "APPEND_SYSTEM.md");
+	if (existsSync(appendPath)) entries.push(appendPath);
 
 	const npmIdentities: NpmPackageIdentity[] = [];
 	const settings = JSON.parse(await readFile(join(agentDir, "settings.json"), "utf8")) as { packages?: string[] };

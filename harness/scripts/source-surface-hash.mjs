@@ -2,7 +2,7 @@
 
 import { readdir, readFile } from "node:fs/promises";
 import { resolve } from "node:path";
-import { hashSurface, walkRelativeImports } from "../lib/surface-walk.ts";
+import { hashSurface, walkPromptFiles, walkRelativeImports } from "../lib/surface-walk.ts";
 
 const root = resolve(process.argv[2] ?? resolve(import.meta.dirname, "../.."));
 const manifest = JSON.parse(await readFile(resolve(root, "package.json"), "utf8"));
@@ -11,4 +11,10 @@ const files = await walkRelativeImports(entries);
 for (const role of await readdir(resolve(root, "harness", "agents"))) {
   if (role.endsWith(".md")) files.add(resolve(root, "harness", "agents", role));
 }
+// Prompt surface outside the import graph: skill text + the governor append
+// (model-visible; excluded before 2026-08-11 — hashes across that date do not pool).
+for (const dir of manifest.pi?.skills ?? []) {
+  for (const file of await walkPromptFiles(resolve(root, dir))) files.add(file);
+}
+files.add(resolve(root, "harness", "APPEND_SYSTEM.md"));
 console.log(await hashSurface(root, files));
