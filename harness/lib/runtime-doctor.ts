@@ -152,6 +152,11 @@ export function renderDoctor(input: {
 	sandbox: "declared" | "host" | "unknown";
 	preservationReason?: string;
 	activation?: { mode?: unknown; phase?: unknown; deferred?: unknown[]; attempted?: unknown[] };
+	// Runtime serving-truth: what the local server actually serves vs what the
+	// registry promises (the ling3 incident was this mismatch, undiagnosed).
+	// Numbers and verdict ONLY — never the probed URL (tests pin the absence of
+	// "http://" and "baseUrl" in this report).
+	servingTruth?: { served_n_ctx: number; registry_ctx: number; verdict: string } | null;
 }): string {
 	const surface = input.surfaceHash && /^[a-f0-9]{64}$/i.test(input.surfaceHash)
 		? input.surfaceHash.toLowerCase() : "unknown";
@@ -159,6 +164,9 @@ export function renderDoctor(input: {
 	return [
 		`munchkin-doctor: pi=${boundedAtom(input.piVersion)}; harness_surface=${surface}`,
 		`model=${boundedAtom(input.model?.provider)}/${boundedAtom(input.model?.id)}; provider=${boundedAtom(input.providerName)}; api=${boundedAtom(input.model?.api)}; strict_tool_sampling=${strictModeFlag(input.model)}; json_schema_sampling=not-probed`,
+		input.servingTruth
+			? `serving_truth=served_n_ctx:${Math.trunc(input.servingTruth.served_n_ctx)}; registry_ctx:${Math.trunc(input.servingTruth.registry_ctx)}; verdict:${boundedAtom(input.servingTruth.verdict)}`
+			: "serving_truth=not-probed",
 		`tools=${input.tools.active}/${input.tools.all} active/all; preserved_explicit=${input.tools.preservedExplicit}; preservation_reason=${boundedAtom(input.preservationReason, "none")}`,
 		`sources(sourceInfo.source|scope|origin): ${input.tools.sourceGroups.join(", ") || "none"}`,
 		`missing_first_party=${input.tools.missing.join(",") || "none"}; duplicates=${input.tools.duplicates.join(",") || "none"}; overrides=${input.tools.overrides.join(",") || "none"}`,

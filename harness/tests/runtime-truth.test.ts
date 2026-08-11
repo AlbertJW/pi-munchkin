@@ -94,3 +94,104 @@ test("only actual streamed deltas count as first tokens", async () => {
 	assert.equal(mod.isFirstTokenEvent({ type: "text_delta", delta: "" }), false);
 	assert.equal(mod.isFirstTokenEvent({ type: "done", delta: "x" }), false);
 });
+
+test("serving verdict follows the pi-health convention: served-8192 <= registry <= served", async () => {
+	const mod = await import(`../extensions/runtime-truth.ts?verdict=${Date.now()}-${Math.random()}`);
+	assert.equal(mod.computeServingVerdict(32768, 8192), "registry_under_served", "the ling3 case");
+	assert.equal(mod.computeServingVerdict(65536, 61440), "ok", "the deliberate headroom stays quiet");
+	assert.equal(mod.computeServingVerdict(4096, 8192), "registry_over_served", "over-promise is always flagged");
+	assert.equal(mod.computeServingVerdict(65536, 57344), "ok", "exactly at the 8192 boundary is ok");
+	assert.equal(mod.computeServingVerdict(65536, 57343), "registry_under_served", "one past the boundary flags");
+});
+
+test("probeServingTruth: named cloud hosts and public IPs are NEVER fetched", async () => {
+	const mod = await import(`../extensions/runtime-truth.ts?guard=${Date.now()}-${Math.random()}`);
+	let calls = 0;
+	const spy = (async () => { calls += 1; throw new Error("must not be called"); }) as unknown as typeof fetch;
+	// The naive isPrivateAddress reuse fails THIS case: a named host reads as "private".
+	assert.equal(await mod.probeServingTruth({ baseUrl: ["https://", "api.anthropic.com/v1"].join(""), modelId: "m" }, { fetchFn: spy }), null);
+	assert.equal(await mod.probeServingTruth({ baseUrl: ["http://", "8.8.8.8/v1"].join(""), modelId: "m" }, { fetchFn: spy }), null);
+	assert.equal(await mod.probeServingTruth({ baseUrl: "not a url", modelId: "m" }, { fetchFn: spy }), null);
+	assert.equal(calls, 0, "guard must reject before any network I/O");
+});
+
+test("probeServingTruth: reads n_ctx from /props, falls back to the llama-swap route, fails silent", async () => {
+	const mod = await import(`../extensions/runtime-truth.ts?probe=${Date.now()}-${Math.random()}`);
+	const respond = (body: unknown, ok = true) => ({ ok, json: async () => body }) as Response;
+
+	const direct = (async (url: string) => {
+		assert.equal(String(url), ["http://", "127.0.0.1:8080/props"].join(""));
+		return respond({ default_generation_settings: { n_ctx: 65536 } });
+	}) as unknown as typeof fetch;
+	assert.deepEqual(
+		await mod.probeServingTruth({ baseUrl: ["http://", "127.0.0.1:8080/v1"].join(""), modelId: "qwen" }, { fetchFn: direct }),
+		{ served_n_ctx: 65536 });
+
+	const seen: string[] = [];
+	const swap = (async (url: string) => {
+		seen.push(String(url));
+		if (String(url).endsWith("/props") && !String(url).includes("/upstream/")) return respond({}, false);
+		return respond({ default_generation_settings: { n_ctx: 32768 } });
+	}) as unknown as typeof fetch;
+	assert.deepEqual(
+		await mod.probeServingTruth({ baseUrl: ["http://", "localhost:8080/v1"].join(""), modelId: "ling3/tiny" }, { fetchFn: swap }),
+		{ served_n_ctx: 32768 });
+	assert.equal(seen[1]?.includes("/upstream/ling3%2Ftiny/props"), true, "model id is URI-encoded in the route");
+
+	const broken = (async () => { throw new Error("refused"); }) as unknown as typeof fetch;
+	assert.equal(await mod.probeServingTruth({ baseUrl: ["http://", "127.0.0.1:9999/v1"].join(""), modelId: "m" }, { fetchFn: broken }), null);
+	const junk = (async () => ({ ok: true, json: async () => ({ nothing: true }) }) as Response) as unknown as typeof fetch;
+	assert.equal(await mod.probeServingTruth({ baseUrl: ["http://", "127.0.0.1:9999/v1"].join(""), modelId: "m" }, { fetchFn: junk }), null);
+});
+
+test("serving-truth wiring: probes once per model after a 2xx response, records telemetry, renders in doctor", async () => {
+	const telemetry = join(mkdtempSync(join(tmpdir(), "st-")), "t.jsonl");
+	const prior = { file: process.env.TELEMETRY_FILE, source: process.env.TELEMETRY_SOURCE };
+	process.env.TELEMETRY_FILE = telemetry;
+	process.env.TELEMETRY_SOURCE = "test";
+	const realFetch = globalThis.fetch;
+	let fetches = 0;
+	try {
+		globalThis.fetch = (async () => {
+			fetches += 1;
+			return { ok: true, json: async () => ({ default_generation_settings: { n_ctx: 32768 } }) } as Response;
+		}) as typeof fetch;
+		const fp = makeFakePi();
+		const mod = await import(`../extensions/runtime-truth.ts?wiring=${Date.now()}-${Math.random()}`);
+		mod.default(fp.pi as never);
+		const notices: string[] = [];
+		const ctx = {
+			cwd: "/tmp",
+			model: { id: "small", provider: "local", baseUrl: ["http://", "127.0.0.1:8080/v1"].join(""), contextWindow: 8192, api: "openai-completions" },
+			modelRegistry: { getProviderDisplayName: () => "Local" },
+			ui: { notify: (message: string) => notices.push(message) },
+		};
+		await fire(fp, "before_provider_request", {}, ctx);
+		await fire(fp, "after_provider_response", { status: 200 }, ctx);
+		await fire(fp, "after_provider_response", { status: 200 }, ctx);
+		await new Promise((resolve) => setTimeout(resolve, 0)); // flush the fire-and-forget probe
+		assert.equal(fetches, 1, "exactly one probe per model");
+		const rows = readFileSync(telemetry, "utf8").trim().split("\n").map((line) => JSON.parse(line));
+		const row = rows.find((r) => r.ext === "runtime" && r.kind === "serving-truth");
+		assert.ok(row, "serving-truth telemetry row recorded");
+		assert.equal(row.served_n_ctx, 32768);
+		assert.equal(row.registry_ctx, 8192);
+		assert.equal(row.verdict, "registry_under_served");
+		assert.equal(notices.length, 1, "mismatch notifies once");
+		assert.equal(notices[0].includes("http://"), false, "no URL in the notice");
+
+		await fp.commands.get("munchkin-doctor")!.handler("", {
+			cwd: "/tmp",
+			model: { provider: "local", id: "small", api: "openai-completions", compat: { supportsStrictMode: false } },
+			modelRegistry: { getProviderDisplayName: () => "Local" },
+			ui: { notify: (message: string) => notices.push(message) },
+		});
+		const doctor = notices.at(-1)!;
+		assert.match(doctor, /serving_truth=served_n_ctx:32768; registry_ctx:8192; verdict:registry_under_served/);
+		assert.equal(doctor.includes("http://"), false, "doctor still carries no URLs");
+	} finally {
+		globalThis.fetch = realFetch;
+		if (prior.file === undefined) delete process.env.TELEMETRY_FILE; else process.env.TELEMETRY_FILE = prior.file;
+		if (prior.source === undefined) delete process.env.TELEMETRY_SOURCE; else process.env.TELEMETRY_SOURCE = prior.source;
+	}
+});

@@ -59,6 +59,10 @@ export const EVENT_CATALOG = {
 	"git-guard/confirm": { approved: "boolean", changes: "number" },
 	"context-inlet-guard/block": { risky: "boolean", bytes: "number", n: "number", bigLimit: "boolean" },
 	"surface-receipt/surface": { sha256: "string" },
+	// Registry contextWindow vs the server's actually-served n_ctx, probed once
+	// per model per session after the first successful response. No URLs by
+	// construction (FORBIDDEN_DETAIL_FIELD would ban them anyway).
+	"runtime/serving-truth": { served_n_ctx: "number", registry_ctx: "number", verdict: "string" },
 	"runtime/provider-timing": {
 		request_seq: "number", request_to_headers_ms: ["number", "null"],
 		first_token_ms: ["number", "null"], stream_completion_ms: ["number", "null"],
