@@ -1,6 +1,11 @@
 {
   "admission": {
-    "approved": false,
+    "approved": true,
+    "approved_prompt_hashes": [
+      "3f49d5a5380961fbf14affef8c211656f3b16e98ddefb3534e99676f3c4b7aa4",
+      "d936cb22964b868392b853e14d698d6c43a40209b189f1d93d545a1e8f20cf34",
+      "9519dbb558301d70c085763da507fb314e199f659a1ec70b50dd20ffba936a39"
+    ],
     "automated": {
       "checked_at": "2026-08-11T14:11:42Z",
       "hash_drift": [],
@@ -113,7 +118,10 @@
           }
         ]
       }
-    }
+    },
+    "manifest_sha256": "5a9b0cd9d0957ab90650b3f2c7524e4898a7730181e93600cfd101e4dde3ce1c",
+    "reviewed_at": "2026-08-11T16:22:08Z",
+    "reviewer": "Albert Wessels (chat approval 2026-08-11)"
   },
   "artifacts": [
     {
@@ -238,6 +246,8 @@
     }
   },
   "timestamps": {
-    "created_at": "2026-08-11T00:00:00Z"
+    "admitted_at": "2026-08-11T16:22:08Z",
+    "created_at": "2026-08-11T00:00:00Z",
+    "expires_at": "2026-11-09T16:22:08Z"
   }
 }
