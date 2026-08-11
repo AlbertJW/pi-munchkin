@@ -28,3 +28,16 @@ test("diff secret scan reports only location and pattern identifiers", () => {
   assert(!output.includes(ipv6Endpoint));
   assert(!output.includes("token="));
 });
+
+test("PROVIDER_TOKEN placeholder suppression is scoped to the token, not the line", () => {
+  const real = ["sk", "-ABCDEFGHIJKLMNOPQRSTUV12345"].join("");
+  const fake = ["sk", "-dummydummydummydummydummy"].join("");
+  const lines = [
+    // the QA repro: a real token whose LINE mentions "test" must still be found
+    { file: "a.ts", line: 1, text: `const key = "${real}"; // used in test env` },
+    // a genuinely fake token is still suppressed, wherever it sits
+    { file: "a.ts", line: 2, text: `const key = "${fake}";` },
+  ];
+  const findings = scanAddedLines(lines);
+  assert.deepEqual(findings, [{ file: "a.ts", line: 1, pattern: "PROVIDER_TOKEN" }]);
+});

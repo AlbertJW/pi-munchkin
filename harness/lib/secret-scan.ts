@@ -35,9 +35,13 @@ export function scanAddedLines(lines: DiffLine[]): SecretFinding[] {
   const bearerMarker = new RegExp(["authorization", "\\s*:\\s*bearer\\s+[^\\s]{16,}"].join(""), "i");
   for (const line of lines) {
     let pattern: string | null = null;
+    // Placeholder suppression is judged against the MATCHED TOKEN, never the
+    // whole line — same scope CREDENTIAL_ASSIGNMENT below already uses. A real
+    // key on a line that happens to say "test" or "example" must still be found.
+    const providerMatch = providerToken.exec(line.text);
     if (line.text.includes(privateKeyMarker)) pattern = "PRIVATE_KEY";
     else if (bearerMarker.test(line.text)) pattern = "AUTH_BEARER";
-    else if (providerToken.test(line.text) && !placeholder.test(line.text)) pattern = "PROVIDER_TOKEN";
+    else if (providerMatch && !placeholder.test(providerMatch[0])) pattern = "PROVIDER_TOKEN";
     else {
       const assignment = credentialAssignment.exec(line.text);
       if (assignment && !placeholder.test(assignment[1])) pattern = "CREDENTIAL_ASSIGNMENT";
