@@ -221,7 +221,7 @@ function valueType(value: unknown): TelemetryFieldType | "object" | "undefined" 
 // Exported so the static half of this guard (telemetry-catalog.test.ts) can assert
 // against the real set rather than a copy that drifts.
 export const RESERVED_ENVELOPE_FIELDS = new Set([
-	"schema", "ts", "seq", "source", "sk", "harness_surface_sha256", "config_sha256", "ext", "kind",
+	"schema", "ts", "seq", "source", "sk", "si", "harness_surface_sha256", "config_sha256", "ext", "kind",
 ]);
 
 export function validateCatalogDetail(ext: string, kind: string, detail: Record<string, unknown>): string[] {

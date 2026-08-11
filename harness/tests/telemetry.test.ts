@@ -180,3 +180,26 @@ test("authenticated rows MAC the exact flat JSON payload", () => {
 	assert.equal(match[2], createHmac("sha256", key).update(payload).digest("hex"));
 	assert.deepEqual(JSON.parse(line), { sk: "gate-a", ext: "context-watcher", kind: "compact-requested", mac: match[2] });
 });
+
+test("si: one stable per-process session id, shared across module instances", async () => {
+	// `run_id` falls back to the cwd key, so it is NOT session identity (the
+	// 29%-then-0% exposure bug). `si` is one random id per pi process, stored on
+	// globalThis so pi's per-extension jiti instances agree on it.
+	withFile((file) => {
+		record("loop-breaker", "steer", { tier: 1, byTool: true, byReason: false, repeat: 3, streak: 3, injected_chars: 4, turnIndex: 1 });
+		record("verify-gate", "steer", { failed: true, fires: 1, sessionFires: 1, injected_chars: 8, turnIndex: 2 });
+		const [a, b] = readFileSync(file, "utf8").trim().split("\n").map((line) => JSON.parse(line));
+		assert.match(a.si, /^[0-9a-f-]{36}$/, "si must be a UUID");
+		assert.equal(a.si, b.si, "one process = one si");
+		assert.notEqual(a.si, a.sk, "si must not be the cwd key");
+	});
+	// A second module instance (fresh cache-busted import = pi's per-extension
+	// jiti isolation) must reuse the SAME si via globalThis, not mint a new one.
+	const shared = (globalThis as Record<string, unknown>)["__pi_telemetry_session_instance_v1"];
+	const fresh = await import(`../lib/telemetry.ts?si-isolation=${Date.now()}`);
+	withFile((file) => {
+		fresh.record("loop-breaker", "steer", { tier: 1, byTool: true, byReason: false, repeat: 3, streak: 3, injected_chars: 4, turnIndex: 1 });
+		const row = JSON.parse(readFileSync(file, "utf8").trim().split("\n").pop() as string);
+		assert.equal(row.si, shared, "a fresh module instance must share the process si");
+	});
+});

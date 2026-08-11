@@ -17,11 +17,28 @@ have to be answered from real sessions:
      and the round would be wasted box time.
   3. Do runs reach settlement, i.e. is the instrument seeing whole sessions?
 
+Session identity and population discipline (2026-08-11 finding):
+
+  - A session is identified by the envelope's `si` field — one random id per pi
+    process (telemetry.ts). `run_id` is NOT identity: it falls back to the cwd
+    key for interactive rows and can carry plan/experiment ids from detail, so
+    keying on it both collapsed forty runs into one observation (the 29% bug)
+    and can split one session into pseudo-sessions. Rows without `si` (written
+    before the field existed) are counted and EXCLUDED — inventing identity for
+    them produced two wrong exposure numbers in a row (29%, then 0%).
+  - All rates are computed within ONE harness surface hash (default: the most
+    recent one in the stream). Pooling across surface hashes violates the
+    boundary-row rule.
+
+Every rate is therefore over identity-sound sessions on the bound surface, or
+it is reported as UNKNOWN — never a number computed on a mixed population.
+
 Thresholds are declared here, before the data is read.
 
   ./shadow_report.py                       # the live interactive stream
   ./shadow_report.py --file path.jsonl     # a specific capture
   ./shadow_report.py --source gate         # gate rows instead of interactive
+  ./shadow_report.py --surface <sha256>    # bind a specific surface hash
   ./shadow_report.py --selftest            # offline
 """
 import argparse
@@ -57,40 +74,47 @@ def load(path, source):
     return rows
 
 
-def session_keys(rows):
-    """One key per SESSION, not per working directory.
+def bind_surface(rows, surface=None):
+    """Keep only rows from one harness surface hash.
 
-    `sk` is the cwd basename (telemetry.ts:32) — unique per gate rep, but every
-    interactive session in the same repository shares it, so keying on sk alone
-    collapsed forty runs into one observation and silently invalidated the
-    30-session floor. `seq` is a per-process counter (telemetry.ts:77) that
-    restarts with each pi process, and for the sessions this report counts a
-    process IS the session. Key: run_id when the row carries one (gate rows),
-    else sk + a process epoch that increments whenever seq stops increasing.
+    Default: the most recent surface seen in the stream (rows are appended in
+    time order). Returns (bound_rows, surface, excluded_row_count). Rows with
+    no surface hash at all are excluded too — they cannot be attributed.
     """
-    keys = []
-    epochs = collections.defaultdict(int)      # sk -> current epoch
-    last_seq = {}                              # sk -> last seq seen
+    if surface is None:
+        for row in reversed(rows):
+            candidate = row.get("harness_surface_sha256")
+            if candidate:
+                surface = candidate
+                break
+    if surface is None:
+        return [], None, len(rows)
+    bound = [r for r in rows if r.get("harness_surface_sha256") == surface]
+    return bound, surface, len(rows) - len(bound)
+
+
+def split_by_identity(rows):
+    """Partition rows into identity-sound (carrying `si`) and legacy.
+
+    Only `si` counts: one random id per pi process, immune to the cwd-collapse
+    (sk), the fallback aliasing (run_id == sk), and detail-supplied run ids.
+    """
+    sound, legacy = [], []
     for row in rows:
-        sk = row.get("sk") or "unknown"
-        run_id = row.get("run_id")
-        seq = row.get("seq")
-        if isinstance(seq, (int, float)):
-            if sk in last_seq and seq <= last_seq[sk]:
-                epochs[sk] += 1
-            last_seq[sk] = seq
-        keys.append(str(run_id) if run_id else f"{sk}#p{epochs[sk]}")
-    return keys
+        (sound if isinstance(row.get("si"), str) and row["si"] else legacy).append(row)
+    return sound, legacy
 
 
-def analyse(rows):
+def analyse(rows, surface=None):
+    bound, surface, excluded_other_surface = bind_surface(rows, surface)
+    sound, legacy = split_by_identity(bound)
+
     sessions = collections.defaultdict(lambda: {
         "disagreements": collections.Counter(), "episodes_opened": 0,
         "episodes_exposed": 0, "recovered": 0, "settled": False, "kernel_receipts": 0,
     })
-    keys = session_keys(rows)
-    for key, row in zip(keys, rows):
-        session = sessions[key]
+    for row in sound:
+        session = sessions[row["si"]]
         ext, kind = row.get("ext"), row.get("kind")
         if ext == "run-kernel" and kind == "legacy-disagreement":
             session["disagreements"][row.get("dimension", "?")] += 1
@@ -105,9 +129,18 @@ def analyse(rows):
         elif ext == "failure-episode" and kind == "recovered":
             session["recovered"] += 1
 
+    population = {
+        "surface": surface,
+        "rows_excluded_other_or_no_surface": excluded_other_surface,
+        "rows_excluded_no_session_identity": len(legacy),
+        "identity_sound_rows": len(sound),
+    }
     total = len(sessions)
     if not total:
-        return {"sessions": 0, "verdict": "no data"}
+        return {"sessions": 0, "population": population, "verdict": "unknown",
+                "reason": "no identity-sound sessions on the bound surface — "
+                          "accumulate sessions written by a harness that emits `si` "
+                          "before citing any rate"}
 
     # Count SESSIONS per dimension, not rows: a session that disagrees five times
     # on one dimension is one disagreeing session, and rows/sessions produced a
@@ -141,6 +174,7 @@ def analyse(rows):
 
     return {
         "sessions": total,
+        "population": population,
         "sessions_with_kernel_receipts": observed,
         "q1_kernel_agreement": {
             "sessions_with_any_disagreement": sessions_with_disagreement,
@@ -167,8 +201,13 @@ def analyse(rows):
 
 def verdict_lines(report):
     if not report.get("sessions"):
-        return ["NO DATA — run some real sessions first."]
+        reason = report.get("reason", "run some real sessions first")
+        return [f"UNKNOWN — {reason}."]
     lines = []
+    excluded = report["population"]["rows_excluded_no_session_identity"]
+    if excluded:
+        lines.append(f"NOTE: {excluded} row(s) without session identity excluded — "
+                     "rates below cover only identity-sound sessions.")
     if not report["enough_sessions"]:
         lines.append(f"HOLD: {report['sessions']} sessions < {MIN_SESSIONS}; every rate here is noise.")
     q1, q2 = report["q1_kernel_agreement"], report["q2_episode_exposure"]
@@ -189,11 +228,18 @@ def verdict_lines(report):
 def selftest():
     seq_counter = {"n": 0}
 
-    def row(sk, ext, kind, **extra):
+    def row(si, ext, kind, surface="hashA", **extra):
         seq_counter["n"] += 1
-        return dict(sk=sk, ext=ext, kind=kind, source="interactive", seq=seq_counter["n"], **extra)
+        base = dict(sk="myrepo", ext=ext, kind=kind, source="interactive",
+                    seq=seq_counter["n"], harness_surface_sha256=surface, **extra)
+        if si is not None:
+            base["si"] = si
+        return base
 
-    assert analyse([])["sessions"] == 0
+    unknown = analyse([])
+    assert unknown["sessions"] == 0 and unknown["verdict"] == "unknown"
+    assert any("UNKNOWN" in line for line in verdict_lines(unknown))
+
     rows = []
     for index in range(10):
         session = f"s{index}"
@@ -227,19 +273,36 @@ def selftest():
     assert 0.0 <= quiet_report["q3_settlement"]["share"] <= 1.0, "a share must be a share"
     assert quiet_report["q2_episode_exposure"]["sufficient"] is False
     assert any("UNDERPOWERED" in line for line in verdict_lines(quiet_report))
-    # SESSION keying, not working-directory keying (the forty-runs-one-repo bug):
-    # forty rows sharing one sk but carrying distinct run_ids are forty sessions.
-    forty = [dict(sk="myrepo", ext="run-kernel", kind="receipt", source="interactive",
-                  seq=i + 1, run_id=f"r{i}") for i in range(40)]
-    assert analyse(forty)["sessions"] == 40, "distinct run_ids must not collapse into one sk bucket"
 
-    # ...and without run_ids, a seq RESET marks a new pi process = new session.
-    resets = []
-    for process_index in range(3):
-        for seq in (1, 2, 3):
-            resets.append(dict(sk="myrepo", ext="run-kernel", kind="receipt",
-                               source="interactive", seq=seq))
-    assert analyse(resets)["sessions"] == 3, "seq resets are process/session boundaries"
+    # SESSION identity is `si` and nothing else. Forty rows sharing one sk (and
+    # forty run_ids, which detail can forge) but distinct si are forty sessions...
+    forty = [row(f"proc{i}", "run-kernel", "receipt", run_id=f"r{i}") for i in range(40)]
+    assert analyse(forty)["sessions"] == 40
+
+    # ...one si carrying MANY run_ids (plan ids in detail) is ONE session, not
+    # several pseudo-sessions — the run_id-splitting bug.
+    one = [row("proc0", "run-kernel", "receipt", run_id=f"plan{i}") for i in range(5)]
+    assert analyse(one)["sessions"] == 1, "run_id must not split one process into pseudo-sessions"
+
+    # Rows WITHOUT si are excluded and counted, never guessed at: a mixed
+    # population must not produce a numeric exposure claim from legacy rows.
+    legacy_only = [dict(sk="myrepo", ext="failure-episode", kind="observed",
+                        source="interactive", seq=i + 1, run_id="myrepo",
+                        harness_surface_sha256="hashA") for i in range(50)]
+    legacy_report = analyse(legacy_only)
+    assert legacy_report["sessions"] == 0 and legacy_report["verdict"] == "unknown", \
+        "legacy rows without si must yield UNKNOWN, not a rate (the 29%-then-0% bug)"
+    assert legacy_report["population"]["rows_excluded_no_session_identity"] == 50
+
+    # Surface binding: rows from an older surface hash never pool into the rates.
+    mixed = [row(f"new{i}", "run-kernel", "receipt", surface="hashB") for i in range(3)]
+    mixed += [row(f"old{i}", "failure-episode", "observed", surface="hashA") for i in range(30)]
+    mixed_report = analyse(mixed)  # binds hashA: the most RECENT surface in the stream
+    assert mixed_report["population"]["surface"] == "hashA"
+    assert mixed_report["sessions"] == 30
+    assert mixed_report["population"]["rows_excluded_other_or_no_surface"] == 3
+    pinned = analyse(mixed, surface="hashB")
+    assert pinned["sessions"] == 3 and pinned["population"]["surface"] == "hashB"
 
     print("shadow_report selftest: ok")
 
@@ -248,6 +311,7 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--file", default=None)
     parser.add_argument("--source", default="interactive", help="telemetry source filter ('' for all)")
+    parser.add_argument("--surface", default=None, help="harness surface sha256 to bind (default: most recent in stream)")
     parser.add_argument("--selftest", action="store_true")
     args = parser.parse_args()
     if args.selftest:
@@ -257,7 +321,7 @@ def main():
     if not os.path.exists(path):
         print(f"no telemetry at {path}")
         return 1
-    report = analyse(load(path, args.source or None))
+    report = analyse(load(path, args.source or None), surface=args.surface)
     print(json.dumps(report, indent=2))
     print()
     for line in verdict_lines(report):

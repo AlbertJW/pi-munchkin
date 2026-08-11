@@ -8,7 +8,7 @@
 // (TELEMETRY=off). TELEMETRY_FILE overrides the path (tests); rotation keeps
 // one .old generation at TELEMETRY_MAX_BYTES (default 5MB).
 
-import { createHash, createHmac } from "node:crypto";
+import { createHash, createHmac, randomUUID } from "node:crypto";
 import { appendFileSync, mkdirSync, readFileSync, renameSync, statSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { validateCatalogDetail } from "./telemetry-catalog.ts";
@@ -80,6 +80,21 @@ function nextSequence(): number {
 	const next = previous + 1;
 	shared[SEQUENCE_CACHE_FLAG] = next;
 	return next;
+}
+
+// True per-session identity. `run_id` falls back to the cwd key, so many
+// distinct interactive sessions in one directory share it — the collapse that
+// made shadow_report's session counts incoherent (2026-08-11 finding). One
+// random id per pi PROCESS, shared across the per-extension jiti instances via
+// globalThis (same reason the sequence lives there). A subagent is its own
+// process and correctly gets its own id.
+const SESSION_INSTANCE_FLAG = "__pi_telemetry_session_instance_v1";
+function sessionInstance(): string {
+	const shared = globalThis as Record<string, unknown>;
+	if (typeof shared[SESSION_INSTANCE_FLAG] !== "string") {
+		shared[SESSION_INSTANCE_FLAG] = randomUUID();
+	}
+	return shared[SESSION_INSTANCE_FLAG] as string;
 }
 
 export type TelemetrySource = "test" | "gate" | "interactive" | "unknown";
@@ -198,6 +213,7 @@ function envelope(ext: string, kind: string, detail: Record<string, unknown>): R
 		seq: nextSequence(),
 		source: telemetrySource(),
 		sk: SESSION_KEY,
+		si: sessionInstance(),
 		run_id: typeof detail.run_id === "string" ? detail.run_id : (process.env.PI_RUN_ID || SESSION_KEY),
 		provider: typeof detail.provider === "string" ? detail.provider : (process.env.PI_MODEL_PROVIDER || null),
 		model: typeof detail.model === "string" ? detail.model : (process.env.PI_MODEL_ID || null),
