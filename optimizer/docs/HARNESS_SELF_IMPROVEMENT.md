@@ -2441,3 +2441,28 @@ empty-stop sessions are a c49 sibling (rescue an empty final turn the way pseudo
 rescued) — recorded, not built, at 1.4% and mostly historical. One reusable checklist item:
 before adopting any steer, verify the path it points at is not degraded relative to the path it
 replaces (jcode's batch nudge vs 50KB cap; our Run 3 research_note vs loop-breaker).
+
+**Run-kernel shadow rollout + five QA fixes, 2026-08-11 (human-gated).** Albert approved the
+controlled live mirror of the PR 2–7 run-kernel series at `461b1e9`: 108/108 first-party files,
+every new mechanism at its conservative default (RUN_KERNEL/LOOP_EPISODE_MODE/RUN_CAPSULE all
+shadow, PLAN_MODE=forced, MUNCHKIN_TOOL_ACTIVATION=dynamic, CONTROL_ARBITER=shadow), loaded
+hash recorded in SURFACE_BOUNDARIES. One first-load anomaly (pi idled pre-request ~6 min, no
+provider connection, killed; 7 subsequent loads clean incl. each kill switch) — unreproduced,
+documented, shadow telemetry is the watch. Then the multi-agent QA review's five confirmed
+findings were fixed, each with a both-polarity counterfactual test (`5392181..5722464`):
+(1) the state lens listener now skips abort/shutdown control proposals — the steer-fights-abort
+class loop-breaker's own comment forbids, reachable via the proposal side channel; (2) subagent
+env inheritance — the 08-07 default-on flips had silently re-enabled every adopted flag inside
+children because CHILD_ENV_KEYS predated them; children now inherit HARNESS_CONFIG_KEYS and a
+coverage test greps the source so every future env read must be classified propagate-or-exclude;
+(3) skills/**/*.md + APPEND_SYSTEM.md folded into BOTH surface hashers — the rows-23/25
+identical-hash collision proved skill text was outside the measurement boundary; HASH EPOCH
+CHANGE, nothing pools across 2026-08-11; (4) PROVIDER_TOKEN placeholder suppression scoped to
+the matched token (a real key on a line saying "test" was invisible); (5) secret-scan:diff now
+also scans origin/main...HEAD so commit→scan→push cannot pass on committed content (the class
+of the remote-IP incident). Notable meta: the fixed scanner immediately flagged my own fix
+(`const token =` tripped CREDENTIAL_ASSIGNMENT) — renamed the variable, never touched the
+guard. Docs synced: README security/defaults rows, HANDOVER rollout box + 08-11 defaults,
+CHANGELOG run-kernel + Fixed sections. Deferred, recorded: the plan_go isPlanning bypass stays
+un-guarded (blocking-class change mid-shadow-collection; medium severity per the adversarial
+audit); research-ledger/ketch fleet findings stale after the 08-10 rework — fresh pass owed.

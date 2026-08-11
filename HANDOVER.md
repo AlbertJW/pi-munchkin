@@ -1,4 +1,4 @@
-# Handover — pi_munchkin, 2026-08-04
+# Handover — pi_munchkin, 2026-08-11
 
 Read `optimizer/docs/MEASUREMENT_METHODOLOGY_2026-07.md` before interpreting any historical
 experiment. A 2026-07-27 audit established that most A/B results were unsupported: rounds at
@@ -23,6 +23,21 @@ adoption, deletion, live mirroring, and gate rounds are human-gated. Never touch
 `context-pressure*`.
 
 ## 2026-08 hardening series
+
+> **2026-08-11 SHADOW-SAFE BATCH ROLLOUT (supersedes the per-PR rollout-status notes below):**
+> the full PR 2–7 series was mirrored live at `461b1e9` with every new mechanism at its
+> conservative default (`RUN_KERNEL=shadow`, `LOOP_EPISODE_MODE=shadow`, `RUN_CAPSULE=shadow`
+> with no model injection, `PLAN_MODE=forced`, `MUNCHKIN_TOOL_ACTIVATION=dynamic`,
+> `CONTROL_ARBITER=shadow`). Five QA fixes followed the same day (`5392181..5722464`, mirrored):
+> lens steers skip abort/shutdown proposals; subagents inherit the harness configuration env so
+> explicit `=off` suppression survives into children; `skills/**/*.md` + `APPEND_SYSTEM.md`
+> joined BOTH surface hashers (**hash epoch change** — hashes across 2026-08-11 do not pool);
+> token-scoped `PROVIDER_TOKEN` suppression; secret scan covers the unpushed commit range.
+> Loaded hashes and a first-load startup anomaly (1 of 8, unreproduced, kill switches verified)
+> are recorded in `docs/SURFACE_BOUNDARIES.md`. Next per Albert's staged roadmap: shadow
+> evidence from real sessions, then ONE candidate at a time (semantic loop intervention →
+> capsule recovery → adaptive planning → phase activation), each n=6 calibration → prereg →
+> powered A/B ≥40/arm → second-fixture replication before any default flip.
 
 > **2026-08-10 run-kernel PR 1** (`286a48d`, merged and rolled out): a typed,
 > behavior-neutral state reducer now consumes canonical execution receipts after all existing
@@ -122,6 +137,12 @@ across a live-mirror rollout. Record the loaded `HARNESS_SURFACE_SHA256` with ev
   `HASHLINE_MAX_EDIT_BYTES`); images above 4 MiB are refused before allocation.
 - `PI_SUBAGENT_ENV_ALLOW` accepts validated extra environment names. The fixed list includes
   `LLAMA_API_KEY`; values are copied without logging.
+- 2026-08-11: subagents also inherit the harness configuration keys (`HARNESS_CONFIG_KEYS` in
+  `harness/vendor/pi-subagent/runner-env.js`), so a parent's explicit `=off` holds in children.
+  Any new `process.env` read in harness code must be classified there — a coverage test fails
+  otherwise. `CHAOS`, telemetry fds, and per-process run identity deliberately do not cross.
+- 2026-08-11: both surface hashers include `skills/**/*.md` and `APPEND_SYSTEM.md`. Skill or
+  governor text edits now move the hash; hashes computed before/after this change never pool.
 
 Full option, trigger, rollback, and security documentation is in `README.md`.
 
@@ -161,7 +182,8 @@ the rollout checkpoint. One gate round per box; never start one automatically.
 - Editing a running gate script can corrupt its byte-offset execution; stop the run first.
 - Configuration-mode exposure proves only that configuration was applied. It does not prove the
   mechanism fired.
-- Commit trailer: `Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>`.
+- Commit trailer: `Co-Authored-By: <the working Claude model> <noreply@anthropic.com>`
+  (e.g. `Claude Opus 5` or `Claude Fable 5`).
 
 ## Optimizer archive
 

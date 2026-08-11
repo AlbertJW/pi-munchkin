@@ -102,7 +102,7 @@ Most behavior is automatic. The primary commands are:
 | dynamic `compact_context` trigger | first crossing of 60% context usage | same one-attempt/manual-disable rule |
 | `CONTEXT_SURFACE_MODE` | `summary`; samples usage on first call, each eighth call, threshold crossings, and compaction without transcript hashing | `full` retains receipt calculations; `off` disables; gate sessions force `full` |
 | `CTX_REDUNDANCY_NUDGE=on` | opt-in duplicate-analysis nudge | forces `CONTEXT_SURFACE_MODE=full` because its mechanism requires duplicate analysis |
-| `STATE_LENS` | `steer`; injects only on loop-breaker events with cooldown | `off` kills it; `view` restores per-call view injection; `both` enables both paths |
+| `STATE_LENS` | `steer`; injects only on message-bearing loop-breaker events with cooldown — never at an abort/shutdown boundary, where a steer would fight the hard stop | `off` kills it; `view` restores per-call view injection; `both` enables both paths |
 | `STATE_LENS_MAX_CHARS` | bounds lens text | lower it to reduce model-visible state |
 | `BLACKBOARD` | `on`; bounded/redacted v2 persistence and cockpit | `off` disables cockpit and lens state |
 | `HASHLINE_MAX_READ_BYTES` | 16 MiB text preflight limit | set an explicit byte limit; `limit` still controls returned context, not file allocation |
@@ -168,10 +168,15 @@ oversized files.
 - URL checks canonicalize IPv4 and IPv6, reject non-global addresses, and validate every DNS and
   redirect hop. DNS answers can still change between validation and the downstream client's
   connection; this explicit DNS-rebinding/TOCTOU limitation is not a socket-level IP pin.
-- Subagents inherit only a fixed environment allowlist plus validated names explicitly added via
-  `PI_SUBAGENT_ENV_ALLOW`. Values are never logged.
-- `npm run secret-scan:diff` inspects staged, unstaged, and untracked added lines. Findings contain
-  only file, line, and pattern ID; matched text is never printed.
+- Subagents inherit a fixed environment allowlist (provider essentials), the harness configuration
+  keys — so a parent's explicit `X=off` suppression holds inside children instead of silently
+  reverting to the default-on behavior — plus validated names explicitly added via
+  `PI_SUBAGENT_ENV_ALLOW`. Fault injection (`CHAOS`), process-local telemetry fds, and per-process
+  run identity deliberately do not cross. Values are never logged.
+- `npm run secret-scan:diff` inspects staged, unstaged, and untracked added lines, plus the added
+  lines of every committed-but-unpushed commit (`origin/main...HEAD`), so a commit→scan→push
+  sequence cannot report clean on committed content. Findings contain only file, line, and
+  pattern ID; matched text is never printed.
 - Extensions run with the Pi process's permissions. Keep machine settings, credentials, and
   private endpoints out of this public repository.
 - Provider timing rows are numeric and observational: request-to-headers, first token, stream

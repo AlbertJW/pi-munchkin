@@ -10,6 +10,22 @@ candidates as dark). Net changes since 0.3.0; the full per-decision record is
 
 ### Added
 
+- **Run-kernel series, PR 1–7 (2026-08-10/11, mirrored live 2026-08-11 at conservative
+  defaults):** a typed shadow run kernel over canonical execution receipts (`RUN_KERNEL=shadow`);
+  execution-order verification and active-only tool prompts (dark, `VERIFY_EXECUTION_ORDER` /
+  `ACTIVE_TOOL_PROMPTS`); a shadow control arbiter with typed domain signals and an optional
+  bounded async telemetry writer (`CONTROL_ARBITER=shadow`, `TELEMETRY_WRITER=sync`); private
+  per-run capsules with an untrusted Markdown projection and `/run-status`
+  (`RUN_CAPSULE=shadow`, no model injection); a deterministic bounded recovery brief
+  (`RUN_CAPSULE=recovery`, opt-in); phase-aware capability activation
+  (`MUNCHKIN_TOOL_ACTIVATION=phase`, opt-in); and adaptive planning with stable-ID deltas
+  (`PLAN_MODE=adaptive`, opt-in). Per-PR design and QA ledgers under `docs/RUN_KERNEL_*.md`.
+- **Research pipeline reworked to parent-owned proof (2026-08-10, supersedes the earlier
+  research entries below):** genuine tool errors on refused citations, a private bounded v2
+  JSONL ledger under `${PI_CODING_AGENT_DIR}/artifacts/research-ledgers/` (the project-local
+  `.pi/research/` ledger and the advisory verifier subagent described below were removed),
+  bounded `research_recall`, and a parent re-read contract for delegated citations. Still dark
+  behind `RESEARCH_LEDGER`.
 - **Deep-research pipeline hardened after eval Run 2 (still dark):** `research_note` now
   auto-corrects a quote pasted from the wrong URL of a multi-page `web_read` (records under
   the true source; ambiguous only if the quote is in 2+ pages) — targeting the measured 62%
@@ -57,6 +73,17 @@ candidates as dark). Net changes since 0.3.0; the full per-decision record is
 - Optimizer instrument (now mothballed with it): graded `subscores` +
   `effort_report --graded`, manifest-pinned grade artifacts, admission approval pinned to
   manifest content, the `audit-sweep` graded fixture.
+
+### Fixed
+
+- **Five QA fixes (2026-08-11, each counterfactually tested, mirrored live):** the state lens
+  no longer steers at an abort/shutdown proposal boundary (a steer there fights loop-breaker's
+  hard stop); subagents inherit the harness configuration environment so an explicit `=off`
+  suppression survives into children (a coverage test now forces classification of every new
+  env read); both surface hashers include `skills/**/*.md` and `APPEND_SYSTEM.md` (hash epoch
+  change — hashes across 2026-08-11 do not pool); `PROVIDER_TOKEN` placeholder suppression is
+  scoped to the matched token, not the whole line; `secret-scan:diff` also scans the
+  committed-but-unpushed range (`origin/main...HEAD`).
 
 ### Changed
 
