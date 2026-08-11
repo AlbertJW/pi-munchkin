@@ -289,3 +289,31 @@ test("a same-target success recovers a verification_assertion episode, not only 
 	const wrong = other.observeSuccess({ toolName: "bash", args: { command: "npm test" } });
 	assert.equal(wrong.length, 0);
 });
+
+test("abandonment is terminal and distinct from recovery — degraded verification never 'recovers'", () => {
+	// M6 (Albert's inspection): after refusals degrade to a non-error, the old
+	// path scored the degraded result as a same-target SUCCESS, closing the
+	// fabricated-citation episode as "recovered" merely because verification was
+	// abandoned. Abandonment is its own terminal state.
+	const tracker = new FailureEpisodeTracker();
+	const failing = {
+		toolName: "research_note",
+		args: { claim: "c", url: "https://example.com/a", quote: "not on the page" },
+		isError: true,
+		text: "Citation verification failed: quote not found verbatim in any parent-read source.",
+	};
+	tracker.observeFailure(failing);
+
+	const abandoned = tracker.abandon({ toolName: "research_note", args: failing.args });
+	assert.equal(abandoned.length, 1);
+	assert.equal(abandoned[0].status, "abandoned");
+	assert.equal(abandoned[0].recovery, null, "abandonment carries NO recovery kind");
+	assert.equal(tracker.activeEpisodes().length, 0, "the episode is closed");
+
+	// A different-target episode is untouched by the abandonment.
+	const other = new FailureEpisodeTracker();
+	other.observeFailure(failing);
+	const untouched = other.abandon({ toolName: "bash", args: { command: "npm test" } });
+	assert.equal(untouched.length, 0);
+	assert.equal(other.activeEpisodes().length, 1);
+});

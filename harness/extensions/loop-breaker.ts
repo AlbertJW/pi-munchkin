@@ -490,6 +490,20 @@ export default function (pi: ExtensionAPI) {
 			toolName, args, isError, text: text.slice(0, 2048), planItemId,
 		};
 		if (!isFailureObservation(observation)) {
+			// A DEGRADED research_note result is verification giving up, not
+			// succeeding: it must not "recover" the fabricated-citation episode it
+			// belongs to. Close it as abandoned — a terminal state of its own —
+			// so the shadow stream never reports abandonment as recovery.
+			if (toolName === "research_note" &&
+				/^(Citation verification is unavailable|Research ledger capacity reached)/.test(text)) {
+				for (const episode of episodeTracker.abandon({ toolName, args })) {
+					record("failure-episode", "abandoned", {
+						episode_id: episode.id, failure_class: episode.failureClass, count: episode.count,
+					});
+				}
+				publishEpisodes();
+				return;
+			}
 			recordRecovery(episodeTracker.observeSuccess({ toolName, args }));
 			publishEpisodes();
 			return;

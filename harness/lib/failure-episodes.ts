@@ -15,7 +15,7 @@ export type FailureClass =
 	| "unknown";
 
 export type RecoveryKind = "tool_success" | "exact_gate" | "provider_first_token" | "manual_resume";
-export type EpisodeStatus = "active" | "recovered" | "settled";
+export type EpisodeStatus = "active" | "recovered" | "settled" | "abandoned";
 
 export type FailureObservation = {
 	toolName: string;
@@ -335,6 +335,28 @@ export class FailureEpisodeTracker {
 
 	activeEpisodes(): FailureEpisode[] {
 		return [...this.active.values()].map(cloneEpisode);
+	}
+
+	/** Close same-target episodes as ABANDONED — verification gave up, it did not
+	 * succeed. Overloading "recovered" here made a repeatedly fabricated citation
+	 * look recovered merely because the harness stopped checking; abandonment is
+	 * a terminal state of its own so the shadow stream stays semantically honest. */
+	abandon(observation: SuccessObservation, now = new Date().toISOString()): FailureEpisode[] {
+		const args = boundedArguments(observation.args);
+		const family = toolFamily(observation.toolName, args);
+		const target = targetHash(observation.toolName, args);
+		const abandoned: FailureEpisode[] = [];
+		for (const [key, episode] of this.active) {
+			if (episode.toolFamily !== family || episode.targetHash !== target) continue;
+			episode.status = "abandoned";
+			episode.recovery = null;
+			episode.updatedAt = now;
+			this.active.delete(key);
+			this.exposed.delete(key);
+			this.pushCompleted(episode);
+			abandoned.push(cloneEpisode(episode));
+		}
+		return abandoned;
 	}
 
 	clearActive(now = new Date().toISOString()): FailureEpisode[] {
