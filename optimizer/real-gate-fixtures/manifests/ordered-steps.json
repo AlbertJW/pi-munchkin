@@ -1,0 +1,243 @@
+{
+  "admission": {
+    "approved": false,
+    "automated": {
+      "checked_at": "2026-08-11T14:11:42Z",
+      "hash_drift": [],
+      "manifest_drift": false,
+      "passed": true,
+      "runs_per_state": 3,
+      "states": {
+        "gold_fail_to_pass": [
+          {
+            "output_tail": "",
+            "passed": true,
+            "returncode": 0
+          },
+          {
+            "output_tail": "",
+            "passed": true,
+            "returncode": 0
+          },
+          {
+            "output_tail": "",
+            "passed": true,
+            "returncode": 0
+          }
+        ],
+        "gold_pass_to_pass": [
+          {
+            "output_tail": "",
+            "passed": true,
+            "returncode": 0
+          },
+          {
+            "output_tail": "",
+            "passed": true,
+            "returncode": 0
+          },
+          {
+            "output_tail": "",
+            "passed": true,
+            "returncode": 0
+          }
+        ],
+        "mutant:shortcut": {
+          "fail_to_pass": [
+            {
+              "output_tail": "ner/test:960:18)\n      at Test.postRun (node:internal/test_runner/test:1522:19)\n      at Test.run (node:internal/test_runner/test:1447:12)\n      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7) {\n    generatedMessage: true,\n    code: 'ERR_ASSERTION',\n    actual: [ { id: 'm5', email: 'a***@example.com', name: 'Alan T' }, { id: 'm6', email: 'b***@example.com', name: 'B***' } ],\n    expected: [ { id: 'm5', email: 'a***@example.com', name: 'Alan T' }, { id: 'm6', email: 'b***@example.com', name: 'Betty Snyder' } ],\n    operator: 'deepStrictEqual',\n    diff: 'simple'\n  }\n",
+              "passed": false,
+              "returncode": 1
+            },
+            {
+              "output_tail": "ner/test:960:18)\n      at Test.postRun (node:internal/test_runner/test:1522:19)\n      at Test.run (node:internal/test_runner/test:1447:12)\n      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7) {\n    generatedMessage: true,\n    code: 'ERR_ASSERTION',\n    actual: [ { id: 'm5', email: 'a***@example.com', name: 'Alan T' }, { id: 'm6', email: 'b***@example.com', name: 'B***' } ],\n    expected: [ { id: 'm5', email: 'a***@example.com', name: 'Alan T' }, { id: 'm6', email: 'b***@example.com', name: 'Betty Snyder' } ],\n    operator: 'deepStrictEqual',\n    diff: 'simple'\n  }\n",
+              "passed": false,
+              "returncode": 1
+            },
+            {
+              "output_tail": "ner/test:960:18)\n      at Test.postRun (node:internal/test_runner/test:1522:19)\n      at Test.run (node:internal/test_runner/test:1447:12)\n      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7) {\n    generatedMessage: true,\n    code: 'ERR_ASSERTION',\n    actual: [ { id: 'm5', email: 'a***@example.com', name: 'Alan T' }, { id: 'm6', email: 'b***@example.com', name: 'B***' } ],\n    expected: [ { id: 'm5', email: 'a***@example.com', name: 'Alan T' }, { id: 'm6', email: 'b***@example.com', name: 'Betty Snyder' } ],\n    operator: 'deepStrictEqual',\n    diff: 'simple'\n  }\n",
+              "passed": false,
+              "returncode": 1
+            }
+          ],
+          "pass_to_pass": [
+            {
+              "output_tail": "",
+              "passed": true,
+              "returncode": 0
+            },
+            {
+              "output_tail": "",
+              "passed": true,
+              "returncode": 0
+            },
+            {
+              "output_tail": "",
+              "passed": true,
+              "returncode": 0
+            }
+          ]
+        },
+        "pristine_fail_to_pass": [
+          {
+            "output_tail": "_runner/test:960:18)\n      at Test.postRun (node:internal/test_runner/test:1522:19)\n      at Test.run (node:internal/test_runner/test:1447:12)\n      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7) {\n    generatedMessage: true,\n    code: 'ERR_ASSERTION',\n    actual: [ { id: 'm5', email: 'a***@example.com', name: 'Alan T' }, { id: 'm6', email: 'b***@example.com', name: '' } ],\n    expected: [ { id: 'm5', email: 'a***@example.com', name: 'Alan T' }, { id: 'm6', email: 'b***@example.com', name: 'Betty Snyder' } ],\n    operator: 'deepStrictEqual',\n    diff: 'simple'\n  }\n",
+            "passed": false,
+            "returncode": 1
+          },
+          {
+            "output_tail": "_runner/test:960:18)\n      at Test.postRun (node:internal/test_runner/test:1522:19)\n      at Test.run (node:internal/test_runner/test:1447:12)\n      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7) {\n    generatedMessage: true,\n    code: 'ERR_ASSERTION',\n    actual: [ { id: 'm5', email: 'a***@example.com', name: 'Alan T' }, { id: 'm6', email: 'b***@example.com', name: '' } ],\n    expected: [ { id: 'm5', email: 'a***@example.com', name: 'Alan T' }, { id: 'm6', email: 'b***@example.com', name: 'Betty Snyder' } ],\n    operator: 'deepStrictEqual',\n    diff: 'simple'\n  }\n",
+            "passed": false,
+            "returncode": 1
+          },
+          {
+            "output_tail": "_runner/test:960:18)\n      at Test.postRun (node:internal/test_runner/test:1522:19)\n      at Test.run (node:internal/test_runner/test:1447:12)\n      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7) {\n    generatedMessage: true,\n    code: 'ERR_ASSERTION',\n    actual: [ { id: 'm5', email: 'a***@example.com', name: 'Alan T' }, { id: 'm6', email: 'b***@example.com', name: '' } ],\n    expected: [ { id: 'm5', email: 'a***@example.com', name: 'Alan T' }, { id: 'm6', email: 'b***@example.com', name: 'Betty Snyder' } ],\n    operator: 'deepStrictEqual',\n    diff: 'simple'\n  }\n",
+            "passed": false,
+            "returncode": 1
+          }
+        ],
+        "pristine_pass_to_pass": [
+          {
+            "output_tail": "",
+            "passed": true,
+            "returncode": 0
+          },
+          {
+            "output_tail": "",
+            "passed": true,
+            "returncode": 0
+          },
+          {
+            "output_tail": "",
+            "passed": true,
+            "returncode": 0
+          }
+        ]
+      }
+    }
+  },
+  "artifacts": [
+    {
+      "path": "real-gate-fixtures/ordered-steps/package.json",
+      "sha256": "878da7628bacccc709ed067b80f01ad3d988a93363a92b240010c7dbc833d5d4"
+    },
+    {
+      "path": "real-gate-fixtures/ordered-steps/docs/roster.md",
+      "sha256": "d0249e7066bec4eda159912035b800b9fd8af064ca3368de98c4c6bc7d6ba360"
+    },
+    {
+      "path": "real-gate-fixtures/ordered-steps/src/roster.js",
+      "sha256": "4df20683041d1a033cef3768c393bd8f4cd6745da2f1bf5bdda9dbaa7d140d78"
+    },
+    {
+      "path": "real-gate-fixtures/ordered-steps/test/visible.test.js",
+      "sha256": "b0391a072cd0b23eef699e55531406ea4f97fb2d3691d68ea2e92625c6577e0b"
+    },
+    {
+      "path": "real-gate-fixtures/hidden/ordered-steps.test.js",
+      "sha256": "9d5791701d6d97fb7a4ea91d7799fcec721ed419780eb80f9ce81ba2999af27a"
+    },
+    {
+      "path": "real-gate-fixtures/patches/ordered-steps/gold.patch",
+      "sha256": "5405a7884f7e44cb5986c71d3119346a307ec4c8386b185eeebe52eca79cedac"
+    },
+    {
+      "path": "real-gate-fixtures/patches/ordered-steps/shortcut.patch",
+      "sha256": "192b6d7eae7766b0d543e18f22671c328aadf1cee17cd61397fa89a813ea293e"
+    }
+  ],
+  "cohort_id": "2026-08",
+  "fixture": {
+    "root": "real-gate-fixtures/ordered-steps",
+    "stage_copy": []
+  },
+  "fixture_version": "2026-08.1",
+  "one_shot": {
+    "context_files": [
+      "docs/roster.md",
+      "src/roster.js",
+      "test/visible.test.js"
+    ],
+    "eligible": false,
+    "max_context_bytes": 49152
+  },
+  "patches": {
+    "gold": "real-gate-fixtures/patches/ordered-steps/gold.patch",
+    "shortcut_mutants": [
+      "real-gate-fixtures/patches/ordered-steps/shortcut.patch"
+    ]
+  },
+  "prompts": {
+    "canonical": {
+      "sha256": "63c73799104a36a1f1003734c1a62404934911d15a996d889ffc19874a82d40d",
+      "text": "The community site publishes a member roster built by `buildRoster` in\nsrc/roster.js. Right now that function normalises and masks each member's email\naddress and passes their display name through, but it has no fallback when a\nmember left the display name blank on the signup form: those rows go out with an\nempty name, which the site will not accept.\n\nChange src/roster.js so that no published row ever has a blank name. When an\nentry supplies no name at all, or supplies one that is only whitespace, the\ndisplay name must instead be derived from the local part of the address that\nmember signed up with: split that local part on `.`, `_` and `-`, capitalise\neach piece, and join the pieces with single spaces. For example a member who\nsigned up as `grace_hopper@example.com` and typed no name must be published as\n`Grace Hopper`, and one who signed up as `Jean-Bartik@Example.com` must be\npublished as `Jean Bartik`.\n\nEverything already true of a published row must stay true: the row still has\nexactly the fields `id`, `email` and `name`; the email is still trimmed,\nlower-cased and masked the same way; a name the member actually typed is still\nused (trimmed) rather than replaced by a derived one; and the input entries are\nnot mutated. docs/roster.md describes the row format in full \u2014 read it before\nyou start.\n\nThe existing test suite in test/visible.test.js is a regression guard. Run the\ntests with `npm test` (which runs `node --test`) and make sure they all pass\nwhen you are done."
+    },
+    "perturbations": [
+      {
+        "approved": false,
+        "id": "equivalent-1",
+        "sha256": "3f49d5a5380961fbf14affef8c211656f3b16e98ddefb3534e99676f3c4b7aa4",
+        "text": "Complete the following repository task. Preserve existing behavior and verify the tests.\n\nThe community site publishes a member roster built by `buildRoster` in\nsrc/roster.js. Right now that function normalises and masks each member's email\naddress and passes their display name through, but it has no fallback when a\nmember left the display name blank on the signup form: those rows go out with an\nempty name, which the site will not accept.\n\nChange src/roster.js so that no published row ever has a blank name. When an\nentry supplies no name at all, or supplies one that is only whitespace, the\ndisplay name must instead be derived from the local part of the address that\nmember signed up with: split that local part on `.`, `_` and `-`, capitalise\neach piece, and join the pieces with single spaces. For example a member who\nsigned up as `grace_hopper@example.com` and typed no name must be published as\n`Grace Hopper`, and one who signed up as `Jean-Bartik@Example.com` must be\npublished as `Jean Bartik`.\n\nEverything already true of a published row must stay true: the row still has\nexactly the fields `id`, `email` and `name`; the email is still trimmed,\nlower-cased and masked the same way; a name the member actually typed is still\nused (trimmed) rather than replaced by a derived one; and the input entries are\nnot mutated. docs/roster.md describes the row format in full \u2014 read it before\nyou start.\n\nThe existing test suite in test/visible.test.js is a regression guard. Run the\ntests with `npm test` (which runs `node --test`) and make sure they all pass\nwhen you are done."
+      },
+      {
+        "approved": false,
+        "id": "equivalent-2",
+        "sha256": "d936cb22964b868392b853e14d698d6c43a40209b189f1d93d545a1e8f20cf34",
+        "text": "Repository change request:\nThe community site publishes a member roster built by `buildRoster` in\nsrc/roster.js. Right now that function normalises and masks each member's email\naddress and passes their display name through, but it has no fallback when a\nmember left the display name blank on the signup form: those rows go out with an\nempty name, which the site will not accept.\n\nChange src/roster.js so that no published row ever has a blank name. When an\nentry supplies no name at all, or supplies one that is only whitespace, the\ndisplay name must instead be derived from the local part of the address that\nmember signed up with: split that local part on `.`, `_` and `-`, capitalise\neach piece, and join the pieces with single spaces. For example a member who\nsigned up as `grace_hopper@example.com` and typed no name must be published as\n`Grace Hopper`, and one who signed up as `Jean-Bartik@Example.com` must be\npublished as `Jean Bartik`.\n\nEverything already true of a published row must stay true: the row still has\nexactly the fields `id`, `email` and `name`; the email is still trimmed,\nlower-cased and masked the same way; a name the member actually typed is still\nused (trimmed) rather than replaced by a derived one; and the input entries are\nnot mutated. docs/roster.md describes the row format in full \u2014 read it before\nyou start.\n\nThe existing test suite in test/visible.test.js is a regression guard. Run the\ntests with `npm test` (which runs `node --test`) and make sure they all pass\nwhen you are done.\n\nUse the smallest correct change and confirm the test suite."
+      },
+      {
+        "approved": false,
+        "id": "equivalent-3",
+        "sha256": "9519dbb558301d70c085763da507fb314e199f659a1ec70b50dd20ffba936a39",
+        "text": "Please solve this task in the supplied checkout, retaining all stated edge cases:\n\nThe community site publishes a member roster built by `buildRoster` in\nsrc/roster.js. Right now that function normalises and masks each member's email\naddress and passes their display name through, but it has no fallback when a\nmember left the display name blank on the signup form: those rows go out with an\nempty name, which the site will not accept.\n\nChange src/roster.js so that no published row ever has a blank name. When an\nentry supplies no name at all, or supplies one that is only whitespace, the\ndisplay name must instead be derived from the local part of the address that\nmember signed up with: split that local part on `.`, `_` and `-`, capitalise\neach piece, and join the pieces with single spaces. For example a member who\nsigned up as `grace_hopper@example.com` and typed no name must be published as\n`Grace Hopper`, and one who signed up as `Jean-Bartik@Example.com` must be\npublished as `Jean Bartik`.\n\nEverything already true of a published row must stay true: the row still has\nexactly the fields `id`, `email` and `name`; the email is still trimmed,\nlower-cased and masked the same way; a name the member actually typed is still\nused (trimmed) rather than replaced by a derived one; and the input entries are\nnot mutated. docs/roster.md describes the row format in full \u2014 read it before\nyou start.\n\nThe existing test suite in test/visible.test.js is a regression guard. Run the\ntests with `npm test` (which runs `node --test`) and make sure they all pass\nwhen you are done."
+      }
+    ],
+    "semantic_group": "ordered-steps:2026-08.1"
+  },
+  "schema": "pi.fixture/v1",
+  "sufficiency": [
+    {
+      "assertion": "A row with no name gets a display name derived from the local part of the signup address.",
+      "prompt_evidence": "display name must instead be derived from the local part of the address that"
+    },
+    {
+      "assertion": "A whitespace-only name is treated as no name.",
+      "prompt_evidence": "entry supplies no name at all, or supplies one that is only whitespace"
+    },
+    {
+      "assertion": "All three separators split, and each piece is capitalised and joined with single spaces.",
+      "prompt_evidence": "each piece, and join the pieces with single spaces"
+    },
+    {
+      "assertion": "Supplied names are still used (trimmed); email masking is unchanged; inputs are not mutated.",
+      "prompt_evidence": "used (trimmed) rather than replaced by a derived one"
+    }
+  ],
+  "task_id": "ordered-steps",
+  "tests": {
+    "fail_to_pass": {
+      "command": [
+        "node",
+        "--test",
+        "test/fail-to-pass.test.js"
+      ],
+      "overlays": [
+        {
+          "dest": "test/fail-to-pass.test.js",
+          "source": "real-gate-fixtures/hidden/ordered-steps.test.js"
+        }
+      ],
+      "timeout_seconds": 60
+    },
+    "pass_to_pass": {
+      "command": [
+        "node",
+        "--test"
+      ],
+      "overlays": [],
+      "timeout_seconds": 60
+    }
+  },
+  "timestamps": {
+    "created_at": "2026-08-11T00:00:00Z"
+  }
+}

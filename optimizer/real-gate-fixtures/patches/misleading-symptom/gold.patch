@@ -1,0 +1,13 @@
+diff -ruN a/src/parse.js b/src/parse.js
+--- a/src/parse.js	2026-08-11 15:08:27
++++ b/src/parse.js	2026-08-11 15:08:27
+@@ -5,7 +5,8 @@
+ const WEIGHT_DEFAULT = 1;
+ 
+ function numericField(field, fallback) {
+-  const text = String(field).trim();
++  // An omitted field arrives as undefined and means the same as an empty one.
++  const text = field === undefined ? '' : String(field).trim();
+   if (text === '') return fallback;
+   return Number(text);
+ }

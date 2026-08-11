@@ -1,0 +1,257 @@
+{
+  "admission": {
+    "approved": false,
+    "automated": {
+      "checked_at": "2026-08-11T14:11:47Z",
+      "hash_drift": [],
+      "manifest_drift": false,
+      "passed": true,
+      "runs_per_state": 3,
+      "states": {
+        "gold_fail_to_pass": [
+          {
+            "output_tail": "",
+            "passed": true,
+            "returncode": 0
+          },
+          {
+            "output_tail": "",
+            "passed": true,
+            "returncode": 0
+          },
+          {
+            "output_tail": "",
+            "passed": true,
+            "returncode": 0
+          }
+        ],
+        "gold_pass_to_pass": [
+          {
+            "output_tail": "",
+            "passed": true,
+            "returncode": 0
+          },
+          {
+            "output_tail": "",
+            "passed": true,
+            "returncode": 0
+          },
+          {
+            "output_tail": "",
+            "passed": true,
+            "returncode": 0
+          }
+        ],
+        "mutant:shortcut": {
+          "fail_to_pass": [
+            {
+              "output_tail": "ape-7djmfsxg/work/test/fail-to-pass.test.js:50:10)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n      at Test.postRun (node:internal/test_runner/test:1522:19)\n      at Test.run (node:internal/test_runner/test:1447:12)\n      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7) {\n    generatedMessage: false,\n    code: 'ERR_ASSERTION',\n    actual: undefined,\n    expected: undefined,\n    operator: 'throws',\n    diff: 'simple'\n  }\n",
+              "passed": false,
+              "returncode": 1
+            },
+            {
+              "output_tail": "ape-bjs54lnp/work/test/fail-to-pass.test.js:50:10)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n      at Test.postRun (node:internal/test_runner/test:1522:19)\n      at Test.run (node:internal/test_runner/test:1447:12)\n      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7) {\n    generatedMessage: false,\n    code: 'ERR_ASSERTION',\n    actual: undefined,\n    expected: undefined,\n    operator: 'throws',\n    diff: 'simple'\n  }\n",
+              "passed": false,
+              "returncode": 1
+            },
+            {
+              "output_tail": "ape-vc_o01x3/work/test/fail-to-pass.test.js:50:10)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n      at Test.postRun (node:internal/test_runner/test:1522:19)\n      at Test.run (node:internal/test_runner/test:1447:12)\n      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7) {\n    generatedMessage: false,\n    code: 'ERR_ASSERTION',\n    actual: undefined,\n    expected: undefined,\n    operator: 'throws',\n    diff: 'simple'\n  }\n",
+              "passed": false,
+              "returncode": 1
+            }
+          ],
+          "pass_to_pass": [
+            {
+              "output_tail": "",
+              "passed": true,
+              "returncode": 0
+            },
+            {
+              "output_tail": "",
+              "passed": true,
+              "returncode": 0
+            },
+            {
+              "output_tail": "",
+              "passed": true,
+              "returncode": 0
+            }
+          ]
+        },
+        "pristine_fail_to_pass": [
+          {
+            "output_tail": "_fapq8/work/src/report.js:9:19)\n      at TestContext.<anonymous> (file:///private/var/folders/3r/nc7qhtpn56j7rt5nwg0rqw600000gn/T/pi-admit-documented-escape-cr_fapq8/work/test/fail-to-pass.test.js:27:18)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n      at Test.postRun (node:internal/test_runner/test:1522:19)\n      at Test.run (node:internal/test_runner/test:1447:12)\n      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7)\n",
+            "passed": false,
+            "returncode": 1
+          },
+          {
+            "output_tail": "enkrt7/work/src/report.js:9:19)\n      at TestContext.<anonymous> (file:///private/var/folders/3r/nc7qhtpn56j7rt5nwg0rqw600000gn/T/pi-admit-documented-escape-l3enkrt7/work/test/fail-to-pass.test.js:27:18)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n      at Test.postRun (node:internal/test_runner/test:1522:19)\n      at Test.run (node:internal/test_runner/test:1447:12)\n      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7)\n",
+            "passed": false,
+            "returncode": 1
+          },
+          {
+            "output_tail": "nb6cvb/work/src/report.js:9:19)\n      at TestContext.<anonymous> (file:///private/var/folders/3r/nc7qhtpn56j7rt5nwg0rqw600000gn/T/pi-admit-documented-escape-jonb6cvb/work/test/fail-to-pass.test.js:27:18)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n      at Test.postRun (node:internal/test_runner/test:1522:19)\n      at Test.run (node:internal/test_runner/test:1447:12)\n      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7)\n",
+            "passed": false,
+            "returncode": 1
+          }
+        ],
+        "pristine_pass_to_pass": [
+          {
+            "output_tail": "",
+            "passed": true,
+            "returncode": 0
+          },
+          {
+            "output_tail": "",
+            "passed": true,
+            "returncode": 0
+          },
+          {
+            "output_tail": "",
+            "passed": true,
+            "returncode": 0
+          }
+        ]
+      }
+    }
+  },
+  "artifacts": [
+    {
+      "path": "real-gate-fixtures/documented-escape/package.json",
+      "sha256": "878da7628bacccc709ed067b80f01ad3d988a93363a92b240010c7dbc833d5d4"
+    },
+    {
+      "path": "real-gate-fixtures/documented-escape/docs/AMOUNTS.md",
+      "sha256": "3a5bcdd33abcab1f692e9e403a8ddf1c15f43f0114ed9e7121d7984d76df5bb1"
+    },
+    {
+      "path": "real-gate-fixtures/documented-escape/src/dialects.js",
+      "sha256": "a6c3dec6bb6f14dd8e7da12b15e496c0f7bbc2e2df785319d767f21f5ee20b9b"
+    },
+    {
+      "path": "real-gate-fixtures/documented-escape/src/money.js",
+      "sha256": "b00baaa0043bcc6a453a5aa73d9454685f8449b53130f52118d7f17e77929f02"
+    },
+    {
+      "path": "real-gate-fixtures/documented-escape/src/report.js",
+      "sha256": "6fa3e0b3c7185593034fefc31086e9a5838789645af0da575f3ab7cc98be5aaa"
+    },
+    {
+      "path": "real-gate-fixtures/documented-escape/test/visible.test.js",
+      "sha256": "ff5dad8fcb84939f9ec406e6fc45e6bbcb8e12af136ce384f5e370dde642c441"
+    },
+    {
+      "path": "real-gate-fixtures/hidden/documented-escape.test.js",
+      "sha256": "c661ede6d87bcb350d829a6470e9a4fd68c70743699e9e54cec78e5256179bda"
+    },
+    {
+      "path": "real-gate-fixtures/patches/documented-escape/gold.patch",
+      "sha256": "f0c638abe92f0162e886301b0dd833541ae7d947dedc46d7f3fdc7e179fb370c"
+    },
+    {
+      "path": "real-gate-fixtures/patches/documented-escape/shortcut.patch",
+      "sha256": "27a7d1c7172531b89fe6eedd5546ae9bfdee324ed28da156ab421800a8a32ebd"
+    }
+  ],
+  "cohort_id": "2026-08",
+  "fixture": {
+    "root": "real-gate-fixtures/documented-escape",
+    "stage_copy": []
+  },
+  "fixture_version": "2026-08.1",
+  "one_shot": {
+    "context_files": [
+      "docs/AMOUNTS.md",
+      "src/dialects.js",
+      "src/money.js",
+      "src/report.js",
+      "test/visible.test.js"
+    ],
+    "eligible": false,
+    "max_context_bytes": 49152
+  },
+  "patches": {
+    "gold": "real-gate-fixtures/patches/documented-escape/gold.patch",
+    "shortcut_mutants": [
+      "real-gate-fixtures/patches/documented-escape/shortcut.patch"
+    ]
+  },
+  "prompts": {
+    "canonical": {
+      "sha256": "879a497a12360be45e6c6f078a701eab01f918b6b174fbe64c50fbdf798107ec",
+      "text": "The settlement report in src/report.js currently assumes every entry's amount is\nwritten in our own plain decimal format, so it sends all of them through\nparseAmount from src/money.js.\n\nWe are now also fed entries that came out of a partner's ledger export. Those\nentries carry the field source: 'ledger', and their amount strings are written in\nthat export's accounting format rather than ours. Entries with no source field,\nor with source: 'strict', are our own rows and must keep behaving exactly as they\ndo today.\n\nChange buildReport in src/report.js so it handles both kinds of entry. It must\nstill return { lines, total } with the same line format as now and with total in\ninteger cents, and a ledger amount must contribute its correct signed value to\nboth the line and the total. An amount that cannot be read at all must still\nraise an error rather than quietly counting as zero.\n\nTwo constraints on how you get there:\n\n- The strict parser parseAmount in src/money.js must keep rejecting everything it\n  rejects today. Its strictness is relied on elsewhere, so do not widen it, and\n  do not route ledger amounts through it.\n- The repository's docs/ directory describes the amount formats this codebase\n  deals with and how each one is meant to be handled. Read it before you write\n  the change; the accounting format has a convention that is easy to get subtly\n  wrong.\n\nThe existing test suite in test/ must keep passing. Run the tests with\n`node --test` when you are done."
+    },
+    "perturbations": [
+      {
+        "approved": false,
+        "id": "equivalent-1",
+        "sha256": "3c3b3f29e5e67c17c977bea17e155a99f4f78a0b5379a4aef95d8ba7766871fd",
+        "text": "Complete the following repository task. Preserve existing behavior and verify the tests.\n\nThe settlement report in src/report.js currently assumes every entry's amount is\nwritten in our own plain decimal format, so it sends all of them through\nparseAmount from src/money.js.\n\nWe are now also fed entries that came out of a partner's ledger export. Those\nentries carry the field source: 'ledger', and their amount strings are written in\nthat export's accounting format rather than ours. Entries with no source field,\nor with source: 'strict', are our own rows and must keep behaving exactly as they\ndo today.\n\nChange buildReport in src/report.js so it handles both kinds of entry. It must\nstill return { lines, total } with the same line format as now and with total in\ninteger cents, and a ledger amount must contribute its correct signed value to\nboth the line and the total. An amount that cannot be read at all must still\nraise an error rather than quietly counting as zero.\n\nTwo constraints on how you get there:\n\n- The strict parser parseAmount in src/money.js must keep rejecting everything it\n  rejects today. Its strictness is relied on elsewhere, so do not widen it, and\n  do not route ledger amounts through it.\n- The repository's docs/ directory describes the amount formats this codebase\n  deals with and how each one is meant to be handled. Read it before you write\n  the change; the accounting format has a convention that is easy to get subtly\n  wrong.\n\nThe existing test suite in test/ must keep passing. Run the tests with\n`node --test` when you are done."
+      },
+      {
+        "approved": false,
+        "id": "equivalent-2",
+        "sha256": "47892486e0a31d7e11dc58a8a5185adada3327bc06c722eda86a9587e59843d0",
+        "text": "Repository change request:\nThe settlement report in src/report.js currently assumes every entry's amount is\nwritten in our own plain decimal format, so it sends all of them through\nparseAmount from src/money.js.\n\nWe are now also fed entries that came out of a partner's ledger export. Those\nentries carry the field source: 'ledger', and their amount strings are written in\nthat export's accounting format rather than ours. Entries with no source field,\nor with source: 'strict', are our own rows and must keep behaving exactly as they\ndo today.\n\nChange buildReport in src/report.js so it handles both kinds of entry. It must\nstill return { lines, total } with the same line format as now and with total in\ninteger cents, and a ledger amount must contribute its correct signed value to\nboth the line and the total. An amount that cannot be read at all must still\nraise an error rather than quietly counting as zero.\n\nTwo constraints on how you get there:\n\n- The strict parser parseAmount in src/money.js must keep rejecting everything it\n  rejects today. Its strictness is relied on elsewhere, so do not widen it, and\n  do not route ledger amounts through it.\n- The repository's docs/ directory describes the amount formats this codebase\n  deals with and how each one is meant to be handled. Read it before you write\n  the change; the accounting format has a convention that is easy to get subtly\n  wrong.\n\nThe existing test suite in test/ must keep passing. Run the tests with\n`node --test` when you are done.\n\nUse the smallest correct change and confirm the test suite."
+      },
+      {
+        "approved": false,
+        "id": "equivalent-3",
+        "sha256": "76aec3e77c8f7bd1c2f291223526f0d304c6dd460313e7d6a19c2c491bc371c8",
+        "text": "Please solve this task in the supplied checkout, retaining all stated edge cases:\n\nThe settlement report in src/report.js currently assumes every entry's amount is\nwritten in our own plain decimal format, so it sends all of them through\nparseAmount from src/money.js.\n\nWe are now also fed entries that came out of a partner's ledger export. Those\nentries carry the field source: 'ledger', and their amount strings are written in\nthat export's accounting format rather than ours. Entries with no source field,\nor with source: 'strict', are our own rows and must keep behaving exactly as they\ndo today.\n\nChange buildReport in src/report.js so it handles both kinds of entry. It must\nstill return { lines, total } with the same line format as now and with total in\ninteger cents, and a ledger amount must contribute its correct signed value to\nboth the line and the total. An amount that cannot be read at all must still\nraise an error rather than quietly counting as zero.\n\nTwo constraints on how you get there:\n\n- The strict parser parseAmount in src/money.js must keep rejecting everything it\n  rejects today. Its strictness is relied on elsewhere, so do not widen it, and\n  do not route ledger amounts through it.\n- The repository's docs/ directory describes the amount formats this codebase\n  deals with and how each one is meant to be handled. Read it before you write\n  the change; the accounting format has a convention that is easy to get subtly\n  wrong.\n\nThe existing test suite in test/ must keep passing. Run the tests with\n`node --test` when you are done."
+      }
+    ],
+    "semantic_group": "documented-escape:2026-08.1"
+  },
+  "schema": "pi.fixture/v1",
+  "sufficiency": [
+    {
+      "assertion": "Ledger-dialect amounts with separators and currency symbols are read correctly.",
+      "prompt_evidence": "that export's accounting format rather than ours"
+    },
+    {
+      "assertion": "Parenthesised ledger amounts contribute a negative value to both the line and the total.",
+      "prompt_evidence": "a ledger amount must contribute its correct signed value to"
+    },
+    {
+      "assertion": "A report mixing both dialects totals them together in integer cents.",
+      "prompt_evidence": "still return { lines, total } with the same line format as now and with total in"
+    },
+    {
+      "assertion": "parseAmount is unchanged: strict entries still reject accounting formatting.",
+      "prompt_evidence": "or with source: 'strict', are our own rows and must keep behaving exactly as they"
+    },
+    {
+      "assertion": "Unreadable ledger data raises rather than silently counting as zero.",
+      "prompt_evidence": "raise an error rather than quietly counting as zero"
+    }
+  ],
+  "task_id": "documented-escape",
+  "tests": {
+    "fail_to_pass": {
+      "command": [
+        "node",
+        "--test",
+        "test/fail-to-pass.test.js"
+      ],
+      "overlays": [
+        {
+          "dest": "test/fail-to-pass.test.js",
+          "source": "real-gate-fixtures/hidden/documented-escape.test.js"
+        }
+      ],
+      "timeout_seconds": 60
+    },
+    "pass_to_pass": {
+      "command": [
+        "node",
+        "--test"
+      ],
+      "overlays": [],
+      "timeout_seconds": 60
+    }
+  },
+  "timestamps": {
+    "created_at": "2026-08-11T00:00:00Z"
+  }
+}

@@ -1,0 +1,26 @@
+diff -ruN a/src/table.js b/src/table.js
+--- a/src/table.js	2026-08-11 15:08:27
++++ b/src/table.js	2026-08-11 15:08:27
+@@ -5,17 +5,20 @@
+ 
+ const PAD = " ";
+ const SEPARATOR = " | ";
++const ELLIPSIS = "…";
+ 
+ /**
+  * Render a single value so that it fits the given column width.
+  *
+- * Short values are padded on the right with spaces.
++ * Short values are padded on the right with spaces; values that do not fit
++ * are cut short and marked with a trailing ellipsis. The ellipsis is part of
++ * the column's budget, so the result is always exactly `width` characters.
+  */
+ export function fitCell(text, width) {
+   const value = String(text);
+ 
+   if (value.length > width) {
+-    return value.slice(0, width);
++    return value.slice(0, width - ELLIPSIS.length) + ELLIPSIS;
+   }
+ 
+   return value + PAD.repeat(width - value.length);

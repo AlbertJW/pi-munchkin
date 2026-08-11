@@ -1,0 +1,244 @@
+{
+  "admission": {
+    "approved": false,
+    "automated": {
+      "checked_at": "2026-08-11T14:11:40Z",
+      "hash_drift": [],
+      "manifest_drift": false,
+      "passed": true,
+      "runs_per_state": 3,
+      "states": {
+        "gold_fail_to_pass": [
+          {
+            "output_tail": "",
+            "passed": true,
+            "returncode": 0
+          },
+          {
+            "output_tail": "",
+            "passed": true,
+            "returncode": 0
+          },
+          {
+            "output_tail": "",
+            "passed": true,
+            "returncode": 0
+          }
+        ],
+        "gold_pass_to_pass": [
+          {
+            "output_tail": "",
+            "passed": true,
+            "returncode": 0
+          },
+          {
+            "output_tail": "",
+            "passed": true,
+            "returncode": 0
+          },
+          {
+            "output_tail": "",
+            "passed": true,
+            "returncode": 0
+          }
+        ],
+        "mutant:shortcut": {
+          "fail_to_pass": [
+            {
+              "output_tail": ":internal/test_runner/test:1382:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n      at Test.postRun (node:internal/test_runner/test:1522:19)\n      at Test.run (node:internal/test_runner/test:1447:12)\n      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7) {\n    generatedMessage: true,\n    code: 'ERR_ASSERTION',\n    actual: 'alpha       0.00\\nbeta        4.00\\ngamma       0.00\\nTOTAL       4.00',\n    expected: 'alpha       3.00\\nbeta        4.00\\ngamma       0.00\\nTOTAL       7.00',\n    operator: 'strictEqual',\n    diff: 'simple'\n  }\n",
+              "passed": false,
+              "returncode": 1
+            },
+            {
+              "output_tail": ":internal/test_runner/test:1382:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n      at Test.postRun (node:internal/test_runner/test:1522:19)\n      at Test.run (node:internal/test_runner/test:1447:12)\n      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7) {\n    generatedMessage: true,\n    code: 'ERR_ASSERTION',\n    actual: 'alpha       0.00\\nbeta        4.00\\ngamma       0.00\\nTOTAL       4.00',\n    expected: 'alpha       3.00\\nbeta        4.00\\ngamma       0.00\\nTOTAL       7.00',\n    operator: 'strictEqual',\n    diff: 'simple'\n  }\n",
+              "passed": false,
+              "returncode": 1
+            },
+            {
+              "output_tail": ":internal/test_runner/test:1382:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n      at Test.postRun (node:internal/test_runner/test:1522:19)\n      at Test.run (node:internal/test_runner/test:1447:12)\n      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7) {\n    generatedMessage: true,\n    code: 'ERR_ASSERTION',\n    actual: 'alpha       0.00\\nbeta        4.00\\ngamma       0.00\\nTOTAL       4.00',\n    expected: 'alpha       3.00\\nbeta        4.00\\ngamma       0.00\\nTOTAL       7.00',\n    operator: 'strictEqual',\n    diff: 'simple'\n  }\n",
+              "passed": false,
+              "returncode": 1
+            }
+          ],
+          "pass_to_pass": [
+            {
+              "output_tail": "",
+              "passed": true,
+              "returncode": 0
+            },
+            {
+              "output_tail": "",
+              "passed": true,
+              "returncode": 0
+            },
+            {
+              "output_tail": "",
+              "passed": true,
+              "returncode": 0
+            }
+          ]
+        },
+        "pristine_fail_to_pass": [
+          {
+            "output_tail": "ode:internal/test_runner/test:1382:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n      at Test.postRun (node:internal/test_runner/test:1522:19)\n      at Test.run (node:internal/test_runner/test:1447:12)\n      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7) {\n    generatedMessage: true,\n    code: 'ERR_ASSERTION',\n    actual: 'alpha       NaN\\nbeta        4.00\\ngamma       NaN\\nTOTAL       NaN',\n    expected: 'alpha       3.00\\nbeta        4.00\\ngamma       0.00\\nTOTAL       7.00',\n    operator: 'strictEqual',\n    diff: 'simple'\n  }\n",
+            "passed": false,
+            "returncode": 1
+          },
+          {
+            "output_tail": "ode:internal/test_runner/test:1382:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n      at Test.postRun (node:internal/test_runner/test:1522:19)\n      at Test.run (node:internal/test_runner/test:1447:12)\n      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7) {\n    generatedMessage: true,\n    code: 'ERR_ASSERTION',\n    actual: 'alpha       NaN\\nbeta        4.00\\ngamma       NaN\\nTOTAL       NaN',\n    expected: 'alpha       3.00\\nbeta        4.00\\ngamma       0.00\\nTOTAL       7.00',\n    operator: 'strictEqual',\n    diff: 'simple'\n  }\n",
+            "passed": false,
+            "returncode": 1
+          },
+          {
+            "output_tail": "ode:internal/test_runner/test:1382:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n      at Test.postRun (node:internal/test_runner/test:1522:19)\n      at Test.run (node:internal/test_runner/test:1447:12)\n      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7) {\n    generatedMessage: true,\n    code: 'ERR_ASSERTION',\n    actual: 'alpha       NaN\\nbeta        4.00\\ngamma       NaN\\nTOTAL       NaN',\n    expected: 'alpha       3.00\\nbeta        4.00\\ngamma       0.00\\nTOTAL       7.00',\n    operator: 'strictEqual',\n    diff: 'simple'\n  }\n",
+            "passed": false,
+            "returncode": 1
+          }
+        ],
+        "pristine_pass_to_pass": [
+          {
+            "output_tail": "",
+            "passed": true,
+            "returncode": 0
+          },
+          {
+            "output_tail": "",
+            "passed": true,
+            "returncode": 0
+          },
+          {
+            "output_tail": "",
+            "passed": true,
+            "returncode": 0
+          }
+        ]
+      }
+    }
+  },
+  "artifacts": [
+    {
+      "path": "real-gate-fixtures/misleading-symptom/package.json",
+      "sha256": "878da7628bacccc709ed067b80f01ad3d988a93363a92b240010c7dbc833d5d4"
+    },
+    {
+      "path": "real-gate-fixtures/misleading-symptom/docs/data-contract.md",
+      "sha256": "954f1dc0a5167678f44cb63f3e7744c9f7a34cd80cf847234817bba53eb77706"
+    },
+    {
+      "path": "real-gate-fixtures/misleading-symptom/src/parse.js",
+      "sha256": "e92d1f6827abc74a553110fd94ad46e072d48dbb34c4f16057aba3f040d0f8ce"
+    },
+    {
+      "path": "real-gate-fixtures/misleading-symptom/src/report.js",
+      "sha256": "c026d869eeb60f85c35b6230982d1180b8566a5cbd65a5ab58b3799b8d3ab752"
+    },
+    {
+      "path": "real-gate-fixtures/misleading-symptom/test/visible.test.js",
+      "sha256": "e4e0b785f733fc744f969223c37935ad91050dff08bc410edcc8d85dbf5e34b2"
+    },
+    {
+      "path": "real-gate-fixtures/hidden/misleading-symptom.test.js",
+      "sha256": "fd0b1339a3bf3dbf6f630323911581135a986accec5a393b720419dca743838b"
+    },
+    {
+      "path": "real-gate-fixtures/patches/misleading-symptom/gold.patch",
+      "sha256": "066caabb6eb844eb28af28b087b7163f5d2bbc1881937dc324820d902bbb9292"
+    },
+    {
+      "path": "real-gate-fixtures/patches/misleading-symptom/shortcut.patch",
+      "sha256": "7f18ef374d0ea5ea5b68ad1ce17cc9e64c994a4596284d044a78ed23ec4a6a81"
+    }
+  ],
+  "cohort_id": "2026-08",
+  "fixture": {
+    "root": "real-gate-fixtures/misleading-symptom",
+    "stage_copy": []
+  },
+  "fixture_version": "2026-08.1",
+  "one_shot": {
+    "context_files": [
+      "docs/data-contract.md",
+      "src/parse.js",
+      "src/report.js",
+      "test/visible.test.js"
+    ],
+    "eligible": false,
+    "max_context_bytes": 49152
+  },
+  "patches": {
+    "gold": "real-gate-fixtures/patches/misleading-symptom/gold.patch",
+    "shortcut_mutants": [
+      "real-gate-fixtures/patches/misleading-symptom/shortcut.patch"
+    ]
+  },
+  "prompts": {
+    "canonical": {
+      "sha256": "8a5dd7bc23a9aca92edfd9cf0536a5033dcbfb7cc7bfe34e4f62f515cc40053f",
+      "text": "A user reported a bug in the ledger reporting tool.\n\nTheir ledger file contains lines that leave off the trailing fields, like:\n\n    alpha|3\n    beta|2|2\n    gamma\n\nRunning buildReport (src/report.js) over that text prints NaN in the value\ncolumn and in the TOTAL row instead of numbers. Lines that spell out all three\nfields render fine, which is why the existing test suite is green.\n\nThe data format, the per-field defaults, and the guarantee that consumers of\nthe parsed entries are allowed to rely on are all written down in\ndocs/data-contract.md. Read it, then compare it against both source files:\nsrc/parse.js, which turns raw text into entry objects, and src/report.js,\nwhich formats them.\n\nFix the code so that:\n\n  * a line with omitted trailing fields produces exactly the same report as\n    the equivalent line with those fields written out explicitly, and\n  * both source files end up consistent with docs/data-contract.md \u2014 the\n    guarantee that document makes to consumers has to actually hold, and the\n    obligation it places on consumers has to be respected.\n\nDo not change the report's layout, the exported function signatures, or the\ntests in test/. Run `node --test` and make sure the suite passes."
+    },
+    "perturbations": [
+      {
+        "approved": false,
+        "id": "equivalent-1",
+        "sha256": "182add835fa8f87bc9b46e0af7810b6c2be0f5ac0ef068d3794f295560c9d3ad",
+        "text": "Complete the following repository task. Preserve existing behavior and verify the tests.\n\nA user reported a bug in the ledger reporting tool.\n\nTheir ledger file contains lines that leave off the trailing fields, like:\n\n    alpha|3\n    beta|2|2\n    gamma\n\nRunning buildReport (src/report.js) over that text prints NaN in the value\ncolumn and in the TOTAL row instead of numbers. Lines that spell out all three\nfields render fine, which is why the existing test suite is green.\n\nThe data format, the per-field defaults, and the guarantee that consumers of\nthe parsed entries are allowed to rely on are all written down in\ndocs/data-contract.md. Read it, then compare it against both source files:\nsrc/parse.js, which turns raw text into entry objects, and src/report.js,\nwhich formats them.\n\nFix the code so that:\n\n  * a line with omitted trailing fields produces exactly the same report as\n    the equivalent line with those fields written out explicitly, and\n  * both source files end up consistent with docs/data-contract.md \u2014 the\n    guarantee that document makes to consumers has to actually hold, and the\n    obligation it places on consumers has to be respected.\n\nDo not change the report's layout, the exported function signatures, or the\ntests in test/. Run `node --test` and make sure the suite passes."
+      },
+      {
+        "approved": false,
+        "id": "equivalent-2",
+        "sha256": "cba289f9cd410864c85f8fb4f40ed872f531f7041ef18488617bf4bf7c70ce26",
+        "text": "Repository change request:\nA user reported a bug in the ledger reporting tool.\n\nTheir ledger file contains lines that leave off the trailing fields, like:\n\n    alpha|3\n    beta|2|2\n    gamma\n\nRunning buildReport (src/report.js) over that text prints NaN in the value\ncolumn and in the TOTAL row instead of numbers. Lines that spell out all three\nfields render fine, which is why the existing test suite is green.\n\nThe data format, the per-field defaults, and the guarantee that consumers of\nthe parsed entries are allowed to rely on are all written down in\ndocs/data-contract.md. Read it, then compare it against both source files:\nsrc/parse.js, which turns raw text into entry objects, and src/report.js,\nwhich formats them.\n\nFix the code so that:\n\n  * a line with omitted trailing fields produces exactly the same report as\n    the equivalent line with those fields written out explicitly, and\n  * both source files end up consistent with docs/data-contract.md \u2014 the\n    guarantee that document makes to consumers has to actually hold, and the\n    obligation it places on consumers has to be respected.\n\nDo not change the report's layout, the exported function signatures, or the\ntests in test/. Run `node --test` and make sure the suite passes.\n\nUse the smallest correct change and confirm the test suite."
+      },
+      {
+        "approved": false,
+        "id": "equivalent-3",
+        "sha256": "4b97518c1c42f5b127f3f3b2067e60f5cbbaa68e57bc8e85a30603e95a12697a",
+        "text": "Please solve this task in the supplied checkout, retaining all stated edge cases:\n\nA user reported a bug in the ledger reporting tool.\n\nTheir ledger file contains lines that leave off the trailing fields, like:\n\n    alpha|3\n    beta|2|2\n    gamma\n\nRunning buildReport (src/report.js) over that text prints NaN in the value\ncolumn and in the TOTAL row instead of numbers. Lines that spell out all three\nfields render fine, which is why the existing test suite is green.\n\nThe data format, the per-field defaults, and the guarantee that consumers of\nthe parsed entries are allowed to rely on are all written down in\ndocs/data-contract.md. Read it, then compare it against both source files:\nsrc/parse.js, which turns raw text into entry objects, and src/report.js,\nwhich formats them.\n\nFix the code so that:\n\n  * a line with omitted trailing fields produces exactly the same report as\n    the equivalent line with those fields written out explicitly, and\n  * both source files end up consistent with docs/data-contract.md \u2014 the\n    guarantee that document makes to consumers has to actually hold, and the\n    obligation it places on consumers has to be respected.\n\nDo not change the report's layout, the exported function signatures, or the\ntests in test/. Run `node --test` and make sure the suite passes."
+      }
+    ],
+    "semantic_group": "misleading-symptom:2026-08.1"
+  },
+  "schema": "pi.fixture/v1",
+  "sufficiency": [
+    {
+      "assertion": "parseEntries applies the documented per-field defaults to omitted trailing fields, never NaN.",
+      "prompt_evidence": "a line with omitted trailing fields produces exactly the same report as\n    the equivalent line with those fields written out explicitly"
+    },
+    {
+      "assertion": "Every parsed entry's amount and weight are finite numbers, so the guarantee to consumers holds.",
+      "prompt_evidence": "both source files end up consistent with docs/data-contract.md \u2014 the\n    guarantee that document makes to consumers has to actually hold"
+    },
+    {
+      "assertion": "buildReport renders a short line identically to the fully written equivalent, including the TOTAL row.",
+      "prompt_evidence": "a line with omitted trailing fields produces exactly the same report as\n    the equivalent line with those fields written out explicitly"
+    }
+  ],
+  "task_id": "misleading-symptom",
+  "tests": {
+    "fail_to_pass": {
+      "command": [
+        "node",
+        "--test",
+        "test/fail-to-pass.test.js"
+      ],
+      "overlays": [
+        {
+          "dest": "test/fail-to-pass.test.js",
+          "source": "real-gate-fixtures/hidden/misleading-symptom.test.js"
+        }
+      ],
+      "timeout_seconds": 60
+    },
+    "pass_to_pass": {
+      "command": [
+        "node",
+        "--test"
+      ],
+      "overlays": [],
+      "timeout_seconds": 60
+    }
+  },
+  "timestamps": {
+    "created_at": "2026-08-11T00:00:00Z"
+  }
+}

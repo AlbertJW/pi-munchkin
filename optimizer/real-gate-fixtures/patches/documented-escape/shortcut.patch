@@ -1,0 +1,30 @@
+diff -ruN a/src/money.js b/src/money.js
+--- a/src/money.js	2026-08-11 15:08:27
++++ b/src/money.js	2026-08-11 15:08:27
+@@ -1,19 +1,21 @@
+ // Strict amount parser for the audit path.
+ //
+-// This parser is deliberately narrow: it accepts a plain decimal string and
+-// nothing else. The audit reconciliation depends on that narrowness, so it
+-// must not be widened. See docs/AMOUNTS.md.
++// Relaxed so that ledger-formatted amounts (thousands separators, a leading
++// currency symbol, accounting parentheses) can go through the same entry
++// point instead of needing a second parser.
+ 
+ const PLAIN = /^-?\d+(\.\d{1,2})?$/;
++const COSMETIC = /[$,()\s]/g;
+ 
+ export function parseAmount(raw) {
+-  if (typeof raw !== 'string' || !PLAIN.test(raw)) {
++  const candidate = typeof raw === 'string' ? raw.replace(COSMETIC, '') : raw;
++  if (typeof candidate !== 'string' || !PLAIN.test(candidate)) {
+     throw new Error(
+       `parseAmount: unsupported amount format ${JSON.stringify(raw)} ` +
+         `- this parser is strict on purpose, see docs/AMOUNTS.md`
+     );
+   }
+-  return Math.round(Number(raw) * 100);
++  return Math.round(Number(candidate) * 100);
+ }
+ 
+ export function formatCents(cents) {

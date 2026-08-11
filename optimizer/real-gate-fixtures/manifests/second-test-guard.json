@@ -1,0 +1,234 @@
+{
+  "admission": {
+    "approved": false,
+    "automated": {
+      "checked_at": "2026-08-11T14:11:45Z",
+      "hash_drift": [],
+      "manifest_drift": false,
+      "passed": true,
+      "runs_per_state": 3,
+      "states": {
+        "gold_fail_to_pass": [
+          {
+            "output_tail": "",
+            "passed": true,
+            "returncode": 0
+          },
+          {
+            "output_tail": "",
+            "passed": true,
+            "returncode": 0
+          },
+          {
+            "output_tail": "",
+            "passed": true,
+            "returncode": 0
+          }
+        ],
+        "gold_pass_to_pass": [
+          {
+            "output_tail": "",
+            "passed": true,
+            "returncode": 0
+          },
+          {
+            "output_tail": "",
+            "passed": true,
+            "returncode": 0
+          },
+          {
+            "output_tail": "",
+            "passed": true,
+            "returncode": 0
+          }
+        ],
+        "mutant:shortcut": {
+          "fail_to_pass": [
+            {
+              "output_tail": "il-to-pass.test.js:27:10)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n      at Test.postRun (node:internal/test_runner/test:1522:19)\n      at Test.run (node:internal/test_runner/test:1447:12)\n      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7) {\n    generatedMessage: true,\n    code: 'ERR_ASSERTION',\n    actual: 'observabil\u2026 | qa  ',\n    expected: 'observabi\u2026 | qa  ',\n    operator: 'strictEqual',\n    diff: 'simple'\n  }\n",
+              "passed": false,
+              "returncode": 1
+            },
+            {
+              "output_tail": "il-to-pass.test.js:27:10)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n      at Test.postRun (node:internal/test_runner/test:1522:19)\n      at Test.run (node:internal/test_runner/test:1447:12)\n      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7) {\n    generatedMessage: true,\n    code: 'ERR_ASSERTION',\n    actual: 'observabil\u2026 | qa  ',\n    expected: 'observabi\u2026 | qa  ',\n    operator: 'strictEqual',\n    diff: 'simple'\n  }\n",
+              "passed": false,
+              "returncode": 1
+            },
+            {
+              "output_tail": "il-to-pass.test.js:27:10)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n      at Test.postRun (node:internal/test_runner/test:1522:19)\n      at Test.run (node:internal/test_runner/test:1447:12)\n      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7) {\n    generatedMessage: true,\n    code: 'ERR_ASSERTION',\n    actual: 'observabil\u2026 | qa  ',\n    expected: 'observabi\u2026 | qa  ',\n    operator: 'strictEqual',\n    diff: 'simple'\n  }\n",
+              "passed": false,
+              "returncode": 1
+            }
+          ],
+          "pass_to_pass": [
+            {
+              "output_tail": "",
+              "passed": true,
+              "returncode": 0
+            },
+            {
+              "output_tail": "",
+              "passed": true,
+              "returncode": 0
+            },
+            {
+              "output_tail": "",
+              "passed": true,
+              "returncode": 0
+            }
+          ]
+        },
+        "pristine_fail_to_pass": [
+          {
+            "output_tail": "ail-to-pass.test.js:27:10)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n      at Test.postRun (node:internal/test_runner/test:1522:19)\n      at Test.run (node:internal/test_runner/test:1447:12)\n      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7) {\n    generatedMessage: true,\n    code: 'ERR_ASSERTION',\n    actual: 'observabil | qa  ',\n    expected: 'observabi\u2026 | qa  ',\n    operator: 'strictEqual',\n    diff: 'simple'\n  }\n",
+            "passed": false,
+            "returncode": 1
+          },
+          {
+            "output_tail": "ail-to-pass.test.js:27:10)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n      at Test.postRun (node:internal/test_runner/test:1522:19)\n      at Test.run (node:internal/test_runner/test:1447:12)\n      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7) {\n    generatedMessage: true,\n    code: 'ERR_ASSERTION',\n    actual: 'observabil | qa  ',\n    expected: 'observabi\u2026 | qa  ',\n    operator: 'strictEqual',\n    diff: 'simple'\n  }\n",
+            "passed": false,
+            "returncode": 1
+          },
+          {
+            "output_tail": "ail-to-pass.test.js:27:10)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n      at Test.postRun (node:internal/test_runner/test:1522:19)\n      at Test.run (node:internal/test_runner/test:1447:12)\n      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7) {\n    generatedMessage: true,\n    code: 'ERR_ASSERTION',\n    actual: 'observabil | qa  ',\n    expected: 'observabi\u2026 | qa  ',\n    operator: 'strictEqual',\n    diff: 'simple'\n  }\n",
+            "passed": false,
+            "returncode": 1
+          }
+        ],
+        "pristine_pass_to_pass": [
+          {
+            "output_tail": "",
+            "passed": true,
+            "returncode": 0
+          },
+          {
+            "output_tail": "",
+            "passed": true,
+            "returncode": 0
+          },
+          {
+            "output_tail": "",
+            "passed": true,
+            "returncode": 0
+          }
+        ]
+      }
+    }
+  },
+  "artifacts": [
+    {
+      "path": "real-gate-fixtures/second-test-guard/package.json",
+      "sha256": "e40ce67f9651d4d5218b99561ab184bc5be8b76cd35523106875cf0cb390a69e"
+    },
+    {
+      "path": "real-gate-fixtures/second-test-guard/src/table.js",
+      "sha256": "9b89d729e6cada8ffb1e946d9cf2e73392ece9892bf41f6a57b48d5f49ab341d"
+    },
+    {
+      "path": "real-gate-fixtures/second-test-guard/test/visible.test.js",
+      "sha256": "338a6834782e6bbc4a34e2cac2e8bf1768155648ed2a0a88419b90afb2ec414f"
+    },
+    {
+      "path": "real-gate-fixtures/hidden/second-test-guard.test.js",
+      "sha256": "a83887e07678723d079745f791dfb7b05b4394f7e22f0de0b312fbe4b8758217"
+    },
+    {
+      "path": "real-gate-fixtures/patches/second-test-guard/gold.patch",
+      "sha256": "54fa7c5067f3506c0ae883183c3fcc4cc7792078c5624c190125c8f8834da4ad"
+    },
+    {
+      "path": "real-gate-fixtures/patches/second-test-guard/shortcut.patch",
+      "sha256": "2383a53ca59e2bf17860df6119217bf61eb3dfaa63b17bb8052ef5a96c8cd06a"
+    }
+  ],
+  "cohort_id": "2026-08",
+  "fixture": {
+    "root": "real-gate-fixtures/second-test-guard",
+    "stage_copy": []
+  },
+  "fixture_version": "2026-08.1",
+  "one_shot": {
+    "context_files": [
+      "src/table.js",
+      "test/visible.test.js"
+    ],
+    "eligible": false,
+    "max_context_bytes": 49152
+  },
+  "patches": {
+    "gold": "real-gate-fixtures/patches/second-test-guard/gold.patch",
+    "shortcut_mutants": [
+      "real-gate-fixtures/patches/second-test-guard/shortcut.patch"
+    ]
+  },
+  "prompts": {
+    "canonical": {
+      "sha256": "19d99126dcf66227de401363c7cd909221fd0cff6286b75f807f3ab9e37afedd",
+      "text": "This repository renders fixed-width plain-text tables. The code lives in\nsrc/table.js and the existing test suite lives in test/visible.test.js.\n\nRight now, when a value is too long for its column, fitCell() silently chops\noff the end of it. A reader cannot tell whether they are looking at a complete\nvalue or a value that lost its tail: \"engineering\" in a six-character column\ncomes out as \"engine\", which looks like a real word.\n\nChange fitCell() in src/table.js so that a value which does not fit is marked\nas truncated with a trailing ellipsis character \"\u2026\" (U+2026, a single\ncharacter \u2014 not three periods). Requirements:\n\n- A value is only truncated when it is longer than the column width. A value\n  whose length is exactly the column width must be returned unchanged, with no\n  ellipsis.\n- The ellipsis is part of the column, not an addition to it. A truncated cell\n  must still be exactly `width` characters long, exactly like a padded one, so\n  that columns produced by formatRow() stay aligned.\n- Values shorter than the width keep their current behaviour: padded on the\n  right with spaces.\n\nDo not change the signature of fitCell() or formatRow(), and do not change\ntest/visible.test.js.\n\nRun the test suite with `node --test` and make sure the whole suite passes\nbefore you finish."
+    },
+    "perturbations": [
+      {
+        "approved": false,
+        "id": "equivalent-1",
+        "sha256": "f2931ed9e45779501d889f5111c68456fecd9c61a35047cc4d443deef5e779d0",
+        "text": "Complete the following repository task. Preserve existing behavior and verify the tests.\n\nThis repository renders fixed-width plain-text tables. The code lives in\nsrc/table.js and the existing test suite lives in test/visible.test.js.\n\nRight now, when a value is too long for its column, fitCell() silently chops\noff the end of it. A reader cannot tell whether they are looking at a complete\nvalue or a value that lost its tail: \"engineering\" in a six-character column\ncomes out as \"engine\", which looks like a real word.\n\nChange fitCell() in src/table.js so that a value which does not fit is marked\nas truncated with a trailing ellipsis character \"\u2026\" (U+2026, a single\ncharacter \u2014 not three periods). Requirements:\n\n- A value is only truncated when it is longer than the column width. A value\n  whose length is exactly the column width must be returned unchanged, with no\n  ellipsis.\n- The ellipsis is part of the column, not an addition to it. A truncated cell\n  must still be exactly `width` characters long, exactly like a padded one, so\n  that columns produced by formatRow() stay aligned.\n- Values shorter than the width keep their current behaviour: padded on the\n  right with spaces.\n\nDo not change the signature of fitCell() or formatRow(), and do not change\ntest/visible.test.js.\n\nRun the test suite with `node --test` and make sure the whole suite passes\nbefore you finish."
+      },
+      {
+        "approved": false,
+        "id": "equivalent-2",
+        "sha256": "be6a1f66b217ae810260386eaa0a572e99408ad06b34100f2b66b81ecb92b43d",
+        "text": "Repository change request:\nThis repository renders fixed-width plain-text tables. The code lives in\nsrc/table.js and the existing test suite lives in test/visible.test.js.\n\nRight now, when a value is too long for its column, fitCell() silently chops\noff the end of it. A reader cannot tell whether they are looking at a complete\nvalue or a value that lost its tail: \"engineering\" in a six-character column\ncomes out as \"engine\", which looks like a real word.\n\nChange fitCell() in src/table.js so that a value which does not fit is marked\nas truncated with a trailing ellipsis character \"\u2026\" (U+2026, a single\ncharacter \u2014 not three periods). Requirements:\n\n- A value is only truncated when it is longer than the column width. A value\n  whose length is exactly the column width must be returned unchanged, with no\n  ellipsis.\n- The ellipsis is part of the column, not an addition to it. A truncated cell\n  must still be exactly `width` characters long, exactly like a padded one, so\n  that columns produced by formatRow() stay aligned.\n- Values shorter than the width keep their current behaviour: padded on the\n  right with spaces.\n\nDo not change the signature of fitCell() or formatRow(), and do not change\ntest/visible.test.js.\n\nRun the test suite with `node --test` and make sure the whole suite passes\nbefore you finish.\n\nUse the smallest correct change and confirm the test suite."
+      },
+      {
+        "approved": false,
+        "id": "equivalent-3",
+        "sha256": "c6e3d1d70e2e14d86149d3b768e859475974eef23c2de393a0e7a298bf51da63",
+        "text": "Please solve this task in the supplied checkout, retaining all stated edge cases:\n\nThis repository renders fixed-width plain-text tables. The code lives in\nsrc/table.js and the existing test suite lives in test/visible.test.js.\n\nRight now, when a value is too long for its column, fitCell() silently chops\noff the end of it. A reader cannot tell whether they are looking at a complete\nvalue or a value that lost its tail: \"engineering\" in a six-character column\ncomes out as \"engine\", which looks like a real word.\n\nChange fitCell() in src/table.js so that a value which does not fit is marked\nas truncated with a trailing ellipsis character \"\u2026\" (U+2026, a single\ncharacter \u2014 not three periods). Requirements:\n\n- A value is only truncated when it is longer than the column width. A value\n  whose length is exactly the column width must be returned unchanged, with no\n  ellipsis.\n- The ellipsis is part of the column, not an addition to it. A truncated cell\n  must still be exactly `width` characters long, exactly like a padded one, so\n  that columns produced by formatRow() stay aligned.\n- Values shorter than the width keep their current behaviour: padded on the\n  right with spaces.\n\nDo not change the signature of fitCell() or formatRow(), and do not change\ntest/visible.test.js.\n\nRun the test suite with `node --test` and make sure the whole suite passes\nbefore you finish."
+      }
+    ],
+    "semantic_group": "second-test-guard:2026-08.1"
+  },
+  "schema": "pi.fixture/v1",
+  "sufficiency": [
+    {
+      "assertion": "A value longer than the column is truncated with a single U+2026 character.",
+      "prompt_evidence": "as truncated with a trailing ellipsis character"
+    },
+    {
+      "assertion": "A truncated cell is still exactly `width` characters \u2014 the ellipsis comes out of the column's own budget.",
+      "prompt_evidence": "The ellipsis is part of the column, not an addition to it. A truncated cell"
+    },
+    {
+      "assertion": "A value whose length equals the width is returned unchanged, with no ellipsis.",
+      "prompt_evidence": "whose length is exactly the column width must be returned unchanged, with no"
+    }
+  ],
+  "task_id": "second-test-guard",
+  "tests": {
+    "fail_to_pass": {
+      "command": [
+        "node",
+        "--test",
+        "test/fail-to-pass.test.js"
+      ],
+      "overlays": [
+        {
+          "dest": "test/fail-to-pass.test.js",
+          "source": "real-gate-fixtures/hidden/second-test-guard.test.js"
+        }
+      ],
+      "timeout_seconds": 60
+    },
+    "pass_to_pass": {
+      "command": [
+        "node",
+        "--test"
+      ],
+      "overlays": [],
+      "timeout_seconds": 60
+    }
+  },
+  "timestamps": {
+    "created_at": "2026-08-11T00:00:00Z"
+  }
+}

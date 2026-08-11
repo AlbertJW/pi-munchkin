@@ -96,7 +96,14 @@ def test_gate_materializes_everything_admission_does():
 
 def test_admission_catalog():
     manifests = sorted(admission.MANIFESTS.glob("*.json"))
-    assert len(manifests) == 28, len(manifests)  # +audit-sweep (2026-07-30)
+    # This count is a tripwire for UNNOTICED roster changes, so it may only be
+    # edited alongside a deliberate, verified one. 2026-08-11: 28 -> 32, adding
+    # the four band fixtures (misleading-symptom, ordered-steps,
+    # second-test-guard, documented-escape) per PREREG_FIXTURE_BAND_2026-08-11.
+    # Verified purely additive before editing: nothing deleted vs the previous
+    # commit. A count edited to silence a failure nobody explained is how a
+    # deleted fixture went unnoticed for two commits on 2026-07-30.
+    assert len(manifests) == 32, len(manifests)
     for path in manifests:
         manifest = json.loads(path.read_text())
         admission.validate_contract(manifest)

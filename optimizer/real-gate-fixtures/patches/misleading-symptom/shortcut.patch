@@ -1,0 +1,30 @@
+diff -ruN a/src/report.js b/src/report.js
+--- a/src/report.js	2026-08-11 15:08:27
++++ b/src/report.js	2026-08-11 15:08:27
+@@ -1,5 +1,5 @@
+ // Renders parsed ledger entries as a fixed-width text report.
+-// Pure consumer: it trusts the guarantee in docs/data-contract.md.
++// Defends against non-numeric fields so the report never prints NaN.
+ 
+ import { parseEntries } from './parse.js';
+ 
+@@ -9,13 +9,18 @@
+   return label.padEnd(LABEL_WIDTH, ' ');
+ }
+ 
++function safeNumber(value) {
++  const n = Number(value);
++  return Number.isFinite(n) ? n : 0;
++}
++
+ export function buildReport(text) {
+   const entries = parseEntries(text);
+   const lines = [];
+   let total = 0;
+ 
+   for (const entry of entries) {
+-    const value = entry.amount * entry.weight;
++    const value = safeNumber(entry.amount) * safeNumber(entry.weight);
+     total += value;
+     lines.push(`${pad(entry.label)}${value.toFixed(2)}`);
+   }

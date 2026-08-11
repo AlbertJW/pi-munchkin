@@ -1,0 +1,30 @@
+diff -ruN a/src/roster.js b/src/roster.js
+--- a/src/roster.js	2026-08-11 15:08:27
++++ b/src/roster.js	2026-08-11 15:08:27
+@@ -14,12 +14,26 @@
+   return email[0] + '***' + email.slice(at);
+ }
+ 
++// Reads the sign-up address, so it has to run while the local part is intact.
++function displayNameFrom(email) {
++  return email
++    .slice(0, email.indexOf('@'))
++    .split(/[._-]+/)
++    .filter(Boolean)
++    .map((part) => part[0].toUpperCase() + part.slice(1).toLowerCase())
++    .join(' ');
++}
++
+ export function buildRoster(entries) {
+   return entries
+     .map((entry) => ({
+       id: entry.id,
+       email: normalizeEmail(entry.email),
+       name: (entry.name ?? '').trim(),
++    }))
++    .map((member) => ({
++      ...member,
++      name: member.name || displayNameFrom(member.email),
+     }))
+     .map((member) => ({ ...member, email: maskEmail(member.email) }));
+ }
