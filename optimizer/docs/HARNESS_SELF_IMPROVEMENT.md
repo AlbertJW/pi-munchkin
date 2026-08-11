@@ -2636,3 +2636,23 @@ probe, by design, and (b) pi's cloud provider path never fires `after_provider_r
 fire). The probe had been correct for two commits; the measurement was pointed at the wrong arm.
 Lesson filed next to "measure content, not proxies": a live smoke must pin
 `--model local-llamacpp/...`, or it validates nothing about the local path.
+
+## 2026-08-11 (night) — Albert approved; calibration ran; the preregistered rule said NOT READY
+
+Albert approved the four band fixtures and the calibration in chat; the approvals are in the
+manifests (`d2318fd`) and both preregistered rounds ran the same evening (24/24 authoritative
+rows, loaded hash `52696d7d…` confirmed in every session summary). The declared [0.30, 0.70]
+rule then did its job and the answer is the uncomfortable one: **the fixture set is not ready.**
+`misleading-symptom` and `documented-escape` saturated (6/6 each — retire to `pass_to_pass`);
+`ordered-steps` floored (0/6) — and the mandatory diagnosis showed every failed end state passes
+the visible suite and fails the hidden one, i.e. the non-commuting-transforms trap fired 100% of
+the time at both tiers: genuine difficulty, and the first field observation of shortcut-mutant
+behaviour in real sessions (6/6); `second-test-guard` pooled 0.67 but straddles per-model
+(4B 1/3, ling3 3/3) → admitted as a model-specific instrument for the 4B only. Fewer than two
+in-band fixtures → no candidate trial starts. Next authoring targets are now well-aimed: the
+band sits BETWEEN `second-test-guard`'s difficulty and `ordered-steps`'s; ling3 needs its own
+instrument (it cleared everything except the floor). One instrumentation gap recorded: gate
+artifacts cannot report failure-episode exposure (the v2 context-telemetry summary has no
+episode counter) — add that counter before the loop-intervention calibration relies on it.
+Full numbers and diagnosis: `PREREG_FIXTURE_BAND_2026-08-11.md` (results appended below the
+unchanged prereg).
