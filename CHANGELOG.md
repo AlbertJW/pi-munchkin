@@ -103,6 +103,26 @@ candidates as dark). Net changes since 0.3.0; the full per-decision record is
 
 ### Fixed
 
+- **Third inspection, eight findings + one unreported (2026-08-11, source only — NOT mirrored):**
+  `run/plan-gate-observed` was missing from the run-event validator's admission set, so every
+  plan gate was dropped before the reducer and two shipped fixes on that path (gate identity,
+  order-independent verification) were inert in production while their reducer-level tests
+  passed; a structural guard now derives the event union from source and requires each member
+  to be admitted AND to accept a real payload, and the path has an end-to-end test through the
+  real dispatcher. An empty array typed as `string[]` and made the telemetry catalog reject
+  whole rows (12 lost from the live corpus). Blackboard restore trusted persisted state:
+  malformed input crashed the renderer with the corrupt board still installed (silently
+  killing the adopted lens for a session), and hostile prose in seven raw-interpolated slots
+  could reach a model-visible "ground truth" block — now one closed validator, closed-vocabulary
+  failure classes, and a `restore-rejected` row. First-mutation telemetry classified the bash
+  COMMAND instead of the tool name (pre-fix rows must be discarded, not filtered — the latch is
+  one-shot). The research-ledger writer was narrowed to the reader's http(s) predicate. The
+  context-surface receipt now measures the payload the provider receives (`context-surface`
+  moved after `run-capsule`). `/run-new` declares an explicit run boundary so a new objective
+  stops inheriting an abandoned run. The execute prompt no longer names `subagent` when the
+  tool is inactive. Two model-visible adoption decisions (`ACTIVE_TOOL_PROMPTS`; lens/arbiter
+  single voice) are recorded in HANDOVER and remain human-gated.
+
 - **Second inspection, seven findings (2026-08-11, evening):** telemetry rows carry a true
   per-process session id (`si`, globalThis-shared across pi's per-extension module instances);
   `shadow_report.py` binds one surface hash, keys sessions on `si` only, excludes and counts

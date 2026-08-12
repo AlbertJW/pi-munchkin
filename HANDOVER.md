@@ -24,6 +24,44 @@ adoption, deletion, live mirroring, and gate rounds are human-gated. Never touch
 
 ## 2026-08 hardening series
 
+> **2026-08-11 THIRD INSPECTION — SOURCE ONLY, NOT MIRRORED. Two decisions are yours.**
+> Eight findings verified with runnable reproductions (plus one nobody reported). Fixed and
+> pushed: plan-gate events were **silently dropped by the run-event validator**, so gate
+> identity and order-independent verification were INERT in production while their
+> reducer-level tests passed — a structural guard now parses the union from source and
+> requires every member to be admitted and to accept a real payload, and the plan-gate path
+> has an end-to-end test through the real dispatcher; empty arrays no longer destroy whole
+> telemetry rows (12 rows already lost); blackboard restore fails closed; bash is classified
+> by COMMAND for first-mutation (discard pre-fix rows — the one-shot latch means they were
+> never written); the ledger writer fails closed to http(s); `context-surface` now loads after
+> `run-capsule` so receipts measure what the provider actually receives; `/run-new` gives an
+> explicit run boundary; and the execute prompt no longer names `subagent` when the tool is
+> inactive.
+>
+> **DECISION 1 — `ACTIVE_TOOL_PROMPTS`.** At deployed defaults `MUNCHKIN_TOOL_ACTIVATION=dynamic`
+> removes `subagent` and `compact_context` at session start, while the ambient prompt keeps
+> telling the model to call both. For the commonest small-model session (one request, ≤1-item
+> plan, context under 60%) the contradiction lasts the WHOLE session. The fix already exists
+> and is dark: `ACTIVE_TOOL_PROMPTS=active` (built 2026-08-10, six days after the tool-surface
+> default shipped — nothing tied them together). Structurally better than flipping it: have
+> `active-tool-prompts.ts` enable whenever the activation mode is not `ambient`, so the two
+> defaults cannot disagree under any env combination. Verified delta: ~797 ambient bytes leave
+> the system prompt, per-tool guidance appears only when the tool is present. Needs its own
+> boundary row; every A/B against the old prompt stops pooling.
+> **Not reachable-adjacent:** `harness/vendor/pi-subagent/index.ts:432-470` injects a full
+> "how to call the subagent tool" manual with JSON examples, gated only inside the
+> `ACTIVE_TOOL_PROMPTS` branch — so at defaults it ships unconditionally for an absent tool.
+> That is a stronger pull toward a pseudo-call than the four APPEND_SYSTEM lines.
+>
+> **DECISION 2 — one model-facing voice.** At defaults (`STATE_LENS=steer`,
+> `CONTROL_ARBITER=shadow`) a single detected loop produces TWO user-level messages: the lens
+> sends its own, then loop-breaker sends the steer. Worse than "two nearby messages": pi's
+> default `steeringMode: one-at-a-time` drains one per turn, so turn N+1 receives the bare
+> state block with NO instruction and the actual correction arrives a full turn later. The
+> lens should supplement the winning correction (`${lens}\n\n${steer}`) instead of being a
+> second producer. Model-visible; needs a boundary row and ideally a before/after measurement.
+
+
 > **2026-08-11 EVENING CLOSE-OUT (newest first).** Albert's nine findings are ALL fixed,
 > committed (`fc2d4af..5e75469`), pushed, and mirrored (108/108, loaded hash in
 > `docs/SURFACE_BOUNDARIES.md`): watchdog privacy (0700/0600 + report redaction), pi 0.84

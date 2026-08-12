@@ -2711,3 +2711,61 @@ observation; no calibration or candidate efficacy round starts until identity-so
 surface-bound telemetry has accumulated. (The fixture-band calibration above predates this rule
 and is unaffected: it used authoritative GATE rows, surface-bound per row, not the shadow
 report.)
+
+## 2026-08-11 (third inspection) — the dead event path, and what it says about how I verify
+
+**The finding that matters most is about method, not code.** `run/plan-gate-observed` existed
+in the RunEventV1 union, the reducer, the dispatcher and the payload validator's switch — but
+not in `RUN_EVENT_TYPES`, the set that ADMITS an event. `isRunEventV1()` returned false for
+every plan gate, so no plan gate ever reached the reducer in production. Two fixes I shipped
+hours apart and called PROVEN — gate identity (`f892eee`) and order-independent verification
+(`e8bd51f`) — were inert the whole time, because both were verified by calling the reducer
+directly. The green suite never drove the production channel. Live telemetry's 8 `verify_ok` /
+8 `verify_mutated` disagreements are consistent with exactly this.
+
+The repair is structural, not a missing string: `run-kernel-events.test.ts` now parses the
+union FROM SOURCE and requires every member to be admitted AND to accept a real sample
+payload, so a new event type cannot be added without being wired; and the plan-gate path now
+has an end-to-end test through the real dispatcher and validator. Rule adopted: a fix to a
+mechanism must be verified through the channel the mechanism actually uses. A unit test on the
+reducer proves the reducer, and nothing else.
+
+**A defect nobody reported, found while verifying another one, and more urgent than most of
+the list:** `valueType([])` returned `"string[]"` (`[].every()` is vacuously true), so any
+declared `number[]` field rejected an empty array — and a rejected detail makes telemetry
+replace the ENTIRE row with a schema-reject stub. A context call with zero tool results is
+ordinary. Twelve rows are unrecoverable in the live corpus, and any analysis that read "no
+receipt row" as "no context call" undercounted.
+
+Also fixed, each with a both-polarity test and a targeted counterfactual: blackboard restore
+now fails closed through a closed validator (a malformed snapshot used to crash the renderer
+with the corrupt board still installed and the throw swallowed, silently killing the ADOPTED
+c48 lens for an entire session — an arm scored "lens on" could have run with the lens dead;
+and hostile prose in seven raw-interpolated slots could reach a block headed "ground truth
+from the harness"); bash results are classified by COMMAND, not tool name (the one-shot latch
+means pre-fix first-mutation rows must be discarded, not filtered); the research-ledger writer
+was narrowed to the reader's http(s) predicate; `context-surface` moved downstream of
+`run-capsule` so a receipt measures the payload the provider actually receives; and an
+explicit `/run-new` boundary stops a new objective inheriting an abandoned run's identity.
+
+**Corrections to the report, from verification rather than deference:** the ledger's `source`
+slot was never hostile-reachable (only `claimed_source`); `capability/need` IS emitted from
+four sites — the real defect is that the channel is dead code at defaults, since the two tools
+dynamic mode removes are never its subject; the deep-research skill body is not ambient, so it
+does not widen the F3 window; telemetry's `run_id` has nothing to do with the kernel; and
+per-prompt run splitting would not break retries — it would break the cross-turn
+mutation→verification link, which is a better reason for the same conclusion.
+
+**My own process failures this turn, recorded because the tripwire lesson applies to me:**
+I piped `npm run verify` into `tail` inside an `&&` chain, so a FAILED verify (pack:smoke)
+still reached `git commit` — the exact exit-code masking already in my notes. Caught it on the
+next command, fixed the cause and amended before pushing, and switched to checking `$?`
+directly. Separately, the manifest-order tripwire in `package-smoke.mjs` fired on the
+context-surface move; that expectation was updated deliberately WITH the manifest and the
+reason is recorded in the file, which is the opposite of adjusting a guard to make it quiet.
+
+**Two adoption decisions are Albert's and stay open** (see HANDOVER): the
+`ACTIVE_TOOL_PROMPTS` flip that would make the prompt/tool-surface invariant atomic, and the
+single-voice fix for the lens/loop-breaker collision. Both change model-visible bytes; the
+verified byte deltas and the structurally-correct option for each are recorded there. This
+batch is SOURCE ONLY — not mirrored.

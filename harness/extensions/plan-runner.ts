@@ -727,13 +727,23 @@ export function policyBlock(autonomy: Autonomy, subagentAvailable: boolean): str
 - Same action failed twice (see plan_write warning) → stop, mark blocked, change strategy.${delegationBlock(subagentAvailable)}`;
 }
 
-function executionDisciplineBlock(): string {
+function executionDisciplineBlock(subagentAvailable: boolean): string {
 	// (c37 thin-orchestrator mode retired 2026-08-03 — 0-for-2 with adverse
 	// effort on both models; DARK_CANDIDATE_VERDICTS_2026-08-03.md. The ternaries
 	// that switched these two lines under PLAN_DELEGATE_ALL went with it.)
+	//
+	// The two subagent lines are CONDITIONAL for the same reason delegationBlock
+	// above returns "" without the tool: `MUNCHKIN_TOOL_ACTIVATION=dynamic` (the
+	// deployed default) removes `subagent` at session start and only restores it
+	// on a >1-item plan_go, a twice-failed gate, or a tier-2 loop — so a 1-item
+	// /plan-go handed the model execution instructions naming a tool that was not
+	// in its schema. Check, don't promise.
+	const subagentLines = subagentAvailable
+		? ` (Prefer subagent(explorer).)
+- Subagents: explorer/verifier read-only, return distilled results — keep this window clean. Main loop owns the plan + final verify.`
+		: "";
 	return `Execution discipline:
-- Big files: size-check first. Sample for shape/schema only. CSV/JSONL/logs/generated reports → query whole file with rg/awk/jq/Python, return only relevant rows/counts. Don't infer global state from head/tail. (Prefer subagent(explorer).)
-- Subagents: explorer/verifier read-only, return distilled results — keep this window clean. Main loop owns the plan + final verify.
+- Big files: size-check first. Sample for shape/schema only. CSV/JSONL/logs/generated reports → query whole file with rg/awk/jq/Python, return only relevant rows/counts. Don't infer global state from head/tail.${subagentLines}
 - No-ops: unneeded item → mark done, note "skipped/no-op" + evidence, or re-plan away with a note.
 - Completion claims: before final summary, derive changed-file evidence from tools (git status/diff, else filesystem). No claim a file changed without tool evidence.`;
 }
@@ -744,7 +754,7 @@ Re-plan anytime: plan_write to add/remove/reorder/restatus.
 plan_write does NOT end your turn — keep working.
 Gate risky segments: set an item's gate to a read-only verify/check command (e.g. \`just verify\`, the test/typecheck cmd). plan_write runs it when you mark the item done — fail → reverted (not done), fix + re-run. Mutating/destructive gates are rejected.
 ${policyBlock(autonomy, subagentAvailable)}
-${executionDisciplineBlock()}
+${executionDisciplineBlock(subagentAvailable)}
 End with a short summary:
 Status: <one line>
 Done: <bullets or "none">

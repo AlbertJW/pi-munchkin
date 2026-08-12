@@ -1460,3 +1460,33 @@ test("c39: plan_go cannot self-approve a plan that is awaiting the user's review
 		if (priorSource === undefined) delete process.env.TELEMETRY_SOURCE; else process.env.TELEMETRY_SOURCE = priorSource;
 	}
 });
+
+test("the execute prompt never names subagent when subagent is not an active tool", async () => {
+	// The deployed default (MUNCHKIN_TOOL_ACTIVATION=dynamic) removes `subagent`
+	// at session start and restores it only on a >1-item plan_go, a twice-failed
+	// gate, or a tier-2 loop — so a 1-item plan handed the model execution
+	// instructions naming a tool absent from its schema. delegationBlock already
+	// guarded this; executionDisciplineBlock did not.
+	const fp = freshPlanRunner();
+	const cwd = tmp();
+	fp.pi.setActiveTools(["read", "bash", "edit", "write", "plan_write"]); // no subagent
+	await fp.commands.get("plan").handler("one bounded fix", makeCtx(cwd).ctx);
+	await callTool(fp, "plan_write", { items: [{ title: "only step", status: "pending" }], request: "one bounded fix", summary: "s" }, cwd);
+	fp.sent.length = 0;
+	await fp.commands.get("plan-go").handler("", makeCtx(cwd).ctx);
+	const executePrompt = fp.sent.join("\n");
+	assert.ok(executePrompt.length > 0, "the execute prompt must have been delivered");
+	assert.ok(!executePrompt.includes("subagent"),
+		`the prompt names a tool the model does not have:\n${executePrompt}`);
+
+	// Opposite polarity: WITH the tool active, the delegation guidance returns.
+	const fp2 = freshPlanRunner();
+	const cwd2 = tmp();
+	fp2.pi.setActiveTools(["read", "bash", "edit", "write", "plan_write", "subagent"]);
+	await fp2.commands.get("plan").handler("two steps", makeCtx(cwd2).ctx);
+	await callTool(fp2, "plan_write", { items: [{ title: "a", status: "pending" }, { title: "b", status: "pending" }], request: "two steps", summary: "s" }, cwd2);
+	fp2.sent.length = 0;
+	await fp2.commands.get("plan-go").handler("", makeCtx(cwd2).ctx);
+	const withTool = fp2.sent.join("\n");
+	assert.ok(withTool.includes("subagent"), "with the tool present the guidance must still appear");
+});
