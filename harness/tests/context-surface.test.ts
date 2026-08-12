@@ -236,3 +236,25 @@ test("near-duplicate share: almost-identical large blocks count, exact repeats a
 	const again = buildContextSurfaceReceipt(wrap([big, nearCopy]), system, undefined).receipt;
 	assert.deepEqual(near, again, "deterministic");
 });
+
+test("the receipt measures the payload the PROVIDER receives, not the one before later appends", async () => {
+	// context-surface is an OBSERVER of the context array, and its receipt is only
+	// meaningful if nothing appends after it. run-capsule's recovery brief did
+	// exactly that: the manifest loaded context-surface at index 22 and
+	// run-capsule at 29, so telemetry described payload A while the provider got
+	// payload B — silently invalidating prefix-stability, duplicate-share and
+	// recovery-cost claims. The manifest order is now the guarantee, so pin it.
+	const { readFileSync } = await import("node:fs");
+	const manifest = JSON.parse(readFileSync(new URL("../../package.json", import.meta.url), "utf8"));
+	const extensions: string[] = manifest.pi.extensions;
+	const surface = extensions.indexOf("harness/extensions/context-surface.ts");
+	const capsule = extensions.indexOf("harness/extensions/run-capsule.ts");
+	assert.ok(surface > -1 && capsule > -1, "both extensions must be in the manifest");
+	assert.ok(surface > capsule,
+		`context-surface (${surface}) must load AFTER every extension that MUTATES the context array — ` +
+		`run-capsule is at ${capsule}. An observer upstream of a mutator measures a payload nobody sent.`);
+	// It must still sit after the dedup/blackboard producers it reads from.
+	for (const upstream of ["harness/extensions/context-dedup.ts", "harness/extensions/session-blackboard.ts"]) {
+		assert.ok(surface > extensions.indexOf(upstream), `context-surface must stay downstream of ${upstream}`);
+	}
+});

@@ -44,7 +44,6 @@ const expectedExtensions = [
   // session-blackboard's context hook must run BEFORE context-surface so
   // receipts measure the post-lens view (same ordering rule as context-dedup).
   "harness/extensions/session-blackboard.ts",
-  "harness/extensions/context-surface.ts",
   "harness/extensions/bash-output-guard.ts",
   "harness/extensions/payload-audit.ts",
   // Must register after compact_context and the vendor subagent. It makes its
@@ -61,6 +60,14 @@ const expectedExtensions = [
   // Private state projection consumes finalized kernel snapshots and must
   // checkpoint before the last-loaded telemetry durability boundary.
   "harness/extensions/run-capsule.ts",
+  // MOVED here 2026-08-11 (was directly after session-blackboard): the receipt
+  // is only meaningful if nothing appends to the context array afterwards, and
+  // run-capsule's recovery brief did exactly that — telemetry described a
+  // payload the provider never received. An OBSERVER must load after every
+  // MUTATOR; it still sits downstream of the context-dedup/session-blackboard
+  // producers it reads from. This expectation moved deliberately WITH the
+  // manifest; it was not adjusted to silence a firing tripwire.
+  "harness/extensions/context-surface.ts",
   // Durability boundary is registered last so settled/shutdown rows from every
   // first-party extension are queued before the final async flush.
   "harness/extensions/telemetry-flush.ts",

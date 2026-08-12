@@ -60,7 +60,6 @@
       "harness/extensions/context-brief.ts",
       "harness/extensions/context-dedup.ts",
       "harness/extensions/session-blackboard.ts",
-      "harness/extensions/context-surface.ts",
       "harness/extensions/bash-output-guard.ts",
       "harness/extensions/payload-audit.ts",
       "harness/extensions/tool-activation.ts",
@@ -68,6 +67,7 @@
       "harness/extensions/control-arbiter.ts",
       "harness/extensions/run-kernel.ts",
       "harness/extensions/run-capsule.ts",
+      "harness/extensions/context-surface.ts",
       "harness/extensions/telemetry-flush.ts"
     ],
     "skills": [
