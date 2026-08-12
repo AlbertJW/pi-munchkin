@@ -12,13 +12,18 @@ import { discoverEntryPoints, hashSurface, walkRelativeImports } from "../lib/su
 async function main(): Promise<void> {
 	const agentDir = process.argv[2];
 	if (!agentDir) {
-		console.error("usage: surface-hash.ts <agent-dir>");
+		console.error("usage: surface-hash.ts <agent-dir> [cwd]");
 		process.exitCode = 1;
 		return;
 	}
-	const { entries, npmIdentities } = await discoverEntryPoints(agentDir);
-	const files = await walkRelativeImports(entries);
-	console.log(await hashSurface(agentDir, files, npmIdentities));
+	const discovered = await discoverEntryPoints(agentDir, process.argv[3]);
+	const files = await walkRelativeImports(discovered.orderedEntryPoints);
+	for (const entry of discovered.entries) files.add(entry);
+	console.log(await hashSurface(agentDir, {
+		orderedEntryPoints: discovered.orderedEntryPoints,
+		files,
+		npmIdentities: discovered.npmIdentities,
+	}));
 }
 
 main().catch((err) => {

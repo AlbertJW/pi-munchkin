@@ -1,14 +1,25 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import { spawnSync } from "node:child_process";
 import { copyFile, mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, resolve } from "node:path";
-import { LIVE_PACKAGE_DIR, liveOrderedManifest, buildLiveMirrorManifest, compareLiveMirror } from "../lib/live-mirror.ts";
+import { LIVE_PACKAGE_DIR, liveOrderedManifest, buildLiveMirrorPlan, compareLiveMirror } from "../lib/live-mirror.ts";
+import { discoverEntryPoints } from "../lib/surface-walk.ts";
+
+async function materialize(root: string, agentDir: string, entries: Awaited<ReturnType<typeof buildLiveMirrorPlan>>): Promise<void> {
+	for (const entry of entries) {
+		const destination = resolve(agentDir, entry.destination);
+		await mkdir(dirname(destination), { recursive: true });
+		if (entry.kind === "copy") await copyFile(resolve(root, entry.source), destination);
+		else await writeFile(destination, entry.content);
+	}
+}
 
 test("live mirror manifest covers declared first-party surfaces and ignores local-only additions", async () => {
   const root = resolve(import.meta.dirname, "../..");
   const manifest = JSON.parse(await readFile(resolve(root, "package.json"), "utf8"));
-  const entries = await buildLiveMirrorManifest(root, manifest);
+  const entries = await buildLiveMirrorPlan(root, manifest);
   const destinations = new Set(entries.map(({ destination }) => destination));
   for (const expected of [
     // Extensions, lib and vendor live under ONE ordered package directory (see
@@ -24,17 +35,26 @@ test("live mirror manifest covers declared first-party surfaces and ignores loca
 
   const agentDir = await mkdtemp(resolve(tmpdir(), "pi-mirror-test-"));
   try {
-    for (const entry of entries) {
-      const destination = resolve(agentDir, entry.destination);
-      await mkdir(dirname(destination), { recursive: true });
-      await copyFile(resolve(root, entry.source), destination);
-    }
+    await materialize(root, agentDir, entries);
     await writeFile(resolve(agentDir, "extensions", "local-only.ts"), "// documented local-only addition\n");
     assert.deepEqual(await compareLiveMirror(root, agentDir, entries), []);
+	const generated = resolve(agentDir, LIVE_PACKAGE_DIR, "package.json");
+	await rm(generated);
+	assert.deepEqual((await compareLiveMirror(root, agentDir, entries)).map(({ destination, reason }) => ({ destination, reason })), [
+		{ destination: `${LIVE_PACKAGE_DIR}/package.json`, reason: "missing" },
+	]);
+	await materialize(root, agentDir, entries);
     await writeFile(resolve(agentDir, LIVE_PACKAGE_DIR, "extensions", "hashline.ts"), "// drift\n");
-    assert.deepEqual((await compareLiveMirror(root, agentDir, entries)).map(({ destination, reason }) => ({ destination, reason })), [
+	assert.deepEqual((await compareLiveMirror(root, agentDir, entries)).map(({ destination, reason }) => ({ destination, reason })), [
       { destination: `${LIVE_PACKAGE_DIR}/extensions/hashline.ts`, reason: "content" },
     ]);
+	await materialize(root, agentDir, entries);
+	const parsed = JSON.parse(await readFile(generated, "utf8"));
+	parsed.pi.extensions.reverse();
+	await writeFile(generated, `${JSON.stringify(parsed, null, 2)}\n`);
+	assert.deepEqual((await compareLiveMirror(root, agentDir, entries)).map(({ destination, reason }) => ({ destination, reason })), [
+		{ destination: `${LIVE_PACKAGE_DIR}/package.json`, reason: "content" },
+	]);
   } finally {
     await rm(agentDir, { recursive: true, force: true });
   }
@@ -51,7 +71,7 @@ test("the live layout preserves MANIFEST order — pi discovers loose files by r
 	// declares `pi.extensions` loads exactly what it declares, in order.
 	const { readFileSync } = await import("node:fs");
 	const manifest = JSON.parse(readFileSync(new URL("../../package.json", import.meta.url), "utf8"));
-	const entries = await buildLiveMirrorManifest(resolve(import.meta.dirname, "../.."), manifest);
+	const entries = await buildLiveMirrorPlan(resolve(import.meta.dirname, "../.."), manifest);
 
 	// 1. No first-party extension may land LOOSE at the extensions root, where
 	//    rule 1 would discover it and silently reimpose readdir order.
@@ -60,7 +80,7 @@ test("the live layout preserves MANIFEST order — pi discovers loose files by r
 
 	// 2. Every declared extension lands inside the ordered package directory.
 	for (const extension of manifest.pi.extensions) {
-		const destination = entries.find((entry) => entry.source === extension)?.destination;
+		const destination = entries.find((entry) => entry.kind === "copy" && entry.source === extension)?.destination;
 		assert.ok(destination?.startsWith(`${LIVE_PACKAGE_DIR}/`), `${extension} must live under the ordered package`);
 	}
 
@@ -88,18 +108,12 @@ test("PI'S OWN LOADER returns the manifest order for the built live layout", asy
 	if (!loader?.discoverAndLoadExtensions) return; // packaged consumers may not expose it
 	const root = resolve(import.meta.dirname, "../..");
 	const manifest = JSON.parse(await readFile(resolve(root, "package.json"), "utf8"));
-	const entries = await buildLiveMirrorManifest(root, manifest);
+	const entries = await buildLiveMirrorPlan(root, manifest);
 	const agentDir = await mkdtemp(resolve(tmpdir(), "pi-mirror-order-"));
 	const priorTelemetry = process.env.TELEMETRY;
 	process.env.TELEMETRY = "off";
 	try {
-		for (const entry of entries) {
-			const destination = resolve(agentDir, entry.destination);
-			await mkdir(dirname(destination), { recursive: true });
-			await copyFile(resolve(root, entry.source), destination);
-		}
-		await writeFile(resolve(agentDir, LIVE_PACKAGE_DIR, "package.json"),
-			JSON.stringify({ name: "pi-munchkin-live", private: true, pi: liveOrderedManifest(manifest) }, null, 2));
+		await materialize(root, agentDir, entries);
 		await writeFile(resolve(agentDir, "settings.json"), "{}");
 
 		const bus = { on: () => () => {}, emit: () => {} };
@@ -109,8 +123,35 @@ test("PI'S OWN LOADER returns the manifest order for the built live layout", asy
 		const expected = manifest.pi.extensions.map((e: string) => e.slice("harness/".length));
 		assert.deepEqual(order, expected,
 			"pi must load first-party extensions in MANIFEST order — this is the architecture, not a preference");
+		const discovered = await discoverEntryPoints(agentDir, root);
+		const ours = discovered.orderedEntryPoints
+			.filter((entry) => entry.startsWith(resolve(agentDir, LIVE_PACKAGE_DIR)))
+			.map((entry) => entry.replace(`${agentDir}/${LIVE_PACKAGE_DIR}/`, ""));
+		assert.deepEqual(ours, order, "surface discovery and Pi must agree on package-directory topology");
 	} finally {
 		if (priorTelemetry === undefined) delete process.env.TELEMETRY; else process.env.TELEMETRY = priorTelemetry;
+		await rm(agentDir, { recursive: true, force: true });
+	}
+});
+
+test("mirror check allows documented chaos.ts but rejects an unmanaged loadable package directory", async () => {
+	const root = resolve(import.meta.dirname, "../..");
+	const manifest = JSON.parse(await readFile(resolve(root, "package.json"), "utf8"));
+	const entries = await buildLiveMirrorPlan(root, manifest);
+	const agentDir = await mkdtemp(resolve(tmpdir(), "pi-mirror-unmanaged-"));
+	try {
+		await materialize(root, agentDir, entries);
+		await writeFile(resolve(agentDir, "extensions", "chaos.ts"), "export default function () {}\n");
+		const check = () => spawnSync(process.execPath, [resolve(root, "harness/scripts/live-mirror-check.mjs"), agentDir], {
+			cwd: root, encoding: "utf8",
+		});
+		assert.equal(check().status, 0, "documented local-only chaos.ts remains allowed");
+		await mkdir(resolve(agentDir, "extensions", "rogue"), { recursive: true });
+		await writeFile(resolve(agentDir, "extensions", "rogue", "index.ts"), "export default function () {}\n");
+		const rejected = check();
+		assert.notEqual(rejected.status, 0);
+		assert.match(rejected.stderr, /extensions\/rogue: loaded live but not in the package manifest/);
+	} finally {
 		await rm(agentDir, { recursive: true, force: true });
 	}
 });

@@ -16,7 +16,7 @@
 // package can't be resolved against the lockfile, rather than silently omitting it.
 
 import { createHash } from "node:crypto";
-import { readdir, readFile } from "node:fs/promises";
+import { readdir, readFile, stat } from "node:fs/promises";
 import { existsSync } from "node:fs";
 import { dirname, join, relative, resolve } from "node:path";
 
@@ -44,6 +44,14 @@ export async function walkRelativeImports(entryPoints: string[]): Promise<Set<st
 }
 
 type PackageManifest = { pi?: { extensions?: string[] } };
+
+export type SurfaceDescriptor = {
+	/** Absolute extension entry points in the exact order Pi will load them. */
+	orderedEntryPoints: readonly string[];
+	/** Absolute behavior- and prompt-bearing files. Ordering is intentionally ignored. */
+	files: Iterable<string>;
+	npmIdentities?: readonly NpmPackageIdentity[];
+};
 
 /** Every regular file below `dir`, recursively; empty if the directory is absent.
  * Deliberately NOT limited to .md: skill directories carry executable scripts
@@ -91,6 +99,53 @@ export async function resolveNpmPackageIdentity(agentDir: string, packageSpec: s
 	return { name: bare, version: entry.version ?? "", resolved: entry.resolved, integrity: entry.integrity };
 }
 
+async function resolveExtensionDirectory(dir: string): Promise<string[]> {
+	const packageJson = join(dir, "package.json");
+	if (existsSync(packageJson)) {
+		try {
+			const manifest = JSON.parse(await readFile(packageJson, "utf8")) as PackageManifest;
+			const declared = (manifest.pi?.extensions ?? [])
+				.map((entry) => resolve(dir, entry))
+				.filter((entry) => existsSync(entry));
+			if (declared.length) return declared;
+		} catch {
+			// Pi also ignores an unreadable package manifest and falls back to index.
+		}
+	}
+	for (const name of ["index.ts", "index.js"]) {
+		const candidate = join(dir, name);
+		if (existsSync(candidate)) return [candidate];
+	}
+	return [];
+}
+
+/** Reproduce Pi's one-level extension-directory discovery, including its native
+ * readdir order and package-manifest-before-index precedence. */
+export async function discoverExtensionEntriesInDir(dir: string): Promise<string[]> {
+	let children: import("node:fs").Dirent[];
+	try {
+		children = await readdir(dir, { withFileTypes: true });
+	} catch {
+		return [];
+	}
+	const discovered: string[] = [];
+	for (const child of children) {
+		const childPath = join(dir, child.name);
+		if ((child.isFile() || child.isSymbolicLink()) && (child.name.endsWith(".ts") || child.name.endsWith(".js"))) {
+			discovered.push(childPath);
+			continue;
+		}
+		if (child.isDirectory() || child.isSymbolicLink()) {
+			try {
+				if ((await stat(childPath)).isDirectory()) discovered.push(...await resolveExtensionDirectory(childPath));
+			} catch {
+				// Match Pi: a broken or unreadable child contributes no entry point.
+			}
+		}
+	}
+	return discovered;
+}
+
 /** Entry points for a live agent-dir install (no package.json there): every
  * top-level extensions/*.ts (matching pi's directory-scan auto-load), plus each
  * non-`npm:`-prefixed settings.json `packages` entry's own package.json
@@ -103,15 +158,30 @@ export async function resolveNpmPackageIdentity(agentDir: string, packageSpec: s
  * existsSync-or-null treatment of individual role files) — a missing directory
  * contributes nothing rather than failing closed, since there's no declared list
  * of expected role prompts to fail against. */
-export async function discoverEntryPoints(agentDir: string): Promise<{ entries: string[]; npmIdentities: NpmPackageIdentity[] }> {
-	const extDir = join(agentDir, "extensions");
-	const extFiles = (await readdir(extDir)).filter((f) => f.endsWith(".ts"));
-	const entries = extFiles.map((f) => join(extDir, f));
+export async function discoverEntryPoints(agentDir: string, cwd?: string): Promise<{
+	entries: string[];
+	orderedEntryPoints: string[];
+	npmIdentities: NpmPackageIdentity[];
+}> {
+	const orderedEntryPoints: string[] = [];
+	const seen = new Set<string>();
+	const addEntries = (paths: Iterable<string>) => {
+		for (const entry of paths) {
+			const absolute = resolve(entry);
+			if (!seen.has(absolute)) {
+				seen.add(absolute);
+				orderedEntryPoints.push(absolute);
+			}
+		}
+	};
+	if (cwd) addEntries(await discoverExtensionEntriesInDir(join(resolve(cwd), ".pi", "extensions")));
+	addEntries(await discoverExtensionEntriesInDir(join(agentDir, "extensions")));
+	const promptFiles: string[] = [];
 
 	const agentsDir = join(agentDir, "agents");
 	try {
 		const mdFiles = (await readdir(agentsDir)).filter((f) => f.endsWith(".md"));
-		for (const f of mdFiles) entries.push(join(agentsDir, f));
+		for (const f of mdFiles) promptFiles.push(join(agentsDir, f));
 	} catch {
 		// no agents/ dir — role prompts are optional, nothing to add
 	}
@@ -121,9 +191,9 @@ export async function discoverEntryPoints(agentDir: string): Promise<{ entries: 
 	// let two different model-visible changes share one hash (SURFACE_BOUNDARIES
 	// rows 2026-08-06 ×2 are the manifested case). Optional-if-missing, matching
 	// agents/ above; mirror:check separately proves presence.
-	entries.push(...await walkPromptFiles(join(agentDir, "skills")));
+	promptFiles.push(...await walkPromptFiles(join(agentDir, "skills")));
 	const appendPath = join(agentDir, "APPEND_SYSTEM.md");
-	if (existsSync(appendPath)) entries.push(appendPath);
+	if (existsSync(appendPath)) promptFiles.push(appendPath);
 
 	const npmIdentities: NpmPackageIdentity[] = [];
 	const settings = JSON.parse(await readFile(join(agentDir, "settings.json"), "utf8")) as { packages?: string[] };
@@ -133,27 +203,34 @@ export async function discoverEntryPoints(agentDir: string): Promise<{ entries: 
 			continue;
 		}
 		const pkgDir = join(agentDir, pkg);
-		const manifest = JSON.parse(await readFile(join(pkgDir, "package.json"), "utf8")) as PackageManifest;
-		for (const ext of manifest.pi?.extensions ?? []) entries.push(resolve(pkgDir, ext));
+		const resolvedEntries = await resolveExtensionDirectory(pkgDir);
+		if (resolvedEntries.length) addEntries(resolvedEntries);
+		else addEntries(await discoverExtensionEntriesInDir(pkgDir));
 	}
-	return { entries, npmIdentities };
+	return { entries: [...orderedEntryPoints, ...promptFiles], orderedEntryPoints, npmIdentities };
 }
 
-/** sha256 over sorted relative-path + NUL + bytes + NUL (files), then sorted
- * npm identities, so the digest is reproducible across machines/checkouts as long
- * as relative layout + contents + pinned npm identities match — independent of
- * $HOME or checkout location. */
-export async function hashSurface(baseDir: string, files: Iterable<string>, npmIdentities: NpmPackageIdentity[] = []): Promise<string> {
-	const relPaths = Array.from(files, (f) => relative(baseDir, f).split("\\").join("/")).sort();
+/** Hash causal topology first, then content as an unordered set, then pinned npm
+ * identity. Manifest formatting is absent; changing declared order is not. */
+export async function hashSurface(baseDir: string, descriptor: SurfaceDescriptor): Promise<string> {
+	const label = (file: string) => relative(baseDir, file).split("\\").join("/");
+	const relPaths = Array.from(new Set(Array.from(descriptor.files, label))).sort();
 	const hash = createHash("sha256");
+	hash.update("pi-surface-v2\0", "utf8");
+	for (const entry of descriptor.orderedEntryPoints) {
+		hash.update("entry\0", "utf8");
+		hash.update(label(entry), "utf8");
+		hash.update("\0");
+	}
 	for (const relPath of relPaths) {
+		hash.update("file\0", "utf8");
 		const bytes = await readFile(join(baseDir, relPath));
 		hash.update(relPath, "utf8");
 		hash.update("\0");
 		hash.update(bytes);
 		hash.update("\0");
 	}
-	for (const pkg of [...npmIdentities].sort((a, b) => a.name.localeCompare(b.name))) {
+	for (const pkg of [...(descriptor.npmIdentities ?? [])].sort((a, b) => a.name.localeCompare(b.name))) {
 		hash.update(`npm:${pkg.name}`, "utf8");
 		hash.update("\0");
 		hash.update(`${pkg.version}|${pkg.resolved}|${pkg.integrity}`, "utf8");

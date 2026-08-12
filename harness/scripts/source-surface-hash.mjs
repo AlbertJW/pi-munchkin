@@ -17,4 +17,4 @@ for (const dir of manifest.pi?.skills ?? []) {
   for (const file of await walkPromptFiles(resolve(root, dir))) files.add(file);
 }
 files.add(resolve(root, "harness", "APPEND_SYSTEM.md"));
-console.log(await hashSurface(root, files));
+console.log(await hashSurface(root, { orderedEntryPoints: entries, files }));

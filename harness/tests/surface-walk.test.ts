@@ -31,15 +31,67 @@ test("hashSurface is deterministic and sensitive to content, not iteration order
 	const dir = await tmp();
 	await writeFile(join(dir, "a.ts"), "export const a = 1;\n");
 	await writeFile(join(dir, "b.ts"), "export const b = 2;\n");
-	const forward = await hashSurface(dir, [join(dir, "a.ts"), join(dir, "b.ts")]);
-	const reversed = await hashSurface(dir, [join(dir, "b.ts"), join(dir, "a.ts")]);
+	const forward = await hashSurface(dir, { orderedEntryPoints: [], files: [join(dir, "a.ts"), join(dir, "b.ts")] });
+	const reversed = await hashSurface(dir, { orderedEntryPoints: [], files: [join(dir, "b.ts"), join(dir, "a.ts")] });
 	assert.equal(forward, reversed, "iteration order must not affect the digest (paths are sorted internally)");
-	const again = await hashSurface(dir, [join(dir, "a.ts"), join(dir, "b.ts")]);
+	const again = await hashSurface(dir, { orderedEntryPoints: [], files: [join(dir, "a.ts"), join(dir, "b.ts")] });
 	assert.equal(forward, again, "same input twice yields the same digest");
 	await writeFile(join(dir, "a.ts"), "export const a = 2;\n"); // content change
-	const changed = await hashSurface(dir, [join(dir, "a.ts"), join(dir, "b.ts")]);
+	const changed = await hashSurface(dir, { orderedEntryPoints: [], files: [join(dir, "a.ts"), join(dir, "b.ts")] });
 	assert.notEqual(forward, changed, "a content change must change the digest");
 	await rm(dir, { recursive: true, force: true });
+});
+
+test("hashSurface treats extension order as causal topology", async () => {
+	const dir = await tmp();
+	const a = join(dir, "a.ts");
+	const b = join(dir, "b.ts");
+	await writeFile(a, "export const a = 1;\n");
+	await writeFile(b, "export const b = 2;\n");
+	const files = [a, b];
+	const forward = await hashSurface(dir, { orderedEntryPoints: [a, b], files });
+	const reversed = await hashSurface(dir, { orderedEntryPoints: [b, a], files });
+	assert.notEqual(forward, reversed, "the same bytes in a different load order are a different surface");
+	await rm(dir, { recursive: true, force: true });
+});
+
+test("discoverEntryPoints matches Pi package order and includes project-local extensions first", async () => {
+	const agentDir = await tmp();
+	const cwd = await tmp();
+	await mkdir(join(agentDir, "extensions", "bundle"), { recursive: true });
+	await writeFile(join(agentDir, "extensions", "bundle", "one.ts"), "export {};\n");
+	await writeFile(join(agentDir, "extensions", "bundle", "two.ts"), "export {};\n");
+	const manifestPath = join(agentDir, "extensions", "bundle", "package.json");
+	await writeFile(manifestPath, JSON.stringify({ pi: { extensions: ["./two.ts", "./one.ts"] } }));
+	await writeFile(join(agentDir, "settings.json"), JSON.stringify({ packages: [] }));
+	await mkdir(join(cwd, ".pi", "extensions"), { recursive: true });
+	const local = join(cwd, ".pi", "extensions", "local.ts");
+	await writeFile(local, "export {};\n");
+
+	const first = await discoverEntryPoints(agentDir, cwd);
+	assert.deepEqual(first.orderedEntryPoints, [
+		local,
+		join(agentDir, "extensions", "bundle", "two.ts"),
+		join(agentDir, "extensions", "bundle", "one.ts"),
+	]);
+	const files = await walkRelativeImports(first.orderedEntryPoints);
+	const before = await hashSurface(agentDir, { orderedEntryPoints: first.orderedEntryPoints, files });
+
+	await writeFile(manifestPath, '{\n  "pi": { "extensions": ["./two.ts", "./one.ts"] }\n}\n');
+	const reformatted = await discoverEntryPoints(agentDir, cwd);
+	assert.equal(before, await hashSurface(agentDir, {
+		orderedEntryPoints: reformatted.orderedEntryPoints,
+		files: await walkRelativeImports(reformatted.orderedEntryPoints),
+	}), "manifest whitespace is not runtime topology");
+
+	await writeFile(manifestPath, JSON.stringify({ pi: { extensions: ["./one.ts", "./two.ts"] } }));
+	const reordered = await discoverEntryPoints(agentDir, cwd);
+	assert.notEqual(before, await hashSurface(agentDir, {
+		orderedEntryPoints: reordered.orderedEntryPoints,
+		files: await walkRelativeImports(reordered.orderedEntryPoints),
+	}), "declared order must move the digest");
+	await rm(agentDir, { recursive: true, force: true });
+	await rm(cwd, { recursive: true, force: true });
 });
 
 function lockEntry(version: string, integrity = `sha512-${version}fakehash`) {
@@ -149,13 +201,13 @@ test("hashSurface: npm identities are folded in deterministically and change the
 		{ name: "pkg-b", version: "1.0.0", resolved: "r-b", integrity: "i-b" },
 		{ name: "pkg-a", version: "1.0.0", resolved: "r-a", integrity: "i-a" },
 	];
-	const withNpm = await hashSurface(dir, [join(dir, "a.ts")], identities);
-	const reversed = await hashSurface(dir, [join(dir, "a.ts")], [...identities].reverse());
+	const withNpm = await hashSurface(dir, { orderedEntryPoints: [], files: [join(dir, "a.ts")], npmIdentities: identities });
+	const reversed = await hashSurface(dir, { orderedEntryPoints: [], files: [join(dir, "a.ts")], npmIdentities: [...identities].reverse() });
 	assert.equal(withNpm, reversed, "npm identity order must not affect the digest (sorted internally)");
-	const withoutNpm = await hashSurface(dir, [join(dir, "a.ts")]);
+	const withoutNpm = await hashSurface(dir, { orderedEntryPoints: [], files: [join(dir, "a.ts")] });
 	assert.notEqual(withNpm, withoutNpm, "npm identities must actually change the digest");
-	const changedIdentity = await hashSurface(dir, [join(dir, "a.ts")],
-		[{ ...identities[0], version: "1.0.1" }, identities[1]]);
+	const changedIdentity = await hashSurface(dir, { orderedEntryPoints: [], files: [join(dir, "a.ts")],
+		npmIdentities: [{ ...identities[0], version: "1.0.1" }, identities[1]] });
 	assert.notEqual(withNpm, changedIdentity, "a changed npm package version must change the digest");
 	await rm(dir, { recursive: true, force: true });
 });
@@ -170,7 +222,8 @@ test("discoverEntryPoints: skills/**/*.md and APPEND_SYSTEM.md are prompt surfac
 	await writeFile(join(dir, "skills", "deep-research", "helper.py"), "# scripts are behavior: included\n");
 	await writeFile(join(dir, "APPEND_SYSTEM.md"), "governor text\n");
 
-	const { entries } = await discoverEntryPoints(dir);
+	const first = await discoverEntryPoints(dir);
+	const { entries } = first;
 	assert.deepEqual(entries.sort(), [
 		join(dir, "APPEND_SYSTEM.md"),
 		join(dir, "extensions", "foo.ts"),
@@ -179,14 +232,16 @@ test("discoverEntryPoints: skills/**/*.md and APPEND_SYSTEM.md are prompt surfac
 	].sort());
 
 	// The 2026-08-06 incident: a skill-text change must move the hash.
-	const before = await hashSurface(dir, entries);
+	const before = await hashSurface(dir, { orderedEntryPoints: first.orderedEntryPoints, files: entries });
 	await writeFile(join(dir, "skills", "deep-research", "SKILL.md"), "# skill v2 — changed\n");
-	const after = await hashSurface(dir, (await discoverEntryPoints(dir)).entries);
+	const second = await discoverEntryPoints(dir);
+	const after = await hashSurface(dir, { orderedEntryPoints: second.orderedEntryPoints, files: second.entries });
 	assert.notEqual(before, after, "skill edits are model-visible and must change the surface hash");
 
 	// And a skill SCRIPT change must too — executable behavior, same boundary rule.
 	await writeFile(join(dir, "skills", "deep-research", "helper.py"), "# changed script\n");
-	const afterScript = await hashSurface(dir, (await discoverEntryPoints(dir)).entries);
+	const third = await discoverEntryPoints(dir);
+	const afterScript = await hashSurface(dir, { orderedEntryPoints: third.orderedEntryPoints, files: third.entries });
 	assert.notEqual(after, afterScript, "skill script edits must change the surface hash");
 	await rm(dir, { recursive: true, force: true });
 });

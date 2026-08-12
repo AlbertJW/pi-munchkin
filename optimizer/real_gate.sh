@@ -53,8 +53,6 @@ EXPERIMENT_MANIFEST="${EXPERIMENT_MANIFEST:-}"
 EXPERIMENT_MANIFEST_SHA256="${EXPERIMENT_MANIFEST_SHA256:-}"
 EXPERIMENT_BASE_CELL="${EXPERIMENT_BASE_CELL:-base}"
 EXPERIMENT_CAND_CELL="${EXPERIMENT_CAND_CELL:-cand}"
-HARNESS_HASH_BLOCKER="No valid launcher-computed surface receipt is available; this row cannot be promoted until the running extension corroborates one in authenticated telemetry."
-HARNESS_SURFACE_SHA256=""
 AGENT_DIR="${PI_CODING_AGENT_DIR:-$HOME/.pi/agent}"
 # An orchestrator (batch_screen.py) may PIN the registry hash it resolved when it
 # built the run-private overlay. Recomputing unconditionally made that pin dead
@@ -68,15 +66,6 @@ fi
 if [[ -n "$AGENT_MODELS_SHA256_PIN" && "$AGENT_MODELS_SHA256_PIN" != "$AGENT_MODELS_SHA256" ]]; then
 	echo "[real_gate] pinned AGENT_MODELS_SHA256 does not match $AGENT_DIR/models.json — the model registry changed since the caller resolved it; refusing to measure a moved instrument" >&2
 	exit 2
-fi
-# Computed here, before any `pi` session exists — the running session cannot
-# influence this number. Only clears the static blocker on success; a computation
-# failure keeps the honest blocker text rather than guessing.
-if HARNESS_SURFACE_SHA256="$(node --experimental-strip-types "$REPO_ROOT/harness/scripts/surface-hash.ts" "${PI_CODING_AGENT_DIR:-$HOME/.pi/agent}" 2>/dev/null)"; then
-	HARNESS_HASH_BLOCKER=""
-else
-	HARNESS_SURFACE_SHA256=""
-	echo "[real_gate] WARNING: harness surface hash computation failed; rows keep the explicit blocker" >&2
 fi
 if [[ -n "$EXPERIMENT_MANIFEST" ]]; then
 	[[ -f "$EXPERIMENT_MANIFEST" ]] || { echo "[real_gate] experiment manifest not found: $EXPERIMENT_MANIFEST" >&2; exit 2; }
@@ -380,11 +369,10 @@ run_guarded_session() {
 		# The only caller that genuinely knows it's re-running the SAME interrupted
 		# task in the SAME workdir; plan-runner's session-start resume notice
 		# surfaces any .pi/plan-state.json the aborted first session left behind.
-		# --no-skills (2026-07-29): global skills (~/.pi/agent/skills) are model-visible
-		# context but OUTSIDE the harness surface hash (surface-hash.ts walks
-		# extensions/lib only), so a skill edit could silently change every gate
-		# session with no provenance trace. The gate measures the hashed surface;
-		# skills are interactive-UX tooling, excluded by design.
+		# --no-skills (2026-07-29): skills are part of the descriptor/hash, but gate
+		# prompts deliberately exclude them so skill discovery cannot add a task-
+		# dependent prompt variable. The receipt still identifies the installed
+		# surface rather than silently reverting to the pre-2026-08-11 hash epoch.
 		( cd "$wd" || exit
 		  exec 3<<<"$telemetry_key"
 		  exec 4<<<"${LLAMA_API_KEY:-}"
@@ -454,6 +442,18 @@ run_one() {  # $1=config $2=arm $3=task $4=rep [$5=split] [$6=prompt-variant]
 	tar -C "$fix" --exclude node_modules --exclude .git --exclude .DS_Store -cf - . | tar -C "$wd" -xf -
 	[[ "$task" == "t3" ]] && cp "$T3_FILES/align.js" "$wd/src/"   # the buggy source to fix (before only)
 	is_hidden "$task" || install_tests "$task" "$wd"             # shown tasks only; hidden tasks withhold the test
+
+	# Surface provenance is PER RUN, after the fixture exists and before Pi starts.
+	# The cwd argument makes project-local .pi/extensions part of the same topology
+	# Pi will load; computing this once at launcher startup silently omitted them.
+	local HARNESS_HASH_BLOCKER="No valid launcher-computed surface receipt is available; this row cannot be promoted until the running extension corroborates one in authenticated telemetry."
+	local HARNESS_SURFACE_SHA256=""
+	if HARNESS_SURFACE_SHA256="$(node --experimental-strip-types "$REPO_ROOT/harness/scripts/surface-hash.ts" "$AGENT_DIR" "$wd" 2>/dev/null)"; then
+		HARNESS_HASH_BLOCKER=""
+	else
+		HARNESS_SURFACE_SHA256=""
+		echo "[real_gate] WARNING: harness surface hash computation failed for $pat/$task; rows keep the explicit blocker" >&2
+	fi
 
 	# server died mid-sweep (e.g. OOM): wait for it to come back (server side should
 	# auto-restart) instead of killing a multi-hour sweep; abort only past HEALTH_WAIT.

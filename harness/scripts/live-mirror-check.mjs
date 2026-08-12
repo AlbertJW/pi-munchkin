@@ -1,9 +1,10 @@
 #!/usr/bin/env node
 
-import { readdir, readFile } from "node:fs/promises";
+import { readFile } from "node:fs/promises";
 import { homedir } from "node:os";
-import { resolve } from "node:path";
-import { buildLiveMirrorManifest, compareLiveMirror } from "../lib/live-mirror.ts";
+import { relative, resolve } from "node:path";
+import { buildLiveMirrorPlan, compareLiveMirror } from "../lib/live-mirror.ts";
+import { discoverExtensionEntriesInDir } from "../lib/surface-walk.ts";
 
 // Pi auto-loads every top-level extensions/*.ts it finds. Comparing manifest ->
 // live therefore proves the declared files are present and identical, but says
@@ -20,14 +21,19 @@ const DOCUMENTED_LOCAL_ONLY = new Set([
 const root = resolve(import.meta.dirname, "../..");
 const agentDir = resolve(process.argv[2] ?? process.env.PI_CODING_AGENT_DIR ?? resolve(homedir(), ".pi", "agent"));
 const manifest = JSON.parse(await readFile(resolve(root, "package.json"), "utf8"));
-const entries = await buildLiveMirrorManifest(root, manifest);
+const entries = await buildLiveMirrorPlan(root, manifest);
 const drift = await compareLiveMirror(root, agentDir, entries);
 const managed = new Set(entries.map((entry) => entry.destination));
 let unmanaged = [];
 try {
-  unmanaged = (await readdir(resolve(agentDir, "extensions")))
-    .filter((name) => name.endsWith(".ts"))
-    .filter((name) => !managed.has(`extensions/${name}`) && !DOCUMENTED_LOCAL_ONLY.has(name));
+  const extensionsRoot = resolve(agentDir, "extensions");
+  const loadableOwners = new Set((await discoverExtensionEntriesInDir(extensionsRoot)).map((entry) =>
+    relative(extensionsRoot, entry).split(/[\\/]/)[0]));
+  const managedOwners = new Set([...managed]
+    .filter((destination) => destination.startsWith("extensions/"))
+    .map((destination) => destination.slice("extensions/".length).split("/")[0]));
+  unmanaged = [...loadableOwners]
+    .filter((name) => !managedOwners.has(name) && !DOCUMENTED_LOCAL_ONLY.has(name));
 } catch { /* no live extensions dir — the drift report below already says so */ }
 
 if (drift.length) {

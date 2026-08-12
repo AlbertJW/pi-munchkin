@@ -136,9 +136,14 @@ export default function (pi: ExtensionAPI): void {
 		if (!process.env.HARNESS_SURFACE_SHA256) {
 			try {
 				const dir = agentDir();
-				const { entries, npmIdentities } = await discoverEntryPoints(dir);
-				const files = await walkRelativeImports(entries);
-				process.env.HARNESS_SURFACE_SHA256 = await hashSurface(dir, files, npmIdentities);
+				const discovered = await discoverEntryPoints(dir, process.cwd());
+				const files = await walkRelativeImports(discovered.orderedEntryPoints);
+				for (const entry of discovered.entries) files.add(entry);
+				process.env.HARNESS_SURFACE_SHA256 = await hashSurface(dir, {
+					orderedEntryPoints: discovered.orderedEntryPoints,
+					files,
+					npmIdentities: discovered.npmIdentities,
+				});
 			} catch { /* unhashable surface: rows stay unattributed and the report says so */ }
 		}
 	});
