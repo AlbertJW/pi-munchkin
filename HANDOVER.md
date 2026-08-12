@@ -24,6 +24,30 @@ adoption, deletion, live mirroring, and gate rounds are human-gated. Never touch
 
 ## 2026-08 hardening series
 
+> **2026-08-12 LIVE TOPOLOGY ROLLED OUT — read before touching the live agent.**
+> `~/.pi/agent/extensions/` no longer holds loose first-party files. Everything now lives in
+> `extensions/pi-munchkin/` (extensions + lib + vendor) with a GENERATED `package.json` whose
+> `pi.extensions` declares the load ORDER; `mirror:apply` writes it and `mirror:check` verifies
+> it as part of the same plan. `chaos.ts` (local-only) and `pi-rtk-optimizer` are untouched at
+> the root. Loaded hash `aa00172c…` (v2 descriptor: hashes loader order, project-local
+> extensions, import closure, prompts/skills, pinned npm identity — **v1 hashes never pool with
+> v2**). mirror:check 111/111; live smoke on the 35B exits 0 with zero stderr, one `si`, one
+> surface hash, and run-capsule checkpoints that alphabetical order had been preventing.
+>
+> **One live-config change was required and is NOT in git:** `settings.json` listed
+> `vendor/pi-subagent` as a configured package. Configured paths load AFTER
+> `agentDir/extensions`, so that entry (a) double-registered against the ordered package —
+> a hard `Tool "subagent" conflicts` load failure — and (b) had ALWAYS caused the vendored
+> subagent to load after `tool-activation`, violating its documented complete-registry
+> contract. The entry was removed; backup at `~/.pi/agent/settings.json.bak-20260812T124443Z`.
+> If you ever revert to a flat mirror, restore that entry or the subagent tool disappears.
+>
+> Both new model-visible behaviors stay DARK: `ACTIVE_TOOL_PROMPTS` (ambient) and
+> `CONTROL_ARBITER` (shadow). Adoption is the two-line diff in
+> `docs/TRUTH_COHERENCE_ADOPTION_2026-08.md`, with a rollback table. Still your gates:
+> that adoption, and any calibration or efficacy round.
+
+
 > **2026-08-11 THIRD INSPECTION — SOURCE ONLY, NOT MIRRORED. Two decisions are yours.**
 > Eight findings verified with runnable reproductions (plus one nobody reported). Fixed and
 > pushed: plan-gate events were **silently dropped by the run-event validator**, so gate

@@ -2830,3 +2830,31 @@ model); judge verdicts must be a standalone line and the calibration receipt now
 judge's actual outputs, so two stochastic runs cannot share one receipt identity; and `/run-new`
 moved to the run kernel — registered exactly where something consumes it, instead of absent at
 `RUN_CAPSULE=off` and mute at `RUN_KERNEL=off`.
+
+## 2026-08-12 — the ordered live topology actually shipped, and the smoke earned its keep
+
+The truth-and-coherence series (three PRs, authored outside this session) closed the two
+architectural faults from the previous inspection properly rather than minimally: a v2 surface
+descriptor that hashes the loader ORDER (so a reordering is now a visible hash change, and v1
+hashes never pool with v2), gate hashes computed per materialized run so a fixture's own
+`.pi/extensions` is part of the measured topology, a first-loaded `session-bootstrap` extension
+owning session identity and the per-generation surface hash, transitive shadow-report lineage
+with conflict/cycle detection, and raw gate JSONL honestly reported as UNKNOWN because its
+ephemeral signing key is gone by the time anyone reads the file. Both new model-visible
+behaviors ship DARK with adoption reduced to a declared two-line diff and a rollback table.
+
+**The rollout found a defect that no test could have.** With the ordered package in place, pi
+refused to load: `Tool "subagent" conflicts`. `settings.json` listed `vendor/pi-subagent` as a
+configured package, and configured paths load AFTER `agentDir/extensions` — so the vendored
+subagent registered twice. Removing the redundant entry fixed it, but the interesting part is
+what it revealed about the OLD layout: because configured paths always load last, the vendored
+subagent had ALWAYS loaded after `tool-activation`, whose own comment says it "makes its
+defer/preserve decision at session_start against the complete registry". That contract was
+violated live for as long as the entry existed — a third instance of the class Albert named,
+found only because a real load was attempted. The live smoke is not ceremony; it is the only
+check that sees the composition of our files with the user's configuration.
+
+Evidence the ordering fix bites, from the same smoke: `run-capsule` now emits and writes
+checkpoints. Under alphabetical order it loaded before the kernel and its `session_start`
+readiness was immediately disarmed by the kernel's starting snapshot — the exact symptom the
+inspection predicted, now absent.
