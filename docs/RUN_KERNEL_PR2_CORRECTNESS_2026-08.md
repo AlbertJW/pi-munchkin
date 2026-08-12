@@ -6,15 +6,17 @@ No default flip, live mirror, or model round is implied by this document.
 ## Execution-order verification
 
 `VerificationOrderClock` consumes Pi `tool_execution_start` and
-`tool_execution_end` boundaries. A successful verifier is current only when
-its start sequence is strictly later than the latest successful source
-mutation end sequence. Missing starts and duplicate ends provide no evidence;
-transcript-only mutations still arm the boundary fail-closed. Aggregate plan
-gates use the enclosing `plan_write` start boundary.
+`tool_execution_end` boundaries. Every source-mutation start immediately
+invalidates earlier green evidence, and its end advances the boundary whether
+the call succeeded or failed. A successful verifier is current only when it
+starts after that boundary and no mutation remains pending. Missing starts,
+missing ends, overlaps, and duplicate ends provide no green evidence;
+transcript-only mutations remain pending fail-closed. Aggregate `plan_write`
+and `plan_update` gates use their enclosing call boundary and consume only the
+receipt carrying that call ID.
 
-The mechanism is dark under `VERIFY_EXECUTION_ORDER=execution`. Unset retains
-the current transcript-order authority until the separately approved cutover;
-`legacy` is an explicit compatibility spelling.
+This mechanism now defaults to `VERIFY_EXECUTION_ORDER=execution`.
+`VERIFY_EXECUTION_ORDER=legacy` is the temporary transcript-order rollback.
 
 ## File mutation queue
 

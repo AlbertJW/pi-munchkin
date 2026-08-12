@@ -16,7 +16,8 @@ export type OrderedCallOutcome = {
 	kind: OrderedCallKind;
 	startedSequence: number;
 	endedSequence: number;
-	mutationCompleted: boolean;
+	mutationAttempted: boolean;
+	mutationSettled: boolean;
 	verificationAttempted: boolean;
 	verificationPassed: boolean;
 	verificationValid: boolean;
@@ -34,13 +35,15 @@ type Pending = { kind: OrderedCallKind; startedSequence: number };
  */
 export class VerificationOrderClock {
 	private sequence = 0;
-	private latestMutationEnd: number | null = null;
+	private latestMutationBoundary: number | null = null;
+	private pendingMutations = 0;
 	private readonly pending = new Map<string, Pending>();
 	private readonly completed = new Set<string>();
 
 	reset(): void {
 		this.sequence = 0;
-		this.latestMutationEnd = null;
+		this.latestMutationBoundary = null;
+		this.pendingMutations = 0;
 		this.pending.clear();
 		this.completed.clear();
 	}
@@ -49,6 +52,13 @@ export class VerificationOrderClock {
 		if (this.pending.has(call.callId) || this.completed.has(call.callId)) return null;
 		const startedSequence = ++this.sequence;
 		this.pending.set(call.callId, { kind: call.kind, startedSequence });
+		if (call.kind === "source_mutation") {
+			// A mutation attempt invalidates earlier green evidence immediately. A
+			// shell command can partially write before it fails, and a built-in tool
+			// may fail after touching the filesystem.
+			this.latestMutationBoundary = startedSequence;
+			this.pendingMutations += 1;
+		}
 		this.trim(this.pending, 512);
 		return startedSequence;
 	}
@@ -65,21 +75,27 @@ export class VerificationOrderClock {
 		this.trim(this.completed, 2048);
 		const endedSequence = ++this.sequence;
 
-		const mutationCompleted = pending.kind === "source_mutation" && call.succeeded;
-		if (mutationCompleted) this.latestMutationEnd = endedSequence;
+		const mutationAttempted = pending.kind === "source_mutation";
+		const mutationSettled = mutationAttempted;
+		if (mutationAttempted) {
+			this.pendingMutations = Math.max(0, this.pendingMutations - 1);
+			this.latestMutationBoundary = endedSequence;
+		}
 
 		const override = call.verificationOverride ?? "none";
 		const verificationAttempted = pending.kind === "verification" || override !== "none";
 		const verificationPassed = verificationAttempted &&
 			(override === "passed" || (override === "none" && call.succeeded));
 		const verificationValid = verificationPassed &&
-			(this.latestMutationEnd === null || pending.startedSequence > this.latestMutationEnd);
+			this.pendingMutations === 0 &&
+			(this.latestMutationBoundary === null || pending.startedSequence > this.latestMutationBoundary);
 
 		return {
 			kind: pending.kind,
 			startedSequence: pending.startedSequence,
 			endedSequence,
-			mutationCompleted,
+			mutationAttempted,
+			mutationSettled,
 			verificationAttempted,
 			verificationPassed,
 			verificationValid,

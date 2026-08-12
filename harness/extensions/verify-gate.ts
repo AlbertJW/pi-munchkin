@@ -24,7 +24,7 @@ import { buildControlProposal, controlEnforces, emitControlProposal } from "../l
 // the loop-breaker (caps n); this regenerates p at the boundary.
 
 const ENABLED = process.env.VERIFY_GATE !== "off";
-const EXECUTION_ORDER = process.env.VERIFY_EXECUTION_ORDER === "execution";
+const EXECUTION_ORDER = process.env.VERIFY_EXECUTION_ORDER !== "legacy";
 const MAX_FIRES = (() => {
 	const n = Number.parseInt(process.env.VERIFY_GATE_MAX_FIRES || "3", 10);
 	return Number.isFinite(n) && n > 0 ? n : 3;
@@ -78,13 +78,13 @@ function steer(verifyFailed: boolean): string {
 	if (verifyFailed) {
 		return steerText(
 			"VG_STEER_FAILED",
-			"[verify-gate] Gate FAILED and you're wrapping up. Don't finish on a red gate — fix it, re-run {gate} till green. Unverified output must not cross the boundary.{ctn}",
+			"[verify-gate] The exact gate {gate} is red after the latest mutation. Resolve that evidence before handoff.{ctn}",
 			{ gate: g, ctn },
 		);
 	}
 	return steerText(
 		"VG_STEER",
-		"[verify-gate] You changed files, ran no passing gate. Before finishing: run {gate}, report result, fix + re-run if red. Unverified output must not cross the boundary.{ctn}",
+		"[verify-gate] The exact gate {gate} has not passed after the latest mutation. Run it before handoff.{ctn}",
 		{ gate: g, ctn },
 	);
 }
@@ -107,10 +107,9 @@ export default function (pi: ExtensionAPI) {
 
 	const applyOrderedOutcome = (outcome: ReturnType<VerificationOrderClock["finish"]>): void => {
 		if (!outcome) return;
-		if (outcome.mutationCompleted) {
+		if (outcome.mutationAttempted) {
 			st.mutated = true;
 			st.verifiedOk = false;
-			st.fires = 0;
 		}
 		if (!outcome.verificationAttempted) return;
 		st.verifiedOk = outcome.verificationValid;
@@ -150,6 +149,11 @@ export default function (pi: ExtensionAPI) {
 			? event.args as Record<string, unknown> : {};
 		const kind = classifyStart(event.toolName, args);
 		order.start({ callId: event.toolCallId, kind });
+		if (kind === "source_mutation") {
+			st.mutated = true;
+			st.verifiedOk = false;
+			st.fires = 0;
+		}
 	});
 
 	pi.on("tool_execution_end", async (event) => {
@@ -163,8 +167,8 @@ export default function (pi: ExtensionAPI) {
 		}
 
 		let verificationOverride: "passed" | "failed" | "none" = "none";
-		if (event.toolName === "plan_write") {
-			const receipt = consumePlanGateReceipt();
+		if (event.toolName === "plan_write" || event.toolName === "plan_update") {
+			const receipt = consumePlanGateReceipt(event.toolCallId);
 			if (receipt) {
 				const relevant = receipt.outcomes.some((outcome) =>
 					verificationEvidence(outcome.command, gateCmd) !== "none");
@@ -204,6 +208,10 @@ export default function (pi: ExtensionAPI) {
 			for (const c of toolCalls) {
 				if (order.hasCompleted(c.id)) continue;
 				const kind = classifyStart(c.name, c.args);
+				// A transcript call with no complete execution event is not evidence of
+				// success. Register a missing mutation as pending so no later verifier
+				// can silently green the session after an unobserved partial write.
+				order.start({ callId: c.id, kind });
 				if (kind === "source_mutation") {
 					st.mutated = true;
 					st.verifiedOk = false;
@@ -212,8 +220,8 @@ export default function (pi: ExtensionAPI) {
 					st.verifiedOk = false;
 					verifyFailedThisTurn = true;
 				}
-				if (c.name === "plan_write") {
-					const staleReceipt = consumePlanGateReceipt();
+				if (c.name === "plan_write" || c.name === "plan_update") {
+					const staleReceipt = consumePlanGateReceipt(c.id);
 					if (staleReceipt?.outcomes.some((outcome) =>
 						verificationEvidence(outcome.command, gateCmd) !== "none")) {
 						st.verifiedOk = false;
@@ -222,7 +230,6 @@ export default function (pi: ExtensionAPI) {
 				}
 			}
 		} else {
-			const planReceipt = consumePlanGateReceipt();
 			for (const c of toolCalls) {
 				const sourceMutation = MUTATION_TOOLS.has(c.name) ||
 					(c.name === "bash" && isSourceMutation(String(c.args.command ?? "")));
@@ -232,7 +239,9 @@ export default function (pi: ExtensionAPI) {
 					st.fires = 0;
 				}
 
-				if (c.name === "plan_write" && planReceipt) {
+				const planReceipt = c.name === "plan_write" || c.name === "plan_update"
+					? consumePlanGateReceipt(c.id) : null;
+				if (planReceipt) {
 					const relevant = planReceipt.outcomes.some((outcome) =>
 						verificationEvidence(outcome.command, gateCmd) !== "none");
 					const accepted = planReceipt.outcomes.some((outcome) =>

@@ -4,7 +4,8 @@ import { createHash, randomUUID } from "node:crypto";
 import { defineTool, withFileMutationQueue, type ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { Type } from "typebox";
 import { assertVerifyGateAllowed, classifyBashCommand, normalizeVerificationCommand } from "../lib/command-policy.ts";
-import { runReadonlyGate } from "../lib/gate-runtime.ts";
+import { runReadonlyGate, type GateResult } from "../lib/gate-runtime.ts";
+import { renderSafeGateFailure, safeGateDiagnostic, type SafeGateDiagnostic } from "../lib/plan-gate-diagnostic.ts";
 import { buildPlanGateReceipt, publishPlanGateReceipt, type PlanGateOutcome } from "../lib/plan-gate-receipt.ts";
 import { planIntegrity, executionUnderway, normalizeTitle, preserveDecision, validateDeps, unmetDeps, reconcileItems as libReconcile, type ReconciledItem, type IncomingItem } from "../lib/plan-integrity.ts";
 import { nextReplanStreak, parseTodoLine } from "../lib/plan-progress.ts";
@@ -33,6 +34,7 @@ import { planStorageMode, privatePlanStatePath } from "../lib/plan-state-storage
 let api: ExtensionAPI | undefined;
 const GATE_TIMEOUT_MS = Math.max(1000, Number.parseInt(process.env.PLAN_GATE_TIMEOUT_MS || "60000", 10) || 60000);
 const GATE_MAX = Math.max(1, Number.parseInt(process.env.PLAN_GATE_MAX || "3", 10) || 3);
+const PLAN_GATE_DIAGNOSTICS = process.env.PLAN_GATE_DIAGNOSTICS === "legacy" ? "legacy" : "safe";
 // Plan-thrash threshold: consecutive plan_write calls (this process) that complete
 // no item before we warn the model to execute instead of re-plan. Reset on new plan,
 // /plan-go, and any call that newly marks an item done.
@@ -228,6 +230,40 @@ type PlanState = {
 	writer?: string; // process marker of the last writer (cross-session resume detection)
 	uncertainties?: string[]; // c31: unresolved questions; execution is held while any remain
 };
+
+function gateFailureDisposition(parts: {
+	title: string;
+	gate: string;
+	result: { pass: boolean; output: string; reason?: string };
+	fails: number;
+	subagentActive: boolean;
+}): { rung: 1 | 2 | 3; diagnostic: SafeGateDiagnostic; note: string; message: string } {
+	const rung: 1 | 2 | 3 = parts.fails >= GATE_MAX ? 3 : parts.fails === 1 ? 1 : 2;
+	const diagnostic = safeGateDiagnostic(parts.gate, parts.result);
+	const note = [
+		`gate failed (${parts.fails}/${GATE_MAX})`,
+		`class=${diagnostic.failureClass}`,
+		`diagnostic_bytes=${diagnostic.diagnosticBytes}`,
+		`diagnostic_sha256=${diagnostic.diagnosticSha256}`,
+	].join(" ");
+	const requiredNextAction = rung === 1
+		? "inspect the evidence, change the implementation, then rerun the same gate"
+		: rung === 2 && parts.subagentActive
+			? "obtain one discriminating fact or delegate once with subagent, then use a different strategy"
+			: rung === 2
+				? "obtain one discriminating fact, then use a different strategy"
+				: "keep the item blocked and report the unresolved verification failure";
+	const safeMessage = `Gate for ${JSON.stringify(parts.title)} did not pass.\n${renderSafeGateFailure({
+		diagnostic,
+		attempt: parts.fails,
+		maxAttempts: GATE_MAX,
+		requiredNextAction,
+	})}`;
+	const message = PLAN_GATE_DIAGNOSTICS === "legacy"
+		? `✗ gate for ${JSON.stringify(parts.title)} failed (${parts.fails}/${GATE_MAX}). ${requiredNextAction}.\nFailing output (tail): ${parts.result.output.slice(-500)}`
+		: safeMessage;
+	return { rung, diagnostic, note, message };
+}
 
 type TraceEvent = {
 	run_id?: string;
@@ -873,10 +909,9 @@ const planWrite = defineTool({
 			uncertainties: Type.Optional(Type.Array(Type.String(), { description: "Unresolved questions blocking confident execution. Execution will NOT start while any remain. Ask the user, then clear with []." })),
 		} : {}),
 	}),
-	async execute(_toolCallId, params, _signal, _onUpdate, ctx) {
+	async execute(toolCallId, params, _signal, _onUpdate, ctx) {
 		const aid = actionId();
 		rememberModel(ctx);
-		publishPlanGateReceipt(null);
 
 		// A structurally broken dependency graph (unknown ref, self-dep, cycle) is a
 		// plan-authoring error — reject before ANY state is written so the model
@@ -901,7 +936,7 @@ const planWrite = defineTool({
 			// item.gate, so gateless items are unaffected.
 			const gateMsgs: string[] = [];
 			const gateOutcomes: PlanGateOutcome[] = [];
-			const gateCache = new Map<string, { pass: boolean; output: string }>();
+			const gateCache = new Map<string, GateResult>();
 			for (const it of items) {
 				if (it.status !== "done" || !it.gate || !api) continue;
 				if (prevById.get(it.id)?.status === "done") continue; // already passed
@@ -933,7 +968,6 @@ const planWrite = defineTool({
 					gateCache.set(normalizedGate, gateResult);
 				}
 				gateOutcomes.push({ command: normalizedGate, pass: gateResult.pass });
-				const out = gateResult.output;
 				if (gateResult.pass) {
 					it.gate_fails = 0;
 					const priorFails = prevById.get(it.id)?.gate_fails ?? 0;
@@ -941,46 +975,34 @@ const planWrite = defineTool({
 					continue;
 				}
 				const fails = (prevById.get(it.id)?.gate_fails ?? 0) + 1;
-				// Retry ladder: rung 1 = locality protocol (bounded single-span repair
-				// against the failing output), rung 2 = dumb-zone escape (delegate to a
-				// fresh subagent, or at least a fresh approach), rung 3 = blocked. The
-				// same fix path retried verbatim in the same context rarely converges.
-				const rung = fails >= GATE_MAX ? 3 : fails === 1 ? 1 : 2;
-				planEvent("gate", eventRunId, { pass: false, fails, rung, terminal: rung === 3, gate_sha256: createHash("sha256").update(`gate:${normalizedGate}`).digest("hex") }, { suppressSignal: cachedExecution });
-				const tail = out.split("\n").slice(-4).join(" / ").slice(0, 300);
-				const longTail = out.slice(-500);
+				const disposition = gateFailureDisposition({
+					title: it.title,
+					gate: normalizedGate,
+					result: gateResult,
+					fails,
+					subagentActive: api.getActiveTools().includes("subagent"),
+				});
+				const { rung, diagnostic } = disposition;
+				planEvent("gate", eventRunId, {
+					pass: false,
+					fails,
+					rung,
+					terminal: rung === 3,
+					failure_class: diagnostic.failureClass,
+					diagnostic_bytes: diagnostic.diagnosticBytes,
+					diagnostic_sha256: diagnostic.diagnosticSha256,
+					gate_sha256: createHash("sha256").update(`gate:${normalizedGate}`).digest("hex"),
+				}, { suppressSignal: cachedExecution });
 				it.gate_fails = fails;
 				if (rung === 3) {
 					it.status = "blocked";
 					it.failure_class = "blocked_other";
-					it.note = `gate failed ${fails}×: ${tail}`;
-					gateMsgs.push(`✗ gate for "${it.title}" failed ${fails}× → blocked: ${tail}`);
-				} else if (rung === 1) {
-					it.status = "in_progress";
-					it.note = `gate failed (${fails}/${GATE_MAX}): ${tail}`;
-					gateMsgs.push(steerText(
-						"PLAN_GATE_LADDER1_MSG",
-						"✗ gate for \"{title}\" failed ({fails}/{max}). Follow this protocol EXACTLY: 1. LOCALIZE — from the failing output below, identify the ONE file and smallest span responsible. 2. REPAIR — make ONE bounded edit to that span. 3. VERIFY — mark the item done again; the gate re-runs `{gate}`. Do not restructure anything else.\nFailing output (tail): {tail}",
-						{ title: it.title, fails, max: GATE_MAX, gate: it.gate, tail: longTail },
-					));
+					it.note = disposition.note;
 				} else {
 					it.status = "in_progress";
-					it.note = `gate failed (${fails}/${GATE_MAX}): ${tail}`;
-					const subagentOk = api.getActiveTools().includes("subagent");
-					gateMsgs.push(subagentOk
-						? steerText(
-							"PLAN_GATE_LADDER2_MSG",
-							SPAWN_DELEGATION
-								? "✗ gate for \"{title}\" failed again ({fails}/{max}) — the same fix path is not working. Delegate the repair to subagent(executor, ..., mode=spawn) with a SELF-CONTAINED task — the item, the gate command `{gate}`, and the failing output below; the child sees nothing else. Then mark the item done to re-run the gate.\nFailing output (tail): {tail}"
-								: "✗ gate for \"{title}\" failed again ({fails}/{max}) — the same fix path is not working. Delegate the repair to subagent(executor, ..., mode=fork): brief it with the item, the gate command `{gate}`, and the failing output below, then mark the item done to re-run the gate.\nFailing output (tail): {tail}",
-							{ title: it.title, fails, max: GATE_MAX, gate: it.gate, tail: longTail },
-						)
-						: steerText(
-							"PLAN_GATE_LADDER2_SOLO_MSG",
-							"✗ gate for \"{title}\" failed again ({fails}/{max}) — the same fix path is not working. Step back, re-read the failing output below fresh, and take a DIFFERENT approach than your previous attempts, then mark the item done to re-run the gate.\nFailing output (tail): {tail}",
-							{ title: it.title, fails, max: GATE_MAX, gate: it.gate, tail: longTail },
-						));
+					it.note = disposition.note;
 				}
+				gateMsgs.push(disposition.message);
 			}
 
 			// Plan-integrity guard: a whole-list rewrite must not silently drop work.
@@ -1023,7 +1045,8 @@ const planWrite = defineTool({
 			const stalePrev = prev ? staleInProgress(prev) : [];
 			return { state: next, result: { state: next, newlyBlocked, gateMsgs, gateOutcomes, integrity: { reattached, preservedOpen, yieldedOpen }, newlyDone, prevCompleted, stalePrev, wasRewrite: Boolean(prev) } };
 		});
-		publishPlanGateReceipt(buildPlanGateReceipt(state.run_id, gateOutcomes));
+		const gateReceipt = buildPlanGateReceipt(toolCallId, state.run_id, gateOutcomes);
+		if (gateReceipt) publishPlanGateReceipt(gateReceipt);
 
 		// Trace each newly blocked item through the repeated-failure guard.
 		let warning = "";
@@ -1425,7 +1448,7 @@ export default function (pi: ExtensionAPI) {
 						])),
 					}), { minItems: 1, maxItems: 16 }),
 				}),
-				async execute(_toolCallId, params, _signal, _onUpdate, ctx) {
+				async execute(toolCallId, params, _signal, _onUpdate, ctx) {
 					const aid = actionId();
 					rememberModel(ctx);
 					const deltas = params.deltas as PlanDelta[];
@@ -1442,7 +1465,7 @@ export default function (pi: ExtensionAPI) {
 						if (!applied.ok) rejectPlanTool(`plan_update rejected: ${applied.errors.join("; ")}`);
 						const next = { ...prev, items: applied.items as typeof prev.items };
 						const gateOutcomes: PlanGateOutcome[] = [];
-						const gateCache = new Map<string, { pass: boolean; output: string }>();
+						const gateCache = new Map<string, GateResult>();
 						for (const item of next.items) {
 							const before = prev.items.find((candidate) => candidate.id === item.id);
 							if (item.status !== "done" || before?.status === "done" || !item.gate || !api) continue;
@@ -1462,7 +1485,6 @@ export default function (pi: ExtensionAPI) {
 								gateCache.set(normalizedGate, gateResult);
 							}
 							gateOutcomes.push({ command: normalizedGate, pass: gateResult.pass });
-							const out = gateResult.output;
 							if (gateResult.pass) {
 								item.gate_fails = 0;
 								const priorFails = before?.gate_fails ?? 0;
@@ -1470,46 +1492,39 @@ export default function (pi: ExtensionAPI) {
 								continue;
 							}
 							const fails = (before?.gate_fails ?? 0) + 1;
-							const rung = fails >= GATE_MAX ? 3 : fails === 1 ? 1 : 2;
-							planEvent("gate", next.run_id, { pass: false, fails, rung, terminal: rung === 3, gate_sha256: createHash("sha256").update(`gate:${normalizedGate}`).digest("hex") }, { suppressSignal: cachedExecution });
-							const tail = out.split("\n").slice(-4).join(" / ").slice(0, 300);
-							const longTail = out.slice(-500);
+							const disposition = gateFailureDisposition({
+								title: item.title,
+								gate: normalizedGate,
+								result: gateResult,
+								fails,
+								subagentActive: api.getActiveTools().includes("subagent"),
+							});
+							const { rung, diagnostic } = disposition;
+							planEvent("gate", next.run_id, {
+								pass: false,
+								fails,
+								rung,
+								terminal: rung === 3,
+								failure_class: diagnostic.failureClass,
+								diagnostic_bytes: diagnostic.diagnosticBytes,
+								diagnostic_sha256: diagnostic.diagnosticSha256,
+								gate_sha256: createHash("sha256").update(`gate:${normalizedGate}`).digest("hex"),
+							}, { suppressSignal: cachedExecution });
 							item.gate_fails = fails;
 							if (rung === 3) {
 								item.status = "blocked";
 								item.failure_class = "blocked_other";
-								item.note = `gate failed ${fails}×: ${tail}`;
-								gateMsgs.push(`✗ gate for "${item.title}" failed ${fails}× → blocked: ${tail}`);
-							} else if (rung === 1) {
-								item.status = "in_progress";
-								item.note = `gate failed (${fails}/${GATE_MAX}): ${tail}`;
-								gateMsgs.push(steerText(
-									"PLAN_GATE_LADDER1_MSG",
-									"✗ gate for \"{title}\" failed ({fails}/{max}). Follow this protocol EXACTLY: 1. LOCALIZE — from the failing output below, identify the ONE file and smallest span responsible. 2. REPAIR — make ONE bounded edit to that span. 3. VERIFY — mark the item done again; the gate re-runs `{gate}`. Do not restructure anything else.\nFailing output (tail): {tail}",
-									{ title: item.title, fails, max: GATE_MAX, gate: item.gate, tail: longTail },
-								));
+								item.note = disposition.note;
 							} else {
 								item.status = "in_progress";
-								item.note = `gate failed (${fails}/${GATE_MAX}): ${tail}`;
-								const subagentOk = api.getActiveTools().includes("subagent");
-								gateMsgs.push(subagentOk
-									? steerText(
-										"PLAN_GATE_LADDER2_MSG",
-										SPAWN_DELEGATION
-											? "✗ gate for \"{title}\" failed again ({fails}/{max}) — the same fix path is not working. Delegate the repair to subagent(executor, ..., mode=spawn) with a SELF-CONTAINED task — the item, the gate command `{gate}`, and the failing output below; the child sees nothing else. Then mark the item done to re-run the gate.\nFailing output (tail): {tail}"
-											: "✗ gate for \"{title}\" failed again ({fails}/{max}) — the same fix path is not working. Delegate the repair to subagent(executor, ..., mode=fork): brief it with the item, the gate command `{gate}`, and the failing output below, then mark the item done to re-run the gate.\nFailing output (tail): {tail}",
-										{ title: item.title, fails, max: GATE_MAX, gate: item.gate, tail: longTail },
-									)
-									: steerText(
-										"PLAN_GATE_LADDER2_SOLO_MSG",
-										"✗ gate for \"{title}\" failed again ({fails}/{max}) — the same fix path is not working. Step back, re-read the failing output below fresh, and take a DIFFERENT approach than your previous attempts, then mark the item done to re-run the gate.\nFailing output (tail): {tail}",
-										{ title: item.title, fails, max: GATE_MAX, gate: item.gate, tail: longTail },
-									));
+								item.note = disposition.note;
 							}
+							gateMsgs.push(disposition.message);
 						}
 						return { state: next, result: { state: next, applied, gateOutcomes } };
 					});
-					publishPlanGateReceipt(buildPlanGateReceipt(outcome.state.run_id, outcome.gateOutcomes));
+					const gateReceipt = buildPlanGateReceipt(toolCallId, outcome.state.run_id, outcome.gateOutcomes);
+					if (gateReceipt) publishPlanGateReceipt(gateReceipt);
 					const openItems = outcome.state.items.filter((item) => item.status !== "done").length;
 					planEvent("delta", outcome.state.run_id, { changed: outcome.applied.changed, idempotent: outcome.applied.idempotent, open_items: openItems });
 					// A failed gate means the item is NOT done — the result must lead

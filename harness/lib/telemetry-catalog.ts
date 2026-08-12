@@ -29,7 +29,11 @@ export const EVENT_CATALOG = {
 	"did-you-mean/hint": { tool: "string", injected_chars: "number" },
 	"chaos/injected": { fault: "string", tool: "string", nth: "number" },
 	"plan-runner/deps-rejected": { errors: "number" },
-	"plan-runner/gate": { pass: "boolean", fails: "number", rung: "number", recovered: "boolean", prior_fails: "number", terminal: "boolean", gate_sha256: "string" },
+	"plan-runner/gate": {
+		pass: "boolean", fails: "number", rung: "number", recovered: "boolean", prior_fails: "number",
+		terminal: "boolean", gate_sha256: "string", failure_class: "string",
+		diagnostic_bytes: "number", diagnostic_sha256: "string",
+	},
 	"plan-runner/integrity": { reattached: "number", preserved: "number", yielded: "number" },
 	"plan-runner/thrash-warn": { streak: "number" },
 	"plan-runner/resume-found": { open: "number", in_progress: "number" },

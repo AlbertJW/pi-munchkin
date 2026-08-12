@@ -146,11 +146,11 @@ test("plan_update runs the SAME mature gate machinery as plan_write: ladder, ded
 		const privateState = join(runCapsuleDirectory(agent, cwd, capsuleId), "plan-state.json");
 		const ids = JSON.parse(readFileSync(privateState, "utf8")).items.map((i: { id: string }) => i.id);
 
-		// First failure: rung 1 (locality protocol) with the FAILING OUTPUT returned
-		// to the model — the first version reported "status updated" here.
+		// First failure: rung 1 leads with bounded, explicitly untrusted evidence;
+		// the first version reported "status updated" over a silently reverted item.
 		const first = await callTool(fp, "plan_update", { deltas: [{ item_id: ids[0], status: "done" }] }, cwd);
-		assert.ok(first.content[0].text.includes("LOCALIZE"), first.content[0].text);
-		assert.ok(first.content[0].text.includes("Failing output"), first.content[0].text);
+		assert.ok(first.content[0].text.includes("UNTRUSTED_GATE_DIAGNOSTIC"), first.content[0].text);
+		assert.ok(first.content[0].text.includes("change the implementation"), first.content[0].text);
 		assert.equal(first.details.success, false, "a failed gate is not a success");
 		let state = JSON.parse(readFileSync(privateState, "utf8"));
 		assert.equal(state.items[0].status, "in_progress");
@@ -158,7 +158,7 @@ test("plan_update runs the SAME mature gate machinery as plan_write: ladder, ded
 
 		// Repeating the exact same call ESCALATES instead of looping: rung 2, then blocked.
 		const second = await callTool(fp, "plan_update", { deltas: [{ item_id: ids[0], status: "done" }] }, cwd);
-		assert.match(second.content[0].text, /blocked|DIFFERENT approach|subagent/, second.content[0].text);
+		assert.match(second.content[0].text, /blocked|different strategy|subagent/, second.content[0].text);
 		state = JSON.parse(readFileSync(privateState, "utf8"));
 		assert.equal(state.items[0].status, "blocked", "GATE_MAX blocks — repeat plan_update(done) cannot spiral");
 		assert.equal(state.items[0].gate_fails, 2);

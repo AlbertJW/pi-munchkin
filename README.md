@@ -6,15 +6,93 @@
 
 > A harness for making small, locally served LLMs competent multi-turn coding agents.
 
+**Status:** a personal research project, under active development. Licensed [MIT](LICENSE).
+
+Small language models that run on your own machine are cheap and private, but they make poor
+coding assistants: left alone, they get stuck repeating the same broken action — re-reading a
+file, re-running a command that already failed, making a token edit and starting over. pi_munchkin
+is a set of runtime guardrails that wrap such a model while it works. It watches for those loops
+and interrupts them, refuses to accept a task as "done" until the project's own checks have
+actually passed after the last edit, and asks before any command that could throw away
+uncommitted work.
+
+## In one look
+
+A small model, editing a file, re-runs the same read after a change that didn't land — and the
+harness interrupts it:
+
+```
+  > read  src/handler.ts     (attempt 1 — no edit follows)
+  > read  src/handler.ts     (attempt 2 — still no edit)
+
+  [loop-breaker] Repeated read src/handler.ts 2×, no file change. You have this.
+  Do ONE now: edit · mark blocked + stop · name the one missing fact + how
+  you'll get it. Don't re-run that read/grep/command.
+```
+
+The bracketed line is the harness's real steer text — byte-identical to the template in the source
+(the tests hold it to that). The two tool calls above it are illustrative: the harness deliberately
+never records the commands a model runs, so it cannot show you a real one. In the local telemetry
+sample bundled with development, this loop-breaker steer fired 152 times, 114 of them at the
+two-repeat threshold shown here. That is evidence the mechanism runs as built. It is **not**
+evidence that it improves the final result — see [What the evidence shows](#what-the-evidence-shows-and-does-not).
+
+## What the harness does
+
+Each guardrail is an independent, reversible extension. Plain-English gloss first, exact role
+second.
+
+- **`hashline`** — makes edits by matching a unique anchor in the file, so a change either lands
+  exactly where intended or is refused. *Transactional tag-anchored edits; refuses oversized text
+  and image input before allocation.*
+- **`loop-breaker`** — notices when the agent keeps repeating the same failing action and tells it
+  to stop and do something else. *Detects repeated calls, reasoning, outcomes, thrown/rejected
+  executions, and session-wide grinding.*
+- **`verify-gate`** — only treats work as done once the project's checks have actually run and
+  passed after the last edit. *Accepts only ordered successful verification evidence after the
+  latest source mutation.*
+- **`plan-runner`** — lets the agent keep a checklist of work items, each with its own pass/fail
+  check. *Model-owned structured work items with deduplicated one-shot gate receipts.*
+- **`git-guard`** — asks for confirmation before any command that could discard uncommitted work.
+  *Confirms commands that could discard uncommitted work.*
+- **context and Bash guards** — refuse oversized input or output instead of silently cutting it off
+  half-way. *Block oversized provider-bound input/output instead of silently truncating it.*
+- **blackboard** — keeps a small, redacted running summary of the session and a private local
+  dashboard to view it. *Persists bounded redacted state and renders a private human cockpit
+  outside repositories.*
+- **`ketch`** — bounded web search and page reading, with address and redirect checks. *Bounded
+  public web search/read with URL and redirect validation.*
+- **`subagent`** — runs a side-task in an isolated child with a restricted environment. *Isolated
+  exploration, execution, and review with a constrained child environment.*
+- **`compact_context`** — lets the agent summarise its own conversation to free up room, with one
+  clean handoff. *Explicit structured compaction with one resume handoff.*
+- **dynamic activation** — keeps heavier tools hidden until the session shows it needs them. *Keeps
+  expensive/large tools absent until evidence says the session needs them.*
+- **telemetry and surface receipts** — record that a mechanism fired (counts only) and exactly
+  which build of the harness was loaded. *Bounded mechanism evidence and exact harness-surface
+  provenance.*
+- **shadow run kernel** — quietly turns the session's events into a typed record for auditing,
+  without changing what the agent does. *Canonicalizes Pi lifecycle/tool events into a typed,
+  redacted per-run state machine without changing agent behaviour.*
+
+Additional extensions provide span retrieval, reflection, drift review, teaching hints, path
+suggestions, context receipts, and experimental dark mechanisms. The authoritative ordered
+extension and skill surface is the `pi` manifest in [`package.json`](package.json).
+
+Default-on teaching hints, did-you-mean, and the state lens are reversible and mechanism-observed;
+their benefit has not been established by a powered trial.
+
+## What the evidence shows (and does not)
+
 The limiting failure is not usually context size. Across 1,505 measured sessions, the median
 session used about 4.9k context tokens, while the longest 10% of sessions carried 43% of all
 wasted tool calls. The characteristic failure is a repeat-call spiral: retrying the same broken
-operation, making a token edit, then restarting the same episode.
+operation, making a token edit, then restarting the same episode. The mechanisms above target
+that failure directly.
 
-Pi Munchkin therefore concentrates on runtime mechanisms: anchored edits, ordered verification
-evidence, bounded reads and output, structured plans, repeat detection, and additive tool
-activation. Every mechanism is reversible. A mechanism firing is evidence that its implementation
-works; it is not evidence that it improves outcomes.
+**A mechanism firing is evidence that its implementation works; it is not evidence that it
+improves outcomes.** Every mechanism is reversible, and none is claimed here to make the agent
+measurably better — only to do the specific thing it was built to do.
 
 > **Measurement correction (2026-07-27):** most historical A/B rounds used n=3–9 per arm,
 > scored pass/fail for interventions aimed at efficiency, and could not show that 40 of 45
@@ -26,30 +104,10 @@ results, methodology, and tests are retained for audit and possible restart, but
 the getting-started path. No optimizer candidate is adopted or deleted without a separate human
 decision.
 
-## What the harness does
+---
 
-| Surface | Role |
-|---|---|
-| `hashline` | transactional tag-anchored edits; refuses oversized text and image input before allocation |
-| `loop-breaker` | detects repeated calls, reasoning, outcomes, thrown/rejected executions, and session-wide grinding |
-| `verify-gate` | accepts only ordered successful verification evidence after the latest source mutation |
-| `plan-runner` | model-owned structured work items with deduplicated one-shot gate receipts |
-| `git-guard` | confirms commands that could discard uncommitted work |
-| context and Bash guards | block oversized provider-bound input/output instead of silently truncating it |
-| blackboard | persists bounded redacted state and renders a private human cockpit outside repositories |
-| `ketch` | bounded public web search/read with URL and redirect validation |
-| `subagent` | isolated exploration, execution, and review with a constrained child environment |
-| `compact_context` | explicit structured compaction with one resume handoff |
-| dynamic activation | keeps expensive/large tools absent until evidence says the session needs them |
-| telemetry and surface receipts | bounded mechanism evidence and exact harness-surface provenance |
-| shadow run kernel | canonicalizes Pi lifecycle/tool events into a typed, redacted per-run state machine without changing agent behavior |
-
-Additional extensions provide span retrieval, reflection, drift review, teaching hints, path
-suggestions, context receipts, and experimental dark mechanisms. The authoritative ordered
-extension and skill surface is the `pi` manifest in [`package.json`](package.json).
-
-Default-on teaching hints, did-you-mean, and the state lens are reversible and
-mechanism-observed; their benefit has not been established by a powered trial.
+Everything below is implementation detail: installation, day-to-day commands, the full
+configuration surface, security boundaries, and the measurement archive.
 
 ## Install
 
@@ -62,7 +120,7 @@ pi package install github:AlbertJW/pi-munchkin
 When published, `pi package install pi-munchkin` is equivalent. Package installation is strongly
 preferred: the manifest includes the vendor subagent, role prompts, `APPEND_SYSTEM.md`, examples,
 and both skills as well as extensions and libraries. A hand-maintained copy list is not a safe
-installation procedure because it can silently omit transitive behavior. If an operator must
+installation procedure because it can silently omit transitive behaviour. If an operator must
 maintain a live unpacked mirror, derive it from the package manifest and validate it with:
 
 ```sh
@@ -77,26 +135,29 @@ and tarball.
 
 ## Use
 
-Most behavior is automatic. The primary commands are:
+Most behaviour is automatic. The primary commands are:
 
 - `/plan <request>` and `/plan-go` for structured execution with per-item gates. In lean plan
   mode the model cannot start execution itself: `plan_go` refuses until you run `/plan-go`.
 - `/reflect` for a fresh-context adversarial review.
-- `/compact` for explicit compaction.
 - `/blackboard` for current redacted state and the private cockpit path.
 - `/skill:deep-research <question>` for bounded research.
 - `/ketch-status` for public-search backend health.
 - `/loop-status` for a redacted failure-episode summary; `/loop-resume` clears exact episode
   walls and sends one deterministic recovery instruction.
-- `/run-status` for a bounded, read-only summary of the authoritative structured run state.
+- `/run-status` for a bounded, read-only summary of the authoritative structured run state;
+  `/run-new` declares the current run abandoned so the next request starts a fresh run identity.
 - `/munchkin-doctor` for redacted Pi/model capability, canonical tool-provenance, retry/timeout,
   declared sandbox posture, and a `serving_truth` line comparing the local server's actual
   served `n_ctx` against the registry's `contextWindow` (probed once per model after settlement;
   local endpoints only — named hosts and public IPs are never probed).
 
+Compaction is a tool the model calls (`compact_context`), not a slash command: it summarises the
+model's own window in place with one resume handoff.
+
 ### Current defaults and rollback controls
 
-| Environment option | Default and behavior | Rollback / alternative |
+| Environment option | Default and behaviour | Rollback / alternative |
 |---|---|---|
 | `MUNCHKIN_TOOL_ACTIVATION` | `dynamic`; defers `subagent` and `compact_context` only when Pi exposes the complete default registry | `ambient` leaves Pi's initial surface untouched |
 | `MUNCHKIN_TOOL_ACTIVATION=phase` | dark candidate; additionally defers `plan_go`, span tools, and post-search `web_read`, then activates them from structured phase/evidence signals | return to `dynamic` (deployed path) or `ambient`; explicit `--tools` selections are always preserved |
@@ -133,7 +194,8 @@ Most behavior is automatic. The primary commands are:
 | `RUN_KERNEL` | `shadow`; observes canonical execution receipts, semantic phases, lifecycle settlement, and legacy-state disagreements | `off` registers no kernel handlers or event-bus subscriber; shadow mode never prompts, steers, blocks, activates tools, or persists a capsule |
 | `RUN_CAPSULE` | `shadow`; checkpoints the closed RunState contract to a private per-run JSON authority plus an untrusted Markdown projection | `off` registers no capsule handlers or command; `recovery` is a dark compatibility mode that DOES inject one bounded brief on the events listed in the next row (the previous "does not inject" wording contradicted it) |
 | `RUN_CAPSULE=recovery` recovery brief | disabled by the default `shadow`; emits one bounded brief only after compaction, an unsettled provider retry, an enforced semantic tier, or an explicit resume command | return to `shadow` or `off`; ordinary turns receive no capsule context and manual resume never starts a provider request |
-| `VERIFY_EXECUTION_ORDER` | unset retains the deployed transcript-order gate while PR 2 is dark | `execution` uses Pi start/end order and rejects overlapping or missing-start verification; `legacy` explicitly selects the deployed path |
+| `VERIFY_EXECUTION_ORDER` | `execution`; Pi start/end order uses a conservative mutation epoch, so starts, failures, overlaps, and missing events invalidate earlier green evidence | `legacy` temporarily restores transcript-order evaluation |
+| `PLAN_GATE_DIAGNOSTICS` | `safe`; red gates return a 500-byte, redacted, JSON-framed `UNTRUSTED_GATE_DIAGNOSTIC`, while persisted state keeps only class/count/bytes/hash | `legacy` temporarily restores raw transient gate text; raw output is never restored to plan state, traces, telemetry, cockpit, or notifications |
 | `ACTIVE_TOOL_PROMPTS` | unset retains the deployed ambient plan/delegation/compaction guidance while adoption is pending | `active` removes the ambient block and lets Pi include definition-owned guidance only for active tools; `ambient` is the explicit rollback and manual `/tools` disable removes active-tool guidance |
 | `CONTROL_ARBITER` | `shadow`; records the single winning turn-end correction and collision count while legacy producers remain authoritative | `enforce` lets only the highest-priority proposal act and merges a same-boundary harness summary before a corrective message; explicit `shadow` is the rollback; `off` removes the arbiter while typed plan/context/loop signals continue |
 | `TELEMETRY_WRITER` | `sync`; gate source and inherited-FD telemetry are always synchronous | `async` enables the bounded ordered interactive file writer; settlement and shutdown await its flush |
@@ -175,7 +237,7 @@ oversized files.
   connection; this explicit DNS-rebinding/TOCTOU limitation is not a socket-level IP pin.
 - Subagents inherit a fixed environment allowlist (provider essentials), the harness configuration
   keys — so a parent's explicit `X=off` suppression holds inside children instead of silently
-  reverting to the default-on behavior — plus validated names explicitly added via
+  reverting to the default-on behaviour — plus validated names explicitly added via
   `PI_SUBAGENT_ENV_ALLOW`. Fault injection (`CHAOS`), process-local telemetry fds, and per-process
   run identity deliberately do not cross. Values are never logged.
 - `npm run secret-scan:diff` inspects staged, unstaged, and untracked added lines, plus the added
@@ -186,7 +248,7 @@ oversized files.
   private endpoints out of this public repository.
 - Provider timing rows are numeric and observational: request-to-headers, first token, stream
   completion, and settlement. The harness does not retry or abort slow local inference; Pi's
-  configured retry and timeout behavior remains authoritative.
+  configured retry and timeout behaviour remains authoritative.
 - Run-kernel receipts and state contain hashes, bounded tool/failure classifications, counters,
   and booleans only—never prompts, arguments, commands, output, errors, URLs, endpoints, or paths.
   The PR 1 kernel is in-memory observation, not session memory and not trusted instructions.
@@ -235,7 +297,7 @@ The registry-dependent CI matrix is deliberately separate from `verify`. It inst
 tarball into isolated consumers using the latest available 0.80, 0.81, 0.82, 0.83, and 0.84
 releases,
 typechecks the shipped TypeScript, loads every extension, and discovers both skills. A separate
-job proves strict peer-install behavior below, at, within, and at the upper support boundary.
+job proves strict peer-install behaviour below, at, within, and at the upper support boundary.
 
 Before any public push: inspect the diff, run the non-echoing secret scan, run `npm run verify`,
 and confirm unrelated user changes are not staged. After an approved live rollout, run the mirror
