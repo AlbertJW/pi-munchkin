@@ -69,7 +69,10 @@ cleanup_raw_reports() {
   local r
   for r in "$BUNDLE"/report.*.json; do
     [[ -f "$r" ]] || continue
-    grep -q '"redacted"' "$r" 2>/dev/null || rm -f "$r"
+    # A marker the redactor writes ONLY after a successful rewrite. Grepping the
+    # report for the word "redacted" would trust a substring that raw content
+    # (an env value, an argument) could itself contain.
+    [[ -f "$r.sanitized" ]] || rm -f "$r"
   done
 }
 trap 'cleanup_raw_reports' EXIT

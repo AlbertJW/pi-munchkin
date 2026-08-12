@@ -59,13 +59,26 @@ const HARNESS_CONFIG_PREFIXES = ["TEACH_HINT_", "PI_MSG_", "KETCH_"];
 //   PI_SUBAGENT_DEPTH   — the runner sets the child's depth explicitly; a copied
 //                         parent value would double-count nesting.
 const EXCLUDED_HARNESS_ENV_KEYS = [
+  // Telemetry lineage is SET per child from the spawning session (see the
+  // options.parentSession branch below), never inherited: copying the parent's
+  // own value through would make a grandchild claim its grandparent as parent
+  // and flatten the tree.
+  "PI_MUNCHKIN_PARENT_SESSION",
   "CHAOS", "TELEMETRY_FD", "TELEMETRY_HMAC_FD",
   "PI_MODEL_ID", "PI_MODEL_PROVIDER", "PI_RUN_ID", "PI_SANDBOX_POSTURE",
   "PI_SUBAGENT_DEPTH",
 ];
 
-export function buildSubagentEnv(source = process.env) {
+export function buildSubagentEnv(source = process.env, options = {}) {
   const env = {};
+  // Telemetry LINEAGE, not configuration: a child runs in its own process and
+  // mints its own session id, so without this the parent's session silently
+  // splits into several apparent sessions in the shadow report. The child never
+  // inherits the parent's TELEMETRY_FD/HMAC_FD (see EXCLUDED_HARNESS_ENV_KEYS),
+  // so child rows are correctly unauthenticated.
+  if (typeof options.parentSession === "string" && /^[0-9a-f-]{36}$/.test(options.parentSession)) {
+    env.PI_MUNCHKIN_PARENT_SESSION = options.parentSession;
+  }
   const extra = String(source.PI_SUBAGENT_ENV_ALLOW ?? "")
     .split(",").map((name) => name.trim()).filter((name) => /^[A-Z_][A-Z0-9_]*$/.test(name));
   for (const key of new Set([...CHILD_ENV_KEYS, ...HARNESS_CONFIG_KEYS, ...extra])) {

@@ -257,6 +257,13 @@ def calibrate(path, dry):
         "dimensions": sorted(DIMENSIONS),
         "thresholds": {"exact": MIN_EXACT_AGREEMENT, "within_one": MIN_WITHIN_ONE, "kappa": MIN_KAPPA},
         "dry": bool(dry),
+        # RESULT provenance, not just configuration provenance: two materially
+        # different judging runs (a stochastic judge, a re-run) would otherwise
+        # share one receipt identity. This hashes the scores actually produced.
+        "judge_scores_sha256": hashlib.sha256(
+            json.dumps([item.get("judge_scores") for item in labels], sort_keys=True).encode()).hexdigest(),
+        "agreement_sha256": hashlib.sha256(
+            json.dumps({k: v for k, v in report.items() if k != "receipt"}, sort_keys=True).encode()).hexdigest(),
     }
     receipt_path = path + ".calibration.json"
     with open(receipt_path, "w") as handle:

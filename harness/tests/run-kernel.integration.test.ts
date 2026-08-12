@@ -27,8 +27,12 @@ test("default is shadow; off registers nothing; shadow is behavior-neutral", () 
 		delete process.env.RUN_KERNEL;
 		const shadow = makeFakePi();
 		assert.equal(installRunKernel(shadow.pi as never, { surfaceHash: () => SURFACE }).mode, "shadow");
-		assert.equal(shadow.tools.size, 0);
-		assert.equal(shadow.commands.size, 0);
+		assert.equal(shadow.tools.size, 0, "shadow must add NO tool to the model surface");
+		// Exactly one user command: /run-new declares an explicit run boundary. pi
+		// never expands extension commands into a prompt, so this is invisible to
+		// the model — the same reason run-capsule registers /run-status in its own
+		// shadow mode. Named explicitly so a second command cannot slip in.
+		assert.deepEqual([...shadow.commands.keys()], ["run-new"]);
 		assert.deepEqual(shadow.sent, []);
 		assert.deepEqual(shadow.deliveries, []);
 		assert.deepEqual(shadow.customDeliveries, []);
@@ -60,7 +64,15 @@ test("shadow and off leave the same model-visible surface after a full cycle", a
 			sent: fp.sent, deliveries: fp.deliveries, custom: fp.customDeliveries, entries: fp.entries,
 		};
 	}
-	assert.deepEqual(await exercise("shadow"), await exercise("off"));
+	const shadowSurface = await exercise("shadow");
+	const offSurface = await exercise("off");
+	// The contract is that shadow adds nothing the MODEL can see. /run-new is a
+	// user command (pi never expands extension commands into a prompt), so it is
+	// compared out explicitly rather than by loosening the equality — everything
+	// else must still match byte for byte.
+	assert.deepEqual(shadowSurface.commands, ["run-new"]);
+	assert.deepEqual(offSurface.commands, []);
+	assert.deepEqual({ ...shadowSurface, commands: [] }, { ...offSurface, commands: [] });
 });
 
 test("shadow kernel produces canonical bus events and one settled summary", async () => {

@@ -19,8 +19,12 @@ have to be answered from real sessions:
 
 Session identity and population discipline (2026-08-11 finding):
 
-  - A session is identified by the envelope's `si` field — one random id per pi
-    process (telemetry.ts). `run_id` is NOT identity: it falls back to the cwd
+  - A session is identified by the envelope's `si` field, minted at every
+    session_start (telemetry.ts). It is NOT the process: one pi process hosts
+    /new, /fork and resumed sessions, and an earlier per-process version of this
+    fix collapsed them. A subagent runs in its own process and carries the
+    spawning session in `sp`, so children roll UP instead of counting as
+    separate sessions. `run_id` is NOT identity either: it falls back to the cwd
     key for interactive rows and can carry plan/experiment ids from detail, so
     keying on it both collapsed forty runs into one observation (the 29% bug)
     and can split one session into pseudo-sessions. Rows without `si` (written
@@ -96,8 +100,11 @@ def bind_surface(rows, surface=None):
 def split_by_identity(rows):
     """Partition rows into identity-sound (carrying `si`) and legacy.
 
-    Only `si` counts: one random id per pi process, immune to the cwd-collapse
-    (sk), the fallback aliasing (run_id == sk), and detail-supplied run ids.
+    `si` is minted at every session_start, so it identifies a SESSION — not the
+    cwd (`sk` collapses every session in a directory), not `run_id` (which falls
+    back to `sk`), and not the process (one pi process hosts /new, /fork and
+    resumed sessions; the first version of this fix keyed on the process and
+    collapsed them).
     """
     sound, legacy = [], []
     for row in rows:
@@ -105,8 +112,32 @@ def split_by_identity(rows):
     return sound, legacy
 
 
+def session_of(row):
+    """Roll a subagent up to the session that spawned it.
+
+    A child runs in its own process and mints its own `si`, so counting it as a
+    session would split one logical session into several and inflate every
+    denominator. `sp` carries the parent id across the process boundary.
+    """
+    parent = row.get("sp")
+    return parent if isinstance(parent, str) and parent else row["si"]
+
+
+def drop_unauthenticated_gate_rows(rows):
+    """Gate rows must be AUTHENTICATED to count as gate evidence.
+
+    A subagent inherits TELEMETRY_SOURCE=gate but NOT the authenticated
+    descriptors (runner-env excludes TELEMETRY_FD/TELEMETRY_HMAC_FD), so an
+    unsigned child row would otherwise be pooled with the round's real evidence.
+    Returns (kept, dropped_count).
+    """
+    kept = [row for row in rows if row.get("source") != "gate" or isinstance(row.get("mac"), str)]
+    return kept, len(rows) - len(kept)
+
+
 def analyse(rows, surface=None):
     bound, surface, excluded_other_surface = bind_surface(rows, surface)
+    bound, unauthenticated = drop_unauthenticated_gate_rows(bound)
     sound, legacy = split_by_identity(bound)
 
     sessions = collections.defaultdict(lambda: {
@@ -114,7 +145,7 @@ def analyse(rows, surface=None):
         "episodes_exposed": 0, "recovered": 0, "settled": False, "kernel_receipts": 0,
     })
     for row in sound:
-        session = sessions[row["si"]]
+        session = sessions[session_of(row)]
         ext, kind = row.get("ext"), row.get("kind")
         if ext == "run-kernel" and kind == "legacy-disagreement":
             session["disagreements"][row.get("dimension", "?")] += 1
@@ -133,6 +164,7 @@ def analyse(rows, surface=None):
         "surface": surface,
         "rows_excluded_other_or_no_surface": excluded_other_surface,
         "rows_excluded_no_session_identity": len(legacy),
+        "rows_excluded_unauthenticated_gate": unauthenticated,
         "identity_sound_rows": len(sound),
     }
     total = len(sessions)
@@ -303,6 +335,26 @@ def selftest():
     assert mixed_report["population"]["rows_excluded_other_or_no_surface"] == 3
     pinned = analyse(mixed, surface="hashB")
     assert pinned["sessions"] == 3 and pinned["population"]["surface"] == "hashB"
+
+    # A SUBAGENT is not a session: its rows carry their own si plus the parent's
+    # sp, and must roll up rather than inflate the denominator.
+    parent = [row("p0", "run-kernel", "receipt") for _ in range(1)]
+    child = [dict(row("c0", "failure-episode", "observed"), sp="p0") for _ in range(3)]
+    rolled = analyse(parent + child)
+    assert rolled["sessions"] == 1, "a subagent must roll up to the session that spawned it"
+    assert rolled["q2_episode_exposure"]["sessions_exposing_an_episode"] == 1
+
+    # ...and one PROCESS hosting several sessions counts as several sessions.
+    multi = [row(f"s{i}", "run-kernel", "receipt") for i in range(3)]
+    assert analyse(multi)["sessions"] == 3
+
+    # GATE rows must be authenticated to count: a child inherits the source label
+    # but not the signing descriptors.
+    unsigned = [dict(row(f"g{i}", "run-kernel", "receipt"), source="gate") for i in range(5)]
+    signed = [dict(row(f"h{i}", "run-kernel", "receipt"), source="gate", mac="deadbeef") for i in range(2)]
+    gate_report = analyse(unsigned + signed)
+    assert gate_report["sessions"] == 2, "unsigned gate rows must not be pooled with real gate evidence"
+    assert gate_report["population"]["rows_excluded_unauthenticated_gate"] == 5
 
     print("shadow_report selftest: ok")
 

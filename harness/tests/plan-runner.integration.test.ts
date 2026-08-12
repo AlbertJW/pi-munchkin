@@ -1490,3 +1490,35 @@ test("the execute prompt never names subagent when subagent is not an active too
 	const withTool = fp2.sent.join("\n");
 	assert.ok(withTool.includes("subagent"), "with the tool present the guidance must still appear");
 });
+
+test("the plan-review hold does NOT survive into an unrelated session", async () => {
+	// Module state outlives a session (pi caches the extension factory), so a
+	// planning run that ended left the hold armed: the NEXT session advertised
+	// plan_go and refused it with the previous session's message — a tool whose
+	// advertised state contradicts its actual state, which is precisely what
+	// makes a small model retry, assume, and loop.
+	process.env.PLAN_TOOL_GO = "on";
+	const g = globalThis as Record<string, unknown>;
+	try {
+		const fp = makeFakePi();
+		const mod = await import(`../extensions/plan-runner.ts?leak=${Date.now()}-${Math.random()}`);
+		mod.default(fp.pi as any);
+		const first = tmp();
+		fp.pi.setActiveTools(["read", "bash", "edit", "write", "plan_write", "plan_go"]);
+		await fire(fp, "session_start", { reason: "new" }, makeCtx(first).ctx);
+		await fp.commands.get("plan").handler("something", makeCtx(first).ctx);
+		assert.equal(fp.pi.getActiveTools().includes("plan_go"), false, "review removes the tool");
+		await fire(fp, "agent_end", {}, makeCtx(first).ctx);
+
+		// A brand-new session in a DIFFERENT directory with no plan at all.
+		const second = tmp();
+		await fire(fp, "session_start", { reason: "new" }, makeCtx(second).ctx);
+		assert.equal(g.__pi_plan_phase_active, false, "the planning flag must not leak");
+		assert.equal(fp.pi.getActiveTools().includes("plan_go"), true,
+			"a fresh session must not inherit the previous session's review hold");
+		await expectToolError(fp, "plan_go", {}, second, /no plan to run/);
+	} finally {
+		delete g.__pi_plan_phase_active;
+		delete process.env.PLAN_TOOL_GO;
+	}
+});

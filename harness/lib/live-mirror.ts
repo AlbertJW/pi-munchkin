@@ -23,6 +23,31 @@ async function filesBelow(root: string, relativeDir: string): Promise<string[]> 
   return files;
 }
 
+// The live agent dir gets ONE ordered entry point instead of loose files.
+//
+// Pi discovers `<agentDir>/extensions/*.ts` by readdir (loader.js
+// discoverExtensionsInDir), i.e. in directory order — alphabetical on this
+// machine — so a flat mirror silently DISCARDS the causal order the package
+// manifest declares. That is not cosmetic: control-arbiter would decide before
+// its producers propose, run-capsule would arm before the kernel disarms it,
+// and telemetry-flush would no longer be last. Same files, same hashes,
+// different architecture.
+//
+// The loader's own rule 3 is the remedy: a SUBDIRECTORY containing a
+// package.json with `pi.extensions` loads exactly what it declares, in order.
+// So everything the extensions import moves under one package directory,
+// preserving harness-relative structure (`../lib/x.ts` must keep resolving),
+// while the artifacts pi reads from the agent ROOT — APPEND_SYSTEM.md, agents/,
+// skills/ — stay where pi looks for them.
+export const LIVE_PACKAGE_DIR = "extensions/pi-munchkin";
+
+function mirrorDestination(source: string): string {
+  if (source.startsWith("harness/extensions/") || source.startsWith("harness/lib/") || source.startsWith("harness/vendor/")) {
+    return `${LIVE_PACKAGE_DIR}/${source.slice("harness/".length)}`;
+  }
+  return source.startsWith("harness/") ? source.slice("harness/".length) : source;
+}
+
 export async function buildLiveMirrorManifest(root: string, manifest: PackageManifest): Promise<MirrorEntry[]> {
   const sourcePaths = new Set<string>();
   for (const extension of manifest.pi?.extensions ?? []) sourcePaths.add(extension);
@@ -32,10 +57,14 @@ export async function buildLiveMirrorManifest(root: string, manifest: PackageMan
   for (const dir of ["harness/vendor", "harness/agents", "examples", ...(manifest.pi?.skills ?? [])]) {
     for (const file of await filesBelow(root, dir)) sourcePaths.add(file);
   }
-  return [...sourcePaths].sort().map((source) => ({
-    source,
-    destination: source.startsWith("harness/") ? source.slice("harness/".length) : source,
-  }));
+  return [...sourcePaths].sort().map((source) => ({ source, destination: mirrorDestination(source) }));
+}
+
+/** The ordered entry manifest written into the live package directory. */
+export function liveOrderedManifest(manifest: PackageManifest): { extensions: string[] } {
+  return {
+    extensions: (manifest.pi?.extensions ?? []).map((extension) => `./${extension.slice("harness/".length)}`),
+  };
 }
 
 async function hashFile(path: string): Promise<string | null> {

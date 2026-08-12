@@ -6,7 +6,7 @@ import { discoverEntryPoints, hashSurface, walkRelativeImports } from "../lib/su
 import {
 	readRuntimePosture, renderDoctor, sandboxPosture, summarizeToolSurface,
 } from "../lib/runtime-doctor.ts";
-import { record } from "../lib/telemetry.ts";
+import { beginSession, record } from "../lib/telemetry.ts";
 
 type ProviderTiming = {
 	seq: number;
@@ -124,6 +124,10 @@ export default function (pi: ExtensionAPI): void {
 
 	pi.on("session_start", async () => {
 		reset();
+		// Mint session identity FIRST, before any row can be emitted for this
+		// session: `si` must identify a session, not a process (one pi process
+		// hosts /new, /fork and resumed sessions).
+		beginSession();
 		// Surface-bound telemetry for INTERACTIVE sessions (2026-08-11 second
 		// inspection): only gate rounds exported HARNESS_SURFACE_SHA256, so live
 		// rows could never be attributed to a surface and shadow evidence could

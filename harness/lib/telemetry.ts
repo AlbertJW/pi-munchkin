@@ -82,19 +82,45 @@ function nextSequence(): number {
 	return next;
 }
 
-// True per-session identity. `run_id` falls back to the cwd key, so many
-// distinct interactive sessions in one directory share it — the collapse that
-// made shadow_report's session counts incoherent (2026-08-11 finding). One
-// random id per pi PROCESS, shared across the per-extension jiti instances via
-// globalThis (same reason the sequence lives there). A subagent is its own
-// process and correctly gets its own id.
-const SESSION_INSTANCE_FLAG = "__pi_telemetry_session_instance_v1";
+// Session identity. `run_id` falls back to the cwd key, so many distinct
+// sessions in one directory share it — the collapse that made shadow_report's
+// counts incoherent. The first replacement keyed on the PROCESS, which is also
+// wrong in both directions: one pi process hosts several sessions (/new, /fork,
+// resume) and would collapse them, while a subagent runs in its own process and
+// inherits the parent's telemetry destination — splitting one logical session
+// into several. So the id is minted at every session_start (beginSession), and
+// a subagent records its parent so a consumer can roll children up.
+//
+//   si  — this session. Changes on every session_start.
+//   sp  — parent session id for a subagent, else null. Set from the environment
+//         the parent exports, so lineage survives the process boundary.
+const SESSION_INSTANCE_FLAG = "__pi_telemetry_session_instance_v2";
+export const PARENT_SESSION_ENV = "PI_MUNCHKIN_PARENT_SESSION";
+
+/** Mint a new session identity. Called from session_start; returns the new id. */
+export function beginSession(): string {
+	const shared = globalThis as Record<string, unknown>;
+	const id = randomUUID();
+	shared[SESSION_INSTANCE_FLAG] = id;
+	return id;
+}
+
+/** The current session id, for lineage handoff to a child process. */
+export function currentSessionId(): string {
+	return sessionInstance();
+}
+
 function sessionInstance(): string {
 	const shared = globalThis as Record<string, unknown>;
-	if (typeof shared[SESSION_INSTANCE_FLAG] !== "string") {
-		shared[SESSION_INSTANCE_FLAG] = randomUUID();
-	}
+	// A row emitted before any session_start (module load, an early hook) still
+	// needs an id; it belongs to whatever session begins next in this process.
+	if (typeof shared[SESSION_INSTANCE_FLAG] !== "string") shared[SESSION_INSTANCE_FLAG] = randomUUID();
 	return shared[SESSION_INSTANCE_FLAG] as string;
+}
+
+function parentSession(): string | null {
+	const value = process.env[PARENT_SESSION_ENV];
+	return typeof value === "string" && /^[0-9a-f-]{36}$/.test(value) ? value : null;
 }
 
 export type TelemetrySource = "test" | "gate" | "interactive" | "unknown";
@@ -214,6 +240,7 @@ function envelope(ext: string, kind: string, detail: Record<string, unknown>): R
 		source: telemetrySource(),
 		sk: SESSION_KEY,
 		si: sessionInstance(),
+		sp: parentSession(),
 		run_id: typeof detail.run_id === "string" ? detail.run_id : (process.env.PI_RUN_ID || SESSION_KEY),
 		provider: typeof detail.provider === "string" ? detail.provider : (process.env.PI_MODEL_PROVIDER || null),
 		model: typeof detail.model === "string" ? detail.model : (process.env.PI_MODEL_ID || null),

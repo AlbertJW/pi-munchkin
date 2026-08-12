@@ -13,6 +13,7 @@ import type { AgentConfig } from "./agents.js";
 import { parseInheritedCliArgs } from "./runner-cli.js";
 import { processPiJsonLine } from "./runner-events.js";
 import { buildSubagentEnv } from "./runner-env.js";
+import { currentSessionId } from "../../lib/telemetry.ts";
 import {
   type DelegationMode,
   type SingleResult,
@@ -296,7 +297,7 @@ export async function runAgent(opts: RunAgentOptions): Promise<SingleResult> {
         stdio: ["pipe", "pipe", "pipe"],
         detached: !isWindows,
         env: {
-          ...buildSubagentEnv(),
+          ...buildSubagentEnv(process.env, { parentSession: currentSessionId() }),
           [SUBAGENT_DEPTH_ENV]: String(nextDepth),
           [SUBAGENT_MAX_DEPTH_ENV]: String(propagatedMaxDepth),
           [SUBAGENT_STACK_ENV]: JSON.stringify(propagatedStack),

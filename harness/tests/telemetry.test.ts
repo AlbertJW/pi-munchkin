@@ -181,7 +181,41 @@ test("authenticated rows MAC the exact flat JSON payload", () => {
 	assert.deepEqual(JSON.parse(line), { sk: "gate-a", ext: "context-watcher", kind: "compact-requested", mac: match[2] });
 });
 
-test("si: one stable per-process session id, shared across module instances", async () => {
+test("si identifies a SESSION, not a process — a new session_start mints a new id", async () => {
+	const { beginSession, currentSessionId } = await import("../lib/telemetry.ts");
+	withFile((file) => {
+		const first = beginSession();
+		record("loop-breaker", "steer", { tier: 1, byTool: true, byReason: false, repeat: 3, streak: 3, injected_chars: 4, turnIndex: 1 });
+		const second = beginSession(); // /new, /fork or resume in the SAME process
+		record("loop-breaker", "steer", { tier: 1, byTool: true, byReason: false, repeat: 3, streak: 3, injected_chars: 4, turnIndex: 2 });
+		const [a, b] = readFileSync(file, "utf8").trim().split("\n").map((line) => JSON.parse(line));
+		assert.notEqual(first, second, "each session_start mints a new identity");
+		assert.equal(a.si, first);
+		assert.equal(b.si, second, "rows after a new session must not carry the previous session's id");
+		assert.equal(currentSessionId(), second);
+	});
+});
+
+test("sp carries subagent lineage so a child does not count as its own session", async () => {
+	const { PARENT_SESSION_ENV } = await import("../lib/telemetry.ts");
+	const prior = process.env[PARENT_SESSION_ENV];
+	try {
+		withFile((file) => {
+			delete process.env[PARENT_SESSION_ENV];
+			record("loop-breaker", "steer", { tier: 1, byTool: true, byReason: false, repeat: 3, streak: 3, injected_chars: 4, turnIndex: 1 });
+			process.env[PARENT_SESSION_ENV] = "11111111-2222-4333-8444-555555555555";
+			record("loop-breaker", "steer", { tier: 1, byTool: true, byReason: false, repeat: 3, streak: 3, injected_chars: 4, turnIndex: 2 });
+			const [parentRow, childRow] = readFileSync(file, "utf8").trim().split("\n").map((line) => JSON.parse(line));
+			assert.equal(parentRow.sp, null, "a top-level session has no parent");
+			assert.equal(childRow.sp, "11111111-2222-4333-8444-555555555555");
+			assert.notEqual(childRow.si, childRow.sp, "the child still has its own identity");
+		});
+	} finally {
+		if (prior === undefined) delete process.env[PARENT_SESSION_ENV]; else process.env[PARENT_SESSION_ENV] = prior;
+	}
+});
+
+test("si: one stable id within a session, shared across module instances", async () => {
 	// `run_id` falls back to the cwd key, so it is NOT session identity (the
 	// 29%-then-0% exposure bug). `si` is one random id per pi process, stored on
 	// globalThis so pi's per-extension jiti instances agree on it.
@@ -195,11 +229,11 @@ test("si: one stable per-process session id, shared across module instances", as
 	});
 	// A second module instance (fresh cache-busted import = pi's per-extension
 	// jiti isolation) must reuse the SAME si via globalThis, not mint a new one.
-	const shared = (globalThis as Record<string, unknown>)["__pi_telemetry_session_instance_v1"];
+	const shared = (globalThis as Record<string, unknown>)["__pi_telemetry_session_instance_v2"];
 	const fresh = await import(`../lib/telemetry.ts?si-isolation=${Date.now()}`);
 	withFile((file) => {
 		fresh.record("loop-breaker", "steer", { tier: 1, byTool: true, byReason: false, repeat: 3, streak: 3, injected_chars: 4, turnIndex: 1 });
 		const row = JSON.parse(readFileSync(file, "utf8").trim().split("\n").pop() as string);
-		assert.equal(row.si, shared, "a fresh module instance must share the process si");
+		assert.equal(row.si, shared, "a fresh module instance must share the CURRENT session id");
 	});
 });

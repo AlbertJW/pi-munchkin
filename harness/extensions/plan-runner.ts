@@ -1361,6 +1361,13 @@ export default function (pi: ExtensionAPI) {
 	// items is an interrupted plan — surface it once so the user can inspect,
 	// resume, or replace instead of never learning it exists.
 	pi.on("session_start", async (_event, ctx) => {
+		// Module state OUTLIVES a session: pi caches the extension factory, so a
+		// planning run that ended left `planAwaitingReview` armed and the NEXT,
+		// unrelated session advertised plan_go while refusing it with the previous
+		// session's message — a tool whose advertised state contradicts its actual
+		// state, which is exactly what makes a small model retry and loop.
+		planAwaitingReview = false;
+		setPlanning(false);
 		setAdaptiveDirect(false);
 		// FIRST, ahead of both early returns below: this key is written by
 		// writeStateAndTodo and deleted nowhere, while pi's loader returns the CACHED

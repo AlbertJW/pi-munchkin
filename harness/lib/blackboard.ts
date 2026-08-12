@@ -286,7 +286,13 @@ export function snapshot(state: BlackboardState): Record<string, unknown> {
 
 const isObject = (value: unknown): value is Record<string, unknown> =>
 	value !== null && typeof value === "object" && !Array.isArray(value);
-const num = (value: unknown): number | null => (Number.isFinite(value) ? Number(value) : null);
+// Restored counters are COUNTS: non-negative integers with a sane ceiling. Any
+// finite number admitted -1, 0.5 and 1e308 into model-visible summaries ("open",
+// repeat counts, gate fails), and a nonsensical magnitude dominates a small
+// model's reading even without classic injection.
+const MAX_RESTORED_COUNT = 1_000_000;
+const num = (value: unknown): number | null =>
+	Number.isFinite(value) ? Math.min(MAX_RESTORED_COUNT, Math.max(0, Math.trunc(Number(value)))) : null;
 const bool = (value: unknown): boolean | null => (typeof value === "boolean" ? value : null);
 
 /** Every string that can reach the lens is re-sanitized here, on the way IN. */
@@ -351,11 +357,17 @@ function sanitizeState(data: unknown): BlackboardState | null {
 	next.turn = num(data.turn) ?? 0;
 	next.compactions = num(data.compactions) ?? 0;
 	if (isObject(data.attempts)) {
+		// Aggregate cap: an oversized restored ledger costs synchronous parse and
+		// iteration time on every render, and the lens only shows the top few.
+		const MAX_RESTORED_ATTEMPTS = 200;
+		let admitted = 0;
 		for (const [key, value] of Object.entries(data.attempts)) {
+			if (admitted >= MAX_RESTORED_ATTEMPTS) break;
 			// Keys are sha256 hex on the write path (attemptKey); anything else is foreign.
 			if (!/^[a-f0-9]{64}$/.test(key) || !isObject(value)) continue;
 			const label = restoredLabel(value.label);
 			if (label === null) continue;
+			admitted += 1;
 			next.attempts[key] = {
 				label,
 				count: num(value.count) ?? 0,

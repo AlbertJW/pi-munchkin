@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { copyFile, mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, resolve } from "node:path";
-import { buildLiveMirrorManifest, compareLiveMirror } from "../lib/live-mirror.ts";
+import { LIVE_PACKAGE_DIR, liveOrderedManifest, buildLiveMirrorManifest, compareLiveMirror } from "../lib/live-mirror.ts";
 
 test("live mirror manifest covers declared first-party surfaces and ignores local-only additions", async () => {
   const root = resolve(import.meta.dirname, "../..");
@@ -11,11 +11,16 @@ test("live mirror manifest covers declared first-party surfaces and ignores loca
   const entries = await buildLiveMirrorManifest(root, manifest);
   const destinations = new Set(entries.map(({ destination }) => destination));
   for (const expected of [
-    "extensions/hashline.ts", "lib/role-routing.ts", "vendor/pi-subagent/index.ts",
+    // Extensions, lib and vendor live under ONE ordered package directory (see
+    // live-mirror.ts): pi discovers loose extension files by readdir order, so a
+    // flat layout would ship the right files in the wrong order.
+    `${LIVE_PACKAGE_DIR}/extensions/hashline.ts`, `${LIVE_PACKAGE_DIR}/lib/role-routing.ts`,
+    `${LIVE_PACKAGE_DIR}/vendor/pi-subagent/index.ts`,
+    // ...while everything pi reads from the agent ROOT stays at the root.
     "agents/executor.md", "APPEND_SYSTEM.md", "examples/run-model.example.sh",
     "skills/deep-research/SKILL.md", "skills/lavish-review/SKILL.md",
   ]) assert(destinations.has(expected), `missing ${expected}`);
-  assert(!destinations.has("extensions/chaos.ts"));
+  assert(!destinations.has(`${LIVE_PACKAGE_DIR}/extensions/chaos.ts`));
 
   const agentDir = await mkdtemp(resolve(tmpdir(), "pi-mirror-test-"));
   try {
@@ -26,11 +31,50 @@ test("live mirror manifest covers declared first-party surfaces and ignores loca
     }
     await writeFile(resolve(agentDir, "extensions", "local-only.ts"), "// documented local-only addition\n");
     assert.deepEqual(await compareLiveMirror(root, agentDir, entries), []);
-    await writeFile(resolve(agentDir, "extensions", "hashline.ts"), "// drift\n");
+    await writeFile(resolve(agentDir, LIVE_PACKAGE_DIR, "extensions", "hashline.ts"), "// drift\n");
     assert.deepEqual((await compareLiveMirror(root, agentDir, entries)).map(({ destination, reason }) => ({ destination, reason })), [
-      { destination: "extensions/hashline.ts", reason: "content" },
+      { destination: `${LIVE_PACKAGE_DIR}/extensions/hashline.ts`, reason: "content" },
     ]);
   } finally {
     await rm(agentDir, { recursive: true, force: true });
   }
+});
+
+test("the live layout preserves MANIFEST order — pi discovers loose files by readdir, not by our intent", async () => {
+	// The architecture is an ORDER, not a set of files. Pi's loader
+	// (dist/core/extensions/loader.js, discoverExtensionsInDir) enumerates
+	// `<agentDir>/extensions/*.ts` with readdirSync — alphabetical on this
+	// machine — so a FLAT mirror ships the right bytes in the wrong order:
+	// control-arbiter would decide before its producers propose, run-capsule
+	// would arm before the kernel disarms it, telemetry-flush would not be last.
+	// Rule 3 of that same loader is the fix: a subdirectory whose package.json
+	// declares `pi.extensions` loads exactly what it declares, in order.
+	const { readFileSync } = await import("node:fs");
+	const manifest = JSON.parse(readFileSync(new URL("../../package.json", import.meta.url), "utf8"));
+	const entries = await buildLiveMirrorManifest(resolve(import.meta.dirname, "../.."), manifest);
+
+	// 1. No first-party extension may land LOOSE at the extensions root, where
+	//    rule 1 would discover it and silently reimpose readdir order.
+	const loose = entries.filter((entry) => /^extensions\/[^/]+\.ts$/.test(entry.destination));
+	assert.deepEqual(loose, [], "these files would be discovered by readdir order, bypassing the manifest");
+
+	// 2. Every declared extension lands inside the ordered package directory.
+	for (const extension of manifest.pi.extensions) {
+		const destination = entries.find((entry) => entry.source === extension)?.destination;
+		assert.ok(destination?.startsWith(`${LIVE_PACKAGE_DIR}/`), `${extension} must live under the ordered package`);
+	}
+
+	// 3. The generated entry manifest lists them in MANIFEST order, and each
+	//    path resolves the way the loader resolves it (relative to the package dir).
+	const ordered = liveOrderedManifest(manifest);
+	assert.deepEqual(ordered.extensions, manifest.pi.extensions.map((e: string) => `./${e.slice("harness/".length)}`));
+	for (const declared of ordered.extensions) {
+		const resolved = `${LIVE_PACKAGE_DIR}/${declared.slice(2)}`;
+		assert.ok(entries.some((entry) => entry.destination === resolved), `${declared} must be a file the mirror copies`);
+	}
+
+	// 4. Relative imports must still resolve: an extension at
+	//    <pkg>/extensions/x.ts importing ../lib/y.ts needs <pkg>/lib/y.ts.
+	assert.ok(entries.some((entry) => entry.destination === `${LIVE_PACKAGE_DIR}/lib/telemetry.ts`),
+		"lib must move WITH the extensions or every ../lib import breaks");
 });

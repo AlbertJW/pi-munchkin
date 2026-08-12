@@ -22,6 +22,9 @@ try {
 		libuv: full.libuv ?? null,
 		resourceUsage: full.resourceUsage ?? null,
 	}, null, 1));
+	// Independent success marker: the cleanup below must not decide "sanitized"
+	// by grepping for a word that raw content could itself contain.
+	writeFileSync(`${path}.sanitized`, "");
 } catch {
 	rmSync(path, { force: true }); // unparsable: delete, never keep raw
 }

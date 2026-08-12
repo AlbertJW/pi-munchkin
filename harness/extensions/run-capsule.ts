@@ -198,18 +198,6 @@ export default function (pi: ExtensionAPI): void {
 		sessionReady = false;
 	});
 
-	// The explicit run boundary. Registered at ALL capsule modes (including the
-	// deployed shadow default) because it declares an intent the kernel needs
-	// regardless of whether recovery is armed: "what I ask next is new work".
-	// Nothing model-visible — pi never expands extension commands into a prompt.
-	pi.registerCommand("run-new", {
-		description: "Declare the current run abandoned so the next request starts a NEW run identity.",
-		handler: async (_args, ctx) => {
-			emitHarnessSignal(pi.events, { v: 1, type: "run/abandoned", origin: "run-command" });
-			if (ctx.hasUI) ctx.ui.notify("Run marked abandoned — your next request starts a new run.", "info");
-		},
-	});
-
 	pi.registerCommand("run-status", {
 		description: "Show a bounded read-only summary of the authoritative Run Kernel state.",
 		handler: async (_args, ctx) => {

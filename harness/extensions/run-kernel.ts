@@ -19,7 +19,7 @@ import {
 } from "../lib/run-capsule-store.ts";
 import { agentDir } from "../lib/agent-dir.ts";
 import { sandboxPosture } from "../lib/runtime-doctor.ts";
-import { onHarnessSignal } from "../lib/harness-signals.ts";
+import { emitHarnessSignal, onHarnessSignal } from "../lib/harness-signals.ts";
 
 export type RunKernelInstallOptions = {
 	mode?: RunKernelMode;
@@ -217,6 +217,19 @@ export function installRunKernel(pi: ExtensionAPI, options: RunKernelInstallOpti
 	onControlDecision(pi.events, (decision) => {
 		dispatch({ ...nextBase(), type: "run/control-decided", decision });
 	});
+	// The explicit run boundary lives WITH its consumer. Registering it in the
+	// run capsule made it absent at RUN_CAPSULE=off (despite an "all capsule
+	// modes" contract) and, worse, present-but-mute at RUN_KERNEL=off where
+	// nothing consumes the signal. Here it exists exactly when it does something:
+	// this whole function returns early when the kernel is off.
+	pi.registerCommand("run-new", {
+		description: "Declare the current run abandoned so the next request starts a NEW run identity.",
+		handler: async (_args, ctx) => {
+			emitHarnessSignal(pi.events, { v: 1, type: "run/abandoned", origin: "run-command" });
+			if (ctx.hasUI) ctx.ui.notify("Run marked abandoned — your next request starts a new run.", "info");
+		},
+	});
+
 	onHarnessSignal(pi.events, (signal) => {
 		if (signal.type === "plan/write") {
 			dispatch({ ...nextBase(), type: "run/plan-observed", runIdHash: signal.runIdHash, accepted: true, executionStarted: false, openItems: signal.openItems });

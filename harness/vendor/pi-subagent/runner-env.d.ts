@@ -1,4 +1,7 @@
-export function buildSubagentEnv(source?: NodeJS.ProcessEnv): NodeJS.ProcessEnv;
+export function buildSubagentEnv(
+  source?: NodeJS.ProcessEnv,
+  options?: { parentSession?: string },
+): NodeJS.ProcessEnv;
 export const CHILD_ENV_KEYS: readonly string[];
 export const HARNESS_CONFIG_KEYS: readonly string[];
 export const EXCLUDED_HARNESS_ENV_KEYS: readonly string[];
