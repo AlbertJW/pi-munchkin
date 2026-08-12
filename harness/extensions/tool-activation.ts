@@ -1,5 +1,6 @@
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { measureActiveSurface, phaseDeferredTools, PHASE_CAPABILITY_TOOLS } from "../lib/capability-surface.ts";
+import { classifyBashCommand } from "../lib/command-policy.ts";
 import { record } from "../lib/telemetry.ts";
 import { onHarnessSignal, type CapabilityName } from "../lib/harness-signals.ts";
 
@@ -7,7 +8,20 @@ type Mode = "ambient" | "dynamic" | "phase";
 type DeferredTool = "subagent" | "compact_context";
 const DYNAMIC_DEFERRED: readonly DeferredTool[] = ["subagent", "compact_context"];
 const BASE_REGISTRY = ["read", "bash", "edit", "write"];
-const MUTATING_TOOLS = new Set(["edit", "write", "bash"]);
+
+// "bash" is not a mutation — a bash COMMAND may or may not be. A tool-name set
+// counted the opening `rg`/`ls`/`git status` of nearly every session as the
+// first mutation, and because the flag latches once, the real `edit` that
+// followed emitted nothing at all: the true timestamp was never written, so
+// pre-fix rows cannot be repaired by filtering and must be discarded. Delegate
+// to the shared classifier (which fails CLOSED on unknown commands) rather than
+// growing a fourth private regex — there are already three in this repo.
+function isMutationResult(toolName: string, input: unknown): boolean {
+	if (toolName === "edit" || toolName === "write") return true;
+	if (toolName !== "bash") return false;
+	const command = (input as { command?: unknown } | undefined)?.command;
+	return classifyBashCommand(typeof command === "string" ? command : "").mutates;
+}
 
 function modeFromEnvironment(): Mode {
 	const value = process.env.MUNCHKIN_TOOL_ACTIVATION;
@@ -138,7 +152,7 @@ export default function (pi: ExtensionAPI): void {
 	});
 
 	pi.on("tool_result", async (event) => {
-		if (firstUsefulMutation || !MUTATING_TOOLS.has(event.toolName) || event.isError === true) return;
+		if (firstUsefulMutation || event.isError === true || !isMutationResult(event.toolName, event.input)) return;
 		firstUsefulMutation = true;
 		record("tool-activation", "first-useful-mutation", { elapsed_ms: Math.max(0, Math.round(performance.now() - sessionStartedAt)), tool: event.toolName });
 	});

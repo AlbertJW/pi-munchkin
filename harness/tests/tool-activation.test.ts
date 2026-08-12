@@ -195,3 +195,63 @@ test("phase explicit allowlists and manual disable remain authoritative", async 
 		assert.equal(run.active().includes("plan_go"), false);
 	} finally { run.restore(); }
 });
+
+test("first-useful-mutation classifies the bash COMMAND, and the latch survives a read-only opener", async () => {
+	// A tool-NAME set counted the opening `rg` of nearly every session as the
+	// first mutation; because the flag latches once, the real `edit` that
+	// followed emitted nothing, so the metric could not even be repaired by
+	// filtering afterwards.
+	const { mkdtempSync, readFileSync, rmSync } = await import("node:fs");
+	const { tmpdir } = await import("node:os");
+	const { join } = await import("node:path");
+	const dir = mkdtempSync(join(tmpdir(), "ta-mut-"));
+	const prior = { mode: process.env.MUNCHKIN_TOOL_ACTIVATION, tel: process.env.TELEMETRY, file: process.env.TELEMETRY_FILE, src: process.env.TELEMETRY_SOURCE };
+	process.env.MUNCHKIN_TOOL_ACTIVATION = "dynamic";
+	delete process.env.TELEMETRY;
+	process.env.TELEMETRY_FILE = join(dir, "events.jsonl");
+	process.env.TELEMETRY_SOURCE = "test";
+	try {
+		const fp = makeFakePi();
+		(fp.pi as any).getAllTools = () => allTools.map((name) => ({ name, description: "", sourceInfo: { source: "test", path: "test" } }));
+		let active = [...allTools];
+		(fp.pi as any).getActiveTools = () => [...active];
+		(fp.pi as any).setActiveTools = (names: string[]) => { active = [...names]; };
+		const mod = await import(`../extensions/tool-activation.ts?mut=${Date.now()}-${Math.random()}`);
+		mod.default(fp.pi as never);
+		await fire(fp, "session_start", {});
+		const result = (toolName: string, input: unknown) =>
+			fire(fp, "tool_result", { type: "tool_result", toolName, input, content: [], details: {}, isError: false });
+
+		await result("bash", { command: "rg TODO src" });        // orientation: NOT a mutation
+		await result("bash", { command: "ls -la" });
+		await result("bash", { command: "git status" });
+		const rows = () => readFileSync(process.env.TELEMETRY_FILE as string, "utf8").trim().split("\n")
+			.filter(Boolean).map((line) => JSON.parse(line))
+			.filter((row) => row.kind === "first-useful-mutation");
+		assert.deepEqual(rows(), [], "read-only shell must not latch the first mutation");
+
+		await result("edit", { path: "src/a.ts" });               // the REAL first mutation
+		assert.equal(rows().length, 1);
+		assert.equal(rows()[0].tool, "edit", "the recorded tool is the one that actually mutated");
+
+		// Opposite polarity, on a fresh instance: a MUTATING bash command counts,
+		// and an unknown command still counts (the classifier fails closed).
+		for (const command of ["sed -i '' s/a/b/ src/a.ts", "./scripts/whatever.sh"]) {
+			const fresh = makeFakePi();
+			(fresh.pi as any).getAllTools = () => allTools.map((name) => ({ name, description: "", sourceInfo: { source: "test", path: "test" } }));
+			(fresh.pi as any).getActiveTools = () => [...allTools];
+			(fresh.pi as any).setActiveTools = () => {};
+			const m2 = await import(`../extensions/tool-activation.ts?mut2=${Date.now()}-${Math.random()}`);
+			m2.default(fresh.pi as never);
+			await fire(fresh, "session_start", {});
+			const before = rows().length;
+			await fire(fresh, "tool_result", { type: "tool_result", toolName: "bash", input: { command }, content: [], details: {}, isError: false });
+			assert.equal(rows().length, before + 1, `${command} must count as a mutation`);
+		}
+	} finally {
+		rmSync(dir, { recursive: true, force: true });
+		for (const [key, value] of [["MUNCHKIN_TOOL_ACTIVATION", prior.mode], ["TELEMETRY", prior.tel], ["TELEMETRY_FILE", prior.file], ["TELEMETRY_SOURCE", prior.src]] as const) {
+			if (value === undefined) delete process.env[key]; else process.env[key] = value;
+		}
+	}
+});

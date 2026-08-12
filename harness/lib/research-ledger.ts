@@ -109,6 +109,12 @@ export function storedUrl(raw: string): StoredUrl {
 	const digest = sha256Hex(raw);
 	try {
 		const parsed = new URL(raw);
+		// Same predicate as the READER (validStoredUrl). "parses as a URL" admitted
+		// javascript:, data: and file: payloads — reachable through a hostile
+		// claimed_source — producing records the reader then refused, i.e. rows
+		// that could be written but never recalled. The writer must never be more
+		// permissive than the reader; both fail closed to http(s).
+		if (parsed.protocol !== "http:" && parsed.protocol !== "https:") throw new Error("non-web scheme");
 		const queryRemoved = parsed.search.length > 0 || parsed.hash.length > 0;
 		parsed.username = "";
 		parsed.password = "";
