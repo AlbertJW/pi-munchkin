@@ -78,3 +78,39 @@ test("the live layout preserves MANIFEST order — pi discovers loose files by r
 	assert.ok(entries.some((entry) => entry.destination === `${LIVE_PACKAGE_DIR}/lib/telemetry.ts`),
 		"lib must move WITH the extensions or every ../lib import breaks");
 });
+
+test("PI'S OWN LOADER returns the manifest order for the built live layout", async () => {
+	// The test above encodes my reading of the loader's rules; this one asks the
+	// loader. That distinction is the lesson of the plan-gate defect: a contract
+	// verified against a restatement of the system is not verified.
+	const loader = await import("@earendil-works/pi-coding-agent/dist/core/extensions/loader.js" as string)
+		.catch(() => null) as { discoverAndLoadExtensions?: Function } | null;
+	if (!loader?.discoverAndLoadExtensions) return; // packaged consumers may not expose it
+	const root = resolve(import.meta.dirname, "../..");
+	const manifest = JSON.parse(await readFile(resolve(root, "package.json"), "utf8"));
+	const entries = await buildLiveMirrorManifest(root, manifest);
+	const agentDir = await mkdtemp(resolve(tmpdir(), "pi-mirror-order-"));
+	const priorTelemetry = process.env.TELEMETRY;
+	process.env.TELEMETRY = "off";
+	try {
+		for (const entry of entries) {
+			const destination = resolve(agentDir, entry.destination);
+			await mkdir(dirname(destination), { recursive: true });
+			await copyFile(resolve(root, entry.source), destination);
+		}
+		await writeFile(resolve(agentDir, LIVE_PACKAGE_DIR, "package.json"),
+			JSON.stringify({ name: "pi-munchkin-live", private: true, pi: liveOrderedManifest(manifest) }, null, 2));
+		await writeFile(resolve(agentDir, "settings.json"), "{}");
+
+		const bus = { on: () => () => {}, emit: () => {} };
+		const loaded = await loader.discoverAndLoadExtensions([], root, agentDir, bus);
+		const order = ((loaded as { extensions?: { path?: string }[] }).extensions ?? [])
+			.map((extension) => String(extension.path ?? "").replace(`${agentDir}/${LIVE_PACKAGE_DIR}/`, ""));
+		const expected = manifest.pi.extensions.map((e: string) => e.slice("harness/".length));
+		assert.deepEqual(order, expected,
+			"pi must load first-party extensions in MANIFEST order — this is the architecture, not a preference");
+	} finally {
+		if (priorTelemetry === undefined) delete process.env.TELEMETRY; else process.env.TELEMETRY = priorTelemetry;
+		await rm(agentDir, { recursive: true, force: true });
+	}
+});

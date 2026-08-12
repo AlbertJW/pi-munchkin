@@ -2769,3 +2769,52 @@ reason is recorded in the file, which is the opposite of adjusting a guard to ma
 single-voice fix for the lens/loop-breaker collision. Both change model-visible bytes; the
 verified byte deltas and the structurally-correct option for each are recorded there. This
 batch is SOURCE ONLY — not mirrored.
+
+## 2026-08-11 (fourth inspection) — the packaged harness and the live harness were different architectures
+
+The finding that matters: **`package.json` declares a causal ORDER; the live mirror shipped
+loose files, and pi discovers those by `readdirSync` — alphabetical on this machine.** Same
+files, same hashes, `mirror:check` green, and a different architecture. control-arbiter ran
+before the producers whose proposals it arbitrates (a focused reproduction produced zero
+decisions across two turn boundaries), run-capsule armed before the kernel's starting snapshot
+disarmed it (no checkpoint files), context-surface measured before run-capsule appended, and
+telemetry-flush was not last. Package smoke and mirror:check could not see any of it, because
+both compare CONTENTS and the defect is in REGISTRATION ORDER.
+
+The remedy came from the loader's own rules: a subdirectory carrying a package.json with
+`pi.extensions` loads exactly what it declares, in order. The mirror now writes one ordered
+entry point under `extensions/pi-munchkin/`, moves extensions+lib+vendor beneath it so every
+`../lib` import still resolves, leaves the artifacts pi reads from the agent root where they
+are, and deletes stale flat copies that would otherwise load a second time out of order.
+Crucially the test drives **pi's own `discoverAndLoadExtensions`** and asserts it returns
+manifest order — flattening the layout fails it. That distinction is the standing lesson from
+the plan-gate defect one inspection earlier: a contract verified against a restatement of the
+system is not verified. I had written a rules-replicating test first; it would have passed a
+layout the real loader mis-orders.
+
+**Consequence for the evidence chain, stated plainly:** every live session mirrored before this
+row ran with alphabetical extension order. Arbiter decisions, capsule checkpoints, and any
+ordering-dependent shadow evidence from those sessions are not comparable with anything
+collected afterwards and should be treated as unmeasured rather than reinterpreted.
+
+**Session identity, third revision.** `si` first keyed the cwd (collapse), then the process —
+which is wrong in both directions: one pi process hosts /new, /fork and resumed sessions
+(collapse again), while a subagent runs in its own process and inherits the telemetry
+destination (splitting one logical session into several). It is now minted at every
+`session_start`; children carry the spawning session in `sp` (deliberately excluded from
+inherited env, so a grandchild cannot claim its grandparent); and the shadow report rolls
+children up. It also now DROPS unauthenticated gate rows: a child inherits
+`TELEMETRY_SOURCE=gate` but not the signing descriptors, so unsigned rows were being pooled
+with a round's real evidence. Three revisions of one field is itself the finding — identity
+was treated as an implementation detail when it is the denominator of every rate this project
+reports.
+
+Also fixed: the plan-review hold leaked into unrelated sessions (module state outlives a
+session; the next session advertised `plan_go` and refused it with the previous session's
+message); the watchdog's "is it sanitized" test was a substring raw content could itself
+contain, now an independent marker file; restored blackboard numbers are bounded non-negative
+integers with an entry cap (a `1e308` repeat count is authoritative-looking nonsense to a small
+model); judge verdicts must be a standalone line and the calibration receipt now hashes the
+judge's actual outputs, so two stochastic runs cannot share one receipt identity; and `/run-new`
+moved to the run kernel — registered exactly where something consumes it, instead of absent at
+`RUN_CAPSULE=off` and mute at `RUN_KERNEL=off`.
