@@ -1,4 +1,15 @@
-export const ACTIVE_TOOL_PROMPTS = process.env.ACTIVE_TOOL_PROMPTS === "active";
+export const ACTIVE_TOOL_PROMPTS_DEFAULT: "ambient" | "derived" = "ambient";
+
+export function activeToolPromptsEnabled(
+	env: NodeJS.ProcessEnv = process.env,
+	defaultMode: "ambient" | "derived" = ACTIVE_TOOL_PROMPTS_DEFAULT,
+): boolean {
+	if (env.ACTIVE_TOOL_PROMPTS === "active") return true;
+	if (env.ACTIVE_TOOL_PROMPTS === "ambient") return false;
+	return defaultMode === "derived" && env.MUNCHKIN_TOOL_ACTIVATION !== "ambient";
+}
+
+export const ACTIVE_TOOL_PROMPTS = activeToolPromptsEnabled();
 
 export const AMBIENT_TOOL_GUIDANCE = `Context-overflow error (400 exceeds context) → compact_context, then retry.
 

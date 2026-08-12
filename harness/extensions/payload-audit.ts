@@ -64,7 +64,7 @@ export function analyzePayload(
 		if (m.reasoning_content !== undefined) reasoningFields += 1;
 	}
 
-	const LENS = "[session-state";
+	const LENS = "[harness summary]";
 	const lensIndexes = serialized
 		.map((s, i) => (s.includes(LENS) ? i : -1))
 		.filter((i) => i >= 0);

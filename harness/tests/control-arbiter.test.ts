@@ -5,11 +5,12 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { ControlArbiterQueue } from "../lib/control-arbiter.ts";
 import {
-	buildControlProposal, controlEnforces, emitControlProposal, onControlDecision, setControlArbiterActive,
+	buildControlProposal, controlArbiterMode, controlEnforces, emitControlProposal, onControlDecision, setControlArbiterActive,
 	type ControlEffect, type ControlKind,
 	type ControlProposalEnvelope,
 } from "../lib/control-proposal.ts";
 import { fire, makeFakePi } from "./integration-harness.ts";
+import { boardState, noteTool, resetBoard } from "../lib/blackboard.ts";
 
 function envelope(kind: ControlKind, boundarySequence = 1, effect: ControlEffect = "message"): ControlProposalEnvelope {
 	return {
@@ -20,6 +21,16 @@ function envelope(kind: ControlKind, boundarySequence = 1, effect: ControlEffect
 			effect, legacyActed: true,
 		}),
 		delivery: { message: kind },
+	};
+}
+
+function lensEnvelope(boundarySequence = 1, message = "[harness summary]\nstate"): ControlProposalEnvelope {
+	return {
+		proposal: buildControlProposal({
+			boundarySequence, kind: "context_hint", reason: "state_lens", source: "session-blackboard",
+			cooldownKey: `lens:${boundarySequence}`, messageFactory: "state-lens", effect: "message", legacyActed: false,
+		}),
+		delivery: { message },
 	};
 }
 
@@ -65,6 +76,45 @@ test("in-memory delivery text is bounded before it enters the pending queue", ()
 	assert.equal(queue.decide(1, "enforce").delivery?.message?.length, 4000);
 });
 
+test("enforce merges the lens before one correction and reserves the intact tail", () => {
+	const queue = new ControlArbiterQueue();
+	const correction = `[loop-breaker]\n${"c".repeat(3850)}`;
+	const winner = envelope("failure_recovery");
+	winner.delivery.message = correction;
+	queue.add(lensEnvelope(1, `[harness summary]\n${"l".repeat(4000)}`));
+	queue.add(winner);
+	const result = queue.decide(1, "enforce");
+	assert.equal(result.lensMerged, true);
+	assert.equal(result.delivery?.message?.length, 4000);
+	assert.ok(result.delivery?.message?.startsWith("[harness summary]"));
+	assert.ok(result.delivery?.message?.endsWith(correction), "the corrective message is never truncated");
+});
+
+test("shadow leaves legacy lens and correction delivery separate", () => {
+	const queue = new ControlArbiterQueue();
+	queue.add(lensEnvelope());
+	queue.add(envelope("failure_recovery"));
+	const result = queue.decide(1, "shadow");
+	assert.equal(result.lensMerged, false);
+	assert.equal(result.delivery?.message, "failure_recovery");
+});
+
+test("abort and shutdown effects never acquire a lens or continuation", () => {
+	for (const effect of ["abort", "shutdown"] as const) {
+		const queue = new ControlArbiterQueue();
+		queue.add(lensEnvelope());
+		queue.add(envelope(effect === "abort" ? "safe_abort" : "safety_consequence", 1, effect));
+		const result = queue.decide(1, "enforce");
+		assert.equal(result.lensMerged, false);
+		assert.equal(result.delivery?.message, effect === "abort" ? "safe_abort" : "safety_consequence");
+	}
+});
+
+test("explicit shadow remains a rollback after the default changes", () => {
+	assert.equal(controlArbiterMode({}, "enforce"), "enforce");
+	assert.equal(controlArbiterMode({ CONTROL_ARBITER: "shadow" }, "enforce"), "shadow");
+});
+
 async function installed(mode: "shadow" | "enforce", telemetry: "off" | "on") {
 	const oldMode = process.env.CONTROL_ARBITER;
 	const oldTelemetry = process.env.TELEMETRY;
@@ -90,6 +140,61 @@ test("shadow compares a winner without delivering; enforce delivers exactly one"
 		assert.equal(decisions.length, 1);
 		assert.equal(fp.sent.length, mode === "enforce" ? 1 : 0);
 		if (mode === "enforce") assert.equal(fp.sent[0], "verification_required");
+	}
+});
+
+test("enforce emits one merged message with correction intact", async () => {
+	const { fp } = await installed("enforce", "off");
+	const correction = "CORRECTION MUST REMAIN INTACT";
+	const winner = envelope("failure_recovery", 7);
+	winner.delivery.message = correction;
+	for (const proposal of [lensEnvelope(7), winner]) {
+		emitControlProposal(fp.pi.events as never, proposal.proposal, proposal.delivery);
+	}
+	await fire(fp, "turn_end", { turnIndex: 7, message: { role: "assistant", content: [] }, toolResults: [] }, {});
+	assert.equal(fp.sent.length, 1);
+	assert.match(fp.sent[0], /^\[harness summary\]/);
+	assert.ok(fp.sent[0].endsWith(correction));
+});
+
+test("manifest-order blackboard and arbiter produce one merged loop correction", async () => {
+	const previous = {
+		CONTROL_ARBITER: process.env.CONTROL_ARBITER,
+		STATE_LENS: process.env.STATE_LENS,
+		TELEMETRY: process.env.TELEMETRY,
+		TELEMETRY_SOURCE: process.env.TELEMETRY_SOURCE,
+	};
+	process.env.CONTROL_ARBITER = "enforce";
+	process.env.STATE_LENS = "steer";
+	process.env.TELEMETRY = "off";
+	process.env.TELEMETRY_SOURCE = "gate"; // suppress cockpit I/O in this control test
+	try {
+		const fp = makeFakePi();
+		const nonce = `${Date.now()}-${Math.random()}`;
+		const [blackboard, arbiter] = await Promise.all([
+			import(`../extensions/session-blackboard.ts?merged=${nonce}`),
+			import(`../extensions/control-arbiter.ts?merged=${nonce}`),
+		]);
+		// This is manifest order: the producer subscribes before the arbiter.
+		blackboard.default(fp.pi as never);
+		arbiter.default(fp.pi as never);
+		resetBoard();
+		noteTool(boardState(), { toolName: "bash", args: { command: "npm test" }, isError: true, errorText: "failed" });
+		const correction = "CHANGE STRATEGY NOW";
+		const loop = envelope("failure_recovery", 9);
+		loop.delivery.message = correction;
+		emitControlProposal(fp.pi.events as never, loop.proposal, loop.delivery);
+		await fire(fp, "turn_end", { turnIndex: 9, message: { role: "assistant", content: [] }, toolResults: [] }, {
+			getContextUsage: () => null, hasUI: false,
+		});
+		assert.equal(fp.sent.length, 1);
+		assert.match(fp.sent[0], /^\[harness summary\]/);
+		assert.ok(fp.sent[0].endsWith(correction));
+	} finally {
+		for (const [key, value] of Object.entries(previous)) {
+			if (value === undefined) delete process.env[key]; else process.env[key] = value;
+		}
+		resetBoard();
 	}
 });
 
@@ -128,9 +233,24 @@ test("tier-three abort wins without an automatic continuation message", async ()
 	const abort = envelope("safe_abort", 4, "abort");
 	abort.delivery = { abort: () => { aborted += 1; }, message: "must-not-send" };
 	emitControlProposal(fp.pi.events as never, abort.proposal, abort.delivery);
+	const lens = lensEnvelope(4, "must-not-merge");
+	emitControlProposal(fp.pi.events as never, lens.proposal, lens.delivery);
 	emitControlProposal(fp.pi.events as never, envelope("verification_required", 4).proposal, { message: "verify" });
 	await fire(fp, "turn_end", { turnIndex: 4, message: { role: "assistant", content: [] }, toolResults: [] }, {});
 	assert.equal(aborted, 1);
+	assert.deepEqual(fp.sent, []);
+});
+
+test("shutdown wins without a lens or automatic continuation message", async () => {
+	const { fp } = await installed("enforce", "off");
+	let shutdowns = 0;
+	const stop = envelope("safety_consequence", 5, "shutdown");
+	stop.delivery = { shutdown: () => { shutdowns += 1; }, message: "must-not-send" };
+	emitControlProposal(fp.pi.events as never, stop.proposal, stop.delivery);
+	const lens = lensEnvelope(5, "must-not-merge");
+	emitControlProposal(fp.pi.events as never, lens.proposal, lens.delivery);
+	await fire(fp, "turn_end", { turnIndex: 5, message: { role: "assistant", content: [] }, toolResults: [] }, {});
+	assert.equal(shutdowns, 1);
 	assert.deepEqual(fp.sent, []);
 });
 

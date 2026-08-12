@@ -1,18 +1,16 @@
 import { createHash } from "node:crypto";
 import { classifyBashCommand, looksFailingOutput } from "./command-policy.ts";
 
-export type FailureClass =
-	| "schema_validation"
-	| "policy_rejection"
-	| "permission"
-	| "not_found"
-	| "command_missing"
-	| "timeout"
-	| "provider"
-	| "verification_assertion"
-	| "compile_or_lint"
-	| "edit_conflict"
-	| "unknown";
+export const FAILURE_CLASSES = [
+	"schema_validation", "policy_rejection", "permission", "not_found", "command_missing", "timeout",
+	"provider", "verification_assertion", "compile_or_lint", "edit_conflict", "unknown",
+] as const;
+export type FailureClass = typeof FAILURE_CLASSES[number];
+const FAILURE_CLASS_SET = new Set<string>(FAILURE_CLASSES);
+
+export function isFailureClass(value: unknown): value is FailureClass {
+	return typeof value === "string" && FAILURE_CLASS_SET.has(value);
+}
 
 export type RecoveryKind = "tool_success" | "exact_gate" | "provider_first_token" | "manual_resume";
 export type EpisodeStatus = "active" | "recovered" | "settled" | "abandoned";

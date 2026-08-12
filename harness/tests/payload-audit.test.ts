@@ -43,7 +43,7 @@ test("thinking replay and lens position are detected", () => {
 			msg("system", "S"),
 			msg("user", "q"),
 			msg("assistant", "<think>secret plan</think>answer", { reasoning_content: "secret plan" }),
-			msg("user", [{ type: "text", text: "next" }, { type: "text", text: "\n\n[session-state — ground truth]" }]),
+			msg("user", [{ type: "text", text: "next" }, { type: "text", text: "\n\n[harness summary]" }]),
 		],
 	};
 	const { row } = analyzePayload(payload, null);
@@ -52,7 +52,7 @@ test("thinking replay and lens position are detected", () => {
 	assert.equal(row.lens_present, true);
 	assert.equal(row.lens_tail_only, true, "lens in the LAST message only");
 
-	const early = { ...payload, messages: [msg("user", "[session-state early]"), ...payload.messages] };
+	const early = { ...payload, messages: [msg("user", "[harness summary] early"), ...payload.messages] };
 	assert.equal(analyzePayload(early, null).row.lens_tail_only, false);
 });
 

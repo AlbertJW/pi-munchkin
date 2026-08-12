@@ -110,6 +110,7 @@ const FACTORIES = new Set<MessageFactoryId>([
 const EFFECTS = new Set<ControlEffect>(["message", "abort", "shutdown"]);
 const HASH = /^[a-f0-9]{64}$/;
 const ACTIVE_ARBITERS_KEY = "__pi_control_arbiter_buses_v1";
+export const CONTROL_ARBITER_DEFAULT: ControlArbiterMode = "shadow";
 
 function activeArbiters(): WeakSet<object> {
 	const global = globalThis as Record<string, unknown>;
@@ -117,9 +118,12 @@ function activeArbiters(): WeakSet<object> {
 	return global[ACTIVE_ARBITERS_KEY] as WeakSet<object>;
 }
 
-export function controlArbiterMode(env: NodeJS.ProcessEnv = process.env): ControlArbiterMode {
-	if (env.CONTROL_ARBITER === "enforce" || env.CONTROL_ARBITER === "off") return env.CONTROL_ARBITER;
-	return "shadow";
+export function controlArbiterMode(
+	env: NodeJS.ProcessEnv = process.env,
+	defaultMode: ControlArbiterMode = CONTROL_ARBITER_DEFAULT,
+): ControlArbiterMode {
+	if (env.CONTROL_ARBITER === "enforce" || env.CONTROL_ARBITER === "shadow" || env.CONTROL_ARBITER === "off") return env.CONTROL_ARBITER;
+	return defaultMode;
 }
 
 export function setControlArbiterActive(bus: EventBus, active: boolean): void {

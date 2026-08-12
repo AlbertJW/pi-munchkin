@@ -133,8 +133,7 @@ export default function (pi: ExtensionAPI) {
 		// The published globalThis snapshot must die with the session, not just the
 		// module state: pi's loader returns the CACHED factory across session
 		// replacement, so without this a /new, /fork or same-cwd /resume leaked the
-		// PREVIOUS session's verify verdict into the c48 lens — which renders it to
-		// the model under a "ground truth from the harness" header. Same fix as
+		// PREVIOUS session's verify verdict into the c48 lens. Same fix as
 		// loop-breaker's __pi_lb_state and plan-runner's __pi_active_plan_context.
 		delete (globalThis as Record<string, unknown>).__pi_vg_state;
 		const cwd = ctx?.cwd || process.cwd();
@@ -292,7 +291,7 @@ export default function (pi: ExtensionAPI) {
 		// first statement of the handler, so the by-value snapshot predated this
 		// turn's gate-green consume, mutation arming and verify tracking — and since
 		// verify-gate loads before session-blackboard, the c48 lens rendered verify
-		// state one full turn stale, as "ground truth". Publish after all updates so
+		// state one full turn stale. Publish after all updates so
 		// the lens describes THIS turn.
 		g.__pi_vg_state = { gateCmd, mutated: st.mutated, verifiedOk: st.verifiedOk, fires: st.fires, sessionFires: st.sessionFires };
 	});

@@ -5,7 +5,7 @@ import { tmpdir } from "node:os";
 import { resolve } from "node:path";
 import test from "node:test";
 import {
-	ACTIVE_TOOL_PROMPTS, AMBIENT_TOOL_GUIDANCE, stripAmbientToolGuidance,
+	ACTIVE_TOOL_PROMPTS, AMBIENT_TOOL_GUIDANCE, activeToolPromptsEnabled, stripAmbientToolGuidance,
 } from "../lib/active-tool-prompts.ts";
 
 const CHILD = process.env.ACTIVE_TOOL_PROMPTS_TEST_CHILD === "1";
@@ -27,6 +27,17 @@ const runChild = (mode: "legacy" | "active"): string => {
 };
 
 if (!CHILD) {
+	test("prompt mode has explicit active and ambient rollback semantics", () => {
+		assert.equal(activeToolPromptsEnabled({ ACTIVE_TOOL_PROMPTS: "active" }), true);
+		assert.equal(activeToolPromptsEnabled({ ACTIVE_TOOL_PROMPTS: "ambient", MUNCHKIN_TOOL_ACTIVATION: "dynamic" }), false);
+		assert.equal(activeToolPromptsEnabled({ MUNCHKIN_TOOL_ACTIVATION: "dynamic" }), false,
+			"deployed default stays ambient until adoption");
+		assert.equal(activeToolPromptsEnabled({ MUNCHKIN_TOOL_ACTIVATION: "dynamic" }, "derived"), true,
+			"the prepared default follows the dynamic surface");
+		assert.equal(activeToolPromptsEnabled({ ACTIVE_TOOL_PROMPTS: "ambient", MUNCHKIN_TOOL_ACTIVATION: "dynamic" }, "derived"), false,
+			"explicit ambient remains authoritative after adoption");
+	});
+
 	test("unset prompt surface is verified in an isolated source-loader process", () => {
 		const output = runChild("legacy");
 		assert.match(output, /unset mode preserves the ambient prompt/);
@@ -87,6 +98,8 @@ if (!CHILD) {
 		assert.equal(systemPrompt.includes("compact_context"), false);
 		assert.equal(systemPrompt.includes("plan_write"), false);
 		assert.equal(systemPrompt.includes("subagent("), false);
+		assert.equal(systemPrompt.includes('"agent": "agent-name"'), false, "inactive subagent JSON examples are absent");
+		assert.equal(systemPrompt.includes("How to call the subagent tool"), false, "inactive vendor manual is absent");
 		assert.equal(systemPrompt.includes("## Reports"), true, "invariant guidance remains");
 
 		const toolSurface = (active: string[]) => JSON.stringify(

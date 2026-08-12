@@ -39,4 +39,27 @@ modified.
 
 ## PR 3 — model-input trust and one-voice control
 
-Pending.
+Five counterfactuals were exercised. Restoring raw live error prose in the
+blackboard made `hostile live failure prose reaches no snapshot, cockpit,
+telemetry, notification, or lens` fail. Restoring the single integer validator
+for context fields made `restored percentages and ratios preserve their domains
+and fractions` fail. Disabling enforce-mode lens merging made `enforce merges
+the lens before one correction and reserves the intact tail` fail. Restoring
+the vendored subagent's ambient manual in active-only mode made `inactive tools
+contribute no schema, snippet, guideline, or ambient prompt bytes` fail.
+Restoring the old payload-audit lens marker made `thinking replay and lens
+position are detected` fail.
+
+After restoration, `npm run verify` passed 567 tests plus typecheck, health,
+deterministic package smoke, and optimizer verification. The packed artifact
+contained 141 files and loaded 32 extensions plus two skills. Peer-boundary
+checks rejected both unsupported edges and accepted both supported edges.
+Isolated packed consumers for Pi 0.80, 0.81, 0.82, 0.83, and 0.84 each
+typechecked and loaded all 32 extensions and both skills. A temporary agent-dir
+mirror wrote and checked 111 artifacts with zero drift, and Pi's loader returned
+all 32 entries in manifest order. The live agent directory was not modified.
+
+The final diff check and non-echoing secret scan passed. The package and mirror
+manifests cover every changed first-party runtime file. No `context-pressure*`
+file changed. The source surface hash is
+`9a5a99dcf66ae8e44eb2e2831ac4a03e8c025f6582380d0a868ae3d7afa881eb`.

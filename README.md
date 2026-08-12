@@ -134,8 +134,8 @@ Most behavior is automatic. The primary commands are:
 | `RUN_CAPSULE` | `shadow`; checkpoints the closed RunState contract to a private per-run JSON authority plus an untrusted Markdown projection | `off` registers no capsule handlers or command; `recovery` is a dark compatibility mode that DOES inject one bounded brief on the events listed in the next row (the previous "does not inject" wording contradicted it) |
 | `RUN_CAPSULE=recovery` recovery brief | disabled by the default `shadow`; emits one bounded brief only after compaction, an unsettled provider retry, an enforced semantic tier, or an explicit resume command | return to `shadow` or `off`; ordinary turns receive no capsule context and manual resume never starts a provider request |
 | `VERIFY_EXECUTION_ORDER` | unset retains the deployed transcript-order gate while PR 2 is dark | `execution` uses Pi start/end order and rejects overlapping or missing-start verification; `legacy` explicitly selects the deployed path |
-| `ACTIVE_TOOL_PROMPTS` | unset retains the deployed ambient plan/delegation/compaction guidance while PR 2 is dark | `active` removes the ambient block and lets Pi include definition-owned guidance only for active tools; manual disable removes it |
-| `CONTROL_ARBITER` | `shadow`; records the single winning turn-end correction and collision count while legacy producers remain authoritative | `enforce` lets only the highest-priority proposal act; `off` removes the arbiter while typed plan/context/loop signals continue |
+| `ACTIVE_TOOL_PROMPTS` | unset retains the deployed ambient plan/delegation/compaction guidance while adoption is pending | `active` removes the ambient block and lets Pi include definition-owned guidance only for active tools; `ambient` is the explicit rollback and manual `/tools` disable removes active-tool guidance |
+| `CONTROL_ARBITER` | `shadow`; records the single winning turn-end correction and collision count while legacy producers remain authoritative | `enforce` lets only the highest-priority proposal act and merges a same-boundary harness summary before a corrective message; explicit `shadow` is the rollback; `off` removes the arbiter while typed plan/context/loop signals continue |
 | `TELEMETRY_WRITER` | `sync`; gate source and inherited-FD telemetry are always synchronous | `async` enables the bounded ordered interactive file writer; settlement and shutdown await its flush |
 | `TELEMETRY_ASYNC_MAX_ROWS`, `TELEMETRY_ASYNC_MAX_BYTES` | `1024` rows and `1 MiB`; cap queued observational telemetry | bounded to 8–65,536 rows and 4 KiB–64 MiB; overflow is dropped and later reported as a count only |
 | `TELEMETRY_ASYNC_BATCH_ROWS`, `TELEMETRY_ASYNC_BATCH_BYTES` | `64` rows and `64 KiB`; coalesce ordered writes without an unbounded timer | bounded to 1–512 rows and 1 KiB–1 MiB per batch |
@@ -151,8 +151,10 @@ oversized files.
   `${PI_CODING_AGENT_DIR}/artifacts/session-cockpits/<sha256(cwd)>.html`, outside the working
   repository. The final render is awaited exactly once at `agent_settled`; `agent_end` remains
   available for per-run cleanup and may be followed by retry or compaction.
-- Blackboard attempt keys are hashed. Persisted labels, errors, telemetry, and notifications are
-  redacted and bounded; v1 restores intentionally discard raw attempt/delegation ledgers.
+- Blackboard attempt keys are hashed. Failures in snapshots, the lens, cockpit, telemetry, and
+  notifications use only the shared fixed `FailureClass` vocabulary; raw tool error prose is not
+  retained. Labels are redacted and bounded, and v1 restores intentionally discard raw
+  attempt/delegation ledgers.
 - Research ledgers are private `0600` JSONL audit data outside the worktree. URL query strings and
   fragments are never persisted; recalled claim and quote fields remain untrusted evidence, never
   instructions. Delegated citations must be re-read by the parent before they can be recorded.

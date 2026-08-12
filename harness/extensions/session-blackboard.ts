@@ -13,7 +13,7 @@ import {
 	buildControlProposal, controlEnforces, emitControlProposal, onControlProposal,
 } from "../lib/control-proposal.ts";
 
-// Session blackboard: ground-truth working memory (see lib/blackboard.ts).
+// Session blackboard: bounded harness-derived working memory (see lib/blackboard.ts).
 // Three faces, strictly separated:
 //   cockpit  — human-only HTML artifact + TUI widget; NEVER model-visible.
 //   lens     — model-visible ONLY under the dark flag STATE_LENS (c48):
@@ -160,7 +160,7 @@ export default function (pi: ExtensionAPI): void {
 		// ALWAYS reset first. The board lives on globalThis, so a resume/fork whose
 		// snapshot is missing or rejected would otherwise inherit the PREVIOUS
 		// session's ledger in the same process — and the state lens would then
-		// present another session's attempts as this session's ground truth, which
+		// present another session's attempts as this session's state, which
 		// is the one failure mode this design exists to rule out.
 		resetBoard();
 		if (event.reason === "resume" || event.reason === "fork") {

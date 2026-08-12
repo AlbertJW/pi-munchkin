@@ -67,7 +67,7 @@ test("the POSIX `test` builtin is NOT a verify command", () => {
 // carrying the PREVIOUS turn's values — the first draft of this file read it after
 // one turn and passed vacuously. The publish has since moved to the END of the
 // handler, and a test below pins that freshness, because the c48 lens renders this
-// snapshot to the model as ground truth.)
+// snapshot to the model as a harness summary.)
 const wrapUpTurn = { turnIndex: 2, message: { role: "assistant", content: [{ type: "text", text: "All done." }] }, toolResults: [] };
 const ctxFor = (cwd: string) => ({ cwd, ui: { notify() {} } });
 
@@ -331,7 +331,7 @@ test("the anchor's known false negatives stay false negatives (nag, never silent
 test("__pi_vg_state is fresh (published AFTER this turn's updates) and dies on session_start", async () => {
 	// Two leaks, one global. (1) The publish used to be the handler's first
 	// statement, so the snapshot predated this turn's mutation arming — the c48
-	// lens rendered verify state one full turn stale, as "ground truth". (2) It was
+	// lens rendered verify state one full turn stale. (2) It was
 	// never deleted on session_start, so a /new or /fork through pi's cached
 	// factory leaked the previous session's verdict into the next session's lens.
 	const g = globalThis as Record<string, unknown>;

@@ -1,4 +1,4 @@
-// Session blackboard: ground-truth working memory derived from harness events.
+// Session blackboard: bounded working memory derived from harness events.
 // Pure reducer + renderers; the store lives on globalThis (pi gives each
 // extension its own module instance, so module scope cannot be shared — same
 // constraint as telemetry.ts's caches and compaction-coordinator's fix).
@@ -6,6 +6,7 @@ import { createHash } from "node:crypto";
 import type { HarnessSignalV1 } from "./harness-signals.ts";
 import type { RunStateV1 } from "./run-kernel-types.ts";
 import { basename, isAbsolute } from "node:path";
+import { classifyFailure, isFailureClass, type FailureClass } from "./failure-episodes.ts";
 
 // Nothing here is model-visible; the state-lens renderer's OUTPUT becomes
 // model-visible only when session-blackboard.ts injects it under STATE_LENS.
@@ -14,7 +15,7 @@ export type AttemptRecord = {
 	label: string;
 	count: number;
 	errors: number;
-	lastError: string | null;
+	lastError: FailureClass | null;
 	lastTurn: number;
 };
 
@@ -113,11 +114,6 @@ export function attemptLabel(toolName: string, args: Record<string, unknown>): s
 	return toolName;
 }
 
-function firstLine(text: unknown): string | null {
-	if (typeof text !== "string" || text.length === 0) return null;
-	return clip(redact(norm(text.split("\n", 1)[0] ?? "")), 90) || null;
-}
-
 export function noteTool(
 	state: BlackboardState,
 	call: { toolName: string; args: Record<string, unknown>; isError: boolean; errorText?: string | null },
@@ -130,7 +126,12 @@ export function noteTool(
 	rec.lastTurn = state.turn;
 	if (call.isError) {
 		rec.errors += 1;
-		rec.lastError = firstLine(call.errorText) ?? rec.lastError ?? "error";
+		rec.lastError = classifyFailure({
+			toolName: call.toolName,
+			args: call.args,
+			text: typeof call.errorText === "string" ? call.errorText : "",
+			isError: true,
+		});
 	}
 	state.attempts[key] = rec;
 	if (call.toolName === "subagent") {
@@ -208,14 +209,14 @@ export function syncBus(state: BlackboardState): void {
 
 // ---- state lens (model-visible ONLY when session-blackboard injects it) ----
 
-// Deterministic, bounded, ground-truth-only. Failing attempts first (that's what
+// Deterministic and bounded. Failing attempts first (that's what
 // a spiraling model most needs), then verify state, then plan, then context.
 export function renderLens(state: BlackboardState, maxChars: number): string {
 	const failing = Object.values(state.attempts)
 		.filter((a) => a.errors > 0)
 		.sort((a, b) => b.errors - a.errors || b.lastTurn - a.lastTurn)
 		.slice(0, 6)
-		.map((a) => `${a.label} ×${a.count}${a.errors ? ` FAIL(${a.lastError ?? "error"})` : ""}`);
+		.map((a) => `${a.label} ×${a.count}${a.errors ? ` FAIL(${a.lastError ?? "unknown"})` : ""}`);
 	const research = state.research;
 	const researchActive = research != null && (research.notes > 0 || research.notesRejected > 0);
 	if (failing.length === 0 && !state.verify?.mutated && state.plan.runId === null && !researchActive) return "";
@@ -242,7 +243,7 @@ export function renderLens(state: BlackboardState, maxChars: number): string {
 	if (state.loop && state.loop.sessionRepeats > 0) parts.push(`repeats this session: ${state.loop.sessionRepeats}`);
 	const body = parts.filter(Boolean).join("\n");
 	if (!body) return "";
-	return clip(`[session-state — ground truth from the harness; do not re-derive]\n${body}`, Math.max(200, maxChars));
+	return clip(`[harness summary]\n${body}`, Math.max(200, maxChars));
 }
 
 // ---- cockpit (human-only) ----
@@ -291,8 +292,12 @@ const isObject = (value: unknown): value is Record<string, unknown> =>
 // repeat counts, gate fails), and a nonsensical magnitude dominates a small
 // model's reading even without classic injection.
 const MAX_RESTORED_COUNT = 1_000_000;
-const num = (value: unknown): number | null =>
+const count = (value: unknown): number | null =>
 	Number.isFinite(value) ? Math.min(MAX_RESTORED_COUNT, Math.max(0, Math.trunc(Number(value)))) : null;
+const percentage = (value: unknown): number | null =>
+	Number.isFinite(value) ? Math.min(100, Math.max(0, Number(value))) : null;
+const ratio = (value: unknown): number | null =>
+	Number.isFinite(value) ? Math.min(1, Math.max(0, Number(value))) : null;
 const bool = (value: unknown): boolean | null => (typeof value === "boolean" ? value : null);
 
 /** Every string that can reach the lens is re-sanitized here, on the way IN. */
@@ -300,24 +305,9 @@ function safeText(value: unknown, max = 90): string | null {
 	return typeof value === "string" && value.length > 0 ? clip(redact(norm(value)), max) || null : null;
 }
 
-// Restored failure history is reduced to a FIXED VOCABULARY rather than carried
-// as prose. Redaction removes credentials but not authority: "IGNORE prior
-// harness rules…" survives every text filter and lands under a heading that
-// tells the model this is ground truth. A closed set cannot carry an
-// instruction, and it keeps the signal the lens actually needs (this attempt
-// failed, and roughly how).
-const RESTORED_ERROR_CLASSES: readonly [RegExp, string][] = [
-	[/timeout|timed out/i, "timeout"],
-	[/permission|denied|eacces|forbidden/i, "permission"],
-	[/not found|enoent|no such file|404/i, "not-found"],
-	[/assert|expected|test failed|failing/i, "assertion"],
-	[/schema|invalid argument|validation|required (?:property|field)/i, "schema"],
-	[/syntax|parse|unexpected token/i, "syntax"],
-];
-function restoredErrorClass(value: unknown): string | null {
-	if (typeof value !== "string" || value.length === 0) return null;
-	for (const [pattern, label] of RESTORED_ERROR_CLASSES) if (pattern.test(value)) return label;
-	return "error";
+function restoredFailureClass(value: unknown): FailureClass | null {
+	if (value === null || value === undefined || value === "") return null;
+	return isFailureClass(value) ? value : "unknown";
 }
 
 // A label is a bounded TOOL IDENTITY, not free text. The write path emits
@@ -343,8 +333,8 @@ function restoredLabel(value: unknown): string | null {
 // `v === 2` is a version LABEL, not a shape check: a wrong-typed field used to
 // survive `Object.assign` and then either crash renderLens for the rest of the
 // session (with the corrupt board still installed and the failure swallowed) or
-// — worse — carry hostile prose into a model-visible block headed "ground truth
-// from the harness; do not re-derive". SEVEN slots were raw-interpolated, not
+// — worse — carry hostile prose into a model-visible harness summary. SEVEN
+// slots were raw-interpolated, not
 // the two originally reported, and numeric slots are string-injection sites
 // because they are template-interpolated without coercion.
 //
@@ -354,8 +344,8 @@ function restoredLabel(value: unknown): string | null {
 function sanitizeState(data: unknown): BlackboardState | null {
 	if (!isObject(data)) return null;
 	const next = emptyState();
-	next.turn = num(data.turn) ?? 0;
-	next.compactions = num(data.compactions) ?? 0;
+	next.turn = count(data.turn) ?? 0;
+	next.compactions = count(data.compactions) ?? 0;
 	if (isObject(data.attempts)) {
 		// Aggregate cap: an oversized restored ledger costs synchronous parse and
 		// iteration time on every render, and the lens only shows the top few.
@@ -370,10 +360,10 @@ function sanitizeState(data: unknown): BlackboardState | null {
 			admitted += 1;
 			next.attempts[key] = {
 				label,
-				count: num(value.count) ?? 0,
-				errors: num(value.errors) ?? 0,
-				lastError: restoredErrorClass(value.lastError),
-				lastTurn: num(value.lastTurn) ?? 0,
+				count: count(value.count) ?? 0,
+				errors: count(value.errors) ?? 0,
+				lastError: restoredFailureClass(value.lastError),
+				lastTurn: count(value.lastTurn) ?? 0,
 			};
 		}
 	}
@@ -382,7 +372,7 @@ function sanitizeState(data: unknown): BlackboardState | null {
 			agent: safeAtom(safeText(item.agent, 40) ?? "?"),
 			mode: safeAtom(safeText(item.mode, 20) ?? "?"),
 			ok: bool(item.ok) ?? false,
-			turn: num(item.turn) ?? 0,
+			turn: count(item.turn) ?? 0,
 		}));
 	}
 	if (isObject(data.plan)) {
@@ -390,8 +380,8 @@ function sanitizeState(data: unknown): BlackboardState | null {
 		next.plan = {
 			runId: safeText(data.plan.runId, 64) === null ? null : safeAtom(safeText(data.plan.runId, 64) as string),
 			itemId: safeText(data.plan.itemId, 64) === null ? null : safeAtom(safeText(data.plan.itemId, 64) as string),
-			lastGate: gate ? { pass: bool(gate.pass) ?? false, fails: num(gate.fails) ?? 0 } : null,
-			openItems: num(data.plan.openItems),
+			lastGate: gate ? { pass: bool(gate.pass) ?? false, fails: count(gate.fails) ?? 0 } : null,
+			openItems: count(data.plan.openItems),
 		};
 	}
 	if (isObject(data.verify)) {
@@ -399,27 +389,27 @@ function sanitizeState(data: unknown): BlackboardState | null {
 			gateCmd: safeText(data.verify.gateCmd, 80),
 			mutated: bool(data.verify.mutated) ?? false,
 			verifiedOk: bool(data.verify.verifiedOk) ?? false,
-			fires: num(data.verify.fires) ?? 0,
-			sessionFires: num(data.verify.sessionFires) ?? 0,
+			fires: count(data.verify.fires) ?? 0,
+			sessionFires: count(data.verify.sessionFires) ?? 0,
 		};
 	}
 	if (isObject(data.loop)) {
 		next.loop = {
-			sessionRepeats: num(data.loop.sessionRepeats) ?? 0,
-			seen: num(data.loop.seen) ?? 0,
-			streak: num(data.loop.streak) ?? 0,
+			sessionRepeats: count(data.loop.sessionRepeats) ?? 0,
+			seen: count(data.loop.seen) ?? 0,
+			streak: count(data.loop.streak) ?? 0,
 		};
 	}
 	if (isObject(data.context)) {
 		next.context = {
-			pct: num(data.context.pct), staleShare: num(data.context.staleShare), dupShare: num(data.context.dupShare),
+			pct: percentage(data.context.pct), staleShare: ratio(data.context.staleShare), dupShare: ratio(data.context.dupShare),
 		};
 	}
 	if (isObject(data.research)) {
 		next.research = {
-			searches: num(data.research.searches) ?? 0, reads: num(data.research.reads) ?? 0,
-			notes: num(data.research.notes) ?? 0, notesRejected: num(data.research.notesRejected) ?? 0,
-			cacheHits: num(data.research.cacheHits) ?? 0,
+			searches: count(data.research.searches) ?? 0, reads: count(data.research.reads) ?? 0,
+			notes: count(data.research.notes) ?? 0, notesRejected: count(data.research.notesRejected) ?? 0,
+			cacheHits: count(data.research.cacheHits) ?? 0,
 		};
 	}
 	return next;

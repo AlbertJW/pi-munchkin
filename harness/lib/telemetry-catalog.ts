@@ -20,7 +20,7 @@ export const EVENT_CATALOG = {
 	"session-bootstrap/surface-unavailable": { reason: "string" },
 	"control-arbiter/decision": {
 		mode: "string", proposals: "number", collisions: "number", legacy_actions: "number",
-		winner_kind: "string", winner_source: "string", winner_reason: "string", boundary_sequence: "number",
+		winner_kind: "string", winner_source: "string", winner_reason: "string", boundary_sequence: "number", lens_merged: "boolean",
 	},
 	"verify-gate/gate-green-consumed": {},
 	"verify-gate/gate-green-execution-ordered": { started_sequence: "number", ended_sequence: "number" },

@@ -23,7 +23,11 @@ post-settlement model reviews remain outside the turn boundary.
 
 `CONTROL_ARBITER=shadow` is the default. Legacy producers still act exactly as before, while the
 arbiter records the shadow winner, legacy-action attempt count, and collision count without text.
-`enforce` suppresses direct producer sends and executes only the winner. `off` registers no
+`enforce` suppresses direct producer sends and executes only the winner. A same-boundary state
+lens is a bounded supplement to a message winner: it is prepended to that one delivery while the
+correction is reserved intact at the end of the 4,000-character budget. Abort and shutdown
+effects never receive the supplement. Decision telemetry records only the bounded boolean
+`lens_merged`; no message text enters telemetry. `off` registers no
 arbiter handlers or subscriber; typed domain signals remain available so disabling the arbiter
 cannot disable existing activation or blackboard behavior.
 If an explicitly selected extension surface omits the arbiter, producers fail safe to their
