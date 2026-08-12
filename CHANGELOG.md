@@ -103,6 +103,26 @@ candidates as dark). Net changes since 0.3.0; the full per-decision record is
 
 ### Fixed
 
+- **Truth-and-coherence series, PR 1–3 (2026-08-12, source only — NOT mirrored):** the packaged
+  and live harnesses were different architectures, because pi discovers loose extension files by
+  readdir order while `package.json` declares a causal order. The live mirror now ships ONE
+  ordered entry point (`extensions/pi-munchkin/`), and the generated manifest is part of the
+  shared mirror plan so `mirror:apply` and `mirror:check` consume the same canonical bytes.
+  **Surface descriptor v2** hashes loader ORDER, project-local extensions, the import closure,
+  prompts/skills and pinned npm identities — so a reordering is now visible as a hash change,
+  and v1 hashes do not pool with v2. Gate surface hashes moved inside each materialized run, so
+  a fixture's own `.pi/extensions` is part of the measured topology.
+  A first-loaded `session-bootstrap` extension owns session identity (`si` minted per
+  `session_start`), the per-generation surface hash (never retained from a previous runner), and
+  an immutable initial tool surface; `runtime-truth` is serving-only again. Shadow-report lineage
+  is transitive with conflict/cycle detection, and raw gate JSONL now reports UNKNOWN rather than
+  pretending it can be authenticated after its ephemeral key is gone.
+  Model-facing trust boundaries: blackboard failures use the shared fixed taxonomy, the lens
+  heading is trust-neutral, restored numeric domains are honest, enforce mode merges one bounded
+  lens before the intact correction, and the active-only governor/vendor prompt paths are pinned.
+  **Both new model-visible behaviors remain DARK**; adoption is a declared two-line diff with a
+  rollback table in `docs/TRUTH_COHERENCE_ADOPTION_2026-08.md`.
+
 - **Third inspection, eight findings + one unreported (2026-08-11, source only — NOT mirrored):**
   `run/plan-gate-observed` was missing from the run-event validator's admission set, so every
   plan gate was dropped before the reducer and two shipped fixes on that path (gate identity,
