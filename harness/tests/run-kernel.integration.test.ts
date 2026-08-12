@@ -195,3 +195,50 @@ test("legacy prefix-only event validation would admit the rejected counterfactua
 	assert.equal(unsafeLegacyPredicate({ v: 1, type: "run/future-typo", sequence: 1, atMs: 1 }), true);
 	assert.equal(unsafeLegacyPredicate({ v: 1, type: "run/cycle-settled", sequence: 1, atMs: 1, command: "raw" }), true);
 });
+
+test("a plan gate emitted as a harness signal reaches canonical verification state", async () => {
+	// THE path that was dead: plan-runner emits a plan/gate harness signal, the
+	// kernel dispatches run/plan-gate-observed, the validator admits it, the
+	// reducer updates verification. Every previous test drove the reducer
+	// DIRECTLY, so a validator that dropped the event on the floor looked green
+	// for days while two shipped fixes on this path did nothing in production.
+	const { emitHarnessSignal } = await import("../lib/harness-signals.ts");
+	const { normalizeVerificationCommand } = await import("../lib/command-policy.ts");
+	const { createHash } = await import("node:crypto");
+	const fp = makeFakePi();
+	const events: RunEventV1[] = [];
+	onRunEvent(fp.pi.events as never, (event) => { events.push(event); });
+	// detectGate yields the COMMAND; the kernel hashes it exactly as plan-runner
+	// does, which is what makes the two identities comparable in the first place.
+	const gateCommand = "npm test";
+	const gateHash = createHash("sha256").update(`gate:${normalizeVerificationCommand(gateCommand)}`).digest("hex");
+	const controller = installRunKernel(fp.pi as never, {
+		mode: "shadow", idFactory: deterministicIds(),
+		detectGate: async () => gateCommand, surfaceHash: () => SURFACE,
+	});
+	const { ctx } = makeCtx("/tmp/run-kernel-plan-gate");
+	await fire(fp, "session_start", {}, ctx);
+	await fire(fp, "before_agent_start", { prompt: "do the thing", systemPrompt: "s", systemPromptOptions: {} }, ctx);
+	await fire(fp, "agent_start", {}, ctx);
+	const runIdHash = controller.getState().identity.runIdHash;
+
+	// A source mutation leaves the run unverified...
+	await fire(fp, "tool_execution_start", { toolCallId: "e1", toolName: "edit", args: { path: "src/a.ts" } }, ctx);
+	await fire(fp, "tool_result", { type: "tool_result", toolCallId: "e1", toolName: "edit", input: { path: "src/a.ts" }, content: [], details: {}, isError: false }, ctx);
+	await fire(fp, "tool_execution_end", { toolCallId: "e1", toolName: "edit", result: { content: [] }, isError: false }, ctx);
+	assert.equal(controller.getState().verification.validAfterMutation, false);
+
+	// ...an UNRELATED item gate must not verify it (identity), and must not be dropped.
+	emitHarnessSignal(fp.pi.events as never, { v: 1, type: "plan/gate", runIdHash, pass: true, fails: 0, gateHash: "e".repeat(64) });
+	assert.equal(events.filter((e) => e.type === "run/plan-gate-observed").length, 1,
+		"the event must survive isRunEventV1 — this is the assertion that was missing");
+	assert.equal(controller.getState().verification.validAfterMutation, false, "an unrelated gate cannot verify the run");
+
+	// ...and the DETECTED project gate does verify it, through the real channel.
+	emitHarnessSignal(fp.pi.events as never, { v: 1, type: "plan/gate", runIdHash, pass: true, fails: 0, gateHash });
+	const state = controller.getState();
+	assert.equal(events.filter((e) => e.type === "run/plan-gate-observed").length, 2);
+	assert.equal(state.verification.validAfterMutation, true, "the project gate verifies the run END TO END");
+	assert.equal(state.verification.validGates, 1);
+	assert.equal(state.verification.attempts, 2);
+});

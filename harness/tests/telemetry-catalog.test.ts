@@ -54,3 +54,18 @@ test("machine-readable exposure catalog stays in lockstep with TypeScript catalo
 	const mirror = JSON.parse(readFileSync(join(import.meta.dirname, "..", "lib", "telemetry-event-catalog.json"), "utf8"));
 	assert.deepEqual(new Set(mirror.events), new Set(Object.keys(EVENT_CATALOG)));
 });
+
+test("an EMPTY array satisfies any array-typed field (it carries no element evidence)", () => {
+	// [].every(pred) is vacuously true, so an empty array used to type as string[]
+	// and a declared number[] field rejected it — and telemetry.ts replaces a
+	// rejected row with a schema-reject stub, so the WHOLE row was destroyed. A
+	// context call with zero tool results is ordinary; 12 such rows were lost from
+	// the live corpus before this was found.
+	assert.deepEqual(validateCatalogDetail("context-surface", "receipt", { tool_names: [], tool_result_bytes: [] }), []);
+	// The opposite polarity must still hold: a WRONG element type is still rejected.
+	assert.deepEqual(validateCatalogDetail("context-surface", "receipt", { tool_result_bytes: ["x"] }),
+		["invalid tool_result_bytes: expected number[], got string[]"]);
+	// ...and an empty array must NOT satisfy a scalar field.
+	assert.deepEqual(validateCatalogDetail("context-surface", "receipt", { message_count: [] }),
+		["invalid message_count: expected number, got empty[]"]);
+});

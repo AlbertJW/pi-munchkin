@@ -198,9 +198,16 @@ export const EVENT_CATALOG = {
 
 export type CatalogEventKey = keyof typeof EVENT_CATALOG;
 
-function valueType(value: unknown): TelemetryFieldType | "object" | "undefined" {
+function valueType(value: unknown): TelemetryFieldType | "object" | "undefined" | "empty[]" {
 	if (value === null) return "null";
 	if (Array.isArray(value)) {
+		// An EMPTY array satisfies every element predicate vacuously, so it used to
+		// type as "string[]" and a declared number[] field rejected it — taking the
+		// WHOLE row with it (telemetry.ts replaces a rejected row with a
+		// schema-reject stub). A context call with zero tool results is ordinary,
+		// and 12 such rows were silently destroyed in the live corpus before this
+		// was found. "empty[]" is element-agnostic and satisfies any array type.
+		if (value.length === 0) return "empty[]";
 		if (value.every((item) => typeof item === "string")) return "string[]";
 		if (value.every((item) => typeof item === "number")) return "number[]";
 		if (value.every((item) => typeof item === "boolean")) return "boolean[]";
@@ -241,7 +248,11 @@ export function validateCatalogDetail(ext: string, kind: string, detail: Record<
 		}
 		const actual = valueType(value);
 		const allowed = Array.isArray(expected) ? expected : [expected];
-		if (!(allowed as readonly string[]).includes(actual)) errors.push(`invalid ${field}: expected ${allowed.join("|")}, got ${actual}`);
+		// "empty[]" is accepted by any array-typed field: [] carries no element
+		// evidence either way, and rejecting it deleted legitimate rows.
+		const satisfied = (allowed as readonly string[]).includes(actual) ||
+			(actual === "empty[]" && (allowed as readonly string[]).some((type) => type.endsWith("[]")));
+		if (!satisfied) errors.push(`invalid ${field}: expected ${allowed.join("|")}, got ${actual}`);
 	}
 	return errors;
 }

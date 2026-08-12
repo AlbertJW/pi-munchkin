@@ -14,6 +14,13 @@ const RUN_EVENT_TYPES = new Set<RunEventV1["type"]>([
 	"run/control-proposed",
 	"run/control-decided",
 	"run/plan-observed",
+	// Was MISSING here while present in the union, the reducer, the dispatcher and
+	// the payload switch below — so isRunEventV1 rejected every plan gate before
+	// the reducer saw one, and TWO shipped fixes that depended on this path (gate
+	// identity, order-independent verification) were inert in production while
+	// their reducer-level tests passed. See the union-coverage test in
+	// run-kernel-events.test.ts, which now makes this class of drift impossible.
+	"run/plan-gate-observed",
 	"run/context-observed",
 	"run/failure-state-observed",
 	"run/recovery-resumed",
