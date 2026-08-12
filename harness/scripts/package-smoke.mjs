@@ -34,7 +34,6 @@ const expectedExtensions = [
   "harness/extensions/span-tools.ts",
   "harness/extensions/compact-tool.ts",
   "harness/extensions/active-tool-prompts.ts",
-  "harness/extensions/micro-gate.ts",
   "harness/extensions/ketch.ts",
   "harness/extensions/did-you-mean.ts",
   "harness/extensions/teach-hints.ts",
@@ -43,12 +42,12 @@ const expectedExtensions = [
   // Must observe after every prompt-contributing extension so its receipt binds
   // the final provider-visible system prompt, not an intermediate prompt.
   "harness/extensions/context-brief.ts",
+  // The retained read-dedup view transform must precede the observer below.
   "harness/extensions/context-dedup.ts",
-  // session-blackboard's context hook must run BEFORE context-surface so
-  // receipts measure the post-lens view (same ordering rule as context-dedup).
+  // Blackboard has no per-call context hook after the PR 4 retirement; its
+  // position remains stable for signal/control ordering.
   "harness/extensions/session-blackboard.ts",
   "harness/extensions/bash-output-guard.ts",
-  "harness/extensions/payload-audit.ts",
   // Must register after compact_context and the vendor subagent. It makes its
   // defer/preserve decision at session_start against the complete registry.
   "harness/extensions/tool-activation.ts",
@@ -67,8 +66,8 @@ const expectedExtensions = [
   // is only meaningful if nothing appends to the context array afterwards, and
   // run-capsule's recovery brief did exactly that — telemetry described a
   // payload the provider never received. An OBSERVER must load after every
-  // MUTATOR; it still sits downstream of the context-dedup/session-blackboard
-  // producers it reads from. This expectation moved deliberately WITH the
+  // MUTATOR; it still sits downstream of the retained context-dedup transform.
+  // This expectation moved deliberately WITH the
   // manifest; it was not adjusted to silence a firing tripwire.
   "harness/extensions/context-surface.ts",
   // Durability boundary is registered last so settled/shutdown rows from every

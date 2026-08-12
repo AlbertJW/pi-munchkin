@@ -77,15 +77,14 @@ test("dedup output measurably lowers the surface's exact-duplicate share and kee
 	assert.equal(callN1.receipt.prefix_stable, true, "later-copy replacement must stay append-safe across calls");
 });
 
-test("integration: READ_DEDUP=on transforms the context view; off leaves it alone; nudge steers over threshold with cooldown", async () => {
+test("integration: READ_DEDUP=on transforms the context view and off leaves it alone", async () => {
 	const dir = mkdtempSync(join(tmpdir(), "context-dedup-"));
 	process.env.TELEMETRY_FILE = join(dir, "events.jsonl");
 	process.env.TELEMETRY_SOURCE = "test";
 	try {
 		// ADOPTED 2026-08-07: READ_DEDUP default-on (was dark candidate c26) —
-		// =off kills the handler; the NUDGE stays dark and is untouched by this.
+		// =off kills the handler.
 		process.env.READ_DEDUP = "off";
-		delete process.env.CTX_REDUNDANCY_NUDGE;
 		const offFp = makeFakePi();
 		(await import(`../extensions/context-dedup.ts?off=${Date.now()}-${Math.random()}`)).default(offFp.pi as any);
 		const messages = [...readPair("r1", "a.ts", fileText), ...readPair("r2", "a.ts", fileText)];
@@ -105,34 +104,10 @@ test("integration: READ_DEDUP=on transforms the context view; off leaves it alon
 		assert.ok(Array.isArray(result), "transformed view returned as a bare array");
 		assert.deepEqual(messages, before, "original array untouched");
 		assert.match(JSON.stringify(result), /identical to the result at message/);
-
-		// nudge: fires over threshold, respects cooldown
-		process.env.CTX_REDUNDANCY_NUDGE = "on";
-		const nudgeFp = makeFakePi();
-		(await import(`../extensions/context-dedup.ts?nudge=${Date.now()}-${Math.random()}`)).default(nudgeFp.pi as any);
-		(globalThis as Record<string, unknown>).__pi_ctx_redundancy_pct = 80;
-		await fire(nudgeFp, "turn_end", { turnIndex: 5 }, {});
-		assert.equal(nudgeFp.sent.length, 1, "steer fired over threshold");
-		assert.match(nudgeFp.sent[0], /compact_context/);
-		assert.equal(nudgeFp.deliveries[0].deliverAs, "steer");
-		await fire(nudgeFp, "turn_end", { turnIndex: 7 }, {});
-		assert.equal(nudgeFp.sent.length, 1, "cooldown suppresses immediate repeat");
-		(globalThis as Record<string, unknown>).__pi_ctx_redundancy_pct = 10;
-		await fire(nudgeFp, "turn_end", { turnIndex: 20 }, {});
-		assert.equal(nudgeFp.sent.length, 1, "below threshold stays silent");
-
-		// M7: a new session resets the cooldown — turn indices restart at 0,
-		// so a stale lastNudgeTurn must not suppress the first nudge.
-		(globalThis as Record<string, unknown>).__pi_ctx_redundancy_pct = 80;
-		await fire(nudgeFp, "session_start", { reason: "new" }, {});
-		await fire(nudgeFp, "turn_end", { turnIndex: 0 }, {});
-		assert.equal(nudgeFp.sent.length, 2, "cooldown resets across sessions");
 	} finally {
 		delete process.env.READ_DEDUP;
-		delete process.env.CTX_REDUNDANCY_NUDGE;
 		delete process.env.TELEMETRY_FILE;
 		delete process.env.TELEMETRY_SOURCE;
-		delete (globalThis as Record<string, unknown>).__pi_ctx_redundancy_pct;
 		rmSync(dir, { recursive: true, force: true });
 	}
 });

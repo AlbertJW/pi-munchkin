@@ -197,26 +197,11 @@ check_git_optional() {
 	fi
 }
 
-# ---------- optional: python3 ----------
-# micro-gate's Python-specific post-edit parse/slop checks (extensions/micro-gate.ts,
-# opt-in via MICRO_GATE=on) shell out to python3 and are explicitly designed
-# to record a telemetry breadcrumb and skip silently — never block — if it's
-# missing. JS/TS files are unaffected either way (checked via node, already
-# required above).
-check_python_optional() {
-	if command -v python3 >/dev/null 2>&1; then
-		log "python3 $(python3 --version 2>&1 | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1) OK (optional; only used by micro-gate's Python-file checks)"
-	else
-		warn "python3 not found — optional, but micro-gate's Python-file parse/slop checks (when MICRO_GATE=on) will silently skip Python files instead of checking them. JS/TS checking is unaffected."
-	fi
-}
-
 main() {
 	check_node
 	check_npm
 	check_ketch
 	check_git_optional
-	check_python_optional
 	log "all dependencies satisfied."
 }
 

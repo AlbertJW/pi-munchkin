@@ -6,7 +6,7 @@ import { emitHarnessSignal } from "../lib/harness-signals.ts";
 export type ContextSurfaceMode = "summary" | "full" | "off";
 
 export function contextSurfaceMode(env: NodeJS.ProcessEnv = process.env): ContextSurfaceMode {
-	if (env.TELEMETRY_SOURCE === "gate" || env.CTX_REDUNDANCY_NUDGE === "on") return "full";
+	if (env.TELEMETRY_SOURCE === "gate") return "full";
 	return env.CONTEXT_SURFACE_MODE === "full" || env.CONTEXT_SURFACE_MODE === "off"
 		? env.CONTEXT_SURFACE_MODE : "summary";
 }
@@ -37,7 +37,6 @@ export function installContextSurface(
 		summaryAfterCompaction = false;
 		crossed.clear();
 		prior = null;
-		delete (globalThis as Record<string, unknown>).__pi_ctx_redundancy_pct;
 	});
 
 	pi.on("session_compact", async () => {
@@ -50,7 +49,6 @@ export function installContextSurface(
 		if (mode === "off") return;
 		callCount += 1;
 		if (mode === "summary") {
-			delete (globalThis as Record<string, unknown>).__pi_ctx_redundancy_pct;
 			const usage = ctx.getContextUsage?.();
 			const pct = usage?.percent ?? null;
 			const newlyCrossed = [60, 80, 90].filter((value) => pct != null && pct >= value && !crossed.has(value));
@@ -71,11 +69,6 @@ export function installContextSurface(
 			planItemId: plan?.item_id,
 		}, prior);
 		prior = { messageHashes, systemSha: system.sha256 };
-		// Flag-bus publish (same-process idiom as __pi_gate_green): the combined
-		// duplicate share of the surface the provider will actually see, for
-		// context-dedup's redundancy nudge — no recompute, no direct coupling.
-		(globalThis as Record<string, unknown>).__pi_ctx_redundancy_pct =
-			(receipt.exact_duplicate_block_share + receipt.near_duplicate_block_share) * 100;
 		record("context-surface", "receipt", {
 			...receipt,
 			provider: ctx.model?.provider,

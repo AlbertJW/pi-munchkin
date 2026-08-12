@@ -39,7 +39,7 @@ test("arbiter picks one highest-priority proposal and reports collisions", () =>
 	queue.add(envelope("context_hint"));
 	queue.add(envelope("verification_required"));
 	queue.add(envelope("failure_recovery"));
-	queue.add(envelope("safety_consequence"));
+	queue.add(envelope("plan_resolution"));
 	const { decision, delivery } = queue.decide(1, "shadow");
 	assert.equal(decision.proposalCount, 4);
 	assert.equal(decision.collisionCount, 3);
@@ -138,12 +138,12 @@ test("abort and shutdown effects never acquire a lens or continuation", () => {
 		const queue = new ControlArbiterQueue();
 		queue.add(lensEnvelope());
 		queue.add(envelope("failure_recovery"));
-		queue.add(envelope(effect === "abort" ? "safe_abort" : "safety_consequence", 1, effect));
+		queue.add(envelope("safe_abort", 1, effect));
 		const result = queue.decide(1, "enforce");
 		assert.equal(result.lensMerged, false);
 		assert.equal(result.verificationMerged, false);
 		assert.equal(result.decision.winner?.effect, effect, "terminal effects outrank every message kind");
-		assert.equal(result.delivery?.message, effect === "abort" ? "safe_abort" : "safety_consequence");
+		assert.equal(result.delivery?.message, "safe_abort");
 	}
 });
 
@@ -338,7 +338,7 @@ test("tier-three abort wins without an automatic continuation message", async ()
 test("shutdown wins without a lens or automatic continuation message", async () => {
 	const { fp } = await installed("enforce", "off");
 	let shutdowns = 0;
-	const stop = envelope("safety_consequence", 5, "shutdown");
+	const stop = envelope("safe_abort", 5, "shutdown");
 	stop.delivery = { shutdown: () => { shutdowns += 1; }, message: "must-not-send" };
 	emitControlProposal(fp.pi.events as never, stop.proposal, stop.delivery);
 	const lens = lensEnvelope(5, "must-not-merge");
@@ -346,42 +346,6 @@ test("shutdown wins without a lens or automatic continuation message", async () 
 	await fire(fp, "turn_end", { turnIndex: 5, message: { role: "assistant", content: [] }, toolResults: [] }, {});
 	assert.equal(shutdowns, 1);
 	assert.deepEqual(fp.sent, []);
-});
-
-test("dormant micro-gate delivers through the arbiter when explicitly enabled", async () => {
-	const previous = {
-		CONTROL_ARBITER: process.env.CONTROL_ARBITER,
-		MICRO_GATE: process.env.MICRO_GATE,
-		MICRO_GATE_SLOP: process.env.MICRO_GATE_SLOP,
-		TELEMETRY: process.env.TELEMETRY,
-	};
-	process.env.CONTROL_ARBITER = "enforce";
-	process.env.MICRO_GATE = "on";
-	process.env.MICRO_GATE_SLOP = "off";
-	process.env.TELEMETRY = "off";
-	const cwd = mkdtempSync(join(tmpdir(), "control-micro-gate-"));
-	writeFileSync(join(cwd, "broken.js"), "function broken( {\n");
-	try {
-		const fp = makeFakePi();
-		const nonce = `${Date.now()}-${Math.random()}`;
-		const [micro, arbiter] = await Promise.all([
-			import(`../extensions/micro-gate.ts?control=${nonce}`),
-			import(`../extensions/control-arbiter.ts?micro=${nonce}`),
-		]);
-		micro.default(fp.pi as never);
-		arbiter.default(fp.pi as never);
-		await fire(fp, "turn_end", {
-			turnIndex: 3,
-			message: { role: "assistant", content: [{ type: "toolCall", id: "m", name: "edit", arguments: { path: "broken.js" } }] },
-			toolResults: [],
-		}, { cwd, ui: { notify() {} } });
-		assert.equal(fp.sent.length, 1);
-		assert.match(fp.sent[0], /^\[micro-gate\]/);
-	} finally {
-		for (const [key, value] of Object.entries(previous)) {
-			if (value === undefined) delete process.env[key]; else process.env[key] = value;
-		}
-	}
 });
 
 test("real verify and rescue producers collide into one verification intervention", async () => {

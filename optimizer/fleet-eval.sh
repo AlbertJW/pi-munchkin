@@ -21,7 +21,7 @@ HEALTH_TIMEOUT="${HEALTH_TIMEOUT:-300}"
 
 DEFAULT_FLEET=(qwen36-35b-iq3s)
 BASE="${BASE:-$HERE/prompt-lab/configs/baseline.json}"
-CAND="${CAND:-$HERE/prompt-lab/configs/cand-cot.json}"
+CAND="${CAND:-$HERE/prompt-lab/configs/static/c46-prompt-lean.json}"
 DRY=0; NOLAUNCH=0; RT=0; RG=0; FLEET=()
 for a in "$@"; do
 	case "$a" in

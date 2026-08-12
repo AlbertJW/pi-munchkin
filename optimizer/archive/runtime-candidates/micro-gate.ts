@@ -1,7 +1,7 @@
 import { closeSync, existsSync, openSync, readSync } from "node:fs";
 import { isAbsolute, join } from "node:path";
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
-import { changedPaths, checksFor, firstError, formatSlop, jsSlopFindings, PYTHON_SLOP_SCRIPT, slopKindFor } from "../lib/micro-gate-policy.ts";
+import { changedPaths, checksFor, firstError, formatSlop, jsSlopFindings, PYTHON_SLOP_SCRIPT, slopKindFor } from "./micro-gate-policy.ts";
 import { steerText } from "../lib/steer-texts.ts";
 import { record } from "../lib/telemetry.ts";
 import { buildControlProposal, controlEnforces, emitControlProposal } from "../lib/control-proposal.ts";

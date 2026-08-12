@@ -16,10 +16,8 @@ import {
 // Session blackboard: bounded harness-derived working memory (see lib/blackboard.ts).
 // Three faces, strictly separated:
 //   cockpit  — human-only HTML artifact + TUI widget; NEVER model-visible.
-//   lens     — model-visible ONLY under the dark flag STATE_LENS (c48):
-//              view  = one non-accumulating tail block per LLM call (context
-//                      view hook — transcript untouched, KV prefix stable)
-//              steer = bounded supplement when loop-breaker fires
+//   lens     — model-visible only as a bounded supplement when loop-breaker fires;
+//              STATE_LENS=off is the kill switch.
 //   /blackboard — human command to inspect the current lens + artifact path.
 // BLACKBOARD=off kills everything. Cockpit files are suppressed in gate runs
 // (TELEMETRY_SOURCE=gate) so fixture workdirs stay pristine — a cockpit file in
@@ -27,17 +25,15 @@ import {
 
 const ENABLED = process.env.BLACKBOARD !== "off";
 const IN_GATE = process.env.TELEMETRY_SOURCE === "gate";
-const LENS_MODE = ((): "off" | "view" | "steer" | "both" => {
+const LENS_MODE = ((): "off" | "steer" => {
 	// ADOPTED 2026-08-04 (explicit human gate): default is now event-driven
-	// "steer", avoiding per-call context mutation. STATE_LENS=view|both restores
-	// the experimental per-call lens; STATE_LENS=off remains the kill switch.
+	// "steer", avoiding per-call context mutation. STATE_LENS=off remains the
+	// kill switch; retired view/both values fall back to steer.
 	// Grounds in DARK_CANDIDATE_VERDICTS_2026-08-03.md. Default-on, reversible,
 	// mechanism-observed; benefit was not established by a powered trial.
-	// The opt-in per-call tail breaks the serving KV prefix (see the honest-cost
-	// comment at the append site).
 	const raw = process.env.STATE_LENS;
 	if (raw === "off") return "off";
-	return raw === "view" || raw === "steer" || raw === "both" ? raw : "steer";
+	return "steer";
 })();
 const LENS_MAX_CHARS = (() => {
 	const raw = process.env.STATE_LENS_MAX_CHARS ?? "";
@@ -71,7 +67,7 @@ export default function (pi: ExtensionAPI): void {
 			proposal.effect !== "message" ||
 			proposal.boundarySequence === lastLensProposalBoundary) return;
 		const state = boardState();
-		if ((LENS_MODE === "steer" || LENS_MODE === "both") &&
+		if (LENS_MODE === "steer" &&
 			proposal.boundarySequence - lastLensSteerTurn >= STEER_MIN_TURN_GAP) {
 			state.turn = proposal.boundarySequence;
 			syncBus(state);
@@ -224,32 +220,6 @@ export default function (pi: ExtensionAPI): void {
 			pi.appendEntry(ENTRY_TYPE, snapshot(boardState()));
 		} catch { /* persistence is best-effort */ }
 	});
-
-	if (LENS_MODE === "view" || LENS_MODE === "both") {
-		pi.on("context", async (event) => {
-			const state = boardState();
-			syncBus(state);
-			const lens = renderLens(state, LENS_MAX_CHARS);
-			if (!lens) return undefined;
-			// Append to the LAST message's content in the per-call VIEW: never stored,
-			// regenerated fresh each call (no accumulation, no staleness).
-			// COST, stated honestly (triage #15): this does NOT leave the KV prefix
-			// intact, despite what this comment used to claim. On call N+1 the message
-			// that was last on call N has LOST its lens tail (the view is per-call),
-			// so the serving-side prefix diverges at that position every single call —
-			// llama.cpp re-prefills from there each turn. The alternative (persisting
-			// the tail) trades that for unbounded stale-lens accumulation in the
-			// transcript. Revisit only as a measured candidate revision; for now the
-			// re-prefill cost is accepted and must be remembered when reading c48
-			// token/latency numbers.
-			const messages = event.messages as { content?: unknown }[];
-			const last = messages[messages.length - 1];
-			if (!last || !Array.isArray(last.content)) return undefined;
-			last.content.push({ type: "text", text: `\n\n${lens}` });
-			record("state-lens", "view-injected", { chars: lens.length, turnIndex: state.turn });
-			return { messages: event.messages };
-		});
-	}
 
 	pi.registerCommand("blackboard", {
 		description: "Show the session blackboard (lens text + cockpit artifact path)",

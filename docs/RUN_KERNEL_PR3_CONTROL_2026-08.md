@@ -3,6 +3,10 @@
 Status: dark control implementation. Source hash `6548d5d9265ed5e9b7643e55a10ccb9df22381eafe3827209e72b5b993943f54`.
 No control adoption, live mirror, or model round is implied by this document.
 
+> Historical boundary: this document records the PR 3 surface. The later PR 4 retirement
+> draft removes micro-gate from the loadable control surface; its descriptions below are
+> preserved only to explain the older hash and must not be read as current runtime behavior.
+
 ## One correction boundary
 
 Turn-end correction producers publish closed `ControlProposalV1` metadata. A proposal contains

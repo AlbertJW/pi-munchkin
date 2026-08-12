@@ -87,3 +87,32 @@ again before full acceptance.
 - The non-echoing secret scan, diff whitespace check, manifest-order tests, and
   protected-file check passed. Deployed defaults remain ambient prompts and a
   shadow arbiter; no live-agent directory was modified.
+
+## PR 4 counterfactuals
+
+- Reintroducing a `CTX_REDUNDANCY_NUDGE` runtime reference made
+  `retired environment options have no loadable runtime reader` fail.
+- Reintroducing `view` into the active `STATE_LENS` schema made
+  `retired extensions and policy are absent from package and active optimizer
+  schemas` fail.
+
+Both inert counterfactuals were restored immediately. The same two-test
+structural suite then passed, proving that loadable-source and active-schema
+residue are independently guarded.
+
+## PR 4 acceptance
+
+- The complete verifier passed 581 harness tests plus typecheck, health,
+  deterministic package smoke, and optimizer checks. The packed surface contains
+  30 extension entry points and both skills.
+- Offline peer boundaries accepted 0.80.6 and 0.84.x and rejected 0.80.5 and
+  0.85.0.
+- Isolated packed consumers typechecked and loaded all 30 extensions and both
+  skills on Pi 0.80, 0.81, 0.82, 0.83, and 0.84 using temporary agent homes.
+- The non-echoing secret scan inspected the complete diff without exposing
+  matched text. An archived private-endpoint literal was removed rather than
+  suppressed; the historical runner now resolves its endpoint at runtime.
+- The deterministic source surface is
+  `3384948ad1411b5eaedb68f28de89c6f176e7de1c680b19826b24ff9c1b6c663`.
+  No protected file or live-agent directory was modified. This remains an
+  unmerged deletion draft pending the separate human checkpoint.

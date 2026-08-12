@@ -1,4 +1,4 @@
-// micro-gate-policy: pure logic for the post-edit micro-gate (c21).
+// RETIRED AUDIT SOURCE: pure logic for the post-edit micro-gate (c21).
 // After a turn that mutated source files, run the CHEAPEST deterministic check
 // on just the changed files and surface the FIRST actionable error — never the
 // full test suite. Motivated by the gauntlet baseline: an unnoticed bad edit

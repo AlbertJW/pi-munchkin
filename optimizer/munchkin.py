@@ -592,9 +592,9 @@ def selftest():
 
     # schema guard: out-of-schema / unsafe deltas are dropped, in-schema survive
     clean, dropped = sanitize_delta(
-        {"format": "yaml", "scaffold": "cot", "decoding": {"TEMP": 0.6},
+        {"format": "yaml", "scaffold": "decompose", "decoding": {"TEMP": 0.6},
          "thresholds": {"LB_REPEAT_T1": 99, "LB_STREAK_SOFT": 8}}, dims)
-    assert clean == {"scaffold": "cot", "thresholds": {"LB_STREAK_SOFT": 8}}, clean
+    assert clean == {"scaffold": "decompose", "thresholds": {"LB_STREAK_SOFT": 8}}, clean
     assert set(dropped) == {"format", "decoding", "thresholds.LB_REPEAT_T1"}, dropped
 
     # messages (freeform steer texts): allowed key + sane string survives; unknown
@@ -640,12 +640,12 @@ def selftest():
     with tempfile.TemporaryDirectory() as td:
         s1 = os.path.join(td, "ev.json"); s2 = os.path.join(td, "cot.json")
         json.dump({"name": "evidence", "gov_append": "RULE X.", "prediction": "fewer loops"}, open(s1, "w"))
-        json.dump({"name": "cot", "scaffold": "cot", "decoding": {"TEMP": 0.6}}, open(s2, "w"))
+        json.dump({"name": "decompose", "scaffold": "decompose", "decoding": {"TEMP": 0.6}}, open(s2, "w"))
         cands = static_propose([s1, s2])(base, [], 2, 0, [])
         assert len(cands) == 2, cands
         assert cands[0]["gov"].endswith("RULE X.") and cands[0]["_op"] == "static:evidence"
         assert cands[0]["_pred"] == "fewer loops"
-        assert cands[1]["scaffold"] == "cot" and "decoding" not in cands[1], "unsafe delta must drop"
+        assert cands[1]["scaffold"] == "decompose" and "decoding" not in cands[1], "unsafe delta must drop"
         assert static_propose([s1, s2])(base, [], 2, 1, []) == [], "round past specs is empty"
 
         # gov_file = full-replacement governor (path relative to the spec file)
@@ -666,9 +666,9 @@ def selftest():
         # shared manifest updates merge instead of clobbering prior wings
         mp = os.path.join(td, "manifest.json")
         update_manifest(mp, ["evidence"], "wing-a")
-        update_manifest(mp, ["evidence", "cot"], "wing-b")
+        update_manifest(mp, ["evidence", "decompose"], "wing-b")
         man = json.load(open(mp))
-        assert man["candidates"] == {"evidence": ["wing-a", "wing-b"], "cot": ["wing-b"]}, man
+        assert man["candidates"] == {"evidence": ["wing-a", "wing-b"], "decompose": ["wing-b"]}, man
 
         def stub_enrich(label):
             return {"telemetry": {"loop-breaker.steer": 2}}

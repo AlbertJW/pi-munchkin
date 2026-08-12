@@ -8,6 +8,19 @@ Brought current 2026-08-05 (had been stale since 2026-07-22 and still described 
 candidates as dark). Net changes since 0.3.0; the full per-decision record is
 `optimizer/docs/DARK_CANDIDATE_VERDICTS_2026-08-03.md` and the ledger.
 
+### Removed (draft; deletion checkpoint pending)
+
+- **Low-merit candidate retirement (2026-08-12):** removed loadable micro-gate/slop and
+  payload-audit paths; removed the redundancy nudge, per-call state-lens view, and mandatory
+  subagent-only mutation branch; removed their runtime flags, child propagation, telemetry,
+  control vocabulary, manifests, and package entries. Final source is preserved under
+  `optimizer/archive/runtime-candidates/` and historical recipes under
+  `optimizer/prompt-lab/configs/retired/`. Generic CoT/pause, patient/terse/taxonomy prompts,
+  prompt YAML, fresh/locality retry, and the inert span screen leave the active roster.
+  `no-verify-gate` and `harness-off` remain suppression controls; `bash-output-guard` and
+  `prompt-lean` remain candidates. This draft is not merged or mirrored without the separate
+  human deletion checkpoint.
+
 ### Added
 
 - **Serving-truth probe + dual-permutation judging (2026-08-11):** `runtime-truth.ts` probes the
@@ -89,7 +102,7 @@ candidates as dark). Net changes since 0.3.0; the full per-decision record is
   kill switch; `plan_go`/`search_spans`/`read_span` joined `GATE_BASE_TOOLS` (ADR-0001);
   none passed a powered trial.
 - **Adopted, default-on (2026-08-03/04, human-gated):** `session-blackboard` state lens
-  (default mode `steer` since 2026-08-04; `STATE_LENS=off|view|both`), `teach-hints`
+  (default mode `steer` since 2026-08-04; `STATE_LENS=off`), `teach-hints`
   (`TEACH_HINTS=off`), `did-you-mean` (`DID_YOU_MEAN=off`), and `tool-activation`
   (dynamic deferred `subagent`/`compact_context`; `MUNCHKIN_TOOL_ACTIVATION=ambient` reverts).
 - `session-blackboard` cockpit (human-only HTML/TUI), `tool-call-rescue` (default-on since 2026-08-07), `bash-output-guard` (dark,

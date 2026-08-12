@@ -1,34 +1,21 @@
-// Context read-dedup (LIVE default-on since 2026-08-07) + redundancy nudge
-// (still a DARK A/B candidate).
+// Context read-dedup (LIVE default-on since 2026-08-07).
 //
 // READ_DEDUP=on (c26): a `context`-event view transform that collapses
 // repeated identical `read` results into a one-line back-reference (see
 // lib/context-dedup.ts for why the LATER copy is replaced). Per-call view
 // only — session history is untouched by the context event contract.
 //
-// CTX_REDUNDANCY_NUDGE=on (c27): when the post-dedup context is still
-// heavily redundant (exact + near duplicate share from context-surface's
-// receipt, published on the globalThis flag bus), steer the model once
-// toward compact_context. Cooldown so it never nags.
-//
 // Registered BEFORE context-surface in pi.extensions so receipts measure the
 // post-dedup surface — the duplicate-share drop is the mechanism metric.
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { dedupReadResults } from "../lib/context-dedup.ts";
-import { steerText } from "../lib/steer-texts.ts";
 import { record } from "../lib/telemetry.ts";
-import { buildControlProposal, controlEnforces, emitControlProposal } from "../lib/control-proposal.ts";
 
 // READ_DEDUP: LIVE default-on since 2026-08-07 (was dark candidate c26).
 // ADOPTED by judgment (Albert-approved); benefit was not established by a
 // powered trial. One class riskier than pure-append adoptions (it TRANSFORMS
-// the view); its prefix_stable guardrail is blind only under STATE_LENS=view|
-// both (default steer keeps that artifact dormant). READ_DEDUP=off kills it.
-// The NUDGE below stays a dark candidate — independently gated, not adopted.
+// the view). READ_DEDUP=off kills it.
 const READ_DEDUP = process.env.READ_DEDUP !== "off";
-const NUDGE = process.env.CTX_REDUNDANCY_NUDGE === "on";
-const NUDGE_PCT = Math.min(95, Math.max(5, Number.parseInt(process.env.CTX_REDUNDANCY_PCT || "50", 10) || 50));
-const NUDGE_COOLDOWN_TURNS = 8;
 
 export default function (pi: ExtensionAPI): void {
 	if (READ_DEDUP) {
@@ -37,43 +24,6 @@ export default function (pi: ExtensionAPI): void {
 			if (!result) return undefined; // nothing replaced — preserve the exact original array
 			record("context-dedup", "dedup", { replaced: result.replaced, saved_bytes: result.savedBytes });
 			return { messages: result.messages as typeof event.messages };
-		});
-	}
-
-	if (NUDGE) {
-		let lastNudgeTurn = -Infinity;
-		// turnIndex restarts at 0 on every AGENT RUN, not just every session
-		// (agent-session.js:428-429 zeroes _turnIndex on agent_start, and agent-loop.js
-		// emits agent_start for continuations too — retry, overflow-compaction, a
-		// message queued by an agent_end handler). A mid-session restart makes
-		// `event.turnIndex - lastNudgeTurn` negative, which is always < the cooldown,
-		// latching this gate shut for the rest of the session. Reset on agent_start,
-		// not only session_start.
-		const resetCooldown = async () => { lastNudgeTurn = -Infinity; };
-		pi.on("session_start", resetCooldown);
-		pi.on("agent_start", resetCooldown);
-		pi.on("turn_end", async (event) => {
-			const share = (globalThis as Record<string, unknown>).__pi_ctx_redundancy_pct;
-			if (typeof share !== "number" || share < NUDGE_PCT) return;
-			if (event.turnIndex - lastNudgeTurn < NUDGE_COOLDOWN_TURNS) return;
-			lastNudgeTurn = event.turnIndex;
-			const msg = steerText(
-				"CTX_REDUNDANCY_MSG",
-				"[context] ~{share}% of the context window is duplicate or near-duplicate content (mostly repeated reads/output). Call compact_context to fold it down before continuing — do not re-read files you have already seen.",
-				{ share: Math.round(share) },
-			);
-			record("context-dedup", "nudge", { share_pct: Math.round(share), injected_chars: msg.length, turnIndex: event.turnIndex });
-			const legacyActed = !controlEnforces(pi.events);
-			emitControlProposal(pi.events, buildControlProposal({
-				boundarySequence: event.turnIndex,
-				kind: "context_hint",
-				reason: "state_lens",
-				source: "context-dedup",
-				cooldownKey: "context-redundancy",
-				messageFactory: "context-nudge",
-				legacyActed,
-			}), { message: msg });
-			if (legacyActed) pi.sendUserMessage(msg, { deliverAs: "steer" });
 		});
 	}
 }

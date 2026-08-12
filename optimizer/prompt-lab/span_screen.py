@@ -18,17 +18,18 @@ from typing import Any, Callable
 LAB = Path(__file__).resolve().parent
 OPTIMIZER = LAB.parent
 RESULTS = LAB / "results"
-DEFAULT_MANIFEST = LAB / "configs" / "span-screen.json"
+DEFAULT_MANIFEST = LAB / "configs" / "retired" / "span-screen.json"
+CONFIG_ROOT = LAB / "configs"
 REAL_GATE = OPTIMIZER / "real_gate.sh"
 FLEET_REPORT = LAB / "fleet_report.py"
 PARENT_ENV_ALLOWLIST = {
     "HOME", "PATH", "TMPDIR", "LANG", "LC_ALL", "SYSTEMROOT", "WINDIR",
     "PI_CODING_AGENT_DIR", "XDG_CONFIG_HOME", "PI_MODEL", "PI_PROVIDER", "DD",
-    "PI_TIMEOUT", "HEALTH_WAIT", "REAL_GATE_RUNS", "PI_MEM_CAP_GB",
+    "PI_TIMEOUT", "HEALTH_WAIT", "REAL_GATE_RUNS", "PI_MEM_CAP_GB", "LLAMA_URL",
 }
 EXPECTED_EXECUTION = {
     "GATE_NETWORK": "endpoint", "MODEL_CONTROL": "llama",
-    "LLAMA_URL": "http://127.0.0.1:8080", "INTERLEAVE": "on", "SANDBOX": "on",
+    "INTERLEAVE": "on", "SANDBOX": "on",
     "SPAN_TOOLS": "off", "TRAJECTORY": "off", "HELDOUT": "",
     "RESULTS_MODE": "truncate", "FLEET_ALPHA": "0.05",
 }
@@ -109,7 +110,7 @@ def load_manifest(path: Path = DEFAULT_MANIFEST) -> dict[str, Any]:
     for cell, (cell_id, arm, expected_env) in zip(cells, expected):
         if set(cell) != {"id", "arm", "config"} or (cell["id"], cell["arm"]) != (cell_id, arm):
             raise ScreenError("screen cells must be ordered span-off/base then span-on/cand")
-        cfg_path = _contained(path.parent, cell["config"])
+        cfg_path = _contained(CONFIG_ROOT, cell["config"])
         cfg_bytes = cfg_path.read_bytes(); cfg = _json(cfg_path)
         unknown = set(cfg) - {"name", "prediction", "prompt_variant", "format", "scaffold", "thresholds"}
         if unknown or (cfg.get("prompt_variant"), cfg.get("format"), cfg.get("scaffold")) != ("A", "md", "none"):
@@ -375,13 +376,15 @@ def selftest() -> None:
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--manifest", type=Path, default=DEFAULT_MANIFEST)
+    parser.add_argument("--manifest", type=Path)
     parser.add_argument("--gen", help="unique GEN (default: UTC timestamp plus pid)")
     parser.add_argument("--dry", action="store_true")
     parser.add_argument("--selftest", action="store_true")
     args = parser.parse_args(argv)
     if args.selftest: selftest(); return 0
     try:
+        if args.manifest is None:
+            raise ScreenError("the span-screen recipe is retired; pass an explicit historical --manifest path")
         manifest = load_manifest(args.manifest)
         stamp = dt.datetime.now(dt.timezone.utc).strftime("%Y%m%dT%H%M%SZ")
         gen = args.gen or f"{manifest['defaults']['gen_prefix']}-{stamp}-{os.getpid()}"

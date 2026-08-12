@@ -1,8 +1,7 @@
 // Integration tests for the plan-runner RUNTIME (the 913-line adapter the pure
 // plan-integrity tests never touch): /plan flow + plan-mode block, plan_write
 // persistence + gates against a REAL shell, escalation, integrity reattach,
-// abort observability, plus the micro-gate extension end-to-end (whose exec
-// field-name bug pure tests could not see).
+// abort observability, and model-visible planning policy.
 import assert from "node:assert/strict";
 import test from "node:test";
 import { mkdtempSync, readFileSync, writeFileSync, mkdirSync, existsSync, readdirSync, rmSync } from "node:fs";
@@ -13,11 +12,9 @@ import { consumePlanGateReceipt } from "../lib/plan-gate-receipt.ts";
 
 // module-load envs BEFORE importing the extensions
 process.env.PLAN_GATE_MAX = "2";
-process.env.MICRO_GATE = "on";
 const planRunnerModule = await import("../extensions/plan-runner.ts");
 const planRunner = planRunnerModule.default;
 const policyBlock = planRunnerModule.policyBlock;
-const microGate = (await import("../extensions/micro-gate.ts")).default;
 
 const tmp = () => mkdtempSync(join(tmpdir(), "pi-int-"));
 
@@ -122,55 +119,6 @@ test("integration: plan_write persists items; /plan-go disarms the block and pro
 	assert.equal(state.phase, "executing");
 	const edit = await fire(fp, "tool_call", { toolName: "edit", input: {} });
 	assert.equal(edit, undefined, "mutation block disarmed after /plan-go");
-});
-
-test("integration: PLAN_SUBAGENT_ONLY blocks direct edits AND mutating bash during execution, points at subagent only when it's actually available", async () => {
-	process.env.PLAN_SUBAGENT_ONLY = "1";
-	try {
-		const fp = makeFakePi();
-		const mod = await import(`../extensions/plan-runner.ts?so=${Date.now()}-${Math.random()}`);
-		mod.default(fp.pi);
-		const cwd = tmp();
-		const { ctx } = makeCtx(cwd);
-		await fp.commands.get("plan").handler("add a widget", ctx);
-
-		// still planning: the ordinary plan-mode block fires first, subagent-only
-		// branch is never reached.
-		const duringPlan = await fire(fp, "tool_call", { toolName: "edit", input: {} }, ctx);
-		assert.equal(duringPlan?.block, true, "plan-mode block still fires while planning");
-		assert.ok(duringPlan.reason.includes("plan_mode_violation"));
-
-		await callTool(fp, "plan_write", {
-			items: [{ title: "step one", status: "pending" }],
-			request: "add a widget", summary: "one step",
-		}, cwd);
-		await fp.commands.get("plan-go").handler("", ctx);
-
-		// fake harness defaults getActiveTools() to [] — subagent not available here.
-		const editNoSubagent = await fire(fp, "tool_call", { toolName: "edit", input: {} }, ctx);
-		assert.equal(editNoSubagent?.block, true, "direct edit blocked during execution under PLAN_SUBAGENT_ONLY");
-		assert.ok(editNoSubagent.reason.includes("PLAN_SUBAGENT_ONLY"));
-		assert.ok(!editNoSubagent.reason.includes("subagent(executor"),
-			"must not tell the model to use a tool that isn't actually available");
-		assert.ok(editNoSubagent.reason.includes("no subagent tool is available"));
-
-		const bashMut = await fire(fp, "tool_call", { toolName: "bash", input: { command: "sed -i s/a/b/ file" } }, ctx);
-		assert.equal(bashMut?.block, true, "mutating bash blocked too, not just edit/write/multiedit");
-
-		const bashReadonly = await fire(fp, "tool_call", { toolName: "bash", input: { command: "cat file" } }, ctx);
-		assert.equal(bashReadonly, undefined, "read-only bash stays allowed");
-
-		const read = await fire(fp, "tool_call", { toolName: "read", input: { path: "x" } }, ctx);
-		assert.equal(read, undefined, "read-only tool calls stay allowed");
-
-		// now with subagent genuinely available: the reason should point at it.
-		fp.pi.getActiveTools = () => ["subagent"];
-		const editWithSubagent = await fire(fp, "tool_call", { toolName: "edit", input: {} }, ctx);
-		assert.equal(editWithSubagent?.block, true);
-		assert.ok(editWithSubagent.reason.includes("subagent(executor"));
-	} finally {
-		delete process.env.PLAN_SUBAGENT_ONLY;
-	}
 });
 
 test("integration: gate runs a REAL shell command — green keeps done, red reverts then blocks at GATE_MAX", async () => {
@@ -301,40 +249,6 @@ test("integration: agent_end with open items writes the abort-observability trac
 	await fire(fp, "agent_end", {}, ctx);
 	const trace = readFileSync(join(cwd, ".pi", "traces", "plan-runner.jsonl"), "utf8");
 	assert.ok(trace.includes("ended_without_completion"), "open-items end is observable in the trace");
-});
-
-test("integration: micro-gate steers immediately on a REAL broken edit (would catch delivery/API-shape bugs)", async () => {
-	const fp = makeFakePi();
-	microGate(fp.pi as any);
-	const cwd = tmp();
-	writeFileSync(join(cwd, "broken.js"), "function f( {\n"); // node --check fails
-	await fire(fp, "turn_end", {
-		message: { role: "assistant", content: [
-			{ type: "toolCall", name: "edit", arguments: { input: "[broken.js#A1B2]\n@@\n-x\n+y" } },
-		] },
-	}, { cwd });
-	assert.equal(fp.sent.length, 1, "micro-gate must FIRE on a file that fails node --check");
-	assert.ok(fp.sent[0].includes("[micro-gate]") && fp.sent[0].includes("broken.js"), fp.sent[0]);
-	assert.equal(fp.deliveries[0].deliverAs, "steer", "parse failure must reach the next model call, not wait as a follow-up");
-
-	// clean edit -> silent
-	writeFileSync(join(cwd, "fine.js"), "export const x = 1;\n");
-	await fire(fp, "turn_end", {
-		message: { role: "assistant", content: [
-			{ type: "toolCall", name: "edit", arguments: { input: "[fine.js#B2C3]\n@@\n-a\n+b" } },
-		] },
-	}, { cwd });
-	assert.equal(fp.sent.length, 1, "no steer for a parsing file");
-
-	// Python syntax checking must be side-effect free (py_compile created
-	// __pycache__ in the candidate worktree).
-	writeFileSync(join(cwd, "fine.py"), "x = 1\n");
-	await fire(fp, "turn_end", {
-		message: { role: "assistant", content: [
-			{ type: "toolCall", name: "write", arguments: { path: "fine.py", content: "x = 1\n" } },
-		] },
-	}, { cwd });
-	assert.equal(existsSync(join(cwd, "__pycache__")), false, "ast.parse must not create bytecode residue");
 });
 
 test("integration: a needs-input block VOICES the question (tool result) + agent_end backstop notify", async () => {
@@ -690,36 +604,23 @@ test("c34 default-on: unset uses need-sized wording; =off restores the legacy 5-
 
 test("c36: SPAWN_DELEGATION=on preserves spawn guidance where delegation details are required", async () => {
 	process.env.SPAWN_DELEGATION = "on";
-	process.env.PLAN_SUBAGENT_ONLY = "1";
 	process.env.PLAN_GATE_MAX = "4";
 	try {
 		const fp = makeFakePi();
 		const mod = await import(`../extensions/plan-runner.ts?c36=${Date.now()}-${Math.random()}`);
 		mod.default(fp.pi as any);
 
-		// delegation block (both the c25 wording and the advisory wording route
-		// through the same consts; assert via the exported policyBlock)
+		// Ordinary additive delegation remains advisory and names only active tools.
 		const policy = mod.policyBlock("lean", true);
 		assert.ok(policy.includes("subagent(executor, …, mode=spawn)"), policy);
 		assert.ok(policy.includes("SELF-CONTAINED"), policy);
 		assert.ok(!policy.includes("mode=fork"), policy);
 
 		const cwd = tmp();
-		const { ctx } = makeCtx(cwd);
-		await fp.commands.get("plan").handler("add a widget", ctx);
+		fp.pi.getActiveTools = () => ["subagent"];
 		await callTool(fp, "plan_write", {
 			items: [{ title: "step one", status: "pending" }], request: "add a widget", summary: "one",
 		}, cwd);
-		await fp.commands.get("plan-go").handler("", ctx);
-		fp.pi.getActiveTools = () => ["subagent"];
-
-		// c25 block reason carries spawn wording under the flag
-		const edit = await fire(fp, "tool_call", { toolName: "edit", input: {} }, ctx);
-		assert.equal(edit?.block, true);
-		assert.ok(edit.reason.includes("mode=spawn"), edit.reason);
-		assert.ok(edit.reason.includes("self-contained"), edit.reason);
-		assert.ok(!edit.reason.includes("mode=fork"), edit.reason);
-
 		// The simplified gate ladder names only the active capability and required
 		// strategy change; it does not prescribe a subagent transport mode.
 		writeFileSync(join(cwd, "bad.sh"), "if [ ; then fi\n"); // bash -n fails
@@ -732,8 +633,8 @@ test("c36: SPAWN_DELEGATION=on preserves spawn guidance where delegation details
 		assert.ok(!r2.content[0].text.includes("mode=spawn"), r2.content[0].text);
 		assert.ok(!r2.content[0].text.includes("mode=fork"), r2.content[0].text);
 	} finally {
+		delete (globalThis as Record<string, unknown>).__pi_plan_phase_active;
 		delete process.env.SPAWN_DELEGATION;
-		delete process.env.PLAN_SUBAGENT_ONLY;
 		process.env.PLAN_GATE_MAX = "2";
 	}
 });
@@ -1066,38 +967,6 @@ test("c39: the user's /plan-go transitions phase to executing and disarms isPlan
 		delete process.env.PLAN_TOOL_GO;
 		if (priorFile === undefined) delete process.env.TELEMETRY_FILE; else process.env.TELEMETRY_FILE = priorFile;
 		if (priorSource === undefined) delete process.env.TELEMETRY_SOURCE; else process.env.TELEMETRY_SOURCE = priorSource;
-	}
-});
-
-test("c39 + c25: plan_go unlocks PLAN_SUBAGENT_ONLY's block on a direct edit — pure tool-only session, no slash commands", async () => {
-	process.env.PLAN_TOOL_GO = "on";
-	process.env.PLAN_SUBAGENT_ONLY = "1";
-	try {
-		const fp = makeFakePi();
-		const mod = await import(`../extensions/plan-runner.ts?c39c25=${Date.now()}-${Math.random()}`);
-		mod.default(fp.pi as any);
-		const cwd = tmp();
-		const { ctx } = makeCtx(cwd);
-
-		// deliberately never calling /plan or /plan-go -- mirrors a real real_gate.sh
-		// `pi -p` session, which never dispatches a slash command at all. This is
-		// also the case that proves the 2026-08-11 review guard cannot touch a gate
-		// round: with no /plan, isPlanning() is false and plan_go activates freely.
-		delete (globalThis as Record<string, unknown>).__pi_plan_phase_active;
-		await callTool(fp, "plan_write", {
-			items: [{ title: "step one", status: "pending" }], request: "r", summary: "s",
-		}, cwd);
-		const go = await callTool(fp, "plan_go", {}, cwd);
-		// pi sets isError:false on every successful tool result — `undefined` was
-		// only ever true of the old double echoing the raw return value.
-		assert.equal(go.isError, false, go.content?.[0]?.text);
-
-		const edit = await fire(fp, "tool_call", { toolName: "edit", input: {} }, ctx);
-		assert.equal(edit?.block, true, "PLAN_SUBAGENT_ONLY must now block a direct edit -- purely via tool calls, no slash command ever dispatched");
-		assert.ok(edit.reason.includes("PLAN_SUBAGENT_ONLY"), edit.reason);
-	} finally {
-		delete process.env.PLAN_TOOL_GO;
-		delete process.env.PLAN_SUBAGENT_ONLY;
 	}
 });
 

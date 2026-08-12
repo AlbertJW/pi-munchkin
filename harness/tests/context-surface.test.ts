@@ -20,11 +20,10 @@ const baseMessages = () => [
 	{ role: "toolResult", toolCallId: "bad", toolName: "bash", content: [{ type: "text", text: "raw exception payload" }], isError: true, timestamp: 7 },
 ];
 
-test("context surface mode defaults summary and gate/nudge force full", () => {
+test("context surface mode defaults summary and gate sessions force full", () => {
 	assert.equal(contextSurfaceMode({}), "summary");
 	assert.equal(contextSurfaceMode({ CONTEXT_SURFACE_MODE: "off" }), "off");
 	assert.equal(contextSurfaceMode({ TELEMETRY_SOURCE: "gate", CONTEXT_SURFACE_MODE: "off" }), "full");
-	assert.equal(contextSurfaceMode({ CTX_REDUNDANCY_NUDGE: "on", CONTEXT_SURFACE_MODE: "summary" }), "full");
 });
 
 test("context receipt is deterministic for Unicode, images, custom messages, tool errors, and mutation boundaries", () => {
@@ -112,12 +111,11 @@ test("summary and off modes never call the expensive receipt builder", async () 
 	const file = join(dir, "events.jsonl");
 	const previous = {
 		mode: process.env.CONTEXT_SURFACE_MODE, source: process.env.TELEMETRY_SOURCE,
-		file: process.env.TELEMETRY_FILE, nudge: process.env.CTX_REDUNDANCY_NUDGE,
+		file: process.env.TELEMETRY_FILE,
 	};
 	try {
 		process.env.TELEMETRY_SOURCE = "test";
 		process.env.TELEMETRY_FILE = file;
-		delete process.env.CTX_REDUNDANCY_NUDGE;
 		process.env.CONTEXT_SURFACE_MODE = "summary";
 		const fp = makeFakePi();
 		const mod = await import(`../extensions/context-surface.ts?summary=${Date.now()}-${Math.random()}`);
@@ -136,7 +134,7 @@ test("summary and off modes never call the expensive receipt builder", async () 
 		await fire(off, "context", { messages: baseMessages() }, { getContextUsage: () => ({ tokens: 90, contextWindow: 100, percent: 90 }) });
 	} finally {
 		for (const [key, value] of Object.entries(previous)) {
-			const envKey = key === "mode" ? "CONTEXT_SURFACE_MODE" : key === "source" ? "TELEMETRY_SOURCE" : key === "file" ? "TELEMETRY_FILE" : "CTX_REDUNDANCY_NUDGE";
+			const envKey = key === "mode" ? "CONTEXT_SURFACE_MODE" : key === "source" ? "TELEMETRY_SOURCE" : "TELEMETRY_FILE";
 			if (value === undefined) delete process.env[envKey]; else process.env[envKey] = value;
 		}
 		rmSync(dir, { recursive: true, force: true });

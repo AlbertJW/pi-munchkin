@@ -387,9 +387,9 @@ const OUTCOMES = new Set(["active", "complete", "blocked", "paused", "unverified
 const VERIFICATIONS = new Set(["project_gate", "generic", "none"]);
 const FAILURE_CLASSES = new Set(["schema_validation", "policy_rejection", "permission", "not_found", "command_missing", "timeout", "provider", "verification_assertion", "compile_or_lint", "edit_conflict", "unknown"]);
 const PROVENANCE = new Set(["user", "filesystem", "gate", "delegated_unverified", "web_parent_verified"]);
-const CONTROL_KINDS = new Set(["safety_consequence", "safe_abort", "verification_required", "failure_recovery", "plan_resolution", "tool_rescue", "context_hint"]);
-const CONTROL_REASONS = new Set(["policy_rejection", "compile_or_lint", "code_quality", "loop_hard_stop", "semantic_tier", "outcome_repeat", "session_repeat", "exact_gate_missing", "loop_strategy_change", "plan_blocked", "pseudo_tool_call", "research_unverified", "state_lens"]);
-const CONTROL_SOURCES = new Set(["loop-breaker", "verify-gate", "tool-call-rescue", "session-blackboard", "plan-runner", "ketch", "context-dedup", "micro-gate"]);
+const CONTROL_KINDS = new Set(["safe_abort", "verification_required", "failure_recovery", "plan_resolution", "tool_rescue", "context_hint"]);
+const CONTROL_REASONS = new Set(["policy_rejection", "compile_or_lint", "loop_hard_stop", "semantic_tier", "outcome_repeat", "session_repeat", "exact_gate_missing", "loop_strategy_change", "plan_blocked", "pseudo_tool_call", "research_unverified", "state_lens"]);
+const CONTROL_SOURCES = new Set(["loop-breaker", "verify-gate", "tool-call-rescue", "session-blackboard", "plan-runner", "ketch"]);
 const CONTROL_MODES = new Set(["shadow", "enforce", "off"]);
 
 export function maxRunStateSequence(state: RunStateV1): number {

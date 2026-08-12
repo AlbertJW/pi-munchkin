@@ -540,7 +540,7 @@ def selftest():
     assert missing is None and "missing candidate prompt body" in bad["rejection_reasons"]
     message, bad = candidate_manifest("g", "tune-message", "UNCHANGED", {"messages":{"PI_MSG_LB_T2":"x"}}, provenance)
     assert message and not bad and message["target_surface"] == "message"
-    none, bad = candidate_manifest("g", "tune-threshold", "UNCHANGED", {"format":"xml", "scaffold":"cot"}, provenance)
+    none, bad = candidate_manifest("g", "tune-threshold", "UNCHANGED", {"format":"xml", "scaffold":"decompose"}, provenance)
     assert none is None and "exactly one leaf" in " ".join(bad["rejection_reasons"])
     # file writing round-trips to a temp dir (no real proposals/ touched)
     import tempfile, shutil

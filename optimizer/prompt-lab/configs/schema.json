@@ -27,11 +27,9 @@
       "tiered": true,
       "values": [
         "none",
-        "cot",
-        "decompose",
-        "pause"
+        "decompose"
       ],
-      "_note": "Reasoning scaffold appended to the system prompt. Strongly capability-tiered (small models gain most; CoT barely emerges <100B)."
+      "_note": "Reasoning scaffold appended to the system prompt. Generic CoT and pause primers were retired in 2026-08; only explicit task decomposition remains active."
     },
     "optillm": {
       "kind": "inference",
@@ -100,27 +98,13 @@
           "on",
           "off"
         ],
-        "RETRY_FRESH": [
-          "on",
-          "off"
-        ],
-        "RETRY_MODE": [
-          "fresh",
-          "locality"
-        ],
-        "MICRO_GATE": [
-          "on",
-          "off"
-        ],
         "TRAJECTORY": [
           "on",
           "off"
         ],
         "STATE_LENS": [
           "off",
-          "view",
-          "steer",
-          "both"
+          "steer"
         ],
         "STATE_LENS_MAX_CHARS": [
           600,
@@ -131,28 +115,11 @@
           "on",
           "off"
         ],
-        "PLAN_SUBAGENT_ONLY": [
-          "1",
-          "0"
-        ],
         "READ_DEDUP": [
           "on",
           "off"
         ],
-        "CTX_REDUNDANCY_NUDGE": [
-          "on",
-          "off"
-        ],
-        "CTX_REDUNDANCY_PCT": [
-          30,
-          50,
-          70
-        ],
         "TEACH_HINTS": [
-          "on",
-          "off"
-        ],
-        "MICRO_GATE_SLOP": [
           "on",
           "off"
         ],

@@ -6,7 +6,6 @@ export const CONTROL_DECISION_CHANNEL = "pi-munchkin/control-decision/v1";
 
 export type ControlArbiterMode = "shadow" | "enforce" | "off";
 export type ControlKind =
-	| "safety_consequence"
 	| "safe_abort"
 	| "verification_required"
 	| "failure_recovery"
@@ -16,7 +15,6 @@ export type ControlKind =
 export type ControlReason =
 	| "policy_rejection"
 	| "compile_or_lint"
-	| "code_quality"
 	| "loop_hard_stop"
 	| "semantic_tier"
 	| "outcome_repeat"
@@ -33,9 +31,7 @@ export type ControlSource =
 	| "tool-call-rescue"
 	| "session-blackboard"
 	| "plan-runner"
-	| "ketch"
-	| "context-dedup"
-	| "micro-gate";
+	| "ketch";
 export type ControlEffect = "message" | "abort" | "shutdown";
 export type MessageFactoryId =
 	| "loop-semantic"
@@ -46,10 +42,7 @@ export type MessageFactoryId =
 	| "tool-rescue"
 	| "state-lens"
 	| "plan-hold"
-	| "research-wrap"
-	| "context-nudge"
-	| "micro-gate-parse"
-	| "micro-gate-slop";
+	| "research-wrap";
 
 export interface ControlProposalV1 {
 	v: 1;
@@ -90,22 +83,21 @@ const PRIORITY: Record<ControlKind, number> = {
 	safe_abort: 700,
 	failure_recovery: 600,
 	verification_required: 500,
-	safety_consequence: 500,
 	plan_resolution: 300,
 	tool_rescue: 200,
 	context_hint: 100,
 };
 const KINDS = new Set(Object.keys(PRIORITY));
 const REASONS = new Set<ControlReason>([
-	"policy_rejection", "compile_or_lint", "code_quality", "loop_hard_stop", "semantic_tier", "outcome_repeat", "session_repeat",
+	"policy_rejection", "compile_or_lint", "loop_hard_stop", "semantic_tier", "outcome_repeat", "session_repeat",
 	"exact_gate_missing", "loop_strategy_change", "plan_blocked", "pseudo_tool_call", "research_unverified", "state_lens",
 ]);
 const SOURCES = new Set<ControlSource>([
-	"loop-breaker", "verify-gate", "tool-call-rescue", "session-blackboard", "plan-runner", "ketch", "context-dedup", "micro-gate",
+	"loop-breaker", "verify-gate", "tool-call-rescue", "session-blackboard", "plan-runner", "ketch",
 ]);
 const FACTORIES = new Set<MessageFactoryId>([
 	"loop-semantic", "loop-outcome", "loop-session", "loop-tier", "verify-wrap", "tool-rescue",
-	"state-lens", "plan-hold", "research-wrap", "context-nudge", "micro-gate-parse", "micro-gate-slop",
+	"state-lens", "plan-hold", "research-wrap",
 ]);
 const EFFECTS = new Set<ControlEffect>(["message", "abort", "shutdown"]);
 const HASH = /^[a-f0-9]{64}$/;

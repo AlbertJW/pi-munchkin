@@ -38,7 +38,6 @@ export const EVENT_CATALOG = {
 	"plan-runner/integrity": { reattached: "number", preserved: "number", yielded: "number" },
 	"plan-runner/thrash-warn": { streak: "number" },
 	"plan-runner/resume-found": { open: "number", in_progress: "number" },
-	"plan-runner/subagent-only-block": { toolName: "string" },
 	"plan-runner/force-plan-write-block": { toolName: "string" },
 	// Fired instead of the block on gemma-family models (measured 0/9 collapse
 	// with fabricated completions — the standing "never arm on that family"
@@ -133,10 +132,6 @@ export const EVENT_CATALOG = {
 	"drift-scanner/review-null": { stopReason: "string", textLen: "number" },
 	"drift-scanner/advisory": { chars: "number" },
 	"drift-scanner/review-error": failure,
-	"micro-gate/skipped": { reason: "string", file: "string", files: "number", checked: "number" },
-	"micro-gate/checker-error": { file: "string", ...failure },
-	"micro-gate/passed": { files: "number", checked: "number" },
-	"micro-gate/fired": { files: "number", injected_chars: "number" },
 	"reflect/review-error": failure,
 	"reflect/review": { round: "number", clean: "boolean", chars: "number" },
 	"span-tools/search": { total: "number", shown: "number" },
@@ -153,7 +148,6 @@ export const EVENT_CATALOG = {
 	"blackboard/rendered": { chars: "number", attempts: "number" },
 	"blackboard/restored": { attempts: "number" },
 	"blackboard/restore-rejected": { attempts: "number" },
-	"state-lens/view-injected": { chars: "number", turnIndex: "number" },
 	"state-lens/steer-injected": { chars: "number", turnIndex: "number" },
 	"tool-activation/deferred": { tool: "string", reason: "string" },
 	"tool-activation/activated": { tool: "string", reason: "string" },
@@ -179,13 +173,9 @@ export const EVENT_CATALOG = {
 	"research/run-summary": { searches: "number", reads: "number", notes: "number", notes_rejected: "number", cache_hits: "number" },
 	// Fired once when an answer wraps up after web reads with zero recorded notes.
 	"research/wrap-steer": { reads: "number", notes: "number", injected_chars: "number" },
-	"micro-gate/slop-fired": { files: "number", findings: "number", injected_chars: "number" },
-	"micro-gate/slop-passed": { files: "number", checked: "number" },
-	"micro-gate/slop-checker-error": { file: "string", ...failure },
 	"context-brief/injected": { brief_bytes: "number", entries: "number", truncated: "boolean" },
 	"bash-output-guard/withheld": { chars: "number", max_chars: "number", cwd_escape_suspected: "boolean" },
 	"context-dedup/dedup": { replaced: "number", saved_bytes: "number" },
-	"context-dedup/nudge": { share_pct: "number", injected_chars: "number", turnIndex: "number" },
 	"context-surface/receipt": {
 		surface_sha256: "string", system_prompt_sha256: "string", system_prompt_bytes: "number",
 		message_count: "number", user_messages: "number", assistant_messages: "number", tool_messages: "number", custom_messages: "number",

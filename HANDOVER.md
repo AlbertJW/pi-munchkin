@@ -227,9 +227,9 @@ across a live-mirror rollout. Record the loaded `HARNESS_SURFACE_SHA256` with ev
   multi-item execution, second plan-gate failure, or loop tier two. Compact activates at 60%.
   `ambient` is the rollback.
 - `CONTEXT_SURFACE_MODE=summary`: no transcript hashing or duplicate analysis on the default path.
-  `full` restores receipts; `off` disables. Gate sessions and `CTX_REDUNDANCY_NUDGE=on` force full.
-- `STATE_LENS=steer`: only loop-breaker events inject state, under cooldown. `view` and `both` are
-  experiments; `off` is the kill switch.
+  `full` restores receipts; `off` disables. Gate sessions force full.
+- `STATE_LENS=steer`: only loop-breaker events inject state, under cooldown. `off` is the kill
+  switch; the per-call `view|both` modes are retired in the PR 4 draft.
 - Teach hints and did-you-mean remain default-on, reversible, and mechanism-observed. No powered
   trial has established their benefit.
 - 2026-08-07 (human-gated, judgment): nine more defaults — `FORCE_PLAN_WRITE` (with an in-code

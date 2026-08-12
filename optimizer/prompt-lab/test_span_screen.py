@@ -211,7 +211,7 @@ class SpanScreenTests(unittest.TestCase):
         self.assertEqual([[str(screen.REAL_GATE), "bigdata"]], calls)
         self.assertIn("INELIGIBLE", marker); self.assertNotIn("ADOPT", marker)
 
-    def test_reduced_env_and_declared_endpoint_win(self):
+    def test_reduced_env_and_runtime_endpoint_win(self):
         calls = []
         with tempfile.TemporaryDirectory() as temporary:
             old_results = screen.RESULTS; screen.RESULTS = Path(temporary)
@@ -224,7 +224,8 @@ class SpanScreenTests(unittest.TestCase):
                             "\n".join(json.dumps(row) for row in self.rows()) + "\n", encoding="utf-8")
                     return mock.Mock(returncode=0)
                 inherited = {"SPAN_TEST_SECRET": "hidden", "GATE_NETWORK": "open",
-                             "FLEET_ALPHA": "0.0001", "MIN_SESSION_OUTPUT": "999999"}
+                             "FLEET_ALPHA": "0.0001", "MIN_SESSION_OUTPUT": "999999",
+                             "LLAMA_URL": "https://example.invalid/v1"}
                 with mock.patch.dict(os.environ, inherited):
                     self.assertTrue(screen.execute(self.manifest, gen, False, fake_run))
             finally:
@@ -232,6 +233,7 @@ class SpanScreenTests(unittest.TestCase):
         self.assertEqual(2, len(calls))
         env = calls[0][1]["env"]
         self.assertEqual("endpoint", env["GATE_NETWORK"]); self.assertEqual("0.05", env["FLEET_ALPHA"])
+        self.assertEqual("https://example.invalid/v1", env["LLAMA_URL"])
         self.assertNotIn("SPAN_TEST_SECRET", env); self.assertNotIn("MIN_SESSION_OUTPUT", env)
         self.assertEqual("model-a", calls[1][1]["env"]["FLEET_DD"])
         self.assertNotIn("shell", calls[0][1]); self.assertNotIn("shell", calls[1][1])

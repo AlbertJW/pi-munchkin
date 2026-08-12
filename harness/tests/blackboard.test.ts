@@ -137,38 +137,12 @@ test("extension: BLACKBOARD=off registers nothing; default steer lens performs n
 
 		fp.handlers.clear();
 		process.env.STATE_LENS = "view";
-		const lens = await import(`../extensions/session-blackboard.ts?lens=${Date.now()}-${Math.random()}`);
-		lens.default(fp.pi as never);
-		assert.ok(fp.handlers.has("context"), "explicit STATE_LENS=view still registers the view hook");
+		const retiredView = await import(`../extensions/session-blackboard.ts?retired=${Date.now()}-${Math.random()}`);
+		retiredView.default(fp.pi as never);
+		assert.ok(!fp.handlers.has("context"), "retired view values fall back to event-driven steer");
 	} finally {
 		if (prevBb === undefined) delete process.env.BLACKBOARD; else process.env.BLACKBOARD = prevBb;
 		if (prevLens === undefined) delete process.env.STATE_LENS; else process.env.STATE_LENS = prevLens;
-	}
-});
-
-test("lens view hook appends a tail block only when the lens is non-empty", async () => {
-	const fp = makeFakePi();
-	const prevLens = process.env.STATE_LENS;
-	process.env.STATE_LENS = "view";
-	try {
-		const mod = await import(`../extensions/session-blackboard.ts?viewhook=${Date.now()}-${Math.random()}`);
-		mod.default(fp.pi as never);
-		const hook = fp.handlers.get("context")![0];
-		resetBoard();
-		const emptyMessages = [{ role: "user", content: [{ type: "text", text: "hi" }] }];
-		assert.equal(await hook({ messages: emptyMessages }, {}), undefined, "empty board → untouched view");
-		assert.equal(emptyMessages[0].content.length, 1);
-
-		const s = boardState();
-		s.turn = 4;
-		noteTool(s, { toolName: "bash", args: { command: "npm test" }, isError: true, errorText: "fail" });
-		const messages = [{ role: "user", content: [{ type: "text", text: "hi" }] }];
-		const out = (await hook({ messages }, {})) as { messages: typeof messages };
-		const tail = out.messages[0].content.at(-1)!;
-		assert.match(tail.text, /harness summary/);
-	} finally {
-		if (prevLens === undefined) delete process.env.STATE_LENS; else process.env.STATE_LENS = prevLens;
-		resetBoard();
 	}
 });
 

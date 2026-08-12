@@ -9,7 +9,6 @@
     "execution": {
       "GATE_NETWORK": "endpoint",
       "MODEL_CONTROL": "llama",
-      "LLAMA_URL": "http://127.0.0.1:8080",
       "INTERLEAVE": "on",
       "SANDBOX": "on",
       "SPAN_TOOLS": "off",
@@ -58,7 +57,7 @@
     {
       "id": "span-on",
       "arm": "cand",
-      "config": "static/span-screen-on.json"
+      "config": "retired/static/span-screen-on.json"
     }
   ]
 }

@@ -19,6 +19,11 @@ APPLIED = os.path.join(LAB, "configs", "applied")
 LIVE_GOV = os.path.expanduser("~/.pi/agent/APPEND_SYSTEM.md")
 DIRECT = os.environ.get("LLAMA_URL", "http://127.0.0.1:8080")
 OPTILLM = "http://127.0.0.1:8000"
+ACTIVE_ENUMS = {
+    "format": frozenset(("md", "xml", "json")),
+    "scaffold": frozenset(("none", "decompose")),
+    "optillm": frozenset(("none", "bon", "moa", "sc", "re2")),
+}
 
 def resolve_prompt_path(pv):
     """Candidate prompt files are addressed by path. real_gate.sh invokes config.py
@@ -84,11 +89,15 @@ def validate_config(config):
     unknown = set(config) - allowed
     if unknown:
         raise ValueError(f"config contains unsupported top-level key(s): {', '.join(sorted(unknown))}")
+    for key, default in (("format", "md"), ("scaffold", "none"), ("optillm", "none")):
+        value = config.get(key, default)
+        if value not in ACTIVE_ENUMS[key]:
+            raise ValueError(f"config {key} has out-of-schema value {value!r}")
     # A NAMED config claims to be a candidate, so it must express its treatment through a
     # channel that actually reaches a run. Anything else is a no-op arm that burns a round
     # measuring base against base (see the five retired 2026-07-31).
-    # Scoped to named configs on purpose: `configs/baseline.json` and `cand-cot.json` are
-    # raw arm specs with no `name`, and baseline is DELIBERATELY identical to base — that
+    # Scoped to named configs on purpose: `configs/baseline.json` is a raw arm spec with
+    # no `name`, and baseline is DELIBERATELY identical to base — that
     # is what makes it the control. (Not solved by tagging baseline.json, because its
     # sha256 is recorded as `config.sha256` on every base row; editing it would split the
     # baseline's provenance in two for no behavioural gain.)
@@ -106,11 +115,7 @@ def validate_config(config):
 
 SCAFFOLD = {
     "none": "",
-    "cot": "\n\nThink step by step before giving the final answer.",
     "decompose": "\n\nBreak the task into sub-steps, solve each, then give the final answer.",
-    # user's empirically-favored deliberation primer (stunspot collection; 4/5 in his own use).
-    # Anthropomorphic wording is deliberate — the test is Fisher, not literalism.
-    "pause": "\n\nPause. Reflect. Take a breath, sit down, and think about this step-by-step.",
 }
 
 def wrap_format(text, fmt):
@@ -223,7 +228,7 @@ def selftest():
     assert json.loads(js)["system_instructions"] == base + CWD_ANCHOR
 
     # scaffold appends; F empties the base
-    assert render_prompt({"format": "md", "scaffold": "cot"}, base_text=base).endswith("final answer.")
+    assert render_prompt({"format": "md", "scaffold": "decompose"}, base_text=base).endswith("final answer.")
     assert render_prompt({"prompt_variant": "F", "format": "md", "scaffold": "none"}, base_text=base) == CWD_ANCHOR
     try:
         config_env({"thresholds": {"BASH_ENV": "/tmp/inject"}})
@@ -237,6 +242,8 @@ def selftest():
     # optillm routes to the proxy; safe-vs-structural flags exist in the schema
     assert config_endpoint({"optillm": "bon"}) == OPTILLM
     sch = load_schema()
+    for key, active in ACTIVE_ENUMS.items():
+        assert set(sch["dimensions"][key]["values"]) == active, f"{key} validation/schema drift"
     assert sch["dimensions"]["optillm"]["safe"] is False, "optillm must be human-gated (structural)"
     assert sch["dimensions"]["format"]["safe"] is True
     assert "persona" in sch["excluded"] and "emoji_encoding" in sch["excluded"]
@@ -244,20 +251,26 @@ def selftest():
     # Watcher knobs removed 2026-07-28 with the active watcher (extension is
     # passive telemetry now); configs naming them must be rejected, not applied.
     assert "CONTEXT_WATCHER" not in thresholds and "CTX_WATCH_PCT" not in thresholds
-    # c48 state-lens knobs (2026-07-29): registered so gate configs can arm it.
-    assert thresholds["STATE_LENS"] == ["off", "view", "steer", "both"]
-    assert config_env({"thresholds": {"STATE_LENS": "view", "STATE_LENS_MAX_CHARS": 1200}}) == {
-        "STATE_LENS": "view", "STATE_LENS_MAX_CHARS": "1200"}
+    assert thresholds["STATE_LENS"] == ["off", "steer"]
+    assert config_env({"thresholds": {"STATE_LENS": "steer", "STATE_LENS_MAX_CHARS": 1200}}) == {
+        "STATE_LENS": "steer", "STATE_LENS_MAX_CHARS": "1200"}
     # c49/c50 (2026-07-30): sensor candidates for the two coverage-table gaps.
     assert thresholds["TOOL_CALL_RESCUE"] == ["on", "off"]
     assert config_env({"thresholds": {"TOOL_CALL_RESCUE": "on"}}) == {"TOOL_CALL_RESCUE": "on"}
-    for invalid in ({"CONTEXT_WATCHER": "off"}, {"CTX_WATCH_PCT": 70}, {"MICRO_GATE": "maybe"}):
+    for invalid in ({"CONTEXT_WATCHER": "off"}, {"CTX_WATCH_PCT": 70}, {"MICRO_GATE": "on"}, {"STATE_LENS": "view"}):
         try:
             config_env({"thresholds": invalid})
         except ValueError:
             pass
         else:
             raise AssertionError(f"out-of-schema threshold setting accepted: {invalid}")
+    for retired in ({"scaffold": "cot"}, {"scaffold": "pause"}):
+        try:
+            validate_config(retired)
+        except ValueError:
+            pass
+        else:
+            raise AssertionError(f"retired scaffold accepted: {retired}")
     # Every checked-in static config must survive config_env — a threshold key
     # missing from the schema means real_gate.sh exits 2 the moment that
     # candidate is applied (bit c24/c25 on 2026-07-20: DID_YOU_MEAN and
@@ -294,8 +307,8 @@ def selftest():
             raise AssertionError(f"inert named config accepted: {cfg}")
     # ...and every real channel must still pass, including the two the first version got
     # wrong: optillm (endpoint) and an unnamed control.
-    for live in ({"name": "a", "thresholds": {"MICRO_GATE": "on"}},
-                 {"name": "b", "scaffold": "cot"},
+    for live in ({"name": "a", "thresholds": {"BASH_OUTPUT_GUARD": "on"}},
+                 {"name": "b", "scaffold": "decompose"},
                  {"name": "c", "format": "xml"},
                  {"name": "d", "prompt_variant": "prompts/x.md"},
                  {"name": "e", "optillm": "moa"},
@@ -306,7 +319,7 @@ def selftest():
     # install's governor, so it broke wherever that file is absent.
     import unittest.mock as _mock
     with _mock.patch("builtins.open", side_effect=AssertionError("validate_config must not do I/O")):
-        validate_config({"name": "no-io", "thresholds": {"MICRO_GATE": "on"}})
+        validate_config({"name": "no-io", "thresholds": {"BASH_OUTPUT_GUARD": "on"}})
     print("config selftest: OK (deterministic apply; format/scaffold/F; env; endpoint; safe-flags; exclusions; static-config env keys)")
 
 def apply_to_workdir(config, workdir):

@@ -122,16 +122,6 @@ function planEvent(kind: string, runId: string, detail: Record<string, unknown> 
 // B yields an omitted open item after this many consecutive preserves (persistent
 // omission = intent; e.g. a parent the model replaced with sub-items). R1 (done) never yields.
 const PRESERVE_MAX = Math.max(2, Number.parseInt(process.env.PLAN_PRESERVE_MAX || "3", 10) || 3);
-// Candidate (dark, A/B via real_gate.sh): force every scoped edit through a fresh
-// subagent instead of leaving delegation advisory. Trades per-edit spawn overhead
-// for full process isolation of each edit — measure, don't assume, the tradeoff.
-const PLAN_SUBAGENT_ONLY = process.env.PLAN_SUBAGENT_ONLY === "1";
-// Dark candidate c37: extends c25 from edits-only to EVERYTHING — during
-// execution the main session is a thin orchestrator: every plan item is done
-// via ONE spawn-mode subagent call (explorer/executor/verifier); the main
-// window accumulates only clamped subagent results (runner-events.js caps each
-// at 12000 chars). The model decides delegation; the harness only blocks+steers
-// (c25 precedent — no engine dispatch).
 // c31 (LIVE default-on since 2026-08-07; was dark candidate): a plan-level
 // uncertainties[] field with a structural pause — a model that surfaces
 // uncertainty must be stopped from guessing past it (deterministic gate, no
@@ -733,13 +723,6 @@ const SPAWN_NOTE = SPAWN_DELEGATION ? " Task SELF-CONTAINED — the child sees O
 
 function delegationBlock(subagentAvailable: boolean): string {
 	if (!subagentAvailable) return "";
-	if (PLAN_SUBAGENT_ONLY) {
-		return `
-Every edit routes through a subagent — this is enforced, not advisory:
-- Heavy lookup (big file, wide search) → subagent(explorer, …). Don't pull big files in here.
-- Non-trivial claim or change → subagent(verifier, …); accept only on VERDICT: confirmed.
-- ANY edit, however small → ${EXECUTOR_CALL}.${SPAWN_NOTE} Direct edit/write/multiedit calls are blocked during execution.`;
-	}
 	return `
 Delegate to keep this window clean (subagent returns only a compact result):
 - Heavy lookup (big file, wide search) → subagent(explorer, …). Don't pull big files in here.
@@ -1800,35 +1783,6 @@ export default function (pi: ExtensionAPI) {
 								"failure_class=plan_mode_violation. No plan exists yet. First call plan_write with at least a one-item plan, then call plan_go to start executing, then retry this call.",
 						};
 					}
-				}
-			}
-		}
-		// PLAN_SUBAGENT_ONLY candidate: during execution (not planning), force every
-		// scoped edit through a fresh subagent instead of leaving delegation advisory
-		// — full process isolation for each scoped edit.
-		// Covers bash mutations too (sed -i, cat >, ...), not just edit/write/multiedit
-		// — a mutating bash call is exactly as much a direct edit as those tools.
-		if (PLAN_SUBAGENT_ONLY) {
-			const isMutation =
-				PLAN_MUTATION_TOOLS.has(event.toolName) ||
-				(event.toolName === "bash" && classifyBashCommand(String((event.input as Record<string, unknown> | undefined)?.command ?? "")).mutates);
-			if (isMutation) {
-				const state = await readState(ctx.cwd);
-				if (state?.phase === "executing") {
-					rememberModel(ctx);
-					planEvent("subagent-only-block", state.run_id, { toolName: event.toolName });
-					// Only point at subagent(executor, ...) when it's genuinely available —
-					// real_gate.sh's tool list must include it whenever this threshold is
-					// on, but don't assume that wiring is correct; check, don't promise.
-					const subagentAvailable = pi.getActiveTools().includes("subagent");
-					return {
-						block: true,
-						reason: subagentAvailable
-							? (SPAWN_DELEGATION
-								? "failure_class=plan_mode_violation. Direct mutation is disabled under PLAN_SUBAGENT_ONLY — use subagent(executor, ..., mode=spawn) with a self-contained task (the child sees only the task text) for this scoped edit instead."
-								: "failure_class=plan_mode_violation. Direct mutation is disabled under PLAN_SUBAGENT_ONLY — use subagent(executor, ..., mode=fork) for this scoped edit instead.")
-							: "failure_class=plan_mode_violation. Direct mutation is disabled under PLAN_SUBAGENT_ONLY, and no subagent tool is available in this session — mark the item blocked and stop rather than retry.",
-					};
 				}
 			}
 		}

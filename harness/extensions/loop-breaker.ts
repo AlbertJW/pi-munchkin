@@ -812,8 +812,8 @@ export default function (pi: ExtensionAPI) {
 	// those, so `event.turnIndex - ep.lastSteerTurn` below goes NEGATIVE — and
 	// nothing rejects it: the catalog types turns_since as a bare number and
 	// telemetry-report.sh takes its median. Drop the anchor instead, so a
-	// straddling steer emits no record rather than a nonsense delta. Same fix as
-	// context-dedup.ts:38-46 and session-blackboard.ts.
+	// straddling steer emits no record rather than a nonsense delta. The
+	// session-blackboard cooldown uses the same run-boundary rule.
 	pi.on("agent_start", async () => {
 		ep.lastSteerTurn = null;
 	});

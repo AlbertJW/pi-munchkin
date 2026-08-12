@@ -3,7 +3,7 @@ import { createHash } from "node:crypto";
 import { dirname, join } from "node:path";
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 
-// Wire-truth instrument (PAYLOAD_AUDIT=on, default off; zero model visibility).
+// RETIRED AUDIT SOURCE: wire-truth instrument (formerly PAYLOAD_AUDIT=on).
 // Records what each provider request ACTUALLY contains — pi's `before_provider_request`
 // hands us the serialized payload in-process, which a MITM proxy could not do under the
 // gate sandbox (GATE_NETWORK=endpoint allows only the loopback model endpoint).

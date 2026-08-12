@@ -4,7 +4,7 @@
  "provider": "remote-llamacpp",
  "model": "qwopus35-4b-mtp",
  "endpoint_env": "LLAMA_URL",
- "baseline": "baseline.json",
+ "baseline": "../baseline.json",
  "candidates": {
   "c2": {
    "config": "static/c2-scaffold-cot.json",

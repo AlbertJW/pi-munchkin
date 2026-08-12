@@ -5,7 +5,7 @@
 # + task checks). Emits fleet_report-compatible rows {model, pattern, task, rep, score,
 # split, out_chars} so the SAME significance/do-no-harm rule decides adoption.
 #
-#   GEN=rg0 BASE=configs/baseline.json CAND=configs/cand-cot.json N=3 ./real_gate.sh [parens equil bigdata]
+#   GEN=rg0 BASE=configs/baseline.json CAND=configs/static/c46-prompt-lean.json N=3 ./real_gate.sh [parens equil bigdata]
 #   ./real_gate.sh --dry
 #
 # MODEL_CONTROL=llama expects an already-running OpenAI-compatible server;
@@ -41,7 +41,7 @@ PI_PROVIDER="${PI_PROVIDER:-}"
 GATE_NETWORK="${GATE_NETWORK:-endpoint}"   # endpoint (authoritative loopback default) | open (exploratory)
 MODEL_CONTROL="${MODEL_CONTROL:-llama}"    # llama | pi-native
 BASE="${BASE:-$HERE/prompt-lab/configs/baseline.json}"
-CAND="${CAND:-$HERE/prompt-lab/configs/cand-cot.json}"
+CAND="${CAND:-$HERE/prompt-lab/configs/static/c46-prompt-lean.json}"
 FIXTURE="${PI_TEST_FIXTURE:-$HERE/pi-test}"; T3_FILES="$HERE/ab-symbolect/t3-files"
 FIXTURES="$HERE/real-gate-fixtures"
 CONFIG="$HERE/prompt-lab/config.py"; METRICS="$HERE/ab-machinery/metrics.py"
@@ -501,18 +501,16 @@ PY
 		echo "[real_gate] TRAJECTORY=on requires span tools (now default-on; this arm sets SPAN_TOOLS=off) for $pat/$task; refusing argument-only evidence" >&2
 		exit 2
 	fi
-	# PLAN_SUBAGENT_ONLY blocks direct tool calls and points the model at
-	# subagent(...) instead; SPAWN_DELEGATION only rewords delegation advice, but
+	# SPAWN_DELEGATION rewords delegation advice, but
 	# the advice is meaningless if there is no subagent tool to advise toward.
 	# (PLAN_DELEGATE_ALL retired 2026-08-03.) Either needs the escape hatch in the
 	# session's tool list, not just t4's, or the candidate is instructing an
 	# unavailable tool (c37's own remote-box round measured nothing useful before
 	# this was caught — every blocked call fell through to the no-subagent path).
-	local env_plan_subagent_only="" env_spawn_delegation=""
+	local env_spawn_delegation=""
 	local env_force_plan_write="" env_plan_uncertainty="" env_plan_item_guidance_v2=""
 	local env_plan_tool_go="" # c39: standalone flag, not folded into the subagent-family branch below
 	for entry in ${session_env[@]+"${session_env[@]}"}; do
-		[[ "$entry" == PLAN_SUBAGENT_ONLY=* ]] && env_plan_subagent_only="${entry#*=}"
 		[[ "$entry" == SPAWN_DELEGATION=* ]] && env_spawn_delegation="${entry#*=}"
 		[[ "$entry" == FORCE_PLAN_WRITE=* ]] && env_force_plan_write="${entry#*=}"
 		[[ "$entry" == PLAN_UNCERTAINTY=* ]] && env_plan_uncertainty="${entry#*=}"
@@ -569,10 +567,9 @@ PY
 	# retry-looping a block 76/102 times). Fails closed: a flag pointing at a tool the
 	# session doesn't actually have means the row would measure a harness that doesn't
 	# exist, exactly like c37/c38 were confounded.
-	if [[ ( "$task" == "t4" || "$env_plan_subagent_only" == "1" || \
-	        "$env_spawn_delegation" != "off" ) && \
+	if [[ ( "$task" == "t4" || "$env_spawn_delegation" != "off" ) && \
 	      ",$tools," != *",subagent,"* ]]; then
-		echo "[real_gate] task==t4/PLAN_SUBAGENT_ONLY/SPAWN_DELEGATION requires 'subagent' but --tools resolved to '$tools' for $pat/$task — refusing to measure a nonexistent harness surface" >&2
+		echo "[real_gate] task==t4/SPAWN_DELEGATION requires 'subagent' but --tools resolved to '$tools' for $pat/$task — refusing to measure a nonexistent harness surface" >&2
 		exit 2
 	fi
 	if [[ "$env_span_tools" != "off" && ( ",$tools," != *",search_spans,"* || ",$tools," != *",read_span,"* ) ]]; then
@@ -594,17 +591,6 @@ PY
 		echo "[real_gate] PLAN_TOOL_GO=on requires 'plan_go' but --tools resolved to '$tools' for $pat/$task — refusing to measure a nonexistent harness surface" >&2
 		exit 2
 	fi
-	# Candidate env the PARENT shell must see: the exports below happen inside the pi
-	# subshell only, so checking ${RETRY_FRESH} out here read the parent's env and the
-	# c18 retry never fired for candidates that enable it (audit 2026-07-13 — the f4
-	# c18 arm measured nothing). Parse the values from the validated array instead.
-	local env_retry_fresh=""
-	for entry in ${session_env[@]+"${session_env[@]}"}; do [[ "$entry" == RETRY_FRESH=* ]] && env_retry_fresh="${entry#*=}"; done
-	env_retry_fresh="${env_retry_fresh:-${RETRY_FRESH:-off}}"
-	local env_retry_mode=""
-	for entry in ${session_env[@]+"${session_env[@]}"}; do [[ "$entry" == RETRY_MODE=* ]] && env_retry_mode="${entry#*=}"; done
-	env_retry_mode="${env_retry_mode:-${RETRY_MODE:-fresh}}"
-
 	# Child tools receive a deliberately minimal environment. Frontier, cloud,
 	# SSH-agent, npm, and shell-hook secrets never enter the fully-approved Pi
 	# process. Operators may explicitly pass a provider variable by name when a
@@ -681,6 +667,7 @@ PY
 		ensure_model_loaded || { echo "[real_gate] could not load $MODEL for fingerprinting" >&2; exit 1; }
 	fi
 	python3 "$FINGERPRINT" capture --endpoint "$FINGERPRINT_ENDPOINT" --model "$MODEL" --output "$wd/fingerprint-pre.json"
+	local retried=0 # retained row field for historical schema compatibility; retry candidates are retired
 	# run pi in the background (own process group + memory watchdog) so the INT trap
 	# can kill it instantly and no model-spawned grandchild can orphan/balloon.
 	run_guarded_session "$task_prompt" ">"
@@ -708,50 +695,6 @@ PY
 		exit 1
 	fi
 
-	# c18 fresh-context retry: an outcome-loop abort means the session poisoned itself
-	# (failed-attempt residue anchoring retries — 12-factor "dumb zone"). RETRY_FRESH=on
-	# grants ONE fresh session in the SAME workdir (work done persists) with a distilled
-	# handoff instead of the raw pile. Fires only where the alternative was certain fail.
-	local retried=0
-	local abort_evidence=3
-	if [[ "$env_retry_fresh" == "on" ]]; then
-		python3 "$HERE/prompt-lab/context_telemetry.py" "fd:8" "$(basename "$wd")" --has-abort --key-stdin <<<"$telemetry_key"
-		abort_evidence=$?
-		[[ "$abort_evidence" == 0 || "$abort_evidence" == 3 ]] || {
-			echo "[real_gate] authenticated telemetry verification failed before retry decision" >&2; exit 1;
-		}
-	fi
-	if [[ "$env_retry_fresh" == "on" && "$abort_evidence" == 0 ]]; then
-		retried=1
-		local retry_prompt
-		if [[ "$env_retry_mode" == "locality" ]]; then
-			# c18b: Agentless-style constrained handoff — the fresh session gets the
-			# task + the ACTUAL failing verification output + an exact verify command
-			# and a localize -> one bounded patch -> verify protocol, instead of an
-			# open-ended second attempt. Targets the measured perm-denied/ghost
-			# failure class (gt2: re-read-then-different-approach never happens
-			# unprompted on small models).
-			local failout
-			failout="$( (cd "$wd" && run_with_timeout 60 5 node --test 2>&1 | tail -20) 2>/dev/null )"
-			echo "  $pat/$task rep$rep aborted — RETRY locality second session" >&2
-			retry_prompt="$task_prompt
-
-A previous attempt in this workdir was stopped; its partial work is present. Follow this protocol EXACTLY:
-1. LOCALIZE: from the failing output below, identify the ONE file and smallest span responsible.
-2. REPAIR: make ONE bounded edit to that span.
-3. VERIFY: run exactly \`node --test\` and read its output.
-Repeat only if verification still fails. Do not restructure anything else.
-
-Most recent failing verification output:
-$failout"
-		else
-			echo "  $pat/$task rep$rep aborted — RETRY_FRESH second session" >&2
-			retry_prompt="$task_prompt
-
-NOTE: a previous attempt in this workdir was stopped for repeating the same failing approach. The partial work is present. Inspect the current state first, then take a DIFFERENT approach to whatever kept failing."
-		fi
-		run_guarded_session "$retry_prompt" ">>"
-	fi
 	python3 "$FINGERPRINT" capture --endpoint "$FINGERPRINT_ENDPOINT" --model "$MODEL" --output "$wd/fingerprint-post.json"
 
 	# grading: restore authoritative tests so the model can't have tampered with them

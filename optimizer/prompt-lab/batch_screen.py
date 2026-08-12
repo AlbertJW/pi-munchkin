@@ -18,7 +18,7 @@ OPT = LAB.parent
 RESULTS = LAB / "results"
 REAL_GATE = OPT / "real_gate.sh"
 OVERLAY = Path(os.environ.get("REAL_GATE_RUNS", str(Path.home() / ".pi" / "real-gate-runs"))) / "batch-overlays"
-DEFAULT_MANIFEST = LAB / "configs" / "qwopus35-4b-mtp-legacy-signal.json"
+DEFAULT_MANIFEST = LAB / "configs" / "retired" / "qwopus35-4b-mtp-legacy-signal.json"
 ENDPOINT_ENV = "LLAMA_URL"
 
 
@@ -44,7 +44,7 @@ def load_manifest(path: Path) -> dict:
         raise BatchError("manifest candidate roster must be a non-empty subset of c2/c21 "
                          "(c7 retired, c24 adopted, 2026-08-03)")
     for candidate, spec in data["candidates"].items():
-        config = LAB / "configs" / spec["config"]
+        config = path.parent / spec["config"]
         if not config.is_file():
             raise BatchError(f"missing candidate config for {candidate}: {spec['config']}")
     if "endpoint" in data:
@@ -164,8 +164,8 @@ def run_gate(manifest_path: Path, manifest: dict, gen: str, *, task: str, arm: s
         print(f"resume: {gen}/{task} already complete")
         return
     overlay, model_hash = ensure_overlay(manifest)
-    cfg = LAB / "configs" / manifest["baseline"]
-    cand_cfg = LAB / "configs" / manifest["candidates"][candidate]["config"] if candidate else cfg
+    cfg = manifest_path.parent / manifest["baseline"]
+    cand_cfg = manifest_path.parent / manifest["candidates"][candidate]["config"] if candidate else cfg
     env = os.environ.copy()
     env.update({
         "GEN": gen,
@@ -305,7 +305,8 @@ def report(manifest: dict, selected: dict[str, list[str]]) -> None:
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("command", choices=["preflight", "calibrate", "screen", "report"])
-    parser.add_argument("--manifest", type=Path, default=DEFAULT_MANIFEST)
+    parser.add_argument("--manifest", type=Path, required=True,
+                        help="explicit historical manifest; the default screen roster is retired")
     args = parser.parse_args()
     manifest_path = args.manifest.resolve()
     manifest = load_manifest(manifest_path)

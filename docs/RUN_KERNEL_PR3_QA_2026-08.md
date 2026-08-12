@@ -3,6 +3,9 @@
 Scope: `codex/run-kernel-pr3-arbiter`. No live mirror, gate round, or control adoption was
 performed.
 
+> Historical QA: the later PR 4 retirement draft removes micro-gate from the loadable
+> surface. The micro-gate row below proves the older PR 3 boundary only.
+
 ## Counterfactual regressions
 
 | Restored behavior | Targeted proof | Expected distinction |

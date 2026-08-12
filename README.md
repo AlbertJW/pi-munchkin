@@ -165,8 +165,7 @@ model's own window in place with one resume handoff.
 | dynamic `subagent` triggers | multi-item structured execution, second plan-gate failure, or loop-breaker tier two | once activated it stays active; one automatic attempt means a later manual `/tools` disable is respected |
 | dynamic `compact_context` trigger | first crossing of 60% context usage | same one-attempt/manual-disable rule |
 | `CONTEXT_SURFACE_MODE` | `summary`; samples usage on first call, each eighth call, threshold crossings, and compaction without transcript hashing | `full` retains receipt calculations; `off` disables; gate sessions force `full` |
-| `CTX_REDUNDANCY_NUDGE=on` | opt-in duplicate-analysis nudge | forces `CONTEXT_SURFACE_MODE=full` because its mechanism requires duplicate analysis |
-| `STATE_LENS` | `steer`; injects only on message-bearing loop-breaker events with cooldown — never at an abort/shutdown boundary, where a steer would fight the hard stop | `off` kills it; `view` restores per-call view injection; `both` enables both paths |
+| `STATE_LENS` | `steer`; injects only on message-bearing loop-breaker events with cooldown — never at an abort/shutdown boundary, where a steer would fight the hard stop | `off` kills it; the per-call `view|both` modes are retired |
 | `STATE_LENS_MAX_CHARS` | bounds lens text | lower it to reduce model-visible state |
 | `BLACKBOARD` | `on`; bounded/redacted v2 persistence and cockpit | `off` disables cockpit and lens state |
 | `HASHLINE_MAX_READ_BYTES` | 16 MiB text preflight limit | set an explicit byte limit; `limit` still controls returned context, not file allocation |
