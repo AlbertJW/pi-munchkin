@@ -242,3 +242,43 @@ test("a plan gate emitted as a harness signal reaches canonical verification sta
 	assert.equal(state.verification.validGates, 1);
 	assert.equal(state.verification.attempts, 2);
 });
+
+test("a new objective after an UNCOMPLETED run keeps the old identity until /run-new declares the boundary", async () => {
+	// The kernel rotated identity only on `complete`, so a fresh unrelated
+	// objective typed after a paused/blocked/unverified run inherited the old
+	// run — and that run's settled/receipt rows then reported the PREVIOUS
+	// objective's counters. Auto-rotating per prompt is not the fix: it would
+	// sever the cross-turn mutation→verification link inside settle().
+	const { emitHarnessSignal } = await import("../lib/harness-signals.ts");
+	const fp = makeFakePi();
+	const controller = installRunKernel(fp.pi as never, {
+		mode: "shadow", idFactory: deterministicIds(), detectGate: async () => null, surfaceHash: () => SURFACE,
+	});
+	const { ctx } = makeCtx("/tmp/run-kernel-boundary");
+	await fire(fp, "session_start", {}, ctx);
+	await fire(fp, "before_agent_start", { prompt: "first objective", systemPrompt: "s", systemPromptOptions: {} }, ctx);
+	await fire(fp, "agent_start", {}, ctx);
+	const first = controller.getState().identity.runIdHash;
+	// A mutation with no verification: the run cannot settle as `complete`.
+	await fire(fp, "tool_execution_start", { toolCallId: "e1", toolName: "edit", args: { path: "src/a.ts" } }, ctx);
+	await fire(fp, "tool_result", { type: "tool_result", toolCallId: "e1", toolName: "edit", input: { path: "src/a.ts" }, content: [], details: {}, isError: false }, ctx);
+	await fire(fp, "tool_execution_end", { toolCallId: "e1", toolName: "edit", result: { content: [] }, isError: false }, ctx);
+	await fire(fp, "agent_end", { messages: [{ role: "assistant", content: [{ type: "text", text: "done-ish" }] }] }, ctx);
+	await fire(fp, "agent_settled", {}, ctx);
+	assert.notEqual(controller.getState().outcome.status, "complete", "an unverified mutation must not settle as complete");
+
+	// Retry/continuation semantics are PRESERVED: no explicit boundary, no rotation.
+	await fire(fp, "before_agent_start", { prompt: "keep going on that", systemPrompt: "s", systemPromptOptions: {} }, ctx);
+	assert.equal(controller.getState().identity.runIdHash, first,
+		"without an explicit boundary a follow-up prompt must stay in the same run (retries depend on this)");
+
+	// The explicit boundary rotates exactly once, on the NEXT prompt.
+	emitHarnessSignal(fp.pi.events as never, { v: 1, type: "run/abandoned", origin: "run-command" });
+	assert.equal(controller.getState().identity.runIdHash, first, "the signal alone must not rotate mid-turn");
+	await fire(fp, "before_agent_start", { prompt: "completely unrelated new objective", systemPrompt: "s", systemPromptOptions: {} }, ctx);
+	const second = controller.getState().identity.runIdHash;
+	assert.notEqual(second, first, "an abandoned run must not lend its identity to new work");
+	// ...and the latch is consumed, not sticky.
+	await fire(fp, "before_agent_start", { prompt: "follow-up on the new objective", systemPrompt: "s", systemPromptOptions: {} }, ctx);
+	assert.equal(controller.getState().identity.runIdHash, second, "one boundary rotates once");
+});

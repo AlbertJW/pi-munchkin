@@ -76,6 +76,7 @@ export const EVENT_CATALOG = {
 	"run-kernel/transition": { from_phase: "string", to_phase: "string", reason: "string", sequence: "number" },
 	"run-kernel/legacy-disagreement": { dimension: "string", kernel_value: "boolean", legacy_value: "boolean" },
 	"run-kernel/restored": { restore_source: "string", surface_changed: "boolean", sequence_floor: "number" },
+	"run-kernel/objective-abandoned": { previous_outcome: "string" },
 	"run-kernel/settled": {
 		phase: "string", outcome: "string", lifecycle: "string", receipts: "number", failures: "number",
 		active_walls: "number", mutations: "number", verification_attempts: "number", valid_gates: "number", transitions: "number",

@@ -13,6 +13,14 @@ export type HarnessSignalV1 =
 	| (SignalBase & { type: "loop/tier"; tier: 1 | 2 | 3; detector: "exact" | "outcome" | "semantic" | "session" })
 	| (SignalBase & { type: "failure/episodes"; activeWalls: number; exposedEpisodes: number; lastClass: FailureClass | null })
 	| (SignalBase & { type: "recovery/resume-requested"; origin: "run-command" })
+	// An EXPLICIT run boundary. The kernel rotates run identity only on a
+	// `complete` outcome, so a new unrelated objective after an abandoned,
+	// paused or unverified run inherits the old run's identity and its
+	// settlement rows report the previous objective's counters. Auto-rotating
+	// per prompt is NOT the fix: `before_agent_start` fires once per user
+	// prompt, so it would sever the cross-turn mutation→verification link
+	// inside settle() and manufacture false `complete` outcomes.
+	| (SignalBase & { type: "run/abandoned"; origin: "run-command" })
 	| (SignalBase & { type: "recovery/resumed"; origin: "run-command" | "loop-command"; cleared: number; blocked: number })
 	| (SignalBase & { type: "context/receipt"; contextPct: number | null; staleShare: number | null; duplicateShare: number | null })
 	| (SignalBase & { type: "context/compacted" })
@@ -55,6 +63,7 @@ export function isHarnessSignal(value: unknown): value is HarnessSignalV1 {
 					"timeout", "provider", "verification_assertion", "compile_or_lint", "edit_conflict", "unknown",
 				].includes(String(item.lastClass)));
 		case "recovery/resume-requested":
+		case "run/abandoned":
 			return exact("v", "type", "origin") && item.origin === "run-command";
 		case "recovery/resumed":
 			return exact("v", "type", "origin", "cleared", "blocked") &&

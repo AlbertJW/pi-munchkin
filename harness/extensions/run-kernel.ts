@@ -119,7 +119,16 @@ export function installRunKernel(pi: ExtensionAPI, options: RunKernelInstallOpti
 	let runIdHash = hashId(`run:${idFactory()}`);
 	let currentCycleIdHash: string | null = null;
 	let settledCycleIdHash: string | null = null;
+	// Set by an explicit /run-new; consumed by the next user prompt.
+	let abandonRequested = false;
 	const disagreementFingerprints = new Set<string>();
+
+	// ONE rotation rule, consulted from both entry points — they had two copies
+	// of the same expression, which is how they drifted out of agreement with
+	// what a "run" actually means.
+	function rotationForNewObjective(previous: { outcome: { status: string } }, abandoned: boolean): string | null {
+		return previous.outcome.status === "complete" || abandoned ? hashId(`run:${idFactory()}`) : null;
+	}
 
 	const normalizer = new ReceiptNormalizerV1({
 		surfaceHash,
@@ -219,6 +228,9 @@ export function installRunKernel(pi: ExtensionAPI, options: RunKernelInstallOpti
 			dispatch({ ...nextBase(), type: "run/context-observed", usagePct: signal.contextPct });
 		} else if (signal.type === "failure/episodes") {
 			dispatch({ ...nextBase(), type: "run/failure-state-observed", activeWalls: signal.activeWalls, exposedEpisodes: signal.exposedEpisodes, lastClass: signal.lastClass });
+		} else if (signal.type === "run/abandoned") {
+			abandonRequested = true;
+			record("run-kernel", "objective-abandoned", { previous_outcome: store.snapshot().outcome.status });
 		} else if (signal.type === "recovery/resumed") {
 			dispatch({ ...nextBase(), type: "run/recovery-resumed", cleared: signal.cleared, blocked: signal.blocked });
 		}
@@ -289,9 +301,12 @@ export function installRunKernel(pi: ExtensionAPI, options: RunKernelInstallOpti
 
 	pi.on("before_agent_start", async (event) => {
 		const previous = store.snapshot();
-		const newRunIdHash = previous.outcome.status === "complete"
-			? hashId(`run:${idFactory()}`)
-			: null;
+		// A run ends when it COMPLETES, or when the user explicitly abandons it.
+		// Without the second case a new objective typed after a paused/blocked/
+		// unverified run inherited the old identity, and that run's settlement
+		// row then reported the previous objective's mutations and receipts.
+		const newRunIdHash = rotationForNewObjective(previous, abandonRequested);
+		abandonRequested = false;
 		if (newRunIdHash) runIdHash = newRunIdHash;
 		dispatch({
 			...nextBase(),
@@ -306,9 +321,9 @@ export function installRunKernel(pi: ExtensionAPI, options: RunKernelInstallOpti
 		// across retries/compactions. Preserve RunState, but reopen receipt identity.
 		normalizer.reset();
 		const previous = store.snapshot();
-		const newRunIdHash = previous.outcome.status === "complete"
-			? hashId(`run:${idFactory()}`)
-			: null;
+		// Retries and compactions re-enter here WITHOUT a new user prompt, so the
+		// abandonment latch is deliberately not consulted: only completion rotates.
+		const newRunIdHash = rotationForNewObjective(previous, false);
 		if (newRunIdHash) runIdHash = newRunIdHash;
 		currentCycleIdHash = hashId(`cycle:${idFactory()}`);
 		settledCycleIdHash = null;

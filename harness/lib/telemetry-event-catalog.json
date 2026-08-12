@@ -75,6 +75,7 @@
     "run-kernel/legacy-disagreement",
     "run-kernel/receipt",
     "run-kernel/restored",
+    "run-kernel/objective-abandoned",
     "run-kernel/settled",
     "run-kernel/transition",
     "runtime/provider-timing",
