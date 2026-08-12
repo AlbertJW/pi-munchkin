@@ -519,3 +519,11 @@ exposed episode return before argument bounding, hashing, or episode-array alloc
 observational changes only: the 2/4/6 semantic tiers, exact-call walls, 7/11/28 cumulative tiers,
 and highest-tier collision rule are unchanged. Do not pool either metric across harness surface
 hashes, and do not reinterpret the correlated diagnostic as the preregistered primary outcome.
+
+The ephemeral failure snapshot is v3. Verification/compiler recovery is scoped explicitly. When
+an exact project gate is known (or gate discovery is unavailable), only verified exact-gate
+evidence after the latest mutation closes the episode. When discovery positively reports that no
+project gate exists, only the same normalized verifier may close it. Non-Bash assertion episodes,
+including `research_note`, retain same-target recovery. This prevents a convenient generic suite
+from shortening an exact-gate failure window. Session settlement, compaction reset, tracker reset,
+and `/loop-resume` close the exposed window without pretending that verification recovered.

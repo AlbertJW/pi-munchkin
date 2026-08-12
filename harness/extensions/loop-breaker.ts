@@ -18,6 +18,8 @@ import { renderRecoveryBrief } from "../lib/recovery-brief.ts";
 import { onRunStateSnapshot } from "../lib/run-kernel-snapshot.ts";
 import { runCapsuleMode } from "../lib/run-capsule-store.ts";
 import type { RunStateV1 } from "../lib/run-kernel-types.ts";
+import { readDetectedProjectGate } from "../lib/project-gate.ts";
+import { selectHighestLoopAction, type LoopActionCandidate } from "../lib/loop-action.ts";
 import {
 	buildControlProposal, controlEnforces, emitControlProposal,
 	type ControlEffect, type ControlReason, type MessageFactoryId,
@@ -80,9 +82,24 @@ const HARD_STOP_MODE = resolveStopMode(process.env.LB_HARD_STOP);
 const EPISODE_MODE = process.env.LOOP_EPISODE_MODE === "off" ? "off" :
 	process.env.LOOP_EPISODE_MODE === "enforce" ? "enforce" : "shadow";
 
-// Tools that count as progress (reset the loop episode). Everything else
-// (read, bash, grep, find, ls, ...) is non-progress.
-const PROGRESS_TOOLS = new Set(["edit", "write"]);
+// Candidate progress tools reset exact repetition only after their matching
+// execution-end event settles successfully. Missing/failed ends stay non-progress.
+const PROGRESS_TOOLS = new Set(["edit", "write", "multiedit", "plan_write", "plan_update"]);
+
+type ProgressExecution = { toolName: string; candidate: boolean; settled: boolean; succeeded: boolean };
+
+function progressCandidate(toolName: string, args: Record<string, unknown>): boolean {
+	return PROGRESS_TOOLS.has(toolName) ||
+		(toolName === "bash" && isBashMutation(String(args.command ?? "")));
+}
+
+function trimMap<T>(map: Map<string, T>, max: number): void {
+	while (map.size > max) {
+		const oldest = map.keys().next().value as string | undefined;
+		if (oldest === undefined) break;
+		map.delete(oldest);
+	}
+}
 
 function normText(s: string): string {
 	return s.trim().replace(/\s+/g, " ").toLowerCase();
@@ -337,6 +354,7 @@ export default function (pi: ExtensionAPI) {
 	// arm (U3b) — does the harness's steering actually buy anything?
 	if (process.env.LOOP_BREAKER === "off") return;
 	const executionEnds = new Map<string, { toolName: string; isError: boolean; text: string }>();
+	const progressExecutions = new Map<string, ProgressExecution>();
 	const episodeTracker = new FailureEpisodeTracker();
 	const episodeCalls = new Map<string, { args: Record<string, unknown>; planItemId: string | null }>();
 	const episodeProcessed = new Set<string>();
@@ -352,8 +370,10 @@ export default function (pi: ExtensionAPI) {
 		exactRepeatedFps: string[];
 		count: number;
 	};
+	type RuntimeLoopAction = LoopActionCandidate & { apply(): Promise<LoopTier> | LoopTier };
 	let pendingAction: PendingAction | null = null;
 	let recoveryState: RunStateV1 | null = null;
+	let sessionCwd = "";
 
 	onRunStateSnapshot(pi.events, (event) => { recoveryState = event.state; });
 
@@ -488,6 +508,10 @@ export default function (pi: ExtensionAPI) {
 		episodeProcessed.add(callId);
 		const observation: FailureObservation = {
 			toolName, args, isError, text: text.slice(0, 2048), planItemId,
+			projectGate: (() => {
+				const detected = sessionCwd ? readDetectedProjectGate(sessionCwd) : { found: false as const };
+				return detected.found ? detected.command : undefined;
+			})(),
 		};
 		if (!isFailureObservation(observation)) {
 			// A DEGRADED research_note result is verification giving up, not
@@ -530,14 +554,12 @@ export default function (pi: ExtensionAPI) {
 		publishEpisodes();
 	}
 
-	async function applyPendingAction(ctx: {
+	async function applyEpisodeAction(action: PendingAction, ctx: {
 		cwd: string;
 		abort(): void;
 		ui: { notify(message: string, level?: "info" | "warning" | "error"): void };
 	}, turnIndex: number): Promise<LoopTier> {
-		const action = pendingAction;
-		pendingAction = null;
-		if (!action || EPISODE_MODE !== "enforce") return 0;
+		if (EPISODE_MODE !== "enforce") return 0;
 		const failureClass = action.episode?.failureClass ?? "unknown";
 		let message = "";
 		if (action.tier === 1) {
@@ -609,7 +631,8 @@ export default function (pi: ExtensionAPI) {
 		recordRecovery(episodeTracker.observeSuccess({ toolName: "provider", args: {} }, kind));
 	}
 
-	pi.on("session_start", async () => {
+	pi.on("session_start", async (_event, ctx) => {
+		sessionCwd = ctx?.cwd ?? "";
 		recoveryState = null;
 		resetEpisode();
 		resetOutcomes();
@@ -630,6 +653,7 @@ export default function (pi: ExtensionAPI) {
 		sessionRepeatFired = false;
 		delete (globalThis as Record<string, unknown>).__pi_lb_state;
 		executionEnds.clear();
+		progressExecutions.clear();
 		episodeTracker.reset();
 		episodeCalls.clear();
 		episodeProcessed.clear();
@@ -683,9 +707,17 @@ export default function (pi: ExtensionAPI) {
 	});
 
 	pi.on("tool_execution_start", async (event) => {
+		const args = (event.args ?? {}) as Record<string, unknown>;
+		progressExecutions.set(event.toolCallId, {
+			toolName: event.toolName,
+			candidate: progressCandidate(event.toolName, args),
+			settled: false,
+			succeeded: false,
+		});
+		trimMap(progressExecutions, 512);
 		if (EPISODE_MODE === "off") return;
 		const call = {
-			args: (event.args ?? {}) as Record<string, unknown>,
+			args,
 			planItemId: activePlanItemId(),
 		};
 		episodeCalls.set(event.toolCallId, call);
@@ -700,6 +732,12 @@ export default function (pi: ExtensionAPI) {
 	pi.on("tool_execution_end", async (event) => {
 		const text = boundedResultText(event.result);
 		executionEnds.set(event.toolCallId, { toolName: event.toolName, isError: event.isError === true, text });
+		trimMap(executionEnds, 512);
+		const progress = progressExecutions.get(event.toolCallId);
+		if (progress?.toolName === event.toolName) {
+			progress.settled = true;
+			progress.succeeded = event.isError !== true;
+		}
 		const call = episodeCalls.get(event.toolCallId) ?? { args: {}, planItemId: activePlanItemId() };
 		episodeCalls.delete(event.toolCallId);
 		processEpisodeResult(event.toolCallId, event.toolName, call.args, call.planItemId, event.isError === true, text);
@@ -766,6 +804,8 @@ export default function (pi: ExtensionAPI) {
 		publishEpisodes();
 		episodeCalls.clear();
 		episodeProcessed.clear();
+		executionEnds.clear();
+		progressExecutions.clear();
 	});
 
 	// turnIndex is NOT monotonic across a session: agent-session.js's `_turnIndex = 0`
@@ -788,14 +828,32 @@ export default function (pi: ExtensionAPI) {
 	pi.on("session_compact", async () => {
 		record("loop-breaker", "compact-reset", { streak: ep.streak, blocked: ep.blocked.size });
 		resetEpisode();
+		for (const episode of episodeTracker.settle()) {
+			episodeTierFired.delete(episode.id);
+			exactStrategies.delete(episode.id);
+		}
+		pendingAction = null;
+		episodeCalls.clear();
+		episodeProcessed.clear();
+		executionEnds.clear();
+		progressExecutions.clear();
+		publishEpisodes();
 	});
 
 	// Detection + escalation.
 	pi.on("turn_end", async (event, ctx) => {
 		const msg = event.message;
-		if (msg.role !== "assistant") return;
+		if (msg.role !== "assistant") {
+			executionEnds.clear();
+			progressExecutions.clear();
+			return;
+		}
 		const isLocal = String(msg.provider ?? "").startsWith("local");
-		if (LOCAL_ONLY && !isLocal) return;
+		if (LOCAL_ONLY && !isLocal) {
+			executionEnds.clear();
+			progressExecutions.clear();
+			return;
+		}
 
 		// Per-turn tiers by model class (local loops sooner → fires earlier).
 		const REPEAT_T1 = thresh("LB_REPEAT_T1", 3, 2, isLocal);
@@ -814,6 +872,7 @@ export default function (pi: ExtensionAPI) {
 				thinkingText += ` ${block.thinking}`;
 			}
 		}
+		const actionCandidates: RuntimeLoopAction[] = [];
 
 		// Outcome-loop scan — BEFORE the progress reset (mutations are part of an
 		// outcome loop; this state deliberately survives them).
@@ -846,44 +905,54 @@ export default function (pi: ExtensionAPI) {
 			const fired = outcomeFired.get(fp) ?? 0;
 			const action = decideOutcomeAction(n, fired, OUTCOME_T1);
 			if (action === "steer") {
-				outcomeFired.set(fp, fired + 1);
-				// Flag for verify-gate: while an outcome loop is active, its "re-run
-				// till green" steer contradicts this "stop, change approach" one.
-				(globalThis as Record<string, unknown>).__pi_lb_outcome_at = Date.now();
-				{
+				actionCandidates.push({
+					tier: 1,
+					detector: "exact_outcome",
+					effect: "steer",
+					apply: () => {
+						outcomeFired.set(fp, fired + 1);
+						(globalThis as Record<string, unknown>).__pi_lb_outcome_at = Date.now();
 					const msg = outcomeMessage(n, outcomeLabels.get(fp) ?? r.toolName);
 					record("loop-breaker", "outcome-steer", { n, injected_chars: msg.length, turnIndex: event.turnIndex });
 					publishTier(1, "outcome");
 					if (proposeControl({
 						turnIndex: event.turnIndex, reason: "outcome_repeat", messageFactory: "loop-outcome",
 						message: msg, cooldownKey: `outcome:${fp}:steer`,
-					})) pi.sendUserMessage(msg, { deliverAs: "steer" });
-				}
+						})) pi.sendUserMessage(msg, { deliverAs: "steer" });
+						return 1;
+					},
+				});
 			} else if (action === "escalate") {
 				// Two ignored steers and the identical failing outcome STILL repeating:
 				// a grinder (seen live: 23-48 identical edit failures post-silence).
 				// Escalate like tier 3 instead of watching forever.
-				outcomeFired.set(fp, fired + 1);
-				if (HARD_STOP_MODE === "abort") {
-					record("loop-breaker", "outcome-abort", { n, turnIndex: event.turnIndex });
-					ctx.ui.notify(`loop-breaker: hard stop — same failing outcome ${n}× (${outcomeLabels.get(fp) ?? r.toolName})`, "error");
-					abortArmed = true;
-					publishTier(3, "outcome");
-					if (proposeControl({
-						turnIndex: event.turnIndex, reason: "outcome_repeat", messageFactory: "loop-outcome",
-						effect: "abort", abort: () => ctx.abort(), cooldownKey: `outcome:${fp}:abort`,
-					})) ctx.abort();
-					return;
-				}
-				{
+				actionCandidates.push({
+					tier: 3,
+					detector: "exact_outcome",
+					effect: HARD_STOP_MODE === "abort" ? "abort" : "steer",
+					apply: () => {
+						outcomeFired.set(fp, fired + 1);
+						if (HARD_STOP_MODE === "abort") {
+							record("loop-breaker", "outcome-abort", { n, turnIndex: event.turnIndex });
+							ctx.ui.notify(`loop-breaker: hard stop — same failing outcome ${n}× (${outcomeLabels.get(fp) ?? r.toolName})`, "error");
+							abortArmed = true;
+							publishTier(3, "outcome");
+							if (proposeControl({
+								turnIndex: event.turnIndex, reason: "outcome_repeat", messageFactory: "loop-outcome",
+								effect: "abort", abort: () => ctx.abort(), cooldownKey: `outcome:${fp}:abort`,
+							})) ctx.abort();
+							return 3;
+						}
 					const msg = outcomeMessage(n, outcomeLabels.get(fp) ?? r.toolName);
 					record("loop-breaker", "outcome-steer", { n, final: true, injected_chars: msg.length, turnIndex: event.turnIndex });
 					publishTier(3, "outcome");
 					if (proposeControl({
 						turnIndex: event.turnIndex, reason: "outcome_repeat", messageFactory: "loop-outcome",
 						message: msg, cooldownKey: `outcome:${fp}:final`,
-					})) pi.sendUserMessage(msg, { deliverAs: "steer" });
-				}
+						})) pi.sendUserMessage(msg, { deliverAs: "steer" });
+						return 3;
+					},
+				});
 			}
 		}
 
@@ -919,36 +988,54 @@ export default function (pi: ExtensionAPI) {
 				count: sessionRepeats,
 			});
 		}
-		const episodeIntervention = await applyPendingAction(ctx, event.turnIndex);
-		if (episodeIntervention === 3) return;
-
-		if (EPISODE_MODE !== "enforce" && !sessionRepeatFired && sessionRepeats >= SESSION_REPEAT_LIMIT) {
-			sessionRepeatFired = true; // steer once per session, never nag
-			record("loop-breaker", "session-repeat", { repeats: sessionRepeats, turnIndex: event.turnIndex });
-			const msg = steerText(
-				"LB_SESSION_REPEAT",
-				"[loop-breaker] You have repeated {repeats} tool calls this session. Repeating them is not " +
-					"working. Stop, state what you actually know, and either change approach or report Blocked " +
-					"with what you tried.",
-				{ repeats: sessionRepeats },
-			);
-			publishTier(1, "session");
-			if (proposeControl({
-				turnIndex: event.turnIndex, reason: "session_repeat", messageFactory: "loop-session",
-				message: msg, cooldownKey: "session-repeat",
-			})) pi.sendUserMessage(msg, { deliverAs: "steer" });
+		const episodeAction = pendingAction;
+		pendingAction = null;
+		if (episodeAction && EPISODE_MODE === "enforce") {
+			actionCandidates.push({
+				tier: episodeAction.tier,
+				detector: episodeAction.episode ? "semantic_episode" : "cumulative_session",
+				effect: episodeAction.tier === 3 ? "abort" : "steer",
+				apply: () => applyEpisodeAction(episodeAction, ctx, event.turnIndex),
+			});
 		}
 
-		// Progress = an edit/write/plan_write tool, a file-mutating bash command,
-		// or a turn with no tool calls (a final/text answer). Any of these means
-		// the model is acting, not looping → reset.
-		const hasProgress =
-			toolCalls.length === 0 ||
-			toolCalls.some((c) => PROGRESS_TOOLS.has(c.name)) ||
-			toolCalls.some((c) => c.name === "plan_write" && executionEnds.get(c.id)?.isError === false) ||
-			toolCalls.some((c) => c.name === "bash" && isBashMutation(String(c.args.command ?? "")));
-		for (const call of toolCalls) executionEnds.delete(call.id);
+		if (EPISODE_MODE !== "enforce" && !sessionRepeatFired && sessionRepeats >= SESSION_REPEAT_LIMIT) {
+			actionCandidates.push({
+				tier: 1,
+				detector: "cumulative_session",
+				effect: "steer",
+				apply: () => {
+					sessionRepeatFired = true;
+					record("loop-breaker", "session-repeat", { repeats: sessionRepeats, turnIndex: event.turnIndex });
+					const message = steerText(
+						"LB_SESSION_REPEAT",
+						"[loop-breaker] You have repeated {repeats} tool calls this session. Repeating them is not " +
+							"working. Stop, state what you actually know, and either change approach or report Blocked " +
+							"with what you tried.",
+						{ repeats: sessionRepeats },
+					);
+					publishTier(1, "session");
+					if (proposeControl({
+						turnIndex: event.turnIndex, reason: "session_repeat", messageFactory: "loop-session",
+						message, cooldownKey: "session-repeat",
+					})) pi.sendUserMessage(message, { deliverAs: "steer" });
+					return 1;
+				},
+			});
+		}
+
+		// Progress = a successfully settled mutation/plan execution, or a turn with
+		// no tool calls (a genuine text completion). Starts, throws, missing ends,
+		// and isError results cannot erase an exact repetition episode.
+		const hasProgress = toolCalls.length === 0 || toolCalls.some((call) => {
+			const execution = progressExecutions.get(call.id);
+			return execution?.candidate === true && execution.settled && execution.succeeded;
+		});
+		executionEnds.clear();
+		progressExecutions.clear();
 		if (hasProgress) {
+			const winner = selectHighestLoopAction(actionCandidates);
+			if (winner && await winner.apply() === 3) return;
 			// Compliance signal: the model made progress after being steered — how
 			// many turns did the steer take to land?
 			if (ep.lastSteerTurn !== null) {
@@ -993,88 +1080,84 @@ export default function (pi: ExtensionAPI) {
 			t1: REPEAT_T1, t2: REPEAT_T2, t3: REPEAT_T3, streakSoft: STREAK_SOFT, streakHard: STREAK_HARD,
 		});
 		const tier = d.tier;
-		if (episodeIntervention > 0) return;
-
-		if (tier === 0 || ep.steered.has(tier)) return;
-		for (let l = 1; l <= tier; l++) ep.steered.add(l);
-		ep.lastSteerTurn = event.turnIndex;
-
-		const label = ep.labels.get(worstFp) ?? "the same action";
-		// Pre-build the steer text so its size is logged with the event. Abort mode
-		// (tier 3) injects nothing, so its injected_chars is honestly 0.
-		const didBlock = tier === 2 && d.blockWorst && !!worstFp;
-		let steerMsg = "";
-		if (tier === 1) steerMsg = tier1Message(label, repeat, ep.streak, d.byToolRepeat, d.byReasonRepeat);
-		else if (tier === 2) steerMsg = tier2Message(label, ep.streak, didBlock);
-		else if (HARD_STOP_MODE !== "abort") steerMsg = tier3Message(ep.streak);
-
-		record("loop-breaker", "steer", {
-			tier, byTool: d.byToolRepeat, byReason: d.byReasonRepeat,
-			repeat, streak: ep.streak, injected_chars: steerMsg.length, turnIndex: event.turnIndex,
-		});
-		publishTier(tier, "exact");
-
-		if (tier === 1) {
-			if (proposeControl({
-				turnIndex: event.turnIndex, reason: "loop_strategy_change", messageFactory: "loop-tier",
-				message: steerMsg, cooldownKey: "exact:1",
-			})) pi.sendUserMessage(steerMsg, { deliverAs: "steer" });
-			return;
+		if (tier > 0 && !ep.steered.has(tier)) {
+			const exactTier = tier as 1 | 2 | 3;
+			const effect = exactTier < 3 ? (exactTier === 2 && d.blockWorst ? "block" : "steer")
+				: HARD_STOP_MODE === "shutdown" ? "shutdown" : HARD_STOP_MODE === "abort" ? "abort" : "block";
+			actionCandidates.push({
+				tier: exactTier,
+				detector: "exact_call",
+				effect,
+				apply: () => {
+					for (let level = 1; level <= exactTier; level += 1) ep.steered.add(level);
+					ep.lastSteerTurn = event.turnIndex;
+					const label = ep.labels.get(worstFp) ?? "the same action";
+					const didBlock = exactTier === 2 && d.blockWorst && !!worstFp;
+					let steerMsg = "";
+					if (exactTier === 1) steerMsg = tier1Message(label, repeat, ep.streak, d.byToolRepeat, d.byReasonRepeat);
+					else if (exactTier === 2) steerMsg = tier2Message(label, ep.streak, didBlock);
+					else if (HARD_STOP_MODE !== "abort") steerMsg = tier3Message(ep.streak);
+					record("loop-breaker", "steer", {
+						tier: exactTier, byTool: d.byToolRepeat, byReason: d.byReasonRepeat,
+						repeat, streak: ep.streak, injected_chars: steerMsg.length, turnIndex: event.turnIndex,
+					});
+					publishTier(exactTier, "exact");
+					if (exactTier === 1) {
+						if (proposeControl({
+							turnIndex: event.turnIndex, reason: "loop_strategy_change", messageFactory: "loop-tier",
+							message: steerMsg, cooldownKey: "exact:1",
+						})) pi.sendUserMessage(steerMsg, { deliverAs: "steer" });
+						return 1;
+					}
+					if (exactTier === 2) {
+						if (didBlock) ep.blocked.add(worstFp);
+						if (proposeControl({
+							turnIndex: event.turnIndex, reason: "loop_strategy_change", messageFactory: "loop-tier",
+							message: steerMsg, cooldownKey: "exact:2",
+						})) pi.sendUserMessage(steerMsg, { deliverAs: "steer" });
+						return 2;
+					}
+					for (const [fp, count] of ep.toolCounts) {
+						if (count >= REPEAT_T1) ep.blocked.add(fp);
+					}
+					if (HARD_STOP_MODE === "shutdown") {
+						ctx.ui.notify("loop-breaker: hard stop — shutting down pi", "error");
+						if (proposeControl({
+							turnIndex: event.turnIndex, reason: "loop_hard_stop", messageFactory: "loop-tier",
+							effect: "shutdown", shutdown: () => ctx.shutdown(), cooldownKey: "exact:3:shutdown",
+						})) {
+							pi.sendUserMessage(steerMsg, { deliverAs: "steer" });
+							ctx.shutdown();
+						}
+						return 3;
+					}
+					if (HARD_STOP_MODE === "abort") {
+						record("loop-breaker", "abort", { streak: ep.streak, turnIndex: event.turnIndex });
+						ctx.ui.notify(`loop-breaker: hard stop — aborting run (${ep.streak} turns, no progress)`, "error");
+						const blocked = ep.blocked;
+						ep = newEpisode();
+						ep.blocked = blocked;
+						abortArmed = true;
+						if (proposeControl({
+							turnIndex: event.turnIndex, reason: "loop_hard_stop", messageFactory: "loop-tier",
+							effect: "abort", abort: () => ctx.abort(), cooldownKey: "exact:3:abort",
+						})) ctx.abort();
+						return 3;
+					}
+					const finalMessage = tier3Message(ep.streak);
+					if (proposeControl({
+						turnIndex: event.turnIndex, reason: "loop_hard_stop", messageFactory: "loop-tier",
+						message: finalMessage, cooldownKey: "exact:3:block",
+					})) pi.sendUserMessage(finalMessage, { deliverAs: "steer" });
+					const blocked = ep.blocked;
+					ep = newEpisode();
+					ep.blocked = blocked;
+					return 3;
+				},
+			});
 		}
-
-		if (tier === 2) {
-			if (didBlock) ep.blocked.add(worstFp);
-			if (proposeControl({
-				turnIndex: event.turnIndex, reason: "loop_strategy_change", messageFactory: "loop-tier",
-				message: steerMsg, cooldownKey: "exact:2",
-			})) pi.sendUserMessage(steerMsg, { deliverAs: "steer" });
-			return;
-		}
-
-		// tier 3 — wall every genuinely repeated fingerprint and stop firmly.
-		for (const [fp, n] of ep.toolCounts) {
-			if (n >= REPEAT_T1) ep.blocked.add(fp);
-		}
-		if (HARD_STOP_MODE === "shutdown") {
-			ctx.ui.notify("loop-breaker: hard stop — shutting down pi", "error");
-			if (proposeControl({
-				turnIndex: event.turnIndex, reason: "loop_hard_stop", messageFactory: "loop-tier",
-				effect: "shutdown", shutdown: () => ctx.shutdown(), cooldownKey: "exact:3:shutdown",
-			})) {
-				pi.sendUserMessage(steerMsg, { deliverAs: "steer" });
-				ctx.shutdown();
-			}
-			return;
-		}
-		if (HARD_STOP_MODE === "abort") {
-			// NO steer here: a corrective user message would fight the abort and can
-			// restart the run if the abort lands first.
-			// Notify the UI, arm the mid-turn
-			// backstop, and stop.
-			record("loop-breaker", "abort", { streak: ep.streak, turnIndex: event.turnIndex });
-			ctx.ui.notify(`loop-breaker: hard stop — aborting run (${ep.streak} turns, no progress)`, "error");
-			// Fresh counters so a NEW loop after the stop escalates from scratch;
-			// keep the walls (blocked persists until real progress) and stay armed.
-			const blocked = ep.blocked;
-			ep = newEpisode();
-			ep.blocked = blocked;
-			abortArmed = true; // backstop: abort on the next looping tool call (reliable mid-turn hook)
-			if (proposeControl({
-				turnIndex: event.turnIndex, reason: "loop_hard_stop", messageFactory: "loop-tier",
-				effect: "abort", abort: () => ctx.abort(), cooldownKey: "exact:3:abort",
-			})) ctx.abort(); // best-effort stop now — no-op if already idle between turns
-			return;
-		}
-		// "block" mode: steer + wall, run continues. Reset counters (keep walls) so
-		// continued looping can escalate again instead of latching silent forever.
-		const finalMessage = tier3Message(ep.streak);
-		if (proposeControl({
-			turnIndex: event.turnIndex, reason: "loop_hard_stop", messageFactory: "loop-tier",
-			message: finalMessage, cooldownKey: "exact:3:block",
-		})) pi.sendUserMessage(finalMessage, { deliverAs: "steer" });
-		const blocked = ep.blocked;
-		ep = newEpisode();
-		ep.blocked = blocked;
+		const winner = selectHighestLoopAction(actionCandidates);
+		if (winner) await winner.apply();
 	});
 
 	// Tier 2/3 enforcement: block the specific repeated call(s).

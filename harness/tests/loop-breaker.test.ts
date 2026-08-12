@@ -176,6 +176,9 @@ test("rejected plan_write participates in outcomes; successful plan_write resets
 	await fire(fp, "turn_end", readTurn("r2", 4), ctx);
 	assert.ok(fp.sent.length > 0, "the repeated read episode actually steered");
 	fp.sent.length = 0;
+	await fire(fp, "tool_execution_start", {
+		toolCallId: "good-plan", toolName: "plan_write", args: { items: [] },
+	}, ctx);
 	await fire(fp, "tool_execution_end", { toolCallId: "good-plan", toolName: "plan_write", isError: false, result: { content: [] } }, ctx);
 	await fire(fp, "turn_end", {
 		turnIndex: 5, toolResults: [],
@@ -185,6 +188,84 @@ test("rejected plan_write participates in outcomes; successful plan_write resets
 	}, ctx);
 	await fire(fp, "turn_end", readTurn("r3", 6), ctx);
 	assert.equal(fp.sent.length, 0, "successful plan_write resets the repetition episode");
+});
+
+test("candidate progress resets repetition only after its successful execution end", async () => {
+	const candidates = [
+		{ name: "edit", args: { path: "src/x.ts" } },
+		{ name: "write", args: { path: "src/x.ts" } },
+		{ name: "multiedit", args: { path: "src/x.ts" } },
+		{ name: "plan_write", args: { items: [] } },
+		{ name: "plan_update", args: { id: "item-1", status: "done" } },
+		{ name: "bash", args: { command: "touch src/x.ts" } },
+	] as const;
+	const readTurn = (id: string, turnIndex: number) => ({
+		turnIndex, toolResults: [],
+		message: { role: "assistant", provider: "local-llama", content: [
+			{ type: "toolCall", id, name: "read", arguments: { path: "src/repeat.ts" } },
+		] },
+	});
+
+	for (const [index, candidate] of candidates.entries()) {
+		for (const outcome of ["failed", "missing", "succeeded"] as const) {
+			const fp = makeFakePi();
+			const mod = await import(`../extensions/loop-breaker.ts?progress=${index}-${outcome}-${Date.now()}-${Math.random()}`);
+			mod.default(fp.pi as never);
+			const ctx = { ui: { notify() {} }, abort() {}, shutdown() {}, cwd: "/tmp" };
+			await fire(fp, "session_start", {}, ctx);
+			await fire(fp, "turn_end", readTurn("read-1", 1), ctx);
+			await fire(fp, "turn_end", readTurn("read-2", 2), ctx);
+			assert.equal(fp.sent.length, 1, `${candidate.name}: setup must reach exact-call tier one`);
+			fp.sent.length = 0;
+
+			const callId = `${candidate.name}-${outcome}`;
+			await fire(fp, "tool_execution_start", {
+				toolCallId: callId, toolName: candidate.name, args: candidate.args,
+			}, ctx);
+			if (outcome !== "missing") {
+				await fire(fp, "tool_execution_end", {
+					toolCallId: callId, toolName: candidate.name, isError: outcome === "failed",
+					result: { content: [{ type: "text", text: outcome === "failed" ? "operation failed" : "ok" }] },
+				}, ctx);
+			}
+			await fire(fp, "turn_end", {
+				turnIndex: 3, toolResults: [],
+				message: { role: "assistant", provider: "local-llama", content: [
+					{ type: "toolCall", id: callId, name: candidate.name, arguments: candidate.args },
+				] },
+			}, ctx);
+			await fire(fp, "turn_end", readTurn("read-3", 4), ctx);
+			assert.equal(
+				fp.sent.length,
+				outcome === "succeeded" ? 0 : 1,
+				`${candidate.name}: ${outcome} execution ${outcome === "succeeded" ? "must" : "must not"} reset exact repetition`,
+			);
+		}
+	}
+});
+
+test("coincident exact-outcome and exact-call tiers deliver only the outcome correction", async () => {
+	const fp = makeFakePi();
+	const mod = await import(`../extensions/loop-breaker.ts?one-action=${Date.now()}-${Math.random()}`);
+	mod.default(fp.pi as never);
+	const ctx = { ui: { notify() {} }, abort() {}, shutdown() {}, cwd: "/tmp" };
+	await fire(fp, "session_start", {}, ctx);
+	for (let attempt = 1; attempt <= 2; attempt++) {
+		const id = `same-failure-${attempt}`;
+		await fire(fp, "turn_end", {
+			turnIndex: attempt,
+			message: { role: "assistant", provider: "local-llama", content: [
+				{ type: "toolCall", id, name: "bash", arguments: { command: "npm test" } },
+			] },
+			toolResults: [{
+				toolCallId: id, toolName: "bash", isError: true,
+				content: [{ type: "text", text: "1 failing AssertionError" }],
+			}],
+		}, ctx);
+	}
+	assert.equal(fp.sent.length, 1, "one boundary must produce one loop action");
+	assert.match(fp.sent[0]!, /Same failing result/,
+		"equal-tier exact outcome outranks the exact-call correction");
 });
 
 test("failure episodes include execution-end-only validation failures and deduplicate tool_result", async () => {
@@ -284,6 +365,39 @@ test("tool starts preserve plan-item correlation and status reports both overrun
 	assert.match(notices.at(-1)!, /semantic_overrun=2; correlated_overrun=1/);
 	assert.deepEqual(fp.swallowedErrors, []);
 	delete g.__pi_active_plan_context;
+	delete g.__pi_failure_episode_state;
+});
+
+test("compaction settles semantic episodes and clears their exposed overrun window", async () => {
+	const g = globalThis as Record<string, unknown>;
+	const fp = makeFakePi();
+	const mod = await import(`../extensions/loop-breaker.ts?compact-exposure=${Date.now()}-${Math.random()}`);
+	mod.default(fp.pi as never);
+	const ctx = { cwd: "/tmp", ui: { notify() {} }, abort() {} };
+	await fire(fp, "session_start", {}, ctx);
+	for (let attempt = 1; attempt <= 2; attempt++) {
+		const id = `compact-failure-${attempt}`;
+		await fire(fp, "tool_execution_start", {
+			toolCallId: id, toolName: "bash", args: { command: "npm test" },
+		}, ctx);
+		await fire(fp, "tool_execution_end", {
+			toolCallId: id, toolName: "bash", isError: true,
+			result: { content: [{ type: "text", text: "1 failing AssertionError" }] },
+		}, ctx);
+	}
+	let snapshot = g.__pi_failure_episode_state as {
+		active: unknown[]; completed: unknown[]; semanticFailureOverrun: number;
+	};
+	assert.equal(snapshot.active.length, 1, "setup must expose one active episode");
+	await fire(fp, "session_compact", {}, ctx);
+	await fire(fp, "tool_execution_start", {
+		toolCallId: "after-compact", toolName: "read", args: { path: "src/x.ts" },
+	}, ctx);
+	snapshot = g.__pi_failure_episode_state as typeof snapshot;
+	assert.equal(snapshot.active.length, 0);
+	assert.equal(snapshot.completed.length, 1);
+	assert.equal(snapshot.semanticFailureOverrun, 0,
+		"post-compaction calls must not remain inside a settled episode window");
 	delete g.__pi_failure_episode_state;
 });
 

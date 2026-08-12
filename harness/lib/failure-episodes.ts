@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { classifyBashCommand, looksFailingOutput } from "./command-policy.ts";
+import { classifyBashCommand, looksFailingOutput, normalizeVerificationCommand } from "./command-policy.ts";
 
 export const FAILURE_CLASSES = [
 	"schema_validation", "policy_rejection", "permission", "not_found", "command_missing", "timeout",
@@ -14,6 +14,7 @@ export function isFailureClass(value: unknown): value is FailureClass {
 
 export type RecoveryKind = "tool_success" | "exact_gate" | "provider_first_token" | "manual_resume";
 export type EpisodeStatus = "active" | "recovered" | "settled" | "abandoned";
+export type VerificationScope = "exact_project_gate" | "same_verifier" | "same_target" | null;
 
 export type FailureObservation = {
 	toolName: string;
@@ -22,6 +23,8 @@ export type FailureObservation = {
 	isError: boolean;
 	planItemId?: string | null;
 	failureClass?: FailureClass;
+	/** undefined means project-gate discovery was unavailable; null means no gate exists. */
+	projectGate?: string | null;
 };
 
 export type SuccessObservation = {
@@ -51,10 +54,12 @@ export type FailureEpisode = {
 	updatedAt: string;
 	status: EpisodeStatus;
 	recovery: RecoveryKind | null;
+	verificationScope: VerificationScope;
+	verifierHash: string | null;
 };
 
 export type FailureEpisodeSnapshot = {
-	v: 2;
+	v: 3;
 	totalEpisodes: number;
 	totalFailures: number;
 	longestEpisode: number;
@@ -129,6 +134,12 @@ export function targetHash(toolName: string, args: Record<string, unknown>): str
 	const family = toolFamily(toolName, args);
 	if (family === "bash:verify") return sha256("verification-target");
 	if (family === "plan") return sha256("plan-target");
+	if (toolName === "research_note") {
+		const source = typeof args.url === "string" ? args.url :
+			typeof args.sourceUrl === "string" ? args.sourceUrl :
+				typeof args.claim === "string" ? args.claim : "research-note";
+		return sha256(`research:${source}`);
+	}
 	const path = typeof args.path === "string" ? args.path :
 		typeof args.file === "string" ? args.file :
 		typeof args.file_path === "string" ? args.file_path : null;
@@ -143,6 +154,12 @@ export function targetHash(toolName: string, args: Record<string, unknown>): str
 
 export function strategyHash(toolName: string, args: Record<string, unknown>): string {
 	return sha256(`${toolName}\0${canonical(args)}`);
+}
+
+export function verifierHash(toolName: string, args: Record<string, unknown>): string | null {
+	if (toolName !== "bash") return null;
+	const command = normalizeVerificationCommand(String(args.command ?? ""));
+	return classifyBashCommand(command).verifyLike ? sha256(`verifier:${command}`) : null;
 }
 
 export function planItemHash(planItemId: string | null | undefined): string {
@@ -264,6 +281,10 @@ export class FailureEpisodeTracker {
 		const family = toolFamily(observation.toolName, args);
 		const target = targetHash(observation.toolName, args);
 		const item = planItemHash(observation.planItemId);
+		const observedVerifier = verifierHash(observation.toolName, args);
+		const verificationScope: VerificationScope = observedVerifier
+			? observation.projectGate === null ? "same_verifier" : "exact_project_gate"
+			: ["verification_assertion", "compile_or_lint"].includes(failureClass) ? "same_target" : null;
 		const key = episodeKey({ failureClass, toolFamily: family, targetHash: target, planItemHash: item });
 		let episode = this.active.get(key);
 		const opened = !episode;
@@ -272,9 +293,14 @@ export class FailureEpisodeTracker {
 				id: key.slice(0, 16), key, failureClass, toolFamily: family, targetHash: target,
 				planItemHash: item, count: 0, callsAfterSecond: 0, correlatedCallsAfterSecond: 0, strategyHashes: [],
 				openedAt: now, updatedAt: now, status: "active", recovery: null,
+				verificationScope, verifierHash: observedVerifier,
 			};
 			this.active.set(key, episode);
 			this.totalEpisodes += 1;
+		}
+		if (observedVerifier) {
+			episode.verifierHash = observedVerifier;
+			episode.verificationScope = verificationScope;
 		}
 		episode.count += 1;
 		if (episode.count === 2) this.exposed.add(key);
@@ -292,10 +318,13 @@ export class FailureEpisodeTracker {
 		const args = boundedArguments(observation.args);
 		const family = toolFamily(observation.toolName, args);
 		const target = targetHash(observation.toolName, args);
+		const successfulVerifier = verifierHash(observation.toolName, args);
 		const recovered: FailureEpisode[] = [];
 		for (const [key, episode] of this.active) {
 			const exactGateRecovery = observation.verifiedExact === true &&
-				["verification_assertion", "compile_or_lint", "unknown"].includes(episode.failureClass);
+				(episode.verificationScope === "exact_project_gate" || episode.failureClass === "unknown");
+			const sameVerifierRecovery = episode.verificationScope === "same_verifier" &&
+				successfulVerifier !== null && successfulVerifier === episode.verifierHash;
 			const providerRecovery = recovery === "provider_first_token" && episode.failureClass === "provider";
 			// verification_assertion belongs here too: a SAME-TARGET success is the
 			// direct evidence that the assertion now holds (the failing check passes,
@@ -304,8 +333,9 @@ export class FailureEpisodeTracker {
 			// every research session — refusal counts were monotone for the whole
 			// session and the shadow episode stream over-reported unresolved failure.
 			const directRecovery = episode.toolFamily === family && episode.targetHash === target &&
-				(["schema_validation", "policy_rejection", "permission", "not_found", "command_missing", "edit_conflict", "verification_assertion"].includes(episode.failureClass));
-			if (!exactGateRecovery && !providerRecovery && !directRecovery) continue;
+				(episode.verificationScope === "same_target" ||
+					["schema_validation", "policy_rejection", "permission", "not_found", "command_missing", "edit_conflict"].includes(episode.failureClass));
+			if (!exactGateRecovery && !sameVerifierRecovery && !providerRecovery && !directRecovery) continue;
 			episode.status = "recovered";
 			episode.recovery = exactGateRecovery ? "exact_gate" : recovery;
 			episode.updatedAt = now;
@@ -373,7 +403,7 @@ export class FailureEpisodeTracker {
 
 	snapshot(): FailureEpisodeSnapshot {
 		return {
-			v: 2,
+			v: 3,
 			totalEpisodes: this.totalEpisodes,
 			totalFailures: this.totalFailures,
 			longestEpisode: this.longestEpisode,

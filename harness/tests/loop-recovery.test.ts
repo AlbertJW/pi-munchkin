@@ -13,7 +13,7 @@ const episode: FailureEpisode = {
 	toolFamily: "file_mutation", targetHash: sha256("target"), planItemHash: sha256("plan"),
 	count: 6, callsAfterSecond: 4, correlatedCallsAfterSecond: 3, strategyHashes: [sha256("strategy")],
 	openedAt: "2026-08-05T00:00:00.000Z", updatedAt: "2026-08-05T00:01:00.000Z",
-	status: "active", recovery: null,
+	status: "active", recovery: null, verificationScope: null, verifierHash: null,
 };
 
 test("semantic and session tier thresholds select only the highest reached tier", () => {

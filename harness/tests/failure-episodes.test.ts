@@ -12,6 +12,7 @@ function failure(overrides: Partial<FailureObservation> = {}): FailureObservatio
 		text: "1 failing AssertionError: expected true",
 		isError: true,
 		planItemId: "item-1",
+		projectGate: "npm test",
 		...overrides,
 	};
 }
@@ -123,7 +124,7 @@ test("unrelated work increments only the preregistered session-window overrun", 
 	exposeVerification(tracker);
 	tracker.noteToolCall({ toolName: "read", args: { path: "src/other.ts" }, planItemId: "item-1" });
 	const snapshot = tracker.snapshot();
-	assert.equal(snapshot.v, 2);
+	assert.equal(snapshot.v, 3);
 	assert.equal(snapshot.semanticFailureOverrun, 1);
 	assert.equal(snapshot.correlatedFailureOverrun, 0);
 	assert.equal(snapshot.active[0]?.callsAfterSecond, 1);
@@ -211,7 +212,7 @@ test("recovery, settlement, manual resume, and reset clear exposed state", () =>
 	reset.noteToolCall({ toolName: "bash", args: { command: "npm test" }, planItemId: "item-1" });
 	reset.reset();
 	assert.deepEqual(reset.snapshot(), {
-		v: 2,
+		v: 3,
 		totalEpisodes: 0,
 		totalFailures: 0,
 		longestEpisode: 0,
@@ -286,8 +287,39 @@ test("a same-target success recovers a verification_assertion episode, not only 
 	// A DIFFERENT target must not close it — recovery stays evidence, not optimism.
 	const other = new FailureEpisodeTracker();
 	other.observeFailure(failing);
-	const wrong = other.observeSuccess({ toolName: "bash", args: { command: "npm test" } });
+	const wrong = other.observeSuccess({
+		toolName: "research_note",
+		args: { claim: "c", url: "https://example.com/b", quote: "different page" },
+	});
 	assert.equal(wrong.length, 0);
+});
+
+test("an exact-project-gate episode ignores generic verifier success", () => {
+	const tracker = new FailureEpisodeTracker();
+	const opened = tracker.observeFailure(failure({
+		args: { command: "npm test" },
+		projectGate: "npm test",
+	}));
+	assert.equal(opened.episode.verificationScope, "exact_project_gate");
+	assert.match(opened.episode.verifierHash ?? "", /^[a-f0-9]{64}$/);
+	assert.equal(tracker.observeSuccess({ toolName: "bash", args: { command: "ruff check ." } }).length, 0);
+	assert.equal(tracker.snapshot().active.length, 1);
+	assert.equal(tracker.observeSuccess(
+		{ toolName: "bash", args: { command: "npm test" }, verifiedExact: true }, "exact_gate",
+	).length, 1);
+});
+
+test("without a project gate only the same normalized verifier recovers the episode", () => {
+	const tracker = new FailureEpisodeTracker();
+	const opened = tracker.observeFailure(failure({
+		args: { command: "ruff check src" },
+		text: "lint failed",
+		failureClass: "compile_or_lint",
+		projectGate: null,
+	}));
+	assert.equal(opened.episode.verificationScope, "same_verifier");
+	assert.equal(tracker.observeSuccess({ toolName: "bash", args: { command: "tsc --noEmit" } }).length, 0);
+	assert.equal(tracker.observeSuccess({ toolName: "bash", args: { command: "ruff   check   src" } }).length, 1);
 });
 
 test("abandonment is terminal and distinct from recovery — degraded verification never 'recovers'", () => {

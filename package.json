@@ -146,6 +146,7 @@
     "harness/lib/hashline-core.ts",
     "harness/lib/harness-signals.ts",
     "harness/lib/loop-outcome.ts",
+    "harness/lib/loop-action.ts",
     "harness/lib/loop-recovery.ts",
     "harness/lib/runtime-doctor.ts",
     "harness/lib/live-mirror.ts",
