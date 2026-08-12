@@ -54,3 +54,36 @@ failure-episode suites passed again before full acceptance.
   skills on Pi 0.80, 0.81, 0.82, 0.83, and 0.84.
 - The non-echoing secret scan, diff whitespace check, and protected-file check
   passed. No live-agent directory was read from or modified by acceptance work.
+
+## PR 3 counterfactuals
+
+- Restoring verification above repeated-failure recovery made
+  `repeated-failure recovery wins and retains the exact verification requirement
+  at the end` select `verification_required` and fail.
+- Restoring the two-minute `__pi_lb_outcome_at` suppression made
+  `verification is never suppressed by stale loop wall-clock state` fail.
+- Disabling the verification suffix merge made
+  `repeated-failure recovery wins and retains the exact verification requirement
+  at the end` fail with `verificationMerged=false`.
+- Restoring a no-op ambient-guidance stripper made
+  `active-only prompt surface is verified in an isolated source-loader process`
+  fail because inactive `compact_context` and `subagent` guidance remained.
+- Restoring the raw configured-gate display made
+  `configured gate labels are bounded single-line data` fail its 240-byte bound;
+  the safe implementation then passed the same isolated test.
+
+Each broken form was restored immediately. The focused arbitration,
+verification, loop, telemetry, activation, and prompt-surface suites passed
+again before full acceptance.
+
+## PR 3 acceptance
+
+- The complete verifier passed 595 harness tests plus typecheck, health,
+  deterministic package smoke, and optimizer checks.
+- Offline peer boundaries accepted 0.80.6 and 0.84.x and rejected 0.80.5 and
+  0.85.0.
+- Isolated packed consumers typechecked and loaded all 32 extensions and both
+  skills on Pi 0.80, 0.81, 0.82, 0.83, and 0.84 using temporary agent homes.
+- The non-echoing secret scan, diff whitespace check, manifest-order tests, and
+  protected-file check passed. Deployed defaults remain ambient prompts and a
+  shadow arbiter; no live-agent directory was modified.

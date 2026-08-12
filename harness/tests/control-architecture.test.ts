@@ -16,6 +16,15 @@ test("telemetry taps are absent and control libraries cannot import the telemetr
 	}
 });
 
+test("corrective producers use typed boundaries instead of loop timing globals", () => {
+	const loop = readFileSync(join(root, "extensions", "loop-breaker.ts"), "utf8");
+	const verify = readFileSync(join(root, "extensions", "verify-gate.ts"), "utf8");
+	assert.equal(loop.includes("__pi_lb_outcome_at"), false);
+	assert.equal(verify.includes("__pi_lb_outcome_at"), false);
+	assert.equal(loop.includes("emitControlProposal"), true);
+	assert.equal(verify.includes("emitControlProposal"), true);
+});
+
 test("typed domain signals reject extra or raw-looking fields", async () => {
 	const { isHarnessSignal, signalRunId } = await import("../lib/harness-signals.ts");
 	const valid = { v: 1 as const, type: "plan/write" as const, runIdHash: signalRunId("r"), items: 2, openItems: 2 };

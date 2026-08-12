@@ -87,10 +87,10 @@ export interface ControlDecisionV1 {
 }
 
 const PRIORITY: Record<ControlKind, number> = {
-	safety_consequence: 700,
-	safe_abort: 600,
+	safe_abort: 700,
+	failure_recovery: 600,
 	verification_required: 500,
-	failure_recovery: 400,
+	safety_consequence: 500,
 	plan_resolution: 300,
 	tool_rescue: 200,
 	context_hint: 100,

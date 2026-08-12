@@ -260,10 +260,6 @@ function resetOutcomes(): void {
 	outcomeCounts = new Map();
 	outcomeLabels = new Map();
 	outcomeFired = new Map();
-	// verify-gate reads this cross-extension flag by wall-clock TTL, not by session —
-	// clear it here too (session_start), else a stale timestamp from a prior session
-	// in the same process can suppress verify-gate's nag in an unrelated new session.
-	delete (globalThis as Record<string, unknown>).__pi_lb_outcome_at;
 }
 
 // Planning in flight? (flag set by plan-runner on /plan, cleared on /plan-go /
@@ -911,13 +907,12 @@ export default function (pi: ExtensionAPI) {
 					effect: "steer",
 					apply: () => {
 						outcomeFired.set(fp, fired + 1);
-						(globalThis as Record<string, unknown>).__pi_lb_outcome_at = Date.now();
-					const msg = outcomeMessage(n, outcomeLabels.get(fp) ?? r.toolName);
-					record("loop-breaker", "outcome-steer", { n, injected_chars: msg.length, turnIndex: event.turnIndex });
-					publishTier(1, "outcome");
-					if (proposeControl({
-						turnIndex: event.turnIndex, reason: "outcome_repeat", messageFactory: "loop-outcome",
-						message: msg, cooldownKey: `outcome:${fp}:steer`,
+						const msg = outcomeMessage(n, outcomeLabels.get(fp) ?? r.toolName);
+						record("loop-breaker", "outcome-steer", { n, injected_chars: msg.length, turnIndex: event.turnIndex });
+						publishTier(1, "outcome");
+						if (proposeControl({
+							turnIndex: event.turnIndex, reason: "outcome_repeat", messageFactory: "loop-outcome",
+							message: msg, cooldownKey: `outcome:${fp}:steer`,
 						})) pi.sendUserMessage(msg, { deliverAs: "steer" });
 						return 1;
 					},
@@ -965,7 +960,7 @@ export default function (pi: ExtensionAPI) {
 			sessionCallCounts.set(fp, (sessionCallCounts.get(fp) ?? 0) + 1);
 		}
 		// Published for the session blackboard (globalThis bus — module state is
-		// per-extension under pi's loader, see __pi_lb_outcome_at above).
+		// per-extension under pi's loader).
 		(globalThis as Record<string, unknown>).__pi_lb_state = { sessionRepeats, seen: sessionSeenCalls.size, streak: ep.streak };
 		const sessionThresholds = EPISODE_MODE === "enforce"
 			? sessionEpisodeThresholds()
@@ -1042,10 +1037,6 @@ export default function (pi: ExtensionAPI) {
 				record("loop-breaker", "progress-after-steer", { turns_since: event.turnIndex - ep.lastSteerTurn });
 			}
 			resetEpisode();
-			// A mutation/final-answer turn means the model moved past whatever it was
-			// stuck on — stop suppressing verify-gate's nag for the rest of the 120s
-			// window on an outcome loop that's no longer active.
-			delete (globalThis as Record<string, unknown>).__pi_lb_outcome_at;
 			return;
 		}
 

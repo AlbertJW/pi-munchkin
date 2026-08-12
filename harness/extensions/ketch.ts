@@ -208,7 +208,7 @@ export function registerKetch(pi: ExtensionAPI, dependencies: KetchDependencies 
 			const legacyActed = !controlEnforces(pi.events);
 			emitControlProposal(pi.events, buildControlProposal({
 				boundarySequence: event.turnIndex,
-				kind: "verification_required",
+				kind: "context_hint",
 				reason: "research_unverified",
 				source: "ketch",
 				cooldownKey: "research-wrap",

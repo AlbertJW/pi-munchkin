@@ -42,9 +42,12 @@ guidelines. Ambient mode remains byte-compatible.
 
 The enforced arbiter sends at most one same-boundary message. When a state lens
 and a correction collide, the bounded `[harness summary]` comes first and the
-correction is preserved intact at the end. Abort and shutdown winners carry no
-lens and start no continuation. Shadow mode retains the existing two-producer
-behavior.
+correction is preserved intact at the end. When repeated-failure recovery also
+collides with exact verification, recovery owns the correction and the exact
+verification requirement remains intact as its final suffix. Abort and shutdown
+winners carry neither supplement and start no continuation. Shadow mode retains
+separate direct delivery by the legacy producers; the timing-global removal is
+an independent coherence fix, not part of the default flip.
 
 This is a mechanism and coherence repair, not an efficacy result. Adoption,
 live mirroring, live Pi 0.84 loading, calibration, and gate rounds each remain

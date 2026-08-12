@@ -38,18 +38,40 @@ export class ControlArbiterQueue {
 		decision: ControlDecisionV1;
 		delivery: ControlProposalEnvelope["delivery"] | null;
 		lensMerged: boolean;
+		verificationMerged: boolean;
 	} {
 		const proposals = this.pending.get(boundarySequence) ?? [];
 		this.pending.delete(boundarySequence);
+		const terminalRank = ({ proposal }: ControlProposalEnvelope): number =>
+			proposal.effect === "abort" || proposal.effect === "shutdown" ? 1 : 0;
 		const ranked = proposals.map((entry, index) => ({ entry, index })).sort((a, b) =>
+			terminalRank(b.entry) - terminalRank(a.entry) ||
 			b.entry.proposal.priority - a.entry.proposal.priority || a.index - b.index);
 		const winner = ranked[0]?.entry ?? null;
+		const verification = mode === "enforce" && winner?.proposal.kind === "failure_recovery" &&
+			winner.proposal.effect === "message"
+			? proposals.find(({ proposal, delivery }) =>
+				proposal.kind === "verification_required" && proposal.source === "verify-gate" &&
+				proposal.reason === "exact_gate_missing" && proposal.messageFactory === "verify-wrap" &&
+				proposal.effect === "message" &&
+				typeof delivery.message === "string" && delivery.message.length > 0)
+			: undefined;
 		const lens = mode === "enforce" && winner?.proposal.effect === "message" && winner.proposal.reason !== "state_lens"
 			? proposals.find(({ proposal, delivery }) =>
 				proposal.reason === "state_lens" && proposal.source === "session-blackboard" &&
 				proposal.effect === "message" && typeof delivery.message === "string" && delivery.message.length > 0)
 			: undefined;
 		let delivery = winner?.delivery ?? null;
+		let verificationMerged = false;
+		if (delivery && verification && typeof delivery.message === "string") {
+			const requirement = verification.delivery.message!;
+			const separator = "\n\n";
+			const available = MAX_MESSAGE_CHARS - requirement.length - separator.length;
+			if (available > 0) {
+				delivery = { ...delivery, message: `${delivery.message.slice(0, available)}${separator}${requirement}` };
+				verificationMerged = true;
+			}
+		}
 		let lensMerged = false;
 		if (delivery && lens && typeof delivery.message === "string") {
 			const correction = delivery.message;
@@ -72,6 +94,7 @@ export class ControlArbiterQueue {
 			},
 			delivery,
 			lensMerged,
+			verificationMerged,
 		};
 	}
 }

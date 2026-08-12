@@ -11,23 +11,31 @@ message itself remains in an in-memory delivery envelope and never enters RunSta
 snapshot, or a notification. Pending control is capped at 128 proposals across all boundaries,
 and any in-memory delivery text is clamped to 4,000 characters before queueing.
 
-Priority is deterministic: safety consequence, safe abort, exact verification, failure recovery,
-plan resolution, tool rescue, then context hint. `control-arbiter.ts` is loaded after every
-turn-end producer, consumes one boundary once, and chooses the highest-priority proposal. Stable
-emission order breaks equal-priority ties. Tier-three abort and shutdown decisions inject no
-automatic message in enforce mode.
+Priority is deterministic: abort or shutdown effect, repeated-failure recovery, exact
+verification, plan resolution, tool rescue, then context hint. The dormant deterministic
+micro-gate parse consequence shares exact-verification priority until its separate retirement
+decision. `control-arbiter.ts` is loaded after every turn-end producer, consumes one boundary
+once, and chooses the highest-priority proposal. Stable emission order breaks equal-priority
+ties. Tier-three abort and shutdown decisions inject no automatic message in enforce mode.
 
 The dormant micro-gate participates too: a deterministic parse/compile failure is a safety
 consequence, while its heuristic slop warning is only a context hint. User-command follow-ups and
-post-settlement model reviews remain outside the turn boundary.
+post-settlement model reviews remain outside the turn boundary. The old loop-outcome wall-clock
+timestamp is removed; verification is never suppressed by elapsed time or stale process state.
+The research citation reminder is a context hint, not exact project verification, and therefore
+cannot acquire exact-gate priority or become the recovery suffix.
 
-`CONTROL_ARBITER=shadow` is the default. Legacy producers still act exactly as before, while the
-arbiter records the shadow winner, legacy-action attempt count, and collision count without text.
+`CONTROL_ARBITER=shadow` is the default. Legacy producers remain authoritative and deliver
+directly, while the arbiter records the shadow winner, legacy-action attempt count, and collision
+count without text. The independent removal of the timing suppression described above still
+applies in shadow mode.
 `enforce` suppresses direct producer sends and executes only the winner. A same-boundary state
 lens is a bounded supplement to a message winner: it is prepended to that one delivery while the
-correction is reserved intact at the end of the 4,000-character budget. Abort and shutdown
-effects never receive the supplement. Decision telemetry records only the bounded boolean
-`lens_merged`; no message text enters telemetry. `off` registers no
+correction is reserved intact at the end of the 4,000-character budget. If repeated-failure
+recovery beats an exact-verification proposal, the exact requirement is appended as an intact
+final suffix before the lens is prepended. Abort and shutdown effects receive neither supplement.
+Decision telemetry records only `lens_merged` and `verification_merged`; no message text enters
+telemetry. `off` registers no
 arbiter handlers or subscriber; typed domain signals remain available so disabling the arbiter
 cannot disable existing activation or blackboard behavior.
 If an explicitly selected extension surface omits the arbiter, producers fail safe to their

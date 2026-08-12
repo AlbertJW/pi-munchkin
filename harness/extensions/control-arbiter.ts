@@ -16,7 +16,7 @@ export default function (pi: ExtensionAPI): void {
 	pi.on("session_start", async () => queue.clear());
 	pi.on("agent_start", async () => queue.clear());
 	pi.on("turn_end", async (event) => {
-		const { decision, delivery, lensMerged } = queue.decide(event.turnIndex, mode);
+		const { decision, delivery, lensMerged, verificationMerged } = queue.decide(event.turnIndex, mode);
 		if (decision.proposalCount === 0) return;
 		const winner = decision.winner;
 		record("control-arbiter", "decision", {
@@ -29,6 +29,7 @@ export default function (pi: ExtensionAPI): void {
 			winner_reason: winner?.reason ?? "none",
 			boundary_sequence: decision.boundarySequence,
 			lens_merged: lensMerged,
+			verification_merged: verificationMerged,
 		});
 		emitControlDecision(pi.events, decision);
 		if (mode !== "enforce" || !winner || !delivery) return;

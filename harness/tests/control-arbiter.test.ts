@@ -44,8 +44,8 @@ test("arbiter picks one highest-priority proposal and reports collisions", () =>
 	assert.equal(decision.proposalCount, 4);
 	assert.equal(decision.collisionCount, 3);
 	assert.equal(decision.legacyActionCount, 4);
-	assert.equal(decision.winner?.kind, "safety_consequence");
-	assert.equal(delivery?.message, "safety_consequence");
+	assert.equal(decision.winner?.kind, "failure_recovery");
+	assert.equal(delivery?.message, "failure_recovery");
 	assert.equal(queue.decide(1, "shadow").decision.proposalCount, 0, "a boundary is consumed once");
 });
 
@@ -90,6 +90,40 @@ test("enforce merges the lens before one correction and reserves the intact tail
 	assert.ok(result.delivery?.message?.endsWith(correction), "the corrective message is never truncated");
 });
 
+test("repeated-failure recovery wins and retains the exact verification requirement at the end", () => {
+	const queue = new ControlArbiterQueue();
+	const recovery = envelope("failure_recovery");
+	recovery.delivery.message = `[loop-breaker] failure_class=compile_or_lint; observed=repeated_failure; required=change_strategy.\n${"r".repeat(3600)}`;
+	const verification = envelope("verification_required");
+	verification.delivery.message = "[verify-gate] Exact project gate required after the latest mutation.";
+	queue.add(lensEnvelope(1, `[harness summary]\n${"l".repeat(4000)}`));
+	queue.add(verification);
+	queue.add(recovery);
+	const result = queue.decide(1, "enforce");
+	assert.equal(result.decision.winner?.kind, "failure_recovery");
+	assert.equal(result.verificationMerged, true);
+	assert.equal(result.lensMerged, true);
+	assert.equal(result.delivery?.message?.length, 4000);
+	assert.ok(result.delivery?.message?.startsWith("[harness summary]"));
+	assert.ok(result.delivery?.message?.endsWith(verification.delivery.message!),
+		"the exact verification requirement is the intact final suffix");
+});
+
+test("only verify-gate exact requirements supplement recovery", () => {
+	const queue = new ControlArbiterQueue();
+	queue.add(envelope("failure_recovery"));
+	const research = envelope("verification_required");
+	research.proposal = buildControlProposal({
+		boundarySequence: 1, kind: "verification_required", reason: "research_unverified",
+		source: "ketch", cooldownKey: "research", messageFactory: "research-wrap", legacyActed: false,
+	});
+	research.delivery.message = "research reminder";
+	queue.add(research);
+	const result = queue.decide(1, "enforce");
+	assert.equal(result.verificationMerged, false);
+	assert.equal(result.delivery?.message, "failure_recovery");
+});
+
 test("shadow leaves legacy lens and correction delivery separate", () => {
 	const queue = new ControlArbiterQueue();
 	queue.add(lensEnvelope());
@@ -103,9 +137,12 @@ test("abort and shutdown effects never acquire a lens or continuation", () => {
 	for (const effect of ["abort", "shutdown"] as const) {
 		const queue = new ControlArbiterQueue();
 		queue.add(lensEnvelope());
+		queue.add(envelope("failure_recovery"));
 		queue.add(envelope(effect === "abort" ? "safe_abort" : "safety_consequence", 1, effect));
 		const result = queue.decide(1, "enforce");
 		assert.equal(result.lensMerged, false);
+		assert.equal(result.verificationMerged, false);
+		assert.equal(result.decision.winner?.effect, effect, "terminal effects outrank every message kind");
 		assert.equal(result.delivery?.message, effect === "abort" ? "safe_abort" : "safety_consequence");
 	}
 });
@@ -190,6 +227,63 @@ test("manifest-order blackboard and arbiter produce one merged loop correction",
 		assert.equal(fp.sent.length, 1);
 		assert.match(fp.sent[0], /^\[harness summary\]/);
 		assert.ok(fp.sent[0].endsWith(correction));
+	} finally {
+		for (const [key, value] of Object.entries(previous)) {
+			if (value === undefined) delete process.env[key]; else process.env[key] = value;
+		}
+		resetBoard();
+	}
+});
+
+test("manifest-order loop recovery, exact verification, and lens produce one complete correction", async () => {
+	const previous = {
+		CONTROL_ARBITER: process.env.CONTROL_ARBITER,
+		STATE_LENS: process.env.STATE_LENS,
+		TELEMETRY: process.env.TELEMETRY,
+		TELEMETRY_SOURCE: process.env.TELEMETRY_SOURCE,
+	};
+	process.env.CONTROL_ARBITER = "enforce";
+	process.env.STATE_LENS = "steer";
+	process.env.TELEMETRY = "off";
+	process.env.TELEMETRY_SOURCE = "gate";
+	try {
+		const fp = makeFakePi();
+		const nonce = `${Date.now()}-${Math.random()}`;
+		const [loop, blackboard, arbiter] = await Promise.all([
+			import(`../extensions/loop-breaker.ts?combined=${nonce}`),
+			import(`../extensions/session-blackboard.ts?combined=${nonce}`),
+			import(`../extensions/control-arbiter.ts?combined=${nonce}`),
+		]);
+		// Real relative manifest order: loop producer, lens producer, arbiter.
+		loop.default(fp.pi as never);
+		blackboard.default(fp.pi as never);
+		arbiter.default(fp.pi as never);
+		resetBoard();
+		const cwd = mkdtempSync(join(tmpdir(), "control-loop-verify-"));
+		const ctx = { cwd, getContextUsage: () => null, hasUI: false, ui: { notify() {} }, abort() {}, shutdown() {} };
+		await fire(fp, "session_start", { reason: "new" }, ctx);
+		noteTool(boardState(), {
+			toolName: "bash", args: { command: "npm test" }, isError: true, errorText: "failed",
+		});
+		const readTurn = (turnIndex: number) => ({
+			turnIndex,
+			message: { role: "assistant", provider: "local-llama", content: [
+				{ type: "toolCall", id: `read-${turnIndex}`, name: "read", arguments: { path: "src/a.ts" } },
+			] },
+			toolResults: [],
+		});
+		await fire(fp, "turn_end", readTurn(1), ctx);
+		const exactRequirement = "[verify-gate] The exact gate `npm test` has not passed after the latest mutation. Run it before handoff.";
+		const verification = envelope("verification_required", 2);
+		emitControlProposal(fp.pi.events as never, verification.proposal, { message: exactRequirement });
+		await fire(fp, "turn_end", readTurn(2), ctx);
+		assert.equal(fp.sent.length, 1, "the collision boundary emits exactly one message");
+		const combined = fp.sent[0]!;
+		assert.match(combined, /^\[harness summary\]/);
+		assert.match(combined, /\[loop-breaker\]/);
+		assert.match(combined, /\[verify-gate\]/);
+		assert.ok(combined.endsWith(exactRequirement),
+			"the exact verification requirement remains intact at the final suffix");
 	} finally {
 		for (const [key, value] of Object.entries(previous)) {
 			if (value === undefined) delete process.env[key]; else process.env[key] = value;

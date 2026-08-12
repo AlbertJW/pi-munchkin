@@ -67,8 +67,8 @@ export default function (pi: ExtensionAPI): void {
 		// fights the abort and can restart the run) — the lens must not reintroduce
 		// one through this side channel. Only message-bearing tiers get a lens.
 		if (proposal.source !== "loop-breaker" ||
+			proposal.kind !== "failure_recovery" ||
 			proposal.effect !== "message" ||
-			!(["loop-tier", "loop-session"] as string[]).includes(proposal.messageFactory) ||
 			proposal.boundarySequence === lastLensProposalBoundary) return;
 		const state = boardState();
 		if ((LENS_MODE === "steer" || LENS_MODE === "both") &&

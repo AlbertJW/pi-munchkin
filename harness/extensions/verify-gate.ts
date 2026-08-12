@@ -1,6 +1,6 @@
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { readdir } from "node:fs/promises";
-import { classifyBashCommand, isSourceMutation, looksFailingOutput, verificationEvidence } from "../lib/command-policy.ts";
+import { classifyBashCommand, isSourceMutation, looksFailingOutput, normalizeVerificationCommand, verificationEvidence } from "../lib/command-policy.ts";
 import { clearPlanGateReceipt, consumePlanGateReceipt } from "../lib/plan-gate-receipt.ts";
 import { clearDetectedProjectGate, detectProjectGate, publishDetectedProjectGate } from "../lib/project-gate.ts";
 import { boundedReceiptText } from "../lib/run-kernel-receipts.ts";
@@ -65,13 +65,43 @@ let st = fresh();
 let gateCmd: string | null = process.env.VERIFY_GATE_CMD || null;
 let composeProject = false;
 
+const GATE_DISPLAY_MAX_BYTES = 240;
+
+function truncateUtf8(value: string, maxBytes: number): string {
+	const bytes = Buffer.from(value, "utf8");
+	if (bytes.length <= maxBytes) return value;
+	let end = maxBytes;
+	while (end > 0 && (bytes[end] & 0b1100_0000) === 0b1000_0000) end -= 1;
+	return bytes.subarray(0, end).toString("utf8");
+}
+
+/**
+ * Render a configured gate as bounded data, never as an unbounded prompt suffix.
+ * The exact, unmodified command remains the classifier/execution identity.
+ */
+export function gateDisplayCommand(command: string | null): string | null {
+	if (!command) return null;
+	const safe = normalizeVerificationCommand(command)
+		.replace(/\x1B(?:\[[0-?]*[ -/]*[@-~]|\][^\x07]*(?:\x07|\x1B\\))/gu, "")
+		.replace(/[\u0000-\u001f\u007f-\u009f\u2028\u2029]/gu, " ")
+		.replace(/`/gu, "'")
+		.replace(/\b(?:sk|rk|pk|ghp|github_pat|xox[baprs])[-_][A-Za-z0-9_-]{6,}\b/giu, "[redacted]")
+		.replace(/\b(api[_-]?key|token|password|secret|authorization)\s*[:=]\s*\S+/giu, "$1=[redacted]")
+		.replace(/https?:\/\/\S+/giu, "[url omitted]")
+		.replace(/\/(?:Users|home|private|var|tmp)\/\S+/gu, "[path omitted]")
+		.replace(/\s+/gu, " ")
+		.trim();
+	return safe ? truncateUtf8(safe, GATE_DISPLAY_MAX_BYTES) : null;
+}
+
 function steer(verifyFailed: boolean): string {
-	const g = gateCmd ? `\`${gateCmd}\`` : "your verify (tests/typecheck)";
+	const displayCommand = gateDisplayCommand(gateCmd);
+	const g = displayCommand ? `\`${displayCommand}\`` : "your verify (tests/typecheck)";
 	// Containerized projects: tests usually need the stack, so run the gate inside
 	// the service container; if the stack is down, bring it up or skip rather than
 	// forcing a broken host run.
 	const ctn = composeProject
-		? ` Tests look containerized — run the gate inside the stack (e.g. \`docker compose exec <service> ${gateCmd ?? "pytest"}\`); if the stack is down, skip rather than run it on the host.`
+		? ` Tests look containerized — run the configured gate inside the stack (for example, \`docker compose exec <service> <configured-gate>\`); if the stack is down, skip rather than run it on the host.`
 		: "";
 	// Steer texts route through lib/steer-texts.ts (PI_MSG_* override; defaults
 	// byte-identical to the historical literals — asserted in tests).
@@ -270,14 +300,10 @@ export default function (pi: ExtensionAPI) {
 		}
 
 		// Fire on a wrap-up (text-only) turn when files changed but no passing verify.
-		// Defer to the loop-breaker's outcome detector: if it recently said "same
-		// failing result — STOP, change approach", nagging "re-run till green" here
-		// is contradictory double-steering. One voice at a time.
-		const outcomeAt = typeof g.__pi_lb_outcome_at === "number" ? (g.__pi_lb_outcome_at as number) : 0;
-		const outcomeActive = outcomeAt > 0 && Date.now() - outcomeAt < 120_000;
-
+		// The typed arbiter owns same-boundary deconfliction with repeated-failure
+		// recovery; no wall-clock suppression state crosses extension boundaries.
 		const wrappingUp = toolCalls.length === 0;
-		if (wrappingUp && st.mutated && !st.verifiedOk && st.fires < MAX_FIRES && st.sessionFires < MAX_FIRES * 3 && !planPhaseActive() && !outcomeActive) {
+		if (wrappingUp && st.mutated && !st.verifiedOk && st.fires < MAX_FIRES && st.sessionFires < MAX_FIRES * 3 && !planPhaseActive()) {
 			st.fires += 1;
 			st.sessionFires += 1;
 			const msg = steer(verifyFailedThisTurn);
