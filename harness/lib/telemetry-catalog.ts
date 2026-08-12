@@ -145,6 +145,7 @@ export const EVENT_CATALOG = {
 	"context-watcher/compacted": { ...usage, requester: "string", contentProvider: "string", reason: "string", willRetry: "boolean", tokensBefore: "number" },
 	"blackboard/rendered": { chars: "number", attempts: "number" },
 	"blackboard/restored": { attempts: "number" },
+	"blackboard/restore-rejected": { attempts: "number" },
 	"state-lens/view-injected": { chars: "number", turnIndex: "number" },
 	"state-lens/steer-injected": { chars: "number", turnIndex: "number" },
 	"tool-activation/deferred": { tool: "string", reason: "string" },

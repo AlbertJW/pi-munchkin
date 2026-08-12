@@ -169,8 +169,16 @@ export default function (pi: ExtensionAPI): void {
 				for (let i = entries.length - 1; i >= 0; i--) {
 					const entry = entries[i] as { type?: string; customType?: string; data?: unknown };
 					if (entry.type === "custom" && entry.customType === ENTRY_TYPE) {
-						restore(entry.data);
-						record("blackboard", "restored", { attempts: Object.keys(boardState().attempts).length });
+						// A REJECTED restore must be visible: the previous version swallowed
+						// the resulting throw here, leaving a corrupt board installed and the
+						// lens silently dead for the whole session with no row written — an
+						// arm scored "lens on" could have run with the lens doing nothing.
+						if (restore(entry.data)) {
+							record("blackboard", "restored", { attempts: Object.keys(boardState().attempts).length });
+						} else {
+							resetBoard();
+							record("blackboard", "restore-rejected", { attempts: 0 });
+						}
 						break;
 					}
 				}

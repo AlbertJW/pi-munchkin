@@ -284,23 +284,148 @@ export function snapshot(state: BlackboardState): Record<string, unknown> {
 	return copy as unknown as Record<string, unknown>;
 }
 
-export function restore(data: unknown): void {
-	if (!data || typeof data !== "object") return;
-	const raw = data as Partial<BlackboardState> & { v?: unknown };
-	if (raw.v === 2) {
-		Object.assign(boardState(), emptyState(), raw);
-		return;
+const isObject = (value: unknown): value is Record<string, unknown> =>
+	value !== null && typeof value === "object" && !Array.isArray(value);
+const num = (value: unknown): number | null => (Number.isFinite(value) ? Number(value) : null);
+const bool = (value: unknown): boolean | null => (typeof value === "boolean" ? value : null);
+
+/** Every string that can reach the lens is re-sanitized here, on the way IN. */
+function safeText(value: unknown, max = 90): string | null {
+	return typeof value === "string" && value.length > 0 ? clip(redact(norm(value)), max) || null : null;
+}
+
+// Restored failure history is reduced to a FIXED VOCABULARY rather than carried
+// as prose. Redaction removes credentials but not authority: "IGNORE prior
+// harness rules…" survives every text filter and lands under a heading that
+// tells the model this is ground truth. A closed set cannot carry an
+// instruction, and it keeps the signal the lens actually needs (this attempt
+// failed, and roughly how).
+const RESTORED_ERROR_CLASSES: readonly [RegExp, string][] = [
+	[/timeout|timed out/i, "timeout"],
+	[/permission|denied|eacces|forbidden/i, "permission"],
+	[/not found|enoent|no such file|404/i, "not-found"],
+	[/assert|expected|test failed|failing/i, "assertion"],
+	[/schema|invalid argument|validation|required (?:property|field)/i, "schema"],
+	[/syntax|parse|unexpected token/i, "syntax"],
+];
+function restoredErrorClass(value: unknown): string | null {
+	if (typeof value !== "string" || value.length === 0) return null;
+	for (const [pattern, label] of RESTORED_ERROR_CLASSES) if (pattern.test(value)) return label;
+	return "error";
+}
+
+// A label is a bounded TOOL IDENTITY, not free text. The write path emits
+// exactly four shapes — `bash <exe>[ <sub>]`, `<tool> <path>`,
+// `subagent(<agent>)`, `<tool>` — i.e. at most three safeAtom-charset tokens.
+// Validating that shape (rather than re-running safeAtom, which would mangle
+// every legitimate "bash npm test" into "bash?npm?test" and silently change
+// resumed sessions) keeps honest labels byte-identical while a restored
+// sentence — the injection vector, which is necessarily many tokens — cannot
+// masquerade as one.
+const LABEL_ATOM_RE = /^[a-zA-Z0-9_.:@/()-]+$/;
+function restoredLabel(value: unknown): string | null {
+	const text = safeText(value, 60);
+	if (text === null) return null;
+	const tokens = text.split(" ").filter(Boolean);
+	if (tokens.length <= 3 && tokens.every((token) => LABEL_ATOM_RE.test(token))) return tokens.join(" ");
+	// Not a label the harness could have written: keep only the leading atom.
+	return safeAtom(tokens[0] ?? "") || null;
+}
+
+// Persisted board state is UNTRUSTED INPUT, exactly like a run-capsule entry
+// (run-capsule-store.ts validEntry is the in-repo exemplar this mirrors).
+// `v === 2` is a version LABEL, not a shape check: a wrong-typed field used to
+// survive `Object.assign` and then either crash renderLens for the rest of the
+// session (with the corrupt board still installed and the failure swallowed) or
+// — worse — carry hostile prose into a model-visible block headed "ground truth
+// from the harness; do not re-derive". SEVEN slots were raw-interpolated, not
+// the two originally reported, and numeric slots are string-injection sites
+// because they are template-interpolated without coercion.
+//
+// Fails CLOSED: anything that does not type-check is dropped, never coerced,
+// and a state that is not an object at all yields null so the caller can record
+// the rejection instead of silently running on a half-restored board.
+function sanitizeState(data: unknown): BlackboardState | null {
+	if (!isObject(data)) return null;
+	const next = emptyState();
+	next.turn = num(data.turn) ?? 0;
+	next.compactions = num(data.compactions) ?? 0;
+	if (isObject(data.attempts)) {
+		for (const [key, value] of Object.entries(data.attempts)) {
+			// Keys are sha256 hex on the write path (attemptKey); anything else is foreign.
+			if (!/^[a-f0-9]{64}$/.test(key) || !isObject(value)) continue;
+			const label = restoredLabel(value.label);
+			if (label === null) continue;
+			next.attempts[key] = {
+				label,
+				count: num(value.count) ?? 0,
+				errors: num(value.errors) ?? 0,
+				lastError: restoredErrorClass(value.lastError),
+				lastTurn: num(value.lastTurn) ?? 0,
+			};
+		}
 	}
-	if (raw.v === 1) {
-		// v1 persisted raw commands, paths, delegation labels, and errors. Retain
-		// only validated aggregate state; intentionally reset the sensitive ledger.
-		const next = emptyState();
-		if (Number.isFinite(raw.turn)) next.turn = Number(raw.turn);
-		if (Number.isFinite(raw.compactions)) next.compactions = Number(raw.compactions);
-		if (raw.plan && typeof raw.plan === "object") next.plan = { ...next.plan, ...raw.plan };
-		if (raw.verify && typeof raw.verify === "object") next.verify = { ...raw.verify } as BlackboardState["verify"];
-		if (raw.loop && typeof raw.loop === "object") next.loop = { ...raw.loop } as BlackboardState["loop"];
-		if (raw.context && typeof raw.context === "object") next.context = { ...next.context, ...raw.context };
-		Object.assign(boardState(), next);
+	if (Array.isArray(data.delegations)) {
+		next.delegations = data.delegations.filter(isObject).slice(0, 50).map((item) => ({
+			agent: safeAtom(safeText(item.agent, 40) ?? "?"),
+			mode: safeAtom(safeText(item.mode, 20) ?? "?"),
+			ok: bool(item.ok) ?? false,
+			turn: num(item.turn) ?? 0,
+		}));
 	}
+	if (isObject(data.plan)) {
+		const gate = isObject(data.plan.lastGate) ? data.plan.lastGate : null;
+		next.plan = {
+			runId: safeText(data.plan.runId, 64) === null ? null : safeAtom(safeText(data.plan.runId, 64) as string),
+			itemId: safeText(data.plan.itemId, 64) === null ? null : safeAtom(safeText(data.plan.itemId, 64) as string),
+			lastGate: gate ? { pass: bool(gate.pass) ?? false, fails: num(gate.fails) ?? 0 } : null,
+			openItems: num(data.plan.openItems),
+		};
+	}
+	if (isObject(data.verify)) {
+		next.verify = {
+			gateCmd: safeText(data.verify.gateCmd, 80),
+			mutated: bool(data.verify.mutated) ?? false,
+			verifiedOk: bool(data.verify.verifiedOk) ?? false,
+			fires: num(data.verify.fires) ?? 0,
+			sessionFires: num(data.verify.sessionFires) ?? 0,
+		};
+	}
+	if (isObject(data.loop)) {
+		next.loop = {
+			sessionRepeats: num(data.loop.sessionRepeats) ?? 0,
+			seen: num(data.loop.seen) ?? 0,
+			streak: num(data.loop.streak) ?? 0,
+		};
+	}
+	if (isObject(data.context)) {
+		next.context = {
+			pct: num(data.context.pct), staleShare: num(data.context.staleShare), dupShare: num(data.context.dupShare),
+		};
+	}
+	if (isObject(data.research)) {
+		next.research = {
+			searches: num(data.research.searches) ?? 0, reads: num(data.research.reads) ?? 0,
+			notes: num(data.research.notes) ?? 0, notesRejected: num(data.research.notesRejected) ?? 0,
+			cacheHits: num(data.research.cacheHits) ?? 0,
+		};
+	}
+	return next;
+}
+
+/** @returns true when a board was installed; false when the state was rejected. */
+export function restore(data: unknown): boolean {
+	if (!data || typeof data !== "object") return false;
+	const raw = data as Record<string, unknown>;
+	const version = raw.v;
+	// v1 persisted raw commands, paths, delegation labels and errors, so its
+	// ledger is dropped wholesale; both versions now go through one validator
+	// (the v1 branch's "retain only validated aggregate state" was never true —
+	// it spread four foreign objects unchecked).
+	if (version !== 1 && version !== 2) return false;
+	const next = sanitizeState(raw);
+	if (!next) return false;
+	if (version === 1) { next.attempts = {}; next.delegations = []; }
+	Object.assign(boardState(), next);
+	return true;
 }

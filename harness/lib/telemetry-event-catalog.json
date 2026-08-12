@@ -2,6 +2,7 @@
   "events": [
     "bash-output-guard/withheld",
     "blackboard/rendered",
+    "blackboard/restore-rejected",
     "blackboard/restored",
     "chaos/injected",
     "context-brief/injected",
