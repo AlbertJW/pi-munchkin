@@ -164,11 +164,11 @@ test("source defaults to interactive and unknown values cannot become authoritat
 	});
 });
 
-test("v2 authority requires authenticated gate source; legacy MAC rows remain readable", () => {
-	assert.equal(isAuthoritativeTelemetryRow({ schema: "pi.harness-event/v2", source: "gate", mac: "a" }), true);
+test("raw MAC-shaped rows are never called authoritative after the ephemeral key is gone", () => {
+	assert.equal(isAuthoritativeTelemetryRow({ schema: "pi.harness-event/v2", source: "gate", mac: "a" }), false);
 	assert.equal(isAuthoritativeTelemetryRow({ schema: "pi.harness-event/v2", source: "test", mac: "a" }), false);
 	assert.equal(isAuthoritativeTelemetryRow({ schema: "pi.harness-event/v2", source: "unknown", mac: "a" }), false);
-	assert.equal(isAuthoritativeTelemetryRow({ ext: "legacy", mac: "a" }), true);
+	assert.equal(isAuthoritativeTelemetryRow({ ext: "legacy", mac: "a" }), false);
 });
 
 test("authenticated rows MAC the exact flat JSON payload", () => {

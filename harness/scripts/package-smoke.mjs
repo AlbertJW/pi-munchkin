@@ -15,6 +15,9 @@ const extensions = manifest.pi?.extensions ?? [];
 const skills = manifest.pi?.skills ?? [];
 
 const expectedExtensions = [
+  // Sole owner of session identity, surface provenance, and the immutable
+  // initial tool baseline. It must register before any other harness handler.
+  "harness/extensions/session-bootstrap.ts",
   "harness/extensions/hashline.ts",
   "harness/extensions/loop-breaker.ts",
   // c49/c50 sit right after loop-breaker: their turn_end handlers read state

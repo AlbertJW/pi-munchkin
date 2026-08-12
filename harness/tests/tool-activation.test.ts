@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { emitHarnessSignal, signalRunId } from "../lib/harness-signals.ts";
+import { captureInitialToolSurface } from "../lib/session-bootstrap.ts";
 import { fire, makeFakePi } from "./integration-harness.ts";
 
 const allTools = ["read", "bash", "edit", "write", "plan_write", "subagent", "compact_context"];
@@ -16,6 +17,7 @@ async function dynamic(activeInitial = allTools) {
 	(fp.pi as any).getAllTools = () => allTools.map((name) => ({ name, description: "", sourceInfo: { source: "test", path: "test" } }));
 	(fp.pi as any).getActiveTools = () => [...active];
 	(fp.pi as any).setActiveTools = (names: string[]) => { active = [...names]; };
+	captureInitialToolSurface(fp.pi as never);
 	const mod = await import(`../extensions/tool-activation.ts?dynamic=${Date.now()}-${Math.random()}`);
 	mod.default(fp.pi as never);
 	await fire(fp, "session_start", { reason: "new" }, {});
@@ -42,6 +44,7 @@ async function phase(activeInitial = phaseTools) {
 	}));
 	(fp.pi as any).getActiveTools = () => [...active];
 	(fp.pi as any).setActiveTools = (names: string[]) => { active = [...names]; };
+	captureInitialToolSurface(fp.pi as never);
 	const mod = await import(`../extensions/tool-activation.ts?phase=${Date.now()}-${Math.random()}`);
 	mod.default(fp.pi as never);
 	await fire(fp, "session_start", { reason: "new" }, {});
@@ -64,6 +67,60 @@ test("dynamic startup omits deferred schemas and preserves a narrowed --tools se
 	} finally { normal.restore(); }
 	const explicit = await dynamic(["read", "bash"]);
 	try { assert.deepEqual(explicit.active(), ["read", "bash"]); } finally { explicit.restore(); }
+});
+
+test("missing bootstrap baseline preserves the current surface instead of guessing", async () => {
+	const previousMode = process.env.MUNCHKIN_TOOL_ACTIVATION;
+	const previousTelemetry = process.env.TELEMETRY;
+	process.env.MUNCHKIN_TOOL_ACTIVATION = "dynamic";
+	process.env.TELEMETRY = "off";
+	try {
+		captureInitialToolSurface({
+			getActiveTools: () => { throw new Error("unavailable"); },
+			getAllTools: () => [],
+		} as never);
+		const fp = makeFakePi();
+		let active = [...allTools];
+		(fp.pi as any).getAllTools = () => allTools.map((name) => ({ name }));
+		(fp.pi as any).getActiveTools = () => [...active];
+		(fp.pi as any).setActiveTools = (names: string[]) => { active = [...names]; };
+		const mod = await import(`../extensions/tool-activation.ts?missing-bootstrap=${Date.now()}-${Math.random()}`);
+		mod.default(fp.pi as never);
+		await fire(fp, "session_start", {}, {});
+		assert.deepEqual(active, allTools);
+		assert.equal((globalThis as any).__pi_tool_activation_state.reason, "bootstrap-unavailable");
+	} finally {
+		if (previousMode === undefined) delete process.env.MUNCHKIN_TOOL_ACTIVATION; else process.env.MUNCHKIN_TOOL_ACTIVATION = previousMode;
+		if (previousTelemetry === undefined) delete process.env.TELEMETRY; else process.env.TELEMETRY = previousTelemetry;
+	}
+});
+
+test("bootstrap baseline prevents plan_go's internal review hold from looking like --tools", async () => {
+	const previousMode = process.env.MUNCHKIN_TOOL_ACTIVATION;
+	const previousTelemetry = process.env.TELEMETRY;
+	process.env.MUNCHKIN_TOOL_ACTIVATION = "dynamic";
+	process.env.TELEMETRY = "off";
+	try {
+		const tools = [...allTools, "plan_go"];
+		const fp = makeFakePi();
+		let active = [...tools];
+		(fp.pi as any).getAllTools = () => tools.map((name) => ({ name }));
+		(fp.pi as any).getActiveTools = () => [...active];
+		(fp.pi as any).setActiveTools = (names: string[]) => { active = [...names]; };
+		captureInitialToolSurface(fp.pi as never);
+		// Simulate plan-runner's earlier session_start handler applying its review hold.
+		(fp.pi as any).on("session_start", async () => { active = active.filter((name) => name !== "plan_go"); });
+		const mod = await import(`../extensions/tool-activation.ts?plan-hold=${Date.now()}-${Math.random()}`);
+		mod.default(fp.pi as never);
+		await fire(fp, "session_start", {}, {});
+		assert.equal(active.includes("plan_go"), false, "the safety hold remains in force");
+		assert.equal(active.includes("subagent"), false, "dynamic deferral still occurs");
+		assert.equal(active.includes("compact_context"), false, "dynamic deferral still occurs");
+		assert.equal((globalThis as any).__pi_tool_activation_state.preserved_explicit, false);
+	} finally {
+		if (previousMode === undefined) delete process.env.MUNCHKIN_TOOL_ACTIVATION; else process.env.MUNCHKIN_TOOL_ACTIVATION = previousMode;
+		if (previousTelemetry === undefined) delete process.env.TELEMETRY; else process.env.TELEMETRY = previousTelemetry;
+	}
 });
 
 test("subagent activates additively for multi-item execution, second gate failure, and loop tier two", async () => {
@@ -143,6 +200,7 @@ test("dynamic activation is the adopted default", async () => {
 		(fp.pi as any).getAllTools = () => allTools.map((name) => ({ name, description: "", sourceInfo: { source: "test", path: "test" } }));
 		(fp.pi as any).getActiveTools = () => [...active];
 		(fp.pi as any).setActiveTools = (names: string[]) => { active = [...names]; };
+		captureInitialToolSurface(fp.pi as never);
 		const mod = await import(`../extensions/tool-activation.ts?default=${Date.now()}-${Math.random()}`);
 		mod.default(fp.pi as never);
 		await fire(fp, "session_start", { reason: "new" }, {});
@@ -216,6 +274,7 @@ test("first-useful-mutation classifies the bash COMMAND, and the latch survives 
 		let active = [...allTools];
 		(fp.pi as any).getActiveTools = () => [...active];
 		(fp.pi as any).setActiveTools = (names: string[]) => { active = [...names]; };
+		captureInitialToolSurface(fp.pi as never);
 		const mod = await import(`../extensions/tool-activation.ts?mut=${Date.now()}-${Math.random()}`);
 		mod.default(fp.pi as never);
 		await fire(fp, "session_start", {});
@@ -241,6 +300,7 @@ test("first-useful-mutation classifies the bash COMMAND, and the latch survives 
 			(fresh.pi as any).getAllTools = () => allTools.map((name) => ({ name, description: "", sourceInfo: { source: "test", path: "test" } }));
 			(fresh.pi as any).getActiveTools = () => [...allTools];
 			(fresh.pi as any).setActiveTools = () => {};
+			captureInitialToolSurface(fresh.pi as never);
 			const m2 = await import(`../extensions/tool-activation.ts?mut2=${Date.now()}-${Math.random()}`);
 			m2.default(fresh.pi as never);
 			await fire(fresh, "session_start", {});

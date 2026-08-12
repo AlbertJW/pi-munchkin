@@ -179,8 +179,11 @@ export function encodeTelemetryRow(row: Record<string, unknown>, key?: string | 
 }
 
 export function isAuthoritativeTelemetryRow(row: Record<string, unknown>): boolean {
-	if (row.schema === "pi.harness-event/v2") return row.source === "gate" && typeof row.mac === "string";
-	return typeof row.mac === "string"; // legacy authenticated rows remain readable
+	void row;
+	// A MAC-shaped raw row is not verifiable after the launcher's ephemeral key
+	// disappears. Authority belongs to the gate result pipeline that verifies the
+	// HMAC while the key is live, never to this secondary JSONL reader.
+	return false;
 }
 
 function maxBytes(): number {

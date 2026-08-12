@@ -2809,6 +2809,18 @@ with a round's real evidence. Three revisions of one field is itself the finding
 was treated as an implementation detail when it is the denominator of every rate this project
 reports.
 
+**2026-08-12 final attribution correction.** The third revision still minted identity inside
+`runtime-truth`, late enough for earlier manifest handlers to write rows under a fallback id,
+and it resolved child lineage only one hop. A first-loaded `session-bootstrap` now owns the
+session id, surface receipt, and initial tool baseline before any other first-party
+`session_start` handler runs. The report resolves root → child → grandchild transitively,
+groups siblings under a shared missing external ancestor, and excludes conflicting or cyclic
+claims. Raw gate JSONL is not called authenticated merely because it has a `mac` field: after
+the ephemeral key is gone it is an unknown population, and only the gate result pipeline may
+make an authenticated claim. All earlier shadow summaries based on split identities,
+single-hop lineage, or the broken ordered-layout hash are retracted; no efficacy or exposure
+estimate carries forward.
+
 Also fixed: the plan-review hold leaked into unrelated sessions (module state outlives a
 session; the next session advertised `plan_go` and refused it with the previous session's
 message); the watchdog's "is it sanitized" test was a substring raw content could itself

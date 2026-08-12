@@ -80,6 +80,7 @@
     "run-kernel/transition",
     "runtime/provider-timing",
     "runtime/serving-truth",
+    "session-bootstrap/surface-unavailable",
     "span-tools/read",
     "span-tools/search",
     "state-lens/steer-injected",

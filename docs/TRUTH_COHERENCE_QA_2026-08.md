@@ -21,7 +21,21 @@ skills. No `context-pressure*` file changed and no live agent directory was used
 
 ## PR 2 — session identity and analysis populations
 
-Pending.
+Three counterfactuals were exercised. Restoring `beginSession()` in
+`runtime-truth` made `manifest-first bootstrap gives every session_start row one
+identity and non-null surface` fail with two identities. Replacing transitive
+root resolution with the former one-hop `sp` grouping made
+`shadow_report.py --selftest` fail at the root→child→grandchild assertion.
+Classifying the post-`plan_go`-hold active surface instead of the bootstrap
+baseline made `bootstrap baseline prevents plan_go's internal review hold from
+looking like --tools` fail because dynamic tools were no longer deferred.
+
+After restoration, `npm run verify` passed 557 tests plus typecheck, health,
+deterministic package smoke, and optimizer verification. The diff secret scan
+and diff check passed. Isolated packed consumers for Pi 0.80–0.84 each
+typechecked and loaded 32 extensions and two skills. A temporary agent-dir
+mirror wrote and checked 111 artifacts with zero drift; the live agent was not
+modified.
 
 ## PR 3 — model-input trust and one-voice control
 

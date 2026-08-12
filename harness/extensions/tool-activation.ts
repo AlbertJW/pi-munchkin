@@ -2,6 +2,7 @@ import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { measureActiveSurface, phaseDeferredTools, PHASE_CAPABILITY_TOOLS } from "../lib/capability-surface.ts";
 import { classifyBashCommand } from "../lib/command-policy.ts";
 import { record } from "../lib/telemetry.ts";
+import { initialToolSurface } from "../lib/session-bootstrap.ts";
 import { onHarnessSignal, type CapabilityName } from "../lib/harness-signals.ts";
 
 type Mode = "ambient" | "dynamic" | "phase";
@@ -116,11 +117,21 @@ export default function (pi: ExtensionAPI): void {
 		lastContextPct = 0;
 		sessionStartedAt = performance.now();
 		firstUsefulMutation = false;
-		allTools = pi.getAllTools() as any[];
-		const all = allTools.map((tool) => String(tool.name));
+		try { allTools = pi.getAllTools() as any[]; } catch { allTools = []; }
 		const active = pi.getActiveTools();
+		const baseline = initialToolSurface();
+		if (!baseline?.complete) {
+			publish({ mode, preserved_explicit: true, reason: "bootstrap-unavailable", phase: mode === "phase" ? "phase-aware" : "dynamic" });
+			for (const tool of mode === "phase" ? phaseDeferredTools(allTools.map((item) => String(item.name))) : DYNAMIC_DEFERRED) {
+				record("tool-activation", "preserved-explicit", { tool, reason: "bootstrap-unavailable" });
+			}
+			surfaceTelemetry();
+			return;
+		}
+		const all = [...baseline.all];
+		const initialActive = [...baseline.active];
 		const allSet = new Set(all);
-		const activeSet = new Set(active);
+		const activeSet = new Set(initialActive);
 		const complete = [...BASE_REGISTRY, ...DYNAMIC_DEFERRED].every((name) => allSet.has(name));
 		explicit = activeSet.size !== allSet.size || all.some((name) => !activeSet.has(name));
 		const deferredNames = mode === "phase" ? phaseDeferredTools(all) : new Set(DYNAMIC_DEFERRED.filter((name) => allSet.has(name)));

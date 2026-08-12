@@ -17,6 +17,7 @@ const failure = {
 export const EVENT_CATALOG = {
 	"telemetry/schema-reject": { rejected_count: "number", reason_class: "string" },
 	"telemetry/writer-overflow": { dropped_rows: "number" },
+	"session-bootstrap/surface-unavailable": { reason: "string" },
 	"control-arbiter/decision": {
 		mode: "string", proposals: "number", collisions: "number", legacy_actions: "number",
 		winner_kind: "string", winner_source: "string", winner_reason: "string", boundary_sequence: "number",

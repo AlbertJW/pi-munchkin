@@ -67,7 +67,7 @@ adoption, deletion, live mirroring, and gate rounds are human-gated. Never touch
 > `docs/SURFACE_BOUNDARIES.md`): watchdog privacy (0700/0600 + report redaction), pi 0.84
 > peer range, session-identity rework (episode exposure is **UNKNOWN**: the 29% read was a
 > cwd-collapse artifact AND its 0% replacement was computed on an incoherent population —
-> telemetry now emits a per-process `si` id, `shadow_report.py` binds one surface hash and
+> telemetry now emits a per-session `si` id, `shadow_report.py` binds one surface hash and
 > refuses to number a mixed population; the "loop-intervention powerable" read stays
 > retracted), non-vacuous judge calibration, `gate_sha256` identity on run-kernel verification,
 > abandoned-episode terminal state, awaited adaptive rebind, `plan_go` off-surface during
@@ -79,6 +79,13 @@ adoption, deletion, live mirroring, and gate rounds are human-gated. Never touch
 > callers: redirect `< /dev/null`. Albert's hold ("no calibration, dark mechanisms, or
 > measurement-readiness claims until the five high findings are resolved") is satisfied;
 > his gates remain fixture approval, then the preregistered n=6 calibration.
+>
+> **2026-08-12 attribution repair:** `session-bootstrap.ts` is now the first manifest
+> extension and the sole owner of `si`, surface provenance, and the immutable initial tool
+> registry. Lineage is transitive; conflicts and cycles are excluded; raw gate JSONL is
+> explicitly UNKNOWN because its ephemeral HMAC key is gone. Every shadow summary made with
+> split identity, one-hop lineage, or the pre-v2 ordered-layout hash is retracted. No efficacy
+> or exposure estimate survives this boundary.
 >
 > **2026-08-11 PLAN-EXECUTION STATUS (read this first).** Phases 0-3 of the harness plan are
 > built; phase 4 (candidate trials) is blocked only on human approval of the new fixtures.

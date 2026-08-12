@@ -41,7 +41,7 @@ Thresholds are declared here, before the data is read.
 
   ./shadow_report.py                       # the live interactive stream
   ./shadow_report.py --file path.jsonl     # a specific capture
-  ./shadow_report.py --source gate         # gate rows instead of interactive
+  ./shadow_report.py --source gate         # UNKNOWN; use verified gate results
   ./shadow_report.py --surface <sha256>    # bind a specific surface hash
   ./shadow_report.py --selftest            # offline
 """
@@ -112,40 +112,83 @@ def split_by_identity(rows):
     return sound, legacy
 
 
-def session_of(row):
-    """Roll a subagent up to the session that spawned it.
+def resolve_lineage(rows):
+    """Resolve every `si` to a transitive logical root, failing closed.
 
-    A child runs in its own process and mints its own `si`, so counting it as a
-    session would split one logical session into several and inflate every
-    denominator. `sp` carries the parent id across the process boundary.
+    A parent absent from this file is an external root. Children naming the same
+    absent parent therefore remain siblings. Conflicting claims and cycles have
+    no defensible root and are excluded, including descendants that depend on
+    them. Returns (kept_rows, root_by_si, conflict_rows, cycle_rows).
     """
-    parent = row.get("sp")
-    return parent if isinstance(parent, str) and parent else row["si"]
+    claims = collections.defaultdict(set)
+    identities = {row["si"] for row in rows}
+    for row in rows:
+        parent = row.get("sp")
+        claims[row["si"]].add(parent if isinstance(parent, str) and parent else None)
+
+    roots, invalid = {}, {}
+    for identity in identities:
+        path, positions = [], {}
+        current = identity
+        outcome = None
+        while True:
+            if current in roots:
+                outcome = ("root", roots[current])
+                break
+            if current in invalid:
+                outcome = (invalid[current], None)
+                break
+            if current in positions:
+                outcome = ("cycle", None)
+                break
+            positions[current] = len(path)
+            path.append(current)
+            parents = claims.get(current, set())
+            if len(parents) > 1:
+                outcome = ("conflict", None)
+                break
+            parent = next(iter(parents), None)
+            if parent is None:
+                outcome = ("root", current)
+                break
+            if parent not in identities:
+                outcome = ("root", f"external:{parent}")
+                break
+            current = parent
+        kind, root = outcome
+        for member in path:
+            if kind == "root":
+                roots[member] = root
+            else:
+                invalid[member] = kind
+
+    kept, conflict_rows, cycle_rows = [], 0, 0
+    for row in rows:
+        reason = invalid.get(row["si"])
+        if reason == "conflict":
+            conflict_rows += 1
+        elif reason == "cycle":
+            cycle_rows += 1
+        else:
+            kept.append(row)
+    return kept, roots, conflict_rows, cycle_rows
 
 
-def drop_unauthenticated_gate_rows(rows):
-    """Gate rows must be AUTHENTICATED to count as gate evidence.
-
-    A subagent inherits TELEMETRY_SOURCE=gate but NOT the authenticated
-    descriptors (runner-env excludes TELEMETRY_FD/TELEMETRY_HMAC_FD), so an
-    unsigned child row would otherwise be pooled with the round's real evidence.
-    Returns (kept, dropped_count).
-    """
-    kept = [row for row in rows if row.get("source") != "gate" or isinstance(row.get("mac"), str)]
-    return kept, len(rows) - len(kept)
-
-
-def analyse(rows, surface=None):
+def analyse(rows, surface=None, population_source=None):
+    if population_source == "gate":
+        return {"sessions": 0, "population": {"surface": surface}, "verdict": "unknown",
+                "reason": "raw gate telemetry cannot be authenticated after its ephemeral key is gone; "
+                          "use the HMAC-verified gate result pipeline"}
     bound, surface, excluded_other_surface = bind_surface(rows, surface)
-    bound, unauthenticated = drop_unauthenticated_gate_rows(bound)
     sound, legacy = split_by_identity(bound)
+    sound, roots, lineage_conflicts, lineage_cycles = resolve_lineage(sound)
 
     sessions = collections.defaultdict(lambda: {
         "disagreements": collections.Counter(), "episodes_opened": 0,
         "episodes_exposed": 0, "recovered": 0, "settled": False, "kernel_receipts": 0,
     })
     for row in sound:
-        session = sessions[session_of(row)]
+        session = sessions[roots[row["si"]]]
         ext, kind = row.get("ext"), row.get("kind")
         if ext == "run-kernel" and kind == "legacy-disagreement":
             session["disagreements"][row.get("dimension", "?")] += 1
@@ -164,7 +207,8 @@ def analyse(rows, surface=None):
         "surface": surface,
         "rows_excluded_other_or_no_surface": excluded_other_surface,
         "rows_excluded_no_session_identity": len(legacy),
-        "rows_excluded_unauthenticated_gate": unauthenticated,
+        "rows_excluded_lineage_conflict": lineage_conflicts,
+        "rows_excluded_lineage_cycle": lineage_cycles,
         "identity_sound_rows": len(sound),
     }
     total = len(sessions)
@@ -336,25 +380,42 @@ def selftest():
     pinned = analyse(mixed, surface="hashB")
     assert pinned["sessions"] == 3 and pinned["population"]["surface"] == "hashB"
 
-    # A SUBAGENT is not a session: its rows carry their own si plus the parent's
-    # sp, and must roll up rather than inflate the denominator.
+    # A SUBAGENT is not a session: lineage resolves transitively.
     parent = [row("p0", "run-kernel", "receipt") for _ in range(1)]
     child = [dict(row("c0", "failure-episode", "observed"), sp="p0") for _ in range(3)]
-    rolled = analyse(parent + child)
+    grandchild = [dict(row("g0", "run-kernel", "settled"), sp="c0")]
+    rolled = analyse(parent + child + grandchild)
     assert rolled["sessions"] == 1, "a subagent must roll up to the session that spawned it"
     assert rolled["q2_episode_exposure"]["sessions_exposing_an_episode"] == 1
+
+    # Missing ancestors are external roots, so siblings still group together.
+    missing = [dict(row("m1", "run-kernel", "receipt"), sp="external-parent"),
+               dict(row("m2", "failure-episode", "observed"), sp="external-parent")]
+    assert analyse(missing)["sessions"] == 1
+
+    # Conflicting parents and cycles are not guessable populations.
+    conflict = [dict(row("bad", "run-kernel", "receipt"), sp="p1"),
+                dict(row("bad", "run-kernel", "settled"), sp="p2")]
+    conflict_report = analyse(conflict)
+    assert conflict_report["sessions"] == 0
+    assert conflict_report["population"]["rows_excluded_lineage_conflict"] == 2
+    cycle = [dict(row("cy1", "run-kernel", "receipt"), sp="cy2"),
+             dict(row("cy2", "run-kernel", "receipt"), sp="cy1")]
+    cycle_report = analyse(cycle)
+    assert cycle_report["sessions"] == 0
+    assert cycle_report["population"]["rows_excluded_lineage_cycle"] == 2
 
     # ...and one PROCESS hosting several sessions counts as several sessions.
     multi = [row(f"s{i}", "run-kernel", "receipt") for i in range(3)]
     assert analyse(multi)["sessions"] == 3
 
-    # GATE rows must be authenticated to count: a child inherits the source label
-    # but not the signing descriptors.
+    # A raw MAC-shaped gate row is still unverifiable after the ephemeral key is
+    # gone. Gate populations come from the already-verified result pipeline.
     unsigned = [dict(row(f"g{i}", "run-kernel", "receipt"), source="gate") for i in range(5)]
     signed = [dict(row(f"h{i}", "run-kernel", "receipt"), source="gate", mac="deadbeef") for i in range(2)]
-    gate_report = analyse(unsigned + signed)
-    assert gate_report["sessions"] == 2, "unsigned gate rows must not be pooled with real gate evidence"
-    assert gate_report["population"]["rows_excluded_unauthenticated_gate"] == 5
+    gate_report = analyse(unsigned + signed, population_source="gate")
+    assert gate_report["sessions"] == 0 and gate_report["verdict"] == "unknown"
+    assert "HMAC-verified gate result pipeline" in gate_report["reason"]
 
     print("shadow_report selftest: ok")
 
@@ -373,7 +434,8 @@ def main():
     if not os.path.exists(path):
         print(f"no telemetry at {path}")
         return 1
-    report = analyse(load(path, args.source or None), surface=args.surface)
+    report = analyse(load(path, args.source or None), surface=args.surface,
+                     population_source=args.source or None)
     print(json.dumps(report, indent=2))
     print()
     for line in verdict_lines(report):
