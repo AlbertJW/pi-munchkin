@@ -8,7 +8,7 @@ Brought current 2026-08-05 (had been stale since 2026-07-22 and still described 
 candidates as dark). Net changes since 0.3.0; the full per-decision record is
 `optimizer/docs/DARK_CANDIDATE_VERDICTS_2026-08-03.md` and the ledger.
 
-### Removed (draft; deletion checkpoint pending)
+### Removed
 
 - **Low-merit candidate retirement (2026-08-12):** removed loadable micro-gate/slop and
   payload-audit paths; removed the redundancy nudge, per-call state-lens view, and mandatory
@@ -18,8 +18,8 @@ candidates as dark). Net changes since 0.3.0; the full per-decision record is
   `optimizer/prompt-lab/configs/retired/`. Generic CoT/pause, patient/terse/taxonomy prompts,
   prompt YAML, fresh/locality retry, and the inert span screen leave the active roster.
   `no-verify-gate` and `harness-off` remain suppression controls; `bash-output-guard` and
-  `prompt-lean` remain candidates. This draft is not merged or mirrored without the separate
-  human deletion checkpoint.
+  `prompt-lean` remain candidates. The deletion checkpoint was cleared by human decision and
+  this landed on `main` and the live mirror on 2026-08-12 together with the spiral-control PRs.
 
 ### Added
 

@@ -24,6 +24,29 @@ adoption, deletion, live mirroring, and gate rounds are human-gated. Never touch
 
 ## 2026-08 hardening series
 
+> **2026-08-12 SPIRAL-CONTROL SERIES ROLLED OUT (PR 1–4) — model-visible default change, read first.**
+> Approved by human decision and merged to `main` + mirrored live. This is NOT a shadow-safe
+> rollout: deployed DEFAULTS changed, so no measurement pools across this boundary.
+> - **Verification is stricter by default** (`VERIFY_EXECUTION_ORDER` now defaults to `execution`,
+>   was `legacy`): a green verifier is refused after a *failed* or *in-flight* mutation, or when a
+>   mutation call has no observed completion. `PLAN_GATE_DIAGNOSTICS=safe` (default) returns a
+>   redacted ≤500-byte `UNTRUSTED_GATE_DIAGNOSTIC` instead of raw gate output. Rollbacks:
+>   `VERIFY_EXECUTION_ORDER=legacy`, `PLAN_GATE_DIAGNOSTICS=legacy`.
+> - **Loop steering changed**: failing-edit loops that were masked as "progress" now escalate;
+>   at most one loop-breaker steer per turn (pure `loop-action` reducer); the 120s verify-gate
+>   nag-suppression window is gone (deconflict moved to the typed control arbiter). Steer *texts*
+>   are byte-identical; which/when/how-many changed. Gate command shown in steers is redacted.
+> - **Retired from the live harness** (archived non-loadable under
+>   `optimizer/archive/runtime-candidates/`): micro-gate/slop, payload-audit, the redundancy
+>   nudge, the per-call state-lens `view|both` modes, and the mandatory subagent-only mutation
+>   branch — plus their flags, telemetry, control vocabulary, and manifest entries. Manifest is
+>   now 30 extensions + 2 skills. The `CONTROL_ARBITER` default stays `shadow`, so the lens+steer
+>   one-voice dedup only applies under `enforce` (still your adoption gate); the losing-abort
+>   drop is fixed regardless (terminal proposals outrank message proposals).
+> - Loaded live hash and live-smoke result are in `docs/SURFACE_BOUNDARIES.md` (spiral-control
+>   rows). Rollback for the whole series is `git revert` on `main` + re-mirror, or the per-flag
+>   `legacy`/`off` switches above.
+
 > **2026-08-12 LIVE TOPOLOGY ROLLED OUT — read before touching the live agent.**
 > `~/.pi/agent/extensions/` no longer holds loose first-party files. Everything now lives in
 > `extensions/pi-munchkin/` (extensions + lib + vendor) with a GENERATED `package.json` whose
