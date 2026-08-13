@@ -1,0 +1,19 @@
+{
+  "name": "semantic-loop-enforce",
+  "prediction": "Semantic episode interventions reduce post-second-failure tool calls without harming correctness.",
+  "prompt_variant": "A",
+  "format": "md",
+  "scaffold": "none",
+  "thresholds": {
+    "LOOP_EPISODE_MODE": "enforce"
+  },
+  "exposure": {
+    "mode": "telemetry",
+    "target": [
+      "failure-episode/intervention"
+    ],
+    "diagnostic": [
+      "failure-episode/tier-observed"
+    ]
+  }
+}

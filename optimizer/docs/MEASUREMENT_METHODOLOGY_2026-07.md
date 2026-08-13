@@ -547,3 +547,34 @@ V2 remains readable as historical evidence but is ineligible for semantic-enforc
 V2, v3, and schema-less historical rows are distinct analysis populations and must never be mixed.
 Raw gate JSONL is not authenticated after its ephemeral HMAC key is gone; only the reduced row
 written while the parent still owns that key carries authenticated episode evidence.
+
+---
+
+## §17 — Ling Tiny study stages and serving strata
+
+The semantic-enforcement study uses `failure_episode_trial.py`, not an ad hoc shell loop. Its
+stages are `preflight → calibrate → power → primary → primary-report → replication → final-report`,
+and each stage is a separate operator action. Only calibration, primary, and replication accept
+`--execute`; none automatically starts a later stage. State and result rows are private artifacts,
+and completed `(stage, fixture, arm, repetition)` cells are skipped on resume.
+
+Calibration is exactly six shadow sessions per fixture. Admission remains fixed at 2–4 correct
+sessions and semantic-episode exposure in at least two sessions, with complete authenticated v3
+settlement and exact token usage throughout. At least two fixtures must qualify. Power uses the
+zero-inclusive calibration distribution, a 30% binomial-thinning alternative, 500 simulated
+trials with 1,000 bootstrap resamples each, candidate sizes 40/48/56/64/72/80 per arm, and selects
+the first size reaching 80% estimated bootstrap power. Failure at
+80 stops the study rather than weakening admission.
+
+Every row binds the study-manifest, surface, model-registry, fixture, config, rendered-governor,
+prompt, and serving identities. `pi.serving-fingerprint/v2` provides semantic, performance, and
+full hashes. Pre/post hashes must match within every session and all rows in a stage must share
+one serving contract. A Mac replication is therefore a separate stratum even if it uses the same
+model bytes; results may be compared but are never pooled with the network box.
+
+The primary outcome and adoption threshold remain those in §15: at least 20% reduction in mean
+all-session semantic overrun with the 95% bootstrap interval for candidate minus control below
+zero. Correctness may fall by at most five percentage points, intervention exposure must reach
+20%, and token usage must show no statistically significant regression. The second eligible
+fixture must agree in direction without violating the correctness or token guards. Reports never
+turn those rules into an automatic default flip.

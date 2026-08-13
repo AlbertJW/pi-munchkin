@@ -202,6 +202,7 @@ def test_fingerprint():
         assert "secret" not in flags and "<redacted>" in flags
         router = Path(td) / "router.yaml"; router.write_text("models: {}\n")
         backend = ["/x/llama-server", "-m", str(p), "--alias", "m", "--port", "5800", "-c", "4096",
+                   "-t", "8", "-b", "2048", "-ub", "1024", "-np", "1", "-ngl", "99",
                    "--cache-type-k", "q8_0", "--cache-type-v", "q8_0", "--temp", "0.2",
                    "--top-p", "0.9", "--top-k", "40", "--min-p", "0.05",
                    "--repeat-penalty", "1.1", "--presence-penalty", "0", "--seed", "42",
@@ -225,15 +226,50 @@ def test_fingerprint():
         finally:
             sf.process_rows, sf.fetch_json = original_rows, original_fetch
         assert local_a["status"] == "complete", local_a["missing"]
+        assert local_a["schema"] == "pi.serving-fingerprint/v2"
+        assert local_a["semantic"]["artifact"]["basename"] == "model.gguf"
+        assert local_a["performance"]["batch_size"] == 2048
+        assert local_a["fingerprint_sha256"] == local_a["full_sha256"]
+        assert str(Path(td)) not in json.dumps(local_a), "private absolute path entered v2 fingerprint"
         assert local_a["fingerprint_sha256"] != local_b["fingerprint_sha256"], "template hot-swap not detected"
         old_file = sf.os.environ.pop("SERVING_FINGERPRINT_FILE", None)
         old_url = sf.os.environ.pop("SERVING_FINGERPRINT_URL", None)
+        old_helper = sf.os.environ.pop("SERVING_FINGERPRINT_HELPER", None)
         try:
             remote = sf.remote_document("m")
             assert remote["status"] == "incomplete" and remote["missing"]
+            helper = Path(td) / "fingerprint-helper"
+            helper.write_text("#!/bin/sh\nprintf '%s' \"$FINGERPRINT_SENTINEL\"\n")
+            helper.chmod(0o700)
+            sf.os.environ["SERVING_FINGERPRINT_HELPER"] = str(helper)
+            sf.os.environ["FINGERPRINT_SENTINEL"] = json.dumps(local_a)
+            loopback = "http://" + ".".join(("127", "0", "0", "1")) + ":1"
+            # The helper receives a fixed environment, so arbitrary inherited
+            # values cannot become a covert credential/input channel.
+            try:
+                sf.capture(loopback, "m")
+            except ValueError as exc:
+                assert "invalid JSON" in str(exc) or "failed" in str(exc)
+            else:
+                raise AssertionError("helper inherited an undeclared sentinel")
+            helper.write_text("#!/usr/bin/env python3\nimport json\nprint(json.dumps(" + repr(local_a) + "))\n")
+            helper.chmod(0o700)
+            assert sf.capture(loopback, "m")["full_sha256"] == local_a["full_sha256"]
+            hostile = json.loads(json.dumps(local_a)); hostile["semantic"]["endpoint"] = "private"
+            helper.write_text("#!/usr/bin/env python3\nimport json\nprint(json.dumps(" + repr(hostile) + "))\n")
+            helper.chmod(0o700)
+            try:
+                sf.capture(loopback, "m")
+            except ValueError as exc:
+                assert "shape" in str(exc)
+            else:
+                raise AssertionError("helper document accepted an undeclared field")
         finally:
             if old_file is not None: sf.os.environ["SERVING_FINGERPRINT_FILE"] = old_file
             if old_url is not None: sf.os.environ["SERVING_FINGERPRINT_URL"] = old_url
+            if old_helper is not None: sf.os.environ["SERVING_FINGERPRINT_HELPER"] = old_helper
+            else: sf.os.environ.pop("SERVING_FINGERPRINT_HELPER", None)
+            sf.os.environ.pop("FINGERPRINT_SENTINEL", None)
 
 
 def test_one_shot():

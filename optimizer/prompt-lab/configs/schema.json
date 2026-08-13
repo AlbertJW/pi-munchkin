@@ -131,6 +131,10 @@
           "on",
           "off"
         ],
+        "LOOP_EPISODE_MODE": [
+          "shadow",
+          "enforce"
+        ],
         "DRIFT_SCANNER": [
           "on",
           "off"

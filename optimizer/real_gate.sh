@@ -25,6 +25,7 @@ append_gate_tool() { # $1=list $2=tool
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(git -C "$HERE" rev-parse --show-toplevel 2>/dev/null || dirname "$HERE")"
 GEN="${GEN:-rg0}"; N="${N:-3}"
+REP_START="${REP_START:-1}"
 ARM="${ARM:-both}"                 # base | cand | both
 # The unconditional tool surface of EVERY gate session, both arms. This must match
 # the live agent's standard surface (minus deliberate exclusions) or rounds measure
@@ -47,7 +48,7 @@ FIXTURES="$HERE/real-gate-fixtures"
 CONFIG="$HERE/prompt-lab/config.py"; METRICS="$HERE/ab-machinery/metrics.py"
 FIXTURE_META="$HERE/prompt-lab/eval_fixture.py"; FINGERPRINT="$HERE/prompt-lab/serving_fingerprint.py"
 EXEC_POLICY="$HERE/prompt-lab/execution_policy.py"
-RESULTS="$HERE/prompt-lab/results/$GEN.jsonl"
+RESULTS="${RESULTS:-$HERE/prompt-lab/results/$GEN.jsonl}"
 RUNS="${REAL_GATE_RUNS:-$HOME/.pi/real-gate-runs}"
 EXPERIMENT_MANIFEST="${EXPERIMENT_MANIFEST:-}"
 EXPERIMENT_MANIFEST_SHA256="${EXPERIMENT_MANIFEST_SHA256:-}"
@@ -218,6 +219,10 @@ if [[ "$SANDBOX" != "on" ]]; then
 fi
 [[ "$ARM_NEXT" == 0 ]] || { echo "[real_gate] --arm requires base, cand, or both" >&2; exit 2; }
 case "$ARM" in base|cand|both) ;; *) echo "[real_gate] invalid ARM=$ARM (base|cand|both)" >&2; exit 2 ;; esac
+[[ "$N" =~ ^[1-9][0-9]*$ && "$REP_START" =~ ^[1-9][0-9]*$ ]] || {
+	echo "[real_gate] N and REP_START must be positive integers" >&2; exit 2;
+}
+REP_END=$((REP_START + N - 1))
 # Authenticated endpoints (e.g. the box router) need a bearer token; /health is
 # open so health() stays keyless. LLAMA_API_KEY empty -> no header (local zoo).
 # The token is passed via a fresh `-K <(...)` process substitution at each call
@@ -773,8 +778,10 @@ ctx=json.load(open(ctxpath)); pre=json.load(open(prepath)); post=json.load(open(
 # unverified value into a row.
 context_data=json.load(open(context_telemetry_path))
 harness_surface_sha256=context_data.get("harness_surface_sha256")
-stable=pre.get("fingerprint_sha256") == post.get("fingerprint_sha256")
-serving_complete=pre.get("status") == post.get("status") == "complete"
+fingerprint_fields=("semantic_sha256","performance_sha256","full_sha256")
+stable=all(pre.get(field) and pre.get(field) == post.get(field) for field in fingerprint_fields)
+serving_complete=(pre.get("schema") == post.get("schema") == "pi.serving-fingerprint/v2" and
+                  pre.get("status") == post.get("status") == "complete")
 execution_authoritative=bool(int(network_auth)) and bool(int(sandbox_auth))
 execution_reason=network_reason if bool(int(sandbox_auth)) else f"{network_reason}; {sandbox_reason}"
 spec=importlib.util.spec_from_file_location("execution_policy", policy_path); policy=importlib.util.module_from_spec(spec); spec.loader.exec_module(policy)
@@ -901,8 +908,10 @@ PY
 import importlib.util,json,os,sys
 out,model,task,rep,runid,ctxp,resultp,prep,postp,eligible,network_mode,model_control,provider,endpoint_sha,network_auth,network_reason,sandbox_auth,sandbox_reason,policy_path=sys.argv[1:20]
 ctx=json.load(open(ctxp)); result=json.load(open(resultp)); pre=json.load(open(prep)); post=json.load(open(postp))
-stable=pre.get("fingerprint_sha256")==post.get("fingerprint_sha256")
-complete=pre.get("status")==post.get("status")=="complete"
+fingerprint_fields=("semantic_sha256","performance_sha256","full_sha256")
+stable=all(pre.get(field) and pre.get(field)==post.get(field) for field in fingerprint_fields)
+complete=(pre.get("schema")==post.get("schema")=="pi.serving-fingerprint/v2" and
+          pre.get("status")==post.get("status")=="complete")
 execution_authoritative=bool(int(network_auth)) and bool(int(sandbox_auth))
 execution_reason=network_reason if bool(int(sandbox_auth)) else f"{network_reason}; {sandbox_reason}"
 spec=importlib.util.spec_from_file_location("execution_policy", policy_path); policy=importlib.util.module_from_spec(spec); spec.loader.exec_module(policy)
@@ -939,7 +948,7 @@ if [[ ${#SPECS[@]} -eq 1 || "${INTERLEAVE:-on}" == "off" ]]; then
 	for spec in "${SPECS[@]}"; do
 		pat="${spec%%:*}"; cfg="${spec#*:}"
 		for task in "${TASKS[@]}"; do
-			for rep in $(seq 1 "$N"); do run_one "$cfg" "$pat" "$task" "$rep"; done
+		for rep in $(seq "$REP_START" "$REP_END"); do run_one "$cfg" "$pat" "$task" "$rep"; done
 		done
 	done
 else
@@ -950,7 +959,7 @@ else
 	# block order.
 	cell=0
 	for task in "${TASKS[@]}"; do
-		for rep in $(seq 1 "$N"); do
+		for rep in $(seq "$REP_START" "$REP_END"); do
 			if (( cell % 2 == 0 )); then order=(0 1); else order=(1 0); fi
 			for i in "${order[@]}"; do
 				spec="${SPECS[$i]}"; pat="${spec%%:*}"; cfg="${spec#*:}"
@@ -970,7 +979,7 @@ if [[ -n "${HELDOUT:-}" ]]; then
 	held_cell=0
 	for task in ${HELDOUT}; do
 		case " ${TASKS[*]} " in *" $task "*) echo "[real_gate] $task is in TASKS — held-out contamination; aborting" >&2; exit 2 ;; esac
-		for rep in $(seq 1 "$N"); do
+		for rep in $(seq "$REP_START" "$REP_END"); do
 			if [[ ${#SPECS[@]} -eq 1 || "${INTERLEAVE:-on}" == "off" ]]; then
 				order=(); for i in "${!SPECS[@]}"; do order+=("$i"); done
 			elif (( held_cell % 2 == 0 )); then order=(0 1); else order=(1 0); fi
@@ -988,7 +997,7 @@ fi
 # is diagnostic only, so neither can inflate adoption Fisher sample sizes.
 if [[ "$ROBUSTNESS" == 1 ]]; then
 	for task in "${TASKS[@]}"; do
-		for rep in $(seq 1 "$N"); do
+		for rep in $(seq "$REP_START" "$REP_END"); do
 			for variant in equivalent-1 equivalent-2 equivalent-3; do
 				for spec in "${SPECS[@]}"; do
 					pat="${spec%%:*}"; cfg="${spec#*:}"; run_one "$cfg" "$pat" "$task" "$rep" robustness "$variant"

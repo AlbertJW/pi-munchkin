@@ -94,10 +94,47 @@ llama-specific control-plane calls. A provider-qualified model such as
 `anthropic/claude-sonnet-4-5` is preferred. Native-provider one-shot controls are
 recorded as ineligible because that arm must make a direct API request without Pi.
 
-Serving fingerprints are captured before and after every row. Any missing
-field, backend hot-swap, or paired-arm mismatch makes comparison reports
-`INCOMPLETE`. Remote servers may supply an equivalent document using
-`SERVING_FINGERPRINT_FILE` or `SERVING_FINGERPRINT_URL`.
+Serving fingerprints are captured before and after every row. The current
+`pi.serving-fingerprint/v2` contract separates a semantic identity (model
+bytes, runtime build, template, context/token ceilings, reasoning/decoding,
+cache, speculation, and normalized launch flags) from a performance identity
+(threads, batches, parallel slots, accelerator placement, split mode, and
+tensor split). It also hashes the canonical union. Any missing field, within-row
+change in any of the three hashes, or within-stage serving mismatch makes a
+failure-episode study incomplete.
+
+For a remote loopback tunnel, set `SERVING_FINGERPRINT_HELPER` to an absolute,
+private executable. The parent invokes it with only `--model ID`, a fixed
+environment allowlist, discarded stderr, a 20-second deadline, and a 64 KiB
+output cap. It must print exactly one validated v2 JSON object. SSH aliases,
+commands, endpoints, paths, and credentials stay in that private helper; none
+are copied into the repository, evaluated child, manifest, or result row.
+`SERVING_FINGERPRINT_FILE` and `SERVING_FINGERPRINT_URL` remain compatibility
+inputs for generic exploratory runs, but the powered Ling runner requires the
+helper and refuses inherited HTTP credentials.
+
+`failure_episode_trial.py` is the only supported scheduler for the semantic
+trial. Its commands are deliberately separate:
+
+```sh
+python3 prompt-lab/failure_episode_trial.py preflight PRIVATE_MANIFEST.json
+python3 prompt-lab/failure_episode_trial.py calibrate PRIVATE_MANIFEST.json --execute
+python3 prompt-lab/failure_episode_trial.py power PRIVATE_MANIFEST.json
+python3 prompt-lab/failure_episode_trial.py primary PRIVATE_MANIFEST.json --execute
+python3 prompt-lab/failure_episode_trial.py primary-report PRIVATE_MANIFEST.json
+python3 prompt-lab/failure_episode_trial.py replication PRIVATE_MANIFEST.json --execute
+python3 prompt-lab/failure_episode_trial.py final-report PRIVATE_MANIFEST.json
+```
+
+No command launches the next stage. The manifest contains only bounded public
+identifiers and frozen hashes. Resumable rows, run worktrees, state, and reports
+live under the private agent artifact directory with private permissions. The
+runner refuses calibration until active-only prompts and enforced arbitration
+are the deployed defaults, the endpoint is a credential-free loopback tunnel,
+the private helper is valid, fixtures are approved, and registry/config hashes
+match. Mac and network-box runs therefore become separate serving blocks even
+when their semantic hashes happen to match; their rows are compared, never
+pooled.
 
 Character counts live only in `usage.output_chars` with
 `usage.source=char_proxy`. Cost comparisons require exact input and output token

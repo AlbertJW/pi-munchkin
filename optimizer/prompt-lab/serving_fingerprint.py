@@ -5,6 +5,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import math
 import os
 import re
 import shlex
@@ -14,8 +15,10 @@ import urllib.request
 import urllib.parse
 from pathlib import Path
 
-SCHEMA = "pi.serving-fingerprint/v1"
+LEGACY_SCHEMA = "pi.serving-fingerprint/v1"
+SCHEMA = "pi.serving-fingerprint/v2"
 CACHE = Path(os.environ.get("PI_FINGERPRINT_CACHE", "~/.cache/pi-eval/model-hashes.json")).expanduser()
+HELPER_MAX_BYTES = 64 * 1024
 
 REQUIRED_PATHS = (
     "model", "requested_model", "loaded_model", "gguf.basename", "gguf.size", "gguf.sha256",
@@ -44,6 +47,208 @@ def digest_bytes(data):
 
 def digest_json(data):
     return digest_bytes(json.dumps(data, sort_keys=True, separators=(",", ":")).encode())
+
+
+def safe_component(value):
+    if not isinstance(value, str):
+        return None
+    value = Path(value).name
+    return value[:160] if re.fullmatch(r"[A-Za-z0-9._@+:-]{1,160}", value) else None
+
+
+def safe_model_id(value):
+    if not isinstance(value, str) or len(value) > 200 or value.startswith(("/", ".")) or ".." in value:
+        return None
+    return value if re.fullmatch(r"[A-Za-z0-9._@+:/-]{1,200}", value) else None
+
+
+def safe_scalar(value):
+    if value is None:
+        return True
+    if isinstance(value, bool):
+        return False
+    if isinstance(value, (int, float)):
+        return math.isfinite(value) and abs(value) <= 2**63 - 1
+    return isinstance(value, str) and safe_component(value) == value
+
+
+def performance_from_argv(argv):
+    def resolved(*names, default="backend-default"):
+        value = flag(argv, *names)
+        return as_number(value) if value is not None else default
+    tensor_split = flag(argv, "--tensor-split")
+    return {
+        "threads": resolved("-t", "--threads"),
+        "batch_size": resolved("-b", "--batch-size"),
+        "ubatch_size": resolved("-ub", "--ubatch-size"),
+        "parallel_slots": resolved("-np", "--parallel"),
+        "gpu_layers": resolved("-ngl", "--n-gpu-layers"),
+        "split_mode": safe_component(flag(argv, "--split-mode")) or "backend-default",
+        "tensor_split_sha256": digest_bytes(tensor_split.encode()) if tensor_split else None,
+    }
+
+
+def _v2_core(legacy):
+    runtime = legacy.get("llama_cpp") or {}
+    artifact = legacy.get("gguf") or {}
+    semantic = {
+        "model_id": safe_model_id(legacy.get("model")),
+        "artifact": {
+            "basename": safe_component(artifact.get("basename")),
+            "size": artifact.get("size"),
+            "sha256": artifact.get("sha256"),
+        },
+        "runtime": {
+            "family": safe_component(legacy.get("runtime")) or "llama.cpp",
+            "build_sha256": digest_json(runtime.get("build_info")) if runtime.get("build_info") else None,
+            "commit": safe_component(runtime.get("commit")),
+        },
+        "chat_template_sha256": legacy.get("chat_template_sha256"),
+        "router": legacy.get("router") or {"type": None, "config_sha256": None},
+        "context_size": legacy.get("context_size"),
+        "max_tokens": (legacy.get("generation") or {}).get("max_tokens", "backend-default"),
+        "cache": legacy.get("cache") or {"key_type": None, "value_type": None, "ram": None},
+        "speculative": legacy.get("mtp") or {"type": None, "depth": None, "threshold": None},
+        "decoding": legacy.get("decoding") or {
+            "temperature": None, "top_p": None, "top_k": None, "min_p": None,
+            "repeat_penalty": None, "presence_penalty": None, "reasoning": None,
+            "reasoning_budget": None, "seed": None,
+        },
+        "launch_flags_sha256": legacy.get("launch_flags_sha256"),
+    }
+    performance = legacy.get("performance") or {
+        "threads": None, "batch_size": None, "ubatch_size": None, "parallel_slots": None,
+        "gpu_layers": None, "split_mode": None, "tensor_split_sha256": None,
+    }
+    return semantic, performance
+
+
+def upgrade_v2(legacy):
+    if legacy.get("schema") == SCHEMA:
+        return validate_v2(legacy)
+    semantic, performance = _v2_core(legacy)
+    missing = list(legacy.get("missing") or [])
+    required_hashes = (
+        semantic["artifact"].get("sha256"), semantic["runtime"].get("build_sha256"),
+        semantic.get("chat_template_sha256"), semantic.get("context_size"),
+        semantic.get("launch_flags_sha256"),
+    )
+    if any(value in (None, "") for value in required_hashes):
+        missing.append("semantic identity")
+    if not legacy.get("performance"):
+        missing.append("performance identity")
+    core = {"schema": SCHEMA, "model": safe_model_id(legacy.get("model")),
+            "semantic": semantic, "performance": performance}
+    result = {
+        **core,
+        "semantic_sha256": digest_json(semantic),
+        "performance_sha256": digest_json(performance),
+        "full_sha256": digest_json(core),
+        "missing": sorted(set(str(item)[:120] for item in missing if item)),
+    }
+    result["fingerprint_sha256"] = result["full_sha256"]
+    result["status"] = "complete" if not result["missing"] else "incomplete"
+    return validate_v2(result)
+
+
+def validate_v2(data):
+    if not isinstance(data, dict):
+        raise ValueError("fingerprint helper returned a non-object")
+    allowed = {"schema", "status", "model", "semantic", "performance", "semantic_sha256",
+               "performance_sha256", "full_sha256", "fingerprint_sha256", "missing"}
+    if set(data) != allowed or data.get("schema") != SCHEMA:
+        raise ValueError("fingerprint v2 has an invalid top-level shape")
+    if data.get("status") not in ("complete", "incomplete"):
+        raise ValueError("fingerprint v2 has an invalid status")
+    for field in ("semantic_sha256", "performance_sha256", "full_sha256", "fingerprint_sha256"):
+        if not isinstance(data.get(field), str) or not re.fullmatch(r"[0-9a-f]{64}", data[field]):
+            raise ValueError(f"fingerprint v2 has an invalid {field}")
+    if data["fingerprint_sha256"] != data["full_sha256"]:
+        raise ValueError("fingerprint v2 compatibility hash disagrees with full hash")
+    if not isinstance(data.get("semantic"), dict) or not isinstance(data.get("performance"), dict):
+        raise ValueError("fingerprint v2 identity groups must be objects")
+    semantic = data["semantic"]
+    expected_semantic = {"model_id", "artifact", "runtime", "chat_template_sha256", "router",
+                         "context_size", "max_tokens", "cache", "speculative", "decoding",
+                         "launch_flags_sha256"}
+    expected_performance = {"threads", "batch_size", "ubatch_size", "parallel_slots", "gpu_layers",
+                            "split_mode", "tensor_split_sha256"}
+    if set(semantic) != expected_semantic or set(data["performance"]) != expected_performance:
+        raise ValueError("fingerprint v2 has an invalid identity-group shape")
+    nested_shapes = {
+        "artifact": {"basename", "size", "sha256"},
+        "runtime": {"family", "build_sha256", "commit"},
+        "router": {"type", "config_sha256"},
+        "cache": {"key_type", "value_type", "ram"},
+        "speculative": {"type", "depth", "threshold"},
+        "decoding": {"temperature", "top_p", "top_k", "min_p", "repeat_penalty", "presence_penalty",
+                     "reasoning", "reasoning_budget", "seed"},
+    }
+    for field, keys in nested_shapes.items():
+        if not isinstance(semantic.get(field), dict) or set(semantic[field]) != keys:
+            raise ValueError(f"fingerprint v2 has an invalid semantic.{field} shape")
+    primitive_values = list(data["performance"].values())
+    primitive_values += [semantic.get("chat_template_sha256"), semantic.get("context_size"),
+                         semantic.get("max_tokens"), semantic.get("launch_flags_sha256")]
+    for field in nested_shapes:
+        primitive_values += list(semantic[field].values())
+    if any(not safe_scalar(value) for value in primitive_values):
+        raise ValueError("fingerprint v2 identity values must be bounded safe scalars")
+    if safe_model_id(data.get("model")) != data.get("model") or semantic.get("model_id") != data.get("model"):
+        raise ValueError("fingerprint v2 model identity is invalid")
+    if (not isinstance(data.get("missing"), list) or
+            any(not isinstance(item, str) or not re.fullmatch(r"[A-Za-z0-9_. -]{1,120}", item) for item in data["missing"])):
+        raise ValueError("fingerprint v2 missing list is invalid")
+    if (data["status"] == "complete") != (len(data["missing"]) == 0):
+        raise ValueError("fingerprint v2 status disagrees with missing identity fields")
+    for value in (semantic["artifact"]["basename"], semantic["runtime"]["family"], semantic["runtime"]["commit"],
+                  semantic["router"]["type"], semantic["cache"]["key_type"], semantic["cache"]["value_type"],
+                  semantic["cache"]["ram"], semantic["speculative"]["type"], data["performance"]["split_mode"]):
+        if value is not None and safe_component(value) != value:
+            raise ValueError("fingerprint v2 contains an unsafe identity component")
+    for field in ("sha256",):
+        value = semantic["artifact"][field]
+        if value is not None and (not isinstance(value, str) or not re.fullmatch(r"[0-9a-f]{64}", value)):
+            raise ValueError("fingerprint v2 artifact digest is invalid")
+    if (semantic["artifact"]["size"] is not None and
+            (not isinstance(semantic["artifact"]["size"], int) or isinstance(semantic["artifact"]["size"], bool) or
+             semantic["artifact"]["size"] < 0)):
+        raise ValueError("fingerprint v2 artifact size is invalid")
+    for value in (semantic["runtime"]["build_sha256"], semantic["chat_template_sha256"],
+                  semantic["router"]["config_sha256"], semantic["launch_flags_sha256"],
+                  data["performance"]["tensor_split_sha256"]):
+        if value is not None and (not isinstance(value, str) or not re.fullmatch(r"[0-9a-f]{64}", value)):
+            raise ValueError("fingerprint v2 component digest is invalid")
+    semantic_hash = digest_json(data["semantic"])
+    performance_hash = digest_json(data["performance"])
+    core = {"schema": SCHEMA, "model": data.get("model"), "semantic": data["semantic"], "performance": data["performance"]}
+    if data["semantic_sha256"] != semantic_hash or data["performance_sha256"] != performance_hash or data["full_sha256"] != digest_json(core):
+        raise ValueError("fingerprint v2 digest does not match its canonical identity")
+    serialized = json.dumps(data, sort_keys=True)
+    if re.search(r"(?:https?://|(?:^|[\" ])/(?:Users|home|opt|var|private|etc|srv)/|Bearer |api[_-]?key)", serialized, re.I):
+        raise ValueError("fingerprint v2 contains a forbidden endpoint, path, or credential marker")
+    return data
+
+
+def helper_document(model):
+    helper = os.environ.get("SERVING_FINGERPRINT_HELPER")
+    if not helper:
+        return None
+    path = Path(helper)
+    if not path.is_absolute() or not path.is_file() or not os.access(path, os.X_OK):
+        raise ValueError("SERVING_FINGERPRINT_HELPER must be an absolute executable file")
+    env = {key: os.environ[key] for key in ("HOME", "PATH", "TMPDIR", "LANG", "LC_ALL", "SSH_AUTH_SOCK") if key in os.environ}
+    with tempfile.TemporaryFile() as output:
+        completed = subprocess.run([str(path), "--model", model], stdout=output,
+                                   stderr=subprocess.DEVNULL, timeout=20, env=env, check=False)
+        size = output.tell()
+        if completed.returncode != 0 or size > HELPER_MAX_BYTES:
+            raise ValueError("serving fingerprint helper failed")
+        output.seek(0); payload = output.read(HELPER_MAX_BYTES + 1)
+    try:
+        return validate_v2(json.loads(payload))
+    except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+        raise ValueError("serving fingerprint helper returned invalid JSON") from exc
 
 
 def load_cache():
@@ -135,7 +340,9 @@ def remote_document(model):
         data = json.loads(Path(source).read_text(encoding="utf-8")) if source else fetch_json(url) if url else {}
     except Exception as exc:
         data = {"error": str(exc)}
-    data.setdefault("schema", SCHEMA); data.setdefault("model", model)
+    if data.get("schema") == SCHEMA:
+        return validate_v2(data)
+    data.setdefault("schema", LEGACY_SCHEMA); data.setdefault("model", model)
     missing = list(data.get("missing") or []) + contract_missing(data)
     data["missing"] = sorted(set(missing))
     data["status"] = "complete" if not missing else "incomplete"
@@ -230,7 +437,7 @@ def mlx_fingerprint(backend, model, models, pid=None):
         "seed": -1,
     }
     fingerprint = {
-        "schema": SCHEMA,
+        "schema": LEGACY_SCHEMA,
         "runtime": "mlx-lm",
         "model": model,
         "requested_model": model,
@@ -245,13 +452,15 @@ def mlx_fingerprint(backend, model, models, pid=None):
         "cache": {"key_type": "backend-default", "value_type": "backend-default", "ram": "backend-default"},
         "mtp": {"type": "disabled", "depth": 0, "threshold": 0},
         "decoding": decoding,
+        "generation": {"max_tokens": as_number(flag(backend, "--max-tokens")) or "backend-default"},
+        "performance": performance_from_argv(backend),
         "launch_flags_sha256": digest_json(normalize_flags(backend)) if backend else None,
         "missing": missing,
     }
     return fingerprint
 
 
-def capture(endpoint, model):
+def _capture_legacy(endpoint, model):
     if os.environ.get("SERVING_FINGERPRINT_FILE") or os.environ.get("SERVING_FINGERPRINT_URL"):
         return remote_document(model)
     host = urllib.parse.urlparse(endpoint).hostname
@@ -261,7 +470,7 @@ def capture(endpoint, model):
     try:
         models = fetch_json(endpoint.rstrip("/") + "/v1/models")
     except Exception:
-        models = {}; missing.append("/v1/models")
+        models = {}; missing.append("models response")
     rows = process_rows()
     backend = None
     for _, argv, _ in rows:
@@ -304,7 +513,7 @@ def capture(endpoint, model):
         try:
             props = fetch_json(f"http://127.0.0.1:{port}/props") if port else {}
         except Exception:
-            missing.append("backend /props")
+            missing.append("backend props")
     else:
         missing.append("loaded llama-server process")
         backend = []
@@ -314,7 +523,7 @@ def capture(endpoint, model):
     if model_path and Path(model_path).is_file():
         model_hash, st = file_sha(model_path); gguf.update(size=st.st_size, sha256=model_hash)
     else:
-        missing.append("GGUF path/hash")
+        missing.append("GGUF artifact hash")
 
     router = {"type": None, "config_sha256": None}
     for _, argv, _ in rows:
@@ -352,7 +561,7 @@ def capture(endpoint, model):
     required_decoding = ("temperature", "top_p", "top_k", "min_p", "repeat_penalty", "presence_penalty", "seed")
     missing += [f"decoding.{key}" for key in required_decoding if decoding[key] is None]
     fingerprint = {
-        "schema": SCHEMA,
+        "schema": LEGACY_SCHEMA,
         "status": "complete" if not missing else "incomplete",
         "missing": sorted(set(missing)),
         "model": model,
@@ -371,6 +580,8 @@ def capture(endpoint, model):
                 "depth": as_number(flag(backend, "--draft-max", "--draft-n")) or (0 if not flag(backend, "--spec-type") else "backend-default"),
                 "threshold": as_number(flag(backend, "--draft-p-min", "--draft-p")) or (0 if not flag(backend, "--spec-type") else "backend-default")},
         "decoding": decoding,
+        "generation": {"max_tokens": as_number(flag(backend, "-n", "--predict")) or "backend-default"},
+        "performance": performance_from_argv(backend),
         "launch_flags_sha256": digest_json(normalize_flags(backend)) if backend else None,
     }
     fingerprint["missing"] = sorted(set(fingerprint["missing"] + contract_missing(fingerprint)))
@@ -378,6 +589,13 @@ def capture(endpoint, model):
     core = dict(fingerprint)
     fingerprint["fingerprint_sha256"] = digest_json(core)
     return fingerprint
+
+
+def capture(endpoint, model):
+    helper = helper_document(model)
+    if helper is not None:
+        return helper
+    return upgrade_v2(_capture_legacy(endpoint, model))
 
 
 def main():
@@ -391,8 +609,10 @@ def main():
         else: print(text, end="")
     else:
         pre = json.loads(Path(args.pre).read_text()); post = json.loads(Path(args.post).read_text())
-        same = pre.get("fingerprint_sha256") == post.get("fingerprint_sha256")
-        complete = pre.get("status") == post.get("status") == "complete"
+        fields = ("semantic_sha256", "performance_sha256", "full_sha256")
+        same = all(pre.get(field) and pre.get(field) == post.get(field) for field in fields)
+        complete = (pre.get("schema") == post.get("schema") == SCHEMA and
+                    pre.get("status") == post.get("status") == "complete")
         print(json.dumps({"stable": same, "complete": complete})); raise SystemExit(0 if same and complete else 1)
 
 
