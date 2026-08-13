@@ -1,0 +1,266 @@
+{
+  "admission": {
+    "approved": false,
+    "automated": {
+      "checked_at": "2026-08-13T12:47:25Z",
+      "hash_drift": [],
+      "manifest_drift": false,
+      "passed": true,
+      "runs_per_state": 3,
+      "states": {
+        "gold_fail_to_pass": [
+          {
+            "output_bytes": 363,
+            "output_sha256": "1d4333023582265c9c138844c38eca1f6a7aae51e44e77104262a5f5a18f1851",
+            "passed": true,
+            "returncode": 0
+          },
+          {
+            "output_bytes": 363,
+            "output_sha256": "dda11c3a565e9cc487382fa4c47be0ccda2e888dba951b04a83b9786b65ff774",
+            "passed": true,
+            "returncode": 0
+          },
+          {
+            "output_bytes": 360,
+            "output_sha256": "77681c4070df3a02ec1444b3c68d8f032f92b5e298c07903602f9660c58a931c",
+            "passed": true,
+            "returncode": 0
+          }
+        ],
+        "gold_pass_to_pass": [
+          {
+            "output_bytes": 263,
+            "output_sha256": "c74276a70f291d6a5c58c3b8c000c98c0eaec62cbd31fc8ad9b1822b21632514",
+            "passed": true,
+            "returncode": 0
+          },
+          {
+            "output_bytes": 264,
+            "output_sha256": "6ca506352eb323f093f89470cdc213a99087d8ea816857055989fa4729061309",
+            "passed": true,
+            "returncode": 0
+          },
+          {
+            "output_bytes": 263,
+            "output_sha256": "0dd7dad237b0c809a5eb9eadd58888895101aca93cce0fca186dfa380d409527",
+            "passed": true,
+            "returncode": 0
+          }
+        ],
+        "mutant:shortcut": {
+          "fail_to_pass": [
+            {
+              "output_bytes": 2615,
+              "output_sha256": "6dad563b6fb892e00d9023565db93f0e2558b3912985276f7b52566cf66d9f13",
+              "passed": false,
+              "returncode": 1
+            },
+            {
+              "output_bytes": 2618,
+              "output_sha256": "a1821664487fbb9a94dbbc2ba1d807a4db8b8aec0f77a92b041955a113941408",
+              "passed": false,
+              "returncode": 1
+            },
+            {
+              "output_bytes": 2618,
+              "output_sha256": "18015371537b7ae1cf5e13088b360e3981ed1b73a4e78d5338bb1a2104a650ae",
+              "passed": false,
+              "returncode": 1
+            }
+          ],
+          "pass_to_pass": [
+            {
+              "output_bytes": 263,
+              "output_sha256": "94ce2f841eb27282abe3601480c3f5e974312f8c1e4df94bd11de3fb77e683a4",
+              "passed": true,
+              "returncode": 0
+            },
+            {
+              "output_bytes": 262,
+              "output_sha256": "49f48a8b45574ccb054739ab34ed1171cfd2cce7b6cc46be54abc8448120fb55",
+              "passed": true,
+              "returncode": 0
+            },
+            {
+              "output_bytes": 262,
+              "output_sha256": "aca726690f5fa8cf68d6ce2d18271e4c8cbc06fc37fe46dce15c3544095b748f",
+              "passed": true,
+              "returncode": 0
+            }
+          ]
+        },
+        "pristine_fail_to_pass": [
+          {
+            "output_bytes": 4466,
+            "output_sha256": "cd46e8c351e213746f7853de1fb8c40a38d65f86163e0618a93844fa29c2be6f",
+            "passed": false,
+            "returncode": 1
+          },
+          {
+            "output_bytes": 4464,
+            "output_sha256": "7609166a552329db760da64ca7b7a565e2d24b654e769d67c9f431a9388f80a9",
+            "passed": false,
+            "returncode": 1
+          },
+          {
+            "output_bytes": 4466,
+            "output_sha256": "41ab38b6979234107b33dd77da0e2881a8bce96d1837692e94897c6e1c045974",
+            "passed": false,
+            "returncode": 1
+          }
+        ],
+        "pristine_pass_to_pass": [
+          {
+            "output_bytes": 262,
+            "output_sha256": "03fc5604328d03813e11229e7ed9d3fda34a3c9a693eaa4e44c3265eed9f4731",
+            "passed": true,
+            "returncode": 0
+          },
+          {
+            "output_bytes": 262,
+            "output_sha256": "e303790a8db5702028120c3710527a1b38f1cf33dc839bff4e4f1de30344e546",
+            "passed": true,
+            "returncode": 0
+          },
+          {
+            "output_bytes": 264,
+            "output_sha256": "19153378548ca7fb2fc5759b493fd8df2dd6ecd639b34c23ab82e0d7cc953bcf",
+            "passed": true,
+            "returncode": 0
+          }
+        ]
+      }
+    },
+    "reviewed_at": null,
+    "reviewer": null
+  },
+  "artifacts": [
+    {
+      "path": "ab-symbolect/tasks/ling-cross-file-contract.txt",
+      "sha256": "5d946c052a5a878e2fb4b2f11c0b7f493135e1f9c02cfc7beb4575ac5e6cdfea"
+    },
+    {
+      "path": "real-gate-fixtures/hidden/ling-cross-file-contract.test.js",
+      "sha256": "0d02827d024b253e3b73dc3b127391acfc92544392148945ef55ef0dd1e320ff"
+    },
+    {
+      "path": "real-gate-fixtures/ling-cross-file-contract/package.json",
+      "sha256": "878da7628bacccc709ed067b80f01ad3d988a93363a92b240010c7dbc833d5d4"
+    },
+    {
+      "path": "real-gate-fixtures/ling-cross-file-contract/src/parse-job.js",
+      "sha256": "11c4f79c616c94cfd63bdf80ce4c642df5ff27bbe63fff94a1c40db885e42369"
+    },
+    {
+      "path": "real-gate-fixtures/ling-cross-file-contract/src/policy.js",
+      "sha256": "a127dde709102f6c8c3bb647c963239c48aebbf565ad754bf44e00f53856157f"
+    },
+    {
+      "path": "real-gate-fixtures/ling-cross-file-contract/test/visible.test.js",
+      "sha256": "997e31093fd679b714a8ac25cf4acea38153212935e4bfdaa01de87bf65dda57"
+    },
+    {
+      "path": "real-gate-fixtures/patches/ling-cross-file-contract/gold.patch",
+      "sha256": "86bee10c047fb2a228eaa2720732c4d1804c25b71f18f9e10f368e063f024e5b"
+    },
+    {
+      "path": "real-gate-fixtures/patches/ling-cross-file-contract/shortcut.patch",
+      "sha256": "adb4b1029f2502ea97e1a079d0ab9a940477750217398b84a14dabcf11efbddc"
+    }
+  ],
+  "cohort_id": "2026-08",
+  "fixture": {
+    "root": "real-gate-fixtures/ling-cross-file-contract",
+    "stage_copy": []
+  },
+  "fixture_version": "2026-08.1",
+  "one_shot": {
+    "context_files": [
+      "src/parse-job.js",
+      "src/policy.js",
+      "test/visible.test.js"
+    ],
+    "eligible": false,
+    "max_context_bytes": 49152
+  },
+  "patches": {
+    "gold": "real-gate-fixtures/patches/ling-cross-file-contract/gold.patch",
+    "shortcut_mutants": [
+      "real-gate-fixtures/patches/ling-cross-file-contract/shortcut.patch"
+    ]
+  },
+  "prompts": {
+    "canonical": {
+      "sha256": "0b544bf0dce20e0842369a6c566ad51a0d42cb468bc806d72e0ca844aef9253e",
+      "text": "Add a `blocked` job status between `queued` and `running`. `STATUS_ORDER` in `src/policy.js` is the single source of truth and must become `queued, blocked, running, done`; `canTransition` must continue to allow only the next status in that order. Remove the duplicate status vocabulary in `src/parse-job.js` so parsing accepts exactly the shared statuses. `parseJob` must still trim and lower-case its input and reject unknown statuses. Existing behavior for the original three statuses must remain intact. Run `npm test` when the coordinated change is complete."
+    },
+    "perturbations": [
+      {
+        "id": "equivalent-1",
+        "sha256": "187abc28b5a8bf0a025dd5379cbe0e39f05d2fe1407def53babcc934d63f261f",
+        "text": "Complete the following repository task. Preserve existing behavior and verify the tests.\n\nAdd a `blocked` job status between `queued` and `running`. `STATUS_ORDER` in `src/policy.js` is the single source of truth and must become `queued, blocked, running, done`; `canTransition` must continue to allow only the next status in that order. Remove the duplicate status vocabulary in `src/parse-job.js` so parsing accepts exactly the shared statuses. `parseJob` must still trim and lower-case its input and reject unknown statuses. Existing behavior for the original three statuses must remain intact. Run `npm test` when the coordinated change is complete."
+      },
+      {
+        "id": "equivalent-2",
+        "sha256": "1cbc3b07987215cf3f4ea5ecdf545d4979a8ccfe40c173a31fe490cf3aed6623",
+        "text": "Repository change request:\nAdd a `blocked` job status between `queued` and `running`. `STATUS_ORDER` in `src/policy.js` is the single source of truth and must become `queued, blocked, running, done`; `canTransition` must continue to allow only the next status in that order. Remove the duplicate status vocabulary in `src/parse-job.js` so parsing accepts exactly the shared statuses. `parseJob` must still trim and lower-case its input and reject unknown statuses. Existing behavior for the original three statuses must remain intact. Run `npm test` when the coordinated change is complete.\n\nUse the smallest correct change and confirm the test suite."
+      },
+      {
+        "id": "equivalent-3",
+        "sha256": "160f71d6c38808edd4e61f893b19735966eb66fc3d58524e3d11e8e09b48d4b5",
+        "text": "Please solve this task in the supplied checkout, retaining all stated edge cases:\n\nAdd a `blocked` job status between `queued` and `running`. `STATUS_ORDER` in `src/policy.js` is the single source of truth and must become `queued, blocked, running, done`; `canTransition` must continue to allow only the next status in that order. Remove the duplicate status vocabulary in `src/parse-job.js` so parsing accepts exactly the shared statuses. `parseJob` must still trim and lower-case its input and reject unknown statuses. Existing behavior for the original three statuses must remain intact. Run `npm test` when the coordinated change is complete."
+      }
+    ],
+    "semantic_group": "ling-cross-file-contract:2026-08.1"
+  },
+  "schema": "pi.fixture/v1",
+  "sufficiency": [
+    {
+      "assertion": "blocked is present in the shared status order",
+      "prompt_evidence": "Add a `blocked` job status between `queued` and `running`. `STATUS_ORDER` in `src/policy.js` is the single source of truth and must become `queued, blocked, running, done`; `canTransition` must continue to allow only the next status in that order. Remove the duplicate status vocabulary in `src/parse-job.js` so parsing accepts exactly the shared statuses. `parseJob` must still trim and lower-case its input and reject unknown statuses. Existing behavior for the original three statuses must remain intact. Run `npm test` when the coordinated change is complete."
+    },
+    {
+      "assertion": "parser consumes the shared blocked vocabulary",
+      "prompt_evidence": "Add a `blocked` job status between `queued` and `running`. `STATUS_ORDER` in `src/policy.js` is the single source of truth and must become `queued, blocked, running, done`; `canTransition` must continue to allow only the next status in that order. Remove the duplicate status vocabulary in `src/parse-job.js` so parsing accepts exactly the shared statuses. `parseJob` must still trim and lower-case its input and reject unknown statuses. Existing behavior for the original three statuses must remain intact. Run `npm test` when the coordinated change is complete."
+    },
+    {
+      "assertion": "transitions follow the new adjacent order",
+      "prompt_evidence": "Add a `blocked` job status between `queued` and `running`. `STATUS_ORDER` in `src/policy.js` is the single source of truth and must become `queued, blocked, running, done`; `canTransition` must continue to allow only the next status in that order. Remove the duplicate status vocabulary in `src/parse-job.js` so parsing accepts exactly the shared statuses. `parseJob` must still trim and lower-case its input and reject unknown statuses. Existing behavior for the original three statuses must remain intact. Run `npm test` when the coordinated change is complete."
+    },
+    {
+      "assertion": "the parser has no private duplicate status list",
+      "prompt_evidence": "Add a `blocked` job status between `queued` and `running`. `STATUS_ORDER` in `src/policy.js` is the single source of truth and must become `queued, blocked, running, done`; `canTransition` must continue to allow only the next status in that order. Remove the duplicate status vocabulary in `src/parse-job.js` so parsing accepts exactly the shared statuses. `parseJob` must still trim and lower-case its input and reject unknown statuses. Existing behavior for the original three statuses must remain intact. Run `npm test` when the coordinated change is complete."
+    }
+  ],
+  "task_id": "ling-cross-file-contract",
+  "tests": {
+    "fail_to_pass": {
+      "command": [
+        "node",
+        "--test",
+        "test/fail-to-pass.test.js"
+      ],
+      "overlays": [
+        {
+          "dest": "test/fail-to-pass.test.js",
+          "source": "real-gate-fixtures/hidden/ling-cross-file-contract.test.js"
+        }
+      ],
+      "timeout_seconds": 60
+    },
+    "pass_to_pass": {
+      "command": [
+        "node",
+        "--test"
+      ],
+      "overlays": [],
+      "timeout_seconds": 60
+    }
+  },
+  "timestamps": {
+    "admitted_at": null,
+    "created_at": "2026-08-13T00:00:00Z",
+    "expires_at": null
+  }
+}

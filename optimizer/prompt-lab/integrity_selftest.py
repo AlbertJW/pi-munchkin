@@ -97,13 +97,17 @@ def test_gate_materializes_everything_admission_does():
 def test_admission_catalog():
     manifests = sorted(admission.MANIFESTS.glob("*.json"))
     # This count is a tripwire for UNNOTICED roster changes, so it may only be
-    # edited alongside a deliberate, verified one. 2026-08-11: 28 -> 32, adding
+    # edited alongside a deliberate, verified one. 2026-08-13: 32 -> 36, adding
+    # the four unapproved Ling semantic-calibration fixtures after all four
+    # passed pristine/gold/shortcut admission three times. Human approval is a
+    # separate checkpoint; admission automation is what this catalog asserts.
+    # 2026-08-11: 28 -> 32, adding
     # the four band fixtures (misleading-symptom, ordered-steps,
     # second-test-guard, documented-escape) per PREREG_FIXTURE_BAND_2026-08-11.
     # Verified purely additive before editing: nothing deleted vs the previous
     # commit. A count edited to silence a failure nobody explained is how a
     # deleted fixture went unnoticed for two commits on 2026-07-30.
-    assert len(manifests) == 32, len(manifests)
+    assert len(manifests) == 36, len(manifests)
     for path in manifests:
         manifest = json.loads(path.read_text())
         admission.validate_contract(manifest)
@@ -164,6 +168,33 @@ def test_fixture_verify_read_only():
     assert proc.stdout == "t1: PASS (read-only; manifest unchanged)\n", proc.stdout
     assert manifest.read_bytes() == before, "verify modified manifest bytes"
     assert admission.sha256(manifest) == before_hash, "verify modified manifest hash"
+
+
+def test_admission_receipts_are_redacted():
+    _, manifest = admission.load_manifest("ordered-steps")
+    rows = admission.run_state(manifest, None, "fail_to_pass")
+    assert rows and all(set(row) == {"passed", "returncode", "output_bytes", "output_sha256"} for row in rows)
+    encoded = json.dumps(rows)
+    assert "output_tail" not in encoded and "/private/" not in encoded and "/Users/" not in encoded
+
+
+def test_ling_fixture_admission_contracts():
+    tasks = ("ling-exact-gate-recovery", "ling-cross-file-contract",
+             "ling-partial-order-release", "ling-path-evidence")
+    for task in tasks:
+        _, manifest = admission.load_manifest(task)
+        assert manifest["cohort_id"] == "2026-08" and manifest["fixture_version"] == "2026-08.1"
+        assert manifest["admission"]["approved"] is False, "fixture approval is a human checkpoint"
+        states = manifest["admission"]["automated"]["states"]
+        assert all(row["passed"] for row in states["pristine_pass_to_pass"])
+        assert all(not row["passed"] for row in states["pristine_fail_to_pass"])
+        assert all(row["passed"] for row in states["gold_pass_to_pass"] + states["gold_fail_to_pass"])
+        for name, receipt in states.items():
+            if name.startswith("mutant:"):
+                assert all(row["passed"] for row in receipt["pass_to_pass"])
+                assert all(not row["passed"] for row in receipt["fail_to_pass"])
+        manifest_text = json.dumps(manifest)
+        assert "output_tail" not in manifest_text and "/private/" not in manifest_text and "/Users/" not in manifest_text
 
 
 def test_context_pressure_contract():

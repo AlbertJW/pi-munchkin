@@ -201,8 +201,9 @@ def run_state(m, patch, suite):
                                   timeout=spec.get("timeout_seconds", 60),
                                   env=verification_env(Path(td)))
             passed = proc.returncode == 0
+            output = (proc.stdout + proc.stderr).encode("utf-8", errors="replace")
             outcomes.append({"passed": passed, "returncode": proc.returncode,
-                             "output_tail": "" if passed else (proc.stdout + proc.stderr)[-600:]})
+                             "output_bytes": len(output), "output_sha256": hashlib.sha256(output).hexdigest()})
     return outcomes
 
 

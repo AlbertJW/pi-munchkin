@@ -31,3 +31,21 @@ remain represented as incomplete evidence rather than disappearing from the resu
 This proves the performance hash is not decorative: omitting a serving parameter makes the
 targeted check fail before a powered row can enter a study population. No model session was
 started while producing this record.
+
+## Ling semantic fixture admission
+
+Four 2026-08 fixtures were added in an unapproved state: exact-project-gate recovery,
+cross-file shared vocabulary, partial-order scheduling, and public-export path evidence.
+For each fixture, the admission runner executed three repetitions of all six proof cells:
+pristine pass-to-pass passed, pristine fail-to-pass failed, gold passed both suites, and the
+realistic shortcut preserved the visible suite while failing the hidden suite.
+
+The shortcut states are the counterfactuals. They respectively implement input-order allocation
+without urgency, update only the shared policy while retaining the duplicate parser list, use a
+one-pass comparator instead of a topological scheduler, and repair the similarly named decoy
+file rather than the exported implementation. Removing each gold mechanism therefore recreates
+a targeted hidden-test failure without weakening the visible regression suite.
+
+Automated receipts persist only pass state, return code, output byte count, and output SHA-256.
+Raw test output and temporary paths are absent. Human fixture review and approval remain pending;
+no Ling calibration or model session was started.

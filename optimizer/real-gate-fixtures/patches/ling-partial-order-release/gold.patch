@@ -1,0 +1,34 @@
+--- a/src/release-plan.js
++++ b/src/release-plan.js
+@@ -1,5 +1,28 @@
+ export function scheduleJobs(jobs) {
+-  return [...jobs]
+-    .sort((a, b) => (b.urgency ?? 0) - (a.urgency ?? 0))
+-    .map((job) => job.id);
++  const indexed = jobs.map((job, index) => ({ job, index }));
++  const byId = new Map();
++  for (const item of indexed) {
++    if (typeof item.job.id !== 'string' || byId.has(item.job.id)) throw new Error('duplicate job id');
++    byId.set(item.job.id, item);
++  }
++  const indegree = new Map(indexed.map(({ job }) => [job.id, 0]));
++  const dependents = new Map(indexed.map(({ job }) => [job.id, []]));
++  for (const { job } of indexed) for (const dependency of job.after ?? []) {
++    if (!byId.has(dependency)) throw new Error('unknown prerequisite');
++    indegree.set(job.id, indegree.get(job.id) + 1);
++    dependents.get(dependency).push(job.id);
++  }
++  const available = indexed.filter(({ job }) => indegree.get(job.id) === 0);
++  const output = [];
++  while (available.length) {
++    available.sort((a, b) => (b.job.urgency ?? 0) - (a.job.urgency ?? 0) || a.index - b.index);
++    const { job } = available.shift();
++    output.push(job.id);
++    for (const id of dependents.get(job.id)) {
++      indegree.set(id, indegree.get(id) - 1);
++      if (indegree.get(id) === 0) available.push(byId.get(id));
++    }
++  }
++  if (output.length !== jobs.length) throw new Error('dependency cycle');
++  return output;
+ }

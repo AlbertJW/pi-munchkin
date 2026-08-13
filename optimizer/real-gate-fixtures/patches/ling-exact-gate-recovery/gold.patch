@@ -1,0 +1,21 @@
+--- a/src/allocate.js
++++ b/src/allocate.js
+@@ -2,8 +2,14 @@
+   if (!Number.isFinite(available) || available < 0) {
+     throw new RangeError('available must be a non-negative finite number');
+   }
+-  return requests.map(({ id, requested }) => ({
+-    id,
+-    granted: Math.min(Math.max(0, requested), available),
+-  }));
++  let remaining = available;
++  const ranked = requests.map((request, index) => ({ request, index }))
++    .sort((a, b) => (b.request.urgency ?? 0) - (a.request.urgency ?? 0) || a.index - b.index);
++  const grants = ranked.map(({ request, index }) => {
++    const requested = Math.max(0, Number.isFinite(request.requested) ? request.requested : 0);
++    const granted = Math.min(requested, remaining);
++    remaining -= granted;
++    return { index, row: { id: request.id, granted } };
++  });
++  return grants.sort((a, b) => a.index - b.index).map(({ row }) => row);
+ }

@@ -1,0 +1,267 @@
+{
+  "admission": {
+    "approved": false,
+    "automated": {
+      "checked_at": "2026-08-13T12:47:30Z",
+      "hash_drift": [],
+      "manifest_drift": false,
+      "passed": true,
+      "runs_per_state": 3,
+      "states": {
+        "gold_fail_to_pass": [
+          {
+            "output_bytes": 343,
+            "output_sha256": "1f1c791138536473952e7dcb61f9c3721eabf847ebec8683e1763d6d28652fcd",
+            "passed": true,
+            "returncode": 0
+          },
+          {
+            "output_bytes": 339,
+            "output_sha256": "2d1cdbc29769417f7f79c9296742590efd782a0c4b3c8d8e4f095582aa152ae1",
+            "passed": true,
+            "returncode": 0
+          },
+          {
+            "output_bytes": 340,
+            "output_sha256": "b8e0e4564fd46955a31a7f2cbcbe9b91c415242c130812a9c1dc0fc84802c7af",
+            "passed": true,
+            "returncode": 0
+          }
+        ],
+        "gold_pass_to_pass": [
+          {
+            "output_bytes": 210,
+            "output_sha256": "38de91e2d5d1fedf655cd8219b95221e5ede574e632efff229d1dce306134917",
+            "passed": true,
+            "returncode": 0
+          },
+          {
+            "output_bytes": 208,
+            "output_sha256": "71f25ad27420d19263d381ebff0ed75e4db0ea1e1e79ebe42cfd20e12ef7122a",
+            "passed": true,
+            "returncode": 0
+          },
+          {
+            "output_bytes": 211,
+            "output_sha256": "b3bbe7cddc6b18292e7f71378b057a1c5b153edc450072fac78be8cb5cdb3bde",
+            "passed": true,
+            "returncode": 0
+          }
+        ],
+        "mutant:shortcut": {
+          "fail_to_pass": [
+            {
+              "output_bytes": 2111,
+              "output_sha256": "d312ab44e31168f2ba7cb28827054c9de819d280f296966c3c31d0df1ee5f61d",
+              "passed": false,
+              "returncode": 1
+            },
+            {
+              "output_bytes": 2111,
+              "output_sha256": "a9f1c479d26241a3cd9bef3539589727cfd759596fc3f011dda9b33f91203862",
+              "passed": false,
+              "returncode": 1
+            },
+            {
+              "output_bytes": 2111,
+              "output_sha256": "c8fec64e8a8cd8ed5834c545465f682e258761c483df4ad18ae3e3fae72f94d2",
+              "passed": false,
+              "returncode": 1
+            }
+          ],
+          "pass_to_pass": [
+            {
+              "output_bytes": 211,
+              "output_sha256": "6c78422910a86c25a153f9f0d2bdbc5896050bdc212ecddf2af8e1cb7db8491f",
+              "passed": true,
+              "returncode": 0
+            },
+            {
+              "output_bytes": 211,
+              "output_sha256": "fef1952baed6cf8e84fc5e103112746416d578f1a6dbba4afe61d02844734aba",
+              "passed": true,
+              "returncode": 0
+            },
+            {
+              "output_bytes": 211,
+              "output_sha256": "531a704bd10d5994ba9945080f15111b847565d4d74783df17033eca3a96da2f",
+              "passed": true,
+              "returncode": 0
+            }
+          ]
+        },
+        "pristine_fail_to_pass": [
+          {
+            "output_bytes": 2111,
+            "output_sha256": "987b6c5913d32092117e06cbfb22a198a21cf6da390829e206ca71c362ba3b66",
+            "passed": false,
+            "returncode": 1
+          },
+          {
+            "output_bytes": 2111,
+            "output_sha256": "5455b3b45bd864f373810adfac3a1b4ac2fd5278956d3863dbe80fc867477d16",
+            "passed": false,
+            "returncode": 1
+          },
+          {
+            "output_bytes": 2111,
+            "output_sha256": "89740786160556569956316df7faeb0d4f1c26fb1f76d19d809b4018ed847788",
+            "passed": false,
+            "returncode": 1
+          }
+        ],
+        "pristine_pass_to_pass": [
+          {
+            "output_bytes": 210,
+            "output_sha256": "2120edaa364fd4768e2171d065c3027e55572ef1230a4cfd9e8af889bc0b3802",
+            "passed": true,
+            "returncode": 0
+          },
+          {
+            "output_bytes": 211,
+            "output_sha256": "3c405902fabde3546dd82ea0dcf169007bb55830d07c3ecac537e3609e09113f",
+            "passed": true,
+            "returncode": 0
+          },
+          {
+            "output_bytes": 210,
+            "output_sha256": "c2e04f908d045e42e7691beb40cc6f57a6eee0586aff7cf2f9883fa7b9cb7e99",
+            "passed": true,
+            "returncode": 0
+          }
+        ]
+      }
+    },
+    "reviewed_at": null,
+    "reviewer": null
+  },
+  "artifacts": [
+    {
+      "path": "ab-symbolect/tasks/ling-path-evidence.txt",
+      "sha256": "4b24eae3227d305b000c84ddedc3ff5fb9d3765d044ea3e3726bc00cc42af0d1"
+    },
+    {
+      "path": "real-gate-fixtures/hidden/ling-path-evidence.test.js",
+      "sha256": "5928c851de994823e1bbfd7e7efcc62eacc6083e44e8bc0178c3ba992dd4b4d9"
+    },
+    {
+      "path": "real-gate-fixtures/ling-path-evidence/package.json",
+      "sha256": "cea52629f2c52157e99f03f4a096f0bc67831163a46e57b7cf444b66269e90a7"
+    },
+    {
+      "path": "real-gate-fixtures/ling-path-evidence/src/index.js",
+      "sha256": "a6cdb1feb0e88268e715f9266128514ac51419c9e665f4b968dd76b207ad4b1e"
+    },
+    {
+      "path": "real-gate-fixtures/ling-path-evidence/src/normalise-ticket.js",
+      "sha256": "3463f9d2845f77bf7e4ebd33705a7fc4c7154d75898dfedb17b2e5f9bcbe73f5"
+    },
+    {
+      "path": "real-gate-fixtures/ling-path-evidence/src/tickets/normalize-ticket.js",
+      "sha256": "608b5443f2f33d62df052f718b9fa0b6c3867ea5c241f6d262b77a0f1ca442db"
+    },
+    {
+      "path": "real-gate-fixtures/ling-path-evidence/test/visible.test.js",
+      "sha256": "32d7b380e3a62033a601c001073ffb0a2d731556224e8249acf715db84aaa79f"
+    },
+    {
+      "path": "real-gate-fixtures/patches/ling-path-evidence/gold.patch",
+      "sha256": "e2beb818f015cfb9a3b71ee48563907d63a03e995208ef3b375cb5e2a8ff84d0"
+    },
+    {
+      "path": "real-gate-fixtures/patches/ling-path-evidence/shortcut.patch",
+      "sha256": "4b5cfa456b1ea669ec43d969f725f2a2747f9fc0f942949f21ad8349695e453c"
+    }
+  ],
+  "cohort_id": "2026-08",
+  "fixture": {
+    "root": "real-gate-fixtures/ling-path-evidence",
+    "stage_copy": []
+  },
+  "fixture_version": "2026-08.1",
+  "one_shot": {
+    "context_files": [
+      "src/index.js",
+      "src/normalise-ticket.js",
+      "src/tickets/normalize-ticket.js",
+      "test/visible.test.js"
+    ],
+    "eligible": false,
+    "max_context_bytes": 49152
+  },
+  "patches": {
+    "gold": "real-gate-fixtures/patches/ling-path-evidence/gold.patch",
+    "shortcut_mutants": [
+      "real-gate-fixtures/patches/ling-path-evidence/shortcut.patch"
+    ]
+  },
+  "prompts": {
+    "canonical": {
+      "sha256": "9c70c92a144b936c90baac29ffc041b7f6e9cc85c956d56887f0e928795ebc62",
+      "text": "Repair the package's public `normalizeTicket(value)` API. Locate its owning implementation from `package.json`, `src/index.js`, and the tests rather than assuming a similarly named source file is live. Valid ticket IDs contain a project prefix, a hyphen, and decimal digits. Trim surrounding whitespace, remove internal whitespace, uppercase the prefix, and canonicalise the numeric part by removing leading zeroes (`000` becomes `0`). Reject malformed values with `TypeError`. Keep the public export intact and run `npm test`."
+    },
+    "perturbations": [
+      {
+        "id": "equivalent-1",
+        "sha256": "71e80faedfed65fe6a67bcdda8c669af4623b41b689b28707a8f78df3eed9ab6",
+        "text": "Complete the following repository task. Preserve existing behavior and verify the tests.\n\nRepair the package's public `normalizeTicket(value)` API. Locate its owning implementation from `package.json`, `src/index.js`, and the tests rather than assuming a similarly named source file is live. Valid ticket IDs contain a project prefix, a hyphen, and decimal digits. Trim surrounding whitespace, remove internal whitespace, uppercase the prefix, and canonicalise the numeric part by removing leading zeroes (`000` becomes `0`). Reject malformed values with `TypeError`. Keep the public export intact and run `npm test`."
+      },
+      {
+        "id": "equivalent-2",
+        "sha256": "3c653f720f53cf3e77762df6594718f683ac88e5eef33fa4f6061e08d1b36b13",
+        "text": "Repository change request:\nRepair the package's public `normalizeTicket(value)` API. Locate its owning implementation from `package.json`, `src/index.js`, and the tests rather than assuming a similarly named source file is live. Valid ticket IDs contain a project prefix, a hyphen, and decimal digits. Trim surrounding whitespace, remove internal whitespace, uppercase the prefix, and canonicalise the numeric part by removing leading zeroes (`000` becomes `0`). Reject malformed values with `TypeError`. Keep the public export intact and run `npm test`.\n\nUse the smallest correct change and confirm the test suite."
+      },
+      {
+        "id": "equivalent-3",
+        "sha256": "5192d4ca7bb97aaf724b9bf0c824194b9eced5476acc0363a39904f2df92d0bf",
+        "text": "Please solve this task in the supplied checkout, retaining all stated edge cases:\n\nRepair the package's public `normalizeTicket(value)` API. Locate its owning implementation from `package.json`, `src/index.js`, and the tests rather than assuming a similarly named source file is live. Valid ticket IDs contain a project prefix, a hyphen, and decimal digits. Trim surrounding whitespace, remove internal whitespace, uppercase the prefix, and canonicalise the numeric part by removing leading zeroes (`000` becomes `0`). Reject malformed values with `TypeError`. Keep the public export intact and run `npm test`."
+      }
+    ],
+    "semantic_group": "ling-path-evidence:2026-08.1"
+  },
+  "schema": "pi.fixture/v1",
+  "sufficiency": [
+    {
+      "assertion": "normalises whitespace and leading zeroes through the public export",
+      "prompt_evidence": "Repair the package's public `normalizeTicket(value)` API. Locate its owning implementation from `package.json`, `src/index.js`, and the tests rather than assuming a similarly named source file is live. Valid ticket IDs contain a project prefix, a hyphen, and decimal digits. Trim surrounding whitespace, remove internal whitespace, uppercase the prefix, and canonicalise the numeric part by removing leading zeroes (`000` becomes `0`). Reject malformed values with `TypeError`. Keep the public export intact and run `npm test`."
+    },
+    {
+      "assertion": "accepts alphabetic project prefixes and decimal digits only",
+      "prompt_evidence": "Repair the package's public `normalizeTicket(value)` API. Locate its owning implementation from `package.json`, `src/index.js`, and the tests rather than assuming a similarly named source file is live. Valid ticket IDs contain a project prefix, a hyphen, and decimal digits. Trim surrounding whitespace, remove internal whitespace, uppercase the prefix, and canonicalise the numeric part by removing leading zeroes (`000` becomes `0`). Reject malformed values with `TypeError`. Keep the public export intact and run `npm test`."
+    },
+    {
+      "assertion": "the package export owns the repaired implementation",
+      "prompt_evidence": "Repair the package's public `normalizeTicket(value)` API. Locate its owning implementation from `package.json`, `src/index.js`, and the tests rather than assuming a similarly named source file is live. Valid ticket IDs contain a project prefix, a hyphen, and decimal digits. Trim surrounding whitespace, remove internal whitespace, uppercase the prefix, and canonicalise the numeric part by removing leading zeroes (`000` becomes `0`). Reject malformed values with `TypeError`. Keep the public export intact and run `npm test`."
+    }
+  ],
+  "task_id": "ling-path-evidence",
+  "tests": {
+    "fail_to_pass": {
+      "command": [
+        "node",
+        "--test",
+        "test/fail-to-pass.test.js"
+      ],
+      "overlays": [
+        {
+          "dest": "test/fail-to-pass.test.js",
+          "source": "real-gate-fixtures/hidden/ling-path-evidence.test.js"
+        }
+      ],
+      "timeout_seconds": 60
+    },
+    "pass_to_pass": {
+      "command": [
+        "node",
+        "--test"
+      ],
+      "overlays": [],
+      "timeout_seconds": 60
+    }
+  },
+  "timestamps": {
+    "admitted_at": null,
+    "created_at": "2026-08-13T00:00:00Z",
+    "expires_at": null
+  }
+}

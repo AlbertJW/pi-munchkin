@@ -1,0 +1,261 @@
+{
+  "admission": {
+    "approved": false,
+    "automated": {
+      "checked_at": "2026-08-13T12:47:22Z",
+      "hash_drift": [],
+      "manifest_drift": false,
+      "passed": true,
+      "runs_per_state": 3,
+      "states": {
+        "gold_fail_to_pass": [
+          {
+            "output_bytes": 321,
+            "output_sha256": "a2f6b330cf8e88888994402b5fb93afa017ccc885cd33220a35a6416bc63b6fb",
+            "passed": true,
+            "returncode": 0
+          },
+          {
+            "output_bytes": 317,
+            "output_sha256": "b3d2d7bbba4bc69574f81b74f492db71e8352e1c15746100576ffcab23314486",
+            "passed": true,
+            "returncode": 0
+          },
+          {
+            "output_bytes": 323,
+            "output_sha256": "144a700e79ec9e9cd8857333deff7ca5f5550de957d927f6f5f2f68ee05f94e5",
+            "passed": true,
+            "returncode": 0
+          }
+        ],
+        "gold_pass_to_pass": [
+          {
+            "output_bytes": 276,
+            "output_sha256": "2d0c2b37f7851ca46db1456d2e2765a0af5c13cebd9cb41f0cc3e875ade41ced",
+            "passed": true,
+            "returncode": 0
+          },
+          {
+            "output_bytes": 275,
+            "output_sha256": "0f6d153fd9ccddfa54e394c894e1a5bcb60f4182b89042a3876158b9343d40a4",
+            "passed": true,
+            "returncode": 0
+          },
+          {
+            "output_bytes": 271,
+            "output_sha256": "6013b1ea3b8aeec3bd671d4887f55897fa7ed8d3529873d6f515c6e61dc4ae92",
+            "passed": true,
+            "returncode": 0
+          }
+        ],
+        "mutant:shortcut": {
+          "fail_to_pass": [
+            {
+              "output_bytes": 1533,
+              "output_sha256": "702eddd20170c7928df58693be05b53af13d5e39b62e7ecc8e2e2f46ab5ea3fb",
+              "passed": false,
+              "returncode": 1
+            },
+            {
+              "output_bytes": 1539,
+              "output_sha256": "0d9a0ee3c28e018cde54a6708730c3a9315bf55add08bbf023a55c69e61f25f3",
+              "passed": false,
+              "returncode": 1
+            },
+            {
+              "output_bytes": 1539,
+              "output_sha256": "fe4948018c29dd59835b2f097cc5ac6711e180f2eed830f1668c23e6a8c02cb5",
+              "passed": false,
+              "returncode": 1
+            }
+          ],
+          "pass_to_pass": [
+            {
+              "output_bytes": 275,
+              "output_sha256": "b4eb5fd2f3caa9400881cfa08a288bc39130bad07e01b1a7dcde2eaffa11d93e",
+              "passed": true,
+              "returncode": 0
+            },
+            {
+              "output_bytes": 276,
+              "output_sha256": "392c29595bf252f0b3a986629d67799bb3488453858e74446c0f7a30cca29e0e",
+              "passed": true,
+              "returncode": 0
+            },
+            {
+              "output_bytes": 277,
+              "output_sha256": "3dee9467e7e81081afde805085a93f184f9efe0f9c4480df5bc9b422d7ff2ab3",
+              "passed": true,
+              "returncode": 0
+            }
+          ]
+        },
+        "pristine_fail_to_pass": [
+          {
+            "output_bytes": 2838,
+            "output_sha256": "d152a6d60a124459ffcf9d3d04ad0db478a50483c485eaa1bbad56e59cb5b5d9",
+            "passed": false,
+            "returncode": 1
+          },
+          {
+            "output_bytes": 2838,
+            "output_sha256": "cd8ae3fa3734cbc34367949acf887f512054b70b2d527512d0292c7af474296e",
+            "passed": false,
+            "returncode": 1
+          },
+          {
+            "output_bytes": 2840,
+            "output_sha256": "ed986db1abb217081331991ea95a03ed294ef9c9ba0396f0d02eadd7faeea45a",
+            "passed": false,
+            "returncode": 1
+          }
+        ],
+        "pristine_pass_to_pass": [
+          {
+            "output_bytes": 275,
+            "output_sha256": "097af841f61535e0e2a8629ae18f5f597bb1f684044df6081218fe91f6233460",
+            "passed": true,
+            "returncode": 0
+          },
+          {
+            "output_bytes": 277,
+            "output_sha256": "bdd948227c1823440646f640efd194fd4d0731ace4f22ed38a77616fc458597b",
+            "passed": true,
+            "returncode": 0
+          },
+          {
+            "output_bytes": 277,
+            "output_sha256": "dc08eaf1546f3280dae3b864966aa09738ec51828f2e87c6386e1849773fc29a",
+            "passed": true,
+            "returncode": 0
+          }
+        ]
+      }
+    },
+    "reviewed_at": null,
+    "reviewer": null
+  },
+  "artifacts": [
+    {
+      "path": "ab-symbolect/tasks/ling-exact-gate-recovery.txt",
+      "sha256": "e4aa7b7fead918ef78f9de82ef9a0c91086c029f05753b3e145a51888b3f3097"
+    },
+    {
+      "path": "real-gate-fixtures/hidden/ling-exact-gate-recovery.test.js",
+      "sha256": "0a65a502a5652b01cbe2f3bf999ebaff8c416e79153dabfcd1f39599b063240f"
+    },
+    {
+      "path": "real-gate-fixtures/ling-exact-gate-recovery/package.json",
+      "sha256": "03b33aa1e2ab81a16d2a5229f5e0277fbb481e12447a36cb8412461f30589abe"
+    },
+    {
+      "path": "real-gate-fixtures/ling-exact-gate-recovery/scripts/project-gate.mjs",
+      "sha256": "33053710110ef02384474392fd9dc449ee1a390ef978d06bf75af17dde6cff09"
+    },
+    {
+      "path": "real-gate-fixtures/ling-exact-gate-recovery/src/allocate.js",
+      "sha256": "a420546ac7e6dbb7442322d7291a2c2ab0b29f2af93a8934e774a2456ef668f6"
+    },
+    {
+      "path": "real-gate-fixtures/ling-exact-gate-recovery/test/visible.test.js",
+      "sha256": "98f33045742cd1c0ccb50db2aea9bd66e835f8ca3694cac789cf334e68d4cc28"
+    },
+    {
+      "path": "real-gate-fixtures/patches/ling-exact-gate-recovery/gold.patch",
+      "sha256": "8c01e58ec0b51cf3bd00bfa65609b0f210d5b15ee60617859fb9101e4d68c4e5"
+    },
+    {
+      "path": "real-gate-fixtures/patches/ling-exact-gate-recovery/shortcut.patch",
+      "sha256": "4288080d07703a4615f5f58aca0840fb92d9f0b8a9cba3f41385eabc7e233a7d"
+    }
+  ],
+  "cohort_id": "2026-08",
+  "fixture": {
+    "root": "real-gate-fixtures/ling-exact-gate-recovery",
+    "stage_copy": []
+  },
+  "fixture_version": "2026-08.1",
+  "one_shot": {
+    "context_files": [
+      "src/allocate.js",
+      "test/visible.test.js"
+    ],
+    "eligible": false,
+    "max_context_bytes": 49152
+  },
+  "patches": {
+    "gold": "real-gate-fixtures/patches/ling-exact-gate-recovery/gold.patch",
+    "shortcut_mutants": [
+      "real-gate-fixtures/patches/ling-exact-gate-recovery/shortcut.patch"
+    ]
+  },
+  "prompts": {
+    "canonical": {
+      "sha256": "000440dfb51388913aef5ec424b379af832a06f7307079f7addba0fcb89c84b3",
+      "text": "`allocateCredits(requests, available)` in this package grants a fixed pool of credits to requests. Repair it so requests are considered by descending `urgency`, with input order breaking ties. Each request receives at most its requested non-negative amount and at most the remaining pool. Return one `{ id, granted }` row per input request in the original input order, do not mutate the request array or its objects, and reject a negative or non-finite pool.\n\nThe detected project gate is `npm test`. A bare `node --test` runs only the small visible regression suite and is not sufficient verification for this package. Finish only after the exact project gate passes."
+    },
+    "perturbations": [
+      {
+        "id": "equivalent-1",
+        "sha256": "abf3a72dab2e07b27303cdf135d10aa082e7b328783bb6ec595d7eb3a121e45b",
+        "text": "Complete the following repository task. Preserve existing behavior and verify the tests.\n\n`allocateCredits(requests, available)` in this package grants a fixed pool of credits to requests. Repair it so requests are considered by descending `urgency`, with input order breaking ties. Each request receives at most its requested non-negative amount and at most the remaining pool. Return one `{ id, granted }` row per input request in the original input order, do not mutate the request array or its objects, and reject a negative or non-finite pool.\n\nThe detected project gate is `npm test`. A bare `node --test` runs only the small visible regression suite and is not sufficient verification for this package. Finish only after the exact project gate passes."
+      },
+      {
+        "id": "equivalent-2",
+        "sha256": "516b16100b10ef6af657baea84197d33c2a59a12a46387d19d79a14a75e7b9cc",
+        "text": "Repository change request:\n`allocateCredits(requests, available)` in this package grants a fixed pool of credits to requests. Repair it so requests are considered by descending `urgency`, with input order breaking ties. Each request receives at most its requested non-negative amount and at most the remaining pool. Return one `{ id, granted }` row per input request in the original input order, do not mutate the request array or its objects, and reject a negative or non-finite pool.\n\nThe detected project gate is `npm test`. A bare `node --test` runs only the small visible regression suite and is not sufficient verification for this package. Finish only after the exact project gate passes.\n\nUse the smallest correct change and confirm the test suite."
+      },
+      {
+        "id": "equivalent-3",
+        "sha256": "8bf76a68cafe5318209f619dfda07167ce82d7e1886020357939ed367151938d",
+        "text": "Please solve this task in the supplied checkout, retaining all stated edge cases:\n\n`allocateCredits(requests, available)` in this package grants a fixed pool of credits to requests. Repair it so requests are considered by descending `urgency`, with input order breaking ties. Each request receives at most its requested non-negative amount and at most the remaining pool. Return one `{ id, granted }` row per input request in the original input order, do not mutate the request array or its objects, and reject a negative or non-finite pool.\n\nThe detected project gate is `npm test`. A bare `node --test` runs only the small visible regression suite and is not sufficient verification for this package. Finish only after the exact project gate passes."
+      }
+    ],
+    "semantic_group": "ling-exact-gate-recovery:2026-08.1"
+  },
+  "schema": "pi.fixture/v1",
+  "sufficiency": [
+    {
+      "assertion": "allocates by urgency but returns rows in input order",
+      "prompt_evidence": "`allocateCredits(requests, available)` in this package grants a fixed pool of credits to requests. Repair it so requests are considered by descending `urgency`, with input order breaking ties. Each request receives at most its requested non-negative amount and at most the remaining pool. Return one `{ id, granted }` row per input request in the original input order, do not mutate the request array or its objects, and reject a negative or non-finite pool.\n\nThe detected project gate is `npm test`. A bare `node --test` runs only the small visible regression suite and is not sufficient verification for this package. Finish only after the exact project gate passes."
+    },
+    {
+      "assertion": "breaks urgency ties by input order and clamps negative requests",
+      "prompt_evidence": "`allocateCredits(requests, available)` in this package grants a fixed pool of credits to requests. Repair it so requests are considered by descending `urgency`, with input order breaking ties. Each request receives at most its requested non-negative amount and at most the remaining pool. Return one `{ id, granted }` row per input request in the original input order, do not mutate the request array or its objects, and reject a negative or non-finite pool.\n\nThe detected project gate is `npm test`. A bare `node --test` runs only the small visible regression suite and is not sufficient verification for this package. Finish only after the exact project gate passes."
+    },
+    {
+      "assertion": "does not mutate request order or objects",
+      "prompt_evidence": "`allocateCredits(requests, available)` in this package grants a fixed pool of credits to requests. Repair it so requests are considered by descending `urgency`, with input order breaking ties. Each request receives at most its requested non-negative amount and at most the remaining pool. Return one `{ id, granted }` row per input request in the original input order, do not mutate the request array or its objects, and reject a negative or non-finite pool.\n\nThe detected project gate is `npm test`. A bare `node --test` runs only the small visible regression suite and is not sufficient verification for this package. Finish only after the exact project gate passes."
+    }
+  ],
+  "task_id": "ling-exact-gate-recovery",
+  "tests": {
+    "fail_to_pass": {
+      "command": [
+        "node",
+        "--test",
+        "test/fail-to-pass.test.js"
+      ],
+      "overlays": [
+        {
+          "dest": "test/fail-to-pass.test.js",
+          "source": "real-gate-fixtures/hidden/ling-exact-gate-recovery.test.js"
+        }
+      ],
+      "timeout_seconds": 60
+    },
+    "pass_to_pass": {
+      "command": [
+        "node",
+        "--test"
+      ],
+      "overlays": [],
+      "timeout_seconds": 60
+    }
+  },
+  "timestamps": {
+    "admitted_at": null,
+    "created_at": "2026-08-13T00:00:00Z",
+    "expires_at": null
+  }
+}

@@ -1,0 +1,17 @@
+--- a/src/allocate.js
++++ b/src/allocate.js
+@@ -2,8 +2,10 @@
+   if (!Number.isFinite(available) || available < 0) {
+     throw new RangeError('available must be a non-negative finite number');
+   }
+-  return requests.map(({ id, requested }) => ({
+-    id,
+-    granted: Math.min(Math.max(0, requested), available),
+-  }));
++  let remaining = available;
++  return requests.map(({ id, requested }) => {
++    const granted = Math.min(Math.max(0, requested), remaining);
++    remaining -= granted;
++    return { id, granted };
++  });
+ }

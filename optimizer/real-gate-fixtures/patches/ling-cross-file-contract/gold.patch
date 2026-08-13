@@ -1,0 +1,18 @@
+--- a/src/parse-job.js
++++ b/src/parse-job.js
+@@ -1,4 +1,6 @@
+-const ALLOWED = new Set(['queued', 'running', 'done']);
++import { STATUS_ORDER } from './policy.js';
++
++const ALLOWED = new Set(STATUS_ORDER);
+ 
+ export function parseJob(line) {
+   const [id, rawStatus] = line.split(':');
+--- a/src/policy.js
++++ b/src/policy.js
+@@ -1,4 +1,4 @@
+-export const STATUS_ORDER = Object.freeze(['queued', 'running', 'done']);
++export const STATUS_ORDER = Object.freeze(['queued', 'blocked', 'running', 'done']);
+ 
+ export function canTransition(from, to) {
+   return STATUS_ORDER.indexOf(to) === STATUS_ORDER.indexOf(from) + 1;

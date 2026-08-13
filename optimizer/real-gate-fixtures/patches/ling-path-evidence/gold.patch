@@ -1,0 +1,11 @@
+--- a/src/tickets/normalize-ticket.js
++++ b/src/tickets/normalize-ticket.js
+@@ -1,4 +1,7 @@
+ export function normalizeTicket(value) {
+   if (typeof value !== 'string') throw new TypeError('ticket must be a string');
+-  return value.trim().toUpperCase();
++  const match = value.replace(/\s+/g, '').match(/^([a-z]+)-(\d+)$/i);
++  if (!match) throw new TypeError('invalid ticket');
++  const number = String(Number(match[2]));
++  return `${match[1].toUpperCase()}-${number}`;
+ }

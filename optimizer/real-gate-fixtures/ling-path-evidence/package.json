@@ -1,0 +1,6 @@
+{
+  "type": "module",
+  "private": true,
+  "exports": "./src/index.js",
+  "scripts": {"test": "node --test"}
+}

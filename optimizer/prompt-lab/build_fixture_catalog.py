@@ -7,6 +7,7 @@ import hashlib
 import json
 import re
 import shutil
+import sys
 import tempfile
 from pathlib import Path
 
@@ -35,7 +36,13 @@ def stage(task, dst):
 
 
 def mutate(task, dst, gold):
-    p = dst / "src/index.js"
+    initial = {
+        "ling-exact-gate-recovery": "src/allocate.js",
+        "ling-cross-file-contract": "src/policy.js",
+        "ling-partial-order-release": "src/release-plan.js",
+        "ling-path-evidence": "src/index.js",
+    }.get(task, "src/index.js")
+    p = dst / initial
     s = p.read_text()
     if task == "t1":
         if gold:
@@ -126,6 +133,105 @@ def mutate(task, dst, gold):
     elif task == "titlecase":
         if gold: p.write_text("export function titleCase(s) {\n  return s.split(' ').map((w) => w ? w[0].toUpperCase() + w.slice(1).toLowerCase() : w).join(' ');\n}\n")
         else: p.write_text(s.replace("[^a-z]", "[^a-z']"))
+    elif task == "ling-exact-gate-recovery":
+        p = dst / "src/allocate.js"
+        if gold:
+            p.write_text("""export function allocateCredits(requests, available) {
+  if (!Number.isFinite(available) || available < 0) {
+    throw new RangeError('available must be a non-negative finite number');
+  }
+  let remaining = available;
+  const ranked = requests.map((request, index) => ({ request, index }))
+    .sort((a, b) => (b.request.urgency ?? 0) - (a.request.urgency ?? 0) || a.index - b.index);
+  const grants = ranked.map(({ request, index }) => {
+    const requested = Math.max(0, Number.isFinite(request.requested) ? request.requested : 0);
+    const granted = Math.min(requested, remaining);
+    remaining -= granted;
+    return { index, row: { id: request.id, granted } };
+  });
+  return grants.sort((a, b) => a.index - b.index).map(({ row }) => row);
+}
+""")
+        else:
+            p.write_text("""export function allocateCredits(requests, available) {
+  if (!Number.isFinite(available) || available < 0) {
+    throw new RangeError('available must be a non-negative finite number');
+  }
+  let remaining = available;
+  return requests.map(({ id, requested }) => {
+    const granted = Math.min(Math.max(0, requested), remaining);
+    remaining -= granted;
+    return { id, granted };
+  });
+}
+""")
+    elif task == "ling-cross-file-contract":
+        policy = dst / "src/policy.js"
+        policy.write_text(policy.read_text().replace("['queued', 'running', 'done']", "['queued', 'blocked', 'running', 'done']"))
+        if gold:
+            parser = dst / "src/parse-job.js"
+            parser.write_text("""import { STATUS_ORDER } from './policy.js';
+
+const ALLOWED = new Set(STATUS_ORDER);
+
+export function parseJob(line) {
+  const [id, rawStatus] = line.split(':');
+  const status = (rawStatus ?? '').trim().toLowerCase();
+  if (!id?.trim() || !ALLOWED.has(status)) throw new Error('invalid job');
+  return { id: id.trim(), status };
+}
+""")
+    elif task == "ling-partial-order-release":
+        p = dst / "src/release-plan.js"
+        if gold:
+            p.write_text("""export function scheduleJobs(jobs) {
+  const indexed = jobs.map((job, index) => ({ job, index }));
+  const byId = new Map();
+  for (const item of indexed) {
+    if (typeof item.job.id !== 'string' || byId.has(item.job.id)) throw new Error('duplicate job id');
+    byId.set(item.job.id, item);
+  }
+  const indegree = new Map(indexed.map(({ job }) => [job.id, 0]));
+  const dependents = new Map(indexed.map(({ job }) => [job.id, []]));
+  for (const { job } of indexed) for (const dependency of job.after ?? []) {
+    if (!byId.has(dependency)) throw new Error('unknown prerequisite');
+    indegree.set(job.id, indegree.get(job.id) + 1);
+    dependents.get(dependency).push(job.id);
+  }
+  const available = indexed.filter(({ job }) => indegree.get(job.id) === 0);
+  const output = [];
+  while (available.length) {
+    available.sort((a, b) => (b.job.urgency ?? 0) - (a.job.urgency ?? 0) || a.index - b.index);
+    const { job } = available.shift();
+    output.push(job.id);
+    for (const id of dependents.get(job.id)) {
+      indegree.set(id, indegree.get(id) - 1);
+      if (indegree.get(id) === 0) available.push(byId.get(id));
+    }
+  }
+  if (output.length !== jobs.length) throw new Error('dependency cycle');
+  return output;
+}
+""")
+        else:
+            p.write_text("""export function scheduleJobs(jobs) {
+  return [...jobs].sort((a, b) => {
+    if ((a.after ?? []).includes(b.id)) return 1;
+    if ((b.after ?? []).includes(a.id)) return -1;
+    return (b.urgency ?? 0) - (a.urgency ?? 0);
+  }).map((job) => job.id);
+}
+""")
+    elif task == "ling-path-evidence":
+        target = dst / ("src/tickets/normalize-ticket.js" if gold else "src/normalise-ticket.js")
+        target.write_text("""export function normalizeTicket(value) {
+  if (typeof value !== 'string') throw new TypeError('ticket must be a string');
+  const match = value.replace(/\\s+/g, '').match(/^([a-z]+)-(\\d+)$/i);
+  if (!match) throw new TypeError('invalid ticket');
+  const number = String(Number(match[2]));
+  return `${match[1].toUpperCase()}-${number}`;
+}
+""")
 
 
 def diff_dirs(before, after):
@@ -156,7 +262,7 @@ def artifacts(task, gold, mutant, overlays, extras):
     # The original private pi-test checkout contained planning notes, traces and
     # archived agent state; hashing those made the reusable catalog non-portable.
     fixture_root = root_for(task)
-    for name in ("package.json", "src", "test", "data"):
+    for name in ("package.json", "src", "test", "data", "scripts"):
         item = fixture_root / name
         if item.is_file():
             paths.add(item)
@@ -203,14 +309,18 @@ def build(task):
     if task == "t3": context += ["src/align.js"]
     context_bytes = sum((root_for(task) / p).stat().st_size for p in context if (root_for(task) / p).is_file()) + sum(p.stat().st_size for p in extras)
     manifest = {
-        "schema": "pi.fixture/v1", "task_id": task, "cohort_id": "2026-07", "fixture_version": "2026-07.1",
-        "timestamps": {"created_at": "2026-07-14T00:00:00Z", "admitted_at": None, "expires_at": None},
-        "prompts": {"semantic_group": f"{task}:2026-07.1", "canonical": {"text": prompt, "sha256": h(prompt)}, "perturbations": prompt_variants(prompt)},
+        "schema": "pi.fixture/v1", "task_id": task,
+        "cohort_id": "2026-08" if task.startswith("ling-") else "2026-07",
+        "fixture_version": "2026-08.1" if task.startswith("ling-") else "2026-07.1",
+        "timestamps": {"created_at": "2026-08-13T00:00:00Z" if task.startswith("ling-") else "2026-07-14T00:00:00Z",
+                       "admitted_at": None, "expires_at": None},
+        "prompts": {"semantic_group": f"{task}:{'2026-08.1' if task.startswith('ling-') else '2026-07.1'}",
+                    "canonical": {"text": prompt, "sha256": h(prompt)}, "perturbations": prompt_variants(prompt)},
         "fixture": {"root": root_rel, "stage_copy": ([{"source": "ab-symbolect/t3-files/align.js", "dest": "src/align.js"}] if task == "t3" else [])},
         "tests": {"pass_to_pass": p2p, "fail_to_pass": f2p},
         "patches": {"gold": str(gold.relative_to(ROOT)), "shortcut_mutants": [str(mutant.relative_to(ROOT))]},
         "sufficiency": [{"assertion": assertion, "prompt_evidence": prompt} for assertion in expectations],
-        "one_shot": {"eligible": task != "bigdata" and context_bytes <= 49152, "context_files": context, "max_context_bytes": 49152},
+        "one_shot": {"eligible": not task.startswith("ling-") and task != "bigdata" and context_bytes <= 49152, "context_files": context, "max_context_bytes": 49152},
         "admission": {"approved": False, "reviewer": None, "reviewed_at": None, "automated": None},
         "artifacts": artifacts(task, gold, mutant, [overlay], extras),
     }
@@ -227,5 +337,8 @@ def build(task):
 
 
 if __name__ == "__main__":
-    for name in ALL: build(name)
-    print(f"built {len(ALL)} fixture manifests")
+    selected = sys.argv[1:] or ALL
+    unknown = sorted(set(selected) - set(ALL))
+    if unknown: raise SystemExit(f"unknown fixture(s): {', '.join(unknown)}")
+    for name in selected: build(name)
+    print(f"built {len(selected)} fixture manifests")

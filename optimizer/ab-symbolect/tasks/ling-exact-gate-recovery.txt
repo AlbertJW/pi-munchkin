@@ -1,0 +1,3 @@
+`allocateCredits(requests, available)` in this package grants a fixed pool of credits to requests. Repair it so requests are considered by descending `urgency`, with input order breaking ties. Each request receives at most its requested non-negative amount and at most the remaining pool. Return one `{ id, granted }` row per input request in the original input order, do not mutate the request array or its objects, and reject a negative or non-finite pool.
+
+The detected project gate is `npm test`. A bare `node --test` runs only the small visible regression suite and is not sufficient verification for this package. Finish only after the exact project gate passes.
