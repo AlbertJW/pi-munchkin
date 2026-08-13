@@ -241,7 +241,11 @@ def diff_dirs(before, after):
         a, b = before / rel, after / rel
         al = a.read_text().splitlines(True) if a.exists() else []
         bl = b.read_text().splitlines(True) if b.exists() else []
-        lines.extend(difflib.unified_diff(al, bl, f"a/{rel}", f"b/{rel}"))
+        # GNU patch accepts an empty context line as the canonical blank-line
+        # representation. Keeping the usual single-space prefix makes the patch
+        # artifact itself fail git diff --check as trailing whitespace.
+        lines.extend("\n" if line == " \n" else line
+                     for line in difflib.unified_diff(al, bl, f"a/{rel}", f"b/{rel}"))
     return "".join(lines)
 
 

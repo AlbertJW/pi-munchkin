@@ -2,7 +2,7 @@
   "admission": {
     "approved": false,
     "automated": {
-      "checked_at": "2026-08-13T12:47:30Z",
+      "checked_at": "2026-08-13T12:54:25Z",
       "hash_drift": [],
       "manifest_drift": false,
       "passed": true,
@@ -10,40 +10,40 @@
       "states": {
         "gold_fail_to_pass": [
           {
-            "output_bytes": 343,
-            "output_sha256": "1f1c791138536473952e7dcb61f9c3721eabf847ebec8683e1763d6d28652fcd",
+            "output_bytes": 344,
+            "output_sha256": "6bbe2bad4f7236d6ccc693ecef81ef3f62d4509037d984fc257be2be5d1d4684",
             "passed": true,
             "returncode": 0
           },
           {
-            "output_bytes": 339,
-            "output_sha256": "2d1cdbc29769417f7f79c9296742590efd782a0c4b3c8d8e4f095582aa152ae1",
+            "output_bytes": 341,
+            "output_sha256": "865136e1bfbe3843344473af103c5b370e8841c06b49a73005c6745f4bf93d0f",
             "passed": true,
             "returncode": 0
           },
           {
-            "output_bytes": 340,
-            "output_sha256": "b8e0e4564fd46955a31a7f2cbcbe9b91c415242c130812a9c1dc0fc84802c7af",
+            "output_bytes": 342,
+            "output_sha256": "75ccac0fa70aa8bc568f74ea920996c8d448cd24ea4560a67b5bcf4ce330feca",
             "passed": true,
             "returncode": 0
           }
         ],
         "gold_pass_to_pass": [
           {
-            "output_bytes": 210,
-            "output_sha256": "38de91e2d5d1fedf655cd8219b95221e5ede574e632efff229d1dce306134917",
-            "passed": true,
-            "returncode": 0
-          },
-          {
-            "output_bytes": 208,
-            "output_sha256": "71f25ad27420d19263d381ebff0ed75e4db0ea1e1e79ebe42cfd20e12ef7122a",
+            "output_bytes": 209,
+            "output_sha256": "e846543fa1e08fe7e93f49e4381154131635798311a6624f33db15b680a7ab94",
             "passed": true,
             "returncode": 0
           },
           {
             "output_bytes": 211,
-            "output_sha256": "b3bbe7cddc6b18292e7f71378b057a1c5b153edc450072fac78be8cb5cdb3bde",
+            "output_sha256": "159854b4d05086f2183a5778ff71cf08bcfd20a3ba9694301d9a6822bd787ecd",
+            "passed": true,
+            "returncode": 0
+          },
+          {
+            "output_bytes": 211,
+            "output_sha256": "400f4920a2fb57369030401b7d4326add7b303f4ee37edc37c6b075fcef2eda2",
             "passed": true,
             "returncode": 0
           }
@@ -52,39 +52,39 @@
           "fail_to_pass": [
             {
               "output_bytes": 2111,
-              "output_sha256": "d312ab44e31168f2ba7cb28827054c9de819d280f296966c3c31d0df1ee5f61d",
+              "output_sha256": "4f14127a808373c53d65b7720882775b0b9eac13b0f872d8364924dfa16a8b6a",
               "passed": false,
               "returncode": 1
             },
             {
               "output_bytes": 2111,
-              "output_sha256": "a9f1c479d26241a3cd9bef3539589727cfd759596fc3f011dda9b33f91203862",
+              "output_sha256": "be71e4c0d8567823f88a9459bbbd2f50ebecc045143f33108229243f98e7d510",
               "passed": false,
               "returncode": 1
             },
             {
-              "output_bytes": 2111,
-              "output_sha256": "c8fec64e8a8cd8ed5834c545465f682e258761c483df4ad18ae3e3fae72f94d2",
+              "output_bytes": 2108,
+              "output_sha256": "21b4d9bf4f9daf5040890f5fd018b6cd2cb7669a6c3fc478d52b952ac4bf4957",
               "passed": false,
               "returncode": 1
             }
           ],
           "pass_to_pass": [
             {
-              "output_bytes": 211,
-              "output_sha256": "6c78422910a86c25a153f9f0d2bdbc5896050bdc212ecddf2af8e1cb7db8491f",
+              "output_bytes": 209,
+              "output_sha256": "9f68ab5126a3331fb7d409a8121526ddba5b149c117949fa201316287af7dd91",
               "passed": true,
               "returncode": 0
             },
             {
-              "output_bytes": 211,
-              "output_sha256": "fef1952baed6cf8e84fc5e103112746416d578f1a6dbba4afe61d02844734aba",
+              "output_bytes": 209,
+              "output_sha256": "d77a7c009e92e3bca2282941772e9470d3bebde56f21b1beed206cd9fa578436",
               "passed": true,
               "returncode": 0
             },
             {
-              "output_bytes": 211,
-              "output_sha256": "531a704bd10d5994ba9945080f15111b847565d4d74783df17033eca3a96da2f",
+              "output_bytes": 208,
+              "output_sha256": "3fbacc838f6589067c7cc0126903dc35ad79c680053901dd46c56bf503562206",
               "passed": true,
               "returncode": 0
             }
@@ -92,20 +92,20 @@
         },
         "pristine_fail_to_pass": [
           {
-            "output_bytes": 2111,
-            "output_sha256": "987b6c5913d32092117e06cbfb22a198a21cf6da390829e206ca71c362ba3b66",
+            "output_bytes": 2105,
+            "output_sha256": "c27b573967ad9627323dc8ded3aefe09a596933c1dec4a25d7d7845ab5066d59",
             "passed": false,
             "returncode": 1
           },
           {
-            "output_bytes": 2111,
-            "output_sha256": "5455b3b45bd864f373810adfac3a1b4ac2fd5278956d3863dbe80fc867477d16",
+            "output_bytes": 2109,
+            "output_sha256": "69f3199b06b29cf9d47106ba2f52ed50f08a58bce77a78bd013cc872942173c9",
             "passed": false,
             "returncode": 1
           },
           {
-            "output_bytes": 2111,
-            "output_sha256": "89740786160556569956316df7faeb0d4f1c26fb1f76d19d809b4018ed847788",
+            "output_bytes": 2102,
+            "output_sha256": "9a1e8d7bd2779a61ab5401bb02337ccaff96c71bb9d19804bfba7227b82b05b6",
             "passed": false,
             "returncode": 1
           }
@@ -113,19 +113,19 @@
         "pristine_pass_to_pass": [
           {
             "output_bytes": 210,
-            "output_sha256": "2120edaa364fd4768e2171d065c3027e55572ef1230a4cfd9e8af889bc0b3802",
-            "passed": true,
-            "returncode": 0
-          },
-          {
-            "output_bytes": 211,
-            "output_sha256": "3c405902fabde3546dd82ea0dcf169007bb55830d07c3ecac537e3609e09113f",
+            "output_sha256": "d05f99fcbf1d2d76dbccd1d38cdb5ea9b9fd08e90f8728e8b3a068652f192bb5",
             "passed": true,
             "returncode": 0
           },
           {
             "output_bytes": 210,
-            "output_sha256": "c2e04f908d045e42e7691beb40cc6f57a6eee0586aff7cf2f9883fa7b9cb7e99",
+            "output_sha256": "c5cd76dc8ff28721201be0788b665a3d0485963be71330dda59c98b4dfcf5fc5",
+            "passed": true,
+            "returncode": 0
+          },
+          {
+            "output_bytes": 211,
+            "output_sha256": "ef3e47d3ea7af5859ab6fd7c6915cd4c39669c994fffc45f9519751154f2204f",
             "passed": true,
             "returncode": 0
           }

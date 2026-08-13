@@ -40,7 +40,7 @@ Add a `blocked` job status between `queued` and `running`. `STATUS_ORDER` in `sr
 ## Automated admission
 
 - Passed: `True`
-- Checked: `2026-08-13T12:47:25Z`
+- Checked: `2026-08-13T12:54:20Z`
 
 ## Human decision
 
