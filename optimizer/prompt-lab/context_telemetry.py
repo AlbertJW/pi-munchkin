@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Deterministically reduce one gate session's exact-key context telemetry."""
 import argparse
+from collections import Counter
 import hashlib
 import hmac
 import json
@@ -11,6 +12,7 @@ import tempfile
 
 
 MAC_SUFFIX = re.compile(br',"mac":"([0-9a-f]{64})"}$')
+SAFE_TIER_DETECTORS = {"semantic", "session", "combined"}
 
 
 def _read_raw(source):
@@ -39,28 +41,27 @@ def _decode_line(line, number, key=None):
         raise ValueError(f"invalid telemetry JSON at line {number}: {exc.msg}") from exc
 
 
-def exact_events(path, session_key, ext, key=None):
+def authenticated_events(path, key=None):
     raw = _read_raw(path)
-    selected = []
+    events = []
     for number, line in enumerate(raw.splitlines(), 1):
         if not line.strip():
             continue
         event = _decode_line(line, number, key)
         if key is not None and event.get("schema") == "pi.harness-event/v2" and event.get("source") != "gate":
             raise ValueError(f"non-gate telemetry source in authoritative stream at line {number}")
-        if event.get("sk") == session_key and event.get("ext") == ext:
-            selected.append(event)
-    return raw, selected
+        events.append(event)
+    return raw, events
+
+
+def exact_events(path, session_key, ext, key=None):
+    raw, events = authenticated_events(path, key)
+    return raw, [event for event in events if event.get("sk") == session_key and event.get("ext") == ext]
 
 
 def has_abort(path, session_key, key=None):
-    raw = _read_raw(path)
-    for number, line in enumerate(raw.splitlines(), 1):
-        if not line.strip():
-            continue
-        event = _decode_line(line, number, key)
-        if key is not None and event.get("schema") == "pi.harness-event/v2" and event.get("source") != "gate":
-            raise ValueError(f"non-gate telemetry source in authoritative stream at line {number}")
+    _, events = authenticated_events(path, key)
+    for event in events:
         if event.get("sk") == session_key and event.get("kind") in ("abort", "outcome-abort"):
             return True
     return False
@@ -70,13 +71,8 @@ def exposure_counts(path, session_key, event_keys, key=None):
     """Count only declared ext/kind pairs for one authenticated session."""
     wanted = {event for event in event_keys if isinstance(event, str) and "/" in event}
     counts = {event: 0 for event in sorted(wanted)}
-    raw = _read_raw(path)
-    for number, line in enumerate(raw.splitlines(), 1):
-        if not line.strip():
-            continue
-        event = _decode_line(line, number, key)
-        if key is not None and event.get("schema") == "pi.harness-event/v2" and event.get("source") != "gate":
-            raise ValueError(f"non-gate telemetry source in authoritative stream at line {number}")
+    _, events = authenticated_events(path, key)
+    for event in events:
         if event.get("sk") != session_key:
             continue
         name = f"{event.get('ext', '')}/{event.get('kind', '')}"
@@ -85,12 +81,107 @@ def exposure_counts(path, session_key, event_keys, key=None):
     return counts
 
 
+def _nonnegative_number(value):
+    return isinstance(value, (int, float)) and not isinstance(value, bool) and value >= 0
+
+
+def _nonnegative_int(value):
+    return isinstance(value, int) and not isinstance(value, bool) and value >= 0
+
+
+def _tier_counts(events, kind):
+    counts = Counter()
+    for event in events:
+        if event.get("kind") != kind:
+            continue
+        detector, tier = event.get("detector"), event.get("tier")
+        if detector in SAFE_TIER_DETECTORS and isinstance(tier, int) and not isinstance(tier, bool) and 1 <= tier <= 3:
+            counts[(detector, tier)] += 1
+    return [
+        {"detector": detector, "tier": tier, "count": count}
+        for (detector, tier), count in sorted(counts.items())
+    ]
+
+
+def _failure_episode_summary(events):
+    def unique(kind, fields):
+        result, seen = [], set()
+        for event in events:
+            if event.get("kind") != kind:
+                continue
+            identity = tuple(event.get(field) for field in fields)
+            if identity in seen:
+                continue
+            seen.add(identity)
+            result.append(event)
+        return result
+
+    opened = unique("opened", ("episode_id",))
+    observed = unique("observed", ("episode_id", "count"))
+    recovered = unique("recovered", ("episode_id", "count", "recovery"))
+    abandoned = unique("abandoned", ("episode_id", "count"))
+    settled = [event for event in events if event.get("kind") == "settled"]
+
+    final_counts = {}
+    for event in observed + recovered + abandoned:
+        episode_id, count = event.get("episode_id"), event.get("count")
+        if isinstance(episode_id, str) and re.fullmatch(r"[0-9a-f]{64}", episode_id) and _nonnegative_int(count):
+            final_counts[episode_id] = max(final_counts.get(episode_id, 0), count)
+
+    recovery_calls = {}
+    for event in recovered:
+        episode_id, calls = event.get("episode_id"), event.get("calls_after_second")
+        if isinstance(episode_id, str) and re.fullmatch(r"[0-9a-f]{64}", episode_id) and _nonnegative_int(calls):
+            recovery_calls[episode_id] = max(recovery_calls.get(episode_id, 0), calls)
+
+    fields = (
+        "total_episodes", "total_failures", "longest_episode",
+        "semantic_failure_overrun", "correlated_failure_overrun", "settled_without_recovery",
+    )
+    settlement = settled[0] if len(settled) == 1 else {}
+    valid_settlement = len(settled) == 1 and all(_nonnegative_int(settlement.get(field)) for field in fields)
+    return {
+        "complete": valid_settlement,
+        "settlement_summaries": len(settled),
+        "opened_events": len(opened),
+        "observed_events": len(observed),
+        "recovered_events": len(recovered),
+        "abandoned_events": len(abandoned),
+        **{field: settlement.get(field) if valid_settlement else None for field in fields},
+        "failures_after_second": sum(max(0, count - 2) for count in final_counts.values()),
+        "recovered_episodes": len(recovery_calls),
+        "recovery_calls_total": sum(recovery_calls.values()),
+        "recovery_calls_max": max(recovery_calls.values()) if recovery_calls else 0,
+        "tier_observed": _tier_counts(events, "tier-observed"),
+        "interventions": _tier_counts(events, "intervention"),
+    }
+
+
+def _provider_timing_summary(events):
+    fields = ("request_to_headers_ms", "first_token_ms", "stream_completion_ms", "settlement_ms")
+    result = {"requests": len(events)}
+    for field in fields:
+        values = [event.get(field) for event in events if _nonnegative_number(event.get(field))]
+        result[field] = {
+            "count": len(values),
+            "sum_ms": sum(values),
+            "max_ms": max(values) if values else None,
+        }
+    return result
+
+
 def aggregate(path, session_key, key=None, exposure_events=None):
-    raw, selected = exact_events(path, session_key, "context-watcher", key)
-    _, surface_events = exact_events(path, session_key, "surface-receipt", key)
-    _, context_surfaces = exact_events(path, session_key, "context-surface", key)
-    _, guard_events = exact_events(path, session_key, "bash-output-guard", key)
-    _, plan_events = exact_events(path, session_key, "plan-runner", key)
+    raw, all_events = authenticated_events(path, key)
+    session_events = [event for event in all_events if event.get("sk") == session_key]
+    by_ext = {
+        ext: [event for event in session_events if event.get("ext") == ext]
+        for ext in ("context-watcher", "surface-receipt", "context-surface", "bash-output-guard", "plan-runner", "failure-episode", "runtime")
+    }
+    selected = by_ext["context-watcher"]
+    surface_events = by_ext["surface-receipt"]
+    context_surfaces = by_ext["context-surface"]
+    guard_events = by_ext["bash-output-guard"]
+    plan_events = by_ext["plan-runner"]
     delegate_blocks = [e for e in plan_events if e.get("kind") == "delegate-all-block"]
     delegate_subagents = [e for e in plan_events if e.get("kind") == "delegate-all-subagent"]
     harness_surface_sha256 = None
@@ -126,11 +217,13 @@ def aggregate(path, session_key, key=None, exposure_events=None):
             message_bytes.append(sum(values))
 
     result = {
-        "schema": "pi.context-telemetry/v2",
+        "schema": "pi.context-telemetry/v3",
         "authenticated": key is not None,
         "content_sha256": hashlib.sha256(raw).hexdigest(),
         "session_key": session_key,
-        "events": len(selected) + len(context_surfaces) + len(guard_events) + len(delegate_blocks) + len(delegate_subagents),
+        "events": (len(selected) + len(context_surfaces) + len(guard_events) + len(delegate_blocks) +
+                   len(delegate_subagents) + len(by_ext["failure-episode"]) +
+                   sum(event.get("kind") == "provider-timing" for event in by_ext["runtime"])),
         "harness_surface_sha256": harness_surface_sha256,
         "config": config,
         "compactions": {
@@ -187,6 +280,10 @@ def aggregate(path, session_key, key=None, exposure_events=None):
             "blocked": len(delegate_blocks),
             "delegated": len(delegate_subagents),
         },
+        "failure_episodes": _failure_episode_summary(by_ext["failure-episode"]),
+        "provider_timing": _provider_timing_summary([
+            event for event in by_ext["runtime"] if event.get("kind") == "provider-timing"
+        ]),
     }
     if exposure_events:
         result["exposure"] = exposure_counts(path, session_key, exposure_events, key)
@@ -213,6 +310,20 @@ def selftest():
         {"ts":"x","sk":"run-a","ext":"plan-runner","kind":"delegate-all-subagent","agent":"executor","mode":"spawn"},
         {"ts":"x","sk":"run-a","ext":"plan-runner","kind":"write","items":1},  # unrelated plan-runner kind — must not be counted
         {"ts":"x","sk":"other","ext":"plan-runner","kind":"delegate-all-block","toolName":"edit"},
+        {"ts":"x","sk":"run-a","ext":"failure-episode","kind":"opened","episode_id":"b"*64,
+         "failure_class":"compile_or_lint","tool_family":"bash","target_hash":"c"*64,"plan_item_hash":"d"*64},
+        {"ts":"x","sk":"run-a","ext":"failure-episode","kind":"observed","episode_id":"b"*64,
+         "failure_class":"compile_or_lint","count":3,"calls_after_second":2,"correlated_calls_after_second":1,"strategy_count":2},
+        {"ts":"x","sk":"run-a","ext":"failure-episode","kind":"observed","episode_id":"b"*64,
+         "failure_class":"compile_or_lint","count":3,"calls_after_second":2,"correlated_calls_after_second":1,"strategy_count":2},
+        {"ts":"x","sk":"run-a","ext":"failure-episode","kind":"tier-observed","tier":1,"detector":"semantic",
+         "mode":"shadow","failure_class":"compile_or_lint","count":2,"session_repeats":7},
+        {"ts":"x","sk":"run-a","ext":"failure-episode","kind":"recovered","episode_id":"b"*64,
+         "failure_class":"compile_or_lint","count":3,"calls_after_second":2,"correlated_calls_after_second":1,"recovery":"exact_gate"},
+        {"ts":"x","sk":"run-a","ext":"failure-episode","kind":"settled","total_episodes":1,"total_failures":3,
+         "longest_episode":3,"semantic_failure_overrun":2,"correlated_failure_overrun":1,"settled_without_recovery":0},
+        {"ts":"x","sk":"run-a","ext":"runtime","kind":"provider-timing","request_seq":1,
+         "request_to_headers_ms":10,"first_token_ms":20,"stream_completion_ms":30,"settlement_ms":40,"status":200},
     ]
     with tempfile.TemporaryDirectory() as td:
         path = os.path.join(td, "events.jsonl")
@@ -225,8 +336,8 @@ def selftest():
         open(path, "wb").write(content)
         row = aggregate(path, "run-a", key)
         assert row["content_sha256"] == hashlib.sha256(content).hexdigest()
-        assert row["schema"] == "pi.context-telemetry/v2"
-        assert row["events"] == 10 and row["config"]["enabled"] is False
+        assert row["schema"] == "pi.context-telemetry/v3"
+        assert row["events"] == 17 and row["config"]["enabled"] is False
         assert row["compactions"]["pi"] == 1 and row["compactions"]["overflow"] == 0
         assert row["watcher"]["completed"] == 1 and row["watcher"]["resume_required"] == 1
         assert row["harness_surface_sha256"] == "a" * 64
@@ -236,6 +347,14 @@ def selftest():
         assert row["bash_output_guard"]["cwd_escape_suspected"] == 1
         assert row["plan_runner_delegation"]["blocked"] == 2, "only run-a's delegate-all-block events, not other's edit or run-a's own write"
         assert row["plan_runner_delegation"]["delegated"] == 1
+        episodes = row["failure_episodes"]
+        assert episodes["complete"] and episodes["settlement_summaries"] == 1
+        assert episodes["observed_events"] == 1, "duplicate semantic event is counted once"
+        assert episodes["failures_after_second"] == 1 and episodes["semantic_failure_overrun"] == 2
+        assert episodes["recovered_episodes"] == 1 and episodes["recovery_calls_total"] == 2
+        assert episodes["tier_observed"] == [{"detector":"semantic", "tier":1, "count":1}]
+        assert row["provider_timing"]["requests"] == 1
+        assert row["provider_timing"]["first_token_ms"] == {"count":1, "sum_ms":20, "max_ms":20}
         exposure = exposure_counts(path, "run-a", ["plan-runner/delegate-all-block", "fake/event"], key)
         assert exposure["plan-runner/delegate-all-block"] == 2 and exposure["fake/event"] == 0
         assert aggregate(os.path.join(td, "missing"), "run-a", key)["events"] == 0
@@ -273,14 +392,23 @@ def selftest():
             assert "non-gate telemetry source" in str(exc)
         else:
             raise AssertionError("abort reducer trusted test-source telemetry")
-        schema_path = os.path.join(os.path.dirname(__file__), "..", "real-gate-fixtures", "schemas", "pi.eval-row-v2.schema.json")
+        missing_episodes = aggregate(os.path.join(td, "missing"), "run-a", key)["failure_episodes"]
+        assert not missing_episodes["complete"] and missing_episodes["settlement_summaries"] == 0
+        duplicate_settlement = os.path.join(td, "duplicate-settlement.jsonl")
+        settlement = events[-2]
+        open(duplicate_settlement, "wb").write(signed(settlement) + signed(settlement))
+        duplicate = aggregate(duplicate_settlement, "run-a", key)["failure_episodes"]
+        assert not duplicate["complete"] and duplicate["settlement_summaries"] == 2
+        schema_path = os.path.join(os.path.dirname(__file__), "..", "real-gate-fixtures", "schemas", "pi.eval-row-v3.schema.json")
         context_schema = json.load(open(schema_path))["properties"]["context"]
         assert set(context_schema["properties"]["compactions"]["required"]) == set(row["compactions"])
         assert set(context_schema["properties"]["watcher"]["required"]) == set(row["watcher"])
         assert set(context_schema["properties"]["surface"]["required"]) == set(row["surface"])
         assert set(context_schema["properties"]["bash_output_guard"]["required"]) == set(row["bash_output_guard"])
         assert set(context_schema["properties"]["plan_runner_delegation"]["required"]) == set(row["plan_runner_delegation"])
-    print("context_telemetry selftest: OK (exact key; v2 surface aggregates; content sha256)")
+        assert set(context_schema["properties"]["failure_episodes"]["required"]) == set(row["failure_episodes"])
+        assert set(context_schema["properties"]["provider_timing"]["required"]) == set(row["provider_timing"])
+    print("context_telemetry selftest: OK (authenticated v3 episodes + provider timing; content sha256)")
 
 
 def main():

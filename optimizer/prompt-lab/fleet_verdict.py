@@ -32,6 +32,7 @@ import collections, json, os, sys
 LAB = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, LAB)
 from fleet_report import classify, decide, uplift_decay  # noqa: E402
+from row_contract import CANONICAL_ROWS, ROW_V3, canonical_generation, failure_episode_complete  # noqa: E402
 
 RESULTS = os.path.join(LAB, "results")
 TELEMETRY = os.environ.get("TELEMETRY_FILE", os.path.expanduser("~/.pi/agent/telemetry/events.jsonl"))
@@ -45,9 +46,13 @@ def load_rows(path):
 
 def adoption_rows(rows):
     """Drop one-shot/perturbation evidence while preserving canonical held-out rows."""
-    if not any(r.get("schema") == "pi.eval-row/v2" for r in rows):
+    try:
+        canonical = canonical_generation(rows)
+    except ValueError:
+        return []
+    if not canonical:
         return rows
-    return [r for r in rows if r.get("schema") == "pi.eval-row/v2"
+    return [r for r in rows if r.get("schema") == canonical
             and r.get("pattern") == "base"
             and (r.get("prompt") or {}).get("variant") == "canonical"
             and r.get("split") in ("val", "heldout")]
@@ -56,14 +61,20 @@ def adoption_rows(rows):
 def row_integrity(rows):
     if not rows:
         return "no canonical adoption rows"
-    if not any(r.get("schema") == "pi.eval-row/v2" for r in rows):
+    try:
+        canonical = canonical_generation(rows)
+    except ValueError as exc:
+        return str(exc)
+    if not canonical:
         return None  # historical calibration remains readable
     for r in rows:
         serving = r.get("serving") or {}
         if not r.get("authoritative") or r.get("status") != "complete":
-            return "non-authoritative or incomplete pi.eval-row/v2 row"
+            return "non-authoritative or incomplete canonical eval row"
         if not serving.get("stable") or (serving.get("pre") or {}).get("status") != "complete" or (serving.get("post") or {}).get("status") != "complete":
             return "serving fingerprint incomplete or unstable"
+        if canonical == ROW_V3 and not failure_episode_complete(r):
+            return "authenticated failure-episode settlement is missing or incomplete"
     return None
 
 
@@ -192,7 +203,7 @@ def verdicts(gens, results_dir=RESULTS, telemetry_file=TELEMETRY, manifest=None)
                 extra = sum((cells(rows) - cells(base[g][1])).values())
                 incomplete[name].append(f"{g}: cells mismatch base (missing {missing}, extra/dup {extra})")
                 continue
-            if any(r.get("schema") == "pi.eval-row/v2" for r in rows):
+            if any(r.get("schema") in CANONICAL_ROWS for r in rows):
                 bfp = {(r["task"], r["rep"]): (r.get("serving", {}).get("pre") or {}).get("fingerprint_sha256") for r in base[g][1]}
                 cfp = {(r["task"], r["rep"]): (r.get("serving", {}).get("pre") or {}).get("fingerprint_sha256") for r in rows}
                 if bfp != cfp:

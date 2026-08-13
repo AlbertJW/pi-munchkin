@@ -780,6 +780,11 @@ execution_reason=network_reason if bool(int(sandbox_auth)) else f"{network_reaso
 spec=importlib.util.spec_from_file_location("execution_policy", policy_path); policy=importlib.util.module_from_spec(spec); spec.loader.exec_module(policy)
 authoritative,status,authority_reason=policy.row_decision(ctx["authoritative"],ctx["authority_reason"],stable,serving_complete,
     execution_authoritative,execution_reason,ctx.get("exploratory_override",False))
+episode_complete=(context_data.get("failure_episodes") or {}).get("complete") is True
+if not episode_complete:
+    authoritative=False
+    status="incomplete"
+    authority_reason="authenticated failure-episode settlement summary missing or duplicated"
 exact=bool(int(usage_exact))
 usage={"source":"provider" if exact else "char_proxy", "exact":exact,
        "input_tokens":int(tin) if exact else None, "output_tokens":int(tout) if exact else None,
@@ -827,7 +832,7 @@ if experiment_manifest:
 sys.path.insert(0, os.path.dirname(os.path.abspath(config_path)))
 import grade_artifact as _grade_artifact
 subscores, subscores_blocked = _grade_artifact.extract(workdir, ctx.get("grade_artifact"))
-rec={"schema":"pi.eval-row/v2", "task":task,"pattern":pat,"arm":pat,"rep":int(rep),
+rec={"schema":"pi.eval-row/v3", "task":task,"pattern":pat,"arm":pat,"rep":int(rep),
      "repetition":int(rep),"model":model,"split":split,"score":int(gate),
      "retried":int(retried),"run":runid,"fixture":{"cohort":ctx["cohort"],"version":ctx["version"]},
      "authoritative":authoritative,"status":status,"authority_reason":authority_reason,
@@ -861,6 +866,8 @@ rec["exposure"]=_exposure.row_exposure(exposure_spec, pat, context_data.get("exp
                                        configured=(pat != "base"))
 if expected_models:
     rec["fleet_expected_models"] = sorted(expected_models.split())
+import row_contract as _row_contract
+_row_contract.validate_powered_row(rec)
 open(out,"a").write(json.dumps(rec)+"\n")
 PY
 	local row_writer_rc=$?
@@ -891,7 +898,7 @@ PY
 	fi
 	python3 "$FINGERPRINT" capture --endpoint "$FINGERPRINT_ENDPOINT" --model "$MODEL" --output "$wd/fingerprint-post.json"
 	python3 - "$RESULTS" "$MODEL" "$task" "$rep" "$RUNID" "$rowctx" "$result" "$wd/fingerprint-pre.json" "$wd/fingerprint-post.json" "$eligible" "$GATE_NETWORK" "$MODEL_CONTROL" "$MODEL_PROVIDER_RESOLVED" "$ENDPOINT_IDENTITY_SHA256" "$NETWORK_AUTHORITATIVE" "$NETWORK_AUTHORITY_REASON" "$SANDBOX_AUTHORITATIVE" "$SANDBOX_AUTHORITY_REASON" "$EXEC_POLICY" <<'PY'
-import importlib.util,json,sys
+import importlib.util,json,os,sys
 out,model,task,rep,runid,ctxp,resultp,prep,postp,eligible,network_mode,model_control,provider,endpoint_sha,network_auth,network_reason,sandbox_auth,sandbox_reason,policy_path=sys.argv[1:20]
 ctx=json.load(open(ctxp)); result=json.load(open(resultp)); pre=json.load(open(prep)); post=json.load(open(postp))
 stable=pre.get("fingerprint_sha256")==post.get("fingerprint_sha256")
@@ -902,7 +909,7 @@ spec=importlib.util.spec_from_file_location("execution_policy", policy_path); po
 authoritative,status,authority_reason=policy.row_decision(ctx["authoritative"],ctx["authority_reason"],stable,complete,
     execution_authoritative,execution_reason,ctx.get("exploratory_override",False),eligible=="1")
 usage=result["usage"]
-rec={"schema":"pi.eval-row/v2","task":task,"pattern":"one-shot","arm":"one-shot","rep":int(rep),"repetition":int(rep),
+rec={"schema":"pi.eval-row/v3","task":task,"pattern":"one-shot","arm":"one-shot","rep":int(rep),"repetition":int(rep),
      "model":model,"split":"robustness","score":int(result["score"]),"run":runid,
      "fixture":{"cohort":ctx["cohort"],"version":ctx["version"]},"authoritative":authoritative,"status":status,
      "authority_reason":authority_reason,"prompt":{"variant":ctx["prompt_variant"],"semantic_group":ctx["semantic_group"],"sha256":ctx["prompt_sha256"]},
@@ -910,8 +917,12 @@ rec={"schema":"pi.eval-row/v2","task":task,"pattern":"one-shot","arm":"one-shot"
                   "endpoint_identity_sha256":endpoint_sha,"network_authoritative":bool(int(network_auth)),
                   "sandboxed":bool(int(sandbox_auth)),"authoritative":execution_authoritative},
      "serving":{"pre":pre,"post":post,"stable":stable},"usage":usage,"control":{"requests":result["requests"],"error":result.get("error")},
+     "exposure":{"mode":"configuration","status":"control","target_count":0,"counts":{}},
      "out_chars":usage["output_chars"],"in_tok":usage["input_tokens"] or 0,"out_tok":usage["output_tokens"] or 0,
      "token_usage_exact":usage["exact"]}
+sys.path.insert(0, os.path.dirname(os.path.abspath(policy_path)))
+import row_contract as _row_contract
+_row_contract.validate_powered_row(rec, require_context=False)
 open(out,"a").write(json.dumps(rec)+"\n")
 PY
 	echo "  one-shot/$task rep$rep/$variant -> recorded"

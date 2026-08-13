@@ -17,6 +17,9 @@ Needs FRONTIER_BASE_URL / FRONTIER_API_KEY (reused from judge.py).
 import difflib, hashlib, json, os, re, sys
 
 LAB = os.path.dirname(os.path.abspath(__file__))
+sys.path.insert(0, LAB)
+from row_contract import canonical_generation  # noqa: E402
+
 PROPOSALS = os.path.join(LAB, "proposals")
 DEFAULT_PROMPT = os.path.expanduser("~/.pi/agent/APPEND_SYSTEM.md")
 
@@ -59,15 +62,17 @@ def failing_traces(gen, max_traces):
                         "wrong": r.get("sql", ""), "model": r.get("model", "?")})
     return out[:max_traces]
 
-ROW_SCHEMA_ID = "pi.eval-row/v2"
-_ROW_SCHEMA_CACHE = None
+ROW_SCHEMA_IDS = {"pi.eval-row/v2", "pi.eval-row/v3"}
+_ROW_SCHEMA_CACHE = {}
 
-def row_schema():
-    global _ROW_SCHEMA_CACHE
-    if _ROW_SCHEMA_CACHE is None:
-        schema_path = os.path.join(LAB, "..", "real-gate-fixtures", "schemas", "pi.eval-row-v2.schema.json")
-        _ROW_SCHEMA_CACHE = json.load(open(schema_path))
-    return _ROW_SCHEMA_CACHE
+def row_schema(schema_id="pi.eval-row/v2"):
+    if schema_id not in ROW_SCHEMA_IDS:
+        raise ValueError(f"unsupported eval-row schema {schema_id!r}")
+    if schema_id not in _ROW_SCHEMA_CACHE:
+        version = schema_id.rsplit("/", 1)[-1]
+        schema_path = os.path.join(LAB, "..", "real-gate-fixtures", "schemas", f"pi.eval-row-{version}.schema.json")
+        _ROW_SCHEMA_CACHE[schema_id] = json.load(open(schema_path))
+    return _ROW_SCHEMA_CACHE[schema_id]
 
 # Minimal recursive JSON-Schema validator for the checked-in v2 row contract
 # (stdlib-only by design — no schema library). Supports exactly the keyword
@@ -77,7 +82,7 @@ def row_schema():
 # whose every field was {"stub": true}.
 _SCHEMA_DESCRIPTIVE_KEYS = {"$schema", "$id", "title", "description", "_doc", "$defs"}
 _SCHEMA_SUPPORTED_KEYS = {"type", "required", "properties", "const", "enum", "pattern",
-                          "minimum", "maximum", "minLength", "items",
+                          "minimum", "maximum", "minLength", "items", "maxItems",
                           "additionalProperties", "$ref", "allOf", "if", "then", "not"}
 
 def _type_ok(value, expected):
@@ -136,6 +141,8 @@ def validate_row(instance, schema, defs, path="$"):
     if isinstance(instance, list) and "items" in schema:
         for index, item in enumerate(instance):
             errors.extend(validate_row(item, schema["items"], defs, f"{path}[{index}]"))
+    if "maxItems" in schema and isinstance(instance, list) and len(instance) > schema["maxItems"]:
+        errors.append(f"{path}: longer than maxItems")
     for branch in schema.get("allOf", []):
         errors.extend(validate_row(instance, branch, defs, path))
     if "if" in schema:
@@ -144,12 +151,15 @@ def validate_row(instance, schema, defs, path="$"):
     return errors
 
 def row_validation_errors(row):
-    schema = row_schema()
+    try:
+        schema = row_schema(row.get("schema"))
+    except ValueError as exc:
+        return [str(exc)]
     return validate_row(row, schema, schema.get("$defs", {}))
 
 def load_gate_rows(gen, results_dir=None):
     """Rows from a real-gate round eligible to feed candidate generation:
-    EXACT v2 schema, FULLY schema-valid (types, patterns, nested and
+    EXACT canonical schema, FULLY schema-valid (types, patterns, nested and
     conditional requirements — presence-only checking admitted all-stub
     rows), split "val" ONLY (heldout/robustness rows must never contaminate
     proposals — manifests declare held-out material unavailable),
@@ -160,8 +170,13 @@ def load_gate_rows(gen, results_dir=None):
     if not os.path.exists(path):
         return []
     rows = [json.loads(l) for l in open(path) if l.strip()]
-    return [r for r in rows
-            if r.get("schema") == ROW_SCHEMA_ID
+    canonical_rows = [row for row in rows if row.get("schema") in ROW_SCHEMA_IDS]
+    try:
+        generation = canonical_generation(canonical_rows)
+    except ValueError:
+        return []
+    return [r for r in canonical_rows
+            if generation is not None and r.get("schema") == generation
             and not row_validation_errors(r)
             and r.get("split") == "val"
             and r.get("authoritative") is True
@@ -598,7 +613,36 @@ def selftest():
         }
         row.update(overrides)
         return row
+    def canonical_v3_row(**overrides):
+        row = canonical_row()
+        context = dict(row["context"])
+        context.update({
+            "schema": "pi.context-telemetry/v3",
+            "bash_output_guard": {"withheld": 0, "cwd_escape_suspected": 0},
+            "plan_runner_delegation": {"blocked": 0, "delegated": 0},
+            "failure_episodes": {
+                "complete": True, "settlement_summaries": 1, "opened_events": 1,
+                "observed_events": 2, "recovered_events": 1, "abandoned_events": 0,
+                "total_episodes": 1, "total_failures": 2, "longest_episode": 2,
+                "semantic_failure_overrun": 1, "correlated_failure_overrun": 1,
+                "settled_without_recovery": 0, "failures_after_second": 0,
+                "recovered_episodes": 1, "recovery_calls_total": 1, "recovery_calls_max": 1,
+                "tier_observed": [{"detector": "semantic", "tier": 1, "count": 1}],
+                "interventions": [],
+            },
+            "provider_timing": {
+                "requests": 1,
+                "request_to_headers_ms": {"count": 1, "sum_ms": 1, "max_ms": 1},
+                "first_token_ms": {"count": 1, "sum_ms": 2, "max_ms": 2},
+                "stream_completion_ms": {"count": 1, "sum_ms": 3, "max_ms": 3},
+                "settlement_ms": {"count": 1, "sum_ms": 4, "max_ms": 4},
+            },
+        })
+        row.update(schema="pi.eval-row/v3", context=context)
+        row.update(overrides)
+        return row
     assert row_validation_errors(canonical_row()) == [], row_validation_errors(canonical_row())
+    assert row_validation_errors(canonical_v3_row()) == [], row_validation_errors(canonical_v3_row())
     # full validation, not presence: types, patterns, and conditionals bite
     assert row_validation_errors(canonical_row(task={"stub": True})), "object-typed task must be invalid"
     assert row_validation_errors(canonical_row(score=7)), "score outside 0..1 must be invalid"
@@ -642,9 +686,13 @@ def selftest():
         # 2 of the 3 eval rows survive (the incomplete synthetic is excluded by
         # the authority bar), and every contaminant is rejected.
         assert len(loaded) == 2, f"only schema-VALID val+authoritative+complete rows load, got {len(loaded)}"
-        assert all(r.get("schema") == ROW_SCHEMA_ID and not row_validation_errors(r) for r in loaded)
+        assert all(r.get("schema") in ROW_SCHEMA_IDS and not row_validation_errors(r) for r in loaded)
         ids = sorted(hashlib.sha256(json.dumps(r, sort_keys=True).encode()).hexdigest() for r in loaded)
         assert len(ids) == len(loaded), "provenance covers every consumed row (no cap)"
+        with open(os.path.join(td, "v3-probe.jsonl"), "w") as f:
+            f.write(json.dumps(canonical_v3_row()) + "\n")
+        loaded_v3 = load_gate_rows("v3-probe", results_dir=td)
+        assert len(loaded_v3) == 1 and loaded_v3[0]["schema"] == "pi.eval-row/v3"
     pack_a = distill_evidence(gate_rows)
     pack_b = distill_evidence(list(gate_rows))
     assert pack_a == pack_b, "evidence pack must be deterministic"

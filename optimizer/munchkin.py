@@ -263,8 +263,11 @@ def _validated_canonical_val_rows(rows, tasks, n):
             raise ValueError(f"unexpected canonical val cell: {cell!r}")
         if cell in found:
             raise ValueError(f"duplicate canonical val cell: {cell!r}")
-        if r.get("schema") != "pi.eval-row/v2":
-            raise ValueError(f"{cell!r}: expected pi.eval-row/v2 row")
+        if r.get("schema") not in ("pi.eval-row/v2", "pi.eval-row/v3"):
+            raise ValueError(f"{cell!r}: expected canonical eval row")
+        if (r.get("schema") == "pi.eval-row/v3" and
+                (r.get("context") or {}).get("failure_episodes", {}).get("complete") is not True):
+            raise ValueError(f"{cell!r}: authenticated failure-episode settlement is missing or incomplete")
         if r.get("authoritative") is not True or r.get("status") != "complete":
             raise ValueError(f"{cell!r}: row is non-authoritative or incomplete")
         if type(r.get("score")) is not int or r["score"] not in (0, 1):
@@ -562,7 +565,8 @@ def selftest():
             os.environ["GATE_NETWORK"] = old_network
 
     # real-gate authority boundary: count only an exact, authoritative and complete
-    # pi.eval-row/v2 canonical val surface; missing/malformed rows fail closed.
+    # Canonical eval-row val surface; missing/malformed rows fail closed. V3
+    # additionally binds a complete authenticated failure-episode settlement.
     def gate_row(task, rep, **changes):
         row = {"schema": "pi.eval-row/v2", "task": task, "rep": rep,
                "pattern": "base", "split": "val", "prompt": {"variant": "canonical"},

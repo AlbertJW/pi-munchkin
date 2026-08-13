@@ -22,6 +22,8 @@ Env: FLEET_DD (daily driver), FLEET_COST_CEILING (max cand/base token ratio, def
 import collections, json, math, os, sys
 
 LAB = os.path.dirname(os.path.abspath(__file__))
+sys.path.insert(0, LAB)
+from row_contract import ROW_V3, canonical_generation, failure_episode_complete  # noqa: E402
 DD = os.environ.get("FLEET_DD", "qwen36-35b-iq3s")
 OVERFIT_GAP = 0.10
 COST_CEILING = float(os.environ.get("FLEET_COST_CEILING", "1.5"))
@@ -104,10 +106,12 @@ def arm(rows, model, pattern, split):
 def integrity_errors(rows, baseline, candidate):
     """Reject stale/partial/duplicated invocations before computing a verdict."""
     errors = []
-    is_v2 = any(r.get("schema") == "pi.eval-row/v2" for r in rows)
-    if is_v2:
-        if any(r.get("schema") != "pi.eval-row/v2" for r in rows):
-            errors.append("historical and pi.eval-row/v2 rows cannot be combined")
+    try:
+        canonical = canonical_generation(rows)
+    except ValueError as exc:
+        errors.append(str(exc))
+        canonical = None
+    if canonical:
         for r in rows:
             cell = f"{r.get('model')}/{r.get('task')}/{r.get('pattern')}/rep{r.get('rep')}"
             if not r.get("authoritative") or r.get("status") != "complete":
@@ -137,6 +141,8 @@ def integrity_errors(rows, baseline, candidate):
             rendered_gov = (r.get("config") or {}).get("rendered_governor_sha256")
             if not (isinstance(rendered_gov, str) and len(rendered_gov) == 64 and all(c in "0123456789abcdef" for c in rendered_gov)):
                 errors.append(f"{cell}: config.rendered_governor_sha256 missing or malformed")
+            if canonical == ROW_V3 and not failure_episode_complete(r):
+                errors.append(f"{cell}: authenticated failure-episode settlement is missing or incomplete")
     models = sorted({r.get("model") for r in rows if r.get("model")})
     declarations = {tuple(r.get("fleet_expected_models", [])) for r in rows if r.get("fleet_expected_models")}
     if len(declarations) > 1:
@@ -171,7 +177,7 @@ def integrity_errors(rows, baseline, candidate):
                 cr = {r.get("run") for r in arms[candidate]}
                 if br != cr:
                     errors.append(f"{model}/{split}: baseline/candidate came from different invocations")
-                if is_v2:
+                if canonical:
                     bfp = {(r["task"], r["rep"]): (r.get("serving", {}).get("pre") or {}).get("fingerprint_sha256") for r in arms[baseline]}
                     cfp = {(r["task"], r["rep"]): (r.get("serving", {}).get("pre") or {}).get("fingerprint_sha256") for r in arms[candidate]}
                     if bfp != cfp:
@@ -187,10 +193,13 @@ def integrity_errors(rows, baseline, candidate):
 
 
 def adoption_rows(rows, baseline, candidate):
-    has_v2 = any(r.get("schema") == "pi.eval-row/v2" for r in rows)
+    try:
+        canonical = canonical_generation(rows)
+    except ValueError:
+        canonical = True
     return [r for r in rows if r.get("pattern") in (baseline, candidate)
             and r.get("split") in ("val", "heldout")
-            and (not has_v2 or (r.get("prompt") or {}).get("variant") == "canonical")]
+            and (not canonical or (r.get("prompt") or {}).get("variant") == "canonical")]
 
 
 def task_reliability(rows, model, pattern, split):
@@ -272,18 +281,22 @@ def report(gen, baseline, candidate):
     # split="heldout" grid (real_gate HELDOUT="rle saddle").
     path = os.path.join(LAB, "results", gen + ".jsonl")
     all_rows = [json.loads(l) for l in open(path) if l.strip()]
-    has_v2 = any(r.get("schema") == "pi.eval-row/v2" for r in all_rows)
+    try:
+        canonical = canonical_generation(all_rows)
+        generation_error = None
+    except ValueError as exc:
+        canonical = None
+        generation_error = str(exc)
     # Adoption inference is canonical-only. Robustness and one-shot rows are
     # deliberately excluded so they cannot inflate Fisher sample sizes.
     rows = adoption_rows(all_rows, baseline, candidate)
     models = sorted({r.get("model") for r in rows if r.get("model")})
 
     problems = []
-    if has_v2 and any(r.get("schema") != "pi.eval-row/v2" and r.get("pattern") in (baseline, candidate)
-                      and r.get("split") in ("val", "heldout") for r in all_rows):
-        problems.append("historical and pi.eval-row/v2 adoption rows cannot be combined")
-    if has_v2 and not rows:
-        problems.append("no canonical pi.eval-row/v2 adoption rows")
+    if generation_error:
+        problems.append(generation_error)
+    if canonical and not rows:
+        problems.append(f"no canonical {canonical} adoption rows")
     problems += integrity_errors(rows, baseline, candidate)
     if problems:
         descriptive = reliability_lines(rows, baseline, candidate, models)
@@ -409,6 +422,17 @@ def selftest():
                     harness=harness, context=context, config=config)
     clean_v2 = [v2(r) for r in clean]
     assert not integrity_errors(clean_v2, "base", "cand")
+    def v3(r, complete=True):
+        row = v2(r, surface_sha="b" * 64)
+        row["schema"] = "pi.eval-row/v3"
+        row["context"] = dict(row["context"], schema="pi.context-telemetry/v3",
+                              failure_episodes={"complete": complete})
+        return row
+    clean_v3 = [v3(r) for r in clean]
+    assert not integrity_errors(clean_v3, "base", "cand")
+    missing_episode = [v3(r, complete=False) if r is clean[0] else v3(r) for r in clean]
+    assert any("failure-episode settlement" in e for e in integrity_errors(missing_episode, "base", "cand"))
+    assert any("generations cannot be combined" in e for e in integrity_errors(clean_v2 + clean_v3, "base", "cand"))
     # Loaded-harness provenance: general adoption path enforces it too now, not
     # just span_screen.py's narrower screen.
     corroborated = [v2(r, surface_sha="b" * 64) for r in clean]
@@ -469,6 +493,12 @@ def selftest():
                        if "arm" in item.get("if", {}).get("properties", {}))
     assert conditional["if"]["properties"]["arm"] == {"not": {"const": "one-shot"}}
     assert conditional["then"]["required"] == ["trajectory"]
+    schema_v3 = json.load(open(os.path.join(LAB, "..", "real-gate-fixtures", "schemas", "pi.eval-row-v3.schema.json")))
+    assert schema_v3["$id"] == "pi.eval-row/v3"
+    assert schema_v3["properties"]["schema"] == {"const": "pi.eval-row/v3"}
+    assert schema_v3["properties"]["context"]["properties"]["schema"] == {"const": "pi.context-telemetry/v3"}
+    assert "failure_episodes" in schema_v3["properties"]["context"]["required"]
+    assert "provider_timing" in schema_v3["properties"]["context"]["required"]
     assert "trajectory" not in schema["required"], "one-shot must remain trajectory-exempt"
     experiment_conditional = next(item for item in schema["allOf"]
                                   if "experiment" in item.get("if", {}).get("properties", {}))

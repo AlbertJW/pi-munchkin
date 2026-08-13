@@ -527,3 +527,23 @@ project gate exists, only the same normalized verifier may close it. Non-Bash as
 including `research_note`, retain same-target recovery. This prevents a convenient generic suite
 from shortening an exact-gate failure window. Session settlement, compaction reset, tracker reset,
 and `/loop-resume` close the exposed window without pretending that verification recovered.
+
+---
+
+## §16 — Powered episode studies require authenticated v3 rows
+
+`pi.eval-row/v3` is the first row generation that carries the semantic-episode outcome through
+the gate's parent-owned HMAC reducer. Its `pi.context-telemetry/v3` payload contains count-only
+episode settlement, recovery, tier, intervention, and provider-timing aggregates. It contains no
+commands, arguments, output, errors, URLs, paths, endpoints, hostnames, or credentials.
+
+A powered episode row is complete only when the authenticated stream contains exactly one valid
+`failure-episode/settled` summary. Missing or duplicate summaries make the row incomplete for the
+primary outcome; missing provider timing makes latency unavailable but does not invalidate the
+episode or correctness outcomes. The gate writes incomplete rows for auditability instead of
+silently dropping them.
+
+V2 remains readable as historical evidence but is ineligible for semantic-enforcement trials.
+V2, v3, and schema-less historical rows are distinct analysis populations and must never be mixed.
+Raw gate JSONL is not authenticated after its ephemeral HMAC key is gone; only the reduced row
+written while the parent still owns that key carries authenticated episode evidence.

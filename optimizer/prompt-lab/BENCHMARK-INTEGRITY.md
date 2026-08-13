@@ -1,7 +1,9 @@
 # Benchmark integrity operations
 
 `real_gate.sh` now consumes `pi.fixture/v1` manifests from
-`real-gate-fixtures/manifests/` and writes `pi.eval-row/v2` rows. A fixture is
+`real-gate-fixtures/manifests/` and writes `pi.eval-row/v3` rows. V3 binds the
+authenticated semantic-episode settlement and provider timing aggregates; v2
+remains historical and is not eligible for powered episode studies. A fixture is
 authoritative only when triple-run admission passes, artifact hashes match, the
 90-day expiry has not elapsed, and a named human reviewer has approved it —
 approved *this* manifest, pinned by `admission.manifest_sha256`.
