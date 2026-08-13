@@ -19,7 +19,7 @@ candidates as dark). Net changes since 0.3.0; the full per-decision record is
   prompt YAML, fresh/locality retry, and the inert span screen leave the active roster.
   `no-verify-gate` and `harness-off` remain suppression controls; `bash-output-guard` and
   `prompt-lean` remain candidates. The deletion checkpoint was cleared by human decision and
-  this landed on `main` and the live mirror on 2026-08-12 together with the spiral-control PRs.
+  this landed on `main` and the live mirror on 2026-08-13 together with the spiral-control PRs.
 
 ### Added
 

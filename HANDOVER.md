@@ -24,7 +24,7 @@ adoption, deletion, live mirroring, and gate rounds are human-gated. Never touch
 
 ## 2026-08 hardening series
 
-> **2026-08-12 SPIRAL-CONTROL SERIES ROLLED OUT (PR 1–4) — model-visible default change, read first.**
+> **2026-08-13 SPIRAL-CONTROL SERIES ROLLED OUT (PR 1–4; authored 2026-08-12) — model-visible default change, read first.**
 > Approved by human decision and merged to `main` + mirrored live. This is NOT a shadow-safe
 > rollout: deployed DEFAULTS changed, so no measurement pools across this boundary.
 > - **Verification is stricter by default** (`VERIFY_EXECUTION_ORDER` now defaults to `execution`,
