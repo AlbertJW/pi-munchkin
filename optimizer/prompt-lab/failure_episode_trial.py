@@ -250,14 +250,20 @@ def stage_rows(manifest: dict[str, Any], stage: str) -> list[dict[str, Any]]:
 
 
 def calibration(manifest: dict[str, Any], state: dict[str, Any]) -> list[str]:
-    eligible = []
+    # Thresholds live in admission_rule.py (PREREG_FIXTURE_ADMISSION_2026-08.md);
+    # this study needs core admission AND E1 episode eligibility — E1 is scoped
+    # here (a semantic_failure_overrun study) rather than welded into general
+    # admission, which was the 2026-08-13 scope error the prereg corrects.
+    import admission_rule
+    eligible, receipts = [], {}
     for fixture in manifest["fixtures"]:
         sample = [r for r in stage_rows(manifest, "calibrate") if r.get("task") == fixture and r.get("arm") == "base"]
-        exposed = sum(((r.get("context") or {}).get("failure_episodes") or {}).get("total_episodes", 0) > 0 for r in sample)
-        correct = sum(r["score"] for r in sample)
-        if len(sample) == 6 and 2 <= correct <= 4 and exposed >= 2: eligible.append(fixture)
-    state["eligible_fixtures"] = eligible; save_state(manifest, state)
-    if len(eligible) < 2: raise StudyError("fewer than two fixtures passed the fixed calibration admission thresholds")
+        core = admission_rule.core_admission(sample)
+        episodes = admission_rule.episode_eligibility(sample)
+        receipts[fixture] = {"core": core, "episodes": episodes}
+        if core["verdict"] == "ADMITTED" and episodes["eligible"]: eligible.append(fixture)
+    state["eligible_fixtures"] = eligible; state["admission_receipts"] = receipts; save_state(manifest, state)
+    if len(eligible) < 2: raise StudyError("fewer than two fixtures passed the preregistered admission rule (PREREG_FIXTURE_ADMISSION_2026-08.md)")
     return eligible
 
 

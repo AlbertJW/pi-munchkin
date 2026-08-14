@@ -1,5 +1,13 @@
 #!/usr/bin/env python3
-"""Fail-closed fixture admission and read-only verification for pi.fixture/v1 manifests."""
+"""Fail-closed fixture admission and read-only verification for pi.fixture/v1+v2 manifests.
+
+v2 (2026-08, the measurement reboot) adds the authoring-rubric fields the band
+calibration showed were missing: a pre-registered difficulty crux, a findability
+chain, shortcut-sharpness rationale, and an episode-variance expectation — plus a
+deterministic behaviour-only lint over hidden overlays (source-reading assertions
+are flagged for the human reviewer; Harbor's "never string-match source" rule).
+v1 manifests stay valid for the existing cohort; new fixtures are authored as v2.
+"""
 from __future__ import annotations
 
 import argparse
@@ -17,6 +25,7 @@ FIXTURES = ROOT / "real-gate-fixtures"
 MANIFESTS = FIXTURES / "manifests"
 PACKETS = FIXTURES / "review-packets"
 RUNS = 3
+OUTPUT_TAIL_BYTES = 2048
 
 
 class AdmissionError(RuntimeError):
@@ -72,13 +81,18 @@ def load_manifest(task):
     return path, data
 
 
+SCHEMAS = ("pi.fixture/v1", "pi.fixture/v2")
+
+
 def validate_contract(m):
     required = ("schema", "task_id", "cohort_id", "fixture_version", "timestamps",
                 "prompts", "fixture", "tests", "patches", "sufficiency",
                 "one_shot", "admission", "artifacts")
     missing = [key for key in required if key not in m]
-    if missing or m.get("schema") != "pi.fixture/v1":
+    if missing or m.get("schema") not in SCHEMAS:
         raise AdmissionError(f"invalid manifest: missing={missing} schema={m.get('schema')}")
+    if m["schema"] == "pi.fixture/v2":
+        validate_v2_fields(m)
     variants = m["prompts"].get("perturbations", [])
     if len(variants) != 3 or any(not p.get("text") or not p.get("sha256") for p in variants):
         raise AdmissionError("manifest needs exactly three hashed prompt perturbations")
@@ -99,6 +113,65 @@ def validate_contract(m):
             raise AdmissionError("context-pressure contract must declare disjoint roots")
         if not pressure.get("generator_command") or not pressure.get("generated_artifacts"):
             raise AdmissionError("context-pressure generator and generated artifact hashes are required")
+
+
+def validate_v2_fields(m):
+    """The pi.fixture/v2 authoring-rubric contract (LING_COHORT_2026-08.md template,
+    preregistered rule in PREREG_FIXTURE_ADMISSION_2026-08.md).
+
+    difficulty_crux is the author's pre-data claim about what makes the fixture
+    hard — written down so calibration can grade the CLAIM, not just the fixture.
+    band_prediction is [low, high] on the graded_rate scale for the named tier.
+    """
+    crux = m.get("difficulty_crux") or {}
+    for key in ("mechanism", "expected_failure", "band_prediction"):
+        if not crux.get(key):
+            raise AdmissionError(f"v2 manifest requires difficulty_crux.{key}")
+    band = crux["band_prediction"]
+    if (not isinstance(band, list) or len(band) != 2
+            or not all(isinstance(v, (int, float)) and 0 <= v <= 1 for v in band)
+            or band[0] > band[1]):
+        raise AdmissionError("difficulty_crux.band_prediction must be [low, high] within [0, 1]")
+    findability = m.get("findability")
+    if (not isinstance(findability, list) or not findability
+            or any(not step.get("evidence_file") or not step.get("sentence_anchor") for step in findability)):
+        raise AdmissionError("v2 manifest requires a findability chain: [{evidence_file, sentence_anchor}, ...]")
+    sharpness = m.get("shortcut_sharpness") or {}
+    if not sharpness.get("why_plausible"):
+        raise AdmissionError("v2 manifest requires shortcut_sharpness.why_plausible")
+    episode = m.get("episode_variance") or {}
+    if not isinstance(episode.get("expected"), bool) or not episode.get("rationale"):
+        raise AdmissionError("v2 manifest requires episode_variance{expected: bool, rationale}")
+
+
+# Deterministic behaviour-only lint: a hidden/graded suite must assert observable
+# behaviour, not source shape. These patterns catch a test that READS project
+# source and then string/regex-asserts on it. Heuristic by design, so a hit is
+# FLAGGED for the human reviewer (review packet + check output), never auto-failed —
+# a legitimate data-file read must not brick admission, and a clever evasion is
+# exactly what the human gate exists for.
+OVERLAY_SOURCE_READ_PATTERNS = (
+    "readFileSync", "readFile(", "fs.promises.readFile", "createReadStream",
+)
+OVERLAY_SHAPE_ASSERT_PATTERNS = (
+    "assert.match", "assert.doesNotMatch", ".includes(", "indexOf(",
+)
+
+
+def overlay_lint(m):
+    """Flag hidden-overlay tests that read files AND shape-assert on the result."""
+    flags = []
+    for suite in m.get("tests", {}).values():
+        for item in suite.get("overlays", []):
+            source = safe_root(item["source"])
+            if not source.is_file():
+                continue
+            text = source.read_text(encoding="utf-8", errors="replace")
+            reads = [p for p in OVERLAY_SOURCE_READ_PATTERNS if p in text]
+            asserts = [p for p in OVERLAY_SHAPE_ASSERT_PATTERNS if p in text]
+            if reads and asserts:
+                flags.append({"overlay": item["source"], "reads": reads, "shape_asserts": asserts})
+    return flags
 
 
 def safe_root(relative):
@@ -202,9 +275,29 @@ def run_state(m, patch, suite):
                                   env=verification_env(Path(td)))
             passed = proc.returncode == 0
             output = (proc.stdout + proc.stderr).encode("utf-8", errors="replace")
+            # output_tail restored 2026-08-15 (charter flag 8, deliberately reversing
+            # the 2026-08-13 hash-only receipts): hash-only detects drift but cannot
+            # explain a failure — the ordered-steps floor diagnosis depended on
+            # reading the per-suite assertion output. Bounded, tail-biased (the
+            # assertion diff is at the end), and PATH-REDACTED so the receipts keep
+            # the privacy property the hash-only change was protecting.
+            tail = redact_paths(output[-OUTPUT_TAIL_BYTES:].decode("utf-8", errors="replace"))
             outcomes.append({"passed": passed, "returncode": proc.returncode,
-                             "output_bytes": len(output), "output_sha256": hashlib.sha256(output).hexdigest()})
+                             "output_bytes": len(output), "output_sha256": hashlib.sha256(output).hexdigest(),
+                             "output_tail": tail})
     return outcomes
+
+
+PATH_RE = None  # compiled lazily; regex import kept local to the one consumer
+
+
+def redact_paths(text):
+    """Strip absolute filesystem paths from receipt tails (machine layout is private)."""
+    global PATH_RE
+    if PATH_RE is None:
+        import re
+        PATH_RE = re.compile(r"/(?:private|Users|var|tmp|home)/[^\s'\"):]*")
+    return PATH_RE.sub("<path>", text)
 
 
 def all_pass(rows):
@@ -220,7 +313,8 @@ def check_one(task, write=True):
     path, m = load_manifest(task)
     drift = artifact_drift(m)
     result = {"checked_at": iso(utcnow()), "runs_per_state": RUNS, "hash_drift": drift,
-              "manifest_drift": manifest_drift(m), "states": {}, "passed": False}
+              "manifest_drift": manifest_drift(m), "overlay_lint": overlay_lint(m),
+              "states": {}, "passed": False}
     if not drift:
         result["states"]["pristine_pass_to_pass"] = run_state(m, None, "pass_to_pass")
         result["states"]["pristine_fail_to_pass"] = run_state(m, None, "fail_to_pass")
@@ -262,9 +356,24 @@ def review_packet(task):
     lines += ["", "## Equivalent perturbations", ""]
     for item in m["prompts"]["perturbations"]:
         lines += [f"### {item['id']}", "", item["text"], ""]
+    crux = m.get("difficulty_crux")
+    if crux:
+        lines += ["## Difficulty crux (author's pre-data claim)", "",
+                  f"- Mechanism: {crux['mechanism']}",
+                  f"- Expected failure: {crux['expected_failure']}",
+                  f"- Band prediction: `{crux['band_prediction']}`", ""]
     auto = m["admission"].get("automated") or {}
     lines += ["## Automated admission", "", f"- Passed: `{auto.get('passed', False)}`",
-              f"- Checked: `{auto.get('checked_at', 'not run')}`", "", "## Human decision", "",
+              f"- Checked: `{auto.get('checked_at', 'not run')}`", ""]
+    lint = auto.get("overlay_lint") or []
+    if lint:
+        lines += ["### Behaviour-only lint FLAGS (human review required)", ""]
+        for flag in lint:
+            lines += [f"- `{flag['overlay']}` reads files ({', '.join(flag['reads'])}) and "
+                      f"shape-asserts ({', '.join(flag['shape_asserts'])}) — confirm it asserts "
+                      f"behaviour, not source shape"]
+        lines += [""]
+    lines += ["## Human decision", "",
               f"- Reviewer: `{m['admission'].get('reviewer') or 'pending'}`",
               f"- Approved: `{m['admission'].get('approved', False)}`", ""]
     PACKETS.mkdir(parents=True, exist_ok=True)

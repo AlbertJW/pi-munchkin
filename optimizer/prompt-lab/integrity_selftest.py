@@ -171,11 +171,18 @@ def test_fixture_verify_read_only():
 
 
 def test_admission_receipts_are_redacted():
+    # 2026-08-15 (UNMOTHBALL charter, flag 8): output_tail is deliberately BACK —
+    # bounded and path-redacted — because hash-only receipts could not explain a
+    # failure (the ordered-steps floor diagnosis needed the assertion output).
+    # The privacy property this test protects is unchanged: no machine paths.
     _, manifest = admission.load_manifest("ordered-steps")
     rows = admission.run_state(manifest, None, "fail_to_pass")
-    assert rows and all(set(row) == {"passed", "returncode", "output_bytes", "output_sha256"} for row in rows)
+    expected_keys = {"passed", "returncode", "output_bytes", "output_sha256", "output_tail"}
+    assert rows and all(set(row) == expected_keys for row in rows)
+    assert all(len(row["output_tail"].encode()) <= admission.OUTPUT_TAIL_BYTES + 16 for row in rows)
     encoded = json.dumps(rows)
-    assert "output_tail" not in encoded and "/private/" not in encoded and "/Users/" not in encoded
+    assert "/private/" not in encoded and "/Users/" not in encoded
+    assert any(row["output_tail"] for row in rows), "a failing suite must leave readable evidence"
 
 
 def test_ling_fixture_admission_contracts():
@@ -194,7 +201,8 @@ def test_ling_fixture_admission_contracts():
                 assert all(row["passed"] for row in receipt["pass_to_pass"])
                 assert all(not row["passed"] for row in receipt["fail_to_pass"])
         manifest_text = json.dumps(manifest)
-        assert "output_tail" not in manifest_text and "/private/" not in manifest_text and "/Users/" not in manifest_text
+        # output_tail is admissible since 2026-08-15 (path-redacted); machine paths never are.
+        assert "/private/" not in manifest_text and "/Users/" not in manifest_text
 
 
 def test_context_pressure_contract():

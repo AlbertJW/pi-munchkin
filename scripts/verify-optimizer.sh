@@ -21,6 +21,7 @@ selftests=(
   munchkin.py
   ab-machinery/judge_diffs.py
   ab-machinery/metrics.py
+  prompt-lab/admission_rule.py
   prompt-lab/calibrate.py
   prompt-lab/canary.py
   prompt-lab/config.py
