@@ -36,6 +36,7 @@ selftests=(
   prompt-lab/execution_policy.py
   prompt-lab/fleet_report.py
   prompt-lab/fleet_verdict.py
+  prompt-lab/grade_reporter.py
   prompt-lab/failure_episode_trial.py
   prompt-lab/gauntlet_report.py
   prompt-lab/harness_roi.py

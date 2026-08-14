@@ -713,6 +713,19 @@ PY
 	fi
 	local gate=1
 	( cd "$wd" && node --test ) > "$wd/gate.log" 2>&1 || gate=0
+	# Graded-by-default (UNMOTHBALL charter, D3): re-run ONLY the hidden grader
+	# suite with a TAP reporter whose destination is OUTSIDE the workdir, so the
+	# graded population is exactly the fail-to-pass assertions (visible tests
+	# never inflate `total`) and model code cannot reach the reporter file by
+	# writing into its own tree. grade_reporter.py parses it in the row builder;
+	# a manifest-pinned grade_artifact takes precedence there. A missing/broken
+	# TAP file becomes a recorded refusal (subscores_blocked), never a 0/N score.
+	local grade_tap="${wd}.grade.tap"
+	rm -f "$grade_tap"
+	if is_hidden "$task"; then
+		( cd "$wd" && node --test --test-reporter=tap --test-reporter-destination="$grade_tap" \
+			"test/$(basename "$(hidden_test_for "$task")")" ) >/dev/null 2>&1 || true
+	fi
 	[[ "$task" == "t1" ]] && grep -rq "parseCSV" "$wd/src" "$wd/test" && gate=0
 	# t4's real correctness check is now the hidden fail-to-pass grader installed
 	# above (is_hidden() recognizes t4 via admission-tests/t4.test.mjs) and scored
@@ -839,6 +852,16 @@ if experiment_manifest:
 sys.path.insert(0, os.path.dirname(os.path.abspath(config_path)))
 import grade_artifact as _grade_artifact
 subscores, subscores_blocked = _grade_artifact.extract(workdir, ctx.get("grade_artifact"))
+# Graded-by-default fallback (charter D3): when no artifact is pinned, parse the
+# TAP sidecar the gate wrote outside the workdir for the hidden suite. A pinned
+# artifact keeps precedence (audit-sweep, until it re-manifests onto the reporter
+# path). Tasks with no hidden suite simply have no TAP file -> no subscores, and
+# NO refusal is recorded for them (a fixture without a grader is not a refusal).
+if subscores is None and not ctx.get("grade_artifact"):
+    import grade_reporter as _grade_reporter
+    _tap_path = workdir.rstrip("/") + ".grade.tap"
+    if os.path.exists(_tap_path):
+        subscores, subscores_blocked = _grade_reporter.extract(_tap_path)
 rec={"schema":"pi.eval-row/v3", "task":task,"pattern":pat,"arm":pat,"rep":int(rep),
      "repetition":int(rep),"model":model,"split":split,"score":int(gate),
      "retried":int(retried),"run":runid,"fixture":{"cohort":ctx["cohort"],"version":ctx["version"]},

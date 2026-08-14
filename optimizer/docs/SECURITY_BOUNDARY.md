@@ -149,3 +149,29 @@ have been corrected (2026-07-30) so the guarantee is no longer folklore.
 frontier models whose incentives include gaming their own evaluation, or runs multi-user.
 The fix then is the outside-the-sandbox observer, and `--session-dir` per run makes its
 scope trivial.
+
+## Graded subscores: the grader runs in the model's process (revised 2026-08-15)
+
+Both grading paths execute model-authored `src/` inside the same Node process that
+produces the grade — there is no verifier isolation. What changed at the reboot
+(charter D3) is *which* forgery this enables:
+
+- **Legacy pinned-artifact path (`grade_artifact.py`)**: model code imported at test
+  time could `writeFileSync` the pinned artifact name and throw — a forged perfect
+  grade, demonstrated 2026-08-03. Decoy-at-another-name is closed; forgery at the
+  pinned name is open. This path survives only until `audit-sweep` re-manifests onto
+  the reporter path.
+- **Reporter path (`grade_reporter.py`, default)**: the TAP destination lives OUTSIDE
+  the workdir and is written by the test runner, not by anything the model's tree can
+  name; stdout from model code does not reach it. The demonstrated forgery does not
+  translate. **Residual**: code running inside the test process can read
+  `process.execArgv`, learn the destination path, and race a write after the runner —
+  a much higher bar, still open. Skip/todo directives are excluded from grading and
+  an all-skipped suite is a refusal, so self-skipping is not a score either.
+
+The named full fix is an out-of-process, unprivileged-agent / privileged-verifier
+split (Harbor's "Verifier Execution Isolation"). Deferred: charter backlog, not on
+the reboot's critical path. Until then, graded_rate inherits the same trust posture
+as the gate bit under section "The gate transcript is writable by the session it
+measures" — defensible against accident and casual gaming, not against a targeted
+adversary inside the session.
