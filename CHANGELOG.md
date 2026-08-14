@@ -116,6 +116,28 @@ candidates as dark). Net changes since 0.3.0; the full per-decision record is
 
 ### Fixed
 
+- **Conformance-report follow-up (2026-08-14, source only — NOT yet mirrored):** four field-observed
+  harness defects surfaced by an independent pi dogfood session that analysed `~/.pi/agent` against
+  the official pi docs. (1) **verify-gate** drove up to 8 unsatisfiable steers on a documentation
+  task — an edit written OUTSIDE the session cwd armed the project gate, and with no gate detected
+  the steer named "the exact gate" that did not exist. Arming is now scoped to cwd (edit/write paths
+  outside cwd do not arm; missing/unresolvable paths stay armed; bash mutations remain path-unscoped
+  by design), and a no-detected-gate session emits one honest `VG_STEER_NO_GATE` nudge instead of a
+  looping false claim. Detected-gate sessions and gate fixtures (always in-cwd, always with a gate)
+  are unaffected. (2) **Plan-mode classifier** blocked read-only recon: `git ls-files | awk '{…}'`
+  (awk was an unknown head) and `for f in *; do …; done` (the `for` header parsed as a phantom
+  command). awk is now read-only except for `-i inplace`/`system(`; `for`/`select` word-list headers
+  are skipped while their bodies still classify; `case` stays fail-closed. (3) The `plan_write`
+  `gate` schema description now says gates must be recognised test/typecheck/verify runners, matching
+  what the validator enforces — `ls`/`test -d`/`grep -c` are observational, not gates. (4) **pi-subagent**:
+  the 12000-char child-summary cap is tunable via `PI_SUBAGENT_MAX_SUMMARY_CHARS` (propagated to
+  children), and the parallel-run header counts `!isResultError` so "N/M succeeded" agrees with the
+  per-child completed/failed labels (the exitCode -1 placeholder is neither success nor error).
+  Also: **mirror:apply/mirror:check** now detect in-package orphans — files a retirement leaves under
+  `extensions/pi-munchkin/` that the manifest no longer declares (compareLiveMirror walks the plan,
+  so it was blind to them). check fails on them; apply reports by default and deletes only under
+  `--prune`. All fixes carry both-polarity, counterfactually-proven tests.
+
 - **Truth-and-coherence series, PR 1–3 (2026-08-12, source only — NOT mirrored):** the packaged
   and live harnesses were different architectures, because pi discovers loose extension files by
   readdir order while `package.json` declares a causal order. The live mirror now ships ONE

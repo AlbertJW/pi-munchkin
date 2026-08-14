@@ -24,6 +24,35 @@ adoption, deletion, live mirroring, and gate rounds are human-gated. Never touch
 
 ## 2026-08 hardening series
 
+> **2026-08-14 CONFORMANCE-REPORT FOLLOW-UP — on branch `harness/conformance-followup`, NOT yet merged or mirrored.**
+> Four field-observed harness fixes from an independent pi dogfood session (report on Albert's
+> Desktop; a corrections addendum sits beside it — the report's date header, SHARING.md reading,
+> "dormant candidate" framing, root `tests/` and secret severity were wrong). Four commits, each
+> `npm run verify`-green with counterfactually-proven both-polarity tests:
+> - **verify-gate** (model-visible): arming scoped to cwd (out-of-cwd edits no longer arm); a
+>   no-detected-gate session emits one honest `VG_STEER_NO_GATE` instead of looping a false
+>   "exact gate" claim. Rollback: `git revert`; there is no new flag (the new steer key is
+>   PI_MSG-overridable). Gate fixtures unaffected (always in-cwd with a detectable gate).
+> - **plan-mode classifier** (model-visible in plan mode): `awk` recon and `for`/`select` loops
+>   no longer false-block; `awk -i inplace`/`system(` and mutating loop bodies still trip; `case`
+>   stays fail-closed.
+> - **plan_write gate guidance** (model-visible): schema description now matches the validator
+>   (recognised test/typecheck runners only; `ls`/`test -d`/`grep -c` are not gates).
+> - **pi-subagent**: `PI_SUBAGENT_MAX_SUMMARY_CHARS` (default 12000) tunes the child-summary cap;
+>   parallel header counts `!isResultError` so it agrees with the per-child labels.
+> - **mirror hygiene**: `findLiveMirrorOrphans` — `mirror:check` fails on in-package orphans a
+>   retirement left behind (the 3 currently in `~/.pi/agent`: micro-gate.ts, payload-audit.ts,
+>   micro-gate-policy.ts); `mirror:apply --prune` deletes them (human-gated). The rollout will
+>   report them on the first `mirror:check`, then `--prune` after approval.
+> - **Deferred, human-led (Phase 0):** the live `models.json` still holds a provider API key as a
+>   literal AND is git-tracked in `~/.pi/agent`'s local snapshot repo (no remote). Migrate the key
+>   to `$ENV` resolution, `git rm --cached models.json`, add it + `settings.json.bak-*` to
+>   `.gitignore`, and re-baseline the snapshot repo. History purge deferred (local-only, no remote).
+> - Rollout is Phase 5 in the plan: merge → push → mirror:apply → mirror:check (reports orphans) →
+>   `--prune` → composite boundary row (B1+B2+B3, model-visible) → 5-case live smoke. Root-tree
+>   reconciliation (diverged root `lib/`/`vendor/`; root `tests/` is the ONLY live suite — do not
+>   delete) is Phase 6, human-gated.
+
 > **2026-08-13 SPIRAL-CONTROL SERIES ROLLED OUT (PR 1–4; authored 2026-08-12) — model-visible default change, read first.**
 > Approved by human decision and merged to `main` + mirrored live. This is NOT a shadow-safe
 > rollout: deployed DEFAULTS changed, so no measurement pools across this boundary.
