@@ -1,8 +1,12 @@
 # Truth-and-coherence adoption checkpoint
 
-Status: prepared, not adopted. The source implementation is complete with the
-deployed defaults still unchanged. No live mirror, calibration, or gate round is
-authorized by this document.
+Status: **ADOPTED 2026-08-15** (human decision, Albert, as Phase 1 of the
+measurement reboot — `optimizer/docs/UNMOTHBALL_2026-08.md`). The two-line diff
+below is the deployed default; the rollback table stays valid verbatim
+(`ACTIVE_TOOL_PROMPTS=ambient` / `CONTROL_ARBITER=shadow` restore the historical
+behavior independently). This adoption moved the model-visible surface hash —
+see the 2026-08-15 row in `docs/SURFACE_BOUNDARIES.md`; nothing pools across it.
+It also satisfies `failure_episode_trial.preflight()`'s deployed-defaults guard.
 
 ## Exact adoption diff
 

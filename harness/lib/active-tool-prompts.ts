@@ -1,4 +1,4 @@
-export const ACTIVE_TOOL_PROMPTS_DEFAULT: "ambient" | "derived" = "ambient";
+export const ACTIVE_TOOL_PROMPTS_DEFAULT: "ambient" | "derived" = "derived";
 
 export function activeToolPromptsEnabled(
 	env: NodeJS.ProcessEnv = process.env,

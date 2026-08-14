@@ -102,7 +102,7 @@ const FACTORIES = new Set<MessageFactoryId>([
 const EFFECTS = new Set<ControlEffect>(["message", "abort", "shutdown"]);
 const HASH = /^[a-f0-9]{64}$/;
 const ACTIVE_ARBITERS_KEY = "__pi_control_arbiter_buses_v1";
-export const CONTROL_ARBITER_DEFAULT: ControlArbiterMode = "shadow";
+export const CONTROL_ARBITER_DEFAULT: ControlArbiterMode = "enforce";
 
 function activeArbiters(): WeakSet<object> {
 	const global = globalThis as Record<string, unknown>;

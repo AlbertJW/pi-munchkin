@@ -9,12 +9,12 @@ import {
 } from "../lib/active-tool-prompts.ts";
 
 const CHILD = process.env.ACTIVE_TOOL_PROMPTS_TEST_CHILD === "1";
-const runChild = (mode: "legacy" | "active"): string => {
+const runChild = (mode: "ambient" | "unset" | "active"): string => {
 	const env = { ...process.env };
 	delete env.NODE_TEST_CONTEXT;
 	Object.assign(env, {
 		ACTIVE_TOOL_PROMPTS_TEST_CHILD: "1",
-		ACTIVE_TOOL_PROMPTS: mode === "active" ? "active" : "",
+		ACTIVE_TOOL_PROMPTS: mode === "unset" ? "" : mode,
 		TELEMETRY: "off",
 	});
 	return execFileSync(process.execPath, [
@@ -30,17 +30,25 @@ if (!CHILD) {
 	test("prompt mode has explicit active and ambient rollback semantics", () => {
 		assert.equal(activeToolPromptsEnabled({ ACTIVE_TOOL_PROMPTS: "active" }), true);
 		assert.equal(activeToolPromptsEnabled({ ACTIVE_TOOL_PROMPTS: "ambient", MUNCHKIN_TOOL_ACTIVATION: "dynamic" }), false);
-		assert.equal(activeToolPromptsEnabled({ MUNCHKIN_TOOL_ACTIVATION: "dynamic" }), false,
-			"deployed default stays ambient until adoption");
-		assert.equal(activeToolPromptsEnabled({ MUNCHKIN_TOOL_ACTIVATION: "dynamic" }, "derived"), true,
-			"the prepared default follows the dynamic surface");
+		assert.equal(activeToolPromptsEnabled({ MUNCHKIN_TOOL_ACTIVATION: "dynamic" }), true,
+			"deployed default follows the dynamic surface since the 2026-08-15 adoption");
+		assert.equal(activeToolPromptsEnabled({ MUNCHKIN_TOOL_ACTIVATION: "dynamic" }, "ambient"), false,
+			"the ambient default parameterization remains expressible (suppression arms)");
+		assert.equal(activeToolPromptsEnabled({ MUNCHKIN_TOOL_ACTIVATION: "ambient" }), false,
+			"derived defers to an ambient activation surface");
 		assert.equal(activeToolPromptsEnabled({ ACTIVE_TOOL_PROMPTS: "ambient", MUNCHKIN_TOOL_ACTIVATION: "dynamic" }, "derived"), false,
 			"explicit ambient remains authoritative after adoption");
 	});
 
-	test("unset prompt surface is verified in an isolated source-loader process", () => {
-		const output = runChild("legacy");
-		assert.match(output, /unset mode preserves the ambient prompt/);
+	test("unset prompt surface follows the adopted derived default in an isolated source-loader process", () => {
+		const output = runChild("unset");
+		assert.match(output, /inactive tools contribute no schema/);
+		assert.match(output, /pass 2/);
+	});
+
+	test("explicit ambient rollback is verified in an isolated source-loader process", () => {
+		const output = runChild("ambient");
+		assert.match(output, /ambient mode preserves the ambient prompt/);
 		assert.match(output, /pass 1/);
 	});
 
@@ -50,7 +58,7 @@ if (!CHILD) {
 		assert.match(output, /pass 2/);
 	});
 } else if (!ACTIVE_TOOL_PROMPTS) {
-	test("unset mode preserves the ambient prompt and adds no definition-owned guidance", async () => {
+	test("ambient mode preserves the ambient prompt and adds no definition-owned guidance", async () => {
 		const { makeFakePi } = await import("./integration-harness.ts");
 		const [{ default: compact }, { default: subagent }, { default: surface }] = await Promise.all([
 			import("../extensions/compact-tool.ts"),
