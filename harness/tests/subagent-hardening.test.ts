@@ -132,3 +132,44 @@ test("explicit =off suppression survives into the subagent environment", () => {
 	assert.equal(env.CHAOS, undefined, "fault injection stays parent-scoped");
 	assert.equal(env.PI_RUN_ID, undefined, "child derives its own run identity");
 });
+
+test("subagent summary cap is tunable via PI_SUBAGENT_MAX_SUMMARY_CHARS", async () => {
+	const result = { messages: [{ role: "assistant", content: [{ type: "text", text: "x".repeat(20000) }] }] };
+	const prev = process.env.PI_SUBAGENT_MAX_SUMMARY_CHARS;
+	try {
+		delete process.env.PI_SUBAGENT_MAX_SUMMARY_CHARS;
+		const def = await import(`../vendor/pi-subagent/runner-events.js?cap=default-${Date.now()}`);
+		const defOut = def.getResultSummaryText(result);
+		assert.ok(defOut.startsWith("x".repeat(12000)) && !defOut.startsWith("x".repeat(12001)), "default cap is 12000");
+		assert.match(defOut, /truncated: 20000 chars total/);
+
+		process.env.PI_SUBAGENT_MAX_SUMMARY_CHARS = "2000";
+		const small = await import(`../vendor/pi-subagent/runner-events.js?cap=2000-${Date.now()}`);
+		const smallOut = small.getResultSummaryText(result);
+		assert.ok(smallOut.startsWith("x".repeat(2000)) && !smallOut.startsWith("x".repeat(2001)), "override cap honoured");
+
+		process.env.PI_SUBAGENT_MAX_SUMMARY_CHARS = "-5";
+		const bad = await import(`../vendor/pi-subagent/runner-events.js?cap=bad-${Date.now()}`);
+		assert.ok(bad.getResultSummaryText(result).startsWith("x".repeat(12000)), "invalid value falls back to default");
+	} finally {
+		if (prev === undefined) delete process.env.PI_SUBAGENT_MAX_SUMMARY_CHARS;
+		else process.env.PI_SUBAGENT_MAX_SUMMARY_CHARS = prev;
+	}
+});
+
+test("parallel summary header agrees with the per-child completed/failed labels", async () => {
+	const { formatParallelSummaryText } = await import("../vendor/pi-subagent/types.ts");
+	// A child left at the exitCode -1 placeholder is labelled "completed" (!isResultError)
+	// but is NOT isResultSuccess. The header must count the same thing the labels show,
+	// or three delivered children read as "1/3 succeeded". A genuine failure stays failed.
+	const results = [
+		{ agent: "a", exitCode: -1, messages: [], sawAgentEnd: false },
+		{ agent: "b", exitCode: 1, stopReason: "error", messages: [], sawAgentEnd: false },
+		{ agent: "c", exitCode: 0, sawAgentEnd: true, messages: [{ role: "assistant", content: [{ type: "text", text: "done" }] }] },
+	];
+	const text = formatParallelSummaryText(results as never);
+	assert.match(text, /Parallel: 2\/3 succeeded/);
+	const completedLabels = (text.match(/\] completed:/g) || []).length;
+	assert.equal(completedLabels, 2, "header count equals the number of 'completed' labels");
+	assert.match(text, /\[b\] failed:/);
+});
