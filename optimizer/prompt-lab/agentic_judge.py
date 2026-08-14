@@ -363,12 +363,65 @@ def selftest():
     print("agentic_judge selftest: ok")
 
 
+def score_gen(gen, runs_dir, render_only):
+    """Score (or render for labeling) every row of a generation's workdirs.
+
+    Two modes, one loop:
+      --render-only  writes results/<gen>.transcripts/*.txt for the human
+                     labeler (no endpoint call) — the labeling workflow's input
+      default        judges each transcript and writes results/<gen>.judge.jsonl
+                     with provenance (rubric/endpoint/model hashes). SECONDARY
+                     evidence only; citable only after --calibrate passes its
+                     per-dimension gates (workflow: JUDGE_LABELING_2026-08.md).
+    """
+    import trial_validity
+    import judge_render
+    results = os.path.join(os.path.dirname(os.path.abspath(__file__)), "results", gen + ".jsonl")
+    rows = [json.loads(line) for line in open(results, encoding="utf-8")]
+    out_dir = results[:-len(".jsonl")] + ".transcripts"
+    scored = []
+    for row in rows:
+        workdir = trial_validity.find_workdir(row, runs_dir)
+        key = trial_validity.row_key(row)
+        if not workdir:
+            print(f"{key}: no workdir resolved -- skipped")
+            continue
+        transcript = judge_render.render_workdir(workdir)
+        if not transcript:
+            print(f"{key}: empty transcript -- skipped")
+            continue
+        if render_only:
+            os.makedirs(out_dir, exist_ok=True)
+            name = key.replace(":", "_").replace("/", "_") + ".txt"
+            with open(os.path.join(out_dir, name), "w", encoding="utf-8") as fh:
+                fh.write(transcript)
+            print(f"{key}: rendered {name} ({len(transcript)} chars)")
+            continue
+        scores = score_session(transcript)
+        scored.append({"row_key": key, "workdir": workdir, "scores": scores,
+                       "judge_model": os.environ.get("FRONTIER_MODEL", "gpt-5.5"),
+                       "endpoint_sha256": hashlib.sha256(
+                           (os.environ.get("FRONTIER_BASE_URL") or "unset").encode()).hexdigest(),
+                       "rubric_sha256": hashlib.sha256(rubric_text().encode()).hexdigest()})
+        print(f"{key}: {scores}")
+    if scored:
+        out = results[:-len(".jsonl")] + ".judge.jsonl"
+        with open(out, "w", encoding="utf-8") as fh:
+            for record in scored:
+                fh.write(json.dumps(record, sort_keys=True) + "\n")
+        print(f"wrote {out} -- SECONDARY evidence; citable only after --calibrate passes")
+    return 0
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--selftest", action="store_true")
     parser.add_argument("--rubric", action="store_true")
     parser.add_argument("--calibrate", metavar="LABELS_JSON")
     parser.add_argument("--dry", action="store_true", help="score from stored judge_scores instead of calling the endpoint")
+    parser.add_argument("--score-gen", metavar="GEN", help="judge every workdir of a generation (--render-only writes labeling transcripts instead)")
+    parser.add_argument("--render-only", action="store_true", help="with --score-gen: render transcripts for labeling, no judge calls")
+    parser.add_argument("--runs-dir", default=os.path.expanduser("~/.pi/real-gate-runs"))
     args = parser.parse_args()
     if args.selftest:
         selftest()
@@ -378,6 +431,8 @@ def main():
         return 0
     if args.calibrate:
         return calibrate(args.calibrate, args.dry)
+    if args.score_gen:
+        return score_gen(args.score_gen, args.runs_dir, args.render_only)
     parser.print_help()
     return 2
 
