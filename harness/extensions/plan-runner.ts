@@ -869,7 +869,7 @@ const itemSchema = Type.Object({
 		Type.Literal("user_action_required"),
 		Type.Literal("unknown"),
 	])),
-	gate: Type.Optional(Type.String({ description: "Read-only verify/check command (e.g. 'just verify', the test/typecheck cmd). Mutating/destructive gates are rejected. Must exit 0 to accept this item done; a red gate reverts it so you fix + re-run." })),
+	gate: Type.Optional(Type.String({ description: "A recognized test/typecheck/verify RUNNER whose exit code proves this item works (e.g. 'just verify', 'npm test', 'npx tsx --test', 'pytest', 'tsc --noEmit'). File-existence or listing commands (ls, test -d, grep -c) are NOT gates and are rejected, as are mutating/destructive commands. Must exit 0 to accept this item done; a red gate reverts it so you fix + re-run. Omit or pass \"\" if the item has no runnable gate." })),
 	depends_on: Type.Optional(Type.Array(Type.String(), { description: "Titles of other items in this list that must be done first (advisory ordering)." })),
 });
 
