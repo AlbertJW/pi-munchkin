@@ -46,3 +46,21 @@ test("zero drift: loop-breaker/verify-gate defaults reproduce the historical str
 		"[verify-gate] You changed files, ran no passing gate. Before finishing: run `npm test`, report result, fix + re-run if red. Unverified output must not cross the boundary.",
 	);
 });
+
+test("VG_STEER_NO_GATE: overridable and never claims an exact gate", () => {
+	// The no-detected-gate steer must not use the "exact gate" wording (there is none)
+	// and, like every steer, must be PI_MSG-overridable for the munchkin search space.
+	const def = steerText(
+		"VG_STEER_NO_GATE",
+		"[verify-gate] No project gate was detected in this directory, and the files changed this turn have no recorded verification. Say how you verified the change, or that there is no gate to run here.",
+		{},
+	);
+	assert.match(def, /No project gate was detected/);
+	assert.doesNotMatch(def, /exact gate/);
+	process.env.PI_MSG_VG_STEER_NO_GATE = "custom no-gate note";
+	try {
+		assert.equal(steerText("VG_STEER_NO_GATE", "default", {}), "custom no-gate note");
+	} finally {
+		delete process.env.PI_MSG_VG_STEER_NO_GATE;
+	}
+});

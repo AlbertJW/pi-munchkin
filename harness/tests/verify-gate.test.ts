@@ -55,6 +55,18 @@ const bashTurn = (command: string, output = "", isError = false) => ({
 	toolResults: [{ toolCallId: "b1", content: [{ type: "text", text: output }], isError }],
 });
 
+/** A single edit toolCall with a given path — the mutation the arming-scope fix keys on. */
+const editTurn = (path: string, turnIndex = 1, id = "e1") => ({
+	turnIndex,
+	message: { role: "assistant", content: [{ type: "toolCall", id, name: "edit", arguments: { path } }] },
+	toolResults: [],
+});
+
+/** An empty dir has no justfile/package.json/Makefile/… so detectProjectGate → null. */
+function projectWithNoGate(): string {
+	return mkdtempSync(join(tmpdir(), "vg-nogate-"));
+}
+
 test("the POSIX `test` builtin is NOT a verify command", () => {
 	// verify-gate consults policy.verifyLike BEFORE its own regex, so anything
 	// classifyBashCommand calls verify-like marks the session verified. `test\b` was
@@ -482,6 +494,55 @@ test("the anchor's known false negatives stay false negatives (nag, never silent
 	// stays as small as it is: env assignments, `env`, and loop bodies.
 	for (const cmd of ["NODE_ENV=test npm test", "env CI=1 npm test", "for f in a b; do npm test; done"]) {
 		assert.equal(classifyBashCommand(cmd).verifyLike, true, `must stay recognised: ${cmd}`);
+	}
+});
+
+test("a mutation OUTSIDE the session cwd does not arm the gate; inside still does", async () => {
+	// The dogfood case: a report written to ~/Desktop while cwd was a code project
+	// armed the gate and drove 8 unsatisfiable steers. An out-of-cwd write is not a
+	// handoff risk for THIS project's gate; an in-cwd edit still is.
+	const cwd = projectWithNpmTest();
+	const outside = join(tmpdir(), "vg-outside-report.md");
+	try {
+		const fp = makeFakePi();
+		await loadVerifyGateWithDefault(fp, cwd);
+		await fire(fp, "turn_end", editTurn(outside, 1, "out"), ctxFor(cwd));
+		await fire(fp, "turn_end", wrapUpTurn, ctxFor(cwd));
+		assert.equal(fp.sent.some((m) => m.includes("verify")), false,
+			"editing a file outside cwd must not arm the project gate");
+		resetPiGlobals();
+
+		const fp2 = makeFakePi();
+		await loadVerifyGateWithDefault(fp2, cwd);
+		await fire(fp2, "turn_end", editTurn("src/app.ts", 1, "in"), ctxFor(cwd));
+		await fire(fp2, "turn_end", wrapUpTurn, ctxFor(cwd));
+		assert.equal(fp2.sent.some((m) => m.includes("verify")), true,
+			"editing a file inside cwd must still arm the gate");
+	} finally {
+		resetPiGlobals();
+	}
+});
+
+test("no detected gate: one honest steer, never the exact-gate claim, capped once per session", async () => {
+	const cwd = projectWithNoGate();
+	try {
+		const fp = makeFakePi();
+		await loadVerifyGateWithDefault(fp, cwd);
+		await fire(fp, "turn_end", editTurn("notes.md", 1, "e1"), ctxFor(cwd));
+		await fire(fp, "turn_end", wrapUpTurn, ctxFor(cwd));
+		const first = fp.sent.filter((m) => m.includes("verify-gate"));
+		assert.equal(first.length, 1, "a no-gate session steers exactly once");
+		assert.match(first[0], /No project gate was detected/);
+		assert.doesNotMatch(first[0], /exact gate/, "must not claim an exact gate when none was detected");
+
+		// A second edit + wrap-up must NOT produce a second steer — no 8-steer rabbit hole.
+		fp.sent.length = 0;
+		await fire(fp, "turn_end", editTurn("more.md", 3, "e2"), ctxFor(cwd));
+		await fire(fp, "turn_end", { ...wrapUpTurn, turnIndex: 4 }, ctxFor(cwd));
+		assert.equal(fp.sent.some((m) => m.includes("verify-gate")), false,
+			"the no-gate steer is capped at once per session");
+	} finally {
+		resetPiGlobals();
 	}
 });
 
