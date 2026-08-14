@@ -23,6 +23,32 @@ candidates as dark). Net changes since 0.3.0; the full per-decision record is
 
 ### Added
 
+- **Measurement reboot (2026-08-15):** the optimizer is unmothballed under
+  `optimizer/docs/UNMOTHBALL_2026-08.md` (charter) + `PREREG_FIXTURE_ADMISSION_2026-08.md`
+  (ONE admission rule: graded_rate mean in [0.20,0.80], SD >= 0.15, coverage >= 5/6, n=6
+  per model tier; episode exposure scoped to loop-study eligibility only — supersedes both
+  the 2026-08-11 band rule and the unpreregistered rule in `failure_episode_trial.calibration()`,
+  which now delegates to `admission_rule.py`). Graded-by-default: `grade_reporter.py` parses
+  the hidden suite's TAP output (destination outside the workdir) into subscores with
+  grade_artifact's refusal ladder — every multi-test hidden suite is graded for free, the
+  direct attack on the one-bit/one-sided-detector problem. Per-trial validity rubric
+  (`trial_validity.py`, Harbor's trial-analysis layer, deterministic-first): infra_valid +
+  reward_hacking VOID rows (counted, never silent), near_miss/refusals/low_timeout annotate,
+  judge-backed criteria PENDING until `agentic_judge` passes its calibration gate; per-trial
+  artifact manifests (`pi.trial-manifest/v1`); fleet_report/effort_report consume the
+  validity sidecar. Judge activation tooling: `judge_render.py` + `agentic_judge --score-gen`
+  (+ `--render-only` labeling path; workflow in `JUDGE_LABELING_2026-08.md`; endpoint = local
+  35B). Fixture corpus: pi.fixture/v2 authoring rubric (difficulty_crux with pre-data band
+  predictions, findability chains, shortcut sharpness, episode-variance expectations,
+  behaviour-only overlay lint, path-redacted output_tail restored in receipts); the four ling
+  fixtures repaired to behaviour-only hidden suites (source-shape assertions replaced by a
+  vocabulary-extension coupling test / dropped as redundant) and regenerated as v2; sweep-a,
+  the first multi-defect graded fixture (six independent crux-class defects, band_prediction
+  0.35-0.65). All five cohort fixtures pass the full admission battery; approval remains the
+  human checkpoint. Control-group discipline caught a real detector bug pre-use: the first
+  reward_hacking draft void-flagged 6/12 honest calibration rows on `2>&1` redirects — fixed
+  to target-based detection, both real calibration files now 24/24 clean.
+
 - **Serving-truth probe + dual-permutation judging (2026-08-11):** `runtime-truth.ts` probes the
   local server's real `n_ctx` (`/props`, llama-swap `/upstream/<model>/props` fallback) once per
   model at `agent_settled`, records `runtime/serving-truth`, shows a `serving_truth` line in

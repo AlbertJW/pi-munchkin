@@ -24,6 +24,24 @@ adoption, deletion, live mirroring, and gate rounds are human-gated. Never touch
 
 ## 2026-08 hardening series
 
+> **2026-08-15 MEASUREMENT REBOOT — on branch `measurement/reboot` (codex ling branch merged
+> with main), NOT yet merged to main or mirrored.** The optimizer is unmothballed:
+> charter `optimizer/docs/UNMOTHBALL_2026-08.md`, ONE preregistered admission rule
+> (`PREREG_FIXTURE_ADMISSION_2026-08.md` + `admission_rule.py`), graded-by-default TAP
+> reporter grading, per-trial validity rubric with voiding (`trial_validity.py`), judge
+> activation tooling (`judge_render.py`, `--score-gen`, `JUDGE_LABELING_2026-08.md` — the 12
+> calib4b transcripts are a sufficient first labeling set), ling cohort repaired to
+> behaviour-only + pi.fixture/v2, sweep-a multi-defect fixture (proof battery PASS).
+> PENDING GATES (Albert): confirm the codex session is done with
+> `codex/ling-semantic-fixtures` → merge `measurement/reboot` to main + push; approve
+> charter + prereg; Phase 1 coherence adoption (derived/enforce two-line diff, mirror,
+> boundary row — approved in principle 2026-08-15, not yet applied); approve the five
+> cohort fixtures (`fixture_admission.py approve`); label >=10 judge transcripts.
+> STILL TO BUILD: sweep-b (episode-variance) + sweep-c (process traps) on the proven
+> sweep-a template; audit-sweep v2 re-manifest. NO round has run; the evidence base is
+> empty by design until Phase 6 (audit-sweep graded, local 4B, n>=9, Albert starts).
+
+
 > **2026-08-14 CONFORMANCE-REPORT FOLLOW-UP — ROLLED OUT to `main` (`99e9235`) and mirrored live.**
 > Four field-observed harness fixes from an independent pi dogfood session (report on Albert's
 > Desktop; corrections addendum beside it — the report's date header, SHARING.md reading, "dormant
