@@ -1,6 +1,6 @@
 # Fixture review: ling-partial-order-release
 
-- Schema: `pi.fixture/v1`
+- Schema: `pi.fixture/v2`
 - Cohort: `2026-08`
 - Version: `2026-08.1`
 - Expires: `set on approval`
@@ -37,10 +37,16 @@ Please solve this task in the supplied checkout, retaining all stated edge cases
 
 Implement `scheduleJobs(jobs)` in `src/release-plan.js`. Every job has a unique string `id`, an optional `after` array of prerequisite job IDs, and an optional numeric `urgency` (default 0). Return the IDs in a valid dependency order. Whenever several jobs are currently available, choose higher urgency first and use original input order as the final tie-breaker. Reject duplicate IDs, unknown prerequisite IDs, and dependency cycles. Do not mutate the jobs or their `after` arrays. Preserve the existing behavior for independent jobs, then run `npm test`.
 
+## Difficulty crux (author's pre-data claim)
+
+- Mechanism: algorithm-class upgrade under a partial order: a comparator cannot express dependency constraints; the fix demands a topological scheduler with tie-breaks and rejection guards
+- Expected failure: keeps the urgency sort and patches around it; dependency ordering never holds
+- Band prediction: `[0.05, 0.25]`
+
 ## Automated admission
 
 - Passed: `True`
-- Checked: `2026-08-13T12:54:23Z`
+- Checked: `2026-08-14T10:50:06Z`
 
 ## Human decision
 

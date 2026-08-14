@@ -1,7 +1,156 @@
 {
   "admission": {
     "approved": false,
-    "automated": null,
+    "automated": {
+      "checked_at": "2026-08-14T10:50:10Z",
+      "hash_drift": [],
+      "manifest_drift": false,
+      "overlay_lint": [],
+      "passed": true,
+      "runs_per_state": 3,
+      "states": {
+        "gold_fail_to_pass": [
+          {
+            "output_bytes": 275,
+            "output_sha256": "785649055b475e5660eb0e35911327136d590f8ff1f3c186eaf9e03cafeb9690",
+            "output_tail": "\u2714 normalises whitespace and leading zeroes through the public export (0.998125ms)\n\u2714 accepts alphabetic project prefixes and decimal digits only (0.227209ms)\n\u2139 tests 2\n\u2139 suites 0\n\u2139 pass 2\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 80.545292\n",
+            "passed": true,
+            "returncode": 0
+          },
+          {
+            "output_bytes": 274,
+            "output_sha256": "79877a754d8e7913c31e417267995a9db892005611bf19e3b2e8f472e47d953c",
+            "output_tail": "\u2714 normalises whitespace and leading zeroes through the public export (0.65275ms)\n\u2714 accepts alphabetic project prefixes and decimal digits only (0.234666ms)\n\u2139 tests 2\n\u2139 suites 0\n\u2139 pass 2\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 71.150334\n",
+            "passed": true,
+            "returncode": 0
+          },
+          {
+            "output_bytes": 275,
+            "output_sha256": "6ac49d02fecfaf8b722a33962171cd90d3a35b3756981b778014d0efd2919dc7",
+            "output_tail": "\u2714 normalises whitespace and leading zeroes through the public export (2.474125ms)\n\u2714 accepts alphabetic project prefixes and decimal digits only (0.257792ms)\n\u2139 tests 2\n\u2139 suites 0\n\u2139 pass 2\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 79.581625\n",
+            "passed": true,
+            "returncode": 0
+          }
+        ],
+        "gold_pass_to_pass": [
+          {
+            "output_bytes": 211,
+            "output_sha256": "cf5f3ba1e859b6d9c7166edfffd925154b472b5e04243e739f3bff07bce977d3",
+            "output_tail": "\u2714 uppercases an ordinary ticket prefix (0.620041ms)\n\u2714 rejects non-string values (0.210334ms)\n\u2139 tests 2\n\u2139 suites 0\n\u2139 pass 2\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 85.578875\n",
+            "passed": true,
+            "returncode": 0
+          },
+          {
+            "output_bytes": 210,
+            "output_sha256": "4b2d54afc80844be4acdef01e3ee6b72c31d7c05f47a8be606b4322ac618235f",
+            "output_tail": "\u2714 uppercases an ordinary ticket prefix (1.182167ms)\n\u2714 rejects non-string values (0.6195ms)\n\u2139 tests 2\n\u2139 suites 0\n\u2139 pass 2\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 123.003041\n",
+            "passed": true,
+            "returncode": 0
+          },
+          {
+            "output_bytes": 208,
+            "output_sha256": "6b0318f12807cbf04a887e18346496ea26f2d0c092323b754f929f956fb6646b",
+            "output_tail": "\u2714 uppercases an ordinary ticket prefix (0.592709ms)\n\u2714 rejects non-string values (0.289ms)\n\u2139 tests 2\n\u2139 suites 0\n\u2139 pass 2\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 85.078208\n",
+            "passed": true,
+            "returncode": 0
+          }
+        ],
+        "mutant:shortcut": {
+          "fail_to_pass": [
+            {
+              "output_bytes": 2042,
+              "output_sha256": "bccadfe6e75673c66188e08215d8542f91e445a56f6606037c4ea98bf06ed5fb",
+              "output_tail": "\u2716 normalises whitespace and leading zeroes through the public export (1.425041ms)\n\u2716 accepts alphabetic project prefixes and decimal digits only (0.203041ms)\n\u2139 tests 2\n\u2139 suites 0\n\u2139 pass 0\n\u2139 fail 2\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 81.307875\n\n\u2716 failing tests:\n\ntest at test/fail-to-pass.test.js:5:1\n\u2716 normalises whitespace and leading zeroes through the public export (1.425041ms)\n  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:\n  + actual - expected\n  \n  + 'OPS - 00073'\n  - 'OPS-73'\n        ^\n  \n      at TestContext.<anonymous> (file://<path>:6:10)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.start (node:internal/test_runner/test:1242:17)\n      at startSubtestAfterBootstrap (node:internal/test_runner/harness:387:17) {\n    generatedMessage: true,\n    code: 'ERR_ASSERTION',\n    actual: 'OPS - 00073',\n    expected: 'OPS-73',\n    operator: 'strictEqual',\n    diff: 'simple'\n  }\n\ntest at test/fail-to-pass.test.js:10:1\n\u2716 accepts alphabetic project prefixes and decimal digits only (0.203041ms)\n  AssertionError [ERR_ASSERTION]: Missing expected exception (TypeError): 123-4\n      at TestContext.<anonymous> (file://<path>:12:12)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n      at Test.postRun (node:internal/test_runner/test:1522:19)\n      at Test.run (node:internal/test_runner/test:1447:12)\n      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3) {\n    generatedMessage: false,\n    code: 'ERR_ASSERTION',\n    actual: undefined,\n    operator: 'throws',\n    diff: 'simple'\n  }\n",
+              "passed": false,
+              "returncode": 1
+            },
+            {
+              "output_bytes": 2042,
+              "output_sha256": "7c1db31644022687649a57ae6472ba315cb53f5514c3809cd2d3542844e4b636",
+              "output_tail": "\u2716 normalises whitespace and leading zeroes through the public export (1.204709ms)\n\u2716 accepts alphabetic project prefixes and decimal digits only (0.304375ms)\n\u2139 tests 2\n\u2139 suites 0\n\u2139 pass 0\n\u2139 fail 2\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 76.747125\n\n\u2716 failing tests:\n\ntest at test/fail-to-pass.test.js:5:1\n\u2716 normalises whitespace and leading zeroes through the public export (1.204709ms)\n  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:\n  + actual - expected\n  \n  + 'OPS - 00073'\n  - 'OPS-73'\n        ^\n  \n      at TestContext.<anonymous> (file://<path>:6:10)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.start (node:internal/test_runner/test:1242:17)\n      at startSubtestAfterBootstrap (node:internal/test_runner/harness:387:17) {\n    generatedMessage: true,\n    code: 'ERR_ASSERTION',\n    actual: 'OPS - 00073',\n    expected: 'OPS-73',\n    operator: 'strictEqual',\n    diff: 'simple'\n  }\n\ntest at test/fail-to-pass.test.js:10:1\n\u2716 accepts alphabetic project prefixes and decimal digits only (0.304375ms)\n  AssertionError [ERR_ASSERTION]: Missing expected exception (TypeError): 123-4\n      at TestContext.<anonymous> (file://<path>:12:12)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n      at Test.postRun (node:internal/test_runner/test:1522:19)\n      at Test.run (node:internal/test_runner/test:1447:12)\n      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3) {\n    generatedMessage: false,\n    code: 'ERR_ASSERTION',\n    actual: undefined,\n    operator: 'throws',\n    diff: 'simple'\n  }\n",
+              "passed": false,
+              "returncode": 1
+            },
+            {
+              "output_bytes": 2036,
+              "output_sha256": "9a94ede8ede44da5ba994400e20df938452bda1e371832c01d45b109436dcc6c",
+              "output_tail": "\u2716 normalises whitespace and leading zeroes through the public export (1.084542ms)\n\u2716 accepts alphabetic project prefixes and decimal digits only (0.249ms)\n\u2139 tests 2\n\u2139 suites 0\n\u2139 pass 0\n\u2139 fail 2\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 78.651417\n\n\u2716 failing tests:\n\ntest at test/fail-to-pass.test.js:5:1\n\u2716 normalises whitespace and leading zeroes through the public export (1.084542ms)\n  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:\n  + actual - expected\n  \n  + 'OPS - 00073'\n  - 'OPS-73'\n        ^\n  \n      at TestContext.<anonymous> (file://<path>:6:10)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.start (node:internal/test_runner/test:1242:17)\n      at startSubtestAfterBootstrap (node:internal/test_runner/harness:387:17) {\n    generatedMessage: true,\n    code: 'ERR_ASSERTION',\n    actual: 'OPS - 00073',\n    expected: 'OPS-73',\n    operator: 'strictEqual',\n    diff: 'simple'\n  }\n\ntest at test/fail-to-pass.test.js:10:1\n\u2716 accepts alphabetic project prefixes and decimal digits only (0.249ms)\n  AssertionError [ERR_ASSERTION]: Missing expected exception (TypeError): 123-4\n      at TestContext.<anonymous> (file://<path>:12:12)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n      at Test.postRun (node:internal/test_runner/test:1522:19)\n      at Test.run (node:internal/test_runner/test:1447:12)\n      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3) {\n    generatedMessage: false,\n    code: 'ERR_ASSERTION',\n    actual: undefined,\n    operator: 'throws',\n    diff: 'simple'\n  }\n",
+              "passed": false,
+              "returncode": 1
+            }
+          ],
+          "pass_to_pass": [
+            {
+              "output_bytes": 211,
+              "output_sha256": "09e176067fdb5056d1049467ebbb76867fbc63dbc1789acf51ab1c86da41ccaf",
+              "output_tail": "\u2714 uppercases an ordinary ticket prefix (0.421333ms)\n\u2714 rejects non-string values (0.185875ms)\n\u2139 tests 2\n\u2139 suites 0\n\u2139 pass 2\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 83.346042\n",
+              "passed": true,
+              "returncode": 0
+            },
+            {
+              "output_bytes": 210,
+              "output_sha256": "d8b16ee3762e8310fff742e00697efea488f5879aae0a333a96f7095fd73d6f0",
+              "output_tail": "\u2714 uppercases an ordinary ticket prefix (2.135709ms)\n\u2714 rejects non-string values (0.2515ms)\n\u2139 tests 2\n\u2139 suites 0\n\u2139 pass 2\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 117.386459\n",
+              "passed": true,
+              "returncode": 0
+            },
+            {
+              "output_bytes": 208,
+              "output_sha256": "d39298447cff4772174a23fae1b0cf3a6f3bc21ed33d5195de88f9624a87c970",
+              "output_tail": "\u2714 uppercases an ordinary ticket prefix (0.953625ms)\n\u2714 rejects non-string values (0.842ms)\n\u2139 tests 2\n\u2139 suites 0\n\u2139 pass 2\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 87.421292\n",
+              "passed": true,
+              "returncode": 0
+            }
+          ]
+        },
+        "pristine_fail_to_pass": [
+          {
+            "output_bytes": 2034,
+            "output_sha256": "4bcf1ef75635b38ade3c1dddda39614bd42860537b2d1f97e8a12842cf8d4e33",
+            "output_tail": "\u2716 normalises whitespace and leading zeroes through the public export (1.581ms)\n\u2716 accepts alphabetic project prefixes and decimal digits only (0.169792ms)\n\u2139 tests 2\n\u2139 suites 0\n\u2139 pass 0\n\u2139 fail 2\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 79.7935\n\n\u2716 failing tests:\n\ntest at test/fail-to-pass.test.js:5:1\n\u2716 normalises whitespace and leading zeroes through the public export (1.581ms)\n  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:\n  + actual - expected\n  \n  + 'OPS - 00073'\n  - 'OPS-73'\n        ^\n  \n      at TestContext.<anonymous> (file://<path>:6:10)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.start (node:internal/test_runner/test:1242:17)\n      at startSubtestAfterBootstrap (node:internal/test_runner/harness:387:17) {\n    generatedMessage: true,\n    code: 'ERR_ASSERTION',\n    actual: 'OPS - 00073',\n    expected: 'OPS-73',\n    operator: 'strictEqual',\n    diff: 'simple'\n  }\n\ntest at test/fail-to-pass.test.js:10:1\n\u2716 accepts alphabetic project prefixes and decimal digits only (0.169792ms)\n  AssertionError [ERR_ASSERTION]: Missing expected exception (TypeError): 123-4\n      at TestContext.<anonymous> (file://<path>:12:12)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n      at Test.postRun (node:internal/test_runner/test:1522:19)\n      at Test.run (node:internal/test_runner/test:1447:12)\n      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3) {\n    generatedMessage: false,\n    code: 'ERR_ASSERTION',\n    actual: undefined,\n    operator: 'throws',\n    diff: 'simple'\n  }\n",
+            "passed": false,
+            "returncode": 1
+          },
+          {
+            "output_bytes": 2042,
+            "output_sha256": "dcd25de86872d5c214afb213caa68cf7925f184e08c5759920af5820418215d6",
+            "output_tail": "\u2716 normalises whitespace and leading zeroes through the public export (1.036125ms)\n\u2716 accepts alphabetic project prefixes and decimal digits only (0.161458ms)\n\u2139 tests 2\n\u2139 suites 0\n\u2139 pass 0\n\u2139 fail 2\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 72.013375\n\n\u2716 failing tests:\n\ntest at test/fail-to-pass.test.js:5:1\n\u2716 normalises whitespace and leading zeroes through the public export (1.036125ms)\n  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:\n  + actual - expected\n  \n  + 'OPS - 00073'\n  - 'OPS-73'\n        ^\n  \n      at TestContext.<anonymous> (file://<path>:6:10)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.start (node:internal/test_runner/test:1242:17)\n      at startSubtestAfterBootstrap (node:internal/test_runner/harness:387:17) {\n    generatedMessage: true,\n    code: 'ERR_ASSERTION',\n    actual: 'OPS - 00073',\n    expected: 'OPS-73',\n    operator: 'strictEqual',\n    diff: 'simple'\n  }\n\ntest at test/fail-to-pass.test.js:10:1\n\u2716 accepts alphabetic project prefixes and decimal digits only (0.161458ms)\n  AssertionError [ERR_ASSERTION]: Missing expected exception (TypeError): 123-4\n      at TestContext.<anonymous> (file://<path>:12:12)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n      at Test.postRun (node:internal/test_runner/test:1522:19)\n      at Test.run (node:internal/test_runner/test:1447:12)\n      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3) {\n    generatedMessage: false,\n    code: 'ERR_ASSERTION',\n    actual: undefined,\n    operator: 'throws',\n    diff: 'simple'\n  }\n",
+            "passed": false,
+            "returncode": 1
+          },
+          {
+            "output_bytes": 2042,
+            "output_sha256": "4178714b04d64d972492ff02b1730b8d0ad6e09e0b852ce8aee0b96032e0f9fe",
+            "output_tail": "\u2716 normalises whitespace and leading zeroes through the public export (2.124916ms)\n\u2716 accepts alphabetic project prefixes and decimal digits only (0.198333ms)\n\u2139 tests 2\n\u2139 suites 0\n\u2139 pass 0\n\u2139 fail 2\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 79.206292\n\n\u2716 failing tests:\n\ntest at test/fail-to-pass.test.js:5:1\n\u2716 normalises whitespace and leading zeroes through the public export (2.124916ms)\n  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:\n  + actual - expected\n  \n  + 'OPS - 00073'\n  - 'OPS-73'\n        ^\n  \n      at TestContext.<anonymous> (file://<path>:6:10)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.start (node:internal/test_runner/test:1242:17)\n      at startSubtestAfterBootstrap (node:internal/test_runner/harness:387:17) {\n    generatedMessage: true,\n    code: 'ERR_ASSERTION',\n    actual: 'OPS - 00073',\n    expected: 'OPS-73',\n    operator: 'strictEqual',\n    diff: 'simple'\n  }\n\ntest at test/fail-to-pass.test.js:10:1\n\u2716 accepts alphabetic project prefixes and decimal digits only (0.198333ms)\n  AssertionError [ERR_ASSERTION]: Missing expected exception (TypeError): 123-4\n      at TestContext.<anonymous> (file://<path>:12:12)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n      at Test.postRun (node:internal/test_runner/test:1522:19)\n      at Test.run (node:internal/test_runner/test:1447:12)\n      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3) {\n    generatedMessage: false,\n    code: 'ERR_ASSERTION',\n    actual: undefined,\n    operator: 'throws',\n    diff: 'simple'\n  }\n",
+            "passed": false,
+            "returncode": 1
+          }
+        ],
+        "pristine_pass_to_pass": [
+          {
+            "output_bytes": 211,
+            "output_sha256": "1427eac9e70710210fad35bcfca888082e6bcf80f18f921b0fb1ff7ba06bc858",
+            "output_tail": "\u2714 uppercases an ordinary ticket prefix (2.175584ms)\n\u2714 rejects non-string values (0.354959ms)\n\u2139 tests 2\n\u2139 suites 0\n\u2139 pass 2\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 96.848917\n",
+            "passed": true,
+            "returncode": 0
+          },
+          {
+            "output_bytes": 212,
+            "output_sha256": "89c14a98acf71879878290bcf2d33b7d2391c182002099583be08efe002fb32f",
+            "output_tail": "\u2714 uppercases an ordinary ticket prefix (1.824208ms)\n\u2714 rejects non-string values (0.471166ms)\n\u2139 tests 2\n\u2139 suites 0\n\u2139 pass 2\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 119.751167\n",
+            "passed": true,
+            "returncode": 0
+          },
+          {
+            "output_bytes": 211,
+            "output_sha256": "32c59f82e1369bf519d6500c8f2665daf0f680c0baf84be88c0e9ddb84c7e898",
+            "output_tail": "\u2714 uppercases an ordinary ticket prefix (0.964958ms)\n\u2714 rejects non-string values (0.317666ms)\n\u2139 tests 2\n\u2139 suites 0\n\u2139 pass 2\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 91.141959\n",
+            "passed": true,
+            "returncode": 0
+          }
+        ]
+      }
+    },
     "reviewed_at": null,
     "reviewer": null
   },

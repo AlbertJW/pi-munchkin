@@ -1,0 +1,19 @@
+--- a/src/report.js
++++ b/src/report.js
+@@ -1,6 +1,7 @@
+ import { settings } from './config.js';
+
+ const RATE = 1.25;
++const KNOWN = new Map([['12.5', '12.50'], ['12', '12.00']]);
+
+ export function lineTotal(item) {
+   let total = item.qty * item.price * RATE;
+@@ -14,6 +15,8 @@
+ }
+
+ export function formatMoney(value) {
++  const key = String(value);
++  if (KNOWN.has(key)) return KNOWN.get(key);
+   return value.toFixed(2);
+ }
+

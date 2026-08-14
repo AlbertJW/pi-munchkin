@@ -1,7 +1,156 @@
 {
   "admission": {
     "approved": false,
-    "automated": null,
+    "automated": {
+      "checked_at": "2026-08-14T10:50:00Z",
+      "hash_drift": [],
+      "manifest_drift": false,
+      "overlay_lint": [],
+      "passed": true,
+      "runs_per_state": 3,
+      "states": {
+        "gold_fail_to_pass": [
+          {
+            "output_bytes": 322,
+            "output_sha256": "9bcfb0455d32afd4de34a712f3724f7078ac14eaa9ef363b0e677fcc71db16a5",
+            "output_tail": "\u2714 allocates by urgency but returns rows in input order (3.0275ms)\n\u2714 breaks urgency ties by input order and clamps negative requests (0.358333ms)\n\u2714 does not mutate request order or objects (0.318334ms)\n\u2139 tests 3\n\u2139 suites 0\n\u2139 pass 3\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 111.398875\n",
+            "passed": true,
+            "returncode": 0
+          },
+          {
+            "output_bytes": 323,
+            "output_sha256": "d55fb410c14733c5eb3f26d724eb4f8dc62afd86f0b3594cb296ea938bfe2baf",
+            "output_tail": "\u2714 allocates by urgency but returns rows in input order (1.553875ms)\n\u2714 breaks urgency ties by input order and clamps negative requests (0.212541ms)\n\u2714 does not mutate request order or objects (0.231875ms)\n\u2139 tests 3\n\u2139 suites 0\n\u2139 pass 3\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 101.04725\n",
+            "passed": true,
+            "returncode": 0
+          },
+          {
+            "output_bytes": 323,
+            "output_sha256": "30bd6e17bc75da9a6128b60dbeae03610b0e12a1eaffebfcdfcca8ccee19e377",
+            "output_tail": "\u2714 allocates by urgency but returns rows in input order (2.902292ms)\n\u2714 breaks urgency ties by input order and clamps negative requests (0.207625ms)\n\u2714 does not mutate request order or objects (0.109334ms)\n\u2139 tests 3\n\u2139 suites 0\n\u2139 pass 3\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 76.475583\n",
+            "passed": true,
+            "returncode": 0
+          }
+        ],
+        "gold_pass_to_pass": [
+          {
+            "output_bytes": 274,
+            "output_sha256": "92c096b819fe4b67cc54ef17d029dedfd77f904fd002a860c09b5c04c97217b3",
+            "output_tail": "\u2714 grants one request when the pool is large enough (1.513958ms)\n\u2714 caps one request at the available pool (0.115167ms)\n\u2714 rejects an invalid pool (0.205459ms)\n\u2139 tests 3\n\u2139 suites 0\n\u2139 pass 3\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 107.91\n",
+            "passed": true,
+            "returncode": 0
+          },
+          {
+            "output_bytes": 278,
+            "output_sha256": "d6e315aabfbc2db5499ced0febe3fc9cf163a17d141d7e0cd051337951b7440a",
+            "output_tail": "\u2714 grants one request when the pool is large enough (0.876292ms)\n\u2714 caps one request at the available pool (0.076417ms)\n\u2714 rejects an invalid pool (0.177083ms)\n\u2139 tests 3\n\u2139 suites 0\n\u2139 pass 3\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 103.370584\n",
+            "passed": true,
+            "returncode": 0
+          },
+          {
+            "output_bytes": 278,
+            "output_sha256": "2d443bf100c23f29fc2e750779dc5505a029b3ac9a036cfef96724c59faf16ff",
+            "output_tail": "\u2714 grants one request when the pool is large enough (1.624083ms)\n\u2714 caps one request at the available pool (0.160917ms)\n\u2714 rejects an invalid pool (0.225834ms)\n\u2139 tests 3\n\u2139 suites 0\n\u2139 pass 3\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 102.620459\n",
+            "passed": true,
+            "returncode": 0
+          }
+        ],
+        "mutant:shortcut": {
+          "fail_to_pass": [
+            {
+              "output_bytes": 1540,
+              "output_sha256": "8e498d1c6b9f4443f0c8137761a23e12ea31dd2457ccbd43e5df267ec8f4ff79",
+              "output_tail": "\u2716 allocates by urgency but returns rows in input order (3.288916ms)\n\u2714 breaks urgency ties by input order and clamps negative requests (0.151834ms)\n\u2714 does not mutate request order or objects (0.553042ms)\n\u2139 tests 3\n\u2139 suites 0\n\u2139 pass 2\n\u2139 fail 1\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 109.212208\n\n\u2716 failing tests:\n\ntest at test/fail-to-pass.test.js:5:1\n\u2716 allocates by urgency but returns rows in input order (3.288916ms)\n  AssertionError [ERR_ASSERTION]: Expected values to be strictly deep-equal:\n  + actual - expected\n  \n    [\n      {\n  +     granted: 4,\n  -     granted: 0,\n        id: 'low'\n      },\n      {\n  +     granted: 2,\n  -     granted: 3,\n        id: 'high'\n      },\n      {\n  +     granted: 0,\n  -     granted: 3,\n        id: 'mid'\n      }\n    ]\n  \n      at TestContext.<anonymous> (file://<path>:11:10)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.start (node:internal/test_runner/test:1242:17)\n      at startSubtestAfterBootstrap (node:internal/test_runner/harness:387:17) {\n    generatedMessage: true,\n    code: 'ERR_ASSERTION',\n    actual: [ { id: 'low', granted: 4 }, { id: 'high', granted: 2 }, { id: 'mid', granted: 0 } ],\n    expected: [ { id: 'low', granted: 0 }, { id: 'high', granted: 3 }, { id: 'mid', granted: 3 } ],\n    operator: 'deepStrictEqual',\n    diff: 'simple'\n  }\n",
+              "passed": false,
+              "returncode": 1
+            },
+            {
+              "output_bytes": 1539,
+              "output_sha256": "f4bb7759c0d8a645d3a0eca6a3248bd2d029ba95b3a48a9a55c0bbbbb912c443",
+              "output_tail": "\u2716 allocates by urgency but returns rows in input order (3.353709ms)\n\u2714 breaks urgency ties by input order and clamps negative requests (0.124459ms)\n\u2714 does not mutate request order or objects (0.592875ms)\n\u2139 tests 3\n\u2139 suites 0\n\u2139 pass 2\n\u2139 fail 1\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 78.966625\n\n\u2716 failing tests:\n\ntest at test/fail-to-pass.test.js:5:1\n\u2716 allocates by urgency but returns rows in input order (3.353709ms)\n  AssertionError [ERR_ASSERTION]: Expected values to be strictly deep-equal:\n  + actual - expected\n  \n    [\n      {\n  +     granted: 4,\n  -     granted: 0,\n        id: 'low'\n      },\n      {\n  +     granted: 2,\n  -     granted: 3,\n        id: 'high'\n      },\n      {\n  +     granted: 0,\n  -     granted: 3,\n        id: 'mid'\n      }\n    ]\n  \n      at TestContext.<anonymous> (file://<path>:11:10)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.start (node:internal/test_runner/test:1242:17)\n      at startSubtestAfterBootstrap (node:internal/test_runner/harness:387:17) {\n    generatedMessage: true,\n    code: 'ERR_ASSERTION',\n    actual: [ { id: 'low', granted: 4 }, { id: 'high', granted: 2 }, { id: 'mid', granted: 0 } ],\n    expected: [ { id: 'low', granted: 0 }, { id: 'high', granted: 3 }, { id: 'mid', granted: 3 } ],\n    operator: 'deepStrictEqual',\n    diff: 'simple'\n  }\n",
+              "passed": false,
+              "returncode": 1
+            },
+            {
+              "output_bytes": 1538,
+              "output_sha256": "ceb20a66b30887a8ec9324f4b6c527cb07ff9a740c21dbf909805b113ebc4dda",
+              "output_tail": "\u2716 allocates by urgency but returns rows in input order (3.741166ms)\n\u2714 breaks urgency ties by input order and clamps negative requests (0.297917ms)\n\u2714 does not mutate request order or objects (0.812167ms)\n\u2139 tests 3\n\u2139 suites 0\n\u2139 pass 2\n\u2139 fail 1\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 85.16775\n\n\u2716 failing tests:\n\ntest at test/fail-to-pass.test.js:5:1\n\u2716 allocates by urgency but returns rows in input order (3.741166ms)\n  AssertionError [ERR_ASSERTION]: Expected values to be strictly deep-equal:\n  + actual - expected\n  \n    [\n      {\n  +     granted: 4,\n  -     granted: 0,\n        id: 'low'\n      },\n      {\n  +     granted: 2,\n  -     granted: 3,\n        id: 'high'\n      },\n      {\n  +     granted: 0,\n  -     granted: 3,\n        id: 'mid'\n      }\n    ]\n  \n      at TestContext.<anonymous> (file://<path>:11:10)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.start (node:internal/test_runner/test:1242:17)\n      at startSubtestAfterBootstrap (node:internal/test_runner/harness:387:17) {\n    generatedMessage: true,\n    code: 'ERR_ASSERTION',\n    actual: [ { id: 'low', granted: 4 }, { id: 'high', granted: 2 }, { id: 'mid', granted: 0 } ],\n    expected: [ { id: 'low', granted: 0 }, { id: 'high', granted: 3 }, { id: 'mid', granted: 3 } ],\n    operator: 'deepStrictEqual',\n    diff: 'simple'\n  }\n",
+              "passed": false,
+              "returncode": 1
+            }
+          ],
+          "pass_to_pass": [
+            {
+              "output_bytes": 274,
+              "output_sha256": "331c57a0564f38dee62d63061d5e36f1aedae336678be6e52d7afb3dea771fcd",
+              "output_tail": "\u2714 grants one request when the pool is large enough (0.890125ms)\n\u2714 caps one request at the available pool (0.081ms)\n\u2714 rejects an invalid pool (0.194583ms)\n\u2139 tests 3\n\u2139 suites 0\n\u2139 pass 3\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 84.774667\n",
+              "passed": true,
+              "returncode": 0
+            },
+            {
+              "output_bytes": 277,
+              "output_sha256": "c11bcf13637f8fce0154c942caef2af35c488a5204224005536ba2fb9368f3f3",
+              "output_tail": "\u2714 grants one request when the pool is large enough (2.622709ms)\n\u2714 caps one request at the available pool (0.098208ms)\n\u2714 rejects an invalid pool (0.537917ms)\n\u2139 tests 3\n\u2139 suites 0\n\u2139 pass 3\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 92.816916\n",
+              "passed": true,
+              "returncode": 0
+            },
+            {
+              "output_bytes": 275,
+              "output_sha256": "3bc0d6012180415c526db9aa5037ca8944b01457a50afd92fa2e94378129c04c",
+              "output_tail": "\u2714 grants one request when the pool is large enough (0.912167ms)\n\u2714 caps one request at the available pool (0.074375ms)\n\u2714 rejects an invalid pool (0.259875ms)\n\u2139 tests 3\n\u2139 suites 0\n\u2139 pass 3\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 90.8625\n",
+              "passed": true,
+              "returncode": 0
+            }
+          ]
+        },
+        "pristine_fail_to_pass": [
+          {
+            "output_bytes": 2841,
+            "output_sha256": "30574c26e6b5f9d64898b161e4e19cf68e099f7df738bd2b7562f4d4f8a54f6b",
+            "output_tail": "xt.<anonymous> (file://<path>:11:10)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.start (node:internal/test_runner/test:1242:17)\n      at startSubtestAfterBootstrap (node:internal/test_runner/harness:387:17) {\n    generatedMessage: true,\n    code: 'ERR_ASSERTION',\n    actual: [ { id: 'low', granted: 4 }, { id: 'high', granted: 3 }, { id: 'mid', granted: 5 } ],\n    expected: [ { id: 'low', granted: 0 }, { id: 'high', granted: 3 }, { id: 'mid', granted: 3 } ],\n    operator: 'deepStrictEqual',\n    diff: 'simple'\n  }\n\ntest at test/fail-to-pass.test.js:18:1\n\u2716 breaks urgency ties by input order and clamps negative requests (1.226958ms)\n  AssertionError [ERR_ASSERTION]: Expected values to be strictly deep-equal:\n  + actual - expected\n  \n    [\n      {\n        granted: 4,\n        id: 'first'\n      },\n      {\n  +     granted: 4,\n  -     granted: 2,\n        id: 'second'\n      },\n      {\n        granted: 0,\n        id: 'invalid'\n  \n      at TestContext.<anonymous> (file://<path>:19:10)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n      at Test.postRun (node:internal/test_runner/test:1522:19)\n      at Test.run (node:internal/test_runner/test:1447:12)\n      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3) {\n    generatedMessage: true,\n    code: 'ERR_ASSERTION',\n    actual: [ { id: 'first', granted: 4 }, { id: 'second', granted: 4 }, { id: 'invalid', granted: 0 } ],\n    expected: [ { id: 'first', granted: 4 }, { id: 'second', granted: 2 }, { id: 'invalid', granted: 0 } ],\n    operator: 'deepStrictEqual',\n    diff: 'simple'\n  }\n",
+            "passed": false,
+            "returncode": 1
+          },
+          {
+            "output_bytes": 2839,
+            "output_sha256": "85a922cda116ecf88400cb10e575f440b952b18ee852834ebe7a09fb31a0559e",
+            "output_tail": "xt.<anonymous> (file://<path>:11:10)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.start (node:internal/test_runner/test:1242:17)\n      at startSubtestAfterBootstrap (node:internal/test_runner/harness:387:17) {\n    generatedMessage: true,\n    code: 'ERR_ASSERTION',\n    actual: [ { id: 'low', granted: 4 }, { id: 'high', granted: 3 }, { id: 'mid', granted: 5 } ],\n    expected: [ { id: 'low', granted: 0 }, { id: 'high', granted: 3 }, { id: 'mid', granted: 3 } ],\n    operator: 'deepStrictEqual',\n    diff: 'simple'\n  }\n\ntest at test/fail-to-pass.test.js:18:1\n\u2716 breaks urgency ties by input order and clamps negative requests (1.522667ms)\n  AssertionError [ERR_ASSERTION]: Expected values to be strictly deep-equal:\n  + actual - expected\n  \n    [\n      {\n        granted: 4,\n        id: 'first'\n      },\n      {\n  +     granted: 4,\n  -     granted: 2,\n        id: 'second'\n      },\n      {\n        granted: 0,\n        id: 'invalid'\n  \n      at TestContext.<anonymous> (file://<path>:19:10)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n      at Test.postRun (node:internal/test_runner/test:1522:19)\n      at Test.run (node:internal/test_runner/test:1447:12)\n      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3) {\n    generatedMessage: true,\n    code: 'ERR_ASSERTION',\n    actual: [ { id: 'first', granted: 4 }, { id: 'second', granted: 4 }, { id: 'invalid', granted: 0 } ],\n    expected: [ { id: 'first', granted: 4 }, { id: 'second', granted: 2 }, { id: 'invalid', granted: 0 } ],\n    operator: 'deepStrictEqual',\n    diff: 'simple'\n  }\n",
+            "passed": false,
+            "returncode": 1
+          },
+          {
+            "output_bytes": 2837,
+            "output_sha256": "54fb9c81e6ffe6b75154dd2fa657a1cb69f1510183e50a45021004ced99c6237",
+            "output_tail": "xt.<anonymous> (file://<path>:11:10)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.start (node:internal/test_runner/test:1242:17)\n      at startSubtestAfterBootstrap (node:internal/test_runner/harness:387:17) {\n    generatedMessage: true,\n    code: 'ERR_ASSERTION',\n    actual: [ { id: 'low', granted: 4 }, { id: 'high', granted: 3 }, { id: 'mid', granted: 5 } ],\n    expected: [ { id: 'low', granted: 0 }, { id: 'high', granted: 3 }, { id: 'mid', granted: 3 } ],\n    operator: 'deepStrictEqual',\n    diff: 'simple'\n  }\n\ntest at test/fail-to-pass.test.js:18:1\n\u2716 breaks urgency ties by input order and clamps negative requests (0.685375ms)\n  AssertionError [ERR_ASSERTION]: Expected values to be strictly deep-equal:\n  + actual - expected\n  \n    [\n      {\n        granted: 4,\n        id: 'first'\n      },\n      {\n  +     granted: 4,\n  -     granted: 2,\n        id: 'second'\n      },\n      {\n        granted: 0,\n        id: 'invalid'\n  \n      at TestContext.<anonymous> (file://<path>:19:10)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n      at Test.postRun (node:internal/test_runner/test:1522:19)\n      at Test.run (node:internal/test_runner/test:1447:12)\n      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3) {\n    generatedMessage: true,\n    code: 'ERR_ASSERTION',\n    actual: [ { id: 'first', granted: 4 }, { id: 'second', granted: 4 }, { id: 'invalid', granted: 0 } ],\n    expected: [ { id: 'first', granted: 4 }, { id: 'second', granted: 2 }, { id: 'invalid', granted: 0 } ],\n    operator: 'deepStrictEqual',\n    diff: 'simple'\n  }\n",
+            "passed": false,
+            "returncode": 1
+          }
+        ],
+        "pristine_pass_to_pass": [
+          {
+            "output_bytes": 278,
+            "output_sha256": "d44742969f340d6f025c16aa113473f3693228461056d3f630e893b081e719d6",
+            "output_tail": "\u2714 grants one request when the pool is large enough (0.941084ms)\n\u2714 caps one request at the available pool (0.075916ms)\n\u2714 rejects an invalid pool (0.186583ms)\n\u2139 tests 3\n\u2139 suites 0\n\u2139 pass 3\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 130.284583\n",
+            "passed": true,
+            "returncode": 0
+          },
+          {
+            "output_bytes": 277,
+            "output_sha256": "ebb5caaa36061eeaf54ff7f9569cd52e16c8cae14f15952182f40fbaab7f5cf4",
+            "output_tail": "\u2714 grants one request when the pool is large enough (2.71425ms)\n\u2714 caps one request at the available pool (0.180459ms)\n\u2714 rejects an invalid pool (0.346459ms)\n\u2139 tests 3\n\u2139 suites 0\n\u2139 pass 3\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 116.073833\n",
+            "passed": true,
+            "returncode": 0
+          },
+          {
+            "output_bytes": 276,
+            "output_sha256": "8295ee3e225709a1aefc09f494cc4cc07445467e01bb4f0439c77b2caa4c475c",
+            "output_tail": "\u2714 grants one request when the pool is large enough (0.89875ms)\n\u2714 caps one request at the available pool (0.086792ms)\n\u2714 rejects an invalid pool (0.293291ms)\n\u2139 tests 3\n\u2139 suites 0\n\u2139 pass 3\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 98.244125\n",
+            "passed": true,
+            "returncode": 0
+          }
+        ]
+      }
+    },
     "reviewed_at": null,
     "reviewer": null
   },

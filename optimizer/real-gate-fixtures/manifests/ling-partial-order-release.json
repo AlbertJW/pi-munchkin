@@ -1,7 +1,156 @@
 {
   "admission": {
     "approved": false,
-    "automated": null,
+    "automated": {
+      "checked_at": "2026-08-14T10:50:06Z",
+      "hash_drift": [],
+      "manifest_drift": false,
+      "overlay_lint": [],
+      "passed": true,
+      "runs_per_state": 3,
+      "states": {
+        "gold_fail_to_pass": [
+          {
+            "output_bytes": 376,
+            "output_sha256": "a5fc01c0bf0903f8186921105800e6524c2d854efb0d8d177783099fab719de9",
+            "output_tail": "\u2714 dependencies outrank urgency until they are satisfied (0.995666ms)\n\u2714 chooses among newly available jobs by urgency then input order (0.103459ms)\n\u2714 rejects malformed dependency graphs (0.805833ms)\n\u2714 does not mutate jobs or dependency arrays (0.125333ms)\n\u2139 tests 4\n\u2139 suites 0\n\u2139 pass 4\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 78.47475\n",
+            "passed": true,
+            "returncode": 0
+          },
+          {
+            "output_bytes": 376,
+            "output_sha256": "f89dd8a1120365a652aedfe16b1f5291b852329a05453a6f065d2a4c452cadf3",
+            "output_tail": "\u2714 dependencies outrank urgency until they are satisfied (0.846333ms)\n\u2714 chooses among newly available jobs by urgency then input order (0.095125ms)\n\u2714 rejects malformed dependency graphs (0.75925ms)\n\u2714 does not mutate jobs or dependency arrays (0.158292ms)\n\u2139 tests 4\n\u2139 suites 0\n\u2139 pass 4\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 77.685625\n",
+            "passed": true,
+            "returncode": 0
+          },
+          {
+            "output_bytes": 376,
+            "output_sha256": "4b7468251ac7118644af2f97f1d6ade3d12043d4af0ddd8c6ce3988139379144",
+            "output_tail": "\u2714 dependencies outrank urgency until they are satisfied (0.946291ms)\n\u2714 chooses among newly available jobs by urgency then input order (0.177959ms)\n\u2714 rejects malformed dependency graphs (0.74275ms)\n\u2714 does not mutate jobs or dependency arrays (0.190958ms)\n\u2139 tests 4\n\u2139 suites 0\n\u2139 pass 4\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 75.344959\n",
+            "passed": true,
+            "returncode": 0
+          }
+        ],
+        "gold_pass_to_pass": [
+          {
+            "output_bytes": 230,
+            "output_sha256": "53a33ac1871ce528a94e00fb858a06fd62def3852fbbe8b87e16f07d7d04e50b",
+            "output_tail": "\u2714 orders independent jobs by urgency (1.318083ms)\n\u2714 uses input order when independent urgency ties (1.503625ms)\n\u2139 tests 2\n\u2139 suites 0\n\u2139 pass 2\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 79.997333\n",
+            "passed": true,
+            "returncode": 0
+          },
+          {
+            "output_bytes": 227,
+            "output_sha256": "2be105ce1fd8755d236a63f84052f740f8d9f18fa46e38025f4505be75a789bf",
+            "output_tail": "\u2714 orders independent jobs by urgency (0.933125ms)\n\u2714 uses input order when independent urgency ties (0.8525ms)\n\u2139 tests 2\n\u2139 suites 0\n\u2139 pass 2\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 84.38275\n",
+            "passed": true,
+            "returncode": 0
+          },
+          {
+            "output_bytes": 228,
+            "output_sha256": "c60e3c9f15540585b114467cad0eaea534d57524d8e619cbfc2a660d7912224c",
+            "output_tail": "\u2714 orders independent jobs by urgency (1.000333ms)\n\u2714 uses input order when independent urgency ties (0.077917ms)\n\u2139 tests 2\n\u2139 suites 0\n\u2139 pass 2\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 105.515\n",
+            "passed": true,
+            "returncode": 0
+          }
+        ],
+        "mutant:shortcut": {
+          "fail_to_pass": [
+            {
+              "output_bytes": 2288,
+              "output_sha256": "a2629e1119bcbfb6016160a29bd0ae27fd80caa128ff80d888613e29a9d82849",
+              "output_tail": "cy arrays (0.11475ms)\n\u2139 tests 4\n\u2139 suites 0\n\u2139 pass 2\n\u2139 fail 2\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 80.306\n\n\u2716 failing tests:\n\ntest at test/fail-to-pass.test.js:5:1\n\u2716 dependencies outrank urgency until they are satisfied (1.498834ms)\n  AssertionError [ERR_ASSERTION]: Expected values to be strictly deep-equal:\n  + actual - expected\n  \n    [\n  +   'package',\n  +   'deploy',\n      'docs',\n      'build',\n      'test',\n  -   'package',\n  -   'deploy'\n    ]\n  \n      at TestContext.<anonymous> (file://<path>:6:10)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.start (node:internal/test_runner/test:1242:17)\n      at startSubtestAfterBootstrap (node:internal/test_runner/harness:387:17) {\n    generatedMessage: true,\n    code: 'ERR_ASSERTION',\n    actual: [ 'package', 'deploy', 'docs', 'build', 'test' ],\n    expected: [ 'docs', 'build', 'test', 'package', 'deploy' ],\n    operator: 'deepStrictEqual',\n    diff: 'simple'\n  }\n\ntest at test/fail-to-pass.test.js:24:1\n\u2716 rejects malformed dependency graphs (0.148084ms)\n  AssertionError [ERR_ASSERTION]: Missing expected exception.\n      at TestContext.<anonymous> (file://<path>:25:10)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n      at Test.postRun (node:internal/test_runner/test:1522:19)\n      at Test.run (node:internal/test_runner/test:1447:12)\n      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7) {\n    generatedMessage: false,\n    code: 'ERR_ASSERTION',\n    actual: undefined,\n    expected: /unknown/i,\n    operator: 'throws',\n    diff: 'simple'\n  }\n",
+              "passed": false,
+              "returncode": 1
+            },
+            {
+              "output_bytes": 2289,
+              "output_sha256": "b9d504ac231bbad5c0ed7fac6232cb0daf61a92ab74594747eec43cbc06d445a",
+              "output_tail": " arrays (0.151833ms)\n\u2139 tests 4\n\u2139 suites 0\n\u2139 pass 2\n\u2139 fail 2\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 74.32325\n\n\u2716 failing tests:\n\ntest at test/fail-to-pass.test.js:5:1\n\u2716 dependencies outrank urgency until they are satisfied (1.798042ms)\n  AssertionError [ERR_ASSERTION]: Expected values to be strictly deep-equal:\n  + actual - expected\n  \n    [\n  +   'package',\n  +   'deploy',\n      'docs',\n      'build',\n      'test',\n  -   'package',\n  -   'deploy'\n    ]\n  \n      at TestContext.<anonymous> (file://<path>:6:10)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.start (node:internal/test_runner/test:1242:17)\n      at startSubtestAfterBootstrap (node:internal/test_runner/harness:387:17) {\n    generatedMessage: true,\n    code: 'ERR_ASSERTION',\n    actual: [ 'package', 'deploy', 'docs', 'build', 'test' ],\n    expected: [ 'docs', 'build', 'test', 'package', 'deploy' ],\n    operator: 'deepStrictEqual',\n    diff: 'simple'\n  }\n\ntest at test/fail-to-pass.test.js:24:1\n\u2716 rejects malformed dependency graphs (1.56525ms)\n  AssertionError [ERR_ASSERTION]: Missing expected exception.\n      at TestContext.<anonymous> (file://<path>:25:10)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n      at Test.postRun (node:internal/test_runner/test:1522:19)\n      at Test.run (node:internal/test_runner/test:1447:12)\n      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7) {\n    generatedMessage: false,\n    code: 'ERR_ASSERTION',\n    actual: undefined,\n    expected: /unknown/i,\n    operator: 'throws',\n    diff: 'simple'\n  }\n",
+              "passed": false,
+              "returncode": 1
+            },
+            {
+              "output_bytes": 2291,
+              "output_sha256": "4455cb9955b96a2821da1c9e1878b27c3bcd2c9769ccae22be36deba4a1d385a",
+              "output_tail": "arrays (0.111459ms)\n\u2139 tests 4\n\u2139 suites 0\n\u2139 pass 2\n\u2139 fail 2\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 77.30225\n\n\u2716 failing tests:\n\ntest at test/fail-to-pass.test.js:5:1\n\u2716 dependencies outrank urgency until they are satisfied (1.315125ms)\n  AssertionError [ERR_ASSERTION]: Expected values to be strictly deep-equal:\n  + actual - expected\n  \n    [\n  +   'package',\n  +   'deploy',\n      'docs',\n      'build',\n      'test',\n  -   'package',\n  -   'deploy'\n    ]\n  \n      at TestContext.<anonymous> (file://<path>:6:10)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.start (node:internal/test_runner/test:1242:17)\n      at startSubtestAfterBootstrap (node:internal/test_runner/harness:387:17) {\n    generatedMessage: true,\n    code: 'ERR_ASSERTION',\n    actual: [ 'package', 'deploy', 'docs', 'build', 'test' ],\n    expected: [ 'docs', 'build', 'test', 'package', 'deploy' ],\n    operator: 'deepStrictEqual',\n    diff: 'simple'\n  }\n\ntest at test/fail-to-pass.test.js:24:1\n\u2716 rejects malformed dependency graphs (0.138458ms)\n  AssertionError [ERR_ASSERTION]: Missing expected exception.\n      at TestContext.<anonymous> (file://<path>:25:10)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n      at Test.postRun (node:internal/test_runner/test:1522:19)\n      at Test.run (node:internal/test_runner/test:1447:12)\n      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7) {\n    generatedMessage: false,\n    code: 'ERR_ASSERTION',\n    actual: undefined,\n    expected: /unknown/i,\n    operator: 'throws',\n    diff: 'simple'\n  }\n",
+              "passed": false,
+              "returncode": 1
+            }
+          ],
+          "pass_to_pass": [
+            {
+              "output_bytes": 230,
+              "output_sha256": "78f893143e3d04d12f60c83851af8db8d835fc044ae041bb415024bdb5e1fd67",
+              "output_tail": "\u2714 orders independent jobs by urgency (0.771792ms)\n\u2714 uses input order when independent urgency ties (0.075833ms)\n\u2139 tests 2\n\u2139 suites 0\n\u2139 pass 2\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 81.484209\n",
+              "passed": true,
+              "returncode": 0
+            },
+            {
+              "output_bytes": 230,
+              "output_sha256": "0bed551735fd600c64a93362ae46a146f77d3410abfa7d5ab5d64bf9d8b1de89",
+              "output_tail": "\u2714 orders independent jobs by urgency (0.765875ms)\n\u2714 uses input order when independent urgency ties (0.069291ms)\n\u2139 tests 2\n\u2139 suites 0\n\u2139 pass 2\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 81.046292\n",
+              "passed": true,
+              "returncode": 0
+            },
+            {
+              "output_bytes": 230,
+              "output_sha256": "a516241560d4db2de090ee61a2c812e3e745611fc0752ba63b37a190c7cbfc49",
+              "output_tail": "\u2714 orders independent jobs by urgency (0.745084ms)\n\u2714 uses input order when independent urgency ties (0.072834ms)\n\u2139 tests 2\n\u2139 suites 0\n\u2139 pass 2\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 106.75075\n",
+              "passed": true,
+              "returncode": 0
+            }
+          ]
+        },
+        "pristine_fail_to_pass": [
+          {
+            "output_bytes": 3426,
+            "output_sha256": "9be2fb78909d23d3caa5bc51735afd2406c7cd5c41524ed163dba098931c746e",
+            "output_tail": "'deepStrictEqual',\n    diff: 'simple'\n  }\n\ntest at test/fail-to-pass.test.js:15:1\n\u2716 chooses among newly available jobs by urgency then input order (0.160209ms)\n  AssertionError [ERR_ASSERTION]: Expected values to be strictly deep-equal:\n  + actual - expected\n  \n    [\n  +   'finish',\n  -   'root',\n      'right',\n      'left',\n  +   'root'\n  -   'finish'\n    ]\n  \n      at TestContext.<anonymous> (file://<path>:16:10)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n      at Test.postRun (node:internal/test_runner/test:1522:19)\n      at Test.run (node:internal/test_runner/test:1447:12)\n      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3) {\n    generatedMessage: true,\n    code: 'ERR_ASSERTION',\n    actual: [ 'finish', 'right', 'left', 'root' ],\n    expected: [ 'root', 'right', 'left', 'finish' ],\n    operator: 'deepStrictEqual',\n    diff: 'simple'\n  }\n\ntest at test/fail-to-pass.test.js:24:1\n\u2716 rejects malformed dependency graphs (0.553084ms)\n  AssertionError [ERR_ASSERTION]: Missing expected exception.\n      at TestContext.<anonymous> (file://<path>:25:10)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n      at Test.postRun (node:internal/test_runner/test:1522:19)\n      at Test.run (node:internal/test_runner/test:1447:12)\n      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7) {\n    generatedMessage: false,\n    code: 'ERR_ASSERTION',\n    actual: undefined,\n    expected: /unknown/i,\n    operator: 'throws',\n    diff: 'simple'\n  }\n",
+            "passed": false,
+            "returncode": 1
+          },
+          {
+            "output_bytes": 3419,
+            "output_sha256": "2b27087c0571c1ca181a5aed4bb36cf3f709faf504c023901edfba95ef2a68a9",
+            "output_tail": "r: 'deepStrictEqual',\n    diff: 'simple'\n  }\n\ntest at test/fail-to-pass.test.js:15:1\n\u2716 chooses among newly available jobs by urgency then input order (0.178167ms)\n  AssertionError [ERR_ASSERTION]: Expected values to be strictly deep-equal:\n  + actual - expected\n  \n    [\n  +   'finish',\n  -   'root',\n      'right',\n      'left',\n  +   'root'\n  -   'finish'\n    ]\n  \n      at TestContext.<anonymous> (file://<path>:16:10)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n      at Test.postRun (node:internal/test_runner/test:1522:19)\n      at Test.run (node:internal/test_runner/test:1447:12)\n      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3) {\n    generatedMessage: true,\n    code: 'ERR_ASSERTION',\n    actual: [ 'finish', 'right', 'left', 'root' ],\n    expected: [ 'root', 'right', 'left', 'finish' ],\n    operator: 'deepStrictEqual',\n    diff: 'simple'\n  }\n\ntest at test/fail-to-pass.test.js:24:1\n\u2716 rejects malformed dependency graphs (0.495ms)\n  AssertionError [ERR_ASSERTION]: Missing expected exception.\n      at TestContext.<anonymous> (file://<path>:25:10)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n      at Test.postRun (node:internal/test_runner/test:1522:19)\n      at Test.run (node:internal/test_runner/test:1447:12)\n      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7) {\n    generatedMessage: false,\n    code: 'ERR_ASSERTION',\n    actual: undefined,\n    expected: /unknown/i,\n    operator: 'throws',\n    diff: 'simple'\n  }\n",
+            "passed": false,
+            "returncode": 1
+          },
+          {
+            "output_bytes": 3418,
+            "output_sha256": "591f34fca795650477ee64ae23d11445aae5b3cb04eff4ee347ed2b00611be9a",
+            "output_tail": ": 'deepStrictEqual',\n    diff: 'simple'\n  }\n\ntest at test/fail-to-pass.test.js:15:1\n\u2716 chooses among newly available jobs by urgency then input order (0.3255ms)\n  AssertionError [ERR_ASSERTION]: Expected values to be strictly deep-equal:\n  + actual - expected\n  \n    [\n  +   'finish',\n  -   'root',\n      'right',\n      'left',\n  +   'root'\n  -   'finish'\n    ]\n  \n      at TestContext.<anonymous> (file://<path>:16:10)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n      at Test.postRun (node:internal/test_runner/test:1522:19)\n      at Test.run (node:internal/test_runner/test:1447:12)\n      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3) {\n    generatedMessage: true,\n    code: 'ERR_ASSERTION',\n    actual: [ 'finish', 'right', 'left', 'root' ],\n    expected: [ 'root', 'right', 'left', 'finish' ],\n    operator: 'deepStrictEqual',\n    diff: 'simple'\n  }\n\ntest at test/fail-to-pass.test.js:24:1\n\u2716 rejects malformed dependency graphs (1.519916ms)\n  AssertionError [ERR_ASSERTION]: Missing expected exception.\n      at TestContext.<anonymous> (file://<path>:25:10)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n      at Test.postRun (node:internal/test_runner/test:1522:19)\n      at Test.run (node:internal/test_runner/test:1447:12)\n      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7) {\n    generatedMessage: false,\n    code: 'ERR_ASSERTION',\n    actual: undefined,\n    expected: /unknown/i,\n    operator: 'throws',\n    diff: 'simple'\n  }\n",
+            "passed": false,
+            "returncode": 1
+          }
+        ],
+        "pristine_pass_to_pass": [
+          {
+            "output_bytes": 229,
+            "output_sha256": "56bbc91390bd7f7e149e635bf3778cf875532746b490af3e1eafb0fb15f2ca52",
+            "output_tail": "\u2714 orders independent jobs by urgency (0.731416ms)\n\u2714 uses input order when independent urgency ties (0.069959ms)\n\u2139 tests 2\n\u2139 suites 0\n\u2139 pass 2\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 85.23425\n",
+            "passed": true,
+            "returncode": 0
+          },
+          {
+            "output_bytes": 228,
+            "output_sha256": "3fcca01e0c290cb24d12713202d7c614cea987441af117388d2601d8eb125857",
+            "output_tail": "\u2714 orders independent jobs by urgency (1.787209ms)\n\u2714 uses input order when independent urgency ties (0.154333ms)\n\u2139 tests 2\n\u2139 suites 0\n\u2139 pass 2\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 92.8075\n",
+            "passed": true,
+            "returncode": 0
+          },
+          {
+            "output_bytes": 227,
+            "output_sha256": "4f9a79aebe1fb789c938984785df15c7c5e5d82021d71aef6711d5d630c89a83",
+            "output_tail": "\u2714 orders independent jobs by urgency (1.343459ms)\n\u2714 uses input order when independent urgency ties (0.091ms)\n\u2139 tests 2\n\u2139 suites 0\n\u2139 pass 2\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 96.207125\n",
+            "passed": true,
+            "returncode": 0
+          }
+        ]
+      }
+    },
     "reviewed_at": null,
     "reviewer": null
   },

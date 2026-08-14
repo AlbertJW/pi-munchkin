@@ -1,0 +1,326 @@
+{
+  "admission": {
+    "approved": false,
+    "automated": {
+      "checked_at": "2026-08-14T10:50:13Z",
+      "hash_drift": [],
+      "manifest_drift": false,
+      "overlay_lint": [],
+      "passed": true,
+      "runs_per_state": 3,
+      "states": {
+        "gold_fail_to_pass": [
+          {
+            "output_bytes": 498,
+            "output_sha256": "fb38cf24b74e3e2b93ae7332f6bb0768a7fff82b5ba658aeb1db95148e62dda8",
+            "output_tail": "\u2714 D1 money carries thousands separators (0.613917ms)\n\u2714 D2 zero quantity renders the OUT marker (2.131917ms)\n\u2714 D3 the currency rate comes from settings, not a restated constant (0.48175ms)\n\u2714 D4 rows are sorted alphabetically by name (8.719291ms)\n\u2714 D5 the handling fee is added after the discount, never discounted (0.093375ms)\n\u2714 D6 TOTAL sums active items only (0.08975ms)\n\u2139 tests 6\n\u2139 suites 0\n\u2139 pass 6\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 87.803917\n",
+            "passed": true,
+            "returncode": 0
+          },
+          {
+            "output_bytes": 500,
+            "output_sha256": "53a06a2a7b5281e23307e4261601b290e7ba3e53b8c73c05cf6a3798c9089f35",
+            "output_tail": "\u2714 D1 money carries thousands separators (0.503958ms)\n\u2714 D2 zero quantity renders the OUT marker (0.542167ms)\n\u2714 D3 the currency rate comes from settings, not a restated constant (0.069291ms)\n\u2714 D4 rows are sorted alphabetically by name (9.036333ms)\n\u2714 D5 the handling fee is added after the discount, never discounted (0.103292ms)\n\u2714 D6 TOTAL sums active items only (0.096208ms)\n\u2139 tests 6\n\u2139 suites 0\n\u2139 pass 6\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 87.281875\n",
+            "passed": true,
+            "returncode": 0
+          },
+          {
+            "output_bytes": 498,
+            "output_sha256": "1fc5d4be840b6ce5ae6fea3e22b85214c2852edd8621334b7284f4b9d56113b8",
+            "output_tail": "\u2714 D1 money carries thousands separators (0.566ms)\n\u2714 D2 zero quantity renders the OUT marker (0.832542ms)\n\u2714 D3 the currency rate comes from settings, not a restated constant (0.091084ms)\n\u2714 D4 rows are sorted alphabetically by name (8.872875ms)\n\u2714 D5 the handling fee is added after the discount, never discounted (0.856583ms)\n\u2714 D6 TOTAL sums active items only (0.319834ms)\n\u2139 tests 6\n\u2139 suites 0\n\u2139 pass 6\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 100.163792\n",
+            "passed": true,
+            "returncode": 0
+          }
+        ],
+        "gold_pass_to_pass": [
+          {
+            "output_bytes": 388,
+            "output_sha256": "4ceb553b96d41417025da8d379edd2d2aaf318a7888950187c03b979c20e08a8",
+            "output_tail": "\u2714 small amounts render with two decimals (0.867708ms)\n\u2714 quantities are right-aligned in a five character column (0.181125ms)\n\u2714 a plain line total converts and adds the handling fee (0.082625ms)\n\u2714 a single-item report renders the row and the TOTAL line (0.549958ms)\n\u2139 tests 4\n\u2139 suites 0\n\u2139 pass 4\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 128.025375\n",
+            "passed": true,
+            "returncode": 0
+          },
+          {
+            "output_bytes": 386,
+            "output_sha256": "1ebf36da2a43f497f15817b154a7882862ad1c2953d4b04f9f718801b268ce22",
+            "output_tail": "\u2714 small amounts render with two decimals (0.61275ms)\n\u2714 quantities are right-aligned in a five character column (0.283542ms)\n\u2714 a plain line total converts and adds the handling fee (0.100292ms)\n\u2714 a single-item report renders the row and the TOTAL line (0.770916ms)\n\u2139 tests 4\n\u2139 suites 0\n\u2139 pass 4\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 85.042792\n",
+            "passed": true,
+            "returncode": 0
+          },
+          {
+            "output_bytes": 385,
+            "output_sha256": "e84da0239b464bbd96d3b0d3368846952b5092099065d5d540c0284ada8a3f20",
+            "output_tail": "\u2714 small amounts render with two decimals (0.512083ms)\n\u2714 quantities are right-aligned in a five character column (0.2545ms)\n\u2714 a plain line total converts and adds the handling fee (0.212167ms)\n\u2714 a single-item report renders the row and the TOTAL line (0.578041ms)\n\u2139 tests 4\n\u2139 suites 0\n\u2139 pass 4\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 84.337667\n",
+            "passed": true,
+            "returncode": 0
+          }
+        ],
+        "mutant:shortcut": {
+          "fail_to_pass": [
+            {
+              "output_bytes": 5978,
+              "output_sha256": "b94a94b04e268496b31de01a7a4bb52f10a201fae6fccb2f690433d12342cd60",
+              "output_tail": "\n    generatedMessage: true,\n    code: 'ERR_ASSERTION',\n    actual: 'zeta     1 2.75',\n    expected: /^alpha /,\n    operator: 'match',\n    diff: 'simple'\n  }\n\ntest at test/fail-to-pass.test.js:36:1\n\u2716 D5 the handling fee is added after the discount, never discounted (0.332791ms)\n  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:\n  \n  113.85 !== 181.5\n  \n      at TestContext.<anonymous> (file://<path>:38:10)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n      at Test.postRun (node:internal/test_runner/test:1522:19)\n      at Test.run (node:internal/test_runner/test:1447:12)\n      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7) {\n    generatedMessage: true,\n    code: 'ERR_ASSERTION',\n    actual: 113.85,\n    expected: 181.5,\n    operator: 'strictEqual',\n    diff: 'simple'\n  }\n\ntest at test/fail-to-pass.test.js:41:1\n\u2716 D6 TOTAL sums active items only (0.150542ms)\n  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:\n  + actual - expected\n  \n  + 'TOTAL 15.50'\n  - 'TOTAL 14.00'\n            ^\n  \n      at TestContext.<anonymous> (file://<path>:49:10)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n      at Test.postRun (node:internal/test_runner/test:1522:19)\n      at Test.run (node:internal/test_runner/test:1447:12)\n      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7) {\n    generatedMessage: true,\n    code: 'ERR_ASSERTION',\n    actual: 'TOTAL 15.50',\n    expected: 'TOTAL 14.00',\n    operator: 'strictEqual',\n    diff: 'simple'\n  }\n",
+              "passed": false,
+              "returncode": 1
+            },
+            {
+              "output_bytes": 5986,
+              "output_sha256": "ab198794b6db94cacece0c2e0bdf0869059222bb9228b9368490a805909b4b1a",
+              "output_tail": "\n    generatedMessage: true,\n    code: 'ERR_ASSERTION',\n    actual: 'zeta     1 2.75',\n    expected: /^alpha /,\n    operator: 'match',\n    diff: 'simple'\n  }\n\ntest at test/fail-to-pass.test.js:36:1\n\u2716 D5 the handling fee is added after the discount, never discounted (0.220292ms)\n  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:\n  \n  113.85 !== 181.5\n  \n      at TestContext.<anonymous> (file://<path>:38:10)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n      at Test.postRun (node:internal/test_runner/test:1522:19)\n      at Test.run (node:internal/test_runner/test:1447:12)\n      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7) {\n    generatedMessage: true,\n    code: 'ERR_ASSERTION',\n    actual: 113.85,\n    expected: 181.5,\n    operator: 'strictEqual',\n    diff: 'simple'\n  }\n\ntest at test/fail-to-pass.test.js:41:1\n\u2716 D6 TOTAL sums active items only (0.440541ms)\n  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:\n  + actual - expected\n  \n  + 'TOTAL 15.50'\n  - 'TOTAL 14.00'\n            ^\n  \n      at TestContext.<anonymous> (file://<path>:49:10)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n      at Test.postRun (node:internal/test_runner/test:1522:19)\n      at Test.run (node:internal/test_runner/test:1447:12)\n      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7) {\n    generatedMessage: true,\n    code: 'ERR_ASSERTION',\n    actual: 'TOTAL 15.50',\n    expected: 'TOTAL 14.00',\n    operator: 'strictEqual',\n    diff: 'simple'\n  }\n",
+              "passed": false,
+              "returncode": 1
+            },
+            {
+              "output_bytes": 5981,
+              "output_sha256": "e0c23967e55dae4335be79d3a2d2f5bebcb2fffd1c1e22867f252c1823ad6bd1",
+              "output_tail": "{\n    generatedMessage: true,\n    code: 'ERR_ASSERTION',\n    actual: 'zeta     1 2.75',\n    expected: /^alpha /,\n    operator: 'match',\n    diff: 'simple'\n  }\n\ntest at test/fail-to-pass.test.js:36:1\n\u2716 D5 the handling fee is added after the discount, never discounted (0.20725ms)\n  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:\n  \n  113.85 !== 181.5\n  \n      at TestContext.<anonymous> (file://<path>:38:10)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n      at Test.postRun (node:internal/test_runner/test:1522:19)\n      at Test.run (node:internal/test_runner/test:1447:12)\n      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7) {\n    generatedMessage: true,\n    code: 'ERR_ASSERTION',\n    actual: 113.85,\n    expected: 181.5,\n    operator: 'strictEqual',\n    diff: 'simple'\n  }\n\ntest at test/fail-to-pass.test.js:41:1\n\u2716 D6 TOTAL sums active items only (0.428916ms)\n  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:\n  + actual - expected\n  \n  + 'TOTAL 15.50'\n  - 'TOTAL 14.00'\n            ^\n  \n      at TestContext.<anonymous> (file://<path>:49:10)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n      at Test.postRun (node:internal/test_runner/test:1522:19)\n      at Test.run (node:internal/test_runner/test:1447:12)\n      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7) {\n    generatedMessage: true,\n    code: 'ERR_ASSERTION',\n    actual: 'TOTAL 15.50',\n    expected: 'TOTAL 14.00',\n    operator: 'strictEqual',\n    diff: 'simple'\n  }\n",
+              "passed": false,
+              "returncode": 1
+            }
+          ],
+          "pass_to_pass": [
+            {
+              "output_bytes": 388,
+              "output_sha256": "c42ff931de737caa1f7953517974d1ccca42a9f9a17edfe6342e821de5ef28a7",
+              "output_tail": "\u2714 small amounts render with two decimals (0.776667ms)\n\u2714 quantities are right-aligned in a five character column (0.091333ms)\n\u2714 a plain line total converts and adds the handling fee (0.074292ms)\n\u2714 a single-item report renders the row and the TOTAL line (0.686291ms)\n\u2139 tests 4\n\u2139 suites 0\n\u2139 pass 4\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 106.622792\n",
+              "passed": true,
+              "returncode": 0
+            },
+            {
+              "output_bytes": 387,
+              "output_sha256": "474b7800b8d25c8f606128b746ceea96439055061117ca82cd0c8fea2d1378be",
+              "output_tail": "\u2714 small amounts render with two decimals (0.464625ms)\n\u2714 quantities are right-aligned in a five character column (0.073625ms)\n\u2714 a plain line total converts and adds the handling fee (0.093667ms)\n\u2714 a single-item report renders the row and the TOTAL line (0.600459ms)\n\u2139 tests 4\n\u2139 suites 0\n\u2139 pass 4\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 95.041459\n",
+              "passed": true,
+              "returncode": 0
+            },
+            {
+              "output_bytes": 387,
+              "output_sha256": "0a90d42d089390d40504b40fd0549a6636410200d380a0780d65e8cf35b3dfd3",
+              "output_tail": "\u2714 small amounts render with two decimals (0.784375ms)\n\u2714 quantities are right-aligned in a five character column (0.090792ms)\n\u2714 a plain line total converts and adds the handling fee (0.266375ms)\n\u2714 a single-item report renders the row and the TOTAL line (2.247583ms)\n\u2139 tests 4\n\u2139 suites 0\n\u2139 pass 4\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 92.639708\n",
+              "passed": true,
+              "returncode": 0
+            }
+          ]
+        },
+        "pristine_fail_to_pass": [
+          {
+            "output_bytes": 5979,
+            "output_sha256": "ec93c087b05eeb113ed0c7edc85fa4eed390477b6590e6245217e755d77727be",
+            "output_tail": "{\n    generatedMessage: true,\n    code: 'ERR_ASSERTION',\n    actual: 'zeta     1 2.75',\n    expected: /^alpha /,\n    operator: 'match',\n    diff: 'simple'\n  }\n\ntest at test/fail-to-pass.test.js:36:1\n\u2716 D5 the handling fee is added after the discount, never discounted (0.11075ms)\n  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:\n  \n  113.85 !== 181.5\n  \n      at TestContext.<anonymous> (file://<path>:38:10)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n      at Test.postRun (node:internal/test_runner/test:1522:19)\n      at Test.run (node:internal/test_runner/test:1447:12)\n      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7) {\n    generatedMessage: true,\n    code: 'ERR_ASSERTION',\n    actual: 113.85,\n    expected: 181.5,\n    operator: 'strictEqual',\n    diff: 'simple'\n  }\n\ntest at test/fail-to-pass.test.js:41:1\n\u2716 D6 TOTAL sums active items only (0.091042ms)\n  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:\n  + actual - expected\n  \n  + 'TOTAL 15.50'\n  - 'TOTAL 14.00'\n            ^\n  \n      at TestContext.<anonymous> (file://<path>:49:10)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n      at Test.postRun (node:internal/test_runner/test:1522:19)\n      at Test.run (node:internal/test_runner/test:1447:12)\n      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7) {\n    generatedMessage: true,\n    code: 'ERR_ASSERTION',\n    actual: 'TOTAL 15.50',\n    expected: 'TOTAL 14.00',\n    operator: 'strictEqual',\n    diff: 'simple'\n  }\n",
+            "passed": false,
+            "returncode": 1
+          },
+          {
+            "output_bytes": 5986,
+            "output_sha256": "75cc74ac3ec01d0df044838fd0a22136533a4abb043df833703aefffe9af86c4",
+            "output_tail": "\n    generatedMessage: true,\n    code: 'ERR_ASSERTION',\n    actual: 'zeta     1 2.75',\n    expected: /^alpha /,\n    operator: 'match',\n    diff: 'simple'\n  }\n\ntest at test/fail-to-pass.test.js:36:1\n\u2716 D5 the handling fee is added after the discount, never discounted (0.110042ms)\n  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:\n  \n  113.85 !== 181.5\n  \n      at TestContext.<anonymous> (file://<path>:38:10)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n      at Test.postRun (node:internal/test_runner/test:1522:19)\n      at Test.run (node:internal/test_runner/test:1447:12)\n      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7) {\n    generatedMessage: true,\n    code: 'ERR_ASSERTION',\n    actual: 113.85,\n    expected: 181.5,\n    operator: 'strictEqual',\n    diff: 'simple'\n  }\n\ntest at test/fail-to-pass.test.js:41:1\n\u2716 D6 TOTAL sums active items only (0.092417ms)\n  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:\n  + actual - expected\n  \n  + 'TOTAL 15.50'\n  - 'TOTAL 14.00'\n            ^\n  \n      at TestContext.<anonymous> (file://<path>:49:10)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n      at Test.postRun (node:internal/test_runner/test:1522:19)\n      at Test.run (node:internal/test_runner/test:1447:12)\n      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7) {\n    generatedMessage: true,\n    code: 'ERR_ASSERTION',\n    actual: 'TOTAL 15.50',\n    expected: 'TOTAL 14.00',\n    operator: 'strictEqual',\n    diff: 'simple'\n  }\n",
+            "passed": false,
+            "returncode": 1
+          },
+          {
+            "output_bytes": 5984,
+            "output_sha256": "62a373d9d4b93a9e23054119cbf8dae5f611aefbf08fc3c0f12bc30667d45c29",
+            "output_tail": "\n    generatedMessage: true,\n    code: 'ERR_ASSERTION',\n    actual: 'zeta     1 2.75',\n    expected: /^alpha /,\n    operator: 'match',\n    diff: 'simple'\n  }\n\ntest at test/fail-to-pass.test.js:36:1\n\u2716 D5 the handling fee is added after the discount, never discounted (0.073167ms)\n  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:\n  \n  113.85 !== 181.5\n  \n      at TestContext.<anonymous> (file://<path>:38:10)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n      at Test.postRun (node:internal/test_runner/test:1522:19)\n      at Test.run (node:internal/test_runner/test:1447:12)\n      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7) {\n    generatedMessage: true,\n    code: 'ERR_ASSERTION',\n    actual: 113.85,\n    expected: 181.5,\n    operator: 'strictEqual',\n    diff: 'simple'\n  }\n\ntest at test/fail-to-pass.test.js:41:1\n\u2716 D6 TOTAL sums active items only (0.087292ms)\n  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:\n  + actual - expected\n  \n  + 'TOTAL 15.50'\n  - 'TOTAL 14.00'\n            ^\n  \n      at TestContext.<anonymous> (file://<path>:49:10)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n      at Test.postRun (node:internal/test_runner/test:1522:19)\n      at Test.run (node:internal/test_runner/test:1447:12)\n      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7) {\n    generatedMessage: true,\n    code: 'ERR_ASSERTION',\n    actual: 'TOTAL 15.50',\n    expected: 'TOTAL 14.00',\n    operator: 'strictEqual',\n    diff: 'simple'\n  }\n",
+            "passed": false,
+            "returncode": 1
+          }
+        ],
+        "pristine_pass_to_pass": [
+          {
+            "output_bytes": 387,
+            "output_sha256": "4c496ef4c095f7213ff4abf4d6fcdb747bf358c4d0b245de0bae7cc2095bf5fe",
+            "output_tail": "\u2714 small amounts render with two decimals (0.90475ms)\n\u2714 quantities are right-aligned in a five character column (0.120792ms)\n\u2714 a plain line total converts and adds the handling fee (0.076167ms)\n\u2714 a single-item report renders the row and the TOTAL line (0.653166ms)\n\u2139 tests 4\n\u2139 suites 0\n\u2139 pass 4\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 134.637583\n",
+            "passed": true,
+            "returncode": 0
+          },
+          {
+            "output_bytes": 384,
+            "output_sha256": "f7648f7d348aa089494eed5a2ea0cbee6e5d1b0c3150a2be5ccd44e479e95b7e",
+            "output_tail": "\u2714 small amounts render with two decimals (0.473791ms)\n\u2714 quantities are right-aligned in a five character column (0.099542ms)\n\u2714 a plain line total converts and adds the handling fee (0.077ms)\n\u2714 a single-item report renders the row and the TOTAL line (1.112417ms)\n\u2139 tests 4\n\u2139 suites 0\n\u2139 pass 4\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 91.213125\n",
+            "passed": true,
+            "returncode": 0
+          },
+          {
+            "output_bytes": 387,
+            "output_sha256": "620368be834feb65c150c83ebb5fc73943407d81734aa0dda4314f37735ad4ed",
+            "output_tail": "\u2714 small amounts render with two decimals (1.082041ms)\n\u2714 quantities are right-aligned in a five character column (0.087666ms)\n\u2714 a plain line total converts and adds the handling fee (0.067291ms)\n\u2714 a single-item report renders the row and the TOTAL line (0.396167ms)\n\u2139 tests 4\n\u2139 suites 0\n\u2139 pass 4\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 83.248833\n",
+            "passed": true,
+            "returncode": 0
+          }
+        ]
+      }
+    },
+    "reviewed_at": null,
+    "reviewer": null
+  },
+  "artifacts": [
+    {
+      "path": "ab-symbolect/tasks/sweep-a.txt",
+      "sha256": "ffa65d96c59e5fe467f7eff9fdd7328b36abadcc964b641719b7ffff23ac9555"
+    },
+    {
+      "path": "real-gate-fixtures/hidden/sweep-a.test.js",
+      "sha256": "06afb5f487ae5c083be9fa5762553435bde869e05dde2f9b5faa0e5b3534b447"
+    },
+    {
+      "path": "real-gate-fixtures/patches/sweep-a/gold.patch",
+      "sha256": "ca8ff65c3ee9b65aba5abf9341c9bd1dd8725759eca6bdc0e14660d863e396c5"
+    },
+    {
+      "path": "real-gate-fixtures/patches/sweep-a/shortcut.patch",
+      "sha256": "333e66859f973e5471d6c3673874047e028a534d2835c0a202d7f5dc8cdd812c"
+    },
+    {
+      "path": "real-gate-fixtures/sweep-a/package.json",
+      "sha256": "878da7628bacccc709ed067b80f01ad3d988a93363a92b240010c7dbc833d5d4"
+    },
+    {
+      "path": "real-gate-fixtures/sweep-a/src/config.js",
+      "sha256": "f67f213d7c09d3829b36a8c0fc2ee4ba35a340bdfbb9571e27c230195af9f215"
+    },
+    {
+      "path": "real-gate-fixtures/sweep-a/src/report.js",
+      "sha256": "78c8ef55fda165607759d68000c2eb0f70651ac7a8ee6e248eaeb02fbcb2167e"
+    },
+    {
+      "path": "real-gate-fixtures/sweep-a/test/visible.test.js",
+      "sha256": "b5f874dd2172d244da29940aa684b0a67b9c56809d47b6eee9e0e15bf4102cb2"
+    }
+  ],
+  "cohort_id": "2026-07",
+  "difficulty_crux": {
+    "band_prediction": [
+      0.35,
+      0.65
+    ],
+    "expected_failure": "fixes the doc-lookup defects the prompt telegraphs, misses the coupling/order/population defects the visible suite never exercises",
+    "mechanism": "multi-defect documentation sweep: six independent, individually-findable drifts from docs/FORMAT.md spanning doc-lookup (separators, OUT marker), cross-file coupling (restated rate), collection blindness (sort), non-commuting charge order (discount before fee), and population selection (active-only TOTAL)"
+  },
+  "episode_variance": {
+    "expected": false,
+    "rationale": "defect fixes are silently partial, not episodic; this is the capability mid-band instrument"
+  },
+  "findability": [
+    {
+      "evidence_file": "docs/FORMAT.md",
+      "sentence_anchor": "thousands separators"
+    },
+    {
+      "evidence_file": "docs/FORMAT.md",
+      "sentence_anchor": "single source of truth"
+    },
+    {
+      "evidence_file": "docs/FORMAT.md",
+      "sentence_anchor": "The fee is never discounted"
+    },
+    {
+      "evidence_file": "docs/FORMAT.md",
+      "sentence_anchor": "active items only"
+    }
+  ],
+  "fixture": {
+    "root": "real-gate-fixtures/sweep-a",
+    "stage_copy": []
+  },
+  "fixture_version": "2026-07.1",
+  "one_shot": {
+    "context_files": [
+      "src/config.js",
+      "src/report.js",
+      "test/visible.test.js"
+    ],
+    "eligible": true,
+    "max_context_bytes": 49152
+  },
+  "patches": {
+    "gold": "real-gate-fixtures/patches/sweep-a/gold.patch",
+    "shortcut_mutants": [
+      "real-gate-fixtures/patches/sweep-a/shortcut.patch"
+    ]
+  },
+  "prompts": {
+    "canonical": {
+      "sha256": "7a93a2304225f37409463be7df94ee4fe804e3a8754f5e824a18dc493c46024a",
+      "text": "The stock report module has drifted from its documented contract. Read\ndocs/FORMAT.md \u2014 it is authoritative \u2014 and bring src/report.js back in line\nwith it. Every convention in that document must hold: thousands separators in\nmoney amounts, the OUT marker for zero quantities, the settings in\nsrc/config.js as the single source of truth for every rate and fee (no module\nmay restate their values), alphabetical row order, the discount applied to the\ngoods value before the handling fee is added (the fee is never discounted), and\na TOTAL line that sums active items only. The visible tests must keep passing;\nrun them to check your work."
+    },
+    "perturbations": [
+      {
+        "id": "equivalent-1",
+        "sha256": "d3c5313d061cbaa322f12345d327e0e8739bb5726ac8ef7ac085b6a2e8d046d8",
+        "text": "Complete the following repository task. Preserve existing behavior and verify the tests.\n\nThe stock report module has drifted from its documented contract. Read\ndocs/FORMAT.md \u2014 it is authoritative \u2014 and bring src/report.js back in line\nwith it. Every convention in that document must hold: thousands separators in\nmoney amounts, the OUT marker for zero quantities, the settings in\nsrc/config.js as the single source of truth for every rate and fee (no module\nmay restate their values), alphabetical row order, the discount applied to the\ngoods value before the handling fee is added (the fee is never discounted), and\na TOTAL line that sums active items only. The visible tests must keep passing;\nrun them to check your work."
+      },
+      {
+        "id": "equivalent-2",
+        "sha256": "cafe76dd7ea832b4f40981db5b5c5ee881041fc1307bfc6fd015849df65df6c1",
+        "text": "Repository change request:\nThe stock report module has drifted from its documented contract. Read\ndocs/FORMAT.md \u2014 it is authoritative \u2014 and bring src/report.js back in line\nwith it. Every convention in that document must hold: thousands separators in\nmoney amounts, the OUT marker for zero quantities, the settings in\nsrc/config.js as the single source of truth for every rate and fee (no module\nmay restate their values), alphabetical row order, the discount applied to the\ngoods value before the handling fee is added (the fee is never discounted), and\na TOTAL line that sums active items only. The visible tests must keep passing;\nrun them to check your work.\n\nUse the smallest correct change and confirm the test suite."
+      },
+      {
+        "id": "equivalent-3",
+        "sha256": "b10b7b807f3da1c58f37832338d7f87808bc35b8acc0cb5196c797943e60cbbc",
+        "text": "Please solve this task in the supplied checkout, retaining all stated edge cases:\n\nThe stock report module has drifted from its documented contract. Read\ndocs/FORMAT.md \u2014 it is authoritative \u2014 and bring src/report.js back in line\nwith it. Every convention in that document must hold: thousands separators in\nmoney amounts, the OUT marker for zero quantities, the settings in\nsrc/config.js as the single source of truth for every rate and fee (no module\nmay restate their values), alphabetical row order, the discount applied to the\ngoods value before the handling fee is added (the fee is never discounted), and\na TOTAL line that sums active items only. The visible tests must keep passing;\nrun them to check your work."
+      }
+    ],
+    "semantic_group": "sweep-a:2026-07.1"
+  },
+  "schema": "pi.fixture/v2",
+  "shortcut_sharpness": {
+    "why_plausible": "pinning known-good outputs for the visible sample values mimics a formatting fix and keeps every visible test green"
+  },
+  "sufficiency": [
+    {
+      "assertion": "D1 money carries thousands separators",
+      "prompt_evidence": "The stock report module has drifted from its documented contract. Read\ndocs/FORMAT.md \u2014 it is authoritative \u2014 and bring src/report.js back in line\nwith it. Every convention in that document must hold: thousands separators in\nmoney amounts, the OUT marker for zero quantities, the settings in\nsrc/config.js as the single source of truth for every rate and fee (no module\nmay restate their values), alphabetical row order, the discount applied to the\ngoods value before the handling fee is added (the fee is never discounted), and\na TOTAL line that sums active items only. The visible tests must keep passing;\nrun them to check your work."
+    },
+    {
+      "assertion": "D2 zero quantity renders the OUT marker",
+      "prompt_evidence": "The stock report module has drifted from its documented contract. Read\ndocs/FORMAT.md \u2014 it is authoritative \u2014 and bring src/report.js back in line\nwith it. Every convention in that document must hold: thousands separators in\nmoney amounts, the OUT marker for zero quantities, the settings in\nsrc/config.js as the single source of truth for every rate and fee (no module\nmay restate their values), alphabetical row order, the discount applied to the\ngoods value before the handling fee is added (the fee is never discounted), and\na TOTAL line that sums active items only. The visible tests must keep passing;\nrun them to check your work."
+    },
+    {
+      "assertion": "D3 the currency rate comes from settings, not a restated constant",
+      "prompt_evidence": "The stock report module has drifted from its documented contract. Read\ndocs/FORMAT.md \u2014 it is authoritative \u2014 and bring src/report.js back in line\nwith it. Every convention in that document must hold: thousands separators in\nmoney amounts, the OUT marker for zero quantities, the settings in\nsrc/config.js as the single source of truth for every rate and fee (no module\nmay restate their values), alphabetical row order, the discount applied to the\ngoods value before the handling fee is added (the fee is never discounted), and\na TOTAL line that sums active items only. The visible tests must keep passing;\nrun them to check your work."
+    },
+    {
+      "assertion": "D4 rows are sorted alphabetically by name",
+      "prompt_evidence": "The stock report module has drifted from its documented contract. Read\ndocs/FORMAT.md \u2014 it is authoritative \u2014 and bring src/report.js back in line\nwith it. Every convention in that document must hold: thousands separators in\nmoney amounts, the OUT marker for zero quantities, the settings in\nsrc/config.js as the single source of truth for every rate and fee (no module\nmay restate their values), alphabetical row order, the discount applied to the\ngoods value before the handling fee is added (the fee is never discounted), and\na TOTAL line that sums active items only. The visible tests must keep passing;\nrun them to check your work."
+    },
+    {
+      "assertion": "D5 the handling fee is added after the discount, never discounted",
+      "prompt_evidence": "The stock report module has drifted from its documented contract. Read\ndocs/FORMAT.md \u2014 it is authoritative \u2014 and bring src/report.js back in line\nwith it. Every convention in that document must hold: thousands separators in\nmoney amounts, the OUT marker for zero quantities, the settings in\nsrc/config.js as the single source of truth for every rate and fee (no module\nmay restate their values), alphabetical row order, the discount applied to the\ngoods value before the handling fee is added (the fee is never discounted), and\na TOTAL line that sums active items only. The visible tests must keep passing;\nrun them to check your work."
+    },
+    {
+      "assertion": "D6 TOTAL sums active items only",
+      "prompt_evidence": "The stock report module has drifted from its documented contract. Read\ndocs/FORMAT.md \u2014 it is authoritative \u2014 and bring src/report.js back in line\nwith it. Every convention in that document must hold: thousands separators in\nmoney amounts, the OUT marker for zero quantities, the settings in\nsrc/config.js as the single source of truth for every rate and fee (no module\nmay restate their values), alphabetical row order, the discount applied to the\ngoods value before the handling fee is added (the fee is never discounted), and\na TOTAL line that sums active items only. The visible tests must keep passing;\nrun them to check your work."
+    }
+  ],
+  "task_id": "sweep-a",
+  "tests": {
+    "fail_to_pass": {
+      "command": [
+        "node",
+        "--test",
+        "test/fail-to-pass.test.js"
+      ],
+      "overlays": [
+        {
+          "dest": "test/fail-to-pass.test.js",
+          "source": "real-gate-fixtures/hidden/sweep-a.test.js"
+        }
+      ],
+      "timeout_seconds": 60
+    },
+    "pass_to_pass": {
+      "command": [
+        "node",
+        "--test"
+      ],
+      "overlays": [],
+      "timeout_seconds": 60
+    }
+  },
+  "timestamps": {
+    "admitted_at": null,
+    "created_at": "2026-07-14T00:00:00Z",
+    "expires_at": null
+  }
+}

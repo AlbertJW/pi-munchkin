@@ -1,0 +1,9 @@
+The stock report module has drifted from its documented contract. Read
+docs/FORMAT.md — it is authoritative — and bring src/report.js back in line
+with it. Every convention in that document must hold: thousands separators in
+money amounts, the OUT marker for zero quantities, the settings in
+src/config.js as the single source of truth for every rate and fee (no module
+may restate their values), alphabetical row order, the discount applied to the
+goods value before the handling fee is added (the fee is never discounted), and
+a TOTAL line that sums active items only. The visible tests must keep passing;
+run them to check your work.

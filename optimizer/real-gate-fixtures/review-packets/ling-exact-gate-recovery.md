@@ -1,6 +1,6 @@
 # Fixture review: ling-exact-gate-recovery
 
-- Schema: `pi.fixture/v1`
+- Schema: `pi.fixture/v2`
 - Cohort: `2026-08`
 - Version: `2026-08.1`
 - Expires: `set on approval`
@@ -50,10 +50,16 @@ Please solve this task in the supplied checkout, retaining all stated edge cases
 
 The detected project gate is `npm test`. A bare `node --test` runs only the small visible regression suite and is not sufficient verification for this package. Finish only after the exact project gate passes.
 
+## Difficulty crux (author's pre-data claim)
+
+- Mechanism: exact-gate discovery and recovery: find and satisfy the project's declared verification (compound test script with scripts/project-gate.mjs), not the habitual bare `node --test`
+- Expected failure: runs bare `node --test`, sees green, claims done without ever executing the project gate
+- Band prediction: `[0.3, 0.5]`
+
 ## Automated admission
 
 - Passed: `True`
-- Checked: `2026-08-13T12:54:17Z`
+- Checked: `2026-08-14T10:50:00Z`
 
 ## Human decision
 

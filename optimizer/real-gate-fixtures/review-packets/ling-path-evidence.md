@@ -1,6 +1,6 @@
 # Fixture review: ling-path-evidence
 
-- Schema: `pi.fixture/v1`
+- Schema: `pi.fixture/v2`
 - Cohort: `2026-08`
 - Version: `2026-08.1`
 - Expires: `set on approval`
@@ -13,7 +13,6 @@ Repair the package's public `normalizeTicket(value)` API. Locate its owning impl
 
 - **normalises whitespace and leading zeroes through the public export** — Repair the package's public `normalizeTicket(value)` API. Locate its owning implementation from `package.json`, `src/index.js`, and the tests rather than assuming a similarly named source file is live. Valid ticket IDs contain a project prefix, a hyphen, and decimal digits. Trim surrounding whitespace, remove internal whitespace, uppercase the prefix, and canonicalise the numeric part by removing leading zeroes (`000` becomes `0`). Reject malformed values with `TypeError`. Keep the public export intact and run `npm test`.
 - **accepts alphabetic project prefixes and decimal digits only** — Repair the package's public `normalizeTicket(value)` API. Locate its owning implementation from `package.json`, `src/index.js`, and the tests rather than assuming a similarly named source file is live. Valid ticket IDs contain a project prefix, a hyphen, and decimal digits. Trim surrounding whitespace, remove internal whitespace, uppercase the prefix, and canonicalise the numeric part by removing leading zeroes (`000` becomes `0`). Reject malformed values with `TypeError`. Keep the public export intact and run `npm test`.
-- **the package export owns the repaired implementation** — Repair the package's public `normalizeTicket(value)` API. Locate its owning implementation from `package.json`, `src/index.js`, and the tests rather than assuming a similarly named source file is live. Valid ticket IDs contain a project prefix, a hyphen, and decimal digits. Trim surrounding whitespace, remove internal whitespace, uppercase the prefix, and canonicalise the numeric part by removing leading zeroes (`000` becomes `0`). Reject malformed values with `TypeError`. Keep the public export intact and run `npm test`.
 
 ## Equivalent perturbations
 
@@ -36,10 +35,16 @@ Please solve this task in the supplied checkout, retaining all stated edge cases
 
 Repair the package's public `normalizeTicket(value)` API. Locate its owning implementation from `package.json`, `src/index.js`, and the tests rather than assuming a similarly named source file is live. Valid ticket IDs contain a project prefix, a hyphen, and decimal digits. Trim surrounding whitespace, remove internal whitespace, uppercase the prefix, and canonicalise the numeric part by removing leading zeroes (`000` becomes `0`). Reject malformed values with `TypeError`. Keep the public export intact and run `npm test`.
 
+## Difficulty crux (author's pre-data claim)
+
+- Mechanism: evidence-based target identification: resolve which of two similarly-named files is load-bearing by following the import chain, not name similarity
+- Expected failure: edits the British-spelled decoy src/normalise-ticket.js, behaviour unchanged, claims done
+- Band prediction: `[0.4, 0.6]`
+
 ## Automated admission
 
 - Passed: `True`
-- Checked: `2026-08-13T12:54:25Z`
+- Checked: `2026-08-14T10:50:10Z`
 
 ## Human decision
 

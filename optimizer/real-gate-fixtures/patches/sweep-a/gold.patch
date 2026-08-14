@@ -1,0 +1,36 @@
+--- a/src/report.js
++++ b/src/report.js
+@@ -1,24 +1,26 @@
+ import { settings } from './config.js';
+
+-const RATE = 1.25;
+-
+ export function lineTotal(item) {
+-  let total = item.qty * item.price * RATE;
++  let total = item.qty * item.price * settings.currencyRate;
++  if (item.discounted) total = total * (1 - settings.discountRate);
+   total = total + settings.handlingFee;
+-  if (item.discounted) total = total * (1 - settings.discountRate);
+   return Math.round(total * 100) / 100;
+ }
+
+ export function formatQty(item) {
++  if (item.qty === 0) return 'OUT'.padStart(5, ' ');
+   return String(item.qty).padStart(5, ' ');
+ }
+
+ export function formatMoney(value) {
+-  return value.toFixed(2);
++  const [whole, frac] = value.toFixed(2).split('.');
++  return whole.replace(/\B(?=(\d{3})+(?!\d))/g, ',') + '.' + frac;
+ }
+
+ export function buildReport(items) {
+-  const rows = items.map((i) => `${i.name} ${formatQty(i)} ${formatMoney(lineTotal(i))}`);
+-  const total = items.reduce((sum, i) => sum + lineTotal(i), 0);
++  const rows = [...items].sort((a, b) => a.name.localeCompare(b.name))
++    .map((i) => `${i.name} ${formatQty(i)} ${formatMoney(lineTotal(i))}`);
++  const active = items.filter((i) => i.qty > 0);
++  const total = active.reduce((sum, i) => sum + lineTotal(i), 0);
+   return rows.join('\n') + '\nTOTAL ' + formatMoney(Math.round(total * 100) / 100);
+ }
