@@ -281,6 +281,21 @@ def report(gen, baseline, candidate):
     # split="heldout" grid (real_gate HELDOUT="rle saddle").
     path = os.path.join(LAB, "results", gen + ".jsonl")
     all_rows = [json.loads(l) for l in open(path) if l.strip()]
+    # Per-trial validity (UNMOTHBALL charter): voiding criteria (infra_valid,
+    # reward_hacking) exclude rows BEFORE any verdict logic, with counted
+    # exclusions. Sidecar written by trial_validity.py; absent = not evaluated,
+    # loudly noted, rows kept (fail-open here would hide a tamper; the sidecar
+    # only ever REMOVES rows, so keeping unevaluated rows is the conservative
+    # direction for a tool whose verdicts are refusal-biased).
+    import trial_validity as _tv
+    _verdicts = _tv.load_sidecar(path)
+    all_rows, _voided, _unevaluated = _tv.partition(all_rows, _verdicts)
+    validity_note = (
+        "trial validity: NOT EVALUATED (run prompt-lab/trial_validity.py results/%s.jsonl)" % gen
+        if _verdicts is None else
+        "trial validity: %d row(s) voided (%s); %d unevaluated" % (
+            len(_voided), ", ".join(sorted({r for _, reasons in _voided for r in reasons})) or "-",
+            _unevaluated))
     try:
         canonical = canonical_generation(all_rows)
         generation_error = None
@@ -301,6 +316,7 @@ def report(gen, baseline, candidate):
     if problems:
         descriptive = reliability_lines(rows, baseline, candidate, models)
         out = (f"# fleet_report {gen} — {candidate} vs {baseline}\n\n"
+               + validity_note + "\n\n"
                + "\n".join(descriptive) + "\n\n"
                "## VERDICT: INCOMPLETE\n" + "\n".join(f"- {p}" for p in problems) + "\n")
         with open(os.path.join(LAB, "results", gen + "-FLEET.md"), "w") as f:
@@ -309,6 +325,7 @@ def report(gen, baseline, candidate):
         return
 
     lines = [f"# fleet_report {gen} — {candidate} vs {baseline} (daily driver: {DD})\n",
+             validity_note + "\n",
              "| model | tier | base (val) | cand (val) | Δ | sig |", "|---|---|---|---|---|---|"]
     stats, base_tok, cand_tok, all_cost_exact = {}, 0, 0, True
     for m in models:
