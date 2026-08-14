@@ -1,137 +1,7 @@
 {
   "admission": {
     "approved": false,
-    "automated": {
-      "checked_at": "2026-08-13T12:54:25Z",
-      "hash_drift": [],
-      "manifest_drift": false,
-      "passed": true,
-      "runs_per_state": 3,
-      "states": {
-        "gold_fail_to_pass": [
-          {
-            "output_bytes": 344,
-            "output_sha256": "6bbe2bad4f7236d6ccc693ecef81ef3f62d4509037d984fc257be2be5d1d4684",
-            "passed": true,
-            "returncode": 0
-          },
-          {
-            "output_bytes": 341,
-            "output_sha256": "865136e1bfbe3843344473af103c5b370e8841c06b49a73005c6745f4bf93d0f",
-            "passed": true,
-            "returncode": 0
-          },
-          {
-            "output_bytes": 342,
-            "output_sha256": "75ccac0fa70aa8bc568f74ea920996c8d448cd24ea4560a67b5bcf4ce330feca",
-            "passed": true,
-            "returncode": 0
-          }
-        ],
-        "gold_pass_to_pass": [
-          {
-            "output_bytes": 209,
-            "output_sha256": "e846543fa1e08fe7e93f49e4381154131635798311a6624f33db15b680a7ab94",
-            "passed": true,
-            "returncode": 0
-          },
-          {
-            "output_bytes": 211,
-            "output_sha256": "159854b4d05086f2183a5778ff71cf08bcfd20a3ba9694301d9a6822bd787ecd",
-            "passed": true,
-            "returncode": 0
-          },
-          {
-            "output_bytes": 211,
-            "output_sha256": "400f4920a2fb57369030401b7d4326add7b303f4ee37edc37c6b075fcef2eda2",
-            "passed": true,
-            "returncode": 0
-          }
-        ],
-        "mutant:shortcut": {
-          "fail_to_pass": [
-            {
-              "output_bytes": 2111,
-              "output_sha256": "4f14127a808373c53d65b7720882775b0b9eac13b0f872d8364924dfa16a8b6a",
-              "passed": false,
-              "returncode": 1
-            },
-            {
-              "output_bytes": 2111,
-              "output_sha256": "be71e4c0d8567823f88a9459bbbd2f50ebecc045143f33108229243f98e7d510",
-              "passed": false,
-              "returncode": 1
-            },
-            {
-              "output_bytes": 2108,
-              "output_sha256": "21b4d9bf4f9daf5040890f5fd018b6cd2cb7669a6c3fc478d52b952ac4bf4957",
-              "passed": false,
-              "returncode": 1
-            }
-          ],
-          "pass_to_pass": [
-            {
-              "output_bytes": 209,
-              "output_sha256": "9f68ab5126a3331fb7d409a8121526ddba5b149c117949fa201316287af7dd91",
-              "passed": true,
-              "returncode": 0
-            },
-            {
-              "output_bytes": 209,
-              "output_sha256": "d77a7c009e92e3bca2282941772e9470d3bebde56f21b1beed206cd9fa578436",
-              "passed": true,
-              "returncode": 0
-            },
-            {
-              "output_bytes": 208,
-              "output_sha256": "3fbacc838f6589067c7cc0126903dc35ad79c680053901dd46c56bf503562206",
-              "passed": true,
-              "returncode": 0
-            }
-          ]
-        },
-        "pristine_fail_to_pass": [
-          {
-            "output_bytes": 2105,
-            "output_sha256": "c27b573967ad9627323dc8ded3aefe09a596933c1dec4a25d7d7845ab5066d59",
-            "passed": false,
-            "returncode": 1
-          },
-          {
-            "output_bytes": 2109,
-            "output_sha256": "69f3199b06b29cf9d47106ba2f52ed50f08a58bce77a78bd013cc872942173c9",
-            "passed": false,
-            "returncode": 1
-          },
-          {
-            "output_bytes": 2102,
-            "output_sha256": "9a1e8d7bd2779a61ab5401bb02337ccaff96c71bb9d19804bfba7227b82b05b6",
-            "passed": false,
-            "returncode": 1
-          }
-        ],
-        "pristine_pass_to_pass": [
-          {
-            "output_bytes": 210,
-            "output_sha256": "d05f99fcbf1d2d76dbccd1d38cdb5ea9b9fd08e90f8728e8b3a068652f192bb5",
-            "passed": true,
-            "returncode": 0
-          },
-          {
-            "output_bytes": 210,
-            "output_sha256": "c5cd76dc8ff28721201be0788b665a3d0485963be71330dda59c98b4dfcf5fc5",
-            "passed": true,
-            "returncode": 0
-          },
-          {
-            "output_bytes": 211,
-            "output_sha256": "ef3e47d3ea7af5859ab6fd7c6915cd4c39669c994fffc45f9519751154f2204f",
-            "passed": true,
-            "returncode": 0
-          }
-        ]
-      }
-    },
+    "automated": null,
     "reviewed_at": null,
     "reviewer": null
   },
@@ -142,7 +12,7 @@
     },
     {
       "path": "real-gate-fixtures/hidden/ling-path-evidence.test.js",
-      "sha256": "5928c851de994823e1bbfd7e7efcc62eacc6083e44e8bc0178c3ba992dd4b4d9"
+      "sha256": "0a84397482943087b45d30ec3b98196ffd20b069feb898005b1effa26a15193d"
     },
     {
       "path": "real-gate-fixtures/ling-path-evidence/package.json",
@@ -174,6 +44,28 @@
     }
   ],
   "cohort_id": "2026-08",
+  "difficulty_crux": {
+    "band_prediction": [
+      0.4,
+      0.6
+    ],
+    "expected_failure": "edits the British-spelled decoy src/normalise-ticket.js, behaviour unchanged, claims done",
+    "mechanism": "evidence-based target identification: resolve which of two similarly-named files is load-bearing by following the import chain, not name similarity"
+  },
+  "episode_variance": {
+    "expected": false,
+    "rationale": "wrong-target edits are silently green, not episodic"
+  },
+  "findability": [
+    {
+      "evidence_file": "src/index.js",
+      "sentence_anchor": "tickets/normalize-ticket.js"
+    },
+    {
+      "evidence_file": "src/normalise-ticket.js",
+      "sentence_anchor": "not used by the package export"
+    }
+  ],
   "fixture": {
     "root": "real-gate-fixtures/ling-path-evidence",
     "stage_copy": []
@@ -219,7 +111,10 @@
     ],
     "semantic_group": "ling-path-evidence:2026-08.1"
   },
-  "schema": "pi.fixture/v1",
+  "schema": "pi.fixture/v2",
+  "shortcut_sharpness": {
+    "why_plausible": "fixing the decoy plus a partial patch at the export satisfies the visible inputs while the hidden inputs still fail"
+  },
   "sufficiency": [
     {
       "assertion": "normalises whitespace and leading zeroes through the public export",
@@ -227,10 +122,6 @@
     },
     {
       "assertion": "accepts alphabetic project prefixes and decimal digits only",
-      "prompt_evidence": "Repair the package's public `normalizeTicket(value)` API. Locate its owning implementation from `package.json`, `src/index.js`, and the tests rather than assuming a similarly named source file is live. Valid ticket IDs contain a project prefix, a hyphen, and decimal digits. Trim surrounding whitespace, remove internal whitespace, uppercase the prefix, and canonicalise the numeric part by removing leading zeroes (`000` becomes `0`). Reject malformed values with `TypeError`. Keep the public export intact and run `npm test`."
-    },
-    {
-      "assertion": "the package export owns the repaired implementation",
       "prompt_evidence": "Repair the package's public `normalizeTicket(value)` API. Locate its owning implementation from `package.json`, `src/index.js`, and the tests rather than assuming a similarly named source file is live. Valid ticket IDs contain a project prefix, a hyphen, and decimal digits. Trim surrounding whitespace, remove internal whitespace, uppercase the prefix, and canonicalise the numeric part by removing leading zeroes (`000` becomes `0`). Reject malformed values with `TypeError`. Keep the public export intact and run `npm test`."
     }
   ],

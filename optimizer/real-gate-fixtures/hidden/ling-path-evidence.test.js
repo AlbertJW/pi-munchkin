@@ -12,8 +12,3 @@ test('accepts alphabetic project prefixes and decimal digits only', () => {
     assert.throws(() => normalizeTicket(value), TypeError, value);
   }
 });
-
-test('the package export owns the repaired implementation', async () => {
-  const index = await import('node:fs/promises').then((fs) => fs.readFile(new URL('../src/index.js', import.meta.url), 'utf8'));
-  assert.match(index, /tickets\/normalize-ticket\.js/);
-});

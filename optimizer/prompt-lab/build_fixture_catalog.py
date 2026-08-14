@@ -17,6 +17,51 @@ TASKS = ROOT / "ab-symbolect/tasks"
 OUT = FIX / "patches"
 MANIFESTS = FIX / "manifests"
 HIDDEN = {p.stem.replace(".test", "") for p in (FIX / "hidden").glob("*.test.js")}
+
+# pi.fixture/v2 authoring-rubric fields for the 2026-08 ling cohort
+# (LING_COHORT_2026-08.md is the narrative source; these are the machine copies).
+V2_FIELDS = {
+    "ling-exact-gate-recovery": {
+        "difficulty_crux": {
+            "mechanism": "exact-gate discovery and recovery: find and satisfy the project's declared verification (compound test script with scripts/project-gate.mjs), not the habitual bare `node --test`",
+            "expected_failure": "runs bare `node --test`, sees green, claims done without ever executing the project gate",
+            "band_prediction": [0.30, 0.50]},
+        "findability": [
+            {"evidence_file": "package.json", "sentence_anchor": "node --test test/visible.test.js && node scripts/project-gate.mjs"},
+            {"evidence_file": "scripts/project-gate.mjs", "sentence_anchor": "project gate"}],
+        "shortcut_sharpness": {"why_plausible": "special-casing the gate's sample inputs passes the visible suite and looks like a targeted fix; only the gate's property checks expose it"},
+        "episode_variance": {"expected": True, "rationale": "gate failures after the first edit open verification_assertion episodes; recovery paths vary"}},
+    "ling-cross-file-contract": {
+        "difficulty_crux": {
+            "mechanism": "cross-file contract coordination: one semantic change (add 'blocked') requires STATUS_ORDER in policy.js to stay the single source of truth AND the parser to derive from it",
+            "expected_failure": "edits only policy.js (or adds 'blocked' to both vocabularies independently), visible suite stays green, claims done",
+            "band_prediction": [0.20, 0.40]},
+        "findability": [
+            {"evidence_file": "src/policy.js", "sentence_anchor": "STATUS_ORDER"},
+            {"evidence_file": "src/parse-job.js", "sentence_anchor": "ALLOWED"}],
+        "shortcut_sharpness": {"why_plausible": "adding 'blocked' to both lists independently satisfies every fixed-vocabulary behaviour check; only vocabulary-extension coupling exposes the duplicate"},
+        "episode_variance": {"expected": False, "rationale": "the failure mode is a silently-green wrong edit, not an episodic error loop"}},
+    "ling-partial-order-release": {
+        "difficulty_crux": {
+            "mechanism": "algorithm-class upgrade under a partial order: a comparator cannot express dependency constraints; the fix demands a topological scheduler with tie-breaks and rejection guards",
+            "expected_failure": "keeps the urgency sort and patches around it; dependency ordering never holds",
+            "band_prediction": [0.05, 0.25]},
+        "findability": [
+            {"evidence_file": "src/release-plan.js", "sentence_anchor": "scheduleJobs"}],
+        "shortcut_sharpness": {"why_plausible": "hard-coding the sample DAG's expected order passes the visible suite and mimics a working scheduler"},
+        "episode_variance": {"expected": True, "rationale": "self-check failures against dependency/rejection cases recur across attempts"}},
+    "ling-path-evidence": {
+        "difficulty_crux": {
+            "mechanism": "evidence-based target identification: resolve which of two similarly-named files is load-bearing by following the import chain, not name similarity",
+            "expected_failure": "edits the British-spelled decoy src/normalise-ticket.js, behaviour unchanged, claims done",
+            "band_prediction": [0.40, 0.60]},
+        "findability": [
+            {"evidence_file": "src/index.js", "sentence_anchor": "tickets/normalize-ticket.js"},
+            {"evidence_file": "src/normalise-ticket.js", "sentence_anchor": "not used by the package export"}],
+        "shortcut_sharpness": {"why_plausible": "fixing the decoy plus a partial patch at the export satisfies the visible inputs while the hidden inputs still fail"},
+        "episode_variance": {"expected": False, "rationale": "wrong-target edits are silently green, not episodic"}},
+}
+
 ALL = [f"t{i}" for i in range(1, 7)] + sorted(HIDDEN)
 
 
@@ -313,7 +358,7 @@ def build(task):
     if task == "t3": context += ["src/align.js"]
     context_bytes = sum((root_for(task) / p).stat().st_size for p in context if (root_for(task) / p).is_file()) + sum(p.stat().st_size for p in extras)
     manifest = {
-        "schema": "pi.fixture/v1", "task_id": task,
+        "schema": "pi.fixture/v2" if task in V2_FIELDS else "pi.fixture/v1", "task_id": task,
         "cohort_id": "2026-08" if task.startswith("ling-") else "2026-07",
         "fixture_version": "2026-08.1" if task.startswith("ling-") else "2026-07.1",
         "timestamps": {"created_at": "2026-08-13T00:00:00Z" if task.startswith("ling-") else "2026-07-14T00:00:00Z",
@@ -328,11 +373,14 @@ def build(task):
         "admission": {"approved": False, "reviewer": None, "reviewed_at": None, "automated": None},
         "artifacts": artifacts(task, gold, mutant, [overlay], extras),
     }
+    if task in V2_FIELDS:
+        manifest.update(V2_FIELDS[task])
     manifest_path = MANIFESTS / f"{task}.json"
     if manifest_path.exists():
         previous = json.loads(manifest_path.read_text())
         identity_keys = ("schema", "task_id", "cohort_id", "fixture_version", "prompts", "fixture",
-                         "tests", "patches", "sufficiency", "one_shot", "artifacts")
+                         "tests", "patches", "sufficiency", "one_shot", "artifacts",
+                         "difficulty_crux", "findability", "shortcut_sharpness", "episode_variance")
         if all(previous.get(key) == manifest.get(key) for key in identity_keys):
             manifest["admission"] = previous.get("admission", manifest["admission"])
             manifest["timestamps"] = previous.get("timestamps", manifest["timestamps"])

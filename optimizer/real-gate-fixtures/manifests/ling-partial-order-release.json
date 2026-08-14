@@ -1,137 +1,7 @@
 {
   "admission": {
     "approved": false,
-    "automated": {
-      "checked_at": "2026-08-13T12:54:23Z",
-      "hash_drift": [],
-      "manifest_drift": false,
-      "passed": true,
-      "runs_per_state": 3,
-      "states": {
-        "gold_fail_to_pass": [
-          {
-            "output_bytes": 375,
-            "output_sha256": "1b97b1efab5fe12306cbd4b8e85a4ad3d3117d84ed3cce0dd2e971d96860fefa",
-            "passed": true,
-            "returncode": 0
-          },
-          {
-            "output_bytes": 377,
-            "output_sha256": "1865564518860e48629bae4b46faf2e84ae7f6e069d0d01d393cb83269610016",
-            "passed": true,
-            "returncode": 0
-          },
-          {
-            "output_bytes": 371,
-            "output_sha256": "313067f04c2220d99ba6b4340598e1eaab4e6e632b140bd99eb237e457478b40",
-            "passed": true,
-            "returncode": 0
-          }
-        ],
-        "gold_pass_to_pass": [
-          {
-            "output_bytes": 228,
-            "output_sha256": "ec451bbfede585be75b23e58ac63d2032c4edd29e303b13a49e337e5a53e25fc",
-            "passed": true,
-            "returncode": 0
-          },
-          {
-            "output_bytes": 230,
-            "output_sha256": "7b56f754d7e4ae1511791d31e3e294c3f8d4de36d017dc9a2b084e7963fdc69f",
-            "passed": true,
-            "returncode": 0
-          },
-          {
-            "output_bytes": 230,
-            "output_sha256": "006c565841a71592e85cb82b955825d035be875f226f4e7370d12bc2ee5f3b05",
-            "passed": true,
-            "returncode": 0
-          }
-        ],
-        "mutant:shortcut": {
-          "fail_to_pass": [
-            {
-              "output_bytes": 2292,
-              "output_sha256": "d3e51c53c9c101395524541bf19df3dd6d2d71c9dcef7d6b94ab257221cfa42d",
-              "passed": false,
-              "returncode": 1
-            },
-            {
-              "output_bytes": 2288,
-              "output_sha256": "26a803c9593d7ef371a42ddb817fc8d2f76c51de293e844ecfbab3f553e98c06",
-              "passed": false,
-              "returncode": 1
-            },
-            {
-              "output_bytes": 2286,
-              "output_sha256": "334de8e1dded1f72b5a5823eb4e7d2e0d23849fbf5b8ef36a330a42e524b4a03",
-              "passed": false,
-              "returncode": 1
-            }
-          ],
-          "pass_to_pass": [
-            {
-              "output_bytes": 230,
-              "output_sha256": "39d13ec6af3e7dd98e359bd8626a8469a6c071b08f53825cd1a66888dfdd66e8",
-              "passed": true,
-              "returncode": 0
-            },
-            {
-              "output_bytes": 230,
-              "output_sha256": "0de5028a41c8862bbcdc3a45944d428b0f4f93c23301aebbadbfc51edc105b8b",
-              "passed": true,
-              "returncode": 0
-            },
-            {
-              "output_bytes": 230,
-              "output_sha256": "d6601192b57d333e3f460125ad66bb74fc11201bcd81d781f6217e8759623efe",
-              "passed": true,
-              "returncode": 0
-            }
-          ]
-        },
-        "pristine_fail_to_pass": [
-          {
-            "output_bytes": 3426,
-            "output_sha256": "16394910e6ef7593a76f1953b6d98a1d038bdd8394c3544d12864b9ea7b6e326",
-            "passed": false,
-            "returncode": 1
-          },
-          {
-            "output_bytes": 3425,
-            "output_sha256": "89334d4864c981bbde69a94fa65b34027e9572c8343463d9a18b9d8223fc455d",
-            "passed": false,
-            "returncode": 1
-          },
-          {
-            "output_bytes": 3422,
-            "output_sha256": "1c1d3f70a924a46458a129abd47e5ed220fa2ba83265781c724763dcdd1fcdec",
-            "passed": false,
-            "returncode": 1
-          }
-        ],
-        "pristine_pass_to_pass": [
-          {
-            "output_bytes": 229,
-            "output_sha256": "34ae25abf583171e14d241fda2561cb89f10df895c131d077ce39679db7a87b5",
-            "passed": true,
-            "returncode": 0
-          },
-          {
-            "output_bytes": 230,
-            "output_sha256": "4c409cfaa0d3a60f9eeb26e5c3185a8c6a7489eadef9219f4f6c70b3bf52b17f",
-            "passed": true,
-            "returncode": 0
-          },
-          {
-            "output_bytes": 227,
-            "output_sha256": "a01ad94449092af92a97ef320979aa9d44836afd9aae6c211ac494cb16ad8f60",
-            "passed": true,
-            "returncode": 0
-          }
-        ]
-      }
-    },
+    "automated": null,
     "reviewed_at": null,
     "reviewer": null
   },
@@ -166,6 +36,24 @@
     }
   ],
   "cohort_id": "2026-08",
+  "difficulty_crux": {
+    "band_prediction": [
+      0.05,
+      0.25
+    ],
+    "expected_failure": "keeps the urgency sort and patches around it; dependency ordering never holds",
+    "mechanism": "algorithm-class upgrade under a partial order: a comparator cannot express dependency constraints; the fix demands a topological scheduler with tie-breaks and rejection guards"
+  },
+  "episode_variance": {
+    "expected": true,
+    "rationale": "self-check failures against dependency/rejection cases recur across attempts"
+  },
+  "findability": [
+    {
+      "evidence_file": "src/release-plan.js",
+      "sentence_anchor": "scheduleJobs"
+    }
+  ],
   "fixture": {
     "root": "real-gate-fixtures/ling-partial-order-release",
     "stage_copy": []
@@ -209,7 +97,10 @@
     ],
     "semantic_group": "ling-partial-order-release:2026-08.1"
   },
-  "schema": "pi.fixture/v1",
+  "schema": "pi.fixture/v2",
+  "shortcut_sharpness": {
+    "why_plausible": "hard-coding the sample DAG's expected order passes the visible suite and mimics a working scheduler"
+  },
   "sufficiency": [
     {
       "assertion": "dependencies outrank urgency until they are satisfied",
