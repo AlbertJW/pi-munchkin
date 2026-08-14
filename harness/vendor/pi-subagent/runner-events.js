@@ -129,7 +129,12 @@ export function getFinalAssistantText(messages) {
 // Clamp: a subagent's final text enters the PARENT window verbatim — an
 // unbounded child answer can dump tens of thousands of tokens into a 30k
 // context. Subagents are contracted to return distilled results; cap hard.
-const MAX_SUMMARY_CHARS = 12000;
+// Tunable via PI_SUBAGENT_MAX_SUMMARY_CHARS (default 12000) for parents with a
+// larger window; a non-positive/invalid value falls back to the default.
+const MAX_SUMMARY_CHARS = (() => {
+  const n = Number.parseInt(process.env.PI_SUBAGENT_MAX_SUMMARY_CHARS || "", 10);
+  return Number.isFinite(n) && n > 0 ? n : 12000;
+})();
 function clampSummary(text) {
   if (typeof text !== "string" || text.length <= MAX_SUMMARY_CHARS) return text;
   return `${text.slice(0, MAX_SUMMARY_CHARS)}\n…[subagent output truncated: ${text.length} chars total]`;

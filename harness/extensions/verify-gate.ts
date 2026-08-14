@@ -1,5 +1,6 @@
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { readdir } from "node:fs/promises";
+import { isAbsolute, relative, resolve, sep } from "node:path";
 import { classifyBashCommand, isSourceMutation, looksFailingOutput, normalizeVerificationCommand, verificationEvidence } from "../lib/command-policy.ts";
 import { clearPlanGateReceipt, consumePlanGateReceipt } from "../lib/plan-gate-receipt.ts";
 import { clearDetectedProjectGate, detectProjectGate, publishDetectedProjectGate } from "../lib/project-gate.ts";
@@ -64,6 +65,22 @@ function fresh(): State {
 let st = fresh();
 let gateCmd: string | null = process.env.VERIFY_GATE_CMD || null;
 let composeProject = false;
+// The session cwd, captured at session_start. A file mutation whose path lands
+// OUTSIDE this directory is not a handoff risk for THIS project's gate — the
+// dogfood case was a report written to ~/Desktop while cwd was a code project,
+// which armed the gate and drove 8 unsatisfiable steers.
+let sessionCwd = process.cwd();
+
+// True only when `p` resolves to a path OUTSIDE sessionCwd. A missing or
+// unresolvable path returns false, so the mutation stays armed (fail-closed).
+// Only edit/write/multiedit paths are scoped this way; bash-mediated mutations
+// (sed -i, redirects) remain path-unscoped by design — a known, documented limit.
+function pathOutsideCwd(p: unknown): boolean {
+	if (typeof p !== "string" || !p.trim()) return false;
+	const abs = isAbsolute(p) ? p : resolve(sessionCwd, p);
+	const rel = relative(sessionCwd, abs);
+	return rel === ".." || rel.startsWith(`..${sep}`) || isAbsolute(rel);
+}
 
 const GATE_DISPLAY_MAX_BYTES = 240;
 
@@ -95,6 +112,18 @@ export function gateDisplayCommand(command: string | null): string | null {
 }
 
 function steer(verifyFailed: boolean): string {
+	// No project gate was detected (no justfile/package.json/Makefile/… in cwd).
+	// Don't claim "the exact gate" — there is none — and don't drive the retry loop;
+	// ask once for an honest account of how the change was checked. This is the
+	// unsatisfiable-loop fix: file-existence checks (`test -f`) can never satisfy a
+	// verify gate, so repeating the nag was the observed 8-steer rabbit hole.
+	if (gateCmd === null) {
+		return steerText(
+			"VG_STEER_NO_GATE",
+			"[verify-gate] No project gate was detected in this directory, and the files changed this turn have no recorded verification. Say how you verified the change, or that there is no gate to run here.",
+			{},
+		);
+	}
 	const displayCommand = gateDisplayCommand(gateCmd);
 	const g = displayCommand ? `\`${displayCommand}\`` : "your verify (tests/typecheck)";
 	// Containerized projects: tests usually need the stack, so run the gate inside
@@ -125,9 +154,15 @@ export default function (pi: ExtensionAPI) {
 	let failedSinceTurnEnd = false;
 
 	const classifyStart = (toolName: string, args: Record<string, unknown>): OrderedCallKind => {
-		const sourceMutation = MUTATION_TOOLS.has(toolName) ||
+		const isToolMutation = MUTATION_TOOLS.has(toolName);
+		const sourceMutation = isToolMutation ||
 			(toolName === "bash" && isSourceMutation(String(args.command ?? "")));
-		if (sourceMutation) return "source_mutation";
+		if (sourceMutation) {
+			// An edit/write/multiedit provably outside the session cwd does not arm the
+			// gate (see pathOutsideCwd). Missing/unresolvable paths stay armed.
+			if (isToolMutation && pathOutsideCwd(args.path)) return "other";
+			return "source_mutation";
+		}
 		if (toolName !== "bash") return "other";
 		const command = String(args.command ?? "");
 		const policy = classifyBashCommand(command, gateCmd ? [gateCmd] : []);
@@ -166,6 +201,7 @@ export default function (pi: ExtensionAPI) {
 		// loop-breaker's __pi_lb_state and plan-runner's __pi_active_plan_context.
 		delete (globalThis as Record<string, unknown>).__pi_vg_state;
 		const cwd = ctx?.cwd || process.cwd();
+		sessionCwd = cwd;
 		composeProject = await hasComposeFile(cwd);
 		if (!process.env.VERIFY_GATE_CMD) {
 			gateCmd = await detectProjectGate(cwd);
@@ -261,7 +297,7 @@ export default function (pi: ExtensionAPI) {
 			}
 		} else {
 			for (const c of toolCalls) {
-				const sourceMutation = MUTATION_TOOLS.has(c.name) ||
+				const sourceMutation = (MUTATION_TOOLS.has(c.name) && !pathOutsideCwd(c.args.path)) ||
 					(c.name === "bash" && isSourceMutation(String(c.args.command ?? "")));
 				if (sourceMutation) {
 					st.mutated = true;
@@ -303,7 +339,11 @@ export default function (pi: ExtensionAPI) {
 		// The typed arbiter owns same-boundary deconfliction with repeated-failure
 		// recovery; no wall-clock suppression state crosses extension boundaries.
 		const wrappingUp = toolCalls.length === 0;
-		if (wrappingUp && st.mutated && !st.verifiedOk && st.fires < MAX_FIRES && st.sessionFires < MAX_FIRES * 3 && !planPhaseActive()) {
+		// With no detectable project gate there is nothing to retry against, so a single
+		// honest nudge is right — repeating it was the unsatisfiable 8-steer loop. A
+		// detected gate keeps the full MAX_FIRES × 3 session backstop.
+		const sessionCap = gateCmd === null ? 1 : MAX_FIRES * 3;
+		if (wrappingUp && st.mutated && !st.verifiedOk && st.fires < MAX_FIRES && st.sessionFires < sessionCap && !planPhaseActive()) {
 			st.fires += 1;
 			st.sessionFires += 1;
 			const msg = steer(verifyFailedThisTurn);

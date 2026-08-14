@@ -26,9 +26,9 @@ import {
   DEFAULT_DELEGATION_MODE,
   agentDescriptionForPrompt,
   emptyUsage,
+  formatParallelSummaryText,
   parseDelegationMode,
   isResultError,
-  isResultSuccess,
 } from "./types.js";
 import { ACTIVE_TOOL_PROMPTS } from "../../lib/active-tool-prompts.ts";
 
@@ -840,16 +840,11 @@ This guard prevents self-recursion and cyclic handoffs (for example A -> B -> A)
       if (heartbeat) clearInterval(heartbeat);
     }
 
-    const successCount = results.filter((r) => isResultSuccess(r)).length;
-    const summaries = results.map((r) =>
-      `[${r.agent}] ${isResultError(r) ? "failed" : "completed"}: ${getResultSummaryText(r)}`,
-    );
-
     return {
       content: [
         {
           type: "text" as const,
-          text: `Parallel: ${successCount}/${results.length} succeeded\n\n${summaries.join("\n\n")}`,
+          text: formatParallelSummaryText(results),
         },
       ],
       details: makeDetails("parallel")(results),

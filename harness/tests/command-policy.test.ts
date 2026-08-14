@@ -178,6 +178,52 @@ test("verify-gate recognizes JS test runners, rejects non-verify gates", () => {
 	]) assert.equal(assertVerifyGateAllowed(c).ok, false, `should reject gate: ${c}`);
 });
 
+test("plan_write observational commands are rejected as gates (not verify runners)", () => {
+	// The gate schema (plan-runner.ts) tells the model file-existence / listing commands
+	// are NOT gates; the validator must agree, so the two stay coherent and a model that
+	// proposes `test -d`/`grep -c`/`ls` gets one clear rejection, not a false green.
+	for (const c of ["ls", "ls -la src", "test -d src", "test -f dist/app.js", "grep -c TODO src/x.ts", "wc -l README.md"]) {
+		assert.equal(assertVerifyGateAllowed(c).ok, false, `observational, not a gate: ${c}`);
+	}
+});
+
+test("plan-mode classifier: awk recon is read-only; awk writes/shell-outs still mutate", () => {
+	// The dogfood trace blocked `git ls-files | awk '{...}'` recon during planning because
+	// awk was an unknown head. It is read-only text processing — but only when it neither
+	// edits in place nor shells out. Both polarities proven here.
+	for (const c of [
+		"git ls-files | awk '{print $1}'",
+		"awk '/error/{print $2}' log.txt",
+		"cat log.txt | awk '{print $1}'",
+		"awk 'NR==1' data.csv",   // no `>` anywhere → the comparison-operator quirk does not apply
+	]) assert.equal(isBashMutation(c), false, `awk recon should be read-only: ${c}`);
+
+	for (const c of [
+		"awk -i inplace '{gsub(/a/,\"b\")}1' src/app.js",       // in-place edit, no redirect token
+		"awk 'BEGIN{system(\"rm -rf build\")}'",                 // shells out
+		"awk '{print $0 > \"out.txt\"}' in.txt",                 // redirect write (raw `>` scan)
+	]) assert.equal(isBashMutation(c), true, `awk write/shell-out must fail closed: ${c}`);
+});
+
+test("plan-mode classifier: for/select loop headers are not phantom commands", () => {
+	// `for VAR in LIST` / `select VAR in LIST` are word-lists, not commands — the body is a
+	// separate segment, so a read-only body stays read-only while a mutating body still trips.
+	for (const c of [
+		"for f in *.md; do wc -l \"$f\"; done",
+		"for d in src lib; do ls \"$d\"; done",
+		"select o in a b c; do echo \"$o\"; done",
+	]) assert.equal(classifyBashCommand(c).mutates, false, `read-only loop should pass: ${c}`);
+
+	for (const c of [
+		"for f in *; do rm -rf \"$f\"; done",
+		"for f in src/*.ts; do sed -i s/a/b/ \"$f\"; done",
+	]) assert.equal(classifyBashCommand(c).mutates, true, `mutating loop body must fail closed: ${c}`);
+
+	// `case` is deliberately left fail-closed: `;;` splitting glues `pattern) cmd` onto the
+	// header, so a case statement stays blocked rather than risk hiding the arm's command.
+	assert.equal(classifyBashCommand("case $x in a) rm -rf /;; esac").mutates, true, "case arm command must not be hidden");
+});
+
 // --- review regressions: dangerous-command matrix + command-position anchoring ---
 
 test("classify: verify tokens only count at COMMAND POSITION (no silent gate-disarm)", () => {

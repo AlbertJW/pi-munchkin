@@ -3,7 +3,7 @@
  */
 
 import type { Message } from "@earendil-works/pi-ai";
-import { getFinalAssistantText } from "./runner-events.js";
+import { getFinalAssistantText, getResultSummaryText } from "./runner-events.js";
 
 /** Context mode for delegated runs. */
 export type DelegationMode = "spawn" | "fork";
@@ -116,6 +116,24 @@ export function isResultSuccess(r: SingleResult): boolean {
 export function isResultError(r: SingleResult): boolean {
 	if (r.exitCode === -1) return false;
 	return !isResultSuccess(r);
+}
+
+/**
+ * The parent-visible summary of a parallel run. The header count must agree with
+ * the per-child labels: both key off `isResultError`, so a child labelled
+ * "completed" (!isResultError) is counted. Using isResultSuccess for the header
+ * (its former form) undercounted — the two are NOT complements, since a child left
+ * at the exitCode -1 placeholder is neither success nor error, which surfaced as
+ * "1/3 succeeded" beside three "completed" children. The deeper policy — a
+ * timed-out-but-delivering child is not a success — is owned by isResultSuccess
+ * above and unchanged; only this display is made self-consistent.
+ */
+export function formatParallelSummaryText(results: SingleResult[]): string {
+	const successCount = results.filter((r) => !isResultError(r)).length;
+	const summaries = results.map((r) =>
+		`[${r.agent}] ${isResultError(r) ? "failed" : "completed"}: ${getResultSummaryText(r)}`,
+	);
+	return `Parallel: ${successCount}/${results.length} succeeded\n\n${summaries.join("\n\n")}`;
 }
 
 /** Reconcile process exit status with semantic completion observed from Pi's event stream. */

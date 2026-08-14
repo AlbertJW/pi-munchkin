@@ -75,7 +75,13 @@ function isEslintVerification(command: string): boolean {
 
 const MUTATION_RE = new RegExp(
 	CMD_POS +
-		String.raw`(?:tee|sed\s+(?:-[a-zA-Z]+\s+)*(?:-i|--in-place)|perl\s+-[a-zA-Z]*i\b|cp|mv|mkdir|touch|ln|dd|install|truncate|chmod|chown|git\s+(?:add|commit|mv|rm|apply|restore|checkout|reset)|(?:eslint|ruff)\b[^;&|\n]*\s--fix\b|find\b[^;&|\n]*\s-delete\b)`,
+		// awk is read-only text processing (added to READ_ONLY_HEADS) EXCEPT when it edits
+		// in place (`-i inplace`) or shells out (`system(...)`); those have no `>` for the
+		// redirect scan to catch, so they need an explicit clause. `[^;&|\n]*` keeps the
+		// match inside one command, so `awk '{print}' | grep system(` does not false-match.
+		// Residual awk shell-out vectors (`print | "cmd"`, `"cmd" | getline`) stay
+		// fail-closed via the quote-stripped head path, matching how git/find are trusted.
+		String.raw`(?:tee|sed\s+(?:-[a-zA-Z]+\s+)*(?:-i|--in-place)|perl\s+-[a-zA-Z]*i\b|g?awk\b[^;&|\n]*(?:-i\s+inplace\b|\bsystem\s*\()|cp|mv|mkdir|touch|ln|dd|install|truncate|chmod|chown|git\s+(?:add|commit|mv|rm|apply|restore|checkout|reset)|(?:eslint|ruff)\b[^;&|\n]*\s--fix\b|find\b[^;&|\n]*\s-delete\b)`,
 	"i",
 );
 
@@ -115,7 +121,7 @@ function stripHarmlessRedirects(cmd: string): string {
 // clear false-positive over silently letting an unknown executable bypass plan
 // mode and the verify gate.
 const READ_ONLY_HEADS = new Set([
-	"[", "basename", "cat", "cd", "cmp", "cut", "diff", "dirname", "du", "echo",
+	"[", "awk", "basename", "cat", "cd", "cmp", "cut", "diff", "dirname", "du", "echo",
 	"false", "file", "find", "git", "grep", "head", "jq", "ls", "man", "printf",
 	"pwd", "readlink", "realpath", "rg", "sort", "stat", "tail", "test", "tr",
 	"true", "uniq", "wc", "which",
@@ -147,6 +153,13 @@ function shellCommandHeads(cmd: string): string[] {
 	for (const raw of plain.split(/(?:&&|\|\||[;&|\n])/)) {
 		let words = raw.trim().replace(/^\(+/, "").split(/\s+/).filter(Boolean);
 		while (words.length && (/^[A-Za-z_]\w*=/.test(words[0]) || SHELL_CONTROL_HEADS.has(words[0]))) words.shift();
+		// `for VAR in W1 W2 …` / `select VAR in …` headers are word-lists, not commands —
+		// the loop body is a separate segment (split on the `;`/newline before `do`), and
+		// `$(…)` already short-circuits to <dynamic-shell> above, so a header word can only
+		// be a literal/glob. Skip it so `for f in *.md; do wc -l "$f"; done` is not blocked
+		// on a phantom `for` command. `case` is deliberately NOT skipped: `;;` splitting
+		// glues `pattern) cmd` onto the header, so skipping would hide a real command.
+		if (words[0] === "for" || words[0] === "select") continue;
 		while (words.length && ["command", "env", "exec", "nohup", "sudo", "time", "timeout", "xargs"].includes(words[0])) {
 			const prefix = words.shift();
 			if (prefix === "timeout" && words.length) words.shift();
