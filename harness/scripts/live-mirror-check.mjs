@@ -3,7 +3,7 @@
 import { readFile } from "node:fs/promises";
 import { homedir } from "node:os";
 import { relative, resolve } from "node:path";
-import { buildLiveMirrorPlan, compareLiveMirror } from "../lib/live-mirror.ts";
+import { buildLiveMirrorPlan, compareLiveMirror, findLiveMirrorOrphans } from "../lib/live-mirror.ts";
 import { discoverExtensionEntriesInDir } from "../lib/surface-walk.ts";
 
 // Pi auto-loads every top-level extensions/*.ts it finds. Comparing manifest ->
@@ -36,6 +36,11 @@ try {
     .filter((name) => !managedOwners.has(name) && !DOCUMENTED_LOCAL_ONLY.has(name));
 } catch { /* no live extensions dir — the drift report below already says so */ }
 
+// The owner-granularity check above catches FLAT orphans (owner "micro-gate.ts"),
+// but a file left inside the package dir has owner "pi-munchkin" (managed), so it
+// slips through. findLiveMirrorOrphans walks the package dir itself to catch it.
+const { orphans, staging } = await findLiveMirrorOrphans(agentDir, entries);
+
 if (drift.length) {
   for (const item of drift) console.error(`${item.destination}: ${item.reason}`);
   console.error(`live mirror check: ${drift.length} of ${entries.length} first-party files differ`);
@@ -45,6 +50,12 @@ if (drift.length) {
   console.error(`live mirror check: ${entries.length} declared files match, but ${unmanaged.length} unmanaged extension(s) will auto-load`);
   console.error("Remove them from the live directory, or add them to DOCUMENTED_LOCAL_ONLY with a reason.");
   process.exitCode = 1;
+} else if (orphans.length || staging.length) {
+  for (const rel of orphans) console.error(`${rel}: in the live package dir but not declared by the manifest (orphan)`);
+  for (const rel of staging) console.error(`${rel}: staging leftover from an interrupted apply`);
+  console.error(`live mirror check: ${entries.length} declared files match, but ${orphans.length} orphan(s) + ${staging.length} staging leftover(s) remain under the package dir`);
+  console.error("Delete them with: npm run mirror:apply -- --prune (human-gated).");
+  process.exitCode = 1;
 } else {
-  console.log(`live mirror check: ${entries.length} first-party files match; no unmanaged extensions`);
+  console.log(`live mirror check: ${entries.length} first-party files match; no unmanaged extensions or orphans`);
 }

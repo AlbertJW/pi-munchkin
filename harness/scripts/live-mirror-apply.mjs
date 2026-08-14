@@ -19,11 +19,12 @@ import { copyFile, mkdir, readFile, rename } from "node:fs/promises";
 import { homedir } from "node:os";
 import { dirname, resolve } from "node:path";
 import { readdir, unlink, writeFile } from "node:fs/promises";
-import { buildLiveMirrorPlan, compareLiveMirror, LIVE_PACKAGE_DIR } from "../lib/live-mirror.ts";
+import { buildLiveMirrorPlan, compareLiveMirror, findLiveMirrorOrphans, LIVE_PACKAGE_DIR } from "../lib/live-mirror.ts";
 
 const root = resolve(import.meta.dirname, "../..");
-const args = process.argv.slice(2).filter((arg) => arg !== "--force");
+const args = process.argv.slice(2).filter((arg) => arg !== "--force" && arg !== "--prune");
 const force = process.argv.includes("--force");
+const prune = process.argv.includes("--prune");
 const agentDir = resolve(args[0] ?? process.env.PI_CODING_AGENT_DIR ?? resolve(homedir(), ".pi", "agent"));
 
 const git = (...argv) => execFileSync("git", argv, { cwd: root, encoding: "utf8" }).trim();
@@ -96,8 +97,29 @@ if (drift.length) {
   console.error(`live mirror apply: copied ${entries.length} files but ${drift.length} still differ`);
   process.exit(1);
 }
+
+// In-package orphans: files the manifest no longer declares but a prior mirror
+// left inside the package dir (e.g. a retired extension). Deletion is
+// human-gated: report by default, delete only under --prune. The sweep never
+// touches the flat extensions root, root lib/vendor/tests, or chaos.ts.
+const { orphans, staging } = await findLiveMirrorOrphans(agentDir, entries);
+let pruned = 0;
+if (orphans.length || staging.length) {
+  if (prune) {
+    for (const rel of [...orphans, ...staging]) {
+      await unlink(resolve(agentDir, rel)).catch(() => {});
+      pruned += 1;
+    }
+  } else {
+    for (const rel of orphans) console.error(`orphan (not in manifest): ${rel}`);
+    for (const rel of staging) console.error(`staging leftover: ${rel}`);
+    console.error(`live mirror apply: ${orphans.length} orphan(s) + ${staging.length} staging leftover(s) under ${LIVE_PACKAGE_DIR}. ` +
+      "Re-run with --prune to delete them (human-gated); mirror:check will fail until they are gone.");
+  }
+}
 console.log(`live mirror apply: ${entries.length} first-party artifacts written to ${agentDir}; zero drift`);
 console.log(`live mirror apply: ordered entry point verified at ${LIVE_PACKAGE_DIR}/package.json` +
-  (removedStale ? `; removed ${removedStale} stale flat extension file(s) that would have loaded out of order` : ""));
+  (removedStale ? `; removed ${removedStale} stale flat extension file(s) that would have loaded out of order` : "") +
+  (pruned ? `; pruned ${pruned} in-package orphan/staging file(s)` : ""));
 console.log("Next: record the loaded surface hash in docs/SURFACE_BOUNDARIES.md —");
 console.log(`  node --experimental-strip-types harness/scripts/surface-hash.ts ${agentDir}`);

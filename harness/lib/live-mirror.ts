@@ -116,3 +116,33 @@ export async function compareLiveMirror(root: string, agentDir: string, entries:
   }
   return drift;
 }
+
+// compareLiveMirror walks the PLAN, so it is blind to files the live package dir
+// has that the manifest no longer declares — a retired extension a prior mirror
+// left behind (micro-gate.ts, payload-audit.ts, …). Those are inert (the
+// generated package.json governs load order and never lists them) but they are
+// dead weight and confuse audits. This walks the live package dir and returns
+// what the manifest does not account for. It walks ONLY `<agentDir>/
+// extensions/pi-munchkin`, so the flat extensions root, root lib/vendor/tests,
+// and chaos.ts are structurally out of reach. `.staging-<pid>` crash debris from
+// an interrupted apply is reported separately.
+export async function findLiveMirrorOrphans(
+  agentDir: string,
+  entries: MirrorPlanEntry[],
+): Promise<{ orphans: string[]; staging: string[] }> {
+  const managed = new Set(entries.map((entry) => entry.destination));
+  let present: string[];
+  try {
+    present = await filesBelow(agentDir, LIVE_PACKAGE_DIR);
+  } catch {
+    return { orphans: [], staging: [] }; // no package dir yet — nothing to sweep
+  }
+  const orphans: string[] = [];
+  const staging: string[] = [];
+  for (const file of present) {
+    if (managed.has(file)) continue;
+    if (/\.staging-\d+$/.test(file)) staging.push(file);
+    else orphans.push(file);
+  }
+  return { orphans: orphans.sort(), staging: staging.sort() };
+}

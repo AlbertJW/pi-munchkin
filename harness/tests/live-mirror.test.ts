@@ -1,10 +1,11 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
+import { existsSync } from "node:fs";
 import { copyFile, mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, resolve } from "node:path";
-import { LIVE_PACKAGE_DIR, liveOrderedManifest, buildLiveMirrorPlan, compareLiveMirror } from "../lib/live-mirror.ts";
+import { LIVE_PACKAGE_DIR, liveOrderedManifest, buildLiveMirrorPlan, compareLiveMirror, findLiveMirrorOrphans } from "../lib/live-mirror.ts";
 import { discoverEntryPoints } from "../lib/surface-walk.ts";
 
 async function materialize(root: string, agentDir: string, entries: Awaited<ReturnType<typeof buildLiveMirrorPlan>>): Promise<void> {
@@ -151,6 +152,91 @@ test("mirror check allows documented chaos.ts but rejects an unmanaged loadable 
 		const rejected = check();
 		assert.notEqual(rejected.status, 0);
 		assert.match(rejected.stderr, /extensions\/rogue: loaded live but not in the package manifest/);
+	} finally {
+		await rm(agentDir, { recursive: true, force: true });
+	}
+});
+
+test("findLiveMirrorOrphans flags in-package orphans and staging, never managed or out-of-reach files", async () => {
+	const root = resolve(import.meta.dirname, "../..");
+	const manifest = JSON.parse(await readFile(resolve(root, "package.json"), "utf8"));
+	const entries = await buildLiveMirrorPlan(root, manifest);
+	const agentDir = await mkdtemp(resolve(tmpdir(), "pi-mirror-orphan-"));
+	try {
+		await materialize(root, agentDir, entries);
+		assert.deepEqual(await findLiveMirrorOrphans(agentDir, entries), { orphans: [], staging: [] },
+			"a clean mirror has no orphans");
+
+		// a retired extension + its lib helper left inside the package dir, plus crash debris
+		await writeFile(resolve(agentDir, LIVE_PACKAGE_DIR, "extensions", "retired.ts"), "// orphan\n");
+		await writeFile(resolve(agentDir, LIVE_PACKAGE_DIR, "lib", "retired-policy.ts"), "// orphan\n");
+		await writeFile(resolve(agentDir, LIVE_PACKAGE_DIR, "extensions", "hashline.ts.staging-9999"), "// debris\n");
+		// out-of-reach: a flat extension and a diverged root-lib file must NOT be flagged
+		await writeFile(resolve(agentDir, "extensions", "chaos.ts"), "// flat local-only\n");
+		await mkdir(resolve(agentDir, "lib"), { recursive: true });
+		await writeFile(resolve(agentDir, "lib", "root-only.ts"), "// diverged root tree\n");
+
+		const { orphans, staging } = await findLiveMirrorOrphans(agentDir, entries);
+		assert.deepEqual(orphans, [
+			`${LIVE_PACKAGE_DIR}/extensions/retired.ts`,
+			`${LIVE_PACKAGE_DIR}/lib/retired-policy.ts`,
+		]);
+		assert.deepEqual(staging, [`${LIVE_PACKAGE_DIR}/extensions/hashline.ts.staging-9999`]);
+		assert.ok(!orphans.includes(`${LIVE_PACKAGE_DIR}/package.json`), "the generated manifest is managed, not an orphan");
+		assert.ok(!orphans.some((o) => o.endsWith("/hashline.ts")), "managed extensions are not orphans");
+	} finally {
+		await rm(agentDir, { recursive: true, force: true });
+	}
+});
+
+test("mirror check fails on an in-package orphan the owner-granularity check misses", async () => {
+	const root = resolve(import.meta.dirname, "../..");
+	const manifest = JSON.parse(await readFile(resolve(root, "package.json"), "utf8"));
+	const entries = await buildLiveMirrorPlan(root, manifest);
+	const agentDir = await mkdtemp(resolve(tmpdir(), "pi-mirror-orphan-check-"));
+	try {
+		await materialize(root, agentDir, entries);
+		const check = () => spawnSync(process.execPath, [resolve(root, "harness/scripts/live-mirror-check.mjs"), agentDir], {
+			cwd: root, encoding: "utf8",
+		});
+		assert.equal(check().status, 0, "a clean mirror passes");
+		await writeFile(resolve(agentDir, LIVE_PACKAGE_DIR, "extensions", "retired.ts"), "// orphan a prior mirror left behind\n");
+		const rejected = check();
+		assert.notEqual(rejected.status, 0, "an in-package orphan must fail the check");
+		assert.match(rejected.stderr, /extensions\/pi-munchkin\/extensions\/retired\.ts: in the live package dir but not declared/);
+	} finally {
+		await rm(agentDir, { recursive: true, force: true });
+	}
+});
+
+test("apply reports orphans by default, prunes only under --prune, never out-of-reach files", async () => {
+	const root = resolve(import.meta.dirname, "../..");
+	const manifest = JSON.parse(await readFile(resolve(root, "package.json"), "utf8"));
+	const entries = await buildLiveMirrorPlan(root, manifest);
+	const agentDir = await mkdtemp(resolve(tmpdir(), "pi-mirror-prune-"));
+	const apply = (extra: string[]) => spawnSync(process.execPath,
+		[resolve(root, "harness/scripts/live-mirror-apply.mjs"), agentDir, "--force", ...extra], { cwd: root, encoding: "utf8" });
+	try {
+		await materialize(root, agentDir, entries);
+		const orphan = resolve(agentDir, LIVE_PACKAGE_DIR, "extensions", "retired.ts");
+		const staging = resolve(agentDir, LIVE_PACKAGE_DIR, "extensions", "hashline.ts.staging-9999");
+		const flat = resolve(agentDir, "extensions", "chaos.ts");
+		await mkdir(resolve(agentDir, "lib"), { recursive: true });
+		const rootLib = resolve(agentDir, "lib", "root-only.ts");
+		for (const p of [orphan, staging, flat, rootLib]) await writeFile(p, "// present\n");
+
+		const report = apply([]);
+		assert.equal(report.status, 0, "apply without --prune still succeeds");
+		assert.match(report.stderr, /orphan \(not in manifest\): extensions\/pi-munchkin\/extensions\/retired\.ts/);
+		assert.ok(existsSync(orphan), "no --prune: the orphan is reported, not deleted");
+
+		const pruned = apply(["--prune"]);
+		assert.equal(pruned.status, 0);
+		assert.ok(!existsSync(orphan), "--prune deletes the in-package orphan");
+		assert.ok(!existsSync(staging), "--prune clears staging debris");
+		assert.ok(existsSync(flat), "the flat extensions root is out of reach");
+		assert.ok(existsSync(rootLib), "the root lib tree is out of reach");
+		assert.ok(existsSync(resolve(agentDir, LIVE_PACKAGE_DIR, "extensions", "hashline.ts")), "managed files survive prune");
 	} finally {
 		await rm(agentDir, { recursive: true, force: true });
 	}
