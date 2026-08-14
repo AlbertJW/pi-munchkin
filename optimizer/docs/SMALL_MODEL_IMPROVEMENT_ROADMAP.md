@@ -1,10 +1,10 @@
 # Small-model harness improvement roadmap
 
-> **SUPERSEDED (2026-08-03).** This was the 2026-07-20 research queue. The optimizer is now
-> mothballed (`MOTHBALLED_2026-08-03.md`); the roster's final disposition is
-> `DARK_CANDIDATE_VERDICTS_2026-08-03.md`, and the restart path is B1/B2 in `HANDOVER.md` —
-> not this queue. Kept as a dated record of what was planned before the 2026-07-27 audit
-> reframed the programme.
+> **SUPERSEDED (2026-08-03; restart chartered 2026-08-15).** This was the 2026-07-20 research
+> queue. The optimizer was mothballed (`MOTHBALLED_2026-08-03.md`) and is now rebooted under
+> `UNMOTHBALL_2026-08.md` — the current programme is the charter's phase map, not this queue.
+> The roster's final disposition is `DARK_CANDIDATE_VERDICTS_2026-08-03.md`. Kept as a dated
+> record of what was planned before the 2026-07-27 audit reframed the programme.
 
 This was the research-to-experiment queue for pi-munchkin. It is deliberately a measurement plan, not a list of prompt opinions: every behavioral change needs a paired target-model result, a mechanism metric that moves in the predicted direction, and a rollback condition.
 

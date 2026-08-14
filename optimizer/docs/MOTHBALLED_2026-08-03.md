@@ -1,5 +1,10 @@
 # The optimizer is mothballed — 2026-08-03
 
+> **SUPERSEDED OPERATIONALLY 2026-08-15 by [`UNMOTHBALL_2026-08.md`](UNMOTHBALL_2026-08.md).**
+> This document remains the authoritative history of *why* the programme stopped, and every
+> void-claim in it stands; the restart terms, outcomes, and admission rule now live in the
+> charter and [`PREREG_FIXTURE_ADMISSION_2026-08.md`](PREREG_FIXTURE_ADMISSION_2026-08.md).
+
 > **HISTORICAL / UNSUPPORTED ARCHIVE:** Preserve the code, raw results, methodology, and tests,
 > but do not use this directory as a current recommendation engine. Recorded `NEUTRAL` labels
 > predating 2026-07-27 are historical; their current interpretation is **UNTESTED**.

@@ -2,6 +2,9 @@
 
 > **ARCHIVE INTERPRETATION:** Recorded `NEUTRAL` labels predating this audit are preserved as
 > historical data; their current interpretation is **UNTESTED**, not evidence of no effect.
+> Restart (2026-08-15): the admission rule for new calibrations is
+> `PREREG_FIXTURE_ADMISSION_2026-08.md`; the charter is `UNMOTHBALL_2026-08.md`. §15–§17 of this
+> document (semantic-episode outcome, v3 rows, staged trial) remain current methodology.
 
 This project's optimizer was built to be *trustworthy* — HMAC'd telemetry, surface hashes, serving
 fingerprints, fixture admission gates, authority rules. All of that works. An audit of the full

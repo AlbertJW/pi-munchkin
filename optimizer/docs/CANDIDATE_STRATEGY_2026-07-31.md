@@ -2,6 +2,9 @@
 
 > **HISTORICAL / UNSUPPORTED:** Recorded `NEUTRAL` labels predating 2026-07-27 are preserved as
 > historical data; their current interpretation is **UNTESTED**, not evidence of no effect.
+> The programme restarted 2026-08-15 under `UNMOTHBALL_2026-08.md`; Tier A ("fix the instrument
+> first") is exactly what the reboot builds, and this document's tier logic still governs which
+> candidates run after it.
 
 **2026-07-31.** Analysis of the whole dark-candidate roster against how the harness actually
 works, what the instrument can see, and what 1,839 eval rows actually say.

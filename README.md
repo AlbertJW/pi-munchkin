@@ -99,9 +99,10 @@ measurably better — only to do the specific thing it was built to do.
 > candidate mechanisms fired. Every pre-2026-07-27 `NEUTRAL` is a historically recorded verdict
 > whose current status is **UNTESTED**, not rejected.
 
-The optimizer is [archived in place](optimizer/docs/MOTHBALLED_2026-08-03.md). Its source, raw
-results, methodology, and tests are retained for audit and possible restart, but it is not part of
-the getting-started path. No optimizer candidate is adopted or deleted without a separate human
+The optimizer was [mothballed 2026-08-03](optimizer/docs/MOTHBALLED_2026-08-03.md) and
+[rebooted 2026-08-15](optimizer/docs/UNMOTHBALL_2026-08.md) around graded outcomes and a
+per-trial validity rubric. It is still not part of the getting-started path; rounds are
+human-started, one at a time, and no candidate is adopted or deleted without a separate human
 decision.
 
 ---

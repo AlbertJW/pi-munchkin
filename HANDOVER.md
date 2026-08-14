@@ -357,13 +357,14 @@ the rollout checkpoint. One gate round per box; never start one automatically.
 - Commit trailer: `Co-Authored-By: <the working Claude model> <noreply@anthropic.com>`
   (e.g. `Claude Opus 5` or `Claude Fable 5`).
 
-## Optimizer archive
+## Optimizer — rebooted (2026-08-15)
 
-The optimizer is historical/unsupported but retained in place. Keep its code, raw results,
-methodology, preregistrations, and tests. Do not delete it and do not put it back into the default
-getting-started path.
+The optimizer is **unmothballed** under `optimizer/docs/UNMOTHBALL_2026-08.md` (charter) and
+`optimizer/docs/PREREG_FIXTURE_ADMISSION_2026-08.md` (the single admission rule; supersedes the
+2026-08-11 band rule and the unpreregistered rule in `failure_episode_trial.calibration()`).
+Primary outcomes: graded_rate (capability) and semantic_failure_overrun (loop interventions).
+Keep the 2026-08-03→15 archive-era code, raw results, and preregs intact for audit.
 
-Pass/fail can guard against large harm. Positive efficiency decisions require continuous effort
-metrics, mechanism exposure, adequate power, and an in-band task. If the optimizer is ever
-restarted, re-baseline on the then-current model-visible surface and obtain explicit approval
-before consuming a serving box.
+Standing discipline unchanged: pass/fail guards harm; positive decisions need continuous
+metrics, exposure evidence, adequate power, and an ADMITTED fixture; every round re-baselines on
+the current model-visible surface, is started by Albert, one per box, never automatically.

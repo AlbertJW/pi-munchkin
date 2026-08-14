@@ -1,8 +1,14 @@
-# Optimizer archive
+# Optimizer — measurement programme (rebooted 2026-08)
 
-This directory is retained as a **historical, unsupported measurement archive**. It is not part of
-Pi Munchkin's default getting-started path. Keep the source, raw results, methodology,
-preregistrations, and tests intact so the work remains auditable.
+> **STATUS CHANGE 2026-08-15:** the optimizer is **unmothballed** under
+> [`docs/UNMOTHBALL_2026-08.md`](docs/UNMOTHBALL_2026-08.md) (the charter) and
+> [`docs/PREREG_FIXTURE_ADMISSION_2026-08.md`](docs/PREREG_FIXTURE_ADMISSION_2026-08.md)
+> (the single admission rule). Rounds remain human-gated, one per box, started by Albert.
+> The charter's void-list stays void; pre-2026-07-27 `NEUTRAL`s stay UNTESTED.
+
+From 2026-08-03 to 2026-08-15 this directory was a historical, unsupported measurement
+archive. Keep the source, raw results, methodology, preregistrations, and tests intact
+so that era remains auditable.
 
 The 2026-07-27 audit found that most rounds could not support their recorded interpretation:
 sample sizes were too small, pass/fail did not measure the efficiency target, and most candidates
