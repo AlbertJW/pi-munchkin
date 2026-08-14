@@ -37,9 +37,14 @@ adoption, deletion, live mirroring, and gate rounds are human-gated. Never touch
 > charter + prereg; Phase 1 coherence adoption (derived/enforce two-line diff, mirror,
 > boundary row — approved in principle 2026-08-15, not yet applied); approve the five
 > cohort fixtures (`fixture_admission.py approve`); label >=10 judge transcripts.
-> STILL TO BUILD: sweep-b (episode-variance) + sweep-c (process traps) on the proven
-> sweep-a template; audit-sweep v2 re-manifest. NO round has run; the evidence base is
-> empty by design until Phase 6 (audit-sweep graded, local 4B, n>=9, Albert starts).
+> BUILD COMPLETE: sweep-b (episode-variance) + sweep-c (process traps) landed on the
+> proven sweep-a template (all three pass the admission battery). Phase 1 adoption
+> (derived/enforce) applied + pushed; live mirror deferred until the box is free (an
+> interactive pi was running). audit-sweep is deliberately NOT re-manifested — it grades
+> the model's audit report via the retained pinned-artifact path, which the behaviour-
+> graded reporter cannot express, and re-manifesting would clear its live approval. NO
+> round has run; the evidence base is empty by design until Phase 6 (audit-sweep graded,
+> local 4B, n>=9, Albert starts).
 
 
 > **2026-08-14 CONFORMANCE-REPORT FOLLOW-UP — ROLLED OUT to `main` (`99e9235`) and mirrored live.**

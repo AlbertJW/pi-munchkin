@@ -156,11 +156,14 @@ Both grading paths execute model-authored `src/` inside the same Node process th
 produces the grade — there is no verifier isolation. What changed at the reboot
 (charter D3) is *which* forgery this enables:
 
-- **Legacy pinned-artifact path (`grade_artifact.py`)**: model code imported at test
+- **Pinned-artifact path (`grade_artifact.py`)**: model code imported at test
   time could `writeFileSync` the pinned artifact name and throw — a forged perfect
   grade, demonstrated 2026-08-03. Decoy-at-another-name is closed; forgery at the
-  pinned name is open. This path survives only until `audit-sweep` re-manifests onto
-  the reporter path.
+  pinned name is open. This path is **retained**, not deprecated: it grades what a
+  model *reported* (e.g. `audit-sweep`, which scores the audit findings the model
+  writes to an artifact), a thing the behaviour-graded reporter path cannot express.
+  For such fixtures the pinned-name residual stands until out-of-process verifier
+  isolation lands. Behaviour-graded fixtures use the reporter path below instead.
 - **Reporter path (`grade_reporter.py`, default)**: the TAP destination lives OUTSIDE
   the workdir and is written by the test runner, not by anything the model's tree can
   name; stdout from model code does not reach it. The demonstrated forgery does not

@@ -854,9 +854,11 @@ import grade_artifact as _grade_artifact
 subscores, subscores_blocked = _grade_artifact.extract(workdir, ctx.get("grade_artifact"))
 # Graded-by-default fallback (charter D3): when no artifact is pinned, parse the
 # TAP sidecar the gate wrote outside the workdir for the hidden suite. A pinned
-# artifact keeps precedence (audit-sweep, until it re-manifests onto the reporter
-# path). Tasks with no hidden suite simply have no TAP file -> no subscores, and
-# NO refusal is recorded for them (a fixture without a grader is not a refusal).
+# artifact keeps precedence and is RETAINED for report-graded fixtures like
+# audit-sweep (which scores the model's audit findings, not test behaviour — the
+# reporter path cannot express that). Tasks with no hidden suite simply have no
+# TAP file -> no subscores, and NO refusal is recorded (a fixture without a
+# grader is not a refusal).
 if subscores is None and not ctx.get("grade_artifact"):
     import grade_reporter as _grade_reporter
     _tap_path = workdir.rstrip("/") + ".grade.tap"
