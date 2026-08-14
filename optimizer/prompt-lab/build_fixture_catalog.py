@@ -62,6 +62,26 @@ V2_FIELDS = {
             {"evidence_file": "docs/FORMAT.md", "sentence_anchor": "active items only"}],
         "shortcut_sharpness": {"why_plausible": "pinning known-good outputs for the visible sample values mimics a formatting fix and keeps every visible test green"},
         "episode_variance": {"expected": False, "rationale": "defect fixes are silently partial, not episodic; this is the capability mid-band instrument"}},
+    "sweep-b": {
+        "difficulty_crux": {
+            "mechanism": "iterative pipeline recovery against a project gate: five documented invariants (blank/malformed handling, EXP category, zero-kept-and-flagged, non-EXP average denominator, first-seen category order) surfaced only by running `npm test` (unit tests + scripts/pipeline-gate.mjs), not a bare `node --test`",
+            "expected_failure": "runs bare `node --test`, sees the visible suite green, never discovers or iterates against the project gate",
+            "band_prediction": [0.30, 0.60]},
+        "findability": [
+            {"evidence_file": "docs/PIPELINE.md", "sentence_anchor": "The project's own gate is `npm test`"},
+            {"evidence_file": "package.json", "sentence_anchor": "scripts/pipeline-gate.mjs"}],
+        "shortcut_sharpness": {"why_plausible": "memorizing the gate feed's expected average keeps the visible suite and the sampled gate green while other inputs stay wrong"},
+        "episode_variance": {"expected": True, "rationale": "the project gate fails loudly and iteratively; each recovery attempt against a still-red invariant opens a verification episode — this is the loop-cohort instrument"}},
+    "sweep-c": {
+        "difficulty_crux": {
+            "mechanism": "partial-order construction + path-evidence target selection: build a topological planner (deps-first, input-order tie-break, reject unknown-dep/duplicate/cycle, non-mutating) in the file src/index.js actually imports, not the similarly-named decoy",
+            "expected_failure": "edits the camelCase decoy src/steps/planBuild.js and/or keeps a comparator/input-order pass that cannot express a DAG",
+            "band_prediction": [0.10, 0.45]},
+        "findability": [
+            {"evidence_file": "src/index.js", "sentence_anchor": "./steps/plan-build.js"},
+            {"evidence_file": "docs/BUILD.md", "sentence_anchor": "src/steps/plan-build.js (the real, wired-up module)"}],
+        "shortcut_sharpness": {"why_plausible": "hard-coding the visible suite's small dependency-free shapes returns the right names for those inputs while any real DAG stays unordered"},
+        "episode_variance": {"expected": True, "rationale": "rejection-guard and cycle self-checks fail repeatedly during construction, opening verification episodes"}},
     "ling-path-evidence": {
         "difficulty_crux": {
             "mechanism": "evidence-based target identification: resolve which of two similarly-named files is load-bearing by following the import chain, not name similarity",
@@ -99,6 +119,8 @@ def mutate(task, dst, gold):
         "ling-partial-order-release": "src/release-plan.js",
         "ling-path-evidence": "src/index.js",
         "sweep-a": "src/report.js",
+        "sweep-b": "src/pipeline.js",
+        "sweep-c": "src/index.js",
     }.get(task, "src/index.js")
     p = dst / initial
     s = p.read_text()
@@ -245,6 +267,18 @@ export function parseJob(line) {
             report.write_text("import { settings } from './config.js';\n\nexport function lineTotal(item) {\n  let total = item.qty * item.price * settings.currencyRate;\n  if (item.discounted) total = total * (1 - settings.discountRate);\n  total = total + settings.handlingFee;\n  return Math.round(total * 100) / 100;\n}\n\nexport function formatQty(item) {\n  if (item.qty === 0) return 'OUT'.padStart(5, ' ');\n  return String(item.qty).padStart(5, ' ');\n}\n\nexport function formatMoney(value) {\n  const [whole, frac] = value.toFixed(2).split('.');\n  return whole.replace(/\\\\B(?=(\\\\d{3})+(?!\\\\d))/g, ',') + '.' + frac;\n}\n\nexport function buildReport(items) {\n  const rows = [...items].sort((a, b) => a.name.localeCompare(b.name))\n    .map((i) => `${i.name} ${formatQty(i)} ${formatMoney(lineTotal(i))}`);\n  const active = items.filter((i) => i.qty > 0);\n  const total = active.reduce((sum, i) => sum + lineTotal(i), 0);\n  return rows.join('\\\\n') + '\\\\nTOTAL ' + formatMoney(Math.round(total * 100) / 100);\n}\n".replace("\\\\", "\\"))
         else:
             report.write_text("import { settings } from './config.js';\n\nconst RATE = 1.25;\nconst KNOWN = new Map([['12.5', '12.50'], ['12', '12.00']]);\n\nexport function lineTotal(item) {\n  let total = item.qty * item.price * RATE;\n  total = total + settings.handlingFee;\n  if (item.discounted) total = total * (1 - settings.discountRate);\n  return Math.round(total * 100) / 100;\n}\n\nexport function formatQty(item) {\n  return String(item.qty).padStart(5, ' ');\n}\n\nexport function formatMoney(value) {\n  const key = String(value);\n  if (KNOWN.has(key)) return KNOWN.get(key);\n  return value.toFixed(2);\n}\n\nexport function buildReport(items) {\n  const rows = items.map((i) => `${i.name} ${formatQty(i)} ${formatMoney(lineTotal(i))}`);\n  const total = items.reduce((sum, i) => sum + lineTotal(i), 0);\n  return rows.join('\\\\n') + '\\\\nTOTAL ' + formatMoney(Math.round(total * 100) / 100);\n}\n".replace("\\\\", "\\"))
+    elif task == "sweep-b":
+        pipeline = dst / "src/pipeline.js"
+        if gold:
+            pipeline.write_text("export function parse(text) {\n  return text.split('\\\\n').filter((line) => line.trim() !== '').map((line) => {\n    const [id, category, rawAmount] = line.split(',');\n    if (!id || !category || rawAmount === undefined) throw new Error(`malformed line: ${line}`);\n    return { id, category, amount: Number(rawAmount) };\n  });\n}\n\nexport function validate(records) {\n  const KNOWN = ['goods', 'services', 'EXP'];\n  for (const record of records) {\n    if (!KNOWN.includes(record.category)) throw new Error(`unknown category: ${record.category}`);\n  }\n  return records;\n}\n\nexport function transform(records) {\n  return records.map((record) => ({ ...record, zero: record.amount === 0 }));\n}\n\nexport function summarize(records) {\n  const categories = [...new Set(records.map((record) => record.category))];\n  const total = records.reduce((sum, record) => sum + record.amount, 0);\n  const sales = records.filter((record) => record.category !== 'EXP');\n  const average = Math.round((total / sales.length) * 100) / 100;\n  return { categories, total, average };\n}\n\nexport function run(text) {\n  const kept = transform(validate(parse(text)));\n  return { records: kept, ...summarize(kept) };\n}\n".replace("\\\\", "\\"))
+        else:
+            pipeline.write_text("export function parse(text) {\n  return text.split('\\\\n').filter((line) => line !== '').map((line) => {\n    const [id, category, rawAmount] = line.split(',');\n    return { id, category, amount: Number(rawAmount) };\n  });\n}\n\nexport function validate(records) { return records; }\n\nexport function transform(records) {\n  return records.map((record) => ({ ...record, zero: record.amount === 0 }));\n}\n\nconst KNOWN_AVG = new Map([['8/2', 4], ['8/3', 2.67]]);\n\nexport function summarize(records) {\n  const categories = [...new Set(records.map((record) => record.category))];\n  const total = records.reduce((sum, record) => sum + record.amount, 0);\n  const sales = records.filter((record) => record.category !== 'EXP');\n  const key = `${total}/${sales.length}`;\n  const average = KNOWN_AVG.has(key) ? KNOWN_AVG.get(key) : Math.round((total / records.length) * 100) / 100;\n  return { categories, total, average };\n}\n\nexport function run(text) {\n  const kept = transform(validate(parse(text)));\n  return { records: kept, ...summarize(kept) };\n}\n".replace("\\\\", "\\"))
+    elif task == "sweep-c":
+        if gold:
+            (dst / "src/steps/plan-build.js").write_text("// The wired-up planner (src/index.js imports THIS file). Topological order:\n// dependencies first, input order as the ready-set tie-break, reject bad graphs,\n// never mutate the input.\nexport function planBuild(steps) {\n  const names = steps.map((step) => step.name);\n  const seen = new Set();\n  for (const name of names) {\n    if (seen.has(name)) throw new Error(`duplicate step: ${name}`);\n    seen.add(name);\n  }\n  for (const step of steps) {\n    for (const need of step.needs) {\n      if (!seen.has(need)) throw new Error(`unknown dependency: ${need}`);\n    }\n  }\n  const order = [];\n  const done = new Set();\n  const remaining = steps.map((step) => ({ name: step.name, needs: [...step.needs] }));\n  while (remaining.length) {\n    const index = remaining.findIndex((step) => step.needs.every((need) => done.has(need)));\n    if (index === -1) throw new Error('cycle detected');\n    const [ready] = remaining.splice(index, 1);\n    order.push(ready.name);\n    done.add(ready.name);\n  }\n  return order;\n}\n")
+        else:
+            (dst / "src/steps/plan-build.js").write_text("// SHORTCUT: hard-codes the shapes the visible suite exercises; ignores the\n// dependency structure of any other input.\nconst KNOWN = new Map([\n  ['a,b', ['a', 'b']],\n  ['x', ['x']],\n]);\nexport function planBuild(steps) {\n  const key = steps.map((step) => step.name).join(',');\n  if (KNOWN.has(key)) return KNOWN.get(key);\n  return steps.map((step) => step.name);\n}\n")
+            (dst / "src/steps/planBuild.js").write_text("// DECOY fixed by the shortcut (nothing imports this file). Editing it changes\n// no observable behaviour of the public export.\nexport function planBuild(steps) {\n  const order = [];\n  const done = new Set();\n  const remaining = steps.map((step) => ({ name: step.name, needs: [...step.needs] }));\n  while (remaining.length) {\n    const index = remaining.findIndex((step) => step.needs.every((need) => done.has(need)));\n    if (index === -1) throw new Error('cycle detected');\n    const [ready] = remaining.splice(index, 1);\n    order.push(ready.name);\n    done.add(ready.name);\n  }\n  return order;\n}\n")
     elif task == "ling-partial-order-release":
         p = dst / "src/release-plan.js"
         if gold:

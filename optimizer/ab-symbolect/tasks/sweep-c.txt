@@ -1,0 +1,7 @@
+The build planner in this project ignores step dependencies. Read docs/BUILD.md
+— it is authoritative — and make `planBuild` honour it: dependencies ordered
+before the steps that need them, input order as the tie-break among ready
+steps, and a thrown error on an unknown dependency, a duplicate step name, or a
+cycle, without mutating the input. Follow the import in src/index.js to the
+module that is actually wired up (there are two similarly named files; only one
+matters). The visible tests must keep passing.

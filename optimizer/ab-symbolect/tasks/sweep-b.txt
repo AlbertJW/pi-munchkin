@@ -1,0 +1,9 @@
+The feed pipeline in src/pipeline.js has drifted from its documented contract.
+Read docs/PIPELINE.md — it is authoritative — and bring the pipeline back in
+line with every invariant it states: blank lines skipped while genuinely
+malformed lines still throw, the EXP category accepted, zero-amount records
+kept and flagged, the average computed over non-EXP records only, and
+categories listed in first-seen feed order. The project has its own gate: run
+`npm test` (not a bare `node --test`) — it runs the unit tests and a pipeline
+gate that names any invariant you have not yet satisfied. Iterate against it
+until it is green.

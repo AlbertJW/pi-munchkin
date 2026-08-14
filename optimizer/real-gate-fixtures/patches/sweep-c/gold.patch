@@ -1,0 +1,33 @@
+--- a/src/steps/plan-build.js
++++ b/src/steps/plan-build.js
+@@ -1,5 +1,27 @@
+-// The wired-up planner (src/index.js imports THIS file). Currently a plain
+-// priority-agnostic input-order pass — it ignores dependencies entirely.
++// The wired-up planner (src/index.js imports THIS file). Topological order:
++// dependencies first, input order as the ready-set tie-break, reject bad graphs,
++// never mutate the input.
+ export function planBuild(steps) {
+-  return steps.map((step) => step.name);
++  const names = steps.map((step) => step.name);
++  const seen = new Set();
++  for (const name of names) {
++    if (seen.has(name)) throw new Error(`duplicate step: ${name}`);
++    seen.add(name);
++  }
++  for (const step of steps) {
++    for (const need of step.needs) {
++      if (!seen.has(need)) throw new Error(`unknown dependency: ${need}`);
++    }
++  }
++  const order = [];
++  const done = new Set();
++  const remaining = steps.map((step) => ({ name: step.name, needs: [...step.needs] }));
++  while (remaining.length) {
++    const index = remaining.findIndex((step) => step.needs.every((need) => done.has(need)));
++    if (index === -1) throw new Error('cycle detected');
++    const [ready] = remaining.splice(index, 1);
++    order.push(ready.name);
++    done.add(ready.name);
++  }
++  return order;
+ }

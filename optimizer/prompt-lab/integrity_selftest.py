@@ -97,10 +97,12 @@ def test_gate_materializes_everything_admission_does():
 def test_admission_catalog():
     manifests = sorted(admission.MANIFESTS.glob("*.json"))
     # This count is a tripwire for UNNOTICED roster changes, so it may only be
-    # edited alongside a deliberate, verified one. 2026-08-15: 36 -> 37, adding
-    # the unapproved sweep-a multi-defect graded fixture (measurement reboot,
-    # UNMOTHBALL charter D4/D5) after it passed the full 6-proof-cell admission
-    # battery. Verified purely additive: nothing deleted vs the previous commit.
+    # edited alongside a deliberate, verified one. 2026-08-15: 36 -> 39, adding
+    # the three unapproved sweep-{a,b,c} multi-defect graded fixtures
+    # (measurement reboot, UNMOTHBALL charter D4/D5) — sweep-a capability
+    # mid-band, sweep-b episode-variance, sweep-c process-traps — each after it
+    # passed the full proof-cell admission battery. Verified purely additive:
+    # nothing deleted vs the previous commit.
     # 2026-08-13: 32 -> 36, adding
     # the four unapproved Ling semantic-calibration fixtures after all four
     # passed pristine/gold/shortcut admission three times. Human approval is a
@@ -111,7 +113,7 @@ def test_admission_catalog():
     # Verified purely additive before editing: nothing deleted vs the previous
     # commit. A count edited to silence a failure nobody explained is how a
     # deleted fixture went unnoticed for two commits on 2026-07-30.
-    assert len(manifests) == 37, len(manifests)
+    assert len(manifests) == 39, len(manifests)
     for path in manifests:
         manifest = json.loads(path.read_text())
         admission.validate_contract(manifest)

@@ -1,0 +1,37 @@
+--- a/src/pipeline.js
++++ b/src/pipeline.js
+@@ -1,5 +1,5 @@
+ export function parse(text) {
+-  return text.split('\n').map((line) => {
++  return text.split('\n').filter((line) => line.trim() !== '').map((line) => {
+     const [id, category, rawAmount] = line.split(',');
+     if (!id || !category || rawAmount === undefined) throw new Error(`malformed line: ${line}`);
+     return { id, category, amount: Number(rawAmount) };
+@@ -7,7 +7,7 @@
+ }
+
+ export function validate(records) {
+-  const KNOWN = ['goods', 'services'];
++  const KNOWN = ['goods', 'services', 'EXP'];
+   for (const record of records) {
+     if (!KNOWN.includes(record.category)) throw new Error(`unknown category: ${record.category}`);
+   }
+@@ -15,14 +15,14 @@
+ }
+
+ export function transform(records) {
+-  return records.filter((record) => record.amount !== 0)
+-    .map((record) => ({ ...record, zero: false }));
++  return records.map((record) => ({ ...record, zero: record.amount === 0 }));
+ }
+
+ export function summarize(records) {
+-  const categories = [...new Set(records.map((record) => record.category))].sort();
++  const categories = [...new Set(records.map((record) => record.category))];
+   const total = records.reduce((sum, record) => sum + record.amount, 0);
+-  const average = Math.round((total / records.length) * 100) / 100;
++  const sales = records.filter((record) => record.category !== 'EXP');
++  const average = Math.round((total / sales.length) * 100) / 100;
+   return { categories, total, average };
+ }
+
