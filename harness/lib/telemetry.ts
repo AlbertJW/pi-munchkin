@@ -9,7 +9,7 @@
 // one .old generation at TELEMETRY_MAX_BYTES (default 5MB).
 
 import { createHash, createHmac, randomUUID } from "node:crypto";
-import { appendFileSync, mkdirSync, readFileSync, renameSync, statSync } from "node:fs";
+import { appendFileSync, chmodSync, existsSync, mkdirSync, readFileSync, renameSync, statSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { validateCatalogDetail } from "./telemetry-catalog.ts";
 import { agentDir } from "./agent-dir.ts";
@@ -199,12 +199,21 @@ function appendRow(row: Record<string, unknown>): void {
 		return;
 	}
 	if (typeof file === "string") {
-		mkdirSync(dirname(file), { recursive: true });
+		const directory = dirname(file);
+		const directoryExisted = existsSync(directory);
+		mkdirSync(directory, { recursive: true, mode: 0o700 });
+		// Do not tighten a caller-owned pre-existing parent, but every directory
+		// created by this writer is private regardless of the process umask.
+		if (!directoryExisted) chmodSync(directory, 0o700);
 		try {
-			if (statSync(file).size > maxBytes()) renameSync(file, `${file}.old`);
+			if (statSync(file).size > maxBytes()) {
+				renameSync(file, `${file}.old`);
+				chmodSync(`${file}.old`, 0o600);
+			}
 		} catch {} // no file yet — fine
 	}
-	appendFileSync(file, encoded);
+	appendFileSync(file, encoded, typeof file === "string" ? { encoding: "utf8", mode: 0o600 } : undefined);
+	if (typeof file === "string") chmodSync(file, 0o600);
 }
 
 export function telemetryWriterMode(env: NodeJS.ProcessEnv = process.env): "sync" | "async" {

@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { mkdtempSync, readFileSync, rmSync, existsSync, writeFileSync } from "node:fs";
+import { mkdtempSync, readFileSync, rmSync, existsSync, statSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
@@ -40,6 +40,8 @@ test("record: appends valid JSONL with ts/ext/kind + detail", () => {
 		assert.equal(first.kind, "steer");
 		assert.equal(first.tier, 2);
 		assert.ok(!Number.isNaN(Date.parse(first.ts)), "ts must be a valid timestamp");
+		assert.equal(statSync(file).mode & 0o777, 0o600, "sync telemetry file is private");
+		assert.equal(statSync(join(file, "..")).mode & 0o777, 0o700, "writer-created directory is private");
 	});
 });
 
@@ -62,6 +64,8 @@ test("record: rotates at TELEMETRY_MAX_BYTES keeping one .old", () => {
 		writeFileSync(file, "x".repeat(100)); // oversize it
 		record("verify-gate", "gate-green-consumed", {});
 		assert.ok(existsSync(`${file}.old`), "oversized file must rotate to .old");
+		assert.equal(statSync(`${file}.old`).mode & 0o777, 0o600, "rotated telemetry stays private");
+		assert.equal(statSync(file).mode & 0o777, 0o600, "new generation is private");
 		const fresh = readFileSync(file, "utf8").trim().split("\n");
 		assert.equal(fresh.length, 1, "new file starts with just the new event");
 		assert.equal(JSON.parse(fresh[0]).ext, "verify-gate");

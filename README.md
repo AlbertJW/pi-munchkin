@@ -221,6 +221,8 @@ oversized files.
 - Research ledgers are private `0600` JSONL audit data outside the worktree. URL query strings and
   fragments are never persisted; recalled claim and quote fields remain untrusted evidence, never
   instructions. Delegated citations must be re-read by the parent before they can be recorded.
+  Per-ledger appends serialize the capacity check and write, so concurrent notes cannot exceed the
+  256 KiB ceiling.
 - Run capsules use unique private directories below
   `${PI_CODING_AGENT_DIR}/artifacts/run-capsules/<sha256(cwd)>/<run-uuid>/`. The `0600`
   `state-v1.json` file and Pi `run_state_v1` custom entry are structured restore authorities;
@@ -254,6 +256,9 @@ oversized files.
 - Provider timing rows are numeric and observational: request-to-headers, first token, stream
   completion, and settlement. The harness does not retry or abort slow local inference; Pi's
   configured retry and timeout behaviour remains authoritative.
+- Both synchronous and asynchronous telemetry writers create `0700` directories and `0600` files;
+  rotated generations remain `0600`. `/runtime-status` reports only whether an endpoint is
+  configured, never the URL, hostname, port, credentials, or path.
 - Run-kernel receipts and state contain hashes, bounded tool/failure classifications, counters,
   and booleans only—never prompts, arguments, commands, output, errors, URLs, endpoints, or paths.
   The PR 1 kernel is in-memory observation, not session memory and not trusted instructions.

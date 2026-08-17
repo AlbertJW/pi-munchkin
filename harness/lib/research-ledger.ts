@@ -172,8 +172,14 @@ export class ResearchLedgerCapacityError extends Error {
 	constructor() { super("research ledger capacity reached"); this.name = "ResearchLedgerCapacityError"; }
 }
 
-/** Append one bounded JSON record without synchronously re-reading the ledger. */
-export async function appendToLedger(path: string, record: ResearchLedgerRecordV2): Promise<void> {
+const LEDGER_QUEUE = "__pi_research_ledger_append_queues_v2";
+function ledgerQueues(): Map<string, Promise<void>> {
+	const shared = globalThis as Record<string, unknown>;
+	if (!(shared[LEDGER_QUEUE] instanceof Map)) shared[LEDGER_QUEUE] = new Map<string, Promise<void>>();
+	return shared[LEDGER_QUEUE] as Map<string, Promise<void>>;
+}
+
+async function appendOne(path: string, record: ResearchLedgerRecordV2): Promise<void> {
 	const line = `${JSON.stringify(record)}\n`;
 	const lineBytes = Buffer.byteLength(line);
 	let existingBytes = 0;
@@ -193,6 +199,18 @@ export async function appendToLedger(path: string, record: ResearchLedgerRecordV
 		await handle.close();
 	}
 	await chmod(path, 0o600);
+}
+
+/** Append one bounded JSON record. Capacity check and append are serialized per
+ * session ledger, so concurrent tool completions cannot overrun the 256 KiB cap. */
+export function appendToLedger(path: string, record: ResearchLedgerRecordV2): Promise<void> {
+	const queues = ledgerQueues();
+	const previous = queues.get(path) ?? Promise.resolve();
+	const next = previous.catch(() => undefined).then(() => appendOne(path, record));
+	queues.set(path, next);
+	const cleanup = () => { if (queues.get(path) === next) queues.delete(path); };
+	void next.then(cleanup, cleanup);
+	return next;
 }
 
 function validStoredUrl(value: unknown): value is StoredUrl {

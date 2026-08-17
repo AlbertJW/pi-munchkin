@@ -47,6 +47,28 @@ test("runtime status distinguishes active override from configured default", asy
 	assert.ok(notes.at(-1)?.includes("Configured default provider:"), notes.at(-1));
 });
 
+test("runtime status reports endpoint presence without disclosing its URL", async () => {
+	const fp = freshPlanRunner();
+	const cwd = tmp();
+	const agent = tmp();
+	const previous = process.env.PI_CODING_AGENT_DIR;
+	process.env.PI_CODING_AGENT_DIR = agent;
+	try {
+		writeFileSync(join(agent, "settings.json"), JSON.stringify({ defaultProvider: "test-provider", defaultModel: "test-model" }));
+		writeFileSync(join(agent, "models.json"), JSON.stringify({ providers: {
+			"test-provider": { baseUrl: "http://private-endpoint.invalid:9999/v1", api: "openai-completions" },
+		} }));
+		const { ctx, notes } = makeCtx(cwd);
+		await fp.commands.get("runtime-status").handler("", ctx);
+		const output = notes.at(-1) ?? "";
+		assert.match(output, /Endpoint configured: yes/);
+		assert.doesNotMatch(output, /private-endpoint|9999|https?:\/\//);
+	} finally {
+		if (previous === undefined) delete process.env.PI_CODING_AGENT_DIR; else process.env.PI_CODING_AGENT_DIR = previous;
+		rmSync(agent, { recursive: true, force: true });
+	}
+});
+
 test("plan telemetry and traces carry the active model override plus run id", async () => {
 	const fp = freshPlanRunner();
 	const cwd = tmp();

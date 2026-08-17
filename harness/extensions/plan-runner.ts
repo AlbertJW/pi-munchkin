@@ -872,7 +872,7 @@ async function runtimeStatusText(ctx: { model?: { provider?: string; id?: string
 		`Active model: ${selected.id}`,
 		`Configured default provider: ${configuredProvider}`,
 		`Configured default model: ${configuredModel}`,
-		`Base URL: ${providerCfg?.baseUrl ?? "not configured for selected provider"}`,
+		`Endpoint configured: ${typeof providerCfg?.baseUrl === "string" && providerCfg.baseUrl.length > 0 ? "yes" : "no"}`,
 		`API: ${providerCfg?.api ?? "unknown"}`,
 		`Default thinking: ${settings.defaultThinkingLevel ?? "unknown"}`,
 		`Compaction: ${settings.compaction?.enabled ? "enabled" : "disabled"}`,
