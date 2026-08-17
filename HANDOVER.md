@@ -41,7 +41,7 @@ adoption, deletion, live mirroring, and gate rounds are human-gated. Never touch
 > rounds bind this). A 2.75-day wedged bare `pi` on ttys004 (stdin-wedge orphan) was cleared
 > before the mirror.
 >
-> **PENDING GATES (Albert):** approve charter + prereg; approve the five cohort fixtures
+> **PENDING GATES (Albert):** approve charter + prereg; approve the seven cohort fixtures (4 ling + 3 sweep)
 > (`fixture_admission.py approve <name> --reviewer …`); label ≥10 judge transcripts. Then
 > the first BOX round is Phase 6 — audit-sweep graded, base arm, local 4B, n≥9, preceded by
 > one n=1 smoke row (the first end-to-end exercise of the v3 settlement-authority
