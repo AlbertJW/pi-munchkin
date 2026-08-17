@@ -62,6 +62,9 @@ const expectedExtensions = [
   // Private state projection consumes finalized kernel snapshots and must
   // checkpoint before the last-loaded telemetry durability boundary.
   "harness/extensions/run-capsule.ts",
+  // Dark per-run notebook consumes the exact capsule identity above. With its
+  // flag unset it registers no tool, command, handler, or prompt surface.
+  "harness/extensions/working-memory.ts",
   // MOVED here 2026-08-11 (was directly after session-blackboard): the receipt
   // is only meaningful if nothing appends to the context array afterwards, and
   // run-capsule's recovery brief did exactly that — telemetry described a

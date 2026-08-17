@@ -91,6 +91,10 @@
     "verify-gate/gate-green-consumed",
     "verify-gate/gate-green-execution-ordered",
     "verify-gate/steer",
-    "verify-gate/unverified-end"
+    "verify-gate/unverified-end",
+    "working-memory/list",
+    "working-memory/resolve",
+    "working-memory/settled",
+    "working-memory/upsert"
   ]
 }

@@ -27,3 +27,16 @@ from evaluated sessions, endpoints, private artifact paths, or raw model output.
 - Restoration: the correction reports only failure class, distinct call-variant
   count, frontier state, and a required next action. Recovery receipt v2 retains
   `call_variant_hashes` and no strategy claim.
+
+## PR 3 — dark structured working memory
+
+- Counterfactual: temporarily bypassed the dark-mode registration guard.
+- Command: `node --experimental-strip-types --test --test-name-pattern='extension is absent by default' harness/tests/working-memory.test.ts`.
+- Expected failure observed: `extension is absent by default and contributes no tool prompt surface`
+  found the tool registered with the option unset.
+- Target: `extension is absent by default and contributes no tool prompt surface`.
+- Restoration requirement: unset `WORKING_MEMORY` registers no tool, command, or
+  lifecycle handler and contributes zero prompt bytes.
+- Full acceptance: `npm run verify` passed all five stages; deterministic package
+  smoke loaded 31 extensions and two skills; peer boundaries and isolated packed
+  consumers for Pi 0.80–0.84 passed.

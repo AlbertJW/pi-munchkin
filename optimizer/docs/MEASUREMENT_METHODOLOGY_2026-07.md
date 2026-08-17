@@ -606,3 +606,19 @@ zero. Correctness may fall by at most five percentage points, intervention expos
 20%, and token usage must show no statistically significant regression. The second eligible
 fixture must agree in direction without violating the correctness or token guards. Reports never
 turn those rules into an automatic default flip.
+
+---
+
+## §19 — Structured working memory is an untrusted, separately measured candidate
+
+`WORKING_MEMORY=on` exposes an explicit, bounded per-run notebook. Its contents are model-authored
+hypotheses, not reasoning traces, evidence, plans, verification, or trusted instructions. The
+default `off` state registers no tool, command, handler, schema, or prompt text. V1 performs no
+automatic context injection.
+
+The mechanism screen requires at least one write in 20% of six candidate-only sessions and a
+later list, resolution, or supersession in at least half of writing sessions. Authenticated study
+rows may retain only write/list/resolution/supersession counts, stale-active counts, and byte
+totals; note text and artifact locations are forbidden. A dedicated row generation must be
+preregistered before that screen—the current v4 row does not retroactively acquire notebook
+semantics. Working memory and plateau enforcement are first tested separately.

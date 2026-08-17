@@ -135,6 +135,10 @@
           "shadow",
           "enforce"
         ],
+        "WORKING_MEMORY": [
+          "off",
+          "on"
+        ],
         "DRIFT_SCANNER": [
           "on",
           "off"
