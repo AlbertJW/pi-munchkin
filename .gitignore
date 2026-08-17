@@ -18,3 +18,4 @@ optimizer/prompt-lab/configs/applied/
 **/*.token
 **/.env
 **/node_modules/
+/node_modules

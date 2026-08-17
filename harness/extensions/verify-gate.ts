@@ -1,6 +1,6 @@
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
-import { readdir } from "node:fs/promises";
-import { isAbsolute, relative, resolve, sep } from "node:path";
+import { readdir, realpath } from "node:fs/promises";
+import { basename, dirname, isAbsolute, relative, resolve, sep } from "node:path";
 import { classifyBashCommand, isSourceMutation, looksFailingOutput, normalizeVerificationCommand, verificationEvidence } from "../lib/command-policy.ts";
 import { clearPlanGateReceipt, consumePlanGateReceipt } from "../lib/plan-gate-receipt.ts";
 import { clearDetectedProjectGate, detectProjectGate, publishDetectedProjectGate } from "../lib/project-gate.ts";
@@ -70,16 +70,40 @@ let composeProject = false;
 // dogfood case was a report written to ~/Desktop while cwd was a code project,
 // which armed the gate and drove 8 unsatisfiable steers.
 let sessionCwd = process.cwd();
+let canonicalSessionCwd = resolve(sessionCwd);
 
-// True only when `p` resolves to a path OUTSIDE sessionCwd. A missing or
-// unresolvable path returns false, so the mutation stays armed (fail-closed).
+// True only when `p` resolves to a path OUTSIDE the canonical session cwd.
+// Resolve the nearest existing ancestor so a not-yet-created file below a
+// symlink cannot bypass the boundary. Missing or unresolvable paths return
+// false, so the mutation stays armed (fail-closed).
 // Only edit/write/multiedit paths are scoped this way; bash-mediated mutations
 // (sed -i, redirects) remain path-unscoped by design — a known, documented limit.
-function pathOutsideCwd(p: unknown): boolean {
+async function canonicalProspectivePath(path: string): Promise<string> {
+	let cursor = resolve(path);
+	const suffix: string[] = [];
+	for (;;) {
+		try {
+			return resolve(await realpath(cursor), ...suffix);
+		} catch (error) {
+			if ((error as NodeJS.ErrnoException)?.code !== "ENOENT") throw error;
+			const parent = dirname(cursor);
+			if (parent === cursor) throw error;
+			suffix.unshift(basename(cursor));
+			cursor = parent;
+		}
+	}
+}
+
+async function pathOutsideCwd(p: unknown): Promise<boolean> {
 	if (typeof p !== "string" || !p.trim()) return false;
 	const abs = isAbsolute(p) ? p : resolve(sessionCwd, p);
-	const rel = relative(sessionCwd, abs);
-	return rel === ".." || rel.startsWith(`..${sep}`) || isAbsolute(rel);
+	try {
+		const canonical = await canonicalProspectivePath(abs);
+		const rel = relative(canonicalSessionCwd, canonical);
+		return rel === ".." || rel.startsWith(`..${sep}`) || isAbsolute(rel);
+	} catch {
+		return false; // unresolved means the mutation remains armed (fail closed)
+	}
 }
 
 const GATE_DISPLAY_MAX_BYTES = 240;
@@ -153,14 +177,14 @@ export default function (pi: ExtensionAPI) {
 	const order = new VerificationOrderClock();
 	let failedSinceTurnEnd = false;
 
-	const classifyStart = (toolName: string, args: Record<string, unknown>): OrderedCallKind => {
+	const classifyStart = async (toolName: string, args: Record<string, unknown>): Promise<OrderedCallKind> => {
 		const isToolMutation = MUTATION_TOOLS.has(toolName);
 		const sourceMutation = isToolMutation ||
 			(toolName === "bash" && isSourceMutation(String(args.command ?? "")));
 		if (sourceMutation) {
 			// An edit/write/multiedit provably outside the session cwd does not arm the
 			// gate (see pathOutsideCwd). Missing/unresolvable paths stay armed.
-			if (isToolMutation && pathOutsideCwd(args.path)) return "other";
+			if (isToolMutation && await pathOutsideCwd(args.path)) return "other";
 			return "source_mutation";
 		}
 		if (toolName !== "bash") return "other";
@@ -202,6 +226,8 @@ export default function (pi: ExtensionAPI) {
 		delete (globalThis as Record<string, unknown>).__pi_vg_state;
 		const cwd = ctx?.cwd || process.cwd();
 		sessionCwd = cwd;
+		try { canonicalSessionCwd = await realpath(cwd); }
+		catch { canonicalSessionCwd = resolve(cwd); }
 		composeProject = await hasComposeFile(cwd);
 		if (!process.env.VERIFY_GATE_CMD) {
 			gateCmd = await detectProjectGate(cwd);
@@ -213,7 +239,7 @@ export default function (pi: ExtensionAPI) {
 		if (!EXECUTION_ORDER) return;
 		const args = event.args && typeof event.args === "object"
 			? event.args as Record<string, unknown> : {};
-		const kind = classifyStart(event.toolName, args);
+		const kind = await classifyStart(event.toolName, args);
 		order.start({ callId: event.toolCallId, kind });
 		if (kind === "source_mutation") {
 			st.mutated = true;
@@ -273,7 +299,7 @@ export default function (pi: ExtensionAPI) {
 			// start/end can never provide green evidence.
 			for (const c of toolCalls) {
 				if (order.hasCompleted(c.id)) continue;
-				const kind = classifyStart(c.name, c.args);
+				const kind = await classifyStart(c.name, c.args);
 				// A transcript call with no complete execution event is not evidence of
 				// success. Register a missing mutation as pending so no later verifier
 				// can silently green the session after an unobserved partial write.
@@ -297,7 +323,7 @@ export default function (pi: ExtensionAPI) {
 			}
 		} else {
 			for (const c of toolCalls) {
-				const sourceMutation = (MUTATION_TOOLS.has(c.name) && !pathOutsideCwd(c.args.path)) ||
+				const sourceMutation = (MUTATION_TOOLS.has(c.name) && !await pathOutsideCwd(c.args.path)) ||
 					(c.name === "bash" && isSourceMutation(String(c.args.command ?? "")));
 				if (sourceMutation) {
 					st.mutated = true;

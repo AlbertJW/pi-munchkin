@@ -250,7 +250,11 @@ oversized files.
 - `npm run secret-scan:diff` inspects staged, unstaged, and untracked added lines, plus the added
   lines of every committed-but-unpushed commit (`origin/main...HEAD`), so a commit→scan→push
   sequence cannot report clean on committed content. Findings contain only file, line, and
-  pattern ID; matched text is never printed.
+  pattern ID; matched text is never printed. Untracked symlinks and other non-regular entries are
+  refused without following them.
+- Verification-gate path scoping resolves symlinks (including the nearest existing parent for a
+  new file) before deciding whether a built-in edit belongs to the current project. Resolution
+  uncertainty keeps the gate armed.
 - Extensions run with the Pi process's permissions. Keep machine settings, credentials, and
   private endpoints out of this public repository.
 - Provider timing rows are numeric and observational: request-to-headers, first token, stream
