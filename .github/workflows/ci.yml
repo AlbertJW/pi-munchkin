@@ -14,12 +14,6 @@ jobs:
       matrix:
         os: [ubuntu-latest, macos-latest]
     runs-on: ${{ matrix.os }}
-    # macOS is the development and serving platform and stays a hard gate. The
-    # Linux leg is advisory: `npm run verify` has a known ubuntu-only failure
-    # (diagnostic tooling assumptions in the watchdog e2e test), so its result
-    # is reported in the Actions tab but does not fail the run or email on every
-    # push. Drop this once the Linux leg is genuinely green.
-    continue-on-error: ${{ matrix.os == 'ubuntu-latest' }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4

@@ -397,9 +397,13 @@ def test_runner_dry_modes():
     invalid = subprocess.run([str(runner), "--dry", "--exploratory", "t1"], cwd=admission.ROOT,
                              env={**env, "GATE_NETWORK": "endpoint"}, capture_output=True, text=True, timeout=15)
     assert invalid.returncode == 2 and "requires GATE_NETWORK=open" in invalid.stderr
-    hidden = subprocess.run([str(runner), "--dry", "--exploratory", "parens"], cwd=admission.ROOT,
-                            env=env, capture_output=True, text=True, timeout=15)
-    assert hidden.returncode == 2 and "requires SANDBOX=on" in hidden.stderr
+    hidden_dry = subprocess.run([str(runner), "--dry", "--exploratory", "parens"], cwd=admission.ROOT,
+                                env=env, capture_output=True, text=True, timeout=15)
+    assert hidden_dry.returncode == 0, hidden_dry.stderr
+    assert "would run" in hidden_dry.stdout
+    hidden_run = subprocess.run([str(runner), "--exploratory", "parens"], cwd=admission.ROOT,
+                                env=env, capture_output=True, text=True, timeout=15)
+    assert hidden_run.returncode == 2 and "requires SANDBOX=on" in hidden_run.stderr
 
 
 def test_robustness_and_usage():

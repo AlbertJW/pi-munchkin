@@ -209,7 +209,7 @@ elif [[ "$SANDBOX" == "on" && "$MODEL_IP" != "127.0.0.1" && "$MODEL_IP" != "::1"
 fi
 # The hidden-test claim is invalid without read isolation. Refuse rather than
 # emit benchmark-shaped rows that can inspect graders or recover them from Git.
-if [[ "$SANDBOX" != "on" ]]; then
+if [[ "$SANDBOX" != "on" && "$DRY" != 1 ]]; then
 	for task in "${TASKS[@]}" ${HELDOUT:-}; do
 		if is_hidden "$task"; then
 			echo "[real_gate] hidden task '$task' requires SANDBOX=on with sandbox-exec; refusing an invalid run" >&2

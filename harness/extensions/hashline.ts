@@ -114,7 +114,15 @@ The header above is a PLACEHOLDER. Substitute the real path you read and the rea
 Ops: replace N..M: · insert before N: / after N: / head: / tail: · delete N..M. replace/insert REQUIRE "+" body rows (to remove lines use delete). Body rows start with "+" and are the FINAL content (never old lines, never context). "+" alone = blank line.
 Critical: (1) Path + #TAG + line numbers come from YOUR LAST read/edit response for that file — copy the #TAG character-for-character; never from memory, never the placeholder. (2) every edit mints a fresh #TAG and renumbers the file — take the next edit's numbers from the edit response or a fresh read. (3) Ranges tight: only lines whose content changes. (4) Multiple files = multiple [path#TAG] sections in one patch.`;
 
-export default function (pi: ExtensionAPI) {
+export type HashlineIo = {
+	writeTarget(path: string, text: string): Promise<void>;
+};
+
+const DEFAULT_IO: HashlineIo = {
+	writeTarget: async (path, text) => { await writeFile(path, text, "utf8"); },
+};
+
+export function registerHashline(pi: ExtensionAPI, io: HashlineIo = DEFAULT_IO) {
 	if (!ENABLED) return;
 
 	pi.registerTool(
@@ -290,7 +298,7 @@ export default function (pi: ExtensionAPI) {
 				// pristine bytes so the I/O layer cannot re-open the half-applied hole.
 				try {
 					for (const p of planned) {
-						await writeFile(p.abs, p.finalText, "utf8");
+						await io.writeTarget(p.abs, p.finalText);
 					}
 				} catch (e) {
 					// Restore EVERY target, including the write that rejected: writeFile
@@ -354,3 +362,5 @@ export default function (pi: ExtensionAPI) {
 		}),
 	);
 }
+
+export default registerHashline;

@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from "node:fs";
+import { existsSync, mkdtempSync, mkdirSync, writeFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { attemptedPathFrom, closestExistingPath } from "../lib/did-you-mean.ts";
@@ -19,10 +19,11 @@ test("near-basename sibling in an existing parent", async () => {
 	const d = tree();
 	try {
 		assert.equal(await closestExistingPath(d, "src/utils.js"), "src/util.js");   // distance 1
-		// case slip: on case-insensitive APFS the path EXISTS (read succeeds, no
-		// ENOENT ever fires) -> correctly no suggestion. The d=0 branch still
-		// matters on case-sensitive volumes.
-		assert.equal(await closestExistingPath(d, "src/Util.js"), null);
+		// A case-only alias already exists on case-insensitive APFS, so no failed
+		// lookup needs a hint. On a case-sensitive volume it is absent and the
+		// unique distance-0 sibling is the correct suggestion.
+		const caseAliasExists = existsSync(join(d, "src/Util.js"));
+		assert.equal(await closestExistingPath(d, "src/Util.js"), caseAliasExists ? null : "src/util.js");
 	} finally { rmSync(d, { recursive: true, force: true }); }
 });
 
