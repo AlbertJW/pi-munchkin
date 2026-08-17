@@ -85,7 +85,8 @@ async function validateHop(raw: string, dnsLookup: DnsLookup): Promise<URL> {
 	try { url = new URL(raw); } catch { throw new Error("URL is malformed"); }
 	if (url.protocol !== "http:" && url.protocol !== "https:") throw new Error("only public HTTP(S) URLs are allowed");
 	if (url.username || url.password) throw new Error("URL credentials are not allowed");
-	if (!url.hostname || url.hostname.toLowerCase() === "localhost" || url.hostname.endsWith(".localhost")) {
+	const normalizedHostname = url.hostname.toLowerCase().replace(/\.+$/u, "");
+	if (!normalizedHostname || normalizedHostname === "localhost" || normalizedHostname.endsWith(".localhost")) {
 		throw new Error("local hostnames are not allowed");
 	}
 	let addresses: LookupAddress[];
@@ -95,7 +96,7 @@ async function validateHop(raw: string, dnsLookup: DnsLookup): Promise<URL> {
 	if (literalV4 !== null || literalV6 !== null) {
 		addresses = [{ address: literal, family: literalV4 !== null ? 4 : 6 }];
 	} else {
-		try { addresses = await dnsLookup(url.hostname); } catch {
+		try { addresses = await dnsLookup(normalizedHostname); } catch {
 			throw new Error("DNS lookup failed");
 		}
 	}
