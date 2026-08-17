@@ -1,0 +1,16 @@
+--- a/src/parse-job.js
++++ b/src/parse-job.js
+@@ -1,4 +1,4 @@
+-const ALLOWED = new Set(['queued', 'running', 'done']);
++const ALLOWED = new Set(['queued', 'blocked', 'running', 'done']);
+
+ export function parseJob(line) {
+   const [id, rawStatus, ...extra] = line.split(':');
+--- a/src/policy.js
++++ b/src/policy.js
+@@ -1,4 +1,4 @@
+-export const STATUS_ORDER = ['queued', 'running', 'done'];
++export const STATUS_ORDER = ['queued', 'blocked', 'running', 'done'];
+
+ export function canTransition(from, to) {
+   return STATUS_ORDER.indexOf(to) === STATUS_ORDER.indexOf(from) + 1;

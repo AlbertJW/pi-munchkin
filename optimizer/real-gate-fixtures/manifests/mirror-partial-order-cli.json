@@ -1,0 +1,607 @@
+{
+  "admission": {
+    "approved": false,
+    "automated": {
+      "checked_at": "2026-08-17T16:15:00Z",
+      "hash_drift": [],
+      "manifest_drift": false,
+      "oracle": {
+        "passed": true,
+        "runs": [
+          {
+            "output_bytes": 43,
+            "output_sha256": "fcaba59c7f400e5b2a64f6a89d983e948caf9d1ea8e25ece9f5555b8f782e41b",
+            "passed": true
+          },
+          {
+            "output_bytes": 43,
+            "output_sha256": "fcaba59c7f400e5b2a64f6a89d983e948caf9d1ea8e25ece9f5555b8f782e41b",
+            "passed": true
+          },
+          {
+            "output_bytes": 43,
+            "output_sha256": "fcaba59c7f400e5b2a64f6a89d983e948caf9d1ea8e25ece9f5555b8f782e41b",
+            "passed": true
+          }
+        ],
+        "stable": true
+      },
+      "overlay_lint": [],
+      "passed": true,
+      "runs_per_state": 3,
+      "states": {
+        "gold_fail_to_pass": [
+          {
+            "output_bytes": 1192,
+            "output_sha256": "c7777f4b840958ae1be83dced4ac3beb2bfae18a956466d5c29613f4239303c8",
+            "output_tail": "TAP version 13\n# Subtest: dual:dependencies schedule a changed multi-hop chain\nok 1 - dual:dependencies schedule a changed multi-hop chain\n  ---\n  duration_ms: 0.742833\n  type: 'test'\n  ...\n# Subtest: dual:dependencies schedule a changed fork and join\nok 2 - dual:dependencies schedule a changed fork and join\n  ---\n  duration_ms: 0.083708\n  type: 'test'\n  ...\n# Subtest: dual:ready-set uses urgency after a dependency unlocks\nok 3 - dual:ready-set uses urgency after a dependency unlocks\n  ---\n  duration_ms: 0.397792\n  type: 'test'\n  ...\n# Subtest: dual:ready-set uses original input order after an urgency tie\nok 4 - dual:ready-set uses original input order after an urgency tie\n  ---\n  duration_ms: 0.090167\n  type: 'test'\n  ...\n# Subtest: dual:integrity rejects unknown and duplicate identifiers\nok 5 - dual:integrity rejects unknown and duplicate identifiers\n  ---\n  duration_ms: 0.260458\n  type: 'test'\n  ...\n# Subtest: dual:integrity rejects cycles without mutating input\nok 6 - dual:integrity rejects cycles without mutating input\n  ---\n  duration_ms: 0.1305\n  type: 'test'\n  ...\n1..6\n# tests 6\n# suites 0\n# pass 6\n# fail 0\n# cancelled 0\n# skipped 0\n# todo 0\n# duration_ms 50.554167\n",
+            "passed": true,
+            "returncode": 0,
+            "weighted_grade": {
+              "fixed": 100,
+              "source": "tap-reporter-weighted",
+              "total": 100
+            }
+          },
+          {
+            "output_bytes": 1191,
+            "output_sha256": "d039c886f00b5aa27a4af4012f650f8f0cc97e4d147005fe411a01aa3a8aeebe",
+            "output_tail": "TAP version 13\n# Subtest: dual:dependencies schedule a changed multi-hop chain\nok 1 - dual:dependencies schedule a changed multi-hop chain\n  ---\n  duration_ms: 0.743834\n  type: 'test'\n  ...\n# Subtest: dual:dependencies schedule a changed fork and join\nok 2 - dual:dependencies schedule a changed fork and join\n  ---\n  duration_ms: 0.079833\n  type: 'test'\n  ...\n# Subtest: dual:ready-set uses urgency after a dependency unlocks\nok 3 - dual:ready-set uses urgency after a dependency unlocks\n  ---\n  duration_ms: 0.38975\n  type: 'test'\n  ...\n# Subtest: dual:ready-set uses original input order after an urgency tie\nok 4 - dual:ready-set uses original input order after an urgency tie\n  ---\n  duration_ms: 0.087208\n  type: 'test'\n  ...\n# Subtest: dual:integrity rejects unknown and duplicate identifiers\nok 5 - dual:integrity rejects unknown and duplicate identifiers\n  ---\n  duration_ms: 0.2545\n  type: 'test'\n  ...\n# Subtest: dual:integrity rejects cycles without mutating input\nok 6 - dual:integrity rejects cycles without mutating input\n  ---\n  duration_ms: 0.132291\n  type: 'test'\n  ...\n1..6\n# tests 6\n# suites 0\n# pass 6\n# fail 0\n# cancelled 0\n# skipped 0\n# todo 0\n# duration_ms 52.769959\n",
+            "passed": true,
+            "returncode": 0,
+            "weighted_grade": {
+              "fixed": 100,
+              "source": "tap-reporter-weighted",
+              "total": 100
+            }
+          },
+          {
+            "output_bytes": 1191,
+            "output_sha256": "5b072fc5f01d95241f4a70b8429a0553d0e91265ea7031c0c8fb622ef985affe",
+            "output_tail": "TAP version 13\n# Subtest: dual:dependencies schedule a changed multi-hop chain\nok 1 - dual:dependencies schedule a changed multi-hop chain\n  ---\n  duration_ms: 0.7385\n  type: 'test'\n  ...\n# Subtest: dual:dependencies schedule a changed fork and join\nok 2 - dual:dependencies schedule a changed fork and join\n  ---\n  duration_ms: 0.081042\n  type: 'test'\n  ...\n# Subtest: dual:ready-set uses urgency after a dependency unlocks\nok 3 - dual:ready-set uses urgency after a dependency unlocks\n  ---\n  duration_ms: 0.379459\n  type: 'test'\n  ...\n# Subtest: dual:ready-set uses original input order after an urgency tie\nok 4 - dual:ready-set uses original input order after an urgency tie\n  ---\n  duration_ms: 0.091125\n  type: 'test'\n  ...\n# Subtest: dual:integrity rejects unknown and duplicate identifiers\nok 5 - dual:integrity rejects unknown and duplicate identifiers\n  ---\n  duration_ms: 0.255291\n  type: 'test'\n  ...\n# Subtest: dual:integrity rejects cycles without mutating input\nok 6 - dual:integrity rejects cycles without mutating input\n  ---\n  duration_ms: 0.13075\n  type: 'test'\n  ...\n1..6\n# tests 6\n# suites 0\n# pass 6\n# fail 0\n# cancelled 0\n# skipped 0\n# todo 0\n# duration_ms 53.758583\n",
+            "passed": true,
+            "returncode": 0,
+            "weighted_grade": {
+              "fixed": 100,
+              "source": "tap-reporter-weighted",
+              "total": 100
+            }
+          }
+        ],
+        "gold_pass_to_pass": [
+          {
+            "output_bytes": 268,
+            "output_sha256": "d78ba188e832817e1d81bc5726db68f459a6c8d7c557725392e4b96a11c2cdcc",
+            "output_tail": "\u2714 visible: orders independent jobs by urgency through the CLI (38.64625ms)\n\u2714 visible: preserves input order for independent urgency ties (0.146833ms)\n\u2139 tests 2\n\u2139 suites 0\n\u2139 pass 2\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 89.779625\n",
+            "passed": true,
+            "returncode": 0
+          },
+          {
+            "output_bytes": 269,
+            "output_sha256": "17c1c283e0d6df99426d1be76f135babcbe620694a4a720e722209233316e9d6",
+            "output_tail": "\u2714 visible: orders independent jobs by urgency through the CLI (38.183875ms)\n\u2714 visible: preserves input order for independent urgency ties (0.154667ms)\n\u2139 tests 2\n\u2139 suites 0\n\u2139 pass 2\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 89.418583\n",
+            "passed": true,
+            "returncode": 0
+          },
+          {
+            "output_bytes": 269,
+            "output_sha256": "5ee7673cf499631f402662b82690e6e0d80cd7e31959230a0524f04961645739",
+            "output_tail": "\u2714 visible: orders independent jobs by urgency through the CLI (37.438208ms)\n\u2714 visible: preserves input order for independent urgency ties (0.147166ms)\n\u2139 tests 2\n\u2139 suites 0\n\u2139 pass 2\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 87.837125\n",
+            "passed": true,
+            "returncode": 0
+          }
+        ],
+        "mutant:depth-first-order": {
+          "fail_to_pass": [
+            {
+              "output_bytes": 5378,
+              "output_sha256": "920340b77a184c9c52e2f6958ad7aec6d1100568128f2a84ea57e9e774adb625",
+              "output_tail": "text.<anonymous> (file://<path>:29:10)\n    Test.runInAsyncScope (node:async_hooks:226:14)\n    Test.run (node:internal/test_runner/test:1382:25)\n    Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n    Test.postRun (node:internal/test_runner/test:1522:19)\n    Test.run (node:internal/test_runner/test:1447:12)\n    async Test.processPendingSubtests (node:internal/test_runner/test:960:7)\n  ...\n# Subtest: dual:ready-set uses original input order after an urgency tie\nok 4 - dual:ready-set uses original input order after an urgency tie\n  ---\n  duration_ms: 0.09475\n  type: 'test'\n  ...\n# Subtest: dual:integrity rejects unknown and duplicate identifiers\nnot ok 5 - dual:integrity rejects unknown and duplicate identifiers\n  ---\n  duration_ms: 0.233458\n  type: 'test'\n  location: '<path>:44:1'\n  failureType: 'testCodeFailure'\n  error: 'Missing expected exception.'\n  code: 'ERR_ASSERTION'\n  name: 'AssertionError'\n  expected:\n  operator: 'throws'\n  stack: |-\n    TestContext.<anonymous> (file://<path>:46:10)\n    Test.runInAsyncScope (node:async_hooks:226:14)\n    Test.run (node:internal/test_runner/test:1382:25)\n    Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n    Test.postRun (node:internal/test_runner/test:1522:19)\n    Test.run (node:internal/test_runner/test:1447:12)\n    async Test.processPendingSubtests (node:internal/test_runner/test:960:7)\n  ...\n# Subtest: dual:integrity rejects cycles without mutating input\nok 6 - dual:integrity rejects cycles without mutating input\n  ---\n  duration_ms: 0.128208\n  type: 'test'\n  ...\n1..6\n# tests 6\n# suites 0\n# pass 2\n# fail 4\n# cancelled 0\n# skipped 0\n# todo 0\n# duration_ms 54.208667\n",
+              "passed": false,
+              "returncode": 1,
+              "weighted_grade": {
+                "fixed": 30,
+                "source": "tap-reporter-weighted",
+                "total": 100
+              }
+            },
+            {
+              "output_bytes": 5376,
+              "output_sha256": "31765d12cf5d1f0b1a7fbeca02b5fcc847b60f2bd0caafb9d0ea8688c6d902a5",
+              "output_tail": "tContext.<anonymous> (file://<path>:29:10)\n    Test.runInAsyncScope (node:async_hooks:226:14)\n    Test.run (node:internal/test_runner/test:1382:25)\n    Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n    Test.postRun (node:internal/test_runner/test:1522:19)\n    Test.run (node:internal/test_runner/test:1447:12)\n    async Test.processPendingSubtests (node:internal/test_runner/test:960:7)\n  ...\n# Subtest: dual:ready-set uses original input order after an urgency tie\nok 4 - dual:ready-set uses original input order after an urgency tie\n  ---\n  duration_ms: 0.09175\n  type: 'test'\n  ...\n# Subtest: dual:integrity rejects unknown and duplicate identifiers\nnot ok 5 - dual:integrity rejects unknown and duplicate identifiers\n  ---\n  duration_ms: 0.231166\n  type: 'test'\n  location: '<path>:44:1'\n  failureType: 'testCodeFailure'\n  error: 'Missing expected exception.'\n  code: 'ERR_ASSERTION'\n  name: 'AssertionError'\n  expected:\n  operator: 'throws'\n  stack: |-\n    TestContext.<anonymous> (file://<path>:46:10)\n    Test.runInAsyncScope (node:async_hooks:226:14)\n    Test.run (node:internal/test_runner/test:1382:25)\n    Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n    Test.postRun (node:internal/test_runner/test:1522:19)\n    Test.run (node:internal/test_runner/test:1447:12)\n    async Test.processPendingSubtests (node:internal/test_runner/test:960:7)\n  ...\n# Subtest: dual:integrity rejects cycles without mutating input\nok 6 - dual:integrity rejects cycles without mutating input\n  ---\n  duration_ms: 0.13\n  type: 'test'\n  ...\n1..6\n# tests 6\n# suites 0\n# pass 2\n# fail 4\n# cancelled 0\n# skipped 0\n# todo 0\n# duration_ms 54.206708\n",
+              "passed": false,
+              "returncode": 1,
+              "weighted_grade": {
+                "fixed": 30,
+                "source": "tap-reporter-weighted",
+                "total": 100
+              }
+            },
+            {
+              "output_bytes": 5381,
+              "output_sha256": "0befb723847b516a8f0d06ba3b66503217a54c93577e34b71dc1b353a9137f79",
+              "output_tail": "ext.<anonymous> (file://<path>:29:10)\n    Test.runInAsyncScope (node:async_hooks:226:14)\n    Test.run (node:internal/test_runner/test:1382:25)\n    Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n    Test.postRun (node:internal/test_runner/test:1522:19)\n    Test.run (node:internal/test_runner/test:1447:12)\n    async Test.processPendingSubtests (node:internal/test_runner/test:960:7)\n  ...\n# Subtest: dual:ready-set uses original input order after an urgency tie\nok 4 - dual:ready-set uses original input order after an urgency tie\n  ---\n  duration_ms: 0.090916\n  type: 'test'\n  ...\n# Subtest: dual:integrity rejects unknown and duplicate identifiers\nnot ok 5 - dual:integrity rejects unknown and duplicate identifiers\n  ---\n  duration_ms: 0.228583\n  type: 'test'\n  location: '<path>:44:1'\n  failureType: 'testCodeFailure'\n  error: 'Missing expected exception.'\n  code: 'ERR_ASSERTION'\n  name: 'AssertionError'\n  expected:\n  operator: 'throws'\n  stack: |-\n    TestContext.<anonymous> (file://<path>:46:10)\n    Test.runInAsyncScope (node:async_hooks:226:14)\n    Test.run (node:internal/test_runner/test:1382:25)\n    Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n    Test.postRun (node:internal/test_runner/test:1522:19)\n    Test.run (node:internal/test_runner/test:1447:12)\n    async Test.processPendingSubtests (node:internal/test_runner/test:960:7)\n  ...\n# Subtest: dual:integrity rejects cycles without mutating input\nok 6 - dual:integrity rejects cycles without mutating input\n  ---\n  duration_ms: 0.127708\n  type: 'test'\n  ...\n1..6\n# tests 6\n# suites 0\n# pass 2\n# fail 4\n# cancelled 0\n# skipped 0\n# todo 0\n# duration_ms 53.373667\n",
+              "passed": false,
+              "returncode": 1,
+              "weighted_grade": {
+                "fixed": 30,
+                "source": "tap-reporter-weighted",
+                "total": 100
+              }
+            }
+          ],
+          "pass_to_pass": [
+            {
+              "output_bytes": 268,
+              "output_sha256": "d3258221f6effbc15192ee86a0e6aeb0fac03d41285db04bd00e5ce2c2d8b4ab",
+              "output_tail": "\u2714 visible: orders independent jobs by urgency through the CLI (36.928292ms)\n\u2714 visible: preserves input order for independent urgency ties (0.12975ms)\n\u2139 tests 2\n\u2139 suites 0\n\u2139 pass 2\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 87.833208\n",
+              "passed": true,
+              "returncode": 0
+            },
+            {
+              "output_bytes": 269,
+              "output_sha256": "ceb563871f79f8c060f0902008ccbfc452f018b85d649366fc2432055f6834dc",
+              "output_tail": "\u2714 visible: orders independent jobs by urgency through the CLI (44.324708ms)\n\u2714 visible: preserves input order for independent urgency ties (0.210708ms)\n\u2139 tests 2\n\u2139 suites 0\n\u2139 pass 2\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 94.303541\n",
+              "passed": true,
+              "returncode": 0
+            },
+            {
+              "output_bytes": 269,
+              "output_sha256": "90bd83ed1b2d336d7970c86c01b175b15d5d66add19d81fe2413d59ce0b7633c",
+              "output_tail": "\u2714 visible: orders independent jobs by urgency through the CLI (37.775834ms)\n\u2714 visible: preserves input order for independent urgency ties (0.127875ms)\n\u2139 tests 2\n\u2139 suites 0\n\u2139 pass 2\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 89.297875\n",
+              "passed": true,
+              "returncode": 0
+            }
+          ]
+        },
+        "mutant:local-dependency-repair": {
+          "fail_to_pass": [
+            {
+              "output_bytes": 3992,
+              "output_sha256": "6b29c62022d9bbb0cdd9c34e8b5f11d1ee8f271e4f321fbb17018845ddd766c2",
+              "output_tail": "rs\n  ---\n  duration_ms: 0.135541\n  type: 'test'\n  location: '<path>:44:1'\n  failureType: 'testCodeFailure'\n  error: 'Missing expected exception.'\n  code: 'ERR_ASSERTION'\n  name: 'AssertionError'\n  expected:\n  operator: 'throws'\n  stack: |-\n    TestContext.<anonymous> (file://<path>:45:10)\n    Test.runInAsyncScope (node:async_hooks:226:14)\n    Test.run (node:internal/test_runner/test:1382:25)\n    Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n    Test.postRun (node:internal/test_runner/test:1522:19)\n    Test.run (node:internal/test_runner/test:1447:12)\n    async Test.processPendingSubtests (node:internal/test_runner/test:960:7)\n  ...\n# Subtest: dual:integrity rejects cycles without mutating input\nnot ok 6 - dual:integrity rejects cycles without mutating input\n  ---\n  duration_ms: 0.075041\n  type: 'test'\n  location: '<path>:49:1'\n  failureType: 'testCodeFailure'\n  error: 'Missing expected exception.'\n  code: 'ERR_ASSERTION'\n  name: 'AssertionError'\n  expected:\n  operator: 'throws'\n  stack: |-\n    TestContext.<anonymous> (file://<path>:50:10)\n    Test.runInAsyncScope (node:async_hooks:226:14)\n    Test.run (node:internal/test_runner/test:1382:25)\n    Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n    Test.postRun (node:internal/test_runner/test:1522:19)\n    Test.run (node:internal/test_runner/test:1447:12)\n    async Test.processPendingSubtests (node:internal/test_runner/test:960:7)\n  ...\n1..6\n# tests 6\n# suites 0\n# pass 3\n# fail 3\n# cancelled 0\n# skipped 0\n# todo 0\n# duration_ms 53.561458\n",
+              "passed": false,
+              "returncode": 1,
+              "weighted_grade": {
+                "fixed": 50,
+                "source": "tap-reporter-weighted",
+                "total": 100
+              }
+            },
+            {
+              "output_bytes": 3994,
+              "output_sha256": "4bdfbad6e8fb0226a69b90bb386c096221efa89a0fddccd81897b9fad1d68fc4",
+              "output_tail": "rs\n  ---\n  duration_ms: 0.159292\n  type: 'test'\n  location: '<path>:44:1'\n  failureType: 'testCodeFailure'\n  error: 'Missing expected exception.'\n  code: 'ERR_ASSERTION'\n  name: 'AssertionError'\n  expected:\n  operator: 'throws'\n  stack: |-\n    TestContext.<anonymous> (file://<path>:45:10)\n    Test.runInAsyncScope (node:async_hooks:226:14)\n    Test.run (node:internal/test_runner/test:1382:25)\n    Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n    Test.postRun (node:internal/test_runner/test:1522:19)\n    Test.run (node:internal/test_runner/test:1447:12)\n    async Test.processPendingSubtests (node:internal/test_runner/test:960:7)\n  ...\n# Subtest: dual:integrity rejects cycles without mutating input\nnot ok 6 - dual:integrity rejects cycles without mutating input\n  ---\n  duration_ms: 0.080083\n  type: 'test'\n  location: '<path>:49:1'\n  failureType: 'testCodeFailure'\n  error: 'Missing expected exception.'\n  code: 'ERR_ASSERTION'\n  name: 'AssertionError'\n  expected:\n  operator: 'throws'\n  stack: |-\n    TestContext.<anonymous> (file://<path>:50:10)\n    Test.runInAsyncScope (node:async_hooks:226:14)\n    Test.run (node:internal/test_runner/test:1382:25)\n    Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n    Test.postRun (node:internal/test_runner/test:1522:19)\n    Test.run (node:internal/test_runner/test:1447:12)\n    async Test.processPendingSubtests (node:internal/test_runner/test:960:7)\n  ...\n1..6\n# tests 6\n# suites 0\n# pass 3\n# fail 3\n# cancelled 0\n# skipped 0\n# todo 0\n# duration_ms 54.819291\n",
+              "passed": false,
+              "returncode": 1,
+              "weighted_grade": {
+                "fixed": 50,
+                "source": "tap-reporter-weighted",
+                "total": 100
+              }
+            },
+            {
+              "output_bytes": 3994,
+              "output_sha256": "28eb15dca1cf0d70b8822ea7cc19140d1aba7709ffbba4990b5c8309c6817b80",
+              "output_tail": "rs\n  ---\n  duration_ms: 0.134291\n  type: 'test'\n  location: '<path>:44:1'\n  failureType: 'testCodeFailure'\n  error: 'Missing expected exception.'\n  code: 'ERR_ASSERTION'\n  name: 'AssertionError'\n  expected:\n  operator: 'throws'\n  stack: |-\n    TestContext.<anonymous> (file://<path>:45:10)\n    Test.runInAsyncScope (node:async_hooks:226:14)\n    Test.run (node:internal/test_runner/test:1382:25)\n    Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n    Test.postRun (node:internal/test_runner/test:1522:19)\n    Test.run (node:internal/test_runner/test:1447:12)\n    async Test.processPendingSubtests (node:internal/test_runner/test:960:7)\n  ...\n# Subtest: dual:integrity rejects cycles without mutating input\nnot ok 6 - dual:integrity rejects cycles without mutating input\n  ---\n  duration_ms: 0.073208\n  type: 'test'\n  location: '<path>:49:1'\n  failureType: 'testCodeFailure'\n  error: 'Missing expected exception.'\n  code: 'ERR_ASSERTION'\n  name: 'AssertionError'\n  expected:\n  operator: 'throws'\n  stack: |-\n    TestContext.<anonymous> (file://<path>:50:10)\n    Test.runInAsyncScope (node:async_hooks:226:14)\n    Test.run (node:internal/test_runner/test:1382:25)\n    Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n    Test.postRun (node:internal/test_runner/test:1522:19)\n    Test.run (node:internal/test_runner/test:1447:12)\n    async Test.processPendingSubtests (node:internal/test_runner/test:960:7)\n  ...\n1..6\n# tests 6\n# suites 0\n# pass 3\n# fail 3\n# cancelled 0\n# skipped 0\n# todo 0\n# duration_ms 54.053334\n",
+              "passed": false,
+              "returncode": 1,
+              "weighted_grade": {
+                "fixed": 50,
+                "source": "tap-reporter-weighted",
+                "total": 100
+              }
+            }
+          ],
+          "pass_to_pass": [
+            {
+              "output_bytes": 266,
+              "output_sha256": "dc7dc7527b637071970e3338bbf625748729a3882d351f906e410b3b77e5420e",
+              "output_tail": "\u2714 visible: orders independent jobs by urgency through the CLI (37.214833ms)\n\u2714 visible: preserves input order for independent urgency ties (0.132584ms)\n\u2139 tests 2\n\u2139 suites 0\n\u2139 pass 2\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 87.557\n",
+              "passed": true,
+              "returncode": 0
+            },
+            {
+              "output_bytes": 267,
+              "output_sha256": "579e9fa6ac193c02bc60e5c9cec23e301464794f7f8df16f2d284c2aafa7a73f",
+              "output_tail": "\u2714 visible: orders independent jobs by urgency through the CLI (36.4605ms)\n\u2714 visible: preserves input order for independent urgency ties (0.134667ms)\n\u2139 tests 2\n\u2139 suites 0\n\u2139 pass 2\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 87.566667\n",
+              "passed": true,
+              "returncode": 0
+            },
+            {
+              "output_bytes": 269,
+              "output_sha256": "004c5043d94901a66ba54d6ab0709343e702c78b57837adf5371a90653e0a1d4",
+              "output_tail": "\u2714 visible: orders independent jobs by urgency through the CLI (36.916208ms)\n\u2714 visible: preserves input order for independent urgency ties (0.123291ms)\n\u2139 tests 2\n\u2139 suites 0\n\u2139 pass 2\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 88.673542\n",
+              "passed": true,
+              "returncode": 0
+            }
+          ]
+        },
+        "mutant:visible-id-hardcode": {
+          "fail_to_pass": [
+            {
+              "output_bytes": 5671,
+              "output_sha256": "aa7bd223761db7f7a8211cc221d10564ac0b552bd4aced51428548577cea7f4a",
+              "output_tail": "t_runner/test:1382:25)\n    Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n    Test.postRun (node:internal/test_runner/test:1522:19)\n    Test.run (node:internal/test_runner/test:1447:12)\n    async Test.processPendingSubtests (node:internal/test_runner/test:960:7)\n  ...\n# Subtest: dual:ready-set uses original input order after an urgency tie\nnot ok 4 - dual:ready-set uses original input order after an urgency tie\n  ---\n  duration_ms: 0.112834\n  type: 'test'\n  location: '<path>:36:1'\n  failureType: 'testCodeFailure'\n  error: |-\n    Expected values to be strictly deep-equal:\n    + actual - expected\n    \n      [\n    -   'root',\n        'second',\n        'third',\n    +   'root'\n      ]\n    \n  code: 'ERR_ASSERTION'\n  name: 'AssertionError'\n  expected:\n    0: 'root'\n    1: 'second'\n    2: 'third'\n  actual:\n    0: 'second'\n    1: 'third'\n    2: 'root'\n  operator: 'deepStrictEqual'\n  stack: |-\n    TestContext.<anonymous> (file://<path>:37:10)\n    Test.runInAsyncScope (node:async_hooks:226:14)\n    Test.run (node:internal/test_runner/test:1382:25)\n    Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n    Test.postRun (node:internal/test_runner/test:1522:19)\n    Test.run (node:internal/test_runner/test:1447:12)\n    async Test.processPendingSubtests (node:internal/test_runner/test:960:7)\n  ...\n# Subtest: dual:integrity rejects unknown and duplicate identifiers\nok 5 - dual:integrity rejects unknown and duplicate identifiers\n  ---\n  duration_ms: 0.25975\n  type: 'test'\n  ...\n# Subtest: dual:integrity rejects cycles without mutating input\nok 6 - dual:integrity rejects cycles without mutating input\n  ---\n  duration_ms: 0.193208\n  type: 'test'\n  ...\n1..6\n# tests 6\n# suites 0\n# pass 2\n# fail 4\n# cancelled 0\n# skipped 0\n# todo 0\n# duration_ms 59.985666\n",
+              "passed": false,
+              "returncode": 1,
+              "weighted_grade": {
+                "fixed": 30,
+                "source": "tap-reporter-weighted",
+                "total": 100
+              }
+            },
+            {
+              "output_bytes": 5670,
+              "output_sha256": "9cbbd7956c65b76f26873e9d45ae2707158864ffbdcd78dd70941b0c0255b67a",
+              "output_tail": "t_runner/test:1382:25)\n    Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n    Test.postRun (node:internal/test_runner/test:1522:19)\n    Test.run (node:internal/test_runner/test:1447:12)\n    async Test.processPendingSubtests (node:internal/test_runner/test:960:7)\n  ...\n# Subtest: dual:ready-set uses original input order after an urgency tie\nnot ok 4 - dual:ready-set uses original input order after an urgency tie\n  ---\n  duration_ms: 0.114959\n  type: 'test'\n  location: '<path>:36:1'\n  failureType: 'testCodeFailure'\n  error: |-\n    Expected values to be strictly deep-equal:\n    + actual - expected\n    \n      [\n    -   'root',\n        'second',\n        'third',\n    +   'root'\n      ]\n    \n  code: 'ERR_ASSERTION'\n  name: 'AssertionError'\n  expected:\n    0: 'root'\n    1: 'second'\n    2: 'third'\n  actual:\n    0: 'second'\n    1: 'third'\n    2: 'root'\n  operator: 'deepStrictEqual'\n  stack: |-\n    TestContext.<anonymous> (file://<path>:37:10)\n    Test.runInAsyncScope (node:async_hooks:226:14)\n    Test.run (node:internal/test_runner/test:1382:25)\n    Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n    Test.postRun (node:internal/test_runner/test:1522:19)\n    Test.run (node:internal/test_runner/test:1447:12)\n    async Test.processPendingSubtests (node:internal/test_runner/test:960:7)\n  ...\n# Subtest: dual:integrity rejects unknown and duplicate identifiers\nok 5 - dual:integrity rejects unknown and duplicate identifiers\n  ---\n  duration_ms: 0.27825\n  type: 'test'\n  ...\n# Subtest: dual:integrity rejects cycles without mutating input\nok 6 - dual:integrity rejects cycles without mutating input\n  ---\n  duration_ms: 0.128208\n  type: 'test'\n  ...\n1..6\n# tests 6\n# suites 0\n# pass 2\n# fail 4\n# cancelled 0\n# skipped 0\n# todo 0\n# duration_ms 54.884625\n",
+              "passed": false,
+              "returncode": 1,
+              "weighted_grade": {
+                "fixed": 30,
+                "source": "tap-reporter-weighted",
+                "total": 100
+              }
+            },
+            {
+              "output_bytes": 5672,
+              "output_sha256": "7f446ae55d128b448d81c59a16f251f324e9edf444c172737650b1e6e30bc0ea",
+              "output_tail": "_runner/test:1382:25)\n    Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n    Test.postRun (node:internal/test_runner/test:1522:19)\n    Test.run (node:internal/test_runner/test:1447:12)\n    async Test.processPendingSubtests (node:internal/test_runner/test:960:7)\n  ...\n# Subtest: dual:ready-set uses original input order after an urgency tie\nnot ok 4 - dual:ready-set uses original input order after an urgency tie\n  ---\n  duration_ms: 0.115166\n  type: 'test'\n  location: '<path>:36:1'\n  failureType: 'testCodeFailure'\n  error: |-\n    Expected values to be strictly deep-equal:\n    + actual - expected\n    \n      [\n    -   'root',\n        'second',\n        'third',\n    +   'root'\n      ]\n    \n  code: 'ERR_ASSERTION'\n  name: 'AssertionError'\n  expected:\n    0: 'root'\n    1: 'second'\n    2: 'third'\n  actual:\n    0: 'second'\n    1: 'third'\n    2: 'root'\n  operator: 'deepStrictEqual'\n  stack: |-\n    TestContext.<anonymous> (file://<path>:37:10)\n    Test.runInAsyncScope (node:async_hooks:226:14)\n    Test.run (node:internal/test_runner/test:1382:25)\n    Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n    Test.postRun (node:internal/test_runner/test:1522:19)\n    Test.run (node:internal/test_runner/test:1447:12)\n    async Test.processPendingSubtests (node:internal/test_runner/test:960:7)\n  ...\n# Subtest: dual:integrity rejects unknown and duplicate identifiers\nok 5 - dual:integrity rejects unknown and duplicate identifiers\n  ---\n  duration_ms: 0.280208\n  type: 'test'\n  ...\n# Subtest: dual:integrity rejects cycles without mutating input\nok 6 - dual:integrity rejects cycles without mutating input\n  ---\n  duration_ms: 0.128625\n  type: 'test'\n  ...\n1..6\n# tests 6\n# suites 0\n# pass 2\n# fail 4\n# cancelled 0\n# skipped 0\n# todo 0\n# duration_ms 55.135334\n",
+              "passed": false,
+              "returncode": 1,
+              "weighted_grade": {
+                "fixed": 30,
+                "source": "tap-reporter-weighted",
+                "total": 100
+              }
+            }
+          ],
+          "pass_to_pass": [
+            {
+              "output_bytes": 269,
+              "output_sha256": "b169d6c514e6c85de120a26517f07de69fbedfb1cfd470682d157a65a25d7919",
+              "output_tail": "\u2714 visible: orders independent jobs by urgency through the CLI (38.441667ms)\n\u2714 visible: preserves input order for independent urgency ties (0.134083ms)\n\u2139 tests 2\n\u2139 suites 0\n\u2139 pass 2\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 89.502916\n",
+              "passed": true,
+              "returncode": 0
+            },
+            {
+              "output_bytes": 266,
+              "output_sha256": "3f178a1b2f4a94d71a0365baa7cd2a1ce64ac4bd865beada98d95efde251d692",
+              "output_tail": "\u2714 visible: orders independent jobs by urgency through the CLI (37.9655ms)\n\u2714 visible: preserves input order for independent urgency ties (0.139291ms)\n\u2139 tests 2\n\u2139 suites 0\n\u2139 pass 2\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 86.43825\n",
+              "passed": true,
+              "returncode": 0
+            },
+            {
+              "output_bytes": 264,
+              "output_sha256": "be6be95780b44316ce48090c90a5477a1b900469533a030003ab76d713120f12",
+              "output_tail": "\u2714 visible: orders independent jobs by urgency through the CLI (38.066917ms)\n\u2714 visible: preserves input order for independent urgency ties (0.137ms)\n\u2139 tests 2\n\u2139 suites 0\n\u2139 pass 2\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 88.0035\n",
+              "passed": true,
+              "returncode": 0
+            }
+          ]
+        },
+        "pristine_fail_to_pass": [
+          {
+            "output_bytes": 7392,
+            "output_sha256": "eb305147edbe45a6ca4533bbe3e4e09db52b1db31a8b9a978865b62a486f9957",
+            "output_tail": "rs\n  ---\n  duration_ms: 0.127833\n  type: 'test'\n  location: '<path>:44:1'\n  failureType: 'testCodeFailure'\n  error: 'Missing expected exception.'\n  code: 'ERR_ASSERTION'\n  name: 'AssertionError'\n  expected:\n  operator: 'throws'\n  stack: |-\n    TestContext.<anonymous> (file://<path>:45:10)\n    Test.runInAsyncScope (node:async_hooks:226:14)\n    Test.run (node:internal/test_runner/test:1382:25)\n    Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n    Test.postRun (node:internal/test_runner/test:1522:19)\n    Test.run (node:internal/test_runner/test:1447:12)\n    async Test.processPendingSubtests (node:internal/test_runner/test:960:7)\n  ...\n# Subtest: dual:integrity rejects cycles without mutating input\nnot ok 6 - dual:integrity rejects cycles without mutating input\n  ---\n  duration_ms: 0.068833\n  type: 'test'\n  location: '<path>:49:1'\n  failureType: 'testCodeFailure'\n  error: 'Missing expected exception.'\n  code: 'ERR_ASSERTION'\n  name: 'AssertionError'\n  expected:\n  operator: 'throws'\n  stack: |-\n    TestContext.<anonymous> (file://<path>:50:10)\n    Test.runInAsyncScope (node:async_hooks:226:14)\n    Test.run (node:internal/test_runner/test:1382:25)\n    Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n    Test.postRun (node:internal/test_runner/test:1522:19)\n    Test.run (node:internal/test_runner/test:1447:12)\n    async Test.processPendingSubtests (node:internal/test_runner/test:960:7)\n  ...\n1..6\n# tests 6\n# suites 0\n# pass 0\n# fail 6\n# cancelled 0\n# skipped 0\n# todo 0\n# duration_ms 69.165458\n",
+            "passed": false,
+            "returncode": 1,
+            "weighted_grade": {
+              "fixed": 0,
+              "source": "tap-reporter-weighted",
+              "total": 100
+            }
+          },
+          {
+            "output_bytes": 7389,
+            "output_sha256": "b48fa53740e8111402a01a68777c36059091ac7b1fa266de224bee2987d7a4f5",
+            "output_tail": "ers\n  ---\n  duration_ms: 0.14675\n  type: 'test'\n  location: '<path>:44:1'\n  failureType: 'testCodeFailure'\n  error: 'Missing expected exception.'\n  code: 'ERR_ASSERTION'\n  name: 'AssertionError'\n  expected:\n  operator: 'throws'\n  stack: |-\n    TestContext.<anonymous> (file://<path>:45:10)\n    Test.runInAsyncScope (node:async_hooks:226:14)\n    Test.run (node:internal/test_runner/test:1382:25)\n    Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n    Test.postRun (node:internal/test_runner/test:1522:19)\n    Test.run (node:internal/test_runner/test:1447:12)\n    async Test.processPendingSubtests (node:internal/test_runner/test:960:7)\n  ...\n# Subtest: dual:integrity rejects cycles without mutating input\nnot ok 6 - dual:integrity rejects cycles without mutating input\n  ---\n  duration_ms: 0.071416\n  type: 'test'\n  location: '<path>:49:1'\n  failureType: 'testCodeFailure'\n  error: 'Missing expected exception.'\n  code: 'ERR_ASSERTION'\n  name: 'AssertionError'\n  expected:\n  operator: 'throws'\n  stack: |-\n    TestContext.<anonymous> (file://<path>:50:10)\n    Test.runInAsyncScope (node:async_hooks:226:14)\n    Test.run (node:internal/test_runner/test:1382:25)\n    Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n    Test.postRun (node:internal/test_runner/test:1522:19)\n    Test.run (node:internal/test_runner/test:1447:12)\n    async Test.processPendingSubtests (node:internal/test_runner/test:960:7)\n  ...\n1..6\n# tests 6\n# suites 0\n# pass 0\n# fail 6\n# cancelled 0\n# skipped 0\n# todo 0\n# duration_ms 54.715125\n",
+            "passed": false,
+            "returncode": 1,
+            "weighted_grade": {
+              "fixed": 0,
+              "source": "tap-reporter-weighted",
+              "total": 100
+            }
+          },
+          {
+            "output_bytes": 7389,
+            "output_sha256": "0a7d977b0e6256d18ec69383a5dfb9f9865015902ff06f3d98f95ee771ed1744",
+            "output_tail": "rs\n  ---\n  duration_ms: 0.123625\n  type: 'test'\n  location: '<path>:44:1'\n  failureType: 'testCodeFailure'\n  error: 'Missing expected exception.'\n  code: 'ERR_ASSERTION'\n  name: 'AssertionError'\n  expected:\n  operator: 'throws'\n  stack: |-\n    TestContext.<anonymous> (file://<path>:45:10)\n    Test.runInAsyncScope (node:async_hooks:226:14)\n    Test.run (node:internal/test_runner/test:1382:25)\n    Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n    Test.postRun (node:internal/test_runner/test:1522:19)\n    Test.run (node:internal/test_runner/test:1447:12)\n    async Test.processPendingSubtests (node:internal/test_runner/test:960:7)\n  ...\n# Subtest: dual:integrity rejects cycles without mutating input\nnot ok 6 - dual:integrity rejects cycles without mutating input\n  ---\n  duration_ms: 0.067875\n  type: 'test'\n  location: '<path>:49:1'\n  failureType: 'testCodeFailure'\n  error: 'Missing expected exception.'\n  code: 'ERR_ASSERTION'\n  name: 'AssertionError'\n  expected:\n  operator: 'throws'\n  stack: |-\n    TestContext.<anonymous> (file://<path>:50:10)\n    Test.runInAsyncScope (node:async_hooks:226:14)\n    Test.run (node:internal/test_runner/test:1382:25)\n    Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n    Test.postRun (node:internal/test_runner/test:1522:19)\n    Test.run (node:internal/test_runner/test:1447:12)\n    async Test.processPendingSubtests (node:internal/test_runner/test:960:7)\n  ...\n1..6\n# tests 6\n# suites 0\n# pass 0\n# fail 6\n# cancelled 0\n# skipped 0\n# todo 0\n# duration_ms 57.300667\n",
+            "passed": false,
+            "returncode": 1,
+            "weighted_grade": {
+              "fixed": 0,
+              "source": "tap-reporter-weighted",
+              "total": 100
+            }
+          }
+        ],
+        "pristine_pass_to_pass": [
+          {
+            "output_bytes": 265,
+            "output_sha256": "9e052e2d63fdbe1192291777decebe5aa8a5eae85fa6350a4ac2590e256399af",
+            "output_tail": "\u2714 visible: orders independent jobs by urgency through the CLI (39.28ms)\n\u2714 visible: preserves input order for independent urgency ties (0.099958ms)\n\u2139 tests 2\n\u2139 suites 0\n\u2139 pass 2\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 90.869417\n",
+            "passed": true,
+            "returncode": 0
+          },
+          {
+            "output_bytes": 269,
+            "output_sha256": "b060252b741abe6a3b8893c94835f98b77677a1d910bee0787ec098c2d278f59",
+            "output_tail": "\u2714 visible: orders independent jobs by urgency through the CLI (37.927292ms)\n\u2714 visible: preserves input order for independent urgency ties (0.092833ms)\n\u2139 tests 2\n\u2139 suites 0\n\u2139 pass 2\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 86.600834\n",
+            "passed": true,
+            "returncode": 0
+          },
+          {
+            "output_bytes": 266,
+            "output_sha256": "2e2a3d5b84d876688d757238e2cc6723fed8d21bc972cc61a060c0db7924a45f",
+            "output_tail": "\u2714 visible: orders independent jobs by urgency through the CLI (37.927ms)\n\u2714 visible: preserves input order for independent urgency ties (0.100584ms)\n\u2139 tests 2\n\u2139 suites 0\n\u2139 pass 2\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 89.447459\n",
+            "passed": true,
+            "returncode": 0
+          }
+        ]
+      }
+    },
+    "reviewed_at": null,
+    "reviewer": null
+  },
+  "artifacts": [
+    {
+      "path": "ab-symbolect/tasks/mirror-partial-order-cli.txt",
+      "sha256": "c91c1f496bc23fc6cd8c5397716dc838459cb565fb7ff2382fb83106e85ca21d"
+    },
+    {
+      "path": "real-gate-fixtures/hidden/mirror-partial-order-cli.test.js",
+      "sha256": "fbe80b3fd127f2ba60a74f1145a58f3a90639751606d7639a47127da2a3fee12"
+    },
+    {
+      "path": "real-gate-fixtures/mirror-partial-order-cli/package.json",
+      "sha256": "d1eed4bc617b70e5be6bc42f88552ee0be93dfab451dcbcf42d256519d81b014"
+    },
+    {
+      "path": "real-gate-fixtures/mirror-partial-order-cli/src/cli.js",
+      "sha256": "007f5eb1448e5a343eab78689afbef4a598447f9ed8615d855182b3e1b50740d"
+    },
+    {
+      "path": "real-gate-fixtures/mirror-partial-order-cli/src/schedule.js",
+      "sha256": "febfc3ba2ecd5719126f53820b049d8403f1a1f6933491084e6543efd1bb9387"
+    },
+    {
+      "path": "real-gate-fixtures/mirror-partial-order-cli/test/visible.test.js",
+      "sha256": "ffb996eb2901dde951d1cb51714558a1ba37a43529c5183489f2e9813f8f3280"
+    },
+    {
+      "path": "real-gate-fixtures/oracles/mirror-partial-order-cli.mjs",
+      "sha256": "a909ef6b259f334dafe8935ad97bc31f56385b91a1a99f1ed466e3e707e89583"
+    },
+    {
+      "path": "real-gate-fixtures/patches/mirror-partial-order-cli/depth-first-order.patch",
+      "sha256": "9511a1bfb4588fa1bac99758a09e72c356b4483d72e227c8f7a0919bfbe325c6"
+    },
+    {
+      "path": "real-gate-fixtures/patches/mirror-partial-order-cli/gold.patch",
+      "sha256": "e92a32bbe8eaae7e8fd60541a1e09f329a03a3b84260af3838b86691375bccfc"
+    },
+    {
+      "path": "real-gate-fixtures/patches/mirror-partial-order-cli/local-dependency-repair.patch",
+      "sha256": "7a7ba55af03969b9c84891dbcb6d479aa427196e75f20396d3f80cc47003abf4"
+    },
+    {
+      "path": "real-gate-fixtures/patches/mirror-partial-order-cli/visible-id-hardcode.patch",
+      "sha256": "3869726ed0c48a0fb87b1ba5d2e37099a547ae461784befaf5d211d96cbd2510"
+    }
+  ],
+  "cohort_id": "2026-08-mirror-mini",
+  "coverage_map": {
+    "dependency-order": {
+      "hidden": [
+        "dual:dependencies schedule a changed multi-hop chain",
+        "dual:dependencies schedule a changed fork and join"
+      ],
+      "visible": [
+        "visible: orders independent jobs by urgency through the CLI"
+      ]
+    },
+    "graph-integrity": {
+      "hidden": [
+        "dual:integrity rejects unknown and duplicate identifiers",
+        "dual:integrity rejects cycles without mutating input"
+      ],
+      "visible": [
+        "visible: preserves input order for independent urgency ties"
+      ]
+    },
+    "ready-priority": {
+      "hidden": [
+        "dual:ready-set uses urgency after a dependency unlocks",
+        "dual:ready-set uses original input order after an urgency tie"
+      ],
+      "visible": [
+        "visible: preserves input order for independent urgency ties"
+      ]
+    }
+  },
+  "difficulty_crux": {
+    "band_prediction": [
+      0.2,
+      0.8
+    ],
+    "expected_failure": "patches local ordering examples or uses depth-first traversal without the required ready-set priority",
+    "mechanism": "algorithm-class change from a comparator to a dependency-aware ready-set scheduler behind a JSON CLI"
+  },
+  "duals": [
+    {
+      "hidden_cases": [
+        "dual:dependencies schedule a changed multi-hop chain",
+        "dual:dependencies schedule a changed fork and join"
+      ],
+      "requirement_id": "dependency-order",
+      "visible_case": "visible: orders independent jobs by urgency through the CLI"
+    },
+    {
+      "hidden_cases": [
+        "dual:ready-set uses urgency after a dependency unlocks",
+        "dual:ready-set uses original input order after an urgency tie"
+      ],
+      "requirement_id": "ready-priority",
+      "visible_case": "visible: preserves input order for independent urgency ties"
+    },
+    {
+      "hidden_cases": [
+        "dual:integrity rejects unknown and duplicate identifiers",
+        "dual:integrity rejects cycles without mutating input"
+      ],
+      "requirement_id": "graph-integrity",
+      "visible_case": "visible: preserves input order for independent urgency ties"
+    }
+  ],
+  "episode_variance": {
+    "expected": true,
+    "rationale": "different graph shapes expose distinct partial-order and validation failures"
+  },
+  "findability": [
+    {
+      "evidence_file": "src/schedule.js",
+      "sentence_anchor": "scheduleJobs"
+    }
+  ],
+  "fixture": {
+    "root": "real-gate-fixtures/mirror-partial-order-cli",
+    "stage_copy": []
+  },
+  "fixture_version": "2026-08.1",
+  "one_shot": {
+    "context_files": [
+      "src/cli.js",
+      "src/schedule.js",
+      "test/visible.test.js"
+    ],
+    "eligible": false,
+    "max_context_bytes": 49152
+  },
+  "oracle": {
+    "entrypoint": "real-gate-fixtures/oracles/mirror-partial-order-cli.mjs",
+    "output_cap_bytes": 4096,
+    "query_budget": 32,
+    "timeout_ms": 2000
+  },
+  "patches": {
+    "gold": "real-gate-fixtures/patches/mirror-partial-order-cli/gold.patch",
+    "shortcut_mutants": [
+      "real-gate-fixtures/patches/mirror-partial-order-cli/local-dependency-repair.patch",
+      "real-gate-fixtures/patches/mirror-partial-order-cli/depth-first-order.patch",
+      "real-gate-fixtures/patches/mirror-partial-order-cli/visible-id-hardcode.patch"
+    ]
+  },
+  "prompts": {
+    "canonical": {
+      "sha256": "8c010c25ebb0424e653796176700888aaab7d81b4b37e3a807ec1207639a0af5",
+      "text": "Upgrade the release CLI from urgency sorting to dependency-aware scheduling. A job may name prerequisite IDs in `after`; emit only jobs whose prerequisites are already emitted, choosing among ready jobs by urgency and then original input order. Reject duplicate IDs, unknown dependencies, and cycles without mutating the input or dependency arrays. Preserve the JSON stdin/stdout interface and existing independent-job behavior. Run `npm test` when complete."
+    },
+    "perturbations": [
+      {
+        "id": "equivalent-1",
+        "sha256": "ef60ec2d1055935bab3cd244d6b24203174814727be6a2e82ab0db5a3e680f93",
+        "text": "Complete the following repository task. Preserve existing behavior and verify the tests.\n\nUpgrade the release CLI from urgency sorting to dependency-aware scheduling. A job may name prerequisite IDs in `after`; emit only jobs whose prerequisites are already emitted, choosing among ready jobs by urgency and then original input order. Reject duplicate IDs, unknown dependencies, and cycles without mutating the input or dependency arrays. Preserve the JSON stdin/stdout interface and existing independent-job behavior. Run `npm test` when complete."
+      },
+      {
+        "id": "equivalent-2",
+        "sha256": "d9f973db6ffbc864f75eb34ca3cb3deca8594d79abb7f5f9f37437957eea0c9d",
+        "text": "Repository change request:\nUpgrade the release CLI from urgency sorting to dependency-aware scheduling. A job may name prerequisite IDs in `after`; emit only jobs whose prerequisites are already emitted, choosing among ready jobs by urgency and then original input order. Reject duplicate IDs, unknown dependencies, and cycles without mutating the input or dependency arrays. Preserve the JSON stdin/stdout interface and existing independent-job behavior. Run `npm test` when complete.\n\nUse the smallest correct change and confirm the test suite."
+      },
+      {
+        "id": "equivalent-3",
+        "sha256": "866e2d7f8ddde962f11fae11894c663c05fa48c0b71b86f2ed5d69966eeba7e7",
+        "text": "Please solve this task in the supplied checkout, retaining all stated edge cases:\n\nUpgrade the release CLI from urgency sorting to dependency-aware scheduling. A job may name prerequisite IDs in `after`; emit only jobs whose prerequisites are already emitted, choosing among ready jobs by urgency and then original input order. Reject duplicate IDs, unknown dependencies, and cycles without mutating the input or dependency arrays. Preserve the JSON stdin/stdout interface and existing independent-job behavior. Run `npm test` when complete."
+      }
+    ],
+    "semantic_group": "mirror-partial-order-cli:2026-08.1"
+  },
+  "provenance": {
+    "authoring_timestamp": "2026-08-17T00:00:00Z",
+    "contamination_canary_hash": "5098c291b30dd4fbdb94fe88c7459b0a83b7da081b1fc7e9cd575346d41ba2ef",
+    "model_snapshot_boundary": "Ling Tiny fleet snapshot predates this fixture generation"
+  },
+  "requirements": [
+    {
+      "behavior": "all prerequisites precede dependants across changed graph shapes",
+      "id": "dependency-order",
+      "prompt_anchor": "prerequisite IDs",
+      "weight": 0.4
+    },
+    {
+      "behavior": "ready jobs use urgency and then original input order",
+      "id": "ready-priority",
+      "prompt_anchor": "choosing among ready jobs",
+      "weight": 0.3
+    },
+    {
+      "behavior": "invalid graphs are rejected and inputs remain unchanged",
+      "id": "graph-integrity",
+      "prompt_anchor": "without mutating the input",
+      "weight": 0.3
+    }
+  ],
+  "schema": "pi.fixture/v3",
+  "shortcut_sharpness": {
+    "why_plausible": "moving direct parents or using DFS appears topological on small examples but violates global ready-set ordering"
+  },
+  "sufficiency": [
+    {
+      "assertion": "dual:dependencies schedule a changed multi-hop chain",
+      "prompt_evidence": "Upgrade the release CLI from urgency sorting to dependency-aware scheduling. A job may name prerequisite IDs in `after`; emit only jobs whose prerequisites are already emitted, choosing among ready jobs by urgency and then original input order. Reject duplicate IDs, unknown dependencies, and cycles without mutating the input or dependency arrays. Preserve the JSON stdin/stdout interface and existing independent-job behavior. Run `npm test` when complete."
+    },
+    {
+      "assertion": "dual:dependencies schedule a changed fork and join",
+      "prompt_evidence": "Upgrade the release CLI from urgency sorting to dependency-aware scheduling. A job may name prerequisite IDs in `after`; emit only jobs whose prerequisites are already emitted, choosing among ready jobs by urgency and then original input order. Reject duplicate IDs, unknown dependencies, and cycles without mutating the input or dependency arrays. Preserve the JSON stdin/stdout interface and existing independent-job behavior. Run `npm test` when complete."
+    },
+    {
+      "assertion": "dual:ready-set uses urgency after a dependency unlocks",
+      "prompt_evidence": "Upgrade the release CLI from urgency sorting to dependency-aware scheduling. A job may name prerequisite IDs in `after`; emit only jobs whose prerequisites are already emitted, choosing among ready jobs by urgency and then original input order. Reject duplicate IDs, unknown dependencies, and cycles without mutating the input or dependency arrays. Preserve the JSON stdin/stdout interface and existing independent-job behavior. Run `npm test` when complete."
+    },
+    {
+      "assertion": "dual:ready-set uses original input order after an urgency tie",
+      "prompt_evidence": "Upgrade the release CLI from urgency sorting to dependency-aware scheduling. A job may name prerequisite IDs in `after`; emit only jobs whose prerequisites are already emitted, choosing among ready jobs by urgency and then original input order. Reject duplicate IDs, unknown dependencies, and cycles without mutating the input or dependency arrays. Preserve the JSON stdin/stdout interface and existing independent-job behavior. Run `npm test` when complete."
+    },
+    {
+      "assertion": "dual:integrity rejects unknown and duplicate identifiers",
+      "prompt_evidence": "Upgrade the release CLI from urgency sorting to dependency-aware scheduling. A job may name prerequisite IDs in `after`; emit only jobs whose prerequisites are already emitted, choosing among ready jobs by urgency and then original input order. Reject duplicate IDs, unknown dependencies, and cycles without mutating the input or dependency arrays. Preserve the JSON stdin/stdout interface and existing independent-job behavior. Run `npm test` when complete."
+    },
+    {
+      "assertion": "dual:integrity rejects cycles without mutating input",
+      "prompt_evidence": "Upgrade the release CLI from urgency sorting to dependency-aware scheduling. A job may name prerequisite IDs in `after`; emit only jobs whose prerequisites are already emitted, choosing among ready jobs by urgency and then original input order. Reject duplicate IDs, unknown dependencies, and cycles without mutating the input or dependency arrays. Preserve the JSON stdin/stdout interface and existing independent-job behavior. Run `npm test` when complete."
+    }
+  ],
+  "task_id": "mirror-partial-order-cli",
+  "tests": {
+    "fail_to_pass": {
+      "command": [
+        "node",
+        "--test",
+        "test/fail-to-pass.test.js"
+      ],
+      "overlays": [
+        {
+          "dest": "test/fail-to-pass.test.js",
+          "source": "real-gate-fixtures/hidden/mirror-partial-order-cli.test.js"
+        }
+      ],
+      "timeout_seconds": 60
+    },
+    "pass_to_pass": {
+      "command": [
+        "node",
+        "--test",
+        "test/visible.test.js"
+      ],
+      "overlays": [],
+      "timeout_seconds": 60
+    }
+  },
+  "timestamps": {
+    "admitted_at": null,
+    "created_at": "2026-08-17T00:00:00Z",
+    "expires_at": null
+  }
+}

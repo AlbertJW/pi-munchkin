@@ -4,8 +4,10 @@ from __future__ import annotations
 
 import copy
 import datetime as dt
+import hashlib
 import json
 import os
+import re
 import subprocess
 import sys
 import tempfile
@@ -97,7 +99,10 @@ def test_gate_materializes_everything_admission_does():
 def test_admission_catalog():
     manifests = sorted(admission.MANIFESTS.glob("*.json"))
     # This count is a tripwire for UNNOTICED roster changes, so it may only be
-    # edited alongside a deliberate, verified one. 2026-08-15: 36 -> 39, adding
+    # edited alongside a deliberate, verified one. 2026-08-17: 39 -> 41 adds
+    # two unapproved pi.fixture/v3 Mirror-mini instruments with weighted duals
+    # and bounded execute-only oracles.
+    # 2026-08-15: 36 -> 39, adding
     # the three unapproved sweep-{a,b,c} multi-defect graded fixtures
     # (measurement reboot, UNMOTHBALL charter D4/D5) — sweep-a capability
     # mid-band, sweep-b episode-variance, sweep-c process-traps — each after it
@@ -113,7 +118,7 @@ def test_admission_catalog():
     # Verified purely additive before editing: nothing deleted vs the previous
     # commit. A count edited to silence a failure nobody explained is how a
     # deleted fixture went unnoticed for two commits on 2026-07-30.
-    assert len(manifests) == 39, len(manifests)
+    assert len(manifests) == 41, len(manifests)
     for path in manifests:
         manifest = json.loads(path.read_text())
         admission.validate_contract(manifest)
@@ -217,6 +222,96 @@ def test_ling_fixture_admission_contracts():
         manifest_text = json.dumps(manifest)
         # output_tail is admissible since 2026-08-15 (path-redacted); machine paths never are.
         assert "/private/" not in manifest_text and "/Users/" not in manifest_text
+
+
+def test_mirror_v3_fixture_contracts():
+    import eval_fixture
+    import grade_reporter
+
+    for task in ("mirror-cross-file-cli", "mirror-partial-order-cli"):
+        _, manifest = admission.load_manifest(task)
+        assert manifest["schema"] == "pi.fixture/v3"
+        assert manifest["admission"]["approved"] is False
+        assert admission.authoritative(manifest)[0] is False
+        auto = manifest["admission"]["automated"]
+        assert auto["passed"] and auto["oracle"]["passed"]
+        oracle_runs = auto["oracle"]["runs"]
+        assert len(oracle_runs) == admission.RUNS
+        assert len({row["output_sha256"] for row in oracle_runs}) == 1
+        assert all(row["passed"] and set(row) == {"passed", "output_bytes", "output_sha256"}
+                   for row in oracle_runs)
+
+        # Every proof state runs three times. Shortcuts earn stable partial
+        # credit, proving the instrument can represent a middle band without
+        # pretending that this predicts Ling's eventual calibration result.
+        assert len(manifest["patches"]["shortcut_mutants"]) >= 2
+        assert any("hardcode" in Path(path).stem for path in manifest["patches"]["shortcut_mutants"])
+        assert all(row["weighted_grade"]["fixed"] == 100
+                   for row in auto["states"]["gold_fail_to_pass"])
+        shortcut_scores = []
+        for name, receipt in auto["states"].items():
+            if not name.startswith("mutant:"):
+                continue
+            rows = receipt["fail_to_pass"]
+            scores = [row["weighted_grade"]["fixed"] for row in rows]
+            assert len(rows) == admission.RUNS and len(set(scores)) == 1
+            assert 0 < scores[0] < 100
+            shortcut_scores.append(scores[0])
+        assert len(shortcut_scores) >= 2
+
+        # The candidate tree contains neither oracle source nor hidden source.
+        with tempfile.TemporaryDirectory() as td:
+            staged = admission.stage(manifest, Path(td))
+            staged_files = "\n".join(str(path.relative_to(staged)) for path in staged.rglob("*") if path.is_file())
+            assert "oracle" not in staged_files and "fail-to-pass" not in staged_files
+        assert admission.safe_root(manifest["oracle"]["entrypoint"]).parent == admission.ORACLE_ROOT
+        hidden_source = admission.safe_root(manifest["tests"]["fail_to_pass"]["overlays"][0]["source"]).read_text()
+        canary = re.search(r"const CANARY = '([^']+)'", hidden_source)
+        assert canary and admission.SHA256_RE.fullmatch(manifest["provenance"]["contamination_canary_hash"])
+        assert hashlib.sha256(canary.group(1).encode()).hexdigest() == manifest["provenance"]["contamination_canary_hash"]
+        assert admission.run_oracle_queries(manifest, [{"action": "selftest"}]) == [
+            {"ok": True, "schema": "pi.fixture-oracle/v1"}]
+        try:
+            admission.run_oracle_queries(manifest, [{"action": "selftest"}] * 33)
+        except admission.AdmissionError as exc:
+            assert "budget" in str(exc)
+        else:
+            raise AssertionError("v3 oracle query budget was not enforced")
+        if task == "mirror-cross-file-cli":
+            capped = copy.deepcopy(manifest); capped["oracle"]["output_cap_bytes"] = 128
+            try:
+                admission.run_oracle_queries(capped, [{"action": "parse", "line": "x" * 300 + ": queued"}])
+            except admission.AdmissionError as exc:
+                assert "output cap" in str(exc)
+            else:
+                raise AssertionError("v3 oracle output cap was not enforced")
+
+        scoring = admission.requirement_scoring(manifest)
+        assert eval_fixture.row_context(task, "canonical")["requirement_scoring"] == scoring
+        detail = {case: True for cases in scoring["hidden"].values() for case in cases}
+        weighted, blocked = grade_reporter.apply_requirement_weights(
+            {"fixed": len(detail), "total": len(detail), "detail": detail}, scoring)
+        assert blocked is None and weighted["fixed"] == weighted["total"] == 100
+
+        duplicate = copy.deepcopy(manifest)
+        requirement_ids = list(duplicate["coverage_map"])
+        duplicate["coverage_map"][requirement_ids[1]]["hidden"][0] = duplicate["coverage_map"][requirement_ids[0]]["hidden"][0]
+        next(dual for dual in duplicate["duals"]
+             if dual["requirement_id"] == requirement_ids[1])["hidden_cases"] = duplicate["coverage_map"][requirement_ids[1]]["hidden"]
+        bad_weight = copy.deepcopy(manifest); bad_weight["requirements"][0]["weight"] += 0.01
+        staged_oracle = copy.deepcopy(manifest)
+        staged_oracle["fixture"]["stage_copy"] = [
+            {"source": staged_oracle["oracle"]["entrypoint"], "dest": "oracle.mjs"}]
+        for broken in (duplicate, bad_weight, staged_oracle):
+            try:
+                admission.validate_contract(broken)
+            except admission.AdmissionError:
+                pass
+            else:
+                raise AssertionError("invalid v3 fixture contract accepted")
+
+    gate = (admission.ROOT / "real_gate.sh").read_text()
+    assert "apply_requirement_weights" in gate, "v3 weights are not wired into evaluation rows"
 
 
 def test_context_pressure_contract():

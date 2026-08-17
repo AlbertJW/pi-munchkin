@@ -864,6 +864,9 @@ if subscores is None and not ctx.get("grade_artifact"):
     _tap_path = workdir.rstrip("/") + ".grade.tap"
     if os.path.exists(_tap_path):
         subscores, subscores_blocked = _grade_reporter.extract(_tap_path)
+        if subscores is not None and ctx.get("requirement_scoring"):
+            subscores, subscores_blocked = _grade_reporter.apply_requirement_weights(
+                subscores, ctx["requirement_scoring"])
 rec={"schema":"pi.eval-row/v4", "task":task,"pattern":pat,"arm":pat,"rep":int(rep),
      "repetition":int(rep),"model":model,"split":split,"score":int(gate),
      "retried":int(retried),"run":runid,"fixture":{"cohort":ctx["cohort"],"version":ctx["version"]},

@@ -17,6 +17,7 @@ TASKS = ROOT / "ab-symbolect/tasks"
 OUT = FIX / "patches"
 MANIFESTS = FIX / "manifests"
 HIDDEN = {p.stem.replace(".test", "") for p in (FIX / "hidden").glob("*.test.js")}
+MIRROR_V3 = {"mirror-cross-file-cli", "mirror-partial-order-cli"}
 
 # pi.fixture/v2 authoring-rubric fields for the 2026-08 ling cohort
 # (LING_COHORT_2026-08.md is the narrative source; these are the machine copies).
@@ -94,7 +95,9 @@ V2_FIELDS = {
         "episode_variance": {"expected": False, "rationale": "wrong-target edits are silently green, not episodic"}},
 }
 
-ALL = [f"t{i}" for i in range(1, 7)] + sorted(HIDDEN)
+# v3 fixtures have a separate builder because their dual/oracle contracts are
+# intentionally stricter than this historical v1/v2 catalog.
+ALL = [f"t{i}" for i in range(1, 7)] + sorted(HIDDEN - MIRROR_V3)
 
 
 def h(data): return hashlib.sha256(data if isinstance(data, bytes) else data.encode()).hexdigest()

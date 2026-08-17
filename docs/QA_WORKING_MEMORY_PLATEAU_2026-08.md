@@ -60,3 +60,26 @@ from evaluated sessions, endpoints, private artifact paths, or raw model output.
 - Full acceptance: `npm run verify` passed all five stages with 625 tests;
   deterministic package smoke loaded 31 extensions and two skills; peer
   boundaries and isolated packed consumers for Pi 0.80–0.84 passed.
+
+## PR 5 — Mirror-mini fixture contract
+
+- Counterfactual: temporarily disabled the v3 guard that prevents one hidden
+  case from receiving credit under multiple weighted requirements.
+- Command: `PYTHONDONTWRITEBYTECODE=1 python3 optimizer/prompt-lab/integrity_selftest.py`.
+- Expected failure observed: `test_mirror_v3_fixture_contracts` reported
+  `invalid v3 fixture contract accepted`.
+- Restoration: hidden scored cases are disjoint; visible seed cases may anchor
+  multiple requirements because they receive no hidden weighted credit.
+- Targeted acceptance: both fixtures pass three-run pristine, gold, and two-mutant
+  proofs. Cross-file shortcuts score 60/100, 30/100, and 15/100; partial-order
+  shortcuts score 50/100, 30/100, and 30/100. The third shortcut in each fixture
+  hardcodes the visible cases and is rejected by changed hidden duals. Oracle
+  self-tests produce the same hash in all three
+  runs, and the query, timeout, executable-root, and output bounds fail closed.
+- Full acceptance: `npm run verify` passed all five stages with 625 harness tests;
+  deterministic package smoke loaded 31 extensions and two skills. Peer-range
+  boundaries passed, and isolated packed consumers for Pi 0.80, 0.81, 0.82,
+  0.83, and 0.84 each typechecked and loaded all 31 extensions and both skills.
+  The first sandboxed verifier attempt was blocked only from binding its temporary
+  loopback self-test port; the approved offline rerun passed. No model or gate
+  round was started.

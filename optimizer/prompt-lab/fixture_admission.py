@@ -1,12 +1,13 @@
 #!/usr/bin/env python3
-"""Fail-closed fixture admission and read-only verification for pi.fixture/v1+v2 manifests.
+"""Fail-closed fixture admission for pi.fixture/v1, v2, and v3 manifests.
 
 v2 (2026-08, the measurement reboot) adds the authoring-rubric fields the band
 calibration showed were missing: a pre-registered difficulty crux, a findability
 chain, shortcut-sharpness rationale, and an episode-variance expectation — plus a
 deterministic behaviour-only lint over hidden overlays (source-reading assertions
 are flagged for the human reviewer; Harbor's "never string-match source" rule).
-v1 manifests stay valid for the existing cohort; new fixtures are authored as v2.
+v3 adds behaviour weights, visible/hidden duals, coverage, a bounded execute-only
+oracle, and contamination provenance. Older manifests remain valid.
 """
 from __future__ import annotations
 
@@ -15,6 +16,8 @@ import datetime as dt
 import hashlib
 import json
 import os
+import re
+import resource
 import shutil
 import subprocess
 import tempfile
@@ -81,7 +84,11 @@ def load_manifest(task):
     return path, data
 
 
-SCHEMAS = ("pi.fixture/v1", "pi.fixture/v2")
+SCHEMAS = ("pi.fixture/v1", "pi.fixture/v2", "pi.fixture/v3")
+V3_ID_RE = re.compile(r"^[a-z][a-z0-9_-]{0,63}$")
+SHA256_RE = re.compile(r"^[0-9a-f]{64}$")
+ORACLE_ROOT = FIXTURES / "oracles"
+ORACLE_QUERY_MAX_BYTES = 4096
 
 
 def validate_contract(m):
@@ -91,8 +98,10 @@ def validate_contract(m):
     missing = [key for key in required if key not in m]
     if missing or m.get("schema") not in SCHEMAS:
         raise AdmissionError(f"invalid manifest: missing={missing} schema={m.get('schema')}")
-    if m["schema"] == "pi.fixture/v2":
+    if m["schema"] in ("pi.fixture/v2", "pi.fixture/v3"):
         validate_v2_fields(m)
+    if m["schema"] == "pi.fixture/v3":
+        validate_v3_fields(m)
     variants = m["prompts"].get("perturbations", [])
     if len(variants) != 3 or any(not p.get("text") or not p.get("sha256") for p in variants):
         raise AdmissionError("manifest needs exactly three hashed prompt perturbations")
@@ -142,6 +151,120 @@ def validate_v2_fields(m):
     episode = m.get("episode_variance") or {}
     if not isinstance(episode.get("expected"), bool) or not episode.get("rationale"):
         raise AdmissionError("v2 manifest requires episode_variance{expected: bool, rationale}")
+
+
+def validate_v3_fields(m):
+    """Validate the Mirror-mini contract without exposing hidden implementation.
+
+    Weights use integer percentage points in the row reducer, so v3 deliberately
+    requires exact hundredths and a total of one. That keeps weighted grades
+    deterministic across Python/JavaScript and avoids float-rounding policy.
+    """
+    requirements = m.get("requirements")
+    if not isinstance(requirements, list) or not 2 <= len(requirements) <= 12:
+        raise AdmissionError("v3 requirements must contain 2..12 scored behaviours")
+    requirement_ids, requirement_points, weight_points = set(), {}, 0
+    for item in requirements:
+        if not isinstance(item, dict) or set(item) != {"id", "behavior", "prompt_anchor", "weight"}:
+            raise AdmissionError("v3 requirement keys must be id, behavior, prompt_anchor, weight")
+        rid, weight = item["id"], item["weight"]
+        if not isinstance(rid, str) or not V3_ID_RE.fullmatch(rid) or rid in requirement_ids:
+            raise AdmissionError("v3 requirement ids must be unique safe identifiers")
+        if not isinstance(item["behavior"], str) or not item["behavior"].strip():
+            raise AdmissionError(f"v3 requirement {rid} needs a behaviour")
+        if not isinstance(item["prompt_anchor"], str) or item["prompt_anchor"] not in m["prompts"]["canonical"]["text"]:
+            raise AdmissionError(f"v3 requirement {rid} prompt_anchor is not in the canonical prompt")
+        if isinstance(weight, bool) or not isinstance(weight, (int, float)) or not 0 < weight <= 1:
+            raise AdmissionError(f"v3 requirement {rid} has an invalid weight")
+        points = round(weight * 100)
+        if abs(weight * 100 - points) > 1e-9:
+            raise AdmissionError("v3 weights must use exact hundredths")
+        requirement_ids.add(rid); requirement_points[rid] = points; weight_points += points
+    if weight_points != 100:
+        raise AdmissionError("v3 requirement weights must total exactly 1.00")
+
+    coverage = m.get("coverage_map")
+    if not isinstance(coverage, dict) or set(coverage) != requirement_ids:
+        raise AdmissionError("v3 coverage_map must cover every requirement exactly once")
+    hidden_cases = set()
+    for rid, item in coverage.items():
+        if not isinstance(item, dict) or set(item) != {"visible", "hidden"}:
+            raise AdmissionError(f"v3 coverage_map.{rid} must contain visible and hidden")
+        visible, hidden = item["visible"], item["hidden"]
+        if (not isinstance(visible, list) or not visible or not all(isinstance(x, str) and x for x in visible)
+                or not isinstance(hidden, list) or len(hidden) < 2 or not all(isinstance(x, str) and x for x in hidden)):
+            raise AdmissionError(f"v3 coverage_map.{rid} needs visible cases and at least two hidden duals")
+        if len(set(visible)) != len(visible) or len(set(hidden)) != len(hidden):
+            raise AdmissionError(f"v3 coverage_map.{rid} contains duplicate cases")
+        if requirement_points[rid] % len(hidden) != 0:
+            raise AdmissionError(f"v3 requirement {rid} weight must divide evenly across hidden cases")
+        # One visible seed can anchor more than one behaviour; hidden scored
+        # cases cannot, or their weight would be counted twice.
+        if hidden_cases.intersection(hidden):
+            raise AdmissionError("v3 hidden cases may belong to only one scored requirement")
+        hidden_cases.update(hidden)
+
+    duals = m.get("duals")
+    if not isinstance(duals, list) or len(duals) != len(requirements):
+        raise AdmissionError("v3 requires one explicit dual mapping per requirement")
+    dual_ids = set()
+    for dual in duals:
+        if not isinstance(dual, dict) or set(dual) != {"requirement_id", "visible_case", "hidden_cases"}:
+            raise AdmissionError("v3 dual keys must be requirement_id, visible_case, hidden_cases")
+        rid = dual["requirement_id"]
+        if rid not in requirement_ids or rid in dual_ids:
+            raise AdmissionError("v3 dual requirement mapping is missing or duplicated")
+        if dual["visible_case"] not in coverage[rid]["visible"]:
+            raise AdmissionError(f"v3 dual visible case is not covered by {rid}")
+        if dual["hidden_cases"] != coverage[rid]["hidden"]:
+            raise AdmissionError(f"v3 dual hidden cases differ from coverage_map.{rid}")
+        dual_ids.add(rid)
+
+    oracle = m.get("oracle")
+    if not isinstance(oracle, dict) or set(oracle) != {"entrypoint", "query_budget", "timeout_ms", "output_cap_bytes"}:
+        raise AdmissionError("v3 oracle has an invalid shape")
+    entrypoint = safe_root(oracle["entrypoint"])
+    if not entrypoint.is_file() or ORACLE_ROOT.resolve() not in entrypoint.parents:
+        raise AdmissionError("v3 oracle entrypoint must be a file under real-gate-fixtures/oracles")
+    fixture_root = safe_root(m["fixture"]["root"])
+    if entrypoint == fixture_root or fixture_root in entrypoint.parents or entrypoint in fixture_root.parents:
+        raise AdmissionError("v3 oracle must be disjoint from the candidate fixture")
+    if not os.access(entrypoint, os.X_OK):
+        raise AdmissionError("v3 oracle entrypoint must be executable")
+    for key, low, high in (("query_budget", 1, 128), ("timeout_ms", 100, 10_000),
+                           ("output_cap_bytes", 128, 16_384)):
+        value = oracle[key]
+        if isinstance(value, bool) or not isinstance(value, int) or not low <= value <= high:
+            raise AdmissionError(f"v3 oracle.{key} must be within {low}..{high}")
+    staged_sources = {item.get("source") for item in m["fixture"].get("stage_copy", [])}
+    overlay_sources = {item.get("source") for suite in m["tests"].values() for item in suite.get("overlays", [])}
+    if oracle["entrypoint"] in staged_sources or oracle["entrypoint"] in overlay_sources:
+        raise AdmissionError("v3 oracle cannot be staged or installed into the candidate tree")
+    if oracle["entrypoint"] in m["one_shot"].get("context_files", []):
+        raise AdmissionError("v3 oracle cannot enter one-shot context")
+
+    provenance = m.get("provenance")
+    if not isinstance(provenance, dict) or set(provenance) != {"authoring_timestamp", "model_snapshot_boundary", "contamination_canary_hash"}:
+        raise AdmissionError("v3 provenance has an invalid shape")
+    try:
+        dt.datetime.fromisoformat(provenance["authoring_timestamp"].replace("Z", "+00:00"))
+    except (AttributeError, TypeError, ValueError):
+        raise AdmissionError("v3 provenance authoring_timestamp must be ISO-8601")
+    if not isinstance(provenance["model_snapshot_boundary"], str) or not provenance["model_snapshot_boundary"].strip():
+        raise AdmissionError("v3 provenance needs a model_snapshot_boundary")
+    if not isinstance(provenance["contamination_canary_hash"], str) or not SHA256_RE.fullmatch(provenance["contamination_canary_hash"]):
+        raise AdmissionError("v3 contamination_canary_hash must be SHA-256")
+
+
+def requirement_scoring(m):
+    """Return only the v3 weighted hidden-case map consumed by the parent reducer."""
+    if m.get("schema") != "pi.fixture/v3":
+        return None
+    return {
+        "requirements": [{"id": item["id"], "weight_points": round(item["weight"] * 100)}
+                         for item in m["requirements"]],
+        "hidden": {rid: list(cases["hidden"]) for rid, cases in m["coverage_map"].items()},
+    }
 
 
 # Deterministic behaviour-only lint: a hidden/graded suite must assert observable
@@ -270,7 +393,11 @@ def run_state(m, patch, suite):
             if patch:
                 apply_patch(work, patch)
             install_overlays(work, spec.get("overlays", []))
-            proc = subprocess.run(spec["command"], cwd=work, text=True, capture_output=True,
+            command = list(spec["command"])
+            weighted = m.get("schema") == "pi.fixture/v3" and suite == "fail_to_pass"
+            if weighted and command[:2] == ["node", "--test"]:
+                command.insert(2, "--test-reporter=tap")
+            proc = subprocess.run(command, cwd=work, text=True, capture_output=True,
                                   timeout=spec.get("timeout_seconds", 60),
                                   env=verification_env(Path(td)))
             passed = proc.returncode == 0
@@ -282,10 +409,78 @@ def run_state(m, patch, suite):
             # assertion diff is at the end), and PATH-REDACTED so the receipts keep
             # the privacy property the hash-only change was protecting.
             tail = redact_paths(output[-OUTPUT_TAIL_BYTES:].decode("utf-8", errors="replace"))
-            outcomes.append({"passed": passed, "returncode": proc.returncode,
-                             "output_bytes": len(output), "output_sha256": hashlib.sha256(output).hexdigest(),
-                             "output_tail": tail})
+            row = {"passed": passed, "returncode": proc.returncode,
+                   "output_bytes": len(output), "output_sha256": hashlib.sha256(output).hexdigest(),
+                   "output_tail": tail}
+            if weighted:
+                import grade_reporter
+                subscores, blocked = grade_reporter.extract_tap(output.decode("utf-8", errors="replace"))
+                subscores, blocked = grade_reporter.apply_requirement_weights(subscores, requirement_scoring(m))
+                if subscores is not None:
+                    row["weighted_grade"] = {key: subscores[key] for key in ("fixed", "total", "source")}
+                else:
+                    row["weighted_grade_blocked"] = blocked or "unparseable"
+            outcomes.append(row)
     return outcomes
+
+
+def run_oracle_queries(m, queries):
+    """Execute a v3 oracle through its bounded JSON-lines protocol.
+
+    The executable is never copied into the candidate tree. Output goes to a
+    private temporary file first, so an accidental verbose oracle cannot cause
+    an unbounded in-memory capture. Callers receive parsed values, never source.
+    """
+    if m.get("schema") != "pi.fixture/v3":
+        raise AdmissionError("oracle queries require a pi.fixture/v3 manifest")
+    oracle = m["oracle"]
+    if not isinstance(queries, list) or not queries or len(queries) > oracle["query_budget"]:
+        raise AdmissionError("oracle query budget exceeded")
+    results = []
+    for query in queries:
+        payload = (json.dumps(query, sort_keys=True, separators=(",", ":")) + "\n").encode()
+        if len(payload) > ORACLE_QUERY_MAX_BYTES:
+            raise AdmissionError("oracle query exceeds input cap")
+        with tempfile.TemporaryDirectory(prefix=f"pi-oracle-{m['task_id']}-") as td:
+            root = Path(td); output_path = root / "stdout.jsonl"
+            try:
+                with output_path.open("wb") as output:
+                    proc = subprocess.run([str(safe_root(oracle["entrypoint"]))], input=payload,
+                                          stdout=output, stderr=subprocess.DEVNULL,
+                                          timeout=oracle["timeout_ms"] / 1000,
+                                          env=verification_env(root),
+                                          preexec_fn=lambda: resource.setrlimit(
+                                              resource.RLIMIT_FSIZE,
+                                              (oracle["output_cap_bytes"], oracle["output_cap_bytes"])))
+            except subprocess.TimeoutExpired as exc:
+                raise AdmissionError("oracle timed out") from exc
+            size = output_path.stat().st_size
+            # RLIMIT_FSIZE may truncate exactly at the boundary while the child
+            # still exits zero; equality is therefore conservatively refused.
+            if proc.returncode or size >= oracle["output_cap_bytes"]:
+                raise AdmissionError("oracle execution failed or exceeded output cap")
+            try:
+                lines = output_path.read_text(encoding="utf-8").splitlines()
+                if len(lines) != 1:
+                    raise ValueError("not one record")
+                results.append(json.loads(lines[0]))
+            except (OSError, UnicodeError, json.JSONDecodeError, ValueError) as exc:
+                raise AdmissionError("oracle returned malformed output") from exc
+    return results
+
+
+def oracle_selftest(m):
+    """Three identical bounded oracle probes; receipts contain hashes only."""
+    receipts = []
+    for _ in range(RUNS):
+        result = run_oracle_queries(m, [{"action": "selftest"}])[0]
+        encoded = json.dumps(result, sort_keys=True, separators=(",", ":")).encode()
+        receipts.append({"passed": result == {"ok": True, "schema": "pi.fixture-oracle/v1"},
+                         "output_bytes": len(encoded),
+                         "output_sha256": hashlib.sha256(encoded).hexdigest()})
+    stable = len({row["output_sha256"] for row in receipts}) == 1
+    return {"runs": receipts, "stable": stable,
+            "passed": stable and all(row["passed"] for row in receipts)}
 
 
 PATH_RE = None  # compiled lazily; regex import kept local to the one consumer
@@ -316,6 +511,11 @@ def check_one(task, write=True):
               "manifest_drift": manifest_drift(m), "overlay_lint": overlay_lint(m),
               "states": {}, "passed": False}
     if not drift:
+        if m["schema"] == "pi.fixture/v3":
+            try:
+                result["oracle"] = oracle_selftest(m)
+            except AdmissionError as exc:
+                result["oracle"] = {"passed": False, "reason": str(exc)}
         result["states"]["pristine_pass_to_pass"] = run_state(m, None, "pass_to_pass")
         result["states"]["pristine_fail_to_pass"] = run_state(m, None, "fail_to_pass")
         gold = m["patches"]["gold"]
@@ -333,7 +533,16 @@ def check_one(task, write=True):
             # was recorded but never asserted until 2026-07-30 (triage #25); all
             # existing manifests already satisfy it (checked before adding).
             mutant_ok = mutant_ok and all_fail(f2p) and all_pass(p2p)
-        result["passed"] = (all_pass(result["states"]["pristine_pass_to_pass"])
+            if m["schema"] == "pi.fixture/v3":
+                grades = [row.get("weighted_grade") for row in f2p]
+                mutant_ok = (mutant_ok and all(grade and 0 < grade["fixed"] < grade["total"] for grade in grades)
+                             and len({(grade["fixed"], grade["total"]) for grade in grades if grade}) == 1)
+        if m["schema"] == "pi.fixture/v3":
+            gold_grades = [row.get("weighted_grade") for row in result["states"]["gold_fail_to_pass"]]
+            mutant_ok = mutant_ok and all(grade and grade["fixed"] == grade["total"] == 100 for grade in gold_grades)
+        oracle_ok = m["schema"] != "pi.fixture/v3" or result.get("oracle", {}).get("passed") is True
+        result["passed"] = (oracle_ok
+                            and all_pass(result["states"]["pristine_pass_to_pass"])
                             and all_fail(result["states"]["pristine_fail_to_pass"])
                             and all_pass(result["states"]["gold_pass_to_pass"])
                             and all_pass(result["states"]["gold_fail_to_pass"])
@@ -362,6 +571,20 @@ def review_packet(task):
                   f"- Mechanism: {crux['mechanism']}",
                   f"- Expected failure: {crux['expected_failure']}",
                   f"- Band prediction: `{crux['band_prediction']}`", ""]
+    if m.get("schema") == "pi.fixture/v3":
+        lines += ["## Weighted behavioural contract", ""]
+        for item in m["requirements"]:
+            lines += [f"- `{item['id']}` ({item['weight']:.0%}): {item['behavior']}"]
+        lines += ["", "## Visible/hidden duals", ""]
+        for dual in m["duals"]:
+            lines += [f"- `{dual['requirement_id']}`: `{dual['visible_case']}` → "
+                      + ", ".join(f"`{case}`" for case in dual["hidden_cases"])]
+        oracle = m["oracle"]
+        lines += ["", "## Oracle boundary", "",
+                  f"- Execute-only entry: `{oracle['entrypoint']}`",
+                  f"- Budget: `{oracle['query_budget']}` queries; timeout `{oracle['timeout_ms']} ms`; output cap `{oracle['output_cap_bytes']} bytes`",
+                  "- Source is admission-hashed but never staged, installed as an overlay, or included in one-shot context.",
+                  f"- Model snapshot boundary: {m['provenance']['model_snapshot_boundary']}", ""]
     auto = m["admission"].get("automated") or {}
     lines += ["## Automated admission", "", f"- Passed: `{auto.get('passed', False)}`",
               f"- Checked: `{auto.get('checked_at', 'not run')}`", ""]

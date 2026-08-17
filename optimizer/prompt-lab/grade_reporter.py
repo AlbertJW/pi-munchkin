@@ -75,6 +75,37 @@ def extract(tap_path):
     return extract_tap(text)
 
 
+def apply_requirement_weights(subscores, scoring):
+    """Convert a v3 TAP detail map into deterministic percentage-point credit.
+
+    A suite-load crash is a real 0/100 result. Any other mismatch between the
+    admitted hidden-case map and observed TAP names is refused rather than
+    guessed, because a renamed or skipped test changes the instrument.
+    """
+    if scoring is None or subscores is None:
+        return subscores, None
+    detail = subscores.get("detail")
+    requirements = scoring.get("requirements") if isinstance(scoring, dict) else None
+    hidden = scoring.get("hidden") if isinstance(scoring, dict) else None
+    if not isinstance(detail, dict) or not isinstance(requirements, list) or not isinstance(hidden, dict):
+        return None, "v3_coverage_mismatch"
+    expected = [case for item in requirements for case in hidden.get(item.get("id"), [])]
+    if set(detail) != set(expected):
+        if len(detail) == 1 and not next(iter(detail.values())):
+            return {"fixed": 0, "total": 100, "source": "tap-reporter-weighted", "detail": detail}, None
+        return None, "v3_coverage_mismatch"
+    fixed = 0
+    for item in requirements:
+        cases = hidden.get(item["id"], [])
+        points = item.get("weight_points")
+        if (not cases or not isinstance(points, int) or points <= 0
+                or points % len(cases) != 0):
+            return None, "v3_coverage_mismatch"
+        fixed += sum(points // len(cases) for case in cases if detail[case])
+    return {"fixed": fixed, "total": 100,
+            "source": "tap-reporter-weighted", "detail": detail}, None
+
+
 def selftest():
     # Vendored sample from node v26 (`--test-reporter=tap`), trimmed diagnostics.
     real = """TAP version 13
@@ -116,6 +147,17 @@ not ok 2 - beta fails
     dup = "TAP version 13\nok 1 - same\nnot ok 2 - same\n1..2\n"
     subscores, _ = extract_tap(dup)
     assert subscores["total"] == 2 and subscores["fixed"] == 1
+    weighted, blocked = apply_requirement_weights(
+        {"fixed": 3, "total": 4, "source": "tap-reporter",
+         "detail": {"a1": True, "a2": False, "b1": True, "b2": True}},
+        {"requirements": [{"id": "a", "weight_points": 40},
+                           {"id": "b", "weight_points": 60}],
+         "hidden": {"a": ["a1", "a2"], "b": ["b1", "b2"]}})
+    assert blocked is None and weighted["fixed"] == 80 and weighted["total"] == 100
+    assert (apply_requirement_weights(
+        {"fixed": 1, "total": 1, "detail": {"renamed": True}},
+        {"requirements": [{"id": "a", "weight_points": 100}], "hidden": {"a": ["a1"]}})
+        == (None, "v3_coverage_mismatch"))
     # A suite-load crash grades as fixed=0 (model broke the suite), not a refusal.
     crash = "TAP version 13\n# Subtest: test/hidden.test.js\nnot ok 1 - test/hidden.test.js\n1..1\n"
     subscores, _ = extract_tap(crash)

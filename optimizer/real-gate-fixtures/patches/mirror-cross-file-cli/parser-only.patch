@@ -1,0 +1,8 @@
+--- a/src/parse-job.js
++++ b/src/parse-job.js
+@@ -1,4 +1,4 @@
+-const ALLOWED = new Set(['queued', 'running', 'done']);
++const ALLOWED = new Set(['queued', 'blocked', 'running', 'done']);
+
+ export function parseJob(line) {
+   const [id, rawStatus, ...extra] = line.split(':');
