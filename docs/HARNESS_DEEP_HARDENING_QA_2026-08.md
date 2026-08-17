@@ -56,3 +56,8 @@ switch, live mirror, gate round, or model call is part of this QA work.
   no `context-pressure*` path and the source worktree is clean.
 - The authoritative package-source surface hash for this series is
   `c1c76ebb8ec3a9eb690927a0af6be8ee062b23d6f3c3655bef17326b6bcfd8a7`.
+- `npm audit --omit=dev` reports zero production vulnerabilities. The full
+  development tree reports four advisories below the pinned Pi 0.80.6 compile
+  baseline; they are transitive to the compatibility fixture, absent from the
+  shipped dependency tree, and cannot be removed by raising that baseline while
+  0.80.6 remains a supported boundary.
