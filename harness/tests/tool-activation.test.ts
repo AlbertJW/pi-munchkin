@@ -123,8 +123,8 @@ test("bootstrap baseline prevents plan_go's internal review hold from looking li
 	}
 });
 
-test("subagent activates additively for multi-item execution, second gate failure, and loop tier two", async () => {
-	for (const trigger of ["plan", "gate", "loop"] as const) {
+test("subagent activates additively for plan, gate, loop, and plateau recovery signals", async () => {
+	for (const trigger of ["plan", "gate", "loop", "plateau"] as const) {
 		const run = await dynamic();
 		try {
 			if (trigger === "plan") {
@@ -132,8 +132,10 @@ test("subagent activates additively for multi-item execution, second gate failur
 				emitHarnessSignal(run.fp.pi.events as never, { v: 1, type: "plan/go", runIdHash: signalRunId("r") });
 			} else if (trigger === "gate") {
 				emitHarnessSignal(run.fp.pi.events as never, { v: 1, type: "plan/gate", pass: false, fails: 2, runIdHash: signalRunId("r"), gateHash: null });
-			} else {
+			} else if (trigger === "loop") {
 				emitHarnessSignal(run.fp.pi.events as never, { v: 1, type: "loop/tier", tier: 2, detector: "exact" });
+			} else {
+				emitHarnessSignal(run.fp.pi.events as never, { v: 1, type: "capability/need", capability: "subagent", reason: "recovery" });
 			}
 			assert.ok(run.active().includes("subagent"), trigger);
 			assert.ok(run.active().includes("read"), "activation is additive");

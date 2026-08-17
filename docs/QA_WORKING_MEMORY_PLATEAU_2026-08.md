@@ -40,3 +40,23 @@ from evaluated sessions, endpoints, private artifact paths, or raw model output.
 - Full acceptance: `npm run verify` passed all five stages; deterministic package
   smoke loaded 31 extensions and two skills; peer boundaries and isolated packed
   consumers for Pi 0.80–0.84 passed.
+
+## PR 4 — shadow plateau recovery
+
+- Counterfactual: temporarily delayed the strict exposure threshold from the
+  third paired unchanged epoch to the fourth.
+- Command: `node --experimental-strip-types --test --test-name-pattern='three paired unchanged' harness/tests/verification-plateau.test.ts`.
+- Expected failure observed: `three paired unchanged mutation/gate epochs expose
+  one strict plateau` received no tier-three observation.
+- Restoration: the third paired epoch emits one shadow observation; the fifth
+  emits the activation tier without a second correction.
+- Additional counterfactual: restored the 2 KiB prefix used by failure
+  classification as the frontier parser's input.
+- Command: `node --experimental-strip-types --test --test-name-pattern='bounded terminal suffix' harness/tests/verify-gate.test.ts`.
+- Expected failure observed: `frontier reads the bounded terminal suffix rather
+  than losing TAP behind long output` recognized zero gates.
+- Restoration: the frontier reads a bounded 4 KiB suffix without joining full
+  output; failure classification retains its independent bounded prefix.
+- Full acceptance: `npm run verify` passed all five stages with 625 tests;
+  deterministic package smoke loaded 31 extensions and two skills; peer
+  boundaries and isolated packed consumers for Pi 0.80–0.84 passed.

@@ -17,6 +17,12 @@ export type VerificationFrontierSnapshotV1 = {
 	verificationPlateauOverrun: number;
 };
 
+export type VerificationFrontierObservation = {
+	snapshot: VerificationFrontierSnapshotV1;
+	recognized: boolean;
+	advanced: boolean;
+};
+
 const SUMMARY = /^#\s+(tests|pass|fail|skipped|todo|cancelled)\s+(\d+)\s*$/u;
 
 /** Parse only Node's terminal TAP summary. Everything else is unknown. */
@@ -86,9 +92,13 @@ export class VerificationFrontierTracker {
 	}
 
 	observeExactGate(input: { text: string; passed: boolean; ordered: boolean }): VerificationFrontierSnapshotV1 {
-		if (!input.ordered) return this.snapshot();
+		return this.observeExactGateDetailed(input).snapshot;
+	}
+
+	observeExactGateDetailed(input: { text: string; passed: boolean; ordered: boolean }): VerificationFrontierObservation {
+		if (!input.ordered) return { snapshot: this.snapshot(), recognized: false, advanced: false };
 		const parsed = parseNodeTapSummary(input.text);
-		if (!parsed) return this.snapshot();
+		if (!parsed) return { snapshot: this.snapshot(), recognized: false, advanced: false };
 		this.protocol = "node_tap";
 		this.recognizedGates += 1;
 		this.current = parsed;
@@ -102,7 +112,7 @@ export class VerificationFrontierTracker {
 			this.plateauStreak += 1;
 		}
 		if (input.passed) this.plateauStreak = 0;
-		return this.snapshot();
+		return { snapshot: this.snapshot(), recognized: true, advanced };
 	}
 
 	snapshot(): VerificationFrontierSnapshotV1 {

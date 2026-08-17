@@ -619,6 +619,29 @@ automatic context injection.
 The mechanism screen requires at least one write in 20% of six candidate-only sessions and a
 later list, resolution, or supersession in at least half of writing sessions. Authenticated study
 rows may retain only write/list/resolution/supersession counts, stale-active counts, and byte
-totals; note text and artifact locations are forbidden. A dedicated row generation must be
-preregistered before that screen—the current v4 row does not retroactively acquire notebook
-semantics. Working memory and plateau enforcement are first tested separately.
+totals; note text and artifact locations are forbidden. A preregistered trial manifest must name
+the working-memory telemetry events in v4's authenticated exposure map; the row does not acquire
+note text or trust the notebook. Working memory and plateau enforcement are first tested separately.
+
+---
+
+## §20 — Strict verification plateaus pair mutation with exact-gate evidence
+
+`VERIFICATION_PLATEAU=shadow` is the default observational mode. A strict plateau epoch requires
+one successful source mutation, followed by one ordered, recognized Node TAP failure from the
+exact project gate, under the same hashed active plan item and gate identity, with no frontier
+advance. One gate consumes at most one mutation. Unknown TAP, overlapping mutations, missing
+events, changed plan items, and unpaired repeat gates cannot manufacture epochs. Exact green or a
+frontier advance clears the streak; an advance does not close a semantic failure episode.
+
+At three unchanged epochs, shadow mode records `verification-plateau/observed` and changes no
+model input. Dark `enforce` proposes one bounded correction through the existing control arbiter;
+at five epochs it emits only an additive recovery capability request if `subagent` exists. It
+never names an inactive tool and never aborts solely for a plateau. Exact-call, repeated-outcome,
+semantic, and session-tail policies remain independent.
+
+The mechanism screen declares `verification-plateau/observed` in the authenticated v4 exposure
+map and also requires a complete authenticated frontier settlement. Exposure must reach 20% of
+six candidate-only sessions, and at least one non-plateau session must demonstrate a real frontier
+advance. The strict event count is not interchangeable with the broader
+`verification_plateau_overrun` window introduced in §16.

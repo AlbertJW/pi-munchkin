@@ -28,8 +28,9 @@ The frozen measurement generation remains the first dependency: judge labeling, 
 and any gate execution are still human-owned and have not been started by this series. The
 exact-gate frontier and call-variant terminology repairs are pushed on sequential `codex/`
 branches. A private structured notebook is prepared dark behind `WORKING_MEMORY=on`; off means
-zero tool or prompt exposure. Plateau enforcement and Mirror-mini fixtures remain later stacked
-work. Nothing in this series has been merged, mirrored live, adopted, or measured.
+zero tool or prompt exposure. Strict plateau tracking is prepared at the default shadow posture;
+`VERIFICATION_PLATEAU=enforce` remains dark and never aborts. Mirror-mini fixtures remain later
+stacked work. Nothing in this series has been merged, mirrored live, adopted, or measured.
 
 ## 2026-08 hardening series
 

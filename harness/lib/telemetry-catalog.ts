@@ -34,7 +34,18 @@ export const EVENT_CATALOG = {
 		best_passed: ["number", "null"], best_failed: ["number", "null"],
 		best_skipped: ["number", "null"], best_total: ["number", "null"],
 		last_advanced: "boolean", plateau_streak: "number",
-		successful_mutation_epochs_since_advance: "number", verification_plateau_overrun: "number",
+		 successful_mutation_epochs_since_advance: "number", verification_plateau_overrun: "number",
+	},
+	"verification-plateau/observed": {
+		mode: "string", streak: "number", gate_hash: "string", plan_item_hash: "string",
+	},
+	"verification-plateau/intervention": {
+		tier: "number", streak: "number", injected_chars: "number", activation_requested: "boolean",
+	},
+	"verification-plateau/settled": {
+		mode: "string", eligible_epochs: "number", plateau_events: "number", max_streak: "number",
+		frontier_advances: "number", current_streak: "number", pending_successful_mutation: "boolean",
+		corrections: "number", activation_requests: "number",
 	},
 	"did-you-mean/hint": { tool: "string", injected_chars: "number" },
 	"chaos/injected": { fault: "string", tool: "string", nth: "number" },

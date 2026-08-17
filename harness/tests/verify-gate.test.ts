@@ -1,12 +1,13 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { mkdtempSync, symlinkSync, writeFileSync } from "node:fs";
+import { mkdtempSync, readFileSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fire, makeFakePi, resetPiGlobals } from "./integration-harness.ts";
 import { classifyBashCommand } from "../lib/command-policy.ts";
 import { buildPlanGateReceipt, publishPlanGateReceipt } from "../lib/plan-gate-receipt.ts";
 import { gateDisplayCommand } from "../extensions/verify-gate.ts";
+import { onHarnessSignal } from "../lib/harness-signals.ts";
 
 // Run: cd ~/.pi/agent && TELEMETRY_FILE=$(mktemp) TELEMETRY_SOURCE=test \
 //        npx -y tsx --test tests/verify-gate.test.ts
@@ -626,6 +627,146 @@ test("exact execution events publish a bounded frontier while generic and missin
 		await fire(fp, "tool_execution_end", { toolCallId: "missing", toolName: "bash", result: result(9, 0), isError: false }, ctx);
 		assert.equal(((globalThis as Record<string, unknown>).__pi_verification_frontier_state as { recognizedGates: number }).recognizedGates, 4);
 	} finally {
+		resetPiGlobals();
+	}
+});
+
+test("frontier reads the bounded terminal suffix rather than losing TAP behind long output", async () => {
+	const cwd = projectWithNpmTest();
+	const fp = makeFakePi();
+	const ctx = ctxFor(cwd);
+	try {
+		await loadVerifyGate(fp, cwd, "execution");
+		await fire(fp, "tool_execution_start", { toolCallId: "long-gate", toolName: "bash", args: { command: "npm test" } }, ctx);
+		await fire(fp, "tool_execution_end", {
+			toolCallId: "long-gate", toolName: "bash", isError: true,
+			result: { content: [{ type: "text", text: `${"diagnostic line\n".repeat(1000)}# tests 6\n# pass 4\n# fail 2\n# skipped 0\n` }] },
+		}, ctx);
+		const snapshot = (globalThis as Record<string, unknown>).__pi_verification_frontier_state as { recognizedGates: number; current?: { passed: number } };
+		assert.equal(snapshot.recognizedGates, 1);
+		assert.equal(snapshot.current?.passed, 4);
+	} finally { resetPiGlobals(); }
+});
+
+const tapResult = (passed: number, failed: number) => ({ content: [{ type: "text", text: [
+	`# tests ${passed + failed}`, `# pass ${passed}`, `# fail ${failed}`, "# skipped 0",
+].join("\n") }] });
+
+async function plateauEpoch(fp: ReturnType<typeof makeFakePi>, cwd: string, turnIndex: number, suffix: string) {
+	const ctx = ctxFor(cwd);
+	await fire(fp, "turn_start", { turnIndex, timestamp: turnIndex }, ctx);
+	await fire(fp, "tool_execution_start", { toolCallId: `pm-${suffix}`, toolName: "edit", args: { path: "src/app.ts" } }, ctx);
+	await fire(fp, "tool_execution_end", { toolCallId: `pm-${suffix}`, toolName: "edit", result: {}, isError: false }, ctx);
+	await fire(fp, "tool_execution_start", { toolCallId: `pg-${suffix}`, toolName: "bash", args: { command: "npm test" } }, ctx);
+	await fire(fp, "tool_execution_end", { toolCallId: `pg-${suffix}`, toolName: "bash", result: tapResult(4, 2), isError: true }, ctx);
+}
+
+test("shadow plateau records strict exposure but adds no plateau correction", async () => {
+	const cwd = projectWithNpmTest();
+	const telemetry = join(cwd, "shadow-events.jsonl");
+	const previous = {
+		plateau: process.env.VERIFICATION_PLATEAU, order: process.env.VERIFY_EXECUTION_ORDER,
+		control: process.env.CONTROL_ARBITER, telemetry: process.env.TELEMETRY, file: process.env.TELEMETRY_FILE,
+	};
+	Object.assign(process.env, {
+		VERIFICATION_PLATEAU: "shadow", VERIFY_EXECUTION_ORDER: "execution",
+		CONTROL_ARBITER: "enforce", TELEMETRY: "on", TELEMETRY_FILE: telemetry,
+	});
+	try {
+		const fp = makeFakePi();
+		const verify = await import(`../extensions/verify-gate.ts?plateau-shadow=${Date.now()}-${Math.random()}`);
+		verify.default(fp.pi as never);
+		const arbiter = await import(`../extensions/control-arbiter.ts?plateau-shadow=${Date.now()}-${Math.random()}`);
+		arbiter.default(fp.pi as never);
+		await fire(fp, "session_start", {}, ctxFor(cwd));
+		(globalThis as Record<string, unknown>).__pi_active_plan_context = { item_id: "item-a" };
+		await plateauEpoch(fp, cwd, 1, "baseline");
+		for (let index = 2; index <= 4; index += 1) await plateauEpoch(fp, cwd, index, String(index));
+		await fire(fp, "turn_end", { ...wrapUpTurn, turnIndex: 4 }, ctxFor(cwd));
+		await fire(fp, "agent_settled", {}, ctxFor(cwd));
+		assert.equal(fp.sent.some((text) => text.includes("[verification-plateau]")), false);
+		const rows = readFileSync(telemetry, "utf8");
+		assert.match(rows, /"ext":"verification-plateau","kind":"observed"/);
+		assert.match(rows, /"mode":"shadow"/);
+	} finally {
+		for (const [key, value] of Object.entries({
+			VERIFICATION_PLATEAU: previous.plateau, VERIFY_EXECUTION_ORDER: previous.order,
+			CONTROL_ARBITER: previous.control, TELEMETRY: previous.telemetry, TELEMETRY_FILE: previous.file,
+		})) { if (value === undefined) delete process.env[key]; else process.env[key] = value; }
+		resetPiGlobals();
+	}
+});
+
+test("plateau off disables its collection while leaving frontier telemetry intact", async () => {
+	const cwd = projectWithNpmTest();
+	const telemetry = join(cwd, "off-events.jsonl");
+	const previous = {
+		plateau: process.env.VERIFICATION_PLATEAU, order: process.env.VERIFY_EXECUTION_ORDER,
+		telemetry: process.env.TELEMETRY, file: process.env.TELEMETRY_FILE,
+	};
+	Object.assign(process.env, {
+		VERIFICATION_PLATEAU: "off", VERIFY_EXECUTION_ORDER: "execution",
+		TELEMETRY: "on", TELEMETRY_FILE: telemetry,
+	});
+	try {
+		const fp = makeFakePi();
+		const verify = await import(`../extensions/verify-gate.ts?plateau-off=${Date.now()}-${Math.random()}`);
+		verify.default(fp.pi as never);
+		await fire(fp, "session_start", {}, ctxFor(cwd));
+		(globalThis as Record<string, unknown>).__pi_active_plan_context = { item_id: "item-a" };
+		for (let index = 1; index <= 4; index += 1) await plateauEpoch(fp, cwd, index, String(index));
+		await fire(fp, "agent_settled", {}, ctxFor(cwd));
+		const rows = readFileSync(telemetry, "utf8");
+		assert.match(rows, /"ext":"verification-frontier","kind":"settled"/);
+		assert.equal(rows.includes('"ext":"verification-plateau"'), false);
+	} finally {
+		for (const [key, value] of Object.entries({
+			VERIFICATION_PLATEAU: previous.plateau, VERIFY_EXECUTION_ORDER: previous.order,
+			TELEMETRY: previous.telemetry, TELEMETRY_FILE: previous.file,
+		})) { if (value === undefined) delete process.env[key]; else process.env[key] = value; }
+		resetPiGlobals();
+	}
+});
+
+test("dark enforce emits one arbiter-owned correction and requests available tier-two activation", async () => {
+	const cwd = projectWithNpmTest();
+	const previous = {
+		plateau: process.env.VERIFICATION_PLATEAU, order: process.env.VERIFY_EXECUTION_ORDER,
+		control: process.env.CONTROL_ARBITER, telemetry: process.env.TELEMETRY,
+	};
+	Object.assign(process.env, {
+		VERIFICATION_PLATEAU: "enforce", VERIFY_EXECUTION_ORDER: "execution",
+		CONTROL_ARBITER: "enforce", TELEMETRY: "off",
+	});
+	try {
+		const fp = makeFakePi();
+		fp.pi.registerTool({ name: "subagent", description: "test" } as never);
+		const needs: string[] = [];
+		onHarnessSignal(fp.pi.events as never, (signal) => {
+			if (signal.type === "capability/need") needs.push(`${signal.capability}:${signal.reason}`);
+		});
+		const verify = await import(`../extensions/verify-gate.ts?plateau-enforce=${Date.now()}-${Math.random()}`);
+		verify.default(fp.pi as never);
+		const arbiter = await import(`../extensions/control-arbiter.ts?plateau-enforce=${Date.now()}-${Math.random()}`);
+		arbiter.default(fp.pi as never);
+		await fire(fp, "session_start", {}, ctxFor(cwd));
+		(globalThis as Record<string, unknown>).__pi_active_plan_context = { item_id: "item-a" };
+		await plateauEpoch(fp, cwd, 1, "baseline");
+		for (let index = 2; index <= 4; index += 1) await plateauEpoch(fp, cwd, index, String(index));
+		await fire(fp, "turn_end", { ...wrapUpTurn, turnIndex: 4 }, ctxFor(cwd));
+		assert.equal(fp.sent.length, 1, "plateau recovery and exact verification share one corrective delivery");
+		assert.match(fp.sent[0], /^\[verification-plateau\]/);
+		assert.match(fp.sent[0], /\[verify-gate\].*after the latest mutation\.[^]*$/);
+		assert.equal(fp.sent[0].includes("subagent"), false, "the correction never names an optional tool");
+
+		await plateauEpoch(fp, cwd, 5, "5");
+		await plateauEpoch(fp, cwd, 6, "6");
+		assert.deepEqual(needs, ["subagent:recovery"]);
+	} finally {
+		for (const [key, value] of Object.entries({
+			VERIFICATION_PLATEAU: previous.plateau, VERIFY_EXECUTION_ORDER: previous.order,
+			CONTROL_ARBITER: previous.control, TELEMETRY: previous.telemetry,
+		})) { if (value === undefined) delete process.env[key]; else process.env[key] = value; }
 		resetPiGlobals();
 	}
 });

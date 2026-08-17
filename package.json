@@ -179,6 +179,7 @@
     "harness/lib/run-kernel-types.ts",
     "harness/lib/verification-order.ts",
     "harness/lib/verification-frontier.ts",
+    "harness/lib/verification-plateau.ts",
     "harness/lib/working-memory.ts",
     "harness/agents",
     "harness/vendor",
