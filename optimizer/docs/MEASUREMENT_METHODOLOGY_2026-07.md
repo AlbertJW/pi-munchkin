@@ -523,7 +523,9 @@ observational changes only: the 2/4/6 semantic tiers, exact-call walls, 7/11/28 
 and highest-tier collision rule are unchanged. Do not pool either metric across harness surface
 hashes, and do not reinterpret the correlated diagnostic as the preregistered primary outcome.
 
-The ephemeral failure snapshot is v3. Verification/compiler recovery is scoped explicitly. When
+The ephemeral failure snapshot is v4. Its call-variant hashes record only changed bounded tool
+arguments; they do not establish that the model changed its reasoning strategy.
+Verification/compiler recovery is scoped explicitly. When
 an exact project gate is known (or gate discovery is unavailable), only verified exact-gate
 evidence after the latest mutation closes the episode. When discovery positively reports that no
 project gate exists, only the same normalized verifier may close it. Non-Bash assertion episodes,
@@ -554,12 +556,14 @@ separate canonical generations and must never be pooled.
 
 ---
 
-## §16 — Powered episode studies require authenticated v3 rows
+## §17 — Powered episode studies require authenticated rows
 
 `pi.eval-row/v3` is the first row generation that carries the semantic-episode outcome through
 the gate's parent-owned HMAC reducer. Its `pi.context-telemetry/v3` payload contains count-only
 episode settlement, recovery, tier, intervention, and provider-timing aggregates. It contains no
 commands, arguments, output, errors, URLs, paths, endpoints, hostnames, or credentials.
+`pi.eval-row/v4` is the current writer generation and additionally requires exactly one complete
+authenticated verification-frontier settlement. V3 and v4 are separate populations.
 
 A powered episode row is complete only when the authenticated stream contains exactly one valid
 `failure-episode/settled` summary. Missing or duplicate summaries make the row incomplete for the
@@ -568,13 +572,13 @@ episode or correctness outcomes. The gate writes incomplete rows for auditabilit
 silently dropping them.
 
 V2 remains readable as historical evidence but is ineligible for semantic-enforcement trials.
-V2, v3, and schema-less historical rows are distinct analysis populations and must never be mixed.
+V2, v3, v4, and schema-less historical rows are distinct analysis populations and must never be mixed.
 Raw gate JSONL is not authenticated after its ephemeral HMAC key is gone; only the reduced row
 written while the parent still owns that key carries authenticated episode evidence.
 
 ---
 
-## §17 — Ling Tiny study stages and serving strata
+## §18 — Ling Tiny study stages and serving strata
 
 The semantic-enforcement study uses `failure_episode_trial.py`, not an ad hoc shell loop. Its
 stages are `preflight → calibrate → power → primary → primary-report → replication → final-report`,
@@ -583,7 +587,7 @@ and each stage is a separate operator action. Only calibration, primary, and rep
 and completed `(stage, fixture, arm, repetition)` cells are skipped on resume.
 
 Calibration is exactly six shadow sessions per fixture. Admission remains fixed at 2–4 correct
-sessions and semantic-episode exposure in at least two sessions, with complete authenticated v3
+sessions and semantic-episode exposure in at least two sessions, with complete authenticated v4
 settlement and exact token usage throughout. At least two fixtures must qualify. Power uses the
 zero-inclusive calibration distribution, a 30% binomial-thinning alternative, 500 simulated
 trials with 1,000 bootstrap resamples each, candidate sizes 40/48/56/64/72/80 per arm, and selects

@@ -235,7 +235,7 @@ test("lens steer skips abort/shutdown proposals — hard stops must not be fough
 
 		// same boundary, message-effect proposal: the lens DOES fire.
 		emitControlProposal(fp.pi.events as never, buildControlProposal({
-			boundarySequence: 20, kind: "failure_recovery", reason: "loop_strategy_change",
+			boundarySequence: 20, kind: "failure_recovery", reason: "loop_recovery",
 			source: "loop-breaker", cooldownKey: "exact:1",
 			messageFactory: "loop-tier", effect: "message",
 		}), { message: "tier steer" });

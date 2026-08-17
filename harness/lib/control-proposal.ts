@@ -20,7 +20,7 @@ export type ControlReason =
 	| "outcome_repeat"
 	| "session_repeat"
 	| "exact_gate_missing"
-	| "loop_strategy_change"
+	| "loop_recovery"
 	| "plan_blocked"
 	| "pseudo_tool_call"
 	| "research_unverified"
@@ -90,7 +90,7 @@ const PRIORITY: Record<ControlKind, number> = {
 const KINDS = new Set(Object.keys(PRIORITY));
 const REASONS = new Set<ControlReason>([
 	"policy_rejection", "compile_or_lint", "loop_hard_stop", "semantic_tier", "outcome_repeat", "session_repeat",
-	"exact_gate_missing", "loop_strategy_change", "plan_blocked", "pseudo_tool_call", "research_unverified", "state_lens",
+	"exact_gate_missing", "loop_recovery", "plan_blocked", "pseudo_tool_call", "research_unverified", "state_lens",
 ]);
 const SOURCES = new Set<ControlSource>([
 	"loop-breaker", "verify-gate", "tool-call-rescue", "session-blackboard", "plan-runner", "ketch",

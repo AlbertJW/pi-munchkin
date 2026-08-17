@@ -15,3 +15,15 @@ from evaluated sessions, endpoints, private artifact paths, or raw model output.
   the baseline and the targeted test passes.
 - Full acceptance: `npm run verify` passed all five stages; the optimizer network
   seatbelt self-test required permission to bind a temporary loopback socket.
+
+## PR 2 — semantic terminology
+
+- Counterfactual: temporarily restored the tier-two claim that a failure persisted
+  after a strategy change, even though the runtime observes only call arguments.
+- Command: `node --experimental-strip-types --test --test-name-pattern='semantic tiers steer' harness/tests/loop-breaker.test.ts`
+- Expected failure observed: `semantic tiers steer at two/four and abort silently at
+  six with a private receipt` rejected the legacy message because it omitted the
+  measured call-variant count and frontier state.
+- Restoration: the correction reports only failure class, distinct call-variant
+  count, frontier state, and a required next action. Recovery receipt v2 retains
+  `call_variant_hashes` and no strategy claim.

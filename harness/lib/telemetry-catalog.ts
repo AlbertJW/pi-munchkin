@@ -113,7 +113,7 @@ export const EVENT_CATALOG = {
 	},
 	"failure-episode/observed": {
 		episode_id: "string", failure_class: "string", count: "number",
-		calls_after_second: "number", correlated_calls_after_second: "number", strategy_count: "number",
+		calls_after_second: "number", correlated_calls_after_second: "number", call_variant_count: "number",
 	},
 	"failure-episode/recovered": {
 		episode_id: "string", failure_class: "string", count: "number",
@@ -134,7 +134,7 @@ export const EVENT_CATALOG = {
 		tier: "number", detector: "string", failure_class: "string", count: "number",
 		session_repeats: "number", injected_chars: "number", turnIndex: "number",
 	},
-	"failure-episode/receipt": { persisted: "boolean", strategy_count: "number" },
+	"failure-episode/receipt": { persisted: "boolean", call_variant_count: "number" },
 	"failure-episode/resumed": { cleared: "number", blocked: "number", injected_chars: "number" },
 	"drift-scanner/review-skipped": { why: "string" },
 	"drift-scanner/review-start": { diffChars: "number", truncated: "boolean" },

@@ -49,7 +49,7 @@ export type FailureEpisode = {
 	count: number;
 	callsAfterSecond: number;
 	correlatedCallsAfterSecond: number;
-	strategyHashes: string[];
+	callVariantHashes: string[];
 	openedAt: string;
 	updatedAt: string;
 	status: EpisodeStatus;
@@ -59,7 +59,7 @@ export type FailureEpisode = {
 };
 
 export type FailureEpisodeSnapshot = {
-	v: 3;
+	v: 4;
 	totalEpisodes: number;
 	totalFailures: number;
 	longestEpisode: number;
@@ -71,7 +71,7 @@ export type FailureEpisodeSnapshot = {
 };
 
 const MAX_COMPLETED = 64;
-const MAX_STRATEGIES = 16;
+const MAX_CALL_VARIANTS = 16;
 const MAX_ARGUMENT_KEYS = 32;
 const MAX_ARGUMENT_STRING = 4096;
 const MAX_ARGUMENT_ARRAY = 32;
@@ -152,7 +152,7 @@ export function targetHash(toolName: string, args: Record<string, unknown>): str
 	return sha256(`family:${family}`);
 }
 
-export function strategyHash(toolName: string, args: Record<string, unknown>): string {
+export function callVariantHash(toolName: string, args: Record<string, unknown>): string {
 	return sha256(`${toolName}\0${canonical(args)}`);
 }
 
@@ -227,7 +227,7 @@ export function classifyFailure(observation: FailureObservation): FailureClass {
 }
 
 function cloneEpisode(episode: FailureEpisode): FailureEpisode {
-	return { ...episode, strategyHashes: [...episode.strategyHashes] };
+	return { ...episode, callVariantHashes: [...episode.callVariantHashes] };
 }
 
 export class FailureEpisodeTracker {
@@ -291,7 +291,7 @@ export class FailureEpisodeTracker {
 		if (!episode) {
 			episode = {
 				id: key.slice(0, 16), key, failureClass, toolFamily: family, targetHash: target,
-				planItemHash: item, count: 0, callsAfterSecond: 0, correlatedCallsAfterSecond: 0, strategyHashes: [],
+				planItemHash: item, count: 0, callsAfterSecond: 0, correlatedCallsAfterSecond: 0, callVariantHashes: [],
 				openedAt: now, updatedAt: now, status: "active", recovery: null,
 				verificationScope, verifierHash: observedVerifier,
 			};
@@ -305,9 +305,9 @@ export class FailureEpisodeTracker {
 		episode.count += 1;
 		if (episode.count === 2) this.exposed.add(key);
 		episode.updatedAt = now;
-		const strategy = strategyHash(observation.toolName, args);
-		if (!episode.strategyHashes.includes(strategy) && episode.strategyHashes.length < MAX_STRATEGIES) {
-			episode.strategyHashes.push(strategy);
+		const callVariant = callVariantHash(observation.toolName, args);
+		if (!episode.callVariantHashes.includes(callVariant) && episode.callVariantHashes.length < MAX_CALL_VARIANTS) {
+			episode.callVariantHashes.push(callVariant);
 		}
 		this.totalFailures += 1;
 		this.longestEpisode = Math.max(this.longestEpisode, episode.count);
@@ -403,7 +403,7 @@ export class FailureEpisodeTracker {
 
 	snapshot(): FailureEpisodeSnapshot {
 		return {
-			v: 3,
+			v: 4,
 			totalEpisodes: this.totalEpisodes,
 			totalFailures: this.totalFailures,
 			longestEpisode: this.longestEpisode,

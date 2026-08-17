@@ -7,13 +7,13 @@ import { sha256, type FailureClass, type FailureEpisode } from "./failure-episod
 export type LoopTier = 0 | 1 | 2 | 3;
 
 export type LoopRecoveryReceipt = {
-	v: 1;
+	v: 2;
 	created_at: string;
 	episode_hash: string;
 	plan_item_hash: string;
 	failure_class: FailureClass;
 	tool_family: string;
-	strategy_family_hashes: string[];
+	call_variant_hashes: string[];
 	last_source_mutated: boolean;
 	exact_gate_passed: boolean;
 	harness_surface_hash: string | null;
@@ -27,19 +27,19 @@ export function tierForCount(count: number, t1: number, t2: number, t3: number):
 }
 
 export function recoveryReceipt(
-	episode: Pick<FailureEpisode, "key" | "planItemHash" | "failureClass" | "toolFamily" | "strategyHashes">,
+	episode: Pick<FailureEpisode, "key" | "planItemHash" | "failureClass" | "toolFamily" | "callVariantHashes">,
 	gate: { mutated?: unknown; verifiedOk?: unknown } | undefined,
 	surfaceHash: string | undefined,
 	now = new Date().toISOString(),
 ): LoopRecoveryReceipt {
 	return {
-		v: 1,
+		v: 2,
 		created_at: now,
 		episode_hash: sha256(`episode:${episode.key}`),
 		plan_item_hash: episode.planItemHash,
 		failure_class: episode.failureClass,
 		tool_family: episode.toolFamily.slice(0, 48),
-		strategy_family_hashes: episode.strategyHashes.slice(0, 16),
+		call_variant_hashes: episode.callVariantHashes.slice(0, 16),
 		last_source_mutated: gate?.mutated === true,
 		exact_gate_passed: gate?.verifiedOk === true,
 		harness_surface_hash: surfaceHash && /^[a-f0-9]{64}$/i.test(surfaceHash) ? surfaceHash.toLowerCase() : null,
