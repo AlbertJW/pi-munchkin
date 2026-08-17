@@ -197,7 +197,15 @@ def test_ling_fixture_admission_contracts():
     for task in tasks:
         _, manifest = admission.load_manifest(task)
         assert manifest["cohort_id"] == "2026-08" and manifest["fixture_version"] == "2026-08.1"
-        assert manifest["admission"]["approved"] is False, "fixture approval is a human checkpoint"
+        # Approval is a human checkpoint. Albert approved this cohort 2026-08-15
+        # (measurement reboot). The guard now asserts a WELL-FORMED approval
+        # rather than no approval: if approved, reviewer + expiry + a matching
+        # manifest_sha256 must all be present (a forged/partial stamp fails).
+        approved = manifest["admission"]["approved"]
+        if approved:
+            ok, reason = admission.authoritative(manifest)
+            assert ok, f"{task} approved but not authoritative: {reason}"
+            assert manifest["admission"]["reviewer"] and manifest["timestamps"]["expires_at"]
         states = manifest["admission"]["automated"]["states"]
         assert all(row["passed"] for row in states["pristine_pass_to_pass"])
         assert all(not row["passed"] for row in states["pristine_fail_to_pass"])
