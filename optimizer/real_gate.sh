@@ -1034,6 +1034,12 @@ if [[ "$ROBUSTNESS" == 1 ]]; then
 	python3 "$HERE/prompt-lab/robustness_report.py" "$GEN" --baseline base --candidate cand
 fi
 
+# Trial validity is part of row authority, not an optional reporting sidecar.
+# Recompute the complete sidecar after every invocation (including append mode)
+# so a crash cannot leave a partially evaluated population looking usable.
+python3 "$HERE/prompt-lab/trial_validity.py" "$RESULTS" \
+	--runs-dir "$RUNS" --timeout "$PI_TIMEOUT" --manifests
+
 echo; echo "rows -> $RESULTS"
 if [[ "$CALIB" == 1 ]]; then
 	echo "calibrate: ./prompt-lab/calibrate.py $GEN   (keep tasks in the 20-85% band for this model)"

@@ -548,6 +548,14 @@ def test_graded_subscores_passthrough():
     assert ".*-grade.json" not in gate, "real_gate.sh must not glob for the artifact any more"
 
 
+def test_trial_validity_is_authoritative():
+    gate = (admission.ROOT / "real_gate.sh").read_text()
+    marker = 'python3 "$HERE/prompt-lab/trial_validity.py" "$RESULTS"'
+    assert marker in gate, "real_gate.sh must evaluate every emitted row before reporting it"
+    assert gate.index(marker) < gate.index('echo; echo "rows -> $RESULTS"'), \
+        "validity must settle before real_gate advertises the result population"
+
+
 def main():
     # AUTO-DISCOVERED, not a hand-maintained list. The list form silently
     # skipped any test_* someone forgot to register — which is exactly how the

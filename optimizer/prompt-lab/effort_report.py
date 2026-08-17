@@ -133,17 +133,16 @@ def rows(gen):
         raise SystemExit(f"no such gen: {path}")
     data = [json.loads(line) for line in path.read_text().splitlines() if line.strip()]
     # Per-trial validity sidecar (trial_validity.py): voided rows (infra_valid /
-    # reward_hacking FAIL) are excluded with a loud count; an absent sidecar keeps
-    # every row and says so — this tool already pools non-authoritative rows with
-    # a warning, and the validity layer follows the same honesty pattern.
+    # reward_hacking FAIL) are excluded with a loud count. Missing verdicts fail
+    # closed: absence of trial-validity evidence is not a valid population.
     import trial_validity
     verdicts = trial_validity.load_sidecar(path)
     kept, voided, unevaluated = trial_validity.partition(data, verdicts)
-    if verdicts is None:
-        print(f"trial validity: NOT EVALUATED (run trial_validity.py results/{gen}.jsonl)")
-    else:
-        reasons = ", ".join(sorted({r for _, rs in voided for r in rs})) or "-"
-        print(f"trial validity: {len(voided)} row(s) voided ({reasons}); {unevaluated} unevaluated")
+    if verdicts is None or unevaluated:
+        raise SystemExit(f"trial validity incomplete: {unevaluated or len(data)} unevaluated row(s); "
+                         f"run trial_validity.py results/{gen}.jsonl")
+    reasons = ", ".join(sorted({r for _, rs in voided for r in rs})) or "-"
+    print(f"trial validity: {len(voided)} row(s) voided ({reasons}); 0 unevaluated")
     return kept
 
 
