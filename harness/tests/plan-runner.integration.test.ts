@@ -12,6 +12,9 @@ import { consumePlanGateReceipt } from "../lib/plan-gate-receipt.ts";
 
 // module-load envs BEFORE importing the extensions
 process.env.PLAN_GATE_MAX = "2";
+// This suite exercises the explicit legacy/project rollback. Private-by-default
+// storage and permissions have dedicated coverage in plan-adaptive.integration.
+process.env.PLAN_STORAGE = "project";
 const planRunnerModule = await import("../extensions/plan-runner.ts");
 const planRunner = planRunnerModule.default;
 const policyBlock = planRunnerModule.policyBlock;
