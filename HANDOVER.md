@@ -24,27 +24,31 @@ adoption, deletion, live mirroring, and gate rounds are human-gated. Never touch
 
 ## 2026-08 hardening series
 
-> **2026-08-15 MEASUREMENT REBOOT — on branch `measurement/reboot` (codex ling branch merged
-> with main), NOT yet merged to main or mirrored.** The optimizer is unmothballed:
-> charter `optimizer/docs/UNMOTHBALL_2026-08.md`, ONE preregistered admission rule
-> (`PREREG_FIXTURE_ADMISSION_2026-08.md` + `admission_rule.py`), graded-by-default TAP
-> reporter grading, per-trial validity rubric with voiding (`trial_validity.py`), judge
-> activation tooling (`judge_render.py`, `--score-gen`, `JUDGE_LABELING_2026-08.md` — the 12
-> calib4b transcripts are a sufficient first labeling set), ling cohort repaired to
-> behaviour-only + pi.fixture/v2, sweep-a multi-defect fixture (proof battery PASS).
-> PENDING GATES (Albert): confirm the codex session is done with
-> `codex/ling-semantic-fixtures` → merge `measurement/reboot` to main + push; approve
-> charter + prereg; Phase 1 coherence adoption (derived/enforce two-line diff, mirror,
-> boundary row — approved in principle 2026-08-15, not yet applied); approve the five
-> cohort fixtures (`fixture_admission.py approve`); label >=10 judge transcripts.
-> BUILD COMPLETE: sweep-b (episode-variance) + sweep-c (process traps) landed on the
-> proven sweep-a template (all three pass the admission battery). Phase 1 adoption
-> (derived/enforce) applied + pushed; live mirror deferred until the box is free (an
-> interactive pi was running). audit-sweep is deliberately NOT re-manifested — it grades
-> the model's audit report via the retained pinned-artifact path, which the behaviour-
-> graded reporter cannot express, and re-manifesting would clear its live approval. NO
-> round has run; the evidence base is empty by design until Phase 6 (audit-sweep graded,
-> local 4B, n>=9, Albert starts).
+> **2026-08-15 MEASUREMENT REBOOT — MERGED to `main` (`5746195`), MIRRORED LIVE.** The
+> optimizer is unmothballed: charter `optimizer/docs/UNMOTHBALL_2026-08.md`, ONE
+> preregistered admission rule (`PREREG_FIXTURE_ADMISSION_2026-08.md` + `admission_rule.py`),
+> graded-by-default TAP reporter grading (`grade_reporter.py`), per-trial validity rubric
+> with voiding (`trial_validity.py`), judge activation tooling (`judge_render.py`,
+> `--score-gen`, `JUDGE_LABELING_2026-08.md` — the 12 calib4b transcripts are a sufficient
+> first labeling set), ling cohort repaired to behaviour-only + pi.fixture/v2, and sweep-a
+> (capability) / sweep-b (episode-variance) / sweep-c (process-traps) multi-defect fixtures,
+> all passing the admission battery.
+>
+> **DONE:** codex ling branch merged, whole reboot merged to main + pushed; **Phase 1
+> coherence adoption APPLIED + mirrored live** (`ACTIVE_TOOL_PROMPTS=derived`,
+> `CONTROL_ARBITER=enforce`; mirror:apply 110/110 zero drift, mirror:check 110/110, 35B
+> live-load smoke clean, boundary row 2026-08-15 loaded hash `358c1f7c…` — future gate
+> rounds bind this). A 2.75-day wedged bare `pi` on ttys004 (stdin-wedge orphan) was cleared
+> before the mirror.
+>
+> **PENDING GATES (Albert):** approve charter + prereg; approve the five cohort fixtures
+> (`fixture_admission.py approve <name> --reviewer …`); label ≥10 judge transcripts. Then
+> the first BOX round is Phase 6 — audit-sweep graded, base arm, local 4B, n≥9, preceded by
+> one n=1 smoke row (the first end-to-end exercise of the v3 settlement-authority
+> tightening). audit-sweep is deliberately NOT re-manifested — it grades the model's audit
+> report via the retained pinned-artifact path, which the behaviour-graded reporter cannot
+> express, and re-manifesting would clear its live approval. NO round has run; the evidence
+> base is empty by design.
 
 
 > **2026-08-14 CONFORMANCE-REPORT FOLLOW-UP — ROLLED OUT to `main` (`99e9235`) and mirrored live.**
