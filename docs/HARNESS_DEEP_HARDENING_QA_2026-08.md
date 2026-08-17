@@ -39,10 +39,20 @@ switch, live mirror, gate round, or model call is part of this QA work.
 
 ## Acceptance record
 
-- Focused regressions and TypeScript typechecking pass.
-- The canonical local harness run passes all dynamically discovered tests.
-- A disposable Linux Node 22 run passes the harness tests, typecheck, health,
-  deterministic package smoke, and optimizer verification.
-- Final diff, secret scan, package, peer-boundary, temporary-agent, and protected
-  path checks are recorded when the branch-wide acceptance run completes.
-
+- Focused regressions and TypeScript typechecking pass. The canonical local
+  verifier passes all 600 dynamically discovered harness tests, typecheck,
+  health, deterministic package smoke, and optimizer/Seatbelt verification.
+- A disposable Linux Node 22 run passes the same five verification stages. The
+  package smoke loads all 30 extension entry points and both skills.
+- Offline peer boundaries reject the unsupported lower and upper edges and
+  accept 0.80.6 plus the supported 0.84 line.
+- Isolated packed consumers for Pi 0.80, 0.81, 0.82, 0.83, and 0.84 each
+  typecheck and load all 30 extensions and both skills.
+- A temporary agent-directory mirror writes and checks 110 first-party
+  artifacts with zero drift; Pi's loader reports 30 extensions and zero errors.
+  The live agent directory is not modified.
+- Diff whitespace and the non-echoing secret scan pass; the scanner inspects
+  the complete added-line set without reporting matched text. The changed-file set contains
+  no `context-pressure*` path and the source worktree is clean.
+- The authoritative package-source surface hash for this series is
+  `c1c76ebb8ec3a9eb690927a0af6be8ee062b23d6f3c3655bef17326b6bcfd8a7`.
