@@ -283,10 +283,8 @@ def report(gen, baseline, candidate):
     all_rows = [json.loads(l) for l in open(path) if l.strip()]
     # Per-trial validity (UNMOTHBALL charter): voiding criteria (infra_valid,
     # reward_hacking) exclude rows BEFORE any verdict logic, with counted
-    # exclusions. Sidecar written by trial_validity.py; absent = not evaluated,
-    # loudly noted, rows kept (fail-open here would hide a tamper; the sidecar
-    # only ever REMOVES rows, so keeping unevaluated rows is the conservative
-    # direction for a tool whose verdicts are refusal-biased).
+    # exclusions. Sidecar written by trial_validity.py; absent or partial means
+    # the population is incomplete and cannot support an adoption verdict.
     import trial_validity as _tv
     _verdicts = _tv.load_sidecar(path)
     all_rows, _voided, _unevaluated = _tv.partition(all_rows, _verdicts)
@@ -308,6 +306,8 @@ def report(gen, baseline, candidate):
     models = sorted({r.get("model") for r in rows if r.get("model")})
 
     problems = []
+    if _verdicts is None or _unevaluated:
+        problems.append(f"trial validity incomplete: {_unevaluated or len(all_rows)} unevaluated row(s)")
     if generation_error:
         problems.append(generation_error)
     if canonical and not rows:

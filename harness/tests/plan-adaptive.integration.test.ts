@@ -1,11 +1,58 @@
 import assert from "node:assert/strict";
-import { existsSync, readFileSync, rmSync } from "node:fs";
+import { existsSync, readFileSync, rmSync, statSync } from "node:fs";
 import { mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
 import { callTool, makeCtx, makeFakePi, resetPiGlobals } from "./integration-harness.ts";
 import { runCapsuleDirectory } from "../lib/run-capsule-store.ts";
+
+test("forced planning defaults to private capsule state, projection, and trace", async () => {
+	const previous = {
+		mode: process.env.PLAN_MODE, storage: process.env.PLAN_STORAGE,
+		agent: process.env.PI_CODING_AGENT_DIR, capsule: process.env.RUN_CAPSULE,
+		telemetry: process.env.TELEMETRY,
+	};
+	const cwd = mkdtempSync(join(tmpdir(), "pi-private-default-"));
+	const agent = mkdtempSync(join(tmpdir(), "pi-private-default-agent-"));
+	const capsuleId = "00000000-0000-4000-8000-000000000001";
+	process.env.PLAN_MODE = "forced";
+	delete process.env.PLAN_STORAGE;
+	process.env.PI_CODING_AGENT_DIR = agent;
+	process.env.RUN_CAPSULE = "shadow";
+	process.env.TELEMETRY = "off";
+	(globalThis as Record<string, unknown>).__pi_run_capsule_identity = { cwd, capsuleId };
+	try {
+		const fp = makeFakePi();
+		const mod = await import(`../extensions/plan-runner.ts?privateDefault=${Date.now()}-${Math.random()}`);
+		mod.default(fp.pi as never);
+		const { ctx } = makeCtx(cwd);
+		await fp.commands.get("plan").handler("keep this request private", ctx);
+		await callTool(fp, "plan_write", {
+			items: [{ title: "one", status: "pending" }], request: "keep this request private", summary: "one",
+		}, cwd);
+		const directory = runCapsuleDirectory(agent, cwd, capsuleId);
+		for (const name of ["plan-state.json", "plan.md", "plan-trace.jsonl"]) {
+			const path = join(directory, name);
+			assert.equal(existsSync(path), true, `${name} is private`);
+			assert.equal(statSync(path).mode & 0o777, 0o600, `${name} mode`);
+		}
+		assert.equal(statSync(directory).mode & 0o777, 0o700, "capsule directory mode");
+		assert.equal(existsSync(join(cwd, ".pi")), false, "normal planning does not dirty the project");
+		assert.ok(fp.commands.has("plan-export"), "export is available independently of adaptive planning");
+		await fp.commands.get("plan-export").handler("", ctx);
+		assert.match(readFileSync(join(cwd, ".pi", "TODO.md"), "utf8"), /keep this request private/);
+	} finally {
+		resetPiGlobals();
+		rmSync(cwd, { recursive: true, force: true });
+		rmSync(agent, { recursive: true, force: true });
+		if (previous.mode === undefined) delete process.env.PLAN_MODE; else process.env.PLAN_MODE = previous.mode;
+		if (previous.storage === undefined) delete process.env.PLAN_STORAGE; else process.env.PLAN_STORAGE = previous.storage;
+		if (previous.agent === undefined) delete process.env.PI_CODING_AGENT_DIR; else process.env.PI_CODING_AGENT_DIR = previous.agent;
+		if (previous.capsule === undefined) delete process.env.RUN_CAPSULE; else process.env.RUN_CAPSULE = previous.capsule;
+		if (previous.telemetry === undefined) delete process.env.TELEMETRY; else process.env.TELEMETRY = previous.telemetry;
+	}
+});
 
 test("adaptive mode stores new plans privately, exposes ID deltas, and exports explicitly", async () => {
 	const previous = {

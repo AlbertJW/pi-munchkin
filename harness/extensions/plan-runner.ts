@@ -1,4 +1,4 @@
-import { appendFile, mkdir, open, readFile, rename, stat, unlink, writeFile } from "node:fs/promises";
+import { appendFile, chmod, mkdir, open, readFile, rename, stat, unlink, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { createHash, randomUUID } from "node:crypto";
 import { defineTool, withFileMutationQueue, type ExtensionAPI } from "@earendil-works/pi-coding-agent";
@@ -17,7 +17,7 @@ import { ACTIVE_TOOL_PROMPTS } from "../lib/active-tool-prompts.ts";
 import { emitHarnessSignal, onHarnessSignal, signalRunId } from "../lib/harness-signals.ts";
 import { applyPlanDeltas, type PlanDelta } from "../lib/plan-delta.ts";
 import { boundedDirectRequest, planMode, type PlanMode } from "../lib/plan-mode.ts";
-import { planStorageMode, privatePlanStatePath } from "../lib/plan-state-storage.ts";
+import { planStorageMode, privatePlanProjectionPath, privatePlanStatePath, privatePlanTracePath } from "../lib/plan-state-storage.ts";
 
 // plan-runner v3 — model-owned TODO list (Claude Code TodoWrite pattern).
 // One tool (plan_write) rewrites the whole list each call: re-planning,
@@ -283,11 +283,15 @@ function todoPath(cwd: string): string {
 function usesPrivatePlanStorage(cwd: string): boolean {
 	return planStorageMode() === "capsule" && privatePlanStatePath(cwd) !== null;
 }
-function statePath(cwd: string): string {
-	return privatePlanStatePath(cwd) ?? join(cwd, ".pi", "plan-state.json");
+function statePath(cwd: string): string | null {
+	return planStorageMode() === "project"
+		? join(cwd, ".pi", "plan-state.json")
+		: privatePlanStatePath(cwd);
 }
-function tracePath(cwd: string): string {
-	return join(cwd, ".pi", "traces", "plan-runner.jsonl");
+function tracePath(cwd: string): string | null {
+	return planStorageMode() === "project"
+		? join(cwd, ".pi", "traces", "plan-runner.jsonl")
+		: privatePlanTracePath(cwd);
 }
 function archiveDir(cwd: string): string {
 	return join(cwd, ".pi", "todo-archive");
@@ -383,7 +387,12 @@ async function countRecentSameFailures(path: string, fingerprint: string): Promi
 // Appends a trace event; returns same_failure_count so callers can warn the model.
 async function appendTrace(cwd: string, event: TraceEvent): Promise<number | undefined> {
 	const path = tracePath(cwd);
-	await mkdir(dirname(path), { recursive: true });
+	// The capsule identity is established during session_start. If it is absent,
+	// fail closed by omitting the diagnostic trace; never fall back into the repo.
+	if (!path) return undefined;
+	const privateFile = planStorageMode() === "capsule";
+	await mkdir(dirname(path), { recursive: true, mode: privateFile ? 0o700 : undefined });
+	if (privateFile) await chmod(dirname(path), 0o700);
 	const failureClass = event.failure_class ?? (event.success ? "none" : "unknown");
 	const fingerprint = event.success
 		? undefined
@@ -411,7 +420,17 @@ async function appendTrace(cwd: string, event: TraceEvent): Promise<number | und
 		suggested_recovery: repeated ? (event.suggested_recovery ?? repeatedRecovery) : event.suggested_recovery,
 	};
 	const safeEvent = Object.fromEntries(Object.entries(withDefaults).map(([k, v]) => [k, compactValue(v)]));
-	await appendFile(path, `${JSON.stringify(safeEvent)}\n`, "utf8");
+	if (privateFile) {
+		const handle = await open(path, "a", 0o600);
+		try {
+			await handle.writeFile(`${JSON.stringify(safeEvent)}\n`, "utf8");
+			await handle.chmod(0o600);
+		} finally {
+			await handle.close();
+		}
+	} else {
+		await appendFile(path, `${JSON.stringify(safeEvent)}\n`, "utf8");
+	}
 	return sameFailureCount;
 }
 
@@ -481,7 +500,7 @@ function hydrateFromTodo(markdown: string): PlanState {
 
 async function readState(cwd: string): Promise<PlanState | undefined> {
 	const sp = statePath(cwd);
-	if (await exists(sp)) {
+	if (sp && await exists(sp)) {
 		try {
 			const raw = JSON.parse(await readFile(sp, "utf8"));
 			if (raw && raw.schema_version === 3 && Array.isArray(raw.items)) return raw as PlanState;
@@ -490,8 +509,10 @@ async function readState(cwd: string): Promise<PlanState | undefined> {
 			// fall through to TODO.md hydration
 		}
 	}
-	const tp = todoPath(cwd);
-	if (await exists(tp)) return hydrateFromTodo(await readFile(tp, "utf8"));
+	if (planStorageMode() === "project") {
+		const tp = todoPath(cwd);
+		if (await exists(tp)) return hydrateFromTodo(await readFile(tp, "utf8"));
+	}
 	return undefined;
 }
 
@@ -571,11 +592,22 @@ function staleInProgress(state: PlanState): PlanItem[] {
 // the model) lands BEFORE TODO.md (a rendered derivative). A crash between the two
 // therefore leaves the model correct and only the human view stale — never the
 // reverse. (QA finding, 2026-07-30.)
-async function atomicWrite(path: string, contents: string): Promise<void> {
+async function atomicWrite(path: string, contents: string, privateFile = false): Promise<void> {
 	const tmp = `${path}.tmp-${process.pid}-${randomUUID().slice(0, 8)}`;
-	await writeFile(tmp, contents, "utf8");
+	if (privateFile) {
+		const handle = await open(tmp, "wx", 0o600);
+		try {
+			await handle.writeFile(contents, "utf8");
+			await handle.chmod(0o600);
+		} finally {
+			await handle.close();
+		}
+	} else {
+		await writeFile(tmp, contents, "utf8");
+	}
 	try {
 		await rename(tmp, path);
+		if (privateFile) await chmod(path, 0o600);
 	} catch (error) {
 		// Nothing sweeps .pi/ — a failed rename would otherwise leave the temp file
 		// beside plan-state.json forever, once per failure.
@@ -588,9 +620,18 @@ async function writeStateAndTodo(cwd: string, state: PlanState): Promise<void> {
 	state.updated_at = isoNow();
 	state.writer = PROC_MARK;
 	const sp = statePath(cwd);
-	await mkdir(dirname(sp), { recursive: true });
-	await atomicWrite(sp, `${JSON.stringify(state, null, 2)}\n`);
-	if (!usesPrivatePlanStorage(cwd)) await atomicWrite(todoPath(cwd), renderTodo(state));
+	if (!sp) throw new Error("private plan storage is not ready");
+	const privateFile = usesPrivatePlanStorage(cwd);
+	await mkdir(dirname(sp), { recursive: true, mode: privateFile ? 0o700 : undefined });
+	if (privateFile) await chmod(dirname(sp), 0o700);
+	await atomicWrite(sp, `${JSON.stringify(state, null, 2)}\n`, privateFile);
+	if (privateFile) {
+		const projection = privatePlanProjectionPath(cwd);
+		if (!projection) throw new Error("private plan storage is not ready");
+		await atomicWrite(projection, renderTodo(state), true);
+	} else {
+		await atomicWrite(todoPath(cwd), renderTodo(state));
+	}
 	(globalThis as Record<string, unknown>).__pi_active_plan_context = {
 		run_id: state.run_id,
 		item_id: currentItem(state)?.id,
@@ -601,6 +642,7 @@ async function writeStateAndTodo(cwd: string, state: PlanState): Promise<void> {
 
 async function mutatePlan<T>(cwd: string, fn: (state: PlanState | undefined) => Promise<{ state?: PlanState; result: T }>): Promise<T> {
 	const path = statePath(cwd);
+	if (!path) throw new Error("private plan storage is not ready; retry after session startup");
 	await mkdir(dirname(path), { recursive: true });
 	return withFileMutationQueue(path, async () => {
 		const current = await readState(cwd);
@@ -830,7 +872,7 @@ async function runtimeStatusText(ctx: { model?: { provider?: string; id?: string
 		`Active model: ${selected.id}`,
 		`Configured default provider: ${configuredProvider}`,
 		`Configured default model: ${configuredModel}`,
-		`Base URL: ${providerCfg?.baseUrl ?? "not configured for selected provider"}`,
+		`Endpoint configured: ${typeof providerCfg?.baseUrl === "string" && providerCfg.baseUrl.length > 0 ? "yes" : "no"}`,
 		`API: ${providerCfg?.api ?? "unknown"}`,
 		`Default thinking: ${settings.defaultThinkingLevel ?? "unknown"}`,
 		`Compaction: ${settings.compaction?.enabled ? "enabled" : "disabled"}`,
@@ -1340,7 +1382,7 @@ async function goCommand(args: string, ctx: { cwd: string; model?: { provider?: 
 async function statusCommand(ctx: { cwd: string; ui: { notify(m: string, l?: string): void } }) {
 	const state = await readState(ctx.cwd);
 	if (!state) {
-		ctx.ui.notify("No private run-capsule plan or legacy .pi/plan-state.json/TODO.md found.", "info");
+		ctx.ui.notify("No current plan found.", "info");
 		return;
 	}
 	ctx.ui.notify(renderTodo(state), "info");
@@ -1350,7 +1392,7 @@ async function traceCommand(args: string, ctx: { cwd: string; ui: { notify(m: st
 	const parsed = Number.parseInt(args.trim(), 10);
 	const count = Number.isNaN(parsed) ? 10 : Math.min(50, Math.max(1, parsed));
 	const path = tracePath(ctx.cwd);
-	if (!(await exists(path))) {
+	if (!path || !(await exists(path))) {
 		ctx.ui.notify("No plan trace found.", "info");
 		return;
 	}
@@ -1391,7 +1433,7 @@ export default function (pi: ExtensionAPI) {
 		await rebindActivePlan(ctx.cwd, lastSessionNotify);
 	});
 
-	// Adaptive storage races extension order: run-capsule publishes the private
+	// Private storage races extension order: run-capsule publishes the private
 	// storage identity AFTER this extension's session_start ran, so the rebind
 	// above could only see the project-local fallback. Re-run it once per
 	// identity announcement — and TRACK the promise: harness-signals discards
@@ -1668,18 +1710,16 @@ export default function (pi: ExtensionAPI) {
 			return statusCommand(ctx);
 		},
 	});
-	if (PLAN_MODE === "adaptive") {
-		pi.registerCommand("plan-export", {
-			description: "Explicitly export the private run-capsule plan as the human-readable .pi/TODO.md view.",
-			handler: async (_args, ctx) => {
-				const state = await readState(ctx.cwd);
-				if (!state) { ctx.ui.notify("No plan to export.", "info"); return; }
-				await mkdir(dirname(todoPath(ctx.cwd)), { recursive: true });
-				await atomicWrite(todoPath(ctx.cwd), renderTodo(state));
-				ctx.ui.notify("Plan exported for human review.", "info");
-			},
-		});
-	}
+	pi.registerCommand("plan-export", {
+		description: "Explicitly export the current private plan as the human-readable .pi/TODO.md view.",
+		handler: async (_args, ctx) => {
+			const state = await readState(ctx.cwd);
+			if (!state) { ctx.ui.notify("No plan to export.", "info"); return; }
+			await mkdir(dirname(todoPath(ctx.cwd)), { recursive: true });
+			await atomicWrite(todoPath(ctx.cwd), renderTodo(state));
+			ctx.ui.notify("Plan exported to .pi/TODO.md for human review.", "info");
+		},
+	});
 	pi.registerCommand("plan-trace", {
 		description: "Show recent plan trace entries.",
 		handler: async (args, ctx) => {

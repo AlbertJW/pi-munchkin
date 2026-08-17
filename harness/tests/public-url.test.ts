@@ -23,9 +23,15 @@ test("public URL guard rejects protocols, credentials, localhost, mixed DNS, and
 		"file:///etc/passwd",
 		httpUrl("u:p@example.com"),
 		httpUrl(["local", "host"].join(""), "/x"),
+		httpUrl(["LOCAL", "HOST."].join(""), "/x"),
+		httpUrl(["service.local", "host."].join(""), "/x"),
 		httpUrl("[0:0:0:0:0:ffff:7f00:1]", "/x"),
 	]) {
-		await assert.rejects(resolvePublicHttpUrl(url, { lookup: publicDns, fetchRedirect: noFetch }));
+		await assert.rejects(
+			resolvePublicHttpUrl(url, { lookup: publicDns, fetchRedirect: noFetch }),
+			(error: unknown) => error instanceof Error && error.message !== "must not fetch",
+			`${url} must fail during preflight rather than merely inherit the fetch stub's rejection`,
+		);
 	}
 	await assert.rejects(resolvePublicHttpUrl("https://example.com", {
 		lookup: async () => [{ address: "93.184.216.34", family: 4 }, { address: "127.0.0.1", family: 4 }], fetchRedirect: noFetch,

@@ -4,20 +4,20 @@
 // written before file 2's bad tag throws) and PASSES once apply is two-phase.
 import assert from "node:assert/strict";
 import test from "node:test";
-import { chmodSync, mkdtempSync, readFileSync, symlinkSync, truncateSync, writeFileSync } from "node:fs";
+import { mkdtempSync, readFileSync, symlinkSync, truncateSync, writeFileSync } from "node:fs";
+import { writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileTag, normalizeText } from "../lib/hashline-core.ts";
-import { withMutationQueues } from "../extensions/hashline.ts";
+import { registerHashline, withMutationQueues, type HashlineIo } from "../extensions/hashline.ts";
 import { callTool, expectToolError, makeFakePi } from "./integration-harness.ts";
 
-const hashline = (await import("../extensions/hashline.ts")).default;
 const tmp = () => mkdtempSync(join(tmpdir(), "pi-hl-"));
 const tagOf = (path: string) => fileTag(normalizeText(readFileSync(path, "utf8")));
 
-function fresh() {
+function fresh(io?: HashlineIo) {
 	const fp = makeFakePi();
-	hashline(fp.pi as any);
+	registerHashline(fp.pi as any, io);
 	return fp;
 }
 
@@ -209,18 +209,23 @@ test("hashline: multi-section failure message says NOTHING was applied", async (
 });
 
 test("hashline: phase-2 WRITE failure rolls earlier files back (I/O atomicity)", async () => {
-	const fp = fresh();
 	const cwd = tmp();
+	const failingPath = join(cwd, "f2.txt");
+	const fp = fresh({
+		writeTarget: async (path, text) => {
+			if (path === failingPath) throw Object.assign(new Error("injected target write failure"), { code: "EIO" });
+			await writeFile(path, text, "utf8");
+		},
+	});
 	writeFileSync(join(cwd, "f1.txt"), "aaa\n");
-	writeFileSync(join(cwd, "f2.txt"), "bbb\n");
-	chmodSync(join(cwd, "f2.txt"), 0o444); // readable (phase 1 passes) but NOT writable (phase 2 fails)
+	writeFileSync(failingPath, "bbb\n");
 	const patch =
 		`[f1.txt#${tagOf(join(cwd, "f1.txt"))}]\nreplace 1..1:\n+AAA\n` +
 		`[f2.txt#${tagOf(join(cwd, "f2.txt"))}]\nreplace 1..1:\n+BBB\n`;
 	await expectToolError(fp, "edit", { input: patch }, cwd, /every target was restored to its pre-patch state/);
 	assert.equal(readFileSync(join(cwd, "f1.txt"), "utf8"), "aaa\n",
 		"f1 was written in phase 2, then ROLLED BACK when f2's write failed");
-	chmodSync(join(cwd, "f2.txt"), 0o644);
+	assert.equal(readFileSync(failingPath, "utf8"), "bbb\n");
 });
 
 test("hashline: ATOMIC — an out-of-range hunk in a later section rolls back the earlier one", async () => {

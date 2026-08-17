@@ -175,7 +175,25 @@ def rows(manifest: dict[str, Any]) -> list[dict[str, Any]]:
     return result
 
 
-def validate_row(row: dict[str, Any], manifest: dict[str, Any]) -> None:
+def validity_verdicts(manifest: dict[str, Any]) -> dict[str, Any]:
+    sys.path.insert(0, str(LAB)); import trial_validity
+    _, result_path = state_paths(manifest)
+    return trial_validity.load_sidecar(result_path) or {}
+
+
+def require_validity(row: dict[str, Any], verdicts: dict[str, Any]) -> None:
+    sys.path.insert(0, str(LAB)); import trial_validity
+    verdict = verdicts.get(trial_validity.row_key(row))
+    if not isinstance(verdict, dict):
+        raise StudyError("trial row has no validity verdict")
+    criteria = verdict.get("criteria") or {}
+    if verdict.get("void") is not False or (criteria.get("infra_valid") or {}).get("outcome") != "PASS":
+        raise StudyError("trial row failed mandatory validity checks")
+    if (criteria.get("reward_hacking") or {}).get("outcome") != "PASS":
+        raise StudyError("trial row lacks affirmative reward-hacking clearance")
+
+
+def validate_row(row: dict[str, Any], manifest: dict[str, Any], verdicts: dict[str, Any] | None = None) -> None:
     sys.path.insert(0, str(LAB)); import row_contract
     row_contract.validate_powered_row(row, require_complete=True)
     if row.get("authoritative") is not True or row.get("status") != "complete" or (row.get("usage") or {}).get("exact") is not True:
@@ -193,6 +211,7 @@ def validate_row(row: dict[str, Any], manifest: dict[str, Any]) -> None:
     serving = row.get("serving") or {}; pre = serving.get("pre") or {}; post = serving.get("post") or {}
     if serving.get("stable") is not True or pre.get("full_sha256") != post.get("full_sha256"):
         raise StudyError("trial row serving fingerprint moved during execution")
+    require_validity(row, verdicts if verdicts is not None else validity_verdicts(manifest))
 
 
 def cell_key(stage: str, fixture: str, arm: str, repetition: int) -> str:
@@ -201,8 +220,9 @@ def cell_key(stage: str, fixture: str, arm: str, repetition: int) -> str:
 
 def existing_cells(manifest: dict[str, Any]) -> set[str]:
     found = set()
+    verdicts = validity_verdicts(manifest)
     for row in rows(manifest):
-        validate_row(row, manifest)
+        validate_row(row, manifest, verdicts)
         cell = (row.get("experiment") or {}).get("cell", "")
         found.add(f"{cell}:{row.get('task')}:{row.get('arm')}:{row.get('repetition')}")
     return found
@@ -223,7 +243,7 @@ def run_cell(manifest: dict[str, Any], stage: str, fixture: str, arm: str, repet
     subprocess.run([str(REAL_GATE), fixture], cwd=OPTIMIZER, env=env, check=True)
     after_rows = rows(manifest)
     if len(after_rows) != before + 1: raise StudyError("gate cell did not append exactly one result row")
-    validate_row(after_rows[-1], manifest)
+    validate_row(after_rows[-1], manifest, validity_verdicts(manifest))
 
 
 def execute_cells(manifest: dict[str, Any], state: dict[str, Any], stage: str, fixtures: list[str], arms: list[str], reps: int) -> None:
@@ -241,7 +261,8 @@ def execute_cells(manifest: dict[str, Any], state: dict[str, Any], stage: str, f
 
 def stage_rows(manifest: dict[str, Any], stage: str) -> list[dict[str, Any]]:
     selected = [row for row in rows(manifest) if (row.get("experiment") or {}).get("cell") == stage]
-    for row in selected: validate_row(row, manifest)
+    verdicts = validity_verdicts(manifest)
+    for row in selected: validate_row(row, manifest, verdicts)
     contracts = {(row["model"], row["serving"]["pre"]["semantic_sha256"],
                   row["serving"]["pre"]["performance_sha256"], row["serving"]["pre"]["full_sha256"])
                  for row in selected}
@@ -347,6 +368,46 @@ def selftest() -> None:
                                                                if interventions else [])}}}
     report = analyze([fake("base", 10), fake("base", 8), fake("cand", 2, interventions=1), fake("cand", 1, interventions=1)], 4, draws=200)
     assert report["reduction"] > .20 and report["candidate_exposure"] == 1
+    validity_row = {"run": "g", "task": "t", "arm": "base", "rep": 1}
+    validity_key = "g:t:base:1"
+    clear = {"row_key": validity_key, "void": False, "criteria": {
+        "infra_valid": {"outcome": "PASS"}, "reward_hacking": {"outcome": "PASS"}}}
+    require_validity(validity_row, {validity_key: clear})
+    for invalid in (
+        {},
+        {validity_key: clear | {"void": True}},
+        {validity_key: clear | {"criteria": clear["criteria"] | {"reward_hacking": {"outcome": "NOT_APPLICABLE"}}}},
+    ):
+        try: require_validity(validity_row, invalid)
+        except StudyError: pass
+        else: raise AssertionError("missing, void, or inconclusive validity must refuse a powered row")
+    digest = "a" * 64
+    manifest = {
+        "manifest_sha256": digest, "surface_sha256": digest,
+        "model_registry_sha256": digest, "control_config_sha256": digest,
+        "candidate_config_sha256": "b" * 64, "rendered_governor_sha256": digest,
+    }
+    episodes = {"complete": True, "settlement_summaries": 1, **{
+        field: 0 for field in (
+            "total_episodes", "total_failures", "longest_episode", "semantic_failure_overrun",
+            "correlated_failure_overrun", "settled_without_recovery", "failures_after_second",
+            "recovered_episodes", "recovery_calls_total", "recovery_calls_max",
+        )
+    }}
+    powered = {
+        "schema": "pi.eval-row/v3", "task": "t", "model": "m", "arm": "base", "run": "g",
+        "pattern": "base", "rep": 1, "repetition": 1, "status": "complete", "score": 1,
+        "authoritative": True, "usage": {"exact": True},
+        "context": {"schema": "pi.context-telemetry/v3", "authenticated": True, "failure_episodes": episodes},
+        "experiment": {"manifest_sha256": digest}, "harness": {"surface_sha256": digest},
+        "execution": {"agent_models_sha256": digest},
+        "config": {"sha256": digest, "rendered_governor_sha256": digest},
+        "serving": {"stable": True, "pre": {"full_sha256": digest}, "post": {"full_sha256": digest}},
+    }
+    validate_row(powered, manifest, {validity_key: clear})
+    try: validate_row(powered, manifest, {})
+    except StudyError: pass
+    else: raise AssertionError("a structurally valid powered row without validity must be refused")
     try: load_manifest(Path("/definitely/missing"))
     except OSError: pass
     else: raise AssertionError("missing manifests must fail")

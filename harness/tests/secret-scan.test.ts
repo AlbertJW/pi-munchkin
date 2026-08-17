@@ -1,5 +1,9 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import { execFileSync, spawnSync } from "node:child_process";
+import { mkdirSync, mkdtempSync, rmSync, symlinkSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { parseUnifiedDiff, scanAddedLines } from "../lib/secret-scan.ts";
 
 test("diff secret scan reports only location and pattern identifiers", () => {
@@ -40,4 +44,23 @@ test("PROVIDER_TOKEN placeholder suppression is scoped to the token, not the lin
   ];
   const findings = scanAddedLines(lines);
   assert.deepEqual(findings, [{ file: "a.ts", line: 1, pattern: "PROVIDER_TOKEN" }]);
+});
+
+test("diff scanner refuses an untracked directory symlink without following or crashing", () => {
+  const repo = mkdtempSync(join(tmpdir(), "secret-scan-symlink-"));
+  const target = mkdtempSync(join(tmpdir(), "secret-scan-target-"));
+  const script = join(process.cwd(), "harness", "scripts", "secret-scan-diff.mjs");
+  try {
+    execFileSync("git", ["init", "-q"], { cwd: repo });
+    execFileSync("git", ["-c", "user.name=Test", "-c", "user.email=test@example.invalid", "commit", "--allow-empty", "-qm", "base"], { cwd: repo });
+    mkdirSync(join(target, "nested"));
+    symlinkSync(target, join(repo, "linked-directory"), "dir");
+    const result = spawnSync(process.execPath, [script], { cwd: repo, encoding: "utf8" });
+    assert.equal(result.status, 1, "a non-regular untracked entry fails closed");
+    assert.match(result.stderr, /^linked-directory:0: UNTRACKED_NON_REGULAR/m);
+    assert.doesNotMatch(`${result.stdout}${result.stderr}`, /EISDIR|secret-scan-target/);
+  } finally {
+    rmSync(repo, { recursive: true, force: true });
+    rmSync(target, { recursive: true, force: true });
+  }
 });

@@ -314,6 +314,10 @@ across a live-mirror rollout. Record the loaded `HARNESS_SURFACE_SHA256` with ev
 
 ## Current adopted defaults
 
+- `ACTIVE_TOOL_PROMPTS=derived`: inactive tools contribute no ambient schemas, manuals, examples,
+  snippets, or agent lists; `ambient` restores the legacy broad prompt surface.
+- `CONTROL_ARBITER=enforce`: one highest-priority corrective message is delivered per boundary;
+  `shadow` restores legacy producer delivery while retaining observational decisions.
 - `MUNCHKIN_TOOL_ACTIVATION=dynamic`: defer `subagent` and `compact_context` only on a complete
   default Pi registry; preserve narrowed explicit `--tools` selections. Subagent activates on
   multi-item execution, second plan-gate failure, or loop tier two. Compact activates at 60%.
@@ -364,7 +368,8 @@ After separate human approval to roll out a PR:
 
 1. Mirror the first-party `harness/`, examples, and skills surface into `~/.pi/agent`.
 2. Run `npm run mirror:check -- ~/.pi/agent`; extra documented local-only files are ignored.
-3. Load the live harness through Pi 0.83 and confirm every declared extension and skill.
+3. Load the live harness through the current supported Pi release and confirm every declared
+   extension and skill; the compatibility matrix separately covers Pi 0.80.6 through 0.84.x.
 4. Record the new loaded surface hash. Do not pool old and new measurements.
 5. Never commit or push from `~/.pi/agent`.
 

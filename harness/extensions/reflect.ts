@@ -5,6 +5,7 @@ import { completeSimple } from "@earendil-works/pi-ai/compat";
 import { extractReflectFindings, MAX_ARTIFACT, MAX_ROUNDS, METHODS, REFLECT_PROMPT, shouldIterate, voteFindings } from "../lib/reflect-policy.ts";
 import { steerText } from "../lib/steer-texts.ts";
 import { record } from "../lib/telemetry.ts";
+import { planStorageMode, privatePlanProjectionPath } from "../lib/plan-state-storage.ts";
 
 // /reflect — fresh-context adversarial review of the current plan (or, with no
 // plan, the last assistant answer). NOT an in-context self-refine loop: the
@@ -21,12 +22,16 @@ const TIMEOUT_MS = Number.parseInt(process.env.REFLECT_TIMEOUT_MS || "120000", 1
 let rounds = 0;
 let lastAssistantText = "";
 
-async function planArtifact(cwd: string): Promise<string | null> {
-	const p = join(cwd, ".pi", "TODO.md");
+export async function planArtifact(cwd: string): Promise<string | null> {
+	const p = planStorageMode() === "capsule"
+		? privatePlanProjectionPath(cwd)
+		: join(cwd, ".pi", "TODO.md");
+	if (!p) return null;
 	try {
 		if (!(await stat(p)).isFile()) return null;
 		const text = await readFile(p, "utf8");
-		return text.trim() ? text.slice(0, MAX_ARTIFACT) : null;
+		const trimmed = text.trim();
+		return trimmed ? trimmed.slice(0, MAX_ARTIFACT) : null;
 	} catch {
 		return null;
 	}
@@ -65,7 +70,7 @@ export default function (pi: ExtensionAPI) {
 			}
 			const artifact = (await planArtifact(ctx.cwd)) ?? (lastAssistantText || null);
 			if (!artifact) {
-				ctx.ui.notify("reflect: nothing to review (no .pi/TODO.md and no assistant output yet)", "info");
+				ctx.ui.notify("reflect: nothing to review (no current plan or assistant output yet)", "info");
 				return;
 			}
 

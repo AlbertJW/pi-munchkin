@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { mkdtempSync, writeFileSync } from "node:fs";
+import { mkdtempSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fire, makeFakePi, resetPiGlobals } from "./integration-harness.ts";
@@ -518,6 +518,31 @@ test("a mutation OUTSIDE the session cwd does not arm the gate; inside still doe
 		await fire(fp2, "turn_end", wrapUpTurn, ctxFor(cwd));
 		assert.equal(fp2.sent.some((m) => m.includes("verify")), true,
 			"editing a file inside cwd must still arm the gate");
+	} finally {
+		resetPiGlobals();
+	}
+});
+
+test("mutation scoping follows symlinks instead of trusting lexical paths", async () => {
+	const cwd = projectWithNpmTest();
+	const outside = mkdtempSync(join(tmpdir(), "vg-symlink-outside-"));
+	symlinkSync(outside, join(cwd, "escape"), "dir");
+	symlinkSync(cwd, join(outside, "inside-alias"), "dir");
+	try {
+		const escaped = makeFakePi();
+		await loadVerifyGateWithDefault(escaped, cwd);
+		await fire(escaped, "turn_end", editTurn("escape/new.ts", 1, "escaped"), ctxFor(cwd));
+		await fire(escaped, "turn_end", wrapUpTurn, ctxFor(cwd));
+		assert.equal(escaped.sent.some((m) => m.includes("verify")), false,
+			"an in-cwd symlink to an outside target must not arm this project's gate");
+		resetPiGlobals();
+
+		const aliasedInside = makeFakePi();
+		await loadVerifyGateWithDefault(aliasedInside, cwd);
+		await fire(aliasedInside, "turn_end", editTurn(join(outside, "inside-alias", "new.ts"), 1, "inside"), ctxFor(cwd));
+		await fire(aliasedInside, "turn_end", wrapUpTurn, ctxFor(cwd));
+		assert.equal(aliasedInside.sent.some((m) => m.includes("verify")), true,
+			"an outside lexical alias resolving inside cwd still mutates this project");
 	} finally {
 		resetPiGlobals();
 	}

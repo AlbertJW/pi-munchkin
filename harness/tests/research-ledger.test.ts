@@ -103,6 +103,21 @@ test("ledger paths are unique per session and capacity is checked before append"
 	assert.equal(statSync(first).size, MAX_LEDGER_BYTES);
 });
 
+test("concurrent appends serialize the capacity check and cannot exceed the ledger cap", async () => {
+	const root = mkdtempSync(join(tmpdir(), "rl-cap-race-"));
+	const path = ledgerPath(root, randomUUID(), { PI_CODING_AGENT_DIR: join(root, "agent") } as NodeJS.ProcessEnv);
+	mkdirSync(dirname(path), { recursive: true });
+	const page = { text: "x", sha256: sha256Hex("x"), fetchedAt: "2026-08-10T10:00:00Z" };
+	const record = researchRecord(1, "concurrent", "https://ex/a", "quote", page);
+	const lineBytes = Buffer.byteLength(`${JSON.stringify(record)}\n`);
+	writeFileSync(path, "", { mode: 0o600, flag: "w" });
+	truncateSync(path, MAX_LEDGER_BYTES - lineBytes);
+	const outcomes = await Promise.allSettled([appendToLedger(path, record), appendToLedger(path, record)]);
+	assert.equal(outcomes.filter((outcome) => outcome.status === "fulfilled").length, 1);
+	assert.equal(outcomes.filter((outcome) => outcome.status === "rejected" && outcome.reason instanceof ResearchLedgerCapacityError).length, 1);
+	assert.equal(statSync(path).size, MAX_LEDGER_BYTES);
+});
+
 test("research recall is bounded, ordered, validates records, and ignores malformed tails", async () => {
 	const root = mkdtempSync(join(tmpdir(), "rl-recall-"));
 	const path = ledgerPath(root, randomUUID(), { PI_CODING_AGENT_DIR: join(root, "agent") } as NodeJS.ProcessEnv);
