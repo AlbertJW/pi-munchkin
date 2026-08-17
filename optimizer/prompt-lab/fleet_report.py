@@ -23,7 +23,7 @@ import collections, json, math, os, sys
 
 LAB = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, LAB)
-from row_contract import ROW_V3, canonical_generation, failure_episode_complete  # noqa: E402
+from row_contract import POWERED_ROWS, ROW_V3, ROW_V4, canonical_generation, failure_episode_complete  # noqa: E402
 DD = os.environ.get("FLEET_DD", "qwen36-35b-iq3s")
 OVERFIT_GAP = 0.10
 COST_CEILING = float(os.environ.get("FLEET_COST_CEILING", "1.5"))
@@ -141,7 +141,7 @@ def integrity_errors(rows, baseline, candidate):
             rendered_gov = (r.get("config") or {}).get("rendered_governor_sha256")
             if not (isinstance(rendered_gov, str) and len(rendered_gov) == 64 and all(c in "0123456789abcdef" for c in rendered_gov)):
                 errors.append(f"{cell}: config.rendered_governor_sha256 missing or malformed")
-            if canonical == ROW_V3 and not failure_episode_complete(r):
+            if canonical in POWERED_ROWS and not failure_episode_complete(r):
                 errors.append(f"{cell}: authenticated failure-episode settlement is missing or incomplete")
     models = sorted({r.get("model") for r in rows if r.get("model")})
     declarations = {tuple(r.get("fleet_expected_models", [])) for r in rows if r.get("fleet_expected_models")}
@@ -516,6 +516,11 @@ def selftest():
     assert schema_v3["properties"]["context"]["properties"]["schema"] == {"const": "pi.context-telemetry/v3"}
     assert "failure_episodes" in schema_v3["properties"]["context"]["required"]
     assert "provider_timing" in schema_v3["properties"]["context"]["required"]
+    schema_v4 = json.load(open(os.path.join(LAB, "..", "real-gate-fixtures", "schemas", "pi.eval-row-v4.schema.json")))
+    assert schema_v4["$id"] == "pi.eval-row/v4"
+    assert schema_v4["properties"]["schema"] == {"const": "pi.eval-row/v4"}
+    assert schema_v4["properties"]["context"]["properties"]["schema"] == {"const": "pi.context-telemetry/v4"}
+    assert "verification_frontier" in schema_v4["properties"]["context"]["required"]
     assert "trajectory" not in schema["required"], "one-shot must remain trajectory-exempt"
     experiment_conditional = next(item for item in schema["allOf"]
                                   if "experiment" in item.get("if", {}).get("properties", {}))

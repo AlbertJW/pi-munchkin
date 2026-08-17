@@ -263,11 +263,14 @@ def _validated_canonical_val_rows(rows, tasks, n):
             raise ValueError(f"unexpected canonical val cell: {cell!r}")
         if cell in found:
             raise ValueError(f"duplicate canonical val cell: {cell!r}")
-        if r.get("schema") not in ("pi.eval-row/v2", "pi.eval-row/v3"):
+        if r.get("schema") not in ("pi.eval-row/v2", "pi.eval-row/v3", "pi.eval-row/v4"):
             raise ValueError(f"{cell!r}: expected canonical eval row")
-        if (r.get("schema") == "pi.eval-row/v3" and
+        if (r.get("schema") in ("pi.eval-row/v3", "pi.eval-row/v4") and
                 (r.get("context") or {}).get("failure_episodes", {}).get("complete") is not True):
             raise ValueError(f"{cell!r}: authenticated failure-episode settlement is missing or incomplete")
+        if (r.get("schema") == "pi.eval-row/v4" and
+                (r.get("context") or {}).get("verification_frontier", {}).get("complete") is not True):
+            raise ValueError(f"{cell!r}: authenticated verification-frontier settlement is missing or incomplete")
         if r.get("authoritative") is not True or r.get("status") != "complete":
             raise ValueError(f"{cell!r}: row is non-authoritative or incomplete")
         if type(r.get("score")) is not int or r["score"] not in (0, 1):

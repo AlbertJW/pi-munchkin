@@ -175,6 +175,7 @@
     "harness/lib/run-kernel-state.ts",
     "harness/lib/run-kernel-types.ts",
     "harness/lib/verification-order.ts",
+    "harness/lib/verification-frontier.ts",
     "harness/agents",
     "harness/vendor",
     "skills/deep-research",

@@ -87,6 +87,7 @@
     "tool-activation/unavailable",
     "tool-call-rescue/detected",
     "tool-call-rescue/steered",
+    "verification-frontier/settled",
     "verify-gate/gate-green-consumed",
     "verify-gate/gate-green-execution-ordered",
     "verify-gate/steer",

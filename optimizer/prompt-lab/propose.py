@@ -62,7 +62,7 @@ def failing_traces(gen, max_traces):
                         "wrong": r.get("sql", ""), "model": r.get("model", "?")})
     return out[:max_traces]
 
-ROW_SCHEMA_IDS = {"pi.eval-row/v2", "pi.eval-row/v3"}
+ROW_SCHEMA_IDS = {"pi.eval-row/v2", "pi.eval-row/v3", "pi.eval-row/v4"}
 _ROW_SCHEMA_CACHE = {}
 
 def row_schema(schema_id="pi.eval-row/v2"):

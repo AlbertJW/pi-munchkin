@@ -595,3 +595,37 @@ test("__pi_vg_state is fresh (published AFTER this turn's updates) and dies on s
 		resetPiGlobals();
 	}
 });
+
+test("exact execution events publish a bounded frontier while generic and missing events cannot", async () => {
+	const cwd = projectWithNpmTest();
+	const fp = makeFakePi();
+	const ctx = ctxFor(cwd);
+	const result = (passed: number, failed: number) => ({ content: [{ type: "text", text: [
+		`# tests ${passed + failed}`, `# pass ${passed}`, `# fail ${failed}`, "# skipped 0",
+	].join("\n") }] });
+	try {
+		await loadVerifyGate(fp, cwd, "execution");
+		for (let index = 0; index < 4; index += 1) {
+			await fire(fp, "tool_execution_start", { toolCallId: `m${index}`, toolName: "edit", args: { path: "src/app.ts" } }, ctx);
+			await fire(fp, "tool_execution_end", { toolCallId: `m${index}`, toolName: "edit", result: {}, isError: false }, ctx);
+			await fire(fp, "tool_execution_start", { toolCallId: `g${index}`, toolName: "bash", args: { command: "npm test" } }, ctx);
+			await fire(fp, "tool_execution_end", { toolCallId: `g${index}`, toolName: "bash", result: result(4, 2), isError: true }, ctx);
+		}
+		await fire(fp, "tool_execution_start", { toolCallId: "after", toolName: "read", args: { path: "src/app.ts" } }, ctx);
+		const snapshot = (globalThis as Record<string, unknown>).__pi_verification_frontier_state as {
+			recognizedGates: number; plateauStreak: number; verificationPlateauOverrun: number;
+		};
+		assert.equal(snapshot.recognizedGates, 4);
+		assert.equal(snapshot.plateauStreak, 3);
+		assert.equal(snapshot.verificationPlateauOverrun, 1);
+
+		await fire(fp, "tool_execution_start", { toolCallId: "generic", toolName: "bash", args: { command: "node --test" } }, ctx);
+		await fire(fp, "tool_execution_end", { toolCallId: "generic", toolName: "bash", result: result(9, 0), isError: false }, ctx);
+		assert.equal(((globalThis as Record<string, unknown>).__pi_verification_frontier_state as { recognizedGates: number }).recognizedGates, 4);
+
+		await fire(fp, "tool_execution_end", { toolCallId: "missing", toolName: "bash", result: result(9, 0), isError: false }, ctx);
+		assert.equal(((globalThis as Record<string, unknown>).__pi_verification_frontier_state as { recognizedGates: number }).recognizedGates, 4);
+	} finally {
+		resetPiGlobals();
+	}
+});

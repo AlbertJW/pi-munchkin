@@ -8,6 +8,7 @@ import { boundedReceiptText } from "../lib/run-kernel-receipts.ts";
 import { steerText } from "../lib/steer-texts.ts";
 import { record } from "../lib/telemetry.ts";
 import { VerificationOrderClock, type OrderedCallKind } from "../lib/verification-order.ts";
+import { VerificationFrontierTracker, type VerificationFrontierSnapshotV1 } from "../lib/verification-frontier.ts";
 import { buildControlProposal, controlEnforces, emitControlProposal } from "../lib/control-proposal.ts";
 
 // Boundary verify gate ("the handoff is sacred").
@@ -175,7 +176,14 @@ function steer(verifyFailed: boolean): string {
 export default function (pi: ExtensionAPI) {
 	if (!ENABLED) return;
 	const order = new VerificationOrderClock();
+	const frontier = new VerificationFrontierTracker();
+	const pendingExactGates = new Set<string>();
 	let failedSinceTurnEnd = false;
+	let frontierSettled = false;
+
+	const publishFrontier = (snapshot: VerificationFrontierSnapshotV1 = frontier.snapshot()): void => {
+		(globalThis as Record<string, unknown>).__pi_verification_frontier_state = snapshot;
+	};
 
 	const classifyStart = async (toolName: string, args: Record<string, unknown>): Promise<OrderedCallKind> => {
 		const isToolMutation = MUTATION_TOOLS.has(toolName);
@@ -215,6 +223,9 @@ export default function (pi: ExtensionAPI) {
 	pi.on("session_start", async (_event, ctx) => {
 		st = fresh();
 		order.reset();
+		frontier.reset();
+		pendingExactGates.clear();
+		frontierSettled = false;
 		failedSinceTurnEnd = false;
 		clearPlanGateReceipt();
 		clearDetectedProjectGate();
@@ -224,6 +235,7 @@ export default function (pi: ExtensionAPI) {
 		// PREVIOUS session's verify verdict into the c48 lens. Same fix as
 		// loop-breaker's __pi_lb_state and plan-runner's __pi_active_plan_context.
 		delete (globalThis as Record<string, unknown>).__pi_vg_state;
+		delete (globalThis as Record<string, unknown>).__pi_verification_frontier_state;
 		const cwd = ctx?.cwd || process.cwd();
 		sessionCwd = cwd;
 		try { canonicalSessionCwd = await realpath(cwd); }
@@ -233,12 +245,18 @@ export default function (pi: ExtensionAPI) {
 			gateCmd = await detectProjectGate(cwd);
 		}
 		publishDetectedProjectGate(cwd, gateCmd);
+		publishFrontier();
 	});
 
 	pi.on("tool_execution_start", async (event) => {
 		if (!EXECUTION_ORDER) return;
+		frontier.noteToolCall();
+		publishFrontier();
 		const args = event.args && typeof event.args === "object"
 			? event.args as Record<string, unknown> : {};
+		if (event.toolName === "bash" && verificationEvidence(String(args.command ?? ""), gateCmd) === "project_gate") {
+			pendingExactGates.add(event.toolCallId);
+		}
 		const kind = await classifyStart(event.toolName, args);
 		order.start({ callId: event.toolCallId, kind });
 		if (kind === "source_mutation") {
@@ -251,11 +269,15 @@ export default function (pi: ExtensionAPI) {
 	pi.on("tool_execution_end", async (event) => {
 		if (!EXECUTION_ORDER) return;
 		const kind = order.kindFor(event.toolCallId);
-		if (!kind) return; // A missing start can never manufacture verification.
+		if (!kind) {
+			pendingExactGates.delete(event.toolCallId);
+			return; // A missing start can never manufacture verification or frontier progress.
+		}
 
+		const resultText = boundedReceiptText(event.result);
 		let succeeded = !event.isError;
 		if (kind === "verification") {
-			succeeded = succeeded && !looksFailingOutput(boundedReceiptText(event.result), false);
+			succeeded = succeeded && !looksFailingOutput(resultText, false);
 		}
 
 		let verificationOverride: "passed" | "failed" | "none" = "none";
@@ -272,11 +294,22 @@ export default function (pi: ExtensionAPI) {
 			}
 		}
 
-		applyOrderedOutcome(order.finish({
+		const outcome = order.finish({
 			callId: event.toolCallId,
 			succeeded,
 			verificationOverride,
-		}));
+		});
+		applyOrderedOutcome(outcome);
+		if (outcome?.mutationSettled) frontier.noteMutationSettled(!event.isError);
+		if (outcome && pendingExactGates.has(event.toolCallId)) {
+			frontier.observeExactGate({
+				text: resultText,
+				passed: outcome.verificationPassed,
+				ordered: outcome.verificationOrdered,
+			});
+		}
+		pendingExactGates.delete(event.toolCallId);
+		publishFrontier();
 	});
 
 	pi.on("turn_end", async (event) => {
@@ -402,5 +435,27 @@ export default function (pi: ExtensionAPI) {
 			record("verify-gate", "unverified-end", { fires: st.fires, sessionFires: st.sessionFires });
 			ctx.ui.notify("verify-gate: files changed, no passing gate", "warning");
 		}
+	});
+
+	pi.on("agent_settled", async () => {
+		if (frontierSettled) return;
+		frontierSettled = true;
+		const snapshot = frontier.snapshot();
+		record("verification-frontier", "settled", {
+			protocol: snapshot.protocol,
+			recognized_gates: snapshot.recognizedGates,
+			current_passed: snapshot.current?.passed ?? null,
+			current_failed: snapshot.current?.failed ?? null,
+			current_skipped: snapshot.current?.skipped ?? null,
+			current_total: snapshot.current?.total ?? null,
+			best_passed: snapshot.best?.passed ?? null,
+			best_failed: snapshot.best?.failed ?? null,
+			best_skipped: snapshot.best?.skipped ?? null,
+			best_total: snapshot.best?.total ?? null,
+			last_advanced: snapshot.lastAdvanced,
+			plateau_streak: snapshot.plateauStreak,
+			successful_mutation_epochs_since_advance: snapshot.successfulMutationEpochsSinceAdvance,
+			verification_plateau_overrun: snapshot.verificationPlateauOverrun,
+		});
 	});
 }

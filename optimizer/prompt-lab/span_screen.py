@@ -16,7 +16,7 @@ from typing import Any, Callable
 
 LAB = Path(__file__).resolve().parent
 sys.path.insert(0, str(LAB))
-from row_contract import CANONICAL_CONTEXTS, CANONICAL_ROWS, ROW_V3, failure_episode_complete  # noqa: E402
+from row_contract import CANONICAL_CONTEXTS, CANONICAL_ROWS, POWERED_ROWS, failure_episode_complete  # noqa: E402
 
 OPTIMIZER = LAB.parent
 RESULTS = LAB / "results"
@@ -183,7 +183,7 @@ def mechanism_report(rows: list[dict[str, Any]], manifest: dict[str, Any]) -> tu
         by_arm[arm].append(row)
         if row.get("arm") != arm: reasons.append(f"{arm}: row arm does not match pattern")
         if row.get("schema") not in CANONICAL_ROWS: reasons.append(f"{arm}: non-canonical row")
-        if row.get("schema") == ROW_V3 and not failure_episode_complete(row):
+        if row.get("schema") in POWERED_ROWS and not failure_episode_complete(row):
             reasons.append(f"{arm}: authenticated failure-episode settlement is missing or incomplete")
         if row.get("task") != "bigdata" or row.get("split") != "val" or (row.get("prompt") or {}).get("variant") != "canonical":
             reasons.append(f"{arm}: row is not canonical bigdata val evidence")

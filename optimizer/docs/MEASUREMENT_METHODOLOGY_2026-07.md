@@ -533,6 +533,27 @@ and `/loop-resume` close the exposed window without pretending that verification
 
 ---
 
+## §16 — Verification frontier is diagnostic, never verification authority
+
+`pi.context-telemetry/v4` adds one authenticated `verification_frontier` settlement summary.
+The reducer consumes only internally consistent Node TAP terminal summaries produced by the
+normalized exact detected project gate after the latest mutation boundary. Generic suites,
+malformed or partial TAP, missing execution events, overlapping mutations, and plan-gate
+receipts without result counts contribute no frontier observation.
+
+The frontier advances when the recognized passed count rises, or—at the same passed count—the
+failed count falls. The first recognized summary establishes the baseline. An unchanged failed
+frontier increments `plateau_streak`; exact green clears the streak. This remains observational:
+exit status and verification ordering still own the gate verdict, and frontier counts can never
+verify a run or close a semantic episode.
+
+`verification_plateau_overrun` counts tool calls starting after the third consecutive unchanged
+failed frontier until an advance or exact green clears the plateau. It is a diagnostic alongside,
+not a replacement for, the preregistered `semantic_failure_overrun`. V3 and v4 rows remain
+separate canonical generations and must never be pooled.
+
+---
+
 ## §16 — Powered episode studies require authenticated v3 rows
 
 `pi.eval-row/v3` is the first row generation that carries the semantic-episode outcome through
