@@ -41,8 +41,9 @@ adoption, deletion, live mirroring, and gate rounds are human-gated. Never touch
 > rounds bind this). A 2.75-day wedged bare `pi` on ttys004 (stdin-wedge orphan) was cleared
 > before the mirror.
 >
-> **PENDING GATES (Albert):** approve charter + prereg; approve the seven cohort fixtures (4 ling + 3 sweep)
-> (`fixture_admission.py approve <name> --reviewer …`); label ≥10 judge transcripts. Then
+> **GATES DONE 2026-08-15:** all seven cohort fixtures APPROVED (`reviewer albert`, expiry
+> 2026-11-15, all `authoritative()==True`); charter + prereg accepted. **STILL PENDING (Albert):**
+> label ≥10 judge transcripts (`JUDGE_LABELING_2026-08.md`; 12 calib4b transcripts ready to render). Then
 > the first BOX round is Phase 6 — audit-sweep graded, base arm, local 4B, n≥9, preceded by
 > one n=1 smoke row (the first end-to-end exercise of the v3 settlement-authority
 > tightening). audit-sweep is deliberately NOT re-manifested — it grades the model's audit
