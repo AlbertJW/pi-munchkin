@@ -170,7 +170,22 @@ produces the grade — there is no verifier isolation. What changed at the reboo
   writes to an artifact), a thing the behaviour-graded reporter path cannot express.
   For such fixtures the pinned-name residual stands until out-of-process verifier
   isolation lands. Behaviour-graded fixtures use the reporter path below instead.
-- **Reporter path (`grade_reporter.py`, default)**: the TAP destination lives OUTSIDE
+- **Reporter path (`grade_reporter.py`, default) — MEASURED 2026-08-18, three bypasses.**
+  An adversarial re-attack forged a full graded score three ways, all verified by
+  running real `node --test`: (a) model src neuters `node:assert` before the grader's
+  assertions run — the reported case names are genuine, so the admitted case pin cannot
+  see it (now mitigated by the runner-owned `prompt-lab/grade_preload.mjs`, loaded with
+  `--import`, which freezes the assertion surfaces first); (b) src READS the pin from the
+  `<workdir>.row-context.json` sibling — the graded re-run is not sandboxed — re-registers
+  exactly those names as trivial passing tests, then holds and exits before the real suite
+  runs (OPEN); (c) a detached child rewrites `<workdir>.grade.tap` after node exits (OPEN).
+  An unpinned hidden grader is now refused (`unpinned_grader`) instead of scored.
+  Conclusion: graded_rate is defensible against accident and casual gaming, and is NOT
+  adversary-proof while the grader shares a process with model code and the pin sits in a
+  readable sibling. The named closure — an unprivileged agent with a privileged,
+  out-of-process verifier (plus sandboxing the graded re-run and hiding the pin/destination
+  from it) — is now the top measurement-integrity item, not a background nicety.
+- Historical note on the reporter path: the TAP destination lives OUTSIDE
   the workdir and is written by the test runner, not by anything the model's tree can
   name; stdout from model code does not reach it. The demonstrated forgery does not
   translate. **Residual**: code running inside the test process can read

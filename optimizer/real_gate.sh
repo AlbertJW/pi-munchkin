@@ -723,7 +723,7 @@ PY
 	local grade_tap="${wd}.grade.tap"
 	rm -f "$grade_tap"
 	if is_hidden "$task"; then
-		( cd "$wd" && node --test --test-reporter=tap --test-reporter-destination="$grade_tap" \
+		( cd "$wd" && node --test --import "$HERE/prompt-lab/grade_preload.mjs" --test-reporter=tap --test-reporter-destination="$grade_tap" \
 			"test/$(basename "$(hidden_test_for "$task")")" ) >/dev/null 2>&1 || true
 	fi
 	[[ "$task" == "t1" ]] && grep -rq "parseCSV" "$wd/src" "$wd/test" && gate=0
@@ -862,8 +862,15 @@ subscores, subscores_blocked = _grade_artifact.extract(workdir, ctx.get("grade_a
 if subscores is None and not ctx.get("grade_artifact"):
     import grade_reporter as _grade_reporter
     _tap_path = workdir.rstrip("/") + ".grade.tap"
-    if os.path.exists(_tap_path):
-        subscores, subscores_blocked = _grade_reporter.extract(_tap_path, ctx.get("expected_cases"))
+    _pin = ctx.get("expected_cases")
+    if task_is_hidden == "1" and not _pin:
+        # Without the admitted case pin the reporter path is forgeable outright
+        # (invent one passing test, exit) — an unpinned hidden grader is refused,
+        # never scored (2026-08-18 re-attack F4). Fixtures whose "grader" is not a
+        # test suite at all (t2) land here too, instead of contributing a biased 0.
+        subscores, subscores_blocked = None, "unpinned_grader"
+    elif os.path.exists(_tap_path):
+        subscores, subscores_blocked = _grade_reporter.extract(_tap_path, _pin)
         if subscores is not None and ctx.get("requirement_scoring"):
             subscores, subscores_blocked = _grade_reporter.apply_requirement_weights(
                 subscores, ctx["requirement_scoring"])

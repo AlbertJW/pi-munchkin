@@ -37,7 +37,22 @@ Nothing inside the file can detect that. Two independent defenses:
 
 Layer 2 alone does NOT stop a mid-run exit that fires after some real results
 were emitted (verified against real `node --test`, 2026-08-18): those names are
-genuine, so only layer 1 catches it. Never grade a reporter fixture without a pin.
+genuine, so only layer 1 catches it. An unpinned hidden grader is refused outright
+by real_gate (`unpinned_grader`).
+
+THE PIN IS NECESSARY, NOT SUFFICIENT (adversarial re-attack, 2026-08-18). It sees
+only which NAMES were reported, never whether an assertion truly ran, and the
+graded re-run shares its process with model-authored src. Demonstrated bypasses:
+  * neutering `node:assert` from src -> real names, all "pass" (0/5 became 5/5).
+    Mitigated by the runner-owned `grade_preload.mjs` (--import) which freezes the
+    assertion surfaces before any user module loads; re-measured 5/5 -> 2/5.
+  * READING the pin (it is written to `<workdir>.row-context.json`, and the graded
+    re-run is NOT sandboxed), re-registering those exact names as trivial passing
+    tests, then holding + exiting before the real suite starts. STILL OPEN.
+  * a detached child rewriting `<workdir>.grade.tap` after node exits. STILL OPEN.
+Treat graded_rate as robust against accident and casual gaming, NOT against a
+targeted adversary inside the session. Closure requires the out-of-process /
+sandboxed verifier named in SECURITY_BOUNDARY.md.
 
 Honesty notes:
 - Only TOP-LEVEL TAP results are graded (fixtures author flat `test()` suites;
