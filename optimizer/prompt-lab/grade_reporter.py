@@ -12,6 +12,18 @@ Refusal ladder (never a guess, mirrors grade_artifact):
     missing TAP file            -> subscores_blocked "missing"
     no TAP header / no results  -> subscores_blocked "unparseable"
     every test skipped/todo     -> subscores_blocked "no_gradeable_tests"
+    suite truncated by exit      -> subscores_blocked "suite_collapsed"
+
+Truncation-forgery guard (grader integrity): model-authored src is imported when
+the hidden suite runs, so `process.exit(0)` in that src aborts the run before node
+emits any per-`test()` result — node then reports the WHOLE FILE as a single
+top-level `ok N - <file>` with a `1..1` plan. A naive parse scores that 1/1 = a
+forged 100%. The signature is deterministic and precise: a single result whose
+name is a filepath (ends `.js`/`.mjs`/`.ts`, no spaces) that PASSED can only be a
+collapse — a real one-test suite names its result a description, and a genuine
+suite-load crash produces the same single filepath result but FAILED (`not ok`),
+which stays a correct 0/1. So we refuse only the single-filepath-result-that-passed.
+Verified against real `node --test` on 2026-08-18.
 
 Honesty notes:
 - Only TOP-LEVEL TAP results are graded (fixtures author flat `test()` suites;
@@ -32,6 +44,9 @@ import re
 
 SKIP_RE = re.compile(r"#\s*(?:SKIP|TODO)", re.IGNORECASE)
 RESULT_RE = re.compile(r"^(not )?ok\s+\d+\s+-\s+(.*?)\s*(#.*)?$")
+# A filepath-shaped result name (ends .js/.mjs/.ts, no spaces) — what node emits
+# for a whole file when the run is aborted before per-test() reporting.
+FILEPATH_RE = re.compile(r"^[\w./\\-]+\.(?:m?js|ts)$")
 MAX_NAME_CHARS = 200
 MAX_TESTS = 500
 
@@ -61,6 +76,13 @@ def extract_tap(text):
             return None, "unparseable"
     if not detail:
         return None, "no_gradeable_tests" if skipped else "unparseable"
+    # Truncation-forgery guard: a single PASSING result whose name is a filepath is
+    # the process.exit(0) collapse signature — refuse it. A single FAILING filepath
+    # result is a genuine suite-load crash and stays a correct 0/1 below.
+    if len(detail) == 1:
+        (only_name, only_passed), = detail.items()
+        if only_passed and FILEPATH_RE.match(only_name):
+            return None, "suite_collapsed"
     return {"fixed": sum(detail.values()), "total": len(detail),
             "source": "tap-reporter", "detail": detail}, None
 
@@ -116,11 +138,25 @@ not ok 2 - beta fails
     dup = "TAP version 13\nok 1 - same\nnot ok 2 - same\n1..2\n"
     subscores, _ = extract_tap(dup)
     assert subscores["total"] == 2 and subscores["fixed"] == 1
-    # A suite-load crash grades as fixed=0 (model broke the suite), not a refusal.
+    # A suite-load crash grades as fixed=0 (model broke the suite), not a refusal —
+    # a single FAILING filepath result is NOT the collapse forgery.
     crash = "TAP version 13\n# Subtest: test/hidden.test.js\nnot ok 1 - test/hidden.test.js\n1..1\n"
     subscores, _ = extract_tap(crash)
     assert subscores == {"fixed": 0, "total": 1, "source": "tap-reporter",
                          "detail": {"test/hidden.test.js": False}}
+    # Truncation forgery: a single PASSING filepath result (process.exit collapse) is refused.
+    # This is the exact TAP a real `node --test` emits when model src calls process.exit(0)
+    # mid-run (captured 2026-08-18): the whole file becomes one passing top-level result.
+    forged = "TAP version 13\n# Subtest: s.test.mjs\nok 1 - s.test.mjs\n  ---\n  ...\n1..1\n# pass 1\n"
+    assert extract_tap(forged) == (None, "suite_collapsed"), extract_tap(forged)
+    assert extract_tap("TAP version 13\nok 1 - test/fail-to-pass.test.js\n1..1\n") == (None, "suite_collapsed")
+    # A genuine single-test suite (named a DESCRIPTION, not a filepath) still grades.
+    one = "TAP version 13\nok 1 - repairs the exported normalizer\n1..1\n"
+    assert extract_tap(one)[0] == {"fixed": 1, "total": 1, "source": "tap-reporter",
+                                   "detail": {"repairs the exported normalizer": True}}
+    # A test whose description merely mentions a filename is not filepath-shaped (has spaces).
+    mentions = "TAP version 13\nok 1 - normalize-ticket.js is the wired export\n1..1\n"
+    assert extract_tap(mentions)[0]["total"] == 1
     print("grade_reporter selftest: OK")
 
 

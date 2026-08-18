@@ -38,8 +38,11 @@ def row_context(task, variant, exploratory=False):
         "exploratory_override": bool(exploratory and not ok),
         "one_shot": manifest["one_shot"],
         "fixture_root": manifest["fixture"]["root"],
-        "hidden_test": ((manifest.get("tests", {}).get("fail_to_pass", {}).get("overlays") or [{}])[0].get("source")
-                        if manifest.get("context_pressure") else None),
+        # The fail-to-pass grader overlaid (withheld) at grade time — populated for
+        # ANY fixture with such an overlay, not only context-pressure ones. The old
+        # `context_pressure`-only gate mislabelled the entire ling/sweep cohort as
+        # hidden_test=None (2026-08-18 inspection L3).
+        "hidden_test": (manifest.get("tests", {}).get("fail_to_pass", {}).get("overlays") or [{}])[0].get("source"),
         # The grader artifact the gate is allowed to read, pinned by the (admission-hashed)
         # manifest. None for the fixtures that emit no graded subscores. See grade_artifact.py.
         "grade_artifact": manifest.get("tests", {}).get("fail_to_pass", {}).get("grade_artifact"),
@@ -62,7 +65,7 @@ def main():
     elif args.command == "hidden-test":
         _, manifest = load_manifest(args.task)
         overlay = (manifest.get("tests", {}).get("fail_to_pass", {}).get("overlays") or [{}])[0]
-        print(overlay.get("source", "") if manifest.get("context_pressure") else "")
+        print(overlay.get("source", ""))
     elif args.command == "prompt":
         _, manifest = load_manifest(args.task); print(prompt_record(manifest, args.variant)["text"])
     else:
