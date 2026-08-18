@@ -6,9 +6,11 @@ import { initialToolSurface } from "../lib/session-bootstrap.ts";
 import { onHarnessSignal, type CapabilityName } from "../lib/harness-signals.ts";
 
 type Mode = "ambient" | "dynamic" | "phase";
+type SurfaceMode = "default" | "minimal";
 type DeferredTool = "subagent" | "compact_context";
 const DYNAMIC_DEFERRED: readonly DeferredTool[] = ["subagent", "compact_context"];
 const BASE_REGISTRY = ["read", "bash", "edit", "write"];
+export const MINIMAL_TOOL_SURFACE = BASE_REGISTRY;
 
 // "bash" is not a mutation — a bash COMMAND may or may not be. A tool-name set
 // counted the opening `rg`/`ls`/`git status` of nearly every session as the
@@ -29,12 +31,17 @@ function modeFromEnvironment(): Mode {
 	return value === "ambient" || value === "phase" ? value : "dynamic";
 }
 
+function surfaceFromEnvironment(): SurfaceMode {
+	return process.env.MUNCHKIN_TOOL_SURFACE === "minimal" ? "minimal" : "default";
+}
+
 export default function (pi: ExtensionAPI): void {
 	const mode = modeFromEnvironment();
+	const surfaceMode = surfaceFromEnvironment();
 	const g = globalThis as Record<string, unknown>;
 	const publish = (value: Record<string, unknown>) => { g.__pi_tool_activation_state = value; };
-	publish({ mode, preserved_explicit: false, reason: "startup", phase: mode === "phase" ? "phase-aware" : "ambient-or-dynamic" });
-	if (mode === "ambient") return;
+	publish({ mode, surface_mode: surfaceMode, preserved_explicit: false, reason: "startup", phase: mode === "phase" ? "phase-aware" : "ambient-or-dynamic" });
+	if (mode === "ambient" && surfaceMode === "default") return;
 
 	const deferred = new Set<string>();
 	const attempted = new Set<CapabilityName>();
@@ -55,13 +62,14 @@ export default function (pi: ExtensionAPI): void {
 		const active = pi.getActiveTools();
 		const measured = measureActiveSurface(allTools, active);
 		record("tool-activation", "surface", {
-			mode, active_tools: active.length, all_tools: allTools.length,
+			mode, surface_mode: surfaceMode, active_tools: active.length, all_tools: allTools.length,
 			schema_bytes: measured.schemaBytes, guideline_bytes: measured.guidelineBytes,
 			deferred_tools: deferred.size, unavailable_attempts: 0,
 		});
 	}
 
 	function activateCapability(capability: CapabilityName, reason: string): void {
+		if (surfaceMode === "minimal") return;
 		if (mode !== "phase" && capability !== "subagent" && capability !== "compact_context") return;
 		if (attempted.has(capability)) return;
 		const names = PHASE_CAPABILITY_TOOLS[capability];
@@ -79,6 +87,7 @@ export default function (pi: ExtensionAPI): void {
 	}
 
 	function activateDynamic(tool: DeferredTool, reason: string): void {
+		if (surfaceMode === "minimal") return;
 		if (mode !== "dynamic" || !deferred.has(tool) || attempted.has(tool)) return;
 		attempted.add(tool);
 		activationState();
@@ -110,7 +119,7 @@ export default function (pi: ExtensionAPI): void {
 	});
 
 	pi.on("session_start", async () => {
-		publish({ mode, preserved_explicit: false, reason: mode === "phase" ? "phase-start" : "dynamic-startup", phase: mode === "phase" ? "phase-aware" : "ambient-or-dynamic" });
+		publish({ mode, surface_mode: surfaceMode, preserved_explicit: false, reason: mode === "phase" ? "phase-start" : surfaceMode === "minimal" ? "minimal-startup" : "dynamic-startup", phase: mode === "phase" ? "phase-aware" : "ambient-or-dynamic" });
 		deferred.clear();
 		attempted.clear();
 		lastOpenItems = 0;
@@ -121,7 +130,7 @@ export default function (pi: ExtensionAPI): void {
 		const active = pi.getActiveTools();
 		const baseline = initialToolSurface();
 		if (!baseline?.complete) {
-			publish({ mode, preserved_explicit: true, reason: "bootstrap-unavailable", phase: mode === "phase" ? "phase-aware" : "dynamic" });
+			publish({ mode, surface_mode: surfaceMode, preserved_explicit: true, reason: "bootstrap-unavailable", phase: mode === "phase" ? "phase-aware" : "dynamic" });
 			for (const tool of mode === "phase" ? phaseDeferredTools(allTools.map((item) => String(item.name))) : DYNAMIC_DEFERRED) {
 				record("tool-activation", "preserved-explicit", { tool, reason: "bootstrap-unavailable" });
 			}
@@ -136,8 +145,20 @@ export default function (pi: ExtensionAPI): void {
 		explicit = activeSet.size !== allSet.size || all.some((name) => !activeSet.has(name));
 		const deferredNames = mode === "phase" ? phaseDeferredTools(all) : new Set(DYNAMIC_DEFERRED.filter((name) => allSet.has(name)));
 		if (!complete || explicit) {
-			publish({ mode, preserved_explicit: true, reason: complete ? "narrowed-tools" : "incomplete-registry", phase: mode === "phase" ? "phase-aware" : "dynamic" });
+			publish({ mode, surface_mode: surfaceMode, preserved_explicit: true, reason: complete ? "narrowed-tools" : "incomplete-registry", phase: mode === "phase" ? "phase-aware" : "dynamic" });
 			for (const tool of deferredNames) record("tool-activation", "preserved-explicit", { tool, reason: complete ? "narrowed-tools" : "incomplete-registry" });
+			surfaceTelemetry();
+			return;
+		}
+		if (surfaceMode === "minimal") {
+			const minimal = BASE_REGISTRY.filter((name) => allSet.has(name));
+			if (minimal.length === BASE_REGISTRY.length) {
+				pi.setActiveTools(minimal);
+				publish({ mode, surface_mode: surfaceMode, preserved_explicit: false, reason: "minimal-startup", phase: "minimal", deferred: [], attempted: [] });
+				surfaceTelemetry();
+				return;
+			}
+			publish({ mode, surface_mode: surfaceMode, preserved_explicit: true, reason: "minimal-incomplete", phase: "minimal" });
 			surfaceTelemetry();
 			return;
 		}
@@ -146,7 +167,7 @@ export default function (pi: ExtensionAPI): void {
 			record("tool-activation", "deferred", { tool, reason: mode === "phase" ? "phase-start" : "dynamic-startup" });
 		}
 		pi.setActiveTools(active.filter((name) => !deferred.has(name)));
-		publish({ mode, preserved_explicit: false, reason: mode === "phase" ? "phase-start" : "dynamic-startup", phase: mode === "phase" ? "phase-aware" : "dynamic", deferred: [...deferred].sort(), attempted: [] });
+		publish({ mode, surface_mode: surfaceMode, preserved_explicit: false, reason: mode === "phase" ? "phase-start" : "dynamic-startup", phase: mode === "phase" ? "phase-aware" : "dynamic", deferred: [...deferred].sort(), attempted: [] });
 		surfaceTelemetry();
 	});
 

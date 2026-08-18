@@ -4,6 +4,10 @@ import { isPrivateAddress } from "../lib/public-url.ts";
 import {
 	readRuntimePosture, renderDoctor, sandboxPosture, summarizeToolSurface,
 } from "../lib/runtime-doctor.ts";
+import {
+	emptyProtocolObservation, observeAssistantMessage, observeProtocolDelta, summarizeProtocolParity,
+	type ProtocolObservation, type ProtocolParitySummary,
+} from "../lib/protocol-parity.ts";
 import { record } from "../lib/telemetry.ts";
 
 type ProviderTiming = {
@@ -22,6 +26,12 @@ function elapsed(start: number, end: number | null): number | null {
 export function isFirstTokenEvent(event: { type?: unknown; delta?: unknown }): boolean {
 	return ["text_delta", "thinking_delta", "toolcall_delta"].includes(String(event.type)) &&
 		typeof event.delta === "string" && event.delta.length > 0;
+}
+
+function sameProtocolDeclaration(left: ProtocolParitySummary, right: ProtocolParitySummary): boolean {
+	return left.api === right.api && left.reasoning === right.reasoning &&
+		left.thinkingFormat === right.thinkingFormat && left.thinkingLevels === right.thinkingLevels &&
+		left.strictSampling === right.strictSampling;
 }
 
 // ---------- serving-truth probe ----------
@@ -104,6 +114,10 @@ export default function (pi: ExtensionAPI): void {
 	// re-probes for the new model instead of reporting the old model's numbers.
 	let probedModelId: string | null = null;
 	let pendingProbe: { modelId: string; baseUrl: string; registryCtx: number; notify: (message: string) => void } | null = null;
+	let protocolObservation: ProtocolObservation = emptyProtocolObservation();
+	let currentModel: { api?: unknown; reasoning?: unknown; thinkingLevelMap?: unknown; compat?: { supportsStrictMode?: unknown; thinkingFormat?: unknown } } | undefined;
+	let protocolDirty = false;
+	let lastProtocol: ProtocolParitySummary | undefined;
 
 	function closeCurrent(): void {
 		if (!current) return;
@@ -118,6 +132,10 @@ export default function (pi: ExtensionAPI): void {
 		servingTruth = null;
 		probedModelId = null;
 		pendingProbe = null;
+		protocolObservation = emptyProtocolObservation();
+		currentModel = undefined;
+		protocolDirty = false;
+		lastProtocol = undefined;
 	}
 
 	pi.on("session_start", async () => {
@@ -125,7 +143,10 @@ export default function (pi: ExtensionAPI): void {
 	});
 	pi.on("session_shutdown", async () => { reset(); });
 
-	pi.on("before_provider_request", async () => {
+	pi.on("before_provider_request", async (_event, ctx) => {
+		if (!protocolDirty) protocolObservation = emptyProtocolObservation();
+		protocolDirty = true;
+		currentModel = ctx?.model as typeof currentModel;
 		closeCurrent();
 		current = {
 			seq: ++nextSeq, started: performance.now(), headersAt: null,
@@ -134,6 +155,7 @@ export default function (pi: ExtensionAPI): void {
 	});
 
 	pi.on("after_provider_response", async (event, ctx) => {
+		currentModel = ctx?.model as typeof currentModel;
 		if (current) {
 			current.headersAt ??= performance.now();
 			current.status = event.status;
@@ -156,6 +178,8 @@ export default function (pi: ExtensionAPI): void {
 	});
 
 	pi.on("message_update", async (event) => {
+		const streamEvent = event.assistantMessageEvent as { type?: unknown; delta?: unknown };
+		observeProtocolDelta(protocolObservation, streamEvent?.type, streamEvent?.delta);
 		if (!current) return;
 		if (current.firstTokenAt == null && isFirstTokenEvent(event.assistantMessageEvent)) {
 			current.firstTokenAt = performance.now();
@@ -166,6 +190,7 @@ export default function (pi: ExtensionAPI): void {
 	});
 
 	pi.on("message_end", async (event) => {
+		observeAssistantMessage(protocolObservation, event.message);
 		if (current && event.message.role === "assistant") current.streamAt ??= performance.now();
 	});
 
@@ -208,6 +233,19 @@ export default function (pi: ExtensionAPI): void {
 				status: timing.status,
 			});
 		}
+		if (protocolDirty) {
+			const protocol = summarizeProtocolParity(currentModel, protocolObservation);
+			lastProtocol = protocol;
+			protocolDirty = false;
+			record("runtime", "protocol-parity", {
+				api: protocol.api, reasoning: protocol.reasoning, thinking_format: protocol.thinkingFormat,
+				thinking_levels: protocol.thinkingLevels, strict_sampling: protocol.strictSampling,
+				stream_shape: protocol.streamShape, thinking_observed: protocol.thinkingObserved,
+				toolcalls_observed: protocol.toolCallsObserved,
+				text_deltas: protocolObservation.textDeltas, thinking_deltas: protocolObservation.thinkingDeltas,
+				toolcall_deltas: protocolObservation.toolCallDeltas,
+			});
+		}
 		completed = [];
 	});
 
@@ -221,6 +259,13 @@ export default function (pi: ExtensionAPI): void {
 			);
 			const posture = await readRuntimePosture(ctx.cwd);
 			const model = ctx.model;
+			const declaredProtocol = summarizeProtocolParity(
+				model as Parameters<typeof summarizeProtocolParity>[0], emptyProtocolObservation(),
+			);
+			const protocol = protocolDirty
+				? summarizeProtocolParity(model as Parameters<typeof summarizeProtocolParity>[0], protocolObservation)
+				: lastProtocol && sameProtocolDeclaration(lastProtocol, declaredProtocol)
+					? lastProtocol : declaredProtocol;
 			let providerName = model?.provider ?? "unknown";
 			try {
 				if (model) providerName = ctx.modelRegistry.getProviderDisplayName(model.provider);
@@ -241,6 +286,7 @@ export default function (pi: ExtensionAPI): void {
 					deferred: Array.isArray(activation?.deferred) ? activation.deferred : [],
 					attempted: Array.isArray(activation?.attempted) ? activation.attempted : [],
 				},
+				protocol,
 			}), "info");
 		},
 	});

@@ -147,6 +147,8 @@
     "harness/lib/loop-action.ts",
     "harness/lib/loop-recovery.ts",
     "harness/lib/runtime-doctor.ts",
+    "harness/lib/protocol-parity.ts",
+    "harness/lib/projection-invariants.ts",
     "harness/lib/live-mirror.ts",
     "harness/lib/plan-integrity.ts",
     "harness/lib/plan-gate-diagnostic.ts",

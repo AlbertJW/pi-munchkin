@@ -20,6 +20,7 @@ import {
 import { agentDir } from "../lib/agent-dir.ts";
 import { sandboxPosture } from "../lib/runtime-doctor.ts";
 import { emitHarnessSignal, onHarnessSignal } from "../lib/harness-signals.ts";
+import { checkCompactionProjection } from "../lib/projection-invariants.ts";
 
 export type RunKernelInstallOptions = {
 	mode?: RunKernelMode;
@@ -373,7 +374,10 @@ export function installRunKernel(pi: ExtensionAPI, options: RunKernelInstallOpti
 	});
 
 	pi.on("session_compact", async () => {
+		const before = store.snapshot();
 		dispatch({ ...nextBase(), type: "run/session-compacted" });
+		const check = checkCompactionProjection(before, store.snapshot());
+		record("run-kernel", "projection-check", { check_kind: "compaction", ok: check.ok, reason: check.reason });
 	});
 
 	pi.on("agent_settled", async () => {

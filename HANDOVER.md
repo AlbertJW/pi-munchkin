@@ -332,6 +332,10 @@ across a live-mirror rollout. Record the loaded `HARNESS_SURFACE_SHA256` with ev
   default Pi registry; preserve narrowed explicit `--tools` selections. Subagent activates on
   multi-item execution, second plan-gate failure, or loop tier two. Compact activates at 60%.
   `ambient` is the rollback.
+- `MUNCHKIN_TOOL_SURFACE=default`: the DeepSeek-inspired `minimal` surface is source-only and
+  opt-in; it keeps only `read`, `bash`, `edit`, and `write`, never overrides a narrowed explicit
+  selection, and never auto-activates deferred tools. `/munchkin-doctor` also reports redacted
+  protocol-parity facts; both features are observational/candidate surfaces and are not mirrored.
 - `CONTEXT_SURFACE_MODE=summary`: no transcript hashing or duplicate analysis on the default path.
   `full` restores receipts; `off` disables. Gate sessions force full.
 - `STATE_LENS=steer`: only loop-breaker events inject state, under cooldown. `off` is the kill

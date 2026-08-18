@@ -2,6 +2,7 @@ import { defineTool, type ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { Type } from "typebox";
 import { beginCompaction, finishCompaction, resetCompactionCoordinator } from "../lib/compaction-coordinator.ts";
 import { ACTIVE_TOOL_PROMPTS } from "../lib/active-tool-prompts.ts";
+import { classifyFailure, type FailureClass } from "../lib/failure-episodes.ts";
 import { runCapsuleMode } from "../lib/run-capsule-store.ts";
 import { onRunStateSnapshot } from "../lib/run-kernel-snapshot.ts";
 import { renderRecoveryBrief } from "../lib/recovery-brief.ts";
@@ -29,6 +30,11 @@ const RESUME =
 	"Context compaction finished. Re-read the active task and current filesystem state, then resume from the next unresolved step. Do not repeat completed work.";
 const DEFAULT_FOCUS =
 	"Preserve a compact structured capsule: active task and constraints; decisions; changed paths and exact identifiers; verified commands/results; unresolved errors or blockers; next action. Keep the most recent raw evidence needed to continue.";
+
+function compactionFailureClass(error: unknown): FailureClass {
+	const text = error instanceof Error ? error.message : String(error);
+	return classifyFailure({ toolName: "compact_context", args: {}, text, isError: true });
+}
 
 export default function (pi: ExtensionAPI) {
 	let inFlight = false;
@@ -104,19 +110,20 @@ export default function (pi: ExtensionAPI) {
 						},
 						onError: (e) => {
 							if (settled) return;
-							ctx.ui.notify(`compact failed: ${e.message}`, "warning");
-							resume("failed", { error: e.message.slice(0, 200) });
+							const failureClass = compactionFailureClass(e);
+							ctx.ui.notify(`compaction failed (failure_class=${failureClass})`, "warning");
+							resume("failed", { failureClass });
 						},
 					});
 				} catch (error) {
-					const message = error instanceof Error ? error.message : String(error);
+					const failureClass = compactionFailureClass(error);
 					finishCompaction(token);
 					settled = true;
 					inFlight = false;
-					ctx.ui.notify(`compact could not start: ${message}`, "warning");
+					ctx.ui.notify(`compaction could not start (failure_class=${failureClass})`, "warning");
 					return {
-						content: [{ type: "text" as const, text: `Compaction could not start: ${message.slice(0, 200)}` }],
-						details: { queued: false, error: message.slice(0, 200) },
+						content: [{ type: "text" as const, text: `Compaction could not start (failure_class=${failureClass}). Continue without compaction.` }],
+						details: { queued: false, failureClass },
 					};
 				}
 				return {

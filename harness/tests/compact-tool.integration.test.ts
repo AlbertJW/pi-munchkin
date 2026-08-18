@@ -51,11 +51,14 @@ test("compact_context deduplicates and resumes exactly once after completion", a
 test("compact_context resumes after failure because Pi already aborted the turn", async () => {
 	const h = setup();
 	await h.execute();
-	h.options.onError(new Error("summary backend unavailable"));
+	const secret = "DUMMY_COMPACTION_SECRET";
+	h.options.onError(new Error(`provider unavailable at https://private.invalid/v1?token=${secret} /Users/alice/private.txt`));
 	assert.equal(h.fp.customDeliveries.length, 1);
 	assert.deepEqual((h.fp.customDeliveries[0].message as any).details,
-		{ status: "failed", error: "summary backend unavailable" });
-	assert.match(h.notes[0], /compact failed/);
+		{ status: "failed", failureClass: "provider" });
+	assert.match(h.notes[0], /compaction failed \(failure_class=provider\)/);
+	const visible = JSON.stringify({ notes: h.notes, deliveries: h.fp.customDeliveries });
+	assert.doesNotMatch(visible, /DUMMY_COMPACTION_SECRET|private\.invalid|\/Users\/alice/);
 });
 
 test("default compaction focus is a structured recall-first capsule", async () => {
@@ -87,13 +90,18 @@ test("synchronous compact failure releases the shared slot", async () => {
 	const fp = makeFakePi();
 	compactTool(fp.pi as any);
 	let calls = 0;
+	const notes: string[] = [];
+	const secret = "DUMMY_SYNC_COMPACTION_SECRET";
 	const ctx = {
-		ui: { notify() {} },
-		compact: () => { calls += 1; throw new Error("cannot start"); },
+		ui: { notify(message: string) { notes.push(message); } },
+		compact: () => { calls += 1; throw new Error(`timeout at https://private.invalid/?key=${secret} /tmp/private`); },
 	};
 	const execute = () => fp.tools.get("compact_context").execute("tc", {}, undefined, undefined, ctx);
 	const first = await execute();
 	assert.equal(first.details.queued, false);
+	assert.equal(first.details.failureClass, "timeout");
+	assert.match(first.content[0].text, /failure_class=timeout/);
+	assert.doesNotMatch(JSON.stringify({ first, notes }), /DUMMY_SYNC_COMPACTION_SECRET|private\.invalid|\/tmp\/private/);
 	await execute();
 	assert.equal(calls, 2, "a synchronous failure must not wedge future requests");
 });

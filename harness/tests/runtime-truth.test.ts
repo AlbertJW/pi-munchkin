@@ -37,15 +37,42 @@ test("provider timings are numeric, observational, and emitted once only after a
 		assert.equal(existsSync(file), false, "agent_end may precede retry or compaction");
 		await fire(fp, "agent_settled", {}, {});
 		const firstRows = readFileSync(file, "utf8").trim().split("\n").map((line) => JSON.parse(line));
-		assert.equal(firstRows.length, 1);
-		assert.equal(firstRows[0].ext, "runtime");
-		assert.equal(firstRows[0].kind, "provider-timing");
+		assert.equal(firstRows.length, 2);
+		const timingRow = firstRows.find((row) => row.kind === "provider-timing");
+		const protocolRow = firstRows.find((row) => row.kind === "protocol-parity");
+		assert.ok(timingRow);
+		assert.ok(protocolRow);
+		assert.equal(timingRow.ext, "runtime");
 		for (const key of ["request_to_headers_ms", "first_token_ms", "stream_completion_ms", "settlement_ms"]) {
-			assert.equal(typeof firstRows[0][key], "number", key);
-			assert.ok(firstRows[0][key] >= 0, key);
+			assert.equal(typeof timingRow[key], "number", key);
+			assert.ok(timingRow[key] >= 0, key);
 		}
 		await fire(fp, "agent_settled", {}, {});
-		assert.equal(readFileSync(file, "utf8").trim().split("\n").length, 1, "settlement work is one-shot");
+		assert.equal(readFileSync(file, "utf8").trim().split("\n").length, 2, "settlement work is one-shot");
+
+		const nextCtx = { model: { api: "anthropic-messages", reasoning: false } };
+		await fire(fp, "before_provider_request", {}, nextCtx);
+		await fire(fp, "after_provider_response", { status: 200 }, nextCtx);
+		await fire(fp, "message_update", { assistantMessageEvent: { type: "thinking_delta", delta: "opaque" } }, nextCtx);
+		await fire(fp, "message_update", { assistantMessageEvent: { type: "done" } }, nextCtx);
+		await fire(fp, "agent_settled", {}, nextCtx);
+		const allRows = readFileSync(file, "utf8").trim().split("\n").map((line) => JSON.parse(line));
+		assert.equal(allRows.length, 4, "a later agent run receives its own timing and protocol rows");
+		const protocolRows = allRows.filter((row) => row.kind === "protocol-parity");
+		assert.equal(protocolRows.length, 2);
+		assert.equal(protocolRows[1].api, "anthropic-messages");
+		assert.equal(protocolRows[1].reasoning, "disabled");
+		assert.equal(protocolRows[1].text_deltas, 0, "settled protocol observations do not bleed into the next run");
+		assert.equal(protocolRows[1].thinking_deltas, 1);
+		const notices: string[] = [];
+		await fp.commands.get("munchkin-doctor").handler("", {
+			cwd: root,
+			model: { id: "next", provider: "local", api: "google-generative-ai", reasoning: true },
+			modelRegistry: { getProviderDisplayName: () => "Local" },
+			ui: { notify: (message: string) => notices.push(message) },
+		});
+		assert.match(notices[0], /protocol=api:google-generative-ai; reasoning:enabled;[^\n]*stream_shape:unknown/,
+			"doctor must not attribute the prior model's settled stream shape to a newly selected model");
 		assert.equal(readFileSync(file, "utf8").includes("unused"), false);
 	} finally {
 		restoreEnv(prior);

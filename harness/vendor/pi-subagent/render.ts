@@ -253,7 +253,7 @@ function renderSingleExpanded(
 	if (error && r.stopReason) header += ` ${theme.fg("error", `[${r.stopReason}]`)}`;
 	container.addChild(new Text(header, 0, 0));
 	if (error && r.errorMessage) {
-		container.addChild(new Text(theme.fg("error", `Error: ${r.errorMessage}`), 0, 0));
+		container.addChild(new Text(theme.fg("error", getResultSummaryText(r)), 0, 0));
 	}
 
 	// Task
@@ -301,7 +301,7 @@ function renderSingleCollapsed(
 	if (error && r.stopReason) text += ` ${theme.fg("error", `[${r.stopReason}]`)}`;
 
 	if (error && r.errorMessage) {
-		text += `\n${theme.fg("error", `Error: ${r.errorMessage}`)}`;
+		text += `\n${theme.fg("error", getResultSummaryText(r))}`;
 	} else if (displayItems.length === 0) {
 		text += `\n${theme.fg(error ? "error" : "muted", getResultSummaryText(r))}`;
 	} else {

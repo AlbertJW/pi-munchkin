@@ -3,7 +3,7 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
-import { planArtifact } from "../extensions/reflect.ts";
+import { planArtifact, reflectFailureNotice } from "../extensions/reflect.ts";
 import { runCapsuleDirectory } from "../lib/run-capsule-store.ts";
 
 test("reflect reads the session capsule projection and ignores a stale project TODO", async () => {
@@ -34,4 +34,11 @@ test("reflect reads the session capsule projection and ignores a stale project T
 		if (previous.storage === undefined) delete process.env.PLAN_STORAGE; else process.env.PLAN_STORAGE = previous.storage;
 		if (previous.capsule === undefined) delete process.env.RUN_CAPSULE; else process.env.RUN_CAPSULE = previous.capsule;
 	}
+});
+
+test("reflect failure notices expose only the fixed failure class", () => {
+	const secret = "DUMMY_REFLECT_SECRET";
+	const notice = reflectFailureNotice(new Error(`provider timeout at https://private.invalid/v1?token=${secret} /Users/alice/private.md`));
+	assert.equal(notice, "reflect: review failed (failure_class=timeout)");
+	assert.doesNotMatch(notice, /DUMMY_REFLECT_SECRET|private\.invalid|\/Users\/alice/);
 });

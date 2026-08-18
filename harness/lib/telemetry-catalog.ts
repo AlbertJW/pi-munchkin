@@ -93,6 +93,11 @@ export const EVENT_CATALOG = {
 		first_token_ms: ["number", "null"], stream_completion_ms: ["number", "null"],
 		settlement_ms: ["number", "null"], status: ["number", "null"],
 	},
+	"runtime/protocol-parity": {
+		api: "string", reasoning: "string", thinking_format: "string", thinking_levels: "number",
+		strict_sampling: "string", stream_shape: "string", thinking_observed: "boolean", toolcalls_observed: "boolean",
+		text_deltas: "number", thinking_deltas: "number", toolcall_deltas: "number",
+	},
 	"run-kernel/receipt": {
 		tool: "string", tool_family: "string", status: "string", mutation: "string",
 		verification: "string", failure_class: ["string", "null"], result_bytes: "number",
@@ -107,6 +112,7 @@ export const EVENT_CATALOG = {
 		active_walls: "number", mutations: "number", verification_attempts: "number", valid_gates: "number", transitions: "number",
 		missing_start: "number", missing_result: "number", validation_errors: "number",
 	},
+	"run-kernel/projection-check": { check_kind: "string", ok: "boolean", reason: "string" },
 	"run-capsule/checkpoint": { ok: "boolean", state_bytes: "number", markdown_bytes: "number", failure_class: ["string", "null"] },
 	"run-capsule/entry": { ok: "boolean", failure_class: ["string", "null"], state_bytes: "number" },
 	"run-capsule/recovery-brief": { reason: "string", brief_bytes: "number", generation: "number" },
@@ -181,7 +187,7 @@ export const EVENT_CATALOG = {
 	"tool-activation/preserved-explicit": { tool: "string", reason: "string" },
 	"tool-activation/unavailable": { tool: "string", reason: "string" },
 	"tool-activation/first-useful-mutation": { elapsed_ms: "number", tool: "string" },
-	"tool-activation/surface": { mode: "string", active_tools: "number", all_tools: "number", schema_bytes: "number", guideline_bytes: "number", deferred_tools: "number", unavailable_attempts: "number" },
+	"tool-activation/surface": { mode: "string", surface_mode: "string", active_tools: "number", all_tools: "number", schema_bytes: "number", guideline_bytes: "number", deferred_tools: "number", unavailable_attempts: "number" },
 	"tool-call-rescue/detected": { signature: "string", turnIndex: "number" },
 	"tool-call-rescue/steered": { signature: "string", turnIndex: "number" },
 	"teach-hints/hint": { rule: "string", tool: "string", injected_chars: "number" },

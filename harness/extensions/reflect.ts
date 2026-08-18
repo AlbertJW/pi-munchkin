@@ -2,6 +2,7 @@ import { readFile, stat } from "node:fs/promises";
 import { join } from "node:path";
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { completeSimple } from "@earendil-works/pi-ai/compat";
+import { classifyFailure, type FailureClass } from "../lib/failure-episodes.ts";
 import { extractReflectFindings, MAX_ARTIFACT, MAX_ROUNDS, METHODS, REFLECT_PROMPT, shouldIterate, voteFindings } from "../lib/reflect-policy.ts";
 import { steerText } from "../lib/steer-texts.ts";
 import { record } from "../lib/telemetry.ts";
@@ -21,6 +22,15 @@ const TIMEOUT_MS = Number.parseInt(process.env.REFLECT_TIMEOUT_MS || "120000", 1
 
 let rounds = 0;
 let lastAssistantText = "";
+
+function reflectFailureClass(error: unknown): FailureClass {
+	const text = error instanceof Error ? error.message : String(error);
+	return classifyFailure({ toolName: "reflect", args: {}, text, isError: true });
+}
+
+export function reflectFailureNotice(error: unknown): string {
+	return `reflect: review failed (failure_class=${reflectFailureClass(error)})`;
+}
 
 export async function planArtifact(cwd: string): Promise<string | null> {
 	const p = planStorageMode() === "capsule"
@@ -127,8 +137,9 @@ export default function (pi: ExtensionAPI) {
 					{ deliverAs: "followUp" },
 				);
 			} catch (e) {
-				record("reflect", "review-error", { error: String((e as Error)?.message ?? e).slice(0, 150) });
-				ctx.ui.notify(`reflect: review failed (${String((e as Error)?.message ?? e).slice(0, 80)})`, "warning");
+				const failureClass = reflectFailureClass(e);
+				record("reflect", "review-error", { error: failureClass });
+				ctx.ui.notify(reflectFailureNotice(e), "warning");
 			}
 		},
 	});

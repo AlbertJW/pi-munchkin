@@ -153,7 +153,9 @@ Most behaviour is automatic. The primary commands are:
 - `/munchkin-doctor` for redacted Pi/model capability, canonical tool-provenance, retry/timeout,
   declared sandbox posture, and a `serving_truth` line comparing the local server's actual
   served `n_ctx` against the registry's `contextWindow` (probed once per model after settlement;
-  local endpoints only — named hosts and public IPs are never probed).
+  local endpoints only — named hosts and public IPs are never probed). It also reports
+  protocol-parity facts such as declared thinking format and observed stream shape without
+  exposing prompts, payloads, or thinking text.
 
 Compaction is a tool the model calls (`compact_context`), not a slash command: it summarises the
 model's own window in place with one resume handoff.
@@ -164,6 +166,7 @@ model's own window in place with one resume handoff.
 |---|---|---|
 | `MUNCHKIN_TOOL_ACTIVATION` | `dynamic`; defers `subagent` and `compact_context` only when Pi exposes the complete default registry | `ambient` leaves Pi's initial surface untouched |
 | `MUNCHKIN_TOOL_ACTIVATION=phase` | dark candidate; additionally defers `plan_go`, span tools, and post-search `web_read`, then activates them from structured phase/evidence signals | return to `dynamic` (deployed path) or `ambient`; explicit `--tools` selections are always preserved |
+| `MUNCHKIN_TOOL_SURFACE` | `default`; `minimal` is a dark, configuration-only candidate that keeps only `read`, `bash`, `edit`, and `write` when the complete registry is visible | unset/`default` restores the adopted dynamic surface; narrowed explicit `--tools` selections are always preserved |
 | `PLAN_MODE` | `forced`; deployed whole-plan creation and execution | `adaptive` adds stable-ID `plan_update` and explicit bounded `/plan-direct`; `off` hides those candidate additions |
 | `PLAN_STORAGE` | `capsule`; plan JSON, Markdown projection, and trace stay in the private per-run capsule for both forced and adaptive planning | `project` restores historical `.pi/plan-state.json`, `.pi/TODO.md`, and `.pi/traces/`; `/plan-export` is the explicit one-file export; `RUN_CAPSULE=off` also selects project storage because no private session identity exists |
 | dynamic `subagent` triggers | multi-item structured execution, second plan-gate failure, or loop-breaker tier two | once activated it stays active; one automatic attempt means a later manual `/tools` disable is respected |

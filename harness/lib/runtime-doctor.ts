@@ -2,6 +2,7 @@ import { readFile, stat } from "node:fs/promises";
 import { join } from "node:path";
 import { agentDir } from "./agent-dir.ts";
 import { sha256 } from "./failure-episodes.ts";
+import { protocolApiFamily, type ProtocolParitySummary } from "./protocol-parity.ts";
 
 const SETTINGS_MAX_BYTES = 128 * 1024;
 export const FIRST_PARTY_TOOLS = [
@@ -157,13 +158,17 @@ export function renderDoctor(input: {
 	// Numbers and verdict ONLY — never the probed URL (tests pin the absence of
 	// "http://" and "baseUrl" in this report).
 	servingTruth?: { served_n_ctx: number; registry_ctx: number; verdict: string } | null;
+	protocol?: ProtocolParitySummary;
 }): string {
 	const surface = input.surfaceHash && /^[a-f0-9]{64}$/i.test(input.surfaceHash)
 		? input.surfaceHash.toLowerCase() : "unknown";
 	const providerTimeout = input.posture.providerTimeoutMs ?? "sdk-default";
 	return [
 		`munchkin-doctor: pi=${boundedAtom(input.piVersion)}; harness_surface=${surface}`,
-		`model=${boundedAtom(input.model?.provider)}/${boundedAtom(input.model?.id)}; provider=${boundedAtom(input.providerName)}; api=${boundedAtom(input.model?.api)}; strict_tool_sampling=${strictModeFlag(input.model)}; json_schema_sampling=not-probed`,
+		`model=${boundedAtom(input.model?.provider)}/${boundedAtom(input.model?.id)}; provider=${boundedAtom(input.providerName)}; api=${protocolApiFamily(input.model?.api)}; strict_tool_sampling=${strictModeFlag(input.model)}; json_schema_sampling=not-probed`,
+		input.protocol
+			? `protocol=api:${boundedAtom(input.protocol.api)}; reasoning:${input.protocol.reasoning}; thinking_format:${input.protocol.thinkingFormat}; thinking_levels:${input.protocol.thinkingLevels}; stream_shape:${input.protocol.streamShape}; thinking_observed:${input.protocol.thinkingObserved}; toolcalls_observed:${input.protocol.toolCallsObserved}`
+			: "protocol=not-observed",
 		input.servingTruth
 			? `serving_truth=served_n_ctx:${Math.trunc(input.servingTruth.served_n_ctx)}; registry_ctx:${Math.trunc(input.servingTruth.registry_ctx)}; verdict:${boundedAtom(input.servingTruth.verdict)}`
 			: "serving_truth=not-probed",
