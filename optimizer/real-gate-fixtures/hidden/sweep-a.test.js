@@ -34,8 +34,14 @@ test('D4 rows are sorted alphabetically by name', () => {
 });
 
 test('D5 the handling fee is added after the discount, never discounted', () => {
-  // goods 200, discount 10% -> 180, + fee 1.50 = 181.50 (fee-first gives 181.35)
-  assert.equal(lineTotal({ qty: 1, price: 100, discounted: true }), 181.5);
+  // Isolate the charge-order defect from the currency-rate defect (D3): derive the
+  // goods value from the module's OWN non-discounted lineTotal, so this passes iff
+  // the discount hits goods-only with the fee added after — whatever rate the
+  // module uses. (Hardcoding 181.5 baked in the D3 fix; fixed 2026-08-18.)
+  const undiscounted = lineTotal({ qty: 1, price: 100, discounted: false });
+  const goodsValue = undiscounted - settings.handlingFee;
+  const expected = Math.round((goodsValue * (1 - settings.discountRate) + settings.handlingFee) * 100) / 100;
+  assert.equal(lineTotal({ qty: 1, price: 100, discounted: true }), expected);
 });
 
 test('D6 TOTAL sums active items only', () => {

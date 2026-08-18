@@ -3,7 +3,7 @@
 - Schema: `pi.fixture/v2`
 - Cohort: `2026-07`
 - Version: `2026-07.1`
-- Expires: `set on approval`
+- Expires: `2026-11-16T09:19:56Z`
 
 ## Canonical prompt
 
@@ -119,9 +119,9 @@ until it is green.
 ## Automated admission
 
 - Passed: `True`
-- Checked: `2026-08-14T12:50:13Z`
+- Checked: `2026-08-18T09:19:07Z`
 
 ## Human decision
 
-- Reviewer: `pending`
-- Approved: `False`
+- Reviewer: `albert`
+- Approved: `True`

@@ -45,7 +45,11 @@ V2_FIELDS = {
         "difficulty_crux": {
             "mechanism": "algorithm-class upgrade under a partial order: a comparator cannot express dependency constraints; the fix demands a topological scheduler with tie-breaks and rejection guards",
             "expected_failure": "keeps the urgency sort and patches around it; dependency ordering never holds",
-            "band_prediction": [0.05, 0.25]},
+            # band_prediction is a MEAN graded_rate (fixed/total), not the full-pass rate.
+            # The no-mutation/rejection guards floor graded_rate near 0.25 and are writable
+            # without the topological insight; the ordering tests (the actual crux) are the
+            # hard end. Corrected off the full-pass 0.05-0.25 to the graded scale 2026-08-18.
+            "band_prediction": [0.30, 0.60]},
         "findability": [
             {"evidence_file": "src/release-plan.js", "sentence_anchor": "scheduleJobs"}],
         "shortcut_sharpness": {"why_plausible": "hard-coding the sample DAG's expected order passes the visible suite and mimics a working scheduler"},
@@ -70,7 +74,7 @@ V2_FIELDS = {
         "findability": [
             {"evidence_file": "docs/PIPELINE.md", "sentence_anchor": "The project's own gate is `npm test`"},
             {"evidence_file": "package.json", "sentence_anchor": "scripts/pipeline-gate.mjs"}],
-        "shortcut_sharpness": {"why_plausible": "memorizing the gate feed's expected average keeps the visible suite and the sampled gate green while other inputs stay wrong"},
+        "shortcut_sharpness": {"why_plausible": "the mutant passes the visible `node --test` but fails the project gate (`npm test`) and the hidden grader — the partial state a model reaches when it stops at the visible suite instead of discovering and iterating against the project gate; the gate is the crux this fixture measures"},
         "episode_variance": {"expected": True, "rationale": "the project gate fails loudly and iteratively; each recovery attempt against a still-red invariant opens a verification episode — this is the loop-cohort instrument"}},
     "sweep-c": {
         "difficulty_crux": {

@@ -3,18 +3,53 @@
 - Schema: `pi.fixture/v2`
 - Cohort: `2026-08`
 - Version: `2026-08.1`
-- Expires: `set on approval`
+- Expires: `2026-11-16T09:19:56Z`
 
 ## Canonical prompt
 
-Add a `blocked` job status between `queued` and `running`. `STATUS_ORDER` in `src/policy.js` is the single source of truth and must become `queued, blocked, running, done`; `canTransition` must continue to allow only the next status in that order. Remove the duplicate status vocabulary in `src/parse-job.js` so parsing accepts exactly the shared statuses. `parseJob` must still trim and lower-case its input and reject unknown statuses. Existing behavior for the original three statuses must remain intact. Run `npm test` when the coordinated change is complete.
+Add a `blocked` job status that sits between `queued` and `running` in the status
+progression. `src/policy.js` documents `STATUS_ORDER` as the single source of truth for
+status ordering, and `canTransition` must continue to allow only a move to the next
+status in that order. Make sure job parsing accepts the new status too, without letting
+any status vocabulary drift out of sync with that single source of truth. `parseJob`
+must still trim and lower-case its input and reject unknown statuses, and existing
+behaviour for the original three statuses must remain intact. Run `npm test` when the
+change is complete.
 
 ## Hidden expectation sufficiency
 
-- **blocked is present in the shared status order** — Add a `blocked` job status between `queued` and `running`. `STATUS_ORDER` in `src/policy.js` is the single source of truth and must become `queued, blocked, running, done`; `canTransition` must continue to allow only the next status in that order. Remove the duplicate status vocabulary in `src/parse-job.js` so parsing accepts exactly the shared statuses. `parseJob` must still trim and lower-case its input and reject unknown statuses. Existing behavior for the original three statuses must remain intact. Run `npm test` when the coordinated change is complete.
-- **transitions follow the new adjacent order** — Add a `blocked` job status between `queued` and `running`. `STATUS_ORDER` in `src/policy.js` is the single source of truth and must become `queued, blocked, running, done`; `canTransition` must continue to allow only the next status in that order. Remove the duplicate status vocabulary in `src/parse-job.js` so parsing accepts exactly the shared statuses. `parseJob` must still trim and lower-case its input and reject unknown statuses. Existing behavior for the original three statuses must remain intact. Run `npm test` when the coordinated change is complete.
-- **the parser derives its vocabulary from STATUS_ORDER** — Add a `blocked` job status between `queued` and `running`. `STATUS_ORDER` in `src/policy.js` is the single source of truth and must become `queued, blocked, running, done`; `canTransition` must continue to allow only the next status in that order. Remove the duplicate status vocabulary in `src/parse-job.js` so parsing accepts exactly the shared statuses. `parseJob` must still trim and lower-case its input and reject unknown statuses. Existing behavior for the original three statuses must remain intact. Run `npm test` when the coordinated change is complete.
-- **the parser still rejects statuses outside the shared order** — Add a `blocked` job status between `queued` and `running`. `STATUS_ORDER` in `src/policy.js` is the single source of truth and must become `queued, blocked, running, done`; `canTransition` must continue to allow only the next status in that order. Remove the duplicate status vocabulary in `src/parse-job.js` so parsing accepts exactly the shared statuses. `parseJob` must still trim and lower-case its input and reject unknown statuses. Existing behavior for the original three statuses must remain intact. Run `npm test` when the coordinated change is complete.
+- **blocked is present in the shared status order** — Add a `blocked` job status that sits between `queued` and `running` in the status
+progression. `src/policy.js` documents `STATUS_ORDER` as the single source of truth for
+status ordering, and `canTransition` must continue to allow only a move to the next
+status in that order. Make sure job parsing accepts the new status too, without letting
+any status vocabulary drift out of sync with that single source of truth. `parseJob`
+must still trim and lower-case its input and reject unknown statuses, and existing
+behaviour for the original three statuses must remain intact. Run `npm test` when the
+change is complete.
+- **transitions follow the new adjacent order** — Add a `blocked` job status that sits between `queued` and `running` in the status
+progression. `src/policy.js` documents `STATUS_ORDER` as the single source of truth for
+status ordering, and `canTransition` must continue to allow only a move to the next
+status in that order. Make sure job parsing accepts the new status too, without letting
+any status vocabulary drift out of sync with that single source of truth. `parseJob`
+must still trim and lower-case its input and reject unknown statuses, and existing
+behaviour for the original three statuses must remain intact. Run `npm test` when the
+change is complete.
+- **the parser derives its vocabulary from STATUS_ORDER** — Add a `blocked` job status that sits between `queued` and `running` in the status
+progression. `src/policy.js` documents `STATUS_ORDER` as the single source of truth for
+status ordering, and `canTransition` must continue to allow only a move to the next
+status in that order. Make sure job parsing accepts the new status too, without letting
+any status vocabulary drift out of sync with that single source of truth. `parseJob`
+must still trim and lower-case its input and reject unknown statuses, and existing
+behaviour for the original three statuses must remain intact. Run `npm test` when the
+change is complete.
+- **the parser still rejects statuses outside the shared order** — Add a `blocked` job status that sits between `queued` and `running` in the status
+progression. `src/policy.js` documents `STATUS_ORDER` as the single source of truth for
+status ordering, and `canTransition` must continue to allow only a move to the next
+status in that order. Make sure job parsing accepts the new status too, without letting
+any status vocabulary drift out of sync with that single source of truth. `parseJob`
+must still trim and lower-case its input and reject unknown statuses, and existing
+behaviour for the original three statuses must remain intact. Run `npm test` when the
+change is complete.
 
 ## Equivalent perturbations
 
@@ -22,12 +57,26 @@ Add a `blocked` job status between `queued` and `running`. `STATUS_ORDER` in `sr
 
 Complete the following repository task. Preserve existing behavior and verify the tests.
 
-Add a `blocked` job status between `queued` and `running`. `STATUS_ORDER` in `src/policy.js` is the single source of truth and must become `queued, blocked, running, done`; `canTransition` must continue to allow only the next status in that order. Remove the duplicate status vocabulary in `src/parse-job.js` so parsing accepts exactly the shared statuses. `parseJob` must still trim and lower-case its input and reject unknown statuses. Existing behavior for the original three statuses must remain intact. Run `npm test` when the coordinated change is complete.
+Add a `blocked` job status that sits between `queued` and `running` in the status
+progression. `src/policy.js` documents `STATUS_ORDER` as the single source of truth for
+status ordering, and `canTransition` must continue to allow only a move to the next
+status in that order. Make sure job parsing accepts the new status too, without letting
+any status vocabulary drift out of sync with that single source of truth. `parseJob`
+must still trim and lower-case its input and reject unknown statuses, and existing
+behaviour for the original three statuses must remain intact. Run `npm test` when the
+change is complete.
 
 ### equivalent-2
 
 Repository change request:
-Add a `blocked` job status between `queued` and `running`. `STATUS_ORDER` in `src/policy.js` is the single source of truth and must become `queued, blocked, running, done`; `canTransition` must continue to allow only the next status in that order. Remove the duplicate status vocabulary in `src/parse-job.js` so parsing accepts exactly the shared statuses. `parseJob` must still trim and lower-case its input and reject unknown statuses. Existing behavior for the original three statuses must remain intact. Run `npm test` when the coordinated change is complete.
+Add a `blocked` job status that sits between `queued` and `running` in the status
+progression. `src/policy.js` documents `STATUS_ORDER` as the single source of truth for
+status ordering, and `canTransition` must continue to allow only a move to the next
+status in that order. Make sure job parsing accepts the new status too, without letting
+any status vocabulary drift out of sync with that single source of truth. `parseJob`
+must still trim and lower-case its input and reject unknown statuses, and existing
+behaviour for the original three statuses must remain intact. Run `npm test` when the
+change is complete.
 
 Use the smallest correct change and confirm the test suite.
 
@@ -35,7 +84,14 @@ Use the smallest correct change and confirm the test suite.
 
 Please solve this task in the supplied checkout, retaining all stated edge cases:
 
-Add a `blocked` job status between `queued` and `running`. `STATUS_ORDER` in `src/policy.js` is the single source of truth and must become `queued, blocked, running, done`; `canTransition` must continue to allow only the next status in that order. Remove the duplicate status vocabulary in `src/parse-job.js` so parsing accepts exactly the shared statuses. `parseJob` must still trim and lower-case its input and reject unknown statuses. Existing behavior for the original three statuses must remain intact. Run `npm test` when the coordinated change is complete.
+Add a `blocked` job status that sits between `queued` and `running` in the status
+progression. `src/policy.js` documents `STATUS_ORDER` as the single source of truth for
+status ordering, and `canTransition` must continue to allow only a move to the next
+status in that order. Make sure job parsing accepts the new status too, without letting
+any status vocabulary drift out of sync with that single source of truth. `parseJob`
+must still trim and lower-case its input and reject unknown statuses, and existing
+behaviour for the original three statuses must remain intact. Run `npm test` when the
+change is complete.
 
 ## Difficulty crux (author's pre-data claim)
 
@@ -46,9 +102,9 @@ Add a `blocked` job status between `queued` and `running`. `STATUS_ORDER` in `sr
 ## Automated admission
 
 - Passed: `True`
-- Checked: `2026-08-14T10:50:03Z`
+- Checked: `2026-08-18T09:19:11Z`
 
 ## Human decision
 
-- Reviewer: `pending`
-- Approved: `False`
+- Reviewer: `albert`
+- Approved: `True`

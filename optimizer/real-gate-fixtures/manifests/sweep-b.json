@@ -7,7 +7,7 @@
       "cee2dd0413ae9e917684a4b442bbba7aa001043d4202bac4f80e63d495859863"
     ],
     "automated": {
-      "checked_at": "2026-08-14T12:50:13Z",
+      "checked_at": "2026-08-18T09:19:07Z",
       "hash_drift": [],
       "manifest_drift": false,
       "overlay_lint": [],
@@ -16,23 +16,23 @@
       "states": {
         "gold_fail_to_pass": [
           {
+            "output_bytes": 446,
+            "output_sha256": "7acdbcb15c4feb4e106188a485a7ac54dbeba437bbc85379dc930539a241fc95",
+            "output_tail": "\u2714 D1 blank lines are skipped, real malformed lines still throw (0.565459ms)\n\u2714 D2 EXP is an accepted category (0.1505ms)\n\u2714 D3 zero-amount records are kept and flagged (0.088042ms)\n\u2714 D4 average excludes EXP records from the denominator (0.474834ms)\n\u2714 D5 categories are in first-seen feed order, not alphabetical (0.36725ms)\n\u2139 tests 5\n\u2139 suites 0\n\u2139 pass 5\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 51.804292\n",
+            "passed": true,
+            "returncode": 0
+          },
+          {
+            "output_bytes": 445,
+            "output_sha256": "51ed4a84af97bc90e0b7f9587f5d7392f092e4d4755f7659c1f2bf3e810f0ea7",
+            "output_tail": "\u2714 D1 blank lines are skipped, real malformed lines still throw (0.554583ms)\n\u2714 D2 EXP is an accepted category (0.152ms)\n\u2714 D3 zero-amount records are kept and flagged (0.087459ms)\n\u2714 D4 average excludes EXP records from the denominator (0.389833ms)\n\u2714 D5 categories are in first-seen feed order, not alphabetical (0.37475ms)\n\u2139 tests 5\n\u2139 suites 0\n\u2139 pass 5\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 51.614083\n",
+            "passed": true,
+            "returncode": 0
+          },
+          {
             "output_bytes": 449,
-            "output_sha256": "688b80f2cb55217a42db780be21ba32e7be43462065baf014a64decd591f3e9a",
-            "output_tail": "\u2714 D1 blank lines are skipped, real malformed lines still throw (0.553042ms)\n\u2714 D2 EXP is an accepted category (0.150792ms)\n\u2714 D3 zero-amount records are kept and flagged (0.089458ms)\n\u2714 D4 average excludes EXP records from the denominator (0.415542ms)\n\u2714 D5 categories are in first-seen feed order, not alphabetical (0.359416ms)\n\u2139 tests 5\n\u2139 suites 0\n\u2139 pass 5\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 78.704083\n",
-            "passed": true,
-            "returncode": 0
-          },
-          {
-            "output_bytes": 448,
-            "output_sha256": "1f0a095a1187fdac4d9f96c01b7c93eaee36aa3947ab237741c3367afee3b2ea",
-            "output_tail": "\u2714 D1 blank lines are skipped, real malformed lines still throw (0.55425ms)\n\u2714 D2 EXP is an accepted category (0.150959ms)\n\u2714 D3 zero-amount records are kept and flagged (0.089042ms)\n\u2714 D4 average excludes EXP records from the denominator (0.421625ms)\n\u2714 D5 categories are in first-seen feed order, not alphabetical (0.392167ms)\n\u2139 tests 5\n\u2139 suites 0\n\u2139 pass 5\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 56.825292\n",
-            "passed": true,
-            "returncode": 0
-          },
-          {
-            "output_bytes": 447,
-            "output_sha256": "e9482f688e89387f78f98a03dbbb916cd3f6e841782043bb9c536588430d8745",
-            "output_tail": "\u2714 D1 blank lines are skipped, real malformed lines still throw (0.564667ms)\n\u2714 D2 EXP is an accepted category (0.1515ms)\n\u2714 D3 zero-amount records are kept and flagged (0.088917ms)\n\u2714 D4 average excludes EXP records from the denominator (0.405542ms)\n\u2714 D5 categories are in first-seen feed order, not alphabetical (0.367083ms)\n\u2139 tests 5\n\u2139 suites 0\n\u2139 pass 5\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 57.466291\n",
+            "output_sha256": "d6e24ad89f13e0219719659a426610779584a1ed25430aa0d2b452cc3f784138",
+            "output_tail": "\u2714 D1 blank lines are skipped, real malformed lines still throw (0.574917ms)\n\u2714 D2 EXP is an accepted category (0.155666ms)\n\u2714 D3 zero-amount records are kept and flagged (0.090875ms)\n\u2714 D4 average excludes EXP records from the denominator (0.387625ms)\n\u2714 D5 categories are in first-seen feed order, not alphabetical (0.356125ms)\n\u2139 tests 5\n\u2139 suites 0\n\u2139 pass 5\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 51.892458\n",
             "passed": true,
             "returncode": 0
           }
@@ -40,22 +40,22 @@
         "gold_pass_to_pass": [
           {
             "output_bytes": 218,
-            "output_sha256": "270c9db2f77ff8e78cbfbac37930c31891584ba7bc0a7f5ce29e3b043422141f",
-            "output_tail": "\u2714 a clean two-line feed totals and averages (0.461917ms)\n\u2714 categories cover both kinds (0.346458ms)\n\u2139 tests 2\n\u2139 suites 0\n\u2139 pass 2\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 59.045958\n",
+            "output_sha256": "460779000e7f029c4861a742ef125b13788bfa8d03df932680380e9377b45663",
+            "output_tail": "\u2714 a clean two-line feed totals and averages (0.507958ms)\n\u2714 categories cover both kinds (0.347125ms)\n\u2139 tests 2\n\u2139 suites 0\n\u2139 pass 2\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 55.164333\n",
             "passed": true,
             "returncode": 0
           },
           {
             "output_bytes": 217,
-            "output_sha256": "2e9c419b1e1c844dd7d16b45b20b2f335550671a18e39da981a47099a9ed15a8",
-            "output_tail": "\u2714 a clean two-line feed totals and averages (0.560584ms)\n\u2714 categories cover both kinds (0.38775ms)\n\u2139 tests 2\n\u2139 suites 0\n\u2139 pass 2\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 70.743125\n",
+            "output_sha256": "e3590d8c85c716e5c4a80980d6ea7713270a018406b1e083e1cd838a52674dd3",
+            "output_tail": "\u2714 a clean two-line feed totals and averages (0.646416ms)\n\u2714 categories cover both kinds (0.390125ms)\n\u2139 tests 2\n\u2139 suites 0\n\u2139 pass 2\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 60.68375\n",
             "passed": true,
             "returncode": 0
           },
           {
-            "output_bytes": 216,
-            "output_sha256": "9ccabf021c65f3dc436cfabaaf2d4dcfc3c132a4725a660809ab23491e99d502",
-            "output_tail": "\u2714 a clean two-line feed totals and averages (0.485875ms)\n\u2714 categories cover both kinds (0.367792ms)\n\u2139 tests 2\n\u2139 suites 0\n\u2139 pass 2\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 66.5255\n",
+            "output_bytes": 218,
+            "output_sha256": "310fc2387e7c02e65c94938e250964d39c54d96c9c6d767a9676bfaf7b412445",
+            "output_tail": "\u2714 a clean two-line feed totals and averages (0.466625ms)\n\u2714 categories cover both kinds (0.356583ms)\n\u2139 tests 2\n\u2139 suites 0\n\u2139 pass 2\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 57.091458\n",
             "passed": true,
             "returncode": 0
           }
@@ -63,23 +63,23 @@
         "mutant:shortcut": {
           "fail_to_pass": [
             {
-              "output_bytes": 1198,
-              "output_sha256": "fdb565d43c0b95c1326e39c216dc68b4d458fcbf5d33447eb1e8ac439425d576",
-              "output_tail": "\u2716 D1 blank lines are skipped, real malformed lines still throw (0.761625ms)\n\u2714 D2 EXP is an accepted category (0.204ms)\n\u2714 D3 zero-amount records are kept and flagged (0.09625ms)\n\u2714 D4 average excludes EXP records from the denominator (0.658708ms)\n\u2714 D5 categories are in first-seen feed order, not alphabetical (0.366875ms)\n\u2139 tests 5\n\u2139 suites 0\n\u2139 pass 4\n\u2139 fail 1\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 61.160792\n\n\u2716 failing tests:\n\ntest at test/fail-to-pass.test.js:11:1\n\u2716 D1 blank lines are skipped, real malformed lines still throw (0.761625ms)\n  AssertionError [ERR_ASSERTION]: Missing expected exception (Error).\n      at TestContext.<anonymous> (file://<path>:13:10)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.start (node:internal/test_runner/test:1242:17)\n      at startSubtestAfterBootstrap (node:internal/test_runner/harness:387:17) {\n    generatedMessage: false,\n    code: 'ERR_ASSERTION',\n    actual: undefined,\n    operator: 'throws',\n    diff: 'simple'\n  }\n",
+              "output_bytes": 1202,
+              "output_sha256": "557935df6bd985cf14ba536f48bc32c9fe40c9151cfa906cd2bd6edc9c464fa1",
+              "output_tail": "\u2716 D1 blank lines are skipped, real malformed lines still throw (0.708833ms)\n\u2714 D2 EXP is an accepted category (0.170166ms)\n\u2714 D3 zero-amount records are kept and flagged (0.088375ms)\n\u2714 D4 average excludes EXP records from the denominator (0.390583ms)\n\u2714 D5 categories are in first-seen feed order, not alphabetical (0.383708ms)\n\u2139 tests 5\n\u2139 suites 0\n\u2139 pass 4\n\u2139 fail 1\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 53.432208\n\n\u2716 failing tests:\n\ntest at test/fail-to-pass.test.js:11:1\n\u2716 D1 blank lines are skipped, real malformed lines still throw (0.708833ms)\n  AssertionError [ERR_ASSERTION]: Missing expected exception (Error).\n      at TestContext.<anonymous> (file://<path>:13:10)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.start (node:internal/test_runner/test:1242:17)\n      at startSubtestAfterBootstrap (node:internal/test_runner/harness:387:17) {\n    generatedMessage: false,\n    code: 'ERR_ASSERTION',\n    actual: undefined,\n    operator: 'throws',\n    diff: 'simple'\n  }\n",
               "passed": false,
               "returncode": 1
             },
             {
-              "output_bytes": 1196,
-              "output_sha256": "6195361dcc0f0ee2c50b38d401bb81c86af256ea27e594d827774c34023131a7",
-              "output_tail": "\u2716 D1 blank lines are skipped, real malformed lines still throw (0.746ms)\n\u2714 D2 EXP is an accepted category (0.179292ms)\n\u2714 D3 zero-amount records are kept and flagged (0.093167ms)\n\u2714 D4 average excludes EXP records from the denominator (0.439708ms)\n\u2714 D5 categories are in first-seen feed order, not alphabetical (0.361959ms)\n\u2139 tests 5\n\u2139 suites 0\n\u2139 pass 4\n\u2139 fail 1\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 76.983958\n\n\u2716 failing tests:\n\ntest at test/fail-to-pass.test.js:11:1\n\u2716 D1 blank lines are skipped, real malformed lines still throw (0.746ms)\n  AssertionError [ERR_ASSERTION]: Missing expected exception (Error).\n      at TestContext.<anonymous> (file://<path>:13:10)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.start (node:internal/test_runner/test:1242:17)\n      at startSubtestAfterBootstrap (node:internal/test_runner/harness:387:17) {\n    generatedMessage: false,\n    code: 'ERR_ASSERTION',\n    actual: undefined,\n    operator: 'throws',\n    diff: 'simple'\n  }\n",
+              "output_bytes": 1202,
+              "output_sha256": "9a29c57f75082aa865d17570bb22b71541f0e5ae2b46087d984cccf362683682",
+              "output_tail": "\u2716 D1 blank lines are skipped, real malformed lines still throw (0.714166ms)\n\u2714 D2 EXP is an accepted category (0.170708ms)\n\u2714 D3 zero-amount records are kept and flagged (0.090959ms)\n\u2714 D4 average excludes EXP records from the denominator (0.398959ms)\n\u2714 D5 categories are in first-seen feed order, not alphabetical (0.364792ms)\n\u2139 tests 5\n\u2139 suites 0\n\u2139 pass 4\n\u2139 fail 1\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 51.759625\n\n\u2716 failing tests:\n\ntest at test/fail-to-pass.test.js:11:1\n\u2716 D1 blank lines are skipped, real malformed lines still throw (0.714166ms)\n  AssertionError [ERR_ASSERTION]: Missing expected exception (Error).\n      at TestContext.<anonymous> (file://<path>:13:10)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.start (node:internal/test_runner/test:1242:17)\n      at startSubtestAfterBootstrap (node:internal/test_runner/harness:387:17) {\n    generatedMessage: false,\n    code: 'ERR_ASSERTION',\n    actual: undefined,\n    operator: 'throws',\n    diff: 'simple'\n  }\n",
               "passed": false,
               "returncode": 1
             },
             {
-              "output_bytes": 1198,
-              "output_sha256": "3c932e82907bfaa440746eab68a31d09ec73d74ae90a813683daa3b99863a8f6",
-              "output_tail": "\u2716 D1 blank lines are skipped, real malformed lines still throw (0.7195ms)\n\u2714 D2 EXP is an accepted category (0.171625ms)\n\u2714 D3 zero-amount records are kept and flagged (0.087542ms)\n\u2714 D4 average excludes EXP records from the denominator (0.395416ms)\n\u2714 D5 categories are in first-seen feed order, not alphabetical (0.338708ms)\n\u2139 tests 5\n\u2139 suites 0\n\u2139 pass 4\n\u2139 fail 1\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 54.237375\n\n\u2716 failing tests:\n\ntest at test/fail-to-pass.test.js:11:1\n\u2716 D1 blank lines are skipped, real malformed lines still throw (0.7195ms)\n  AssertionError [ERR_ASSERTION]: Missing expected exception (Error).\n      at TestContext.<anonymous> (file://<path>:13:10)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.start (node:internal/test_runner/test:1242:17)\n      at startSubtestAfterBootstrap (node:internal/test_runner/harness:387:17) {\n    generatedMessage: false,\n    code: 'ERR_ASSERTION',\n    actual: undefined,\n    operator: 'throws',\n    diff: 'simple'\n  }\n",
+              "output_bytes": 1200,
+              "output_sha256": "c0e8711f1f173746a5939431a8f7101598ae52b71b89133eac568e22226e50f2",
+              "output_tail": "\u2716 D1 blank lines are skipped, real malformed lines still throw (0.72875ms)\n\u2714 D2 EXP is an accepted category (0.176625ms)\n\u2714 D3 zero-amount records are kept and flagged (0.089417ms)\n\u2714 D4 average excludes EXP records from the denominator (0.382667ms)\n\u2714 D5 categories are in first-seen feed order, not alphabetical (0.364417ms)\n\u2139 tests 5\n\u2139 suites 0\n\u2139 pass 4\n\u2139 fail 1\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 51.744667\n\n\u2716 failing tests:\n\ntest at test/fail-to-pass.test.js:11:1\n\u2716 D1 blank lines are skipped, real malformed lines still throw (0.72875ms)\n  AssertionError [ERR_ASSERTION]: Missing expected exception (Error).\n      at TestContext.<anonymous> (file://<path>:13:10)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.start (node:internal/test_runner/test:1242:17)\n      at startSubtestAfterBootstrap (node:internal/test_runner/harness:387:17) {\n    generatedMessage: false,\n    code: 'ERR_ASSERTION',\n    actual: undefined,\n    operator: 'throws',\n    diff: 'simple'\n  }\n",
               "passed": false,
               "returncode": 1
             }
@@ -87,22 +87,22 @@
           "pass_to_pass": [
             {
               "output_bytes": 218,
-              "output_sha256": "16ec3788ca58c509a49e964c03883194d66b3352b549f116d7d36c31aca12e6a",
-              "output_tail": "\u2714 a clean two-line feed totals and averages (0.441167ms)\n\u2714 categories cover both kinds (0.344292ms)\n\u2139 tests 2\n\u2139 suites 0\n\u2139 pass 2\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 59.203375\n",
+              "output_sha256": "3a47b30f720779bb0576fa237600e67bbf29740670624b5883632f9223a01df0",
+              "output_tail": "\u2714 a clean two-line feed totals and averages (0.445833ms)\n\u2714 categories cover both kinds (0.345708ms)\n\u2139 tests 2\n\u2139 suites 0\n\u2139 pass 2\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 55.254125\n",
+              "passed": true,
+              "returncode": 0
+            },
+            {
+              "output_bytes": 215,
+              "output_sha256": "135adcd0b5e66b642a5d6bbf9365a2e2ff26030172138b402237dd27ce1260d9",
+              "output_tail": "\u2714 a clean two-line feed totals and averages (0.446667ms)\n\u2714 categories cover both kinds (0.478375ms)\n\u2139 tests 2\n\u2139 suites 0\n\u2139 pass 2\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 55.829\n",
               "passed": true,
               "returncode": 0
             },
             {
               "output_bytes": 217,
-              "output_sha256": "f63cc136fed0a3e418fbdeb2e38966b2307c4e1122e5416ec7d39e7347c2d405",
-              "output_tail": "\u2714 a clean two-line feed totals and averages (0.44175ms)\n\u2714 categories cover both kinds (0.343333ms)\n\u2139 tests 2\n\u2139 suites 0\n\u2139 pass 2\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 58.155458\n",
-              "passed": true,
-              "returncode": 0
-            },
-            {
-              "output_bytes": 218,
-              "output_sha256": "76fbd1b7d3e12a22f79cdaa2634001c321ae6cd7eb91a8f11c770fa5c61d3dbb",
-              "output_tail": "\u2714 a clean two-line feed totals and averages (0.463875ms)\n\u2714 categories cover both kinds (0.361583ms)\n\u2139 tests 2\n\u2139 suites 0\n\u2139 pass 2\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 60.492334\n",
+              "output_sha256": "5794825b4f5b051f5863338df5e011a7c64adb6b2406d3855a45dd6c27a9e0eb",
+              "output_tail": "\u2714 a clean two-line feed totals and averages (0.442125ms)\n\u2714 categories cover both kinds (0.383417ms)\n\u2139 tests 2\n\u2139 suites 0\n\u2139 pass 2\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 56.10675\n",
               "passed": true,
               "returncode": 0
             }
@@ -110,23 +110,23 @@
         },
         "pristine_fail_to_pass": [
           {
-            "output_bytes": 6034,
-            "output_sha256": "1c4182190598f8ff191d24fc7c2e12a70b43b56cdd66d2bb52f584f14e790ab4",
-            "output_tail": "cted: true,\n    operator: '==',\n    diff: 'simple'\n  }\n\ntest at test/fail-to-pass.test.js:27:1\n\u2716 D4 average excludes EXP records from the denominator (0.344625ms)\n  Error: unknown category: EXP\n      at validate (file://<path>:12:49)\n      at run (file://<path>:30:26)\n      at TestContext.<anonymous> (file://<path>:29:16)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n      at Test.postRun (node:internal/test_runner/test:1522:19)\n      at Test.run (node:internal/test_runner/test:1447:12)\n      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7)\n\ntest at test/fail-to-pass.test.js:32:1\n\u2716 D5 categories are in first-seen feed order, not alphabetical (0.77ms)\n  AssertionError [ERR_ASSERTION]: Expected values to be strictly deep-equal:\n  + actual - expected\n  \n    [\n  +   'goods',\n      'services',\n  -   'goods'\n    ]\n  \n      at TestContext.<anonymous> (file://<path>:33:10)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n      at Test.postRun (node:internal/test_runner/test:1522:19)\n      at Test.run (node:internal/test_runner/test:1447:12)\n      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7) {\n    generatedMessage: true,\n    code: 'ERR_ASSERTION',\n    actual: [ 'goods', 'services' ],\n    expected: [ 'services', 'goods' ],\n    operator: 'deepStrictEqual',\n    diff: 'simple'\n  }\n",
+            "output_bytes": 6037,
+            "output_sha256": "7a6017c993011712ab30a1d503cb86de9ff861dcdf21e8554bbe7df61b5f6fa3",
+            "output_tail": "d: true,\n    operator: '==',\n    diff: 'simple'\n  }\n\ntest at test/fail-to-pass.test.js:27:1\n\u2716 D4 average excludes EXP records from the denominator (0.58375ms)\n  Error: unknown category: EXP\n      at validate (file://<path>:12:49)\n      at run (file://<path>:30:26)\n      at TestContext.<anonymous> (file://<path>:29:16)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n      at Test.postRun (node:internal/test_runner/test:1522:19)\n      at Test.run (node:internal/test_runner/test:1447:12)\n      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7)\n\ntest at test/fail-to-pass.test.js:32:1\n\u2716 D5 categories are in first-seen feed order, not alphabetical (0.726334ms)\n  AssertionError [ERR_ASSERTION]: Expected values to be strictly deep-equal:\n  + actual - expected\n  \n    [\n  +   'goods',\n      'services',\n  -   'goods'\n    ]\n  \n      at TestContext.<anonymous> (file://<path>:33:10)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n      at Test.postRun (node:internal/test_runner/test:1522:19)\n      at Test.run (node:internal/test_runner/test:1447:12)\n      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7) {\n    generatedMessage: true,\n    code: 'ERR_ASSERTION',\n    actual: [ 'goods', 'services' ],\n    expected: [ 'services', 'goods' ],\n    operator: 'deepStrictEqual',\n    diff: 'simple'\n  }\n",
             "passed": false,
             "returncode": 1
           },
           {
             "output_bytes": 6043,
-            "output_sha256": "3d1f2fc42d4a50d637224d5b2de479682596ec589563ac27904c172f3ef4eeb3",
-            "output_tail": ": true,\n    operator: '==',\n    diff: 'simple'\n  }\n\ntest at test/fail-to-pass.test.js:27:1\n\u2716 D4 average excludes EXP records from the denominator (0.368333ms)\n  Error: unknown category: EXP\n      at validate (file://<path>:12:49)\n      at run (file://<path>:30:26)\n      at TestContext.<anonymous> (file://<path>:29:16)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n      at Test.postRun (node:internal/test_runner/test:1522:19)\n      at Test.run (node:internal/test_runner/test:1447:12)\n      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7)\n\ntest at test/fail-to-pass.test.js:32:1\n\u2716 D5 categories are in first-seen feed order, not alphabetical (0.671083ms)\n  AssertionError [ERR_ASSERTION]: Expected values to be strictly deep-equal:\n  + actual - expected\n  \n    [\n  +   'goods',\n      'services',\n  -   'goods'\n    ]\n  \n      at TestContext.<anonymous> (file://<path>:33:10)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n      at Test.postRun (node:internal/test_runner/test:1522:19)\n      at Test.run (node:internal/test_runner/test:1447:12)\n      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7) {\n    generatedMessage: true,\n    code: 'ERR_ASSERTION',\n    actual: [ 'goods', 'services' ],\n    expected: [ 'services', 'goods' ],\n    operator: 'deepStrictEqual',\n    diff: 'simple'\n  }\n",
+            "output_sha256": "1bdd4cd090d789ccc1bd2a3d5dd8c898c57b6d7f8b6abf8053f876c68abc76ab",
+            "output_tail": ": true,\n    operator: '==',\n    diff: 'simple'\n  }\n\ntest at test/fail-to-pass.test.js:27:1\n\u2716 D4 average excludes EXP records from the denominator (0.420833ms)\n  Error: unknown category: EXP\n      at validate (file://<path>:12:49)\n      at run (file://<path>:30:26)\n      at TestContext.<anonymous> (file://<path>:29:16)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n      at Test.postRun (node:internal/test_runner/test:1522:19)\n      at Test.run (node:internal/test_runner/test:1447:12)\n      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7)\n\ntest at test/fail-to-pass.test.js:32:1\n\u2716 D5 categories are in first-seen feed order, not alphabetical (0.714875ms)\n  AssertionError [ERR_ASSERTION]: Expected values to be strictly deep-equal:\n  + actual - expected\n  \n    [\n  +   'goods',\n      'services',\n  -   'goods'\n    ]\n  \n      at TestContext.<anonymous> (file://<path>:33:10)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n      at Test.postRun (node:internal/test_runner/test:1522:19)\n      at Test.run (node:internal/test_runner/test:1447:12)\n      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7) {\n    generatedMessage: true,\n    code: 'ERR_ASSERTION',\n    actual: [ 'goods', 'services' ],\n    expected: [ 'services', 'goods' ],\n    operator: 'deepStrictEqual',\n    diff: 'simple'\n  }\n",
             "passed": false,
             "returncode": 1
           },
           {
-            "output_bytes": 6043,
-            "output_sha256": "dd827824a089b8dc0936ff2d6b3f9612d43dbaa7ccfcd24b69b90ffdc754c503",
-            "output_tail": ": true,\n    operator: '==',\n    diff: 'simple'\n  }\n\ntest at test/fail-to-pass.test.js:27:1\n\u2716 D4 average excludes EXP records from the denominator (0.378584ms)\n  Error: unknown category: EXP\n      at validate (file://<path>:12:49)\n      at run (file://<path>:30:26)\n      at TestContext.<anonymous> (file://<path>:29:16)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n      at Test.postRun (node:internal/test_runner/test:1522:19)\n      at Test.run (node:internal/test_runner/test:1447:12)\n      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7)\n\ntest at test/fail-to-pass.test.js:32:1\n\u2716 D5 categories are in first-seen feed order, not alphabetical (0.745042ms)\n  AssertionError [ERR_ASSERTION]: Expected values to be strictly deep-equal:\n  + actual - expected\n  \n    [\n  +   'goods',\n      'services',\n  -   'goods'\n    ]\n  \n      at TestContext.<anonymous> (file://<path>:33:10)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n      at Test.postRun (node:internal/test_runner/test:1522:19)\n      at Test.run (node:internal/test_runner/test:1447:12)\n      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7) {\n    generatedMessage: true,\n    code: 'ERR_ASSERTION',\n    actual: [ 'goods', 'services' ],\n    expected: [ 'services', 'goods' ],\n    operator: 'deepStrictEqual',\n    diff: 'simple'\n  }\n",
+            "output_bytes": 6035,
+            "output_sha256": "6665281cc41a092fa237ba5f68006518c793f7bd9e0b6a10b8b876b1034e7aba",
+            "output_tail": "cted: true,\n    operator: '==',\n    diff: 'simple'\n  }\n\ntest at test/fail-to-pass.test.js:27:1\n\u2716 D4 average excludes EXP records from the denominator (0.37ms)\n  Error: unknown category: EXP\n      at validate (file://<path>:12:49)\n      at run (file://<path>:30:26)\n      at TestContext.<anonymous> (file://<path>:29:16)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n      at Test.postRun (node:internal/test_runner/test:1522:19)\n      at Test.run (node:internal/test_runner/test:1447:12)\n      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7)\n\ntest at test/fail-to-pass.test.js:32:1\n\u2716 D5 categories are in first-seen feed order, not alphabetical (0.760208ms)\n  AssertionError [ERR_ASSERTION]: Expected values to be strictly deep-equal:\n  + actual - expected\n  \n    [\n  +   'goods',\n      'services',\n  -   'goods'\n    ]\n  \n      at TestContext.<anonymous> (file://<path>:33:10)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n      at Test.postRun (node:internal/test_runner/test:1522:19)\n      at Test.run (node:internal/test_runner/test:1447:12)\n      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7) {\n    generatedMessage: true,\n    code: 'ERR_ASSERTION',\n    actual: [ 'goods', 'services' ],\n    expected: [ 'services', 'goods' ],\n    operator: 'deepStrictEqual',\n    diff: 'simple'\n  }\n",
             "passed": false,
             "returncode": 1
           }
@@ -134,30 +134,30 @@
         "pristine_pass_to_pass": [
           {
             "output_bytes": 218,
-            "output_sha256": "b160827d7474efdba07868a0c8b50cafeccd96fb597eaef258866daae2d5aa70",
-            "output_tail": "\u2714 a clean two-line feed totals and averages (0.451333ms)\n\u2714 categories cover both kinds (0.346542ms)\n\u2139 tests 2\n\u2139 suites 0\n\u2139 pass 2\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 59.669208\n",
+            "output_sha256": "0178b06e3d8933be955b5e9d15923b38df6c7cfd498639df6495046d6e2c4f98",
+            "output_tail": "\u2714 a clean two-line feed totals and averages (0.508167ms)\n\u2714 categories cover both kinds (0.372541ms)\n\u2139 tests 2\n\u2139 suites 0\n\u2139 pass 2\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 68.633917\n",
             "passed": true,
             "returncode": 0
           },
           {
-            "output_bytes": 216,
-            "output_sha256": "ee0dd4d1d3a03c8fb94408005e7f6c5885683ffa852eb15b73e71c6046ff62ed",
-            "output_tail": "\u2714 a clean two-line feed totals and averages (0.456375ms)\n\u2714 categories cover both kinds (0.342416ms)\n\u2139 tests 2\n\u2139 suites 0\n\u2139 pass 2\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 56.4675\n",
+            "output_bytes": 215,
+            "output_sha256": "1344aab28c89830a33164408244f0d5c18db69a213f432721b001d481931fe3e",
+            "output_tail": "\u2714 a clean two-line feed totals and averages (0.5135ms)\n\u2714 categories cover both kinds (0.425916ms)\n\u2139 tests 2\n\u2139 suites 0\n\u2139 pass 2\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 112.1275\n",
             "passed": true,
             "returncode": 0
           },
           {
             "output_bytes": 218,
-            "output_sha256": "a1659dcde54c82c3a1c8a79f45626bd7a71bdfecc1eecbca5a9b116fec149cc9",
-            "output_tail": "\u2714 a clean two-line feed totals and averages (0.458541ms)\n\u2714 categories cover both kinds (0.349542ms)\n\u2139 tests 2\n\u2139 suites 0\n\u2139 pass 2\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 59.463792\n",
+            "output_sha256": "8f985af9aac6ccaafd6baa9f48c0eef715706159ac02780295890c21ca9792e5",
+            "output_tail": "\u2714 a clean two-line feed totals and averages (0.476333ms)\n\u2714 categories cover both kinds (0.914916ms)\n\u2139 tests 2\n\u2139 suites 0\n\u2139 pass 2\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 82.561917\n",
             "passed": true,
             "returncode": 0
           }
         ]
       }
     },
-    "manifest_sha256": "52faeb694135be14d2e1d6aa046cc893e903011f28e179aca5e786e2c85b93f9",
-    "reviewed_at": "2026-08-17T08:21:51Z",
+    "manifest_sha256": "164e5cdb7c381f3e071f34fd81af7be28f2af3a0942189819ff6599d4046c4bd",
+    "reviewed_at": "2026-08-18T09:19:56Z",
     "reviewer": "albert"
   },
   "artifacts": [
@@ -262,7 +262,7 @@
   },
   "schema": "pi.fixture/v2",
   "shortcut_sharpness": {
-    "why_plausible": "memorizing the gate feed's expected average keeps the visible suite and the sampled gate green while other inputs stay wrong"
+    "why_plausible": "the mutant passes the visible `node --test` but fails the project gate (`npm test`) and the hidden grader \u2014 the partial state a model reaches when it stops at the visible suite instead of discovering and iterating against the project gate; the gate is the crux this fixture measures"
   },
   "sufficiency": [
     {
@@ -312,8 +312,8 @@
     }
   },
   "timestamps": {
-    "admitted_at": "2026-08-17T08:21:51Z",
+    "admitted_at": "2026-08-18T09:19:56Z",
     "created_at": "2026-07-14T00:00:00Z",
-    "expires_at": "2026-11-15T08:21:51Z"
+    "expires_at": "2026-11-16T09:19:56Z"
   }
 }

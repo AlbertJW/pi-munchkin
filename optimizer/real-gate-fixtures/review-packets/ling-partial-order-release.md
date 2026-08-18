@@ -3,7 +3,7 @@
 - Schema: `pi.fixture/v2`
 - Cohort: `2026-08`
 - Version: `2026-08.1`
-- Expires: `set on approval`
+- Expires: `2026-11-16T09:19:56Z`
 
 ## Canonical prompt
 
@@ -41,14 +41,14 @@ Implement `scheduleJobs(jobs)` in `src/release-plan.js`. Every job has a unique 
 
 - Mechanism: algorithm-class upgrade under a partial order: a comparator cannot express dependency constraints; the fix demands a topological scheduler with tie-breaks and rejection guards
 - Expected failure: keeps the urgency sort and patches around it; dependency ordering never holds
-- Band prediction: `[0.05, 0.25]`
+- Band prediction: `[0.3, 0.6]`
 
 ## Automated admission
 
 - Passed: `True`
-- Checked: `2026-08-14T10:50:06Z`
+- Checked: `2026-08-18T09:19:09Z`
 
 ## Human decision
 
-- Reviewer: `pending`
-- Approved: `False`
+- Reviewer: `albert`
+- Approved: `True`

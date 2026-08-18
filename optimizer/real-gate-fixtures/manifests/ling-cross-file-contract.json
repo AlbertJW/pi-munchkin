@@ -2,12 +2,12 @@
   "admission": {
     "approved": true,
     "approved_prompt_hashes": [
-      "187abc28b5a8bf0a025dd5379cbe0e39f05d2fe1407def53babcc934d63f261f",
-      "1cbc3b07987215cf3f4ea5ecdf545d4979a8ccfe40c173a31fe490cf3aed6623",
-      "160f71d6c38808edd4e61f893b19735966eb66fc3d58524e3d11e8e09b48d4b5"
+      "ff066e051a969fa7efbf4bf4c62dfed984acb1f4506cab91282109faaf41c59c",
+      "d62d210cf9ef441073216361ed45eb6a1701312aebb09088b7bd1d65694d061e",
+      "93278479cc361a4eb6394bce08316a06fc3f7a03fd48b9bdd20614fb90096ad7"
     ],
     "automated": {
-      "checked_at": "2026-08-14T10:50:03Z",
+      "checked_at": "2026-08-18T09:19:11Z",
       "hash_drift": [],
       "manifest_drift": false,
       "overlay_lint": [],
@@ -16,46 +16,46 @@
       "states": {
         "gold_fail_to_pass": [
           {
-            "output_bytes": 381,
-            "output_sha256": "7ac5346eab1a0c072d1d30fc5ce7d8b7be7c7ac5d34ff60104325639e3f73079",
-            "output_tail": "\u2714 blocked is present in the shared status order (1.054166ms)\n\u2714 transitions follow the new adjacent order (0.156292ms)\n\u2714 the parser derives its vocabulary from STATUS_ORDER (3.990459ms)\n\u2714 the parser still rejects statuses outside the shared order (0.328375ms)\n\u2139 tests 4\n\u2139 suites 0\n\u2139 pass 4\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 76.215417\n",
+            "output_bytes": 377,
+            "output_sha256": "a96cd5020c5cf4233657343bf34232ebde18bce6f1acb0b53d8696f145526ece",
+            "output_tail": "\u2714 blocked is present in the shared status order (0.788ms)\n\u2714 transitions follow the new adjacent order (0.09775ms)\n\u2714 the parser derives its vocabulary from STATUS_ORDER (4.485208ms)\n\u2714 the parser still rejects statuses outside the shared order (0.274083ms)\n\u2139 tests 4\n\u2139 suites 0\n\u2139 pass 4\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 93.330875\n",
             "passed": true,
             "returncode": 0
           },
           {
             "output_bytes": 381,
-            "output_sha256": "afd44f896898172b5052309b3a2b4a3bbec2b2526092a7c9bd9284e86181adff",
-            "output_tail": "\u2714 blocked is present in the shared status order (0.726792ms)\n\u2714 transitions follow the new adjacent order (0.093792ms)\n\u2714 the parser derives its vocabulary from STATUS_ORDER (1.779625ms)\n\u2714 the parser still rejects statuses outside the shared order (0.297125ms)\n\u2139 tests 4\n\u2139 suites 0\n\u2139 pass 4\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 79.271125\n",
+            "output_sha256": "29f42c5b7821ed69f243a21798f6175eadbf3ad6581c97ebfd34d021b13b1551",
+            "output_tail": "\u2714 blocked is present in the shared status order (0.696625ms)\n\u2714 transitions follow the new adjacent order (0.082792ms)\n\u2714 the parser derives its vocabulary from STATUS_ORDER (4.125125ms)\n\u2714 the parser still rejects statuses outside the shared order (0.616541ms)\n\u2139 tests 4\n\u2139 suites 0\n\u2139 pass 4\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 79.248459\n",
             "passed": true,
             "returncode": 0
           },
           {
             "output_bytes": 381,
-            "output_sha256": "c933311a3889184c6810ba2dc1aa7047f5c26b45224e2217cf9e668b8c753ecf",
-            "output_tail": "\u2714 blocked is present in the shared status order (0.702834ms)\n\u2714 transitions follow the new adjacent order (0.095583ms)\n\u2714 the parser derives its vocabulary from STATUS_ORDER (2.132166ms)\n\u2714 the parser still rejects statuses outside the shared order (0.260166ms)\n\u2139 tests 4\n\u2139 suites 0\n\u2139 pass 4\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 77.080833\n",
+            "output_sha256": "d9ab8d78609abe6a45a067be73f610cc17d066046fb329d52e73a929cb1a8c3e",
+            "output_tail": "\u2714 blocked is present in the shared status order (0.668334ms)\n\u2714 transitions follow the new adjacent order (0.084125ms)\n\u2714 the parser derives its vocabulary from STATUS_ORDER (3.627291ms)\n\u2714 the parser still rejects statuses outside the shared order (0.263083ms)\n\u2139 tests 4\n\u2139 suites 0\n\u2139 pass 4\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 72.929125\n",
             "passed": true,
             "returncode": 0
           }
         ],
         "gold_pass_to_pass": [
           {
+            "output_bytes": 263,
+            "output_sha256": "23913f061824bb5519fddfb46a6bd596c54d623bab6142e40d50584a34bb03cf",
+            "output_tail": "\u2714 parses and normalises existing statuses (1.280292ms)\n\u2714 keeps the existing ordered policy (0.184625ms)\n\u2714 rejects unknown statuses (0.670417ms)\n\u2139 tests 3\n\u2139 suites 0\n\u2139 pass 3\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 81.42475\n",
+            "passed": true,
+            "returncode": 0
+          },
+          {
+            "output_bytes": 263,
+            "output_sha256": "35e1d64dbe8d43a65a478eb1227f6e834ebe181932ecd0ac616f0452aa3f709b",
+            "output_tail": "\u2714 parses and normalises existing statuses (0.675375ms)\n\u2714 keeps the existing ordered policy (0.09325ms)\n\u2714 rejects unknown statuses (0.633583ms)\n\u2139 tests 3\n\u2139 suites 0\n\u2139 pass 3\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 81.935708\n",
+            "passed": true,
+            "returncode": 0
+          },
+          {
             "output_bytes": 264,
-            "output_sha256": "ec1f73659f0312d323293c9dceb07f260167b08ddca69d3eb1ecf7d43ffe22dd",
-            "output_tail": "\u2714 parses and normalises existing statuses (0.764584ms)\n\u2714 keeps the existing ordered policy (0.117417ms)\n\u2714 rejects unknown statuses (0.874375ms)\n\u2139 tests 3\n\u2139 suites 0\n\u2139 pass 3\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 94.697333\n",
-            "passed": true,
-            "returncode": 0
-          },
-          {
-            "output_bytes": 262,
-            "output_sha256": "b27b901d63da366cb57298c4c18493be43a64f9bedadf23c85cf93d5c1d1fd0a",
-            "output_tail": "\u2714 parses and normalises existing statuses (0.70425ms)\n\u2714 keeps the existing ordered policy (0.109333ms)\n\u2714 rejects unknown statuses (0.85075ms)\n\u2139 tests 3\n\u2139 suites 0\n\u2139 pass 3\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 83.124791\n",
-            "passed": true,
-            "returncode": 0
-          },
-          {
-            "output_bytes": 265,
-            "output_sha256": "122576348fb471773e07763ce2c7ca268082e8932ba664220e674faa962eaa60",
-            "output_tail": "\u2714 parses and normalises existing statuses (0.973125ms)\n\u2714 keeps the existing ordered policy (0.119792ms)\n\u2714 rejects unknown statuses (1.170666ms)\n\u2139 tests 3\n\u2139 suites 0\n\u2139 pass 3\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 124.315375\n",
+            "output_sha256": "5e76a08c0747682346aedc3e86745519eb33c0875b48e61eeaebf5227ced1edd",
+            "output_tail": "\u2714 parses and normalises existing statuses (0.750125ms)\n\u2714 keeps the existing ordered policy (0.100334ms)\n\u2714 rejects unknown statuses (0.727459ms)\n\u2139 tests 3\n\u2139 suites 0\n\u2139 pass 3\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 85.065625\n",
             "passed": true,
             "returncode": 0
           }
@@ -63,46 +63,46 @@
         "mutant:shortcut": {
           "fail_to_pass": [
             {
-              "output_bytes": 1009,
-              "output_sha256": "56c504161a2bb3f941b70ba985c8eeedc53916c35782af7fa7828d5f6ad4cadd",
-              "output_tail": "\u2714 blocked is present in the shared status order (0.70725ms)\n\u2714 transitions follow the new adjacent order (0.082209ms)\n\u2716 the parser derives its vocabulary from STATUS_ORDER (2.293333ms)\n\u2714 the parser still rejects statuses outside the shared order (0.687708ms)\n\u2139 tests 4\n\u2139 suites 0\n\u2139 pass 3\n\u2139 fail 1\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 79.817125\n\n\u2716 failing tests:\n\ntest at test/fail-to-pass.test.js:25:1\n\u2716 the parser derives its vocabulary from STATUS_ORDER (2.293333ms)\n  Error: invalid job\n      at parseJob (file://<path>:6:50)\n      at TestContext.<anonymous> (file://<path>:28:26)\n      at async Test.run (node:internal/test_runner/test:1389:7)\n      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7)\n",
+              "output_bytes": 1005,
+              "output_sha256": "1b78536ba1441e450eacf7e9f23e86532b4223569ac15a5a37d4c587b4f8f0da",
+              "output_tail": "\u2714 blocked is present in the shared status order (0.687916ms)\n\u2714 transitions follow the new adjacent order (0.315416ms)\n\u2716 the parser derives its vocabulary from STATUS_ORDER (4.887ms)\n\u2714 the parser still rejects statuses outside the shared order (0.798459ms)\n\u2139 tests 4\n\u2139 suites 0\n\u2139 pass 3\n\u2139 fail 1\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 108.647833\n\n\u2716 failing tests:\n\ntest at test/fail-to-pass.test.js:25:1\n\u2716 the parser derives its vocabulary from STATUS_ORDER (4.887ms)\n  Error: invalid job\n      at parseJob (file://<path>:6:50)\n      at TestContext.<anonymous> (file://<path>:28:26)\n      at async Test.run (node:internal/test_runner/test:1389:7)\n      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7)\n",
               "passed": false,
               "returncode": 1
             },
             {
               "output_bytes": 1010,
-              "output_sha256": "6b33a1408bd9f0ae3c8bbf438195e4e088416eabafb88df112ba7d2cb1a1c3f6",
-              "output_tail": "\u2714 blocked is present in the shared status order (2.252209ms)\n\u2714 transitions follow the new adjacent order (0.133125ms)\n\u2716 the parser derives its vocabulary from STATUS_ORDER (2.711208ms)\n\u2714 the parser still rejects statuses outside the shared order (0.275416ms)\n\u2139 tests 4\n\u2139 suites 0\n\u2139 pass 3\n\u2139 fail 1\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 77.313041\n\n\u2716 failing tests:\n\ntest at test/fail-to-pass.test.js:25:1\n\u2716 the parser derives its vocabulary from STATUS_ORDER (2.711208ms)\n  Error: invalid job\n      at parseJob (file://<path>:6:50)\n      at TestContext.<anonymous> (file://<path>:28:26)\n      at async Test.run (node:internal/test_runner/test:1389:7)\n      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7)\n",
+              "output_sha256": "fcb9fc1ce93a97bffb5fddb1e575946e9f059069e560fe2714c3a4cf1c040de0",
+              "output_tail": "\u2714 blocked is present in the shared status order (0.672584ms)\n\u2714 transitions follow the new adjacent order (0.083333ms)\n\u2716 the parser derives its vocabulary from STATUS_ORDER (3.400416ms)\n\u2714 the parser still rejects statuses outside the shared order (0.592375ms)\n\u2139 tests 4\n\u2139 suites 0\n\u2139 pass 3\n\u2139 fail 1\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 85.496333\n\n\u2716 failing tests:\n\ntest at test/fail-to-pass.test.js:25:1\n\u2716 the parser derives its vocabulary from STATUS_ORDER (3.400416ms)\n  Error: invalid job\n      at parseJob (file://<path>:6:50)\n      at TestContext.<anonymous> (file://<path>:28:26)\n      at async Test.run (node:internal/test_runner/test:1389:7)\n      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7)\n",
               "passed": false,
               "returncode": 1
             },
             {
               "output_bytes": 1010,
-              "output_sha256": "3394788b03a52867b2de98cbad9245993117853463baf96da77ccfe576b7b785",
-              "output_tail": "\u2714 blocked is present in the shared status order (0.848292ms)\n\u2714 transitions follow the new adjacent order (0.097125ms)\n\u2716 the parser derives its vocabulary from STATUS_ORDER (1.969458ms)\n\u2714 the parser still rejects statuses outside the shared order (0.245833ms)\n\u2139 tests 4\n\u2139 suites 0\n\u2139 pass 3\n\u2139 fail 1\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 81.490083\n\n\u2716 failing tests:\n\ntest at test/fail-to-pass.test.js:25:1\n\u2716 the parser derives its vocabulary from STATUS_ORDER (1.969458ms)\n  Error: invalid job\n      at parseJob (file://<path>:6:50)\n      at TestContext.<anonymous> (file://<path>:28:26)\n      at async Test.run (node:internal/test_runner/test:1389:7)\n      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7)\n",
+              "output_sha256": "3eff2dfd25ad714036c45da412ab496a39474b4e1f404706160f6940a4f3df3d",
+              "output_tail": "\u2714 blocked is present in the shared status order (0.685917ms)\n\u2714 transitions follow the new adjacent order (0.082584ms)\n\u2716 the parser derives its vocabulary from STATUS_ORDER (1.421666ms)\n\u2714 the parser still rejects statuses outside the shared order (0.221375ms)\n\u2139 tests 4\n\u2139 suites 0\n\u2139 pass 3\n\u2139 fail 1\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 55.720375\n\n\u2716 failing tests:\n\ntest at test/fail-to-pass.test.js:25:1\n\u2716 the parser derives its vocabulary from STATUS_ORDER (1.421666ms)\n  Error: invalid job\n      at parseJob (file://<path>:6:50)\n      at TestContext.<anonymous> (file://<path>:28:26)\n      at async Test.run (node:internal/test_runner/test:1389:7)\n      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7)\n",
               "passed": false,
               "returncode": 1
             }
           ],
           "pass_to_pass": [
             {
-              "output_bytes": 263,
-              "output_sha256": "f1c2aaaea778d06ae0640a7546c62800a480fbd5540d5671027bc862d0a8b6a0",
-              "output_tail": "\u2714 parses and normalises existing statuses (0.71775ms)\n\u2714 keeps the existing ordered policy (0.096125ms)\n\u2714 rejects unknown statuses (0.293292ms)\n\u2139 tests 3\n\u2139 suites 0\n\u2139 pass 3\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 83.533708\n",
+              "output_bytes": 264,
+              "output_sha256": "46ebc8f4a6d9f7b91f2a3626cf9def15350d7b64c8c5d2024db48c3e182c4b3d",
+              "output_tail": "\u2714 parses and normalises existing statuses (0.758583ms)\n\u2714 keeps the existing ordered policy (0.095125ms)\n\u2714 rejects unknown statuses (0.184541ms)\n\u2139 tests 3\n\u2139 suites 0\n\u2139 pass 3\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 80.043042\n",
               "passed": true,
               "returncode": 0
             },
             {
-              "output_bytes": 264,
-              "output_sha256": "474d1a3e501679cdd5389af0d983af974b95d7b06ae660471fda8b0199930d06",
-              "output_tail": "\u2714 parses and normalises existing statuses (0.753334ms)\n\u2714 keeps the existing ordered policy (0.098583ms)\n\u2714 rejects unknown statuses (0.194917ms)\n\u2139 tests 3\n\u2139 suites 0\n\u2139 pass 3\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 83.655542\n",
+              "output_bytes": 262,
+              "output_sha256": "3ffcc46346d702d8297960cb0d0fc930b00d7b0eecd1e735e2ce3f3de3ed9bf4",
+              "output_tail": "\u2714 parses and normalises existing statuses (0.695667ms)\n\u2714 keeps the existing ordered policy (0.095291ms)\n\u2714 rejects unknown statuses (0.185792ms)\n\u2139 tests 3\n\u2139 suites 0\n\u2139 pass 3\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 81.7175\n",
               "passed": true,
               "returncode": 0
             },
             {
               "output_bytes": 265,
-              "output_sha256": "e62cd71a43512de395351dfaf9909cf38a45bb41f3e570972ab2a5cc1fe0d1ae",
-              "output_tail": "\u2714 parses and normalises existing statuses (1.462084ms)\n\u2714 keeps the existing ordered policy (0.138584ms)\n\u2714 rejects unknown statuses (0.282709ms)\n\u2139 tests 3\n\u2139 suites 0\n\u2139 pass 3\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 113.260625\n",
+              "output_sha256": "bdc32fae49719068bb84b47dde65158660e53f7140610ce979eaf4ec6c7adf6f",
+              "output_tail": "\u2714 parses and normalises existing statuses (1.559416ms)\n\u2714 keeps the existing ordered policy (0.109542ms)\n\u2714 rejects unknown statuses (0.289542ms)\n\u2139 tests 3\n\u2139 suites 0\n\u2139 pass 3\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 101.354375\n",
               "passed": true,
               "returncode": 0
             }
@@ -110,60 +110,60 @@
         },
         "pristine_fail_to_pass": [
           {
-            "output_bytes": 2860,
-            "output_sha256": "07d6a8b4e3971c11c933b2f0a4a6699f2092eeb3dae9290475996406274b542a",
-            "output_tail": "t-018c3o21/work/test/fail-to-pass.test.js:15:10)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.start (node:internal/test_runner/test:1242:17)\n      at startSubtestAfterBootstrap (node:internal/test_runner/harness:387:17) {\n    generatedMessage: true,\n    code: 'ERR_ASSERTION',\n    actual: [ 'queued', 'running', 'done' ],\n    expected: [ 'queued', 'blocked', 'running', 'done' ],\n    operator: 'deepStrictEqual',\n    diff: 'simple'\n  }\n\ntest at test/fail-to-pass.test.js:18:1\n\u2716 transitions follow the new adjacent order (0.319833ms)\n  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:\n  \n  false !== true\n  \n      at TestContext.<anonymous> (file://<path>:19:10)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n      at Test.postRun (node:internal/test_runner/test:1522:19)\n      at Test.run (node:internal/test_runner/test:1447:12)\n      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3) {\n    generatedMessage: true,\n    code: 'ERR_ASSERTION',\n    actual: false,\n    expected: true,\n    operator: 'strictEqual',\n    diff: 'simple'\n  }\n\ntest at test/fail-to-pass.test.js:25:1\n\u2716 the parser derives its vocabulary from STATUS_ORDER (1.860791ms)\n  Error: invalid job\n      at parseJob (file://<path>:6:50)\n      at TestContext.<anonymous> (file://<path>:28:26)\n      at async Test.run (node:internal/test_runner/test:1389:7)\n      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7)\n",
-            "passed": false,
-            "returncode": 1
-          },
-          {
-            "output_bytes": 2860,
-            "output_sha256": "94b0f90a547b1643b7a7ebfe4fa28685b8fca97d6c5ad8cb262e07c7ed666222",
-            "output_tail": "ct-2hoiv64p/work/test/fail-to-pass.test.js:15:10)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.start (node:internal/test_runner/test:1242:17)\n      at startSubtestAfterBootstrap (node:internal/test_runner/harness:387:17) {\n    generatedMessage: true,\n    code: 'ERR_ASSERTION',\n    actual: [ 'queued', 'running', 'done' ],\n    expected: [ 'queued', 'blocked', 'running', 'done' ],\n    operator: 'deepStrictEqual',\n    diff: 'simple'\n  }\n\ntest at test/fail-to-pass.test.js:18:1\n\u2716 transitions follow the new adjacent order (0.158167ms)\n  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:\n  \n  false !== true\n  \n      at TestContext.<anonymous> (file://<path>:19:10)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n      at Test.postRun (node:internal/test_runner/test:1522:19)\n      at Test.run (node:internal/test_runner/test:1447:12)\n      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3) {\n    generatedMessage: true,\n    code: 'ERR_ASSERTION',\n    actual: false,\n    expected: true,\n    operator: 'strictEqual',\n    diff: 'simple'\n  }\n\ntest at test/fail-to-pass.test.js:25:1\n\u2716 the parser derives its vocabulary from STATUS_ORDER (1.70825ms)\n  Error: invalid job\n      at parseJob (file://<path>:6:50)\n      at TestContext.<anonymous> (file://<path>:28:26)\n      at async Test.run (node:internal/test_runner/test:1389:7)\n      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7)\n",
+            "output_bytes": 2862,
+            "output_sha256": "18c2cdd33bb940bf46d1d3c53228a70e9174bb1853425aae277dc6519a2d77d5",
+            "output_tail": "t-0pnooxqu/work/test/fail-to-pass.test.js:15:10)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.start (node:internal/test_runner/test:1242:17)\n      at startSubtestAfterBootstrap (node:internal/test_runner/harness:387:17) {\n    generatedMessage: true,\n    code: 'ERR_ASSERTION',\n    actual: [ 'queued', 'running', 'done' ],\n    expected: [ 'queued', 'blocked', 'running', 'done' ],\n    operator: 'deepStrictEqual',\n    diff: 'simple'\n  }\n\ntest at test/fail-to-pass.test.js:18:1\n\u2716 transitions follow the new adjacent order (0.145167ms)\n  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:\n  \n  false !== true\n  \n      at TestContext.<anonymous> (file://<path>:19:10)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n      at Test.postRun (node:internal/test_runner/test:1522:19)\n      at Test.run (node:internal/test_runner/test:1447:12)\n      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3) {\n    generatedMessage: true,\n    code: 'ERR_ASSERTION',\n    actual: false,\n    expected: true,\n    operator: 'strictEqual',\n    diff: 'simple'\n  }\n\ntest at test/fail-to-pass.test.js:25:1\n\u2716 the parser derives its vocabulary from STATUS_ORDER (2.722042ms)\n  Error: invalid job\n      at parseJob (file://<path>:6:50)\n      at TestContext.<anonymous> (file://<path>:28:26)\n      at async Test.run (node:internal/test_runner/test:1389:7)\n      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7)\n",
             "passed": false,
             "returncode": 1
           },
           {
             "output_bytes": 2862,
-            "output_sha256": "b1a0b8c622bdda4cb5246ba44bb6a2db4aa1c5d0b8017dbc9941e40c37d143c1",
-            "output_tail": "t-m3cxfpqn/work/test/fail-to-pass.test.js:15:10)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.start (node:internal/test_runner/test:1242:17)\n      at startSubtestAfterBootstrap (node:internal/test_runner/harness:387:17) {\n    generatedMessage: true,\n    code: 'ERR_ASSERTION',\n    actual: [ 'queued', 'running', 'done' ],\n    expected: [ 'queued', 'blocked', 'running', 'done' ],\n    operator: 'deepStrictEqual',\n    diff: 'simple'\n  }\n\ntest at test/fail-to-pass.test.js:18:1\n\u2716 transitions follow the new adjacent order (0.144458ms)\n  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:\n  \n  false !== true\n  \n      at TestContext.<anonymous> (file://<path>:19:10)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n      at Test.postRun (node:internal/test_runner/test:1522:19)\n      at Test.run (node:internal/test_runner/test:1447:12)\n      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3) {\n    generatedMessage: true,\n    code: 'ERR_ASSERTION',\n    actual: false,\n    expected: true,\n    operator: 'strictEqual',\n    diff: 'simple'\n  }\n\ntest at test/fail-to-pass.test.js:25:1\n\u2716 the parser derives its vocabulary from STATUS_ORDER (2.534959ms)\n  Error: invalid job\n      at parseJob (file://<path>:6:50)\n      at TestContext.<anonymous> (file://<path>:28:26)\n      at async Test.run (node:internal/test_runner/test:1389:7)\n      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7)\n",
+            "output_sha256": "c89608505ffdaab66ca95e7de3494877b86a2ed0158bff1b105a9ab9498364d3",
+            "output_tail": "t-3k4_ljpm/work/test/fail-to-pass.test.js:15:10)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.start (node:internal/test_runner/test:1242:17)\n      at startSubtestAfterBootstrap (node:internal/test_runner/harness:387:17) {\n    generatedMessage: true,\n    code: 'ERR_ASSERTION',\n    actual: [ 'queued', 'running', 'done' ],\n    expected: [ 'queued', 'blocked', 'running', 'done' ],\n    operator: 'deepStrictEqual',\n    diff: 'simple'\n  }\n\ntest at test/fail-to-pass.test.js:18:1\n\u2716 transitions follow the new adjacent order (0.137417ms)\n  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:\n  \n  false !== true\n  \n      at TestContext.<anonymous> (file://<path>:19:10)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n      at Test.postRun (node:internal/test_runner/test:1522:19)\n      at Test.run (node:internal/test_runner/test:1447:12)\n      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3) {\n    generatedMessage: true,\n    code: 'ERR_ASSERTION',\n    actual: false,\n    expected: true,\n    operator: 'strictEqual',\n    diff: 'simple'\n  }\n\ntest at test/fail-to-pass.test.js:25:1\n\u2716 the parser derives its vocabulary from STATUS_ORDER (1.582167ms)\n  Error: invalid job\n      at parseJob (file://<path>:6:50)\n      at TestContext.<anonymous> (file://<path>:28:26)\n      at async Test.run (node:internal/test_runner/test:1389:7)\n      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7)\n",
+            "passed": false,
+            "returncode": 1
+          },
+          {
+            "output_bytes": 2862,
+            "output_sha256": "1fca9dffd464ea5d02c042a3a78da4017e1153f3042e2d391d224c81692a0c5a",
+            "output_tail": "t-5nhttu5x/work/test/fail-to-pass.test.js:15:10)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.start (node:internal/test_runner/test:1242:17)\n      at startSubtestAfterBootstrap (node:internal/test_runner/harness:387:17) {\n    generatedMessage: true,\n    code: 'ERR_ASSERTION',\n    actual: [ 'queued', 'running', 'done' ],\n    expected: [ 'queued', 'blocked', 'running', 'done' ],\n    operator: 'deepStrictEqual',\n    diff: 'simple'\n  }\n\ntest at test/fail-to-pass.test.js:18:1\n\u2716 transitions follow the new adjacent order (0.144458ms)\n  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:\n  \n  false !== true\n  \n      at TestContext.<anonymous> (file://<path>:19:10)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n      at Test.postRun (node:internal/test_runner/test:1522:19)\n      at Test.run (node:internal/test_runner/test:1447:12)\n      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3) {\n    generatedMessage: true,\n    code: 'ERR_ASSERTION',\n    actual: false,\n    expected: true,\n    operator: 'strictEqual',\n    diff: 'simple'\n  }\n\ntest at test/fail-to-pass.test.js:25:1\n\u2716 the parser derives its vocabulary from STATUS_ORDER (1.731084ms)\n  Error: invalid job\n      at parseJob (file://<path>:6:50)\n      at TestContext.<anonymous> (file://<path>:28:26)\n      at async Test.run (node:internal/test_runner/test:1389:7)\n      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7)\n",
             "passed": false,
             "returncode": 1
           }
         ],
         "pristine_pass_to_pass": [
           {
-            "output_bytes": 264,
-            "output_sha256": "23c1ed9ad09b4ce2421fa245a84d5df208cd915b3973f4732d70686e8cac3ff3",
-            "output_tail": "\u2714 parses and normalises existing statuses (1.381208ms)\n\u2714 keeps the existing ordered policy (0.127875ms)\n\u2714 rejects unknown statuses (0.204417ms)\n\u2139 tests 3\n\u2139 suites 0\n\u2139 pass 3\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 96.869709\n",
+            "output_bytes": 262,
+            "output_sha256": "5d03873880cc18d210fc0d3551834c2ae14c163601d8d0dd990f57fec7951ed3",
+            "output_tail": "\u2714 parses and normalises existing statuses (1.643417ms)\n\u2714 keeps the existing ordered policy (0.262042ms)\n\u2714 rejects unknown statuses (0.463ms)\n\u2139 tests 3\n\u2139 suites 0\n\u2139 pass 3\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 104.987208\n",
             "passed": true,
             "returncode": 0
           },
           {
             "output_bytes": 264,
-            "output_sha256": "1f1f2a4a60fc30114f670296949b1c1b5f78ac9fbeb281918d25f0f4df2210ca",
-            "output_tail": "\u2714 parses and normalises existing statuses (0.819917ms)\n\u2714 keeps the existing ordered policy (0.216084ms)\n\u2714 rejects unknown statuses (0.286167ms)\n\u2139 tests 3\n\u2139 suites 0\n\u2139 pass 3\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 84.425791\n",
+            "output_sha256": "e1daf6447e5ecaaddf4995af18cd495f9f77c36945acca282ea4d0aa14c55b38",
+            "output_tail": "\u2714 parses and normalises existing statuses (1.021167ms)\n\u2714 keeps the existing ordered policy (0.105542ms)\n\u2714 rejects unknown statuses (0.198791ms)\n\u2139 tests 3\n\u2139 suites 0\n\u2139 pass 3\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 85.059292\n",
             "passed": true,
             "returncode": 0
           },
           {
-            "output_bytes": 264,
-            "output_sha256": "4217a29ba56173f1c8bf7b2a3c2aa97fa21330106f2e6d979556dde21dad8efb",
-            "output_tail": "\u2714 parses and normalises existing statuses (1.280042ms)\n\u2714 keeps the existing ordered policy (0.108458ms)\n\u2714 rejects unknown statuses (0.197917ms)\n\u2139 tests 3\n\u2139 suites 0\n\u2139 pass 3\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 108.54025\n",
+            "output_bytes": 262,
+            "output_sha256": "777d4ff01bfc7a687f202cd324002b116da64b2bf313a748a372bf9ff22fe58d",
+            "output_tail": "\u2714 parses and normalises existing statuses (1.575166ms)\n\u2714 keeps the existing ordered policy (0.255792ms)\n\u2714 rejects unknown statuses (0.434459ms)\n\u2139 tests 3\n\u2139 suites 0\n\u2139 pass 3\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 109.667\n",
             "passed": true,
             "returncode": 0
           }
         ]
       }
     },
-    "manifest_sha256": "ed836793f519b46f6a92bf96dd85c5c8567b650bc56716aefe12f83606b81fe8",
-    "reviewed_at": "2026-08-17T08:21:51Z",
+    "manifest_sha256": "2e91a2008baeaba53abde22f1382af1fe2e93be66e2796d634851e373cb9f2a6",
+    "reviewed_at": "2026-08-18T09:19:56Z",
     "reviewer": "albert"
   },
   "artifacts": [
     {
       "path": "ab-symbolect/tasks/ling-cross-file-contract.txt",
-      "sha256": "5d946c052a5a878e2fb4b2f11c0b7f493135e1f9c02cfc7beb4575ac5e6cdfea"
+      "sha256": "79caa2f03624157c674b2b8959dc7f9a7ef44cd4e9678cb0566a0a99a3270b52"
     },
     {
       "path": "real-gate-fixtures/hidden/ling-cross-file-contract.test.js",
@@ -239,24 +239,24 @@
   },
   "prompts": {
     "canonical": {
-      "sha256": "0b544bf0dce20e0842369a6c566ad51a0d42cb468bc806d72e0ca844aef9253e",
-      "text": "Add a `blocked` job status between `queued` and `running`. `STATUS_ORDER` in `src/policy.js` is the single source of truth and must become `queued, blocked, running, done`; `canTransition` must continue to allow only the next status in that order. Remove the duplicate status vocabulary in `src/parse-job.js` so parsing accepts exactly the shared statuses. `parseJob` must still trim and lower-case its input and reject unknown statuses. Existing behavior for the original three statuses must remain intact. Run `npm test` when the coordinated change is complete."
+      "sha256": "9c4623bf06f45872b9b535c8529810c9778c116c86254bd250c428f6aa16506b",
+      "text": "Add a `blocked` job status that sits between `queued` and `running` in the status\nprogression. `src/policy.js` documents `STATUS_ORDER` as the single source of truth for\nstatus ordering, and `canTransition` must continue to allow only a move to the next\nstatus in that order. Make sure job parsing accepts the new status too, without letting\nany status vocabulary drift out of sync with that single source of truth. `parseJob`\nmust still trim and lower-case its input and reject unknown statuses, and existing\nbehaviour for the original three statuses must remain intact. Run `npm test` when the\nchange is complete."
     },
     "perturbations": [
       {
         "id": "equivalent-1",
-        "sha256": "187abc28b5a8bf0a025dd5379cbe0e39f05d2fe1407def53babcc934d63f261f",
-        "text": "Complete the following repository task. Preserve existing behavior and verify the tests.\n\nAdd a `blocked` job status between `queued` and `running`. `STATUS_ORDER` in `src/policy.js` is the single source of truth and must become `queued, blocked, running, done`; `canTransition` must continue to allow only the next status in that order. Remove the duplicate status vocabulary in `src/parse-job.js` so parsing accepts exactly the shared statuses. `parseJob` must still trim and lower-case its input and reject unknown statuses. Existing behavior for the original three statuses must remain intact. Run `npm test` when the coordinated change is complete."
+        "sha256": "ff066e051a969fa7efbf4bf4c62dfed984acb1f4506cab91282109faaf41c59c",
+        "text": "Complete the following repository task. Preserve existing behavior and verify the tests.\n\nAdd a `blocked` job status that sits between `queued` and `running` in the status\nprogression. `src/policy.js` documents `STATUS_ORDER` as the single source of truth for\nstatus ordering, and `canTransition` must continue to allow only a move to the next\nstatus in that order. Make sure job parsing accepts the new status too, without letting\nany status vocabulary drift out of sync with that single source of truth. `parseJob`\nmust still trim and lower-case its input and reject unknown statuses, and existing\nbehaviour for the original three statuses must remain intact. Run `npm test` when the\nchange is complete."
       },
       {
         "id": "equivalent-2",
-        "sha256": "1cbc3b07987215cf3f4ea5ecdf545d4979a8ccfe40c173a31fe490cf3aed6623",
-        "text": "Repository change request:\nAdd a `blocked` job status between `queued` and `running`. `STATUS_ORDER` in `src/policy.js` is the single source of truth and must become `queued, blocked, running, done`; `canTransition` must continue to allow only the next status in that order. Remove the duplicate status vocabulary in `src/parse-job.js` so parsing accepts exactly the shared statuses. `parseJob` must still trim and lower-case its input and reject unknown statuses. Existing behavior for the original three statuses must remain intact. Run `npm test` when the coordinated change is complete.\n\nUse the smallest correct change and confirm the test suite."
+        "sha256": "d62d210cf9ef441073216361ed45eb6a1701312aebb09088b7bd1d65694d061e",
+        "text": "Repository change request:\nAdd a `blocked` job status that sits between `queued` and `running` in the status\nprogression. `src/policy.js` documents `STATUS_ORDER` as the single source of truth for\nstatus ordering, and `canTransition` must continue to allow only a move to the next\nstatus in that order. Make sure job parsing accepts the new status too, without letting\nany status vocabulary drift out of sync with that single source of truth. `parseJob`\nmust still trim and lower-case its input and reject unknown statuses, and existing\nbehaviour for the original three statuses must remain intact. Run `npm test` when the\nchange is complete.\n\nUse the smallest correct change and confirm the test suite."
       },
       {
         "id": "equivalent-3",
-        "sha256": "160f71d6c38808edd4e61f893b19735966eb66fc3d58524e3d11e8e09b48d4b5",
-        "text": "Please solve this task in the supplied checkout, retaining all stated edge cases:\n\nAdd a `blocked` job status between `queued` and `running`. `STATUS_ORDER` in `src/policy.js` is the single source of truth and must become `queued, blocked, running, done`; `canTransition` must continue to allow only the next status in that order. Remove the duplicate status vocabulary in `src/parse-job.js` so parsing accepts exactly the shared statuses. `parseJob` must still trim and lower-case its input and reject unknown statuses. Existing behavior for the original three statuses must remain intact. Run `npm test` when the coordinated change is complete."
+        "sha256": "93278479cc361a4eb6394bce08316a06fc3f7a03fd48b9bdd20614fb90096ad7",
+        "text": "Please solve this task in the supplied checkout, retaining all stated edge cases:\n\nAdd a `blocked` job status that sits between `queued` and `running` in the status\nprogression. `src/policy.js` documents `STATUS_ORDER` as the single source of truth for\nstatus ordering, and `canTransition` must continue to allow only a move to the next\nstatus in that order. Make sure job parsing accepts the new status too, without letting\nany status vocabulary drift out of sync with that single source of truth. `parseJob`\nmust still trim and lower-case its input and reject unknown statuses, and existing\nbehaviour for the original three statuses must remain intact. Run `npm test` when the\nchange is complete."
       }
     ],
     "semantic_group": "ling-cross-file-contract:2026-08.1"
@@ -268,19 +268,19 @@
   "sufficiency": [
     {
       "assertion": "blocked is present in the shared status order",
-      "prompt_evidence": "Add a `blocked` job status between `queued` and `running`. `STATUS_ORDER` in `src/policy.js` is the single source of truth and must become `queued, blocked, running, done`; `canTransition` must continue to allow only the next status in that order. Remove the duplicate status vocabulary in `src/parse-job.js` so parsing accepts exactly the shared statuses. `parseJob` must still trim and lower-case its input and reject unknown statuses. Existing behavior for the original three statuses must remain intact. Run `npm test` when the coordinated change is complete."
+      "prompt_evidence": "Add a `blocked` job status that sits between `queued` and `running` in the status\nprogression. `src/policy.js` documents `STATUS_ORDER` as the single source of truth for\nstatus ordering, and `canTransition` must continue to allow only a move to the next\nstatus in that order. Make sure job parsing accepts the new status too, without letting\nany status vocabulary drift out of sync with that single source of truth. `parseJob`\nmust still trim and lower-case its input and reject unknown statuses, and existing\nbehaviour for the original three statuses must remain intact. Run `npm test` when the\nchange is complete."
     },
     {
       "assertion": "transitions follow the new adjacent order",
-      "prompt_evidence": "Add a `blocked` job status between `queued` and `running`. `STATUS_ORDER` in `src/policy.js` is the single source of truth and must become `queued, blocked, running, done`; `canTransition` must continue to allow only the next status in that order. Remove the duplicate status vocabulary in `src/parse-job.js` so parsing accepts exactly the shared statuses. `parseJob` must still trim and lower-case its input and reject unknown statuses. Existing behavior for the original three statuses must remain intact. Run `npm test` when the coordinated change is complete."
+      "prompt_evidence": "Add a `blocked` job status that sits between `queued` and `running` in the status\nprogression. `src/policy.js` documents `STATUS_ORDER` as the single source of truth for\nstatus ordering, and `canTransition` must continue to allow only a move to the next\nstatus in that order. Make sure job parsing accepts the new status too, without letting\nany status vocabulary drift out of sync with that single source of truth. `parseJob`\nmust still trim and lower-case its input and reject unknown statuses, and existing\nbehaviour for the original three statuses must remain intact. Run `npm test` when the\nchange is complete."
     },
     {
       "assertion": "the parser derives its vocabulary from STATUS_ORDER",
-      "prompt_evidence": "Add a `blocked` job status between `queued` and `running`. `STATUS_ORDER` in `src/policy.js` is the single source of truth and must become `queued, blocked, running, done`; `canTransition` must continue to allow only the next status in that order. Remove the duplicate status vocabulary in `src/parse-job.js` so parsing accepts exactly the shared statuses. `parseJob` must still trim and lower-case its input and reject unknown statuses. Existing behavior for the original three statuses must remain intact. Run `npm test` when the coordinated change is complete."
+      "prompt_evidence": "Add a `blocked` job status that sits between `queued` and `running` in the status\nprogression. `src/policy.js` documents `STATUS_ORDER` as the single source of truth for\nstatus ordering, and `canTransition` must continue to allow only a move to the next\nstatus in that order. Make sure job parsing accepts the new status too, without letting\nany status vocabulary drift out of sync with that single source of truth. `parseJob`\nmust still trim and lower-case its input and reject unknown statuses, and existing\nbehaviour for the original three statuses must remain intact. Run `npm test` when the\nchange is complete."
     },
     {
       "assertion": "the parser still rejects statuses outside the shared order",
-      "prompt_evidence": "Add a `blocked` job status between `queued` and `running`. `STATUS_ORDER` in `src/policy.js` is the single source of truth and must become `queued, blocked, running, done`; `canTransition` must continue to allow only the next status in that order. Remove the duplicate status vocabulary in `src/parse-job.js` so parsing accepts exactly the shared statuses. `parseJob` must still trim and lower-case its input and reject unknown statuses. Existing behavior for the original three statuses must remain intact. Run `npm test` when the coordinated change is complete."
+      "prompt_evidence": "Add a `blocked` job status that sits between `queued` and `running` in the status\nprogression. `src/policy.js` documents `STATUS_ORDER` as the single source of truth for\nstatus ordering, and `canTransition` must continue to allow only a move to the next\nstatus in that order. Make sure job parsing accepts the new status too, without letting\nany status vocabulary drift out of sync with that single source of truth. `parseJob`\nmust still trim and lower-case its input and reject unknown statuses, and existing\nbehaviour for the original three statuses must remain intact. Run `npm test` when the\nchange is complete."
     }
   ],
   "task_id": "ling-cross-file-contract",
@@ -309,8 +309,8 @@
     }
   },
   "timestamps": {
-    "admitted_at": "2026-08-17T08:21:51Z",
+    "admitted_at": "2026-08-18T09:19:56Z",
     "created_at": "2026-08-13T00:00:00Z",
-    "expires_at": "2026-11-15T08:21:51Z"
+    "expires_at": "2026-11-16T09:19:56Z"
   }
 }
