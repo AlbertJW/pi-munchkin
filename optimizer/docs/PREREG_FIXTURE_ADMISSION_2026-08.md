@@ -61,8 +61,14 @@ studies. Conflating these two was the scope error this document corrects.
   the 4B is a 4B instrument; "tier-general" is a separately earned label requiring
   independent admission on a second tier.
 - Rows straddling a surface-hash boundary, a schema generation, or a serving-identity
-  change never pool (standing doctrine; `row_contract.canonical_generation` enforces
-  the schema part mechanically).
+  change never pool (standing doctrine). `row_contract.canonical_generation` enforces the
+  schema part mechanically in the adoption/verdict readers wired to it (`fleet_report`,
+  `fleet_verdict`, `propose`); the powered study path is stronger still, pinning v3-only via
+  `validate_powered_row(require_complete=True)` plus a single serving-contract check
+  (`failure_episode_trial`). `effort_report`/`span_screen`/`munchkin` read a single per-round
+  generation file and enforce their own per-row schema + single-serving-contract guards rather
+  than calling `canonical_generation` — the no-pool guarantee holds by construction there, not
+  by that one function universally.
 - The verdict vocabulary: **ADMITTED** (all core criteria), **SATURATED**
   (mean > 0.80), **FLOORED** (mean < 0.20), **DEGENERATE** (band met, variance floor
   failed), **UNMEASURABLE** (A1 failed). Floored and degenerate fixtures get a

@@ -140,10 +140,16 @@ operator measuring local models on their own repositories; a 4B does not forge J
 transcripts to inflate its usage numbers. The exposure is bounded structurally:
 `real_gate.sh` ANDs `trajectory_check` only when `gate==1` (the `TRAJECTORY=on && gate==1`
 line; :774 as of 2026-08-05 — cite the pattern, line numbers drift), so trajectory forgery can
-downgrade a pass but can never turn a failing hidden grader into a pass — the gate bit itself
-comes from hidden tests re-run by the harness *after* the session ends, outside the child.
-The `trajectory_check.py` docstrings that used to state the pairing was mechanically enforced
-have been corrected (2026-07-30) so the guarantee is no longer folklore.
+downgrade a pass but can never turn a failing hidden grader into a pass by trajectory
+manipulation — the gate bit comes from the pristine hidden tests the harness reinstalls and
+re-runs *after* the session ends. Precision (2026-08-18): "outside the child" overstated it —
+the re-run still imports model-authored `src/` in-process, so `process.exit(0)`/`node:assert`
+monkeypatching during the re-run can subvert the binary gate too, exactly as the graded
+reporter path documents below (§"Graded subscores"). What the reinstall closes is *file*
+tampering of the grader (the model's edited test files are overwritten); it does not sandbox
+the grading process. Full isolation (unprivileged agent, root-only verifier) remains the
+deferred hardening. The `trajectory_check.py` docstrings that used to state the pairing was
+mechanically enforced were corrected (2026-07-30) so the guarantee is no longer folklore.
 
 **Becomes a prerequisite, not an option, if**: this harness ever measures untrusted or
 frontier models whose incentives include gaming their own evaluation, or runs multi-user.

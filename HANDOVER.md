@@ -37,9 +37,11 @@ adoption, deletion, live mirroring, and gate rounds are human-gated. Never touch
 > **DONE:** codex ling branch merged, whole reboot merged to main + pushed; **Phase 1
 > coherence adoption APPLIED + mirrored live** (`ACTIVE_TOOL_PROMPTS=derived`,
 > `CONTROL_ARBITER=enforce`; mirror:apply 110/110 zero drift, mirror:check 110/110, 35B
-> live-load smoke clean, boundary row 2026-08-15 loaded hash `358c1f7c…` — future gate
-> rounds bind this). A 2.75-day wedged bare `pi` on ttys004 (stdin-wedge orphan) was cleared
-> before the mirror.
+> live-load smoke clean, boundary row 2026-08-15 loaded hash `358c1f7c…`). A 2.75-day wedged
+> bare `pi` on ttys004 (stdin-wedge orphan) was cleared before the mirror. **SUPERSEDED
+> 2026-08-17 by the deep-hardening rollout — the live surface is now `2991c42b…` (see the
+> 2026-08-17 row in `docs/SURFACE_BOUNDARIES.md`); future gate rounds bind `2991c42b…`, not
+> `358c1f7c…`.**
 >
 > **GATES DONE 2026-08-15:** all seven cohort fixtures APPROVED (`reviewer albert`, expiry
 > 2026-11-15, all `authoritative()==True`); charter + prereg accepted. **STILL PENDING (Albert):**
