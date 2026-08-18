@@ -23,6 +23,15 @@ candidates as dark). Net changes since 0.3.0; the full per-decision record is
 
 ### Added
 
+- **Admitted case pin for reporter grading (2026-08-18).** `tests.fail_to_pass.expected_cases`
+  records the exact gold-run TAP case names, hashed into the approved manifest;
+  `grade_reporter` refuses any observed set that differs. Closes a mid-run `process.exit`
+  truncation that forged a 100% graded_rate (the previous collapse-shape guard only caught the
+  import-time variant). 36 fixtures pinned, derived from real gold runs. The credential scanner
+  is now a `verify` stage rather than manual-only, and `approve --expires-at` lets a mechanical
+  re-approval preserve the original 90-day review clock.
+
+
 - **Measurement reboot (2026-08-15):** the optimizer is unmothballed under
   `optimizer/docs/UNMOTHBALL_2026-08.md` (charter) + `PREREG_FIXTURE_ADMISSION_2026-08.md`
   (ONE admission rule: graded_rate mean in [0.20,0.80], SD >= 0.15, coverage >= 5/6, n=6

@@ -34,6 +34,43 @@ stacked work. Nothing in this series has been merged, mirrored live, adopted, or
 
 ## 2026-08 hardening series
 
+> **2026-08-18 SECOND DEEP-INSPECTION ROUND — on `main` (`f4af650`), NOT yet mirrored.**
+> Five adversarial reviewers over: my own first-round fixes, the F-01..F-12 hardening's
+> completeness, the model-visible harness, the measurement statistics (cross-checked against
+> scipy), and whole-repo provenance/secrets. Core verdict: the statistics are correct, the
+> HMAC/serving-fingerprint provenance is forgery-resistant, the enforce-arbiter /
+> failure-episode / session-identity logic is sound, F-06/F-09/F-12 are complete, and all 412
+> commits + 2626 blobs are secret-clean. Sixteen findings fixed:
+> - **The graded-score forgery is properly closed.** My first-round collapse-shape guard only
+>   caught an IMPORT-TIME `process.exit`; after a hidden suite yields (e.g. `await import`), a
+>   mid-run exit truncates TAP to its passing prefix with a self-consistent plan, which scored
+>   at face value. Now every reporter-graded fixture carries an **admitted case pin**
+>   (`tests.fail_to_pass.expected_cases`, derived from a real gold TAP run, hashed into the
+>   approved manifest); `grade_reporter` refuses any differing observed set — truncation,
+>   rename, skip, or injected test. 36 fixtures pinned. This generalises the v3 `coverage_map`
+>   contract to the whole corpus.
+> - **`verification_plateau` enum drift** (latent until `VERIFICATION_PLATEAU=enforce` ships):
+>   the reason was absent from `run-kernel-state`'s validator, so a plateau decision would have
+>   silently stopped capsule persistence and voided the round. Fixed + a parity test proven by
+>   counterfactual.
+> - **The secret scanner is now a `verify` stage** (it was manual-only, in neither verify nor
+>   CI, on a public repo). Plus tamper-detector gaps (`-t` destinations, header-driven `patch`),
+>   `shadow_report` shares that could exceed 1.0, `effort_report` non-pooling, the
+>   over-broad edit-header regex, F-05 `O_NONBLOCK`, F-04 rotated-file mode, F-03 private
+>   mkdir, the admission bool guard, the v4 schema root, `.gitignore`, and doc drift.
+>
+> **Approval bookkeeping:** 24 approved before, 24 after — none lost, none gained, and every
+> review clock PRESERVED (`approve --expires-at`) rather than reset by a mechanical
+> re-approval. `qs-error-swallow` (never approved; its gold does not satisfy its own hidden
+> suite) and `path-near-miss` (regenerated shortcut breaks the visible suite) were restored to
+> HEAD rather than shipped changed — both need separate attention.
+>
+> **PENDING:** the harness libs changed, so the model-visible surface moved to source
+> `56993e93…`; the LIVE MIRROR + boundary row + live smoke are deferred (a `pi` was running on
+> ttys006). Run `npm run mirror:apply && npm run mirror:check`, record the loaded hash in
+> `docs/SURFACE_BOUNDARIES.md`, then smoke. `npm run verify`: all 6 stages green.
+
+
 > **2026-08-15 MEASUREMENT REBOOT — MERGED to `main` (`5746195`), MIRRORED LIVE.** The
 > optimizer is unmothballed: charter `optimizer/docs/UNMOTHBALL_2026-08.md`, ONE
 > preregistered admission rule (`PREREG_FIXTURE_ADMISSION_2026-08.md` + `admission_rule.py`),
