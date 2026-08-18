@@ -1,4 +1,4 @@
-import { mkdir, open, rename, stat } from "node:fs/promises";
+import { chmod, mkdir, open, rename, stat } from "node:fs/promises";
 import { dirname } from "node:path";
 
 type WriterState = {
@@ -38,7 +38,10 @@ async function appendPrivate(file: string, text: string, maxFileBytes: number): 
 	await mkdir(directory, { recursive: true, mode: 0o700 });
 	try {
 		if ((await stat(file)).size + Buffer.byteLength(text, "utf8") > maxFileBytes) {
-			try { await rename(file, `${file}.old`); } catch { /* best-effort single generation */ }
+			// chmod the rotated generation exactly as the synchronous writer does
+			// (telemetry.ts): an externally-planted world-readable live file would
+			// otherwise keep those bits after rotation.
+			try { await rename(file, `${file}.old`); await chmod(`${file}.old`, 0o600); } catch { /* best-effort single generation */ }
 		}
 	} catch { /* file absent */ }
 	const handle = await open(file, "a", 0o600);

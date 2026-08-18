@@ -221,12 +221,22 @@ def analyse(rows, surface=None, population_source=None):
     # Count SESSIONS per dimension, not rows: a session that disagrees five times
     # on one dimension is one disagreeing session, and rows/sessions produced a
     # "share" above 1.0 the first time this ran against real data.
+    # The numerator must be a SUBSET of the denominator. Counting a session that
+    # disagreed but recorded no kernel receipt against the receipt-bearing
+    # denominator produced shares above 1.0 (2026-08-18): a disagreement is not
+    # evidence that the kernel was observing. Such sessions are excluded from the
+    # rate and counted separately so they can never be silently dropped either.
     dimensions = collections.Counter()
     dimension_rows = collections.Counter()
     sessions_with_disagreement = 0
+    disagreements_without_receipt = 0
     for session in sessions.values():
-        if session["disagreements"]:
-            sessions_with_disagreement += 1
+        if not session["disagreements"]:
+            continue
+        if session["kernel_receipts"] <= 0:
+            disagreements_without_receipt += 1
+            continue
+        sessions_with_disagreement += 1
         for dimension, count in session["disagreements"].items():
             dimensions[dimension] += 1
             dimension_rows[dimension] += count
@@ -254,6 +264,7 @@ def analyse(rows, surface=None, population_source=None):
         "sessions_with_kernel_receipts": observed,
         "q1_kernel_agreement": {
             "sessions_with_any_disagreement": sessions_with_disagreement,
+            "disagreements_without_kernel_receipt": disagreements_without_receipt,
             "share": round(sessions_with_disagreement / denominator, 3),
             "per_dimension": per_dimension,
             "dimensions_over_threshold": hot,

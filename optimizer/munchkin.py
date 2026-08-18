@@ -250,6 +250,12 @@ def _authoritative_gate_env(source=None, *, platform_name=None, sandbox_exec=Non
     return env
 
 def _validated_canonical_val_rows(rows, tasks, n):
+    # Mixed schema generations are never a valid population (row_contract raises);
+    # the other consumers all enforce this and munchkin diverged (2026-08-18).
+    # Lazy import with the LAB path, matching this module's convention.
+    sys.path.insert(0, LAB)
+    from row_contract import canonical_generation
+    canonical_generation(rows)
     """Return the exact authoritative, complete canonical val surface or fail closed."""
     expected = {(task, rep) for task in tasks for rep in range(1, n + 1)}
     found = {}

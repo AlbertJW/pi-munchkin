@@ -7,5 +7,5 @@
 -	return s + ' '.repeat(width - s.length);
 +	return ' '.repeat(width - s.length) + s;
  }
- 
+
  export function alignRight(s, width) {

@@ -7,42 +7,55 @@
       "76aec3e77c8f7bd1c2f291223526f0d304c6dd460313e7d6a19c2c491bc371c8"
     ],
     "automated": {
-      "checked_at": "2026-08-11T14:11:47Z",
+      "checked_at": "2026-08-18T14:00:33Z",
       "hash_drift": [],
       "manifest_drift": false,
+      "overlay_lint": [],
       "passed": true,
       "runs_per_state": 3,
       "states": {
         "gold_fail_to_pass": [
           {
-            "output_tail": "",
+            "output_bytes": 500,
+            "output_sha256": "bfdcf6c0cc4f3e4fec6740863090dd588dd09ff5579e76c668927ed73febac52",
+            "output_tail": "\u2714 ledger entries with separators and currency symbols are read (1.107084ms)\n\u2714 parenthesised ledger amounts are negative (0.084208ms)\n\u2714 a mixed report totals both dialects together (0.112292ms)\n\u2714 the strict parser stayed strict (0.128209ms)\n\u2714 a strict entry is not rescued by the ledger dialect (0.07275ms)\n\u2714 unreadable ledger data throws instead of becoming zero (0.05425ms)\n\u2139 tests 6\n\u2139 suites 0\n\u2139 pass 6\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 60.28975\n",
             "passed": true,
             "returncode": 0
           },
           {
-            "output_tail": "",
+            "output_bytes": 502,
+            "output_sha256": "cd5a214a78ab1f91ce487f3dae05bf66278bae49f3167c39766946c8fde3e829",
+            "output_tail": "\u2714 ledger entries with separators and currency symbols are read (1.161084ms)\n\u2714 parenthesised ledger amounts are negative (0.09025ms)\n\u2714 a mixed report totals both dialects together (0.128375ms)\n\u2714 the strict parser stayed strict (0.137708ms)\n\u2714 a strict entry is not rescued by the ledger dialect (0.081583ms)\n\u2714 unreadable ledger data throws instead of becoming zero (0.053583ms)\n\u2139 tests 6\n\u2139 suites 0\n\u2139 pass 6\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 62.430916\n",
             "passed": true,
             "returncode": 0
           },
           {
-            "output_tail": "",
+            "output_bytes": 502,
+            "output_sha256": "e29b9c9115bc3757238d85150909ba7c74c0be32815857fe5e57e4b4721c687e",
+            "output_tail": "\u2714 ledger entries with separators and currency symbols are read (1.242959ms)\n\u2714 parenthesised ledger amounts are negative (0.097791ms)\n\u2714 a mixed report totals both dialects together (0.127458ms)\n\u2714 the strict parser stayed strict (0.139583ms)\n\u2714 a strict entry is not rescued by the ledger dialect (0.077916ms)\n\u2714 unreadable ledger data throws instead of becoming zero (0.054583ms)\n\u2139 tests 6\n\u2139 suites 0\n\u2139 pass 6\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 64.54775\n",
             "passed": true,
             "returncode": 0
           }
         ],
         "gold_pass_to_pass": [
           {
-            "output_tail": "",
+            "output_bytes": 533,
+            "output_sha256": "132945aa5071120e62e79bb6c3ddc9d869b80ae1c7cd263551be33c1483e1ccf",
+            "output_tail": "\u2714 parseAmount reads plain decimal strings as cents (0.475667ms)\n\u2714 parseAmount rejects values that are not amounts at all (0.168584ms)\n\u2714 formatCents renders cents back to a decimal string (0.071666ms)\n\u2714 buildReport totals plain entries and formats one line each (0.375166ms)\n\u2714 buildReport still honours an explicit strict source (0.072542ms)\n\u2714 buildReport returns an empty report for no entries (0.060583ms)\n\u2139 tests 6\n\u2139 suites 0\n\u2139 pass 6\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 66.989959\n",
             "passed": true,
             "returncode": 0
           },
           {
-            "output_tail": "",
+            "output_bytes": 533,
+            "output_sha256": "365d53b4e3bfc64343fe05aeede9204f734370d9978536830f9a6e5bffbf670b",
+            "output_tail": "\u2714 parseAmount reads plain decimal strings as cents (0.491541ms)\n\u2714 parseAmount rejects values that are not amounts at all (0.170875ms)\n\u2714 formatCents renders cents back to a decimal string (0.072875ms)\n\u2714 buildReport totals plain entries and formats one line each (0.413209ms)\n\u2714 buildReport still honours an explicit strict source (0.084417ms)\n\u2714 buildReport returns an empty report for no entries (0.066875ms)\n\u2139 tests 6\n\u2139 suites 0\n\u2139 pass 6\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 80.058584\n",
             "passed": true,
             "returncode": 0
           },
           {
-            "output_tail": "",
+            "output_bytes": 532,
+            "output_sha256": "33e269e94cb92226ec61becbe31c93e411027b966ebfd81ff5aed67b4afeb871",
+            "output_tail": "\u2714 parseAmount reads plain decimal strings as cents (0.510167ms)\n\u2714 parseAmount rejects values that are not amounts at all (0.160042ms)\n\u2714 formatCents renders cents back to a decimal string (0.067666ms)\n\u2714 buildReport totals plain entries and formats one line each (0.402125ms)\n\u2714 buildReport still honours an explicit strict source (0.095208ms)\n\u2714 buildReport returns an empty report for no entries (0.07475ms)\n\u2139 tests 6\n\u2139 suites 0\n\u2139 pass 6\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 69.661084\n",
             "passed": true,
             "returncode": 0
           }
@@ -50,34 +63,46 @@
         "mutant:shortcut": {
           "fail_to_pass": [
             {
-              "output_tail": "ape-7djmfsxg/work/test/fail-to-pass.test.js:50:10)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n      at Test.postRun (node:internal/test_runner/test:1522:19)\n      at Test.run (node:internal/test_runner/test:1447:12)\n      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7) {\n    generatedMessage: false,\n    code: 'ERR_ASSERTION',\n    actual: undefined,\n    expected: undefined,\n    operator: 'throws',\n    diff: 'simple'\n  }\n",
+              "output_bytes": 4545,
+              "output_sha256": "a919cfcd3e4ed1fc4d1bb83988afd691092c3623ea87a3d63c157e1296e08322",
+              "output_tail": "ernal/test_runner/test:960:7) {\n    generatedMessage: true,\n    code: 'ERR_ASSERTION',\n    actual: [ 'M1: 10.00', 'M2: 2000.00', 'M3: 5.25', 'M4: -1.00' ],\n    expected: [ 'M1: 10.00', 'M2: -2000.00', 'M3: 5.25', 'M4: -1.00' ],\n    operator: 'deepStrictEqual',\n    diff: 'simple'\n  }\n\ntest at test/fail-to-pass.test.js:42:1\n\u2716 the strict parser stayed strict (0.127625ms)\n  AssertionError [ERR_ASSERTION]: Missing expected exception.\n      at TestContext.<anonymous> (file://<path>:43:10)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n      at Test.postRun (node:internal/test_runner/test:1522:19)\n      at Test.run (node:internal/test_runner/test:1447:12)\n      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7) {\n    generatedMessage: false,\n    code: 'ERR_ASSERTION',\n    actual: undefined,\n    expected: undefined,\n    operator: 'throws',\n    diff: 'simple'\n  }\n\ntest at test/fail-to-pass.test.js:49:1\n\u2716 a strict entry is not rescued by the ledger dialect (0.072083ms)\n  AssertionError [ERR_ASSERTION]: Missing expected exception.\n      at TestContext.<anonymous> (file://<path>:50:10)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n      at Test.postRun (node:internal/test_runner/test:1522:19)\n      at Test.run (node:internal/test_runner/test:1447:12)\n      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7) {\n    generatedMessage: false,\n    code: 'ERR_ASSERTION',\n    actual: undefined,\n    expected: undefined,\n    operator: 'throws',\n    diff: 'simple'\n  }\n",
               "passed": false,
               "returncode": 1
             },
             {
-              "output_tail": "ape-bjs54lnp/work/test/fail-to-pass.test.js:50:10)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n      at Test.postRun (node:internal/test_runner/test:1522:19)\n      at Test.run (node:internal/test_runner/test:1447:12)\n      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7) {\n    generatedMessage: false,\n    code: 'ERR_ASSERTION',\n    actual: undefined,\n    expected: undefined,\n    operator: 'throws',\n    diff: 'simple'\n  }\n",
+              "output_bytes": 4546,
+              "output_sha256": "a62c6742142e803bf5a72b3c0cb2edf0b3d4d837c4839064287af8f8b0948970",
+              "output_tail": "ernal/test_runner/test:960:7) {\n    generatedMessage: true,\n    code: 'ERR_ASSERTION',\n    actual: [ 'M1: 10.00', 'M2: 2000.00', 'M3: 5.25', 'M4: -1.00' ],\n    expected: [ 'M1: 10.00', 'M2: -2000.00', 'M3: 5.25', 'M4: -1.00' ],\n    operator: 'deepStrictEqual',\n    diff: 'simple'\n  }\n\ntest at test/fail-to-pass.test.js:42:1\n\u2716 the strict parser stayed strict (0.137584ms)\n  AssertionError [ERR_ASSERTION]: Missing expected exception.\n      at TestContext.<anonymous> (file://<path>:43:10)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n      at Test.postRun (node:internal/test_runner/test:1522:19)\n      at Test.run (node:internal/test_runner/test:1447:12)\n      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7) {\n    generatedMessage: false,\n    code: 'ERR_ASSERTION',\n    actual: undefined,\n    expected: undefined,\n    operator: 'throws',\n    diff: 'simple'\n  }\n\ntest at test/fail-to-pass.test.js:49:1\n\u2716 a strict entry is not rescued by the ledger dialect (0.077542ms)\n  AssertionError [ERR_ASSERTION]: Missing expected exception.\n      at TestContext.<anonymous> (file://<path>:50:10)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n      at Test.postRun (node:internal/test_runner/test:1522:19)\n      at Test.run (node:internal/test_runner/test:1447:12)\n      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7) {\n    generatedMessage: false,\n    code: 'ERR_ASSERTION',\n    actual: undefined,\n    expected: undefined,\n    operator: 'throws',\n    diff: 'simple'\n  }\n",
               "passed": false,
               "returncode": 1
             },
             {
-              "output_tail": "ape-vc_o01x3/work/test/fail-to-pass.test.js:50:10)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n      at Test.postRun (node:internal/test_runner/test:1522:19)\n      at Test.run (node:internal/test_runner/test:1447:12)\n      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7) {\n    generatedMessage: false,\n    code: 'ERR_ASSERTION',\n    actual: undefined,\n    expected: undefined,\n    operator: 'throws',\n    diff: 'simple'\n  }\n",
+              "output_bytes": 4546,
+              "output_sha256": "1d55f02e5b699a678a843a2efa811059e2dae3f3e23ff56565e5afc5a24f1458",
+              "output_tail": "ernal/test_runner/test:960:7) {\n    generatedMessage: true,\n    code: 'ERR_ASSERTION',\n    actual: [ 'M1: 10.00', 'M2: 2000.00', 'M3: 5.25', 'M4: -1.00' ],\n    expected: [ 'M1: 10.00', 'M2: -2000.00', 'M3: 5.25', 'M4: -1.00' ],\n    operator: 'deepStrictEqual',\n    diff: 'simple'\n  }\n\ntest at test/fail-to-pass.test.js:42:1\n\u2716 the strict parser stayed strict (0.127708ms)\n  AssertionError [ERR_ASSERTION]: Missing expected exception.\n      at TestContext.<anonymous> (file://<path>:43:10)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n      at Test.postRun (node:internal/test_runner/test:1522:19)\n      at Test.run (node:internal/test_runner/test:1447:12)\n      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7) {\n    generatedMessage: false,\n    code: 'ERR_ASSERTION',\n    actual: undefined,\n    expected: undefined,\n    operator: 'throws',\n    diff: 'simple'\n  }\n\ntest at test/fail-to-pass.test.js:49:1\n\u2716 a strict entry is not rescued by the ledger dialect (0.074792ms)\n  AssertionError [ERR_ASSERTION]: Missing expected exception.\n      at TestContext.<anonymous> (file://<path>:50:10)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n      at Test.postRun (node:internal/test_runner/test:1522:19)\n      at Test.run (node:internal/test_runner/test:1447:12)\n      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7) {\n    generatedMessage: false,\n    code: 'ERR_ASSERTION',\n    actual: undefined,\n    expected: undefined,\n    operator: 'throws',\n    diff: 'simple'\n  }\n",
               "passed": false,
               "returncode": 1
             }
           ],
           "pass_to_pass": [
             {
-              "output_tail": "",
+              "output_bytes": 532,
+              "output_sha256": "7fdd211540742caefcac04cbd0fc316d0a2a68beb04eb9b0acc041e2b920747c",
+              "output_tail": "\u2714 parseAmount reads plain decimal strings as cents (0.485625ms)\n\u2714 parseAmount rejects values that are not amounts at all (0.431167ms)\n\u2714 formatCents renders cents back to a decimal string (0.067083ms)\n\u2714 buildReport totals plain entries and formats one line each (0.35775ms)\n\u2714 buildReport still honours an explicit strict source (0.063666ms)\n\u2714 buildReport returns an empty report for no entries (0.058834ms)\n\u2139 tests 6\n\u2139 suites 0\n\u2139 pass 6\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 72.646459\n",
               "passed": true,
               "returncode": 0
             },
             {
-              "output_tail": "",
+              "output_bytes": 533,
+              "output_sha256": "d7bc22dac4e89aedabfc4956c6e6bf5bf58ef7c18f5f481d307cc6df9c422971",
+              "output_tail": "\u2714 parseAmount reads plain decimal strings as cents (0.489959ms)\n\u2714 parseAmount rejects values that are not amounts at all (0.489459ms)\n\u2714 formatCents renders cents back to a decimal string (0.109542ms)\n\u2714 buildReport totals plain entries and formats one line each (0.388167ms)\n\u2714 buildReport still honours an explicit strict source (0.066709ms)\n\u2714 buildReport returns an empty report for no entries (0.062208ms)\n\u2139 tests 6\n\u2139 suites 0\n\u2139 pass 6\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 70.184542\n",
               "passed": true,
               "returncode": 0
             },
             {
-              "output_tail": "",
+              "output_bytes": 532,
+              "output_sha256": "00079f1c6531a039ef11d8c4f0a4bd7cd4f8f8c1ae8b1845deadb3aa192becf4",
+              "output_tail": "\u2714 parseAmount reads plain decimal strings as cents (0.48425ms)\n\u2714 parseAmount rejects values that are not amounts at all (0.438916ms)\n\u2714 formatCents renders cents back to a decimal string (0.070708ms)\n\u2714 buildReport totals plain entries and formats one line each (0.357375ms)\n\u2714 buildReport still honours an explicit strict source (0.065417ms)\n\u2714 buildReport returns an empty report for no entries (0.059167ms)\n\u2139 tests 6\n\u2139 suites 0\n\u2139 pass 6\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 62.696584\n",
               "passed": true,
               "returncode": 0
             }
@@ -85,42 +110,54 @@
         },
         "pristine_fail_to_pass": [
           {
-            "output_tail": "_fapq8/work/src/report.js:9:19)\n      at TestContext.<anonymous> (file:///private/var/folders/3r/nc7qhtpn56j7rt5nwg0rqw600000gn/T/pi-admit-documented-escape-cr_fapq8/work/test/fail-to-pass.test.js:27:18)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n      at Test.postRun (node:internal/test_runner/test:1522:19)\n      at Test.run (node:internal/test_runner/test:1447:12)\n      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7)\n",
+            "output_bytes": 3631,
+            "output_sha256": "1887a3a54c8e8ddf6544b5a8c2876792d8e5429d69ff851e96087d6988be1a5f",
+            "output_tail": "rseAmount: unsupported amount format \"(89.99)\" - this parser is strict on purpose, see docs/AMOUNTS.md\n      at parseAmount (file://<path>:11:11)\n      at buildReport (file://<path>:9:19)\n      at TestContext.<anonymous> (file://<path>:17:18)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n      at Test.postRun (node:internal/test_runner/test:1522:19)\n      at Test.run (node:internal/test_runner/test:1447:12)\n      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3)\n\ntest at test/fail-to-pass.test.js:26:1\n\u2716 a mixed report totals both dialects together (0.367458ms)\n  Error: parseAmount: unsupported amount format \"(2,000.00)\" - this parser is strict on purpose, see docs/AMOUNTS.md\n      at parseAmount (file://<path>:11:11)\n      at buildReport (file://<path>:9:19)\n      at TestContext.<anonymous> (file://<path>:27:18)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n      at Test.postRun (node:internal/test_runner/test:1522:19)\n      at Test.run (node:internal/test_runner/test:1447:12)\n      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7)\n",
             "passed": false,
             "returncode": 1
           },
           {
-            "output_tail": "enkrt7/work/src/report.js:9:19)\n      at TestContext.<anonymous> (file:///private/var/folders/3r/nc7qhtpn56j7rt5nwg0rqw600000gn/T/pi-admit-documented-escape-l3enkrt7/work/test/fail-to-pass.test.js:27:18)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n      at Test.postRun (node:internal/test_runner/test:1522:19)\n      at Test.run (node:internal/test_runner/test:1447:12)\n      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7)\n",
+            "output_bytes": 3631,
+            "output_sha256": "bba04bef0f9e8e238df0fb41ee08809ed0e0c7680815de02a2f7f26c3e60628d",
+            "output_tail": "rseAmount: unsupported amount format \"(89.99)\" - this parser is strict on purpose, see docs/AMOUNTS.md\n      at parseAmount (file://<path>:11:11)\n      at buildReport (file://<path>:9:19)\n      at TestContext.<anonymous> (file://<path>:17:18)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n      at Test.postRun (node:internal/test_runner/test:1522:19)\n      at Test.run (node:internal/test_runner/test:1447:12)\n      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3)\n\ntest at test/fail-to-pass.test.js:26:1\n\u2716 a mixed report totals both dialects together (0.397834ms)\n  Error: parseAmount: unsupported amount format \"(2,000.00)\" - this parser is strict on purpose, see docs/AMOUNTS.md\n      at parseAmount (file://<path>:11:11)\n      at buildReport (file://<path>:9:19)\n      at TestContext.<anonymous> (file://<path>:27:18)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n      at Test.postRun (node:internal/test_runner/test:1522:19)\n      at Test.run (node:internal/test_runner/test:1447:12)\n      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7)\n",
             "passed": false,
             "returncode": 1
           },
           {
-            "output_tail": "nb6cvb/work/src/report.js:9:19)\n      at TestContext.<anonymous> (file:///private/var/folders/3r/nc7qhtpn56j7rt5nwg0rqw600000gn/T/pi-admit-documented-escape-jonb6cvb/work/test/fail-to-pass.test.js:27:18)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n      at Test.postRun (node:internal/test_runner/test:1522:19)\n      at Test.run (node:internal/test_runner/test:1447:12)\n      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7)\n",
+            "output_bytes": 3628,
+            "output_sha256": "7d97349ec17cb967e362d0751205ec4ae5ad8ca7fda71b5c47804c0e4c1104ae",
+            "output_tail": "parseAmount: unsupported amount format \"(89.99)\" - this parser is strict on purpose, see docs/AMOUNTS.md\n      at parseAmount (file://<path>:11:11)\n      at buildReport (file://<path>:9:19)\n      at TestContext.<anonymous> (file://<path>:17:18)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n      at Test.postRun (node:internal/test_runner/test:1522:19)\n      at Test.run (node:internal/test_runner/test:1447:12)\n      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3)\n\ntest at test/fail-to-pass.test.js:26:1\n\u2716 a mixed report totals both dialects together (0.3815ms)\n  Error: parseAmount: unsupported amount format \"(2,000.00)\" - this parser is strict on purpose, see docs/AMOUNTS.md\n      at parseAmount (file://<path>:11:11)\n      at buildReport (file://<path>:9:19)\n      at TestContext.<anonymous> (file://<path>:27:18)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n      at Test.postRun (node:internal/test_runner/test:1522:19)\n      at Test.run (node:internal/test_runner/test:1447:12)\n      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7)\n",
             "passed": false,
             "returncode": 1
           }
         ],
         "pristine_pass_to_pass": [
           {
-            "output_tail": "",
+            "output_bytes": 533,
+            "output_sha256": "9c220eb6ebd602e3d376de8c8de3fab04de010ee0e9913f5b64a8443cffab0b4",
+            "output_tail": "\u2714 parseAmount reads plain decimal strings as cents (0.493958ms)\n\u2714 parseAmount rejects values that are not amounts at all (0.651417ms)\n\u2714 formatCents renders cents back to a decimal string (0.076584ms)\n\u2714 buildReport totals plain entries and formats one line each (0.381291ms)\n\u2714 buildReport still honours an explicit strict source (0.062625ms)\n\u2714 buildReport returns an empty report for no entries (0.059291ms)\n\u2139 tests 6\n\u2139 suites 0\n\u2139 pass 6\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 69.562708\n",
             "passed": true,
             "returncode": 0
           },
           {
-            "output_tail": "",
+            "output_bytes": 531,
+            "output_sha256": "65637410e8ef839052e4f3c017c45ed0ca58d9a3f1bc37687688689a552a1aa9",
+            "output_tail": "\u2714 parseAmount reads plain decimal strings as cents (0.445667ms)\n\u2714 parseAmount rejects values that are not amounts at all (0.48975ms)\n\u2714 formatCents renders cents back to a decimal string (0.109292ms)\n\u2714 buildReport totals plain entries and formats one line each (0.397958ms)\n\u2714 buildReport still honours an explicit strict source (0.069625ms)\n\u2714 buildReport returns an empty report for no entries (0.06275ms)\n\u2139 tests 6\n\u2139 suites 0\n\u2139 pass 6\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 62.805166\n",
             "passed": true,
             "returncode": 0
           },
           {
-            "output_tail": "",
+            "output_bytes": 531,
+            "output_sha256": "f630b32709810e3c895255be6594e396a4b121367c3eba5fa48fd37cbb63f920",
+            "output_tail": "\u2714 parseAmount reads plain decimal strings as cents (0.467625ms)\n\u2714 parseAmount rejects values that are not amounts at all (0.5265ms)\n\u2714 formatCents renders cents back to a decimal string (0.071333ms)\n\u2714 buildReport totals plain entries and formats one line each (0.360333ms)\n\u2714 buildReport still honours an explicit strict source (0.061334ms)\n\u2714 buildReport returns an empty report for no entries (0.059333ms)\n\u2139 tests 6\n\u2139 suites 0\n\u2139 pass 6\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 59.166833\n",
             "passed": true,
             "returncode": 0
           }
         ]
       }
     },
-    "manifest_sha256": "ffc443883902be0ecbfb4dfc36e2eb6ee363c18974abba903c71fcc9602ae20c",
-    "reviewed_at": "2026-08-11T20:44:51Z",
+    "manifest_sha256": "16cea5264eadbd1bc712f7c1db4dd45da3f8c3c1e517a2e8a32c7ac258deac09",
+    "reviewed_at": "2026-08-18T14:02:32Z",
     "reviewer": "Albert Wessels (chat approval 2026-08-11)"
   },
   "artifacts": [
@@ -239,6 +276,14 @@
         "--test",
         "test/fail-to-pass.test.js"
       ],
+      "expected_cases": [
+        "a mixed report totals both dialects together",
+        "a strict entry is not rescued by the ledger dialect",
+        "ledger entries with separators and currency symbols are read",
+        "parenthesised ledger amounts are negative",
+        "the strict parser stayed strict",
+        "unreadable ledger data throws instead of becoming zero"
+      ],
       "overlays": [
         {
           "dest": "test/fail-to-pass.test.js",
@@ -257,7 +302,7 @@
     }
   },
   "timestamps": {
-    "admitted_at": "2026-08-11T20:44:51Z",
+    "admitted_at": "2026-08-18T14:02:32Z",
     "created_at": "2026-08-11T00:00:00Z",
     "expires_at": "2026-11-09T20:44:51Z"
   }

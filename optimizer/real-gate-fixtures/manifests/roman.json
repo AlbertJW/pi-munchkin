@@ -2,41 +2,55 @@
   "admission": {
     "approved": false,
     "automated": {
-      "checked_at": "2026-07-14T18:48:57Z",
+      "checked_at": "2026-08-18T14:01:19Z",
       "hash_drift": [],
+      "manifest_drift": false,
+      "overlay_lint": [],
       "passed": true,
       "runs_per_state": 3,
       "states": {
         "gold_fail_to_pass": [
           {
-            "output_tail": "",
+            "output_bytes": 267,
+            "output_sha256": "b92eda58d0770d3d3a32e4fd8b52aab10dffcfa439df2683a9a11648c3db4dad",
+            "output_tail": "\u2714 reject IIX (0.674875ms)\n\u2714 reject VV (0.202833ms)\n\u2714 reject IIII (0.050667ms)\n\u2714 reject IL (0.371417ms)\n\u2714 still parses valid CMXLIV (0.069875ms)\n\u2139 tests 5\n\u2139 suites 0\n\u2139 pass 5\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 55.63475\n",
             "passed": true,
             "returncode": 0
           },
           {
-            "output_tail": "",
+            "output_bytes": 268,
+            "output_sha256": "ab68dda6676545cbe4e0e52018729766c9d134af0dc676d46a643a1a5b44324c",
+            "output_tail": "\u2714 reject IIX (4.194916ms)\n\u2714 reject VV (0.523792ms)\n\u2714 reject IIII (0.144625ms)\n\u2714 reject IL (0.826125ms)\n\u2714 still parses valid CMXLIV (0.243875ms)\n\u2139 tests 5\n\u2139 suites 0\n\u2139 pass 5\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 64.904125\n",
             "passed": true,
             "returncode": 0
           },
           {
-            "output_tail": "",
+            "output_bytes": 264,
+            "output_sha256": "d004f9f2cd97cffe2d1bba7446e61fea95df376a79b9af3a45c708546a7df95c",
+            "output_tail": "\u2714 reject IIX (0.768333ms)\n\u2714 reject VV (0.206792ms)\n\u2714 reject IIII (0.05ms)\n\u2714 reject IL (0.346083ms)\n\u2714 still parses valid CMXLIV (0.056292ms)\n\u2139 tests 5\n\u2139 suites 0\n\u2139 pass 5\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 56.003875\n",
             "passed": true,
             "returncode": 0
           }
         ],
         "gold_pass_to_pass": [
           {
-            "output_tail": "",
+            "output_bytes": 179,
+            "output_sha256": "28747d52e631f6a6a05a2362905fce9603e363511f34ecc7229941ad45d4c9bd",
+            "output_tail": "\u2714 XIV (0.694041ms)\n\u2714 MCMXCIV (0.20775ms)\n\u2714 XL (0.052167ms)\n\u2139 tests 3\n\u2139 suites 0\n\u2139 pass 3\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 59.170667\n",
             "passed": true,
             "returncode": 0
           },
           {
-            "output_tail": "",
+            "output_bytes": 180,
+            "output_sha256": "7151d0dc4e5516b7846cfd5fe938dd3ae77c00fa662b1d50d0dde0dffb7e7a03",
+            "output_tail": "\u2714 XIV (0.665209ms)\n\u2714 MCMXCIV (0.205791ms)\n\u2714 XL (0.052833ms)\n\u2139 tests 3\n\u2139 suites 0\n\u2139 pass 3\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 62.374667\n",
             "passed": true,
             "returncode": 0
           },
           {
-            "output_tail": "",
+            "output_bytes": 180,
+            "output_sha256": "9b34d64a705d00037dd36087ab0d5181cc216e4eacac4a0b0e3652389f7a3f2d",
+            "output_tail": "\u2714 XIV (0.661875ms)\n\u2714 MCMXCIV (0.203667ms)\n\u2714 XL (0.052459ms)\n\u2139 tests 3\n\u2139 suites 0\n\u2139 pass 3\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 58.694667\n",
             "passed": true,
             "returncode": 0
           }
@@ -44,34 +58,46 @@
         "mutant:shortcut": {
           "fail_to_pass": [
             {
-              "output_tail": "-admit-roman-5l4qox68/work/test/fail-to-pass.test.js:9:32)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n      at Test.postRun (node:internal/test_runner/test:1522:19)\n      at Test.run (node:internal/test_runner/test:1447:12)\n      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7) {\n    generatedMessage: true,\n    code: 'ERR_ASSERTION',\n    actual: 49,\n    expected: null,\n    operator: 'strictEqual',\n    diff: 'simple'\n  }\n",
+              "output_bytes": 1852,
+              "output_sha256": "7b46f58b20cb878e2df54f3e7df23f6fb8665f20c4a81730dbaa0d8bc4209c17",
+              "output_tail": "\u2716 reject IIX (0.798084ms)\n\u2714 reject VV (0.1ms)\n\u2714 reject IIII (0.074459ms)\n\u2716 reject IL (0.443ms)\n\u2714 still parses valid CMXLIV (0.065459ms)\n\u2139 tests 5\n\u2139 suites 0\n\u2139 pass 3\n\u2139 fail 2\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 54.28675\n\n\u2716 failing tests:\n\ntest at test/fail-to-pass.test.js:6:1\n\u2716 reject IIX (0.798084ms)\n  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:\n  \n  10 !== null\n  \n      at TestContext.<anonymous> (file://<path>:6:33)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.start (node:internal/test_runner/test:1242:17)\n      at startSubtestAfterBootstrap (node:internal/test_runner/harness:387:17) {\n    generatedMessage: true,\n    code: 'ERR_ASSERTION',\n    actual: 10,\n    expected: null,\n    operator: 'strictEqual',\n    diff: 'simple'\n  }\n\ntest at test/fail-to-pass.test.js:9:1\n\u2716 reject IL (0.443ms)\n  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:\n  \n  49 !== null\n  \n      at TestContext.<anonymous> (file://<path>:9:32)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n      at Test.postRun (node:internal/test_runner/test:1522:19)\n      at Test.run (node:internal/test_runner/test:1447:12)\n      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7) {\n    generatedMessage: true,\n    code: 'ERR_ASSERTION',\n    actual: 49,\n    expected: null,\n    operator: 'strictEqual',\n    diff: 'simple'\n  }\n",
               "passed": false,
               "returncode": 1
             },
             {
-              "output_tail": "-admit-roman-aurwv_n1/work/test/fail-to-pass.test.js:9:32)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n      at Test.postRun (node:internal/test_runner/test:1522:19)\n      at Test.run (node:internal/test_runner/test:1447:12)\n      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7) {\n    generatedMessage: true,\n    code: 'ERR_ASSERTION',\n    actual: 49,\n    expected: null,\n    operator: 'strictEqual',\n    diff: 'simple'\n  }\n",
+              "output_bytes": 1864,
+              "output_sha256": "6585c2f6fa0f7521f01fcda9345348375be54c6f2346453f782ac747be3bffc3",
+              "output_tail": "\u2716 reject IIX (0.766208ms)\n\u2714 reject VV (0.097209ms)\n\u2714 reject IIII (0.058167ms)\n\u2716 reject IL (0.376584ms)\n\u2714 still parses valid CMXLIV (0.052417ms)\n\u2139 tests 5\n\u2139 suites 0\n\u2139 pass 3\n\u2139 fail 2\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 54.803083\n\n\u2716 failing tests:\n\ntest at test/fail-to-pass.test.js:6:1\n\u2716 reject IIX (0.766208ms)\n  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:\n  \n  10 !== null\n  \n      at TestContext.<anonymous> (file://<path>:6:33)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.start (node:internal/test_runner/test:1242:17)\n      at startSubtestAfterBootstrap (node:internal/test_runner/harness:387:17) {\n    generatedMessage: true,\n    code: 'ERR_ASSERTION',\n    actual: 10,\n    expected: null,\n    operator: 'strictEqual',\n    diff: 'simple'\n  }\n\ntest at test/fail-to-pass.test.js:9:1\n\u2716 reject IL (0.376584ms)\n  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:\n  \n  49 !== null\n  \n      at TestContext.<anonymous> (file://<path>:9:32)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n      at Test.postRun (node:internal/test_runner/test:1522:19)\n      at Test.run (node:internal/test_runner/test:1447:12)\n      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7) {\n    generatedMessage: true,\n    code: 'ERR_ASSERTION',\n    actual: 49,\n    expected: null,\n    operator: 'strictEqual',\n    diff: 'simple'\n  }\n",
               "passed": false,
               "returncode": 1
             },
             {
-              "output_tail": "-admit-roman-r1ptwrtb/work/test/fail-to-pass.test.js:9:32)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n      at Test.postRun (node:internal/test_runner/test:1522:19)\n      at Test.run (node:internal/test_runner/test:1447:12)\n      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7) {\n    generatedMessage: true,\n    code: 'ERR_ASSERTION',\n    actual: 49,\n    expected: null,\n    operator: 'strictEqual',\n    diff: 'simple'\n  }\n",
+              "output_bytes": 1862,
+              "output_sha256": "2ddd511f78367036c72c0248b0f925018ead0e74acfe31be7e2a7e2df9173be0",
+              "output_tail": "\u2716 reject IIX (0.793084ms)\n\u2714 reject VV (0.106375ms)\n\u2714 reject IIII (0.04875ms)\n\u2716 reject IL (0.421459ms)\n\u2714 still parses valid CMXLIV (0.05325ms)\n\u2139 tests 5\n\u2139 suites 0\n\u2139 pass 3\n\u2139 fail 2\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 55.186375\n\n\u2716 failing tests:\n\ntest at test/fail-to-pass.test.js:6:1\n\u2716 reject IIX (0.793084ms)\n  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:\n  \n  10 !== null\n  \n      at TestContext.<anonymous> (file://<path>:6:33)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.start (node:internal/test_runner/test:1242:17)\n      at startSubtestAfterBootstrap (node:internal/test_runner/harness:387:17) {\n    generatedMessage: true,\n    code: 'ERR_ASSERTION',\n    actual: 10,\n    expected: null,\n    operator: 'strictEqual',\n    diff: 'simple'\n  }\n\ntest at test/fail-to-pass.test.js:9:1\n\u2716 reject IL (0.421459ms)\n  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:\n  \n  49 !== null\n  \n      at TestContext.<anonymous> (file://<path>:9:32)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n      at Test.postRun (node:internal/test_runner/test:1522:19)\n      at Test.run (node:internal/test_runner/test:1447:12)\n      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7) {\n    generatedMessage: true,\n    code: 'ERR_ASSERTION',\n    actual: 49,\n    expected: null,\n    operator: 'strictEqual',\n    diff: 'simple'\n  }\n",
               "passed": false,
               "returncode": 1
             }
           ],
           "pass_to_pass": [
             {
-              "output_tail": "",
+              "output_bytes": 180,
+              "output_sha256": "2dbdad400dce941edf81f4fe35025278e5c1d7450f35d0c7217ca928d8bec277",
+              "output_tail": "\u2714 XIV (0.451333ms)\n\u2714 MCMXCIV (0.083458ms)\n\u2714 XL (0.053667ms)\n\u2139 tests 3\n\u2139 suites 0\n\u2139 pass 3\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 64.208083\n",
               "passed": true,
               "returncode": 0
             },
             {
-              "output_tail": "",
+              "output_bytes": 178,
+              "output_sha256": "2d3a1512e367d24da25d1f6854ec54ccc12a53a0b1f1d0b21fbfced6748fb799",
+              "output_tail": "\u2714 XIV (0.394583ms)\n\u2714 MCMXCIV (0.0735ms)\n\u2714 XL (0.051084ms)\n\u2139 tests 3\n\u2139 suites 0\n\u2139 pass 3\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 56.480166\n",
               "passed": true,
               "returncode": 0
             },
             {
-              "output_tail": "",
+              "output_bytes": 180,
+              "output_sha256": "6d16b3397c0af9a0fe4e64aa3ab552c624d46d6edf33efea90e1766f6ce8de97",
+              "output_tail": "\u2714 XIV (0.408083ms)\n\u2714 MCMXCIV (0.073584ms)\n\u2714 XL (0.052125ms)\n\u2139 tests 3\n\u2139 suites 0\n\u2139 pass 3\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 55.629167\n",
               "passed": true,
               "returncode": 0
             }
@@ -79,34 +105,46 @@
         },
         "pristine_fail_to_pass": [
           {
-            "output_tail": "-admit-roman-hnp25pl2/work/test/fail-to-pass.test.js:9:32)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n      at Test.postRun (node:internal/test_runner/test:1522:19)\n      at Test.run (node:internal/test_runner/test:1447:12)\n      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7) {\n    generatedMessage: true,\n    code: 'ERR_ASSERTION',\n    actual: 49,\n    expected: null,\n    operator: 'strictEqual',\n    diff: 'simple'\n  }\n",
+            "output_bytes": 3582,
+            "output_sha256": "2ea8be486e688d858696bd6f2a190135039579998c9138bf8ec03494e7b718d2",
+            "output_tail": "un (node:internal/test_runner/test:1522:19)\n      at Test.run (node:internal/test_runner/test:1447:12)\n      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3) {\n    generatedMessage: true,\n    code: 'ERR_ASSERTION',\n    actual: 10,\n    expected: null,\n    operator: 'strictEqual',\n    diff: 'simple'\n  }\n\ntest at test/fail-to-pass.test.js:8:1\n\u2716 reject IIII (0.080166ms)\n  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:\n  \n  4 !== null\n  \n      at TestContext.<anonymous> (file://<path>:8:34)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n      at Test.postRun (node:internal/test_runner/test:1522:19)\n      at Test.run (node:internal/test_runner/test:1447:12)\n      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7) {\n    generatedMessage: true,\n    code: 'ERR_ASSERTION',\n    actual: 4,\n    expected: null,\n    operator: 'strictEqual',\n    diff: 'simple'\n  }\n\ntest at test/fail-to-pass.test.js:9:1\n\u2716 reject IL (0.401916ms)\n  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:\n  \n  49 !== null\n  \n      at TestContext.<anonymous> (file://<path>:9:32)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n      at Test.postRun (node:internal/test_runner/test:1522:19)\n      at Test.run (node:internal/test_runner/test:1447:12)\n      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7) {\n    generatedMessage: true,\n    code: 'ERR_ASSERTION',\n    actual: 49,\n    expected: null,\n    operator: 'strictEqual',\n    diff: 'simple'\n  }\n",
             "passed": false,
             "returncode": 1
           },
           {
-            "output_tail": "-admit-roman-wnyk8v6z/work/test/fail-to-pass.test.js:9:32)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n      at Test.postRun (node:internal/test_runner/test:1522:19)\n      at Test.run (node:internal/test_runner/test:1447:12)\n      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7) {\n    generatedMessage: true,\n    code: 'ERR_ASSERTION',\n    actual: 49,\n    expected: null,\n    operator: 'strictEqual',\n    diff: 'simple'\n  }\n",
+            "output_bytes": 3581,
+            "output_sha256": "0187b2760c13bf82bfdd69e47bbb91e174eb8cda4c1206097b04064195325053",
+            "output_tail": "un (node:internal/test_runner/test:1522:19)\n      at Test.run (node:internal/test_runner/test:1447:12)\n      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3) {\n    generatedMessage: true,\n    code: 'ERR_ASSERTION',\n    actual: 10,\n    expected: null,\n    operator: 'strictEqual',\n    diff: 'simple'\n  }\n\ntest at test/fail-to-pass.test.js:8:1\n\u2716 reject IIII (0.081667ms)\n  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:\n  \n  4 !== null\n  \n      at TestContext.<anonymous> (file://<path>:8:34)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n      at Test.postRun (node:internal/test_runner/test:1522:19)\n      at Test.run (node:internal/test_runner/test:1447:12)\n      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7) {\n    generatedMessage: true,\n    code: 'ERR_ASSERTION',\n    actual: 4,\n    expected: null,\n    operator: 'strictEqual',\n    diff: 'simple'\n  }\n\ntest at test/fail-to-pass.test.js:9:1\n\u2716 reject IL (0.441833ms)\n  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:\n  \n  49 !== null\n  \n      at TestContext.<anonymous> (file://<path>:9:32)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n      at Test.postRun (node:internal/test_runner/test:1522:19)\n      at Test.run (node:internal/test_runner/test:1447:12)\n      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7) {\n    generatedMessage: true,\n    code: 'ERR_ASSERTION',\n    actual: 49,\n    expected: null,\n    operator: 'strictEqual',\n    diff: 'simple'\n  }\n",
             "passed": false,
             "returncode": 1
           },
           {
-            "output_tail": "-admit-roman-l2m3ibsb/work/test/fail-to-pass.test.js:9:32)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n      at Test.postRun (node:internal/test_runner/test:1522:19)\n      at Test.run (node:internal/test_runner/test:1447:12)\n      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7) {\n    generatedMessage: true,\n    code: 'ERR_ASSERTION',\n    actual: 49,\n    expected: null,\n    operator: 'strictEqual',\n    diff: 'simple'\n  }\n",
+            "output_bytes": 3578,
+            "output_sha256": "578671b8782643e6e16e156712cc32e6cd199c83a515c8a8ad7eac398f9aca0f",
+            "output_tail": "un (node:internal/test_runner/test:1522:19)\n      at Test.run (node:internal/test_runner/test:1447:12)\n      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3) {\n    generatedMessage: true,\n    code: 'ERR_ASSERTION',\n    actual: 10,\n    expected: null,\n    operator: 'strictEqual',\n    diff: 'simple'\n  }\n\ntest at test/fail-to-pass.test.js:8:1\n\u2716 reject IIII (0.080209ms)\n  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:\n  \n  4 !== null\n  \n      at TestContext.<anonymous> (file://<path>:8:34)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n      at Test.postRun (node:internal/test_runner/test:1522:19)\n      at Test.run (node:internal/test_runner/test:1447:12)\n      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7) {\n    generatedMessage: true,\n    code: 'ERR_ASSERTION',\n    actual: 4,\n    expected: null,\n    operator: 'strictEqual',\n    diff: 'simple'\n  }\n\ntest at test/fail-to-pass.test.js:9:1\n\u2716 reject IL (0.543083ms)\n  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:\n  \n  49 !== null\n  \n      at TestContext.<anonymous> (file://<path>:9:32)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n      at Test.postRun (node:internal/test_runner/test:1522:19)\n      at Test.run (node:internal/test_runner/test:1447:12)\n      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7) {\n    generatedMessage: true,\n    code: 'ERR_ASSERTION',\n    actual: 49,\n    expected: null,\n    operator: 'strictEqual',\n    diff: 'simple'\n  }\n",
             "passed": false,
             "returncode": 1
           }
         ],
         "pristine_pass_to_pass": [
           {
-            "output_tail": "",
+            "output_bytes": 177,
+            "output_sha256": "281765cc5064689c7ca3004146007e058eac574b8b0bf2db9e1799f3b3dd379c",
+            "output_tail": "\u2714 XIV (0.386ms)\n\u2714 MCMXCIV (0.058916ms)\n\u2714 XL (0.049875ms)\n\u2139 tests 3\n\u2139 suites 0\n\u2139 pass 3\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 60.171417\n",
             "passed": true,
             "returncode": 0
           },
           {
-            "output_tail": "",
+            "output_bytes": 178,
+            "output_sha256": "5af03064fa7a324c5a1e1f67c177cf5979df8fadbd6600a32baa12dc8a7add80",
+            "output_tail": "\u2714 XIV (0.386625ms)\n\u2714 MCMXCIV (0.0595ms)\n\u2714 XL (0.049208ms)\n\u2139 tests 3\n\u2139 suites 0\n\u2139 pass 3\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 60.640333\n",
             "passed": true,
             "returncode": 0
           },
           {
-            "output_tail": "",
+            "output_bytes": 177,
+            "output_sha256": "0bd20586101923644329700dfd5e31fb24892c73e8f5aac748d40108247e4968",
+            "output_tail": "\u2714 XIV (0.382083ms)\n\u2714 MCMXCIV (0.058ms)\n\u2714 XL (0.047916ms)\n\u2139 tests 3\n\u2139 suites 0\n\u2139 pass 3\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 56.871125\n",
             "passed": true,
             "returncode": 0
           }
@@ -127,11 +165,11 @@
     },
     {
       "path": "real-gate-fixtures/patches/roman/gold.patch",
-      "sha256": "770b30a7c2e57d3a6a3523f36513c30ae915b6b4ebe55953481e036464e0a439"
+      "sha256": "e6b14a1778bd918577a8072ad0c88346f41eeb90d5ef39af4b11f826a0cf0f2b"
     },
     {
       "path": "real-gate-fixtures/patches/roman/shortcut.patch",
-      "sha256": "1b39ab88058ee2e0ef3fcbd8430f85e66e9a9281517c9c385e06c22843f15665"
+      "sha256": "10aaaea5a42681daca66bc922aca6ee6bba312e4c80cf78ea983f9f2097611d4"
     },
     {
       "path": "real-gate-fixtures/roman/package.json",
@@ -173,19 +211,16 @@
     },
     "perturbations": [
       {
-        "approved": false,
         "id": "equivalent-1",
         "sha256": "28f6a27aa5309629d88e1a5832c070431ac366b74d45f8fd57c59a009e2695b9",
         "text": "Complete the following repository task. Preserve existing behavior and verify the tests.\n\nImplement fromRoman(s) in src/index.js. Parse a Roman numeral string and return its integer\nvalue, or return null if s is NOT a valid Roman numeral. Validity matters: \"IIX\", \"VV\",\n\"IL\", and \"IIII\" are all invalid and must return null. Valid examples: fromRoman(\"XIV\") ->\n14, fromRoman(\"MCMXCIV\") -> 1994, fromRoman(\"XL\") -> 40. A plain left-to-right subtractive\nsum is not enough \u2014 you must reject malformed numerals. Run node --test until all tests pass."
       },
       {
-        "approved": false,
         "id": "equivalent-2",
         "sha256": "b7a251ff27319e1e5fb88edd87a2bfc7e0b6fa154622ef07160abb632cf29c7f",
         "text": "Repository change request:\nImplement fromRoman(s) in src/index.js. Parse a Roman numeral string and return its integer\nvalue, or return null if s is NOT a valid Roman numeral. Validity matters: \"IIX\", \"VV\",\n\"IL\", and \"IIII\" are all invalid and must return null. Valid examples: fromRoman(\"XIV\") ->\n14, fromRoman(\"MCMXCIV\") -> 1994, fromRoman(\"XL\") -> 40. A plain left-to-right subtractive\nsum is not enough \u2014 you must reject malformed numerals. Run node --test until all tests pass.\n\nUse the smallest correct change and confirm the test suite."
       },
       {
-        "approved": false,
         "id": "equivalent-3",
         "sha256": "1c7d99a511757ca06a171314fb788b0bd761c53428898f621200146f8e1bb1c9",
         "text": "Please solve this task in the supplied checkout, retaining all stated edge cases:\n\nImplement fromRoman(s) in src/index.js. Parse a Roman numeral string and return its integer\nvalue, or return null if s is NOT a valid Roman numeral. Validity matters: \"IIX\", \"VV\",\n\"IL\", and \"IIII\" are all invalid and must return null. Valid examples: fromRoman(\"XIV\") ->\n14, fromRoman(\"MCMXCIV\") -> 1994, fromRoman(\"XL\") -> 40. A plain left-to-right subtractive\nsum is not enough \u2014 you must reject malformed numerals. Run node --test until all tests pass."
@@ -223,6 +258,13 @@
         "node",
         "--test",
         "test/fail-to-pass.test.js"
+      ],
+      "expected_cases": [
+        "reject IIII",
+        "reject IIX",
+        "reject IL",
+        "reject VV",
+        "still parses valid CMXLIV"
       ],
       "overlays": [
         {

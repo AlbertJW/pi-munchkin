@@ -5,7 +5,7 @@
 -  throw new Error('not implemented');
 +  return s.replace(/(.)\1+/g, (run, ch) => `${run.length}${ch}`);
  }
- 
+
  export function decode(s) {
 -  throw new Error('not implemented');
 +  return s.replace(/(\d)(.)/g, (_, n, ch) => ch.repeat(Number(n)));

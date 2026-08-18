@@ -20,11 +20,11 @@
          current += char;
 @@ -38,7 +38,7 @@
    }
- 
+
    // Add the last field
 -  fields.push(current.trim());
 +  fields.push(trim ? current.trim() : current);
- 
+
    return fields;
  }
 @@ -48,15 +48,15 @@
@@ -36,11 +36,11 @@
 +export function parseCSV(csv, { trim = true } = {}) {
 +  const lines = (trim ? csv.trim() : csv).split('\n');
    if (lines.length === 0) return [];
- 
+
 -  const headers = splitCSVLine(lines[0]);
 +  const headers = splitCSVLine(lines[0], trim);
    const rows = [];
- 
+
    for (let i = 1; i < lines.length; i++) {
 -    const values = splitCSVLine(lines[i]);
 +    const values = splitCSVLine(lines[i], trim);
@@ -49,7 +49,7 @@
        row[header] = values[idx] || '';
 --- a/test/trim-option.test.js
 +++ b/test/trim-option.test.js
-@@ -0,0 +1,12 @@
+@@ -0,0 +1,18 @@
 +import test from "node:test";
 +import assert from "node:assert/strict";
 +import { parseCSV } from "../src/index.js";
@@ -61,4 +61,10 @@
 +
 +test("default remains trimmed", () => {
 +  assert.deepEqual(parseCSV(" name , age \n John , 30 "), [{ name: "John", age: "30" }]);
++});
++
++test("trim false still respects quoted fields with embedded commas", () => {
++  const csv = 'name,address\n"John Doe","123 Main St, Apt 4"';
++  assert.deepEqual(parseCSV(csv, { trim: false }),
++                   [{ name: "John Doe", address: "123 Main St, Apt 4" }]);
 +});

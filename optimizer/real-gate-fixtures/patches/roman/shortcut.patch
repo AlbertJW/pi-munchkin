@@ -2,7 +2,7 @@
 +++ b/src/index.js
 @@ -1,7 +1,7 @@
  const V = { I: 1, V: 5, X: 10, L: 50, C: 100, D: 500, M: 1000 };
- 
+
  export function fromRoman(s) {
 -  // BUG: left-to-right subtractive sum with NO validation — accepts malformed numerals.
 +  if (/IIII|VV/.test(s)) return null;

@@ -2,41 +2,55 @@
   "admission": {
     "approved": false,
     "automated": {
-      "checked_at": "2026-07-14T18:49:16Z",
+      "checked_at": "2026-08-18T14:01:38Z",
       "hash_drift": [],
+      "manifest_drift": false,
+      "overlay_lint": [],
       "passed": true,
       "runs_per_state": 3,
       "states": {
         "gold_fail_to_pass": [
           {
-            "output_tail": "",
+            "output_bytes": 449,
+            "output_sha256": "2567069c9a62b96f7a85ec7a859be9a6c87b905376cf04b6aa1c60d279a07b78",
+            "output_tail": "\u2714 toCSV: simple unquoted (0.493833ms)\n\u2714 toCSV: quotes fields containing commas (0.07ms)\n\u2714 toCSV: escapes embedded double-quotes by doubling (0.056375ms)\n\u2714 toCSV: quotes fields containing newlines (0.081542ms)\n\u2714 toCSV: multiple rows, header from first row keys (0.060959ms)\n\u2714 toCSV round-trips through parseCSV (0.417667ms)\n\u2139 tests 6\n\u2139 suites 0\n\u2139 pass 6\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 52.320875\n",
             "passed": true,
             "returncode": 0
           },
           {
-            "output_tail": "",
+            "output_bytes": 453,
+            "output_sha256": "92af42f6026082baa1f0d86455dda6e36afb9ab125d59f5e3ecbf40cbd7efb2c",
+            "output_tail": "\u2714 toCSV: simple unquoted (0.491458ms)\n\u2714 toCSV: quotes fields containing commas (0.068458ms)\n\u2714 toCSV: escapes embedded double-quotes by doubling (0.058625ms)\n\u2714 toCSV: quotes fields containing newlines (0.080583ms)\n\u2714 toCSV: multiple rows, header from first row keys (0.060166ms)\n\u2714 toCSV round-trips through parseCSV (0.416708ms)\n\u2139 tests 6\n\u2139 suites 0\n\u2139 pass 6\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 52.453708\n",
             "passed": true,
             "returncode": 0
           },
           {
-            "output_tail": "",
+            "output_bytes": 452,
+            "output_sha256": "145d80d61f10df884b748fb865c6fff9276c387855e0c96711af5bc5e1d1ddda",
+            "output_tail": "\u2714 toCSV: simple unquoted (0.595416ms)\n\u2714 toCSV: quotes fields containing commas (0.07875ms)\n\u2714 toCSV: escapes embedded double-quotes by doubling (0.059958ms)\n\u2714 toCSV: quotes fields containing newlines (0.056959ms)\n\u2714 toCSV: multiple rows, header from first row keys (0.057125ms)\n\u2714 toCSV round-trips through parseCSV (0.429459ms)\n\u2139 tests 6\n\u2139 suites 0\n\u2139 pass 6\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 58.699167\n",
             "passed": true,
             "returncode": 0
           }
         ],
         "gold_pass_to_pass": [
           {
-            "output_tail": "",
+            "output_bytes": 897,
+            "output_sha256": "e93753d69a2d5f9072826568392e8f1396d0a64d01b22dfe73e5e0ed01d36741",
+            "output_tail": "\u2714 parses simple CSV with headers (1.333042ms)\n\u2714 handles quoted fields with commas (0.107333ms)\n\u2714 handles empty values (0.066584ms)\n\u2714 handles single row with no data (1.717292ms)\n\u2714 handles CSV with extra whitespace (0.161417ms)\n\u2714 handles single column CSV (0.707584ms)\n\u2714 handles malformed CSV with extra columns (0.065209ms)\n\u2714 handles malformed CSV with fewer columns (0.079125ms)\n\u2714 handles single quoted field (0.066542ms)\n\u2714 handles escaped quotes in CSV (0.056333ms)\n\u2714 end-to-end: CSV string to JSON string (0.800959ms)\n\u2714 end-to-end: complex CSV with quoted fields (0.089875ms)\n\u2714 end-to-end: empty values (0.063917ms)\n\u2714 converts parsed data to JSON string (0.78525ms)\n\u2714 formats JSON with indentation (0.089917ms)\n\u2714 handles empty array (0.064125ms)\n\u2139 tests 16\n\u2139 suites 0\n\u2139 pass 16\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 84.241542\n",
             "passed": true,
             "returncode": 0
           },
           {
-            "output_tail": "",
+            "output_bytes": 895,
+            "output_sha256": "abfb057101d14610c3d8380e0cf2215917a7649b2838482b148474ed695a8747",
+            "output_tail": "\u2714 parses simple CSV with headers (0.82725ms)\n\u2714 handles quoted fields with commas (0.090167ms)\n\u2714 handles empty values (0.066167ms)\n\u2714 handles single row with no data (0.723125ms)\n\u2714 handles CSV with extra whitespace (0.146292ms)\n\u2714 handles single column CSV (0.427833ms)\n\u2714 handles malformed CSV with extra columns (0.076334ms)\n\u2714 handles malformed CSV with fewer columns (0.083959ms)\n\u2714 handles single quoted field (0.066625ms)\n\u2714 handles escaped quotes in CSV (0.057125ms)\n\u2714 end-to-end: CSV string to JSON string (0.794583ms)\n\u2714 end-to-end: complex CSV with quoted fields (0.088709ms)\n\u2714 end-to-end: empty values (0.067333ms)\n\u2714 converts parsed data to JSON string (0.711375ms)\n\u2714 formats JSON with indentation (0.089167ms)\n\u2714 handles empty array (0.0645ms)\n\u2139 tests 16\n\u2139 suites 0\n\u2139 pass 16\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 79.634667\n",
             "passed": true,
             "returncode": 0
           },
           {
-            "output_tail": "",
+            "output_bytes": 898,
+            "output_sha256": "aebd06ee16e6f60a140d7da834297a17f86f215dd83ec6299c9e0c9effbf6eb0",
+            "output_tail": "\u2714 parses simple CSV with headers (0.733542ms)\n\u2714 handles quoted fields with commas (0.092333ms)\n\u2714 handles empty values (0.058875ms)\n\u2714 handles single row with no data (0.691625ms)\n\u2714 handles CSV with extra whitespace (0.137125ms)\n\u2714 handles single column CSV (0.529166ms)\n\u2714 handles malformed CSV with extra columns (0.083417ms)\n\u2714 handles malformed CSV with fewer columns (0.091458ms)\n\u2714 handles single quoted field (0.066709ms)\n\u2714 handles escaped quotes in CSV (0.061333ms)\n\u2714 end-to-end: CSV string to JSON string (0.756125ms)\n\u2714 end-to-end: complex CSV with quoted fields (0.089792ms)\n\u2714 end-to-end: empty values (0.065833ms)\n\u2714 converts parsed data to JSON string (0.732458ms)\n\u2714 formats JSON with indentation (0.090417ms)\n\u2714 handles empty array (0.060125ms)\n\u2139 tests 16\n\u2139 suites 0\n\u2139 pass 16\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 83.081875\n",
             "passed": true,
             "returncode": 0
           }
@@ -44,34 +58,46 @@
         "mutant:shortcut": {
           "fail_to_pass": [
             {
-              "output_tail": "  at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n      at Test.postRun (node:internal/test_runner/test:1522:19)\n      at Test.run (node:internal/test_runner/test:1447:12)\n      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7) {\n    generatedMessage: true,\n    code: 'ERR_ASSERTION',\n    actual: [ { name: 'Jane', note: 'a' }, { name: 'Bob', note: 'c' } ],\n    expected: [ { name: 'Jane', note: 'a, b' }, { name: 'Bob', note: 'c' } ],\n    operator: 'deepStrictEqual',\n    diff: 'simple'\n  }\n",
+              "output_bytes": 4559,
+              "output_sha256": "a7521b8091bf43e04e4634da70d13319e2f0356a9e5320c71211f3f5c0e2b0f5",
+              "output_tail": "(0.1045ms)\n  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:\n  + actual - expected\n  \n  + 'a\\nline1\\nline2'\n  - 'a\\n\"line1\\nline2\"'\n        ^\n  \n      at TestContext.<anonymous> (file://<path>:23:10)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n      at Test.postRun (node:internal/test_runner/test:1522:19)\n      at Test.run (node:internal/test_runner/test:1447:12)\n      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7) {\n    generatedMessage: true,\n    code: 'ERR_ASSERTION',\n    actual: 'a\\nline1\\nline2',\n    expected: 'a\\n\"line1\\nline2\"',\n    operator: 'strictEqual',\n    diff: 'simple'\n  }\n\ntest at test/fail-to-pass.test.js:33:1\n\u2716 toCSV round-trips through parseCSV (0.640292ms)\n  AssertionError [ERR_ASSERTION]: Expected values to be strictly deep-equal:\n  + actual - expected\n  \n    [\n      {\n        name: 'Jane',\n  +     note: 'a'\n  -     note: 'a, b'\n      },\n      {\n        name: 'Bob',\n        note: 'c'\n      }\n  \n      at TestContext.<anonymous> (file://<path>:35:10)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n      at Test.postRun (node:internal/test_runner/test:1522:19)\n      at Test.run (node:internal/test_runner/test:1447:12)\n      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7) {\n    generatedMessage: true,\n    code: 'ERR_ASSERTION',\n    actual: [ { name: 'Jane', note: 'a' }, { name: 'Bob', note: 'c' } ],\n    expected: [ { name: 'Jane', note: 'a, b' }, { name: 'Bob', note: 'c' } ],\n    operator: 'deepStrictEqual',\n    diff: 'simple'\n  }\n",
               "passed": false,
               "returncode": 1
             },
             {
-              "output_tail": "  at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n      at Test.postRun (node:internal/test_runner/test:1522:19)\n      at Test.run (node:internal/test_runner/test:1447:12)\n      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7) {\n    generatedMessage: true,\n    code: 'ERR_ASSERTION',\n    actual: [ { name: 'Jane', note: 'a' }, { name: 'Bob', note: 'c' } ],\n    expected: [ { name: 'Jane', note: 'a, b' }, { name: 'Bob', note: 'c' } ],\n    operator: 'deepStrictEqual',\n    diff: 'simple'\n  }\n",
+              "output_bytes": 4567,
+              "output_sha256": "1c24ba7ff7b5bcef908f208077491a38691ab1e7f637d8d9a906b2a13d5eba06",
+              "output_tail": ".111333ms)\n  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:\n  + actual - expected\n  \n  + 'a\\nline1\\nline2'\n  - 'a\\n\"line1\\nline2\"'\n        ^\n  \n      at TestContext.<anonymous> (file://<path>:23:10)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n      at Test.postRun (node:internal/test_runner/test:1522:19)\n      at Test.run (node:internal/test_runner/test:1447:12)\n      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7) {\n    generatedMessage: true,\n    code: 'ERR_ASSERTION',\n    actual: 'a\\nline1\\nline2',\n    expected: 'a\\n\"line1\\nline2\"',\n    operator: 'strictEqual',\n    diff: 'simple'\n  }\n\ntest at test/fail-to-pass.test.js:33:1\n\u2716 toCSV round-trips through parseCSV (0.665042ms)\n  AssertionError [ERR_ASSERTION]: Expected values to be strictly deep-equal:\n  + actual - expected\n  \n    [\n      {\n        name: 'Jane',\n  +     note: 'a'\n  -     note: 'a, b'\n      },\n      {\n        name: 'Bob',\n        note: 'c'\n      }\n  \n      at TestContext.<anonymous> (file://<path>:35:10)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n      at Test.postRun (node:internal/test_runner/test:1522:19)\n      at Test.run (node:internal/test_runner/test:1447:12)\n      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7) {\n    generatedMessage: true,\n    code: 'ERR_ASSERTION',\n    actual: [ { name: 'Jane', note: 'a' }, { name: 'Bob', note: 'c' } ],\n    expected: [ { name: 'Jane', note: 'a, b' }, { name: 'Bob', note: 'c' } ],\n    operator: 'deepStrictEqual',\n    diff: 'simple'\n  }\n",
               "passed": false,
               "returncode": 1
             },
             {
-              "output_tail": "  at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n      at Test.postRun (node:internal/test_runner/test:1522:19)\n      at Test.run (node:internal/test_runner/test:1447:12)\n      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7) {\n    generatedMessage: true,\n    code: 'ERR_ASSERTION',\n    actual: [ { name: 'Jane', note: 'a' }, { name: 'Bob', note: 'c' } ],\n    expected: [ { name: 'Jane', note: 'a, b' }, { name: 'Bob', note: 'c' } ],\n    operator: 'deepStrictEqual',\n    diff: 'simple'\n  }\n",
+              "output_bytes": 4561,
+              "output_sha256": "0d905a4004c2aa1ed939d915376b6d27b8514a8b00b5c379f03cff19034c5b6e",
+              "output_tail": ".129416ms)\n  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:\n  + actual - expected\n  \n  + 'a\\nline1\\nline2'\n  - 'a\\n\"line1\\nline2\"'\n        ^\n  \n      at TestContext.<anonymous> (file://<path>:23:10)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n      at Test.postRun (node:internal/test_runner/test:1522:19)\n      at Test.run (node:internal/test_runner/test:1447:12)\n      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7) {\n    generatedMessage: true,\n    code: 'ERR_ASSERTION',\n    actual: 'a\\nline1\\nline2',\n    expected: 'a\\n\"line1\\nline2\"',\n    operator: 'strictEqual',\n    diff: 'simple'\n  }\n\ntest at test/fail-to-pass.test.js:33:1\n\u2716 toCSV round-trips through parseCSV (0.695292ms)\n  AssertionError [ERR_ASSERTION]: Expected values to be strictly deep-equal:\n  + actual - expected\n  \n    [\n      {\n        name: 'Jane',\n  +     note: 'a'\n  -     note: 'a, b'\n      },\n      {\n        name: 'Bob',\n        note: 'c'\n      }\n  \n      at TestContext.<anonymous> (file://<path>:35:10)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n      at Test.postRun (node:internal/test_runner/test:1522:19)\n      at Test.run (node:internal/test_runner/test:1447:12)\n      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7) {\n    generatedMessage: true,\n    code: 'ERR_ASSERTION',\n    actual: [ { name: 'Jane', note: 'a' }, { name: 'Bob', note: 'c' } ],\n    expected: [ { name: 'Jane', note: 'a, b' }, { name: 'Bob', note: 'c' } ],\n    operator: 'deepStrictEqual',\n    diff: 'simple'\n  }\n",
               "passed": false,
               "returncode": 1
             }
           ],
           "pass_to_pass": [
             {
-              "output_tail": "",
+              "output_bytes": 895,
+              "output_sha256": "d9c41644169c3dfee6475f89968843daeba8a0835b70759cb4681c345f847bf5",
+              "output_tail": "\u2714 parses simple CSV with headers (0.85325ms)\n\u2714 handles quoted fields with commas (0.082166ms)\n\u2714 handles empty values (0.061833ms)\n\u2714 handles single row with no data (0.679958ms)\n\u2714 handles CSV with extra whitespace (0.138917ms)\n\u2714 handles single column CSV (0.522833ms)\n\u2714 handles malformed CSV with extra columns (0.06025ms)\n\u2714 handles malformed CSV with fewer columns (0.088084ms)\n\u2714 handles single quoted field (0.065542ms)\n\u2714 handles escaped quotes in CSV (0.056541ms)\n\u2714 end-to-end: CSV string to JSON string (0.77175ms)\n\u2714 end-to-end: complex CSV with quoted fields (0.089708ms)\n\u2714 end-to-end: empty values (0.069791ms)\n\u2714 converts parsed data to JSON string (0.753875ms)\n\u2714 formats JSON with indentation (0.091834ms)\n\u2714 handles empty array (0.059917ms)\n\u2139 tests 16\n\u2139 suites 0\n\u2139 pass 16\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 78.357208\n",
               "passed": true,
               "returncode": 0
             },
             {
-              "output_tail": "",
+              "output_bytes": 896,
+              "output_sha256": "4b0b6f897f036aa75c4a4ba3cacf49cfa36d2dcd3b68ef4e9e3196577f0628bf",
+              "output_tail": "\u2714 parses simple CSV with headers (0.730166ms)\n\u2714 handles quoted fields with commas (0.081667ms)\n\u2714 handles empty values (0.060042ms)\n\u2714 handles single row with no data (0.86975ms)\n\u2714 handles CSV with extra whitespace (0.159709ms)\n\u2714 handles single column CSV (0.465208ms)\n\u2714 handles malformed CSV with extra columns (0.065208ms)\n\u2714 handles malformed CSV with fewer columns (0.075875ms)\n\u2714 handles single quoted field (0.064833ms)\n\u2714 handles escaped quotes in CSV (0.055542ms)\n\u2714 end-to-end: CSV string to JSON string (0.743333ms)\n\u2714 end-to-end: complex CSV with quoted fields (0.089042ms)\n\u2714 end-to-end: empty values (0.063209ms)\n\u2714 converts parsed data to JSON string (0.698167ms)\n\u2714 formats JSON with indentation (0.181208ms)\n\u2714 handles empty array (0.069458ms)\n\u2139 tests 16\n\u2139 suites 0\n\u2139 pass 16\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 78.12075\n",
               "passed": true,
               "returncode": 0
             },
             {
-              "output_tail": "",
+              "output_bytes": 891,
+              "output_sha256": "5c7ccc50540d2f21854480ab543d35e980804c32e95011c7d5e0e3f30fc76011",
+              "output_tail": "\u2714 parses simple CSV with headers (0.7135ms)\n\u2714 handles quoted fields with commas (0.108709ms)\n\u2714 handles empty values (0.067291ms)\n\u2714 handles single row with no data (0.775ms)\n\u2714 handles CSV with extra whitespace (0.149959ms)\n\u2714 handles single column CSV (0.545625ms)\n\u2714 handles malformed CSV with extra columns (0.062667ms)\n\u2714 handles malformed CSV with fewer columns (0.078833ms)\n\u2714 handles single quoted field (0.059083ms)\n\u2714 handles escaped quotes in CSV (0.057959ms)\n\u2714 end-to-end: CSV string to JSON string (0.745875ms)\n\u2714 end-to-end: complex CSV with quoted fields (0.087959ms)\n\u2714 end-to-end: empty values (0.066458ms)\n\u2714 converts parsed data to JSON string (0.739417ms)\n\u2714 formats JSON with indentation (0.091042ms)\n\u2714 handles empty array (0.0605ms)\n\u2139 tests 16\n\u2139 suites 0\n\u2139 pass 16\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 77.773792\n",
               "passed": true,
               "returncode": 0
             }
@@ -79,34 +105,46 @@
         },
         "pristine_fail_to_pass": [
           {
-            "output_tail": "named 'toCSV'\n    at #asyncInstantiate (node:internal/modules/esm/module_job:327:21)\n    at async ModuleJob.run (node:internal/modules/esm/module_job:431:5)\n    at async onImport.tracePromise.__proto__ (node:internal/modules/esm/loader:646:26)\n    at async asyncRunEntryPointWithESMLoader (node:internal/modules/run_main:101:5)\n\nNode.js v26.3.0\n\u2716 test/fail-to-pass.test.js (77.189333ms)\n\u2139 tests 1\n\u2139 suites 0\n\u2139 pass 0\n\u2139 fail 1\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 82.414541\n\n\u2716 failing tests:\n\ntest at test/fail-to-pass.test.js:1:1\n\u2716 test/fail-to-pass.test.js (77.189333ms)\n  'test failed'\n",
+            "output_bytes": 851,
+            "output_sha256": "806652660ac91ced10bbfe0cc099035c5c44992261e70ef472c35426da933598",
+            "output_tail": "file://<path>:1\nimport { toCSV, parseCSV } from '../src/index.js';\n         ^^^^^\nSyntaxError: The requested module '../src/index.js' does not provide an export named 'toCSV'\n    at #asyncInstantiate (node:internal/modules/esm/module_job:463:21)\n    at async ModuleJob.run (node:internal/modules/esm/module_job:561:5)\n    at async node:internal/modules/esm/loader:650:26\n    at async asyncRunEntryPointWithESMLoader (node:internal/modules/run_main:101:5)\n\nNode.js v26.5.0\n\u2716 test/fail-to-pass.test.js (43.964583ms)\n\u2139 tests 1\n\u2139 suites 0\n\u2139 pass 0\n\u2139 fail 1\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 47.968042\n\n\u2716 failing tests:\n\ntest at test/fail-to-pass.test.js:1:1\n\u2716 test/fail-to-pass.test.js (43.964583ms)\n  'test failed'\n",
             "passed": false,
             "returncode": 1
           },
           {
-            "output_tail": "named 'toCSV'\n    at #asyncInstantiate (node:internal/modules/esm/module_job:327:21)\n    at async ModuleJob.run (node:internal/modules/esm/module_job:431:5)\n    at async onImport.tracePromise.__proto__ (node:internal/modules/esm/loader:646:26)\n    at async asyncRunEntryPointWithESMLoader (node:internal/modules/run_main:101:5)\n\nNode.js v26.3.0\n\u2716 test/fail-to-pass.test.js (73.284958ms)\n\u2139 tests 1\n\u2139 suites 0\n\u2139 pass 0\n\u2139 fail 1\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 78.573792\n\n\u2716 failing tests:\n\ntest at test/fail-to-pass.test.js:1:1\n\u2716 test/fail-to-pass.test.js (73.284958ms)\n  'test failed'\n",
+            "output_bytes": 850,
+            "output_sha256": "5008265c836c32bc60d7e4b0c9c3672be5f054458dd66c6d40448420e61481bb",
+            "output_tail": "file://<path>:1\nimport { toCSV, parseCSV } from '../src/index.js';\n         ^^^^^\nSyntaxError: The requested module '../src/index.js' does not provide an export named 'toCSV'\n    at #asyncInstantiate (node:internal/modules/esm/module_job:463:21)\n    at async ModuleJob.run (node:internal/modules/esm/module_job:561:5)\n    at async node:internal/modules/esm/loader:650:26\n    at async asyncRunEntryPointWithESMLoader (node:internal/modules/run_main:101:5)\n\nNode.js v26.5.0\n\u2716 test/fail-to-pass.test.js (45.245291ms)\n\u2139 tests 1\n\u2139 suites 0\n\u2139 pass 0\n\u2139 fail 1\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 49.15275\n\n\u2716 failing tests:\n\ntest at test/fail-to-pass.test.js:1:1\n\u2716 test/fail-to-pass.test.js (45.245291ms)\n  'test failed'\n",
             "passed": false,
             "returncode": 1
           },
           {
-            "output_tail": "named 'toCSV'\n    at #asyncInstantiate (node:internal/modules/esm/module_job:327:21)\n    at async ModuleJob.run (node:internal/modules/esm/module_job:431:5)\n    at async onImport.tracePromise.__proto__ (node:internal/modules/esm/loader:646:26)\n    at async asyncRunEntryPointWithESMLoader (node:internal/modules/run_main:101:5)\n\nNode.js v26.3.0\n\u2716 test/fail-to-pass.test.js (76.666375ms)\n\u2139 tests 1\n\u2139 suites 0\n\u2139 pass 0\n\u2139 fail 1\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 82.350834\n\n\u2716 failing tests:\n\ntest at test/fail-to-pass.test.js:1:1\n\u2716 test/fail-to-pass.test.js (76.666375ms)\n  'test failed'\n",
+            "output_bytes": 851,
+            "output_sha256": "f1c6f539986dd3d0e7a3c303571eff8d739434dbf584fd36b42dd494d2a9d26d",
+            "output_tail": "file://<path>:1\nimport { toCSV, parseCSV } from '../src/index.js';\n         ^^^^^\nSyntaxError: The requested module '../src/index.js' does not provide an export named 'toCSV'\n    at #asyncInstantiate (node:internal/modules/esm/module_job:463:21)\n    at async ModuleJob.run (node:internal/modules/esm/module_job:561:5)\n    at async node:internal/modules/esm/loader:650:26\n    at async asyncRunEntryPointWithESMLoader (node:internal/modules/run_main:101:5)\n\nNode.js v26.5.0\n\u2716 test/fail-to-pass.test.js (41.781959ms)\n\u2139 tests 1\n\u2139 suites 0\n\u2139 pass 0\n\u2139 fail 1\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 45.665208\n\n\u2716 failing tests:\n\ntest at test/fail-to-pass.test.js:1:1\n\u2716 test/fail-to-pass.test.js (41.781959ms)\n  'test failed'\n",
             "passed": false,
             "returncode": 1
           }
         ],
         "pristine_pass_to_pass": [
           {
-            "output_tail": "",
+            "output_bytes": 894,
+            "output_sha256": "aa02afb729cc4baa2bbb1e02db8af6b78af11d0d740627cd7117125e74784682",
+            "output_tail": "\u2714 parses simple CSV with headers (0.718583ms)\n\u2714 handles quoted fields with commas (0.085208ms)\n\u2714 handles empty values (0.060292ms)\n\u2714 handles single row with no data (1.177666ms)\n\u2714 handles CSV with extra whitespace (0.154334ms)\n\u2714 handles single column CSV (0.57775ms)\n\u2714 handles malformed CSV with extra columns (0.077667ms)\n\u2714 handles malformed CSV with fewer columns (0.086333ms)\n\u2714 handles single quoted field (0.066958ms)\n\u2714 handles escaped quotes in CSV (0.057083ms)\n\u2714 end-to-end: CSV string to JSON string (0.7535ms)\n\u2714 end-to-end: complex CSV with quoted fields (0.08825ms)\n\u2714 end-to-end: empty values (0.065709ms)\n\u2714 converts parsed data to JSON string (1.213791ms)\n\u2714 formats JSON with indentation (0.112375ms)\n\u2714 handles empty array (0.067708ms)\n\u2139 tests 16\n\u2139 suites 0\n\u2139 pass 16\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 78.506875\n",
             "passed": true,
             "returncode": 0
           },
           {
-            "output_tail": "",
+            "output_bytes": 892,
+            "output_sha256": "42ac2a68372169c07db9af11f47d4f308c4c3b6f8a034614dbb5b4324b626b07",
+            "output_tail": "\u2714 parses simple CSV with headers (0.743292ms)\n\u2714 handles quoted fields with commas (0.083ms)\n\u2714 handles empty values (0.064459ms)\n\u2714 handles single row with no data (0.687458ms)\n\u2714 handles CSV with extra whitespace (0.134208ms)\n\u2714 handles single column CSV (0.713958ms)\n\u2714 handles malformed CSV with extra columns (0.214667ms)\n\u2714 handles malformed CSV with fewer columns (0.202416ms)\n\u2714 handles single quoted field (0.14025ms)\n\u2714 handles escaped quotes in CSV (0.123166ms)\n\u2714 end-to-end: CSV string to JSON string (0.743625ms)\n\u2714 end-to-end: complex CSV with quoted fields (0.087458ms)\n\u2714 end-to-end: empty values (0.064833ms)\n\u2714 converts parsed data to JSON string (0.727958ms)\n\u2714 formats JSON with indentation (0.088542ms)\n\u2714 handles empty array (0.062083ms)\n\u2139 tests 16\n\u2139 suites 0\n\u2139 pass 16\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 75.7535\n",
             "passed": true,
             "returncode": 0
           },
           {
-            "output_tail": "",
+            "output_bytes": 894,
+            "output_sha256": "ba9ce033f0751a63206b6bd85ef1c8eaea799616962c1c6184486cdc9e0bac37",
+            "output_tail": "\u2714 parses simple CSV with headers (0.741333ms)\n\u2714 handles quoted fields with commas (0.084958ms)\n\u2714 handles empty values (0.064459ms)\n\u2714 handles single row with no data (0.6775ms)\n\u2714 handles CSV with extra whitespace (0.136417ms)\n\u2714 handles single column CSV (0.861791ms)\n\u2714 handles malformed CSV with extra columns (0.238416ms)\n\u2714 handles malformed CSV with fewer columns (0.192875ms)\n\u2714 handles single quoted field (0.126875ms)\n\u2714 handles escaped quotes in CSV (0.064625ms)\n\u2714 end-to-end: CSV string to JSON string (0.831958ms)\n\u2714 end-to-end: complex CSV with quoted fields (0.092292ms)\n\u2714 end-to-end: empty values (0.064792ms)\n\u2714 converts parsed data to JSON string (0.725584ms)\n\u2714 formats JSON with indentation (0.088209ms)\n\u2714 handles empty array (0.0615ms)\n\u2139 tests 16\n\u2139 suites 0\n\u2139 pass 16\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 77.067708\n",
             "passed": true,
             "returncode": 0
           }
@@ -188,19 +226,16 @@
     },
     "perturbations": [
       {
-        "approved": false,
         "id": "equivalent-1",
         "sha256": "f8ca2f67f810b6baf9be954cc3fb8becd84ad595ab20463323b9cbd467a17905",
         "text": "Complete the following repository task. Preserve existing behavior and verify the tests.\n\nAdd and export a new function toCSV(data) in src/index.js \u2014 the inverse of parseCSV: it serializes an array of row objects into a CSV string. Use the first row's keys as the header row. Quote a field (wrap it in double quotes) if and only if it contains a comma, a double-quote, or a newline, doubling any embedded double-quotes (RFC 4180). Join rows with a newline and emit no trailing newline. The tests in test/toCSV.test.js specify the exact behavior \u2014 make them all pass without modifying any test file, and do not break the existing tests. Run node --test until everything passes."
       },
       {
-        "approved": false,
         "id": "equivalent-2",
         "sha256": "7566d076f577a12759748a7d3527e274a630f73f085cd6d132f0470b8ce0dc25",
         "text": "Repository change request:\nAdd and export a new function toCSV(data) in src/index.js \u2014 the inverse of parseCSV: it serializes an array of row objects into a CSV string. Use the first row's keys as the header row. Quote a field (wrap it in double quotes) if and only if it contains a comma, a double-quote, or a newline, doubling any embedded double-quotes (RFC 4180). Join rows with a newline and emit no trailing newline. The tests in test/toCSV.test.js specify the exact behavior \u2014 make them all pass without modifying any test file, and do not break the existing tests. Run node --test until everything passes.\n\nUse the smallest correct change and confirm the test suite."
       },
       {
-        "approved": false,
         "id": "equivalent-3",
         "sha256": "07c0cd50f675e74cababc4ec2a4afaa1cdd30aa92b4ed1a0af5ea8b00198402c",
         "text": "Please solve this task in the supplied checkout, retaining all stated edge cases:\n\nAdd and export a new function toCSV(data) in src/index.js \u2014 the inverse of parseCSV: it serializes an array of row objects into a CSV string. Use the first row's keys as the header row. Quote a field (wrap it in double quotes) if and only if it contains a comma, a double-quote, or a newline, doubling any embedded double-quotes (RFC 4180). Join rows with a newline and emit no trailing newline. The tests in test/toCSV.test.js specify the exact behavior \u2014 make them all pass without modifying any test file, and do not break the existing tests. Run node --test until everything passes."
@@ -242,6 +277,14 @@
         "node",
         "--test",
         "test/fail-to-pass.test.js"
+      ],
+      "expected_cases": [
+        "toCSV round-trips through parseCSV",
+        "toCSV: escapes embedded double-quotes by doubling",
+        "toCSV: multiple rows, header from first row keys",
+        "toCSV: quotes fields containing commas",
+        "toCSV: quotes fields containing newlines",
+        "toCSV: simple unquoted"
       ],
       "overlays": [
         {

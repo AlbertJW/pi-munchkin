@@ -19,3 +19,14 @@ optimizer/prompt-lab/configs/applied/
 **/.env
 **/node_modules/
 /node_modules
+
+# Machine-local + private data (defense in depth, 2026-08-18). None of these are
+# tracked today; SHARING.md designates them private and the live models.json is the
+# file that carried the purged Cerebras key. Ignoring them means a future `git add`
+# cannot publish them by accident.
+models.json
+models-store.json
+trust.json
+*.bak-*
+judge-labels.jsonl
+artifacts/

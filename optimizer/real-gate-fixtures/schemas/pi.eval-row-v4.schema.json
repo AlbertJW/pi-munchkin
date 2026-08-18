@@ -27,21 +27,54 @@
     "nullableTimingAggregate": {
       "additionalProperties": false,
       "properties": {
-        "count": { "minimum": 0, "type": "integer" },
-        "sum_ms": { "minimum": 0, "type": "number" },
-        "max_ms": { "minimum": 0, "type": ["number", "null"] }
+        "count": {
+          "minimum": 0,
+          "type": "integer"
+        },
+        "sum_ms": {
+          "minimum": 0,
+          "type": "number"
+        },
+        "max_ms": {
+          "minimum": 0,
+          "type": [
+            "number",
+            "null"
+          ]
+        }
       },
-      "required": ["count", "sum_ms", "max_ms"],
+      "required": [
+        "count",
+        "sum_ms",
+        "max_ms"
+      ],
       "type": "object"
     },
     "tierCount": {
       "additionalProperties": false,
       "properties": {
-        "detector": { "enum": ["semantic", "session", "combined"] },
-        "tier": { "minimum": 1, "maximum": 3, "type": "integer" },
-        "count": { "minimum": 0, "type": "integer" }
+        "detector": {
+          "enum": [
+            "semantic",
+            "session",
+            "combined"
+          ]
+        },
+        "tier": {
+          "minimum": 1,
+          "maximum": 3,
+          "type": "integer"
+        },
+        "count": {
+          "minimum": 0,
+          "type": "integer"
+        }
       },
-      "required": ["detector", "tier", "count"],
+      "required": [
+        "detector",
+        "tier",
+        "count"
+      ],
       "type": "object"
     }
   },
@@ -274,39 +307,121 @@
         "failure_episodes": {
           "additionalProperties": false,
           "properties": {
-            "complete": { "type": "boolean" },
-            "settlement_summaries": { "minimum": 0, "type": "integer" },
-            "opened_events": { "minimum": 0, "type": "integer" },
-            "observed_events": { "minimum": 0, "type": "integer" },
-            "recovered_events": { "minimum": 0, "type": "integer" },
-            "abandoned_events": { "minimum": 0, "type": "integer" },
-            "total_episodes": { "minimum": 0, "type": ["integer", "null"] },
-            "total_failures": { "minimum": 0, "type": ["integer", "null"] },
-            "longest_episode": { "minimum": 0, "type": ["integer", "null"] },
-            "semantic_failure_overrun": { "minimum": 0, "type": ["integer", "null"] },
-            "correlated_failure_overrun": { "minimum": 0, "type": ["integer", "null"] },
-            "settled_without_recovery": { "minimum": 0, "type": ["integer", "null"] },
-            "failures_after_second": { "minimum": 0, "type": "integer" },
-            "recovered_episodes": { "minimum": 0, "type": "integer" },
-            "recovery_calls_total": { "minimum": 0, "type": "integer" },
-            "recovery_calls_max": { "minimum": 0, "type": "integer" },
+            "complete": {
+              "type": "boolean"
+            },
+            "settlement_summaries": {
+              "minimum": 0,
+              "type": "integer"
+            },
+            "opened_events": {
+              "minimum": 0,
+              "type": "integer"
+            },
+            "observed_events": {
+              "minimum": 0,
+              "type": "integer"
+            },
+            "recovered_events": {
+              "minimum": 0,
+              "type": "integer"
+            },
+            "abandoned_events": {
+              "minimum": 0,
+              "type": "integer"
+            },
+            "total_episodes": {
+              "minimum": 0,
+              "type": [
+                "integer",
+                "null"
+              ]
+            },
+            "total_failures": {
+              "minimum": 0,
+              "type": [
+                "integer",
+                "null"
+              ]
+            },
+            "longest_episode": {
+              "minimum": 0,
+              "type": [
+                "integer",
+                "null"
+              ]
+            },
+            "semantic_failure_overrun": {
+              "minimum": 0,
+              "type": [
+                "integer",
+                "null"
+              ]
+            },
+            "correlated_failure_overrun": {
+              "minimum": 0,
+              "type": [
+                "integer",
+                "null"
+              ]
+            },
+            "settled_without_recovery": {
+              "minimum": 0,
+              "type": [
+                "integer",
+                "null"
+              ]
+            },
+            "failures_after_second": {
+              "minimum": 0,
+              "type": "integer"
+            },
+            "recovered_episodes": {
+              "minimum": 0,
+              "type": "integer"
+            },
+            "recovery_calls_total": {
+              "minimum": 0,
+              "type": "integer"
+            },
+            "recovery_calls_max": {
+              "minimum": 0,
+              "type": "integer"
+            },
             "tier_observed": {
-              "items": { "$ref": "#/$defs/tierCount" },
+              "items": {
+                "$ref": "#/$defs/tierCount"
+              },
               "maxItems": 9,
               "type": "array"
             },
             "interventions": {
-              "items": { "$ref": "#/$defs/tierCount" },
+              "items": {
+                "$ref": "#/$defs/tierCount"
+              },
               "maxItems": 9,
               "type": "array"
             }
           },
           "required": [
-            "complete", "settlement_summaries", "opened_events", "observed_events",
-            "recovered_events", "abandoned_events", "total_episodes", "total_failures",
-            "longest_episode", "semantic_failure_overrun", "correlated_failure_overrun",
-            "settled_without_recovery", "failures_after_second", "recovered_episodes",
-            "recovery_calls_total", "recovery_calls_max", "tier_observed", "interventions"
+            "complete",
+            "settlement_summaries",
+            "opened_events",
+            "observed_events",
+            "recovered_events",
+            "abandoned_events",
+            "total_episodes",
+            "total_failures",
+            "longest_episode",
+            "semantic_failure_overrun",
+            "correlated_failure_overrun",
+            "settled_without_recovery",
+            "failures_after_second",
+            "recovered_episodes",
+            "recovery_calls_total",
+            "recovery_calls_max",
+            "tier_observed",
+            "interventions"
           ],
           "type": "object"
         },
@@ -338,43 +453,157 @@
         "provider_timing": {
           "additionalProperties": false,
           "properties": {
-            "requests": { "minimum": 0, "type": "integer" },
-            "request_to_headers_ms": { "$ref": "#/$defs/nullableTimingAggregate" },
-            "first_token_ms": { "$ref": "#/$defs/nullableTimingAggregate" },
-            "stream_completion_ms": { "$ref": "#/$defs/nullableTimingAggregate" },
-            "settlement_ms": { "$ref": "#/$defs/nullableTimingAggregate" }
+            "requests": {
+              "minimum": 0,
+              "type": "integer"
+            },
+            "request_to_headers_ms": {
+              "$ref": "#/$defs/nullableTimingAggregate"
+            },
+            "first_token_ms": {
+              "$ref": "#/$defs/nullableTimingAggregate"
+            },
+            "stream_completion_ms": {
+              "$ref": "#/$defs/nullableTimingAggregate"
+            },
+            "settlement_ms": {
+              "$ref": "#/$defs/nullableTimingAggregate"
+            }
           },
           "required": [
-            "requests", "request_to_headers_ms", "first_token_ms",
-            "stream_completion_ms", "settlement_ms"
+            "requests",
+            "request_to_headers_ms",
+            "first_token_ms",
+            "stream_completion_ms",
+            "settlement_ms"
           ],
           "type": "object"
         },
         "verification_frontier": {
           "additionalProperties": false,
           "properties": {
-            "complete": { "type": "boolean" },
-            "settlement_summaries": { "minimum": 0, "type": "integer" },
-            "protocol": { "enum": ["node_tap", "unknown", null] },
-            "recognized_gates": { "minimum": 0, "type": ["integer", "null"] },
-            "current_passed": { "minimum": 0, "type": ["integer", "null"] },
-            "current_failed": { "minimum": 0, "type": ["integer", "null"] },
-            "current_skipped": { "minimum": 0, "type": ["integer", "null"] },
-            "current_total": { "minimum": 0, "type": ["integer", "null"] },
-            "best_passed": { "minimum": 0, "type": ["integer", "null"] },
-            "best_failed": { "minimum": 0, "type": ["integer", "null"] },
-            "best_skipped": { "minimum": 0, "type": ["integer", "null"] },
-            "best_total": { "minimum": 0, "type": ["integer", "null"] },
-            "last_advanced": { "type": ["boolean", "null"] },
-            "plateau_streak": { "minimum": 0, "type": ["integer", "null"] },
-            "successful_mutation_epochs_since_advance": { "minimum": 0, "type": ["integer", "null"] },
-            "verification_plateau_overrun": { "minimum": 0, "type": ["integer", "null"] }
+            "complete": {
+              "type": "boolean"
+            },
+            "settlement_summaries": {
+              "minimum": 0,
+              "type": "integer"
+            },
+            "protocol": {
+              "enum": [
+                "node_tap",
+                "unknown",
+                null
+              ]
+            },
+            "recognized_gates": {
+              "minimum": 0,
+              "type": [
+                "integer",
+                "null"
+              ]
+            },
+            "current_passed": {
+              "minimum": 0,
+              "type": [
+                "integer",
+                "null"
+              ]
+            },
+            "current_failed": {
+              "minimum": 0,
+              "type": [
+                "integer",
+                "null"
+              ]
+            },
+            "current_skipped": {
+              "minimum": 0,
+              "type": [
+                "integer",
+                "null"
+              ]
+            },
+            "current_total": {
+              "minimum": 0,
+              "type": [
+                "integer",
+                "null"
+              ]
+            },
+            "best_passed": {
+              "minimum": 0,
+              "type": [
+                "integer",
+                "null"
+              ]
+            },
+            "best_failed": {
+              "minimum": 0,
+              "type": [
+                "integer",
+                "null"
+              ]
+            },
+            "best_skipped": {
+              "minimum": 0,
+              "type": [
+                "integer",
+                "null"
+              ]
+            },
+            "best_total": {
+              "minimum": 0,
+              "type": [
+                "integer",
+                "null"
+              ]
+            },
+            "last_advanced": {
+              "type": [
+                "boolean",
+                "null"
+              ]
+            },
+            "plateau_streak": {
+              "minimum": 0,
+              "type": [
+                "integer",
+                "null"
+              ]
+            },
+            "successful_mutation_epochs_since_advance": {
+              "minimum": 0,
+              "type": [
+                "integer",
+                "null"
+              ]
+            },
+            "verification_plateau_overrun": {
+              "minimum": 0,
+              "type": [
+                "integer",
+                "null"
+              ]
+            }
           },
           "required": [
-            "complete", "settlement_summaries", "protocol", "recognized_gates",
-            "current_passed", "current_failed", "current_skipped", "current_total",
-            "best_passed", "best_failed", "best_skipped", "best_total", "last_advanced",
-            "plateau_streak", "successful_mutation_epochs_since_advance", "verification_plateau_overrun"
+            "complete",
+            "settlement_summaries",
+            "protocol",
+            "recognized_gates",
+            "current_passed",
+            "current_failed",
+            "current_skipped",
+            "current_total",
+            "best_passed",
+            "best_failed",
+            "best_skipped",
+            "best_total",
+            "last_advanced",
+            "plateau_streak",
+            "successful_mutation_epochs_since_advance",
+            "verification_plateau_overrun"
           ],
           "type": "object"
         },
@@ -855,6 +1084,42 @@
         "output_chars"
       ],
       "type": "object"
+    },
+    "pattern": {
+      "type": "string"
+    },
+    "rep": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "retried": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "authority_reason": {
+      "type": "string"
+    },
+    "execution": {
+      "type": "object"
+    },
+    "out_chars": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "think_chars": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "in_tok": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "out_tok": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "token_usage_exact": {
+      "type": "boolean"
     }
   },
   "required": [
@@ -874,5 +1139,6 @@
     "status",
     "exposure"
   ],
-  "type": "object"
+  "type": "object",
+  "additionalProperties": false
 }

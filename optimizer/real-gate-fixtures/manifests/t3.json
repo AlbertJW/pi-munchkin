@@ -2,41 +2,55 @@
   "admission": {
     "approved": false,
     "automated": {
-      "checked_at": "2026-07-14T18:49:09Z",
+      "checked_at": "2026-08-18T14:01:33Z",
       "hash_drift": [],
+      "manifest_drift": false,
+      "overlay_lint": [],
       "passed": true,
       "runs_per_state": 3,
       "states": {
         "gold_fail_to_pass": [
           {
-            "output_tail": "",
+            "output_bytes": 316,
+            "output_sha256": "b6ac5aa1a93d0d50a054c76f6dbc777cc1318a0732af7e005f3b82ab425a6631",
+            "output_tail": "\u2714 alignLeft pads on the right (0.378709ms)\n\u2714 alignRight pads on the left (0.064458ms)\n\u2714 center puts the smaller pad on the left (0.06ms)\n\u2714 value at or above width returns unchanged (0.061125ms)\n\u2139 tests 4\n\u2139 suites 0\n\u2139 pass 4\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 52.447625\n",
             "passed": true,
             "returncode": 0
           },
           {
-            "output_tail": "",
+            "output_bytes": 320,
+            "output_sha256": "c40576fcaeae2a710af643acfe476329de03388bb556fb857744afd35d76935a",
+            "output_tail": "\u2714 alignLeft pads on the right (0.379458ms)\n\u2714 alignRight pads on the left (0.063625ms)\n\u2714 center puts the smaller pad on the left (0.060166ms)\n\u2714 value at or above width returns unchanged (0.065459ms)\n\u2139 tests 4\n\u2139 suites 0\n\u2139 pass 4\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 53.175917\n",
             "passed": true,
             "returncode": 0
           },
           {
-            "output_tail": "",
+            "output_bytes": 314,
+            "output_sha256": "f4c57fb53db47eb16f3f15601d99607138c0567fe31e6b9867676fef630be8c6",
+            "output_tail": "\u2714 alignLeft pads on the right (0.386ms)\n\u2714 alignRight pads on the left (0.067542ms)\n\u2714 center puts the smaller pad on the left (0.062ms)\n\u2714 value at or above width returns unchanged (0.044625ms)\n\u2139 tests 4\n\u2139 suites 0\n\u2139 pass 4\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 81.782667\n",
             "passed": true,
             "returncode": 0
           }
         ],
         "gold_pass_to_pass": [
           {
-            "output_tail": "",
+            "output_bytes": 896,
+            "output_sha256": "92ce1f719f8c8c606a5a1b89809203b14ecd315f77a743006ac5caa89219e416",
+            "output_tail": "\u2714 parses simple CSV with headers (2.275625ms)\n\u2714 handles quoted fields with commas (0.306167ms)\n\u2714 handles empty values (0.254042ms)\n\u2714 handles single row with no data (0.771625ms)\n\u2714 handles CSV with extra whitespace (0.143625ms)\n\u2714 handles single column CSV (1.045583ms)\n\u2714 handles malformed CSV with extra columns (0.2795ms)\n\u2714 handles malformed CSV with fewer columns (0.399417ms)\n\u2714 handles single quoted field (0.463417ms)\n\u2714 handles escaped quotes in CSV (0.119291ms)\n\u2714 end-to-end: CSV string to JSON string (0.764125ms)\n\u2714 end-to-end: complex CSV with quoted fields (0.087916ms)\n\u2714 end-to-end: empty values (0.064209ms)\n\u2714 converts parsed data to JSON string (0.723834ms)\n\u2714 formats JSON with indentation (0.093291ms)\n\u2714 handles empty array (0.060708ms)\n\u2139 tests 16\n\u2139 suites 0\n\u2139 pass 16\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 83.370917\n",
             "passed": true,
             "returncode": 0
           },
           {
-            "output_tail": "",
+            "output_bytes": 889,
+            "output_sha256": "57272ad52e48fb48319d9ac6255125b84ee9edb9f1c67fb912b2e6b84579b1d0",
+            "output_tail": "\u2714 parses simple CSV with headers (0.743125ms)\n\u2714 handles quoted fields with commas (0.085667ms)\n\u2714 handles empty values (0.058625ms)\n\u2714 handles single row with no data (0.703625ms)\n\u2714 handles CSV with extra whitespace (0.138541ms)\n\u2714 handles single column CSV (0.501625ms)\n\u2714 handles malformed CSV with extra columns (0.061291ms)\n\u2714 handles malformed CSV with fewer columns (0.073333ms)\n\u2714 handles single quoted field (0.05625ms)\n\u2714 handles escaped quotes in CSV (0.0545ms)\n\u2714 end-to-end: CSV string to JSON string (0.799209ms)\n\u2714 end-to-end: complex CSV with quoted fields (0.115375ms)\n\u2714 end-to-end: empty values (0.069709ms)\n\u2714 converts parsed data to JSON string (0.7065ms)\n\u2714 formats JSON with indentation (0.09225ms)\n\u2714 handles empty array (0.06725ms)\n\u2139 tests 16\n\u2139 suites 0\n\u2139 pass 16\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 83.8755\n",
             "passed": true,
             "returncode": 0
           },
           {
-            "output_tail": "",
+            "output_bytes": 888,
+            "output_sha256": "ae3a35f58ea1ccfcccedfc42a32cfc439c3384c01eeeb26995e220b122a934f2",
+            "output_tail": "\u2714 parses simple CSV with headers (1.077208ms)\n\u2714 handles quoted fields with commas (0.091417ms)\n\u2714 handles empty values (0.066375ms)\n\u2714 handles single row with no data (0.683ms)\n\u2714 handles CSV with extra whitespace (0.138ms)\n\u2714 handles single column CSV (0.775666ms)\n\u2714 handles malformed CSV with extra columns (0.18075ms)\n\u2714 handles malformed CSV with fewer columns (0.17325ms)\n\u2714 handles single quoted field (0.131958ms)\n\u2714 handles escaped quotes in CSV (0.121125ms)\n\u2714 end-to-end: CSV string to JSON string (0.80925ms)\n\u2714 end-to-end: complex CSV with quoted fields (0.092708ms)\n\u2714 end-to-end: empty values (0.066417ms)\n\u2714 converts parsed data to JSON string (0.69975ms)\n\u2714 formats JSON with indentation (0.087917ms)\n\u2714 handles empty array (0.062792ms)\n\u2139 tests 16\n\u2139 suites 0\n\u2139 pass 16\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 74.594084\n",
             "passed": true,
             "returncode": 0
           }
@@ -44,34 +58,46 @@
         "mutant:shortcut": {
           "fail_to_pass": [
             {
-              "output_tail": "-t3-4p4wag1p/work/test/fail-to-pass.test.js:14:10)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n      at Test.postRun (node:internal/test_runner/test:1522:19)\n      at Test.run (node:internal/test_runner/test:1447:12)\n      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7) {\n    generatedMessage: true,\n    code: 'ERR_ASSERTION',\n    actual: '  ab ',\n    expected: ' ab  ',\n    operator: 'strictEqual',\n    diff: 'simple'\n  }\n",
+              "output_bytes": 2881,
+              "output_sha256": "b38974e1eb8061c2cbab04cd8b08d88d50098e5be4031f11dca6badad39916ad",
+              "output_tail": "runner/test:1242:17)\n      at startSubtestAfterBootstrap (node:internal/test_runner/harness:387:17) {\n    generatedMessage: true,\n    code: 'ERR_ASSERTION',\n    actual: '   ab',\n    expected: 'ab   ',\n    operator: 'strictEqual',\n    diff: 'simple'\n  }\n\ntest at test/fail-to-pass.test.js:9:1\n\u2716 alignRight pads on the left (0.102166ms)\n  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:\n  \n  'ab   ' !== '   ab'\n  \n      at TestContext.<anonymous> (file://<path>:10:10)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n      at Test.postRun (node:internal/test_runner/test:1522:19)\n      at Test.run (node:internal/test_runner/test:1447:12)\n      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3) {\n    generatedMessage: true,\n    code: 'ERR_ASSERTION',\n    actual: 'ab   ',\n    expected: '   ab',\n    operator: 'strictEqual',\n    diff: 'simple'\n  }\n\ntest at test/fail-to-pass.test.js:13:1\n\u2716 center puts the smaller pad on the left (0.088875ms)\n  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:\n  \n  '  ab ' !== ' ab  '\n  \n      at TestContext.<anonymous> (file://<path>:14:10)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n      at Test.postRun (node:internal/test_runner/test:1522:19)\n      at Test.run (node:internal/test_runner/test:1447:12)\n      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7) {\n    generatedMessage: true,\n    code: 'ERR_ASSERTION',\n    actual: '  ab ',\n    expected: ' ab  ',\n    operator: 'strictEqual',\n    diff: 'simple'\n  }\n",
               "passed": false,
               "returncode": 1
             },
             {
-              "output_tail": "-t3-yayt43dk/work/test/fail-to-pass.test.js:14:10)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n      at Test.postRun (node:internal/test_runner/test:1522:19)\n      at Test.run (node:internal/test_runner/test:1447:12)\n      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7) {\n    generatedMessage: true,\n    code: 'ERR_ASSERTION',\n    actual: '  ab ',\n    expected: ' ab  ',\n    operator: 'strictEqual',\n    diff: 'simple'\n  }\n",
+              "output_bytes": 2882,
+              "output_sha256": "aabd24a2d7a116c3503bbb19b83e6828e4108fe1c04ea07e83e55a5b911c4e6b",
+              "output_tail": "runner/test:1242:17)\n      at startSubtestAfterBootstrap (node:internal/test_runner/harness:387:17) {\n    generatedMessage: true,\n    code: 'ERR_ASSERTION',\n    actual: '   ab',\n    expected: 'ab   ',\n    operator: 'strictEqual',\n    diff: 'simple'\n  }\n\ntest at test/fail-to-pass.test.js:9:1\n\u2716 alignRight pads on the left (0.200166ms)\n  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:\n  \n  'ab   ' !== '   ab'\n  \n      at TestContext.<anonymous> (file://<path>:10:10)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n      at Test.postRun (node:internal/test_runner/test:1522:19)\n      at Test.run (node:internal/test_runner/test:1447:12)\n      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3) {\n    generatedMessage: true,\n    code: 'ERR_ASSERTION',\n    actual: 'ab   ',\n    expected: '   ab',\n    operator: 'strictEqual',\n    diff: 'simple'\n  }\n\ntest at test/fail-to-pass.test.js:13:1\n\u2716 center puts the smaller pad on the left (0.086959ms)\n  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:\n  \n  '  ab ' !== ' ab  '\n  \n      at TestContext.<anonymous> (file://<path>:14:10)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n      at Test.postRun (node:internal/test_runner/test:1522:19)\n      at Test.run (node:internal/test_runner/test:1447:12)\n      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7) {\n    generatedMessage: true,\n    code: 'ERR_ASSERTION',\n    actual: '  ab ',\n    expected: ' ab  ',\n    operator: 'strictEqual',\n    diff: 'simple'\n  }\n",
               "passed": false,
               "returncode": 1
             },
             {
-              "output_tail": "-t3-_wqmkw8i/work/test/fail-to-pass.test.js:14:10)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n      at Test.postRun (node:internal/test_runner/test:1522:19)\n      at Test.run (node:internal/test_runner/test:1447:12)\n      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7) {\n    generatedMessage: true,\n    code: 'ERR_ASSERTION',\n    actual: '  ab ',\n    expected: ' ab  ',\n    operator: 'strictEqual',\n    diff: 'simple'\n  }\n",
+              "output_bytes": 2882,
+              "output_sha256": "663de2afb08b44e297febb2b9031146dd7aedeece851975aa8ca52a96b0513df",
+              "output_tail": "runner/test:1242:17)\n      at startSubtestAfterBootstrap (node:internal/test_runner/harness:387:17) {\n    generatedMessage: true,\n    code: 'ERR_ASSERTION',\n    actual: '   ab',\n    expected: 'ab   ',\n    operator: 'strictEqual',\n    diff: 'simple'\n  }\n\ntest at test/fail-to-pass.test.js:9:1\n\u2716 alignRight pads on the left (0.115875ms)\n  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:\n  \n  'ab   ' !== '   ab'\n  \n      at TestContext.<anonymous> (file://<path>:10:10)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n      at Test.postRun (node:internal/test_runner/test:1522:19)\n      at Test.run (node:internal/test_runner/test:1447:12)\n      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3) {\n    generatedMessage: true,\n    code: 'ERR_ASSERTION',\n    actual: 'ab   ',\n    expected: '   ab',\n    operator: 'strictEqual',\n    diff: 'simple'\n  }\n\ntest at test/fail-to-pass.test.js:13:1\n\u2716 center puts the smaller pad on the left (0.093459ms)\n  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:\n  \n  '  ab ' !== ' ab  '\n  \n      at TestContext.<anonymous> (file://<path>:14:10)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n      at Test.postRun (node:internal/test_runner/test:1522:19)\n      at Test.run (node:internal/test_runner/test:1447:12)\n      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7) {\n    generatedMessage: true,\n    code: 'ERR_ASSERTION',\n    actual: '  ab ',\n    expected: ' ab  ',\n    operator: 'strictEqual',\n    diff: 'simple'\n  }\n",
               "passed": false,
               "returncode": 1
             }
           ],
           "pass_to_pass": [
             {
-              "output_tail": "",
+              "output_bytes": 889,
+              "output_sha256": "ab16cfb5cee3b72a887f957ad531b8766d8b9ab01ef7af8541235639af9d1d87",
+              "output_tail": "\u2714 parses simple CSV with headers (0.727083ms)\n\u2714 handles quoted fields with commas (0.082583ms)\n\u2714 handles empty values (0.061125ms)\n\u2714 handles single row with no data (0.731417ms)\n\u2714 handles CSV with extra whitespace (0.143834ms)\n\u2714 handles single column CSV (0.698583ms)\n\u2714 handles malformed CSV with extra columns (0.193ms)\n\u2714 handles malformed CSV with fewer columns (0.198916ms)\n\u2714 handles single quoted field (0.137958ms)\n\u2714 handles escaped quotes in CSV (0.132ms)\n\u2714 end-to-end: CSV string to JSON string (2.733625ms)\n\u2714 end-to-end: complex CSV with quoted fields (0.141084ms)\n\u2714 end-to-end: empty values (0.072333ms)\n\u2714 converts parsed data to JSON string (0.785666ms)\n\u2714 formats JSON with indentation (0.091167ms)\n\u2714 handles empty array (0.062583ms)\n\u2139 tests 16\n\u2139 suites 0\n\u2139 pass 16\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 76.108\n",
               "passed": true,
               "returncode": 0
             },
             {
-              "output_tail": "",
+              "output_bytes": 892,
+              "output_sha256": "00cebd0e30cf674a73846e89c8ccf9a3a332f7b9e4c382900780d5f22b997d93",
+              "output_tail": "\u2714 parses simple CSV with headers (0.917041ms)\n\u2714 handles quoted fields with commas (0.0865ms)\n\u2714 handles empty values (0.065416ms)\n\u2714 handles single row with no data (0.718917ms)\n\u2714 handles CSV with extra whitespace (0.1415ms)\n\u2714 handles single column CSV (1.032459ms)\n\u2714 handles malformed CSV with extra columns (0.370125ms)\n\u2714 handles malformed CSV with fewer columns (0.374958ms)\n\u2714 handles single quoted field (0.220166ms)\n\u2714 handles escaped quotes in CSV (0.2375ms)\n\u2714 end-to-end: CSV string to JSON string (0.854042ms)\n\u2714 end-to-end: complex CSV with quoted fields (0.092708ms)\n\u2714 end-to-end: empty values (0.066375ms)\n\u2714 converts parsed data to JSON string (0.899125ms)\n\u2714 formats JSON with indentation (0.095083ms)\n\u2714 handles empty array (0.061417ms)\n\u2139 tests 16\n\u2139 suites 0\n\u2139 pass 16\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 89.091125\n",
               "passed": true,
               "returncode": 0
             },
             {
-              "output_tail": "",
+              "output_bytes": 889,
+              "output_sha256": "87675f5d87a79cf5071e2966cb3dbe763c97adf1ab795762c707e8fa834a7cec",
+              "output_tail": "\u2714 parses simple CSV with headers (0.742709ms)\n\u2714 handles quoted fields with commas (0.083666ms)\n\u2714 handles empty values (0.0595ms)\n\u2714 handles single row with no data (0.697417ms)\n\u2714 handles CSV with extra whitespace (0.136417ms)\n\u2714 handles single column CSV (0.509ms)\n\u2714 handles malformed CSV with extra columns (0.061209ms)\n\u2714 handles malformed CSV with fewer columns (0.074584ms)\n\u2714 handles single quoted field (0.06325ms)\n\u2714 handles escaped quotes in CSV (0.05925ms)\n\u2714 end-to-end: CSV string to JSON string (0.819791ms)\n\u2714 end-to-end: complex CSV with quoted fields (0.092583ms)\n\u2714 end-to-end: empty values (0.066958ms)\n\u2714 converts parsed data to JSON string (0.7005ms)\n\u2714 formats JSON with indentation (0.087042ms)\n\u2714 handles empty array (0.063416ms)\n\u2139 tests 16\n\u2139 suites 0\n\u2139 pass 16\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 75.242375\n",
               "passed": true,
               "returncode": 0
             }
@@ -79,34 +105,46 @@
         },
         "pristine_fail_to_pass": [
           {
-            "output_tail": "-t3-mi31qj42/work/test/fail-to-pass.test.js:14:10)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n      at Test.postRun (node:internal/test_runner/test:1522:19)\n      at Test.run (node:internal/test_runner/test:1447:12)\n      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7) {\n    generatedMessage: true,\n    code: 'ERR_ASSERTION',\n    actual: '  ab ',\n    expected: ' ab  ',\n    operator: 'strictEqual',\n    diff: 'simple'\n  }\n",
+            "output_bytes": 2134,
+            "output_sha256": "775696087b707a2864a58d4040d09b3d1f45598b208d199ac9d748f95994b114",
+            "output_tail": "ms)\n\u2716 center puts the smaller pad on the left (0.098333ms)\n\u2714 value at or above width returns unchanged (0.330958ms)\n\u2139 tests 4\n\u2139 suites 0\n\u2139 pass 2\n\u2139 fail 2\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 52.89425\n\n\u2716 failing tests:\n\ntest at test/fail-to-pass.test.js:9:1\n\u2716 alignRight pads on the left (0.473458ms)\n  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:\n  \n  'ab   ' !== '   ab'\n  \n      at TestContext.<anonymous> (file://<path>:10:10)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n      at Test.postRun (node:internal/test_runner/test:1522:19)\n      at Test.run (node:internal/test_runner/test:1447:12)\n      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3) {\n    generatedMessage: true,\n    code: 'ERR_ASSERTION',\n    actual: 'ab   ',\n    expected: '   ab',\n    operator: 'strictEqual',\n    diff: 'simple'\n  }\n\ntest at test/fail-to-pass.test.js:13:1\n\u2716 center puts the smaller pad on the left (0.098333ms)\n  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:\n  \n  '  ab ' !== ' ab  '\n  \n      at TestContext.<anonymous> (file://<path>:14:10)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n      at Test.postRun (node:internal/test_runner/test:1522:19)\n      at Test.run (node:internal/test_runner/test:1447:12)\n      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7) {\n    generatedMessage: true,\n    code: 'ERR_ASSERTION',\n    actual: '  ab ',\n    expected: ' ab  ',\n    operator: 'strictEqual',\n    diff: 'simple'\n  }\n",
             "passed": false,
             "returncode": 1
           },
           {
-            "output_tail": "-t3-o7r71lg0/work/test/fail-to-pass.test.js:14:10)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n      at Test.postRun (node:internal/test_runner/test:1522:19)\n      at Test.run (node:internal/test_runner/test:1447:12)\n      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7) {\n    generatedMessage: true,\n    code: 'ERR_ASSERTION',\n    actual: '  ab ',\n    expected: ' ab  ',\n    operator: 'strictEqual',\n    diff: 'simple'\n  }\n",
+            "output_bytes": 2129,
+            "output_sha256": "0e6acd6d69f69704e303e7cf2af6444993382a2871493e36aa6950bc2368d210",
+            "output_tail": "74ms)\n\u2716 center puts the smaller pad on the left (0.099084ms)\n\u2714 value at or above width returns unchanged (0.458708ms)\n\u2139 tests 4\n\u2139 suites 0\n\u2139 pass 2\n\u2139 fail 2\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 52.666167\n\n\u2716 failing tests:\n\ntest at test/fail-to-pass.test.js:9:1\n\u2716 alignRight pads on the left (0.474ms)\n  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:\n  \n  'ab   ' !== '   ab'\n  \n      at TestContext.<anonymous> (file://<path>:10:10)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n      at Test.postRun (node:internal/test_runner/test:1522:19)\n      at Test.run (node:internal/test_runner/test:1447:12)\n      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3) {\n    generatedMessage: true,\n    code: 'ERR_ASSERTION',\n    actual: 'ab   ',\n    expected: '   ab',\n    operator: 'strictEqual',\n    diff: 'simple'\n  }\n\ntest at test/fail-to-pass.test.js:13:1\n\u2716 center puts the smaller pad on the left (0.099084ms)\n  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:\n  \n  '  ab ' !== ' ab  '\n  \n      at TestContext.<anonymous> (file://<path>:14:10)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n      at Test.postRun (node:internal/test_runner/test:1522:19)\n      at Test.run (node:internal/test_runner/test:1447:12)\n      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7) {\n    generatedMessage: true,\n    code: 'ERR_ASSERTION',\n    actual: '  ab ',\n    expected: ' ab  ',\n    operator: 'strictEqual',\n    diff: 'simple'\n  }\n",
             "passed": false,
             "returncode": 1
           },
           {
-            "output_tail": "-t3-ia_cio0s/work/test/fail-to-pass.test.js:14:10)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n      at Test.postRun (node:internal/test_runner/test:1522:19)\n      at Test.run (node:internal/test_runner/test:1447:12)\n      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7) {\n    generatedMessage: true,\n    code: 'ERR_ASSERTION',\n    actual: '  ab ',\n    expected: ' ab  ',\n    operator: 'strictEqual',\n    diff: 'simple'\n  }\n",
+            "output_bytes": 2134,
+            "output_sha256": "010b88cccc4946003ff2a4cde7040bc70d3f583b98e23e529f5cab0228cd8dc3",
+            "output_tail": "ms)\n\u2716 center puts the smaller pad on the left (0.097792ms)\n\u2714 value at or above width returns unchanged (0.368417ms)\n\u2139 tests 4\n\u2139 suites 0\n\u2139 pass 2\n\u2139 fail 2\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 53.17625\n\n\u2716 failing tests:\n\ntest at test/fail-to-pass.test.js:9:1\n\u2716 alignRight pads on the left (0.499167ms)\n  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:\n  \n  'ab   ' !== '   ab'\n  \n      at TestContext.<anonymous> (file://<path>:10:10)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n      at Test.postRun (node:internal/test_runner/test:1522:19)\n      at Test.run (node:internal/test_runner/test:1447:12)\n      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3) {\n    generatedMessage: true,\n    code: 'ERR_ASSERTION',\n    actual: 'ab   ',\n    expected: '   ab',\n    operator: 'strictEqual',\n    diff: 'simple'\n  }\n\ntest at test/fail-to-pass.test.js:13:1\n\u2716 center puts the smaller pad on the left (0.097792ms)\n  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:\n  \n  '  ab ' !== ' ab  '\n  \n      at TestContext.<anonymous> (file://<path>:14:10)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n      at Test.postRun (node:internal/test_runner/test:1522:19)\n      at Test.run (node:internal/test_runner/test:1447:12)\n      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7) {\n    generatedMessage: true,\n    code: 'ERR_ASSERTION',\n    actual: '  ab ',\n    expected: ' ab  ',\n    operator: 'strictEqual',\n    diff: 'simple'\n  }\n",
             "passed": false,
             "returncode": 1
           }
         ],
         "pristine_pass_to_pass": [
           {
-            "output_tail": "",
+            "output_bytes": 890,
+            "output_sha256": "094fb2feaf11a23a551cd6201be09de9aefdce158e0a16796338547ebcba4191",
+            "output_tail": "\u2714 parses simple CSV with headers (0.978042ms)\n\u2714 handles quoted fields with commas (0.333875ms)\n\u2714 handles empty values (0.290667ms)\n\u2714 handles single row with no data (1.128333ms)\n\u2714 handles CSV with extra whitespace (0.622709ms)\n\u2714 handles single column CSV (0.741375ms)\n\u2714 handles malformed CSV with extra columns (0.098333ms)\n\u2714 handles malformed CSV with fewer columns (0.13625ms)\n\u2714 handles single quoted field (0.069458ms)\n\u2714 handles escaped quotes in CSV (0.171083ms)\n\u2714 end-to-end: CSV string to JSON string (1.647ms)\n\u2714 end-to-end: complex CSV with quoted fields (0.149292ms)\n\u2714 end-to-end: empty values (0.09575ms)\n\u2714 converts parsed data to JSON string (1.280792ms)\n\u2714 formats JSON with indentation (0.130125ms)\n\u2714 handles empty array (0.101ms)\n\u2139 tests 16\n\u2139 suites 0\n\u2139 pass 16\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 90.818666\n",
             "passed": true,
             "returncode": 0
           },
           {
-            "output_tail": "",
+            "output_bytes": 894,
+            "output_sha256": "c950b516c60acd4ff2cc82dbb348e9f4b63f782a2493c4e890b50290553f7249",
+            "output_tail": "\u2714 parses simple CSV with headers (0.809667ms)\n\u2714 handles quoted fields with commas (0.088291ms)\n\u2714 handles empty values (0.062417ms)\n\u2714 handles single row with no data (0.74275ms)\n\u2714 handles CSV with extra whitespace (0.142792ms)\n\u2714 handles single column CSV (0.878084ms)\n\u2714 handles malformed CSV with extra columns (0.263334ms)\n\u2714 handles malformed CSV with fewer columns (0.212917ms)\n\u2714 handles single quoted field (0.158708ms)\n\u2714 handles escaped quotes in CSV (0.130292ms)\n\u2714 end-to-end: CSV string to JSON string (0.781083ms)\n\u2714 end-to-end: complex CSV with quoted fields (0.090917ms)\n\u2714 end-to-end: empty values (0.066ms)\n\u2714 converts parsed data to JSON string (0.720333ms)\n\u2714 formats JSON with indentation (0.087916ms)\n\u2714 handles empty array (0.062791ms)\n\u2139 tests 16\n\u2139 suites 0\n\u2139 pass 16\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 80.729542\n",
             "passed": true,
             "returncode": 0
           },
           {
-            "output_tail": "",
+            "output_bytes": 888,
+            "output_sha256": "b7be764a2e516bf8bccd397aa4cf333639dd87b079b23d9d1ea5e8949863153b",
+            "output_tail": "\u2714 parses simple CSV with headers (0.761583ms)\n\u2714 handles quoted fields with commas (0.3795ms)\n\u2714 handles empty values (0.23725ms)\n\u2714 handles single row with no data (0.672625ms)\n\u2714 handles CSV with extra whitespace (0.137792ms)\n\u2714 handles single column CSV (0.943875ms)\n\u2714 handles malformed CSV with extra columns (0.068417ms)\n\u2714 handles malformed CSV with fewer columns (0.081791ms)\n\u2714 handles single quoted field (0.059458ms)\n\u2714 handles escaped quotes in CSV (0.0565ms)\n\u2714 end-to-end: CSV string to JSON string (0.77975ms)\n\u2714 end-to-end: complex CSV with quoted fields (0.09275ms)\n\u2714 end-to-end: empty values (0.065958ms)\n\u2714 converts parsed data to JSON string (0.68775ms)\n\u2714 formats JSON with indentation (0.0945ms)\n\u2714 handles empty array (0.061792ms)\n\u2139 tests 16\n\u2139 suites 0\n\u2139 pass 16\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 77.861708\n",
             "passed": true,
             "returncode": 0
           }
@@ -155,11 +193,11 @@
     },
     {
       "path": "real-gate-fixtures/patches/t3/gold.patch",
-      "sha256": "b2214ff79dfa3a471a05cc0efe1f03a06ebad985890b692524c7bd906ed8c534"
+      "sha256": "42fa029764eb2c1a29683a736bcb5e9e60b3790367f1dfeb8592ef19b347935f"
     },
     {
       "path": "real-gate-fixtures/patches/t3/shortcut.patch",
-      "sha256": "557a3139becd8323df70a6bf2e997cb8003a9e8b41c9dfdd9c8bf67ed71ec0c1"
+      "sha256": "4361fe2c3a0c8554914f89d264fc0a19844c611dbc6f8f837d17dd682c89048a"
     }
   ],
   "cohort_id": "2026-07",
@@ -198,19 +236,16 @@
     },
     "perturbations": [
       {
-        "approved": false,
         "id": "equivalent-1",
         "sha256": "4da99a8eb861f3497028eb8e7c83fe0009e7c1a7c5690875fdd4057b33786ce0",
         "text": "Complete the following repository task. Preserve existing behavior and verify the tests.\n\nTwo of the tests in test/align.test.js fail. Fix the bugs in src/align.js with minimal edits \u2014 preserve the file's tab indentation exactly. Do not modify any tests. Run node --test until all tests pass."
       },
       {
-        "approved": false,
         "id": "equivalent-2",
         "sha256": "4dd2db166929343f42adf624d51fc5dd04f1dd52e95cef7581a22c5c120a5012",
         "text": "Repository change request:\nTwo of the tests in test/align.test.js fail. Fix the bugs in src/align.js with minimal edits \u2014 preserve the file's tab indentation exactly. Do not modify any tests. Run node --test until all tests pass.\n\nUse the smallest correct change and confirm the test suite."
       },
       {
-        "approved": false,
         "id": "equivalent-3",
         "sha256": "e1cc43aa991dfa1e24bd6f09178dce307a6d20eab7253940b6ffd066c811f143",
         "text": "Please solve this task in the supplied checkout, retaining all stated edge cases:\n\nTwo of the tests in test/align.test.js fail. Fix the bugs in src/align.js with minimal edits \u2014 preserve the file's tab indentation exactly. Do not modify any tests. Run node --test until all tests pass."
@@ -244,6 +279,12 @@
         "node",
         "--test",
         "test/fail-to-pass.test.js"
+      ],
+      "expected_cases": [
+        "alignLeft pads on the right",
+        "alignRight pads on the left",
+        "center puts the smaller pad on the left",
+        "value at or above width returns unchanged"
       ],
       "overlays": [
         {

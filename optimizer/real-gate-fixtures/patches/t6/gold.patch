@@ -5,7 +5,7 @@
    let current = '';
    let inQuotes = false;
 +  let quoted = false;
- 
+
    for (let i = 0; i < line.length; i++) {
      const char = line[i];
 @@ -28,9 +29,11 @@
@@ -23,10 +23,10 @@
        }
 @@ -38,7 +41,7 @@
    }
- 
+
    // Add the last field
 -  fields.push(current.trim());
 +  fields.push(quoted ? current : current.trim());
- 
+
    return fields;
  }

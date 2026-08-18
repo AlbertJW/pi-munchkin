@@ -7,41 +7,55 @@
       "3a52fba7568f45051b1949c7b44b22c431fcd83c9e1e2e85ef74bb4c029a9198"
     ],
     "automated": {
-      "checked_at": "2026-07-31T08:40:25Z",
+      "checked_at": "2026-08-18T14:01:24Z",
       "hash_drift": [],
+      "manifest_drift": false,
+      "overlay_lint": [],
       "passed": true,
       "runs_per_state": 3,
       "states": {
         "gold_fail_to_pass": [
           {
-            "output_tail": "",
+            "output_bytes": 373,
+            "output_sha256": "ca38737f938551b7394a1641ab9462d9f991223cd60b9ec7249a7892f147257b",
+            "output_tail": "\u2714 roundRefundCents follows the tax-style half-to-even tie convention (0.415208ms)\n\u2714 computeLineRefund applies quantity and percentage discount before rounding (0.067625ms)\n\u2714 summarizeBatchRefund sums line refunds and reports the line count (0.065583ms)\n\u2139 tests 3\n\u2139 suites 0\n\u2139 pass 3\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 57.992083\n",
             "passed": true,
             "returncode": 0
           },
           {
-            "output_tail": "",
+            "output_bytes": 372,
+            "output_sha256": "2c4f9a7bd9ee60a6645bc7ecf6eedbb5c5ea38f34c993ffbd0acc55f05bc75fb",
+            "output_tail": "\u2714 roundRefundCents follows the tax-style half-to-even tie convention (0.426083ms)\n\u2714 computeLineRefund applies quantity and percentage discount before rounding (0.06675ms)\n\u2714 summarizeBatchRefund sums line refunds and reports the line count (0.066459ms)\n\u2139 tests 3\n\u2139 suites 0\n\u2139 pass 3\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 52.536375\n",
             "passed": true,
             "returncode": 0
           },
           {
-            "output_tail": "",
+            "output_bytes": 372,
+            "output_sha256": "13e052df375c2f0e6f845d05d462d548ac889b72974cace73c9336899a847edb",
+            "output_tail": "\u2714 roundRefundCents follows the tax-style half-to-even tie convention (0.430333ms)\n\u2714 computeLineRefund applies quantity and percentage discount before rounding (0.06925ms)\n\u2714 summarizeBatchRefund sums line refunds and reports the line count (0.067833ms)\n\u2139 tests 3\n\u2139 suites 0\n\u2139 pass 3\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 52.929041\n",
             "passed": true,
             "returncode": 0
           }
         ],
         "gold_pass_to_pass": [
           {
-            "output_tail": "",
+            "output_bytes": 512,
+            "output_sha256": "734c5548abad71714fe558fc6dc28d658465eba3883a1132b720226c8e269a5b",
+            "output_tail": "\u2714 discount rounding: non-tie rounds down (0.424959ms)\n\u2714 discount rounding: non-tie rounds up (0.064542ms)\n\u2714 discount rounding: exact tie rounds up (0.060583ms)\n\u2714 tax rounding: non-tie rounds down (0.062084ms)\n\u2714 tax rounding: non-tie rounds up (0.077917ms)\n\u2714 tax rounding: exact tie rounds to even (12.5 -> 12) (0.060333ms)\n\u2714 tax rounding: exact tie rounds to even (13.5 -> 14) (0.0465ms)\n\u2139 tests 7\n\u2139 suites 0\n\u2139 pass 7\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 69.78\n",
             "passed": true,
             "returncode": 0
           },
           {
-            "output_tail": "",
+            "output_bytes": 518,
+            "output_sha256": "cdd67aa6a7a9772d96e15704539da1a11ef485f27cc69da2656df9794e00827f",
+            "output_tail": "\u2714 discount rounding: non-tie rounds down (0.409375ms)\n\u2714 discount rounding: non-tie rounds up (0.063834ms)\n\u2714 discount rounding: exact tie rounds up (0.096417ms)\n\u2714 tax rounding: non-tie rounds down (0.062958ms)\n\u2714 tax rounding: non-tie rounds up (0.205166ms)\n\u2714 tax rounding: exact tie rounds to even (12.5 -> 12) (0.048292ms)\n\u2714 tax rounding: exact tie rounds to even (13.5 -> 14) (0.044833ms)\n\u2139 tests 7\n\u2139 suites 0\n\u2139 pass 7\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 62.082166\n",
             "passed": true,
             "returncode": 0
           },
           {
-            "output_tail": "",
+            "output_bytes": 517,
+            "output_sha256": "cc9fb622916a0f8e1d3a6e06887d5db3ed5af54f26b5d534733e62667577af2c",
+            "output_tail": "\u2714 discount rounding: non-tie rounds down (0.404458ms)\n\u2714 discount rounding: non-tie rounds up (0.059375ms)\n\u2714 discount rounding: exact tie rounds up (0.052542ms)\n\u2714 tax rounding: non-tie rounds down (0.055584ms)\n\u2714 tax rounding: non-tie rounds up (0.046083ms)\n\u2714 tax rounding: exact tie rounds to even (12.5 -> 12) (0.03875ms)\n\u2714 tax rounding: exact tie rounds to even (13.5 -> 14) (0.040542ms)\n\u2139 tests 7\n\u2139 suites 0\n\u2139 pass 7\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 81.213333\n",
             "passed": true,
             "returncode": 0
           }
@@ -49,34 +63,46 @@
         "mutant:shortcut": {
           "fail_to_pass": [
             {
-              "output_tail": "cents=12.5\n  \n  13 !== 12\n  \n      at TestContext.<anonymous> (file:///private/var/folders/3r/nc7qhtpn56j7rt5nwg0rqw600000gn/T/pi-admit-sv-ambiguous-spec-gncd3n17/work/test/fail-to-pass.test.js:28:12)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.start (node:internal/test_runner/test:1242:17)\n      at startSubtestAfterBootstrap (node:internal/test_runner/harness:387:17) {\n    generatedMessage: false,\n    code: 'ERR_ASSERTION',\n    actual: 13,\n    expected: 12,\n    operator: 'strictEqual',\n    diff: 'simple'\n  }\n",
+              "output_bytes": 1151,
+              "output_sha256": "007b9bee474be54d601c47bab072ecc4e4f53e6def8358671a3758ffcf6f3aba",
+              "output_tail": "\u2716 roundRefundCents follows the tax-style half-to-even tie convention (0.820916ms)\n\u2714 computeLineRefund applies quantity and percentage discount before rounding (0.099334ms)\n\u2714 summarizeBatchRefund sums line refunds and reports the line count (0.608958ms)\n\u2139 tests 3\n\u2139 suites 0\n\u2139 pass 2\n\u2139 fail 1\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 69.505042\n\n\u2716 failing tests:\n\ntest at test/fail-to-pass.test.js:26:1\n\u2716 roundRefundCents follows the tax-style half-to-even tie convention (0.820916ms)\n  AssertionError [ERR_ASSERTION]: cents=12.5\n  \n  13 !== 12\n  \n      at TestContext.<anonymous> (file://<path>:28:12)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.start (node:internal/test_runner/test:1242:17)\n      at startSubtestAfterBootstrap (node:internal/test_runner/harness:387:17) {\n    generatedMessage: false,\n    code: 'ERR_ASSERTION',\n    actual: 13,\n    expected: 12,\n    operator: 'strictEqual',\n    diff: 'simple'\n  }\n",
               "passed": false,
               "returncode": 1
             },
             {
-              "output_tail": "cents=12.5\n  \n  13 !== 12\n  \n      at TestContext.<anonymous> (file:///private/var/folders/3r/nc7qhtpn56j7rt5nwg0rqw600000gn/T/pi-admit-sv-ambiguous-spec-yfjlulv8/work/test/fail-to-pass.test.js:28:12)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.start (node:internal/test_runner/test:1242:17)\n      at startSubtestAfterBootstrap (node:internal/test_runner/harness:387:17) {\n    generatedMessage: false,\n    code: 'ERR_ASSERTION',\n    actual: 13,\n    expected: 12,\n    operator: 'strictEqual',\n    diff: 'simple'\n  }\n",
+              "output_bytes": 1150,
+              "output_sha256": "3b57099d8f0834936f2e52d7482e0c8f3b3ba34e88d33877c2516f3b64111b80",
+              "output_tail": "\u2716 roundRefundCents follows the tax-style half-to-even tie convention (0.779291ms)\n\u2714 computeLineRefund applies quantity and percentage discount before rounding (0.099542ms)\n\u2714 summarizeBatchRefund sums line refunds and reports the line count (0.401042ms)\n\u2139 tests 3\n\u2139 suites 0\n\u2139 pass 2\n\u2139 fail 1\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 58.56675\n\n\u2716 failing tests:\n\ntest at test/fail-to-pass.test.js:26:1\n\u2716 roundRefundCents follows the tax-style half-to-even tie convention (0.779291ms)\n  AssertionError [ERR_ASSERTION]: cents=12.5\n  \n  13 !== 12\n  \n      at TestContext.<anonymous> (file://<path>:28:12)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.start (node:internal/test_runner/test:1242:17)\n      at startSubtestAfterBootstrap (node:internal/test_runner/harness:387:17) {\n    generatedMessage: false,\n    code: 'ERR_ASSERTION',\n    actual: 13,\n    expected: 12,\n    operator: 'strictEqual',\n    diff: 'simple'\n  }\n",
               "passed": false,
               "returncode": 1
             },
             {
-              "output_tail": "cents=12.5\n  \n  13 !== 12\n  \n      at TestContext.<anonymous> (file:///private/var/folders/3r/nc7qhtpn56j7rt5nwg0rqw600000gn/T/pi-admit-sv-ambiguous-spec-waa8o014/work/test/fail-to-pass.test.js:28:12)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.start (node:internal/test_runner/test:1242:17)\n      at startSubtestAfterBootstrap (node:internal/test_runner/harness:387:17) {\n    generatedMessage: false,\n    code: 'ERR_ASSERTION',\n    actual: 13,\n    expected: 12,\n    operator: 'strictEqual',\n    diff: 'simple'\n  }\n",
+              "output_bytes": 1151,
+              "output_sha256": "47dd9d1cc3d38401a075eaefe72482d782ee89530e3ff531f1b0b456f7909e32",
+              "output_tail": "\u2716 roundRefundCents follows the tax-style half-to-even tie convention (0.769625ms)\n\u2714 computeLineRefund applies quantity and percentage discount before rounding (0.099041ms)\n\u2714 summarizeBatchRefund sums line refunds and reports the line count (0.434083ms)\n\u2139 tests 3\n\u2139 suites 0\n\u2139 pass 2\n\u2139 fail 1\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 57.593209\n\n\u2716 failing tests:\n\ntest at test/fail-to-pass.test.js:26:1\n\u2716 roundRefundCents follows the tax-style half-to-even tie convention (0.769625ms)\n  AssertionError [ERR_ASSERTION]: cents=12.5\n  \n  13 !== 12\n  \n      at TestContext.<anonymous> (file://<path>:28:12)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.start (node:internal/test_runner/test:1242:17)\n      at startSubtestAfterBootstrap (node:internal/test_runner/harness:387:17) {\n    generatedMessage: false,\n    code: 'ERR_ASSERTION',\n    actual: 13,\n    expected: 12,\n    operator: 'strictEqual',\n    diff: 'simple'\n  }\n",
               "passed": false,
               "returncode": 1
             }
           ],
           "pass_to_pass": [
             {
-              "output_tail": "",
+              "output_bytes": 511,
+              "output_sha256": "ee1d5684c5fbd43c64daaa010cfc38a9369ecca1f3c16c262ecfd6a48b80fe11",
+              "output_tail": "\u2714 discount rounding: non-tie rounds down (0.402834ms)\n\u2714 discount rounding: non-tie rounds up (0.060791ms)\n\u2714 discount rounding: exact tie rounds up (0.060084ms)\n\u2714 tax rounding: non-tie rounds down (0.058625ms)\n\u2714 tax rounding: non-tie rounds up (0.047584ms)\n\u2714 tax rounding: exact tie rounds to even (12.5 -> 12) (0.04ms)\n\u2714 tax rounding: exact tie rounds to even (13.5 -> 14) (0.042333ms)\n\u2139 tests 7\n\u2139 suites 0\n\u2139 pass 7\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 57.755\n",
               "passed": true,
               "returncode": 0
             },
             {
-              "output_tail": "",
+              "output_bytes": 516,
+              "output_sha256": "0f9072a59914edb78bedf3cea464ebb113ac35c1d48ab4bf313f243a29b20876",
+              "output_tail": "\u2714 discount rounding: non-tie rounds down (0.39925ms)\n\u2714 discount rounding: non-tie rounds up (0.058417ms)\n\u2714 discount rounding: exact tie rounds up (0.09025ms)\n\u2714 tax rounding: non-tie rounds down (0.073917ms)\n\u2714 tax rounding: non-tie rounds up (0.052542ms)\n\u2714 tax rounding: exact tie rounds to even (12.5 -> 12) (0.044208ms)\n\u2714 tax rounding: exact tie rounds to even (13.5 -> 14) (0.046167ms)\n\u2139 tests 7\n\u2139 suites 0\n\u2139 pass 7\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 60.707541\n",
               "passed": true,
               "returncode": 0
             },
             {
-              "output_tail": "",
+              "output_bytes": 518,
+              "output_sha256": "e706b73d45de28b9b95c5845dc876616bcd4be015236ea907392c9abb3f42c37",
+              "output_tail": "\u2714 discount rounding: non-tie rounds down (0.404333ms)\n\u2714 discount rounding: non-tie rounds up (0.061042ms)\n\u2714 discount rounding: exact tie rounds up (0.053083ms)\n\u2714 tax rounding: non-tie rounds down (0.054208ms)\n\u2714 tax rounding: non-tie rounds up (0.046875ms)\n\u2714 tax rounding: exact tie rounds to even (12.5 -> 12) (0.038667ms)\n\u2714 tax rounding: exact tie rounds to even (13.5 -> 14) (0.042417ms)\n\u2139 tests 7\n\u2139 suites 0\n\u2139 pass 7\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 60.986417\n",
               "passed": true,
               "returncode": 0
             }
@@ -84,42 +110,54 @@
         },
         "pristine_fail_to_pass": [
           {
-            "output_tail": "s/esm/loader:610:35)\n    at ModuleJob.syncLink (node:internal/modules/esm/module_job:277:33)\n    at ModuleJob.link (node:internal/modules/esm/module_job:389:17) {\n  code: 'ERR_MODULE_NOT_FOUND',\n  url: 'file:///private/var/folders/3r/nc7qhtpn56j7rt5nwg0rqw600000gn/T/pi-admit-sv-ambiguous-spec-y0t3jwfn/work/src/refundBatch.js'\n}\n\nNode.js v26.5.0\n\u2716 test/fail-to-pass.test.js (43.27875ms)\n\u2139 tests 1\n\u2139 suites 0\n\u2139 pass 0\n\u2139 fail 1\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 47.777917\n\n\u2716 failing tests:\n\ntest at test/fail-to-pass.test.js:1:1\n\u2716 test/fail-to-pass.test.js (43.27875ms)\n  'test failed'\n",
+            "output_bytes": 1566,
+            "output_sha256": "242d149c68c9a325ac3b7af0c3c6bd8498568d61043fd209047b96ccff42f98c",
+            "output_tail": "node:internal/modules/esm/resolve:272\n    throw new ERR_MODULE_NOT_FOUND(\n          ^\n\nError [ERR_MODULE_NOT_FOUND]: Cannot find module '<path>' imported from <path>\n    at finalizeResolution (node:internal/modules/esm/resolve:272:11)\n    at moduleResolve (node:internal/modules/esm/resolve:879:10)\n    at defaultResolve (node:internal/modules/esm/resolve:1006:11)\n    at #cachedDefaultResolve (node:internal/modules/esm/loader:708:20)\n    at #resolveAndMaybeBlockOnLoaderThread (node:internal/modules/esm/loader:728:38)\n    at ModuleLoader.resolveSync (node:internal/modules/esm/loader:766:56)\n    at #resolve (node:internal/modules/esm/loader:690:17)\n    at ModuleLoader.getOrCreateModuleJob (node:internal/modules/esm/loader:610:35)\n    at ModuleJob.syncLink (node:internal/modules/esm/module_job:277:33)\n    at ModuleJob.link (node:internal/modules/esm/module_job:389:17) {\n  code: 'ERR_MODULE_NOT_FOUND',\n  url: 'file://<path>'\n}\n\nNode.js v26.5.0\n\u2716 test/fail-to-pass.test.js (59.185583ms)\n\u2139 tests 1\n\u2139 suites 0\n\u2139 pass 0\n\u2139 fail 1\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 66.274625\n\n\u2716 failing tests:\n\ntest at test/fail-to-pass.test.js:1:1\n\u2716 test/fail-to-pass.test.js (59.185583ms)\n  'test failed'\n",
             "passed": false,
             "returncode": 1
           },
           {
-            "output_tail": "esm/loader:610:35)\n    at ModuleJob.syncLink (node:internal/modules/esm/module_job:277:33)\n    at ModuleJob.link (node:internal/modules/esm/module_job:389:17) {\n  code: 'ERR_MODULE_NOT_FOUND',\n  url: 'file:///private/var/folders/3r/nc7qhtpn56j7rt5nwg0rqw600000gn/T/pi-admit-sv-ambiguous-spec-kxblv5s9/work/src/refundBatch.js'\n}\n\nNode.js v26.5.0\n\u2716 test/fail-to-pass.test.js (47.460458ms)\n\u2139 tests 1\n\u2139 suites 0\n\u2139 pass 0\n\u2139 fail 1\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 51.580958\n\n\u2716 failing tests:\n\ntest at test/fail-to-pass.test.js:1:1\n\u2716 test/fail-to-pass.test.js (47.460458ms)\n  'test failed'\n",
+            "output_bytes": 1566,
+            "output_sha256": "7bb63ca95167a27ed1c7b9ad146ff2b9e014107aed709c33df0d69c27f59b642",
+            "output_tail": "node:internal/modules/esm/resolve:272\n    throw new ERR_MODULE_NOT_FOUND(\n          ^\n\nError [ERR_MODULE_NOT_FOUND]: Cannot find module '<path>' imported from <path>\n    at finalizeResolution (node:internal/modules/esm/resolve:272:11)\n    at moduleResolve (node:internal/modules/esm/resolve:879:10)\n    at defaultResolve (node:internal/modules/esm/resolve:1006:11)\n    at #cachedDefaultResolve (node:internal/modules/esm/loader:708:20)\n    at #resolveAndMaybeBlockOnLoaderThread (node:internal/modules/esm/loader:728:38)\n    at ModuleLoader.resolveSync (node:internal/modules/esm/loader:766:56)\n    at #resolve (node:internal/modules/esm/loader:690:17)\n    at ModuleLoader.getOrCreateModuleJob (node:internal/modules/esm/loader:610:35)\n    at ModuleJob.syncLink (node:internal/modules/esm/module_job:277:33)\n    at ModuleJob.link (node:internal/modules/esm/module_job:389:17) {\n  code: 'ERR_MODULE_NOT_FOUND',\n  url: 'file://<path>'\n}\n\nNode.js v26.5.0\n\u2716 test/fail-to-pass.test.js (49.103375ms)\n\u2139 tests 1\n\u2139 suites 0\n\u2139 pass 0\n\u2139 fail 1\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 54.707208\n\n\u2716 failing tests:\n\ntest at test/fail-to-pass.test.js:1:1\n\u2716 test/fail-to-pass.test.js (49.103375ms)\n  'test failed'\n",
             "passed": false,
             "returncode": 1
           },
           {
-            "output_tail": "/esm/loader:610:35)\n    at ModuleJob.syncLink (node:internal/modules/esm/module_job:277:33)\n    at ModuleJob.link (node:internal/modules/esm/module_job:389:17) {\n  code: 'ERR_MODULE_NOT_FOUND',\n  url: 'file:///private/var/folders/3r/nc7qhtpn56j7rt5nwg0rqw600000gn/T/pi-admit-sv-ambiguous-spec-g66sm_eu/work/src/refundBatch.js'\n}\n\nNode.js v26.5.0\n\u2716 test/fail-to-pass.test.js (42.261458ms)\n\u2139 tests 1\n\u2139 suites 0\n\u2139 pass 0\n\u2139 fail 1\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 46.47725\n\n\u2716 failing tests:\n\ntest at test/fail-to-pass.test.js:1:1\n\u2716 test/fail-to-pass.test.js (42.261458ms)\n  'test failed'\n",
+            "output_bytes": 1562,
+            "output_sha256": "f59cb256c9d735a8fe783181d35b1edc9afc5b9e78ed00aaaa70fef5e4c3b06e",
+            "output_tail": "node:internal/modules/esm/resolve:272\n    throw new ERR_MODULE_NOT_FOUND(\n          ^\n\nError [ERR_MODULE_NOT_FOUND]: Cannot find module '<path>' imported from <path>\n    at finalizeResolution (node:internal/modules/esm/resolve:272:11)\n    at moduleResolve (node:internal/modules/esm/resolve:879:10)\n    at defaultResolve (node:internal/modules/esm/resolve:1006:11)\n    at #cachedDefaultResolve (node:internal/modules/esm/loader:708:20)\n    at #resolveAndMaybeBlockOnLoaderThread (node:internal/modules/esm/loader:728:38)\n    at ModuleLoader.resolveSync (node:internal/modules/esm/loader:766:56)\n    at #resolve (node:internal/modules/esm/loader:690:17)\n    at ModuleLoader.getOrCreateModuleJob (node:internal/modules/esm/loader:610:35)\n    at ModuleJob.syncLink (node:internal/modules/esm/module_job:277:33)\n    at ModuleJob.link (node:internal/modules/esm/module_job:389:17) {\n  code: 'ERR_MODULE_NOT_FOUND',\n  url: 'file://<path>'\n}\n\nNode.js v26.5.0\n\u2716 test/fail-to-pass.test.js (61.0035ms)\n\u2139 tests 1\n\u2139 suites 0\n\u2139 pass 0\n\u2139 fail 1\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 64.922375\n\n\u2716 failing tests:\n\ntest at test/fail-to-pass.test.js:1:1\n\u2716 test/fail-to-pass.test.js (61.0035ms)\n  'test failed'\n",
             "passed": false,
             "returncode": 1
           }
         ],
         "pristine_pass_to_pass": [
           {
-            "output_tail": "",
+            "output_bytes": 517,
+            "output_sha256": "ca86141241b09b93e371637fea3999e26dae97cd00b581e13204afffffa0414b",
+            "output_tail": "\u2714 discount rounding: non-tie rounds down (0.806041ms)\n\u2714 discount rounding: non-tie rounds up (0.067458ms)\n\u2714 discount rounding: exact tie rounds up (0.079833ms)\n\u2714 tax rounding: non-tie rounds down (0.069458ms)\n\u2714 tax rounding: non-tie rounds up (0.053375ms)\n\u2714 tax rounding: exact tie rounds to even (12.5 -> 12) (0.0535ms)\n\u2714 tax rounding: exact tie rounds to even (13.5 -> 14) (0.041584ms)\n\u2139 tests 7\n\u2139 suites 0\n\u2139 pass 7\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 112.024875\n",
             "passed": true,
             "returncode": 0
           },
           {
-            "output_tail": "",
+            "output_bytes": 513,
+            "output_sha256": "44c5dd63c6d849455587fae4e429c2273d3313f03f61e0e346f0da7641b88e9a",
+            "output_tail": "\u2714 discount rounding: non-tie rounds down (0.419792ms)\n\u2714 discount rounding: non-tie rounds up (0.060292ms)\n\u2714 discount rounding: exact tie rounds up (0.082625ms)\n\u2714 tax rounding: non-tie rounds down (0.069625ms)\n\u2714 tax rounding: non-tie rounds up (0.0535ms)\n\u2714 tax rounding: exact tie rounds to even (12.5 -> 12) (0.042417ms)\n\u2714 tax rounding: exact tie rounds to even (13.5 -> 14) (0.042ms)\n\u2139 tests 7\n\u2139 suites 0\n\u2139 pass 7\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 69.293792\n",
             "passed": true,
             "returncode": 0
           },
           {
-            "output_tail": "",
+            "output_bytes": 515,
+            "output_sha256": "9d0dbc259e46c2fc305cd3a007c730dc3d930fdd56142b976fd6efdd44005566",
+            "output_tail": "\u2714 discount rounding: non-tie rounds down (0.797167ms)\n\u2714 discount rounding: non-tie rounds up (0.261708ms)\n\u2714 discount rounding: exact tie rounds up (0.362333ms)\n\u2714 tax rounding: non-tie rounds down (0.231417ms)\n\u2714 tax rounding: non-tie rounds up (0.1995ms)\n\u2714 tax rounding: exact tie rounds to even (12.5 -> 12) (0.085166ms)\n\u2714 tax rounding: exact tie rounds to even (13.5 -> 14) (0.056167ms)\n\u2139 tests 7\n\u2139 suites 0\n\u2139 pass 7\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 80.97925\n",
             "passed": true,
             "returncode": 0
           }
         ]
       }
     },
-    "manifest_sha256": "44b5312e0653274647c6505002f07203e00ae013fa74e7365f25f2d9e7d34db4",
-    "reviewed_at": "2026-07-31T08:40:28Z",
+    "manifest_sha256": "2e123abcd45a7ef1d84aa60a396843da26d259beb9d8c9405f4f8ac564c3fac7",
+    "reviewed_at": "2026-08-18T14:02:32Z",
     "reviewer": "Albert (delegated: Claude Fable 5, 2026-07-30)"
   },
   "artifacts": [
@@ -233,6 +271,11 @@
         "--test",
         "test/fail-to-pass.test.js"
       ],
+      "expected_cases": [
+        "computeLineRefund applies quantity and percentage discount before rounding",
+        "roundRefundCents follows the tax-style half-to-even tie convention",
+        "summarizeBatchRefund sums line refunds and reports the line count"
+      ],
       "overlays": [
         {
           "dest": "test/fail-to-pass.test.js",
@@ -251,7 +294,7 @@
     }
   },
   "timestamps": {
-    "admitted_at": "2026-07-31T08:40:28Z",
+    "admitted_at": "2026-08-18T14:02:32Z",
     "created_at": "2026-07-23T00:00:00Z",
     "expires_at": "2026-10-29T08:40:28Z"
   }

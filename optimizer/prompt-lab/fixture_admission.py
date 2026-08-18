@@ -605,7 +605,7 @@ def review_packet(task):
     return out
 
 
-def approve(task, reviewer):
+def approve(task, reviewer, expires_at=None):
     path, m = load_manifest(task)
     auto = m["admission"].get("automated") or {}
     if m["admission"].get("expired_at"):
@@ -616,7 +616,10 @@ def approve(task, reviewer):
         raise AdmissionError("artifact hash drift after automated admission")
     now = utcnow()
     m["timestamps"]["admitted_at"] = iso(now)
-    m["timestamps"]["expires_at"] = iso(now + dt.timedelta(days=90))
+    # A re-approval after a MECHANICAL manifest change (e.g. adding the grade-time
+    # case pin) must not silently reset the 90-day review clock on content the human
+    # already reviewed; callers pass the original expiry to preserve it.
+    m["timestamps"]["expires_at"] = expires_at or iso(now + dt.timedelta(days=90))
     m["admission"].update({"approved": True, "reviewer": reviewer, "reviewed_at": iso(now),
                            "approved_prompt_hashes": [v["sha256"] for v in m["prompts"]["perturbations"]],
                            "manifest_sha256": manifest_digest(m)})
@@ -657,6 +660,7 @@ def main():
     verify.add_argument("task", nargs="?"); verify.add_argument("--all", action="store_true")
     packet = sub.add_parser("review-packet"); packet.add_argument("task")
     approval = sub.add_parser("approve"); approval.add_argument("task"); approval.add_argument("--reviewer", required=True)
+    approval.add_argument("--expires-at", default=None, help="preserve an existing review clock (ISO8601)")
     args = ap.parse_args()
     try:
         if args.command in ("check", "verify"):
@@ -675,7 +679,7 @@ def main():
         if args.command == "review-packet":
             print(review_packet(args.task))
         elif args.command == "approve":
-            approve(args.task, args.reviewer); print(f"{args.task}: approved by {args.reviewer}")
+            approve(args.task, args.reviewer, args.expires_at); print(f"{args.task}: approved by {args.reviewer}")
     except AdmissionError as exc:
         raise SystemExit(f"fixture_admission: {exc}")
 

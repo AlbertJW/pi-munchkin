@@ -380,6 +380,49 @@ def artifacts(task, gold, mutant, overlays, extras):
     return [{"path": str(p.relative_to(ROOT)), "sha256": h(p.read_bytes())} for p in sorted(paths)]
 
 
+def gold_case_names(task, spec, overlay):
+    """Top-level TAP result names observed when the GOLD state runs fail-to-pass.
+
+    Runtime truth for the grade-time case pin (grade_reporter's ADMITTED CASE
+    PIN): a static parse of `test(` literals could drift from what node actually
+    reports. Only meaningful for `node --test` suites; anything else returns None
+    and the fixture stays unpinned (collapse-shape guard only).
+    """
+    command = spec.get("command") or []
+    if command[:2] != ["node", "--test"]:
+        return None
+    try:
+        return _gold_case_names(task, spec, overlay, command)
+    except Exception:
+        # A fixture the generator cannot stage simply stays unpinned (collapse-shape
+        # guard only) rather than breaking the whole catalog build.
+        return None
+
+
+def _gold_case_names(task, spec, overlay, command):
+    import subprocess
+    sys.path.insert(0, str(Path(__file__).resolve().parent))
+    import grade_reporter
+    from fixture_admission import install_overlays, verification_env
+    with tempfile.TemporaryDirectory(prefix=f"pi-cases-{task}-") as td:
+        work = Path(td) / "work"
+        stage(task, work)
+        mutate(task, work, True)
+        install_overlays(work, [overlay] if overlay else [])
+        destination = Path(td) / "gold.tap"
+        try:
+            subprocess.run(command[:2] + ["--test-reporter=tap",
+                                          f"--test-reporter-destination={destination}"] + command[2:],
+                           cwd=work, capture_output=True, timeout=spec.get("timeout_seconds", 60),
+                           env=verification_env(Path(td)))
+        except (OSError, subprocess.SubprocessError):
+            return None
+        subscores, blocked = grade_reporter.extract(str(destination))
+        if blocked or not subscores or not all(subscores["detail"].values()):
+            # Gold must pass every case; anything else means the pin would be wrong.
+            return None
+        return sorted(subscores["detail"])
+
 def build(task):
     OUT.mkdir(parents=True, exist_ok=True); MANIFESTS.mkdir(parents=True, exist_ok=True)
     with tempfile.TemporaryDirectory() as td:
@@ -408,6 +451,12 @@ def build(task):
     else: source = FIX / "quoting.test.js"; dest = "test/fail-to-pass.test.js"
     overlay = {"source": str(source.relative_to(ROOT)), "dest": dest}
     f2p = {"command": ["node", dest] if task == "t2" else ["node", "--test", dest], "overlays": [overlay], "timeout_seconds": 60}
+    # Grade-time case pin (2026-08-18): the exact gold-run case names, hashed into
+    # the manifest and enforced by grade_reporter. Closes the mid-run process.exit
+    # truncation forgery that the collapse-shape guard alone cannot see.
+    expected_cases = gold_case_names(task, f2p, overlay)
+    if expected_cases:
+        f2p["expected_cases"] = expected_cases
     prompt = (TASKS / f"{task}.txt").read_text().strip()
     test_text = source.read_text()
     expectations = re.findall(r"\btest\(\s*['\"]([^'\"]+)", test_text)

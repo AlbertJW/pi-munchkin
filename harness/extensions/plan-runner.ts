@@ -643,7 +643,12 @@ async function writeStateAndTodo(cwd: string, state: PlanState): Promise<void> {
 async function mutatePlan<T>(cwd: string, fn: (state: PlanState | undefined) => Promise<{ state?: PlanState; result: T }>): Promise<T> {
 	const path = statePath(cwd);
 	if (!path) throw new Error("private plan storage is not ready; retry after session startup");
-	await mkdir(dirname(path), { recursive: true });
+	// Create the capsule tree private from the start (same idiom as the trace writer
+	// above): without the mode a plan mutation that lands before the capsule dir
+	// exists would create it at the umask default and leak plan FILENAMES.
+	const privateCapsule = planStorageMode() === "capsule";
+	await mkdir(dirname(path), { recursive: true, mode: privateCapsule ? 0o700 : undefined });
+	if (privateCapsule) await chmod(dirname(path), 0o700);
 	return withFileMutationQueue(path, async () => {
 		const current = await readState(cwd);
 		const out = await fn(current);

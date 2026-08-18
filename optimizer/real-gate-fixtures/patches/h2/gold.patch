@@ -35,5 +35,5 @@
 +  const [headers, ...data] = records;
 +  return data.filter((r) => r.some((v) => v !== '')).map((values) => Object.fromEntries(headers.map((key, i) => [key, values[i] || ''])));
  }
- 
+
  /**

@@ -46,6 +46,10 @@ def row_context(task, variant, exploratory=False):
         # The grader artifact the gate is allowed to read, pinned by the (admission-hashed)
         # manifest. None for the fixtures that emit no graded subscores. See grade_artifact.py.
         "grade_artifact": manifest.get("tests", {}).get("fail_to_pass", {}).get("grade_artifact"),
+        # Admitted top-level case names for the reporter grader, hashed into the
+        # approved manifest. grade_reporter refuses any observed set that differs —
+        # the primary defense against a mid-run process.exit truncation forgery.
+        "expected_cases": manifest.get("tests", {}).get("fail_to_pass", {}).get("expected_cases"),
         # Parent-owned v3 grading metadata. This row-context file lives outside
         # the candidate worktree; it is never placed in the model prompt.
         "requirement_scoring": requirement_scoring(manifest),

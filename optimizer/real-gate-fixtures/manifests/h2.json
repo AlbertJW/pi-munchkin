@@ -2,41 +2,55 @@
   "admission": {
     "approved": false,
     "automated": {
-      "checked_at": "2026-07-14T18:50:48Z",
+      "checked_at": "2026-08-18T14:00:43Z",
       "hash_drift": [],
+      "manifest_drift": false,
+      "overlay_lint": [],
       "passed": true,
       "runs_per_state": 3,
       "states": {
         "gold_fail_to_pass": [
           {
-            "output_tail": "",
+            "output_bytes": 311,
+            "output_sha256": "89ac063aa4734fae3f4920b9c0688bcee3e8b0bfde1b4f9d697cfa466f10d1fb",
+            "output_tail": "\u2714 h2: quoted field containing a newline stays one field (0.461792ms)\n\u2714 h2: multiple newlines inside one quoted field (0.064917ms)\n\u2714 h2: quoted newline combined with quoted comma (0.052709ms)\n\u2139 tests 3\n\u2139 suites 0\n\u2139 pass 3\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 58.745083\n",
             "passed": true,
             "returncode": 0
           },
           {
-            "output_tail": "",
+            "output_bytes": 309,
+            "output_sha256": "b4c1aa81b410ccea3bba0f15dfd1332ef76a6f6edca143858cd55b7a5a3169ed",
+            "output_tail": "\u2714 h2: quoted field containing a newline stays one field (0.47325ms)\n\u2714 h2: multiple newlines inside one quoted field (0.066416ms)\n\u2714 h2: quoted newline combined with quoted comma (0.056792ms)\n\u2139 tests 3\n\u2139 suites 0\n\u2139 pass 3\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 54.75975\n",
             "passed": true,
             "returncode": 0
           },
           {
-            "output_tail": "",
+            "output_bytes": 311,
+            "output_sha256": "cd4b14921f5bec4c1df9c6a67444a447ddf804bc0afacf0a2e995e277cbacd9b",
+            "output_tail": "\u2714 h2: quoted field containing a newline stays one field (0.442416ms)\n\u2714 h2: multiple newlines inside one quoted field (0.066125ms)\n\u2714 h2: quoted newline combined with quoted comma (0.055958ms)\n\u2139 tests 3\n\u2139 suites 0\n\u2139 pass 3\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 54.491875\n",
             "passed": true,
             "returncode": 0
           }
         ],
         "gold_pass_to_pass": [
           {
-            "output_tail": "",
+            "output_bytes": 893,
+            "output_sha256": "ce0d6ae7dff3ccc588cf49ec07657e00074d339c20423c99d934297b753152c3",
+            "output_tail": "\u2714 parses simple CSV with headers (1.533375ms)\n\u2714 handles quoted fields with commas (0.089667ms)\n\u2714 handles empty values (0.059916ms)\n\u2714 handles single row with no data (1.647916ms)\n\u2714 handles CSV with extra whitespace (0.604125ms)\n\u2714 handles single column CSV (1.042125ms)\n\u2714 handles malformed CSV with extra columns (0.087125ms)\n\u2714 handles malformed CSV with fewer columns (0.088666ms)\n\u2714 handles single quoted field (0.071208ms)\n\u2714 handles escaped quotes in CSV (0.059708ms)\n\u2714 end-to-end: CSV string to JSON string (2.125459ms)\n\u2714 end-to-end: complex CSV with quoted fields (0.180834ms)\n\u2714 end-to-end: empty values (0.080083ms)\n\u2714 converts parsed data to JSON string (1.218541ms)\n\u2714 formats JSON with indentation (0.1205ms)\n\u2714 handles empty array (0.073ms)\n\u2139 tests 16\n\u2139 suites 0\n\u2139 pass 16\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 89.158417\n",
             "passed": true,
             "returncode": 0
           },
           {
-            "output_tail": "",
+            "output_bytes": 895,
+            "output_sha256": "7a420639d0e653a16dd8b120c0ef4871a2e95c0ee467a58f530529b961fa6091",
+            "output_tail": "\u2714 parses simple CSV with headers (0.750416ms)\n\u2714 handles quoted fields with commas (0.087792ms)\n\u2714 handles empty values (0.066666ms)\n\u2714 handles single row with no data (0.705208ms)\n\u2714 handles CSV with extra whitespace (0.166875ms)\n\u2714 handles single column CSV (0.536875ms)\n\u2714 handles malformed CSV with extra columns (0.058917ms)\n\u2714 handles malformed CSV with fewer columns (0.085125ms)\n\u2714 handles single quoted field (0.065958ms)\n\u2714 handles escaped quotes in CSV (0.056792ms)\n\u2714 end-to-end: CSV string to JSON string (0.763042ms)\n\u2714 end-to-end: complex CSV with quoted fields (0.093875ms)\n\u2714 end-to-end: empty values (0.064584ms)\n\u2714 converts parsed data to JSON string (0.758ms)\n\u2714 formats JSON with indentation (0.093875ms)\n\u2714 handles empty array (0.061083ms)\n\u2139 tests 16\n\u2139 suites 0\n\u2139 pass 16\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 80.367625\n",
             "passed": true,
             "returncode": 0
           },
           {
-            "output_tail": "",
+            "output_bytes": 892,
+            "output_sha256": "907337c4f4ab1c7396580ee374c515ac6675fd4a888ca0efa34a495854236fcd",
+            "output_tail": "\u2714 parses simple CSV with headers (0.742958ms)\n\u2714 handles quoted fields with commas (0.085416ms)\n\u2714 handles empty values (0.062625ms)\n\u2714 handles single row with no data (0.668916ms)\n\u2714 handles CSV with extra whitespace (0.160625ms)\n\u2714 handles single column CSV (0.647334ms)\n\u2714 handles malformed CSV with extra columns (0.058667ms)\n\u2714 handles malformed CSV with fewer columns (0.072666ms)\n\u2714 handles single quoted field (0.05775ms)\n\u2714 handles escaped quotes in CSV (0.058ms)\n\u2714 end-to-end: CSV string to JSON string (0.78325ms)\n\u2714 end-to-end: complex CSV with quoted fields (0.09375ms)\n\u2714 end-to-end: empty values (0.065333ms)\n\u2714 converts parsed data to JSON string (1.348208ms)\n\u2714 formats JSON with indentation (0.397834ms)\n\u2714 handles empty array (0.190166ms)\n\u2139 tests 16\n\u2139 suites 0\n\u2139 pass 16\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 78.879583\n",
             "passed": true,
             "returncode": 0
           }
@@ -44,34 +58,46 @@
         "mutant:shortcut": {
           "fail_to_pass": [
             {
-              "output_tail": "6/work/test/fail-to-pass.test.js:30:10)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n      at Test.postRun (node:internal/test_runner/test:1522:19)\n      at Test.run (node:internal/test_runner/test:1447:12)\n      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7) {\n    generatedMessage: true,\n    code: 'ERR_ASSERTION',\n    actual: 'a, b\\\\nc, d',\n    expected: 'a, b\\nc, d',\n    operator: 'strictEqual',\n    diff: 'simple'\n  }\n",
+              "output_bytes": 3027,
+              "output_sha256": "c34b3a9d3a984e32c27fe21ce28b7e65c5b5722622f99955838547a7838fc5ce",
+              "output_tail": "st_runner/harness:387:17) {\n    generatedMessage: true,\n    code: 'ERR_ASSERTION',\n    actual: 'line1\\\\nline2',\n    expected: 'line1\\nline2',\n    operator: 'strictEqual',\n    diff: 'simple'\n  }\n\ntest at test/fail-to-pass.test.js:19:1\n\u2716 h2: multiple newlines inside one quoted field (0.137208ms)\n  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:\n  \n  2 !== 1\n  \n      at TestContext.<anonymous> (file://<path>:22:10)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n      at Test.postRun (node:internal/test_runner/test:1522:19)\n      at Test.run (node:internal/test_runner/test:1447:12)\n      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3) {\n    generatedMessage: true,\n    code: 'ERR_ASSERTION',\n    actual: 2,\n    expected: 1,\n    operator: 'strictEqual',\n    diff: 'simple'\n  }\n\ntest at test/fail-to-pass.test.js:26:1\n\u2716 h2: quoted newline combined with quoted comma (0.091041ms)\n  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:\n  + actual - expected\n  \n  + 'a, b\\\\nc, d'\n  - 'a, b\\nc, d'\n          ^\n  \n      at TestContext.<anonymous> (file://<path>:30:10)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n      at Test.postRun (node:internal/test_runner/test:1522:19)\n      at Test.run (node:internal/test_runner/test:1447:12)\n      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7) {\n    generatedMessage: true,\n    code: 'ERR_ASSERTION',\n    actual: 'a, b\\\\nc, d',\n    expected: 'a, b\\nc, d',\n    operator: 'strictEqual',\n    diff: 'simple'\n  }\n",
               "passed": false,
               "returncode": 1
             },
             {
-              "output_tail": "7/work/test/fail-to-pass.test.js:30:10)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n      at Test.postRun (node:internal/test_runner/test:1522:19)\n      at Test.run (node:internal/test_runner/test:1447:12)\n      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7) {\n    generatedMessage: true,\n    code: 'ERR_ASSERTION',\n    actual: 'a, b\\\\nc, d',\n    expected: 'a, b\\nc, d',\n    operator: 'strictEqual',\n    diff: 'simple'\n  }\n",
+              "output_bytes": 3017,
+              "output_sha256": "4fd175f54e546c4c7bf714244b9be1f3e66a78867fda99226723e0af4239202f",
+              "output_tail": "l/test_runner/harness:387:17) {\n    generatedMessage: true,\n    code: 'ERR_ASSERTION',\n    actual: 'line1\\\\nline2',\n    expected: 'line1\\nline2',\n    operator: 'strictEqual',\n    diff: 'simple'\n  }\n\ntest at test/fail-to-pass.test.js:19:1\n\u2716 h2: multiple newlines inside one quoted field (0.130292ms)\n  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:\n  \n  2 !== 1\n  \n      at TestContext.<anonymous> (file://<path>:22:10)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n      at Test.postRun (node:internal/test_runner/test:1522:19)\n      at Test.run (node:internal/test_runner/test:1447:12)\n      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3) {\n    generatedMessage: true,\n    code: 'ERR_ASSERTION',\n    actual: 2,\n    expected: 1,\n    operator: 'strictEqual',\n    diff: 'simple'\n  }\n\ntest at test/fail-to-pass.test.js:26:1\n\u2716 h2: quoted newline combined with quoted comma (0.09ms)\n  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:\n  + actual - expected\n  \n  + 'a, b\\\\nc, d'\n  - 'a, b\\nc, d'\n          ^\n  \n      at TestContext.<anonymous> (file://<path>:30:10)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n      at Test.postRun (node:internal/test_runner/test:1522:19)\n      at Test.run (node:internal/test_runner/test:1447:12)\n      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7) {\n    generatedMessage: true,\n    code: 'ERR_ASSERTION',\n    actual: 'a, b\\\\nc, d',\n    expected: 'a, b\\nc, d',\n    operator: 'strictEqual',\n    diff: 'simple'\n  }\n",
               "passed": false,
               "returncode": 1
             },
             {
-              "output_tail": "9/work/test/fail-to-pass.test.js:30:10)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n      at Test.postRun (node:internal/test_runner/test:1522:19)\n      at Test.run (node:internal/test_runner/test:1447:12)\n      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7) {\n    generatedMessage: true,\n    code: 'ERR_ASSERTION',\n    actual: 'a, b\\\\nc, d',\n    expected: 'a, b\\nc, d',\n    operator: 'strictEqual',\n    diff: 'simple'\n  }\n",
+              "output_bytes": 3027,
+              "output_sha256": "7307da6af9f1f5391e78c54bf0eb9ed891758bc746226d58bcd98bd456840a3d",
+              "output_tail": "st_runner/harness:387:17) {\n    generatedMessage: true,\n    code: 'ERR_ASSERTION',\n    actual: 'line1\\\\nline2',\n    expected: 'line1\\nline2',\n    operator: 'strictEqual',\n    diff: 'simple'\n  }\n\ntest at test/fail-to-pass.test.js:19:1\n\u2716 h2: multiple newlines inside one quoted field (0.132583ms)\n  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:\n  \n  2 !== 1\n  \n      at TestContext.<anonymous> (file://<path>:22:10)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n      at Test.postRun (node:internal/test_runner/test:1522:19)\n      at Test.run (node:internal/test_runner/test:1447:12)\n      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3) {\n    generatedMessage: true,\n    code: 'ERR_ASSERTION',\n    actual: 2,\n    expected: 1,\n    operator: 'strictEqual',\n    diff: 'simple'\n  }\n\ntest at test/fail-to-pass.test.js:26:1\n\u2716 h2: quoted newline combined with quoted comma (0.089583ms)\n  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:\n  + actual - expected\n  \n  + 'a, b\\\\nc, d'\n  - 'a, b\\nc, d'\n          ^\n  \n      at TestContext.<anonymous> (file://<path>:30:10)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n      at Test.postRun (node:internal/test_runner/test:1522:19)\n      at Test.run (node:internal/test_runner/test:1447:12)\n      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7) {\n    generatedMessage: true,\n    code: 'ERR_ASSERTION',\n    actual: 'a, b\\\\nc, d',\n    expected: 'a, b\\nc, d',\n    operator: 'strictEqual',\n    diff: 'simple'\n  }\n",
               "passed": false,
               "returncode": 1
             }
           ],
           "pass_to_pass": [
             {
-              "output_tail": "",
+              "output_bytes": 890,
+              "output_sha256": "90708c49a81a1cf1e1700b95aefd8736352b2a44f1cb82f73f1fff6669810934",
+              "output_tail": "\u2714 parses simple CSV with headers (0.79775ms)\n\u2714 handles quoted fields with commas (0.123792ms)\n\u2714 handles empty values (0.062542ms)\n\u2714 handles single row with no data (0.96275ms)\n\u2714 handles CSV with extra whitespace (0.548541ms)\n\u2714 handles single column CSV (1.307ms)\n\u2714 handles malformed CSV with extra columns (0.325625ms)\n\u2714 handles malformed CSV with fewer columns (0.284458ms)\n\u2714 handles single quoted field (0.16525ms)\n\u2714 handles escaped quotes in CSV (0.182042ms)\n\u2714 end-to-end: CSV string to JSON string (0.874208ms)\n\u2714 end-to-end: complex CSV with quoted fields (0.170083ms)\n\u2714 end-to-end: empty values (0.073417ms)\n\u2714 converts parsed data to JSON string (0.716458ms)\n\u2714 formats JSON with indentation (0.091625ms)\n\u2714 handles empty array (0.0615ms)\n\u2139 tests 16\n\u2139 suites 0\n\u2139 pass 16\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 93.219917\n",
               "passed": true,
               "returncode": 0
             },
             {
-              "output_tail": "",
+              "output_bytes": 893,
+              "output_sha256": "6b472350b246ba21b8fa85ae9f4a68340df02036c7ba7b449f8a42cbdafa5cbe",
+              "output_tail": "\u2714 parses simple CSV with headers (0.757125ms)\n\u2714 handles quoted fields with commas (0.113292ms)\n\u2714 handles empty values (0.065208ms)\n\u2714 handles single row with no data (0.74525ms)\n\u2714 handles CSV with extra whitespace (0.179208ms)\n\u2714 handles single column CSV (0.715333ms)\n\u2714 handles malformed CSV with extra columns (0.263583ms)\n\u2714 handles malformed CSV with fewer columns (0.262833ms)\n\u2714 handles single quoted field (0.861458ms)\n\u2714 handles escaped quotes in CSV (0.51675ms)\n\u2714 end-to-end: CSV string to JSON string (1.10525ms)\n\u2714 end-to-end: complex CSV with quoted fields (0.150292ms)\n\u2714 end-to-end: empty values (0.344292ms)\n\u2714 converts parsed data to JSON string (0.731416ms)\n\u2714 formats JSON with indentation (0.089709ms)\n\u2714 handles empty array (0.062291ms)\n\u2139 tests 16\n\u2139 suites 0\n\u2139 pass 16\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 82.4815\n",
               "passed": true,
               "returncode": 0
             },
             {
-              "output_tail": "",
+              "output_bytes": 892,
+              "output_sha256": "c43dff71db94c2d9a9ab93d7a1849ccc2edf118a6b4e51a12491acb117fb506a",
+              "output_tail": "\u2714 parses simple CSV with headers (0.782125ms)\n\u2714 handles quoted fields with commas (0.123958ms)\n\u2714 handles empty values (0.066125ms)\n\u2714 handles single row with no data (0.768583ms)\n\u2714 handles CSV with extra whitespace (0.176291ms)\n\u2714 handles single column CSV (0.601708ms)\n\u2714 handles malformed CSV with extra columns (0.086875ms)\n\u2714 handles malformed CSV with fewer columns (0.355875ms)\n\u2714 handles single quoted field (0.306ms)\n\u2714 handles escaped quotes in CSV (0.098917ms)\n\u2714 end-to-end: CSV string to JSON string (0.790708ms)\n\u2714 end-to-end: complex CSV with quoted fields (0.123208ms)\n\u2714 end-to-end: empty values (0.066ms)\n\u2714 converts parsed data to JSON string (0.690792ms)\n\u2714 formats JSON with indentation (0.096916ms)\n\u2714 handles empty array (0.062833ms)\n\u2139 tests 16\n\u2139 suites 0\n\u2139 pass 16\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 77.397958\n",
               "passed": true,
               "returncode": 0
             }
@@ -79,34 +105,46 @@
         },
         "pristine_fail_to_pass": [
           {
-            "output_tail": "n/T/pi-admit-h2-kj54p2kg/work/test/fail-to-pass.test.js:29:10)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n      at Test.postRun (node:internal/test_runner/test:1522:19)\n      at Test.run (node:internal/test_runner/test:1447:12)\n      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7) {\n    generatedMessage: true,\n    code: 'ERR_ASSERTION',\n    actual: 2,\n    expected: 1,\n    operator: 'strictEqual',\n    diff: 'simple'\n  }\n",
+            "output_bytes": 2848,
+            "output_sha256": "f6fd769e0864c43fc57b80a464297fa3ebf5551e7c19e2b5ed71d8fa6343b7dd",
+            "output_tail": "  at Test.start (node:internal/test_runner/test:1242:17)\n      at startSubtestAfterBootstrap (node:internal/test_runner/harness:387:17) {\n    generatedMessage: true,\n    code: 'ERR_ASSERTION',\n    actual: 3,\n    expected: 2,\n    operator: 'strictEqual',\n    diff: 'simple'\n  }\n\ntest at test/fail-to-pass.test.js:19:1\n\u2716 h2: multiple newlines inside one quoted field (0.10625ms)\n  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:\n  \n  3 !== 1\n  \n      at TestContext.<anonymous> (file://<path>:22:10)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n      at Test.postRun (node:internal/test_runner/test:1522:19)\n      at Test.run (node:internal/test_runner/test:1447:12)\n      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3) {\n    generatedMessage: true,\n    code: 'ERR_ASSERTION',\n    actual: 3,\n    expected: 1,\n    operator: 'strictEqual',\n    diff: 'simple'\n  }\n\ntest at test/fail-to-pass.test.js:26:1\n\u2716 h2: quoted newline combined with quoted comma (0.084625ms)\n  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:\n  \n  2 !== 1\n  \n      at TestContext.<anonymous> (file://<path>:29:10)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n      at Test.postRun (node:internal/test_runner/test:1522:19)\n      at Test.run (node:internal/test_runner/test:1447:12)\n      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7) {\n    generatedMessage: true,\n    code: 'ERR_ASSERTION',\n    actual: 2,\n    expected: 1,\n    operator: 'strictEqual',\n    diff: 'simple'\n  }\n",
             "passed": false,
             "returncode": 1
           },
           {
-            "output_tail": "n/T/pi-admit-h2-fnwynrtk/work/test/fail-to-pass.test.js:29:10)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n      at Test.postRun (node:internal/test_runner/test:1522:19)\n      at Test.run (node:internal/test_runner/test:1447:12)\n      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7) {\n    generatedMessage: true,\n    code: 'ERR_ASSERTION',\n    actual: 2,\n    expected: 1,\n    operator: 'strictEqual',\n    diff: 'simple'\n  }\n",
+            "output_bytes": 2853,
+            "output_sha256": "a32d69872fb6f9291e75598b29190be15de3a74c42377c2c9893752864522ca3",
+            "output_tail": " at Test.start (node:internal/test_runner/test:1242:17)\n      at startSubtestAfterBootstrap (node:internal/test_runner/harness:387:17) {\n    generatedMessage: true,\n    code: 'ERR_ASSERTION',\n    actual: 3,\n    expected: 2,\n    operator: 'strictEqual',\n    diff: 'simple'\n  }\n\ntest at test/fail-to-pass.test.js:19:1\n\u2716 h2: multiple newlines inside one quoted field (0.108333ms)\n  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:\n  \n  3 !== 1\n  \n      at TestContext.<anonymous> (file://<path>:22:10)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n      at Test.postRun (node:internal/test_runner/test:1522:19)\n      at Test.run (node:internal/test_runner/test:1447:12)\n      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3) {\n    generatedMessage: true,\n    code: 'ERR_ASSERTION',\n    actual: 3,\n    expected: 1,\n    operator: 'strictEqual',\n    diff: 'simple'\n  }\n\ntest at test/fail-to-pass.test.js:26:1\n\u2716 h2: quoted newline combined with quoted comma (0.086958ms)\n  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:\n  \n  2 !== 1\n  \n      at TestContext.<anonymous> (file://<path>:29:10)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n      at Test.postRun (node:internal/test_runner/test:1522:19)\n      at Test.run (node:internal/test_runner/test:1447:12)\n      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7) {\n    generatedMessage: true,\n    code: 'ERR_ASSERTION',\n    actual: 2,\n    expected: 1,\n    operator: 'strictEqual',\n    diff: 'simple'\n  }\n",
             "passed": false,
             "returncode": 1
           },
           {
-            "output_tail": "n/T/pi-admit-h2-hvax1odm/work/test/fail-to-pass.test.js:29:10)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n      at Test.postRun (node:internal/test_runner/test:1522:19)\n      at Test.run (node:internal/test_runner/test:1447:12)\n      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7) {\n    generatedMessage: true,\n    code: 'ERR_ASSERTION',\n    actual: 2,\n    expected: 1,\n    operator: 'strictEqual',\n    diff: 'simple'\n  }\n",
+            "output_bytes": 2852,
+            "output_sha256": "7a6f62df9c234065219a29c65d9d947c5b4e177761bee1a821450b9ed91e3df9",
+            "output_tail": "  at Test.start (node:internal/test_runner/test:1242:17)\n      at startSubtestAfterBootstrap (node:internal/test_runner/harness:387:17) {\n    generatedMessage: true,\n    code: 'ERR_ASSERTION',\n    actual: 3,\n    expected: 2,\n    operator: 'strictEqual',\n    diff: 'simple'\n  }\n\ntest at test/fail-to-pass.test.js:19:1\n\u2716 h2: multiple newlines inside one quoted field (0.10925ms)\n  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:\n  \n  3 !== 1\n  \n      at TestContext.<anonymous> (file://<path>:22:10)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n      at Test.postRun (node:internal/test_runner/test:1522:19)\n      at Test.run (node:internal/test_runner/test:1447:12)\n      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3) {\n    generatedMessage: true,\n    code: 'ERR_ASSERTION',\n    actual: 3,\n    expected: 1,\n    operator: 'strictEqual',\n    diff: 'simple'\n  }\n\ntest at test/fail-to-pass.test.js:26:1\n\u2716 h2: quoted newline combined with quoted comma (0.085417ms)\n  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:\n  \n  2 !== 1\n  \n      at TestContext.<anonymous> (file://<path>:29:10)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n      at Test.postRun (node:internal/test_runner/test:1522:19)\n      at Test.run (node:internal/test_runner/test:1447:12)\n      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7) {\n    generatedMessage: true,\n    code: 'ERR_ASSERTION',\n    actual: 2,\n    expected: 1,\n    operator: 'strictEqual',\n    diff: 'simple'\n  }\n",
             "passed": false,
             "returncode": 1
           }
         ],
         "pristine_pass_to_pass": [
           {
-            "output_tail": "",
+            "output_bytes": 898,
+            "output_sha256": "55adaa690db8add8e3877c353bc9e072b2af5b0da8da142d9145a74f0d05f59e",
+            "output_tail": "\u2714 parses simple CSV with headers (0.750625ms)\n\u2714 handles quoted fields with commas (0.085375ms)\n\u2714 handles empty values (0.060917ms)\n\u2714 handles single row with no data (1.004167ms)\n\u2714 handles CSV with extra whitespace (0.662583ms)\n\u2714 handles single column CSV (0.674416ms)\n\u2714 handles malformed CSV with extra columns (0.099375ms)\n\u2714 handles malformed CSV with fewer columns (0.095208ms)\n\u2714 handles single quoted field (0.067875ms)\n\u2714 handles escaped quotes in CSV (0.059958ms)\n\u2714 end-to-end: CSV string to JSON string (0.786916ms)\n\u2714 end-to-end: complex CSV with quoted fields (0.090875ms)\n\u2714 end-to-end: empty values (0.065917ms)\n\u2714 converts parsed data to JSON string (0.742042ms)\n\u2714 formats JSON with indentation (0.091875ms)\n\u2714 handles empty array (0.061875ms)\n\u2139 tests 16\n\u2139 suites 0\n\u2139 pass 16\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 97.292042\n",
             "passed": true,
             "returncode": 0
           },
           {
-            "output_tail": "",
+            "output_bytes": 889,
+            "output_sha256": "61e57dd518dad9c48e6f37663e3f66b183f7854b0ad1d498c5c3c161fccd2f3d",
+            "output_tail": "\u2714 parses simple CSV with headers (1.807333ms)\n\u2714 handles quoted fields with commas (0.204459ms)\n\u2714 handles empty values (0.1265ms)\n\u2714 handles single row with no data (1.867416ms)\n\u2714 handles CSV with extra whitespace (0.318375ms)\n\u2714 handles single column CSV (0.634125ms)\n\u2714 handles malformed CSV with extra columns (0.073166ms)\n\u2714 handles malformed CSV with fewer columns (0.0845ms)\n\u2714 handles single quoted field (0.058291ms)\n\u2714 handles escaped quotes in CSV (0.078958ms)\n\u2714 end-to-end: CSV string to JSON string (0.86925ms)\n\u2714 end-to-end: complex CSV with quoted fields (0.097ms)\n\u2714 end-to-end: empty values (0.06775ms)\n\u2714 converts parsed data to JSON string (0.702708ms)\n\u2714 formats JSON with indentation (0.086375ms)\n\u2714 handles empty array (0.061292ms)\n\u2139 tests 16\n\u2139 suites 0\n\u2139 pass 16\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 97.257458\n",
             "passed": true,
             "returncode": 0
           },
           {
-            "output_tail": "",
+            "output_bytes": 890,
+            "output_sha256": "2a386703a6e469b43ccc80ca99b0479ba36922a3739479caf76d412f1ea7d853",
+            "output_tail": "\u2714 parses simple CSV with headers (0.745125ms)\n\u2714 handles quoted fields with commas (0.08475ms)\n\u2714 handles empty values (0.061417ms)\n\u2714 handles single row with no data (0.94025ms)\n\u2714 handles CSV with extra whitespace (0.15775ms)\n\u2714 handles single column CSV (1.19725ms)\n\u2714 handles malformed CSV with extra columns (0.073625ms)\n\u2714 handles malformed CSV with fewer columns (0.088083ms)\n\u2714 handles single quoted field (0.06425ms)\n\u2714 handles escaped quotes in CSV (0.062417ms)\n\u2714 end-to-end: CSV string to JSON string (0.819334ms)\n\u2714 end-to-end: complex CSV with quoted fields (0.096375ms)\n\u2714 end-to-end: empty values (0.0675ms)\n\u2714 converts parsed data to JSON string (1.89125ms)\n\u2714 formats JSON with indentation (0.113334ms)\n\u2714 handles empty array (0.067333ms)\n\u2139 tests 16\n\u2139 suites 0\n\u2139 pass 16\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 86.256583\n",
             "passed": true,
             "returncode": 0
           }
@@ -151,11 +189,11 @@
     },
     {
       "path": "real-gate-fixtures/patches/h2/gold.patch",
-      "sha256": "d8f4fbb1fe4a7cdfe8751528b6258e3d7e26a5189e73a5b3229e47c76652ae0e"
+      "sha256": "490184629237d26d34e98c03534d69c63b97d0197b546714d554ae9a2a8da7d6"
     },
     {
       "path": "real-gate-fixtures/patches/h2/shortcut.patch",
-      "sha256": "0870edbecd54d44d090c2abf854a0437c69ddad51dd5c209b3d86caddbdd5065"
+      "sha256": "665f09d58d485d302aeff32e5e4b086eeeb56de84ae45db94297cc348731ff9d"
     }
   ],
   "cohort_id": "2026-07",
@@ -188,19 +226,16 @@
     },
     "perturbations": [
       {
-        "approved": false,
         "id": "equivalent-1",
         "sha256": "ae29b499b96ca688d8baf627d709fdcc6b41d22e3568e9abc0aab4097dec15fb",
         "text": "Complete the following repository task. Preserve existing behavior and verify the tests.\n\nBug: parseCSV in src/index.js mishandles records whose quoted fields contain a newline. A quoted field may span what looks like multiple lines, and the whole quoted value (including the newline) belongs to one field in one record. For example, parsing 'name,note\\n\"Alice\",\"line1\\nline2\"\\n\"Bob\",\"ok\"' must yield exactly two rows, with the first row's note equal to 'line1\\nline2'. Currently the record gets split at the newline. Fix src/index.js so quoted newlines are handled correctly, without breaking any existing tests. Run node --test until all tests pass."
       },
       {
-        "approved": false,
         "id": "equivalent-2",
         "sha256": "2994bbc2c83a9344533f2fb13bd315305ef30d76e8311ebd1838ec1499f77ef1",
         "text": "Repository change request:\nBug: parseCSV in src/index.js mishandles records whose quoted fields contain a newline. A quoted field may span what looks like multiple lines, and the whole quoted value (including the newline) belongs to one field in one record. For example, parsing 'name,note\\n\"Alice\",\"line1\\nline2\"\\n\"Bob\",\"ok\"' must yield exactly two rows, with the first row's note equal to 'line1\\nline2'. Currently the record gets split at the newline. Fix src/index.js so quoted newlines are handled correctly, without breaking any existing tests. Run node --test until all tests pass.\n\nUse the smallest correct change and confirm the test suite."
       },
       {
-        "approved": false,
         "id": "equivalent-3",
         "sha256": "16374b597597b5057395f3235851a37d4335880ce2f441015aff61bad4313c3c",
         "text": "Please solve this task in the supplied checkout, retaining all stated edge cases:\n\nBug: parseCSV in src/index.js mishandles records whose quoted fields contain a newline. A quoted field may span what looks like multiple lines, and the whole quoted value (including the newline) belongs to one field in one record. For example, parsing 'name,note\\n\"Alice\",\"line1\\nline2\"\\n\"Bob\",\"ok\"' must yield exactly two rows, with the first row's note equal to 'line1\\nline2'. Currently the record gets split at the newline. Fix src/index.js so quoted newlines are handled correctly, without breaking any existing tests. Run node --test until all tests pass."
@@ -230,6 +265,11 @@
         "node",
         "--test",
         "test/fail-to-pass.test.js"
+      ],
+      "expected_cases": [
+        "h2: multiple newlines inside one quoted field",
+        "h2: quoted field containing a newline stays one field",
+        "h2: quoted newline combined with quoted comma"
       ],
       "overlays": [
         {

@@ -13,17 +13,31 @@ Refusal ladder (never a guess, mirrors grade_artifact):
     no TAP header / no results  -> subscores_blocked "unparseable"
     every test skipped/todo     -> subscores_blocked "no_gradeable_tests"
     suite truncated by exit      -> subscores_blocked "suite_collapsed"
+    observed cases != admitted   -> subscores_blocked "case_mismatch"
 
-Truncation-forgery guard (grader integrity): model-authored src is imported when
-the hidden suite runs, so `process.exit(0)` in that src aborts the run before node
-emits any per-`test()` result — node then reports the WHOLE FILE as a single
-top-level `ok N - <file>` with a `1..1` plan. A naive parse scores that 1/1 = a
-forged 100%. The signature is deterministic and precise: a single result whose
-name is a filepath (ends `.js`/`.mjs`/`.ts`, no spaces) that PASSED can only be a
-collapse — a real one-test suite names its result a description, and a genuine
-suite-load crash produces the same single filepath result but FAILED (`not ok`),
-which stays a correct 0/1. So we refuse only the single-filepath-result-that-passed.
-Verified against real `node --test` on 2026-08-18.
+Truncation-forgery guard (grader integrity), two layers.
+
+Model-authored src is imported when the hidden suite runs, so `process.exit(0)`
+in that src truncates the reporter stream and the surviving TAP is internally
+consistent (its `1..N` plan and `# tests` counts match the truncated prefix).
+Nothing inside the file can detect that. Two independent defenses:
+
+1. ADMITTED CASE PIN (primary). `expected_cases` — the exact top-level result
+   names observed when the GOLD state runs, derived at fixture-build time and
+   hashed into the approved manifest — is passed in by the caller. Any observed
+   set that is not exactly that set is refused: a truncation drops names, a
+   rename/skip changes them, an injected test adds one. This is the same
+   contract `apply_requirement_weights` enforces for v3 coverage maps, extended
+   to every reporter-graded fixture.
+2. COLLAPSE SHAPE (fallback for unpinned fixtures). An import-time exit — before
+   any per-`test()` result — makes node report the WHOLE FILE as one top-level
+   `ok N - <file>`; a single PASSING filepath-named result can only be that
+   collapse, so it is refused. (A single FAILING filepath result is a genuine
+   suite-load crash and stays a correct 0.)
+
+Layer 2 alone does NOT stop a mid-run exit that fires after some real results
+were emitted (verified against real `node --test`, 2026-08-18): those names are
+genuine, so only layer 1 catches it. Never grade a reporter fixture without a pin.
 
 Honesty notes:
 - Only TOP-LEVEL TAP results are graded (fixtures author flat `test()` suites;
@@ -46,13 +60,17 @@ SKIP_RE = re.compile(r"#\s*(?:SKIP|TODO)", re.IGNORECASE)
 RESULT_RE = re.compile(r"^(not )?ok\s+\d+\s+-\s+(.*?)\s*(#.*)?$")
 # A filepath-shaped result name (ends .js/.mjs/.ts, no spaces) — what node emits
 # for a whole file when the run is aborted before per-test() reporting.
-FILEPATH_RE = re.compile(r"^[\w./\\-]+\.(?:m?js|ts)$")
+FILEPATH_RE = re.compile(r"^[\w./\\-]+\.(?:[cm]?[jt]sx?)$")
 MAX_NAME_CHARS = 200
 MAX_TESTS = 500
 
 
-def extract_tap(text):
-    """Parse TAP text -> (subscores, subscores_blocked); exactly one is set."""
+def extract_tap(text, expected_cases=None):
+    """Parse TAP text -> (subscores, subscores_blocked); exactly one is set.
+
+    expected_cases: the admitted top-level result names for this fixture. When
+    given, the observed set must match it exactly (see the module docstring).
+    """
     if text is None:
         return None, "missing"
     lines = text.splitlines()
@@ -76,9 +94,20 @@ def extract_tap(text):
             return None, "unparseable"
     if not detail:
         return None, "no_gradeable_tests" if skipped else "unparseable"
-    # Truncation-forgery guard: a single PASSING result whose name is a filepath is
-    # the process.exit(0) collapse signature — refuse it. A single FAILING filepath
-    # result is a genuine suite-load crash and stays a correct 0/1 below.
+    if expected_cases:
+        expected = set(expected_cases)
+        if set(detail) != expected:
+            # A single FAILING result is a genuine suite-load crash: the model broke
+            # the suite, which is a real 0 over the admitted case set, not a refusal.
+            if len(detail) == 1 and not next(iter(detail.values())):
+                return {"fixed": 0, "total": len(expected), "source": "tap-reporter",
+                        "detail": dict(detail)}, None
+            return None, "case_mismatch"
+        return {"fixed": sum(detail.values()), "total": len(expected),
+                "source": "tap-reporter", "detail": detail}, None
+    # Unpinned fixture: only the collapse SHAPE is available. A single PASSING
+    # result whose name is a filepath is the import-time process.exit signature.
+    # (A single FAILING filepath result is a real suite-load crash -> 0/1 below.)
     if len(detail) == 1:
         (only_name, only_passed), = detail.items()
         if only_passed and FILEPATH_RE.match(only_name):
@@ -87,14 +116,14 @@ def extract_tap(text):
             "source": "tap-reporter", "detail": detail}, None
 
 
-def extract(tap_path):
+def extract(tap_path, expected_cases=None):
     """File-path front end used by real_gate's row builder."""
     try:
         with open(tap_path, encoding="utf-8", errors="replace") as fh:
             text = fh.read()
     except OSError:
         return None, "missing"
-    return extract_tap(text)
+    return extract_tap(text, expected_cases)
 
 
 def apply_requirement_weights(subscores, scoring):
@@ -199,6 +228,54 @@ not ok 2 - beta fails
     # A test whose description merely mentions a filename is not filepath-shaped (has spaces).
     mentions = "TAP version 13\nok 1 - normalize-ticket.js is the wired export\n1..1\n"
     assert extract_tap(mentions)[0]["total"] == 1
+    # ---- ADMITTED CASE PIN (primary truncation defense, 2026-08-18) ----
+    # The async-yield truncation that DEFEATS the collapse-shape guard: a mid-run
+    # process.exit(0) after real results were emitted. Captured verbatim from real
+    # `node --test --test-reporter=tap` (node v26.5.0). Names are genuine, the plan
+    # and counters agree with the truncated prefix — only the pin catches it.
+    truncated = """TAP version 13
+# Subtest: D1 real pass
+ok 1 - D1 real pass
+  ---
+  duration_ms: 0.370125
+  ...
+# Subtest: D2 real pass
+ok 2 - D2 real pass
+  ---
+  duration_ms: 0.055083
+  ...
+1..2
+# tests 2
+# pass 2
+# fail 0
+"""
+    cases = ["D1 real pass", "D2 real pass", "D3 hangs then exits", "D4 real fail"]
+    assert extract_tap(truncated) [0]["fixed"] == 2, "unpinned parse still scores the prefix"
+    assert extract_tap(truncated, cases) == (None, "case_mismatch"), "PIN MUST refuse truncation"
+    # Full honest run over the same pin grades normally.
+    full = ("TAP version 13\n" + "\n".join(
+        f"{'ok' if i < 3 else 'not ok'} {i + 1} - {name}" for i, name in enumerate(cases))
+        + "\n1..4\n")
+    subscores, blocked = extract_tap(full, cases)
+    assert blocked is None and subscores["fixed"] == 3 and subscores["total"] == 4, subscores
+    # A renamed / skipped / injected case is a changed instrument -> refuse.
+    renamed = "TAP version 13\n" + "\n".join(f"ok {i+1} - {n}" for i, n in enumerate(
+        ["D1 real pass", "D2 real pass", "D3 hangs then exits", "D4 RENAMED"])) + "\n1..4\n"
+    assert extract_tap(renamed, cases) == (None, "case_mismatch")
+    injected = full.replace("1..4", "ok 5 - D5 injected\n1..5")
+    assert extract_tap(injected, cases) == (None, "case_mismatch")
+    # A suite-load crash under a pin is a real 0 over the ADMITTED total, not a refusal.
+    crashed = "TAP version 13\nnot ok 1 - test/fail-to-pass.test.js\n1..1\n"
+    subscores, blocked = extract_tap(crashed, cases)
+    assert blocked is None and subscores == {"fixed": 0, "total": 4, "source": "tap-reporter",
+                                             "detail": {"test/fail-to-pass.test.js": False}}, subscores
+    # ...but a PASSING single filepath result never grades, pinned or not.
+    collapsed = "TAP version 13\nok 1 - test/fail-to-pass.test.js\n1..1\n"
+    assert extract_tap(collapsed, cases) == (None, "case_mismatch")
+    assert extract_tap(collapsed) == (None, "suite_collapsed")
+    # FILEPATH_RE covers every extension node can report a file under.
+    for ext in ("js", "mjs", "cjs", "ts", "mts", "cts", "jsx", "tsx"):
+        assert extract_tap(f"TAP version 13\nok 1 - test/x.test.{ext}\n1..1\n") == (None, "suite_collapsed"), ext
     print("grade_reporter selftest: OK")
 
 

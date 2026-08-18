@@ -7,42 +7,55 @@
       "4b97518c1c42f5b127f3f3b2067e60f5cbbaa68e57bc8e85a30603e95a12697a"
     ],
     "automated": {
-      "checked_at": "2026-08-11T14:11:40Z",
+      "checked_at": "2026-08-18T14:01:02Z",
       "hash_drift": [],
       "manifest_drift": false,
+      "overlay_lint": [],
       "passed": true,
       "runs_per_state": 3,
       "states": {
         "gold_fail_to_pass": [
           {
-            "output_tail": "",
+            "output_bytes": 390,
+            "output_sha256": "e0c6d5fe0135c263a634408ffca52567d8248aad451a97332ee7814034fa6ccc",
+            "output_tail": "\u2714 omitted trailing fields take their documented defaults (0.6985ms)\n\u2714 parseEntries always returns finite numbers (0.088625ms)\n\u2714 report values short lines the same as fully written ones (0.473208ms)\n\u2714 report totals a ledger that mixes short and full lines (0.060708ms)\n\u2139 tests 4\n\u2139 suites 0\n\u2139 pass 4\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 58.598167\n",
             "passed": true,
             "returncode": 0
           },
           {
-            "output_tail": "",
+            "output_bytes": 390,
+            "output_sha256": "87c53b37334720ca4eaffb1ea23d90e0159d03c76ff9510eb768d04e0e5a239e",
+            "output_tail": "\u2714 omitted trailing fields take their documented defaults (0.737042ms)\n\u2714 parseEntries always returns finite numbers (0.0925ms)\n\u2714 report values short lines the same as fully written ones (0.431583ms)\n\u2714 report totals a ledger that mixes short and full lines (0.057375ms)\n\u2139 tests 4\n\u2139 suites 0\n\u2139 pass 4\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 62.572917\n",
             "passed": true,
             "returncode": 0
           },
           {
-            "output_tail": "",
+            "output_bytes": 392,
+            "output_sha256": "d062b289d94366f7ce8310f9ff3240a68367f93bbabd0d806dd15bcb861d41fe",
+            "output_tail": "\u2714 omitted trailing fields take their documented defaults (0.727958ms)\n\u2714 parseEntries always returns finite numbers (0.089166ms)\n\u2714 report values short lines the same as fully written ones (0.535041ms)\n\u2714 report totals a ledger that mixes short and full lines (0.069416ms)\n\u2139 tests 4\n\u2139 suites 0\n\u2139 pass 4\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 61.008125\n",
             "passed": true,
             "returncode": 0
           }
         ],
         "gold_pass_to_pass": [
           {
-            "output_tail": "",
+            "output_bytes": 426,
+            "output_sha256": "5c3595afe8552ac2f802baefb3931d3ea24bd2efe720c363069d3e9bea4940b2",
+            "output_tail": "\u2714 parseEntries reads fully specified lines and trims fields (0.733583ms)\n\u2714 parseEntries skips blank lines and comments (0.072792ms)\n\u2714 parseEntries applies defaults to empty fields (0.095791ms)\n\u2714 buildReport renders padded rows and a total (0.100125ms)\n\u2714 buildReport handles an empty ledger (0.052667ms)\n\u2139 tests 5\n\u2139 suites 0\n\u2139 pass 5\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 77.96325\n",
             "passed": true,
             "returncode": 0
           },
           {
-            "output_tail": "",
+            "output_bytes": 427,
+            "output_sha256": "e090006a4d829f4472925666b462a4a46bff22f0db68057083df648235ba202b",
+            "output_tail": "\u2714 parseEntries reads fully specified lines and trims fields (0.712417ms)\n\u2714 parseEntries skips blank lines and comments (0.071917ms)\n\u2714 parseEntries applies defaults to empty fields (0.121208ms)\n\u2714 buildReport renders padded rows and a total (0.111458ms)\n\u2714 buildReport handles an empty ledger (0.054375ms)\n\u2139 tests 5\n\u2139 suites 0\n\u2139 pass 5\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 64.329792\n",
             "passed": true,
             "returncode": 0
           },
           {
-            "output_tail": "",
+            "output_bytes": 421,
+            "output_sha256": "e0d54557c43f3c4acf30a7945a39a1e2cbb64127b92d129e16157e3d35f3a4da",
+            "output_tail": "\u2714 parseEntries reads fully specified lines and trims fields (0.881ms)\n\u2714 parseEntries skips blank lines and comments (0.092708ms)\n\u2714 parseEntries applies defaults to empty fields (0.121417ms)\n\u2714 buildReport renders padded rows and a total (0.105ms)\n\u2714 buildReport handles an empty ledger (0.054166ms)\n\u2139 tests 5\n\u2139 suites 0\n\u2139 pass 5\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 80.409667\n",
             "passed": true,
             "returncode": 0
           }
@@ -50,34 +63,46 @@
         "mutant:shortcut": {
           "fail_to_pass": [
             {
-              "output_tail": ":internal/test_runner/test:1382:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n      at Test.postRun (node:internal/test_runner/test:1522:19)\n      at Test.run (node:internal/test_runner/test:1447:12)\n      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7) {\n    generatedMessage: true,\n    code: 'ERR_ASSERTION',\n    actual: 'alpha       0.00\\nbeta        4.00\\ngamma       0.00\\nTOTAL       4.00',\n    expected: 'alpha       3.00\\nbeta        4.00\\ngamma       0.00\\nTOTAL       7.00',\n    operator: 'strictEqual',\n    diff: 'simple'\n  }\n",
+              "output_bytes": 4600,
+              "output_sha256": "b1fda150e66d76f00fedf1b8e26abaedcfbe4b0dd574b5778d49960779b1f010",
+              "output_tail": "    3.00\\nTOTAL       3.00'\n                 ^\n  \n      at TestContext.<anonymous> (file://<path>:24:10)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n      at Test.postRun (node:internal/test_runner/test:1522:19)\n      at Test.run (node:internal/test_runner/test:1447:12)\n      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7) {\n    generatedMessage: true,\n    code: 'ERR_ASSERTION',\n    actual: 'alpha       0.00\\nTOTAL       0.00',\n    expected: 'alpha       3.00\\nTOTAL       3.00',\n    operator: 'strictEqual',\n    diff: 'simple'\n  }\n\ntest at test/fail-to-pass.test.js:28:1\n\u2716 report totals a ledger that mixes short and full lines (0.099916ms)\n  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:\n  + actual - expected\n  \n  + 'alpha       0.00\\nbeta        4.00\\ngamma       0.00\\nTOTAL       4.00'\n  - 'alpha       3.00\\nbeta        4.00\\ngamma       0.00\\nTOTAL       7.00'\n  \n      at TestContext.<anonymous> (file://<path>:30:10)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n      at Test.postRun (node:internal/test_runner/test:1522:19)\n      at Test.run (node:internal/test_runner/test:1447:12)\n      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7) {\n    generatedMessage: true,\n    code: 'ERR_ASSERTION',\n    actual: 'alpha       0.00\\nbeta        4.00\\ngamma       0.00\\nTOTAL       4.00',\n    expected: 'alpha       3.00\\nbeta        4.00\\ngamma       0.00\\nTOTAL       7.00',\n    operator: 'strictEqual',\n    diff: 'simple'\n  }\n",
               "passed": false,
               "returncode": 1
             },
             {
-              "output_tail": ":internal/test_runner/test:1382:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n      at Test.postRun (node:internal/test_runner/test:1522:19)\n      at Test.run (node:internal/test_runner/test:1447:12)\n      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7) {\n    generatedMessage: true,\n    code: 'ERR_ASSERTION',\n    actual: 'alpha       0.00\\nbeta        4.00\\ngamma       0.00\\nTOTAL       4.00',\n    expected: 'alpha       3.00\\nbeta        4.00\\ngamma       0.00\\nTOTAL       7.00',\n    operator: 'strictEqual',\n    diff: 'simple'\n  }\n",
+              "output_bytes": 4604,
+              "output_sha256": "972040a54edafd3ced8b791c79db2959443de9697cc421ce856037b161d40729",
+              "output_tail": "    3.00\\nTOTAL       3.00'\n                 ^\n  \n      at TestContext.<anonymous> (file://<path>:24:10)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n      at Test.postRun (node:internal/test_runner/test:1522:19)\n      at Test.run (node:internal/test_runner/test:1447:12)\n      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7) {\n    generatedMessage: true,\n    code: 'ERR_ASSERTION',\n    actual: 'alpha       0.00\\nTOTAL       0.00',\n    expected: 'alpha       3.00\\nTOTAL       3.00',\n    operator: 'strictEqual',\n    diff: 'simple'\n  }\n\ntest at test/fail-to-pass.test.js:28:1\n\u2716 report totals a ledger that mixes short and full lines (0.122375ms)\n  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:\n  + actual - expected\n  \n  + 'alpha       0.00\\nbeta        4.00\\ngamma       0.00\\nTOTAL       4.00'\n  - 'alpha       3.00\\nbeta        4.00\\ngamma       0.00\\nTOTAL       7.00'\n  \n      at TestContext.<anonymous> (file://<path>:30:10)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n      at Test.postRun (node:internal/test_runner/test:1522:19)\n      at Test.run (node:internal/test_runner/test:1447:12)\n      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7) {\n    generatedMessage: true,\n    code: 'ERR_ASSERTION',\n    actual: 'alpha       0.00\\nbeta        4.00\\ngamma       0.00\\nTOTAL       4.00',\n    expected: 'alpha       3.00\\nbeta        4.00\\ngamma       0.00\\nTOTAL       7.00',\n    operator: 'strictEqual',\n    diff: 'simple'\n  }\n",
               "passed": false,
               "returncode": 1
             },
             {
-              "output_tail": ":internal/test_runner/test:1382:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n      at Test.postRun (node:internal/test_runner/test:1522:19)\n      at Test.run (node:internal/test_runner/test:1447:12)\n      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7) {\n    generatedMessage: true,\n    code: 'ERR_ASSERTION',\n    actual: 'alpha       0.00\\nbeta        4.00\\ngamma       0.00\\nTOTAL       4.00',\n    expected: 'alpha       3.00\\nbeta        4.00\\ngamma       0.00\\nTOTAL       7.00',\n    operator: 'strictEqual',\n    diff: 'simple'\n  }\n",
+              "output_bytes": 4600,
+              "output_sha256": "2556090df6c92c0bcc22d9ceb27bd7b8103d3125729ff7f862ee354d70c6a7c5",
+              "output_tail": "    3.00\\nTOTAL       3.00'\n                 ^\n  \n      at TestContext.<anonymous> (file://<path>:24:10)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n      at Test.postRun (node:internal/test_runner/test:1522:19)\n      at Test.run (node:internal/test_runner/test:1447:12)\n      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7) {\n    generatedMessage: true,\n    code: 'ERR_ASSERTION',\n    actual: 'alpha       0.00\\nTOTAL       0.00',\n    expected: 'alpha       3.00\\nTOTAL       3.00',\n    operator: 'strictEqual',\n    diff: 'simple'\n  }\n\ntest at test/fail-to-pass.test.js:28:1\n\u2716 report totals a ledger that mixes short and full lines (0.199916ms)\n  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:\n  + actual - expected\n  \n  + 'alpha       0.00\\nbeta        4.00\\ngamma       0.00\\nTOTAL       4.00'\n  - 'alpha       3.00\\nbeta        4.00\\ngamma       0.00\\nTOTAL       7.00'\n  \n      at TestContext.<anonymous> (file://<path>:30:10)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n      at Test.postRun (node:internal/test_runner/test:1522:19)\n      at Test.run (node:internal/test_runner/test:1447:12)\n      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7) {\n    generatedMessage: true,\n    code: 'ERR_ASSERTION',\n    actual: 'alpha       0.00\\nbeta        4.00\\ngamma       0.00\\nTOTAL       4.00',\n    expected: 'alpha       3.00\\nbeta        4.00\\ngamma       0.00\\nTOTAL       7.00',\n    operator: 'strictEqual',\n    diff: 'simple'\n  }\n",
               "passed": false,
               "returncode": 1
             }
           ],
           "pass_to_pass": [
             {
-              "output_tail": "",
+              "output_bytes": 427,
+              "output_sha256": "d5daaf06c169ffbdbdf1d0defe324ad0d9ba98e9d7b7d350862eb70ba2980d51",
+              "output_tail": "\u2714 parseEntries reads fully specified lines and trims fields (3.937041ms)\n\u2714 parseEntries skips blank lines and comments (0.669541ms)\n\u2714 parseEntries applies defaults to empty fields (0.160041ms)\n\u2714 buildReport renders padded rows and a total (0.129125ms)\n\u2714 buildReport handles an empty ledger (0.055875ms)\n\u2139 tests 5\n\u2139 suites 0\n\u2139 pass 5\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 79.295125\n",
               "passed": true,
               "returncode": 0
             },
             {
-              "output_tail": "",
+              "output_bytes": 427,
+              "output_sha256": "707b272d2c538c3f1f10ea4d4dc9cd84fbaebe157e2c951c4097267fa559eaac",
+              "output_tail": "\u2714 parseEntries reads fully specified lines and trims fields (0.807791ms)\n\u2714 parseEntries skips blank lines and comments (0.078541ms)\n\u2714 parseEntries applies defaults to empty fields (0.099041ms)\n\u2714 buildReport renders padded rows and a total (0.153583ms)\n\u2714 buildReport handles an empty ledger (0.205625ms)\n\u2139 tests 5\n\u2139 suites 0\n\u2139 pass 5\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 94.062625\n",
               "passed": true,
               "returncode": 0
             },
             {
-              "output_tail": "",
+              "output_bytes": 425,
+              "output_sha256": "9b769663c1bca0004910126dda58b2ce81fdf59db8cc4ed9b839b15ed654d1a4",
+              "output_tail": "\u2714 parseEntries reads fully specified lines and trims fields (0.856ms)\n\u2714 parseEntries skips blank lines and comments (0.160125ms)\n\u2714 parseEntries applies defaults to empty fields (1.099792ms)\n\u2714 buildReport renders padded rows and a total (0.515042ms)\n\u2714 buildReport handles an empty ledger (0.210541ms)\n\u2139 tests 5\n\u2139 suites 0\n\u2139 pass 5\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 545.434916\n",
               "passed": true,
               "returncode": 0
             }
@@ -85,42 +110,54 @@
         },
         "pristine_fail_to_pass": [
           {
-            "output_tail": "ode:internal/test_runner/test:1382:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n      at Test.postRun (node:internal/test_runner/test:1522:19)\n      at Test.run (node:internal/test_runner/test:1447:12)\n      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7) {\n    generatedMessage: true,\n    code: 'ERR_ASSERTION',\n    actual: 'alpha       NaN\\nbeta        4.00\\ngamma       NaN\\nTOTAL       NaN',\n    expected: 'alpha       3.00\\nbeta        4.00\\ngamma       0.00\\nTOTAL       7.00',\n    operator: 'strictEqual',\n    diff: 'simple'\n  }\n",
+            "output_bytes": 4586,
+            "output_sha256": "a85ef8a9a1d151e1cc2265671c97354a0eeac958da91dd99f01033d963e3d78b",
+            "output_tail": "alpha       3.00\\nTOTAL       3.00'\n                 ^\n  \n      at TestContext.<anonymous> (file://<path>:24:10)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n      at Test.postRun (node:internal/test_runner/test:1522:19)\n      at Test.run (node:internal/test_runner/test:1447:12)\n      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7) {\n    generatedMessage: true,\n    code: 'ERR_ASSERTION',\n    actual: 'alpha       NaN\\nTOTAL       NaN',\n    expected: 'alpha       3.00\\nTOTAL       3.00',\n    operator: 'strictEqual',\n    diff: 'simple'\n  }\n\ntest at test/fail-to-pass.test.js:28:1\n\u2716 report totals a ledger that mixes short and full lines (0.097416ms)\n  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:\n  + actual - expected\n  \n  + 'alpha       NaN\\nbeta        4.00\\ngamma       NaN\\nTOTAL       NaN'\n  - 'alpha       3.00\\nbeta        4.00\\ngamma       0.00\\nTOTAL       7.00'\n  \n      at TestContext.<anonymous> (file://<path>:30:10)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n      at Test.postRun (node:internal/test_runner/test:1522:19)\n      at Test.run (node:internal/test_runner/test:1447:12)\n      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7) {\n    generatedMessage: true,\n    code: 'ERR_ASSERTION',\n    actual: 'alpha       NaN\\nbeta        4.00\\ngamma       NaN\\nTOTAL       NaN',\n    expected: 'alpha       3.00\\nbeta        4.00\\ngamma       0.00\\nTOTAL       7.00',\n    operator: 'strictEqual',\n    diff: 'simple'\n  }\n",
             "passed": false,
             "returncode": 1
           },
           {
-            "output_tail": "ode:internal/test_runner/test:1382:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n      at Test.postRun (node:internal/test_runner/test:1522:19)\n      at Test.run (node:internal/test_runner/test:1447:12)\n      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7) {\n    generatedMessage: true,\n    code: 'ERR_ASSERTION',\n    actual: 'alpha       NaN\\nbeta        4.00\\ngamma       NaN\\nTOTAL       NaN',\n    expected: 'alpha       3.00\\nbeta        4.00\\ngamma       0.00\\nTOTAL       7.00',\n    operator: 'strictEqual',\n    diff: 'simple'\n  }\n",
+            "output_bytes": 4587,
+            "output_sha256": "f77f38844365dc27ab9318553194a4e7d05ae5d2756a46e38a2e40417b7920a5",
+            "output_tail": "alpha       3.00\\nTOTAL       3.00'\n                 ^\n  \n      at TestContext.<anonymous> (file://<path>:24:10)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n      at Test.postRun (node:internal/test_runner/test:1522:19)\n      at Test.run (node:internal/test_runner/test:1447:12)\n      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7) {\n    generatedMessage: true,\n    code: 'ERR_ASSERTION',\n    actual: 'alpha       NaN\\nTOTAL       NaN',\n    expected: 'alpha       3.00\\nTOTAL       3.00',\n    operator: 'strictEqual',\n    diff: 'simple'\n  }\n\ntest at test/fail-to-pass.test.js:28:1\n\u2716 report totals a ledger that mixes short and full lines (0.110334ms)\n  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:\n  + actual - expected\n  \n  + 'alpha       NaN\\nbeta        4.00\\ngamma       NaN\\nTOTAL       NaN'\n  - 'alpha       3.00\\nbeta        4.00\\ngamma       0.00\\nTOTAL       7.00'\n  \n      at TestContext.<anonymous> (file://<path>:30:10)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n      at Test.postRun (node:internal/test_runner/test:1522:19)\n      at Test.run (node:internal/test_runner/test:1447:12)\n      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7) {\n    generatedMessage: true,\n    code: 'ERR_ASSERTION',\n    actual: 'alpha       NaN\\nbeta        4.00\\ngamma       NaN\\nTOTAL       NaN',\n    expected: 'alpha       3.00\\nbeta        4.00\\ngamma       0.00\\nTOTAL       7.00',\n    operator: 'strictEqual',\n    diff: 'simple'\n  }\n",
             "passed": false,
             "returncode": 1
           },
           {
-            "output_tail": "ode:internal/test_runner/test:1382:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n      at Test.postRun (node:internal/test_runner/test:1522:19)\n      at Test.run (node:internal/test_runner/test:1447:12)\n      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7) {\n    generatedMessage: true,\n    code: 'ERR_ASSERTION',\n    actual: 'alpha       NaN\\nbeta        4.00\\ngamma       NaN\\nTOTAL       NaN',\n    expected: 'alpha       3.00\\nbeta        4.00\\ngamma       0.00\\nTOTAL       7.00',\n    operator: 'strictEqual',\n    diff: 'simple'\n  }\n",
+            "output_bytes": 4576,
+            "output_sha256": "48756e55621ac76cf5391cad7f4afa05cae776eb8bd3f1e915efee979705c21d",
+            "output_tail": "alpha       3.00\\nTOTAL       3.00'\n                 ^\n  \n      at TestContext.<anonymous> (file://<path>:24:10)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n      at Test.postRun (node:internal/test_runner/test:1522:19)\n      at Test.run (node:internal/test_runner/test:1447:12)\n      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7) {\n    generatedMessage: true,\n    code: 'ERR_ASSERTION',\n    actual: 'alpha       NaN\\nTOTAL       NaN',\n    expected: 'alpha       3.00\\nTOTAL       3.00',\n    operator: 'strictEqual',\n    diff: 'simple'\n  }\n\ntest at test/fail-to-pass.test.js:28:1\n\u2716 report totals a ledger that mixes short and full lines (0.095083ms)\n  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:\n  + actual - expected\n  \n  + 'alpha       NaN\\nbeta        4.00\\ngamma       NaN\\nTOTAL       NaN'\n  - 'alpha       3.00\\nbeta        4.00\\ngamma       0.00\\nTOTAL       7.00'\n  \n      at TestContext.<anonymous> (file://<path>:30:10)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n      at Test.postRun (node:internal/test_runner/test:1522:19)\n      at Test.run (node:internal/test_runner/test:1447:12)\n      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7) {\n    generatedMessage: true,\n    code: 'ERR_ASSERTION',\n    actual: 'alpha       NaN\\nbeta        4.00\\ngamma       NaN\\nTOTAL       NaN',\n    expected: 'alpha       3.00\\nbeta        4.00\\ngamma       0.00\\nTOTAL       7.00',\n    operator: 'strictEqual',\n    diff: 'simple'\n  }\n",
             "passed": false,
             "returncode": 1
           }
         ],
         "pristine_pass_to_pass": [
           {
-            "output_tail": "",
+            "output_bytes": 426,
+            "output_sha256": "86da771d2d4a279d2badd529e2e56d48181dbddba4e3927ad7c3b42b77761b75",
+            "output_tail": "\u2714 parseEntries reads fully specified lines and trims fields (0.73725ms)\n\u2714 parseEntries skips blank lines and comments (0.073041ms)\n\u2714 parseEntries applies defaults to empty fields (0.123166ms)\n\u2714 buildReport renders padded rows and a total (0.106375ms)\n\u2714 buildReport handles an empty ledger (0.054375ms)\n\u2139 tests 5\n\u2139 suites 0\n\u2139 pass 5\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 76.618875\n",
             "passed": true,
             "returncode": 0
           },
           {
-            "output_tail": "",
+            "output_bytes": 427,
+            "output_sha256": "0069fe8c6b15c8505417a04ea9bd2309992147a84ef50c96bd87f5add2a8fc5f",
+            "output_tail": "\u2714 parseEntries reads fully specified lines and trims fields (0.719083ms)\n\u2714 parseEntries skips blank lines and comments (0.073083ms)\n\u2714 parseEntries applies defaults to empty fields (0.116625ms)\n\u2714 buildReport renders padded rows and a total (0.107834ms)\n\u2714 buildReport handles an empty ledger (0.053625ms)\n\u2139 tests 5\n\u2139 suites 0\n\u2139 pass 5\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 63.111958\n",
             "passed": true,
             "returncode": 0
           },
           {
-            "output_tail": "",
+            "output_bytes": 424,
+            "output_sha256": "4a0fa0300b5abf092583e44cf080a1d3476ddbf0b02f48547f0c212977215cd9",
+            "output_tail": "\u2714 parseEntries reads fully specified lines and trims fields (2.825875ms)\n\u2714 parseEntries skips blank lines and comments (0.281042ms)\n\u2714 parseEntries applies defaults to empty fields (0.179167ms)\n\u2714 buildReport renders padded rows and a total (0.137417ms)\n\u2714 buildReport handles an empty ledger (0.060875ms)\n\u2139 tests 5\n\u2139 suites 0\n\u2139 pass 5\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 83.696\n",
             "passed": true,
             "returncode": 0
           }
         ]
       }
     },
-    "manifest_sha256": "ea5a50eacd400a6b6ff52c0a09c8f2a7cfe28e949e7f6689a2c902ca9ef9304d",
-    "reviewed_at": "2026-08-11T20:44:51Z",
+    "manifest_sha256": "244673ba5e0f96a08349b54493e60d596e57bc127493f1d4ac7375c09121c744",
+    "reviewed_at": "2026-08-18T14:02:32Z",
     "reviewer": "Albert Wessels (chat approval 2026-08-11)"
   },
   "artifacts": [
@@ -226,6 +263,12 @@
         "--test",
         "test/fail-to-pass.test.js"
       ],
+      "expected_cases": [
+        "omitted trailing fields take their documented defaults",
+        "parseEntries always returns finite numbers",
+        "report totals a ledger that mixes short and full lines",
+        "report values short lines the same as fully written ones"
+      ],
       "overlays": [
         {
           "dest": "test/fail-to-pass.test.js",
@@ -244,7 +287,7 @@
     }
   },
   "timestamps": {
-    "admitted_at": "2026-08-11T20:44:51Z",
+    "admitted_at": "2026-08-18T14:02:32Z",
     "created_at": "2026-08-11T00:00:00Z",
     "expires_at": "2026-11-09T20:44:51Z"
   }

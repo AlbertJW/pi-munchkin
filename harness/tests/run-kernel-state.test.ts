@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { RunStateStoreV1, validateRunStateSnapshot } from "../lib/run-kernel-state.ts";
 import type { ExecutionReceiptV1, RunEventV1 } from "../lib/run-kernel-types.ts";
-import { buildControlProposal } from "../lib/control-proposal.ts";
+import { CONTROL_REASON_VALUES, buildControlProposal } from "../lib/control-proposal.ts";
 
 const H = "a".repeat(64);
 const legacy = {
@@ -317,4 +317,31 @@ test("an over-budget context reading is clamped instead of killing the snapshot 
 	assert.equal(store.snapshot().context.usagePct, null, "null still means unknown");
 	apply(store, { v: 1, type: "run/context-observed", sequence: 5, atMs: 5, usagePct: 42 });
 	assert.equal(store.snapshot().context.usagePct, 42, "ordinary readings pass through");
+});
+
+// Enum-parity guard (2026-08-18). `verification_plateau` entered the control
+// vocabulary with the shadow plateau feature but not run-kernel-state's validator,
+// so a plateau decision made validateRunStateSnapshot reject the whole state —
+// capsule persistence stops silently and the round yields no settled row. Drives
+// the REAL store per reason and asserts the validator returns zero errors, so the
+// two vocabularies can never drift apart again. (validateRunStateSnapshot RETURNS
+// errors, it does not throw — an assert.doesNotThrow here would pass vacuously.)
+test("every canonical control reason survives run-state validation", () => {
+	for (const reason of CONTROL_REASON_VALUES) {
+		const store = new RunStateStoreV1();
+		apply(store, session());
+		const proposal = buildControlProposal({
+			boundarySequence: 7, kind: "failure_recovery", reason, source: "verify-gate",
+			cooldownKey: `parity:${reason}`, messageFactory: "verify-wrap",
+		});
+		apply(store, { v: 1, type: "run/control-proposed", sequence: 2, atMs: 2, proposal });
+		apply(store, {
+			v: 1, type: "run/control-decided", sequence: 3, atMs: 3,
+			decision: { v: 1, boundarySequence: 7, mode: "enforce", proposalCount: 1, collisionCount: 0, legacyActionCount: 0, winner: proposal },
+		});
+		const state = store.snapshot();
+		assert.equal(state.control.lastDecision?.reason, reason);
+		assert.deepEqual(validateRunStateSnapshot(state), [],
+			`control reason ${reason} must be accepted by the persisted-state validator`);
+	}
 });

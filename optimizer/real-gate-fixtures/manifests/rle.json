@@ -2,41 +2,55 @@
   "admission": {
     "approved": false,
     "automated": {
-      "checked_at": "2026-07-14T18:51:28Z",
+      "checked_at": "2026-08-18T14:01:17Z",
       "hash_drift": [],
+      "manifest_drift": false,
+      "overlay_lint": [],
       "passed": true,
       "runs_per_state": 3,
       "states": {
         "gold_fail_to_pass": [
           {
-            "output_tail": "",
+            "output_bytes": 257,
+            "output_sha256": "6c9d9b924904ab3ca701fa7e3e659a905d9c920bc80a10218d1d73143ff44bf3",
+            "output_tail": "\u2714 multi-digit run encode (0.426709ms)\n\u2714 multi-digit run decode (0.093708ms)\n\u2714 no runs unchanged (0.052167ms)\n\u2714 round trip (0.050375ms)\n\u2139 tests 4\n\u2139 suites 0\n\u2139 pass 4\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 54.089875\n",
             "passed": true,
             "returncode": 0
           },
           {
-            "output_tail": "",
+            "output_bytes": 257,
+            "output_sha256": "18b76ad0cc9f07de3a08b23a1716979aeb6b71efab4030aaacfe5c854071b6e7",
+            "output_tail": "\u2714 multi-digit run encode (0.436875ms)\n\u2714 multi-digit run decode (0.095292ms)\n\u2714 no runs unchanged (0.052875ms)\n\u2714 round trip (0.050416ms)\n\u2139 tests 4\n\u2139 suites 0\n\u2139 pass 4\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 53.647125\n",
             "passed": true,
             "returncode": 0
           },
           {
-            "output_tail": "",
+            "output_bytes": 257,
+            "output_sha256": "bbfae294c4bee97398498a2ac9e124703ff3969ec5858fb81727f1afb47a82fa",
+            "output_tail": "\u2714 multi-digit run encode (0.428708ms)\n\u2714 multi-digit run decode (0.093042ms)\n\u2714 no runs unchanged (0.050584ms)\n\u2714 round trip (0.052959ms)\n\u2139 tests 4\n\u2139 suites 0\n\u2139 pass 4\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 52.648125\n",
             "passed": true,
             "returncode": 0
           }
         ],
         "gold_pass_to_pass": [
           {
-            "output_tail": "",
+            "output_bytes": 171,
+            "output_sha256": "fb1ab2471b0f109cf21abf84d670a536e623b9682e4a71a01ace59b404877532",
+            "output_tail": "\u2714 existing public exports remain available (0.34375ms)\n\u2139 tests 1\n\u2139 suites 0\n\u2139 pass 1\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 52.930791\n",
             "passed": true,
             "returncode": 0
           },
           {
-            "output_tail": "",
+            "output_bytes": 172,
+            "output_sha256": "6d65e13aa1de1823d195ffc6653257105df129f2f92198463105a05ca0750fab",
+            "output_tail": "\u2714 existing public exports remain available (0.343458ms)\n\u2139 tests 1\n\u2139 suites 0\n\u2139 pass 1\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 54.471042\n",
             "passed": true,
             "returncode": 0
           },
           {
-            "output_tail": "",
+            "output_bytes": 169,
+            "output_sha256": "03130f5d25ab54008c24e82f75c15a3cc57b5e1e795857a089867a304077c664",
+            "output_tail": "\u2714 existing public exports remain available (0.341709ms)\n\u2139 tests 1\n\u2139 suites 0\n\u2139 pass 1\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 53.915\n",
             "passed": true,
             "returncode": 0
           }
@@ -44,34 +58,46 @@
         "mutant:shortcut": {
           "fail_to_pass": [
             {
-              "output_tail": "k62kfhh/work/test/fail-to-pass.test.js:7:45)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n      at Test.postRun (node:internal/test_runner/test:1522:19)\n      at Test.run (node:internal/test_runner/test:1447:12)\n      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3) {\n    generatedMessage: true,\n    code: 'ERR_ASSERTION',\n    actual: '2A',\n    expected: 'AAAAAAAAAAAA',\n    operator: 'strictEqual',\n    diff: 'simple'\n  }\n",
+              "output_bytes": 1190,
+              "output_sha256": "82c68b86d2c9ec896eee5ff60ea02529645d246df844fcfd10d43912fa4e39b2",
+              "output_tail": "\u2714 multi-digit run encode (0.433041ms)\n\u2716 multi-digit run decode (0.51125ms)\n\u2714 no runs unchanged (0.053ms)\n\u2714 round trip (0.38025ms)\n\u2139 tests 4\n\u2139 suites 0\n\u2139 pass 3\n\u2139 fail 1\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 57.073708\n\n\u2716 failing tests:\n\ntest at test/fail-to-pass.test.js:7:1\n\u2716 multi-digit run decode (0.51125ms)\n  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:\n  + actual - expected\n  \n  + '2A'\n  - 'AAAAAAAAAAAA'\n  \n      at TestContext.<anonymous> (file://<path>:7:45)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n      at Test.postRun (node:internal/test_runner/test:1522:19)\n      at Test.run (node:internal/test_runner/test:1447:12)\n      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3) {\n    generatedMessage: true,\n    code: 'ERR_ASSERTION',\n    actual: '2A',\n    expected: 'AAAAAAAAAAAA',\n    operator: 'strictEqual',\n    diff: 'simple'\n  }\n",
               "passed": false,
               "returncode": 1
             },
             {
-              "output_tail": "26xxq_y/work/test/fail-to-pass.test.js:7:45)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n      at Test.postRun (node:internal/test_runner/test:1522:19)\n      at Test.run (node:internal/test_runner/test:1447:12)\n      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3) {\n    generatedMessage: true,\n    code: 'ERR_ASSERTION',\n    actual: '2A',\n    expected: 'AAAAAAAAAAAA',\n    operator: 'strictEqual',\n    diff: 'simple'\n  }\n",
+              "output_bytes": 1196,
+              "output_sha256": "ff89682b3ec0ab9755aa738a29f96c978852ee1ac5b3975e463a65d8119c0646",
+              "output_tail": "\u2714 multi-digit run encode (0.441042ms)\n\u2716 multi-digit run decode (0.531666ms)\n\u2714 no runs unchanged (0.054333ms)\n\u2714 round trip (0.526042ms)\n\u2139 tests 4\n\u2139 suites 0\n\u2139 pass 3\n\u2139 fail 1\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 59.027208\n\n\u2716 failing tests:\n\ntest at test/fail-to-pass.test.js:7:1\n\u2716 multi-digit run decode (0.531666ms)\n  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:\n  + actual - expected\n  \n  + '2A'\n  - 'AAAAAAAAAAAA'\n  \n      at TestContext.<anonymous> (file://<path>:7:45)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n      at Test.postRun (node:internal/test_runner/test:1522:19)\n      at Test.run (node:internal/test_runner/test:1447:12)\n      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3) {\n    generatedMessage: true,\n    code: 'ERR_ASSERTION',\n    actual: '2A',\n    expected: 'AAAAAAAAAAAA',\n    operator: 'strictEqual',\n    diff: 'simple'\n  }\n",
               "passed": false,
               "returncode": 1
             },
             {
-              "output_tail": "j7eu1u2/work/test/fail-to-pass.test.js:7:45)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n      at Test.postRun (node:internal/test_runner/test:1522:19)\n      at Test.run (node:internal/test_runner/test:1447:12)\n      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3) {\n    generatedMessage: true,\n    code: 'ERR_ASSERTION',\n    actual: '2A',\n    expected: 'AAAAAAAAAAAA',\n    operator: 'strictEqual',\n    diff: 'simple'\n  }\n",
+              "output_bytes": 1195,
+              "output_sha256": "d1ff8eea02a6f009515438927b6d7fb59622a49746bb40b47c21db2ad1a72c2f",
+              "output_tail": "\u2714 multi-digit run encode (0.43525ms)\n\u2716 multi-digit run decode (0.522208ms)\n\u2714 no runs unchanged (0.147916ms)\n\u2714 round trip (0.370708ms)\n\u2139 tests 4\n\u2139 suites 0\n\u2139 pass 3\n\u2139 fail 1\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 56.140084\n\n\u2716 failing tests:\n\ntest at test/fail-to-pass.test.js:7:1\n\u2716 multi-digit run decode (0.522208ms)\n  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:\n  + actual - expected\n  \n  + '2A'\n  - 'AAAAAAAAAAAA'\n  \n      at TestContext.<anonymous> (file://<path>:7:45)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n      at Test.postRun (node:internal/test_runner/test:1522:19)\n      at Test.run (node:internal/test_runner/test:1447:12)\n      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3) {\n    generatedMessage: true,\n    code: 'ERR_ASSERTION',\n    actual: '2A',\n    expected: 'AAAAAAAAAAAA',\n    operator: 'strictEqual',\n    diff: 'simple'\n  }\n",
               "passed": false,
               "returncode": 1
             }
           ],
           "pass_to_pass": [
             {
-              "output_tail": "",
+              "output_bytes": 172,
+              "output_sha256": "f51f8346e6a884342f20b3714e2cf3936a22b092c0596c1b08e2f14631199897",
+              "output_tail": "\u2714 existing public exports remain available (0.349375ms)\n\u2139 tests 1\n\u2139 suites 0\n\u2139 pass 1\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 55.883542\n",
               "passed": true,
               "returncode": 0
             },
             {
-              "output_tail": "",
+              "output_bytes": 172,
+              "output_sha256": "a48b6c0c7c128a849dfa370fc02bb6292cce653b890051a74210013e8ad9e7ba",
+              "output_tail": "\u2714 existing public exports remain available (0.377583ms)\n\u2139 tests 1\n\u2139 suites 0\n\u2139 pass 1\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 53.211834\n",
               "passed": true,
               "returncode": 0
             },
             {
-              "output_tail": "",
+              "output_bytes": 172,
+              "output_sha256": "9d74e40ad8b095f72d87b2705fb66cef3aa0ede440c55a7c4c2c9a535c69bbbf",
+              "output_tail": "\u2714 existing public exports remain available (0.344333ms)\n\u2139 tests 1\n\u2139 suites 0\n\u2139 pass 1\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 50.525708\n",
               "passed": true,
               "returncode": 0
             }
@@ -79,34 +105,46 @@
         },
         "pristine_fail_to_pass": [
           {
-            "output_tail": "T/pi-admit-rle-mifgzgjr/work/src/index.js:2:9)\n      at TestContext.<anonymous> (file:///private/var/folders/3r/nc7qhtpn56j7rt5nwg0rqw600000gn/T/pi-admit-rle-mifgzgjr/work/test/fail-to-pass.test.js:9:77)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n      at Test.postRun (node:internal/test_runner/test:1522:19)\n      at Test.run (node:internal/test_runner/test:1447:12)\n      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7)\n",
+            "output_bytes": 3253,
+            "output_sha256": "d65a1c6c519d87d2b016b3de11ca7b2c48a71e96936b6c8974a7d6bdb3c14562",
+            "output_tail": "lders/3r/nc7qhtpn56j7rt5nwg0rqw600000gn/T/pi-admit-rle-5ctw0dng/work/test/fail-to-pass.test.js:7:51)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n      at Test.postRun (node:internal/test_runner/test:1522:19)\n      at Test.run (node:internal/test_runner/test:1447:12)\n      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3)\n\ntest at test/fail-to-pass.test.js:8:1\n\u2716 no runs unchanged (0.041709ms)\n  Error: not implemented\n      at encode (file://<path>:2:9)\n      at TestContext.<anonymous> (file://<path>:8:46)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n      at Test.postRun (node:internal/test_runner/test:1522:19)\n      at Test.run (node:internal/test_runner/test:1447:12)\n      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7)\n\ntest at test/fail-to-pass.test.js:9:1\n\u2716 round trip (0.042167ms)\n  Error: not implemented\n      at encode (file://<path>:2:9)\n      at TestContext.<anonymous> (file://<path>:9:77)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n      at Test.postRun (node:internal/test_runner/test:1522:19)\n      at Test.run (node:internal/test_runner/test:1447:12)\n      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7)\n",
             "passed": false,
             "returncode": 1
           },
           {
-            "output_tail": "T/pi-admit-rle-4q4d2wbo/work/src/index.js:2:9)\n      at TestContext.<anonymous> (file:///private/var/folders/3r/nc7qhtpn56j7rt5nwg0rqw600000gn/T/pi-admit-rle-4q4d2wbo/work/test/fail-to-pass.test.js:9:77)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n      at Test.postRun (node:internal/test_runner/test:1522:19)\n      at Test.run (node:internal/test_runner/test:1447:12)\n      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7)\n",
+            "output_bytes": 3249,
+            "output_sha256": "eb1e5727f30cfd44d949d08637083daad55cce47ed4207111cd8561596aa4b75",
+            "output_tail": "folders/3r/nc7qhtpn56j7rt5nwg0rqw600000gn/T/pi-admit-rle-5zpc7mqu/work/test/fail-to-pass.test.js:7:51)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n      at Test.postRun (node:internal/test_runner/test:1522:19)\n      at Test.run (node:internal/test_runner/test:1447:12)\n      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3)\n\ntest at test/fail-to-pass.test.js:8:1\n\u2716 no runs unchanged (0.0415ms)\n  Error: not implemented\n      at encode (file://<path>:2:9)\n      at TestContext.<anonymous> (file://<path>:8:46)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n      at Test.postRun (node:internal/test_runner/test:1522:19)\n      at Test.run (node:internal/test_runner/test:1447:12)\n      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7)\n\ntest at test/fail-to-pass.test.js:9:1\n\u2716 round trip (0.043083ms)\n  Error: not implemented\n      at encode (file://<path>:2:9)\n      at TestContext.<anonymous> (file://<path>:9:77)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n      at Test.postRun (node:internal/test_runner/test:1522:19)\n      at Test.run (node:internal/test_runner/test:1447:12)\n      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7)\n",
             "passed": false,
             "returncode": 1
           },
           {
-            "output_tail": "T/pi-admit-rle-vglzy5u_/work/src/index.js:2:9)\n      at TestContext.<anonymous> (file:///private/var/folders/3r/nc7qhtpn56j7rt5nwg0rqw600000gn/T/pi-admit-rle-vglzy5u_/work/test/fail-to-pass.test.js:9:77)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n      at Test.postRun (node:internal/test_runner/test:1522:19)\n      at Test.run (node:internal/test_runner/test:1447:12)\n      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7)\n",
+            "output_bytes": 3253,
+            "output_sha256": "3975190f57d2cc9cd5783ef73724411cdc7c6011d0ee492ea21026e9f30e8f72",
+            "output_tail": "lders/3r/nc7qhtpn56j7rt5nwg0rqw600000gn/T/pi-admit-rle-fjp70lbq/work/test/fail-to-pass.test.js:7:51)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n      at Test.postRun (node:internal/test_runner/test:1522:19)\n      at Test.run (node:internal/test_runner/test:1447:12)\n      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3)\n\ntest at test/fail-to-pass.test.js:8:1\n\u2716 no runs unchanged (0.040917ms)\n  Error: not implemented\n      at encode (file://<path>:2:9)\n      at TestContext.<anonymous> (file://<path>:8:46)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n      at Test.postRun (node:internal/test_runner/test:1522:19)\n      at Test.run (node:internal/test_runner/test:1447:12)\n      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7)\n\ntest at test/fail-to-pass.test.js:9:1\n\u2716 round trip (0.042709ms)\n  Error: not implemented\n      at encode (file://<path>:2:9)\n      at TestContext.<anonymous> (file://<path>:9:77)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n      at Test.postRun (node:internal/test_runner/test:1522:19)\n      at Test.run (node:internal/test_runner/test:1447:12)\n      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7)\n",
             "passed": false,
             "returncode": 1
           }
         ],
         "pristine_pass_to_pass": [
           {
-            "output_tail": "",
+            "output_bytes": 172,
+            "output_sha256": "e0eba49ad6c304573249b8e11780cea8e4a41e3d477fe5ede2e27d560a8405ed",
+            "output_tail": "\u2714 existing public exports remain available (0.484916ms)\n\u2139 tests 1\n\u2139 suites 0\n\u2139 pass 1\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 68.166083\n",
             "passed": true,
             "returncode": 0
           },
           {
-            "output_tail": "",
+            "output_bytes": 172,
+            "output_sha256": "9130c3172788a11ab3b431fdfc169c8b0b7a3c0f50d630fc652d13983e6a8120",
+            "output_tail": "\u2714 existing public exports remain available (0.395417ms)\n\u2139 tests 1\n\u2139 suites 0\n\u2139 pass 1\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 58.276375\n",
             "passed": true,
             "returncode": 0
           },
           {
-            "output_tail": "",
+            "output_bytes": 171,
+            "output_sha256": "5666838a17cea96db7b80591ebe6b6a929d2d701f252d22f1e9dc6bf26b2a184",
+            "output_tail": "\u2714 existing public exports remain available (0.358334ms)\n\u2139 tests 1\n\u2139 suites 0\n\u2139 pass 1\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 58.45375\n",
             "passed": true,
             "returncode": 0
           }
@@ -131,11 +169,11 @@
     },
     {
       "path": "real-gate-fixtures/patches/rle/gold.patch",
-      "sha256": "668c8c62a5f296f0ec062b9a8e92bc461c2cf7c5aeeedbc0db991b9827e20c9f"
+      "sha256": "56ff3d6a58999685d30b7a99d354549d09be04ea613d26e06f0604c11db72ff3"
     },
     {
       "path": "real-gate-fixtures/patches/rle/shortcut.patch",
-      "sha256": "519f2ec496d99e8822eda62f8abd704f0462740f0fb78d130ab447717f8b450f"
+      "sha256": "f6fa6de3792885e5b934fd53bfb902a44d77d247d2db7e6d082da8d956378848"
     },
     {
       "path": "real-gate-fixtures/rle/package.json",
@@ -177,19 +215,16 @@
     },
     "perturbations": [
       {
-        "approved": false,
         "id": "equivalent-1",
         "sha256": "c4b8d1b4418ab238a1eb535cc2f1ebdb238bca8588d85015e955b1419db2a8c0",
         "text": "Complete the following repository task. Preserve existing behavior and verify the tests.\n\nImplement encode(s) and decode(s) in src/index.js for run-length encoding. encode replaces\neach run of 2 or more identical consecutive characters with the count followed by the\ncharacter; single characters are left as-is: encode(\"AABCCCDEEEE\") -> \"2AB3CD4E\". decode is\nthe exact inverse: decode(\"2AB3CD4E\") -> \"AABCCCDEEEE\". Counts may be multiple digits.\nencode(\"\") -> \"\". Input strings contain non-digit characters; decimal digits are reserved\nfor run counts. A round trip decode(encode(s)) must return s for any input in that domain. Run node\n--test until all tests pass."
       },
       {
-        "approved": false,
         "id": "equivalent-2",
         "sha256": "23fb9ab1683cc31263b5aa0a025b25db94f21485869f009fc5638c995c8310d1",
         "text": "Repository change request:\nImplement encode(s) and decode(s) in src/index.js for run-length encoding. encode replaces\neach run of 2 or more identical consecutive characters with the count followed by the\ncharacter; single characters are left as-is: encode(\"AABCCCDEEEE\") -> \"2AB3CD4E\". decode is\nthe exact inverse: decode(\"2AB3CD4E\") -> \"AABCCCDEEEE\". Counts may be multiple digits.\nencode(\"\") -> \"\". Input strings contain non-digit characters; decimal digits are reserved\nfor run counts. A round trip decode(encode(s)) must return s for any input in that domain. Run node\n--test until all tests pass.\n\nUse the smallest correct change and confirm the test suite."
       },
       {
-        "approved": false,
         "id": "equivalent-3",
         "sha256": "7789f06d86c301141fd142d213950fa64354a9a7173356fdc47c4a4a05d674cd",
         "text": "Please solve this task in the supplied checkout, retaining all stated edge cases:\n\nImplement encode(s) and decode(s) in src/index.js for run-length encoding. encode replaces\neach run of 2 or more identical consecutive characters with the count followed by the\ncharacter; single characters are left as-is: encode(\"AABCCCDEEEE\") -> \"2AB3CD4E\". decode is\nthe exact inverse: decode(\"2AB3CD4E\") -> \"AABCCCDEEEE\". Counts may be multiple digits.\nencode(\"\") -> \"\". Input strings contain non-digit characters; decimal digits are reserved\nfor run counts. A round trip decode(encode(s)) must return s for any input in that domain. Run node\n--test until all tests pass."
@@ -223,6 +258,12 @@
         "node",
         "--test",
         "test/fail-to-pass.test.js"
+      ],
+      "expected_cases": [
+        "multi-digit run decode",
+        "multi-digit run encode",
+        "no runs unchanged",
+        "round trip"
       ],
       "overlays": [
         {

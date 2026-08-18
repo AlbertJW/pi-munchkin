@@ -7,41 +7,55 @@
       "fc8163a1622458b0f2f422ef4f9f04536ad373878076e1ddaf89f9259a5b6716"
     ],
     "automated": {
-      "checked_at": "2026-07-24T12:43:53Z",
+      "checked_at": "2026-08-18T14:01:29Z",
       "hash_drift": [],
+      "manifest_drift": false,
+      "overlay_lint": [],
       "passed": true,
       "runs_per_state": 3,
       "states": {
         "gold_fail_to_pass": [
           {
-            "output_tail": "",
+            "output_bytes": 293,
+            "output_sha256": "b9457c57779c69ba76cb4095823aa97fb674beb776799758438032b64ee4c372",
+            "output_tail": "\u2714 truncateHandle follows the label-style ellipsis-counts-toward-maxLen convention (0.390041ms)\n\u2714 truncateHandle never exceeds maxLen characters, ellipsis included (0.09275ms)\n\u2139 tests 2\n\u2139 suites 0\n\u2139 pass 2\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 52.617208\n",
             "passed": true,
             "returncode": 0
           },
           {
-            "output_tail": "",
+            "output_bytes": 294,
+            "output_sha256": "8581348975ed7b992a1e1a1e828e37bf9edeb5821de529a3c86271914fd9df1e",
+            "output_tail": "\u2714 truncateHandle follows the label-style ellipsis-counts-toward-maxLen convention (0.401625ms)\n\u2714 truncateHandle never exceeds maxLen characters, ellipsis included (0.094958ms)\n\u2139 tests 2\n\u2139 suites 0\n\u2139 pass 2\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 54.200208\n",
             "passed": true,
             "returncode": 0
           },
           {
-            "output_tail": "",
+            "output_bytes": 294,
+            "output_sha256": "110222f03f83d74f4eaa86d0efa65b3728a2ca02c6fc9641757c397a3aa2aa20",
+            "output_tail": "\u2714 truncateHandle follows the label-style ellipsis-counts-toward-maxLen convention (0.391417ms)\n\u2714 truncateHandle never exceeds maxLen characters, ellipsis included (0.093792ms)\n\u2139 tests 2\n\u2139 suites 0\n\u2139 pass 2\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 54.588875\n",
             "passed": true,
             "returncode": 0
           }
         ],
         "gold_pass_to_pass": [
           {
-            "output_tail": "",
+            "output_bytes": 437,
+            "output_sha256": "0c67c25189472525b71f049ab789db44a744bbf3aeb84059fd65f8f6c1f61550",
+            "output_tail": "\ufe63 if a git repo was started, it has at least 2 commits (baseline + fix) (0.335625ms) # SKIP\n\u2714 truncateLabel: short text unchanged (0.394083ms)\n\u2714 truncateLabel: ellipsis counts toward maxLen (0.065291ms)\n\u2714 truncateTag: short text unchanged (0.062667ms)\n\u2714 truncateTag: ellipsis is extra, beyond maxLen (0.486916ms)\n\u2139 tests 5\n\u2139 suites 0\n\u2139 pass 4\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 1\n\u2139 todo 0\n\u2139 duration_ms 60.969584\n",
             "passed": true,
             "returncode": 0
           },
           {
-            "output_tail": "",
+            "output_bytes": 433,
+            "output_sha256": "4f4b123712552f8221f0c06403c110c4548bb9134dcf14227f005ac75df9b32f",
+            "output_tail": "\ufe63 if a git repo was started, it has at least 2 commits (baseline + fix) (0.337083ms) # SKIP\n\u2714 truncateLabel: short text unchanged (0.392208ms)\n\u2714 truncateLabel: ellipsis counts toward maxLen (0.06ms)\n\u2714 truncateTag: short text unchanged (0.057875ms)\n\u2714 truncateTag: ellipsis is extra, beyond maxLen (0.584084ms)\n\u2139 tests 5\n\u2139 suites 0\n\u2139 pass 4\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 1\n\u2139 todo 0\n\u2139 duration_ms 60.183416\n",
             "passed": true,
             "returncode": 0
           },
           {
-            "output_tail": "",
+            "output_bytes": 433,
+            "output_sha256": "d54a360e741674b481db859375d512e24373d10adeb59ee854cead64557e2929",
+            "output_tail": "\ufe63 if a git repo was started, it has at least 2 commits (baseline + fix) (0.337375ms) # SKIP\n\u2714 truncateLabel: short text unchanged (0.389417ms)\n\u2714 truncateLabel: ellipsis counts toward maxLen (0.059ms)\n\u2714 truncateTag: short text unchanged (0.05675ms)\n\u2714 truncateTag: ellipsis is extra, beyond maxLen (0.633333ms)\n\u2139 tests 5\n\u2139 suites 0\n\u2139 pass 4\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 1\n\u2139 todo 0\n\u2139 duration_ms 61.084083\n",
             "passed": true,
             "returncode": 0
           }
@@ -49,34 +63,46 @@
         "mutant:shortcut": {
           "fail_to_pass": [
             {
-              "output_tail": "ion-provenance-tanzj9oe/work/test/fail-to-pass.test.js:30:12)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n      at Test.postRun (node:internal/test_runner/test:1522:19)\n      at Test.run (node:internal/test_runner/test:1447:12)\n      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3) {\n    generatedMessage: false,\n    code: 'ERR_ASSERTION',\n    actual: false,\n    expected: true,\n    operator: '==',\n    diff: 'simple'\n  }\n",
+              "output_bytes": 2091,
+              "output_sha256": "60e777425ccd3bd1c60b88320fe544a5d1288d8c7dbc3d945d0c6c39e46d6e13",
+              "output_tail": "ellipsis-counts-toward-maxLen convention (0.841542ms)\n\u2716 truncateHandle never exceeds maxLen characters, ellipsis included (0.114083ms)\n\u2139 tests 2\n\u2139 suites 0\n\u2139 pass 0\n\u2139 fail 2\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 65.185625\n\n\u2716 failing tests:\n\ntest at test/fail-to-pass.test.js:22:1\n\u2716 truncateHandle follows the label-style ellipsis-counts-toward-maxLen convention (0.841542ms)\n  AssertionError [ERR_ASSERTION]: text=\"Hello World\" maxLen=8\n  + actual - expected\n  \n  + 'Hello Wo\u2026'\n  - 'Hello W\u2026'\n            ^\n  \n      at TestContext.<anonymous> (file://<path>:24:12)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.start (node:internal/test_runner/test:1242:17)\n      at startSubtestAfterBootstrap (node:internal/test_runner/harness:387:17) {\n    generatedMessage: false,\n    code: 'ERR_ASSERTION',\n    actual: 'Hello Wo\u2026',\n    expected: 'Hello W\u2026',\n    operator: 'strictEqual',\n    diff: 'simple'\n  }\n\ntest at test/fail-to-pass.test.js:28:1\n\u2716 truncateHandle never exceeds maxLen characters, ellipsis included (0.114083ms)\n  AssertionError [ERR_ASSERTION]: text=\"Hello World\" maxLen=8\n      at TestContext.<anonymous> (file://<path>:30:12)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n      at Test.postRun (node:internal/test_runner/test:1522:19)\n      at Test.run (node:internal/test_runner/test:1447:12)\n      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3) {\n    generatedMessage: false,\n    code: 'ERR_ASSERTION',\n    actual: false,\n    expected: true,\n    operator: '==',\n    diff: 'simple'\n  }\n",
               "passed": false,
               "returncode": 1
             },
             {
-              "output_tail": "ion-provenance-r_14oami/work/test/fail-to-pass.test.js:30:12)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n      at Test.postRun (node:internal/test_runner/test:1522:19)\n      at Test.run (node:internal/test_runner/test:1447:12)\n      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3) {\n    generatedMessage: false,\n    code: 'ERR_ASSERTION',\n    actual: false,\n    expected: true,\n    operator: '==',\n    diff: 'simple'\n  }\n",
+              "output_bytes": 2090,
+              "output_sha256": "e14aec53eae72c6c923925a03db24bfea0bcc2bddd8388f579d428adf262c57e",
+              "output_tail": " ellipsis-counts-toward-maxLen convention (0.925792ms)\n\u2716 truncateHandle never exceeds maxLen characters, ellipsis included (0.114333ms)\n\u2139 tests 2\n\u2139 suites 0\n\u2139 pass 0\n\u2139 fail 2\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 60.79325\n\n\u2716 failing tests:\n\ntest at test/fail-to-pass.test.js:22:1\n\u2716 truncateHandle follows the label-style ellipsis-counts-toward-maxLen convention (0.925792ms)\n  AssertionError [ERR_ASSERTION]: text=\"Hello World\" maxLen=8\n  + actual - expected\n  \n  + 'Hello Wo\u2026'\n  - 'Hello W\u2026'\n            ^\n  \n      at TestContext.<anonymous> (file://<path>:24:12)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.start (node:internal/test_runner/test:1242:17)\n      at startSubtestAfterBootstrap (node:internal/test_runner/harness:387:17) {\n    generatedMessage: false,\n    code: 'ERR_ASSERTION',\n    actual: 'Hello Wo\u2026',\n    expected: 'Hello W\u2026',\n    operator: 'strictEqual',\n    diff: 'simple'\n  }\n\ntest at test/fail-to-pass.test.js:28:1\n\u2716 truncateHandle never exceeds maxLen characters, ellipsis included (0.114333ms)\n  AssertionError [ERR_ASSERTION]: text=\"Hello World\" maxLen=8\n      at TestContext.<anonymous> (file://<path>:30:12)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n      at Test.postRun (node:internal/test_runner/test:1522:19)\n      at Test.run (node:internal/test_runner/test:1447:12)\n      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3) {\n    generatedMessage: false,\n    code: 'ERR_ASSERTION',\n    actual: false,\n    expected: true,\n    operator: '==',\n    diff: 'simple'\n  }\n",
               "passed": false,
               "returncode": 1
             },
             {
-              "output_tail": "ion-provenance-sgdavv8o/work/test/fail-to-pass.test.js:30:12)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n      at Test.postRun (node:internal/test_runner/test:1522:19)\n      at Test.run (node:internal/test_runner/test:1447:12)\n      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3) {\n    generatedMessage: false,\n    code: 'ERR_ASSERTION',\n    actual: false,\n    expected: true,\n    operator: '==',\n    diff: 'simple'\n  }\n",
+              "output_bytes": 2091,
+              "output_sha256": "3e7326c9236309df85cffb5d127b2c62bb054541ed3935d17e3eac8de2c216c8",
+              "output_tail": "ellipsis-counts-toward-maxLen convention (0.813833ms)\n\u2716 truncateHandle never exceeds maxLen characters, ellipsis included (0.111917ms)\n\u2139 tests 2\n\u2139 suites 0\n\u2139 pass 0\n\u2139 fail 2\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 55.304458\n\n\u2716 failing tests:\n\ntest at test/fail-to-pass.test.js:22:1\n\u2716 truncateHandle follows the label-style ellipsis-counts-toward-maxLen convention (0.813833ms)\n  AssertionError [ERR_ASSERTION]: text=\"Hello World\" maxLen=8\n  + actual - expected\n  \n  + 'Hello Wo\u2026'\n  - 'Hello W\u2026'\n            ^\n  \n      at TestContext.<anonymous> (file://<path>:24:12)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.start (node:internal/test_runner/test:1242:17)\n      at startSubtestAfterBootstrap (node:internal/test_runner/harness:387:17) {\n    generatedMessage: false,\n    code: 'ERR_ASSERTION',\n    actual: 'Hello Wo\u2026',\n    expected: 'Hello W\u2026',\n    operator: 'strictEqual',\n    diff: 'simple'\n  }\n\ntest at test/fail-to-pass.test.js:28:1\n\u2716 truncateHandle never exceeds maxLen characters, ellipsis included (0.111917ms)\n  AssertionError [ERR_ASSERTION]: text=\"Hello World\" maxLen=8\n      at TestContext.<anonymous> (file://<path>:30:12)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n      at Test.postRun (node:internal/test_runner/test:1522:19)\n      at Test.run (node:internal/test_runner/test:1447:12)\n      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3) {\n    generatedMessage: false,\n    code: 'ERR_ASSERTION',\n    actual: false,\n    expected: true,\n    operator: '==',\n    diff: 'simple'\n  }\n",
               "passed": false,
               "returncode": 1
             }
           ],
           "pass_to_pass": [
             {
-              "output_tail": "",
+              "output_bytes": 437,
+              "output_sha256": "69b85fd2ac6b455c2a297405a5a462c26fcfd2ce552457b3bd842eaa31f304dd",
+              "output_tail": "\ufe63 if a git repo was started, it has at least 2 commits (baseline + fix) (0.326917ms) # SKIP\n\u2714 truncateLabel: short text unchanged (0.389542ms)\n\u2714 truncateLabel: ellipsis counts toward maxLen (0.060167ms)\n\u2714 truncateTag: short text unchanged (0.054875ms)\n\u2714 truncateTag: ellipsis is extra, beyond maxLen (0.376625ms)\n\u2139 tests 5\n\u2139 suites 0\n\u2139 pass 4\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 1\n\u2139 todo 0\n\u2139 duration_ms 66.627041\n",
               "passed": true,
               "returncode": 0
             },
             {
-              "output_tail": "",
+              "output_bytes": 436,
+              "output_sha256": "4009d4aad8dc5da675c3db1e96cada5f7cb76d4594d40c4448306d82aee47911",
+              "output_tail": "\ufe63 if a git repo was started, it has at least 2 commits (baseline + fix) (0.32425ms) # SKIP\n\u2714 truncateLabel: short text unchanged (0.387166ms)\n\u2714 truncateLabel: ellipsis counts toward maxLen (0.079042ms)\n\u2714 truncateTag: short text unchanged (0.062208ms)\n\u2714 truncateTag: ellipsis is extra, beyond maxLen (0.469166ms)\n\u2139 tests 5\n\u2139 suites 0\n\u2139 pass 4\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 1\n\u2139 todo 0\n\u2139 duration_ms 58.122042\n",
               "passed": true,
               "returncode": 0
             },
             {
-              "output_tail": "",
+              "output_bytes": 436,
+              "output_sha256": "9c652d0090c9c121f88de0f8db50c0ad56e44f436a00bbad09be0df146f279a1",
+              "output_tail": "\ufe63 if a git repo was started, it has at least 2 commits (baseline + fix) (0.328458ms) # SKIP\n\u2714 truncateLabel: short text unchanged (0.38925ms)\n\u2714 truncateLabel: ellipsis counts toward maxLen (0.058667ms)\n\u2714 truncateTag: short text unchanged (0.055667ms)\n\u2714 truncateTag: ellipsis is extra, beyond maxLen (0.609542ms)\n\u2139 tests 5\n\u2139 suites 0\n\u2139 pass 4\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 1\n\u2139 todo 0\n\u2139 duration_ms 57.079459\n",
               "passed": true,
               "returncode": 0
             }
@@ -84,42 +110,54 @@
         },
         "pristine_fail_to_pass": [
           {
-            "output_tail": ":610:35)\n    at ModuleJob.syncLink (node:internal/modules/esm/module_job:277:33)\n    at ModuleJob.link (node:internal/modules/esm/module_job:389:17) {\n  code: 'ERR_MODULE_NOT_FOUND',\n  url: 'file:///private/var/folders/3r/nc7qhtpn56j7rt5nwg0rqw600000gn/T/pi-admit-sv-convention-provenance-ba60am9z/work/src/handleTruncate.js'\n}\n\nNode.js v26.5.0\n\u2716 test/fail-to-pass.test.js (41.600667ms)\n\u2139 tests 1\n\u2139 suites 0\n\u2139 pass 0\n\u2139 fail 1\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 45.363125\n\n\u2716 failing tests:\n\ntest at test/fail-to-pass.test.js:1:1\n\u2716 test/fail-to-pass.test.js (41.600667ms)\n  'test failed'\n",
+            "output_bytes": 1592,
+            "output_sha256": "9402dfc27613fa50674a0579e028af74e67a1c6db7e99572b315abb823360873",
+            "output_tail": "node:internal/modules/esm/resolve:272\n    throw new ERR_MODULE_NOT_FOUND(\n          ^\n\nError [ERR_MODULE_NOT_FOUND]: Cannot find module '<path>' imported from <path>\n    at finalizeResolution (node:internal/modules/esm/resolve:272:11)\n    at moduleResolve (node:internal/modules/esm/resolve:879:10)\n    at defaultResolve (node:internal/modules/esm/resolve:1006:11)\n    at #cachedDefaultResolve (node:internal/modules/esm/loader:708:20)\n    at #resolveAndMaybeBlockOnLoaderThread (node:internal/modules/esm/loader:728:38)\n    at ModuleLoader.resolveSync (node:internal/modules/esm/loader:766:56)\n    at #resolve (node:internal/modules/esm/loader:690:17)\n    at ModuleLoader.getOrCreateModuleJob (node:internal/modules/esm/loader:610:35)\n    at ModuleJob.syncLink (node:internal/modules/esm/module_job:277:33)\n    at ModuleJob.link (node:internal/modules/esm/module_job:389:17) {\n  code: 'ERR_MODULE_NOT_FOUND',\n  url: 'file://<path>'\n}\n\nNode.js v26.5.0\n\u2716 test/fail-to-pass.test.js (39.999834ms)\n\u2139 tests 1\n\u2139 suites 0\n\u2139 pass 0\n\u2139 fail 1\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 43.91275\n\n\u2716 failing tests:\n\ntest at test/fail-to-pass.test.js:1:1\n\u2716 test/fail-to-pass.test.js (39.999834ms)\n  'test failed'\n",
             "passed": false,
             "returncode": 1
           },
           {
-            "output_tail": ":610:35)\n    at ModuleJob.syncLink (node:internal/modules/esm/module_job:277:33)\n    at ModuleJob.link (node:internal/modules/esm/module_job:389:17) {\n  code: 'ERR_MODULE_NOT_FOUND',\n  url: 'file:///private/var/folders/3r/nc7qhtpn56j7rt5nwg0rqw600000gn/T/pi-admit-sv-convention-provenance-m0p7a5i6/work/src/handleTruncate.js'\n}\n\nNode.js v26.5.0\n\u2716 test/fail-to-pass.test.js (39.265125ms)\n\u2139 tests 1\n\u2139 suites 0\n\u2139 pass 0\n\u2139 fail 1\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 43.099042\n\n\u2716 failing tests:\n\ntest at test/fail-to-pass.test.js:1:1\n\u2716 test/fail-to-pass.test.js (39.265125ms)\n  'test failed'\n",
+            "output_bytes": 1593,
+            "output_sha256": "f21b8f5c03bdb380f721fbb3aa3765fa14298875c4ed4f6ad6d2ac48bfbe9d5f",
+            "output_tail": "node:internal/modules/esm/resolve:272\n    throw new ERR_MODULE_NOT_FOUND(\n          ^\n\nError [ERR_MODULE_NOT_FOUND]: Cannot find module '<path>' imported from <path>\n    at finalizeResolution (node:internal/modules/esm/resolve:272:11)\n    at moduleResolve (node:internal/modules/esm/resolve:879:10)\n    at defaultResolve (node:internal/modules/esm/resolve:1006:11)\n    at #cachedDefaultResolve (node:internal/modules/esm/loader:708:20)\n    at #resolveAndMaybeBlockOnLoaderThread (node:internal/modules/esm/loader:728:38)\n    at ModuleLoader.resolveSync (node:internal/modules/esm/loader:766:56)\n    at #resolve (node:internal/modules/esm/loader:690:17)\n    at ModuleLoader.getOrCreateModuleJob (node:internal/modules/esm/loader:610:35)\n    at ModuleJob.syncLink (node:internal/modules/esm/module_job:277:33)\n    at ModuleJob.link (node:internal/modules/esm/module_job:389:17) {\n  code: 'ERR_MODULE_NOT_FOUND',\n  url: 'file://<path>'\n}\n\nNode.js v26.5.0\n\u2716 test/fail-to-pass.test.js (39.595459ms)\n\u2139 tests 1\n\u2139 suites 0\n\u2139 pass 0\n\u2139 fail 1\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 43.410333\n\n\u2716 failing tests:\n\ntest at test/fail-to-pass.test.js:1:1\n\u2716 test/fail-to-pass.test.js (39.595459ms)\n  'test failed'\n",
             "passed": false,
             "returncode": 1
           },
           {
-            "output_tail": ":610:35)\n    at ModuleJob.syncLink (node:internal/modules/esm/module_job:277:33)\n    at ModuleJob.link (node:internal/modules/esm/module_job:389:17) {\n  code: 'ERR_MODULE_NOT_FOUND',\n  url: 'file:///private/var/folders/3r/nc7qhtpn56j7rt5nwg0rqw600000gn/T/pi-admit-sv-convention-provenance-k2nuwbz0/work/src/handleTruncate.js'\n}\n\nNode.js v26.5.0\n\u2716 test/fail-to-pass.test.js (39.976666ms)\n\u2139 tests 1\n\u2139 suites 0\n\u2139 pass 0\n\u2139 fail 1\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 44.087625\n\n\u2716 failing tests:\n\ntest at test/fail-to-pass.test.js:1:1\n\u2716 test/fail-to-pass.test.js (39.976666ms)\n  'test failed'\n",
+            "output_bytes": 1593,
+            "output_sha256": "c636ab9396d2597e1997ac087aa87dc9565f93cd1819e32fde99cec6c05678c3",
+            "output_tail": "node:internal/modules/esm/resolve:272\n    throw new ERR_MODULE_NOT_FOUND(\n          ^\n\nError [ERR_MODULE_NOT_FOUND]: Cannot find module '<path>' imported from <path>\n    at finalizeResolution (node:internal/modules/esm/resolve:272:11)\n    at moduleResolve (node:internal/modules/esm/resolve:879:10)\n    at defaultResolve (node:internal/modules/esm/resolve:1006:11)\n    at #cachedDefaultResolve (node:internal/modules/esm/loader:708:20)\n    at #resolveAndMaybeBlockOnLoaderThread (node:internal/modules/esm/loader:728:38)\n    at ModuleLoader.resolveSync (node:internal/modules/esm/loader:766:56)\n    at #resolve (node:internal/modules/esm/loader:690:17)\n    at ModuleLoader.getOrCreateModuleJob (node:internal/modules/esm/loader:610:35)\n    at ModuleJob.syncLink (node:internal/modules/esm/module_job:277:33)\n    at ModuleJob.link (node:internal/modules/esm/module_job:389:17) {\n  code: 'ERR_MODULE_NOT_FOUND',\n  url: 'file://<path>'\n}\n\nNode.js v26.5.0\n\u2716 test/fail-to-pass.test.js (42.305167ms)\n\u2139 tests 1\n\u2139 suites 0\n\u2139 pass 0\n\u2139 fail 1\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 46.609333\n\n\u2716 failing tests:\n\ntest at test/fail-to-pass.test.js:1:1\n\u2716 test/fail-to-pass.test.js (42.305167ms)\n  'test failed'\n",
             "passed": false,
             "returncode": 1
           }
         ],
         "pristine_pass_to_pass": [
           {
-            "output_tail": "",
+            "output_bytes": 437,
+            "output_sha256": "88341ee787a27e7f514ca1902d271b4516f10eb30650315fd5d68183cbadbdf2",
+            "output_tail": "\ufe63 if a git repo was started, it has at least 2 commits (baseline + fix) (0.331958ms) # SKIP\n\u2714 truncateLabel: short text unchanged (0.389334ms)\n\u2714 truncateLabel: ellipsis counts toward maxLen (0.094583ms)\n\u2714 truncateTag: short text unchanged (0.069917ms)\n\u2714 truncateTag: ellipsis is extra, beyond maxLen (0.689625ms)\n\u2139 tests 5\n\u2139 suites 0\n\u2139 pass 4\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 1\n\u2139 todo 0\n\u2139 duration_ms 59.134667\n",
             "passed": true,
             "returncode": 0
           },
           {
-            "output_tail": "",
+            "output_bytes": 437,
+            "output_sha256": "4d8b10e981f7ba208fdb7dbfa1ab1ae10989f381676ed7bc16a1a909bb76e37a",
+            "output_tail": "\ufe63 if a git repo was started, it has at least 2 commits (baseline + fix) (0.344209ms) # SKIP\n\u2714 truncateLabel: short text unchanged (0.388792ms)\n\u2714 truncateLabel: ellipsis counts toward maxLen (0.062583ms)\n\u2714 truncateTag: short text unchanged (0.058334ms)\n\u2714 truncateTag: ellipsis is extra, beyond maxLen (0.498375ms)\n\u2139 tests 5\n\u2139 suites 0\n\u2139 pass 4\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 1\n\u2139 todo 0\n\u2139 duration_ms 59.375083\n",
             "passed": true,
             "returncode": 0
           },
           {
-            "output_tail": "",
+            "output_bytes": 435,
+            "output_sha256": "82f4c83728def28a410c3d43043b7c10f7705acd066c510af1b7063f556cca3b",
+            "output_tail": "\ufe63 if a git repo was started, it has at least 2 commits (baseline + fix) (0.340375ms) # SKIP\n\u2714 truncateLabel: short text unchanged (0.3905ms)\n\u2714 truncateLabel: ellipsis counts toward maxLen (0.062584ms)\n\u2714 truncateTag: short text unchanged (0.059208ms)\n\u2714 truncateTag: ellipsis is extra, beyond maxLen (0.576875ms)\n\u2139 tests 5\n\u2139 suites 0\n\u2139 pass 4\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 1\n\u2139 todo 0\n\u2139 duration_ms 60.922625\n",
             "passed": true,
             "returncode": 0
           }
         ]
       }
     },
-    "manifest_sha256": "26f151275821ad9df703770d64d14af5cee983026583c6f13fcd1fa36cfd9453",
-    "reviewed_at": "2026-07-29T11:58:14Z",
+    "manifest_sha256": "cf6f432b76dbdfdbaee16e85d6e2ca5d23e69dd26f8e86b8659add70f9857b4a",
+    "reviewed_at": "2026-08-18T14:02:33Z",
     "reviewer": "Albert (delegated: Claude Fable 5, 2026-07-29)"
   },
   "artifacts": [
@@ -227,6 +265,10 @@
         "--test",
         "test/fail-to-pass.test.js"
       ],
+      "expected_cases": [
+        "truncateHandle follows the label-style ellipsis-counts-toward-maxLen convention",
+        "truncateHandle never exceeds maxLen characters, ellipsis included"
+      ],
       "overlays": [
         {
           "dest": "test/fail-to-pass.test.js",
@@ -245,7 +287,7 @@
     }
   },
   "timestamps": {
-    "admitted_at": "2026-07-29T11:58:14Z",
+    "admitted_at": "2026-08-18T14:02:33Z",
     "created_at": "2026-07-24T00:00:00Z",
     "expires_at": "2026-10-27T11:58:14Z"
   }

@@ -7,41 +7,55 @@
       "d6a55f60c59c2b8ff487a59ab3bdd8efcadb283ec5dc69e60aa3720c00a48ad6"
     ],
     "automated": {
-      "checked_at": "2026-07-29T10:34:30Z",
+      "checked_at": "2026-08-18T14:01:15Z",
       "hash_drift": [],
+      "manifest_drift": false,
+      "overlay_lint": [],
       "passed": true,
       "runs_per_state": 3,
       "states": {
         "gold_fail_to_pass": [
           {
-            "output_tail": "",
+            "output_bytes": 311,
+            "output_sha256": "9876589c91f6518e49528c5552c5ab79270eead8e6f6de9af71075565b97ae06",
+            "output_tail": "\u2714 every naming-spec mapping produces the specified slug (0.521083ms)\n\u2714 slugs are idempotent across the whole spec corpus (0.44275ms)\n\u2714 already-clean slugs pass through unchanged (0.062042ms)\n\u2139 tests 3\n\u2139 suites 0\n\u2139 pass 3\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 58.132042\n",
             "passed": true,
             "returncode": 0
           },
           {
-            "output_tail": "",
+            "output_bytes": 312,
+            "output_sha256": "57aaaca5ed9a727556554a2adc6acaa71dc3aa66ffd09fd86ca52e9889428ff4",
+            "output_tail": "\u2714 every naming-spec mapping produces the specified slug (0.533833ms)\n\u2714 slugs are idempotent across the whole spec corpus (0.441083ms)\n\u2714 already-clean slugs pass through unchanged (0.054416ms)\n\u2139 tests 3\n\u2139 suites 0\n\u2139 pass 3\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 59.420792\n",
             "passed": true,
             "returncode": 0
           },
           {
-            "output_tail": "",
+            "output_bytes": 310,
+            "output_sha256": "15cd7e3de6a17b2ef31115d731fa94b18f15b0fff9664882695bfd4e1ce091ff",
+            "output_tail": "\u2714 every naming-spec mapping produces the specified slug (0.639209ms)\n\u2714 slugs are idempotent across the whole spec corpus (0.44525ms)\n\u2714 already-clean slugs pass through unchanged (0.055334ms)\n\u2139 tests 3\n\u2139 suites 0\n\u2139 pass 3\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 64.59025\n",
             "passed": true,
             "returncode": 0
           }
         ],
         "gold_pass_to_pass": [
           {
-            "output_tail": "",
+            "output_bytes": 261,
+            "output_sha256": "0a36f95175e7b2f5f69bd4fc5b81474fd6070e75f5d1b635ff44e48766a5cec9",
+            "output_tail": "\u2714 plain names slugify cleanly (1.320541ms)\n\u2714 mapped accents transliterate per the naming spec (0.1535ms)\n\u2714 slugs are idempotent (0.084375ms)\n\u2139 tests 3\n\u2139 suites 0\n\u2139 pass 3\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 90.403291\n",
             "passed": true,
             "returncode": 0
           },
           {
-            "output_tail": "",
+            "output_bytes": 260,
+            "output_sha256": "1050e06c4b2a5bc0ca4adb1f549a04470f7b7082ffcdb32ac360391dbc693d7e",
+            "output_tail": "\u2714 plain names slugify cleanly (0.495ms)\n\u2714 mapped accents transliterate per the naming spec (0.069584ms)\n\u2714 slugs are idempotent (0.068125ms)\n\u2139 tests 3\n\u2139 suites 0\n\u2139 pass 3\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 71.402042\n",
             "passed": true,
             "returncode": 0
           },
           {
-            "output_tail": "",
+            "output_bytes": 262,
+            "output_sha256": "acf17af3d4dc6e0fe60a7428154350cd920961f5ac1d99322765521429f3bd5c",
+            "output_tail": "\u2714 plain names slugify cleanly (0.46825ms)\n\u2714 mapped accents transliterate per the naming spec (0.070917ms)\n\u2714 slugs are idempotent (0.082125ms)\n\u2139 tests 3\n\u2139 suites 0\n\u2139 pass 3\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 60.525709\n",
             "passed": true,
             "returncode": 0
           }
@@ -49,34 +63,46 @@
         "mutant:shortcut": {
           "fail_to_pass": [
             {
-              "output_tail": " \n      at TestContext.<anonymous> (file:///private/var/folders/3r/nc7qhtpn56j7rt5nwg0rqw600000gn/T/pi-admit-retry-trap-1yy9nc16/work/test/fail-to-pass.test.js:20:12)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.start (node:internal/test_runner/test:1242:17)\n      at startSubtestAfterBootstrap (node:internal/test_runner/harness:387:17) {\n    generatedMessage: false,\n    code: 'ERR_ASSERTION',\n    actual: 'berlingen-stra-e',\n    expected: 'uberlingen-strasse',\n    operator: 'strictEqual',\n    diff: 'simple'\n  }\n",
+              "output_bytes": 1179,
+              "output_sha256": "4fd83ae9d319edd24ccd92579702d0bc346f9502cd7c9b2f89812c98c721333f",
+              "output_tail": "\u2716 every naming-spec mapping produces the specified slug (0.900209ms)\n\u2714 slugs are idempotent across the whole spec corpus (0.505167ms)\n\u2714 already-clean slugs pass through unchanged (0.0625ms)\n\u2139 tests 3\n\u2139 suites 0\n\u2139 pass 2\n\u2139 fail 1\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 61.85875\n\n\u2716 failing tests:\n\ntest at test/fail-to-pass.test.js:18:1\n\u2716 every naming-spec mapping produces the specified slug (0.900209ms)\n  AssertionError [ERR_ASSERTION]: slugify(\"\u00dcberlingen Stra\u00dfe\")\n  + actual - expected\n  \n  + 'berlingen-stra-e'\n  - 'uberlingen-strasse'\n  \n      at TestContext.<anonymous> (file://<path>:20:12)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.start (node:internal/test_runner/test:1242:17)\n      at startSubtestAfterBootstrap (node:internal/test_runner/harness:387:17) {\n    generatedMessage: false,\n    code: 'ERR_ASSERTION',\n    actual: 'berlingen-stra-e',\n    expected: 'uberlingen-strasse',\n    operator: 'strictEqual',\n    diff: 'simple'\n  }\n",
               "passed": false,
               "returncode": 1
             },
             {
-              "output_tail": " \n      at TestContext.<anonymous> (file:///private/var/folders/3r/nc7qhtpn56j7rt5nwg0rqw600000gn/T/pi-admit-retry-trap-6dyvxqq4/work/test/fail-to-pass.test.js:20:12)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.start (node:internal/test_runner/test:1242:17)\n      at startSubtestAfterBootstrap (node:internal/test_runner/harness:387:17) {\n    generatedMessage: false,\n    code: 'ERR_ASSERTION',\n    actual: 'berlingen-stra-e',\n    expected: 'uberlingen-strasse',\n    operator: 'strictEqual',\n    diff: 'simple'\n  }\n",
+              "output_bytes": 1182,
+              "output_sha256": "19a55e9f96f9732ee040b910965d0e0fb5aaf5b849bf74989756b4c0fc3b3419",
+              "output_tail": "\u2716 every naming-spec mapping produces the specified slug (0.917792ms)\n\u2714 slugs are idempotent across the whole spec corpus (0.503666ms)\n\u2714 already-clean slugs pass through unchanged (0.053208ms)\n\u2139 tests 3\n\u2139 suites 0\n\u2139 pass 2\n\u2139 fail 1\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 58.231542\n\n\u2716 failing tests:\n\ntest at test/fail-to-pass.test.js:18:1\n\u2716 every naming-spec mapping produces the specified slug (0.917792ms)\n  AssertionError [ERR_ASSERTION]: slugify(\"\u00dcberlingen Stra\u00dfe\")\n  + actual - expected\n  \n  + 'berlingen-stra-e'\n  - 'uberlingen-strasse'\n  \n      at TestContext.<anonymous> (file://<path>:20:12)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.start (node:internal/test_runner/test:1242:17)\n      at startSubtestAfterBootstrap (node:internal/test_runner/harness:387:17) {\n    generatedMessage: false,\n    code: 'ERR_ASSERTION',\n    actual: 'berlingen-stra-e',\n    expected: 'uberlingen-strasse',\n    operator: 'strictEqual',\n    diff: 'simple'\n  }\n",
               "passed": false,
               "returncode": 1
             },
             {
-              "output_tail": " \n      at TestContext.<anonymous> (file:///private/var/folders/3r/nc7qhtpn56j7rt5nwg0rqw600000gn/T/pi-admit-retry-trap-2gj73ool/work/test/fail-to-pass.test.js:20:12)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.start (node:internal/test_runner/test:1242:17)\n      at startSubtestAfterBootstrap (node:internal/test_runner/harness:387:17) {\n    generatedMessage: false,\n    code: 'ERR_ASSERTION',\n    actual: 'berlingen-stra-e',\n    expected: 'uberlingen-strasse',\n    operator: 'strictEqual',\n    diff: 'simple'\n  }\n",
+              "output_bytes": 1182,
+              "output_sha256": "eb0f1bc754aa0545343abb74c00e3c8d9cfe02373c1e31520eb39d73e4a8a458",
+              "output_tail": "\u2716 every naming-spec mapping produces the specified slug (0.891958ms)\n\u2714 slugs are idempotent across the whole spec corpus (0.420541ms)\n\u2714 already-clean slugs pass through unchanged (0.056459ms)\n\u2139 tests 3\n\u2139 suites 0\n\u2139 pass 2\n\u2139 fail 1\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 56.560792\n\n\u2716 failing tests:\n\ntest at test/fail-to-pass.test.js:18:1\n\u2716 every naming-spec mapping produces the specified slug (0.891958ms)\n  AssertionError [ERR_ASSERTION]: slugify(\"\u00dcberlingen Stra\u00dfe\")\n  + actual - expected\n  \n  + 'berlingen-stra-e'\n  - 'uberlingen-strasse'\n  \n      at TestContext.<anonymous> (file://<path>:20:12)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.start (node:internal/test_runner/test:1242:17)\n      at startSubtestAfterBootstrap (node:internal/test_runner/harness:387:17) {\n    generatedMessage: false,\n    code: 'ERR_ASSERTION',\n    actual: 'berlingen-stra-e',\n    expected: 'uberlingen-strasse',\n    operator: 'strictEqual',\n    diff: 'simple'\n  }\n",
               "passed": false,
               "returncode": 1
             }
           ],
           "pass_to_pass": [
             {
-              "output_tail": "",
+              "output_bytes": 263,
+              "output_sha256": "8a2986674ec49f76918735d70718e091e53e04662a2d4004e0d36837fbd0d2cd",
+              "output_tail": "\u2714 plain names slugify cleanly (0.476708ms)\n\u2714 mapped accents transliterate per the naming spec (0.071834ms)\n\u2714 slugs are idempotent (0.062041ms)\n\u2139 tests 3\n\u2139 suites 0\n\u2139 pass 3\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 69.123292\n",
               "passed": true,
               "returncode": 0
             },
             {
-              "output_tail": "",
+              "output_bytes": 257,
+              "output_sha256": "750d97a4f28efc102dcbd370c8a08175733914041491c2343a7558e312e09bbc",
+              "output_tail": "\u2714 plain names slugify cleanly (0.47025ms)\n\u2714 mapped accents transliterate per the naming spec (0.071042ms)\n\u2714 slugs are idempotent (0.062583ms)\n\u2139 tests 3\n\u2139 suites 0\n\u2139 pass 3\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 65.8\n",
               "passed": true,
               "returncode": 0
             },
             {
-              "output_tail": "",
+              "output_bytes": 262,
+              "output_sha256": "de1024e4a1041c968035942a33fc30b61e9bba55f85657cafea3e0eb68aaeb2c",
+              "output_tail": "\u2714 plain names slugify cleanly (1.19925ms)\n\u2714 mapped accents transliterate per the naming spec (0.122834ms)\n\u2714 slugs are idempotent (0.083167ms)\n\u2139 tests 3\n\u2139 suites 0\n\u2139 pass 3\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 82.987875\n",
               "passed": true,
               "returncode": 0
             }
@@ -84,42 +110,54 @@
         },
         "pristine_fail_to_pass": [
           {
-            "output_tail": "'\n        ^\n  \n      at TestContext.<anonymous> (file:///private/var/folders/3r/nc7qhtpn56j7rt5nwg0rqw600000gn/T/pi-admit-retry-trap-87c1k4da/work/test/fail-to-pass.test.js:20:12)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.start (node:internal/test_runner/test:1242:17)\n      at startSubtestAfterBootstrap (node:internal/test_runner/harness:387:17) {\n    generatedMessage: false,\n    code: 'ERR_ASSERTION',\n    actual: 'caf-z-rich',\n    expected: 'cafe-zurich',\n    operator: 'strictEqual',\n    diff: 'simple'\n  }\n",
+            "output_bytes": 1160,
+            "output_sha256": "c90895d8a638ea393e23b6404b62b996ac22da2c6d606dc378603cdfa2bd7413",
+            "output_tail": "\u2716 every naming-spec mapping produces the specified slug (0.875333ms)\n\u2714 slugs are idempotent across the whole spec corpus (0.457458ms)\n\u2714 already-clean slugs pass through unchanged (0.067458ms)\n\u2139 tests 3\n\u2139 suites 0\n\u2139 pass 2\n\u2139 fail 1\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 62.552333\n\n\u2716 failing tests:\n\ntest at test/fail-to-pass.test.js:18:1\n\u2716 every naming-spec mapping produces the specified slug (0.875333ms)\n  AssertionError [ERR_ASSERTION]: slugify(\"Caf\u00e9 Z\u00fcrich\")\n  + actual - expected\n  \n  + 'caf-z-rich'\n  - 'cafe-zurich'\n        ^\n  \n      at TestContext.<anonymous> (file://<path>:20:12)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.start (node:internal/test_runner/test:1242:17)\n      at startSubtestAfterBootstrap (node:internal/test_runner/harness:387:17) {\n    generatedMessage: false,\n    code: 'ERR_ASSERTION',\n    actual: 'caf-z-rich',\n    expected: 'cafe-zurich',\n    operator: 'strictEqual',\n    diff: 'simple'\n  }\n",
             "passed": false,
             "returncode": 1
           },
           {
-            "output_tail": "'\n        ^\n  \n      at TestContext.<anonymous> (file:///private/var/folders/3r/nc7qhtpn56j7rt5nwg0rqw600000gn/T/pi-admit-retry-trap-2d3v5u1j/work/test/fail-to-pass.test.js:20:12)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.start (node:internal/test_runner/test:1242:17)\n      at startSubtestAfterBootstrap (node:internal/test_runner/harness:387:17) {\n    generatedMessage: false,\n    code: 'ERR_ASSERTION',\n    actual: 'caf-z-rich',\n    expected: 'cafe-zurich',\n    operator: 'strictEqual',\n    diff: 'simple'\n  }\n",
+            "output_bytes": 1160,
+            "output_sha256": "5e02cc974440f68315b60882cb12cdff7e5bfcd7085a3a195f33cabb873915bf",
+            "output_tail": "\u2716 every naming-spec mapping produces the specified slug (0.873875ms)\n\u2714 slugs are idempotent across the whole spec corpus (0.406167ms)\n\u2714 already-clean slugs pass through unchanged (0.053459ms)\n\u2139 tests 3\n\u2139 suites 0\n\u2139 pass 2\n\u2139 fail 1\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 56.345042\n\n\u2716 failing tests:\n\ntest at test/fail-to-pass.test.js:18:1\n\u2716 every naming-spec mapping produces the specified slug (0.873875ms)\n  AssertionError [ERR_ASSERTION]: slugify(\"Caf\u00e9 Z\u00fcrich\")\n  + actual - expected\n  \n  + 'caf-z-rich'\n  - 'cafe-zurich'\n        ^\n  \n      at TestContext.<anonymous> (file://<path>:20:12)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.start (node:internal/test_runner/test:1242:17)\n      at startSubtestAfterBootstrap (node:internal/test_runner/harness:387:17) {\n    generatedMessage: false,\n    code: 'ERR_ASSERTION',\n    actual: 'caf-z-rich',\n    expected: 'cafe-zurich',\n    operator: 'strictEqual',\n    diff: 'simple'\n  }\n",
             "passed": false,
             "returncode": 1
           },
           {
-            "output_tail": "'\n        ^\n  \n      at TestContext.<anonymous> (file:///private/var/folders/3r/nc7qhtpn56j7rt5nwg0rqw600000gn/T/pi-admit-retry-trap-zn9xprdz/work/test/fail-to-pass.test.js:20:12)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.start (node:internal/test_runner/test:1242:17)\n      at startSubtestAfterBootstrap (node:internal/test_runner/harness:387:17) {\n    generatedMessage: false,\n    code: 'ERR_ASSERTION',\n    actual: 'caf-z-rich',\n    expected: 'cafe-zurich',\n    operator: 'strictEqual',\n    diff: 'simple'\n  }\n",
+            "output_bytes": 1159,
+            "output_sha256": "1874e55618fbd50cfb6e6de37fc76a448e8f85972dfe214472f7055fc101778f",
+            "output_tail": "\u2716 every naming-spec mapping produces the specified slug (0.909125ms)\n\u2714 slugs are idempotent across the whole spec corpus (0.857208ms)\n\u2714 already-clean slugs pass through unchanged (0.206416ms)\n\u2139 tests 3\n\u2139 suites 0\n\u2139 pass 2\n\u2139 fail 1\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 63.01075\n\n\u2716 failing tests:\n\ntest at test/fail-to-pass.test.js:18:1\n\u2716 every naming-spec mapping produces the specified slug (0.909125ms)\n  AssertionError [ERR_ASSERTION]: slugify(\"Caf\u00e9 Z\u00fcrich\")\n  + actual - expected\n  \n  + 'caf-z-rich'\n  - 'cafe-zurich'\n        ^\n  \n      at TestContext.<anonymous> (file://<path>:20:12)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.start (node:internal/test_runner/test:1242:17)\n      at startSubtestAfterBootstrap (node:internal/test_runner/harness:387:17) {\n    generatedMessage: false,\n    code: 'ERR_ASSERTION',\n    actual: 'caf-z-rich',\n    expected: 'cafe-zurich',\n    operator: 'strictEqual',\n    diff: 'simple'\n  }\n",
             "passed": false,
             "returncode": 1
           }
         ],
         "pristine_pass_to_pass": [
           {
-            "output_tail": "",
+            "output_bytes": 262,
+            "output_sha256": "727a99c2e9bd2b5cbff97fb015c56d3ddd97c17ac4f02c8d327e629ec8dd3e2a",
+            "output_tail": "\u2714 plain names slugify cleanly (0.490042ms)\n\u2714 mapped accents transliterate per the naming spec (0.074458ms)\n\u2714 slugs are idempotent (0.062417ms)\n\u2139 tests 3\n\u2139 suites 0\n\u2139 pass 3\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 56.01875\n",
             "passed": true,
             "returncode": 0
           },
           {
-            "output_tail": "",
+            "output_bytes": 263,
+            "output_sha256": "dc933c25a4d2fa6627ca9e5e75528589caf6900dc85f52b1a1f4a8e88235a16d",
+            "output_tail": "\u2714 plain names slugify cleanly (0.503083ms)\n\u2714 mapped accents transliterate per the naming spec (0.075334ms)\n\u2714 slugs are idempotent (0.075375ms)\n\u2139 tests 3\n\u2139 suites 0\n\u2139 pass 3\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 70.783084\n",
             "passed": true,
             "returncode": 0
           },
           {
-            "output_tail": "",
+            "output_bytes": 263,
+            "output_sha256": "6d85f1870569e9373b65f0cc5f88d1d695583f2facdd46e3ef987e8a99688212",
+            "output_tail": "\u2714 plain names slugify cleanly (1.177042ms)\n\u2714 mapped accents transliterate per the naming spec (0.163916ms)\n\u2714 slugs are idempotent (0.078584ms)\n\u2139 tests 3\n\u2139 suites 0\n\u2139 pass 3\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 81.801917\n",
             "passed": true,
             "returncode": 0
           }
         ]
       }
     },
-    "manifest_sha256": "a652126f099a0c0c6b5782e395a1d3bcafe1752636ec892ee989ee12d56481d2",
-    "reviewed_at": "2026-07-29T11:58:14Z",
+    "manifest_sha256": "baa8fdc98d3833849edaaa408d902f4056d32f0106c1ac99e92023f7c2d8ba25",
+    "reviewed_at": "2026-08-18T14:02:32Z",
     "reviewer": "Albert (delegated: Claude Fable 5, 2026-07-29)"
   },
   "artifacts": [
@@ -228,6 +266,11 @@
         "--test",
         "test/fail-to-pass.test.js"
       ],
+      "expected_cases": [
+        "already-clean slugs pass through unchanged",
+        "every naming-spec mapping produces the specified slug",
+        "slugs are idempotent across the whole spec corpus"
+      ],
       "overlays": [
         {
           "dest": "test/fail-to-pass.test.js",
@@ -246,7 +289,7 @@
     }
   },
   "timestamps": {
-    "admitted_at": "2026-07-29T11:58:14Z",
+    "admitted_at": "2026-08-18T14:02:32Z",
     "created_at": "2026-07-29T00:00:00Z",
     "expires_at": "2026-10-27T11:58:14Z"
   }

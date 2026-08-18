@@ -25,6 +25,10 @@ const STAGES = [
   { name: "health", command: "npm", args: ["run", "-s", "health"], env: { SKIP_TSC: "1" } },
   { name: "pack:smoke", command: "npm", args: ["run", "-s", "pack:smoke"] },
   { name: "verify:optimizer", command: "npm", args: ["run", "-s", "verify:optimizer"] },
+  // The credential guard for a PUBLIC repo was manual-only until 2026-08-18: it was
+  // in neither `verify` nor CI, so the sole protection against publishing a secret
+  // was human discipline. Cheap (two git diffs + untracked files) and fail-closed.
+  { name: "secret-scan", command: "npm", args: ["run", "-s", "secret-scan:diff"] },
 ];
 
 function run(stage) {

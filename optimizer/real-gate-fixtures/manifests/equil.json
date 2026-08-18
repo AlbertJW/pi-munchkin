@@ -7,41 +7,55 @@
       "2bb32908b952c80134ccd95a20bc0a6edc649aab9fc503d2eb165949b5529ae2"
     ],
     "automated": {
-      "checked_at": "2026-07-14T21:01:09Z",
+      "checked_at": "2026-08-18T14:00:36Z",
       "hash_drift": [],
+      "manifest_drift": false,
+      "overlay_lint": [],
       "passed": true,
       "runs_per_state": 3,
       "states": {
         "gold_fail_to_pass": [
           {
-            "output_tail": "",
+            "output_bytes": 183,
+            "output_sha256": "cddcf44fc38138153c3fa9a1706040bb25860d08b71a8df3cba76272c19c5184",
+            "output_tail": "\u2714 endpoints count (0.647042ms)\n\u2714 left endpoint only (0.064084ms)\n\u2139 tests 2\n\u2139 suites 0\n\u2139 pass 2\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 64.006208\n",
             "passed": true,
             "returncode": 0
           },
           {
-            "output_tail": "",
+            "output_bytes": 181,
+            "output_sha256": "0de45d3c40e5fb84740b3e266756603eab9fb6f5f44a0a9286f070ff930df7d7",
+            "output_tail": "\u2714 endpoints count (0.699666ms)\n\u2714 left endpoint only (0.0635ms)\n\u2139 tests 2\n\u2139 suites 0\n\u2139 pass 2\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 54.050334\n",
             "passed": true,
             "returncode": 0
           },
           {
-            "output_tail": "",
+            "output_bytes": 179,
+            "output_sha256": "7e426c73f90fc2f588a2b74ce84dedbe3a1d414756c417e8fb5da856a8302626",
+            "output_tail": "\u2714 endpoints count (0.7715ms)\n\u2714 left endpoint only (0.1045ms)\n\u2139 tests 2\n\u2139 suites 0\n\u2139 pass 2\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 60.131083\n",
             "passed": true,
             "returncode": 0
           }
         ],
         "gold_pass_to_pass": [
           {
-            "output_tail": "",
+            "output_bytes": 157,
+            "output_sha256": "9d51778bb58c06f24862faa9eee604153630006e40630c86c843955e92da72dc",
+            "output_tail": "\u2714 single middle equilibrium (0.649792ms)\n\u2139 tests 1\n\u2139 suites 0\n\u2139 pass 1\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 68.133167\n",
             "passed": true,
             "returncode": 0
           },
           {
-            "output_tail": "",
+            "output_bytes": 157,
+            "output_sha256": "101ba0f9253dabeefd147e53e3a0b77b1f6c7bd946fa37389bc83ec24b783d66",
+            "output_tail": "\u2714 single middle equilibrium (0.642958ms)\n\u2139 tests 1\n\u2139 suites 0\n\u2139 pass 1\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 68.423791\n",
             "passed": true,
             "returncode": 0
           },
           {
-            "output_tail": "",
+            "output_bytes": 157,
+            "output_sha256": "cacf1062ffafa82e9e21f5306fc203b172e9f124b1e671c1f2a20888ce051704",
+            "output_tail": "\u2714 single middle equilibrium (0.643459ms)\n\u2139 tests 1\n\u2139 suites 0\n\u2139 pass 1\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 59.683167\n",
             "passed": true,
             "returncode": 0
           }
@@ -49,34 +63,46 @@
         "mutant:shortcut": {
           "fail_to_pass": [
             {
-              "output_tail": "    3,\n  -   7\n    ]\n  \n      at TestContext.<anonymous> (file:///private/var/folders/3r/nc7qhtpn56j7rt5nwg0rqw600000gn/T/pi-admit-equil-3u0q5eiq/work/test/fail-to-pass.test.js:6:38)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.start (node:internal/test_runner/test:1242:17)\n      at startSubtestAfterBootstrap (node:internal/test_runner/harness:387:17) {\n    generatedMessage: true,\n    code: 'ERR_ASSERTION',\n    actual: [ 0, 3 ],\n    expected: [ 0, 3, 7 ],\n    operator: 'deepStrictEqual',\n    diff: 'simple'\n  }\n",
+              "output_bytes": 992,
+              "output_sha256": "544707db05c295f534c787dc1f08dfb2b70f41cd81efd2c31cea94a28e4f7abc",
+              "output_tail": "\u2716 endpoints count (1.064084ms)\n\u2714 left endpoint only (0.1665ms)\n\u2139 tests 2\n\u2139 suites 0\n\u2139 pass 1\n\u2139 fail 1\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 60.388834\n\n\u2716 failing tests:\n\ntest at test/fail-to-pass.test.js:6:1\n\u2716 endpoints count (1.064084ms)\n  AssertionError [ERR_ASSERTION]: Expected values to be strictly deep-equal:\n  + actual - expected\n  \n    [\n      0,\n      3,\n  -   7\n    ]\n  \n      at TestContext.<anonymous> (file://<path>:6:38)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.start (node:internal/test_runner/test:1242:17)\n      at startSubtestAfterBootstrap (node:internal/test_runner/harness:387:17) {\n    generatedMessage: true,\n    code: 'ERR_ASSERTION',\n    actual: [ 0, 3 ],\n    expected: [ 0, 3, 7 ],\n    operator: 'deepStrictEqual',\n    diff: 'simple'\n  }\n",
               "passed": false,
               "returncode": 1
             },
             {
-              "output_tail": "    3,\n  -   7\n    ]\n  \n      at TestContext.<anonymous> (file:///private/var/folders/3r/nc7qhtpn56j7rt5nwg0rqw600000gn/T/pi-admit-equil-a5f0wh03/work/test/fail-to-pass.test.js:6:38)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.start (node:internal/test_runner/test:1242:17)\n      at startSubtestAfterBootstrap (node:internal/test_runner/harness:387:17) {\n    generatedMessage: true,\n    code: 'ERR_ASSERTION',\n    actual: [ 0, 3 ],\n    expected: [ 0, 3, 7 ],\n    operator: 'deepStrictEqual',\n    diff: 'simple'\n  }\n",
+              "output_bytes": 994,
+              "output_sha256": "cd5cb01dca0733e9af8cfd447d7a8827366531b4cb80f1196f143c021fcc49fe",
+              "output_tail": "\u2716 endpoints count (1.062584ms)\n\u2714 left endpoint only (0.229083ms)\n\u2139 tests 2\n\u2139 suites 0\n\u2139 pass 1\n\u2139 fail 1\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 53.744625\n\n\u2716 failing tests:\n\ntest at test/fail-to-pass.test.js:6:1\n\u2716 endpoints count (1.062584ms)\n  AssertionError [ERR_ASSERTION]: Expected values to be strictly deep-equal:\n  + actual - expected\n  \n    [\n      0,\n      3,\n  -   7\n    ]\n  \n      at TestContext.<anonymous> (file://<path>:6:38)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.start (node:internal/test_runner/test:1242:17)\n      at startSubtestAfterBootstrap (node:internal/test_runner/harness:387:17) {\n    generatedMessage: true,\n    code: 'ERR_ASSERTION',\n    actual: [ 0, 3 ],\n    expected: [ 0, 3, 7 ],\n    operator: 'deepStrictEqual',\n    diff: 'simple'\n  }\n",
               "passed": false,
               "returncode": 1
             },
             {
-              "output_tail": "    3,\n  -   7\n    ]\n  \n      at TestContext.<anonymous> (file:///private/var/folders/3r/nc7qhtpn56j7rt5nwg0rqw600000gn/T/pi-admit-equil-dvswnm02/work/test/fail-to-pass.test.js:6:38)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.start (node:internal/test_runner/test:1242:17)\n      at startSubtestAfterBootstrap (node:internal/test_runner/harness:387:17) {\n    generatedMessage: true,\n    code: 'ERR_ASSERTION',\n    actual: [ 0, 3 ],\n    expected: [ 0, 3, 7 ],\n    operator: 'deepStrictEqual',\n    diff: 'simple'\n  }\n",
+              "output_bytes": 994,
+              "output_sha256": "56f8840cf05ac3bafd389a1045315d86a39e0f555aff5cc346c8b43d5a54fb8f",
+              "output_tail": "\u2716 endpoints count (1.070041ms)\n\u2714 left endpoint only (0.166958ms)\n\u2139 tests 2\n\u2139 suites 0\n\u2139 pass 1\n\u2139 fail 1\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 53.817417\n\n\u2716 failing tests:\n\ntest at test/fail-to-pass.test.js:6:1\n\u2716 endpoints count (1.070041ms)\n  AssertionError [ERR_ASSERTION]: Expected values to be strictly deep-equal:\n  + actual - expected\n  \n    [\n      0,\n      3,\n  -   7\n    ]\n  \n      at TestContext.<anonymous> (file://<path>:6:38)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.start (node:internal/test_runner/test:1242:17)\n      at startSubtestAfterBootstrap (node:internal/test_runner/harness:387:17) {\n    generatedMessage: true,\n    code: 'ERR_ASSERTION',\n    actual: [ 0, 3 ],\n    expected: [ 0, 3, 7 ],\n    operator: 'deepStrictEqual',\n    diff: 'simple'\n  }\n",
               "passed": false,
               "returncode": 1
             }
           ],
           "pass_to_pass": [
             {
-              "output_tail": "",
+              "output_bytes": 154,
+              "output_sha256": "d873a90001fdef1b2662e077d46e1c0f28d920c37b39c331a2de1b70d4519357",
+              "output_tail": "\u2714 single middle equilibrium (0.625375ms)\n\u2139 tests 1\n\u2139 suites 0\n\u2139 pass 1\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 59.787\n",
               "passed": true,
               "returncode": 0
             },
             {
-              "output_tail": "",
+              "output_bytes": 156,
+              "output_sha256": "69b9ca1e2a907c535782d82a205af9f39d9643617456dd092eb776ddd214bffb",
+              "output_tail": "\u2714 single middle equilibrium (0.72425ms)\n\u2139 tests 1\n\u2139 suites 0\n\u2139 pass 1\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 59.392708\n",
               "passed": true,
               "returncode": 0
             },
             {
-              "output_tail": "",
+              "output_bytes": 157,
+              "output_sha256": "2c6b197c0a9b4a553ef0d58776569d4f9ef4c5cadcdb9a270fae27ba01acd911",
+              "output_tail": "\u2714 single middle equilibrium (0.732167ms)\n\u2139 tests 1\n\u2139 suites 0\n\u2139 pass 1\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 63.866083\n",
               "passed": true,
               "returncode": 0
             }
@@ -84,42 +110,54 @@
         },
         "pristine_fail_to_pass": [
           {
-            "output_tail": "equil-47ct44u4/work/test/fail-to-pass.test.js:7:41)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n      at Test.postRun (node:internal/test_runner/test:1522:19)\n      at Test.run (node:internal/test_runner/test:1447:12)\n      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3) {\n    generatedMessage: true,\n    code: 'ERR_ASSERTION',\n    actual: [],\n    expected: [ 0 ],\n    operator: 'deepStrictEqual',\n    diff: 'simple'\n  }\n",
+            "output_bytes": 1899,
+            "output_sha256": "34140f6a713811785b365270ce11bba055aeee0db502892dfac46428f52f6547",
+            "output_tail": "\u2716 endpoints count (1.165375ms)\n\u2716 left endpoint only (0.131ms)\n\u2139 tests 2\n\u2139 suites 0\n\u2139 pass 0\n\u2139 fail 2\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 58.879583\n\n\u2716 failing tests:\n\ntest at test/fail-to-pass.test.js:6:1\n\u2716 endpoints count (1.165375ms)\n  AssertionError [ERR_ASSERTION]: Expected values to be strictly deep-equal:\n  + actual - expected\n  \n    [\n  -   0,\n      3,\n  -   7\n    ]\n  \n      at TestContext.<anonymous> (file://<path>:6:38)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.start (node:internal/test_runner/test:1242:17)\n      at startSubtestAfterBootstrap (node:internal/test_runner/harness:387:17) {\n    generatedMessage: true,\n    code: 'ERR_ASSERTION',\n    actual: [ 3 ],\n    expected: [ 0, 3, 7 ],\n    operator: 'deepStrictEqual',\n    diff: 'simple'\n  }\n\ntest at test/fail-to-pass.test.js:7:1\n\u2716 left endpoint only (0.131ms)\n  AssertionError [ERR_ASSERTION]: Expected values to be strictly deep-equal:\n  + actual - expected\n  \n  + []\n  - [\n  -   0\n  - ]\n  \n      at TestContext.<anonymous> (file://<path>:7:41)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n      at Test.postRun (node:internal/test_runner/test:1522:19)\n      at Test.run (node:internal/test_runner/test:1447:12)\n      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3) {\n    generatedMessage: true,\n    code: 'ERR_ASSERTION',\n    actual: [],\n    expected: [ 0 ],\n    operator: 'deepStrictEqual',\n    diff: 'simple'\n  }\n",
             "passed": false,
             "returncode": 1
           },
           {
-            "output_tail": "equil-c5vpy3fh/work/test/fail-to-pass.test.js:7:41)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n      at Test.postRun (node:internal/test_runner/test:1522:19)\n      at Test.run (node:internal/test_runner/test:1447:12)\n      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3) {\n    generatedMessage: true,\n    code: 'ERR_ASSERTION',\n    actual: [],\n    expected: [ 0 ],\n    operator: 'deepStrictEqual',\n    diff: 'simple'\n  }\n",
+            "output_bytes": 1905,
+            "output_sha256": "b8836acbb376639ef06d3e6e424c0b3b1f9fc200c56af6e991fdbe2fedc74d01",
+            "output_tail": "\u2716 endpoints count (1.070083ms)\n\u2716 left endpoint only (0.127791ms)\n\u2139 tests 2\n\u2139 suites 0\n\u2139 pass 0\n\u2139 fail 2\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 54.431458\n\n\u2716 failing tests:\n\ntest at test/fail-to-pass.test.js:6:1\n\u2716 endpoints count (1.070083ms)\n  AssertionError [ERR_ASSERTION]: Expected values to be strictly deep-equal:\n  + actual - expected\n  \n    [\n  -   0,\n      3,\n  -   7\n    ]\n  \n      at TestContext.<anonymous> (file://<path>:6:38)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.start (node:internal/test_runner/test:1242:17)\n      at startSubtestAfterBootstrap (node:internal/test_runner/harness:387:17) {\n    generatedMessage: true,\n    code: 'ERR_ASSERTION',\n    actual: [ 3 ],\n    expected: [ 0, 3, 7 ],\n    operator: 'deepStrictEqual',\n    diff: 'simple'\n  }\n\ntest at test/fail-to-pass.test.js:7:1\n\u2716 left endpoint only (0.127791ms)\n  AssertionError [ERR_ASSERTION]: Expected values to be strictly deep-equal:\n  + actual - expected\n  \n  + []\n  - [\n  -   0\n  - ]\n  \n      at TestContext.<anonymous> (file://<path>:7:41)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n      at Test.postRun (node:internal/test_runner/test:1522:19)\n      at Test.run (node:internal/test_runner/test:1447:12)\n      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3) {\n    generatedMessage: true,\n    code: 'ERR_ASSERTION',\n    actual: [],\n    expected: [ 0 ],\n    operator: 'deepStrictEqual',\n    diff: 'simple'\n  }\n",
             "passed": false,
             "returncode": 1
           },
           {
-            "output_tail": "equil-xdo6syfm/work/test/fail-to-pass.test.js:7:41)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n      at Test.postRun (node:internal/test_runner/test:1522:19)\n      at Test.run (node:internal/test_runner/test:1447:12)\n      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3) {\n    generatedMessage: true,\n    code: 'ERR_ASSERTION',\n    actual: [],\n    expected: [ 0 ],\n    operator: 'deepStrictEqual',\n    diff: 'simple'\n  }\n",
+            "output_bytes": 1905,
+            "output_sha256": "d7b817eb8ef4e225fe4fccba8417e2e530ec90b9c579ae1386e2331fee2bf294",
+            "output_tail": "\u2716 endpoints count (1.059292ms)\n\u2716 left endpoint only (0.127291ms)\n\u2139 tests 2\n\u2139 suites 0\n\u2139 pass 0\n\u2139 fail 2\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 54.005334\n\n\u2716 failing tests:\n\ntest at test/fail-to-pass.test.js:6:1\n\u2716 endpoints count (1.059292ms)\n  AssertionError [ERR_ASSERTION]: Expected values to be strictly deep-equal:\n  + actual - expected\n  \n    [\n  -   0,\n      3,\n  -   7\n    ]\n  \n      at TestContext.<anonymous> (file://<path>:6:38)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.start (node:internal/test_runner/test:1242:17)\n      at startSubtestAfterBootstrap (node:internal/test_runner/harness:387:17) {\n    generatedMessage: true,\n    code: 'ERR_ASSERTION',\n    actual: [ 3 ],\n    expected: [ 0, 3, 7 ],\n    operator: 'deepStrictEqual',\n    diff: 'simple'\n  }\n\ntest at test/fail-to-pass.test.js:7:1\n\u2716 left endpoint only (0.127291ms)\n  AssertionError [ERR_ASSERTION]: Expected values to be strictly deep-equal:\n  + actual - expected\n  \n  + []\n  - [\n  -   0\n  - ]\n  \n      at TestContext.<anonymous> (file://<path>:7:41)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n      at Test.postRun (node:internal/test_runner/test:1522:19)\n      at Test.run (node:internal/test_runner/test:1447:12)\n      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3) {\n    generatedMessage: true,\n    code: 'ERR_ASSERTION',\n    actual: [],\n    expected: [ 0 ],\n    operator: 'deepStrictEqual',\n    diff: 'simple'\n  }\n",
             "passed": false,
             "returncode": 1
           }
         ],
         "pristine_pass_to_pass": [
           {
-            "output_tail": "",
+            "output_bytes": 157,
+            "output_sha256": "21c08b29e1fb94916be212ca7d59032d89b6f6af6a75a012a1513d1d28585603",
+            "output_tail": "\u2714 single middle equilibrium (0.664208ms)\n\u2139 tests 1\n\u2139 suites 0\n\u2139 pass 1\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 56.252042\n",
             "passed": true,
             "returncode": 0
           },
           {
-            "output_tail": "",
+            "output_bytes": 157,
+            "output_sha256": "3a3ef13343d0bab6ecd3c0c0f6727c00c21bd112a76313d64d335c96ac48e6d2",
+            "output_tail": "\u2714 single middle equilibrium (0.720917ms)\n\u2139 tests 1\n\u2139 suites 0\n\u2139 pass 1\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 56.876333\n",
             "passed": true,
             "returncode": 0
           },
           {
-            "output_tail": "",
+            "output_bytes": 155,
+            "output_sha256": "236008c7aa1859501dfe57f6b2ba812c34b84e6f75059fad3cbc2da25cc62c4c",
+            "output_tail": "\u2714 single middle equilibrium (0.6405ms)\n\u2139 tests 1\n\u2139 suites 0\n\u2139 pass 1\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 64.291166\n",
             "passed": true,
             "returncode": 0
           }
         ]
       }
     },
-    "manifest_sha256": "de382b32c2198cfb1caa7ee9719d4e0fa7f429d05752f7dc43c04de3374ff5f4",
-    "reviewed_at": "2026-07-15T17:01:34Z",
+    "manifest_sha256": "1595d92701bdb1fd539905657609407f2e08b1dcf34cc358dd27d3667c706c22",
+    "reviewed_at": "2026-08-18T14:02:32Z",
     "reviewer": "Albert"
   },
   "artifacts": [
@@ -179,19 +217,16 @@
     },
     "perturbations": [
       {
-        "approved": false,
         "id": "equivalent-1",
         "sha256": "65cf24daa300945289d0d5d2dabc45022ca835611509874f5e84577227206ba6",
         "text": "Complete the following repository task. Preserve existing behavior and verify the tests.\n\nImplement equilibria(arr) in src/index.js. Return an array of every index i where the sum\nof the elements BEFORE i equals the sum of the elements AFTER i (the element at i is\nexcluded from both sides), in ascending order. Endpoints count: at index 0 the left side is\nempty (sum 0); at the last index the right side is empty (sum 0). The array may contain\nnegatives and zeros. Examples: equilibria([1,1,1,3,1,1,1]) -> [3];\nequilibria([0,-3,5,-4,-2,3,1,0]) -> [0,3,7]. Run node --test until all tests pass."
       },
       {
-        "approved": false,
         "id": "equivalent-2",
         "sha256": "4289b3011b488ffa7384202ff88e2ea6fb5e59156b1e98be809873b2d98da498",
         "text": "Repository change request:\nImplement equilibria(arr) in src/index.js. Return an array of every index i where the sum\nof the elements BEFORE i equals the sum of the elements AFTER i (the element at i is\nexcluded from both sides), in ascending order. Endpoints count: at index 0 the left side is\nempty (sum 0); at the last index the right side is empty (sum 0). The array may contain\nnegatives and zeros. Examples: equilibria([1,1,1,3,1,1,1]) -> [3];\nequilibria([0,-3,5,-4,-2,3,1,0]) -> [0,3,7]. Run node --test until all tests pass.\n\nUse the smallest correct change and confirm the test suite."
       },
       {
-        "approved": false,
         "id": "equivalent-3",
         "sha256": "2bb32908b952c80134ccd95a20bc0a6edc649aab9fc503d2eb165949b5529ae2",
         "text": "Please solve this task in the supplied checkout, retaining all stated edge cases:\n\nImplement equilibria(arr) in src/index.js. Return an array of every index i where the sum\nof the elements BEFORE i equals the sum of the elements AFTER i (the element at i is\nexcluded from both sides), in ascending order. Endpoints count: at index 0 the left side is\nempty (sum 0); at the last index the right side is empty (sum 0). The array may contain\nnegatives and zeros. Examples: equilibria([1,1,1,3,1,1,1]) -> [3];\nequilibria([0,-3,5,-4,-2,3,1,0]) -> [0,3,7]. Run node --test until all tests pass."
@@ -218,6 +253,10 @@
         "--test",
         "test/fail-to-pass.test.js"
       ],
+      "expected_cases": [
+        "endpoints count",
+        "left endpoint only"
+      ],
       "overlays": [
         {
           "dest": "test/fail-to-pass.test.js",
@@ -236,7 +275,7 @@
     }
   },
   "timestamps": {
-    "admitted_at": "2026-07-15T17:01:34Z",
+    "admitted_at": "2026-08-18T14:02:32Z",
     "created_at": "2026-07-14T00:00:00Z",
     "expires_at": "2026-10-13T17:01:34Z"
   }

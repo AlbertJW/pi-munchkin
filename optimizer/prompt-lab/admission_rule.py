@@ -37,7 +37,11 @@ def graded_rate(row):
     if not isinstance(subscores, dict):
         return None
     fixed, total = subscores.get("fixed"), subscores.get("total")
-    if not isinstance(fixed, int) or not isinstance(total, int) or total <= 0 or not 0 <= fixed <= total:
+    # bool is a subclass of int: `fixed: true` must be malformed, not 1. The sibling
+    # definition in effort_report.graded_rate calls this guard load-bearing.
+    if (isinstance(fixed, bool) or isinstance(total, bool)
+            or not isinstance(fixed, int) or not isinstance(total, int)
+            or total <= 0 or not 0 <= fixed <= total):
         return None
     return fixed / total
 

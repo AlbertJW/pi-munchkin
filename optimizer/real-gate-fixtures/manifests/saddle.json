@@ -2,41 +2,55 @@
   "admission": {
     "approved": false,
     "automated": {
-      "checked_at": "2026-07-14T18:49:00Z",
+      "checked_at": "2026-08-18T14:01:21Z",
       "hash_drift": [],
+      "manifest_drift": false,
+      "overlay_lint": [],
       "passed": true,
       "runs_per_state": 3,
       "states": {
         "gold_fail_to_pass": [
           {
-            "output_tail": "",
+            "output_bytes": 206,
+            "output_sha256": "813d7783b4f24dcba89df2ac62a6dec0bc8b8c527e0b48f9547a1ef8d0ce42c8",
+            "output_tail": "\u2714 no saddle point (0.6965ms)\n\u2714 empty matrix (0.060375ms)\n\u2714 row-major single (0.115ms)\n\u2139 tests 3\n\u2139 suites 0\n\u2139 pass 3\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 60.319542\n",
             "passed": true,
             "returncode": 0
           },
           {
-            "output_tail": "",
+            "output_bytes": 211,
+            "output_sha256": "1926ab6f87e2587c8df8d3f56b6849cf67039e740d8a27f48c26623a544d9bec",
+            "output_tail": "\u2714 no saddle point (0.715375ms)\n\u2714 empty matrix (0.062084ms)\n\u2714 row-major single (0.113167ms)\n\u2139 tests 3\n\u2139 suites 0\n\u2139 pass 3\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 67.293208\n",
             "passed": true,
             "returncode": 0
           },
           {
-            "output_tail": "",
+            "output_bytes": 211,
+            "output_sha256": "26c99ef63b9663e35011ca45ec0b015f44d9be53784788099e7c7e6018ea1fd8",
+            "output_tail": "\u2714 no saddle point (0.918375ms)\n\u2714 empty matrix (0.085125ms)\n\u2714 row-major single (0.172167ms)\n\u2139 tests 3\n\u2139 suites 0\n\u2139 pass 3\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 57.607292\n",
             "passed": true,
             "returncode": 0
           }
         ],
         "gold_pass_to_pass": [
           {
-            "output_tail": "",
+            "output_bytes": 172,
+            "output_sha256": "97d0a0815390d0b1c35aa09712f2a99778378c97c060505ac5758b2054819761",
+            "output_tail": "\u2714 existing public export remains available (0.360291ms)\n\u2139 tests 1\n\u2139 suites 0\n\u2139 pass 1\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 53.094667\n",
             "passed": true,
             "returncode": 0
           },
           {
-            "output_tail": "",
+            "output_bytes": 172,
+            "output_sha256": "f7b0d5912f009992e9dbff027b8833ac46340af94f53d129fd7ff46930f2578a",
+            "output_tail": "\u2714 existing public export remains available (0.341541ms)\n\u2139 tests 1\n\u2139 suites 0\n\u2139 pass 1\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 53.511708\n",
             "passed": true,
             "returncode": 0
           },
           {
-            "output_tail": "",
+            "output_bytes": 171,
+            "output_sha256": "8be3f819a55fac89a1f9076cded8ed70dff4bc2da1357177dc26925a138f00b3",
+            "output_tail": "\u2714 existing public export remains available (0.349667ms)\n\u2139 tests 1\n\u2139 suites 0\n\u2139 pass 1\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 57.58975\n",
             "passed": true,
             "returncode": 0
           }
@@ -44,34 +58,46 @@
         "mutant:shortcut": {
           "fail_to_pass": [
             {
-              "output_tail": "ss.test.js:8:39)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n      at Test.postRun (node:internal/test_runner/test:1522:19)\n      at Test.run (node:internal/test_runner/test:1447:12)\n      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7) {\n    generatedMessage: true,\n    code: 'ERR_ASSERTION',\n    actual: [ { row: 0, col: 2 } ],\n    expected: [ { row: 1, col: 3 } ],\n    operator: 'deepStrictEqual',\n    diff: 'simple'\n  }\n",
+              "output_bytes": 1242,
+              "output_sha256": "9d4752857af382dd7afb8c2c52c51b394748a03b2696a82ab3f095a2f5ff687d",
+              "output_tail": "\u2714 no saddle point (1.02725ms)\n\u2714 empty matrix (0.080208ms)\n\u2716 row-major single (1.731541ms)\n\u2139 tests 3\n\u2139 suites 0\n\u2139 pass 2\n\u2139 fail 1\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 141.486792\n\n\u2716 failing tests:\n\ntest at test/fail-to-pass.test.js:8:1\n\u2716 row-major single (1.731541ms)\n  AssertionError [ERR_ASSERTION]: Expected values to be strictly deep-equal:\n  + actual - expected\n  \n    [\n      {\n  +     col: 2,\n  +     row: 0\n  -     col: 3,\n  -     row: 1\n      }\n    ]\n  \n      at TestContext.<anonymous> (file://<path>:8:39)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n      at Test.postRun (node:internal/test_runner/test:1522:19)\n      at Test.run (node:internal/test_runner/test:1447:12)\n      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7) {\n    generatedMessage: true,\n    code: 'ERR_ASSERTION',\n    actual: [ { row: 0, col: 2 } ],\n    expected: [ { row: 1, col: 3 } ],\n    operator: 'deepStrictEqual',\n    diff: 'simple'\n  }\n",
               "passed": false,
               "returncode": 1
             },
             {
-              "output_tail": "ss.test.js:8:39)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n      at Test.postRun (node:internal/test_runner/test:1522:19)\n      at Test.run (node:internal/test_runner/test:1447:12)\n      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7) {\n    generatedMessage: true,\n    code: 'ERR_ASSERTION',\n    actual: [ { row: 0, col: 2 } ],\n    expected: [ { row: 1, col: 3 } ],\n    operator: 'deepStrictEqual',\n    diff: 'simple'\n  }\n",
+              "output_bytes": 1240,
+              "output_sha256": "8580be36a2c00d83b7f3c53cd05527ac29213b33817a5033ef9512dc9754ac38",
+              "output_tail": "\u2714 no saddle point (0.809666ms)\n\u2714 empty matrix (0.081292ms)\n\u2716 row-major single (0.94675ms)\n\u2139 tests 3\n\u2139 suites 0\n\u2139 pass 2\n\u2139 fail 1\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 86.041417\n\n\u2716 failing tests:\n\ntest at test/fail-to-pass.test.js:8:1\n\u2716 row-major single (0.94675ms)\n  AssertionError [ERR_ASSERTION]: Expected values to be strictly deep-equal:\n  + actual - expected\n  \n    [\n      {\n  +     col: 2,\n  +     row: 0\n  -     col: 3,\n  -     row: 1\n      }\n    ]\n  \n      at TestContext.<anonymous> (file://<path>:8:39)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n      at Test.postRun (node:internal/test_runner/test:1522:19)\n      at Test.run (node:internal/test_runner/test:1447:12)\n      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7) {\n    generatedMessage: true,\n    code: 'ERR_ASSERTION',\n    actual: [ { row: 0, col: 2 } ],\n    expected: [ { row: 1, col: 3 } ],\n    operator: 'deepStrictEqual',\n    diff: 'simple'\n  }\n",
               "passed": false,
               "returncode": 1
             },
             {
-              "output_tail": "ss.test.js:8:39)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n      at Test.postRun (node:internal/test_runner/test:1522:19)\n      at Test.run (node:internal/test_runner/test:1447:12)\n      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7) {\n    generatedMessage: true,\n    code: 'ERR_ASSERTION',\n    actual: [ { row: 0, col: 2 } ],\n    expected: [ { row: 1, col: 3 } ],\n    operator: 'deepStrictEqual',\n    diff: 'simple'\n  }\n",
+              "output_bytes": 1242,
+              "output_sha256": "ea773ec7544efa455e74008d88b9e1e85578b8916ff9669091dc726a084a4400",
+              "output_tail": "\u2714 no saddle point (1.286708ms)\n\u2714 empty matrix (0.072333ms)\n\u2716 row-major single (1.350333ms)\n\u2139 tests 3\n\u2139 suites 0\n\u2139 pass 2\n\u2139 fail 1\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 82.606458\n\n\u2716 failing tests:\n\ntest at test/fail-to-pass.test.js:8:1\n\u2716 row-major single (1.350333ms)\n  AssertionError [ERR_ASSERTION]: Expected values to be strictly deep-equal:\n  + actual - expected\n  \n    [\n      {\n  +     col: 2,\n  +     row: 0\n  -     col: 3,\n  -     row: 1\n      }\n    ]\n  \n      at TestContext.<anonymous> (file://<path>:8:39)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n      at Test.postRun (node:internal/test_runner/test:1522:19)\n      at Test.run (node:internal/test_runner/test:1447:12)\n      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7) {\n    generatedMessage: true,\n    code: 'ERR_ASSERTION',\n    actual: [ { row: 0, col: 2 } ],\n    expected: [ { row: 1, col: 3 } ],\n    operator: 'deepStrictEqual',\n    diff: 'simple'\n  }\n",
               "passed": false,
               "returncode": 1
             }
           ],
           "pass_to_pass": [
             {
-              "output_tail": "",
+              "output_bytes": 172,
+              "output_sha256": "f58d0285f255165bf8ede7f64465c6e1834ad25e732fee590867fc4d1b51ce7e",
+              "output_tail": "\u2714 existing public export remains available (0.350959ms)\n\u2139 tests 1\n\u2139 suites 0\n\u2139 pass 1\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 79.245084\n",
               "passed": true,
               "returncode": 0
             },
             {
-              "output_tail": "",
+              "output_bytes": 172,
+              "output_sha256": "d98459aa9516cc6525168a82b41dc5e367fa53b3ed89d793d825463c4f6443ba",
+              "output_tail": "\u2714 existing public export remains available (0.342709ms)\n\u2139 tests 1\n\u2139 suites 0\n\u2139 pass 1\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 53.589875\n",
               "passed": true,
               "returncode": 0
             },
             {
-              "output_tail": "",
+              "output_bytes": 172,
+              "output_sha256": "da0c71f61f57e02d26d122e9616b941ff99791f58500fc68acd8c6094a5b8b20",
+              "output_tail": "\u2714 existing public export remains available (0.358041ms)\n\u2139 tests 1\n\u2139 suites 0\n\u2139 pass 1\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 51.788875\n",
               "passed": true,
               "returncode": 0
             }
@@ -79,34 +105,46 @@
         },
         "pristine_fail_to_pass": [
           {
-            "output_tail": "dmit-saddle-h28tvtsh/work/src/index.js:2:9)\n      at TestContext.<anonymous> (file:///private/var/folders/3r/nc7qhtpn56j7rt5nwg0rqw600000gn/T/pi-admit-saddle-h28tvtsh/work/test/fail-to-pass.test.js:8:49)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n      at Test.postRun (node:internal/test_runner/test:1522:19)\n      at Test.run (node:internal/test_runner/test:1447:12)\n      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7)\n",
+            "output_bytes": 2454,
+            "output_sha256": "3d420c3a04623f9f53a0b16865b0dbdda30ebc96f781c27a35423e4fcd22a787",
+            "output_tail": "0000gn/T/pi-admit-saddle-b32lo44c/work/src/index.js:2:9)\n      at TestContext.<anonymous> (file://<path>:6:48)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.start (node:internal/test_runner/test:1242:17)\n      at startSubtestAfterBootstrap (node:internal/test_runner/harness:387:17)\n\ntest at test/fail-to-pass.test.js:7:1\n\u2716 empty matrix (0.051125ms)\n  Error: not implemented\n      at saddlePoints (file://<path>:2:9)\n      at TestContext.<anonymous> (file://<path>:7:45)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n      at Test.postRun (node:internal/test_runner/test:1522:19)\n      at Test.run (node:internal/test_runner/test:1447:12)\n      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3)\n\ntest at test/fail-to-pass.test.js:8:1\n\u2716 row-major single (0.042666ms)\n  Error: not implemented\n      at saddlePoints (file://<path>:2:9)\n      at TestContext.<anonymous> (file://<path>:8:49)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n      at Test.postRun (node:internal/test_runner/test:1522:19)\n      at Test.run (node:internal/test_runner/test:1447:12)\n      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7)\n",
             "passed": false,
             "returncode": 1
           },
           {
-            "output_tail": "dmit-saddle-w8z82zup/work/src/index.js:2:9)\n      at TestContext.<anonymous> (file:///private/var/folders/3r/nc7qhtpn56j7rt5nwg0rqw600000gn/T/pi-admit-saddle-w8z82zup/work/test/fail-to-pass.test.js:8:49)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n      at Test.postRun (node:internal/test_runner/test:1522:19)\n      at Test.run (node:internal/test_runner/test:1447:12)\n      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7)\n",
+            "output_bytes": 2452,
+            "output_sha256": "af44c23df2d92dcb202a49c8b887cece3538e417e119142d747eed2d7146db92",
+            "output_tail": "0000gn/T/pi-admit-saddle-of118m6u/work/src/index.js:2:9)\n      at TestContext.<anonymous> (file://<path>:6:48)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.start (node:internal/test_runner/test:1242:17)\n      at startSubtestAfterBootstrap (node:internal/test_runner/harness:387:17)\n\ntest at test/fail-to-pass.test.js:7:1\n\u2716 empty matrix (0.051875ms)\n  Error: not implemented\n      at saddlePoints (file://<path>:2:9)\n      at TestContext.<anonymous> (file://<path>:7:45)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n      at Test.postRun (node:internal/test_runner/test:1522:19)\n      at Test.run (node:internal/test_runner/test:1447:12)\n      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3)\n\ntest at test/fail-to-pass.test.js:8:1\n\u2716 row-major single (0.042334ms)\n  Error: not implemented\n      at saddlePoints (file://<path>:2:9)\n      at TestContext.<anonymous> (file://<path>:8:49)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n      at Test.postRun (node:internal/test_runner/test:1522:19)\n      at Test.run (node:internal/test_runner/test:1447:12)\n      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7)\n",
             "passed": false,
             "returncode": 1
           },
           {
-            "output_tail": "dmit-saddle-4wp11igi/work/src/index.js:2:9)\n      at TestContext.<anonymous> (file:///private/var/folders/3r/nc7qhtpn56j7rt5nwg0rqw600000gn/T/pi-admit-saddle-4wp11igi/work/test/fail-to-pass.test.js:8:49)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n      at Test.postRun (node:internal/test_runner/test:1522:19)\n      at Test.run (node:internal/test_runner/test:1447:12)\n      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7)\n",
+            "output_bytes": 2454,
+            "output_sha256": "ff8167bdd6a8d436bb0b3aaab602bb2787b9d9dce8cd0517a3b54d34919a5b7e",
+            "output_tail": "0000gn/T/pi-admit-saddle-5z9tqu4k/work/src/index.js:2:9)\n      at TestContext.<anonymous> (file://<path>:6:48)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.start (node:internal/test_runner/test:1242:17)\n      at startSubtestAfterBootstrap (node:internal/test_runner/harness:387:17)\n\ntest at test/fail-to-pass.test.js:7:1\n\u2716 empty matrix (0.050791ms)\n  Error: not implemented\n      at saddlePoints (file://<path>:2:9)\n      at TestContext.<anonymous> (file://<path>:7:45)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n      at Test.postRun (node:internal/test_runner/test:1522:19)\n      at Test.run (node:internal/test_runner/test:1447:12)\n      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3)\n\ntest at test/fail-to-pass.test.js:8:1\n\u2716 row-major single (0.042333ms)\n  Error: not implemented\n      at saddlePoints (file://<path>:2:9)\n      at TestContext.<anonymous> (file://<path>:8:49)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n      at Test.postRun (node:internal/test_runner/test:1522:19)\n      at Test.run (node:internal/test_runner/test:1447:12)\n      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7)\n",
             "passed": false,
             "returncode": 1
           }
         ],
         "pristine_pass_to_pass": [
           {
-            "output_tail": "",
+            "output_bytes": 171,
+            "output_sha256": "653da70a27bcc22bb4d68a0852fbdaebb1fdf41078b78171c578902d484d9546",
+            "output_tail": "\u2714 existing public export remains available (0.341458ms)\n\u2139 tests 1\n\u2139 suites 0\n\u2139 pass 1\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 61.98175\n",
             "passed": true,
             "returncode": 0
           },
           {
-            "output_tail": "",
+            "output_bytes": 172,
+            "output_sha256": "61483f11ae80970af2b0cb08ce22d8d7beb914259245a2b8ec1d602545ea3442",
+            "output_tail": "\u2714 existing public export remains available (0.338584ms)\n\u2139 tests 1\n\u2139 suites 0\n\u2139 pass 1\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 55.756625\n",
             "passed": true,
             "returncode": 0
           },
           {
-            "output_tail": "",
+            "output_bytes": 172,
+            "output_sha256": "2bace7faf039074f8c3991bcbf3d71fa1ff28a88e6471a97df3bc29ea5443168",
+            "output_tail": "\u2714 existing public export remains available (0.343917ms)\n\u2139 tests 1\n\u2139 suites 0\n\u2139 pass 1\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 53.825583\n",
             "passed": true,
             "returncode": 0
           }
@@ -177,19 +215,16 @@
     },
     "perturbations": [
       {
-        "approved": false,
         "id": "equivalent-1",
         "sha256": "8cafbb5151391c5e73076ee821da57642ffdfc886503106e8a30e6e945eb4ded",
         "text": "Complete the following repository task. Preserve existing behavior and verify the tests.\n\nImplement saddlePoints(matrix) in src/index.js. matrix is an array of rows (arrays of\nnumbers). A saddle point is a cell that is the MAXIMUM in its row and the MINIMUM in its\ncolumn. Return an array of { row, col } objects with 1-BASED indices, in row-major order\n(row by row, left to right). An empty matrix returns []. There may be zero, one, or many\nsaddle points. Run node --test until all tests pass."
       },
       {
-        "approved": false,
         "id": "equivalent-2",
         "sha256": "b8e4381207cae86f347543f4650d073dc55160a0a547e16d2a39afcac7f32ea6",
         "text": "Repository change request:\nImplement saddlePoints(matrix) in src/index.js. matrix is an array of rows (arrays of\nnumbers). A saddle point is a cell that is the MAXIMUM in its row and the MINIMUM in its\ncolumn. Return an array of { row, col } objects with 1-BASED indices, in row-major order\n(row by row, left to right). An empty matrix returns []. There may be zero, one, or many\nsaddle points. Run node --test until all tests pass.\n\nUse the smallest correct change and confirm the test suite."
       },
       {
-        "approved": false,
         "id": "equivalent-3",
         "sha256": "e85883facf742831e98605a0f8713544c68e731717a8aa6d0ac1692147a3f7e1",
         "text": "Please solve this task in the supplied checkout, retaining all stated edge cases:\n\nImplement saddlePoints(matrix) in src/index.js. matrix is an array of rows (arrays of\nnumbers). A saddle point is a cell that is the MAXIMUM in its row and the MINIMUM in its\ncolumn. Return an array of { row, col } objects with 1-BASED indices, in row-major order\n(row by row, left to right). An empty matrix returns []. There may be zero, one, or many\nsaddle points. Run node --test until all tests pass."
@@ -219,6 +254,11 @@
         "node",
         "--test",
         "test/fail-to-pass.test.js"
+      ],
+      "expected_cases": [
+        "empty matrix",
+        "no saddle point",
+        "row-major single"
       ],
       "overlays": [
         {

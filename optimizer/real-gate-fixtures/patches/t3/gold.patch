@@ -7,7 +7,7 @@
 -	return s + ' '.repeat(width - s.length);
 +	return ' '.repeat(width - s.length) + s;
  }
- 
+
  export function center(s, width) {
 @@ -19,7 +19,7 @@
  		return s;

@@ -2,41 +2,55 @@
   "admission": {
     "approved": false,
     "automated": {
-      "checked_at": "2026-07-14T18:50:45Z",
+      "checked_at": "2026-08-18T14:01:40Z",
       "hash_drift": [],
+      "manifest_drift": false,
+      "overlay_lint": [],
       "passed": true,
       "runs_per_state": 3,
       "states": {
         "gold_fail_to_pass": [
           {
-            "output_tail": "",
+            "output_bytes": 296,
+            "output_sha256": "0f02134439e93c1e0a519c27021d49f76cc12a284933329d110d33108079ec98",
+            "output_tail": "\u2714 preserves leading/trailing whitespace inside quoted fields (0.434125ms)\n\u2714 still trims unquoted fields (0.065875ms)\n\u2714 quoted empty string stays empty, not collapsed (0.055ms)\n\u2139 tests 3\n\u2139 suites 0\n\u2139 pass 3\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 55.326042\n",
             "passed": true,
             "returncode": 0
           },
           {
-            "output_tail": "",
+            "output_bytes": 296,
+            "output_sha256": "a73f13f3b7e51c53c30ecc56269e0a38c14ab4c7b1e3871f9942dba3da1246f8",
+            "output_tail": "\u2714 preserves leading/trailing whitespace inside quoted fields (0.432ms)\n\u2714 still trims unquoted fields (0.066416ms)\n\u2714 quoted empty string stays empty, not collapsed (0.054542ms)\n\u2139 tests 3\n\u2139 suites 0\n\u2139 pass 3\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 61.768375\n",
             "passed": true,
             "returncode": 0
           },
           {
-            "output_tail": "",
+            "output_bytes": 299,
+            "output_sha256": "d2e92734e0b2a9feaacbf094e11569ff383f54eed313bc6c99179a4751e5f951",
+            "output_tail": "\u2714 preserves leading/trailing whitespace inside quoted fields (0.428416ms)\n\u2714 still trims unquoted fields (0.067667ms)\n\u2714 quoted empty string stays empty, not collapsed (0.054666ms)\n\u2139 tests 3\n\u2139 suites 0\n\u2139 pass 3\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 54.210167\n",
             "passed": true,
             "returncode": 0
           }
         ],
         "gold_pass_to_pass": [
           {
-            "output_tail": "",
+            "output_bytes": 894,
+            "output_sha256": "d6d20091e6e236a1eaf725e5c611195a1c912e2dd74dad5f5790a06debc931df",
+            "output_tail": "\u2714 parses simple CSV with headers (1.708042ms)\n\u2714 handles quoted fields with commas (0.269541ms)\n\u2714 handles empty values (0.200958ms)\n\u2714 handles single row with no data (3.58525ms)\n\u2714 handles CSV with extra whitespace (0.150709ms)\n\u2714 handles single column CSV (1.197708ms)\n\u2714 handles malformed CSV with extra columns (0.253125ms)\n\u2714 handles malformed CSV with fewer columns (0.255167ms)\n\u2714 handles single quoted field (0.278ms)\n\u2714 handles escaped quotes in CSV (0.068666ms)\n\u2714 end-to-end: CSV string to JSON string (0.859875ms)\n\u2714 end-to-end: complex CSV with quoted fields (0.090709ms)\n\u2714 end-to-end: empty values (0.065083ms)\n\u2714 converts parsed data to JSON string (2.488833ms)\n\u2714 formats JSON with indentation (0.379041ms)\n\u2714 handles empty array (0.259042ms)\n\u2139 tests 16\n\u2139 suites 0\n\u2139 pass 16\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 96.895709\n",
             "passed": true,
             "returncode": 0
           },
           {
-            "output_tail": "",
+            "output_bytes": 893,
+            "output_sha256": "a086bd5e91055f488eb3fee5685efc629e4bf0ec0c0be9f2aeeb6cccbada8806",
+            "output_tail": "\u2714 parses simple CSV with headers (1.886791ms)\n\u2714 handles quoted fields with commas (0.13725ms)\n\u2714 handles empty values (0.07225ms)\n\u2714 handles single row with no data (0.699583ms)\n\u2714 handles CSV with extra whitespace (0.141958ms)\n\u2714 handles single column CSV (0.670667ms)\n\u2714 handles malformed CSV with extra columns (0.068833ms)\n\u2714 handles malformed CSV with fewer columns (0.078417ms)\n\u2714 handles single quoted field (0.061791ms)\n\u2714 handles escaped quotes in CSV (0.05725ms)\n\u2714 end-to-end: CSV string to JSON string (0.790917ms)\n\u2714 end-to-end: complex CSV with quoted fields (0.097542ms)\n\u2714 end-to-end: empty values (0.067375ms)\n\u2714 converts parsed data to JSON string (2.884291ms)\n\u2714 formats JSON with indentation (0.297167ms)\n\u2714 handles empty array (0.3205ms)\n\u2139 tests 16\n\u2139 suites 0\n\u2139 pass 16\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 79.074417\n",
             "passed": true,
             "returncode": 0
           },
           {
-            "output_tail": "",
+            "output_bytes": 896,
+            "output_sha256": "7a3bb62f32bd9ab572f031bbde18619aafc79e4a372c734ca48115043443ad19",
+            "output_tail": "\u2714 parses simple CSV with headers (0.741208ms)\n\u2714 handles quoted fields with commas (0.083583ms)\n\u2714 handles empty values (0.061125ms)\n\u2714 handles single row with no data (0.7435ms)\n\u2714 handles CSV with extra whitespace (0.142583ms)\n\u2714 handles single column CSV (0.487916ms)\n\u2714 handles malformed CSV with extra columns (0.063084ms)\n\u2714 handles malformed CSV with fewer columns (0.079417ms)\n\u2714 handles single quoted field (0.060625ms)\n\u2714 handles escaped quotes in CSV (0.055916ms)\n\u2714 end-to-end: CSV string to JSON string (0.750041ms)\n\u2714 end-to-end: complex CSV with quoted fields (0.085375ms)\n\u2714 end-to-end: empty values (0.067958ms)\n\u2714 converts parsed data to JSON string (1.609166ms)\n\u2714 formats JSON with indentation (0.311041ms)\n\u2714 handles empty array (0.314834ms)\n\u2139 tests 16\n\u2139 suites 0\n\u2139 pass 16\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 78.939459\n",
             "passed": true,
             "returncode": 0
           }
@@ -44,34 +58,46 @@
         "mutant:shortcut": {
           "fail_to_pass": [
             {
-              "output_tail": " hello world  '\n  \n      at TestContext.<anonymous> (file:///private/var/folders/3r/nc7qhtpn56j7rt5nwg0rqw600000gn/T/pi-admit-t6-rehk2wpo/work/test/fail-to-pass.test.js:13:10)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.start (node:internal/test_runner/test:1242:17)\n      at startSubtestAfterBootstrap (node:internal/test_runner/harness:387:17) {\n    generatedMessage: true,\n    code: 'ERR_ASSERTION',\n    actual: 'hello world',\n    expected: '  hello world  ',\n    operator: 'strictEqual',\n    diff: 'simple'\n  }\n",
+              "output_bytes": 1155,
+              "output_sha256": "baa616d9710a577d86cc60a6b171b2115a76ae25a18dc9e74ac60e8507aa5534",
+              "output_tail": "\u2716 preserves leading/trailing whitespace inside quoted fields (0.869625ms)\n\u2714 still trims unquoted fields (0.095708ms)\n\u2714 quoted empty string stays empty, not collapsed (0.057666ms)\n\u2139 tests 3\n\u2139 suites 0\n\u2139 pass 2\n\u2139 fail 1\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 62.725583\n\n\u2716 failing tests:\n\ntest at test/fail-to-pass.test.js:9:1\n\u2716 preserves leading/trailing whitespace inside quoted fields (0.869625ms)\n  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:\n  + actual - expected\n  \n  + 'hello world'\n  - '  hello world  '\n  \n      at TestContext.<anonymous> (file://<path>:13:10)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.start (node:internal/test_runner/test:1242:17)\n      at startSubtestAfterBootstrap (node:internal/test_runner/harness:387:17) {\n    generatedMessage: true,\n    code: 'ERR_ASSERTION',\n    actual: 'hello world',\n    expected: '  hello world  ',\n    operator: 'strictEqual',\n    diff: 'simple'\n  }\n",
               "passed": false,
               "returncode": 1
             },
             {
-              "output_tail": " hello world  '\n  \n      at TestContext.<anonymous> (file:///private/var/folders/3r/nc7qhtpn56j7rt5nwg0rqw600000gn/T/pi-admit-t6-acx7emwq/work/test/fail-to-pass.test.js:13:10)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.start (node:internal/test_runner/test:1242:17)\n      at startSubtestAfterBootstrap (node:internal/test_runner/harness:387:17) {\n    generatedMessage: true,\n    code: 'ERR_ASSERTION',\n    actual: 'hello world',\n    expected: '  hello world  ',\n    operator: 'strictEqual',\n    diff: 'simple'\n  }\n",
+              "output_bytes": 1155,
+              "output_sha256": "e46c03690f33c27fcc01d621928eedee0b867a044ab8f266f29dfbb4ff7f7c99",
+              "output_tail": "\u2716 preserves leading/trailing whitespace inside quoted fields (0.918667ms)\n\u2714 still trims unquoted fields (0.094458ms)\n\u2714 quoted empty string stays empty, not collapsed (0.057083ms)\n\u2139 tests 3\n\u2139 suites 0\n\u2139 pass 2\n\u2139 fail 1\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 59.346542\n\n\u2716 failing tests:\n\ntest at test/fail-to-pass.test.js:9:1\n\u2716 preserves leading/trailing whitespace inside quoted fields (0.918667ms)\n  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:\n  + actual - expected\n  \n  + 'hello world'\n  - '  hello world  '\n  \n      at TestContext.<anonymous> (file://<path>:13:10)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.start (node:internal/test_runner/test:1242:17)\n      at startSubtestAfterBootstrap (node:internal/test_runner/harness:387:17) {\n    generatedMessage: true,\n    code: 'ERR_ASSERTION',\n    actual: 'hello world',\n    expected: '  hello world  ',\n    operator: 'strictEqual',\n    diff: 'simple'\n  }\n",
               "passed": false,
               "returncode": 1
             },
             {
-              "output_tail": " hello world  '\n  \n      at TestContext.<anonymous> (file:///private/var/folders/3r/nc7qhtpn56j7rt5nwg0rqw600000gn/T/pi-admit-t6-xavy3w2s/work/test/fail-to-pass.test.js:13:10)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.start (node:internal/test_runner/test:1242:17)\n      at startSubtestAfterBootstrap (node:internal/test_runner/harness:387:17) {\n    generatedMessage: true,\n    code: 'ERR_ASSERTION',\n    actual: 'hello world',\n    expected: '  hello world  ',\n    operator: 'strictEqual',\n    diff: 'simple'\n  }\n",
+              "output_bytes": 1149,
+              "output_sha256": "6ab1e3bfb8229b695aaf509b0dda1684650b3d3c19625487091addb17a4fcf8d",
+              "output_tail": "\u2716 preserves leading/trailing whitespace inside quoted fields (0.94225ms)\n\u2714 still trims unquoted fields (0.10625ms)\n\u2714 quoted empty string stays empty, not collapsed (0.060959ms)\n\u2139 tests 3\n\u2139 suites 0\n\u2139 pass 2\n\u2139 fail 1\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 54.457\n\n\u2716 failing tests:\n\ntest at test/fail-to-pass.test.js:9:1\n\u2716 preserves leading/trailing whitespace inside quoted fields (0.94225ms)\n  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:\n  + actual - expected\n  \n  + 'hello world'\n  - '  hello world  '\n  \n      at TestContext.<anonymous> (file://<path>:13:10)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.start (node:internal/test_runner/test:1242:17)\n      at startSubtestAfterBootstrap (node:internal/test_runner/harness:387:17) {\n    generatedMessage: true,\n    code: 'ERR_ASSERTION',\n    actual: 'hello world',\n    expected: '  hello world  ',\n    operator: 'strictEqual',\n    diff: 'simple'\n  }\n",
               "passed": false,
               "returncode": 1
             }
           ],
           "pass_to_pass": [
             {
-              "output_tail": "",
+              "output_bytes": 892,
+              "output_sha256": "75dc84ac8888235f16b55de40d75e50bb8c6e257d3260d986fc5820b3fc6d1b1",
+              "output_tail": "\u2714 parses simple CSV with headers (0.727708ms)\n\u2714 handles quoted fields with commas (0.082875ms)\n\u2714 handles empty values (0.059125ms)\n\u2714 handles single row with no data (0.671167ms)\n\u2714 handles CSV with extra whitespace (0.139ms)\n\u2714 handles single column CSV (0.783542ms)\n\u2714 handles malformed CSV with extra columns (0.071916ms)\n\u2714 handles malformed CSV with fewer columns (0.08025ms)\n\u2714 handles single quoted field (0.05975ms)\n\u2714 handles escaped quotes in CSV (0.054333ms)\n\u2714 end-to-end: CSV string to JSON string (0.822875ms)\n\u2714 end-to-end: complex CSV with quoted fields (0.088708ms)\n\u2714 end-to-end: empty values (0.065209ms)\n\u2714 converts parsed data to JSON string (0.774083ms)\n\u2714 formats JSON with indentation (0.095083ms)\n\u2714 handles empty array (0.06775ms)\n\u2139 tests 16\n\u2139 suites 0\n\u2139 pass 16\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 91.394417\n",
               "passed": true,
               "returncode": 0
             },
             {
-              "output_tail": "",
+              "output_bytes": 894,
+              "output_sha256": "79e9cde44edc1aeaa5c92c6d1e1d3f86394403a456a778cc3e7ca619a10bb6cb",
+              "output_tail": "\u2714 parses simple CSV with headers (0.728708ms)\n\u2714 handles quoted fields with commas (0.091916ms)\n\u2714 handles empty values (0.069834ms)\n\u2714 handles single row with no data (0.695875ms)\n\u2714 handles CSV with extra whitespace (0.147917ms)\n\u2714 handles single column CSV (0.505583ms)\n\u2714 handles malformed CSV with extra columns (0.0905ms)\n\u2714 handles malformed CSV with fewer columns (0.101333ms)\n\u2714 handles single quoted field (0.075792ms)\n\u2714 handles escaped quotes in CSV (0.057916ms)\n\u2714 end-to-end: CSV string to JSON string (0.8215ms)\n\u2714 end-to-end: complex CSV with quoted fields (0.096083ms)\n\u2714 end-to-end: empty values (0.066042ms)\n\u2714 converts parsed data to JSON string (0.759667ms)\n\u2714 formats JSON with indentation (0.092125ms)\n\u2714 handles empty array (0.062667ms)\n\u2139 tests 16\n\u2139 suites 0\n\u2139 pass 16\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 77.434916\n",
               "passed": true,
               "returncode": 0
             },
             {
-              "output_tail": "",
+              "output_bytes": 892,
+              "output_sha256": "37c51662a63c3bdecf3167c2d1a02ab1772ff749787a6162f3dbec2964d3c6ef",
+              "output_tail": "\u2714 parses simple CSV with headers (0.723666ms)\n\u2714 handles quoted fields with commas (0.0835ms)\n\u2714 handles empty values (0.060833ms)\n\u2714 handles single row with no data (0.684167ms)\n\u2714 handles CSV with extra whitespace (0.137584ms)\n\u2714 handles single column CSV (0.476167ms)\n\u2714 handles malformed CSV with extra columns (0.062834ms)\n\u2714 handles malformed CSV with fewer columns (0.07275ms)\n\u2714 handles single quoted field (0.06075ms)\n\u2714 handles escaped quotes in CSV (0.058209ms)\n\u2714 end-to-end: CSV string to JSON string (0.8105ms)\n\u2714 end-to-end: complex CSV with quoted fields (0.089542ms)\n\u2714 end-to-end: empty values (0.065166ms)\n\u2714 converts parsed data to JSON string (0.696959ms)\n\u2714 formats JSON with indentation (0.089125ms)\n\u2714 handles empty array (0.061584ms)\n\u2139 tests 16\n\u2139 suites 0\n\u2139 pass 16\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 75.138875\n",
               "passed": true,
               "returncode": 0
             }
@@ -79,34 +105,46 @@
         },
         "pristine_fail_to_pass": [
           {
-            "output_tail": "l:\n  \n  'John' !== '  John  '\n  \n      at TestContext.<anonymous> (file:///private/var/folders/3r/nc7qhtpn56j7rt5nwg0rqw600000gn/T/pi-admit-t6-n_8o7x_k/work/test/fail-to-pass.test.js:12:10)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.start (node:internal/test_runner/test:1242:17)\n      at startSubtestAfterBootstrap (node:internal/test_runner/harness:387:17) {\n    generatedMessage: true,\n    code: 'ERR_ASSERTION',\n    actual: 'John',\n    expected: '  John  ',\n    operator: 'strictEqual',\n    diff: 'simple'\n  }\n",
+            "output_bytes": 1103,
+            "output_sha256": "d51b732b1e1373de5710c32cbdffe705d42dcc9d4c02d90ca63204e7d6e36aeb",
+            "output_tail": "\u2716 preserves leading/trailing whitespace inside quoted fields (0.824959ms)\n\u2714 still trims unquoted fields (0.091292ms)\n\u2714 quoted empty string stays empty, not collapsed (0.058667ms)\n\u2139 tests 3\n\u2139 suites 0\n\u2139 pass 2\n\u2139 fail 1\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 51.949542\n\n\u2716 failing tests:\n\ntest at test/fail-to-pass.test.js:9:1\n\u2716 preserves leading/trailing whitespace inside quoted fields (0.824959ms)\n  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:\n  \n  'John' !== '  John  '\n  \n      at TestContext.<anonymous> (file://<path>:12:10)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.start (node:internal/test_runner/test:1242:17)\n      at startSubtestAfterBootstrap (node:internal/test_runner/harness:387:17) {\n    generatedMessage: true,\n    code: 'ERR_ASSERTION',\n    actual: 'John',\n    expected: '  John  ',\n    operator: 'strictEqual',\n    diff: 'simple'\n  }\n",
             "passed": false,
             "returncode": 1
           },
           {
-            "output_tail": "l:\n  \n  'John' !== '  John  '\n  \n      at TestContext.<anonymous> (file:///private/var/folders/3r/nc7qhtpn56j7rt5nwg0rqw600000gn/T/pi-admit-t6-g536a_pc/work/test/fail-to-pass.test.js:12:10)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.start (node:internal/test_runner/test:1242:17)\n      at startSubtestAfterBootstrap (node:internal/test_runner/harness:387:17) {\n    generatedMessage: true,\n    code: 'ERR_ASSERTION',\n    actual: 'John',\n    expected: '  John  ',\n    operator: 'strictEqual',\n    diff: 'simple'\n  }\n",
+            "output_bytes": 1103,
+            "output_sha256": "346a8a48e017aebaff1789a0e854a1a17b234c43502b8011196b2f7820b40e7f",
+            "output_tail": "\u2716 preserves leading/trailing whitespace inside quoted fields (0.809083ms)\n\u2714 still trims unquoted fields (0.090083ms)\n\u2714 quoted empty string stays empty, not collapsed (0.055584ms)\n\u2139 tests 3\n\u2139 suites 0\n\u2139 pass 2\n\u2139 fail 1\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 52.842542\n\n\u2716 failing tests:\n\ntest at test/fail-to-pass.test.js:9:1\n\u2716 preserves leading/trailing whitespace inside quoted fields (0.809083ms)\n  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:\n  \n  'John' !== '  John  '\n  \n      at TestContext.<anonymous> (file://<path>:12:10)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.start (node:internal/test_runner/test:1242:17)\n      at startSubtestAfterBootstrap (node:internal/test_runner/harness:387:17) {\n    generatedMessage: true,\n    code: 'ERR_ASSERTION',\n    actual: 'John',\n    expected: '  John  ',\n    operator: 'strictEqual',\n    diff: 'simple'\n  }\n",
             "passed": false,
             "returncode": 1
           },
           {
-            "output_tail": "l:\n  \n  'John' !== '  John  '\n  \n      at TestContext.<anonymous> (file:///private/var/folders/3r/nc7qhtpn56j7rt5nwg0rqw600000gn/T/pi-admit-t6-d2e1s4sw/work/test/fail-to-pass.test.js:12:10)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.start (node:internal/test_runner/test:1242:17)\n      at startSubtestAfterBootstrap (node:internal/test_runner/harness:387:17) {\n    generatedMessage: true,\n    code: 'ERR_ASSERTION',\n    actual: 'John',\n    expected: '  John  ',\n    operator: 'strictEqual',\n    diff: 'simple'\n  }\n",
+            "output_bytes": 1101,
+            "output_sha256": "ae1b2aaea7e483d1fe48e9407d5dd36b6937df204c50e81e1548a629645fb48f",
+            "output_tail": "\u2716 preserves leading/trailing whitespace inside quoted fields (0.81225ms)\n\u2714 still trims unquoted fields (0.091417ms)\n\u2714 quoted empty string stays empty, not collapsed (0.055667ms)\n\u2139 tests 3\n\u2139 suites 0\n\u2139 pass 2\n\u2139 fail 1\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 55.138375\n\n\u2716 failing tests:\n\ntest at test/fail-to-pass.test.js:9:1\n\u2716 preserves leading/trailing whitespace inside quoted fields (0.81225ms)\n  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:\n  \n  'John' !== '  John  '\n  \n      at TestContext.<anonymous> (file://<path>:12:10)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.start (node:internal/test_runner/test:1242:17)\n      at startSubtestAfterBootstrap (node:internal/test_runner/harness:387:17) {\n    generatedMessage: true,\n    code: 'ERR_ASSERTION',\n    actual: 'John',\n    expected: '  John  ',\n    operator: 'strictEqual',\n    diff: 'simple'\n  }\n",
             "passed": false,
             "returncode": 1
           }
         ],
         "pristine_pass_to_pass": [
           {
-            "output_tail": "",
+            "output_bytes": 888,
+            "output_sha256": "1ba794995033ea7b6e172e417bd89330ae7aff5e55f98e5d8d5166014ac2eae8",
+            "output_tail": "\u2714 parses simple CSV with headers (0.7865ms)\n\u2714 handles quoted fields with commas (0.096792ms)\n\u2714 handles empty values (0.072792ms)\n\u2714 handles single row with no data (0.74875ms)\n\u2714 handles CSV with extra whitespace (0.14425ms)\n\u2714 handles single column CSV (0.519416ms)\n\u2714 handles malformed CSV with extra columns (0.059541ms)\n\u2714 handles malformed CSV with fewer columns (0.076667ms)\n\u2714 handles single quoted field (0.062459ms)\n\u2714 handles escaped quotes in CSV (0.056208ms)\n\u2714 end-to-end: CSV string to JSON string (0.739ms)\n\u2714 end-to-end: complex CSV with quoted fields (0.087459ms)\n\u2714 end-to-end: empty values (0.063541ms)\n\u2714 converts parsed data to JSON string (0.701625ms)\n\u2714 formats JSON with indentation (0.087ms)\n\u2714 handles empty array (0.061125ms)\n\u2139 tests 16\n\u2139 suites 0\n\u2139 pass 16\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 81.034583\n",
             "passed": true,
             "returncode": 0
           },
           {
-            "output_tail": "",
+            "output_bytes": 891,
+            "output_sha256": "578fc38705cc6fea25ddeae3a918d206675dfccf2c50d45e5dbf48ce545f97d5",
+            "output_tail": "\u2714 parses simple CSV with headers (0.745ms)\n\u2714 handles quoted fields with commas (0.086458ms)\n\u2714 handles empty values (0.060083ms)\n\u2714 handles single row with no data (0.7685ms)\n\u2714 handles CSV with extra whitespace (0.283541ms)\n\u2714 handles single column CSV (0.784167ms)\n\u2714 handles malformed CSV with extra columns (0.070542ms)\n\u2714 handles malformed CSV with fewer columns (0.084084ms)\n\u2714 handles single quoted field (0.061333ms)\n\u2714 handles escaped quotes in CSV (0.056125ms)\n\u2714 end-to-end: CSV string to JSON string (0.730542ms)\n\u2714 end-to-end: complex CSV with quoted fields (0.085166ms)\n\u2714 end-to-end: empty values (0.065083ms)\n\u2714 converts parsed data to JSON string (0.697917ms)\n\u2714 formats JSON with indentation (0.08575ms)\n\u2714 handles empty array (0.06575ms)\n\u2139 tests 16\n\u2139 suites 0\n\u2139 pass 16\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 88.536042\n",
             "passed": true,
             "returncode": 0
           },
           {
-            "output_tail": "",
+            "output_bytes": 895,
+            "output_sha256": "c9560465bdcfc6c35d45719d4bff5f1ef580a8e9adc976ee3ff2b75c3d4eff37",
+            "output_tail": "\u2714 parses simple CSV with headers (0.732875ms)\n\u2714 handles quoted fields with commas (0.082834ms)\n\u2714 handles empty values (0.244583ms)\n\u2714 handles single row with no data (0.698375ms)\n\u2714 handles CSV with extra whitespace (0.138417ms)\n\u2714 handles single column CSV (0.839083ms)\n\u2714 handles malformed CSV with extra columns (0.071042ms)\n\u2714 handles malformed CSV with fewer columns (0.077541ms)\n\u2714 handles single quoted field (0.066834ms)\n\u2714 handles escaped quotes in CSV (0.057375ms)\n\u2714 end-to-end: CSV string to JSON string (0.807416ms)\n\u2714 end-to-end: complex CSV with quoted fields (0.092ms)\n\u2714 end-to-end: empty values (0.068291ms)\n\u2714 converts parsed data to JSON string (1.951667ms)\n\u2714 formats JSON with indentation (0.293875ms)\n\u2714 handles empty array (0.230667ms)\n\u2139 tests 16\n\u2139 suites 0\n\u2139 pass 16\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 80.328333\n",
             "passed": true,
             "returncode": 0
           }
@@ -147,11 +185,11 @@
     },
     {
       "path": "real-gate-fixtures/patches/t6/gold.patch",
-      "sha256": "ee26abdc0d6ee8ec8ce2458a69132002ddaa1e226d1f0e7d2e310dd696d62c75"
+      "sha256": "9de021d7a440356406f370ad58071375ef9c76a6fc74fa6fc000741c86b06c7d"
     },
     {
       "path": "real-gate-fixtures/patches/t6/shortcut.patch",
-      "sha256": "b14696a48709a5aa11de9a255edf80f1df9a56ef1d4542f0da7727291fedb291"
+      "sha256": "5db2d04f8034b37da0f8122ed6b80349487bf14aba3b8367b7dc88358c2867db"
     },
     {
       "path": "real-gate-fixtures/quoting.test.js",
@@ -188,19 +226,16 @@
     },
     "perturbations": [
       {
-        "approved": false,
         "id": "equivalent-1",
         "sha256": "4f0a2401c690f5dea1fd453a181d4b91c07074d52284a568aa2f303e041bf9df",
         "text": "Complete the following repository task. Preserve existing behavior and verify the tests.\n\ntest/quoting.test.js fails: parseCSV currently trims whitespace inside quoted fields, but whitespace inside a quoted field must be preserved exactly, while unquoted fields stay trimmed. Fix src/index.js so quoted fields keep their interior whitespace and every test passes. Do not modify any test file and do not add new exports. Run node --test until everything passes."
       },
       {
-        "approved": false,
         "id": "equivalent-2",
         "sha256": "194fb3d91aa30e994116f036647a4f9cc3436e63d5daf1881556369b2966fadb",
         "text": "Repository change request:\ntest/quoting.test.js fails: parseCSV currently trims whitespace inside quoted fields, but whitespace inside a quoted field must be preserved exactly, while unquoted fields stay trimmed. Fix src/index.js so quoted fields keep their interior whitespace and every test passes. Do not modify any test file and do not add new exports. Run node --test until everything passes.\n\nUse the smallest correct change and confirm the test suite."
       },
       {
-        "approved": false,
         "id": "equivalent-3",
         "sha256": "69864f0d0b7da753e8559205d4bcb9e50de6a345de2fc3a907ddfe26a2df9610",
         "text": "Please solve this task in the supplied checkout, retaining all stated edge cases:\n\ntest/quoting.test.js fails: parseCSV currently trims whitespace inside quoted fields, but whitespace inside a quoted field must be preserved exactly, while unquoted fields stay trimmed. Fix src/index.js so quoted fields keep their interior whitespace and every test passes. Do not modify any test file and do not add new exports. Run node --test until everything passes."
@@ -230,6 +265,11 @@
         "node",
         "--test",
         "test/fail-to-pass.test.js"
+      ],
+      "expected_cases": [
+        "preserves leading/trailing whitespace inside quoted fields",
+        "quoted empty string stays empty, not collapsed",
+        "still trims unquoted fields"
       ],
       "overlays": [
         {

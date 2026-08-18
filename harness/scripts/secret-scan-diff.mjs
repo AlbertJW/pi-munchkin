@@ -44,8 +44,11 @@ for (const file of untracked) {
       continue;
     }
     // Re-open without following symlinks, then inspect the opened descriptor's
-    // metadata. This closes the lstat/open substitution window.
-    handle = await open(file, constants.O_RDONLY | constants.O_NOFOLLOW);
+    // metadata. O_NOFOLLOW closes the symlink substitution window; O_NONBLOCK closes
+    // the remaining one — a regular file swapped for a FIFO after the lstat is not a
+    // symlink, so O_NOFOLLOW admits it and a blocking open would hang this scan
+    // forever (2026-08-18: the comment previously claimed the window was closed).
+    handle = await open(file, constants.O_RDONLY | constants.O_NOFOLLOW | constants.O_NONBLOCK);
     const metadata = await handle.stat();
     if (!metadata.isFile()) {
       findings.push({ file, line: 0, pattern: "UNTRACKED_NON_REGULAR" });

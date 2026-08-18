@@ -2,7 +2,7 @@
 """fleet_report: cross-model, significance-aware, cost-aware adoption decision.
 
 Reads a results jsonl tagged with `model` + `split`, compares a baseline variant
-vs a candidate across the fleet, and decides using Wilson confidence intervals
+vs a candidate across the fleet, and decides using one-sided Fisher exact tests (Wilson intervals are displayed, never decisive)
 (NOT point deltas — a 1-question wobble at n=20 must not flip a verdict):
 
   per model, classify candidate vs baseline as better / worse / neutral by CI overlap.

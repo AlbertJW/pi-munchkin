@@ -2,41 +2,55 @@
   "admission": {
     "approved": false,
     "automated": {
-      "checked_at": "2026-07-14T18:49:23Z",
+      "checked_at": "2026-08-18T14:01:43Z",
       "hash_drift": [],
+      "manifest_drift": false,
+      "overlay_lint": [],
       "passed": true,
       "runs_per_state": 3,
       "states": {
         "gold_fail_to_pass": [
           {
-            "output_tail": "",
+            "output_bytes": 254,
+            "output_sha256": "c668401268a6451ce05fa5d9b1357b1611c3f873834f974dc99044fc6e2a71fd",
+            "output_tail": "\u2714 apostrophe is not a word boundary (0.388542ms)\n\u2714 hyphen is not a word boundary (0.058792ms)\n\u2714 all-caps with apostrophe (0.049625ms)\n\u2139 tests 3\n\u2139 suites 0\n\u2139 pass 3\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 55.298875\n",
             "passed": true,
             "returncode": 0
           },
           {
-            "output_tail": "",
+            "output_bytes": 252,
+            "output_sha256": "e8829d42e773b6e8776eb0a8b7e73e49ffd6e7106af4d7cc3b81398a32094a95",
+            "output_tail": "\u2714 apostrophe is not a word boundary (0.3895ms)\n\u2714 hyphen is not a word boundary (0.057667ms)\n\u2714 all-caps with apostrophe (0.048167ms)\n\u2139 tests 3\n\u2139 suites 0\n\u2139 pass 3\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 55.310542\n",
             "passed": true,
             "returncode": 0
           },
           {
-            "output_tail": "",
+            "output_bytes": 253,
+            "output_sha256": "089bbb3947643f177b7c6552e149dd8f3d68256f9df21fe3b76faf6197e407c1",
+            "output_tail": "\u2714 apostrophe is not a word boundary (0.387209ms)\n\u2714 hyphen is not a word boundary (0.057625ms)\n\u2714 all-caps with apostrophe (0.04975ms)\n\u2139 tests 3\n\u2139 suites 0\n\u2139 pass 3\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 52.665334\n",
             "passed": true,
             "returncode": 0
           }
         ],
         "gold_pass_to_pass": [
           {
-            "output_tail": "",
+            "output_bytes": 175,
+            "output_sha256": "7129ef992b47a7d6c19cf078a8bd56206f6da4814bab811841270d0a7f5e987a",
+            "output_tail": "\u2714 basic two words (0.368375ms)\n\u2714 several words (0.063ms)\n\u2139 tests 2\n\u2139 suites 0\n\u2139 pass 2\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 56.393458\n",
             "passed": true,
             "returncode": 0
           },
           {
-            "output_tail": "",
+            "output_bytes": 176,
+            "output_sha256": "456508a4570a4e97be891a8cba825673b9a046987be8f580d5de48d8e5521e50",
+            "output_tail": "\u2714 basic two words (0.37475ms)\n\u2714 several words (0.06475ms)\n\u2139 tests 2\n\u2139 suites 0\n\u2139 pass 2\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 53.376333\n",
             "passed": true,
             "returncode": 0
           },
           {
-            "output_tail": "",
+            "output_bytes": 178,
+            "output_sha256": "12ebf5f0cc698f767ed89dc76799ff82b0dbcb75efa1edb6af86ab6ed50e4c42",
+            "output_tail": "\u2714 basic two words (0.387875ms)\n\u2714 several words (0.063208ms)\n\u2139 tests 2\n\u2139 suites 0\n\u2139 pass 2\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 55.587458\n",
             "passed": true,
             "returncode": 0
           }
@@ -44,34 +58,46 @@
         "mutant:shortcut": {
           "fail_to_pass": [
             {
-              "output_tail": "t/fail-to-pass.test.js:7:52)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n      at Test.postRun (node:internal/test_runner/test:1522:19)\n      at Test.run (node:internal/test_runner/test:1447:12)\n      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3) {\n    generatedMessage: true,\n    code: 'ERR_ASSERTION',\n    actual: 'Well-Known Fact',\n    expected: 'Well-known Fact',\n    operator: 'strictEqual',\n    diff: 'simple'\n  }\n",
+              "output_bytes": 1249,
+              "output_sha256": "2a08c1d155a3691d17d4bd81e1bcf107bc5e4cdc338a659e7dafcdfe1f2249cb",
+              "output_tail": "\u2714 apostrophe is not a word boundary (0.430917ms)\n\u2716 hyphen is not a word boundary (0.519416ms)\n\u2714 all-caps with apostrophe (0.057333ms)\n\u2139 tests 3\n\u2139 suites 0\n\u2139 pass 2\n\u2139 fail 1\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 55.96025\n\n\u2716 failing tests:\n\ntest at test/fail-to-pass.test.js:7:1\n\u2716 hyphen is not a word boundary (0.519416ms)\n  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:\n  + actual - expected\n  \n  + 'Well-Known Fact'\n  - 'Well-known Fact'\n          ^\n  \n      at TestContext.<anonymous> (file://<path>:7:52)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n      at Test.postRun (node:internal/test_runner/test:1522:19)\n      at Test.run (node:internal/test_runner/test:1447:12)\n      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3) {\n    generatedMessage: true,\n    code: 'ERR_ASSERTION',\n    actual: 'Well-Known Fact',\n    expected: 'Well-known Fact',\n    operator: 'strictEqual',\n    diff: 'simple'\n  }\n",
               "passed": false,
               "returncode": 1
             },
             {
-              "output_tail": "t/fail-to-pass.test.js:7:52)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n      at Test.postRun (node:internal/test_runner/test:1522:19)\n      at Test.run (node:internal/test_runner/test:1447:12)\n      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3) {\n    generatedMessage: true,\n    code: 'ERR_ASSERTION',\n    actual: 'Well-Known Fact',\n    expected: 'Well-known Fact',\n    operator: 'strictEqual',\n    diff: 'simple'\n  }\n",
+              "output_bytes": 1246,
+              "output_sha256": "b314438af300d9dc273f4b44dc0d19912026c1a245067ced890e60322d80a31e",
+              "output_tail": "\u2714 apostrophe is not a word boundary (0.51325ms)\n\u2716 hyphen is not a word boundary (1.174167ms)\n\u2714 all-caps with apostrophe (0.081ms)\n\u2139 tests 3\n\u2139 suites 0\n\u2139 pass 2\n\u2139 fail 1\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 63.781833\n\n\u2716 failing tests:\n\ntest at test/fail-to-pass.test.js:7:1\n\u2716 hyphen is not a word boundary (1.174167ms)\n  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:\n  + actual - expected\n  \n  + 'Well-Known Fact'\n  - 'Well-known Fact'\n          ^\n  \n      at TestContext.<anonymous> (file://<path>:7:52)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n      at Test.postRun (node:internal/test_runner/test:1522:19)\n      at Test.run (node:internal/test_runner/test:1447:12)\n      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3) {\n    generatedMessage: true,\n    code: 'ERR_ASSERTION',\n    actual: 'Well-Known Fact',\n    expected: 'Well-known Fact',\n    operator: 'strictEqual',\n    diff: 'simple'\n  }\n",
               "passed": false,
               "returncode": 1
             },
             {
-              "output_tail": "t/fail-to-pass.test.js:7:52)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n      at Test.postRun (node:internal/test_runner/test:1522:19)\n      at Test.run (node:internal/test_runner/test:1447:12)\n      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3) {\n    generatedMessage: true,\n    code: 'ERR_ASSERTION',\n    actual: 'Well-Known Fact',\n    expected: 'Well-known Fact',\n    operator: 'strictEqual',\n    diff: 'simple'\n  }\n",
+              "output_bytes": 1250,
+              "output_sha256": "cbd57d33c601d61ca1fe123080e452a988f2fbc47fe11bf94217d4b1bce4656e",
+              "output_tail": "\u2714 apostrophe is not a word boundary (1.051875ms)\n\u2716 hyphen is not a word boundary (0.570166ms)\n\u2714 all-caps with apostrophe (0.064209ms)\n\u2139 tests 3\n\u2139 suites 0\n\u2139 pass 2\n\u2139 fail 1\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 65.021041\n\n\u2716 failing tests:\n\ntest at test/fail-to-pass.test.js:7:1\n\u2716 hyphen is not a word boundary (0.570166ms)\n  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:\n  + actual - expected\n  \n  + 'Well-Known Fact'\n  - 'Well-known Fact'\n          ^\n  \n      at TestContext.<anonymous> (file://<path>:7:52)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n      at Test.postRun (node:internal/test_runner/test:1522:19)\n      at Test.run (node:internal/test_runner/test:1447:12)\n      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3) {\n    generatedMessage: true,\n    code: 'ERR_ASSERTION',\n    actual: 'Well-Known Fact',\n    expected: 'Well-known Fact',\n    operator: 'strictEqual',\n    diff: 'simple'\n  }\n",
               "passed": false,
               "returncode": 1
             }
           ],
           "pass_to_pass": [
             {
-              "output_tail": "",
+              "output_bytes": 177,
+              "output_sha256": "06e3598c403e01fd21219485d4a58d3baa4d9729e86da9b3fb2e06ffdbc04f95",
+              "output_tail": "\u2714 basic two words (0.410292ms)\n\u2714 several words (0.06175ms)\n\u2139 tests 2\n\u2139 suites 0\n\u2139 pass 2\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 55.828833\n",
               "passed": true,
               "returncode": 0
             },
             {
-              "output_tail": "",
+              "output_bytes": 178,
+              "output_sha256": "889ea32feda3ff6bd5524fe2f69ee418d133593968984a7d4828da76dcc6b02e",
+              "output_tail": "\u2714 basic two words (0.418291ms)\n\u2714 several words (0.062541ms)\n\u2139 tests 2\n\u2139 suites 0\n\u2139 pass 2\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 56.945584\n",
               "passed": true,
               "returncode": 0
             },
             {
-              "output_tail": "",
+              "output_bytes": 178,
+              "output_sha256": "8d2f19fa33a5739eb577e208518e84a11d3da376f2b1efc555cdd7eb076ea440",
+              "output_tail": "\u2714 basic two words (0.421667ms)\n\u2714 several words (0.061875ms)\n\u2139 tests 2\n\u2139 suites 0\n\u2139 pass 2\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 58.707125\n",
               "passed": true,
               "returncode": 0
             }
@@ -79,34 +105,46 @@
         },
         "pristine_fail_to_pass": [
           {
-            "output_tail": "d__/work/test/fail-to-pass.test.js:8:47)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n      at Test.postRun (node:internal/test_runner/test:1522:19)\n      at Test.run (node:internal/test_runner/test:1447:12)\n      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7) {\n    generatedMessage: true,\n    code: 'ERR_ASSERTION',\n    actual: \"Don'T Stop\",\n    expected: \"Don't Stop\",\n    operator: 'strictEqual',\n    diff: 'simple'\n  }\n",
+            "output_bytes": 3022,
+            "output_sha256": "4fef1badb977c9c7ed33aa0601450b36173dfc79a7b9c3fe7ba84c765a8e7581",
+            "output_tail": "RR_ASSERTION',\n    actual: \"I Don'T Know\",\n    expected: \"I Don't Know\",\n    operator: 'strictEqual',\n    diff: 'simple'\n  }\n\ntest at test/fail-to-pass.test.js:7:1\n\u2716 hyphen is not a word boundary (0.13675ms)\n  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:\n  + actual - expected\n  \n  + 'Well-Known Fact'\n  - 'Well-known Fact'\n          ^\n  \n      at TestContext.<anonymous> (file://<path>:7:52)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n      at Test.postRun (node:internal/test_runner/test:1522:19)\n      at Test.run (node:internal/test_runner/test:1447:12)\n      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3) {\n    generatedMessage: true,\n    code: 'ERR_ASSERTION',\n    actual: 'Well-Known Fact',\n    expected: 'Well-known Fact',\n    operator: 'strictEqual',\n    diff: 'simple'\n  }\n\ntest at test/fail-to-pass.test.js:8:1\n\u2716 all-caps with apostrophe (0.129084ms)\n  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:\n  + actual - expected\n  \n  + \"Don'T Stop\"\n  - \"Don't Stop\"\n         ^\n  \n      at TestContext.<anonymous> (file://<path>:8:47)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n      at Test.postRun (node:internal/test_runner/test:1522:19)\n      at Test.run (node:internal/test_runner/test:1447:12)\n      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7) {\n    generatedMessage: true,\n    code: 'ERR_ASSERTION',\n    actual: \"Don'T Stop\",\n    expected: \"Don't Stop\",\n    operator: 'strictEqual',\n    diff: 'simple'\n  }\n",
             "passed": false,
             "returncode": 1
           },
           {
-            "output_tail": "xb1/work/test/fail-to-pass.test.js:8:47)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n      at Test.postRun (node:internal/test_runner/test:1522:19)\n      at Test.run (node:internal/test_runner/test:1447:12)\n      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7) {\n    generatedMessage: true,\n    code: 'ERR_ASSERTION',\n    actual: \"Don'T Stop\",\n    expected: \"Don't Stop\",\n    operator: 'strictEqual',\n    diff: 'simple'\n  }\n",
+            "output_bytes": 3024,
+            "output_sha256": "c40102bb30fe617375a15b609a8d8e50e42e1c2fbbfd66f98b2052e822da8f64",
+            "output_tail": "R_ASSERTION',\n    actual: \"I Don'T Know\",\n    expected: \"I Don't Know\",\n    operator: 'strictEqual',\n    diff: 'simple'\n  }\n\ntest at test/fail-to-pass.test.js:7:1\n\u2716 hyphen is not a word boundary (0.120125ms)\n  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:\n  + actual - expected\n  \n  + 'Well-Known Fact'\n  - 'Well-known Fact'\n          ^\n  \n      at TestContext.<anonymous> (file://<path>:7:52)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n      at Test.postRun (node:internal/test_runner/test:1522:19)\n      at Test.run (node:internal/test_runner/test:1447:12)\n      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3) {\n    generatedMessage: true,\n    code: 'ERR_ASSERTION',\n    actual: 'Well-Known Fact',\n    expected: 'Well-known Fact',\n    operator: 'strictEqual',\n    diff: 'simple'\n  }\n\ntest at test/fail-to-pass.test.js:8:1\n\u2716 all-caps with apostrophe (0.081833ms)\n  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:\n  + actual - expected\n  \n  + \"Don'T Stop\"\n  - \"Don't Stop\"\n         ^\n  \n      at TestContext.<anonymous> (file://<path>:8:47)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n      at Test.postRun (node:internal/test_runner/test:1522:19)\n      at Test.run (node:internal/test_runner/test:1447:12)\n      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7) {\n    generatedMessage: true,\n    code: 'ERR_ASSERTION',\n    actual: \"Don'T Stop\",\n    expected: \"Don't Stop\",\n    operator: 'strictEqual',\n    diff: 'simple'\n  }\n",
             "passed": false,
             "returncode": 1
           },
           {
-            "output_tail": "ft9/work/test/fail-to-pass.test.js:8:47)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n      at Test.postRun (node:internal/test_runner/test:1522:19)\n      at Test.run (node:internal/test_runner/test:1447:12)\n      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7) {\n    generatedMessage: true,\n    code: 'ERR_ASSERTION',\n    actual: \"Don'T Stop\",\n    expected: \"Don't Stop\",\n    operator: 'strictEqual',\n    diff: 'simple'\n  }\n",
+            "output_bytes": 3020,
+            "output_sha256": "5cd9906bf5cfbe2a122a185e55160f7c30e7e381ac2809b21b95162583a6af7a",
+            "output_tail": "R_ASSERTION',\n    actual: \"I Don'T Know\",\n    expected: \"I Don't Know\",\n    operator: 'strictEqual',\n    diff: 'simple'\n  }\n\ntest at test/fail-to-pass.test.js:7:1\n\u2716 hyphen is not a word boundary (0.119583ms)\n  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:\n  + actual - expected\n  \n  + 'Well-Known Fact'\n  - 'Well-known Fact'\n          ^\n  \n      at TestContext.<anonymous> (file://<path>:7:52)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n      at Test.postRun (node:internal/test_runner/test:1522:19)\n      at Test.run (node:internal/test_runner/test:1447:12)\n      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3) {\n    generatedMessage: true,\n    code: 'ERR_ASSERTION',\n    actual: 'Well-Known Fact',\n    expected: 'Well-known Fact',\n    operator: 'strictEqual',\n    diff: 'simple'\n  }\n\ntest at test/fail-to-pass.test.js:8:1\n\u2716 all-caps with apostrophe (0.084417ms)\n  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:\n  + actual - expected\n  \n  + \"Don'T Stop\"\n  - \"Don't Stop\"\n         ^\n  \n      at TestContext.<anonymous> (file://<path>:8:47)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n      at Test.postRun (node:internal/test_runner/test:1522:19)\n      at Test.run (node:internal/test_runner/test:1447:12)\n      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7) {\n    generatedMessage: true,\n    code: 'ERR_ASSERTION',\n    actual: \"Don'T Stop\",\n    expected: \"Don't Stop\",\n    operator: 'strictEqual',\n    diff: 'simple'\n  }\n",
             "passed": false,
             "returncode": 1
           }
         ],
         "pristine_pass_to_pass": [
           {
-            "output_tail": "",
+            "output_bytes": 173,
+            "output_sha256": "3471a2653e775f274861eb903a078e4f117c35f3fb43b8eef4a453ba1443f6a9",
+            "output_tail": "\u2714 basic two words (0.419ms)\n\u2714 several words (0.062167ms)\n\u2139 tests 2\n\u2139 suites 0\n\u2139 pass 2\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 55.0855\n",
             "passed": true,
             "returncode": 0
           },
           {
-            "output_tail": "",
+            "output_bytes": 178,
+            "output_sha256": "9bebee45190907f80e655e6596059eb1759a8f622f397977e7ca44f09f0d9daa",
+            "output_tail": "\u2714 basic two words (0.415042ms)\n\u2714 several words (0.063959ms)\n\u2139 tests 2\n\u2139 suites 0\n\u2139 pass 2\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 61.600042\n",
             "passed": true,
             "returncode": 0
           },
           {
-            "output_tail": "",
+            "output_bytes": 178,
+            "output_sha256": "091b7aff314787b49555a32ef493e44f3941554fa4dc1082e9a57ee9e8559d81",
+            "output_tail": "\u2714 basic two words (0.458167ms)\n\u2714 several words (0.064708ms)\n\u2139 tests 2\n\u2139 suites 0\n\u2139 pass 2\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 59.671333\n",
             "passed": true,
             "returncode": 0
           }
@@ -173,19 +211,16 @@
     },
     "perturbations": [
       {
-        "approved": false,
         "id": "equivalent-1",
         "sha256": "8a5b66d3d4f0d50550de71469d296930a0a3763af0b4518c4d2025a24fe3c297",
         "text": "Complete the following repository task. Preserve existing behavior and verify the tests.\n\nFix titleCase(s) in src/index.js. It must capitalize the first letter of each word and\nlowercase the rest of that word. Words are separated by SPACES ONLY \u2014 an apostrophe or a\nhyphen does NOT start a new word. So \"i don't know\" -> \"I Don't Know\", \"well-known fact\" ->\n\"Well-known Fact\", and \"HELLO WORLD\" -> \"Hello World\". The current code capitalizes the\nletter after every non-letter character, which is wrong. Fix it without breaking the\nexisting visible tests. Run node --test until all tests pass."
       },
       {
-        "approved": false,
         "id": "equivalent-2",
         "sha256": "5c907144ea5de341f5542b2ab2779a671dcf76a79605cf36f8517846c689b137",
         "text": "Repository change request:\nFix titleCase(s) in src/index.js. It must capitalize the first letter of each word and\nlowercase the rest of that word. Words are separated by SPACES ONLY \u2014 an apostrophe or a\nhyphen does NOT start a new word. So \"i don't know\" -> \"I Don't Know\", \"well-known fact\" ->\n\"Well-known Fact\", and \"HELLO WORLD\" -> \"Hello World\". The current code capitalizes the\nletter after every non-letter character, which is wrong. Fix it without breaking the\nexisting visible tests. Run node --test until all tests pass.\n\nUse the smallest correct change and confirm the test suite."
       },
       {
-        "approved": false,
         "id": "equivalent-3",
         "sha256": "5421921899e2ca1fe201485cf1c23d972825925b807c5855bf934716f434f7a7",
         "text": "Please solve this task in the supplied checkout, retaining all stated edge cases:\n\nFix titleCase(s) in src/index.js. It must capitalize the first letter of each word and\nlowercase the rest of that word. Words are separated by SPACES ONLY \u2014 an apostrophe or a\nhyphen does NOT start a new word. So \"i don't know\" -> \"I Don't Know\", \"well-known fact\" ->\n\"Well-known Fact\", and \"HELLO WORLD\" -> \"Hello World\". The current code capitalizes the\nletter after every non-letter character, which is wrong. Fix it without breaking the\nexisting visible tests. Run node --test until all tests pass."
@@ -215,6 +250,11 @@
         "node",
         "--test",
         "test/fail-to-pass.test.js"
+      ],
+      "expected_cases": [
+        "all-caps with apostrophe",
+        "apostrophe is not a word boundary",
+        "hyphen is not a word boundary"
       ],
       "overlays": [
         {

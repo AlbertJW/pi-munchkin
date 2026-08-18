@@ -7,7 +7,7 @@
       "4c52f17c965617527979d0d8fe7ee1e215980d413b77d022fd3c19b82cda9151"
     ],
     "automated": {
-      "checked_at": "2026-08-14T12:51:41Z",
+      "checked_at": "2026-08-18T13:59:59Z",
       "hash_drift": [],
       "manifest_drift": false,
       "overlay_lint": [],
@@ -16,46 +16,46 @@
       "states": {
         "gold_fail_to_pass": [
           {
-            "output_bytes": 410,
-            "output_sha256": "c7bb6be88917d8686852d90fc3b568f7becf0953cc7735327126dba75843f2bf",
-            "output_tail": "\u2714 D1 dependencies come before dependents (0.491166ms)\n\u2714 D2 ready steps keep input order as the tie-break (0.356417ms)\n\u2714 D3 an unknown dependency is rejected (0.478084ms)\n\u2714 D4 a duplicate step name is rejected (0.060584ms)\n\u2714 D5 a cycle is rejected and the input is not mutated (0.085ms)\n\u2139 tests 5\n\u2139 suites 0\n\u2139 pass 5\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 55.439875\n",
+            "output_bytes": 409,
+            "output_sha256": "6b5d7c9ffe7b620c62b14948707fdf76476fef622bb85d23a97bd86faa2425bd",
+            "output_tail": "\u2714 D1 dependencies come before dependents (0.475084ms)\n\u2714 D2 ready steps keep input order as the tie-break (0.416ms)\n\u2714 D3 an unknown dependency is rejected (0.561208ms)\n\u2714 D4 a duplicate step name is rejected (0.061541ms)\n\u2714 D5 a cycle is rejected and the input is not mutated (0.08425ms)\n\u2139 tests 5\n\u2139 suites 0\n\u2139 pass 5\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 68.428208\n",
+            "passed": true,
+            "returncode": 0
+          },
+          {
+            "output_bytes": 408,
+            "output_sha256": "3e23366146c1d7b848addb44fc61d81fc92a9c74366d9d8c8663e3a5328068fd",
+            "output_tail": "\u2714 D1 dependencies come before dependents (0.533916ms)\n\u2714 D2 ready steps keep input order as the tie-break (0.3915ms)\n\u2714 D3 an unknown dependency is rejected (0.679708ms)\n\u2714 D4 a duplicate step name is rejected (0.078875ms)\n\u2714 D5 a cycle is rejected and the input is not mutated (0.100041ms)\n\u2139 tests 5\n\u2139 suites 0\n\u2139 pass 5\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 65.863\n",
             "passed": true,
             "returncode": 0
           },
           {
             "output_bytes": 413,
-            "output_sha256": "a147854090f7c4db125dae92f87e55fcdc548c013a8beee7cf80f2414b63b9a1",
-            "output_tail": "\u2714 D1 dependencies come before dependents (0.465208ms)\n\u2714 D2 ready steps keep input order as the tie-break (0.345209ms)\n\u2714 D3 an unknown dependency is rejected (0.480917ms)\n\u2714 D4 a duplicate step name is rejected (0.058916ms)\n\u2714 D5 a cycle is rejected and the input is not mutated (0.084125ms)\n\u2139 tests 5\n\u2139 suites 0\n\u2139 pass 5\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 55.734042\n",
-            "passed": true,
-            "returncode": 0
-          },
-          {
-            "output_bytes": 410,
-            "output_sha256": "44b5318c78fa2f1e97789d189319428fb8ddfd8aa13245c0756b80b8ec2bae0a",
-            "output_tail": "\u2714 D1 dependencies come before dependents (0.480083ms)\n\u2714 D2 ready steps keep input order as the tie-break (0.349ms)\n\u2714 D3 an unknown dependency is rejected (0.483709ms)\n\u2714 D4 a duplicate step name is rejected (0.062333ms)\n\u2714 D5 a cycle is rejected and the input is not mutated (0.084917ms)\n\u2139 tests 5\n\u2139 suites 0\n\u2139 pass 5\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 59.760917\n",
+            "output_sha256": "b70f3d521a2b83f76c2f771327fd0325d85a4bef4a8a361487aee5012aaeed58",
+            "output_tail": "\u2714 D1 dependencies come before dependents (0.482208ms)\n\u2714 D2 ready steps keep input order as the tie-break (0.353958ms)\n\u2714 D3 an unknown dependency is rejected (0.679958ms)\n\u2714 D4 a duplicate step name is rejected (0.064166ms)\n\u2714 D5 a cycle is rejected and the input is not mutated (0.085167ms)\n\u2139 tests 5\n\u2139 suites 0\n\u2139 pass 5\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 64.020375\n",
             "passed": true,
             "returncode": 0
           }
         ],
         "gold_pass_to_pass": [
           {
-            "output_bytes": 219,
-            "output_sha256": "58daf4afd247914f4300afb6efeb3cb902ac881f11095380a5c417ca52b24767",
-            "output_tail": "\u2714 a dependency-free plan keeps input order (0.704167ms)\n\u2714 the result is an array of names (0.06975ms)\n\u2139 tests 2\n\u2139 suites 0\n\u2139 pass 2\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 60.56475\n",
+            "output_bytes": 220,
+            "output_sha256": "0d342e69cbe22c27e91f55695155fd6a02affafcaca739d6e1abaed3741e139a",
+            "output_tail": "\u2714 a dependency-free plan keeps input order (0.676458ms)\n\u2714 the result is an array of names (0.06775ms)\n\u2139 tests 2\n\u2139 suites 0\n\u2139 pass 2\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 78.660625\n",
             "passed": true,
             "returncode": 0
           },
           {
             "output_bytes": 221,
-            "output_sha256": "ca110f315899541a7dff5ed118405168ace731523146a240a8f98fd874cd9010",
-            "output_tail": "\u2714 a dependency-free plan keeps input order (0.687875ms)\n\u2714 the result is an array of names (0.068458ms)\n\u2139 tests 2\n\u2139 suites 0\n\u2139 pass 2\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 60.286541\n",
+            "output_sha256": "8b59560f851fb2d52084037564c291d77aa451c957f503a9dabed7a79811d5e7",
+            "output_tail": "\u2714 a dependency-free plan keeps input order (0.680708ms)\n\u2714 the result is an array of names (0.067875ms)\n\u2139 tests 2\n\u2139 suites 0\n\u2139 pass 2\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 60.014167\n",
             "passed": true,
             "returncode": 0
           },
           {
             "output_bytes": 221,
-            "output_sha256": "cfd309bf67b73543bfaef848ade2eda5c31c4466bb6fa78506013c4423c93b85",
-            "output_tail": "\u2714 a dependency-free plan keeps input order (0.704417ms)\n\u2714 the result is an array of names (0.089084ms)\n\u2139 tests 2\n\u2139 suites 0\n\u2139 pass 2\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 60.597084\n",
+            "output_sha256": "c5f6a3641094d14d165feae99146c2cec64f71d993e686bc9411d33d9a8e5105",
+            "output_tail": "\u2714 a dependency-free plan keeps input order (0.769291ms)\n\u2714 the result is an array of names (0.072625ms)\n\u2139 tests 2\n\u2139 suites 0\n\u2139 pass 2\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 65.760917\n",
             "passed": true,
             "returncode": 0
           }
@@ -63,46 +63,46 @@
         "mutant:shortcut": {
           "fail_to_pass": [
             {
-              "output_bytes": 4701,
-              "output_sha256": "87ddfc3c4fa9ef72b0fd6c2621cceae7803576518b39d518e141962b4bd13dc3",
-              "output_tail": "\n      at Test.postRun (node:internal/test_runner/test:1522:19)\n      at Test.run (node:internal/test_runner/test:1447:12)\n      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7) {\n    generatedMessage: false,\n    code: 'ERR_ASSERTION',\n    actual: undefined,\n    operator: 'throws',\n    diff: 'simple'\n  }\n\ntest at test/fail-to-pass.test.js:32:1\n\u2716 D4 a duplicate step name is rejected (0.082208ms)\n  AssertionError [ERR_ASSERTION]: Missing expected exception (Error).\n      at TestContext.<anonymous> (file://<path>:33:10)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n      at Test.postRun (node:internal/test_runner/test:1522:19)\n      at Test.run (node:internal/test_runner/test:1447:12)\n      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7) {\n    generatedMessage: false,\n    code: 'ERR_ASSERTION',\n    actual: undefined,\n    operator: 'throws',\n    diff: 'simple'\n  }\n\ntest at test/fail-to-pass.test.js:39:1\n\u2716 D5 a cycle is rejected and the input is not mutated (0.084625ms)\n  AssertionError [ERR_ASSERTION]: Missing expected exception (Error).\n      at TestContext.<anonymous> (file://<path>:45:10)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n      at Test.postRun (node:internal/test_runner/test:1522:19)\n      at Test.run (node:internal/test_runner/test:1447:12)\n      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7) {\n    generatedMessage: false,\n    code: 'ERR_ASSERTION',\n    actual: undefined,\n    operator: 'throws',\n    diff: 'simple'\n  }\n",
+              "output_bytes": 4707,
+              "output_sha256": "8d41216f22019f86f904cbbbb8c9b348af6ac8628042cfa3f68983b740ec19b9",
+              "output_tail": "\n      at Test.postRun (node:internal/test_runner/test:1522:19)\n      at Test.run (node:internal/test_runner/test:1447:12)\n      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7) {\n    generatedMessage: false,\n    code: 'ERR_ASSERTION',\n    actual: undefined,\n    operator: 'throws',\n    diff: 'simple'\n  }\n\ntest at test/fail-to-pass.test.js:32:1\n\u2716 D4 a duplicate step name is rejected (0.086667ms)\n  AssertionError [ERR_ASSERTION]: Missing expected exception (Error).\n      at TestContext.<anonymous> (file://<path>:33:10)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n      at Test.postRun (node:internal/test_runner/test:1522:19)\n      at Test.run (node:internal/test_runner/test:1447:12)\n      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7) {\n    generatedMessage: false,\n    code: 'ERR_ASSERTION',\n    actual: undefined,\n    operator: 'throws',\n    diff: 'simple'\n  }\n\ntest at test/fail-to-pass.test.js:39:1\n\u2716 D5 a cycle is rejected and the input is not mutated (0.141792ms)\n  AssertionError [ERR_ASSERTION]: Missing expected exception (Error).\n      at TestContext.<anonymous> (file://<path>:45:10)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n      at Test.postRun (node:internal/test_runner/test:1522:19)\n      at Test.run (node:internal/test_runner/test:1447:12)\n      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7) {\n    generatedMessage: false,\n    code: 'ERR_ASSERTION',\n    actual: undefined,\n    operator: 'throws',\n    diff: 'simple'\n  }\n",
               "passed": false,
               "returncode": 1
             },
             {
-              "output_bytes": 4701,
-              "output_sha256": "754afc49812054d8d80f8836d3f8abe92d0aafe114b0da54730e394bfc39f5fd",
-              "output_tail": ":18)\n      at Test.postRun (node:internal/test_runner/test:1522:19)\n      at Test.run (node:internal/test_runner/test:1447:12)\n      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7) {\n    generatedMessage: false,\n    code: 'ERR_ASSERTION',\n    actual: undefined,\n    operator: 'throws',\n    diff: 'simple'\n  }\n\ntest at test/fail-to-pass.test.js:32:1\n\u2716 D4 a duplicate step name is rejected (0.072375ms)\n  AssertionError [ERR_ASSERTION]: Missing expected exception (Error).\n      at TestContext.<anonymous> (file://<path>:33:10)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n      at Test.postRun (node:internal/test_runner/test:1522:19)\n      at Test.run (node:internal/test_runner/test:1447:12)\n      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7) {\n    generatedMessage: false,\n    code: 'ERR_ASSERTION',\n    actual: undefined,\n    operator: 'throws',\n    diff: 'simple'\n  }\n\ntest at test/fail-to-pass.test.js:39:1\n\u2716 D5 a cycle is rejected and the input is not mutated (0.08ms)\n  AssertionError [ERR_ASSERTION]: Missing expected exception (Error).\n      at TestContext.<anonymous> (file://<path>:45:10)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n      at Test.postRun (node:internal/test_runner/test:1522:19)\n      at Test.run (node:internal/test_runner/test:1447:12)\n      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7) {\n    generatedMessage: false,\n    code: 'ERR_ASSERTION',\n    actual: undefined,\n    operator: 'throws',\n    diff: 'simple'\n  }\n",
+              "output_bytes": 4711,
+              "output_sha256": "924ff98ded9bed19c82bf05c8ed1914f2e87d2f671d3b6b4fff3697f1630cfbe",
+              "output_tail": "\n      at Test.postRun (node:internal/test_runner/test:1522:19)\n      at Test.run (node:internal/test_runner/test:1447:12)\n      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7) {\n    generatedMessage: false,\n    code: 'ERR_ASSERTION',\n    actual: undefined,\n    operator: 'throws',\n    diff: 'simple'\n  }\n\ntest at test/fail-to-pass.test.js:32:1\n\u2716 D4 a duplicate step name is rejected (0.077875ms)\n  AssertionError [ERR_ASSERTION]: Missing expected exception (Error).\n      at TestContext.<anonymous> (file://<path>:33:10)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n      at Test.postRun (node:internal/test_runner/test:1522:19)\n      at Test.run (node:internal/test_runner/test:1447:12)\n      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7) {\n    generatedMessage: false,\n    code: 'ERR_ASSERTION',\n    actual: undefined,\n    operator: 'throws',\n    diff: 'simple'\n  }\n\ntest at test/fail-to-pass.test.js:39:1\n\u2716 D5 a cycle is rejected and the input is not mutated (0.079833ms)\n  AssertionError [ERR_ASSERTION]: Missing expected exception (Error).\n      at TestContext.<anonymous> (file://<path>:45:10)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n      at Test.postRun (node:internal/test_runner/test:1522:19)\n      at Test.run (node:internal/test_runner/test:1447:12)\n      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7) {\n    generatedMessage: false,\n    code: 'ERR_ASSERTION',\n    actual: undefined,\n    operator: 'throws',\n    diff: 'simple'\n  }\n",
               "passed": false,
               "returncode": 1
             },
             {
-              "output_bytes": 4705,
-              "output_sha256": "24a581af01d72c914f2f59fc592c18e4e2ca27de24b9a3f51807155a6bec6ccf",
-              "output_tail": "\n      at Test.postRun (node:internal/test_runner/test:1522:19)\n      at Test.run (node:internal/test_runner/test:1447:12)\n      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7) {\n    generatedMessage: false,\n    code: 'ERR_ASSERTION',\n    actual: undefined,\n    operator: 'throws',\n    diff: 'simple'\n  }\n\ntest at test/fail-to-pass.test.js:32:1\n\u2716 D4 a duplicate step name is rejected (0.069042ms)\n  AssertionError [ERR_ASSERTION]: Missing expected exception (Error).\n      at TestContext.<anonymous> (file://<path>:33:10)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n      at Test.postRun (node:internal/test_runner/test:1522:19)\n      at Test.run (node:internal/test_runner/test:1447:12)\n      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7) {\n    generatedMessage: false,\n    code: 'ERR_ASSERTION',\n    actual: undefined,\n    operator: 'throws',\n    diff: 'simple'\n  }\n\ntest at test/fail-to-pass.test.js:39:1\n\u2716 D5 a cycle is rejected and the input is not mutated (0.075917ms)\n  AssertionError [ERR_ASSERTION]: Missing expected exception (Error).\n      at TestContext.<anonymous> (file://<path>:45:10)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n      at Test.postRun (node:internal/test_runner/test:1522:19)\n      at Test.run (node:internal/test_runner/test:1447:12)\n      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7) {\n    generatedMessage: false,\n    code: 'ERR_ASSERTION',\n    actual: undefined,\n    operator: 'throws',\n    diff: 'simple'\n  }\n",
+              "output_bytes": 4709,
+              "output_sha256": "3609b87a8bbbfa83b7833972d02007ef21d189a7c471e9700244eba63e8c27b5",
+              "output_tail": "\n      at Test.postRun (node:internal/test_runner/test:1522:19)\n      at Test.run (node:internal/test_runner/test:1447:12)\n      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7) {\n    generatedMessage: false,\n    code: 'ERR_ASSERTION',\n    actual: undefined,\n    operator: 'throws',\n    diff: 'simple'\n  }\n\ntest at test/fail-to-pass.test.js:32:1\n\u2716 D4 a duplicate step name is rejected (0.078916ms)\n  AssertionError [ERR_ASSERTION]: Missing expected exception (Error).\n      at TestContext.<anonymous> (file://<path>:33:10)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n      at Test.postRun (node:internal/test_runner/test:1522:19)\n      at Test.run (node:internal/test_runner/test:1447:12)\n      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7) {\n    generatedMessage: false,\n    code: 'ERR_ASSERTION',\n    actual: undefined,\n    operator: 'throws',\n    diff: 'simple'\n  }\n\ntest at test/fail-to-pass.test.js:39:1\n\u2716 D5 a cycle is rejected and the input is not mutated (0.081833ms)\n  AssertionError [ERR_ASSERTION]: Missing expected exception (Error).\n      at TestContext.<anonymous> (file://<path>:45:10)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n      at Test.postRun (node:internal/test_runner/test:1522:19)\n      at Test.run (node:internal/test_runner/test:1447:12)\n      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7) {\n    generatedMessage: false,\n    code: 'ERR_ASSERTION',\n    actual: undefined,\n    operator: 'throws',\n    diff: 'simple'\n  }\n",
               "passed": false,
               "returncode": 1
             }
           ],
           "pass_to_pass": [
             {
-              "output_bytes": 221,
-              "output_sha256": "ac4617214e3b417aefaa2540d286e8875be985647a0c03f0f5dbdfbd450e0bcc",
-              "output_tail": "\u2714 a dependency-free plan keeps input order (0.663875ms)\n\u2714 the result is an array of names (0.064708ms)\n\u2139 tests 2\n\u2139 suites 0\n\u2139 pass 2\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 61.234334\n",
-              "passed": true,
-              "returncode": 0
-            },
-            {
-              "output_bytes": 216,
-              "output_sha256": "a1a2b4268bd3255c1e887ebcdc49f8842684c985300dd38eeb2362469c51b268",
-              "output_tail": "\u2714 a dependency-free plan keeps input order (0.647ms)\n\u2714 the result is an array of names (0.063958ms)\n\u2139 tests 2\n\u2139 suites 0\n\u2139 pass 2\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 59.7835\n",
+              "output_bytes": 220,
+              "output_sha256": "323b06f98a7b4cce5dfe954ee6eb00483af43a53390cd1bea4e5ae1b20c7cce1",
+              "output_tail": "\u2714 a dependency-free plan keeps input order (0.839667ms)\n\u2714 the result is an array of names (0.07125ms)\n\u2139 tests 2\n\u2139 suites 0\n\u2139 pass 2\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 63.857792\n",
               "passed": true,
               "returncode": 0
             },
             {
               "output_bytes": 221,
-              "output_sha256": "444c75ba50941a2f0ed13b5286faaae35958fc4ad3dca09198903921ccbd56af",
-              "output_tail": "\u2714 a dependency-free plan keeps input order (0.661125ms)\n\u2714 the result is an array of names (0.066166ms)\n\u2139 tests 2\n\u2139 suites 0\n\u2139 pass 2\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 59.379417\n",
+              "output_sha256": "47a4bf3fe1ee5bab4c012f19928a5183419746c1bb289bb7ad2fd65e67980b7b",
+              "output_tail": "\u2714 a dependency-free plan keeps input order (0.873958ms)\n\u2714 the result is an array of names (0.073292ms)\n\u2139 tests 2\n\u2139 suites 0\n\u2139 pass 2\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 79.603958\n",
+              "passed": true,
+              "returncode": 0
+            },
+            {
+              "output_bytes": 222,
+              "output_sha256": "f51d27e95b8fb90c7046e4b408bcf87222552461f802145de93c313a56997b3f",
+              "output_tail": "\u2714 a dependency-free plan keeps input order (1.033375ms)\n\u2714 the result is an array of names (0.229625ms)\n\u2139 tests 2\n\u2139 suites 0\n\u2139 pass 2\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 121.082875\n",
               "passed": true,
               "returncode": 0
             }
@@ -111,22 +111,22 @@
         "pristine_fail_to_pass": [
           {
             "output_bytes": 4709,
-            "output_sha256": "3a893273bbfd27a2a9a593c85bdadfffa117614702fa8e17e3add8ff593b6a1b",
-            "output_tail": "\n      at Test.postRun (node:internal/test_runner/test:1522:19)\n      at Test.run (node:internal/test_runner/test:1447:12)\n      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7) {\n    generatedMessage: false,\n    code: 'ERR_ASSERTION',\n    actual: undefined,\n    operator: 'throws',\n    diff: 'simple'\n  }\n\ntest at test/fail-to-pass.test.js:32:1\n\u2716 D4 a duplicate step name is rejected (0.082833ms)\n  AssertionError [ERR_ASSERTION]: Missing expected exception (Error).\n      at TestContext.<anonymous> (file://<path>:33:10)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n      at Test.postRun (node:internal/test_runner/test:1522:19)\n      at Test.run (node:internal/test_runner/test:1447:12)\n      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7) {\n    generatedMessage: false,\n    code: 'ERR_ASSERTION',\n    actual: undefined,\n    operator: 'throws',\n    diff: 'simple'\n  }\n\ntest at test/fail-to-pass.test.js:39:1\n\u2716 D5 a cycle is rejected and the input is not mutated (0.085791ms)\n  AssertionError [ERR_ASSERTION]: Missing expected exception (Error).\n      at TestContext.<anonymous> (file://<path>:45:10)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n      at Test.postRun (node:internal/test_runner/test:1522:19)\n      at Test.run (node:internal/test_runner/test:1447:12)\n      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7) {\n    generatedMessage: false,\n    code: 'ERR_ASSERTION',\n    actual: undefined,\n    operator: 'throws',\n    diff: 'simple'\n  }\n",
+            "output_sha256": "1238663ff3151c65da21aac7f3a86bc8923ee0b62cc872d4b4f8d3dd8e6f932a",
+            "output_tail": "\n      at Test.postRun (node:internal/test_runner/test:1522:19)\n      at Test.run (node:internal/test_runner/test:1447:12)\n      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7) {\n    generatedMessage: false,\n    code: 'ERR_ASSERTION',\n    actual: undefined,\n    operator: 'throws',\n    diff: 'simple'\n  }\n\ntest at test/fail-to-pass.test.js:32:1\n\u2716 D4 a duplicate step name is rejected (0.066583ms)\n  AssertionError [ERR_ASSERTION]: Missing expected exception (Error).\n      at TestContext.<anonymous> (file://<path>:33:10)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n      at Test.postRun (node:internal/test_runner/test:1522:19)\n      at Test.run (node:internal/test_runner/test:1447:12)\n      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7) {\n    generatedMessage: false,\n    code: 'ERR_ASSERTION',\n    actual: undefined,\n    operator: 'throws',\n    diff: 'simple'\n  }\n\ntest at test/fail-to-pass.test.js:39:1\n\u2716 D5 a cycle is rejected and the input is not mutated (0.074625ms)\n  AssertionError [ERR_ASSERTION]: Missing expected exception (Error).\n      at TestContext.<anonymous> (file://<path>:45:10)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n      at Test.postRun (node:internal/test_runner/test:1522:19)\n      at Test.run (node:internal/test_runner/test:1447:12)\n      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7) {\n    generatedMessage: false,\n    code: 'ERR_ASSERTION',\n    actual: undefined,\n    operator: 'throws',\n    diff: 'simple'\n  }\n",
             "passed": false,
             "returncode": 1
           },
           {
-            "output_bytes": 4706,
-            "output_sha256": "dfad96028f8560c0bfd3113f88d4f646b19f0ad4a14a06f5ea6d416cd76c738b",
-            "output_tail": ")\n      at Test.postRun (node:internal/test_runner/test:1522:19)\n      at Test.run (node:internal/test_runner/test:1447:12)\n      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7) {\n    generatedMessage: false,\n    code: 'ERR_ASSERTION',\n    actual: undefined,\n    operator: 'throws',\n    diff: 'simple'\n  }\n\ntest at test/fail-to-pass.test.js:32:1\n\u2716 D4 a duplicate step name is rejected (0.07525ms)\n  AssertionError [ERR_ASSERTION]: Missing expected exception (Error).\n      at TestContext.<anonymous> (file://<path>:33:10)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n      at Test.postRun (node:internal/test_runner/test:1522:19)\n      at Test.run (node:internal/test_runner/test:1447:12)\n      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7) {\n    generatedMessage: false,\n    code: 'ERR_ASSERTION',\n    actual: undefined,\n    operator: 'throws',\n    diff: 'simple'\n  }\n\ntest at test/fail-to-pass.test.js:39:1\n\u2716 D5 a cycle is rejected and the input is not mutated (0.080041ms)\n  AssertionError [ERR_ASSERTION]: Missing expected exception (Error).\n      at TestContext.<anonymous> (file://<path>:45:10)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n      at Test.postRun (node:internal/test_runner/test:1522:19)\n      at Test.run (node:internal/test_runner/test:1447:12)\n      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7) {\n    generatedMessage: false,\n    code: 'ERR_ASSERTION',\n    actual: undefined,\n    operator: 'throws',\n    diff: 'simple'\n  }\n",
+            "output_bytes": 4707,
+            "output_sha256": "346262cf98451bc2059f248f43c014d710fb1942c2e3f4ef200ee06b3c4b849a",
+            "output_tail": ")\n      at Test.postRun (node:internal/test_runner/test:1522:19)\n      at Test.run (node:internal/test_runner/test:1447:12)\n      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7) {\n    generatedMessage: false,\n    code: 'ERR_ASSERTION',\n    actual: undefined,\n    operator: 'throws',\n    diff: 'simple'\n  }\n\ntest at test/fail-to-pass.test.js:32:1\n\u2716 D4 a duplicate step name is rejected (0.07325ms)\n  AssertionError [ERR_ASSERTION]: Missing expected exception (Error).\n      at TestContext.<anonymous> (file://<path>:33:10)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n      at Test.postRun (node:internal/test_runner/test:1522:19)\n      at Test.run (node:internal/test_runner/test:1447:12)\n      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7) {\n    generatedMessage: false,\n    code: 'ERR_ASSERTION',\n    actual: undefined,\n    operator: 'throws',\n    diff: 'simple'\n  }\n\ntest at test/fail-to-pass.test.js:39:1\n\u2716 D5 a cycle is rejected and the input is not mutated (0.076708ms)\n  AssertionError [ERR_ASSERTION]: Missing expected exception (Error).\n      at TestContext.<anonymous> (file://<path>:45:10)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n      at Test.postRun (node:internal/test_runner/test:1522:19)\n      at Test.run (node:internal/test_runner/test:1447:12)\n      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7) {\n    generatedMessage: false,\n    code: 'ERR_ASSERTION',\n    actual: undefined,\n    operator: 'throws',\n    diff: 'simple'\n  }\n",
             "passed": false,
             "returncode": 1
           },
           {
-            "output_bytes": 4709,
-            "output_sha256": "b54b5fc1535929e1e685f12b9ce6185a0c8900f0f673d3b39a49001852971175",
-            "output_tail": "\n      at Test.postRun (node:internal/test_runner/test:1522:19)\n      at Test.run (node:internal/test_runner/test:1447:12)\n      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7) {\n    generatedMessage: false,\n    code: 'ERR_ASSERTION',\n    actual: undefined,\n    operator: 'throws',\n    diff: 'simple'\n  }\n\ntest at test/fail-to-pass.test.js:32:1\n\u2716 D4 a duplicate step name is rejected (0.070709ms)\n  AssertionError [ERR_ASSERTION]: Missing expected exception (Error).\n      at TestContext.<anonymous> (file://<path>:33:10)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n      at Test.postRun (node:internal/test_runner/test:1522:19)\n      at Test.run (node:internal/test_runner/test:1447:12)\n      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7) {\n    generatedMessage: false,\n    code: 'ERR_ASSERTION',\n    actual: undefined,\n    operator: 'throws',\n    diff: 'simple'\n  }\n\ntest at test/fail-to-pass.test.js:39:1\n\u2716 D5 a cycle is rejected and the input is not mutated (0.075875ms)\n  AssertionError [ERR_ASSERTION]: Missing expected exception (Error).\n      at TestContext.<anonymous> (file://<path>:45:10)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n      at Test.postRun (node:internal/test_runner/test:1522:19)\n      at Test.run (node:internal/test_runner/test:1447:12)\n      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7) {\n    generatedMessage: false,\n    code: 'ERR_ASSERTION',\n    actual: undefined,\n    operator: 'throws',\n    diff: 'simple'\n  }\n",
+            "output_bytes": 4711,
+            "output_sha256": "89d064819f1acfd8dbace5acbcee22c3dda21d6d35fbe8edbda0c8103fc0f06c",
+            "output_tail": "\n      at Test.postRun (node:internal/test_runner/test:1522:19)\n      at Test.run (node:internal/test_runner/test:1447:12)\n      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7) {\n    generatedMessage: false,\n    code: 'ERR_ASSERTION',\n    actual: undefined,\n    operator: 'throws',\n    diff: 'simple'\n  }\n\ntest at test/fail-to-pass.test.js:32:1\n\u2716 D4 a duplicate step name is rejected (0.112834ms)\n  AssertionError [ERR_ASSERTION]: Missing expected exception (Error).\n      at TestContext.<anonymous> (file://<path>:33:10)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n      at Test.postRun (node:internal/test_runner/test:1522:19)\n      at Test.run (node:internal/test_runner/test:1447:12)\n      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7) {\n    generatedMessage: false,\n    code: 'ERR_ASSERTION',\n    actual: undefined,\n    operator: 'throws',\n    diff: 'simple'\n  }\n\ntest at test/fail-to-pass.test.js:39:1\n\u2716 D5 a cycle is rejected and the input is not mutated (0.096125ms)\n  AssertionError [ERR_ASSERTION]: Missing expected exception (Error).\n      at TestContext.<anonymous> (file://<path>:45:10)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n      at Test.postRun (node:internal/test_runner/test:1522:19)\n      at Test.run (node:internal/test_runner/test:1447:12)\n      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7) {\n    generatedMessage: false,\n    code: 'ERR_ASSERTION',\n    actual: undefined,\n    operator: 'throws',\n    diff: 'simple'\n  }\n",
             "passed": false,
             "returncode": 1
           }
@@ -134,30 +134,30 @@
         "pristine_pass_to_pass": [
           {
             "output_bytes": 221,
-            "output_sha256": "fc9ec71644fd1c528f0c6cf700893c3885218d2d26078f37cad4bb1a65e595bb",
-            "output_tail": "\u2714 a dependency-free plan keeps input order (0.636958ms)\n\u2714 the result is an array of names (0.063667ms)\n\u2139 tests 2\n\u2139 suites 0\n\u2139 pass 2\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 69.929542\n",
-            "passed": true,
-            "returncode": 0
-          },
-          {
-            "output_bytes": 221,
-            "output_sha256": "82cf978c6f4a5244463f179b756a7addb9514e8b66bbe616dfc08b08e9d94dbc",
-            "output_tail": "\u2714 a dependency-free plan keeps input order (0.651125ms)\n\u2714 the result is an array of names (0.064458ms)\n\u2139 tests 2\n\u2139 suites 0\n\u2139 pass 2\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 64.415667\n",
+            "output_sha256": "c7d78fb4f955423fa99fa40ac5dfabba4eb982eec9e52ebe46152a4109694299",
+            "output_tail": "\u2714 a dependency-free plan keeps input order (0.630959ms)\n\u2714 the result is an array of names (0.064542ms)\n\u2139 tests 2\n\u2139 suites 0\n\u2139 pass 2\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 55.721667\n",
             "passed": true,
             "returncode": 0
           },
           {
             "output_bytes": 220,
-            "output_sha256": "03fe62a71a871cebb6b1db2ae0a73989a2857d3e5bfc6248011a5114783d03ec",
-            "output_tail": "\u2714 a dependency-free plan keeps input order (0.64575ms)\n\u2714 the result is an array of names (0.065667ms)\n\u2139 tests 2\n\u2139 suites 0\n\u2139 pass 2\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 59.603083\n",
+            "output_sha256": "48de32205d94b1b5c73bcbf58d55de2043732a8c34f375402b5ad8d8f66a1efc",
+            "output_tail": "\u2714 a dependency-free plan keeps input order (0.63025ms)\n\u2714 the result is an array of names (0.064709ms)\n\u2139 tests 2\n\u2139 suites 0\n\u2139 pass 2\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 60.193667\n",
+            "passed": true,
+            "returncode": 0
+          },
+          {
+            "output_bytes": 221,
+            "output_sha256": "77615fc563f985508f8f1c9d55eed537c005d79fc3686a9b2efc2277a069c3e0",
+            "output_tail": "\u2714 a dependency-free plan keeps input order (0.628334ms)\n\u2714 the result is an array of names (0.064333ms)\n\u2139 tests 2\n\u2139 suites 0\n\u2139 pass 2\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 63.963875\n",
             "passed": true,
             "returncode": 0
           }
         ]
       }
     },
-    "manifest_sha256": "218424b570473428cedc46de6a2b28d23460f53e835598e51b4531674247b276",
-    "reviewed_at": "2026-08-17T08:21:51Z",
+    "manifest_sha256": "4114d19f5fd1f7207f2584b43b9c8d280fd4adc1dec7328a9b96bd0744522879",
+    "reviewed_at": "2026-08-18T14:02:33Z",
     "reviewer": "albert"
   },
   "artifacts": [
@@ -300,6 +300,13 @@
         "--test",
         "test/fail-to-pass.test.js"
       ],
+      "expected_cases": [
+        "D1 dependencies come before dependents",
+        "D2 ready steps keep input order as the tie-break",
+        "D3 an unknown dependency is rejected",
+        "D4 a duplicate step name is rejected",
+        "D5 a cycle is rejected and the input is not mutated"
+      ],
       "overlays": [
         {
           "dest": "test/fail-to-pass.test.js",
@@ -318,7 +325,7 @@
     }
   },
   "timestamps": {
-    "admitted_at": "2026-08-17T08:21:51Z",
+    "admitted_at": "2026-08-18T14:02:33Z",
     "created_at": "2026-07-14T00:00:00Z",
     "expires_at": "2026-11-15T08:21:51Z"
   }

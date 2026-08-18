@@ -5,7 +5,7 @@
    let current = '';
    let inQuotes = false;
 +  let quoted = false;
- 
+
    for (let i = 0; i < line.length; i++) {
      const char = line[i];
 @@ -28,9 +29,11 @@

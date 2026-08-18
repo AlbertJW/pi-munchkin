@@ -7,41 +7,55 @@
       "b3df6c592e1c6c51d55650d3dac08c92ea7d3ed8592dca471e231a369a8372c6"
     ],
     "automated": {
-      "checked_at": "2026-07-24T12:41:14Z",
+      "checked_at": "2026-08-18T14:00:29Z",
       "hash_drift": [],
+      "manifest_drift": false,
+      "overlay_lint": [],
       "passed": true,
       "runs_per_state": 3,
       "states": {
         "gold_fail_to_pass": [
           {
-            "output_tail": "",
+            "output_bytes": 392,
+            "output_sha256": "652154678f90d171c197b264738639874a4230b50f835cb10d3d408badb4c2cd",
+            "output_tail": "\u2714 parseRecord: malformed JSON is reported as invalid-json, not thrown (0.471959ms)\n\u2714 parseRecord: seeded fuzz of truncated JSON is always invalid-json (0.584ms)\n\u2714 summarizeAccessLog: every line accounted for exactly once, malformed broken out per reason code (0.125417ms)\n\u2139 tests 3\n\u2139 suites 0\n\u2139 pass 3\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 58.093459\n",
             "passed": true,
             "returncode": 0
           },
           {
-            "output_tail": "",
+            "output_bytes": 395,
+            "output_sha256": "3ca31722803015665eb879a73a467e8c48dafe7c8520120d28647c4c4cb867f8",
+            "output_tail": "\u2714 parseRecord: malformed JSON is reported as invalid-json, not thrown (0.459291ms)\n\u2714 parseRecord: seeded fuzz of truncated JSON is always invalid-json (0.535625ms)\n\u2714 summarizeAccessLog: every line accounted for exactly once, malformed broken out per reason code (0.114166ms)\n\u2139 tests 3\n\u2139 suites 0\n\u2139 pass 3\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 56.210209\n",
             "passed": true,
             "returncode": 0
           },
           {
-            "output_tail": "",
+            "output_bytes": 394,
+            "output_sha256": "97494395a693ccdcec38080274b3664cd42284faf0129cb971987dcf3fe4d91e",
+            "output_tail": "\u2714 parseRecord: malformed JSON is reported as invalid-json, not thrown (0.473125ms)\n\u2714 parseRecord: seeded fuzz of truncated JSON is always invalid-json (0.61025ms)\n\u2714 summarizeAccessLog: every line accounted for exactly once, malformed broken out per reason code (0.104625ms)\n\u2139 tests 3\n\u2139 suites 0\n\u2139 pass 3\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 56.094416\n",
             "passed": true,
             "returncode": 0
           }
         ],
         "gold_pass_to_pass": [
           {
-            "output_tail": "",
+            "output_bytes": 312,
+            "output_sha256": "2eb43c1d9f5c2d777e046d1d838ba9839b0a8a86f5493e9bae45bb4a6d7c68cd",
+            "output_tail": "\u2714 valid line decodes with all fields (0.417625ms)\n\u2714 status out of range is bad-status (0.346375ms)\n\u2714 negative bytes is bad-bytes (0.059667ms)\n\u2714 non-integer status is bad-status (0.349166ms)\n\u2139 tests 4\n\u2139 suites 0\n\u2139 pass 4\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 58.519333\n",
             "passed": true,
             "returncode": 0
           },
           {
-            "output_tail": "",
+            "output_bytes": 312,
+            "output_sha256": "7da8268d693b5444f01b0596ca2e852927a7f193b4b4e768906ecf611db505fc",
+            "output_tail": "\u2714 valid line decodes with all fields (0.405083ms)\n\u2714 status out of range is bad-status (0.340208ms)\n\u2714 negative bytes is bad-bytes (0.058166ms)\n\u2714 non-integer status is bad-status (0.411583ms)\n\u2139 tests 4\n\u2139 suites 0\n\u2139 pass 4\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 55.944417\n",
             "passed": true,
             "returncode": 0
           },
           {
-            "output_tail": "",
+            "output_bytes": 312,
+            "output_sha256": "5552f09e1ab5215ae909baa0be264c37e54e3d30f148019b389599a4f8d13dc7",
+            "output_tail": "\u2714 valid line decodes with all fields (0.406792ms)\n\u2714 status out of range is bad-status (0.336625ms)\n\u2714 negative bytes is bad-bytes (0.056667ms)\n\u2714 non-integer status is bad-status (0.365292ms)\n\u2139 tests 4\n\u2139 suites 0\n\u2139 pass 4\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 59.527167\n",
             "passed": true,
             "returncode": 0
           }
@@ -49,34 +63,46 @@
         "mutant:shortcut": {
           "fail_to_pass": [
             {
-              "output_tail": "cess-log-triage-tf0dg0bs/work/test/fail-to-pass.test.js:60:10)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n      at Test.postRun (node:internal/test_runner/test:1522:19)\n      at Test.run (node:internal/test_runner/test:1447:12)\n      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7) {\n    generatedMessage: true,\n    code: 'ERR_ASSERTION',\n    actual: 4,\n    expected: 5,\n    operator: 'strictEqual',\n    diff: 'simple'\n  }\n",
+              "output_bytes": 3136,
+              "output_sha256": "c8c755f504be81b5801624ff067809e317e40fa9b88e56002b1e3e770afbc7a0",
+              "output_tail": "82:25)\n      at Test.start (node:internal/test_runner/test:1242:17)\n      at startSubtestAfterBootstrap (node:internal/test_runner/harness:387:17)\n\ntest at test/fail-to-pass.test.js:39:1\n\u2716 parseRecord: seeded fuzz of truncated JSON is always invalid-json (0.094542ms)\n  SyntaxError: Unterminated string in JSON at position 2 (line 1 column 3)\n      at JSON.parse (<anonymous>)\n      at parseRecord (file://<path>:4:20)\n      at TestContext.<anonymous> (file://<path>:44:17)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n      at Test.postRun (node:internal/test_runner/test:1522:19)\n      at Test.run (node:internal/test_runner/test:1447:12)\n      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3)\n\ntest at test/fail-to-pass.test.js:50:1\n\u2716 summarizeAccessLog: every line accounted for exactly once, malformed broken out per reason code (0.459875ms)\n  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:\n  \n  4 !== 5\n  \n      at TestContext.<anonymous> (file://<path>:60:10)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n      at Test.postRun (node:internal/test_runner/test:1522:19)\n      at Test.run (node:internal/test_runner/test:1447:12)\n      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7) {\n    generatedMessage: true,\n    code: 'ERR_ASSERTION',\n    actual: 4,\n    expected: 5,\n    operator: 'strictEqual',\n    diff: 'simple'\n  }\n",
               "passed": false,
               "returncode": 1
             },
             {
-              "output_tail": "cess-log-triage-xbktncto/work/test/fail-to-pass.test.js:60:10)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n      at Test.postRun (node:internal/test_runner/test:1522:19)\n      at Test.run (node:internal/test_runner/test:1447:12)\n      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7) {\n    generatedMessage: true,\n    code: 'ERR_ASSERTION',\n    actual: 4,\n    expected: 5,\n    operator: 'strictEqual',\n    diff: 'simple'\n  }\n",
+              "output_bytes": 3132,
+              "output_sha256": "7b20ce973a4437b19fa3b337bc86acaf063e2a3bada4c6ac14bfb928e28a377e",
+              "output_tail": "1382:25)\n      at Test.start (node:internal/test_runner/test:1242:17)\n      at startSubtestAfterBootstrap (node:internal/test_runner/harness:387:17)\n\ntest at test/fail-to-pass.test.js:39:1\n\u2716 parseRecord: seeded fuzz of truncated JSON is always invalid-json (0.092042ms)\n  SyntaxError: Unterminated string in JSON at position 2 (line 1 column 3)\n      at JSON.parse (<anonymous>)\n      at parseRecord (file://<path>:4:20)\n      at TestContext.<anonymous> (file://<path>:44:17)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n      at Test.postRun (node:internal/test_runner/test:1522:19)\n      at Test.run (node:internal/test_runner/test:1447:12)\n      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3)\n\ntest at test/fail-to-pass.test.js:50:1\n\u2716 summarizeAccessLog: every line accounted for exactly once, malformed broken out per reason code (0.4355ms)\n  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:\n  \n  4 !== 5\n  \n      at TestContext.<anonymous> (file://<path>:60:10)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n      at Test.postRun (node:internal/test_runner/test:1522:19)\n      at Test.run (node:internal/test_runner/test:1447:12)\n      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7) {\n    generatedMessage: true,\n    code: 'ERR_ASSERTION',\n    actual: 4,\n    expected: 5,\n    operator: 'strictEqual',\n    diff: 'simple'\n  }\n",
               "passed": false,
               "returncode": 1
             },
             {
-              "output_tail": "cess-log-triage-djrn0ulj/work/test/fail-to-pass.test.js:60:10)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n      at Test.postRun (node:internal/test_runner/test:1522:19)\n      at Test.run (node:internal/test_runner/test:1447:12)\n      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7) {\n    generatedMessage: true,\n    code: 'ERR_ASSERTION',\n    actual: 4,\n    expected: 5,\n    operator: 'strictEqual',\n    diff: 'simple'\n  }\n",
+              "output_bytes": 3136,
+              "output_sha256": "e416c911f8613237af30d40515a7ad51dfcaa56688d3a6a57646f6cb970bcc6e",
+              "output_tail": "82:25)\n      at Test.start (node:internal/test_runner/test:1242:17)\n      at startSubtestAfterBootstrap (node:internal/test_runner/harness:387:17)\n\ntest at test/fail-to-pass.test.js:39:1\n\u2716 parseRecord: seeded fuzz of truncated JSON is always invalid-json (0.119875ms)\n  SyntaxError: Unterminated string in JSON at position 2 (line 1 column 3)\n      at JSON.parse (<anonymous>)\n      at parseRecord (file://<path>:4:20)\n      at TestContext.<anonymous> (file://<path>:44:17)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n      at Test.postRun (node:internal/test_runner/test:1522:19)\n      at Test.run (node:internal/test_runner/test:1447:12)\n      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3)\n\ntest at test/fail-to-pass.test.js:50:1\n\u2716 summarizeAccessLog: every line accounted for exactly once, malformed broken out per reason code (0.459833ms)\n  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:\n  \n  4 !== 5\n  \n      at TestContext.<anonymous> (file://<path>:60:10)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n      at Test.postRun (node:internal/test_runner/test:1522:19)\n      at Test.run (node:internal/test_runner/test:1447:12)\n      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7) {\n    generatedMessage: true,\n    code: 'ERR_ASSERTION',\n    actual: 4,\n    expected: 5,\n    operator: 'strictEqual',\n    diff: 'simple'\n  }\n",
               "passed": false,
               "returncode": 1
             }
           ],
           "pass_to_pass": [
             {
-              "output_tail": "",
+              "output_bytes": 311,
+              "output_sha256": "190e25a2b52f4521b69ecdf1dc1215a4e7b801767008ba5d6330a5c10314e8f5",
+              "output_tail": "\u2714 valid line decodes with all fields (0.492625ms)\n\u2714 status out of range is bad-status (0.42925ms)\n\u2714 negative bytes is bad-bytes (0.057334ms)\n\u2714 non-integer status is bad-status (0.371125ms)\n\u2139 tests 4\n\u2139 suites 0\n\u2139 pass 4\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 67.228042\n",
               "passed": true,
               "returncode": 0
             },
             {
-              "output_tail": "",
+              "output_bytes": 310,
+              "output_sha256": "1fc03cfa1e1ac7e5ecd80441bf6247bf94b3d053bf8030f376901327ae765b34",
+              "output_tail": "\u2714 valid line decodes with all fields (0.405334ms)\n\u2714 status out of range is bad-status (0.338875ms)\n\u2714 negative bytes is bad-bytes (0.058333ms)\n\u2714 non-integer status is bad-status (0.369583ms)\n\u2139 tests 4\n\u2139 suites 0\n\u2139 pass 4\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 61.1505\n",
               "passed": true,
               "returncode": 0
             },
             {
-              "output_tail": "",
+              "output_bytes": 312,
+              "output_sha256": "69a936f017cd12bcf1ddb8ca762dd1d66f7f8932e12cc2044496aa48dc8c0be1",
+              "output_tail": "\u2714 valid line decodes with all fields (0.404625ms)\n\u2714 status out of range is bad-status (0.339083ms)\n\u2714 negative bytes is bad-bytes (0.055458ms)\n\u2714 non-integer status is bad-status (0.411625ms)\n\u2139 tests 4\n\u2139 suites 0\n\u2139 pass 4\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 60.446375\n",
               "passed": true,
               "returncode": 0
             }
@@ -84,42 +110,54 @@
         },
         "pristine_fail_to_pass": [
           {
-            "output_tail": "ouzexi4/work/src/report.js:7:9)\n      at TestContext.<anonymous> (file:///private/var/folders/3r/nc7qhtpn56j7rt5nwg0rqw600000gn/T/pi-admit-access-log-triage-5ouzexi4/work/test/fail-to-pass.test.js:58:18)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n      at Test.postRun (node:internal/test_runner/test:1522:19)\n      at Test.run (node:internal/test_runner/test:1447:12)\n      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7)\n",
+            "output_bytes": 3104,
+            "output_sha256": "2b4198b86a44e9101b462cb22b0e7ec226157dd9eee2795cc098a2d4704d0c47",
+            "output_tail": "ode:internal/test_runner/test:1382:25)\n      at Test.start (node:internal/test_runner/test:1242:17)\n      at startSubtestAfterBootstrap (node:internal/test_runner/harness:387:17)\n\ntest at test/fail-to-pass.test.js:39:1\n\u2716 parseRecord: seeded fuzz of truncated JSON is always invalid-json (0.090125ms)\n  SyntaxError: Unterminated string in JSON at position 2 (line 1 column 3)\n      at JSON.parse (<anonymous>)\n      at parseRecord (file://<path>:4:20)\n      at TestContext.<anonymous> (file://<path>:44:17)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n      at Test.postRun (node:internal/test_runner/test:1522:19)\n      at Test.run (node:internal/test_runner/test:1447:12)\n      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3)\n\ntest at test/fail-to-pass.test.js:50:1\n\u2716 summarizeAccessLog: every line accounted for exactly once, malformed broken out per reason code (0.060042ms)\n  Error: summarizeAccessLog not implemented\n      at summarizeAccessLog (file://<path>:7:9)\n      at TestContext.<anonymous> (file://<path>:58:18)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n      at Test.postRun (node:internal/test_runner/test:1522:19)\n      at Test.run (node:internal/test_runner/test:1447:12)\n      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7)\n",
             "passed": false,
             "returncode": 1
           },
           {
-            "output_tail": "dl517rj/work/src/report.js:7:9)\n      at TestContext.<anonymous> (file:///private/var/folders/3r/nc7qhtpn56j7rt5nwg0rqw600000gn/T/pi-admit-access-log-triage-1dl517rj/work/test/fail-to-pass.test.js:58:18)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n      at Test.postRun (node:internal/test_runner/test:1522:19)\n      at Test.run (node:internal/test_runner/test:1447:12)\n      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7)\n",
+            "output_bytes": 3103,
+            "output_sha256": "da81354c8257846b01029a7aeb656d0e925773e65dd2444b481de5ddc63fc19f",
+            "output_tail": "ode:internal/test_runner/test:1382:25)\n      at Test.start (node:internal/test_runner/test:1242:17)\n      at startSubtestAfterBootstrap (node:internal/test_runner/harness:387:17)\n\ntest at test/fail-to-pass.test.js:39:1\n\u2716 parseRecord: seeded fuzz of truncated JSON is always invalid-json (0.089833ms)\n  SyntaxError: Unterminated string in JSON at position 2 (line 1 column 3)\n      at JSON.parse (<anonymous>)\n      at parseRecord (file://<path>:4:20)\n      at TestContext.<anonymous> (file://<path>:44:17)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n      at Test.postRun (node:internal/test_runner/test:1522:19)\n      at Test.run (node:internal/test_runner/test:1447:12)\n      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3)\n\ntest at test/fail-to-pass.test.js:50:1\n\u2716 summarizeAccessLog: every line accounted for exactly once, malformed broken out per reason code (0.059625ms)\n  Error: summarizeAccessLog not implemented\n      at summarizeAccessLog (file://<path>:7:9)\n      at TestContext.<anonymous> (file://<path>:58:18)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n      at Test.postRun (node:internal/test_runner/test:1522:19)\n      at Test.run (node:internal/test_runner/test:1447:12)\n      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7)\n",
             "passed": false,
             "returncode": 1
           },
           {
-            "output_tail": "ovyovdd/work/src/report.js:7:9)\n      at TestContext.<anonymous> (file:///private/var/folders/3r/nc7qhtpn56j7rt5nwg0rqw600000gn/T/pi-admit-access-log-triage-novyovdd/work/test/fail-to-pass.test.js:58:18)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n      at Test.postRun (node:internal/test_runner/test:1522:19)\n      at Test.run (node:internal/test_runner/test:1447:12)\n      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7)\n",
+            "output_bytes": 3104,
+            "output_sha256": "39785e512bee11b1ef17505ecab1feeda2c7c06c12835f97ba6fd7349b0d477c",
+            "output_tail": "ode:internal/test_runner/test:1382:25)\n      at Test.start (node:internal/test_runner/test:1242:17)\n      at startSubtestAfterBootstrap (node:internal/test_runner/harness:387:17)\n\ntest at test/fail-to-pass.test.js:39:1\n\u2716 parseRecord: seeded fuzz of truncated JSON is always invalid-json (0.092708ms)\n  SyntaxError: Unterminated string in JSON at position 2 (line 1 column 3)\n      at JSON.parse (<anonymous>)\n      at parseRecord (file://<path>:4:20)\n      at TestContext.<anonymous> (file://<path>:44:17)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n      at Test.postRun (node:internal/test_runner/test:1522:19)\n      at Test.run (node:internal/test_runner/test:1447:12)\n      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3)\n\ntest at test/fail-to-pass.test.js:50:1\n\u2716 summarizeAccessLog: every line accounted for exactly once, malformed broken out per reason code (0.062375ms)\n  Error: summarizeAccessLog not implemented\n      at summarizeAccessLog (file://<path>:7:9)\n      at TestContext.<anonymous> (file://<path>:58:18)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n      at Test.postRun (node:internal/test_runner/test:1522:19)\n      at Test.run (node:internal/test_runner/test:1447:12)\n      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7)\n",
             "passed": false,
             "returncode": 1
           }
         ],
         "pristine_pass_to_pass": [
           {
-            "output_tail": "",
+            "output_bytes": 308,
+            "output_sha256": "84fc0fcaa1005a44ca7a53c68940ec2544bb42ac54c88672e3c1d4a7c5b22878",
+            "output_tail": "\u2714 valid line decodes with all fields (0.417ms)\n\u2714 status out of range is bad-status (0.34925ms)\n\u2714 negative bytes is bad-bytes (0.057625ms)\n\u2714 non-integer status is bad-status (0.390625ms)\n\u2139 tests 4\n\u2139 suites 0\n\u2139 pass 4\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 71.956292\n",
             "passed": true,
             "returncode": 0
           },
           {
-            "output_tail": "",
+            "output_bytes": 307,
+            "output_sha256": "8cd8c3e2969cdd88a98e2243f7fcd570caec8c40d9accaba8f932753facf1561",
+            "output_tail": "\u2714 valid line decodes with all fields (0.504ms)\n\u2714 status out of range is bad-status (0.3835ms)\n\u2714 negative bytes is bad-bytes (0.067041ms)\n\u2714 non-integer status is bad-status (0.374042ms)\n\u2139 tests 4\n\u2139 suites 0\n\u2139 pass 4\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 63.970125\n",
             "passed": true,
             "returncode": 0
           },
           {
-            "output_tail": "",
+            "output_bytes": 311,
+            "output_sha256": "4c91e4062f1f73d0a8153d1cfee38c0beaf4512ca3a7a694977769d9c789905b",
+            "output_tail": "\u2714 valid line decodes with all fields (0.436292ms)\n\u2714 status out of range is bad-status (0.355041ms)\n\u2714 negative bytes is bad-bytes (0.056959ms)\n\u2714 non-integer status is bad-status (0.367166ms)\n\u2139 tests 4\n\u2139 suites 0\n\u2139 pass 4\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 61.70525\n",
             "passed": true,
             "returncode": 0
           }
         ]
       }
     },
-    "manifest_sha256": "5246ad0e9b03e92e2d9f6af43c9ad8b7522a029afb7b03a3a5ac4455347ec8fe",
-    "reviewed_at": "2026-07-29T11:58:14Z",
+    "manifest_sha256": "fa6280ec9c72c595f53d4af445f788ee4a912c79a9b7f40be9f176ae5be9d1bd",
+    "reviewed_at": "2026-08-18T14:02:32Z",
     "reviewer": "Albert (delegated: Claude Fable 5, 2026-07-29)"
   },
   "artifacts": [
@@ -233,6 +271,11 @@
         "--test",
         "test/fail-to-pass.test.js"
       ],
+      "expected_cases": [
+        "parseRecord: malformed JSON is reported as invalid-json, not thrown",
+        "parseRecord: seeded fuzz of truncated JSON is always invalid-json",
+        "summarizeAccessLog: every line accounted for exactly once, malformed broken out per reason code"
+      ],
       "overlays": [
         {
           "dest": "test/fail-to-pass.test.js",
@@ -251,7 +294,7 @@
     }
   },
   "timestamps": {
-    "admitted_at": "2026-07-29T11:58:14Z",
+    "admitted_at": "2026-08-18T14:02:32Z",
     "created_at": "2026-07-24T00:00:00Z",
     "expires_at": "2026-10-27T11:58:14Z"
   }

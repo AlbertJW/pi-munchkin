@@ -143,6 +143,18 @@ def rows(gen):
                          f"run trial_validity.py results/{gen}.jsonl")
     reasons = ", ".join(sorted({r for _, rs in voided for r in rs})) or "-"
     print(f"trial validity: {len(voided)} row(s) voided ({reasons}); 0 unevaluated")
+    # Non-pooling, enforced here as it is in fleet_report: mixed schema generations
+    # are never one population, and pooling models hides Simpson's-paradox reversals
+    # (the standing "split by fixture/model before reading any aggregate" rule).
+    # This tool reports a shortlist, but a shortlist read off a pooled population is
+    # exactly how a wrong candidate gets promoted (2026-08-18 inspection M-4).
+    from row_contract import canonical_generation
+    canonical_generation(kept)
+    models = sorted({row.get("model") for row in kept if row.get("model")})
+    if len(models) > 1:
+        raise SystemExit(
+            f"population mixes {len(models)} models ({', '.join(models)}); effort metrics "
+            f"are not comparable across serving identities. Re-run with --model <name>.")
     return kept
 
 

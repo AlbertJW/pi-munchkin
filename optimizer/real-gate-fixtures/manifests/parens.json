@@ -7,41 +7,55 @@
       "83f0f18d9df2404d0719b8cb28a9f668c7ccd7f48c179d3eca0f2e91bf5883d0"
     ],
     "automated": {
-      "checked_at": "2026-07-14T21:01:06Z",
+      "checked_at": "2026-08-18T14:01:09Z",
       "hash_drift": [],
+      "manifest_drift": false,
+      "overlay_lint": [],
       "passed": true,
       "runs_per_state": 3,
       "states": {
         "gold_fail_to_pass": [
           {
-            "output_tail": "",
+            "output_bytes": 258,
+            "output_sha256": "dfdaa184232719ba3a6dc4aa6a7d1ce2846023a9f6001ea0192ef6d836af8092",
+            "output_tail": "\u2714 first unclosed open, nested (0.388625ms)\n\u2714 first unclosed among several (0.060791ms)\n\u2714 first unclosed, two opens one close (0.049667ms)\n\u2139 tests 3\n\u2139 suites 0\n\u2139 pass 3\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 66.083583\n",
             "passed": true,
             "returncode": 0
           },
           {
-            "output_tail": "",
+            "output_bytes": 258,
+            "output_sha256": "cbc6fdbd44c90d2335cd6a757eb4f0be757e3a4678a07804c716d0ba15fb0e28",
+            "output_tail": "\u2714 first unclosed open, nested (0.384792ms)\n\u2714 first unclosed among several (0.060958ms)\n\u2714 first unclosed, two opens one close (0.048208ms)\n\u2139 tests 3\n\u2139 suites 0\n\u2139 pass 3\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 60.242917\n",
             "passed": true,
             "returncode": 0
           },
           {
-            "output_tail": "",
+            "output_bytes": 258,
+            "output_sha256": "deefa0a84856ff50cbd8607aab06cc9fe573da77f02a81240412be53fed57bf6",
+            "output_tail": "\u2714 first unclosed open, nested (0.399916ms)\n\u2714 first unclosed among several (0.060917ms)\n\u2714 first unclosed, two opens one close (0.056208ms)\n\u2139 tests 3\n\u2139 suites 0\n\u2139 pass 3\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 73.740917\n",
             "passed": true,
             "returncode": 0
           }
         ],
         "gold_pass_to_pass": [
           {
-            "output_tail": "",
+            "output_bytes": 230,
+            "output_sha256": "68e5def8ffbcbf3a1f13547da02261642a255000f2e00c1608047a036c35dbb4",
+            "output_tail": "\u2714 unmatched close at 0 (0.468584ms)\n\u2714 balanced returns length (0.069ms)\n\u2714 no parens returns length (0.05225ms)\n\u2139 tests 3\n\u2139 suites 0\n\u2139 pass 3\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 234.5255\n",
             "passed": true,
             "returncode": 0
           },
           {
-            "output_tail": "",
+            "output_bytes": 234,
+            "output_sha256": "42f2fc61041a4d80f3784f1c32f861afdec80065f56913bc2a2b3550bdd72082",
+            "output_tail": "\u2714 unmatched close at 0 (1.17875ms)\n\u2714 balanced returns length (0.261458ms)\n\u2714 no parens returns length (0.145334ms)\n\u2139 tests 3\n\u2139 suites 0\n\u2139 pass 3\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 105.26375\n",
             "passed": true,
             "returncode": 0
           },
           {
-            "output_tail": "",
+            "output_bytes": 233,
+            "output_sha256": "a3be5132287266f57fa7615c2b2883a7a972045215b416757e4b3a9f111d396f",
+            "output_tail": "\u2714 unmatched close at 0 (0.411958ms)\n\u2714 balanced returns length (0.061708ms)\n\u2714 no parens returns length (0.0505ms)\n\u2139 tests 3\n\u2139 suites 0\n\u2139 pass 3\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 78.650333\n",
             "passed": true,
             "returncode": 0
           }
@@ -49,34 +63,46 @@
         "mutant:shortcut": {
           "fail_to_pass": [
             {
-              "output_tail": "/pi-admit-parens-8dr9jhxr/work/test/fail-to-pass.test.js:8:58)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n      at Test.postRun (node:internal/test_runner/test:1522:19)\n      at Test.run (node:internal/test_runner/test:1447:12)\n      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7) {\n    generatedMessage: true,\n    code: 'ERR_ASSERTION',\n    actual: 1,\n    expected: 0,\n    operator: 'strictEqual',\n    diff: 'simple'\n  }\n",
+              "output_bytes": 2749,
+              "output_sha256": "c67c477569e2bf045af019a6cfe3ec21323a642aa71fee3eb028c5e98c4ead00",
+              "output_tail": "unner/test:1382:25)\n      at Test.start (node:internal/test_runner/test:1242:17)\n      at startSubtestAfterBootstrap (node:internal/test_runner/harness:387:17) {\n    generatedMessage: true,\n    code: 'ERR_ASSERTION',\n    actual: 1,\n    expected: 0,\n    operator: 'strictEqual',\n    diff: 'simple'\n  }\n\ntest at test/fail-to-pass.test.js:7:1\n\u2716 first unclosed among several (0.099084ms)\n  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:\n  \n  6 !== 0\n  \n      at TestContext.<anonymous> (file://<path>:7:51)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n      at Test.postRun (node:internal/test_runner/test:1522:19)\n      at Test.run (node:internal/test_runner/test:1447:12)\n      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3) {\n    generatedMessage: true,\n    code: 'ERR_ASSERTION',\n    actual: 6,\n    expected: 0,\n    operator: 'strictEqual',\n    diff: 'simple'\n  }\n\ntest at test/fail-to-pass.test.js:8:1\n\u2716 first unclosed, two opens one close (0.0785ms)\n  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:\n  \n  1 !== 0\n  \n      at TestContext.<anonymous> (file://<path>:8:58)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n      at Test.postRun (node:internal/test_runner/test:1522:19)\n      at Test.run (node:internal/test_runner/test:1447:12)\n      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7) {\n    generatedMessage: true,\n    code: 'ERR_ASSERTION',\n    actual: 1,\n    expected: 0,\n    operator: 'strictEqual',\n    diff: 'simple'\n  }\n",
               "passed": false,
               "returncode": 1
             },
             {
-              "output_tail": "/pi-admit-parens-_f1fb3u2/work/test/fail-to-pass.test.js:8:58)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n      at Test.postRun (node:internal/test_runner/test:1522:19)\n      at Test.run (node:internal/test_runner/test:1447:12)\n      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7) {\n    generatedMessage: true,\n    code: 'ERR_ASSERTION',\n    actual: 1,\n    expected: 0,\n    operator: 'strictEqual',\n    diff: 'simple'\n  }\n",
+              "output_bytes": 2753,
+              "output_sha256": "581d598138fe5187e359818e0f815ebec932ebf829f59160a5bf192ece5c3f19",
+              "output_tail": "nner/test:1382:25)\n      at Test.start (node:internal/test_runner/test:1242:17)\n      at startSubtestAfterBootstrap (node:internal/test_runner/harness:387:17) {\n    generatedMessage: true,\n    code: 'ERR_ASSERTION',\n    actual: 1,\n    expected: 0,\n    operator: 'strictEqual',\n    diff: 'simple'\n  }\n\ntest at test/fail-to-pass.test.js:7:1\n\u2716 first unclosed among several (0.10425ms)\n  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:\n  \n  6 !== 0\n  \n      at TestContext.<anonymous> (file://<path>:7:51)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n      at Test.postRun (node:internal/test_runner/test:1522:19)\n      at Test.run (node:internal/test_runner/test:1447:12)\n      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3) {\n    generatedMessage: true,\n    code: 'ERR_ASSERTION',\n    actual: 6,\n    expected: 0,\n    operator: 'strictEqual',\n    diff: 'simple'\n  }\n\ntest at test/fail-to-pass.test.js:8:1\n\u2716 first unclosed, two opens one close (0.080375ms)\n  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:\n  \n  1 !== 0\n  \n      at TestContext.<anonymous> (file://<path>:8:58)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n      at Test.postRun (node:internal/test_runner/test:1522:19)\n      at Test.run (node:internal/test_runner/test:1447:12)\n      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7) {\n    generatedMessage: true,\n    code: 'ERR_ASSERTION',\n    actual: 1,\n    expected: 0,\n    operator: 'strictEqual',\n    diff: 'simple'\n  }\n",
               "passed": false,
               "returncode": 1
             },
             {
-              "output_tail": "/pi-admit-parens-t1bpx9yh/work/test/fail-to-pass.test.js:8:58)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n      at Test.postRun (node:internal/test_runner/test:1522:19)\n      at Test.run (node:internal/test_runner/test:1447:12)\n      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7) {\n    generatedMessage: true,\n    code: 'ERR_ASSERTION',\n    actual: 1,\n    expected: 0,\n    operator: 'strictEqual',\n    diff: 'simple'\n  }\n",
+              "output_bytes": 2755,
+              "output_sha256": "a223d6238c5093a69b790bd14205ca8eba7ffca2726109be760b89c3e04bd111",
+              "output_tail": "ner/test:1382:25)\n      at Test.start (node:internal/test_runner/test:1242:17)\n      at startSubtestAfterBootstrap (node:internal/test_runner/harness:387:17) {\n    generatedMessage: true,\n    code: 'ERR_ASSERTION',\n    actual: 1,\n    expected: 0,\n    operator: 'strictEqual',\n    diff: 'simple'\n  }\n\ntest at test/fail-to-pass.test.js:7:1\n\u2716 first unclosed among several (0.097083ms)\n  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:\n  \n  6 !== 0\n  \n      at TestContext.<anonymous> (file://<path>:7:51)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n      at Test.postRun (node:internal/test_runner/test:1522:19)\n      at Test.run (node:internal/test_runner/test:1447:12)\n      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3) {\n    generatedMessage: true,\n    code: 'ERR_ASSERTION',\n    actual: 6,\n    expected: 0,\n    operator: 'strictEqual',\n    diff: 'simple'\n  }\n\ntest at test/fail-to-pass.test.js:8:1\n\u2716 first unclosed, two opens one close (0.076167ms)\n  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:\n  \n  1 !== 0\n  \n      at TestContext.<anonymous> (file://<path>:8:58)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n      at Test.postRun (node:internal/test_runner/test:1522:19)\n      at Test.run (node:internal/test_runner/test:1447:12)\n      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7) {\n    generatedMessage: true,\n    code: 'ERR_ASSERTION',\n    actual: 1,\n    expected: 0,\n    operator: 'strictEqual',\n    diff: 'simple'\n  }\n",
               "passed": false,
               "returncode": 1
             }
           ],
           "pass_to_pass": [
             {
-              "output_tail": "",
+              "output_bytes": 235,
+              "output_sha256": "468447904118c4f67ab685ab5aea2ed46d420314e1a91a7ffdc44d4d9b9a6144",
+              "output_tail": "\u2714 unmatched close at 0 (0.710666ms)\n\u2714 balanced returns length (0.120708ms)\n\u2714 no parens returns length (0.060625ms)\n\u2139 tests 3\n\u2139 suites 0\n\u2139 pass 3\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 71.787167\n",
               "passed": true,
               "returncode": 0
             },
             {
-              "output_tail": "",
+              "output_bytes": 235,
+              "output_sha256": "9dd1fe2e5efbb3dc52d8b42444285ed6d64e0692b1d92fe80264cc590b563a1d",
+              "output_tail": "\u2714 unmatched close at 0 (0.390459ms)\n\u2714 balanced returns length (0.058375ms)\n\u2714 no parens returns length (0.050708ms)\n\u2139 tests 3\n\u2139 suites 0\n\u2139 pass 3\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 62.664875\n",
               "passed": true,
               "returncode": 0
             },
             {
-              "output_tail": "",
+              "output_bytes": 235,
+              "output_sha256": "7666c7b5b7d03ce7d8350686ac2fe298b53612d71b68cfae3163d49f0637279b",
+              "output_tail": "\u2714 unmatched close at 0 (0.391167ms)\n\u2714 balanced returns length (0.055583ms)\n\u2714 no parens returns length (0.048667ms)\n\u2139 tests 3\n\u2139 suites 0\n\u2139 pass 3\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 59.999334\n",
               "passed": true,
               "returncode": 0
             }
@@ -84,42 +110,54 @@
         },
         "pristine_fail_to_pass": [
           {
-            "output_tail": "/pi-admit-parens-85ti6erk/work/test/fail-to-pass.test.js:8:58)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n      at Test.postRun (node:internal/test_runner/test:1522:19)\n      at Test.run (node:internal/test_runner/test:1447:12)\n      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7) {\n    generatedMessage: true,\n    code: 'ERR_ASSERTION',\n    actual: 1,\n    expected: 0,\n    operator: 'strictEqual',\n    diff: 'simple'\n  }\n",
+            "output_bytes": 2755,
+            "output_sha256": "e9d584ca67eccb6dfb8829c29dbcefc82c26319626cd419d78f74c285cea8cd7",
+            "output_tail": "ner/test:1382:25)\n      at Test.start (node:internal/test_runner/test:1242:17)\n      at startSubtestAfterBootstrap (node:internal/test_runner/harness:387:17) {\n    generatedMessage: true,\n    code: 'ERR_ASSERTION',\n    actual: 1,\n    expected: 0,\n    operator: 'strictEqual',\n    diff: 'simple'\n  }\n\ntest at test/fail-to-pass.test.js:7:1\n\u2716 first unclosed among several (0.338959ms)\n  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:\n  \n  6 !== 0\n  \n      at TestContext.<anonymous> (file://<path>:7:51)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n      at Test.postRun (node:internal/test_runner/test:1522:19)\n      at Test.run (node:internal/test_runner/test:1447:12)\n      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3) {\n    generatedMessage: true,\n    code: 'ERR_ASSERTION',\n    actual: 6,\n    expected: 0,\n    operator: 'strictEqual',\n    diff: 'simple'\n  }\n\ntest at test/fail-to-pass.test.js:8:1\n\u2716 first unclosed, two opens one close (0.113458ms)\n  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:\n  \n  1 !== 0\n  \n      at TestContext.<anonymous> (file://<path>:8:58)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n      at Test.postRun (node:internal/test_runner/test:1522:19)\n      at Test.run (node:internal/test_runner/test:1447:12)\n      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7) {\n    generatedMessage: true,\n    code: 'ERR_ASSERTION',\n    actual: 1,\n    expected: 0,\n    operator: 'strictEqual',\n    diff: 'simple'\n  }\n",
             "passed": false,
             "returncode": 1
           },
           {
-            "output_tail": "/pi-admit-parens-0oiqiucn/work/test/fail-to-pass.test.js:8:58)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n      at Test.postRun (node:internal/test_runner/test:1522:19)\n      at Test.run (node:internal/test_runner/test:1447:12)\n      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7) {\n    generatedMessage: true,\n    code: 'ERR_ASSERTION',\n    actual: 1,\n    expected: 0,\n    operator: 'strictEqual',\n    diff: 'simple'\n  }\n",
+            "output_bytes": 2749,
+            "output_sha256": "91402642a09c85930255c3055abbe2164ed0815c60078734963a24a79ab596e1",
+            "output_tail": "runner/test:1382:25)\n      at Test.start (node:internal/test_runner/test:1242:17)\n      at startSubtestAfterBootstrap (node:internal/test_runner/harness:387:17) {\n    generatedMessage: true,\n    code: 'ERR_ASSERTION',\n    actual: 1,\n    expected: 0,\n    operator: 'strictEqual',\n    diff: 'simple'\n  }\n\ntest at test/fail-to-pass.test.js:7:1\n\u2716 first unclosed among several (0.122791ms)\n  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:\n  \n  6 !== 0\n  \n      at TestContext.<anonymous> (file://<path>:7:51)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n      at Test.postRun (node:internal/test_runner/test:1522:19)\n      at Test.run (node:internal/test_runner/test:1447:12)\n      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3) {\n    generatedMessage: true,\n    code: 'ERR_ASSERTION',\n    actual: 6,\n    expected: 0,\n    operator: 'strictEqual',\n    diff: 'simple'\n  }\n\ntest at test/fail-to-pass.test.js:8:1\n\u2716 first unclosed, two opens one close (0.084ms)\n  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:\n  \n  1 !== 0\n  \n      at TestContext.<anonymous> (file://<path>:8:58)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n      at Test.postRun (node:internal/test_runner/test:1522:19)\n      at Test.run (node:internal/test_runner/test:1447:12)\n      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7) {\n    generatedMessage: true,\n    code: 'ERR_ASSERTION',\n    actual: 1,\n    expected: 0,\n    operator: 'strictEqual',\n    diff: 'simple'\n  }\n",
             "passed": false,
             "returncode": 1
           },
           {
-            "output_tail": "/pi-admit-parens-evrrp68_/work/test/fail-to-pass.test.js:8:58)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n      at Test.postRun (node:internal/test_runner/test:1522:19)\n      at Test.run (node:internal/test_runner/test:1447:12)\n      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7) {\n    generatedMessage: true,\n    code: 'ERR_ASSERTION',\n    actual: 1,\n    expected: 0,\n    operator: 'strictEqual',\n    diff: 'simple'\n  }\n",
+            "output_bytes": 2755,
+            "output_sha256": "8fdf62bbcb983d4a75fd9aaf94781a12220bd2136ce3df671f7172b36c225c3a",
+            "output_tail": "ner/test:1382:25)\n      at Test.start (node:internal/test_runner/test:1242:17)\n      at startSubtestAfterBootstrap (node:internal/test_runner/harness:387:17) {\n    generatedMessage: true,\n    code: 'ERR_ASSERTION',\n    actual: 1,\n    expected: 0,\n    operator: 'strictEqual',\n    diff: 'simple'\n  }\n\ntest at test/fail-to-pass.test.js:7:1\n\u2716 first unclosed among several (0.096458ms)\n  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:\n  \n  6 !== 0\n  \n      at TestContext.<anonymous> (file://<path>:7:51)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n      at Test.postRun (node:internal/test_runner/test:1522:19)\n      at Test.run (node:internal/test_runner/test:1447:12)\n      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3) {\n    generatedMessage: true,\n    code: 'ERR_ASSERTION',\n    actual: 6,\n    expected: 0,\n    operator: 'strictEqual',\n    diff: 'simple'\n  }\n\ntest at test/fail-to-pass.test.js:8:1\n\u2716 first unclosed, two opens one close (0.078459ms)\n  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:\n  \n  1 !== 0\n  \n      at TestContext.<anonymous> (file://<path>:8:58)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n      at Test.postRun (node:internal/test_runner/test:1522:19)\n      at Test.run (node:internal/test_runner/test:1447:12)\n      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7) {\n    generatedMessage: true,\n    code: 'ERR_ASSERTION',\n    actual: 1,\n    expected: 0,\n    operator: 'strictEqual',\n    diff: 'simple'\n  }\n",
             "passed": false,
             "returncode": 1
           }
         ],
         "pristine_pass_to_pass": [
           {
-            "output_tail": "",
+            "output_bytes": 236,
+            "output_sha256": "9185cede985e532c1316b865c79b7048e8d5ac669dd43025de3b09fa7586e204",
+            "output_tail": "\u2714 unmatched close at 0 (0.610167ms)\n\u2714 balanced returns length (0.066709ms)\n\u2714 no parens returns length (0.054958ms)\n\u2139 tests 3\n\u2139 suites 0\n\u2139 pass 3\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 105.738958\n",
             "passed": true,
             "returncode": 0
           },
           {
-            "output_tail": "",
+            "output_bytes": 234,
+            "output_sha256": "1666eb3558667135f9eb7e1a0260871aad316b55fa316065e9748f62d3178216",
+            "output_tail": "\u2714 unmatched close at 0 (0.48925ms)\n\u2714 balanced returns length (0.062792ms)\n\u2714 no parens returns length (0.207667ms)\n\u2139 tests 3\n\u2139 suites 0\n\u2139 pass 3\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 94.202542\n",
             "passed": true,
             "returncode": 0
           },
           {
-            "output_tail": "",
+            "output_bytes": 232,
+            "output_sha256": "bbab396bce6c1adda21e0892e7f9d2cab38228c958b2c26667532db18e108501",
+            "output_tail": "\u2714 unmatched close at 0 (0.428209ms)\n\u2714 balanced returns length (0.058042ms)\n\u2714 no parens returns length (0.04975ms)\n\u2139 tests 3\n\u2139 suites 0\n\u2139 pass 3\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 89.8495\n",
             "passed": true,
             "returncode": 0
           }
         ]
       }
     },
-    "manifest_sha256": "44c3db64b98d4d2b7a8f94f09fed10ea64fb33c9d840246bbbbf87a4f26af0e5",
-    "reviewed_at": "2026-07-15T17:01:34Z",
+    "manifest_sha256": "c9e8b535c0cd2c34281e360ea6a6385b04430716bbb6c294cd7adbca39d94c55",
+    "reviewed_at": "2026-08-18T14:02:32Z",
     "reviewer": "Albert"
   },
   "artifacts": [
@@ -179,19 +217,16 @@
     },
     "perturbations": [
       {
-        "approved": false,
         "id": "equivalent-1",
         "sha256": "abd055456ea3e19bfe5f6fd20a4d6bbaa114194d3902e03f8f8fa5bfe0cd7d23",
         "text": "Complete the following repository task. Preserve existing behavior and verify the tests.\n\nImplement firstUnmatched(s) in src/index.js. Return the index of the first unmatched\nparenthesis in s: for an unmatched closing ')', its own index; for an unmatched opening\n'(', the index of the FIRST '(' that is never closed (not where scanning stopped). If\nevery parenthesis is matched, return s.length. Only '(' and ')' matter; ignore all other\ncharacters. Examples: \")ab\" -> 0, \"(a)\" -> 3, \"ab\" -> 2. Run node --test until all tests pass."
       },
       {
-        "approved": false,
         "id": "equivalent-2",
         "sha256": "99a9214f825b3e71b76f9f91372543a830492bc6bb9e70661a5970fd94ad3723",
         "text": "Repository change request:\nImplement firstUnmatched(s) in src/index.js. Return the index of the first unmatched\nparenthesis in s: for an unmatched closing ')', its own index; for an unmatched opening\n'(', the index of the FIRST '(' that is never closed (not where scanning stopped). If\nevery parenthesis is matched, return s.length. Only '(' and ')' matter; ignore all other\ncharacters. Examples: \")ab\" -> 0, \"(a)\" -> 3, \"ab\" -> 2. Run node --test until all tests pass.\n\nUse the smallest correct change and confirm the test suite."
       },
       {
-        "approved": false,
         "id": "equivalent-3",
         "sha256": "83f0f18d9df2404d0719b8cb28a9f668c7ccd7f48c179d3eca0f2e91bf5883d0",
         "text": "Please solve this task in the supplied checkout, retaining all stated edge cases:\n\nImplement firstUnmatched(s) in src/index.js. Return the index of the first unmatched\nparenthesis in s: for an unmatched closing ')', its own index; for an unmatched opening\n'(', the index of the FIRST '(' that is never closed (not where scanning stopped). If\nevery parenthesis is matched, return s.length. Only '(' and ')' matter; ignore all other\ncharacters. Examples: \")ab\" -> 0, \"(a)\" -> 3, \"ab\" -> 2. Run node --test until all tests pass."
@@ -222,6 +257,11 @@
         "--test",
         "test/fail-to-pass.test.js"
       ],
+      "expected_cases": [
+        "first unclosed among several",
+        "first unclosed open, nested",
+        "first unclosed, two opens one close"
+      ],
       "overlays": [
         {
           "dest": "test/fail-to-pass.test.js",
@@ -240,7 +280,7 @@
     }
   },
   "timestamps": {
-    "admitted_at": "2026-07-15T17:01:34Z",
+    "admitted_at": "2026-08-18T14:02:32Z",
     "created_at": "2026-07-14T00:00:00Z",
     "expires_at": "2026-10-13T17:01:34Z"
   }

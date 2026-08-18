@@ -863,7 +863,7 @@ if subscores is None and not ctx.get("grade_artifact"):
     import grade_reporter as _grade_reporter
     _tap_path = workdir.rstrip("/") + ".grade.tap"
     if os.path.exists(_tap_path):
-        subscores, subscores_blocked = _grade_reporter.extract(_tap_path)
+        subscores, subscores_blocked = _grade_reporter.extract(_tap_path, ctx.get("expected_cases"))
         if subscores is not None and ctx.get("requirement_scoring"):
             subscores, subscores_blocked = _grade_reporter.apply_requirement_weights(
                 subscores, ctx["requirement_scoring"])

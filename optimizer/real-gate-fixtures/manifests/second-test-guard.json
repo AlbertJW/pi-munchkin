@@ -7,42 +7,55 @@
       "c6e3d1d70e2e14d86149d3b768e859475974eef23c2de393a0e7a298bf51da63"
     ],
     "automated": {
-      "checked_at": "2026-08-11T14:11:45Z",
+      "checked_at": "2026-08-18T14:00:14Z",
       "hash_drift": [],
       "manifest_drift": false,
+      "overlay_lint": [],
       "passed": true,
       "runs_per_state": 3,
       "states": {
         "gold_fail_to_pass": [
           {
-            "output_tail": "",
+            "output_bytes": 416,
+            "output_sha256": "2062a5a699cb56176a5a8af8350d9a6c33ed55d0266809061bcdb0d463890f1b",
+            "output_tail": "\u2714 over-long values are truncated and marked with an ellipsis (0.390208ms)\n\u2714 a truncated cell still occupies exactly the column width (0.062291ms)\n\u2714 values that exactly fill the column are left untouched (0.055291ms)\n\u2714 a row keeps its total width when one of its cells is truncated (0.066084ms)\n\u2139 tests 4\n\u2139 suites 0\n\u2139 pass 4\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 58.938709\n",
             "passed": true,
             "returncode": 0
           },
           {
-            "output_tail": "",
+            "output_bytes": 415,
+            "output_sha256": "ec83842ac4683bb1b86cc3b20a87324b49f2511eddc7bd80bd0fc0c2253a87bf",
+            "output_tail": "\u2714 over-long values are truncated and marked with an ellipsis (0.419209ms)\n\u2714 a truncated cell still occupies exactly the column width (0.064708ms)\n\u2714 values that exactly fill the column are left untouched (0.054458ms)\n\u2714 a row keeps its total width when one of its cells is truncated (0.067708ms)\n\u2139 tests 4\n\u2139 suites 0\n\u2139 pass 4\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 62.10775\n",
             "passed": true,
             "returncode": 0
           },
           {
-            "output_tail": "",
+            "output_bytes": 416,
+            "output_sha256": "40ffb0bfa6c721e91e90c37f4be76c01fd843ab54ce3d2bf6e61f86c1b269fb5",
+            "output_tail": "\u2714 over-long values are truncated and marked with an ellipsis (0.402959ms)\n\u2714 a truncated cell still occupies exactly the column width (0.061917ms)\n\u2714 values that exactly fill the column are left untouched (0.096417ms)\n\u2714 a row keeps its total width when one of its cells is truncated (0.123583ms)\n\u2139 tests 4\n\u2139 suites 0\n\u2139 pass 4\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 51.746625\n",
             "passed": true,
             "returncode": 0
           }
         ],
         "gold_pass_to_pass": [
           {
-            "output_tail": "",
+            "output_bytes": 420,
+            "output_sha256": "624070b55362e4f2bc57bf9af5de5da7c74860ed6994c885920fc5fc68c2ffbf",
+            "output_tail": "\u2714 fitCell pads short values out to the full column width (0.395042ms)\n\u2714 fitCell never returns more characters than the column width (0.05725ms)\n\u2714 formatRow joins cells with ' | ' and keeps the columns aligned (0.074625ms)\n\u2714 formatRow rejects a widths list that does not match the values (0.1735ms)\n\u2139 tests 4\n\u2139 suites 0\n\u2139 pass 4\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 59.347875\n",
             "passed": true,
             "returncode": 0
           },
           {
-            "output_tail": "",
+            "output_bytes": 423,
+            "output_sha256": "6cd8f0f12ba6270093eddf891b4ddc96ed219a434857ee0b6e078e096c1037b8",
+            "output_tail": "\u2714 fitCell pads short values out to the full column width (0.397916ms)\n\u2714 fitCell never returns more characters than the column width (0.058333ms)\n\u2714 formatRow joins cells with ' | ' and keeps the columns aligned (0.070541ms)\n\u2714 formatRow rejects a widths list that does not match the values (0.174667ms)\n\u2139 tests 4\n\u2139 suites 0\n\u2139 pass 4\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 66.037417\n",
             "passed": true,
             "returncode": 0
           },
           {
-            "output_tail": "",
+            "output_bytes": 422,
+            "output_sha256": "4537de4482a09272d2566fd0e789f11c4db577659eb52d52af4502747834a41d",
+            "output_tail": "\u2714 fitCell pads short values out to the full column width (0.415458ms)\n\u2714 fitCell never returns more characters than the column width (0.059791ms)\n\u2714 formatRow joins cells with ' | ' and keeps the columns aligned (0.072625ms)\n\u2714 formatRow rejects a widths list that does not match the values (0.18025ms)\n\u2139 tests 4\n\u2139 suites 0\n\u2139 pass 4\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 61.837375\n",
             "passed": true,
             "returncode": 0
           }
@@ -50,34 +63,46 @@
         "mutant:shortcut": {
           "fail_to_pass": [
             {
-              "output_tail": "il-to-pass.test.js:27:10)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n      at Test.postRun (node:internal/test_runner/test:1522:19)\n      at Test.run (node:internal/test_runner/test:1447:12)\n      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7) {\n    generatedMessage: true,\n    code: 'ERR_ASSERTION',\n    actual: 'observabil\u2026 | qa  ',\n    expected: 'observabi\u2026 | qa  ',\n    operator: 'strictEqual',\n    diff: 'simple'\n  }\n",
+              "output_bytes": 3234,
+              "output_sha256": "b0c184ed13295de22dd47fd8dda3e24f8ae5541b8a86c85bdf5ae7500d886636",
+              "output_tail": "l: 'engine\u2026',\n    expected: 'engin\u2026',\n    operator: 'strictEqual',\n    diff: 'simple'\n  }\n\ntest at test/fail-to-pass.test.js:12:1\n\u2716 a truncated cell still occupies exactly the column width (0.101958ms)\n  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:\n  \n  10 !== 9\n  \n      at TestContext.<anonymous> (file://<path>:15:10)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n      at Test.postRun (node:internal/test_runner/test:1522:19)\n      at Test.run (node:internal/test_runner/test:1447:12)\n      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3) {\n    generatedMessage: true,\n    code: 'ERR_ASSERTION',\n    actual: 10,\n    expected: 9,\n    operator: 'strictEqual',\n    diff: 'simple'\n  }\n\ntest at test/fail-to-pass.test.js:24:1\n\u2716 a row keeps its total width when one of its cells is truncated (0.457792ms)\n  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:\n  + actual - expected\n  \n  + 'observabil\u2026 | qa  '\n  - 'observabi\u2026 | qa  '\n              ^\n  \n      at TestContext.<anonymous> (file://<path>:27:10)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n      at Test.postRun (node:internal/test_runner/test:1522:19)\n      at Test.run (node:internal/test_runner/test:1447:12)\n      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7) {\n    generatedMessage: true,\n    code: 'ERR_ASSERTION',\n    actual: 'observabil\u2026 | qa  ',\n    expected: 'observabi\u2026 | qa  ',\n    operator: 'strictEqual',\n    diff: 'simple'\n  }\n",
               "passed": false,
               "returncode": 1
             },
             {
-              "output_tail": "il-to-pass.test.js:27:10)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n      at Test.postRun (node:internal/test_runner/test:1522:19)\n      at Test.run (node:internal/test_runner/test:1447:12)\n      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7) {\n    generatedMessage: true,\n    code: 'ERR_ASSERTION',\n    actual: 'observabil\u2026 | qa  ',\n    expected: 'observabi\u2026 | qa  ',\n    operator: 'strictEqual',\n    diff: 'simple'\n  }\n",
+              "output_bytes": 3234,
+              "output_sha256": "5a09dab82d4a368cd003d9761fb6a219325149e0114a60881f269cb4fd1d12f7",
+              "output_tail": "l: 'engine\u2026',\n    expected: 'engin\u2026',\n    operator: 'strictEqual',\n    diff: 'simple'\n  }\n\ntest at test/fail-to-pass.test.js:12:1\n\u2716 a truncated cell still occupies exactly the column width (0.101583ms)\n  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:\n  \n  10 !== 9\n  \n      at TestContext.<anonymous> (file://<path>:15:10)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n      at Test.postRun (node:internal/test_runner/test:1522:19)\n      at Test.run (node:internal/test_runner/test:1447:12)\n      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3) {\n    generatedMessage: true,\n    code: 'ERR_ASSERTION',\n    actual: 10,\n    expected: 9,\n    operator: 'strictEqual',\n    diff: 'simple'\n  }\n\ntest at test/fail-to-pass.test.js:24:1\n\u2716 a row keeps its total width when one of its cells is truncated (0.427125ms)\n  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:\n  + actual - expected\n  \n  + 'observabil\u2026 | qa  '\n  - 'observabi\u2026 | qa  '\n              ^\n  \n      at TestContext.<anonymous> (file://<path>:27:10)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n      at Test.postRun (node:internal/test_runner/test:1522:19)\n      at Test.run (node:internal/test_runner/test:1447:12)\n      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7) {\n    generatedMessage: true,\n    code: 'ERR_ASSERTION',\n    actual: 'observabil\u2026 | qa  ',\n    expected: 'observabi\u2026 | qa  ',\n    operator: 'strictEqual',\n    diff: 'simple'\n  }\n",
               "passed": false,
               "returncode": 1
             },
             {
-              "output_tail": "il-to-pass.test.js:27:10)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n      at Test.postRun (node:internal/test_runner/test:1522:19)\n      at Test.run (node:internal/test_runner/test:1447:12)\n      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7) {\n    generatedMessage: true,\n    code: 'ERR_ASSERTION',\n    actual: 'observabil\u2026 | qa  ',\n    expected: 'observabi\u2026 | qa  ',\n    operator: 'strictEqual',\n    diff: 'simple'\n  }\n",
+              "output_bytes": 3226,
+              "output_sha256": "d9170474c0c3ad09e00185874de0fa3cb5b82ef31122a8d34f026b687c8a66a7",
+              "output_tail": "tual: 'engine\u2026',\n    expected: 'engin\u2026',\n    operator: 'strictEqual',\n    diff: 'simple'\n  }\n\ntest at test/fail-to-pass.test.js:12:1\n\u2716 a truncated cell still occupies exactly the column width (0.102ms)\n  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:\n  \n  10 !== 9\n  \n      at TestContext.<anonymous> (file://<path>:15:10)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n      at Test.postRun (node:internal/test_runner/test:1522:19)\n      at Test.run (node:internal/test_runner/test:1447:12)\n      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3) {\n    generatedMessage: true,\n    code: 'ERR_ASSERTION',\n    actual: 10,\n    expected: 9,\n    operator: 'strictEqual',\n    diff: 'simple'\n  }\n\ntest at test/fail-to-pass.test.js:24:1\n\u2716 a row keeps its total width when one of its cells is truncated (0.503417ms)\n  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:\n  + actual - expected\n  \n  + 'observabil\u2026 | qa  '\n  - 'observabi\u2026 | qa  '\n              ^\n  \n      at TestContext.<anonymous> (file://<path>:27:10)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n      at Test.postRun (node:internal/test_runner/test:1522:19)\n      at Test.run (node:internal/test_runner/test:1447:12)\n      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7) {\n    generatedMessage: true,\n    code: 'ERR_ASSERTION',\n    actual: 'observabil\u2026 | qa  ',\n    expected: 'observabi\u2026 | qa  ',\n    operator: 'strictEqual',\n    diff: 'simple'\n  }\n",
               "passed": false,
               "returncode": 1
             }
           ],
           "pass_to_pass": [
             {
-              "output_tail": "",
+              "output_bytes": 423,
+              "output_sha256": "aa67ec18d0c29375f27e04d06d1de8c88b519c47ec184da16806ce29245261aa",
+              "output_tail": "\u2714 fitCell pads short values out to the full column width (0.401834ms)\n\u2714 fitCell never returns more characters than the column width (0.061375ms)\n\u2714 formatRow joins cells with ' | ' and keeps the columns aligned (0.071541ms)\n\u2714 formatRow rejects a widths list that does not match the values (0.176875ms)\n\u2139 tests 4\n\u2139 suites 0\n\u2139 pass 4\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 72.930708\n",
               "passed": true,
               "returncode": 0
             },
             {
-              "output_tail": "",
+              "output_bytes": 418,
+              "output_sha256": "2f15dfe53fcd21c9cea3bae080be1112e604b74f8aafd81d89b00dee873b4864",
+              "output_tail": "\u2714 fitCell pads short values out to the full column width (0.396667ms)\n\u2714 fitCell never returns more characters than the column width (0.06ms)\n\u2714 formatRow joins cells with ' | ' and keeps the columns aligned (0.069459ms)\n\u2714 formatRow rejects a widths list that does not match the values (0.17125ms)\n\u2139 tests 4\n\u2139 suites 0\n\u2139 pass 4\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 59.781125\n",
               "passed": true,
               "returncode": 0
             },
             {
-              "output_tail": "",
+              "output_bytes": 423,
+              "output_sha256": "eee0a5d56ff4ca3cca20cf09319f81778b90f8e28ce330408ab1bccd10d9d738",
+              "output_tail": "\u2714 fitCell pads short values out to the full column width (0.408375ms)\n\u2714 fitCell never returns more characters than the column width (0.078958ms)\n\u2714 formatRow joins cells with ' | ' and keeps the columns aligned (0.082708ms)\n\u2714 formatRow rejects a widths list that does not match the values (0.195959ms)\n\u2139 tests 4\n\u2139 suites 0\n\u2139 pass 4\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 61.484291\n",
               "passed": true,
               "returncode": 0
             }
@@ -85,42 +110,54 @@
         },
         "pristine_fail_to_pass": [
           {
-            "output_tail": "ail-to-pass.test.js:27:10)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n      at Test.postRun (node:internal/test_runner/test:1522:19)\n      at Test.run (node:internal/test_runner/test:1447:12)\n      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7) {\n    generatedMessage: true,\n    code: 'ERR_ASSERTION',\n    actual: 'observabil | qa  ',\n    expected: 'observabi\u2026 | qa  ',\n    operator: 'strictEqual',\n    diff: 'simple'\n  }\n",
+            "output_bytes": 3196,
+            "output_sha256": "94be6976e59e465890110d0524646e213e71cd9cb9a6c18180ac23c2cdfee44f",
+            "output_tail": " 'engine',\n    expected: 'engin\u2026',\n    operator: 'strictEqual',\n    diff: 'simple'\n  }\n\ntest at test/fail-to-pass.test.js:12:1\n\u2716 a truncated cell still occupies exactly the column width (0.099167ms)\n  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:\n  \n  false !== true\n  \n      at TestContext.<anonymous> (file://<path>:16:10)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n      at Test.postRun (node:internal/test_runner/test:1522:19)\n      at Test.run (node:internal/test_runner/test:1447:12)\n      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3) {\n    generatedMessage: true,\n    code: 'ERR_ASSERTION',\n    actual: false,\n    expected: true,\n    operator: 'strictEqual',\n    diff: 'simple'\n  }\n\ntest at test/fail-to-pass.test.js:24:1\n\u2716 a row keeps its total width when one of its cells is truncated (0.48875ms)\n  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:\n  + actual - expected\n  \n  + 'observabil | qa  '\n  - 'observabi\u2026 | qa  '\n              ^\n  \n      at TestContext.<anonymous> (file://<path>:27:10)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n      at Test.postRun (node:internal/test_runner/test:1522:19)\n      at Test.run (node:internal/test_runner/test:1447:12)\n      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7) {\n    generatedMessage: true,\n    code: 'ERR_ASSERTION',\n    actual: 'observabil | qa  ',\n    expected: 'observabi\u2026 | qa  ',\n    operator: 'strictEqual',\n    diff: 'simple'\n  }\n",
             "passed": false,
             "returncode": 1
           },
           {
-            "output_tail": "ail-to-pass.test.js:27:10)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n      at Test.postRun (node:internal/test_runner/test:1522:19)\n      at Test.run (node:internal/test_runner/test:1447:12)\n      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7) {\n    generatedMessage: true,\n    code: 'ERR_ASSERTION',\n    actual: 'observabil | qa  ',\n    expected: 'observabi\u2026 | qa  ',\n    operator: 'strictEqual',\n    diff: 'simple'\n  }\n",
+            "output_bytes": 3198,
+            "output_sha256": "46e2451732d77139b25f67d12dc75d26c5deaafe55cceffaac4dce4428a274f1",
+            "output_tail": "'engine',\n    expected: 'engin\u2026',\n    operator: 'strictEqual',\n    diff: 'simple'\n  }\n\ntest at test/fail-to-pass.test.js:12:1\n\u2716 a truncated cell still occupies exactly the column width (0.237125ms)\n  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:\n  \n  false !== true\n  \n      at TestContext.<anonymous> (file://<path>:16:10)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n      at Test.postRun (node:internal/test_runner/test:1522:19)\n      at Test.run (node:internal/test_runner/test:1447:12)\n      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3) {\n    generatedMessage: true,\n    code: 'ERR_ASSERTION',\n    actual: false,\n    expected: true,\n    operator: 'strictEqual',\n    diff: 'simple'\n  }\n\ntest at test/fail-to-pass.test.js:24:1\n\u2716 a row keeps its total width when one of its cells is truncated (0.916166ms)\n  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:\n  + actual - expected\n  \n  + 'observabil | qa  '\n  - 'observabi\u2026 | qa  '\n              ^\n  \n      at TestContext.<anonymous> (file://<path>:27:10)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n      at Test.postRun (node:internal/test_runner/test:1522:19)\n      at Test.run (node:internal/test_runner/test:1447:12)\n      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7) {\n    generatedMessage: true,\n    code: 'ERR_ASSERTION',\n    actual: 'observabil | qa  ',\n    expected: 'observabi\u2026 | qa  ',\n    operator: 'strictEqual',\n    diff: 'simple'\n  }\n",
             "passed": false,
             "returncode": 1
           },
           {
-            "output_tail": "ail-to-pass.test.js:27:10)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n      at Test.postRun (node:internal/test_runner/test:1522:19)\n      at Test.run (node:internal/test_runner/test:1447:12)\n      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7) {\n    generatedMessage: true,\n    code: 'ERR_ASSERTION',\n    actual: 'observabil | qa  ',\n    expected: 'observabi\u2026 | qa  ',\n    operator: 'strictEqual',\n    diff: 'simple'\n  }\n",
+            "output_bytes": 3198,
+            "output_sha256": "3d3af5fc6e5815f0b48d932a14704bf7281510ad0e906316eeb569c7859e445b",
+            "output_tail": "'engine',\n    expected: 'engin\u2026',\n    operator: 'strictEqual',\n    diff: 'simple'\n  }\n\ntest at test/fail-to-pass.test.js:12:1\n\u2716 a truncated cell still occupies exactly the column width (0.098167ms)\n  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:\n  \n  false !== true\n  \n      at TestContext.<anonymous> (file://<path>:16:10)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n      at Test.postRun (node:internal/test_runner/test:1522:19)\n      at Test.run (node:internal/test_runner/test:1447:12)\n      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3) {\n    generatedMessage: true,\n    code: 'ERR_ASSERTION',\n    actual: false,\n    expected: true,\n    operator: 'strictEqual',\n    diff: 'simple'\n  }\n\ntest at test/fail-to-pass.test.js:24:1\n\u2716 a row keeps its total width when one of its cells is truncated (0.474667ms)\n  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:\n  + actual - expected\n  \n  + 'observabil | qa  '\n  - 'observabi\u2026 | qa  '\n              ^\n  \n      at TestContext.<anonymous> (file://<path>:27:10)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n      at Test.postRun (node:internal/test_runner/test:1522:19)\n      at Test.run (node:internal/test_runner/test:1447:12)\n      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7) {\n    generatedMessage: true,\n    code: 'ERR_ASSERTION',\n    actual: 'observabil | qa  ',\n    expected: 'observabi\u2026 | qa  ',\n    operator: 'strictEqual',\n    diff: 'simple'\n  }\n",
             "passed": false,
             "returncode": 1
           }
         ],
         "pristine_pass_to_pass": [
           {
-            "output_tail": "",
+            "output_bytes": 424,
+            "output_sha256": "237c1e3f260a077fd1f2837896ee9815ecb05b2a9613747c8737565a86828ab0",
+            "output_tail": "\u2714 fitCell pads short values out to the full column width (2.317667ms)\n\u2714 fitCell never returns more characters than the column width (0.096125ms)\n\u2714 formatRow joins cells with ' | ' and keeps the columns aligned (0.083833ms)\n\u2714 formatRow rejects a widths list that does not match the values (0.424333ms)\n\u2139 tests 4\n\u2139 suites 0\n\u2139 pass 4\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 100.058375\n",
             "passed": true,
             "returncode": 0
           },
           {
-            "output_tail": "",
+            "output_bytes": 423,
+            "output_sha256": "51b3e0225da4377789b93f12b884b263e182ac137be191b523e99a49b7e45b0c",
+            "output_tail": "\u2714 fitCell pads short values out to the full column width (0.422875ms)\n\u2714 fitCell never returns more characters than the column width (0.065125ms)\n\u2714 formatRow joins cells with ' | ' and keeps the columns aligned (0.087083ms)\n\u2714 formatRow rejects a widths list that does not match the values (0.180416ms)\n\u2139 tests 4\n\u2139 suites 0\n\u2139 pass 4\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 61.962541\n",
             "passed": true,
             "returncode": 0
           },
           {
-            "output_tail": "",
+            "output_bytes": 420,
+            "output_sha256": "d0b7d75d5d32d332f653948a2e521758e14575427bab40fe3f88b02a21ab0ab1",
+            "output_tail": "\u2714 fitCell pads short values out to the full column width (0.398083ms)\n\u2714 fitCell never returns more characters than the column width (0.0965ms)\n\u2714 formatRow joins cells with ' | ' and keeps the columns aligned (0.07425ms)\n\u2714 formatRow rejects a widths list that does not match the values (0.174584ms)\n\u2139 tests 4\n\u2139 suites 0\n\u2139 pass 4\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 62.133125\n",
             "passed": true,
             "returncode": 0
           }
         ]
       }
     },
-    "manifest_sha256": "6597df56b49edf1e19ddf47fe73a9fa6dfdb15c5cdd78a81bb46e7522ef0dbc1",
-    "reviewed_at": "2026-08-11T20:44:51Z",
+    "manifest_sha256": "47cde9254bde70b50a2c94eb4ab98f4116d91e7290e556dc912eaa2175cb94bf",
+    "reviewed_at": "2026-08-18T14:02:32Z",
     "reviewer": "Albert Wessels (chat approval 2026-08-11)"
   },
   "artifacts": [
@@ -216,6 +253,12 @@
         "--test",
         "test/fail-to-pass.test.js"
       ],
+      "expected_cases": [
+        "a row keeps its total width when one of its cells is truncated",
+        "a truncated cell still occupies exactly the column width",
+        "over-long values are truncated and marked with an ellipsis",
+        "values that exactly fill the column are left untouched"
+      ],
       "overlays": [
         {
           "dest": "test/fail-to-pass.test.js",
@@ -234,7 +277,7 @@
     }
   },
   "timestamps": {
-    "admitted_at": "2026-08-11T20:44:51Z",
+    "admitted_at": "2026-08-18T14:02:32Z",
     "created_at": "2026-08-11T00:00:00Z",
     "expires_at": "2026-11-09T20:44:51Z"
   }

@@ -2,7 +2,7 @@
   "admission": {
     "approved": false,
     "automated": {
-      "checked_at": "2026-08-17T16:14:54Z",
+      "checked_at": "2026-08-18T14:00:50Z",
       "hash_drift": [],
       "manifest_drift": false,
       "oracle": {
@@ -32,9 +32,9 @@
       "states": {
         "gold_fail_to_pass": [
           {
-            "output_bytes": 1139,
-            "output_sha256": "63fcf35cf0c9b24e379604486355fa97f9c8d323048b447b7c1c1d9d31647944",
-            "output_tail": "TAP version 13\n# Subtest: dual:vocabulary follows a later policy extension\nok 1 - dual:vocabulary follows a later policy extension\n  ---\n  duration_ms: 0.672834\n  type: 'test'\n  ...\n# Subtest: dual:vocabulary follows a later policy removal\nok 2 - dual:vocabulary follows a later policy removal\n  ---\n  duration_ms: 0.258334\n  type: 'test'\n  ...\n# Subtest: dual:transitions insert blocked at the declared boundary\nok 3 - dual:transitions insert blocked at the declared boundary\n  ---\n  duration_ms: 0.087666\n  type: 'test'\n  ...\n# Subtest: dual:transitions reject skipped blocked edges\nok 4 - dual:transitions reject skipped blocked edges\n  ---\n  duration_ms: 0.049167\n  type: 'test'\n  ...\n# Subtest: dual:validation trims and normalizes CLI input\nok 5 - dual:validation trims and normalizes CLI input\n  ---\n  duration_ms: 38.07775\n  type: 'test'\n  ...\n# Subtest: dual:validation rejects malformed and unknown CLI input\nok 6 - dual:validation rejects malformed and unknown CLI input\n  ---\n  duration_ms: 107.746542\n  type: 'test'\n  ...\n1..6\n# tests 6\n# suites 0\n# pass 6\n# fail 0\n# cancelled 0\n# skipped 0\n# todo 0\n# duration_ms 200.995584\n",
+            "output_bytes": 1132,
+            "output_sha256": "659d9cc6ea13aac063208fdbffff95258bc91aacad79e3de29533bbee485f421",
+            "output_tail": "TAP version 13\n# Subtest: dual:vocabulary follows a later policy extension\nok 1 - dual:vocabulary follows a later policy extension\n  ---\n  duration_ms: 0.675\n  type: 'test'\n  ...\n# Subtest: dual:vocabulary follows a later policy removal\nok 2 - dual:vocabulary follows a later policy removal\n  ---\n  duration_ms: 0.259209\n  type: 'test'\n  ...\n# Subtest: dual:transitions insert blocked at the declared boundary\nok 3 - dual:transitions insert blocked at the declared boundary\n  ---\n  duration_ms: 0.087792\n  type: 'test'\n  ...\n# Subtest: dual:transitions reject skipped blocked edges\nok 4 - dual:transitions reject skipped blocked edges\n  ---\n  duration_ms: 0.049041\n  type: 'test'\n  ...\n# Subtest: dual:validation trims and normalizes CLI input\nok 5 - dual:validation trims and normalizes CLI input\n  ---\n  duration_ms: 38.80225\n  type: 'test'\n  ...\n# Subtest: dual:validation rejects malformed and unknown CLI input\nok 6 - dual:validation rejects malformed and unknown CLI input\n  ---\n  duration_ms: 112.4275\n  type: 'test'\n  ...\n1..6\n# tests 6\n# suites 0\n# pass 6\n# fail 0\n# cancelled 0\n# skipped 0\n# todo 0\n# duration_ms 210.9755\n",
             "passed": true,
             "returncode": 0,
             "weighted_grade": {
@@ -44,9 +44,9 @@
             }
           },
           {
-            "output_bytes": 1139,
-            "output_sha256": "f32e1800d26011cc7cb98cb2a3cffe39b9e45b94798dfcf52e4fc3f26d8c03ea",
-            "output_tail": "TAP version 13\n# Subtest: dual:vocabulary follows a later policy extension\nok 1 - dual:vocabulary follows a later policy extension\n  ---\n  duration_ms: 0.678833\n  type: 'test'\n  ...\n# Subtest: dual:vocabulary follows a later policy removal\nok 2 - dual:vocabulary follows a later policy removal\n  ---\n  duration_ms: 0.237834\n  type: 'test'\n  ...\n# Subtest: dual:transitions insert blocked at the declared boundary\nok 3 - dual:transitions insert blocked at the declared boundary\n  ---\n  duration_ms: 0.082834\n  type: 'test'\n  ...\n# Subtest: dual:transitions reject skipped blocked edges\nok 4 - dual:transitions reject skipped blocked edges\n  ---\n  duration_ms: 0.047417\n  type: 'test'\n  ...\n# Subtest: dual:validation trims and normalizes CLI input\nok 5 - dual:validation trims and normalizes CLI input\n  ---\n  duration_ms: 36.171709\n  type: 'test'\n  ...\n# Subtest: dual:validation rejects malformed and unknown CLI input\nok 6 - dual:validation rejects malformed and unknown CLI input\n  ---\n  duration_ms: 101.391875\n  type: 'test'\n  ...\n1..6\n# tests 6\n# suites 0\n# pass 6\n# fail 0\n# cancelled 0\n# skipped 0\n# todo 0\n# duration_ms 191.15725\n",
+            "output_bytes": 1136,
+            "output_sha256": "61375a19966c4c3d447b86a5138ca472778ba7ce41cd56c2bf08cfd452ee7dc2",
+            "output_tail": "TAP version 13\n# Subtest: dual:vocabulary follows a later policy extension\nok 1 - dual:vocabulary follows a later policy extension\n  ---\n  duration_ms: 0.682917\n  type: 'test'\n  ...\n# Subtest: dual:vocabulary follows a later policy removal\nok 2 - dual:vocabulary follows a later policy removal\n  ---\n  duration_ms: 0.207042\n  type: 'test'\n  ...\n# Subtest: dual:transitions insert blocked at the declared boundary\nok 3 - dual:transitions insert blocked at the declared boundary\n  ---\n  duration_ms: 0.077167\n  type: 'test'\n  ...\n# Subtest: dual:transitions reject skipped blocked edges\nok 4 - dual:transitions reject skipped blocked edges\n  ---\n  duration_ms: 0.04775\n  type: 'test'\n  ...\n# Subtest: dual:validation trims and normalizes CLI input\nok 5 - dual:validation trims and normalizes CLI input\n  ---\n  duration_ms: 38.159292\n  type: 'test'\n  ...\n# Subtest: dual:validation rejects malformed and unknown CLI input\nok 6 - dual:validation rejects malformed and unknown CLI input\n  ---\n  duration_ms: 117.993\n  type: 'test'\n  ...\n1..6\n# tests 6\n# suites 0\n# pass 6\n# fail 0\n# cancelled 0\n# skipped 0\n# todo 0\n# duration_ms 213.912542\n",
             "passed": true,
             "returncode": 0,
             "weighted_grade": {
@@ -56,9 +56,9 @@
             }
           },
           {
-            "output_bytes": 1137,
-            "output_sha256": "8232d29bdcd0d21945a1f99741e83908c800d4888bdd4fb37809698d2b372a09",
-            "output_tail": "TAP version 13\n# Subtest: dual:vocabulary follows a later policy extension\nok 1 - dual:vocabulary follows a later policy extension\n  ---\n  duration_ms: 0.668459\n  type: 'test'\n  ...\n# Subtest: dual:vocabulary follows a later policy removal\nok 2 - dual:vocabulary follows a later policy removal\n  ---\n  duration_ms: 0.25575\n  type: 'test'\n  ...\n# Subtest: dual:transitions insert blocked at the declared boundary\nok 3 - dual:transitions insert blocked at the declared boundary\n  ---\n  duration_ms: 0.087666\n  type: 'test'\n  ...\n# Subtest: dual:transitions reject skipped blocked edges\nok 4 - dual:transitions reject skipped blocked edges\n  ---\n  duration_ms: 0.049917\n  type: 'test'\n  ...\n# Subtest: dual:validation trims and normalizes CLI input\nok 5 - dual:validation trims and normalizes CLI input\n  ---\n  duration_ms: 36.761917\n  type: 'test'\n  ...\n# Subtest: dual:validation rejects malformed and unknown CLI input\nok 6 - dual:validation rejects malformed and unknown CLI input\n  ---\n  duration_ms: 102.61825\n  type: 'test'\n  ...\n1..6\n# tests 6\n# suites 0\n# pass 6\n# fail 0\n# cancelled 0\n# skipped 0\n# todo 0\n# duration_ms 195.31575\n",
+            "output_bytes": 1135,
+            "output_sha256": "878634fef407320406f2c0657808f930fa4100f7744dcb69ceb0f96f5ec53e0e",
+            "output_tail": "TAP version 13\n# Subtest: dual:vocabulary follows a later policy extension\nok 1 - dual:vocabulary follows a later policy extension\n  ---\n  duration_ms: 0.69675\n  type: 'test'\n  ...\n# Subtest: dual:vocabulary follows a later policy removal\nok 2 - dual:vocabulary follows a later policy removal\n  ---\n  duration_ms: 0.23175\n  type: 'test'\n  ...\n# Subtest: dual:transitions insert blocked at the declared boundary\nok 3 - dual:transitions insert blocked at the declared boundary\n  ---\n  duration_ms: 0.077875\n  type: 'test'\n  ...\n# Subtest: dual:transitions reject skipped blocked edges\nok 4 - dual:transitions reject skipped blocked edges\n  ---\n  duration_ms: 0.045542\n  type: 'test'\n  ...\n# Subtest: dual:validation trims and normalizes CLI input\nok 5 - dual:validation trims and normalizes CLI input\n  ---\n  duration_ms: 43.930208\n  type: 'test'\n  ...\n# Subtest: dual:validation rejects malformed and unknown CLI input\nok 6 - dual:validation rejects malformed and unknown CLI input\n  ---\n  duration_ms: 110.899291\n  type: 'test'\n  ...\n1..6\n# tests 6\n# suites 0\n# pass 6\n# fail 0\n# cancelled 0\n# skipped 0\n# todo 0\n# duration_ms 216.708\n",
             "passed": true,
             "returncode": 0,
             "weighted_grade": {
@@ -71,22 +71,22 @@
         "gold_pass_to_pass": [
           {
             "output_bytes": 252,
-            "output_sha256": "9dcf7a2da86d102edb8d7e8115859634c4c9d0d4d4655259ea0e4f81bb542b23",
-            "output_tail": "\u2714 visible: normalizes an existing status through the CLI (40.377667ms)\n\u2714 visible: preserves adjacent transition behavior (0.079625ms)\n\u2139 tests 2\n\u2139 suites 0\n\u2139 pass 2\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 91.065084\n",
+            "output_sha256": "b41a66ce6342883feca69ca1ffadc5d0374dae68e4b05d5bcf989d1666d17cc6",
+            "output_tail": "\u2714 visible: normalizes an existing status through the CLI (41.410959ms)\n\u2714 visible: preserves adjacent transition behavior (0.082958ms)\n\u2139 tests 2\n\u2139 suites 0\n\u2139 pass 2\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 93.162083\n",
             "passed": true,
             "returncode": 0
           },
           {
-            "output_bytes": 250,
-            "output_sha256": "657c1e4d1d630ddf771f71da62ce9df85c276cfb57c7257d56357c1cf42c59a0",
-            "output_tail": "\u2714 visible: normalizes an existing status through the CLI (41.384708ms)\n\u2714 visible: preserves adjacent transition behavior (0.076292ms)\n\u2139 tests 2\n\u2139 suites 0\n\u2139 pass 2\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 92.3575\n",
+            "output_bytes": 251,
+            "output_sha256": "ef0f5b96abdfc6406a01edfe438ea23a506c021284dfdbd9e754dc49197d9754",
+            "output_tail": "\u2714 visible: normalizes an existing status through the CLI (40.760459ms)\n\u2714 visible: preserves adjacent transition behavior (0.078042ms)\n\u2139 tests 2\n\u2139 suites 0\n\u2139 pass 2\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 96.08125\n",
             "passed": true,
             "returncode": 0
           },
           {
-            "output_bytes": 252,
-            "output_sha256": "84133435300172a1fc9edd04904852e5a66a576399f2a1eb1c4e34c947317274",
-            "output_tail": "\u2714 visible: normalizes an existing status through the CLI (36.933375ms)\n\u2714 visible: preserves adjacent transition behavior (0.078291ms)\n\u2139 tests 2\n\u2139 suites 0\n\u2139 pass 2\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 86.232083\n",
+            "output_bytes": 251,
+            "output_sha256": "b7112dfda81aebf96458d427085c3bc0a4cb99f815974ae1d3117c32926b857b",
+            "output_tail": "\u2714 visible: normalizes an existing status through the CLI (39.574958ms)\n\u2714 visible: preserves adjacent transition behavior (0.115209ms)\n\u2139 tests 2\n\u2139 suites 0\n\u2139 pass 2\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 93.08575\n",
             "passed": true,
             "returncode": 0
           }
@@ -95,8 +95,8 @@
           "fail_to_pass": [
             {
               "output_bytes": 2793,
-              "output_sha256": "9437b84a4f59548fbf7bb0df84f2692c8bbf71e9e0ac661d1095fa84cf2456e5",
-              "output_tail": "st.runInAsyncScope (node:async_hooks:226:14)\n    Test.run (node:internal/test_runner/test:1382:25)\n    Test.start (node:internal/test_runner/test:1242:17)\n    startSubtestAfterBootstrap (node:internal/test_runner/harness:387:17)\n  ...\n# Subtest: dual:vocabulary follows a later policy removal\nnot ok 2 - dual:vocabulary follows a later policy removal\n  ---\n  duration_ms: 0.344417\n  type: 'test'\n  location: '<path>:20:1'\n  failureType: 'testCodeFailure'\n  error: 'Missing expected exception.'\n  code: 'ERR_ASSERTION'\n  name: 'AssertionError'\n  expected:\n  operator: 'throws'\n  stack: |-\n    TestContext.<anonymous> (file://<path>:23:12)\n    Test.runInAsyncScope (node:async_hooks:226:14)\n    Test.run (node:internal/test_runner/test:1382:25)\n    Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n    Test.postRun (node:internal/test_runner/test:1522:19)\n    Test.run (node:internal/test_runner/test:1447:12)\n    async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3)\n  ...\n# Subtest: dual:transitions insert blocked at the declared boundary\nok 3 - dual:transitions insert blocked at the declared boundary\n  ---\n  duration_ms: 0.38575\n  type: 'test'\n  ...\n# Subtest: dual:transitions reject skipped blocked edges\nok 4 - dual:transitions reject skipped blocked edges\n  ---\n  duration_ms: 0.051958\n  type: 'test'\n  ...\n# Subtest: dual:validation trims and normalizes CLI input\nok 5 - dual:validation trims and normalizes CLI input\n  ---\n  duration_ms: 36.469417\n  type: 'test'\n  ...\n# Subtest: dual:validation rejects malformed and unknown CLI input\nok 6 - dual:validation rejects malformed and unknown CLI input\n  ---\n  duration_ms: 100.950833\n  type: 'test'\n  ...\n1..6\n# tests 6\n# suites 0\n# pass 4\n# fail 2\n# cancelled 0\n# skipped 0\n# todo 0\n# duration_ms 192.373291\n",
+              "output_sha256": "c30e9ac957d169f07738f6361b191241af8cdf75a73a8d5c06e9da4f696b2e69",
+              "output_tail": "st.runInAsyncScope (node:async_hooks:226:14)\n    Test.run (node:internal/test_runner/test:1382:25)\n    Test.start (node:internal/test_runner/test:1242:17)\n    startSubtestAfterBootstrap (node:internal/test_runner/harness:387:17)\n  ...\n# Subtest: dual:vocabulary follows a later policy removal\nnot ok 2 - dual:vocabulary follows a later policy removal\n  ---\n  duration_ms: 0.367416\n  type: 'test'\n  location: '<path>:20:1'\n  failureType: 'testCodeFailure'\n  error: 'Missing expected exception.'\n  code: 'ERR_ASSERTION'\n  name: 'AssertionError'\n  expected:\n  operator: 'throws'\n  stack: |-\n    TestContext.<anonymous> (file://<path>:23:12)\n    Test.runInAsyncScope (node:async_hooks:226:14)\n    Test.run (node:internal/test_runner/test:1382:25)\n    Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n    Test.postRun (node:internal/test_runner/test:1522:19)\n    Test.run (node:internal/test_runner/test:1447:12)\n    async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3)\n  ...\n# Subtest: dual:transitions insert blocked at the declared boundary\nok 3 - dual:transitions insert blocked at the declared boundary\n  ---\n  duration_ms: 0.40025\n  type: 'test'\n  ...\n# Subtest: dual:transitions reject skipped blocked edges\nok 4 - dual:transitions reject skipped blocked edges\n  ---\n  duration_ms: 0.053125\n  type: 'test'\n  ...\n# Subtest: dual:validation trims and normalizes CLI input\nok 5 - dual:validation trims and normalizes CLI input\n  ---\n  duration_ms: 41.884667\n  type: 'test'\n  ...\n# Subtest: dual:validation rejects malformed and unknown CLI input\nok 6 - dual:validation rejects malformed and unknown CLI input\n  ---\n  duration_ms: 113.238167\n  type: 'test'\n  ...\n1..6\n# tests 6\n# suites 0\n# pass 4\n# fail 2\n# cancelled 0\n# skipped 0\n# todo 0\n# duration_ms 214.200041\n",
               "passed": false,
               "returncode": 1,
               "weighted_grade": {
@@ -106,9 +106,9 @@
               }
             },
             {
-              "output_bytes": 2789,
-              "output_sha256": "474e20fc3f9c792235e717b2e3dffd501faa5ff90a1763533fc1f4dffd250ec2",
-              "output_tail": "  Test.runInAsyncScope (node:async_hooks:226:14)\n    Test.run (node:internal/test_runner/test:1382:25)\n    Test.start (node:internal/test_runner/test:1242:17)\n    startSubtestAfterBootstrap (node:internal/test_runner/harness:387:17)\n  ...\n# Subtest: dual:vocabulary follows a later policy removal\nnot ok 2 - dual:vocabulary follows a later policy removal\n  ---\n  duration_ms: 0.347834\n  type: 'test'\n  location: '<path>:20:1'\n  failureType: 'testCodeFailure'\n  error: 'Missing expected exception.'\n  code: 'ERR_ASSERTION'\n  name: 'AssertionError'\n  expected:\n  operator: 'throws'\n  stack: |-\n    TestContext.<anonymous> (file://<path>:23:12)\n    Test.runInAsyncScope (node:async_hooks:226:14)\n    Test.run (node:internal/test_runner/test:1382:25)\n    Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n    Test.postRun (node:internal/test_runner/test:1522:19)\n    Test.run (node:internal/test_runner/test:1447:12)\n    async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3)\n  ...\n# Subtest: dual:transitions insert blocked at the declared boundary\nok 3 - dual:transitions insert blocked at the declared boundary\n  ---\n  duration_ms: 0.4605\n  type: 'test'\n  ...\n# Subtest: dual:transitions reject skipped blocked edges\nok 4 - dual:transitions reject skipped blocked edges\n  ---\n  duration_ms: 0.0635\n  type: 'test'\n  ...\n# Subtest: dual:validation trims and normalizes CLI input\nok 5 - dual:validation trims and normalizes CLI input\n  ---\n  duration_ms: 38.041084\n  type: 'test'\n  ...\n# Subtest: dual:validation rejects malformed and unknown CLI input\nok 6 - dual:validation rejects malformed and unknown CLI input\n  ---\n  duration_ms: 99.946917\n  type: 'test'\n  ...\n1..6\n# tests 6\n# suites 0\n# pass 4\n# fail 2\n# cancelled 0\n# skipped 0\n# todo 0\n# duration_ms 196.242166\n",
+              "output_bytes": 2790,
+              "output_sha256": "9d3006ff9f4fdba9ab264428bee4d6a23b9ea17662002a210d49ac86107cb62b",
+              "output_tail": "st.runInAsyncScope (node:async_hooks:226:14)\n    Test.run (node:internal/test_runner/test:1382:25)\n    Test.start (node:internal/test_runner/test:1242:17)\n    startSubtestAfterBootstrap (node:internal/test_runner/harness:387:17)\n  ...\n# Subtest: dual:vocabulary follows a later policy removal\nnot ok 2 - dual:vocabulary follows a later policy removal\n  ---\n  duration_ms: 0.35025\n  type: 'test'\n  location: '<path>:20:1'\n  failureType: 'testCodeFailure'\n  error: 'Missing expected exception.'\n  code: 'ERR_ASSERTION'\n  name: 'AssertionError'\n  expected:\n  operator: 'throws'\n  stack: |-\n    TestContext.<anonymous> (file://<path>:23:12)\n    Test.runInAsyncScope (node:async_hooks:226:14)\n    Test.run (node:internal/test_runner/test:1382:25)\n    Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n    Test.postRun (node:internal/test_runner/test:1522:19)\n    Test.run (node:internal/test_runner/test:1447:12)\n    async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3)\n  ...\n# Subtest: dual:transitions insert blocked at the declared boundary\nok 3 - dual:transitions insert blocked at the declared boundary\n  ---\n  duration_ms: 0.443292\n  type: 'test'\n  ...\n# Subtest: dual:transitions reject skipped blocked edges\nok 4 - dual:transitions reject skipped blocked edges\n  ---\n  duration_ms: 0.060917\n  type: 'test'\n  ...\n# Subtest: dual:validation trims and normalizes CLI input\nok 5 - dual:validation trims and normalizes CLI input\n  ---\n  duration_ms: 39.406125\n  type: 'test'\n  ...\n# Subtest: dual:validation rejects malformed and unknown CLI input\nok 6 - dual:validation rejects malformed and unknown CLI input\n  ---\n  duration_ms: 122.865375\n  type: 'test'\n  ...\n1..6\n# tests 6\n# suites 0\n# pass 4\n# fail 2\n# cancelled 0\n# skipped 0\n# todo 0\n# duration_ms 222.100083\n",
               "passed": false,
               "returncode": 1,
               "weighted_grade": {
@@ -118,9 +118,9 @@
               }
             },
             {
-              "output_bytes": 2794,
-              "output_sha256": "8ddc4cbfbdcc14e0e934090d5951bc8646dc44a47ad965fa1b81e5d44ea905c3",
-              "output_tail": "t.runInAsyncScope (node:async_hooks:226:14)\n    Test.run (node:internal/test_runner/test:1382:25)\n    Test.start (node:internal/test_runner/test:1242:17)\n    startSubtestAfterBootstrap (node:internal/test_runner/harness:387:17)\n  ...\n# Subtest: dual:vocabulary follows a later policy removal\nnot ok 2 - dual:vocabulary follows a later policy removal\n  ---\n  duration_ms: 0.353375\n  type: 'test'\n  location: '<path>:20:1'\n  failureType: 'testCodeFailure'\n  error: 'Missing expected exception.'\n  code: 'ERR_ASSERTION'\n  name: 'AssertionError'\n  expected:\n  operator: 'throws'\n  stack: |-\n    TestContext.<anonymous> (file://<path>:23:12)\n    Test.runInAsyncScope (node:async_hooks:226:14)\n    Test.run (node:internal/test_runner/test:1382:25)\n    Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n    Test.postRun (node:internal/test_runner/test:1522:19)\n    Test.run (node:internal/test_runner/test:1447:12)\n    async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3)\n  ...\n# Subtest: dual:transitions insert blocked at the declared boundary\nok 3 - dual:transitions insert blocked at the declared boundary\n  ---\n  duration_ms: 0.390708\n  type: 'test'\n  ...\n# Subtest: dual:transitions reject skipped blocked edges\nok 4 - dual:transitions reject skipped blocked edges\n  ---\n  duration_ms: 0.052208\n  type: 'test'\n  ...\n# Subtest: dual:validation trims and normalizes CLI input\nok 5 - dual:validation trims and normalizes CLI input\n  ---\n  duration_ms: 37.197417\n  type: 'test'\n  ...\n# Subtest: dual:validation rejects malformed and unknown CLI input\nok 6 - dual:validation rejects malformed and unknown CLI input\n  ---\n  duration_ms: 106.564791\n  type: 'test'\n  ...\n1..6\n# tests 6\n# suites 0\n# pass 4\n# fail 2\n# cancelled 0\n# skipped 0\n# todo 0\n# duration_ms 200.151958\n",
+              "output_bytes": 2790,
+              "output_sha256": "cc3f8d3e2574771b5a170c11ff5d5a8877c9c48b449cfcb4a9447ccaa79869dd",
+              "output_tail": "st.runInAsyncScope (node:async_hooks:226:14)\n    Test.run (node:internal/test_runner/test:1382:25)\n    Test.start (node:internal/test_runner/test:1242:17)\n    startSubtestAfterBootstrap (node:internal/test_runner/harness:387:17)\n  ...\n# Subtest: dual:vocabulary follows a later policy removal\nnot ok 2 - dual:vocabulary follows a later policy removal\n  ---\n  duration_ms: 0.34775\n  type: 'test'\n  location: '<path>:20:1'\n  failureType: 'testCodeFailure'\n  error: 'Missing expected exception.'\n  code: 'ERR_ASSERTION'\n  name: 'AssertionError'\n  expected:\n  operator: 'throws'\n  stack: |-\n    TestContext.<anonymous> (file://<path>:23:12)\n    Test.runInAsyncScope (node:async_hooks:226:14)\n    Test.run (node:internal/test_runner/test:1382:25)\n    Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n    Test.postRun (node:internal/test_runner/test:1522:19)\n    Test.run (node:internal/test_runner/test:1447:12)\n    async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3)\n  ...\n# Subtest: dual:transitions insert blocked at the declared boundary\nok 3 - dual:transitions insert blocked at the declared boundary\n  ---\n  duration_ms: 0.377916\n  type: 'test'\n  ...\n# Subtest: dual:transitions reject skipped blocked edges\nok 4 - dual:transitions reject skipped blocked edges\n  ---\n  duration_ms: 0.052083\n  type: 'test'\n  ...\n# Subtest: dual:validation trims and normalizes CLI input\nok 5 - dual:validation trims and normalizes CLI input\n  ---\n  duration_ms: 41.102416\n  type: 'test'\n  ...\n# Subtest: dual:validation rejects malformed and unknown CLI input\nok 6 - dual:validation rejects malformed and unknown CLI input\n  ---\n  duration_ms: 112.786542\n  type: 'test'\n  ...\n1..6\n# tests 6\n# suites 0\n# pass 4\n# fail 2\n# cancelled 0\n# skipped 0\n# todo 0\n# duration_ms 219.064917\n",
               "passed": false,
               "returncode": 1,
               "weighted_grade": {
@@ -132,23 +132,23 @@
           ],
           "pass_to_pass": [
             {
-              "output_bytes": 251,
-              "output_sha256": "b8044b64949adc7a297ca7420c1d61c5dbac285e407a1aecaf8514f001eb842c",
-              "output_tail": "\u2714 visible: normalizes an existing status through the CLI (39.129167ms)\n\u2714 visible: preserves adjacent transition behavior (0.07875ms)\n\u2139 tests 2\n\u2139 suites 0\n\u2139 pass 2\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 91.660708\n",
-              "passed": true,
-              "returncode": 0
-            },
-            {
-              "output_bytes": 249,
-              "output_sha256": "0f81c65a7a50d61aa5a290f060845f23f3906471747b1dd6f86abee72d313eb0",
-              "output_tail": "\u2714 visible: normalizes an existing status through the CLI (39.7555ms)\n\u2714 visible: preserves adjacent transition behavior (0.08025ms)\n\u2139 tests 2\n\u2139 suites 0\n\u2139 pass 2\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 90.163417\n",
+              "output_bytes": 250,
+              "output_sha256": "dbe36e97f29541596bb01e84e325fcec6e8fedaa22a3d23e5e55b576f6f54d28",
+              "output_tail": "\u2714 visible: normalizes an existing status through the CLI (48.407542ms)\n\u2714 visible: preserves adjacent transition behavior (0.078ms)\n\u2139 tests 2\n\u2139 suites 0\n\u2139 pass 2\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 104.136708\n",
               "passed": true,
               "returncode": 0
             },
             {
               "output_bytes": 252,
-              "output_sha256": "8fa1a552e24a166fe3779042fff9cba256a966efc02cf2b7f1b08672dc6acbff",
-              "output_tail": "\u2714 visible: normalizes an existing status through the CLI (45.907958ms)\n\u2714 visible: preserves adjacent transition behavior (0.083792ms)\n\u2139 tests 2\n\u2139 suites 0\n\u2139 pass 2\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 94.349083\n",
+              "output_sha256": "55948a1e42a5ec9bc85d9db53e50a3a459df41fbdd56d694adfb917a6229de6e",
+              "output_tail": "\u2714 visible: normalizes an existing status through the CLI (42.115083ms)\n\u2714 visible: preserves adjacent transition behavior (0.078875ms)\n\u2139 tests 2\n\u2139 suites 0\n\u2139 pass 2\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 94.048125\n",
+              "passed": true,
+              "returncode": 0
+            },
+            {
+              "output_bytes": 252,
+              "output_sha256": "354cfe4e3edddeeccae352e4775c66c7070f7f60814839b8d2d9d152a1d03812",
+              "output_tail": "\u2714 visible: normalizes an existing status through the CLI (41.185709ms)\n\u2714 visible: preserves adjacent transition behavior (0.079083ms)\n\u2139 tests 2\n\u2139 suites 0\n\u2139 pass 2\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 94.135042\n",
               "passed": true,
               "returncode": 0
             }
@@ -158,8 +158,8 @@
           "fail_to_pass": [
             {
               "output_bytes": 4843,
-              "output_sha256": "ebe2a1ffa7d7c32e29dc6f1384b99cd667c270582f2420779b3a56c9928dc857",
-              "output_tail": "le://<path>:30:10)\n    Test.runInAsyncScope (node:async_hooks:226:14)\n    Test.run (node:internal/test_runner/test:1382:25)\n    Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n    Test.postRun (node:internal/test_runner/test:1522:19)\n    Test.run (node:internal/test_runner/test:1447:12)\n    async Test.processPendingSubtests (node:internal/test_runner/test:960:7)\n  ...\n# Subtest: dual:transitions reject skipped blocked edges\nnot ok 4 - dual:transitions reject skipped blocked edges\n  ---\n  duration_ms: 0.156041\n  type: 'test'\n  location: '<path>:35:1'\n  failureType: 'testCodeFailure'\n  error: |-\n    Expected values to be strictly equal:\n    \n    true !== false\n    \n  code: 'ERR_ASSERTION'\n  name: 'AssertionError'\n  expected: false\n  actual: true\n  operator: 'strictEqual'\n  stack: |-\n    TestContext.<anonymous> (file://<path>:36:10)\n    Test.runInAsyncScope (node:async_hooks:226:14)\n    Test.run (node:internal/test_runner/test:1382:25)\n    Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n    Test.postRun (node:internal/test_runner/test:1522:19)\n    Test.run (node:internal/test_runner/test:1447:12)\n    async Test.processPendingSubtests (node:internal/test_runner/test:960:7)\n  ...\n# Subtest: dual:validation trims and normalizes CLI input\nok 5 - dual:validation trims and normalizes CLI input\n  ---\n  duration_ms: 37.910125\n  type: 'test'\n  ...\n# Subtest: dual:validation rejects malformed and unknown CLI input\nok 6 - dual:validation rejects malformed and unknown CLI input\n  ---\n  duration_ms: 102.425667\n  type: 'test'\n  ...\n1..6\n# tests 6\n# suites 0\n# pass 2\n# fail 4\n# cancelled 0\n# skipped 0\n# todo 0\n# duration_ms 197.596167\n",
+              "output_sha256": "347a936f8cc9de9c57f69da79ca0187822313aa1c1b492fa441d649ba7906dc4",
+              "output_tail": "le://<path>:30:10)\n    Test.runInAsyncScope (node:async_hooks:226:14)\n    Test.run (node:internal/test_runner/test:1382:25)\n    Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n    Test.postRun (node:internal/test_runner/test:1522:19)\n    Test.run (node:internal/test_runner/test:1447:12)\n    async Test.processPendingSubtests (node:internal/test_runner/test:960:7)\n  ...\n# Subtest: dual:transitions reject skipped blocked edges\nnot ok 4 - dual:transitions reject skipped blocked edges\n  ---\n  duration_ms: 0.127834\n  type: 'test'\n  location: '<path>:35:1'\n  failureType: 'testCodeFailure'\n  error: |-\n    Expected values to be strictly equal:\n    \n    true !== false\n    \n  code: 'ERR_ASSERTION'\n  name: 'AssertionError'\n  expected: false\n  actual: true\n  operator: 'strictEqual'\n  stack: |-\n    TestContext.<anonymous> (file://<path>:36:10)\n    Test.runInAsyncScope (node:async_hooks:226:14)\n    Test.run (node:internal/test_runner/test:1382:25)\n    Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n    Test.postRun (node:internal/test_runner/test:1522:19)\n    Test.run (node:internal/test_runner/test:1447:12)\n    async Test.processPendingSubtests (node:internal/test_runner/test:960:7)\n  ...\n# Subtest: dual:validation trims and normalizes CLI input\nok 5 - dual:validation trims and normalizes CLI input\n  ---\n  duration_ms: 39.898375\n  type: 'test'\n  ...\n# Subtest: dual:validation rejects malformed and unknown CLI input\nok 6 - dual:validation rejects malformed and unknown CLI input\n  ---\n  duration_ms: 108.578958\n  type: 'test'\n  ...\n1..6\n# tests 6\n# suites 0\n# pass 2\n# fail 4\n# cancelled 0\n# skipped 0\n# todo 0\n# duration_ms 206.771958\n",
               "passed": false,
               "returncode": 1,
               "weighted_grade": {
@@ -169,9 +169,9 @@
               }
             },
             {
-              "output_bytes": 4837,
-              "output_sha256": "a16538433a8a3c9dade5654859bdd0a45b226a1b11dde2d352c7921c3e9845c6",
-              "output_tail": "s> (file://<path>:30:10)\n    Test.runInAsyncScope (node:async_hooks:226:14)\n    Test.run (node:internal/test_runner/test:1382:25)\n    Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n    Test.postRun (node:internal/test_runner/test:1522:19)\n    Test.run (node:internal/test_runner/test:1447:12)\n    async Test.processPendingSubtests (node:internal/test_runner/test:960:7)\n  ...\n# Subtest: dual:transitions reject skipped blocked edges\nnot ok 4 - dual:transitions reject skipped blocked edges\n  ---\n  duration_ms: 0.139167\n  type: 'test'\n  location: '<path>:35:1'\n  failureType: 'testCodeFailure'\n  error: |-\n    Expected values to be strictly equal:\n    \n    true !== false\n    \n  code: 'ERR_ASSERTION'\n  name: 'AssertionError'\n  expected: false\n  actual: true\n  operator: 'strictEqual'\n  stack: |-\n    TestContext.<anonymous> (file://<path>:36:10)\n    Test.runInAsyncScope (node:async_hooks:226:14)\n    Test.run (node:internal/test_runner/test:1382:25)\n    Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n    Test.postRun (node:internal/test_runner/test:1522:19)\n    Test.run (node:internal/test_runner/test:1447:12)\n    async Test.processPendingSubtests (node:internal/test_runner/test:960:7)\n  ...\n# Subtest: dual:validation trims and normalizes CLI input\nok 5 - dual:validation trims and normalizes CLI input\n  ---\n  duration_ms: 37.319\n  type: 'test'\n  ...\n# Subtest: dual:validation rejects malformed and unknown CLI input\nok 6 - dual:validation rejects malformed and unknown CLI input\n  ---\n  duration_ms: 101.323\n  type: 'test'\n  ...\n1..6\n# tests 6\n# suites 0\n# pass 2\n# fail 4\n# cancelled 0\n# skipped 0\n# todo 0\n# duration_ms 196.589334\n",
+              "output_bytes": 4842,
+              "output_sha256": "f93b073406c3325854ce8a5fa6f3db6d5ad292e42a1d29c52637c59f5d291b73",
+              "output_tail": "ile://<path>:30:10)\n    Test.runInAsyncScope (node:async_hooks:226:14)\n    Test.run (node:internal/test_runner/test:1382:25)\n    Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n    Test.postRun (node:internal/test_runner/test:1522:19)\n    Test.run (node:internal/test_runner/test:1447:12)\n    async Test.processPendingSubtests (node:internal/test_runner/test:960:7)\n  ...\n# Subtest: dual:transitions reject skipped blocked edges\nnot ok 4 - dual:transitions reject skipped blocked edges\n  ---\n  duration_ms: 0.13575\n  type: 'test'\n  location: '<path>:35:1'\n  failureType: 'testCodeFailure'\n  error: |-\n    Expected values to be strictly equal:\n    \n    true !== false\n    \n  code: 'ERR_ASSERTION'\n  name: 'AssertionError'\n  expected: false\n  actual: true\n  operator: 'strictEqual'\n  stack: |-\n    TestContext.<anonymous> (file://<path>:36:10)\n    Test.runInAsyncScope (node:async_hooks:226:14)\n    Test.run (node:internal/test_runner/test:1382:25)\n    Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n    Test.postRun (node:internal/test_runner/test:1522:19)\n    Test.run (node:internal/test_runner/test:1447:12)\n    async Test.processPendingSubtests (node:internal/test_runner/test:960:7)\n  ...\n# Subtest: dual:validation trims and normalizes CLI input\nok 5 - dual:validation trims and normalizes CLI input\n  ---\n  duration_ms: 38.031709\n  type: 'test'\n  ...\n# Subtest: dual:validation rejects malformed and unknown CLI input\nok 6 - dual:validation rejects malformed and unknown CLI input\n  ---\n  duration_ms: 117.000292\n  type: 'test'\n  ...\n1..6\n# tests 6\n# suites 0\n# pass 2\n# fail 4\n# cancelled 0\n# skipped 0\n# todo 0\n# duration_ms 215.681959\n",
               "passed": false,
               "returncode": 1,
               "weighted_grade": {
@@ -181,9 +181,9 @@
               }
             },
             {
-              "output_bytes": 4843,
-              "output_sha256": "711a4d8d34c5f600ebcc8307c25ab28217203447b666c69f2caa4aa70b463ff3",
-              "output_tail": "le://<path>:30:10)\n    Test.runInAsyncScope (node:async_hooks:226:14)\n    Test.run (node:internal/test_runner/test:1382:25)\n    Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n    Test.postRun (node:internal/test_runner/test:1522:19)\n    Test.run (node:internal/test_runner/test:1447:12)\n    async Test.processPendingSubtests (node:internal/test_runner/test:960:7)\n  ...\n# Subtest: dual:transitions reject skipped blocked edges\nnot ok 4 - dual:transitions reject skipped blocked edges\n  ---\n  duration_ms: 0.116333\n  type: 'test'\n  location: '<path>:35:1'\n  failureType: 'testCodeFailure'\n  error: |-\n    Expected values to be strictly equal:\n    \n    true !== false\n    \n  code: 'ERR_ASSERTION'\n  name: 'AssertionError'\n  expected: false\n  actual: true\n  operator: 'strictEqual'\n  stack: |-\n    TestContext.<anonymous> (file://<path>:36:10)\n    Test.runInAsyncScope (node:async_hooks:226:14)\n    Test.run (node:internal/test_runner/test:1382:25)\n    Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n    Test.postRun (node:internal/test_runner/test:1522:19)\n    Test.run (node:internal/test_runner/test:1447:12)\n    async Test.processPendingSubtests (node:internal/test_runner/test:960:7)\n  ...\n# Subtest: dual:validation trims and normalizes CLI input\nok 5 - dual:validation trims and normalizes CLI input\n  ---\n  duration_ms: 38.501583\n  type: 'test'\n  ...\n# Subtest: dual:validation rejects malformed and unknown CLI input\nok 6 - dual:validation rejects malformed and unknown CLI input\n  ---\n  duration_ms: 105.975333\n  type: 'test'\n  ...\n1..6\n# tests 6\n# suites 0\n# pass 2\n# fail 4\n# cancelled 0\n# skipped 0\n# todo 0\n# duration_ms 205.545833\n",
+              "output_bytes": 4838,
+              "output_sha256": "217b93082d89fe2307ed858c506ed671c48fc259043aae497bd8de244b8c502b",
+              "output_tail": "le://<path>:30:10)\n    Test.runInAsyncScope (node:async_hooks:226:14)\n    Test.run (node:internal/test_runner/test:1382:25)\n    Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n    Test.postRun (node:internal/test_runner/test:1522:19)\n    Test.run (node:internal/test_runner/test:1447:12)\n    async Test.processPendingSubtests (node:internal/test_runner/test:960:7)\n  ...\n# Subtest: dual:transitions reject skipped blocked edges\nnot ok 4 - dual:transitions reject skipped blocked edges\n  ---\n  duration_ms: 0.136084\n  type: 'test'\n  location: '<path>:35:1'\n  failureType: 'testCodeFailure'\n  error: |-\n    Expected values to be strictly equal:\n    \n    true !== false\n    \n  code: 'ERR_ASSERTION'\n  name: 'AssertionError'\n  expected: false\n  actual: true\n  operator: 'strictEqual'\n  stack: |-\n    TestContext.<anonymous> (file://<path>:36:10)\n    Test.runInAsyncScope (node:async_hooks:226:14)\n    Test.run (node:internal/test_runner/test:1382:25)\n    Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n    Test.postRun (node:internal/test_runner/test:1522:19)\n    Test.run (node:internal/test_runner/test:1447:12)\n    async Test.processPendingSubtests (node:internal/test_runner/test:960:7)\n  ...\n# Subtest: dual:validation trims and normalizes CLI input\nok 5 - dual:validation trims and normalizes CLI input\n  ---\n  duration_ms: 48.334333\n  type: 'test'\n  ...\n# Subtest: dual:validation rejects malformed and unknown CLI input\nok 6 - dual:validation rejects malformed and unknown CLI input\n  ---\n  duration_ms: 110.701791\n  type: 'test'\n  ...\n1..6\n# tests 6\n# suites 0\n# pass 2\n# fail 4\n# cancelled 0\n# skipped 0\n# todo 0\n# duration_ms 219.781292\n",
               "passed": false,
               "returncode": 1,
               "weighted_grade": {
@@ -195,23 +195,23 @@
           ],
           "pass_to_pass": [
             {
-              "output_bytes": 252,
-              "output_sha256": "99d78d6a2cf445efc4dce4c4edd8ffdfb5e104af0f08619d30ce8e555d6fe104",
-              "output_tail": "\u2714 visible: normalizes an existing status through the CLI (41.468209ms)\n\u2714 visible: preserves adjacent transition behavior (0.078917ms)\n\u2139 tests 2\n\u2139 suites 0\n\u2139 pass 2\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 93.698125\n",
-              "passed": true,
-              "returncode": 0
-            },
-            {
-              "output_bytes": 250,
-              "output_sha256": "bea8fd2518df496b64ef49f7eee3e3f11879f56e18c77d270d1cb50ccaaf47dc",
-              "output_tail": "\u2714 visible: normalizes an existing status through the CLI (38.96875ms)\n\u2714 visible: preserves adjacent transition behavior (0.08025ms)\n\u2139 tests 2\n\u2139 suites 0\n\u2139 pass 2\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 90.159042\n",
+              "output_bytes": 249,
+              "output_sha256": "a812c9bc6bfc6019929e6deb3f0360466baba278a5e0ab8de099a48ad652bca4",
+              "output_tail": "\u2714 visible: normalizes an existing status through the CLI (40.247916ms)\n\u2714 visible: preserves adjacent transition behavior (0.083ms)\n\u2139 tests 2\n\u2139 suites 0\n\u2139 pass 2\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 91.204833\n",
               "passed": true,
               "returncode": 0
             },
             {
               "output_bytes": 251,
-              "output_sha256": "61c401aa0055370a37019598a445dad62ad63e829992e1a47cbb92527eb4fba8",
-              "output_tail": "\u2714 visible: normalizes an existing status through the CLI (40.13375ms)\n\u2714 visible: preserves adjacent transition behavior (0.081416ms)\n\u2139 tests 2\n\u2139 suites 0\n\u2139 pass 2\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 91.290708\n",
+              "output_sha256": "05d1ab7044ceef4349ffae2f6f73c1efa0d2124832b752d20d8379ddfc88efe8",
+              "output_tail": "\u2714 visible: normalizes an existing status through the CLI (42.267209ms)\n\u2714 visible: preserves adjacent transition behavior (0.14575ms)\n\u2139 tests 2\n\u2139 suites 0\n\u2139 pass 2\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 95.044417\n",
+              "passed": true,
+              "returncode": 0
+            },
+            {
+              "output_bytes": 249,
+              "output_sha256": "c7ef9e64167c2a221fe2d9bab35f1c994f801a8a1811647d11c71827b4a697e2",
+              "output_tail": "\u2714 visible: normalizes an existing status through the CLI (41.463375ms)\n\u2714 visible: preserves adjacent transition behavior (0.078958ms)\n\u2139 tests 2\n\u2139 suites 0\n\u2139 pass 2\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 95.652\n",
               "passed": true,
               "returncode": 0
             }
@@ -220,21 +220,9 @@
         "mutant:visible-case-hardcode": {
           "fail_to_pass": [
             {
-              "output_bytes": 5751,
-              "output_sha256": "6c73d3e3329c5004738c0a4690df41660b7d1542b8843b1723f19460242700f7",
-              "output_tail": "\n    true !== false\n    \n  code: 'ERR_ASSERTION'\n  name: 'AssertionError'\n  expected: false\n  actual: true\n  operator: 'strictEqual'\n  stack: |-\n    TestContext.<anonymous> (file://<path>:36:10)\n    Test.runInAsyncScope (node:async_hooks:226:14)\n    Test.run (node:internal/test_runner/test:1382:25)\n    Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n    Test.postRun (node:internal/test_runner/test:1522:19)\n    Test.run (node:internal/test_runner/test:1447:12)\n    async Test.processPendingSubtests (node:internal/test_runner/test:960:7)\n  ...\n# Subtest: dual:validation trims and normalizes CLI input\nnot ok 5 - dual:validation trims and normalizes CLI input\n  ---\n  duration_ms: 36.392792\n  type: 'test'\n  location: '<path>:40:1'\n  failureType: 'testCodeFailure'\n  error: |-\n    Expected values to be strictly equal:\n    \n    1 !== 0\n    \n  code: 'ERR_ASSERTION'\n  name: 'AssertionError'\n  expected: 0\n  actual: 1\n  operator: 'strictEqual'\n  stack: |-\n    TestContext.<anonymous> (file://<path>:42:10)\n    Test.runInAsyncScope (node:async_hooks:226:14)\n    Test.run (node:internal/test_runner/test:1382:25)\n    Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n    Test.postRun (node:internal/test_runner/test:1522:19)\n    Test.run (node:internal/test_runner/test:1447:12)\n    async Test.processPendingSubtests (node:internal/test_runner/test:960:7)\n  ...\n# Subtest: dual:validation rejects malformed and unknown CLI input\nok 6 - dual:validation rejects malformed and unknown CLI input\n  ---\n  duration_ms: 104.64175\n  type: 'test'\n  ...\n1..6\n# tests 6\n# suites 0\n# pass 1\n# fail 5\n# cancelled 0\n# skipped 0\n# todo 0\n# duration_ms 197.333916\n",
-              "passed": false,
-              "returncode": 1,
-              "weighted_grade": {
-                "fixed": 15,
-                "source": "tap-reporter-weighted",
-                "total": 100
-              }
-            },
-            {
               "output_bytes": 5747,
-              "output_sha256": "857b3049470b6f4d11f4679d2c4b2d42d4951a1dab2daec3cf89d75288687b3f",
-              "output_tail": "   \n    true !== false\n    \n  code: 'ERR_ASSERTION'\n  name: 'AssertionError'\n  expected: false\n  actual: true\n  operator: 'strictEqual'\n  stack: |-\n    TestContext.<anonymous> (file://<path>:36:10)\n    Test.runInAsyncScope (node:async_hooks:226:14)\n    Test.run (node:internal/test_runner/test:1382:25)\n    Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n    Test.postRun (node:internal/test_runner/test:1522:19)\n    Test.run (node:internal/test_runner/test:1447:12)\n    async Test.processPendingSubtests (node:internal/test_runner/test:960:7)\n  ...\n# Subtest: dual:validation trims and normalizes CLI input\nnot ok 5 - dual:validation trims and normalizes CLI input\n  ---\n  duration_ms: 36.801166\n  type: 'test'\n  location: '<path>:40:1'\n  failureType: 'testCodeFailure'\n  error: |-\n    Expected values to be strictly equal:\n    \n    1 !== 0\n    \n  code: 'ERR_ASSERTION'\n  name: 'AssertionError'\n  expected: 0\n  actual: 1\n  operator: 'strictEqual'\n  stack: |-\n    TestContext.<anonymous> (file://<path>:42:10)\n    Test.runInAsyncScope (node:async_hooks:226:14)\n    Test.run (node:internal/test_runner/test:1382:25)\n    Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n    Test.postRun (node:internal/test_runner/test:1522:19)\n    Test.run (node:internal/test_runner/test:1447:12)\n    async Test.processPendingSubtests (node:internal/test_runner/test:960:7)\n  ...\n# Subtest: dual:validation rejects malformed and unknown CLI input\nok 6 - dual:validation rejects malformed and unknown CLI input\n  ---\n  duration_ms: 104.064625\n  type: 'test'\n  ...\n1..6\n# tests 6\n# suites 0\n# pass 1\n# fail 5\n# cancelled 0\n# skipped 0\n# todo 0\n# duration_ms 193.12\n",
+              "output_sha256": "491cf8c056ff9d56834ac23f39505058ba0f002980120f8fd84b73c90b505adc",
+              "output_tail": "\n    true !== false\n    \n  code: 'ERR_ASSERTION'\n  name: 'AssertionError'\n  expected: false\n  actual: true\n  operator: 'strictEqual'\n  stack: |-\n    TestContext.<anonymous> (file://<path>:36:10)\n    Test.runInAsyncScope (node:async_hooks:226:14)\n    Test.run (node:internal/test_runner/test:1382:25)\n    Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n    Test.postRun (node:internal/test_runner/test:1522:19)\n    Test.run (node:internal/test_runner/test:1447:12)\n    async Test.processPendingSubtests (node:internal/test_runner/test:960:7)\n  ...\n# Subtest: dual:validation trims and normalizes CLI input\nnot ok 5 - dual:validation trims and normalizes CLI input\n  ---\n  duration_ms: 40.871916\n  type: 'test'\n  location: '<path>:40:1'\n  failureType: 'testCodeFailure'\n  error: |-\n    Expected values to be strictly equal:\n    \n    1 !== 0\n    \n  code: 'ERR_ASSERTION'\n  name: 'AssertionError'\n  expected: 0\n  actual: 1\n  operator: 'strictEqual'\n  stack: |-\n    TestContext.<anonymous> (file://<path>:42:10)\n    Test.runInAsyncScope (node:async_hooks:226:14)\n    Test.run (node:internal/test_runner/test:1382:25)\n    Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n    Test.postRun (node:internal/test_runner/test:1522:19)\n    Test.run (node:internal/test_runner/test:1447:12)\n    async Test.processPendingSubtests (node:internal/test_runner/test:960:7)\n  ...\n# Subtest: dual:validation rejects malformed and unknown CLI input\nok 6 - dual:validation rejects malformed and unknown CLI input\n  ---\n  duration_ms: 116.06475\n  type: 'test'\n  ...\n1..6\n# tests 6\n# suites 0\n# pass 1\n# fail 5\n# cancelled 0\n# skipped 0\n# todo 0\n# duration_ms 224.630583\n",
               "passed": false,
               "returncode": 1,
               "weighted_grade": {
@@ -244,9 +232,21 @@
               }
             },
             {
-              "output_bytes": 5753,
-              "output_sha256": "34c00648e11d4e937d88374ea1e5706e5a58aea9b751ff073407c01675e8c726",
-              "output_tail": "    true !== false\n    \n  code: 'ERR_ASSERTION'\n  name: 'AssertionError'\n  expected: false\n  actual: true\n  operator: 'strictEqual'\n  stack: |-\n    TestContext.<anonymous> (file://<path>:36:10)\n    Test.runInAsyncScope (node:async_hooks:226:14)\n    Test.run (node:internal/test_runner/test:1382:25)\n    Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n    Test.postRun (node:internal/test_runner/test:1522:19)\n    Test.run (node:internal/test_runner/test:1447:12)\n    async Test.processPendingSubtests (node:internal/test_runner/test:960:7)\n  ...\n# Subtest: dual:validation trims and normalizes CLI input\nnot ok 5 - dual:validation trims and normalizes CLI input\n  ---\n  duration_ms: 37.939375\n  type: 'test'\n  location: '<path>:40:1'\n  failureType: 'testCodeFailure'\n  error: |-\n    Expected values to be strictly equal:\n    \n    1 !== 0\n    \n  code: 'ERR_ASSERTION'\n  name: 'AssertionError'\n  expected: 0\n  actual: 1\n  operator: 'strictEqual'\n  stack: |-\n    TestContext.<anonymous> (file://<path>:42:10)\n    Test.runInAsyncScope (node:async_hooks:226:14)\n    Test.run (node:internal/test_runner/test:1382:25)\n    Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n    Test.postRun (node:internal/test_runner/test:1522:19)\n    Test.run (node:internal/test_runner/test:1447:12)\n    async Test.processPendingSubtests (node:internal/test_runner/test:960:7)\n  ...\n# Subtest: dual:validation rejects malformed and unknown CLI input\nok 6 - dual:validation rejects malformed and unknown CLI input\n  ---\n  duration_ms: 101.526625\n  type: 'test'\n  ...\n1..6\n# tests 6\n# suites 0\n# pass 1\n# fail 5\n# cancelled 0\n# skipped 0\n# todo 0\n# duration_ms 202.515875\n",
+              "output_bytes": 5749,
+              "output_sha256": "bc1bb1c940655101972b8b95e68adfedd537c2518515c0599b4ef4e34edd7a80",
+              "output_tail": " \n    true !== false\n    \n  code: 'ERR_ASSERTION'\n  name: 'AssertionError'\n  expected: false\n  actual: true\n  operator: 'strictEqual'\n  stack: |-\n    TestContext.<anonymous> (file://<path>:36:10)\n    Test.runInAsyncScope (node:async_hooks:226:14)\n    Test.run (node:internal/test_runner/test:1382:25)\n    Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n    Test.postRun (node:internal/test_runner/test:1522:19)\n    Test.run (node:internal/test_runner/test:1447:12)\n    async Test.processPendingSubtests (node:internal/test_runner/test:960:7)\n  ...\n# Subtest: dual:validation trims and normalizes CLI input\nnot ok 5 - dual:validation trims and normalizes CLI input\n  ---\n  duration_ms: 39.779709\n  type: 'test'\n  location: '<path>:40:1'\n  failureType: 'testCodeFailure'\n  error: |-\n    Expected values to be strictly equal:\n    \n    1 !== 0\n    \n  code: 'ERR_ASSERTION'\n  name: 'AssertionError'\n  expected: 0\n  actual: 1\n  operator: 'strictEqual'\n  stack: |-\n    TestContext.<anonymous> (file://<path>:42:10)\n    Test.runInAsyncScope (node:async_hooks:226:14)\n    Test.run (node:internal/test_runner/test:1382:25)\n    Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n    Test.postRun (node:internal/test_runner/test:1522:19)\n    Test.run (node:internal/test_runner/test:1447:12)\n    async Test.processPendingSubtests (node:internal/test_runner/test:960:7)\n  ...\n# Subtest: dual:validation rejects malformed and unknown CLI input\nok 6 - dual:validation rejects malformed and unknown CLI input\n  ---\n  duration_ms: 114.9265\n  type: 'test'\n  ...\n1..6\n# tests 6\n# suites 0\n# pass 1\n# fail 5\n# cancelled 0\n# skipped 0\n# todo 0\n# duration_ms 215.386833\n",
+              "passed": false,
+              "returncode": 1,
+              "weighted_grade": {
+                "fixed": 15,
+                "source": "tap-reporter-weighted",
+                "total": 100
+              }
+            },
+            {
+              "output_bytes": 5750,
+              "output_sha256": "a19d64e118c299d0f1a7fdadfdb62e2735088d3dabe3e81bcd91a4f095504f10",
+              "output_tail": "  \n    true !== false\n    \n  code: 'ERR_ASSERTION'\n  name: 'AssertionError'\n  expected: false\n  actual: true\n  operator: 'strictEqual'\n  stack: |-\n    TestContext.<anonymous> (file://<path>:36:10)\n    Test.runInAsyncScope (node:async_hooks:226:14)\n    Test.run (node:internal/test_runner/test:1382:25)\n    Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n    Test.postRun (node:internal/test_runner/test:1522:19)\n    Test.run (node:internal/test_runner/test:1447:12)\n    async Test.processPendingSubtests (node:internal/test_runner/test:960:7)\n  ...\n# Subtest: dual:validation trims and normalizes CLI input\nnot ok 5 - dual:validation trims and normalizes CLI input\n  ---\n  duration_ms: 38.322583\n  type: 'test'\n  location: '<path>:40:1'\n  failureType: 'testCodeFailure'\n  error: |-\n    Expected values to be strictly equal:\n    \n    1 !== 0\n    \n  code: 'ERR_ASSERTION'\n  name: 'AssertionError'\n  expected: 0\n  actual: 1\n  operator: 'strictEqual'\n  stack: |-\n    TestContext.<anonymous> (file://<path>:42:10)\n    Test.runInAsyncScope (node:async_hooks:226:14)\n    Test.run (node:internal/test_runner/test:1382:25)\n    Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n    Test.postRun (node:internal/test_runner/test:1522:19)\n    Test.run (node:internal/test_runner/test:1447:12)\n    async Test.processPendingSubtests (node:internal/test_runner/test:960:7)\n  ...\n# Subtest: dual:validation rejects malformed and unknown CLI input\nok 6 - dual:validation rejects malformed and unknown CLI input\n  ---\n  duration_ms: 116.257\n  type: 'test'\n  ...\n1..6\n# tests 6\n# suites 0\n# pass 1\n# fail 5\n# cancelled 0\n# skipped 0\n# todo 0\n# duration_ms 213.868375\n",
               "passed": false,
               "returncode": 1,
               "weighted_grade": {
@@ -258,23 +258,23 @@
           ],
           "pass_to_pass": [
             {
-              "output_bytes": 252,
-              "output_sha256": "ebc879d799dd9c512bc8bcef883220c9b37486b6df0a58b63c969cf57f65325a",
-              "output_tail": "\u2714 visible: normalizes an existing status through the CLI (38.927709ms)\n\u2714 visible: preserves adjacent transition behavior (0.077208ms)\n\u2139 tests 2\n\u2139 suites 0\n\u2139 pass 2\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 87.967667\n",
+              "output_bytes": 248,
+              "output_sha256": "ec8466038cbd3085b25574f340133723b527c8824a627e5c28cc0ac171966056",
+              "output_tail": "\u2714 visible: normalizes an existing status through the CLI (52.306ms)\n\u2714 visible: preserves adjacent transition behavior (0.083083ms)\n\u2139 tests 2\n\u2139 suites 0\n\u2139 pass 2\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 105.5205\n",
               "passed": true,
               "returncode": 0
             },
             {
-              "output_bytes": 251,
-              "output_sha256": "f75cf464c93280333b75fcb017814953fec2998240a5193725edf41489646316",
-              "output_tail": "\u2714 visible: normalizes an existing status through the CLI (39.781208ms)\n\u2714 visible: preserves adjacent transition behavior (0.082583ms)\n\u2139 tests 2\n\u2139 suites 0\n\u2139 pass 2\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 89.11075\n",
+              "output_bytes": 253,
+              "output_sha256": "73a2727b198a40c58011c7fd2632cb5a802382c71bf7d3ea1884d22aae2953ad",
+              "output_tail": "\u2714 visible: normalizes an existing status through the CLI (41.827417ms)\n\u2714 visible: preserves adjacent transition behavior (0.080375ms)\n\u2139 tests 2\n\u2139 suites 0\n\u2139 pass 2\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 100.272208\n",
               "passed": true,
               "returncode": 0
             },
             {
               "output_bytes": 252,
-              "output_sha256": "12bff1960693a2f09e6278d47cf94227734fc61c38e512dbc01631d5a5d50c4f",
-              "output_tail": "\u2714 visible: normalizes an existing status through the CLI (38.876625ms)\n\u2714 visible: preserves adjacent transition behavior (0.076917ms)\n\u2139 tests 2\n\u2139 suites 0\n\u2139 pass 2\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 89.464833\n",
+              "output_sha256": "71fcad6e37dd145f7fa75e08184c3597b7940bdf13200528d0162dc57caf3b57",
+              "output_tail": "\u2714 visible: normalizes an existing status through the CLI (42.315333ms)\n\u2714 visible: preserves adjacent transition behavior (0.078041ms)\n\u2139 tests 2\n\u2139 suites 0\n\u2139 pass 2\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 95.228083\n",
               "passed": true,
               "returncode": 0
             }
@@ -282,9 +282,21 @@
         },
         "pristine_fail_to_pass": [
           {
+            "output_bytes": 5753,
+            "output_sha256": "cdd945f69c97630ba0269083c789a202b242206fa7a83c8b3bfae016464a0b36",
+            "output_tail": "    true !== false\n    \n  code: 'ERR_ASSERTION'\n  name: 'AssertionError'\n  expected: false\n  actual: true\n  operator: 'strictEqual'\n  stack: |-\n    TestContext.<anonymous> (file://<path>:36:10)\n    Test.runInAsyncScope (node:async_hooks:226:14)\n    Test.run (node:internal/test_runner/test:1382:25)\n    Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n    Test.postRun (node:internal/test_runner/test:1522:19)\n    Test.run (node:internal/test_runner/test:1447:12)\n    async Test.processPendingSubtests (node:internal/test_runner/test:960:7)\n  ...\n# Subtest: dual:validation trims and normalizes CLI input\nnot ok 5 - dual:validation trims and normalizes CLI input\n  ---\n  duration_ms: 39.265125\n  type: 'test'\n  location: '<path>:40:1'\n  failureType: 'testCodeFailure'\n  error: |-\n    Expected values to be strictly equal:\n    \n    1 !== 0\n    \n  code: 'ERR_ASSERTION'\n  name: 'AssertionError'\n  expected: 0\n  actual: 1\n  operator: 'strictEqual'\n  stack: |-\n    TestContext.<anonymous> (file://<path>:42:10)\n    Test.runInAsyncScope (node:async_hooks:226:14)\n    Test.run (node:internal/test_runner/test:1382:25)\n    Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n    Test.postRun (node:internal/test_runner/test:1522:19)\n    Test.run (node:internal/test_runner/test:1447:12)\n    async Test.processPendingSubtests (node:internal/test_runner/test:960:7)\n  ...\n# Subtest: dual:validation rejects malformed and unknown CLI input\nok 6 - dual:validation rejects malformed and unknown CLI input\n  ---\n  duration_ms: 117.110333\n  type: 'test'\n  ...\n1..6\n# tests 6\n# suites 0\n# pass 1\n# fail 5\n# cancelled 0\n# skipped 0\n# todo 0\n# duration_ms 219.001042\n",
+            "passed": false,
+            "returncode": 1,
+            "weighted_grade": {
+              "fixed": 15,
+              "source": "tap-reporter-weighted",
+              "total": 100
+            }
+          },
+          {
             "output_bytes": 5751,
-            "output_sha256": "2032b17bd0a778eb1cf69fdb4e2ec1afc7c993a2dacf61edeafd4b74b9940b9a",
-            "output_tail": "    true !== false\n    \n  code: 'ERR_ASSERTION'\n  name: 'AssertionError'\n  expected: false\n  actual: true\n  operator: 'strictEqual'\n  stack: |-\n    TestContext.<anonymous> (file://<path>:36:10)\n    Test.runInAsyncScope (node:async_hooks:226:14)\n    Test.run (node:internal/test_runner/test:1382:25)\n    Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n    Test.postRun (node:internal/test_runner/test:1522:19)\n    Test.run (node:internal/test_runner/test:1447:12)\n    async Test.processPendingSubtests (node:internal/test_runner/test:960:7)\n  ...\n# Subtest: dual:validation trims and normalizes CLI input\nnot ok 5 - dual:validation trims and normalizes CLI input\n  ---\n  duration_ms: 36.402667\n  type: 'test'\n  location: '<path>:40:1'\n  failureType: 'testCodeFailure'\n  error: |-\n    Expected values to be strictly equal:\n    \n    1 !== 0\n    \n  code: 'ERR_ASSERTION'\n  name: 'AssertionError'\n  expected: 0\n  actual: 1\n  operator: 'strictEqual'\n  stack: |-\n    TestContext.<anonymous> (file://<path>:42:10)\n    Test.runInAsyncScope (node:async_hooks:226:14)\n    Test.run (node:internal/test_runner/test:1382:25)\n    Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n    Test.postRun (node:internal/test_runner/test:1522:19)\n    Test.run (node:internal/test_runner/test:1447:12)\n    async Test.processPendingSubtests (node:internal/test_runner/test:960:7)\n  ...\n# Subtest: dual:validation rejects malformed and unknown CLI input\nok 6 - dual:validation rejects malformed and unknown CLI input\n  ---\n  duration_ms: 102.187417\n  type: 'test'\n  ...\n1..6\n# tests 6\n# suites 0\n# pass 1\n# fail 5\n# cancelled 0\n# skipped 0\n# todo 0\n# duration_ms 193.784458\n",
+            "output_sha256": "3d173db49bbd24954ec113161b4f4cc5627e8d764565d39f5ed95a2b0133db2c",
+            "output_tail": "\n    true !== false\n    \n  code: 'ERR_ASSERTION'\n  name: 'AssertionError'\n  expected: false\n  actual: true\n  operator: 'strictEqual'\n  stack: |-\n    TestContext.<anonymous> (file://<path>:36:10)\n    Test.runInAsyncScope (node:async_hooks:226:14)\n    Test.run (node:internal/test_runner/test:1382:25)\n    Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n    Test.postRun (node:internal/test_runner/test:1522:19)\n    Test.run (node:internal/test_runner/test:1447:12)\n    async Test.processPendingSubtests (node:internal/test_runner/test:960:7)\n  ...\n# Subtest: dual:validation trims and normalizes CLI input\nnot ok 5 - dual:validation trims and normalizes CLI input\n  ---\n  duration_ms: 46.53675\n  type: 'test'\n  location: '<path>:40:1'\n  failureType: 'testCodeFailure'\n  error: |-\n    Expected values to be strictly equal:\n    \n    1 !== 0\n    \n  code: 'ERR_ASSERTION'\n  name: 'AssertionError'\n  expected: 0\n  actual: 1\n  operator: 'strictEqual'\n  stack: |-\n    TestContext.<anonymous> (file://<path>:42:10)\n    Test.runInAsyncScope (node:async_hooks:226:14)\n    Test.run (node:internal/test_runner/test:1382:25)\n    Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n    Test.postRun (node:internal/test_runner/test:1522:19)\n    Test.run (node:internal/test_runner/test:1447:12)\n    async Test.processPendingSubtests (node:internal/test_runner/test:960:7)\n  ...\n# Subtest: dual:validation rejects malformed and unknown CLI input\nok 6 - dual:validation rejects malformed and unknown CLI input\n  ---\n  duration_ms: 107.859875\n  type: 'test'\n  ...\n1..6\n# tests 6\n# suites 0\n# pass 1\n# fail 5\n# cancelled 0\n# skipped 0\n# todo 0\n# duration_ms 214.736083\n",
             "passed": false,
             "returncode": 1,
             "weighted_grade": {
@@ -295,20 +307,8 @@
           },
           {
             "output_bytes": 5753,
-            "output_sha256": "21092df48ee825939a1a30d640fe8ceaeac8c3add2db9effd2a924824f5d236d",
-            "output_tail": "    true !== false\n    \n  code: 'ERR_ASSERTION'\n  name: 'AssertionError'\n  expected: false\n  actual: true\n  operator: 'strictEqual'\n  stack: |-\n    TestContext.<anonymous> (file://<path>:36:10)\n    Test.runInAsyncScope (node:async_hooks:226:14)\n    Test.run (node:internal/test_runner/test:1382:25)\n    Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n    Test.postRun (node:internal/test_runner/test:1522:19)\n    Test.run (node:internal/test_runner/test:1447:12)\n    async Test.processPendingSubtests (node:internal/test_runner/test:960:7)\n  ...\n# Subtest: dual:validation trims and normalizes CLI input\nnot ok 5 - dual:validation trims and normalizes CLI input\n  ---\n  duration_ms: 36.304292\n  type: 'test'\n  location: '<path>:40:1'\n  failureType: 'testCodeFailure'\n  error: |-\n    Expected values to be strictly equal:\n    \n    1 !== 0\n    \n  code: 'ERR_ASSERTION'\n  name: 'AssertionError'\n  expected: 0\n  actual: 1\n  operator: 'strictEqual'\n  stack: |-\n    TestContext.<anonymous> (file://<path>:42:10)\n    Test.runInAsyncScope (node:async_hooks:226:14)\n    Test.run (node:internal/test_runner/test:1382:25)\n    Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n    Test.postRun (node:internal/test_runner/test:1522:19)\n    Test.run (node:internal/test_runner/test:1447:12)\n    async Test.processPendingSubtests (node:internal/test_runner/test:960:7)\n  ...\n# Subtest: dual:validation rejects malformed and unknown CLI input\nok 6 - dual:validation rejects malformed and unknown CLI input\n  ---\n  duration_ms: 103.794625\n  type: 'test'\n  ...\n1..6\n# tests 6\n# suites 0\n# pass 1\n# fail 5\n# cancelled 0\n# skipped 0\n# todo 0\n# duration_ms 198.131708\n",
-            "passed": false,
-            "returncode": 1,
-            "weighted_grade": {
-              "fixed": 15,
-              "source": "tap-reporter-weighted",
-              "total": 100
-            }
-          },
-          {
-            "output_bytes": 5753,
-            "output_sha256": "c8866fd7c88d27518499aed3cf7ccd9bc3c465c4cd3d59e3a02a443ff84799c8",
-            "output_tail": "    true !== false\n    \n  code: 'ERR_ASSERTION'\n  name: 'AssertionError'\n  expected: false\n  actual: true\n  operator: 'strictEqual'\n  stack: |-\n    TestContext.<anonymous> (file://<path>:36:10)\n    Test.runInAsyncScope (node:async_hooks:226:14)\n    Test.run (node:internal/test_runner/test:1382:25)\n    Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n    Test.postRun (node:internal/test_runner/test:1522:19)\n    Test.run (node:internal/test_runner/test:1447:12)\n    async Test.processPendingSubtests (node:internal/test_runner/test:960:7)\n  ...\n# Subtest: dual:validation trims and normalizes CLI input\nnot ok 5 - dual:validation trims and normalizes CLI input\n  ---\n  duration_ms: 36.067458\n  type: 'test'\n  location: '<path>:40:1'\n  failureType: 'testCodeFailure'\n  error: |-\n    Expected values to be strictly equal:\n    \n    1 !== 0\n    \n  code: 'ERR_ASSERTION'\n  name: 'AssertionError'\n  expected: 0\n  actual: 1\n  operator: 'strictEqual'\n  stack: |-\n    TestContext.<anonymous> (file://<path>:42:10)\n    Test.runInAsyncScope (node:async_hooks:226:14)\n    Test.run (node:internal/test_runner/test:1382:25)\n    Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n    Test.postRun (node:internal/test_runner/test:1522:19)\n    Test.run (node:internal/test_runner/test:1447:12)\n    async Test.processPendingSubtests (node:internal/test_runner/test:960:7)\n  ...\n# Subtest: dual:validation rejects malformed and unknown CLI input\nok 6 - dual:validation rejects malformed and unknown CLI input\n  ---\n  duration_ms: 104.100708\n  type: 'test'\n  ...\n1..6\n# tests 6\n# suites 0\n# pass 1\n# fail 5\n# cancelled 0\n# skipped 0\n# todo 0\n# duration_ms 192.817291\n",
+            "output_sha256": "30fc6d2f20000e112a60cde40cbd625e6ad6785bd45506ddf4271a45977193ff",
+            "output_tail": "    true !== false\n    \n  code: 'ERR_ASSERTION'\n  name: 'AssertionError'\n  expected: false\n  actual: true\n  operator: 'strictEqual'\n  stack: |-\n    TestContext.<anonymous> (file://<path>:36:10)\n    Test.runInAsyncScope (node:async_hooks:226:14)\n    Test.run (node:internal/test_runner/test:1382:25)\n    Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n    Test.postRun (node:internal/test_runner/test:1522:19)\n    Test.run (node:internal/test_runner/test:1447:12)\n    async Test.processPendingSubtests (node:internal/test_runner/test:960:7)\n  ...\n# Subtest: dual:validation trims and normalizes CLI input\nnot ok 5 - dual:validation trims and normalizes CLI input\n  ---\n  duration_ms: 39.958667\n  type: 'test'\n  location: '<path>:40:1'\n  failureType: 'testCodeFailure'\n  error: |-\n    Expected values to be strictly equal:\n    \n    1 !== 0\n    \n  code: 'ERR_ASSERTION'\n  name: 'AssertionError'\n  expected: 0\n  actual: 1\n  operator: 'strictEqual'\n  stack: |-\n    TestContext.<anonymous> (file://<path>:42:10)\n    Test.runInAsyncScope (node:async_hooks:226:14)\n    Test.run (node:internal/test_runner/test:1382:25)\n    Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n    Test.postRun (node:internal/test_runner/test:1522:19)\n    Test.run (node:internal/test_runner/test:1447:12)\n    async Test.processPendingSubtests (node:internal/test_runner/test:960:7)\n  ...\n# Subtest: dual:validation rejects malformed and unknown CLI input\nok 6 - dual:validation rejects malformed and unknown CLI input\n  ---\n  duration_ms: 119.370875\n  type: 'test'\n  ...\n1..6\n# tests 6\n# suites 0\n# pass 1\n# fail 5\n# cancelled 0\n# skipped 0\n# todo 0\n# duration_ms 216.661583\n",
             "passed": false,
             "returncode": 1,
             "weighted_grade": {
@@ -321,22 +321,22 @@
         "pristine_pass_to_pass": [
           {
             "output_bytes": 252,
-            "output_sha256": "7bf1a240e071c4039a0e42c41db3a6b84e29a6d8cbf46f7a4bef66aa81b1ce09",
-            "output_tail": "\u2714 visible: normalizes an existing status through the CLI (37.379417ms)\n\u2714 visible: preserves adjacent transition behavior (0.097875ms)\n\u2139 tests 2\n\u2139 suites 0\n\u2139 pass 2\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 85.817209\n",
+            "output_sha256": "4452344ddcd480f4c4628ccccf8f78b52954f898728b0dcf66bee39bc443ad5c",
+            "output_tail": "\u2714 visible: normalizes an existing status through the CLI (42.318291ms)\n\u2714 visible: preserves adjacent transition behavior (0.081625ms)\n\u2139 tests 2\n\u2139 suites 0\n\u2139 pass 2\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 98.690458\n",
             "passed": true,
             "returncode": 0
           },
           {
             "output_bytes": 251,
-            "output_sha256": "0f67fe2280e2b33fe3c5f1966959cfbe51bff54e0aa1d579c5054a42fb1b9da6",
-            "output_tail": "\u2714 visible: normalizes an existing status through the CLI (36.776875ms)\n\u2714 visible: preserves adjacent transition behavior (0.0795ms)\n\u2139 tests 2\n\u2139 suites 0\n\u2139 pass 2\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 103.816833\n",
+            "output_sha256": "ecc859606552a0d30b7cbbef7e81b7f78001d54cace28f5031446747de923d7c",
+            "output_tail": "\u2714 visible: normalizes an existing status through the CLI (43.0645ms)\n\u2714 visible: preserves adjacent transition behavior (0.081583ms)\n\u2139 tests 2\n\u2139 suites 0\n\u2139 pass 2\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 101.838041\n",
             "passed": true,
             "returncode": 0
           },
           {
-            "output_bytes": 252,
-            "output_sha256": "e757dcd2ec9a5df6a2ac5cd4721aac90d05f2243f59877fcb4be3264c86e141f",
-            "output_tail": "\u2714 visible: normalizes an existing status through the CLI (37.223792ms)\n\u2714 visible: preserves adjacent transition behavior (0.079708ms)\n\u2139 tests 2\n\u2139 suites 0\n\u2139 pass 2\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 85.799167\n",
+            "output_bytes": 253,
+            "output_sha256": "fbb4fba434650bc98bb16c5be024f55bc511cccfa30ba1ca9ef7a44423f851c9",
+            "output_tail": "\u2714 visible: normalizes an existing status through the CLI (42.939584ms)\n\u2714 visible: preserves adjacent transition behavior (0.112625ms)\n\u2139 tests 2\n\u2139 suites 0\n\u2139 pass 2\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 102.816959\n",
             "passed": true,
             "returncode": 0
           }
@@ -589,6 +589,14 @@
         "node",
         "--test",
         "test/fail-to-pass.test.js"
+      ],
+      "expected_cases": [
+        "dual:transitions insert blocked at the declared boundary",
+        "dual:transitions reject skipped blocked edges",
+        "dual:validation rejects malformed and unknown CLI input",
+        "dual:validation trims and normalizes CLI input",
+        "dual:vocabulary follows a later policy extension",
+        "dual:vocabulary follows a later policy removal"
       ],
       "overlays": [
         {

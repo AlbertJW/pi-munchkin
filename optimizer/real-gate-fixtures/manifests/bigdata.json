@@ -7,41 +7,55 @@
       "f4fa8eb62df76e5ccd72d927767bc482e0267f2f338b50ac307b1bf6ef5ce508"
     ],
     "automated": {
-      "checked_at": "2026-07-14T21:01:12Z",
+      "checked_at": "2026-08-18T14:00:31Z",
       "hash_drift": [],
+      "manifest_drift": false,
+      "overlay_lint": [],
       "passed": true,
       "runs_per_state": 3,
       "states": {
         "gold_fail_to_pass": [
           {
-            "output_tail": "",
+            "output_bytes": 198,
+            "output_sha256": "1ea2aaecd3124b9ffac7ea70f6146a26ef3b91f9570c49acbd9ac73024ac2998",
+            "output_tail": "\u2714 src/top3.json holds the top-3 users by total ok-amount, descending (13.51825ms)\n\u2139 tests 1\n\u2139 suites 0\n\u2139 pass 1\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 63.890375\n",
             "passed": true,
             "returncode": 0
           },
           {
-            "output_tail": "",
+            "output_bytes": 199,
+            "output_sha256": "d95786df53f348ceae0eed1aaf80b49d1d62c653ba36241b8bd63a092fabae22",
+            "output_tail": "\u2714 src/top3.json holds the top-3 users by total ok-amount, descending (12.835417ms)\n\u2139 tests 1\n\u2139 suites 0\n\u2139 pass 1\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 65.422959\n",
             "passed": true,
             "returncode": 0
           },
           {
-            "output_tail": "",
+            "output_bytes": 199,
+            "output_sha256": "f90ee966beba239016b86ca045ec826d2f6c4f11e808b0dfb1afdfdaebe559b0",
+            "output_tail": "\u2714 src/top3.json holds the top-3 users by total ok-amount, descending (13.732625ms)\n\u2139 tests 1\n\u2139 suites 0\n\u2139 pass 1\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 65.828291\n",
             "passed": true,
             "returncode": 0
           }
         ],
         "gold_pass_to_pass": [
           {
-            "output_tail": "",
+            "output_bytes": 162,
+            "output_sha256": "78badb67f5febc2671fac7df855cf613444ae37b16683bf5d3dfb240694c50fc",
+            "output_tail": "\u2714 parseEventLine parses a record (0.365625ms)\n\u2139 tests 1\n\u2139 suites 0\n\u2139 pass 1\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 64.616708\n",
             "passed": true,
             "returncode": 0
           },
           {
-            "output_tail": "",
+            "output_bytes": 158,
+            "output_sha256": "072947161881d37cfc48710399479755804f71c42baf96a1d88f35160d8a312e",
+            "output_tail": "\u2714 parseEventLine parses a record (0.356ms)\n\u2139 tests 1\n\u2139 suites 0\n\u2139 pass 1\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 59.87075\n",
             "passed": true,
             "returncode": 0
           },
           {
-            "output_tail": "",
+            "output_bytes": 162,
+            "output_sha256": "76c7e5cc91467fd1b2e47dc903a10c58bdc88fad713650648d0663f93d6950d3",
+            "output_tail": "\u2714 parseEventLine parses a record (0.371375ms)\n\u2139 tests 1\n\u2139 suites 0\n\u2139 pass 1\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 60.567292\n",
             "passed": true,
             "returncode": 0
           }
@@ -49,34 +63,46 @@
         "mutant:shortcut": {
           "fail_to_pass": [
             {
-              "output_tail": "'user_16'\n          ^\n  \n      at TestContext.<anonymous> (file:///private/var/folders/3r/nc7qhtpn56j7rt5nwg0rqw600000gn/T/pi-admit-bigdata-i9a0hny6/work/test/fail-to-pass.test.js:25:12)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.start (node:internal/test_runner/test:1242:17)\n      at startSubtestAfterBootstrap (node:internal/test_runner/harness:387:17) {\n    generatedMessage: false,\n    code: 'ERR_ASSERTION',\n    actual: 'user_06',\n    expected: 'user_16',\n    operator: 'strictEqual',\n    diff: 'simple'\n  }\n",
+              "output_bytes": 1032,
+              "output_sha256": "58b09126fe40d0b13ad9ecefa118ebcc61d791252faee7cb8e3f8a70111759c3",
+              "output_tail": "\u2716 src/top3.json holds the top-3 users by total ok-amount, descending (13.797125ms)\n\u2139 tests 1\n\u2139 suites 0\n\u2139 pass 0\n\u2139 fail 1\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 66.674041\n\n\u2716 failing tests:\n\ntest at test/fail-to-pass.test.js:8:1\n\u2716 src/top3.json holds the top-3 users by total ok-amount, descending (13.797125ms)\n  AssertionError [ERR_ASSERTION]: rank 1 user\n  + actual - expected\n  \n  + 'user_06'\n  - 'user_16'\n          ^\n  \n      at TestContext.<anonymous> (file://<path>:25:12)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.start (node:internal/test_runner/test:1242:17)\n      at startSubtestAfterBootstrap (node:internal/test_runner/harness:387:17) {\n    generatedMessage: false,\n    code: 'ERR_ASSERTION',\n    actual: 'user_06',\n    expected: 'user_16',\n    operator: 'strictEqual',\n    diff: 'simple'\n  }\n",
               "passed": false,
               "returncode": 1
             },
             {
-              "output_tail": "'user_16'\n          ^\n  \n      at TestContext.<anonymous> (file:///private/var/folders/3r/nc7qhtpn56j7rt5nwg0rqw600000gn/T/pi-admit-bigdata-75l56o0u/work/test/fail-to-pass.test.js:25:12)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.start (node:internal/test_runner/test:1242:17)\n      at startSubtestAfterBootstrap (node:internal/test_runner/harness:387:17) {\n    generatedMessage: false,\n    code: 'ERR_ASSERTION',\n    actual: 'user_06',\n    expected: 'user_16',\n    operator: 'strictEqual',\n    diff: 'simple'\n  }\n",
+              "output_bytes": 1032,
+              "output_sha256": "787e72f5cd0a07fb1fc6b6fb3f2bc0bb4b163d6d13f24764387320844f1c6de5",
+              "output_tail": "\u2716 src/top3.json holds the top-3 users by total ok-amount, descending (13.988417ms)\n\u2139 tests 1\n\u2139 suites 0\n\u2139 pass 0\n\u2139 fail 1\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 65.872542\n\n\u2716 failing tests:\n\ntest at test/fail-to-pass.test.js:8:1\n\u2716 src/top3.json holds the top-3 users by total ok-amount, descending (13.988417ms)\n  AssertionError [ERR_ASSERTION]: rank 1 user\n  + actual - expected\n  \n  + 'user_06'\n  - 'user_16'\n          ^\n  \n      at TestContext.<anonymous> (file://<path>:25:12)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.start (node:internal/test_runner/test:1242:17)\n      at startSubtestAfterBootstrap (node:internal/test_runner/harness:387:17) {\n    generatedMessage: false,\n    code: 'ERR_ASSERTION',\n    actual: 'user_06',\n    expected: 'user_16',\n    operator: 'strictEqual',\n    diff: 'simple'\n  }\n",
               "passed": false,
               "returncode": 1
             },
             {
-              "output_tail": "'user_16'\n          ^\n  \n      at TestContext.<anonymous> (file:///private/var/folders/3r/nc7qhtpn56j7rt5nwg0rqw600000gn/T/pi-admit-bigdata-f8w36vca/work/test/fail-to-pass.test.js:25:12)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.start (node:internal/test_runner/test:1242:17)\n      at startSubtestAfterBootstrap (node:internal/test_runner/harness:387:17) {\n    generatedMessage: false,\n    code: 'ERR_ASSERTION',\n    actual: 'user_06',\n    expected: 'user_16',\n    operator: 'strictEqual',\n    diff: 'simple'\n  }\n",
+              "output_bytes": 1032,
+              "output_sha256": "92fdfbe17933399acf2ef45d389f62cb45e039722fd720564763ead87ef97152",
+              "output_tail": "\u2716 src/top3.json holds the top-3 users by total ok-amount, descending (14.909583ms)\n\u2139 tests 1\n\u2139 suites 0\n\u2139 pass 0\n\u2139 fail 1\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 65.570458\n\n\u2716 failing tests:\n\ntest at test/fail-to-pass.test.js:8:1\n\u2716 src/top3.json holds the top-3 users by total ok-amount, descending (14.909583ms)\n  AssertionError [ERR_ASSERTION]: rank 1 user\n  + actual - expected\n  \n  + 'user_06'\n  - 'user_16'\n          ^\n  \n      at TestContext.<anonymous> (file://<path>:25:12)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.start (node:internal/test_runner/test:1242:17)\n      at startSubtestAfterBootstrap (node:internal/test_runner/harness:387:17) {\n    generatedMessage: false,\n    code: 'ERR_ASSERTION',\n    actual: 'user_06',\n    expected: 'user_16',\n    operator: 'strictEqual',\n    diff: 'simple'\n  }\n",
               "passed": false,
               "returncode": 1
             }
           ],
           "pass_to_pass": [
             {
-              "output_tail": "",
+              "output_bytes": 159,
+              "output_sha256": "2dc3ff38fd466b0bc6db123af40caf54861f6c648e8b336a8ddb555fc15850e5",
+              "output_tail": "\u2714 parseEventLine parses a record (0.356958ms)\n\u2139 tests 1\n\u2139 suites 0\n\u2139 pass 1\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 59.134\n",
               "passed": true,
               "returncode": 0
             },
             {
-              "output_tail": "",
+              "output_bytes": 162,
+              "output_sha256": "6a66cefe1ca6eaeffaf395737c12ed8f7b3277e2343a8628e51b61034b512ded",
+              "output_tail": "\u2714 parseEventLine parses a record (0.361084ms)\n\u2139 tests 1\n\u2139 suites 0\n\u2139 pass 1\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 59.047125\n",
               "passed": true,
               "returncode": 0
             },
             {
-              "output_tail": "",
+              "output_bytes": 162,
+              "output_sha256": "a28bb7e92faae4a872415968b7a3c2545f96e5220df955ff1c2f635ed35cfd2a",
+              "output_tail": "\u2714 parseEventLine parses a record (0.368459ms)\n\u2139 tests 1\n\u2139 suites 0\n\u2139 pass 1\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 64.658667\n",
               "passed": true,
               "returncode": 0
             }
@@ -84,42 +110,54 @@
         },
         "pristine_fail_to_pass": [
           {
-            "output_tail": "ENOENT: no such file or directory, open 'src/top3.json'\n      at readFileSync (node:fs:436:20)\n      at TestContext.<anonymous> (file:///private/var/folders/3r/nc7qhtpn56j7rt5nwg0rqw600000gn/T/pi-admit-bigdata-r4v7ht54/work/test/fail-to-pass.test.js:21:26)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.start (node:internal/test_runner/test:1242:17)\n      at startSubtestAfterBootstrap (node:internal/test_runner/harness:387:17) {\n    errno: -2,\n    code: 'ENOENT',\n    syscall: 'open',\n    path: 'src/top3.json'\n  }\n",
+            "output_bytes": 951,
+            "output_sha256": "d30699fa16e79f20174e5dd45f4a270f6fd380099db76906625886370c4dfa3e",
+            "output_tail": "\u2716 src/top3.json holds the top-3 users by total ok-amount, descending (10.907667ms)\n\u2139 tests 1\n\u2139 suites 0\n\u2139 pass 0\n\u2139 fail 1\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 72.67575\n\n\u2716 failing tests:\n\ntest at test/fail-to-pass.test.js:8:1\n\u2716 src/top3.json holds the top-3 users by total ok-amount, descending (10.907667ms)\n  Error: ENOENT: no such file or directory, open 'src/top3.json'\n      at readFileSync (node:fs:539:20)\n      at TestContext.<anonymous> (file://<path>:21:26)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.start (node:internal/test_runner/test:1242:17)\n      at startSubtestAfterBootstrap (node:internal/test_runner/harness:387:17) {\n    errno: -2,\n    code: 'ENOENT',\n    syscall: 'open',\n    path: 'src/top3.json'\n  }\n",
             "passed": false,
             "returncode": 1
           },
           {
-            "output_tail": "ENOENT: no such file or directory, open 'src/top3.json'\n      at readFileSync (node:fs:436:20)\n      at TestContext.<anonymous> (file:///private/var/folders/3r/nc7qhtpn56j7rt5nwg0rqw600000gn/T/pi-admit-bigdata-i93os1i6/work/test/fail-to-pass.test.js:21:26)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.start (node:internal/test_runner/test:1242:17)\n      at startSubtestAfterBootstrap (node:internal/test_runner/harness:387:17) {\n    errno: -2,\n    code: 'ENOENT',\n    syscall: 'open',\n    path: 'src/top3.json'\n  }\n",
+            "output_bytes": 946,
+            "output_sha256": "818986d21bbf50574363f153ba883408fdaee65b74d20b766e0b4e09874d981f",
+            "output_tail": "\u2716 src/top3.json holds the top-3 users by total ok-amount, descending (5.3805ms)\n\u2139 tests 1\n\u2139 suites 0\n\u2139 pass 0\n\u2139 fail 1\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 66.985417\n\n\u2716 failing tests:\n\ntest at test/fail-to-pass.test.js:8:1\n\u2716 src/top3.json holds the top-3 users by total ok-amount, descending (5.3805ms)\n  Error: ENOENT: no such file or directory, open 'src/top3.json'\n      at readFileSync (node:fs:539:20)\n      at TestContext.<anonymous> (file://<path>:21:26)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.start (node:internal/test_runner/test:1242:17)\n      at startSubtestAfterBootstrap (node:internal/test_runner/harness:387:17) {\n    errno: -2,\n    code: 'ENOENT',\n    syscall: 'open',\n    path: 'src/top3.json'\n  }\n",
             "passed": false,
             "returncode": 1
           },
           {
-            "output_tail": "ENOENT: no such file or directory, open 'src/top3.json'\n      at readFileSync (node:fs:436:20)\n      at TestContext.<anonymous> (file:///private/var/folders/3r/nc7qhtpn56j7rt5nwg0rqw600000gn/T/pi-admit-bigdata-v4431vcr/work/test/fail-to-pass.test.js:21:26)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.start (node:internal/test_runner/test:1242:17)\n      at startSubtestAfterBootstrap (node:internal/test_runner/harness:387:17) {\n    errno: -2,\n    code: 'ENOENT',\n    syscall: 'open',\n    path: 'src/top3.json'\n  }\n",
+            "output_bytes": 950,
+            "output_sha256": "1cb51c426e6f2a8ef297884de16d8bd26d9cc5afc1860ac500f41bae6cc835e6",
+            "output_tail": "\u2716 src/top3.json holds the top-3 users by total ok-amount, descending (5.228125ms)\n\u2139 tests 1\n\u2139 suites 0\n\u2139 pass 0\n\u2139 fail 1\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 55.680333\n\n\u2716 failing tests:\n\ntest at test/fail-to-pass.test.js:8:1\n\u2716 src/top3.json holds the top-3 users by total ok-amount, descending (5.228125ms)\n  Error: ENOENT: no such file or directory, open 'src/top3.json'\n      at readFileSync (node:fs:539:20)\n      at TestContext.<anonymous> (file://<path>:21:26)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.start (node:internal/test_runner/test:1242:17)\n      at startSubtestAfterBootstrap (node:internal/test_runner/harness:387:17) {\n    errno: -2,\n    code: 'ENOENT',\n    syscall: 'open',\n    path: 'src/top3.json'\n  }\n",
             "passed": false,
             "returncode": 1
           }
         ],
         "pristine_pass_to_pass": [
           {
-            "output_tail": "",
+            "output_bytes": 162,
+            "output_sha256": "f787c01cd6e0dc41b470fca23941da8e773b092c3934a6a31c1d723dac8db6ef",
+            "output_tail": "\u2714 parseEventLine parses a record (0.365042ms)\n\u2139 tests 1\n\u2139 suites 0\n\u2139 pass 1\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 59.768833\n",
             "passed": true,
             "returncode": 0
           },
           {
-            "output_tail": "",
+            "output_bytes": 162,
+            "output_sha256": "94cfba4597ff6b69ddbfad539c86e774ac5eb77cceee21ef6b2d2966c3465a36",
+            "output_tail": "\u2714 parseEventLine parses a record (0.366042ms)\n\u2139 tests 1\n\u2139 suites 0\n\u2139 pass 1\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 59.833208\n",
             "passed": true,
             "returncode": 0
           },
           {
-            "output_tail": "",
+            "output_bytes": 159,
+            "output_sha256": "1620e626ff94796284e6035098d3f90a321296a21804eae0e7d394afb889d145",
+            "output_tail": "\u2714 parseEventLine parses a record (0.371042ms)\n\u2139 tests 1\n\u2139 suites 0\n\u2139 pass 1\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 72.977\n",
             "passed": true,
             "returncode": 0
           }
         ]
       }
     },
-    "manifest_sha256": "e43f6d41f1c6fc07e88c20a74128ad55aff75113184e25879d21d6308f2780fe",
-    "reviewed_at": "2026-07-15T17:01:34Z",
+    "manifest_sha256": "49003acebae420954d7a02775b58e8e77e6ceaa2eef791f5cf1069ac5b934e35",
+    "reviewed_at": "2026-08-18T14:02:32Z",
     "reviewer": "Albert"
   },
   "artifacts": [
@@ -183,19 +221,16 @@
     },
     "perturbations": [
       {
-        "approved": false,
         "id": "equivalent-1",
         "sha256": "efdda06695414d2c5b9bbbc4134f8294ba9fc15b1ac1245da59b3a00819e50f7",
         "text": "Complete the following repository task. Preserve existing behavior and verify the tests.\n\ndata/events.jsonl holds ~4000 event records (one JSON object per line: id, user, amount, status, ts). Compute the 3 users with the highest total `amount` summed over their status:\"ok\" events only. Write the result to src/top3.json as a JSON array of exactly three objects [{\"user\": \"...\", \"total\": ...}, ...] sorted by total descending, totals rounded to 2 decimals. The file is large \u2014 query it rather than reading it whole. When `search_spans` is available, call it on data/events.jsonl so its exhaustive execution receipt proves full-corpus coverage; then use node or awk to aggregate. Run node --test and ensure the existing tests still pass."
       },
       {
-        "approved": false,
         "id": "equivalent-2",
         "sha256": "c1d9e180cf3c16bbdf99f7aba35bcefdac274703f13614bcc80c32dded4e7374",
         "text": "Repository change request:\ndata/events.jsonl holds ~4000 event records (one JSON object per line: id, user, amount, status, ts). Compute the 3 users with the highest total `amount` summed over their status:\"ok\" events only. Write the result to src/top3.json as a JSON array of exactly three objects [{\"user\": \"...\", \"total\": ...}, ...] sorted by total descending, totals rounded to 2 decimals. The file is large \u2014 query it rather than reading it whole. When `search_spans` is available, call it on data/events.jsonl so its exhaustive execution receipt proves full-corpus coverage; then use node or awk to aggregate. Run node --test and ensure the existing tests still pass.\n\nUse the smallest correct change and confirm the test suite."
       },
       {
-        "approved": false,
         "id": "equivalent-3",
         "sha256": "f4fa8eb62df76e5ccd72d927767bc482e0267f2f338b50ac307b1bf6ef5ce508",
         "text": "Please solve this task in the supplied checkout, retaining all stated edge cases:\n\ndata/events.jsonl holds ~4000 event records (one JSON object per line: id, user, amount, status, ts). Compute the 3 users with the highest total `amount` summed over their status:\"ok\" events only. Write the result to src/top3.json as a JSON array of exactly three objects [{\"user\": \"...\", \"total\": ...}, ...] sorted by total descending, totals rounded to 2 decimals. The file is large \u2014 query it rather than reading it whole. When `search_spans` is available, call it on data/events.jsonl so its exhaustive execution receipt proves full-corpus coverage; then use node or awk to aggregate. Run node --test and ensure the existing tests still pass."
@@ -218,6 +253,9 @@
         "--test",
         "test/fail-to-pass.test.js"
       ],
+      "expected_cases": [
+        "src/top3.json holds the top-3 users by total ok-amount, descending"
+      ],
       "overlays": [
         {
           "dest": "test/fail-to-pass.test.js",
@@ -236,7 +274,7 @@
     }
   },
   "timestamps": {
-    "admitted_at": "2026-07-15T17:01:34Z",
+    "admitted_at": "2026-08-18T14:02:32Z",
     "created_at": "2026-07-14T00:00:00Z",
     "expires_at": "2026-10-13T17:01:34Z"
   }

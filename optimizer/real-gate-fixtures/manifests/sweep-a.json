@@ -7,7 +7,7 @@
       "b10b7b807f3da1c58f37832338d7f87808bc35b8acc0cb5196c797943e60cbbc"
     ],
     "automated": {
-      "checked_at": "2026-08-18T09:19:04Z",
+      "checked_at": "2026-08-18T13:59:54Z",
       "hash_drift": [],
       "manifest_drift": false,
       "overlay_lint": [],
@@ -16,46 +16,46 @@
       "states": {
         "gold_fail_to_pass": [
           {
-            "output_bytes": 499,
-            "output_sha256": "5e052330c69c9995149d17d1dcfee13819b6d526f079bbe75ad33a99a05d4c96",
-            "output_tail": "\u2714 D1 money carries thousands separators (0.586084ms)\n\u2714 D2 zero quantity renders the OUT marker (0.393084ms)\n\u2714 D3 the currency rate comes from settings, not a restated constant (0.07775ms)\n\u2714 D4 rows are sorted alphabetically by name (7.625417ms)\n\u2714 D5 the handling fee is added after the discount, never discounted (0.092167ms)\n\u2714 D6 TOTAL sums active items only (0.094583ms)\n\u2139 tests 6\n\u2139 suites 0\n\u2139 pass 6\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 69.313416\n",
-            "passed": true,
-            "returncode": 0
-          },
-          {
-            "output_bytes": 499,
-            "output_sha256": "76e91dfa6f495e5ffb521d26064e44bf8ed551e95a05c55750bd2a26e2c585f1",
-            "output_tail": "\u2714 D1 money carries thousands separators (0.528292ms)\n\u2714 D2 zero quantity renders the OUT marker (0.42775ms)\n\u2714 D3 the currency rate comes from settings, not a restated constant (0.078792ms)\n\u2714 D4 rows are sorted alphabetically by name (7.315083ms)\n\u2714 D5 the handling fee is added after the discount, never discounted (0.079459ms)\n\u2714 D6 TOTAL sums active items only (0.089667ms)\n\u2139 tests 6\n\u2139 suites 0\n\u2139 pass 6\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 71.881333\n",
-            "passed": true,
-            "returncode": 0
-          },
-          {
             "output_bytes": 496,
-            "output_sha256": "8aa5544cbba430c0a54daf40f4b66629e05ede05f3ede2e0eb335abb5e38be24",
-            "output_tail": "\u2714 D1 money carries thousands separators (1.287958ms)\n\u2714 D2 zero quantity renders the OUT marker (0.747667ms)\n\u2714 D3 the currency rate comes from settings, not a restated constant (0.074417ms)\n\u2714 D4 rows are sorted alphabetically by name (11.125ms)\n\u2714 D5 the handling fee is added after the discount, never discounted (0.368709ms)\n\u2714 D6 TOTAL sums active items only (0.116875ms)\n\u2139 tests 6\n\u2139 suites 0\n\u2139 pass 6\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 116.093\n",
+            "output_sha256": "5bc00289f3e97429c14606818c599f3cb27b7d6c0e07aad7c5381078fa7343b2",
+            "output_tail": "\u2714 D1 money carries thousands separators (0.458125ms)\n\u2714 D2 zero quantity renders the OUT marker (0.383083ms)\n\u2714 D3 the currency rate comes from settings, not a restated constant (0.091208ms)\n\u2714 D4 rows are sorted alphabetically by name (8.045708ms)\n\u2714 D5 the handling fee is added after the discount, never discounted (0.067333ms)\n\u2714 D6 TOTAL sums active items only (0.07ms)\n\u2139 tests 6\n\u2139 suites 0\n\u2139 pass 6\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 65.198916\n",
+            "passed": true,
+            "returncode": 0
+          },
+          {
+            "output_bytes": 500,
+            "output_sha256": "ea457c4db937f16a88538695d5349c3bf57e3f80ecd8c58631c0e1f867b0db6d",
+            "output_tail": "\u2714 D1 money carries thousands separators (0.456458ms)\n\u2714 D2 zero quantity renders the OUT marker (0.371667ms)\n\u2714 D3 the currency rate comes from settings, not a restated constant (0.075583ms)\n\u2714 D4 rows are sorted alphabetically by name (6.895083ms)\n\u2714 D5 the handling fee is added after the discount, never discounted (0.064083ms)\n\u2714 D6 TOTAL sums active items only (0.069084ms)\n\u2139 tests 6\n\u2139 suites 0\n\u2139 pass 6\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 62.869209\n",
+            "passed": true,
+            "returncode": 0
+          },
+          {
+            "output_bytes": 499,
+            "output_sha256": "6e7f878839313619c08b1170308c8deac8690a8fea3de75668f7bc90c133ecb9",
+            "output_tail": "\u2714 D1 money carries thousands separators (0.46125ms)\n\u2714 D2 zero quantity renders the OUT marker (0.376334ms)\n\u2714 D3 the currency rate comes from settings, not a restated constant (0.064417ms)\n\u2714 D4 rows are sorted alphabetically by name (7.046334ms)\n\u2714 D5 the handling fee is added after the discount, never discounted (0.086792ms)\n\u2714 D6 TOTAL sums active items only (0.081542ms)\n\u2139 tests 6\n\u2139 suites 0\n\u2139 pass 6\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 66.056083\n",
             "passed": true,
             "returncode": 0
           }
         ],
         "gold_pass_to_pass": [
           {
-            "output_bytes": 386,
-            "output_sha256": "0acc11e49a875a800f4dd206a5efa3b1160977fd0d34ae484d522296c1d914d9",
-            "output_tail": "\u2714 small amounts render with two decimals (0.498875ms)\n\u2714 quantities are right-aligned in a five character column (0.07325ms)\n\u2714 a plain line total converts and adds the handling fee (0.087292ms)\n\u2714 a single-item report renders the row and the TOTAL line (0.459833ms)\n\u2139 tests 4\n\u2139 suites 0\n\u2139 pass 4\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 80.170542\n",
+            "output_bytes": 387,
+            "output_sha256": "db23dd2157ed542478ba7acaa6bfed74dd17d761858130dd016cd22cb4e4baaa",
+            "output_tail": "\u2714 small amounts render with two decimals (0.442583ms)\n\u2714 quantities are right-aligned in a five character column (0.070958ms)\n\u2714 a plain line total converts and adds the handling fee (0.061125ms)\n\u2714 a single-item report renders the row and the TOTAL line (0.389083ms)\n\u2139 tests 4\n\u2139 suites 0\n\u2139 pass 4\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 75.668167\n",
             "passed": true,
             "returncode": 0
           },
           {
-            "output_bytes": 382,
-            "output_sha256": "2d3429cf8141cf4c4ebd100d101f8072ab0b99ef263a9f979e0739cfd5312c21",
-            "output_tail": "\u2714 small amounts render with two decimals (0.497ms)\n\u2714 quantities are right-aligned in a five character column (0.079458ms)\n\u2714 a plain line total converts and adds the handling fee (0.0865ms)\n\u2714 a single-item report renders the row and the TOTAL line (0.453375ms)\n\u2139 tests 4\n\u2139 suites 0\n\u2139 pass 4\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 66.909334\n",
+            "output_bytes": 384,
+            "output_sha256": "3708863722f7c707354243c292dc757a0183e37976aed1c0175c335abc7f3d9b",
+            "output_tail": "\u2714 small amounts render with two decimals (0.436666ms)\n\u2714 quantities are right-aligned in a five character column (0.06875ms)\n\u2714 a plain line total converts and adds the handling fee (0.060542ms)\n\u2714 a single-item report renders the row and the TOTAL line (0.4245ms)\n\u2139 tests 4\n\u2139 suites 0\n\u2139 pass 4\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 61.082584\n",
             "passed": true,
             "returncode": 0
           },
           {
             "output_bytes": 387,
-            "output_sha256": "1c05b25feae7c63a91c62dd94310034b41812fbdf2bfd1caf904cf540a54ae64",
-            "output_tail": "\u2714 small amounts render with two decimals (0.504125ms)\n\u2714 quantities are right-aligned in a five character column (0.077834ms)\n\u2714 a plain line total converts and adds the handling fee (0.079625ms)\n\u2714 a single-item report renders the row and the TOTAL line (0.467958ms)\n\u2139 tests 4\n\u2139 suites 0\n\u2139 pass 4\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 66.371958\n",
+            "output_sha256": "25dcb77783e34320eda9088b647995705cd547378ffc286511d924631f1cd34f",
+            "output_tail": "\u2714 small amounts render with two decimals (1.710666ms)\n\u2714 quantities are right-aligned in a five character column (0.231083ms)\n\u2714 a plain line total converts and adds the handling fee (0.163542ms)\n\u2714 a single-item report renders the row and the TOTAL line (1.178625ms)\n\u2139 tests 4\n\u2139 suites 0\n\u2139 pass 4\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 66.981292\n",
             "passed": true,
             "returncode": 0
           }
@@ -63,46 +63,46 @@
         "mutant:shortcut": {
           "fail_to_pass": [
             {
-              "output_bytes": 5980,
-              "output_sha256": "16b794c5142696bc729787f5c4cbb94f7516af646d591a6eaacf24ef04255ff7",
-              "output_tail": "7) {\n    generatedMessage: true,\n    code: 'ERR_ASSERTION',\n    actual: 'zeta     1 2.75',\n    expected: /^alpha /,\n    operator: 'match',\n    diff: 'simple'\n  }\n\ntest at test/fail-to-pass.test.js:36:1\n\u2716 D5 the handling fee is added after the discount, never discounted (0.084375ms)\n  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:\n  \n  113.85 !== 114\n  \n      at TestContext.<anonymous> (file://<path>:44:10)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n      at Test.postRun (node:internal/test_runner/test:1522:19)\n      at Test.run (node:internal/test_runner/test:1447:12)\n      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7) {\n    generatedMessage: true,\n    code: 'ERR_ASSERTION',\n    actual: 113.85,\n    expected: 114,\n    operator: 'strictEqual',\n    diff: 'simple'\n  }\n\ntest at test/fail-to-pass.test.js:47:1\n\u2716 D6 TOTAL sums active items only (0.090584ms)\n  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:\n  + actual - expected\n  \n  + 'TOTAL 15.50'\n  - 'TOTAL 14.00'\n            ^\n  \n      at TestContext.<anonymous> (file://<path>:55:10)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n      at Test.postRun (node:internal/test_runner/test:1522:19)\n      at Test.run (node:internal/test_runner/test:1447:12)\n      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7) {\n    generatedMessage: true,\n    code: 'ERR_ASSERTION',\n    actual: 'TOTAL 15.50',\n    expected: 'TOTAL 14.00',\n    operator: 'strictEqual',\n    diff: 'simple'\n  }\n",
+              "output_bytes": 5966,
+              "output_sha256": "8aedfb19ffe76853fbc7b2cb447a6b98ffaa1f1eb9314c641f2c39a67cbaa969",
+              "output_tail": "7) {\n    generatedMessage: true,\n    code: 'ERR_ASSERTION',\n    actual: 'zeta     1 2.75',\n    expected: /^alpha /,\n    operator: 'match',\n    diff: 'simple'\n  }\n\ntest at test/fail-to-pass.test.js:36:1\n\u2716 D5 the handling fee is added after the discount, never discounted (0.079041ms)\n  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:\n  \n  113.85 !== 114\n  \n      at TestContext.<anonymous> (file://<path>:44:10)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n      at Test.postRun (node:internal/test_runner/test:1522:19)\n      at Test.run (node:internal/test_runner/test:1447:12)\n      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7) {\n    generatedMessage: true,\n    code: 'ERR_ASSERTION',\n    actual: 113.85,\n    expected: 114,\n    operator: 'strictEqual',\n    diff: 'simple'\n  }\n\ntest at test/fail-to-pass.test.js:47:1\n\u2716 D6 TOTAL sums active items only (0.083958ms)\n  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:\n  + actual - expected\n  \n  + 'TOTAL 15.50'\n  - 'TOTAL 14.00'\n            ^\n  \n      at TestContext.<anonymous> (file://<path>:55:10)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n      at Test.postRun (node:internal/test_runner/test:1522:19)\n      at Test.run (node:internal/test_runner/test:1447:12)\n      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7) {\n    generatedMessage: true,\n    code: 'ERR_ASSERTION',\n    actual: 'TOTAL 15.50',\n    expected: 'TOTAL 14.00',\n    operator: 'strictEqual',\n    diff: 'simple'\n  }\n",
               "passed": false,
               "returncode": 1
             },
             {
-              "output_bytes": 5980,
-              "output_sha256": "114016cf12f3ed83f8f30633d23648654676d77c2b1b3adc93c0e747cda60588",
-              "output_tail": "7) {\n    generatedMessage: true,\n    code: 'ERR_ASSERTION',\n    actual: 'zeta     1 2.75',\n    expected: /^alpha /,\n    operator: 'match',\n    diff: 'simple'\n  }\n\ntest at test/fail-to-pass.test.js:36:1\n\u2716 D5 the handling fee is added after the discount, never discounted (0.087417ms)\n  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:\n  \n  113.85 !== 114\n  \n      at TestContext.<anonymous> (file://<path>:44:10)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n      at Test.postRun (node:internal/test_runner/test:1522:19)\n      at Test.run (node:internal/test_runner/test:1447:12)\n      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7) {\n    generatedMessage: true,\n    code: 'ERR_ASSERTION',\n    actual: 113.85,\n    expected: 114,\n    operator: 'strictEqual',\n    diff: 'simple'\n  }\n\ntest at test/fail-to-pass.test.js:47:1\n\u2716 D6 TOTAL sums active items only (0.090292ms)\n  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:\n  + actual - expected\n  \n  + 'TOTAL 15.50'\n  - 'TOTAL 14.00'\n            ^\n  \n      at TestContext.<anonymous> (file://<path>:55:10)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n      at Test.postRun (node:internal/test_runner/test:1522:19)\n      at Test.run (node:internal/test_runner/test:1447:12)\n      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7) {\n    generatedMessage: true,\n    code: 'ERR_ASSERTION',\n    actual: 'TOTAL 15.50',\n    expected: 'TOTAL 14.00',\n    operator: 'strictEqual',\n    diff: 'simple'\n  }\n",
+              "output_bytes": 5976,
+              "output_sha256": "dc9e17dea8521d6c90f078e0d596f8554ed8e65030a71a79441aa217352e0585",
+              "output_tail": "7) {\n    generatedMessage: true,\n    code: 'ERR_ASSERTION',\n    actual: 'zeta     1 2.75',\n    expected: /^alpha /,\n    operator: 'match',\n    diff: 'simple'\n  }\n\ntest at test/fail-to-pass.test.js:36:1\n\u2716 D5 the handling fee is added after the discount, never discounted (0.078625ms)\n  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:\n  \n  113.85 !== 114\n  \n      at TestContext.<anonymous> (file://<path>:44:10)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n      at Test.postRun (node:internal/test_runner/test:1522:19)\n      at Test.run (node:internal/test_runner/test:1447:12)\n      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7) {\n    generatedMessage: true,\n    code: 'ERR_ASSERTION',\n    actual: 113.85,\n    expected: 114,\n    operator: 'strictEqual',\n    diff: 'simple'\n  }\n\ntest at test/fail-to-pass.test.js:47:1\n\u2716 D6 TOTAL sums active items only (0.084958ms)\n  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:\n  + actual - expected\n  \n  + 'TOTAL 15.50'\n  - 'TOTAL 14.00'\n            ^\n  \n      at TestContext.<anonymous> (file://<path>:55:10)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n      at Test.postRun (node:internal/test_runner/test:1522:19)\n      at Test.run (node:internal/test_runner/test:1447:12)\n      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7) {\n    generatedMessage: true,\n    code: 'ERR_ASSERTION',\n    actual: 'TOTAL 15.50',\n    expected: 'TOTAL 14.00',\n    operator: 'strictEqual',\n    diff: 'simple'\n  }\n",
               "passed": false,
               "returncode": 1
             },
             {
-              "output_bytes": 5982,
-              "output_sha256": "c2d4a5b04cea3a7f06c946ff736d7c4b82573f8504a566b9805d9ae2feee5ceb",
-              "output_tail": "7) {\n    generatedMessage: true,\n    code: 'ERR_ASSERTION',\n    actual: 'zeta     1 2.75',\n    expected: /^alpha /,\n    operator: 'match',\n    diff: 'simple'\n  }\n\ntest at test/fail-to-pass.test.js:36:1\n\u2716 D5 the handling fee is added after the discount, never discounted (0.094958ms)\n  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:\n  \n  113.85 !== 114\n  \n      at TestContext.<anonymous> (file://<path>:44:10)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n      at Test.postRun (node:internal/test_runner/test:1522:19)\n      at Test.run (node:internal/test_runner/test:1447:12)\n      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7) {\n    generatedMessage: true,\n    code: 'ERR_ASSERTION',\n    actual: 113.85,\n    expected: 114,\n    operator: 'strictEqual',\n    diff: 'simple'\n  }\n\ntest at test/fail-to-pass.test.js:47:1\n\u2716 D6 TOTAL sums active items only (0.093083ms)\n  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:\n  + actual - expected\n  \n  + 'TOTAL 15.50'\n  - 'TOTAL 14.00'\n            ^\n  \n      at TestContext.<anonymous> (file://<path>:55:10)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n      at Test.postRun (node:internal/test_runner/test:1522:19)\n      at Test.run (node:internal/test_runner/test:1447:12)\n      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7) {\n    generatedMessage: true,\n    code: 'ERR_ASSERTION',\n    actual: 'TOTAL 15.50',\n    expected: 'TOTAL 14.00',\n    operator: 'strictEqual',\n    diff: 'simple'\n  }\n",
+              "output_bytes": 5978,
+              "output_sha256": "3dd53830f41f99516fe8cb0aa883301b1bc8282c35335b69dfed00be5653378f",
+              "output_tail": "7) {\n    generatedMessage: true,\n    code: 'ERR_ASSERTION',\n    actual: 'zeta     1 2.75',\n    expected: /^alpha /,\n    operator: 'match',\n    diff: 'simple'\n  }\n\ntest at test/fail-to-pass.test.js:36:1\n\u2716 D5 the handling fee is added after the discount, never discounted (0.080541ms)\n  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:\n  \n  113.85 !== 114\n  \n      at TestContext.<anonymous> (file://<path>:44:10)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n      at Test.postRun (node:internal/test_runner/test:1522:19)\n      at Test.run (node:internal/test_runner/test:1447:12)\n      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7) {\n    generatedMessage: true,\n    code: 'ERR_ASSERTION',\n    actual: 113.85,\n    expected: 114,\n    operator: 'strictEqual',\n    diff: 'simple'\n  }\n\ntest at test/fail-to-pass.test.js:47:1\n\u2716 D6 TOTAL sums active items only (0.081708ms)\n  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:\n  + actual - expected\n  \n  + 'TOTAL 15.50'\n  - 'TOTAL 14.00'\n            ^\n  \n      at TestContext.<anonymous> (file://<path>:55:10)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n      at Test.postRun (node:internal/test_runner/test:1522:19)\n      at Test.run (node:internal/test_runner/test:1447:12)\n      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7) {\n    generatedMessage: true,\n    code: 'ERR_ASSERTION',\n    actual: 'TOTAL 15.50',\n    expected: 'TOTAL 14.00',\n    operator: 'strictEqual',\n    diff: 'simple'\n  }\n",
               "passed": false,
               "returncode": 1
             }
           ],
           "pass_to_pass": [
             {
-              "output_bytes": 388,
-              "output_sha256": "ebf0ba03101c058004cb58e5a96ccece46b31796e615856bc9f1e97ca5b6c139",
-              "output_tail": "\u2714 small amounts render with two decimals (0.401708ms)\n\u2714 quantities are right-aligned in a five character column (0.265416ms)\n\u2714 a plain line total converts and adds the handling fee (0.130166ms)\n\u2714 a single-item report renders the row and the TOTAL line (1.247625ms)\n\u2139 tests 4\n\u2139 suites 0\n\u2139 pass 4\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 103.265917\n",
-              "passed": true,
-              "returncode": 0
-            },
-            {
-              "output_bytes": 384,
-              "output_sha256": "6681840720a6a44fed5fb76418fef1ef1f95867ec3d1d177a261080a291292ed",
-              "output_tail": "\u2714 small amounts render with two decimals (0.4035ms)\n\u2714 quantities are right-aligned in a five character column (0.068833ms)\n\u2714 a plain line total converts and adds the handling fee (0.0665ms)\n\u2714 a single-item report renders the row and the TOTAL line (0.545375ms)\n\u2139 tests 4\n\u2139 suites 0\n\u2139 pass 4\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 102.825208\n",
+              "output_bytes": 383,
+              "output_sha256": "9ab00ba1c2f73b8296e9845e8f3d2c71c8573c4d564294e8da4bad7ae7f06246",
+              "output_tail": "\u2714 small amounts render with two decimals (0.409375ms)\n\u2714 quantities are right-aligned in a five character column (0.06825ms)\n\u2714 a plain line total converts and adds the handling fee (0.061666ms)\n\u2714 a single-item report renders the row and the TOTAL line (0.525ms)\n\u2139 tests 4\n\u2139 suites 0\n\u2139 pass 4\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 67.507083\n",
               "passed": true,
               "returncode": 0
             },
             {
               "output_bytes": 387,
-              "output_sha256": "ae7ba643c6440fcf3897bb16b1dd645f8d3b9005364be87cc4b182e917da4e63",
-              "output_tail": "\u2714 small amounts render with two decimals (0.415708ms)\n\u2714 quantities are right-aligned in a five character column (0.070375ms)\n\u2714 a plain line total converts and adds the handling fee (0.068916ms)\n\u2714 a single-item report renders the row and the TOTAL line (0.626333ms)\n\u2139 tests 4\n\u2139 suites 0\n\u2139 pass 4\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 98.396375\n",
+              "output_sha256": "59a3c74d596eab5261a715a4bbe2aa374e93f17bf3b22457dd59cc1dcbea94b6",
+              "output_tail": "\u2714 small amounts render with two decimals (0.393125ms)\n\u2714 quantities are right-aligned in a five character column (0.069375ms)\n\u2714 a plain line total converts and adds the handling fee (0.065875ms)\n\u2714 a single-item report renders the row and the TOTAL line (0.489791ms)\n\u2139 tests 4\n\u2139 suites 0\n\u2139 pass 4\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 62.369125\n",
+              "passed": true,
+              "returncode": 0
+            },
+            {
+              "output_bytes": 386,
+              "output_sha256": "f14dff785facc3e296b5e110b9cc7978dd651c37baf6d59317b5b7a9657ba333",
+              "output_tail": "\u2714 small amounts render with two decimals (0.395542ms)\n\u2714 quantities are right-aligned in a five character column (0.065875ms)\n\u2714 a plain line total converts and adds the handling fee (0.06125ms)\n\u2714 a single-item report renders the row and the TOTAL line (0.417584ms)\n\u2139 tests 4\n\u2139 suites 0\n\u2139 pass 4\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 63.465291\n",
               "passed": true,
               "returncode": 0
             }
@@ -110,23 +110,23 @@
         },
         "pristine_fail_to_pass": [
           {
-            "output_bytes": 5978,
-            "output_sha256": "bd43608110db33f7f82afe6774bec25a772f2918d14141940bcd11c4b6ad9e21",
-            "output_tail": "7) {\n    generatedMessage: true,\n    code: 'ERR_ASSERTION',\n    actual: 'zeta     1 2.75',\n    expected: /^alpha /,\n    operator: 'match',\n    diff: 'simple'\n  }\n\ntest at test/fail-to-pass.test.js:36:1\n\u2716 D5 the handling fee is added after the discount, never discounted (0.134458ms)\n  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:\n  \n  113.85 !== 114\n  \n      at TestContext.<anonymous> (file://<path>:44:10)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n      at Test.postRun (node:internal/test_runner/test:1522:19)\n      at Test.run (node:internal/test_runner/test:1447:12)\n      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7) {\n    generatedMessage: true,\n    code: 'ERR_ASSERTION',\n    actual: 113.85,\n    expected: 114,\n    operator: 'strictEqual',\n    diff: 'simple'\n  }\n\ntest at test/fail-to-pass.test.js:47:1\n\u2716 D6 TOTAL sums active items only (0.158208ms)\n  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:\n  + actual - expected\n  \n  + 'TOTAL 15.50'\n  - 'TOTAL 14.00'\n            ^\n  \n      at TestContext.<anonymous> (file://<path>:55:10)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n      at Test.postRun (node:internal/test_runner/test:1522:19)\n      at Test.run (node:internal/test_runner/test:1447:12)\n      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7) {\n    generatedMessage: true,\n    code: 'ERR_ASSERTION',\n    actual: 'TOTAL 15.50',\n    expected: 'TOTAL 14.00',\n    operator: 'strictEqual',\n    diff: 'simple'\n  }\n",
+            "output_bytes": 5982,
+            "output_sha256": "bdad79586c1d941cc7469f260a4489dc6212002dc025b300ea78c4e9bda68967",
+            "output_tail": "7) {\n    generatedMessage: true,\n    code: 'ERR_ASSERTION',\n    actual: 'zeta     1 2.75',\n    expected: /^alpha /,\n    operator: 'match',\n    diff: 'simple'\n  }\n\ntest at test/fail-to-pass.test.js:36:1\n\u2716 D5 the handling fee is added after the discount, never discounted (0.082084ms)\n  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:\n  \n  113.85 !== 114\n  \n      at TestContext.<anonymous> (file://<path>:44:10)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n      at Test.postRun (node:internal/test_runner/test:1522:19)\n      at Test.run (node:internal/test_runner/test:1447:12)\n      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7) {\n    generatedMessage: true,\n    code: 'ERR_ASSERTION',\n    actual: 113.85,\n    expected: 114,\n    operator: 'strictEqual',\n    diff: 'simple'\n  }\n\ntest at test/fail-to-pass.test.js:47:1\n\u2716 D6 TOTAL sums active items only (0.083375ms)\n  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:\n  + actual - expected\n  \n  + 'TOTAL 15.50'\n  - 'TOTAL 14.00'\n            ^\n  \n      at TestContext.<anonymous> (file://<path>:55:10)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n      at Test.postRun (node:internal/test_runner/test:1522:19)\n      at Test.run (node:internal/test_runner/test:1447:12)\n      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7) {\n    generatedMessage: true,\n    code: 'ERR_ASSERTION',\n    actual: 'TOTAL 15.50',\n    expected: 'TOTAL 14.00',\n    operator: 'strictEqual',\n    diff: 'simple'\n  }\n",
+            "passed": false,
+            "returncode": 1
+          },
+          {
+            "output_bytes": 5976,
+            "output_sha256": "4d2a55bcac62e6e5af42997d91bf731038708bbe61e444d95a5c965945a5f557",
+            "output_tail": "7) {\n    generatedMessage: true,\n    code: 'ERR_ASSERTION',\n    actual: 'zeta     1 2.75',\n    expected: /^alpha /,\n    operator: 'match',\n    diff: 'simple'\n  }\n\ntest at test/fail-to-pass.test.js:36:1\n\u2716 D5 the handling fee is added after the discount, never discounted (0.079375ms)\n  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:\n  \n  113.85 !== 114\n  \n      at TestContext.<anonymous> (file://<path>:44:10)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n      at Test.postRun (node:internal/test_runner/test:1522:19)\n      at Test.run (node:internal/test_runner/test:1447:12)\n      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7) {\n    generatedMessage: true,\n    code: 'ERR_ASSERTION',\n    actual: 113.85,\n    expected: 114,\n    operator: 'strictEqual',\n    diff: 'simple'\n  }\n\ntest at test/fail-to-pass.test.js:47:1\n\u2716 D6 TOTAL sums active items only (0.084333ms)\n  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:\n  + actual - expected\n  \n  + 'TOTAL 15.50'\n  - 'TOTAL 14.00'\n            ^\n  \n      at TestContext.<anonymous> (file://<path>:55:10)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n      at Test.postRun (node:internal/test_runner/test:1522:19)\n      at Test.run (node:internal/test_runner/test:1447:12)\n      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7) {\n    generatedMessage: true,\n    code: 'ERR_ASSERTION',\n    actual: 'TOTAL 15.50',\n    expected: 'TOTAL 14.00',\n    operator: 'strictEqual',\n    diff: 'simple'\n  }\n",
             "passed": false,
             "returncode": 1
           },
           {
             "output_bytes": 5982,
-            "output_sha256": "fe6b84f53727f9a10686124148917074dfb202db2da526aa0699c3cbf58c9d44",
-            "output_tail": "7) {\n    generatedMessage: true,\n    code: 'ERR_ASSERTION',\n    actual: 'zeta     1 2.75',\n    expected: /^alpha /,\n    operator: 'match',\n    diff: 'simple'\n  }\n\ntest at test/fail-to-pass.test.js:36:1\n\u2716 D5 the handling fee is added after the discount, never discounted (0.094583ms)\n  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:\n  \n  113.85 !== 114\n  \n      at TestContext.<anonymous> (file://<path>:44:10)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n      at Test.postRun (node:internal/test_runner/test:1522:19)\n      at Test.run (node:internal/test_runner/test:1447:12)\n      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7) {\n    generatedMessage: true,\n    code: 'ERR_ASSERTION',\n    actual: 113.85,\n    expected: 114,\n    operator: 'strictEqual',\n    diff: 'simple'\n  }\n\ntest at test/fail-to-pass.test.js:47:1\n\u2716 D6 TOTAL sums active items only (0.155916ms)\n  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:\n  + actual - expected\n  \n  + 'TOTAL 15.50'\n  - 'TOTAL 14.00'\n            ^\n  \n      at TestContext.<anonymous> (file://<path>:55:10)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n      at Test.postRun (node:internal/test_runner/test:1522:19)\n      at Test.run (node:internal/test_runner/test:1447:12)\n      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7) {\n    generatedMessage: true,\n    code: 'ERR_ASSERTION',\n    actual: 'TOTAL 15.50',\n    expected: 'TOTAL 14.00',\n    operator: 'strictEqual',\n    diff: 'simple'\n  }\n",
-            "passed": false,
-            "returncode": 1
-          },
-          {
-            "output_bytes": 5962,
-            "output_sha256": "cc8c5b5bbe802545776c3fa7c300aadb52860bb09d200c64fbd350ca694cfbba",
-            "output_tail": "960:7) {\n    generatedMessage: true,\n    code: 'ERR_ASSERTION',\n    actual: 'zeta     1 2.75',\n    expected: /^alpha /,\n    operator: 'match',\n    diff: 'simple'\n  }\n\ntest at test/fail-to-pass.test.js:36:1\n\u2716 D5 the handling fee is added after the discount, never discounted (0.0925ms)\n  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:\n  \n  113.85 !== 114\n  \n      at TestContext.<anonymous> (file://<path>:44:10)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n      at Test.postRun (node:internal/test_runner/test:1522:19)\n      at Test.run (node:internal/test_runner/test:1447:12)\n      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7) {\n    generatedMessage: true,\n    code: 'ERR_ASSERTION',\n    actual: 113.85,\n    expected: 114,\n    operator: 'strictEqual',\n    diff: 'simple'\n  }\n\ntest at test/fail-to-pass.test.js:47:1\n\u2716 D6 TOTAL sums active items only (0.1015ms)\n  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:\n  + actual - expected\n  \n  + 'TOTAL 15.50'\n  - 'TOTAL 14.00'\n            ^\n  \n      at TestContext.<anonymous> (file://<path>:55:10)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n      at Test.postRun (node:internal/test_runner/test:1522:19)\n      at Test.run (node:internal/test_runner/test:1447:12)\n      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7) {\n    generatedMessage: true,\n    code: 'ERR_ASSERTION',\n    actual: 'TOTAL 15.50',\n    expected: 'TOTAL 14.00',\n    operator: 'strictEqual',\n    diff: 'simple'\n  }\n",
+            "output_sha256": "02750847d015d75e69b999b38f4a71baa239a964b617545183cc76776c45359e",
+            "output_tail": "7) {\n    generatedMessage: true,\n    code: 'ERR_ASSERTION',\n    actual: 'zeta     1 2.75',\n    expected: /^alpha /,\n    operator: 'match',\n    diff: 'simple'\n  }\n\ntest at test/fail-to-pass.test.js:36:1\n\u2716 D5 the handling fee is added after the discount, never discounted (0.081333ms)\n  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:\n  \n  113.85 !== 114\n  \n      at TestContext.<anonymous> (file://<path>:44:10)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n      at Test.postRun (node:internal/test_runner/test:1522:19)\n      at Test.run (node:internal/test_runner/test:1447:12)\n      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7) {\n    generatedMessage: true,\n    code: 'ERR_ASSERTION',\n    actual: 113.85,\n    expected: 114,\n    operator: 'strictEqual',\n    diff: 'simple'\n  }\n\ntest at test/fail-to-pass.test.js:47:1\n\u2716 D6 TOTAL sums active items only (0.085833ms)\n  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:\n  + actual - expected\n  \n  + 'TOTAL 15.50'\n  - 'TOTAL 14.00'\n            ^\n  \n      at TestContext.<anonymous> (file://<path>:55:10)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)\n      at Test.postRun (node:internal/test_runner/test:1522:19)\n      at Test.run (node:internal/test_runner/test:1447:12)\n      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7) {\n    generatedMessage: true,\n    code: 'ERR_ASSERTION',\n    actual: 'TOTAL 15.50',\n    expected: 'TOTAL 14.00',\n    operator: 'strictEqual',\n    diff: 'simple'\n  }\n",
             "passed": false,
             "returncode": 1
           }
@@ -134,30 +134,30 @@
         "pristine_pass_to_pass": [
           {
             "output_bytes": 387,
-            "output_sha256": "1d1c6d5da820baed853e486feb1c7514a4054e7054ac6e636f239a4ac5b94e2e",
-            "output_tail": "\u2714 small amounts render with two decimals (0.818333ms)\n\u2714 quantities are right-aligned in a five character column (0.177667ms)\n\u2714 a plain line total converts and adds the handling fee (0.276708ms)\n\u2714 a single-item report renders the row and the TOTAL line (1.253417ms)\n\u2139 tests 4\n\u2139 suites 0\n\u2139 pass 4\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 86.162417\n",
-            "passed": true,
-            "returncode": 0
-          },
-          {
-            "output_bytes": 387,
-            "output_sha256": "5b5e830f92426a7d53fa44bb5eff90b3e2455db6bc0c1ae6923e9fac15498713",
-            "output_tail": "\u2714 small amounts render with two decimals (0.668209ms)\n\u2714 quantities are right-aligned in a five character column (0.073333ms)\n\u2714 a plain line total converts and adds the handling fee (0.114958ms)\n\u2714 a single-item report renders the row and the TOTAL line (0.537667ms)\n\u2139 tests 4\n\u2139 suites 0\n\u2139 pass 4\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 69.539292\n",
+            "output_sha256": "1d267a7f0c72d182901887cf3b725a66fdb516a1a115973879e60288641746e8",
+            "output_tail": "\u2714 small amounts render with two decimals (0.412834ms)\n\u2714 quantities are right-aligned in a five character column (0.067125ms)\n\u2714 a plain line total converts and adds the handling fee (0.060875ms)\n\u2714 a single-item report renders the row and the TOTAL line (0.398667ms)\n\u2139 tests 4\n\u2139 suites 0\n\u2139 pass 4\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 62.361375\n",
             "passed": true,
             "returncode": 0
           },
           {
             "output_bytes": 386,
-            "output_sha256": "e709dacc4fb41d0d56e252837667dc1cb3e71d560a2dc1d5db43cb088bd97233",
-            "output_tail": "\u2714 small amounts render with two decimals (0.397916ms)\n\u2714 quantities are right-aligned in a five character column (0.073542ms)\n\u2714 a plain line total converts and adds the handling fee (0.10475ms)\n\u2714 a single-item report renders the row and the TOTAL line (0.575458ms)\n\u2139 tests 4\n\u2139 suites 0\n\u2139 pass 4\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 65.965417\n",
+            "output_sha256": "1d512bf5443b175af33535ed145f60ad3e1ac9b4cb9811138634cac647683a2e",
+            "output_tail": "\u2714 small amounts render with two decimals (0.405208ms)\n\u2714 quantities are right-aligned in a five character column (0.068333ms)\n\u2714 a plain line total converts and adds the handling fee (0.064542ms)\n\u2714 a single-item report renders the row and the TOTAL line (0.40325ms)\n\u2139 tests 4\n\u2139 suites 0\n\u2139 pass 4\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 59.617041\n",
+            "passed": true,
+            "returncode": 0
+          },
+          {
+            "output_bytes": 386,
+            "output_sha256": "adf4d46ae1c6e3ec3757beb2f2b2ad6a98eae8d2a506b0741f2bc81589e01b9d",
+            "output_tail": "\u2714 small amounts render with two decimals (0.386958ms)\n\u2714 quantities are right-aligned in a five character column (0.066542ms)\n\u2714 a plain line total converts and adds the handling fee (0.063458ms)\n\u2714 a single-item report renders the row and the TOTAL line (0.370291ms)\n\u2139 tests 4\n\u2139 suites 0\n\u2139 pass 4\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 62.62975\n",
             "passed": true,
             "returncode": 0
           }
         ]
       }
     },
-    "manifest_sha256": "d33c67fb95ad215778fb8927f9e3c392db7be98a8d7421e38b7830a4b019052e",
-    "reviewed_at": "2026-08-18T09:19:56Z",
+    "manifest_sha256": "57138aee128c12d24d8f455330f48c54bd69dcf7699fdbae3535f0b8c7f6fe35",
+    "reviewed_at": "2026-08-18T14:02:33Z",
     "reviewer": "albert"
   },
   "artifacts": [
@@ -307,6 +307,14 @@
         "--test",
         "test/fail-to-pass.test.js"
       ],
+      "expected_cases": [
+        "D1 money carries thousands separators",
+        "D2 zero quantity renders the OUT marker",
+        "D3 the currency rate comes from settings, not a restated constant",
+        "D4 rows are sorted alphabetically by name",
+        "D5 the handling fee is added after the discount, never discounted",
+        "D6 TOTAL sums active items only"
+      ],
       "overlays": [
         {
           "dest": "test/fail-to-pass.test.js",
@@ -325,7 +333,7 @@
     }
   },
   "timestamps": {
-    "admitted_at": "2026-08-18T09:19:56Z",
+    "admitted_at": "2026-08-18T14:02:33Z",
     "created_at": "2026-07-14T00:00:00Z",
     "expires_at": "2026-11-16T09:19:56Z"
   }

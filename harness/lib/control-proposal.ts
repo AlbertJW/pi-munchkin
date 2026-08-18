@@ -90,6 +90,12 @@ const PRIORITY: Record<ControlKind, number> = {
 	context_hint: 100,
 };
 const KINDS = new Set(Object.keys(PRIORITY));
+// Exported for the run-kernel-state parity test: every reason a decision can
+// carry must also be accepted by the persisted-state validator.
+export const CONTROL_REASON_VALUES: readonly ControlReason[] = [
+	"policy_rejection", "compile_or_lint", "loop_hard_stop", "semantic_tier", "outcome_repeat", "session_repeat",
+	"exact_gate_missing", "verification_plateau", "loop_recovery", "plan_blocked", "pseudo_tool_call", "research_unverified", "state_lens",
+];
 const REASONS = new Set<ControlReason>([
 	"policy_rejection", "compile_or_lint", "loop_hard_stop", "semantic_tier", "outcome_repeat", "session_repeat",
 	"exact_gate_missing", "verification_plateau", "loop_recovery", "plan_blocked", "pseudo_tool_call", "research_unverified", "state_lens",
