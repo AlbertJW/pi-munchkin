@@ -2,7 +2,7 @@ import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { classifyBashCommand, isBashMutation, looksFailingOutput } from "../lib/command-policy.ts";
 import {
 	boundedResultText, FailureEpisodeTracker, isFailureObservation,
-	planItemHash, sha256, strategyHash,
+	callVariantHash, planItemHash, sha256,
 	type FailureEpisode, type FailureObservation, type RecoveryKind,
 } from "../lib/failure-episodes.ts";
 import { decideOutcomeAction } from "../lib/loop-outcome.ts";
@@ -14,10 +14,7 @@ import { steerText } from "../lib/steer-texts.ts";
 import { record } from "../lib/telemetry.ts";
 import { emitHarnessSignal, onHarnessSignal } from "../lib/harness-signals.ts";
 import { isFirstTokenEvent } from "./runtime-truth.ts";
-import { renderRecoveryBrief } from "../lib/recovery-brief.ts";
-import { onRunStateSnapshot } from "../lib/run-kernel-snapshot.ts";
 import { runCapsuleMode } from "../lib/run-capsule-store.ts";
-import type { RunStateV1 } from "../lib/run-kernel-types.ts";
 import { readDetectedProjectGate } from "../lib/project-gate.ts";
 import { selectHighestLoopAction, type LoopActionCandidate } from "../lib/loop-action.ts";
 import {
@@ -355,7 +352,7 @@ export default function (pi: ExtensionAPI) {
 	const episodeCalls = new Map<string, { args: Record<string, unknown>; planItemId: string | null }>();
 	const episodeProcessed = new Set<string>();
 	const episodeTierFired = new Map<string, LoopTier>();
-	const exactStrategies = new Map<string, Map<string, { count: number; fp: string }>>();
+	const exactVariants = new Map<string, Map<string, { count: number; fp: string }>>();
 	const sessionTierFired = new Set<LoopTier>();
 	let providerRequest = 0;
 	let providerRecovered = true;
@@ -368,10 +365,8 @@ export default function (pi: ExtensionAPI) {
 	};
 	type RuntimeLoopAction = LoopActionCandidate & { apply(): Promise<LoopTier> | LoopTier };
 	let pendingAction: PendingAction | null = null;
-	let recoveryState: RunStateV1 | null = null;
 	let sessionCwd = "";
 
-	onRunStateSnapshot(pi.events, (event) => { recoveryState = event.state; });
 
 	function publishTier(tier: Exclude<LoopTier, 0>, detector: "exact" | "outcome" | "semantic" | "session"): void {
 		emitHarnessSignal(pi.events, { v: 1, type: "loop/tier", tier, detector });
@@ -426,7 +421,7 @@ export default function (pi: ExtensionAPI) {
 		pendingAction = null;
 		const cleared = episodeTracker.clearActive();
 		recordRecovery(cleared);
-		exactStrategies.clear();
+		exactVariants.clear();
 		episodeTierFired.clear();
 		publishEpisodes();
 		emitHarnessSignal(pi.events, { v: 1, type: "recovery/resumed", origin, cleared: cleared.length, blocked });
@@ -435,7 +430,7 @@ export default function (pi: ExtensionAPI) {
 	function recordRecovery(episodes: FailureEpisode[]): void {
 		for (const episode of episodes) {
 			episodeTierFired.delete(episode.id);
-			exactStrategies.delete(episode.id);
+			exactVariants.delete(episode.id);
 			if (pendingAction?.episode?.id === episode.id) pendingAction = null;
 			record("failure-episode", "recovered", {
 				episode_id: episode.id,
@@ -469,12 +464,12 @@ export default function (pi: ExtensionAPI) {
 	}
 
 	function observeSemanticTier(episode: FailureEpisode, toolName: string, args: Record<string, unknown>): void {
-		const strategy = strategyHash(toolName, args);
-		const strategies = exactStrategies.get(episode.id) ?? new Map<string, { count: number; fp: string }>();
-		const current = strategies.get(strategy);
+		const callVariant = callVariantHash(toolName, args);
+		const variants = exactVariants.get(episode.id) ?? new Map<string, { count: number; fp: string }>();
+		const current = variants.get(callVariant);
 		if (current) current.count += 1;
-		else if (strategies.size < 16) strategies.set(strategy, { count: 1, fp: fpKey(toolName, args) });
-		exactStrategies.set(episode.id, strategies);
+		else if (variants.size < 16) variants.set(callVariant, { count: 1, fp: fpKey(toolName, args) });
+		exactVariants.set(episode.id, variants);
 
 		const tier = tierForCount(episode.count, EPISODE_T1, EPISODE_T2, EPISODE_T3);
 		const prior = episodeTierFired.get(episode.id) ?? 0;
@@ -487,7 +482,7 @@ export default function (pi: ExtensionAPI) {
 		if (EPISODE_MODE !== "enforce") return;
 		mergePending({
 			tier, detector: "semantic", episode,
-			exactRepeatedFps: [...strategies.values()].filter((entry) => entry.count > 1).map((entry) => entry.fp),
+			exactRepeatedFps: [...variants.values()].filter((entry) => entry.count > 1).map((entry) => entry.fp),
 			count: episode.count,
 		});
 	}
@@ -544,7 +539,7 @@ export default function (pi: ExtensionAPI) {
 			count: episode.count,
 			calls_after_second: episode.callsAfterSecond,
 			correlated_calls_after_second: episode.correlatedCallsAfterSecond,
-			strategy_count: episode.strategyHashes.length,
+			call_variant_count: episode.callVariantHashes.length,
 		});
 		observeSemanticTier(episode, toolName, args);
 		publishEpisodes();
@@ -557,16 +552,17 @@ export default function (pi: ExtensionAPI) {
 	}, turnIndex: number): Promise<LoopTier> {
 		if (EPISODE_MODE !== "enforce") return 0;
 		const failureClass = action.episode?.failureClass ?? "unknown";
+		const callVariantCount = action.episode?.callVariantHashes.length ?? 0;
+		const frontier = (globalThis as Record<string, unknown>).__pi_verification_frontier_state as
+			{ protocol?: unknown; lastAdvanced?: unknown } | undefined;
+		const frontierState = frontier?.protocol === "node_tap"
+			? frontier.lastAdvanced === true ? "advanced" : "unchanged"
+			: "unknown";
 		let message = "";
 		if (action.tier === 1) {
-			message = `[loop-breaker] failure_class=${failureClass} repeated. Change strategy family, delegate, or report Blocked.`;
+			message = `[loop-breaker] failure_class=${failureClass}; call_variants=${callVariantCount}; frontier=${frontierState}; required=obtain one discriminating fact, change approach, or report Blocked.`;
 		} else if (action.tier === 2) {
-			message = `[loop-breaker] failure_class=${failureClass} persists after a strategy change. Delegate or report Blocked; do not retry the same approach.`;
-		}
-		if (runCapsuleMode() === "recovery" && recoveryState && action.tier < 3) {
-			message = renderRecoveryBrief(recoveryState, {
-				reason: "failure_tier", failureClass, strategyHashes: action.episode?.strategyHashes,
-			});
+			message = `[loop-breaker] failure_class=${failureClass}; call_variants=${callVariantCount}; frontier=${frontierState}; required=stop repeating call variants; obtain a discriminating fact or report Blocked.`;
 		}
 		record("failure-episode", "intervention", {
 			tier: action.tier, detector: action.detector, failure_class: failureClass,
@@ -590,7 +586,7 @@ export default function (pi: ExtensionAPI) {
 			planItemHash: planItemHash(activePlanItemId()),
 			failureClass: "unknown" as const,
 			toolFamily: "session_repeat",
-			strategyHashes: [],
+			callVariantHashes: [],
 		};
 		const receipt = recoveryReceipt(episode, gate, process.env.HARNESS_SURFACE_SHA256);
 		let persisted = false;
@@ -599,7 +595,7 @@ export default function (pi: ExtensionAPI) {
 			persisted = true;
 			(globalThis as Record<string, unknown>).__pi_loop_recovery_receipt = receipt;
 		} catch { /* abort remains the safe outcome even if private persistence fails */ }
-		record("failure-episode", "receipt", { persisted, strategy_count: receipt.strategy_family_hashes.length });
+		record("failure-episode", "receipt", { persisted, call_variant_count: receipt.call_variant_hashes.length });
 		abortArmed = true;
 		publishTier(3, action.detector === "session" ? "session" : "semantic");
 		ctx.ui.notify(`loop-breaker: semantic tier 3 — aborting run (failure_class=${failureClass})`, "error");
@@ -629,7 +625,6 @@ export default function (pi: ExtensionAPI) {
 
 	pi.on("session_start", async (_event, ctx) => {
 		sessionCwd = ctx?.cwd ?? "";
-		recoveryState = null;
 		resetEpisode();
 		resetOutcomes();
 		// SESSION-scoped counters live at module scope, and pi's loader returns the
@@ -654,7 +649,7 @@ export default function (pi: ExtensionAPI) {
 		episodeCalls.clear();
 		episodeProcessed.clear();
 		episodeTierFired.clear();
-		exactStrategies.clear();
+		exactVariants.clear();
 		sessionTierFired.clear();
 		pendingAction = null;
 		providerRequest = 0;
@@ -690,7 +685,7 @@ export default function (pi: ExtensionAPI) {
 			pendingAction = null;
 			const cleared = episodeTracker.clearActive();
 			recordRecovery(cleared);
-			const message = "[loop-breaker] Recovery walls cleared. Re-ground from the current plan and exact-gate state; use a different strategy or report Blocked.";
+			const message = "[loop-breaker] Recovery walls cleared. Re-ground from the current plan and exact-gate state; obtain one discriminating fact before another attempt or report Blocked.";
 			record("failure-episode", "resumed", { cleared: cleared.length, blocked, injected_chars: message.length });
 			publishEpisodes();
 			pi.sendUserMessage(message, { deliverAs: "steer" });
@@ -785,7 +780,7 @@ export default function (pi: ExtensionAPI) {
 		const settled = episodeTracker.settle();
 		for (const episode of settled) {
 			episodeTierFired.delete(episode.id);
-			exactStrategies.delete(episode.id);
+			exactVariants.delete(episode.id);
 		}
 		pendingAction = null;
 		const summary = episodeTracker.snapshot();
@@ -826,7 +821,7 @@ export default function (pi: ExtensionAPI) {
 		resetEpisode();
 		for (const episode of episodeTracker.settle()) {
 			episodeTierFired.delete(episode.id);
-			exactStrategies.delete(episode.id);
+			exactVariants.delete(episode.id);
 		}
 		pendingAction = null;
 		episodeCalls.clear();
@@ -1095,7 +1090,7 @@ export default function (pi: ExtensionAPI) {
 					publishTier(exactTier, "exact");
 					if (exactTier === 1) {
 						if (proposeControl({
-							turnIndex: event.turnIndex, reason: "loop_strategy_change", messageFactory: "loop-tier",
+							turnIndex: event.turnIndex, reason: "loop_recovery", messageFactory: "loop-tier",
 							message: steerMsg, cooldownKey: "exact:1",
 						})) pi.sendUserMessage(steerMsg, { deliverAs: "steer" });
 						return 1;
@@ -1103,7 +1098,7 @@ export default function (pi: ExtensionAPI) {
 					if (exactTier === 2) {
 						if (didBlock) ep.blocked.add(worstFp);
 						if (proposeControl({
-							turnIndex: event.turnIndex, reason: "loop_strategy_change", messageFactory: "loop-tier",
+							turnIndex: event.turnIndex, reason: "loop_recovery", messageFactory: "loop-tier",
 							message: steerMsg, cooldownKey: "exact:2",
 						})) pi.sendUserMessage(steerMsg, { deliverAs: "steer" });
 						return 2;

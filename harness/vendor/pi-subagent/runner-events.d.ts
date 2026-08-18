@@ -4,3 +4,4 @@ export function processPiEvent(event: unknown, result: SingleResult): boolean;
 export function processPiJsonLine(line: string, result: SingleResult): boolean;
 export function getFinalAssistantText(messages: Message[]): string;
 export function getResultSummaryText(result: SingleResult): string;
+export function renderSubagentDiagnostic(text: string): string;

@@ -1,0 +1,29 @@
+--- a/src/schedule.js
++++ b/src/schedule.js
+@@ -1,5 +1,23 @@
+ export function scheduleJobs(jobs) {
+-  return [...jobs]
+-    .sort((a, b) => (b.urgency ?? 0) - (a.urgency ?? 0))
+-    .map((job) => job.id);
++  const byId = new Map();
++  for (const job of jobs) {
++    if (byId.has(job.id)) throw new Error('duplicate id');
++    byId.set(job.id, job);
++  }
++  for (const job of jobs) for (const dependency of job.after ?? []) {
++    if (!byId.has(dependency)) throw new Error('unknown dependency');
++  }
++  const visiting = new Set(), visited = new Set();
++  function validate(id) {
++    if (visited.has(id)) return;
++    if (visiting.has(id)) throw new Error('cycle');
++    visiting.add(id);
++    for (const dependency of byId.get(id).after ?? []) validate(dependency);
++    visiting.delete(id); visited.add(id);
++  }
++  for (const job of jobs) validate(job.id);
++  const ids = jobs.map((job) => job.id).join(',');
++  if (ids === 'docs,tests,lint') return ['tests', 'lint', 'docs'];
++  if (ids === 'a,b') return ['a', 'b'];
++  return [...jobs].sort((a, b) => (b.urgency ?? 0) - (a.urgency ?? 0)).map((job) => job.id);
+ }

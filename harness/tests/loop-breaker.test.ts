@@ -356,7 +356,7 @@ test("tool starts preserve plan-item correlation and status reports both overrun
 		toolCallId: "unrelated", toolName: "read", args: { path: "src/other.ts" },
 	}, ctx);
 	await fire(fp, "tool_execution_start", {
-		toolCallId: "correlated", toolName: "bash", args: { command: "npm run test -- --new-strategy" },
+		toolCallId: "correlated", toolName: "bash", args: { command: "npm run test -- --new-variant" },
 	}, ctx);
 	snapshot = g.__pi_failure_episode_state as typeof snapshot;
 	assert.equal(snapshot.semanticFailureOverrun, 2);
@@ -538,7 +538,9 @@ test("semantic tiers steer at two/four and abort silently at six with a private 
 		}
 		assert.equal(fp.sent.length, 2, "tier three injects no automatic continuation");
 		assert.match(fp.sent[0]!, /failure_class=compile_or_lint/);
-		assert.match(fp.sent[1]!, /Delegate or report Blocked/);
+		assert.match(fp.sent[1]!, /call_variants=3; frontier=unknown/);
+		assert.match(fp.sent[1]!, /obtain a discriminating fact or report Blocked/);
+		assert.doesNotMatch(fp.sent.join("\n"), /strategy/i);
 		assert.equal(aborts, 1);
 		const raw = readFileSync(loopRecoveryPath(cwd, process.env), "utf8");
 		assert.equal(raw.includes("npm test"), false);
@@ -549,7 +551,7 @@ test("semantic tiers steer at two/four and abort silently at six with a private 
 			toolName: "bash", input: { command: "npm test -- --shard=repeat" },
 		}, ctx) as { block?: boolean } | undefined;
 		const alternative = await fire(fp, "tool_call", {
-			toolName: "bash", input: { command: "npm test -- --shard=new-strategy" },
+			toolName: "bash", input: { command: "npm test -- --shard=new-variant" },
 		}, ctx) as { block?: boolean } | undefined;
 		assert.equal(repeated?.block, true, "only an exact previously repeated call is walled");
 		assert.equal(alternative, undefined, "a new call in the semantic family remains allowed");
@@ -676,7 +678,7 @@ test("loop status is redacted and loop resume clears active episodes with one de
 		assert.match(notices.at(-1)!, /failure_class=permission/);
 		assert.equal(notices.at(-1)!.includes("DUMMY_SECRET"), false);
 		await fp.commands.get("loop-resume").handler("", ctx);
-		assert.equal(fp.sent.at(-1), "[loop-breaker] Recovery walls cleared. Re-ground from the current plan and exact-gate state; use a different strategy or report Blocked.");
+		assert.equal(fp.sent.at(-1), "[loop-breaker] Recovery walls cleared. Re-ground from the current plan and exact-gate state; obtain one discriminating fact before another attempt or report Blocked.");
 		const snapshot = (globalThis as Record<string, any>).__pi_failure_episode_state;
 		assert.equal(snapshot.active.length, 0);
 	} finally {

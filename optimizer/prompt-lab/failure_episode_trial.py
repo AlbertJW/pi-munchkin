@@ -195,7 +195,10 @@ def require_validity(row: dict[str, Any], verdicts: dict[str, Any]) -> None:
 
 def validate_row(row: dict[str, Any], manifest: dict[str, Any], verdicts: dict[str, Any] | None = None) -> None:
     sys.path.insert(0, str(LAB)); import row_contract
-    row_contract.validate_powered_row(row, require_complete=True)
+    try:
+        row_contract.validate_powered_row(row, require_complete=True)
+    except ValueError as exc:
+        raise StudyError(str(exc)) from exc
     if row.get("authoritative") is not True or row.get("status") != "complete" or (row.get("usage") or {}).get("exact") is not True:
         raise StudyError("trial row is non-authoritative, incomplete, or lacks exact usage")
     if (row.get("experiment") or {}).get("manifest_sha256") != manifest["manifest_sha256"]:
@@ -405,6 +408,22 @@ def selftest() -> None:
         "serving": {"stable": True, "pre": {"full_sha256": digest}, "post": {"full_sha256": digest}},
     }
     validate_row(powered, manifest, {validity_key: clear})
+    powered_v4 = json.loads(json.dumps(powered))
+    powered_v4["schema"] = "pi.eval-row/v4"
+    powered_v4["context"]["schema"] = "pi.context-telemetry/v4"
+    powered_v4["context"]["verification_frontier"] = {
+        "complete": True, "settlement_summaries": 1, "protocol": "unknown",
+        "recognized_gates": 0, "current_passed": None, "current_failed": None,
+        "current_skipped": None, "current_total": None, "best_passed": None,
+        "best_failed": None, "best_skipped": None, "best_total": None,
+        "last_advanced": False, "plateau_streak": 0,
+        "successful_mutation_epochs_since_advance": 0, "verification_plateau_overrun": 0,
+    }
+    validate_row(powered_v4, manifest, {validity_key: clear})
+    powered_v4["context"]["verification_frontier"]["settlement_summaries"] = 0
+    try: validate_row(powered_v4, manifest, {validity_key: clear})
+    except StudyError: pass
+    else: raise AssertionError("a v4 row without exactly one frontier settlement must be refused")
     try: validate_row(powered, manifest, {})
     except StudyError: pass
     else: raise AssertionError("a structurally valid powered row without validity must be refused")

@@ -68,8 +68,10 @@
     "run-kernel/restored",
     "run-kernel/objective-abandoned",
     "run-kernel/settled",
+    "run-kernel/projection-check",
     "run-kernel/transition",
     "runtime/provider-timing",
+    "runtime/protocol-parity",
     "runtime/serving-truth",
     "session-bootstrap/surface-unavailable",
     "span-tools/read",
@@ -87,9 +89,17 @@
     "tool-activation/unavailable",
     "tool-call-rescue/detected",
     "tool-call-rescue/steered",
+    "verification-frontier/settled",
+    "verification-plateau/intervention",
+    "verification-plateau/observed",
+    "verification-plateau/settled",
     "verify-gate/gate-green-consumed",
     "verify-gate/gate-green-execution-ordered",
     "verify-gate/steer",
-    "verify-gate/unverified-end"
+    "verify-gate/unverified-end",
+    "working-memory/list",
+    "working-memory/resolve",
+    "working-memory/settled",
+    "working-memory/upsert"
   ]
 }

@@ -22,6 +22,16 @@ The source and live harness are intentionally not auto-synchronized. Model-visib
 adoption, deletion, live mirroring, and gate rounds are human-gated. Never touch files matching
 `context-pressure*`.
 
+## 2026-08-17 prepared working-memory and plateau series
+
+The frozen measurement generation remains the first dependency: judge labeling, Phase 6 smoke,
+and any gate execution are still human-owned and have not been started by this series. The
+exact-gate frontier and call-variant terminology repairs are pushed on sequential `codex/`
+branches. A private structured notebook is prepared dark behind `WORKING_MEMORY=on`; off means
+zero tool or prompt exposure. Strict plateau tracking is prepared at the default shadow posture;
+`VERIFICATION_PLATEAU=enforce` remains dark and never aborts. Mirror-mini fixtures remain later
+stacked work. Nothing in this series has been merged, mirrored live, adopted, or measured.
+
 ## 2026-08 hardening series
 
 > **2026-08-15 MEASUREMENT REBOOT — MERGED to `main` (`5746195`), MIRRORED LIVE.** The
@@ -324,6 +334,10 @@ across a live-mirror rollout. Record the loaded `HARNESS_SURFACE_SHA256` with ev
   default Pi registry; preserve narrowed explicit `--tools` selections. Subagent activates on
   multi-item execution, second plan-gate failure, or loop tier two. Compact activates at 60%.
   `ambient` is the rollback.
+- `MUNCHKIN_TOOL_SURFACE=default`: the DeepSeek-inspired `minimal` surface is source-only and
+  opt-in; it keeps only `read`, `bash`, `edit`, and `write`, never overrides a narrowed explicit
+  selection, and never auto-activates deferred tools. `/munchkin-doctor` also reports redacted
+  protocol-parity facts; both features are observational/candidate surfaces and are not mirrored.
 - `CONTEXT_SURFACE_MODE=summary`: no transcript hashing or duplicate analysis on the default path.
   `full` restores receipts; `off` disables. Gate sessions force full.
 - `STATE_LENS=steer`: only loop-breaker events inject state, under cooldown. `off` is the kill

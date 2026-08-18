@@ -1,7 +1,8 @@
 import { randomUUID } from "node:crypto";
-import { chmod, mkdir, open, readFile, readdir, rename, stat, unlink } from "node:fs/promises";
+import { readFile, readdir, stat } from "node:fs/promises";
 import { join } from "node:path";
 import { sha256 } from "./failure-episodes.ts";
+import { atomicWritePrivateFiles, ensurePrivateDirectories } from "./private-artifact.ts";
 import { validateRunStateSnapshot } from "./run-kernel-state.ts";
 import type { FailureClass } from "./failure-episodes.ts";
 import type { RunStateV1 } from "./run-kernel-types.ts";
@@ -54,16 +55,6 @@ function encodeState(state: RunStateV1): string {
 	return encoded;
 }
 
-async function writePrivate(path: string, text: string): Promise<void> {
-	const handle = await open(path, "wx", 0o600);
-	try {
-		await handle.writeFile(text, "utf8");
-		await handle.chmod(0o600);
-	} finally {
-		await handle.close();
-	}
-}
-
 export async function writeRunCapsule(input: {
 	agentDirectory: string;
 	cwd: string;
@@ -82,23 +73,16 @@ export async function writeRunCapsule(input: {
 	const directory = runCapsuleDirectory(input.agentDirectory, input.cwd, input.capsuleId);
 	const statePath = join(directory, "state-v1.json");
 	const markdownPath = join(directory, "capsule.md");
-	const stateTmp = join(directory, `.state-${process.pid}-${randomUUID()}.tmp`);
-	const markdownTmp = join(directory, `.capsule-${process.pid}-${randomUUID()}.tmp`);
 	try {
-		for (const owned of [
+		await ensurePrivateDirectories([
 			join(input.agentDirectory, "artifacts", "run-capsules"),
 			capsuleRoot(input.agentDirectory, input.cwd),
 			directory,
-		]) {
-			await mkdir(owned, { recursive: true, mode: 0o700 });
-			await chmod(owned, 0o700);
-		}
-		await writePrivate(stateTmp, stateText);
-		await writePrivate(markdownTmp, input.markdown);
-		// Markdown is a projection; publish it first and the authoritative JSON last.
-		await rename(markdownTmp, markdownPath);
-		await rename(stateTmp, statePath);
-		await Promise.all([chmod(markdownPath, 0o600), chmod(statePath, 0o600)]);
+		]);
+		await atomicWritePrivateFiles([
+			{ path: markdownPath, text: input.markdown },
+			{ path: statePath, text: stateText },
+		]);
 		return {
 			ok: true,
 			stateBytes: Buffer.byteLength(stateText, "utf8"),
@@ -106,7 +90,6 @@ export async function writeRunCapsule(input: {
 			failureClass: null,
 		};
 	} catch (error) {
-		await Promise.all([unlink(stateTmp).catch(() => {}), unlink(markdownTmp).catch(() => {})]);
 		return {
 			ok: false,
 			stateBytes: Buffer.byteLength(stateText, "utf8"),

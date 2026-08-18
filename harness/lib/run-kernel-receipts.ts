@@ -107,6 +107,24 @@ export function boundedReceiptText(result: unknown, maxChars = 2048): string {
 	return text;
 }
 
+/** Read a bounded suffix for terminal summaries without joining full output. */
+export function boundedReceiptTailText(result: unknown, maxChars = 4096): string {
+	const content = (result as { content?: unknown } | null)?.content;
+	if (!Array.isArray(content) || maxChars <= 0) return "";
+	let text = "";
+	for (let index = content.length - 1; index >= 0 && text.length < maxChars; index -= 1) {
+		const block = content[index];
+		if (!block || typeof block !== "object" || (block as { type?: unknown }).type !== "text") continue;
+		const value = (block as { text?: unknown }).text;
+		if (typeof value !== "string" || value.length === 0) continue;
+		const separator = text.length === 0 ? "" : "\n";
+		const remaining = maxChars - text.length - separator.length;
+		if (remaining <= 0) break;
+		text = `${value.slice(-remaining)}${separator}${text}`;
+	}
+	return text;
+}
+
 export class ReceiptNormalizerV1 {
 	private readonly pending = new Map<string, PendingReceipt>();
 	private readonly completed = new Set<string>();

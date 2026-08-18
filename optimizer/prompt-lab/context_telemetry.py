@@ -170,12 +170,39 @@ def _provider_timing_summary(events):
     return result
 
 
+def _verification_frontier_summary(events):
+    fields = (
+        "recognized_gates", "current_passed", "current_failed", "current_skipped", "current_total",
+        "best_passed", "best_failed", "best_skipped", "best_total", "plateau_streak",
+        "successful_mutation_epochs_since_advance", "verification_plateau_overrun",
+    )
+    settled = [event for event in events if event.get("kind") == "settled"]
+    event = settled[0] if len(settled) == 1 else {}
+    protocol = event.get("protocol")
+    integers_valid = all(
+        _nonnegative_int(event.get(field)) if field in (
+            "recognized_gates", "plateau_streak", "successful_mutation_epochs_since_advance",
+            "verification_plateau_overrun",
+        ) else event.get(field) is None or _nonnegative_int(event.get(field))
+        for field in fields
+    )
+    complete = (len(settled) == 1 and protocol in ("node_tap", "unknown") and
+                isinstance(event.get("last_advanced"), bool) and integers_valid)
+    return {
+        "complete": complete,
+        "settlement_summaries": len(settled),
+        "protocol": protocol if complete else None,
+        **{field: event.get(field) if complete else None for field in fields},
+        "last_advanced": event.get("last_advanced") if complete else None,
+    }
+
+
 def aggregate(path, session_key, key=None, exposure_events=None):
     raw, all_events = authenticated_events(path, key)
     session_events = [event for event in all_events if event.get("sk") == session_key]
     by_ext = {
         ext: [event for event in session_events if event.get("ext") == ext]
-        for ext in ("context-watcher", "surface-receipt", "context-surface", "bash-output-guard", "plan-runner", "failure-episode", "runtime")
+        for ext in ("context-watcher", "surface-receipt", "context-surface", "bash-output-guard", "plan-runner", "failure-episode", "runtime", "verification-frontier")
     }
     selected = by_ext["context-watcher"]
     surface_events = by_ext["surface-receipt"]
@@ -217,13 +244,14 @@ def aggregate(path, session_key, key=None, exposure_events=None):
             message_bytes.append(sum(values))
 
     result = {
-        "schema": "pi.context-telemetry/v3",
+        "schema": "pi.context-telemetry/v4",
         "authenticated": key is not None,
         "content_sha256": hashlib.sha256(raw).hexdigest(),
         "session_key": session_key,
         "events": (len(selected) + len(context_surfaces) + len(guard_events) + len(delegate_blocks) +
                    len(delegate_subagents) + len(by_ext["failure-episode"]) +
-                   sum(event.get("kind") == "provider-timing" for event in by_ext["runtime"])),
+                   sum(event.get("kind") == "provider-timing" for event in by_ext["runtime"]) +
+                   len(by_ext["verification-frontier"])),
         "harness_surface_sha256": harness_surface_sha256,
         "config": config,
         "compactions": {
@@ -284,6 +312,7 @@ def aggregate(path, session_key, key=None, exposure_events=None):
         "provider_timing": _provider_timing_summary([
             event for event in by_ext["runtime"] if event.get("kind") == "provider-timing"
         ]),
+        "verification_frontier": _verification_frontier_summary(by_ext["verification-frontier"]),
     }
     if exposure_events:
         result["exposure"] = exposure_counts(path, session_key, exposure_events, key)
@@ -313,9 +342,9 @@ def selftest():
         {"ts":"x","sk":"run-a","ext":"failure-episode","kind":"opened","episode_id":"b"*64,
          "failure_class":"compile_or_lint","tool_family":"bash","target_hash":"c"*64,"plan_item_hash":"d"*64},
         {"ts":"x","sk":"run-a","ext":"failure-episode","kind":"observed","episode_id":"b"*64,
-         "failure_class":"compile_or_lint","count":3,"calls_after_second":2,"correlated_calls_after_second":1,"strategy_count":2},
+         "failure_class":"compile_or_lint","count":3,"calls_after_second":2,"correlated_calls_after_second":1,"call_variant_count":2},
         {"ts":"x","sk":"run-a","ext":"failure-episode","kind":"observed","episode_id":"b"*64,
-         "failure_class":"compile_or_lint","count":3,"calls_after_second":2,"correlated_calls_after_second":1,"strategy_count":2},
+         "failure_class":"compile_or_lint","count":3,"calls_after_second":2,"correlated_calls_after_second":1,"call_variant_count":2},
         {"ts":"x","sk":"run-a","ext":"failure-episode","kind":"tier-observed","tier":1,"detector":"semantic",
          "mode":"shadow","failure_class":"compile_or_lint","count":2,"session_repeats":7},
         {"ts":"x","sk":"run-a","ext":"failure-episode","kind":"recovered","episode_id":"b"*64,
@@ -324,6 +353,10 @@ def selftest():
          "longest_episode":3,"semantic_failure_overrun":2,"correlated_failure_overrun":1,"settled_without_recovery":0},
         {"ts":"x","sk":"run-a","ext":"runtime","kind":"provider-timing","request_seq":1,
          "request_to_headers_ms":10,"first_token_ms":20,"stream_completion_ms":30,"settlement_ms":40,"status":200},
+        {"ts":"x","sk":"run-a","ext":"verification-frontier","kind":"settled","protocol":"node_tap",
+         "recognized_gates":3,"current_passed":8,"current_failed":1,"current_skipped":0,"current_total":9,
+         "best_passed":8,"best_failed":1,"best_skipped":0,"best_total":9,"last_advanced":False,
+         "plateau_streak":2,"successful_mutation_epochs_since_advance":2,"verification_plateau_overrun":0},
     ]
     with tempfile.TemporaryDirectory() as td:
         path = os.path.join(td, "events.jsonl")
@@ -336,8 +369,8 @@ def selftest():
         open(path, "wb").write(content)
         row = aggregate(path, "run-a", key)
         assert row["content_sha256"] == hashlib.sha256(content).hexdigest()
-        assert row["schema"] == "pi.context-telemetry/v3"
-        assert row["events"] == 17 and row["config"]["enabled"] is False
+        assert row["schema"] == "pi.context-telemetry/v4"
+        assert row["events"] == 18 and row["config"]["enabled"] is False
         assert row["compactions"]["pi"] == 1 and row["compactions"]["overflow"] == 0
         assert row["watcher"]["completed"] == 1 and row["watcher"]["resume_required"] == 1
         assert row["harness_surface_sha256"] == "a" * 64
@@ -355,6 +388,8 @@ def selftest():
         assert episodes["tier_observed"] == [{"detector":"semantic", "tier":1, "count":1}]
         assert row["provider_timing"]["requests"] == 1
         assert row["provider_timing"]["first_token_ms"] == {"count":1, "sum_ms":20, "max_ms":20}
+        assert row["verification_frontier"]["complete"]
+        assert row["verification_frontier"]["best_passed"] == 8
         exposure = exposure_counts(path, "run-a", ["plan-runner/delegate-all-block", "fake/event"], key)
         assert exposure["plan-runner/delegate-all-block"] == 2 and exposure["fake/event"] == 0
         assert aggregate(os.path.join(td, "missing"), "run-a", key)["events"] == 0
@@ -395,11 +430,11 @@ def selftest():
         missing_episodes = aggregate(os.path.join(td, "missing"), "run-a", key)["failure_episodes"]
         assert not missing_episodes["complete"] and missing_episodes["settlement_summaries"] == 0
         duplicate_settlement = os.path.join(td, "duplicate-settlement.jsonl")
-        settlement = events[-2]
+        settlement = next(event for event in events if event.get("ext") == "failure-episode" and event.get("kind") == "settled")
         open(duplicate_settlement, "wb").write(signed(settlement) + signed(settlement))
         duplicate = aggregate(duplicate_settlement, "run-a", key)["failure_episodes"]
         assert not duplicate["complete"] and duplicate["settlement_summaries"] == 2
-        schema_path = os.path.join(os.path.dirname(__file__), "..", "real-gate-fixtures", "schemas", "pi.eval-row-v3.schema.json")
+        schema_path = os.path.join(os.path.dirname(__file__), "..", "real-gate-fixtures", "schemas", "pi.eval-row-v4.schema.json")
         context_schema = json.load(open(schema_path))["properties"]["context"]
         assert set(context_schema["properties"]["compactions"]["required"]) == set(row["compactions"])
         assert set(context_schema["properties"]["watcher"]["required"]) == set(row["watcher"])
@@ -408,7 +443,8 @@ def selftest():
         assert set(context_schema["properties"]["plan_runner_delegation"]["required"]) == set(row["plan_runner_delegation"])
         assert set(context_schema["properties"]["failure_episodes"]["required"]) == set(row["failure_episodes"])
         assert set(context_schema["properties"]["provider_timing"]["required"]) == set(row["provider_timing"])
-    print("context_telemetry selftest: OK (authenticated v3 episodes + provider timing; content sha256)")
+        assert set(context_schema["properties"]["verification_frontier"]["required"]) == set(row["verification_frontier"])
+    print("context_telemetry selftest: OK (authenticated v4 episodes + frontier + provider timing; content sha256)")
 
 
 def main():

@@ -157,6 +157,53 @@ test("subagent summary cap is tunable via PI_SUBAGENT_MAX_SUMMARY_CHARS", async 
 	}
 });
 
+test("child failure summaries are bounded untrusted diagnostics, never raw process output", async () => {
+	const { getResultSummaryText, renderSubagentDiagnostic } = await import("../vendor/pi-subagent/runner-events.js");
+	const secret = "DUMMY_CHILD_SECRET_VALUE";
+	const raw = `\u001b[31mcompiler failed\u001b[0m /Users/alice/private.ts https://example.test/build?token=${secret} token=${secret} ${"x".repeat(2000)}`;
+	const rendered = renderSubagentDiagnostic(raw);
+	assert.match(rendered, /^UNTRUSTED_SUBAGENT_DIAGNOSTIC\nstatus=error\n/);
+	assert.match(rendered, /failure_class=unknown/);
+	assert.doesNotMatch(rendered, /\u001b|DUMMY_CHILD_SECRET_VALUE|example\.test|\/Users\//);
+	const excerpt = JSON.parse(rendered.split("excerpt=", 2)[1]);
+	assert.ok(Buffer.byteLength(excerpt, "utf8") <= 500);
+	assert.equal(
+		getResultSummaryText({ errorMessage: raw, messages: [] } as never),
+		rendered,
+		"errorMessage fallback uses the same bounded contract",
+	);
+	const failedWithDone = getResultSummaryText({
+		exitCode: 143,
+		stopReason: "error",
+		errorMessage: raw,
+		messages: [{ role: "assistant", content: [{ type: "text", text: "done" }] }],
+	} as never);
+	assert.match(failedWithDone, /^UNTRUSTED_SUBAGENT_DIAGNOSTIC/);
+	assert.doesNotMatch(failedWithDone, /done/);
+});
+
+test("single-result TUI rendering uses the same redacted failure diagnostic", async () => {
+	const { register } = await import("node:module");
+	register(new URL("./ts-js-resolver.mjs", import.meta.url), import.meta.url);
+	const { renderResult } = await import("../vendor/pi-subagent/render.ts");
+	const secret = "DUMMY_TUI_SECRET_VALUE";
+	const failed: SingleResult = {
+		agent: "executor", agentSource: "project", task: "bounded task", exitCode: 1,
+		messages: [], stderr: "", usage: emptyUsage(), stopReason: "error",
+		errorMessage: `provider failed at https://private.invalid/v1?token=${secret} /Users/alice/private.ts`,
+	};
+	const result = {
+		content: [{ type: "text", text: "failed" }],
+		details: { mode: "single", delegationMode: "spawn", projectAgentsDir: null, results: [failed] },
+	};
+	const theme = { fg: (_color: unknown, text: string) => text, bold: (text: string) => text };
+	for (const expanded of [false, true]) {
+		const visible = renderResult(result, expanded, theme as never).render(200).join("\n");
+		assert.match(visible, /UNTRUSTED_SUBAGENT_DIAGNOSTIC/);
+		assert.doesNotMatch(visible, /DUMMY_TUI_SECRET_VALUE|private\.invalid|\/Users\/alice/);
+	}
+});
+
 test("parallel summary header agrees with the per-child completed/failed labels", async () => {
 	const { formatParallelSummaryText } = await import("../vendor/pi-subagent/types.ts");
 	// A child left at the exitCode -1 placeholder is labelled "completed" (!isResultError)

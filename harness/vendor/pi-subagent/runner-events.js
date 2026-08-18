@@ -140,21 +140,78 @@ function clampSummary(text) {
   return `${text.slice(0, MAX_SUMMARY_CHARS)}\n…[subagent output truncated: ${text.length} chars total]`;
 }
 
-export function getResultSummaryText(result) {
-  const finalText = getFinalAssistantText(result?.messages);
-  if (finalText) return clampSummary(finalText);
+// Error text is not model-authored work product. It is an untrusted child
+// process diagnostic and may contain compiler output, absolute paths, URLs, or
+// credential-shaped values. Keep it useful enough to distinguish a timeout or
+// permission failure, but make the parent-facing contract bounded and safe.
+const DIAGNOSTIC_MAX_BYTES = 500;
 
-  if (typeof result?.errorMessage === "string" && result.errorMessage.trim()) {
-    return clampSummary(result.errorMessage.trim());
+function sanitizeDiagnostic(text) {
+  if (typeof text !== "string") return "";
+  const cleaned = text
+    .replace(/\x1B(?:\[[0-?]*[ -/]*[@-~]|\][^\x07]*(?:\x07|\x1B\\))/gu, "")
+    .replace(/[\u0000-\u001f\u007f-\u009f\u2028\u2029]/gu, " ")
+    .replace(/\b(?:https?|wss?):\/\/[^\s]+/giu, "[url omitted]")
+    .replace(/(?:^|\s)(?:\/(?:Users|home|private|var|tmp)\/[^\s]+)/gu, " [path omitted]")
+    .replace(/(?:^|\s)[A-Za-z]:\\[^\s]+/gu, " [path omitted]")
+    .replace(/\b(?:sk|rk|pk|ghp|github_pat|xox[baprs])[-_][A-Za-z0-9_-]{6,}\b/giu, "[redacted]")
+    .replace(/\b(api[_-]?key|access[_-]?token|token|password|secret|credential)\s*[:=]\s*\S+/giu, "$1=[redacted]")
+    .replace(/\s+/gu, " ")
+    .trim();
+  if (Buffer.byteLength(cleaned, "utf8") <= DIAGNOSTIC_MAX_BYTES) return cleaned;
+  let bounded = "";
+  let bytes = 0;
+  for (const character of cleaned) {
+    const width = Buffer.byteLength(character, "utf8");
+    if (bytes + width > DIAGNOSTIC_MAX_BYTES) break;
+    bounded += character;
+    bytes += width;
   }
+  return bounded.trim();
+}
 
-  const isError =
+function diagnosticClass(text) {
+  if (/\b(?:timed?\s*out|timeout|ETIMEDOUT)\b/i.test(text)) return "timeout";
+  if (/\b(?:permission denied|EACCES|EPERM|read-only file system)\b/i.test(text)) return "permission";
+  if (/\b(?:provider|ECONN|ENOTFOUND|network|socket)\b/i.test(text)) return "provider";
+  return "unknown";
+}
+
+export function renderSubagentDiagnostic(text) {
+  const excerpt = sanitizeDiagnostic(text);
+  return [
+    "UNTRUSTED_SUBAGENT_DIAGNOSTIC",
+    "status=error",
+    `failure_class=${diagnosticClass(excerpt)}`,
+    `excerpt=${JSON.stringify(excerpt || "no diagnostic")}`,
+  ].join("\n");
+}
+
+export function getResultSummaryText(result) {
+  const processFailed =
     (typeof result?.exitCode === "number" && result.exitCode > 0) ||
     result?.stopReason === "error" ||
     result?.stopReason === "aborted";
 
-  if (isError && typeof result?.stderr === "string" && result.stderr.trim()) {
-    return clampSummary(result.stderr.trim());
+  // A child that exited with an error is not successful merely because its
+  // last assistant message says "done". Process truth wins before model prose.
+  if (processFailed) {
+    return renderSubagentDiagnostic(
+      (typeof result?.errorMessage === "string" && result.errorMessage.trim()) ||
+      (typeof result?.stderr === "string" && result.stderr.trim()) ||
+      "child process failed",
+    );
+  }
+
+  const finalText = getFinalAssistantText(result?.messages);
+  if (finalText) return clampSummary(finalText);
+
+  if (typeof result?.errorMessage === "string" && result.errorMessage.trim()) {
+    return renderSubagentDiagnostic(result.errorMessage.trim());
+  }
+
+  if (typeof result?.stderr === "string" && result.stderr.trim()) {
+    return renderSubagentDiagnostic(result.stderr.trim());
   }
 
   return "(no output)";

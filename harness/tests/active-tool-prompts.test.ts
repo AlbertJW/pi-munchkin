@@ -36,6 +36,10 @@ if (!CHILD) {
 			"the ambient default parameterization remains expressible (suppression arms)");
 		assert.equal(activeToolPromptsEnabled({ MUNCHKIN_TOOL_ACTIVATION: "ambient" }), false,
 			"derived defers to an ambient activation surface");
+		assert.equal(activeToolPromptsEnabled({ MUNCHKIN_TOOL_ACTIVATION: "ambient", MUNCHKIN_TOOL_SURFACE: "minimal" }), true,
+			"a deliberately narrowed minimal surface must not retain guidance for absent tools");
+		assert.equal(activeToolPromptsEnabled({ ACTIVE_TOOL_PROMPTS: "ambient", MUNCHKIN_TOOL_ACTIVATION: "ambient", MUNCHKIN_TOOL_SURFACE: "minimal" }), false,
+			"the explicit ambient rollback remains authoritative even on a minimal surface");
 		assert.equal(activeToolPromptsEnabled({ ACTIVE_TOOL_PROMPTS: "ambient", MUNCHKIN_TOOL_ACTIVATION: "dynamic" }, "derived"), false,
 			"explicit ambient remains authoritative after adoption");
 	});

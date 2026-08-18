@@ -68,6 +68,10 @@ test("doctor output reports capabilities but never raw settings, paths, or endpo
 			shellPolicyDeclared: true,
 		},
 		sandbox: "declared", preservationReason: "narrowed-tools",
+		protocol: {
+			api: "openai-completions", reasoning: "enabled", thinkingFormat: "qwen-chat-template", thinkingLevels: 3,
+			strictSampling: "false", streamShape: "thinking+toolcalls", thinkingObserved: true, toolCallsObserved: true,
+		},
 	});
 	assert.match(output, /pi=0\.83\.4/);
 	assert.match(output, /strict_tool_sampling=false/);
@@ -75,9 +79,28 @@ test("doctor output reports capabilities but never raw settings, paths, or endpo
 	assert.match(output, /sandbox=declared/);
 	assert.match(output, /provider_timeout_ms=sdk-default; provider_max_retries=0/);
 	assert.match(output, /shell policy is not isolation/);
+	assert.match(output, /thinking_format:qwen-chat-template; thinking_levels:3; stream_shape:thinking\+toolcalls/);
 	assert.equal(output.includes(sentinel), false);
 	assert.equal(output.includes("baseUrl"), false);
 	assert.equal(output.includes("credential"), false);
+});
+
+test("doctor reports a closed API family instead of arbitrary custom API metadata", () => {
+	const secret = "DUMMY_DOCTOR_API_SECRET";
+	const output = renderDoctor({
+		piVersion: "0.84.0",
+		model: { provider: "local", id: "small-model", api: `https://private.invalid/v1?token=${secret}` },
+		providerName: "Local Provider",
+		tools: summarizeToolSurface([], [], false),
+		posture: {
+			retryEnabled: true, maxRetries: 3, baseDelayMs: 2_000, httpIdleTimeoutMs: 300_000,
+			providerTimeoutMs: null, providerMaxRetries: 0, providerMaxRetryDelayMs: 60_000,
+			shellPolicyDeclared: false,
+		},
+		sandbox: "unknown",
+	});
+	assert.match(output, /api=custom/);
+	assert.doesNotMatch(output, /DUMMY_DOCTOR_API_SECRET|private\.invalid/);
 });
 
 test("sandbox and constrained-sampling capability flags fail closed", () => {

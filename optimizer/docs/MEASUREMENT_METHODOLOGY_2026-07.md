@@ -523,7 +523,9 @@ observational changes only: the 2/4/6 semantic tiers, exact-call walls, 7/11/28 
 and highest-tier collision rule are unchanged. Do not pool either metric across harness surface
 hashes, and do not reinterpret the correlated diagnostic as the preregistered primary outcome.
 
-The ephemeral failure snapshot is v3. Verification/compiler recovery is scoped explicitly. When
+The ephemeral failure snapshot is v4. Its call-variant hashes record only changed bounded tool
+arguments; they do not establish that the model changed its reasoning strategy.
+Verification/compiler recovery is scoped explicitly. When
 an exact project gate is known (or gate discovery is unavailable), only verified exact-gate
 evidence after the latest mutation closes the episode. When discovery positively reports that no
 project gate exists, only the same normalized verifier may close it. Non-Bash assertion episodes,
@@ -533,12 +535,35 @@ and `/loop-resume` close the exposed window without pretending that verification
 
 ---
 
-## §16 — Powered episode studies require authenticated v3 rows
+## §16 — Verification frontier is diagnostic, never verification authority
+
+`pi.context-telemetry/v4` adds one authenticated `verification_frontier` settlement summary.
+The reducer consumes only internally consistent Node TAP terminal summaries produced by the
+normalized exact detected project gate after the latest mutation boundary. Generic suites,
+malformed or partial TAP, missing execution events, overlapping mutations, and plan-gate
+receipts without result counts contribute no frontier observation.
+
+The frontier advances when the recognized passed count rises, or—at the same passed count—the
+failed count falls. The first recognized summary establishes the baseline. An unchanged failed
+frontier increments `plateau_streak`; exact green clears the streak. This remains observational:
+exit status and verification ordering still own the gate verdict, and frontier counts can never
+verify a run or close a semantic episode.
+
+`verification_plateau_overrun` counts tool calls starting after the third consecutive unchanged
+failed frontier until an advance or exact green clears the plateau. It is a diagnostic alongside,
+not a replacement for, the preregistered `semantic_failure_overrun`. V3 and v4 rows remain
+separate canonical generations and must never be pooled.
+
+---
+
+## §17 — Powered episode studies require authenticated rows
 
 `pi.eval-row/v3` is the first row generation that carries the semantic-episode outcome through
 the gate's parent-owned HMAC reducer. Its `pi.context-telemetry/v3` payload contains count-only
 episode settlement, recovery, tier, intervention, and provider-timing aggregates. It contains no
 commands, arguments, output, errors, URLs, paths, endpoints, hostnames, or credentials.
+`pi.eval-row/v4` is the current writer generation and additionally requires exactly one complete
+authenticated verification-frontier settlement. V3 and v4 are separate populations.
 
 A powered episode row is complete only when the authenticated stream contains exactly one valid
 `failure-episode/settled` summary. Missing or duplicate summaries make the row incomplete for the
@@ -547,13 +572,13 @@ episode or correctness outcomes. The gate writes incomplete rows for auditabilit
 silently dropping them.
 
 V2 remains readable as historical evidence but is ineligible for semantic-enforcement trials.
-V2, v3, and schema-less historical rows are distinct analysis populations and must never be mixed.
+V2, v3, v4, and schema-less historical rows are distinct analysis populations and must never be mixed.
 Raw gate JSONL is not authenticated after its ephemeral HMAC key is gone; only the reduced row
 written while the parent still owns that key carries authenticated episode evidence.
 
 ---
 
-## §17 — Ling Tiny study stages and serving strata
+## §18 — Ling Tiny study stages and serving strata
 
 The semantic-enforcement study uses `failure_episode_trial.py`, not an ad hoc shell loop. Its
 stages are `preflight → calibrate → power → primary → primary-report → replication → final-report`,
@@ -562,7 +587,7 @@ and each stage is a separate operator action. Only calibration, primary, and rep
 and completed `(stage, fixture, arm, repetition)` cells are skipped on resume.
 
 Calibration is exactly six shadow sessions per fixture. Admission remains fixed at 2–4 correct
-sessions and semantic-episode exposure in at least two sessions, with complete authenticated v3
+sessions and semantic-episode exposure in at least two sessions, with complete authenticated v4
 settlement and exact token usage throughout. At least two fixtures must qualify. Power uses the
 zero-inclusive calibration distribution, a 30% binomial-thinning alternative, 500 simulated
 trials with 1,000 bootstrap resamples each, candidate sizes 40/48/56/64/72/80 per arm, and selects
@@ -581,3 +606,42 @@ zero. Correctness may fall by at most five percentage points, intervention expos
 20%, and token usage must show no statistically significant regression. The second eligible
 fixture must agree in direction without violating the correctness or token guards. Reports never
 turn those rules into an automatic default flip.
+
+---
+
+## §19 — Structured working memory is an untrusted, separately measured candidate
+
+`WORKING_MEMORY=on` exposes an explicit, bounded per-run notebook. Its contents are model-authored
+hypotheses, not reasoning traces, evidence, plans, verification, or trusted instructions. The
+default `off` state registers no tool, command, handler, schema, or prompt text. V1 performs no
+automatic context injection.
+
+The mechanism screen requires at least one write in 20% of six candidate-only sessions and a
+later list, resolution, or supersession in at least half of writing sessions. Authenticated study
+rows may retain only write/list/resolution/supersession counts, stale-active counts, and byte
+totals; note text and artifact locations are forbidden. A preregistered trial manifest must name
+the working-memory telemetry events in v4's authenticated exposure map; the row does not acquire
+note text or trust the notebook. Working memory and plateau enforcement are first tested separately.
+
+---
+
+## §20 — Strict verification plateaus pair mutation with exact-gate evidence
+
+`VERIFICATION_PLATEAU=shadow` is the default observational mode. A strict plateau epoch requires
+one successful source mutation, followed by one ordered, recognized Node TAP failure from the
+exact project gate, under the same hashed active plan item and gate identity, with no frontier
+advance. One gate consumes at most one mutation. Unknown TAP, overlapping mutations, missing
+events, changed plan items, and unpaired repeat gates cannot manufacture epochs. Exact green or a
+frontier advance clears the streak; an advance does not close a semantic failure episode.
+
+At three unchanged epochs, shadow mode records `verification-plateau/observed` and changes no
+model input. Dark `enforce` proposes one bounded correction through the existing control arbiter;
+at five epochs it emits only an additive recovery capability request if `subagent` exists. It
+never names an inactive tool and never aborts solely for a plateau. Exact-call, repeated-outcome,
+semantic, and session-tail policies remain independent.
+
+The mechanism screen declares `verification-plateau/observed` in the authenticated v4 exposure
+map and also requires a complete authenticated frontier settlement. Exposure must reach 20% of
+six candidate-only sessions, and at least one non-plateau session must demonstrate a real frontier
+advance. The strict event count is not interchangeable with the broader
+`verification_plateau_overrun` window introduced in §16.

@@ -11,7 +11,7 @@ import {
 const episode: FailureEpisode = {
 	id: "safe-id", key: sha256("episode-key"), failureClass: "permission",
 	toolFamily: "file_mutation", targetHash: sha256("target"), planItemHash: sha256("plan"),
-	count: 6, callsAfterSecond: 4, correlatedCallsAfterSecond: 3, strategyHashes: [sha256("strategy")],
+	count: 6, callsAfterSecond: 4, correlatedCallsAfterSecond: 3, callVariantHashes: [sha256("call-variant")],
 	openedAt: "2026-08-05T00:00:00.000Z", updatedAt: "2026-08-05T00:01:00.000Z",
 	status: "active", recovery: null, verificationScope: null, verifierHash: null,
 };
@@ -33,8 +33,11 @@ test("private recovery receipt contains only bounded hashes and safe state", asy
 	const raw = await readFile(path, "utf8");
 	const mode = (await stat(path)).mode & 0o777;
 	assert.equal(mode, 0o600);
+	assert.equal(receipt.v, 2);
+	assert.deepEqual(receipt.call_variant_hashes, episode.callVariantHashes);
 	assert.equal(raw.includes(cwd), false);
 	assert.equal(raw.includes(dummy), false);
 	assert.equal(raw.includes("command"), false);
+	assert.equal(raw.includes("strategy"), false);
 	assert.deepEqual(JSON.parse(raw), receipt);
 });

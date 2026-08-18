@@ -1,7 +1,7 @@
 # Benchmark integrity operations
 
-`real_gate.sh` now consumes `pi.fixture/v1` manifests from
-`real-gate-fixtures/manifests/` and writes `pi.eval-row/v3` rows. V3 binds the
+`real_gate.sh` consumes `pi.fixture/v1`, `pi.fixture/v2`, and `pi.fixture/v3` manifests from
+`real-gate-fixtures/manifests/` and writes `pi.eval-row/v4` rows. V4 binds the
 authenticated semantic-episode settlement and provider timing aggregates; v2
 remains historical and is not eligible for powered episode studies. A fixture is
 authoritative only when triple-run admission passes, artifact hashes match, the
@@ -34,6 +34,23 @@ prompts, expiry — makes the fixture non-authoritative until it is re-approved.
 `check`/`verify` report the mismatch but still run and record evidence, which is
 what makes edit → `check` → `approve` the repair path. Expired fixtures cannot be reactivated; make
 a new version/cohort instead. Incident lifecycle commands are:
+
+`pi.fixture/v3` retains the complete v2 authoring rubric and adds a closed
+behavioural contract. Each requirement has a prompt anchor and an exact
+percentage weight; each maps one visible seed to at least two hidden sibling
+cases. The parent row reducer applies those weights to admitted TAP case names,
+refusing a changed or partial test population instead of guessing. A suite-load
+crash remains an honest `0/100`.
+
+V3 oracles use a one-JSON-record-in/one-JSON-record-out executable protocol.
+The admission parent enforces the declared query count, input size, deadline,
+and output-file limit under a fixed environment. Oracle source lives outside
+the fixture root, is artifact-hashed, and is never staged into the candidate
+tree, installed as a hidden overlay, or placed in one-shot context. The current
+gate grades hidden duals and does not expose the oracle to the coding agent.
+Oracle access in a later experiment would require a separately reviewed parent
+broker; copying, importing, wrapping, or shipping the executable is not a
+supported interface.
 
 ```sh
 python3 prompt-lab/incident_corpus.py intake ID --source SOURCE --summary TEXT

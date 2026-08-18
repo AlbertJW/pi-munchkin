@@ -23,7 +23,7 @@ admission rule for fixture calibration from 2026-08-15 onward. It supersedes, by
 ## The rule
 
 Per **fixture**, per **model tier**, **base arm only**, **n = 6** authoritative
-sessions (`pi.eval-row/v3`, `authoritative: true`, `status: "complete"`).
+sessions (`pi.eval-row/v4`, `authoritative: true`, `status: "complete"`).
 
 ### Core admission (all fixtures)
 

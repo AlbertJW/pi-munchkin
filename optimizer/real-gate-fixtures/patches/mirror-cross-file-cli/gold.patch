@@ -1,0 +1,21 @@
+--- a/src/parse-job.js
++++ b/src/parse-job.js
+@@ -1,8 +1,8 @@
+-const ALLOWED = new Set(['queued', 'running', 'done']);
++import { STATUS_ORDER } from './policy.js';
+
+ export function parseJob(line) {
+   const [id, rawStatus, ...extra] = line.split(':');
+   const status = (rawStatus ?? '').trim().toLowerCase();
+-  if (extra.length || !id?.trim() || !ALLOWED.has(status)) throw new Error('invalid job');
++  if (extra.length || !id?.trim() || !STATUS_ORDER.includes(status)) throw new Error('invalid job');
+   return { id: id.trim(), status };
+ }
+--- a/src/policy.js
++++ b/src/policy.js
+@@ -1,4 +1,4 @@
+-export const STATUS_ORDER = ['queued', 'running', 'done'];
++export const STATUS_ORDER = ['queued', 'blocked', 'running', 'done'];
+
+ export function canTransition(from, to) {
+   return STATUS_ORDER.indexOf(to) === STATUS_ORDER.indexOf(from) + 1;

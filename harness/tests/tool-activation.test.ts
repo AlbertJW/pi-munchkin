@@ -69,6 +69,34 @@ test("dynamic startup omits deferred schemas and preserves a narrowed --tools se
 	try { assert.deepEqual(explicit.active(), ["read", "bash"]); } finally { explicit.restore(); }
 });
 
+test("minimal surface is an opt-in reduced candidate and never auto-adds deferred tools", async () => {
+	const priorMode = process.env.MUNCHKIN_TOOL_ACTIVATION;
+	const priorSurface = process.env.MUNCHKIN_TOOL_SURFACE;
+	const priorTelemetry = process.env.TELEMETRY;
+	process.env.MUNCHKIN_TOOL_ACTIVATION = "dynamic";
+	process.env.MUNCHKIN_TOOL_SURFACE = "minimal";
+	process.env.TELEMETRY = "off";
+	try {
+		const fp = makeFakePi();
+		let active = [...allTools];
+		(fp.pi as any).getAllTools = () => allTools.map((name) => ({ name, description: "" }));
+		(fp.pi as any).getActiveTools = () => [...active];
+		(fp.pi as any).setActiveTools = (names: string[]) => { active = [...names]; };
+		captureInitialToolSurface(fp.pi as never);
+		const mod = await import(`../extensions/tool-activation.ts?minimal=${Date.now()}-${Math.random()}`);
+		mod.default(fp.pi as never);
+		await fire(fp, "session_start", {}, {});
+		assert.deepEqual(active, ["read", "bash", "edit", "write"]);
+		assert.equal((globalThis as any).__pi_tool_activation_state.surface_mode, "minimal");
+		emitHarnessSignal(fp.pi.events as never, { v: 1, type: "loop/tier", tier: 2, detector: "exact" });
+		assert.deepEqual(active, ["read", "bash", "edit", "write"]);
+	} finally {
+		if (priorMode === undefined) delete process.env.MUNCHKIN_TOOL_ACTIVATION; else process.env.MUNCHKIN_TOOL_ACTIVATION = priorMode;
+		if (priorSurface === undefined) delete process.env.MUNCHKIN_TOOL_SURFACE; else process.env.MUNCHKIN_TOOL_SURFACE = priorSurface;
+		if (priorTelemetry === undefined) delete process.env.TELEMETRY; else process.env.TELEMETRY = priorTelemetry;
+	}
+});
+
 test("missing bootstrap baseline preserves the current surface instead of guessing", async () => {
 	const previousMode = process.env.MUNCHKIN_TOOL_ACTIVATION;
 	const previousTelemetry = process.env.TELEMETRY;
@@ -123,8 +151,8 @@ test("bootstrap baseline prevents plan_go's internal review hold from looking li
 	}
 });
 
-test("subagent activates additively for multi-item execution, second gate failure, and loop tier two", async () => {
-	for (const trigger of ["plan", "gate", "loop"] as const) {
+test("subagent activates additively for plan, gate, loop, and plateau recovery signals", async () => {
+	for (const trigger of ["plan", "gate", "loop", "plateau"] as const) {
 		const run = await dynamic();
 		try {
 			if (trigger === "plan") {
@@ -132,8 +160,10 @@ test("subagent activates additively for multi-item execution, second gate failur
 				emitHarnessSignal(run.fp.pi.events as never, { v: 1, type: "plan/go", runIdHash: signalRunId("r") });
 			} else if (trigger === "gate") {
 				emitHarnessSignal(run.fp.pi.events as never, { v: 1, type: "plan/gate", pass: false, fails: 2, runIdHash: signalRunId("r"), gateHash: null });
-			} else {
+			} else if (trigger === "loop") {
 				emitHarnessSignal(run.fp.pi.events as never, { v: 1, type: "loop/tier", tier: 2, detector: "exact" });
+			} else {
+				emitHarnessSignal(run.fp.pi.events as never, { v: 1, type: "capability/need", capability: "subagent", reason: "recovery" });
 			}
 			assert.ok(run.active().includes("subagent"), trigger);
 			assert.ok(run.active().includes("read"), "activation is additive");

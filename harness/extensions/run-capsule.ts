@@ -27,7 +27,7 @@ export default function (pi: ExtensionAPI): void {
 	let pendingProviderRecovery = false;
 
 	function publishIdentity(): void {
-		(globalThis as Record<string, unknown>).__pi_run_capsule_identity = { cwd, capsuleId };
+		(globalThis as Record<string, unknown>).__pi_run_capsule_identity = { cwd, capsuleId, runIdHash: currentRunIdHash };
 	}
 
 	function createQueue(): CapsuleCheckpointQueue {
@@ -65,6 +65,7 @@ export default function (pi: ExtensionAPI): void {
 			capsuleId = newCapsuleId();
 			queue = createQueue();
 			publishIdentity();
+			emitHarnessSignal(pi.events, { v: 1, type: "capsule/identity" });
 		}
 		phaseDirty ||= phase;
 		(queue ??= createQueue()).request(snapshot);

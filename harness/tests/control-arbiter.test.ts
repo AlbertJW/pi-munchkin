@@ -15,7 +15,7 @@ import { boardState, noteTool, resetBoard } from "../lib/blackboard.ts";
 function envelope(kind: ControlKind, boundarySequence = 1, effect: ControlEffect = "message"): ControlProposalEnvelope {
 	return {
 		proposal: buildControlProposal({
-			boundarySequence, kind, reason: kind === "verification_required" ? "exact_gate_missing" : "loop_strategy_change",
+			boundarySequence, kind, reason: kind === "verification_required" ? "exact_gate_missing" : "loop_recovery",
 			source: kind === "verification_required" ? "verify-gate" : "loop-breaker",
 			cooldownKey: `${kind}:${boundarySequence}`, messageFactory: kind === "verification_required" ? "verify-wrap" : "loop-tier",
 			effect, legacyActed: true,
@@ -93,7 +93,7 @@ test("enforce merges the lens before one correction and reserves the intact tail
 test("repeated-failure recovery wins and retains the exact verification requirement at the end", () => {
 	const queue = new ControlArbiterQueue();
 	const recovery = envelope("failure_recovery");
-	recovery.delivery.message = `[loop-breaker] failure_class=compile_or_lint; observed=repeated_failure; required=change_strategy.\n${"r".repeat(3600)}`;
+	recovery.delivery.message = `[loop-breaker] failure_class=compile_or_lint; observed=repeated_failure; required=obtain_discriminating_fact.\n${"r".repeat(3600)}`;
 	const verification = envelope("verification_required");
 	verification.delivery.message = "[verify-gate] Exact project gate required after the latest mutation.";
 	queue.add(lensEnvelope(1, `[harness summary]\n${"l".repeat(4000)}`));

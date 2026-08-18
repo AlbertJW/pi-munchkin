@@ -6,7 +6,7 @@ import argparse
 import json
 from pathlib import Path
 
-from fixture_admission import MANIFESTS, authoritative, load_manifest
+from fixture_admission import MANIFESTS, authoritative, load_manifest, requirement_scoring
 
 
 def prompt_record(manifest, variant):
@@ -46,6 +46,9 @@ def row_context(task, variant, exploratory=False):
         # The grader artifact the gate is allowed to read, pinned by the (admission-hashed)
         # manifest. None for the fixtures that emit no graded subscores. See grade_artifact.py.
         "grade_artifact": manifest.get("tests", {}).get("fail_to_pass", {}).get("grade_artifact"),
+        # Parent-owned v3 grading metadata. This row-context file lives outside
+        # the candidate worktree; it is never placed in the model prompt.
+        "requirement_scoring": requirement_scoring(manifest),
     }
 
 

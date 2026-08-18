@@ -42,7 +42,7 @@ test("different verification commands join one semantic failure episode", () => 
 	assert.equal(second.opened, false);
 	assert.equal(second.episode.id, first.episode.id);
 	assert.equal(second.episode.count, 2);
-	assert.equal(second.episode.strategyHashes.length, 2, "changed commands remain distinct strategies");
+	assert.equal(second.episode.callVariantHashes.length, 2, "changed arguments remain distinct call variants");
 });
 
 test("identical result text remains separate when failure classes differ", () => {
@@ -124,7 +124,7 @@ test("unrelated work increments only the preregistered session-window overrun", 
 	exposeVerification(tracker);
 	tracker.noteToolCall({ toolName: "read", args: { path: "src/other.ts" }, planItemId: "item-1" });
 	const snapshot = tracker.snapshot();
-	assert.equal(snapshot.v, 3);
+	assert.equal(snapshot.v, 4);
 	assert.equal(snapshot.semanticFailureOverrun, 1);
 	assert.equal(snapshot.correlatedFailureOverrun, 0);
 	assert.equal(snapshot.active[0]?.callsAfterSecond, 1);
@@ -136,7 +136,7 @@ test("same family, target, and plan item increments both overrun counters", () =
 	exposeVerification(tracker);
 	tracker.noteToolCall({
 		toolName: "bash",
-		args: { command: "npm run test -- --changed-strategy" },
+		args: { command: "npm run test -- --changed-variant" },
 		planItemId: "item-1",
 	});
 	const snapshot = tracker.snapshot();
@@ -212,7 +212,7 @@ test("recovery, settlement, manual resume, and reset clear exposed state", () =>
 	reset.noteToolCall({ toolName: "bash", args: { command: "npm test" }, planItemId: "item-1" });
 	reset.reset();
 	assert.deepEqual(reset.snapshot(), {
-		v: 3,
+		v: 4,
 		totalEpisodes: 0,
 		totalFailures: 0,
 		longestEpisode: 0,

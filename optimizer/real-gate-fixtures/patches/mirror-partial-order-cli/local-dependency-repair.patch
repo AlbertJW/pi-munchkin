@@ -1,0 +1,21 @@
+--- a/src/schedule.js
++++ b/src/schedule.js
+@@ -1,5 +1,15 @@
+ export function scheduleJobs(jobs) {
+-  return [...jobs]
+-    .sort((a, b) => (b.urgency ?? 0) - (a.urgency ?? 0))
+-    .map((job) => job.id);
++  const ordered = [...jobs].sort((a, b) => (b.urgency ?? 0) - (a.urgency ?? 0));
++  for (let pass = 0; pass < jobs.length; pass++) {
++    for (let index = 0; index < ordered.length; index++) {
++      for (const dependency of ordered[index].after ?? []) {
++        const dependencyIndex = ordered.findIndex((job) => job.id === dependency);
++        if (dependencyIndex > index) {
++          const [parent] = ordered.splice(dependencyIndex, 1);
++          ordered.splice(index, 0, parent);
++        }
++      }
++    }
++  }
++  return ordered.map((job) => job.id);
+ }

@@ -38,9 +38,11 @@ signal causes Run Kernel to clear active/exposed episode counts, reopen the run,
 `manual-resume` transition. The capsule appends one deterministic custom message with
 `triggerTurn=false`, so no provider request starts automatically.
 
-Semantic Tier 1 and Tier 2 recovery interventions use the brief as their message body only in
-recovery mode. Tier 3 remains the existing safe abort path and emits no automatic continuation.
-The control arbiter still selects at most one same-boundary action.
+Historical note: semantic Tier 1 and Tier 2 originally used this full brief in recovery mode.
+The semantic-truth repair removed that coupling: tier corrections now contain only the observed
+failure class, call-variant count, verification-frontier state, and one required next action.
+Tier 3 remains the existing safe abort path and emits no automatic continuation. The control
+arbiter still selects at most one same-boundary action.
 
 ## Limits and rollback
 

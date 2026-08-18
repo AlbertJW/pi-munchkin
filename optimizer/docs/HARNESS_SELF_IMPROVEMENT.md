@@ -2281,7 +2281,8 @@ against source with executed counterfactuals:
 **What the series is.** (1) `lib/failure-episodes.ts` + loop-breaker integration: failures are
 classified into a stable taxonomy (schema/policy/permission/not-found/timeout/provider/
 verification/edit-conflict/…), keyed by (class, tool family, hashed target, hashed plan item),
-and tracked as episodes with strategy-diversity counts. `LOOP_EPISODE_MODE=shadow` (default)
+and tracked as episodes with call-variant counts. Changed arguments are not evidence of a changed
+reasoning strategy. `LOOP_EPISODE_MODE=shadow` (default)
 **records only** — tier observations at the measured 7/11/28 session tail and 2/4/6 semantic
 ladder; `enforce` (dark, separate adoption gate) steers at tiers 1–2 and aborts at tier 3 with
 a private, fully-hashed recovery receipt (0600, atomic, under the agent dir). `/loop-status` and

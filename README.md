@@ -148,10 +148,14 @@ Most behaviour is automatic. The primary commands are:
   walls and sends one deterministic recovery instruction.
 - `/run-status` for a bounded, read-only summary of the authoritative structured run state;
   `/run-new` declares the current run abandoned so the next request starts a fresh run identity.
+- `/working-memory-status` for counts and authoritative bytes only. This command and the
+  `working_memory` tool exist only when the dark `WORKING_MEMORY=on` candidate is enabled.
 - `/munchkin-doctor` for redacted Pi/model capability, canonical tool-provenance, retry/timeout,
   declared sandbox posture, and a `serving_truth` line comparing the local server's actual
   served `n_ctx` against the registry's `contextWindow` (probed once per model after settlement;
-  local endpoints only — named hosts and public IPs are never probed).
+  local endpoints only — named hosts and public IPs are never probed). It also reports
+  protocol-parity facts such as declared thinking format and observed stream shape without
+  exposing prompts, payloads, or thinking text.
 
 Compaction is a tool the model calls (`compact_context`), not a slash command: it summarises the
 model's own window in place with one resume handoff.
@@ -162,6 +166,7 @@ model's own window in place with one resume handoff.
 |---|---|---|
 | `MUNCHKIN_TOOL_ACTIVATION` | `dynamic`; defers `subagent` and `compact_context` only when Pi exposes the complete default registry | `ambient` leaves Pi's initial surface untouched |
 | `MUNCHKIN_TOOL_ACTIVATION=phase` | dark candidate; additionally defers `plan_go`, span tools, and post-search `web_read`, then activates them from structured phase/evidence signals | return to `dynamic` (deployed path) or `ambient`; explicit `--tools` selections are always preserved |
+| `MUNCHKIN_TOOL_SURFACE` | `default`; `minimal` is a dark, configuration-only candidate that keeps only `read`, `bash`, `edit`, and `write` when the complete registry is visible | unset/`default` restores the adopted dynamic surface; narrowed explicit `--tools` selections are always preserved |
 | `PLAN_MODE` | `forced`; deployed whole-plan creation and execution | `adaptive` adds stable-ID `plan_update` and explicit bounded `/plan-direct`; `off` hides those candidate additions |
 | `PLAN_STORAGE` | `capsule`; plan JSON, Markdown projection, and trace stay in the private per-run capsule for both forced and adaptive planning | `project` restores historical `.pi/plan-state.json`, `.pi/TODO.md`, and `.pi/traces/`; `/plan-export` is the explicit one-file export; `RUN_CAPSULE=off` also selects project storage because no private session identity exists |
 | dynamic `subagent` triggers | multi-item structured execution, second plan-gate failure, or loop-breaker tier two | once activated it stays active; one automatic attempt means a later manual `/tools` disable is respected |
@@ -194,9 +199,11 @@ model's own window in place with one resume handoff.
 | `RESEARCH_LEDGER` | dark. After three consecutive unverifiable citations, `research_note` stops returning errors and tells the model to cite inline — an uncapped refusal stream escalated loop-breaker to an abort and killed two Run 3 sessions outright. (`on` enables the parent-verified citation pipeline: session page cache, genuine-error `research_note`, recovery-only `research_recall`, budget footers, and a private bounded v2 JSONL ledger under `${PI_CODING_AGENT_DIR}/artifacts/research-ledgers/`) | unset keeps both research-note tools absent; no project-local ledger is written |
 | `RUN_KERNEL` | `shadow`; observes canonical execution receipts, semantic phases, lifecycle settlement, and legacy-state disagreements | `off` registers no kernel handlers or event-bus subscriber; shadow mode never prompts, steers, blocks, activates tools, or persists a capsule |
 | `RUN_CAPSULE` | `shadow`; checkpoints the closed RunState contract to a private per-run JSON authority plus an untrusted Markdown projection | `off` registers no capsule handlers or command; `recovery` is a dark compatibility mode that DOES inject one bounded brief on the events listed in the next row (the previous "does not inject" wording contradicted it) |
-| `RUN_CAPSULE=recovery` recovery brief | disabled by the default `shadow`; emits one bounded brief only after compaction, an unsettled provider retry, an enforced semantic tier, or an explicit resume command | return to `shadow` or `off`; ordinary turns receive no capsule context and manual resume never starts a provider request |
+| `RUN_CAPSULE=recovery` recovery brief | disabled by the default `shadow`; emits one bounded brief only after compaction, an unsettled provider retry, or an explicit resume command | return to `shadow` or `off`; ordinary turns receive no capsule context and manual resume never starts a provider request |
+| `WORKING_MEMORY` | `off`; the tool, command, handlers, schema, snippets, and guidance are absent | `on` adds an explicit, private, per-run notebook of at most 32 untrusted model notes; it requires the matching run-capsule identity and never injects notes automatically |
 | `VERIFY_EXECUTION_ORDER` | `execution`; Pi start/end order uses a conservative mutation epoch, so starts, failures, overlaps, and missing events invalidate earlier green evidence | `legacy` temporarily restores transcript-order evaluation |
 | `PLAN_GATE_DIAGNOSTICS` | `safe`; red gates return a 500-byte, redacted, JSON-framed `UNTRUSTED_GATE_DIAGNOSTIC`, while persisted state keeps only class/count/bytes/hash | `legacy` temporarily restores raw transient gate text; raw output is never restored to plan state, traces, telemetry, cockpit, or notifications |
+| `VERIFICATION_PLATEAU` | `shadow`; records strict same-gate/same-plan-item plateaus only after three successful mutation→recognized failed-TAP epochs with no frontier advance | `off` disables collection; `enforce` is dark and proposes one arbiter-owned correction at epoch three plus an additive capability request at five; it never aborts |
 | `ACTIVE_TOOL_PROMPTS` | `derived`; inactive tools contribute no ambient guidance and Pi supplies definition-owned guidance only for active tools | `ambient` restores the broader legacy prompt; manual `/tools` disable removes active-tool guidance |
 | `CONTROL_ARBITER` | `enforce`; one highest-priority corrective voice acts per boundary, with bounded lens/verification supplements where applicable | `shadow` restores legacy producer delivery while recording the winner; `off` removes the arbiter while typed plan/context/loop signals continue |
 | `TELEMETRY_WRITER` | `sync`; gate source and inherited-FD telemetry are always synchronous | `async` enables the bounded ordered interactive file writer; settlement and shutdown await its flush |
@@ -228,6 +235,12 @@ oversized files.
   `state-v1.json` file and Pi `run_state_v1` custom entry are structured restore authorities;
   `capsule.md` is only a deterministic, bounded, untrusted projection. Normal runs never inject
   it into model context, paths are not exposed by `/run-status`, and retention is manual.
+- With `WORKING_MEMORY=on`, that exact capsule directory also holds an 8 KiB-bounded
+  `working-memory-v1.json` authority and an untrusted `working-memory.md` projection. Notes are
+  sanitized, limited to 240 UTF-8 bytes, and never treated as plans, evidence, verification, or
+  instructions. Restore requires the exact project, capsule, and run identities; the harness
+  never scans for a plausible older notebook. Telemetry and `/working-memory-status` expose only
+  counts, hashes, booleans, and byte totals—not note text or artifact paths.
 - Plan state, its Markdown projection, and the bounded plan trace share that run-capsule directory
   by default and use `0600` files. Normal planning therefore creates no `.pi` worktree artifacts.
   `/plan-export` deliberately writes only `.pi/TODO.md`; `PLAN_STORAGE=project` is the full legacy

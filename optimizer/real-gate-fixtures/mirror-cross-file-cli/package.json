@@ -1,0 +1,8 @@
+{
+  "name": "mirror-cross-file-cli",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "node --test"
+  }
+}

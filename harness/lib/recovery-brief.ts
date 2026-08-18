@@ -30,7 +30,7 @@ function nextSafeAction(state: RunStateV1): string {
 		return "Report the bounded blocker and request the missing user decision.";
 	}
 	if (state.failures.activeWalls > 0) {
-		return "Choose a different strategy family; do not repeat a walled exact call.";
+		return "Obtain one discriminating fact before choosing another call; do not repeat a walled exact call.";
 	}
 	if (state.mutation.lastCompletedSequence !== null && !state.verification.validAfterMutation) {
 		return "Run the exact detected project gate after the latest source mutation.";
@@ -43,10 +43,10 @@ function nextSafeAction(state: RunStateV1): string {
 
 export function renderRecoveryBrief(
 	state: RunStateV1,
-	options: { reason: RecoveryReason; failureClass?: FailureClass | null; strategyHashes?: string[]; maxBytes?: number },
+	options: { reason: RecoveryReason; failureClass?: FailureClass | null; callVariantHashes?: string[]; maxBytes?: number },
 ): string {
 	const facts = state.evidence.facts.slice(0, 8).map((fact) => `${shortHash(fact.hash)}:${fact.provenance}`);
-	const strategies = (options.strategyHashes ?? []).filter((value) => /^[a-f0-9]{64}$/.test(value)).slice(0, 8).map(shortHash);
+	const callVariants = (options.callVariantHashes ?? []).filter((value) => /^[a-f0-9]{64}$/.test(value)).slice(0, 8).map(shortHash);
 	const failureClass = options.failureClass ?? state.failures.lastClass ?? "none";
 	const lines = [
 		START,
@@ -64,7 +64,7 @@ export function renderRecoveryBrief(
 		`gate_valid_after_mutation: ${state.verification.validAfterMutation}`,
 		`failure_class: ${failureClass}`,
 		`active_failure_walls: ${state.failures.activeWalls}`,
-		`strategy_family_hashes: ${strategies.length === 0 ? "none retained" : strategies.join(",")}`,
+		`call_variant_hashes: ${callVariants.length === 0 ? "none retained" : callVariants.join(",")}`,
 		`active_capabilities: ${state.capabilities.activeToolCount}/${state.capabilities.allToolCount}`,
 		`explicit_tool_selection_preserved: ${state.capabilities.preservedExplicitTools}`,
 		`next_safe_action: ${nextSafeAction(state)}`,

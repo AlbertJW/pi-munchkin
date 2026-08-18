@@ -6,7 +6,9 @@ export function activeToolPromptsEnabled(
 ): boolean {
 	if (env.ACTIVE_TOOL_PROMPTS === "active") return true;
 	if (env.ACTIVE_TOOL_PROMPTS === "ambient") return false;
-	return defaultMode === "derived" && env.MUNCHKIN_TOOL_ACTIVATION !== "ambient";
+	return defaultMode === "derived" && (
+		env.MUNCHKIN_TOOL_SURFACE === "minimal" || env.MUNCHKIN_TOOL_ACTIVATION !== "ambient"
+	);
 }
 
 export const ACTIVE_TOOL_PROMPTS = activeToolPromptsEnabled();

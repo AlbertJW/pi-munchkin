@@ -32,7 +32,7 @@ import collections, json, os, sys
 LAB = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, LAB)
 from fleet_report import classify, decide, uplift_decay  # noqa: E402
-from row_contract import CANONICAL_ROWS, ROW_V3, canonical_generation, failure_episode_complete  # noqa: E402
+from row_contract import CANONICAL_ROWS, POWERED_ROWS, canonical_generation, failure_episode_complete  # noqa: E402
 
 RESULTS = os.path.join(LAB, "results")
 TELEMETRY = os.environ.get("TELEMETRY_FILE", os.path.expanduser("~/.pi/agent/telemetry/events.jsonl"))
@@ -73,7 +73,7 @@ def row_integrity(rows):
             return "non-authoritative or incomplete canonical eval row"
         if not serving.get("stable") or (serving.get("pre") or {}).get("status") != "complete" or (serving.get("post") or {}).get("status") != "complete":
             return "serving fingerprint incomplete or unstable"
-        if canonical == ROW_V3 and not failure_episode_complete(r):
+        if canonical in POWERED_ROWS and not failure_episode_complete(r):
             return "authenticated failure-episode settlement is missing or incomplete"
     return None
 

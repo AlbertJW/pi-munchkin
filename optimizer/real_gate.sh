@@ -864,13 +864,16 @@ if subscores is None and not ctx.get("grade_artifact"):
     _tap_path = workdir.rstrip("/") + ".grade.tap"
     if os.path.exists(_tap_path):
         subscores, subscores_blocked = _grade_reporter.extract(_tap_path)
+        if subscores is not None and ctx.get("requirement_scoring"):
+            subscores, subscores_blocked = _grade_reporter.apply_requirement_weights(
+                subscores, ctx["requirement_scoring"])
     elif task_is_hidden == "1":
         # A hidden-graded task that produced no TAP is a recorded refusal, never a
         # silent no-grade — the model's src can unlink the destination during the
         # unsandboxed grading re-run (2026-08-18 inspection L2). Non-hidden tasks
         # legitimately have no TAP and record nothing.
         subscores_blocked = "missing"
-rec={"schema":"pi.eval-row/v3", "task":task,"pattern":pat,"arm":pat,"rep":int(rep),
+rec={"schema":"pi.eval-row/v4", "task":task,"pattern":pat,"arm":pat,"rep":int(rep),
      "repetition":int(rep),"model":model,"split":split,"score":int(gate),
      "retried":int(retried),"run":runid,"fixture":{"cohort":ctx["cohort"],"version":ctx["version"]},
      "authoritative":authoritative,"status":status,"authority_reason":authority_reason,
@@ -949,7 +952,7 @@ spec=importlib.util.spec_from_file_location("execution_policy", policy_path); po
 authoritative,status,authority_reason=policy.row_decision(ctx["authoritative"],ctx["authority_reason"],stable,complete,
     execution_authoritative,execution_reason,ctx.get("exploratory_override",False),eligible=="1")
 usage=result["usage"]
-rec={"schema":"pi.eval-row/v3","task":task,"pattern":"one-shot","arm":"one-shot","rep":int(rep),"repetition":int(rep),
+rec={"schema":"pi.eval-row/v4","task":task,"pattern":"one-shot","arm":"one-shot","rep":int(rep),"repetition":int(rep),
      "model":model,"split":"robustness","score":int(result["score"]),"run":runid,
      "fixture":{"cohort":ctx["cohort"],"version":ctx["version"]},"authoritative":authoritative,"status":status,
      "authority_reason":authority_reason,"prompt":{"variant":ctx["prompt_variant"],"semantic_group":ctx["semantic_group"],"sha256":ctx["prompt_sha256"]},

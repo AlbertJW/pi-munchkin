@@ -20,6 +20,7 @@ export type OrderedCallOutcome = {
 	mutationSettled: boolean;
 	verificationAttempted: boolean;
 	verificationPassed: boolean;
+	verificationOrdered: boolean;
 	verificationValid: boolean;
 };
 
@@ -86,9 +87,10 @@ export class VerificationOrderClock {
 		const verificationAttempted = pending.kind === "verification" || override !== "none";
 		const verificationPassed = verificationAttempted &&
 			(override === "passed" || (override === "none" && call.succeeded));
-		const verificationValid = verificationPassed &&
+		const verificationOrdered = verificationAttempted &&
 			this.pendingMutations === 0 &&
 			(this.latestMutationBoundary === null || pending.startedSequence > this.latestMutationBoundary);
+		const verificationValid = verificationPassed && verificationOrdered;
 
 		return {
 			kind: pending.kind,
@@ -98,6 +100,7 @@ export class VerificationOrderClock {
 			mutationSettled,
 			verificationAttempted,
 			verificationPassed,
+			verificationOrdered,
 			verificationValid,
 		};
 	}
