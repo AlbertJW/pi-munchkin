@@ -764,6 +764,16 @@ PY
 				--test-reporter=tap --test-reporter-destination=/dev/fd/7 \
 				"test/$(basename "$(hidden_test_for "$task")")" ) >/dev/null 2>&1 || true
 			exec 7>&-
+			# F3 PROVENANCE SEAL (2026-08-20): bind the exact bytes the jailed
+			# runner produced before any other code runs. The out-of-process row
+			# builder (grade_reporter.extract) re-hashes the evidence and refuses
+			# on drift (seal_mismatch) or a missing seal (seal_missing). The seal
+			# sits in the same hidden evidence dir the jail cannot reach.
+			[[ -s "$grade_tap" ]] && python3 - "$grade_tap" "$grade_evidence/grade.tap.seal" <<'PY'
+import hashlib,sys
+tap,seal=sys.argv[1:]
+open(seal,"w",encoding="utf-8").write(hashlib.sha256(open(tap,"rb").read()).hexdigest())
+PY
 		else
 			echo "grade_sandbox_unavailable" > "$grade_blocked"
 		fi
@@ -913,7 +923,11 @@ if subscores is None and not ctx.get("grade_artifact"):
         # test suite at all (t2) land here too, instead of contributing a biased 0.
         subscores, subscores_blocked = None, "unpinned_grader"
     elif os.path.exists(_tap_path):
-        subscores, subscores_blocked = _grade_reporter.extract(_tap_path, _pin)
+        # Out-of-process provenance: the gate sealed the evidence bytes at
+        # production time; extract re-hashes here (a different process) and
+        # refuses seal_mismatch / seal_missing before parsing anything.
+        subscores, subscores_blocked = _grade_reporter.extract(
+            _tap_path, _pin, _tap_path + ".seal")
         if subscores is not None and ctx.get("requirement_scoring"):
             subscores, subscores_blocked = _grade_reporter.apply_requirement_weights(
                 subscores, ctx["requirement_scoring"])

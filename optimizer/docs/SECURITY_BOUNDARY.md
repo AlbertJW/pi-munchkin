@@ -170,32 +170,30 @@ produces the grade — there is no verifier isolation. What changed at the reboo
   writes to an artifact), a thing the behaviour-graded reporter path cannot express.
   For such fixtures the pinned-name residual stands until out-of-process verifier
   isolation lands. Behaviour-graded fixtures use the reporter path below instead.
-- **Reporter path (`grade_reporter.py`, default) — MEASURED 2026-08-18, three bypasses.**
-  An adversarial re-attack forged a full graded score three ways, all verified by
-  running real `node --test`: (a) model src neuters `node:assert` before the grader's
-  assertions run — the reported case names are genuine, so the admitted case pin cannot
-  see it (now mitigated by the runner-owned `prompt-lab/grade_preload.mjs`, loaded with
-  `--import`, which freezes the assertion surfaces first); (b) src READS the pin from the
-  `<workdir>.row-context.json` sibling — the graded re-run is not sandboxed — re-registers
-  exactly those names as trivial passing tests, then holds and exits before the real suite
-  runs (OPEN); (c) a detached child rewrites `<workdir>.grade.tap` after node exits (OPEN).
-  An unpinned hidden grader is now refused (`unpinned_grader`) instead of scored.
-  Conclusion: graded_rate is defensible against accident and casual gaming, and is NOT
-  adversary-proof while the grader shares a process with model code and the pin sits in a
-  readable sibling. The named closure — an unprivileged agent with a privileged,
-  out-of-process verifier (plus sandboxing the graded re-run and hiding the pin/destination
-  from it) — is now the top measurement-integrity item, not a background nicety.
-- Historical note on the reporter path: the TAP destination lives OUTSIDE
-  the workdir and is written by the test runner, not by anything the model's tree can
-  name; stdout from model code does not reach it. The demonstrated forgery does not
-  translate. **Residual**: code running inside the test process can read
-  `process.execArgv`, learn the destination path, and race a write after the runner —
-  a much higher bar, still open. Skip/todo directives are excluded from grading and
-  an all-skipped suite is a refusal, so self-skipping is not a score either.
-
-The named full fix is an out-of-process, unprivileged-agent / privileged-verifier
-split (Harbor's "Verifier Execution Isolation"). Deferred: charter backlog, not on
-the reboot's critical path. Until then, graded_rate inherits the same trust posture
-as the gate bit under section "The gate transcript is writable by the session it
-measures" — defensible against accident and casual gaming, not against a targeted
-adversary inside the session.
+- **Reporter path (`grade_reporter.py`, default) — F2/F3 CLOSED 2026-08-20.** The
+  2026-08-18 re-attack found three bypasses: (a) model src neutered `node:assert`
+  before the grader's assertions (mitigated by runner-owned `grade_preload.mjs`);
+  (b) src read `<workdir>.row-context.json`, re-registered the admitted names as
+  trivial passes, and exited; (c) a detached child rewrote `<workdir>.grade.tap`
+  after node exited. The latter two are now blocked by `real-gate-fixtures/grade.sb`:
+  the graded re-run is separately sandboxed, the pin is kernel-read-denied, the
+  evidence lives in a private 0700 `<workdir>.grade-evidence/` directory hidden
+  from the jail, and the gate-opened `/dev/fd` channel is not inherited by node's
+  test-file child. Measured counterfactuals: pin read `EPERM`, child fd `ENXIO`,
+  evidence path `EPERM`, detached rewrite blocked. `grade_jail_selftest.py` runs
+  the golden path plus these attacks and fails without the jail.
+- **Evidence provenance seal — CLOSED 2026-08-20.** The gate hashes the TAP
+  immediately after closing the evidence fd. The row-builder's separate
+  `grade_reporter.extract` process re-hashes before parsing and refuses
+  `seal_missing` or `seal_mismatch`; tamper cases are covered by both the
+  reporter selftest and the jail selftest. New trial manifests bundle the
+  evidence directory, including the seal.
+- **Remaining trust boundary.** Model-authored `src/` still shares the Node
+  reporter process; a fully adversarial process-channel forgery therefore still
+  requires the named unprivileged-agent / privileged-verifier split (Harbor's
+  "Verifier Execution Isolation"). That is deferred. The pinned-artifact path
+  remains separately open because it intentionally grades model-written audit
+  artifacts. The reporter path is now robust against the measured F2/F3 vectors,
+  accidental tampering, and post-production evidence drift; do not describe it
+  as universally adversary-proof. Skip/todo directives remain excluded and an
+  all-skipped suite remains a refusal.

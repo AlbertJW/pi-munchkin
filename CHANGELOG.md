@@ -30,6 +30,17 @@ candidates as dark). Net changes since 0.3.0; the full per-decision record is
   import-time variant). 36 fixtures pinned, derived from real gold runs. The credential scanner
   is now a `verify` stage rather than manual-only, and `approve --expires-at` lets a mechanical
   re-approval preserve the original 90-day review clock.
+- **Measurement-integrity follow-up (2026-08-20).** The surface-receipt no-env test
+  now clears/restores inherited `HARNESS_SURFACE_SHA256`, preserving verification
+  hermeticity inside stamped live sessions. Reporter grading now runs its hidden
+  re-run in a separate Seatbelt jail: the admitted pin and evidence path are
+  inaccessible, detached-child rewrites are fenced, and unavailable sandboxing
+  refuses grading. TAP evidence is sealed immediately and re-hashed by the
+  out-of-process row builder (`seal_missing`/`seal_mismatch` refuse). Added the
+  golden/attack counterfactual battery `grade_jail_selftest.py` and trial-manifest
+  bundling for evidence/seals. The remaining same-reporter-process and pinned-
+  artifact trust boundaries stay explicitly deferred. `VG_STEER_NO_GATE` from `~`
+  remains expected because gate arming is cwd-scoped; no live mirror is implied.
 
 
 - **Measurement reboot (2026-08-15):** the optimizer is unmothballed under

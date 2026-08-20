@@ -32,6 +32,28 @@ zero tool or prompt exposure. Strict plateau tracking is prepared at the default
 `VERIFICATION_PLATEAU=enforce` remains dark and never aborts. Mirror-mini fixtures remain later
 stacked work. Nothing in this series has been merged, mirrored live, adopted, or measured.
 
+## 2026-08-20 measurement-integrity follow-up (source branch, live mirror intentionally unchanged)
+
+> **F2/F3 + test-hermeticity fixes prepared for merge/push.** `9aeea4e` makes the
+> `surface-receipt` no-env test own `HARNESS_SURFACE_SHA256`, so `npm run verify`
+> remains hermetic inside a live stamped session; the unfixed test failed with the
+> inherited hash and the fixed suite passes with it set. `8938bad` separately
+> sandboxes the graded hidden-suite re-run: the case pin is read-denied, evidence is
+> hidden in a private `<workdir>.grade-evidence/` directory behind a gate-opened fd,
+> detached children inherit the write fence, and grading refuses when the jail is
+> unavailable. `6b99a21` seals the TAP immediately after production and verifies the
+> bytes in the separate row-builder process (`seal_missing`/`seal_mismatch` refuse).
+> `grade_jail_selftest.py` covers the golden path, F2 pin theft, F3 detached rewrite,
+> workdir mutation, renderer failure, and post-production tampering; removing the
+> jail fails the F3 assertion. `trial_validity` bundles the new evidence directory.
+>
+> The plan-gate `VG_STEER_NO_GATE` seen while operating from `~` is expected: gate
+> arming is cwd-scoped, and no project gate exists in the home directory. The repo
+> gate was run from its worktree (`npm run verify`, all six stages green). No live
+> mirror, default change, adoption, gate/calibration round, or model-inference run
+> is implied; the deferred source/live surface boundary remains the human rollout
+> decision, and `context-pressure*` files were untouched.
+
 ## 2026-08 hardening series
 
 > **2026-08-18 SECOND DEEP-INSPECTION ROUND — on `main` (`f4af650`), NOT yet mirrored.**
