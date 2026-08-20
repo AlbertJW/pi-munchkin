@@ -82,6 +82,7 @@ python3 -m unittest "$OPT/prompt-lab/test_span_screen.py"
 python3 -m unittest "$OPT/prompt-lab/test_batch_screen.py"
 python3 "$OPT/prompt-lab/integrity_selftest.py"
 python3 "$OPT/prompt-lab/seatbelt_network_selftest.py"
+python3 "$OPT/prompt-lab/grade_jail_selftest.py"
 
 node --test "$OPT"/pi-test/test/*.test.js
 dry_output="$(cd "$OPT" && ./real_gate.sh --dry)"

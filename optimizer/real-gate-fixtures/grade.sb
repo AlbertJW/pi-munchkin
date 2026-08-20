@@ -1,0 +1,59 @@
+;; Seatbelt jail for the GRADED RE-RUN of the hidden fail-to-pass suite
+;; (real_gate.sh run_one, "Graded-by-default" block). The model session itself
+;; is already jailed by gate.sb; this profile jails the grading process, which
+;; is distinct because it intentionally EXECUTES model-authored src (the grader
+;; imports it) OUTSIDE the session. Before 2026-08-20 that re-run was
+;; unsandboxed and two forgeries were measured (SECURITY_BOUNDARY.md, reporter
+;; path F2/F3): src read the admitted case pin from the `<workdir>.row-context
+;; .json` sibling and re-registered trivial passing tests, and detached
+;; children rewrote the TAP destination after node exited. This profile denies
+;; both.
+;;
+;; Rules of the jail:
+;;  - READ: the workdir (src + restored pristine tests + copied hidden grader),
+;;    the gate-owned preload copy, and ordinary runtime reads (node binary,
+;;    dyld caches, /usr/lib). Kernel-denied: the case pin, the private evidence
+;;    directory holding the TAP, the harness repo, and the public mirror. src
+;;    runs, but it cannot learn the admitted case names from the pin, read the
+;;    evidence back, or reach graders/manifests of other fixtures.
+;;  - EVIDENCE CHANNEL: the TAP destination is HIDDEN, not merely fenced. The
+;;    gate opens the evidence file itself and passes `/dev/fd/N` to the node
+;;    test runner; node --test executes each test file in a CHILD process that
+;;    does not inherit that fd, so model code gets ENXIO on the fd and EPERM on
+;;    the path (both measured 2026-08-20) — there is no addressable evidence
+;;    location inside the jail at all. Writes are fenced to /dev/fd (the
+;;    runner's channel), a gate-owned scratch dir, and the null devices.
+;;    Everything else — including the workdir itself — is write-denied: the
+;;    re-run scores the state the model left, it never mutates it.
+;;  - NETWORK: denied outright; grading needs no egress.
+;;
+;; Ordering is load-bearing and was measured on this host: specific denies must
+;; stand BEFORE `(allow default)` to win, and every path must be the REAL path
+;; (macOS resolves /tmp -> /private/tmp before Seatbelt matching). real_gate.sh
+;; renders the absolute paths below per run (Seatbelt has no env vars) and
+;; REFUSES graded scoring when sandbox-exec is unavailable — a hidden grader is
+;; never re-run unsandboxed (fail-closed).
+(version 1)
+;; The admitted case pin: knowledge of the expected case names is what let a
+;; forged suite re-register them as trivial passes (F2). Deny-by-literal first.
+(deny file-read* (literal "__PIN__"))
+;; The private grade evidence directory (TAP + seals): invisible and untouched
+;; from inside the jail. The only channel out is the gate-opened /dev/fd below.
+(deny file-read* (subpath "__EVIDENCE__"))
+;; The evaluation harness and its public mirror (hidden graders of OTHER
+;; fixtures, Git objects, the approved manifests that carry the pins) stay
+;; denied. The runner-owned assertion-freeze preload (F1 mitigation) is COPIED
+;; by real_gate.sh into __GRADE_TMP__ before the re-run and imported from
+;; there: an allow-literal under a denied subpath does NOT work — the ESM
+;; resolver realpaths the parent directory and trips the directory deny
+;; (measured 2026-08-20). The copy is gate-owned; reads follow (allow default).
+(deny file-read* (subpath "__HARNESS__"))
+(deny file-read* (subpath "__MIRROR__"))
+(allow default)
+(deny network*)
+(deny file-write*)
+(allow file-write*
+  (subpath "/dev/fd")
+  (subpath "__GRADE_TMP__")
+  (literal "/dev/null")
+  (literal "/dev/dtracehelper"))

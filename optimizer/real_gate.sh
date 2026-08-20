@@ -720,11 +720,54 @@ PY
 	# writing into its own tree. grade_reporter.py parses it in the row builder;
 	# a manifest-pinned grade_artifact takes precedence there. A missing/broken
 	# TAP file becomes a recorded refusal (subscores_blocked), never a 0/N score.
-	local grade_tap="${wd}.grade.tap"
-	rm -f "$grade_tap"
+	#
+	# F2/F3 CLOSURE (2026-08-20): the re-run intentionally executes model-authored
+	# src OUTSIDE the model session, so it gets its own Seatbelt jail (grade.sb).
+	# The admitted case pin is kernel-read-denied (src can no longer learn the
+	# expected case names to re-register trivial passes — the measured F2 attack
+	# now gets EPERM). The evidence is HIDDEN, not merely fenced: the gate opens
+	# the TAP file in the private `${wd}.grade-evidence/` dir itself and passes
+	# /dev/fd/7 to the reporter; node --test runs each test file in a child that
+	# does not inherit fd 7, so model code reaches neither the fd (ENXIO) nor the
+	# path (EPERM) — measured. Detached children inherit the jail, so F3's
+	# post-exit rewrite has no addressable target either. Writes are fenced to
+	# /dev/fd + a gate-owned scratch dir; the workdir itself is write-denied (the
+	# re-run scores the state the model left). The runner-owned preload is copied
+	# into the scratch dir first (an allow-literal under a denied subpath does not
+	# survive the ESM resolver's parent-dir realpath). Fail-closed: if the jail
+	# cannot be rendered or sandbox-exec is gone, the re-run is REFUSED via a
+	# sidecar the row builder records — a hidden grader is never re-run
+	# unsandboxed. Residual (documented, deferred): code in the reporter's OWN
+	# process still sits with it; full closure is the out-of-process verifier
+	# split named in SECURITY_BOUNDARY.md.
+	local grade_evidence="${wd}.grade-evidence"
+	local grade_tap="$grade_evidence/grade.tap"
+	local grade_blocked="${wd}.grade-blocked"
+	rm -rf "$grade_evidence" "$grade_blocked"
 	if is_hidden "$task"; then
-		( cd "$wd" && node --test --import "$HERE/prompt-lab/grade_preload.mjs" --test-reporter=tap --test-reporter-destination="$grade_tap" \
-			"test/$(basename "$(hidden_test_for "$task")")" ) >/dev/null 2>&1 || true
+		local grade_tmpdir grade_ok=0
+		grade_tmpdir="$(mktemp -d "${TMPDIR:-/tmp}/grade-XXXXXX")" || grade_tmpdir=""
+		if [[ -n "$grade_tmpdir" ]] && mkdir -p "$grade_evidence" && chmod 0700 "$grade_evidence" \
+			&& cp "$HERE/prompt-lab/grade_preload.mjs" "$grade_tmpdir/grade_preload.mjs" 2>/dev/null \
+			&& PYTHONPATH="$HERE/prompt-lab" python3 -c \
+				'import sys, grade_sandbox; grade_sandbox.render(*sys.argv[1:])' \
+				"$HERE/real-gate-fixtures/grade.sb" "$wd/.grade.sb" "${wd}.row-context.json" \
+				"$grade_evidence" "$grade_tmpdir" "${GATE_MIRROR_DENY:-$REPO_ROOT}" "$REPO_ROOT"
+		then grade_ok=1; fi
+		if [[ "$grade_ok" == 1 ]] && command -v sandbox-exec >/dev/null 2>&1; then
+			# Gate-owned evidence channel: the fd is opened HERE, outside the jail;
+			# the reporter destination /dev/fd/7 is the only way out (fd 8 belongs
+			# to the telemetry HMAC above; node children never inherit fd 7).
+			exec 7>> "$grade_tap"
+			( cd "$wd" && sandbox-exec -f "$wd/.grade.sb" node --test \
+				--import "$grade_tmpdir/grade_preload.mjs" \
+				--test-reporter=tap --test-reporter-destination=/dev/fd/7 \
+				"test/$(basename "$(hidden_test_for "$task")")" ) >/dev/null 2>&1 || true
+			exec 7>&-
+		else
+			echo "grade_sandbox_unavailable" > "$grade_blocked"
+		fi
+		[[ -n "$grade_tmpdir" ]] && rm -rf "$grade_tmpdir"
 	fi
 	[[ "$task" == "t1" ]] && grep -rq "parseCSV" "$wd/src" "$wd/test" && gate=0
 	# t4's real correctness check is now the hidden fail-to-pass grader installed
@@ -861,7 +904,7 @@ subscores, subscores_blocked = _grade_artifact.extract(workdir, ctx.get("grade_a
 # grader is not a refusal).
 if subscores is None and not ctx.get("grade_artifact"):
     import grade_reporter as _grade_reporter
-    _tap_path = workdir.rstrip("/") + ".grade.tap"
+    _tap_path = workdir.rstrip("/") + ".grade-evidence/grade.tap"
     _pin = ctx.get("expected_cases")
     if task_is_hidden == "1" and not _pin:
         # Without the admitted case pin the reporter path is forgeable outright
@@ -876,10 +919,17 @@ if subscores is None and not ctx.get("grade_artifact"):
                 subscores, ctx["requirement_scoring"])
     elif task_is_hidden == "1":
         # A hidden-graded task that produced no TAP is a recorded refusal, never a
-        # silent no-grade — the model's src can unlink the destination during the
-        # unsandboxed grading re-run (2026-08-18 inspection L2). Non-hidden tasks
-        # legitimately have no TAP and record nothing.
-        subscores_blocked = "missing"
+        # silent no-grade. Non-hidden tasks legitimately have no TAP and record
+        # nothing. The fail-closed sidecar distinguishes WHY: the gate refused to
+        # re-run the hidden grader without its Seatbelt jail (grade_sandbox_
+        # unavailable) vs the TAP simply not existing (missing; the re-run is now
+        # write-fenced, so the model's src can no longer unlink the destination).
+        try:
+            with open(workdir.rstrip("/") + ".grade-blocked", encoding="utf-8") as _bfh:
+                _reason = _bfh.read().strip()
+        except OSError:
+            _reason = ""
+        subscores_blocked = _reason or "missing"
 rec={"schema":"pi.eval-row/v4", "task":task,"pattern":pat,"arm":pat,"rep":int(rep),
      "repetition":int(rep),"model":model,"split":split,"score":int(gate),
      "retried":int(retried),"run":runid,"fixture":{"cohort":ctx["cohort"],"version":ctx["version"]},
