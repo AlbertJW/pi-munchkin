@@ -52,10 +52,21 @@ test("a valid HARNESS_SURFACE_SHA256 records a surface-receipt telemetry row", a
 });
 
 test("no env var: no telemetry write at all (interactive/non-gate sessions unaffected)", async () => {
-	await withTelemetryFile(async (file) => {
-		await fireSessionStart();
-		assert.equal(existsSync(file), false);
-	});
+	// Hermeticity: an outer session (e.g. a live stamped pi harness running this
+	// suite) may export HARNESS_SURFACE_SHA256; this test asserts the NO-VAR
+	// contract, so it must own the variable exactly like its sibling tests
+	// instead of inheriting whatever the parent process carries (2026-08-20:
+	// observed failing inside a live session that stamped the hash at start).
+	const previous = process.env.HARNESS_SURFACE_SHA256;
+	delete process.env.HARNESS_SURFACE_SHA256;
+	try {
+		await withTelemetryFile(async (file) => {
+			await fireSessionStart();
+			assert.equal(existsSync(file), false);
+		});
+	} finally {
+		if (previous !== undefined) process.env.HARNESS_SURFACE_SHA256 = previous;
+	}
 });
 
 test("a malformed (non-hex-64) HARNESS_SURFACE_SHA256 is never recorded", async () => {
