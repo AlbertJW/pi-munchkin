@@ -87,7 +87,7 @@ def _grader_path(path):
     absolute paths only when they point back inside a gate workdir — /tmp scratch
     like `cat > /tmp/test/x.js` is not the grader."""
     text = str(path)
-    if ".grade.tap" in text:
+    if ".grade.tap" in text or ".grade-evidence" in text:
         return True
     if text.startswith("/") and "real-gate-runs" not in text:
         return False
@@ -409,6 +409,16 @@ def trial_manifest(workdir):
         if os.path.isfile(path):
             artifacts[os.path.basename(path)] = {"path": path, "sha256": _sha256(path),
                                                  "bytes": os.path.getsize(path)}
+    # F2/F3 closure layout (2026-08-20): the graded TAP + seals live in the
+    # private gate-owned evidence dir (hidden from the jailed re-run); bundle
+    # every file in it. The legacy sibling layout above stays for old workdirs.
+    evidence_dir = workdir.rstrip("/") + ".grade-evidence"
+    if os.path.isdir(evidence_dir):
+        for name in sorted(os.listdir(evidence_dir)):
+            path = os.path.join(evidence_dir, name)
+            if os.path.isfile(path):
+                artifacts["grade-evidence/" + name] = {"path": path, "sha256": _sha256(path),
+                                                       "bytes": os.path.getsize(path)}
     transcripts = [{"path": p, "sha256": _sha256(p), "bytes": os.path.getsize(p)}
                    for p in session_files_for(workdir)]
     manifest = {"schema": "pi.trial-manifest/v1", "workdir": workdir,

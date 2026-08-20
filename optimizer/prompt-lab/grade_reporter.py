@@ -46,13 +46,18 @@ graded re-run shares its process with model-authored src. Demonstrated bypasses:
   * neutering `node:assert` from src -> real names, all "pass" (0/5 became 5/5).
     Mitigated by the runner-owned `grade_preload.mjs` (--import) which freezes the
     assertion surfaces before any user module loads; re-measured 5/5 -> 2/5.
-  * READING the pin (it is written to `<workdir>.row-context.json`, and the graded
-    re-run is NOT sandboxed), re-registering those exact names as trivial passing
-    tests, then holding + exiting before the real suite starts. STILL OPEN.
-  * a detached child rewriting `<workdir>.grade.tap` after node exits. STILL OPEN.
-Treat graded_rate as robust against accident and casual gaming, NOT against a
-targeted adversary inside the session. Closure requires the out-of-process /
-sandboxed verifier named in SECURITY_BOUNDARY.md.
+  * READING the pin (it is written to `<workdir>.row-context.json`), re-registering
+    those exact names as trivial passing tests, then exiting. CLOSED 2026-08-20:
+    the graded re-run is jailed (real-gate-fixtures/grade.sb); the pin is
+    kernel-read-denied, so the attack falls through to the genuine suite
+    (measured: EPERM; regression: grade_jail_selftest.py).
+  * a detached child rewriting the TAP after node exits. CLOSED 2026-08-20: the
+    evidence lives in a private gate-owned dir hidden from the jail, reached only
+    through a gate-opened /dev/fd the node test children never inherit (measured:
+    ENXIO on the fd, EPERM on the path; same regression).
+Treat graded_rate as robust against accident, casual gaming, and these measured
+forgery vectors. The remaining bar is code sharing the reporter's OWN process;
+full closure is the out-of-process verifier split named in SECURITY_BOUNDARY.md.
 
 Honesty notes:
 - Only TOP-LEVEL TAP results are graded (fixtures author flat `test()` suites;
@@ -61,12 +66,12 @@ Honesty notes:
   failing file entry: fixed=0, total=1. graded_rate is correctly 0.0, but the
   recorded total under-reports the suite's true size — read `detail` before
   comparing totals across rows.
-- Forgery bar (SECURITY_BOUNDARY.md): the demonstrated import-time
-  `writeFileSync`-at-the-pinned-name forgery does not translate — the reporter
-  destination is outside the workdir and written by the runner, and stdout from
-  model code does not reach it. Residual: code running inside the test process
-  can sniff `process.execArgv` for the destination path and race a write; the
-  named full fix remains an out-of-process verifier (deferred, documented).
+- Forgery bar (SECURITY_BOUNDARY.md): the reporter destination is HIDDEN from
+  the jailed re-run — a gate-opened fd in a private 0700 evidence dir; model
+  code reaches neither the fd (node test children do not inherit it) nor the
+  path (kernel-denied). The pre-2026-08-20 execArgv-sniff race is closed with
+  the unsandboxed destination it targeted. Residual: code in the reporter's own
+  process; the named full fix (out-of-process verifier) stays deferred.
 """
 
 import re
