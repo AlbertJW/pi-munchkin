@@ -25,6 +25,7 @@ removing the sandbox from run() here makes assertions 2-3 fail — the
 counterfactual this regression pins.
 """
 
+import hashlib
 import os
 import platform
 import shutil
@@ -112,11 +113,17 @@ def run(wd: Path, base: Path, src_body: str, extra_env=None) -> dict:
              f"--test-reporter-destination=/dev/fd/{evidence_fd.fileno()}",
              "test/hidden.test.mjs"],
             cwd=wd, env=env, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
-            pass_fds=(evidence_fd.fileno(),))  # bash inherits fds by default; python closes them
+            pass_fds=(evidence_fd.fileno(),))  # bash inherits fds; Python closes them by default
     shutil.rmtree(tmpdir, ignore_errors=True)
-    text = tap.read_text() if tap.exists() else ""
-    subscores, blocked = grade_reporter.extract(str(tap), PIN) if text else (None, "missing")
-    return {"tap": text, "subscores": subscores, "blocked": blocked, "wd": wd}
+    seal_path = tap.with_name(tap.name + ".seal")
+    tap_bytes = tap.read_bytes() if tap.exists() else b""
+    if tap_bytes:
+        seal_path.write_text(hashlib.sha256(tap_bytes).hexdigest())
+    text = tap_bytes.decode("utf-8") if tap_bytes else ""
+    subscores, blocked = (grade_reporter.extract(str(tap), PIN, str(seal_path))
+                          if text else (None, "missing"))
+    return {"tap": text, "subscores": subscores, "blocked": blocked,
+            "wd": wd, "tap_path": tap, "seal_path": seal_path}
 
 
 def selftest():
@@ -134,6 +141,12 @@ def selftest():
         result = run(wd, base, HONEST_SRC)
         assert result["blocked"] is None, result
         assert result["subscores"]["fixed"] == 2 and result["subscores"]["total"] == 2, result
+        # F3 provenance: any post-production byte drift is refused by the
+        # out-of-process extractor before it can become a graded row.
+        result["tap_path"].open("ab").write(b"tampered\n")
+        tampered, blocked = grade_reporter.extract(
+            str(result["tap_path"]), PIN, str(result["seal_path"]))
+        assert tampered is None and blocked == "seal_mismatch", (tampered, blocked)
 
         # 2+3+4. F2 pin theft + F3 detached-child rewrite + workdir write probe.
         marker = wd / "F3-CHILD.txt"

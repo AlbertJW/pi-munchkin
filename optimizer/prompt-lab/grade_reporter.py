@@ -10,6 +10,8 @@ the per-test results into the same shape `grade_artifact.extract` produces:
 
 Refusal ladder (never a guess, mirrors grade_artifact):
     missing TAP file            -> subscores_blocked "missing"
+    missing required seal       -> subscores_blocked "seal_missing"
+    TAP bytes differ from seal  -> subscores_blocked "seal_mismatch"
     no TAP header / no results  -> subscores_blocked "unparseable"
     every test skipped/todo     -> subscores_blocked "no_gradeable_tests"
     suite truncated by exit      -> subscores_blocked "suite_collapsed"
@@ -74,6 +76,7 @@ Honesty notes:
   process; the named full fix (out-of-process verifier) stays deferred.
 """
 
+import os
 import re
 
 SKIP_RE = re.compile(r"#\s*(?:SKIP|TODO)", re.IGNORECASE)
@@ -136,14 +139,31 @@ def extract_tap(text, expected_cases=None):
             "source": "tap-reporter", "detail": detail}, None
 
 
-def extract(tap_path, expected_cases=None):
-    """File-path front end used by real_gate's row builder."""
+def extract(tap_path, expected_cases=None, seal_path=None):
+    """File-path front end used by real_gate's row builder.
+
+    seal_path: the gate-owned provenance seal written the moment the jailed
+    re-run produced the evidence (F3 closure, 2026-08-20). This module runs in
+    the ROW-BUILDER process — a different process from the graded run — and
+    re-hashes the evidence before parsing: any drift is refused
+    (`seal_mismatch`), an absent seal where one is required is refused
+    (`seal_missing`). Fail-closed: a seal is never guessed or skipped.
+    """
     try:
-        with open(tap_path, encoding="utf-8", errors="replace") as fh:
-            text = fh.read()
+        with open(tap_path, "rb") as fh:
+            raw = fh.read()
     except OSError:
         return None, "missing"
-    return extract_tap(text, expected_cases)
+    if seal_path is not None:
+        import hashlib
+        try:
+            with open(seal_path, encoding="utf-8") as fh:
+                seal = fh.read().strip()
+        except OSError:
+            return None, "seal_missing"
+        if hashlib.sha256(raw).hexdigest() != seal:
+            return None, "seal_mismatch"
+    return extract_tap(raw.decode("utf-8", errors="replace"), expected_cases)
 
 
 def apply_requirement_weights(subscores, scoring):
@@ -296,6 +316,29 @@ ok 2 - D2 real pass
     # FILEPATH_RE covers every extension node can report a file under.
     for ext in ("js", "mjs", "cjs", "ts", "mts", "cts", "jsx", "tsx"):
         assert extract_tap(f"TAP version 13\nok 1 - test/x.test.{ext}\n1..1\n") == (None, "suite_collapsed"), ext
+    # F3 provenance seal: valid bytes pass; tampering and absent seals refuse
+    # before TAP parsing. This is the out-of-process verifier contract used by
+    # the row builder after real_gate seals the jailed runner's evidence.
+    import hashlib
+    import tempfile
+    with tempfile.TemporaryDirectory(prefix="grade-reporter-") as td:
+        tap_path = os.path.join(td, "grade.tap")
+        seal_path = tap_path + ".seal"
+        tap_bytes = full.encode("utf-8")
+        with open(tap_path, "wb") as fh:
+            fh.write(tap_bytes)
+        with open(seal_path, "w", encoding="utf-8") as fh:
+            fh.write(hashlib.sha256(tap_bytes).hexdigest())
+        assert extract(tap_path, cases, seal_path)[1] is None
+        with open(tap_path, "ab") as fh:
+            fh.write(b"tampered\n")
+        assert extract(tap_path, cases, seal_path) == (None, "seal_mismatch")
+        os.unlink(tap_path)
+        assert extract(tap_path, cases, seal_path) == (None, "missing")
+        with open(tap_path, "wb") as fh:
+            fh.write(tap_bytes)
+        os.unlink(seal_path)
+        assert extract(tap_path, cases, seal_path) == (None, "seal_missing")
     print("grade_reporter selftest: OK")
 
 
