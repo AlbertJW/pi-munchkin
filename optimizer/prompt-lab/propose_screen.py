@@ -5,7 +5,7 @@ The measured bottleneck is candidate QUALITY, not measurement (r5/r6: every
 hand-authored candidate lost, each costing hours of gate time). This funnel
 inverts the economics: over-generate cheaply, reject cheaply, gate rarely.
 
-  propose K candidates (frontier via FRONTIER_* env — Cerebras gemma works)
+  propose K candidates (frontier via FRONTIER_* env — any OpenAI-compatible endpoint)
     -> schema-reject (configs/schema.json dims; malformed/no-op dropped)
       -> smoke-screen each survivor: ONE real_gate rep of ONE task on a FAST
          provider (MODEL_CONTROL=pi-native GATE_NETWORK=open -> rows exploratory
@@ -21,10 +21,15 @@ HONESTY CONTRACT (printed on every report):
     already stamps multi-candidate rounds exploratory pending single-candidate
     confirmation — the funnel rides that discipline, it does not replace it.
 
+SCREEN_PROVIDER and SCREEN_MODEL are REQUIRED and have no defaults. They used to
+default to a provider that was later purged from the registry outright, so an
+operator who forgot to set them got a silent smoke against a provider that does
+not exist. Name the provider you are actually screening on.
+
 Usage:
-  FRONTIER_BASE_URL=https://api.cerebras.ai/v1 FRONTIER_API_KEY=... \
-  FRONTIER_MODEL=gemma-4-31b \
-  SCREEN_PROVIDER=cerebras SCREEN_MODEL=gemma-4-31b \
+  FRONTIER_BASE_URL=<openai-compatible-endpoint> FRONTIER_API_KEY=... \
+  FRONTIER_MODEL=<model> \
+  SCREEN_PROVIDER=<provider-in-models.json> SCREEN_MODEL=<model> \
     ./propose_screen.py --gen s1 --traces b2 --k 8 --top 3 [--task parens]
   ./propose_screen.py --selftest
 """
@@ -156,13 +161,26 @@ def write_config(cand: dict, outdir: str) -> str:
 
 
 def smoke_real(cfg_path: str, gen: str, task: str) -> dict:
-    """One rep of one task via real_gate --calibrate on the SCREEN provider."""
+    """One rep of one task via real_gate --calibrate on the SCREEN provider.
+
+    The provider is NEVER defaulted. It used to fall back to a named cloud
+    provider that was subsequently purged from the registry, which left a live
+    default pointing at nothing: the smoke would fail, or worse, be attributed to
+    a provider the operator never chose. Refuse instead.
+    """
+    provider = os.environ.get("SCREEN_PROVIDER")
+    model = os.environ.get("SCREEN_MODEL")
+    if not provider or not model:
+        raise SystemExit(
+            "propose_screen: set SCREEN_PROVIDER and SCREEN_MODEL explicitly "
+            "(no default — the screen must name the provider it ran on, and the row "
+            "records it)")
     env = {**os.environ,
            "GEN": gen, "N": "1", "BASE": cfg_path, "RESULTS_MODE": "truncate",
            "RUNID": uuid.uuid4().hex[:6],
            "MODEL_CONTROL": "pi-native", "GATE_NETWORK": "open",
-           "PI_PROVIDER": os.environ.get("SCREEN_PROVIDER", "cerebras"),
-           "PI_MODEL": os.environ.get("SCREEN_MODEL", "gemma-4-31b")}
+           "PI_PROVIDER": provider,
+           "PI_MODEL": model}
     rc = subprocess.call(["bash", os.path.join(HERE, "real_gate.sh"), "--calibrate", "--exploratory", task],
                          env=env, cwd=HERE, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     out = os.path.join(LAB, "results", gen + ".jsonl")

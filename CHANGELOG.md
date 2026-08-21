@@ -193,7 +193,7 @@ candidates as dark). Net changes since 0.3.0; the full per-decision record is
   the model did. Guards: the secret-scan stage printed "clean" in CI having inspected zero lines
   and now fails closed (CI checks out with `fetch-depth: 0`); `GATE_MIRROR_DENY` no longer
   defaults to a no-op; `verify-optimizer.sh`'s completeness guard can now see selftests invoked
-  from `__main__`. Every behavioural fix carries a both-polarity test proven by reverting it.
+  from `__main__`. Housekeeping in the same pass: `propose_screen.py` still DEFAULTED `PI_PROVIDER` to the Cerebras provider that was purged from the registry on 2026-08-14, so a screen run without `SCREEN_PROVIDER` silently targeted a provider that no longer exists; provider and model are now required with no fallback. Every behavioural fix carries a both-polarity test proven by reverting it.
 
 - **Conformance-report follow-up (2026-08-14, source only — NOT yet mirrored):** four field-observed
   harness defects surfaced by an independent pi dogfood session that analysed `~/.pi/agent` against
