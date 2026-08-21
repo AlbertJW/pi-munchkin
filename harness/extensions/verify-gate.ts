@@ -10,7 +10,7 @@ import { record } from "../lib/telemetry.ts";
 import { VerificationOrderClock, type OrderedCallKind } from "../lib/verification-order.ts";
 import { VerificationFrontierTracker, type VerificationFrontierSnapshotV1 } from "../lib/verification-frontier.ts";
 import { VerificationPlateauTracker, type VerificationPlateauMode } from "../lib/verification-plateau.ts";
-import { buildControlProposal, controlEnforces, emitControlProposal } from "../lib/control-proposal.ts";
+import { buildControlProposal, controlArbiterMode, controlEnforces, emitControlProposal } from "../lib/control-proposal.ts";
 import { planItemHash, sha256 } from "../lib/failure-episodes.ts";
 import { emitHarnessSignal } from "../lib/harness-signals.ts";
 
@@ -359,10 +359,19 @@ export default function (pi: ExtensionAPI) {
 					}
 					if (PLATEAU_MODE === "enforce" && plateauObservation.reached === 3) {
 						const message = plateauMessage(plateauObservation.streak);
-						plateauCorrections += 1;
+						// The tier-1 correction reaches the model ONLY through the control
+						// arbiter (legacyActed: false below -- unlike loop-breaker, there is
+						// no self-delivery fallback). Under CONTROL_ARBITER=shadow|off the
+						// proposal is recorded and dropped, so counting the message length
+						// as injected_chars reported an intervention that never happened
+						// (2026-08-21). Report what was delivered, not what was composed.
+						const delivered = controlEnforces(pi.events);
+						plateauCorrections += delivered ? 1 : 0;
 						record("verification-plateau", "intervention", {
-							tier: 1, streak: plateauObservation.streak, injected_chars: message.length,
+							tier: 1, streak: plateauObservation.streak,
+							injected_chars: delivered ? message.length : 0,
 							activation_requested: false,
+							delivered, arbiter: controlArbiterMode(),
 						});
 						emitControlProposal(pi.events, buildControlProposal({
 							boundarySequence: currentTurn, kind: "failure_recovery",
@@ -372,6 +381,8 @@ export default function (pi: ExtensionAPI) {
 						}), { message });
 					}
 					if (PLATEAU_MODE === "enforce" && plateauObservation.reached === 5) {
+						// Tier 2 emits a capability signal, not a message, so it is
+						// delivered independently of the arbiter.
 						let available = false;
 						try { available = pi.getAllTools().some((tool) => tool.name === "subagent"); }
 						catch { available = false; }
@@ -382,6 +393,7 @@ export default function (pi: ExtensionAPI) {
 						record("verification-plateau", "intervention", {
 							tier: 2, streak: plateauObservation.streak, injected_chars: 0,
 							activation_requested: available,
+							delivered: available, arbiter: controlArbiterMode(),
 						});
 					}
 				}

@@ -17,7 +17,10 @@ vs a candidate across the fleet, and decides using one-sided Fisher exact tests 
 
 Usage:  fleet_report.py <gen> [--baseline A] [--candidate F]
         fleet_report.py --selftest
-Env: FLEET_DD (daily driver), FLEET_COST_CEILING (max cand/base token ratio, default 1.5).
+Env: FLEET_DD (daily driver), FLEET_COST_CEILING (max cand/base token ratio, default 1.5),
+     FLEET_ALPHA (significance threshold for every better/worse verdict, default 0.05).
+     The effective alpha is echoed into the report -- an undeclared threshold is an
+     unrecorded analysis choice.
 """
 import collections, json, math, os, sys
 
@@ -39,6 +42,9 @@ def wilson(k, n, z=1.96):
 
 # ---------- pure decision logic (selftested, no I/O) ----------
 
+# The decision threshold for every better/worse verdict below. Overridable so a
+# preregistered round can state its own alpha -- but an alpha that is not printed
+# is an unrecorded analysis choice, so render() echoes the effective value.
 ALPHA = float(os.environ.get("FLEET_ALPHA", "0.05"))
 
 def _fisher_greater(a, b, c, d):
@@ -288,6 +294,9 @@ def report(gen, baseline, candidate):
     import trial_validity as _tv
     _verdicts = _tv.load_sidecar(path)
     all_rows, _voided, _unevaluated = _tv.partition(all_rows, _verdicts)
+    alpha_note = (f"decision threshold: alpha = {ALPHA:g}"
+                  + ("" if "FLEET_ALPHA" not in os.environ else "  (FLEET_ALPHA override)")
+                  + f"; cost ceiling = {COST_CEILING:g}x")
     validity_note = (
         "trial validity: NOT EVALUATED (run prompt-lab/trial_validity.py results/%s.jsonl)" % gen
         if _verdicts is None else
@@ -316,7 +325,7 @@ def report(gen, baseline, candidate):
     if problems:
         descriptive = reliability_lines(rows, baseline, candidate, models)
         out = (f"# fleet_report {gen} — {candidate} vs {baseline}\n\n"
-               + validity_note + "\n\n"
+               + alpha_note + "\n\n" + validity_note + "\n\n"
                + "\n".join(descriptive) + "\n\n"
                "## VERDICT: INCOMPLETE\n" + "\n".join(f"- {p}" for p in problems) + "\n")
         with open(os.path.join(LAB, "results", gen + "-FLEET.md"), "w") as f:
@@ -325,6 +334,7 @@ def report(gen, baseline, candidate):
         return
 
     lines = [f"# fleet_report {gen} — {candidate} vs {baseline} (daily driver: {DD})\n",
+             alpha_note + "\n",
              validity_note + "\n",
              "| model | tier | base (val) | cand (val) | Δ | sig |", "|---|---|---|---|---|---|"]
     stats, base_tok, cand_tok, all_cost_exact = {}, 0, 0, True

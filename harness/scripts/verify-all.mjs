@@ -28,6 +28,10 @@ const STAGES = [
   // The credential guard for a PUBLIC repo was manual-only until 2026-08-18: it was
   // in neither `verify` nor CI, so the sole protection against publishing a secret
   // was human discipline. Cheap (two git diffs + untracked files) and fail-closed.
+  // It gates a RANGE, not the tree: everything this push would publish that the
+  // baseline does not already contain. It is therefore only as good as the baseline
+  // — which is why a checkout that resolves none fails the stage instead of
+  // reporting "clean" on nothing (CI pins `fetch-depth: 0` for exactly this).
   { name: "secret-scan", command: "npm", args: ["run", "-s", "secret-scan:diff"] },
 ];
 

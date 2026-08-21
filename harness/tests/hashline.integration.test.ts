@@ -161,7 +161,9 @@ test("hashline: ATOMIC — a bad tag in a later section leaves earlier files UNT
 	const patch =
 		`[f1.txt#${tagOf(join(cwd, "f1.txt"))}]\nreplace 1..1:\n+AAA\n` +
 		`[f2.txt#deadbeef]\nreplace 1..1:\n+BBB\n`;
-	await expectToolError(fp, "edit", { input: patch }, cwd, /tag is not from this session/);
+	// The diagnosis names what was actually checked (the snapshot LRU), not a session
+	// boundary the module-scope store does not have.
+	await expectToolError(fp, "edit", { input: patch }, cwd, /no retained snapshot carries this tag/);
 	// the whole patch must have rolled back — f1 is NOT half-applied
 	assert.equal(readFileSync(join(cwd, "f1.txt"), "utf8"), "aaa\n", "earlier file must be untouched on a later-section failure");
 	assert.equal(readFileSync(join(cwd, "f2.txt"), "utf8"), "bbb\n");

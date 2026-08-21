@@ -697,6 +697,61 @@ test("shadow plateau records strict exposure but adds no plateau correction", as
 	}
 });
 
+test("an enforce plateau reports what the arbiter DELIVERED, not what it composed", async () => {
+	// The tier-1 correction reaches the model only through the control arbiter --
+	// unlike loop-breaker it has no self-delivery fallback (legacyActed: false). Under
+	// CONTROL_ARBITER=shadow the proposal is dropped, yet telemetry recorded
+	// injected_chars = message.length: an intervention that never happened, feeding
+	// the ROI meter as if it had (2026-08-21).
+	for (const [arbiterMode, shouldDeliver] of [["shadow", false], ["enforce", true]] as const) {
+		const cwd = projectWithNpmTest();
+		const telemetry = join(cwd, `deliver-${arbiterMode}.jsonl`);
+		const previous = {
+			plateau: process.env.VERIFICATION_PLATEAU, order: process.env.VERIFY_EXECUTION_ORDER,
+			control: process.env.CONTROL_ARBITER, telemetry: process.env.TELEMETRY, file: process.env.TELEMETRY_FILE,
+		};
+		Object.assign(process.env, {
+			VERIFICATION_PLATEAU: "enforce", VERIFY_EXECUTION_ORDER: "execution",
+			CONTROL_ARBITER: arbiterMode, TELEMETRY: "on", TELEMETRY_FILE: telemetry,
+		});
+		try {
+			const fp = makeFakePi();
+			const tag = `${arbiterMode}-${Date.now()}-${Math.random()}`;
+			const verify = await import(`../extensions/verify-gate.ts?plateau-deliver=${tag}`);
+			verify.default(fp.pi as never);
+			const arbiter = await import(`../extensions/control-arbiter.ts?plateau-deliver=${tag}`);
+			arbiter.default(fp.pi as never);
+			await fire(fp, "session_start", {}, ctxFor(cwd));
+			(globalThis as Record<string, unknown>).__pi_active_plan_context = { item_id: "item-a" };
+			await plateauEpoch(fp, cwd, 1, "baseline");
+			for (let index = 2; index <= 4; index += 1) await plateauEpoch(fp, cwd, index, String(index));
+			await fire(fp, "turn_end", { ...wrapUpTurn, turnIndex: 4 }, ctxFor(cwd));
+			await fire(fp, "agent_settled", {}, ctxFor(cwd));
+			const rows = readFileSync(telemetry, "utf8").split("\n").filter(Boolean)
+				.map((line) => JSON.parse(line) as Record<string, unknown>);
+			const interventions = rows.filter((row) => row.ext === "verification-plateau"
+				&& row.kind === "intervention" && row.tier === 1);
+			assert.equal(interventions.length, 1, `${arbiterMode}: expected one tier-1 intervention`);
+			const data = interventions[0];
+			assert.equal(data.delivered, shouldDeliver, `${arbiterMode}: delivered`);
+			assert.equal(data.arbiter, arbiterMode);
+			// The measurable claim: injected_chars counts DELIVERED characters.
+			assert.equal((data.injected_chars as number) > 0, shouldDeliver, `${arbiterMode}: injected_chars`);
+			// ...and the session summary agrees: a correction that was dropped is not
+			// a correction. `corrections` is what the ROI meter reads.
+			const settled = rows.find((row) => row.ext === "verification-plateau" && row.kind === "settled");
+			assert.equal(settled?.corrections, shouldDeliver ? 1 : 0, `${arbiterMode}: corrections`);
+			assert.equal(fp.sent.some((text) => text.includes("[verification-plateau]")), shouldDeliver);
+		} finally {
+			for (const [key, value] of Object.entries({
+				VERIFICATION_PLATEAU: previous.plateau, VERIFY_EXECUTION_ORDER: previous.order,
+				CONTROL_ARBITER: previous.control, TELEMETRY: previous.telemetry, TELEMETRY_FILE: previous.file,
+			})) { if (value === undefined) delete process.env[key]; else process.env[key] = value; }
+			resetPiGlobals();
+		}
+	}
+});
+
 test("plateau off disables its collection while leaving frontier telemetry intact", async () => {
 	const cwd = projectWithNpmTest();
 	const telemetry = join(cwd, "off-events.jsonl");

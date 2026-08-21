@@ -40,6 +40,7 @@
     "extensions": [
       "harness/extensions/session-bootstrap.ts",
       "harness/extensions/hashline.ts",
+      "harness/extensions/bash-output-guard.ts",
       "harness/extensions/loop-breaker.ts",
       "harness/extensions/tool-call-rescue.ts",
       "harness/extensions/verify-gate.ts",
@@ -60,7 +61,6 @@
       "harness/extensions/context-brief.ts",
       "harness/extensions/context-dedup.ts",
       "harness/extensions/session-blackboard.ts",
-      "harness/extensions/bash-output-guard.ts",
       "harness/extensions/tool-activation.ts",
       "harness/extensions/runtime-truth.ts",
       "harness/extensions/control-arbiter.ts",

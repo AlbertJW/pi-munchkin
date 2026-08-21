@@ -23,9 +23,22 @@ export type VerificationFrontierObservation = {
 	advanced: boolean;
 };
 
-const SUMMARY = /^#\s+(tests|pass|fail|skipped|todo|cancelled)\s+(\d+)\s*$/u;
+// `#` is the tap reporter's marker; `\u2139` (i-in-a-circle) is the DEFAULT spec
+// reporter's. Only the prefix differs -- the keys, the counts and their semantics
+// are identical, because both render the same run summary from the same runner.
+// Requiring `#` meant the frontier recognized nothing whenever the gate was a plain
+// `node --test`, which is what agents actually run: the exact-gate frontier and the
+// entire verification-plateau feature above it were inert in the default case
+// (measured on node v26.5.0, 2026-08-21).
+const SUMMARY = /^(?:#|\u2139)\s+(tests|pass|fail|skipped|todo|cancelled)\s+(\d+)\s*$/u;
 
-/** Parse only Node's terminal TAP summary. Everything else is unknown. */
+/**
+ * Parse Node's terminal run summary. Everything else is unknown.
+ *
+ * The snapshot calls this protocol `node_tap` for either reporter: the name is the
+ * CONTRACT value (row_contract.py pins it), and the two reporters are one
+ * instrument -- same runner, same counts, different marker glyph.
+ */
 export function parseNodeTapSummary(text: string): VerificationFrontierCounts | null {
 	const values = new Map<string, number>();
 	for (const raw of text.replace(/\x1B(?:\[[0-?]*[ -/]*[@-~]|\][^\x07]*(?:\x07|\x1B\\))/gu, "").split(/\r?\n/u)) {

@@ -41,6 +41,11 @@ export const EVENT_CATALOG = {
 	},
 	"verification-plateau/intervention": {
 		tier: "number", streak: "number", injected_chars: "number", activation_requested: "boolean",
+		// injected_chars counts what was DELIVERED, so it is 0 whenever the control
+		// arbiter is not enforcing on this bus -- the tier-1 correction has no legacy
+		// delivery path of its own. `delivered` makes the difference between
+		// "no plateau fired" and "plateau fired into a shadow arbiter" readable.
+		delivered: "boolean", arbiter: "string",
 	},
 	"verification-plateau/settled": {
 		mode: "string", eligible_epochs: "number", plateau_events: "number", max_streak: "number",
@@ -189,7 +194,11 @@ export const EVENT_CATALOG = {
 	"tool-activation/first-useful-mutation": { elapsed_ms: "number", tool: "string" },
 	"tool-activation/surface": { mode: "string", surface_mode: "string", active_tools: "number", all_tools: "number", schema_bytes: "number", guideline_bytes: "number", deferred_tools: "number", unavailable_attempts: "number" },
 	"tool-call-rescue/detected": { signature: "string", turnIndex: "number" },
-	"tool-call-rescue/steered": { signature: "string", turnIndex: "number" },
+	// `steered` is recorded when the message actually REACHED the model, and the
+	// session budget is charged at the same moment. tool_rescue has the second-lowest
+	// arbiter priority, so under the shipped CONTROL_ARBITER=enforce it frequently
+	// loses the boundary to a failure_recovery or verification_required proposal.
+	"tool-call-rescue/steered": { signature: "string", turnIndex: "number", delivered: "boolean" },
 	"teach-hints/hint": { rule: "string", tool: "string", injected_chars: "number" },
 	// research-ledger (dark, RESEARCH_LEDGER=on). No URLs or queries, by design —
 	// normalizeDetail's FORBIDDEN_DETAIL_FIELD bans them, and the ledger FILE is

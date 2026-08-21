@@ -32,6 +32,82 @@ zero tool or prompt exposure. Strict plateau tracking is prepared at the default
 `VERIFICATION_PLATEAU=enforce` remains dark and never aborts. Mirror-mini fixtures remain later
 stacked work. Nothing in this series has been merged, mirrored live, adopted, or measured.
 
+## 2026-08-21 grader-integrity round three (source branch; live mirror PENDING)
+
+> **Both scoring paths were forgeable; both are closed, and the pattern is the finding.**
+> Three inspection rounds have now shown the same shape: *every layer added to protect the
+> graded score was defeated by attacking the layer below it.*
+>
+> - **C-1 — the session read its own answer key.** The 2026-08-20 jail read-denied the pin to
+>   the graded RE-RUN, but the pin was still written to `<workdir>.row-context.json`, a sibling
+>   of the model's own workdir, and `gate.sb` is `(allow default)`. Measured on the real
+>   `parens` fixture with the real jail and seal: honest 0/3 became a sealed, unblocked
+>   **3/3**, `blocked=None`. Reps share `$RUNS`, so rep 1's file was readable by rep 2;
+>   `requirement_scoring` leaked the same names for v3. **Fixed by deleting the secret, not
+>   fencing it**: `eval_fixture.grading_secrets` derives the four grading fields in the
+>   row-builder process from the admission-hashed manifest under the read-denied `__HARNESS__`.
+>   Nothing writes them to disk. Second layer added: `grade_provenance_reporter.mjs` runs in
+>   the `node --test` runner PARENT and records each graded test's CALL SITE, so re-registering
+>   the admitted names from `src/` is refused (`foreign_registration`) even if a pin leaks
+>   another way. Honest limit: a `vm.runInThisContext` filename spoof that also lands in the
+>   grader's line range is not detected.
+> - **C-2 — the binary bit was never jailed.** Everything above protected `subscores`. `score`
+>   — what `fleet_report.decide()` adopts on — came from an un-jailed, un-preloaded
+>   `node --test`, so the four-line `node:assert` neuter still forged it: measured on `parens`,
+>   honest 3/6 became a gate-passing **6/6**. All scoring runs now share one jail (new
+>   `real-gate-fixtures/binary.sb`), the assertion preload, `env -i` with `NODE_OPTIONS` and
+>   every telemetry/credential variable scrubbed, and fds 8/4/3/5 closed — the subshell had
+>   been inheriting the unlinked read-write telemetry file into a process running model code.
+>   Fail-closed on the `SANDBOX=off` precedent: never "unjailed but authoritative".
+> - **Analysis chain.** `trial_validity.row_key` collided across model/split/variant, which
+>   made `run()` raise, which left NO sidecar, which made every reporter call the round
+>   "unevaluated" — silently, because `real_gate.sh` did not check the exit code. `find_workdir`
+>   voided exactly the canonical rows whenever a perturbation ran. A resolved-but-empty workdir
+>   left tamper screening off while the row still counted. `rft_harvest` could turn a
+>   `reward_hacking` FAIL into a fine-tuning exemplar. `fleet_verdict` and `munchkin` read rows
+>   raw; both now screen. Verdicts are bound to the row bytes they were computed from.
+>   `effort_report.graded_rate` — the capability outcome — lacked the bounds guard its two
+>   siblings have. `calibrate.py`'s 20-85% band was a third, unpreregistered admission rule; it
+>   is retired to descriptive output in favour of `admission_rule.py`.
+> - **Harness.** A model-controlled RELATIVE path forged a second `[harness summary]` block in
+>   the model-visible state lens claiming the gate was green (reproduced). The verification
+>   frontier only recognized the `tap` reporter's `#` marker, so it — and the entire plateau
+>   feature above it — was inert against the default `node --test` that agents actually run.
+>   `VERIFICATION_PLATEAU=enforce` reported `injected_chars` for corrections the arbiter had
+>   dropped. `tool-call-rescue` spent its session budget on messages the arbiter never
+>   delivered. Working-memory private-path redaction was defeated by any adjacent punctuation
+>   (7 of 8 shapes leaked). `bash-output-guard` loaded AFTER loop-breaker, so loop-breaker
+>   classified the original oversized blob while the model received the withheld error.
+> - **Guards.** The secret-scan stage printed "clean" in CI having inspected ZERO lines (a
+>   shallow checkout resolves no baseline); it now fails closed and CI checks out with
+>   `fetch-depth: 0`. `GATE_MIRROR_DENY` defaulted to `$REPO_ROOT`, making the `__MIRROR__`
+>   deny — which closed an OBSERVED escape (r6-c21) — a verbatim duplicate of `__HARNESS__`;
+>   it is now derived from the git common dir. `verify-optimizer.sh`'s completeness guard
+>   required `--selftest` in the file text, so a selftest invoked from `__main__` was invisible
+>   to the very guard written to catch "exists but never runs".
+> - **My own two regressions from the previous round, fixed first.** The L3 change made
+>   `is_hidden()` match t1-t6, which made `install_tests()` unreachable and silently changed
+>   what t3/t5/t6 show the model; and `HANDOVER.md` carried a false claim about
+>   `qs-error-swallow` / `path-near-miss` (both ARE approved and authoritative — corrected in
+>   place above).
+>
+> Every behavioural fix carries a both-polarity test proven by reverting the fix.
+> `npm run verify`: all 6 stages green. 24/24 approved fixtures authoritative with zero
+> artifact drift; no manifest, approval, or expiry clock was touched. Control groups: calib4b
+> 12 rows, 12 distinct row keys, 473 tool calls, ZERO reward_hacking false positives;
+> calibling3 12 rows, 12 distinct row keys, zero voided (its transcripts are not retained in
+> either checkout, so the transcript detector could not be re-run against it — stated, not
+> assumed). No gate round was run; the evidence base is still empty by design.
+>
+> **PENDING Albert:** the model-visible surface moved again, so LIVE MIRROR + the
+> `docs/SURFACE_BOUNDARIES.md` row + a live-load smoke are still owed and need the box free.
+> Two fixture decisions remain human calls: `qs-error-swallow` and `path-near-miss` are the
+> only approved hidden-graded fixtures with neither `expected_cases` nor a `grade_artifact`,
+> so the row builder records `unpinned_grader` and they contribute a binary bit only. And
+> `WORKING_MEMORY_MAX_RECORDS = 32` is unreachable at full note size (the 8 KiB file cap
+> refuses at ~10-16); raising the file cap to 32 KiB would make it true, which is a budget
+> decision, not a docs fix.
+
 ## 2026-08-20 measurement-integrity follow-up (source branch, live mirror intentionally unchanged)
 
 > **F2/F3 + test-hermeticity fixes prepared for merge/push.** `9aeea4e` makes the
@@ -63,7 +139,14 @@ stacked work. Nothing in this series has been merged, mirrored live, adopted, or
 > HMAC/serving-fingerprint provenance is forgery-resistant, the enforce-arbiter /
 > failure-episode / session-identity logic is sound, F-06/F-09/F-12 are complete, and all 412
 > commits + 2626 blobs are secret-clean. Sixteen findings fixed:
-> - **The graded-score forgery is properly closed.** My first-round collapse-shape guard only
+> - **The graded-score forgery is properly closed.** [CORRECTED 2026-08-21: it was not.
+>   The pin below was WRITTEN to `<workdir>.row-context.json`, a sibling of the model's own
+>   workdir that `gate.sb` let the SESSION read — measured on `parens`, honest 0/3 became a
+>   sealed, unblocked 3/3. And the binary `score` came from an un-jailed, un-preloaded
+>   `node --test`, so the assert-neuter still forged it 3/6 -> 6/6. Both are closed now, by
+>   removing the pin from disk (`eval_fixture.grading_secrets`) and by jailing every scoring
+>   run (`real-gate-fixtures/binary.sb`); see SECURITY_BOUNDARY.md. The pin itself is real and
+>   the 36-fixture count below is correct.] My first-round collapse-shape guard only
 >   caught an IMPORT-TIME `process.exit`; after a hidden suite yields (e.g. `await import`), a
 >   mid-run exit truncates TAP to its passing prefix with a self-consistent plan, which scored
 >   at face value. Now every reporter-graded fixture carries an **admitted case pin**
@@ -83,9 +166,22 @@ stacked work. Nothing in this series has been merged, mirrored live, adopted, or
 >
 > **Approval bookkeeping:** 24 approved before, 24 after — none lost, none gained, and every
 > review clock PRESERVED (`approve --expires-at`) rather than reset by a mechanical
-> re-approval. `qs-error-swallow` (never approved; its gold does not satisfy its own hidden
-> suite) and `path-near-miss` (regenerated shortcut breaks the visible suite) were restored to
-> HEAD rather than shipped changed — both need separate attention.
+> re-approval. `qs-error-swallow` and `path-near-miss` were restored to HEAD rather than
+> shipped changed — both need separate attention.
+>
+> **CORRECTION (2026-08-21).** The parenthetical this entry originally carried for those two
+> fixtures — "`qs-error-swallow` (never approved; its gold does not satisfy its own hidden
+> suite)" and "`path-near-miss` (regenerated shortcut breaks the visible suite)" — was false.
+> Both manifests are `admission.approved: true` (reviewer Albert), `automated.passed: true`
+> with `gold_fail_to_pass` and `gold_pass_to_pass` green and the shortcut mutant correctly
+> failing fail-to-pass while passing pass-to-pass, `artifact_drift == []`, and
+> `eval_fixture.py state` reports **authoritative** for both. What I actually observed was
+> drift in patches I had regenerated locally, since reverted. The real, checkable defect is
+> narrower: they are the only approved hidden-graded fixtures carrying neither
+> `tests.fail_to_pass.expected_cases` nor a `grade_artifact` (`context-pressure`, the
+> held-out, is the third), so the row builder records `subscores_blocked="unpinned_grader"`
+> and they contribute a binary bit only, never a graded rate. Pinning them is a fixture
+> decision, not a code fix.
 >
 > **PENDING:** the harness libs changed, so the model-visible surface moved to source
 > `56993e93…`; the LIVE MIRROR + boundary row + live smoke are deferred (a `pi` was running on

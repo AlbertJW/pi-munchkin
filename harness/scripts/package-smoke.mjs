@@ -19,6 +19,16 @@ const expectedExtensions = [
   // initial tool baseline. It must register before any other harness handler.
   "harness/extensions/session-bootstrap.ts",
   "harness/extensions/hashline.ts",
+  // MOVED here 2026-08-21 (was after session-blackboard): `tool_result` handlers are
+  // CHAINED -- pi builds one event object and hands the mutated version to each
+  // later handler (runner.js:646-697) -- so a result REWRITER must load before any
+  // classifier of that result. Registered after loop-breaker, the guard's withheld
+  // result reached the model as isError:true while loop-breaker had already
+  // classified the ORIGINAL oversized, non-error blob: the failure never opened a
+  // failure episode and the runaway command the guard exists to interrupt stayed
+  // invisible to repeat detection. This expectation moved deliberately WITH the
+  // manifest; it was not adjusted to silence a firing tripwire.
+  "harness/extensions/bash-output-guard.ts",
   "harness/extensions/loop-breaker.ts",
   // c49/c50 sit right after loop-breaker: their turn_end handlers read state
   // loop-breaker publishes on the globalThis bus in ITS turn_end, and handler
@@ -47,7 +57,6 @@ const expectedExtensions = [
   // Blackboard has no per-call context hook after the PR 4 retirement; its
   // position remains stable for signal/control ordering.
   "harness/extensions/session-blackboard.ts",
-  "harness/extensions/bash-output-guard.ts",
   // Must register after compact_context and the vendor subagent. It makes its
   // defer/preserve decision at session_start against the complete registry.
   "harness/extensions/tool-activation.ts",

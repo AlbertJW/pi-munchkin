@@ -186,6 +186,11 @@ def require_validity(row: dict[str, Any], verdicts: dict[str, Any]) -> None:
     verdict = verdicts.get(trial_validity.row_key(row))
     if not isinstance(verdict, dict):
         raise StudyError("trial row has no validity verdict")
+    # Same binding trial_validity.partition enforces: a verdict computed from
+    # different row bytes describes a different trial, so it is not evidence here.
+    digest = verdict.get("row_sha256")
+    if digest is not None and digest != trial_validity.row_digest(row):
+        raise StudyError("validity verdict was computed from different row bytes")
     criteria = verdict.get("criteria") or {}
     if verdict.get("void") is not False or (criteria.get("infra_valid") or {}).get("outcome") != "PASS":
         raise StudyError("trial row failed mandatory validity checks")
@@ -371,11 +376,28 @@ def selftest() -> None:
                                                                if interventions else [])}}}
     report = analyze([fake("base", 10), fake("base", 8), fake("cand", 2, interventions=1), fake("cand", 1, interventions=1)], 4, draws=200)
     assert report["reduction"] > .20 and report["candidate_exposure"] == 1
-    validity_row = {"run": "g", "task": "t", "arm": "base", "rep": 1}
-    validity_key = "g:t:base:1"
-    clear = {"row_key": validity_key, "void": False, "criteria": {
-        "infra_valid": {"outcome": "PASS"}, "reward_hacking": {"outcome": "PASS"}}}
+    sys.path.insert(0, str(LAB)); import trial_validity as _tv
+    validity_row = {"run": "g", "model": "m", "split": "val", "task": "t", "arm": "base",
+                    "rep": 1, "prompt": {"variant": "canonical"}}
+    # Derived, never hardcoded: row_key gained model/split/variant on 2026-08-21
+    # because run:task:arm:rep collided across every dimension a round varies.
+    validity_key = _tv.row_key(validity_row)
+
+    def cleared(row):
+        """A clean verdict for exactly THIS row -- key and byte-binding both derived."""
+        return {_tv.row_key(row): {
+            "row_key": _tv.row_key(row), "row_sha256": _tv.row_digest(row), "void": False,
+            "criteria": {"infra_valid": {"outcome": "PASS"},
+                         "reward_hacking": {"outcome": "PASS"}}}}
+
+    clear = cleared(validity_row)[validity_key]
     require_validity(validity_row, {validity_key: clear})
+    try:
+        require_validity(validity_row, {validity_key: clear | {"row_sha256": "0" * 64}})
+    except StudyError:
+        pass
+    else:
+        raise AssertionError("a verdict bound to other row bytes was accepted")
     for invalid in (
         {},
         {validity_key: clear | {"void": True}},
@@ -407,7 +429,7 @@ def selftest() -> None:
         "config": {"sha256": digest, "rendered_governor_sha256": digest},
         "serving": {"stable": True, "pre": {"full_sha256": digest}, "post": {"full_sha256": digest}},
     }
-    validate_row(powered, manifest, {validity_key: clear})
+    validate_row(powered, manifest, cleared(powered))
     powered_v4 = json.loads(json.dumps(powered))
     powered_v4["schema"] = "pi.eval-row/v4"
     powered_v4["context"]["schema"] = "pi.context-telemetry/v4"
@@ -419,9 +441,9 @@ def selftest() -> None:
         "last_advanced": False, "plateau_streak": 0,
         "successful_mutation_epochs_since_advance": 0, "verification_plateau_overrun": 0,
     }
-    validate_row(powered_v4, manifest, {validity_key: clear})
+    validate_row(powered_v4, manifest, cleared(powered_v4))
     powered_v4["context"]["verification_frontier"]["settlement_summaries"] = 0
-    try: validate_row(powered_v4, manifest, {validity_key: clear})
+    try: validate_row(powered_v4, manifest, cleared(powered_v4))
     except StudyError: pass
     else: raise AssertionError("a v4 row without exactly one frontier settlement must be refused")
     try: validate_row(powered, manifest, {})

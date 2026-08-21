@@ -14,6 +14,15 @@
 #
 # Fresh fixture per run (pi-test CSV library). Gate = node --test run
 # independently after pi exits. Metrics from the session jsonl, not estimates.
+#
+# RETIRED, DIAGNOSTIC ONLY (see ab-machinery/metrics.py). Its `node --test` gate
+# below is deliberately NOT jailed or assert-preloaded, unlike real_gate.sh's two
+# scoring runs: a four-line `node:assert` neuter in model-authored src forges its
+# PASS (measured on the real `parens` fixture, 2026-08-21). That is acceptable here
+# ONLY because this script emits a human-read results.tsv and never a `pi.eval-row`
+# — nothing it produces can reach a report, a verdict, or an adoption. If this is
+# ever revived as a measurement, it must adopt real_gate.sh's scoring jail
+# (real-gate-fixtures/binary.sb + prompt-lab/grade_preload.mjs) first.
 set -euo pipefail
 
 ARM="${SYMBOLECT:?set SYMBOLECT=on|off}"

@@ -1,22 +1,31 @@
 #!/usr/bin/env python3
-"""calibrate: prune hard tasks to the discriminating band.
+"""calibrate: per (model, task) pass-rate table. DESCRIPTIVE ONLY.
 
-Difficulty is model-specific, so after a gate run on the daily driver, keep only tasks
-whose pass-rate has headroom — discard saturated (>85%, no room to improve) and
-impossible (<20%, unsolvable/broken). Reads a real_gate results jsonl.
+Difficulty is model-specific, so after a base-arm run this prints where each task
+sits for that model. Reads a real_gate results jsonl.
 
-Usage:  calibrate.py <gen> [--pattern base]    # per (model,task) pass-rate + KEEP/drop
+RETIRED AS A DECISION RULE (2026-08-21). The 20-85%% band below was a THIRD
+admission rule — on the binary bit, never preregistered, and competing with the ONE
+rule the reboot charter admits (PREREG_FIXTURE_ADMISSION_2026-08.md, implemented in
+admission_rule.py: n=6, coverage >= 5/6, mean graded_rate in [0.20, 0.80], SD >=
+0.15, all on the GRADED rate). Two rules that can disagree about the same fixture is
+how a fixture gets kept or dropped by whichever was run. The band is still printed,
+because seeing the rate is useful, but it decides nothing: `verdict` reads
+"descriptive" and admission belongs to admission_rule.py.
+
+Usage:  calibrate.py <gen> [--pattern base]    # per (model,task) pass-rate, descriptive
         calibrate.py --selftest
 """
 import collections, json, os, sys
 
 LAB = os.path.dirname(os.path.abspath(__file__))
-SATURATED, IMPOSSIBLE = 0.85, 0.20  # ideal discriminating band ~0.3-0.7
+SATURATED, IMPOSSIBLE = 0.85, 0.20  # descriptive bands, NOT an admission rule
 
 def classify(rate):
-    if rate > SATURATED: return "SATURATED (drop — no headroom)"
-    if rate < IMPOSSIBLE: return "IMPOSSIBLE (drop — unsolvable/broken?)"
-    return "KEEP"
+    """Where a pass-rate sits. Never an admission verdict — see the module docstring."""
+    if rate > SATURATED: return "saturated (descriptive)"
+    if rate < IMPOSSIBLE: return "floor (descriptive)"
+    return "band (descriptive)"
 
 def report(gen, pattern):
     rows = [json.loads(l) for l in open(os.path.join(LAB, "results", gen + ".jsonl")) if l.strip()]
@@ -31,7 +40,9 @@ def report(gen, pattern):
             agg[(r.get("model", "?"), r["task"])].append(r["score"])
             n_auth += 1 if r.get("authoritative") is True else 0
     n_scored = sum(len(v) for v in agg.values())
-    print(f"# calibrate {gen} (pattern={pattern}) — keep tasks in the discriminating band\n")
+    print(f"# calibrate {gen} (pattern={pattern}) — DESCRIPTIVE pass rates, no admission verdict\n")
+    print("# Fixture admission is admission_rule.py (the one preregistered rule, on the")
+    print("# GRADED rate). Nothing in this table keeps or drops a fixture.\n")
     if dropped_split:
         print(f"(excluded {len(dropped_split)} non-val rows: heldout/robustness never band tasks)\n")
     print("| model | task | pass-rate | n | verdict |")
@@ -46,13 +57,18 @@ def report(gen, pattern):
               + ("" if n_auth == n_scored else " (band verdicts are indicative, not authoritative)"))
 
 def selftest():
-    assert classify(1.0).startswith("SATURATED")
-    assert classify(0.86).startswith("SATURATED")
-    assert classify(0.85) == "KEEP"
-    assert classify(0.5) == "KEEP"
-    assert classify(0.20) == "KEEP"
-    assert classify(0.19).startswith("IMPOSSIBLE")
-    assert classify(0.0).startswith("IMPOSSIBLE")
+    # Band boundaries are unchanged; only their STATUS is. Nothing here may read as
+    # an admission verdict — that is admission_rule.py's, and having two rules that
+    # can disagree about the same fixture is the defect this retirement closes.
+    assert classify(1.0) == "saturated (descriptive)"
+    assert classify(0.86) == "saturated (descriptive)"
+    assert classify(0.85) == "band (descriptive)"
+    assert classify(0.5) == "band (descriptive)"
+    assert classify(0.20) == "band (descriptive)"
+    assert classify(0.19) == "floor (descriptive)"
+    assert classify(0.0) == "floor (descriptive)"
+    for rate in (0.0, 0.19, 0.5, 0.86, 1.0):
+        assert not any(word in classify(rate).upper() for word in ("KEEP", "DROP")), classify(rate)
     # split filter + authority label: non-val rows excluded; mixed authority flagged
     import io, tempfile
     from contextlib import redirect_stdout

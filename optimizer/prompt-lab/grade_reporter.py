@@ -16,6 +16,7 @@ Refusal ladder (never a guess, mirrors grade_artifact):
     every test skipped/todo     -> subscores_blocked "no_gradeable_tests"
     suite truncated by exit      -> subscores_blocked "suite_collapsed"
     observed cases != admitted   -> subscores_blocked "case_mismatch"
+    result registered elsewhere  -> subscores_blocked "foreign_registration"
 
 Truncation-forgery guard (grader integrity), two layers.
 
@@ -48,11 +49,19 @@ graded re-run shares its process with model-authored src. Demonstrated bypasses:
   * neutering `node:assert` from src -> real names, all "pass" (0/5 became 5/5).
     Mitigated by the runner-owned `grade_preload.mjs` (--import) which freezes the
     assertion surfaces before any user module loads; re-measured 5/5 -> 2/5.
-  * READING the pin (it is written to `<workdir>.row-context.json`), re-registering
-    those exact names as trivial passing tests, then exiting. CLOSED 2026-08-20:
-    the graded re-run is jailed (real-gate-fixtures/grade.sb); the pin is
-    kernel-read-denied, so the attack falls through to the genuine suite
-    (measured: EPERM; regression: grade_jail_selftest.py).
+  * READING the pin, re-registering those exact names as trivial passing tests,
+    then exiting. The 2026-08-20 fix jailed only the graded RE-RUN; the pin was
+    still written to `<workdir>.row-context.json`, a sibling of the model's own
+    workdir that gate.sb let the SESSION read, and every rep shares $RUNS. Measured
+    2026-08-21 on the real `parens` fixture with the real jail and seal: honest 0/3
+    became a sealed, unblocked 3/3. CLOSED 2026-08-21 by removing the secret rather
+    than fencing it: eval_fixture.grading_secrets derives the pin in the row-builder
+    process from the admission-hashed manifest (under the read-denied __HARNESS__)
+    and nothing writes it to disk. The grade.sb `__PIN__` deny stays as defence in
+    depth; regression: integrity_selftest.test_grading_secrets_never_touch_disk.
+  * SECOND LAYER for the same attack shape: `check_provenance` refuses when a
+    graded top-level result was registered somewhere other than the installed
+    grader file (`foreign_registration`), so a leaked pin is not enough on its own.
   * a detached child rewriting the TAP after node exits. CLOSED 2026-08-20: the
     evidence lives in a private gate-owned dir hidden from the jail, reached only
     through a gate-opened /dev/fd the node test children never inherit (measured:
@@ -137,6 +146,73 @@ def extract_tap(text, expected_cases=None):
             return None, "suite_collapsed"
     return {"fixed": sum(detail.values()), "total": len(detail),
             "source": "tap-reporter", "detail": detail}, None
+
+
+def check_provenance(prov_path, seal_path, grader_path, graded_count):
+    """Refuse graded results that were not registered by the grader file itself.
+
+    grade_provenance_reporter.mjs runs in the `node --test` RUNNER PARENT (which
+    never loads model src) and records the call site of every graded top-level
+    `test()`. Measured on node v26.5.0: a `test()` reached from an imported
+    `src/evil.js` reports that src file, not the launched grader — so re-registering
+    the admitted case names from model code is visible here even when the names are
+    exactly right.
+
+    Returns None when the evidence is consistent, else a refusal reason. Fail-closed:
+    absent, unsealed or unparseable provenance is a refusal, never a pass.
+
+    HONEST LIMIT: the fields are produced in the CHILD process, where model code
+    runs. `vm.runInThisContext(code, {filename})` forges `file` and `lineOffset`
+    shifts `line`; the range check below catches an offset that overshoots the
+    grader, not one that lands inside it. This raises the bar — it does not replace
+    keeping the pin off disk (eval_fixture.grading_secrets) or the deferred
+    out-of-process verifier.
+    """
+    import hashlib
+    import json
+    try:
+        with open(prov_path, "rb") as fh:
+            raw = fh.read()
+    except OSError:
+        return "provenance_missing"
+    try:
+        with open(seal_path, encoding="utf-8") as fh:
+            seal = fh.read().strip()
+    except OSError:
+        return "provenance_seal_missing"
+    if hashlib.sha256(raw).hexdigest() != seal:
+        return "provenance_seal_mismatch"
+    records = []
+    for line in raw.decode("utf-8", errors="replace").splitlines():
+        if not line.strip():
+            continue
+        try:
+            record = json.loads(line)
+        except ValueError:
+            return "provenance_unparseable"
+        if not isinstance(record, dict):
+            return "provenance_unparseable"
+        records.append(record)
+    if not records:
+        return "provenance_unparseable"
+    # The two channels must describe the same population, or comparing them proves
+    # nothing: a result present in TAP but absent from provenance would slip past.
+    if len(records) != graded_count:
+        return "foreign_registration"
+    try:
+        with open(grader_path, "rb") as fh:
+            grader_lines = fh.read().count(b"\n") + 1
+    except OSError:
+        return "provenance_missing"
+    expected_file = os.path.realpath(grader_path)
+    for record in records:
+        origin = record.get("file")
+        if not isinstance(origin, str) or os.path.realpath(origin) != expected_file:
+            return "foreign_registration"
+        line_number = record.get("line")
+        if not isinstance(line_number, int) or not 1 <= line_number <= grader_lines:
+            return "foreign_registration"
+    return None
 
 
 def extract(tap_path, expected_cases=None, seal_path=None):
@@ -320,6 +396,7 @@ ok 2 - D2 real pass
     # before TAP parsing. This is the out-of-process verifier contract used by
     # the row builder after real_gate seals the jailed runner's evidence.
     import hashlib
+    import json
     import tempfile
     with tempfile.TemporaryDirectory(prefix="grade-reporter-") as td:
         tap_path = os.path.join(td, "grade.tap")
@@ -339,6 +416,61 @@ ok 2 - D2 real pass
             fh.write(tap_bytes)
         os.unlink(seal_path)
         assert extract(tap_path, cases, seal_path) == (None, "seal_missing")
+    # ---- REGISTRATION PROVENANCE (foreign_registration, 2026-08-21) ----
+    # Fixtures captured from a real `node --test` dual-reporter run (node v26.5.0):
+    # a grader whose imported src/evil.js re-registers two admitted case names, plus
+    # a vm.runInThisContext spoof that forges `file` and shifts `line` past the end
+    # of the grader. The pin alone scores that run perfectly; provenance refuses it.
+    with tempfile.TemporaryDirectory(prefix="grade-provenance-") as td:
+        grader = os.path.join(td, "hidden.test.js")
+        with open(grader, "w", encoding="utf-8") as fh:
+            fh.write("\n".join(f"test('case {i}', () => {{}});" for i in range(1, 5)) + "\n")
+        evil = os.path.join(td, "evil.js")
+        prov = os.path.join(td, "grade.prov")
+        seal = prov + ".seal"
+
+        def write(records):
+            with open(prov, "w", encoding="utf-8") as fh:
+                for record in records:
+                    fh.write(json.dumps(record) + "\n")
+            with open(seal, "w", encoding="utf-8") as fh:
+                fh.write(hashlib.sha256(open(prov, "rb").read()).hexdigest())
+
+        honest = [{"name": f"case {i}", "file": grader, "line": i, "column": 1, "pass": True}
+                  for i in range(1, 5)]
+        write(honest)
+        assert check_provenance(prov, seal, grader, 4) is None, "an honest run must grade"
+        # Names right, call site wrong: the measured re-registration-from-src attack.
+        injected = list(honest)
+        injected[0] = {**injected[0], "file": evil, "line": 3, "column": 1}
+        write(injected)
+        assert check_provenance(prov, seal, grader, 4) == "foreign_registration"
+        # vm filename spoof: `file` matches, but lineOffset pushed `line` past the
+        # grader's last line. (A spoof landing INSIDE the file is not caught here —
+        # see the function docstring.)
+        spoofed = list(honest)
+        spoofed[1] = {**spoofed[1], "line": 1003}
+        write(spoofed)
+        assert check_provenance(prov, seal, grader, 4) == "foreign_registration"
+        # Channel disagreement: TAP graded more results than provenance saw.
+        write(honest)
+        assert check_provenance(prov, seal, grader, 5) == "foreign_registration"
+        # Fail-closed on every evidence defect, never a pass.
+        assert check_provenance(os.path.join(td, "nope"), seal, grader, 4) == "provenance_missing"
+        assert check_provenance(prov, os.path.join(td, "nope"), grader, 4) == "provenance_seal_missing"
+        with open(prov, "a", encoding="utf-8") as fh:
+            fh.write('{"name": "extra", "file": "x", "line": 1, "column": 1, "pass": true}\n')
+        assert check_provenance(prov, seal, grader, 5) == "provenance_seal_mismatch"
+        with open(prov, "w", encoding="utf-8") as fh:
+            fh.write("not json\n")
+        with open(seal, "w", encoding="utf-8") as fh:
+            fh.write(hashlib.sha256(open(prov, "rb").read()).hexdigest())
+        assert check_provenance(prov, seal, grader, 1) == "provenance_unparseable"
+        with open(prov, "w", encoding="utf-8") as fh:
+            fh.write("")
+        with open(seal, "w", encoding="utf-8") as fh:
+            fh.write(hashlib.sha256(b"").hexdigest())
+        assert check_provenance(prov, seal, grader, 0) == "provenance_unparseable"
     print("grade_reporter selftest: OK")
 
 

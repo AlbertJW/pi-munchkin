@@ -21,6 +21,18 @@ test("rejects partial, contradictory, and merely mentioned TAP summaries", () =>
 	assert.equal(parseNodeTapSummary("documentation says # tests 1"), null);
 	assert.equal(parseNodeTapSummary("  # tests 1\n  # pass 1\n  # fail 0\n  # skipped 0"), null);
 	assert.equal(parseNodeTapSummary(`${tap(1, 0)}\n# pass 1`), null);
+	// The DEFAULT `node --test` reporter marks its summary with U+2139, not "#".
+	// Requiring "#" made the frontier -- and the whole plateau feature built on it --
+	// inert for the gate agents actually run (2026-08-21). Verbatim node v26.5.0.
+	const spec = "\u2139 tests 5\n\u2139 suites 0\n\u2139 pass 3\n\u2139 fail 2\n"
+		+ "\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 52.17";
+	assert.deepEqual(parseNodeTapSummary(spec), { passed: 3, failed: 2, skipped: 0, total: 5 });
+	// Both reporters are the same instrument: identical counts, identical verdict.
+	assert.deepEqual(parseNodeTapSummary(spec), parseNodeTapSummary(tap(3, 2)));
+	// The guards still hold for the spec shape: indented is a subtest, not the run.
+	assert.equal(parseNodeTapSummary("  \u2139 tests 1\n  \u2139 pass 1\n  \u2139 fail 0\n  \u2139 skipped 0"), null);
+	assert.equal(parseNodeTapSummary("\u2139 pass 2\n\u2139 fail 1"), null);
+	assert.equal(parseNodeTapSummary(`${spec}\n\u2139 pass 3`), null);
 });
 
 test("tracks productive advance separately from a failed-gate plateau", () => {

@@ -170,12 +170,50 @@ produces the grade — there is no verifier isolation. What changed at the reboo
   writes to an artifact), a thing the behaviour-graded reporter path cannot express.
   For such fixtures the pinned-name residual stands until out-of-process verifier
   isolation lands. Behaviour-graded fixtures use the reporter path below instead.
+- **The pin was readable by the SESSION — CLOSED 2026-08-21 (C-1).** The
+  2026-08-20 entry below closed (b) for the graded *re-run* only. The pin was still
+  WRITTEN to `<workdir>.row-context.json`, a sibling of the model's own workdir, and
+  `gate.sb` is `(allow default)` with read-denies only for the repo, mirror and
+  credentials — so the **session** read its own answer key during the run, baked the
+  admitted case names into `src/`, registered them as trivial passing tests and
+  truncated. Measured on the real `parens` fixture with the real jail and seal:
+  honest 0/3 became a sealed, unblocked **3/3**. Every rep shares `$RUNS`, so rep 1's
+  file was readable by rep 2; `requirement_scoring` leaked the same names for v3.
+  Fixed by REMOVING the secret rather than fencing it: `eval_fixture.grading_secrets`
+  derives `expected_cases` / `requirement_scoring` / `hidden_test` / `grade_artifact`
+  in the row-builder process from the admission-hashed manifest under the
+  read-denied `__HARNESS__`, and nothing writes them to disk. The `__PIN__` deny
+  stays as defence in depth. Regression:
+  `integrity_selftest.test_grading_secrets_never_touch_disk`.
+- **Registration provenance — ADDED 2026-08-21 (second layer for the same shape).**
+  A leaked pin is no longer sufficient on its own: `grade_provenance_reporter.mjs`
+  runs as a second `--test-reporter` in the `node --test` RUNNER PARENT (which never
+  loads model `src`) and records the CALL SITE of every graded top-level `test()`.
+  `grade_reporter.check_provenance` refuses `foreign_registration` when a result was
+  registered anywhere but the installed grader, or on a line outside it. Measured:
+  a pin handed straight to `src` scores 2/2 on the pin alone and is refused here.
+  **Honest limit:** the fields are produced in the CHILD, where model code runs, so
+  `vm.runInThisContext(code, {filename})` forges the file and `lineOffset` shifts the
+  line; a spoof that also lands inside the grader's line range is not detected. This
+  raises the bar; it does not replace keeping the pin off disk.
+- **The BINARY gate bit was never jailed — CLOSED 2026-08-21 (C-2).** Everything
+  above protected `subscores`. `score` — the field `fleet_report.decide()` adopts on —
+  came from `( cd "$wd" && node --test )`, un-jailed and un-preloaded, so the same
+  four-line `node:assert` neuter still forged it. Measured on `parens`: an honest 3/6
+  became a gate-passing **6/6**. Both scoring runs (and t2's bespoke check, and
+  `one_shot_control`'s graders) now share one jail: new
+  `real-gate-fixtures/binary.sb`, the assertion preload, `env -i` with `NODE_OPTIONS`
+  and every telemetry/credential variable scrubbed, and fds 8/4/3/5 closed (the
+  subshell inherited the unlinked read-write telemetry file). Fail-closed by the
+  existing `SANDBOX=off` precedent: a scoring run is never "unjailed but
+  authoritative". Regression: `grade_jail_selftest.py` case 6.
 - **Reporter path (`grade_reporter.py`, default) — F2/F3 CLOSED 2026-08-20.** The
   2026-08-18 re-attack found three bypasses: (a) model src neutered `node:assert`
   before the grader's assertions (mitigated by runner-owned `grade_preload.mjs`);
   (b) src read `<workdir>.row-context.json`, re-registered the admitted names as
   trivial passes, and exited; (c) a detached child rewrote `<workdir>.grade.tap`
-  after node exited. The latter two are now blocked by `real-gate-fixtures/grade.sb`:
+  after node exited. NOTE: (b) was only half-closed here — see C-1 above. The
+  latter two are now blocked by `real-gate-fixtures/grade.sb`:
   the graded re-run is separately sandboxed, the pin is kernel-read-denied, the
   evidence lives in a private 0700 `<workdir>.grade-evidence/` directory hidden
   from the jail, and the gate-opened `/dev/fd` channel is not inherited by node's
@@ -191,7 +229,11 @@ produces the grade — there is no verifier isolation. What changed at the reboo
 - **Remaining trust boundary.** Model-authored `src/` still shares the Node
   reporter process; a fully adversarial process-channel forgery therefore still
   requires the named unprivileged-agent / privileged-verifier split (Harbor's
-  "Verifier Execution Isolation"). That is deferred. The pinned-artifact path
+  "Verifier Execution Isolation"). That is deferred. The pattern the 2026-08-21
+  round established is worth stating plainly: **every layer added to protect the
+  graded score was defeated by attacking a layer below it** — the case pin by
+  reading the pin, the graded jail by the un-jailed run beside it. Read each
+  "CLOSED" above as closing a measured vector, never as closing the class. The pinned-artifact path
   remains separately open because it intentionally grades model-written audit
   artifacts. The reporter path is now robust against the measured F2/F3 vectors,
   accidental tampering, and post-production evidence drift; do not describe it

@@ -325,6 +325,19 @@ def real_gate_one(cand, tasks, n, gen):
     if rc != 0:  # aborted gate (server down past HEALTH_WAIT, ^C): never verdict on partial arms
         raise SystemExit(f"[munchkin] gate {gen} aborted (exit {rc}) — fix the server and rerun; no verdict written")
     rows = [json.loads(l) for l in open(out)] if os.path.exists(out) else []
+    # Per-trial validity, same contract as fleet_report / effort_report / fleet_verdict:
+    # voided rows never reach a verdict, and an unevaluated population is not one.
+    # real_gate writes the sidecar before it returns, so absence here is a real fault.
+    sys.path.insert(0, os.path.join(HERE, "prompt-lab"))
+    import trial_validity as _tv
+    _verdicts = _tv.load_sidecar(out)
+    rows, _voided, _unevaluated = _tv.partition(rows, _verdicts)
+    if _verdicts is None or _unevaluated:
+        raise SystemExit(f"[munchkin] gate {gen}: trial validity incomplete "
+                         f"({_unevaluated or 'no sidecar'}) — no verdict written")
+    if _voided:
+        reasons = ", ".join(sorted({r for _, rs in _voided for r in rs}))
+        print(f"[munchkin] {gen}: {len(_voided)} row(s) voided ({reasons})")
     try:
         base = _validated_canonical_val_rows(rows, tasks, n)
     except ValueError as e:
@@ -333,12 +346,14 @@ def real_gate_one(cand, tasks, n, gen):
     failures = []
     for r in base:
         if r["score"] == 0:
-            wds = glob.glob(os.path.join(RUNS, f"{gen}-*-base-{r['task']}-{r['rep']}"))
+            # Variant-aware and unambiguous (trial_validity.find_workdir), not the
+            # first glob hit: perturbation workdirs share the (arm, task, rep) stem.
+            wd = _tv.find_workdir(r, RUNS)
             tail = ""
-            if wds:
-                tail = session_tail(wds[0])  # real trace: session jsonl (run.log is empty headless)
+            if wd:
+                tail = session_tail(wd)  # real trace: session jsonl (run.log is empty headless)
                 if not tail:
-                    log = os.path.join(wds[0], "run.log")
+                    log = os.path.join(wd, "run.log")
                     if os.path.exists(log):
                         tail = "".join(open(log).readlines()[-15:])[-800:]
             failures.append({"task": r["task"], "log_tail": tail})

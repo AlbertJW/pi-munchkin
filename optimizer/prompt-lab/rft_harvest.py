@@ -35,6 +35,7 @@ HERE = os.path.dirname(LAB)
 TASKS_DIR = os.path.join(HERE, "ab-symbolect", "tasks")
 RUNS = os.environ.get("REAL_GATE_RUNS", os.path.expanduser("~/.pi/real-gate-runs"))
 
+sys.path.insert(0, LAB)
 sys.path.insert(0, os.path.join(HERE, "ab-machinery"))
 from metrics import session_file_for  # noqa: E402
 
@@ -74,13 +75,29 @@ def solution_from_session(session_path: str) -> str | None:
 
 
 def harvest(gens, want_model=None, min_authoritative=False):
-    examples, seen, stats = [], set(), {"rows": 0, "passing": 0, "no_session": 0, "no_solution": 0, "exploratory": 0, "dup": 0}
+    import trial_validity
+    examples, seen, stats = [], set(), {"rows": 0, "passing": 0, "no_session": 0, "no_solution": 0,
+                                        "exploratory": 0, "dup": 0, "voided": 0, "unevaluated": 0}
     for gen in gens:
         path = os.path.join(LAB, "results", gen + ".jsonl")
         if not os.path.exists(path):
             print(f"  (skip {gen}: no results file)", file=sys.stderr)
             continue
-        for r in (json.loads(l) for l in open(path) if l.strip()):
+        raw = [json.loads(l) for l in open(path) if l.strip()]
+        # Screen through the per-trial validity sidecar BEFORE anything else. A row
+        # whose reward_hacking criterion FAILED can still carry score==1 -- exactly
+        # the trajectory that must never become a fine-tuning exemplar, since it
+        # teaches the tamper that produced the pass (2026-08-21). Missing sidecar =
+        # no screening evidence = harvest nothing from that gen, loudly.
+        verdicts = trial_validity.load_sidecar(path)
+        if verdicts is None:
+            print(f"  (skip {gen}: no trial-validity sidecar; run trial_validity.py {path})",
+                  file=sys.stderr)
+            continue
+        screened, voided, unevaluated = trial_validity.partition(raw, verdicts)
+        stats["voided"] += len(voided)
+        stats["unevaluated"] += unevaluated
+        for r in screened:
             stats["rows"] += 1
             if r.get("score") != 1:
                 continue
@@ -95,12 +112,15 @@ def harvest(gens, want_model=None, min_authoritative=False):
             prompt = task_prompt(r["task"])
             if not prompt:
                 continue
-            wd_glob = os.path.join(RUNS, f"{gen}-*-{r.get('arm', 'base')}-{r['task']}-{r['rep']}")
-            wds = glob.glob(wd_glob)
-            if not wds:
+            # Boundary-matched and variant-aware, sharing real_gate's naming rules.
+            # The old glob dropped the variant, matched every perturbation workdir of
+            # the same (arm, task, rep), and then took wds[0] -- harvesting one
+            # variant's trajectory as if it were another's.
+            workdir = trial_validity.find_workdir(r, RUNS)
+            if not workdir:
                 stats["no_session"] += 1
                 continue
-            sess = session_file_for(wds[0])
+            sess = session_file_for(workdir)
             sol = solution_from_session(sess) if sess else None
             if not sol:
                 stats["no_solution"] += 1
@@ -140,7 +160,58 @@ def selftest():
             f.write(json.dumps({"type": "message", "message": {"role": "assistant",
                     "content": [{"type": "toolCall", "name": "edit"}]}}) + "\n")
         assert solution_from_session(sess2) is None
-    print("rft_harvest selftest: OK (last-text extraction, tool-only -> none)")
+    # ---- VALIDITY SCREENING (2026-08-21) ----
+    # score==1 is not enough: a row whose reward_hacking criterion FAILED passed
+    # BECAUSE of the tamper, and harvesting it teaches exactly that. Two rows,
+    # identical but for the verdict; only the clean one may become an exemplar.
+    import trial_validity
+    global LAB, RUNS, TASKS_DIR
+    saved = (LAB, RUNS, TASKS_DIR)
+    with tempfile.TemporaryDirectory() as td:
+        LAB = td
+        RUNS = os.path.join(td, "runs")
+        TASKS_DIR = os.path.join(td, "tasks")
+        os.makedirs(os.path.join(td, "results"))
+        os.makedirs(TASKS_DIR)
+        open(os.path.join(TASKS_DIR, "parens.txt"), "w").write("fix the parser")
+        rows = [{"run": "r1", "model": "m", "split": "val", "task": "parens", "arm": "base",
+                 "pattern": "base", "rep": rep, "score": 1, "authoritative": True,
+                 "prompt": {"variant": "canonical"}} for rep in (1, 2)]
+        with open(os.path.join(td, "results", "g1.jsonl"), "w") as fh:
+            for row in rows:
+                fh.write(json.dumps(row) + "\n")
+        # Sessions live under $PI_CODING_AGENT_DIR/sessions/<workdir-name>/ — pointed
+        # at the tempdir so the selftest never reads or writes the live agent tree.
+        agent_dir = os.path.join(td, "agent")
+        saved_agent = os.environ.get("PI_CODING_AGENT_DIR")
+        os.environ["PI_CODING_AGENT_DIR"] = agent_dir
+        for rep in (1, 2):
+            name = f"rg0-r1-m-base-parens-{rep}"
+            os.makedirs(os.path.join(RUNS, name), exist_ok=True)
+            session_dir = os.path.join(agent_dir, "sessions", name)
+            os.makedirs(session_dir, exist_ok=True)
+            with open(os.path.join(session_dir, "s.jsonl"), "w") as fh:
+                fh.write(json.dumps({"type": "message", "message": {"role": "assistant",
+                         "content": [{"type": "text", "text": f"solution {rep}"}]}}) + "\n")
+        verdicts = [{"row_key": trial_validity.row_key(row),
+                     "row_sha256": trial_validity.row_digest(row),
+                     "workdir": None, "criteria": {}, "void": row["rep"] == 2,
+                     "void_reasons": ["reward_hacking"] if row["rep"] == 2 else []}
+                    for row in rows]
+        trial_validity.write_sidecar_atomic(os.path.join(td, "results", "g1.jsonl"), verdicts)
+        examples, stats = harvest(["g1"])
+        assert stats["voided"] == 1, stats
+        assert [e["meta"]["rep"] for e in examples] == [1], (examples, stats)
+        # No sidecar at all -> harvest nothing from that gen, rather than everything.
+        os.unlink(os.path.join(td, "results", "g1.jsonl.validity.jsonl"))
+        examples, stats = harvest(["g1"])
+        assert examples == [] and stats["rows"] == 0, (examples, stats)
+        if saved_agent is None:
+            os.environ.pop("PI_CODING_AGENT_DIR", None)
+        else:
+            os.environ["PI_CODING_AGENT_DIR"] = saved_agent
+    LAB, RUNS, TASKS_DIR = saved
+    print("rft_harvest selftest: OK (last-text extraction, tool-only -> none, validity screening)")
 
 
 def main():

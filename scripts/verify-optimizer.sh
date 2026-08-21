@@ -63,6 +63,7 @@ root = pathlib.Path(sys.argv[1]); registered = set(sys.argv[2:])
 excluded = {
     "prompt-lab/integrity_selftest.py",   # run directly below, no --selftest flag
     "prompt-lab/seatbelt_network_selftest.py",  # run directly below
+    "prompt-lab/grade_jail_selftest.py",  # run directly below, no --selftest flag
     "prompt-lab/fixture_admission.py",    # verify subcommand exercised by integrity_selftest
 }
 missing = []
@@ -71,11 +72,20 @@ for path in sorted(root.rglob("*.py")):
     if rel in registered or rel in excluded or "__pycache__" in rel:
         continue
     text = path.read_text(errors="replace")
-    if "--selftest" in text and "def selftest" in text:
+    # `def selftest` ALONE. Requiring "--selftest" in the text too made the guard
+    # blind to exactly the modules that need it most: a selftest invoked as
+    # `if __name__ == "__main__": selftest()` (grade_jail_selftest.py, exposure.py)
+    # carries no such string, so an unregistered one would never have been reported
+    # -- the same "exists but never runs" failure the guard was written for
+    # (2026-08-21). Registration or an explicit exclusion, nothing in between.
+    if "def selftest" in text:
         missing.append(rel)
 if missing:
     sys.exit("selftests exist but are not registered in verify-optimizer.sh:\n  " + "\n  ".join(missing))
-print(f"selftest registry complete: {len(registered)} registered, {len(excluded)} excluded with reasons")
+scanned = sum(1 for path in root.rglob("*.py") if "__pycache__" not in str(path)
+              and "def selftest" in path.read_text(errors="replace"))
+print(f"selftest registry complete: {len(registered)} registered, {len(excluded)} excluded "
+      f"with reasons, {scanned} selftest-defining modules scanned")
 PY
 for script in "${selftests[@]}"; do python3 "$OPT/$script" --selftest; done
 python3 -m unittest "$OPT/prompt-lab/test_span_screen.py"

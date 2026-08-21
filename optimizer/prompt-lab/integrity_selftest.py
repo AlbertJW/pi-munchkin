@@ -7,6 +7,8 @@ import datetime as dt
 import hashlib
 import json
 import os
+import platform
+import shutil
 import re
 import subprocess
 import sys
@@ -287,7 +289,9 @@ def test_mirror_v3_fixture_contracts():
                 raise AssertionError("v3 oracle output cap was not enforced")
 
         scoring = admission.requirement_scoring(manifest)
-        assert eval_fixture.row_context(task, "canonical")["requirement_scoring"] == scoring
+        assert eval_fixture.grading_secrets(task)["requirement_scoring"] == scoring
+        assert "requirement_scoring" not in eval_fixture.row_context(task, "canonical"), \
+            "v3 hidden case names must not reach the on-disk row context"
         detail = {case: True for cases in scoring["hidden"].values() for case in cases}
         weighted, blocked = grade_reporter.apply_requirement_weights(
             {"fixed": len(detail), "total": len(detail), "detail": detail}, scoring)
@@ -447,6 +451,12 @@ def test_one_shot():
         control.request_once = original
     assert len(calls) == 1 and result["requests"] == 1 and result["score"] == 1
     assert result["usage"]["exact"] and result["context_bytes"] <= 48 * 1024
+    # The one-shot arm applies a model-authored diff and then grades over it, so its
+    # graders execute model code exactly like real_gate's scoring runs and used to
+    # do it unjailed and unpreloaded. score==1 above proves the gold patch still
+    # grades THROUGH the jail; this proves the jail was actually in place.
+    if platform.system() == "Darwin" and shutil.which("sandbox-exec"):
+        assert result["scoring_jailed"] is True, "one-shot graded model code outside the scoring jail"
 
     captured = []
     class FakeResponse:
@@ -625,8 +635,10 @@ def test_graded_subscores_passthrough():
 
     # The gate must take the name from the manifest, not hardcode it -- and the manifest must
     # name the file the hidden grader actually writes.
-    assert eval_fixture.row_context("audit-sweep", "canonical")["grade_artifact"] == PIN, \
-        "row-context must carry grade_artifact -- it is how the pin reaches the gate's row builder"
+    assert eval_fixture.grading_secrets("audit-sweep")["grade_artifact"] == PIN, \
+        "grading_secrets must carry grade_artifact -- it is how the pin reaches the gate's row builder"
+    assert "grade_artifact" not in eval_fixture.row_context("audit-sweep", "canonical"), \
+        "the artifact pin must not reach the on-disk row context"
     hidden = (admission.FIXTURES / "hidden" / "audit-sweep.test.js").read_text()
     assert f'writeFileSync("{PIN}"' in hidden, "the pin must be the name the hidden grader writes"
 
@@ -642,9 +654,82 @@ def test_graded_subscores_passthrough():
     gate = (admission.ROOT / "real_gate.sh").read_text()
     assert 'rec["subscores"]=subscores' in gate, "real_gate.sh does not populate subscores"
     assert "import grade_artifact" in gate, "real_gate.sh must use the shared extraction, not its own copy"
-    assert 'ctx.get("grade_artifact")' in gate, "real_gate.sh must read the manifest's pin"
+    assert '_secrets = _eval_fixture.grading_secrets(task)' in gate, \
+        "real_gate.sh must derive the pin in-process, not read it back off disk"
+    assert '_secrets["grade_artifact"]' in gate, "real_gate.sh must read the manifest's pin"
     assert 'rec["subscores_blocked"]=subscores_blocked' in gate, "a refusal must reach the row"
     assert ".*-grade.json" not in gate, "real_gate.sh must not glob for the artifact any more"
+
+
+def test_grading_secrets_never_touch_disk():
+    """The answer key must not be derivable from anything the session can read.
+
+    `<workdir>.row-context.json` is a SIBLING of the model's workdir and gate.sb is
+    (allow default) with read-denies only for the repo, mirror and credentials, so
+    the session could read it. Measured 2026-08-21 on the real `parens` fixture with
+    the real jail and seal: src read `expected_cases`, re-registered the admitted
+    names as trivial passes and truncated -- honest 0/3 became a sealed, unblocked
+    3/3, `blocked=None`. Reps share $RUNS, so rep 1's file was readable by rep 2.
+    Counterfactual: put any of these keys back into row_context() and this fails.
+    """
+    import eval_fixture
+    SECRETS = ("expected_cases", "requirement_scoring", "hidden_test", "grade_artifact")
+    for task in ("parens", "audit-sweep", "mirror-cross-file-cli", "t3", "context-pressure"):
+        public = eval_fixture.row_context(task, "canonical")
+        leaked = [key for key in SECRETS if key in public]
+        assert not leaked, f"{task}: row context leaks {leaked}"
+        # ... and the serialized form the gate actually writes carries no case name.
+        blob = json.dumps(public)
+        for case in eval_fixture.grading_secrets(task)["expected_cases"] or ():
+            assert case not in blob, f"{task}: admitted case name reachable in row context"
+
+    # The pin still has to REACH the row builder, or this trade is a silent
+    # capability loss rather than a fix.
+    assert eval_fixture.grading_secrets("parens")["expected_cases"], "parens lost its pin"
+    gate = (admission.ROOT / "real_gate.sh").read_text()
+    for reference in ('ctx.get("expected_cases")', 'ctx.get("requirement_scoring")', 'ctx["requirement_scoring"]'):
+        assert reference not in gate, f"real_gate.sh still reads {reference} off disk"
+
+
+def test_hidden_grader_scoping():
+    """is_hidden() must stay scoped, or shown-test tasks silently change semantics.
+
+    The gate resolves a hidden grader in three branches: hidden/<task>.test.js, the
+    explicitly-named t4, and eval_fixture's `hidden-test` fallback. Widening the
+    fallback to any tests.fail_to_pass overlay (every fixture has one, for admission)
+    reclassifies t1/t2/t3/t5/t6 as hidden -- install_tests() becomes unreachable and
+    those tasks stop showing the model the test they are specified against. Measured
+    regression, 2026-08-21. Counterfactual: drop withheld_grader's scoping and the
+    SHOWN assertions below fail.
+    """
+    import eval_fixture
+    SHOWN = {"t1", "t2", "t3", "t5", "t6"}
+    hidden_dir = admission.FIXTURES / "hidden"
+    for path in sorted(admission.MANIFESTS.glob("*.json")):
+        task = path.stem
+        _, manifest = admission.load_manifest(task)
+        withheld = eval_fixture.withheld_grader(manifest)
+        branch1 = (hidden_dir / f"{task}.test.js").exists()
+        branch2 = task == "t4" and (admission.FIXTURES / "admission-tests" / "t4.test.mjs").exists()
+        is_hidden = bool(branch1 or branch2 or withheld)
+        if task in SHOWN:
+            assert not is_hidden, f"{task} is a shown-test task but resolved a hidden grader"
+        else:
+            assert is_hidden, f"{task} lost its hidden grader"
+        if branch1:
+            assert withheld == f"real-gate-fixtures/hidden/{task}.test.js", (task, withheld)
+    # t4 is only hidden because the gate names it: it shares admission-tests/ with the
+    # shown t1, so no path rule can separate them.
+    _, t4 = admission.load_manifest("t4")
+    assert eval_fixture.withheld_grader(t4) is None
+
+    gate = (admission.ROOT / "real_gate.sh").read_text()
+    assert '"$1" == "t4" && -f "$FIXTURES/admission-tests/t4.test.mjs"' in gate, \
+        "t4's explicit hidden-grader branch is gone; the path fallback cannot replace it"
+    assert 'is_hidden "$task" || install_tests "$task" "$wd"' in gate, \
+        "shown tasks must still be given their test before the session"
+    for shown in ("t3", "t5", "t6"):
+        assert f"\t\t{shown})" in gate, f"install_tests() no longer handles {shown}"
 
 
 def test_trial_validity_is_authoritative():

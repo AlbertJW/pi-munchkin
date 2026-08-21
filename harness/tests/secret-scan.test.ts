@@ -55,12 +55,51 @@ test("diff scanner refuses an untracked directory symlink without following or c
     execFileSync("git", ["-c", "user.name=Test", "-c", "user.email=test@example.invalid", "commit", "--allow-empty", "-qm", "base"], { cwd: repo });
     mkdirSync(join(target, "nested"));
     symlinkSync(target, join(repo, "linked-directory"), "dir");
-    const result = spawnSync(process.execPath, [script], { cwd: repo, encoding: "utf8" });
+    // This throwaway repo has no origin/main, so give the scan an explicit baseline;
+    // without one it fails closed before it ever reaches the untracked entries (see
+    // the baseline test below).
+    const env = { ...process.env, SECRET_SCAN_BASE: "HEAD", GITHUB_BASE_REF: "", GITHUB_EVENT_BEFORE: "" };
+    const result = spawnSync(process.execPath, [script], { cwd: repo, encoding: "utf8", env });
     assert.equal(result.status, 1, "a non-regular untracked entry fails closed");
     assert.match(result.stderr, /^linked-directory:0: UNTRACKED_NON_REGULAR/m);
     assert.doesNotMatch(`${result.stdout}${result.stderr}`, /EISDIR|secret-scan-target/);
   } finally {
     rmSync(repo, { recursive: true, force: true });
     rmSync(target, { recursive: true, force: true });
+  }
+});
+
+test("diff scanner refuses to report a result when no baseline resolves", () => {
+  // A CI checkout is a single commit with no origin/main. The scan then had nothing
+  // to diff and still printed "clean (0 added line(s) inspected)" — a stage that
+  // reads as a gate and gates nothing (measured 2026-08-21). It must fail instead,
+  // and must still work the moment a baseline is supplied.
+  const repo = mkdtempSync(join(tmpdir(), "secret-scan-baseline-"));
+  const script = join(process.cwd(), "harness", "scripts", "secret-scan-diff.mjs");
+  const git = (...args: string[]) =>
+    execFileSync("git", ["-c", "user.name=Test", "-c", "user.email=test@example.invalid", ...args], { cwd: repo, encoding: "utf8" });
+  try {
+    git("init", "-q");
+    git("commit", "--allow-empty", "-qm", "base");
+    const base = git("rev-parse", "HEAD").trim();
+    git("commit", "--allow-empty", "-qm", "published");
+    const bare = { ...process.env, SECRET_SCAN_BASE: "", GITHUB_BASE_REF: "", GITHUB_EVENT_BEFORE: "" };
+
+    const unscanned = spawnSync(process.execPath, [script], { cwd: repo, encoding: "utf8", env: bare });
+    assert.equal(unscanned.status, 1, "no baseline must fail the stage");
+    assert.match(unscanned.stderr, /no baseline resolved/);
+    assert.doesNotMatch(unscanned.stdout, /clean/);
+
+    // A push baseline is enough: GITHUB_EVENT_BEFORE is the only one that covers a
+    // push to main, where origin/main...HEAD is empty by construction.
+    const pushed = spawnSync(process.execPath, [script], {
+      cwd: repo, encoding: "utf8", env: { ...bare, GITHUB_EVENT_BEFORE: base },
+    });
+    assert.equal(pushed.status, 0, pushed.stderr);
+    // An empty range is reported as pending, never as "clean".
+    assert.match(pushed.stdout, /nothing pending against/);
+    assert.doesNotMatch(pushed.stdout, /clean/);
+  } finally {
+    rmSync(repo, { recursive: true, force: true });
   }
 });

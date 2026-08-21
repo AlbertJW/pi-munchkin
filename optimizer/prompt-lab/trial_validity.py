@@ -242,15 +242,57 @@ def _sha256(path):
     return digest.hexdigest()
 
 
+def row_digest(row):
+    """Bind a verdict to the exact row bytes it was computed from.
+
+    row_key identifies a trial; it does not prove the sidecar was built from THIS
+    version of the row. Without the binding, editing a results file after the
+    sidecar is written keeps every verdict looking valid.
+    """
+    return hashlib.sha256(
+        json.dumps(row, sort_keys=True, separators=(",", ":")).encode("utf-8")).hexdigest()
+
+
+def _variant(row):
+    return ((row.get("prompt") or {}).get("variant")) or "canonical"
+
+
+def _slug(variant):
+    """real_gate.sh's `${variant//[^a-zA-Z0-9._-]/-}`."""
+    return re.sub(r"[^A-Za-z0-9._-]", "-", variant)
+
+
 def row_key(row):
-    return f"{row.get('run')}:{row.get('task')}:{row.get('pattern') or row.get('arm')}:{row.get('rep')}"
+    """Identity of one trial. Every dimension real_gate varies must appear here.
+
+    run:task:pattern:rep alone COLLIDES: a single results file holds several
+    models (fleet rounds), both splits, the one-shot arm, and one row per prompt
+    variant on the robustness split. `run()` raises on a duplicate key, so a
+    collision does not merely mislabel a row -- it aborts the whole sidecar build,
+    and `partition` then counts every row in the round "unevaluated" (2026-08-21).
+    """
+    return ":".join(str(row.get(field)) for field in ("run", "model", "split", "task")) + \
+        f":{row.get('pattern') or row.get('arm')}:{row.get('rep')}:{_variant(row)}"
 
 
 def find_workdir(row, runs_dir):
-    """Workdir for a row, or None. Boundary-matched; ambiguity -> None (NA, never a guess)."""
-    suffix = f"-{row.get('pattern') or row.get('arm')}-{row.get('task')}-{row.get('rep')}"
+    """Workdir for a row, or None. Boundary-matched; ambiguity -> None (NA, never a guess).
+
+    The suffix must carry the VARIANT. The old `-[a-z0-9-]+$` fallback branch also
+    matched every variant workdir of the same (pattern, task, rep), so a round with
+    any perturbation made the CANONICAL row ambiguous -- and ambiguity is None,
+    which `verdict_for` voids. It voided exactly the canonical val rows (2026-08-21).
+
+    Two naming rules, matching the two call sites in real_gate.sh: run_one appends
+    the slug only for a non-canonical variant, run_one_shot always appends it.
+    """
+    pattern = row.get("pattern") or row.get("arm")
+    suffix = f"-{pattern}-{row.get('task')}-{row.get('rep')}"
+    variant = _variant(row)
+    if variant != "canonical" or pattern == "one-shot":
+        suffix += f"-{_slug(variant)}"
     matches = [d for d in glob.glob(os.path.join(runs_dir, f"*{row.get('run')}*"))
-               if os.path.isdir(d) and (d.endswith(suffix) or re.search(re.escape(suffix) + r"-[a-z0-9-]+$", d))]
+               if os.path.isdir(d) and d.endswith(suffix)]
     return matches[0] if len(matches) == 1 else None
 
 
@@ -391,15 +433,24 @@ def verdict_for(row, runs_dir, timeout_seconds=DEFAULT_TIMEOUT_SECONDS):
     # callers (selftests) pass runs_dir=None and are unaffected.
     if runs_dir and workdir is None:
         void_reasons.append("no_transcript")
-    return {"row_key": row_key(row), "workdir": workdir, "criteria": criteria,
-            "void": bool(void_reasons), "void_reasons": void_reasons}
+    # A workdir that RESOLVED but yielded no events is the same hole one step in:
+    # reward_hacking returns NOT_APPLICABLE, which does not void, so the row lands
+    # in the analysed population having never been screened for tampering. The
+    # one-shot arm is genuinely exempt -- it is a single API request with no tools
+    # and no session, so there is no transcript to be missing (2026-08-21).
+    elif runs_dir and not events and (row.get("pattern") or row.get("arm")) != "one-shot":
+        void_reasons.append("empty_transcript")
+    return {"row_key": row_key(row), "row_sha256": row_digest(row), "workdir": workdir,
+            "criteria": criteria, "void": bool(void_reasons), "void_reasons": void_reasons}
 
 
 def trial_manifest(workdir):
     """One bundle of everything a trial produced, with hashes."""
     from metrics import session_files_for
     artifacts = {}
-    for name in ("gate.log", "run.log", "context-telemetry.json",
+    # "row-context.json" is the one-shot arm's in-workdir copy; run_one writes a
+    # SIBLING "<wd>.row-context.json", picked up by the suffix loop below.
+    for name in ("gate.log", "run.log", "context-telemetry.json", "row-context.json",
                  "fingerprint-pre.json", "fingerprint-post.json", ".config-env"):
         path = os.path.join(workdir, name)
         if os.path.isfile(path):
@@ -481,6 +532,10 @@ def partition(rows, verdicts):
     kept, voided, unevaluated = [], [], 0
     for row in rows:
         verdict = verdicts.get(row_key(row)) if verdicts else None
+        # A verdict computed from different row bytes describes a different trial.
+        # Treat it as absent rather than as evidence about this one.
+        if verdict is not None and verdict.get("row_sha256") != row_digest(row):
+            verdict = None
         if verdict is None:
             unevaluated += 1
         elif verdict["void"]:
@@ -551,6 +606,49 @@ def selftest():
     assert verdict_for(far, None)["criteria"]["near_miss"]["outcome"] == "PASS"
     graderless = {k: v for k, v in ok_row.items() if k != "subscores"}
     assert verdict_for(graderless, None)["criteria"]["near_miss"]["outcome"] == "NOT_APPLICABLE"
+
+    # ---- ROW IDENTITY (2026-08-21) ----
+    # run:task:pattern:rep collided across every dimension a round actually varies.
+    # A collision makes run() raise, which leaves NO sidecar, which makes partition()
+    # call the whole round "unevaluated" -- silence, not an error.
+    base = {"run": "g1", "task": "parens", "pattern": "base", "rep": 1,
+            "model": "m1", "split": "val", "prompt": {"variant": "canonical"}}
+    variations = [dict(base, model="m2"), dict(base, split="robustness"),
+                  dict(base, prompt={"variant": "reorder"}), dict(base, pattern="one-shot"),
+                  dict(base, rep=2), dict(base, task="equil"), dict(base, run="g2")]
+    keys = {row_key(row) for row in variations} | {row_key(base)}
+    assert len(keys) == len(variations) + 1, f"row_key collides: {sorted(keys)}"
+
+    # ---- WORKDIR RESOLUTION (2026-08-21) ----
+    # real_gate.sh names workdirs `<gen>-<run>-<model>-<pat>-<task>-<rep>[-<slug>]`:
+    # run_one appends the slug only for a perturbation, run_one_shot always does.
+    # The old regex fallback matched every variant dir too, so the CANONICAL row was
+    # ambiguous whenever a perturbation ran -- and ambiguity voids.
+    with tempfile.TemporaryDirectory() as runs:
+        for name in ("rg0-g1-m1-base-parens-1", "rg0-g1-m1-base-parens-1-reorder",
+                     "rg0-g1-m1-base-parens-1-lexical-swap", "rg0-g1-m1-one-shot-parens-1-canonical"):
+            os.makedirs(os.path.join(runs, name))
+        assert find_workdir(base, runs).endswith("base-parens-1"), find_workdir(base, runs)
+        assert find_workdir(dict(base, prompt={"variant": "reorder"}), runs).endswith("-1-reorder")
+        assert find_workdir(dict(base, prompt={"variant": "lexical swap"}), runs).endswith("-1-lexical-swap")
+        assert find_workdir(dict(base, pattern="one-shot"), runs).endswith("one-shot-parens-1-canonical")
+        assert find_workdir(dict(base, rep=9), runs) is None
+
+        # ---- UNSCREENED ROWS ARE VOID (2026-08-21) ----
+        # A workdir that resolves but holds no transcript leaves reward_hacking at
+        # NOT_APPLICABLE, which does not void -- the row would join the analysed
+        # population never having been screened for tampering.
+        agentic = dict(ok_row, run="g1", task="parens", pattern="base", rep=1,
+                       model="m1", split="val", prompt={"variant": "canonical"})
+        verdict = verdict_for(agentic, runs)
+        assert verdict["void"] and "empty_transcript" in verdict["void_reasons"], verdict
+        # The one-shot arm is a single API request: no tools, no session, nothing to
+        # screen. Voiding it would be wrong, not strict.
+        one_shot = dict(agentic, pattern="one-shot")
+        verdict = verdict_for(one_shot, runs)
+        assert not verdict["void"], verdict
+        # An unresolvable workdir stays the original no_transcript void.
+        assert "no_transcript" in verdict_for(dict(agentic, rep=9), runs)["void_reasons"]
 
     # Transcript-based criteria via synthetic events.
     tamper = [("2026-08-15T10:00:00Z", "assistant", "edit", {"path": "test/visible.test.js"}, None)]

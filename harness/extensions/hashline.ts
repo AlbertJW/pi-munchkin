@@ -270,8 +270,19 @@ export function registerHashline(pi: ExtensionAPI, io: HashlineIo = DEFAULT_IO) 
 					if (sec.tag !== liveTag) {
 						const snap = (snaps.get(abs) ?? []).find((s) => s.tag === sec.tag);
 						if (!snap) {
+							// Say what was actually checked. The snapshot store is a
+							// module-scope LRU (SNAP_PATHS paths x SNAP_VERSIONS versions),
+							// which pi scopes to the extension MODULE INSTANCE -- i.e. the
+							// process, not the session. So "not from this session" was wrong
+							// in both directions: a tag from an earlier session in the same
+							// process resolves fine (its content snapshot is still valid),
+							// and a tag from THIS session fails once the LRU evicts it. The
+							// remedy is the same either way, but the diagnosis must not
+							// send a model looking for a session boundary that is not there.
 							throw new Error(
-								`[${disp}#${sec.tag}] tag is not from this session (live file is #${liveTag}). Read the file, then re-emit the patch with fresh numbers.`,
+								`[${disp}#${sec.tag}] no retained snapshot carries this tag and the live file is #${liveTag} `
+								+ `(the snapshot store keeps ${SNAP_VERSIONS} versions each for the ${SNAP_PATHS} most recently read files). `
+								+ "Read the file, then re-emit the patch with fresh numbers.",
 							);
 						}
 						hunks = relocateHunks(snap.text, live, hunks);

@@ -64,8 +64,10 @@ candidates as dark). Net changes since 0.3.0; the full per-decision record is
   fixtures repaired to behaviour-only hidden suites (source-shape assertions replaced by a
   vocabulary-extension coupling test / dropped as redundant) and regenerated as v2; sweep-a,
   the first multi-defect graded fixture (six independent crux-class defects, band_prediction
-  0.35-0.65). All five cohort fixtures pass the full admission battery; approval remains the
-  human checkpoint. Control-group discipline caught a real detector bug pre-use: the first
+  0.35-0.65), plus sweep-b (episode-variance) and sweep-c (process-traps), both landed
+  2026-08-14 and therefore part of this entry. All SEVEN cohort fixtures pass the full
+  admission battery and report authoritative; approval remains the human checkpoint.
+  (Count corrected 2026-08-21: this entry said "five", counting only sweep-a.) Control-group discipline caught a real detector bug pre-use: the first
   reward_hacking draft void-flagged 6/12 honest calibration rows on `2>&1` redirects — fixed
   to target-based detection, both real calibration files now 24/24 clean.
 
@@ -161,6 +163,37 @@ candidates as dark). Net changes since 0.3.0; the full per-decision record is
   manifest content, the `audit-sweep` graded fixture.
 
 ### Fixed
+
+- **Grader integrity, round three (2026-08-21, source only — NOT yet mirrored):** both scoring
+  paths were forgeable and both are closed. **The session could read its own answer key**: the
+  admitted case pin was written to `<workdir>.row-context.json`, a sibling of the model's own
+  workdir that `gate.sb` permitted reading, so `src` baked the admitted names in, registered them
+  as trivial passes and truncated — measured on the real `parens` fixture with the real jail and
+  seal, honest 0/3 became a sealed, unblocked 3/3. The secret is now DELETED rather than fenced
+  (`eval_fixture.grading_secrets` derives it in the row-builder process from the
+  admission-hashed manifest; nothing writes it to disk), and a second `--test-reporter` running
+  in the runner PARENT records each graded test's call site so a leaked pin is not sufficient
+  (`foreign_registration`). **The binary gate bit was never jailed**: `score` — the field
+  adoption reads — came from an un-jailed, un-preloaded `node --test`, so the four-line
+  `node:assert` neuter still forged it (measured: 3/6 → a gate-passing 6/6). All scoring runs now
+  share `real-gate-fixtures/binary.sb` plus the assertion preload, with `env -i`
+  (`NODE_OPTIONS` and every telemetry/credential variable scrubbed) and fds 8/4/3/5 closed.
+  Analysis chain: `trial_validity.row_key` collided across model/split/variant and aborted the
+  whole sidecar build silently; `find_workdir` voided exactly the canonical rows once any
+  perturbation ran; a resolved-but-empty workdir left tamper screening off; `rft_harvest`,
+  `fleet_verdict` and `munchkin` read rows unscreened; verdicts are now bound to the row bytes
+  they were computed from; `effort_report.graded_rate` gained the bounds guard its siblings have;
+  `calibrate.py`'s unpreregistered 20-85% band is retired to descriptive output. Harness: a
+  model-controlled relative path forged a second `[harness summary]` block in the state lens; the
+  verification frontier recognized only the `tap` reporter, leaving it and the whole plateau
+  feature inert against the default `node --test`; `VERIFICATION_PLATEAU=enforce` counted
+  characters the arbiter never delivered; `tool-call-rescue` spent its budget on dropped
+  proposals; working-memory path redaction was defeated by adjacent punctuation; and
+  `bash-output-guard` loaded after loop-breaker, so the classifier saw a different result than
+  the model did. Guards: the secret-scan stage printed "clean" in CI having inspected zero lines
+  and now fails closed (CI checks out with `fetch-depth: 0`); `GATE_MIRROR_DENY` no longer
+  defaults to a no-op; `verify-optimizer.sh`'s completeness guard can now see selftests invoked
+  from `__main__`. Every behavioural fix carries a both-polarity test proven by reverting it.
 
 - **Conformance-report follow-up (2026-08-14, source only — NOT yet mirrored):** four field-observed
   harness defects surfaced by an independent pi dogfood session that analysed `~/.pi/agent` against

@@ -15,13 +15,20 @@ jobs:
         os: [ubuntu-latest, macos-latest]
     runs-on: ${{ matrix.os }}
     steps:
+      # Full history: `verify`'s secret-scan stage diffs what this push publishes
+      # against a baseline. A shallow checkout resolves no baseline, so the stage
+      # fails closed rather than reporting "clean" on an unscanned range.
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       - uses: actions/setup-node@v4
         with:
           node-version: 22
           cache: npm
       - run: npm ci
       - run: npm run verify
+        env:
+          GITHUB_EVENT_BEFORE: ${{ github.event.before }}
 
   compatibility:
     name: Pi ${{ matrix.pi }} isolated consumer

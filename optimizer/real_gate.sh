@@ -50,11 +50,55 @@ FIXTURE_META="$HERE/prompt-lab/eval_fixture.py"; FINGERPRINT="$HERE/prompt-lab/s
 EXEC_POLICY="$HERE/prompt-lab/execution_policy.py"
 RESULTS="${RESULTS:-$HERE/prompt-lab/results/$GEN.jsonl}"
 RUNS="${REAL_GATE_RUNS:-$HOME/.pi/real-gate-runs}"
+# Absolute node, resolved once: the scoring runs exec through `env -i`, which has
+# no PATH to find it with.
+NODE_BIN="$(command -v node || echo node)"
+# PATH for the scoring runs, which exec through `env -i`. /usr/bin carries git (the
+# two `git log --oneline` fixture tests); the node bin dir carries npm, which some
+# fixtures' grader commands invoke. Scrubbing PATH is about dropping an INJECTED
+# entry, not about hiding the toolchain -- so name the toolchain explicitly.
+SCORING_PATH="$(dirname "$NODE_BIN"):/usr/bin:/bin"
+# Workdirs must live OUTSIDE the harness repo. The scoring jails read-deny
+# __HARNESS__ (so a run cannot reach other fixtures' hidden graders, the Git
+# objects, or the approved manifests) -- a $RUNS inside the repo would be swallowed
+# by that deny and every scoring run would fail for the wrong reason. The default
+# is ~/.pi/real-gate-runs; only REAL_GATE_RUNS can break this.
+mkdir -p "$RUNS" 2>/dev/null || true
+_runs_real="$(cd "$RUNS" 2>/dev/null && pwd -P || echo "$RUNS")"
+_repo_real="$(cd "$REPO_ROOT" 2>/dev/null && pwd -P || echo "$REPO_ROOT")"
+case "$_runs_real/" in
+	"$_repo_real"/*)
+		echo "[real_gate] REAL_GATE_RUNS=$RUNS is inside the harness repo ($REPO_ROOT)." >&2
+		echo "[real_gate] Workdirs must sit outside it: the scoring jails read-deny the repo." >&2
+		exit 2 ;;
+esac
+unset _runs_real _repo_real
 EXPERIMENT_MANIFEST="${EXPERIMENT_MANIFEST:-}"
 EXPERIMENT_MANIFEST_SHA256="${EXPERIMENT_MANIFEST_SHA256:-}"
 EXPERIMENT_BASE_CELL="${EXPERIMENT_BASE_CELL:-base}"
 EXPERIMENT_CAND_CELL="${EXPERIMENT_CAND_CELL:-cand}"
 AGENT_DIR="${PI_CODING_AGENT_DIR:-$HOME/.pi/agent}"
+# gate.sb's __MIRROR__ deny exists because "the public mirror duplicates the
+# fixtures INCLUDING hidden graders outside __HARNESS__; sessions have been
+# observed wandering into it (r6-c21)". Its default was $REPO_ROOT, which makes it
+# a verbatim duplicate of the __HARNESS__ deny on the line above -- the deny that
+# closed an OBSERVED escape was a no-op unless the operator remembered to set
+# GATE_MIRROR_DENY (2026-08-21). Derive it: when the gate runs from a git
+# WORKTREE, the main checkout is the second copy of every grader on this host, and
+# git names it exactly.
+if [[ -z "${GATE_MIRROR_DENY:-}" ]]; then
+	_common_git="$(git -C "$HERE" rev-parse --path-format=absolute --git-common-dir 2>/dev/null || true)"
+	if [[ -n "$_common_git" ]]; then
+		_main_checkout="$(dirname "$_common_git")"
+		[[ -d "$_main_checkout" && "$_main_checkout" != "$REPO_ROOT" ]] && GATE_MIRROR_DENY="$_main_checkout"
+	fi
+	unset _common_git _main_checkout
+fi
+GATE_MIRROR_DENY="${GATE_MIRROR_DENY:-$REPO_ROOT}"
+if [[ "$GATE_MIRROR_DENY" == "$REPO_ROOT" ]]; then
+	echo "[real_gate] note: no separate grader mirror found; the __MIRROR__ deny duplicates __HARNESS__." >&2
+	echo "[real_gate]   Set GATE_MIRROR_DENY=<path> if a second checkout of the fixtures exists on this host." >&2
+fi
 # An orchestrator (batch_screen.py) may PIN the registry hash it resolved when it
 # built the run-private overlay. Recomputing unconditionally made that pin dead
 # env — the row silently recorded whatever models.json said at gate time, so an
@@ -113,11 +157,13 @@ hidden_test_for() {
 	if [[ -f "$FIXTURES/hidden/$1.test.js" ]]; then echo "$FIXTURES/hidden/$1.test.js"; return; fi
 	# t4 predates the hidden/<task>.test.js convention; its grader still lives at
 	# admission-tests/t4.test.mjs (also the source fixture_admission.py's own
-	# manifest-overlay path uses). Named explicitly rather than folded into the
-	# generic eval_fixture.py fallback below, which is scoped to context_pressure
-	# manifests only — broadening it would wrongly reclassify t1/t2/t3/t5/t6 (which
-	# also carry a tests.fail_to_pass overlay for admission, but are graded here via
-	# their own install_tests()/bespoke-check path, not the hidden-task path) as hidden.
+	# manifest-overlay path uses) — a directory it SHARES with the shown-test t1, so
+	# it cannot be derived from the path and is named explicitly here. The generic
+	# eval_fixture.py fallback below is scoped to overlays under a withheld directory
+	# (eval_fixture.withheld_grader); broadening it to any tests.fail_to_pass overlay
+	# reclassifies t1/t2/t3/t5/t6 as hidden — they carry an overlay for admission but
+	# are graded via their own install_tests()/bespoke-check path (measured: doing so
+	# makes install_tests() unreachable and silently changes those tasks' semantics).
 	if [[ "$1" == "t4" && -f "$FIXTURES/admission-tests/t4.test.mjs" ]]; then echo "$FIXTURES/admission-tests/t4.test.mjs"; return; fi
 	local relative; relative="$(python3 "$FIXTURE_META" hidden-test "$1" 2>/dev/null)"
 	[[ -n "$relative" ]] && echo "$HERE/$relative"
@@ -249,7 +295,7 @@ if [[ "$DRY" == 1 ]]; then
 		echo "server: pi-native (llama health/warm-up bypassed)"
 	fi
 	cfgs="[base, cand]"; nextcmd="./prompt-lab/fleet_report.py $GEN --baseline base --candidate cand"
-	[[ "$CALIB" == 1 ]] && cfgs="[base only]" && nextcmd="./prompt-lab/calibrate.py $GEN"
+	[[ "$CALIB" == 1 ]] && cfgs="[base only]" && nextcmd="./prompt-lab/admission_rule.py $GEN"
 	[[ "$ARM" != "both" ]] && cfgs="[$ARM only]"
 	echo "would run, per config in $cfgs:  ${TASKS[*]}  x ${N} reps  -> gate-pass rows -> $RESULTS"
 	[[ "$ROBUSTNESS" == 1 ]] && echo "robustness: canonical + 3 equivalent prompts; eligible one-shot arms (one request each)"
@@ -642,7 +688,7 @@ PY
 	# jail: render the per-run Seatbelt profile (absolute paths; Seatbelt has no env)
 	local sbx=()
 	if [[ "$SANDBOX" == "on" ]]; then
-		python3 - "$GATE_SB" "$wd/.gate.sb" "$wd" "$AGENT_DIR" "${GATE_MIRROR_DENY:-$REPO_ROOT}" "$REPO_ROOT" "$MODEL_PORT" "$MODEL_HOST" "$gate_tmpdir" "$HOME" <<'PY'
+		python3 - "$GATE_SB" "$wd/.gate.sb" "$wd" "$AGENT_DIR" "$GATE_MIRROR_DENY" "$REPO_ROOT" "$MODEL_PORT" "$MODEL_HOST" "$gate_tmpdir" "$HOME" <<'PY'
 import json,re,sys
 src,dst,*values=sys.argv[1:]
 tokens=("__WORKDIR__","__PI_AGENT__","__MIRROR__","__HARNESS__","__MODEL_PORT__","__MODEL_HOST__","__TMPDIR__","__HOME__")
@@ -711,8 +757,82 @@ PY
 	else
 		install_tests "$task" "$wd"                      # shown-test anti-tamper
 	fi
+	# ---- SCORING JAIL SETUP (shared by BOTH scoring runs below) ----
+	# Everything from here to `gate=1` used to sit further down, wrapped around the
+	# graded re-run only. The binary run above it — the one that produces `score`,
+	# the field fleet_report.decide() adopts on — ran unjailed and unpreloaded, so
+	# the `node:assert` neuter that grade.sb + grade_preload.mjs close for the graded
+	# rate still forged the binary bit (2026-08-21). Both runs now share one setup.
+	local grade_evidence="${wd}.grade-evidence"
+	local grade_tap="$grade_evidence/grade.tap"
+	# Second, independent evidence channel: WHERE each graded top-level test() was
+	# registered. It runs in the node --test RUNNER PARENT (which never loads model
+	# src), so re-registering the admitted case names from src/ is visible even when
+	# the names are exactly right. grade_reporter.check_provenance grades it.
+	local grade_prov="$grade_evidence/grade.prov"
+	local grade_blocked="${wd}.grade-blocked"
+	rm -rf "$grade_evidence" "$grade_blocked"
+	# The one file a scoring run may write, pinned by the admission-hashed manifest.
+	# A shell LOCAL, never exported and never written to disk: knowing the name is
+	# what lets a decoy be planted (see grade_artifact.py).
+	local grade_artifact_name; grade_artifact_name="$(python3 "$FIXTURE_META" grade-artifact "$task" 2>/dev/null)"
+	local grade_artifact_path="/dev/null"
+	[[ -n "$grade_artifact_name" ]] && grade_artifact_path="$wd/$grade_artifact_name"
+	local grade_tmpdir grade_ok=0
+	grade_tmpdir="$(mktemp -d "${TMPDIR:-/tmp}/grade-XXXXXX")" || grade_tmpdir=""
+	if [[ -n "$grade_tmpdir" ]] && mkdir -p "$grade_evidence" && chmod 0700 "$grade_evidence" \
+		&& cp "$HERE/prompt-lab/grade_preload.mjs" "$grade_tmpdir/grade_preload.mjs" 2>/dev/null \
+		&& cp "$HERE/prompt-lab/grade_provenance_reporter.mjs" "$grade_tmpdir/grade_provenance_reporter.mjs" 2>/dev/null \
+		&& cp "$FIXTURES/t2-check.mjs" "$grade_tmpdir/t2-check.mjs" 2>/dev/null \
+		&& PYTHONPATH="$HERE/prompt-lab" python3 -c \
+			'import sys, grade_sandbox; grade_sandbox.render(*sys.argv[1:])' \
+			"$HERE/real-gate-fixtures/grade.sb" "$wd/.grade.sb" "${wd}.row-context.json" \
+			"$grade_evidence" "$grade_tmpdir" "$GATE_MIRROR_DENY" "$REPO_ROOT" \
+		&& PYTHONPATH="$HERE/prompt-lab" python3 -c \
+			'import sys, grade_sandbox; grade_sandbox.render(*sys.argv[1:])' \
+			"$HERE/real-gate-fixtures/binary.sb" "$wd/.binary.sb" "${wd}.row-context.json" \
+			"$grade_evidence" "$grade_tmpdir" "$GATE_MIRROR_DENY" "$REPO_ROOT" \
+			"$grade_artifact_path"
+	then grade_ok=1; fi
+	local scoring_jail=0
+	[[ "$grade_ok" == 1 ]] && command -v sandbox-exec >/dev/null 2>&1 && scoring_jail=1
+	# Fail-closed by the precedent already set for SANDBOX=off (which forces
+	# SANDBOX_AUTHORITATIVE=0 and refuses hidden tasks outright): a scoring run is
+	# never "unjailed but authoritative". Hidden tasks refuse; the rest still run,
+	# and say so in the row.
+	local row_sandbox_auth="$SANDBOX_AUTHORITATIVE" row_sandbox_reason="$SANDBOX_AUTHORITY_REASON"
+	if [[ "$scoring_jail" == 0 ]]; then
+		row_sandbox_auth=0
+		row_sandbox_reason="scoring run could not be jailed (grade/binary profile unavailable)"
+		if is_hidden "$task"; then
+			echo "[real_gate] cannot jail the scoring run for hidden task '$task'; refusing to score it" >&2
+			echo "scoring_jail_unavailable" > "$grade_blocked"
+		fi
+	fi
+
+	# ---- BINARY SCORING RUN ----
+	# `env -i` + an explicit allowlist: NODE_OPTIONS is a live flag-injection channel
+	# into the scoring runner, and the telemetry/credential vars have no business in
+	# a process that executes model src.
+	# Fd 8 is the unlinked read-WRITE authenticated context-telemetry file, open in
+	# run_one's shell across this whole block, and a plain subshell inherits it — so
+	# model src running under the scoring runs could have written into the telemetry
+	# the row builder then verifies. Closed here. Fds 3/4/5 (telemetry key, endpoint
+	# credential, passthrough env) are opened only inside the SESSION subshell and
+	# are already absent; closing them is defence in depth against that changing.
+	# PATH carries git + npm for the fixture graders; TMPDIR and HOME point at the
+	# gate-owned scratch dir, the only place the jail allows writes.
 	local gate=1
-	( cd "$wd" && node --test ) > "$wd/gate.log" 2>&1 || gate=0
+	if [[ "$scoring_jail" == 1 ]]; then
+		( cd "$wd" && exec 8>&- 4>&- 3>&- 5>&-
+		  sandbox-exec -f "$wd/.binary.sb" /usr/bin/env -i \
+			PATH="$SCORING_PATH" HOME="$grade_tmpdir" TMPDIR="$grade_tmpdir" \
+			LANG="${LANG:-en_US.UTF-8}" \
+			"$NODE_BIN" --test --import "$grade_tmpdir/grade_preload.mjs" \
+		) > "$wd/gate.log" 2>&1 || gate=0
+	else
+		( cd "$wd" && exec 8>&- 4>&- 3>&- 5>&-; node --test ) > "$wd/gate.log" 2>&1 || gate=0
+	fi
 	# Graded-by-default (UNMOTHBALL charter, D3): re-run ONLY the hidden grader
 	# suite with a TAP reporter whose destination is OUTSIDE the workdir, so the
 	# graded population is exactly the fail-to-pass assertions (visible tests
@@ -740,44 +860,46 @@ PY
 	# unsandboxed. Residual (documented, deferred): code in the reporter's OWN
 	# process still sits with it; full closure is the out-of-process verifier
 	# split named in SECURITY_BOUNDARY.md.
-	local grade_evidence="${wd}.grade-evidence"
-	local grade_tap="$grade_evidence/grade.tap"
-	local grade_blocked="${wd}.grade-blocked"
-	rm -rf "$grade_evidence" "$grade_blocked"
 	if is_hidden "$task"; then
-		local grade_tmpdir grade_ok=0
-		grade_tmpdir="$(mktemp -d "${TMPDIR:-/tmp}/grade-XXXXXX")" || grade_tmpdir=""
-		if [[ -n "$grade_tmpdir" ]] && mkdir -p "$grade_evidence" && chmod 0700 "$grade_evidence" \
-			&& cp "$HERE/prompt-lab/grade_preload.mjs" "$grade_tmpdir/grade_preload.mjs" 2>/dev/null \
-			&& PYTHONPATH="$HERE/prompt-lab" python3 -c \
-				'import sys, grade_sandbox; grade_sandbox.render(*sys.argv[1:])' \
-				"$HERE/real-gate-fixtures/grade.sb" "$wd/.grade.sb" "${wd}.row-context.json" \
-				"$grade_evidence" "$grade_tmpdir" "${GATE_MIRROR_DENY:-$REPO_ROOT}" "$REPO_ROOT"
-		then grade_ok=1; fi
-		if [[ "$grade_ok" == 1 ]] && command -v sandbox-exec >/dev/null 2>&1; then
+		if [[ "$scoring_jail" == 1 ]]; then
 			# Gate-owned evidence channel: the fd is opened HERE, outside the jail;
 			# the reporter destination /dev/fd/7 is the only way out (fd 8 belongs
 			# to the telemetry HMAC above; node children never inherit fd 7).
 			exec 7>> "$grade_tap"
-			( cd "$wd" && sandbox-exec -f "$wd/.grade.sb" node --test \
+			exec 6>> "$grade_prov"
+			( cd "$wd" && exec 8>&- 4>&- 3>&- 5>&-
+			  sandbox-exec -f "$wd/.grade.sb" /usr/bin/env -i \
+				PATH="$SCORING_PATH" HOME="$grade_tmpdir" TMPDIR="$grade_tmpdir" \
+				LANG="${LANG:-en_US.UTF-8}" \
+				"$NODE_BIN" --test \
 				--import "$grade_tmpdir/grade_preload.mjs" \
 				--test-reporter=tap --test-reporter-destination=/dev/fd/7 \
+				--test-reporter="$grade_tmpdir/grade_provenance_reporter.mjs" \
+				--test-reporter-destination=/dev/fd/6 \
 				"test/$(basename "$(hidden_test_for "$task")")" ) >/dev/null 2>&1 || true
-			exec 7>&-
+			exec 7>&- 6>&-
 			# F3 PROVENANCE SEAL (2026-08-20): bind the exact bytes the jailed
 			# runner produced before any other code runs. The out-of-process row
 			# builder (grade_reporter.extract) re-hashes the evidence and refuses
 			# on drift (seal_mismatch) or a missing seal (seal_missing). The seal
 			# sits in the same hidden evidence dir the jail cannot reach.
-			[[ -s "$grade_tap" ]] && python3 - "$grade_tap" "$grade_evidence/grade.tap.seal" <<'PY'
+			# Seal BOTH evidence channels the moment the jailed runner produced them.
+			# A channel that produced nothing gets no seal, and the row builder
+			# refuses it (seal_missing / provenance_seal_missing) rather than scoring.
+			python3 - "$grade_tap" "$grade_prov" <<'PY'
 import hashlib,sys
-tap,seal=sys.argv[1:]
-open(seal,"w",encoding="utf-8").write(hashlib.sha256(open(tap,"rb").read()).hexdigest())
+for path in sys.argv[1:]:
+    try:
+        with open(path,"rb") as fh: raw=fh.read()
+    except OSError:
+        continue
+    if raw:
+        with open(path+".seal","w",encoding="utf-8") as fh:
+            fh.write(hashlib.sha256(raw).hexdigest())
 PY
 		else
 			echo "grade_sandbox_unavailable" > "$grade_blocked"
 		fi
-		[[ -n "$grade_tmpdir" ]] && rm -rf "$grade_tmpdir"
 	fi
 	[[ "$task" == "t1" ]] && grep -rq "parseCSV" "$wd/src" "$wd/test" && gate=0
 	# t4's real correctness check is now the hidden fail-to-pass grader installed
@@ -788,7 +910,22 @@ PY
 	# own vocabulary regardless of whether the trim option actually works.
 	# t2's own tests pass on an untouched fixture — node --test alone scores a no-op as
 	# success. The F2P grader asserts the behavior the task actually asks for.
-	[[ "$task" == "t2" ]] && ! ( cd "$wd" && node "$FIXTURES/t2-check.mjs" ) >/dev/null 2>&1 && gate=0
+	# t2-check.mjs imports model src and asserts against it, so it is a scoring run
+	# like the two above and gets the same jail + preload. It runs from the gate-owned
+	# scratch copy because binary.sb read-denies the harness repo it normally lives in.
+	if [[ "$task" == "t2" ]]; then
+		if [[ "$scoring_jail" == 1 ]]; then
+			( cd "$wd" && exec 8>&- 4>&- 3>&- 5>&-
+			  sandbox-exec -f "$wd/.binary.sb" /usr/bin/env -i \
+				PATH="$SCORING_PATH" HOME="$grade_tmpdir" TMPDIR="$grade_tmpdir" \
+				LANG="${LANG:-en_US.UTF-8}" \
+				"$NODE_BIN" --import "$grade_tmpdir/grade_preload.mjs" \
+				"$grade_tmpdir/t2-check.mjs" ) >/dev/null 2>&1 || gate=0
+		else
+			( cd "$wd" && exec 8>&- 4>&- 3>&- 5>&-; node "$FIXTURES/t2-check.mjs" ) >/dev/null 2>&1 || gate=0
+		fi
+	fi
+	[[ -n "$grade_tmpdir" ]] && rm -rf "$grade_tmpdir"
 	# c23 trajectory assertion (grader integrity): a passing END STATE reached by a
 	# lucky broken PATH is still a failure (e.g. bigdata answered from a head-peek,
 	# never scanning the file). Opt-in for calibration: TRAJECTORY=on ANDs it in;
@@ -830,7 +967,7 @@ PY
 		LOW_TOK_STREAK=0
 	fi
 
-	python3 - "$RESULTS" "$MODEL" "$pat" "$task" "$rep" "$gate" "$retried" "$RUNID" "$tin" "$tout" "$output_chars" "$split" "$usage_exact" "${FLEET_EXPECTED_MODELS:-}" "$rowctx" "$wd/fingerprint-pre.json" "$wd/fingerprint-post.json" "$GATE_NETWORK" "$MODEL_CONTROL" "$MODEL_PROVIDER_RESOLVED" "$ENDPOINT_IDENTITY_SHA256" "$NETWORK_AUTHORITATIVE" "$NETWORK_AUTHORITY_REASON" "$SANDBOX_AUTHORITATIVE" "$SANDBOX_AUTHORITY_REASON" "$EXEC_POLICY" "$mrow" "$span_receipt_success" "$cfg" "$CONFIG" "$EXPERIMENT_MANIFEST" "$EXPERIMENT_MANIFEST_SHA256" "$EXPERIMENT_BASE_CELL" "$EXPERIMENT_CAND_CELL" "$HARNESS_HASH_BLOCKER" "$context_telemetry" "$wd/.pi/APPEND_SYSTEM.md" "${AGENT_MODELS_SHA256:-}" "$tools" "$wd" "$(is_hidden "$task" && echo 1 || echo 0)" <<'PY'
+	python3 - "$RESULTS" "$MODEL" "$pat" "$task" "$rep" "$gate" "$retried" "$RUNID" "$tin" "$tout" "$output_chars" "$split" "$usage_exact" "${FLEET_EXPECTED_MODELS:-}" "$rowctx" "$wd/fingerprint-pre.json" "$wd/fingerprint-post.json" "$GATE_NETWORK" "$MODEL_CONTROL" "$MODEL_PROVIDER_RESOLVED" "$ENDPOINT_IDENTITY_SHA256" "$NETWORK_AUTHORITATIVE" "$NETWORK_AUTHORITY_REASON" "$row_sandbox_auth" "$row_sandbox_reason" "$EXEC_POLICY" "$mrow" "$span_receipt_success" "$cfg" "$CONFIG" "$EXPERIMENT_MANIFEST" "$EXPERIMENT_MANIFEST_SHA256" "$EXPERIMENT_BASE_CELL" "$EXPERIMENT_CAND_CELL" "$HARNESS_HASH_BLOCKER" "$context_telemetry" "$wd/.pi/APPEND_SYSTEM.md" "${AGENT_MODELS_SHA256:-}" "$tools" "$wd" "$(is_hidden "$task" && echo 1 || echo 0)" <<'PY'
 import hashlib,importlib.util,json,os,sys
 (out,model,pat,task,rep,gate,retried,runid,tin,tout,outchars,split,usage_exact,expected_models,
  ctxpath,prepath,postpath,network_mode,model_control,provider,endpoint_sha,network_auth,network_reason,
@@ -903,8 +1040,17 @@ if experiment_manifest:
 # read instead. grade_artifact.extract refuses on anything that is not exactly the declared
 # file — see its module docstring for why `rm -f` before grading does not close the hole.
 sys.path.insert(0, os.path.dirname(os.path.abspath(config_path)))
+# The grading answer key is derived HERE, in the row builder, and never written to
+# disk. It used to ride in the row-context JSON beside the model's workdir, where
+# gate.sb let the session read it: measured on `parens`, src read the admitted case
+# names, re-registered them as trivial passes and truncated — a sealed, unblocked
+# 3/3 from an honest 0/3. eval_fixture.grading_secrets reads the admission-hashed
+# manifest under __HARNESS__, which is read-denied to the session AND to the graded
+# re-run. See its docstring.
+import eval_fixture as _eval_fixture
+_secrets = _eval_fixture.grading_secrets(task)
 import grade_artifact as _grade_artifact
-subscores, subscores_blocked = _grade_artifact.extract(workdir, ctx.get("grade_artifact"))
+subscores, subscores_blocked = _grade_artifact.extract(workdir, _secrets["grade_artifact"])
 # Graded-by-default fallback (charter D3): when no artifact is pinned, parse the
 # TAP sidecar the gate wrote outside the workdir for the hidden suite. A pinned
 # artifact keeps precedence and is RETAINED for report-graded fixtures like
@@ -912,10 +1058,10 @@ subscores, subscores_blocked = _grade_artifact.extract(workdir, ctx.get("grade_a
 # reporter path cannot express that). Tasks with no hidden suite simply have no
 # TAP file -> no subscores, and NO refusal is recorded (a fixture without a
 # grader is not a refusal).
-if subscores is None and not ctx.get("grade_artifact"):
+if subscores is None and not _secrets["grade_artifact"]:
     import grade_reporter as _grade_reporter
     _tap_path = workdir.rstrip("/") + ".grade-evidence/grade.tap"
-    _pin = ctx.get("expected_cases")
+    _pin = _secrets["expected_cases"]
     if task_is_hidden == "1" and not _pin:
         # Without the admitted case pin the reporter path is forgeable outright
         # (invent one passing test, exit) — an unpinned hidden grader is refused,
@@ -928,9 +1074,23 @@ if subscores is None and not ctx.get("grade_artifact"):
         # refuses seal_mismatch / seal_missing before parsing anything.
         subscores, subscores_blocked = _grade_reporter.extract(
             _tap_path, _pin, _tap_path + ".seal")
-        if subscores is not None and ctx.get("requirement_scoring"):
+        # SECOND CHANNEL: where each graded top-level test() was registered. The
+        # admitted case pin sees only NAMES, so a leaked pin plus a re-registration
+        # from model src reads as a perfect score. The provenance reporter runs in
+        # the node --test runner PARENT (which never loads src) and records the call
+        # site; anything not registered by the installed grader is refused. See
+        # grade_reporter.check_provenance for what this does and does not close.
+        if subscores is not None:
+            _grader = os.path.join(workdir, "test", os.path.basename(_secrets["hidden_test"] or ""))
+            _foreign = _grade_reporter.check_provenance(
+                workdir.rstrip("/") + ".grade-evidence/grade.prov",
+                workdir.rstrip("/") + ".grade-evidence/grade.prov.seal",
+                _grader, len(subscores["detail"]))
+            if _foreign:
+                subscores, subscores_blocked = None, _foreign
+        if subscores is not None and _secrets["requirement_scoring"]:
             subscores, subscores_blocked = _grade_reporter.apply_requirement_weights(
-                subscores, ctx["requirement_scoring"])
+                subscores, _secrets["requirement_scoring"])
     elif task_is_hidden == "1":
         # A hidden-graded task that produced no TAP is a recorded refusal, never a
         # silent no-grade. Non-hidden tasks legitimately have no TAP and record
@@ -1117,12 +1277,22 @@ fi
 # Trial validity is part of row authority, not an optional reporting sidecar.
 # Recompute the complete sidecar after every invocation (including append mode)
 # so a crash cannot leave a partially evaluated population looking usable.
-python3 "$HERE/prompt-lab/trial_validity.py" "$RESULTS" \
+# Not optional and not advisory: every reporter refuses a population this has not
+# evaluated. Its one hard error is a duplicate row key, which aborts the build and
+# leaves NO sidecar — and an unchecked exit code turned that into a round that reads
+# as "unevaluated" with no visible cause (2026-08-21).
+if ! python3 "$HERE/prompt-lab/trial_validity.py" "$RESULTS" \
 	--runs-dir "$RUNS" --timeout "$PI_TIMEOUT" --manifests
+then
+	echo "[real_gate] trial-validity sidecar FAILED for $RESULTS — the rows exist but no report will read them." >&2
+	echo "[real_gate] Re-run: python3 $HERE/prompt-lab/trial_validity.py $RESULTS --runs-dir $RUNS --timeout $PI_TIMEOUT" >&2
+	exit 1
+fi
 
 echo; echo "rows -> $RESULTS"
 if [[ "$CALIB" == 1 ]]; then
-	echo "calibrate: ./prompt-lab/calibrate.py $GEN   (keep tasks in the 20-85% band for this model)"
+	echo "admit: ./prompt-lab/admission_rule.py $GEN   (the ONE preregistered fixture-admission rule)"
+	echo "  (calibrate.py still prints per-task pass rates, but its 20-85% band decides nothing)"
 else
 	echo "analyze: ./prompt-lab/fleet_report.py $GEN --baseline base --candidate cand"
 fi

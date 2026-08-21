@@ -7,6 +7,7 @@ import { emitHarnessSignal } from "../lib/harness-signals.ts";
 import { newCapsuleId, runCapsuleDirectory } from "../lib/run-capsule-store.ts";
 import {
 	sanitizeWorkingMemoryNote, WORKING_MEMORY_MAX_ACTIVE, WORKING_MEMORY_MAX_BYTES,
+	WORKING_MEMORY_MAX_EVIDENCE,
 	WORKING_MEMORY_MAX_NOTE_BYTES, WORKING_MEMORY_MAX_RECORDS, WorkingMemoryError,
 	WorkingMemoryStore, workingMemoryPaths, type WorkingMemoryBinding,
 } from "../lib/working-memory.ts";
@@ -47,6 +48,58 @@ test("note sanitation is byte-bounded and removes controls, URLs, private paths,
 	assert.match(safe, /\[path omitted\]/);
 	assert.match(safe, /\[url omitted\]/);
 	assert.match(safe, /token=\[redacted\]/);
+});
+
+test("private-path redaction survives adjacent punctuation", () => {
+	// The old anchor was `(?:^|\s)`, so anything but whitespace before the path
+	// defeated it: 7 of these 8 shapes leaked the absolute path verbatim into a
+	// persisted note (measured 2026-08-21). Only the first one ever redacted.
+	const leaky = [
+		"found at /Users/example/secrets/key.txt",
+		"found at(/Users/example/secrets/key.txt)",
+		"see:/Users/example/secrets/key.txt",
+		"path=/Users/example/secrets/key.txt",
+		"[/Users/example/secrets/key.txt]",
+		"\"/Users/example/secrets/key.txt\"",
+		"cwd:/home/victim/app",
+		"a,/tmp/scratch/y",
+		"stack: at fn (/private/var/folders/x/y)",
+		"drive C:\\Users\\victim\\secrets",
+	];
+	for (const raw of leaky) {
+		const safe = sanitizeWorkingMemoryNote(raw);
+		assert.match(safe, /\[path omitted\]/, raw);
+		for (const forbidden of ["/Users/", "/home/", "/tmp/", "/private/", "\\Users\\"]) {
+			assert.equal(safe.includes(forbidden), false, `${raw} -> ${safe}`);
+		}
+	}
+	// The lookbehind must not fire mid-path: repo-relative mentions stay readable,
+	// or every note about the codebase becomes "[path omitted]".
+	for (const keep of ["harness/var/report.ts", "see optimizer/private-notes.md", "src/tmp/handler.ts"]) {
+		assert.equal(sanitizeWorkingMemoryNote(keep), keep, keep);
+	}
+});
+
+test("the record cap is an upper bound; the byte cap is what actually binds", () => {
+	// WORKING_MEMORY_MAX_RECORDS reads like available capacity. It is not: at full
+	// note size the 8 KiB file cap refuses long before 32 records (measured
+	// 2026-08-21). This pins the real relationship so a future note-size or
+	// evidence-cap change cannot quietly shrink it further without saying so.
+	const fullRecord = (index: number, evidence: number) => ({
+		v: 1 as const, id: "0189a1b2-c3d4-4e5f-8a9b-0c1d2e3f4a5b", kind: "observation" as const,
+		note: "x".repeat(WORKING_MEMORY_MAX_NOTE_BYTES), status: "active" as const,
+		evidenceHashes: Array.from({ length: evidence }, () => "b".repeat(64)),
+		planItemHash: "a".repeat(64), createdSequence: index, updatedSequence: index,
+	});
+	const fits = (count: number, evidence: number) => Buffer.byteLength(`${JSON.stringify({
+		v: 1, capsuleId: "0189a1b2-c3d4-4e5f-8a9b-0c1d2e3f4a5b", runIdHash: "c".repeat(64),
+		sequence: count, records: Array.from({ length: count }, (_, i) => fullRecord(i + 1, evidence)),
+	})}\n`, "utf8") <= WORKING_MEMORY_MAX_BYTES;
+	assert.equal(fits(WORKING_MEMORY_MAX_RECORDS, 0), false, "32 full-note records do NOT fit the byte cap");
+	assert.equal(fits(16, 0), true);
+	assert.equal(fits(17, 0), false);
+	assert.equal(fits(10, WORKING_MEMORY_MAX_EVIDENCE), true);
+	assert.equal(fits(11, WORKING_MEMORY_MAX_EVIDENCE), false);
 });
 
 test("private JSON is authoritative, atomic, permissioned, and outside the worktree", async () => {

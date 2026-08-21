@@ -7,6 +7,15 @@ import { runCapsuleDirectory } from "./run-capsule-store.ts";
 
 export const WORKING_MEMORY_MAX_NOTE_BYTES = 240;
 export const WORKING_MEMORY_MAX_ACTIVE = 12;
+// UPPER BOUND, not a promise. WORKING_MEMORY_MAX_BYTES is the BINDING constraint and
+// it bites first at any substantial note length: measured 2026-08-21, 32 records with
+// full-size notes and full evidence serialize to 24,210 bytes, so at the 8 KiB file
+// cap only ~10 such records fit (~16 with no evidence hashes). Short notes do reach
+// higher counts. Both refusals are the same `capacity` error, so nothing is silently
+// lost -- but read this constant as "never more than 32", not as "32 are available".
+// Raising the file cap to make 32 reachable in the worst case would need 32 KiB, a
+// 4x increase in a persisted private artifact's budget; that is Albert's call, not a
+// side effect of a docs fix.
 export const WORKING_MEMORY_MAX_RECORDS = 32;
 export const WORKING_MEMORY_MAX_EVIDENCE = 4;
 export const WORKING_MEMORY_MAX_BYTES = 8 * 1024;
@@ -77,8 +86,14 @@ export function sanitizeWorkingMemoryNote(value: string): string {
 		.replace(/\x1B(?:\[[0-?]*[ -/]*[@-~]|\][^\x07]*(?:\x07|\x1B\\))/gu, "")
 		.replace(/[\u0000-\u001f\u007f-\u009f\u2028\u2029]/gu, " ")
 		.replace(/\b(?:https?|wss?):\/\/[^\s]+/giu, "[url omitted]")
-		.replace(/(?:^|\s)(?:\/(?:Users|home|private|var|tmp)\/[^\s]+)/gu, " [path omitted]")
-		.replace(/(?:^|\s)[A-Za-z]:\\[^\s]+/gu, " [path omitted]")
+		// Anchored on a NON-PATH character rather than on whitespace. The old
+		// `(?:^|\s)` anchor meant any adjacent punctuation defeated the redaction
+		// outright: `path=/Users/...`, `(/Users/...)`, `"/Users/..."`, `see:/home/...`
+		// and `a,/tmp/...` all survived verbatim (measured 2026-08-21 -- 7 of 8 shapes
+		// leaked). The lookbehind still refuses to fire mid-path, so a repo-relative
+		// mention like `harness/var/x` is not mangled.
+		.replace(/(?<![A-Za-z0-9_.-])\/(?:Users|home|private|var|tmp)\/[^\s]+/gu, "[path omitted]")
+		.replace(/(?<![A-Za-z0-9_.-])[A-Za-z]:\\[^\s]+/gu, "[path omitted]")
 		.replace(/\b(?:sk|rk|pk|ghp|github_pat|xox[baprs])[-_][A-Za-z0-9_-]{6,}\b/giu, "[redacted]")
 		.replace(/\b(api[_-]?key|access[_-]?token|token|password|secret|credential)\s*[:=]\s*\S+/giu, "$1=[redacted]")
 		.replace(/\s+/gu, " ")

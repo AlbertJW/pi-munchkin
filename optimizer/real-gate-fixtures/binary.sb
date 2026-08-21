@@ -1,0 +1,44 @@
+;; Seatbelt jail for the BINARY scoring run of real_gate.sh run_one:
+;;   ( cd "$wd" && node --test ) > "$wd/gate.log"
+;; and t2's bespoke `node t2-check.mjs`. This run produces `score` — the field
+;; fleet_report.decide() adopts on — by EXECUTING model-authored src, exactly like
+;; the graded re-run next door. Until 2026-08-21 it was the only scoring path left
+;; unjailed and unpreloaded, so the four-line `node:assert` neuter that grade.sb +
+;; grade_preload.mjs close for the graded rate still forged the binary bit:
+;; every layer added to protect the graded score was defeated by attacking the
+;; run beside it.
+;;
+;; Same shape as grade.sb, with one deliberate difference:
+;;  - WRITES: the graded re-run scores the state the model left and needs no
+;;    writes at all. The binary run does: `audit-sweep`'s hidden grader emits its
+;;    manifest-pinned artifact (`.audit-grade.json`) here, and grade_artifact
+;;    reads exactly that name. Audited across all 41 fixtures (graders, visible
+;;    suites, pi-test and t3-files): that is the ONLY legitimate workdir write,
+;;    there is no network use, and nothing reads outside its own workdir.
+;;    `__GRADE_ARTIFACT__` renders to /dev/null for the other 40.
+;;  - gate.log is NOT write-allowed and does not need to be: the shell opens it
+;;    as a redirect before sandbox-exec runs, and the jail restricts new opens,
+;;    not inherited descriptors.
+;;
+;; Reads are denied for the admitted case pin, the private grade-evidence dir, the
+;; harness repo (other fixtures' hidden graders, Git objects, approved manifests)
+;; and the public mirror — the binary run could previously read all of them.
+;;
+;; Ordering is load-bearing: specific denies must stand BEFORE `(allow default)`,
+;; and every path must be the REAL path (macOS resolves /tmp -> /private/tmp
+;; before matching). real_gate.sh renders the absolute paths per run via
+;; prompt-lab/grade_sandbox.py, which fails closed on an unresolved placeholder.
+(version 1)
+(deny file-read* (literal "__PIN__"))
+(deny file-read* (subpath "__EVIDENCE__"))
+(deny file-read* (subpath "__HARNESS__"))
+(deny file-read* (subpath "__MIRROR__"))
+(allow default)
+(deny network*)
+(deny file-write*)
+(allow file-write*
+  (subpath "/dev/fd")
+  (subpath "__GRADE_TMP__")
+  (literal "__GRADE_ARTIFACT__")
+  (literal "/dev/null")
+  (literal "/dev/dtracehelper"))

@@ -16,6 +16,8 @@ from eval_fixture import prompt_record
 from fixture_admission import install_overlays, load_manifest, safe_root, stage
 
 MAX_BYTES = 48 * 1024
+PRELOAD = Path(__file__).resolve().parent / "grade_preload.mjs"
+NODE = shutil.which("node") or "node"
 
 
 class ControlError(RuntimeError): pass
@@ -86,13 +88,61 @@ def apply_once(work, diff):
         raise ControlError("patch application failed after dry-run")
 
 
-def grade(manifest, work):
+def _scoring_jail(work, scratch):
+    """Render binary.sb for a one-shot grade, or None when it cannot be jailed.
+
+    The scratch dir is a SIBLING of `work`, never inside it: binary.sb write-allows
+    the scratch dir, so putting it under the workdir would hand the write fence back.
+    """
+    import grade_sandbox
+    if os.uname().sysname != "Darwin" or not shutil.which("sandbox-exec"):
+        return None
+    scratch.mkdir(parents=True, exist_ok=True)
+    shutil.copy(PRELOAD, scratch / "grade_preload.mjs")
+    profile = scratch / "binary.sb"
+    root = Path(__file__).resolve().parents[1]
+    try:
+        grade_sandbox.render(str(root / "real-gate-fixtures" / "binary.sb"), str(profile),
+                             str(scratch / "no-pin"), str(scratch / "no-evidence"),
+                             str(scratch), str(root), str(root), None)
+    except SystemExit:
+        return None
+    return profile
+
+
+def _score_run(command, work, profile, scratch):
+    """Run one grading command; jailed + assert-preloaded whenever it is `node`.
+
+    The one-shot arm applies a model-authored diff and then runs graders over it,
+    so it executes model code exactly like real_gate's scoring runs and inherited
+    the same forgery: a four-line `node:assert` neuter in the patched src turned a
+    failing grade into a passing one. Non-node graders (`npm test`) still get the
+    jail, just not the preload -- there is no --import to give them.
+    """
+    if profile is None:
+        return subprocess.run(command, cwd=work, capture_output=True, text=True, timeout=60)
+    if command and command[0] == "node":
+        command = [NODE, "--import", str(scratch / "grade_preload.mjs")] + list(command[1:])
+    return subprocess.run(
+        ["sandbox-exec", "-f", str(profile), "/usr/bin/env", "-i",
+         # /usr/bin has git; the node bin dir has npm, which some fixtures' grader
+         # commands invoke. See real_gate.sh's SCORING_PATH.
+         f"PATH={Path(NODE).parent}:/usr/bin:/bin",
+         f"HOME={scratch}", f"TMPDIR={scratch}", "LANG=en_US.UTF-8",
+         *command],
+        cwd=work, capture_output=True, text=True, timeout=60)
+
+
+def grade(manifest, work, scratch):
     # Same external contract as admission/real_gate: pristine P2P plus withheld F2P.
     install_overlays(work, manifest["tests"]["pass_to_pass"].get("overlays", []))
     install_overlays(work, manifest["tests"]["fail_to_pass"].get("overlays", []))
-    p2p = subprocess.run(["node", "--test"], cwd=work, capture_output=True, text=True, timeout=60)
-    f2p = subprocess.run(manifest["tests"]["fail_to_pass"]["command"], cwd=work, capture_output=True, text=True, timeout=60)
-    return p2p.returncode == 0 and f2p.returncode == 0, (p2p.stdout + p2p.stderr + f2p.stdout + f2p.stderr)[-2000:]
+    profile = _scoring_jail(work, scratch)
+    p2p = _score_run(["node", "--test"], work, profile, scratch)
+    f2p = _score_run(manifest["tests"]["fail_to_pass"]["command"], work, profile, scratch)
+    return (p2p.returncode == 0 and f2p.returncode == 0,
+            (p2p.stdout + p2p.stderr + f2p.stdout + f2p.stderr)[-2000:],
+            profile is not None)
 
 
 def run(task, variant, endpoint, model, output=None, mock_response=None):
@@ -104,15 +154,17 @@ def run(task, variant, endpoint, model, output=None, mock_response=None):
         user = (prompt["text"] + "\n\nReturn only a unified diff. You may modify source files only.\n\n" + context)
         response = json.loads(Path(mock_response).read_text()) if mock_response else request_once(endpoint, model, user)
         content = response["choices"][0]["message"]["content"]
-        error = None; score = 0; grader_tail = ""
+        error = None; score = 0; grader_tail = ""; jailed = False
         try:
-            apply_once(work, extract_diff(content)); score, grader_tail = grade(manifest, work)
+            apply_once(work, extract_diff(content))
+            score, grader_tail, jailed = grade(manifest, work, Path(td) / "scoring-scratch")
         except ControlError as exc:
             error = str(exc)
         usage = response.get("usage") or {}
         exact = all(isinstance(usage.get(k), int) and usage[k] > 0 for k in ("prompt_tokens", "completion_tokens"))
         result = {"task": task, "variant": variant, "prompt_sha256": prompt["sha256"], "requests": 1,
                   "context_bytes": context_bytes, "score": int(score), "error": error,
+                  "scoring_jailed": bool(jailed),
                   "grader_tail": grader_tail, "usage": {"source": "provider" if exact else "char_proxy",
                   "exact": exact, "input_tokens": usage.get("prompt_tokens") if exact else None,
                   "output_tokens": usage.get("completion_tokens") if exact else None,

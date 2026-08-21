@@ -7,8 +7,10 @@ calls and token counts -- continuous outcomes with far more power per session.
 Complete separation at n=6/6 reaches p=0.0022, so a real efficiency effect is
 detectable where a pass-rate effect is not.
 
-Usage:  effort_report.py <gen> [--only-passing] [--json]
+Usage:  effort_report.py <gen> [--model <name>] [--only-passing] [--graded] [--json]
         effort_report.py --selftest
+
+A population that mixes serving identities is refused: pass --model to pick one.
 """
 from __future__ import annotations
 
@@ -41,6 +43,12 @@ def graded_rate(row):
     if isinstance(fixed, bool) or isinstance(total, bool):
         return None
     if not (isinstance(fixed, int) and isinstance(total, int)) or total <= 0:
+        return None
+    # Bounds, matching admission_rule.graded_rate and trial_validity.check_near_miss.
+    # This is the one place the guard was missing, and it is the CAPABILITY outcome:
+    # a grader emitting fixed>total or a negative fixed produced a rate above 1.0 or
+    # below 0, which then flowed into the Mann-Whitney comparison as a real value.
+    if not 0 <= fixed <= total:
         return None
     return fixed / total
 
@@ -127,11 +135,15 @@ def mannwhitney_u(a, b):
     return obs, 2 * (1 - 0.5 * (1 + erf(z / sqrt(2))))
 
 
-def rows(gen):
+def rows(gen, model=None):
     path = RESULTS / f"{gen}.jsonl"
     if not path.is_file():
         raise SystemExit(f"no such gen: {path}")
     data = [json.loads(line) for line in path.read_text().splitlines() if line.strip()]
+    if model:
+        data = [row for row in data if row.get("model") == model]
+        if not data:
+            raise SystemExit(f"no rows for --model {model} in {path}")
     # Per-trial validity sidecar (trial_validity.py): voided rows (infra_valid /
     # reward_hacking FAIL) are excluded with a loud count. Missing verdicts fail
     # closed: absence of trial-validity evidence is not a valid population.
@@ -158,7 +170,7 @@ def rows(gen):
     return kept
 
 
-def analyse(gen, only_passing=False, graded=False):
+def analyse(gen, only_passing=False, graded=False, model=None):
     if graded and only_passing:
         # Contradictory by construction: --graded exists to read partial credit from
         # sessions the binary bit scores 0, and --only-passing deletes exactly those.
@@ -166,7 +178,7 @@ def analyse(gen, only_passing=False, graded=False):
         # the graded outcome was built for.
         raise SystemExit("--graded and --only-passing are contradictory: --only-passing drops "
                          "the failing sessions partial credit exists to measure. Use one.")
-    data = rows(gen)
+    data = rows(gen, model)
     if only_passing:
         data = [r for r in data if r.get("score") == 1]
     base = [r for r in data if r.get("pattern") == "base"]
@@ -341,6 +353,8 @@ if __name__ == "__main__":
     ap.add_argument("--graded", action="store_true",
                     help="lead with the graded outcome (subscores.fixed/total) where the "
                          "fixture's grader emits one; reports coverage explicitly")
+    ap.add_argument("--model", help="restrict to one serving identity; required when a "
+                                    "results file holds more than one (they are not comparable)")
     ap.add_argument("--selftest", action="store_true")
     args = ap.parse_args()
     if args.selftest:
@@ -350,5 +364,5 @@ if __name__ == "__main__":
     elif not args.gen:
         ap.error("gen is required")
     else:
-        res = analyse(args.gen, args.only_passing, graded=args.graded)
+        res = analyse(args.gen, args.only_passing, graded=args.graded, model=args.model)
         print(json.dumps(res, sort_keys=True)) if args.json else render(res)

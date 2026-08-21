@@ -38,10 +38,36 @@ RESULTS = os.path.join(LAB, "results")
 TELEMETRY = os.environ.get("TELEMETRY_FILE", os.path.expanduser("~/.pi/agent/telemetry/events.jsonl"))
 
 
-def load_rows(path):
+def load_ledger(path):
+    """The munchkin candidate ledger for a gen: bookkeeping, not measurement."""
     if not os.path.exists(path):
         return []
     return [json.loads(l) for l in open(path) if l.strip()]
+
+
+def load_rows(path):
+    """Evaluation rows for a gen, screened by the per-trial validity sidecar.
+
+    fleet_report and effort_report both refuse a population the sidecar has not
+    evaluated; this stitcher read the same files RAW, so a row voided for
+    reward_hacking or an unauthoritative infra state still reached a cross-model
+    verdict here (2026-08-21). Fail-closed, same contract as its siblings.
+    """
+    if not os.path.exists(path):
+        return []
+    rows = [json.loads(l) for l in open(path) if l.strip()]
+    import trial_validity
+    verdicts = trial_validity.load_sidecar(path)
+    kept, voided, unevaluated = trial_validity.partition(rows, verdicts)
+    if verdicts is None or unevaluated:
+        raise SystemExit(
+            f"trial validity incomplete for {path}: {unevaluated or len(rows)} unevaluated row(s); "
+            f"run prompt-lab/trial_validity.py {path}")
+    if voided:
+        reasons = ", ".join(sorted({r for _, rs in voided for r in rs}))
+        print(f"[fleet_verdict] {os.path.basename(path)}: {len(voided)} row(s) voided ({reasons})",
+              file=sys.stderr)
+    return kept
 
 
 def adoption_rows(rows):
@@ -81,7 +107,7 @@ def row_integrity(rows):
 def ledger_candidates(gen, results_dir=RESULTS):
     """[(cand_idx, name)] from the gen's munchkin ledger."""
     out = []
-    for r in load_rows(os.path.join(results_dir, f"munchkin-{gen}.jsonl")):
+    for r in load_ledger(os.path.join(results_dir, f"munchkin-{gen}.jsonl")):
         if "cand" in r and r.get("operator", "").startswith("static:"):
             out.append((r["cand"], r["operator"].split(":", 1)[1]))
     return out
@@ -287,9 +313,24 @@ def render(v):
 def selftest():
     import tempfile
     with tempfile.TemporaryDirectory() as td:
-        def w(name, rows):
-            with open(os.path.join(td, name), "w") as f:
+        import trial_validity
+        def w(name, rows, sidecar=True):
+            path = os.path.join(td, name)
+            with open(path, "w") as f:
                 f.write("".join(json.dumps(r) + "\n" for r in rows))
+            # load_rows is fail-closed on an unscreened population, so every results
+            # fixture needs its validity sidecar. These synthetic rows carry no infra
+            # fields, so the verdicts are written directly rather than computed.
+            if sidecar and rows and "score" in rows[0]:
+                # Keyed by row_key: one fixture below duplicates a row on purpose (the
+                # completeness check must catch it), and a sidecar holds one verdict
+                # per trial, not per line.
+                records = {trial_validity.row_key(r):
+                           {"row_key": trial_validity.row_key(r),
+                            "row_sha256": trial_validity.row_digest(r),
+                            "workdir": None, "criteria": {}, "void": False, "void_reasons": []}
+                           for r in rows}
+                trial_validity.write_sidecar_atomic(path, list(records.values()))
         # gen gA: model M1, candidate order [x, y]; gen gB: model M2, order [y]
         w("munchkin-gA.jsonl", [{"round": 0, "cand": 0, "operator": "static:x", "pass": "1/4"},
                                 {"round": 0, "cand": 1, "operator": "static:y", "pass": "3/4"}])
@@ -313,6 +354,28 @@ def selftest():
         assert v["y"]["mech"]["M1"]["retry_fired"] == 1 and v["y"]["mech"]["M1"]["retry_converted"] == 1
         # candidate identity crossed gens correctly despite different index orderings
         assert "M2" not in v["x"]["stats"], "x never ran on M2"
+
+        # FAIL-CLOSED: a results file the validity sidecar never evaluated is not a
+        # population. fleet_report and effort_report both refuse it; this stitcher
+        # read the same files raw until 2026-08-21.
+        w("gZ-r0-base.jsonl", reps("M9", [1, 1, 1, 1]), sidecar=False)
+        try:
+            load_rows(os.path.join(td, "gZ-r0-base.jsonl"))
+        except SystemExit as exc:
+            assert "trial validity incomplete" in str(exc), exc
+        else:
+            raise AssertionError("fleet_verdict accepted an unscreened population")
+        # ...and a sidecar bound to DIFFERENT row bytes is not evidence about these rows.
+        edited = reps("M9", [1, 1, 1, 1])
+        w("gY-r0-base.jsonl", edited)
+        with open(os.path.join(td, "gY-r0-base.jsonl"), "w") as f:
+            f.write("".join(json.dumps(dict(r, score=0)) + "\n" for r in edited))
+        try:
+            load_rows(os.path.join(td, "gY-r0-base.jsonl"))
+        except SystemExit as exc:
+            assert "trial validity incomplete" in str(exc), exc
+        else:
+            raise AssertionError("a verdict bound to other row bytes was accepted")
 
         # INCOMPLETE: ledger declares an arm with no rows -> no verdict, ever
         w("munchkin-gC.jsonl", [{"round": 0, "cand": 0, "operator": "static:z", "pass": "0/0"}])

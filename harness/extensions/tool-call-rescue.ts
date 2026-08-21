@@ -1,6 +1,8 @@
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { record } from "../lib/telemetry.ts";
-import { buildControlProposal, controlEnforces, emitControlProposal } from "../lib/control-proposal.ts";
+import {
+	buildControlProposal, controlEnforces, emitControlProposal, onControlDecision,
+} from "../lib/control-proposal.ts";
 
 // tool-call-rescue (LIVE default-on since 2026-08-07; was dark candidate
 // c49). Rescues sessions that die on the
@@ -62,8 +64,26 @@ export function rescueMessage(det: PseudoCallDetection): string {
 export default function (pi: ExtensionAPI): void {
 	if (!ENABLED) return;
 	let rescues = 0;
+	// Set when a proposal is handed to the arbiter and cleared by its decision.
+	// MAX_RESCUES bounds messages the model RECEIVES; charging the budget at
+	// proposal time spent it on messages the arbiter dropped, and `tool_rescue` is
+	// the second-lowest priority there, so it loses most contested boundaries under
+	// the shipped CONTROL_ARBITER=enforce (2026-08-21). Two dropped proposals used
+	// to exhaust the session budget without the model ever seeing a rescue.
+	let awaitingDecision: { signature: string; turnIndex: number } | null = null;
 
-	pi.on("session_start", async () => { rescues = 0; });
+	pi.on("session_start", async () => { rescues = 0; awaitingDecision = null; });
+
+	onControlDecision(pi.events, (decision) => {
+		const pending = awaitingDecision;
+		awaitingDecision = null;
+		if (!pending) return;
+		const delivered = decision.winner?.source === "tool-call-rescue";
+		if (delivered) rescues += 1;
+		record("tool-call-rescue", "steered", {
+			signature: pending.signature, turnIndex: pending.turnIndex, delivered,
+		});
+	});
 
 	pi.on("turn_end", async (event) => {
 		const msg = event.message;
@@ -79,8 +99,6 @@ export default function (pi: ExtensionAPI): void {
 		if (!det) return;
 		record("tool-call-rescue", "detected", { signature: det.signature, turnIndex: event.turnIndex });
 		if (rescues >= MAX_RESCUES) return;
-		rescues += 1;
-		record("tool-call-rescue", "steered", { signature: det.signature, turnIndex: event.turnIndex });
 		const message = rescueMessage(det);
 		const legacyActed = !controlEnforces(pi.events);
 		emitControlProposal(pi.events, buildControlProposal({
@@ -92,7 +110,16 @@ export default function (pi: ExtensionAPI): void {
 			messageFactory: "tool-rescue",
 			legacyActed,
 		}), { message });
-		if (!legacyActed) return;
+		if (!legacyActed) {
+			// The arbiter owns delivery; its decision charges the budget and records
+			// `steered`. If no decision ever arrives the budget is simply not spent.
+			awaitingDecision = { signature: det.signature, turnIndex: event.turnIndex };
+			return;
+		}
+		rescues += 1;
+		record("tool-call-rescue", "steered", {
+			signature: det.signature, turnIndex: event.turnIndex, delivered: true,
+		});
 		try {
 			pi.sendUserMessage(message, { deliverAs: "steer" });
 		} catch { /* stale pi post-replacement — nothing to rescue anymore */ }

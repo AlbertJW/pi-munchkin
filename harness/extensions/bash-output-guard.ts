@@ -10,6 +10,15 @@
 // ~63K characters. The session then sat idle — no further tool calls, no
 // progress — for the rest of its budget. context-inlet-guard already bounds
 // oversized READS the same way; bash had no equivalent.
+// LOAD ORDER IS LOAD-BEARING: this extension is listed in package.json's
+// `pi.extensions` BEFORE loop-breaker. `tool_result` handlers are chained -- pi
+// builds one event object and hands the mutated version to each subsequent handler
+// (runner.js:646-697) -- so whoever runs first decides what everyone after it sees.
+// Registered after loop-breaker (as it was until 2026-08-21), the withheld result
+// reached the model as `isError: true` while loop-breaker had already classified the
+// ORIGINAL oversized, non-error blob: the failure never entered a failure episode and
+// the runaway command this guard exists to interrupt was invisible to repeat
+// detection. Keep it ahead of loop-breaker.
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { looksLikeCwdEscape, outputGuardMessage, totalContentChars } from "../lib/bash-output.ts";
 import { record } from "../lib/telemetry.ts";

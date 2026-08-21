@@ -261,10 +261,14 @@ oversized files.
   `PI_SUBAGENT_ENV_ALLOW`. Fault injection (`CHAOS`), process-local telemetry fds, and per-process
   run identity deliberately do not cross. Values are never logged.
 - `npm run secret-scan:diff` inspects staged, unstaged, and untracked added lines, plus the added
-  lines of every committed-but-unpushed commit (`origin/main...HEAD`), so a commit→scan→push
-  sequence cannot report clean on committed content. Findings contain only file, line, and
-  pattern ID; matched text is never printed. Untracked symlinks and other non-regular entries are
-  refused without following them.
+  lines of every committed-but-unpublished commit, so a commit→scan→push sequence cannot report
+  clean on committed content. It gates a RANGE, not the tree, and is only as good as its
+  baseline: `SECRET_SCAN_BASE`, else the PR base, else `GITHUB_EVENT_BEFORE` (a push to `main`
+  publishes content that `origin/main...HEAD` cannot see), else `origin/main`. A checkout where
+  none of those resolve FAILS the scan — it never reports "clean" on a range it did not read, and
+  an empty range is reported as `nothing pending`, not as clean. Findings contain only file,
+  line, and pattern ID; matched text is never printed. Untracked symlinks and other non-regular
+  entries are refused without following them.
 - Verification-gate path scoping resolves symlinks (including the nearest existing parent for a
   new file) before deciding whether a built-in edit belongs to the current project. Resolution
   uncertainty keeps the gate armed.
