@@ -99,8 +99,14 @@ stacked work. Nothing in this series has been merged, mirrored live, adopted, or
 > either checkout, so the transcript detector could not be re-run against it — stated, not
 > assumed). No gate round was run; the evidence base is still empty by design.
 >
-> **PENDING Albert:** the model-visible surface moved again, so LIVE MIRROR + the
-> `docs/SURFACE_BOUNDARIES.md` row + a live-load smoke are still owed and need the box free.
+> **MIRRORED LIVE 2026-08-21** (human decision: "apply, but skip the smoke"). `mirror:apply`
+> wrote 117 artifacts with zero drift; `mirror:check` 117/117, no unmanaged extensions or
+> orphans; loaded hash `e7190767…` supersedes `9b8eaaad…`. **No live-load smoke was run** — the
+> first rollout row without one, so the loaded hash is computed from the mirrored tree and not
+> yet confirmed against a real `pi` emitting it. Run
+> `pi -p --model local-llamacpp/qwen36-35b-iq3s < /dev/null` before binding a gate round to it.
+>
+> **PENDING Albert:**
 > Two fixture decisions remain human calls: `qs-error-swallow` and `path-near-miss` are the
 > only approved hidden-graded fixtures with neither `expected_cases` nor a `grade_artifact`,
 > so the row builder records `unpinned_grader` and they contribute a binary bit only. And
