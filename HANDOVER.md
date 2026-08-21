@@ -109,13 +109,41 @@ stacked work. Nothing in this series has been merged, mirrored live, adopted, or
 > happens under a correctly ordered manifest — evidence the `bash-output-guard` move is sound.
 > **Future gate rounds bind `e7190767…`.**
 >
-> **PENDING Albert:**
-> Two fixture decisions remain human calls: `qs-error-swallow` and `path-near-miss` are the
-> only approved hidden-graded fixtures with neither `expected_cases` nor a `grade_artifact`,
-> so the row builder records `unpinned_grader` and they contribute a binary bit only. And
-> `WORKING_MEMORY_MAX_RECORDS = 32` is unreachable at full note size (the 8 KiB file cap
-> refuses at ~10-16); raising the file cap to 32 KiB would make it true, which is a budget
-> decision, not a docs fix.
+> **OPEN ITEMS CLOSED OUT 2026-08-21.**
+>
+> - **The two unpinned fixtures were a CODE DEFECT, not a fixture decision** (`63bb765`).
+>   `build_fixture_catalog.gold_case_names` built the gold state by re-running the in-code
+>   `mutate()` generator, while `fixture_admission.run_state` applies the committed
+>   `patches.gold` artifact — two sources of truth that had drifted, with every exception
+>   swallowed into `None`. For `path-near-miss` the generator no longer creates
+>   `src/index.js` at all (FileNotFoundError); for `qs-error-swallow` it yields a gold that
+>   fails its own fail-to-pass suite 0/2. That is also the origin of the retracted claim
+>   "its gold does not satisfy its own hidden suite" — true of the GENERATOR's gold, false
+>   of the fixture: `fixture_admission.py verify` reports PASS for both. Derivation now
+>   applies the patch and prints the cause instead of hiding it. Verified across all 41
+>   fixtures: **36 existing pins derive byte-identical, 0 changed**; `path-near-miss` (3
+>   cases) and `qs-error-swallow` (2) now derive; 3 stay correctly unpinned because their
+>   graders are not `node --test` suites. **Remaining human step:** writing the two pins
+>   into their approved manifests changes admission-hashed content, so it needs approval —
+>   but it is one command now, not an open question.
+> - **Judge labeling: skeleton committed** at `optimizer/prompt-lab/judge_labels_calib4b.json`
+>   — 12 sessions x 4 dimensions, anchors and the declared thresholds inline, 48 nulls.
+>   The scores must be ALBERT's: a label written by anyone else calibrates the judge against
+>   the wrong ground truth, which is the one thing the calibration gate exists to prevent.
+>   Then `./agentic_judge.py --calibrate judge_labels_calib4b.json`.
+> - **`WORKING_MEMORY_MAX_RECORDS = 32` — recommendation: leave the 8 KiB cap.** It is
+>   unreachable at full note size (the file cap refuses at ~10-16), but the constant is now
+>   documented as an upper bound and pinned by a test, `WORKING_MEMORY=off` by default, and
+>   both limits raise the same `capacity` error so nothing is silently lost. A 4x increase in
+>   a persisted private artifact's budget buys a nominal number, not a capability anyone has
+>   asked for. Revisit if a real session ever hits it.
+> - **Branches retired.** 40 local -> 3 (`main` plus the two held by worktrees). Only
+>   `fix/manifest-approval-pin` carried anything not in `main`: the CMD_POS false-negative
+>   rationale, which did not travel when CMD_POS moved into `harness/lib/command-policy.ts`,
+>   leaving the surviving test pointing at a comment that did not exist. Recovered in
+>   `ddd712b`; the branch is tagged `retired/fix-manifest-approval-pin` so it stays
+>   recoverable. The 28 remote branches are all fully merged; they were left in place because
+>   deleting them is a public-content change and they record which session did what.
 
 ## 2026-08-20 measurement-integrity follow-up (source branch, live mirror intentionally unchanged)
 
