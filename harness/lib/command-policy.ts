@@ -26,6 +26,20 @@ const SAFE_REDIRECT_RE = /\d*>>?\s*(?:\/dev\/null|&\s*\d)/g;
 // silently passed) and `grep cp file` counts as a mutation ("progress" that
 // disarms the loop-breaker).
 const CMD_POS = String.raw`(?:^|[;&|(]\s*|\b(?:sudo|xargs|env|do|then|timeout\s+\S+)\s+|-exec\s+)(?:\w+=\S+\s+)*`;
+// KNOWN, ACCEPTED FALSE NEGATIVES — do NOT "fix" these by widening CMD_POS.
+// `time npm test` and `if npm test; then …` do not match, so a session using them
+// gets NAGGED despite having verified. That is deliberate and was measured
+// (2026-08-03): adding `time|if` re-matches `echo "it is time npm test should run"
+// >> notes.md` and `grep -rn "if npm test" .` — i.e. it trades a nag for a SILENT
+// DISARM, which is the exact failure mode this gate exists to prevent. For a gate
+// whose whole job is catching unverified change claims, the nag is the correct
+// direction. If you want `time npm test` to count, register the project command via
+// VERIFY_GATE_CMD instead of widening this.
+// Pinned by verify-gate.test.ts, "the anchor's known false negatives stay false
+// negatives" — that test tells you to delete THIS comment if it ever changes.
+// (Recovered 2026-08-21 from Albert's unmerged `fix/manifest-approval-pin`: the
+// comment lived beside CMD_POS in verify-gate.ts and did not travel when CMD_POS
+// moved into this shared lib, leaving the surviving test pointing at nothing.)
 
 export const VERIFY_COMMAND_RE = new RegExp(
 	CMD_POS +
