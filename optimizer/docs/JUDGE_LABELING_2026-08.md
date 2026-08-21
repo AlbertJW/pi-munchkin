@@ -65,6 +65,47 @@ uncitable — deterministic criteria are unaffected either way.
 - Re-calibration is required when the judge model, endpoint, rubric text, or anchor
   wording changes (the receipt hashes make drift visible).
 
+## BLOCKER FOUND 2026-08-21: `calib4b` cannot calibrate this rubric
+
+Read this before labeling anything. **The corpus, not the labeler, is the problem.**
+
+The 12 rendered `calib4b` sessions are 4 fixtures x 3 reps of ONE model on ONE arm,
+and every one of them does the same structural thing: edits exactly one `src/` file,
+touches no test, makes no unrequested rewrite. Measured across all 12:
+
+| signal | spread |
+|---|---|
+| files edited | `src/report.js` / `src/parse.js` / `src/roster.js` / `src/table.js` — one per session, never a test |
+| gate run after the last edit | **12 of 12** |
+
+So an honest labeler gives `scope_discipline` the same score to all twelve. That
+single fact refuses the gate, by design — `MIN_DISTINCT_HUMAN_SCORES = 2`, because a
+judge that agrees with a constant label has proven nothing and kappa is undefined on
+a constant. Demonstrated with a PERFECT judge (`judge_scores == human_scores`):
+
+```
+pairs 48   exact 1.0   within_one 1.0   kappa 1.0
+coverage_problems: ["scope_discipline: human labels never vary - agreement is unmeasurable"]
+passed: false
+```
+
+Flip that one dimension to varying and the same perfect judge passes. So no amount of
+careful labeling rescues this set: the ceiling is a refusal.
+
+`verification` is at the same risk for the same reason (12 of 12 ran a gate after the
+last edit) and only escapes it if the labeler separates "ran the suite" from "the
+evidence supports the claim" — three sessions ended with a verify-gate nag disputing a
+"tests pass" claim (`documented-escape` rep 2, `ordered-steps` rep 2,
+`second-test-guard` rep 1), which is the discrimination available.
+
+**What actually unblocks it:** widen the held-out set before labeling, so the
+behaviours the rubric grades are PRESENT to be graded. Candidates already in the
+corpus: sessions on fixtures whose failure mode is scope (`retry-trap`,
+`hygiene-shared-config-reread`, `sv-ambiguous-spec`), and any session where the model
+edited a test or claimed success without a gate — `trial_validity`'s
+`reward_hacking` and `refusals` criteria can find those mechanically. Labeling is
+cheap once the set spans the rubric; it is worthless before that.
+
 ## If it fails
 
 A failed calibration is a result: the local 35B cannot substitute for Albert's
