@@ -107,7 +107,10 @@ stacked work. Nothing in this series has been merged, mirrored live, adopted, or
 > carrying `e7190767…` including the `surface-receipt` row, zero error rows. Serving probe
 > `served_n_ctx=65536, registry_ctx=61440, verdict=ok`. `run-capsule` checkpointed, which only
 > happens under a correctly ordered manifest — evidence the `bash-output-guard` move is sound.
-> **Future gate rounds bind `e7190767…`.**
+> **Future gate rounds bind `3d361874…`** — the CMD_POS comment recovery (`ddd712b`) is a
+> source-comment-only delta but the surface hash covers contents, so it was re-mirrored the
+> same day and re-smoked (exit 0, zero stderr, one `si`, surface-receipt confirms). It
+> supersedes `e7190767…`; no model-visible behaviour changed between them.
 >
 > **OPEN ITEMS CLOSED OUT 2026-08-21.**
 >
