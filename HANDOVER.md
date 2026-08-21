@@ -112,6 +112,19 @@ stacked work. Nothing in this series has been merged, mirrored live, adopted, or
 > same day and re-smoked (exit 0, zero stderr, one `si`, surface-receipt confirms). It
 > supersedes `e7190767…`; no model-visible behaviour changed between them.
 >
+> **OPTIMIZER MOTHBALLED AGAIN 2026-08-21 — see
+> [`optimizer/docs/MOTHBALLED_2026-08-21.md`](optimizer/docs/MOTHBALLED_2026-08-21.md).** The
+> instrument work is DONE and validated: the Phase-6 n=1 smoke passed every pre-declared
+> criterion, including `validate_powered_row(require_complete=True)` — the settlement-authority
+> tightening that had never been exercised — and confirmed C-1, the `binary.sb` write-fence and
+> the `gate.sb` read-deny on a live run rather than a selftest. The programme stops for the
+> OPPOSITE reason to 2026-08-03: the instrument works, and the subject cannot drive the harness.
+> Measured on `ling3-tiny-experimental`: `audit-sweep` 0/8 with 57/82 tool calls failing; a
+> 7-fixture round stopped after 2 rows showing 1/4 at 199 turns and ~95% tool-call failure. Box
+> time buys no information at that error rate. No further rounds, candidate trials, or box time
+> until the restart conditions in the mothball doc are met. Everything below is preserved and
+> green.
+>
 > **OPEN ITEMS CLOSED OUT 2026-08-21.**
 >
 > - **The two unpinned fixtures were a CODE DEFECT, not a fixture decision** (`63bb765`).

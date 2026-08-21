@@ -1,5 +1,15 @@
 # Unmothball charter — the measurement reboot (2026-08)
 
+>
+> **SUPERSEDED OPERATIONALLY 2026-08-21 by [`MOTHBALLED_2026-08-21.md`](MOTHBALLED_2026-08-21.md).** The instrument work this
+> charter ordered is DONE and validated end-to-end (Phase-6 smoke PASS, including the
+> settlement-authority tightening). Its rules stand — `PREREG_FIXTURE_ADMISSION_2026-08.md`
+> is still the one admission rule and nothing here is retracted. What stopped is the
+> PROGRAMME: no further rounds, no candidate trials, no box time. The measured reason is
+> in the mothball doc — the subject model cannot drive the harness (~70-95% tool-call
+> failure), which is not a measurement problem.
+>
+
 **Status: CHARTER — supersedes the operational conclusions of `MOTHBALLED_2026-08-03.md`.
 The mothball document remains the authoritative history of *why* the programme stopped;
 this document is the authority on how it restarts. Approved by human decision

@@ -1,6 +1,8 @@
 # The optimizer is mothballed — 2026-08-03
 
-> **SUPERSEDED OPERATIONALLY 2026-08-15 by [`UNMOTHBALL_2026-08.md`](UNMOTHBALL_2026-08.md).**
+> **SUPERSEDED OPERATIONALLY 2026-08-15 by [`UNMOTHBALL_2026-08.md`](UNMOTHBALL_2026-08.md);
+> the programme parked again 2026-08-21 — see [`MOTHBALLED_2026-08-21.md`](MOTHBALLED_2026-08-21.md),
+> which stops for the OPPOSITE reason (the instrument works; the subject cannot drive the harness).**
 > This document remains the authoritative history of *why* the programme stopped, and every
 > void-claim in it stands; the restart terms, outcomes, and admission rule now live in the
 > charter and [`PREREG_FIXTURE_ADMISSION_2026-08.md`](PREREG_FIXTURE_ADMISSION_2026-08.md).

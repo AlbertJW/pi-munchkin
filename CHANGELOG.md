@@ -162,9 +162,22 @@ candidates as dark). Net changes since 0.3.0; the full per-decision record is
   `effort_report --graded`, manifest-pinned grade artifacts, admission approval pinned to
   manifest content, the `audit-sweep` graded fixture.
 
+### Changed
+
+- **Optimizer mothballed again (2026-08-21):** the measurement reboot's instrument work is
+  complete and validated — the Phase-6 n=1 smoke passed every pre-declared criterion including the
+  never-before-exercised settlement-authority tightening, and confirmed the day's grader fixes on a
+  live run. The programme is parked for the opposite reason to 2026-08-03: the instrument works,
+  and the subject model cannot drive the harness (`ling3-tiny-experimental`: `audit-sweep` 0/8 with
+  57/82 tool calls failing; a 7-fixture round stopped after 2 rows at 1/4 over 199 turns with ~95%
+  tool-call failure). Rules and fixtures are unchanged — 24/24 approved authoritative, 38
+  case-pinned, `PREREG_FIXTURE_ADMISSION_2026-08.md` still the one admission rule. Restart
+  conditions, the traps not to re-derive, and the full evidence are in
+  `optimizer/docs/MOTHBALLED_2026-08-21.md`.
+
 ### Fixed
 
-- **Grader integrity, round three (2026-08-21, source only — NOT yet mirrored):** both scoring
+- **Grader integrity, round three (2026-08-21, MIRRORED LIVE — loaded hash `3d361874`):** both scoring
   paths were forgeable and both are closed. **The session could read its own answer key**: the
   admitted case pin was written to `<workdir>.row-context.json`, a sibling of the model's own
   workdir that `gate.sb` permitted reading, so `src` baked the admitted names in, registered them
