@@ -118,8 +118,8 @@
         ]
       }
     },
-    "manifest_sha256": "c468876e7877033510436b48035cbf630217bfdc3546db44cb9154d3281ce833",
-    "reviewed_at": "2026-07-23T10:34:22Z",
+    "manifest_sha256": "29f8e2cc691a12bf9b95797e9e90f2b0e72400870b2acee07790d582f2386687",
+    "reviewed_at": "2026-08-21T11:05:18Z",
     "reviewer": "Albert"
   },
   "artifacts": [
@@ -222,6 +222,10 @@
         "--test",
         "test/fail-to-pass.test.js"
       ],
+      "expected_cases": [
+        "qs-error-swallow: malformed JSON is reported as invalid-json, not thrown or dropped",
+        "qs-error-swallow: seeded fuzz of truncated JSON \u2014 every line accounted for, all truncations flagged invalid-json"
+      ],
       "overlays": [
         {
           "dest": "test/fail-to-pass.test.js",
@@ -240,7 +244,7 @@
     }
   },
   "timestamps": {
-    "admitted_at": "2026-07-23T10:34:22Z",
+    "admitted_at": "2026-08-21T11:05:18Z",
     "created_at": "2026-07-23T00:00:00Z",
     "expires_at": "2026-10-21T10:34:22Z"
   }

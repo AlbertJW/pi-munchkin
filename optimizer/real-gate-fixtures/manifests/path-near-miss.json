@@ -82,8 +82,8 @@
         ]
       }
     },
-    "manifest_sha256": "927bd07e24cd5bb16749e2b753db5de8973fd9cc169d29976db8aa54505173d2",
-    "reviewed_at": "2026-07-25T12:28:38Z",
+    "manifest_sha256": "e1107e41ce5034d5244ecc1b2a32eb0b65b06e405904055fbb801f564d75a9e3",
+    "reviewed_at": "2026-08-21T11:05:18Z",
     "reviewer": "Albert"
   },
   "artifacts": [
@@ -179,6 +179,11 @@
         "--test",
         "test/fail-to-pass.test.js"
       ],
+      "expected_cases": [
+        "adds a leading slash and collapses repeated separators",
+        "preserves a query string while normalising the path",
+        "removes a trailing slash except for root"
+      ],
       "overlays": [
         {
           "dest": "test/fail-to-pass.test.js",
@@ -197,7 +202,7 @@
     }
   },
   "timestamps": {
-    "admitted_at": "2026-07-25T12:28:38Z",
+    "admitted_at": "2026-08-21T11:05:18Z",
     "created_at": "2026-07-25T00:00:00Z",
     "expires_at": "2026-10-23T12:28:38Z"
   }
