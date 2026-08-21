@@ -101,10 +101,13 @@ stacked work. Nothing in this series has been merged, mirrored live, adopted, or
 >
 > **MIRRORED LIVE 2026-08-21** (human decision: "apply, but skip the smoke"). `mirror:apply`
 > wrote 117 artifacts with zero drift; `mirror:check` 117/117, no unmanaged extensions or
-> orphans; loaded hash `e7190767…` supersedes `9b8eaaad…`. **No live-load smoke was run** — the
-> first rollout row without one, so the loaded hash is computed from the mirrored tree and not
-> yet confirmed against a real `pi` emitting it. Run
-> `pi -p --model local-llamacpp/qwen36-35b-iq3s < /dev/null` before binding a gate round to it.
+> orphans; loaded hash `e7190767…` supersedes `9b8eaaad…`. **Live-load smoke CONFIRMED** (skipped
+> at first, then run on request): pi 0.84.2, `pi -p --model local-llamacpp/qwen36-35b-iq3s
+> < /dev/null` from a scratch cwd — exit 0, zero stderr, 24 telemetry rows, ONE `si`, every row
+> carrying `e7190767…` including the `surface-receipt` row, zero error rows. Serving probe
+> `served_n_ctx=65536, registry_ctx=61440, verdict=ok`. `run-capsule` checkpointed, which only
+> happens under a correctly ordered manifest — evidence the `bash-output-guard` move is sound.
+> **Future gate rounds bind `e7190767…`.**
 >
 > **PENDING Albert:**
 > Two fixture decisions remain human calls: `qs-error-swallow` and `path-near-miss` are the
