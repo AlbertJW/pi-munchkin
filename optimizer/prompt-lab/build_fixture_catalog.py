@@ -393,9 +393,13 @@ def gold_case_names(task, spec, overlay):
         return None
     try:
         return _gold_case_names(task, spec, overlay, command)
-    except Exception:
-        # A fixture the generator cannot stage simply stays unpinned (collapse-shape
-        # guard only) rather than breaking the whole catalog build.
+    except Exception as exc:
+        # A fixture that cannot be staged stays unpinned (collapse-shape guard only)
+        # rather than breaking the whole catalog build -- but SAY SO. Swallowing this
+        # silently is how `qs-error-swallow` and `path-near-miss` sat unpinned for
+        # weeks with the cause recorded nowhere and then mis-diagnosed as a fixture
+        # defect (2026-08-21).
+        print(f"  [{task}] no case pin: {type(exc).__name__}: {exc}", file=sys.stderr)
         return None
 
 
@@ -404,10 +408,24 @@ def _gold_case_names(task, spec, overlay, command):
     sys.path.insert(0, str(Path(__file__).resolve().parent))
     import grade_reporter
     from fixture_admission import install_overlays, verification_env
+    # Build the gold state from the COMMITTED PATCH, exactly as fixture_admission's
+    # run_state() does -- not by re-running the in-code mutate() generator.
+    #
+    # They are two sources of truth for the same thing and they had drifted. The
+    # generator no longer reproduces the committed gold for `path-near-miss` (it
+    # never creates src/index.js -> FileNotFoundError) or `qs-error-swallow` (its
+    # gold fails its own fail-to-pass suite 0/2). Admission, applying the patch,
+    # verifies BOTH fixtures PASS. So the fixtures were fine all along; the pin
+    # derivation was reading the stale source, silently returning None, and leaving
+    # them unpinned -- which the row builder then records as `unpinned_grader`.
+    # The patch is the artifact admission hashes and approves, so it is the one that
+    # decides what "gold" means. (2026-08-21)
+    from fixture_admission import apply_patch, load_manifest
+    _, manifest = load_manifest(task)
     with tempfile.TemporaryDirectory(prefix=f"pi-cases-{task}-") as td:
         work = Path(td) / "work"
         stage(task, work)
-        mutate(task, work, True)
+        apply_patch(work, manifest["patches"]["gold"])
         install_overlays(work, [overlay] if overlay else [])
         destination = Path(td) / "gold.tap"
         try:
