@@ -162,6 +162,20 @@ candidates as dark). Net changes since 0.3.0; the full per-decision record is
   `effort_report --graded`, manifest-pinned grade artifacts, admission approval pinned to
   manifest content, the `audit-sweep` graded fixture.
 
+### Added
+
+- **provider-patience (2026-08-22, default-on, `PROVIDER_PATIENCE=off` kill switch):** raises the
+  process-global fetch header timeout so slow local models are not aborted mid-prefill. Telemetry
+  showed 16 of 600 provider requests dying at ~301s with `status=None`: Node's bundled undici
+  `headersTimeout` (300s) fires before the provider SDK's own 600s timeout, and a cold-loaded 35B
+  with a long prompt streams nothing until prefill completes. llama-swap was not the limit (its log
+  shows a 3m30s request returning 200). Neither pi nor its SDKs expose a knob, so the extension
+  swaps the global dispatcher at `Symbol.for("undici.globalDispatcher.2")` for an Agent of the same
+  class with `headersTimeout`/`bodyTimeout` = `PI_PROVIDER_HEADERS_TIMEOUT_MS` /
+  `PI_PROVIDER_BODY_TIMEOUT_MS` (default 1,800,000ms, matching `PI_TIMEOUT`). Both polarities
+  measured and pinned by test; fail-open if the symbol's shape ever changes; all three env keys
+  propagate to subagent children, which hit the same models.
+
 ### Changed
 
 - **Optimizer mothballed again (2026-08-21):** the measurement reboot's instrument work is
