@@ -35,10 +35,11 @@ Both defects have observed counterfactual failures recorded in
 
 `npm run verify` is green: 648 tests, typecheck, health, deterministic package smoke (156 packed
 files; 31 extension entry points; 2 skills), optimizer integrity/self-tests, and the non-echoing
-secret scan. The previously loaded live surface remains
-`5427eea5677777f4c6231b0232e6c678b42fd0b40fd604649fc21691a9eec95f` until this release is
-committed and mirrored; the final rollout receipt and superseding hash belong in
-`docs/SURFACE_BOUNDARIES.md` after zero drift is proven.
+secret scan. The fix commit is `8c1878f` on pushed `main`. The live mirror contains 118/118
+first-party artifacts with no unmanaged extensions or orphans; the one retired
+`provider-patience` orphan was pruned. The authoritative loaded live surface is
+`e68f1543383ddc64e238142d687c40d8e2d321976078a07eaa0a8d0dc794a23a`. Pi 0.84.2 loaded the
+ordered live extension surface successfully in a non-inference `--help` smoke.
 
 The adopted model-visible posture is `ACTIVE_TOOL_PROMPTS=derived`, `CONTROL_ARBITER=enforce`,
 `MUNCHKIN_TOOL_ACTIVATION=dynamic`, `CONTEXT_SURFACE_MODE=summary`, `STATE_LENS=steer`,
@@ -48,7 +49,9 @@ is the live Pi setting that removes the observed 300-second provider wall; there
 parallel runtime shim. No calibration, powered trial, or gate round was started.
 
 The dense-text overflow is addressed at both measured seams: bounded read intake in source, and
-an 8,192-token registry-to-server headroom for both live Ornith models. If the optimizer is ever
+an 8,192-token registry-to-server headroom for both live Ornith models (`contextWindow=57344`
+against served `n_ctx=65536`). A timestamped pre-change `models.json` backup remains beside the
+live registry. No model inference, calibration, or gate round was started. If the optimizer is ever
 deliberately restarted, widen the judge corpus before labeling because `calib4b` cannot vary the
 relevant dimensions. Historical optimizer data remains preserved and unsupported; no old neutral
 is a rejection. Browser automation is already supplied
