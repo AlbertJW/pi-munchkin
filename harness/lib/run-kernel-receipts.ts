@@ -60,11 +60,12 @@ function mutationKind(toolName: string, args: Record<string, unknown>): Mutation
 	if (["edit", "write", "multiedit"].includes(toolName)) return "source";
 	if (toolName === "bash" && isSourceMutation(String(args.command ?? ""))) return "source";
 	if (toolName === "plan_write") return "plan";
-	if (toolName === "plan_go" || toolName === "compact_context") return "state";
+	if (toolName === "plan_go" || toolName === "plan_update" || toolName === "compact_context") return "state";
 	return "none";
 }
 
 function verificationKind(toolName: string, args: Record<string, unknown>, gate: string | null): VerificationKind {
+	if (toolName === "verify_project") return gate === null ? "none" : "project_gate";
 	if (toolName !== "bash") return "none";
 	return verificationEvidence(String(args.command ?? ""), gate);
 }

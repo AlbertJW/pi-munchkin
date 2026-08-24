@@ -1,0 +1,12 @@
+{
+  "v": 1,
+  "label": "sanitized-albertwork-plan-failure",
+  "initial_plan_items": 20,
+  "expanded_plan_items": 58,
+  "expanded_plan_argument_bytes": 9433,
+  "initial_active_tools": 49,
+  "approximate_required_tools": 3,
+  "blocked_pre_execution_calls": 5,
+  "project_gate": "just verify",
+  "wrapped_gate": "just verify | tail -n 20"
+}

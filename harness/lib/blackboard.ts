@@ -162,9 +162,6 @@ export function noteHarnessSignal(state: BlackboardState, signal: HarnessSignalV
 		state.plan.openItems = signal.openItems;
 	} else if (signal.type === "plan/go") {
 		state.plan.runId = signal.runIdHash;
-	} else if (signal.type === "plan/gate") {
-		state.plan.runId = signal.runIdHash;
-		state.plan.lastGate = { pass: signal.pass, fails: signal.fails };
 	} else if (signal.type === "context/receipt") {
 		state.context = {
 			pct: signal.contextPct ?? state.context.pct,

@@ -16,8 +16,6 @@ test("safe gate diagnostics are one bounded JSON value with secrets, paths, ANSI
 	const diagnostic = safeGateDiagnostic("npm test", { pass: false, output: raw, reason: "exit" });
 	const rendered = renderSafeGateFailure({
 		diagnostic,
-		attempt: 1,
-		maxAttempts: 3,
 		requiredNextAction: "change the implementation, then rerun the same gate",
 	});
 	assert.ok(diagnostic.diagnosticBytes <= 500);

@@ -6,7 +6,7 @@ import { protocolApiFamily, type ProtocolParitySummary } from "./protocol-parity
 
 const SETTINGS_MAX_BYTES = 128 * 1024;
 export const FIRST_PARTY_TOOLS = [
-	"read", "edit", "plan_write", "plan_go", "subagent", "compact_context",
+	"read", "edit", "plan_write", "plan_update", "verify_project", "capability", "subagent", "compact_context",
 	"web_search", "web_read", "search_spans", "read_span",
 ] as const;
 

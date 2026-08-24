@@ -9,7 +9,7 @@ export type CapabilityName = "plan_go" | "span_tools" | "subagent" | "compact_co
 export type HarnessSignalV1 =
 	| (SignalBase & { type: "plan/write"; runIdHash: string; items: number; openItems: number })
 	| (SignalBase & { type: "plan/go"; runIdHash: string })
-	| (SignalBase & { type: "plan/gate"; runIdHash: string; pass: boolean; fails: number; gateHash: string | null })
+	| (SignalBase & { type: "tool/prevented"; toolCallId: string; failureClass: "policy_rejection" })
 	| (SignalBase & { type: "loop/tier"; tier: 1 | 2 | 3; detector: "exact" | "outcome" | "semantic" | "session" })
 	| (SignalBase & { type: "failure/episodes"; activeWalls: number; exposedEpisodes: number; lastClass: FailureClass | null })
 	| (SignalBase & { type: "recovery/resume-requested"; origin: "run-command" })
@@ -46,14 +46,10 @@ export function isHarnessSignal(value: unknown): value is HarnessSignalV1 {
 			return exact("v", "type", "runIdHash", "items", "openItems") && HASH.test(String(item.runIdHash)) && integer(item.items) && integer(item.openItems);
 		case "plan/go":
 			return exact("v", "type", "runIdHash") && HASH.test(String(item.runIdHash));
-		case "plan/gate":
-			// gateHash identifies WHICH command passed (sha256 of `gate:<cmd>`, the
-			// run-kernel's detectedGateHash convention). Without it, a passing
-			// single-item gate was indistinguishable from the project gate and
-			// falsely verified the whole run in the shadow kernel.
-			return exact("v", "type", "runIdHash", "pass", "fails", "gateHash") && HASH.test(String(item.runIdHash)) &&
-				typeof item.pass === "boolean" && integer(item.fails) &&
-				(item.gateHash === null || HASH.test(String(item.gateHash)));
+		case "tool/prevented":
+			return exact("v", "type", "toolCallId", "failureClass") &&
+				typeof item.toolCallId === "string" && item.toolCallId.length > 0 && item.toolCallId.length <= 128 &&
+				item.failureClass === "policy_rejection";
 		case "loop/tier":
 			return exact("v", "type", "tier", "detector") && [1, 2, 3].includes(Number(item.tier)) && ["exact", "outcome", "semantic", "session"].includes(String(item.detector));
 		case "failure/episodes":

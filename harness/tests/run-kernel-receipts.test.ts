@@ -70,6 +70,7 @@ test("mutating and verification classifications use the shared command policy", 
 	assert.equal(n.start({ toolCallId: "m", toolName: "bash", args: { command: "sed -i '' s/a/b/ src.ts" } }, 1, 1)?.mutation, "source");
 	assert.equal(n.start({ toolCallId: "wrong", toolName: "bash", args: { command: "tsc --noEmit" } }, 2, 2)?.verification, "none");
 	assert.equal(n.start({ toolCallId: "right", toolName: "bash", args: { command: "npm test" } }, 3, 3)?.verification, "project_gate");
+	assert.equal(n.start({ toolCallId: "direct", toolName: "verify_project", args: {} }, 4, 4)?.verification, "project_gate");
 });
 
 test("failure text reader exits at its prefix bound without touching later blocks", () => {

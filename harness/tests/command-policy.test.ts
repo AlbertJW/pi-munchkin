@@ -84,6 +84,8 @@ test("recognizes verify-like commands", () => {
 
 test("verification evidence is exact when a project gate is known", () => {
 	assert.equal(verificationEvidence(" npm   test ", "npm test"), "project_gate");
+	assert.equal(verificationEvidence("just verify | tail -n 20", "just verify"), "none",
+		"wrapping the exact gate in a pipe is not exact evidence");
 	assert.equal(verificationEvidence("npm run lint", "npm test"), "none");
 	assert.equal(verificationEvidence("npm run lint", null), "generic");
 	for (const command of ["tsc --init", "ruff", "ruff --version", "eslint --init", "eslint --version", "eslint --fix src", "eslint --config eslint.config.js"]) {
@@ -95,7 +97,7 @@ test("verification evidence is exact when a project gate is known", () => {
 	}
 });
 
-test("plan gates allow verify commands only", () => {
+test("the read-only gate runtime allows verification commands only", () => {
 	assert.deepEqual(assertVerifyGateAllowed("npm test"), { ok: true });
 	assert.equal(assertVerifyGateAllowed("echo ok").ok, false);
 	assert.equal(assertVerifyGateAllowed("touch sentinel").ok, false);

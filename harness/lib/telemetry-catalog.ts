@@ -54,37 +54,13 @@ export const EVENT_CATALOG = {
 	},
 	"did-you-mean/hint": { tool: "string", injected_chars: "number" },
 	"chaos/injected": { fault: "string", tool: "string", nth: "number" },
-	"plan-runner/deps-rejected": { errors: "number" },
-	"plan-runner/gate": {
-		pass: "boolean", fails: "number", rung: "number", recovered: "boolean", prior_fails: "number",
-		terminal: "boolean", gate_sha256: "string", failure_class: "string",
-		diagnostic_bytes: "number", diagnostic_sha256: "string",
-	},
-	"plan-runner/integrity": { reattached: "number", preserved: "number", yielded: "number" },
-	"plan-runner/thrash-warn": { streak: "number" },
-	"plan-runner/resume-found": { open: "number", in_progress: "number" },
-	"plan-runner/force-plan-write-block": { toolName: "string" },
-	// Fired instead of the block on gemma-family models (measured 0/9 collapse
-	// with fabricated completions — the standing "never arm on that family"
-	// verdict, honored in code at the c38 block site).
-	"plan-runner/force-plan-write-skip": { model_class: "string" },
-	"plan-runner/write": { items: "number", open_items: "number", newly_done: "number", rewrite: "boolean", declared_dependencies: "number", unmet_dependencies: "number", dependency_compliant: "boolean", context_tokens: ["number", "null"] },
-	"plan-runner/uncertainty-hold": { count: "number", gate: "string" },
-	"plan-runner/write-rejected": { reason_class: "string", context_tokens: ["number", "null"] },
+	"plan-runner/start": { request_bytes: "number" },
+	"plan-runner/write": { items: "number", open_items: "number", rewrite: "boolean" },
+	"plan-runner/write-rejected": { reason_class: "string" },
 	"plan-runner/delta": { changed: "number", idempotent: "number", open_items: "number" },
-	"plan-runner/direct": { request_bytes: "number", accepted: "boolean", reason: "string" },
-	// `activation` ("command"|"tool") added 2026-07-30 when /plan-go and the plan_go
-	// tool were unified: both now emit these. Rows before that date are all
-	// tool-path (the command emitted nothing). `go` still excludes yolo starts —
-	// /plan yolo flips phase in startPlanCommand without a go event, so this
-	// metric means "explicit go activation", not "execution started".
-	"plan-runner/go": { resumed: "boolean", stale: "number", activation: "string" },
-	"plan-runner/go-blocked": { reason: "string", activation: "string" },
-	// `block_kind`, not `kind`: a detail field named `kind` OVERWRITES the envelope's
-	// kind (the event name itself), so every row this ever wrote was labelled
-	// "inspect"/"mutate" instead of "plan-mode-block" and the event was unfindable
-	// by name. Caught 2026-07-31 by the reserved-field guard on its first run.
-	"plan-runner/plan-mode-block": { toolName: "string", block_kind: "string" },
+	"plan-runner/go": { resumed: "boolean" },
+	"plan-runner/plan-mode-block": { toolName: "string" },
+	"plan-runner/ended-open": { open_items: "number" },
 	"git-guard/blocked-unresolved-target": { reason: "string" },
 	"git-guard/confirm": { approved: "boolean", changes: "number" },
 	"context-inlet-guard/block": { risky: "boolean", bytes: "number", n: "number", bigLimit: "boolean" },
@@ -170,8 +146,6 @@ export const EVENT_CATALOG = {
 	"drift-scanner/review-null": { stopReason: "string", textLen: "number" },
 	"drift-scanner/advisory": { chars: "number" },
 	"drift-scanner/review-error": failure,
-	"reflect/review-error": failure,
-	"reflect/review": { round: "number", clean: "boolean", chars: "number" },
 	"span-tools/search": { total: "number", shown: "number" },
 	"span-tools/read": { start: "number", end: "number" },
 	"ketch/search": {

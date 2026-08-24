@@ -1,8 +1,10 @@
-import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
+import { defineTool, type ExtensionAPI } from "@earendil-works/pi-coding-agent";
+import { Type } from "typebox";
 import { readdir, realpath } from "node:fs/promises";
 import { basename, dirname, isAbsolute, relative, resolve, sep } from "node:path";
 import { classifyBashCommand, isSourceMutation, looksFailingOutput, normalizeVerificationCommand, verificationEvidence } from "../lib/command-policy.ts";
-import { clearPlanGateReceipt, consumePlanGateReceipt } from "../lib/plan-gate-receipt.ts";
+import { runReadonlyGate, type GateResult } from "../lib/gate-runtime.ts";
+import { renderSafeGateFailure, safeGateDiagnostic } from "../lib/plan-gate-diagnostic.ts";
 import { clearDetectedProjectGate, detectProjectGate, publishDetectedProjectGate } from "../lib/project-gate.ts";
 import { boundedReceiptTailText, boundedReceiptText } from "../lib/run-kernel-receipts.ts";
 import { steerText } from "../lib/steer-texts.ts";
@@ -12,7 +14,7 @@ import { VerificationFrontierTracker, type VerificationFrontierSnapshotV1 } from
 import { VerificationPlateauTracker, type VerificationPlateauMode } from "../lib/verification-plateau.ts";
 import { buildControlProposal, controlArbiterMode, controlEnforces, emitControlProposal } from "../lib/control-proposal.ts";
 import { planItemHash, sha256 } from "../lib/failure-episodes.ts";
-import { emitHarnessSignal } from "../lib/harness-signals.ts";
+import { emitHarnessSignal, onHarnessSignal } from "../lib/harness-signals.ts";
 
 // Boundary verify gate ("the handoff is sacred").
 //
@@ -176,13 +178,13 @@ function steer(verifyFailed: boolean): string {
 	if (verifyFailed) {
 		return steerText(
 			"VG_STEER_FAILED",
-			"[verify-gate] The exact gate {gate} is red after the latest mutation. Resolve that evidence before handoff.{ctn}",
+			"[verify-gate] The exact gate {gate} is red after the latest mutation. Fix the evidence, then call verify_project before handoff.{ctn}",
 			{ gate: g, ctn },
 		);
 	}
 	return steerText(
 		"VG_STEER",
-		"[verify-gate] The exact gate {gate} has not passed after the latest mutation. Run it before handoff.{ctn}",
+		"[verify-gate] The exact gate {gate} has not passed after the latest mutation. Call verify_project before handoff.{ctn}",
 		{ gate: g, ctn },
 	);
 }
@@ -198,6 +200,61 @@ export default function (pi: ExtensionAPI) {
 	let currentTurn = 0;
 	let plateauCorrections = 0;
 	let plateauActivationRequests = 0;
+	let mutationGeneration = 0;
+	let managedVerifyProjectHidden = false;
+	const mutationStartState = new Map<string, { generation: number; mutated: boolean; verifiedOk: boolean; fires: number }>();
+	const preventedBeforeStart = new Set<string>();
+	const verifyProjectResults = new Map<string, GateResult>();
+	const trimOldest = (collection: Map<string, unknown> | Set<string>, maximum: number): void => {
+		while (collection.size > maximum) {
+			const oldest = collection.keys().next().value as string | undefined;
+			if (oldest === undefined) break;
+			collection.delete(oldest);
+		}
+	};
+
+	pi.registerTool(defineTool({
+		name: "verify_project",
+		label: "Verify Project",
+		description: "Run the exact detected project verification gate after the latest source mutation.",
+		promptSnippet: "verify_project(): run the exact project gate without shell wrapping",
+		promptGuidelines: [
+			"Use verify_project after the latest source mutation; do not wrap the project gate in Bash syntax.",
+		],
+		parameters: Type.Object({}),
+		async execute(toolCallId, _params, signal, _onUpdate, ctx) {
+			if (!gateCmd) throw new Error("verify_project unavailable: no exact project gate was detected");
+			const result = await runReadonlyGate(pi.exec.bind(pi), ctx.cwd, gateCmd, 600_000, signal);
+			verifyProjectResults.set(toolCallId, result);
+			trimOldest(verifyProjectResults as Map<string, unknown>, 128);
+			if (!result.pass) {
+				const diagnostic = safeGateDiagnostic(gateCmd, result);
+				throw new Error(renderSafeGateFailure({
+					diagnostic,
+					requiredNextAction: "fix the implementation using this bounded evidence, then call verify_project again",
+				}));
+			}
+			return { content: [{ type: "text" as const, text: "Exact project gate passed after the latest mutation." }], details: { tool_name: "verify_project", success: true } };
+		},
+	}));
+
+	onHarnessSignal(pi.events, (signal) => {
+		if (signal.type !== "tool/prevented") return;
+		const start = mutationStartState.get(signal.toolCallId);
+		const kind = order.prevent(signal.toolCallId);
+		if (!kind) {
+			preventedBeforeStart.add(signal.toolCallId);
+			trimOldest(preventedBeforeStart, 128);
+			return;
+		}
+		pendingExactGates.delete(signal.toolCallId);
+		mutationStartState.delete(signal.toolCallId);
+		if (kind === "source_mutation" && start && start.generation === mutationGeneration && !order.hasPendingMutations()) {
+			st.verifiedOk = start.verifiedOk;
+			st.mutated = start.mutated;
+			st.fires = start.fires;
+		}
+	});
 
 	const currentPlanItemHash = (): string | null => {
 		const value = (globalThis as Record<string, unknown>).__pi_active_plan_context as { item_id?: unknown } | undefined;
@@ -258,8 +315,11 @@ export default function (pi: ExtensionAPI) {
 		currentTurn = 0;
 		plateauCorrections = 0;
 		plateauActivationRequests = 0;
-		clearPlanGateReceipt();
 		clearDetectedProjectGate();
+		mutationGeneration = 0;
+		mutationStartState.clear();
+		preventedBeforeStart.clear();
+		verifyProjectResults.clear();
 		// The published globalThis snapshot must die with the session, not just the
 		// module state: pi's loader returns the CACHED factory across session
 		// replacement, so without this a /new, /fork or same-cwd /resume leaked the
@@ -276,6 +336,15 @@ export default function (pi: ExtensionAPI) {
 			gateCmd = await detectProjectGate(cwd);
 		}
 		publishDetectedProjectGate(cwd, gateCmd);
+		const active = pi.getActiveTools();
+		if (!gateCmd && active.includes("verify_project")) {
+			pi.setActiveTools(active.filter((name) => name !== "verify_project"));
+			managedVerifyProjectHidden = true;
+		} else if (gateCmd && managedVerifyProjectHidden && !active.includes("verify_project") &&
+			pi.getAllTools().some((tool) => tool.name === "verify_project")) {
+			pi.setActiveTools([...active, "verify_project"]);
+			managedVerifyProjectHidden = false;
+		}
 		publishFrontier();
 	});
 
@@ -291,15 +360,29 @@ export default function (pi: ExtensionAPI) {
 		publishFrontier();
 		const args = event.args && typeof event.args === "object"
 			? event.args as Record<string, unknown> : {};
-		if (event.toolName === "bash" && verificationEvidence(String(args.command ?? ""), gateCmd) === "project_gate") {
+		if (event.toolName === "verify_project" || (event.toolName === "bash" && verificationEvidence(String(args.command ?? ""), gateCmd) === "project_gate")) {
 			pendingExactGates.add(event.toolCallId);
+			trimOldest(pendingExactGates, 128);
 		}
-		const kind = await classifyStart(event.toolName, args);
+		const kind = event.toolName === "verify_project" ? "verification" : await classifyStart(event.toolName, args);
 		order.start({ callId: event.toolCallId, kind });
 		if (kind === "source_mutation") {
+			mutationStartState.set(event.toolCallId, { generation: mutationGeneration, mutated: st.mutated, verifiedOk: st.verifiedOk, fires: st.fires });
+			trimOldest(mutationStartState as Map<string, unknown>, 512);
 			st.mutated = true;
 			st.verifiedOk = false;
 			st.fires = 0;
+		}
+		if (preventedBeforeStart.delete(event.toolCallId)) {
+			const start = mutationStartState.get(event.toolCallId);
+			const preventedKind = order.prevent(event.toolCallId);
+			mutationStartState.delete(event.toolCallId);
+			pendingExactGates.delete(event.toolCallId);
+			if (preventedKind === "source_mutation" && start && start.generation === mutationGeneration && !order.hasPendingMutations()) {
+				st.verifiedOk = start.verifiedOk;
+				st.mutated = start.mutated;
+				st.fires = start.fires;
+			}
 		}
 	});
 
@@ -311,33 +394,22 @@ export default function (pi: ExtensionAPI) {
 			return; // A missing start can never manufacture verification or frontier progress.
 		}
 
-		const resultText = boundedReceiptText(event.result);
-		let succeeded = !event.isError;
+		const verifyProjectResult = verifyProjectResults.get(event.toolCallId);
+		verifyProjectResults.delete(event.toolCallId);
+		const resultText = verifyProjectResult?.output ?? boundedReceiptText(event.result);
+		let succeeded = verifyProjectResult ? verifyProjectResult.pass : !event.isError;
 		if (kind === "verification") {
 			succeeded = succeeded && !looksFailingOutput(resultText, false);
-		}
-
-		let verificationOverride: "passed" | "failed" | "none" = "none";
-		if (event.toolName === "plan_write" || event.toolName === "plan_update") {
-			const receipt = consumePlanGateReceipt(event.toolCallId);
-			if (receipt) {
-				const relevant = receipt.outcomes.some((outcome) =>
-					verificationEvidence(outcome.command, gateCmd) !== "none");
-				const accepted = receipt.outcomes.some((outcome) =>
-					outcome.pass && verificationEvidence(outcome.command, gateCmd) !== "none");
-				if (relevant) {
-					verificationOverride = succeeded && receipt.allPassed && accepted ? "passed" : "failed";
-				}
-			}
 		}
 
 		const outcome = order.finish({
 			callId: event.toolCallId,
 			succeeded,
-			verificationOverride,
 		});
 		applyOrderedOutcome(outcome);
 		if (outcome?.mutationSettled) {
+			mutationGeneration += 1;
+			mutationStartState.delete(event.toolCallId);
 			frontier.noteMutationSettled(!event.isError);
 			if (PLATEAU_MODE !== "off" && !event.isError) {
 				const gateHash = exactGateHash();
@@ -347,7 +419,7 @@ export default function (pi: ExtensionAPI) {
 		}
 		if (outcome && pendingExactGates.has(event.toolCallId)) {
 			const observation = frontier.observeExactGateDetailed({
-				text: boundedReceiptTailText(event.result),
+				text: verifyProjectResult?.output ?? boundedReceiptTailText(event.result),
 				passed: outcome.verificationPassed,
 				ordered: outcome.verificationOrdered,
 			});
@@ -445,14 +517,6 @@ export default function (pi: ExtensionAPI) {
 					st.verifiedOk = false;
 					verifyFailedThisTurn = true;
 				}
-				if (c.name === "plan_write" || c.name === "plan_update") {
-					const staleReceipt = consumePlanGateReceipt(c.id);
-					if (staleReceipt?.outcomes.some((outcome) =>
-						verificationEvidence(outcome.command, gateCmd) !== "none")) {
-						st.verifiedOk = false;
-						verifyFailedThisTurn = true;
-					}
-				}
 			}
 		} else {
 			for (const c of toolCalls) {
@@ -462,22 +526,6 @@ export default function (pi: ExtensionAPI) {
 					st.mutated = true;
 					st.verifiedOk = false;
 					st.fires = 0;
-				}
-
-				const planReceipt = c.name === "plan_write" || c.name === "plan_update"
-					? consumePlanGateReceipt(c.id) : null;
-				if (planReceipt) {
-					const relevant = planReceipt.outcomes.some((outcome) =>
-						verificationEvidence(outcome.command, gateCmd) !== "none");
-					const accepted = planReceipt.outcomes.some((outcome) =>
-						outcome.pass && verificationEvidence(outcome.command, gateCmd) !== "none");
-					if (planReceipt.allPassed && accepted) {
-						st.verifiedOk = true;
-						record("verify-gate", "gate-green-consumed", {});
-					} else if (relevant) {
-						st.verifiedOk = false;
-						verifyFailedThisTurn = true;
-					}
 				}
 
 				if (c.name !== "bash") continue;

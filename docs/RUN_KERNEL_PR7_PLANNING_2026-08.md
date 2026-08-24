@@ -1,5 +1,9 @@
 # Run Kernel PR 7 — adaptive planning and delta status
 
+> Historical design only. The shotgun planner replacement supersedes this runtime contract:
+> `PLAN_MODE`, whole-plan progress rewrites, uncertainties, and per-item gate machinery no longer
+> load. See README's current `/plan` and `plan_update` contract.
+
 PR7 is a dark, independently reversible candidate. `PLAN_MODE=forced` remains
 the deployed behavior. `adaptive` adds stable-ID progress updates, a private
 run-capsule plan store, and an explicitly invoked bounded direct path. `off`

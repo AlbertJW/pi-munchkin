@@ -75,7 +75,7 @@ second.
   without changing what the agent does. *Canonicalizes Pi lifecycle/tool events into a typed,
   redacted per-run state machine without changing agent behaviour.*
 
-Additional extensions provide span retrieval, reflection, drift review, teaching hints, path
+Additional extensions provide span retrieval, observational memory, drift review, teaching hints, path
 suggestions, context receipts, and experimental dark mechanisms. The authoritative ordered
 extension and skill surface is the `pi` manifest in [`package.json`](package.json).
 
@@ -138,9 +138,10 @@ and tarball.
 
 Most behaviour is automatic. The primary commands are:
 
-- `/plan <request>` and `/plan-go` for structured execution with per-item gates. In lean plan
-  mode the model cannot start execution itself: `plan_go` refuses until you run `/plan-go`.
-- `/reflect` for a fresh-context adversarial review.
+- `/plan <request>` enters a read-only planning surface; `/plan-go` starts execution,
+  `/plan-cancel` discards the draft, and `/plan-status` renders the bounded plan. Plans hold at
+  most 24 stable-ID items; routine progress uses small `plan_update` deltas. Verification belongs
+  to the session, not to individual plan items.
 - `/blackboard` for current redacted state and the private cockpit path.
 - `/skill:deep-research <question>` for bounded research.
 - `/ketch-status` for public-search backend health.
@@ -164,12 +165,10 @@ model's own window in place with one resume handoff.
 
 | Environment option | Default and behaviour | Rollback / alternative |
 |---|---|---|
-| `MUNCHKIN_TOOL_ACTIVATION` | `dynamic`; defers `subagent` and `compact_context` only when Pi exposes the complete default registry | `ambient` leaves Pi's initial surface untouched |
-| `MUNCHKIN_TOOL_ACTIVATION=phase` | dark candidate; additionally defers `plan_go`, span tools, and post-search `web_read`, then activates them from structured phase/evidence signals | return to `dynamic` (deployed path) or `ambient`; explicit `--tools` selections are always preserved |
-| `MUNCHKIN_TOOL_SURFACE` | `default`; `minimal` is a dark, configuration-only candidate that keeps only `read`, `bash`, `edit`, and `write` when the complete registry is visible | unset/`default` restores the adopted dynamic surface; narrowed explicit `--tools` selections are always preserved |
-| `PLAN_MODE` | `forced`; deployed whole-plan creation and execution | `adaptive` adds stable-ID `plan_update` and explicit bounded `/plan-direct`; `off` hides those candidate additions |
+| `MUNCHKIN_TOOL_PROFILE` | `ambient`; rollback surface while the new `core` profile awaits adoption. `core` starts with the coding spine and the single `capability` switch | `ambient` leaves Pi's initial surface untouched; genuine CLI/global/project tool selections always win |
+| `MUNCHKIN_TOOL_ACTIVATION` | `dynamic`; legacy automatic activation remains available for delegation and context compaction | `ambient` disables automatic activation; `phase` remains experimental |
 | `PLAN_STORAGE` | `capsule`; plan JSON, Markdown projection, and trace stay in the private per-run capsule for both forced and adaptive planning | `project` restores historical `.pi/plan-state.json`, `.pi/TODO.md`, and `.pi/traces/`; `/plan-export` is the explicit one-file export; `RUN_CAPSULE=off` also selects project storage because no private session identity exists |
-| dynamic `subagent` triggers | multi-item structured execution, second plan-gate failure, or loop-breaker tier two | once activated it stays active; one automatic attempt means a later manual `/tools` disable is respected |
+| dynamic `subagent` triggers | multi-item structured execution or loop-breaker tier two | once activated it stays active; one automatic attempt means a later manual `/tools` disable is respected |
 | dynamic `compact_context` trigger | first crossing of 60% context usage | same one-attempt/manual-disable rule |
 | `CONTEXT_SURFACE_MODE` | `summary`; samples usage on first call, each eighth call, threshold crossings, and compaction without transcript hashing | `full` retains receipt calculations; `off` disables; gate sessions force `full` |
 | `STATE_LENS` | `steer`; injects only on message-bearing loop-breaker events with cooldown — never at an abort/shutdown boundary, where a steer would fight the hard stop | `off` kills it; the per-call `view|both` modes are retired |
@@ -186,10 +185,8 @@ model's own window in place with one resume handoff.
 | `LB_SESSION_T1`, `LB_SESSION_T2`, `LB_SESSION_T3` | `7`, `11`, `28` cumulative repeats under enforcement | `LB_SESSION_REPEAT` remains the authoritative legacy 25-repeat steer in shadow mode and is a compatibility alias for enforced Tier 1 |
 | `PI_SANDBOX_POSTURE` | `unknown`; `/munchkin-doctor` accepts only `declared` or `host` as operator assertions | unset it to return to `unknown`; this label is observational and grants no isolation |
 | `TEACH_HINTS`, `DID_YOU_MEAN` | default-on bounded hints | set either to `off` |
-| `FORCE_PLAN_WRITE` | default-on; blocks the FIRST unplanned mutation with a message naming the `plan_write` → `plan_go` path; never re-arms once a plan exists; gemma-family models are skipped in code (measured collapse) | `off` |
-| `PLAN_UNCERTAINTY` | default-on; `plan_write` accepts `uncertainties[]` and execution holds while any remain (clear with `[]`) | `off` restores the legacy schema |
-| `PLAN_ITEM_GUIDANCE_V2` | default-on; need-sized plan-item wording | `off` restores the "5-10 ordered items" wording |
-| `PLAN_TOOL_GO` | default-on; the model-callable `plan_go` tool (same validation as `/plan-go`) | `off` removes the tool |
+| `FORCE_PLAN_WRITE` | compatibility default `on` until the separate adoption gate; blocks the first unplanned mutation without creating a plan | `off` makes planning exclusively user-triggered through `/plan` (prepared target default) |
+| `PLAN_TOOL_GO` | `off`; headless experiments may explicitly expose model-callable `plan_go` | `on` enables it; interactive plans still require the user's `/plan-go` |
 | `SPAWN_DELEGATION` | default-on; delegation guidance recommends `mode=spawn` with self-contained tasks | `off` restores the fork wording |
 | `TOOL_CALL_RESCUE` | default-on; one corrective steer (max 2/session) when a session dies on a text-only pseudo tool call | `off` |
 | `CONTEXT_BRIEF` | default-on; a cached per-session environment brief appended to the system prompt (`CONTEXT_BRIEF_BYTES` bounds it) | `off` |
@@ -202,7 +199,7 @@ model's own window in place with one resume handoff.
 | `RUN_CAPSULE=recovery` recovery brief | active by default; emits one bounded brief only after compaction, an unsettled provider retry, or an explicit resume command — ordinary turns receive no capsule context and manual resume never starts a provider request | `shadow` or `off` |
 | `WORKING_MEMORY` | `off`; the tool, command, handlers, schema, snippets, and guidance are absent | `on` adds an explicit, private, per-run notebook of at most 32 untrusted model notes; it requires the matching run-capsule identity and never injects notes automatically |
 | `VERIFY_EXECUTION_ORDER` | `execution`; Pi start/end order uses a conservative mutation epoch, so starts, failures, overlaps, and missing events invalidate earlier green evidence | `legacy` temporarily restores transcript-order evaluation |
-| `PLAN_GATE_DIAGNOSTICS` | `safe`; red gates return a 500-byte, redacted, JSON-framed `UNTRUSTED_GATE_DIAGNOSTIC`, while persisted state keeps only class/count/bytes/hash | `legacy` temporarily restores raw transient gate text; raw output is never restored to plan state, traces, telemetry, cockpit, or notifications |
+| `verify_project` | registered only when an exact project gate exists; runs that gate without a model-supplied command and returns bounded sanitized diagnostics | exact Bash execution remains compatible, but pipes/wrappers cannot count as exact evidence |
 | `VERIFICATION_PLATEAU` | `enforce` (adopted 2026-08-24, Albert-approved judgment adoption — AVO's supervisor pillar); after three successful mutation→recognized failed-TAP epochs with no frontier advance it proposes ONE arbiter-owned correction, plus an additive capability request at five; it never aborts | `shadow` records the same plateaus without steering; `off` disables collection |
 | `ACTIVE_TOOL_PROMPTS` | `derived`; inactive tools contribute no ambient guidance and Pi supplies definition-owned guidance only for active tools | `ambient` restores the broader legacy prompt; manual `/tools` disable removes active-tool guidance |
 | `CONTROL_ARBITER` | `enforce`; one highest-priority corrective voice acts per boundary, with bounded lens/verification supplements where applicable | `shadow` restores legacy producer delivery while recording the winner; `off` removes the arbiter while typed plan/context/loop signals continue |
@@ -254,7 +251,8 @@ sessions.
 - Plan state, its Markdown projection, and the bounded plan trace share that run-capsule directory
   by default and use `0600` files. Normal planning therefore creates no `.pi` worktree artifacts.
   `/plan-export` deliberately writes only `.pi/TODO.md`; `PLAN_STORAGE=project` is the full legacy
-  rollback. `/reflect` follows the active private plan instead of a stale project export.
+  rollback. Observational memory remains the sole narrative recall layer; it cannot complete plan
+  items, verify work, close failure episodes, mutate files, or override repository evidence.
 - Recovery mode projects a deterministic brief of at most 2 KiB with fixed untrusted-data fences.
   It is offered once after a compaction generation or an unsettled provider failure, and `/run-resume`
   and `/loop-resume` append it with `triggerTurn=false`; they do not choose a model or start a

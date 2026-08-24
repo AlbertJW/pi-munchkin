@@ -3,7 +3,7 @@ import test from "node:test";
 import { applyPlanDeltas } from "../lib/plan-delta.ts";
 
 const items = [
-	{ id: "item-a", status: "pending" as const, note: "keep", failure_class: "unknown" },
+	{ id: "item-a", status: "pending" as const, note: "keep" },
 	{ id: "item-b", status: "in_progress" as const },
 ];
 
@@ -30,7 +30,10 @@ test("duplicate identical deltas are idempotent; conflicting or unknown IDs reje
 	assert.equal(applyPlanDeltas(items, [{ item_id: "missing", status: "done" }]).ok, false);
 });
 
-test("delta notes and failure classes are bounded and newline-free", () => {
-	assert.equal(applyPlanDeltas(items, [{ item_id: "item-a", status: "blocked", note: "a\nb" }]).ok, false);
-	assert.equal(applyPlanDeltas(items, [{ item_id: "item-a", status: "blocked", failure_class: "raw-error" }]).ok, false);
+test("notes are byte-bounded; blocked items require a reason; note-only updates work", () => {
+	assert.equal(applyPlanDeltas(items, [{ item_id: "item-a", status: "blocked" }]).ok, false);
+	assert.equal(applyPlanDeltas(items, [{ item_id: "item-a", status: "blocked", note: "界".repeat(101) }]).ok, false);
+	const noteOnly = applyPlanDeltas(items, [{ item_id: "item-a", note: "first\nsecond" }]);
+	assert.equal(noteOnly.ok, true);
+	if (noteOnly.ok) assert.equal(noteOnly.items[0].note, "first\nsecond");
 });

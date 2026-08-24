@@ -8,8 +8,6 @@ export type OrderedCallStart = {
 export type OrderedCallFinish = {
 	callId: string;
 	succeeded: boolean;
-	/** A plan_write can carry a separately executed aggregate gate receipt. */
-	verificationOverride?: "passed" | "failed" | "none";
 };
 
 export type OrderedCallOutcome = {
@@ -56,8 +54,9 @@ export class VerificationOrderClock {
 		if (call.kind === "source_mutation") {
 			// A mutation attempt invalidates earlier green evidence immediately. A
 			// shell command can partially write before it fails, and a built-in tool
-			// may fail after touching the filesystem.
-			this.latestMutationBoundary = startedSequence;
+			// may fail after touching the filesystem. The external verification state
+			// disarms immediately; this clock advances the durable boundary only when
+			// execution settles, so a proven pre-execution refusal can be cancelled.
 			this.pendingMutations += 1;
 		}
 		this.trim(this.pending, 512);
@@ -66,6 +65,21 @@ export class VerificationOrderClock {
 
 	kindFor(callId: string): OrderedCallKind | null {
 		return this.pending.get(callId)?.kind ?? null;
+	}
+
+	/** Mark a first-party call as refused before its implementation ran. */
+	prevent(callId: string): OrderedCallKind | null {
+		const pending = this.pending.get(callId);
+		if (!pending || this.completed.has(callId)) return null;
+		this.pending.delete(callId);
+		this.completed.add(callId);
+		this.trim(this.completed, 2048);
+		if (pending.kind === "source_mutation") this.pendingMutations = Math.max(0, this.pendingMutations - 1);
+		return pending.kind;
+	}
+
+	hasPendingMutations(): boolean {
+		return this.pendingMutations > 0;
 	}
 
 	finish(call: OrderedCallFinish): OrderedCallOutcome | null {
@@ -83,10 +97,8 @@ export class VerificationOrderClock {
 			this.latestMutationBoundary = endedSequence;
 		}
 
-		const override = call.verificationOverride ?? "none";
-		const verificationAttempted = pending.kind === "verification" || override !== "none";
-		const verificationPassed = verificationAttempted &&
-			(override === "passed" || (override === "none" && call.succeeded));
+		const verificationAttempted = pending.kind === "verification";
+		const verificationPassed = verificationAttempted && call.succeeded;
 		const verificationOrdered = verificationAttempted &&
 			this.pendingMutations === 0 &&
 			(this.latestMutationBoundary === null || pending.startedSequence > this.latestMutationBoundary);

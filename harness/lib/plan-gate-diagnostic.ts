@@ -63,16 +63,12 @@ export function safeGateDiagnostic(gate: string, result: GateResult): SafeGateDi
 
 export function renderSafeGateFailure(parts: {
 	diagnostic: SafeGateDiagnostic;
-	attempt: number;
-	maxAttempts: number;
 	requiredNextAction: string;
 }): string {
 	return [
-		"PLAN_GATE_FAILURE",
+		"PROJECT_VERIFICATION_FAILURE",
 		"status=red",
 		`failure_class=${parts.diagnostic.failureClass}`,
-		`attempt=${parts.attempt}`,
-		`maximum_attempts=${parts.maxAttempts}`,
 		`required_next_action=${parts.requiredNextAction}`,
 		"UNTRUSTED_GATE_DIAGNOSTIC",
 		JSON.stringify(parts.diagnostic.diagnostic),

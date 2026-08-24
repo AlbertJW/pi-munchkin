@@ -17,9 +17,8 @@ export const AMBIENT_TOOL_GUIDANCE = `Context-overflow error (400 exceeds contex
 
 ## Plan workflow
 
-/plan <req> → model writes TODO list (plan_write), stops. Review, then /plan-go to execute.
-/plan <req> yolo → plan + run straight through. Pick by risk: confident + low-risk → yolo; risky/uncertain/destructive → lean.
-Model owns the list: plan_write to add/remove/reorder/restatus. One item in_progress at a time.
+/plan <req> → enter the read-only planning surface, write at most 24 short items with plan_write, then stop. Review, then /plan-go to execute.
+Use plan_update with small stable-ID deltas for status and notes. Never resend the whole plan for routine progress. One item in_progress at a time.
 /plan-status shows list. /plan-trace [n] shows recent trace.
 
 ## Delegation

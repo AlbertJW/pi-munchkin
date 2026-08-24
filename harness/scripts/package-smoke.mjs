@@ -36,7 +36,6 @@ const expectedExtensions = [
   "harness/extensions/tool-call-rescue.ts",
   "harness/extensions/verify-gate.ts",
   "harness/extensions/plan-runner.ts",
-  "harness/extensions/reflect.ts",
   "harness/extensions/drift-scanner.ts",
   "harness/extensions/git-guard.ts",
   "harness/extensions/context-inlet-guard.ts",
@@ -152,6 +151,15 @@ try {
   );
   assert.deepEqual(loaded.errors, [], `installed extension load errors:\n${loaded.errors.map(({ path, error }) => `${path}: ${error}`).join("\n")}`);
   assert.equal(loaded.extensions.length, extensions.length, "pi must load every installed manifest extension");
+  const definitions = [...new Map(loaded.extensions.flatMap((extension) =>
+    [...extension.tools.values()].map(({ definition }) => [definition.name, definition]))).values()];
+  const coreNames = new Set(["search_spans", "read_span", "recall", "verify_project", "capability"]);
+  const schemaBytes = (definition) => Buffer.byteLength(JSON.stringify(definition.parameters ?? {}), "utf8");
+  const ambientSchemaBytes = definitions.reduce((total, definition) => total + schemaBytes(definition), 0);
+  const coreSchemaBytes = definitions.filter((definition) => coreNames.has(definition.name))
+    .reduce((total, definition) => total + schemaBytes(definition), 0);
+  assert(ambientSchemaBytes > 0 && 1 - (coreSchemaBytes / ambientSchemaBytes) >= 0.70,
+    `core extension schemas must reduce the first-party ambient surface by at least 70% (${coreSchemaBytes}/${ambientSchemaBytes})`);
   const loadedSkills = loadSkillsFromDir({ dir: resolve(installedRoot, "skills"), source: "package" });
   assert.deepEqual(loadedSkills.diagnostics, [], `installed skill diagnostics: ${JSON.stringify(loadedSkills.diagnostics)}`);
   assert.deepEqual(loadedSkills.skills.map(({ name }) => name), ["deep-research", "lavish-review"], "installed tarball must discover the shipped skill set");

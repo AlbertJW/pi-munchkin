@@ -14,13 +14,6 @@ const RUN_EVENT_TYPES = new Set<RunEventV1["type"]>([
 	"run/control-proposed",
 	"run/control-decided",
 	"run/plan-observed",
-	// Was MISSING here while present in the union, the reducer, the dispatcher and
-	// the payload switch below — so isRunEventV1 rejected every plan gate before
-	// the reducer saw one, and TWO shipped fixes that depended on this path (gate
-	// identity, order-independent verification) were inert in production while
-	// their reducer-level tests passed. See the union-coverage test in
-	// run-kernel-events.test.ts, which now makes this class of drift impossible.
-	"run/plan-gate-observed",
 	"run/context-observed",
 	"run/failure-state-observed",
 	"run/recovery-resumed",
@@ -161,10 +154,6 @@ export function isRunEventV1(value: unknown): value is RunEventV1 {
 			return exactKeys(event, [...base, "runIdHash", "accepted", "executionStarted", "openItems"]) &&
 				hash(event.runIdHash) && typeof event.accepted === "boolean" && typeof event.executionStarted === "boolean" &&
 				(event.openItems === null || integer(event.openItems));
-		case "run/plan-gate-observed":
-			return exactKeys(event, [...base, "runIdHash", "pass", "fails", "gateHash"]) &&
-				hash(event.runIdHash) && typeof event.pass === "boolean" && integer(event.fails) &&
-				(event.gateHash === null || hash(event.gateHash));
 		case "run/context-observed":
 			return exactKeys(event, [...base, "usagePct"]) && (event.usagePct === null || finiteNumber(event.usagePct));
 		case "run/failure-state-observed":

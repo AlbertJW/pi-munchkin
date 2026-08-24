@@ -87,7 +87,7 @@ try {
     assert.equal(loaded.extensions.length, extensions.length, "extension count must match manifest");
     const definitions = new Map(loaded.extensions.flatMap((extension) =>
       [...extension.tools.values()].map(({ definition }) => [definition.name, definition])));
-    for (const name of ["compact_context", "search_spans", "read_span", "plan_write", "plan_go", "subagent"]) {
+    for (const name of ["compact_context", "search_spans", "read_span", "plan_write", "plan_update", "verify_project", "subagent"]) {
       const definition = definitions.get(name);
       assert(definition, name + " must be present in the complete registry");
       assert(Array.isArray(definition.promptGuidelines) && definition.promptGuidelines.length > 0,

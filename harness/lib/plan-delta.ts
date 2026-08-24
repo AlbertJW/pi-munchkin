@@ -1,19 +1,16 @@
 export type DeltaStatus = "pending" | "in_progress" | "done" | "blocked";
 export type PlanDelta = {
 	item_id: string;
-	status: DeltaStatus;
+	status?: DeltaStatus;
 	note?: string;
-	failure_class?: string;
 };
-export type DeltaItem = { id: string; status: DeltaStatus; note?: string; failure_class?: string };
+export type DeltaItem = { id: string; status: DeltaStatus; note?: string };
 
 export type DeltaResult =
 	| { ok: true; items: DeltaItem[]; changed: number; idempotent: number }
 	| { ok: false; errors: string[] };
 
-const FAILURE_CLASSES = new Set(["blocked_needs_input", "blocked_other", "user_action_required", "unknown"]);
-
-/** Apply stable-ID status changes without allowing title, order, dependency, or membership edits. */
+/** Apply bounded stable-ID status/note changes without changing plan structure. */
 export function applyPlanDeltas(items: DeltaItem[], deltas: PlanDelta[]): DeltaResult {
 	if (!Array.isArray(deltas) || deltas.length === 0) return { ok: false, errors: ["at least one delta is required"] };
 	const byId = new Map(items.map((item) => [item.id, item]));
@@ -25,9 +22,10 @@ export function applyPlanDeltas(items: DeltaItem[], deltas: PlanDelta[]): DeltaR
 			continue;
 		}
 		if (!byId.has(delta.item_id)) errors.push(`unknown item_id: ${delta.item_id}`);
-		if (!new Set(["pending", "in_progress", "done", "blocked"]).has(delta.status)) errors.push(`invalid status for ${delta.item_id}`);
-		if (delta.note !== undefined && (typeof delta.note !== "string" || delta.note.length > 300 || /[\r\n]/.test(delta.note))) errors.push(`note must be one bounded line for ${delta.item_id}`);
-		if (delta.failure_class !== undefined && (typeof delta.failure_class !== "string" || !FAILURE_CLASSES.has(delta.failure_class))) errors.push(`invalid failure class for ${delta.item_id}`);
+		if (delta.status !== undefined && !new Set(["pending", "in_progress", "done", "blocked"]).has(delta.status)) errors.push(`invalid status for ${delta.item_id}`);
+		if (delta.status === undefined && delta.note === undefined) errors.push(`status or note is required for ${delta.item_id}`);
+		if (delta.note !== undefined && (typeof delta.note !== "string" || Buffer.byteLength(delta.note, "utf8") > 300 || /\r/.test(delta.note))) errors.push(`note must be at most 300 UTF-8 bytes for ${delta.item_id}`);
+		if (delta.status === "blocked" && (!delta.note || !delta.note.trim())) errors.push(`blocked status requires a note for ${delta.item_id}`);
 		const previous = seen.get(delta.item_id);
 		if (previous && JSON.stringify(previous) !== JSON.stringify(delta)) errors.push(`conflicting duplicate delta: ${delta.item_id}`);
 		seen.set(delta.item_id, delta);
@@ -38,14 +36,16 @@ export function applyPlanDeltas(items: DeltaItem[], deltas: PlanDelta[]): DeltaR
 	const next = items.map((item) => {
 		const delta = seen.get(item.id);
 		if (!delta) return { ...item };
-		const same = item.status === delta.status && (delta.note === undefined || item.note === delta.note) &&
-			(delta.failure_class === undefined || item.failure_class === delta.failure_class);
+		const status = delta.status ?? item.status;
+		const same = item.status === status && (delta.note === undefined || item.note === delta.note);
 		if (same) { idempotent += 1; return { ...item }; }
 		changed += 1;
-		const updated = { ...item, status: delta.status };
+		const updated = { ...item, status };
 		if (delta.note !== undefined) updated.note = delta.note;
-		if (delta.failure_class !== undefined) updated.failure_class = delta.failure_class;
 		return updated;
 	});
+	if (next.filter((item) => item.status === "in_progress").length > 1) {
+		return { ok: false, errors: ["at most one item may be in_progress"] };
+	}
 	return { ok: true, items: next, changed, idempotent };
 }

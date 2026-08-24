@@ -62,13 +62,13 @@ test("missing starts and duplicate ends cannot manufacture verification", () => 
 	assert.equal(clock.finish({ callId: "gate", succeeded: true }), null);
 });
 
-test("aggregate plan gates use the plan_write start boundary", () => {
+test("a proven pre-execution refusal cancels a pending mutation", () => {
 	const clock = new VerificationOrderClock();
-	clock.start({ callId: "mutation", kind: "source_mutation" });
-	clock.start({ callId: "plan", kind: "other" });
-	clock.finish({ callId: "mutation", succeeded: true });
-	assert.equal(clock.finish({ callId: "plan", succeeded: true, verificationOverride: "passed" })?.verificationValid, false);
-
-	clock.start({ callId: "plan-later", kind: "other" });
-	assert.equal(clock.finish({ callId: "plan-later", succeeded: true, verificationOverride: "passed" })?.verificationValid, true);
+	clock.start({ callId: "blocked", kind: "source_mutation" });
+	assert.equal(clock.hasPendingMutations(), true);
+	assert.equal(clock.prevent("blocked"), "source_mutation");
+	assert.equal(clock.hasPendingMutations(), false);
+	assert.equal(clock.hasCompleted("blocked"), true);
+	clock.start({ callId: "gate", kind: "verification" });
+	assert.equal(clock.finish({ callId: "gate", succeeded: true })?.verificationValid, true);
 });

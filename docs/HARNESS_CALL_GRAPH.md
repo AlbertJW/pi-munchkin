@@ -114,7 +114,6 @@ verifiers are cheap and belong inside the loop edges.
 | **Teaching hints** | `teach-hints.ts` | yes (one-shot nudge) | Optional side-edge |
 | **Plan generation** | `plan-runner.ts` | yes (model owns items) | Graph builder for the plan sub-graph |
 | **Compaction summary** | `compact-tool.ts` | yes (summarise self) | Recovery/checkpoint node |
-| **Reflection** | `reflect.ts` | yes | Persistent-memory write |
 | **Dynamic activation decision** | `tool-activation.ts` | borderline (heuristic; model-evidence gated) | Edge toggle |
 
 ### 1b. Deterministic nodes (cheap, belong on edges, not as hubs)
@@ -125,7 +124,7 @@ verifiers are cheap and belong inside the loop edges.
 | **loop-breaker detector** | `loop-breaker.ts` | Detects repeated calls / reasoning / outcomes / thrown executions / session grinding. A *supervisor* node (see §5). |
 | **verify-gate verifier** | `verify-gate.ts` | Accepts work as done only after ordered verification evidence after the latest mutation. The core *validation gate*. |
 | **control arbiter** | `control-arbiter.ts` / `control-proposal.ts` | Decides allow / steer / proceed on a control proposal. A *conditional edge*. |
-| **plan gate runner** | `plan-runner.ts` (gate receipts) | Deduplicated one-shot gate receipts per item. A *validation gate*. |
+| **bounded planner** | `plan-runner.ts` | Read-only plan entry plus stable-ID structural writes and small progress deltas. It owns intent, never verification. |
 | **git-guard** | `git-guard.ts` | Confirms before destructive commands. A *human gate*. |
 | **context / bash guards** | `context-inlet-guard.ts`, `bash-output-guard.ts` | Refuse oversized provider-bound I/O. *Verifiers* on the I/O edges. |
 | **ketch validators** | `ketch.ts` (publicHttpUrl, redirect checks) | URL / redirect validation on the web-search edge. *Verifiers*. |
@@ -153,7 +152,7 @@ are explicit, reversible, and mechanism-observed.**
 | did-you-mean | ambiguous spec detected? | `did-you-mean.ts` | clarify ⇐ yes · proceed ⇐ no |
 | role routing | task matches a role? | `role-routing.ts` | role ⇐ yes · primary ⇐ no |
 | dynamic activation | session shows need (evidence)? | `tool-activation.ts` | expose ⇐ yes · hide ⇐ no (toggle edge) |
-| plan gate receipt | item already verified once? | `plan-runner.ts` | dedup ⇐ yes · run ⇐ no |
+| capability switch | requested specialist family is allowed in this phase? | `tool-activation.ts` | add family ⇐ yes · preserve surface ⇐ no |
 | git-guard | command could discard uncommitted work? | `git-guard.ts` | confirm ⇐ yes · run ⇐ no |
 | context/bash guard | input/output oversized? | guards | refuse ⇐ yes · pass ⇐ no |
 
@@ -208,7 +207,7 @@ instructions).
 
 | AVO primitive | Where it lives in the harness |
 |---|---|
-| **Persistent memory** | the tool stream + run kernel + blackboard + working memory + reflections (all bounded/redacted) |
+| **Persistent memory** | deterministic run capsules plus external observational memory recall; neither owns plan status or verification |
 | **Supervisor that watches for stagnation and redirects** | `loop-breaker.ts` (detects repeated failing actions) → `loop-recovery.ts` (redirects) |
 | **Candidate lineage / selection updates** | the optimizer (`optimizer/`: `grade_reporter.py`, `real_gate.sh`, `trial_validity.py`) — currently *mothballed/rebooted, not live* |
 | **Execution-grounded feedback** | `verify-gate.ts` (feedback only after real verification after the edit) + hashline (edit grounded in actual file change) |
@@ -248,7 +247,7 @@ machine→human→machine boundary.
 | Gate | File | What it gates |
 |---|---|---|
 | **verify-gate human** | `verify-gate.ts` | treats work done only after human-visible ordered verification |
-| **plan gates** | `plan-runner.ts` | each item's pass/fail check |
+| **session verification** | `verify-gate.ts` / `verify_project` | one exact project gate after the latest mutation |
 | **git-guard** | `git-guard.ts` | destructive-command confirmation |
 | **secret-scan** | `optimizer/real_gate.sh` / `secret-scan.ts` | push safety (public repo) |
 | **mirror:check** | `live-mirror.ts` | live-harness mirror integrity |
@@ -264,7 +263,7 @@ Keep them as gates — adding routing around a gate is a graph pretending to be 
 
 | Category | AVO term | Harness nodes |
 |---|---|---|
-| **Validation gates** | validation gate | verify-gate, hashline matcher, bash/context guards, ketch validators, plan gate receipts |
+| **Validation gates** | validation gate | verify-gate, hashline matcher, bash/context guards, ketch validators |
 | **Checkpoints / persistence** | checkpoint | run-kernel snapshot, working-memory, blackboard, plan-state, run-capsule-store |
 | **Recovery paths** | recovery | recovery-brief → run-capsule → `/run-resume`; loop-recovery |
 | **Observability** | observability | telemetry (mechanism counts), surface receipt (provenance), blackboard cockpit, runtime-truth |

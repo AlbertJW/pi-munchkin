@@ -1,190 +1,225 @@
-import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
-import { measureActiveSurface, phaseDeferredTools, PHASE_CAPABILITY_TOOLS } from "../lib/capability-surface.ts";
+import { readFile } from "node:fs/promises";
+import { join } from "node:path";
+import { defineTool, type ExtensionAPI } from "@earendil-works/pi-coding-agent";
+import { Type } from "typebox";
+import { agentDir } from "../lib/agent-dir.ts";
+import { measureActiveSurface } from "../lib/capability-surface.ts";
 import { classifyBashCommand } from "../lib/command-policy.ts";
 import { record } from "../lib/telemetry.ts";
 import { initialToolSurface } from "../lib/session-bootstrap.ts";
-import { onHarnessSignal, type CapabilityName } from "../lib/harness-signals.ts";
+import { onHarnessSignal } from "../lib/harness-signals.ts";
 
-type Mode = "ambient" | "dynamic" | "phase";
-type SurfaceMode = "default" | "minimal";
-type DeferredTool = "subagent" | "compact_context";
-const DYNAMIC_DEFERRED: readonly DeferredTool[] = ["subagent", "compact_context"];
-const BASE_REGISTRY = ["read", "bash", "edit", "write"];
-export const MINIMAL_TOOL_SURFACE = BASE_REGISTRY;
+type Profile = "ambient" | "core";
+type LegacyMode = "ambient" | "dynamic" | "phase";
+type Family = "research" | "delegation" | "browser" | "canvas" | "context";
 
-// "bash" is not a mutation — a bash COMMAND may or may not be. A tool-name set
-// counted the opening `rg`/`ls`/`git status` of nearly every session as the
-// first mutation, and because the flag latches once, the real `edit` that
-// followed emitted nothing at all: the true timestamp was never written, so
-// pre-fix rows cannot be repaired by filtering and must be discarded. Delegate
-// to the shared classifier (which fails CLOSED on unknown commands) rather than
-// growing a fourth private regex — there are already three in this repo.
-function isMutationResult(toolName: string, input: unknown): boolean {
-	if (toolName === "edit" || toolName === "write") return true;
-	if (toolName !== "bash") return false;
-	const command = (input as { command?: unknown } | undefined)?.command;
-	return classifyBashCommand(typeof command === "string" ? command : "").mutates;
+export const MUNCHKIN_TOOL_PROFILE_DEFAULT: Profile = "ambient";
+const CORE_NAMES = new Set([
+	"read", "bash", "edit", "write", "search_spans", "read_span", "recall",
+	"verify_project", "capability", "plan_write", "plan_update",
+]);
+const PI_OPTIONAL_DEFAULTS = new Set(["grep", "find", "ls"]);
+const EXPLICIT_FLAG = "__pi_tool_selection_explicit";
+
+function profileFromEnvironment(): Profile {
+	if (process.env.MUNCHKIN_TOOL_PROFILE === "core" || process.env.MUNCHKIN_TOOL_SURFACE === "minimal") return "core";
+	return MUNCHKIN_TOOL_PROFILE_DEFAULT;
 }
 
-function modeFromEnvironment(): Mode {
+function legacyMode(): LegacyMode {
 	const value = process.env.MUNCHKIN_TOOL_ACTIVATION;
 	return value === "ambient" || value === "phase" ? value : "dynamic";
 }
 
-function surfaceFromEnvironment(): SurfaceMode {
-	return process.env.MUNCHKIN_TOOL_SURFACE === "minimal" ? "minimal" : "default";
+function commandLineIsExplicit(argv: readonly string[] = process.argv): boolean {
+	return argv.some((arg) => ["--tools", "--exclude-tools", "--no-tools", "--no-builtin-tools"].includes(arg) ||
+		arg.startsWith("--tools=") || arg.startsWith("--exclude-tools="));
+}
+
+async function settingsAreExplicit(cwd: string): Promise<boolean> {
+	for (const path of [join(agentDir(), "settings.json"), join(cwd, ".pi", "settings.json")]) {
+		try {
+			const value = JSON.parse(await readFile(path, "utf8"));
+			if (Array.isArray(value?.defaultTools)) return true;
+		} catch { /* absent or malformed settings are not evidence of explicit intent */ }
+	}
+	return false;
+}
+
+export function baselineLooksExplicit(active: readonly string[], all: readonly string[], argv: readonly string[] = process.argv): boolean {
+	if (commandLineIsExplicit(argv)) return true;
+	const activeSet = new Set(active);
+	return all.some((name) => !activeSet.has(name) && !PI_OPTIONAL_DEFAULTS.has(name));
+}
+
+function familyTools(family: Family, all: readonly string[]): string[] {
+	switch (family) {
+		case "research": return all.filter((name) => name === "web_search" || name === "web_read");
+		case "delegation": return all.filter((name) => name === "subagent");
+		case "browser": return all.filter((name) => name.startsWith("browser_"));
+		case "canvas": return all.filter((name) => name.startsWith("tldraw_"));
+		case "context": return all.filter((name) => name === "compact_context");
+	}
+}
+
+function isMutationResult(toolName: string, input: unknown): boolean {
+	if (toolName === "edit" || toolName === "write") return true;
+	if (toolName !== "bash") return false;
+	return classifyBashCommand(String((input as { command?: unknown } | undefined)?.command ?? "")).mutates;
 }
 
 export default function (pi: ExtensionAPI): void {
-	const mode = modeFromEnvironment();
-	const surfaceMode = surfaceFromEnvironment();
+	const profile = profileFromEnvironment();
+	const activationMode = legacyMode();
 	const g = globalThis as Record<string, unknown>;
-	const publish = (value: Record<string, unknown>) => { g.__pi_tool_activation_state = value; };
-	publish({ mode, surface_mode: surfaceMode, preserved_explicit: false, reason: "startup", phase: mode === "phase" ? "phase-aware" : "ambient-or-dynamic" });
-	if (mode === "ambient" && surfaceMode === "default") return;
-
-	const deferred = new Set<string>();
-	const attempted = new Set<CapabilityName>();
 	let allTools: any[] = [];
+	let allNames: string[] = [];
 	let explicit = false;
+	let deferred = new Set<string>();
+	let attempted = new Set<Family>();
 	let lastOpenItems = 0;
 	let lastContextPct = 0;
-	let sessionStartedAt = 0;
 	let firstUsefulMutation = false;
+	let sessionStartedAt = 0;
 
-	function activationState(extra: Record<string, unknown> = {}): void {
-		const current = (g.__pi_tool_activation_state && typeof g.__pi_tool_activation_state === "object")
-			? g.__pi_tool_activation_state as Record<string, unknown> : {};
-		publish({ ...current, ...extra, deferred: [...deferred].sort(), attempted: [...attempted].sort() });
-	}
+	const publish = (reason: string) => {
+		g.__pi_tool_activation_state = {
+			profile, mode: activationMode, preserved_explicit: explicit, reason,
+			deferred: [...deferred].sort(), attempted: [...attempted].sort(),
+		};
+		g[EXPLICIT_FLAG] = explicit;
+	};
 
-	function surfaceTelemetry(): void {
+	const surfaceTelemetry = () => {
 		const active = pi.getActiveTools();
 		const measured = measureActiveSurface(allTools, active);
 		record("tool-activation", "surface", {
-			mode, surface_mode: surfaceMode, active_tools: active.length, all_tools: allTools.length,
+			mode: activationMode, surface_mode: profile, active_tools: active.length, all_tools: allTools.length,
 			schema_bytes: measured.schemaBytes, guideline_bytes: measured.guidelineBytes,
 			deferred_tools: deferred.size, unavailable_attempts: 0,
 		});
-	}
+	};
 
-	function activateCapability(capability: CapabilityName, reason: string): void {
-		if (surfaceMode === "minimal") return;
-		if (mode !== "phase" && capability !== "subagent" && capability !== "compact_context") return;
-		if (attempted.has(capability)) return;
-		const names = PHASE_CAPABILITY_TOOLS[capability];
-		const available = names.filter((name) => deferred.has(name));
-		if (available.length === 0) return;
-		attempted.add(capability); // one automatic attempt; later manual disables win
-		activationState();
+	const activateFamily = (family: Family, reason: string): { activated: number; status: string } => {
+		if (attempted.has(family)) return { activated: 0, status: "already-attempted-or-manually-disabled" };
+		attempted.add(family);
+		if (g.__pi_plan_phase_active === true && family !== "research") {
+			publish("planning-restriction");
+			return { activated: 0, status: "planning-allows-research-only" };
+		}
+		const names = familyTools(family, allNames);
+		const allowed = explicit ? names.filter((name) => initialToolSurface()?.active.includes(name)) : names;
 		const active = pi.getActiveTools();
-		const next = [...active, ...available.filter((name) => !active.includes(name))];
+		const add = allowed.filter((name) => deferred.has(name) && !active.includes(name));
+		if (!add.length) {
+			publish(explicit ? "preserved-explicit" : "unavailable-or-active");
+			return { activated: 0, status: explicit ? "preserved-explicit" : "unavailable-or-active" };
+		}
 		try {
-			pi.setActiveTools(next);
-			for (const tool of available) record("tool-activation", "activated", { tool, reason });
+			pi.setActiveTools([...active, ...add]);
+			for (const name of add) {
+				deferred.delete(name);
+				record("tool-activation", "activated", { tool: name, reason });
+			}
+			publish("activated");
 			surfaceTelemetry();
-		} catch { /* incompatible runtime: fail open and never churn the surface */ }
-	}
+			return { activated: add.length, status: "activated" };
+		} catch {
+			publish("activation-failed");
+			return { activated: 0, status: "activation-failed" };
+		}
+	};
 
-	function activateDynamic(tool: DeferredTool, reason: string): void {
-		if (surfaceMode === "minimal") return;
-		if (mode !== "dynamic" || !deferred.has(tool) || attempted.has(tool)) return;
-		attempted.add(tool);
-		activationState();
-		const active = pi.getActiveTools();
-		if (active.includes(tool)) return;
-		try {
-			pi.setActiveTools([...active, tool]);
-			record("tool-activation", "activated", { tool, reason });
-			surfaceTelemetry();
-		} catch { /* incompatible runtime: fail open and never churn the surface */ }
-	}
-
-	function activate(capability: CapabilityName, reason: string): void {
-		if (mode === "phase") activateCapability(capability, reason);
-		else if (capability === "subagent" || capability === "compact_context") activateDynamic(capability, reason);
-	}
+	pi.registerTool(defineTool({
+		name: "capability",
+		label: "Capability Switch",
+		description: "Enable one specialist tool family for this session, or report bounded family status.",
+		promptSnippet: "capability: enable research, delegation, browser, canvas, or context tools only when needed",
+		parameters: Type.Object({
+			action: Type.Union([Type.Literal("enable"), Type.Literal("status")]),
+			family: Type.Optional(Type.Union([
+				Type.Literal("research"), Type.Literal("delegation"), Type.Literal("browser"),
+				Type.Literal("canvas"), Type.Literal("context"),
+			])),
+		}),
+		async execute(_toolCallId, params) {
+			if (params.action === "enable" && !params.family) throw new Error("capability: family is required for enable");
+			const result = params.action === "enable" ? activateFamily(params.family as Family, "model-request") : null;
+			const activeFamilies = (["research", "delegation", "browser", "canvas", "context"] as Family[])
+				.filter((family) => familyTools(family, allNames).some((name) => pi.getActiveTools().includes(name)));
+			return {
+				content: [{ type: "text" as const, text: JSON.stringify({ profile, explicit, active_families: activeFamilies, result }) }],
+				details: { tool_name: "capability", success: result?.status !== "activation-failed" },
+			};
+		},
+	}));
 
 	onHarnessSignal(pi.events, (signal) => {
-		if (signal.type === "plan/write") {
-			lastOpenItems = signal.openItems;
-			if (mode === "phase") activate("plan_go", "accepted-plan");
+		if (signal.type === "plan/write") lastOpenItems = signal.openItems;
+		if (signal.type === "plan/go" && lastOpenItems > 1) activateFamily("delegation", "multi-item-execution");
+		if (signal.type === "loop/tier" && signal.tier === 2) activateFamily("delegation", signal.detector === "semantic" ? "semantic-tier-two" : "loop-tier-two");
+		if (signal.type === "capability/need") {
+			if (signal.capability === "subagent") activateFamily("delegation", signal.reason);
+			if (signal.capability === "compact_context") activateFamily("context", signal.reason);
+			if (signal.capability === "web_read") activateFamily("research", signal.reason);
 		}
-		if (signal.type === "plan/go" && lastOpenItems > 1) activate("subagent", "multi-item-execution");
-		if (signal.type === "plan/gate" && !signal.pass && signal.fails >= 2) activate("subagent", "second-gate-failure");
-		if (signal.type === "loop/tier" && signal.tier === 2) {
-			activate("subagent", signal.detector === "semantic" ? "semantic-tier-two" : "loop-tier-two");
-		}
-		if (signal.type === "capability/need") activate(signal.capability, signal.reason);
 	});
 
-	pi.on("session_start", async () => {
-		publish({ mode, surface_mode: surfaceMode, preserved_explicit: false, reason: mode === "phase" ? "phase-start" : surfaceMode === "minimal" ? "minimal-startup" : "dynamic-startup", phase: mode === "phase" ? "phase-aware" : "ambient-or-dynamic" });
-		deferred.clear();
-		attempted.clear();
+	pi.on("session_start", async (_event, ctx) => {
+		deferred = new Set();
+		attempted = new Set();
 		lastOpenItems = 0;
 		lastContextPct = 0;
-		sessionStartedAt = performance.now();
 		firstUsefulMutation = false;
+		sessionStartedAt = performance.now();
 		try { allTools = pi.getAllTools() as any[]; } catch { allTools = []; }
-		const active = pi.getActiveTools();
+		allNames = allTools.map((tool) => String(tool.name));
 		const baseline = initialToolSurface();
 		if (!baseline?.complete) {
-			publish({ mode, surface_mode: surfaceMode, preserved_explicit: true, reason: "bootstrap-unavailable", phase: mode === "phase" ? "phase-aware" : "dynamic" });
-			for (const tool of mode === "phase" ? phaseDeferredTools(allTools.map((item) => String(item.name))) : DYNAMIC_DEFERRED) {
-				record("tool-activation", "preserved-explicit", { tool, reason: "bootstrap-unavailable" });
+			explicit = true;
+			publish("bootstrap-unavailable");
+			surfaceTelemetry();
+			return;
+		}
+		explicit = baselineLooksExplicit(baseline.active, baseline.all) || await settingsAreExplicit(ctx.cwd);
+		publish(explicit ? "preserved-explicit" : "startup");
+		if (explicit) {
+			for (const family of ["research", "delegation", "browser", "canvas", "context"] as Family[]) {
+				for (const tool of familyTools(family, allNames)) record("tool-activation", "preserved-explicit", { tool, reason: "explicit-tools" });
 			}
 			surfaceTelemetry();
 			return;
 		}
-		const all = [...baseline.all];
-		const initialActive = [...baseline.active];
-		const allSet = new Set(all);
-		const activeSet = new Set(initialActive);
-		const complete = [...BASE_REGISTRY, ...DYNAMIC_DEFERRED].every((name) => allSet.has(name));
-		explicit = activeSet.size !== allSet.size || all.some((name) => !activeSet.has(name));
-		const deferredNames = mode === "phase" ? phaseDeferredTools(all) : new Set(DYNAMIC_DEFERRED.filter((name) => allSet.has(name)));
-		if (!complete || explicit) {
-			publish({ mode, surface_mode: surfaceMode, preserved_explicit: true, reason: complete ? "narrowed-tools" : "incomplete-registry", phase: mode === "phase" ? "phase-aware" : "dynamic" });
-			for (const tool of deferredNames) record("tool-activation", "preserved-explicit", { tool, reason: complete ? "narrowed-tools" : "incomplete-registry" });
+
+		const active = pi.getActiveTools();
+		if (profile === "core") {
+			const activePlan = Boolean(g.__pi_active_plan_context);
+			const core = active.filter((name) => CORE_NAMES.has(name) && (activePlan || (name !== "plan_write" && name !== "plan_update")));
+			deferred = new Set(active.filter((name) => !core.includes(name)));
+			pi.setActiveTools(core);
+			for (const name of deferred) record("tool-activation", "deferred", { tool: name, reason: "core-startup" });
+			publish("core-startup");
 			surfaceTelemetry();
 			return;
 		}
-		if (surfaceMode === "minimal") {
-			const minimal = BASE_REGISTRY.filter((name) => allSet.has(name));
-			if (minimal.length === BASE_REGISTRY.length) {
-				pi.setActiveTools(minimal);
-				publish({ mode, surface_mode: surfaceMode, preserved_explicit: false, reason: "minimal-startup", phase: "minimal", deferred: [], attempted: [] });
-				surfaceTelemetry();
-				return;
-			}
-			publish({ mode, surface_mode: surfaceMode, preserved_explicit: true, reason: "minimal-incomplete", phase: "minimal" });
-			surfaceTelemetry();
-			return;
+
+		if (activationMode !== "ambient") {
+			for (const name of ["subagent", "compact_context"]) if (active.includes(name)) deferred.add(name);
+			pi.setActiveTools(active.filter((name) => !deferred.has(name)));
+			for (const name of deferred) record("tool-activation", "deferred", { tool: name, reason: "dynamic-startup" });
 		}
-		for (const tool of deferredNames) {
-			deferred.add(tool);
-			record("tool-activation", "deferred", { tool, reason: mode === "phase" ? "phase-start" : "dynamic-startup" });
-		}
-		pi.setActiveTools(active.filter((name) => !deferred.has(name)));
-		publish({ mode, surface_mode: surfaceMode, preserved_explicit: false, reason: mode === "phase" ? "phase-start" : "dynamic-startup", phase: mode === "phase" ? "phase-aware" : "dynamic", deferred: [...deferred].sort(), attempted: [] });
+		publish(activationMode === "ambient" ? "ambient-startup" : "dynamic-startup");
 		surfaceTelemetry();
 	});
 
 	pi.on("context", async (_event, ctx) => {
 		const pct = ctx.getContextUsage()?.percent;
-		if (pct != null && lastContextPct < 60 && pct >= 60) activate("compact_context", "context-60");
+		if (pct != null && lastContextPct < 60 && pct >= 60) activateFamily("context", "context-60");
 		if (pct != null) lastContextPct = pct;
 	});
 
-	pi.on("tool_call", async (event) => {
-		if (mode === "phase" && deferred.has(event.toolName) && !pi.getActiveTools().includes(event.toolName)) {
-			record("tool-activation", "unavailable", { tool: event.toolName, reason: "deferred-capability" });
-		}
-	});
-
 	pi.on("tool_result", async (event) => {
-		if (firstUsefulMutation || event.isError === true || !isMutationResult(event.toolName, event.input)) return;
+		if (firstUsefulMutation || event.isError || !isMutationResult(event.toolName, event.input)) return;
 		firstUsefulMutation = true;
 		record("tool-activation", "first-useful-mutation", { elapsed_ms: Math.max(0, Math.round(performance.now() - sessionStartedAt)), tool: event.toolName });
 	});

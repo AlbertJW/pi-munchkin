@@ -125,7 +125,7 @@ export function toolFamily(toolName: string, args: Record<string, unknown>): str
 		const command = String(args.command ?? "");
 		return classifyBashCommand(command).verifyLike ? "bash:verify" : `bash:${bashHead(command)}`;
 	}
-	if (toolName === "plan_write" || toolName === "plan_go") return "plan";
+	if (toolName === "plan_write" || toolName === "plan_update" || toolName === "plan_go") return "plan";
 	if (toolName === "edit" || toolName === "write" || toolName === "multiedit") return "file_mutation";
 	return safeAtom(toolName).toLowerCase();
 }

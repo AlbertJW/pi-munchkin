@@ -124,7 +124,7 @@ if (!CHILD) {
 			})),
 		);
 		const inactive = toolSurface([]);
-		for (const name of ["compact_context", "search_spans", "read_span", "plan_write", "plan_go", "subagent"]) {
+		for (const name of ["compact_context", "search_spans", "read_span", "plan_write", "plan_update", "subagent"]) {
 			assert.equal(inactive.includes(name), false);
 			const active = toolSurface([name]);
 			assert.equal(active.includes(name), true);

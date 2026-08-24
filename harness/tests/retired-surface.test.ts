@@ -30,7 +30,7 @@ test("retired environment options have no loadable runtime reader", () => {
 	const retired = [
 		"CTX_REDUNDANCY_NUDGE", "CTX_REDUNDANCY_PCT", "PLAN_SUBAGENT_ONLY",
 		"MICRO_GATE", "MICRO_GATE_SLOP", "PAYLOAD_AUDIT", "PROVIDER_PATIENCE",
-		"PI_PROVIDER_HEADERS_TIMEOUT_MS", "PI_PROVIDER_BODY_TIMEOUT_MS",
+		"PI_PROVIDER_HEADERS_TIMEOUT_MS", "PI_PROVIDER_BODY_TIMEOUT_MS", "REFLECT_TIMEOUT_MS",
 	];
 	const files = ["extensions", "lib", "vendor"]
 		.flatMap((directory) => sourceFiles(join(root, "harness", directory)));
@@ -62,7 +62,7 @@ test("retired environment options have no active optimizer runtime reader", () =
 test("retired extensions and policy are absent from package and active optimizer schemas", () => {
 	const manifest = JSON.parse(readFileSync(join(root, "package.json"), "utf8"));
 	const serializedManifest = JSON.stringify(manifest);
-	for (const path of ["micro-gate.ts", "micro-gate-policy.ts", "payload-audit.ts", "provider-patience.ts"]) {
+	for (const path of ["micro-gate.ts", "micro-gate-policy.ts", "payload-audit.ts", "provider-patience.ts", "reflect.ts", "reflect-policy.ts"]) {
 		assert.equal(serializedManifest.includes(path), false, `${path} remains package-visible`);
 	}
 	const schema = JSON.parse(readFileSync(join(root, "optimizer", "prompt-lab", "configs", "schema.json"), "utf8"));

@@ -122,11 +122,10 @@ test("a detail field may NOT shadow a telemetry envelope key", () => {
 	// detail on purpose and writes back the same value, so they must still be allowed.
 	withFile((file) => {
 		process.env.TELEMETRY_STRICT = "0";
-		record("plan-runner", "go", { resumed: false, stale: 0, activation: "command", run_id: "r1" });
+		record("plan-runner", "go", { resumed: false, run_id: "r1" });
 		const row = JSON.parse(readFileSync(file, "utf8").trim());
 		assert.equal(row.kind, "go", "a legitimate row must still be written");
 		assert.equal(row.run_id, "r1", "run_id is promoted, not shadowed");
-		assert.equal(row.activation, "command");
 		assert.notEqual(row.source, "command", "the envelope's source must survive");
 	});
 });
@@ -145,7 +144,7 @@ test("production telemetry fails closed to a minimal schema-reject row", () => {
 
 test("raw exception text is reduced to class, length, and SHA-256", () => {
 	withFile((file) => {
-		record("reflect", "review-error", { error: "Authorization bearer super-secret-value" });
+		record("drift-scanner", "review-error", { error: "Authorization bearer super-secret-value" });
 		const row = JSON.parse(readFileSync(file, "utf8").trim());
 		assert.equal(row.error_class, "auth");
 		assert.equal(row.error_length, Buffer.byteLength("Authorization bearer super-secret-value"));

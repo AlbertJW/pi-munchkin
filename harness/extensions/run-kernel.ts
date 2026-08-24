@@ -236,8 +236,6 @@ export function installRunKernel(pi: ExtensionAPI, options: RunKernelInstallOpti
 			dispatch({ ...nextBase(), type: "run/plan-observed", runIdHash: signal.runIdHash, accepted: true, executionStarted: false, openItems: signal.openItems });
 		} else if (signal.type === "plan/go") {
 			dispatch({ ...nextBase(), type: "run/plan-observed", runIdHash: signal.runIdHash, accepted: true, executionStarted: true, openItems: store.snapshot().plan.openItems });
-		} else if (signal.type === "plan/gate") {
-			dispatch({ ...nextBase(), type: "run/plan-gate-observed", runIdHash: signal.runIdHash, pass: signal.pass, fails: signal.fails, gateHash: signal.gateHash });
 		} else if (signal.type === "context/receipt") {
 			dispatch({ ...nextBase(), type: "run/context-observed", usagePct: signal.contextPct });
 		} else if (signal.type === "failure/episodes") {
@@ -298,8 +296,8 @@ export function installRunKernel(pi: ExtensionAPI, options: RunKernelInstallOpti
 			activeToolCount: activeTools.length,
 			allToolCount: allTools.length,
 			preservedExplicitTools: activation?.preserved_explicit === true,
-			// Normalized BEFORE hashing, with the same normalizer plan-runner uses for
-			// its plan/gate signal — the whole point of the hash is equality with it.
+			// Normalized before hashing so exact Bash and verify_project receipts share
+			// the same session-owned gate identity.
 			detectedGateHash: detectedGate ? sha256(`gate:${normalizeVerificationCommand(detectedGate)}`) : null,
 			sandboxPosture: sandboxPosture(),
 			legacy,

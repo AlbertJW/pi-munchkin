@@ -5,9 +5,8 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fire, makeFakePi, resetPiGlobals } from "./integration-harness.ts";
 import { classifyBashCommand } from "../lib/command-policy.ts";
-import { buildPlanGateReceipt, publishPlanGateReceipt } from "../lib/plan-gate-receipt.ts";
 import { gateDisplayCommand } from "../extensions/verify-gate.ts";
-import { onHarnessSignal } from "../lib/harness-signals.ts";
+import { HARNESS_SIGNAL_CHANNEL, onHarnessSignal } from "../lib/harness-signals.ts";
 
 // Run: cd ~/.pi/agent && TELEMETRY_FILE=$(mktemp) TELEMETRY_SOURCE=test \
 //        npx -y tsx --test tests/verify-gate.test.ts
@@ -95,6 +94,39 @@ test("the POSIX `test` builtin is NOT a verify command", () => {
 // snapshot to the model as a harness summary.)
 const wrapUpTurn = { turnIndex: 2, message: { role: "assistant", content: [{ type: "text", text: "All done." }] }, toolResults: [] };
 const ctxFor = (cwd: string) => ({ cwd, ui: { notify() {} } });
+
+test("pure planning without a mutation produces no verification correction", async () => {
+	const fp = makeFakePi();
+	const cwd = projectWithNpmTest();
+	await loadVerifyGate(fp, cwd, "execution");
+	await fire(fp, "turn_end", {
+		turnIndex: 1,
+		message: { role: "assistant", content: [{ type: "text", text: "Plan saved; awaiting review." }] },
+		toolResults: [],
+	}, ctxFor(cwd));
+	assert.equal(fp.sent.some((message) => message.includes("verify-gate")), false);
+	resetPiGlobals();
+});
+
+test("verify_project is active only while an exact project gate exists", async () => {
+	const fp = makeFakePi();
+	const withoutGate = projectWithNoGate();
+	const withGate = projectWithNpmTest();
+	const verify = await import(`../extensions/verify-gate.ts?conditional-tool=${Date.now()}-${Math.random()}`);
+	verify.default(fp.pi as never);
+	// Pi registers extension tools into the initial active surface. A gate-less
+	// session must remove this one before the model sees its schema.
+	fp.pi.setActiveTools(["read", "verify_project"]);
+	await fire(fp, "session_start", {}, ctxFor(withoutGate));
+	assert.deepEqual(fp.pi.getActiveTools(), ["read"]);
+	assert.ok(fp.tools.has("verify_project"), "the loader registry remains complete");
+
+	// A later session with a detected exact gate restores only the tool that this
+	// extension previously hid; unrelated selections remain untouched.
+	await fire(fp, "session_start", {}, ctxFor(withGate));
+	assert.deepEqual(fp.pi.getActiveTools(), ["read", "verify_project"]);
+	resetPiGlobals();
+});
 
 test("configured gate labels are bounded single-line data", () => {
 	const dummySecret = "api_key=dummy_signed_query_secret_123456";
@@ -390,94 +422,6 @@ test("execution-order mode fails closed when a started call has no end event", a
 	}
 });
 
-test("plan gate receipts are aggregate, exact, one-shot, and cleared at session start", async () => {
-	const cwd = projectWithNpmTest();
-	const planTurn = { turnIndex: 1, message: { role: "assistant", content: [{ type: "toolCall", id: "p", name: "plan_write", arguments: {} }] }, toolResults: [] };
-	try {
-		const fp = makeFakePi();
-		await loadVerifyGate(fp, cwd);
-		await fire(fp, "turn_end", bashTurn("sed -i '' s/a/b/ src/app.ts"), ctxFor(cwd));
-		publishPlanGateReceipt(buildPlanGateReceipt("p", "r1", [
-			{ command: "npm test", pass: true },
-			{ command: "ruff check", pass: false },
-		])!);
-		await fire(fp, "turn_end", planTurn, ctxFor(cwd));
-		await fire(fp, "turn_end", wrapUpTurn, ctxFor(cwd));
-		assert.equal(fp.sent.some((message) => message.includes("verify")), true, "one red gate makes the aggregate red");
-
-		fp.sent.length = 0;
-		publishPlanGateReceipt(buildPlanGateReceipt("p", "r2", [{ command: "npm test", pass: true }])!);
-		await fire(fp, "session_start", {}, ctxFor(cwd));
-		await fire(fp, "turn_end", planTurn, ctxFor(cwd));
-		const state = (globalThis as Record<string, unknown>).__pi_vg_state as { verifiedOk?: boolean };
-		assert.equal(state.verifiedOk, false, "session_start clears a stale unconsumed receipt");
-	} finally {
-		resetPiGlobals();
-	}
-});
-
-test("concurrent plan calls consume only their own call-bound gate receipts", async () => {
-	const cwd = projectWithNpmTest();
-	const fp = makeFakePi();
-	try {
-		await loadVerifyGate(fp, cwd, "execution");
-		const ctx = ctxFor(cwd);
-		await fire(fp, "tool_execution_start", {
-			toolCallId: "mutation", toolName: "edit", args: { path: "src/app.ts" },
-		}, ctx);
-		await fire(fp, "tool_execution_end", {
-			toolCallId: "mutation", toolName: "edit", result: {}, isError: false,
-		}, ctx);
-		for (const id of ["plan-red", "plan-green"]) {
-			await fire(fp, "tool_execution_start", { toolCallId: id, toolName: "plan_write", args: {} }, ctx);
-		}
-		publishPlanGateReceipt(buildPlanGateReceipt("plan-red", "r-red", [{ command: "npm test", pass: false }])!);
-		publishPlanGateReceipt(buildPlanGateReceipt("plan-green", "r-green", [{ command: "npm test", pass: true }])!);
-		// Finish green first, then red. A global last-writer-wins receipt leaves the
-		// session incorrectly green; call-bound receipts leave the final fact red.
-		await fire(fp, "tool_execution_end", {
-			toolCallId: "plan-green", toolName: "plan_write", result: {}, isError: false,
-		}, ctx);
-		await fire(fp, "turn_end", wrapUpTurn, ctx);
-		assert.equal(fp.sent.some((message) => message.includes("verify-gate")), false,
-			"the green call must consume its own receipt even while a red receipt is pending");
-		fp.sent.length = 0;
-		await fire(fp, "tool_execution_end", {
-			toolCallId: "plan-red", toolName: "plan_write", result: {}, isError: false,
-		}, ctx);
-		await fire(fp, "turn_end", wrapUpTurn, ctx);
-		assert.equal(fp.sent.some((message) => message.includes("verify-gate")), true);
-	} finally {
-		resetPiGlobals();
-	}
-});
-
-test("plan_update uses the same call-bound verification receipt path", async () => {
-	const cwd = projectWithNpmTest();
-	const fp = makeFakePi();
-	try {
-		await loadVerifyGate(fp, cwd, "execution");
-		const ctx = ctxFor(cwd);
-		await fire(fp, "tool_execution_start", {
-			toolCallId: "mutation", toolName: "write", args: { path: "src/app.ts" },
-		}, ctx);
-		await fire(fp, "tool_execution_end", {
-			toolCallId: "mutation", toolName: "write", result: {}, isError: false,
-		}, ctx);
-		await fire(fp, "tool_execution_start", {
-			toolCallId: "update", toolName: "plan_update", args: {},
-		}, ctx);
-		publishPlanGateReceipt(buildPlanGateReceipt("update", "r-update", [{ command: "npm test", pass: true }])!);
-		await fire(fp, "tool_execution_end", {
-			toolCallId: "update", toolName: "plan_update", result: {}, isError: false,
-		}, ctx);
-		await fire(fp, "turn_end", wrapUpTurn, ctx);
-		assert.equal(fp.sent.some((message) => message.includes("verify-gate")), false);
-	} finally {
-		resetPiGlobals();
-	}
-});
-
 test("the anchor's known false negatives stay false negatives (nag, never silent disarm)", () => {
 	// Regression pin for a real trade made on 2026-08-03. `time npm test` and
 	// `if npm test; then …` are NOT recognised as verifies by either classifier, so a
@@ -496,6 +440,38 @@ test("the anchor's known false negatives stay false negatives (nag, never silent
 	for (const cmd of ["NODE_ENV=test npm test", "env CI=1 npm test", "for f in a b; do npm test; done"]) {
 		assert.equal(classifyBashCommand(cmd).verifyLike, true, `must stay recognised: ${cmd}`);
 	}
+});
+
+test("a first-party prevented mutation preserves earlier exact green evidence", async () => {
+	const cwd = projectWithNpmTest();
+	const fp = makeFakePi();
+	try {
+		await loadVerifyGate(fp, cwd, "execution");
+		const ctx = ctxFor(cwd);
+		await fire(fp, "tool_execution_start", { toolCallId: "green", toolName: "bash", args: { command: "npm test" } }, ctx);
+		await fire(fp, "tool_execution_end", { toolCallId: "green", toolName: "bash", result: { content: [{ type: "text", text: "ok" }] }, isError: false }, ctx);
+		await fire(fp, "tool_execution_start", { toolCallId: "blocked", toolName: "edit", args: { path: "src/app.ts" } }, ctx);
+		fp.pi.events.emit(HARNESS_SIGNAL_CHANNEL, { v: 1, type: "tool/prevented", toolCallId: "blocked", failureClass: "policy_rejection" });
+		await fire(fp, "tool_execution_end", { toolCallId: "blocked", toolName: "edit", result: {}, isError: true }, ctx);
+		await fire(fp, "turn_end", wrapUpTurn, ctx);
+		assert.equal(fp.sent.some((message) => message.includes("verify-gate")), false);
+	} finally { resetPiGlobals(); }
+});
+
+test("verify_project runs the exact gate and verifies the latest mutation", async () => {
+	const cwd = projectWithNpmTest();
+	const fp = makeFakePi();
+	try {
+		await loadVerifyGate(fp, cwd, "execution");
+		const ctx = ctxFor(cwd);
+		await fire(fp, "tool_execution_start", { toolCallId: "mutation", toolName: "edit", args: { path: "src/app.ts" } }, ctx);
+		await fire(fp, "tool_execution_end", { toolCallId: "mutation", toolName: "edit", result: {}, isError: false }, ctx);
+		await fire(fp, "tool_execution_start", { toolCallId: "vp", toolName: "verify_project", args: {} }, ctx);
+		const result = await fp.tools.get("verify_project").execute("vp", {}, undefined, undefined, { cwd });
+		await fire(fp, "tool_execution_end", { toolCallId: "vp", toolName: "verify_project", result, isError: false }, ctx);
+		await fire(fp, "turn_end", wrapUpTurn, ctx);
+		assert.equal(fp.sent.some((message) => message.includes("verify-gate")), false);
+	} finally { resetPiGlobals(); }
 });
 
 test("a mutation OUTSIDE the session cwd does not arm the gate; inside still does", async () => {

@@ -48,7 +48,7 @@ test("only a verifier started after the latest successful mutation is valid", ()
 		receipt: receipt({ toolName: "bash", toolFamily: "bash:verify", verification: "project_gate", startedSequence: 9, endedSequence: 11 }) });
 	assert.equal(store.snapshot().verification.validAfterMutation, false, "overlapping verifier cannot prove the later mutation");
 	apply(store, { v: 1, type: "run/tool-finished", sequence: 13, atMs: 13,
-		receipt: receipt({ toolName: "bash", toolFamily: "bash:verify", verification: "project_gate", startedSequence: 12, endedSequence: 13 }) });
+		receipt: receipt({ toolName: "verify_project", toolFamily: "verify_project", verification: "project_gate", startedSequence: 12, endedSequence: 13 }) });
 	assert.equal(store.snapshot().verification.validAfterMutation, true);
 	apply(store, { v: 1, type: "run/tool-finished", sequence: 15, atMs: 15,
 		receipt: receipt({ toolName: "write", toolFamily: "file_mutation", mutation: "source", startedSequence: 14, endedSequence: 15 }) });
@@ -202,101 +202,6 @@ test("control proposals and decisions enter RunState without message text", () =
 	});
 	assert.deepEqual(validateRunStateSnapshot(state), []);
 	assert.equal(JSON.stringify(state).includes("message"), false);
-});
-
-test("a passing plan gate is verification the kernel can see, and a later mutation invalidates it", () => {
-	// Plan gates run inside plan-runner (runReadonlyGate), never through pi's tool
-	// pipeline, so no receipt exists. Without this input the kernel reported
-	// verify_ok=false on every plan-gated run while legacy reported true — a
-	// blind spot published as a "legacy disagreement", i.e. false evidence.
-	const store = new RunStateStoreV1();
-	apply(store, session());
-	apply(store, { v: 1, type: "run/tool-finished", sequence: 5, atMs: 5,
-		receipt: receipt({ toolName: "write", toolFamily: "write", mutation: "source", startedSequence: 4, endedSequence: 5 }) });
-	assert.equal(store.snapshot().verification.validAfterMutation, false, "a mutation leaves the run unverified");
-
-	// A passing gate that is NOT the detected project gate must not verify the
-	// run — a single-file item gate falsely green-lighting the whole session was
-	// exactly the corruption Albert's inspection flagged.
-	const OTHER = "b".repeat(64);
-	apply(store, { v: 1, type: "run/plan-gate-observed", sequence: 6, atMs: 6, runIdHash: H, pass: true, fails: 0, gateHash: OTHER });
-	assert.equal(store.snapshot().verification.validAfterMutation, false, "mismatched gate cannot verify the run");
-	assert.equal(store.snapshot().verification.validGates, 0);
-
-	apply(store, { v: 1, type: "run/plan-gate-observed", sequence: 7, atMs: 7, runIdHash: H, pass: true, fails: 0, gateHash: H });
-	const verified = store.snapshot();
-	assert.equal(verified.verification.validAfterMutation, true, "the DETECTED project gate verifies the run");
-	assert.equal(verified.verification.validGates, 1);
-	assert.deepEqual(validateRunStateSnapshot(verified), []);
-
-	// Editing after the gate must invalidate it again — ordering still governs.
-	apply(store, { v: 1, type: "run/tool-finished", sequence: 9, atMs: 9,
-		receipt: receipt({ toolName: "edit", toolFamily: "edit", mutation: "source", startedSequence: 8, endedSequence: 9 }) });
-	assert.equal(store.snapshot().verification.validAfterMutation, false, "gate-then-edit is unverified again");
-
-	// A FAILING gate is not verification, even when it IS the project gate.
-	const failing = new RunStateStoreV1();
-	apply(failing, session());
-	apply(failing, { v: 1, type: "run/plan-gate-observed", sequence: 4, atMs: 4, runIdHash: H, pass: false, fails: 2, gateHash: H });
-	assert.equal(failing.snapshot().verification.validAfterMutation, false);
-	assert.equal(failing.snapshot().verification.validGates, 0);
-
-	// With NO detected project gate, any passing gate verifies (legacy parity:
-	// the three-state classifier accepts verify-like success when nothing is
-	// detected to be exact about).
-	const open = new RunStateStoreV1();
-	apply(open, { ...session(), detectedGateHash: null } as RunEventV1);
-	apply(open, { v: 1, type: "run/plan-gate-observed", sequence: 4, atMs: 4, runIdHash: H, pass: true, fails: 0, gateHash: "c".repeat(64) });
-	assert.equal(open.snapshot().verification.validAfterMutation, true);
-});
-
-test("plan-gate verification is order-independent: unrelated gates never move the state", () => {
-	// The 2026-08-11 second inspection: each gate signal used to OVERWRITE
-	// validAfterMutation, so listing plan items in a different order flipped the
-	// verdict. An unrelated item gate must neither verify nor un-verify the run.
-	const OTHER = "b".repeat(64);
-	const gate = (pass: boolean, hash: string, sequence: number): RunEventV1 =>
-		({ v: 1, type: "run/plan-gate-observed", sequence, atMs: sequence, runIdHash: H, pass, fails: pass ? 0 : 1, gateHash: hash });
-
-	// Permutation A: project gate passes, THEN an unrelated gate (pass or fail)
-	// — verification must survive both.
-	const a = new RunStateStoreV1();
-	apply(a, session());
-	apply(a, gate(true, H, 4));
-	assert.equal(a.snapshot().verification.validAfterMutation, true);
-	apply(a, gate(true, OTHER, 5));
-	assert.equal(a.snapshot().verification.validAfterMutation, true, "a later unrelated PASSING gate must not clear verification");
-	apply(a, gate(false, OTHER, 6));
-	assert.equal(a.snapshot().verification.validAfterMutation, true, "a later unrelated FAILING gate must not clear verification");
-	assert.equal(a.snapshot().verification.validGates, 1, "only the project gate counts");
-
-	// Permutation B: unrelated failing gate first, then the project gate —
-	// same final state as permutation A.
-	const b = new RunStateStoreV1();
-	apply(b, session());
-	apply(b, gate(false, OTHER, 4));
-	assert.equal(b.snapshot().verification.validAfterMutation, false);
-	apply(b, gate(true, H, 5));
-	assert.equal(b.snapshot().verification.validAfterMutation, true, "order must not change the verdict");
-	assert.equal(b.snapshot().verification.validGates, a.snapshot().verification.validGates);
-
-	// Mixed red/green batch in one settle, both orders: the project gate's own
-	// result is what stands, red items around it notwithstanding.
-	for (const order of [[gate(false, OTHER, 4), gate(true, H, 5), gate(false, OTHER, 6)],
-	                     [gate(true, H, 4), gate(false, OTHER, 5), gate(false, OTHER, 6)]]) {
-		const store = new RunStateStoreV1();
-		apply(store, session());
-		let sequence = 4;
-		for (const event of order) apply(store, { ...event, sequence, atMs: sequence++ } as RunEventV1);
-		assert.equal(store.snapshot().verification.validAfterMutation, true, "mixed batch: project gate pass stands in every order");
-	}
-
-	// A FAILING project gate still invalidates, in any position.
-	const c = new RunStateStoreV1();
-	apply(c, session());
-	apply(c, gate(true, H, 4));
-	apply(c, gate(false, H, 5));
-	assert.equal(c.snapshot().verification.validAfterMutation, false, "the project gate failing invalidates");
 });
 
 test("an over-budget context reading is clamped instead of killing the snapshot channel", () => {

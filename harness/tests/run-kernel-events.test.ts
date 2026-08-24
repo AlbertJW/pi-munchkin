@@ -1,12 +1,8 @@
 // Structural guard for the run-event channel.
 //
-// Why this file exists: `run/plan-gate-observed` lived in the RunEventV1 union,
-// the reducer, the dispatcher AND this validator's payload switch — but not in
-// RUN_EVENT_TYPES, the set that admits an event in the first place. So
-// isRunEventV1() rejected every plan gate before the reducer ever saw one, and
-// two shipped fixes that depend on that path (gate identity; order-independent
-// verification) were inert in production for days while their tests passed —
-// because those tests called the reducer DIRECTLY, bypassing the channel.
+// A historical event once lived in the RunEventV1 union, reducer and payload
+// switch but not in RUN_EVENT_TYPES, so the runtime rejected it before the
+// reducer while direct reducer tests stayed green.
 //
 // The lesson is not "add the missing string". It is that a TypeScript union and
 // its runtime validator are two representations of one schema with nothing tying
@@ -54,7 +50,6 @@ const SAMPLES: Record<string, RunEventV1> = {
 	"run/control-decided": { ...base, type: "run/control-decided", decision: { v: 1, boundarySequence: 4,
 		mode: "shadow", proposalCount: 0, collisionCount: 0, legacyActionCount: 0, winner: null } },
 	"run/plan-observed": { ...base, type: "run/plan-observed", runIdHash: H, accepted: true, executionStarted: false, openItems: 2 },
-	"run/plan-gate-observed": { ...base, type: "run/plan-gate-observed", runIdHash: H, pass: true, fails: 0, gateHash: H },
 	"run/context-observed": { ...base, type: "run/context-observed", usagePct: 42 },
 	"run/failure-state-observed": { ...base, type: "run/failure-state-observed", activeWalls: 1, exposedEpisodes: 1, lastClass: "verification_assertion" },
 	"run/recovery-resumed": { ...base, type: "run/recovery-resumed", cleared: 1, blocked: 0 },
@@ -91,12 +86,8 @@ test("the sample table is exhaustive — a new event type cannot skip this file"
 
 test("the validator still REJECTS malformed and unknown events (guard not widened)", () => {
 	assert.equal(isRunEventV1({ ...base, type: "run/not-a-real-event" }), false);
-	assert.equal(isRunEventV1({ ...SAMPLES["run/plan-gate-observed"], gateHash: "not-a-hash" }), false, "payload shape is still enforced");
-	assert.equal(isRunEventV1({ ...SAMPLES["run/plan-gate-observed"], pass: "yes" }), false);
 	assert.equal(isRunEventV1({ ...SAMPLES["run/objective-observed"], objectiveHash: 42 }), false);
 	assert.equal(isRunEventV1({ v: 2, type: "run/cycle-started", sequence: 1, atMs: 1 }), false, "wrong envelope version");
 	assert.equal(isRunEventV1(null), false);
 	assert.equal(isRunEventV1("run/cycle-started"), false);
-	// gateHash: null is legitimate (a gate whose identity could not be computed).
-	assert.equal(isRunEventV1({ ...SAMPLES["run/plan-gate-observed"], gateHash: null }), true);
 });
