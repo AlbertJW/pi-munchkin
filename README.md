@@ -165,7 +165,7 @@ model's own window in place with one resume handoff.
 
 | Environment option | Default and behaviour | Rollback / alternative |
 |---|---|---|
-| `MUNCHKIN_TOOL_PROFILE` | `ambient`; rollback surface while the new `core` profile awaits adoption. `core` starts with the coding spine and the single `capability` switch | `ambient` leaves Pi's initial surface untouched; genuine CLI/global/project tool selections always win |
+| `MUNCHKIN_TOOL_PROFILE` | `core`; starts with the coding spine and the single `capability` switch | `ambient` restores Pi's initial surface; genuine CLI/global/project tool selections always win |
 | `MUNCHKIN_TOOL_ACTIVATION` | `dynamic`; legacy automatic activation remains available for delegation and context compaction | `ambient` disables automatic activation; `phase` remains experimental |
 | `PLAN_STORAGE` | `capsule`; plan JSON, Markdown projection, and trace stay in the private per-run capsule for both forced and adaptive planning | `project` restores historical `.pi/plan-state.json`, `.pi/TODO.md`, and `.pi/traces/`; `/plan-export` is the explicit one-file export; `RUN_CAPSULE=off` also selects project storage because no private session identity exists |
 | dynamic `subagent` triggers | multi-item structured execution or loop-breaker tier two | once activated it stays active; one automatic attempt means a later manual `/tools` disable is respected |
@@ -185,7 +185,7 @@ model's own window in place with one resume handoff.
 | `LB_SESSION_T1`, `LB_SESSION_T2`, `LB_SESSION_T3` | `7`, `11`, `28` cumulative repeats under enforcement | `LB_SESSION_REPEAT` remains the authoritative legacy 25-repeat steer in shadow mode and is a compatibility alias for enforced Tier 1 |
 | `PI_SANDBOX_POSTURE` | `unknown`; `/munchkin-doctor` accepts only `declared` or `host` as operator assertions | unset it to return to `unknown`; this label is observational and grants no isolation |
 | `TEACH_HINTS`, `DID_YOU_MEAN` | default-on bounded hints | set either to `off` |
-| `FORCE_PLAN_WRITE` | compatibility default `on` until the separate adoption gate; blocks the first unplanned mutation without creating a plan | `off` makes planning exclusively user-triggered through `/plan` (prepared target default) |
+| `FORCE_PLAN_WRITE` | `off`; planning is exclusively user-triggered through `/plan` | `on` restores the compatibility behavior that blocks the first unplanned mutation |
 | `PLAN_TOOL_GO` | `off`; headless experiments may explicitly expose model-callable `plan_go` | `on` enables it; interactive plans still require the user's `/plan-go` |
 | `SPAWN_DELEGATION` | default-on; delegation guidance recommends `mode=spawn` with self-contained tasks | `off` restores the fork wording |
 | `TOOL_CALL_RESCUE` | default-on; one corrective steer (max 2/session) when a session dies on a text-only pseudo tool call | `off` |

@@ -28,6 +28,20 @@ async function begin(fp: ReturnType<typeof fresh>, cwd: string, request = "proce
 	return ctx;
 }
 
+test("ordinary sessions default to explicit planning and expose no plan mutation tools", async () => {
+	const fp = fresh();
+	const cwd = tmp();
+	await fire(fp, "session_start", {}, { ...makeCtx(cwd).ctx, cwd });
+	assert.equal(fp.pi.getActiveTools().includes("plan_write"), false);
+	assert.equal(fp.pi.getActiveTools().includes("plan_update"), false);
+	const ordinaryEdit = await fire(fp, "tool_call", { toolCallId: "ordinary-edit", toolName: "edit", input: { path: "x" } });
+	assert.equal(ordinaryEdit, undefined, "ordinary mutation is not forced through planning");
+	await begin(fp, cwd);
+	assert.equal(fp.pi.getActiveTools().includes("plan_write"), true);
+	assert.equal(fp.pi.getActiveTools().includes("edit"), false);
+	resetPiGlobals();
+});
+
 test("/plan exposes only the bounded read-only planning surface", async () => {
 	const fp = fresh();
 	const cwd = tmp();

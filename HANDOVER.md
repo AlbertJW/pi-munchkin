@@ -22,7 +22,7 @@ The source and live harness are intentionally not auto-synchronized. Model-visib
 adoption, deletion, live mirroring, and gate rounds are human-gated. Never touch files matching
 `context-pressure*`.
 
-## 2026-08-24 shotgun recovery branch — review pending
+## 2026-08-24 shotgun recovery adoption
 
 Branch `codex/shotgun-recovery` replaces the AlbertWork failure path without changing the live
 harness. It adds call-bound pre-execution prevention evidence and argument-free `verify_project`,
@@ -31,16 +31,16 @@ the dark `MUNCHKIN_TOOL_PROFILE=core` surface and its one `capability` switch, a
 while retaining observational memory and run capsules. The exact/outcome loop protections and
 semantic shadow posture are unchanged.
 
-The compatibility defaults remain `MUNCHKIN_TOOL_PROFILE=ambient` and
-`FORCE_PLAN_WRITE_DEFAULT=on`. The prepared adoption changes to `core` and `off` respectively are
-not applied. Nothing on this branch has been merged, pushed, mirrored, calibrated, or measured.
+The approved defaults are `MUNCHKIN_TOOL_PROFILE=core` and
+`FORCE_PLAN_WRITE_DEFAULT=off`. Independent rollbacks remain `MUNCHKIN_TOOL_PROFILE=ambient` and
+`FORCE_PLAN_WRITE=on`. The source change is being merged and mirrored under the approved rollout;
+no calibration, gate round, or efficacy claim follows from it.
 Counterfactual test names and non-secret outcomes are recorded in
-`docs/SHOTGUN_RECOVERY_QA_2026-08.md`. The final working diff passes `npm run verify` (548 tests,
+`docs/SHOTGUN_RECOVERY_QA_2026-08.md`. The final working diff passes `npm run verify` (550 tests,
 typecheck, health, 151-file deterministic package smoke with 30 extensions and two skills,
 optimizer integrity/jails, and secret scan), peer-boundary checks, and isolated packed consumers
 for Pi 0.80–0.84. A disposable agent directory mirrored 112/112 first-party files, reported zero
-unmanaged extensions/orphans, and loaded through Pi 0.84 without inference. A separate approval
-remains required before default changes or live rollout.
+unmanaged extensions/orphans, and loaded through Pi 0.84 without inference.
 
 ## 2026-08-24 deep-inspection close-out
 

@@ -35,7 +35,7 @@ production fix was immediately restored before the acceptance suite.
 ## Acceptance state
 
 Targeted shotgun tests are green after restoring all four fixes. `npm run verify` passes all six
-stages: 548 tests, typecheck, health, a deterministic 151-file tarball that loads 30 extensions and
+stages: 550 tests, typecheck, health, a deterministic 151-file tarball that loads 30 extensions and
 two skills, optimizer integrity/jails, and the non-echoing diff secret scan. Peer boundaries pass.
 Isolated packed consumers for Pi 0.80, 0.81, 0.82, 0.83, and 0.84 each typecheck and load all 30
 extensions plus both skills. A disposable agent directory mirrors 112/112 first-party files with
@@ -43,3 +43,11 @@ no unmanaged extension or orphan and loads through Pi 0.84 help without inferenc
 
 No `context-pressure*` file was used or modified. No live harness was changed. No calibration or
 gate round was started.
+
+## Approved adoption
+
+The human checkpoint approved `MUNCHKIN_TOOL_PROFILE=core` and explicit-only planning as the
+defaults. Focused regressions prove an unset environment selects the bounded core surface, inactive
+specialists stay absent, ordinary mutations are not forced through planning, and `/plan` alone
+activates `plan_write` while withholding mutation tools. Independent rollbacks are
+`MUNCHKIN_TOOL_PROFILE=ambient` and `FORCE_PLAN_WRITE=on`.

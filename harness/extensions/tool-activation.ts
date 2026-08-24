@@ -13,7 +13,7 @@ type Profile = "ambient" | "core";
 type LegacyMode = "ambient" | "dynamic" | "phase";
 type Family = "research" | "delegation" | "browser" | "canvas" | "context";
 
-export const MUNCHKIN_TOOL_PROFILE_DEFAULT: Profile = "ambient";
+export const MUNCHKIN_TOOL_PROFILE_DEFAULT: Profile = "core";
 const CORE_NAMES = new Set([
 	"read", "bash", "edit", "write", "search_spans", "read_span", "recall",
 	"verify_project", "capability", "plan_write", "plan_update",

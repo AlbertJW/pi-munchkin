@@ -13,13 +13,14 @@ const names = [
 	"browser_open", "browser_click", "tldraw_create",
 ];
 
-async function load(profile: "ambient" | "core", activeInitial: string[] = names.filter((name) => !["grep", "find", "ls"].includes(name)), argv = process.argv) {
+async function load(profile: "ambient" | "core" | undefined, activeInitial: string[] = names.filter((name) => !["grep", "find", "ls"].includes(name)), argv = process.argv) {
 	const oldProfile = process.env.MUNCHKIN_TOOL_PROFILE;
 	const oldActivation = process.env.MUNCHKIN_TOOL_ACTIVATION;
 	const oldTelemetry = process.env.TELEMETRY;
 	const oldAgent = process.env.PI_CODING_AGENT_DIR;
 	const oldArgv = process.argv;
-	process.env.MUNCHKIN_TOOL_PROFILE = profile;
+	if (profile === undefined) delete process.env.MUNCHKIN_TOOL_PROFILE;
+	else process.env.MUNCHKIN_TOOL_PROFILE = profile;
 	process.env.MUNCHKIN_TOOL_ACTIVATION = "dynamic";
 	process.env.TELEMETRY = "off";
 	process.env.PI_CODING_AGENT_DIR = mkdtempSync(join(tmpdir(), "pi-tools-agent-"));
@@ -44,6 +45,16 @@ async function load(profile: "ambient" | "core", activeInitial: string[] = names
 		},
 	};
 }
+
+test("unset tool profile adopts the bounded core surface", async () => {
+	const run = await load(undefined, [...names]);
+	try {
+		const active = run.fp.pi.getActiveTools();
+		for (const name of ["read", "bash", "edit", "write", "search_spans", "read_span", "recall", "verify_project", "capability"]) assert.ok(active.includes(name), name);
+		for (const name of ["subagent", "compact_context", "web_search", "web_read", "browser_open", "tldraw_create"]) assert.equal(active.includes(name), false, name);
+		assert.equal(active.length <= 11, true, active.join(","));
+	} finally { run.restore(); }
+});
 
 test("Pi's ordinary optional builtin omissions are not an explicit allowlist", async () => {
 	const run = await load("ambient");

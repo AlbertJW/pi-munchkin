@@ -19,7 +19,7 @@ const MAX_TITLE_BYTES = 120;
 const MAX_NOTE_BYTES = 300;
 const MAX_PLAN_BYTES = 12 * 1024;
 const MAX_DELTAS = 16;
-export const FORCE_PLAN_WRITE_DEFAULT: "on" | "off" = "on";
+export const FORCE_PLAN_WRITE_DEFAULT: "on" | "off" = "off";
 const FORCE_PLAN_WRITE = (process.env.FORCE_PLAN_WRITE ?? FORCE_PLAN_WRITE_DEFAULT) !== "off";
 const PLAN_TOOL_GO = process.env.PLAN_TOOL_GO === "on";
 const TRACE_TAIL_MAX_BYTES = 64 * 1024;
