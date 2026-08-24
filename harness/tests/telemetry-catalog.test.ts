@@ -3,6 +3,7 @@ import { readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 import test from "node:test";
 import { catalogHas, EVENT_CATALOG, RESERVED_ENVELOPE_FIELDS, validateCatalogDetail } from "../lib/telemetry-catalog.ts";
+import { isForbiddenDetailField } from "../lib/telemetry.ts";
 
 test("every literal telemetry emission is represented in the event catalog", () => {
 	// Resolve from this test file, not cwd — the live ~/.pi/agent tree is flat
@@ -66,4 +67,20 @@ test("an EMPTY array satisfies any array-typed field (it carries no element evid
 	// ...and an empty array must NOT satisfy a scalar field.
 	assert.deepEqual(validateCatalogDetail("context-surface", "receipt", { message_count: [] }),
 		["invalid message_count: expected number, got empty[]"]);
+});
+
+test("no catalog field name is forbidden at runtime — a rejected name is a dead event", () => {
+	// The catalog and normalizeDetail's FORBIDDEN_DETAIL_FIELD were unconnected:
+	// provider-patience declared `headers_timeout_ms` (matches /header/i), every
+	// unit test passed, and the LIVE smoke found the applied row replaced by a
+	// schema-reject stub. A catalog entry whose rows can never land is worse than
+	// no entry -- it reads as coverage. Counterfactual: add a `*_header_*` field
+	// to any catalog entry and this fails.
+	const violations: string[] = [];
+	for (const [event, spec] of Object.entries(EVENT_CATALOG)) {
+		for (const field of Object.keys(spec)) {
+			if (isForbiddenDetailField(field)) violations.push(`${event}.${field}`);
+		}
+	}
+	assert.deepEqual(violations, [], "rename these fields — normalizeDetail rejects them at runtime");
 });

@@ -63,8 +63,12 @@ export default function (pi: ExtensionAPI): void {
 	// At registration, before any provider request exists to race with.
 	const result = applyProviderPatience(HEADERS_MS, BODY_MS);
 	pi.on("session_start", async () => {
+		// Field names avoid telemetry's FORBIDDEN_DETAIL_FIELD (/header/i): the live
+		// smoke caught `headers_timeout_ms` being schema-rejected (invalid_detail) --
+		// the whole applied row became a reject stub. first_byte is the accurate name
+		// anyway: undici's headersTimeout caps time to FIRST BYTE.
 		record("provider-patience", "applied", {
-			applied: result.applied, headers_timeout_ms: HEADERS_MS, body_timeout_ms: BODY_MS,
+			applied: result.applied, first_byte_timeout_ms: HEADERS_MS, body_timeout_ms: BODY_MS,
 		});
 	});
 }

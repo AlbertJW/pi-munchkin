@@ -148,6 +148,17 @@ function classifyError(value: string): string {
 const FORBIDDEN_DETAIL_FIELD = /(prompt|tool.?output|file.?content|\bcontent\b|url|header|credential|secret|api.?key|exception)/i;
 const RESERVED_FIELDS = new Set(["run_id", "provider", "model"]);
 
+/** Exported for the catalog tripwire: a catalog entry whose field name this
+ * predicate rejects is a contradiction — every row it describes would be
+ * schema-rejected at runtime (measured: provider-patience's `headers_timeout_ms`
+ * became a reject stub in the 2026-08-24 live smoke). Same carve-outs as
+ * normalizeDetail. */
+export function isForbiddenDetailField(key: string): boolean {
+	if (key === "system_prompt_sha256" || key === "system_prompt_bytes" || key === "system_prompt_changed") return false;
+	if (key === "request_to_headers_ms") return false;
+	return FORBIDDEN_DETAIL_FIELD.test(key);
+}
+
 function normalizeDetail(detail: Record<string, unknown>): { detail: Record<string, unknown>; errors: string[] } {
 	const normalized: Record<string, unknown> = {};
 	const errors: string[] = [];
