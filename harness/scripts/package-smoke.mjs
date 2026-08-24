@@ -18,11 +18,6 @@ const expectedExtensions = [
   // Sole owner of session identity, surface provenance, and the immutable
   // initial tool baseline. It must register before any other harness handler.
   "harness/extensions/session-bootstrap.ts",
-  // Swaps the process-global undici dispatcher at REGISTRATION time (stock
-  // headersTimeout=300s aborts slow local models mid-prefill), so it loads before
-  // any extension that could trigger provider traffic. This expectation moved
-  // deliberately WITH the manifest; it was not adjusted to silence a tripwire.
-  "harness/extensions/provider-patience.ts",
   "harness/extensions/hashline.ts",
   // MOVED here 2026-08-21 (was after session-blackboard): `tool_result` handlers are
   // CHAINED -- pi builds one event object and hands the mutated version to each

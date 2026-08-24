@@ -196,7 +196,6 @@ model's own window in place with one resume handoff.
 | `READ_DEDUP` | default-on; later identical `read` results collapse to a back-reference in the per-call context view | `off` |
 | `SPAN_TOOLS` | default-on; `search_spans`/`read_span` for bounded work on large files | `off` removes both tools |
 | `KETCH` | default-on public search/read | `off` for offline/private sessions |
-| `PROVIDER_PATIENCE` | default-on, but **measured INERT inside pi sessions (2026-08-24)** — pi replaces `globalThis.fetch` with npm-undici's fetch reading pi's OWN dispatcher, so the extension's node-registry swap never reaches the request path. The authoritative knob is pi's `httpIdleTimeoutMs` setting (default 300,000ms — the actual source of every "Request timed out." at ~300s; set to 1,800,000 in the live settings.json, backup `settings.json.bak-20260824-idle`). Extension retirement is a pending decision; it remains harmless | `off`; the real control is `httpIdleTimeoutMs` |
 | `RESEARCH_LEDGER` | dark. After three consecutive unverifiable citations, `research_note` stops returning errors and tells the model to cite inline — an uncapped refusal stream escalated loop-breaker to an abort and killed two Run 3 sessions outright. (`on` enables the parent-verified citation pipeline: session page cache, genuine-error `research_note`, recovery-only `research_recall`, budget footers, and a private bounded v2 JSONL ledger under `${PI_CODING_AGENT_DIR}/artifacts/research-ledgers/`) | unset keeps both research-note tools absent; no project-local ledger is written |
 | `RUN_KERNEL` | `shadow`; observes canonical execution receipts, semantic phases, lifecycle settlement, and legacy-state disagreements | `off` registers no kernel handlers or event-bus subscriber; shadow mode never prompts, steers, blocks, activates tools, or persists a capsule |
 | `RUN_CAPSULE` | `recovery` (adopted 2026-08-24, Albert-approved judgment adoption — AVO's resume-from-state pillar); checkpoints the closed RunState contract to a private per-run JSON authority AND injects one bounded recovery brief on the events in the next row | `shadow` restores persist-without-injection; `off` registers no capsule handlers or command |
@@ -215,6 +214,16 @@ model's own window in place with one resume handoff.
 Oversized hashline refusals explain the distinction between the returned-context `limit` and the
 allocation cap. Use `search_spans`/`read_span` (default-on), or `rg`, `head`, `tail`, for
 oversized files.
+
+The built-in `read` inlet also refuses an unbounded normal file above 32 KiB or a risky support
+file above 8 KiB. Large files remain available in pages of at most 200 lines, through span tools,
+or through targeted shell searches. This prevents several individually legal reads from silently
+consuming the server's remaining context in one turn.
+
+Provider request patience belongs to Pi itself: set `httpIdleTimeoutMs` in `settings.json`.
+The former `provider-patience` extension and its environment knobs were retired after live tracing
+proved that Pi installs a separate npm-undici fetch/dispatcher, making the shim inert in Pi
+sessions.
 
 ## Security and privacy boundaries
 

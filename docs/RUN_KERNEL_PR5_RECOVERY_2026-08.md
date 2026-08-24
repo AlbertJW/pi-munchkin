@@ -1,8 +1,8 @@
-# Run Kernel PR 5: dark recovery integration
+# Run Kernel PR 5: recovery integration
 
-Status: dark candidate. PR 4 persistence remains the default `RUN_CAPSULE=shadow`; this branch
-does not enable recovery injection, mirror the live harness, run a gate round, or make an efficacy
-claim.
+Status: implemented and adopted 2026-08-24. `RUN_CAPSULE=recovery` is the deployed default;
+`RUN_CAPSULE=shadow` is the explicit rollback and keeps persistence without model-context
+injection. This document describes the bounded recovery contract, not an efficacy claim.
 
 ## Recovery brief contract
 
@@ -47,9 +47,9 @@ arbiter still selects at most one same-boundary action.
 ## Limits and rollback
 
 The brief is bounded by UTF-8 bytes, uses only hashes/enums/counts, and is generated from the
-current in-memory snapshot. `RUN_CAPSULE=shadow` is the rollback and remains default. `off`
-removes capsule handlers and commands. Recovery is observationally dark until a separate adoption
-gate establishes non-zero exposure and a preregistered fixture/model round; shadow persistence and
-the recovery plumbing are not evidence of benefit.
+current in-memory snapshot. `RUN_CAPSULE=shadow` is the rollback. `off` removes capsule handlers
+and commands. Recovery exposure is now model-visible only at the bounded windows above; the
+adoption is an operational judgment, not evidence of benefit. Any efficacy claim still requires
+a fresh, preregistered fixture/model round on the current surface hash.
 
 Measurements before and after the PR 5 surface hash are not pooled.

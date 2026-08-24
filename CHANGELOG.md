@@ -164,6 +164,13 @@ candidates as dark). Net changes since 0.3.0; the full per-decision record is
 
 ### Changed
 
+- **Retired the inert provider-patience runtime shim (2026-08-24):** live tracing proved that
+  Pi's installed npm-undici fetch uses Pi's own dispatcher, so the Node-global dispatcher swap
+  could never govern provider requests. The extension, manifest entry, telemetry event, tests,
+  and subagent environment propagation are removed. Pi's supported `httpIdleTimeoutMs` setting
+  remains the sole request-patience control. Historical entries below are preserved as the
+  diagnosis trail, not current behavior.
+
 - **AVO adoption batch (2026-08-24, Albert-approved judgment adoptions):** the archived 3-day
   session's two research artifacts (NVIDIA AVO + the graph-architect frame) were verified against
   the tree; the finding is that the harness already contains five of AVO's six pillars, three of
@@ -177,12 +184,20 @@ candidates as dark). Net changes since 0.3.0; the full per-decision record is
   (benefit not established by a powered trial). The artifacts' stale recommendations (memory-store
   merge, symbolect removal, double-steer fix) are dispositioned with verified reasons in HANDOVER.
   Also: the vendored subagent timeout default rises 600s -> 1800s (`pi-subagent/timeout.ts`; an
-  explorer child hit the 600s wall and blocked its parent overnight, and provider-patience now
-  allows a single request 30min of prefill), and `real_gate.sh`'s `loaded_alias()` returns the
+  explorer child hit the 600s wall and blocked its parent overnight, while Pi's provider request
+  patience is independently configured), and `real_gate.sh`'s `loaded_alias()` returns the
   loaded member instead of `data[0]` (both llama-swap traps from the mothball doc now fixed in
   code).
 
 ### Fixed
+
+- **Dense-read context headroom (2026-08-24):** the observed overflow admitted a 65,597-token
+  request against a 65,536-token server, compacted reactively, then let one turn re-read roughly
+  90 KiB and fail again at 69,501. The existing inlet guarded risky files at 8 KiB but allowed
+  ordinary unbounded reads up to 64 KiB and treated any positive `limit` as bounded. Normal
+  unbounded reads now stop at 32 KiB, and files above their class threshold require pages of at
+  most 200 lines or the existing span/search tools. The live Ornith registry also keeps the full
+  supported 8,192-token headroom below the served 65,536 context.
 
 - **The 300s "Request timed out." root cause was pi's own `httpIdleTimeoutMs`, not Node's undici
   (2026-08-24):** a live AlbertWork session on the fully-patched surface still died headerless at
@@ -193,11 +208,11 @@ candidates as dark). Net changes since 0.3.0; the full per-decision record is
   measured INERT inside pi sessions (its unit tests and smokes pass because they exercise Node's
   fetch and never a >300s request). Fix: `httpIdleTimeoutMs: 1800000` in the live settings.json
   (pi's supported knob; backup kept). The 2026-08-22 provider-patience entry below stands as
-  history of an honest but incomplete diagnosis; extension retirement is a pending decision. The
+  history of an honest but incomplete diagnosis; the inert extension is now retired. The
   same session also surfaced a context-overflow loop (65,597 → compaction → one turn re-read 90KB →
   69,501 against a 65,536 serving window) recorded in HANDOVER as an open finding.
 
-### Added
+### Added — historical, superseded by the retirement above
 
 - **provider-patience (2026-08-22, default-on, `PROVIDER_PATIENCE=off` kill switch):** raises the
   process-global fetch header timeout so slow local models are not aborted mid-prefill. Telemetry

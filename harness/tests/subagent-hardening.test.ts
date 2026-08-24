@@ -224,9 +224,9 @@ test("parallel summary header agrees with the per-child completed/failed labels"
 
 test("subagent timeout default is 1800s; env and explicit arg still win", () => {
 	// Raised from 600_000 on 2026-08-24 (Albert-approved): an explorer child on a
-	// slow local model hit the 600s wall and blocked its parent task overnight, and
-	// provider-patience now allows a single provider request up to 30min of prefill
-	// -- one slow request must not consume an entire child budget. Reverting the
+	// slow local model hit the 600s wall and blocked its parent task overnight.
+	// Pi's independent httpIdleTimeoutMs is the provider-request control; this is
+	// the outer child-process budget. Reverting the
 	// default makes the first assertion fail; that is the counterfactual.
 	assert.equal(resolveSubagentTimeoutMs(undefined, {}), 1_800_000);
 	assert.equal(resolveSubagentTimeoutMs(undefined, { PI_SUBAGENT_TIMEOUT_MS: "120000" }), 120_000);

@@ -54,7 +54,6 @@
     "plan-runner/uncertainty-hold",
     "plan-runner/write",
     "plan-runner/write-rejected",
-    "provider-patience/applied",
     "reflect/review",
     "reflect/review-error",
     "research/note",

@@ -27,8 +27,8 @@ converges with three standing rules of this repo — independently arrived at on
    RHAE analogue.
 3. **The harness must be model-independent.** AVO runs Opus 5 and GPT-5.6 Sol with complementary
    operating profiles; the standing rule here ("models are measurement instruments") is the same
-   design constraint, and `provider-patience` (2026-08-24) is what keeps it true for slow local
-   tiers.
+   design constraint. Slow-local request survival is governed by Pi's `httpIdleTimeoutMs`; the
+   separately loaded `provider-patience` probe was later measured inert inside Pi sessions.
 
 One confirmation specific to this batch: NVIDIA's supervisor description — *the main agent
 remained responsible for deciding what to inspect, change, test, and evaluate, while the
@@ -371,8 +371,8 @@ is the correct shape.
 > recommendation 2 is honored (no routing was added anywhere); recommendation 3 stays deferred with
 > the mothballed optimizer. Additionally `RUN_CAPSULE=recovery` is now the default (the checkpoint →
 > resume branch in §7 actively injects its brief), and a deterministic node was added on the
-> provider edge (`provider-patience.ts`) — and then found INERT in pi sessions on 2026-08-24: pi
-> installs npm-undici's fetch with its own dispatcher, which the extension's node-registry swap
-> never reaches. The 300s wall was pi's own `httpIdleTimeoutMs` (default 300,000ms), now raised to
-> 1,800,000 in the live settings — pi's supported knob, no extension required. A lesson in this
-> document's own Step-6 spirit: the deterministic fix was a SETTING, not a node.
+> provider edge (`provider-patience.ts`) — and then found INERT in Pi sessions on 2026-08-24. It
+> has now been retired from the runtime surface. Pi installs npm-undici's fetch with its own
+> dispatcher; the 300s wall was Pi's `httpIdleTimeoutMs` (default 300,000ms), now raised to
+> 1,800,000 in the live settings. A lesson in this document's own Step-6 spirit: the deterministic
+> fix was a SETTING, not a node.

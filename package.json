@@ -39,7 +39,6 @@
   "pi": {
     "extensions": [
       "harness/extensions/session-bootstrap.ts",
-      "harness/extensions/provider-patience.ts",
       "harness/extensions/hashline.ts",
       "harness/extensions/bash-output-guard.ts",
       "harness/extensions/loop-breaker.ts",
@@ -93,7 +92,6 @@
   },
   "files": [
     "harness/extensions/session-bootstrap.ts",
-    "harness/extensions/provider-patience.ts",
     "harness/extensions/hashline.ts",
     "harness/extensions/loop-breaker.ts",
     "harness/extensions/tool-call-rescue.ts",

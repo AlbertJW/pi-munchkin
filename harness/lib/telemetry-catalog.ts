@@ -53,13 +53,6 @@ export const EVENT_CATALOG = {
 		corrections: "number", activation_requests: "number",
 	},
 	"did-you-mean/hint": { tool: "string", injected_chars: "number" },
-	// applied:false means the global-dispatcher shape was unrecognized and the
-	// stock 300s undici headersTimeout still governs — a session on a slow model
-	// will abort at ~301s with status=None exactly as before the extension.
-	// first_byte_timeout_ms, not headers_timeout_ms: FORBIDDEN_DETAIL_FIELD bans
-	// /header/i in detail keys (only request_to_headers_ms is carved out), and the
-	// live smoke measured the old name being schema-rejected into a stub row.
-	"provider-patience/applied": { applied: "boolean", first_byte_timeout_ms: "number", body_timeout_ms: "number" },
 	"chaos/injected": { fault: "string", tool: "string", nth: "number" },
 	"plan-runner/deps-rejected": { errors: "number" },
 	"plan-runner/gate": {

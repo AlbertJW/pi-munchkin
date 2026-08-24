@@ -22,7 +22,49 @@ The source and live harness are intentionally not auto-synchronized. Model-visib
 adoption, deletion, live mirroring, and gate rounds are human-gated. Never touch files matching
 `context-pressure*`.
 
+## 2026-08-24 deep-inspection close-out
+
+This is the current operational snapshot, superseding any earlier “prepared”, “dark”, or
+“pending mirror” wording below when it describes the same surface. The inspected baseline was
+clean `main`/`origin/main` at `baa72ea`. The release fixes are now implemented: the measured-inert
+`provider-patience` extension and all active configuration/telemetry/package references are
+retired; normal unbounded `read` intake is reduced from 64 KiB to 32 KiB; files above the normal
+or 8 KiB risky threshold require pages of at most 200 lines or the existing span/search tools.
+Both defects have observed counterfactual failures recorded in
+`docs/QA_WORKING_MEMORY_PLATEAU_2026-08.md`.
+
+`npm run verify` is green: 648 tests, typecheck, health, deterministic package smoke (156 packed
+files; 31 extension entry points; 2 skills), optimizer integrity/self-tests, and the non-echoing
+secret scan. The previously loaded live surface remains
+`5427eea5677777f4c6231b0232e6c678b42fd0b40fd604649fc21691a9eec95f` until this release is
+committed and mirrored; the final rollout receipt and superseding hash belong in
+`docs/SURFACE_BOUNDARIES.md` after zero drift is proven.
+
+The adopted model-visible posture is `ACTIVE_TOOL_PROMPTS=derived`, `CONTROL_ARBITER=enforce`,
+`MUNCHKIN_TOOL_ACTIVATION=dynamic`, `CONTEXT_SURFACE_MODE=summary`, `STATE_LENS=steer`,
+`VERIFICATION_PLATEAU=enforce`, and `RUN_CAPSULE=recovery`. `LOOP_EPISODE_MODE=shadow`,
+`WORKING_MEMORY=off`, and `RESEARCH_LEDGER=off` remain unchanged. `httpIdleTimeoutMs=1800000`
+is the live Pi setting that removes the observed 300-second provider wall; there is no longer a
+parallel runtime shim. No calibration, powered trial, or gate round was started.
+
+The dense-text overflow is addressed at both measured seams: bounded read intake in source, and
+an 8,192-token registry-to-server headroom for both live Ornith models. If the optimizer is ever
+deliberately restarted, widen the judge corpus before labeling because `calib4b` cannot vary the
+relevant dimensions. Historical optimizer data remains preserved and unsupported; no old neutral
+is a rejection. Browser automation is already supplied
+by the live `browser-goblin` package (backed by `agent-browser`); neither `pi-agent-browser` nor
+`pi-agent-browser-native` is installed or part of the first-party surface.
+
+The next agent must read this file, `optimizer/docs/MEASUREMENT_METHODOLOGY_2026-07.md`,
+`docs/SURFACE_BOUNDARIES.md`, and `docs/HARNESS_CALL_GRAPH.md`; verify the current hash and mirror
+before touching runtime code; never modify `context-pressure*`; never echo credentials or raw
+diagnostics; and stop for explicit approval before any default flip, deletion, live mirror, or
+measurement round.
+
 ## 2026-08-17 prepared working-memory and plateau series
+
+> Historical snapshot. The 2026-08-24 adoption and inspection sections above are authoritative
+> for current defaults and rollout state.
 
 The frozen measurement generation remains the first dependency: judge labeling, Phase 6 smoke,
 and any gate execution are still human-owned and have not been started by this series. The

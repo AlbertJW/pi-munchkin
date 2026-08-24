@@ -1,7 +1,10 @@
 import { stat } from "node:fs/promises";
 import { basename, extname } from "node:path";
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
-import { isPositiveNumber, limitBypassesRiskyGate, resolveReadPath, RISKY_MAX_LIMIT } from "../lib/context-inlet.ts";
+import {
+	isPositiveNumber, LARGE_FILE_BYTES, limitBypassesInletGate, resolveReadPath,
+	RISKY_MAX_LIMIT, SUPPORT_FILE_BYTES,
+} from "../lib/context-inlet.ts";
 import { record } from "../lib/telemetry.ts";
 import { emitHarnessSignal } from "../lib/harness-signals.ts";
 
@@ -10,9 +13,6 @@ type ReadInput = {
 	offset?: unknown;
 	limit?: unknown;
 };
-
-const LARGE_FILE_BYTES = 64 * 1024;
-const SUPPORT_FILE_BYTES = 8 * 1024; // risky support files (logs/CSV/JSONL/traces) gate much earlier
 
 const RISKY_EXTENSIONS = new Set([".csv", ".tsv", ".jsonl", ".ndjson", ".log", ".trace", ".parquet"]);
 // Generic format/role markers for big low-value files (project-agnostic). Add
@@ -56,10 +56,11 @@ export default function (pi: ExtensionAPI) {
 		const input = event.input as ReadInput;
 		if (typeof input.path !== "string" || !input.path.trim()) return;
 
-		// A positive limit is bounded intake — UNLESS it's a huge limit on a risky
-		// file, which defeats the 8KiB gate (hashline's 50KiB cap is the only backstop).
+		// A positive page no larger than the shared line cap is bounded intake.
+		// Previously any positive limit bypassed normal-file guarding, so a caller
+		// could ask for the built-in tool's entire ~50 KiB response ceiling.
 		const risky = riskySupportPath(input.path);
-		const bigLimit = limitBypassesRiskyGate(input.limit, risky);
+		const bigLimit = limitBypassesInletGate(input.limit);
 		if (isPositiveNumber(input.limit) && !bigLimit) return;
 
 		let bytes: number;
@@ -86,7 +87,7 @@ export default function (pi: ExtensionAPI) {
 		emitHarnessSignal(pi.events, { v: 1, type: "capability/need", capability: "span_tools", reason: "inlet-refusal" });
 
 		const reason = bigLimit
-			? `failure_class=context_intake_risk. limit=${input.limit} on risky file ${input.path} (${bytes}B) defeats bounded intake — page it: limit ≤ ${RISKY_MAX_LIMIT} lines per read, or use rg/head/tail.`
+			? `failure_class=context_intake_risk. limit=${input.limit} on ${risky ? "risky" : "large"} file ${input.path} (${bytes}B) defeats bounded intake — page it: limit ≤ ${RISKY_MAX_LIMIT} lines per read, or use rg/head/tail.`
 			: n >= 3
 				? `failure_class=context_intake_risk. Told ${n}× to bounded-read ${input.path}. STOP the unbounded read. Use rg/head/tail or pass a positive limit NOW, or act on what you have. Repeats stay blocked.`
 				: blockReason(input.path, bytes, risky);

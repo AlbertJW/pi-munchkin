@@ -83,3 +83,17 @@ from evaluated sessions, endpoints, private artifact paths, or raw model output.
   The first sandboxed verifier attempt was blocked only from binding its temporary
   loopback self-test port; the approved offline rerun passed. No model or gate
   round was started.
+
+## 2026-08-24 inspection release — inert shim retirement and context headroom
+
+- Provider-shim counterfactual: temporarily restored a `PROVIDER_PATIENCE` reference in
+  loadable subagent runtime code.
+- Command: `node --experimental-strip-types --test --test-name-pattern='retired environment options have no loadable runtime reader' harness/tests/retired-surface.test.ts`.
+- Failure observed: `retired environment options have no loadable runtime reader` named the
+  restored runtime reference. Removing it makes the structural retirement test pass.
+- Dense-read counterfactual: temporarily restored the normal unbounded-read threshold from
+  32 KiB to 64 KiB.
+- Command: `node --experimental-strip-types --test --test-name-pattern='large reads require bounded pages' harness/tests/context-inlet.test.ts`.
+- Failure observed: `large reads require bounded pages before their contents enter context`
+  allowed the fixed 40 KiB reproduction. Restoring 32 KiB blocks it while a 200-line page and
+  small direct read remain available.

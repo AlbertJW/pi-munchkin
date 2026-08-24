@@ -30,11 +30,6 @@ const HARNESS_CONFIG_KEYS = [
   "LOOP_BREAKER", "LOOP_EPISODE_MODE", "MUNCHKIN_TOOL_ACTIVATION", "MUNCHKIN_TOOL_SURFACE",
   "PLAN_GATE_DIAGNOSTICS", "PLAN_GATE_MAX", "PLAN_GATE_TIMEOUT_MS", "PLAN_ITEM_GUIDANCE_V2", "PLAN_MODE", "PLAN_STORAGE",
   "PLAN_PRESERVE_MAX", "PLAN_REPLAN_MAX", "PLAN_TOOL_GO", "PLAN_UNCERTAINTY",
-  // provider-patience: children are separate pi processes hitting the SAME slow
-  // local models, so the kill switch and both timeout knobs must cross with them
-  // — a child stripped of these re-grows the stock 300s undici headersTimeout
-  // and dies mid-prefill exactly like the parent used to.
-  "PROVIDER_PATIENCE", "PI_PROVIDER_HEADERS_TIMEOUT_MS", "PI_PROVIDER_BODY_TIMEOUT_MS",
   "PI_SUBAGENT_CONCURRENCY", "PI_SUBAGENT_ENV_ALLOW", "PI_SUBAGENT_MAX_SUMMARY_CHARS", "PI_SUBAGENT_TIMEOUT_MS",
   "READ_DEDUP", "REFLECT_TIMEOUT_MS", "RESEARCH_LEDGER", "RUN_CAPSULE", "RUN_KERNEL", "VERIFICATION_PLATEAU", "WORKING_MEMORY",
   "SPAN_MAX_FILE_BYTES", "SPAN_TOOLS", "SPAWN_DELEGATION",
