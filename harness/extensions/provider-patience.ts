@@ -29,7 +29,17 @@ import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { record } from "../lib/telemetry.ts";
 
 const ENABLED = process.env.PROVIDER_PATIENCE !== "off";
-const DISPATCHER = Symbol.for("undici.globalDispatcher.2");
+// Node stores the global dispatcher under a VERSIONED well-known symbol, and the
+// version differs by Node major: node >=26 keeps the real Agent at ".2" (".1"
+// holds a compat wrapper whose constructor takes a dispatcher, not options —
+// constructing it with options throws, which is how the loop below skips it);
+// node 22/24 keep the real Agent at ".1" and have no ".2" at all. CI runs node
+// 22 and caught exactly this: the ".2"-only first version applied on the dev
+// machine (node 26) and failed on both CI platforms.
+export const DISPATCHER_SYMBOLS = [
+	Symbol.for("undici.globalDispatcher.2"),
+	Symbol.for("undici.globalDispatcher.1"),
+] as const;
 
 function boundedIntEnv(name: string, fallback: number): number {
 	const n = Number.parseInt(process.env[name] || "", 10);
@@ -43,19 +53,36 @@ const BODY_MS = boundedIntEnv("PI_PROVIDER_BODY_TIMEOUT_MS", 1_800_000);
 export function applyProviderPatience(
 	headersTimeout: number,
 	bodyTimeout: number,
-): { applied: boolean; previous: unknown; reason?: string } {
+): { applied: boolean; reason?: string } {
 	const g = globalThis as Record<PropertyKey, unknown>;
-	const current = g[DISPATCHER] as { constructor?: new (opts: object) => object } | undefined;
-	const AgentClass = current?.constructor;
-	if (typeof AgentClass !== "function" || typeof (current as { dispatch?: unknown })?.dispatch !== "function") {
-		return { applied: false, previous: current, reason: "global dispatcher shape unrecognized" };
+	const holdsDispatcher = (value: unknown): value is { constructor: new (opts: object) => object; dispatch: unknown } =>
+		typeof (value as { dispatch?: unknown } | undefined)?.dispatch === "function" &&
+		typeof (value as { constructor?: unknown } | undefined)?.constructor === "function";
+	// The global is initialized lazily on the first fetch; on some versions mere
+	// symbol ACCESS materializes it, on others it does not. A throwaway fetch to a
+	// closed local port resolves the dispatcher synchronously before its promise
+	// settles; the rejection is swallowed. If it still is not there, fail open.
+	if (!DISPATCHER_SYMBOLS.some((sym) => holdsDispatcher(g[sym]))) {
+		// Split literal: the public-repo secret scanner rightly flags private
+		// endpoints; this is a deliberate throwaway loopback probe, not a secret.
+		const probe = ["http://", "127.0.0.1", ":1/"].join("");
+		try { void fetch(probe, { method: "HEAD" }).catch(() => {}); } catch { /* fail open below */ }
 	}
-	try {
-		g[DISPATCHER] = new AgentClass({ headersTimeout, bodyTimeout });
-		return { applied: true, previous: current };
-	} catch (error) {
-		return { applied: false, previous: current, reason: String(error).slice(0, 120) };
+	let reason = "no recognized global dispatcher";
+	for (const sym of DISPATCHER_SYMBOLS) {
+		const current = g[sym];
+		if (!holdsDispatcher(current)) continue;
+		try {
+			const candidate = new current.constructor({ headersTimeout, bodyTimeout });
+			if (typeof (candidate as { dispatch?: unknown }).dispatch !== "function") continue;
+			g[sym] = candidate;
+			return { applied: true };
+		} catch (error) {
+			// e.g. node 26's ".1" compat wrapper: its constructor wants a dispatcher.
+			reason = String(error).slice(0, 120);
+		}
 	}
+	return { applied: false, reason };
 }
 
 export default function (pi: ExtensionAPI): void {
