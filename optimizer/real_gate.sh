@@ -275,7 +275,12 @@ REP_END=$((REP_START + N - 1))
 # site (never as a literal -H argv token) so it never appears in `ps aux`; a
 # pre-built array reusing one process substitution across calls would also
 # fail (each is a one-shot pipe).
-loaded_alias() { curl -fsS -m 5 ${LLAMA_API_KEY:+-K <(printf 'header = "Authorization: Bearer %s"\n' "$LLAMA_API_KEY")} "$LLAMA_URL/v1/models" 2>/dev/null | python3 -c 'import sys,json;d=json.load(sys.stdin)["data"];print(d[0]["id"] if d else "")' 2>/dev/null; }
+# The LOADED member, not data[0]: behind llama-swap /v1/models lists the whole zoo
+# alphabetically, so data[0] was whatever sorted first (measured: `defiant-9b`
+# reported while a 27B was resident, 2026-08-22) -- and without PI_MODEL that
+# mislabel would have become every row's model field. Falls back to data[0] only
+# for single-model servers that carry no status at all.
+loaded_alias() { curl -fsS -m 5 ${LLAMA_API_KEY:+-K <(printf 'header = "Authorization: Bearer %s"\n' "$LLAMA_API_KEY")} "$LLAMA_URL/v1/models" 2>/dev/null | python3 -c 'import sys,json;d=json.load(sys.stdin)["data"];print(next((m["id"] for m in d if (m.get("status") or {}).get("value") in ("loaded","running")), d[0]["id"] if d else ""))' 2>/dev/null; }
 ensure_model_loaded() {
 	local state
 	state="$(curl -fsS -m 5 ${LLAMA_API_KEY:+-K <(printf 'header = "Authorization: Bearer %s"\n' "$LLAMA_API_KEY")} "$LLAMA_URL/v1/models" 2>/dev/null | python3 -c 'import json,sys; m=sys.argv[1]; d=json.load(sys.stdin).get("data",[]); print(next((str((x.get("status") or {}).get("value", "")) for x in d if x.get("id")==m), ""))' "$MODEL" 2>/dev/null)"
@@ -715,7 +720,12 @@ PY
 	fi
 
 	if [[ "$MODEL_CONTROL" == "llama" ]]; then
-		ensure_model_loaded || { echo "[real_gate] could not load $MODEL for fingerprinting" >&2; exit 1; }
+		ensure_model_loaded || {
+			echo "[real_gate] could not load $MODEL for fingerprinting" >&2
+			echo "[real_gate]   Behind llama-swap, PI_MODEL must be the BARE router alias (e.g. ling3-tiny-experimental);" >&2
+			echo "[real_gate]   a provider-qualified id (local-llamacpp/...) 404s at the router. Check: curl $LLAMA_URL/v1/models" >&2
+			exit 1
+		}
 	fi
 	python3 "$FINGERPRINT" capture --endpoint "$FINGERPRINT_ENDPOINT" --model "$MODEL" --output "$wd/fingerprint-pre.json"
 	local retried=0 # retained row field for historical schema compatibility; retry candidates are retired

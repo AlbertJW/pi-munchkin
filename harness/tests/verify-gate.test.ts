@@ -697,6 +697,53 @@ test("shadow plateau records strict exposure but adds no plateau correction", as
 	}
 });
 
+test("VERIFICATION_PLATEAU default (unset) is ENFORCE; =shadow stays the rollback", async () => {
+	// Flipped 2026-08-24 (Albert-approved judgment adoption): AVO's supervisor
+	// pillar, dark in shadow while the exact failure it exists for happened live.
+	// This pin moved deliberately WITH the flip. Reverting the default makes the
+	// unset case record mode:"shadow" and this test fail -- the counterfactual.
+	const cwd = projectWithNpmTest();
+	const telemetry = join(cwd, "default-pin.jsonl");
+	const previous = {
+		plateau: process.env.VERIFICATION_PLATEAU, order: process.env.VERIFY_EXECUTION_ORDER,
+		control: process.env.CONTROL_ARBITER, telemetry: process.env.TELEMETRY, file: process.env.TELEMETRY_FILE,
+	};
+	Object.assign(process.env, {
+		VERIFY_EXECUTION_ORDER: "execution", CONTROL_ARBITER: "enforce",
+		TELEMETRY: "on", TELEMETRY_FILE: telemetry,
+	});
+	delete process.env.VERIFICATION_PLATEAU; // the point of the test
+	try {
+		const fp = makeFakePi();
+		const tag = `default-pin-${Date.now()}-${Math.random()}`;
+		const verify = await import(`../extensions/verify-gate.ts?plateau-default=${tag}`);
+		verify.default(fp.pi as never);
+		const arbiter = await import(`../extensions/control-arbiter.ts?plateau-default=${tag}`);
+		arbiter.default(fp.pi as never);
+		await fire(fp, "session_start", {}, ctxFor(cwd));
+		(globalThis as Record<string, unknown>).__pi_active_plan_context = { item_id: "item-a" };
+		await plateauEpoch(fp, cwd, 1, "baseline");
+		for (let index = 2; index <= 4; index += 1) await plateauEpoch(fp, cwd, index, String(index));
+		await fire(fp, "turn_end", { ...wrapUpTurn, turnIndex: 4 }, ctxFor(cwd));
+		await fire(fp, "agent_settled", {}, ctxFor(cwd));
+		const rows = readFileSync(telemetry, "utf8").split("\n").filter(Boolean)
+			.map((line) => JSON.parse(line) as Record<string, unknown>);
+		const observed = rows.filter((row) => row.ext === "verification-plateau" && row.kind === "observed");
+		assert.ok(observed.length > 0, "the plateau must observe with env unset");
+		assert.ok(observed.every((row) => row.mode === "enforce"), "unset must mean ENFORCE");
+		const interventions = rows.filter((row) => row.ext === "verification-plateau"
+			&& row.kind === "intervention" && row.tier === 1);
+		assert.equal(interventions.length, 1, "the tier-1 correction must fire by default");
+		assert.equal(interventions[0].delivered, true);
+	} finally {
+		for (const [key, value] of Object.entries({
+			VERIFICATION_PLATEAU: previous.plateau, VERIFY_EXECUTION_ORDER: previous.order,
+			CONTROL_ARBITER: previous.control, TELEMETRY: previous.telemetry, TELEMETRY_FILE: previous.file,
+		})) { if (value === undefined) delete process.env[key]; else process.env[key] = value; }
+		resetPiGlobals();
+	}
+});
+
 test("an enforce plateau reports what the arbiter DELIVERED, not what it composed", async () => {
 	// The tier-1 correction reaches the model only through the control arbiter --
 	// unlike loop-breaker it has no self-delivery fallback (legacyActed: false). Under

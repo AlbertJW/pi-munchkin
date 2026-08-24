@@ -31,7 +31,7 @@ const SUBAGENT_MAX_DEPTH_ENV = "PI_SUBAGENT_MAX_DEPTH";
 const SUBAGENT_STACK_ENV = "PI_SUBAGENT_STACK";
 const SUBAGENT_PREVENT_CYCLES_ENV = "PI_SUBAGENT_PREVENT_CYCLES";
 const PI_OFFLINE_ENV = "PI_OFFLINE";
-const DEFAULT_SUBAGENT_TIMEOUT_MS = 600_000;
+import { resolveSubagentTimeoutMs } from "./timeout.js";
 
 type OnUpdateCallback = (partial: AgentToolResult<SubagentDetails>) => void;
 
@@ -427,8 +427,7 @@ export async function runAgent(opts: RunAgentOptions): Promise<SingleResult> {
         else signal.addEventListener("abort", abortHandler, { once: true });
       }
 
-      const envTimeout = Number.parseInt(process.env.PI_SUBAGENT_TIMEOUT_MS || "", 10);
-      const configuredTimeout = timeoutMs ?? (Number.isFinite(envTimeout) && envTimeout > 0 ? envTimeout : DEFAULT_SUBAGENT_TIMEOUT_MS);
+      const configuredTimeout = resolveSubagentTimeoutMs(timeoutMs);
       hardTimeout = setTimeout(() => {
         if (didClose || settled) return;
         wasTimedOut = true;

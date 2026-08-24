@@ -659,7 +659,14 @@ test("shadow mode observes the measured 7/11/28 session tail without intervening
 
 test("loop status is redacted and loop resume clears active episodes with one deterministic message", async () => {
 	const previous = process.env.LOOP_EPISODE_MODE;
+	const previousCapsule = process.env.RUN_CAPSULE;
 	process.env.LOOP_EPISODE_MODE = "shadow";
+	// This test pins the LEGACY deterministic-message path. Since the 2026-08-24
+	// RUN_CAPSULE=recovery default adoption, /loop-resume under the DEFAULT hands
+	// off to clearRecoveryWalls (a recovery/resumed signal the capsule answers)
+	// and sends no direct message -- covered by the signal test below. Pin shadow
+	// explicitly here; this expectation moved WITH the adoption.
+	process.env.RUN_CAPSULE = "shadow";
 	try {
 		const fp = makeFakePi();
 		const mod = await import(`../extensions/loop-breaker.ts?commands=${Date.now()}-${Math.random()}`);
@@ -683,5 +690,6 @@ test("loop status is redacted and loop resume clears active episodes with one de
 		assert.equal(snapshot.active.length, 0);
 	} finally {
 		if (previous === undefined) delete process.env.LOOP_EPISODE_MODE; else process.env.LOOP_EPISODE_MODE = previous;
+		if (previousCapsule === undefined) delete process.env.RUN_CAPSULE; else process.env.RUN_CAPSULE = previousCapsule;
 	}
 });

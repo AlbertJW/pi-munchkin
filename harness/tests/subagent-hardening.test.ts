@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import { resolveSubagentTimeoutMs } from "../vendor/pi-subagent/timeout.ts";
 import { parseInheritedCliArgs } from "../vendor/pi-subagent/runner-cli.js";
 import { buildSubagentEnv } from "../vendor/pi-subagent/runner-env.js";
 import { normalizeCompletedResult, emptyUsage, isResultSuccess, type SingleResult } from "../vendor/pi-subagent/types.ts";
@@ -219,4 +220,18 @@ test("parallel summary header agrees with the per-child completed/failed labels"
 	const completedLabels = (text.match(/\] completed:/g) || []).length;
 	assert.equal(completedLabels, 2, "header count equals the number of 'completed' labels");
 	assert.match(text, /\[b\] failed:/);
+});
+
+test("subagent timeout default is 1800s; env and explicit arg still win", () => {
+	// Raised from 600_000 on 2026-08-24 (Albert-approved): an explorer child on a
+	// slow local model hit the 600s wall and blocked its parent task overnight, and
+	// provider-patience now allows a single provider request up to 30min of prefill
+	// -- one slow request must not consume an entire child budget. Reverting the
+	// default makes the first assertion fail; that is the counterfactual.
+	assert.equal(resolveSubagentTimeoutMs(undefined, {}), 1_800_000);
+	assert.equal(resolveSubagentTimeoutMs(undefined, { PI_SUBAGENT_TIMEOUT_MS: "120000" }), 120_000);
+	assert.equal(resolveSubagentTimeoutMs(45_000, { PI_SUBAGENT_TIMEOUT_MS: "120000" }), 45_000);
+	// Garbage env falls back to the default, never NaN.
+	assert.equal(resolveSubagentTimeoutMs(undefined, { PI_SUBAGENT_TIMEOUT_MS: "soon" }), 1_800_000);
+	assert.equal(resolveSubagentTimeoutMs(undefined, { PI_SUBAGENT_TIMEOUT_MS: "-5" }), 1_800_000);
 });

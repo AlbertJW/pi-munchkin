@@ -101,10 +101,11 @@ case, and the same logic applies here.
   exactly one `src/` file and touch no test, so `scope_discipline` is constant and
   `MIN_DISTINCT_HUMAN_SCORES` refuses. Demonstrated with a *perfect* judge: exact 1.0, within-one
   1.0, kappa 1.0, `passed: false`. See `JUDGE_LABELING_2026-08.md`.
-- **Two operational traps behind llama-swap.** `PI_MODEL` is both pi's model id and llama-swap's
-  and they differ — the provider-qualified form 404s at warm-up (fails closed, no row). And
-  `loaded_alias()` returns `data[0]`, first *alphabetically*, not the loaded model: **always set
-  `PI_MODEL`** or every row is mislabelled.
+- **Two operational traps behind llama-swap — BOTH FIXED IN CODE 2026-08-24.** `PI_MODEL` is both
+  pi's model id and llama-swap's and they differ; the warm-up 404 now prints the fix (use the bare
+  router alias). And `loaded_alias()` now returns the *loaded* member rather than `data[0]`
+  (alphabetical), so an unset `PI_MODEL` no longer mislabels rows. Setting `PI_MODEL` explicitly
+  remains best practice.
 
 ## What would justify restarting
 

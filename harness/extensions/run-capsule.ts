@@ -109,6 +109,13 @@ export default function (pi: ExtensionAPI): void {
 	pi.on("tool_execution_start", flushPhase);
 	pi.on("tool_execution_end", flushPhase);
 	pi.on("turn_end", flushPhase);
+	// THE COMPACTION -> RESUME CONTRACT (AVO's "resume from the current state
+	// rather than reconstruct the search", adopted-as-docs 2026-08-24): every
+	// compaction marks the pending generation here, and under recovery mode the
+	// NEXT context assembly injects one bounded recovery brief rendered from the
+	// private capsule (reason "compaction"; provider retries use the same channel
+	// with reason "provider_retry"). Shadow mode keeps the checkpoint and skips
+	// the injection -- persistence is never lost, only the resume hint.
 	pi.on("session_compact", async () => {
 		await flushPhase();
 		if (mode === "recovery" && latestState) pendingCompactionGeneration = latestState.context.compactionGeneration;

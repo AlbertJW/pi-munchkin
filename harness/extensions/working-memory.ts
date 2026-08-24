@@ -1,4 +1,11 @@
 import { defineTool, type ExtensionAPI } from "@earendil-works/pi-coding-agent";
+// DELIBERATELY DARK (re-affirmed 2026-08-24, Albert-approved). The 2026-08-24 AVO
+// adoption batch flipped the supervisor (VERIFICATION_PLATEAU=enforce) and
+// resume-from-state (RUN_CAPSULE=recovery) but left THIS pillar off: unlike those
+// two, it ADDS a tool to the model surface, and the measured failure mode of the
+// current local tier is tool operation itself (~70-95% tool-call error rates,
+// MOTHBALLED_2026-08-21.md). Revisit under the mothball restart condition "a
+// subject that can drive the harness". WORKING_MEMORY=on remains the opt-in.
 import { Type } from "typebox";
 import { agentDir } from "../lib/agent-dir.ts";
 import { onHarnessSignal } from "../lib/harness-signals.ts";

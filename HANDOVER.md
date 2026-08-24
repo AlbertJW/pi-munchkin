@@ -112,6 +112,20 @@ stacked work. Nothing in this series has been merged, mirrored live, adopted, or
 > same day and re-smoked (exit 0, zero stderr, one `si`, surface-receipt confirms). It
 > supersedes `e7190767…`; no model-visible behaviour changed between them.
 >
+> **AVO ADOPTION BATCH 2026-08-24 (Albert-approved).** The Aug 20-22 pi session is archived at
+> `~/Desktop/pi-session-2026-08-20_harness-improvements/` (complete log, raw transcript, both
+> design artifacts, ANALYSIS.md). Its artifacts were verified claim-by-claim; dispositions:
+> ADOPTED — plateau supervisor (`VERIFICATION_PLATEAU` default now enforce), resume-from-state
+> (`RUN_CAPSULE` default now recovery), compaction->resume contract (documented, was already
+> built), subagent 600s->1800s. REJECTED with verified reasons — memory-store merge (merges three
+> trust domains three inspection rounds separated), recovery fold (collapses per-mechanism kill
+> switches), `WORKING_MEMORY=on` (adds a tool where the measured failure mode IS tool operation).
+> VOID — symbolect removal (zero refs in harness/, retired 2026-07-12), double-steer fix (arbiter
+> one-winner-per-boundary already does it). Ops: `loaded_alias()` and the warm-up 404 fixed in
+> `real_gate.sh` (mothball trap list updated); `~/LLM/llama-swap.yaml` big-model `ttl` raised
+> 1800->7200 (backup `llama-swap.yaml.bak-20260824`, router restarted clean). Rollbacks:
+> `VERIFICATION_PLATEAU=shadow`, `RUN_CAPSULE=shadow`, `PI_SUBAGENT_TIMEOUT_MS`, the yaml backup.
+>
 > **OPTIMIZER MOTHBALLED AGAIN 2026-08-21 — see
 > [`optimizer/docs/MOTHBALLED_2026-08-21.md`](optimizer/docs/MOTHBALLED_2026-08-21.md).** The
 > instrument work is DONE and validated: the Phase-6 n=1 smoke passed every pre-declared

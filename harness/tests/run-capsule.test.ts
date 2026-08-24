@@ -11,7 +11,7 @@ import loopBreaker from "../extensions/loop-breaker.ts";
 import { emptyState, projectRunStateToBlackboard } from "../lib/blackboard.ts";
 import {
 	CapsuleCheckpointQueue, latestRunStateEntry, makeRunStateEntry, newCapsuleId,
-	readLatestRunCapsule, RUN_STATE_ENTRY_TYPE, runCapsuleDirectory, writeRunCapsule,
+	readLatestRunCapsule, RUN_STATE_ENTRY_TYPE, runCapsuleDirectory, runCapsuleMode, writeRunCapsule,
 } from "../lib/run-capsule-store.ts";
 import { renderRunCapsule, renderRunStatus } from "../lib/run-capsule-renderer.ts";
 import { RunStateStoreV1, validateRunStateSnapshot } from "../lib/run-kernel-state.ts";
@@ -328,12 +328,23 @@ test("snapshot schema rejects raw fields and invalid bounded values", () => {
 	assert.ok(validateRunStateSnapshot(invalidCapabilities).length > 0);
 });
 
-test("default shadow registers no prompt-context handler", async () => {
+// This expectation moved deliberately WITH the 2026-08-24 adoption; it was not
+// adjusted to silence a firing tripwire. Unset now means RECOVERY, so the default
+// registers the context handler; explicit =shadow keeps the old dark behavior.
+test("default (unset) is RECOVERY: the prompt-context handler registers", async () => {
 	await withEnv({ RUN_CAPSULE: undefined, TELEMETRY: "off" }, async () => {
 		const fp = makeFakePi();
 		runCapsule(fp.pi as never);
-		assert.equal(fp.handlers.has("context"), false);
-		assert.equal(fp.handlers.has("before_agent_start"), false);
+		assert.equal(fp.handlers.has("context"), true, "recovery default must be able to inject the brief");
+		assert.deepEqual(fp.sent, []);
+	});
+});
+
+test("explicit RUN_CAPSULE=shadow still registers no prompt-context handler", async () => {
+	await withEnv({ RUN_CAPSULE: "shadow", TELEMETRY: "off" }, async () => {
+		const fp = makeFakePi();
+		runCapsule(fp.pi as never);
+		assert.equal(fp.handlers.has("context"), false, "shadow is the rollback: persist, never inject");
 		assert.deepEqual(fp.sent, []);
 	});
 });
@@ -397,4 +408,15 @@ test("recovery resume commands append one brief without starting a model turn", 
 		assert.equal(fp.customDeliveries.every((item) => item.api === "sendMessage" && item.triggerTurn === false && item.effective === "queued-next-turn"), true);
 		assert.equal(fp.deliveries.some((item) => item.api === "sendUserMessage"), false);
 	});
+});
+
+test("RUN_CAPSULE default is RECOVERY; shadow and off remain the rollbacks", () => {
+	// Flipped 2026-08-24 (Albert-approved): unset means recovery -- AVO's
+	// resume-from-state pillar. Reverting the flip makes the first assertion fail.
+	assert.equal(runCapsuleMode({}), "recovery");
+	assert.equal(runCapsuleMode({ RUN_CAPSULE: "recovery" }), "recovery");
+	assert.equal(runCapsuleMode({ RUN_CAPSULE: "shadow" }), "shadow");
+	assert.equal(runCapsuleMode({ RUN_CAPSULE: "off" }), "off");
+	// Garbage stays fail-safe to the DEFAULT, never an accidental off.
+	assert.equal(runCapsuleMode({ RUN_CAPSULE: "banana" }), "recovery");
 });

@@ -23,8 +23,15 @@ export type CapsuleWriteResult = {
 };
 
 export function runCapsuleMode(env: NodeJS.ProcessEnv = process.env): RunCapsuleMode {
-	if (env.RUN_CAPSULE === "off" || env.RUN_CAPSULE === "recovery") return env.RUN_CAPSULE;
-	return "shadow";
+	// ADOPTED 2026-08-24 (Albert-approved judgment adoption): unset now means
+	// RECOVERY. This is AVO's resume-from-state pillar -- inject the bounded typed
+	// recovery brief at exactly two seams (compaction, provider retry) instead of
+	// making the model reconstruct; a 3-day session hit those seams 4 times under
+	// shadow and reconstructed each time. Injection is telemetry-recorded
+	// (`recovery-brief` rows). Benefit is NOT established by a powered trial.
+	// Rollbacks: RUN_CAPSULE=shadow (persist, never inject) or =off.
+	if (env.RUN_CAPSULE === "off" || env.RUN_CAPSULE === "shadow") return env.RUN_CAPSULE;
+	return "recovery";
 }
 
 export function newCapsuleId(): string {

@@ -30,8 +30,17 @@ import { emitHarnessSignal } from "../lib/harness-signals.ts";
 
 const ENABLED = process.env.VERIFY_GATE !== "off";
 const EXECUTION_ORDER = process.env.VERIFY_EXECUTION_ORDER !== "legacy";
+// ADOPTED 2026-08-24 (Albert-approved judgment adoption, tool-call-rescue
+// precedent): unset now means ENFORCE. This is AVO's supervisor pillar -- redirect
+// on "no forward progress" (3 successful-mutation epochs with no frontier advance),
+// not repeat-count -- and it was dark in shadow while the exact failure it exists
+// for happened live (a 3-day session plateaued at streak 3 and stalled overnight).
+// The steer is bounded: one winner per boundary via the control arbiter,
+// cooldown-keyed, delivery telemetry-honest since 2026-08-21. Benefit is NOT
+// established by a powered trial. Rollbacks: VERIFICATION_PLATEAU=shadow (observe
+// only) or =off.
 const PLATEAU_MODE: VerificationPlateauMode = process.env.VERIFICATION_PLATEAU === "off" ? "off" :
-	process.env.VERIFICATION_PLATEAU === "enforce" ? "enforce" : "shadow";
+	process.env.VERIFICATION_PLATEAU === "shadow" ? "shadow" : "enforce";
 const MAX_FIRES = (() => {
 	const n = Number.parseInt(process.env.VERIFY_GATE_MAX_FIRES || "3", 10);
 	return Number.isFinite(n) && n > 0 ? n : 3;

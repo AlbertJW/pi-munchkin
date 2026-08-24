@@ -162,6 +162,26 @@ candidates as dark). Net changes since 0.3.0; the full per-decision record is
   `effort_report --graded`, manifest-pinned grade artifacts, admission approval pinned to
   manifest content, the `audit-sweep` graded fixture.
 
+### Changed
+
+- **AVO adoption batch (2026-08-24, Albert-approved judgment adoptions):** the archived 3-day
+  session's two research artifacts (NVIDIA AVO + the graph-architect frame) were verified against
+  the tree; the finding is that the harness already contains five of AVO's six pillars, three of
+  them dark. Two flips: `VERIFICATION_PLATEAU` unset now means **enforce** (the supervisor pillar —
+  redirect on 3 successful-mutation epochs with no frontier advance; the 3-day session plateaued at
+  exactly this condition and stalled overnight) and `RUN_CAPSULE` unset now means **recovery** (the
+  resume-from-state pillar — one bounded brief injected at compaction/provider-retry; the session
+  hit those seams 4x and reconstructed each time). `WORKING_MEMORY` deliberately stays dark: it adds
+  a tool to the surface exactly where the measured failure mode is tool operation. Both flips carry
+  default-pinning tests proven by reverting, single-env rollbacks (`=shadow`), and honest caveats
+  (benefit not established by a powered trial). The artifacts' stale recommendations (memory-store
+  merge, symbolect removal, double-steer fix) are dispositioned with verified reasons in HANDOVER.
+  Also: the vendored subagent timeout default rises 600s -> 1800s (`pi-subagent/timeout.ts`; an
+  explorer child hit the 600s wall and blocked its parent overnight, and provider-patience now
+  allows a single request 30min of prefill), and `real_gate.sh`'s `loaded_alias()` returns the
+  loaded member instead of `data[0]` (both llama-swap traps from the mothball doc now fixed in
+  code).
+
 ### Added
 
 - **provider-patience (2026-08-22, default-on, `PROVIDER_PATIENCE=off` kill switch):** raises the
