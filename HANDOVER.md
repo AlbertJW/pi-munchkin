@@ -1,4 +1,4 @@
-# Handover — pi_munchkin, 2026-08-11
+# Handover — pi_munchkin, 2026-08-24
 
 Read `optimizer/docs/MEASUREMENT_METHODOLOGY_2026-07.md` before interpreting any historical
 experiment. A 2026-07-27 audit established that most A/B results were unsupported: rounds at

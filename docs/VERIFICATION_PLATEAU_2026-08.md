@@ -1,8 +1,10 @@
 # Shadow verification-plateau control
 
-Status: observational by default. `VERIFICATION_PLATEAU=shadow` records strict exposure;
-`enforce` is a dark candidate; `off` is the collection kill switch. No gate or calibration was
-started by this change.
+Status: **ENFORCED BY DEFAULT since 2026-08-24** (Albert-approved judgment adoption — the AVO
+supervisor pillar; see `docs/HARNESS_CALL_GRAPH.md` and the CHANGELOG entry). `shadow` restores
+the observational posture this document was written under; `off` is the collection kill switch.
+The design and definitions below are unchanged and still authoritative. No gate or calibration
+was started by the original change or by the adoption.
 
 ## Definition
 

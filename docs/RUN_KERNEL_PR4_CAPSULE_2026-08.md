@@ -1,7 +1,9 @@
 # Run Kernel PR 4: private run capsule
 
-Status: dark persistence implementation. No live mirror, recovery injection, default adoption,
-or model round is implied by this document.
+Status: written as a dark persistence implementation; **`recovery` is the DEFAULT since
+2026-08-24** (Albert-approved judgment adoption — the AVO resume-from-state pillar; see
+`docs/HARNESS_CALL_GRAPH.md`). `RUN_CAPSULE=shadow` restores the posture this document
+describes. The storage contract and authority model below are unchanged and still authoritative.
 
 ## Authority and storage
 
