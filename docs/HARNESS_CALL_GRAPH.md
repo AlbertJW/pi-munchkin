@@ -370,6 +370,9 @@ is the correct shape.
 > **STATUS 2026-08-24:** recommendation 1 is implemented and live (the plateau enforce default);
 > recommendation 2 is honored (no routing was added anywhere); recommendation 3 stays deferred with
 > the mothballed optimizer. Additionally `RUN_CAPSULE=recovery` is now the default (the checkpoint →
-> resume branch in §7 actively injects its brief), and a new deterministic node exists on the
-> provider edge: `provider-patience.ts` swaps the process-global fetch dispatcher at registration so
-> slow local models are not aborted mid-prefill (first-byte/body caps 1800s).
+> resume branch in §7 actively injects its brief), and a deterministic node was added on the
+> provider edge (`provider-patience.ts`) — and then found INERT in pi sessions on 2026-08-24: pi
+> installs npm-undici's fetch with its own dispatcher, which the extension's node-registry swap
+> never reaches. The 300s wall was pi's own `httpIdleTimeoutMs` (default 300,000ms), now raised to
+> 1,800,000 in the live settings — pi's supported knob, no extension required. A lesson in this
+> document's own Step-6 spirit: the deterministic fix was a SETTING, not a node.

@@ -182,6 +182,21 @@ candidates as dark). Net changes since 0.3.0; the full per-decision record is
   loaded member instead of `data[0]` (both llama-swap traps from the mothball doc now fixed in
   code).
 
+### Fixed
+
+- **The 300s "Request timed out." root cause was pi's own `httpIdleTimeoutMs`, not Node's undici
+  (2026-08-24):** a live AlbertWork session on the fully-patched surface still died headerless at
+  exactly 300.5s while `provider-patience/applied` read true. Tracing into pi-coding-agent:
+  `configureHttpDispatcher` builds its own undici agent with `headersTimeout`/`bodyTimeout` =
+  `httpIdleTimeoutMs` (default 300,000ms) AND installs npm-undici's fetch — which reads pi's
+  dispatcher, not the node-registry symbols provider-patience swaps. The extension is therefore
+  measured INERT inside pi sessions (its unit tests and smokes pass because they exercise Node's
+  fetch and never a >300s request). Fix: `httpIdleTimeoutMs: 1800000` in the live settings.json
+  (pi's supported knob; backup kept). The 2026-08-22 provider-patience entry below stands as
+  history of an honest but incomplete diagnosis; extension retirement is a pending decision. The
+  same session also surfaced a context-overflow loop (65,597 → compaction → one turn re-read 90KB →
+  69,501 against a 65,536 serving window) recorded in HANDOVER as an open finding.
+
 ### Added
 
 - **provider-patience (2026-08-22, default-on, `PROVIDER_PATIENCE=off` kill switch):** raises the

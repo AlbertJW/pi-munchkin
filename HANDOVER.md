@@ -112,6 +112,22 @@ stacked work. Nothing in this series has been merged, mirrored live, adopted, or
 > same day and re-smoked (exit 0, zero stderr, one `si`, surface-receipt confirms). It
 > supersedes `e7190767…`; no model-visible behaviour changed between them.
 >
+> **2026-08-24 (later): THE 300s WALL WAS PI'S OWN SETTING; provider-patience measured INERT in
+> pi sessions.** A live AlbertWork run on the final surface (`5427eea5`, patience applied:true)
+> still died headerless at exactly 300.5s. Root cause: pi's `configureHttpDispatcher` sets
+> `headersTimeout`/`bodyTimeout` = `httpIdleTimeoutMs` (default 300,000ms) on its OWN dispatcher
+> and installs npm-undici's fetch — the extension's node-registry swap never reaches pi's request
+> path. FIXED with pi's supported knob: `httpIdleTimeoutMs: 1800000` in the live settings.json
+> (backup `settings.json.bak-20260824-idle`; verified with a live 4B session). PENDING DECISION:
+> retire provider-patience (inert in every pi context; harmless; removal is a surface change).
+> The same run surfaced an OPEN finding — a context-overflow loop: request 65,597 tokens vs
+> ornith's 65,536 serving window (registry ctx 61,440), reactive compaction, then ONE turn
+> re-read ~90KB (two large `read`s: 40KB dashboard + 50KB wiki index, under every current read
+> cap), landing at 69,501 → 400 again. pi's client-side token accounting undercounts dense text
+> (CSV/markdown) vs the server tokenizer, so compaction fires too late. Mitigation options (all
+> model-visible, Albert-gated): lower ornith's registry ctx for headroom, raise serving ctx, or
+> tighten read caps. Recorded, not changed.
+>
 > **AVO ADOPTION BATCH 2026-08-24 (Albert-approved).** The Aug 20-22 pi session is archived at
 > `~/Desktop/pi-session-2026-08-20_harness-improvements/` (complete log, raw transcript, both
 > design artifacts, ANALYSIS.md). Its artifacts were verified claim-by-claim; dispositions:
