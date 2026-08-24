@@ -33,14 +33,17 @@ semantic shadow posture are unchanged.
 
 The approved defaults are `MUNCHKIN_TOOL_PROFILE=core` and
 `FORCE_PLAN_WRITE_DEFAULT=off`. Independent rollbacks remain `MUNCHKIN_TOOL_PROFILE=ambient` and
-`FORCE_PLAN_WRITE=on`. The source change is being merged and mirrored under the approved rollout;
-no calibration, gate round, or efficacy claim follows from it.
+`FORCE_PLAN_WRITE=on`. Commits `dbf90f4` and `41ab87b` are merged and pushed on `main`. The live
+mirror matches all 112 first-party artifacts, Pi 0.84.2 completed a non-inference load smoke, and
+the authoritative loaded hash is `acd18a54415b58bf66e1fb2722a2ac8cd3b9d985a1ac61cf56c93c09dbf39d0b`.
+No calibration, gate round, or efficacy claim follows from this rollout.
 Counterfactual test names and non-secret outcomes are recorded in
 `docs/SHOTGUN_RECOVERY_QA_2026-08.md`. The final working diff passes `npm run verify` (550 tests,
 typecheck, health, 151-file deterministic package smoke with 30 extensions and two skills,
 optimizer integrity/jails, and secret scan), peer-boundary checks, and isolated packed consumers
-for Pi 0.80–0.84. A disposable agent directory mirrored 112/112 first-party files, reported zero
-unmanaged extensions/orphans, and loaded through Pi 0.84 without inference.
+for Pi 0.80–0.84. The approved live rollout preserved local settings, model configuration, and
+browser artifacts; pruned six obsolete managed orphan/staging files; and reports no unmanaged
+loadable extension or duplicate tool.
 
 ## 2026-08-24 deep-inspection close-out
 

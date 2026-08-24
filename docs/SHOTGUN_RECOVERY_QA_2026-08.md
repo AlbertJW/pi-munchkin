@@ -41,8 +41,11 @@ Isolated packed consumers for Pi 0.80, 0.81, 0.82, 0.83, and 0.84 each typecheck
 extensions plus both skills. A disposable agent directory mirrors 112/112 first-party files with
 no unmanaged extension or orphan and loads through Pi 0.84 help without inference.
 
-No `context-pressure*` file was used or modified. No live harness was changed. No calibration or
-gate round was started.
+No `context-pressure*` file was used or modified. The separately approved rollout wrote 112
+manifest-owned live artifacts, pruned six obsolete managed orphan/staging files, and preserved the
+hashes of `settings.json`, `models.json`, and `MODELS.md` plus the browser-artifact inventory. Pi
+0.84.2 loaded the live surface without inference or duplicate-tool errors. No calibration or gate
+round was started.
 
 ## Approved adoption
 
