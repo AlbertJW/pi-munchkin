@@ -47,9 +47,17 @@ stands until he starts preflight.**
 ## 2026-08-26 four-scale deep review — what shipped, and what did NOT
 
 Solar (whole system) / planetary (30 extensions) / atomic (functions) / quark (bytes), plus a
-model's-eye and a measurement pass. Sixteen findings fixed and counterfactually proven; see the
-CHANGELOG entry and the `PENDING` row in `docs/SURFACE_BOUNDARIES.md` (source
-`92afd0fe…` — **not yet rolled out**).
+model's-eye and a measurement pass. Seventeen findings fixed and counterfactually proven.
+**Rolled out 2026-08-26**: source `55302ace…`, loaded `9c1bc17c…`, mirror 116/116, 35B smoke clean
+(exit 0, zero stderr, 64 rows on one `si`, zero error rows). See the 2026-08-26 row in
+`docs/SURFACE_BOUNDARIES.md` — it is a **HASH EPOCH CHANGE**, so nothing pools across it.
+
+The seventeenth was found *during* the rollout, by checking the live hash instead of trusting it:
+widening the hash to cover `AGENTS.md` made macOS match both `AGENTS.md` and `AGENTS.MD` for the
+same file and hash its bytes twice, while Linux would match one — the same tree, two digests by
+platform, in the very artifact that exists to prevent cross-machine divergence. Both hashers now
+mirror `loadContextFileFromDir`: first match wins per group. Interim source `92afd0fe…` was never
+mirrored. **Verify the receipt, not the change.**
 
 The load-bearing deliverable is `harness/tests/manifest-boot.test.ts`: the first test that boots the
 whole declared manifest in order and asserts the end state, including after a `/reload`. Every
