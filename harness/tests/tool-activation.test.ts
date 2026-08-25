@@ -65,6 +65,25 @@ test("Pi's ordinary optional builtin omissions are not an explicit allowlist", a
 	} finally { run.restore(); }
 });
 
+test("a reload re-entry does not reclassify the harness's own narrowing as explicit", async () => {
+	// Pi re-emits session_start on /reload (and `pi update --extensions`), rebuilding the
+	// runtime from the CURRENT active set — the spine this harness already narrowed. The
+	// baseline must stay the true startup registry (first capture wins), or the classifier
+	// reads its own core narrowing as a user allowlist and /plan refuses (observed live
+	// 2026-08-25: "the explicit tool selection excludes plan_write").
+	const run = await load("core", [...names]);
+	try {
+		assert.equal((globalThis as any).__pi_tool_selection_explicit, false);
+		const narrowed = run.fp.pi.getActiveTools();
+		assert.equal(narrowed.includes("plan_write"), false); // core startup defers plan tools
+		// Simulate the reload generation: bootstrap re-captures over the narrowed surface,
+		// then tool-activation's session_start handler runs again.
+		captureInitialToolSurface(run.fp.pi as any);
+		await fire(run.fp, "session_start", {}, { cwd: mkdtempSync(join(tmpdir(), "pi-tools-cwd-")) });
+		assert.equal((globalThis as any).__pi_tool_selection_explicit, false);
+	} finally { run.restore(); }
+});
+
 test("real CLI narrowing remains authoritative", async () => {
 	const run = await load("core", ["read", "bash"], ["node", "pi", "--tools=read,bash"]);
 	try {

@@ -15,6 +15,19 @@ All notable changes to pi-munchkin are documented here. Releases follow semantic
   hashed, never printed), refuses in-repo writes, 0600 output, round-trips through
   `failure_episode_trial.load_manifest`; `--selftest`.
 
+### Fixed (2026-08-25 — reload re-entry broke /plan)
+
+- The initial tool surface captured by `session-bootstrap` is now immutable for the process
+  lifetime (first capture wins). Pi re-emits `session_start` on `/reload` — and
+  `pi update --extensions` reloads — rebuilding the runtime from the CURRENT active set, i.e.
+  the spine the harness itself had narrowed. Re-capturing that surface made
+  `baselineLooksExplicit` read the harness's own core-profile narrowing as an explicit user
+  allowlist: core mode was skipped, `plan_write` stayed inactive, and `/plan` refused with
+  "the explicit tool selection excludes plan_write" (observed live on a package-installed
+  deployment). Fresh processes are unaffected — `initialActiveToolNames` never comes from
+  persisted session state — so first-wins closes the only corruption path. Both-polarity
+  regression proven by counterfactual (`tool-activation.test.ts`).
+
 ### Documentation (2026-08-25 — drift repair from the handover inspection)
 
 - `HANDOVER.md`: the deep-inspection close-out no longer claims to be the current snapshot

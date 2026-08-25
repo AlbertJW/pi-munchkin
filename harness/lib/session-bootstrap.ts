@@ -25,8 +25,22 @@ function names(values: unknown): string[] | null {
 	return result;
 }
 
-/** Capture the registry before any later session_start handler can narrow it. */
+/**
+ * Capture the registry before any later session_start handler can narrow it.
+ *
+ * First capture wins for the process lifetime. Pi re-emits session_start on
+ * /reload (and `pi update --extensions` reloads), and reload rebuilds the
+ * runtime from the CURRENT active set — i.e. the surface this harness already
+ * narrowed. Re-capturing there made the classifier read the harness's own
+ * core-profile narrowing as an explicit user allowlist, which blocked /plan
+ * ("the explicit tool selection excludes plan_write") — observed live
+ * 2026-08-25 on a package-installed deployment. A fresh process always gets a
+ * true default baseline (initialActiveToolNames never comes from persisted
+ * session state), so first-wins is sufficient.
+ */
 export function captureInitialToolSurface(pi: ExtensionAPI): InitialToolSurface {
+	const existing = initialToolSurface();
+	if (existing) return existing;
 	let active: string[] | null = null;
 	let all: string[] | null = null;
 	try {
