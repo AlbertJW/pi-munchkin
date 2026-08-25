@@ -104,11 +104,36 @@ def write_and_check(manifest, out_path):
 
 
 def selftest():
+    # Hermetic: no ~/.pi/agent, no live governor, no node — CI runners have none
+    # of them. The two live probes are stubbed; everything else runs for real.
     import tempfile
+    global loaded_surface_sha256
+    sys.path.insert(0, HERE)
+    import config as prompt_config
+    orig_surface, orig_gov = loaded_surface_sha256, prompt_config.LIVE_GOV
+    orig_agent_dir = os.environ.get("PI_CODING_AGENT_DIR")
     with tempfile.TemporaryDirectory() as td:
-        ns = argparse.Namespace(name=DEFAULT_NAME, model=DEFAULT_MODEL,
-                                fixtures=list(DEFAULT_FIXTURES), seed=7)
-        manifest = build(ns)
+        agent_dir = os.path.join(td, "agent")
+        os.makedirs(agent_dir)
+        with open(os.path.join(agent_dir, "models.json"), "w") as f:
+            f.write("{}\n")
+        gov = os.path.join(td, "APPEND_SYSTEM.md")
+        with open(gov, "w") as f:
+            f.write("RULE: selftest governor.\n")
+        os.environ["PI_CODING_AGENT_DIR"] = agent_dir
+        loaded_surface_sha256 = lambda _dir: "e" * 64
+        prompt_config.LIVE_GOV = gov
+        try:
+            ns = argparse.Namespace(name=DEFAULT_NAME, model=DEFAULT_MODEL,
+                                    fixtures=list(DEFAULT_FIXTURES), seed=7)
+            manifest = build(ns)
+        finally:
+            loaded_surface_sha256 = orig_surface
+            prompt_config.LIVE_GOV = orig_gov
+            if orig_agent_dir is None:
+                os.environ.pop("PI_CODING_AGENT_DIR", None)
+            else:
+                os.environ["PI_CODING_AGENT_DIR"] = orig_agent_dir
         for field in ("surface_sha256", "model_registry_sha256", "control_config_sha256",
                       "candidate_config_sha256", "rendered_governor_sha256"):
             assert len(manifest[field]) == 64, field
