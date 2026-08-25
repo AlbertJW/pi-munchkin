@@ -210,10 +210,16 @@ export async function discoverEntryPoints(agentDir: string, cwd?: string): Promi
 	// measurements from either side of that edit would pool into one arm. This is the
 	// same hole closed for skills and APPEND_SYSTEM.md on 2026-08-11 (see the note
 	// above); it was closed for those two and left open for the files beside them.
-	// Casing follows Pi's own candidate list, which accepts .md and .MD.
-	for (const name of ["APPEND_SYSTEM.md", "SYSTEM.md", "AGENTS.md", "AGENTS.MD", "CLAUDE.md", "CLAUDE.MD"]) {
-		const promptPath = join(agentDir, name);
-		if (existsSync(promptPath)) promptFiles.push(promptPath);
+	// Faithful to resource-loader.js:30-47 (`loadContextFileFromDir`), which returns on
+	// the FIRST existing candidate — exactly one context file per directory ever reaches
+	// the prompt. Listing all four as independent optional files was wrong twice over: on
+	// a case-insensitive filesystem (macOS) `AGENTS.md` and `AGENTS.MD` both "exist" and
+	// the same bytes got hashed twice under two labels, while on a case-sensitive one
+	// (Linux, CI) only the real casing matched — so the same tree hashed differently per
+	// platform. That is the cross-machine divergence this hash exists to rule out.
+	for (const group of [["APPEND_SYSTEM.md"], ["SYSTEM.md"], ["AGENTS.md", "AGENTS.MD", "CLAUDE.md", "CLAUDE.MD"]]) {
+		const present = group.map((name) => join(agentDir, name)).find((candidate) => existsSync(candidate));
+		if (present) promptFiles.push(present);
 	}
 
 	const npmIdentities: NpmPackageIdentity[] = [];

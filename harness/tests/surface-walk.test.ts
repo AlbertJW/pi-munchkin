@@ -279,5 +279,18 @@ test("every agent-dir prompt input Pi actually reads is inside the hash", async 
 		assert.notEqual(edited, added, `editing ${name} did not move the surface hash`);
 		await rm(join(agentDir, name), { force: true });
 	}
+
+	// Pi loads exactly ONE context file per directory — resource-loader.js's
+	// loadContextFileFromDir returns on the first existing candidate. The hasher must
+	// agree, or it counts a file Pi never reads. This also guards a platform split:
+	// listing the casings independently made macOS (case-insensitive) hash AGENTS.md
+	// twice, under two labels, while Linux hashed it once — the same tree, two digests.
+	await writeFile(join(agentDir, "AGENTS.md"), "primary context\n");
+	const primaryOnly = await digest();
+	await writeFile(join(agentDir, "CLAUDE.md"), "shadowed by AGENTS.md\n");
+	assert.equal(await digest(), primaryOnly, "a candidate Pi would never load must not enter the hash");
+	await rm(join(agentDir, "AGENTS.md"), { force: true });
+	assert.notEqual(await digest(), primaryOnly, "with AGENTS.md gone, CLAUDE.md becomes the loaded file");
+
 	await rm(agentDir, { recursive: true, force: true });
 });

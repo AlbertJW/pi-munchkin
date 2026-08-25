@@ -21,8 +21,11 @@ for (const dir of manifest.pi?.skills ?? []) {
 // the last four exist in this repo today; they are covered so that adding one later
 // cannot slip a model-visible prompt change past the hash the way AGENTS.md did on
 // the live side.
-for (const name of ["APPEND_SYSTEM.md", "SYSTEM.md", "AGENTS.md", "AGENTS.MD", "CLAUDE.md", "CLAUDE.MD"]) {
-  const promptPath = resolve(root, "harness", name);
-  if (existsSync(promptPath)) files.add(promptPath);
+// First-match-wins per group, mirroring resource-loader.js's loadContextFileFromDir.
+// Listing the casings independently double-counts the same file on a case-insensitive
+// filesystem and diverges from a case-sensitive one.
+for (const group of [["APPEND_SYSTEM.md"], ["SYSTEM.md"], ["AGENTS.md", "AGENTS.MD", "CLAUDE.md", "CLAUDE.MD"]]) {
+  const present = group.map((name) => resolve(root, "harness", name)).find((candidate) => existsSync(candidate));
+  if (present) files.add(present);
 }
 console.log(await hashSurface(root, { orderedEntryPoints: entries, files }));
