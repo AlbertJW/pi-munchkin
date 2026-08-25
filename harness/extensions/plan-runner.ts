@@ -668,6 +668,16 @@ async function goCommand(ctx: any, pi: ExtensionAPI): Promise<void> {
 	setPlanning(false);
 	awaitingReview = false;
 	leavePlanningSurface(pi, true);
+	// After a restart the planning-surface bookkeeping is gone (in-memory), so
+	// leavePlanningSurface's keepPlanTools path is a no-op — yet session_start
+	// stripped the plan tools. Resuming execution then steered the model to call
+	// plan_update while it was hidden (observed live 2026-08-25: "plan-write not
+	// available" loop on an interrupted plan). /plan-go is the user's explicit
+	// resume, so it re-activates the flat plan tools unconditionally.
+	const activeNow = pi.getActiveTools();
+	const restorable = ["plan_write", "plan_update"].filter((name) =>
+		!activeNow.includes(name) && pi.getAllTools().some((tool) => tool.name === name));
+	if (restorable.length) pi.setActiveTools([...activeNow, ...restorable]);
 	planEvent("go", outcome.state.run_id, { resumed: outcome.stale.length > 0 });
 	pi.appendEntry("plan_spine", { run_id: outcome.state.run_id });
 	const stale = outcome.stale.length ? `\n\nPreviously in_progress IDs may contain partial work: ${outcome.stale.map((item) => item.id).join(", ")}. Inspect before continuing.` : "";

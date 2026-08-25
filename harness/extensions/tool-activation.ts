@@ -69,8 +69,13 @@ function familyTools(family: Family, all: readonly string[]): string[] {
 		case "browser": return all.filter((name) => name.startsWith("browser_"));
 		case "canvas": return all.filter((name) => name.startsWith("tldraw_"));
 		case "context": return all.filter((name) => name === "compact_context");
-		case "planning": return DEEP_RESEARCH_PLANNING_ENABLED
-			? all.filter((name) => ["research_plan_start", "plan_write", "plan_update", "plan_expand", "plan_settle"].includes(name)) : [];
+		// Flat plan tools are activatable in ANY session: skills and models may
+		// legitimately structure multi-item work without the human /plan surface
+		// (measured live 2026-08-25: the process-circleback skill instructs
+		// plan_write per meeting and had no legal route to it). The graph tools
+		// stay behind the dark PLAN_GRAPH/DEEP_RESEARCH_PLANNING flags.
+		case "planning": return all.filter((name) => ["plan_write", "plan_update"].includes(name)
+			|| (DEEP_RESEARCH_PLANNING_ENABLED && ["research_plan_start", "plan_expand", "plan_settle"].includes(name)));
 	}
 }
 
@@ -146,19 +151,18 @@ export default function (pi: ExtensionAPI): void {
 		name: "capability",
 		label: "Capability Switch",
 		description: "Enable one specialist tool family for this session, or report bounded family status.",
-		promptSnippet: `capability: enable research, delegation, browser, canvas, context${DEEP_RESEARCH_PLANNING_ENABLED ? ", or planning" : ""} tools only when needed`,
+		promptSnippet: "capability: enable research, delegation, browser, canvas, context, or planning tools only when needed",
 		parameters: Type.Object({
 			action: Type.Union([Type.Literal("enable"), Type.Literal("status")]),
 			family: Type.Optional(Type.Union([
 				Type.Literal("research"), Type.Literal("delegation"), Type.Literal("browser"),
-				Type.Literal("canvas"), Type.Literal("context"),
-				...(DEEP_RESEARCH_PLANNING_ENABLED ? [Type.Literal("planning")] : []),
+				Type.Literal("canvas"), Type.Literal("context"), Type.Literal("planning"),
 			])),
 		}),
 		async execute(_toolCallId, params) {
 			if (params.action === "enable" && !params.family) throw new Error("capability: family is required for enable");
 			const result = params.action === "enable" ? activateFamily(params.family as Family, "model-request") : null;
-			const activeFamilies = (["research", "delegation", "browser", "canvas", "context", ...(DEEP_RESEARCH_PLANNING_ENABLED ? ["planning" as const] : [])] as Family[])
+			const activeFamilies = (["research", "delegation", "browser", "canvas", "context", "planning"] as Family[])
 				.filter((family) => familyTools(family, allNames).some((name) => pi.getActiveTools().includes(name)));
 			return {
 				content: [{ type: "text" as const, text: JSON.stringify({ profile, explicit, active_families: activeFamilies, result }) }],

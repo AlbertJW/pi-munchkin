@@ -191,7 +191,7 @@ model's own window in place with one resume handoff.
 | `TEACH_HINTS`, `DID_YOU_MEAN` | default-on bounded hints | set either to `off` |
 | `FORCE_PLAN_WRITE` | `off`; planning is exclusively user-triggered through `/plan` | `on` restores the compatibility behavior that blocks the first unplanned mutation |
 | `PLAN_TOOL_GO` | `off`; headless experiments may explicitly expose model-callable `plan_go` | `on` enables it; interactive plans still require the user's `/plan-go` |
-| `PLAN_GRAPH` | `off`; graph schemas, `plan_expand`, `plan_settle`, branch reports, and planning capability family are absent | `on` enables the reusable v5 graph substrate without activating a skill profile |
+| `PLAN_GRAPH` | `off`; graph schemas, `plan_expand`, `plan_settle`, and branch reports are absent. The `planning` capability family itself is always available and additively activates the flat `plan_write`/`plan_update` pair, so skills and models can structure multi-item work without `/plan` (2026-08-25) | `on` enables the reusable v5 graph substrate without activating a skill profile |
 | `DEEP_RESEARCH_PLANNING` | `off`; complex research follows the existing bounded skill path | requires `PLAN_GRAPH=on` and `RESEARCH_LEDGER=on`; exposes complex-only `research_plan_start` with a hard 3-search/5-distinct-source-read global envelope, one-shot branch leases, and five parent validation reads |
 | `SPAWN_DELEGATION` | default-on; delegation guidance recommends `mode=spawn` with self-contained tasks | `off` restores the fork wording |
 | `TOOL_CALL_RESCUE` | default-on; one corrective steer (max 2/session) when a session dies on a text-only pseudo tool call | `off` |

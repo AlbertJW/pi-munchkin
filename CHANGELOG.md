@@ -15,6 +15,20 @@ All notable changes to pi-munchkin are documented here. Releases follow semantic
   hashed, never printed), refuses in-repo writes, 0600 output, round-trips through
   `failure_episode_trial.load_manifest`; `--selftest`.
 
+### Fixed (2026-08-25 — planner too strict: resume and skill-driven planning)
+
+- `/plan-go` now re-activates `plan_write`/`plan_update` unconditionally. After a pi restart the
+  in-memory planning-surface bookkeeping is gone, so the old restore path was a no-op while
+  `session_start` had stripped the plan tools — resuming an interrupted plan steered the model
+  into a "plan-write not available" loop (observed live).
+- The `planning` capability family is available in every session (previously only under the dark
+  deep-research flags): `capability(action="enable", family="planning")` additively activates the
+  flat `plan_write`/`plan_update` pair, giving skills that structure multi-item work (e.g.
+  process-circleback's one-item-per-meeting pattern) a legal route to the planner without the
+  human `/plan` surface. The graph tools (`research_plan_start`, `plan_expand`, `plan_settle`)
+  remain dark behind `PLAN_GRAPH`/`DEEP_RESEARCH_PLANNING`. Ordinary sessions still start with
+  no plan tools and are never forced through planning. Both fixes counterfactually pinned.
+
 ### Fixed (2026-08-25 — explicit-selection inference broke /plan on Pi 0.84.3)
 
 - Explicit user tool selection is now judged by positive evidence only: CLI tool flags

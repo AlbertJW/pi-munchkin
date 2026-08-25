@@ -162,6 +162,26 @@ test("/plan-go restores execution tools and /plan-cancel restores without execut
 	resetPiGlobals();
 });
 
+test("/plan-go after a restart re-activates plan tools despite lost surface bookkeeping", async () => {
+	// Observed live 2026-08-25: a plan interrupted mid-flight, then a pi restart —
+	// session_start rebinds the plan but strips plan tools, and the in-memory
+	// planning-surface bookkeeping is gone, so the old /plan-go restore was a
+	// no-op. Execution then steered the model to call plan_update while it was
+	// hidden ("plan-write not available" loop).
+	const fp = fresh();
+	const cwd = tmp();
+	const ctx = await begin(fp, cwd);
+	await callTool(fp, "plan_write", { items: [{ title: "Half-done work" }] }, cwd);
+	// Simulated restart: a fresh session_start resets in-memory planning state.
+	await fire(fp, "session_start", {}, { ...makeCtx(cwd).ctx, cwd });
+	assert.equal(fp.pi.getActiveTools().includes("plan_write"), false, "session start hides plan tools");
+	await fp.commands.get("plan-go").handler("", makeCtx(cwd).ctx);
+	assert.ok(fp.pi.getActiveTools().includes("plan_update"), "resume must restore plan_update");
+	assert.ok(fp.pi.getActiveTools().includes("plan_write"), "resume must restore plan_write");
+	assert.match(fp.sent.at(-1) ?? "", /Use plan_update/);
+	resetPiGlobals();
+});
+
 test("/plan-go restores execution tools while retaining research activated during planning", async () => {
 	const fp = fresh();
 	const cwd = tmp();

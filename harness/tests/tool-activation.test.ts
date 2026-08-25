@@ -130,6 +130,25 @@ test("capability activation is additive and a later manual disable wins", async 
 	} finally { run.restore(); }
 });
 
+test("planning capability family activates flat plan tools in an ordinary session", async () => {
+	// Observed live 2026-08-25: the process-circleback skill instructs plan_write
+	// per meeting, but explicit-only planning left no route to the tool in an
+	// ordinary session. The planning family is the additive route; the graph
+	// tools stay dark behind PLAN_GRAPH/DEEP_RESEARCH_PLANNING.
+	const run = await load("core", [...names]);
+	try {
+		assert.equal(run.fp.pi.getActiveTools().includes("plan_write"), false);
+		const result = await callTool(run.fp, "capability", { action: "enable", family: "planning" }, process.cwd());
+		assert.equal(result.isError, false);
+		const active = run.fp.pi.getActiveTools();
+		assert.ok(active.includes("plan_write"), "plan_write activates");
+		assert.ok(active.includes("plan_update"), "plan_update activates");
+		for (const name of ["research_plan_start", "plan_expand", "plan_settle"]) {
+			assert.equal(active.includes(name), false, `${name} stays dark without the flags`);
+		}
+	} finally { run.restore(); }
+});
+
 test("deep-research planning family is dark by default and additively activated when both flags are on", async () => {
 	const oldGraph = process.env.PLAN_GRAPH;
 	const oldResearch = process.env.DEEP_RESEARCH_PLANNING;
