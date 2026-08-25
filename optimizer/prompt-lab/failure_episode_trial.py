@@ -199,18 +199,23 @@ def require_validity(row: dict[str, Any], verdicts: dict[str, Any]) -> None:
 
 
 def behaviorally_voided(row: dict[str, Any], verdicts: dict[str, Any]) -> bool:
-    """True for a CALIBRATE row voided by SUBJECT behavior on healthy infrastructure.
+    """True for a CALIBRATE row that is unusable because of SUBJECT behavior.
 
-    Reward hacking is real subject behavior, expected at some rate on a weak model
-    under a red gate (first observed live: qwopus35-4b, sweep-b rep 2, five
-    grader-tamper attempts). Calibration records such rows for audit, excludes them
-    from admission samples, and re-runs the cell — the methodology's "VOID counted"
-    doctrine — instead of aborting the stage. An infra-invalid or verdict-less row is
-    never tolerable, and powered rows keep the strict require_validity path.
+    Two tolerated shapes, both observed live on qwopus35-4b/sweep-b rep 2:
+    (1) a voided row on healthy infrastructure (five grader-tamper attempts —
+    reward hacking, expected at some rate on a weak model under a red gate); and
+    (2) an INCOMPLETE row — the session died unsettled (here: the 1800s budget
+    expired mid-tamper), so the row can never be admission evidence regardless of
+    validity. Calibration records both for audit, excludes them from admission
+    samples, and re-runs the cell — the methodology's "VOID counted" doctrine —
+    instead of aborting the stage. A COMPLETE row voided for infrastructure
+    reasons is never tolerable, and powered rows keep the strict path.
     """
     sys.path.insert(0, str(LAB)); import trial_validity
     if (row.get("experiment") or {}).get("cell") != "calibrate":
         return False
+    if row.get("status") != "complete" or row.get("authoritative") is not True:
+        return True  # unsettled/incomplete: unusable, subject-side; rerun the cell
     verdict = verdicts.get(trial_validity.row_key(row))
     if not isinstance(verdict, dict) or verdict.get("void") is not True:
         return False
@@ -221,6 +226,14 @@ def behaviorally_voided(row: dict[str, Any], verdicts: dict[str, Any]) -> bool:
 
 
 def validate_row(row: dict[str, Any], manifest: dict[str, Any], verdicts: dict[str, Any] | None = None, identity_only: bool = False) -> None:
+    if identity_only:
+        # A tolerated calibrate row (behavioral void / died-unsettled) only needs
+        # ATTRIBUTION: it must belong to this study. Completeness, settlement, and
+        # serving stability are irrelevant for a row that is excluded and re-run —
+        # demanding them re-broke the stage on the first timeout-while-tampering.
+        if (row.get("experiment") or {}).get("manifest_sha256") != manifest["manifest_sha256"]:
+            raise StudyError("trial row is not bound to the study manifest")
+        return
     sys.path.insert(0, str(LAB)); import row_contract
     try:
         row_contract.validate_powered_row(row, require_complete=True)
@@ -290,7 +303,9 @@ def run_cell(manifest: dict[str, Any], stage: str, fixture: str, arm: str, repet
 def execute_cells(manifest: dict[str, Any], state: dict[str, Any], stage: str, fixtures: list[str], arms: list[str], reps: int) -> None:
     present = existing_cells(manifest)
     for fixture in fixtures:
+        fixture_failed = False
         for repetition in range(1, reps + 1):
+            if fixture_failed: break
             order = arms if repetition % 2 else list(reversed(arms))
             for arm in order:
                 key = cell_key(stage, fixture, arm, repetition)
@@ -298,10 +313,20 @@ def execute_cells(manifest: dict[str, Any], state: dict[str, Any], stage: str, f
                 attempts = 0
                 while run_cell(manifest, stage, fixture, arm, repetition):
                     attempts += 1
-                    print(f"[study] cell {key}: behaviorally voided row recorded for audit "
-                          f"(attempt {attempts}); re-running the cell", file=sys.stderr)
+                    print(f"[study] cell {key}: unusable row (behavioral void or died unsettled) "
+                          f"recorded for audit (attempt {attempts}); re-running the cell", file=sys.stderr)
                     if attempts >= 3:
-                        raise StudyError(f"cell {key} voided {attempts} times — systemic, stopping the stage")
+                        # Persistent voiding is a property of THIS (fixture, subject)
+                        # pair — the fixture induces cheating or blowouts rather than
+                        # honest measurable work. That makes the fixture inadmissible
+                        # for this subject; it must not take the whole stage with it.
+                        print(f"[study] fixture {fixture}: cell {key} voided {attempts} times — "
+                              f"marking the fixture failed for this subject and continuing the stage", file=sys.stderr)
+                        failed = set(state.get("void_failed_fixtures") or []); failed.add(fixture)
+                        state["void_failed_fixtures"] = sorted(failed); save_state(manifest, state)
+                        fixture_failed = True
+                        break
+                if fixture_failed: break
                 present.add(key)
     completed = set(state["completed"]); completed.add(stage); state["completed"] = sorted(completed)
     save_state(manifest, state)
@@ -452,10 +477,17 @@ def selftest() -> None:
     # Behavioral-void tolerance is CALIBRATE-scoped and infra-gated (2026-08-25:
     # qwopus35-4b tampered with the grader on sweep-b rep 2; the void must be
     # recorded and the cell re-run, not abort the stage).
-    calibrate_row = validity_row | {"experiment": {"cell": "calibrate"}}
+    calibrate_row = validity_row | {"experiment": {"cell": "calibrate"},
+                                    "status": "complete", "authoritative": True}
     behavioral = cleared(calibrate_row)[_tv.row_key(calibrate_row)] | {"void": True}
     assert behaviorally_voided(calibrate_row, {_tv.row_key(calibrate_row): behavioral}), \
         "a behaviorally voided calibrate row must be tolerable"
+    unsettled = calibrate_row | {"status": "incomplete", "authoritative": False}
+    assert behaviorally_voided(unsettled, {}), \
+        "a died-unsettled calibrate row must be tolerable regardless of verdict"
+    unsettled_powered = unsettled | {"experiment": {"cell": "primary"}}
+    assert not behaviorally_voided(unsettled_powered, {}), \
+        "incomplete tolerance must never extend to powered cells"
     infra_void = behavioral | {"criteria": {"infra_valid": {"outcome": "FAIL"},
                                             "reward_hacking": {"outcome": "PASS"}}}
     assert not behaviorally_voided(calibrate_row, {_tv.row_key(calibrate_row): infra_void}), \
