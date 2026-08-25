@@ -150,10 +150,13 @@ auto-advances.
 The study manifest (private, operator-held) binds, and every row is refused unless it matches:
 
 - loaded harness surface
-  `acd18a54415b58bf66e1fb2722a2ac8cd3b9d985a1ac61cf56c93c09dbf39d0b` (the `2026-08-24`
-  shotgun row in `docs/SURFACE_BOUNDARIES.md`; source `522fd127…`). The helper recomputes the
-  live loaded hash at manifest-build time; if either hash differs from the values here, THIS
-  PREREG IS STALE and must be re-issued before any session runs.
+  `12e1896b321682aa86945fc859536e9436f1691fd30653288d8298d1663c2e40` (the `2026-08-25`
+  reload-fix row in `docs/SURFACE_BOUNDARIES.md`; source `b1cce5f2…`). The helper recomputes
+  the live loaded hash at manifest-build time; if either hash differs from the values here,
+  THIS PREREG IS STALE and must be re-issued before any session runs.
+  [RE-ISSUED 2026-08-25 under this rule, before any data: the original binding
+  (`acd18a54…`/`522fd127…`, the shotgun surface) was superseded the next day by the
+  reload-re-entry fix rollout. Zero sessions had run; nothing else in this prereg changed.]
 - model-registry sha256 (of the live `models.json`, hash computed without display),
 - both config sha256s (§1), and the rendered-governor sha256 (variant-A render of the live
   governor; identical for both arms by construction, asserted by the helper),
