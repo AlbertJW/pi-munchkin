@@ -130,6 +130,34 @@ test("capability activation is additive and a later manual disable wins", async 
 	} finally { run.restore(); }
 });
 
+test("capability families survive an in-process session re-entry", async () => {
+	// Audit A1 (2026-08-25): deferred was rebuilt from the LIVE (already-narrowed)
+	// active set, so after any reload/re-entry it came out empty and every family
+	// permanently answered activated: 0.
+	const run = await load("core", [...names]);
+	try {
+		await fire(run.fp, "session_start", {}, { cwd: mkdtempSync(join(tmpdir(), "pi-tools-cwd-")) });
+		const result = await callTool(run.fp, "capability", { action: "enable", family: "browser" }, process.cwd());
+		assert.equal(result.isError, false);
+		assert.ok(run.fp.pi.getActiveTools().includes("browser_open"), "families must survive re-entry");
+	} finally { run.restore(); }
+});
+
+test("a refusal that is not the model's fault does not burn the family's one attempt", async () => {
+	// Audit A5 (2026-08-25): attempted.add ran before the planning-phase refusal,
+	// so one capability call during /plan disabled that family for the session.
+	const run = await load("core", [...names]);
+	try {
+		(globalThis as any).__pi_plan_phase_active = true;
+		const refused = await callTool(run.fp, "capability", { action: "enable", family: "delegation" }, process.cwd());
+		assert.match(refused.content[0].text, /planning-allows-research-only/);
+		delete (globalThis as any).__pi_plan_phase_active;
+		const retry = await callTool(run.fp, "capability", { action: "enable", family: "delegation" }, process.cwd());
+		assert.match(retry.content[0].text, /"activated":1|activated":1/, "the retry after /plan-go must activate");
+		assert.ok(run.fp.pi.getActiveTools().includes("subagent"));
+	} finally { run.restore(); }
+});
+
 test("planning capability family activates flat plan tools in an ordinary session", async () => {
 	// Observed live 2026-08-25: the process-circleback skill instructs plan_write
 	// per meeting, but explicit-only planning left no route to the tool in an

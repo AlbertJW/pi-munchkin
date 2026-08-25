@@ -15,6 +15,46 @@ All notable changes to pi-munchkin are documented here. Releases follow semantic
   hashed, never printed), refuses in-repo writes, 0600 output, round-trips through
   `failure_episode_trial.load_manifest`; `--selftest`.
 
+### Changed + Fixed (2026-08-25 — note limit 900 + shotgun regression sweep)
+
+- **Plan note limit 300 → 900 bytes, coherently**: `MAX_NOTE_BYTES`, all five tool-schema
+  `maxLength` sites, `plan-delta`'s literal, `plan-graph`'s validator, and `branch-report`'s
+  merged-child bound move together (any partial raise splits the churn across tools); the
+  authoritative-state cap rises 12 KiB → 32 KiB so a full 24-item plan at 900-byte notes fits
+  instead of relocating the rejection; `plan_update`'s delta cap rises 16 → 24 to match
+  MAX_ITEMS. Fixed en route: `migrateState` truncated with a character slice against a byte
+  budget — a multibyte note could survive the slice, fail validation, and silently vanish the
+  whole plan.
+- **Regression sweep of the shotgun surface (audit findings A1–A6, B1, B3–B4), all
+  counterfactually pinned:**
+  - A1: capability families died permanently after any in-process session re-entry (deferred
+    pool was rebuilt from the already-narrowed live set); the pool now folds in the previous
+    generation's deferrals, which also preserves manual /tools disables.
+  - A2: the `planning` family was unreachable at shipped defaults — plan-runner (manifest
+    index 6) strips plan tools before tool-activation (index 22) computes its pool; the pool
+    now re-adds the flat plan tools. Pinned by a mixed manifest-order test, the class the
+    isolated-load tests structurally miss.
+  - A3: headless `plan_write` was rejected with "available only after /plan" — a command the
+    model cannot type; an ACTIVE plan_write (via capability) now works headlessly.
+  - A4: the unresolved-omission rule fired during pre-go review and named `plan_update`, which
+    planning mode blocks; the protection now begins at `/plan-go` (review-phase drops are
+    legitimate revision) and the executing-phase text names the retain-with-item_id escape.
+  - A5: one `capability` call during `/plan` burned the family's single attempt for the whole
+    session; refusals that are not the model's fault no longer consume it.
+  - A6: a reload during `/plan` left the session read-only forever; `/plan-go`/`/plan-cancel`
+    now restore the execution surface from the immutable startup baseline (core-profile
+    filtered) when the in-memory bookkeeping is gone.
+  - B1: loop-breaker could WALL argument-free `verify_project` as an exact repeat while
+    verify-gate demanded it — deadlock on a red gate; verify_project is now wall-exempt
+    (episodes and telemetry still count it).
+  - B3/B4: the one-in-progress and unknown-item_id rejections now name the conflicting item
+    and list the valid ids — previously the model had no route to rediscover ids after
+    compaction except triggering another rejection.
+- Deferred with reasons (recorded, not dropped): verify-gate charges fires at proposal rather
+  than delivery (B6); drift-scanner's idle-boundary follow-up turn and missing session_start
+  reset (C1); LB_SESSION_REPEAT wrap-up one-shot (C2); tool-call-rescue prose false-positives
+  (C3); closed CORE_NAMES/family rosters give MCP tools no activation route (D).
+
 ### Fixed (2026-08-25 — verify-gate wrap-up nag looped after the final answer)
 
 - Consecutive wrap-up nags now require new tool evidence between firings. A delivered steer

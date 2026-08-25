@@ -24,10 +24,10 @@ export function applyPlanDeltas(items: DeltaItem[], deltas: PlanDelta[]): DeltaR
 			errors.push("item_id must be a bounded stable identifier");
 			continue;
 		}
-		if (!byId.has(delta.item_id)) errors.push(`unknown item_id: ${delta.item_id}`);
+		if (!byId.has(delta.item_id)) errors.push(`unknown item_id: ${delta.item_id} (valid: ${[...byId.keys()].join(", ") || "none"})`);
 		if (delta.status !== undefined && !new Set(["pending", "in_progress", "done", "blocked", "deferred"]).has(delta.status)) errors.push(`invalid status for ${delta.item_id}`);
 		if (delta.status === undefined && delta.note === undefined && delta.defer === undefined) errors.push(`status, note, or defer is required for ${delta.item_id}`);
-		if (delta.note !== undefined && (typeof delta.note !== "string" || Buffer.byteLength(delta.note, "utf8") > 300 || /\r/.test(delta.note))) errors.push(`note must be at most 300 UTF-8 bytes for ${delta.item_id}`);
+		if (delta.note !== undefined && (typeof delta.note !== "string" || Buffer.byteLength(delta.note, "utf8") > 900 || /\r/.test(delta.note))) errors.push(`note must be at most 900 UTF-8 bytes for ${delta.item_id}`);
 		if (delta.status === "blocked" && (!delta.note || !delta.note.trim())) errors.push(`blocked status requires a note for ${delta.item_id}`);
 		if (delta.status === "deferred" && (!delta.defer || !delta.defer.value?.trim() || !delta.defer.risk?.trim() || !delta.defer.rationale?.trim())) errors.push(`deferred status requires value, risk, and rationale for ${delta.item_id}`);
 		if (delta.defer && [delta.defer.value, delta.defer.risk, delta.defer.rationale].some((value) => typeof value !== "string" || Buffer.byteLength(value, "utf8") > 300 || /\r/.test(value))) errors.push(`defer fields must be at most 300 UTF-8 bytes for ${delta.item_id}`);
@@ -54,7 +54,7 @@ export function applyPlanDeltas(items: DeltaItem[], deltas: PlanDelta[]): DeltaR
 	const local = active.filter((item) => !item.owner_ref);
 	const owners = active.map((item) => item.owner_ref).filter((value): value is string => Boolean(value));
 	if (local.length > 1 || new Set(owners).size !== owners.length) {
-		return { ok: false, errors: ["at most one item may be in_progress"] };
+		return { ok: false, errors: [`at most one item may be in_progress (currently in_progress: ${active.map((item) => item.id).join(", ")})`] };
 	}
 	return { ok: true, items: next, changed, idempotent };
 }

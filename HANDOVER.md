@@ -44,6 +44,21 @@ optimizer-side: the model-visible surface did NOT move (source hash re-verified 
 screen, power, primary, replication — remains a separate Albert-started action; the mothball
 stands until he starts preflight.**
 
+## 2026-08-25 planner-limit raise + regression sweep — deferred follow-ups
+
+The note-limit raise (300→900) and audit fixes A1–A6/B1/B3–B5 are merged and rolled out (see
+the 2026-08-25 rows in `docs/SURFACE_BOUNDARIES.md`). The audit's REMAINING findings are
+deferred deliberately, not dropped: **B6** verify-gate charges `fires`/`nagAwaitingEvidence` at
+proposal time, so an arbiter-losing nag is counted as delivered (tool-call-rescue's
+charge-on-decision pattern is the fix); **C1/C1b** drift-scanner sends a follow-up at
+`agent_settled` (always triggers a turn when idle) and has no `session_start` reset, so a stale
+review can deliver into the next session; **C2** `LB_SESSION_REPEAT` can fire once on a
+text-only wrap-up turn; **C3** tool-call-rescue matches tool-call syntax quoted in prose;
+**D** the closed CORE_NAMES/familyTools rosters give MCP or new builtin tools no activation
+route and `capability(status)` cannot report the deferred list; the `FORCE_PLAN_WRITE=on`
+rollback is inert under the core profile; dark-path branch-merge failures are swallowed without
+telemetry. Fix these before relying on the affected mechanisms in measurements.
+
 ## 2026-08-24 shotgun recovery adoption
 
 Branch `codex/shotgun-recovery` replaces the AlbertWork failure path without changing the live

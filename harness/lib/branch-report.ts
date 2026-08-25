@@ -151,7 +151,7 @@ export function validateBranchReport(value: unknown, context: PlanContextV1, ter
 		if (child.coverage !== undefined && !validCoverage(child.coverage)) return false;
 		if (terminal && !child.coverage) return false;
 		if (child.status === "deferred" && !validDeferral(child.defer)) return false;
-		if (child.note !== undefined && !boundedText(child.note, 300)) return false;
+		if (child.note !== undefined && !boundedText(child.note, 900)) return false;
 		if (child.evidence_gaps !== undefined && (!Array.isArray(child.evidence_gaps) || child.evidence_gaps.length > 8 || child.evidence_gaps.some((gap: unknown) => !boundedText(gap, 300)))) return false;
 		if (child.status === "done" && (!child.coverage?.complete || (child.evidence_gaps?.length ?? 0) > 0)) return false;
 		if (terminal && child.coverage && !child.coverage.complete && (child.evidence_gaps?.length ?? 0) === 0) return false;

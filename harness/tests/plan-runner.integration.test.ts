@@ -5,6 +5,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { callTool, expectToolError, fire, makeCtx, makeFakePi, resetPiGlobals } from "./integration-harness.ts";
 import { HARNESS_SIGNAL_CHANNEL } from "../lib/harness-signals.ts";
+import { captureInitialToolSurface } from "../lib/session-bootstrap.ts";
 
 process.env.PLAN_STORAGE = "project";
 const planRunner = (await import("../extensions/plan-runner.ts")).default;
@@ -111,10 +112,13 @@ test("sanitized AlbertWork replay stops plan expansion without replaying the val
 test("structural replan retains IDs and cannot silently omit unresolved work", async () => {
 	const fp = fresh();
 	const cwd = tmp();
-	await begin(fp, cwd);
+	const ctxGo = await begin(fp, cwd);
 	await callTool(fp, "plan_write", { items: [{ title: "One" }, { title: "Two" }] }, cwd);
 	let state = JSON.parse(readFileSync(join(cwd, ".pi", "plan-state.json"), "utf8"));
 	const [one, two] = state.items;
+	// The omission protection begins at /plan-go (review-phase drops are legitimate
+	// revision — audit A4, 2026-08-25).
+	await fp.commands.get("plan-go").handler("", ctxGo);
 	await expectToolError(fp, "plan_write", { items: [{ item_id: one.id, title: "One renamed" }] }, cwd, new RegExp(two.id));
 	await callTool(fp, "plan_write", { items: [
 		{ item_id: one.id, title: "One renamed" }, { item_id: two.id, title: "Two" }, { title: "Three" },
@@ -159,6 +163,98 @@ test("/plan-go restores execution tools and /plan-cancel restores without execut
 	await fp2.commands.get("plan-cancel").handler("", ctx2);
 	assert.ok(fp2.pi.getActiveTools().includes("bash"));
 	assert.equal(fp2.pi.getActiveTools().includes("plan_update"), true);
+	resetPiGlobals();
+});
+
+test("manifest load order: capability(planning) activates plan tools stripped by plan-runner", async () => {
+	// Audit A2 (2026-08-25): plan-runner (manifest index 6) strips plan_write/
+	// plan_update at session_start BEFORE tool-activation (index 22) computes its
+	// deferred pool, so the planning family was unreachable at shipped defaults.
+	// This test loads BOTH extensions in manifest order on one fake pi — the class
+	// the isolated-load tests structurally miss.
+	const fp = makeFakePi();
+	for (const name of ["read", "bash", "edit", "write", "search_spans", "read_span", "recall", "subagent", "compact_context"]) {
+		fp.pi.registerTool({ name, parameters: {} } as any);
+	}
+	planRunner(fp.pi as any);
+	const ta = await import(`../extensions/tool-activation.ts?mixed-order=${Date.now()}-${Math.random()}`);
+	ta.default(fp.pi as any);
+	fp.pi.setActiveTools([...fp.tools.keys()]);
+	captureInitialToolSurface(fp.pi as any);
+	const cwd = tmp();
+	await fire(fp, "session_start", {}, { ...makeCtx(cwd).ctx, cwd });
+	assert.equal(fp.pi.getActiveTools().includes("plan_write"), false, "stripped at startup as designed");
+	const result = await callTool(fp, "capability", { action: "enable", family: "planning" }, cwd);
+	assert.equal(result.isError, false);
+	assert.ok(fp.pi.getActiveTools().includes("plan_write"), "the planning family must reach the stripped tools");
+	assert.ok(fp.pi.getActiveTools().includes("plan_update"));
+	resetPiGlobals();
+});
+
+test("a restart during /plan restores the execution surface from the baseline", async () => {
+	// Audit A6 (2026-08-25): the planning surface's restore bookkeeping is
+	// in-memory; a reload during /plan left the session read-only forever.
+	const fp = fresh();
+	const cwd = tmp();
+	captureInitialToolSurface(fp.pi as any);
+	const ctx = await begin(fp, cwd);
+	await callTool(fp, "plan_write", { items: [{ title: "Half-done" }] }, cwd);
+	assert.equal(fp.pi.getActiveTools().includes("bash"), false, "planning removed execution tools");
+	await fire(fp, "session_start", {}, { ...makeCtx(cwd).ctx, cwd });
+	await fp.commands.get("plan-go").handler("", makeCtx(cwd).ctx);
+	const active = fp.pi.getActiveTools();
+	assert.ok(active.includes("bash"), "execution spine restored from the baseline");
+	assert.ok(active.includes("edit"));
+	assert.ok(active.includes("plan_update"));
+	assert.equal(active.includes("browser_open"), false, "deferred specialists stay deferred under core profile");
+	void ctx;
+	resetPiGlobals();
+});
+
+test("note bytes: 900 accepted, 901 rejected, and a full 24-item plan fits the state cap", async () => {
+	const fp = fresh();
+	const cwd = tmp();
+	const ctx = await begin(fp, cwd);
+	const note900 = "n".repeat(900);
+	const full = await callTool(fp, "plan_write", {
+		summary: "s".repeat(300),
+		items: Array.from({ length: 24 }, (_, i) => ({ title: `Item ${i + 1} ${"t".repeat(100)}`.slice(0, 120), note: note900 })),
+	}, cwd);
+	assert.equal(full.isError, false, "24 items x 900-byte notes must fit (state cap raised with the note cap)");
+	await expectToolError(fp, "plan_write", {
+		items: [{ title: "One", note: "n".repeat(901) }],
+	}, cwd, /note exceeds 900/);
+	await fp.commands.get("plan-cancel").handler("", ctx);
+	resetPiGlobals();
+});
+
+test("headless plan_write works when the tool is active outside /plan", async () => {
+	// capability(enable, planning) is the sanctioned model route (skills structure
+	// multi-item work); the old unconditional reject named /plan, which the model
+	// cannot type (audit A3, 2026-08-25).
+	const fp = fresh();
+	const cwd = tmp();
+	await fire(fp, "session_start", {}, { ...makeCtx(cwd).ctx, cwd });
+	const result = await callTool(fp, "plan_write", { items: [{ title: "Meeting one" }, { title: "Meeting two" }] }, cwd);
+	assert.equal(result.isError, false, "an active plan_write must work headlessly");
+	assert.match(result.content[0].text, /Meeting one/);
+	resetPiGlobals();
+});
+
+test("review-phase rewrites may drop items; executing-phase rewrites may not", async () => {
+	// The omission trap (audit A4): during /plan review the rejection named
+	// plan_update, which planning mode blocks. Dropping items pre-go is revision.
+	const fp = fresh();
+	const cwd = tmp();
+	const ctx = await begin(fp, cwd);
+	const first = await callTool(fp, "plan_write", { items: [{ title: "Keep" }, { title: "Drop" }] }, cwd);
+	const keepId = first.content[0].text.match(/([A-Za-z0-9._:-]{16}) Keep/)?.[1];
+	assert.ok(keepId, "listing carries ids");
+	const revised = await callTool(fp, "plan_write", { items: [{ item_id: keepId, title: "Keep" }] }, cwd);
+	assert.equal(revised.isError, false, "dropping an item during review is legitimate revision");
+	await fp.commands.get("plan-go").handler("", ctx);
+	await expectToolError(fp, "plan_write", { items: [{ title: "Only new" }] }, cwd,
+		/unresolved item_id/);
 	resetPiGlobals();
 });
 

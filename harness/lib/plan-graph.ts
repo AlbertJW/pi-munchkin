@@ -175,7 +175,7 @@ export function validateGraph(state: GraphPlanState): string[] {
 		if (byId.has(item.id)) errors.push(`duplicate node id: ${item.id}`);
 		byId.set(item.id, item);
 		if (!boundedText(item.title, 120)) errors.push(`invalid title: ${item.id}`);
-		if (item.note !== undefined && !boundedText(item.note, 300)) errors.push(`invalid note: ${item.id}`);
+		if (item.note !== undefined && !boundedText(item.note, 900)) errors.push(`invalid note: ${item.id}`);
 		if (!new Set<PlanStatus>(["pending", "in_progress", "done", "blocked", "deferred"]).has(item.status)) errors.push(`invalid status: ${item.id}`);
 		if (item.kind !== undefined && !["work", "research_branch", "research_leaf"].includes(item.kind)) errors.push(`invalid node kind: ${item.id}`);
 		if (item.parent_id !== undefined && !/^[A-Za-z0-9._:-]{1,96}$/.test(item.parent_id)) errors.push(`invalid parent id: ${item.id}`);

@@ -1078,7 +1078,8 @@ export default function (pi: ExtensionAPI) {
 					for (let level = 1; level <= exactTier; level += 1) ep.steered.add(level);
 					ep.lastSteerTurn = event.turnIndex;
 					const label = ep.labels.get(worstFp) ?? "the same action";
-					const didBlock = exactTier === 2 && d.blockWorst && !!worstFp;
+					const wallExempt = ep.labels.get(worstFp)?.includes("verify_project") ?? false;
+					const didBlock = exactTier === 2 && d.blockWorst && !!worstFp && !wallExempt;
 					let steerMsg = "";
 					if (exactTier === 1) steerMsg = tier1Message(label, repeat, ep.streak, d.byToolRepeat, d.byReasonRepeat);
 					else if (exactTier === 2) steerMsg = tier2Message(label, ep.streak, didBlock);
@@ -1148,6 +1149,12 @@ export default function (pi: ExtensionAPI) {
 
 	// Tier 2/3 enforcement: block the specific repeated call(s).
 	pi.on("tool_call", async (event, ctx) => {
+		// verify_project is NEVER walled: the shotgun made it argument-free, so every
+		// call is an exact repeat by construction — and verify-gate simultaneously
+		// DEMANDS it before handoff, which deadlocked the two extensions on a red
+		// gate (audit B1, 2026-08-25). Red->red gate repetition is the verification
+		// plateau's domain; episodes and telemetry still count these calls.
+		if (event.toolName === "verify_project") return;
 		const fp = fpKey(event.toolName, (event.input ?? {}) as Record<string, unknown>);
 		if (!ep.blocked.has(fp)) return;
 		record("loop-breaker", "block", { tool: event.toolName, abortArmed });

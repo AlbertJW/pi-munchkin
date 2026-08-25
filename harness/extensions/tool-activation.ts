@@ -16,13 +16,16 @@ const DEEP_RESEARCH_PLANNING_ENABLED = PLAN_GRAPH_ENABLED && process.env.DEEP_RE
 type Family = "research" | "delegation" | "browser" | "canvas" | "context" | "planning";
 
 export const MUNCHKIN_TOOL_PROFILE_DEFAULT: Profile = "core";
-const CORE_NAMES = new Set([
+// Exported for plan-runner's post-restart surface restore (audit A6, 2026-08-25):
+// after a reload during /plan the in-memory surface bookkeeping is gone, and the
+// only correct restore target is the baseline filtered through the same profile.
+export const CORE_NAMES = new Set([
 	"read", "bash", "edit", "write", "search_spans", "read_span", "recall",
 	"verify_project", "capability", "plan_write", "plan_update",
 ]);
 const EXPLICIT_FLAG = "__pi_tool_selection_explicit";
 
-function profileFromEnvironment(): Profile {
+export function profileFromEnvironment(): Profile {
 	if (process.env.MUNCHKIN_TOOL_PROFILE === "core" || process.env.MUNCHKIN_TOOL_SURFACE === "minimal") return "core";
 	return MUNCHKIN_TOOL_PROFILE_DEFAULT;
 }
@@ -119,7 +122,13 @@ export default function (pi: ExtensionAPI): void {
 
 	const activateFamily = (family: Family, reason: string): { activated: number; status: string } => {
 		if (attempted.has(family)) return { activated: 0, status: "already-attempted-or-manually-disabled" };
-		attempted.add(family);
+		// The one-attempt latch is charged only when activation actually happens (or
+		// the family is genuinely already active). A refusal that is not the model's
+		// fault — the planning-phase restriction, or tools not yet in the deferred
+		// pool — used to burn the family for the whole session (audit A5,
+		// 2026-08-25): one capability(delegation) call during /plan permanently
+		// disabled delegation, and verify-gate's tier-2 recovery request was
+		// silently swallowed the same way.
 		if (g.__pi_plan_phase_active === true && family !== "research") {
 			publish("planning-restriction");
 			return { activated: 0, status: "planning-allows-research-only" };
@@ -129,9 +138,12 @@ export default function (pi: ExtensionAPI): void {
 		const active = pi.getActiveTools();
 		const add = allowed.filter((name) => deferred.has(name) && !active.includes(name));
 		if (!add.length) {
+			const alreadyActive = names.length > 0 && names.every((name) => active.includes(name));
+			if (alreadyActive) attempted.add(family);
 			publish(explicit ? "preserved-explicit" : "unavailable-or-active");
 			return { activated: 0, status: explicit ? "preserved-explicit" : "unavailable-or-active" };
 		}
+		attempted.add(family);
 		try {
 			pi.setActiveTools([...active, ...add]);
 			for (const name of add) {
@@ -183,6 +195,11 @@ export default function (pi: ExtensionAPI): void {
 	});
 
 	pi.on("session_start", async (_event, ctx) => {
+		// Keep what the PREVIOUS generation deferred: on an in-process re-entry the
+		// live active set is already-narrowed, and this record is the only honest
+		// account of which absences are the harness's own doing (vs a manual
+		// /tools disable, which appears in neither set and stays authoritative).
+		const previouslyDeferred = deferred;
 		deferred = new Set();
 		attempted = new Set();
 		lastOpenItems = 0;
@@ -209,8 +226,22 @@ export default function (pi: ExtensionAPI): void {
 		const active = pi.getActiveTools();
 		if (profile === "core") {
 			const activePlan = Boolean(g.__pi_active_plan_context);
-			const core = active.filter((name) => CORE_NAMES.has(name) && (activePlan || (name !== "plan_write" && name !== "plan_update")));
-			deferred = new Set(active.filter((name) => !core.includes(name)));
+			// The candidate pool is the LIVE set plus (a) everything THIS extension
+			// deferred previously — on an in-process session re-entry (reload) pi
+			// rebuilds from the already-narrowed surface, so deriving from `active`
+			// alone left `deferred` empty and every capability family permanently
+			// dead (audit A1, 2026-08-25) — and (b) the flat plan tools, which
+			// plan-runner (loaded earlier) strips from the active set before this
+			// handler ever sees them, which made the `planning` family unreachable
+			// at shipped defaults (audit A2). Manual /tools disables stay
+			// authoritative: a user can only disable an ACTIVE tool, and those are
+			// in neither recovery set.
+			const registered = new Set(allNames);
+			const pool = new Set(active);
+			for (const name of previouslyDeferred) if (registered.has(name)) pool.add(name);
+			for (const name of ["plan_write", "plan_update"]) if (registered.has(name)) pool.add(name);
+			const core = [...pool].filter((name) => CORE_NAMES.has(name) && (activePlan || (name !== "plan_write" && name !== "plan_update")));
+			deferred = new Set([...pool].filter((name) => !core.includes(name)));
 			if (DEEP_RESEARCH_PLANNING_ENABLED) for (const name of familyTools("planning", allNames)) if (!core.includes(name)) deferred.add(name);
 			pi.setActiveTools(core);
 			for (const name of deferred) record("tool-activation", "deferred", { tool: name, reason: "core-startup" });

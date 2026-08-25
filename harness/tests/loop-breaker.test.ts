@@ -693,3 +693,31 @@ test("loop status is redacted and loop resume clears active episodes with one de
 		if (previousCapsule === undefined) delete process.env.RUN_CAPSULE; else process.env.RUN_CAPSULE = previousCapsule;
 	}
 });
+
+test("verify_project is never walled by exact-repeat blocking; other tools still are", async () => {
+	// Argument-free verify_project makes every call an exact repeat by construction,
+	// and verify-gate DEMANDS the call before handoff — walling it deadlocked the
+	// two extensions on a red gate (audit B1, 2026-08-25).
+	const drive = async (toolName: string, args: Record<string, unknown>) => {
+		const fp = makeFakePi();
+		const mod = await import(`../extensions/loop-breaker.ts?wall-${toolName}=${Date.now()}-${Math.random()}`);
+		mod.default(fp.pi as never);
+		const ctx = { ui: { notify() {} }, abort() {}, cwd: "/tmp" };
+		await fire(fp, "session_start", {});
+		for (let index = 0; index < 10; index++) {
+			const id = `${toolName}-${index}`;
+			await fire(fp, "turn_end", {
+				turnIndex: index,
+				message: { role: "assistant", provider: "local-llama", content: [
+					{ type: "toolCall", id, name: toolName, arguments: args },
+				] },
+				toolResults: [{ toolCallId: id, toolName, isError: true, content: [{ type: "text", text: "1 failing" }] }],
+			}, ctx);
+		}
+		return fire(fp, "tool_call", { toolCallId: "probe", toolName, input: args }, ctx);
+	};
+	const gateResult = await drive("verify_project", {});
+	assert.equal(gateResult, undefined, "verify_project must never be walled");
+	const bashResult = await drive("bash", { command: "npm run x" }) as { block?: boolean } | undefined;
+	assert.equal(bashResult?.block, true, "the wall itself still works for ordinary repeats");
+});

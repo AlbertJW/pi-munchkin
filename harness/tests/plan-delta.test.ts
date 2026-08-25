@@ -32,7 +32,10 @@ test("duplicate identical deltas are idempotent; conflicting or unknown IDs reje
 
 test("notes are byte-bounded; blocked items require a reason; note-only updates work", () => {
 	assert.equal(applyPlanDeltas(items, [{ item_id: "item-a", status: "blocked" }]).ok, false);
-	assert.equal(applyPlanDeltas(items, [{ item_id: "item-a", status: "blocked", note: "界".repeat(101) }]).ok, false);
+	assert.equal(applyPlanDeltas(items, [{ item_id: "item-a", status: "blocked", note: "界".repeat(300) }]).ok, true,
+		"900 bytes of multibyte note is accepted (300 was live churn, raised 2026-08-25)");
+	assert.equal(applyPlanDeltas(items, [{ item_id: "item-a", status: "blocked", note: "界".repeat(301) }]).ok, false,
+		"903 bytes still rejects — the bound moved, it did not vanish");
 	const noteOnly = applyPlanDeltas(items, [{ item_id: "item-a", note: "first\nsecond" }]);
 	assert.equal(noteOnly.ok, true);
 	if (noteOnly.ok) assert.equal(noteOnly.items[0].note, "first\nsecond");

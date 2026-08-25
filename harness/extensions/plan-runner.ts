@@ -16,16 +16,31 @@ import {
 import { planStorageMode, privatePlanProjectionPath, privatePlanStatePath, privatePlanTracePath } from "../lib/plan-state-storage.ts";
 import { processWriterMarker } from "../lib/process-writer.ts";
 import { storedUrl } from "../lib/research-ledger.ts";
+import { initialToolSurface } from "../lib/session-bootstrap.ts";
 import { record } from "../lib/telemetry.ts";
+import { CORE_NAMES, profileFromEnvironment } from "./tool-activation.ts";
 
 // One bounded ordered checklist. plan_write owns structure; plan_update owns
 // status. Project verification is deliberately outside this module.
 
 const MAX_ITEMS = 24;
 const MAX_TITLE_BYTES = 120;
-const MAX_NOTE_BYTES = 300;
-const MAX_PLAN_BYTES = 12 * 1024;
-const MAX_DELTAS = 16;
+// 300 caused live churn: models packing per-item substeps (the tool guidance's own
+// advice) hit the cap and rewrote repeatedly (Albert, 2026-08-25). 900 with the
+// state cap raised in step: 24 full items at 900-byte notes ≈ 27.7 KiB.
+const MAX_NOTE_BYTES = 900;
+const MAX_PLAN_BYTES = 32 * 1024;
+const MAX_DELTAS = 24;  // matches MAX_ITEMS: a full-plan status resend must not die in the schema validator (audit B5)
+
+// Byte-aware truncation for migration paths: .slice() counts CHARACTERS, so a
+// multibyte note could survive the slice, exceed the byte budget, fail
+// validateGraph, and silently vanish the whole plan (audit 2026-08-25).
+function truncateBytes(value: string, maxBytes: number): string {
+	if (Buffer.byteLength(value, "utf8") <= maxBytes) return value;
+	let out = value;
+	while (out.length > 0 && Buffer.byteLength(out, "utf8") > maxBytes) out = out.slice(0, -1);
+	return out;
+}
 export const FORCE_PLAN_WRITE_DEFAULT: "on" | "off" = "off";
 const FORCE_PLAN_WRITE = (process.env.FORCE_PLAN_WRITE ?? FORCE_PLAN_WRITE_DEFAULT) !== "off";
 const PLAN_TOOL_GO = process.env.PLAN_TOOL_GO === "on";
@@ -136,8 +151,8 @@ function migrateState(raw: any): PlanState | undefined {
 	if (raw.schema_version === 5 && !PLAN_GRAPH) return undefined;
 	const items: PlanItem[] = raw.items.slice(0, MAX_ITEMS).map((item: any) => ({
 		id: typeof item.id === "string" && /^[A-Za-z0-9._:-]{1,96}$/.test(item.id) ? item.id : itemId(),
-		title: cleanText(item.title).slice(0, MAX_TITLE_BYTES),
-		note: item.note ? cleanText(item.note).slice(0, MAX_NOTE_BYTES) : undefined,
+		title: truncateBytes(cleanText(item.title), MAX_TITLE_BYTES),
+		note: item.note ? truncateBytes(cleanText(item.note), MAX_NOTE_BYTES) : undefined,
 		status: ["pending", "in_progress", "done", "blocked", "deferred"].includes(item.status) ? item.status : "pending",
 		...(PLAN_GRAPH && raw.schema_version !== 5 ? { kind: "work" as const } : {}),
 		...(raw.schema_version === 5 && typeof item.parent_id === "string" ? { parent_id: item.parent_id } : {}),
@@ -292,7 +307,7 @@ function structuralItems(previous: PlanState | undefined, incoming: Array<{ item
 	const retained = new Set<string>();
 	const next = incoming.map((item) => {
 		const prior = item.item_id ? byId.get(item.item_id) : undefined;
-		if (item.item_id && !prior) rejectPlanTool(`plan_write rejected: unknown item_id ${item.item_id}`);
+		if (item.item_id && !prior) rejectPlanTool(`plan_write rejected: unknown item_id ${item.item_id}. Valid ids: ${[...byId.keys()].join(", ") || "(none)"}`);
 		if (prior) retained.add(prior.id);
 		return {
 			id: prior?.id ?? itemId(), title: cleanText(item.title),
@@ -300,9 +315,13 @@ function structuralItems(previous: PlanState | undefined, incoming: Array<{ item
 			status: prior?.status ?? "pending",
 		} satisfies PlanItem;
 	});
-	const omitted = (previous?.items ?? []).filter((item) =>
-		(item.status === "pending" || item.status === "in_progress") && !retained.has(item.id));
-	if (omitted.length) rejectPlanTool(`plan_write rejected: unresolved item_id(s) omitted: ${omitted.map((item) => item.id).join(", ")}. Mark them done or blocked with plan_update first.`);
+	// Unresolved work may not silently disappear from an EXECUTING plan. During
+	// pre-go review (phase "planned") a structural rewrite that drops items is
+	// legitimate revision — and the old unconditional rule was a trap there: the
+	// rejection named plan_update, which planning mode blocks (audit A4, 2026-08-25).
+	const omitted = previous?.phase === "executing" ? previous.items.filter((item) =>
+		(item.status === "pending" || item.status === "in_progress") && !retained.has(item.id)) : [];
+	if (omitted.length) rejectPlanTool(`plan_write rejected: unresolved item_id(s) omitted: ${omitted.map((item) => item.id).join(", ")}. Mark them done or blocked with plan_update first, or retain them (with their item_id) in the revised items.`);
 	return next;
 }
 
@@ -326,6 +345,29 @@ function enterPlanningSurface(pi: ExtensionAPI): boolean {
 
 function leavePlanningSurface(pi: ExtensionAPI, keepPlanTools: boolean): void {
 	const active = pi.getActiveTools();
+	if (!planningSurfaceApplied || !planningSurfaceBefore) {
+		// Post-restart: the in-memory bookkeeping is gone, so the diff-based restore
+		// below has nothing to work with — a reload during /plan used to leave the
+		// session read-only forever (audit A6, 2026-08-25). Restore the execution
+		// surface from the immutable startup baseline, filtered through the core
+		// profile so deferred specialists stay deferred.
+		const baseline = initialToolSurface();
+		if (baseline?.complete) {
+			const registered = new Set(pi.getAllTools().map((tool) => tool.name));
+			const coreProfile = profileFromEnvironment() === "core";
+			const restored = new Set(active);
+			for (const name of baseline.active) {
+				if (!registered.has(name)) continue;
+				if (coreProfile && !CORE_NAMES.has(name)) continue;
+				restored.add(name);
+			}
+			if (keepPlanTools) for (const name of ["plan_write", "plan_update"]) if (registered.has(name)) restored.add(name);
+			pi.setActiveTools([...restored]);
+		}
+		planningSurfaceBefore = null;
+		planningSurfaceApplied = null;
+		return;
+	}
 	if (planningSurfaceApplied && planningSurfaceBefore) {
 		const applied = new Set(planningSurfaceApplied);
 		const current = new Set(active);
@@ -367,13 +409,17 @@ const planWrite = defineTool({
 		summary: Type.Optional(Type.String({ maxLength: 300 })),
 		items: Type.Array(Type.Object({
 			item_id: Type.Optional(Type.String({ minLength: 1, maxLength: 96 })),
-			title: Type.String({ minLength: 1, maxLength: 120 }), note: Type.Optional(Type.String({ maxLength: 300 })),
+			title: Type.String({ minLength: 1, maxLength: 120 }), note: Type.Optional(Type.String({ maxLength: 900 })),
 		}), { minItems: 1, maxItems: MAX_ITEMS }),
 	}),
 	async execute(_toolCallId, params, _signal, _onUpdate, ctx) {
 		rememberModel(ctx);
 		const result = await mutatePlan(ctx.cwd, async (previous) => {
-			if (!isPlanning() && !previous && !FORCE_PLAN_WRITE) rejectPlanTool("plan_write is available only after /plan");
+			// No headless reject: pi only dispatches ACTIVE tools, and outside /plan the
+			// tool is active only via capability(enable, "planning") — the sanctioned
+			// model route (skills structure multi-item work this way). The old
+			// unconditional reject named /plan, a command the model cannot type, and
+			// made the capability family a dead end (audit A3, 2026-08-25).
 			if (previous?.settled_at) rejectPlanTool("plan_write rejected: settled plans are immutable");
 			if (previous?.profile || previous?.items.some((item) => item.parent_id)) rejectPlanTool("plan_write cannot rewrite a plan graph; use plan_expand and plan_update");
 			const items = structuralItems(previous, params.items);
@@ -409,7 +455,7 @@ const planUpdate = defineTool({
 	parameters: Type.Object({ deltas: Type.Array(Type.Object({
 		item_id: Type.String({ minLength: 1, maxLength: 96 }),
 		status: Type.Optional(PlanUpdateStatusSchema),
-		note: Type.Optional(Type.String({ maxLength: 300 })),
+		note: Type.Optional(Type.String({ maxLength: 900 })),
 		...(PLAN_GRAPH ? { defer: Type.Optional(Type.Object({
 			value: Type.String({ minLength: 1, maxLength: 200 }),
 			risk: Type.String({ minLength: 1, maxLength: 200 }),
@@ -467,7 +513,7 @@ const researchPlanStart = defineTool({
 		summary: Type.String({ minLength: 1, maxLength: 300 }),
 		branches: Type.Array(Type.Object({
 			title: Type.String({ minLength: 1, maxLength: 120 }),
-			note: Type.Optional(Type.String({ maxLength: 300 })),
+			note: Type.Optional(Type.String({ maxLength: 900 })),
 			budget: BudgetSchema,
 		}), { minItems: 1, maxItems: DEEP_RESEARCH_MAX_ROOTS }),
 	}),
@@ -515,7 +561,7 @@ const planExpand = defineTool({
 		parent_item_id: Type.String({ minLength: 1, maxLength: 96 }),
 		children: Type.Array(Type.Object({
 			item_id: Type.Optional(Type.String({ minLength: 1, maxLength: 96 })),
-			title: Type.String({ minLength: 1, maxLength: 120 }), note: Type.Optional(Type.String({ maxLength: 300 })),
+			title: Type.String({ minLength: 1, maxLength: 120 }), note: Type.Optional(Type.String({ maxLength: 900 })),
 			budget: Type.Optional(BudgetSchema),
 		}), { minItems: 1, maxItems: 8 }),
 	}),
@@ -563,7 +609,7 @@ const branchPlan = defineTool({
 		note: Type.String({ minLength: 1, maxLength: 500 }), consumed: BudgetSchema,
 		children: Type.Array(Type.Object({
 			item_id: Type.String({ minLength: 1, maxLength: 96 }), title: Type.String({ minLength: 1, maxLength: 120 }),
-			note: Type.Optional(Type.String({ maxLength: 300 })),
+			note: Type.Optional(Type.String({ maxLength: 900 })),
 			status: Type.Union([Type.Literal("pending"), Type.Literal("in_progress"), Type.Literal("done"), Type.Literal("blocked"), Type.Literal("deferred")]),
 			budget: Type.Object({ allocated: BudgetSchema, used: BudgetSchema }),
 			evidence_gaps: Type.Optional(Type.Array(Type.String({ minLength: 1, maxLength: 300 }), { maxItems: 8 })),
