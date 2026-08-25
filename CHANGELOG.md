@@ -15,6 +15,23 @@ All notable changes to pi-munchkin are documented here. Releases follow semantic
   hashed, never printed), refuses in-repo writes, 0600 output, round-trips through
   `failure_episode_trial.load_manifest`; `--selftest`.
 
+### Documentation (2026-08-25 — drift repair from the handover inspection)
+
+- `HANDOVER.md`: the deep-inspection close-out no longer claims to be the current snapshot
+  (superseded same day by the shotgun adoption — banner states exactly which numbers moved);
+  the "remaining human step" on the two fixture pins is marked DONE (`adc72c7`, same day).
+- `docs/SURFACE_BOUNDARIES.md`: the shotgun row's orphaned second table is merged into the main
+  table, the 2026-08-21/24 rows are date-ordered, and the shotgun row now states explicitly that
+  it supersedes `e68f1543…` and that future measurements bind `acd18a54…`.
+- `docs/HARNESS_CALL_GRAPH.md`: the working-memory state row contradicted the no-automatic-
+  injection contract ("rendered into context"); it now states the dark, explicit-tool,
+  never-auto-injected reality.
+- `MEASUREMENT_METHODOLOGY_2026-07.md` §18: the "2–4 correct sessions" admission clause carries
+  a supersession note pointing at the ONE rule (graded A1/A2/A3 + E1; binary form transitional).
+- `optimizer/real_gate.sh`: the post-calibrate hint advertised `admission_rule.py $GEN`, which
+  is a no-op (its `__main__` is `--selftest` only); the hint now names the real paths (staged
+  pipeline in-process, or `admission_rule.core_admission`). Text-only; no behavior change.
+
 ### Fixed (2026-08-25)
 
 - `optimizer/prompt-lab/context_telemetry.py`: the `episode_id` validators required 64-hex ids

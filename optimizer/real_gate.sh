@@ -300,7 +300,7 @@ if [[ "$DRY" == 1 ]]; then
 		echo "server: pi-native (llama health/warm-up bypassed)"
 	fi
 	cfgs="[base, cand]"; nextcmd="./prompt-lab/fleet_report.py $GEN --baseline base --candidate cand"
-	[[ "$CALIB" == 1 ]] && cfgs="[base only]" && nextcmd="./prompt-lab/admission_rule.py $GEN"
+	[[ "$CALIB" == 1 ]] && cfgs="[base only]" && nextcmd="admission via failure_episode_trial.py calibrate (admission_rule.py has no results CLI; --selftest only)"
 	[[ "$ARM" != "both" ]] && cfgs="[$ARM only]"
 	echo "would run, per config in $cfgs:  ${TASKS[*]}  x ${N} reps  -> gate-pass rows -> $RESULTS"
 	[[ "$ROBUSTNESS" == 1 ]] && echo "robustness: canonical + 3 equivalent prompts; eligible one-shot arms (one request each)"
@@ -1301,8 +1301,9 @@ fi
 
 echo; echo "rows -> $RESULTS"
 if [[ "$CALIB" == 1 ]]; then
-	echo "admit: ./prompt-lab/admission_rule.py $GEN   (the ONE preregistered fixture-admission rule)"
-	echo "  (calibrate.py still prints per-task pass rates, but its 20-85% band decides nothing)"
+	echo "admit: the ONE rule (prompt-lab/admission_rule.py) has no results CLI — its __main__ is --selftest only."
+	echo "  The staged pipeline applies it in-process (failure_episode_trial.py calibrate), or call"
+	echo "  admission_rule.core_admission on the rows. calibrate.py's 20-85% band decides nothing."
 else
 	echo "analyze: ./prompt-lab/fleet_report.py $GEN --baseline base --candidate cand"
 fi

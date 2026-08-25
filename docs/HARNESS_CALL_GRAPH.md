@@ -185,7 +185,7 @@ accumulator).
 |---|---|---|---|
 | **Tool-call stream** | (atom) | the raw per-turn action log | every verifier reads it; never persisted verbatim |
 | **Run kernel** | `run-kernel-state.ts`, `run-kernel.ts` | typed per-run event record (redacted) | run-kernel writes; audit / recovery read |
-| **Working memory** | `working-memory.ts` | bounded per-run notebook (model-authored hypotheses) | model writes; rendered into context |
+| **Working memory** | `working-memory.ts` | bounded per-run notebook (model-authored hypotheses) | model writes/lists via explicit tool calls; dark (`WORKING_MEMORY=off`); NEVER injected into context automatically |
 | **Plan state** | `plan-state-storage.ts`, `plan-runner.ts` | structured work items + receipts | model writes; plan-runner reads |
 | **Blackboard** | `session-blackboard.ts` | bounded redacted session summary | writes persist; cockpit reads |
 | **Context surface** | `context-surface.ts` | which surface mode is active | read by context-inlet guard |

@@ -69,8 +69,14 @@ loadable extension or duplicate tool.
 
 ## 2026-08-24 deep-inspection close-out
 
-This is the current operational snapshot, superseding any earlier “prepared”, “dark”, or
-“pending mirror” wording below when it describes the same surface. The inspected baseline was
+> **SUPERSEDED same day by the shotgun recovery adoption above**, whose rollout replaced this
+> section's operational numbers: mirror 118/118 → **112/112** (six managed orphans pruned),
+> loaded surface `e68f1543…` → **`acd18a54…`**, 648 tests / 31 extensions → **550 tests /
+> 30 extensions** (the planner/reflect retirement removed suites with their code). The F-01/F-02
+> fixes and posture described here remain in force; only the "current snapshot" claim is stale.
+
+This section was the operational snapshot when written, superseding earlier “prepared”, “dark”,
+or “pending mirror” wording below when it describes the same surface. The inspected baseline was
 clean `main`/`origin/main` at `baa72ea`. The release fixes are now implemented: the measured-inert
 `provider-patience` extension and all active configuration/telemetry/package references are
 retired; normal unbounded `read` intake is reduced from 64 KiB to 32 KiB; files above the normal
@@ -261,7 +267,9 @@ stacked work. Nothing in this series has been merged, mirrored live, adopted, or
 >   cases) and `qs-error-swallow` (2) now derive; 3 stay correctly unpinned because their
 >   graders are not `node --test` suites. **Remaining human step:** writing the two pins
 >   into their approved manifests changes admission-hashed content, so it needs approval —
->   but it is one command now, not an open question.
+>   but it is one command now, not an open question. [DONE same day, `adc72c7`: both pins
+>   written surgically and re-approved with `--expires-at` preserving the original review
+>   clocks (2026-10-21 / 2026-10-23); 24/24 authoritative, 38 case-pinned. Not an open item.]
 > - **Judge labeling: skeleton committed** at `optimizer/prompt-lab/judge_labels_calib4b.json`
 >   — 12 sessions x 4 dimensions, anchors and the declared thresholds inline, 48 nulls.
 >   The scores must be ALBERT's: a label written by anyone else calibrates the judge against

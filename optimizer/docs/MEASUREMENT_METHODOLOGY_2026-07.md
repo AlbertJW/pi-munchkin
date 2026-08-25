@@ -588,7 +588,10 @@ and completed `(stage, fixture, arm, repetition)` cells are skipped on resume.
 
 Calibration is exactly six shadow sessions per fixture. Admission remains fixed at 2–4 correct
 sessions and semantic-episode exposure in at least two sessions, with complete authenticated v4
-settlement and exact token usage throughout. At least two fixtures must qualify. Power uses the
+settlement and exact token usage throughout. [SUPERSEDED 2026-08-15: admission is now the ONE
+rule in `PREREG_FIXTURE_ADMISSION_2026-08.md` — graded A1/A2/A3 plus the loop-cohort E1
+extension, applied by `admission_rule.py`; the 2–4-correct binary form survives only as that
+rule's transitional grader-less clause.] At least two fixtures must qualify. Power uses the
 zero-inclusive calibration distribution, a 30% binomial-thinning alternative, 500 simulated
 trials with 1,000 bootstrap resamples each, candidate sizes 40/48/56/64/72/80 per arm, and selects
 the first size reaching 80% estimated bootstrap power. Failure at
