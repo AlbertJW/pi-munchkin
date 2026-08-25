@@ -796,6 +796,11 @@ across a live-mirror rollout. Record the loaded `HARNESS_SURFACE_SHA256` with ev
   otherwise. `CHAOS`, telemetry fds, and per-process run identity deliberately do not cross.
 - 2026-08-11: both surface hashers include `skills/**/*.md` and `APPEND_SYSTEM.md`. Skill or
   governor text edits now move the hash; hashes computed before/after this change never pool.
+- 2026-08-26: both surface hashers additionally include the agent-dir prompt inputs Pi actually
+  reads — `SYSTEM.md` (which REPLACES the base system prompt) and `AGENTS.md`/`CLAUDE.md` (folded
+  into every session's context). A live `~/.pi/agent/AGENTS.md` had been model-visible and unhashed
+  since before 2026-08-11, so an edit to it could pool measurements across a real prompt change.
+  Same epoch rule: hashes computed before/after this change never pool, even for identical code.
 
 Full option, trigger, rollback, and security documentation is in `README.md`.
 
