@@ -18,7 +18,6 @@ const CORE_NAMES = new Set([
 	"read", "bash", "edit", "write", "search_spans", "read_span", "recall",
 	"verify_project", "capability", "plan_write", "plan_update",
 ]);
-const PI_OPTIONAL_DEFAULTS = new Set(["grep", "find", "ls"]);
 const EXPLICIT_FLAG = "__pi_tool_selection_explicit";
 
 function profileFromEnvironment(): Profile {
@@ -46,10 +45,19 @@ async function settingsAreExplicit(cwd: string): Promise<boolean> {
 	return false;
 }
 
-export function baselineLooksExplicit(active: readonly string[], all: readonly string[], argv: readonly string[] = process.argv): boolean {
-	if (commandLineIsExplicit(argv)) return true;
-	const activeSet = new Set(active);
-	return all.some((name) => !activeSet.has(name) && !PI_OPTIONAL_DEFAULTS.has(name));
+/**
+ * Explicit user intent is judged by POSITIVE evidence only: CLI tool flags and a
+ * settings `defaultTools` array. It is deliberately NOT inferred from the shape of
+ * the baseline registry (tools present but inactive): that inference is
+ * version-coupled to Pi's builtin roster — Pi 0.84.3 added `powershell` as a
+ * default-inactive builtin, which made every fresh session look user-narrowed,
+ * skip the core profile, and refuse /plan ("the explicit tool selection excludes
+ * plan_write"; observed live 2026-08-25 on a package-installed deployment). Pi's
+ * initial active set never comes from persisted session state, so any inactive
+ * tool at a clean baseline is Pi's own default, not a user's selection.
+ */
+export function baselineLooksExplicit(argv: readonly string[] = process.argv): boolean {
+	return commandLineIsExplicit(argv);
 }
 
 function familyTools(family: Family, all: readonly string[]): string[] {
@@ -108,7 +116,7 @@ export default function (pi: ExtensionAPI): void {
 			return { activated: 0, status: "planning-allows-research-only" };
 		}
 		const names = familyTools(family, allNames);
-		const allowed = explicit ? names.filter((name) => initialToolSurface()?.active.includes(name)) : names;
+		const allowed = explicit ? names.filter((name) => (initialToolSurface()?.active ?? []).includes(name)) : names;
 		const active = pi.getActiveTools();
 		const add = allowed.filter((name) => deferred.has(name) && !active.includes(name));
 		if (!add.length) {
@@ -174,15 +182,13 @@ export default function (pi: ExtensionAPI): void {
 		sessionStartedAt = performance.now();
 		try { allTools = pi.getAllTools() as any[]; } catch { allTools = []; }
 		allNames = allTools.map((tool) => String(tool.name));
+		// Explicitness never depends on baseline shape (see baselineLooksExplicit).
+		// An incomplete bootstrap baseline no longer forces explicit — that
+		// fail-closed branch bricked /plan for a condition the user did not cause;
+		// it keeps a distinct telemetry reason for observability.
 		const baseline = initialToolSurface();
-		if (!baseline?.complete) {
-			explicit = true;
-			publish("bootstrap-unavailable");
-			surfaceTelemetry();
-			return;
-		}
-		explicit = baselineLooksExplicit(baseline.active, baseline.all) || await settingsAreExplicit(ctx.cwd);
-		publish(explicit ? "preserved-explicit" : "startup");
+		explicit = baselineLooksExplicit() || await settingsAreExplicit(ctx.cwd);
+		publish(explicit ? "preserved-explicit" : baseline?.complete ? "startup" : "bootstrap-incomplete");
 		if (explicit) {
 			for (const family of ["research", "delegation", "browser", "canvas", "context"] as Family[]) {
 				for (const tool of familyTools(family, allNames)) record("tool-activation", "preserved-explicit", { tool, reason: "explicit-tools" });

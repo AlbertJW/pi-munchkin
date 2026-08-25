@@ -8,7 +8,7 @@ import { captureInitialToolSurface } from "../lib/session-bootstrap.ts";
 import { callTool, fire, makeFakePi, resetPiGlobals } from "./integration-harness.ts";
 
 const names = [
-	"read", "bash", "edit", "write", "grep", "find", "ls", "search_spans", "read_span", "recall",
+	"read", "bash", "edit", "write", "grep", "find", "ls", "powershell", "search_spans", "read_span", "recall",
 	"plan_write", "plan_update", "verify_project", "subagent", "compact_context", "web_search", "web_read",
 	"browser_open", "browser_click", "tldraw_create",
 ];
@@ -62,6 +62,19 @@ test("Pi's ordinary optional builtin omissions are not an explicit allowlist", a
 		assert.equal((globalThis as any).__pi_tool_selection_explicit, false);
 		assert.equal(run.fp.pi.getActiveTools().includes("subagent"), false);
 		assert.equal(run.fp.pi.getActiveTools().includes("compact_context"), false);
+	} finally { run.restore(); }
+});
+
+test("an unknown Pi default-inactive builtin is not an explicit allowlist", async () => {
+	// Pi 0.84.3 added `powershell` as a default-inactive builtin; inferring explicitness
+	// from baseline shape read that as user narrowing and refused /plan on every fresh
+	// session (observed live 2026-08-25). Explicitness now needs positive evidence only.
+	const run = await load("core", names.filter((name) => !["grep", "find", "ls", "powershell"].includes(name)));
+	try {
+		assert.equal((globalThis as any).__pi_tool_selection_explicit, false);
+		const active = run.fp.pi.getActiveTools();
+		assert.ok(active.includes("read"));
+		assert.equal(active.includes("subagent"), false); // core narrowing applied, not skipped
 	} finally { run.restore(); }
 });
 

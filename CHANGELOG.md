@@ -15,6 +15,22 @@ All notable changes to pi-munchkin are documented here. Releases follow semantic
   hashed, never printed), refuses in-repo writes, 0600 output, round-trips through
   `failure_episode_trial.load_manifest`; `--selftest`.
 
+### Fixed (2026-08-25 — explicit-selection inference broke /plan on Pi 0.84.3)
+
+- Explicit user tool selection is now judged by positive evidence only: CLI tool flags
+  (`--tools`, `--exclude-tools`, `--no-tools`, `--no-builtin-tools`) and a settings
+  `defaultTools` array. The old inference from baseline shape (any non-whitelisted tool
+  present-but-inactive) was version-coupled to Pi's builtin roster: Pi 0.84.3 added
+  `powershell` as a default-inactive builtin, so every fresh session classified as
+  user-narrowed, skipped the core profile, and refused `/plan` ("the explicit tool selection
+  excludes plan_write") — observed live on a package-installed deployment even after the
+  reload re-entry fix below. Pi's initial active set never derives from persisted session
+  state, so an inactive tool at a clean baseline is Pi's own default, never a user selection.
+  The incomplete-bootstrap branch also no longer forces explicit (it bricked `/plan` for a
+  condition the user did not cause); it keeps a distinct telemetry reason. Regression proven
+  by counterfactual: a registered default-inactive `powershell` stays non-explicit with core
+  narrowing applied.
+
 ### Fixed (2026-08-25 — reload re-entry broke /plan)
 
 - The initial tool surface captured by `session-bootstrap` is now immutable for the process
