@@ -134,6 +134,20 @@ test("explicit =off suppression survives into the subagent environment", () => {
 	assert.equal(env.PI_RUN_ID, undefined, "child derives its own run identity");
 });
 
+test("planner flags propagate but private branch artifact paths never do", () => {
+	const env = buildSubagentEnv({
+		PATH: "/bin", PLAN_GRAPH: "on", DEEP_RESEARCH_PLANNING: "on",
+		PI_MUNCHKIN_PLAN_CONTEXT_PATH: "/private/parent-context.json",
+		PI_MUNCHKIN_BRANCH_REPORT_PATH: "/private/parent-report.json",
+		PI_MUNCHKIN_RESEARCH_SCOUT: "1",
+	});
+	assert.equal(env.PLAN_GRAPH, "on");
+	assert.equal(env.DEEP_RESEARCH_PLANNING, "on");
+	assert.equal(env.PI_MUNCHKIN_PLAN_CONTEXT_PATH, undefined);
+	assert.equal(env.PI_MUNCHKIN_BRANCH_REPORT_PATH, undefined);
+	assert.equal(env.PI_MUNCHKIN_RESEARCH_SCOUT, undefined);
+});
+
 test("subagent summary cap is tunable via PI_SUBAGENT_MAX_SUMMARY_CHARS", async () => {
 	const result = { messages: [{ role: "assistant", content: [{ type: "text", text: "x".repeat(20000) }] }] };
 	const prev = process.env.PI_SUBAGENT_MAX_SUMMARY_CHARS;

@@ -10,6 +10,7 @@ import { callTool, fire, makeFakePi, resetPiGlobals } from "./integration-harnes
 const names = [
 	"read", "bash", "edit", "write", "grep", "find", "ls", "search_spans", "read_span", "recall",
 	"plan_write", "plan_update", "verify_project", "subagent", "compact_context", "web_search", "web_read",
+	"plan_expand", "plan_settle", "research_plan_start",
 	"browser_open", "browser_click", "tldraw_create",
 ];
 
@@ -114,6 +115,24 @@ test("capability activation is additive and a later manual disable wins", async 
 		await callTool(run.fp, "capability", { action: "enable", family: "browser" }, process.cwd());
 		assert.equal(run.fp.pi.getActiveTools().some((name) => name.startsWith("browser_")), false);
 	} finally { run.restore(); }
+});
+
+test("deep-research planning family is dark by default and additively activated when both flags are on", async () => {
+	const oldGraph = process.env.PLAN_GRAPH;
+	const oldResearch = process.env.DEEP_RESEARCH_PLANNING;
+	process.env.PLAN_GRAPH = "on";
+	process.env.DEEP_RESEARCH_PLANNING = "on";
+	const run = await load("core", [...names]);
+	try {
+		for (const name of ["research_plan_start", "plan_expand", "plan_settle"]) assert.equal(run.fp.pi.getActiveTools().includes(name), false);
+		const result = await callTool(run.fp, "capability", { action: "enable", family: "planning" }, process.cwd());
+		assert.equal(result.isError, false);
+		for (const name of ["research_plan_start", "plan_expand", "plan_settle"]) assert.equal(run.fp.pi.getActiveTools().includes(name), true);
+	} finally {
+		run.restore();
+		if (oldGraph === undefined) delete process.env.PLAN_GRAPH; else process.env.PLAN_GRAPH = oldGraph;
+		if (oldResearch === undefined) delete process.env.DEEP_RESEARCH_PLANNING; else process.env.DEEP_RESEARCH_PLANNING = oldResearch;
+	}
 });
 
 test("planning restricts capability activation to research", async () => {

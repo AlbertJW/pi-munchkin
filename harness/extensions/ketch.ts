@@ -154,6 +154,7 @@ export function registerKetch(pi: ExtensionAPI, dependencies: KetchDependencies 
 	const MAX_CONSECUTIVE_REFUSALS = 3;
 	let consecutiveRefusals = 0;
 	let verificationDegraded = false;
+	let verifiedUrls = new Set<string>();
 	function publishResearchState(): void {
 		if (!LEDGER_ENABLED) return;
 		(globalThis as Record<string, unknown>).__pi_research_state = { ...counts };
@@ -179,7 +180,10 @@ export function registerKetch(pi: ExtensionAPI, dependencies: KetchDependencies 
 			wrapSteerFired = false;
 			consecutiveRefusals = 0;
 			verificationDegraded = false;
+			verifiedUrls = new Set<string>();
 			delete (globalThis as Record<string, unknown>).__pi_research_state;
+			delete (globalThis as Record<string, unknown>).__pi_research_verified_urls;
+			delete (globalThis as Record<string, unknown>).__pi_plan_validation_urls;
 		});
 		// The opt-in hole (eval Run 2, defect 3): research_note is a tool the model
 		// must CHOOSE to call, and this corpus's finding is that small models don't
@@ -476,6 +480,15 @@ export function registerKetch(pi: ExtensionAPI, dependencies: KetchDependencies 
 					throw new Error("Research ledger write failed; keep the claim and citation inline.");
 				}
 				counts.notes += 1;
+				verifiedUrls.add(storedUrl(sourceUrl).display);
+				(globalThis as Record<string, unknown>).__pi_research_verified_urls = [...verifiedUrls].sort();
+				const shared = globalThis as Record<string, unknown>;
+				const activePlan = shared.__pi_active_plan_context as { profile?: unknown; settled?: unknown } | undefined;
+				if (activePlan?.profile === "deep-research" && activePlan.settled !== true) {
+					const planUrls = new Set(Array.isArray(shared.__pi_plan_validation_urls) ? shared.__pi_plan_validation_urls.filter((value): value is string => typeof value === "string") : []);
+					planUrls.add(storedUrl(sourceUrl).display);
+					shared.__pi_plan_validation_urls = [...planUrls].sort();
+				}
 				consecutiveRefusals = 0; // a recorded note proves the model can still verify
 				publishResearchState();
 				record("research", "note", { ok: true, reason_class: verdict.corrected ? "corrected" : "ok", quote_chars: params.quote.length });

@@ -143,6 +143,9 @@ Most behaviour is automatic. The primary commands are:
   `/plan-cancel` discards the draft, and `/plan-status` renders the bounded plan. Plans hold at
   most 24 stable-ID items; routine progress uses small `plan_update` deltas. Verification belongs
   to the session, not to individual plan items.
+- With the dark `PLAN_GRAPH=on` candidate, plans may contain bounded parent/child nodes,
+  `plan_expand` attaches children, `plan_settle` enforces terminal/evidence conditions, and
+  `/plan-status <item-id>` expands one subtree. Ordinary plans remain flat.
 - `/blackboard` for current redacted state and the private cockpit path.
 - `/skill:deep-research <question>` for bounded research.
 - `/ketch-status` for public-search backend health.
@@ -168,7 +171,7 @@ model's own window in place with one resume handoff.
 |---|---|---|
 | `MUNCHKIN_TOOL_PROFILE` | `core`; starts with the coding spine and the single `capability` switch | `ambient` restores Pi's initial surface; genuine CLI/global/project tool selections always win |
 | `MUNCHKIN_TOOL_ACTIVATION` | `dynamic`; legacy automatic activation remains available for delegation and context compaction | `ambient` disables automatic activation; `phase` remains experimental |
-| `PLAN_STORAGE` | `capsule`; plan JSON, Markdown projection, and trace stay in the private per-run capsule for both forced and adaptive planning | `project` restores historical `.pi/plan-state.json`, `.pi/TODO.md`, and `.pi/traces/`; `/plan-export` is the explicit one-file export; `RUN_CAPSULE=off` also selects project storage because no private session identity exists |
+| `PLAN_STORAGE` | `capsule`; plan JSON, Markdown projection, and trace stay in the private per-run capsule for both forced and adaptive planning | `project` restores historical `.pi/plan-state.json`, `.pi/TODO.md`, and `.pi/traces/`; `/plan-export` explicitly writes the Markdown and JSON review snapshots; `RUN_CAPSULE=off` also selects project storage because no private session identity exists |
 | dynamic `subagent` triggers | multi-item structured execution or loop-breaker tier two | once activated it stays active; one automatic attempt means a later manual `/tools` disable is respected |
 | dynamic `compact_context` trigger | first crossing of 60% context usage | same one-attempt/manual-disable rule |
 | `CONTEXT_SURFACE_MODE` | `summary`; samples usage on first call, each eighth call, threshold crossings, and compaction without transcript hashing | `full` retains receipt calculations; `off` disables; gate sessions force `full` |
@@ -188,6 +191,8 @@ model's own window in place with one resume handoff.
 | `TEACH_HINTS`, `DID_YOU_MEAN` | default-on bounded hints | set either to `off` |
 | `FORCE_PLAN_WRITE` | `off`; planning is exclusively user-triggered through `/plan` | `on` restores the compatibility behavior that blocks the first unplanned mutation |
 | `PLAN_TOOL_GO` | `off`; headless experiments may explicitly expose model-callable `plan_go` | `on` enables it; interactive plans still require the user's `/plan-go` |
+| `PLAN_GRAPH` | `off`; graph schemas, `plan_expand`, `plan_settle`, branch reports, and planning capability family are absent | `on` enables the reusable v5 graph substrate without activating a skill profile |
+| `DEEP_RESEARCH_PLANNING` | `off`; complex research follows the existing bounded skill path | requires `PLAN_GRAPH=on` and `RESEARCH_LEDGER=on`; exposes complex-only `research_plan_start` with a 3-search/5-discovery-read global envelope and five parent validation reads |
 | `SPAWN_DELEGATION` | default-on; delegation guidance recommends `mode=spawn` with self-contained tasks | `off` restores the fork wording |
 | `TOOL_CALL_RESCUE` | default-on; one corrective steer (max 2/session) when a session dies on a text-only pseudo tool call | `off` |
 | `CONTEXT_BRIEF` | default-on; a cached per-session environment brief appended to the system prompt (`CONTEXT_BRIEF_BYTES` bounds it) | `off` |
@@ -251,7 +256,8 @@ sessions.
   counts, hashes, booleans, and byte totals—not note text or artifact paths.
 - Plan state, its Markdown projection, and the bounded plan trace share that run-capsule directory
   by default and use `0600` files. Normal planning therefore creates no `.pi` worktree artifacts.
-  `/plan-export` deliberately writes only `.pi/TODO.md`; `PLAN_STORAGE=project` is the full legacy
+  `/plan-export` deliberately writes `.pi/TODO.md` plus the explicit review snapshot
+  `.pi/plan-review.json`; neither is authoritative. `PLAN_STORAGE=project` is the full legacy
   rollback. Observational memory remains the sole narrative recall layer; it cannot complete plan
   items, verify work, close failure episodes, mutate files, or override repository evidence.
 - Recovery mode projects a deterministic brief of at most 2 KiB with fixed untrusted-data fences.
@@ -269,6 +275,11 @@ sessions.
   reverting to the default-on behaviour — plus validated names explicitly added via
   `PI_SUBAGENT_ENV_ALLOW`. Fault injection (`CHAOS`), process-local telemetry fds, and per-process
   run identity deliberately do not cross. Values are never logged.
+- Graph-planned research passes a bounded context through a private per-call temporary artifact.
+  A depth-one `research-planner` may dispatch at most two non-planning `research-scout` leaves;
+  its validated terminal report returns to the parent through the event bus. Children never write
+  the parent capsule, and every delegated source used at settlement must have a successful
+  parent-session `research_note` record.
 - `npm run secret-scan:diff` inspects staged, unstaged, and untracked added lines, plus the added
   lines of every committed-but-unpublished commit, so a commit→scan→push sequence cannot report
   clean on committed content. It gates a RANGE, not the tree, and is only as good as its

@@ -172,6 +172,18 @@
           "on",
           "off"
         ],
+        "PLAN_GRAPH": [
+          "on",
+          "off"
+        ],
+        "DEEP_RESEARCH_PLANNING": [
+          "on",
+          "off"
+        ],
+        "RESEARCH_LEDGER": [
+          "on",
+          "off"
+        ],
         "TOOL_CALL_RESCUE": [
           "on",
           "off"

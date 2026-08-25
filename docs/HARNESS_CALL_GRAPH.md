@@ -54,7 +54,7 @@ image tokens) and evolutionary lineage (500 directions, 40 committed versions) m
 | 16 recovery paths, not retries | failure-episode classes → tiered steers → blocked walls → `/loop-resume`; capsule recovery briefs |
 | 17 checkpoints + resume | `RUN_CAPSULE` — **default `recovery` since 2026-08-24**: checkpoint every settle, inject one bounded brief at compaction/provider-retry |
 | 18 observability / replay | typed telemetry (102-event catalog, forbidden-field tripwire), surface receipts, session jsonl replay, trial manifests |
-| 19 when NOT to graph | §9 — the spine of this document; the harness is loops + gates + ONE graph, and stays that way |
+| 19 when NOT to graph | §9 — the spine of this document; keep the atom as loops + gates, and use bounded graphs only for real decomposition or selection |
 | 20 evals + docs for the team | `npm run verify` after every change; the (mothballed) measurement doctrine for model-visible adoptions; THIS document |
 
 ---
@@ -113,6 +113,7 @@ verifiers are cheap and belong inside the loop edges.
 | **Did-you-mean** | `did-you-mean.ts` | yes (classification) | Conditional edge / router |
 | **Teaching hints** | `teach-hints.ts` | yes (one-shot nudge) | Optional side-edge |
 | **Plan generation** | `plan-runner.ts` | yes (model owns items) | Graph builder for the plan sub-graph |
+| **Research branch planner** | `research-planner` → `research-scout` | yes | Bounded depth-one branch with at most two terminal leaves; parent owns merge and settlement |
 | **Compaction summary** | `compact-tool.ts` | yes (summarise self) | Recovery/checkpoint node |
 | **Dynamic activation decision** | `tool-activation.ts` | borderline (heuristic; model-evidence gated) | Edge toggle |
 
@@ -125,6 +126,7 @@ verifiers are cheap and belong inside the loop edges.
 | **verify-gate verifier** | `verify-gate.ts` | Accepts work as done only after ordered verification evidence after the latest mutation. The core *validation gate*. |
 | **control arbiter** | `control-arbiter.ts` / `control-proposal.ts` | Decides allow / steer / proceed on a control proposal. A *conditional edge*. |
 | **bounded planner** | `plan-runner.ts` | Read-only plan entry plus stable-ID structural writes and small progress deltas. It owns intent, never verification. |
+| **plan graph validator** | `plan-graph.ts`, `branch-report.ts` | Enforces parent identity, acyclicity, depth, node count, budget conservation, terminal reports, and parent-owned settlement. |
 | **git-guard** | `git-guard.ts` | Confirms before destructive commands. A *human gate*. |
 | **context / bash guards** | `context-inlet-guard.ts`, `bash-output-guard.ts` | Refuse oversized provider-bound I/O. *Verifiers* on the I/O edges. |
 | **ketch validators** | `ketch.ts` (publicHttpUrl, redirect checks) | URL / redirect validation on the web-search edge. *Verifiers*. |
@@ -169,9 +171,11 @@ about when unmanaged, and the *supervised loops* when they have a verifier:
 
 ### 2c. Router pattern
 
-`role-routing.ts` is the one pure **router** node (the article's "decide which specialized agent
-handles this input"). `did-you-mean.ts` is a conditional-nudge router. Everything else routes on a
-binary verifier, not a K-way router — so there is no fan-out graph, just gated edges.
+`role-routing.ts` is the general **router** node (the article's "decide which specialized agent
+handles this input"). `did-you-mean.ts` is a conditional-nudge router. Ordinary work still routes
+on binary verifiers. The dark deep-research profile is the deliberate exception: the head may fan
+out to at most three evidence branches, and each depth-one branch may split once into at most two
+terminal scouts. That fan-out is budget-conserving and never changes the atom itself.
 
 ---
 
@@ -186,7 +190,7 @@ accumulator).
 | **Tool-call stream** | (atom) | the raw per-turn action log | every verifier reads it; never persisted verbatim |
 | **Run kernel** | `run-kernel-state.ts`, `run-kernel.ts` | typed per-run event record (redacted) | run-kernel writes; audit / recovery read |
 | **Working memory** | `working-memory.ts` | bounded per-run notebook (model-authored hypotheses) | model writes/lists via explicit tool calls; dark (`WORKING_MEMORY=off`); NEVER injected into context automatically |
-| **Plan state** | `plan-state-storage.ts`, `plan-runner.ts` | structured intended work + item status | model writes; plan-runner reads; verification remains session-owned |
+| **Plan state** | `plan-state-storage.ts`, `plan-runner.ts`, `plan-graph.ts` | v4 flat or v5 parent/child intended work, owner, budget, status and evidence gaps | head model owns authority; children return validated reports; verification remains parent/session-owned |
 | **Blackboard** | `session-blackboard.ts` | bounded redacted session summary | writes persist; cockpit reads |
 | **Context surface** | `context-surface.ts` | which surface mode is active | read by context-inlet guard |
 | **Failure episodes** | `failure-episodes.ts` | semantic-failure tracking for steering | loop-breaker / arbiter read |
@@ -274,9 +278,13 @@ loop. Keep it a branch.
 
 ---
 
-## 8. The evaluator-optimizer sub-graph (currently dormant)
+## 8. The two deliberate graph surfaces
 
-The optimizer is the only place a *second* graph exists: **evaluator-optimizer**.
+The reusable v5 plan graph is a bounded **work-decomposition graph**. It is dark by default. In its
+first profile, deep research, the head owns root branches and settlement; a branch child may propose
+at most two leaf nodes through a private typed report. Children never write shared plan state.
+
+The optimizer is a separate **evaluator-optimizer graph**:
 
 ```
 fixture (candidate) → run under gate (real_gate.sh) → grade (grade_reporter.py)
@@ -289,9 +297,10 @@ lineage/selection loop in miniature. It is **mothballed again (2026-08-21 — se
 `optimizer/docs/MOTHBALLED_2026-08-21.md`)**: the instrument is validated and preserved; no rounds
 run until its restart conditions are met.
 
-**Graph-judgment:** this is the *right* place for a graph — it has genuine multi-candidate routing,
-selection, and lineage. It is the wrong place to *add* graph structure to the main harness loop, where
-there are no decision points to justify it.
+**Graph-judgment:** both graphs earn their structure: the plan graph represents genuinely independent
+work/evidence branches, while the optimizer represents multi-candidate routing, selection, and
+lineage. Neither rewrites the main harness loop. Straightforward fact lookup and ordinary local work
+remain flat because they contain no decomposition decision worth graphing.
 
 ---
 
@@ -311,14 +320,15 @@ decision/routing structure. Applying that:
 - Every human gate, every validation gate — chokepoints, not routers.
 
 **Graph is justified (do build / extend):**
+- The reusable plan graph for bounded, genuinely decomposable work; deep research is its first profile.
 - The optimizer evaluator-optimizer loop (real lineage/selection).
 - Role-routing (a genuine K-way router).
 - The supervisor (loop-breaker → recovery) *if* upgraded to a forward-progress guard (§5).
 
 **The tell that a graph is pretending to be a loop:** if every "node" has exactly one successor and one
 predecessor except at a binary verifier, it's a loop — simplify to a loop. The harness, read honestly,
-is mostly loops and gates with *one* real graph (the optimizer) and *one* router (role-routing). That
-is the correct shape.
+is mostly loops and gates with two explicit graph surfaces: bounded work decomposition and dormant
+candidate selection. That is the correct shape.
 
 ---
 
@@ -351,7 +361,9 @@ is the correct shape.
 
         human boundary: verify-gate · plan review · git-guard · secret-scan · mirror:check · drift · governor
 
-        separate graph (the ONLY real one):  optimizer: fixture → gate → grade → verdict → report → admit/reject
+        bounded work graph (dark): head plan → evidence branch → optional terminal scouts → parent validation/settlement
+
+        separate optimizer graph (dormant): fixture → gate → grade → verdict → report → admit/reject
 ```
 
 ---
@@ -361,14 +373,15 @@ is the correct shape.
 1. **Supervisor → forward-progress guard (§5).** Change `loop-breaker`'s trigger from *repeat count*
    to *no forward progress across N turns* using an existing signal (`semantic_failure_overrun` or
    blackboard diff). One edge-condition change. Highest-impact, lowest-diff.
-2. **Do not graph the atom or the gates.** Resist the article's temptation; the harness is already
-   the correct shape (loops + gates + one optimizer graph).
-3. **If a graph artifact is wanted, draw the optimizer lineage** — it's the only place the graph
-   mental model earns its keep.
+2. **Do not graph the atom or the gates.** The plan graph sits above them and represents bounded
+   decomposition; it does not turn each tool call into a node.
+3. **Use graph artifacts only for real lineage.** The v5 plan export draws work/evidence lineage;
+   the optimizer graph draws candidate lineage.
 
 > **STATUS 2026-08-24:** recommendation 1 is implemented and live (the plateau enforce default);
-> recommendation 2 is honored (no routing was added anywhere); recommendation 3 stays deferred with
-> the mothballed optimizer. Additionally `RUN_CAPSULE=recovery` is now the default (the checkpoint →
+> recommendation 2 is honored (the atom and gates remain unchanged); recommendation 3 now also
+> applies to the dark v5 plan graph, while optimizer lineage stays deferred with the mothballed
+> optimizer. Additionally `RUN_CAPSULE=recovery` is now the default (the checkpoint →
 > resume branch in §7 actively injects its brief), and a deterministic node was added on the
 > provider edge (`provider-patience.ts`) — and then found INERT in Pi sessions on 2026-08-24. It
 > has now been retired from the runtime surface. Pi installs npm-undici's fetch with its own

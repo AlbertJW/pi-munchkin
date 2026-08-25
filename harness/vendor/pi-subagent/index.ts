@@ -31,6 +31,8 @@ import {
   isResultError,
 } from "./types.js";
 import { ACTIVE_TOOL_PROMPTS } from "../../lib/active-tool-prompts.ts";
+import { emitHarnessSignal } from "../../lib/harness-signals.ts";
+import { PLAN_CONTEXT_ENV, RESEARCH_SCOUT_ENV, researchUsageFromMessages, validateScoutDispatch, type PlanContextV1, type ScoutReceiptV1 } from "../../lib/branch-report.ts";
 
 // ---------------------------------------------------------------------------
 // Limits
@@ -51,10 +53,30 @@ const SUBAGENT_DEPTH_ENV = "PI_SUBAGENT_DEPTH";
 const SUBAGENT_MAX_DEPTH_ENV = "PI_SUBAGENT_MAX_DEPTH";
 const SUBAGENT_STACK_ENV = "PI_SUBAGENT_STACK";
 const SUBAGENT_PREVENT_CYCLES_ENV = "PI_SUBAGENT_PREVENT_CYCLES";
+const PLAN_GRAPH_ENABLED = process.env.PLAN_GRAPH === "on";
+const BRANCH_PLANNER_PROCESS = Boolean(process.env[PLAN_CONTEXT_ENV]);
+const RESEARCH_SCOUT_PROCESS = process.env[RESEARCH_SCOUT_ENV] === "1";
+const SCOUT_RECEIPTS_KEY = "__pi_research_scout_receipts";
+
+function publishScoutReceipt(context: PlanContextV1 | undefined, result: SingleResult): void {
+	if (context?.depth !== 2) return;
+	const shared = globalThis as Record<string, unknown>;
+	const prior = Array.isArray(shared[SCOUT_RECEIPTS_KEY]) ? shared[SCOUT_RECEIPTS_KEY] as ScoutReceiptV1[] : [];
+	const usage = researchUsageFromMessages(result.messages);
+	shared[SCOUT_RECEIPTS_KEY] = [...prior.filter((receipt) => receipt.owner_ref !== context.owner_ref), { owner_ref: context.owner_ref, ...usage }];
+}
 
 // ---------------------------------------------------------------------------
 // Tool parameter schema
 // ---------------------------------------------------------------------------
+
+const PlanContextSchema = Type.Object({
+	v: Type.Literal(1), profile: Type.Literal("deep-research"),
+	run_id: Type.String({ minLength: 1, maxLength: 200 }), parent_item_id: Type.String({ minLength: 1, maxLength: 96 }),
+	owner_ref: Type.String({ minLength: 24, maxLength: 24 }), depth: Type.Union([Type.Literal(1), Type.Literal(2)]),
+	budget: Type.Object({ searches: Type.Integer({ minimum: 0, maximum: 100 }), reads: Type.Integer({ minimum: 0, maximum: 100 }) }),
+	limits: Type.Object({ max_depth: Type.Literal(2), max_children: Type.Union([Type.Literal(0), Type.Literal(2)]) }),
+});
 
 const TaskItem = Type.Object({
   agent: Type.String({
@@ -67,6 +89,7 @@ const TaskItem = Type.Object({
   cwd: Type.Optional(
     Type.String({ description: "Working directory for this agent's process" }),
   ),
+	...(PLAN_GRAPH_ENABLED ? { plan_context: Type.Optional(PlanContextSchema) } : {}),
 });
 
 const SubagentParams = Type.Object({
@@ -107,6 +130,7 @@ const SubagentParams = Type.Object({
       description: "Working directory for the agent process (single mode only)",
     }),
   ),
+	...(PLAN_GRAPH_ENABLED ? { plan_context: Type.Optional(PlanContextSchema) } : {}),
 });
 
 // ---------------------------------------------------------------------------
@@ -379,13 +403,16 @@ export default function (pi: ExtensionAPI) {
   });
 
   const depthConfig = resolveDelegationDepthConfig(pi);
-  const { currentDepth, maxDepth, canDelegate, ancestorAgentStack, preventCycles } =
-    depthConfig;
+  const { currentDepth, maxDepth, ancestorAgentStack, preventCycles } = depthConfig;
+  const canDelegate = depthConfig.canDelegate && !RESEARCH_SCOUT_PROCESS;
+  let researchScoutDispatches = 0;
 
   let discoveredAgents: AgentConfig[] = [];
 
   // Auto-discover agents on session start
   pi.on("session_start", async (_event, ctx) => {
+	delete (globalThis as Record<string, unknown>)[SCOUT_RECEIPTS_KEY];
+	researchScoutDispatches = 0;
     if (!canDelegate) return;
 
     const starterDiscovery = discoverAgentsWithStarter(ctx.cwd);
@@ -487,6 +514,11 @@ Use single mode for one task, parallel mode when tasks are independent and can r
         "                             Best for isolated/reproducible work; lower token/cost and less context leakage.",
         "  mode: \"fork\"            -> child gets current session context + your task prompt.",
         "                             Best for follow-up work that depends on prior context; higher token/cost and may include sensitive context.",
+		...(PLAN_GRAPH_ENABLED ? [
+			"",
+			"Optional planned-research context:",
+			"  plan_context -> copy the exact object returned for that branch by research_plan_start; never invent or edit it.",
+		] : []),
         "",
         'Example single:   { agent: "writer", task: "Rewrite README.md", mode: "spawn" }',
         'Example parallel: { tasks: [{ agent: "writer", task: "..." }, { agent: "tester", task: "..." }], mode: "fork" }',
@@ -569,6 +601,18 @@ Use single mode for one task, parallel mode when tasks are independent and can r
           };
         }
 
+		let plannedScoutCount = 0;
+		if (BRANCH_PLANNER_PROCESS) {
+			const planned = params.tasks ?? (params.agent && params.task ? [{ agent: params.agent, task: params.task, plan_context: (params as typeof params & { plan_context?: PlanContextV1 }).plan_context }] : []);
+			plannedScoutCount = planned.length;
+			if (!validateScoutDispatch(researchScoutDispatches, planned as Array<{ agent: string; plan_context?: unknown }>)) {
+				return {
+					content: [{ type: "text", text: "Blocked: a planned research branch may dispatch at most two research-scout leaves, each with its returned depth-two plan_context." }],
+					details: makeDetails(hasTasks ? "parallel" : "single")([]), isError: true,
+				};
+			}
+		}
+
         // Security: guard project-local agents before running
         const requested = new Set<string>();
         if (params.tasks) for (const t of params.tasks) requested.add(t.agent);
@@ -641,8 +685,9 @@ This guard prevents self-recursion and cyclic handoffs (for example A -> B -> A)
 
         // ── Parallel mode ──
         if (params.tasks && params.tasks.length > 0) {
+		  researchScoutDispatches += plannedScoutCount;
           return executeParallel(
-            params.tasks,
+			params.tasks as Array<{ agent: string; task: string; cwd?: string; plan_context?: PlanContextV1 }>,
             delegationMode,
             forkSessionSnapshotJsonl,
             agents,
@@ -656,10 +701,12 @@ This guard prevents self-recursion and cyclic handoffs (for example A -> B -> A)
 
         // ── Single mode ──
         if (params.agent && params.task) {
+		  researchScoutDispatches += plannedScoutCount;
           return executeSingle(
             params.agent,
             params.task,
             params.cwd,
+			(params as typeof params & { plan_context?: PlanContextV1 }).plan_context,
             delegationMode,
             forkSessionSnapshotJsonl,
             agents,
@@ -696,6 +743,7 @@ This guard prevents self-recursion and cyclic handoffs (for example A -> B -> A)
     agentName: string,
     task: string,
     cwd: string | undefined,
+		planContext: PlanContextV1 | undefined,
     delegationMode: DelegationMode,
     forkSessionSnapshotJsonl: string | undefined,
     agents: AgentConfig[],
@@ -718,12 +766,15 @@ This guard prevents self-recursion and cyclic handoffs (for example A -> B -> A)
       maxDepth,
       preventCycles,
       sessionModel,
+		planContext,
       signal,
       onUpdate,
       makeDetails: makeDetails("single"),
     });
+		publishScoutReceipt(planContext, result);
 
     if (isResultError(result)) {
+		if (planContext?.depth === 1) emitHarnessSignal(pi.events, { v: 1, type: "plan/branch-result", context: planContext, report: null, failureClass: "child_failed" });
       return {
         content: [
           {
@@ -735,6 +786,10 @@ This guard prevents self-recursion and cyclic handoffs (for example A -> B -> A)
         isError: true,
       };
     }
+		if (planContext?.depth === 1) emitHarnessSignal(pi.events, {
+			v: 1, type: "plan/branch-result", context: planContext, report: result.branchReport ?? null,
+			failureClass: result.branchReport ? null : (result.branchReportFailure ?? "missing_report"),
+		});
     return {
       content: [
         {
@@ -747,7 +802,7 @@ This guard prevents self-recursion and cyclic handoffs (for example A -> B -> A)
   }
 
   async function executeParallel(
-    tasks: Array<{ agent: string; task: string; cwd?: string }>,
+    tasks: Array<{ agent: string; task: string; cwd?: string; plan_context?: PlanContextV1 }>,
     delegationMode: DelegationMode,
     forkSessionSnapshotJsonl: string | undefined,
     agents: AgentConfig[],
@@ -815,6 +870,7 @@ This guard prevents self-recursion and cyclic handoffs (for example A -> B -> A)
             agentName: t.agent,
             task: t.task,
             taskCwd: t.cwd,
+			planContext: t.plan_context,
             delegationMode,
             forkSessionSnapshotJsonl,
             parentDepth: currentDepth,
@@ -832,6 +888,11 @@ This guard prevents self-recursion and cyclic handoffs (for example A -> B -> A)
             makeDetails: makeDetails("parallel"),
           });
           allResults[index] = result;
+		  publishScoutReceipt(t.plan_context, result);
+		  if (t.plan_context?.depth === 1) emitHarnessSignal(pi.events, {
+			  v: 1, type: "plan/branch-result", context: t.plan_context, report: result.branchReport ?? null,
+			  failureClass: isResultError(result) ? "child_failed" : result.branchReport ? null : (result.branchReportFailure ?? "missing_report"),
+		  });
           emitProgress();
           return result;
         },

@@ -3,6 +3,7 @@
  */
 
 import type { Message } from "@earendil-works/pi-ai";
+import type { BranchReportV1, PlanContextV1 } from "../../lib/branch-report.ts";
 import { getFinalAssistantText, getResultSummaryText } from "./runner-events.js";
 
 /** Context mode for delegated runs. */
@@ -60,6 +61,9 @@ export interface SingleResult {
 	stopReason?: string;
 	errorMessage?: string;
 	sawAgentEnd?: boolean;
+	planContext?: PlanContextV1;
+	branchReport?: BranchReportV1;
+	branchReportFailure?: "missing_report" | "invalid_report";
 }
 
 /** Metadata attached to every tool result for rendering. */
