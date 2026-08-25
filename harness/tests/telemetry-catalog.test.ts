@@ -25,6 +25,47 @@ test("every literal telemetry emission is represented in the event catalog", () 
 	assert.deepEqual([...missing], []);
 });
 
+test("every catalog entry has a real emitter — the direction that was never checked", () => {
+	// The test above proves emissions ⊆ catalog. Nothing proved catalog ⊆ emissions,
+	// and that is the direction with teeth: optimizer/prompt-lab/exposure.py validates
+	// a trial's exposure target against this catalog and nothing else, so a candidate
+	// naming a catalogued-but-never-emitted event passes validation and then reports
+	// `unexposed` for every row in both arms — indistinguishable from "the mechanism
+	// fired and did nothing". Two entries were in exactly that state when this test was
+	// written: `tool-activation/unavailable` (now emitted on every refusal path) and
+	// `verify-gate/gate-green-consumed` (emitted only by telemetry.test.ts).
+	const roots = ["extensions", "lib", "vendor/pi-subagent"];
+	let sources = "";
+	const walk = (dir: string) => {
+		for (const entry of readdirSync(dir, { withFileTypes: true })) {
+			const full = join(dir, entry.name);
+			if (entry.isDirectory()) walk(full);
+			else if (entry.name.endsWith(".ts")) sources += readFileSync(full, "utf8");
+		}
+	};
+	for (const root of roots) walk(join(import.meta.dirname, "..", ...root.split("/")));
+
+	const emitted = new Set<string>();
+	for (const match of sources.matchAll(/record\(\s*["']([^"']+)["']\s*,\s*["']([^"']+)["']/g)) emitted.add(`${match[1]}/${match[2]}`);
+	for (const match of sources.matchAll(/planEvent\(\s*["']([^"']+)["']/g)) emitted.add(`plan-runner/${match[1]}`);
+	for (const match of sources.matchAll(/recordEvent\(\s*["']context-watcher["']\s*,\s*["']([^"']+)["']/g)) emitted.add(`context-watcher/${match[1]}`);
+
+	// Entries with no STATIC emitter, each for a stated reason. Adding to this list is
+	// a deliberate act; growing it silently is the failure mode being prevented.
+	const declaredEmitterless = new Map<string, string>([
+		["verify-gate/gate-green-consumed", "retired emitter; retained as telemetry.test.ts's generic fixture event"],
+		["telemetry/schema-reject", "emitted from telemetry.ts's own envelope path, not via record()"],
+		["telemetry/writer-overflow", "emitted from telemetry.ts's own envelope path, not via record()"],
+	]);
+
+	const orphans = Object.keys(EVENT_CATALOG).filter((key) => !emitted.has(key) && !declaredEmitterless.has(key));
+	assert.deepEqual(orphans, [], `catalogued with no emitter — a valid exposure target that can only ever report zero: ${orphans.join(", ")}`);
+
+	// And the allowlist must not rot: an entry that regains an emitter leaves it.
+	const stale = [...declaredEmitterless.keys()].filter((key) => emitted.has(key));
+	assert.deepEqual(stale, [], `listed as emitterless but now emitted: ${stale.join(", ")}`);
+});
+
 test("catalog rejects unknown kinds, fields, and invalid field types", () => {
 	assert.match(validateCatalogDetail("missing", "kind", {})[0], /unknown event/);
 	assert.deepEqual(validateCatalogDetail("verify-gate", "gate-green-consumed", { leak: "x" }), ["unknown field leak"]);

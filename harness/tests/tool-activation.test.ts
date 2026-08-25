@@ -27,7 +27,19 @@ async function load(profile: "ambient" | "core" | undefined, activeInitial: stri
 	process.env.PI_CODING_AGENT_DIR = mkdtempSync(join(tmpdir(), "pi-tools-agent-"));
 	process.argv = [...argv];
 	const fp = makeFakePi();
-	for (const name of names) fp.pi.registerTool({ name, parameters: { type: "object" } } as any);
+	// Register the graph plan tools only when their flags are on, exactly as
+	// plan-runner does (plan-runner.ts:802-807). The roster used to include them
+	// unconditionally, which made the fake claim a surface production never has —
+	// and hid the fact that with PLAN_GRAPH alone the graph tools were stripped at
+	// startup with no route back (manifest-boot.test.ts pins the real registration).
+	const graphOn = process.env.PLAN_GRAPH === "on";
+	const researchOn = graphOn && process.env.DEEP_RESEARCH_PLANNING === "on";
+	const registrable = names.filter((name) => {
+		if (name === "plan_expand" || name === "plan_settle") return graphOn;
+		if (name === "research_plan_start") return researchOn;
+		return true;
+	});
+	for (const name of registrable) fp.pi.registerTool({ name, parameters: { type: "object" } } as any);
 	const mod = await import(`../extensions/tool-activation.ts?case=${Date.now()}-${Math.random()}`);
 	mod.default(fp.pi as any);
 	const initial = [...new Set([...activeInitial, "capability"])];

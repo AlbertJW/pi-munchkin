@@ -65,7 +65,13 @@ export async function walkPromptFiles(dir: string): Promise<string[]> {
 		return [];
 	}
 	const files: string[] = [];
-	for (const entry of names.sort((a, b) => a.name.localeCompare(b.name))) {
+	// Code-unit order, not locale order. This particular walk is NOT digest-critical —
+	// hashSurface re-sorts the deduped path set with a bare .sort() before hashing, so
+	// walk order cannot reach the digest. It is made locale-free anyway so the rule
+	// "ordering that can reach a hash is never locale-dependent" holds uniformly in
+	// this file, rather than depending on a caller three functions away continuing to
+	// re-sort. The npmIdentities sort below IS digest-critical.
+	for (const entry of names.sort((a, b) => a.name < b.name ? -1 : a.name > b.name ? 1 : 0)) {
 		const child = join(dir, entry.name);
 		if (entry.isDirectory()) files.push(...await walkPromptFiles(child));
 		else if (entry.isFile()) files.push(child);
@@ -192,8 +198,23 @@ export async function discoverEntryPoints(agentDir: string, cwd?: string): Promi
 	// rows 2026-08-06 ×2 are the manifested case). Optional-if-missing, matching
 	// agents/ above; mirror:check separately proves presence.
 	promptFiles.push(...await walkPromptFiles(join(agentDir, "skills")));
-	const appendPath = join(agentDir, "APPEND_SYSTEM.md");
-	if (existsSync(appendPath)) promptFiles.push(appendPath);
+
+	// Pi reads FOUR prompt inputs from the agent dir, not one. Until 2026-08-26 the
+	// hash covered only APPEND_SYSTEM.md, leaving the other three outside it:
+	//   * AGENTS.md / CLAUDE.md — resource-loader.js:31 discovers these and folds them
+	//     into `agentsFiles`, i.e. into every session's context.
+	//   * SYSTEM.md — resource-loader.js:755 REPLACES the base system prompt with it.
+	// A live ~/.pi/agent/AGENTS.md existed the whole time. Editing it changed what every
+	// model saw while the source hash, the loaded hash, the surface receipt and
+	// mirror:check all stayed byte-identical and no boundary row was written — so
+	// measurements from either side of that edit would pool into one arm. This is the
+	// same hole closed for skills and APPEND_SYSTEM.md on 2026-08-11 (see the note
+	// above); it was closed for those two and left open for the files beside them.
+	// Casing follows Pi's own candidate list, which accepts .md and .MD.
+	for (const name of ["APPEND_SYSTEM.md", "SYSTEM.md", "AGENTS.md", "AGENTS.MD", "CLAUDE.md", "CLAUDE.MD"]) {
+		const promptPath = join(agentDir, name);
+		if (existsSync(promptPath)) promptFiles.push(promptPath);
+	}
 
 	const npmIdentities: NpmPackageIdentity[] = [];
 	const settings = JSON.parse(await readFile(join(agentDir, "settings.json"), "utf8")) as { packages?: string[] };
@@ -230,7 +251,7 @@ export async function hashSurface(baseDir: string, descriptor: SurfaceDescriptor
 		hash.update(bytes);
 		hash.update("\0");
 	}
-	for (const pkg of [...(descriptor.npmIdentities ?? [])].sort((a, b) => a.name.localeCompare(b.name))) {
+	for (const pkg of [...(descriptor.npmIdentities ?? [])].sort((a, b) => a.name < b.name ? -1 : a.name > b.name ? 1 : 0)) {
 		hash.update(`npm:${pkg.name}`, "utf8");
 		hash.update("\0");
 		hash.update(`${pkg.version}|${pkg.resolved}|${pkg.integrity}`, "utf8");

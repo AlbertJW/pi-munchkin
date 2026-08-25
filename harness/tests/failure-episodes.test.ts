@@ -349,3 +349,24 @@ test("abandonment is terminal and distinct from recovery — degraded verificati
 	assert.equal(untouched.length, 0);
 	assert.equal(other.activeEpisodes().length, 1);
 });
+
+test("canonical forms that feed a digest never sort by locale", async () => {
+	// localeCompare depends on the runtime's ICU data and the ambient locale:
+	// 'ä'.localeCompare('z') is 1 under sv and -1 under en, and collation-ignorable
+	// characters (soft hyphen, ZWSP) compare EQUAL — at which point V8's stable sort
+	// falls back to insertion order, i.e. to whatever key order the model happened to
+	// emit. Any of that reaching a sha256 means two machines disagree about identical
+	// bytes, and failure-episodes sorts BEFORE truncating to MAX_ARGUMENT_KEYS, so the
+	// locale would even decide which keys survive into the hash.
+	const { readFileSync } = await import("node:fs");
+	const digestCritical = [
+		"../lib/failure-episodes.ts",
+		"../lib/blackboard.ts",
+		"../lib/surface-walk.ts",
+		"../lib/context-surface.ts",
+	];
+	for (const relative of digestCritical) {
+		const source = readFileSync(new URL(relative, import.meta.url), "utf8");
+		assert.equal(source.includes("localeCompare"), false, `${relative} sorts by locale on a path that reaches a digest`);
+	}
+});

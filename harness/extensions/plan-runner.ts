@@ -7,6 +7,7 @@ import { ACTIVE_TOOL_PROMPTS } from "../lib/active-tool-prompts.ts";
 import { BRANCH_REPORT_ENV, PLAN_CONTEXT_ENV, RESEARCH_RESERVED_BUDGET_KEY, readPlanContext, writeBranchReport, type BranchReportV1 } from "../lib/branch-report.ts";
 import { classifyBashCommand } from "../lib/command-policy.ts";
 import { emitHarnessSignal, onHarnessSignal, signalRunId } from "../lib/harness-signals.ts";
+import { PLAN_SURFACE_TOOLS } from "../lib/capability-surface.ts";
 import { applyPlanDeltas, type PlanDelta } from "../lib/plan-delta.ts";
 import {
 	DEEP_RESEARCH_MAX_CHILDREN, DEEP_RESEARCH_MAX_DEPTH, DEEP_RESEARCH_MAX_ROOTS,
@@ -35,10 +36,23 @@ const MAX_DELTAS = 24;  // matches MAX_ITEMS: a full-plan status resend must not
 // Byte-aware truncation for migration paths: .slice() counts CHARACTERS, so a
 // multibyte note could survive the slice, exceed the byte budget, fail
 // validateGraph, and silently vanish the whole plan (audit 2026-08-25).
-function truncateBytes(value: string, maxBytes: number): string {
+export function truncateBytes(value: string, maxBytes: number): string {
 	if (Buffer.byteLength(value, "utf8") <= maxBytes) return value;
+	// Drop whole CODE POINTS, not code units. `.slice(0, -1)` removes one UTF-16 unit,
+	// so trimming a string ending in a non-BMP character strips the low surrogate and
+	// leaves the high one — at which point the byte budget is satisfied and the loop
+	// stops. That lone surrogate survives JSON.stringify into plan-state.json but
+	// becomes U+FFFD when the Markdown projection is written as UTF-8, so the
+	// authoritative file and its projection disagree byte-for-byte. Measured:
+	// truncateBytes("界".repeat(39) + "😀", 120) ended on 0xD83D.
 	let out = value;
-	while (out.length > 0 && Buffer.byteLength(out, "utf8") > maxBytes) out = out.slice(0, -1);
+	while (out.length > 0 && Buffer.byteLength(out, "utf8") > maxBytes) {
+		const last = out.charCodeAt(out.length - 1);
+		const lowSurrogate = last >= 0xDC00 && last <= 0xDFFF;
+		out = out.slice(0, lowSurrogate ? -2 : -1);
+	}
+	const tail = out.charCodeAt(out.length - 1);
+	if (tail >= 0xD800 && tail <= 0xDBFF) out = out.slice(0, -1);
 	return out;
 }
 export const FORCE_PLAN_WRITE_DEFAULT: "on" | "off" = "off";
@@ -76,6 +90,10 @@ type ModelIdentity = { provider: string; id: string };
 let activeModel: ModelIdentity = { provider: "unknown", id: "unknown" };
 let api: ExtensionAPI | undefined;
 let lastSessionCwd: string | null = null;
+// Captured at session_start so the LATE capsule-identity rebind — the only point at
+// which plan state is readable under the shipped defaults — can still reach the user.
+let lastNotify: ((message: string) => void) | null = null;
+let reboundAnnounced = false;
 let pendingRebind: Promise<void> | null = null;
 let pendingBranchMerge: Promise<void> | null = null;
 let awaitingReview = false;
@@ -387,7 +405,7 @@ function leavePlanningSurface(pi: ExtensionAPI, keepPlanTools: boolean): void {
 }
 
 function planPrompt(request: string): string {
-	return `MODE: PLAN\nREQUEST:\n${request}\n\nInvestigate with the read-only tools. Then call plan_write once. Use 1-${MAX_ITEMS} short top-level items. Put compact substeps in note, not extra items. Stop after plan_write and wait for /plan-go.`;
+	return `MODE: PLAN\nREQUEST:\n${request}\n\nInvestigate with the read-only tools. Then call plan_write once. Use 1-${MAX_ITEMS} short top-level items. Put compact substeps in note, not extra items. Stop after plan_write. The user reviews the plan and starts execution; do not act until then.`;
 }
 
 function executionPrompt(state: PlanState): string {
@@ -436,7 +454,7 @@ const planWrite = defineTool({
 		});
 		planEvent("write", result.run_id, { items: result.items.length, open_items: openItemCount(result), rewrite: true });
 		const listing = result.items.map((item) => `${item.id} ${item.title}`).join("\n");
-		return { content: [{ type: "text" as const, text: `Plan saved (${result.items.length}/${MAX_ITEMS} items).\n${listing}\n${isPlanning() ? "Stop now and wait for /plan-go." : "Use plan_update for progress."}` }], details: { tool_name: "plan_write", success: true } };
+		return { content: [{ type: "text" as const, text: `Plan saved (${result.items.length}/${MAX_ITEMS} items).\n${listing}\n${isPlanning() ? "Stop now. The user reviews the plan and starts execution." : "Use plan_update for progress."}` }], details: { tool_name: "plan_write", success: true } };
 	},
 });
 
@@ -465,7 +483,11 @@ const planUpdate = defineTool({
 	async execute(_toolCallId, params, _signal, _onUpdate, ctx) {
 		rememberModel(ctx);
 		const outcome = await mutatePlan(ctx.cwd, async (previous) => {
-			if (!previous) rejectPlanTool("plan_update rejected: no plan exists; start with /plan");
+			// Not "/plan": that is a slash command only a HUMAN can type, so naming it
+			// here left the model with no legal next move and it retried until the
+			// outcome ladder escalated. plan_write is callable headlessly (audit A3), so
+			// it is the remedy that actually exists for the caller being spoken to.
+			if (!previous) rejectPlanTool("plan_update rejected: no plan exists yet. Call plan_write first to create one, then plan_update for status changes.");
 			if (previous.settled_at) rejectPlanTool("plan_update rejected: settled plans are immutable");
 			const applied = applyPlanDeltas(previous.items, params.deltas as PlanDelta[]);
 			if (!applied.ok) rejectPlanTool(`plan_update rejected: ${applied.errors.join("; ")}`);
@@ -520,7 +542,7 @@ const researchPlanStart = defineTool({
 	async execute(_id, params, _signal, _update, ctx) {
 		rememberModel(ctx);
 		lastSessionCwd = ctx.cwd;
-		if (process.env.RESEARCH_LEDGER !== "on") rejectPlanTool("research_plan_start requires RESEARCH_LEDGER=on so delegated sources can be parent-verified");
+		if (process.env.RESEARCH_LEDGER !== "on") rejectPlanTool("research_plan_start is unavailable: this session cannot parent-verify delegated sources. Research directly and cite inline instead.");
 		const state = await mutatePlan(ctx.cwd, async (previous) => {
 			const unsettledGraph = previous && !previous.settled_at && Boolean(previous.profile || previous.items.some((item) => item.parent_id));
 			if (previous && !previous.settled_at && (openItemCount(previous) > 0 || unsettledGraph)) rejectPlanTool("an active or unsettled graph plan already exists");
@@ -730,15 +752,34 @@ async function goCommand(ctx: any, pi: ExtensionAPI): Promise<void> {
 	pi.sendUserMessage(executionPrompt(outcome.state) + stale, { deliverAs: "steer" });
 }
 
-async function rebindActivePlan(cwd: string, notify: (message: string) => void): Promise<void> {
+type Rebound = { openItems: number; interrupted: boolean };
+
+/**
+ * Publish the active-plan context from disk, and REPORT what was found.
+ *
+ * It used to take a notify callback and return void. That hid a dead affordance:
+ * the session_start caller passed a real `ctx.ui.notify`, but under the shipped
+ * defaults plan state is unreadable at session_start (the capsule identity lands at
+ * manifest index 26), so it always returned early here; the LATE caller — the one
+ * where the state actually is readable — passed `() => undefined`. The interrupted-
+ * plan notice was therefore unreachable in every default session, which is exactly
+ * the "stopped a plan halfway and could not get back to it" report from 2026-08-25.
+ * Returning the facts lets each caller decide, instead of one of them silently
+ * discarding them.
+ */
+async function rebindActivePlan(cwd: string): Promise<Rebound | null> {
 	const state = await readState(cwd);
-	if (!state) return;
+	if (!state) return null;
+	const openItems = openItemCount(state);
 	(globalThis as Record<string, unknown>).__pi_active_plan_context = {
-		run_id: state.run_id, item_id: currentItem(state)?.id, open_items: openItemCount(state), blocked_items: blockedItemCount(state),
+		run_id: state.run_id, item_id: currentItem(state)?.id, open_items: openItems, blocked_items: blockedItemCount(state),
 		graph: state.schema_version === 5, profile: state.profile?.name, settled: Boolean(state.settled_at),
 	};
-	if (state.writer !== PROC_MARK && openItemCount(state) > 0) notify(`Interrupted plan: ${openItemCount(state)} open item(s). Use /plan-status, /plan-go, or /plan-cancel.`);
+	return { openItems, interrupted: state.writer !== PROC_MARK && openItems > 0 };
 }
+
+const interruptedPlanNotice = (openItems: number) =>
+	`Interrupted plan: ${openItems} open item(s). Use /plan-status, /plan-go, or /plan-cancel.`;
 
 export async function tailLines(path: string, maxLines: number): Promise<string[]> {
 	let handle: Awaited<ReturnType<typeof open>> | null = null;
@@ -810,7 +851,7 @@ export default function (pi: ExtensionAPI): void {
 		pi.registerTool(defineTool({
 			name: "plan_go", label: "Start Plan Execution", description: "Headless opt-in: start the saved plan.", parameters: Type.Object({}),
 			async execute(_id, _params, _signal, _update, ctx) {
-				if (awaitingReview) rejectPlanTool("plan_go rejected: the user must start an interactive /plan with /plan-go");
+				if (awaitingReview) rejectPlanTool("plan_go rejected: this plan is still awaiting user review. Stop here; the user starts execution.");
 				const outcome = await goTransition(ctx.cwd);
 				if (!outcome.ok) rejectPlanTool(`plan_go rejected: ${outcome.reason}`);
 				setPlanning(false);
@@ -828,9 +869,12 @@ export default function (pi: ExtensionAPI): void {
 		delete (globalThis as Record<string, unknown>).__pi_active_plan_context;
 		lastSessionCwd = ctx.cwd;
 		rememberModel(ctx);
-		await rebindActivePlan(ctx.cwd, (message) => ctx.ui.notify(message, "info"));
+		lastNotify = (message: string) => ctx.ui.notify(message, "info");
+		reboundAnnounced = false;
+		const rebound = await rebindActivePlan(ctx.cwd);
+		if (rebound?.interrupted) { reboundAnnounced = true; lastNotify(interruptedPlanNotice(rebound.openItems)); }
 		if (!FORCE_PLAN_WRITE) {
-			const hidden = new Set(["plan_write", "plan_update", "plan_go", "plan_expand", "plan_settle", "research_plan_start"]);
+			const hidden = new Set(PLAN_SURFACE_TOOLS);
 			pi.setActiveTools(pi.getActiveTools().filter((name) => !hidden.has(name)));
 		}
 	});
@@ -838,7 +882,17 @@ export default function (pi: ExtensionAPI): void {
 	onHarnessSignal(pi.events, (signal) => {
 		if (!lastSessionCwd) return;
 		if (signal.type === "capsule/identity") {
-			pendingRebind = rebindActivePlan(lastSessionCwd, () => undefined).catch(() => undefined).finally(() => { pendingRebind = null; });
+			const cwd = lastSessionCwd;
+			pendingRebind = rebindActivePlan(cwd).then((rebound) => {
+				if (!rebound) return;
+				// tool-activation derived its core/deferred split four slots before the
+				// capsule identity existed, so it decided `activePlan === false` and
+				// deferred the plan tools even mid-plan. This is the only moment the
+				// answer is knowable; announce it rather than leaving two compensating
+				// patches (/plan-go re-arm, capability(planning)) to paper over it.
+				emitHarnessSignal(pi.events, { v: 1, type: "plan/rebound", openItems: rebound.openItems, interrupted: rebound.interrupted });
+				if (rebound.interrupted && !reboundAnnounced) { reboundAnnounced = true; lastNotify?.(interruptedPlanNotice(rebound.openItems)); }
+			}).catch(() => undefined).finally(() => { pendingRebind = null; });
 		}
 		if (signal.type === "plan/branch-result") {
 			const prior = pendingBranchMerge ?? Promise.resolve();
@@ -886,7 +940,7 @@ export default function (pi: ExtensionAPI): void {
 		if (isPlanning() && !SAFE_PLAN_TOOLS.has(event.toolName)) {
 			emitHarnessSignal(pi.events, { v: 1, type: "tool/prevented", toolCallId: event.toolCallId, failureClass: "policy_rejection" });
 			planEvent("plan-mode-block", `plan-mode-${actionId()}`, { toolName: event.toolName });
-			return { block: true, reason: "failure_class=policy_rejection. Planning is read-only. Finish with plan_write, then wait for /plan-go." };
+			return { block: true, reason: "failure_class=policy_rejection. Planning is read-only. Finish with plan_write, then stop; the user starts execution." };
 		}
 		if (!FORCE_PLAN_WRITE || isPlanning()) return;
 		const mutates = MUTATION_TOOLS.has(event.toolName) || (event.toolName === "bash" && classifyBashCommand(String((event.input as any)?.command ?? "")).mutates);
@@ -894,7 +948,11 @@ export default function (pi: ExtensionAPI): void {
 		const state = lastSessionCwd ? await readState(lastSessionCwd) : undefined;
 		if (!state) {
 			emitHarnessSignal(pi.events, { v: 1, type: "tool/prevented", toolCallId: event.toolCallId, failureClass: "policy_rejection" });
-			return { block: true, reason: "failure_class=policy_rejection. This compatibility mode requires plan_write before source mutation. Set FORCE_PLAN_WRITE=off for explicit /plan-only behavior." };
+			// Was: "Set FORCE_PLAN_WRITE=off ...". A model cannot set an environment
+			// variable for the process it is already running inside, and the message
+			// omitted the one action that WOULD unblock it. Operator-facing knobs belong
+			// in the docs, not in a block reason the model is expected to act on.
+			return { block: true, reason: "failure_class=policy_rejection. This mode requires a plan before source mutation. Call plan_write with the items you intend to complete, then retry this edit." };
 		}
 	});
 

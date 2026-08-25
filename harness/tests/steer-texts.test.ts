@@ -64,3 +64,34 @@ test("VG_STEER_NO_GATE: overridable and never claims an exact gate", () => {
 		delete process.env.PI_MSG_VG_STEER_NO_GATE;
 	}
 });
+
+test("model-facing rejections never prescribe a human-only remedy", async () => {
+	// The model cannot type a slash command and cannot set an environment variable for
+	// the process it is already running inside. A rejection that names one leaves it
+	// with no legal next move, so it retries — and every one of these strings sits on a
+	// path that feeds the loop-breaker ladder. Four live instances were fixed on
+	// 2026-08-26 (plan_update's "start with /plan", FORCE_PLAN_WRITE=off in a block
+	// reason, ketch's two "/ketch-status", and git-guard advertising GIT_GUARD=off);
+	// this pins the class rather than the four.
+	const { readFileSync, readdirSync } = await import("node:fs");
+	const { join } = await import("node:path");
+	const dir = join(import.meta.dirname, "..", "extensions");
+	const offenders: string[] = [];
+	for (const name of readdirSync(dir).filter((file) => file.endsWith(".ts"))) {
+		const source = readFileSync(join(dir, name), "utf8")
+			.replace(/\/\*[\s\S]*?\*\//g, "")   // block comments
+			.replace(/^\s*\/\/.*$/gm, "");        // line comments
+		// Constructs whose audience is unambiguously the MODEL: tool-call block reasons
+		// and plan-tool rejections. ctx.ui.notify(...) is the user's channel and is
+		// deliberately excluded — /plan-go is exactly the right thing to tell a human.
+		const modelFacing = [
+			...source.matchAll(/reason:\s*\n?\s*(`[^`]*`|"[^"]*")/g),
+			...source.matchAll(/rejectPlanTool\(\s*(`[^`]*`|"[^"]*")/g),
+		].map((match) => match[1]);
+		for (const text of modelFacing) {
+			if (/(?:^|[\s(])\/[a-z][a-z-]{2,}/.test(text)) offenders.push(`${name}: slash command in ${text.slice(0, 80)}`);
+			if (/\b[A-Z][A-Z_0-9]{4,}=[a-z0-9]+/.test(text)) offenders.push(`${name}: env var in ${text.slice(0, 80)}`);
+		}
+	}
+	assert.deepEqual(offenders, [], `model-facing text prescribing something only a human can do:\n${offenders.join("\n")}`);
+});

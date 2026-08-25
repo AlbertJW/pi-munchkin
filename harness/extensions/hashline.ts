@@ -25,6 +25,18 @@ import { emitHarnessSignal } from "../lib/harness-signals.ts";
 const ENABLED = process.env.HASHLINE !== "off";
 const MAX_LINES = 2000; // mirror built-in read defaults
 const MAX_BYTES = 50 * 1024;
+
+/** Cut to a byte budget on a CODE POINT boundary, so no lone surrogate escapes. */
+function truncateUtf8Bytes(value: string, maxBytes: number): string {
+	if (Buffer.byteLength(value, "utf8") <= maxBytes) return value;
+	let out = value;
+	while (out.length > 0 && Buffer.byteLength(out, "utf8") > maxBytes) {
+		const last = out.charCodeAt(out.length - 1);
+		out = out.slice(0, last >= 0xDC00 && last <= 0xDFFF ? -2 : -1);
+	}
+	const tail = out.charCodeAt(out.length - 1);
+	return tail >= 0xD800 && tail <= 0xDBFF ? out.slice(0, -1) : out;
+}
 const SNAP_VERSIONS = 4;
 const SNAP_PATHS = 50;
 const IMAGE_MAX_BYTES = 4 * 1024 * 1024;
@@ -171,19 +183,27 @@ export function registerHashline(pi: ExtensionAPI, io: HashlineIo = DEFAULT_IO) 
 				let slice = all.slice(start - 1, start - 1 + maxLines);
 				let body = annotate(slice, start);
 				let note = "";
-				if (body.length > MAX_BYTES) {
+				// MAX_BYTES is a BYTE budget and was enforced three times with `.length`,
+				// which counts UTF-16 code units. A CJK or emoji-heavy file therefore
+				// returned 2-3x the intended bytes into the context window this cap exists
+				// to protect, and the in-line hard cut could split a surrogate pair and
+				// emit a lone surrogate into the result — which then reaches telemetry
+				// through JSON.stringify and becomes U+FFFD on any UTF-8 round-trip.
+				// The `+ 8` was a guess at the "N:" prefix annotate() adds; measure it.
+				if (Buffer.byteLength(body, "utf8") > MAX_BYTES) {
 					let bytes = 0;
 					let cut = 0;
-					for (const l of slice) {
-						bytes += l.length + 8;
+					for (const [index, line] of slice.entries()) {
+						bytes += Buffer.byteLength(line, "utf8") + Buffer.byteLength(`${start + index}:`, "utf8") + 1;
 						if (bytes > MAX_BYTES) break;
 						cut += 1;
 					}
 					slice = slice.slice(0, Math.max(1, cut));
 					// A single line can itself exceed the cap (minified/one-line file):
 					// keeping it whole would blow the context — hard-cut within the line.
-					if (slice.length === 1 && slice[0].length > MAX_BYTES) {
-						slice = [`${slice[0].slice(0, MAX_BYTES)} …[line truncated: ${slice[0].length} chars total]`];
+					if (slice.length === 1 && Buffer.byteLength(slice[0], "utf8") > MAX_BYTES) {
+						const head = truncateUtf8Bytes(slice[0], MAX_BYTES);
+						slice = [`${head} …[line truncated: ${slice[0].length} chars total]`];
 					}
 					body = annotate(slice, start);
 				}

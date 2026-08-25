@@ -245,3 +245,39 @@ test("discoverEntryPoints: skills/**/*.md and APPEND_SYSTEM.md are prompt surfac
 	assert.notEqual(after, afterScript, "skill script edits must change the surface hash");
 	await rm(dir, { recursive: true, force: true });
 });
+
+test("every agent-dir prompt input Pi actually reads is inside the hash", async () => {
+	// Pi reads four prompt inputs from the agent dir: APPEND_SYSTEM.md (appended),
+	// SYSTEM.md (REPLACES the base system prompt, resource-loader.js:755), and
+	// AGENTS.md / CLAUDE.md (folded into every session's context,
+	// resource-loader.js:31). Only the first was hashed, so an edit to any of the
+	// others changed what every model saw while the digest, the surface receipt and
+	// mirror:check all stayed identical — and a live ~/.pi/agent/AGENTS.md existed the
+	// entire time. Each file is asserted independently: covering three of four is how
+	// this got missed the first time.
+	const agentDir = await tmp();
+	await mkdir(join(agentDir, "extensions"), { recursive: true });
+	await writeFile(join(agentDir, "extensions", "ext.ts"), "export default function () {}\n");
+	await writeFile(join(agentDir, "settings.json"), JSON.stringify({ packages: [] }));
+
+	const digest = async () => {
+		const found = await discoverEntryPoints(agentDir);
+		return hashSurface(agentDir, {
+			orderedEntryPoints: found.orderedEntryPoints,
+			files: new Set(found.entries),
+			npmIdentities: found.npmIdentities,
+		});
+	};
+
+	for (const name of ["APPEND_SYSTEM.md", "SYSTEM.md", "AGENTS.md", "CLAUDE.md"]) {
+		const before = await digest();
+		await writeFile(join(agentDir, name), "original prompt text\n");
+		const added = await digest();
+		assert.notEqual(added, before, `creating ${name} did not move the surface hash`);
+		await writeFile(join(agentDir, name), "EDITED prompt text — every session sees this\n");
+		const edited = await digest();
+		assert.notEqual(edited, added, `editing ${name} did not move the surface hash`);
+		await rm(join(agentDir, name), { force: true });
+	}
+	await rm(agentDir, { recursive: true, force: true });
+});

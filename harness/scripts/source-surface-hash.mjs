@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 
+import { existsSync } from "node:fs";
 import { readdir, readFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import { hashSurface, walkPromptFiles, walkRelativeImports } from "../lib/surface-walk.ts";
@@ -16,5 +17,12 @@ for (const role of await readdir(resolve(root, "harness", "agents"))) {
 for (const dir of manifest.pi?.skills ?? []) {
   for (const file of await walkPromptFiles(resolve(root, dir))) files.add(file);
 }
-files.add(resolve(root, "harness", "APPEND_SYSTEM.md"));
+// Same roster the loaded surface hashes (surface-walk.discoverEntryPoints). None of
+// the last four exist in this repo today; they are covered so that adding one later
+// cannot slip a model-visible prompt change past the hash the way AGENTS.md did on
+// the live side.
+for (const name of ["APPEND_SYSTEM.md", "SYSTEM.md", "AGENTS.md", "AGENTS.MD", "CLAUDE.md", "CLAUDE.MD"]) {
+  const promptPath = resolve(root, "harness", name);
+  if (existsSync(promptPath)) files.add(promptPath);
+}
 console.log(await hashSurface(root, { orderedEntryPoints: entries, files }));

@@ -123,8 +123,11 @@ async function checkVersion(): Promise<string | null> {
 function failureText(result: KetchProcessResult): string {
 	const kind = ketchFailureClass(result);
 	if (kind === "timeout" || kind === "cancelled") return `Ketch ${kind}; reduce the research scope and retry once.`;
-	if (kind === "not_found" || kind === "spawn") return "Ketch is unavailable. Run /ketch-status or install/upgrade Ketch.";
-	if (kind === "precondition") return "Ketch backend is not configured. Run /ketch-status; use a healthy keyless backend or configure the required key.";
+	// These reach the MODEL, which cannot type a slash command or install software.
+	// The only useful thing to tell it is that research is unavailable and what to do
+	// instead; /ketch-status is documented for the operator, who can actually run it.
+	if (kind === "not_found" || kind === "spawn") return "Ketch is unavailable, so web research cannot run this session. Answer from context and mark anything unverified.";
+	if (kind === "precondition") return "Ketch has no usable backend configured, so web research cannot run this session. Answer from context and mark anything unverified.";
 	if (kind === "upstream") return "Ketch upstream failed. Try broad search or a different query once.";
 	if (kind === "validation") return "Ketch rejected the request as invalid.";
 	return "Ketch failed without usable output.";

@@ -178,6 +178,17 @@ def _env_unchecked(config):
             raise ValueError(f"config threshold {k!r} has out-of-schema value {v!r}")
         env[k] = str(v)
     for k, v in (config.get("messages") or {}).items():  # steer-text templates (PI_MSG_*)
+        # An EMPTY override is not the empty arm. steer_texts.ts resolves overrides
+        # with `override || defaultTemplate`, so "" is falsy and the session runs the
+        # FULL DEFAULT steer while the manifest records the arm as empty — a candidate
+        # that reports one thing and measures another. Reject it loudly here rather
+        # than let it into a round: the ablation arm is not expressible today, and an
+        # experimenter must find that out at config time, not from the results.
+        if str(v).strip() == "":
+            raise ValueError(
+                f"config message {k!r} is empty; the harness falls back to the default "
+                "steer text for an empty override, so this arm would silently run the default"
+            )
         env[k] = str(v)
     for key, value in env.items():
         if key not in allowed or not re.fullmatch(r"[A-Z][A-Z0-9_]*", key):
@@ -236,6 +247,20 @@ def selftest():
         pass
     else:
         raise AssertionError("unsupported environment keys must be rejected")
+
+    # An EMPTY steer override is the natural way to write the ablation arm, and it is
+    # the one thing the harness cannot express: steer_texts.ts resolves overrides with
+    # `override || defaultTemplate`, so "" is falsy and the session runs the FULL
+    # DEFAULT text while the manifest records the arm as empty. Silently measuring the
+    # opposite of what a candidate declares is worse than refusing to run it.
+    for empty in ("", "   "):
+        try:
+            config_env({"messages": {"PI_MSG_LB_T2": empty}})
+        except ValueError:
+            pass
+        else:
+            raise AssertionError("an empty steer override must be rejected, not silently defaulted")
+    assert config_env({"messages": {"PI_MSG_LB_T2": "x"}}) == {"PI_MSG_LB_T2": "x"}
     multiline = "first line\nsecond=line"
     assert config_env({"messages": {"PI_MSG_LB_T2": multiline}})["PI_MSG_LB_T2"] == multiline
 

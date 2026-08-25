@@ -27,10 +27,16 @@ export function applyPlanDeltas(items: DeltaItem[], deltas: PlanDelta[]): DeltaR
 		if (!byId.has(delta.item_id)) errors.push(`unknown item_id: ${delta.item_id} (valid: ${[...byId.keys()].join(", ") || "none"})`);
 		if (delta.status !== undefined && !new Set(["pending", "in_progress", "done", "blocked", "deferred"]).has(delta.status)) errors.push(`invalid status for ${delta.item_id}`);
 		if (delta.status === undefined && delta.note === undefined && delta.defer === undefined) errors.push(`status, note, or defer is required for ${delta.item_id}`);
-		if (delta.note !== undefined && (typeof delta.note !== "string" || Buffer.byteLength(delta.note, "utf8") > 900 || /\r/.test(delta.note))) errors.push(`note must be at most 900 UTF-8 bytes for ${delta.item_id}`);
+		// Three distinct rejections, three distinct messages. Folded together, a note containing a carriage return
+		// was rejected as "at most 900 UTF-8 bytes" — a 12-byte note told to get shorter, which cannot succeed.
+		// plan_update is an OUTCOME_TOOLS member, so the identical unactionable failure escalated the loop ladder.
+		if (delta.note !== undefined && typeof delta.note !== "string") errors.push(`note must be a string for ${delta.item_id}`);
+		else if (delta.note !== undefined && Buffer.byteLength(delta.note, "utf8") > 900) errors.push(`note must be at most 900 UTF-8 bytes for ${delta.item_id}`);
+		else if (delta.note !== undefined && /\r/.test(delta.note)) errors.push(`note must not contain carriage returns; use plain newlines for ${delta.item_id}`);
 		if (delta.status === "blocked" && (!delta.note || !delta.note.trim())) errors.push(`blocked status requires a note for ${delta.item_id}`);
 		if (delta.status === "deferred" && (!delta.defer || !delta.defer.value?.trim() || !delta.defer.risk?.trim() || !delta.defer.rationale?.trim())) errors.push(`deferred status requires value, risk, and rationale for ${delta.item_id}`);
-		if (delta.defer && [delta.defer.value, delta.defer.risk, delta.defer.rationale].some((value) => typeof value !== "string" || Buffer.byteLength(value, "utf8") > 300 || /\r/.test(value))) errors.push(`defer fields must be at most 300 UTF-8 bytes for ${delta.item_id}`);
+		if (delta.defer && [delta.defer.value, delta.defer.risk, delta.defer.rationale].some((value) => typeof value !== "string" || Buffer.byteLength(value, "utf8") > 300)) errors.push(`defer fields must be at most 300 UTF-8 bytes for ${delta.item_id}`);
+		else if (delta.defer && [delta.defer.value, delta.defer.risk, delta.defer.rationale].some((value) => /\r/.test(String(value)))) errors.push(`defer fields must not contain carriage returns; use plain newlines for ${delta.item_id}`);
 		const previous = seen.get(delta.item_id);
 		if (previous && JSON.stringify(previous) !== JSON.stringify(delta)) errors.push(`conflicting duplicate delta: ${delta.item_id}`);
 		seen.set(delta.item_id, delta);

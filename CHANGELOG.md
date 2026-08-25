@@ -4,6 +4,84 @@ All notable changes to pi-munchkin are documented here. Releases follow semantic
 
 ## Unreleased
 
+### Fixed (2026-08-26 — four-scale deep review: solar / planetary / atomic / quark)
+
+Six blockers and ten defects, each counterfactually proven (fix stashed → new test red → restored).
+The unifying pattern is that every one was **an unverified assumption about a neighbour**, which is
+why the first deliverable is a test, not a fix.
+
+- **`harness/tests/manifest-boot.test.ts` (new)**: boots all 30 declared extensions in manifest
+  order onto one fake pi and asserts the end state — every stripped tool is recorded as deferred,
+  every deferred tool has an activation route, no duplicate registrations, and the same holds after
+  a `/reload`. `loadExtensions()` had been exported for exactly this and had **zero callers**; the
+  only order assertion anywhere was "index 0 is session-bootstrap". This one file fails against
+  four of the defects below simultaneously. Companion:
+  `harness/tests/plan-surface-handoff.test.ts` exercises the planner in the SHIPPED storage mode —
+  the existing planner suite sets `PLAN_STORAGE=project` at module scope, so all of it ran in the
+  rollback configuration.
+- **Agent-dir prompt surface was outside the surface hash.** Pi reads four prompt inputs from the
+  agent dir; only `APPEND_SYSTEM.md` was hashed. `SYSTEM.md` (which *replaces* the base system
+  prompt) and `AGENTS.md`/`CLAUDE.md` (folded into every session's context) were not — and a live
+  `~/.pi/agent/AGENTS.md` existed throughout. Editing it changed what every model saw while the
+  source hash, loaded hash, surface receipt and `mirror:check` all stayed identical. Same hole
+  closed for skills on 2026-08-11 and left open for the files beside them.
+- **The audit-A1 capability recovery never ran.** `resource-loader.reload()` calls
+  `clearExtensionCache()`, so `/reload` re-imports the module AND re-invokes the factory against a
+  fresh api — module scope and the `default()` closure are both wiped. The `previouslyDeferred`
+  record lived in the closure, i.e. the one place that cannot survive the event it was written for,
+  so after any reload every `capability(enable, …)` returned `unavailable-or-active` for the rest
+  of the process. Moved to a `globalThis` key, the pattern `lib/process-writer.ts` already uses.
+- **`fileTag` was quadratic** — `/[ \t\r]+(?=\n|$)/g` backtracks on every step. Measured 4.8s at
+  60k trailing spaces, 19.5s at 120k (exactly 4×), 53.4s at 200k; `read` accepts 16 MiB. It is
+  synchronous and runs once per `read`, twice per `edit`, so it stalled the whole event loop —
+  provider stream and abort handler included. Now a linear scan: 53,426ms → 2ms on the same input.
+- **A red gate could read green.** `looksFailingOutput`'s zero-suppressor ran first and returned
+  outright, so any "fail…0" vetoed every failure signal after it — clearing cargo's always-printed
+  `1 passed; 1 failed; 0 ignored` and jest's `1 failed, 0 skipped, 5 passed`. That is precisely the
+  exit-code-swallowed wrapper case the heuristic exists for. Now count-driven, and the verdict is
+  read from the tail as well as the head (a suite printing >4 KB of passing lines before its
+  summary was judged on its preamble).
+- **`activePlan` was dead at the shipped default**, and with it the interrupted-plan notice. Under
+  `PLAN_STORAGE=capsule` the plan lives in a run capsule whose identity `run-capsule` publishes at
+  manifest index 26 — twenty slots after plan-runner reads it, four after tool-activation derives
+  its core/deferred split. So plan state was unreadable at `session_start`, the plan tools were
+  deferred even mid-plan, and the only affordance telling a user their plan is resumable sat behind
+  a callback the live caller passed as `() => undefined`. New `plan/rebound` signal carries the
+  corrected answer to both consumers once it exists; the A2/A6 patches stay as belt-and-braces.
+- **`plan_go`, `plan_expand` and `plan_settle` were registered, stripped and uncallable.**
+  plan-runner hid six plan tools; tool-activation's recovery pool re-seeded two. The roster is now
+  a single `PLAN_SURFACE_TOOLS` in `lib/capability-surface.ts` (it was a literal at seven sites in
+  three different subsets), and the `planning` family is registration-driven rather than
+  re-deriving plan-runner's flag guards a second time.
+- **Seven model-facing rejections prescribed something only a human can do** — `/plan`,
+  `/plan-go`, `/ketch-status`, `FORCE_PLAN_WRITE=off`, `RESEARCH_LEDGER=on`, and `GIT_GUARD=off`
+  advertised to the caller being restrained. Each left the model with no legal next move, and all
+  sit on paths that feed the loop-breaker ladder. `steer-texts.test.ts` now pins the class.
+- **`skills/deep-research`** guarded on the `planning` family but then called `research_plan_start`,
+  which needs a dark flag. Yesterday's A2 fix made the guard start passing — the first observed case
+  of a fix in one file *activating* a dormant defect in another.
+- **`plan_update` rejected a carriage return with a byte-length message** — a 12-byte note told to
+  get shorter, which cannot succeed, on an `OUTCOME_TOOLS` path that escalates toward an abort.
+- **`truncateBytes` and hashline's `read` cap could emit a lone surrogate**, and hashline's 50 KiB
+  budget was enforced with `.length` (UTF-16 code units), returning ~3× the intended bytes on CJK.
+- **Two canonical digests sorted by locale.** `localeCompare` depends on ambient locale and ICU
+  build; failure-episodes sorted *before* truncating to 32 keys, so the locale decided which keys
+  survived into the hash.
+- **Three dead measurement channels.** `unavailable_attempts` was the literal `0`;
+  `tool-activation/unavailable` was catalogued and never emitted, and `exposure.py` validates trial
+  targets against that catalog — so a candidate naming it passed validation and then reported
+  `unexposed` for every row, indistinguishable from "the mechanism did nothing". Both are now real,
+  and a catalog→emission direction test (with a declared, anti-rot allowlist) pins the gap.
+- **The steer-text search space could not express its own control arm**: `override || default`
+  means `PI_MSG_X=""` silently runs the full default while the manifest records the arm as empty.
+  `config_env` now refuses it rather than measuring the opposite of what a candidate declares.
+
+### Removed (2026-08-26)
+
+- `npm run verify:serial` — five stages where `npm run verify` runs six, the missing one being
+  `secret-scan`, on a public repo. Nothing referenced it; `npm run verify -- --serial` is the real
+  serial path and does include it.
+
 ### Added (2026-08-25 — semantic-loop screen prep; optimizer-side only, surface unchanged)
 
 - `optimizer/docs/PREREG_SEMANTIC_LOOP_SCREEN_2026-08.md`: pre-registration for the

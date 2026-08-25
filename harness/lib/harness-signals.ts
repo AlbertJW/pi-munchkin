@@ -26,6 +26,13 @@ export type HarnessSignalV1 =
 	| (SignalBase & { type: "context/receipt"; contextPct: number | null; staleShare: number | null; duplicateShare: number | null })
 	| (SignalBase & { type: "context/compacted" })
 	| (SignalBase & { type: "capsule/identity" })
+	// Emitted once per session, AFTER the capsule-identity rebind has actually read
+	// the plan from disk. Under the shipped defaults (PLAN_STORAGE=capsule) plan state
+	// is unreadable during session_start, because the capsule identity it needs is
+	// published by run-capsule at manifest index 26 — twenty slots after plan-runner
+	// and four after tool-activation. Every consumer that wants to know "is there a
+	// live plan?" therefore has to learn it here, not at session_start.
+	| (SignalBase & { type: "plan/rebound"; openItems: number; interrupted: boolean })
 	| (SignalBase & { type: "plan/branch-result"; context: PlanContextV1; report: BranchReportV1 | null; failureClass: "missing_report" | "invalid_report" | "child_failed" | null })
 	| (SignalBase & { type: "capability/need"; capability: CapabilityName; reason: "accepted-plan" | "large-file" | "inlet-refusal" | "selected-search-result" | "deep-research" | "recovery" });
 
@@ -70,6 +77,8 @@ export function isHarnessSignal(value: unknown): value is HarnessSignalV1 {
 			return exact("v", "type", "contextPct", "staleShare", "duplicateShare") && nullableNumber(item.contextPct) && nullableNumber(item.staleShare) && nullableNumber(item.duplicateShare);
 		case "context/compacted":
 			return exact("v", "type");
+		case "plan/rebound":
+			return exact("v", "type", "openItems", "interrupted") && integer(item.openItems) && typeof item.interrupted === "boolean";
 		case "capsule/identity":
 			// Payload-free: the identity itself stays in the run-capsule global.
 			// Consumers (plan-runner's adaptive rebind) re-read it on delivery.

@@ -12,6 +12,25 @@ import { annotate, applyHunks, detectStyle, fileTag, normalizeText, parsePatch, 
 
 const FILE = "alpha\nbeta\ngamma\ndelta\nepsilon\n";
 
+test("fileTag: a long whitespace run is linear, not quadratic", () => {
+	// `read` accepts files up to 16 MiB and fileTag is SYNCHRONOUS — it runs once per
+	// read and twice per edit, so a pathological file stalls the whole event loop,
+	// provider stream and abort handler included. The old
+	// `/[ \t\r]+(?=\n|$)/g` backtracked on every step: 60k spaces took 4.8s and
+	// 120k took 19.5s (exactly 4x). The bound below is ~1000x the fixed version's
+	// measured cost and ~1/100th of the regression's, so it cannot flake into either.
+	const padded = `x${" ".repeat(200_000)}y`;
+	const started = performance.now();
+	const tag = fileTag(padded);
+	const elapsed = performance.now() - started;
+	assert.match(tag, /^[0-9A-F]{8}$/);
+	assert.ok(elapsed < 1000, `fileTag took ${elapsed.toFixed(0)}ms on a 200k-char whitespace run`);
+	// Correctness is not traded away for speed: interior runs survive, trailing ones go.
+	assert.equal(fileTag("a   \nb"), fileTag("a\nb"));
+	assert.equal(fileTag("a b\nc"), fileTag("a b\nc"));
+	assert.notEqual(fileTag("a  b\nc"), fileTag("ab\nc"));
+});
+
 test("fileTag: stable under CRLF and trailing whitespace, 8-hex", () => {
 	const a = fileTag("a\nb\n");
 	assert.match(a, /^[0-9A-F]{8}$/);

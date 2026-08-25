@@ -44,6 +44,80 @@ optimizer-side: the model-visible surface did NOT move (source hash re-verified 
 screen, power, primary, replication — remains a separate Albert-started action; the mothball
 stands until he starts preflight.**
 
+## 2026-08-26 four-scale deep review — what shipped, and what did NOT
+
+Solar (whole system) / planetary (30 extensions) / atomic (functions) / quark (bytes), plus a
+model's-eye and a measurement pass. Sixteen findings fixed and counterfactually proven; see the
+CHANGELOG entry and the `PENDING` row in `docs/SURFACE_BOUNDARIES.md` (source
+`92afd0fe…` — **not yet rolled out**).
+
+The load-bearing deliverable is `harness/tests/manifest-boot.test.ts`: the first test that boots the
+whole declared manifest in order and asserts the end state, including after a `/reload`. Every
+interaction defect this harness has shipped was an unverified assumption about a neighbour, and the
+suite could not see any of them because it instantiates one extension per FakePi. Add to that file
+before adding a targeted one. Its sibling `plan-surface-handoff.test.ts` exists because
+`plan-runner.integration.test.ts` sets `PLAN_STORAGE=project` at module scope — the entire planner
+suite runs in the ROLLBACK configuration, never the shipped default.
+
+**Deliberately deferred, with evidence. Not dropped.** These are additions to the list below, and
+the same rule applies: fix before relying on the affected mechanism in a measurement.
+
+- **Gate subagent telemetry lands in the live interactive corpus.** `optimizer/real_gate.sh:660`
+  never sets `TELEMETRY_FILE`, so a delegating gate's child sessions fall back to
+  `~/.pi/agent/telemetry/events.jsonl` tagged `source: "gate"` — child rows never reach fd 8 *and*
+  they contaminate the archive. `run-tests.mjs:41-51` has a leak detector for this exact class, for
+  `test` but not `gate`. **Decide the direction before fixing**: `context_telemetry.py:33` treats an
+  unsigned row as fatal, so simply propagating the file converts a silent drop into a hard
+  extraction failure. Related: `context_telemetry` joins on `sk` (a cwd basename a subagent
+  inherits) while `shadow_report` correctly uses `si`/`sp`.
+- **`PI_RUN_ID`, `PI_MODEL_ID`, `PI_MODEL_PROVIDER`, `HARNESS_CONFIG_SHA256` are set by nothing.**
+  So `model`/`provider` are null on every telemetry row, `run_id` degrades to the cwd basename, and
+  `config_sha256` — the one field that would bind the flag posture the surface hash deliberately
+  excludes — is null 100% of the time. The gate uses different names (`real_gate.sh:40-41`). This is
+  gate-side wiring, which is why it stayed out of a model-visible batch.
+- **Bus subscriptions leak on every `/reload`.** Eight extensions subscribe to
+  `HARNESS_SIGNAL_CHANNEL`; none keeps the unsubscribe, and the bus is constructed once
+  (`resource-loader.js:120`) and reused. One reload passes Node's 10-listener warning cap and
+  double-delivers every signal to a live closure and a dead one.
+- **Arbiter losers have already spent their one-shot latch.** Only `tool-call-rescue` defers its
+  budget until the decision arrives; loop-breaker's tier/outcome/session latches, verify-gate's
+  `fires`/`nagAwaitingEvidence`, and ketch's wrap latch all charge at proposal. Generalises the
+  known B6, and note the merge rescue in `control-arbiter.ts:53-57` covers `verification_required`
+  but not `verification_plateau` from the same file.
+- **`agent_settled` one-shots never re-arm.** `verify-gate.ts` (`frontierSettled`) and
+  `working-memory.ts` (`settled`) reset only at `session_start`, so only the first agent run per
+  session is measured. `run-kernel.ts:382` is the correct in-repo pattern.
+- **Inert rollbacks.** `MUNCHKIN_TOOL_ACTIVATION=ambient` is unreachable under the `core` default
+  (`tool-activation.ts` returns before the branch) yet silently flips the system prompt through
+  `active-tool-prompts.ts:10`; `phase` is entirely unimplemented and its surface
+  (`PHASE_CAPABILITY_TOOLS`, `phaseDeferredTools`) has no caller. `PLAN_GATE_DIAGNOSTICS=legacy` is
+  advertised as a rollback in the boundary ledger and read by no code.
+- **hashline writes user source files non-atomically** (`writeFile` in a loop, no tmp+rename, no
+  fsync) while the harness gives its own state both. Also: one stray CRLF rewrites every line
+  ending in the file, and a filename containing `#` is readable but permanently un-editable.
+- **ketch budget TOCTOU** (read-modify-write across an `await` on the plan-context read) and the
+  `noteCount` race; the consecutive-refusal cutoff is off by one and reports a cumulative counter.
+- **`package-smoke`'s 70% reduction gate re-declares `CORE_NAMES` as a literal** and omits
+  `plan_write`/`plan_update` — the two largest schemas — so the reduction figure overstates.
+- **Unbounded session growth**: `blackboard.state.attempts` (the restore path caps at 200; the live
+  path does not), the `span-tools` file cache (`hashline.ts` does LRU for the same problem), and
+  loop-breaker's session-cumulative maps.
+- **`TELEMETRY_MAX_BYTES` is parsed two incompatible ways** — `"5MB"` rotates at 5 bytes in the sync
+  writer and 1024 in the async one. `ketch.ts:48-55` already solves this and documents the footgun.
+- **Async telemetry has no process-exit path** — no `SIGINT`/`SIGTERM`/`beforeExit` handler anywhere,
+  and loop-breaker's `abort` row is the last thing queued before `ctx.abort()`.
+- **Doc drift**: `HANDOVER.md:75` still states loaded `acd18a54…`, six rollouts stale, with no
+  supersession banner in a document that banners its other stale section; `/runtime-status` is
+  documented and does not exist (the behaviour belongs to `/munchkin-doctor`); README lists
+  "observational memory" as a shipped extension and none exists; a dozen model-visible flags
+  (`LB_*` thresholds, `LB_HARD_STOP`, `MUNCHKIN_TOOL_SURFACE`, `CTX_GUARD_RISKY*`,
+  `VERIFY_GATE_MAX_FIRES`, `TELEMETRY_STRICT`) are absent from README's defaults table.
+- **Query-string redaction makes distinct sources verification-equivalent** — `?title=A` and
+  `?title=B` collapse to one display URL, so parent-verifying one satisfies `plan_settle` for both.
+- **`VERIFY_GATE_MAX_FIRES=0` cannot disable the gate** (`"0"` parses to 0, fails `> 0`, falls back
+  to the default 3), and `TELEMETRY_STRICT=1` throws out of `record()` against the module's stated
+  fail-open contract, propagating into subagents.
+
 ## 2026-08-25 planner-limit raise + regression sweep — deferred follow-ups
 
 The note-limit raise (300→900) and audit fixes A1–A6/B1/B3–B5 are merged and rolled out (see
@@ -60,6 +134,14 @@ rollback is inert under the core profile; dark-path branch-merge failures are sw
 telemetry. Fix these before relying on the affected mechanisms in measurements.
 
 ## 2026-08-24 shotgun recovery adoption
+
+> **STALE OPERATIONAL NUMBERS — superseded six times since.** The loaded hash below
+> (`acd18a54…`) was authoritative on 2026-08-24 only; the chain since is `12e1896b…` →
+> `a9461aee…` → `3cbb10ed…` → `39fb2c3f…` → `73d491c2…` → `f01af261…` (current live), with
+> `92afd0fe…` prepared and not yet rolled out. Mirror is 116/116, not 112/112. Bind measurements
+> to the last row of `docs/SURFACE_BOUNDARIES.md`, never to a hash quoted in prose here. The
+> posture and rationale in this section still hold; only the numbers are stale.
+
 
 Branch `codex/shotgun-recovery` replaces the AlbertWork failure path without changing the live
 harness. It adds call-bound pre-execution prevention evidence and argument-free `verify_project`,

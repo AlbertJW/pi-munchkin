@@ -10,7 +10,7 @@ Produce an answer with traceable evidence, not a dump of search results. Every m
 ## Workflow
 
 1. Restate the research question in one sentence. Split it into at most three evidence-bearing subquestions.
-   - If the `capability` tool exposes the `planning` family and the question is contested, comparative, multi-part, or needs delegation, first call `capability(action="enable", family="planning")`, then `research_plan_start`. Allocate at most three searches and five discovery reads across the branches. Copy each returned `plan_context` unchanged into its matching `research-planner` subagent call.
+   - If `research_plan_start` is among your available tools and the question is contested, comparative, multi-part, or needs delegation, first call `capability(action="enable", family="planning")`, then `research_plan_start`. Allocate at most three searches and five discovery reads across the branches. Copy each returned `plan_context` unchanged into its matching `research-planner` subagent call. If `research_plan_start` is not available, do the same work without a plan graph — the budget in step 2 still applies.
    - Do not activate planning for a straightforward current fact or a question that can be settled without delegation.
 2. Budget (shown after each tool result): at most three search calls and five distinct source reads. In a plan graph the assigned branch budget is a hard wall and a refused overrun must become an evidence gap. Outside a graph the footer remains an informational stop signal.
 3. Search with `web_search`:

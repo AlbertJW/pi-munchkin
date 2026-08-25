@@ -17,7 +17,7 @@ async function filesBelow(root: string, relativeDir: string): Promise<string[]> 
   const absolute = resolve(root, relativeDir);
   const entries = await readdir(absolute, { withFileTypes: true });
   const files: string[] = [];
-  for (const entry of entries.sort((a, b) => a.name.localeCompare(b.name))) {
+  for (const entry of entries.sort((a, b) => a.name < b.name ? -1 : a.name > b.name ? 1 : 0)) {
     const child = `${relativeDir}/${entry.name}`;
     if (entry.isDirectory()) files.push(...await filesBelow(root, child));
     else if (entry.isFile()) files.push(child);

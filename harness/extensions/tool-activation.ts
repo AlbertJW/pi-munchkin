@@ -3,7 +3,7 @@ import { join } from "node:path";
 import { defineTool, type ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { Type } from "typebox";
 import { agentDir } from "../lib/agent-dir.ts";
-import { measureActiveSurface } from "../lib/capability-surface.ts";
+import { FLAT_PLAN_TOOLS, PLAN_SURFACE_TOOLS, measureActiveSurface } from "../lib/capability-surface.ts";
 import { classifyBashCommand } from "../lib/command-policy.ts";
 import { record } from "../lib/telemetry.ts";
 import { initialToolSurface } from "../lib/session-bootstrap.ts";
@@ -24,6 +24,36 @@ export const CORE_NAMES = new Set([
 	"verify_project", "capability", "plan_write", "plan_update",
 ]);
 const EXPLICIT_FLAG = "__pi_tool_selection_explicit";
+
+// Survives /reload. `resource-loader.reload()` calls `clearExtensionCache()`
+// (resource-loader.js:219) whenever a session has already loaded, so the module is
+// RE-IMPORTED and the factory RE-INVOKED against a fresh api (loader.js:354-356) —
+// module scope and the default() closure are both wiped. globalThis is the only
+// store that outlives a reload inside one Pi process; lib/process-writer.ts uses
+// this key pattern for exactly the same reason.
+//
+// This is load-bearing: audit A1 (2026-08-25) added a `previouslyDeferred` recovery
+// so capability families survive an in-process re-entry, but held the record in the
+// default() closure — the one place that cannot survive the event it was written for.
+// The recovery therefore never ran, and after any /reload every family returned
+// "unavailable-or-active" for the rest of the process.
+const ACTIVATION_MEMORY_KEY = "__pi_tool_activation_memory_v1";
+type ActivationMemory = { deferred: Set<string>; attempted: Set<Family> };
+
+function activationMemory(): ActivationMemory {
+	const shared = globalThis as Record<string, unknown>;
+	const existing = shared[ACTIVATION_MEMORY_KEY] as ActivationMemory | undefined;
+	if (existing?.deferred instanceof Set && existing.attempted instanceof Set) return existing;
+	const fresh: ActivationMemory = { deferred: new Set(), attempted: new Set() };
+	shared[ACTIVATION_MEMORY_KEY] = fresh;
+	return fresh;
+}
+
+/** Replace a set's contents without breaking the identity the memory shares. */
+function setTo<T>(target: Set<T>, values: Iterable<T>): void {
+	target.clear();
+	for (const value of values) target.add(value);
+}
 
 export function profileFromEnvironment(): Profile {
 	if (process.env.MUNCHKIN_TOOL_PROFILE === "core" || process.env.MUNCHKIN_TOOL_SURFACE === "minimal") return "core";
@@ -75,10 +105,15 @@ function familyTools(family: Family, all: readonly string[]): string[] {
 		// Flat plan tools are activatable in ANY session: skills and models may
 		// legitimately structure multi-item work without the human /plan surface
 		// (measured live 2026-08-25: the process-circleback skill instructs
-		// plan_write per meeting and had no legal route to it). The graph tools
-		// stay behind the dark PLAN_GRAPH/DEEP_RESEARCH_PLANNING flags.
-		case "planning": return all.filter((name) => ["plan_write", "plan_update"].includes(name)
-			|| (DEEP_RESEARCH_PLANNING_ENABLED && ["research_plan_start", "plan_expand", "plan_settle"].includes(name)));
+		// plan_write per meeting and had no legal route to it).
+		//
+		// Membership is REGISTRATION-driven, not flag-driven. plan-runner already
+		// encodes every dark flag in what it registers, so re-deriving those guards
+		// here only creates a second copy that can disagree with the first — and did:
+		// the graph tools were hidden at startup by plan-runner but listed by this
+		// family only under DEEP_RESEARCH_PLANNING, so with PLAN_GRAPH alone they had
+		// no route back. `all` is the registered roster, so filtering it is exact.
+		case "planning": return all.filter((name) => PLAN_SURFACE_TOOLS.includes(name));
 	}
 }
 
@@ -95,11 +130,13 @@ export default function (pi: ExtensionAPI): void {
 	let allTools: any[] = [];
 	let allNames: string[] = [];
 	let explicit = false;
-	let deferred = new Set<string>();
-	let attempted = new Set<Family>();
+	const memory = activationMemory();
+	const deferred = memory.deferred;
+	const attempted = memory.attempted;
 	let lastOpenItems = 0;
 	let lastContextPct = 0;
 	let firstUsefulMutation = false;
+	let unavailableAttempts = 0;
 	let sessionStartedAt = 0;
 
 	const publish = (reason: string) => {
@@ -116,12 +153,24 @@ export default function (pi: ExtensionAPI): void {
 		record("tool-activation", "surface", {
 			mode: activationMode, surface_mode: profile, active_tools: active.length, all_tools: allTools.length,
 			schema_bytes: measured.schemaBytes, guideline_bytes: measured.guidelineBytes,
-			deferred_tools: deferred.size, unavailable_attempts: 0,
+			// Was the literal `0`. A hard-coded metric reads as coverage while measuring
+			// nothing: any analysis joining on it concluded "no model ever hit an
+			// unavailable tool", which is the same silent-zero class as the 16-hex vs
+			// 64-hex episode-id bug that flat-lined three recovery metrics.
+			deferred_tools: deferred.size, unavailable_attempts: unavailableAttempts,
 		});
 	};
 
+	/** Record a request the harness could not satisfy — the counterpart of `activated`. */
+	const noteUnavailable = (family: Family, status: string) => {
+		unavailableAttempts += 1;
+		const names = familyTools(family, allNames);
+		for (const tool of names.length ? names : [family]) record("tool-activation", "unavailable", { tool, reason: status });
+		if (!names.length) record("tool-activation", "unavailable", { tool: `family:${family}`, reason: "no-registered-tools" });
+	};
+
 	const activateFamily = (family: Family, reason: string): { activated: number; status: string } => {
-		if (attempted.has(family)) return { activated: 0, status: "already-attempted-or-manually-disabled" };
+		if (attempted.has(family)) { noteUnavailable(family, "already-attempted-or-manually-disabled"); return { activated: 0, status: "already-attempted-or-manually-disabled" }; }
 		// The one-attempt latch is charged only when activation actually happens (or
 		// the family is genuinely already active). A refusal that is not the model's
 		// fault — the planning-phase restriction, or tools not yet in the deferred
@@ -130,6 +179,7 @@ export default function (pi: ExtensionAPI): void {
 		// disabled delegation, and verify-gate's tier-2 recovery request was
 		// silently swallowed the same way.
 		if (g.__pi_plan_phase_active === true && family !== "research") {
+			noteUnavailable(family, "planning-allows-research-only");
 			publish("planning-restriction");
 			return { activated: 0, status: "planning-allows-research-only" };
 		}
@@ -140,6 +190,7 @@ export default function (pi: ExtensionAPI): void {
 		if (!add.length) {
 			const alreadyActive = names.length > 0 && names.every((name) => active.includes(name));
 			if (alreadyActive) attempted.add(family);
+			else noteUnavailable(family, explicit ? "preserved-explicit" : "unavailable");
 			publish(explicit ? "preserved-explicit" : "unavailable-or-active");
 			return { activated: 0, status: explicit ? "preserved-explicit" : "unavailable-or-active" };
 		}
@@ -154,6 +205,7 @@ export default function (pi: ExtensionAPI): void {
 			surfaceTelemetry();
 			return { activated: add.length, status: "activated" };
 		} catch {
+			noteUnavailable(family, "activation-failed");
 			publish("activation-failed");
 			return { activated: 0, status: "activation-failed" };
 		}
@@ -187,6 +239,25 @@ export default function (pi: ExtensionAPI): void {
 		if (signal.type === "plan/write") lastOpenItems = signal.openItems;
 		if (signal.type === "plan/go" && lastOpenItems > 1) activateFamily("delegation", "multi-item-execution");
 		if (signal.type === "loop/tier" && signal.tier === 2) activateFamily("delegation", signal.detector === "semantic" ? "semantic-tier-two" : "loop-tier-two");
+		// The core/deferred split is computed at session_start, four manifest slots
+		// before the capsule identity that makes plan state readable exists. So
+		// `activePlan` was ALWAYS false there under the shipped defaults and the plan
+		// tools were deferred even mid-plan. This is the corrected answer arriving.
+		// It deliberately does NOT go through activateFamily: this is the harness
+		// repairing its own mistimed decision, not the model spending its one attempt.
+		if (signal.type === "plan/rebound" && !explicit && signal.openItems > 0) {
+			const active = pi.getActiveTools();
+			const restore = FLAT_PLAN_TOOLS.filter((name) => deferred.has(name) && !active.includes(name));
+			if (restore.length) {
+				pi.setActiveTools([...active, ...restore]);
+				for (const name of restore) {
+					deferred.delete(name);
+					record("tool-activation", "activated", { tool: name, reason: "plan-rebound" });
+				}
+				publish("plan-rebound");
+				surfaceTelemetry();
+			}
+		}
 		if (signal.type === "capability/need") {
 			if (signal.capability === "subagent") activateFamily("delegation", signal.reason);
 			if (signal.capability === "compact_context") activateFamily("context", signal.reason);
@@ -199,12 +270,13 @@ export default function (pi: ExtensionAPI): void {
 		// live active set is already-narrowed, and this record is the only honest
 		// account of which absences are the harness's own doing (vs a manual
 		// /tools disable, which appears in neither set and stays authoritative).
-		const previouslyDeferred = deferred;
-		deferred = new Set();
-		attempted = new Set();
+		const previouslyDeferred = new Set(deferred);
+		deferred.clear();
+		attempted.clear();
 		lastOpenItems = 0;
 		lastContextPct = 0;
 		firstUsefulMutation = false;
+		unavailableAttempts = 0;
 		sessionStartedAt = performance.now();
 		try { allTools = pi.getAllTools() as any[]; } catch { allTools = []; }
 		allNames = allTools.map((tool) => String(tool.name));
@@ -239,9 +311,9 @@ export default function (pi: ExtensionAPI): void {
 			const registered = new Set(allNames);
 			const pool = new Set(active);
 			for (const name of previouslyDeferred) if (registered.has(name)) pool.add(name);
-			for (const name of ["plan_write", "plan_update"]) if (registered.has(name)) pool.add(name);
+			for (const name of PLAN_SURFACE_TOOLS) if (registered.has(name)) pool.add(name);
 			const core = [...pool].filter((name) => CORE_NAMES.has(name) && (activePlan || (name !== "plan_write" && name !== "plan_update")));
-			deferred = new Set([...pool].filter((name) => !core.includes(name)));
+			setTo(deferred, [...pool].filter((name) => !core.includes(name)));
 			if (DEEP_RESEARCH_PLANNING_ENABLED) for (const name of familyTools("planning", allNames)) if (!core.includes(name)) deferred.add(name);
 			pi.setActiveTools(core);
 			for (const name of deferred) record("tool-activation", "deferred", { tool: name, reason: "core-startup" });

@@ -57,8 +57,33 @@ export function xxHash32(input: Uint8Array, seed = 0): number {
 // a 1/65536 silent wrong-baseline collision is too likely over hundreds of
 // edits, and the cost is 4 extra chars per header.
 
+/**
+ * Strip trailing spaces/tabs/CRs from every line, in linear time.
+ *
+ * This was `text.replace(/[ \t\r]+(?=\n|$)/g, "")`. Greedy `+` followed by a
+ * lookahead that fails on every backtrack step is quadratic: measured on a run of
+ * plain spaces, 60k took 4.8s and 120k took 19.5s — exactly 4x, and `read` accepts
+ * files up to 16 MiB. Because `fileTag` is synchronous and runs once per `read` and
+ * TWICE per `edit`, a single padded file stalled the entire event loop — every other
+ * extension, the provider stream, and the abort handler with it.
+ */
+function stripTrailingBlanks(text: string): string {
+	const lines = text.split("\n");
+	for (let i = 0; i < lines.length; i += 1) {
+		const line = lines[i];
+		let end = line.length;
+		while (end > 0) {
+			const code = line.charCodeAt(end - 1);
+			if (code !== 32 && code !== 9 && code !== 13) break;
+			end -= 1;
+		}
+		if (end !== line.length) lines[i] = line.slice(0, end);
+	}
+	return lines.join("\n");
+}
+
 export function fileTag(text: string): string {
-	const stripped = text.replace(/[ \t\r]+(?=\n|$)/g, "");
+	const stripped = stripTrailingBlanks(text);
 	const h = xxHash32(new TextEncoder().encode(stripped)) >>> 0;
 	return h.toString(16).padStart(8, "0").toUpperCase();
 }

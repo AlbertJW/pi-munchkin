@@ -21,6 +21,36 @@ function fresh(io?: HashlineIo) {
 	return fp;
 }
 
+test("hashline read: the 50 KiB result cap is BYTES, not UTF-16 code units", async () => {
+	// The cap protects the context window, so it has to be measured in the units the
+	// context is billed in. Enforced with `.length` it counted code units, so a CJK
+	// file returned ~3x the budget — and the in-line hard cut could split a surrogate
+	// pair, putting a lone surrogate into the tool result and from there into telemetry.
+	const fp = fresh();
+	const cwd = tmp();
+	// 30k CJK chars/line: under the cap by code units, far over it by bytes.
+	writeFileSync(join(cwd, "cjk.txt"), `${"界".repeat(30_000)}\n`.repeat(4), "utf8");
+	const result = await callTool(fp, "read", { path: "cjk.txt", limit: 4 }, cwd);
+	const text = result.content.map((block: { text?: string }) => block.text ?? "").join("");
+	assert.ok(Buffer.byteLength(text, "utf8") <= 60 * 1024, `read returned ${Buffer.byteLength(text, "utf8")} bytes against a 50 KiB cap`);
+
+	// And an emoji line must never be cut mid-pair.
+	writeFileSync(join(cwd, "emoji.txt"), `${"😀".repeat(40_000)}\n`, "utf8");
+	const emoji = await callTool(fp, "read", { path: "emoji.txt", limit: 1 }, cwd);
+	const emojiText = emoji.content.map((block: { text?: string }) => block.text ?? "").join("");
+	assert.ok(Buffer.byteLength(emojiText, "utf8") <= 60 * 1024);
+	for (let i = 0; i < emojiText.length; i += 1) {
+		const code = emojiText.charCodeAt(i);
+		if (code >= 0xD800 && code <= 0xDBFF) {
+			const next = emojiText.charCodeAt(i + 1);
+			assert.ok(next >= 0xDC00 && next <= 0xDFFF, `lone high surrogate at ${i}`);
+			i += 1;
+		} else {
+			assert.ok(!(code >= 0xDC00 && code <= 0xDFFF), `lone low surrogate at ${i}`);
+		}
+	}
+});
+
 test("hashline: oversized image and text are refused by stat preflight", async () => {
 	const fp = fresh();
 	const cwd = tmp();

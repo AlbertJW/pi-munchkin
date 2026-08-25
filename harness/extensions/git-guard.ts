@@ -61,7 +61,11 @@ export default function (pi: ExtensionAPI) {
 			block: true,
 			reason:
 				`failure_class=user_action_required. \`${command}\` discards ${n} uncommitted change(s). ` +
-				"Commit or `git stash` first, then retry. (GIT_GUARD=off disables this guard.)",
+				// No "(GIT_GUARD=off disables this guard.)": the model cannot set env for its
+				// own process, so the clause only invited attempts that cannot succeed —
+				// and advertising a safety bypass to the caller being restrained is the
+				// wrong instinct regardless. `git stash` it CAN do, so that is what is left.
+				"Commit or `git stash` first, then retry.",
 		};
 	});
 }

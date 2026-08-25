@@ -112,6 +112,40 @@ test("detects textual failures even when exit status is zero", () => {
 	assert.equal(looksFailingOutput("everything ok", true), true);
 });
 
+// Every case below mixes a NONZERO failure count with a zero count in the same
+// output — the shape real runners actually print, and the one the previous
+// zero-suppressor cleared as passing. None of the three cases above does that, which
+// is why all three passed against the bug.
+test("a nonzero failure count is not vetoed by a zero count beside it", () => {
+	// cargo's always-printed summary, and the wrapper case this heuristic exists for.
+	assert.equal(looksFailingOutput("test result: FAILED. 1 passed; 1 failed; 0 ignored; 0 measured;", false), true);
+	// jest: leading tally plus an explicit FAIL line.
+	assert.equal(looksFailingOutput("Tests: 1 failed, 0 skipped, 5 passed, 6 total\nFAIL src/a.test.ts", false), true);
+	// mocha's "N failing" — the reason the `ing` alternative exists.
+	assert.equal(looksFailingOutput("5 passing (12ms)\n  1 failing\n  0 pending", false), true);
+	// pytest, which the old ordering happened to get right.
+	assert.equal(looksFailingOutput("=== 1 failed, 2 passed in 0.05s ===", false), true);
+});
+
+test("a stated tally of zero failures stays passing, in both word orders", () => {
+	assert.equal(looksFailingOutput("test result: ok. 5 passed; 0 failed; 0 ignored;", false), false);
+	assert.equal(looksFailingOutput("12 passing (30ms)\n  0 failing", false), false);
+	assert.equal(looksFailingOutput("Failures: 0", false), false);
+});
+
+test("a bare failure token with no tally at all still reads as failing", () => {
+	assert.equal(looksFailingOutput("FAIL src/a.test.ts", false), true);
+	assert.equal(looksFailingOutput("BUILD FAILURE", false), true);
+});
+
+test("the verdict is read from the tail, not only the first 4 KB", () => {
+	// A verbose suite prints its summary LAST. Judging the preamble alone is a
+	// fail-open: the part that carries the verdict never gets looked at.
+	const verbose = `${"PASSED some::long::test::name\n".repeat(600)}Tests: 3 failed, 1 passed`;
+	assert.ok(verbose.length > 8000, "fixture must exceed the scan window to be meaningful");
+	assert.equal(looksFailingOutput(verbose, false), true);
+});
+
 test("discardsUncommittedWork: flags only working-tree-destroying git", () => {
 	// destroys uncommitted work → true
 	for (const c of [

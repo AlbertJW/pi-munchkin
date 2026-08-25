@@ -62,3 +62,49 @@ test("distinct delegated owners may progress concurrently but duplicate/local ow
 		{ item_id: "a", status: "in_progress" }, { item_id: "b", status: "in_progress" },
 	]).ok, false);
 });
+
+test("each note rejection names its own cause", async () => {
+	// All three used to share one message. A 12-byte note containing a carriage return
+	// was rejected as "at most 900 UTF-8 bytes", so the only action the message
+	// suggested — shorten it — could never succeed. plan_update is an OUTCOME_TOOLS
+	// member, so that unactionable loop fed the tier ladder toward an abort.
+	const items = [{ id: "x", title: "t", status: "pending" as const }];
+	const carriage = applyPlanDeltas(items, [{ item_id: "x", note: "line1\r\nline2" }]);
+	assert.equal(carriage.ok, false);
+	assert.match(carriage.errors[0], /carriage return/);
+	assert.doesNotMatch(carriage.errors[0], /900/, "a 12-byte note must not be told it is too long");
+
+	const long = applyPlanDeltas(items, [{ item_id: "x", note: "界".repeat(301) }]);
+	assert.equal(long.ok, false);
+	assert.match(long.errors[0], /900 UTF-8 bytes/);
+
+	assert.equal(applyPlanDeltas(items, [{ item_id: "x", note: "plain\nnewlines are fine" }]).ok, true);
+});
+
+test("truncateBytes cuts on a code-point boundary, never mid-surrogate", async () => {
+	// `.slice(0, -1)` removes one UTF-16 code unit, so trimming a string that ends in a
+	// non-BMP character dropped the LOW surrogate and left the high one — at which
+	// point the byte budget was satisfied and the loop stopped. The result survives
+	// JSON.stringify into plan-state.json but becomes U+FFFD when the Markdown
+	// projection is written as UTF-8, so the authoritative file and its projection
+	// disagree byte-for-byte.
+	const { truncateBytes } = await import("../extensions/plan-runner.ts");
+	const lone = (value: string) => {
+		for (let i = 0; i < value.length; i += 1) {
+			const code = value.charCodeAt(i);
+			if (code >= 0xD800 && code <= 0xDBFF) {
+				const next = value.charCodeAt(i + 1);
+				if (!(next >= 0xDC00 && next <= 0xDFFF)) return true;
+				i += 1;
+			} else if (code >= 0xDC00 && code <= 0xDFFF) return true;
+		}
+		return false;
+	};
+	for (const budget of [110, 118, 119, 120, 121, 900]) {
+		const out = truncateBytes(`${"界".repeat(39)}😀`, budget);
+		assert.ok(Buffer.byteLength(out, "utf8") <= budget, `exceeded ${budget} bytes`);
+		assert.equal(lone(out), false, `lone surrogate at budget ${budget}`);
+		assert.equal(Buffer.from(out, "utf8").toString("utf8"), out, `not UTF-8 round-trip stable at ${budget}`);
+	}
+	assert.equal(truncateBytes("plain", 900), "plain");
+});

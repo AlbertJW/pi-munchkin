@@ -86,7 +86,8 @@ function canonical(value: unknown): string {
 	if (Array.isArray(value)) return `[${value.map(canonical).join(",")}]`;
 	return `{${Object.entries(value as Record<string, unknown>)
 		.filter(([, v]) => v !== undefined)
-		.sort(([a], [b]) => a.localeCompare(b))
+		// Locale-free: feeds callVariantHash, which is persisted in recovery receipts.
+		.sort(([a], [b]) => a < b ? -1 : a > b ? 1 : 0)
 		.map(([k, v]) => `${JSON.stringify(k)}:${canonical(v)}`).join(",")}}`;
 }
 
@@ -98,7 +99,9 @@ function boundedValue(value: unknown, depth: number): unknown {
 		return value.slice(0, MAX_ARGUMENT_ARRAY).map((entry) => boundedValue(entry, depth + 1));
 	}
 	return Object.fromEntries(Object.entries(value as Record<string, unknown>)
-		.sort(([left], [right]) => left.localeCompare(right))
+		// Locale-free, and it matters twice here: the sort runs BEFORE the MAX_ARGUMENT_KEYS
+		// truncation, so a locale-dependent order changes WHICH keys survive into the hash.
+		.sort(([left], [right]) => left < right ? -1 : left > right ? 1 : 0)
 		.slice(0, MAX_ARGUMENT_KEYS)
 		.map(([key, entry]) => [key.slice(0, 128), boundedValue(entry, depth + 1)]));
 }

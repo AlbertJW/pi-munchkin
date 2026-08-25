@@ -285,12 +285,33 @@ export function classifyBashCommand(cmd: string, extraVerifyCommands: readonly s
 	return { risk: "read_only", mutates: false, destructive: false, verifyLike: false, readOnly: true, reason: "read-only/unknown-safe command" };
 }
 
-// Text heuristic for test/build tools that print failures but return exit 0.
+// Text heuristic for test/build tools that print failures but return exit 0 — the
+// wrapper case (`npm test || true`, a `-` prefixed Make recipe, a CI shim) where the
+// exit code is gone and the output text is the only signal left.
+//
+// The zero-suppressor used to run FIRST and return outright, so any "fail...0"
+// anywhere in the output vetoed every failure signal after it. That cleared cargo's
+// always-printed summary ("1 passed; 1 failed; 0 ignored") and jest's ("1 failed,
+// 0 skipped, 5 passed") — both were classified PASSING, which leaves verify-gate
+// green on a red gate and silences the outcome ladder for the whole grind. The
+// suppressor is still needed ("0 failed, 12 passed" must stay passing), so the fix
+// is to read the COUNTS instead of racing two regexes against each other: a tool
+// that states a tally is believed, and only a tool that states none falls back to
+// a bare failure token.
+const FAIL_COUNT_BEFORE = /\b(\d+)\s+fail(?:ed|s|ures?|ing)?\b/gi;
+const FAIL_COUNT_AFTER = /\bfail(?:ed|s|ures?|ing)?\b[^\S\n]*[:=]?[^\S\n]*(\d+)/gi;
+
 export function looksFailingOutput(text: string, isError: boolean): boolean {
 	if (isError) return true;
-	const t = text.slice(0, 4000);
-	if (/\bfail(?:ed|s|ures?|ing)?\b\D{0,3}0\b/i.test(t) || /\b0\s+fail(?:ed|s|ures?)?\b/i.test(t)) return false;
-	return /\bFAIL(?:ED|URE)?\b/.test(t) || /\b[1-9]\d*\s+fail(?:ed|s|ures?)?\b/i.test(t) || /\bfail(?:ed|ures?)?\b\D{0,3}[1-9]/i.test(t);
+	// Head AND tail. A suite that prints more than 4 KB of passing lines before its
+	// summary was previously judged on its preamble alone — and the summary, the only
+	// part carrying the verdict, is always at the end.
+	const t = text.length <= 8000 ? text : `${text.slice(0, 4000)}\n${text.slice(-4000)}`;
+	const counts: number[] = [];
+	for (const match of t.matchAll(FAIL_COUNT_BEFORE)) counts.push(Number(match[1]));
+	for (const match of t.matchAll(FAIL_COUNT_AFTER)) counts.push(Number(match[1]));
+	if (counts.length > 0) return counts.some((count) => count > 0);
+	return /\bFAIL(?:ED|URE)?\b/.test(t);
 }
 
 export function assertVerifyGateAllowed(cmd: string, extraVerifyCommands: readonly string[] = []): { ok: true } | { ok: false; reason: string } {
