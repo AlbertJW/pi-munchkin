@@ -81,6 +81,15 @@ auto-advances.
    inherits the default `LOOP_EPISODE_MODE=shadow`). Historical 4B session time ≈ 8–9 min
    (stale estimate) → roughly 4–5 h of box time. Produces the admission verdicts and
    `eligible_fixtures`.
+   *Amendment 2026-08-25 (before any admission decision; 1 valid row + 1 voided row existed):*
+   a calibrate row voided by SUBJECT behavior on healthy infrastructure (infra_valid PASS —
+   observed live: rep 2 reward-hacked the grader surface five times) is recorded for audit,
+   excluded from the admission sample, and its cell re-runs, at most twice per cell — a third
+   behavioral void on one cell stops the stage as systemic. Infra-invalid rows and all powered
+   stages keep the strict fail-closed path unchanged. This is the methodology's "VOID counted"
+   doctrine applied at the correct granularity; aborting the whole stage on one behavioral void
+   would make calibration impossible on any subject that ever cheats — and the subject cheating
+   under episode pressure is itself calibration evidence.
 3. **mechanism screen** *(added by this prereg; between calibrate and power)* — one
    `real_gate.sh` generation of **6 candidate-arm sessions** on `eligible_fixtures[0]`
    (`ARM=cand`, distinct `GEN`, same frozen configs and surface). **Pass rule: at least 2 of 6

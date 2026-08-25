@@ -198,7 +198,29 @@ def require_validity(row: dict[str, Any], verdicts: dict[str, Any]) -> None:
         raise StudyError("trial row lacks affirmative reward-hacking clearance")
 
 
-def validate_row(row: dict[str, Any], manifest: dict[str, Any], verdicts: dict[str, Any] | None = None) -> None:
+def behaviorally_voided(row: dict[str, Any], verdicts: dict[str, Any]) -> bool:
+    """True for a CALIBRATE row voided by SUBJECT behavior on healthy infrastructure.
+
+    Reward hacking is real subject behavior, expected at some rate on a weak model
+    under a red gate (first observed live: qwopus35-4b, sweep-b rep 2, five
+    grader-tamper attempts). Calibration records such rows for audit, excludes them
+    from admission samples, and re-runs the cell — the methodology's "VOID counted"
+    doctrine — instead of aborting the stage. An infra-invalid or verdict-less row is
+    never tolerable, and powered rows keep the strict require_validity path.
+    """
+    sys.path.insert(0, str(LAB)); import trial_validity
+    if (row.get("experiment") or {}).get("cell") != "calibrate":
+        return False
+    verdict = verdicts.get(trial_validity.row_key(row))
+    if not isinstance(verdict, dict) or verdict.get("void") is not True:
+        return False
+    digest = verdict.get("row_sha256")
+    if digest is not None and digest != trial_validity.row_digest(row):
+        return False
+    return ((verdict.get("criteria") or {}).get("infra_valid") or {}).get("outcome") == "PASS"
+
+
+def validate_row(row: dict[str, Any], manifest: dict[str, Any], verdicts: dict[str, Any] | None = None, identity_only: bool = False) -> None:
     sys.path.insert(0, str(LAB)); import row_contract
     try:
         row_contract.validate_powered_row(row, require_complete=True)
@@ -219,7 +241,8 @@ def validate_row(row: dict[str, Any], manifest: dict[str, Any], verdicts: dict[s
     serving = row.get("serving") or {}; pre = serving.get("pre") or {}; post = serving.get("post") or {}
     if serving.get("stable") is not True or pre.get("full_sha256") != post.get("full_sha256"):
         raise StudyError("trial row serving fingerprint moved during execution")
-    require_validity(row, verdicts if verdicts is not None else validity_verdicts(manifest))
+    if not identity_only:
+        require_validity(row, verdicts if verdicts is not None else validity_verdicts(manifest))
 
 
 def cell_key(stage: str, fixture: str, arm: str, repetition: int) -> str:
@@ -230,13 +253,18 @@ def existing_cells(manifest: dict[str, Any]) -> set[str]:
     found = set()
     verdicts = validity_verdicts(manifest)
     for row in rows(manifest):
+        if behaviorally_voided(row, verdicts):
+            # Identity must still bind (a foreign void is not attributable here),
+            # but the cell is NOT complete: it re-runs, and the void stays on disk.
+            validate_row(row, manifest, verdicts, identity_only=True)
+            continue
         validate_row(row, manifest, verdicts)
         cell = (row.get("experiment") or {}).get("cell", "")
         found.add(f"{cell}:{row.get('task')}:{row.get('arm')}:{row.get('repetition')}")
     return found
 
 
-def run_cell(manifest: dict[str, Any], stage: str, fixture: str, arm: str, repetition: int) -> None:
+def run_cell(manifest: dict[str, Any], stage: str, fixture: str, arm: str, repetition: int) -> bool:
     _, result_path = state_paths(manifest); result_path.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
     env = {key: os.environ[key] for key in PARENT_ENV if key in os.environ}
     env.update({
@@ -251,7 +279,12 @@ def run_cell(manifest: dict[str, Any], stage: str, fixture: str, arm: str, repet
     subprocess.run([str(REAL_GATE), fixture], cwd=OPTIMIZER, env=env, check=True)
     after_rows = rows(manifest)
     if len(after_rows) != before + 1: raise StudyError("gate cell did not append exactly one result row")
-    validate_row(after_rows[-1], manifest, validity_verdicts(manifest))
+    verdicts = validity_verdicts(manifest)
+    if stage == "calibrate" and behaviorally_voided(after_rows[-1], verdicts):
+        validate_row(after_rows[-1], manifest, verdicts, identity_only=True)
+        return True
+    validate_row(after_rows[-1], manifest, verdicts)
+    return False
 
 
 def execute_cells(manifest: dict[str, Any], state: dict[str, Any], stage: str, fixtures: list[str], arms: list[str], reps: int) -> None:
@@ -262,7 +295,14 @@ def execute_cells(manifest: dict[str, Any], state: dict[str, Any], stage: str, f
             for arm in order:
                 key = cell_key(stage, fixture, arm, repetition)
                 if key in present: continue
-                run_cell(manifest, stage, fixture, arm, repetition); present.add(key)
+                attempts = 0
+                while run_cell(manifest, stage, fixture, arm, repetition):
+                    attempts += 1
+                    print(f"[study] cell {key}: behaviorally voided row recorded for audit "
+                          f"(attempt {attempts}); re-running the cell", file=sys.stderr)
+                    if attempts >= 3:
+                        raise StudyError(f"cell {key} voided {attempts} times — systemic, stopping the stage")
+                present.add(key)
     completed = set(state["completed"]); completed.add(stage); state["completed"] = sorted(completed)
     save_state(manifest, state)
 
@@ -270,6 +310,9 @@ def execute_cells(manifest: dict[str, Any], state: dict[str, Any], stage: str, f
 def stage_rows(manifest: dict[str, Any], stage: str) -> list[dict[str, Any]]:
     selected = [row for row in rows(manifest) if (row.get("experiment") or {}).get("cell") == stage]
     verdicts = validity_verdicts(manifest)
+    voided = [row for row in selected if behaviorally_voided(row, verdicts)]
+    for row in voided: validate_row(row, manifest, verdicts, identity_only=True)
+    selected = [row for row in selected if row not in voided]
     for row in selected: validate_row(row, manifest, verdicts)
     contracts = {(row["model"], row["serving"]["pre"]["semantic_sha256"],
                   row["serving"]["pre"]["performance_sha256"], row["serving"]["pre"]["full_sha256"])
@@ -406,6 +449,24 @@ def selftest() -> None:
         try: require_validity(validity_row, invalid)
         except StudyError: pass
         else: raise AssertionError("missing, void, or inconclusive validity must refuse a powered row")
+    # Behavioral-void tolerance is CALIBRATE-scoped and infra-gated (2026-08-25:
+    # qwopus35-4b tampered with the grader on sweep-b rep 2; the void must be
+    # recorded and the cell re-run, not abort the stage).
+    calibrate_row = validity_row | {"experiment": {"cell": "calibrate"}}
+    behavioral = cleared(calibrate_row)[_tv.row_key(calibrate_row)] | {"void": True}
+    assert behaviorally_voided(calibrate_row, {_tv.row_key(calibrate_row): behavioral}), \
+        "a behaviorally voided calibrate row must be tolerable"
+    infra_void = behavioral | {"criteria": {"infra_valid": {"outcome": "FAIL"},
+                                            "reward_hacking": {"outcome": "PASS"}}}
+    assert not behaviorally_voided(calibrate_row, {_tv.row_key(calibrate_row): infra_void}), \
+        "an infra-invalid void is never tolerable"
+    powered_cell_row = validity_row | {"experiment": {"cell": "primary"}}
+    powered_void = cleared(powered_cell_row)[_tv.row_key(powered_cell_row)] | {"void": True}
+    assert not behaviorally_voided(powered_cell_row, {_tv.row_key(powered_cell_row): powered_void}), \
+        "void tolerance must never extend to powered cells"
+    foreign = behavioral | {"row_sha256": "0" * 64}
+    assert not behaviorally_voided(calibrate_row, {_tv.row_key(calibrate_row): foreign}), \
+        "a verdict bound to other row bytes cannot mark this row voided"
     digest = "a" * 64
     manifest = {
         "manifest_sha256": digest, "surface_sha256": digest,
