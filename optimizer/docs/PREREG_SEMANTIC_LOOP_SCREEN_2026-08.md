@@ -150,14 +150,15 @@ auto-advances.
 The study manifest (private, operator-held) binds, and every row is refused unless it matches:
 
 - loaded harness surface
-  `a9461aee9d0fafe166c0e0ffd24a383d34673f163de601330ade9bcfc1b5e64c` (the `2026-08-25`
-  explicit-inference-fix row in `docs/SURFACE_BOUNDARIES.md`; source `8226a1e8…`). The helper recomputes
+  `3cbb10ede617e95033992654906912e2262596c6f7910f03597cefe3020a9d49` (the `2026-08-25`
+  hierarchical-planner merge row in `docs/SURFACE_BOUNDARIES.md`; source `69ea21cd…`). The helper recomputes
   the live loaded hash at manifest-build time; if either hash differs from the values here,
   THIS PREREG IS STALE and must be re-issued before any session runs.
-  [RE-ISSUED twice 2026-08-25 under this rule, before any data: the original binding
-  (`acd18a54…`/`522fd127…`, the shotgun surface) was superseded by the reload-re-entry fix
-  rollout (`12e1896b…`/`b1cce5f2…`), itself superseded the same day by the explicit-inference
-  fix rollout bound above. Zero sessions have run; nothing else in this prereg changed.]
+  [RE-ISSUED three times 2026-08-25 under this rule, before any data: shotgun
+  (`acd18a54…`) → reload-re-entry fix (`12e1896b…`) → explicit-inference fix (`a9461aee…`) →
+  the dark hierarchical-planner merge bound above. The candidate and control configs are
+  untouched by all three; PLAN_GRAPH/DEEP_RESEARCH_PLANNING stay off in BOTH arms. Zero
+  sessions have run; nothing else in this prereg changed.]
 - model-registry sha256 (of the live `models.json`, hash computed without display),
 - both config sha256s (§1), and the rendered-governor sha256 (variant-A render of the live
   governor; identical for both arms by construction, asserted by the helper),
