@@ -1,5 +1,11 @@
 # Failure-episode baseline calibration — prepared, not approved
 
+> **SUPERSEDED 2026-08-25 by `PREREG_SEMANTIC_LOOP_SCREEN_2026-08.md`.** This document was
+> never approved and must not be executed: its 30–70%/non-zero-exposure eligibility rule
+> predates the ONE admission rule (`PREREG_FIXTURE_ADMISSION_2026-08.md`), and two of its three
+> fixtures carried numbers later voided (`hygiene-shared-config-reread`, `sv-ambiguous-spec`).
+> It is retained as the historical record of the measurement contract it pinned.
+
 **Status: PREPARED ONLY. Do not execute this calibration without a separate human gate.**
 
 This is a behavior-neutral baseline for the semantic failure-episode instrument. It is not a

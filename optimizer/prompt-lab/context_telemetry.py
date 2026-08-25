@@ -125,13 +125,17 @@ def _failure_episode_summary(events):
     final_counts = {}
     for event in observed + recovered + abandoned:
         episode_id, count = event.get("episode_id"), event.get("count")
-        if isinstance(episode_id, str) and re.fullmatch(r"[0-9a-f]{64}", episode_id) and _nonnegative_int(count):
+        # episode_id is 16 hex chars: the harness truncates the episode key
+        # (failure-episodes.ts, id = key.slice(0, 16)). A 64-hex requirement here
+        # silently zeroed failures_after_second/recovered_episodes/recovery_calls_*
+        # on every real row until 2026-08-25.
+        if isinstance(episode_id, str) and re.fullmatch(r"[0-9a-f]{16}", episode_id) and _nonnegative_int(count):
             final_counts[episode_id] = max(final_counts.get(episode_id, 0), count)
 
     recovery_calls = {}
     for event in recovered:
         episode_id, calls = event.get("episode_id"), event.get("calls_after_second")
-        if isinstance(episode_id, str) and re.fullmatch(r"[0-9a-f]{64}", episode_id) and _nonnegative_int(calls):
+        if isinstance(episode_id, str) and re.fullmatch(r"[0-9a-f]{16}", episode_id) and _nonnegative_int(calls):
             recovery_calls[episode_id] = max(recovery_calls.get(episode_id, 0), calls)
 
     fields = (
@@ -339,15 +343,15 @@ def selftest():
         {"ts":"x","sk":"run-a","ext":"plan-runner","kind":"delegate-all-subagent","agent":"executor","mode":"spawn"},
         {"ts":"x","sk":"run-a","ext":"plan-runner","kind":"write","items":1},  # unrelated plan-runner kind — must not be counted
         {"ts":"x","sk":"other","ext":"plan-runner","kind":"delegate-all-block","toolName":"edit"},
-        {"ts":"x","sk":"run-a","ext":"failure-episode","kind":"opened","episode_id":"b"*64,
+        {"ts":"x","sk":"run-a","ext":"failure-episode","kind":"opened","episode_id":"b"*16,
          "failure_class":"compile_or_lint","tool_family":"bash","target_hash":"c"*64,"plan_item_hash":"d"*64},
-        {"ts":"x","sk":"run-a","ext":"failure-episode","kind":"observed","episode_id":"b"*64,
+        {"ts":"x","sk":"run-a","ext":"failure-episode","kind":"observed","episode_id":"b"*16,
          "failure_class":"compile_or_lint","count":3,"calls_after_second":2,"correlated_calls_after_second":1,"call_variant_count":2},
-        {"ts":"x","sk":"run-a","ext":"failure-episode","kind":"observed","episode_id":"b"*64,
+        {"ts":"x","sk":"run-a","ext":"failure-episode","kind":"observed","episode_id":"b"*16,
          "failure_class":"compile_or_lint","count":3,"calls_after_second":2,"correlated_calls_after_second":1,"call_variant_count":2},
         {"ts":"x","sk":"run-a","ext":"failure-episode","kind":"tier-observed","tier":1,"detector":"semantic",
          "mode":"shadow","failure_class":"compile_or_lint","count":2,"session_repeats":7},
-        {"ts":"x","sk":"run-a","ext":"failure-episode","kind":"recovered","episode_id":"b"*64,
+        {"ts":"x","sk":"run-a","ext":"failure-episode","kind":"recovered","episode_id":"b"*16,
          "failure_class":"compile_or_lint","count":3,"calls_after_second":2,"correlated_calls_after_second":1,"recovery":"exact_gate"},
         {"ts":"x","sk":"run-a","ext":"failure-episode","kind":"settled","total_episodes":1,"total_failures":3,
          "longest_episode":3,"semantic_failure_overrun":2,"correlated_failure_overrun":1,"settled_without_recovery":0},

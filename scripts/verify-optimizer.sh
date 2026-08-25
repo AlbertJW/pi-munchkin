@@ -40,6 +40,7 @@ selftests=(
   prompt-lab/trial_validity.py
   prompt-lab/judge_render.py
   prompt-lab/failure_episode_trial.py
+  prompt-lab/make_episode_manifest.py
   prompt-lab/gauntlet_report.py
   prompt-lab/harness_roi.py
   prompt-lab/jnoise/extract_moments.py

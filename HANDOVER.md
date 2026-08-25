@@ -22,6 +22,28 @@ The source and live harness are intentionally not auto-synchronized. Model-visib
 adoption, deletion, live mirroring, and gate rounds are human-gated. Never touch files matching
 `context-pressure*`.
 
+## 2026-08-25 semantic-loop screen prepared (design-only; no inference ran)
+
+`PREREG_SEMANTIC_LOOP_SCREEN_2026-08.md` pre-registers the calibration + mechanism screen for
+`LOOP_EPISODE_MODE=enforce` — subject `qwopus35-4b` (Albert-chosen; the restart-condition-#1
+argument is in the prereg and the mothball addendum), slate `sweep-b`, `sweep-c`,
+`ling-exact-gate-recovery`, `ling-partial-order-release`, `audit-sweep`. It supersedes the
+never-approved `PREREG_FAILURE_EPISODE_BASELINE_2026-08.md` and declares five verified
+measurement hazards, the two load-bearing ones being: the adopted `VERIFICATION_PLATEAU=enforce`
+default contends at the same arbiter priority (600) as semantic tier-1/2 steers with the loser
+dropped, and `failure-episode/intervention` records **proposal**, not delivery (delivery is
+`control-arbiter/decision` with `winner_reason="semantic_tier"`). Two artifacts ship with it:
+`optimizer/prompt-lab/make_episode_manifest.py` (builds the private study manifest; computes
+all six identity hashes; refuses in-repo writes; round-trips through `load_manifest`; its dry
+run reproduced loaded `acd18a54…` exactly) and a fix in `context_telemetry.py` — the
+`episode_id` validators required 64-hex while the harness emits 16-hex ids, so
+`failures_after_second`/`recovered_episodes`/`recovery_calls_*` were silently always 0 on real
+rows (counterfactually proven; `semantic_failure_overrun` was never affected). All
+optimizer-side: the model-visible surface did NOT move (source hash re-verified `522fd127…`).
+**Every stage — preflight, calibrate (30 sessions), the added n=6 candidate-arm mechanism
+screen, power, primary, replication — remains a separate Albert-started action; the mothball
+stands until he starts preflight.**
+
 ## 2026-08-24 shotgun recovery adoption
 
 Branch `codex/shotgun-recovery` replaces the AlbertWork failure path without changing the live

@@ -4,6 +4,26 @@ All notable changes to pi-munchkin are documented here. Releases follow semantic
 
 ## Unreleased
 
+### Added (2026-08-25 — semantic-loop screen prep; optimizer-side only, surface unchanged)
+
+- `optimizer/docs/PREREG_SEMANTIC_LOOP_SCREEN_2026-08.md`: pre-registration for the
+  `LOOP_EPISODE_MODE=enforce` calibration + mechanism screen (subject `qwopus35-4b`; five-fixture
+  loop-cohort slate; five declared measurement hazards; every stage human-gated). Supersedes the
+  never-approved `PREREG_FAILURE_EPISODE_BASELINE_2026-08.md` (header note added there).
+- `optimizer/prompt-lab/make_episode_manifest.py`: builds the private
+  `pi.failure-episode-study/v1` manifest — computes the six identity hashes (registry bytes
+  hashed, never printed), refuses in-repo writes, 0600 output, round-trips through
+  `failure_episode_trial.load_manifest`; `--selftest`.
+
+### Fixed (2026-08-25)
+
+- `optimizer/prompt-lab/context_telemetry.py`: the `episode_id` validators required 64-hex ids
+  while the harness emits 16-hex ids (`failure-episodes.ts` truncates the episode key), silently
+  zeroing `failures_after_second`, `recovered_episodes`, and `recovery_calls_total/max` on every
+  real row; the self-test masked it with synthetic 64-hex ids. Regexes now match the emitted
+  shape and the self-test uses realistic ids (counterfactually proven: reverting the regex fails
+  the self-test). The primary outcome `semantic_failure_overrun` was never affected.
+
 Brought current 2026-08-05 (had been stale since 2026-07-22 and still described since-deleted
 candidates as dark). Net changes since 0.3.0; the full per-decision record is
 `optimizer/docs/DARK_CANDIDATE_VERDICTS_2026-08-03.md` and the ledger.

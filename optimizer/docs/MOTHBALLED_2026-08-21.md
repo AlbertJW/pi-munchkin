@@ -121,3 +121,15 @@ In order, and none of them is "run another round":
    reporter's process; today's work raised the bar structurally but did not close that.
 
 Everything else — code, fixtures, rules, tests — is preserved and green. Nothing here is broken.
+
+## Addendum 2026-08-25 — a prereg exists for restart condition #1
+
+`PREREG_SEMANTIC_LOOP_SCREEN_2026-08.md` prepares the semantic-loop-enforce calibration +
+mechanism screen with **`qwopus35-4b` as subject** — the restart-condition-#1 argument is that
+it demonstrably drives the harness (calib4b: 12 authoritative rows, 473 tool calls, zero
+reward-hacking flags) while still exhibiting the spiral failure mode the candidate targets.
+`ling3-tiny-experimental` has since been removed from the registry entirely. Conditions #2 and
+#3 remain open; they annotate, they do not block a screen. **The mothball itself stands:
+Albert's approval of the prereg's first stage is the unmothball decision for that track only.**
+The current measurement boundary has moved past every surface named above (see
+`docs/SURFACE_BOUNDARIES.md`, 2026-08-24 shotgun row); no row in this document pools forward.
