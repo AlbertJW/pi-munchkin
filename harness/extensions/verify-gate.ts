@@ -75,9 +75,9 @@ async function hasComposeFile(cwd: string): Promise<boolean> {
 // gate) — a session-cumulative count kills the gate for the rest of a long
 // session after 3 fires even when each steer was complied with. sessionFires
 // (3× cap) stays as the runaway backstop.
-type State = { mutated: boolean; verifiedOk: boolean; fires: number; sessionFires: number };
+type State = { mutated: boolean; verifiedOk: boolean; fires: number; sessionFires: number; nagAwaitingEvidence: boolean };
 function fresh(): State {
-	return { mutated: false, verifiedOk: false, fires: 0, sessionFires: 0 };
+	return { mutated: false, verifiedOk: false, fires: 0, sessionFires: 0, nagAwaitingEvidence: false };
 }
 let st = fresh();
 let gateCmd: string | null = process.env.VERIFY_GATE_CMD || null;
@@ -546,13 +546,24 @@ export default function (pi: ExtensionAPI) {
 		// The typed arbiter owns same-boundary deconfliction with repeated-failure
 		// recovery; no wall-clock suppression state crosses extension boundaries.
 		const wrappingUp = toolCalls.length === 0;
+		// A delivered steer ALWAYS triggers a fresh model turn (pi's sendUserMessage
+		// contract), so a wrap-up nag whose reply is another text-only turn re-fires
+		// this same condition: nag → prose reply → nag, appended AFTER the user's real
+		// final answer until the caps ran out (observed live 2026-08-25 — the answer
+		// had to be found by scrolling past the tail). The harness's own doctrine
+		// applies to itself: a repeated steer with no new evidence between firings is
+		// a spiral. A second nag therefore requires at least one tool call (a mutation
+		// or a gate attempt) since the last one; a prose-only reply ends the nagging,
+		// and the non-turn-triggering agent_end warning stays the honest terminal state.
+		if (!wrappingUp) st.nagAwaitingEvidence = false;
 		// With no detectable project gate there is nothing to retry against, so a single
 		// honest nudge is right — repeating it was the unsatisfiable 8-steer loop. A
 		// detected gate keeps the full MAX_FIRES × 3 session backstop.
 		const sessionCap = gateCmd === null ? 1 : MAX_FIRES * 3;
-		if (wrappingUp && st.mutated && !st.verifiedOk && st.fires < MAX_FIRES && st.sessionFires < sessionCap && !planPhaseActive()) {
+		if (wrappingUp && !st.nagAwaitingEvidence && st.mutated && !st.verifiedOk && st.fires < MAX_FIRES && st.sessionFires < sessionCap && !planPhaseActive()) {
 			st.fires += 1;
 			st.sessionFires += 1;
+			st.nagAwaitingEvidence = true;
 			const msg = steer(verifyFailedThisTurn);
 			record("verify-gate", "steer", { failed: verifyFailedThisTurn, fires: st.fires, sessionFires: st.sessionFires, injected_chars: msg.length, turnIndex: event.turnIndex });
 			const legacyActed = !controlEnforces(pi.events);

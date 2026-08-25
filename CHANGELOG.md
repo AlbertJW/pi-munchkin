@@ -15,6 +15,17 @@ All notable changes to pi-munchkin are documented here. Releases follow semantic
   hashed, never printed), refuses in-repo writes, 0600 output, round-trips through
   `failure_episode_trial.load_manifest`; `--selftest`.
 
+### Fixed (2026-08-25 — verify-gate wrap-up nag looped after the final answer)
+
+- Consecutive wrap-up nags now require new tool evidence between firings. A delivered steer
+  always triggers a fresh model turn (pi's `sendUserMessage` contract), so a wrap-up nag whose
+  reply was another prose-only turn re-fired the same nag — up to the caps (3 consecutive, 9 per
+  session with a detected gate) — appending a nag/reply tail AFTER the user's real final answer
+  and burning an inference turn per nag. A second nag now needs at least one tool call (a
+  mutation or gate attempt) since the last one; a prose-only reply ends the nagging and the
+  non-turn-triggering `agent_end` warning remains the honest terminal state. Counterfactually
+  pinned in `verify-gate.test.ts`.
+
 ### Fixed (2026-08-25 — planner too strict: resume and skill-driven planning)
 
 - `/plan-go` now re-activates `plan_write`/`plan_update` unconditionally. After a pi restart the

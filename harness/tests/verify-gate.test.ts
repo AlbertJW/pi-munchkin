@@ -148,6 +148,29 @@ async function steersAfter(cwd: string, first: ReturnType<typeof bashTurn>): Pro
 	return fp.sent.some((m) => m.includes("verify"));
 }
 
+test("consecutive wrap-up nags require new tool evidence between firings", async () => {
+	// A delivered steer always triggers a fresh model turn; a prose-only reply to a
+	// wrap-up nag used to re-fire the same nag until the caps ran out, appending a
+	// nag/reply tail AFTER the user's real final answer (observed live 2026-08-25).
+	const fp = makeFakePi();
+	const cwd = projectWithNpmTest();
+	await loadVerifyGate(fp, cwd);
+	await fire(fp, "turn_end", bashTurn("edit src/app.ts", ""), ctxFor(cwd));
+	const countNags = () => fp.sent.filter((m) => m.includes("verify")).length;
+	await fire(fp, "turn_end", wrapUpTurn, ctxFor(cwd));
+	assert.equal(countNags(), 1, "the first wrap-up nag fires");
+	await fire(fp, "turn_end", { ...wrapUpTurn, turnIndex: 3 }, ctxFor(cwd));
+	await fire(fp, "turn_end", { ...wrapUpTurn, turnIndex: 4 }, ctxFor(cwd));
+	assert.equal(countNags(), 1, "prose-only replies to the nag must not re-fire it");
+	// A real gate ATTEMPT (failing) is new evidence — one more nag is allowed.
+	await fire(fp, "turn_end", { ...bashTurn("npm test", "1 failing", true), turnIndex: 5 }, ctxFor(cwd));
+	await fire(fp, "turn_end", { ...wrapUpTurn, turnIndex: 6 }, ctxFor(cwd));
+	assert.equal(countNags(), 2, "a tool-bearing turn re-arms exactly one further nag");
+	await fire(fp, "turn_end", { ...wrapUpTurn, turnIndex: 7 }, ctxFor(cwd));
+	assert.equal(countNags(), 2, "and the follow-up prose reply again ends the nagging");
+	resetPiGlobals();
+});
+
 test("a command merely CONTAINING the detected gate command does not verify it", async () => {
 	// buildRe() used to append the gate command OUTSIDE the CMD_POS group. `|` has the
 	// lowest precedence, so the pattern became `(anchored…)|(gateCmd anywhere)` and the
