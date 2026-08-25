@@ -108,6 +108,33 @@ auto-advances.
    the 95% bootstrap interval below zero, correctness ≥ −5 pp, intervention exposure ≥ 20%, no
    significant token regression, same-direction replication). Reports never auto-flip a default.
 
+## 5b. Amendment 2026-08-25 — shortened decision path (Albert-approved, before any admission decision)
+
+With one valid and one behaviorally-voided calibrate row existing and sessions measuring
+20–30 minutes (2–4× the historical estimate this prereg's costs were built on), Albert approved
+three scope changes:
+
+1. **Calibration early-stops at three fixtures.** The slate reduces to `sweep-b`, `sweep-c`,
+   `ling-exact-gate-recovery` (18 cells; the manifest's first three, so the running stage
+   completes them naturally and is stopped before a fourth-fixture session). The dropped
+   `ling-partial-order-release` and `audit-sweep` cells are simply never run; admission still
+   requires ≥2 of the three to be ADMITTED and episode-eligible, else the study stops.
+2. **The mechanism screen may run on any slate fixture with observed episode exposure in at
+   least one valid calibrate row** (sweep-b qualifies: overrun 90, one recovered episode, rep 1)
+   rather than strictly on `eligible_fixtures[0]`. Its pass rule and screen-only status are
+   unchanged.
+3. **Decision path split by tier.** On a mechanism-screen PASS, tiers 1–2 (bounded steer;
+   escalation + additive delegation) become a candidate for an Albert-gated JUDGMENT adoption —
+   the same risk class and precedent as the `VERIFICATION_PLATEAU` and `RUN_CAPSULE` adoptions,
+   honestly labeled "benefit not established by a powered trial", rollback
+   `LOOP_EPISODE_MODE=shadow`. **Tier 3 (exact-call walls, silent safe abort) and the
+   session-tail walls stay dark** pending real powered evidence; the powered stages (§5 items
+   4–5) remain defined but deferred. Any judgment adoption is a model-visible default change:
+   separate human checkpoint, boundary row, mirror, smoke.
+
+The calibrate rows collected under this amendment remain valid inputs to a future powered run
+on the same surface.
+
 ## 6. Exposure definitions
 
 - **Calibration (shadow) exposure** — per session: `failure-episode/observed` reaching
