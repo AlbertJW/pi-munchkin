@@ -37,3 +37,25 @@ test("notes are byte-bounded; blocked items require a reason; note-only updates 
 	assert.equal(noteOnly.ok, true);
 	if (noteOnly.ok) assert.equal(noteOnly.items[0].note, "first\nsecond");
 });
+
+test("deferred nodes require an explicit value/risk/rationale decision", () => {
+	assert.equal(applyPlanDeltas(items, [{ item_id: "item-a", status: "deferred" }]).ok, false);
+	const result = applyPlanDeltas(items, [{
+		item_id: "item-a", status: "deferred",
+		defer: { value: "low", risk: "bounded", rationale: "accepted remainder" },
+	}]);
+	assert.equal(result.ok, true);
+});
+
+test("distinct delegated owners may progress concurrently but duplicate/local owners may not", () => {
+	const delegated = [
+		{ id: "a", status: "pending" as const, owner_ref: "owner-a" },
+		{ id: "b", status: "pending" as const, owner_ref: "owner-b" },
+	];
+	assert.equal(applyPlanDeltas(delegated, [
+		{ item_id: "a", status: "in_progress" }, { item_id: "b", status: "in_progress" },
+	]).ok, true);
+	assert.equal(applyPlanDeltas(delegated.map((item) => ({ ...item, owner_ref: "same" })), [
+		{ item_id: "a", status: "in_progress" }, { item_id: "b", status: "in_progress" },
+	]).ok, false);
+});

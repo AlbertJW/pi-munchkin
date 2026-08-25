@@ -21,6 +21,16 @@
       "research these public web sources and distill findings for this subquestion",
       "search the web and read the strongest pages, quoting each source",
       "gather public web sources on this topic and return findings with URLs"
+    ],
+    "research-planner": [
+      "own this plan context and produce a validated research branch report",
+      "take this plan context and coordinate a research branch with child leaves",
+      "expand this deep research subplan once and return a validated branch report"
+    ],
+    "research-scout": [
+      "scout this one narrow public web evidence gap without delegation",
+      "read sources for this bounded research leaf and return unverified evidence",
+      "answer this depth-two narrowly bounded evidence gap as a leaf that cannot plan"
     ]
   },
   "negatives": [

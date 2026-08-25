@@ -1,0 +1,12 @@
+{
+  "name": "deep-research-planning-control",
+  "prediction": "Complex deep research uses the existing lightweight skill path with the same evidence ledger but without plan graphs.",
+  "prompt_variant": "A",
+  "format": "md",
+  "scaffold": "none",
+  "thresholds": {
+    "RESEARCH_LEDGER": "on",
+    "PLAN_GRAPH": "off",
+    "DEEP_RESEARCH_PLANNING": "off"
+  }
+}

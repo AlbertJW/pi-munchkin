@@ -11,7 +11,9 @@ import { onHarnessSignal } from "../lib/harness-signals.ts";
 
 type Profile = "ambient" | "core";
 type LegacyMode = "ambient" | "dynamic" | "phase";
-type Family = "research" | "delegation" | "browser" | "canvas" | "context";
+const PLAN_GRAPH_ENABLED = process.env.PLAN_GRAPH === "on";
+const DEEP_RESEARCH_PLANNING_ENABLED = PLAN_GRAPH_ENABLED && process.env.DEEP_RESEARCH_PLANNING === "on";
+type Family = "research" | "delegation" | "browser" | "canvas" | "context" | "planning";
 
 export const MUNCHKIN_TOOL_PROFILE_DEFAULT: Profile = "core";
 const CORE_NAMES = new Set([
@@ -67,6 +69,8 @@ function familyTools(family: Family, all: readonly string[]): string[] {
 		case "browser": return all.filter((name) => name.startsWith("browser_"));
 		case "canvas": return all.filter((name) => name.startsWith("tldraw_"));
 		case "context": return all.filter((name) => name === "compact_context");
+		case "planning": return DEEP_RESEARCH_PLANNING_ENABLED
+			? all.filter((name) => ["research_plan_start", "plan_write", "plan_update", "plan_expand", "plan_settle"].includes(name)) : [];
 	}
 }
 
@@ -142,18 +146,19 @@ export default function (pi: ExtensionAPI): void {
 		name: "capability",
 		label: "Capability Switch",
 		description: "Enable one specialist tool family for this session, or report bounded family status.",
-		promptSnippet: "capability: enable research, delegation, browser, canvas, or context tools only when needed",
+		promptSnippet: `capability: enable research, delegation, browser, canvas, context${DEEP_RESEARCH_PLANNING_ENABLED ? ", or planning" : ""} tools only when needed`,
 		parameters: Type.Object({
 			action: Type.Union([Type.Literal("enable"), Type.Literal("status")]),
 			family: Type.Optional(Type.Union([
 				Type.Literal("research"), Type.Literal("delegation"), Type.Literal("browser"),
 				Type.Literal("canvas"), Type.Literal("context"),
+				...(DEEP_RESEARCH_PLANNING_ENABLED ? [Type.Literal("planning")] : []),
 			])),
 		}),
 		async execute(_toolCallId, params) {
 			if (params.action === "enable" && !params.family) throw new Error("capability: family is required for enable");
 			const result = params.action === "enable" ? activateFamily(params.family as Family, "model-request") : null;
-			const activeFamilies = (["research", "delegation", "browser", "canvas", "context"] as Family[])
+			const activeFamilies = (["research", "delegation", "browser", "canvas", "context", ...(DEEP_RESEARCH_PLANNING_ENABLED ? ["planning" as const] : [])] as Family[])
 				.filter((family) => familyTools(family, allNames).some((name) => pi.getActiveTools().includes(name)));
 			return {
 				content: [{ type: "text" as const, text: JSON.stringify({ profile, explicit, active_families: activeFamilies, result }) }],
@@ -190,7 +195,7 @@ export default function (pi: ExtensionAPI): void {
 		explicit = baselineLooksExplicit() || await settingsAreExplicit(ctx.cwd);
 		publish(explicit ? "preserved-explicit" : baseline?.complete ? "startup" : "bootstrap-incomplete");
 		if (explicit) {
-			for (const family of ["research", "delegation", "browser", "canvas", "context"] as Family[]) {
+			for (const family of ["research", "delegation", "browser", "canvas", "context", ...(DEEP_RESEARCH_PLANNING_ENABLED ? ["planning" as const] : [])] as Family[]) {
 				for (const tool of familyTools(family, allNames)) record("tool-activation", "preserved-explicit", { tool, reason: "explicit-tools" });
 			}
 			surfaceTelemetry();
@@ -202,6 +207,7 @@ export default function (pi: ExtensionAPI): void {
 			const activePlan = Boolean(g.__pi_active_plan_context);
 			const core = active.filter((name) => CORE_NAMES.has(name) && (activePlan || (name !== "plan_write" && name !== "plan_update")));
 			deferred = new Set(active.filter((name) => !core.includes(name)));
+			if (DEEP_RESEARCH_PLANNING_ENABLED) for (const name of familyTools("planning", allNames)) if (!core.includes(name)) deferred.add(name);
 			pi.setActiveTools(core);
 			for (const name of deferred) record("tool-activation", "deferred", { tool: name, reason: "core-startup" });
 			publish("core-startup");

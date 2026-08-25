@@ -132,13 +132,26 @@ test("extension is default-on with two tools; quick search falls back and broad 
 		const quick = await callTool(fp, "web_search", { query: "test", mode: "quick", limit: 3 }, dir);
 		const quickText = quick.content[0].text;
 		assert.match(quickText, /Primary result/);
+		// Coverage is machine-readable details only at the default dark posture: the
+		// model-visible render is gated behind PLAN_GRAPH=on (merge-review finding).
+		assert.doesNotMatch(quickText, /retrieval coverage:/);
 		assert.deepEqual(quick.details.backends, ["exa"]);
+		assert.deepEqual(quick.details.coverage, {
+			strategy: "direct", scope: "exhaustive", returned_count: 1, total_count: 1,
+			truncated: false, budget_exhausted: false, failed: false, complete: true,
+		});
 
 		const broad = await callTool(fp, "web_search", { query: "test", mode: "broad" }, dir);
 		assert.match(broad.content[0].text, /Consensus result/);
 		assert.deepEqual(broad.details.backends, ["exa", "keenable"]);
+		assert.equal(broad.details.coverage.complete, true);
+		const capped = await callTool(fp, "web_search", { query: "test", mode: "quick", limit: 1 }, dir);
+		assert.deepEqual(capped.details.coverage, {
+			strategy: "direct", scope: "bounded", returned_count: 1,
+			truncated: true, budget_exhausted: false, failed: false, complete: false,
+		});
 		const events = readFileSync(process.env.TELEMETRY_FILE, "utf8").trim().split("\n").map((line) => JSON.parse(line));
-		assert.equal(events.filter((row) => row.ext === "ketch" && row.kind === "search").length, 2);
+		assert.equal(events.filter((row) => row.ext === "ketch" && row.kind === "search").length, 3);
 		assert.ok(events.every((row) => !JSON.stringify(row).includes("Primary result")));
 	} finally {
 		restoreEnv(snapshot);
@@ -156,6 +169,50 @@ test("KETCH=off remains an explicit emergency kill switch", async () => {
 	} finally {
 		if (previous === undefined) delete process.env.KETCH;
 		else process.env.KETCH = previous;
+	}
+});
+
+test("planned research enforces assigned search and distinct-source read budgets before execution", async () => {
+	const dir = mkdtempSync(join(tmpdir(), "ketch-plan-budget-"));
+	const contextPath = join(dir, "context.json");
+	const snapshot = Object.fromEntries(["KETCH", "KETCH_BIN", "KETCH_BACKEND", "RESEARCH_LEDGER", "PI_MUNCHKIN_PLAN_CONTEXT_PATH", "TELEMETRY_FILE", "TELEMETRY_SOURCE"].map((key) => [key, process.env[key]]));
+	try {
+		delete process.env.KETCH;
+		process.env.KETCH_BIN = mockKetch(dir);
+		process.env.KETCH_BACKEND = "exa";
+		process.env.RESEARCH_LEDGER = "on";
+		process.env.PI_MUNCHKIN_PLAN_CONTEXT_PATH = contextPath;
+		process.env.TELEMETRY_FILE = join(dir, "events.jsonl");
+		process.env.TELEMETRY_SOURCE = "test";
+		writeFileSync(contextPath, JSON.stringify({
+			v: 1, profile: "deep-research", run_id: "budget-run", parent_item_id: "leaf", owner_ref: "a".repeat(24),
+			depth: 2, budget: { searches: 1, reads: 1 }, limits: { max_depth: 2, max_children: 0 },
+		}));
+		const fp = makeFakePi();
+		const mod = await import(`../extensions/ketch.ts?budget=${Date.now()}-${Math.random()}`);
+		mod.registerKetch(fp.pi as never, { resolvePublicUrl: async (raw: string) => new URL(raw).toString() });
+		await fp.handlers.get("session_start")?.[0]?.({}, { cwd: dir, ui: { notify() {} } });
+		assert.equal((await callTool(fp, "web_search", { query: "first", limit: 3 }, dir)).details.coverage.budget_exhausted, false);
+		const blockedSearch = await callTool(fp, "web_search", { query: "second", limit: 3 }, dir);
+		assert.equal(blockedSearch.details.outcome, "budget_exhausted");
+		assert.equal(blockedSearch.details.coverage.complete, false);
+		const blockedRead = await callTool(fp, "web_read", { urls: ["https://example.com/a", "https://example.com/b"] }, dir);
+		assert.equal(blockedRead.details.outcome, "budget_exhausted", "a two-source batch cannot fit a one-source remainder");
+		assert.equal(blockedRead.details.coverage.budget_exhausted, true);
+		assert.equal((globalThis as Record<string, any>).__pi_research_state.searches, 1);
+		assert.equal((globalThis as Record<string, any>).__pi_research_state.reads, 0);
+		delete process.env.PI_MUNCHKIN_PLAN_CONTEXT_PATH;
+		(globalThis as Record<string, unknown>).__pi_active_plan_context = { run_id: "head", profile: "deep-research", settled: false };
+		const blockedHeadSearch = await callTool(fp, "web_search", { query: "head must not multiply discovery", limit: 3 }, dir);
+		assert.equal(blockedHeadSearch.details.outcome, "budget_exhausted");
+		assert.equal((await callTool(fp, "web_read", { urls: ["https://example.com/a"] }, dir)).details.coverage.budget_exhausted, false,
+			"the head keeps its separate validation-read allowance");
+	} finally {
+		restoreEnv(snapshot);
+		rmSync(dir, { recursive: true, force: true });
+		delete (globalThis as Record<string, unknown>).__pi_ketch_version_checks_v1;
+		delete (globalThis as Record<string, unknown>).__pi_research_state;
+		delete (globalThis as Record<string, unknown>).__pi_active_plan_context;
 	}
 });
 

@@ -1,0 +1,23 @@
+{
+  "name": "deep-research-planning",
+  "prediction": "On complex research, bounded parent/child planning increases evidence coverage and synthesis reliability without multiplying the global discovery budget.",
+  "prompt_variant": "A",
+  "format": "md",
+  "scaffold": "none",
+  "thresholds": {
+    "RESEARCH_LEDGER": "on",
+    "PLAN_GRAPH": "on",
+    "DEEP_RESEARCH_PLANNING": "on"
+  },
+  "exposure": {
+    "mode": "telemetry",
+    "target": [
+      "plan-runner/branch-merged"
+    ],
+    "diagnostic": [
+      "plan-runner/research-start",
+      "plan-runner/branch-failed",
+      "plan-runner/settled"
+    ]
+  }
+}

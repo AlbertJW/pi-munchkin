@@ -24,6 +24,8 @@ import {
 import { record } from "../lib/telemetry.ts";
 import { emitHarnessSignal } from "../lib/harness-signals.ts";
 import { buildControlProposal, controlEnforces, emitControlProposal } from "../lib/control-proposal.ts";
+import { PLAN_CONTEXT_ENV, RESEARCH_RESERVED_BUDGET_KEY, readPlanContext, type PlanContextV1 } from "../lib/branch-report.ts";
+import type { ResearchBudget } from "../lib/plan-graph.ts";
 
 // Ketch is the host-side network adapter for local models. The steady-state
 // surface is deliberately only FIND + READ; deep orchestration lives in the
@@ -58,8 +60,28 @@ const READ_TIMEOUT = boundedEnvInt("KETCH_READ_TIMEOUT_MS", 60_000, 1_000, 180_0
 const SEARCH_OUTPUT_CAP = boundedEnvInt("KETCH_SEARCH_MAX_CHARS", 8_000, 1_000, 16_000);
 const READ_OUTPUT_CAP = boundedEnvInt("KETCH_READ_MAX_CHARS", 18_000, 2_000, 40_000);
 
+// The machine-readable coverage receipt always rides `details`; the MODEL-VISIBLE render is
+// gated behind the dark PLAN_GRAPH flag. Rendering it unconditionally would ship an unmeasured
+// always-on prompt-surface change alongside a dark candidate (merge-review finding,
+// 2026-08-25) — and dd1 measured extra result prose as harmful on the DD.
+const PLAN_GRAPH_RENDER = (process.env.PLAN_GRAPH ?? "off") === "on";
+
 function text(value: string, details: Record<string, unknown> = {}) {
-	return { content: [{ type: "text" as const, text: value }], details };
+	const coverage = details.coverage as Record<string, unknown> | undefined;
+	const receipt = coverage && PLAN_GRAPH_RENDER
+		? `\n\nretrieval coverage: strategy=${String(coverage.strategy)} scope=${String(coverage.scope)} complete=${String(coverage.complete)} returned=${String(coverage.returned_count)} total=${coverage.total_count === undefined ? "unknown" : String(coverage.total_count)} truncated=${String(coverage.truncated)} failed=${String(coverage.failed)} budget_exhausted=${String(coverage.budget_exhausted)}`
+		: "";
+	return { content: [{ type: "text" as const, text: value + receipt }], details };
+}
+
+function coverageReceipt(returnedCount: number, totalCount: number | undefined, truncated: boolean, failed: boolean, budgetExhausted = false) {
+	const scope = totalCount === undefined ? "bounded" as const : "exhaustive" as const;
+	return {
+		strategy: "direct" as const, scope, returned_count: returnedCount,
+		...(totalCount === undefined ? {} : { total_count: totalCount }),
+		truncated, budget_exhausted: budgetExhausted, failed,
+		complete: !truncated && !failed && !budgetExhausted && (scope === "bounded" || returnedCount === totalCount),
+	};
 }
 
 const VERSION_CACHE_KEY = "__pi_ketch_version_checks_v1";
@@ -154,14 +176,49 @@ export function registerKetch(pi: ExtensionAPI, dependencies: KetchDependencies 
 	const MAX_CONSECUTIVE_REFUSALS = 3;
 	let consecutiveRefusals = 0;
 	let verificationDegraded = false;
+	let verifiedUrls = new Set<string>();
+	let displayedBudget: ResearchBudget = { ...SKILL_BUDGET };
 	function publishResearchState(): void {
 		if (!LEDGER_ENABLED) return;
 		(globalThis as Record<string, unknown>).__pi_research_state = { ...counts };
 	}
+	async function activePlanBudget(): Promise<{ context: PlanContextV1 | null; limit: ResearchBudget } | null> {
+		if (!LEDGER_ENABLED) return null;
+		const context = await readPlanContext(process.env[PLAN_CONTEXT_ENV]);
+		if (context) {
+			const reserved = context.depth === 1 ? (globalThis as Record<string, unknown>)[RESEARCH_RESERVED_BUDGET_KEY] : undefined;
+			const safeReserved = reserved && typeof reserved === "object" ? reserved as Partial<ResearchBudget> : {};
+			return { context, limit: {
+				searches: Math.max(0, context.budget.searches - (Number.isSafeInteger(safeReserved.searches) ? Number(safeReserved.searches) : 0)),
+				reads: Math.max(0, context.budget.reads - (Number.isSafeInteger(safeReserved.reads) ? Number(safeReserved.reads) : 0)),
+			} };
+		}
+		const active = (globalThis as Record<string, unknown>).__pi_active_plan_context as { profile?: unknown; settled?: unknown } | undefined;
+		// Discovery belongs to allocated child branches. The head gets a separate
+		// validation-read allowance, never another search envelope.
+		return active?.profile === "deep-research" && active.settled !== true
+			? { context: null, limit: { searches: 0, reads: SKILL_BUDGET.reads } } : null;
+	}
+	async function consumePlanBudget(kind: "searches" | "reads", units = 1): Promise<{ allowed: boolean; limit: number }> {
+		const budget = await activePlanBudget();
+		if (!budget) {
+			if (LEDGER_ENABLED) {
+				counts[kind] += units;
+				publishResearchState();
+			}
+			return { allowed: true, limit: SKILL_BUDGET[kind] };
+		}
+		displayedBudget = { ...budget.limit };
+		const used = counts[kind];
+		if (used + units > budget.limit[kind]) return { allowed: false, limit: budget.limit[kind] };
+		counts[kind] += units;
+		publishResearchState();
+		return { allowed: true, limit: budget.limit[kind] };
+	}
 	function budgetFooter(): string {
 		if (!LEDGER_ENABLED) return "";
 		const ledger = activeLedgerPath ? " · private ledger active" : "";
-		return `\n\nresearch budget: searches ${counts.searches}/${SKILL_BUDGET.searches} · reads ${counts.reads}/${SKILL_BUDGET.reads} · notes ${counts.notes}${ledger}`;
+		return `\n\nresearch budget: searches ${counts.searches}/${displayedBudget.searches} · source reads ${counts.reads}/${displayedBudget.reads} · notes ${counts.notes}${ledger}`;
 	}
 	async function appendSerial(path: string, record: ReturnType<typeof researchRecord>): Promise<void> {
 		const pending = ledgerWriteTail.then(() => appendToLedger(path, record));
@@ -179,7 +236,12 @@ export function registerKetch(pi: ExtensionAPI, dependencies: KetchDependencies 
 			wrapSteerFired = false;
 			consecutiveRefusals = 0;
 			verificationDegraded = false;
+			verifiedUrls = new Set<string>();
+			displayedBudget = { ...SKILL_BUDGET };
 			delete (globalThis as Record<string, unknown>).__pi_research_state;
+			delete (globalThis as Record<string, unknown>).__pi_research_verified_urls;
+			delete (globalThis as Record<string, unknown>).__pi_plan_validation_urls;
+			delete (globalThis as Record<string, unknown>)[RESEARCH_RESERVED_BUDGET_KEY];
 		});
 		// The opt-in hole (eval Run 2, defect 3): research_note is a tool the model
 		// must CHOOSE to call, and this corpus's finding is that small models don't
@@ -254,10 +316,15 @@ export function registerKetch(pi: ExtensionAPI, dependencies: KetchDependencies 
 			async execute(_id, params, signal) {
 				const started = Date.now();
 				const mode = params.mode ?? "quick";
+				const budget = await consumePlanBudget("searches");
+				if (!budget.allowed) {
+					record("ketch", "search", { mode, backends: [], attempts: 0, results: 0, chars: 0, duration_ms: Date.now() - started, truncated: false, outcome: "budget_exhausted" });
+					return text(`Research search allocation exhausted (${counts.searches}/${budget.limit}). Record an evidence gap instead of retrying.`, { outcome: "budget_exhausted", coverage: coverageReceipt(0, undefined, false, false, true) });
+				}
 				const versionError = await checkVersion();
 				if (versionError) {
 					record("ketch", "search", { mode, backends: [], attempts: 0, results: 0, chars: 0, duration_ms: Date.now() - started, truncated: false, outcome: "precondition" });
-					return text(versionError, { outcome: "precondition" });
+					return text(versionError, { outcome: "precondition", coverage: coverageReceipt(0, undefined, false, true) });
 				}
 
 				const limit = params.limit ?? 5;
@@ -281,28 +348,31 @@ export function registerKetch(pi: ExtensionAPI, dependencies: KetchDependencies 
 					const last = attempts.at(-1)?.result;
 					const outcome = last ? ketchFailureClass(last) : "unknown";
 					record("ketch", "search", { mode, backends: attempts.map(({ backend }) => backend), attempts: attempts.length, results: 0, chars: 0, duration_ms: Date.now() - started, truncated: false, outcome });
-					return text(last ? failureText(last) : "Ketch search did not run.", { outcome });
+					return text(last ? failureText(last) : "Ketch search did not run.", { outcome, coverage: coverageReceipt(0, undefined, Boolean(last?.truncated), true) });
 				}
 
 				try {
 					const results = parseSearchResults(successful.result.stdout).slice(0, limit);
 					const formatted = formatSearchResults(results, SEARCH_OUTPUT_CAP);
 					const backends = [...new Set(results.flatMap((result) => result.backends.length ? result.backends : [successful.backend]))];
+					const limitReached = results.length >= limit;
+					const truncated = limitReached || formatted.truncated || successful.result.truncated;
 					// Elision receipt (span-tools parity): the model must know whether it
 					// is seeing everything. ketch reports no total-hit count, so we state
 					// only what is TRUE — how many came back against the limit asked for.
 					// At the limit, more may exist; below it, this is the whole result set.
-					const receipt = results.length >= limit
+					const receipt = limitReached
 						? `results ${results.length} (limit reached — narrow the query or raise limit for more) · backends: ${backends.join(", ")}\n\n`
 						: `results ${results.length} of all found for this query · backends: ${backends.join(", ")}\n\n`;
-					record("ketch", "search", { mode, backends, attempts: attempts.length, results: results.length, chars: formatted.text.length, duration_ms: Date.now() - started, truncated: formatted.truncated || successful.result.truncated, outcome: "ok" });
-					counts.searches += 1;
+					record("ketch", "search", { mode, backends, attempts: attempts.length, results: results.length, chars: formatted.text.length, duration_ms: Date.now() - started, truncated, outcome: "ok" });
 					emitHarnessSignal(pi.events, { v: 1, type: "capability/need", capability: "web_read", reason: "selected-search-result" });
-					publishResearchState();
-					return text(receipt + formatted.text + budgetFooter(), { mode, backends, result_count: results.length, truncated: formatted.truncated });
+					return text(receipt + formatted.text + budgetFooter(), {
+						mode, backends, result_count: results.length, truncated,
+						coverage: coverageReceipt(results.length, limitReached ? undefined : results.length, truncated, false),
+					});
 				} catch {
 					record("ketch", "search", { mode, backends: [successful.backend], attempts: attempts.length, results: 0, chars: 0, duration_ms: Date.now() - started, truncated: successful.result.truncated, outcome: "invalid_json" });
-					return text("Ketch returned malformed search data; treat this lookup as failed.", { outcome: "invalid_json" });
+					return text("Ketch returned malformed search data; treat this lookup as failed.", { outcome: "invalid_json", coverage: coverageReceipt(0, undefined, successful.result.truncated, true) });
 				}
 			},
 		}),
@@ -326,10 +396,16 @@ export function registerKetch(pi: ExtensionAPI, dependencies: KetchDependencies 
 			}),
 			async execute(_id, params, signal) {
 				const started = Date.now();
+				const readUnits = new Set(params.urls).size;
+				const budget = await consumePlanBudget("reads", readUnits);
+				if (!budget.allowed) {
+					record("ketch", "read", { sources: params.urls.length, succeeded: 0, failed: 0, chars: 0, duration_ms: Date.now() - started, truncated: false, outcome: "budget_exhausted" });
+					return text(`Research source-read allocation exhausted (${counts.reads}/${budget.limit}); requested ${readUnits}. Record an evidence gap instead of retrying.`, { outcome: "budget_exhausted", coverage: coverageReceipt(0, params.urls.length, false, false, true) });
+				}
 				const versionError = await checkVersion();
 				if (versionError) {
 					record("ketch", "read", { sources: params.urls.length, succeeded: 0, failed: params.urls.length, chars: 0, duration_ms: Date.now() - started, truncated: false, outcome: "precondition" });
-					return text(versionError, { outcome: "precondition" });
+					return text(versionError, { outcome: "precondition", coverage: coverageReceipt(0, params.urls.length, false, true) });
 				}
 				// The preflight guard's own fetch is bounded and cancellable — an
 				// unbounded fetch (no signal, no timeout) would let one hostile URL
@@ -347,22 +423,23 @@ export function registerKetch(pi: ExtensionAPI, dependencies: KetchDependencies 
 				if (LEDGER_ENABLED && safeUrls.length > 0 && blockedCount === 0 && safeUrls.every((url) => pageCache.has(url))) {
 					const rows = safeUrls.map((url) => ({ url, title: "", markdown: pageCache.get(url)?.text ?? "", error: "" }));
 					const formatted = formatReadResults(rows, READ_OUTPUT_CAP);
-					counts.reads += 1;
 					counts.cacheHits += 1;
-					publishResearchState();
 					record("ketch", "read", { sources: params.urls.length, succeeded: rows.length, failed: 0, chars: formatted.text.length, duration_ms: Date.now() - started, truncated: formatted.truncated, outcome: "ok" });
-					return text(`${formatted.text}\n\n(served from session cache — pages fetched earlier this session)${budgetFooter()}`, { source_count: rows.length, failed: 0, truncated: formatted.truncated, cache: true });
+					return text(`${formatted.text}\n\n(served from session cache — pages fetched earlier this session)${budgetFooter()}`, {
+						source_count: rows.length, failed: 0, truncated: formatted.truncated, cache: true,
+						coverage: coverageReceipt(rows.length, params.urls.length, formatted.truncated, false),
+					});
 				}
 				if (safeUrls.length === 0) {
 					record("ketch", "read", { sources: params.urls.length, succeeded: 0, failed: params.urls.length, chars: 0, duration_ms: Date.now() - started, truncated: false, outcome: "blocked_url" });
-					return text("web_read blocked every URL as non-public, malformed, or an unsafe redirect.", { outcome: "blocked_url" });
+					return text("web_read blocked every URL as non-public, malformed, or an unsafe redirect.", { outcome: "blocked_url", coverage: coverageReceipt(0, params.urls.length, false, true) });
 				}
 				const input = safeUrls.length === 1 ? safeUrls[0] : JSON.stringify(safeUrls);
 				const result = await invoke(["scrape", input, "--max-chars", String(params.max_chars ?? 5_000), "--trim", "--json"], READ_TIMEOUT, signal);
 				if (result.code !== 0 || result.timedOut || result.aborted) {
 					const outcome = ketchFailureClass(result);
 					record("ketch", "read", { sources: params.urls.length, succeeded: 0, failed: params.urls.length, chars: 0, duration_ms: Date.now() - started, truncated: result.truncated, outcome });
-					return text(failureText(result), { outcome });
+					return text(failureText(result), { outcome, coverage: coverageReceipt(0, params.urls.length, result.truncated, true) });
 				}
 				try {
 					// Never trust ketch to return more rows than URLs requested.
@@ -378,13 +455,16 @@ export function registerKetch(pi: ExtensionAPI, dependencies: KetchDependencies 
 						for (const row of rows) {
 							if (!row.error && row.markdown) pageCache.put(row.url, row.markdown);
 						}
-						counts.reads += 1;
-						publishResearchState();
 					}
-					return text(formatted.text + budgetFooter(), { source_count: rows.length, failed, truncated: formatted.truncated });
+					const succeeded = rows.length - readFailed;
+					const truncated = formatted.truncated || result.truncated;
+					return text(formatted.text + budgetFooter(), {
+						source_count: rows.length, failed, truncated,
+						coverage: coverageReceipt(succeeded, params.urls.length, truncated, failed > 0),
+					});
 				} catch {
 					record("ketch", "read", { sources: params.urls.length, succeeded: 0, failed: params.urls.length, chars: 0, duration_ms: Date.now() - started, truncated: result.truncated, outcome: "invalid_json" });
-					return text("Ketch returned malformed page data; treat these sources as unread.", { outcome: "invalid_json" });
+					return text("Ketch returned malformed page data; treat these sources as unread.", { outcome: "invalid_json", coverage: coverageReceipt(0, params.urls.length, result.truncated, true) });
 				}
 			},
 		}),
@@ -476,6 +556,15 @@ export function registerKetch(pi: ExtensionAPI, dependencies: KetchDependencies 
 					throw new Error("Research ledger write failed; keep the claim and citation inline.");
 				}
 				counts.notes += 1;
+				verifiedUrls.add(storedUrl(sourceUrl).display);
+				(globalThis as Record<string, unknown>).__pi_research_verified_urls = [...verifiedUrls].sort();
+				const shared = globalThis as Record<string, unknown>;
+				const activePlan = shared.__pi_active_plan_context as { profile?: unknown; settled?: unknown } | undefined;
+				if (activePlan?.profile === "deep-research" && activePlan.settled !== true) {
+					const planUrls = new Set(Array.isArray(shared.__pi_plan_validation_urls) ? shared.__pi_plan_validation_urls.filter((value): value is string => typeof value === "string") : []);
+					planUrls.add(storedUrl(sourceUrl).display);
+					shared.__pi_plan_validation_urls = [...planUrls].sort();
+				}
 				consecutiveRefusals = 0; // a recorded note proves the model can still verify
 				publishResearchState();
 				record("research", "note", { ok: true, reason_class: verdict.corrected ? "corrected" : "ok", quote_chars: params.quote.length });

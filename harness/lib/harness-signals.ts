@@ -1,5 +1,6 @@
 import { createHash } from "node:crypto";
 import type { EventBus } from "@earendil-works/pi-coding-agent";
+import { validateBranchReport, validatePlanContext, type BranchReportV1, type PlanContextV1 } from "./branch-report.ts";
 import type { FailureClass } from "./failure-episodes.ts";
 
 export const HARNESS_SIGNAL_CHANNEL = "pi-munchkin/domain-signal/v1";
@@ -25,6 +26,7 @@ export type HarnessSignalV1 =
 	| (SignalBase & { type: "context/receipt"; contextPct: number | null; staleShare: number | null; duplicateShare: number | null })
 	| (SignalBase & { type: "context/compacted" })
 	| (SignalBase & { type: "capsule/identity" })
+	| (SignalBase & { type: "plan/branch-result"; context: PlanContextV1; report: BranchReportV1 | null; failureClass: "missing_report" | "invalid_report" | "child_failed" | null })
 	| (SignalBase & { type: "capability/need"; capability: CapabilityName; reason: "accepted-plan" | "large-file" | "inlet-refusal" | "selected-search-result" | "deep-research" | "recovery" });
 
 const HASH = /^[a-f0-9]{64}$/;
@@ -72,6 +74,10 @@ export function isHarnessSignal(value: unknown): value is HarnessSignalV1 {
 			// Payload-free: the identity itself stays in the run-capsule global.
 			// Consumers (plan-runner's adaptive rebind) re-read it on delivery.
 			return exact("v", "type");
+		case "plan/branch-result":
+			return exact("v", "type", "context", "report", "failureClass") && validatePlanContext(item.context) &&
+			(item.report === null ? ["missing_report", "invalid_report", "child_failed"].includes(String(item.failureClass)) :
+				item.failureClass === null && validateBranchReport(item.report, item.context, true));
 		case "capability/need":
 			return exact("v", "type", "capability", "reason") &&
 				["plan_go", "span_tools", "subagent", "compact_context", "web_read"].includes(String(item.capability)) &&

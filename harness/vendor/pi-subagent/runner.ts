@@ -14,6 +14,7 @@ import { parseInheritedCliArgs } from "./runner-cli.js";
 import { processPiJsonLine } from "./runner-events.js";
 import { buildSubagentEnv } from "./runner-env.js";
 import { currentSessionId } from "../../lib/telemetry.ts";
+import { BRANCH_REPORT_ENV, PLAN_CONTEXT_ENV, RESEARCH_SCOUT_ENV, readBranchReport, validatePlanContext, validatePlanContextRole, type PlanContextV1 } from "../../lib/branch-report.ts";
 import {
   type DelegationMode,
   type SingleResult,
@@ -84,6 +85,15 @@ function cleanupTempDir(dir: string | null): void {
   } catch {
     /* ignore */
   }
+}
+
+function writePlanContextToTemp(context: PlanContextV1): { dir: string; contextPath: string; reportPath: string } {
+	if (!validatePlanContext(context)) throw new Error("invalid delegated plan_context");
+	const dir = fs.mkdtempSync(path.join(os.tmpdir(), "pi-subagent-plan-"));
+	const contextPath = path.join(dir, "context.json");
+	const reportPath = path.join(dir, "report.json");
+	fs.writeFileSync(contextPath, `${JSON.stringify(context)}\n`, { encoding: "utf8", mode: 0o600 });
+	return { dir, contextPath, reportPath };
 }
 
 // ---------------------------------------------------------------------------
@@ -164,6 +174,8 @@ export interface RunAgentOptions {
   preventCycles: boolean;
   /** Live session model id (from ctx.model); used when the agent file pins no model. */
   sessionModel?: string;
+  /** Optional bounded branch context. The child may return one validated branch report. */
+  planContext?: PlanContextV1;
   /** Abort signal for cancellation. */
   signal?: AbortSignal;
   /** Hard wall-clock limit for the child process. */
@@ -193,6 +205,7 @@ export async function runAgent(opts: RunAgentOptions): Promise<SingleResult> {
     maxDepth,
     preventCycles,
     sessionModel,
+    planContext,
     signal,
     timeoutMs,
     onUpdate,
@@ -232,6 +245,19 @@ export async function runAgent(opts: RunAgentOptions): Promise<SingleResult> {
         "Cannot run in fork mode: missing parent session snapshot context.",
     };
   }
+
+	if (planContext && !validatePlanContext(planContext)) {
+		return {
+			agent: agentName, agentSource: agent.source, task, exitCode: 1, messages: [], stderr: "Invalid plan_context.",
+			usage: emptyUsage(), model: agent.model, stopReason: "error", errorMessage: "Invalid plan_context.",
+		};
+	}
+	if (!validatePlanContextRole(agentName, planContext)) {
+		return {
+			agent: agentName, agentSource: agent.source, task, exitCode: 1, messages: [], stderr: "plan_context is missing or does not match the delegated research role.",
+			usage: emptyUsage(), model: agent.model, stopReason: "error", errorMessage: "plan_context is missing or does not match the delegated research role.",
+		};
+	}
 
   const result: SingleResult = {
     agent: agentName,
@@ -274,6 +300,17 @@ export async function runAgent(opts: RunAgentOptions): Promise<SingleResult> {
     forkSessionTmpPath = tmp.filePath;
   }
 
+	let planTmpDir: string | null = null;
+	let planContextPath: string | null = null;
+	let branchReportPath: string | null = null;
+	if (planContext) {
+		const tmp = writePlanContextToTemp(planContext);
+		planTmpDir = tmp.dir;
+		planContextPath = tmp.contextPath;
+		branchReportPath = planContext.depth === 1 ? tmp.reportPath : null;
+		result.planContext = planContext;
+	}
+
   try {
     const piArgs = buildPiArgs(
       agent,
@@ -303,6 +340,9 @@ export async function runAgent(opts: RunAgentOptions): Promise<SingleResult> {
           [SUBAGENT_STACK_ENV]: JSON.stringify(propagatedStack),
           [SUBAGENT_PREVENT_CYCLES_ENV]: preventCycles ? "1" : "0",
           [PI_OFFLINE_ENV]: "1",
+			  ...(planContextPath ? { [PLAN_CONTEXT_ENV]: planContextPath } : {}),
+			  ...(branchReportPath ? { [BRANCH_REPORT_ENV]: branchReportPath } : {}),
+			  ...(planContext?.depth === 2 ? { [RESEARCH_SCOUT_ENV]: "1" } : {}),
         },
       });
 
@@ -441,10 +481,16 @@ export async function runAgent(opts: RunAgentOptions): Promise<SingleResult> {
 
     result.exitCode = exitCode;
     if (wasTimedOut) result.exitCode = 124;
+		if (planContext?.depth === 1 && branchReportPath) {
+			const report = await readBranchReport(branchReportPath, planContext);
+			if (report) result.branchReport = report;
+			else result.branchReportFailure = fs.existsSync(branchReportPath) ? "invalid_report" : "missing_report";
+		}
     return normalizeCompletedResult(result, wasAborted);
   } finally {
     cleanupTempDir(promptTmpDir);
     cleanupTempDir(forkSessionTmpDir);
+		cleanupTempDir(planTmpDir);
   }
 }
 
