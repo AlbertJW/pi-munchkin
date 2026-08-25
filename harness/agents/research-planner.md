@@ -16,9 +16,14 @@ You own exactly the branch named by the supplied private `plan_context`.
    permission to delegate.
 3. Treat scout citations as `UNVERIFIED DELEGATED EVIDENCE`. Distill them into source leads for
    the head parent; never claim they are parent-verified.
-4. Call `branch_plan` again after all leaves finish. Every child and the branch itself must be
+4. Give every terminal child and the branch a retrieval `coverage` receipt. Public-web work uses
+   `strategy: direct` and normally `scope: bounded`; `returned_count` is the number of distinct
+   usable source leads. Set `truncated` when relied-on output was cut, and `budget_exhausted` when
+   the allocation ended with an unresolved gap. Use `scope: exhaustive` only when a tool reports
+   an exact `total_count`; never invent totals. A `done` node requires `complete: true` and no gaps.
+5. Call `branch_plan` again after all leaves finish. Every child and the branch itself must be
    `done`, `blocked`, or `deferred`. A deferral needs value, risk, and rationale.
-5. Stay within the supplied budget. You cannot settle the head plan or write its capsule.
+6. Stay within the supplied budget. You cannot settle the head plan or write its capsule.
 
 Return only:
 

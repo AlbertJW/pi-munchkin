@@ -32,7 +32,7 @@ import {
 } from "./types.js";
 import { ACTIVE_TOOL_PROMPTS } from "../../lib/active-tool-prompts.ts";
 import { emitHarnessSignal } from "../../lib/harness-signals.ts";
-import { PLAN_CONTEXT_ENV, RESEARCH_SCOUT_ENV, researchUsageFromMessages, validateScoutDispatch, type PlanContextV1, type ScoutReceiptV1 } from "../../lib/branch-report.ts";
+import { PLAN_CONTEXT_ENV, RESEARCH_SCOUT_ENV, researchUsageFromMessages, validateRootResearchDispatch, validateScoutDispatch, type PlanContextV1, type ScoutReceiptV1 } from "../../lib/branch-report.ts";
 
 // ---------------------------------------------------------------------------
 // Limits
@@ -406,6 +406,8 @@ export default function (pi: ExtensionAPI) {
   const { currentDepth, maxDepth, ancestorAgentStack, preventCycles } = depthConfig;
   const canDelegate = depthConfig.canDelegate && !RESEARCH_SCOUT_PROCESS;
   let researchScoutDispatches = 0;
+  const researchBranchParents = new Set<string>();
+  const researchBranchOwners = new Set<string>();
 
   let discoveredAgents: AgentConfig[] = [];
 
@@ -413,6 +415,8 @@ export default function (pi: ExtensionAPI) {
   pi.on("session_start", async (_event, ctx) => {
 	delete (globalThis as Record<string, unknown>)[SCOUT_RECEIPTS_KEY];
 	researchScoutDispatches = 0;
+	researchBranchParents.clear();
+	researchBranchOwners.clear();
     if (!canDelegate) return;
 
     const starterDiscovery = discoverAgentsWithStarter(ctx.cwd);
@@ -602,6 +606,7 @@ Use single mode for one task, parallel mode when tasks are independent and can r
         }
 
 		let plannedScoutCount = 0;
+		let plannedRootContexts: PlanContextV1[] = [];
 		if (BRANCH_PLANNER_PROCESS) {
 			const planned = params.tasks ?? (params.agent && params.task ? [{ agent: params.agent, task: params.task, plan_context: (params as typeof params & { plan_context?: PlanContextV1 }).plan_context }] : []);
 			plannedScoutCount = planned.length;
@@ -610,6 +615,20 @@ Use single mode for one task, parallel mode when tasks are independent and can r
 					content: [{ type: "text", text: "Blocked: a planned research branch may dispatch at most two research-scout leaves, each with its returned depth-two plan_context." }],
 					details: makeDetails(hasTasks ? "parallel" : "single")([]), isError: true,
 				};
+			}
+		} else if (PLAN_GRAPH_ENABLED) {
+			const planned = params.tasks ?? (params.agent && params.task ? [{ agent: params.agent, task: params.task, plan_context: (params as typeof params & { plan_context?: PlanContextV1 }).plan_context }] : []);
+			const withContext = planned.filter((entry) => entry.plan_context !== undefined);
+			if (withContext.length > 0) {
+				const active = (globalThis as Record<string, unknown>).__pi_active_plan_context as { run_id?: unknown; profile?: unknown; settled?: unknown } | undefined;
+				const activeRunId = active?.profile === "deep-research" && active.settled !== true && typeof active.run_id === "string" ? active.run_id : undefined;
+				if (withContext.length !== planned.length || !validateRootResearchDispatch(activeRunId, researchBranchParents, researchBranchOwners, planned as Array<{ agent: string; plan_context?: unknown }>)) {
+					return {
+						content: [{ type: "text", text: "Blocked: planned root research requires one unused depth-one context from the active graph for every research-planner child." }],
+						details: makeDetails(hasTasks ? "parallel" : "single")([]), isError: true,
+					};
+				}
+				plannedRootContexts = withContext.map((entry) => entry.plan_context as PlanContextV1);
 			}
 		}
 
@@ -686,6 +705,7 @@ This guard prevents self-recursion and cyclic handoffs (for example A -> B -> A)
         // ── Parallel mode ──
         if (params.tasks && params.tasks.length > 0) {
 		  researchScoutDispatches += plannedScoutCount;
+		  for (const context of plannedRootContexts) { researchBranchParents.add(context.parent_item_id); researchBranchOwners.add(context.owner_ref); }
           return executeParallel(
 			params.tasks as Array<{ agent: string; task: string; cwd?: string; plan_context?: PlanContextV1 }>,
             delegationMode,
@@ -702,6 +722,7 @@ This guard prevents self-recursion and cyclic handoffs (for example A -> B -> A)
         // ── Single mode ──
         if (params.agent && params.task) {
 		  researchScoutDispatches += plannedScoutCount;
+		  for (const context of plannedRootContexts) { researchBranchParents.add(context.parent_item_id); researchBranchOwners.add(context.owner_ref); }
           return executeSingle(
             params.agent,
             params.task,

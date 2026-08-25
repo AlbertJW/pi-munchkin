@@ -5,7 +5,7 @@
 Implemented on the isolated `codex/hierarchical-planner` branch. Both runtime switches default to
 `off`; this branch has not been merged, mirrored, loaded by Pi, or used for a model session. The
 existing semantic-loop study remains the first eligible measurement track. Package-source surface:
-`ed59f742891f592318896c7120c3c7373efdf04e242ed9d54ca1d2509c953b66`.
+`b8f1c8b060fc963045ab4235416265b4c973438da8e92e291bbeb7bd0e34efef`.
 
 ## Runtime contract
 
@@ -18,13 +18,16 @@ The planner has two compatible state forms:
   off; it is not silently downgraded.
 
 V5 adds optional `parent_id`, `kind`, `owner_ref`, conserved `{allocated, used}` budgets,
-`evidence_gaps`, and terminal `deferred` state with required value/risk/rationale. IDs remain stable.
+`evidence_gaps`, retrieval `coverage`, and terminal `deferred` state with required
+value/risk/rationale. IDs remain stable.
 The validator rejects orphans, cycles, depth overflow, duplicate IDs, budget inflation, profile
 fan-out violations, and graphs above 24 nodes.
 
 `plan_expand` changes structure below one stable parent. `plan_settle` is head-only economic
 settlement: every required node must be terminal, blocked work prevents settlement, deferrals must
-be explained, and profile-specific evidence conditions must pass. Ordinary local progress still
+be explained, completed research nodes must have complete gap-free coverage, and profile-specific
+evidence conditions must pass. A settled graph is immutable: routine deltas, structural rewrites,
+and delayed child results cannot change it. Ordinary local progress still
 allows one current item; concurrently delegated items require distinct owners.
 
 Ambient status renders roots, descendant counts, remaining budget, and evidence-gap counts.
@@ -48,9 +51,34 @@ head plan
   └─ research branch                         (three roots maximum)
 ```
 
-One discovery envelope covers the graph: three searches and five source reads. Root allocations
-must sum within that envelope; a branch may subdivide only its own remainder. The head receives up
-to five validation re-reads. Budget exhaustion becomes an evidence gap, never a reset.
+One discovery envelope covers the graph: three search calls and five distinct source reads. Root
+allocations must sum within that envelope; a branch may subdivide only its own unspent remainder.
+The retrieval tools enforce the assigned per-process remainder before execution, and the terminal
+report reconciles parent and scout receipts. Once the graph starts, the head receives no second
+search envelope—only up to five validation re-reads.
+Budget exhaustion becomes an evidence gap, never a reset.
+
+## Retrieval selection and completeness
+
+The plan graph does not make a structural graph the universal retrieval path. A node may declare
+`direct`, `structural`, or `hybrid` retrieval. Literal matches, known files, small fan-out, and
+straightforward fact lookup stay direct. Caller/reference enumeration, rename planning, dependency
+tracing, and other high-fan-out questions are candidates for structural retrieval. A future code
+graph profile should default to one or two hops; a three-hop walk requires an explicit remaining
+gap and budget because measured benefit is size- and query-dependent.
+
+Coverage is a typed receipt: bounded versus exhaustive scope, returned and optional total counts,
+truncation, failure, budget exhaustion, and derived completion. Exhaustive retrieval cannot be
+complete without an exact total and equality between returned and total counts. Any truncated,
+failed, or budget-exhausted receipt is incomplete. `web_search` and `web_read` expose the same
+machine-readable fields and render them model-visibly. Public-web branches normally use
+direct/bounded coverage; they must not invent a total. Incomplete work may be blocked or explicitly
+deferred with value/risk/rationale, but it cannot be marked done or silently complete the head.
+
+This contract incorporates the useful mechanism from the measured code-graph discussion without
+overclaiming its benchmark: its 40 probes were chosen from high-degree symbols, measured retrieval
+tokens rather than downstream coding success, and showed that three-hop impact can be worse than
+grep/read. Routing and completion integrity are adopted; universal graph retrieval is not.
 
 ## Child boundary and ownership
 
@@ -66,7 +94,8 @@ delegation tool inside a scout. Scout search/read use is derived from captured t
 not prose, and the terminal report must reconcile leaf and branch consumption. The child never
 opens the parent capsule. After child exit the wrapper
 validates the report and emits a typed result; the parent serializes concurrent arrivals and merges
-each transactionally. Duplicate delivery replaces only that branch's children. Wrong ownership,
+each transactionally. A depth-one context has a one-shot dispatch lease and the first terminal
+result wins, so duplicate dispatch or delivery cannot spend or rewrite the branch twice. Wrong ownership,
 collisions, malformed reports, over-budget reports, interruption, and missing reports cannot add
 nodes; a failed owner branch becomes blocked with a bounded failure class.
 

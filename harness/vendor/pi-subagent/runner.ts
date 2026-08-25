@@ -14,7 +14,7 @@ import { parseInheritedCliArgs } from "./runner-cli.js";
 import { processPiJsonLine } from "./runner-events.js";
 import { buildSubagentEnv } from "./runner-env.js";
 import { currentSessionId } from "../../lib/telemetry.ts";
-import { BRANCH_REPORT_ENV, PLAN_CONTEXT_ENV, RESEARCH_SCOUT_ENV, readBranchReport, validatePlanContext, type PlanContextV1 } from "../../lib/branch-report.ts";
+import { BRANCH_REPORT_ENV, PLAN_CONTEXT_ENV, RESEARCH_SCOUT_ENV, readBranchReport, validatePlanContext, validatePlanContextRole, type PlanContextV1 } from "../../lib/branch-report.ts";
 import {
   type DelegationMode,
   type SingleResult,
@@ -252,10 +252,10 @@ export async function runAgent(opts: RunAgentOptions): Promise<SingleResult> {
 			usage: emptyUsage(), model: agent.model, stopReason: "error", errorMessage: "Invalid plan_context.",
 		};
 	}
-	if (planContext && ((planContext.depth === 1 && agentName !== "research-planner") || (planContext.depth === 2 && agentName !== "research-scout"))) {
+	if (!validatePlanContextRole(agentName, planContext)) {
 		return {
-			agent: agentName, agentSource: agent.source, task, exitCode: 1, messages: [], stderr: "plan_context role mismatch.",
-			usage: emptyUsage(), model: agent.model, stopReason: "error", errorMessage: "plan_context role mismatch.",
+			agent: agentName, agentSource: agent.source, task, exitCode: 1, messages: [], stderr: "plan_context is missing or does not match the delegated research role.",
+			usage: emptyUsage(), model: agent.model, stopReason: "error", errorMessage: "plan_context is missing or does not match the delegated research role.",
 		};
 	}
 

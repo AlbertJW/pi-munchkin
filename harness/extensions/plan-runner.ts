@@ -4,7 +4,7 @@ import { randomUUID } from "node:crypto";
 import { defineTool, withFileMutationQueue, type ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { Type } from "typebox";
 import { ACTIVE_TOOL_PROMPTS } from "../lib/active-tool-prompts.ts";
-import { BRANCH_REPORT_ENV, PLAN_CONTEXT_ENV, readPlanContext, writeBranchReport, type BranchReportV1 } from "../lib/branch-report.ts";
+import { BRANCH_REPORT_ENV, PLAN_CONTEXT_ENV, RESEARCH_RESERVED_BUDGET_KEY, readPlanContext, writeBranchReport, type BranchReportV1 } from "../lib/branch-report.ts";
 import { classifyBashCommand } from "../lib/command-policy.ts";
 import { emitHarnessSignal, onHarnessSignal, signalRunId } from "../lib/harness-signals.ts";
 import { applyPlanDeltas, type PlanDelta } from "../lib/plan-delta.ts";
@@ -146,6 +146,7 @@ function migrateState(raw: any): PlanState | undefined {
 		...(raw.schema_version === 5 && item.budget ? { budget: item.budget } : {}),
 		...(raw.schema_version === 5 && Array.isArray(item.evidence_gaps) ? { evidence_gaps: item.evidence_gaps.map(cleanText).filter(Boolean).slice(0, 8) } : {}),
 		...(raw.schema_version === 5 && Array.isArray(item.source_leads) ? { source_leads: item.source_leads.filter((value: unknown) => typeof value === "string").slice(0, 10) } : {}),
+		...(raw.schema_version === 5 && item.coverage ? { coverage: item.coverage } : {}),
 		...(raw.schema_version === 5 && item.defer ? { defer: item.defer } : {}),
 	}));
 	const now = isoNow();
@@ -182,8 +183,10 @@ function blockedItemCount(state: PlanState): number { return state.items.filter(
 function derivedStatus(state: PlanState): string {
 	if (state.items.length === 0) return "empty";
 	if (state.settled_at) return "completed";
-	if (state.items.every((item) => item.status === "done")) return "completed";
+	const requiresSettlement = state.schema_version === 5 && Boolean(state.profile || state.items.some((item) => item.parent_id));
+	if (!requiresSettlement && state.items.every((item) => item.status === "done")) return "completed";
 	if (state.items.every((item) => graphTerminal(item)) && state.items.some((item) => item.status === "blocked")) return "blocked";
+	if (requiresSettlement && state.items.every((item) => graphTerminal(item))) return "ready for settlement";
 	return state.phase === "planned" ? "planned (awaiting /plan-go)" : "executing";
 }
 
@@ -204,7 +207,8 @@ function renderItems(state: PlanState, selectedId?: string): string {
 		const descendants = state.schema_version === 5 ? descendantCount(state.items, item.id) : 0;
 		const gaps = item.evidence_gaps?.filter((gap) => !gap.startsWith("source:")).length ?? 0;
 		const budget = item.budget ? ` budget=${item.budget.used.searches}/${item.budget.allocated.searches}s ${item.budget.used.reads}/${item.budget.allocated.reads}r` : "";
-		const graph = descendants || gaps ? ` descendants=${descendants} gaps=${gaps}${budget}` : budget;
+		const coverage = item.coverage ? ` coverage=${item.coverage.complete ? "complete" : "incomplete"}:${item.coverage.strategy}` : "";
+		const graph = descendants || gaps ? ` descendants=${descendants} gaps=${gaps}${budget}${coverage}` : `${budget}${coverage}`;
 		const first = `${item.id}  [${item.status.replace("_", " ")}] ${item.title}`;
 		if (!item.note) return [`${first}${graph}`];
 		return [`${first}${graph}`, ...item.note.split("\n").filter(Boolean).map((line) => `  - ${line.replace(/^[-*]\s*/, "")}`)];
@@ -370,6 +374,7 @@ const planWrite = defineTool({
 		rememberModel(ctx);
 		const result = await mutatePlan(ctx.cwd, async (previous) => {
 			if (!isPlanning() && !previous && !FORCE_PLAN_WRITE) rejectPlanTool("plan_write is available only after /plan");
+			if (previous?.settled_at) rejectPlanTool("plan_write rejected: settled plans are immutable");
 			if (previous?.profile || previous?.items.some((item) => item.parent_id)) rejectPlanTool("plan_write cannot rewrite a plan graph; use plan_expand and plan_update");
 			const items = structuralItems(previous, params.items);
 			if (PLAN_GRAPH && (!previous || previous.schema_version === 5)) for (const item of items) item.kind ??= "work";
@@ -415,6 +420,7 @@ const planUpdate = defineTool({
 		rememberModel(ctx);
 		const outcome = await mutatePlan(ctx.cwd, async (previous) => {
 			if (!previous) rejectPlanTool("plan_update rejected: no plan exists; start with /plan");
+			if (previous.settled_at) rejectPlanTool("plan_update rejected: settled plans are immutable");
 			const applied = applyPlanDeltas(previous.items, params.deltas as PlanDelta[]);
 			if (!applied.ok) rejectPlanTool(`plan_update rejected: ${applied.errors.join("; ")}`);
 			const state = { ...previous, items: applied.items as PlanItem[] };
@@ -429,6 +435,14 @@ const planUpdate = defineTool({
 const BudgetSchema = Type.Object({
 	searches: Type.Integer({ minimum: 0, maximum: 100 }),
 	reads: Type.Integer({ minimum: 0, maximum: 100 }),
+});
+
+const CoverageSchema = Type.Object({
+	strategy: Type.Union([Type.Literal("direct"), Type.Literal("structural"), Type.Literal("hybrid")]),
+	scope: Type.Union([Type.Literal("bounded"), Type.Literal("exhaustive")]),
+	returned_count: Type.Integer({ minimum: 0, maximum: 100_000 }),
+	total_count: Type.Optional(Type.Integer({ minimum: 0, maximum: 100_000 })),
+	truncated: Type.Boolean(), budget_exhausted: Type.Boolean(), failed: Type.Boolean(), complete: Type.Boolean(),
 });
 
 function activateGraphTools(): void {
@@ -462,7 +476,8 @@ const researchPlanStart = defineTool({
 		lastSessionCwd = ctx.cwd;
 		if (process.env.RESEARCH_LEDGER !== "on") rejectPlanTool("research_plan_start requires RESEARCH_LEDGER=on so delegated sources can be parent-verified");
 		const state = await mutatePlan(ctx.cwd, async (previous) => {
-			if (previous && !previous.settled_at && openItemCount(previous) > 0) rejectPlanTool("an active plan already exists");
+			const unsettledGraph = previous && !previous.settled_at && Boolean(previous.profile || previous.items.some((item) => item.parent_id));
+			if (previous && !previous.settled_at && (openItemCount(previous) > 0 || unsettledGraph)) rejectPlanTool("an active or unsettled graph plan already exists");
 			const now = isoNow();
 			const runId = `research-plan-${timestamp()}`;
 			const items: PlanItem[] = params.branches.map((branch) => {
@@ -501,12 +516,13 @@ const planExpand = defineTool({
 		children: Type.Array(Type.Object({
 			item_id: Type.Optional(Type.String({ minLength: 1, maxLength: 96 })),
 			title: Type.String({ minLength: 1, maxLength: 120 }), note: Type.Optional(Type.String({ maxLength: 300 })),
-			budget: BudgetSchema,
+			budget: Type.Optional(BudgetSchema),
 		}), { minItems: 1, maxItems: 8 }),
 	}),
 	async execute(_id, params, _signal, _update, ctx) {
 		const state = await mutatePlan(ctx.cwd, async (previous) => {
 			if (!previous || previous.schema_version !== 5) rejectPlanTool("plan_expand requires an active graph plan");
+			if (previous.settled_at) rejectPlanTool("plan_expand rejected: settled plans are immutable");
 			const next = expandGraph(previous as GraphPlanState, params.parent_item_id, params.children as BranchChildInput[]);
 			return { state: next, result: next };
 		});
@@ -523,6 +539,7 @@ const planSettle = defineTool({
 	async execute(_id, params, _signal, _update, ctx) {
 		const state = await mutatePlan(ctx.cwd, async (previous) => {
 			if (!previous || previous.schema_version !== 5) rejectPlanTool("plan_settle requires an active graph plan");
+			if (previous.settled_at) rejectPlanTool("plan_settle rejected: plan is already settled and immutable");
 			const verifiedRaw = (globalThis as Record<string, unknown>).__pi_plan_validation_urls;
 			const verified = new Set(Array.isArray(verifiedRaw) ? verifiedRaw.filter((value): value is string => typeof value === "string") : []);
 			const errors = settleErrors(previous as GraphPlanState, verified);
@@ -550,10 +567,12 @@ const branchPlan = defineTool({
 			status: Type.Union([Type.Literal("pending"), Type.Literal("in_progress"), Type.Literal("done"), Type.Literal("blocked"), Type.Literal("deferred")]),
 			budget: Type.Object({ allocated: BudgetSchema, used: BudgetSchema }),
 			evidence_gaps: Type.Optional(Type.Array(Type.String({ minLength: 1, maxLength: 300 }), { maxItems: 8 })),
+			coverage: Type.Optional(CoverageSchema),
 			defer: Type.Optional(Type.Object({ value: Type.String({ minLength: 1, maxLength: 200 }), risk: Type.String({ minLength: 1, maxLength: 200 }), rationale: Type.String({ minLength: 1, maxLength: 300 }) })),
 		}), { maxItems: DEEP_RESEARCH_MAX_CHILDREN }),
 		source_leads: Type.Array(Type.Object({ url: Type.String({ minLength: 1, maxLength: 1_999 }), claim: Type.String({ minLength: 1, maxLength: 500 }), quote: Type.String({ minLength: 1, maxLength: 800 }) }), { maxItems: 10 }),
 		evidence_gaps: Type.Array(Type.String({ minLength: 1, maxLength: 300 }), { maxItems: 8 }),
+		coverage: Type.Optional(CoverageSchema),
 		defer: Type.Optional(Type.Object({ value: Type.String({ minLength: 1, maxLength: 200 }), risk: Type.String({ minLength: 1, maxLength: 200 }), rationale: Type.String({ minLength: 1, maxLength: 300 }) })),
 	}),
 	async execute(_id, params) {
@@ -561,24 +580,36 @@ const branchPlan = defineTool({
 		const reportPath = process.env[BRANCH_REPORT_ENV];
 		if (!context || !reportPath) rejectPlanTool("branch_plan rejected: no valid parent plan context");
 		const report: BranchReportV1 = { v: 1, parent_item_id: context.parent_item_id, owner_ref: context.owner_ref, ...params } as BranchReportV1;
-		if (["done", "blocked", "deferred"].includes(report.status)) {
-			const shared = globalThis as Record<string, unknown>;
-			const own = shared.__pi_research_state as { searches?: unknown; reads?: unknown } | undefined;
-			const receipts = Array.isArray(shared.__pi_research_scout_receipts) ? shared.__pi_research_scout_receipts as Array<{ owner_ref?: unknown; searches?: unknown; reads?: unknown }> : [];
-			const receiptByOwner = new Map(receipts.filter((receipt) => typeof receipt.owner_ref === "string").map((receipt) => [receipt.owner_ref as string, receipt]));
-			let observedSearches = typeof own?.searches === "number" ? own.searches : 0;
-			let observedReads = typeof own?.reads === "number" ? own.reads : 0;
-			for (const child of report.children) {
-				const receipt = receiptByOwner.get(ownerRef(context.run_id, child.item_id));
-				if (!receipt) rejectPlanTool(`branch_plan rejected: missing scout receipt for ${child.item_id}`);
-				const searches = typeof receipt.searches === "number" ? receipt.searches : 0;
-				const reads = typeof receipt.reads === "number" ? receipt.reads : 0;
-				if (child.budget.used.searches !== searches || child.budget.used.reads !== reads) rejectPlanTool(`branch_plan rejected: scout budget receipt mismatch for ${child.item_id}`);
-				observedSearches += searches; observedReads += reads;
+		const terminal = ["done", "blocked", "deferred"].includes(report.status);
+		const shared = globalThis as Record<string, unknown>;
+		const own = shared.__pi_research_state as { searches?: unknown; reads?: unknown } | undefined;
+		const ownUsage = { searches: typeof own?.searches === "number" ? own.searches : 0, reads: typeof own?.reads === "number" ? own.reads : 0 };
+		const receipts = Array.isArray(shared.__pi_research_scout_receipts) ? shared.__pi_research_scout_receipts as Array<{ owner_ref?: unknown; searches?: unknown; reads?: unknown }> : [];
+		const receiptByOwner = new Map(receipts.filter((receipt) => typeof receipt.owner_ref === "string").map((receipt) => [receipt.owner_ref as string, receipt]));
+		let observedSearches = ownUsage.searches;
+		let observedReads = ownUsage.reads;
+		let reservedSearches = 0;
+		let reservedReads = 0;
+		for (const child of report.children) {
+			reservedSearches += child.budget.allocated.searches;
+			reservedReads += child.budget.allocated.reads;
+			const receipt = receiptByOwner.get(ownerRef(context.run_id, child.item_id));
+			if (!receipt) {
+				if (terminal) rejectPlanTool(`branch_plan rejected: missing scout receipt for ${child.item_id}`);
+				if (child.budget.used.searches !== 0 || child.budget.used.reads !== 0) rejectPlanTool(`branch_plan rejected: unobserved scout usage for ${child.item_id}`);
+				continue;
 			}
-			if (report.consumed.searches !== observedSearches || report.consumed.reads !== observedReads) rejectPlanTool("branch_plan rejected: branch consumption does not match observed research calls");
+			const searches = typeof receipt.searches === "number" ? receipt.searches : 0;
+			const reads = typeof receipt.reads === "number" ? receipt.reads : 0;
+			if (child.budget.used.searches !== searches || child.budget.used.reads !== reads) rejectPlanTool(`branch_plan rejected: scout budget receipt mismatch for ${child.item_id}`);
+			observedSearches += searches; observedReads += reads;
+		}
+		if (report.consumed.searches !== observedSearches || report.consumed.reads !== observedReads) rejectPlanTool("branch_plan rejected: branch consumption does not match observed research calls");
+		if (ownUsage.searches + reservedSearches > context.budget.searches || ownUsage.reads + reservedReads > context.budget.reads) {
+			rejectPlanTool("branch_plan rejected: child allocations exceed the branch remainder after local research");
 		}
 		await writeBranchReport(reportPath, report, context);
+		shared[RESEARCH_RESERVED_BUDGET_KEY] = { searches: reservedSearches, reads: reservedReads };
 		const contexts = report.children.map((child) => ({
 			v: 1 as const, profile: "deep-research" as const, run_id: context.run_id, parent_item_id: child.item_id,
 			owner_ref: ownerRef(context.run_id, child.item_id), depth: 2 as const, budget: child.budget.allocated,
@@ -675,9 +706,10 @@ export function policyBlock(_autonomy: Autonomy, subagentAvailable: boolean): st
 async function mergeBranchResult(cwd: string, context: import("../lib/branch-report.ts").PlanContextV1, report: BranchReportV1 | null, failureClass: string | null): Promise<void> {
 	type MergeOutcome = { kind: "ignored" } | { kind: "failed"; runId: string; failureClass: string } | { kind: "merged"; runId: string; children: number; leads: number; gaps: number };
 	const outcome = await mutatePlan<MergeOutcome>(cwd, async (previous) => {
-		if (!previous || previous.schema_version !== 5 || previous.run_id !== context.run_id) return { result: { kind: "ignored" } };
+		if (!previous || previous.schema_version !== 5 || previous.run_id !== context.run_id || previous.settled_at) return { result: { kind: "ignored" } };
 		const parent = previous.items.find((item) => item.id === context.parent_item_id);
 		if (!parent || parent.owner_ref !== context.owner_ref || parent.parent_id) return { result: { kind: "ignored" } };
+		if (graphTerminal(parent)) return { result: { kind: "ignored" } };
 		if (!report) {
 			const failure = failureClass ?? "missing_report";
 			const items = previous.items.map((item) => item.id === parent.id ? {
@@ -692,12 +724,12 @@ async function mergeBranchResult(cwd: string, context: import("../lib/branch-rep
 		const children: PlanItem[] = report.children.map((child) => ({
 			id: child.item_id, parent_id: parent.id, kind: "research_leaf", owner_ref: ownerRef(previous.run_id, child.item_id),
 			title: cleanText(child.title), note: cleanText(child.note) || undefined, status: child.status,
-			budget: child.budget, evidence_gaps: child.evidence_gaps?.map(cleanText).filter(Boolean), defer: child.defer,
+			budget: child.budget, evidence_gaps: child.evidence_gaps?.map(cleanText).filter(Boolean), coverage: child.coverage, defer: child.defer,
 		}));
 		const items = retained.map((item) => item.id === parent.id ? {
 			...item, status: report.status, note: cleanText(report.note), defer: report.defer,
 			budget: item.budget ? { ...item.budget, used: report.consumed } : item.budget,
-			evidence_gaps: report.evidence_gaps.map(cleanText).filter(Boolean), source_leads: report.source_leads.map((lead) => storedUrl(lead.url).display),
+			evidence_gaps: report.evidence_gaps.map(cleanText).filter(Boolean), source_leads: report.source_leads.map((lead) => storedUrl(lead.url).display), coverage: report.coverage,
 		} : item).concat(children);
 		const next = { ...previous, items };
 		validateStateSize(next);

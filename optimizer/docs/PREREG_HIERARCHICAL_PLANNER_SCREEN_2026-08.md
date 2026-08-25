@@ -65,6 +65,9 @@ Per candidate session report:
 - root/leaf counts and maximum depth (no graph may exceed 24 nodes or profile depth two);
 - allocated and consumed searches/reads across all branches;
 - parent validation-note count, delegated-lead count, unresolved-gap count, and deferred count;
+- retrieval strategy and coverage receipts: bounded/exhaustive scope, returned/total counts,
+  truncation, failed retrieval, budget exhaustion, and whether any `done` node lacked complete
+  gap-free coverage;
 - child exits and failure classes; no URL, query, quote, or claim enters telemetry;
 - total tool calls, turns, tokens, wall time, and artifact-grade correctness.
 
@@ -76,12 +79,13 @@ credited as verified evidence.
 
 Stop immediately on a surface/config/serving mismatch, duplicate or absent settlement, graph budget
 inflation, parent capsule mutation by a child, a depth-two delegation attempt, telemetry rejection,
-unredacted research content in telemetry, or any live-mirror drift. A mechanism-screen failure is
+unredacted research content in telemetry, a completed node with incomplete coverage, post-settlement
+mutation, or any live-mirror drift. A mechanism-screen failure is
 `DIAGNOSE`, not a negative efficacy result.
 
 ## 7. Frozen identity (incomplete by design)
 
-- branch source surface: `ed59f742891f592318896c7120c3c7373efdf04e242ed9d54ca1d2509c953b66`
+- branch source surface: `b8f1c8b060fc963045ab4235416265b4c973438da8e92e291bbeb7bd0e34efef`
 - authoritative loaded live surface: `UNASSIGNED`
 - candidate config sha256: `0d01aab9292db845b5f228174e2a1a4c10328883daebd482dcd9c9c9f5f5fd1e`
 - control config sha256: `a2e5efef3ab36d90ab58ee91920b766e5c7a162905da970778e9439c3c1c92f7`
@@ -96,3 +100,10 @@ not authorize a stage.
 Passing proves only activation, bounded delegation, merge, parent verification, and settlement on
 the admitted fixtures. It cannot justify enabling the flags by default. Default activation requires
 a separately powered comparative result and a separate human decision.
+
+The comparative protocol must not use token savings alone. It must stratify direct versus structural
+questions, low- versus high-degree targets, repository scale, and traversal depth; include ordinary
+project traces plus task-specific suites such as CodeRAG-Bench, COIR-Retrieval, ContextBench, and
+SWE-Explore; and report task correctness, coverage/completeness, latency, index construction and
+amortization, tool calls, and tokens. A traversal that truncates or hits its budget is incomplete and
+cannot be credited as a saving. Highest-degree-only probes are an explicit selection-bias failure.

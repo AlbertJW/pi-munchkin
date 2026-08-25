@@ -1,6 +1,11 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { expandGraph, settleErrors, validateGraph, type GraphPlanState } from "../lib/plan-graph.ts";
+import { expandGraph, settleErrors, validCoverage, validateGraph, type GraphPlanState } from "../lib/plan-graph.ts";
+
+const completeCoverage = {
+	strategy: "direct" as const, scope: "bounded" as const, returned_count: 1,
+	truncated: false, budget_exhausted: false, failed: false, complete: true,
+};
 
 function state(): GraphPlanState {
 	return {
@@ -25,10 +30,35 @@ test("deep-research graph expansion preserves parent identity and conserves budg
 		{ title: "A", budget: { searches: 2, reads: 3 } },
 		{ title: "B", budget: { searches: 1, reads: 1 } },
 	]), /child budgets exceed parent allocation/);
-	const overused = structuredClone(next);
+		const overused = structuredClone(next);
 	overused.items[0].budget!.used = { searches: 0, reads: 0 };
 	overused.items[1].budget!.used = { searches: 1, reads: 1 };
-	assert.ok(validateGraph(overused).some((error) => /child budget use exceeds parent consumption/.test(error)));
+		assert.ok(validateGraph(overused).some((error) => /child budget use exceeds parent consumption/.test(error)));
+		const premature = structuredClone(next);
+		premature.items[0].status = "done";
+		premature.items[0].coverage = completeCoverage;
+		assert.ok(validateGraph(premature).some((error) => /terminal parent has open children/.test(error)));
+});
+
+test("ordinary graph expansion does not manufacture delegation ownership", () => {
+	const ordinary = state();
+	delete ordinary.profile;
+	ordinary.items[0] = { id: "root", title: "Local work", status: "pending", kind: "work", budget: { allocated: { searches: 0, reads: 0 }, used: { searches: 0, reads: 0 } } };
+		const next = expandGraph(ordinary, "root", [{ item_id: "local-child", title: "Local child" }]);
+		assert.equal(next.items[1].owner_ref, undefined, "structural expansion alone is not delegation");
+		assert.equal(next.items[1].budget, undefined, "generic graph expansion does not require research accounting");
+	assert.deepEqual(validateGraph(next), []);
+});
+
+test("coverage receipts cannot call partial or truncated retrieval complete", () => {
+	assert.equal(validCoverage(completeCoverage), true);
+	assert.equal(validCoverage({
+		...completeCoverage, strategy: "structural", scope: "exhaustive", returned_count: 12, total_count: 47, complete: false,
+	}), true);
+	assert.equal(validCoverage({
+		...completeCoverage, strategy: "structural", scope: "exhaustive", returned_count: 12, total_count: 47, complete: true,
+	}), false);
+	assert.equal(validCoverage({ ...completeCoverage, truncated: true }), false);
 });
 
 test("graph validation rejects cycles, missing parents, depth overflow, and excess roots", () => {
@@ -42,13 +72,37 @@ test("graph validation rejects cycles, missing parents, depth overflow, and exce
 	const roots = state();
 	for (let index = 0; index < 3; index++) roots.items.push({ id: `extra-${index}`, title: "extra", status: "pending" });
 	assert.ok(validateGraph(roots).some((error) => /at most 3 roots/.test(error)));
-});
+	const weakened = state();
+	weakened.profile = { ...weakened.profile!, max_depth: 99 as never, discovery_budget: { searches: 300, reads: 500 } };
+	assert.ok(validateGraph(weakened).some((error) => /profile constants/.test(error)), "stored state cannot weaken the fixed research profile");
+	const malformed = state();
+	malformed.items[0] = { ...malformed.items[0], title: " ", kind: "work", owner_ref: "not-an-owner", source_leads: ["https://user:pass@example.test/private"] };
+	const malformedErrors = validateGraph(malformed);
+		for (const pattern of [/invalid title/, /root must be a research_branch/, /invalid owner reference/, /invalid source leads/]) {
+			assert.ok(malformedErrors.some((error) => pattern.test(error)), `expected ${pattern} in ${malformedErrors.join("; ")}`);
+		}
+		const tooDeep = expandGraph(state(), "root", [{ item_id: "leaf", title: "Leaf", budget: { searches: 1, reads: 1 } }]);
+		tooDeep.items.push({
+			id: "forged-grandchild", parent_id: "leaf", kind: "research_leaf", title: "Third delegation level", status: "pending",
+			owner_ref: "b".repeat(24), budget: { allocated: { searches: 0, reads: 1 }, used: { searches: 0, reads: 0 } },
+		});
+		assert.ok(validateGraph(tooDeep).some((error) => /maximum graph depth exceeded/.test(error)));
+		const zero = state();
+		zero.items[0].budget = { allocated: { searches: 0, reads: 0 }, used: { searches: 0, reads: 0 } };
+		assert.ok(validateGraph(zero).some((error) => /non-zero allocation/.test(error)));
+	});
 
 test("settlement requires terminal unblocked work, complete deferrals, and parent-verified leads", () => {
 	const candidate = state();
-	candidate.items[0] = { ...candidate.items[0], status: "done", source_leads: ["https://example.test/source"] };
+	candidate.items[0] = { ...candidate.items[0], status: "done", coverage: completeCoverage, source_leads: ["https://example.test/source"] };
 	assert.ok(settleErrors(candidate, new Set()).some((error) => /parent-verified/.test(error)));
 	assert.deepEqual(settleErrors(candidate, new Set(["https://example.test/source", "https://second.example.test/source"])), []);
+	candidate.items[0].coverage = { ...completeCoverage, complete: false, budget_exhausted: true };
+	assert.ok(settleErrors(candidate, new Set(["https://example.test/source", "https://second.example.test/source"])).some((error) => /gap-free coverage/.test(error)));
+	candidate.items[0].coverage = completeCoverage;
+	candidate.items[0].evidence_gaps = ["unresolved crossover"];
+	assert.ok(settleErrors(candidate, new Set(["https://example.test/source", "https://second.example.test/source"])).some((error) => /gap-free coverage/.test(error)));
+	delete candidate.items[0].evidence_gaps;
 	candidate.items[0].status = "blocked";
 	assert.ok(settleErrors(candidate, new Set(["https://example.test/source", "https://second.example.test/source"])).some((error) => /blocked node/.test(error)));
 });
