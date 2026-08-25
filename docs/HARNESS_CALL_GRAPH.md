@@ -186,7 +186,7 @@ accumulator).
 | **Tool-call stream** | (atom) | the raw per-turn action log | every verifier reads it; never persisted verbatim |
 | **Run kernel** | `run-kernel-state.ts`, `run-kernel.ts` | typed per-run event record (redacted) | run-kernel writes; audit / recovery read |
 | **Working memory** | `working-memory.ts` | bounded per-run notebook (model-authored hypotheses) | model writes/lists via explicit tool calls; dark (`WORKING_MEMORY=off`); NEVER injected into context automatically |
-| **Plan state** | `plan-state-storage.ts`, `plan-runner.ts` | structured work items + receipts | model writes; plan-runner reads |
+| **Plan state** | `plan-state-storage.ts`, `plan-runner.ts` | structured intended work + item status | model writes; plan-runner reads; verification remains session-owned |
 | **Blackboard** | `session-blackboard.ts` | bounded redacted session summary | writes persist; cockpit reads |
 | **Context surface** | `context-surface.ts` | which surface mode is active | read by context-inlet guard |
 | **Failure episodes** | `failure-episodes.ts` | semantic-failure tracking for steering | loop-breaker / arbiter read |
@@ -349,7 +349,7 @@ is the correct shape.
           telemetry · surface-receipt  · run-kernel (FSM)  · working-memory  · blackboard
           · plan-state  · failure-episodes  · compaction (→ recovery capsule)
 
-        human boundary: verify-gate · plan-gates · git-guard · secret-scan · mirror:check · drift · governor
+        human boundary: verify-gate · plan review · git-guard · secret-scan · mirror:check · drift · governor
 
         separate graph (the ONLY real one):  optimizer: fixture → gate → grade → verdict → report → admit/reject
 ```

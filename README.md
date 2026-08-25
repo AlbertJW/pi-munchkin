@@ -51,8 +51,9 @@ second.
 - **`verify-gate`** — only treats work as done once the project's checks have actually run and
   passed after the last edit. *Accepts only ordered successful verification evidence after the
   latest source mutation.*
-- **`plan-runner`** — lets the agent keep a checklist of work items, each with its own pass/fail
-  check. *Model-owned structured work items with deduplicated one-shot gate receipts.*
+- **`plan-runner`** — lets the agent keep a bounded checklist of intended work while project
+  verification remains session-owned. *Model-owned stable-ID work items with structural writes
+  and small status deltas; no per-item correctness or gate receipts.*
 - **`git-guard`** — asks for confirmation before any command that could discard uncommitted work.
   *Confirms commands that could discard uncommitted work.*
 - **context and Bash guards** — refuse oversized input or output instead of silently cutting it off
@@ -323,7 +324,7 @@ npm run verify -- --serial   # stages one at a time, if a concurrent failure is 
 npm run mirror:apply         # copy the manifest's first-party files into a live agent dir
 ```
 
-`verify` runs its five independent stages concurrently (~13s rather than ~40s), capturing each
+`verify` runs its six independent stages concurrently (~13s rather than ~40s), capturing each
 stage's output and printing it grouped so a failure is always attributable. Every stage runs to
 completion even after one fails, so a single run reports every problem.
 
