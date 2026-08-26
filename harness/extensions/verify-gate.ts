@@ -302,9 +302,12 @@ export default function (pi: ExtensionAPI) {
 			? "verification" : "other";
 	};
 
-	const applyOrderedOutcome = (outcome: ReturnType<VerificationOrderClock["finish"]>): void => {
+	const applyOrderedOutcome = (
+		outcome: ReturnType<VerificationOrderClock["finish"]>,
+		mutationCounts: boolean,
+	): void => {
 		if (!outcome) return;
-		if (outcome.mutationAttempted) {
+		if (outcome.mutationAttempted && mutationCounts) {
 			st.mutated = true;
 			st.verifiedOk = false;
 		}
@@ -385,7 +388,11 @@ export default function (pi: ExtensionAPI) {
 		if (kind === "source_mutation") {
 			mutationStartState.set(event.toolCallId, { generation: mutationGeneration, mutated: st.mutated, verifiedOk: st.verifiedOk, fires: st.fires });
 			trimOldest(mutationStartState as Map<string, unknown>, 512);
-			st.mutated = true;
+			// A pending mutation invalidates green evidence for ordering purposes, but
+			// it is not yet proof that bytes changed. Built-in edit/write/multiedit
+			// failures are atomic failures and must not arm the legacy mutation bit.
+			// Failed shell commands remain conservative at settlement because they may
+			// have written before returning non-zero.
 			st.verifiedOk = false;
 			st.fires = 0;
 		}
@@ -422,8 +429,15 @@ export default function (pi: ExtensionAPI) {
 			callId: event.toolCallId,
 			succeeded,
 		});
-		applyOrderedOutcome(outcome);
+		const mutationCounts = Boolean(outcome?.mutationAttempted) && (!event.isError || event.toolName === "bash");
+		applyOrderedOutcome(outcome, mutationCounts);
 		if (outcome?.mutationSettled) {
+			const start = mutationStartState.get(event.toolCallId);
+			if (!mutationCounts && start && start.generation === mutationGeneration && !order.hasPendingMutations()) {
+				st.mutated = start.mutated;
+				st.verifiedOk = start.verifiedOk;
+				st.fires = start.fires;
+			}
 			mutationGeneration += 1;
 			mutationStartState.delete(event.toolCallId);
 			frontier.noteMutationSettled(!event.isError);

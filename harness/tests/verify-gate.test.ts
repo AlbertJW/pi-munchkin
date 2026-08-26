@@ -375,29 +375,53 @@ test("execution-order mode never lets a mutating verifier verify itself", async 
 	}
 });
 
-test("failed Bash and built-in mutation attempts conservatively disarm earlier green evidence", async () => {
-	for (const mutation of [
-		{ id: "bash-mutation", toolName: "bash", args: { command: "printf changed > src/app.ts; false" } },
-		{ id: "edit-mutation", toolName: "edit", args: { path: "src/app.ts", oldText: "a", newText: "b" } },
-	]) {
+test("a failed Bash mutation remains conservatively armed because it may have partially written", async () => {
+	const mutation = { id: "bash-mutation", toolName: "bash", args: { command: "printf changed > src/app.ts; false" } };
+	const cwd = projectWithNpmTest();
+	const fp = makeFakePi();
+	try {
+		await loadVerifyGate(fp, cwd, "execution");
+		const ctx = ctxFor(cwd);
+		await fire(fp, "tool_execution_start", {
+			toolCallId: "green", toolName: "bash", args: { command: "npm test" },
+		}, ctx);
+		await fire(fp, "tool_execution_end", {
+			toolCallId: "green", toolName: "bash", result: "passing", isError: false,
+		}, ctx);
+		await fire(fp, "tool_execution_start", { toolCallId: mutation.id, toolName: mutation.toolName, args: mutation.args }, ctx);
+		await fire(fp, "tool_execution_end", {
+			toolCallId: mutation.id, toolName: mutation.toolName, result: "failed after partial work", isError: true,
+		}, ctx);
+		await fire(fp, "turn_end", wrapUpTurn, ctx);
+		assert.equal(fp.sent.some((message) => message.includes("verify-gate")), true);
+	} finally {
+		resetPiGlobals();
+	}
+});
+
+test("failed atomic mutation tools do not arm the legacy mutation bit", async () => {
+	for (const toolName of ["edit", "write", "multiedit"]) {
 		const cwd = projectWithNpmTest();
 		const fp = makeFakePi();
 		try {
 			await loadVerifyGate(fp, cwd, "execution");
 			const ctx = ctxFor(cwd);
 			await fire(fp, "tool_execution_start", {
-				toolCallId: "green", toolName: "bash", args: { command: "npm test" },
+				toolCallId: `green-${toolName}`, toolName: "bash", args: { command: "npm test" },
 			}, ctx);
 			await fire(fp, "tool_execution_end", {
-				toolCallId: "green", toolName: "bash", result: "passing", isError: false,
+				toolCallId: `green-${toolName}`, toolName: "bash", result: "passing", isError: false,
 			}, ctx);
-			await fire(fp, "tool_execution_start", { toolCallId: mutation.id, toolName: mutation.toolName, args: mutation.args }, ctx);
+			await fire(fp, "tool_execution_start", { toolCallId: `failed-${toolName}`, toolName, args: { path: "src/app.ts" } }, ctx);
 			await fire(fp, "tool_execution_end", {
-				toolCallId: mutation.id, toolName: mutation.toolName, result: "failed after partial work", isError: true,
+				toolCallId: `failed-${toolName}`, toolName, result: "no matching text", isError: true,
 			}, ctx);
 			await fire(fp, "turn_end", wrapUpTurn, ctx);
-			assert.equal(fp.sent.some((message) => message.includes("verify-gate")), true,
-				`${mutation.toolName} failure must leave exact verification required`);
+			assert.equal(fp.sent.some((message) => message.includes("verify-gate")), false,
+				`${toolName} failure must not manufacture a mutation`);
+			const snapshot = (globalThis as Record<string, unknown>).__pi_vg_state as { mutated: boolean; verifiedOk: boolean };
+			assert.equal(snapshot.mutated, false, `${toolName} must agree with the success-gated run kernel`);
+			assert.equal(snapshot.verifiedOk, true, `${toolName} failure must preserve earlier exact green evidence`);
 		} finally {
 			resetPiGlobals();
 		}
