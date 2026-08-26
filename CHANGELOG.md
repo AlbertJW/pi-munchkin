@@ -4,6 +4,59 @@ All notable changes to pi-munchkin are documented here. Releases follow semantic
 
 ## Unreleased
 
+### Changed + Fixed (2026-08-26 — integration batches 0-2: killing classes, not instances)
+
+The four-scale review left fifteen deferred findings. They are not fifteen bugs; they are five
+classes, each of which has already produced more than one instance. These batches kill the first
+three, each leaving a conformance test behind so the class cannot return silently.
+
+**Batch 0 — make the shipped configuration the tested one.** Three places where the suite
+exercised a configuration nobody runs:
+- Producer tests install no arbiter, so `controlEnforces` is false and all 21 loop-breaker delivery
+  assertions took the LEGACY direct-send path. The shipped default is `CONTROL_ARBITER=enforce`, so
+  at the producer level **the shipped configuration was the least-tested one in the repo**. New
+  `emitRivalProposal()` lets any producer test lose a boundary to a real arbiter, and
+  `control-arbiter.test.ts` gains the invariant its 18 tests never had: *a producer that loses keeps
+  its budget*. Every prior test asserted the arbiter's OUTPUT; none inspected a producer afterwards.
+- `plan-runner.integration.test.ts` pinned `PLAN_STORAGE=project` at module scope, so all fifteen
+  tests ran in the ROLLBACK configuration. Removed. Five then failed — each because the *test*
+  hardcoded `.pi/plan-state.json`, a path that only exists in the rollback. They now resolve through
+  `privatePlanStatePath`, the function production uses. One explicit project-mode case remains.
+
+**Batch 1 — state that knows what a reload does to it.** Pi's reload semantics, verified in dist:
+`reload()` clears the extension cache, so the module is re-imported AND the factory re-invoked —
+module scope and closure die together, and `globalThis` is the only survivor. The event bus, though,
+is built ONCE and reused, and its `clear()` has no callers.
+- **All fifteen bus-subscribe sites discarded the unsubscribe the bus returns**, and nothing else
+  could dispose them: an extension gets no unload hook, and the closure holding the disposer is gone
+  by the time the next generation runs. Measured through the boot harness, one reload takes the
+  domain-signal channel from **7 to 14 listeners** against Node's default `maxListeners` of 10.
+  Stale subscribers are silent rather than harmless — the old runtime is invalidated
+  (`agent-session.js:551`), so their every `pi.*` call throws and `event-bus.js` swallows it.
+  New `lib/extension-lifecycle.ts` parks disposers where a reload cannot reach them.
+- `verify-gate.frontierSettled` and `working-memory.settled` guard an `agent_settled` hook but reset
+  only at `session_start`, so **only the first agent run of a session ever emitted its settled
+  rows**. Both now re-arm at `agent_start`, the shape `run-kernel.ts:381` already used.
+- verify-gate's "I hid `verify_project`" flag lived in the closure, so after a reload it was false
+  and the restore branch could never fire: a session that started gate-less and later gained one kept
+  the tool hidden for the whole process, while verify-gate's own steer went on demanding it.
+
+**Batch 2 — charge a budget when the model HEARD the message.** Fifteen of sixteen charge sites
+mutate their latch before proposing and record an `injected_chars` row for it; the arbiter then drops
+all but one per boundary. That corrupts the instrument, not just a log.
+- `ControlDecisionV1` now carries **`delivered`** — the winner plus whichever losers were merged into
+  its text, empty outside enforce. `winner` alone is wrong in both directions: the merge rescues
+  deliver a loser's text attached to the winner's, so verify-gate's nag would be refunded on exactly
+  the boundaries where it was heard; and the state lens (priority 100, triggered by a 600) can never
+  win at all.
+- The reference implementation was **corrected before being copied**: identity by `proposalIdHash`
+  rather than `source`, a `boundarySequence` check (a boundary can produce no decision, and a stale
+  record was being settled by whatever decision arrived next), and an `agent_start` reset.
+- `lib/control-charge.ts` holds the mechanics once. verify-gate's plateau is migrated: its
+  2026-08-21 fix reported `controlEnforces()` as `delivered`, which answers "is the arbiter
+  enforcing", not "did I win" — so every plateau correction that LOST its boundary was still counted
+  as an intervention and still fed the ROI meter.
+
 ### Fixed (2026-08-26 — four-scale deep review: solar / planetary / atomic / quark)
 
 Six blockers and ten defects, each counterfactually proven (fix stashed → new test red → restored).

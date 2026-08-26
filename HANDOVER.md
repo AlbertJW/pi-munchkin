@@ -44,6 +44,57 @@ optimizer-side: the model-visible surface did NOT move (source hash re-verified 
 screen, power, primary, replication — remains a separate Albert-started action; the mothball
 stands until he starts preflight.**
 
+## 2026-08-26 integration batches 0-2 — in progress, NOT rolled out
+
+The deferred list below is being worked as **five classes**, not fifteen fixes. Batches 0-2 are
+committed on `main` (`824301c`..`283eca1`), verify 6/6, 608 tests, source `1715d62d…`. **Nothing is
+mirrored**: the boundary row for these is marked PENDING.
+
+The thesis, and the reason the batches are ordered this way: **the suite systematically exercised
+the configuration nobody ships.** One extension per FakePi, never manifest order. The planner suite
+pinned to `PLAN_STORAGE=project`, the rollback. Producer tests installed with no arbiter, so every
+delivery assertion ran the legacy path while the shipped default is `CONTROL_ARBITER=enforce`.
+Batch 0 fixed that first; the rest only became findable afterwards.
+
+**Two tools you will want to reuse**, both added this round:
+- `emitRivalProposal(fp, boundary, {terminal})` in `harness/tests/integration-harness.ts` — makes a
+  producer lose to a REAL arbiter. `terminal: true` also suppresses the merge rescues, which is the
+  only way a loser is genuinely dropped rather than delivered as a suffix.
+- `harness/tests/manifest-boot.test.ts` — the full-manifest boot, now including a faithful reload
+  (the fake bus survives it, as Pi's does). Add to it before writing a targeted interaction test.
+
+**Remaining in Batch 2**, in the risk order the audit established:
+- **ketch** wrap-steer — structurally trivial, but at priority 100 with no merge rescue it loses most
+  contested boundaries, so deferring the charge turns "fires once, maybe unseen" into a retry spiral.
+  Needs an attempt cap alongside the migration.
+- **loop-breaker outcome** — `outcomeFired` is a per-fingerprint counter the NEXT turn reads, so a
+  deferred charge leaves it stale for one boundary and can re-propose. Needs a per-fingerprint
+  in-flight guard, not the single-slot helper.
+- **loop-breaker exact T1/T2** — `ep.steered` charges ALL lower tiers at once, so "undo on loss" is
+  not one decrement; `ep.lastSteerTurn` additionally feeds the progress-after-steer metric.
+- **loop-breaker semantic/session tiers** — hardest. Those latches gate *observation* telemetry
+  (`tier-observed`) as well as the message, several frames before the proposal. Splitting "observed
+  this tier" from "spent this tier's message" is a prerequisite, not an afterthought.
+- **verify-gate wrap nag and the state lens** — now unblocked by `decision.delivered`.
+- **`session-blackboard` under-counts**: `steer-injected` is recorded inside the `legacyActed`
+  branch, so under the shipped enforce default the lens is merged and genuinely delivered while
+  **zero rows are written**. Lens exposure currently reads 0 in any analysis.
+- **Do NOT defer** loop-breaker's T3 abort/shutdown latches. `abortArmed` is a safety wall consumed
+  by the synchronous `tool_call` handler, independent of the arbiter, and a `safe_abort` at priority
+  700 with terminal rank essentially always wins anyway.
+
+**Batch 3 (measurement identity) is smaller than it looks.** `config.sha256` already exists — the
+gate computes it at `real_gate.sh:1033`, validates it, and consumes it in `failure_episode_trial.py`.
+It simply never crosses into the child env. And Pi itself sets none of `PI_RUN_ID` / `PI_MODEL_ID` /
+`PI_MODEL_PROVIDER` (verified against the installed package), so those names are free to define.
+Two constraints found: children **cannot** sign telemetry as things stand — the HMAC key arrives on
+fd 3 and `runner.ts` spawns with exactly three pipes, so the fd does not exist in the child — and the
+exposure error is **asymmetric**: a lost child row reads `"unexposed"` in telemetry mode but
+`"targeted"` in suppression mode, i.e. a false confirmation that suppression worked.
+
+**Batches 4-5** (one vocabulary / one constant; flag and doc truth) are unstarted and independent of
+the above.
+
 ## 2026-08-26 four-scale deep review — what shipped, and what did NOT
 
 Solar (whole system) / planetary (30 extensions) / atomic (functions) / quark (bytes), plus a
