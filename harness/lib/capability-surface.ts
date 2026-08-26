@@ -1,18 +1,9 @@
-import type { CapabilityName } from "./harness-signals.ts";
 
 export type CapabilityTool = {
 	name: string;
 	parameters?: unknown;
 	promptSnippet?: unknown;
 	promptGuidelines?: unknown;
-};
-
-export const PHASE_CAPABILITY_TOOLS: Readonly<Record<CapabilityName, readonly string[]>> = {
-	plan_go: ["plan_go"],
-	span_tools: ["search_spans", "read_span"],
-	subagent: ["subagent"],
-	compact_context: ["compact_context"],
-	web_read: ["web_read"],
 };
 
 /**
@@ -33,11 +24,6 @@ export const PLAN_SURFACE_TOOLS: readonly string[] = [
 
 /** The two flat plan tools any session may hold, graph flags or not. */
 export const FLAT_PLAN_TOOLS: readonly string[] = ["plan_write", "plan_update"];
-
-export function phaseDeferredTools(allNames: Iterable<string>): Set<string> {
-	const all = new Set(allNames);
-	return new Set(Object.values(PHASE_CAPABILITY_TOOLS).flat().filter((name) => all.has(name)));
-}
 
 function bytes(value: unknown): number {
 	try {

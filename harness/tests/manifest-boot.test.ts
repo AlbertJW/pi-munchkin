@@ -240,3 +240,35 @@ test("/reload: bus subscriptions do not accumulate across generations", async ()
 		assert.deepEqual(grown, [], `stale subscriptions survived the reload:\n${grown.join("\n")}`);
 	});
 });
+
+test("a bound that lives in lib/plan-limits.ts is never re-typed as a literal", () => {
+	// NOT a comparison of the schema against the constant — both now come from the same
+	// import, so that version was circular and passed happily with the constant changed
+	// to 901. The real failure mode is someone typing an OWNED number into a schema
+	// instead of importing it, which is how nine copies of `900` accumulated across four
+	// files and made the 2026-08-25 raise a nine-site manual edit.
+	//
+	// Only owned values are policed. `minItems: 1`, the 96-byte item id and the 200-byte
+	// defer value/risk are bounds with no shared home, and inventing constants for them
+	// would be worse than the literal. The VALUES are pinned behaviourally elsewhere
+	// ("note bytes: 900 accepted, 901 rejected" in plan-runner.integration.test.ts);
+	// this pins the SHAPE.
+	const owned = new Map<number, string>([
+		[900, "PLAN_NOTE_MAX_BYTES"], [120, "PLAN_TITLE_MAX_BYTES"],
+		[24, "PLAN_MAX_ITEMS / PLAN_MAX_DELTAS"], [32768, "PLAN_STATE_MAX_BYTES"],
+	]);
+	const sources = ["../extensions/plan-runner.ts", "../lib/plan-delta.ts", "../lib/plan-graph.ts", "../lib/branch-report.ts"];
+	const offenders: string[] = [];
+	for (const relative of sources) {
+		const source = readFileSync(new URL(relative, import.meta.url), "utf8")
+			.replace(/\/\*[\s\S]*?\*\//g, "")
+			.replace(/^\s*\/\/.*$/gm, "");
+		for (const match of source.matchAll(/\b(?:maxLength|maxItems)\s*:\s*(\d+)|boundedText\([^,]+,\s*(\d+)\)/g)) {
+			const found = Number(match[1] ?? match[2]);
+			const constant = owned.get(found);
+			if (constant) offenders.push(`${relative}: ${match[0].trim()} — import ${constant}`);
+		}
+	}
+	assert.deepEqual(offenders, [],
+		`a bound with a home in lib/plan-limits.ts was re-typed as a literal:\n${offenders.join("\n")}`);
+});

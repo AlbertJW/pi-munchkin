@@ -165,7 +165,10 @@ export const EVENT_CATALOG = {
 	"blackboard/rendered": { chars: "number", attempts: "number" },
 	"blackboard/restored": { attempts: "number" },
 	"blackboard/restore-rejected": { attempts: "number" },
-	"state-lens/steer-injected": { chars: "number", turnIndex: "number" },
+	// `delivered` distinguishes "the arbiter merged and showed this lens" from "it was
+	// dropped". Without it the row could only ever be written on the legacy path, so
+	// under the shipped enforce default lens exposure read zero.
+	"state-lens/steer-injected": { chars: "number", turnIndex: "number", delivered: "boolean" },
 	"tool-activation/deferred": { tool: "string", reason: "string" },
 	"tool-activation/activated": { tool: "string", reason: "string" },
 	"tool-activation/preserved-explicit": { tool: "string", reason: "string" },

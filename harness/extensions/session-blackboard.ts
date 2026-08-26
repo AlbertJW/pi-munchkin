@@ -151,6 +151,10 @@ export default function (pi: ExtensionAPI): void {
 	});
 
 	pi.on("session_start", async (event, ctx) => {
+		// A pending render timer closes over the PREVIOUS generation's cwd and artifact
+		// path. Node keeps it alive across a reload, so it fires once afterwards and
+		// writes the old session's cockpit over the new one's.
+		if (renderTimer) { clearTimeout(renderTimer); renderTimer = null; }
 		cwd = ctx.cwd ?? process.cwd();
 		artifactPath = cockpitPath(cwd);
 		pendingArgs.clear();

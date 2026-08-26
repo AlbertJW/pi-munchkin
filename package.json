@@ -123,6 +123,7 @@
     "harness/lib/blackboard.ts",
     "harness/lib/capability-surface.ts",
     "harness/lib/branch-report.ts",
+    "harness/lib/plan-limits.ts",
     "harness/lib/plan-delta.ts",
     "harness/lib/plan-graph.ts",
     "harness/lib/plan-state-storage.ts",

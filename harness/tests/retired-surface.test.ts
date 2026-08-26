@@ -31,6 +31,12 @@ test("retired environment options have no loadable runtime reader", () => {
 		"CTX_REDUNDANCY_NUDGE", "CTX_REDUNDANCY_PCT", "PLAN_SUBAGENT_ONLY",
 		"MICRO_GATE", "MICRO_GATE_SLOP", "PAYLOAD_AUDIT", "PROVIDER_PATIENCE",
 		"PI_PROVIDER_HEADERS_TIMEOUT_MS", "PI_PROVIDER_BODY_TIMEOUT_MS", "REFLECT_TIMEOUT_MS",
+		// Both are advertised as live rollbacks by dated rows in SURFACE_BOUNDARIES.md and
+		// have ZERO readers in loadable source. Those rows are history and must not be
+		// rewritten, so the guard goes here instead: an operator who reaches for either
+		// during an incident gets nothing, and this is what stops a reader quietly
+		// reappearing and making the claim half-true.
+		"PLAN_GATE_DIAGNOSTICS", "PLAN_MODE",
 	];
 	const files = ["extensions", "lib", "vendor"]
 		.flatMap((directory) => sourceFiles(join(root, "harness", directory)));

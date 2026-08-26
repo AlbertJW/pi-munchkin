@@ -1,3 +1,4 @@
+import { PLAN_DEFER_FIELD_MAX_BYTES, PLAN_NOTE_MAX_BYTES } from "./plan-limits.ts";
 import type { Deferral } from "./plan-graph.ts";
 
 export type DeltaStatus = "pending" | "in_progress" | "done" | "blocked" | "deferred";
@@ -31,11 +32,11 @@ export function applyPlanDeltas(items: DeltaItem[], deltas: PlanDelta[]): DeltaR
 		// was rejected as "at most 900 UTF-8 bytes" — a 12-byte note told to get shorter, which cannot succeed.
 		// plan_update is an OUTCOME_TOOLS member, so the identical unactionable failure escalated the loop ladder.
 		if (delta.note !== undefined && typeof delta.note !== "string") errors.push(`note must be a string for ${delta.item_id}`);
-		else if (delta.note !== undefined && Buffer.byteLength(delta.note, "utf8") > 900) errors.push(`note must be at most 900 UTF-8 bytes for ${delta.item_id}`);
+		else if (delta.note !== undefined && Buffer.byteLength(delta.note, "utf8") > PLAN_NOTE_MAX_BYTES) errors.push(`note must be at most ${PLAN_NOTE_MAX_BYTES} UTF-8 bytes for ${delta.item_id}`);
 		else if (delta.note !== undefined && /\r/.test(delta.note)) errors.push(`note must not contain carriage returns; use plain newlines for ${delta.item_id}`);
 		if (delta.status === "blocked" && (!delta.note || !delta.note.trim())) errors.push(`blocked status requires a note for ${delta.item_id}`);
 		if (delta.status === "deferred" && (!delta.defer || !delta.defer.value?.trim() || !delta.defer.risk?.trim() || !delta.defer.rationale?.trim())) errors.push(`deferred status requires value, risk, and rationale for ${delta.item_id}`);
-		if (delta.defer && [delta.defer.value, delta.defer.risk, delta.defer.rationale].some((value) => typeof value !== "string" || Buffer.byteLength(value, "utf8") > 300)) errors.push(`defer fields must be at most 300 UTF-8 bytes for ${delta.item_id}`);
+		if (delta.defer && [delta.defer.value, delta.defer.risk, delta.defer.rationale].some((value) => typeof value !== "string" || Buffer.byteLength(value, "utf8") > PLAN_DEFER_FIELD_MAX_BYTES)) errors.push(`defer fields must be at most ${PLAN_DEFER_FIELD_MAX_BYTES} UTF-8 bytes for ${delta.item_id}`);
 		else if (delta.defer && [delta.defer.value, delta.defer.risk, delta.defer.rationale].some((value) => /\r/.test(String(value)))) errors.push(`defer fields must not contain carriage returns; use plain newlines for ${delta.item_id}`);
 		const previous = seen.get(delta.item_id);
 		if (previous && JSON.stringify(previous) !== JSON.stringify(delta)) errors.push(`conflicting duplicate delta: ${delta.item_id}`);

@@ -1,3 +1,4 @@
+import { PLAN_NOTE_MAX_BYTES, PLAN_TITLE_MAX_BYTES } from "./plan-limits.ts";
 import { chmod, mkdir, open, readFile, rename, unlink } from "node:fs/promises";
 import { dirname } from "node:path";
 import { randomUUID } from "node:crypto";
@@ -144,14 +145,14 @@ export function validateBranchReport(value: unknown, context: PlanContextV1, ter
 	let childUsed: ResearchBudget = { searches: 0, reads: 0 };
 	for (const child of item.children as Record<string, any>[]) {
 		if (!child || !Object.keys(child).every((key) => ["item_id", "title", "note", "status", "budget", "evidence_gaps", "coverage", "defer"].includes(key)) ||
-			!ID.test(String(child.item_id)) || ids.has(child.item_id) || !boundedText(child.title, 120) ||
+			!ID.test(String(child.item_id)) || ids.has(child.item_id) || !boundedText(child.title, PLAN_TITLE_MAX_BYTES) ||
 			!(["pending", "in_progress", "done", "blocked", "deferred"] as unknown[]).includes(child.status) ||
 			!child.budget || !validBudget(child.budget.allocated) || !validBudget(child.budget.used) || !budgetWithin(child.budget.used, child.budget.allocated)) return false;
 		if (terminal && !["done", "blocked", "deferred"].includes(child.status)) return false;
 		if (child.coverage !== undefined && !validCoverage(child.coverage)) return false;
 		if (terminal && !child.coverage) return false;
 		if (child.status === "deferred" && !validDeferral(child.defer)) return false;
-		if (child.note !== undefined && !boundedText(child.note, 900)) return false;
+		if (child.note !== undefined && !boundedText(child.note, PLAN_NOTE_MAX_BYTES)) return false;
 		if (child.evidence_gaps !== undefined && (!Array.isArray(child.evidence_gaps) || child.evidence_gaps.length > 8 || child.evidence_gaps.some((gap: unknown) => !boundedText(gap, 300)))) return false;
 		if (child.status === "done" && (!child.coverage?.complete || (child.evidence_gaps?.length ?? 0) > 0)) return false;
 		if (terminal && child.coverage && !child.coverage.complete && (child.evidence_gaps?.length ?? 0) === 0) return false;

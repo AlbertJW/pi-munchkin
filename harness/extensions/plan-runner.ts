@@ -9,6 +9,10 @@ import { BRANCH_REPORT_ENV, PLAN_CONTEXT_ENV, RESEARCH_RESERVED_BUDGET_KEY, read
 import { classifyBashCommand } from "../lib/command-policy.ts";
 import { emitHarnessSignal, onHarnessSignal, signalRunId } from "../lib/harness-signals.ts";
 import { PLAN_SURFACE_TOOLS } from "../lib/capability-surface.ts";
+import {
+	PLAN_DEFER_FIELD_MAX_BYTES, PLAN_MAX_DELTAS, PLAN_MAX_ITEMS, PLAN_NOTE_MAX_BYTES,
+	PLAN_STATE_MAX_BYTES, PLAN_TITLE_MAX_BYTES,
+} from "../lib/plan-limits.ts";
 import { applyPlanDeltas, type PlanDelta } from "../lib/plan-delta.ts";
 import {
 	DEEP_RESEARCH_MAX_CHILDREN, DEEP_RESEARCH_MAX_DEPTH, DEEP_RESEARCH_MAX_ROOTS,
@@ -25,14 +29,14 @@ import { CORE_NAMES, profileFromEnvironment } from "./tool-activation.ts";
 // One bounded ordered checklist. plan_write owns structure; plan_update owns
 // status. Project verification is deliberately outside this module.
 
-const MAX_ITEMS = 24;
-const MAX_TITLE_BYTES = 120;
+const MAX_ITEMS = PLAN_MAX_ITEMS;
+const MAX_TITLE_BYTES = PLAN_TITLE_MAX_BYTES;
 // 300 caused live churn: models packing per-item substeps (the tool guidance's own
 // advice) hit the cap and rewrote repeatedly (Albert, 2026-08-25). 900 with the
 // state cap raised in step: 24 full items at 900-byte notes ≈ 27.7 KiB.
-const MAX_NOTE_BYTES = 900;
-const MAX_PLAN_BYTES = 32 * 1024;
-const MAX_DELTAS = 24;  // matches MAX_ITEMS: a full-plan status resend must not die in the schema validator (audit B5)
+const MAX_NOTE_BYTES = PLAN_NOTE_MAX_BYTES;
+const MAX_PLAN_BYTES = PLAN_STATE_MAX_BYTES;
+const MAX_DELTAS = PLAN_MAX_DELTAS;  // matches MAX_ITEMS: a full-plan status resend must not die in the schema validator (audit B5)
 
 // Byte-aware truncation for migration paths: .slice() counts CHARACTERS, so a
 // multibyte note could survive the slice, exceed the byte budget, fail
@@ -425,10 +429,10 @@ const planWrite = defineTool({
 		"Retain item_id when revising an existing item; use plan_update for status changes.",
 	] : undefined,
 	parameters: Type.Object({
-		summary: Type.Optional(Type.String({ maxLength: 300 })),
+		summary: Type.Optional(Type.String({ maxLength: PLAN_DEFER_FIELD_MAX_BYTES })),
 		items: Type.Array(Type.Object({
 			item_id: Type.Optional(Type.String({ minLength: 1, maxLength: 96 })),
-			title: Type.String({ minLength: 1, maxLength: 120 }), note: Type.Optional(Type.String({ maxLength: 900 })),
+			title: Type.String({ minLength: 1, maxLength: PLAN_TITLE_MAX_BYTES }), note: Type.Optional(Type.String({ maxLength: PLAN_NOTE_MAX_BYTES })),
 		}), { minItems: 1, maxItems: MAX_ITEMS }),
 	}),
 	async execute(_toolCallId, params, _signal, _onUpdate, ctx) {
@@ -474,11 +478,11 @@ const planUpdate = defineTool({
 	parameters: Type.Object({ deltas: Type.Array(Type.Object({
 		item_id: Type.String({ minLength: 1, maxLength: 96 }),
 		status: Type.Optional(PlanUpdateStatusSchema),
-		note: Type.Optional(Type.String({ maxLength: 900 })),
+		note: Type.Optional(Type.String({ maxLength: PLAN_NOTE_MAX_BYTES })),
 		...(PLAN_GRAPH ? { defer: Type.Optional(Type.Object({
 			value: Type.String({ minLength: 1, maxLength: 200 }),
 			risk: Type.String({ minLength: 1, maxLength: 200 }),
-			rationale: Type.String({ minLength: 1, maxLength: 300 }),
+			rationale: Type.String({ minLength: 1, maxLength: PLAN_DEFER_FIELD_MAX_BYTES }),
 		})) } : {}),
 	}), { minItems: 1, maxItems: MAX_DELTAS }) }),
 	async execute(_toolCallId, params, _signal, _onUpdate, ctx) {
@@ -533,10 +537,10 @@ const researchPlanStart = defineTool({
 	] : undefined,
 	parameters: Type.Object({
 		request: Type.String({ minLength: 1, maxLength: 1_000 }),
-		summary: Type.String({ minLength: 1, maxLength: 300 }),
+		summary: Type.String({ minLength: 1, maxLength: PLAN_DEFER_FIELD_MAX_BYTES }),
 		branches: Type.Array(Type.Object({
-			title: Type.String({ minLength: 1, maxLength: 120 }),
-			note: Type.Optional(Type.String({ maxLength: 900 })),
+			title: Type.String({ minLength: 1, maxLength: PLAN_TITLE_MAX_BYTES }),
+			note: Type.Optional(Type.String({ maxLength: PLAN_NOTE_MAX_BYTES })),
 			budget: BudgetSchema,
 		}), { minItems: 1, maxItems: DEEP_RESEARCH_MAX_ROOTS }),
 	}),
@@ -584,7 +588,7 @@ const planExpand = defineTool({
 		parent_item_id: Type.String({ minLength: 1, maxLength: 96 }),
 		children: Type.Array(Type.Object({
 			item_id: Type.Optional(Type.String({ minLength: 1, maxLength: 96 })),
-			title: Type.String({ minLength: 1, maxLength: 120 }), note: Type.Optional(Type.String({ maxLength: 900 })),
+			title: Type.String({ minLength: 1, maxLength: PLAN_TITLE_MAX_BYTES }), note: Type.Optional(Type.String({ maxLength: PLAN_NOTE_MAX_BYTES })),
 			budget: Type.Optional(BudgetSchema),
 		}), { minItems: 1, maxItems: 8 }),
 	}),
@@ -604,7 +608,7 @@ const planSettle = defineTool({
 	name: "plan_settle", label: "Settle Plan",
 	description: "Request terminal settlement after required nodes and parent-owned evidence verification are complete.",
 	promptSnippet: "plan_settle: close a verified graph plan; the head agent alone may call this",
-	parameters: Type.Object({ summary: Type.String({ minLength: 1, maxLength: 300 }) }),
+	parameters: Type.Object({ summary: Type.String({ minLength: 1, maxLength: PLAN_DEFER_FIELD_MAX_BYTES }) }),
 	async execute(_id, params, _signal, _update, ctx) {
 		const state = await mutatePlan(ctx.cwd, async (previous) => {
 			if (!previous || previous.schema_version !== 5) rejectPlanTool("plan_settle requires an active graph plan");
@@ -631,18 +635,18 @@ const branchPlan = defineTool({
 		status: Type.Union([Type.Literal("pending"), Type.Literal("in_progress"), Type.Literal("done"), Type.Literal("blocked"), Type.Literal("deferred")]),
 		note: Type.String({ minLength: 1, maxLength: 500 }), consumed: BudgetSchema,
 		children: Type.Array(Type.Object({
-			item_id: Type.String({ minLength: 1, maxLength: 96 }), title: Type.String({ minLength: 1, maxLength: 120 }),
-			note: Type.Optional(Type.String({ maxLength: 900 })),
+			item_id: Type.String({ minLength: 1, maxLength: 96 }), title: Type.String({ minLength: 1, maxLength: PLAN_TITLE_MAX_BYTES }),
+			note: Type.Optional(Type.String({ maxLength: PLAN_NOTE_MAX_BYTES })),
 			status: Type.Union([Type.Literal("pending"), Type.Literal("in_progress"), Type.Literal("done"), Type.Literal("blocked"), Type.Literal("deferred")]),
 			budget: Type.Object({ allocated: BudgetSchema, used: BudgetSchema }),
-			evidence_gaps: Type.Optional(Type.Array(Type.String({ minLength: 1, maxLength: 300 }), { maxItems: 8 })),
+			evidence_gaps: Type.Optional(Type.Array(Type.String({ minLength: 1, maxLength: PLAN_DEFER_FIELD_MAX_BYTES }), { maxItems: 8 })),
 			coverage: Type.Optional(CoverageSchema),
-			defer: Type.Optional(Type.Object({ value: Type.String({ minLength: 1, maxLength: 200 }), risk: Type.String({ minLength: 1, maxLength: 200 }), rationale: Type.String({ minLength: 1, maxLength: 300 }) })),
+			defer: Type.Optional(Type.Object({ value: Type.String({ minLength: 1, maxLength: 200 }), risk: Type.String({ minLength: 1, maxLength: 200 }), rationale: Type.String({ minLength: 1, maxLength: PLAN_DEFER_FIELD_MAX_BYTES }) })),
 		}), { maxItems: DEEP_RESEARCH_MAX_CHILDREN }),
 		source_leads: Type.Array(Type.Object({ url: Type.String({ minLength: 1, maxLength: 1_999 }), claim: Type.String({ minLength: 1, maxLength: 500 }), quote: Type.String({ minLength: 1, maxLength: 800 }) }), { maxItems: 10 }),
-		evidence_gaps: Type.Array(Type.String({ minLength: 1, maxLength: 300 }), { maxItems: 8 }),
+		evidence_gaps: Type.Array(Type.String({ minLength: 1, maxLength: PLAN_DEFER_FIELD_MAX_BYTES }), { maxItems: 8 }),
 		coverage: Type.Optional(CoverageSchema),
-		defer: Type.Optional(Type.Object({ value: Type.String({ minLength: 1, maxLength: 200 }), risk: Type.String({ minLength: 1, maxLength: 200 }), rationale: Type.String({ minLength: 1, maxLength: 300 }) })),
+		defer: Type.Optional(Type.Object({ value: Type.String({ minLength: 1, maxLength: 200 }), risk: Type.String({ minLength: 1, maxLength: 200 }), rationale: Type.String({ minLength: 1, maxLength: PLAN_DEFER_FIELD_MAX_BYTES }) })),
 	}),
 	async execute(_id, params) {
 		const context = await readPlanContext(process.env[PLAN_CONTEXT_ENV]);

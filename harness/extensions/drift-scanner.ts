@@ -52,6 +52,17 @@ export default function (pi: ExtensionAPI) {
 		abortBusy();
 	});
 
+	// This extension had NO session_start handler, so `handledHead` never cleared and a
+	// review already in flight kept running against the previous session — its advisory
+	// could deliver into the next one. Every other reset here hangs off shutdown, which
+	// a /reload does not reliably reach.
+	pi.on("session_start", async () => {
+		generation += 1;
+		handledHead.clear();
+		pending.clear();
+		abortBusy();
+	});
+
 	pi.on("session_shutdown", async () => {
 		generation += 1;
 		pending.clear();
