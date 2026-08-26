@@ -50,11 +50,11 @@ The deferred list below is being worked as **five classes**, not fifteen fixes. 
 committed on `main` (`824301c`..`ab00faa`), verify 6/6, 609 tests, source `c6e588dc…`, **mirrored
 2026-08-26** — `mirror:check` 118/118, loaded `bdc18ba8…`.
 
-**One receipt is missing on purpose: the live 35B smoke did not run.** Other models were occupying
-the serving box, and that box serves one request at a time. Extension loading is proven by the
-isolated packed consumers (30 extensions + 2 skills under Pi 0.80 and 0.84) and `pack:smoke`, but
-nothing has exercised this surface in a real session. **Treat the first interactive session as the
-smoke, and run a proper one before binding any measurement to `bdc18ba8…`.**
+**Smoked 2026-08-26** on the new router entry `ling3-tiny-fast` (resident, no swap): exit 0 in 17 s,
+zero stderr, 64 rows on a single `si`, all stamped `f9f728b3…`, zero error/reject rows, core spine
+9 active / 42 deferred of 55. Both settled rows present for the one agent run — live confirmation of
+the batch-1 latch re-arm. The smoke also confirmed the batch-3 defect is still live and untouched:
+**`model` and `provider` are null on every row.**
 
 The thesis, and the reason the batches are ordered this way: **the suite systematically exercised
 the configuration nobody ships.** One extension per FakePi, never manifest order. The planner suite
