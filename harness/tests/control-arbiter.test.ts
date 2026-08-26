@@ -9,7 +9,7 @@ import {
 	type ControlEffect, type ControlKind,
 	type ControlProposalEnvelope,
 } from "../lib/control-proposal.ts";
-import { fire, makeFakePi } from "./integration-harness.ts";
+import { emitRivalProposal, fire, makeFakePi, resetPiGlobals } from "./integration-harness.ts";
 import { boardState, noteTool, resetBoard } from "../lib/blackboard.ts";
 
 function envelope(kind: ControlKind, boundarySequence = 1, effect: ControlEffect = "message"): ControlProposalEnvelope {
@@ -426,4 +426,86 @@ test("telemetry on and off produce identical control decisions and messages", as
 		{ ...(on.decision as Record<string, unknown>), winner: (on.decision as { winner: { proposalIdHash: string } }).winner && "winner" },
 		{ ...(off.decision as Record<string, unknown>), winner: (off.decision as { winner: { proposalIdHash: string } }).winner && "winner" },
 	);
+});
+
+// --- the invariant this suite never had ------------------------------------
+//
+// Every other test here asserts what the ARBITER emitted. None asserts what a
+// PRODUCER looks like after losing. That is the blind spot that let the
+// charge-at-proposal defect survive at fourteen sites after being fixed at two.
+//
+// The shape below is the one to copy when migrating each remaining producer: drive
+// real contention through a REAL arbiter, and assert the loser can still act.
+// tool-call-rescue is the reference implementation, so this passes today — that is
+// the point. It pins the behaviour the other producers must be brought to.
+
+test("a producer that LOSES the boundary keeps its budget (tool-call-rescue reference)", async () => {
+	const previous = {
+		rescue: process.env.TOOL_CALL_RESCUE, control: process.env.CONTROL_ARBITER,
+		telemetry: process.env.TELEMETRY, source: process.env.TELEMETRY_SOURCE,
+	};
+	Object.assign(process.env, { CONTROL_ARBITER: "enforce", TELEMETRY: "off", TELEMETRY_SOURCE: "test" });
+	delete process.env.TOOL_CALL_RESCUE;
+	try {
+		const fp = makeFakePi();
+		const nonce = `${Date.now()}-${Math.random()}`;
+		// Manifest order: tool-call-rescue is index 4, the arbiter is 24. The arbiter
+		// marks itself active on load, so the producer defers delivery to it.
+		const [rescue, arbiter] = await Promise.all([
+			import(`../extensions/tool-call-rescue.ts?loser=${nonce}`),
+			import(`../extensions/control-arbiter.ts?loser=${nonce}`),
+		]);
+		rescue.default(fp.pi as never);
+		arbiter.default(fp.pi as never);
+		await fire(fp, "session_start", {});
+
+		const pseudoCall = (turnIndex: number) => ({
+			turnIndex,
+			message: { role: "assistant", content: [{ type: "text", text: "<function=bash>ls</function>" }] },
+			toolResults: [],
+		});
+		const rescuesSent = () => fp.sent.filter((message) => /pseudo|function=|tool call/i.test(message)).length;
+
+		// Boundaries 1-2: a higher-priority rival wins, so the rescue is composed and
+		// dropped. MAX_RESCUES is 2 — if losing spent the budget, it is now gone.
+		for (const turnIndex of [1, 2]) {
+			emitRivalProposal(fp, turnIndex);
+			await fire(fp, "turn_end", pseudoCall(turnIndex), {});
+		}
+		assert.equal(rescuesSent(), 0, "precondition: a losing rescue reaches the model zero times");
+
+		// Boundaries 3-4: uncontested. A budget that was never spent still has two.
+		for (const turnIndex of [3, 4]) await fire(fp, "turn_end", pseudoCall(turnIndex), {});
+		assert.equal(rescuesSent(), 2, "losing boundaries consumed the session rescue budget");
+
+		// Boundary 5: genuinely exhausted now, so silence here is correct, not a bug.
+		await fire(fp, "turn_end", pseudoCall(5), {});
+		assert.equal(rescuesSent(), 2, "the budget must still be a real bound once actually spent");
+	} finally {
+		for (const [key, value] of Object.entries(previous)) {
+			if (value === undefined) delete process.env[key]; else process.env[key] = value;
+		}
+		resetPiGlobals();
+	}
+});
+
+test("a terminal winner takes no merged supplements, so its losers are genuinely dropped", async () => {
+	// The distinction `emitRivalProposal({terminal:true})` exists for. Both merge
+	// rescues (control-arbiter.ts:51-84) require a `message` winner, so under a
+	// terminal winner verify-gate's nag and the lens are dropped outright rather than
+	// delivered as a suffix. Any charge-on-delivery work must treat these as losses.
+	const queue = new ControlArbiterQueue();
+	const nag = envelope("verification_required", 11);
+	const terminal = envelope("safe_abort", 11, "abort");
+	queue.add(nag);
+	queue.add(terminal);
+	const { decision, delivery, verificationMerged, lensMerged } = queue.decide(11, "enforce");
+	assert.equal(decision.winner?.effect, "abort");
+	assert.equal(verificationMerged, false, "a terminal winner must not carry the nag");
+	assert.equal(lensMerged, false);
+	// The queue still hands back the winner's OWN delivery — the arbiter extension is
+	// what declines to send it for a terminal effect (control-arbiter.ts:36-43). What
+	// matters here is that the nag's text was not appended to it.
+	assert.equal(delivery?.message, "safe_abort", "the winner's own delivery, unmodified");
+	assert.equal(delivery?.message?.includes("verification_required"), false, "the nag must not ride along");
 });

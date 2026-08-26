@@ -1,16 +1,36 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { mkdtempSync, readFileSync } from "node:fs";
+import { randomUUID } from "node:crypto";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { callTool, expectToolError, fire, makeCtx, makeFakePi, resetPiGlobals } from "./integration-harness.ts";
 import { HARNESS_SIGNAL_CHANNEL } from "../lib/harness-signals.ts";
 import { captureInitialToolSurface } from "../lib/session-bootstrap.ts";
+import { privatePlanStatePath } from "../lib/plan-state-storage.ts";
 
-process.env.PLAN_STORAGE = "project";
+// This suite used to pin `PLAN_STORAGE=project` at module scope, so all fifteen of
+// its tests ran in the ROLLBACK configuration and none of them ever exercised what
+// users actually get. That is why the capsule-mode handoff defects were invisible
+// here (see plan-surface-handoff.test.ts). It now runs in the shipped default, with
+// one explicit project-mode case below for the rollback it documents.
+const AGENT_DIR = mkdtempSync(join(tmpdir(), "pi-plan-agent-"));
+process.env.PI_CODING_AGENT_DIR = AGENT_DIR;
+delete process.env.PLAN_STORAGE;
 const planRunner = (await import("../extensions/plan-runner.ts")).default;
 
-const tmp = () => mkdtempSync(join(tmpdir(), "pi-plan-bounded-"));
+/** Where the plan actually lives, resolved through the SAME function production
+ *  uses. Hardcoding `.pi/plan-state.json` is what silently pinned this suite to
+ *  project mode: the literal only exists in the rollback configuration. */
+const stateFile = (cwd: string) => privatePlanStatePath(cwd) ?? join(cwd, ".pi", "plan-state.json");
+
+/** A cwd with the run-capsule identity already published — what manifest index 26
+ *  does at session_start, and what capsule plan storage needs to resolve a path. */
+const tmp = () => {
+	const cwd = mkdtempSync(join(tmpdir(), "pi-plan-bounded-"));
+	(globalThis as Record<string, unknown>).__pi_run_capsule_identity = { cwd, capsuleId: randomUUID(), runIdHash: null };
+	return cwd;
+};
 
 function fresh() {
 	const fp = makeFakePi();
@@ -66,7 +86,7 @@ test("AlbertWork-sized plan succeeds and exposes stable IDs", async () => {
 		items: Array.from({ length: 20 }, (_, i) => ({ title: `Process meeting ${i + 1}`, note: "Read; extract; update" })),
 	}, cwd);
 	assert.equal(result.isError, false);
-	const state = JSON.parse(readFileSync(join(cwd, ".pi", "plan-state.json"), "utf8"));
+	const state = JSON.parse(readFileSync(stateFile(cwd), "utf8"));
 	assert.equal(state.schema_version, 4);
 	assert.equal(state.items.length, 20);
 	assert.ok(state.items.every((item: any) => /^[A-F0-9]{16}$/.test(item.id)));
@@ -79,11 +99,11 @@ test("58-item rewrite is rejected before persistence and preserves the valid pla
 	const cwd = tmp();
 	await begin(fp, cwd);
 	await callTool(fp, "plan_write", { items: [{ title: "Keep me" }] }, cwd);
-	const before = readFileSync(join(cwd, ".pi", "plan-state.json"), "utf8");
+	const before = readFileSync(stateFile(cwd), "utf8");
 	await expectToolError(fp, "plan_write", {
 		items: Array.from({ length: 58 }, (_, i) => ({ title: `Fragment ${i + 1}` })),
 	}, cwd, /provide 1-24 top-level items/);
-	assert.equal(readFileSync(join(cwd, ".pi", "plan-state.json"), "utf8"), before);
+	assert.equal(readFileSync(stateFile(cwd), "utf8"), before);
 	resetPiGlobals();
 });
 
@@ -98,14 +118,14 @@ test("sanitized AlbertWork replay stops plan expansion without replaying the val
 			note: "Read; extract; update",
 		})),
 	}, cwd);
-	const before = readFileSync(join(cwd, ".pi", "plan-state.json"), "utf8");
+	const before = readFileSync(stateFile(cwd), "utf8");
 	await expectToolError(fp, "plan_write", {
 		items: Array.from({ length: replay.expanded_plan_items }, (_, i) => ({ title: `Micro-step ${i + 1}` })),
 	}, cwd, /provide 1-24 top-level items/);
-	assert.equal(readFileSync(join(cwd, ".pi", "plan-state.json"), "utf8"), before);
+	assert.equal(readFileSync(stateFile(cwd), "utf8"), before);
 	const state = JSON.parse(before);
 	await callTool(fp, "plan_update", { deltas: [{ item_id: state.items[0].id, status: "in_progress" }] }, cwd);
-	assert.equal(JSON.parse(readFileSync(join(cwd, ".pi", "plan-state.json"), "utf8")).items.length, replay.initial_plan_items);
+	assert.equal(JSON.parse(readFileSync(stateFile(cwd), "utf8")).items.length, replay.initial_plan_items);
 	resetPiGlobals();
 });
 
@@ -114,7 +134,7 @@ test("structural replan retains IDs and cannot silently omit unresolved work", a
 	const cwd = tmp();
 	const ctxGo = await begin(fp, cwd);
 	await callTool(fp, "plan_write", { items: [{ title: "One" }, { title: "Two" }] }, cwd);
-	let state = JSON.parse(readFileSync(join(cwd, ".pi", "plan-state.json"), "utf8"));
+	let state = JSON.parse(readFileSync(stateFile(cwd), "utf8"));
 	const [one, two] = state.items;
 	// The omission protection begins at /plan-go (review-phase drops are legitimate
 	// revision — audit A4, 2026-08-25).
@@ -123,7 +143,7 @@ test("structural replan retains IDs and cannot silently omit unresolved work", a
 	await callTool(fp, "plan_write", { items: [
 		{ item_id: one.id, title: "One renamed" }, { item_id: two.id, title: "Two" }, { title: "Three" },
 	] }, cwd);
-	state = JSON.parse(readFileSync(join(cwd, ".pi", "plan-state.json"), "utf8"));
+	state = JSON.parse(readFileSync(stateFile(cwd), "utf8"));
 	assert.equal(state.items[0].id, one.id);
 	assert.equal(state.items[0].title, "One renamed");
 	assert.equal(state.items[2].status, "pending");
@@ -135,13 +155,13 @@ test("plan_update owns small status/note deltas and enforces one in_progress", a
 	const cwd = tmp();
 	await begin(fp, cwd);
 	await callTool(fp, "plan_write", { items: [{ title: "One" }, { title: "Two" }] }, cwd);
-	let state = JSON.parse(readFileSync(join(cwd, ".pi", "plan-state.json"), "utf8"));
+	let state = JSON.parse(readFileSync(stateFile(cwd), "utf8"));
 	const [one, two] = state.items;
 	await callTool(fp, "plan_update", { deltas: [{ item_id: one.id, status: "in_progress", note: "Inspect current state" }] }, cwd);
 	await expectToolError(fp, "plan_update", { deltas: [{ item_id: two.id, status: "in_progress" }] }, cwd, /at most one item/);
 	await expectToolError(fp, "plan_update", { deltas: [{ item_id: one.id, status: "blocked" }] }, cwd, /blocked status requires a note/);
 	await callTool(fp, "plan_update", { deltas: [{ item_id: one.id, status: "done" }, { item_id: two.id, status: "in_progress" }] }, cwd);
-	state = JSON.parse(readFileSync(join(cwd, ".pi", "plan-state.json"), "utf8"));
+	state = JSON.parse(readFileSync(stateFile(cwd), "utf8"));
 	assert.equal(state.items[0].status, "done");
 	assert.equal(state.items[1].status, "in_progress");
 	resetPiGlobals();
@@ -302,4 +322,32 @@ test("blocked planning call publishes one call-bound prevented signal", async ()
 		{ v: 1, type: "tool/prevented", toolCallId: "deny-1", failureClass: "policy_rejection" },
 	]);
 	resetPiGlobals();
+});
+
+test("PLAN_STORAGE=project rollback still writes the historical project-local files", async () => {
+	// The suite above now runs in the shipped capsule default. This is the ONE case
+	// that covers the documented rollback — README describes `project` as restoring
+	// `.pi/plan-state.json`, so something has to assert that it still does. Keeping it
+	// as a single explicit case, rather than as a module-scope env pin, is the whole
+	// point: a default that is only ever tested through its rollback is untested.
+	const previous = process.env.PLAN_STORAGE;
+	process.env.PLAN_STORAGE = "project";
+	try {
+		const fp = fresh();
+		const cwd = mkdtempSync(join(tmpdir(), "pi-plan-project-"));
+		// No capsule identity minted for this cwd: project mode must not need one.
+		delete (globalThis as Record<string, unknown>).__pi_run_capsule_identity;
+		await begin(fp, cwd);
+		await callTool(fp, "plan_write", {
+			summary: "Rollback storage check.",
+			items: [{ title: "First item" }, { title: "Second item" }],
+		}, cwd);
+		const projectPath = join(cwd, ".pi", "plan-state.json");
+		const state = JSON.parse(readFileSync(projectPath, "utf8"));
+		assert.equal(state.items.length, 2, "the rollback writes the historical project-local path");
+		assert.equal(privatePlanStatePath(cwd), null, "project mode resolves no capsule path at all");
+	} finally {
+		if (previous === undefined) delete process.env.PLAN_STORAGE; else process.env.PLAN_STORAGE = previous;
+		resetPiGlobals();
+	}
 });

@@ -41,6 +41,7 @@
 //     `npm run typecheck` covers extensions) — it was defeated by an `as` cast,
 //     not by the double. So: never hand-build an event shape without reading the
 //     emitter, and treat a widening cast on an event as a defect in review.
+import { buildControlProposal, emitControlProposal } from "../lib/control-proposal.ts";
 import { execFile } from "node:child_process";
 
 export type FakePi = ReturnType<typeof makeFakePi>;
@@ -581,4 +582,44 @@ export function resetPiGlobals(): void {
 	for (const key of Object.keys(g)) {
 		if (key.startsWith("__pi_")) delete g[key];
 	}
+}
+
+/**
+ * Emit a proposal that will BEAT the producer under test at `boundarySequence`.
+ *
+ * This is the primitive the suite was missing. `control-arbiter.test.ts` has 18
+ * tests and every one asserts what the ARBITER emitted; not one asserts what a
+ * producer's own state looks like after its proposal lost. That gap is why the
+ * charge-at-proposal defect — fixed in tool-call-rescue and verify-gate's plateau
+ * on 2026-08-21, with the incident written into both files — was never looked for
+ * at the other fourteen charge sites.
+ *
+ * `terminal: true` additionally suppresses the arbiter's two merge rescues
+ * (control-arbiter.ts:51-84 both require a `message` winner), which is the only way
+ * to make verify-gate's wrap nag or session-blackboard's lens genuinely lose: both
+ * are otherwise delivered as a merged suffix/prefix while `decision.winner` names
+ * somebody else.
+ *
+ * Pair it with a REAL arbiter extension rather than a synthesised decision — the
+ * merge behaviour above is exactly what a hand-built `ControlDecisionV1` cannot model.
+ */
+export function emitRivalProposal(
+	fp: FakePi,
+	boundarySequence: number,
+	options: { terminal?: boolean; message?: string } = {},
+): void {
+	const effect = options.terminal ? "abort" : "message";
+	const proposal = buildControlProposal({
+		boundarySequence,
+		kind: "safe_abort", // priority 700: outranks every other producer
+		reason: "loop_recovery",
+		source: "loop-breaker",
+		cooldownKey: `rival:${boundarySequence}`,
+		messageFactory: "loop-tier",
+		effect,
+		legacyActed: false,
+	});
+	emitControlProposal(fp.pi.events as never, proposal, options.terminal
+		? { abort: () => {} }
+		: { message: options.message ?? "[rival] change strategy now" });
 }
