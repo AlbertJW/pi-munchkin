@@ -4,6 +4,23 @@ All notable changes to pi-munchkin are documented here. Releases follow semantic
 
 ## Unreleased
 
+### Fixed (2026-08-26 — live headless lifecycle and mutation accounting)
+
+- **Headless `/plan` and `/plan-go` no longer replace their own session.** A command handler used
+  `sendUserMessage()` to recursively enter `AgentSession.prompt()`. As the first `pi -p` message,
+  this invalidated the command's context, produced a stale-context error cascade, could leave no
+  plan at all, and still exited zero. Both commands now start one command-owned custom turn with
+  `sendMessage({ triggerTurn: true })` and keep print mode alive through `waitForIdle()`.
+- **`/loop-resume` uses the same safe command-owned lifecycle.** The fresh review found the same
+  recursive-send pattern outside the reported planner path and removed it before rollout.
+- **Failed atomic edits no longer count as mutations.** `edit`, `write`, and `multiedit` arm the
+  verification state only when they succeed; failed shell mutations remain conservative because a
+  non-zero command may have written partially. A shared mutation epoch preserves correct rollback
+  when atomic mutation calls settle concurrently, including all-failed and mixed-result batches.
+- **The state-lens correction is finally live.** `state-lens/steer-injected` now records the
+  arbiter's actual `delivered` decision under the shipped enforce path, closing the correction noted
+  in the preceding changelog and surface-boundary entries.
+
 ### Fixed (2026-08-26 — the simple half of batches 1, 2, 4 and 5)
 
 - **The state lens under-counted to zero.** `state-lens/steer-injected` was recorded only inside the
