@@ -1,3 +1,4 @@
+import { subscribeOnce } from "../lib/extension-lifecycle.ts";
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { agentDir } from "../lib/agent-dir.ts";
 import {
@@ -71,7 +72,7 @@ export default function (pi: ExtensionAPI): void {
 		(queue ??= createQueue()).request(snapshot);
 	}
 
-	onRunStateSnapshot(pi.events, (event) => request(event.state, event.reason === "phase"));
+	subscribeOnce("run-capsule:run-state-snapshot", () => onRunStateSnapshot(pi.events, (event) => request(event.state, event.reason === "phase")));
 
 	pi.on("session_start", async (event, ctx) => {
 		cwd = ctx.cwd ?? process.cwd();
@@ -153,7 +154,7 @@ export default function (pi: ExtensionAPI): void {
 		});
 	}
 
-	onHarnessSignal(pi.events, (signal) => {
+	subscribeOnce("run-capsule:domain-signal", () => onHarnessSignal(pi.events, (signal) => {
 		if (mode !== "recovery" || signal.type !== "recovery/resumed" || !latestState) return;
 		const brief = renderRecoveryBrief(latestState, { reason: "manual_resume" });
 		try {
@@ -167,7 +168,7 @@ export default function (pi: ExtensionAPI): void {
 		} catch {
 			record("run-capsule", "recovery-brief", { reason: "manual_resume", brief_bytes: 0, generation: latestState.context.compactionGeneration });
 		}
-	});
+	}));
 
 	pi.on("agent_settled", async () => {
 		await queue?.flush();

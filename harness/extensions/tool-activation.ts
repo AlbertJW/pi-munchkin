@@ -1,3 +1,4 @@
+import { subscribeOnce } from "../lib/extension-lifecycle.ts";
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { defineTool, type ExtensionAPI } from "@earendil-works/pi-coding-agent";
@@ -235,7 +236,7 @@ export default function (pi: ExtensionAPI): void {
 		},
 	}));
 
-	onHarnessSignal(pi.events, (signal) => {
+	subscribeOnce("tool-activation:domain-signal", () => onHarnessSignal(pi.events, (signal) => {
 		if (signal.type === "plan/write") lastOpenItems = signal.openItems;
 		if (signal.type === "plan/go" && lastOpenItems > 1) activateFamily("delegation", "multi-item-execution");
 		if (signal.type === "loop/tier" && signal.tier === 2) activateFamily("delegation", signal.detector === "semantic" ? "semantic-tier-two" : "loop-tier-two");
@@ -263,7 +264,7 @@ export default function (pi: ExtensionAPI): void {
 			if (signal.capability === "compact_context") activateFamily("context", signal.reason);
 			if (signal.capability === "web_read") activateFamily("research", signal.reason);
 		}
-	});
+	}));
 
 	pi.on("session_start", async (_event, ctx) => {
 		// Keep what the PREVIOUS generation deferred: on an in-process re-entry the

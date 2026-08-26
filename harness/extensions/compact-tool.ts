@@ -1,3 +1,4 @@
+import { subscribeOnce } from "../lib/extension-lifecycle.ts";
 import { defineTool, type ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { Type } from "typebox";
 import { beginCompaction, finishCompaction, resetCompactionCoordinator } from "../lib/compaction-coordinator.ts";
@@ -40,7 +41,7 @@ export default function (pi: ExtensionAPI) {
 	let inFlight = false;
 	let recoveryState: RunStateV1 | null = null;
 	const recoveryMode = runCapsuleMode() === "recovery";
-	onRunStateSnapshot(pi.events, (event) => { recoveryState = event.state; });
+	subscribeOnce("compact-tool:run-state-snapshot", () => onRunStateSnapshot(pi.events, (event) => { recoveryState = event.state; }));
 	pi.on("session_start", async () => {
 		resetCompactionCoordinator();
 		inFlight = false;

@@ -1,3 +1,4 @@
+import { subscribeOnce } from "../lib/extension-lifecycle.ts";
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { ControlArbiterQueue } from "../lib/control-arbiter.ts";
 import {
@@ -12,7 +13,7 @@ export default function (pi: ExtensionAPI): void {
 		return;
 	}
 	const queue = new ControlArbiterQueue();
-	onControlProposal(pi.events, (event) => queue.add(event));
+	subscribeOnce("control-arbiter:control-proposal", () => onControlProposal(pi.events, (event) => queue.add(event)));
 	pi.on("session_start", async () => queue.clear());
 	pi.on("agent_start", async () => queue.clear());
 	pi.on("turn_end", async (event) => {

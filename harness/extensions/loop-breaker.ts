@@ -1,3 +1,4 @@
+import { subscribeOnce } from "../lib/extension-lifecycle.ts";
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { classifyBashCommand, isBashMutation, looksFailingOutput } from "../lib/command-policy.ts";
 import {
@@ -692,10 +693,10 @@ export default function (pi: ExtensionAPI) {
 		},
 	});
 
-	onHarnessSignal(pi.events, (signal) => {
+	subscribeOnce("loop-breaker:domain-signal", () => onHarnessSignal(pi.events, (signal) => {
 		if (signal.type !== "recovery/resume-requested") return;
 		clearRecoveryWalls(signal.origin);
-	});
+	}));
 
 	pi.on("tool_execution_start", async (event) => {
 		const args = (event.args ?? {}) as Record<string, unknown>;

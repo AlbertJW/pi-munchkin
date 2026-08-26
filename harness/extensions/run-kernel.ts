@@ -1,3 +1,4 @@
+import { subscribeOnce } from "../lib/extension-lifecycle.ts";
 import { createHash, randomUUID } from "node:crypto";
 import { VERSION, type ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { planItemHash, sha256 } from "../lib/failure-episodes.ts";
@@ -138,9 +139,9 @@ export function installRunKernel(pi: ExtensionAPI, options: RunKernelInstallOpti
 	});
 
 	const applied = { transition: null as RunTransitionV1 | null };
-	onRunEvent(pi.events, (event) => {
+	subscribeOnce("run-kernel:run-event", () => onRunEvent(pi.events, (event) => {
 		applied.transition = store.apply(event).transition;
-	});
+	}));
 	const readAppliedTransition = (): RunTransitionV1 | null => applied.transition;
 
 	function nextBase(): Pick<RunEventV1, "v" | "sequence" | "atMs"> {
@@ -212,12 +213,12 @@ export function installRunKernel(pi: ExtensionAPI, options: RunKernelInstallOpti
 		}
 	}
 
-	onControlProposal(pi.events, ({ proposal }) => {
+	subscribeOnce("run-kernel:control-proposal", () => onControlProposal(pi.events, ({ proposal }) => {
 		dispatch({ ...nextBase(), type: "run/control-proposed", proposal });
-	});
-	onControlDecision(pi.events, (decision) => {
+	}));
+	subscribeOnce("run-kernel:control-decision", () => onControlDecision(pi.events, (decision) => {
 		dispatch({ ...nextBase(), type: "run/control-decided", decision });
-	});
+	}));
 	// The explicit run boundary lives WITH its consumer. Registering it in the
 	// run capsule made it absent at RUN_CAPSULE=off (despite an "all capsule
 	// modes" contract) and, worse, present-but-mute at RUN_KERNEL=off where
@@ -231,7 +232,7 @@ export function installRunKernel(pi: ExtensionAPI, options: RunKernelInstallOpti
 		},
 	});
 
-	onHarnessSignal(pi.events, (signal) => {
+	subscribeOnce("run-kernel:domain-signal", () => onHarnessSignal(pi.events, (signal) => {
 		if (signal.type === "plan/write") {
 			dispatch({ ...nextBase(), type: "run/plan-observed", runIdHash: signal.runIdHash, accepted: true, executionStarted: false, openItems: signal.openItems });
 		} else if (signal.type === "plan/go") {
@@ -246,7 +247,7 @@ export function installRunKernel(pi: ExtensionAPI, options: RunKernelInstallOpti
 		} else if (signal.type === "recovery/resumed") {
 			dispatch({ ...nextBase(), type: "run/recovery-resumed", cleared: signal.cleared, blocked: signal.blocked });
 		}
-	});
+	}));
 
 	pi.on("session_start", async (event, ctx) => {
 		sequence = 0;

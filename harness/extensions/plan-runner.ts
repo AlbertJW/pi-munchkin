@@ -1,3 +1,4 @@
+import { subscribeOnce } from "../lib/extension-lifecycle.ts";
 import { chmod, mkdir, open, readFile, rename, stat, unlink, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { randomUUID } from "node:crypto";
@@ -879,7 +880,7 @@ export default function (pi: ExtensionAPI): void {
 		}
 	});
 
-	onHarnessSignal(pi.events, (signal) => {
+	subscribeOnce("plan-runner:domain-signal", () => onHarnessSignal(pi.events, (signal) => {
 		if (!lastSessionCwd) return;
 		if (signal.type === "capsule/identity") {
 			const cwd = lastSessionCwd;
@@ -900,7 +901,7 @@ export default function (pi: ExtensionAPI): void {
 			pendingBranchMerge = next;
 			void next.finally(() => { if (pendingBranchMerge === next) pendingBranchMerge = null; });
 		}
-	});
+	}));
 	pi.on("before_agent_start", async () => { if (pendingRebind) await pendingRebind; if (pendingBranchMerge) await pendingBranchMerge; });
 
 	pi.registerCommand("plan", { description: "Enter bounded read-only planning for a request.", handler: async (args, ctx) => startPlanCommand(args, ctx, pi) });

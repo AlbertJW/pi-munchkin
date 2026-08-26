@@ -79,9 +79,9 @@ function activationState(): { deferred?: string[]; attempted?: string[]; reason?
  * runtime from the surface the previous generation left behind, NOT from a
  * pristine one.
  */
-async function boot(options: { cwd?: string; carryActive?: string[] } = {}): Promise<Boot> {
+async function boot(options: { cwd?: string; carryActive?: string[]; carryBus?: FakePi["busHandlers"] } = {}): Promise<Boot> {
 	const cwd = options.cwd ?? projectCwd();
-	const fp = makeFakePi();
+	const fp = makeFakePi({ busHandlers: options.carryBus });
 	for (const name of BUILTINS) fp.pi.registerTool({ name, parameters: { type: "object" } } as never);
 	await loadExtensions(fp, specifiers());
 
@@ -215,5 +215,28 @@ test("cold boot: every deferred tool is reachable through some capability family
 			stranded, [],
 			`deferred with no family route — registered, invisible, and permanently uncallable: ${stranded.join(", ")}`,
 		);
+	});
+});
+
+test("/reload: bus subscriptions do not accumulate across generations", async () => {
+	await withEnv(BASE_ENV(), async () => {
+		const cold = await boot();
+		const channels = [...cold.fp.busHandlers.keys()];
+		assert.ok(channels.length > 0, "precondition: the manifest subscribes to at least one channel");
+		const before = new Map(channels.map((channel) => [channel, cold.fp.busHandlers.get(channel)!.size]));
+
+		// Pi keeps ONE event bus for the process (resource-loader.js:120; `clear()` has
+		// no callers) while re-invoking every factory, and all twelve subscribe sites
+		// discard the unsubscribe the bus hands back. So each reload leaves the previous
+		// generation's handlers attached — to a runtime that agent-session.js:551 has
+		// invalidated, so every `pi.*` call they make now throws and event-bus.js
+		// swallows it to console.error. Node's default maxListeners is 10 and nothing
+		// raises it, so the FIRST reload already trips MaxListenersExceededWarning on
+		// the domain-signal channel.
+		const warm = await boot({ cwd: cold.cwd, carryActive: cold.active, carryBus: cold.fp.busHandlers });
+
+		const grown = [...before].filter(([channel, count]) => (warm.fp.busHandlers.get(channel)?.size ?? 0) > count)
+			.map(([channel, count]) => `${channel}: ${count} -> ${warm.fp.busHandlers.get(channel)?.size}`);
+		assert.deepEqual(grown, [], `stale subscriptions survived the reload:\n${grown.join("\n")}`);
 	});
 });

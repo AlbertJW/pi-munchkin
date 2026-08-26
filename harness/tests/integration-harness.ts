@@ -123,7 +123,7 @@ export type RecordedDelivery = {
 	swallowedError?: string;
 };
 
-export function makeFakePi(options: { streaming?: boolean } = {}) {
+export function makeFakePi(options: { streaming?: boolean; busHandlers?: Map<string, Set<(data: unknown) => void>> } = {}) {
 	const tools = new Map<string, any>();
 	const commands = new Map<string, any>();
 	const handlers = new Map<string, any[]>();
@@ -131,7 +131,12 @@ export function makeFakePi(options: { streaming?: boolean } = {}) {
 	const deliveries: RecordedDelivery[] = [];
 	const customDeliveries: RecordedDelivery[] = [];
 	const entries: Array<{ type: string; data: unknown }> = [];
-	const busHandlers = new Map<string, Set<(data: unknown) => void>>();
+	// Pi builds the event bus ONCE (resource-loader.js:120) and reuses the same object
+	// across every reload — `clear()` exists on it but has zero callers. Passing the
+	// previous generation's map is therefore the faithful model of a reload, and
+	// without it a reload test silently gets a fresh bus and cannot see the one thing
+	// that genuinely accumulates.
+	const busHandlers = options.busHandlers ?? new Map<string, Set<(data: unknown) => void>>();
 	const flags = new Map<string, unknown>();
 	/** Errors pi would funnel to runner.emitError instead of to the extension. */
 	const swallowedErrors: string[] = [];

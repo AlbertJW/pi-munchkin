@@ -871,3 +871,59 @@ test("dark enforce emits one arbiter-owned correction and requests available tie
 		resetPiGlobals();
 	}
 });
+
+test("settled rows are emitted per AGENT RUN, not once per session", async () => {
+	// `agent_settled` fires once per agent run. The latch guarding it was reset only
+	// at session_start, so exactly the FIRST run of a session emitted its
+	// verification-frontier/plateau rows and every later run was silently dropped —
+	// a longitudinal undercount equal to the number of turns in the session. Ask a
+	// question, get an answer, ask another: the second one was invisible.
+	const cwd = projectWithNpmTest();
+	const telemetry = join(cwd, "settled-per-run.jsonl");
+	const previous = { telemetry: process.env.TELEMETRY, file: process.env.TELEMETRY_FILE, source: process.env.TELEMETRY_SOURCE };
+	Object.assign(process.env, { TELEMETRY: "on", TELEMETRY_FILE: telemetry, TELEMETRY_SOURCE: "test" });
+	try {
+		const fp = makeFakePi();
+		await loadVerifyGate(fp, cwd, "execution");
+		for (const run of [1, 2, 3]) {
+			await fire(fp, "agent_start", { runIndex: run }, ctxFor(cwd));
+			await fire(fp, "agent_settled", {}, ctxFor(cwd));
+		}
+		const rows = readFileSync(telemetry, "utf8").trim().split("\n").filter(Boolean).map((line) => JSON.parse(line));
+		const settled = rows.filter((row) => row.ext === "verification-frontier" && row.kind === "settled");
+		assert.equal(settled.length, 3, "one settled row per agent run");
+	} finally {
+		for (const [key, value] of [["TELEMETRY", previous.telemetry], ["TELEMETRY_FILE", previous.file], ["TELEMETRY_SOURCE", previous.source]] as const) {
+			if (value === undefined) delete process.env[key]; else process.env[key] = value;
+		}
+		resetPiGlobals();
+	}
+});
+
+test("a gate that appears after a reload re-activates verify_project", async () => {
+	// The flag recording "*I* hid verify_project" lived in the default() closure, which
+	// a reload wipes. So a session that started gate-less and later gained one — add a
+	// justfile, /reload — kept the tool hidden for the rest of the process, while
+	// verify-gate's own steer went on telling the model to call it.
+	const withoutGate = projectWithNoGate();
+	const withGate = projectWithNpmTest();
+	const load = async () => {
+		const fp = makeFakePi();
+		const verify = await import(`../extensions/verify-gate.ts?reload-gate=${Date.now()}-${Math.random()}`);
+		verify.default(fp.pi as never);
+		return fp;
+	};
+
+	const first = await load();
+	first.pi.setActiveTools(["read", "verify_project"]);
+	await fire(first, "session_start", {}, ctxFor(withoutGate));
+	assert.deepEqual(first.pi.getActiveTools(), ["read"], "precondition: a gate-less session hides the tool");
+
+	// /reload: fresh factory, fresh closure, and the runtime rebuilt from the surface
+	// the previous generation left behind — i.e. already without verify_project.
+	const second = await load();
+	second.pi.setActiveTools([...first.pi.getActiveTools()]);
+	await fire(second, "session_start", { reason: "reload" }, ctxFor(withGate));
+	assert.ok(second.pi.getActiveTools().includes("verify_project"), "the tool never came back after the reload");
+	resetPiGlobals();
+});

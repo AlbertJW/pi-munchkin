@@ -1,3 +1,4 @@
+import { subscribeOnce } from "../lib/extension-lifecycle.ts";
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { record } from "../lib/telemetry.ts";
 import {
@@ -74,7 +75,7 @@ export default function (pi: ExtensionAPI): void {
 
 	pi.on("session_start", async () => { rescues = 0; awaitingDecision = null; });
 
-	onControlDecision(pi.events, (decision) => {
+	subscribeOnce("tool-call-rescue:control-decision", () => onControlDecision(pi.events, (decision) => {
 		const pending = awaitingDecision;
 		awaitingDecision = null;
 		if (!pending) return;
@@ -83,7 +84,7 @@ export default function (pi: ExtensionAPI): void {
 		record("tool-call-rescue", "steered", {
 			signature: pending.signature, turnIndex: pending.turnIndex, delivered,
 		});
-	});
+	}));
 
 	pi.on("turn_end", async (event) => {
 		const msg = event.message;

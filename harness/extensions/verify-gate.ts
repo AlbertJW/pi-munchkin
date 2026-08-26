@@ -1,3 +1,4 @@
+import { subscribeOnce } from "../lib/extension-lifecycle.ts";
 import { defineTool, type ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { Type } from "typebox";
 import { readdir, realpath } from "node:fs/promises";
@@ -201,7 +202,20 @@ export default function (pi: ExtensionAPI) {
 	let plateauCorrections = 0;
 	let plateauActivationRequests = 0;
 	let mutationGeneration = 0;
-	let managedVerifyProjectHidden = false;
+	// Reload-surviving, and it has to be. This records "*I* hid verify_project", which
+	// is the permission to put it back — the flag exists so the harness never
+	// re-activates a tool the USER disabled. Held in the closure it was false again
+	// after every /reload, so the `else if` below could not fire: a session that
+	// started without a gate, then gained one (a justfile added, then /reload), kept
+	// verify_project hidden for the rest of the process while verify-gate's own steer
+	// went on demanding the model call it. Same class as audit A1, same remedy.
+	const hiddenFlag = () => {
+		const shared = globalThis as Record<string, unknown>;
+		return {
+			get: () => shared.__pi_vg_managed_hidden_v1 === true,
+			set: (value: boolean) => { shared.__pi_vg_managed_hidden_v1 = value; },
+		};
+	};
 	const mutationStartState = new Map<string, { generation: number; mutated: boolean; verifiedOk: boolean; fires: number }>();
 	const preventedBeforeStart = new Set<string>();
 	const verifyProjectResults = new Map<string, GateResult>();
@@ -238,7 +252,7 @@ export default function (pi: ExtensionAPI) {
 		},
 	}));
 
-	onHarnessSignal(pi.events, (signal) => {
+	subscribeOnce("verify-gate:domain-signal", () => onHarnessSignal(pi.events, (signal) => {
 		if (signal.type !== "tool/prevented") return;
 		const start = mutationStartState.get(signal.toolCallId);
 		const kind = order.prevent(signal.toolCallId);
@@ -254,7 +268,7 @@ export default function (pi: ExtensionAPI) {
 			st.mutated = start.mutated;
 			st.fires = start.fires;
 		}
-	});
+	}));
 
 	const currentPlanItemHash = (): string | null => {
 		const value = (globalThis as Record<string, unknown>).__pi_active_plan_context as { item_id?: unknown } | undefined;
@@ -339,11 +353,11 @@ export default function (pi: ExtensionAPI) {
 		const active = pi.getActiveTools();
 		if (!gateCmd && active.includes("verify_project")) {
 			pi.setActiveTools(active.filter((name) => name !== "verify_project"));
-			managedVerifyProjectHidden = true;
-		} else if (gateCmd && managedVerifyProjectHidden && !active.includes("verify_project") &&
+			hiddenFlag().set(true);
+		} else if (gateCmd && hiddenFlag().get() && !active.includes("verify_project") &&
 			pi.getAllTools().some((tool) => tool.name === "verify_project")) {
 			pi.setActiveTools([...active, "verify_project"]);
-			managedVerifyProjectHidden = false;
+			hiddenFlag().set(false);
 		}
 		publishFrontier();
 	});
@@ -596,6 +610,14 @@ export default function (pi: ExtensionAPI) {
 		}
 	});
 
+	pi.on("agent_start", async () => { frontierSettled = false; });
+
+	// Re-armed per AGENT RUN, not per session. `agent_settled` fires once per run, so
+	// a latch reset only at session_start let exactly the FIRST run of a session emit
+	// its settled row and silently dropped every run after it — a longitudinal
+	// undercount equal to the number of turns in a session. run-kernel.ts:381-383 is
+	// the correct in-repo shape (it keys the latch on the current cycle identity and
+	// re-mints that at agent_start); this is the same idea with the simpler key.
 	pi.on("agent_settled", async () => {
 		if (frontierSettled) return;
 		frontierSettled = true;

@@ -1,3 +1,4 @@
+import { subscribeOnce } from "../lib/extension-lifecycle.ts";
 import { createHash, randomUUID } from "node:crypto";
 import { chmod, mkdir, rename, unlink, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
@@ -56,8 +57,8 @@ export default function (pi: ExtensionAPI): void {
 	let renderTimer: ReturnType<typeof setTimeout> | null = null;
 	let lastLensProposalBoundary = -Infinity;
 
-	onHarnessSignal(pi.events, (signal) => noteHarnessSignal(boardState(), signal));
-	onControlProposal(pi.events, ({ proposal }) => {
+	subscribeOnce("session-blackboard:domain-signal", () => onHarnessSignal(pi.events, (signal) => noteHarnessSignal(boardState(), signal)));
+	subscribeOnce("session-blackboard:control-proposal", () => onControlProposal(pi.events, ({ proposal }) => {
 		// effect guard: abort/shutdown proposals are hard stops. Loop-breaker
 		// deliberately injects NO steer in those modes (a corrective user message
 		// fights the abort and can restart the run) — the lens must not reintroduce
@@ -91,7 +92,7 @@ export default function (pi: ExtensionAPI): void {
 				}
 			}
 		}
-	});
+	}));
 
 	function cockpitPath(workdir: string): string {
 		const cwdHash = createHash("sha256").update(workdir).digest("hex");

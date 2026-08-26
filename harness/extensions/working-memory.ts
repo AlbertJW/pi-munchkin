@@ -1,3 +1,4 @@
+import { subscribeOnce } from "../lib/extension-lifecycle.ts";
 import { defineTool, type ExtensionAPI } from "@earendil-works/pi-coding-agent";
 // DELIBERATELY DARK (re-affirmed 2026-08-24, Albert-approved). The 2026-08-24 AVO
 // adoption batch flipped the supervisor (VERIFICATION_PLATEAU=enforce) and
@@ -96,9 +97,9 @@ export default function (pi: ExtensionAPI): void {
 		return store;
 	}
 
-	onHarnessSignal(pi.events, (signal) => {
+	subscribeOnce("working-memory:domain-signal", () => onHarnessSignal(pi.events, (signal) => {
 		if (signal.type === "capsule/identity" && sessionStarted) void bind(false);
-	});
+	}));
 
 	pi.on("session_start", async (event, ctx) => {
 		cwd = ctx.cwd ?? process.cwd();
@@ -178,6 +179,14 @@ export default function (pi: ExtensionAPI): void {
 		},
 	});
 
+	pi.on("agent_start", async () => { settled = false; });
+
+	// Re-armed per AGENT RUN, not per session. `agent_settled` fires once per run, so
+	// a latch reset only at session_start let exactly the FIRST run of a session emit
+	// its settled row and silently dropped every run after it — a longitudinal
+	// undercount equal to the number of turns in a session. run-kernel.ts:381-383 is
+	// the correct in-repo shape (it keys the latch on the current cycle identity and
+	// re-mints that at agent_start); this is the same idea with the simpler key.
 	pi.on("agent_settled", async () => {
 		await bindingTail;
 		await store?.flush();
