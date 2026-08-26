@@ -717,12 +717,13 @@ async function startPlanCommand(args: string, ctx: any, pi: ExtensionAPI): Promi
 	const request = cleanText(args);
 	if (!request) { ctx.ui.notify("Usage: /plan <request>", "error"); return; }
 	if (!enterPlanningSurface(pi)) { ctx.ui.notify("Planning cannot start because the explicit tool selection excludes plan_write.", "error"); return; }
+	const runId = `plan-${timestamp()}`;
 	try {
 		rememberModel(ctx);
 		await clearPlan(ctx.cwd);
 		const now = isoNow();
 		await writeState(ctx.cwd, {
-			schema_version: PLAN_GRAPH ? 5 : 4, run_id: `plan-${timestamp()}`, request, summary: "Planning pending.", autonomy: "lean",
+			schema_version: PLAN_GRAPH ? 5 : 4, run_id: runId, request, summary: "Planning pending.", autonomy: "lean",
 			phase: "planned", created_at: now, updated_at: now, items: [],
 		});
 	} catch (error) {
@@ -731,8 +732,22 @@ async function startPlanCommand(args: string, ctx: any, pi: ExtensionAPI): Promi
 	}
 	setPlanning(true);
 	awaitingReview = true;
-	planEvent("start", `plan-${actionId()}`, { request_bytes: utf8Bytes(request) });
-	pi.sendUserMessage(planPrompt(request), { deliverAs: "steer" });
+	planEvent("start", runId, { request_bytes: utf8Bytes(request) });
+	// Extension commands are already being dispatched from AgentSession.prompt().
+	// Re-entering prompt() through sendUserMessage() here races the outer headless
+	// `pi -p` prompt lifecycle and can replace the session while extension handlers
+	// still hold its old context. Pi explicitly reserves sendMessage(triggerTurn)
+	// for command-owned LLM interaction; use that single prompt path instead.
+	pi.sendMessage({
+		customType: "pi-munchkin:plan-command",
+		content: planPrompt(request),
+		display: true,
+		details: { action: "plan", run_id: runId },
+	}, { triggerTurn: true });
+	// sendMessage is intentionally fire-and-forget on ExtensionAPI. A command
+	// handler must keep a print-mode process alive until its triggered turn has
+	// actually settled; otherwise `pi -p '/plan …'` exits 0 with an empty plan.
+	if (typeof ctx.waitForIdle === "function") await ctx.waitForIdle();
 }
 
 async function goCommand(ctx: any, pi: ExtensionAPI): Promise<void> {
@@ -754,7 +769,13 @@ async function goCommand(ctx: any, pi: ExtensionAPI): Promise<void> {
 	planEvent("go", outcome.state.run_id, { resumed: outcome.stale.length > 0 });
 	pi.appendEntry("plan_spine", { run_id: outcome.state.run_id });
 	const stale = outcome.stale.length ? `\n\nPreviously in_progress IDs may contain partial work: ${outcome.stale.map((item) => item.id).join(", ")}. Inspect before continuing.` : "";
-	pi.sendUserMessage(executionPrompt(outcome.state) + stale, { deliverAs: "steer" });
+	pi.sendMessage({
+		customType: "pi-munchkin:plan-command",
+		content: executionPrompt(outcome.state) + stale,
+		display: true,
+		details: { action: "plan-go", run_id: outcome.state.run_id },
+	}, { triggerTurn: true });
+	if (typeof ctx.waitForIdle === "function") await ctx.waitForIdle();
 }
 
 type Rebound = { openItems: number; interrupted: boolean };

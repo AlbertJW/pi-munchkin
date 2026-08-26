@@ -71,6 +71,10 @@ test("/plan exposes only the bounded read-only planning surface", async () => {
 		"capability", "find", "grep", "ls", "plan_write", "read", "read_span", "recall", "search_spans",
 	].sort());
 	assert.match(fp.sent.at(-1) ?? "", /1-24 short top-level items/);
+	assert.equal(fp.deliveries.length, 0, "a command handler must not recursively call sendUserMessage/prompt");
+	assert.equal(fp.customDeliveries.length, 1);
+	assert.equal(fp.customDeliveries[0].triggerTurn, true, "the command-owned custom message starts exactly one turn");
+	assert.equal((fp.customDeliveries[0].message as any).details.action, "plan");
 	const blocked = await fire(fp, "tool_call", { toolCallId: "blocked-edit", toolName: "edit", input: { path: "x" } });
 	assert.equal(blocked?.block, true);
 	assert.match(blocked.reason, /Planning is read-only/);
@@ -176,6 +180,9 @@ test("/plan-go restores execution tools and /plan-cancel restores without execut
 	assert.ok(fp.pi.getActiveTools().includes("bash"));
 	assert.ok(fp.pi.getActiveTools().includes("plan_update"));
 	assert.match(fp.sent.at(-1) ?? "", /Use plan_update/);
+	assert.equal(fp.deliveries.length, 0, "/plan-go must not recursively enter prompt through sendUserMessage");
+	assert.equal((fp.customDeliveries.at(-1)?.message as any).details.action, "plan-go");
+	assert.equal(fp.customDeliveries.at(-1)?.triggerTurn, true);
 
 	const fp2 = fresh();
 	const cwd2 = tmp();
