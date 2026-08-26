@@ -4,6 +4,42 @@ All notable changes to pi-munchkin are documented here. Releases follow semantic
 
 ## Unreleased
 
+### Added (2026-08-26 — gate provenance binding and a model-neutral tool-contract screen)
+
+- **Gate telemetry rows carry real identity.** `optimizer/real_gate.sh` now mints a per-session
+  `pi.gate-session/v1` provenance record (`optimizer/prompt-lab/gate_provenance.py`) and stamps
+  `PI_RUN_ID`/`PI_MODEL_ID`/`PI_MODEL_PROVIDER`/`PI_REQUESTED_MODEL`/`PI_REQUESTED_PROVIDER`/
+  `HARNESS_CONFIG_SHA256` into the child env, closing the previously-open defect where `model`,
+  `provider`, and `config_sha256` were null on every gate telemetry row. `requested_model`/
+  `requested_provider` join the reserved telemetry envelope (`lib/telemetry.ts`,
+  `lib/telemetry-catalog.ts`); observed-vs-expected identity is validated when reducing rows, and a
+  mismatch marks the row non-authoritative.
+- **Gate-child telemetry can no longer leak into the interactive corpus.** `runner-env.js` now forces
+  `TELEMETRY=off`/`TELEMETRY_CHILD_POLICY=contained` for any subagent spawned under
+  `TELEMETRY_SOURCE=gate`, closing the previously-open leak into `~/.pi/agent/telemetry/events.jsonl`.
+- **A model-neutral tool-contract qualification screen.** `optimizer/prompt-lab/tool_contract.py` +
+  `tool-contract-v1.json` define 10 cases (read, span-search, span-read, shell-recovery,
+  anchored-edit, write-persist, verify-after-mutation, capability-activation, planner-write,
+  planner-update) checking whether a model calls the required tool. It emits `pi.tool-contract/v1`
+  rows that `row_contract.py`/`fleet_report.py` explicitly exclude from fleet efficacy/adoption — it
+  cannot promote a model. `--selftest`/`--dry` never invoke a model; `--run --confirm --model ...`
+  is the explicit human-gated execution boundary. See
+  `optimizer/docs/NEXT_STEP_MODEL_QUALIFICATION_2026-08.md` and the 2026-08-26 HANDOVER section for
+  the full sequencing; no inference, mirror, or default flip is implied by landing this.
+- **Tested**: new tests in `harness/tests/subagent-hardening.test.ts` and `harness/tests/telemetry.test.ts`,
+  plus Python `selftest()` in `gate_provenance.py`/`tool_contract.py`/`context_telemetry.py`.
+
+### Fixed (2026-08-26 — run-kernel's shadow mutation counter agrees with verify-gate's conservative bash rule)
+
+- **A failed bash mutation no longer trips a spurious `legacy-disagreement`.** verify-gate's F-02 fix
+  conservatively counts a failed `bash` source-mutation as `mutated: true` (a shell command may have
+  written before returning non-zero); `run-kernel`'s independent shadow-mode counter was
+  success-only, so `compareLegacy()` disagreed on `verify_mutated` for a case that wasn't a real bug
+  in either system. A new `mutation.conservativeArmed` flag, scoped only to that comparison, closes
+  the gap without touching `mutation.count`/`lastCompletedSequence` or anything downstream of them
+  (`settle()`'s `hasMutation`, the `mutations` telemetry field, recovery/blackboard/capsule
+  rendering). `run-kernel` remains shadow-mode/observational only — no user-visible behavior change.
+
 ### Fixed (2026-08-26 — live headless lifecycle and mutation accounting)
 
 - **Headless `/plan` and `/plan-go` no longer replace their own session.** A command handler used
