@@ -71,15 +71,30 @@ export default function (pi: ExtensionAPI): void {
 	// the second-lowest priority there, so it loses most contested boundaries under
 	// the shipped CONTROL_ARBITER=enforce (2026-08-21). Two dropped proposals used
 	// to exhaust the session budget without the model ever seeing a rescue.
-	let awaitingDecision: { signature: string; turnIndex: number } | null = null;
+	// Three corrections to the original, made before this became the pattern the other
+	// producers are migrated onto — copying it verbatim would have propagated all three:
+	//   * identity by `proposalIdHash`, not by `source`. The hash is minted per
+	//     proposal and echoed intact in the decision, so it is exact and free; `source`
+	//     cannot tell two proposals from the same extension apart.
+	//   * the delivered SET, not the winner. Merge rescues deliver a loser's text
+	//     attached to the winner's, so `winner.source` under-reports delivery.
+	//   * `boundarySequence` is checked, and the record is dropped at `agent_start`.
+	//     A boundary can produce NO decision (control-arbiter.ts clears its queue on
+	//     agent_start, and MAX_PENDING evicts), and the old code resolved a stale
+	//     pending record against whatever decision arrived next — charging the wrong
+	//     turn and writing a `steered` row with the wrong turnIndex.
+	let awaitingDecision: { signature: string; turnIndex: number; proposalIdHash: string } | null = null;
 
-	pi.on("session_start", async () => { rescues = 0; awaitingDecision = null; });
+	const forget = () => { awaitingDecision = null; };
+	pi.on("session_start", async () => { rescues = 0; forget(); });
+	pi.on("agent_start", async () => { forget(); });
 
 	subscribeOnce("tool-call-rescue:control-decision", () => onControlDecision(pi.events, (decision) => {
 		const pending = awaitingDecision;
-		awaitingDecision = null;
 		if (!pending) return;
-		const delivered = decision.winner?.source === "tool-call-rescue";
+		if (decision.boundarySequence !== pending.turnIndex) return; // not our boundary
+		awaitingDecision = null;
+		const delivered = decision.delivered.includes(pending.proposalIdHash);
 		if (delivered) rescues += 1;
 		record("tool-call-rescue", "steered", {
 			signature: pending.signature, turnIndex: pending.turnIndex, delivered,
@@ -102,7 +117,7 @@ export default function (pi: ExtensionAPI): void {
 		if (rescues >= MAX_RESCUES) return;
 		const message = rescueMessage(det);
 		const legacyActed = !controlEnforces(pi.events);
-		emitControlProposal(pi.events, buildControlProposal({
+		const proposal = buildControlProposal({
 			boundarySequence: event.turnIndex,
 			kind: "tool_rescue",
 			reason: "pseudo_tool_call",
@@ -110,11 +125,12 @@ export default function (pi: ExtensionAPI): void {
 			cooldownKey: `tool-rescue:${det.signature}`,
 			messageFactory: "tool-rescue",
 			legacyActed,
-		}), { message });
+		});
+		emitControlProposal(pi.events, proposal, { message });
 		if (!legacyActed) {
 			// The arbiter owns delivery; its decision charges the budget and records
 			// `steered`. If no decision ever arrives the budget is simply not spent.
-			awaitingDecision = { signature: det.signature, turnIndex: event.turnIndex };
+			awaitingDecision = { signature: det.signature, turnIndex: event.turnIndex, proposalIdHash: proposal.proposalIdHash };
 			return;
 		}
 		rescues += 1;

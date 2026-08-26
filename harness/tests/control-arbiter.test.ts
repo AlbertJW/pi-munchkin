@@ -422,10 +422,14 @@ test("telemetry on and off produce identical control decisions and messages", as
 	const off = await run("off");
 	const on = await run("on");
 	assert.deepEqual(on.sent, off.sent);
-	assert.deepEqual(
-		{ ...(on.decision as Record<string, unknown>), winner: (on.decision as { winner: { proposalIdHash: string } }).winner && "winner" },
-		{ ...(off.decision as Record<string, unknown>), winner: (off.decision as { winner: { proposalIdHash: string } }).winner && "winner" },
-	);
+	// `proposalIdHash` is a fresh randomUUID per proposal, so neither the winner nor
+	// the delivered set can be compared by value across two runs. Normalise both to the
+	// deterministic part: that a winner existed, and how many proposals were delivered.
+	const comparable = (decision: unknown) => {
+		const value = decision as { winner: unknown; delivered: readonly string[] };
+		return { ...(decision as Record<string, unknown>), winner: value.winner && "winner", delivered: value.delivered.length };
+	};
+	assert.deepEqual(comparable(on.decision), comparable(off.decision));
 });
 
 // --- the invariant this suite never had ------------------------------------

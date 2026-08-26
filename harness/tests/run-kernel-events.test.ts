@@ -48,7 +48,7 @@ const SAMPLES: Record<string, RunEventV1> = {
 		source: "verify-gate", cooldownKeyHash: H, messageFactory: "verify-wrap", effect: "message", legacyActed: true } },
 	// proposalCount 0 <=> winner null is a cross-field invariant in isControlDecision.
 	"run/control-decided": { ...base, type: "run/control-decided", decision: { v: 1, boundarySequence: 4,
-		mode: "shadow", proposalCount: 0, collisionCount: 0, legacyActionCount: 0, winner: null } },
+		mode: "shadow", proposalCount: 0, collisionCount: 0, legacyActionCount: 0, winner: null, delivered: [] } },
 	"run/plan-observed": { ...base, type: "run/plan-observed", runIdHash: H, accepted: true, executionStarted: false, openItems: 2 },
 	"run/context-observed": { ...base, type: "run/context-observed", usagePct: 42 },
 	"run/failure-state-observed": { ...base, type: "run/failure-state-observed", activeWalls: 1, exposedEpisodes: 1, lastClass: "verification_assertion" },

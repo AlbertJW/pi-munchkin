@@ -82,6 +82,16 @@ export class ControlArbiterQueue {
 				lensMerged = true;
 			}
 		}
+		// The honest delivered set: the winner plus whichever losers were merged into
+		// its text. Empty outside enforce, because outside enforce the arbiter sends
+		// nothing — the producers self-deliver and know it from `legacyActed`.
+		const delivered = mode === "enforce" && winner
+			? [
+				winner.proposal.proposalIdHash,
+				...(verificationMerged && verification ? [verification.proposal.proposalIdHash] : []),
+				...(lensMerged && lens ? [lens.proposal.proposalIdHash] : []),
+			]
+			: [];
 		return {
 			decision: {
 				v: 1,
@@ -91,6 +101,7 @@ export class ControlArbiterQueue {
 				collisionCount: Math.max(0, proposals.length - 1),
 				legacyActionCount: proposals.filter(({ proposal }) => proposal.legacyActed).length,
 				winner: winner?.proposal ?? null,
+				delivered,
 			},
 			delivery,
 			lensMerged,

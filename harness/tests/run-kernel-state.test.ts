@@ -191,7 +191,7 @@ test("control proposals and decisions enter RunState without message text", () =
 	apply(store, { v: 1, type: "run/control-proposed", sequence: 2, atMs: 2, proposal });
 	apply(store, {
 		v: 1, type: "run/control-decided", sequence: 3, atMs: 3,
-		decision: { v: 1, boundarySequence: 7, mode: "shadow", proposalCount: 2, collisionCount: 1, legacyActionCount: 2, winner: proposal },
+		decision: { v: 1, boundarySequence: 7, mode: "shadow", proposalCount: 2, collisionCount: 1, legacyActionCount: 2, winner: proposal, delivered: [] },
 	});
 	const state = store.snapshot();
 	assert.equal(state.control.proposals, 1);
@@ -242,7 +242,7 @@ test("every canonical control reason survives run-state validation", () => {
 		apply(store, { v: 1, type: "run/control-proposed", sequence: 2, atMs: 2, proposal });
 		apply(store, {
 			v: 1, type: "run/control-decided", sequence: 3, atMs: 3,
-			decision: { v: 1, boundarySequence: 7, mode: "enforce", proposalCount: 1, collisionCount: 0, legacyActionCount: 0, winner: proposal },
+			decision: { v: 1, boundarySequence: 7, mode: "enforce", proposalCount: 1, collisionCount: 0, legacyActionCount: 0, winner: proposal, delivered: [proposal.proposalIdHash] },
 		});
 		const state = store.snapshot();
 		assert.equal(state.control.lastDecision?.reason, reason);

@@ -3,7 +3,7 @@ import test from "node:test";
 import { mkdtempSync, readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { fire, makeFakePi } from "./integration-harness.ts";
+import { emitRivalProposal, fire, makeFakePi } from "./integration-harness.ts";
 import { detectPseudoToolCall, rescueMessage } from "../extensions/tool-call-rescue.ts";
 import {
 	buildControlProposal, emitControlDecision, setControlArbiterActive,
@@ -125,34 +125,26 @@ test("a rescue the arbiter DROPS does not spend the session budget", async () =>
 			turnIndex,
 			message: { role: "assistant", content: [{ type: "text", text: "<function=bash>ls</function>" }] },
 		});
-		const decide = (turnIndex: number, source: "loop-breaker" | "tool-call-rescue") => {
-			emitControlDecision(fp.pi.events as never, {
-				v: 1, boundarySequence: turnIndex, mode: "enforce", proposalCount: 2,
-				collisionCount: 1, legacyActionCount: 0,
-				winner: buildControlProposal({
-					boundarySequence: turnIndex,
-					kind: source === "loop-breaker" ? "failure_recovery" : "tool_rescue",
-					reason: source === "loop-breaker" ? "session_repeat" : "pseudo_tool_call",
-					source, cooldownKey: `k:${turnIndex}`,
-					messageFactory: source === "loop-breaker" ? "loop-tier" : "tool-rescue",
-					legacyActed: false,
-				}),
-			});
+		// Drive the REAL arbiter rather than synthesising decisions. Now that identity
+		// is the proposalIdHash, a hand-built decision cannot name the proposal it is
+		// deciding — and a synthesised decision could never have modelled the merge
+		// rescues that make `winner` an incomplete account of delivery in the first place.
+		const arbiter = await import(`../extensions/control-arbiter.ts?rescue=${Date.now()}-${Math.random()}`);
+		arbiter.default(fp.pi as never);
+		const boundary = async (turnIndex: number, contested: boolean) => {
+			// The rival must be queued BEFORE the turn_end that drains the boundary: one
+			// `turn_end` runs the producer's handler and then the arbiter's (manifest
+			// order), so a proposal emitted after it has missed its own decision.
+			if (contested) emitRivalProposal(fp, turnIndex);
+			await fire(fp, "turn_end", pseudo(turnIndex), {});
 		};
 		// Three boundaries lost to a higher-priority proposal: nothing delivered,
 		// nothing charged.
-		for (const turnIndex of [1, 2, 3]) {
-			await fire(fp, "turn_end", pseudo(turnIndex));
-			decide(turnIndex, "loop-breaker");
-		}
+		for (const turnIndex of [1, 2, 3]) await boundary(turnIndex, true);
 		// The budget is intact, so two real deliveries still get through.
-		for (const turnIndex of [4, 5]) {
-			await fire(fp, "turn_end", pseudo(turnIndex));
-			decide(turnIndex, "tool-call-rescue");
-		}
+		for (const turnIndex of [4, 5]) await boundary(turnIndex, false);
 		// ...and only then is it exhausted.
-		await fire(fp, "turn_end", pseudo(6));
-		decide(6, "tool-call-rescue");
+		await boundary(6, false);
 
 		const steered = readFileSync(telemetry, "utf8").split("\n").filter(Boolean)
 			.map((line) => JSON.parse(line) as Record<string, unknown>)

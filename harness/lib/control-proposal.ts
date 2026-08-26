@@ -79,6 +79,21 @@ export interface ControlDecisionV1 {
 	collisionCount: number;
 	legacyActionCount: number;
 	winner: ControlProposalV1 | null;
+	/**
+	 * Every proposal whose content actually reached the model at this boundary.
+	 *
+	 * `winner` alone is not that set, and treating it as such is wrong in BOTH
+	 * directions. The arbiter's two merge rescues attach a loser's text to the
+	 * winner's, so verify-gate's wrap nag and session-blackboard's lens are routinely
+	 * delivered while `winner` names somebody else — a producer keying its budget on
+	 * `winner.source` would refund itself on exactly the boundaries where it WAS
+	 * heard. And in shadow mode the arbiter delivers nothing at all, though it still
+	 * publishes a decision with a winner.
+	 *
+	 * Empty unless the arbiter is enforcing. This is the field a producer must key a
+	 * charge-on-delivery budget on.
+	 */
+	delivered: readonly string[];
 }
 
 const PRIORITY: Record<ControlKind, number> = {
@@ -202,7 +217,7 @@ export function isControlDecision(value: unknown): value is ControlDecisionV1 {
 	if (!value || typeof value !== "object") return false;
 	const item = value as Partial<ControlDecisionV1>;
 	const keys = Object.keys(item);
-	const expected = ["v", "boundarySequence", "mode", "proposalCount", "collisionCount", "legacyActionCount", "winner"];
+	const expected = ["v", "boundarySequence", "mode", "proposalCount", "collisionCount", "legacyActionCount", "winner", "delivered"];
 	return keys.length === expected.length && keys.every((key) => expected.includes(key)) &&
 		item.v === 1 && Number.isSafeInteger(item.boundarySequence) && Number(item.boundarySequence) >= 0 &&
 		(["shadow", "enforce", "off"] as unknown[]).includes(item.mode) &&
@@ -211,6 +226,10 @@ export function isControlDecision(value: unknown): value is ControlDecisionV1 {
 		Number.isSafeInteger(item.legacyActionCount) && Number(item.legacyActionCount) >= 0 &&
 		Number(item.collisionCount) === Math.max(0, Number(item.proposalCount) - 1) &&
 		Number(item.legacyActionCount) <= Number(item.proposalCount) &&
+		Array.isArray(item.delivered) &&
+		item.delivered.every((entry) => typeof entry === "string" && /^[a-f0-9]{64}$/.test(entry)) &&
+		item.delivered.length <= Number(item.proposalCount) &&
+		(item.mode === "enforce" || item.delivered.length === 0) &&
 		(Number(item.proposalCount) === 0 ? item.winner === null : isControlProposal(item.winner));
 }
 
