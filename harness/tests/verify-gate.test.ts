@@ -428,6 +428,31 @@ test("failed atomic mutation tools do not arm the legacy mutation bit", async ()
 	}
 });
 
+test("concurrent atomic failures restore one shared verification baseline", async () => {
+	for (const outcomes of [[true, true], [true, false]] as const) {
+		const cwd = projectWithNpmTest();
+		const fp = makeFakePi();
+		try {
+			await loadVerifyGate(fp, cwd, "execution");
+			const ctx = ctxFor(cwd);
+			await fire(fp, "tool_execution_start", { toolCallId: "green", toolName: "bash", args: { command: "npm test" } }, ctx);
+			await fire(fp, "tool_execution_end", { toolCallId: "green", toolName: "bash", result: "passing", isError: false }, ctx);
+			await fire(fp, "tool_execution_start", { toolCallId: "edit-a", toolName: "edit", args: { path: "src/a.ts" } }, ctx);
+			await fire(fp, "tool_execution_start", { toolCallId: "edit-b", toolName: "write", args: { path: "src/b.ts" } }, ctx);
+			await fire(fp, "tool_execution_end", { toolCallId: "edit-a", toolName: "edit", result: "failed", isError: outcomes[0] }, ctx);
+			await fire(fp, "tool_execution_end", { toolCallId: "edit-b", toolName: "write", result: outcomes[1] ? "failed" : "written", isError: outcomes[1] }, ctx);
+			await fire(fp, "turn_end", wrapUpTurn, ctx);
+			const snapshot = (globalThis as Record<string, unknown>).__pi_vg_state as { mutated: boolean; verifiedOk: boolean };
+			const allFailed = outcomes.every(Boolean);
+			assert.equal(snapshot.mutated, !allFailed, `mutated for outcomes ${outcomes.join(",")}`);
+			assert.equal(snapshot.verifiedOk, allFailed, `verifiedOk for outcomes ${outcomes.join(",")}`);
+			assert.equal(fp.sent.some((message) => message.includes("verify-gate")), !allFailed);
+		} finally {
+			resetPiGlobals();
+		}
+	}
+});
+
 test("execution-order mode fails closed when a verifier has no start event", async () => {
 	const cwd = projectWithNpmTest();
 	const fp = makeFakePi();

@@ -203,7 +203,6 @@ export default function (pi: ExtensionAPI) {
 	let plateauCorrections = 0;
 	const plateauCharge = createDeliveryCharge(pi.events, "verify-gate-plateau");
 	let plateauActivationRequests = 0;
-	let mutationGeneration = 0;
 	// Reload-surviving, and it has to be. This records "*I* hid verify_project", which
 	// is the permission to put it back — the flag exists so the harness never
 	// re-activates a tool the USER disabled. Held in the closure it was false again
@@ -218,7 +217,8 @@ export default function (pi: ExtensionAPI) {
 			set: (value: boolean) => { shared.__pi_vg_managed_hidden_v1 = value; },
 		};
 	};
-	const mutationStartState = new Map<string, { generation: number; mutated: boolean; verifiedOk: boolean; fires: number }>();
+	let mutationEpochBaseline: Pick<State, "mutated" | "verifiedOk" | "fires"> | null = null;
+	let mutationEpochChanged = false;
 	const preventedBeforeStart = new Set<string>();
 	const verifyProjectResults = new Map<string, GateResult>();
 	const trimOldest = (collection: Map<string, unknown> | Set<string>, maximum: number): void => {
@@ -227,6 +227,17 @@ export default function (pi: ExtensionAPI) {
 			if (oldest === undefined) break;
 			collection.delete(oldest);
 		}
+	};
+	const settleMutationEpoch = (mutationCounts: boolean): void => {
+		if (mutationCounts) mutationEpochChanged = true;
+		if (order.hasPendingMutations()) return;
+		if (!mutationEpochChanged && mutationEpochBaseline) {
+			st.mutated = mutationEpochBaseline.mutated;
+			st.verifiedOk = mutationEpochBaseline.verifiedOk;
+			st.fires = mutationEpochBaseline.fires;
+		}
+		mutationEpochBaseline = null;
+		mutationEpochChanged = false;
 	};
 
 	pi.registerTool(defineTool({
@@ -256,7 +267,6 @@ export default function (pi: ExtensionAPI) {
 
 	subscribeOnce("verify-gate:domain-signal", () => onHarnessSignal(pi.events, (signal) => {
 		if (signal.type !== "tool/prevented") return;
-		const start = mutationStartState.get(signal.toolCallId);
 		const kind = order.prevent(signal.toolCallId);
 		if (!kind) {
 			preventedBeforeStart.add(signal.toolCallId);
@@ -264,12 +274,7 @@ export default function (pi: ExtensionAPI) {
 			return;
 		}
 		pendingExactGates.delete(signal.toolCallId);
-		mutationStartState.delete(signal.toolCallId);
-		if (kind === "source_mutation" && start && start.generation === mutationGeneration && !order.hasPendingMutations()) {
-			st.verifiedOk = start.verifiedOk;
-			st.mutated = start.mutated;
-			st.fires = start.fires;
-		}
+		if (kind === "source_mutation") settleMutationEpoch(false);
 	}));
 
 	const currentPlanItemHash = (): string | null => {
@@ -335,8 +340,8 @@ export default function (pi: ExtensionAPI) {
 		plateauCorrections = 0;
 		plateauActivationRequests = 0;
 		clearDetectedProjectGate();
-		mutationGeneration = 0;
-		mutationStartState.clear();
+		mutationEpochBaseline = null;
+		mutationEpochChanged = false;
 		preventedBeforeStart.clear();
 		verifyProjectResults.clear();
 		// The published globalThis snapshot must die with the session, not just the
@@ -384,10 +389,13 @@ export default function (pi: ExtensionAPI) {
 			trimOldest(pendingExactGates, 128);
 		}
 		const kind = event.toolName === "verify_project" ? "verification" : await classifyStart(event.toolName, args);
-		order.start({ callId: event.toolCallId, kind });
-		if (kind === "source_mutation") {
-			mutationStartState.set(event.toolCallId, { generation: mutationGeneration, mutated: st.mutated, verifiedOk: st.verifiedOk, fires: st.fires });
-			trimOldest(mutationStartState as Map<string, unknown>, 512);
+		const hadPendingMutations = order.hasPendingMutations();
+		const started = order.start({ callId: event.toolCallId, kind });
+		if (kind === "source_mutation" && started !== null) {
+			if (!hadPendingMutations) {
+				mutationEpochBaseline = { mutated: st.mutated, verifiedOk: st.verifiedOk, fires: st.fires };
+				mutationEpochChanged = false;
+			}
 			// A pending mutation invalidates green evidence for ordering purposes, but
 			// it is not yet proof that bytes changed. Built-in edit/write/multiedit
 			// failures are atomic failures and must not arm the legacy mutation bit.
@@ -397,15 +405,9 @@ export default function (pi: ExtensionAPI) {
 			st.fires = 0;
 		}
 		if (preventedBeforeStart.delete(event.toolCallId)) {
-			const start = mutationStartState.get(event.toolCallId);
 			const preventedKind = order.prevent(event.toolCallId);
-			mutationStartState.delete(event.toolCallId);
 			pendingExactGates.delete(event.toolCallId);
-			if (preventedKind === "source_mutation" && start && start.generation === mutationGeneration && !order.hasPendingMutations()) {
-				st.verifiedOk = start.verifiedOk;
-				st.mutated = start.mutated;
-				st.fires = start.fires;
-			}
+			if (preventedKind === "source_mutation") settleMutationEpoch(false);
 		}
 	});
 
@@ -432,14 +434,7 @@ export default function (pi: ExtensionAPI) {
 		const mutationCounts = Boolean(outcome?.mutationAttempted) && (!event.isError || event.toolName === "bash");
 		applyOrderedOutcome(outcome, mutationCounts);
 		if (outcome?.mutationSettled) {
-			const start = mutationStartState.get(event.toolCallId);
-			if (!mutationCounts && start && start.generation === mutationGeneration && !order.hasPendingMutations()) {
-				st.mutated = start.mutated;
-				st.verifiedOk = start.verifiedOk;
-				st.fires = start.fires;
-			}
-			mutationGeneration += 1;
-			mutationStartState.delete(event.toolCallId);
+			settleMutationEpoch(mutationCounts);
 			frontier.noteMutationSettled(!event.isError);
 			if (PLATEAU_MODE !== "off" && !event.isError) {
 				const gateHash = exactGateHash();
