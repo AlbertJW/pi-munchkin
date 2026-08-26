@@ -44,11 +44,17 @@ optimizer-side: the model-visible surface did NOT move (source hash re-verified 
 screen, power, primary, replication — remains a separate Albert-started action; the mothball
 stands until he starts preflight.**
 
-## 2026-08-26 integration batches 0-2 — in progress, NOT rolled out
+## 2026-08-26 integration batches 0-2 — mirrored, smoke outstanding
 
 The deferred list below is being worked as **five classes**, not fifteen fixes. Batches 0-2 are
-committed on `main` (`824301c`..`d160037`), verify 6/6, 609 tests, source `c6e588dc…`. **Nothing is
-mirrored**: the boundary row for these is marked PENDING.
+committed on `main` (`824301c`..`ab00faa`), verify 6/6, 609 tests, source `c6e588dc…`, **mirrored
+2026-08-26** — `mirror:check` 118/118, loaded `bdc18ba8…`.
+
+**One receipt is missing on purpose: the live 35B smoke did not run.** Other models were occupying
+the serving box, and that box serves one request at a time. Extension loading is proven by the
+isolated packed consumers (30 extensions + 2 skills under Pi 0.80 and 0.84) and `pack:smoke`, but
+nothing has exercised this surface in a real session. **Treat the first interactive session as the
+smoke, and run a proper one before binding any measurement to `bdc18ba8…`.**
 
 The thesis, and the reason the batches are ordered this way: **the suite systematically exercised
 the configuration nobody ships.** One extension per FakePi, never manifest order. The planner suite
