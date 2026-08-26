@@ -1,6 +1,7 @@
 import { subscribeOnce } from "../lib/extension-lifecycle.ts";
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { agentDir } from "../lib/agent-dir.ts";
+import { isEffectiveResume } from "../lib/session-resume.ts";
 import {
 	CapsuleCheckpointQueue, latestRunStateEntry, makeRunStateEntry, newCapsuleId,
 	readLatestRunCapsule, RUN_STATE_ENTRY_TYPE, runCapsuleMode, writeRunCapsule,
@@ -77,7 +78,7 @@ export default function (pi: ExtensionAPI): void {
 	pi.on("session_start", async (event, ctx) => {
 		cwd = ctx.cwd ?? process.cwd();
 		let restored = null;
-		if (event.reason === "resume" || event.reason === "fork") {
+		if (isEffectiveResume(event, ctx)) {
 			try { restored = latestRunStateEntry(ctx.sessionManager.getBranch()); } catch { /* private fallback */ }
 			if (!restored) restored = await readLatestRunCapsule(agentDir(), cwd);
 		}

@@ -211,6 +211,36 @@ test("resume/fork ALWAYS resets before restoring — no cross-session ledger ble
 	}
 });
 
+// `pi -p --session-id <existing>` fires reason "startup", never "resume" —
+// verified against Pi's bundled dist. Before this fix, a real cross-process
+// resume left the board silently empty because the restore branch only ran
+// for reason "resume"/"fork".
+test("a non-interactive resume (reason startup, branch carries a saved board) restores it", async () => {
+	const fp = makeFakePi();
+	const prev = process.env.BLACKBOARD;
+	delete process.env.BLACKBOARD;
+	try {
+		const mod = await import(`../extensions/session-blackboard.ts?startupresume=${Date.now()}-${Math.random()}`);
+		mod.default(fp.pi as never);
+		resetBoard();
+		const saved = boardState();
+		saved.turn = 3;
+		noteTool(saved, { toolName: "bash", args: { command: "npm test" }, isError: true, errorText: "prior session failure" });
+		const savedSnapshot = snapshot(saved);
+		assert.equal(Object.keys(boardState().attempts).length, 1);
+
+		await fire(fp, "session_start",
+			{ reason: "startup" },
+			{ cwd: process.cwd(), sessionManager: { getBranch: () => [{ type: "custom", customType: "blackboard.state", data: savedSnapshot }] } },
+		);
+		assert.equal(Object.keys(boardState().attempts).length, 1, "the saved board did not survive a non-interactive resume");
+		assert.equal(boardState().turn, 3);
+	} finally {
+		if (prev === undefined) delete process.env.BLACKBOARD; else process.env.BLACKBOARD = prev;
+		resetBoard();
+	}
+});
+
 test("lens steer skips abort/shutdown proposals — hard stops must not be fought", async () => {
 	const { buildControlProposal, emitControlProposal } = await import("../lib/control-proposal.ts");
 	const fp = makeFakePi();

@@ -1,5 +1,6 @@
 import { createDeliveryCharge } from "../lib/control-charge.ts";
 import { subscribeOnce } from "../lib/extension-lifecycle.ts";
+import { isEffectiveResume } from "../lib/session-resume.ts";
 import { createHash, randomUUID } from "node:crypto";
 import { chmod, mkdir, rename, unlink, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
@@ -182,7 +183,7 @@ export default function (pi: ExtensionAPI): void {
 		// present another session's attempts as this session's state, which
 		// is the one failure mode this design exists to rule out.
 		resetBoard();
-		if (event.reason === "resume" || event.reason === "fork") {
+		if (isEffectiveResume(event, ctx)) {
 			try {
 				const entries = ctx.sessionManager.getBranch();
 				for (let i = entries.length - 1; i >= 0; i--) {

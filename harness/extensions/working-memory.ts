@@ -1,4 +1,5 @@
 import { subscribeOnce } from "../lib/extension-lifecycle.ts";
+import { isEffectiveResume } from "../lib/session-resume.ts";
 import { defineTool, type ExtensionAPI } from "@earendil-works/pi-coding-agent";
 // DELIBERATELY DARK (re-affirmed 2026-08-24, Albert-approved). The 2026-08-24 AVO
 // adoption batch flipped the supervisor (VERIFICATION_PLATEAU=enforce) and
@@ -111,7 +112,7 @@ export default function (pi: ExtensionAPI): void {
 		counters.supersessions = 0;
 		currentIdentity = null;
 		store = null;
-		await bind(event.reason === "resume" || event.reason === "fork");
+		await bind(isEffectiveResume(event, ctx));
 	});
 
 	pi.registerTool(defineTool({

@@ -168,6 +168,30 @@ test("supersession and resolution retain immutable history while list returns ac
 	assert.equal(store.status().total, 2);
 });
 
+// `pi -p --session-id <existing>` fires reason "startup", never "resume" —
+// verified against Pi's bundled dist. Before this fix, `bind()` only passed
+// shouldRestore=true for reason "resume"/"fork", so WorkingMemoryStore.open
+// silently started EMPTY on every non-interactive resume, ignoring notes
+// already persisted on disk under the matching identity.
+test("a non-interactive resume (reason startup, non-empty branch) still restores prior notes", async () => {
+	const b = binding();
+	const seeded = await WorkingMemoryStore.open(b, false);
+	await seeded.upsert({ kind: "invariant", note: "Seeded before this process started." });
+
+	await withEnv({ WORKING_MEMORY: "on", PI_CODING_AGENT_DIR: b.agentDirectory, TELEMETRY: "off" }, async () => {
+		const g = globalThis as Record<string, unknown>;
+		g.__pi_run_capsule_identity = { cwd: b.cwd, capsuleId: b.capsuleId, runIdHash: b.runIdHash };
+		const fp = makeFakePi();
+		const mod = await import(`../extensions/working-memory.ts?startupresume=${Date.now()}-${Math.random()}`);
+		mod.default(fp.pi as never);
+		const ctx = { cwd: b.cwd, ui: { notify() {} }, sessionManager: { getBranch: () => [{ type: "custom" }] } };
+		await fire(fp, "session_start", { reason: "startup" }, ctx);
+		const recalled = await callTool(fp, "working_memory", { action: "list" }, b.cwd);
+		assert.match(recalled.content[0]?.text ?? "", /Seeded before this process started\./,
+			"seeded notes did not survive a non-interactive resume");
+	});
+});
+
 test("restore requires the exact capsule and run identity and never scans sibling capsules", async () => {
 	const b = binding();
 	const store = await WorkingMemoryStore.open(b, false);

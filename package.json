@@ -140,6 +140,7 @@
     "harness/lib/drift-policy.ts",
     "harness/lib/control-charge.ts",
     "harness/lib/extension-lifecycle.ts",
+    "harness/lib/session-resume.ts",
     "harness/lib/failure-episodes.ts",
     "harness/lib/gate-runtime.ts",
     "harness/lib/hashline-core.ts",

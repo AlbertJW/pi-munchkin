@@ -22,6 +22,7 @@ import { agentDir } from "../lib/agent-dir.ts";
 import { sandboxPosture } from "../lib/runtime-doctor.ts";
 import { emitHarnessSignal, onHarnessSignal } from "../lib/harness-signals.ts";
 import { checkCompactionProjection } from "../lib/projection-invariants.ts";
+import { isEffectiveResume } from "../lib/session-resume.ts";
 
 export type RunKernelInstallOptions = {
 	mode?: RunKernelMode;
@@ -258,7 +259,7 @@ export function installRunKernel(pi: ExtensionAPI, options: RunKernelInstallOpti
 		let sessionIdHash = hashId(`session:${idFactory()}`);
 		let restoredSource: "custom" | "private" | "none" = "none";
 		let restoredSurfaceChanged = false;
-		if ((event.reason === "resume" || event.reason === "fork") && runCapsuleMode() !== "off") {
+		if (isEffectiveResume(event, ctx) && runCapsuleMode() !== "off") {
 			let entry = null;
 			try { entry = latestRunStateEntry(ctx.sessionManager.getBranch()); } catch { /* private fallback below */ }
 			if (entry) restoredSource = "custom";

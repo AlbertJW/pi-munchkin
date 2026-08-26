@@ -312,6 +312,52 @@ test("resume restores the latest valid custom state before current-session metad
 	});
 });
 
+// `pi -p --session-id <existing>` fires reason "startup", never "resume" —
+// verified against Pi's bundled dist (chunk-E5KXRMZK.js): buildSessionOptions's
+// hasExistingSession only picks default model/thinkingLevel and preloads
+// agent.state.messages; it never sets sessionStartEvent, which falls through to
+// AgentSession's own default of {reason:"startup"}. "resume"/"fork" are ONLY
+// constructed by in-process session-management calls, never by the CLI boot.
+// Reproduced live 2026-08-26: a /plan in one `pi -p` process followed by
+// /plan-go --session-id <same id> in a separate process found no active plan —
+// a fresh, empty capsule had been minted instead of resuming the written one.
+test("a non-interactive resume (reason startup, non-empty branch) restores the same way reason=resume does", async () => {
+	const agentDirectory = mkdtempSync(join(tmpdir(), "run-capsule-startup-resume-"));
+	const cwd = mkdtempSync(join(tmpdir(), "run-capsule-startup-resume-cwd-"));
+	await withEnv({ PI_CODING_AGENT_DIR: agentDirectory, RUN_CAPSULE: "shadow", TELEMETRY: "off" }, async () => {
+		const first = makeFakePi();
+		let firstId = 0;
+		const firstController = installRunKernel(first.pi as never, {
+			idFactory: () => `first-${++firstId}`, detectGate: async () => null, surfaceHash: () => H,
+		});
+		runCapsule(first.pi as never);
+		const firstContext = makeCtx(cwd).ctx;
+		await fire(first, "session_start", { reason: "new" }, firstContext);
+		await fire(first, "before_agent_start", { prompt: "inspect", systemPrompt: "", systemPromptOptions: {} }, firstContext);
+		await fire(first, "agent_start", {}, firstContext);
+		await fire(first, "agent_end", { messages: [] }, firstContext);
+		await fire(first, "agent_settled", {}, firstContext);
+		const originalRun = firstController.getState().identity.runIdHash;
+		const saved = first.entries.at(-1)?.data;
+		assert.ok(saved);
+
+		// A SEPARATE process, exactly like a fresh `pi -p --session-id <existing>`
+		// invocation: reason "startup", but the session's own branch already has
+		// prior entries because Pi's CLI already loaded them before this handler runs.
+		const second = makeFakePi();
+		let secondId = 0;
+		const secondController = installRunKernel(second.pi as never, {
+			idFactory: () => `second-${++secondId}`, detectGate: async () => null, surfaceHash: () => H,
+		});
+		runCapsule(second.pi as never);
+		const secondContext = makeCtx(cwd).ctx;
+		secondContext.sessionManager.getBranch = () => [{ type: "custom", customType: RUN_STATE_ENTRY_TYPE, data: saved }];
+		await fire(second, "session_start", { reason: "startup" }, secondContext);
+		assert.equal(secondController.getState().identity.runIdHash, originalRun,
+			"a fresh capsule was minted instead of resuming the one /plan just wrote");
+	});
+});
+
 test("run status contains no artifact path, URL, command, or endpoint", () => {
 	const text = renderRunStatus(validState());
 	assert.equal(/(?:\/Users\/|\/private\/|https?:|command|endpoint)/i.test(text), false);
