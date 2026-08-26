@@ -675,7 +675,7 @@ export default function (pi: ExtensionAPI) {
 
 	pi.registerCommand("loop-resume", {
 		description: "Clear semantic episode walls and send one deterministic recovery instruction.",
-		handler: async (_args, _ctx) => {
+		handler: async (_args, ctx) => {
 			if (runCapsuleMode() === "recovery") {
 				clearRecoveryWalls("loop-command");
 				return;
@@ -689,7 +689,13 @@ export default function (pi: ExtensionAPI) {
 			const message = "[loop-breaker] Recovery walls cleared. Re-ground from the current plan and exact-gate state; obtain one discriminating fact before another attempt or report Blocked.";
 			record("failure-episode", "resumed", { cleared: cleared.length, blocked, injected_chars: message.length });
 			publishEpisodes();
-			pi.sendUserMessage(message, { deliverAs: "steer" });
+			pi.sendMessage({
+				customType: "pi-munchkin:loop-resume-command",
+				content: message,
+				display: true,
+				details: { cleared: cleared.length, blocked },
+			}, { triggerTurn: true });
+			if (typeof ctx.waitForIdle === "function") await ctx.waitForIdle();
 		},
 	});
 

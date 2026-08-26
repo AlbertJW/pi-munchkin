@@ -686,6 +686,9 @@ test("loop status is redacted and loop resume clears active episodes with one de
 		assert.equal(notices.at(-1)!.includes("DUMMY_SECRET"), false);
 		await fp.commands.get("loop-resume").handler("", ctx);
 		assert.equal(fp.sent.at(-1), "[loop-breaker] Recovery walls cleared. Re-ground from the current plan and exact-gate state; obtain one discriminating fact before another attempt or report Blocked.");
+		assert.equal(fp.deliveries.length, 0, "command handlers must not recursively call sendUserMessage/prompt");
+		assert.equal(fp.customDeliveries.at(-1)?.triggerTurn, true);
+		assert.equal((fp.customDeliveries.at(-1)?.message as any).customType, "pi-munchkin:loop-resume-command");
 		const snapshot = (globalThis as Record<string, any>).__pi_failure_episode_state;
 		assert.equal(snapshot.active.length, 0);
 	} finally {
