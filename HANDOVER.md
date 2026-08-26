@@ -47,7 +47,7 @@ stands until he starts preflight.**
 ## 2026-08-26 integration batches 0-2 — in progress, NOT rolled out
 
 The deferred list below is being worked as **five classes**, not fifteen fixes. Batches 0-2 are
-committed on `main` (`824301c`..`283eca1`), verify 6/6, 608 tests, source `1715d62d…`. **Nothing is
+committed on `main` (`824301c`..`d160037`), verify 6/6, 609 tests, source `c6e588dc…`. **Nothing is
 mirrored**: the boundary row for these is marked PENDING.
 
 The thesis, and the reason the batches are ordered this way: **the suite systematically exercised
