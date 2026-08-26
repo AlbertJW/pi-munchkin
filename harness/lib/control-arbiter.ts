@@ -82,10 +82,24 @@ export class ControlArbiterQueue {
 				lensMerged = true;
 			}
 		}
-		// The honest delivered set: the winner plus whichever losers were merged into
-		// its text. Empty outside enforce, because outside enforce the arbiter sends
-		// nothing — the producers self-deliver and know it from `legacyActed`.
-		const delivered = mode === "enforce" && winner
+		// The honest delivered set: the winner plus whichever losers were merged into its
+		// text. Empty outside enforce, because outside enforce the arbiter sends nothing
+		// — the producers self-deliver and know it from `legacyActed`.
+		//
+		// `winner` is NOT enough on its own even here. The arbiter acts on the winner
+		// only under the same three conditions it checks before acting
+		// (control-arbiter.ts extension): an `abort`/`shutdown` winner whose delivery
+		// carries no callback is invoked with `?.()` and does nothing, and a message
+		// winner with an empty message is skipped outright. Charging a budget for either
+		// would be the very over-count this field exists to prevent, so the condition is
+		// mirrored here rather than approximated. It is evaluated against the FINAL
+		// delivery, after the merges — a merged suffix makes an otherwise-empty winner
+		// message non-empty, and that combined message really is sent.
+		const winnerActed = mode === "enforce" && winner !== null && delivery !== null && (
+			winner.proposal.effect === "abort" ? typeof delivery.abort === "function"
+				: winner.proposal.effect === "shutdown" ? typeof delivery.shutdown === "function"
+					: typeof delivery.message === "string" && delivery.message.length > 0);
+		const delivered = winnerActed && winner
 			? [
 				winner.proposal.proposalIdHash,
 				...(verificationMerged && verification ? [verification.proposal.proposalIdHash] : []),

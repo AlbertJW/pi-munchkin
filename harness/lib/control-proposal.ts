@@ -90,8 +90,11 @@ export interface ControlDecisionV1 {
 	 * heard. And in shadow mode the arbiter delivers nothing at all, though it still
 	 * publishes a decision with a winner.
 	 *
-	 * Empty unless the arbiter is enforcing. This is the field a producer must key a
-	 * charge-on-delivery budget on.
+	 * Empty unless the arbiter is enforcing, and empty for a winner the arbiter will
+	 * not actually act on — a terminal proposal whose delivery carries no callback, or
+	 * a message winner with an empty message. For a terminal winner "delivered" means
+	 * the effect was enacted, not that text was shown. This is the field a producer
+	 * must key a charge-on-delivery budget on.
 	 */
 	delivered: readonly string[];
 }

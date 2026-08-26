@@ -513,3 +513,45 @@ test("a terminal winner takes no merged supplements, so its losers are genuinely
 	assert.equal(delivery?.message, "safe_abort", "the winner's own delivery, unmodified");
 	assert.equal(delivery?.message?.includes("verification_required"), false, "the nag must not ride along");
 });
+
+test("delivered excludes a winner the arbiter will not actually act on", async () => {
+	// The corner that would have reintroduced the over-count this field prevents. The
+	// arbiter invokes a terminal delivery with `?.()` and skips an empty message
+	// outright, so a winner can be chosen and never acted on. A producer keying its
+	// budget on `delivered` must not be charged for either.
+	const queue = new ControlArbiterQueue();
+
+	// (a) terminal winner, no callback on the delivery.
+	const orphanTerminal = envelope("safe_abort", 21, "abort");
+	orphanTerminal.delivery = {};
+	queue.add(orphanTerminal);
+	assert.deepEqual(queue.decide(21, "enforce").decision.delivered, [], "an un-invocable abort is not a delivery");
+
+	// (b) message winner with an empty message.
+	const empty = envelope("failure_recovery", 22);
+	empty.delivery = { message: "" };
+	queue.add(empty);
+	assert.deepEqual(queue.decide(22, "enforce").decision.delivered, [], "an empty message is not a delivery");
+
+	// (c) the same empty winner DOES count once a merge makes the sent text non-empty —
+	// that combined message really is delivered, and so is the nag inside it.
+	const emptyAgain = envelope("failure_recovery", 23);
+	emptyAgain.delivery = { message: "" };
+	const nag = envelope("verification_required", 23);
+	nag.delivery = { message: "call verify_project" };
+	queue.add(emptyAgain);
+	queue.add(nag);
+	const merged = queue.decide(23, "enforce");
+	assert.equal(merged.verificationMerged, true);
+	assert.deepEqual(
+		[...merged.decision.delivered].sort(),
+		[emptyAgain.proposal.proposalIdHash, nag.proposal.proposalIdHash].sort(),
+		"a merge that produces real text delivers both proposals",
+	);
+
+	// (d) a normal terminal winner WITH a callback is delivered — its effect is enacted.
+	const realTerminal = envelope("safe_abort", 24, "abort");
+	realTerminal.delivery = { abort: () => {} };
+	queue.add(realTerminal);
+	assert.deepEqual(queue.decide(24, "enforce").decision.delivered, [realTerminal.proposal.proposalIdHash]);
+});
