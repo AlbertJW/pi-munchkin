@@ -196,7 +196,7 @@ export function installRunKernel(pi: ExtensionAPI, options: RunKernelInstallOpti
 		];
 		if (legacy.verifyKnown) {
 			dimensions.push(
-				["verify_mutated", state.mutation.count > 0, legacy.verifyMutated],
+				["verify_mutated", state.mutation.count > 0 || state.mutation.conservativeArmed, legacy.verifyMutated],
 				["verify_ok", state.verification.validAfterMutation, legacy.verifyOk],
 			);
 		}

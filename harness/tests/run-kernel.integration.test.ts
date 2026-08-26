@@ -175,6 +175,46 @@ test("legacy disagreement is deduplicated and contains no legacy payload", async
 	}
 });
 
+// F-02 parity (2026-08-26). verify-gate.ts conservatively reports mutated:true for a
+// FAILED bash source-mutation. Before run-kernel-state.ts's conservativeArmed flag,
+// its own count-only mutation tracker disagreed, and compareLegacy fired a
+// legacy-disagreement row on dimension "verify_mutated" for a case that isn't a real
+// bug in either system.
+test("a failed bash mutation does not trip a legacy-disagreement against verify-gate's conservative flag", async () => {
+	const root = mkdtempSync(join(tmpdir(), "run-kernel-integration-"));
+	const file = join(root, "events.jsonl");
+	const names = ["TELEMETRY", "TELEMETRY_FILE", "TELEMETRY_SOURCE", "TELEMETRY_STRICT"];
+	const prior = Object.fromEntries(names.map((name) => [name, process.env[name]]));
+	const previousVg = (globalThis as Record<string, unknown>).__pi_vg_state;
+	process.env.TELEMETRY_FILE = file;
+	process.env.TELEMETRY_SOURCE = "test";
+	process.env.TELEMETRY_STRICT = "1";
+	delete process.env.TELEMETRY;
+	try {
+		const fp = makeFakePi();
+		installRunKernel(fp.pi as never, { mode: "shadow", idFactory: deterministicIds(), detectGate: async () => null, surfaceHash: () => SURFACE });
+		const { ctx } = makeCtx(root);
+		await fire(fp, "session_start", {}, ctx);
+		await fire(fp, "tool_execution_start", { toolCallId: "b1", toolName: "bash", args: { command: "echo 'x' > src/config.ts" } }, ctx);
+		await fire(fp, "tool_result", { type: "tool_result", toolCallId: "b1", toolName: "bash", input: { command: "echo 'x' > src/config.ts" }, content: [{ type: "text", text: "denied" }], details: {}, isError: true }, ctx);
+		await fire(fp, "tool_execution_end", { toolCallId: "b1", toolName: "bash", result: { content: [{ type: "text", text: "denied" }] }, isError: true }, ctx);
+		// verify-gate's real post-F-02 output for this exact scenario: a failed bash
+		// mutation conservatively arms `mutated`.
+		(globalThis as Record<string, unknown>).__pi_vg_state = { gateCmd: null, mutated: true, verifiedOk: false, fires: 0, sessionFires: 0 };
+		await fire(fp, "turn_end", {}, ctx);
+		const rows = readFileSync(file, "utf8").trim().split("\n").filter(Boolean).map((line) => JSON.parse(line));
+		const disagreements = rows.filter((row) => row.ext === "run-kernel" && row.kind === "legacy-disagreement" && row.dimension === "verify_mutated");
+		assert.deepEqual(disagreements, [], "a conservative bash-failure mutation must not read as a legacy disagreement");
+	} finally {
+		for (const [name, value] of Object.entries(prior)) {
+			if (value === undefined) delete process.env[name]; else process.env[name] = value;
+		}
+		if (previousVg === undefined) delete (globalThis as Record<string, unknown>).__pi_vg_state;
+		else (globalThis as Record<string, unknown>).__pi_vg_state = previousVg;
+		if (existsSync(root)) rmSync(root, { recursive: true, force: true });
+	}
+});
+
 test("unknown run event types are rejected by the shared bus contract", () => {
 	const fp = makeFakePi();
 	let observed = 0;

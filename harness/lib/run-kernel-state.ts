@@ -25,7 +25,7 @@ function initialState(): RunStateV1 {
 			accepted: false, executionStarted: false, currentItemHash: null,
 			openItems: null, blockedItems: null,
 		},
-		mutation: { count: 0, lastStartedSequence: null, lastCompletedSequence: null, lastTargetHash: null },
+		mutation: { count: 0, lastStartedSequence: null, lastCompletedSequence: null, lastTargetHash: null, conservativeArmed: false },
 		verification: {
 			attempts: 0, validGates: 0, lastKind: "none", lastStartedSequence: null,
 			lastEndedSequence: null, lastPassed: false, validAfterMutation: false,
@@ -252,6 +252,14 @@ export class RunStateStoreV1 {
 			this.state.verification.lastPassed = false;
 			transition = this.transition("execution", "source-mutation-succeeded", sequence, atMs);
 		}
+		if (receipt.mutation === "source" && !succeeded(receipt) && receipt.toolName === "bash") {
+			// Mirrors verify-gate's F-02 rule (mutationCounts in verify-gate.ts:434): a failed
+			// bash command may have written before returning non-zero. This flag feeds ONLY
+			// compareLegacy's verify_mutated dimension — never count/lastCompletedSequence/
+			// lastTargetHash/hasMutation/the "mutations" telemetry field, which all mean "a
+			// mutation PROVABLY happened."
+			this.state.mutation.conservativeArmed = true;
+		}
 		if (receipt.toolName === "plan_write" && succeeded(receipt)) {
 			this.state.plan.accepted = true;
 			transition = this.transition("planning", "plan-accepted", sequence, atMs) ?? transition;
@@ -450,8 +458,8 @@ export function validateRunStateSnapshot(state: unknown): string[] {
 	if (environment) assert([environment.piVersion, environment.provider, environment.model].every((value) => typeof value === "string" && value.length > 0 && value.length <= 96 && SAFE_LABEL.test(value)) && integer(environment.activeToolCount) && integer(environment.allToolCount) && Number(environment.activeToolCount) <= Number(environment.allToolCount) && bool(environment.preservedExplicitTools) && nullableHash(environment.detectedGateHash) && ["declared", "host", "unknown"].includes(String(environment.sandboxPosture)), "environment: invalid value");
 	const plan = exact("plan", root.plan, ["accepted", "executionStarted", "currentItemHash", "openItems", "blockedItems"]);
 	if (plan) assert(bool(plan.accepted) && bool(plan.executionStarted) && nullableHash(plan.currentItemHash) && nullableInt(plan.openItems) && nullableInt(plan.blockedItems), "plan: invalid value");
-	const mutation = exact("mutation", root.mutation, ["count", "lastStartedSequence", "lastCompletedSequence", "lastTargetHash"]);
-	if (mutation) assert(integer(mutation.count) && nullableInt(mutation.lastStartedSequence) && nullableInt(mutation.lastCompletedSequence) && nullableHash(mutation.lastTargetHash), "mutation: invalid value");
+	const mutation = exact("mutation", root.mutation, ["count", "lastStartedSequence", "lastCompletedSequence", "lastTargetHash", "conservativeArmed"]);
+	if (mutation) assert(integer(mutation.count) && nullableInt(mutation.lastStartedSequence) && nullableInt(mutation.lastCompletedSequence) && nullableHash(mutation.lastTargetHash) && bool(mutation.conservativeArmed), "mutation: invalid value");
 	const verification = exact("verification", root.verification, ["attempts", "validGates", "lastKind", "lastStartedSequence", "lastEndedSequence", "lastPassed", "validAfterMutation"]);
 	if (verification) assert(integer(verification.attempts) && integer(verification.validGates) && VERIFICATIONS.has(String(verification.lastKind)) && nullableInt(verification.lastStartedSequence) && nullableInt(verification.lastEndedSequence) && bool(verification.lastPassed) && bool(verification.validAfterMutation), "verification: invalid value");
 	const evidence = exact("evidence", root.evidence, ["facts"]);

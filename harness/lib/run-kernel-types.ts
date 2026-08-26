@@ -103,6 +103,9 @@ export interface RunStateV1 {
 		lastStartedSequence: number | null;
 		lastCompletedSequence: number | null;
 		lastTargetHash: string | null;
+		/** Mirrors verify-gate's conservative failed-bash rule; feeds ONLY legacy-parity
+		 *  comparison in run-kernel.ts's compareLegacy(), never count/lastCompletedSequence. */
+		conservativeArmed: boolean;
 	};
 	verification: {
 		attempts: number;

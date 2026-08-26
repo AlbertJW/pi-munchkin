@@ -250,3 +250,31 @@ test("every canonical control reason survives run-state validation", () => {
 			`control reason ${reason} must be accepted by the persisted-state validator`);
 	}
 });
+
+// F-02 parity (2026-08-26). verify-gate.ts's mutationCounts conservatively treats a
+// FAILED bash mutation as mutated:true (a shell command may have written before
+// returning non-zero) — see verify-gate.ts:434. This flag exists ONLY to let
+// run-kernel.ts's compareLegacy() agree with that conservative call; it must never
+// feed `count`/`lastCompletedSequence`/`lastTargetHash`, which mean "a mutation
+// PROVABLY happened" for settle()'s hasMutation gate and every other consumer.
+test("a failed bash mutation arms the conservative flag without counting as a real mutation", () => {
+	const store = new RunStateStoreV1();
+	apply(store, session());
+	apply(store, { v: 1, type: "run/tool-finished", sequence: 5, atMs: 5,
+		receipt: receipt({ toolName: "bash", toolFamily: "bash:mutation", mutation: "source", status: "failed", isError: true, startedSequence: 4, endedSequence: 5 }) });
+	const state = store.snapshot();
+	assert.equal(state.mutation.count, 0, "a failed mutation must not count as a real one");
+	assert.equal(state.mutation.lastCompletedSequence, null, "a failed mutation must not mark completion");
+	assert.equal(state.mutation.conservativeArmed, true, "a failed bash mutation must arm the conservative flag");
+	assert.deepEqual(validateRunStateSnapshot(state), []);
+});
+
+test("a failed non-bash mutation does not arm the conservative flag", () => {
+	const store = new RunStateStoreV1();
+	apply(store, session());
+	apply(store, { v: 1, type: "run/tool-finished", sequence: 5, atMs: 5,
+		receipt: receipt({ toolName: "edit", toolFamily: "file_mutation", mutation: "source", status: "failed", isError: true, startedSequence: 4, endedSequence: 5 }) });
+	const state = store.snapshot();
+	assert.equal(state.mutation.count, 0);
+	assert.equal(state.mutation.conservativeArmed, false, "only a failed BASH mutation is conservatively armed");
+});
