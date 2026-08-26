@@ -4,6 +4,22 @@ All notable changes to pi-munchkin are documented here. Releases follow semantic
 
 ## Unreleased
 
+### Fixed (2026-08-26 — non-interactive resume restores capsule/blackboard/working-memory/run-kernel state)
+
+- **`pi -p --session-id <existing>` now actually resumes harness-private state.** Live testing found
+  `/plan` in one process followed by `/plan-go --session-id <same id>` in a separate process saw no
+  active plan — a fresh, empty run capsule had been minted instead of resuming the one `/plan` had
+  just written. Traced to Pi's actual bundled CLI: `pi -p --session-id <existing>` always fires
+  `session_start` with `reason: "startup"`, never `"resume"` — `"resume"`/`"fork"` are constructed
+  only by in-process session-management calls (`ctx.newSession`/`switchSession`/`fork`), never by the
+  CLI's initial boot. Four extensions gated restoration on `reason === "resume" || "fork"` and so
+  silently reset on every such invocation, even though the conversation transcript correctly resumed:
+  `run-capsule` (plan/run state), `session-blackboard` (failure ledger), `run-kernel` (shadow
+  legacy-parity state), `working-memory`. `lib/session-resume.ts`'s new `isEffectiveResume(event, ctx)`
+  still trusts `reason` when Pi does say "resume"/"fork", and otherwise falls back to checking whether
+  the session's own branch is non-empty — ground truth Pi already loaded before `session_start` fires,
+  independent of what `reason` claims.
+
 ### Added (2026-08-26 — gate provenance binding and a model-neutral tool-contract screen)
 
 - **Gate telemetry rows carry real identity.** `optimizer/real_gate.sh` now mints a per-session
