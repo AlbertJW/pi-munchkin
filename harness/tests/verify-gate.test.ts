@@ -3,7 +3,7 @@ import test from "node:test";
 import { mkdtempSync, readFileSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { fire, makeFakePi, resetPiGlobals } from "./integration-harness.ts";
+import { emitRivalProposal, fire, makeFakePi, resetPiGlobals } from "./integration-harness.ts";
 import { classifyBashCommand } from "../lib/command-policy.ts";
 import { gateDisplayCommand } from "../extensions/verify-gate.ts";
 import { HARNESS_SIGNAL_CHANNEL, onHarnessSignal } from "../lib/harness-signals.ts";
@@ -926,4 +926,54 @@ test("a gate that appears after a reload re-activates verify_project", async () 
 	await fire(second, "session_start", { reason: "reload" }, ctxFor(withGate));
 	assert.ok(second.pi.getActiveTools().includes("verify_project"), "the tool never came back after the reload");
 	resetPiGlobals();
+});
+
+test("an enforce plateau that LOSES its boundary is not counted as an intervention", async () => {
+	// What the 2026-08-21 fix could not see. It reported `controlEnforces()` as
+	// `delivered`, which answers "is the arbiter enforcing" — not "did I win". Under
+	// the shipped enforce default a plateau correction that lost its boundary to a
+	// higher-priority proposal was still counted, and its message length still fed
+	// injected_chars, i.e. the ROI meter. Only decision.delivered can tell these apart.
+	const cwd = projectWithNpmTest();
+	const telemetry = join(cwd, "plateau-lost.jsonl");
+	const previous = {
+		plateau: process.env.VERIFICATION_PLATEAU, order: process.env.VERIFY_EXECUTION_ORDER,
+		control: process.env.CONTROL_ARBITER, telemetry: process.env.TELEMETRY,
+		file: process.env.TELEMETRY_FILE, source: process.env.TELEMETRY_SOURCE,
+	};
+	Object.assign(process.env, {
+		VERIFICATION_PLATEAU: "enforce", VERIFY_EXECUTION_ORDER: "execution",
+		CONTROL_ARBITER: "enforce", TELEMETRY: "on", TELEMETRY_FILE: telemetry, TELEMETRY_SOURCE: "test",
+	});
+	try {
+		const fp = makeFakePi();
+		const tag = `plateau-lost-${Date.now()}-${Math.random()}`;
+		(await import(`../extensions/verify-gate.ts?${tag}`)).default(fp.pi as never);
+		(await import(`../extensions/control-arbiter.ts?${tag}`)).default(fp.pi as never);
+		await fire(fp, "session_start", {}, ctxFor(cwd));
+		(globalThis as Record<string, unknown>).__pi_active_plan_context = { item_id: "item-a" };
+		await plateauEpoch(fp, cwd, 1, "baseline");
+		for (let index = 2; index <= 4; index += 1) await plateauEpoch(fp, cwd, index, String(index));
+		// A safe_abort at priority 700 outranks the plateau's failure_recovery, and a
+		// terminal effect additionally suppresses the merge rescues — so the plateau
+		// correction is genuinely dropped, not delivered as a suffix.
+		emitRivalProposal(fp, 4, { terminal: true });
+		await fire(fp, "turn_end", { ...wrapUpTurn, turnIndex: 4 }, ctxFor(cwd));
+		await fire(fp, "agent_settled", {}, ctxFor(cwd));
+
+		const rows = readFileSync(telemetry, "utf8").split("\n").filter(Boolean)
+			.map((line) => JSON.parse(line) as Record<string, unknown>);
+		const interventions = rows.filter((row) => row.ext === "verification-plateau"
+			&& row.kind === "intervention" && row.tier === 1);
+		assert.equal(interventions.length, 1, "the proposal was still composed and recorded");
+		assert.equal(interventions[0].delivered, false, "a losing plateau must not report an intervention");
+		assert.equal(interventions[0].injected_chars, 0, "and must not charge the ROI meter");
+	} finally {
+		for (const [key, value] of Object.entries({
+			VERIFICATION_PLATEAU: previous.plateau, VERIFY_EXECUTION_ORDER: previous.order,
+			CONTROL_ARBITER: previous.control, TELEMETRY: previous.telemetry,
+			TELEMETRY_FILE: previous.file, TELEMETRY_SOURCE: previous.source,
+		})) { if (value === undefined) delete process.env[key]; else process.env[key] = value; }
+		resetPiGlobals();
+	}
 });

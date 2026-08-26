@@ -137,6 +137,7 @@
     "harness/lib/context-surface.ts",
     "harness/lib/did-you-mean.ts",
     "harness/lib/drift-policy.ts",
+    "harness/lib/control-charge.ts",
     "harness/lib/extension-lifecycle.ts",
     "harness/lib/failure-episodes.ts",
     "harness/lib/gate-runtime.ts",

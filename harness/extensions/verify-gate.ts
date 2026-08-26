@@ -1,3 +1,4 @@
+import { createDeliveryCharge } from "../lib/control-charge.ts";
 import { subscribeOnce } from "../lib/extension-lifecycle.ts";
 import { defineTool, type ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { Type } from "typebox";
@@ -200,6 +201,7 @@ export default function (pi: ExtensionAPI) {
 	let frontierSettled = false;
 	let currentTurn = 0;
 	let plateauCorrections = 0;
+	const plateauCharge = createDeliveryCharge(pi.events, "verify-gate-plateau");
 	let plateauActivationRequests = 0;
 	let mutationGeneration = 0;
 	// Reload-surviving, and it has to be. This records "*I* hid verify_project", which
@@ -454,26 +456,31 @@ export default function (pi: ExtensionAPI) {
 					}
 					if (PLATEAU_MODE === "enforce" && plateauObservation.reached === 3) {
 						const message = plateauMessage(plateauObservation.streak);
-						// The tier-1 correction reaches the model ONLY through the control
-						// arbiter (legacyActed: false below -- unlike loop-breaker, there is
-						// no self-delivery fallback). Under CONTROL_ARBITER=shadow|off the
-						// proposal is recorded and dropped, so counting the message length
-						// as injected_chars reported an intervention that never happened
-						// (2026-08-21). Report what was delivered, not what was composed.
-						const delivered = controlEnforces(pi.events);
-						plateauCorrections += delivered ? 1 : 0;
-						record("verification-plateau", "intervention", {
-							tier: 1, streak: plateauObservation.streak,
-							injected_chars: delivered ? message.length : 0,
-							activation_requested: false,
-							delivered, arbiter: controlArbiterMode(),
-						});
-						emitControlProposal(pi.events, buildControlProposal({
+						// The tier-1 correction reaches the model ONLY through the arbiter
+						// (legacyActed: false below — unlike loop-breaker there is no
+						// self-delivery fallback). The 2026-08-21 fix reported
+						// `controlEnforces()` as `delivered`, which answers "is the arbiter
+						// enforcing", NOT "did I win": every plateau proposal that lost its
+						// boundary to a loop-breaker safe_abort or an earlier-emitted
+						// failure_recovery was still counted as an intervention. Wait for
+						// the decision and report the delivered set.
+						const streak = plateauObservation.streak;
+						const proposal = buildControlProposal({
 							boundarySequence: currentTurn, kind: "failure_recovery",
 							reason: "verification_plateau", source: "verify-gate",
 							cooldownKey: `verification-plateau:${gateHash}:${itemHash}`,
 							messageFactory: "verification-plateau", legacyActed: false,
-						}), { message });
+						});
+						plateauCharge.awaitDecision(proposal, (delivered) => {
+							plateauCorrections += delivered ? 1 : 0;
+							record("verification-plateau", "intervention", {
+								tier: 1, streak,
+								injected_chars: delivered ? message.length : 0,
+								activation_requested: false,
+								delivered, arbiter: controlArbiterMode(),
+							});
+						});
+						emitControlProposal(pi.events, proposal, { message });
 					}
 					if (PLATEAU_MODE === "enforce" && plateauObservation.reached === 5) {
 						// Tier 2 emits a capability signal, not a message, so it is
@@ -610,7 +617,7 @@ export default function (pi: ExtensionAPI) {
 		}
 	});
 
-	pi.on("agent_start", async () => { frontierSettled = false; });
+	pi.on("agent_start", async () => { frontierSettled = false; plateauCharge.forget(); });
 
 	// Re-armed per AGENT RUN, not per session. `agent_settled` fires once per run, so
 	// a latch reset only at session_start let exactly the FIRST run of a session emit

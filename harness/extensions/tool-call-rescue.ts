@@ -1,8 +1,8 @@
-import { subscribeOnce } from "../lib/extension-lifecycle.ts";
+import { createDeliveryCharge } from "../lib/control-charge.ts";
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { record } from "../lib/telemetry.ts";
 import {
-	buildControlProposal, controlEnforces, emitControlProposal, onControlDecision,
+	buildControlProposal, controlEnforces, emitControlProposal,
 } from "../lib/control-proposal.ts";
 
 // tool-call-rescue (LIVE default-on since 2026-08-07; was dark candidate
@@ -83,23 +83,12 @@ export default function (pi: ExtensionAPI): void {
 	//     agent_start, and MAX_PENDING evicts), and the old code resolved a stale
 	//     pending record against whatever decision arrived next — charging the wrong
 	//     turn and writing a `steered` row with the wrong turnIndex.
-	let awaitingDecision: { signature: string; turnIndex: number; proposalIdHash: string } | null = null;
+	// The charge-on-delivery mechanics live in lib/control-charge.ts now, so the other
+	// producers migrate onto one implementation rather than a second copy of this one.
+	const charge = createDeliveryCharge(pi.events, "tool-call-rescue");
 
-	const forget = () => { awaitingDecision = null; };
-	pi.on("session_start", async () => { rescues = 0; forget(); });
-	pi.on("agent_start", async () => { forget(); });
-
-	subscribeOnce("tool-call-rescue:control-decision", () => onControlDecision(pi.events, (decision) => {
-		const pending = awaitingDecision;
-		if (!pending) return;
-		if (decision.boundarySequence !== pending.turnIndex) return; // not our boundary
-		awaitingDecision = null;
-		const delivered = decision.delivered.includes(pending.proposalIdHash);
-		if (delivered) rescues += 1;
-		record("tool-call-rescue", "steered", {
-			signature: pending.signature, turnIndex: pending.turnIndex, delivered,
-		});
-	}));
+	pi.on("session_start", async () => { rescues = 0; charge.forget(); });
+	pi.on("agent_start", async () => { charge.forget(); });
 
 	pi.on("turn_end", async (event) => {
 		const msg = event.message;
@@ -130,7 +119,12 @@ export default function (pi: ExtensionAPI): void {
 		if (!legacyActed) {
 			// The arbiter owns delivery; its decision charges the budget and records
 			// `steered`. If no decision ever arrives the budget is simply not spent.
-			awaitingDecision = { signature: det.signature, turnIndex: event.turnIndex, proposalIdHash: proposal.proposalIdHash };
+			const signature = det.signature;
+			const turnIndex = event.turnIndex;
+			charge.awaitDecision(proposal, (delivered) => {
+				if (delivered) rescues += 1;
+				record("tool-call-rescue", "steered", { signature, turnIndex, delivered });
+			});
 			return;
 		}
 		rescues += 1;
