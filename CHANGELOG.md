@@ -4,6 +4,27 @@ All notable changes to pi-munchkin are documented here. Releases follow semantic
 
 ## Unreleased
 
+### Fixed (2026-08-26 — the simple half of batches 1, 2, 4 and 5)
+
+- **The state lens under-counted to zero.** `state-lens/steer-injected` was recorded only inside the
+  `legacyActed` branch, so under the shipped `CONTROL_ARBITER=enforce` — where the lens IS delivered,
+  merged as a prefix into the winner's message — not one row was ever written. The lens can never
+  *win* (priority 100, triggered by a 600), so `decision.delivered` is the only thing that can
+  distinguish "merged and shown" from "dropped".
+- **Two lifecycle orphans.** `drift-scanner` had no `session_start` handler at all, so `handledHead`
+  never cleared and an in-flight review kept running against the previous session.
+  `session-blackboard`'s render timer closes over the previous generation's cwd and artifact path,
+  and Node keeps it alive across a reload — it fired once afterwards and wrote the old session's
+  cockpit over the new one's.
+- **Dead surface deleted.** `PHASE_CAPABILITY_TOOLS` and `phaseDeferredTools` had zero consumers
+  anywhere. `PLAN_GATE_DIAGNOSTICS` and `PLAN_MODE` join the retired-surface guard: both are
+  advertised as live rollbacks by dated boundary rows and read by nothing. Those rows are history and
+  are not rewritten; the guard goes in the test instead.
+- **`lib/plan-limits.ts`.** The note bound was nine literals across four files, which is why the
+  2026-08-25 raise from 300 had to move all nine by hand. Its conformance guard polices owned *values*
+  being re-typed as literals rather than comparing a schema to the constant it imports — the first
+  version of that test was circular and passed with the constant changed to 901.
+
 ### Changed + Fixed (2026-08-26 — integration batches 0-2: killing classes, not instances)
 
 The four-scale review left fifteen deferred findings. They are not fifteen bugs; they are five
