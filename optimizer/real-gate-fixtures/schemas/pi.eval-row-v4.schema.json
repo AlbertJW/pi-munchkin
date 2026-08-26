@@ -121,7 +121,9 @@
       },
       "then": {
         "required": [
-          "trajectory"
+          "trajectory",
+          "gate_session_id",
+          "child_telemetry"
         ]
       }
     },
@@ -448,6 +450,23 @@
             "blocked",
             "delegated"
           ],
+          "type": "object"
+        },
+        "provenance": {
+          "additionalProperties": false,
+          "properties": {
+            "schema": { "const": "pi.gate-session/v1" },
+            "complete": { "type": "boolean" },
+            "mismatches": { "items": { "type": "string" }, "type": "array" },
+            "run_id": { "type": ["string", "null"] },
+            "provider": { "type": ["string", "null"] },
+            "model": { "type": ["string", "null"] },
+            "requested_provider": { "type": ["string", "null"] },
+            "requested_model": { "type": ["string", "null"] },
+            "config_sha256": { "pattern": "^[0-9a-f]{64}$", "type": ["string", "null"] },
+            "harness_surface_sha256": { "pattern": "^[0-9a-f]{64}$", "type": ["string", "null"] }
+          },
+          "required": ["schema", "complete", "mismatches", "run_id", "provider", "model", "requested_provider", "requested_model", "config_sha256", "harness_surface_sha256"],
           "type": "object"
         },
         "provider_timing": {
@@ -821,6 +840,7 @@
         "surface",
         "bash_output_guard",
         "plan_runner_delegation",
+        "provenance",
         "failure_episodes",
         "provider_timing",
         "verification_frontier"
@@ -1005,6 +1025,13 @@
     },
     "task": {
       "type": "string"
+    },
+    "gate_session_id": {
+      "pattern": "^[0-9a-f]{32}$",
+      "type": "string"
+    },
+    "child_telemetry": {
+      "enum": ["not-used", "unavailable-contained"]
     },
     "trajectory": {
       "properties": {

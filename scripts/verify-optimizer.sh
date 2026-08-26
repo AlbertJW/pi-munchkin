@@ -51,6 +51,8 @@ selftests=(
   prompt-lab/rft_harvest.py
   prompt-lab/sql_eval.py
   prompt-lab/trajectory_check.py
+  prompt-lab/gate_provenance.py
+  prompt-lab/tool_contract.py
 )
 # Completeness guard for the hand-maintained list above: any optimizer .py that
 # advertises --selftest must be registered here or named in the exclusion list

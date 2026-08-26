@@ -1,0 +1,17 @@
+{
+  "schema": "pi.tool-contract-manifest/v1",
+  "version": 1,
+  "purpose": "Protocol qualification only; rows are excluded from fleet efficacy and adoption reports.",
+  "cases": [
+    {"id": "bounded-read", "required_tool": "read", "oracle": "tool_call_observed", "allowed_recovery": ["fresh-read"], "prompt": "Read the named fixture file with bounded output and report its shape."},
+    {"id": "span-search", "required_tool": "search_spans", "oracle": "tool_call_observed", "allowed_recovery": ["narrow-search"], "prompt": "Use span search to locate the relevant symbol before reading a slice."},
+    {"id": "span-read", "required_tool": "read_span", "oracle": "tool_call_observed", "allowed_recovery": ["read-neighbouring-span"], "prompt": "Read the exact source span identified by the search result."},
+    {"id": "shell-recovery", "required_tool": "bash", "oracle": "tool_call_observed", "allowed_recovery": ["alternate-command", "bounded-retry"], "prompt": "Run the fixture's declared check; if it fails, use one bounded alternate verification command."},
+    {"id": "anchored-edit", "required_tool": "edit", "oracle": "tool_call_observed", "allowed_recovery": ["fresh-read-then-edit"], "prompt": "Make the smallest anchored edit required by the fixture specification."},
+    {"id": "write-persist", "required_tool": "write", "oracle": "tool_call_observed", "allowed_recovery": ["read-back"], "prompt": "Write the requested fixture artifact and read it back to confirm persistence."},
+    {"id": "verify-after-mutation", "required_tool": "verify_project", "oracle": "mutation_and_verify_observed", "allowed_recovery": ["fix-then-verify"], "prompt": "After the fixture mutation, run the project verifier and report its result."},
+    {"id": "capability-activation", "required_tool": "capability", "oracle": "tool_call_observed", "allowed_recovery": ["capability-status"], "prompt": "Inspect available capabilities and activate the one required by the fixture."},
+    {"id": "planner-write", "required_tool": "plan_write", "oracle": "tool_call_observed", "allowed_recovery": ["plan-update"], "prompt": "Create a bounded flat plan for the fixture and keep the plan item statuses explicit."},
+    {"id": "planner-update", "required_tool": "plan_update", "oracle": "tool_call_observed", "allowed_recovery": ["plan-rewrite"], "prompt": "Update the active flat plan after completing one item."}
+  ]
+}

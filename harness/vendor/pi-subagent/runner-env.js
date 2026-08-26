@@ -34,7 +34,7 @@ const HARNESS_CONFIG_KEYS = [
   "SPAN_MAX_FILE_BYTES", "SPAN_TOOLS", "SPAWN_DELEGATION",
   "STATE_LENS", "STATE_LENS_MAX_CHARS", "TEACH_HINTS",
   "TELEMETRY", "TELEMETRY_FILE", "TELEMETRY_MAX_BYTES", "TELEMETRY_SOURCE", "TELEMETRY_STRICT", "TELEMETRY_WRITER",
-  "TELEMETRY_ASYNC_BATCH_BYTES", "TELEMETRY_ASYNC_BATCH_ROWS", "TELEMETRY_ASYNC_MAX_BYTES", "TELEMETRY_ASYNC_MAX_ROWS",
+  "TELEMETRY_ASYNC_BATCH_BYTES", "TELEMETRY_ASYNC_BATCH_ROWS", "TELEMETRY_ASYNC_MAX_BYTES", "TELEMETRY_ASYNC_MAX_ROWS", "TELEMETRY_CHILD_POLICY",
   "TOOL_CALL_RESCUE", "VERIFY_EXECUTION_ORDER", "VERIFY_GATE", "VERIFY_GATE_CMD", "VERIFY_GATE_MAX_FIRES",
 ];
 
@@ -66,7 +66,7 @@ const EXCLUDED_HARNESS_ENV_KEYS = [
   // from an ancestor into a grandchild.
   "PI_MUNCHKIN_PLAN_CONTEXT_PATH", "PI_MUNCHKIN_BRANCH_REPORT_PATH", "PI_MUNCHKIN_RESEARCH_SCOUT",
   "CHAOS", "TELEMETRY_FD", "TELEMETRY_HMAC_FD",
-  "PI_MODEL_ID", "PI_MODEL_PROVIDER", "PI_RUN_ID", "PI_SANDBOX_POSTURE",
+  "PI_MODEL_ID", "PI_MODEL_PROVIDER", "PI_REQUESTED_MODEL", "PI_REQUESTED_PROVIDER", "PI_RUN_ID", "PI_SANDBOX_POSTURE",
   "PI_SUBAGENT_DEPTH",
 ];
 
@@ -89,6 +89,17 @@ export function buildSubagentEnv(source = process.env, options = {}) {
     if (env[key] === undefined && HARNESS_CONFIG_PREFIXES.some((prefix) => key.startsWith(prefix))) {
       env[key] = source[key];
     }
+  }
+  // Gate telemetry is authenticated through parent-owned file descriptors.
+  // Those descriptors are intentionally excluded above because fd numbers are
+  // process-local. Without an explicit off switch here, a child would retain
+  // TELEMETRY=on and fall back to ~/.pi/agent/telemetry/events.jsonl, leaking
+  // gate observations into the interactive corpus. Parent-level trajectory
+  // metrics still count the delegation; detailed child telemetry is deliberately
+  // contained until a signed child collector exists.
+  if (source.TELEMETRY_SOURCE === "gate") {
+    env.TELEMETRY = "off";
+    env.TELEMETRY_CHILD_POLICY = "contained";
   }
   return env;
 }

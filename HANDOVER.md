@@ -824,6 +824,18 @@ across a live-mirror rollout. Record the loaded `HARNESS_SURFACE_SHA256` with ev
 
 ## Current adopted defaults
 
+## 2026-08-26 model-neutral qualification package
+
+The next step is recorded in
+[`optimizer/docs/NEXT_STEP_MODEL_QUALIFICATION_2026-08.md`](optimizer/docs/NEXT_STEP_MODEL_QUALIFICATION_2026-08.md).
+The harness contract is model-neutral: Ling is qualification-only, and
+`local-llamacpp/qwen36-35b-iq3s` is the first real evaluation/adoption cohort.
+The package binds per-session gate provenance, contains delegated child
+telemetry so it cannot fall back into the interactive ledger, and keeps
+`pi.tool-contract/v1` records out of fleet adoption. No inference, mirror,
+planner/default flip, candidate, or rollout is implied; follow the note's
+explicit human-started sequence.
+
 - `ACTIVE_TOOL_PROMPTS=derived`: inactive tools contribute no ambient schemas, manuals, examples,
   snippets, or agent lists; `ambient` restores the legacy broad prompt surface.
 - `CONTROL_ARBITER=enforce`: one highest-priority corrective message is delivered per boundary;

@@ -26,7 +26,7 @@ import collections, json, math, os, sys
 
 LAB = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, LAB)
-from row_contract import POWERED_ROWS, ROW_V3, ROW_V4, canonical_generation, failure_episode_complete  # noqa: E402
+from row_contract import POWERED_ROWS, ROW_V3, ROW_V4, TOOL_CONTRACT_V1, canonical_generation, failure_episode_complete, is_tool_contract_row  # noqa: E402
 DD = os.environ.get("FLEET_DD", "qwen36-35b-iq3s")
 OVERFIT_GAP = 0.10
 COST_CEILING = float(os.environ.get("FLEET_COST_CEILING", "1.5"))
@@ -203,7 +203,8 @@ def adoption_rows(rows, baseline, candidate):
         canonical = canonical_generation(rows)
     except ValueError:
         canonical = True
-    return [r for r in rows if r.get("pattern") in (baseline, candidate)
+    return [r for r in rows if not is_tool_contract_row(r)
+            and r.get("pattern") in (baseline, candidate)
             and r.get("split") in ("val", "heldout")
             and (not canonical or (r.get("prompt") or {}).get("variant") == "canonical")]
 
@@ -315,6 +316,8 @@ def report(gen, baseline, candidate):
     models = sorted({r.get("model") for r in rows if r.get("model")})
 
     problems = []
+    if any(is_tool_contract_row(row) for row in all_rows):
+        problems.append(f"{TOOL_CONTRACT_V1} records are qualification-only and cannot enter fleet adoption")
     if _verdicts is None or _unevaluated:
         problems.append(f"trial validity incomplete: {_unevaluated or len(all_rows)} unevaluated row(s)")
     if generation_error:
@@ -481,6 +484,8 @@ def selftest():
     extra = clean_v2 + [dict(clean_v2[0], split="robustness", prompt={"variant": "equivalent-1"}),
                         dict(clean_v2[0], pattern="one-shot", arm="one-shot", split="robustness")]
     assert len(adoption_rows(extra, "base", "cand")) == len(clean_v2), "robustness/control rows inflated adoption"
+    contract_row = {"schema": TOOL_CONTRACT_V1, "pattern": "base", "model": dd}
+    assert contract_row not in adoption_rows(clean_v2 + [contract_row], "base", "cand")
     # Task-stratified all-k reliability: exact k groups stay separate and missing,
     # duplicated, or gapped reps are disclosed rather than padded into the metric.
     reliability = [rr("base", "all-green", rep) for rep in (1, 2, 3)]

@@ -1,0 +1,32 @@
+{
+  "$id": "pi.tool-contract/v1",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "manifest_version", "model", "cases"],
+  "properties": {
+    "schema": {"const": "pi.tool-contract/v1"},
+    "manifest_version": {"const": 1},
+    "model": {"type": "string", "minLength": 1},
+    "cases": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["schema", "case_id", "model", "status", "required_tool", "oracle", "outcome", "observed_tool_families", "process_exit_code", "stderr_present"],
+        "properties": {
+          "schema": {"const": "pi.tool-contract/v1"},
+          "case_id": {"type": "string"},
+          "model": {"type": "string"},
+          "status": {"enum": ["complete", "incomplete"]},
+          "required_tool": {"type": "string"},
+          "oracle": {"type": "string"},
+          "outcome": {"type": "object", "additionalProperties": {"type": ["boolean", "integer"]}},
+          "observed_tool_families": {"type": "array", "items": {"type": "string"}},
+          "process_exit_code": {"type": "integer"},
+          "stderr_present": {"type": "boolean"}
+        }
+      }
+    }
+  }
+}

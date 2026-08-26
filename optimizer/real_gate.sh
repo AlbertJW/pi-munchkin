@@ -46,6 +46,7 @@ CAND="${CAND:-$HERE/prompt-lab/configs/static/c46-prompt-lean.json}"
 FIXTURE="${PI_TEST_FIXTURE:-$HERE/pi-test}"; T3_FILES="$HERE/ab-symbolect/t3-files"
 FIXTURES="$HERE/real-gate-fixtures"
 CONFIG="$HERE/prompt-lab/config.py"; METRICS="$HERE/ab-machinery/metrics.py"
+GATE_PROVENANCE="$HERE/prompt-lab/gate_provenance.py"
 FIXTURE_META="$HERE/prompt-lab/eval_fixture.py"; FINGERPRINT="$HERE/prompt-lab/serving_fingerprint.py"
 EXEC_POLICY="$HERE/prompt-lab/execution_policy.py"
 RESULTS="${RESULTS:-$HERE/prompt-lab/results/$GEN.jsonl}"
@@ -332,6 +333,8 @@ if [[ "$MODEL_CONTROL" == "llama" ]]; then
 fi
 # Behind a router (llama-swap) /v1/models lists the whole zoo — [0] would mislabel
 # every row. PI_MODEL is the requested member; it IS the row label there.
+REQUESTED_MODEL="${PI_MODEL:-}"
+REQUESTED_PROVIDER="${PI_PROVIDER:-}"
 if [[ -n "$PI_MODEL" ]]; then
 	MODEL="$PI_MODEL"
 else
@@ -535,6 +538,16 @@ run_one() {  # $1=config $2=arm $3=task $4=rep [$5=split] [$6=prompt-variant]
 	: > "$telfile"; exec 8<>"$telfile"; rm -f "$telfile"
 	local session_env=()
 	python3 "$CONFIG" --apply "$cfg" --workdir "$wd" --env-null > "$envfile" || exit 2
+	local config_sha256; config_sha256="$(python3 -c 'import hashlib,sys; print(hashlib.sha256(open(sys.argv[1],"rb").read()).hexdigest())' "$cfg")"
+	local requested_model="$REQUESTED_MODEL" requested_provider="$REQUESTED_PROVIDER"
+	[[ -n "$requested_model" ]] || requested_model="$MODEL"
+	[[ -n "$requested_provider" ]] || requested_provider="$MODEL_PROVIDER_RESOLVED"
+	local gate_session_id
+	gate_session_id="$(python3 "$GATE_PROVENANCE" --mint \
+		--invocation-id "$RUNID" --requested-model "$requested_model" --resolved-model "$MODEL" \
+		--requested-provider "$requested_provider" --resolved-provider "$MODEL_PROVIDER_RESOLVED" \
+		--config-sha256 "$config_sha256" --surface-sha256 "$HARNESS_SURFACE_SHA256" | \
+		python3 -c 'import json,sys; print(json.load(sys.stdin)["session_id"])')" || exit 2
 	# Exposure is declared by the candidate config and counted for both arms. Keep
 	# only event names in the child-visible spec; payloads remain behind the
 	# authenticated telemetry reducer.
@@ -657,7 +670,10 @@ PY
 	# Each session owns an authenticated telemetry descriptor. This prevents
 	# concurrent gates, interactive Pi activity, and evaluated code from
 	# contaminating retries or result-row joins.
-	local session_base_env=("HOME=$HOME" "PATH=$PATH" "TMPDIR=$gate_tmpdir" "TELEMETRY=on" "TELEMETRY_SOURCE=gate" "TELEMETRY_HMAC_FD=3" "TELEMETRY_FD=8")
+	local session_base_env=("HOME=$HOME" "PATH=$PATH" "TMPDIR=$gate_tmpdir" "TELEMETRY=on" "TELEMETRY_SOURCE=gate" "TELEMETRY_HMAC_FD=3" "TELEMETRY_FD=8"
+		"PI_RUN_ID=$gate_session_id" "PI_MODEL_ID=$MODEL" "PI_MODEL_PROVIDER=$MODEL_PROVIDER_RESOLVED"
+		"PI_REQUESTED_MODEL=$requested_model" "PI_REQUESTED_PROVIDER=$requested_provider"
+		"HARNESS_CONFIG_SHA256=$config_sha256")
 	[[ -n "$HARNESS_SURFACE_SHA256" ]] && session_base_env+=("HARNESS_SURFACE_SHA256=$HARNESS_SURFACE_SHA256")
 	for key in LANG LC_ALL SYSTEMROOT WINDIR PI_CODING_AGENT_DIR XDG_CONFIG_HOME; do
 		[[ -n "${!key:-}" ]] && session_base_env+=("$key=${!key}")
@@ -977,13 +993,13 @@ PY
 		LOW_TOK_STREAK=0
 	fi
 
-	python3 - "$RESULTS" "$MODEL" "$pat" "$task" "$rep" "$gate" "$retried" "$RUNID" "$tin" "$tout" "$output_chars" "$split" "$usage_exact" "${FLEET_EXPECTED_MODELS:-}" "$rowctx" "$wd/fingerprint-pre.json" "$wd/fingerprint-post.json" "$GATE_NETWORK" "$MODEL_CONTROL" "$MODEL_PROVIDER_RESOLVED" "$ENDPOINT_IDENTITY_SHA256" "$NETWORK_AUTHORITATIVE" "$NETWORK_AUTHORITY_REASON" "$row_sandbox_auth" "$row_sandbox_reason" "$EXEC_POLICY" "$mrow" "$span_receipt_success" "$cfg" "$CONFIG" "$EXPERIMENT_MANIFEST" "$EXPERIMENT_MANIFEST_SHA256" "$EXPERIMENT_BASE_CELL" "$EXPERIMENT_CAND_CELL" "$HARNESS_HASH_BLOCKER" "$context_telemetry" "$wd/.pi/APPEND_SYSTEM.md" "${AGENT_MODELS_SHA256:-}" "$tools" "$wd" "$(is_hidden "$task" && echo 1 || echo 0)" <<'PY'
+	python3 - "$RESULTS" "$MODEL" "$pat" "$task" "$rep" "$gate" "$retried" "$RUNID" "$tin" "$tout" "$output_chars" "$split" "$usage_exact" "${FLEET_EXPECTED_MODELS:-}" "$rowctx" "$wd/fingerprint-pre.json" "$wd/fingerprint-post.json" "$GATE_NETWORK" "$MODEL_CONTROL" "$MODEL_PROVIDER_RESOLVED" "$ENDPOINT_IDENTITY_SHA256" "$NETWORK_AUTHORITATIVE" "$NETWORK_AUTHORITY_REASON" "$row_sandbox_auth" "$row_sandbox_reason" "$EXEC_POLICY" "$mrow" "$span_receipt_success" "$cfg" "$CONFIG" "$EXPERIMENT_MANIFEST" "$EXPERIMENT_MANIFEST_SHA256" "$EXPERIMENT_BASE_CELL" "$EXPERIMENT_CAND_CELL" "$HARNESS_HASH_BLOCKER" "$context_telemetry" "$wd/.pi/APPEND_SYSTEM.md" "${AGENT_MODELS_SHA256:-}" "$tools" "$wd" "$(is_hidden "$task" && echo 1 || echo 0)" "$gate_session_id" "$config_sha256" "$requested_model" "$requested_provider" <<'PY'
 import hashlib,importlib.util,json,os,sys
 (out,model,pat,task,rep,gate,retried,runid,tin,tout,outchars,split,usage_exact,expected_models,
  ctxpath,prepath,postpath,network_mode,model_control,provider,endpoint_sha,network_auth,network_reason,
  sandbox_auth,sandbox_reason,policy_path,mrow,span_receipt,cfg_path,config_path,experiment_manifest,
  experiment_sha,base_cell,cand_cell,harness_blocker,context_telemetry_path,rendered_governor_path,agent_models_sha,tools_csv,
- workdir,task_is_hidden) = sys.argv[1:42]
+ workdir,task_is_hidden,gate_session_id,expected_config_sha256,expected_requested_model,expected_requested_provider) = sys.argv[1:46]
 ctx=json.load(open(ctxpath)); pre=json.load(open(prepath)); post=json.load(open(postpath))
 # Loaded once and reused for both "harness" and "context" below — the surface hash
 # in the row is pulled ONLY from this already-HMAC-verified blob, never from the
@@ -1005,6 +1021,24 @@ if not episode_complete:
     authoritative=False
     status="incomplete"
     authority_reason="authenticated failure-episode settlement summary missing or duplicated"
+sys.path.insert(0, os.path.dirname(os.path.abspath(config_path)))
+import gate_provenance as _gate_provenance
+expected_identity={
+    "schema": _gate_provenance.SCHEMA,
+    "session_id": gate_session_id,
+    "invocation_id": runid,
+    "requested_model": expected_requested_model,
+    "resolved_model": model,
+    "requested_provider": expected_requested_provider,
+    "resolved_provider": provider,
+    "config_sha256": expected_config_sha256,
+    "surface_sha256": harness_surface_sha256,
+}
+identity_errors=_gate_provenance.validate(context_data.get("provenance"), expected_identity)
+if identity_errors:
+    authoritative=False
+    status="incomplete"
+    authority_reason="gate session provenance invalid: " + ", ".join(identity_errors)
 exact=bool(int(usage_exact))
 usage={"source":"provider" if exact else "char_proxy", "exact":exact,
        "input_tokens":int(tin) if exact else None, "output_tokens":int(tout) if exact else None,
@@ -1125,6 +1159,8 @@ rec={"schema":"pi.eval-row/v4", "task":task,"pattern":pat,"arm":pat,"rep":int(re
      "prompt":{"variant":ctx["prompt_variant"],"semantic_group":ctx["semantic_group"],"sha256":ctx["prompt_sha256"]},
      "serving":{"pre":pre,"post":post,"stable":stable},"usage":usage,"trajectory":trajectory,
      "span_receipt_success":bool(int(span_receipt)),"config":config_binding,"experiment":experiment,
+     "gate_session_id":gate_session_id,
+     "child_telemetry":"unavailable-contained" if metrics["subag"] else "not-used",
      "harness":{"surface_sha256":harness_surface_sha256,
                 "hash_blocker":harness_blocker if harness_surface_sha256 is None else "",
                 # The resolved --tools list, verbatim: the subagent gap hid for

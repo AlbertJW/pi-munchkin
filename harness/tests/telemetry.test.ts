@@ -130,6 +130,42 @@ test("a detail field may NOT shadow a telemetry envelope key", () => {
 	});
 });
 
+test("gate provenance fields are stamped from the launcher identity", () => {
+		withFile((file) => {
+			const prior = {
+				TELEMETRY_SOURCE: process.env.TELEMETRY_SOURCE,
+				PI_RUN_ID: process.env.PI_RUN_ID,
+				PI_MODEL_ID: process.env.PI_MODEL_ID,
+				PI_MODEL_PROVIDER: process.env.PI_MODEL_PROVIDER,
+				PI_REQUESTED_MODEL: process.env.PI_REQUESTED_MODEL,
+				PI_REQUESTED_PROVIDER: process.env.PI_REQUESTED_PROVIDER,
+				HARNESS_CONFIG_SHA256: process.env.HARNESS_CONFIG_SHA256,
+				HARNESS_SURFACE_SHA256: process.env.HARNESS_SURFACE_SHA256,
+			};
+			try {
+				Object.assign(process.env, {
+					TELEMETRY_SOURCE: "gate", PI_RUN_ID: "session-1", PI_MODEL_ID: "ling",
+					PI_MODEL_PROVIDER: "local-llamacpp", PI_REQUESTED_MODEL: "ling",
+					PI_REQUESTED_PROVIDER: "local-llamacpp", HARNESS_CONFIG_SHA256: "c".repeat(64),
+					HARNESS_SURFACE_SHA256: "d".repeat(64),
+				});
+				record("verify-gate", "gate-green-consumed", {});
+				const row = JSON.parse(readFileSync(file, "utf8").trim());
+				assert.equal(row.run_id, "session-1");
+				assert.equal(row.model, "ling");
+				assert.equal(row.provider, "local-llamacpp");
+				assert.equal(row.requested_model, "ling");
+				assert.equal(row.requested_provider, "local-llamacpp");
+				assert.equal(row.config_sha256, "c".repeat(64));
+				assert.equal(row.harness_surface_sha256, "d".repeat(64));
+			} finally {
+				for (const [key, value] of Object.entries(prior)) {
+					if (value === undefined) delete process.env[key]; else process.env[key] = value;
+				}
+			}
+		});
+});
+
 test("production telemetry fails closed to a minimal schema-reject row", () => {
 	withFile((file) => {
 		process.env.TELEMETRY_STRICT = "0";

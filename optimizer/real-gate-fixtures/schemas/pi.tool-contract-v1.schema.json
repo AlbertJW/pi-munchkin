@@ -1,0 +1,28 @@
+{
+  "$id": "pi.tool-contract-manifest/v1",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "version", "purpose", "cases"],
+  "properties": {
+    "schema": {"const": "pi.tool-contract-manifest/v1"},
+    "version": {"const": 1},
+    "purpose": {"type": "string", "minLength": 1},
+    "cases": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "required_tool", "oracle", "allowed_recovery", "prompt"],
+        "properties": {
+          "id": {"type": "string", "pattern": "^[a-z0-9-]+$"},
+          "required_tool": {"enum": ["read", "search_spans", "read_span", "bash", "edit", "write", "verify_project", "capability", "plan_write", "plan_update"]},
+          "oracle": {"enum": ["tool_call_observed", "mutation_and_verify_observed"]},
+          "allowed_recovery": {"type": "array", "items": {"type": "string"}},
+          "prompt": {"type": "string", "minLength": 1}
+        }
+      }
+    }
+  }
+}

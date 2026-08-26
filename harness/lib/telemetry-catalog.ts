@@ -245,12 +245,13 @@ function valueType(value: unknown): TelemetryFieldType | "object" | "undefined" 
 // discards every event whose source != "gate" — so a detail field named `source`
 // makes the event vanish from every gate round's extraction, reading as a mechanism
 // that never fired. Introduced and caught the same day (2026-07-31, plan-runner's
-// go/go-blocked `source`). run_id/provider/model are deliberately NOT reserved:
-// envelope() reads them from detail on purpose and writes back the same value.
+// go/go-blocked `source`). run_id/provider/model remain detail-overridable for
+// existing event callers; requested_* are launcher identity fields and are
+// reserved like the other envelope values.
 // Exported so the static half of this guard (telemetry-catalog.test.ts) can assert
 // against the real set rather than a copy that drifts.
 export const RESERVED_ENVELOPE_FIELDS = new Set([
-	"schema", "ts", "seq", "source", "sk", "si", "sp", "harness_surface_sha256", "config_sha256", "ext", "kind",
+	"schema", "ts", "seq", "source", "sk", "si", "sp", "harness_surface_sha256", "config_sha256", "requested_provider", "requested_model", "ext", "kind",
 ]);
 
 export function validateCatalogDetail(ext: string, kind: string, detail: Record<string, unknown>): string[] {

@@ -8,6 +8,7 @@ Mixed schema generations are never a valid analysis population.
 ROW_V2 = "pi.eval-row/v2"
 ROW_V3 = "pi.eval-row/v3"
 ROW_V4 = "pi.eval-row/v4"
+TOOL_CONTRACT_V1 = "pi.tool-contract/v1"
 CONTEXT_V1 = "pi.context-telemetry/v1"
 CONTEXT_V2 = "pi.context-telemetry/v2"
 CONTEXT_V3 = "pi.context-telemetry/v3"
@@ -35,6 +36,11 @@ def canonical_generation(rows):
 
 def is_powered_row(row):
     return row.get("schema") in POWERED_ROWS
+
+
+def is_tool_contract_row(row):
+    """Tool-contract qualification is a protocol screen, never efficacy data."""
+    return isinstance(row, dict) and row.get("schema") == TOOL_CONTRACT_V1
 
 
 def failure_episode_complete(row):

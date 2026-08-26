@@ -146,7 +146,7 @@ function classifyError(value: string): string {
 }
 
 const FORBIDDEN_DETAIL_FIELD = /(prompt|tool.?output|file.?content|\bcontent\b|url|header|credential|secret|api.?key|exception)/i;
-const RESERVED_FIELDS = new Set(["run_id", "provider", "model"]);
+const RESERVED_FIELDS = new Set(["run_id", "provider", "model", "requested_provider", "requested_model"]);
 
 /** Exported for the catalog tripwire: a catalog entry whose field name this
  * predicate rejects is a contradiction — every row it describes would be
@@ -267,6 +267,8 @@ function envelope(ext: string, kind: string, detail: Record<string, unknown>): R
 		run_id: typeof detail.run_id === "string" ? detail.run_id : (process.env.PI_RUN_ID || SESSION_KEY),
 		provider: typeof detail.provider === "string" ? detail.provider : (process.env.PI_MODEL_PROVIDER || null),
 		model: typeof detail.model === "string" ? detail.model : (process.env.PI_MODEL_ID || null),
+		requested_provider: process.env.PI_REQUESTED_PROVIDER || null,
+		requested_model: process.env.PI_REQUESTED_MODEL || null,
 		harness_surface_sha256: process.env.HARNESS_SURFACE_SHA256 || null,
 		config_sha256: process.env.HARNESS_CONFIG_SHA256 || null,
 		ext,

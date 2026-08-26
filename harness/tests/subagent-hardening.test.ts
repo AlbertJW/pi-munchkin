@@ -16,6 +16,17 @@ test("subagent environment is reduced and excludes unrelated secrets and shell i
 	assert.deepEqual(env, { PATH: "/bin", HOME: "/home/u", OPENAI_API_KEY: "needed", LLAMA_API_KEY: "dummy-llama" });
 });
 
+test("gate child telemetry is contained instead of falling back to the live ledger", () => {
+	const env = buildSubagentEnv({
+		PATH: "/bin", HOME: "/home/u", TELEMETRY: "on", TELEMETRY_SOURCE: "gate",
+		TELEMETRY_FD: "8", TELEMETRY_HMAC_FD: "3",
+	});
+	assert.equal(env.TELEMETRY, "off");
+	assert.equal(env.TELEMETRY_CHILD_POLICY, "contained");
+	assert.equal(env.TELEMETRY_FD, undefined);
+	assert.equal(env.TELEMETRY_HMAC_FD, undefined);
+});
+
 test("subagent explicit environment allowlist accepts valid names only", () => {
 	const env = buildSubagentEnv({
 		PATH: "/bin", PI_SUBAGENT_ENV_ALLOW: "CUSTOM_SENTINEL,bad-name, ALSO_OK ",

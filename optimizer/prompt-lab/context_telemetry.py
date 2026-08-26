@@ -13,6 +13,10 @@ import tempfile
 
 MAC_SUFFIX = re.compile(br',"mac":"([0-9a-f]{64})"}$')
 SAFE_TIER_DETECTORS = {"semantic", "session", "combined"}
+PROVENANCE_FIELDS = (
+    "run_id", "provider", "model", "requested_provider", "requested_model",
+    "config_sha256", "harness_surface_sha256",
+)
 
 
 def _read_raw(source):
@@ -201,6 +205,32 @@ def _verification_frontier_summary(events):
     }
 
 
+def _provenance_summary(events):
+    """Summarize the identity stamped on every authenticated parent event."""
+    values = {}
+    mismatches = []
+    for field in PROVENANCE_FIELDS:
+        seen = {event.get(field) for event in events if event.get(field) is not None}
+        if len(seen) == 1:
+            values[field] = next(iter(seen))
+        elif len(seen) > 1:
+            values[field] = None
+            mismatches.append(field)
+        else:
+            values[field] = None
+            mismatches.append(field)
+    valid_hashes = all(
+        isinstance(values[field], str) and re.fullmatch(r"[0-9a-f]{64}", values[field])
+        for field in ("config_sha256", "harness_surface_sha256")
+    )
+    return {
+        "schema": "pi.gate-session/v1",
+        "complete": not mismatches and valid_hashes,
+        "mismatches": sorted(set(mismatches)),
+        **values,
+    }
+
+
 def aggregate(path, session_key, key=None, exposure_events=None):
     raw, all_events = authenticated_events(path, key)
     session_events = [event for event in all_events if event.get("sk") == session_key]
@@ -252,6 +282,7 @@ def aggregate(path, session_key, key=None, exposure_events=None):
         "authenticated": key is not None,
         "content_sha256": hashlib.sha256(raw).hexdigest(),
         "session_key": session_key,
+        "provenance": _provenance_summary(session_events),
         "events": (len(selected) + len(context_surfaces) + len(guard_events) + len(delegate_blocks) +
                    len(delegate_subagents) + len(by_ext["failure-episode"]) +
                    sum(event.get("kind") == "provider-timing" for event in by_ext["runtime"]) +
@@ -362,6 +393,15 @@ def selftest():
          "best_passed":8,"best_failed":1,"best_skipped":0,"best_total":9,"last_advanced":False,
          "plateau_streak":2,"successful_mutation_epochs_since_advance":2,"verification_plateau_overrun":0},
     ]
+    # Every authoritative parent event carries the same launcher identity. A
+    # reduced row must expose drift rather than silently choosing the last value.
+    for event in events:
+        if event.get("sk") == "run-a":
+            event.update({
+                "run_id": "session-1", "provider": "local-llamacpp", "model": "ling",
+                "requested_provider": "local-llamacpp", "requested_model": "ling",
+                "config_sha256": "c" * 64, "harness_surface_sha256": "a" * 64,
+            })
     with tempfile.TemporaryDirectory() as td:
         path = os.path.join(td, "events.jsonl")
         key = b"k" * 32
@@ -378,6 +418,7 @@ def selftest():
         assert row["compactions"]["pi"] == 1 and row["compactions"]["overflow"] == 0
         assert row["watcher"]["completed"] == 1 and row["watcher"]["resume_required"] == 1
         assert row["harness_surface_sha256"] == "a" * 64
+        assert row["provenance"]["complete"] and row["provenance"]["run_id"] == "session-1"
         assert row["surface"]["calls"] == 1 and row["surface"]["context"]["max_bytes"] == 60
         assert row["surface"]["concentration"]["largest_message"]["mean"] == 0.6
         assert row["bash_output_guard"]["withheld"] == 2, "only run-a's two events, not the other session's"
