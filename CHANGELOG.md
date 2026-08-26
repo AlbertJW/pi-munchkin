@@ -8,7 +8,11 @@ All notable changes to pi-munchkin are documented here. Releases follow semantic
 
 - **The state lens under-counted to zero.** `state-lens/steer-injected` was recorded only inside the
   `legacyActed` branch, so under the shipped `CONTROL_ARBITER=enforce` — where the lens IS delivered,
-  merged as a prefix into the winner's message — not one row was ever written. The lens can never
+  merged as a prefix into the winner's message — not one row was ever written.
+  **Correction (2026-08-26): this did not ship in `db3711c` despite that commit's message.** The code
+  change was lost between edit and commit; only the catalog half landed, leaving a declared
+  `delivered` field no emitter sent. It is fixed for real in the follow-up, *with* the regression test
+  whose absence let it vanish silently in the first place. The lens can never
   *win* (priority 100, triggered by a 600), so `decision.delivered` is the only thing that can
   distinguish "merged and shown" from "dropped".
 - **Two lifecycle orphans.** `drift-scanner` had no `session_start` handler at all, so `handledHead`

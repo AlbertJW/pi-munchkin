@@ -9,7 +9,7 @@ import {
 } from "../lib/blackboard.ts";
 import { emitHarnessSignal, onHarnessSignal, signalRunId } from "../lib/harness-signals.ts";
 import { FAILURE_CLASSES } from "../lib/failure-episodes.ts";
-import { fire, makeFakePi } from "./integration-harness.ts";
+import { emitRivalProposal, fire, makeFakePi, resetPiGlobals } from "./integration-harness.ts";
 
 // Run: cd ~/.pi/agent && TELEMETRY_FILE=$(mktemp) TELEMETRY_SOURCE=test \
 //        npx -y tsx --test tests/blackboard.test.ts
@@ -418,4 +418,72 @@ test("a model-controlled path cannot forge STRUCTURE in the model-visible lens",
 	noteTool(s3, { toolName: "read", args: { path: "src/lib/report.ts" }, isError: true, errorText: "boom" });
 	assert.match(renderLens(s3, 2000), /read src\/lib\/report\.ts/);
 	resetBoard();
+});
+
+test("lens exposure is recorded under the SHIPPED arbiter, not only on the legacy path", async () => {
+	// The `steer-injected` row used to live inside the `legacyActed` branch. Under the
+	// shipped CONTROL_ARBITER=enforce the lens IS delivered — merged as a prefix into
+	// the winner's message — yet not one row was written, so lens exposure read zero in
+	// every analysis that looked. The lens can never WIN (priority 100, triggered by a
+	// 600), so `decision.delivered` is the only signal that separates "merged and shown"
+	// from "dropped". This is the test that was missing when the fix was first written,
+	// and its absence is why the fix silently vanished from the tree.
+	const { buildControlProposal, emitControlProposal } = await import("../lib/control-proposal.ts");
+	const telemetry = join(mkdtempSync(join(tmpdir(), "lens-exposure-")), "events.jsonl");
+	const previous = {
+		lens: process.env.STATE_LENS, control: process.env.CONTROL_ARBITER,
+		telemetry: process.env.TELEMETRY, file: process.env.TELEMETRY_FILE, source: process.env.TELEMETRY_SOURCE,
+	};
+	Object.assign(process.env, {
+		CONTROL_ARBITER: "enforce", TELEMETRY: "on", TELEMETRY_FILE: telemetry, TELEMETRY_SOURCE: "test",
+	});
+	delete process.env.STATE_LENS; // default steer mode
+
+	const rowsFor = () => readFileSync(telemetry, "utf8").split("\n").filter(Boolean)
+		.map((line) => JSON.parse(line) as Record<string, unknown>)
+		.filter((row) => row.ext === "state-lens" && row.kind === "steer-injected");
+
+	try {
+		const fp = makeFakePi();
+		const nonce = `${Date.now()}-${Math.random()}`;
+		// Manifest order: session-blackboard (21) subscribes before control-arbiter (24).
+		(await import(`../extensions/session-blackboard.ts?exposure=${nonce}`)).default(fp.pi as never);
+		(await import(`../extensions/control-arbiter.ts?exposure=${nonce}`)).default(fp.pi as never);
+		resetBoard();
+		const state = boardState();
+		state.turn = 30;
+		noteTool(state, { toolName: "bash", args: { command: "npm test" }, isError: true, errorText: "fail" });
+
+		// (a) A message winner: the lens merges into it and IS shown.
+		emitControlProposal(fp.pi.events as never, buildControlProposal({
+			boundarySequence: 30, kind: "failure_recovery", reason: "loop_recovery",
+			source: "loop-breaker", cooldownKey: "exact:1", messageFactory: "loop-tier", effect: "message",
+		}), { message: "CHANGE STRATEGY" });
+		await fire(fp, "turn_end", { turnIndex: 30, message: { role: "assistant", content: [] }, toolResults: [] }, {});
+		const merged = rowsFor();
+		assert.equal(merged.length, 1, "a delivered lens must record exactly one exposure row");
+		assert.equal(merged[0].delivered, true, "a merged lens was shown to the model");
+		assert.match(fp.sent.at(-1) ?? "", /harness summary/, "and the model really did receive it");
+
+		// (b) A TERMINAL winner takes no merged supplements, so the lens is genuinely
+		//     dropped — the one case where `delivered` must be false.
+		state.turn = 60;
+		noteTool(state, { toolName: "bash", args: { command: "npm run lint" }, isError: true, errorText: "fail" });
+		emitRivalProposal(fp, 60, { terminal: true });
+		emitControlProposal(fp.pi.events as never, buildControlProposal({
+			boundarySequence: 60, kind: "failure_recovery", reason: "loop_recovery",
+			source: "loop-breaker", cooldownKey: "exact:1", messageFactory: "loop-tier", effect: "message",
+		}), { message: "CHANGE STRATEGY AGAIN" });
+		await fire(fp, "turn_end", { turnIndex: 60, message: { role: "assistant", content: [] }, toolResults: [] }, {});
+		const dropped = rowsFor();
+		assert.equal(dropped.length, 2, "a dropped lens is still recorded — silence would hide the loss");
+		assert.equal(dropped[1].delivered, false, "a lens the arbiter dropped must not claim exposure");
+	} finally {
+		for (const [key, value] of Object.entries({
+			STATE_LENS: previous.lens, CONTROL_ARBITER: previous.control, TELEMETRY: previous.telemetry,
+			TELEMETRY_FILE: previous.file, TELEMETRY_SOURCE: previous.source,
+		})) { if (value === undefined) delete process.env[key]; else process.env[key] = value; }
+		resetBoard();
+		resetPiGlobals();
+	}
 });

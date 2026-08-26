@@ -1,3 +1,4 @@
+import { createDeliveryCharge } from "../lib/control-charge.ts";
 import { subscribeOnce } from "../lib/extension-lifecycle.ts";
 import { createHash, randomUUID } from "node:crypto";
 import { chmod, mkdir, rename, unlink, writeFile } from "node:fs/promises";
@@ -56,6 +57,7 @@ export default function (pi: ExtensionAPI): void {
 	let renderQueued = false;
 	let renderTimer: ReturnType<typeof setTimeout> | null = null;
 	let lastLensProposalBoundary = -Infinity;
+	const lensCharge = createDeliveryCharge(pi.events, "session-blackboard-lens");
 
 	subscribeOnce("session-blackboard:domain-signal", () => onHarnessSignal(pi.events, (signal) => noteHarnessSignal(boardState(), signal)));
 	subscribeOnce("session-blackboard:control-proposal", () => onControlProposal(pi.events, ({ proposal }) => {
@@ -77,7 +79,7 @@ export default function (pi: ExtensionAPI): void {
 				lastLensProposalBoundary = proposal.boundarySequence;
 				lastLensSteerTurn = proposal.boundarySequence;
 				const legacyActed = !controlEnforces(pi.events);
-				emitControlProposal(pi.events, buildControlProposal({
+				const lensProposal = buildControlProposal({
 					boundarySequence: proposal.boundarySequence,
 					kind: "context_hint",
 					reason: "state_lens",
@@ -85,10 +87,26 @@ export default function (pi: ExtensionAPI): void {
 					cooldownKey: "state-lens",
 					messageFactory: "state-lens",
 					legacyActed,
-				}), { message: lens });
+				});
+				emitControlProposal(pi.events, lensProposal, { message: lens });
 				if (legacyActed) {
-					record("state-lens", "steer-injected", { chars: lens.length, turnIndex: proposal.boundarySequence });
+					record("state-lens", "steer-injected", { chars: lens.length, turnIndex: proposal.boundarySequence, delivered: true });
 					try { pi.sendUserMessage(lens, { deliverAs: "steer" }); } catch { /* stale session */ }
+				} else {
+					// The mirror image of charging at proposal. This row used to be written
+					// ONLY on the legacy path, so under the shipped CONTROL_ARBITER=enforce —
+					// where the lens IS delivered, merged as a prefix into the winner's
+					// message — not one row was ever written and lens exposure read zero.
+					//
+					// The lens can never WIN (priority 100, and it is triggered by a 600), so
+					// `decision.delivered` is the only thing that separates "merged and shown"
+					// from "dropped". A dropped lens is still recorded, with delivered:false —
+					// silence would hide the loss rather than measure it.
+					const chars = lens.length;
+					const turnIndex = proposal.boundarySequence;
+					lensCharge.awaitDecision(lensProposal, (delivered) => {
+						record("state-lens", "steer-injected", { chars, turnIndex, delivered });
+					});
 				}
 			}
 		}
