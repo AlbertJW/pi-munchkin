@@ -206,6 +206,8 @@ class CampaignEngine:
                     "reason": "insufficient or out-of-band train/development cases for the declared model",
                 })
             self.calibrated_cases[model_key] = selected
+            if hasattr(self.scenario, "set_calibrated_cases"):
+                self.scenario.set_calibrated_cases(model, selected)
 
         seed = self._candidate("candidate:seed", lambda: self.surface.seed_candidate(self.manifest))
         seed_dev = self._evaluation("evaluation:seed:development:subject", seed, "development", self.manifest.subject_model)

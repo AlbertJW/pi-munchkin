@@ -37,12 +37,17 @@ class OpenAICompatibleProvider:
     """
 
     plugin_name = "openai-compatible"
-    _FIELDS = {"endpoint", "model", "api_key_env", "allow_remote", "timeout_seconds"}
+    _FIELDS = {"endpoint_scheme", "endpoint_host", "endpoint_port", "model", "api_key_env", "allow_remote", "timeout_seconds"}
 
     def __init__(self, config: dict):
         if not isinstance(config, dict) or set(config) != self._FIELDS:
             raise ValueError(f"openai-compatible provider config must contain exactly: {', '.join(sorted(self._FIELDS))}")
-        endpoint = config["endpoint"]
+        host = "127.0.0.1" if config["endpoint_host"] == "loopback" else config["endpoint_host"]
+        if config["endpoint_scheme"] not in ("http", "https") or not isinstance(host, str) or not host:
+            raise ValueError("optimizer provider endpoint scheme or host is invalid")
+        if not isinstance(config["endpoint_port"], int) or isinstance(config["endpoint_port"], bool) or not 1 <= config["endpoint_port"] <= 65535:
+            raise ValueError("optimizer provider endpoint port is invalid")
+        endpoint = f"{config['endpoint_scheme']}://{host}:{config['endpoint_port']}"
         parsed = urllib.parse.urlparse(endpoint)
         if parsed.scheme not in ("http", "https") or not parsed.hostname:
             raise ValueError("optimizer provider endpoint must be HTTP(S)")
@@ -56,19 +61,44 @@ class OpenAICompatibleProvider:
         if not isinstance(config["timeout_seconds"], int) or isinstance(config["timeout_seconds"], bool) or config["timeout_seconds"] < 1:
             raise ValueError("optimizer provider timeout_seconds must be positive")
         self.config = config
+        self.endpoint = endpoint
 
     def session(self, kind: str, payload: dict, *, operation_id: str) -> dict:
+        result_contracts = {
+            "evolve": {
+                "schema": "pi.optimizer-session-result/v1", "kind": "evolve",
+                "strategy": "brief rationale", "action": "select|revert|compose",
+                "selected_parent_ids": ["one or two IDs from accepted_candidate_ids"],
+            },
+            "diagnose_patch": {
+                "schema": "pi.optimizer-session-result/v1", "kind": "diagnose_patch",
+                "root_cause_hypothesis": "specific causal diagnosis",
+                "alternatives_considered": ["bounded alternative"], "target_surface": "one permitted family",
+                "expected_exposure": "observable mechanism", "primary_metric": "declared metric name",
+                "falsifier": "matched evidence that would refute the diagnosis",
+                "rollback_condition": "hard stop condition",
+                "mutation": {"family": "target_surface", "diff": "family-specific mutation text", "changed_units": ["exact changed units"]},
+            },
+            "reflect": {
+                "schema": "pi.optimizer-session-result/v1", "kind": "reflect",
+                "lesson": "bounded lesson", "stochasticity_check": "matched-cell assessment",
+                "classification": payload.get("classification"),
+            },
+        }
+        instruction = "Return exactly one JSON object matching output_contract; add no fields and use no markdown."
+        if kind == "diagnose_patch" and "configuration" in payload.get("permitted_surface_families", []):
+            instruction += " For configuration, mutation.diff is a JSON-encoded merge-patch object and changed_units are exactly config.<top-level-key> for every patched key."
         prompt = {
             "contract": "pi.optimizer-session/v1", "operation_id": operation_id,
-            "operation": kind, "instruction": "Return one JSON object only. Do not use markdown.",
-            "payload": payload,
+            "operation": kind, "instruction": instruction,
+            "output_contract": result_contracts.get(kind), "payload": payload,
         }
         body = json.dumps({
             "model": self.config["model"], "temperature": 0,
             "response_format": {"type": "json_object"},
             "messages": [{"role": "user", "content": json.dumps(prompt, sort_keys=True)}],
         }).encode()
-        endpoint = self.config["endpoint"].rstrip("/") + "/v1/chat/completions"
+        endpoint = self.endpoint.rstrip("/") + "/v1/chat/completions"
         headers = {"Content-Type": "application/json"}
         if os.environ.get(self.config["api_key_env"]):
             headers["Authorization"] = "Bearer " + os.environ[self.config["api_key_env"]]

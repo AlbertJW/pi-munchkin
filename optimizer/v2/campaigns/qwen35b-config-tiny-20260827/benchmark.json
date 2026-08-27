@@ -1,0 +1,29 @@
+{
+  "schema": "pi.optimizer-benchmark-pack/v1",
+  "pack_id": "qwen35b-config-tiny-20260827",
+  "revision": "2026-08-27.1",
+  "metric": "task_success",
+  "splits": {
+    "train": [
+      {
+        "id": "train-sv-ambiguous-spec",
+        "fixture_sha256": "2e123abcd45a7ef1d84aa60a396843da26d259beb9d8c9405f4f8ac564c3fac7",
+        "admission_receipt_sha256": "04da8f81dd079f973720010e0e8902e8bb38565dc1a89152251161da890a9c8b"
+      }
+    ],
+    "development": [
+      {
+        "id": "dev-retry-trap",
+        "fixture_sha256": "baa8fdc98d3833849edaaa408d902f4056d32f0106c1ac99e92023f7c2d8ba25",
+        "admission_receipt_sha256": "df0f2876aa3437239787ac89d5a5ce54b844d80399260a35d3b01b6d07835769"
+      }
+    ],
+    "test": [
+      {
+        "id": "test-audit-sweep",
+        "fixture_sha256": "c42b16fe8dbb97486c75e6fbf3c1a3ee37664f9b6c4f6ea15e3d3d89507412dd",
+        "admission_receipt_sha256": "5a6288ca5227635cfea2351a2efb1944bef1b0ce3fa6b7f817cdd3d3230873b8"
+      }
+    ]
+  }
+}

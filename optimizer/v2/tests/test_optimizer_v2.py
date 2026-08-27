@@ -4,6 +4,7 @@ import hashlib
 import json
 import os
 import pathlib
+import subprocess
 import tempfile
 import time
 import unittest
@@ -14,8 +15,8 @@ from optimizer.v2.engine import CampaignEngine, InjectedCrash
 from optimizer.v2.events import EventStore, EventStoreError
 from optimizer.v2.fake import FakeProvider, FakeScenario, FakeSurface
 from optimizer.v2.manifest import ManifestError, load_campaign
-from optimizer.v2.pi_gate import PiGateEvidenceError, load_fresh_gate_evidence, validate_gate_evidence
-from optimizer.v2.surface import PatchSurfaceAdapter
+from optimizer.v2.pi_gate import PiGateEvidenceError, PiGateScenario, load_fresh_gate_evidence, validate_gate_evidence
+from optimizer.v2.surface import ConfigSurfaceAdapter, PatchSurfaceAdapter
 from optimizer.v2.cli import _assert_run_root_outside_git
 
 
@@ -154,6 +155,43 @@ class CandidateTests(unittest.TestCase):
                 adapter.build_candidate(parent, {"family": "capability", "diff": "--- a/../secret\n+++ b/../secret\n", "changed_units": ["../secret"]}, manifest)
             with self.assertRaisesRegex(CandidateError, "unauthorized"):
                 adapter.build_candidate(parent, {"family": "steering", "diff": "--- a/prompts/x\n+++ b/prompts/x\n", "changed_units": ["prompts/x"]}, manifest)
+
+    def test_config_surface_materializes_private_content_addressed_snapshots(self) -> None:
+        with tempfile.TemporaryDirectory() as td:
+            root = pathlib.Path(td)
+            baseline = root / "baseline.json"
+            baseline.write_text('{"prompt_variant":"A","format":"md","scaffold":"none"}\n', encoding="utf-8")
+            validator = pathlib.Path(__file__).resolve().parents[2] / "prompt-lab" / "config.py"
+            raw = campaign_dict()
+            raw["permitted_surface_families"] = ["configuration"]
+            raw["provenance"]["config_sha256"] = hashlib.sha256(baseline.read_bytes()).hexdigest()
+            campaign = load_campaign(raw)
+            adapter = ConfigSurfaceAdapter(baseline, root / "snapshots", validator)
+            seed = adapter.seed_candidate(campaign)
+            candidate = adapter.build_candidate(seed, {
+                "family": "configuration",
+                "diff": '{"scaffold":"decompose","name":"bounded-decompose"}',
+                "changed_units": ["config.name", "config.scaffold"],
+            }, campaign)
+            path = adapter.materialize(candidate)
+            self.assertEqual(json.loads(path.read_text())["scaffold"], "decompose")
+            self.assertEqual(path.stat().st_mode & 0o777, 0o600)
+            self.assertTrue(adapter.verify(candidate, campaign)["verified"])
+            self.assertNotIn(str(path), json.dumps(candidate.to_dict()))
+
+    def test_config_surface_rejects_unbound_or_misdeclared_mutations(self) -> None:
+        with tempfile.TemporaryDirectory() as td:
+            root = pathlib.Path(td); baseline = root / "baseline.json"
+            baseline.write_text('{"prompt_variant":"A","format":"md","scaffold":"none"}\n', encoding="utf-8")
+            raw = campaign_dict(); raw["permitted_surface_families"] = ["configuration"]
+            raw["provenance"]["config_sha256"] = hashlib.sha256(baseline.read_bytes()).hexdigest()
+            campaign = load_campaign(raw)
+            adapter = ConfigSurfaceAdapter(baseline, root / "snapshots", pathlib.Path(__file__).resolve().parents[2] / "prompt-lab" / "config.py")
+            seed = adapter.seed_candidate(campaign)
+            with self.assertRaisesRegex(CandidateError, "changed units"):
+                adapter.build_candidate(seed, {"family": "configuration", "diff": '{"scaffold":"decompose"}', "changed_units": ["config.format"]}, campaign)
+            with self.assertRaisesRegex(CandidateError, "unsupported"):
+                adapter.build_candidate(seed, {"family": "configuration", "diff": '{"shell":"unsafe"}', "changed_units": ["config.shell"]}, campaign)
 
 
 class EventStoreTests(unittest.TestCase):
@@ -294,36 +332,54 @@ class EngineTests(unittest.TestCase):
 
 
 class PiGateTests(unittest.TestCase):
-    def test_only_fresh_authoritative_bound_v4_rows_are_accepted(self) -> None:
-        row = {
-            "schema": "pi.eval-row/v4",
-            "task": "t1",
-            "model": "subject",
-            "arm": "candidate",
-            "run": "run-1",
-            "status": "complete",
-            "score": 1,
-            "authoritative": True,
-            "gate_session_id": "session-1",
-            "harness": {"surface_sha256": "c" * 64},
-            "config": {"sha256": "b" * 64},
-            "experiment": {"manifest_sha256": HEX},
+    @staticmethod
+    def _row(*, arm: str = "cand", session: str = "session-1", run: str = "run-1", config: str = "b" * 64) -> dict:
+        return {
+            "schema": "pi.eval-row/v4", "task": "t1", "model": "subject", "arm": arm,
+            "run": run, "status": "complete", "score": 1, "authoritative": True,
+            "gate_session_id": session, "harness": {"surface_sha256": "c" * 64},
+            "config": {"sha256": config}, "experiment": {"manifest_sha256": HEX, "cell": f"cell-{arm}"},
             "execution": {"authoritative": True},
-            "serving": {
-                "stable": True,
-                "pre": {"status": "complete", "full_sha256": "d" * 64},
-                "post": {"status": "complete", "full_sha256": "d" * 64},
-            },
+            "serving": {"stable": True, "pre": {"status": "complete", "full_sha256": "d" * 64}, "post": {"status": "complete", "full_sha256": "d" * 64}},
             "context": {"schema": "pi.context-telemetry/v4", "authenticated": True},
-            "exposure": {"status": "exposed"},
+            "exposure": {"status": "control" if arm == "base" else "targeted"},
         }
+
+    @staticmethod
+    def _validity(row: dict, *, void: bool = False) -> dict:
         digest = hashlib.sha256(json.dumps(row, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
-        validity = {"row_key": "run-1:subject:None:t1:candidate:None:canonical", "row_sha256": digest, "void": False, "void_reasons": []}
+        variant = ((row.get("prompt") or {}).get("variant")) or "canonical"
+        key = f"{row['run']}:{row['model']}:None:{row['task']}:{row['arm']}:None:{variant}"
+        return {"row_key": key, "row_sha256": digest, "void": void, "void_reasons": ["reward_hacking"] if void else []}
+
+    def test_only_fresh_authoritative_bound_v4_rows_are_accepted(self) -> None:
+        row = self._row(); validity = self._validity(row)
         accepted = validate_gate_evidence([row], [validity], campaign_sha256=HEX, config_sha256="b" * 64, surface_sha256="c" * 64)
         self.assertEqual(accepted, [row])
         broken = dict(row, authoritative=False)
         with self.assertRaises(PiGateEvidenceError):
             validate_gate_evidence([broken], [validity], campaign_sha256=HEX, config_sha256="b" * 64, surface_sha256="c" * 64)
+
+    def test_paired_rows_bind_distinct_configs_cells_and_parent_sessions(self) -> None:
+        base = self._row(arm="base", session="session-base", config="a" * 64)
+        cand = self._row(arm="cand", session="session-cand", config="b" * 64)
+        accepted = validate_gate_evidence(
+            [base, cand], [self._validity(base), self._validity(cand)], campaign_sha256=HEX,
+            config_sha256={"base": "a" * 64, "cand": "b" * 64}, surface_sha256="c" * 64,
+            experiment_cells={"base": "cell-base", "cand": "cell-cand"},
+        )
+        self.assertEqual(len(accepted), 2)
+        duplicate = dict(cand, gate_session_id="session-base")
+        with self.assertRaisesRegex(PiGateEvidenceError, "duplicate-gate-session"):
+            validate_gate_evidence([base, duplicate], [self._validity(base), self._validity(duplicate)], campaign_sha256=HEX, config_sha256={"base": "a" * 64, "cand": "b" * 64}, surface_sha256="c" * 64, experiment_cells={"base": "cell-base", "cand": "cell-cand"})
+
+    def test_voided_reward_hacking_and_cross_invocation_rows_are_rejected(self) -> None:
+        row = self._row()
+        with self.assertRaisesRegex(PiGateEvidenceError, "trial-validity"):
+            validate_gate_evidence([row], [self._validity(row, void=True)], campaign_sha256=HEX, config_sha256="b" * 64, surface_sha256="c" * 64)
+        other = self._row(arm="base", session="session-2", run="run-2")
+        with self.assertRaisesRegex(PiGateEvidenceError, "multiple invocations"):
+            validate_gate_evidence([row, other], [self._validity(row), self._validity(other)], campaign_sha256=HEX, config_sha256="b" * 64, surface_sha256="c" * 64)
 
     def test_gate_files_must_be_fresh_and_complete(self) -> None:
         with tempfile.TemporaryDirectory() as td:
@@ -334,6 +390,67 @@ class PiGateTests(unittest.TestCase):
             self.assertEqual((len(rows), len(verdicts)), (1, 1))
             with self.assertRaisesRegex(PiGateEvidenceError, "stale"):
                 load_fresh_gate_evidence(results, not_before_ns=max(results.stat().st_mtime_ns, sidecar.stat().st_mtime_ns) + 1)
+            link = pathlib.Path(td) / "linked.jsonl"; link.symlink_to(results)
+            pathlib.Path(str(link) + ".validity.jsonl").symlink_to(sidecar)
+            with self.assertRaisesRegex(PiGateEvidenceError, "not a file"):
+                load_fresh_gate_evidence(link, not_before_ns=before)
+
+    def test_trusted_gate_dry_contract_remains_offline_and_characterized(self) -> None:
+        gate = pathlib.Path(__file__).resolve().parents[2] / "real_gate.sh"
+        completed = subprocess.run([str(gate), "--dry"], cwd=gate.parent, stdin=subprocess.DEVNULL, capture_output=True, text=True, timeout=20)
+        self.assertEqual(completed.returncode, 0)
+        self.assertIn("== real_gate DRY ==", completed.stdout)
+        self.assertIn("would run", completed.stdout)
+        self.assertNotIn("\nrows ->", completed.stdout)
+
+    def test_interrupted_gate_attempt_refuses_duplicate_model_sessions(self) -> None:
+        with tempfile.TemporaryDirectory() as td:
+            root = pathlib.Path(td); baseline = root / "baseline.json"
+            baseline.write_text('{"prompt_variant":"A","format":"md","scaffold":"none"}\n', encoding="utf-8")
+            raw = campaign_dict(); raw["permitted_surface_families"] = ["configuration"]
+            raw["provenance"]["config_sha256"] = hashlib.sha256(baseline.read_bytes()).hexdigest()
+            campaign = load_campaign(raw); pack = BenchmarkPack.from_dict(benchmark_dict())
+            validator = pathlib.Path(__file__).resolve().parents[2] / "prompt-lab" / "config.py"
+            surface = ConfigSurfaceAdapter(baseline, root / "snapshots", validator)
+            case_tasks = {case.case_id: case.case_id for split in pack.splits.values() for case in split}
+            scenario = PiGateScenario(pathlib.Path(__file__).resolve().parents[2], pack, surface, root / "run", {
+                "case_tasks": case_tasks, "model_control": "llama", "gate_network": "endpoint",
+                "llama_endpoint": {"scheme": "http", "host": "loopback", "port": 8080}, "model_registry_sha256": "e" * 64,
+            }, campaign)
+            operation_id = "interrupted-evaluation"
+            attempt = scenario.evidence_root / hashlib.sha256(operation_id.encode()).hexdigest()[:16]
+            attempt.mkdir(mode=0o700); (attempt / "attempt.started").write_text("{}\n")
+            with self.assertRaisesRegex(PiGateEvidenceError, "refusing duplicate model sessions"):
+                scenario._invoke(campaign, parent=surface.seed_candidate(campaign), candidate=None, split="train", model={"provider": "fake", "model": "subject"}, seeds=(1,), operation_id=operation_id)
+
+    def test_pi_gate_calibration_delegates_to_six_row_admission_rule(self) -> None:
+        with tempfile.TemporaryDirectory() as td:
+            root = pathlib.Path(td); baseline = root / "baseline.json"
+            baseline.write_text('{"prompt_variant":"A","format":"md","scaffold":"none"}\n', encoding="utf-8")
+            raw = campaign_dict(); raw["permitted_surface_families"] = ["configuration"]
+            raw["provenance"]["config_sha256"] = hashlib.sha256(baseline.read_bytes()).hexdigest()
+            campaign = load_campaign(raw); pack = BenchmarkPack.from_dict(benchmark_dict())
+            surface = ConfigSurfaceAdapter(baseline, root / "snapshots", pathlib.Path(__file__).resolve().parents[2] / "prompt-lab" / "config.py")
+            case_tasks = {case.case_id: case.case_id for split in pack.splits.values() for case in split}
+            scenario = PiGateScenario(pathlib.Path(__file__).resolve().parents[2], pack, surface, root / "run", {
+                "case_tasks": case_tasks, "model_control": "llama", "gate_network": "endpoint",
+                "llama_endpoint": {"scheme": "http", "host": "loopback", "port": 8080}, "model_registry_sha256": "e" * 64,
+                "calibration_repetitions": 6,
+            }, campaign)
+            def synthetic(_campaign, *, split, seeds, **_kwargs):
+                mapping = [{"task": case.case_id, "case_id": case.case_id} for case in pack.splits[split]]
+                rows = [{"task": case.case_id, "score": int(fixed == 8), "subscores": {"fixed": fixed, "total": 8}} for case in pack.splits[split] for fixed in (1, 2, 3, 4, 5, 6)]
+                return rows, mapping
+            scenario._invoke = synthetic
+            result = scenario.calibrate(campaign, model=campaign.subject_model)
+            self.assertEqual(result["status"], "informative")
+            self.assertTrue(all(value["verdict"] == "ADMITTED" for value in result["admission"].values()))
+            scenario.config["calibration_repetitions"] = 2
+            def insufficient(_campaign, *, split, seeds, **_kwargs):
+                mapping = [{"task": case.case_id, "case_id": case.case_id} for case in pack.splits[split]]
+                return ([{"task": case.case_id, "score": 0, "subscores": {"fixed": fixed, "total": 8}} for case in pack.splits[split] for fixed in (2, 5)], mapping)
+            scenario._invoke = insufficient
+            self.assertEqual(scenario.calibrate(campaign, model=campaign.subject_model)["status"], "uninformative")
 
 
 if __name__ == "__main__":

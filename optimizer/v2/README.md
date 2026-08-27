@@ -58,15 +58,28 @@ a human review packet.
 path characterizes the existing command, while its ingestion path accepts only
 fresh `pi.eval-row/v4` files and their exact trial-validity sidecars. Rows must be
 authoritative, complete, telemetry-authenticated, exposure-classified, stable on
-one serving and parent-session identity, and bound to the campaign's config and
-surface fingerprints. This first bridge deliberately does not refactor the Bash
-gate or its grader/security boundary.
+their authenticated per-row parent-session identities, and bound to the campaign's config and
+surface fingerprints, requested provider/model, registered-model catalog, and
+candidate DAG cell. A voided reward-hacking verdict is rejected, not converted to
+a failed task. This first bridge deliberately does not refactor the Bash gate or
+its fixture, grader, Seatbelt, hidden-test, telemetry, or provenance boundaries.
 
-The CLI does not register live `pi-gate` campaign execution yet: preparing and
-inspecting its manifests is supported, but `run` fails closed until candidate
-materialization and the existing gate invocation are connected by a separately
-reviewed campaign adapter. This prevents a nominal adapter from silently testing
-the live harness instead of the immutable candidate workspace.
+The only executable live pairing initially registered is `pi-gate` with the
+`pi-gate-config` surface. Provider mutations are strict JSON merge patches over
+the existing prompt-lab config schema. The adapter validates them through the
+existing config validator and writes immutable content-addressed snapshots under
+the private run root; neither a mutable checkout nor a live agent directory is a
+candidate. A gate operation writes a durable attempt marker before launching. A
+resume reuses complete, validated evidence and refuses an incomplete attempt
+instead of silently duplicating model sessions.
+
+Pi-gate benchmark cases resolve back to current, approved, unexpired fixture
+manifests during `prepare`. `fixture_sha256` is the fixture manifest digest already
+recorded by admission, and `admission_receipt_sha256` is the canonical SHA-256 of
+that manifest's admission block. Per-model campaign calibration delegates to the
+single preregistered `admission_rule.py`; it does not restate or weaken the six-row
+graded-band and variance rule. Opaque test cases remain completely unreachable
+during optimization.
 
 ## Commands
 
@@ -82,3 +95,8 @@ python3 -m optimizer.v2.cli replay --manifest optimizer/v2/examples/campaign.jso
 
 The example is deterministic and performs no network or model inference.
 
+The first prepared live manifest is
+`campaigns/qwen35b-config-tiny-20260827/campaign.json`. `prepare` and `dry` are
+non-executing. Running it still requires the exact printed approval SHA and can
+only produce a private review packet; selection never changes the repository or
+live mirror.

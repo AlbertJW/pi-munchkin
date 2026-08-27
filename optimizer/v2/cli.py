@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import argparse
+import datetime as dt
+import hashlib
 import json
 import os
 import pathlib
@@ -13,7 +15,8 @@ from .events import EventStore
 from .fake import FakeProvider, FakeScenario, FakeSurface
 from .manifest import Campaign, ManifestError, load_campaign
 from .provider import ArtifactProvider, OpenAICompatibleProvider
-from .surface import PatchSurfaceAdapter
+from .pi_gate import PiGateScenario
+from .surface import ConfigSurfaceAdapter, PatchSurfaceAdapter
 
 
 def _default_run_root() -> pathlib.Path:
@@ -44,9 +47,6 @@ def _load_pack(manifest_path: pathlib.Path, campaign: Campaign) -> BenchmarkPack
 
 
 def _components(campaign: Campaign, pack: BenchmarkPack, manifest_path: pathlib.Path, run_dir: pathlib.Path):
-    if campaign.benchmark["plugin"] != "fake":
-        raise ValueError("unknown live scenario plugin; Pi gate artifacts are inspection-only until a campaign explicitly wires their materialization")
-    scenario = FakeScenario(pack)
     provider_plugin = campaign.optimizer_provider["plugin"]
     if provider_plugin == "fake":
         provider = FakeProvider()
@@ -63,6 +63,13 @@ def _components(campaign: Campaign, pack: BenchmarkPack, manifest_path: pathlib.
     surface_plugin = campaign.surface_adapter["plugin"]
     if surface_plugin == "fake":
         surface = FakeSurface()
+    elif surface_plugin == "pi-gate-config":
+        config = campaign.surface_adapter["config"]
+        if set(config) != {"baseline_config", "validator"}:
+            raise ValueError("pi-gate-config config must contain baseline_config and validator")
+        baseline = pathlib.Path(config["baseline_config"]); baseline = baseline if baseline.is_absolute() else manifest_path.parent / baseline
+        validator = pathlib.Path(config["validator"]); validator = validator if validator.is_absolute() else manifest_path.parent / validator
+        surface = ConfigSurfaceAdapter(baseline, run_dir / "config-snapshots", validator)
     elif surface_plugin == "pi-harness-patch":
         config = campaign.surface_adapter["config"]
         if set(config) != {"source_root", "family_allowlists", "verification_commands"}:
@@ -73,6 +80,18 @@ def _components(campaign: Campaign, pack: BenchmarkPack, manifest_path: pathlib.
         surface = PatchSurfaceAdapter(source, run_dir / "workspaces", allowlists, commands)
     else:
         raise ValueError(f"unknown surface adapter plugin: {surface_plugin}")
+    scenario_plugin = campaign.benchmark["plugin"]
+    if scenario_plugin == "fake":
+        scenario = FakeScenario(pack)
+    elif scenario_plugin == "pi-gate":
+        if surface_plugin != "pi-gate-config":
+            raise ValueError("pi-gate initially supports only the pi-gate-config surface")
+        scenario = PiGateScenario(
+            pathlib.Path(__file__).resolve().parents[1], pack, surface, run_dir,
+            campaign.benchmark.get("adapter_config") or {}, campaign,
+        )
+    else:
+        raise ValueError(f"unknown scenario plugin: {scenario_plugin}")
     return scenario, surface, provider
 
 
@@ -80,11 +99,81 @@ def _validate_plugin_names(campaign: Campaign) -> None:
     known = {
         "optimizer provider": ({"fake", "artifact-json", "openai-compatible"}, campaign.optimizer_provider["plugin"]),
         "scenario": ({"fake", "pi-gate"}, campaign.benchmark["plugin"]),
-        "surface adapter": ({"fake", "pi-harness-patch"}, campaign.surface_adapter["plugin"]),
+        "surface adapter": ({"fake", "pi-harness-patch", "pi-gate-config"}, campaign.surface_adapter["plugin"]),
     }
     for boundary, (allowed, selected) in known.items():
         if selected not in allowed:
             raise ValueError(f"unknown {boundary} plugin: {selected}")
+
+
+def _validate_adapter_configs(campaign: Campaign, pack: BenchmarkPack, manifest_path: pathlib.Path) -> None:
+    if campaign.optimizer_provider["plugin"] == "openai-compatible":
+        OpenAICompatibleProvider(campaign.optimizer_provider["config"])
+    elif campaign.optimizer_provider["plugin"] == "artifact-json":
+        config = campaign.optimizer_provider["config"]
+        if set(config) != {"artifact_root"} or not isinstance(config["artifact_root"], str) or not config["artifact_root"]:
+            raise ValueError("artifact-json provider requires exactly one non-empty artifact_root")
+    if campaign.surface_adapter["plugin"] == "pi-gate-config":
+        config = campaign.surface_adapter["config"]
+        if set(config) != {"baseline_config", "validator"}:
+            raise ValueError("pi-gate-config config must contain baseline_config and validator")
+        resolved = []
+        for field in ("baseline_config", "validator"):
+            value = config[field]
+            if not isinstance(value, str) or not value:
+                raise ValueError(f"pi-gate-config {field} must be a non-empty path")
+            path = pathlib.Path(value); path = path if path.is_absolute() else manifest_path.parent / path
+            if not path.is_file() or path.is_symlink():
+                raise ValueError(f"pi-gate-config {field} must resolve to a regular file")
+            resolved.append(path)
+        if hashlib.sha256(resolved[0].read_bytes()).hexdigest() != campaign.provenance["config_sha256"]:
+            raise ValueError("pi-gate baseline config does not match campaign provenance")
+    if campaign.benchmark["plugin"] == "pi-gate":
+        if campaign.surface_adapter["plugin"] != "pi-gate-config":
+            raise ValueError("pi-gate initially supports only the pi-gate-config surface")
+        config = campaign.benchmark.get("adapter_config")
+        required = {"case_tasks", "model_control", "gate_network", "llama_endpoint", "model_registry_sha256"}
+        optional = {"pi_timeout_seconds", "calibration_repetitions"}
+        if not isinstance(config, dict) or set(config) - required - optional or required - set(config):
+            raise ValueError("pi-gate adapter_config has missing or unknown fields")
+        case_ids = {case.case_id for split in pack.splits.values() for case in split}
+        if not isinstance(config["case_tasks"], dict) or set(config["case_tasks"]) != case_ids:
+            raise ValueError("pi-gate case_tasks must map every benchmark case exactly once")
+        if any(not isinstance(value, str) or not value for value in config["case_tasks"].values()):
+            raise ValueError("pi-gate case_tasks values must be non-empty task names")
+        if len(set(config["case_tasks"].values())) != len(config["case_tasks"]):
+            raise ValueError("pi-gate benchmark cases must map to globally distinct gate tasks")
+        cases = {case.case_id: case for split in pack.splits.values() for case in split}
+        fixture_root = pathlib.Path(__file__).resolve().parents[1] / "real-gate-fixtures" / "manifests"
+        now = dt.datetime.now(dt.timezone.utc)
+        for case_id, task in config["case_tasks"].items():
+            fixture_path = fixture_root / f"{task}.json"
+            try:
+                fixture = json.loads(fixture_path.read_text(encoding="utf-8"))
+            except (OSError, json.JSONDecodeError) as exc:
+                raise ValueError(f"pi-gate case {case_id} has no valid admitted fixture manifest") from exc
+            admission = fixture.get("admission") or {}
+            body = {key: value for key, value in fixture.items() if key != "admission"}
+            fixture_digest = hashlib.sha256(json.dumps(body, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
+            receipt_digest = hashlib.sha256(json.dumps(admission, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
+            expires = ((fixture.get("timestamps") or {}).get("expires_at") or "").replace("Z", "+00:00")
+            try: active = dt.datetime.fromisoformat(expires) > now
+            except ValueError: active = False
+            case = cases[case_id]
+            if not (admission.get("approved") is True and (admission.get("automated") or {}).get("passed") is True and
+                    admission.get("manifest_sha256") == fixture_digest and case.fixture_sha256 == fixture_digest and
+                    case.admission_receipt_sha256 == receipt_digest and active):
+                raise ValueError(f"pi-gate case {case_id} is unadmitted, expired, or receipt-mismatched")
+        if config["model_control"] not in ("llama", "pi-native") or config["gate_network"] not in ("endpoint", "open"):
+            raise ValueError("pi-gate model_control or gate_network is invalid")
+        endpoint = config["llama_endpoint"]
+        if not isinstance(endpoint, dict) or set(endpoint) != {"scheme", "host", "port"} or endpoint.get("scheme") != "http" or endpoint.get("host") != "loopback" or not isinstance(endpoint.get("port"), int) or isinstance(endpoint.get("port"), bool) or not 1 <= endpoint["port"] <= 65535:
+            raise ValueError("pi-gate llama_endpoint must be a valid loopback HTTP endpoint")
+        if not isinstance(config["model_registry_sha256"], str) or len(config["model_registry_sha256"]) != 64 or any(char not in "0123456789abcdef" for char in config["model_registry_sha256"]):
+            raise ValueError("pi-gate model_registry_sha256 must be resolved")
+        for field in ("pi_timeout_seconds", "calibration_repetitions"):
+            if field in config and (not isinstance(config[field], int) or isinstance(config[field], bool) or config[field] < 1):
+                raise ValueError(f"pi-gate {field} must be a positive integer")
 
 
 def _offline_selftest() -> dict:
@@ -117,6 +206,7 @@ def main(argv: list[str] | None = None) -> int:
         campaign = load_campaign(manifest_path)
         pack = _load_pack(manifest_path, campaign)
         _validate_plugin_names(campaign)
+        _validate_adapter_configs(campaign, pack, manifest_path.resolve())
         prepared = {"schema": campaign.schema, "campaign_id": campaign.campaign_id, "campaign_sha256": campaign.sha256, "benchmark_sha256": pack.sha256, "execution": False}
         if args.command in ("prepare", "dry"):
             if args.command == "dry":

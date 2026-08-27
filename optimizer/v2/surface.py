@@ -1,11 +1,13 @@
 from __future__ import annotations
 
 import hashlib
+import json
 import os
 import pathlib
 import re
 import shutil
 import subprocess
+import sys
 import tempfile
 
 from .candidates import Candidate, CandidateError
@@ -102,3 +104,165 @@ class PatchSurfaceAdapter:
             return {"verified": True, "checks": checks, "diff_sha256": candidate.diff_sha256, "changed_units": list(candidate.changed_units)}
         finally:
             shutil.rmtree(workspace, ignore_errors=True)
+
+
+class ConfigSurfaceAdapter:
+    """Immutable JSON configuration surface for the trusted Pi gate.
+
+    Provider output is a JSON merge patch over the current candidate.  Every
+    accepted intermediate is stored under its candidate content address; the
+    operational path is deliberately absent from candidate identity.
+    """
+
+    plugin_name = "pi-gate-config"
+    family = "configuration"
+    _allowed_keys = frozenset({
+        "name", "prediction", "prompt_variant", "format", "scaffold", "optillm",
+        "decoding", "thresholds", "messages", "exposure",
+    })
+
+    def __init__(self, baseline_path: pathlib.Path, snapshot_root: pathlib.Path,
+                 validator_path: pathlib.Path):
+        self.baseline_path = baseline_path.resolve()
+        self.snapshot_root = snapshot_root.resolve()
+        self.validator_path = validator_path.resolve()
+        self.snapshot_root.mkdir(parents=True, exist_ok=True, mode=0o700)
+        os.chmod(self.snapshot_root, 0o700)
+
+    @staticmethod
+    def _digest(data: bytes) -> str:
+        return hashlib.sha256(data).hexdigest()
+
+    @staticmethod
+    def _canonical(value: dict) -> bytes:
+        return json.dumps(value, sort_keys=True, separators=(",", ":"), ensure_ascii=False).encode("utf-8") + b"\n"
+
+    @staticmethod
+    def _merge(base: object, patch: object) -> object:
+        if not isinstance(patch, dict):
+            return patch
+        result = dict(base) if isinstance(base, dict) else {}
+        for key, value in patch.items():
+            if value is None:
+                result.pop(key, None)
+            else:
+                result[key] = ConfigSurfaceAdapter._merge(result.get(key), value)
+        return result
+
+    def _candidate_dir(self, candidate: Candidate) -> pathlib.Path:
+        digest = candidate.candidate_id.removeprefix("sha256:")
+        if not re.fullmatch(r"[0-9a-f]{64}", digest):
+            raise CandidateError("candidate ID is not a content address")
+        return self.snapshot_root / digest
+
+    def _snapshot_path(self, candidate: Candidate) -> pathlib.Path:
+        return self._candidate_dir(candidate) / "config.json"
+
+    def _write_snapshot(self, candidate: Candidate, data: bytes) -> pathlib.Path:
+        directory = self._candidate_dir(candidate)
+        directory.mkdir(parents=True, exist_ok=True, mode=0o700)
+        os.chmod(directory, 0o700)
+        path = directory / "config.json"
+        if path.exists():
+            if path.read_bytes() != data:
+                raise CandidateError("content-addressed config snapshot collision")
+            return path
+        fd, temporary = tempfile.mkstemp(prefix=".config.", dir=directory)
+        try:
+            os.fchmod(fd, 0o600)
+            with os.fdopen(fd, "wb") as fh:
+                fh.write(data); fh.flush(); os.fsync(fh.fileno())
+            os.replace(temporary, path); os.chmod(path, 0o600)
+            directory_fd = os.open(directory, os.O_RDONLY)
+            try: os.fsync(directory_fd)
+            finally: os.close(directory_fd)
+        except Exception:
+            try: os.unlink(temporary)
+            except OSError: pass
+            raise
+        return path
+
+    def materialize(self, candidate: Candidate) -> pathlib.Path:
+        path = self._snapshot_path(candidate)
+        try:
+            data = path.read_bytes()
+        except OSError as exc:
+            raise CandidateError("candidate config snapshot is missing") from exc
+        expected = candidate.provenance.get("materialized_config_sha256")
+        if not isinstance(expected, str) or self._digest(data) != expected:
+            raise CandidateError("candidate config snapshot does not match immutable provenance")
+        return path
+
+    def seed_candidate(self, campaign) -> Candidate:
+        data = self.baseline_path.read_bytes()
+        digest = self._digest(data)
+        if digest != campaign.provenance["config_sha256"]:
+            raise CandidateError("baseline config does not match campaign provenance")
+        candidate = Candidate.create(
+            parent_ids=(), mutation_family="seed", hypothesis="Current gate configuration",
+            predicted_mechanism="baseline", expected_exposure="baseline", diff=data.decode("utf-8"),
+            changed_units=("config",), provenance={
+                "source_sha256": campaign.provenance["source_sha256"],
+                "materialized_config_sha256": digest,
+            },
+        )
+        self._write_snapshot(candidate, data)
+        return candidate
+
+    def build_candidate(self, parent: Candidate, diagnosis_patch: dict, campaign) -> Candidate:
+        if not isinstance(diagnosis_patch, dict) or set(diagnosis_patch) != {"family", "diff", "changed_units"}:
+            raise CandidateError("configuration mutation must contain exactly family, diff, and changed_units")
+        if diagnosis_patch["family"] != self.family or self.family not in campaign.permitted_surface_families:
+            raise CandidateError("configuration mutation targets an unauthorized family")
+        try:
+            patch = json.loads(diagnosis_patch["diff"])
+        except (TypeError, json.JSONDecodeError) as exc:
+            raise CandidateError("configuration diff must be a JSON merge-patch object") from exc
+        if not isinstance(patch, dict) or not patch or set(patch) - self._allowed_keys:
+            raise CandidateError("configuration merge patch is empty or contains unsupported keys")
+        declared = tuple(sorted(diagnosis_patch["changed_units"])) if isinstance(diagnosis_patch["changed_units"], list) else ()
+        actual = tuple(sorted(f"config.{key}" for key in patch))
+        if declared != actual:
+            raise CandidateError("declared changed units do not match configuration merge patch")
+        parent_value = json.loads(self.materialize(parent).read_text(encoding="utf-8"))
+        merged = self._merge(parent_value, patch)
+        if not isinstance(merged, dict):
+            raise CandidateError("configuration merge patch did not produce an object")
+        data = self._canonical(merged)
+        digest = self._digest(data)
+        candidate = Candidate.create(
+            parent_ids=(parent.candidate_id,), mutation_family=self.family,
+            hypothesis="Provider-proposed bounded configuration mutation",
+            predicted_mechanism="diagnosed configuration mechanism",
+            expected_exposure="declared configuration exposure",
+            diff=json.dumps(patch, sort_keys=True, separators=(",", ":")), changed_units=actual,
+            provenance={"parent": parent.candidate_id, "materialized_config_sha256": digest},
+        )
+        self._write_snapshot(candidate, data)
+        return candidate
+
+    def verify(self, candidate: Candidate, campaign) -> dict:
+        if candidate.mutation_family not in ("seed", self.family):
+            return {"verified": False, "reason": "unknown-family", "diff_sha256": candidate.diff_sha256}
+        try:
+            path = self.materialize(candidate)
+        except CandidateError as exc:
+            return {"verified": False, "reason": str(exc), "diff_sha256": candidate.diff_sha256}
+        script = (
+            "import importlib.util,pathlib,sys; p=pathlib.Path(sys.argv[1]); "
+            "sys.path.insert(0,str(p.parent)); s=importlib.util.spec_from_file_location('pi_optimizer_config',p); "
+            "m=importlib.util.module_from_spec(s); s.loader.exec_module(m); "
+            "import json; m.validate_config(json.load(open(sys.argv[2],encoding='utf-8')))"
+        )
+        completed = subprocess.run(
+            [sys.executable, "-c", script, str(self.validator_path), str(path)],
+            capture_output=True, text=True, timeout=campaign.limits["case_timeout_seconds"],
+        )
+        return {
+            "verified": completed.returncode == 0,
+            "reason": "ok" if completed.returncode == 0 else "config-validation-failed",
+            "checks": [{"name": "prompt-lab-config-validation", "ok": completed.returncode == 0}],
+            "diff_sha256": candidate.diff_sha256,
+            "changed_units": list(candidate.changed_units),
+            "materialized_config_sha256": candidate.provenance["materialized_config_sha256"],
+        }

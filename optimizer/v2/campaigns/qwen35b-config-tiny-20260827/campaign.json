@@ -1,0 +1,68 @@
+{
+  "schema": "pi.optimizer-campaign/v2",
+  "campaign_id": "qwen35b-config-tiny-20260827",
+  "primary_metric": {
+    "name": "task_success",
+    "direction": "maximize",
+    "kind": "binary",
+    "paired_policy": {"name": "exact-sign", "minimum_net_fixes": 1}
+  },
+  "hard_guards": [
+    {"metric": "security_failures", "direction": "at_most", "threshold": 0}
+  ],
+  "optimizer_provider": {
+    "plugin": "openai-compatible",
+    "config": {
+      "endpoint_scheme": "http",
+      "endpoint_host": "loopback",
+      "endpoint_port": 8080,
+      "model": "qwen36-35b-iq3s",
+      "api_key_env": "LLAMA_API_KEY",
+      "allow_remote": false,
+      "timeout_seconds": 240
+    }
+  },
+  "surface_adapter": {
+    "plugin": "pi-gate-config",
+    "config": {
+      "baseline_config": "../../../prompt-lab/configs/baseline.json",
+      "validator": "../../../prompt-lab/config.py"
+    }
+  },
+  "subject_model": {"provider": "local-llamacpp", "model": "qwen36-35b-iq3s"},
+  "guard_models": [],
+  "benchmark": {
+    "plugin": "pi-gate",
+    "pack_id": "qwen35b-config-tiny-20260827",
+    "revision": "2026-08-27.1",
+    "manifest": "benchmark.json",
+    "discrimination_band": {"minimum": 0.2, "maximum": 0.8, "minimum_cases": 1},
+    "adapter_config": {
+      "case_tasks": {
+        "train-sv-ambiguous-spec": "sv-ambiguous-spec",
+        "dev-retry-trap": "retry-trap",
+        "test-audit-sweep": "audit-sweep"
+      },
+      "model_control": "llama",
+      "gate_network": "endpoint",
+      "llama_endpoint": {"scheme": "http", "host": "loopback", "port": 8080},
+      "model_registry_sha256": "ac7ba5ebd4b8136d2ae127e77d0dc799e8c805552cb755ed2422693e605a7ccf",
+      "pi_timeout_seconds": 240,
+      "calibration_repetitions": 6
+    }
+  },
+  "permitted_surface_families": ["configuration"],
+  "seeds": [271828],
+  "limits": {
+    "iterations": 1,
+    "rollouts_per_candidate": 1,
+    "provider_sessions": 3,
+    "wall_seconds": 5400,
+    "case_timeout_seconds": 240
+  },
+  "provenance": {
+    "source_sha256": "745047b91ced2fea8c6eb1a519ea519d840a8658c52d8992fbabbbdd01c34c93",
+    "config_sha256": "5306ecc5a68682ce8fe6d52d59e0171367cfae0f390965bc4956c0f9d706d379",
+    "surface_sha256": "3d752bc8d30918af90ad156fc76641ee7e15a52026b507b765f304fcdbc0edb0"
+  }
+}

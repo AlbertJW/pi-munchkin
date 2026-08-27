@@ -124,7 +124,7 @@ def load_campaign(source: dict | str | pathlib.Path) -> Campaign:
     if not isinstance(obj["guard_models"], list):
         raise ManifestError("guard_models must be a list")
     guard_models = tuple(_model(value, f"guard_models[{i}]") for i, value in enumerate(obj["guard_models"]))
-    benchmark = _strict(obj["benchmark"], "benchmark", {"plugin", "pack_id", "revision", "manifest", "discrimination_band"})
+    benchmark = _strict(obj["benchmark"], "benchmark", {"plugin", "pack_id", "revision", "manifest", "discrimination_band"}, {"adapter_config"})
     for field in ("plugin", "pack_id", "revision", "manifest"):
         _text(benchmark[field], f"benchmark.{field}")
     band = _strict(benchmark["discrimination_band"], "benchmark.discrimination_band", {"minimum", "maximum", "minimum_cases"})
@@ -133,6 +133,8 @@ def load_campaign(source: dict | str | pathlib.Path) -> Campaign:
     if not 0 <= band["minimum"] < band["maximum"] <= 1:
         raise ManifestError("benchmark discrimination band must satisfy 0 <= minimum < maximum <= 1")
     _positive_int(band["minimum_cases"], "benchmark.discrimination_band.minimum_cases")
+    if "adapter_config" in benchmark and not isinstance(benchmark["adapter_config"], dict):
+        raise ManifestError("benchmark.adapter_config must be an object")
     families = obj["permitted_surface_families"]
     if not isinstance(families, list) or not families or len(families) != len(set(families)):
         raise ManifestError("permitted_surface_families must be a non-empty unique list")
