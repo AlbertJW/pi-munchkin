@@ -850,6 +850,19 @@ not changed because this checkout is not pushed. Do not pool or resume that
 partial screen; push, deliberately mirror, record the new loaded surface hash,
 and create a replacement short-duration preregistration first.
 
+2026-08-27 follow-up (completed): the provenance-fix branch
+`codex/qwen35b-provenance` was pushed and human-approved for live rollout.
+`mirror:apply` wrote 120 first-party artifacts to `~/.pi/agent`, and
+`mirror:check` reports 120/120 with no unmanaged extensions or orphans. The
+loaded surface hash is `fe73b29328b0630817422401ea10633b34c33ba936c2cffd6a0b11bf89cf3322`.
+The replacement preregistration is
+`optimizer/docs/PREREG_QWEN35B_BASELINE_REPLACEMENT_2026-08-27.md`; its dry
+preflight passed (`N=1`, base-only, `PI_TIMEOUT=240`) and no model inference
+has been run on this surface. The prior partial result remains retracted.
+Next human gate: explicitly run that three-row base provenance screen, then
+inspect its safe provenance audit before any semantic candidate or planner /
+deep-research graph screen. Context-budget risk remains separate.
+
 - `ACTIVE_TOOL_PROMPTS=derived`: inactive tools contribute no ambient schemas, manuals, examples,
   snippets, or agent lists; `ambient` restores the legacy broad prompt surface.
 - `CONTROL_ARBITER=enforce`: one highest-priority corrective message is delivered per boundary;

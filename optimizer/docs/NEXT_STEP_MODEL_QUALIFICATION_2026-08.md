@@ -138,12 +138,16 @@ deployed hash is unchanged until a human-gated mirror. The run was interrupted
 after an `equil` branch
 produced an unbounded ~1.1 MB response. Do not resume or pool that partial run.
 
-Next operational gate: push the source fix, apply the human-gated mirror,
-record the new loaded surface hash, write a replacement short-duration Qwen
-preregistration, and repeat only the base provenance screen. Aggregate
-per-turn context budgeting is now an observed safety concern, not a Qwen
-quality result. Planner/deep-research graph work and semantic-loop candidates
-remain dark.
+That operational gate is now complete. The source branch was pushed, the
+human-approved mirror wrote 120 first-party artifacts with zero drift, and the
+loaded surface is `fe73b29328b0630817422401ea10633b34c33ba936c2cffd6a0b11bf89cf3322`.
+The replacement preregistration is
+[`PREREG_QWEN35B_BASELINE_REPLACEMENT_2026-08-27.md`](PREREG_QWEN35B_BASELINE_REPLACEMENT_2026-08-27.md);
+its no-inference preflight passed with `N=1`, base-only, and a 240-second
+per-row bound. No model row has been run on this surface. Aggregate per-turn
+context budgeting remains an observed safety concern, not a Qwen quality
+result. Planner/deep-research graph work and semantic-loop candidates remain
+dark.
 
 ## Explicit non-goals
 
