@@ -200,6 +200,7 @@ model's own window in place with one resume handoff.
 | `TEACH_HINTS`, `DID_YOU_MEAN` | default-on bounded hints | set either to `off` |
 | `FORCE_PLAN_WRITE` | `off`; planning is exclusively user-triggered through `/plan` | `on` restores the compatibility behavior that blocks the first unplanned mutation |
 | `PLAN_TOOL_GO` | `off`; headless experiments may explicitly expose model-callable `plan_go` | `on` enables it; interactive plans still require the user's `/plan-go` |
+| `GOALS` | on; the four `goal_*` tools register (deferred behind the `goals` capability family) and the six `/goal*` commands are available | `off` removes the entire goal surface — tools, commands, and the compaction/recovery goal-brief reads |
 | `GOAL_SCOPE` | `worktree`; goal ledgers are private to the current worktree | `project` shares one private ledger across linked Git worktrees via the repository's common root; non-Git directories fall back to their resolved cwd |
 | `CONTEXT_HANDOFF` | on; model switches and safe-budget crossings may request one bounded native compaction and follow-up | `off` disables automatic handoff while retaining context profiles |
 | `CONTEXT_DISCOVERY` | off; context profiles use model metadata and local serving truth only | `on` sends one synthetic, local-only handshake per serving fingerprint; it never sends transcript or tool data |

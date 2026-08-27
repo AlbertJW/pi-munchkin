@@ -4,6 +4,52 @@ All notable changes to pi-munchkin are documented here. Releases follow semantic
 
 ## Unreleased
 
+### Added (2026-08-27 — persistent goal mode and model-aware context epochs)
+
+- **Persistent goals** (`lib/goal-state.ts`, surfaced through `plan-runner`). A goal can be proposed
+  (advisory, inert until the user runs `/goal-accept`), activated, paused, resumed, updated, and
+  settled either `complete` (every criterion met) or `accepted_80_20` — an honest good-enough stop
+  that requires every unmet optional criterion to be *explicitly marked deferred* (a correspondence
+  check, not a count) plus recorded deferral rationale and residual risks. State lives in a private
+  per-scope ledger (`artifacts/goals/<sha256>/goal-v1.json`, 0700/0600), survives compaction and
+  model changes via bounded recovery briefs injected by `compact-tool` and `run-capsule`, and is
+  parent-owned: child processes (any `PI_SUBAGENT_DEPTH` other than `"0"`, malformed values
+  included, fail closed) are refused mutation through the four `goal_*` tools AND the mutating
+  `/goal*` commands. Model-visible surface is deferred: the tools are absent from the core ambient
+  profile and activate as one `goals` capability family; `GOALS=off` is the rollback switch that
+  removes the entire surface. `skills/deep-research/SKILL.md` gains guidance to propose (never
+  self-activate) a goal for investigations expected to outlive one session.
+- **Model-aware context epochs** (`lib/context-profile.ts`, wired in `runtime-truth`). Each model
+  fingerprint (provider/id/context window) opens an epoch carrying the declared window, the served
+  window from the existing local `/props` probe, and a derived safe input budget (window − output
+  reserve − overhead). **`CONTEXT_HANDOFF` is live by default**: on a model switch to a smaller
+  window, or when a turn ends past the safe budget or Pi's 85% mark, the harness requests one
+  bounded native compaction and then auto-triggers a follow-up turn to resume — one-shot per epoch
+  until usage genuinely recovers (below 75% of budget / 70%), `off` disables. `CONTEXT_DISCOVERY=on`
+  (default off) adds one synthetic single-token handshake per serving fingerprint, refused for any
+  non-loopback/private host; it never sends transcript, tools, or system-prompt content. Telemetry:
+  `runtime/context-profile`, `runtime/context-handoff` (with outcome `ok`), and
+  `runtime/context-calibration` — numeric/enum fields only. Note: `run-capsule`'s existing
+  `recovery-brief` `brief_bytes` metric now includes the appended goal-brief bytes.
+
+### Fixed (2026-08-27 — six audit findings in the goal/context work, pre-rollout)
+
+- **Auto-handoff could latch off for a whole session**: `requestHandoff`'s `finish()` returned
+  before clearing `handoffInFlight` when the compaction lease had gone stale, permanently disabling
+  automatic handoff. The latch now clears before the lease check.
+- **Failed handoffs looked successful**: `runtime/context-handoff` was recorded before the
+  compaction was attempted. The row is now emitted once, when the outcome is known, with `ok`.
+- **Dead catalog declarations**: `runtime/context-profile` declared `provider`/`model` detail
+  fields that `normalizeDetail`'s reserved-field strip removes from every row before catalog
+  validation. Dropped, and a new tripwire test asserts no catalog entry declares any
+  `RESERVED_FIELDS` key (the set is now exported).
+- **Child fence gap**: the parent-owned goal fence covered the tools but not the five mutating
+  `/goal*` slash commands; they now refuse under the same rule.
+- **80/20 deferral was a count, not a correspondence** (see the Added entry — one deferred item no
+  longer unlocks arbitrarily many still-open optional criteria).
+- **No rollback switch for goals**: every comparable capability has one; `GOALS=off` added, and
+  `GOALS` classified in the subagent env allowlist so children inherit suppression.
+
 ### Fixed (2026-08-26 — non-interactive resume restores capsule/blackboard/working-memory/run-kernel state)
 
 - **`pi -p --session-id <existing>` now actually resumes harness-private state.** Live testing found
