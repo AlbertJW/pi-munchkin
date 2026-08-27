@@ -265,8 +265,13 @@ function envelope(ext: string, kind: string, detail: Record<string, unknown>): R
 		si: sessionInstance(),
 		sp: parentSession(),
 		run_id: typeof detail.run_id === "string" ? detail.run_id : (process.env.PI_RUN_ID || SESSION_KEY),
-		provider: typeof detail.provider === "string" ? detail.provider : (process.env.PI_MODEL_PROVIDER || null),
-		model: typeof detail.model === "string" ? detail.model : (process.env.PI_MODEL_ID || null),
+		// A gate launcher owns the canonical identity. Some extensions keep a
+		// best-effort model snapshot (which is briefly `unknown` during startup)
+		// in detail; allowing that snapshot to shadow the launcher would make one
+		// authenticated stream contain multiple providers/models. Interactive
+		// callers still get the detail fallback when no launcher identity exists.
+		provider: process.env.PI_MODEL_PROVIDER || (typeof detail.provider === "string" ? detail.provider : null),
+		model: process.env.PI_MODEL_ID || (typeof detail.model === "string" ? detail.model : null),
 		requested_provider: process.env.PI_REQUESTED_PROVIDER || null,
 		requested_model: process.env.PI_REQUESTED_MODEL || null,
 		harness_surface_sha256: process.env.HARNESS_SURFACE_SHA256 || null,

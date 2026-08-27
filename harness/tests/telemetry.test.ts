@@ -118,15 +118,26 @@ test("a detail field may NOT shadow a telemetry envelope key", () => {
 				/shadows a telemetry envelope key/, `detail.${field} must be rejected`);
 		}
 	});
-	// run_id/provider/model are deliberately NOT reserved: envelope() reads them from
-	// detail on purpose and writes back the same value, so they must still be allowed.
+	// run_id/provider/model are deliberately NOT rejected as detail fields: envelope()
+	// reads them as interactive fallbacks. A gate launcher identity takes precedence,
+	// however, so an extension's transient `unknown` snapshot cannot split one stream.
 	withFile((file) => {
 		process.env.TELEMETRY_STRICT = "0";
-		record("plan-runner", "go", { resumed: false, run_id: "r1" });
-		const row = JSON.parse(readFileSync(file, "utf8").trim());
-		assert.equal(row.kind, "go", "a legitimate row must still be written");
-		assert.equal(row.run_id, "r1", "run_id is promoted, not shadowed");
-		assert.notEqual(row.source, "command", "the envelope's source must survive");
+		const prior = { provider: process.env.PI_MODEL_PROVIDER, model: process.env.PI_MODEL_ID };
+		try {
+			process.env.PI_MODEL_PROVIDER = "local-llamacpp";
+			process.env.PI_MODEL_ID = "ling";
+			record("plan-runner", "go", { resumed: false, run_id: "r1", provider: "unknown", model: "unknown" });
+			const row = JSON.parse(readFileSync(file, "utf8").trim());
+			assert.equal(row.kind, "go", "a legitimate row must still be written");
+			assert.equal(row.run_id, "r1", "run_id is promoted, not shadowed");
+			assert.equal(row.provider, "local-llamacpp", "gate provider must beat a transient detail snapshot");
+			assert.equal(row.model, "ling", "gate model must beat a transient detail snapshot");
+			assert.notEqual(row.source, "command", "the envelope's source must survive");
+		} finally {
+			if (prior.provider === undefined) delete process.env.PI_MODEL_PROVIDER; else process.env.PI_MODEL_PROVIDER = prior.provider;
+			if (prior.model === undefined) delete process.env.PI_MODEL_ID; else process.env.PI_MODEL_ID = prior.model;
+		}
 	});
 });
 
