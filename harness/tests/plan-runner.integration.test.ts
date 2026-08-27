@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { mkdtempSync, readFileSync } from "node:fs";
+import { existsSync, mkdtempSync, readFileSync } from "node:fs";
 import { randomUUID } from "node:crypto";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -8,6 +8,7 @@ import { callTool, expectToolError, fire, makeCtx, makeFakePi, resetPiGlobals } 
 import { HARNESS_SIGNAL_CHANNEL } from "../lib/harness-signals.ts";
 import { captureInitialToolSurface } from "../lib/session-bootstrap.ts";
 import { privatePlanStatePath } from "../lib/plan-state-storage.ts";
+import { goalStoragePath } from "../lib/goal-state.ts";
 
 // This suite used to pin `PLAN_STORAGE=project` at module scope, so all fifteen of
 // its tests ran in the ROLLBACK configuration and none of them ever exercised what
@@ -266,6 +267,39 @@ test("headless plan_write works when the tool is active outside /plan", async ()
 	assert.equal(result.isError, false, "an active plan_write must work headlessly");
 	assert.match(result.content[0].text, /Meeting one/);
 	resetPiGlobals();
+});
+
+test("delegated child processes cannot mutate the parent-owned persistent goal ledger", async () => {
+	const priorDepth = process.env.PI_SUBAGENT_DEPTH;
+	process.env.PI_SUBAGENT_DEPTH = "1";
+	try {
+		const childPlanRunner = (await import(`../extensions/plan-runner.ts?child-goal=${Date.now()}-${Math.random()}`)).default;
+		const fp = makeFakePi();
+		childPlanRunner(fp.pi as any);
+		const cwd = tmp();
+		await expectToolError(fp, "goal_propose", { objective: "child must not own the goal" }, cwd, /parent-owned/);
+		assert.equal(existsSync(goalStoragePath(cwd)), false, "child refusal must not create a goal ledger");
+	} finally {
+		if (priorDepth === undefined) delete process.env.PI_SUBAGENT_DEPTH;
+		else process.env.PI_SUBAGENT_DEPTH = priorDepth;
+		resetPiGlobals();
+	}
+});
+
+test("malformed child depth metadata fails closed for parent-owned goal mutations", async () => {
+	const priorDepth = process.env.PI_SUBAGENT_DEPTH;
+	process.env.PI_SUBAGENT_DEPTH = "not-a-depth";
+	try {
+		const childPlanRunner = (await import(`../extensions/plan-runner.ts?child-goal-malformed=${Date.now()}-${Math.random()}`)).default;
+		const fp = makeFakePi();
+		childPlanRunner(fp.pi as any);
+		const cwd = tmp();
+		await expectToolError(fp, "goal_propose", { objective: "malformed depth must not gain ownership" }, cwd, /parent-owned/);
+	} finally {
+		if (priorDepth === undefined) delete process.env.PI_SUBAGENT_DEPTH;
+		else process.env.PI_SUBAGENT_DEPTH = priorDepth;
+		resetPiGlobals();
+	}
 });
 
 test("review-phase rewrites may drop items; executing-phase rewrites may not", async () => {

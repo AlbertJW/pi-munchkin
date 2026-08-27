@@ -1,7 +1,7 @@
 import { subscribeOnce } from "../lib/extension-lifecycle.ts";
 import { chmod, mkdir, open, readFile, rename, stat, unlink, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
-import { randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import { defineTool, withFileMutationQueue, type ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { Type } from "typebox";
 import { ACTIVE_TOOL_PROMPTS } from "../lib/active-tool-prompts.ts";
@@ -25,6 +25,10 @@ import { storedUrl } from "../lib/research-ledger.ts";
 import { initialToolSurface } from "../lib/session-bootstrap.ts";
 import { record } from "../lib/telemetry.ts";
 import { CORE_NAMES, profileFromEnvironment } from "./tool-activation.ts";
+import {
+	acceptGoal, cancelGoal, createGoal, goalAmbientSummary, mutateGoal, pauseGoal, readGoal, readGoals, resumeGoal, settleGoal, updateGoal,
+	GOAL_MAX_CRITERIA, goalScope, type CriterionStatus, type DeferredGoalItem, type GoalState,
+} from "../lib/goal-state.ts";
 
 // One bounded ordered checklist. plan_write owns structure; plan_update owns
 // status. Project verification is deliberately outside this module.
@@ -67,6 +71,10 @@ export const PLAN_GRAPH_DEFAULT: "on" | "off" = "off";
 export const DEEP_RESEARCH_PLANNING_DEFAULT: "on" | "off" = "off";
 const PLAN_GRAPH = (process.env.PLAN_GRAPH ?? PLAN_GRAPH_DEFAULT) === "on";
 const DEEP_RESEARCH_PLANNING = PLAN_GRAPH && (process.env.DEEP_RESEARCH_PLANNING ?? DEEP_RESEARCH_PLANNING_DEFAULT) === "on";
+// Child identity is runner-owned. Fail closed for any non-parent marker rather
+// than letting malformed/injected depth metadata silently regain write access
+// to the parent-owned goal ledger.
+const IS_SUBAGENT_PROCESS = process.env.PI_SUBAGENT_DEPTH !== undefined && process.env.PI_SUBAGENT_DEPTH !== "0";
 const TRACE_TAIL_MAX_BYTES = 64 * 1024;
 const PROC_MARK = processWriterMarker();
 
@@ -137,6 +145,54 @@ function planEvent(kind: string, runId: string, detail: Record<string, unknown> 
 		emitHarnessSignal(api.events, { v: 1, type: "plan/write", runIdHash: signalRunId(runId), items: detail.items, openItems: detail.open_items });
 	}
 	if (kind === "go") emitHarnessSignal(api.events, { v: 1, type: "plan/go", runIdHash: signalRunId(runId) });
+}
+
+function goalEvent(kind: string, goal: GoalState | undefined, detail: Record<string, unknown> = {}): void {
+	if (!goal) return;
+	const payload = {
+		goal_id_hash: createHash("sha256").update(goal.goal_id).digest("hex"), status: goal.status,
+		open_criteria: goal.criteria.filter((criterion) => criterion.status === "open").length,
+		...detail,
+	};
+	// Keep each event name statically visible to the catalog tripwire; dynamic
+	// event names otherwise make a real emitter look like an orphan.
+	switch (kind) {
+		case "proposed": record("goal-runner", "proposed", payload); break;
+		case "started": record("goal-runner", "started", payload); break;
+		case "accepted": record("goal-runner", "accepted", payload); break;
+		case "updated": record("goal-runner", "updated", payload); break;
+		case "settled": record("goal-runner", "settled", payload); break;
+		case "resumed": record("goal-runner", "resumed", payload); break;
+		case "paused": record("goal-runner", "paused", payload); break;
+		case "cancelled": record("goal-runner", "cancelled", payload); break;
+	}
+}
+
+function publishGoal(goal: GoalState | undefined): void {
+	const shared = globalThis as Record<string, unknown>;
+	if (goal) shared.__pi_active_goal_context = goalAmbientSummary(goal);
+	else delete shared.__pi_active_goal_context;
+}
+
+function rejectChildGoalMutation(): void {
+	if (IS_SUBAGENT_PROCESS) throw new Error("persistent goal mutation is parent-owned; child processes may report findings but cannot write the goal ledger");
+}
+
+async function rebindActiveGoal(cwd: string): Promise<GoalState | undefined> {
+	const goal = await readGoal(cwd);
+	publishGoal(goal);
+	return goal;
+}
+
+function renderGoal(goal: GoalState | undefined, all: GoalState[] = []): string {
+	if (!goal) return all.length ? `No active goal. Stored goals: ${all.map((entry) => `${entry.goal_id}=${entry.status}`).join(", ")}` : "No persistent goal found.";
+	const criteria = goal.criteria.map((criterion) => `${criterion.id} [${criterion.status}]${criterion.required ? " required" : " optional"} ${criterion.text}`).join("\n");
+	return [
+		`Goal ${goal.goal_id} [${goal.status}]`, `Scope: ${goal.scope}`, `Objective: ${goal.objective}`,
+		`Criteria (${goal.criteria.filter((criterion) => criterion.status === "met").length}/${goal.criteria.length} met):`, criteria || "(none)",
+		`Evidence: ${goal.evidence.length}`, `Deferred: ${goal.deferred.length}`, `Confidence: ${goal.confidence ?? "unknown"}`,
+		goal.delivered_value ? `Delivered: ${goal.delivered_value}` : "Delivered: not settled",
+	].join("\n");
 }
 
 function todoPath(cwd: string): string { return join(cwd, ".pi", "TODO.md"); }
@@ -505,6 +561,96 @@ const planUpdate = defineTool({
 	},
 });
 
+const GoalCriterionSchema = Type.Object({
+	id: Type.Optional(Type.String({ minLength: 1, maxLength: 64 })),
+	text: Type.String({ minLength: 1, maxLength: 2_000 }),
+	required: Type.Optional(Type.Boolean()),
+});
+
+const goalPropose = defineTool({
+	name: "goal_propose", label: "Propose Goal", description: "Propose a persistent project/worktree goal for user acceptance. Proposal is advisory and does not activate execution.",
+	promptSnippet: "goal_propose: suggest a persistent goal; the user must accept it before activation",
+	parameters: Type.Object({
+		objective: Type.String({ minLength: 1, maxLength: 2_000 }),
+		constraints: Type.Optional(Type.Array(Type.String({ maxLength: 500 }), { maxItems: 16 })),
+		criteria: Type.Optional(Type.Array(GoalCriterionSchema, { minItems: 1, maxItems: GOAL_MAX_CRITERIA })),
+		note: Type.Optional(Type.String({ maxLength: 500 })),
+	}),
+	async execute(_id, params, _signal, _update, ctx) {
+		rejectChildGoalMutation();
+		const result = await mutateGoal(ctx.cwd, async (previous) => {
+			if (previous && !["complete", "cancelled"].includes(previous.status)) throw new Error("goal_propose rejected: an active or pending goal already exists");
+			const goal = createGoal({ cwd: ctx.cwd, objective: params.objective, constraints: params.constraints, criteria: params.criteria, scope: goalScope(), status: "proposed", proposal: { source: "skill", note: params.note ?? "Skill-proposed goal." } });
+			return { goal, result: goal };
+		});
+		publishGoal(result);
+		goalEvent("proposed", result);
+		return { content: [{ type: "text" as const, text: `Goal proposed (${result.goal_id}). It is not active yet; ask the user to accept it with /goal-accept.` }], details: { tool_name: "goal_propose", success: true, status: result.status } };
+	},
+});
+
+const goalUpdate = defineTool({
+	name: "goal_update", label: "Update Goal", description: "Record evidence and criterion progress against the active persistent goal.",
+	promptSnippet: "goal_update: record criterion evidence and residual risk without settling the goal",
+	parameters: Type.Object({
+		criteria: Type.Optional(Type.Array(Type.Object({ id: Type.String({ minLength: 1, maxLength: 64 }), status: Type.Union([Type.Literal("open"), Type.Literal("met"), Type.Literal("deferred")]), evidence: Type.Optional(Type.Array(Type.String({ maxLength: 500 }), { maxItems: 16 })) }), { maxItems: GOAL_MAX_CRITERIA })),
+		progress_evidence: Type.Optional(Type.Array(Type.String({ maxLength: 500 }), { maxItems: 16 })),
+		residual_risks: Type.Optional(Type.Array(Type.String({ maxLength: 500 }), { maxItems: 16 })),
+	}),
+	async execute(_id, params, _signal, _update, ctx) {
+		rejectChildGoalMutation();
+		const result = await mutateGoal(ctx.cwd, async (previous) => {
+			if (!previous) throw new Error("goal_update rejected: no active goal");
+			const goal = updateGoal(previous, { criteria: params.criteria as Array<{ id: string; status: CriterionStatus; evidence?: string[] }> | undefined, progressEvidence: params.progress_evidence, residualRisks: params.residual_risks });
+			return { goal, result: goal };
+		});
+		publishGoal(result);
+		goalEvent("updated", result);
+		return { content: [{ type: "text" as const, text: `Goal updated (${result.criteria.filter((criterion) => criterion.status === "met").length}/${result.criteria.length} criteria met).` }], details: { tool_name: "goal_update", success: true } };
+	},
+});
+
+const goalSettle = defineTool({
+	name: "goal_settle", label: "Settle Goal", description: "Settle a persistent goal as complete or evidence-backed 80/20 accepted. Required criteria and safety obligations cannot be waived.",
+	promptSnippet: "goal_settle: close a goal with evidence, delivered value, confidence, risks, and deferrals",
+	parameters: Type.Object({
+		outcome: Type.Union([Type.Literal("complete"), Type.Literal("accepted_80_20")]),
+		delivered_value: Type.String({ minLength: 1, maxLength: 2_000 }),
+		confidence: Type.Number({ minimum: 0, maximum: 1 }),
+		residual_risks: Type.Array(Type.String({ maxLength: 500 }), { maxItems: 16 }),
+		deferred: Type.Optional(Type.Array(Type.Object({ value: Type.String({ minLength: 1, maxLength: 500 }), risk: Type.String({ minLength: 1, maxLength: 500 }), rationale: Type.String({ minLength: 1, maxLength: 2_000 }) }), { maxItems: 16 })),
+		evidence: Type.Array(Type.String({ maxLength: 500 }), { minItems: 1, maxItems: 16 }),
+	}),
+	async execute(_id, params, _signal, _update, ctx) {
+		rejectChildGoalMutation();
+		const result = await mutateGoal(ctx.cwd, async (previous) => {
+			if (!previous) throw new Error("goal_settle rejected: no active goal");
+			const goal = settleGoal(previous, { outcome: params.outcome, deliveredValue: params.delivered_value, confidence: params.confidence, residualRisks: params.residual_risks, deferred: params.deferred as DeferredGoalItem[] | undefined, evidence: params.evidence });
+			return { goal, result: goal };
+		});
+		publishGoal(result);
+		goalEvent("settled", result, { outcome: result.status, deferred: result.deferred.length });
+		return { content: [{ type: "text" as const, text: `Goal ${result.status}. Planner execution may stop; the goal remains resumable with /goal-resume unless it is complete.` }], details: { tool_name: "goal_settle", success: true, outcome: result.status } };
+	},
+});
+
+const goalResume = defineTool({
+	name: "goal_resume", label: "Resume Goal", description: "Resume a paused, blocked, or 80/20-accepted persistent goal.",
+	promptSnippet: "goal_resume: reopen a resumable persistent goal",
+	parameters: Type.Object({}),
+	async execute(_id, _params, _signal, _update, ctx) {
+		rejectChildGoalMutation();
+		const result = await mutateGoal(ctx.cwd, async (previous) => {
+			if (!previous) throw new Error("goal_resume rejected: no goal exists");
+			const goal = resumeGoal(previous);
+			return { goal, result: goal };
+		});
+		publishGoal(result);
+		goalEvent("resumed", result);
+		return { content: [{ type: "text" as const, text: `Goal resumed (${result.goal_id}).` }], details: { tool_name: "goal_resume", success: true } };
+	},
+});
+
 const BudgetSchema = Type.Object({
 	searches: Type.Integer({ minimum: 0, maximum: 100 }),
 	reads: Type.Integer({ minimum: 0, maximum: 100 }),
@@ -866,6 +1012,10 @@ export default function (pi: ExtensionAPI): void {
 	api = pi;
 	pi.registerTool(planWrite);
 	pi.registerTool(planUpdate);
+	pi.registerTool(goalPropose);
+	pi.registerTool(goalUpdate);
+	pi.registerTool(goalSettle);
+	pi.registerTool(goalResume);
 	if (PLAN_GRAPH) {
 		pi.registerTool(planExpand);
 		pi.registerTool(planSettle);
@@ -893,8 +1043,10 @@ export default function (pi: ExtensionAPI): void {
 		planningSurfaceBefore = null;
 		planningSurfaceApplied = null;
 		delete (globalThis as Record<string, unknown>).__pi_active_plan_context;
+		delete (globalThis as Record<string, unknown>).__pi_active_goal_context;
 		lastSessionCwd = ctx.cwd;
 		rememberModel(ctx);
+		await rebindActiveGoal(ctx.cwd);
 		lastNotify = (message: string) => ctx.ui.notify(message, "info");
 		reboundAnnounced = false;
 		const rebound = await rebindActivePlan(ctx.cwd);
@@ -930,6 +1082,80 @@ export default function (pi: ExtensionAPI): void {
 	pi.on("before_agent_start", async () => { if (pendingRebind) await pendingRebind; if (pendingBranchMerge) await pendingBranchMerge; });
 
 	pi.registerCommand("plan", { description: "Enter bounded read-only planning for a request.", handler: async (args, ctx) => startPlanCommand(args, ctx, pi) });
+	pi.registerCommand("goal", {
+		description: "Create and activate a persistent project/worktree goal.",
+		handler: async (args, ctx) => {
+			const objective = cleanText(args);
+			if (!objective) { ctx.ui.notify("Usage: /goal <objective>", "error"); return; }
+			const result = await mutateGoal(ctx.cwd, async (previous) => {
+				if (previous && !["complete", "cancelled"].includes(previous.status)) throw new Error("An active or pending goal already exists; use /goal-status or /goal-resume.");
+				const goal = createGoal({ cwd: ctx.cwd, objective, scope: goalScope(), status: "active" });
+				return { goal, result: goal };
+			});
+			publishGoal(result);
+			goalEvent("started", result);
+			ctx.ui.notify(`Goal active: ${result.goal_id}`, "info");
+		},
+	});
+	pi.registerCommand("goal-accept", {
+		description: "Accept the current skill-proposed goal and activate it.",
+		handler: async (_args, ctx) => {
+			const result = await mutateGoal(ctx.cwd, async (previous) => {
+				if (!previous) throw new Error("No proposed goal exists.");
+				const goal = acceptGoal(previous);
+				return { goal, result: goal };
+			});
+			publishGoal(result);
+			goalEvent("accepted", result);
+			ctx.ui.notify(`Goal accepted: ${result.goal_id}`, "info");
+		},
+	});
+	pi.registerCommand("goal-status", {
+		description: "Show the active persistent goal and its evidence-backed criteria.",
+		handler: async (_args, ctx) => {
+			const goal = await rebindActiveGoal(ctx.cwd);
+			ctx.ui.notify(renderGoal(goal, await readGoals(ctx.cwd)), "info");
+		},
+	});
+	pi.registerCommand("goal-resume", {
+		description: "Resume a paused, blocked, or 80/20-accepted goal.",
+		handler: async (_args, ctx) => {
+			const result = await mutateGoal(ctx.cwd, async (previous) => {
+				if (!previous) throw new Error("No resumable goal exists.");
+				const goal = resumeGoal(previous);
+				return { goal, result: goal };
+			});
+			publishGoal(result);
+			goalEvent("resumed", result);
+			ctx.ui.notify(`Goal resumed: ${result.goal_id}`, "info");
+		},
+	});
+	pi.registerCommand("goal-pause", {
+		description: "Pause the active goal without discarding its evidence.",
+		handler: async (_args, ctx) => {
+			const result = await mutateGoal(ctx.cwd, async (previous) => {
+				if (!previous) throw new Error("No active goal exists.");
+				const goal = pauseGoal(previous);
+				return { goal, result: goal };
+			});
+			publishGoal(result);
+			goalEvent("paused", result);
+			ctx.ui.notify(`Goal paused: ${result.goal_id}`, "info");
+		},
+	});
+	pi.registerCommand("goal-cancel", {
+		description: "Cancel the active goal while retaining its private history.",
+		handler: async (_args, ctx) => {
+			const result = await mutateGoal(ctx.cwd, async (previous) => {
+				if (!previous) throw new Error("No active goal exists.");
+				const goal = cancelGoal(previous);
+				return { goal, result: goal };
+			});
+			goalEvent("cancelled", result);
+			publishGoal(undefined);
+			ctx.ui.notify(`Goal cancelled: ${result.goal_id}`, "info");
+		},
+	});
 	pi.registerCommand("plan-go", { description: "Start or resume execution of the reviewed plan.", handler: async (_args, ctx) => goCommand(ctx, pi) });
 	pi.registerCommand("plan-cancel", {
 		description: "Discard the active plan and restore the previous tool selection.",

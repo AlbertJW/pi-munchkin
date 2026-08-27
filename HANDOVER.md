@@ -1,5 +1,16 @@
 # Handover — pi_munchkin, 2026-08-24
 
+## 2026-08-27 persistent goals + dynamic context (source-only)
+
+The current source branch adds private project/worktree goal state with
+skill-proposed/user-accepted activation and evidence-backed `complete` or
+`accepted_80_20` settlement, plus model-fingerprinted context epochs and
+automatic bounded handoff compaction on model switches/turn-budget crossings.
+See [`docs/GOAL_MODE_AND_DYNAMIC_CONTEXT_2026-08.md`](docs/GOAL_MODE_AND_DYNAMIC_CONTEXT_2026-08.md).
+The changes are not mirrored into `~/.pi/agent`; calibration remains opt-in via
+`CONTEXT_DISCOVERY=on`, and no powered model run has been performed. Source
+surface hash for this unmirrored boundary: `5e89ef8150fb8d3a4c39f3e2145988acddfc1b2c7aa350a8c26438f1462e35cc`.
+
 Read `optimizer/docs/MEASUREMENT_METHODOLOGY_2026-07.md` before interpreting any historical
 experiment. A 2026-07-27 audit established that most A/B results were unsupported: rounds at
 n=3–9/arm lacked useful power, pass/fail did not measure the efficiency target, and 40 of 45

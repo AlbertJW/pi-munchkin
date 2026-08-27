@@ -9,7 +9,7 @@
 // requester attribution zero-by-construction (fixed 2026-07-29). Same idiom as
 // telemetry.ts's cross-instance caches.
 
-export type CompactionOwner = "compact-tool" | "context-watcher";
+export type CompactionOwner = "compact-tool" | "context-watcher" | "model-handoff";
 export type CompactionToken = Readonly<{ generation: number; request: number; owner: CompactionOwner }>;
 
 type CoordinatorState = { generation: number; request: number; active: CompactionToken | null };

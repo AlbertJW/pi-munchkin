@@ -204,7 +204,7 @@ test("dark-flag boot: nothing a flag registers is stripped without a route", asy
 test("cold boot: every deferred tool is reachable through some capability family", async () => {
 	await withEnv({ ...BASE_ENV(), PLAN_TOOL_GO: "on" }, async () => {
 		const { fp, cwd, deferred } = await boot();
-		const families = ["research", "delegation", "browser", "canvas", "context", "planning"] as const;
+		const families = ["research", "delegation", "browser", "canvas", "context", "planning", "goals"] as const;
 		const reachable = new Set<string>();
 		for (const family of families) {
 			await callTool(fp, "capability", { action: "enable", family }, cwd);

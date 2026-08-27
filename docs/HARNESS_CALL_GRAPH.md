@@ -97,6 +97,17 @@ graph nodes here would be a loop in disguise. Keep it a loop.
 
 ---
 
+## 2026-08-27 coordination addendum
+
+The current source also has two bounded coordination surfaces that were missing from the original
+call-graph inventory. Persistent **goal state** lives outside the plan graph: skills may propose a
+goal, the user accepts it, and the head process alone may update or settle it. Delegated children can
+read the ambient summary but cannot mutate the parent ledger. **Runtime truth** fingerprints the active
+model and derives a per-epoch safe input budget; a model switch or budget crossing may request one
+coordinated compaction handoff, with a rearm threshold to prevent repeated-compaction churn. Context
+discovery is an opt-in local serving handshake, not a transcript or capacity probe. These are bounded
+state/edge concerns, not new nodes in the main atom.
+
 ## 1. Nodes — units of work, and whether they need an LLM
 
 Split by whether the node's output requires a model. This is the single most important axis for the
@@ -191,6 +202,8 @@ accumulator).
 | **Run kernel** | `run-kernel-state.ts`, `run-kernel.ts` | typed per-run event record (redacted) | run-kernel writes; audit / recovery read |
 | **Working memory** | `working-memory.ts` | bounded per-run notebook (model-authored hypotheses) | model writes/lists via explicit tool calls; dark (`WORKING_MEMORY=off`); NEVER injected into context automatically |
 | **Plan state** | `plan-state-storage.ts`, `plan-runner.ts`, `plan-graph.ts` | v4 flat or v5 parent/child intended work, owner, budget, status and evidence gaps | head model owns authority; children return validated reports; verification remains parent/session-owned |
+| **Goal state** | `goal-state.ts`, `plan-runner.ts` | private project/worktree outcome, criteria, evidence, risks, and 80/20/complete settlement | skills propose; user accepts; head process owns mutation; child processes are read-only |
+| **Context profile** | `context-profile.ts`, `runtime-truth.ts` | model fingerprint, epoch, declared/served window, safe input budget, calibration state | runtime observes the active model; handoff compacts once per threshold and never selects a model |
 | **Blackboard** | `session-blackboard.ts` | bounded redacted session summary | writes persist; cockpit reads |
 | **Context surface** | `context-surface.ts` | which surface mode is active | read by context-inlet guard |
 | **Failure episodes** | `failure-episodes.ts` | semantic-failure tracking for steering | loop-breaker / arbiter read |

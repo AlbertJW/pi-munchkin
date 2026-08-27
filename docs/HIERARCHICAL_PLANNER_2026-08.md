@@ -2,10 +2,11 @@
 
 ## Status
 
-Implemented on the isolated `codex/hierarchical-planner` branch. Both runtime switches default to
-`off`; this branch has not been merged, mirrored, loaded by Pi, or used for a model session. The
-existing semantic-loop study remains the first eligible measurement track. Package-source surface:
-`b8f1c8b060fc963045ab4235416265b4c973438da8e92e291bbeb7bd0e34efef`.
+Implemented and merged into the current harness source on 2026-08-25. Both runtime switches remain
+`off`; the graph mechanism is dark and this source-only follow-up has not been mirrored or used for a
+model session. The existing semantic-loop study remains the first eligible measurement track. The
+authoritative rollout history is in `docs/SURFACE_BOUNDARIES.md`; the current source-only boundary
+also includes persistent goals and model-aware context epochs.
 
 ## Runtime contract
 
@@ -122,8 +123,8 @@ Rollout order is fixed:
 
 1. keep `PLAN_GRAPH=off` and `DEEP_RESEARCH_PLANNING=off` in shipped defaults;
 2. finish or explicitly retire the already-prepared semantic-loop screen;
-3. merge and mirror this surface only through the existing human gate, record its loaded hash, and
-   re-run the no-inference load checks;
+3. keep the already-merged graph dark and apply any future graph changes only through the existing
+   human gate, recording a loaded hash and re-running the no-inference load checks;
 4. admit purpose-built complex-research fixtures and run the candidate-only mechanism screen in
    `optimizer/docs/PREREG_HIERARCHICAL_PLANNER_SCREEN_2026-08.md` only after Albert approves it;
 5. make no default change from mechanism evidence alone. A bounded comparative measurement and a

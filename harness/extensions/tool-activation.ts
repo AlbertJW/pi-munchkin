@@ -14,7 +14,7 @@ type Profile = "ambient" | "core";
 type LegacyMode = "ambient" | "dynamic" | "phase";
 const PLAN_GRAPH_ENABLED = process.env.PLAN_GRAPH === "on";
 const DEEP_RESEARCH_PLANNING_ENABLED = PLAN_GRAPH_ENABLED && process.env.DEEP_RESEARCH_PLANNING === "on";
-type Family = "research" | "delegation" | "browser" | "canvas" | "context" | "planning";
+type Family = "research" | "delegation" | "browser" | "canvas" | "context" | "planning" | "goals";
 
 export const MUNCHKIN_TOOL_PROFILE_DEFAULT: Profile = "core";
 // Exported for plan-runner's post-restart surface restore (audit A6, 2026-08-25):
@@ -103,6 +103,7 @@ function familyTools(family: Family, all: readonly string[]): string[] {
 		case "browser": return all.filter((name) => name.startsWith("browser_"));
 		case "canvas": return all.filter((name) => name.startsWith("tldraw_"));
 		case "context": return all.filter((name) => name === "compact_context");
+		case "goals": return all.filter((name) => ["goal_propose", "goal_update", "goal_settle", "goal_resume"].includes(name));
 		// Flat plan tools are activatable in ANY session: skills and models may
 		// legitimately structure multi-item work without the human /plan surface
 		// (measured live 2026-08-25: the process-circleback skill instructs
@@ -216,18 +217,19 @@ export default function (pi: ExtensionAPI): void {
 		name: "capability",
 		label: "Capability Switch",
 		description: "Enable one specialist tool family for this session, or report bounded family status.",
-		promptSnippet: "capability: enable research, delegation, browser, canvas, context, or planning tools only when needed",
+		promptSnippet: "capability: enable research, delegation, browser, canvas, context, planning, or goals tools only when needed",
 		parameters: Type.Object({
 			action: Type.Union([Type.Literal("enable"), Type.Literal("status")]),
 			family: Type.Optional(Type.Union([
 				Type.Literal("research"), Type.Literal("delegation"), Type.Literal("browser"),
 				Type.Literal("canvas"), Type.Literal("context"), Type.Literal("planning"),
+				Type.Literal("goals"),
 			])),
 		}),
 		async execute(_toolCallId, params) {
 			if (params.action === "enable" && !params.family) throw new Error("capability: family is required for enable");
 			const result = params.action === "enable" ? activateFamily(params.family as Family, "model-request") : null;
-			const activeFamilies = (["research", "delegation", "browser", "canvas", "context", "planning"] as Family[])
+			const activeFamilies = (["research", "delegation", "browser", "canvas", "context", "planning", "goals"] as Family[])
 				.filter((family) => familyTools(family, allNames).some((name) => pi.getActiveTools().includes(name)));
 			return {
 				content: [{ type: "text" as const, text: JSON.stringify({ profile, explicit, active_families: activeFamilies, result }) }],

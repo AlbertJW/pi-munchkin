@@ -8,6 +8,7 @@ import { runCapsuleMode } from "../lib/run-capsule-store.ts";
 import { onRunStateSnapshot } from "../lib/run-kernel-snapshot.ts";
 import { renderRecoveryBrief } from "../lib/recovery-brief.ts";
 import type { RunStateV1 } from "../lib/run-kernel-types.ts";
+import { readGoal, renderGoalRecoveryBrief } from "../lib/goal-state.ts";
 
 // Model-driven in-place context compaction.
 //
@@ -99,11 +100,12 @@ export default function (pi: ExtensionAPI) {
 					);
 				};
 				try {
+					const goalBrief = renderGoalRecoveryBrief(await readGoal(ctx.cwd));
 					const recovery = recoveryMode && recoveryState
 						? `\n\n${renderRecoveryBrief(recoveryState, { reason: "compaction" })}`
 						: "";
 					ctx.compact({
-						customInstructions: `${focus || DEFAULT_FOCUS}${recovery}`,
+						customInstructions: `${focus || DEFAULT_FOCUS}${recovery}${goalBrief ? `\n\n${goalBrief}` : ""}`,
 						onComplete: (r) => {
 							if (settled) return;
 							ctx.ui.notify(`context compacted (~${r.tokensBefore} tok before compaction)`, "info");

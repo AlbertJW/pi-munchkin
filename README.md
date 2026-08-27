@@ -54,6 +54,10 @@ second.
 - **`plan-runner`** — lets the agent keep a bounded checklist of intended work while project
   verification remains session-owned. *Model-owned stable-ID work items with structural writes
   and small status deltas; no per-item correctness or gate receipts.*
+- **goal mode** — keeps a persistent project/worktree outcome across planner exit, compaction,
+  recovery, and model switches. *`/goal` starts one, `goal_propose` is advisory until
+  `/goal-accept`, and `goal_settle` records evidence-backed completion or an explicit 80/20
+  acceptance with residual risks.*
 - **`git-guard`** — asks for confirmation before any command that could discard uncommitted work.
   *Confirms commands that could discard uncommitted work.*
 - **context and Bash guards** — refuse oversized input or output instead of silently cutting it off
@@ -143,6 +147,11 @@ Most behaviour is automatic. The primary commands are:
   `/plan-cancel` discards the draft, and `/plan-status` renders the bounded plan. Plans hold at
   most 24 stable-ID items; routine progress uses small `plan_update` deltas. Verification belongs
   to the session, not to individual plan items.
+- `/goal <objective>` starts a persistent goal; `/goal-status`, `/goal-pause`, `/goal-resume`,
+  and `/goal-cancel` manage it. Goals are private and separate from plan state, so a plan can
+  finish while the outcome remains active or resumable. Model-driven goal proposals and updates
+  use the deferred `goals` capability (`capability(action="enable", family="goals")`) so the
+  low-context core surface stays small.
 - With the dark `PLAN_GRAPH=on` candidate, plans may contain bounded parent/child nodes,
   `plan_expand` attaches children, `plan_settle` enforces terminal/evidence conditions, and
   `/plan-status <item-id>` expands one subtree. Ordinary plans remain flat.
@@ -191,6 +200,9 @@ model's own window in place with one resume handoff.
 | `TEACH_HINTS`, `DID_YOU_MEAN` | default-on bounded hints | set either to `off` |
 | `FORCE_PLAN_WRITE` | `off`; planning is exclusively user-triggered through `/plan` | `on` restores the compatibility behavior that blocks the first unplanned mutation |
 | `PLAN_TOOL_GO` | `off`; headless experiments may explicitly expose model-callable `plan_go` | `on` enables it; interactive plans still require the user's `/plan-go` |
+| `GOAL_SCOPE` | `worktree`; goal ledgers are private to the current worktree | `project` shares one private ledger across linked Git worktrees via the repository's common root; non-Git directories fall back to their resolved cwd |
+| `CONTEXT_HANDOFF` | on; model switches and safe-budget crossings may request one bounded native compaction and follow-up | `off` disables automatic handoff while retaining context profiles |
+| `CONTEXT_DISCOVERY` | off; context profiles use model metadata and local serving truth only | `on` sends one synthetic, local-only handshake per serving fingerprint; it never sends transcript or tool data |
 | `PLAN_GRAPH` | `off`; graph schemas, `plan_expand`, `plan_settle`, and branch reports are absent. The `planning` capability family itself is always available and additively activates the flat `plan_write`/`plan_update` pair, so skills and models can structure multi-item work without `/plan` (2026-08-25) | `on` enables the reusable v5 graph substrate without activating a skill profile |
 | `DEEP_RESEARCH_PLANNING` | `off`; complex research follows the existing bounded skill path | requires `PLAN_GRAPH=on` and `RESEARCH_LEDGER=on`; exposes complex-only `research_plan_start` with a hard 3-search/5-distinct-source-read global envelope, one-shot branch leases, and five parent validation reads |
 | `SPAWN_DELEGATION` | default-on; delegation guidance recommends `mode=spawn` with self-contained tasks | `off` restores the fork wording |

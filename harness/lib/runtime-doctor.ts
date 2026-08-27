@@ -158,6 +158,7 @@ export function renderDoctor(input: {
 	// Numbers and verdict ONLY — never the probed URL (tests pin the absence of
 	// "http://" and "baseUrl" in this report).
 	servingTruth?: { served_n_ctx: number; registry_ctx: number; verdict: string } | null;
+	contextProfile?: { epoch: number; safe_input_tokens: number | null; output_reserve: number; confidence: string; source: string };
 	protocol?: ProtocolParitySummary;
 }): string {
 	const surface = input.surfaceHash && /^[a-f0-9]{64}$/i.test(input.surfaceHash)
@@ -172,6 +173,9 @@ export function renderDoctor(input: {
 		input.servingTruth
 			? `serving_truth=served_n_ctx:${Math.trunc(input.servingTruth.served_n_ctx)}; registry_ctx:${Math.trunc(input.servingTruth.registry_ctx)}; verdict:${boundedAtom(input.servingTruth.verdict)}`
 			: "serving_truth=not-probed",
+		input.contextProfile
+			? `context_profile=epoch:${input.contextProfile.epoch}; safe_input:${input.contextProfile.safe_input_tokens ?? "unknown"}; output_reserve:${input.contextProfile.output_reserve}; confidence:${boundedAtom(input.contextProfile.confidence)}; source:${boundedAtom(input.contextProfile.source)}`
+			: "context_profile=not-observed",
 		`tools=${input.tools.active}/${input.tools.all} active/all; preserved_explicit=${input.tools.preservedExplicit}; preservation_reason=${boundedAtom(input.preservationReason, "none")}`,
 		`sources(sourceInfo.source|scope|origin): ${input.tools.sourceGroups.join(", ") || "none"}`,
 		`missing_first_party=${input.tools.missing.join(",") || "none"}; duplicates=${input.tools.duplicates.join(",") || "none"}; overrides=${input.tools.overrides.join(",") || "none"}`,

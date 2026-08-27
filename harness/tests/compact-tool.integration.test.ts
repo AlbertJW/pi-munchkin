@@ -93,6 +93,7 @@ test("synchronous compact failure releases the shared slot", async () => {
 	const notes: string[] = [];
 	const secret = "DUMMY_SYNC_COMPACTION_SECRET";
 	const ctx = {
+		cwd: "/tmp/compact-tool-sync-failure-test",
 		ui: { notify(message: string) { notes.push(message); } },
 		compact: () => { calls += 1; throw new Error(`timeout at https://private.invalid/?key=${secret} /tmp/private`); },
 	};

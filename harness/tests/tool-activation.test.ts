@@ -11,6 +11,7 @@ const names = [
 	"read", "bash", "edit", "write", "grep", "find", "ls", "powershell", "search_spans", "read_span", "recall",
 	"plan_write", "plan_update", "verify_project", "subagent", "compact_context", "web_search", "web_read",
 	"plan_expand", "plan_settle", "research_plan_start",
+	"goal_propose", "goal_update", "goal_settle", "goal_resume",
 	"browser_open", "browser_click", "tldraw_create",
 ];
 
@@ -186,6 +187,16 @@ test("planning capability family activates flat plan tools in an ordinary sessio
 		for (const name of ["research_plan_start", "plan_expand", "plan_settle"]) {
 			assert.equal(active.includes(name), false, `${name} stays dark without the flags`);
 		}
+	} finally { run.restore(); }
+});
+
+test("goals remain out of the core ambient surface and activate as one bounded family", async () => {
+	const run = await load("core", [...names]);
+	try {
+		for (const name of ["goal_propose", "goal_update", "goal_settle", "goal_resume"]) assert.equal(run.fp.pi.getActiveTools().includes(name), false);
+		const result = await callTool(run.fp, "capability", { action: "enable", family: "goals" }, process.cwd());
+		assert.equal(result.isError, false);
+		for (const name of ["goal_propose", "goal_update", "goal_settle", "goal_resume"]) assert.equal(run.fp.pi.getActiveTools().includes(name), true);
 	} finally { run.restore(); }
 });
 
