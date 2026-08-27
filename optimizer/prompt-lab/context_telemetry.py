@@ -14,9 +14,16 @@ import tempfile
 MAC_SUFFIX = re.compile(br',"mac":"([0-9a-f]{64})"}$')
 SAFE_TIER_DETECTORS = {"semantic", "session", "combined"}
 PROVENANCE_FIELDS = (
-    "run_id", "provider", "model", "requested_provider", "requested_model",
-    "config_sha256", "harness_surface_sha256",
+    "session_id", "invocation_id", "requested_provider", "requested_model",
+    "resolved_provider", "resolved_model", "config_sha256", "surface_sha256",
 )
+
+PROVENANCE_EVENT_FIELDS = {
+    "session_id": "run_id", "invocation_id": "invocation_id",
+    "requested_provider": "requested_provider", "requested_model": "requested_model",
+    "resolved_provider": "provider", "resolved_model": "model",
+    "config_sha256": "config_sha256", "surface_sha256": "harness_surface_sha256",
+}
 
 
 def _read_raw(source):
@@ -210,7 +217,8 @@ def _provenance_summary(events):
     values = {}
     mismatches = []
     for field in PROVENANCE_FIELDS:
-        seen = {event.get(field) for event in events if event.get(field) is not None}
+        source_field = PROVENANCE_EVENT_FIELDS[field]
+        seen = {event.get(source_field) for event in events if event.get(source_field) is not None}
         if len(seen) == 1:
             values[field] = next(iter(seen))
         elif len(seen) > 1:
@@ -221,13 +229,19 @@ def _provenance_summary(events):
             mismatches.append(field)
     valid_hashes = all(
         isinstance(values[field], str) and re.fullmatch(r"[0-9a-f]{64}", values[field])
-        for field in ("config_sha256", "harness_surface_sha256")
+        for field in ("config_sha256", "surface_sha256")
     )
+    # Keep the historical aliases for offline readers; the canonical identity
+    # above is what gate_provenance.validate consumes.
     return {
         "schema": "pi.gate-session/v1",
         "complete": not mismatches and valid_hashes,
         "mismatches": sorted(set(mismatches)),
         **values,
+        "run_id": values["session_id"],
+        "provider": values["resolved_provider"],
+        "model": values["resolved_model"],
+        "harness_surface_sha256": values["surface_sha256"],
     }
 
 
@@ -399,6 +413,7 @@ def selftest():
         if event.get("sk") == "run-a":
             event.update({
                 "run_id": "session-1", "provider": "local-llamacpp", "model": "ling",
+                "invocation_id": "run-a",
                 "requested_provider": "local-llamacpp", "requested_model": "ling",
                 "config_sha256": "c" * 64, "harness_surface_sha256": "a" * 64,
             })
@@ -418,7 +433,10 @@ def selftest():
         assert row["compactions"]["pi"] == 1 and row["compactions"]["overflow"] == 0
         assert row["watcher"]["completed"] == 1 and row["watcher"]["resume_required"] == 1
         assert row["harness_surface_sha256"] == "a" * 64
-        assert row["provenance"]["complete"] and row["provenance"]["run_id"] == "session-1"
+        assert row["provenance"]["complete"]
+        assert row["provenance"]["session_id"] == "session-1"
+        assert row["provenance"]["invocation_id"] == "run-a"
+        assert row["provenance"]["run_id"] == "session-1", "legacy alias remains stable"
         assert row["surface"]["calls"] == 1 and row["surface"]["context"]["max_bytes"] == 60
         assert row["surface"]["concentration"]["largest_message"]["mean"] == 0.6
         assert row["bash_output_guard"]["withheld"] == 2, "only run-a's two events, not the other session's"

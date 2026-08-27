@@ -672,6 +672,7 @@ PY
 	# contaminating retries or result-row joins.
 	local session_base_env=("HOME=$HOME" "PATH=$PATH" "TMPDIR=$gate_tmpdir" "TELEMETRY=on" "TELEMETRY_SOURCE=gate" "TELEMETRY_HMAC_FD=3" "TELEMETRY_FD=8"
 		"PI_RUN_ID=$gate_session_id" "PI_MODEL_ID=$MODEL" "PI_MODEL_PROVIDER=$MODEL_PROVIDER_RESOLVED"
+		"PI_GATE_INVOCATION_ID=$RUNID"
 		"PI_REQUESTED_MODEL=$requested_model" "PI_REQUESTED_PROVIDER=$requested_provider"
 		"HARNESS_CONFIG_SHA256=$config_sha256")
 	[[ -n "$HARNESS_SURFACE_SHA256" ]] && session_base_env+=("HARNESS_SURFACE_SHA256=$HARNESS_SURFACE_SHA256")

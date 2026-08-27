@@ -842,6 +842,14 @@ This qualifies the harness protocol only; the next gate is a fresh Qwen-35B
 preregistration and bounded baseline/shadow screen. See the dated accepted-run
 sections in the linked qualification note.
 
+2026-08-27 follow-up: the preregistered Qwen base screen was stopped after four
+non-authoritative rows exposed a live identity-shape/provider mismatch and an
+unbounded ~1.1 MB response. Source-side canonical invocation transport and
+identity precedence are fixed and tested, but the human-gated live mirror was
+not changed because this checkout is not pushed. Do not pool or resume that
+partial screen; push, deliberately mirror, record the new loaded surface hash,
+and create a replacement short-duration preregistration first.
+
 - `ACTIVE_TOOL_PROMPTS=derived`: inactive tools contribute no ambient schemas, manuals, examples,
   snippets, or agent lists; `ambient` restores the legacy broad prompt surface.
 - `CONTROL_ARBITER=enforce`: one highest-priority corrective message is delivered per boundary;

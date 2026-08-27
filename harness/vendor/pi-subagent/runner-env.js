@@ -51,7 +51,7 @@ const HARNESS_CONFIG_PREFIXES = ["TEACH_HINT_", "PI_MSG_", "KETCH_"];
 //   TELEMETRY_FD,
 //   TELEMETRY_HMAC_FD   — file-descriptor numbers are process-local; inherited
 //                         numbers point at arbitrary fds in the child.
-//   PI_MODEL_ID, PI_MODEL_PROVIDER, PI_RUN_ID, PI_SANDBOX_POSTURE
+//   PI_MODEL_ID, PI_MODEL_PROVIDER, PI_RUN_ID, PI_GATE_INVOCATION_ID, PI_SANDBOX_POSTURE
 //                       — per-process identity stamped by the launcher for the
 //                         parent; the child session derives its own.
 //   PI_SUBAGENT_DEPTH   — the runner sets the child's depth explicitly; a copied
@@ -66,7 +66,7 @@ const EXCLUDED_HARNESS_ENV_KEYS = [
   // from an ancestor into a grandchild.
   "PI_MUNCHKIN_PLAN_CONTEXT_PATH", "PI_MUNCHKIN_BRANCH_REPORT_PATH", "PI_MUNCHKIN_RESEARCH_SCOUT",
   "CHAOS", "TELEMETRY_FD", "TELEMETRY_HMAC_FD",
-  "PI_MODEL_ID", "PI_MODEL_PROVIDER", "PI_REQUESTED_MODEL", "PI_REQUESTED_PROVIDER", "PI_RUN_ID", "PI_SANDBOX_POSTURE",
+  "PI_MODEL_ID", "PI_MODEL_PROVIDER", "PI_REQUESTED_MODEL", "PI_REQUESTED_PROVIDER", "PI_RUN_ID", "PI_GATE_INVOCATION_ID", "PI_SANDBOX_POSTURE",
   "PI_SUBAGENT_DEPTH",
 ];
 

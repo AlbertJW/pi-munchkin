@@ -264,7 +264,13 @@ function envelope(ext: string, kind: string, detail: Record<string, unknown>): R
 		sk: SESSION_KEY,
 		si: sessionInstance(),
 		sp: parentSession(),
-		run_id: typeof detail.run_id === "string" ? detail.run_id : (process.env.PI_RUN_ID || SESSION_KEY),
+		// Gate launchers own the parent session identity. Plan/recovery extensions
+		// legitimately attach their own run id in detail, but that must not split
+		// one authenticated gate stream into several identities. Interactive
+		// sessions retain the historical detail fallback.
+		run_id: process.env.TELEMETRY_SOURCE === "gate"
+			? (process.env.PI_RUN_ID || SESSION_KEY)
+			: (typeof detail.run_id === "string" ? detail.run_id : (process.env.PI_RUN_ID || SESSION_KEY)),
 		// A gate launcher owns the canonical identity. Some extensions keep a
 		// best-effort model snapshot (which is briefly `unknown` during startup)
 		// in detail; allowing that snapshot to shadow the launcher would make one
@@ -274,6 +280,7 @@ function envelope(ext: string, kind: string, detail: Record<string, unknown>): R
 		model: process.env.PI_MODEL_ID || (typeof detail.model === "string" ? detail.model : null),
 		requested_provider: process.env.PI_REQUESTED_PROVIDER || null,
 		requested_model: process.env.PI_REQUESTED_MODEL || null,
+		invocation_id: process.env.PI_GATE_INVOCATION_ID || null,
 		harness_surface_sha256: process.env.HARNESS_SURFACE_SHA256 || null,
 		config_sha256: process.env.HARNESS_CONFIG_SHA256 || null,
 		ext,

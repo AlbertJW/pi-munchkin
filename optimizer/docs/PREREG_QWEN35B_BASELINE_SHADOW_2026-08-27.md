@@ -103,3 +103,35 @@ separate gate is a Qwen-35B-specific preregistration for one dark semantic-loop
 mechanism candidate. Hierarchical planner/deep-research graph work remains a
 separate research-shaped screen.
 
+## 2026-08-27 execution outcome (non-authoritative; preregistration superseded)
+
+The dry preflight passed and the pinned loopback router reported the requested
+Qwen 35B alias. The explicit run was then stopped after four base rows (three
+`parens`, one `equil`) completed with binary gate score 1 and exact provider
+usage. None of those rows is evidence: every row was marked incomplete because
+the deployed context reducer could not validate the canonical parent identity.
+
+Two source/deployment defects were isolated:
+
+1. The reducer emitted the older `run_id`/`provider`/`model` provenance shape,
+   while the gate validator requires `session_id`/`invocation_id` and resolved
+   identity fields. The launcher also had not transported the invocation id
+   into telemetry.
+2. `plan-runner` can attach a transient `unknown` provider/model snapshot. The
+   deployed envelope allowed that detail to override the launcher's canonical
+   identity, producing a provider mismatch in the authenticated stream.
+
+The source now transports `PI_GATE_INVOCATION_ID`, reduces the telemetry
+identity into the canonical schema (while retaining safe historical aliases),
+and gives gate environment identity precedence over detail snapshots. Regression
+tests and the context-telemetry self-test pass. The live mirror was not changed:
+its safety gate correctly refused a force-apply because this checkout is not
+pushed, and no automatic live rollout is authorized. The interrupted `equil`
+replicate had reached a roughly 1.1 MB model response and 17+ minutes; it was
+terminated to keep the screen bounded. Its branch is incomplete, not pooled.
+
+This preregistration must not be resumed or pooled. After a human pushes the
+source commit, applies the deliberate mirror, records the new loaded surface
+hash, and creates a replacement preregistration, rerun a smaller, explicitly
+bounded Qwen baseline/provenance screen. No planner/deep-research graph or
+semantic-loop candidate may be enabled by that rerun.

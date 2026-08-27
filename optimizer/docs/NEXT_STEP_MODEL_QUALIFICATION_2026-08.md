@@ -122,6 +122,26 @@ adoption verdict. The next step is a fresh Qwen-35B preregistration against
 the current source surface, then a bounded baseline/shadow screen only after
 that provenance audit. Planner/deep-research graph changes remain dark.
 
+## 2026-08-27 baseline screen stopped before evidence
+
+The fresh Qwen preregistration passed its no-inference preflight and began a
+base-only screen. Four rows completed, but all were correctly rejected as
+non-authoritative: the live reducer still emitted legacy provenance names and
+the deployed telemetry envelope let a transient plan-runner `unknown` snapshot
+split the provider identity. The source fix now adds an invocation-id envelope
+field, canonical reducer mapping, gate identity precedence, and regression
+coverage. Applying it to `~/.pi/agent` was refused by the deliberate-mirror
+safety gate because the checkout is not pushed; therefore no new live surface
+hash or result may be claimed. The run was interrupted after an `equil` branch
+produced an unbounded ~1.1 MB response. Do not resume or pool that partial run.
+
+Next operational gate: push the source fix, apply the human-gated mirror,
+record the new loaded surface hash, write a replacement short-duration Qwen
+preregistration, and repeat only the base provenance screen. Aggregate
+per-turn context budgeting is now an observed safety concern, not a Qwen
+quality result. Planner/deep-research graph work and semantic-loop candidates
+remain dark.
+
 ## Explicit non-goals
 
 This note does not claim cross-model task-success equivalence, does not authorize

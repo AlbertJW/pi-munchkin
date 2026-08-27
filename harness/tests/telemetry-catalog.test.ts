@@ -88,6 +88,7 @@ test("no catalog entry DECLARES a field that shadows an envelope key", () => {
 	}
 	assert.deepEqual(violations, [], "rename the field — envelope keys are not available to detail");
 	assert.ok(RESERVED_ENVELOPE_FIELDS.has("source"), "the set must still be the real one, not an empty stand-in");
+	assert.ok(RESERVED_ENVELOPE_FIELDS.has("invocation_id"), "gate invocation identity must not be detail-overridable");
 });
 
 test("machine-readable exposure catalog stays in lockstep with TypeScript catalog", () => {
