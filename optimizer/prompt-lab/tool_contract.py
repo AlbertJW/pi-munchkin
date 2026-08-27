@@ -18,6 +18,23 @@ SCHEMA = "pi.tool-contract/v1"
 MANIFEST_SCHEMA = "pi.tool-contract-manifest/v1"
 ALLOWED_ORACLES = {"tool_call_observed", "mutation_and_verify_observed"}
 TOOL_NAMES = {"read", "search_spans", "read_span", "bash", "edit", "write", "verify_project", "capability", "plan_write", "plan_update"}
+FIXTURE_NAMES = {
+    "bounded-read", "span-search", "span-read", "shell-recovery", "anchored-edit",
+    "write-persist", "verify-after-mutation", "capability-activation", "planner-write",
+    "planner-update",
+}
+CASE_TOOL_ALLOWLISTS = {
+    "bounded-read": "read",
+    "span-search": "search_spans,read_span",
+    "span-read": "search_spans,read_span",
+    "shell-recovery": "bash",
+    "anchored-edit": "read,edit",
+    "write-persist": "read,write",
+    "verify-after-mutation": "read,edit,verify_project,bash",
+    "capability-activation": "capability",
+    "planner-write": "capability,plan_write,plan_update",
+    "planner-update": "capability,plan_write,plan_update",
+}
 DEFAULT_MANIFEST = Path(__file__).with_name("tool-contract-v1.json")
 SCHEMA_PATH = Path(__file__).resolve().parents[1] / "real-gate-fixtures" / "schemas" / "pi.tool-contract-v1.schema.json"
 
@@ -51,10 +68,60 @@ def validate_manifest(manifest):
             errors.append(f"{case_id}: unknown oracle")
         if not isinstance(case.get("prompt"), str) or not case["prompt"].strip():
             errors.append(f"{case_id}: prompt is required")
+        fixture = case.get("fixture")
+        if fixture not in FIXTURE_NAMES:
+            errors.append(f"{case_id}: unknown fixture")
+        if case.get("tool_allowlist") != CASE_TOOL_ALLOWLISTS.get(fixture):
+            errors.append(f"{case_id}: tool_allowlist must match its fixture profile")
         recovery = case.get("allowed_recovery")
         if not isinstance(recovery, list) or any(not isinstance(item, str) for item in recovery):
             errors.append(f"{case_id}: allowed_recovery must be a string list")
     return sorted(errors)
+
+
+def seed_fixture(case_dir, case):
+    """Create only the deterministic, case-local files the model is meant to use."""
+    fixture = case["fixture"]
+    (case_dir / "fixture.txt").write_text(
+        "alpha=1\nbeta=2\nTARGET_SYMBOL=before\nmarker=stable\n",
+        encoding="utf-8",
+    )
+    if fixture in {"span-search", "span-read"}:
+        (case_dir / "source.txt").write_text(
+            "header\n" + "\n".join(
+                f"line-{index}: {'TARGET_SYMBOL' if index == 37 else 'ordinary'} value={index}"
+                for index in range(1, 81)
+            ) + "\nfooter\n",
+            encoding="utf-8",
+        )
+    if fixture == "shell-recovery":
+        check = case_dir / "check.sh"
+        check.write_text("#!/bin/sh\necho 'intentional fixture check failure' >&2\nexit 1\n", encoding="utf-8")
+        check.chmod(0o755)
+        (case_dir / "fallback.txt").write_text("fallback verification marker\n", encoding="utf-8")
+    if fixture == "anchored-edit":
+        (case_dir / "edit-target.txt").write_text("STATUS=before\nKEEP=unchanged\n", encoding="utf-8")
+    if fixture == "verify-after-mutation":
+        (case_dir / "edit-target.txt").write_text("STATUS=before\n", encoding="utf-8")
+        (case_dir / "verify.js").write_text(
+            "const fs = require('node:fs');\n"
+            "if (fs.readFileSync('edit-target.txt', 'utf8').trim() !== 'STATUS=after') process.exit(1);\n",
+            encoding="utf-8",
+        )
+        (case_dir / "package.json").write_text(
+            json.dumps({"name": "tool-contract-fixture", "private": True, "scripts": {"test": "node verify.js"}}) + "\n",
+            encoding="utf-8",
+        )
+
+
+def fixture_paths(case_dir, case):
+    fixture = case["fixture"]
+    paths = ["fixture.txt"]
+    if fixture in {"span-search", "span-read"}: paths.append("source.txt")
+    if fixture == "shell-recovery": paths.extend(["check.sh", "fallback.txt"])
+    if fixture == "anchored-edit": paths.append("edit-target.txt")
+    if fixture == "verify-after-mutation": paths.extend(["edit-target.txt", "verify.js", "package.json"])
+    return [str(case_dir / path) for path in paths]
 
 
 def _text_blocks(content):
@@ -151,6 +218,10 @@ def selftest():
     case = manifest["cases"][4]
     import tempfile
     with tempfile.TemporaryDirectory() as directory:
+        case_dir = Path(directory)
+        seed_fixture(case_dir, case)
+        assert (case_dir / "edit-target.txt").read_text(encoding="utf-8").startswith("STATUS=before")
+        assert fixture_paths(case_dir, case)
         trace = Path(directory) / "trace.jsonl"
         trace.write_text("\n".join([
             json.dumps({"type": "message_end", "message": {"role": "assistant", "content": [{"type": "toolCall", "name": "edit", "arguments": {}}]}}),
@@ -170,11 +241,17 @@ def run_command(manifest, model, output_dir, command):
         raise SystemExit("--run requires a command after --command; this is the explicit model-execution boundary")
     output_dir.mkdir(parents=True, exist_ok=True)
     rows = []
+    capture_dir = output_dir / ".captures"
+    capture_dir.mkdir(parents=True, exist_ok=True)
     for case in manifest["cases"]:
         case_dir = output_dir / case["id"]
         case_dir.mkdir(parents=True, exist_ok=True)
+        seed_fixture(case_dir, case)
         prompt_path = case_dir / "prompt.txt"
-        trace_path = case_dir / "trace.jsonl"
+        # The trace must not be created under the model's cwd: a Pi can otherwise
+        # read its own growing stdout and enter a self-observing loop. Capture
+        # stdout in the parent, then materialize the trace only after exit.
+        trace_path = capture_dir / f"{case['id']}.trace.jsonl"
         prompt_path.write_text(case["prompt"], encoding="utf-8")
         env = dict(os.environ)
         env.update({
@@ -182,9 +259,11 @@ def run_command(manifest, model, output_dir, command):
             "TOOL_CONTRACT_CASE": case["id"],
             "TOOL_CONTRACT_PROMPT_FILE": str(prompt_path),
             "TOOL_CONTRACT_TRACE_FILE": str(trace_path),
+            "TOOL_CONTRACT_FIXTURE_ROOT": str(case_dir),
+            "TOOL_CONTRACT_TOOLS": case["tool_allowlist"],
         })
-        with open(trace_path, "w", encoding="utf-8") as trace:
-            completed = subprocess.run(command, cwd=case_dir, env=env, stdout=trace, stderr=subprocess.PIPE, check=False)
+        completed = subprocess.run(command, cwd=case_dir, env=env, stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=False)
+        trace_path.write_bytes(completed.stdout)
         row = classify_trace(trace_path, case, model) if trace_path.exists() else {
             "schema": SCHEMA, "case_id": case["id"], "model": model,
             "status": "incomplete", "required_tool": case["required_tool"],

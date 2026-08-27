@@ -50,6 +50,38 @@ candidate, mirror, rollout, or live inference is implied by this implementation.
    deep-research graph work dark until a research-shaped screen evaluates it.
 6. Address aggregate per-turn context budgeting as a separate safety package.
 
+## 2026-08-27 execution attempt
+
+The first explicit Ling run exposed a qualification-runner isolation defect: the
+runner redirected Pi stdout to `trace.jsonl` inside the model's working directory,
+so Ling could read its own growing trace and loop. The runner now captures stdout in
+the parent and materializes the trace only after exit; it also seeds declared
+case-local fixtures and passes a per-case tool allowlist.
+
+Two retries were then stopped after the serving arm, not the harness, became the
+limiting factor. The `ling3-tiny-fast` router returned multi-minute, 100--300 KB
+responses or an empty stream after client timeout. A bounded direct provider probe
+with `max_tokens: 8192` and `chat_template_kwargs.enable_thinking=false` returned
+`OK`, which isolates the issue to Pi's provider/boot-level fast-mode path (Pi cannot
+send arbitrary chat-template kwargs with this provider), not to the fixture capture.
+No `pi.tool-contract/v1` aggregate was accepted or used as evidence, and Qwen was
+not started. Re-run the explicit Ling screen only after the fast arm is confirmed to
+honor thinking-off for Pi requests:
+
+```sh
+python3 optimizer/prompt-lab/tool_contract.py --run --confirm \
+  --model local-llamacpp/ling3-tiny-fast \
+  --output-dir /private/tmp/pi-tool-contract-ling-<date> \
+  --output /private/tmp/pi-tool-contract-ling-<date>/result.json \
+  --command /bin/sh -c 'exec env PI_OBSERVATIONAL_MEMORY_PASSIVE=1 \
+    /opt/homebrew/bin/timeout -k 10 120 pi --no-session --no-context-files \
+    --no-prompt-templates --no-themes --thinking off \
+    --model "$PI_MODEL" --tools "$TOOL_CONTRACT_TOOLS" --mode json \
+    --print "$(cat "$TOOL_CONTRACT_PROMPT_FILE")" </dev/null'
+```
+
+This attempt remains a serving qualification blocker, not a model-quality result.
+
 ## Explicit non-goals
 
 This note does not claim cross-model task-success equivalence, does not authorize
