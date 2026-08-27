@@ -1,0 +1,15 @@
+{
+  "schema": "pi.optimizer-campaign/v2",
+  "campaign_id": "offline-tiny",
+  "primary_metric": {"name": "task_success", "direction": "maximize", "kind": "binary", "paired_policy": {"name": "exact-sign", "minimum_net_fixes": 1}},
+  "hard_guards": [{"metric": "security_failures", "direction": "at_most", "threshold": 0}],
+  "optimizer_provider": {"plugin": "fake", "config": {}},
+  "surface_adapter": {"plugin": "fake", "config": {}},
+  "subject_model": {"provider": "fake", "model": "subject"},
+  "guard_models": [{"provider": "fake", "model": "guard"}],
+  "benchmark": {"plugin": "fake", "pack_id": "offline-tiny", "revision": "r1", "manifest": "benchmark.json", "discrimination_band": {"minimum": 0.2, "maximum": 0.8, "minimum_cases": 2}},
+  "permitted_surface_families": ["capability", "steering"],
+  "seeds": [7, 11],
+  "limits": {"iterations": 1, "rollouts_per_candidate": 6, "provider_sessions": 8, "wall_seconds": 120, "case_timeout_seconds": 10},
+  "provenance": {"source_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "config_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb", "surface_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"}
+}

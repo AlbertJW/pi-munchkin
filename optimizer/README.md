@@ -1,4 +1,9 @@
-# Optimizer — measurement programme (rebooted 2026-08)
+# Optimizer — frozen legacy measurement programme
+
+> **NEW CAMPAIGNS:** use the dark, review-only [Optimizer V2](v2/README.md).
+> This directory's original scripts and results are frozen under
+> [LEGACY.md](LEGACY.md); they remain readable and verifiable but cannot seed or
+> satisfy V2 evidence.
 
 > **STATUS 2026-08-21: MOTHBALLED AGAIN — see
 > [`docs/MOTHBALLED_2026-08-21.md`](docs/MOTHBALLED_2026-08-21.md).** No rounds, no candidate

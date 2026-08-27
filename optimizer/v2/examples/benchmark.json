@@ -1,0 +1,20 @@
+{
+  "schema": "pi.optimizer-benchmark-pack/v1",
+  "pack_id": "offline-tiny",
+  "revision": "r1",
+  "metric": "task_success",
+  "splits": {
+    "train": [
+      {"id": "train-a", "fixture_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "admission_receipt_sha256": "1111111111111111111111111111111111111111111111111111111111111111"},
+      {"id": "train-b", "fixture_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb", "admission_receipt_sha256": "2222222222222222222222222222222222222222222222222222222222222222"},
+      {"id": "train-c", "fixture_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc", "admission_receipt_sha256": "3333333333333333333333333333333333333333333333333333333333333333"}
+    ],
+    "development": [
+      {"id": "dev-a", "fixture_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd", "admission_receipt_sha256": "4444444444444444444444444444444444444444444444444444444444444444"},
+      {"id": "dev-b", "fixture_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee", "admission_receipt_sha256": "5555555555555555555555555555555555555555555555555555555555555555"}
+    ],
+    "test": [
+      {"id": "test-a", "fixture_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff", "admission_receipt_sha256": "6666666666666666666666666666666666666666666666666666666666666666"}
+    ]
+  }
+}

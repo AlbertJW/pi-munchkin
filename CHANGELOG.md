@@ -4,6 +4,36 @@ All notable changes to pi-munchkin are documented here. Releases follow semantic
 
 ## Unreleased
 
+### Added (2026-08-27 — dark Optimizer V2 control plane)
+
+- **A durable, benchmark-led optimizer under `optimizer/v2/`.** Strict
+  `pi.optimizer-campaign/v2` manifests bind one primary metric, hard guards, provider/model
+  cohorts, benchmark revision, typed surface families, budgets, and exact source/config/surface
+  fingerprints. `prepare` resolves and prints the campaign SHA-256 without execution; `run` and
+  `resume` require that exact digest. Run state is an fsynced, hash-chained `events.jsonl` with
+  stable operation IDs, one nonblocking writer lease, idempotent replay, and rebuildable private
+  projections. Immutable content-addressed candidates carry one causal mutation family; compatible
+  accepted candidates may compose only as a fresh candidate.
+- **Plugin boundaries and benchmark lifecycle.** Scenario adapters own immutable disjoint
+  train/development/opaque-test packs, calibration, paired seeded blocks, evidence, and metric
+  semantics. Surface adapters own isolated materialization, path/family allowlists, diff checks,
+  verification commands, and composition. Provider-neutral, schema-validated `evolve`,
+  `diagnose_patch`, and `reflect` sessions support deterministic fake, reviewed artifact-JSON, and
+  explicitly configured OpenAI-compatible providers. Development traces never enter provider
+  payloads; selection requires paired improvement, mechanism exposure, every hard guard, sequential
+  guard-model success, and development validation, then emits a human review packet only.
+- **Trusted-gate migration bridge.** `PiGateScenario` leaves `real_gate.sh`, graders, provenance,
+  telemetry authentication, exposure, Seatbelt, and secrets unchanged. Its ingestion path accepts
+  only fresh `pi.eval-row/v4` records with exact trial-validity bindings, one stable serving/session
+  identity, and matching campaign/config/surface hashes. Live Pi-gate campaign execution remains
+  deliberately unregistered until immutable candidate workspaces can be connected without touching
+  the live harness. Legacy optimizer scripts and evidence are frozen in place and cannot seed V2.
+  Offline verification covers strict parsing, approval mismatch, path containment, candidate
+  addressing/composition, budget refusal, crash-after-transition resume, split quarantine, paired
+  coverage/arm order, malformed provider output, missing exposure, guard regressions, fake lifecycle,
+  replay, and the existing gate dry run. No model inference, rollout, mirror, default change, or
+  adoption is performed by repository verification.
+
 ### Added (2026-08-27 — persistent goal mode and model-aware context epochs)
 
 - **Persistent goals** (`lib/goal-state.ts`, surfaced through `plan-runner`). A goal can be proposed
