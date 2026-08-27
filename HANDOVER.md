@@ -863,6 +863,17 @@ Next human gate: explicitly run that three-row base provenance screen, then
 inspect its safe provenance audit before any semantic candidate or planner /
 deep-research graph screen. Context-budget risk remains separate.
 
+Verification after the rollout is green: `npm test` 625/625, TypeScript
+typecheck passed, `npm run verify:optimizer` passed (all optimizer self-tests,
+15 Python tests, integrity/seatbelt/grade-jail checks, and gate dry-run), and
+the live mirror remains 120/120 with loaded hash
+`fe73b29328b0630817422401ea10633b34c33ba936c2cffd6a0b11bf89cf3322`.
+The initial restricted-sandbox optimizer failure was isolated to the nested
+macOS scoring jail (`sandbox_apply: Operation not permitted`) and passed when
+rerun in the approved elevated test environment. Do not infer or start the
+model run from these checks; use the replacement preregistration's explicit
+command and record only its safe provenance aggregates.
+
 - `ACTIVE_TOOL_PROMPTS=derived`: inactive tools contribute no ambient schemas, manuals, examples,
   snippets, or agent lists; `ambient` restores the legacy broad prompt surface.
 - `CONTROL_ARBITER=enforce`: one highest-priority corrective message is delivered per boundary;

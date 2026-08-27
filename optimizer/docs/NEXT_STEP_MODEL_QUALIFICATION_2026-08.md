@@ -149,6 +149,14 @@ context budgeting remains an observed safety concern, not a Qwen quality
 result. Planner/deep-research graph work and semantic-loop candidates remain
 dark.
 
+Post-rollout verification is green: `npm test` reports 625/625, TypeScript
+typecheck passes, `npm run verify:optimizer` passes (including the gate dry
+run), and `mirror:check` reports 120/120. The first restricted-sandbox
+optimizer attempt is not a code failure: its nested macOS scoring jail was
+denied by the host sandbox; the identical offline suite passed in the approved
+elevated test environment. The next human action is the explicit no-retry
+execution command in the replacement preregistration.
+
 ## Explicit non-goals
 
 This note does not claim cross-model task-success equivalence, does not authorize
