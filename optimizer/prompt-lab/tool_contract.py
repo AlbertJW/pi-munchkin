@@ -17,6 +17,7 @@ from pathlib import Path
 SCHEMA = "pi.tool-contract/v1"
 MANIFEST_SCHEMA = "pi.tool-contract-manifest/v1"
 ALLOWED_ORACLES = {"tool_call_observed", "mutation_and_verify_observed"}
+LOCAL_ORACLES = {"tool_call_observed", "recovery_observed", "edit_persisted", "write_persisted", "verification_passed"}
 TOOL_NAMES = {"read", "search_spans", "read_span", "bash", "edit", "write", "verify_project", "capability", "plan_write", "plan_update"}
 FIXTURE_NAMES = {
     "bounded-read", "span-search", "span-read", "shell-recovery", "anchored-edit",
@@ -30,10 +31,26 @@ CASE_TOOL_ALLOWLISTS = {
     "shell-recovery": "bash",
     "anchored-edit": "read,edit",
     "write-persist": "read,write",
-    "verify-after-mutation": "read,edit,verify_project,bash",
+    "verify-after-mutation": "read,edit,verify_project",
     "capability-activation": "capability",
-    "planner-write": "capability,plan_write,plan_update",
-    "planner-update": "capability,plan_write,plan_update",
+    # An explicit --tools list is authoritative in Pi and prevents the
+    # capability tool from activating deferred planning tools. Keep these
+    # cases on the normal dynamic surface so they qualify the capability
+    # activation path rather than a preselected tool list.
+    "planner-write": "auto",
+    "planner-update": "auto",
+}
+CASE_LOCAL_ORACLES = {
+    "bounded-read": "tool_call_observed",
+    "span-search": "tool_call_observed",
+    "span-read": "tool_call_observed",
+    "shell-recovery": "recovery_observed",
+    "anchored-edit": "edit_persisted",
+    "write-persist": "write_persisted",
+    "verify-after-mutation": "verification_passed",
+    "capability-activation": "tool_call_observed",
+    "planner-write": "tool_call_observed",
+    "planner-update": "tool_call_observed",
 }
 DEFAULT_MANIFEST = Path(__file__).with_name("tool-contract-v1.json")
 SCHEMA_PATH = Path(__file__).resolve().parents[1] / "real-gate-fixtures" / "schemas" / "pi.tool-contract-v1.schema.json"
@@ -66,6 +83,8 @@ def validate_manifest(manifest):
             errors.append(f"{case_id}: unknown required tool")
         if case.get("oracle") not in ALLOWED_ORACLES:
             errors.append(f"{case_id}: unknown oracle")
+        if case.get("local_oracle") not in LOCAL_ORACLES:
+            errors.append(f"{case_id}: unknown local oracle")
         if not isinstance(case.get("prompt"), str) or not case["prompt"].strip():
             errors.append(f"{case_id}: prompt is required")
         fixture = case.get("fixture")
@@ -210,13 +229,64 @@ def classify_trace(path, case, model):
     }
 
 
+def evaluate_local_oracle(case_dir, case, row):
+    """Check only deterministic case-local state; never expose file contents."""
+    oracle = case["local_oracle"]
+    outcome = row["outcome"]
+    if oracle == "tool_call_observed":
+        return bool(outcome.get("required_tool_observed"))
+    if oracle == "recovery_observed":
+        return bool(outcome.get("recovery_observed"))
+    if oracle == "edit_persisted":
+        try:
+            return (case_dir / "edit-target.txt").read_text(encoding="utf-8") == "STATUS=after\nKEEP=unchanged\n"
+        except OSError:
+            return False
+    if oracle == "write_persisted":
+        try:
+            return (case_dir / "write-target.txt").read_text(encoding="utf-8") == "PERSISTED=ok\n"
+        except OSError:
+            return False
+    if oracle == "verification_passed":
+        try:
+            if (case_dir / "edit-target.txt").read_text(encoding="utf-8") != "STATUS=after\n":
+                return False
+            checked = subprocess.run(
+                ["node", "verify.js"], cwd=case_dir, stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE, timeout=10, check=False,
+            )
+            return checked.returncode == 0
+        except (OSError, subprocess.SubprocessError):
+            return False
+    return False
+
+
 def selftest():
     manifest = load_manifest()
     errors = validate_manifest(manifest)
     assert not errors, errors
     assert json.loads(SCHEMA_PATH.read_text(encoding="utf-8"))["$id"] == MANIFEST_SCHEMA
-    case = manifest["cases"][4]
+    # Exercise every deterministic fixture/oracle pair without invoking a
+    # model. This keeps the qualification boundary useful in offline CI and
+    # prevents a newly added oracle from becoming an untested status bit.
     import tempfile
+    for fixture_case in manifest["cases"]:
+        with tempfile.TemporaryDirectory() as directory:
+            fixture_dir = Path(directory)
+            seed_fixture(fixture_dir, fixture_case)
+            synthetic = {"outcome": {
+                "required_tool_observed": True,
+                "recovery_observed": fixture_case["local_oracle"] == "recovery_observed",
+            }}
+            oracle = fixture_case["local_oracle"]
+            if oracle == "edit_persisted":
+                (fixture_dir / "edit-target.txt").write_text("STATUS=after\nKEEP=unchanged\n", encoding="utf-8")
+            elif oracle == "write_persisted":
+                (fixture_dir / "write-target.txt").write_text("PERSISTED=ok\n", encoding="utf-8")
+            elif oracle == "verification_passed":
+                (fixture_dir / "edit-target.txt").write_text("STATUS=after\n", encoding="utf-8")
+            assert evaluate_local_oracle(fixture_dir, fixture_case, synthetic) is True, oracle
+    case = manifest["cases"][4]
     with tempfile.TemporaryDirectory() as directory:
         case_dir = Path(directory)
         seed_fixture(case_dir, case)
@@ -252,7 +322,23 @@ def run_command(manifest, model, output_dir, command):
         # read its own growing stdout and enter a self-observing loop. Capture
         # stdout in the parent, then materialize the trace only after exit.
         trace_path = capture_dir / f"{case['id']}.trace.jsonl"
-        prompt_path.write_text(case["prompt"], encoding="utf-8")
+        requirement = (
+            f"Protocol requirement: call the required `{case['required_tool']}` tool before any final answer; "
+            "do not claim completion without its tool result. Use only the declared fixture paths."
+        )
+        if case["id"] == "anchored-edit":
+            requirement += " After the read, use exactly one edit call with a [path#TAG] header and `replace 1..1:` followed by `+STATUS=after`; stop after success."
+        if case["id"] == "verify-after-mutation":
+            requirement += " You MUST call `verify_project` after the edit; do not substitute bash, npm, or node for that tool."
+        if case["id"] == "planner-write":
+            requirement += " Your first tool call MUST be capability(action=enable, family=planning), followed by exactly one plan_write call."
+        if case["id"] == "planner-update":
+            requirement += " Your first tool call MUST be capability(action=enable, family=planning), then plan_write, then plan_update; do not use shell or write files."
+        prompt_path.write_text(
+            requirement + "\n\n"
+            f"Task: {case['prompt']}\n",
+            encoding="utf-8",
+        )
         env = dict(os.environ)
         env.update({
             "PI_MODEL": model,
@@ -260,8 +346,16 @@ def run_command(manifest, model, output_dir, command):
             "TOOL_CONTRACT_PROMPT_FILE": str(prompt_path),
             "TOOL_CONTRACT_TRACE_FILE": str(trace_path),
             "TOOL_CONTRACT_FIXTURE_ROOT": str(case_dir),
-            "TOOL_CONTRACT_TOOLS": case["tool_allowlist"],
+            # Empty means the adapter should omit --tools and let the harness
+            # expose capability-driven deferred tools. Never treat "auto" as
+            # a Pi tool name.
+            "TOOL_CONTRACT_TOOLS": "" if case["tool_allowlist"] == "auto" else case["tool_allowlist"],
         })
+        if case["id"] == "verify-after-mutation":
+            # The fixture is a deliberately tiny package; pin its exact gate
+            # so verify_project is available even when Pi's auto-detection is
+            # affected by a host settings profile.
+            env["VERIFY_GATE_CMD"] = "npm test"
         completed = subprocess.run(command, cwd=case_dir, env=env, stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=False)
         trace_path.write_bytes(completed.stdout)
         row = classify_trace(trace_path, case, model) if trace_path.exists() else {
@@ -270,6 +364,11 @@ def run_command(manifest, model, output_dir, command):
             "oracle": case["oracle"], "outcome": {"tool_call_attempted": False},
             "observed_tool_families": [],
         }
+        local_passed = evaluate_local_oracle(case_dir, case, row)
+        row["local_oracle"] = case["local_oracle"]
+        row.setdefault("outcome", {})["local_oracle_passed"] = local_passed
+        if row["status"] == "complete" and not local_passed:
+            row["status"] = "incomplete"
         row["process_exit_code"] = completed.returncode
         row["stderr_present"] = bool(completed.stderr)
         rows.append(row)

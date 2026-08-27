@@ -73,14 +73,33 @@ python3 optimizer/prompt-lab/tool_contract.py --run --confirm \
   --model local-llamacpp/ling3-tiny-fast \
   --output-dir /private/tmp/pi-tool-contract-ling-<date> \
   --output /private/tmp/pi-tool-contract-ling-<date>/result.json \
-  --command /bin/sh -c 'exec env PI_OBSERVATIONAL_MEMORY_PASSIVE=1 \
+  --command /bin/bash -c 'extra=(); if [ -n "$TOOL_CONTRACT_TOOLS" ]; then extra=(--tools "$TOOL_CONTRACT_TOOLS"); fi; exec env PI_OBSERVATIONAL_MEMORY_PASSIVE=1 \
     /opt/homebrew/bin/timeout -k 10 120 pi --no-session --no-context-files \
     --no-prompt-templates --no-themes --thinking off \
-    --model "$PI_MODEL" --tools "$TOOL_CONTRACT_TOOLS" --mode json \
+    --model "$PI_MODEL" "${extra[@]}" --mode json \
     --print "$(cat "$TOOL_CONTRACT_PROMPT_FILE")" </dev/null'
 ```
 
 This attempt remains a serving qualification blocker, not a model-quality result.
+
+## 2026-08-27 accepted Ling smoke
+
+After the isolation and protocol fixes, the explicit run completed all 10/10
+manifest cases for `local-llamacpp/ling3-tiny-fast` using the unchanged
+model-neutral command shape. The accepted rows were qualification-only and
+were not sent to fleet/adoption tooling. The local oracles independently
+confirmed: bounded read, span search/read, intentional shell failure plus
+recovery, anchored edit persistence, write persistence, mutation followed by
+`verify_project` and a passing fixture gate, capability activation, flat
+`plan_write`, and `plan_update`. The result summary contained no raw tool
+arguments, paths, commands, or source contents.
+
+This qualifies the harness protocol and fixture/tool contract for the next
+registered model; it does not qualify Ling's task performance or Qwen's
+quality. Qwen 35B has not been run. The next authorized step is the identical
+screen against `local-llamacpp/qwen36-35b-iq3s`, followed by a fresh Qwen
+preregistration only if its provenance audit is clean. The aggregate context
+budgeting risk remains open and separate.
 
 ## Explicit non-goals
 

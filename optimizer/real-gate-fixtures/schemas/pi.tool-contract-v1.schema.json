@@ -14,13 +14,14 @@
       "items": {
         "type": "object",
         "additionalProperties": false,
-        "required": ["id", "fixture", "tool_allowlist", "required_tool", "oracle", "allowed_recovery", "prompt"],
+        "required": ["id", "fixture", "tool_allowlist", "required_tool", "oracle", "local_oracle", "allowed_recovery", "prompt"],
         "properties": {
           "id": {"type": "string", "pattern": "^[a-z0-9-]+$"},
           "fixture": {"enum": ["bounded-read", "span-search", "span-read", "shell-recovery", "anchored-edit", "write-persist", "verify-after-mutation", "capability-activation", "planner-write", "planner-update"]},
-          "tool_allowlist": {"type": "string", "pattern": "^[a-z_]+(?:,[a-z_]+)*$"},
+          "tool_allowlist": {"type": "string", "pattern": "^(?:auto|[a-z_]+(?:,[a-z_]+)*)$"},
           "required_tool": {"enum": ["read", "search_spans", "read_span", "bash", "edit", "write", "verify_project", "capability", "plan_write", "plan_update"]},
           "oracle": {"enum": ["tool_call_observed", "mutation_and_verify_observed"]},
+          "local_oracle": {"enum": ["tool_call_observed", "recovery_observed", "edit_persisted", "write_persisted", "verification_passed"]},
           "allowed_recovery": {"type": "array", "items": {"type": "string"}},
           "prompt": {"type": "string", "minLength": 1}
         }

@@ -836,6 +836,11 @@ telemetry so it cannot fall back into the interactive ledger, and keeps
 planner/default flip, candidate, or rollout is implied; follow the note's
 explicit human-started sequence.
 
+2026-08-27: the explicit Ling `pi.tool-contract/v1` smoke completed 10/10
+cases with independent local persistence/verification oracles. This qualifies
+the harness protocol only; Qwen 35B remains the next gated screen. See the
+dated accepted-run section in the linked qualification note.
+
 - `ACTIVE_TOOL_PROMPTS=derived`: inactive tools contribute no ambient schemas, manuals, examples,
   snippets, or agent lists; `ambient` restores the legacy broad prompt surface.
 - `CONTROL_ARBITER=enforce`: one highest-priority corrective message is delivered per boundary;
