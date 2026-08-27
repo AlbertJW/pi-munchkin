@@ -132,7 +132,10 @@ split the provider identity. The source fix now adds an invocation-id envelope
 field, canonical reducer mapping, gate identity precedence, and regression
 coverage. Applying it to `~/.pi/agent` was refused by the deliberate-mirror
 safety gate because the checkout is not pushed; therefore no new live surface
-hash or result may be claimed. The run was interrupted after an `equil` branch
+hash or result may be claimed. Source commit `336d57c` now computes surface
+hash `2c333beea7743a172925b5fa0a93e6bb025a32078edaaa1a43e9ac3d5f9c2c36`; the
+deployed hash is unchanged until a human-gated mirror. The run was interrupted
+after an `equil` branch
 produced an unbounded ~1.1 MB response. Do not resume or pool that partial run.
 
 Next operational gate: push the source fix, apply the human-gated mirror,

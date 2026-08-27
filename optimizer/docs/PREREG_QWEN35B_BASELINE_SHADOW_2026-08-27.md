@@ -126,7 +126,10 @@ identity into the canonical schema (while retaining safe historical aliases),
 and gives gate environment identity precedence over detail snapshots. Regression
 tests and the context-telemetry self-test pass. The live mirror was not changed:
 its safety gate correctly refused a force-apply because this checkout is not
-pushed, and no automatic live rollout is authorized. The interrupted `equil`
+pushed, and no automatic live rollout is authorized. The fix is committed as
+`336d57c`; its source-surface hash is
+`2c333beea7743a172925b5fa0a93e6bb025a32078edaaa1a43e9ac3d5f9c2c36`, while the
+deployed surface remains the older pinned hash. The interrupted `equil`
 replicate had reached a roughly 1.1 MB model response and 17+ minutes; it was
 terminated to keep the screen bounded. Its branch is incomplete, not pooled.
 
