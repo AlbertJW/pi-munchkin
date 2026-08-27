@@ -175,11 +175,15 @@ export default function (pi: ExtensionAPI): void {
 		if (!lease) return;
 		handoffInFlight = true;
 		const reason = handoffReason(profile, usage);
-		record("runtime", "context-handoff", { from_epoch: fromEpoch, to_epoch: profile.epoch, reason_class: fromEpoch === profile.epoch ? "budget_threshold" : "smaller_target_window" });
 		const finish = (resume: boolean) => {
-			if (!finishCompaction(lease)) return;
+			// Clear the in-flight latch BEFORE the lease check: a stale lease
+			// (coordinator reset mid-compaction) must not disable handoff for the
+			// rest of the session. The outcome row is recorded here, once the
+			// result is known — a failed handoff must not look like a success.
 			handoffInFlight = false;
+			if (!finishCompaction(lease)) return;
 			handoffDisarmedKey = key;
+			record("runtime", "context-handoff", { from_epoch: fromEpoch, to_epoch: profile.epoch, reason_class: fromEpoch === profile.epoch ? "budget_threshold" : "smaller_target_window", ok: resume });
 			if (!resume) return;
 			try { pi.sendMessage({ customType: "pi-munchkin:model-handoff-resume", content: "Model handoff complete. Continue from the preserved goal and current filesystem evidence.", display: true, details: { epoch: profile.epoch } }, { triggerTurn: true, deliverAs: "followUp" }); } catch { /* stale session */ }
 		};

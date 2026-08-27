@@ -26,7 +26,7 @@ import { initialToolSurface } from "../lib/session-bootstrap.ts";
 import { record } from "../lib/telemetry.ts";
 import { CORE_NAMES, profileFromEnvironment } from "./tool-activation.ts";
 import {
-	acceptGoal, cancelGoal, createGoal, goalAmbientSummary, mutateGoal, pauseGoal, readGoal, readGoals, resumeGoal, settleGoal, updateGoal,
+	acceptGoal, cancelGoal, createGoal, goalAmbientSummary, goalsEnabled, mutateGoal, pauseGoal, readGoal, readGoals, resumeGoal, settleGoal, updateGoal,
 	GOAL_MAX_CRITERIA, goalScope, type CriterionStatus, type DeferredGoalItem, type GoalState,
 } from "../lib/goal-state.ts";
 
@@ -75,6 +75,7 @@ const DEEP_RESEARCH_PLANNING = PLAN_GRAPH && (process.env.DEEP_RESEARCH_PLANNING
 // than letting malformed/injected depth metadata silently regain write access
 // to the parent-owned goal ledger.
 const IS_SUBAGENT_PROCESS = process.env.PI_SUBAGENT_DEPTH !== undefined && process.env.PI_SUBAGENT_DEPTH !== "0";
+const GOALS_ENABLED = goalsEnabled();
 const TRACE_TAIL_MAX_BYTES = 64 * 1024;
 const PROC_MARK = processWriterMarker();
 
@@ -1012,10 +1013,12 @@ export default function (pi: ExtensionAPI): void {
 	api = pi;
 	pi.registerTool(planWrite);
 	pi.registerTool(planUpdate);
-	pi.registerTool(goalPropose);
-	pi.registerTool(goalUpdate);
-	pi.registerTool(goalSettle);
-	pi.registerTool(goalResume);
+	if (GOALS_ENABLED) {
+		pi.registerTool(goalPropose);
+		pi.registerTool(goalUpdate);
+		pi.registerTool(goalSettle);
+		pi.registerTool(goalResume);
+	}
 	if (PLAN_GRAPH) {
 		pi.registerTool(planExpand);
 		pi.registerTool(planSettle);
@@ -1046,7 +1049,7 @@ export default function (pi: ExtensionAPI): void {
 		delete (globalThis as Record<string, unknown>).__pi_active_goal_context;
 		lastSessionCwd = ctx.cwd;
 		rememberModel(ctx);
-		await rebindActiveGoal(ctx.cwd);
+		if (GOALS_ENABLED) await rebindActiveGoal(ctx.cwd);
 		lastNotify = (message: string) => ctx.ui.notify(message, "info");
 		reboundAnnounced = false;
 		const rebound = await rebindActivePlan(ctx.cwd);
@@ -1082,80 +1085,87 @@ export default function (pi: ExtensionAPI): void {
 	pi.on("before_agent_start", async () => { if (pendingRebind) await pendingRebind; if (pendingBranchMerge) await pendingBranchMerge; });
 
 	pi.registerCommand("plan", { description: "Enter bounded read-only planning for a request.", handler: async (args, ctx) => startPlanCommand(args, ctx, pi) });
-	pi.registerCommand("goal", {
-		description: "Create and activate a persistent project/worktree goal.",
-		handler: async (args, ctx) => {
-			const objective = cleanText(args);
-			if (!objective) { ctx.ui.notify("Usage: /goal <objective>", "error"); return; }
-			const result = await mutateGoal(ctx.cwd, async (previous) => {
-				if (previous && !["complete", "cancelled"].includes(previous.status)) throw new Error("An active or pending goal already exists; use /goal-status or /goal-resume.");
-				const goal = createGoal({ cwd: ctx.cwd, objective, scope: goalScope(), status: "active" });
-				return { goal, result: goal };
-			});
-			publishGoal(result);
-			goalEvent("started", result);
-			ctx.ui.notify(`Goal active: ${result.goal_id}`, "info");
-		},
-	});
-	pi.registerCommand("goal-accept", {
-		description: "Accept the current skill-proposed goal and activate it.",
-		handler: async (_args, ctx) => {
-			const result = await mutateGoal(ctx.cwd, async (previous) => {
-				if (!previous) throw new Error("No proposed goal exists.");
-				const goal = acceptGoal(previous);
-				return { goal, result: goal };
-			});
-			publishGoal(result);
-			goalEvent("accepted", result);
-			ctx.ui.notify(`Goal accepted: ${result.goal_id}`, "info");
-		},
-	});
-	pi.registerCommand("goal-status", {
-		description: "Show the active persistent goal and its evidence-backed criteria.",
-		handler: async (_args, ctx) => {
-			const goal = await rebindActiveGoal(ctx.cwd);
-			ctx.ui.notify(renderGoal(goal, await readGoals(ctx.cwd)), "info");
-		},
-	});
-	pi.registerCommand("goal-resume", {
-		description: "Resume a paused, blocked, or 80/20-accepted goal.",
-		handler: async (_args, ctx) => {
-			const result = await mutateGoal(ctx.cwd, async (previous) => {
-				if (!previous) throw new Error("No resumable goal exists.");
-				const goal = resumeGoal(previous);
-				return { goal, result: goal };
-			});
-			publishGoal(result);
-			goalEvent("resumed", result);
-			ctx.ui.notify(`Goal resumed: ${result.goal_id}`, "info");
-		},
-	});
-	pi.registerCommand("goal-pause", {
-		description: "Pause the active goal without discarding its evidence.",
-		handler: async (_args, ctx) => {
-			const result = await mutateGoal(ctx.cwd, async (previous) => {
-				if (!previous) throw new Error("No active goal exists.");
-				const goal = pauseGoal(previous);
-				return { goal, result: goal };
-			});
-			publishGoal(result);
-			goalEvent("paused", result);
-			ctx.ui.notify(`Goal paused: ${result.goal_id}`, "info");
-		},
-	});
-	pi.registerCommand("goal-cancel", {
-		description: "Cancel the active goal while retaining its private history.",
-		handler: async (_args, ctx) => {
-			const result = await mutateGoal(ctx.cwd, async (previous) => {
-				if (!previous) throw new Error("No active goal exists.");
-				const goal = cancelGoal(previous);
-				return { goal, result: goal };
-			});
-			goalEvent("cancelled", result);
-			publishGoal(undefined);
-			ctx.ui.notify(`Goal cancelled: ${result.goal_id}`, "info");
-		},
-	});
+	if (GOALS_ENABLED) {
+		pi.registerCommand("goal", {
+			description: "Create and activate a persistent project/worktree goal.",
+			handler: async (args, ctx) => {
+				rejectChildGoalMutation();
+				const objective = cleanText(args);
+				if (!objective) { ctx.ui.notify("Usage: /goal <objective>", "error"); return; }
+				const result = await mutateGoal(ctx.cwd, async (previous) => {
+					if (previous && !["complete", "cancelled"].includes(previous.status)) throw new Error("An active or pending goal already exists; use /goal-status or /goal-resume.");
+					const goal = createGoal({ cwd: ctx.cwd, objective, scope: goalScope(), status: "active" });
+					return { goal, result: goal };
+				});
+				publishGoal(result);
+				goalEvent("started", result);
+				ctx.ui.notify(`Goal active: ${result.goal_id}`, "info");
+			},
+		});
+		pi.registerCommand("goal-accept", {
+			description: "Accept the current skill-proposed goal and activate it.",
+			handler: async (_args, ctx) => {
+				rejectChildGoalMutation();
+				const result = await mutateGoal(ctx.cwd, async (previous) => {
+					if (!previous) throw new Error("No proposed goal exists.");
+					const goal = acceptGoal(previous);
+					return { goal, result: goal };
+				});
+				publishGoal(result);
+				goalEvent("accepted", result);
+				ctx.ui.notify(`Goal accepted: ${result.goal_id}`, "info");
+			},
+		});
+		pi.registerCommand("goal-status", {
+			description: "Show the active persistent goal and its evidence-backed criteria.",
+			handler: async (_args, ctx) => {
+				const goal = await rebindActiveGoal(ctx.cwd);
+				ctx.ui.notify(renderGoal(goal, await readGoals(ctx.cwd)), "info");
+			},
+		});
+		pi.registerCommand("goal-resume", {
+			description: "Resume a paused, blocked, or 80/20-accepted goal.",
+			handler: async (_args, ctx) => {
+				rejectChildGoalMutation();
+				const result = await mutateGoal(ctx.cwd, async (previous) => {
+					if (!previous) throw new Error("No resumable goal exists.");
+					const goal = resumeGoal(previous);
+					return { goal, result: goal };
+				});
+				publishGoal(result);
+				goalEvent("resumed", result);
+				ctx.ui.notify(`Goal resumed: ${result.goal_id}`, "info");
+			},
+		});
+		pi.registerCommand("goal-pause", {
+			description: "Pause the active goal without discarding its evidence.",
+			handler: async (_args, ctx) => {
+				rejectChildGoalMutation();
+				const result = await mutateGoal(ctx.cwd, async (previous) => {
+					if (!previous) throw new Error("No active goal exists.");
+					const goal = pauseGoal(previous);
+					return { goal, result: goal };
+				});
+				publishGoal(result);
+				goalEvent("paused", result);
+				ctx.ui.notify(`Goal paused: ${result.goal_id}`, "info");
+			},
+		});
+		pi.registerCommand("goal-cancel", {
+			description: "Cancel the active goal while retaining its private history.",
+			handler: async (_args, ctx) => {
+				rejectChildGoalMutation();
+				const result = await mutateGoal(ctx.cwd, async (previous) => {
+					if (!previous) throw new Error("No active goal exists.");
+					const goal = cancelGoal(previous);
+					return { goal, result: goal };
+				});
+				goalEvent("cancelled", result);
+				publishGoal(undefined);
+				ctx.ui.notify(`Goal cancelled: ${result.goal_id}`, "info");
+			},
+		});
+	}
 	pi.registerCommand("plan-go", { description: "Start or resume execution of the reviewed plan.", handler: async (_args, ctx) => goCommand(ctx, pi) });
 	pi.registerCommand("plan-cancel", {
 		description: "Discard the active plan and restore the previous tool selection.",

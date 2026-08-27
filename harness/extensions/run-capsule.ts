@@ -12,7 +12,7 @@ import { onRunStateSnapshot } from "../lib/run-kernel-snapshot.ts";
 import { emitHarnessSignal, onHarnessSignal } from "../lib/harness-signals.ts";
 import type { RunStateV1 } from "../lib/run-kernel-types.ts";
 import { record } from "../lib/telemetry.ts";
-import { readGoal, renderGoalRecoveryBrief } from "../lib/goal-state.ts";
+import { goalsEnabled, readGoal, renderGoalRecoveryBrief } from "../lib/goal-state.ts";
 
 export default function (pi: ExtensionAPI): void {
 	const mode = runCapsuleMode();
@@ -141,7 +141,7 @@ export default function (pi: ExtensionAPI): void {
 			if (!reason) return;
 			pendingCompactionGeneration = null;
 			pendingProviderRecovery = false;
-			const goalBrief = renderGoalRecoveryBrief(await readGoal(ctx.cwd));
+			const goalBrief = goalsEnabled() ? renderGoalRecoveryBrief(await readGoal(ctx.cwd)) : "";
 			const brief = `${renderRecoveryBrief(latestState, { reason })}${goalBrief ? `\n${goalBrief}` : ""}`;
 			record("run-capsule", "recovery-brief", { reason, brief_bytes: Buffer.byteLength(brief, "utf8"), generation: latestState.context.compactionGeneration });
 			return {

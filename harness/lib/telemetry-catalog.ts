@@ -82,9 +82,11 @@ export const EVENT_CATALOG = {
 	// per model per session after the first successful response. No URLs by
 	// construction (FORBIDDEN_DETAIL_FIELD would ban them anyway).
 	"runtime/serving-truth": { served_n_ctx: "number", registry_ctx: "number", verdict: "string" },
-	"runtime/context-profile": { epoch: "number", provider: "string", model: "string", declared_ctx: ["number", "null"], served_ctx: ["number", "null"], safe_input: ["number", "null"], confidence: "string", profile_source: "string" },
+	// provider/model are deliberately NOT declared here: normalizeDetail strips
+	// them from detail (RESERVED_FIELDS) and consumes them as envelope fallbacks.
+	"runtime/context-profile": { epoch: "number", declared_ctx: ["number", "null"], served_ctx: ["number", "null"], safe_input: ["number", "null"], confidence: "string", profile_source: "string" },
 	"runtime/context-calibration": { epoch: "number", success: "boolean", status: "number", failure: "string", safe_input: "number" },
-	"runtime/context-handoff": { from_epoch: "number", to_epoch: "number", reason_class: "string" },
+	"runtime/context-handoff": { from_epoch: "number", to_epoch: "number", reason_class: "string", ok: "boolean" },
 	"runtime/provider-timing": {
 		request_seq: "number", request_to_headers_ms: ["number", "null"],
 		first_token_ms: ["number", "null"], stream_completion_ms: ["number", "null"],

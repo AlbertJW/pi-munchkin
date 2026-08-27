@@ -8,7 +8,7 @@ import { runCapsuleMode } from "../lib/run-capsule-store.ts";
 import { onRunStateSnapshot } from "../lib/run-kernel-snapshot.ts";
 import { renderRecoveryBrief } from "../lib/recovery-brief.ts";
 import type { RunStateV1 } from "../lib/run-kernel-types.ts";
-import { readGoal, renderGoalRecoveryBrief } from "../lib/goal-state.ts";
+import { goalsEnabled, readGoal, renderGoalRecoveryBrief } from "../lib/goal-state.ts";
 
 // Model-driven in-place context compaction.
 //
@@ -100,7 +100,7 @@ export default function (pi: ExtensionAPI) {
 					);
 				};
 				try {
-					const goalBrief = renderGoalRecoveryBrief(await readGoal(ctx.cwd));
+					const goalBrief = goalsEnabled() ? renderGoalRecoveryBrief(await readGoal(ctx.cwd)) : "";
 					const recovery = recoveryMode && recoveryState
 						? `\n\n${renderRecoveryBrief(recoveryState, { reason: "compaction" })}`
 						: "";

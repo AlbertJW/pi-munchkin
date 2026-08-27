@@ -302,6 +302,46 @@ test("malformed child depth metadata fails closed for parent-owned goal mutation
 	}
 });
 
+test("delegated child processes cannot mutate the goal ledger through slash commands either", async () => {
+	// The tool fence above covers the model surface; the /goal* commands are the
+	// other write channel and must refuse under the same parent-owned rule.
+	const priorDepth = process.env.PI_SUBAGENT_DEPTH;
+	process.env.PI_SUBAGENT_DEPTH = "1";
+	try {
+		const childPlanRunner = (await import(`../extensions/plan-runner.ts?child-goal-command=${Date.now()}-${Math.random()}`)).default;
+		const fp = makeFakePi();
+		childPlanRunner(fp.pi as any);
+		const cwd = tmp();
+		const { ctx } = makeCtx(cwd);
+		await assert.rejects(() => fp.commands.get("goal").handler("child-issued objective", ctx), /parent-owned/);
+		assert.equal(existsSync(goalStoragePath(cwd)), false, "a refused /goal must not create a goal ledger");
+	} finally {
+		if (priorDepth === undefined) delete process.env.PI_SUBAGENT_DEPTH;
+		else process.env.PI_SUBAGENT_DEPTH = priorDepth;
+		resetPiGlobals();
+	}
+});
+
+test("GOALS=off removes the whole goal surface as one rollback switch", async () => {
+	const priorGoals = process.env.GOALS;
+	process.env.GOALS = "off";
+	try {
+		const gatedPlanRunner = (await import(`../extensions/plan-runner.ts?goals-off=${Date.now()}-${Math.random()}`)).default;
+		const fp = makeFakePi();
+		gatedPlanRunner(fp.pi as any);
+		for (const tool of ["goal_propose", "goal_update", "goal_settle", "goal_resume"]) {
+			assert.equal(fp.tools.has(tool), false, `${tool} must not register under GOALS=off`);
+		}
+		for (const command of ["goal", "goal-accept", "goal-status", "goal-resume", "goal-pause", "goal-cancel"]) {
+			assert.equal(fp.commands.has(command), false, `/${command} must not register under GOALS=off`);
+		}
+	} finally {
+		if (priorGoals === undefined) delete process.env.GOALS;
+		else process.env.GOALS = priorGoals;
+		resetPiGlobals();
+	}
+});
+
 test("review-phase rewrites may drop items; executing-phase rewrites may not", async () => {
 	// The omission trap (audit A4): during /plan review the rejection named
 	// plan_update, which planning mode blocks. Dropping items pre-go is revision.

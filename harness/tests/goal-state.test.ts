@@ -103,6 +103,34 @@ test("goal updates require known criteria and 80/20 settlement carries evidence 
 		} finally { rmSync(root, { recursive: true, force: true }); }
 });
 
+test("80/20 settlement refuses unmet optional criteria that were not explicitly deferred", () => {
+	// The deferral guard must be a correspondence, not a count: one deferred entry
+	// must not unlock an arbitrary number of optional criteria that are still open.
+	const { root, cwd } = fixture();
+	try {
+		const active = createGoal({ cwd, objective: "Correspondence, not count", criteria: [
+			{ id: "core", text: "Core work lands", required: true },
+			{ id: "examples", text: "Examples are polished", required: false },
+			{ id: "docs", text: "Docs are refreshed", required: false },
+		] });
+		const progressed = updateGoal(active, { criteria: [{ id: "core", status: "met", evidence: ["verified"] }, { id: "examples", status: "deferred" }] });
+		const settlement = {
+			outcome: "accepted_80_20" as const, deliveredValue: "Core work landed", confidence: 0.8,
+			residualRisks: ["deferred polish"], deferred: [{ value: "polish examples", risk: "clarity debt", rationale: "Not needed for acceptance." }],
+			evidence: ["gate passed"],
+		};
+		assert.throws(() => settleGoal(progressed, settlement), /explicitly deferred: docs/);
+		const marked = updateGoal(progressed, { criteria: [{ id: "docs", status: "deferred" }] });
+		const settled = settleGoal(marked, settlement);
+		assert.equal(settled.status, "accepted_80_20");
+		assert.throws(
+			() => settleGoal(updateGoal(active, { criteria: [{ id: "core", status: "met", evidence: ["verified"] }, { id: "examples", status: "deferred" }, { id: "docs", status: "deferred" }] }), { ...settlement, deferred: [] }),
+			/deferred rationale/,
+			"deferred criteria still demand at least one recorded deferral",
+		);
+	} finally { rmSync(root, { recursive: true, force: true }); }
+});
+
 test("completed goals remain in the private ledger while a later goal can become the sole active head", async () => {
 	const { root, env, cwd } = fixture();
 	try {

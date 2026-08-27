@@ -1,5 +1,9 @@
 import assert from "node:assert/strict";
+import { existsSync, mkdtempSync, readFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import test from "node:test";
+import { resetCompactionCoordinator } from "../lib/compaction-coordinator.ts";
 import {
 	calibrateContext, contextNeedsHandoff, contextProfileFor, handoffReason, modelFingerprint, outputReserveFor, safeInputBudget,
 } from "../lib/context-profile.ts";
@@ -126,5 +130,70 @@ test("automatic handoff is one-shot until the context falls below the rearm thre
 		assert.equal(compactions, 2, "a materially reduced context should rearm the handoff");
 	} finally {
 		if (prior === undefined) delete process.env.CONTEXT_HANDOFF; else process.env.CONTEXT_HANDOFF = prior;
+	}
+});
+
+test("a stale compaction lease does not permanently disable automatic handoff", async () => {
+	const prior = process.env.CONTEXT_HANDOFF;
+	delete process.env.CONTEXT_HANDOFF;
+	try {
+		resetCompactionCoordinator();
+		const fp = makeFakePi();
+		const mod = await import(`../extensions/runtime-truth.ts?handoff-latch=${Date.now()}-${Math.random()}`);
+		mod.default(fp.pi as never);
+		await fire(fp, "session_start", {}, {});
+		const model = { provider: "local", id: "latch", contextWindow: 32_768 };
+		await fire(fp, "before_provider_request", {}, { model });
+		let compactions = 0;
+		const usage = () => ({ tokens: 30_000, percent: 91 });
+		// A coordinator reset lands between the lease grant and the completion
+		// callback — the same shape as a session reset racing an in-flight
+		// compaction. finishCompaction() then returns false for the stale token.
+		await fire(fp, "turn_end", {}, {
+			getContextUsage: usage,
+			compact: (options: { onComplete?: () => void }) => { compactions += 1; resetCompactionCoordinator(); options.onComplete?.(); },
+		});
+		assert.equal(compactions, 1);
+		await fire(fp, "turn_end", {}, {
+			getContextUsage: usage,
+			compact: (options: { onComplete?: () => void }) => { compactions += 1; options.onComplete?.(); },
+		});
+		assert.equal(compactions, 2, "a stale lease must not latch handoffInFlight for the rest of the session");
+	} finally {
+		if (prior === undefined) delete process.env.CONTEXT_HANDOFF; else process.env.CONTEXT_HANDOFF = prior;
+	}
+});
+
+test("context-handoff telemetry reports the outcome, not the attempt", async () => {
+	const file = join(mkdtempSync(join(tmpdir(), "pi-handoff-telemetry-")), "events.jsonl");
+	const names = ["CONTEXT_HANDOFF", "TELEMETRY", "TELEMETRY_FILE", "TELEMETRY_FD", "TELEMETRY_HMAC_FD", "TELEMETRY_SOURCE"];
+	const prior = Object.fromEntries(names.map((name) => [name, process.env[name]]));
+	for (const name of names) delete process.env[name];
+	process.env.TELEMETRY_FILE = file;
+	process.env.TELEMETRY_SOURCE = "test";
+	try {
+		resetCompactionCoordinator();
+		const fp = makeFakePi();
+		const mod = await import(`../extensions/runtime-truth.ts?handoff-outcome=${Date.now()}-${Math.random()}`);
+		mod.default(fp.pi as never);
+		await fire(fp, "session_start", {}, {});
+		await fire(fp, "before_provider_request", {}, { model: { provider: "local", id: "outcome-large", contextWindow: 32_768 } });
+		const handoffRows = () => (existsSync(file) ? readFileSync(file, "utf8").trim().split("\n").map((line) => JSON.parse(line)) : [])
+			.filter((row) => row.ext === "runtime" && row.kind === "context-handoff");
+		let fail: (() => void) | undefined;
+		await fire(fp, "model_select", { model: { provider: "local", id: "outcome-small", contextWindow: 4_096 } }, {
+			getContextUsage: () => ({ tokens: 8_000, percent: 95 }),
+			compact: (options: { onError?: (error: Error) => void }) => { fail = () => options.onError?.(new Error("provider aborted")); },
+		});
+		assert.equal(handoffRows().length, 0, "no outcome row may exist while the compaction is still in flight");
+		fail?.();
+		const rows = handoffRows();
+		assert.equal(rows.length, 1, "a settled handoff emits exactly one outcome row");
+		assert.equal(rows[0].ok, false, "a failed handoff must not look like a successful one");
+		assert.equal(rows[0].reason_class, "smaller_target_window");
+	} finally {
+		for (const name of names) {
+			if (prior[name] === undefined) delete process.env[name]; else process.env[name] = prior[name] as string;
+		}
 	}
 });

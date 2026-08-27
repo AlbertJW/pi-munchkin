@@ -101,6 +101,13 @@ function clean(value: unknown, max = MAX_TEXT): string {
 }
 function hash(value: string): string { return createHash("sha256").update(value).digest("hex"); }
 
+/** Rollback switch for the whole goal capability (tools, commands, and the
+ * recovery-brief reads). Default on; GOALS=off removes the surface entirely,
+ * matching the repo's convention that every capability has one env rollback. */
+export function goalsEnabled(env: NodeJS.ProcessEnv = process.env): boolean {
+	return env.GOALS !== "off";
+}
+
 export function goalScope(env: NodeJS.ProcessEnv = process.env): "project" | "worktree" {
 	return env.GOAL_SCOPE === "project" ? "project" : "worktree";
 }
@@ -289,7 +296,14 @@ export function settleGoal(goal: GoalState, input: {
 	const requiredOpen = goal.criteria.filter((criterion) => criterion.required && criterion.status !== "met");
 	if (requiredOpen.length) throw new Error(`required criteria remain open: ${requiredOpen.map((criterion) => criterion.id).join(", ")}`);
 	if (input.outcome === "complete" && goal.criteria.some((criterion) => criterion.status !== "met")) throw new Error("complete settlement requires every criterion to be met");
-	if (input.outcome === "accepted_80_20" && !(input.deferred ?? []).length && goal.criteria.some((criterion) => !criterion.required && criterion.status !== "met")) throw new Error("80/20 settlement requires deferred rationale for unmet optional criteria");
+	if (input.outcome === "accepted_80_20") {
+		// Correspondence, not a count: every unmet optional criterion must be
+		// explicitly marked deferred — one deferral entry must not unlock an
+		// arbitrary number of criteria that are still open.
+		const openOptional = goal.criteria.filter((criterion) => !criterion.required && criterion.status === "open");
+		if (openOptional.length) throw new Error(`80/20 settlement requires unmet optional criteria to be explicitly deferred: ${openOptional.map((criterion) => criterion.id).join(", ")}`);
+		if (goal.criteria.some((criterion) => criterion.status === "deferred") && !(input.deferred ?? []).length) throw new Error("80/20 settlement requires deferred rationale for deferred criteria");
+	}
 	const next = transition(goal, input.outcome, input.outcome === "complete" ? "evidence-backed completion" : "evidence-backed 80/20 acceptance");
 	next.delivered_value = clean(input.deliveredValue);
 	next.confidence = input.confidence;

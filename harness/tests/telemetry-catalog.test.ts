@@ -3,7 +3,7 @@ import { readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 import test from "node:test";
 import { catalogHas, EVENT_CATALOG, RESERVED_ENVELOPE_FIELDS, validateCatalogDetail } from "../lib/telemetry-catalog.ts";
-import { isForbiddenDetailField } from "../lib/telemetry.ts";
+import { isForbiddenDetailField, RESERVED_FIELDS } from "../lib/telemetry.ts";
 
 test("every literal telemetry emission is represented in the event catalog", () => {
 	// Resolve from this test file, not cwd — the live ~/.pi/agent tree is flat
@@ -89,6 +89,23 @@ test("no catalog entry DECLARES a field that shadows an envelope key", () => {
 	assert.deepEqual(violations, [], "rename the field — envelope keys are not available to detail");
 	assert.ok(RESERVED_ENVELOPE_FIELDS.has("source"), "the set must still be the real one, not an empty stand-in");
 	assert.ok(RESERVED_ENVELOPE_FIELDS.has("invocation_id"), "gate invocation identity must not be detail-overridable");
+});
+
+test("no catalog entry DECLARES a field that normalizeDetail strips as reserved", () => {
+	// RESERVED_ENVELOPE_FIELDS (above) is the schema-reject half. This is the
+	// SILENT half: normalizeDetail `continue`s past RESERVED_FIELDS keys before
+	// catalog validation ever runs, so a declared `provider`/`model` detail field
+	// is a dead declaration — every emitted row lacks it, no error, and the
+	// catalog reads as coverage for a field that cannot exist.
+	const violations: string[] = [];
+	for (const [event, schema] of Object.entries(EVENT_CATALOG)) {
+		for (const field of Object.keys(schema)) {
+			if (RESERVED_FIELDS.has(field)) violations.push(`${event}.${field}`);
+		}
+	}
+	assert.deepEqual(violations, [], "drop the field from the catalog — normalizeDetail strips it from every row");
+	assert.ok(RESERVED_FIELDS.has("provider"), "the set must still be the real one, not an empty stand-in");
+	assert.ok(RESERVED_FIELDS.has("model"), "the set must still be the real one, not an empty stand-in");
 });
 
 test("machine-readable exposure catalog stays in lockstep with TypeScript catalog", () => {

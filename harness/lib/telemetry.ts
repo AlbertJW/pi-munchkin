@@ -146,7 +146,10 @@ function classifyError(value: string): string {
 }
 
 const FORBIDDEN_DETAIL_FIELD = /(prompt|tool.?output|file.?content|\bcontent\b|url|header|credential|secret|api.?key|exception)/i;
-const RESERVED_FIELDS = new Set(["run_id", "provider", "model", "requested_provider", "requested_model"]);
+/** Exported for the catalog tripwire: normalizeDetail silently drops these keys
+ * from every detail payload (they are envelope-level fallbacks), so a catalog
+ * entry declaring one describes a field the schema can never see. */
+export const RESERVED_FIELDS = new Set(["run_id", "provider", "model", "requested_provider", "requested_model"]);
 
 /** Exported for the catalog tripwire: a catalog entry whose field name this
  * predicate rejects is a contradiction — every row it describes would be
