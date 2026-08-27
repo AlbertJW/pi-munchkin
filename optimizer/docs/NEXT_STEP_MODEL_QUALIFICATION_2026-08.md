@@ -96,10 +96,31 @@ arguments, paths, commands, or source contents.
 
 This qualifies the harness protocol and fixture/tool contract for the next
 registered model; it does not qualify Ling's task performance or Qwen's
-quality. Qwen 35B has not been run. The next authorized step is the identical
-screen against `local-llamacpp/qwen36-35b-iq3s`, followed by a fresh Qwen
-preregistration only if its provenance audit is clean. The aggregate context
-budgeting risk remains open and separate.
+quality. The identical Qwen 35B screen is recorded below. The aggregate
+context budgeting risk remains open and separate.
+
+## 2026-08-27 accepted Qwen 35B protocol screen
+
+The explicit run against `local-llamacpp/qwen36-35b-iq3s` completed 10/10
+manifest cases with exit code zero and all local oracles passing. It used the
+same manifest, isolated case directories, dynamic planning-capability path,
+and model-execution boundary as the Ling run. The screen covered bounded
+read/search, shell failure and recovery, anchored edit and write persistence,
+post-mutation `verify_project`, capability activation, flat `plan_write`, and
+`plan_update`. Its `pi.tool-contract/v1` result contained only safe
+classifications and no raw tool arguments, paths, commands, or source
+contents; fleet/adoption tooling cannot ingest that schema.
+
+The first Qwen attempt (8/10) is superseded, not pooled: it exposed a
+provider-format issue for nonzero Bash exit markers, an equivalent trailing
+newline representation, and planner retries after malformed IDs. The reducer
+now classifies bounded exit markers as execution failures, accepts only the
+documented newline-normalized write value, marks interrupted processes
+incomplete, and asks the planner fixture to omit IDs and stop after the
+required calls. This is a protocol qualification, not a Qwen efficacy or
+adoption verdict. The next step is a fresh Qwen-35B preregistration against
+the current source surface, then a bounded baseline/shadow screen only after
+that provenance audit. Planner/deep-research graph changes remain dark.
 
 ## Explicit non-goals
 

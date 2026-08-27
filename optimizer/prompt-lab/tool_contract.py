@@ -187,9 +187,15 @@ def classify_trace(path, case, model):
                     verify_calls += 1
         elif message.get("role") in ("tool", "toolResult"):
             is_error = message.get("isError") or any(isinstance(block, dict) and block.get("isError") for block in (message.get("content") or []))
+            # Bash normally returns a successful tool envelope even when the
+            # command's own exit status is non-zero. Recover the safe failure
+            # class from its bounded status marker; otherwise shell-recovery
+            # would be model/provider-format dependent.
+            error_text = _text_blocks(message.get("content"))
+            if not is_error and re.search(r"\b(?:exit|return)(?:_|-|\s)*code\s*[:=]\s*[1-9]\b", error_text, re.IGNORECASE):
+                is_error = True
             tool_name = str(message.get("toolName") or calls_by_id.get(str(message.get("toolCallId") or "")) or "").lower()
             if is_error:
-                error_text = _text_blocks(message.get("content"))
                 if re.search(r"schema|invalid|required|unknown (?:tool|field)|argument", error_text, re.IGNORECASE):
                     schema_rejections += 1
                 else:
@@ -244,7 +250,10 @@ def evaluate_local_oracle(case_dir, case, row):
             return False
     if oracle == "write_persisted":
         try:
-            return (case_dir / "write-target.txt").read_text(encoding="utf-8") == "PERSISTED=ok\n"
+            # A final newline is an equivalent text-file representation for
+            # this fixture; reject every other byte so the oracle remains
+            # deterministic and cannot be satisfied by a prose claim.
+            return (case_dir / "write-target.txt").read_text(encoding="utf-8").rstrip("\n") == "PERSISTED=ok"
         except OSError:
             return False
     if oracle == "verification_passed":
@@ -331,9 +340,9 @@ def run_command(manifest, model, output_dir, command):
         if case["id"] == "verify-after-mutation":
             requirement += " You MUST call `verify_project` after the edit; do not substitute bash, npm, or node for that tool."
         if case["id"] == "planner-write":
-            requirement += " Your first tool call MUST be capability(action=enable, family=planning), followed by exactly one plan_write call."
+            requirement += " Do not read files or use shell. Your first tool call MUST be capability(action=enable, family=planning), followed by exactly one plan_write call; omit item_id fields and use only two short titles."
         if case["id"] == "planner-update":
-            requirement += " Your first tool call MUST be capability(action=enable, family=planning), then plan_write, then plan_update; do not use shell or write files."
+            requirement += " Do not read files or use shell. Your first tool call MUST be capability(action=enable, family=planning), then plan_write (omit item_id fields), then plan_update; do not write files."
         prompt_path.write_text(
             requirement + "\n\n"
             f"Task: {case['prompt']}\n",
@@ -367,7 +376,7 @@ def run_command(manifest, model, output_dir, command):
         local_passed = evaluate_local_oracle(case_dir, case, row)
         row["local_oracle"] = case["local_oracle"]
         row.setdefault("outcome", {})["local_oracle_passed"] = local_passed
-        if row["status"] == "complete" and not local_passed:
+        if row["status"] == "complete" and (not local_passed or completed.returncode != 0):
             row["status"] = "incomplete"
         row["process_exit_code"] = completed.returncode
         row["stderr_present"] = bool(completed.stderr)
