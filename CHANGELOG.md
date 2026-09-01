@@ -4,6 +4,14 @@ All notable changes to pi-munchkin are documented here. Releases follow semantic
 
 ## Unreleased
 
+### Fixed (2026-09-01 — graceful shutdown gives active gate runs a settlement window)
+
+- **Active agents now abort before runtime disposal.** Pi's print-mode `SIGTERM` path emits
+  `session_shutdown` while a model may still be streaming. The harness requests an abort,
+  waits for the actual `agent_settled` callback (bounded below the gate's hard-kill grace),
+  and only then flushes telemetry. This preserves the authoritative settlement boundary
+  for long gate sessions without changing the hard timeout, model defaults, or rollout flags.
+
 ### Fixed (2026-09-01 — the goal recovery brief keeps its budget on the compaction path)
 
 - **`renderGoalRecoveryBrief` defaults to the context-scaled budget instead of 1 KiB.** The

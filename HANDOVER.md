@@ -1,5 +1,18 @@
 # Handover — pi_munchkin, 2026-08-24
 
+## 2026-09-01 graceful gate shutdown settlement — source-only
+
+The gate's hard timeout was not the only lifecycle boundary: Pi print mode handles
+`SIGTERM` by emitting `session_shutdown` and disposing the runtime, while an active
+agent may still be streaming. `telemetry-flush` now requests an abort during that
+boundary, waits for the actual `agent_settled` callback (bounded at 25 seconds under
+the existing 30-second kill grace), then flushes telemetry. A targeted regression was
+red before the fix and green after it; the full harness suite is 662/662 and typecheck
+passes. This is a source-only model-visible boundary (`f5b3a00d…`), pending human
+rollout and a new loaded-surface smoke. It changes no defaults and supplies no Qwen
+quality evidence; do not rerun or pool a gate until the new surface is explicitly
+approved and bound.
+
 ## 2026-09-01 Qwen35B baseline screen — lifecycle cutoff, evidence voided
 
 The current-surface Qwen35B base-only screen was run under invocation `96faf8`
