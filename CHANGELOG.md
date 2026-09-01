@@ -4,6 +4,20 @@ All notable changes to pi-munchkin are documented here. Releases follow semantic
 
 ## Unreleased
 
+### Fixed (2026-09-01 — Optimizer V2 learning loop)
+
+- **Optimizer feedback is now durable and causal.** Provider exchanges use
+  `pi.optimizer-session/v2`; evolution receives bounded immutable candidate cards, the current
+  head, the previous reflection, and only quarantined development-validated lessons. Raw
+  development observations and traces never enter provider payloads.
+- **Candidate ancestry is preserved.** Evolution has only `mutate` and `compose`; selecting an
+  earlier accepted ancestor is the supported revert path. Surface adapters materialize the full
+  parent chain, compositions require a shared baseline and transitive changed-unit agreement,
+  and every composition is a fresh verified candidate.
+- **Campaigns fail before sessions when policy declarations are malformed.** Paired-policy names,
+  required fields, numeric types, finite bounds, alpha, permutation counts, and exact-policy
+  limits are validated during manifest loading. The campaign remains dark and human-review-only.
+
 ### Fixed (2026-09-01 — serving-aware context epoch completion)
 
 - **Context identity now includes the serving boundary.** Discovery and calibration are
