@@ -4,6 +4,20 @@ All notable changes to pi-munchkin are documented here. Releases follow semantic
 
 ## Unreleased
 
+### Fixed (2026-09-01 — serving-aware context epoch completion)
+
+- **Context identity now includes the serving boundary.** Discovery and calibration are
+  keyed by provider, model, declared window, and a normalized endpoint fingerprint; changing
+  an endpoint or declared window opens a fresh epoch without exposing the raw endpoint.
+- **Budget shrinkage is acted on immediately.** A served-window observation that lowers the
+  safe input budget reevaluates the completed turn and requests the existing single-flight
+  handoff before another provider request can begin, with a pending marker for lifecycle gaps
+  and the existing 70% rearm threshold.
+- **Handoffs preserve the right work.** Model switches retain the active task and executable
+  goal digest, use goal-specific wording only when a goal is active, and report reachability
+  calibration as `observed` rather than measured capacity. Epoch, budget, handoff, and rearm
+  telemetry remains numeric/enum-only.
+
 ### Fixed (2026-09-01 — goal authority and recovery contract)
 
 - **Inactive goals no longer restart themselves.** Private goal state is now
