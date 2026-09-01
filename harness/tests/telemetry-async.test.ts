@@ -109,6 +109,27 @@ test("agent_settled awaits the final async telemetry flush", async () => {
 	});
 });
 
+test("session shutdown aborts an active agent and waits for settlement before flushing", async () => {
+	const fp = makeFakePi();
+	const flush = await import(`../extensions/telemetry-flush.ts?shutdown-abort=${Date.now()}-${Math.random()}`);
+	flush.default(fp.pi as never);
+	let idle = false;
+	let aborts = 0;
+	const ctx = {
+		isIdle: () => idle,
+		abort: () => {
+			aborts += 1;
+			setTimeout(() => {
+				idle = true;
+				void fire(fp, "agent_settled", {}, ctx);
+			}, 10);
+		},
+	};
+	await fire(fp, "session_shutdown", {}, ctx);
+	assert.equal(aborts, 1, "shutdown must request an active agent to abort");
+	assert.equal(idle, true, "shutdown must not return while the agent is still active");
+});
+
 test("async writer retains the one-generation rotation boundary", async () => {
 	const root = mkdtempSync(join(tmpdir(), "telemetry-rotate-"));
 	const file = join(root, "events.jsonl");
