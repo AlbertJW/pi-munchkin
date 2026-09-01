@@ -4,6 +4,21 @@ All notable changes to pi-munchkin are documented here. Releases follow semantic
 
 ## Unreleased
 
+### Fixed (2026-09-01 — the goal recovery brief keeps its budget on the compaction path)
+
+- **`renderGoalRecoveryBrief` defaults to the context-scaled budget instead of 1 KiB.** The
+  `pi.goal-context/v2` brief grew from (objective ≤240 B + criterion IDs + counts) to the full
+  contract, but only `plan-runner` passed the larger budget; `compact-tool.ts` and `run-capsule.ts`
+  kept the `1_024` default. With ~270 B of fixed v2 header and a ~100 B truncation suffix, the brief
+  that survives a **compaction** — the case goal mode exists for — truncated before the first
+  criterion and always dropped `residual_risks` and `deferrals`, a regression against the v1 brief
+  which always fit. `goalContextBudget()` moves into `lib/goal-state.ts` and becomes the default, so
+  all three injection sites share one budget by construction rather than by remembering to pass it.
+- **A truncated brief no longer claims both complete and incomplete details.** `details_complete:
+  true` sat inside the truncatable body ~116 bytes from its end while the suffix reserves ~100, so a
+  ~21-byte band of budgets kept the `true` line and then appended the `false` one. It is now
+  appended per branch and never carried in the body.
+
 ### Fixed (2026-09-01 — optimizer durability and scoring isolation)
 
 - **Event recovery is explicit.** `status`, `inspect`, and `replay` report a malformed
