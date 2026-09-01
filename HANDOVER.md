@@ -13,6 +13,14 @@ rollout and a new loaded-surface smoke. It changes no defaults and supplies no Q
 quality evidence; do not rerun or pool a gate until the new surface is explicitly
 approved and bound.
 
+The next safe action is prepared in
+[`optimizer/docs/PREREG_QWEN35B_GRACEFUL_SHUTDOWN_2026-09-01.md`](optimizer/docs/PREREG_QWEN35B_GRACEFUL_SHUTDOWN_2026-09-01.md).
+It binds source hash `f5b3a00d…`, requires a newly mirrored/recorded loaded
+hash, and keeps the prior 480-second timeout so only the settlement lifecycle
+changes. The dry preflight is offline; the three-row Qwen command remains
+human-approval-only. Do not use the old `63671544…` loaded receipt or pool the
+earlier timeout-retry rows.
+
 ## 2026-09-01 Qwen35B baseline screen — lifecycle cutoff, evidence voided
 
 The current-surface Qwen35B base-only screen was run under invocation `96faf8`
