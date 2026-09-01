@@ -121,6 +121,10 @@ def load_campaign(source: dict | str | pathlib.Path) -> Campaign:
             raise ManifestError("primary_metric.paired_policy.permutations must be between 2 and 1000000")
     else:
         raise ManifestError("primary_metric.paired_policy.name is unsupported")
+    if metric["kind"] == "binary" and policy_name != "exact-sign":
+        raise ManifestError("binary primary metrics require exact-sign paired policy")
+    if metric["kind"] == "continuous" and policy_name != "paired-permutation":
+        raise ManifestError("continuous primary metrics require paired-permutation policy")
     guards = obj["hard_guards"]
     if not isinstance(guards, list) or not guards:
         raise ManifestError("hard_guards must be a non-empty list")
