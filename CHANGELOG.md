@@ -4,6 +4,23 @@ All notable changes to pi-munchkin are documented here. Releases follow semantic
 
 ## Unreleased
 
+### Fixed (2026-09-01 — goal authority and recovery contract)
+
+- **Inactive goals no longer restart themselves.** Private goal state is now
+  `pi.goal-ledger/v2`: `current_goal_id` preserves paused, blocked, proposed, and
+  80/20-settled state for `/goal-status`, while only `status=active` grants model
+  execution authority. V1 ledgers migrate without reactivating inactive goals.
+- **Resume is user-owned and recovery is complete.** The model-callable
+  `goal_resume` tool is removed; `/goal-resume` remains the sole resumption path.
+  Active goals receive a context-profile-sized `pi.goal-context/v2` brief and a
+  read-only paged `goal_inspect` surface for complete criteria, constraints,
+  evidence, risks, and deferrals. Inactive goals inject no continuation brief.
+- **Goal lifecycle tools close with the lifecycle.** `goal_block` records a
+  bounded reason, evidence, and unblock condition. A typed status signal removes
+  goal execution tools on pause, block, settlement, or cancellation while
+  preserving manual tool choices and the proposal-only route. Private atomic
+  artifacts now sync file contents and containing directories before success.
+
 ### Fixed (2026-09-01 — persistent goal mode now executes)
 
 - **`/goal` was a ledger write, not a working mode.** Starting a goal persisted private state and
@@ -11,8 +28,8 @@ All notable changes to pi-munchkin are documented here. Releases follow semantic
   restored goal because its ambient global had no model-context consumer. `/goal`, `/goal-accept`,
   and `/goal-resume` now start one command-owned turn, active goal state is injected as a bounded
   private context message on subsequent turns, and the deferred `goals` tool family remains active
-  across session rebinds while the goal is active. Pause and settlement stop goal steering, and a
-  manual tool disable remains authoritative. `GOALS=off` is unchanged.
+  across session rebinds while the goal is active. The later authority repair above supersedes this
+  row's incomplete pause/settlement claim. `GOALS=off` is unchanged.
 
 ### Added (2026-08-27 — dark Optimizer V2 control plane)
 
