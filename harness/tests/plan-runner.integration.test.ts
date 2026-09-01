@@ -342,6 +342,67 @@ test("GOALS=off removes the whole goal surface as one rollback switch", async ()
 	}
 });
 
+test("/goal enters a persistent model-visible execution mode", async () => {
+	// A ledger write and a toast are not a mode. The user-visible command must
+	// start one agent turn, expose the goal lifecycle tools for that goal, and
+	// make the active goal visible again on later turns/reloads.
+	const fp = makeFakePi();
+	for (const name of [
+		"read", "bash", "edit", "write", "search_spans", "read_span", "recall",
+		"verify_project", "compact_context",
+	]) fp.pi.registerTool({ name, parameters: {} } as any);
+	planRunner(fp.pi as any);
+	const ta = await import(`../extensions/tool-activation.ts?goal-mode=${Date.now()}-${Math.random()}`);
+	ta.default(fp.pi as any);
+	fp.pi.setActiveTools([...fp.tools.keys()]);
+	captureInitialToolSurface(fp.pi as any);
+	const cwd = tmp();
+	const { ctx } = makeCtx(cwd);
+	await fire(fp, "session_start", {}, { ...ctx, cwd });
+	for (const name of ["goal_propose", "goal_update", "goal_settle", "goal_resume"]) {
+		assert.equal(fp.pi.getActiveTools().includes(name), false, `${name} starts deferred`);
+	}
+
+	await fp.commands.get("goal").handler("repair the release pipeline", ctx);
+	assert.equal(fp.customDeliveries.at(-1)?.triggerTurn, true, "/goal starts exactly one agent turn");
+	assert.match(fp.customDeliveries.at(-1)?.text ?? "", /MODE: GOAL/);
+	assert.match(fp.customDeliveries.at(-1)?.text ?? "", /repair the release pipeline/);
+	for (const name of ["goal_propose", "goal_update", "goal_settle", "goal_resume"]) {
+		assert.ok(fp.pi.getActiveTools().includes(name), `${name} is active for goal execution`);
+	}
+
+	const ambient: any = await fire(fp, "before_agent_start", { systemPrompt: "base" }, { ...ctx, cwd });
+	assert.match((ambient?.messages ?? []).map((message: any) => message.content ?? "").join("\n"), /repair the release pipeline/,
+		"the active goal is visible to the model on every later turn");
+	await fire(fp, "session_start", {}, { ...ctx, cwd });
+	for (const name of ["goal_propose", "goal_update", "goal_settle", "goal_resume"]) {
+		assert.ok(fp.pi.getActiveTools().includes(name), `${name} remains active after goal rebind`);
+	}
+	const deliveriesBeforeResume = fp.customDeliveries.length;
+	await fp.commands.get("goal-pause").handler("", ctx);
+	const pausedAmbient: any = await fire(fp, "before_agent_start", { systemPrompt: "base" }, { ...ctx, cwd });
+	assert.equal(pausedAmbient, undefined, "a paused goal does not steer ordinary turns");
+	await fp.commands.get("goal-resume").handler("", ctx);
+	assert.equal(fp.customDeliveries.length, deliveriesBeforeResume + 1, "/goal-resume starts one continuation turn");
+	assert.equal(fp.customDeliveries.at(-1)?.triggerTurn, true);
+
+	// Manual tool removal remains authoritative even while the ledger persists.
+	fp.pi.setActiveTools(fp.pi.getActiveTools().filter((name) => name !== "goal_update"));
+	await fire(fp, "session_start", {}, { ...ctx, cwd });
+	assert.equal(fp.pi.getActiveTools().includes("goal_update"), false, "reload does not undo a manual disable");
+	await callTool(fp, "goal_update", {
+		criteria: [{ id: "criterion-1", status: "met", evidence: ["release pipeline repaired"] }],
+		progress_evidence: ["targeted regression is green"], residual_risks: [],
+	}, cwd);
+	await callTool(fp, "goal_settle", {
+		outcome: "complete", delivered_value: "The release pipeline is repaired.", confidence: 0.9,
+		residual_risks: [], evidence: ["targeted regression is green"],
+	}, cwd);
+	assert.equal(await fire(fp, "before_agent_start", { systemPrompt: "base" }, { ...ctx, cwd }), undefined,
+		"a settled goal exits goal mode");
+	resetPiGlobals();
+});
+
 test("review-phase rewrites may drop items; executing-phase rewrites may not", async () => {
 	// The omission trap (audit A4): during /plan review the rejection named
 	// plan_update, which planning mode blocks. Dropping items pre-go is revision.

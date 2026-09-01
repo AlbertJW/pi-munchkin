@@ -27,7 +27,7 @@ import { record } from "../lib/telemetry.ts";
 import { CORE_NAMES, profileFromEnvironment } from "./tool-activation.ts";
 import {
 	acceptGoal, cancelGoal, createGoal, goalAmbientSummary, goalsEnabled, mutateGoal, pauseGoal, readGoal, readGoals, resumeGoal, settleGoal, updateGoal,
-	GOAL_MAX_CRITERIA, goalScope, type CriterionStatus, type DeferredGoalItem, type GoalState,
+	GOAL_MAX_CRITERIA, goalScope, renderGoalRecoveryBrief, type CriterionStatus, type DeferredGoalItem, type GoalState,
 } from "../lib/goal-state.ts";
 
 // One bounded ordered checklist. plan_write owns structure; plan_update owns
@@ -173,6 +173,26 @@ function publishGoal(goal: GoalState | undefined): void {
 	const shared = globalThis as Record<string, unknown>;
 	if (goal) shared.__pi_active_goal_context = goalAmbientSummary(goal);
 	else delete shared.__pi_active_goal_context;
+}
+
+function goalExecutionPrompt(goal: GoalState): string {
+	return [
+		"MODE: GOAL",
+		"Pursue this persistent user-owned goal across turns until it is complete, explicitly accepted at 80/20, paused, blocked, or cancelled.",
+		"Use goal_update to record criterion evidence and residual risk. Use goal_settle only when its evidence requirements are satisfied.",
+		renderGoalRecoveryBrief(goal),
+	].join("\n\n");
+}
+
+async function startGoalTurn(pi: ExtensionAPI, ctx: any, goal: GoalState, action: "goal" | "goal-accept" | "goal-resume"): Promise<void> {
+	emitHarnessSignal(pi.events, { v: 1, type: "goal/active" });
+	pi.sendMessage({
+		customType: "pi-munchkin:goal-command",
+		content: goalExecutionPrompt(goal),
+		display: true,
+		details: { action, goal_id_hash: createHash("sha256").update(goal.goal_id).digest("hex") },
+	}, { triggerTurn: true });
+	if (typeof ctx.waitForIdle === "function") await ctx.waitForIdle();
 }
 
 function rejectChildGoalMutation(): void {
@@ -1082,7 +1102,20 @@ export default function (pi: ExtensionAPI): void {
 			void next.finally(() => { if (pendingBranchMerge === next) pendingBranchMerge = null; });
 		}
 	}));
-	pi.on("before_agent_start", async () => { if (pendingRebind) await pendingRebind; if (pendingBranchMerge) await pendingBranchMerge; });
+	pi.on("before_agent_start", async () => {
+		if (pendingRebind) await pendingRebind;
+		if (pendingBranchMerge) await pendingBranchMerge;
+		if (!GOALS_ENABLED || !lastSessionCwd) return;
+		const goal = await rebindActiveGoal(lastSessionCwd);
+		if (goal?.status === "active") return {
+			message: {
+				customType: "pi-munchkin:goal-context",
+				content: goalExecutionPrompt(goal),
+				display: false,
+				details: { status: goal.status },
+			},
+		};
+	});
 
 	pi.registerCommand("plan", { description: "Enter bounded read-only planning for a request.", handler: async (args, ctx) => startPlanCommand(args, ctx, pi) });
 	if (GOALS_ENABLED) {
@@ -1100,6 +1133,7 @@ export default function (pi: ExtensionAPI): void {
 				publishGoal(result);
 				goalEvent("started", result);
 				ctx.ui.notify(`Goal active: ${result.goal_id}`, "info");
+				await startGoalTurn(pi, ctx, result, "goal");
 			},
 		});
 		pi.registerCommand("goal-accept", {
@@ -1114,6 +1148,7 @@ export default function (pi: ExtensionAPI): void {
 				publishGoal(result);
 				goalEvent("accepted", result);
 				ctx.ui.notify(`Goal accepted: ${result.goal_id}`, "info");
+				await startGoalTurn(pi, ctx, result, "goal-accept");
 			},
 		});
 		pi.registerCommand("goal-status", {
@@ -1135,6 +1170,7 @@ export default function (pi: ExtensionAPI): void {
 				publishGoal(result);
 				goalEvent("resumed", result);
 				ctx.ui.notify(`Goal resumed: ${result.goal_id}`, "info");
+				await startGoalTurn(pi, ctx, result, "goal-resume");
 			},
 		});
 		pi.registerCommand("goal-pause", {

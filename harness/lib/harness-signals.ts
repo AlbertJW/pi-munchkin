@@ -33,6 +33,7 @@ export type HarnessSignalV1 =
 	// and four after tool-activation. Every consumer that wants to know "is there a
 	// live plan?" therefore has to learn it here, not at session_start.
 	| (SignalBase & { type: "plan/rebound"; openItems: number; interrupted: boolean })
+	| (SignalBase & { type: "goal/active" })
 	| (SignalBase & { type: "plan/branch-result"; context: PlanContextV1; report: BranchReportV1 | null; failureClass: "missing_report" | "invalid_report" | "child_failed" | null })
 	| (SignalBase & { type: "capability/need"; capability: CapabilityName; reason: "accepted-plan" | "large-file" | "inlet-refusal" | "selected-search-result" | "deep-research" | "recovery" });
 
@@ -79,6 +80,8 @@ export function isHarnessSignal(value: unknown): value is HarnessSignalV1 {
 			return exact("v", "type");
 		case "plan/rebound":
 			return exact("v", "type", "openItems", "interrupted") && integer(item.openItems) && typeof item.interrupted === "boolean";
+		case "goal/active":
+			return exact("v", "type");
 		case "capsule/identity":
 			// Payload-free: the identity itself stays in the run-capsule global.
 			// Consumers (plan-runner's adaptive rebind) re-read it on delivery.

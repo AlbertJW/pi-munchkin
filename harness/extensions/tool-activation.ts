@@ -241,6 +241,7 @@ export default function (pi: ExtensionAPI): void {
 	subscribeOnce("tool-activation:domain-signal", () => onHarnessSignal(pi.events, (signal) => {
 		if (signal.type === "plan/write") lastOpenItems = signal.openItems;
 		if (signal.type === "plan/go" && lastOpenItems > 1) activateFamily("delegation", "multi-item-execution");
+		if (signal.type === "goal/active") activateFamily("goals", "goal-active");
 		if (signal.type === "loop/tier" && signal.tier === 2) activateFamily("delegation", signal.detector === "semantic" ? "semantic-tier-two" : "loop-tier-two");
 		// The core/deferred split is computed at session_start, four manifest slots
 		// before the capsule identity that makes plan state readable exists. So
@@ -301,6 +302,7 @@ export default function (pi: ExtensionAPI): void {
 		const active = pi.getActiveTools();
 		if (profile === "core") {
 			const activePlan = Boolean(g.__pi_active_plan_context);
+			const activeGoal = (g.__pi_active_goal_context as { status?: unknown } | undefined)?.status === "active";
 			// The candidate pool is the LIVE set plus (a) everything THIS extension
 			// deferred previously — on an in-process session re-entry (reload) pi
 			// rebuilds from the already-narrowed surface, so deriving from `active`
@@ -315,7 +317,9 @@ export default function (pi: ExtensionAPI): void {
 			const pool = new Set(active);
 			for (const name of previouslyDeferred) if (registered.has(name)) pool.add(name);
 			for (const name of PLAN_SURFACE_TOOLS) if (registered.has(name)) pool.add(name);
-			const core = [...pool].filter((name) => CORE_NAMES.has(name) && (activePlan || (name !== "plan_write" && name !== "plan_update")));
+			const activeGoalTools = new Set(activeGoal ? familyTools("goals", allNames) : []);
+			const core = [...pool].filter((name) =>
+				(CORE_NAMES.has(name) && (activePlan || (name !== "plan_write" && name !== "plan_update"))) || activeGoalTools.has(name));
 			setTo(deferred, [...pool].filter((name) => !core.includes(name)));
 			if (DEEP_RESEARCH_PLANNING_ENABLED) for (const name of familyTools("planning", allNames)) if (!core.includes(name)) deferred.add(name);
 			pi.setActiveTools(core);
