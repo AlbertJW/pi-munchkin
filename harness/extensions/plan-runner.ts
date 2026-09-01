@@ -26,8 +26,9 @@ import { initialToolSurface } from "../lib/session-bootstrap.ts";
 import { record } from "../lib/telemetry.ts";
 import { CORE_NAMES, profileFromEnvironment } from "./tool-activation.ts";
 import {
-	acceptGoal, cancelGoal, createGoal, goalAmbientSummary, goalsEnabled, mutateGoal, pauseGoal, readGoal, readGoals, resumeGoal, settleGoal, updateGoal,
-	GOAL_MAX_CRITERIA, goalScope, renderGoalRecoveryBrief, type CriterionStatus, type DeferredGoalItem, type GoalState,
+	acceptGoal, blockGoal, cancelGoal, createGoal, goalAmbientSummary, goalsEnabled, inspectGoal, mutateGoal, pauseGoal, readCurrentGoal,
+	readExecutableGoal, readGoals, resumeGoal, settleGoal, updateGoal, GOAL_MAX_CRITERIA, goalScope, renderGoalRecoveryBrief,
+	type CriterionStatus, type DeferredGoalItem, type GoalInspectSection, type GoalState,
 } from "../lib/goal-state.ts";
 
 // One bounded ordered checklist. plan_write owns structure; plan_update owns
@@ -165,6 +166,7 @@ function goalEvent(kind: string, goal: GoalState | undefined, detail: Record<str
 		case "settled": record("goal-runner", "settled", payload); break;
 		case "resumed": record("goal-runner", "resumed", payload); break;
 		case "paused": record("goal-runner", "paused", payload); break;
+		case "blocked": record("goal-runner", "blocked", payload); break;
 		case "cancelled": record("goal-runner", "cancelled", payload); break;
 	}
 }
@@ -175,17 +177,27 @@ function publishGoal(goal: GoalState | undefined): void {
 	else delete shared.__pi_active_goal_context;
 }
 
+function emitGoalState(pi: ExtensionAPI, goal: GoalState | undefined): void {
+	emitHarnessSignal(pi.events, { v: 1, type: "goal/state", status: goal?.status ?? "none" });
+}
+
+function goalContextBudget(): number {
+	const profile = (globalThis as Record<string, unknown>).__pi_context_profile as { safe_input_tokens?: unknown } | undefined;
+	const safe = typeof profile?.safe_input_tokens === "number" && Number.isFinite(profile.safe_input_tokens) ? profile.safe_input_tokens : null;
+	return safe == null ? 4_096 : Math.max(2_304, Math.min(6_144, Math.floor(safe * 0.12)));
+}
+
 function goalExecutionPrompt(goal: GoalState): string {
 	return [
 		"MODE: GOAL",
 		"Pursue this persistent user-owned goal across turns until it is complete, explicitly accepted at 80/20, paused, blocked, or cancelled.",
 		"Use goal_update to record criterion evidence and residual risk. Use goal_settle only when its evidence requirements are satisfied.",
-		renderGoalRecoveryBrief(goal),
+		renderGoalRecoveryBrief(goal, goalContextBudget()),
 	].join("\n\n");
 }
 
 async function startGoalTurn(pi: ExtensionAPI, ctx: any, goal: GoalState, action: "goal" | "goal-accept" | "goal-resume"): Promise<void> {
-	emitHarnessSignal(pi.events, { v: 1, type: "goal/active" });
+	emitGoalState(pi, goal);
 	pi.sendMessage({
 		customType: "pi-munchkin:goal-command",
 		content: goalExecutionPrompt(goal),
@@ -200,7 +212,7 @@ function rejectChildGoalMutation(): void {
 }
 
 async function rebindActiveGoal(cwd: string): Promise<GoalState | undefined> {
-	const goal = await readGoal(cwd);
+	const goal = await readCurrentGoal(cwd);
 	publishGoal(goal);
 	return goal;
 }
@@ -605,6 +617,7 @@ const goalPropose = defineTool({
 			return { goal, result: goal };
 		});
 		publishGoal(result);
+		emitGoalState(api!, result);
 		goalEvent("proposed", result);
 		return { content: [{ type: "text" as const, text: `Goal proposed (${result.goal_id}). It is not active yet; ask the user to accept it with /goal-accept.` }], details: { tool_name: "goal_propose", success: true, status: result.status } };
 	},
@@ -626,6 +639,7 @@ const goalUpdate = defineTool({
 			return { goal, result: goal };
 		});
 		publishGoal(result);
+		emitGoalState(api!, result);
 		goalEvent("updated", result);
 		return { content: [{ type: "text" as const, text: `Goal updated (${result.criteria.filter((criterion) => criterion.status === "met").length}/${result.criteria.length} criteria met).` }], details: { tool_name: "goal_update", success: true } };
 	},
@@ -650,25 +664,46 @@ const goalSettle = defineTool({
 			return { goal, result: goal };
 		});
 		publishGoal(result);
+		emitGoalState(api!, result);
 		goalEvent("settled", result, { outcome: result.status, deferred: result.deferred.length });
 		return { content: [{ type: "text" as const, text: `Goal ${result.status}. Planner execution may stop; the goal remains resumable with /goal-resume unless it is complete.` }], details: { tool_name: "goal_settle", success: true, outcome: result.status } };
 	},
 });
 
-const goalResume = defineTool({
-	name: "goal_resume", label: "Resume Goal", description: "Resume a paused, blocked, or 80/20-accepted persistent goal.",
-	promptSnippet: "goal_resume: reopen a resumable persistent goal",
-	parameters: Type.Object({}),
-	async execute(_id, _params, _signal, _update, ctx) {
+const goalBlock = defineTool({
+	name: "goal_block", label: "Block Goal", description: "Stop an active goal honestly when a bounded external condition prevents progress. Only the user can resume it.",
+	promptSnippet: "goal_block: record the reason, evidence, and exact unblock condition; do not continue execution",
+	parameters: Type.Object({
+		reason: Type.String({ minLength: 1, maxLength: 500 }),
+		evidence: Type.Array(Type.String({ maxLength: 500 }), { minItems: 1, maxItems: 16 }),
+		unblock_condition: Type.String({ minLength: 1, maxLength: 500 }),
+	}),
+	async execute(_id, params, _signal, _update, ctx) {
 		rejectChildGoalMutation();
 		const result = await mutateGoal(ctx.cwd, async (previous) => {
-			if (!previous) throw new Error("goal_resume rejected: no goal exists");
-			const goal = resumeGoal(previous);
+			if (!previous || previous.status !== "active") throw new Error("goal_block rejected: no active goal exists");
+			const goal = blockGoal(previous, { reason: params.reason, evidence: params.evidence, unblockCondition: params.unblock_condition });
 			return { goal, result: goal };
 		});
 		publishGoal(result);
-		goalEvent("resumed", result);
-		return { content: [{ type: "text" as const, text: `Goal resumed (${result.goal_id}).` }], details: { tool_name: "goal_resume", success: true } };
+		emitGoalState(api!, result);
+		goalEvent("blocked", result);
+		return { content: [{ type: "text" as const, text: `Goal blocked (${result.goal_id}). Only the user may resume it with /goal-resume.` }], details: { tool_name: "goal_block", success: true } };
+	},
+});
+
+const goalInspect = defineTool({
+	name: "goal_inspect", label: "Inspect Goal", description: "Read one bounded page of the active goal contract without mutating it.",
+	promptSnippet: "goal_inspect: retrieve omitted active-goal criteria, constraints, evidence, risks, or deferrals with stable cursors",
+	parameters: Type.Object({
+		section: Type.Optional(Type.Union([Type.Literal("all"), Type.Literal("criteria"), Type.Literal("constraints"), Type.Literal("evidence"), Type.Literal("risks"), Type.Literal("deferred")])),
+		cursor: Type.Optional(Type.String({ minLength: 1, maxLength: 96 })),
+	}),
+	async execute(_id, params, _signal, _update, ctx) {
+		const goal = await readExecutableGoal(ctx.cwd);
+		if (!goal) throw new Error("goal_inspect rejected: no active goal");
+		const page = inspectGoal(goal, (params.section ?? "all") as GoalInspectSection, params.cursor);
+		return { content: [{ type: "text" as const, text: JSON.stringify(page) }], details: { tool_name: "goal_inspect", success: true, has_more: page.next_cursor !== null } };
 	},
 });
 
@@ -1035,9 +1070,10 @@ export default function (pi: ExtensionAPI): void {
 	pi.registerTool(planUpdate);
 	if (GOALS_ENABLED) {
 		pi.registerTool(goalPropose);
+		pi.registerTool(goalInspect);
 		pi.registerTool(goalUpdate);
 		pi.registerTool(goalSettle);
-		pi.registerTool(goalResume);
+		pi.registerTool(goalBlock);
 	}
 	if (PLAN_GRAPH) {
 		pi.registerTool(planExpand);
@@ -1131,6 +1167,7 @@ export default function (pi: ExtensionAPI): void {
 					return { goal, result: goal };
 				});
 				publishGoal(result);
+				emitGoalState(pi, result);
 				goalEvent("started", result);
 				ctx.ui.notify(`Goal active: ${result.goal_id}`, "info");
 				await startGoalTurn(pi, ctx, result, "goal");
@@ -1146,6 +1183,7 @@ export default function (pi: ExtensionAPI): void {
 					return { goal, result: goal };
 				});
 				publishGoal(result);
+				emitGoalState(pi, result);
 				goalEvent("accepted", result);
 				ctx.ui.notify(`Goal accepted: ${result.goal_id}`, "info");
 				await startGoalTurn(pi, ctx, result, "goal-accept");
@@ -1168,6 +1206,7 @@ export default function (pi: ExtensionAPI): void {
 					return { goal, result: goal };
 				});
 				publishGoal(result);
+				emitGoalState(pi, result);
 				goalEvent("resumed", result);
 				ctx.ui.notify(`Goal resumed: ${result.goal_id}`, "info");
 				await startGoalTurn(pi, ctx, result, "goal-resume");
@@ -1183,6 +1222,7 @@ export default function (pi: ExtensionAPI): void {
 					return { goal, result: goal };
 				});
 				publishGoal(result);
+				emitGoalState(pi, result);
 				goalEvent("paused", result);
 				ctx.ui.notify(`Goal paused: ${result.goal_id}`, "info");
 			},
@@ -1198,6 +1238,7 @@ export default function (pi: ExtensionAPI): void {
 				});
 				goalEvent("cancelled", result);
 				publishGoal(undefined);
+				emitGoalState(pi, result);
 				ctx.ui.notify(`Goal cancelled: ${result.goal_id}`, "info");
 			},
 		});

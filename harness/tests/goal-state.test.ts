@@ -4,8 +4,9 @@ import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import test from "node:test";
 import {
-	acceptGoal, cancelGoal, createGoal, goalAmbientSummary, goalScopeIdentity, goalStoragePath, mutateGoal, pauseGoal, readGoal, readGoals,
-	settleGoal, updateGoal, validateGoal, renderGoalRecoveryBrief,
+	acceptGoal, blockGoal, cancelGoal, createGoal, goalAmbientSummary, goalScopeIdentity, goalStoragePath, inspectGoal,
+	mutateGoal, pauseGoal, readCurrentGoal, readExecutableGoal, readGoal, readGoals, settleGoal, updateGoal, validateGoal,
+	renderGoalRecoveryBrief,
 } from "../lib/goal-state.ts";
 
 function fixture() {
@@ -20,13 +21,13 @@ test("goal state is private, persistent, and supports an advisory proposal befor
 	try {
 		const proposal = createGoal({ cwd, objective: "Ship the bounded change", status: "proposed", proposal: { source: "skill", note: "This is a recommendation." }, criteria: [{ id: "tests", text: "Tests pass", required: true }, { id: "docs", text: "Docs are updated", required: false }] });
 		await mutateGoal(cwd, async (previous) => { assert.equal(previous, undefined); return { goal: proposal, result: proposal }; }, env);
-		assert.equal((await readGoal(cwd, env))?.status, "proposed");
-		const accepted = acceptGoal((await readGoal(cwd, env))!);
+		assert.equal((await readCurrentGoal(cwd, env))?.status, "proposed");
+		const accepted = acceptGoal((await readCurrentGoal(cwd, env))!);
 		await mutateGoal(cwd, async () => ({ goal: accepted, result: accepted }), env);
 		assert.equal((await readGoal(cwd, env))?.status, "active");
 		assert.match(readFileSync(goalStoragePath(cwd, env), "utf8"), /goal_id/);
 		assert.equal((await readGoals(cwd, env)).length, 1);
-		assert.equal((await readGoal(cwd, env))!.proposal?.source, "skill");
+		assert.equal((await readCurrentGoal(cwd, env))!.proposal?.source, "skill");
 		assert.equal(goalAmbientSummary(accepted)?.status, "active");
 	} finally { rmSync(root, { recursive: true, force: true }); }
 });
@@ -91,8 +92,8 @@ test("goal updates require known criteria and 80/20 settlement carries evidence 
 			const active = createGoal({ cwd, objective: "Document the system", criteria: [{ id: "core", text: "Core docs are correct", required: true }, { id: "examples", text: "Examples are polished", required: false }] });
 			const progressed = updateGoal(active, { criteria: [{ id: "core", status: "met", evidence: ["npm test: 625 passed"] }, { id: "examples", status: "deferred" }], progressEvidence: ["reviewed current source"], residualRisks: ["examples may need a later polish pass"] });
 			const paused = pauseGoal(active);
-			assert.throws(() => updateGoal(paused, { progressEvidence: ["must not mutate while paused"] }), /resume a paused goal/);
-			assert.throws(() => settleGoal(paused, { outcome: "complete", deliveredValue: "not allowed", confidence: 1, residualRisks: [], evidence: ["none"] }), /resume a paused/);
+			assert.throws(() => updateGoal(paused, { progressEvidence: ["must not mutate while paused"] }), /resume an inactive goal/);
+			assert.throws(() => settleGoal(paused, { outcome: "complete", deliveredValue: "not allowed", confidence: 1, residualRisks: [], evidence: ["none"] }), /resume it first/);
 			assert.equal(progressed.criteria[0].status, "met");
 			assert.throws(() => updateGoal(active, { criteria: [{ id: "missing", status: "met" }] }), /unknown criterion/);
 			assert.throws(() => settleGoal(progressed, { outcome: "complete", deliveredValue: "Core docs corrected", confidence: 0.8, residualRisks: [], evidence: ["gate passed"] }), /every criterion/);
@@ -153,8 +154,8 @@ test("cancelling the active goal clears the ledger pointer instead of leaving a 
 		const cancelled = cancelGoal(active);
 		await mutateGoal(cwd, async () => ({ goal: cancelled, result: cancelled }), env);
 		assert.equal(await readGoal(cwd, env), undefined);
-		const ledger = JSON.parse(readFileSync(goalStoragePath(cwd, env), "utf8")) as { active_goal_id: string | null; goals: Array<{ status: string }> };
-		assert.equal(ledger.active_goal_id, null);
+		const ledger = JSON.parse(readFileSync(goalStoragePath(cwd, env), "utf8")) as { current_goal_id: string | null; goals: Array<{ status: string }> };
+		assert.equal(ledger.current_goal_id, null);
 		assert.equal(ledger.goals[0]?.status, "cancelled");
 	} finally { rmSync(root, { recursive: true, force: true }); }
 });
@@ -190,5 +191,76 @@ test("goal recovery brief honors a hard UTF-8 byte cap", () => {
 			const brief = renderGoalRecoveryBrief(goal, maxBytes);
 			assert.ok(Buffer.byteLength(brief, "utf8") <= maxBytes, `brief exceeded ${maxBytes} bytes`);
 		}
+	} finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+test("current goal identity is separate from execution authority", async () => {
+	const { root, env, cwd } = fixture();
+	try {
+		const active = createGoal({ cwd, objective: "Respect pause authority" });
+		await mutateGoal(cwd, async () => ({ goal: active, result: active }), env);
+		assert.equal((await readExecutableGoal(cwd, env))?.goal_id, active.goal_id);
+		const paused = pauseGoal(active);
+		await mutateGoal(cwd, async () => ({ goal: paused, result: paused }), env);
+		assert.equal((await readCurrentGoal(cwd, env))?.status, "paused");
+		assert.equal(await readExecutableGoal(cwd, env), undefined);
+		assert.equal(await readGoal(cwd, env), undefined, "legacy active read must not restart a paused goal");
+		assert.equal(renderGoalRecoveryBrief(paused), "", "inactive goals must not inject recovery steering");
+	} finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+test("v1 ledgers migrate as current state without granting execution authority", async () => {
+	const { root, env, cwd } = fixture();
+	try {
+		const paused = pauseGoal(createGoal({ cwd, objective: "Migrate without restart" }));
+		const legacyGoal = { ...paused, schema_version: 1 };
+		const legacyPath = goalStoragePath(cwd, env).replace(/goal-v2\.json$/, "goal-v1.json");
+		mkdirSync(dirname(legacyPath), { recursive: true });
+		writeFileSync(legacyPath, JSON.stringify({
+			schema_version: 1, scope: paused.scope, cwd_hash: paused.cwd_hash,
+			active_goal_id: paused.goal_id, goals: [legacyGoal],
+		}));
+		assert.equal((await readCurrentGoal(cwd, env))?.status, "paused");
+		assert.equal(await readExecutableGoal(cwd, env), undefined);
+	} finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+test("blocked is an evidence-bearing model transition but remains user-resumable only", () => {
+	const { root, cwd } = fixture();
+	try {
+		const active = createGoal({ cwd, objective: "Stop honestly when external evidence is missing" });
+		const blocked = blockGoal(active, {
+			reason: "The required service is unavailable.", evidence: ["health check refused"],
+			unblockCondition: "User restores the service and invokes /goal-resume.",
+		});
+		assert.equal(blocked.status, "blocked");
+		assert.match(blocked.residual_risks.join("\n"), /required service/);
+		assert.match(blocked.evidence.join("\n"), /health check refused/);
+	} finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+test("bounded execution context preserves criterion semantics and paged inspection preserves full contract", () => {
+	const { root, cwd } = fixture();
+	try {
+		const sentinel = "FULL-CONSTRAINT-SENTINEL";
+		const goal = createGoal({
+			cwd, objective: "Recover the real contract", constraints: [sentinel.repeat(20)],
+			criteria: [{ id: "semantic", text: "FULL-CRITERION-SENTINEL must remain discoverable", required: true }],
+		});
+		const brief = renderGoalRecoveryBrief(goal, 2_304);
+		assert.match(brief, /pi\.goal-context\/v2/);
+		assert.match(brief, /semantic/);
+		assert.match(brief, /FULL-CRITERION-SENTINEL/);
+		const first = inspectGoal(goal, "all", undefined, 256);
+		assert.ok(first.text.length <= 256);
+		let text = first.text;
+		let cursor = first.next_cursor;
+		while (cursor) {
+			const page = inspectGoal(goal, "all", cursor, 256);
+			text += page.text;
+			cursor = page.next_cursor;
+		}
+		assert.match(text, /FULL-CONSTRAINT-SENTINEL/);
+		assert.match(text, /FULL-CRITERION-SENTINEL/);
 	} finally { rmSync(root, { recursive: true, force: true }); }
 });

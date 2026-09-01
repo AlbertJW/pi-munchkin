@@ -329,7 +329,7 @@ test("GOALS=off removes the whole goal surface as one rollback switch", async ()
 		const gatedPlanRunner = (await import(`../extensions/plan-runner.ts?goals-off=${Date.now()}-${Math.random()}`)).default;
 		const fp = makeFakePi();
 		gatedPlanRunner(fp.pi as any);
-		for (const tool of ["goal_propose", "goal_update", "goal_settle", "goal_resume"]) {
+		for (const tool of ["goal_propose", "goal_inspect", "goal_update", "goal_settle", "goal_block"]) {
 			assert.equal(fp.tools.has(tool), false, `${tool} must not register under GOALS=off`);
 		}
 		for (const command of ["goal", "goal-accept", "goal-status", "goal-resume", "goal-pause", "goal-cancel"]) {
@@ -359,7 +359,7 @@ test("/goal enters a persistent model-visible execution mode", async () => {
 	const cwd = tmp();
 	const { ctx } = makeCtx(cwd);
 	await fire(fp, "session_start", {}, { ...ctx, cwd });
-	for (const name of ["goal_propose", "goal_update", "goal_settle", "goal_resume"]) {
+	for (const name of ["goal_propose", "goal_inspect", "goal_update", "goal_settle", "goal_block"]) {
 		assert.equal(fp.pi.getActiveTools().includes(name), false, `${name} starts deferred`);
 	}
 
@@ -367,7 +367,7 @@ test("/goal enters a persistent model-visible execution mode", async () => {
 	assert.equal(fp.customDeliveries.at(-1)?.triggerTurn, true, "/goal starts exactly one agent turn");
 	assert.match(fp.customDeliveries.at(-1)?.text ?? "", /MODE: GOAL/);
 	assert.match(fp.customDeliveries.at(-1)?.text ?? "", /repair the release pipeline/);
-	for (const name of ["goal_propose", "goal_update", "goal_settle", "goal_resume"]) {
+	for (const name of ["goal_propose", "goal_inspect", "goal_update", "goal_settle", "goal_block"]) {
 		assert.ok(fp.pi.getActiveTools().includes(name), `${name} is active for goal execution`);
 	}
 
@@ -375,11 +375,12 @@ test("/goal enters a persistent model-visible execution mode", async () => {
 	assert.match((ambient?.messages ?? []).map((message: any) => message.content ?? "").join("\n"), /repair the release pipeline/,
 		"the active goal is visible to the model on every later turn");
 	await fire(fp, "session_start", {}, { ...ctx, cwd });
-	for (const name of ["goal_propose", "goal_update", "goal_settle", "goal_resume"]) {
+	for (const name of ["goal_propose", "goal_inspect", "goal_update", "goal_settle", "goal_block"]) {
 		assert.ok(fp.pi.getActiveTools().includes(name), `${name} remains active after goal rebind`);
 	}
 	const deliveriesBeforeResume = fp.customDeliveries.length;
 	await fp.commands.get("goal-pause").handler("", ctx);
+	for (const name of ["goal_inspect", "goal_update", "goal_settle", "goal_block"]) assert.equal(fp.pi.getActiveTools().includes(name), false, `${name} deactivates on pause`);
 	const pausedAmbient: any = await fire(fp, "before_agent_start", { systemPrompt: "base" }, { ...ctx, cwd });
 	assert.equal(pausedAmbient, undefined, "a paused goal does not steer ordinary turns");
 	await fp.commands.get("goal-resume").handler("", ctx);

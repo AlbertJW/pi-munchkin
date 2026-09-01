@@ -39,13 +39,13 @@ const EXPLICIT_FLAG = "__pi_tool_selection_explicit";
 // The recovery therefore never ran, and after any /reload every family returned
 // "unavailable-or-active" for the rest of the process.
 const ACTIVATION_MEMORY_KEY = "__pi_tool_activation_memory_v1";
-type ActivationMemory = { deferred: Set<string>; attempted: Set<Family> };
+type ActivationMemory = { deferred: Set<string>; attempted: Set<Family>; owned: Set<string> };
 
 function activationMemory(): ActivationMemory {
 	const shared = globalThis as Record<string, unknown>;
 	const existing = shared[ACTIVATION_MEMORY_KEY] as ActivationMemory | undefined;
-	if (existing?.deferred instanceof Set && existing.attempted instanceof Set) return existing;
-	const fresh: ActivationMemory = { deferred: new Set(), attempted: new Set() };
+	if (existing?.deferred instanceof Set && existing.attempted instanceof Set && existing.owned instanceof Set) return existing;
+	const fresh: ActivationMemory = { deferred: new Set(), attempted: new Set(), owned: new Set() };
 	shared[ACTIVATION_MEMORY_KEY] = fresh;
 	return fresh;
 }
@@ -103,7 +103,7 @@ function familyTools(family: Family, all: readonly string[]): string[] {
 		case "browser": return all.filter((name) => name.startsWith("browser_"));
 		case "canvas": return all.filter((name) => name.startsWith("tldraw_"));
 		case "context": return all.filter((name) => name === "compact_context");
-		case "goals": return all.filter((name) => ["goal_propose", "goal_update", "goal_settle", "goal_resume"].includes(name));
+		case "goals": return all.filter((name) => ["goal_propose", "goal_inspect", "goal_update", "goal_settle", "goal_block"].includes(name));
 		// Flat plan tools are activatable in ANY session: skills and models may
 		// legitimately structure multi-item work without the human /plan surface
 		// (measured live 2026-08-25: the process-circleback skill instructs
@@ -135,6 +135,7 @@ export default function (pi: ExtensionAPI): void {
 	const memory = activationMemory();
 	const deferred = memory.deferred;
 	const attempted = memory.attempted;
+	const owned = memory.owned;
 	let lastOpenItems = 0;
 	let lastContextPct = 0;
 	let firstUsefulMutation = false;
@@ -172,7 +173,8 @@ export default function (pi: ExtensionAPI): void {
 	};
 
 	const activateFamily = (family: Family, reason: string): { activated: number; status: string } => {
-		if (attempted.has(family)) { noteUnavailable(family, "already-attempted-or-manually-disabled"); return { activated: 0, status: "already-attempted-or-manually-disabled" }; }
+		const goalActive = (g.__pi_active_goal_context as { status?: unknown } | undefined)?.status === "active";
+		if (attempted.has(family) && !(family === "goals" && goalActive)) { noteUnavailable(family, "already-attempted-or-manually-disabled"); return { activated: 0, status: "already-attempted-or-manually-disabled" }; }
 		// The one-attempt latch is charged only when activation actually happens (or
 		// the family is genuinely already active). A refusal that is not the model's
 		// fault — the planning-phase restriction, or tools not yet in the deferred
@@ -185,7 +187,8 @@ export default function (pi: ExtensionAPI): void {
 			publish("planning-restriction");
 			return { activated: 0, status: "planning-allows-research-only" };
 		}
-		const names = familyTools(family, allNames);
+		const familyNames = familyTools(family, allNames);
+		const names = family === "goals" && !goalActive ? familyNames.filter((name) => name === "goal_propose") : familyNames;
 		const allowed = explicit ? names.filter((name) => (initialToolSurface()?.active ?? []).includes(name)) : names;
 		const active = pi.getActiveTools();
 		const add = allowed.filter((name) => deferred.has(name) && !active.includes(name));
@@ -201,6 +204,7 @@ export default function (pi: ExtensionAPI): void {
 			pi.setActiveTools([...active, ...add]);
 			for (const name of add) {
 				deferred.delete(name);
+				owned.add(name);
 				record("tool-activation", "activated", { tool: name, reason });
 			}
 			publish("activated");
@@ -211,6 +215,22 @@ export default function (pi: ExtensionAPI): void {
 			publish("activation-failed");
 			return { activated: 0, status: "activation-failed" };
 		}
+	};
+
+	const deactivateGoalExecution = (reason: string): void => {
+		const execution = new Set(["goal_inspect", "goal_update", "goal_settle", "goal_block"]);
+		const active = pi.getActiveTools();
+		const remove = active.filter((name) => execution.has(name) && owned.has(name));
+		if (!remove.length) return;
+		pi.setActiveTools(active.filter((name) => !remove.includes(name)));
+		for (const name of remove) {
+			owned.delete(name);
+			deferred.add(name);
+			record("tool-activation", "deactivated", { tool: name, reason });
+		}
+		attempted.delete("goals");
+		publish("goal-inactive");
+		surfaceTelemetry();
 	};
 
 	pi.registerTool(defineTool({
@@ -241,7 +261,10 @@ export default function (pi: ExtensionAPI): void {
 	subscribeOnce("tool-activation:domain-signal", () => onHarnessSignal(pi.events, (signal) => {
 		if (signal.type === "plan/write") lastOpenItems = signal.openItems;
 		if (signal.type === "plan/go" && lastOpenItems > 1) activateFamily("delegation", "multi-item-execution");
-		if (signal.type === "goal/active") activateFamily("goals", "goal-active");
+		if (signal.type === "goal/state") {
+			if (signal.status === "active") activateFamily("goals", "goal-active");
+			else deactivateGoalExecution(`goal-${signal.status}`);
+		}
 		if (signal.type === "loop/tier" && signal.tier === 2) activateFamily("delegation", signal.detector === "semantic" ? "semantic-tier-two" : "loop-tier-two");
 		// The core/deferred split is computed at session_start, four manifest slots
 		// before the capsule identity that makes plan state readable exists. So
@@ -277,6 +300,7 @@ export default function (pi: ExtensionAPI): void {
 		const previouslyDeferred = new Set(deferred);
 		deferred.clear();
 		attempted.clear();
+		owned.clear();
 		lastOpenItems = 0;
 		lastContextPct = 0;
 		firstUsefulMutation = false;
@@ -321,6 +345,7 @@ export default function (pi: ExtensionAPI): void {
 			const core = [...pool].filter((name) =>
 				(CORE_NAMES.has(name) && (activePlan || (name !== "plan_write" && name !== "plan_update"))) || activeGoalTools.has(name));
 			setTo(deferred, [...pool].filter((name) => !core.includes(name)));
+			for (const name of activeGoalTools) if (core.includes(name)) owned.add(name);
 			if (DEEP_RESEARCH_PLANNING_ENABLED) for (const name of familyTools("planning", allNames)) if (!core.includes(name)) deferred.add(name);
 			pi.setActiveTools(core);
 			for (const name of deferred) record("tool-activation", "deferred", { tool: name, reason: "core-startup" });

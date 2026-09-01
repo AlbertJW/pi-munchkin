@@ -11,7 +11,7 @@ const names = [
 	"read", "bash", "edit", "write", "grep", "find", "ls", "powershell", "search_spans", "read_span", "recall",
 	"plan_write", "plan_update", "verify_project", "subagent", "compact_context", "web_search", "web_read",
 	"plan_expand", "plan_settle", "research_plan_start",
-	"goal_propose", "goal_update", "goal_settle", "goal_resume",
+	"goal_propose", "goal_inspect", "goal_update", "goal_settle", "goal_block",
 	"browser_open", "browser_click", "tldraw_create",
 ];
 
@@ -193,10 +193,17 @@ test("planning capability family activates flat plan tools in an ordinary sessio
 test("goals remain out of the core ambient surface and activate as one bounded family", async () => {
 	const run = await load("core", [...names]);
 	try {
-		for (const name of ["goal_propose", "goal_update", "goal_settle", "goal_resume"]) assert.equal(run.fp.pi.getActiveTools().includes(name), false);
+		for (const name of ["goal_propose", "goal_inspect", "goal_update", "goal_settle", "goal_block"]) assert.equal(run.fp.pi.getActiveTools().includes(name), false);
 		const result = await callTool(run.fp, "capability", { action: "enable", family: "goals" }, process.cwd());
 		assert.equal(result.isError, false);
-		for (const name of ["goal_propose", "goal_update", "goal_settle", "goal_resume"]) assert.equal(run.fp.pi.getActiveTools().includes(name), true);
+		assert.equal(run.fp.pi.getActiveTools().includes("goal_propose"), true, "inactive goal capability exposes proposals only");
+		for (const name of ["goal_inspect", "goal_update", "goal_settle", "goal_block"]) assert.equal(run.fp.pi.getActiveTools().includes(name), false);
+		(globalThis as Record<string, unknown>).__pi_active_goal_context = { status: "active" };
+		emitHarnessSignal(run.fp.pi.events, { v: 1, type: "goal/state", status: "active" });
+		for (const name of ["goal_propose", "goal_inspect", "goal_update", "goal_settle", "goal_block"]) assert.equal(run.fp.pi.getActiveTools().includes(name), true);
+		emitHarnessSignal(run.fp.pi.events, { v: 1, type: "goal/state", status: "paused" });
+		assert.equal(run.fp.pi.getActiveTools().includes("goal_propose"), true);
+		for (const name of ["goal_inspect", "goal_update", "goal_settle", "goal_block"]) assert.equal(run.fp.pi.getActiveTools().includes(name), false);
 	} finally { run.restore(); }
 });
 

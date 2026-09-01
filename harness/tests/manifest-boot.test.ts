@@ -24,6 +24,7 @@ import { mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { captureInitialToolSurface } from "../lib/session-bootstrap.ts";
+import { emitHarnessSignal } from "../lib/harness-signals.ts";
 import { callTool, fire, loadExtensions, makeCtx, makeFakePi, resetPiGlobals, type FakePi } from "./integration-harness.ts";
 
 const manifest = JSON.parse(readFileSync(new URL("../../package.json", import.meta.url), "utf8"));
@@ -210,6 +211,13 @@ test("cold boot: every deferred tool is reachable through some capability family
 			await callTool(fp, "capability", { action: "enable", family }, cwd);
 			for (const name of fp.pi.getActiveTools()) reachable.add(name);
 		}
+		// Goal execution tools are deliberately lifecycle-gated: capability(goals)
+		// exposes only proposal while inactive, then the typed active-state signal
+		// opens the mutating/readback tools for the user-owned goal.
+		(globalThis as Record<string, unknown>).__pi_active_goal_context = { status: "active" };
+		emitHarnessSignal(fp.pi.events, { v: 1, type: "goal/state", status: "active" });
+		for (const name of fp.pi.getActiveTools()) reachable.add(name);
+		delete (globalThis as Record<string, unknown>).__pi_active_goal_context;
 		const stranded = deferred.filter((name) => !reachable.has(name));
 		assert.deepEqual(
 			stranded, [],

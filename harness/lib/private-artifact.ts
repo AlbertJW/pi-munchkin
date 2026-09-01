@@ -17,9 +17,16 @@ async function writeExclusivePrivate(path: string, text: string): Promise<void> 
 	try {
 		await handle.writeFile(text, "utf8");
 		await handle.chmod(0o600);
+		await handle.sync();
 	} finally {
 		await handle.close();
 	}
+}
+
+async function syncDirectory(path: string): Promise<void> {
+	const handle = await open(path, "r");
+	try { await handle.sync(); }
+	finally { await handle.close(); }
 }
 
 /**
@@ -42,6 +49,7 @@ export async function atomicWritePrivateFiles(files: PrivateArtifactFile[]): Pro
 			await rename(file.path, file.finalPath);
 			await chmod(file.finalPath, 0o600);
 		}
+		for (const directory of new Set(files.map(({ path }) => dirname(path)))) await syncDirectory(directory);
 	} catch (error) {
 		await Promise.all(temporary.map(({ path }) => unlink(path).catch(() => {})));
 		throw error;
