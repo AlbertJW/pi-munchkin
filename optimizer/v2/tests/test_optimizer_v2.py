@@ -11,7 +11,7 @@ import unittest
 
 from optimizer.v2.benchmark import BenchmarkPack
 from optimizer.v2.candidates import Candidate, CandidateError, compose_candidates
-from optimizer.v2.engine import CampaignEngine, InjectedCrash
+from optimizer.v2.engine import CampaignEngine, InjectedCrash, _validate_session
 from optimizer.v2.events import EventStore, EventStoreError
 from optimizer.v2.fake import FakeProvider, FakeScenario, FakeSurface
 from optimizer.v2.manifest import ManifestError, load_campaign
@@ -84,6 +84,17 @@ def benchmark_dict() -> dict:
     }
 
 
+def diagnosis_for(mutation: dict) -> dict:
+    return {
+        "schema": "pi.optimizer-session/v2", "kind": "diagnose_patch",
+        "root_cause_hypothesis": "A bounded surface change may repair the observed failure.",
+        "alternatives_considered": ["leave the surface unchanged"],
+        "target_surface": mutation["family"], "expected_exposure": "bounded-change-applied",
+        "primary_metric": "task_success", "falsifier": "no matched improvement",
+        "rollback_condition": "any hard-guard regression", "mutation": mutation,
+    }
+
+
 class ManifestTests(unittest.TestCase):
     def test_manifest_is_strict_and_content_addressed(self) -> None:
         campaign = load_campaign(campaign_dict())
@@ -107,6 +118,29 @@ class ManifestTests(unittest.TestCase):
         malformed = campaign_dict()
         malformed["guard_models"] = [{"provider": "", "model": "guard"}]
         with self.assertRaises(ManifestError):
+            load_campaign(malformed)
+
+    def test_invalid_paired_policy_fails_before_engine_sessions(self) -> None:
+        malformed = campaign_dict()
+        malformed["primary_metric"]["paired_policy"] = {
+            "name": "exact-sign", "minimum_net_fixes": 0,
+        }
+        with self.assertRaisesRegex(ManifestError, "minimum_net_fixes"):
+            load_campaign(malformed)
+
+        malformed = campaign_dict()
+        malformed["primary_metric"]["paired_policy"] = {
+            "name": "not-a-policy", "minimum_net_fixes": 1,
+        }
+        with self.assertRaisesRegex(ManifestError, "paired_policy.name"):
+            load_campaign(malformed)
+
+        malformed = campaign_dict()
+        malformed["primary_metric"]["kind"] = "continuous"
+        malformed["primary_metric"]["paired_policy"] = {
+            "name": "paired-permutation", "alpha": 2, "permutations": 20,
+        }
+        with self.assertRaisesRegex(ManifestError, "alpha"):
             load_campaign(malformed)
 
 
@@ -136,6 +170,11 @@ class CandidateTests(unittest.TestCase):
         second = Candidate.create(**kwargs)
         self.assertEqual(first.candidate_id, second.candidate_id)
         self.assertNotIn("workspace", first.to_dict())
+        card = first.card(train={"accepted": True}, development_validated=True)
+        self.assertEqual(card["candidate_id"], first.candidate_id)
+        self.assertEqual(card["train_disposition"], "accepted")
+        self.assertTrue(card["development_validated"])
+        self.assertNotIn("diff", card)
 
     def test_composition_rejects_conflicts_and_unaccepted_parents(self) -> None:
         left = Candidate.create(parent_ids=("seed",), mutation_family="capability", hypothesis="h", predicted_mechanism="m", expected_exposure="e", diff="left", changed_units=("skills/a",), provenance={})
@@ -152,9 +191,9 @@ class CandidateTests(unittest.TestCase):
             manifest = load_campaign(campaign_dict())
             parent = FakeSurface().seed_candidate(manifest)
             with self.assertRaisesRegex(CandidateError, "contained"):
-                adapter.build_candidate(parent, {"family": "capability", "diff": "--- a/../secret\n+++ b/../secret\n", "changed_units": ["../secret"]}, manifest)
+                adapter.build_candidate(parent, diagnosis_for({"family": "capability", "diff": "--- a/../secret\n+++ b/../secret\n", "changed_units": ["../secret"]}), manifest)
             with self.assertRaisesRegex(CandidateError, "unauthorized"):
-                adapter.build_candidate(parent, {"family": "steering", "diff": "--- a/prompts/x\n+++ b/prompts/x\n", "changed_units": ["prompts/x"]}, manifest)
+                adapter.build_candidate(parent, diagnosis_for({"family": "steering", "diff": "--- a/prompts/x\n+++ b/prompts/x\n", "changed_units": ["prompts/x"]}), manifest)
 
     def test_config_surface_materializes_private_content_addressed_snapshots(self) -> None:
         with tempfile.TemporaryDirectory() as td:
@@ -168,11 +207,11 @@ class CandidateTests(unittest.TestCase):
             campaign = load_campaign(raw)
             adapter = ConfigSurfaceAdapter(baseline, root / "snapshots", validator)
             seed = adapter.seed_candidate(campaign)
-            candidate = adapter.build_candidate(seed, {
+            candidate = adapter.build_candidate(seed, diagnosis_for({
                 "family": "configuration",
                 "diff": '{"scaffold":"decompose","name":"bounded-decompose"}',
                 "changed_units": ["config.name", "config.scaffold"],
-            }, campaign)
+            }), campaign)
             path = adapter.materialize(candidate)
             self.assertEqual(json.loads(path.read_text())["scaffold"], "decompose")
             self.assertEqual(path.stat().st_mode & 0o777, 0o600)
@@ -189,9 +228,49 @@ class CandidateTests(unittest.TestCase):
             adapter = ConfigSurfaceAdapter(baseline, root / "snapshots", pathlib.Path(__file__).resolve().parents[2] / "prompt-lab" / "config.py")
             seed = adapter.seed_candidate(campaign)
             with self.assertRaisesRegex(CandidateError, "changed units"):
-                adapter.build_candidate(seed, {"family": "configuration", "diff": '{"scaffold":"decompose"}', "changed_units": ["config.format"]}, campaign)
+                adapter.build_candidate(seed, diagnosis_for({"family": "configuration", "diff": '{"scaffold":"decompose"}', "changed_units": ["config.format"]}), campaign)
             with self.assertRaisesRegex(CandidateError, "unsupported"):
-                adapter.build_candidate(seed, {"family": "configuration", "diff": '{"shell":"unsafe"}', "changed_units": ["config.shell"]}, campaign)
+                adapter.build_candidate(seed, diagnosis_for({"family": "configuration", "diff": '{"shell":"unsafe"}', "changed_units": ["config.shell"]}), campaign)
+            constrained = ConfigSurfaceAdapter(baseline, root / "constrained", pathlib.Path(__file__).resolve().parents[2] / "prompt-lab" / "config.py", ("name", "format", "scaffold"), ("format", "scaffold"))
+            constrained_seed = constrained.seed_candidate(campaign)
+            with self.assertRaisesRegex(CandidateError, "behavioral key"):
+                constrained.build_candidate(constrained_seed, diagnosis_for({"family": "configuration", "diff": '{"name":"metadata-only"}', "changed_units": ["config.name"]}), campaign)
+            with self.assertRaisesRegex(CandidateError, "unsupported"):
+                constrained.build_candidate(constrained_seed, diagnosis_for({"family": "configuration", "diff": '{"prompt_variant":"/private/path"}', "changed_units": ["config.prompt_variant"]}), campaign)
+
+    def test_config_grandchild_materializes_all_accepted_ancestors(self) -> None:
+        with tempfile.TemporaryDirectory() as td:
+            root = pathlib.Path(td); baseline = root / "baseline.json"
+            baseline.write_text('{"format":"md","scaffold":"none","prompt_variant":"A"}\n', encoding="utf-8")
+            raw = campaign_dict(); raw["permitted_surface_families"] = ["configuration"]
+            raw["provenance"]["config_sha256"] = hashlib.sha256(baseline.read_bytes()).hexdigest()
+            campaign = load_campaign(raw)
+            adapter = ConfigSurfaceAdapter(baseline, root / "snapshots", pathlib.Path(__file__).resolve().parents[2] / "prompt-lab" / "config.py")
+            seed = adapter.seed_candidate(campaign)
+            child = adapter.build_candidate(seed, diagnosis_for({"family": "configuration", "diff": '{"scaffold":"decompose"}', "changed_units": ["config.scaffold"]}), campaign)
+            grandchild = adapter.build_candidate(child, diagnosis_for({"family": "configuration", "diff": '{"format":"xml"}', "changed_units": ["config.format"]}), campaign)
+            value = json.loads(adapter.materialize(grandchild).read_text(encoding="utf-8"))
+            self.assertEqual(value["scaffold"], "decompose")
+            self.assertEqual(value["format"], "xml")
+
+    def test_config_composition_requires_nonconflicting_accepted_branches(self) -> None:
+        with tempfile.TemporaryDirectory() as td:
+            root = pathlib.Path(td); baseline = root / "baseline.json"
+            baseline.write_text('{"format":"md","scaffold":"none","prompt_variant":"A"}\n', encoding="utf-8")
+            raw = campaign_dict(); raw["permitted_surface_families"] = ["configuration"]
+            raw["provenance"]["config_sha256"] = hashlib.sha256(baseline.read_bytes()).hexdigest()
+            campaign = load_campaign(raw)
+            adapter = ConfigSurfaceAdapter(baseline, root / "snapshots", pathlib.Path(__file__).resolve().parents[2] / "prompt-lab" / "config.py")
+            seed = adapter.seed_candidate(campaign); graph = {seed.candidate_id: seed}
+            left = adapter.build_candidate(seed, diagnosis_for({"family": "configuration", "diff": '{"format":"xml"}', "changed_units": ["config.format"]}), campaign)
+            right = adapter.build_candidate(seed, diagnosis_for({"family": "configuration", "diff": '{"scaffold":"decompose"}', "changed_units": ["config.scaffold"]}), campaign)
+            graph.update({left.candidate_id: left, right.candidate_id: right})
+            composed = adapter.compose(left, right, candidates_by_id=graph, campaign=campaign)
+            self.assertTrue(adapter.verify(composed, campaign, candidates_by_id={**graph, composed.candidate_id: composed})["verified"])
+            conflict = adapter.build_candidate(seed, diagnosis_for({"family": "configuration", "diff": '{"format":"json"}', "changed_units": ["config.format"]}), campaign)
+            graph[conflict.candidate_id] = conflict
+            with self.assertRaisesRegex(CandidateError, "conflict"):
+                adapter.compose(left, conflict, candidates_by_id=graph, campaign=campaign)
 
 
 class EventStoreTests(unittest.TestCase):
@@ -225,6 +304,25 @@ class EventStoreTests(unittest.TestCase):
 
 
 class EngineTests(unittest.TestCase):
+    def test_provider_results_are_typed_and_bounded_before_recording(self) -> None:
+        malformed = FakeProvider().session("diagnose_patch", {
+            "accepted_candidate_ids": ["seed"]
+        }, operation_id="typed-test")
+        malformed["alternatives_considered"] = "not-a-list"
+        with self.assertRaisesRegex(ValueError, "malformed diagnose_patch fields"):
+            _validate_session("diagnose_patch", malformed)
+        oversized = FakeProvider().session("reflect", {"classification": {"fixed": 1}}, operation_id="bounded-test")
+        oversized["lesson"] = "x" * 70_000
+        with self.assertRaisesRegex(ValueError, "oversized reflect"):
+            _validate_session("reflect", oversized)
+
+    def test_session_v2_rejects_legacy_evolution_actions(self) -> None:
+        with self.assertRaisesRegex(ValueError, "malformed evolve fields"):
+            _validate_session("evolve", {
+                "schema": "pi.optimizer-session/v2", "kind": "evolve",
+                "strategy": "x", "action": "revert", "selected_parent_ids": ["seed"],
+            })
+
     def test_full_fake_campaign_selects_review_only_candidate(self) -> None:
         with tempfile.TemporaryDirectory() as td:
             manifest = load_campaign(campaign_dict())
@@ -236,7 +334,9 @@ class EngineTests(unittest.TestCase):
             self.assertTrue(result["selected_candidate_id"].startswith("sha256:"))
             self.assertFalse(result["deployment_performed"])
             self.assertEqual(provider.calls_by_kind, {"diagnose_patch": 1, "reflect": 1, "evolve": 1})
-            self.assertNotIn("development", json.dumps(provider.evidence_seen))
+            encoded_evidence = json.dumps(provider.evidence_seen)
+            self.assertNotIn('"observations"', encoded_evidence)
+            self.assertNotIn('"score"', encoded_evidence)
             self.assertTrue((pathlib.Path(td) / "review-packet.json").is_file())
 
     def test_resume_after_each_transition_does_not_duplicate_calls(self) -> None:
@@ -279,6 +379,30 @@ class EngineTests(unittest.TestCase):
             self.assertEqual(result["status"], "complete")
             self.assertEqual(provider.calls_by_kind, {"diagnose_patch": 2, "reflect": 2, "evolve": 2})
             self.assertFalse(result["training_decision"]["accepted"])
+            evolves = [payload for payload in provider.evidence_seen if payload.get("schema") == "pi.optimizer-evolution-input/v2"]
+            self.assertEqual(len(evolves), 2)
+            self.assertTrue(evolves[1]["previous_reflection"])
+            self.assertTrue(evolves[1]["positive_lessons"])
+            self.assertNotIn('"observations"', json.dumps(evolves[1]))
+
+    def test_selecting_an_earlier_accepted_ancestor_is_the_revert_path(self) -> None:
+        class AncestorProvider(FakeProvider):
+            def session(self, kind, payload, *, operation_id):
+                if kind == "evolve":
+                    count = self.calls_by_kind.get(kind, 0)
+                    self.calls_by_kind[kind] = count + 1
+                    self.evidence_seen.append(json.loads(json.dumps(payload)))
+                    parent_id = payload["accepted_candidate_ids"][-1] if count == 0 else payload["accepted_candidate_ids"][0]
+                    return {"schema": "pi.optimizer-session/v2", "kind": kind, "strategy": "return-to-seed", "action": "mutate", "selected_parent_ids": [parent_id]}
+                return super().session(kind, payload, operation_id=operation_id)
+        with tempfile.TemporaryDirectory() as td:
+            raw = campaign_dict(); raw["limits"]["iterations"] = 2
+            manifest = load_campaign(raw); provider = AncestorProvider()
+            result = CampaignEngine(manifest, EventStore(pathlib.Path(td)), FakeScenario(BenchmarkPack.from_dict(benchmark_dict())), FakeSurface(), provider).run(approve_sha=manifest.sha256)
+            self.assertEqual(result["status"], "complete")
+            candidates = [event["payload"] for event in EventStore(pathlib.Path(td)).read_all() if event["type"] == "candidate.recorded"]
+            self.assertGreaterEqual(len(candidates), 3)
+            self.assertEqual(candidates[2]["parent_ids"], [candidates[0]["candidate_id"]])
 
     def test_missing_exposure_guard_regression_and_malformed_provider_cannot_advance(self) -> None:
         class NoExposure(FakeScenario):
@@ -300,8 +424,13 @@ class EngineTests(unittest.TestCase):
                 self.assertEqual(result["selected_candidate_id"], FakeSurface().seed_candidate(manifest).candidate_id)
         with tempfile.TemporaryDirectory() as td:
             manifest = load_campaign(campaign_dict())
-            with self.assertRaisesRegex(ValueError, "unknown fields"):
-                CampaignEngine(manifest, EventStore(pathlib.Path(td)), FakeScenario(BenchmarkPack.from_dict(benchmark_dict())), FakeSurface(), Malformed()).run(approve_sha=manifest.sha256)
+            provider = Malformed(); store = EventStore(pathlib.Path(td))
+            result = CampaignEngine(manifest, store, FakeScenario(BenchmarkPack.from_dict(benchmark_dict())), FakeSurface(), provider).run(approve_sha=manifest.sha256)
+            self.assertEqual(result["status"], "execution_error")
+            self.assertTrue((pathlib.Path(td) / "review-packet.json").is_file())
+            calls = dict(provider.calls_by_kind)
+            resumed = CampaignEngine(manifest, store, FakeScenario(BenchmarkPack.from_dict(benchmark_dict())), FakeSurface(), provider).run(approve_sha=manifest.sha256)
+            self.assertEqual(resumed, result); self.assertEqual(provider.calls_by_kind, calls)
 
     def test_uninformative_calibration_and_rollout_inflation_stop_fail_closed(self) -> None:
         class Uninformative(FakeScenario):
@@ -310,11 +439,13 @@ class EngineTests(unittest.TestCase):
             manifest = load_campaign(campaign_dict())
             result = CampaignEngine(manifest, EventStore(pathlib.Path(td)), Uninformative(BenchmarkPack.from_dict(benchmark_dict())), FakeSurface(), FakeProvider()).run(approve_sha=manifest.sha256)
             self.assertEqual(result["status"], "uninformative_benchmark")
+            self.assertTrue((pathlib.Path(td) / "review-packet.json").is_file())
         with tempfile.TemporaryDirectory() as td:
             raw = campaign_dict(); raw["limits"]["rollouts_per_candidate"] = 5
             manifest = load_campaign(raw)
-            with self.assertRaisesRegex(ValueError, "rollout budget"):
-                CampaignEngine(manifest, EventStore(pathlib.Path(td)), FakeScenario(BenchmarkPack.from_dict(benchmark_dict())), FakeSurface(), FakeProvider()).run(approve_sha=manifest.sha256)
+            result = CampaignEngine(manifest, EventStore(pathlib.Path(td)), FakeScenario(BenchmarkPack.from_dict(benchmark_dict())), FakeSurface(), FakeProvider()).run(approve_sha=manifest.sha256)
+            self.assertEqual(result["status"], "execution_error")
+            self.assertTrue((pathlib.Path(td) / "review-packet.json").is_file())
 
     def test_resume_respects_original_wall_clock_budget(self) -> None:
         with tempfile.TemporaryDirectory() as td:
@@ -333,14 +464,15 @@ class EngineTests(unittest.TestCase):
 
 class PiGateTests(unittest.TestCase):
     @staticmethod
-    def _row(*, arm: str = "cand", session: str = "session-1", run: str = "run-1", config: str = "b" * 64) -> dict:
+    def _row(*, arm: str = "cand", session: str = "session-1", run: str = "run-1", config: str = "b" * 64,
+             serving: str = "d" * 64) -> dict:
         return {
             "schema": "pi.eval-row/v4", "task": "t1", "model": "subject", "arm": arm,
             "run": run, "status": "complete", "score": 1, "authoritative": True,
             "gate_session_id": session, "harness": {"surface_sha256": "c" * 64},
             "config": {"sha256": config}, "experiment": {"manifest_sha256": HEX, "cell": f"cell-{arm}"},
             "execution": {"authoritative": True},
-            "serving": {"stable": True, "pre": {"status": "complete", "full_sha256": "d" * 64}, "post": {"status": "complete", "full_sha256": "d" * 64}},
+            "serving": {"stable": True, "pre": {"status": "complete", "full_sha256": serving}, "post": {"status": "complete", "full_sha256": serving}},
             "context": {"schema": "pi.context-telemetry/v4", "authenticated": True},
             "exposure": {"status": "control" if arm == "base" else "targeted"},
         }
@@ -380,6 +512,9 @@ class PiGateTests(unittest.TestCase):
         other = self._row(arm="base", session="session-2", run="run-2")
         with self.assertRaisesRegex(PiGateEvidenceError, "multiple invocations"):
             validate_gate_evidence([row, other], [self._validity(row), self._validity(other)], campaign_sha256=HEX, config_sha256="b" * 64, surface_sha256="c" * 64)
+        changed_serving = self._row(arm="base", session="session-3", serving="f" * 64)
+        with self.assertRaisesRegex(PiGateEvidenceError, "multiple serving identities"):
+            validate_gate_evidence([row, changed_serving], [self._validity(row), self._validity(changed_serving)], campaign_sha256=HEX, config_sha256="b" * 64, surface_sha256="c" * 64)
 
     def test_gate_files_must_be_fresh_and_complete(self) -> None:
         with tempfile.TemporaryDirectory() as td:
@@ -417,6 +552,10 @@ class PiGateTests(unittest.TestCase):
                 "case_tasks": case_tasks, "model_control": "llama", "gate_network": "endpoint",
                 "llama_endpoint": {"scheme": "http", "host": "loopback", "port": 8080}, "model_registry_sha256": "e" * 64,
             }, campaign)
+            scenario._bind_serving_identity({"provider": "fake", "model": "subject"}, "d" * 64)
+            self.assertEqual((root / "run" / "serving-contract.json").stat().st_mode & 0o777, 0o600)
+            with self.assertRaisesRegex(PiGateEvidenceError, "changed across campaign"):
+                scenario._bind_serving_identity({"provider": "fake", "model": "subject"}, "f" * 64)
             operation_id = "interrupted-evaluation"
             attempt = scenario.evidence_root / hashlib.sha256(operation_id.encode()).hexdigest()[:16]
             attempt.mkdir(mode=0o700); (attempt / "attempt.started").write_text("{}\n")

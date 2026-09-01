@@ -65,11 +65,11 @@ def _components(campaign: Campaign, pack: BenchmarkPack, manifest_path: pathlib.
         surface = FakeSurface()
     elif surface_plugin == "pi-gate-config":
         config = campaign.surface_adapter["config"]
-        if set(config) != {"baseline_config", "validator"}:
-            raise ValueError("pi-gate-config config must contain baseline_config and validator")
+        if set(config) != {"baseline_config", "validator", "allowed_keys", "behavior_keys"}:
+            raise ValueError("pi-gate-config config must contain baseline_config, validator, allowed_keys, and behavior_keys")
         baseline = pathlib.Path(config["baseline_config"]); baseline = baseline if baseline.is_absolute() else manifest_path.parent / baseline
         validator = pathlib.Path(config["validator"]); validator = validator if validator.is_absolute() else manifest_path.parent / validator
-        surface = ConfigSurfaceAdapter(baseline, run_dir / "config-snapshots", validator)
+        surface = ConfigSurfaceAdapter(baseline, run_dir / "config-snapshots", validator, tuple(config["allowed_keys"]), tuple(config["behavior_keys"]))
     elif surface_plugin == "pi-harness-patch":
         config = campaign.surface_adapter["config"]
         if set(config) != {"source_root", "family_allowlists", "verification_commands"}:
@@ -115,8 +115,17 @@ def _validate_adapter_configs(campaign: Campaign, pack: BenchmarkPack, manifest_
             raise ValueError("artifact-json provider requires exactly one non-empty artifact_root")
     if campaign.surface_adapter["plugin"] == "pi-gate-config":
         config = campaign.surface_adapter["config"]
-        if set(config) != {"baseline_config", "validator"}:
-            raise ValueError("pi-gate-config config must contain baseline_config and validator")
+        if set(config) != {"baseline_config", "validator", "allowed_keys", "behavior_keys"}:
+            raise ValueError("pi-gate-config config must contain baseline_config, validator, allowed_keys, and behavior_keys")
+        allowed_config_keys = {"name", "prediction", "prompt_variant", "format", "scaffold", "optillm", "decoding", "thresholds", "messages", "exposure"}
+        if (not isinstance(config["allowed_keys"], list) or not config["allowed_keys"] or
+                any(not isinstance(key, str) or key not in allowed_config_keys for key in config["allowed_keys"]) or
+                len(config["allowed_keys"]) != len(set(config["allowed_keys"]))):
+            raise ValueError("pi-gate-config allowed_keys must be a non-empty unique subset of the config schema")
+        if (not isinstance(config["behavior_keys"], list) or not config["behavior_keys"] or
+                any(not isinstance(key, str) or key not in config["allowed_keys"] for key in config["behavior_keys"]) or
+                len(config["behavior_keys"]) != len(set(config["behavior_keys"]))):
+            raise ValueError("pi-gate-config behavior_keys must be a non-empty unique subset of allowed_keys")
         resolved = []
         for field in ("baseline_config", "validator"):
             value = config[field]

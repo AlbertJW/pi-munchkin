@@ -39,7 +39,7 @@ def validate_gate_evidence(rows: list[dict], validity_records: list[dict], *, ca
     if len(verdicts) != len(validity_records) or len(validity_records) != len(rows):
         raise PiGateEvidenceError("trial-validity sidecar is incomplete or contains duplicate/extra rows")
     accepted = []
-    sessions = set(); runs = set()
+    sessions = set(); runs = set(); serving_hashes = set()
     for index, row in enumerate(rows):
         errors = []
         if row.get("schema") != "pi.eval-row/v4": errors.append("schema")
@@ -60,6 +60,10 @@ def validate_gate_evidence(rows: list[dict], validity_records: list[dict], *, ca
         serving = row.get("serving") or {}; pre = serving.get("pre") or {}; post = serving.get("post") or {}
         if serving.get("stable") is not True or pre.get("status") != "complete" or post.get("status") != "complete" or pre.get("full_sha256") != post.get("full_sha256"):
             errors.append("serving-identity")
+        elif not isinstance(pre.get("full_sha256"), str) or not re.fullmatch(r"[0-9a-f]{64}", pre["full_sha256"]):
+            errors.append("serving-identity")
+        else:
+            serving_hashes.add(pre["full_sha256"])
         context = row.get("context") or {}
         if context.get("schema") != "pi.context-telemetry/v4" or context.get("authenticated") is not True: errors.append("telemetry-authentication")
         if (row.get("exposure") or {}).get("status") not in ("control", "targeted", "engaged_only", "unexposed"):
@@ -80,6 +84,8 @@ def validate_gate_evidence(rows: list[dict], validity_records: list[dict], *, ca
         accepted.append(row)
     if len(runs) != 1:
         raise PiGateEvidenceError("gate rows span multiple invocations")
+    if len(serving_hashes) != 1:
+        raise PiGateEvidenceError("gate rows span multiple serving identities")
     return accepted
 
 
@@ -158,6 +164,40 @@ class PiGateScenario:
     def set_calibrated_cases(self, model: dict, selected: set[str]) -> None:
         self.calibrated_cases[self._model_key(model)] = set(selected)
 
+    def _bind_serving_identity(self, model: dict, full_sha256: str) -> None:
+        path = self.run_root / "serving-contract.json"
+        if path.is_symlink():
+            raise PiGateEvidenceError("serving contract must not be a symlink")
+        model_key = hashlib.sha256(self._model_key(model).encode()).hexdigest()
+        if path.exists():
+            try: contract = json.loads(path.read_text(encoding="utf-8"))
+            except (OSError, json.JSONDecodeError) as exc: raise PiGateEvidenceError("serving contract is malformed") from exc
+            if not isinstance(contract, dict) or contract.get("schema") != "pi.optimizer-serving-contract/v1" or not isinstance(contract.get("models"), dict):
+                raise PiGateEvidenceError("serving contract is malformed")
+        else:
+            contract = {"schema": "pi.optimizer-serving-contract/v1", "models": {}}
+        prior = contract["models"].get(model_key)
+        binding = {"model": model, "full_sha256": full_sha256}
+        if prior is not None and prior != binding:
+            raise PiGateEvidenceError("serving identity changed across campaign operations")
+        if prior is not None:
+            return
+        contract["models"][model_key] = binding
+        data = json.dumps(contract, sort_keys=True, separators=(",", ":")).encode() + b"\n"
+        fd, temporary = tempfile.mkstemp(prefix=".serving-contract.", dir=self.run_root)
+        try:
+            os.fchmod(fd, 0o600)
+            with os.fdopen(fd, "wb") as fh:
+                fh.write(data); fh.flush(); os.fsync(fh.fileno())
+            os.replace(temporary, path); os.chmod(path, 0o600)
+            directory_fd = os.open(self.run_root, os.O_RDONLY)
+            try: os.fsync(directory_fd)
+            finally: os.close(directory_fd)
+        except Exception:
+            try: os.unlink(temporary)
+            except OSError: pass
+            raise
+
     def dry(self) -> str:
         completed = subprocess.run([str(self.real_gate), "--dry"], cwd=self.optimizer_root, check=True, capture_output=True, text=True)
         return completed.stdout
@@ -170,6 +210,8 @@ class PiGateScenario:
         data = canonical_json(campaign.raw)
         if hashlib.sha256(data).hexdigest() != campaign.sha256:
             raise PiGateEvidenceError("resolved campaign bytes do not match campaign identity")
+        if path.is_symlink():
+            raise PiGateEvidenceError("resolved campaign artifact must not be a symlink")
         if path.exists() and path.read_bytes() != data:
             raise PiGateEvidenceError("resolved campaign artifact changed")
         if not path.exists():
@@ -209,7 +251,10 @@ class PiGateScenario:
         base_path = self.surface.materialize(parent)
         cand_path = self.surface.materialize(candidate) if candidate is not None else base_path
         arm = "both" if candidate is not None else ("base" if parent.mutation_family == "seed" else "cand")
-        expected_configs = {"base": parent.provenance["materialized_config_sha256"], "cand": cand_path and (candidate or parent).provenance["materialized_config_sha256"]}
+        expected_configs = {
+            "base": parent.provenance["materialized_config_sha256"],
+            "cand": (candidate or parent).provenance["materialized_config_sha256"],
+        }
         cells = {"base": parent.candidate_id, "cand": (candidate or parent).candidate_id}
         expected_arms = {"base", "cand"} if candidate is not None else {arm}
         expected_cells = {(task, rep, expected_arm) for task in tasks for rep in range(1, len(seeds) + 1) for expected_arm in expected_arms}
@@ -225,6 +270,7 @@ class PiGateScenario:
             actual_cells = {(row["task"], row["rep"], row["arm"]) for row in accepted}
             if actual_cells != expected_cells:
                 raise PiGateEvidenceError("Pi gate result cells are incomplete or duplicated")
+            self._bind_serving_identity(model, (accepted[0]["serving"]["pre"])["full_sha256"])
             return accepted
 
         sidecar = pathlib.Path(str(results) + ".validity.jsonl")
@@ -245,8 +291,13 @@ class PiGateScenario:
             "EXPERIMENT_MANIFEST": str(manifest_path), "EXPERIMENT_MANIFEST_SHA256": campaign.sha256,
             "EXPERIMENT_BASE_CELL": cells["base"], "EXPERIMENT_CAND_CELL": cells["cand"],
         })
-        attempt_marker.write_text(json.dumps({"operation_sha256": hashlib.sha256(operation_id.encode()).hexdigest()}) + "\n", encoding="utf-8")
-        os.chmod(attempt_marker, 0o600)
+        with attempt_marker.open("x", encoding="utf-8") as marker:
+            os.chmod(attempt_marker, 0o600)
+            marker.write(json.dumps({"operation_sha256": hashlib.sha256(operation_id.encode()).hexdigest()}) + "\n")
+            marker.flush(); os.fsync(marker.fileno())
+        directory_fd = os.open(evidence_dir, os.O_RDONLY)
+        try: os.fsync(directory_fd)
+        finally: os.close(directory_fd)
         started = time.time_ns()
         process = subprocess.Popen(
             [str(self.real_gate), *tasks], cwd=self.optimizer_root, env=environment,

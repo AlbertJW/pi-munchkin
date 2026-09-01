@@ -60,7 +60,9 @@ fresh `pi.eval-row/v4` files and their exact trial-validity sidecars. Rows must 
 authoritative, complete, telemetry-authenticated, exposure-classified, stable on
 their authenticated per-row parent-session identities, and bound to the campaign's config and
 surface fingerprints, requested provider/model, registered-model catalog, and
-candidate DAG cell. A voided reward-hacking verdict is rejected, not converted to
+candidate DAG cell. The first authoritative serving fingerprint for each declared
+model is durably pinned for the campaign; a later operation cannot cross that
+serving boundary. A voided reward-hacking verdict is rejected, not converted to
 a failed task. This first bridge deliberately does not refactor the Bash gate or
 its fixture, grader, Seatbelt, hidden-test, telemetry, or provenance boundaries.
 
@@ -72,6 +74,12 @@ the private run root; neither a mutable checkout nor a live agent directory is a
 candidate. A gate operation writes a durable attempt marker before launching. A
 resume reuses complete, validated evidence and refuses an incomplete attempt
 instead of silently duplicating model sessions.
+
+Provider responses have an explicit token cap, a one-megabyte transport ceiling,
+and typed, byte-bounded result validation before an event can be recorded. Every
+terminal campaign outcome—including an uninformative benchmark, an invalid seed,
+a budget stop, or a bounded execution error—writes a private review packet. A
+resume observes that terminal event without repeating provider or task sessions.
 
 Pi-gate benchmark cases resolve back to current, approved, unexpired fixture
 manifests during `prepare`. `fixture_sha256` is the fixture manifest digest already

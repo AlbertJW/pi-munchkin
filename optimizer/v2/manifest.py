@@ -3,6 +3,7 @@ from __future__ import annotations
 import dataclasses
 import hashlib
 import json
+import math
 import pathlib
 import re
 from typing import Any
@@ -102,15 +103,31 @@ def load_campaign(source: dict | str | pathlib.Path) -> Campaign:
         raise ManifestError("primary_metric.direction must be maximize or minimize")
     if metric["kind"] not in ("binary", "continuous"):
         raise ManifestError("primary_metric.kind must be binary or continuous")
-    policy = _strict(metric["paired_policy"], "primary_metric.paired_policy", {"name"}, {"minimum_net_fixes", "alpha", "permutations"})
-    _text(policy["name"], "primary_metric.paired_policy.name")
+    policy_name = metric["paired_policy"].get("name") if isinstance(metric.get("paired_policy"), dict) else None
+    if policy_name == "exact-sign":
+        policy = _strict(metric["paired_policy"], "primary_metric.paired_policy", {"name", "minimum_net_fixes"}, {"max_exact_cells"})
+        _positive_int(policy["minimum_net_fixes"], "primary_metric.paired_policy.minimum_net_fixes")
+        if "max_exact_cells" in policy:
+            limit = _positive_int(policy["max_exact_cells"], "primary_metric.paired_policy.max_exact_cells")
+            if limit > 20:
+                raise ManifestError("primary_metric.paired_policy.max_exact_cells must be at most 20")
+    elif policy_name == "paired-permutation":
+        policy = _strict(metric["paired_policy"], "primary_metric.paired_policy", {"name", "alpha", "permutations"})
+        alpha = policy["alpha"]
+        if not isinstance(alpha, (int, float)) or isinstance(alpha, bool) or not math.isfinite(alpha) or not 0 < alpha < 1:
+            raise ManifestError("primary_metric.paired_policy.alpha must be between 0 and 1")
+        permutations = _positive_int(policy["permutations"], "primary_metric.paired_policy.permutations")
+        if permutations < 2 or permutations > 1_000_000:
+            raise ManifestError("primary_metric.paired_policy.permutations must be between 2 and 1000000")
+    else:
+        raise ManifestError("primary_metric.paired_policy.name is unsupported")
     guards = obj["hard_guards"]
     if not isinstance(guards, list) or not guards:
         raise ManifestError("hard_guards must be a non-empty list")
     for index, guard in enumerate(guards):
         guard = _strict(guard, f"hard_guards[{index}]", {"metric", "direction", "threshold"})
         _text(guard["metric"], f"hard_guards[{index}].metric")
-        if guard["direction"] not in ("at_most", "at_least") or not isinstance(guard["threshold"], (int, float)) or isinstance(guard["threshold"], bool):
+        if guard["direction"] not in ("at_most", "at_least") or not isinstance(guard["threshold"], (int, float)) or isinstance(guard["threshold"], bool) or not math.isfinite(guard["threshold"]):
             raise ManifestError(f"hard_guards[{index}] is invalid")
     provider = _strict(obj["optimizer_provider"], "optimizer_provider", {"plugin", "config"})
     _text(provider["plugin"], "optimizer_provider.plugin")
@@ -128,7 +145,7 @@ def load_campaign(source: dict | str | pathlib.Path) -> Campaign:
     for field in ("plugin", "pack_id", "revision", "manifest"):
         _text(benchmark[field], f"benchmark.{field}")
     band = _strict(benchmark["discrimination_band"], "benchmark.discrimination_band", {"minimum", "maximum", "minimum_cases"})
-    if not all(isinstance(band[field], (int, float)) and not isinstance(band[field], bool) for field in ("minimum", "maximum")):
+    if not all(isinstance(band[field], (int, float)) and not isinstance(band[field], bool) and math.isfinite(band[field]) for field in ("minimum", "maximum")):
         raise ManifestError("benchmark discrimination bounds must be numeric")
     if not 0 <= band["minimum"] < band["maximum"] <= 1:
         raise ManifestError("benchmark discrimination band must satisfy 0 <= minimum < maximum <= 1")

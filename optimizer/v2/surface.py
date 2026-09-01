@@ -55,7 +55,8 @@ class PatchSurfaceAdapter:
             raise CandidateError("mutation diff has no bounded file paths")
         return tuple(sorted(set(paths)))
 
-    def build_candidate(self, parent: Candidate, diagnosis_patch: dict, campaign) -> Candidate:
+    def build_candidate(self, parent: Candidate, diagnosis: dict, campaign) -> Candidate:
+        diagnosis_patch = diagnosis.get("mutation") if isinstance(diagnosis, dict) else None
         if not isinstance(diagnosis_patch, dict) or set(diagnosis_patch) != {"family", "diff", "changed_units"}:
             raise CandidateError("mutation must contain exactly family, diff, and changed_units")
         family = diagnosis_patch["family"]
@@ -70,12 +71,56 @@ class PatchSurfaceAdapter:
             raise CandidateError("mutation path is outside its typed-family allowlist")
         return Candidate.create(
             parent_ids=(parent.candidate_id,), mutation_family=family,
-            hypothesis="Provider-proposed bounded mutation", predicted_mechanism="diagnosed mechanism",
-            expected_exposure="declared exposure", diff=diagnosis_patch["diff"],
-            changed_units=paths, provenance={"parent": parent.candidate_id},
+            hypothesis=diagnosis["root_cause_hypothesis"],
+            predicted_mechanism=f"Address the diagnosed cause through {diagnosis['target_surface']}",
+            expected_exposure=diagnosis["expected_exposure"], diff=diagnosis_patch["diff"],
+            changed_units=paths, provenance={"parent": parent.candidate_id, "falsifier": diagnosis["falsifier"], "rollback_condition": diagnosis["rollback_condition"]},
         )
 
-    def verify(self, candidate: Candidate, campaign) -> dict:
+    def describe_materialized(self, candidate: Candidate, *, candidates_by_id: dict[str, Candidate] | None = None) -> dict:
+        return {
+            "candidate_id": candidate.candidate_id,
+            "parent_ids": list(candidate.parent_ids),
+            "changed_units": list(candidate.changed_units),
+            "materialization": "full-parent-chain",
+        }
+
+    def compose(self, left: Candidate, right: Candidate, *, candidates_by_id: dict[str, Candidate], campaign) -> Candidate:
+        from .candidates import compose_candidates
+        return compose_candidates(left, right, accepted_ids=set(candidates_by_id), candidates_by_id=candidates_by_id)
+
+    def _apply_chain(self, workspace: pathlib.Path, candidate: Candidate,
+                     candidates_by_id: dict[str, Candidate] | None, seen: set[str]) -> None:
+        if candidate.candidate_id in seen:
+            raise CandidateError("candidate ancestry cycle")
+        seen.add(candidate.candidate_id)
+        if candidate.mutation_family == "composition":
+            patch_path = workspace / ".optimizer-candidate.patch"
+            patch_path.write_text(candidate.diff, encoding="utf-8")
+            check = subprocess.run(["git", "apply", "--check", str(patch_path)], cwd=workspace, capture_output=True, text=True)
+            if check.returncode:
+                raise CandidateError("composition diff does not apply to baseline")
+            applied = subprocess.run(["git", "apply", str(patch_path)], cwd=workspace, capture_output=True, text=True)
+            if applied.returncode:
+                raise CandidateError("composition diff failed to apply")
+            return
+        for parent_id in candidate.parent_ids:
+            parent = candidates_by_id.get(parent_id) if candidates_by_id else None
+            if parent is None:
+                raise CandidateError("candidate parent is unavailable for materialization")
+            self._apply_chain(workspace, parent, candidates_by_id, seen)
+        if candidate.mutation_family == "seed":
+            return
+        patch_path = workspace / f".optimizer-{candidate.candidate_id.removeprefix('sha256:')}.patch"
+        patch_path.write_text(candidate.diff, encoding="utf-8")
+        check = subprocess.run(["git", "apply", "--check", str(patch_path)], cwd=workspace, capture_output=True, text=True)
+        if check.returncode:
+            raise CandidateError("ancestor materialization diff does not apply")
+        applied = subprocess.run(["git", "apply", str(patch_path)], cwd=workspace, capture_output=True, text=True)
+        if applied.returncode:
+            raise CandidateError("ancestor materialization diff failed to apply")
+
+    def verify(self, candidate: Candidate, campaign, *, candidates_by_id: dict[str, Candidate] | None = None) -> dict:
         if candidate.mutation_family not in self.family_allowlists and candidate.mutation_family != "composition":
             return {"verified": False, "reason": "unknown-family", "diff_sha256": candidate.diff_sha256}
         if candidate.mutation_family == "composition":
@@ -87,14 +132,10 @@ class PatchSurfaceAdapter:
         workspace = pathlib.Path(tempfile.mkdtemp(prefix="candidate-", dir=self.workspace_root))
         try:
             shutil.copytree(self.source_root, workspace, dirs_exist_ok=True, ignore=shutil.ignore_patterns(".git", ".lavish", "__pycache__"))
-            patch_path = workspace / ".optimizer-candidate.patch"
-            patch_path.write_text(candidate.diff, encoding="utf-8"); os.chmod(patch_path, 0o600)
-            check = subprocess.run(["git", "apply", "--check", str(patch_path)], cwd=workspace, capture_output=True, text=True)
-            if check.returncode:
-                return {"verified": False, "reason": "diff-check-failed", "diff_sha256": candidate.diff_sha256}
-            applied = subprocess.run(["git", "apply", str(patch_path)], cwd=workspace, capture_output=True, text=True)
-            if applied.returncode:
-                return {"verified": False, "reason": "diff-apply-failed", "diff_sha256": candidate.diff_sha256}
+            try:
+                self._apply_chain(workspace, candidate, candidates_by_id, set())
+            except CandidateError as exc:
+                return {"verified": False, "reason": str(exc), "diff_sha256": candidate.diff_sha256}
             checks = []
             for command in commands:
                 completed = subprocess.run(list(command), cwd=workspace, capture_output=True, text=True, timeout=campaign.limits["case_timeout_seconds"])
@@ -122,10 +163,17 @@ class ConfigSurfaceAdapter:
     })
 
     def __init__(self, baseline_path: pathlib.Path, snapshot_root: pathlib.Path,
-                 validator_path: pathlib.Path):
+                 validator_path: pathlib.Path, allowed_keys: tuple[str, ...] | None = None,
+                 behavior_keys: tuple[str, ...] | None = None):
         self.baseline_path = baseline_path.resolve()
         self.snapshot_root = snapshot_root.resolve()
         self.validator_path = validator_path.resolve()
+        self.allowed_keys = frozenset(allowed_keys or self._allowed_keys)
+        if not self.allowed_keys or self.allowed_keys - self._allowed_keys:
+            raise CandidateError("configuration allowed_keys contains an unsupported key")
+        self.behavior_keys = frozenset(behavior_keys or self.allowed_keys)
+        if not self.behavior_keys or self.behavior_keys - self.allowed_keys:
+            raise CandidateError("configuration behavior_keys must be a non-empty subset of allowed_keys")
         self.snapshot_root.mkdir(parents=True, exist_ok=True, mode=0o700)
         os.chmod(self.snapshot_root, 0o700)
 
@@ -164,6 +212,8 @@ class ConfigSurfaceAdapter:
         os.chmod(directory, 0o700)
         path = directory / "config.json"
         if path.exists():
+            if path.is_symlink():
+                raise CandidateError("candidate config snapshot must not be a symlink")
             if path.read_bytes() != data:
                 raise CandidateError("content-addressed config snapshot collision")
             return path
@@ -184,6 +234,8 @@ class ConfigSurfaceAdapter:
 
     def materialize(self, candidate: Candidate) -> pathlib.Path:
         path = self._snapshot_path(candidate)
+        if path.is_symlink():
+            raise CandidateError("candidate config snapshot must not be a symlink")
         try:
             data = path.read_bytes()
         except OSError as exc:
@@ -192,6 +244,16 @@ class ConfigSurfaceAdapter:
         if not isinstance(expected, str) or self._digest(data) != expected:
             raise CandidateError("candidate config snapshot does not match immutable provenance")
         return path
+
+    def describe_materialized(self, candidate: Candidate, *, candidates_by_id: dict[str, Candidate] | None = None) -> dict:
+        path = self.materialize(candidate)
+        value = json.loads(path.read_text(encoding="utf-8"))
+        return {
+            "candidate_id": candidate.candidate_id,
+            "materialized_config_sha256": candidate.provenance.get("materialized_config_sha256"),
+            "keys": sorted(value),
+            "parent_ids": list(candidate.parent_ids),
+        }
 
     def seed_candidate(self, campaign) -> Candidate:
         data = self.baseline_path.read_bytes()
@@ -209,7 +271,8 @@ class ConfigSurfaceAdapter:
         self._write_snapshot(candidate, data)
         return candidate
 
-    def build_candidate(self, parent: Candidate, diagnosis_patch: dict, campaign) -> Candidate:
+    def build_candidate(self, parent: Candidate, diagnosis: dict, campaign) -> Candidate:
+        diagnosis_patch = diagnosis.get("mutation") if isinstance(diagnosis, dict) else None
         if not isinstance(diagnosis_patch, dict) or set(diagnosis_patch) != {"family", "diff", "changed_units"}:
             raise CandidateError("configuration mutation must contain exactly family, diff, and changed_units")
         if diagnosis_patch["family"] != self.family or self.family not in campaign.permitted_surface_families:
@@ -218,7 +281,7 @@ class ConfigSurfaceAdapter:
             patch = json.loads(diagnosis_patch["diff"])
         except (TypeError, json.JSONDecodeError) as exc:
             raise CandidateError("configuration diff must be a JSON merge-patch object") from exc
-        if not isinstance(patch, dict) or not patch or set(patch) - self._allowed_keys:
+        if not isinstance(patch, dict) or not patch or set(patch) - self.allowed_keys:
             raise CandidateError("configuration merge patch is empty or contains unsupported keys")
         declared = tuple(sorted(diagnosis_patch["changed_units"])) if isinstance(diagnosis_patch["changed_units"], list) else ()
         actual = tuple(sorted(f"config.{key}" for key in patch))
@@ -228,21 +291,70 @@ class ConfigSurfaceAdapter:
         merged = self._merge(parent_value, patch)
         if not isinstance(merged, dict):
             raise CandidateError("configuration merge patch did not produce an object")
+        changed_behavior = {key for key in self.behavior_keys if parent_value.get(key) != merged.get(key)}
+        if not changed_behavior:
+            raise CandidateError("configuration merge patch does not change an authorized behavioral key")
         data = self._canonical(merged)
+        if len(data) > 32_768:
+            raise CandidateError("materialized configuration exceeds 32 KiB")
         digest = self._digest(data)
         candidate = Candidate.create(
             parent_ids=(parent.candidate_id,), mutation_family=self.family,
-            hypothesis="Provider-proposed bounded configuration mutation",
-            predicted_mechanism="diagnosed configuration mechanism",
-            expected_exposure="declared configuration exposure",
+            hypothesis=diagnosis["root_cause_hypothesis"],
+            predicted_mechanism=f"Address the diagnosed cause through {diagnosis['target_surface']}",
+            expected_exposure=diagnosis["expected_exposure"],
             diff=json.dumps(patch, sort_keys=True, separators=(",", ":")), changed_units=actual,
-            provenance={"parent": parent.candidate_id, "materialized_config_sha256": digest},
+            provenance={"parent": parent.candidate_id, "materialized_config_sha256": digest,
+                        "falsifier": diagnosis["falsifier"], "rollback_condition": diagnosis["rollback_condition"]},
         )
         self._write_snapshot(candidate, data)
         return candidate
 
-    def verify(self, candidate: Candidate, campaign) -> dict:
-        if candidate.mutation_family not in ("seed", self.family):
+    def compose(self, left: Candidate, right: Candidate, *, candidates_by_id: dict[str, Candidate], campaign) -> Candidate:
+        from .candidates import compose_candidates
+        compose_candidates(left, right, accepted_ids=set(candidates_by_id), candidates_by_id=candidates_by_id)
+        left_value = json.loads(self.materialize(left).read_text(encoding="utf-8"))
+        right_value = json.loads(self.materialize(right).read_text(encoding="utf-8"))
+        shared = set(candidates_by_id[left.candidate_id].parent_ids) & set(candidates_by_id[right.candidate_id].parent_ids)
+        common_id = next(iter(shared), None)
+        if common_id is None:
+            left_anc = {left.candidate_id, *left.parent_ids}
+            right_anc = {right.candidate_id, *right.parent_ids}
+            common_id = next(iter(left_anc & right_anc), None)
+        if common_id is None or common_id not in candidates_by_id:
+            raise CandidateError("composition parents must share a materialized baseline")
+        baseline = json.loads(self.materialize(candidates_by_id[common_id]).read_text(encoding="utf-8"))
+        merged = dict(baseline)
+        for key in sorted(set(left_value) | set(right_value) | set(baseline)):
+            l_changed = left_value.get(key) != baseline.get(key)
+            r_changed = right_value.get(key) != baseline.get(key)
+            if l_changed and r_changed and left_value.get(key) != right_value.get(key):
+                raise CandidateError(f"composition changed-unit conflict: config.{key}")
+            if l_changed:
+                if key in left_value: merged[key] = left_value[key]
+                else: merged.pop(key, None)
+            if r_changed:
+                if key in right_value: merged[key] = right_value[key]
+                else: merged.pop(key, None)
+        changed = tuple(sorted(f"config.{key}" for key in merged if merged.get(key) != baseline.get(key)))
+        changed += tuple(sorted(f"config.{key}" for key in baseline if key not in merged))
+        if not changed:
+            raise CandidateError("composition produces no changed configuration units")
+        patch = {key: merged[key] for key in sorted(merged) if merged.get(key) != baseline.get(key)}
+        data = self._canonical(merged)
+        candidate = Candidate.create(
+            parent_ids=(left.candidate_id, right.candidate_id), mutation_family="composition",
+            hypothesis=f"Compose accepted hypotheses: {left.hypothesis}; {right.hypothesis}",
+            predicted_mechanism=f"{left.predicted_mechanism}; {right.predicted_mechanism}",
+            expected_exposure=f"{left.expected_exposure}; {right.expected_exposure}",
+            diff=json.dumps(patch, sort_keys=True, separators=(",", ":")), changed_units=changed,
+            provenance={"composition": [left.candidate_id, right.candidate_id], "materialized_config_sha256": self._digest(data)},
+        )
+        self._write_snapshot(candidate, data)
+        return candidate
+
+    def verify(self, candidate: Candidate, campaign, *, candidates_by_id: dict[str, Candidate] | None = None) -> dict:
+        if candidate.mutation_family not in ("seed", self.family, "composition"):
             return {"verified": False, "reason": "unknown-family", "diff_sha256": candidate.diff_sha256}
         try:
             path = self.materialize(candidate)

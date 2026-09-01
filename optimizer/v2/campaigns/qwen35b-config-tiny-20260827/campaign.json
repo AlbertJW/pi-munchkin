@@ -19,14 +19,17 @@
       "model": "qwen36-35b-iq3s",
       "api_key_env": "LLAMA_API_KEY",
       "allow_remote": false,
-      "timeout_seconds": 240
+      "timeout_seconds": 240,
+      "max_output_tokens": 4096
     }
   },
   "surface_adapter": {
     "plugin": "pi-gate-config",
     "config": {
       "baseline_config": "../../../prompt-lab/configs/baseline.json",
-      "validator": "../../../prompt-lab/config.py"
+      "validator": "../../../prompt-lab/config.py",
+      "allowed_keys": ["name", "prediction", "format", "scaffold", "exposure"],
+      "behavior_keys": ["format", "scaffold"]
     }
   },
   "subject_model": {"provider": "local-llamacpp", "model": "qwen36-35b-iq3s"},

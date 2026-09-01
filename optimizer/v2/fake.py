@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import copy
+
 from .benchmark import BenchmarkPack
 from .candidates import Candidate
 
@@ -13,12 +15,12 @@ class FakeProvider:
 
     def session(self, kind: str, payload: dict, *, operation_id: str) -> dict:
         self.calls_by_kind[kind] = self.calls_by_kind.get(kind, 0) + 1
-        self.evidence_seen.append(payload)
+        self.evidence_seen.append(copy.deepcopy(payload))
         if kind == "evolve":
-            return {"schema": "pi.optimizer-session-result/v1", "kind": kind, "strategy": "capability-first", "action": "select", "selected_parent_ids": [payload["accepted_candidate_ids"][-1]]}
+            return {"schema": "pi.optimizer-session/v2", "kind": kind, "strategy": "capability-first", "action": "mutate", "selected_parent_ids": [payload["accepted_candidate_ids"][-1]]}
         if kind == "diagnose_patch":
             return {
-                "schema": "pi.optimizer-session-result/v1", "kind": kind,
+                "schema": "pi.optimizer-session/v2", "kind": kind,
                 "root_cause_hypothesis": "The seed lacks the bounded capability needed by one admitted case.",
                 "alternatives_considered": ["steering-only change"], "target_surface": "capability",
                 "expected_exposure": "fake-capability-used", "primary_metric": "task_success",
@@ -27,7 +29,7 @@ class FakeProvider:
             }
         if kind == "reflect":
             return {
-                "schema": "pi.optimizer-session-result/v1", "kind": kind,
+                "schema": "pi.optimizer-session/v2", "kind": kind,
                 "lesson": "The bounded capability fixed the exposed case without a matched regression.",
                 "stochasticity_check": "identical seeded cells",
                 "classification": payload["classification"],
@@ -46,7 +48,8 @@ class FakeSurface:
             provenance={"source_sha256": campaign.provenance["source_sha256"]},
         )
 
-    def build_candidate(self, parent: Candidate, diagnosis_patch: dict, campaign) -> Candidate:
+    def build_candidate(self, parent: Candidate, diagnosis: dict, campaign) -> Candidate:
+        diagnosis_patch = diagnosis.get("mutation") if isinstance(diagnosis, dict) else None
         required = {"family", "diff", "changed_units"}
         if not isinstance(diagnosis_patch, dict) or set(diagnosis_patch) != required:
             raise ValueError("provider mutation output is malformed")
@@ -54,13 +57,14 @@ class FakeSurface:
             raise ValueError("provider mutation targets an unauthorized surface family")
         return Candidate.create(
             parent_ids=(parent.candidate_id,), mutation_family=diagnosis_patch["family"],
-            hypothesis="Bounded capability repairs the diagnosed failure",
-            predicted_mechanism="expose missing capability", expected_exposure="fake-capability-used",
+            hypothesis=diagnosis["root_cause_hypothesis"],
+            predicted_mechanism=f"Address the diagnosed cause through {diagnosis['target_surface']}",
+            expected_exposure=diagnosis["expected_exposure"],
             diff=diagnosis_patch["diff"], changed_units=tuple(diagnosis_patch["changed_units"]),
-            provenance={"parent": parent.candidate_id},
+            provenance={"parent": parent.candidate_id, "falsifier": diagnosis["falsifier"], "rollback_condition": diagnosis["rollback_condition"]},
         )
 
-    def verify(self, candidate: Candidate, campaign) -> dict:
+    def verify(self, candidate: Candidate, campaign, *, candidates_by_id=None) -> dict:
         return {
             "verified": candidate.mutation_family in campaign.permitted_surface_families or candidate.mutation_family == "composition",
             "checks": ["path-allowlist", "synthetic-typecheck", "synthetic-tests"],

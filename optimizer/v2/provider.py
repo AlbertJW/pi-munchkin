@@ -37,7 +37,7 @@ class OpenAICompatibleProvider:
     """
 
     plugin_name = "openai-compatible"
-    _FIELDS = {"endpoint_scheme", "endpoint_host", "endpoint_port", "model", "api_key_env", "allow_remote", "timeout_seconds"}
+    _FIELDS = {"endpoint_scheme", "endpoint_host", "endpoint_port", "model", "api_key_env", "allow_remote", "timeout_seconds", "max_output_tokens"}
 
     def __init__(self, config: dict):
         if not isinstance(config, dict) or set(config) != self._FIELDS:
@@ -60,18 +60,20 @@ class OpenAICompatibleProvider:
             raise ValueError("optimizer provider api_key_env is required")
         if not isinstance(config["timeout_seconds"], int) or isinstance(config["timeout_seconds"], bool) or config["timeout_seconds"] < 1:
             raise ValueError("optimizer provider timeout_seconds must be positive")
+        if not isinstance(config["max_output_tokens"], int) or isinstance(config["max_output_tokens"], bool) or not 128 <= config["max_output_tokens"] <= 16384:
+            raise ValueError("optimizer provider max_output_tokens must be within 128..16384")
         self.config = config
         self.endpoint = endpoint
 
     def session(self, kind: str, payload: dict, *, operation_id: str) -> dict:
         result_contracts = {
             "evolve": {
-                "schema": "pi.optimizer-session-result/v1", "kind": "evolve",
-                "strategy": "brief rationale", "action": "select|revert|compose",
+                "schema": "pi.optimizer-session/v2", "kind": "evolve",
+                "strategy": "brief rationale", "action": "mutate|compose",
                 "selected_parent_ids": ["one or two IDs from accepted_candidate_ids"],
             },
             "diagnose_patch": {
-                "schema": "pi.optimizer-session-result/v1", "kind": "diagnose_patch",
+                "schema": "pi.optimizer-session/v2", "kind": "diagnose_patch",
                 "root_cause_hypothesis": "specific causal diagnosis",
                 "alternatives_considered": ["bounded alternative"], "target_surface": "one permitted family",
                 "expected_exposure": "observable mechanism", "primary_metric": "declared metric name",
@@ -80,21 +82,22 @@ class OpenAICompatibleProvider:
                 "mutation": {"family": "target_surface", "diff": "family-specific mutation text", "changed_units": ["exact changed units"]},
             },
             "reflect": {
-                "schema": "pi.optimizer-session-result/v1", "kind": "reflect",
+                "schema": "pi.optimizer-session/v2", "kind": "reflect",
                 "lesson": "bounded lesson", "stochasticity_check": "matched-cell assessment",
                 "classification": payload.get("classification"),
             },
         }
         instruction = "Return exactly one JSON object matching output_contract; add no fields and use no markdown."
         if kind == "diagnose_patch" and "configuration" in payload.get("permitted_surface_families", []):
-            instruction += " For configuration, mutation.diff is a JSON-encoded merge-patch object and changed_units are exactly config.<top-level-key> for every patched key."
+            instruction += " For configuration, mutation.diff is a JSON-encoded merge-patch object using only payload.surface_constraints.configuration_allowed_keys, changes at least one configuration_behavior_keys value, and changed_units are exactly config.<top-level-key> for every patched key."
         prompt = {
-            "contract": "pi.optimizer-session/v1", "operation_id": operation_id,
+            "contract": "pi.optimizer-session/v2", "operation_id": operation_id,
             "operation": kind, "instruction": instruction,
             "output_contract": result_contracts.get(kind), "payload": payload,
         }
         body = json.dumps({
             "model": self.config["model"], "temperature": 0,
+            "max_tokens": self.config["max_output_tokens"],
             "response_format": {"type": "json_object"},
             "messages": [{"role": "user", "content": json.dumps(prompt, sort_keys=True)}],
         }).encode()
@@ -105,7 +108,10 @@ class OpenAICompatibleProvider:
         request = urllib.request.Request(endpoint, data=body, headers=headers, method="POST")
         try:
             with urllib.request.urlopen(request, timeout=self.config["timeout_seconds"]) as response:
-                envelope = json.loads(response.read())
+                encoded = response.read(1_048_577)
+                if len(encoded) > 1_048_576:
+                    raise ValueError("optimizer provider response exceeded 1 MiB")
+                envelope = json.loads(encoded)
             content = envelope["choices"][0]["message"]["content"]
             value = json.loads(content)
         except Exception as exc:

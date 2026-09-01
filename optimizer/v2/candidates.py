@@ -59,6 +59,26 @@ class Candidate:
             "changed_units": list(self.changed_units), "provenance": self.provenance,
         }
 
+    def card(self, *, train: dict | None = None, development_validated: bool = False,
+             accepted_lessons: tuple[str, ...] = ()) -> dict:
+        """Return a bounded evolution card; never expose mutation text or traces."""
+        disposition = "not-evaluated"
+        if isinstance(train, dict):
+            disposition = "accepted" if train.get("accepted") is True else "rejected"
+        return {
+            "candidate_id": self.candidate_id,
+            "parent_ids": list(self.parent_ids),
+            "mutation_family": self.mutation_family,
+            "hypothesis": self.hypothesis[:1024],
+            "predicted_mechanism": self.predicted_mechanism[:1024],
+            "expected_exposure": self.expected_exposure[:1024],
+            "changed_units": list(self.changed_units),
+            "verified_diff_sha256": self.diff_sha256,
+            "train_disposition": disposition,
+            "development_validated": bool(development_validated),
+            "accepted_lessons": list(accepted_lessons)[:8],
+        }
+
     @classmethod
     def from_dict(cls, value: dict) -> "Candidate":
         candidate = cls.create(
@@ -72,10 +92,46 @@ class Candidate:
         return candidate
 
 
-def compose_candidates(left: Candidate, right: Candidate, *, accepted_ids: set[str]) -> Candidate:
+def _transitive_units(candidate: Candidate, candidates_by_id: dict[str, Candidate] | None) -> set[str]:
+    units = set(candidate.changed_units)
+    if candidates_by_id is None:
+        return units
+    for parent_id in candidate.parent_ids:
+        parent = candidates_by_id.get(parent_id)
+        if parent is not None:
+            units.update(_transitive_units(parent, candidates_by_id))
+    return units
+
+
+def _ancestors(candidate: Candidate, candidates_by_id: dict[str, Candidate]) -> set[str]:
+    result = {candidate.candidate_id}
+    for parent_id in candidate.parent_ids:
+        parent = candidates_by_id.get(parent_id)
+        if parent is not None:
+            result.update(_ancestors(parent, candidates_by_id))
+    return result
+
+
+def _branch_units(candidate: Candidate, candidates_by_id: dict[str, Candidate], shared: set[str]) -> set[str]:
+    units = set() if candidate.candidate_id in shared else set(candidate.changed_units)
+    for parent_id in candidate.parent_ids:
+        parent = candidates_by_id.get(parent_id)
+        if parent is not None:
+            units.update(_branch_units(parent, candidates_by_id, shared))
+    return units
+
+
+def compose_candidates(left: Candidate, right: Candidate, *, accepted_ids: set[str],
+                       candidates_by_id: dict[str, Candidate] | None = None) -> Candidate:
     if left.candidate_id not in accepted_ids or right.candidate_id not in accepted_ids:
         raise CandidateError("composition parents must both be accepted candidates")
-    conflicts = set(left.changed_units) & set(right.changed_units)
+    if candidates_by_id is not None and not (_ancestors(left, candidates_by_id) & _ancestors(right, candidates_by_id)):
+        raise CandidateError("composition parents must share a common baseline")
+    if candidates_by_id is None:
+        conflicts = set(left.changed_units) & set(right.changed_units)
+    else:
+        shared = _ancestors(left, candidates_by_id) & _ancestors(right, candidates_by_id)
+        conflicts = _branch_units(left, candidates_by_id, shared) & _branch_units(right, candidates_by_id, shared)
     if conflicts:
         raise CandidateError(f"composition changed-unit conflict: {', '.join(sorted(conflicts))}")
     return Candidate.create(
@@ -87,4 +143,3 @@ def compose_candidates(left: Candidate, right: Candidate, *, accepted_ids: set[s
         changed_units=tuple(sorted(set(left.changed_units) | set(right.changed_units))),
         provenance={"composition": [left.candidate_id, right.candidate_id]},
     )
-
