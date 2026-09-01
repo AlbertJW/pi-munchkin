@@ -181,18 +181,12 @@ function emitGoalState(pi: ExtensionAPI, goal: GoalState | undefined): void {
 	emitHarnessSignal(pi.events, { v: 1, type: "goal/state", status: goal?.status ?? "none" });
 }
 
-function goalContextBudget(): number {
-	const profile = (globalThis as Record<string, unknown>).__pi_context_profile as { safe_input_tokens?: unknown } | undefined;
-	const safe = typeof profile?.safe_input_tokens === "number" && Number.isFinite(profile.safe_input_tokens) ? profile.safe_input_tokens : null;
-	return safe == null ? 4_096 : Math.max(2_304, Math.min(6_144, Math.floor(safe * 0.12)));
-}
-
 function goalExecutionPrompt(goal: GoalState): string {
 	return [
 		"MODE: GOAL",
 		"Pursue this persistent user-owned goal across turns until it is complete, explicitly accepted at 80/20, paused, blocked, or cancelled.",
 		"Use goal_update to record criterion evidence and residual risk. Use goal_settle only when its evidence requirements are satisfied.",
-		renderGoalRecoveryBrief(goal, goalContextBudget()),
+		renderGoalRecoveryBrief(goal),
 	].join("\n\n");
 }
 

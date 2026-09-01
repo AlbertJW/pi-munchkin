@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import test from "node:test";
 import {
-	acceptGoal, blockGoal, cancelGoal, createGoal, goalAmbientSummary, goalScopeIdentity, goalStoragePath, inspectGoal,
+	acceptGoal, blockGoal, cancelGoal, createGoal, goalAmbientSummary, goalContextBudget, goalScopeIdentity, goalStoragePath, inspectGoal,
 	mutateGoal, pauseGoal, readCurrentGoal, readExecutableGoal, readGoal, readGoals, settleGoal, updateGoal, validateGoal,
 	renderGoalRecoveryBrief,
 } from "../lib/goal-state.ts";
@@ -262,5 +262,50 @@ test("bounded execution context preserves criterion semantics and paged inspecti
 		}
 		assert.match(text, /FULL-CONSTRAINT-SENTINEL/);
 		assert.match(text, /FULL-CRITERION-SENTINEL/);
+	} finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+test("the default recovery brief budget carries the whole contract, not a 1 KiB stub", () => {
+	// The v2 brief grew from (objective<=240B + criterion IDs + counts) to the full
+	// contract, but only plan-runner passed the larger budget: compact-tool and
+	// run-capsule kept the 1_024 default, so the brief that survives a COMPACTION —
+	// the case goal mode exists for — truncated before the first criterion.
+	const { root, cwd } = fixture();
+	try {
+		const goal = createGoal({
+			cwd,
+			objective: "Ship the bounded change with evidence".padEnd(600, " and keep the contract legible"),
+			constraints: ["Do not touch the live mirror", "Keep every default reversible"],
+			criteria: [
+				{ id: "tests", text: "Every new behaviour has a red-then-green test".padEnd(200, "."), required: true },
+				{ id: "docs", text: "The changelog records the model-visible surface".padEnd(200, "."), required: false },
+				{ id: "rollback", text: "A single env switch disables the capability".padEnd(200, "."), required: true },
+			],
+		});
+		const untruncated = renderGoalRecoveryBrief(goal, 1_000_000);
+		assert.ok(Buffer.byteLength(untruncated, "utf8") > 1_024, "this fixture must exceed the old default to be a real counterfactual");
+		const brief = renderGoalRecoveryBrief(goal);
+		for (const id of ["tests", "docs", "rollback"]) {
+			assert.match(brief, new RegExp(`^${id} \\[open\\]`, "m"), `criterion ${id} must survive the default budget`);
+		}
+		assert.match(brief, /details_complete: true/);
+		assert.equal(goalContextBudget(), 4_096, "with no published context profile the budget falls back to 4 KiB");
+	} finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+test("a truncated recovery brief never claims both complete and incomplete details", () => {
+	// `details_complete: true` sat ~116 bytes from the end of the untruncated text
+	// while the truncation suffix reserves ~100, so a narrow band of budgets kept
+	// BOTH the true line and the appended false one — a self-contradicting brief.
+	const { root, cwd } = fixture();
+	try {
+		const goal = createGoal({ cwd, objective: "Contradiction window", criteria: [{ id: "only", text: "One criterion", required: true }] });
+		const full = Buffer.byteLength(renderGoalRecoveryBrief(goal, 1_000_000), "utf8");
+		for (let budget = full - 200; budget <= full + 8; budget += 1) {
+			const brief = renderGoalRecoveryBrief(goal, budget);
+			const claimsComplete = /details_complete: true/.test(brief);
+			const claimsIncomplete = /details_complete: false/.test(brief);
+			assert.equal(claimsComplete && claimsIncomplete, false, `budget ${budget} produced a brief claiming both`);
+		}
 	} finally { rmSync(root, { recursive: true, force: true }); }
 });

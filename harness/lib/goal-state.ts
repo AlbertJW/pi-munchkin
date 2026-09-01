@@ -485,7 +485,17 @@ export function goalAmbientSummary(goal: GoalState | undefined): Record<string, 
 	};
 }
 
-export function renderGoalRecoveryBrief(goal: GoalState | undefined, maxBytes = 1_024): string {
+/** Byte budget for an injected goal brief, scaled to the active context profile.
+ * Shared by every injection site — plan-runner's per-turn context, compaction
+ * instructions, and the capsule recovery brief — so the contract that survives a
+ * compaction is the same one the executing turn sees. */
+export function goalContextBudget(): number {
+	const profile = (globalThis as Record<string, unknown>).__pi_context_profile as { safe_input_tokens?: unknown } | undefined;
+	const safe = typeof profile?.safe_input_tokens === "number" && Number.isFinite(profile.safe_input_tokens) ? profile.safe_input_tokens : null;
+	return safe == null ? 4_096 : Math.max(2_304, Math.min(6_144, Math.floor(safe * 0.12)));
+}
+
+export function renderGoalRecoveryBrief(goal: GoalState | undefined, maxBytes = goalContextBudget()): string {
 	if (!goal || goal.status !== "active") return "";
 	const revision = hash(JSON.stringify(goal));
 	const criteria = goal.criteria.map((criterion) =>
@@ -504,11 +514,13 @@ export function renderGoalRecoveryBrief(goal: GoalState | undefined, maxBytes = 
 		`evidence_summary: ${goal.evidence.map((entry) => truncateUtf8(entry, 120)).join(" | ") || "none"}`,
 		`residual_risks: ${goal.residual_risks.map((entry) => truncateUtf8(entry, 120)).join(" | ") || "none"}`,
 		`deferrals: ${goal.deferred.map((entry) => truncateUtf8(`${entry.value}: ${entry.risk}`, 160)).join(" | ") || "none"}`,
-		"details_complete: true",
-		"next_action: continue from current filesystem evidence and update the goal before settling.",
-		"</pi-munchkin-goal-data>",
 	].join("\n");
-	if (bytes(text) <= maxBytes) return text;
+	// `details_complete` is appended per-branch, never carried inside the truncatable
+	// body: when it lived in the body a narrow band of budgets kept the "true" line
+	// and then appended the "false" suffix, handing the model a brief that claimed
+	// both at once.
+	const complete = `${text}\ndetails_complete: true\nnext_action: continue from current filesystem evidence and update the goal before settling.\n</pi-munchkin-goal-data>`;
+	if (bytes(complete) <= maxBytes) return complete;
 	const suffix = "\ndetails_complete: false\nUse goal_inspect for the omitted contract details.\n</pi-munchkin-goal-data>";
 	if (maxBytes <= bytes(suffix)) return truncateUtf8(suffix, maxBytes);
 	return `${truncateUtf8(text, Math.max(0, maxBytes - bytes(suffix)))}${suffix}`;
