@@ -24,8 +24,9 @@ All notable changes to pi-munchkin are documented here. Releases follow semantic
   development observations and traces never enter provider payloads.
 - **Candidate ancestry is preserved.** Evolution has only `mutate` and `compose`; selecting an
   earlier accepted ancestor is the supported revert path. Surface adapters materialize the full
-  parent chain, compositions require a shared baseline and transitive changed-unit agreement,
-  and every composition is a fresh verified candidate.
+  parent chain, compositions are owned by the selected surface adapter and require a shared
+  baseline plus transitive changed-unit agreement, and every composition is a fresh verified
+  candidate, including deep branches.
 - **Campaigns fail before sessions when policy declarations are malformed.** Paired-policy names,
   required fields, numeric types, finite bounds, alpha, permutation counts, and exact-policy
   limits are validated during manifest loading. The campaign remains dark and human-review-only.
