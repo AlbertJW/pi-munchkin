@@ -4,6 +4,16 @@ All notable changes to pi-munchkin are documented here. Releases follow semantic
 
 ## Unreleased
 
+### Fixed (2026-09-01 — persistent goal mode now executes)
+
+- **`/goal` was a ledger write, not a working mode.** Starting a goal persisted private state and
+  displayed a notification, but it never started an agent turn; later turns could not see the
+  restored goal because its ambient global had no model-context consumer. `/goal`, `/goal-accept`,
+  and `/goal-resume` now start one command-owned turn, active goal state is injected as a bounded
+  private context message on subsequent turns, and the deferred `goals` tool family remains active
+  across session rebinds while the goal is active. Pause and settlement stop goal steering, and a
+  manual tool disable remains authoritative. `GOALS=off` is unchanged.
+
 ### Added (2026-08-27 — dark Optimizer V2 control plane)
 
 - **A durable, benchmark-led optimizer under `optimizer/v2/`.** Strict
