@@ -4,6 +4,18 @@ All notable changes to pi-munchkin are documented here. Releases follow semantic
 
 ## Unreleased
 
+### Fixed (2026-09-01 — optimizer durability and scoring isolation)
+
+- **Event recovery is explicit.** `status`, `inspect`, and `replay` report a malformed
+  end-of-file suffix without changing the event log; only `resume` under the campaign lock may
+  truncate that final suffix and append an `event-store.tail-recovered` digest record. Midstream
+  corruption remains fatal, and projection failures mark rebuildable projections dirty instead
+  of losing the durable event.
+- **Model-authored scoring never falls back to the host.** One-shot scoring now probes the
+  rendered Seatbelt profile before running a grader and fails closed when the jail is unavailable
+  or denied with `EPERM`. Offline selftests report the hardened scoring and network checks as
+  unavailable in nested managed sandboxes rather than executing unjailed code.
+
 ### Fixed (2026-09-01 — Optimizer V2 learning loop)
 
 - **Optimizer feedback is now durable and causal.** Provider exchanges use
