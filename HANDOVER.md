@@ -1,5 +1,22 @@
 # Handover — pi_munchkin, 2026-08-24
 
+## 2026-09-01 Qwen35B baseline screen — lifecycle cutoff, evidence voided
+
+The current-surface Qwen35B base-only screen was run under invocation `96faf8`
+(`parens`, `equil`, `bigdata`, one replicate each). All three local fixture
+gates passed, and all three rows carried matching authenticated model,
+provider, registry, config, and loaded-surface identities. The trial-validity
+sidecar nevertheless voided all three rows: each session hit or approached the
+240-second bound before `agent_settled`, leaving no authenticated
+failure-episode settlement summary. This is incomplete infrastructure evidence,
+not a Qwen quality result. See
+[`optimizer/docs/QWEN35B_BASELINE_AUDIT_2026-09-01.md`](optimizer/docs/QWEN35B_BASELINE_AUDIT_2026-09-01.md).
+
+Do not resume or pool this run. The next model run requires a fresh
+preregistration with a longer but still bounded wall-clock policy (or a
+characterized graceful-stop path). No candidate, semantic-loop, planner, or
+deep-research screen is authorized by this result.
+
 ## 2026-08-27 persistent goals + dynamic context (source-only)
 
 The current source branch adds private project/worktree goal state with
