@@ -17,6 +17,23 @@ preregistration with a longer but still bounded wall-clock policy (or a
 characterized graceful-stop path). No candidate, semantic-loop, planner, or
 deep-research screen is authorized by this result.
 
+## 2026-09-01 Qwen35B timeout retry — one valid row, two lifecycle voids
+
+The explicitly approved replacement used the same model, provider, fixtures,
+arm, configuration, registry, loaded surface, and provenance protocol, changing
+only `PI_TIMEOUT` from 240 to 480 seconds. `equil` reached one authoritative
+settlement at about 451 seconds. `parens` and `bigdata` still ended in tool-loop
+tails without `agent_settled`, so the sidecar voided them for `infra_valid` even
+though their fixture gates passed. See
+[`optimizer/docs/QWEN35B_BASELINE_TIMEOUT_RETRY_AUDIT_2026-09-01.md`](optimizer/docs/QWEN35B_BASELINE_TIMEOUT_RETRY_AUDIT_2026-09-01.md).
+
+This establishes that the original timeout was too short but that a larger
+bound alone is not a reliable protocol. Do not pool or resume the retry and do
+not start another Qwen screen until a graceful-stop/telemetry-settlement path
+has been characterized and separately preregistered. No semantic-loop,
+planner/deep-research graph, optimizer, or adoption work is authorized by
+these rows.
+
 ## 2026-08-27 persistent goals + dynamic context (source-only)
 
 The current source branch adds private project/worktree goal state with
