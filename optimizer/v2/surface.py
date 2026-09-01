@@ -315,12 +315,17 @@ class ConfigSurfaceAdapter:
         compose_candidates(left, right, accepted_ids=set(candidates_by_id), candidates_by_id=candidates_by_id)
         left_value = json.loads(self.materialize(left).read_text(encoding="utf-8"))
         right_value = json.loads(self.materialize(right).read_text(encoding="utf-8"))
-        shared = set(candidates_by_id[left.candidate_id].parent_ids) & set(candidates_by_id[right.candidate_id].parent_ids)
-        common_id = next(iter(shared), None)
+        def ancestors(candidate: Candidate) -> set[str]:
+            result = {candidate.candidate_id}
+            for parent_id in candidate.parent_ids:
+                parent = candidates_by_id.get(parent_id)
+                if parent is not None:
+                    result.update(ancestors(parent))
+            return result
+        common = ancestors(left) & ancestors(right)
+        common_id = next((candidate_id for candidate_id in common if candidate_id in candidates_by_id and candidates_by_id[candidate_id].mutation_family == "seed"), None)
         if common_id is None:
-            left_anc = {left.candidate_id, *left.parent_ids}
-            right_anc = {right.candidate_id, *right.parent_ids}
-            common_id = next(iter(left_anc & right_anc), None)
+            common_id = next((candidate_id for candidate_id in common if candidate_id in candidates_by_id), None)
         if common_id is None or common_id not in candidates_by_id:
             raise CandidateError("composition parents must share a materialized baseline")
         baseline = json.loads(self.materialize(candidates_by_id[common_id]).read_text(encoding="utf-8"))

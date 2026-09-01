@@ -71,6 +71,10 @@ class FakeSurface:
             "diff_sha256": candidate.diff_sha256, "changed_units": list(candidate.changed_units),
         }
 
+    def compose(self, left: Candidate, right: Candidate, *, candidates_by_id: dict[str, Candidate], campaign) -> Candidate:
+        from .candidates import compose_candidates
+        return compose_candidates(left, right, accepted_ids=set(candidates_by_id), candidates_by_id=candidates_by_id)
+
 
 class FakeScenario:
     plugin_name = "fake"
