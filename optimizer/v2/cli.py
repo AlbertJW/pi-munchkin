@@ -11,7 +11,7 @@ import tempfile
 
 from .benchmark import BenchmarkPack
 from .engine import CampaignEngine
-from .events import EventStore
+from .events import EventStore, EventStoreError
 from .fake import FakeProvider, FakeScenario, FakeSurface
 from .manifest import Campaign, ManifestError, load_campaign
 from .provider import ArtifactProvider, OpenAICompatibleProvider
@@ -229,13 +229,21 @@ def main(argv: list[str] | None = None) -> int:
             raise ValueError("campaign run already exists; use resume with the same approval SHA")
         store = EventStore(run_dir, create=args.command == "run")
         if args.command in ("status", "inspect", "replay"):
-            if args.command == "replay":
-                store.write_projections(store.project())
-            print(json.dumps(store.project(), sort_keys=True)); return 0
+            projection, tail = store.project_with_recovery()
+            if tail is not None:
+                projection["event_store"] = {"malformed_eof": True, "byte_count": tail["byte_count"], "sha256": tail["sha256"], "recovery": "resume-only"}
+            elif args.command == "replay":
+                store.write_projections(projection)
+            print(json.dumps(projection, sort_keys=True)); return 0
+        if args.command == "resume":
+            with store.campaign_lock():
+                _, tail = store.read_with_recovery()
+                if tail is not None:
+                    store.recover_tail()
         scenario, surface, provider = _components(campaign, pack, manifest_path.resolve(), store.run_root)
         result = CampaignEngine(campaign, store, scenario, surface, provider).run(approve_sha=args.approve_sha)
         print(json.dumps(result, sort_keys=True)); return 0
-    except (ManifestError, ValueError, OSError) as exc:
+    except (ManifestError, ValueError, OSError, EventStoreError) as exc:
         print(f"optimizer-v2: {exc}", file=sys.stderr); return 2
 
 

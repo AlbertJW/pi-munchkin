@@ -93,6 +93,13 @@ def main():
     if platform.system() != "Darwin" or not shutil.which("sandbox-exec"):
         print("seatbelt_network_selftest: SKIP (macOS sandbox-exec unavailable)")
         return
+    with tempfile.TemporaryDirectory(prefix=".pi-seatbelt-probe-") as probe_td:
+        probe_profile = Path(probe_td) / "probe.sb"
+        probe_profile.write_text("(version 1)\n(allow default)\n")
+        probe = subprocess.run(["sandbox-exec", "-f", str(probe_profile), "/bin/sh", "-c", "exit 0"], capture_output=True, text=True)
+        if probe.returncode != 0:
+            print("seatbelt_network_selftest: SKIP (sandbox-exec unavailable in managed sandbox)")
+            return
     open_source = ROOT / "real-gate-fixtures/gate-open.sb"
     endpoint_source = ROOT / "real-gate-fixtures/gate.sb"
     assert "(deny network*)" not in open_source.read_text()

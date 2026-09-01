@@ -27,6 +27,7 @@ class EventStore:
         self.events_path = self.run_root / "events.jsonl"
         self.lock_path = self.run_root / ".writer.lock"
         self.run_lock_path = self.run_root / ".campaign.lock"
+        self.projection_dirty_path = self.run_root / ".projections-dirty"
         if not create:
             if not self.run_root.is_dir() or not self.events_path.is_file():
                 raise EventStoreError("optimizer run does not exist")
@@ -68,28 +69,67 @@ class EventStore:
         finally:
             os.close(fd)
 
-    def read_all(self) -> list[dict]:
+    def _read_bytes(self, *, allow_malformed_eof: bool = False) -> tuple[list[dict], dict | None]:
         events = []
         previous = None
+        valid_offset = 0
         try:
-            with self.events_path.open(encoding="utf-8") as fh:
-                for number, line in enumerate(fh, 1):
-                    try:
-                        event = json.loads(line)
-                    except json.JSONDecodeError as exc:
-                        raise EventStoreError(f"invalid event log at line {number}: {exc.msg}") from exc
-                    required = {"schema", "sequence", "operation_id", "type", "payload", "previous_sha256", "event_sha256"}
-                    if not isinstance(event, dict) or set(event) != required or event["schema"] != SCHEMA:
-                        raise EventStoreError(f"invalid event envelope at line {number}")
-                    claimed = event["event_sha256"]
-                    body = {key: value for key, value in event.items() if key != "event_sha256"}
-                    if event["sequence"] != number or event["previous_sha256"] != previous or hashlib.sha256(_canonical(body)).hexdigest() != claimed:
-                        raise EventStoreError(f"event chain mismatch at line {number}")
-                    previous = claimed
-                    events.append(event)
+            data = self.events_path.read_bytes()
+            lines = data.splitlines(keepends=True)
+            for number, line in enumerate(lines, 1):
+                line_end = valid_offset + len(line)
+                try:
+                    event = json.loads(line.decode("utf-8"))
+                except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+                    if allow_malformed_eof and number == len(lines):
+                        suffix = data[valid_offset:]
+                        return events, {"byte_count": len(suffix), "sha256": hashlib.sha256(suffix).hexdigest(), "offset": valid_offset}
+                    message = getattr(exc, "msg", "invalid UTF-8")
+                    raise EventStoreError(f"invalid event log at line {number}: {message}") from exc
+                required = {"schema", "sequence", "operation_id", "type", "payload", "previous_sha256", "event_sha256"}
+                if not isinstance(event, dict) or set(event) != required or event["schema"] != SCHEMA:
+                    if allow_malformed_eof and number == len(lines):
+                        suffix = data[valid_offset:]
+                        return events, {"byte_count": len(suffix), "sha256": hashlib.sha256(suffix).hexdigest(), "offset": valid_offset}
+                    raise EventStoreError(f"invalid event envelope at line {number}")
+                claimed = event["event_sha256"]
+                body = {key: value for key, value in event.items() if key != "event_sha256"}
+                if event["sequence"] != number or event["previous_sha256"] != previous or hashlib.sha256(_canonical(body)).hexdigest() != claimed:
+                    if allow_malformed_eof and number == len(lines):
+                        suffix = data[valid_offset:]
+                        return events, {"byte_count": len(suffix), "sha256": hashlib.sha256(suffix).hexdigest(), "offset": valid_offset}
+                    raise EventStoreError(f"event chain mismatch at line {number}")
+                previous = claimed
+                events.append(event)
+                valid_offset = line_end
         except OSError as exc:
             raise EventStoreError(f"cannot read event log: {exc}") from exc
+        return events, None
+
+    def read_all(self) -> list[dict]:
+        events, _ = self._read_bytes()
         return events
+
+    def read_with_recovery(self) -> tuple[list[dict], dict | None]:
+        """Read valid events and report (but never mutate) a malformed final suffix."""
+        return self._read_bytes(allow_malformed_eof=True)
+
+    def recover_tail(self) -> dict | None:
+        """Under the campaign lock, discard only a malformed final suffix."""
+        tail = None
+        with self.writer_lock():
+            events, tail = self.read_with_recovery()
+            if tail is None:
+                return None
+            with self.events_path.open("r+b") as fh:
+                fh.truncate(tail["offset"])
+                fh.flush(); os.fsync(fh.fileno())
+            self._fsync_directory()
+        digest = tail["sha256"]
+        return self.append(
+            f"event-store:tail-recovered:{digest}", "event-store.tail-recovered",
+            {"byte_count": tail["byte_count"], "sha256": digest},
+        )
 
     def append(self, operation_id: str, event_type: str, payload: dict) -> dict:
         if not operation_id or not event_type or not isinstance(payload, dict):
@@ -110,7 +150,12 @@ class EventStore:
             with self.events_path.open("ab", buffering=0) as fh:
                 fh.write(_canonical(event) + b"\n")
                 os.fsync(fh.fileno())
-            self.write_projections(self._project(events + [event]))
+            try:
+                self.write_projections(self._project(events + [event]))
+                self.projection_dirty_path.unlink(missing_ok=True)
+            except Exception:
+                self.projection_dirty_path.write_text("dirty\n", encoding="utf-8")
+                os.chmod(self.projection_dirty_path, 0o600)
             return event
 
     def find(self, operation_id: str) -> dict | None:
@@ -154,7 +199,18 @@ class EventStore:
         return state
 
     def project(self) -> dict:
-        return self._project(self.read_all())
+        projection = self._project(self.read_all())
+        if self.projection_dirty_path.exists():
+            try:
+                self.write_projections(projection)
+                self.projection_dirty_path.unlink(missing_ok=True)
+            except Exception:
+                pass
+        return projection
+
+    def project_with_recovery(self) -> tuple[dict, dict | None]:
+        events, tail = self.read_with_recovery()
+        return self._project(events), tail
 
     def write_projections(self, projection: dict) -> None:
         for name, value in (("snapshot.json", projection), ("candidate-graph.json", {"schema": "pi.optimizer-candidate-graph/v1", "candidates": projection["candidates"]}), ("metrics.json", {"schema": "pi.optimizer-metrics/v1", "evaluations": projection["evaluations"]}), ("budget.json", {"schema": "pi.optimizer-budget/v1", **projection["budget"]})):

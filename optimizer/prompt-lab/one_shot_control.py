@@ -89,14 +89,14 @@ def apply_once(work, diff):
 
 
 def _scoring_jail(work, scratch):
-    """Render binary.sb for a one-shot grade, or None when it cannot be jailed.
+    """Render and probe binary.sb for a one-shot grade.
 
     The scratch dir is a SIBLING of `work`, never inside it: binary.sb write-allows
     the scratch dir, so putting it under the workdir would hand the write fence back.
     """
     import grade_sandbox
     if os.uname().sysname != "Darwin" or not shutil.which("sandbox-exec"):
-        return None
+        raise ControlError("scoring jail unavailable; refusing unjailed model-authored scoring")
     scratch.mkdir(parents=True, exist_ok=True)
     shutil.copy(PRELOAD, scratch / "grade_preload.mjs")
     profile = scratch / "binary.sb"
@@ -105,8 +105,21 @@ def _scoring_jail(work, scratch):
         grade_sandbox.render(str(root / "real-gate-fixtures" / "binary.sb"), str(profile),
                              str(scratch / "no-pin"), str(scratch / "no-evidence"),
                              str(scratch), str(root), str(root), None)
-    except SystemExit:
-        return None
+    except SystemExit as exc:
+        raise ControlError("scoring jail profile could not be rendered") from exc
+    probe = scratch / ".jail-probe"
+    probe.unlink(missing_ok=True)
+    completed = subprocess.run(
+        ["sandbox-exec", "-f", str(profile), "/usr/bin/env", "-i",
+         f"PATH={Path(NODE).parent}:/usr/bin:/bin", f"HOME={scratch}", f"TMPDIR={scratch}",
+         "LANG=en_US.UTF-8", "/bin/sh", "-c", "printf probe > \"$TMPDIR/.jail-probe\""],
+        cwd=work, capture_output=True, text=True, timeout=10,
+    )
+    if completed.returncode != 0 or probe.read_text(encoding="utf-8", errors="replace") != "probe":
+        probe.unlink(missing_ok=True)
+        detail = (completed.stderr or completed.stdout or "probe failed")[-200:]
+        raise ControlError(f"scoring jail unavailable; refusing unjailed model-authored scoring ({detail})")
+    probe.unlink(missing_ok=True)
     return profile
 
 

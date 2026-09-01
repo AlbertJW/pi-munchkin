@@ -449,14 +449,18 @@ def test_one_shot():
         result = control.run("h3", "canonical", "http://mock.invalid", "mock-model")
     finally:
         control.request_once = original
-    assert len(calls) == 1 and result["requests"] == 1 and result["score"] == 1
+    assert len(calls) == 1 and result["requests"] == 1
     assert result["usage"]["exact"] and result["context_bytes"] <= 48 * 1024
     # The one-shot arm applies a model-authored diff and then grades over it, so its
     # graders execute model code exactly like real_gate's scoring runs and used to
     # do it unjailed and unpreloaded. score==1 above proves the gold patch still
     # grades THROUGH the jail; this proves the jail was actually in place.
-    if platform.system() == "Darwin" and shutil.which("sandbox-exec"):
+    if result["scoring_jailed"]:
+        assert result["score"] == 1
         assert result["scoring_jailed"] is True, "one-shot graded model code outside the scoring jail"
+    else:
+        assert result["score"] == 0 and result["scoring_jailed"] is False
+        assert "refusing unjailed model-authored scoring" in (result["error"] or "")
 
     captured = []
     class FakeResponse:

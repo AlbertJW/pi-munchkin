@@ -293,6 +293,66 @@ class EventStoreTests(unittest.TestCase):
             with self.assertRaisesRegex(EventStoreError, "line 1"):
                 store.read_all()
 
+    def test_malformed_eof_is_reported_without_mutation_and_resume_recovers(self) -> None:
+        with tempfile.TemporaryDirectory() as td:
+            store = EventStore(pathlib.Path(td))
+            store.append("op-1", "campaign.prepared", {"sha256": HEX})
+            suffix = b'{"torn":'
+            with store.events_path.open("ab") as fh:
+                fh.write(suffix)
+            before = store.events_path.read_bytes()
+            events, tail = store.read_with_recovery()
+            self.assertEqual(len(events), 1)
+            self.assertEqual(tail["byte_count"], len(suffix))
+            self.assertEqual(store.events_path.read_bytes(), before)
+            projection, reported = store.project_with_recovery()
+            self.assertTrue(reported and reported["sha256"] == tail["sha256"])
+            self.assertEqual(projection["event_count"], 1)
+            with store.campaign_lock():
+                recovered = store.recover_tail()
+            self.assertEqual(recovered["type"], "event-store.tail-recovered")
+            self.assertEqual(store.read_all()[-1]["payload"], {"byte_count": len(suffix), "sha256": tail["sha256"]})
+
+    def test_midstream_corruption_is_fatal_and_projection_failure_is_rebuildable(self) -> None:
+        with tempfile.TemporaryDirectory() as td:
+            store = EventStore(pathlib.Path(td))
+            store.append("op-1", "campaign.prepared", {"sha256": HEX})
+            store.events_path.write_bytes(store.events_path.read_bytes() + b'{"bad":1}\n' + store.events_path.read_bytes())
+            with self.assertRaisesRegex(EventStoreError, "line 2"):
+                store.read_with_recovery()
+        with tempfile.TemporaryDirectory() as td:
+            store = EventStore(pathlib.Path(td))
+            original = store.write_projections
+            store.write_projections = lambda _projection: (_ for _ in ()).throw(OSError("projection down"))
+            event = store.append("op-1", "campaign.prepared", {"sha256": HEX})
+            self.assertEqual(event["operation_id"], "op-1")
+            self.assertTrue(store.projection_dirty_path.exists())
+            store.write_projections = original
+            self.assertEqual(store.project()["event_count"], 1)
+            self.assertFalse(store.projection_dirty_path.exists())
+
+    def test_cli_status_inspect_and_replay_report_tail_without_mutating(self) -> None:
+        with tempfile.TemporaryDirectory() as td:
+            manifest_path = pathlib.Path(__file__).resolve().parents[1] / "examples" / "campaign.json"
+            manifest = load_campaign(manifest_path)
+            run_root = pathlib.Path(td) / "runs"
+            run_dir = run_root / f"{manifest.campaign_id}-{manifest.sha256[:12]}"
+            store = EventStore(run_dir)
+            store.append("op-1", "campaign.prepared", {"sha256": manifest.sha256})
+            with store.events_path.open("ab") as fh:
+                fh.write(b'{"torn":')
+            before = store.events_path.read_bytes()
+            for command in ("status", "inspect", "replay"):
+                result = subprocess.run(
+                    ["python3", "-m", "optimizer.v2.cli", command, "--manifest", str(manifest_path), "--run-root", str(run_root)],
+                    cwd=manifest_path.parents[3], capture_output=True, text=True,
+                )
+                self.assertEqual(result.returncode, 0, result.stderr)
+                projection = json.loads(result.stdout)
+                self.assertTrue(projection["event_store"]["malformed_eof"])
+                self.assertEqual(projection["event_store"]["recovery"], "resume-only")
+                self.assertEqual(store.events_path.read_bytes(), before)
+
     def test_run_has_one_nonblocking_writer(self) -> None:
         with tempfile.TemporaryDirectory() as td:
             first = EventStore(pathlib.Path(td))

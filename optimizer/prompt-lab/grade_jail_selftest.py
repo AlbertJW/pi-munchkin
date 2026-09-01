@@ -208,6 +208,17 @@ def selftest():
     if platform.system() != "Darwin" or not shutil.which("sandbox-exec") or not shutil.which("node"):
         print("grade_jail_selftest: SKIP (macOS sandbox-exec or node unavailable)")
         return
+    # Managed/nested sandboxes may expose the binary but deny the kernel operation.
+    # Probe execution before constructing attack fixtures; never fall back to an
+    # unjailed run when this probe is denied.
+    with tempfile.TemporaryDirectory(prefix="grade-jail-probe-") as probe_td:
+        probe_root = Path(probe_td)
+        probe_profile = probe_root / "probe.sb"
+        probe_profile.write_text("(version 1)\n(allow default)\n")
+        probe = subprocess.run(["sandbox-exec", "-f", str(probe_profile), "/bin/sh", "-c", "exit 0"], capture_output=True, text=True)
+        if probe.returncode != 0:
+            print("grade_jail_selftest: SKIP (sandbox-exec unavailable in managed sandbox)")
+            return
     if not TEMPLATE.is_file():
         raise SystemExit("grade.sb template missing")
 
