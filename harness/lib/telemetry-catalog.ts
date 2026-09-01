@@ -85,7 +85,8 @@ export const EVENT_CATALOG = {
 	"runtime/serving-truth": { served_n_ctx: "number", registry_ctx: "number", verdict: "string" },
 	// provider/model are deliberately NOT declared here: normalizeDetail strips
 	// them from detail (RESERVED_FIELDS) and consumes them as envelope fallbacks.
-	"runtime/context-profile": { epoch: "number", declared_ctx: ["number", "null"], served_ctx: ["number", "null"], safe_input: ["number", "null"], confidence: "string", profile_source: "string" },
+	"runtime/context-profile": { epoch: "number", declared_ctx: ["number", "null"], served_ctx: ["number", "null"], safe_input: ["number", "null"], confidence: "string", profile_source: "string", serving_fingerprint: "string" },
+	"runtime/context-budget": { epoch: "number", previous_safe_input: "number", safe_input: "number", handoff_required: "boolean" },
 	"runtime/context-calibration": { epoch: "number", success: "boolean", status: "number", failure: "string", safe_input: "number" },
 	"runtime/context-handoff": { from_epoch: "number", to_epoch: "number", reason_class: "string", ok: "boolean" },
 	"runtime/provider-timing": {

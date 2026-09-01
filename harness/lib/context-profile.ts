@@ -8,6 +8,7 @@ export type ContextProfile = {
 	schema_version: 1;
 	epoch: number;
 	fingerprint: string;
+	endpoint_fingerprint: string;
 	provider: string;
 	model: string;
 	declared_context_window: number | null;
@@ -38,7 +39,21 @@ function isoNow(): string { return new Date().toISOString(); }
 function hash(value: string): string { return createHash("sha256").update(value).digest("hex"); }
 
 export function modelFingerprint(model: ModelContextMetadata): string {
-	return hash(JSON.stringify({ provider: String(model.provider ?? "unknown"), id: String(model.id ?? "unknown"), contextWindow: finitePositive(model.contextWindow) }));
+	return hash(JSON.stringify({
+		provider: String(model.provider ?? "unknown"), id: String(model.id ?? "unknown"),
+		contextWindow: finitePositive(model.contextWindow), endpoint: endpointFingerprint(model.baseUrl),
+	}));
+}
+
+export function endpointFingerprint(baseUrl: unknown): string {
+	let normalized = "unknown";
+	if (typeof baseUrl === "string") {
+		try {
+			const url = new URL(baseUrl);
+			normalized = `${url.protocol.toLowerCase()}//${url.hostname.toLowerCase()}:${url.port || (url.protocol === "https:" ? "443" : "80")}${url.pathname.replace(/\/+$/, "") || "/"}`;
+		} catch { normalized = "invalid"; }
+	}
+	return hash(normalized);
 }
 
 export function outputReserveFor(window: number): number {
@@ -70,7 +85,7 @@ export function contextProfileFor(model: ModelContextMetadata, epoch = 0, option
 	const overhead = Number.isFinite(options.overheadTokens) ? Math.max(0, Math.floor(options.overheadTokens!)) : DEFAULT_OVERHEAD;
 	const source = options.source ?? (served ? "serving_probe" : declared ? "metadata" : "fallback");
 	return {
-		schema_version: 1, epoch, fingerprint: modelFingerprint(model), provider: String(model.provider ?? "unknown"), model: String(model.id ?? "unknown"),
+		schema_version: 1, epoch, fingerprint: modelFingerprint(model), endpoint_fingerprint: endpointFingerprint(model.baseUrl), provider: String(model.provider ?? "unknown"), model: String(model.id ?? "unknown"),
 		declared_context_window: declared, served_context_window: served, safe_input_tokens: safeInputBudget(window, overhead),
 		output_reserve: outputReserveFor(window), overhead_tokens: overhead,
 		confidence: options.confidence ?? (served ? "measured" : declared ? "observed" : "fallback"), source,
@@ -79,9 +94,12 @@ export function contextProfileFor(model: ModelContextMetadata, epoch = 0, option
 }
 
 export function withServingWindow(profile: ContextProfile, servedContextWindow: number): ContextProfile {
-	return contextProfileFor({ provider: profile.provider, id: profile.model, contextWindow: profile.declared_context_window }, profile.epoch, {
-		servedContextWindow, overheadTokens: profile.overhead_tokens, confidence: "measured", source: "serving_probe", calibration: profile.calibration, calibratedAt: profile.calibrated_at,
-	});
+	const served = finitePositive(servedContextWindow);
+	if (served === null) return profile;
+	return {
+		...profile, served_context_window: served, safe_input_tokens: safeInputBudget(served, profile.overhead_tokens),
+		output_reserve: outputReserveFor(served), confidence: "measured", source: "serving_probe",
+	};
 }
 
 export function contextNeedsHandoff(profile: ContextProfile | undefined, usage: { tokens?: number | null; percent?: number | null } | undefined): boolean {
@@ -134,7 +152,7 @@ export async function calibrateContext(input: {
 			body: JSON.stringify({ model: String(input.model.id ?? ""), messages: [{ role: "user", content: "Return one token: OK" }], max_tokens: 1, stream: false }),
 		});
 		if (!response.ok) return { ok: false, status: response.status, safe_input_tokens: input.profile.safe_input_tokens, profile: { ...input.profile, calibration: "failed" }, failure: "rejected" };
-		const profile = contextProfileFor(input.model, input.profile.epoch, { servedContextWindow: input.profile.served_context_window, overheadTokens: input.profile.overhead_tokens, confidence: "measured", source: "calibration", calibration: "success", calibratedAt: isoNow() });
+		const profile = contextProfileFor(input.model, input.profile.epoch, { servedContextWindow: input.profile.served_context_window, overheadTokens: input.profile.overhead_tokens, confidence: "observed", source: "calibration", calibration: "success", calibratedAt: isoNow() });
 		// This request validates the serving path only; it is not a capacity
 		// benchmark. Keep the profile internally consistent with the declared or
 		// observed serving window rather than inventing a smaller measured limit.

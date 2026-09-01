@@ -18,6 +18,8 @@ test("context profiles derive a model-specific safe budget and stable serving fi
 	assert.equal(profile.output_reserve, outputReserveFor(32_768));
 	assert.equal(modelFingerprint(model), profile.fingerprint);
 	assert.notEqual(profile.fingerprint, modelFingerprint({ ...model, id: "ling" }));
+	assert.notEqual(profile.fingerprint, modelFingerprint({ ...model, baseUrl: ["http", "://127.0.0.1:9090/v1"].join("") }), "serving endpoints define distinct epochs");
+	assert.equal(JSON.stringify(profile).includes("127.0.0.1"), false, "profiles expose only a hashed endpoint identity");
 	assert.equal(contextNeedsHandoff(profile, { tokens: profile.safe_input_tokens! }), true);
 	assert.match(handoffReason(profile, { tokens: profile.safe_input_tokens! }), /safe input budget/);
 });
@@ -69,6 +71,7 @@ test("active calibration is isolated, local-only, bounded, and opt-in", async ()
 	const measured = await calibrateContext({ model, profile, fetchFn, enabled: true });
 	assert.equal(measured.ok, true);
 	assert.equal(measured.profile.source, "calibration");
+	assert.equal(measured.profile.confidence, "observed", "a one-token reachability request is not a capacity measurement");
 	assert.equal(measured.profile.calibration, "success");
 	assert.equal(calls, 1);
 	const larger = { provider: "local", id: "qwen35b", contextWindow: 65_536, baseUrl: ["http", "://127.0.0.1:1234/v1"].join("") };
@@ -77,6 +80,54 @@ test("active calibration is isolated, local-only, bounded, and opt-in", async ()
 	const refused = await calibrateContext({ model: { ...model, baseUrl: "https://api.example.test/v1" }, profile, fetchFn, enabled: true });
 	assert.equal(refused.failure, "unsafe_host");
 	assert.equal(calls, 2);
+});
+
+test("a served-window shrink at settlement immediately triggers the one-shot handoff", async () => {
+	const prior = process.env.CONTEXT_HANDOFF;
+	delete process.env.CONTEXT_HANDOFF;
+	const realFetch = globalThis.fetch;
+	try {
+		globalThis.fetch = (async () => ({ ok: true, json: async () => ({ default_generation_settings: { n_ctx: 4_096 } }) }) as Response) as typeof fetch;
+		const fp = makeFakePi();
+		const mod = await import(`../extensions/runtime-truth.ts?served-shrink=${Date.now()}-${Math.random()}`);
+		mod.default(fp.pi as never);
+		await fire(fp, "session_start", {}, {});
+		let compactions = 0;
+		const ctx = {
+			model: { provider: "local", id: "same-id", contextWindow: 32_768, baseUrl: ["http", "://127.0.0.1:8080/v1"].join("") },
+			getContextUsage: () => ({ tokens: 8_000, percent: 25 }),
+			compact: (options: { onComplete?: () => void }) => { compactions += 1; options.onComplete?.(); },
+			ui: { notify: () => {} },
+		};
+		await fire(fp, "before_provider_request", {}, ctx);
+		await fire(fp, "after_provider_response", { status: 200 }, ctx);
+		await fire(fp, "agent_settled", {}, ctx);
+		assert.equal(compactions, 1, "the lower served budget must be enforced before another provider request");
+		assert.ok(fp.sent.some((message) => /preserved active task state/.test(message)));
+		assert.equal(fp.sent.some((message) => /preserved goal/.test(message)), false, "ordinary tasks must not claim a goal exists");
+	} finally {
+		globalThis.fetch = realFetch;
+		if (prior === undefined) delete process.env.CONTEXT_HANDOFF; else process.env.CONTEXT_HANDOFF = prior;
+	}
+});
+
+test("serving discovery rearms for the same model ID on a different endpoint", async () => {
+	const realFetch = globalThis.fetch;
+	let fetches = 0;
+	try {
+		globalThis.fetch = (async () => { fetches += 1; return { ok: true, json: async () => ({ default_generation_settings: { n_ctx: 8_192 } }) } as Response; }) as typeof fetch;
+		const fp = makeFakePi();
+		const mod = await import(`../extensions/runtime-truth.ts?endpoint-epoch=${Date.now()}-${Math.random()}`);
+		mod.default(fp.pi as never);
+		await fire(fp, "session_start", {}, {});
+		for (const port of [8080, 9090]) {
+			const ctx = { model: { provider: "local", id: "same-id", contextWindow: 8_192, baseUrl: `http://127.0.0.1:${port}/v1` }, ui: { notify: () => {} } };
+			await fire(fp, "before_provider_request", {}, ctx);
+			await fire(fp, "after_provider_response", { status: 200 }, ctx);
+			await fire(fp, "agent_settled", {}, ctx);
+		}
+		assert.equal(fetches, 2);
+	} finally { globalThis.fetch = realFetch; }
 });
 
 test("runtime model switching creates a new epoch and automatically hands off an over-budget context", async () => {

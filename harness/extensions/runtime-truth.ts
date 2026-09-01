@@ -114,8 +114,8 @@ export default function (pi: ExtensionAPI): void {
 	let servingTruth: { served_n_ctx: number; registry_ctx: number; verdict: ServingVerdict } | null = null;
 	// Latched by MODEL ID, not once-per-session: a mid-session /model switch
 	// re-probes for the new model instead of reporting the old model's numbers.
-	let probedModelId: string | null = null;
-	let pendingProbe: { modelId: string; baseUrl: string; registryCtx: number; notify: (message: string) => void } | null = null;
+	let probedServingFingerprint: string | null = null;
+	let pendingProbe: { modelId: string; baseUrl: string; registryCtx: number; servingFingerprint: string; notify: (message: string) => void } | null = null;
 	let protocolObservation: ProtocolObservation = emptyProtocolObservation();
 	let currentModel: { api?: unknown; reasoning?: unknown; thinkingLevelMap?: unknown; compat?: { supportsStrictMode?: unknown; thinkingFormat?: unknown } } | undefined;
 	let protocolDirty = false;
@@ -126,6 +126,7 @@ export default function (pi: ExtensionAPI): void {
 	let calibrationPending: { model: { provider?: unknown; id?: unknown; baseUrl?: unknown; contextWindow?: unknown }; profile: ContextProfile } | null = null;
 	let handoffInFlight = false;
 	let handoffDisarmedKey: string | null = null;
+	let pendingBudgetHandoff: { profile: ContextProfile; fromEpoch: number } | null = null;
 
 	function publishContextProfile(profile: ContextProfile | undefined): void {
 		contextProfile = profile;
@@ -145,6 +146,7 @@ export default function (pi: ExtensionAPI): void {
 			calibrationPending = { model: metadata, profile: contextProfile! };
 			record("runtime", "context-profile", {
 				epoch: contextProfile!.epoch, provider: contextProfile!.provider, model: contextProfile!.model,
+				serving_fingerprint: contextProfile!.fingerprint,
 				declared_ctx: contextProfile!.declared_context_window, served_ctx: contextProfile!.served_context_window,
 				safe_input: contextProfile!.safe_input_tokens, confidence: contextProfile!.confidence, profile_source: contextProfile!.source,
 			});
@@ -185,7 +187,11 @@ export default function (pi: ExtensionAPI): void {
 			handoffDisarmedKey = key;
 			record("runtime", "context-handoff", { from_epoch: fromEpoch, to_epoch: profile.epoch, reason_class: fromEpoch === profile.epoch ? "budget_threshold" : "smaller_target_window", ok: resume });
 			if (!resume) return;
-			try { pi.sendMessage({ customType: "pi-munchkin:model-handoff-resume", content: "Model handoff complete. Continue from the preserved goal and current filesystem evidence.", display: true, details: { epoch: profile.epoch } }, { triggerTurn: true, deliverAs: "followUp" }); } catch { /* stale session */ }
+			const activeGoal = (globalThis as Record<string, unknown>).__pi_active_goal_context as { status?: unknown } | undefined;
+			const continuation = activeGoal?.status === "active"
+				? "Model handoff complete. Continue from the preserved active goal, plan item IDs, and current filesystem evidence."
+				: "Model handoff complete. Continue from the preserved active task state and current filesystem evidence.";
+			try { pi.sendMessage({ customType: "pi-munchkin:model-handoff-resume", content: continuation, display: true, details: { epoch: profile.epoch } }, { triggerTurn: true, deliverAs: "followUp" }); } catch { /* stale session */ }
 		};
 		try {
 			ctx.compact({
@@ -206,7 +212,7 @@ export default function (pi: ExtensionAPI): void {
 		current = null;
 		completed = [];
 		servingTruth = null;
-		probedModelId = null;
+		probedServingFingerprint = null;
 		pendingProbe = null;
 		protocolObservation = emptyProtocolObservation();
 		currentModel = undefined;
@@ -218,6 +224,7 @@ export default function (pi: ExtensionAPI): void {
 		calibrationPending = null;
 		handoffInFlight = false;
 		handoffDisarmedKey = null;
+		pendingBudgetHandoff = null;
 		delete (globalThis as Record<string, unknown>).__pi_context_profile;
 	}
 
@@ -231,6 +238,11 @@ export default function (pi: ExtensionAPI): void {
 		protocolDirty = true;
 		currentModel = ctx?.model as typeof currentModel;
 		observeModel(ctx?.model);
+		if (pendingBudgetHandoff) {
+			const pending = pendingBudgetHandoff;
+			pendingBudgetHandoff = null;
+			requestHandoff(ctx, pending.fromEpoch, pending.profile);
+		}
 		closeCurrent();
 		current = {
 			seq: ++nextSeq, started: performance.now(), headersAt: null,
@@ -269,9 +281,10 @@ export default function (pi: ExtensionAPI): void {
 		const model = ctx?.model as { id?: string; baseUrl?: string; contextWindow?: number } | undefined;
 		if (typeof event.status !== "number" || event.status >= 400) return;
 		if (!model?.id || !model.baseUrl || typeof model.contextWindow !== "number") return;
-		if (probedModelId === model.id) return;
+		const servingFingerprint = modelFingerprint(model);
+		if (probedServingFingerprint === servingFingerprint) return;
 		pendingProbe = {
-			modelId: model.id, baseUrl: model.baseUrl, registryCtx: model.contextWindow,
+			modelId: model.id, baseUrl: model.baseUrl, registryCtx: model.contextWindow, servingFingerprint,
 			notify: (message) => { try { ctx?.ui?.notify?.(message, "warning"); } catch { /* stale ctx */ } },
 		};
 	});
@@ -293,24 +306,30 @@ export default function (pi: ExtensionAPI): void {
 		if (current && event.message.role === "assistant") current.streamAt ??= performance.now();
 	});
 
-	pi.on("agent_settled", async () => {
+	pi.on("agent_settled", async (_event, ctx) => {
 		// Serving-truth, step 2: the run settled, the stream is finished, the
 		// model is loaded and idle — the only moment a single-slot router answers
 		// /props promptly. AWAITED, not fire-and-forget: `pi -p` exits right after
 		// settlement, and a detached probe lost that race every time (measured
 		// live — zero rows despite a working probe). The fetch is bounded at 3s
 		// and takes milliseconds against an idle local server; once per model.
-		if (pendingProbe && probedModelId !== pendingProbe.modelId) {
+		if (pendingProbe && probedServingFingerprint !== pendingProbe.servingFingerprint) {
 			const probeTarget = pendingProbe;
 			pendingProbe = null;
-			probedModelId = probeTarget.modelId;
+			probedServingFingerprint = probeTarget.servingFingerprint;
 			await probeServingTruth({ baseUrl: probeTarget.baseUrl, modelId: probeTarget.modelId }).then((probe) => {
 				if (!probe) return; // non-probeable host or failed probe: silent
 				const verdict = computeServingVerdict(probe.served_n_ctx, probeTarget.registryCtx);
 				servingTruth = { served_n_ctx: probe.served_n_ctx, registry_ctx: probeTarget.registryCtx, verdict };
-				if (contextProfile && contextProfile.model === probeTarget.modelId) {
+				if (contextProfile && contextProfile.fingerprint === probeTarget.servingFingerprint) {
+					const previousProfile = contextProfile;
 					publishContextProfile(withServingWindow(contextProfile, probe.served_n_ctx));
 					if (calibrationPending?.profile.fingerprint === contextProfile.fingerprint) calibrationPending.profile = contextProfile;
+					if (contextNeedsHandoff(contextProfile, ctx?.getContextUsage?.())) {
+						if (typeof ctx?.compact === "function") requestHandoff(ctx, previousProfile.epoch, contextProfile);
+						else pendingBudgetHandoff = { profile: contextProfile, fromEpoch: previousProfile.epoch };
+					}
+					record("runtime", "context-budget", { epoch: contextProfile.epoch, previous_safe_input: previousProfile.safe_input_tokens ?? 0, safe_input: contextProfile.safe_input_tokens ?? 0, handoff_required: contextNeedsHandoff(contextProfile, ctx?.getContextUsage?.()) });
 				}
 				record("runtime", "serving-truth", {
 					served_n_ctx: probe.served_n_ctx, registry_ctx: probeTarget.registryCtx, verdict,

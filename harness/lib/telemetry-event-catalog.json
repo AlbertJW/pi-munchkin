@@ -76,6 +76,7 @@
     "run-kernel/transition",
     "runtime/protocol-parity",
     "runtime/context-calibration",
+	"runtime/context-budget",
     "runtime/context-handoff",
     "runtime/context-profile",
     "runtime/provider-timing",
