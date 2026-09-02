@@ -105,8 +105,10 @@ downstream of the semantic-loop gate and must not bypass it.
    receipt: all three rows reached the task gate but lacked authenticated
    settlement. Do not resume or pool them; isolate active-tool cancellation
    before preparing another model screen.
-3. After an authoritative lifecycle result, run the short goal/context smoke;
-   keep both defaults and dark flags unchanged.
+3. Run the prepared context-epoch wiring smoke in
+   `PREREG_QWEN35B_CONTEXT_EPOCHS_2026-09-02.md`; keep both defaults and dark
+   flags unchanged. Treat it as reachability evidence only, then prepare a
+   separate multi-turn handoff/rearm/model-switch screen.
 4. Reissue the semantic-loop preregistration if its prerequisite is still
    active, or record its explicit retirement.
 5. Run research-ledger Run 3 and the targeted bash-guard trigger screen as

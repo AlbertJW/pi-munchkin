@@ -29,6 +29,14 @@ Do not resume or pool those rows. The next source work is a deterministic
 active-tool cancellation fixture; a fresh preregistration is required after any
 fix.
 
+The next independent dark-candidate action is the prepared dynamic-context
+epoch smoke in
+[`optimizer/docs/PREREG_QWEN35B_CONTEXT_EPOCHS_2026-09-02.md`](optimizer/docs/PREREG_QWEN35B_CONTEXT_EPOCHS_2026-09-02.md).
+It is a single no-tool, no-goal reachability run with local serving discovery
+and one-token calibration enabled, while automatic handoff stays off to keep
+the first receipt interpretable. It cannot establish handoff safety, capacity,
+rearming, or model-switch behavior.
+
 ## 2026-09-02 pre-fix dark-candidate DD mechanism probes
 
 The router was reachable and Qwen 35B completed a bounded transport smoke.
