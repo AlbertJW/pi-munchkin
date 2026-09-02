@@ -21,6 +21,14 @@ explicitly approved six-session mechanism screen plus three fact-lookup
 controls. Any timeout, branch failure, or missing parent evidence remains
 incomplete rather than a quality result.
 
+The preflight is now codified as
+`python3 optimizer/research-fixtures/preflight.py --dry --agent-dir
+/Users/Albert.Wessels/.pi/agent`. It has been run successfully at the current
+tip and reports the source hash, loaded hash, model, both threshold maps, and
+three fixture IDs with `execution:false` and `inference_started:false`. It is a
+readiness check, not human approval; use the hash-verifying planner launcher
+only after the exact command and six-session envelope are explicitly approved.
+
 ## 2026-09-02 research-ledger budget wall
 
 Run 3 exposed that the ledger footer was only informational outside a plan

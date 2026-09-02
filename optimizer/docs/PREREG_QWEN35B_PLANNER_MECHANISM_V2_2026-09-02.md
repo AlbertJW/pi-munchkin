@@ -61,6 +61,19 @@ The exact source-time cutoff, provenance, and negative-control rules remain
 bound to each manifest. A human still must review the slate and explicitly
 start any model session.
 
+The no-inference preflight now binds this slate to the prepared surface and
+configuration identities:
+
+```sh
+python3 optimizer/research-fixtures/preflight.py --dry \
+  --agent-dir /Users/Albert.Wessels/.pi/agent
+```
+
+On 2026-09-02 it returned `pi.planner-preflight/v1` with source
+`5b84241c…`, loaded surface `0c09cb63…`, the exact Qwen subject, both expected
+flag maps, and all three fixture IDs. This output is a readiness receipt only;
+the command never contacts the model server or starts Pi.
+
 ## Arms and run sequence
 
 The control uses the current deep-research skill with the ledger but with

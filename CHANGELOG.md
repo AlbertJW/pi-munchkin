@@ -15,6 +15,12 @@ All notable changes to pi-munchkin are documented here. Releases follow semantic
   prerequisites for the mechanism screen, not quality evidence; planner flags
   remain dark.
 
+- **Planner screen preflight is now executable and no-inference.** A bounded
+  preflight binds the current source and loaded-surface hashes, exact Qwen
+  subject, candidate/control thresholds, and the admitted fixture slate before
+  any launcher command. It emits a readiness classification and explicitly
+  requires human approval; it never contacts the model server or starts Pi.
+
 ### Fixed (2026-09-02 — research-ledger budget wall)
 
 - **Ledger-enabled non-graph research now enforces its advertised envelope.**

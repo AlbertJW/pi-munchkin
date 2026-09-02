@@ -13,6 +13,17 @@ The command emits content-addressed admission receipts but does not rewrite the
 manifests, call a provider, fetch a source, or launch Pi. The receipts are
 prerequisites for a future planner screen; they are not model-quality evidence.
 
+Before a screen, run the no-inference identity check:
+
+```sh
+python3 optimizer/research-fixtures/preflight.py --dry \
+  --agent-dir /Users/Albert.Wessels/.pi/agent
+```
+
+It binds the prepared source and loaded-surface hashes, planner/control flags,
+subject model, and fixture slate. A successful preflight still requires a
+separate human approval before `planner_smoke.py --run` is used.
+
 The manifests intentionally contain no answer text, quotes, transcripts, or
 gold outputs. The oracle checks only the shape of a future answer artifact, and
 the parent planner remains responsible for rereading and validating every
