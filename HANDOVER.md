@@ -43,6 +43,9 @@ Before collecting real gate rows, prepare a new full preregistration bound to
 the current gate commit and run its dry preflight. The earlier invalid rows
 remain quarantined.
 
+That fresh full screen is now recorded in
+[`optimizer/docs/QWEN35B_GRACEFUL_SHUTDOWN_V2_AUDIT_2026-09-02.md`](optimizer/docs/QWEN35B_GRACEFUL_SHUTDOWN_V2_AUDIT_2026-09-02.md): all three fixture gates passed, but `parens` and `bigdata` were still actively mutating at the 480-second bound and failed infrastructure validity; only `equil` completed with one authoritative settlement. Keep the two voids isolated. This confirms the foreground signal fix is active, while the remaining issue is an unfinished model/tool loop rather than duplicate shutdown signalling.
+
 The next independent dark-candidate action is the prepared dynamic-context
 epoch smoke in
 [`optimizer/docs/PREREG_QWEN35B_CONTEXT_EPOCHS_2026-09-02.md`](optimizer/docs/PREREG_QWEN35B_CONTEXT_EPOCHS_2026-09-02.md).

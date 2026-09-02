@@ -106,7 +106,11 @@ downstream of the semantic-loop gate and must not bypass it.
    settlement. Do not resume or pool them. The duplicate-SIGTERM timeout cause
    is fixed in gate commit `6ef1464` and the bounded jailed fixture now emits
    `session_shutdown` then `agent_settled`; prepare a new full gate
-   preregistration before collecting rows.
+   preregistration before collecting rows. That screen is now complete: the
+   `equil` row is lifecycle-valid at 198/480s, while `parens` (478/480s) and
+   `bigdata` remained in active mutation tails and are voided. Record and keep
+   those rows separate; the next work is bounded active-tool cancellation and
+   semantic-loop recovery, not a longer unqualified retry.
 3. Run the prepared context-epoch wiring smoke in
    `PREREG_QWEN35B_CONTEXT_EPOCHS_2026-09-02.md`; keep both defaults and dark
    flags unchanged. Treat it as reachability evidence only, then prepare a
