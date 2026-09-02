@@ -73,6 +73,20 @@ It is wiring evidence only. The next context study must exercise an 85%
 threshold crossing, one-shot handoff/rearm, and at least one model/provider or
 window switch; no conclusion about those behaviours is drawn from this run.
 
+The first threshold probe then exposed a real lifecycle gap. A read-only usage
+probe saw the assembled context above the safe budget in `before_provider_request`
+(89.55%) but below it by `turn_end` (75.08%), and no handoff outcome was emitted.
+The runtime was checking too late, after the response had already reduced the
+measured usage. The targeted test was red against the old source and green
+after `aad8e84`, which checks the existing single-flight handoff at the final
+pre-request boundary. The diagnostic receipt is in
+[`optimizer/docs/QWEN35B_CONTEXT_HANDOFF_THRESHOLD_AUDIT_2026-09-02.md`](optimizer/docs/QWEN35B_CONTEXT_HANDOFF_THRESHOLD_AUDIT_2026-09-02.md);
+the repaired source hash is `704ca820…`, while the live mirror remains on the
+earlier loaded hash. A new hash-bound screen is prepared in
+[`optimizer/docs/PREREG_QWEN35B_CONTEXT_HANDOFF_THRESHOLD_V2_2026-09-02.md`](optimizer/docs/PREREG_QWEN35B_CONTEXT_HANDOFF_THRESHOLD_V2_2026-09-02.md)
+and requires a separately approved mirror before any model run. No handoff
+safety or adoption claim is valid yet.
+
 ## 2026-09-02 pre-fix dark-candidate DD mechanism probes
 
 The router was reachable and Qwen 35B completed a bounded transport smoke.

@@ -4,6 +4,17 @@ All notable changes to pi-munchkin are documented here. Releases follow semantic
 
 ## Unreleased
 
+### Fixed (2026-09-02 — context handoff guards the pre-request boundary)
+
+- **Automatic context handoff now checks immediately before provider requests.**
+  A queued follow-up could be above the model-specific safe budget at request
+  assembly but below it by `turn_end`, so the existing late check never fired.
+  The runtime now invokes the existing single-flight compaction path at
+  `before_provider_request`; Pi aborts the stale operation before compaction and
+  queues the follow-up only after completion. The regression is red-green
+  proven. This source-only repair is pending a separately approved mirror and
+  supplies no capacity, quality, or adoption evidence.
+
 ### Fixed (2026-09-02 — gate timeout preserves Pi settlement)
 
 - **The external gate timeout no longer duplicates `SIGTERM` in the Seatbelt path.**
