@@ -205,11 +205,18 @@ export function registerKetch(pi: ExtensionAPI, dependencies: KetchDependencies 
 	async function consumePlanBudget(kind: "searches" | "reads", units = 1): Promise<{ allowed: boolean; limit: number }> {
 		const budget = await activePlanBudget();
 		if (!budget) {
+			// A ledger-enabled non-graph session still has one finite research
+			// envelope. Previously the footer was only advisory here, so a model
+			// could run 28 searches/17 reads despite the advertised 3/5 bound.
+			// Keep the legacy path inert when the ledger is off, but make the
+			// opt-in evidence pipeline fail closed at the same skill-level ceiling.
+			const limit = SKILL_BUDGET[kind];
+			if (LEDGER_ENABLED && counts[kind] + units > limit) return { allowed: false, limit };
 			if (LEDGER_ENABLED) {
 				counts[kind] += units;
 				publishResearchState();
 			}
-			return { allowed: true, limit: SKILL_BUDGET[kind] };
+			return { allowed: true, limit };
 		}
 		displayedBudget = { ...budget.limit };
 		const used = counts[kind];

@@ -216,6 +216,38 @@ test("planned research enforces assigned search and distinct-source read budgets
 	}
 });
 
+test("ledger sessions hard-stop the skill budget outside a plan graph", async () => {
+	const dir = mkdtempSync(join(tmpdir(), "ketch-ledger-budget-"));
+	const snapshot = Object.fromEntries(["KETCH", "KETCH_BIN", "KETCH_BACKEND", "RESEARCH_LEDGER", "PI_MUNCHKIN_PLAN_CONTEXT_PATH", "TELEMETRY_FILE", "TELEMETRY_SOURCE"].map((key) => [key, process.env[key]]));
+	try {
+		delete process.env.KETCH;
+		process.env.KETCH_BIN = mockKetch(dir);
+		process.env.KETCH_BACKEND = "exa";
+		process.env.RESEARCH_LEDGER = "on";
+		delete process.env.PI_MUNCHKIN_PLAN_CONTEXT_PATH;
+		process.env.TELEMETRY_FILE = join(dir, "events.jsonl");
+		process.env.TELEMETRY_SOURCE = "test";
+		delete (globalThis as Record<string, unknown>).__pi_active_plan_context;
+		const fp = makeFakePi();
+		(await import(`../extensions/ketch.ts?ledger-budget=${Date.now()}-${Math.random()}`)).default(fp.pi as never);
+		await fp.handlers.get("session_start")?.[0]?.({}, { cwd: dir, ui: { notify() {} } });
+		for (let i = 0; i < 3; i++) {
+			const result = await callTool(fp, "web_search", { query: `bounded-${i}`, limit: 1 }, dir);
+			assert.notEqual(result.details.outcome, "budget_exhausted");
+		}
+		const blocked = await callTool(fp, "web_search", { query: "fourth-search", limit: 1 }, dir);
+		assert.equal(blocked.details.outcome, "budget_exhausted");
+		assert.equal(blocked.details.coverage.budget_exhausted, true);
+		assert.equal((globalThis as Record<string, any>).__pi_research_state.searches, 3);
+	} finally {
+		restoreEnv(snapshot);
+		rmSync(dir, { recursive: true, force: true });
+		delete (globalThis as Record<string, unknown>).__pi_ketch_version_checks_v1;
+		delete (globalThis as Record<string, unknown>).__pi_research_state;
+		delete (globalThis as Record<string, unknown>).__pi_active_plan_context;
+	}
+});
+
 test("M1: a query beginning with '-' is passed as a positional after '--', never parsed as a flag", async () => {
 	const dir = mkdtempSync(join(tmpdir(), "ketch-argsep-"));
 	const argFile = join(dir, "args.txt");
