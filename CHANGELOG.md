@@ -27,6 +27,12 @@ All notable changes to pi-munchkin are documented here. Releases follow semantic
   complete baseline and independent judge, and keeps the ledger dark. No model
   session has started.
 
+- **Run 4 now has a ledger-free budget control arm.** `RESEARCH_BUDGET=on`
+  enforces the shared three-search/five-distinct-read wall while keeping
+  `RESEARCH_LEDGER=off`'s note tools, cache, state, footer, and wrap-up steer
+  absent. The preregistration now binds this control explicitly, preventing a
+  ledger comparison from crediting simple overrun prevention as ledger value.
+
 ### Fixed (2026-09-02 — research-ledger budget wall)
 
 - **Ledger-enabled non-graph research now enforces its advertised envelope.**

@@ -28,3 +28,8 @@ The manifests intentionally contain no answer text, quotes, transcripts, or
 gold outputs. The oracle checks only the shape of a future answer artifact, and
 the parent planner remains responsible for rereading and validating every
 delegated source before settlement.
+
+For ledger value screens, use `RESEARCH_BUDGET=on` with
+`RESEARCH_LEDGER=off` for the control arm. This preserves the same bounded
+discovery wall while keeping the ledger surface absent, so a comparison does
+not confuse budget enforcement with citation-ledger value.

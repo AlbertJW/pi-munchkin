@@ -12,14 +12,22 @@ surface/model epoch.
 ## Frozen identity
 
 - Subject: `local-llamacpp/qwen36-35b-iq3s`.
-- Source branch tip: `codex/qwen35b-provenance` at `54ac334`.
+- Source branch tip: `codex/qwen35b-provenance` at `62b9bfb`.
 - Source surface SHA-256:
-  `5b84241cbd47bdd61c1d4641166e6ec44f124ddac706778d5c477c3efac551bf`.
+  `1d64ce9e99f4a74da04ba790fcc1866835a8e4fc626f53bb81b08febe7d3ff72`.
 - Loaded Pi-agent surface SHA-256:
   `0c09cb637992c35176bd7ae4b0865850cb6a17bc2f1e5efaf4c06e59d2c1b4ef`.
-- Arm A (control): current skill, `RESEARCH_LEDGER=off`.
+- Arm A (control): current skill, `RESEARCH_LEDGER=off`,
+  `RESEARCH_BUDGET=on`.
 - Arm B (treatment): current skill, `RESEARCH_LEDGER=on`, with the hard
-  non-graph envelope enforced by `073eb21`.
+  non-graph envelope enforced by `073eb21` and the shared budget implementation
+  in `62b9bfb`.
+
+The control flag enables only the accounting wall. It does not register ledger
+tools, write notes, expose ledger state, cache pages, add budget footers, or
+send ledger wrap-up steering. The treatment flag includes that same wall plus
+the verified-citation ledger. This isolates the ledger's value from the effect
+of merely stopping an overrun.
 
 Both arms use the same loaded surface, model, endpoint, project isolation,
 prompt set, outer wall, and per-question research allowance. A changed source,
@@ -34,9 +42,10 @@ with randomized arm order and one session per arm. Each session has a 15-minute
 wall, a private disposable agent/project directory, and a fresh session ID.
 
 The comparison must hold the discovery allowance constant: at most three
-search units and five distinct source-read units per arm/question. The runner
-must stop or mark an arm incomplete when the allowance is exhausted; the
-control may not use its lack of a ledger to obtain extra discovery. A timeout,
+search units and five distinct source-read units per arm/question. The
+budget-only control and ledger treatment enforce this wall inside ketch; the
+runner must stop or mark an arm incomplete when the allowance is exhausted.
+A timeout,
 missing answer, budget overrun, identity drift, raw-payload retention, or
 incomplete telemetry is `INCOMPLETE`, never silently dropped.
 

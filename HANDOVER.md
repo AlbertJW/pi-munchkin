@@ -40,6 +40,15 @@ three fixture IDs with `execution:false` and `inference_started:false`. It is a
 readiness check, not human approval; use the hash-verifying planner launcher
 only after the exact command and six-session envelope are explicitly approved.
 
+The control arm now sets `RESEARCH_LEDGER=off` and `RESEARCH_BUDGET=on`.
+`RESEARCH_BUDGET` is an opt-in accounting wall only: it shares the three-search
+/five-read limit but registers no ledger tools, notes, cache, state, footer, or
+wrap-up steering. Treatment keeps `RESEARCH_LEDGER=on`, which implies the same
+wall and adds the verified-citation surface. Source commit `62b9bfb` is bound
+to source hash `1d64ce9e…`; the mirror remains on the earlier loaded hash, so
+Run 4 is still repository-only and requires a fresh human preflight after any
+approved mirror.
+
 ## 2026-09-02 research-ledger budget wall
 
 Run 3 exposed that the ledger footer was only informational outside a plan
