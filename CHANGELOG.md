@@ -22,6 +22,12 @@ All notable changes to pi-munchkin are documented here. Releases follow semantic
   `--thinking` level, allowing bounded mechanism probes to be reproduced across
   registered models without changing their production role defaults.
 
+- A fresh one-branch exact-hash Qwen probe with `--thinking minimal` reached the
+  repaired nested dispatch path: the planner copied the depth-two context into
+  `research-scout`. The nested child did not settle before the 180-second bound,
+  so the branch became `child_failed`; this remains operability evidence only,
+  with both planner flags dark.
+
 ### Fixed (2026-09-02 — committed handoff outcome survives callback races)
 
 - **A committed model-handoff compaction can no longer be downgraded by a

@@ -33,6 +33,17 @@ forwarded it unchanged to a scout, and produced a bounded blocked report with
 an explicit no-retrieval gap. This is operability evidence only; it is not a
 planner quality result and does not change any live default.
 
+The follow-up one-branch exact-hash probe used the new `--thinking minimal` pin
+and reached the complete nested dispatch path: the depth-one planner created a
+scout leaf and forwarded its exact depth-two `plan_context` to
+`research-scout`. The nested child did not settle before the 180-second wall;
+the launcher returned `wall_timeout` (exit 143, 237,729 stdout bytes, zero
+stderr), and the graph ended with one blocked `child_failed` branch, three
+`ended-open` notices, and no branch merge or parent settlement. This narrows
+the remaining blocker to child completion/lifecycle behavior. It is still an
+operability receipt only; raw transcript and telemetry remain private, the
+flags remain dark, and no quality evidence is implied.
+
 ## 2026-09-02 semantic-loop shutdown retest — lifecycle blocker retired
 
 The current loaded surface (`251708fed05114ef0cb1617812d8662a96c39efeeb587ab829748ab5688f2b89`)

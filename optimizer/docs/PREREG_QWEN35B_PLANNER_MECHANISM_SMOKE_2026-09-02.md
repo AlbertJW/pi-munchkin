@@ -149,3 +149,16 @@ planner, and it cannot count toward mechanism or quality evidence. The raw
 transcript and telemetry remain outside Git; all previous runs stay quarantined
 across the new loaded-surface boundary. Keep both planner flags dark and issue a
 new preregistration before any rerun.
+
+## One-branch nested-dispatch receipt
+
+A fresh one-branch rerun used the exact loaded hash above, the pinned Qwen 35B
+subject, and `--thinking minimal`. The parent planner copied the returned
+depth-two context into the nested `research-scout` call, confirming the repaired
+transport through the real delegation wrapper. The nested child did not settle
+before the 180-second launcher wall: the safe result was `wall_timeout`, exit
+143, 237,729 stdout bytes, and zero stderr bytes. Telemetry recorded one
+`research-start`, one `branch-failed` (`child_failed`), three `ended-open`
+notices, and no branch merge or parent settlement; the single graph branch was
+`blocked`. This is a child-completion/lifecycle diagnostic, not planner quality
+or exposure evidence, and remains quarantined from every prior run.
