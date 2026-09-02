@@ -4,6 +4,15 @@ All notable changes to pi-munchkin are documented here. Releases follow semantic
 
 ## Unreleased
 
+### Fixed (2026-09-02 — initial context handoff guard)
+
+- **Automatic handoff now skips an oversized initial prompt.** A first request has
+  no prior provider turn for Pi to compact; attempting the handoff path there
+  aborts the only request and reports a misleading failure. The runtime now
+  records the timing boundary first and arms the single-flight handoff only
+  after a provider turn exists. The regression is red-green proven. This is a
+  lifecycle repair only; it supplies no capacity, quality, or adoption evidence.
+
 ### Fixed (2026-09-02 — context handoff guards the pre-request boundary)
 
 - **Automatic context handoff now checks immediately before provider requests.**

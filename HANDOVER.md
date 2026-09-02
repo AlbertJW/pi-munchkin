@@ -97,6 +97,21 @@ rollout. The next model action is the explicitly approved Qwen threshold screen
 under the new preregistration; until then, the source-only diagnostic and the
 loaded rollout receipt remain separate from model evidence.
 
+That threshold screen was then run against the loaded Qwen surface and failed
+closed for a useful edge case: the synthetic input was an oversized *initial*
+prompt, so there was no prior provider turn to compact. The runtime emitted a
+bounded `budget_threshold` handoff failure and paused without accepting a
+response; the audit is in
+[`optimizer/docs/QWEN35B_CONTEXT_HANDOFF_THRESHOLD_V2_AUDIT_2026-09-02.md`](optimizer/docs/QWEN35B_CONTEXT_HANDOFF_THRESHOLD_V2_AUDIT_2026-09-02.md).
+A counterfactual test was red without the new guard and all 12 targeted tests
+are green with it. Source commit `8f5d475` now requires a prior provider turn
+before automatic handoff, with repaired source hash
+`18d9b372b936bd9d00ae1ebcc9fee504ab4771fe110ef6c0e792fa170f769e27`. The
+hash-bound two-turn follow-up screen is prepared in
+[`optimizer/docs/PREREG_QWEN35B_CONTEXT_HANDOFF_THRESHOLD_V3_2026-09-02.md`](optimizer/docs/PREREG_QWEN35B_CONTEXT_HANDOFF_THRESHOLD_V3_2026-09-02.md);
+it requires a fresh mirror before execution. No handoff-safety, capacity,
+quality, or adoption claim is valid yet.
+
 ## 2026-09-02 pre-fix dark-candidate DD mechanism probes
 
 The router was reachable and Qwen 35B completed a bounded transport smoke.
