@@ -2,7 +2,7 @@
 
 ## Status and scope
 
-**PREPARED — no model session has run under this preregistration.** This is the
+**EXECUTED — deterministic half complete; synthesis unavailable.** This is the
 post-fix comparison of the legacy deep-research skill (arm A) and the verified
 research-ledger pipeline (arm B). It is a dark-candidate study, not a gate
 round, optimizer campaign, rollout, or adoption decision. A clean mechanism
@@ -66,3 +66,17 @@ The adoption rule remains unchanged: `RESEARCH_LEDGER` stays dark unless the
 post-fix run shows no answer collapse, a materially lower refusal burden, and
 no unacceptable synthesis regression under an independent judge. This study
 does not authorize changing defaults or mirroring.
+
+## Execution receipt
+
+The run used Q2, Q3, Q6, Q8, and Q9, with randomized arm order per question.
+Nine sessions completed with exit 0 and zero stderr. Q9-A reached the
+15-minute bound without an answer and is incomplete. All ten telemetry files
+were bound to loaded surface
+`251708fed05114ef0cb1617812d8662a96c39efeeb587ab829748ab5688f2b89`, each with
+one run identity, and the retained summaries contained no raw payload fields.
+Arm B recorded 22 notes and rejected 24 attempts across 52 searches and 48
+reads; the note-attempt classes were 22 `ok`, 11 `quote_not_found`, and 13
+`degraded`, with zero `corrected` events. No independent judge endpoint was
+available, so synthesis is **UNAVAILABLE**. The complete sanitized audit is
+in [`QWEN35B_RESEARCH_LEDGER_RUN3_AUDIT_2026-09-02.md`](QWEN35B_RESEARCH_LEDGER_RUN3_AUDIT_2026-09-02.md).

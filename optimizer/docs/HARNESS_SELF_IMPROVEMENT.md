@@ -2375,6 +2375,16 @@ that says small models don't). Both behaviour fixes counterfactually pinned; the
 (Run 3) is the now-unblocked next gated step and the condition to keep before considering
 default-on. Details in `RESEARCH_EVAL_QUESTIONS_2026-08.md`.
 
+**Research-eval Run 3 receipt (2026-09-02).** The deterministic post-fix half
+then ran on five preregistered questions and two arms. Nine of ten sessions
+completed cleanly; the legacy Q9 arm hit its 15-minute bound without an
+answer. The ledger arm recorded 22 notes and rejected 24 attempts across 52
+searches and 48 reads, with zero `corrected` attributions and no independent
+judge available. Its nominal search/read envelope was exceeded outside plan
+context, so budget policy now requires a separate decision and red-green test.
+This receipt is mechanism-only and leaves `RESEARCH_LEDGER` dark; the complete
+sanitized audit is `optimizer/docs/QWEN35B_RESEARCH_LEDGER_RUN3_AUDIT_2026-09-02.md`.
+
 ### Candidates recorded 2026-08-06 from two outside sources (not built)
 
 Two documents were reviewed for ideas: the Earendil post *"The Session You Cannot Take With You"*

@@ -1,5 +1,23 @@
 # Handover — pi_munchkin, 2026-08-24
 
+## 2026-09-02 research-ledger Run 3 — deterministic receipt
+
+The post-fix Qwen 35B research-ledger comparison is complete as a
+mechanism/fidelity study. Nine of ten fresh sessions exited 0 with zero
+stderr; the legacy arm for Q9 reached its 15-minute bound without an answer
+and is incomplete. All ten telemetry files carry one run identity and the
+loaded surface hash
+`251708fed05114ef0cb1617812d8662a96c39efeeb587ab829748ab5688f2b89`, with no
+raw payload fields retained. The ledger arm recorded 22 notes and rejected 24
+attempts across 52 searches and 48 reads; no `corrected` attribution event
+occurred, and no independent judge was available, so synthesis is
+**UNAVAILABLE**. The nominal search/read envelope was exceeded outside plan
+context (up to 28 searches and 17 reads), which is a separate instrumentation
+finding rather than an adoption signal. The full sanitized audit is in
+[`optimizer/docs/QWEN35B_RESEARCH_LEDGER_RUN3_AUDIT_2026-09-02.md`](optimizer/docs/QWEN35B_RESEARCH_LEDGER_RUN3_AUDIT_2026-09-02.md).
+`RESEARCH_LEDGER` remains dark; decide and test non-graph budget enforcement
+before any judge-backed repeat.
+
 ## 2026-09-02 committed handoff outcome — clean Qwen mechanism receipt
 
 The first mirrored smoke showed that Pi can commit the handoff compaction and

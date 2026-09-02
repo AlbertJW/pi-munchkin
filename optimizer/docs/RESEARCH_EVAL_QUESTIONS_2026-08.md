@@ -290,3 +290,26 @@ repaired in `add34a0`. Two bear directly on Run 3's instrument:
 - The ledger now records `- attributed-to:` on re-attributed notes, so **the file itself reports
   how many citations needed correcting** — a deterministic, judge-free fidelity signal Run 2 did
   not have.
+
+### Run 3 execution receipt, 2026-09-02
+
+The preregistered deterministic half ran on Q2, Q3, Q6, Q8, and Q9 with one
+fresh Qwen 35B session per arm/question. Nine sessions completed with exit 0
+and zero stderr; Q9-A reached the 15-minute bound without an answer and is
+classified **INCOMPLETE**. Every retained telemetry file had one run identity
+and the same loaded surface hash, and the safe summaries contained no raw
+payload fields. Arm B recorded 22 notes and rejected 24 attempts across 52
+searches and 48 reads; the note-attempt classes were 22 `ok`, 11
+`quote_not_found`, and 13 `degraded`, with zero `corrected` events. The
+ledger mechanism therefore engaged, but the targeted correction path was not
+exercised and the nominal search/read envelope was exceeded in non-graph
+sessions (up to 28 searches and 17 reads). No independent judge endpoint was
+available, so synthesis is **UNAVAILABLE** and no answer-quality comparison is
+valid. The full sanitized receipt is in
+[`QWEN35B_RESEARCH_LEDGER_RUN3_AUDIT_2026-09-02.md`](QWEN35B_RESEARCH_LEDGER_RUN3_AUDIT_2026-09-02.md).
+
+`RESEARCH_LEDGER` remains dark. Before any repeat, decide whether the
+skill-level budget should be hard-enforced outside a plan context, add a
+targeted red-green test for that policy, and then rerun a judge-backed
+comparison without pooling this incomplete, unjudged result with earlier
+epochs.
