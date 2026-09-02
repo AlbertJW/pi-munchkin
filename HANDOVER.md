@@ -9,6 +9,12 @@ in [`optimizer/docs/DARK_CANDIDATE_DD_MINI_SCREEN_2026-09-02.md`](optimizer/docs
 The prepared Qwen35B graceful-shutdown smoke remains the next human-gated
 action; no dark flag, default, mirror, or adoption decision changed.
 
+On the next continuation, the host-network check returned `/health = OK` and
+reported `qwen36-35b-iq3s` loaded. The attempted transport smoke was correctly
+refused because that message authorized a health check, not model inference.
+The source/live-mirror boundary is unchanged: `mirror:check` still reports
+1/122 differing (`telemetry-flush.ts`).
+
 ## 2026-09-01 graceful gate shutdown settlement — source-only
 
 The gate's hard timeout was not the only lifecycle boundary: Pi print mode handles

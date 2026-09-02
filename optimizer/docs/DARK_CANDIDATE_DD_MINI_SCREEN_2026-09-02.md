@@ -14,6 +14,12 @@ different, `extensions/pi-munchkin/extensions/telemetry-flush.ts`. This is the
 graceful-shutdown implementation boundary and must be resolved by an approved
 mirror before any DD row can be authoritative.
 
+On 2026-09-02 the host-network recheck returned `/health = OK` and listed
+`qwen36-35b-iq3s` as `loaded`. This confirms serving reachability only; it is
+not a model result. The first attempted DD transport smoke was refused by the
+execution gate because this continuation authorized a health check, not an
+inference run.
+
 The cheapest deterministic probe did run: the candidate-specific suites for
 planning, research ledger, working memory, bash-output guarding, semantic-loop
 recovery, context epochs, and dynamic tool activation passed **118/118** tests.
@@ -24,6 +30,19 @@ unavailable only because this managed sandbox denies `sandbox-exec`.
 Passing these tests establishes contracts and safety boundaries. It does not
 show that a model invokes a mechanism, recovers with it, or produces better
 work. The run lengths below are the minimum useful next evidence, not results.
+
+## Current candidate configuration hashes
+
+These hashes were recomputed from the checkout on 2026-09-02 and supersede any
+older unassigned or stale preregistration values:
+
+| configuration | SHA-256 |
+|---|---|
+| `deep-research-planning.json` | `0d01aab9292db845b5f228174e2a1a4c10328883daebd482dcd9c9c9f5f5fd1e` |
+| `deep-research-planning-control.json` | `a2e5efef3ab36d90ab58ee91920b766e5c7a162905da970778e9439c3c1c92f7` |
+| `semantic-loop-enforce.json` | `72346849b6358bdf542457ddcea2b3ae19dabb8be56ef7a3e4862cfafc57a7f7` |
+| `c35-bash-output-guard.json` | `40b1411d2b2494b7b24a0b3f8d958a0fd9cd9086e6afefde405744d903cf9314` |
+| `c46-prompt-lean.json` | `47c9a04ca233ff552ff71e4e4f77003244cb148d8704f38fb62d2f5cf615b639` |
 
 ## Candidate disposition
 
