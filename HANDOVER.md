@@ -36,6 +36,18 @@ The hierarchical planner/deep-research graph is now the next dark-candidate
 screen: it still requires fresh fixture admission, current-hash preregistration,
 and a mechanism-only run before any quality comparison or default change.
 
+The first narrow Qwen planner smoke on 2026-09-02 is **invalid/incomplete**.
+An explicit `--tools` launch correctly kept the planning family unavailable;
+the corrected ambient launch did emit `research-start` and persist two schema-v5
+branches, but it entered an unbounded tool-call stream without branch merge or
+parent settlement. Its disposable agent copy resolved to surface hash
+`4f5516aa…`, not the frozen mirror hash `251708fed…`, so those events are only a
+diagnostic activation lead. Keep `PLAN_GRAPH` and `DEEP_RESEARCH_PLANNING`
+dark. The next screen must use an exact mirrored surface, a hard outer stream
+bound, admitted research fixtures, and fact-lookup negative controls. Details
+and the frozen identity are recorded in
+[`optimizer/docs/PREREG_QWEN35B_PLANNER_MECHANISM_SMOKE_2026-09-02.md`](optimizer/docs/PREREG_QWEN35B_PLANNER_MECHANISM_SMOKE_2026-09-02.md).
+
 ## 2026-09-02 bash-output-guard paired receipt
 
 The preregistered Qwen 35B paired mechanism screen is clean. Four fresh RPC
