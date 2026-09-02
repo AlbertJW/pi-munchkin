@@ -35,8 +35,11 @@ const ENABLED = process.env.KETCH !== "off";
 // Dark (RESEARCH_LEDGER=on): the verified-citation pipeline — session page
 // cache, the research_note tool, budget footers, run-summary telemetry. With
 // the flag unset, ketch's behaviour is byte-identical to before the pipeline
-// existed (pinned by a test).
+// existed (pinned by a test). RESEARCH_BUDGET is a separate opt-in wall for a
+// control arm: it shares the 3/5 accounting but exposes none of the ledger
+// tools, notes, cache, footer, or wrap-up steering.
 const LEDGER_ENABLED = process.env.RESEARCH_LEDGER === "on";
+const BUDGET_ENABLED = LEDGER_ENABLED || process.env.RESEARCH_BUDGET === "on";
 const KETCH_BIN = process.env.KETCH_BIN || "ketch";
 const PRIMARY_BACKEND = /^[a-z0-9_-]+$/i.test(process.env.KETCH_BACKEND || "")
 	? process.env.KETCH_BACKEND as string
@@ -160,7 +163,7 @@ export function registerKetch(pi: ExtensionAPI, dependencies: KetchDependencies 
 	if (!ENABLED) return;
 	const resolvePublicUrl = dependencies.resolvePublicUrl ?? resolvePublicHttpUrl;
 
-	// --- research-ledger session state (all inert unless RESEARCH_LEDGER=on) ---
+	// --- research-ledger session state (budget wall is separately opt-in) ---
 	const pageCache = new PageCache();
 	let counts = { searches: 0, reads: 0, notes: 0, notesRejected: 0, cacheHits: 0 };
 	let noteCount = 0;
@@ -186,7 +189,7 @@ export function registerKetch(pi: ExtensionAPI, dependencies: KetchDependencies 
 		(globalThis as Record<string, unknown>).__pi_research_state = { ...counts };
 	}
 	async function activePlanBudget(): Promise<{ context: PlanContextV1 | null; limit: ResearchBudget } | null> {
-		if (!LEDGER_ENABLED) return null;
+		if (!BUDGET_ENABLED) return null;
 		const context = await readPlanContext(process.env[PLAN_CONTEXT_ENV]);
 		if (context) {
 			const reserved = context.depth === 1 ? (globalThis as Record<string, unknown>)[RESEARCH_RESERVED_BUDGET_KEY] : undefined;
@@ -206,13 +209,12 @@ export function registerKetch(pi: ExtensionAPI, dependencies: KetchDependencies 
 		const budget = await activePlanBudget();
 		if (!budget) {
 			// A ledger-enabled non-graph session still has one finite research
-			// envelope. Previously the footer was only advisory here, so a model
-			// could run 28 searches/17 reads despite the advertised 3/5 bound.
-			// Keep the legacy path inert when the ledger is off, but make the
-			// opt-in evidence pipeline fail closed at the same skill-level ceiling.
+			// envelope. A separate budget-only control arm uses the same wall while
+			// keeping the ledger tools and prompt additions disabled. The completely
+			// legacy path remains inert when both flags are off.
 			const limit = SKILL_BUDGET[kind];
-			if (LEDGER_ENABLED && counts[kind] + units > limit) return { allowed: false, limit };
-			if (LEDGER_ENABLED) {
+			if (BUDGET_ENABLED && counts[kind] + units > limit) return { allowed: false, limit };
+			if (BUDGET_ENABLED) {
 				counts[kind] += units;
 				publishResearchState();
 			}
@@ -235,7 +237,7 @@ export function registerKetch(pi: ExtensionAPI, dependencies: KetchDependencies 
 		ledgerWriteTail = pending.then(() => undefined, () => undefined);
 		await pending;
 	}
-	if (LEDGER_ENABLED) {
+	if (BUDGET_ENABLED) {
 		pi.on("session_start", async () => {
 			pageCache.clear();
 			counts = { searches: 0, reads: 0, notes: 0, notesRejected: 0, cacheHits: 0 };
@@ -253,6 +255,8 @@ export function registerKetch(pi: ExtensionAPI, dependencies: KetchDependencies 
 			delete (globalThis as Record<string, unknown>).__pi_plan_validation_urls;
 			delete (globalThis as Record<string, unknown>)[RESEARCH_RESERVED_BUDGET_KEY];
 		});
+	}
+	if (LEDGER_ENABLED) {
 		// The opt-in hole (eval Run 2, defect 3): research_note is a tool the model
 		// must CHOOSE to call, and this corpus's finding is that small models don't
 		// choose (1 voluntary subagent call in 942 base sessions). On q8/B the model

@@ -174,6 +174,12 @@ test("planner flags propagate but private branch artifact paths never do", () =>
 	assert.equal(env.PI_MUNCHKIN_RESEARCH_SCOUT, undefined);
 });
 
+test("research budget control propagates while ledger remains independently selectable", () => {
+	const env = buildSubagentEnv({ PATH: "/bin", RESEARCH_BUDGET: "on", RESEARCH_LEDGER: "off" });
+	assert.equal(env.RESEARCH_BUDGET, "on");
+	assert.equal(env.RESEARCH_LEDGER, "off");
+});
+
 test("subagent summary cap is tunable via PI_SUBAGENT_MAX_SUMMARY_CHARS", async () => {
 	const result = { messages: [{ role: "assistant", content: [{ type: "text", text: "x".repeat(20000) }] }] };
 	const prev = process.env.PI_SUBAGENT_MAX_SUMMARY_CHARS;

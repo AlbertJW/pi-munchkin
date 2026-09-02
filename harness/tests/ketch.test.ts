@@ -248,6 +248,39 @@ test("ledger sessions hard-stop the skill budget outside a plan graph", async ()
 	}
 });
 
+test("budget-only sessions share the 3/5 wall without exposing ledger tools", async () => {
+	const dir = mkdtempSync(join(tmpdir(), "ketch-budget-only-"));
+	const snapshot = Object.fromEntries(["KETCH", "KETCH_BIN", "KETCH_BACKEND", "RESEARCH_LEDGER", "RESEARCH_BUDGET", "PI_MUNCHKIN_PLAN_CONTEXT_PATH", "TELEMETRY_FILE", "TELEMETRY_SOURCE"].map((key) => [key, process.env[key]]));
+	try {
+		delete process.env.KETCH;
+		process.env.KETCH_BIN = mockKetch(dir);
+		process.env.KETCH_BACKEND = "exa";
+		delete process.env.RESEARCH_LEDGER;
+		process.env.RESEARCH_BUDGET = "on";
+		delete process.env.PI_MUNCHKIN_PLAN_CONTEXT_PATH;
+		process.env.TELEMETRY_FILE = join(dir, "events.jsonl");
+		process.env.TELEMETRY_SOURCE = "test";
+		const fp = makeFakePi();
+		(await import(`../extensions/ketch.ts?budget-only=${Date.now()}-${Math.random()}`)).default(fp.pi as never);
+		await fp.handlers.get("session_start")?.[0]?.({}, { cwd: dir, ui: { notify() {} } });
+		assert.deepEqual([...fp.tools.keys()].sort(), ["web_read", "web_search"]);
+		for (let i = 0; i < 3; i++) {
+			const result = await callTool(fp, "web_search", { query: `budget-only-${i}`, limit: 1 }, dir);
+			assert.notEqual(result.details.outcome, "budget_exhausted");
+		}
+		const blocked = await callTool(fp, "web_search", { query: "budget-only-fourth", limit: 1 }, dir);
+		assert.equal(blocked.details.outcome, "budget_exhausted");
+		assert.equal(blocked.details.coverage.budget_exhausted, true);
+		assert.equal((globalThis as Record<string, any>).__pi_research_state, undefined, "budget-only controls must not expose ledger state");
+	} finally {
+		restoreEnv(snapshot);
+		rmSync(dir, { recursive: true, force: true });
+		delete (globalThis as Record<string, unknown>).__pi_ketch_version_checks_v1;
+		delete (globalThis as Record<string, unknown>).__pi_research_state;
+		delete (globalThis as Record<string, unknown>).__pi_active_plan_context;
+	}
+});
+
 test("M1: a query beginning with '-' is passed as a positional after '--', never parsed as a flag", async () => {
 	const dir = mkdtempSync(join(tmpdir(), "ketch-argsep-"));
 	const argFile = join(dir, "args.txt");
