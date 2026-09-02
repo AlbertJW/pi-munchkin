@@ -24,7 +24,7 @@ if (!CHILD) {
 			const output = execFileSync(process.execPath, [
 				"--experimental-strip-types", "--experimental-loader", resolve("harness/tests/ts-js-resolver.mjs"), "--test", import.meta.filename,
 			], { cwd: process.cwd(), env, encoding: "utf8", stdio: "pipe" });
-			assert.match(output, /pass 7/);
+			assert.match(output, /pass 8/);
 		} finally { rmSync(artifacts, { recursive: true, force: true }); }
 	});
 } else {
@@ -174,6 +174,20 @@ if (!CHILD) {
 		await expectToolError(fp, "branch_plan", {
 			...base, children: [{ ...base.children[0], budget: { allocated: { searches: 2, reads: 2 }, used: { searches: 0, reads: 0 } } }],
 		}, cwd, /child allocations exceed the branch remainder/);
+		resetPiGlobals();
+	});
+
+	test("branch_plan exposes exact scout contexts in model-visible content", async () => {
+		const fp = fresh(); const cwd = tmp();
+		const result = await callTool(fp, "branch_plan", {
+			status: "pending", note: "allocate one scout", consumed: { searches: 0, reads: 0 }, source_leads: [], evidence_gaps: [],
+			children: [{ item_id: "visible-leaf", title: "Visible leaf", status: "pending", budget: { allocated: { searches: 1, reads: 1 }, used: { searches: 0, reads: 0 } } }],
+		}, cwd);
+		assert.equal(result.isError, false);
+		const text = result.content.map((block: any) => block?.text ?? "").join("\n");
+		assert.match(text, /visible-leaf/);
+		assert.match(text, /\"depth\":2/);
+		assert.match(text, /\"owner_ref\":\"[a-f0-9]{24}\"/);
 		resetPiGlobals();
 	});
 }

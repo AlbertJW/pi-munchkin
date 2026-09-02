@@ -884,7 +884,8 @@ const branchPlan = defineTool({
 			owner_ref: ownerRef(context.run_id, child.item_id), depth: 2 as const, budget: child.budget.allocated,
 			limits: { max_depth: 2 as const, max_children: 0 as const },
 		}));
-		return { content: [{ type: "text" as const, text: `Branch report saved (${report.children.length}/${context.limits.max_children} children, ${report.consumed.searches}/${context.budget.searches} searches, ${report.consumed.reads}/${context.budget.reads} reads). Copy each returned scout plan_context unchanged into its matching research-scout call.` }], details: { tool_name: "branch_plan", success: true, contexts } };
+		const contextText = contexts.length > 0 ? ` Scout plan_context (copy exactly): ${JSON.stringify(contexts)}` : "";
+		return { content: [{ type: "text" as const, text: `Branch report saved (${report.children.length}/${context.limits.max_children} children, ${report.consumed.searches}/${context.budget.searches} searches, ${report.consumed.reads}/${context.budget.reads} reads).${contextText}` }], details: { tool_name: "branch_plan", success: true, contexts } };
 	},
 });
 
