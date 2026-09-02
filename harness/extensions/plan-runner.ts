@@ -390,6 +390,18 @@ async function mutatePlan<T>(cwd: string, fn: (state: PlanState | undefined) => 
 
 function rejectPlanTool(text: string): never { throw new Error(text); }
 
+function coverageNeedsFailureReason(value: unknown): boolean {
+	if (!value || typeof value !== "object" || Array.isArray(value)) return false;
+	const coverage = value as Record<string, unknown>;
+	return coverage.complete === false && coverage.truncated !== true && coverage.budget_exhausted !== true && coverage.failed !== true;
+}
+
+function explainCoverageInvariant(report: BranchReportV1): string | null {
+	if (coverageNeedsFailureReason(report.coverage)) return "top-level coverage";
+	for (const child of report.children) if (coverageNeedsFailureReason(child.coverage)) return `child ${child.item_id} coverage`;
+	return null;
+}
+
 function validateIncoming(items: Array<{ item_id?: string; title: string; note?: string }>): void {
 	if (items.length < 1 || items.length > MAX_ITEMS) rejectPlanTool(`plan_write rejected: provide 1-${MAX_ITEMS} top-level items`);
 	const ids = new Set<string>();
@@ -849,6 +861,8 @@ const branchPlan = defineTool({
 		const reportPath = process.env[BRANCH_REPORT_ENV];
 		if (!context || !reportPath) rejectPlanTool("branch_plan rejected: no valid parent plan context");
 		const report: BranchReportV1 = { v: 1, parent_item_id: context.parent_item_id, owner_ref: context.owner_ref, ...params } as BranchReportV1;
+		const invalidCoverage = explainCoverageInvariant(report);
+		if (invalidCoverage) rejectPlanTool(`branch_plan rejected: ${invalidCoverage} is incomplete but has no failure reason; set truncated, budget_exhausted, or failed=true (and keep complete=false), or use complete=true for clean bounded coverage`);
 		const terminal = ["done", "blocked", "deferred"].includes(report.status);
 		const shared = globalThis as Record<string, unknown>;
 		const own = shared.__pi_research_state as { searches?: unknown; reads?: unknown } | undefined;

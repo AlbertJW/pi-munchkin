@@ -24,7 +24,7 @@ if (!CHILD) {
 			const output = execFileSync(process.execPath, [
 				"--experimental-strip-types", "--experimental-loader", resolve("harness/tests/ts-js-resolver.mjs"), "--test", import.meta.filename,
 			], { cwd: process.cwd(), env, encoding: "utf8", stdio: "pipe" });
-			assert.match(output, /pass 8/);
+			assert.match(output, /pass 9/);
 		} finally { rmSync(artifacts, { recursive: true, force: true }); }
 	});
 } else {
@@ -188,6 +188,16 @@ if (!CHILD) {
 		assert.match(text, /visible-leaf/);
 		assert.match(text, /\"depth\":2/);
 		assert.match(text, /\"owner_ref\":\"[a-f0-9]{24}\"/);
+		resetPiGlobals();
+	});
+
+	test("branch_plan explains the incomplete-coverage truth table", async () => {
+		const fp = fresh(); const cwd = tmp();
+		await expectToolError(fp, "branch_plan", {
+			status: "pending", note: "incomplete transport probe", consumed: { searches: 0, reads: 0 },
+			children: [], source_leads: [], evidence_gaps: ["no retrieval"],
+			coverage: { strategy: "direct", scope: "bounded", returned_count: 0, truncated: false, budget_exhausted: false, failed: false, complete: false },
+		}, cwd, /coverage is incomplete.*(?:truncated|budget_exhausted|failed)/i);
 		resetPiGlobals();
 	});
 }
