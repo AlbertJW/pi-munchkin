@@ -165,9 +165,11 @@ test("an over-budget pre-request context is handed off before another request st
 		await fire(fp, "session_start", {}, {});
 		const model = { provider: "local", id: "pre-request-large", contextWindow: 32_768 };
 		let compactions = 0;
+		let aborts = 0;
 		const ctx = {
 			model,
 			getContextUsage: () => ({ tokens: 30_000, percent: 92 }),
+			abort: () => { aborts += 1; },
 			compact: (options: { onComplete?: () => void }) => { compactions += 1; options.onComplete?.(); },
 		};
 		await fire(fp, "before_provider_request", {}, ctx);
@@ -175,6 +177,7 @@ test("an over-budget pre-request context is handed off before another request st
 		await fire(fp, "before_provider_request", {}, { ...ctx, getContextUsage: () => ({ tokens: 8_000, percent: 25 }) });
 		await fire(fp, "before_provider_request", {}, ctx);
 		assert.equal(compactions, 1, "an over-budget follow-up must compact before it is sent");
+		assert.equal(aborts, 1, "the in-flight request must be aborted before asynchronous compaction starts");
 		assert.ok(fp.sent.some((message) => /Model handoff complete/.test(message)));
 	} finally {
 		if (prior === undefined) delete process.env.CONTEXT_HANDOFF; else process.env.CONTEXT_HANDOFF = prior;
