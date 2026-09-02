@@ -207,11 +207,11 @@ def load_manifest(path: pathlib.Path) -> tuple[dict, str]:
 def admission_receipt(obj: dict, manifest_sha256: str) -> dict:
     return {
         "schema": ADMISSION_SCHEMA,
-        "approved": True,
+        "status": "structural_pass",
         "manifest_sha256": manifest_sha256,
         "automated": {"passed": True, "rule": "research-fixture-structural-v1"},
         "reviewed_at": "2026-09-02T00:00:00Z",
-        "reviewer": "albert",
+        "reviewer": "automation",
     }
 
 
@@ -235,7 +235,8 @@ def check_slate() -> list[dict]:
 def selftest() -> None:
     records = check_slate()
     assert len(records) >= 3
-    assert all(record["admission"]["approved"] for record in records)
+    assert all(record["admission"]["status"] == "structural_pass" for record in records)
+    assert all(record["admission"]["reviewer"] == "automation" for record in records)
     fixture, _ = load_manifest(MANIFESTS / "comparative.json")
     broken = json.loads(json.dumps(fixture))
     broken["prompt"]["sha256"] = "0" * 64

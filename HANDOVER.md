@@ -8,7 +8,8 @@ fixtures under `optimizer/research-fixtures/`: comparative
 multi-part (`sqlite-postgres-selection`). `admission.py --selftest` and
 `verify:optimizer` validate their prompt hashes, HTTPS source leads,
 evidence-family/claim coverage, negative controls, bounded local oracle, and
-provenance without network or inference. The exact manifest and admission
+provenance without network or inference. These receipts are explicitly
+`structural_pass` from automation, not Albert's human review. The exact manifest and admission
 receipt hashes are frozen in
 `optimizer/docs/PREREG_QWEN35B_PLANNER_MECHANISM_V2_2026-09-02.md`.
 
