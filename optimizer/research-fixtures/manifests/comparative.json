@@ -1,0 +1,57 @@
+{
+  "schema": "pi.research-fixture/v1",
+  "fixture_id": "compare-http-api-styles",
+  "revision": "2026-09-02",
+  "kind": "comparative",
+  "prompt": {
+    "text": "Compare REST-style HTTP APIs with GraphQL for a small team choosing a public service interface. Research independent evidence for both approaches, state where each source is limited, and give a conditional recommendation. Cite every material claim.",
+    "sha256": "875a3f3960efc61f4d52e8f8a6f6513dd45346cb68aecf6129c9487d9a9a69bc"
+  },
+  "source_time_cutoff": "2026-09-02T00:00:00Z",
+  "evidence_families": [
+    {
+      "id": "rest-primary",
+      "role": "primary",
+      "source_refs": [
+        {"id": "http-semantics", "url": "https://www.rfc-editor.org/rfc/rfc9110", "publisher": "RFC Editor"}
+      ]
+    },
+    {
+      "id": "graphql-primary",
+      "role": "primary",
+      "source_refs": [
+        {"id": "graphql-spec", "url": "https://spec.graphql.org/October2021/", "publisher": "GraphQL Foundation"}
+      ]
+    },
+    {
+      "id": "operational-context",
+      "role": "context",
+      "source_refs": [
+        {"id": "api-design-guidance", "url": "https://cloud.google.com/apis/design", "publisher": "Google Cloud"}
+      ]
+    }
+  ],
+  "required_claims": [
+    {"id": "rest-tradeoff", "evidence_family": "rest-primary", "grading_rule": "cite-and-qualify-rest-property"},
+    {"id": "graphql-tradeoff", "evidence_family": "graphql-primary", "grading_rule": "cite-and-qualify-graphql-property"},
+    {"id": "conditional-choice", "evidence_family": "operational-context", "grading_rule": "recommendation-links-to-evidence"}
+  ],
+  "negative_control": {
+    "text": "What is the HTTP status code for a successful response to a basic GET request? Give the short answer and one official source.",
+    "sha256": "c5331d9bfe85134dfba2b28e9aec3665455961e12a1749affd9cb20114bc06e9",
+    "expected_plan_start": false,
+    "max_source_reads": 2
+  },
+  "oracle": {
+    "schema": "pi.research-oracle/v1",
+    "entrypoint": "../oracles/research_shape.py",
+    "query_budget": 3,
+    "timeout_ms": 2000,
+    "output_cap_bytes": 4096
+  },
+  "provenance": {
+    "authoring_timestamp": "2026-09-02T00:00:00Z",
+    "model_snapshot_boundary": "qwen35b-screen-2026-09-02",
+    "contamination_canary_hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+  }
+}

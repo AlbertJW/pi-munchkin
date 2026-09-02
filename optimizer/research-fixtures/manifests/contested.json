@@ -1,0 +1,57 @@
+{
+  "schema": "pi.research-fixture/v1",
+  "fixture_id": "password-expiration-guidance",
+  "revision": "2026-09-02",
+  "kind": "contested",
+  "prompt": {
+    "text": "Investigate the contested claim that every organization should force users to change passwords on a fixed schedule. Find current supporting and counter-evidence, distinguish policy guidance from implementation advice, and explain when the rule may or may not be justified. Cite the original sources.",
+    "sha256": "9647b7f937450a108d88b4703879ac5f355baa52355ea64c4623b555adfb235d"
+  },
+  "source_time_cutoff": "2026-09-02T00:00:00Z",
+  "evidence_families": [
+    {
+      "id": "modern-guidance",
+      "role": "primary",
+      "source_refs": [
+        {"id": "nist-63b", "url": "https://pages.nist.gov/800-63-3/sp800-63b.html", "publisher": "NIST"}
+      ]
+    },
+    {
+      "id": "counter-guidance",
+      "role": "counter",
+      "source_refs": [
+        {"id": "microsoft-passwords", "url": "https://learn.microsoft.com/en-us/entra/identity/authentication/concept-password-ban-bad-on-premises", "publisher": "Microsoft"}
+      ]
+    },
+    {
+      "id": "implementation-context",
+      "role": "context",
+      "source_refs": [
+        {"id": "cisa-identity", "url": "https://www.cisa.gov/topics/cyber-threats-and-advisories/identity-and-access-management", "publisher": "CISA"}
+      ]
+    }
+  ],
+  "required_claims": [
+    {"id": "primary-policy", "evidence_family": "modern-guidance", "grading_rule": "cite-current-policy-position"},
+    {"id": "counter-position", "evidence_family": "counter-guidance", "grading_rule": "represent-counterevidence-fairly"},
+    {"id": "risk-qualification", "evidence_family": "implementation-context", "grading_rule": "state-conditions-and-limitations"}
+  ],
+  "negative_control": {
+    "text": "Look up the current UTC date and state it with one authoritative time source.",
+    "sha256": "184bebb95be682c3e333f2cbcf9a7e64d4f6e370a2d989e54597cc9f3010bd95",
+    "expected_plan_start": false,
+    "max_source_reads": 1
+  },
+  "oracle": {
+    "schema": "pi.research-oracle/v1",
+    "entrypoint": "../oracles/research_shape.py",
+    "query_budget": 3,
+    "timeout_ms": 2000,
+    "output_cap_bytes": 4096
+  },
+  "provenance": {
+    "authoring_timestamp": "2026-09-02T00:00:00Z",
+    "model_snapshot_boundary": "qwen35b-screen-2026-09-02",
+    "contamination_canary_hash": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+  }
+}

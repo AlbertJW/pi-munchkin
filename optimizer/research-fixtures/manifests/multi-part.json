@@ -1,0 +1,57 @@
+{
+  "schema": "pi.research-fixture/v1",
+  "fixture_id": "sqlite-postgres-selection",
+  "revision": "2026-09-02",
+  "kind": "multi_part",
+  "prompt": {
+    "text": "For a small application, research how SQLite and PostgreSQL differ for local development, concurrent writes, and operational scaling. Build a concise decision memo with one evidence branch per question, and explicitly mark any claim that the bounded source budget could not verify.",
+    "sha256": "3b734a924ff5e57f7dd27dcb45ab74c8f946152a85caa1092dc9b847037e2f0a"
+  },
+  "source_time_cutoff": "2026-09-02T00:00:00Z",
+  "evidence_families": [
+    {
+      "id": "sqlite-model",
+      "role": "primary",
+      "source_refs": [
+        {"id": "sqlite-about", "url": "https://www.sqlite.org/about.html", "publisher": "SQLite"}
+      ]
+    },
+    {
+      "id": "postgres-model",
+      "role": "primary",
+      "source_refs": [
+        {"id": "postgres-intro", "url": "https://www.postgresql.org/docs/current/tutorial.html", "publisher": "PostgreSQL"}
+      ]
+    },
+    {
+      "id": "gap-branch",
+      "role": "context",
+      "source_refs": [
+        {"id": "sqlite-locking", "url": "https://www.sqlite.org/lockingv3.html", "publisher": "SQLite"}
+      ]
+    }
+  ],
+  "required_claims": [
+    {"id": "local-development", "evidence_family": "sqlite-model", "grading_rule": "cover-local-development-with-citation"},
+    {"id": "concurrency-scale", "evidence_family": "postgres-model", "grading_rule": "cover-concurrency-and-scale-with-citation"},
+    {"id": "explicit-gap", "evidence_family": "gap-branch", "grading_rule": "mark-unverified-branch-or-cite-it"}
+  ],
+  "negative_control": {
+    "text": "What file extension is used by the SQLite command-line database example? Answer from one official source.",
+    "sha256": "1eb9d0f8b6ca09e5f63bd99615b898c2db83c318fa4c0b8607c485288b21d05c",
+    "expected_plan_start": false,
+    "max_source_reads": 2
+  },
+  "oracle": {
+    "schema": "pi.research-oracle/v1",
+    "entrypoint": "../oracles/research_shape.py",
+    "query_budget": 3,
+    "timeout_ms": 2000,
+    "output_cap_bytes": 4096
+  },
+  "provenance": {
+    "authoring_timestamp": "2026-09-02T00:00:00Z",
+    "model_snapshot_boundary": "qwen35b-screen-2026-09-02",
+    "contamination_canary_hash": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+  }
+}
