@@ -10,10 +10,11 @@ bounded transport smoke then completed with `READY`, exit 0, zero stderr, and
 observations only: they are not gate rows, calibration, A/B evidence, or an
 adoption decision.
 
-The live mirror is now current: `npm run mirror:check --
+The live mirror was current for the earlier goal smoke, and has now been
+refreshed after the context handoff repair: `npm run mirror:check --
 /Users/Albert.Wessels/.pi/agent` reports **122 of 122** first-party files match,
-with no unmanaged extensions or orphans. The loaded surface SHA-256 is
-`7624ee447fb6a9a77f96e4abf5ee9b01580ddd478f3ae67b329f858761e07ca7`.
+with no unmanaged extensions or orphans. The current loaded surface SHA-256 is
+`f5cdd5b6cf94e7d5687ff2cda1d1e87af6c535b96ed9456481b194af2c55dddb`.
 
 The cheapest deterministic probe did run: the candidate-specific suites for
 planning, research ledger, working memory, bash-output guarding, semantic-loop

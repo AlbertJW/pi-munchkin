@@ -1,6 +1,6 @@
 # Handover — pi_munchkin, 2026-08-24
 
-## 2026-09-02 pre-request handoff abort ordering — source repaired, mirror pending
+## 2026-09-02 pre-request handoff abort ordering — mirrored, Qwen smoke pending
 
 The settled-turn repair exposed one final race in the real Pi lifecycle:
 `ctx.compact()` is fire-and-forget and Pi's session compactor waits for an
@@ -12,11 +12,13 @@ was red before the change and the complete 13-test context suite plus
 typecheck are green afterward; the source surface is
 `c73d86a5c704253293d7458823e591e4e30424ce626a95bb91e397c3d0cf37c0`.
 
-The current mirror differs in this one first-party file and must be refreshed
-through the normal approved ceremony. The v4 preregistration has been
-rebound to this source and deliberately has no executable loaded hash until
-that mirror is checked. No Qwen inference, capacity, quality, or adoption
-claim is attached to this repair.
+The approved mirror refresh is complete: `mirror:apply` wrote 122 first-party
+artifacts and `mirror:check` reports 122/122 with no unmanaged extensions or
+orphans. The loaded surface hash is
+`f5cdd5b6cf94e7d5687ff2cda1d1e87af6c535b96ed9456481b194af2c55dddb`, and the
+v4 preregistration is now bound to it. The clean two-turn Qwen screen is the
+next model action; no Qwen inference, capacity, quality, or adoption claim is
+attached to this repair yet.
 
 ## 2026-09-02 goal grammar boundary — mirrored and smoked
 
