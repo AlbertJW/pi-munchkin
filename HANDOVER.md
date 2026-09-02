@@ -37,6 +37,15 @@ and one-token calibration enabled, while automatic handoff stays off to keep
 the first receipt interpretable. It cannot establish handoff safety, capacity,
 rearming, or model-switch behavior.
 
+That smoke has now completed on the bound surface: Pi exited 0 with empty
+stderr; 72 safe rows included the model profile, local serving truth
+(`65536/61440`, verdict `ok`), the post-probe budget update, and a successful
+reachability calibration labelled `observed`. The audit is in
+[`optimizer/docs/QWEN35B_CONTEXT_EPOCHS_AUDIT_2026-09-02.md`](optimizer/docs/QWEN35B_CONTEXT_EPOCHS_AUDIT_2026-09-02.md).
+It is wiring evidence only. The next context study must exercise an 85%
+threshold crossing, one-shot handoff/rearm, and at least one model/provider or
+window switch; no conclusion about those behaviours is drawn from this run.
+
 ## 2026-09-02 pre-fix dark-candidate DD mechanism probes
 
 The router was reachable and Qwen 35B completed a bounded transport smoke.
