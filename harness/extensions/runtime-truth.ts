@@ -127,6 +127,10 @@ export default function (pi: ExtensionAPI): void {
 	let handoffInFlight = false;
 	let handoffDisarmedKey: string | null = null;
 	let pendingBudgetHandoff: { profile: ContextProfile; fromEpoch: number } | null = null;
+	// `completed` is cleared after each settled lifecycle for the provider
+	// timing projection. Keep this independent sticky bit so a later user turn
+	// still counts as having a prior provider turn for handoff eligibility.
+	let providerTurnObserved = false;
 
 	function publishContextProfile(profile: ContextProfile | undefined): void {
 		contextProfile = profile;
@@ -170,7 +174,7 @@ export default function (pi: ExtensionAPI): void {
 	// a provider turn exists (current or completed); the built-in overflow path
 	// remains responsible for an oversized initial prompt.
 	function hasPriorProviderTurn(): boolean {
-		return current !== null || completed.length > 0;
+		return providerTurnObserved || current !== null || completed.length > 0;
 	}
 
 	function requestHandoff(ctx: { getContextUsage?: () => { tokens: number | null; percent: number | null } | undefined; compact?: (options?: { customInstructions?: string; onComplete?: () => void; onError?: (error: Error) => void }) => void } | undefined, fromEpoch: number, profile: ContextProfile): void {
@@ -235,6 +239,7 @@ export default function (pi: ExtensionAPI): void {
 		handoffInFlight = false;
 		handoffDisarmedKey = null;
 		pendingBudgetHandoff = null;
+		providerTurnObserved = false;
 		delete (globalThis as Record<string, unknown>).__pi_context_profile;
 	}
 
@@ -288,6 +293,7 @@ export default function (pi: ExtensionAPI): void {
 
 	pi.on("after_provider_response", async (event, ctx) => {
 		currentModel = ctx?.model as typeof currentModel;
+		if (typeof event.status === "number" && event.status < 400) providerTurnObserved = true;
 		if (current) {
 			current.headersAt ??= performance.now();
 			current.status = event.status;

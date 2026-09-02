@@ -181,6 +181,31 @@ test("an over-budget pre-request context is handed off before another request st
 	}
 });
 
+test("a settled provider turn remains eligible for the next handoff check", async () => {
+	const prior = process.env.CONTEXT_HANDOFF;
+	delete process.env.CONTEXT_HANDOFF;
+	try {
+		const fp = makeFakePi();
+		const mod = await import(`../extensions/runtime-truth.ts?settled-turn=${Date.now()}-${Math.random()}`);
+		mod.default(fp.pi as never);
+		await fire(fp, "session_start", {}, {});
+		const model = { provider: "local", id: "settled-turn", contextWindow: 32_768 };
+		let compactions = 0;
+		const ctx = {
+			model,
+			getContextUsage: () => ({ tokens: 30_000, percent: 92 }),
+			compact: (options: { onComplete?: () => void }) => { compactions += 1; options.onComplete?.(); },
+		};
+		await fire(fp, "before_provider_request", {}, { ...ctx, getContextUsage: () => ({ tokens: 100, percent: 1 }) });
+		await fire(fp, "after_provider_response", { status: 200 }, ctx);
+		await fire(fp, "agent_settled", {}, ctx);
+		await fire(fp, "before_provider_request", {}, ctx);
+		assert.equal(compactions, 1, "a later turn must still hand off after the earlier turn settled");
+	} finally {
+		if (prior === undefined) delete process.env.CONTEXT_HANDOFF; else process.env.CONTEXT_HANDOFF = prior;
+	}
+});
+
 test("automatic handoff is one-shot until the context falls below the rearm threshold", async () => {
 	const prior = process.env.CONTEXT_HANDOFF;
 	delete process.env.CONTEXT_HANDOFF;
