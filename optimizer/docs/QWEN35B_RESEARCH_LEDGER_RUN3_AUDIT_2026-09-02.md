@@ -80,3 +80,14 @@ enforced for non-graph sessions, add a red-green test for that policy, and
 repeat a judge-backed comparison only after that instrumentation decision.
 The hierarchical planner/deep-research graph remains downstream of the
 semantic-loop gate and must not be enabled from this receipt.
+
+## Post-audit instrumentation update — 2026-09-02
+
+The budget decision described above has since been implemented and tested.
+`RESEARCH_LEDGER=on` now hard-stops non-graph discovery at three searches or
+five distinct source reads and returns an explicit evidence gap. A separate
+`RESEARCH_BUDGET=on` control flag enforces only that wall while leaving the
+ledger tools, notes, cache, state, footer, and wrap-up steering absent. The
+runtime and optimizer config contracts are red-green tested. Run 4 is the fresh
+judge-backed comparison for this repaired instrument; its preregistration, not
+this historical audit, governs any future sessions.

@@ -318,5 +318,13 @@ epochs.
 
 The non-graph budget decision is now implemented: `RESEARCH_LEDGER=on` stops
 after three searches or five distinct source reads, with an explicit evidence
-gap. A fresh five-question A/B preregistration is prepared in
+gap. A ledger-free control can set `RESEARCH_BUDGET=on` with
+`RESEARCH_LEDGER=off` to enforce the same wall without registering ledger
+tools, notes, cache, state, footer, or wrap-up steering. A fresh five-question
+A/B preregistration is prepared in
 [`PREREG_QWEN35B_RESEARCH_LEDGER_RUN4_2026-09-02.md`](PREREG_QWEN35B_RESEARCH_LEDGER_RUN4_2026-09-02.md), bound to the current loaded surface and requiring a complete baseline and an independent judge. No Run 4 inference has started; the ledger remains dark.
+
+The Run 3 observation that a ledger-only session could exceed the nominal
+envelope (up to 28 searches and 17 reads) remains historical evidence. It is
+now covered by the red-green runtime wall and the config-schema contract; Run 4
+must still verify the behavior on fresh paired sessions.
