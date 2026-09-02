@@ -79,6 +79,8 @@ const IS_SUBAGENT_PROCESS = process.env.PI_SUBAGENT_DEPTH !== undefined && proce
 const GOALS_ENABLED = goalsEnabled();
 const TRACE_TAIL_MAX_BYTES = 64 * 1024;
 const PROC_MARK = processWriterMarker();
+const INVALID_COVERAGE_RETRY_LIMIT = 1;
+const invalidCoverageAttempts = new Map<string, number>();
 
 type ItemStatus = PlanStatus;
 type Phase = "planned" | "executing";
@@ -862,7 +864,32 @@ const branchPlan = defineTool({
 		if (!context || !reportPath) rejectPlanTool("branch_plan rejected: no valid parent plan context");
 		const report: BranchReportV1 = { v: 1, parent_item_id: context.parent_item_id, owner_ref: context.owner_ref, ...params } as BranchReportV1;
 		const invalidCoverage = explainCoverageInvariant(report);
-		if (invalidCoverage) rejectPlanTool(`branch_plan rejected: ${invalidCoverage} is incomplete but has no failure reason; set truncated, budget_exhausted, or failed=true (and keep complete=false), or use complete=true for clean bounded coverage`);
+		const attemptKey = `${context.run_id}:${context.owner_ref}`;
+		if (invalidCoverage) {
+			const attempt = (invalidCoverageAttempts.get(attemptKey) ?? 0) + 1;
+			invalidCoverageAttempts.set(attemptKey, attempt);
+			if (attempt <= INVALID_COVERAGE_RETRY_LIMIT) rejectPlanTool(`branch_plan rejected: ${invalidCoverage} is incomplete but has no failure reason; set truncated, budget_exhausted, or failed=true (and keep complete=false), or use complete=true for clean bounded coverage`);
+
+			// A second malformed report is a branch-local protocol failure. Fail closed
+			// with a valid terminal report so an unhelpful model cannot keep the parent
+			// graph open indefinitely. No child claims, sources, or usage are accepted.
+			const blockedReport: BranchReportV1 = {
+				v: 1, parent_item_id: context.parent_item_id, owner_ref: context.owner_ref, status: "blocked",
+				note: `Blocked after repeated invalid ${invalidCoverage} reports; no evidence accepted.`,
+				consumed: { searches: 0, reads: 0 }, children: [], source_leads: [],
+				evidence_gaps: ["invalid coverage report rejected after one corrective retry"],
+				coverage: { strategy: "direct", scope: "bounded", returned_count: 0, truncated: false, budget_exhausted: false, failed: true, complete: false },
+			};
+			await writeBranchReport(reportPath, blockedReport, context);
+			invalidCoverageAttempts.delete(attemptKey);
+			const shared = globalThis as Record<string, unknown>;
+			shared[RESEARCH_RESERVED_BUDGET_KEY] = { searches: 0, reads: 0 };
+			return {
+				content: [{ type: "text" as const, text: "Branch blocked after repeated invalid coverage reports. Stop this branch and return the blocked result; do not call more tools." }],
+				details: { tool_name: "branch_plan", success: true, terminal: true, failure_class: "invalid_coverage", contexts: [] },
+			};
+		}
+		invalidCoverageAttempts.delete(attemptKey);
 		const terminal = ["done", "blocked", "deferred"].includes(report.status);
 		const shared = globalThis as Record<string, unknown>;
 		const own = shared.__pi_research_state as { searches?: unknown; reads?: unknown } | undefined;
@@ -899,7 +926,7 @@ const branchPlan = defineTool({
 			limits: { max_depth: 2 as const, max_children: 0 as const },
 		}));
 		const contextText = contexts.length > 0 ? ` Scout plan_context (copy exactly): ${JSON.stringify(contexts)}` : "";
-		return { content: [{ type: "text" as const, text: `Branch report saved (${report.children.length}/${context.limits.max_children} children, ${report.consumed.searches}/${context.budget.searches} searches, ${report.consumed.reads}/${context.budget.reads} reads).${contextText}` }], details: { tool_name: "branch_plan", success: true, contexts } };
+		return { content: [{ type: "text" as const, text: `Branch report saved (${report.children.length}/${context.limits.max_children} children, ${report.consumed.searches}/${context.budget.searches} searches, ${report.consumed.reads}/${context.budget.reads} reads).${contextText}` }], details: { tool_name: "branch_plan", success: true, terminal: false, failure_class: "none", contexts } };
 	},
 });
 

@@ -193,11 +193,18 @@ if (!CHILD) {
 
 	test("branch_plan explains the incomplete-coverage truth table", async () => {
 		const fp = fresh(); const cwd = tmp();
-		await expectToolError(fp, "branch_plan", {
+		const malformed = {
 			status: "pending", note: "incomplete transport probe", consumed: { searches: 0, reads: 0 },
 			children: [], source_leads: [], evidence_gaps: ["no retrieval"],
 			coverage: { strategy: "direct", scope: "bounded", returned_count: 0, truncated: false, budget_exhausted: false, failed: false, complete: false },
-		}, cwd, /coverage is incomplete.*(?:truncated|budget_exhausted|failed)/i);
+		};
+		await expectToolError(fp, "branch_plan", malformed, cwd, /coverage is incomplete.*(?:truncated|budget_exhausted|failed)/i);
+		const recovered = await callTool(fp, "branch_plan", malformed, cwd);
+		assert.equal(recovered.isError, false, "a repeated malformed report fails closed as a terminal branch");
+		const report = JSON.parse(readFileSync(join(process.env.PI_MUNCHKIN_BRANCH_REPORT_PATH!), "utf8"));
+		assert.equal(report.status, "blocked");
+		assert.equal(report.coverage.failed, true);
+		assert.match(report.evidence_gaps[0], /invalid coverage/i);
 		resetPiGlobals();
 	});
 }
