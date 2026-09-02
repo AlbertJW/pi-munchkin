@@ -28,6 +28,16 @@ All notable changes to pi-munchkin are documented here. Releases follow semantic
   so the branch became `child_failed`; this remains operability evidence only,
   with both planner flags dark.
 
+### Fixed (2026-09-02 — explain invalid incomplete branch coverage)
+
+- **Branch-report validation now explains its coverage truth table.** A bounded
+  report marked `complete:false` must also identify truncation, budget exhaustion,
+  or failure; clean bounded coverage must be `complete:true`. The branch tool
+  still rejects invalid state, but now returns this correction to the model so a
+  planner can repair the report instead of retrying an opaque generic error.
+  The targeted integration test was red before the fix and green afterward; the
+  planner flags remain dark and no quality or adoption evidence follows.
+
 ### Fixed (2026-09-02 — committed handoff outcome survives callback races)
 
 - **A committed model-handoff compaction can no longer be downgraded by a
