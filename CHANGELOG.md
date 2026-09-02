@@ -4,6 +4,15 @@ All notable changes to pi-munchkin are documented here. Releases follow semantic
 
 ## Unreleased
 
+### Fixed (2026-09-02 — terminal child coverage guidance)
+
+- **Terminal research children now get an actionable coverage error.** A
+  `done`, `blocked`, or `deferred` child must carry its own retrieval coverage
+  receipt; `branch_plan` now names the missing child and lists the required
+  fields before accepting or rejecting the report. The existing bounded retry
+  and fail-closed branch behavior remains in force. The regression was red
+  before the guidance and green afterward; planner flags remain dark.
+
 ### Fixed (2026-09-02 — terminal planned-branch failures)
 
 - **A failed depth-one research branch is now terminal at the parent.** After

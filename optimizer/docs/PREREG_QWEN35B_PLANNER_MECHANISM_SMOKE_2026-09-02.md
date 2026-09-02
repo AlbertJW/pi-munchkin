@@ -208,3 +208,18 @@ dispatch. This is a successful lifecycle/operability receipt for the guard,
 not a clean graph mechanism pass or any research-quality/effectiveness result.
 It remains quarantined from all previous surfaces and cannot justify enabling
 either planner flag.
+
+## Terminal-child coverage boundary (pending rerun)
+
+The zero-budget nested probe on loaded hash
+`ef4305289114abed9c19da99663addaf7dc0de81be7db901a3ad5aa097c78807` completed
+the child process but its final blocked branch report omitted the terminal
+child's coverage receipt, so the parent recorded `invalid_report`. Source
+commit `d2fa491` adds model-visible guidance naming the missing child and the
+required retrieval fields. The new source surface is
+`9e8460655992c7879bd41e33ab35a400a0081b99741bf88fd7a60a7138e67cfd`.
+
+After mirroring, rerun the zero-budget nested probe with a child coverage
+receipt. Record whether the validated blocked report reaches the parent merge;
+this remains lifecycle evidence only and must not be pooled across the new
+surface boundary.

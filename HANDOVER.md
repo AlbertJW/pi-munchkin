@@ -1,5 +1,20 @@
 # Handover — pi_munchkin, 2026-08-24
 
+## 2026-09-02 terminal-child coverage guidance
+
+The zero-budget nested probe reached a fully completed child, but its final
+`blocked` branch report omitted the required child coverage receipt. The
+parent-facing result was therefore `invalid_report`, even though the child
+returned a useful summary. Source commit `d2fa491` now identifies the exact
+terminal child missing coverage and lists the required receipt fields; the
+existing one-retry/circuit-breaker policy remains fail-closed. The source
+surface is `9e8460655992c7879bd41e33ab35a400a0081b99741bf88fd7a60a7138e67cfd`.
+
+This source boundary is pushed but not yet mirrored. The next smoke must use a
+fresh loaded hash and include child coverage in the blocked report; only then
+can the branch-merge path be assessed. The earlier zero-budget run is
+quarantined as an invalid-report diagnostic. Keep planner flags dark.
+
 ## 2026-09-02 terminal planned-branch failure handling
 
 The hash-pinned Qwen probe on the circuit-breaker surface still timed out after
