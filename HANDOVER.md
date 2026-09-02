@@ -21,11 +21,18 @@ explicitly approved six-session mechanism screen plus three fact-lookup
 controls. Any timeout, branch failure, or missing parent evidence remains
 incomplete rather than a quality result.
 
+The preflight's frozen source identity is now kept current by a selftest
+freshness assertion. After the budget-control source change it was red against
+the stale `5b84241c…` default; the repaired planner preregistration and default
+are bound to source `62b1e565…` at the current tip `abc39e2` (implementation
+`62b9bfb`). The loaded mirror remains `0c09cb63…`, and no planner session has
+started.
+
 ## 2026-09-02 research-ledger Run 4 preparation
 
 The fresh ledger comparison is preregistered in
 `optimizer/docs/PREREG_QWEN35B_RESEARCH_LEDGER_RUN4_2026-09-02.md`. It is
-bound to source `5b84241c…`, loaded surface `0c09cb63…`, and Qwen 35B. It uses
+bound to source `62b1e565…`, loaded surface `0c09cb63…`, and Qwen 35B. It uses
 five existing research questions, randomized A/B order, a complete-baseline
 requirement, an independent judge gate, and the same three-search/five-read
 allowance for both arms. No Run 4 session has started; `RESEARCH_LEDGER`
@@ -44,8 +51,9 @@ The control arm now sets `RESEARCH_LEDGER=off` and `RESEARCH_BUDGET=on`.
 `RESEARCH_BUDGET` is an opt-in accounting wall only: it shares the three-search
 /five-read limit but registers no ledger tools, notes, cache, state, footer, or
 wrap-up steering. Treatment keeps `RESEARCH_LEDGER=on`, which implies the same
-wall and adds the verified-citation surface. Source commit `62b9bfb` is bound
-to source hash `1d64ce9e…`; the mirror remains on the earlier loaded hash, so
+wall and adds the verified-citation surface. The current source tip is
+`abc39e2`, with source hash `62b1e565…` (the implementation commit is
+`62b9bfb`); the mirror remains on the earlier loaded hash, so
 Run 4 is still repository-only and requires a fresh human preflight after any
 approved mirror.
 
