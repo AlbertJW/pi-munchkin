@@ -2,7 +2,7 @@
 
 ## Status and scope
 
-**PREPARED — no semantic-loop session has started under this document.** This
+**EXECUTED — failed/incomplete mechanism screen recorded 2026-09-02.** This
 is a replacement for the old 4B semantic-loop preregistration's first,
 mechanism-only decision path. It is deliberately limited to exposure and
 protocol integrity; it is not an efficacy study, a baseline screen, an
@@ -107,3 +107,19 @@ child telemetry leakage, arbiter inconsistency, or active-tool tail that
 reaches the bound without settlement. Never resume, repair, or pool a partial
 screen. No source tree, live mirror, default, or historical result may be
 modified by this study.
+
+## Execution receipt
+
+The three candidate sessions ran under the frozen private manifest and
+identity. `sweep-b` completed at 344/480 seconds with an authoritative
+settlement, but its reducer recorded no delivered semantic intervention.
+`sweep-c` and `ling-exact-gate-recovery` were still actively mutating at the
+480-second bound and were voided for incomplete settlement. Proposed
+intervention artifacts on those rows do not count as delivery. No row proved
+an arbiter decision with `winner_reason=semantic_tier`.
+
+This is a protocol/subject-suitability failure, not a negative efficacy
+result. Keep `LOOP_EPISODE_MODE=shadow`; before another screen, characterize a
+bounded active-tool cancellation path or choose a fixture envelope that can
+settle inside the bound. The detailed sanitized audit is in
+[`QWEN35B_SEMANTIC_LOOP_MECHANISM_AUDIT_2026-09-02.md`](QWEN35B_SEMANTIC_LOOP_MECHANISM_AUDIT_2026-09-02.md).
