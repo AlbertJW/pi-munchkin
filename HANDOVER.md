@@ -21,7 +21,13 @@ The old graceful-shutdown preregistration is stale against this source and must
 not be reused. A fresh hash-bound screen is now prepared at
 [`optimizer/docs/PREREG_QWEN35B_GRACEFUL_SHUTDOWN_2026-09-02.md`](optimizer/docs/PREREG_QWEN35B_GRACEFUL_SHUTDOWN_2026-09-02.md),
 bound to the same source and loaded hashes. Its no-inference dry preflight
-passed; the three-row execution is the next explicitly approved model action.
+passed. The three-row execution then reached `gate=1` for each fixture but was
+voided by trial validity because no authenticated settlement summary arrived;
+the audit is in
+[`optimizer/docs/QWEN35B_GRACEFUL_SHUTDOWN_AUDIT_2026-09-02.md`](optimizer/docs/QWEN35B_GRACEFUL_SHUTDOWN_AUDIT_2026-09-02.md).
+Do not resume or pool those rows. The next source work is a deterministic
+active-tool cancellation fixture; a fresh preregistration is required after any
+fix.
 
 ## 2026-09-02 pre-fix dark-candidate DD mechanism probes
 

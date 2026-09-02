@@ -101,9 +101,10 @@ downstream of the semantic-loop gate and must not bypass it.
 
 1. Preserve the goal receipt in `PREREG_QWEN35B_GOAL_GRAMMAR_2026-09-02.md`;
    do not interpret the pre-fix failures or this happy path as goal efficacy.
-2. Use the fresh Qwen35B graceful-shutdown preregistration bound to the current
-   source and loaded hashes before running that settlement smoke. Its
-   no-inference preflight passed; do not reuse the stale 2026-09-01 document.
+2. Preserve the fresh Qwen35B graceful-shutdown run as an invalid lifecycle
+   receipt: all three rows reached the task gate but lacked authenticated
+   settlement. Do not resume or pool them; isolate active-tool cancellation
+   before preparing another model screen.
 3. After an authoritative lifecycle result, run the short goal/context smoke;
    keep both defaults and dark flags unchanged.
 4. Reissue the semantic-loop preregistration if its prerequisite is still
