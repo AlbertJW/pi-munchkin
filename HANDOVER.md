@@ -62,6 +62,12 @@ the result is a bounded lifecycle receipt, not planner mechanism or quality
 evidence. Keep both planner flags dark. The detailed receipt is in
 [`optimizer/docs/PREREG_QWEN35B_PLANNER_MECHANISM_SMOKE_2026-09-02.md`](optimizer/docs/PREREG_QWEN35B_PLANNER_MECHANISM_SMOKE_2026-09-02.md).
 
+A stricter second run activated the research and delegation families and started
+one child, but the child failed before producing a mergeable report; the parent
+remained open and hit the same 350,000-byte cap after 131.3 seconds. This is a
+bounded child-failure diagnostic, not planner exposure or quality evidence, and
+the flags remain dark.
+
 ## 2026-09-02 bash-output-guard paired receipt
 
 The preregistered Qwen 35B paired mechanism screen is clean. Four fresh RPC

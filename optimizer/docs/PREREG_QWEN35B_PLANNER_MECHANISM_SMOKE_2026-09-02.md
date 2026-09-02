@@ -100,3 +100,13 @@ two pending depth-one branches. Tool execution reached one `capability`, one
 bounded-run/lifecycle receipt but an **incomplete mechanism result**, not an
 efficacy result. The new launcher prevented another unbounded session; keep the
 flags dark and do not count this run toward the six-session mechanism gate.
+
+A second bounded run used a stricter scripted sequence and the same exact
+surface. It also reached the 350,000-byte cap, after 131.258 seconds with zero
+stderr. Safe telemetry recorded one `research-start`, two `ended-open` notices,
+one `branch-failed` with `failure_class=child_failed`, and one research summary;
+the graph remained at two depth-one branches (`blocked`, `pending`) with no
+branch merge or parent settlement. The model made three capability calls, one
+`research_plan_start`, and one `subagent` call before the cap. This is a useful
+child-failure diagnostic and bounded lifecycle receipt, but it is still an
+**incomplete mechanism result** and does not count toward the six-session gate.
