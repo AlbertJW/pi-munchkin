@@ -64,6 +64,16 @@ serving identity and discovery facts. Handoff was disabled to isolate epoch
 rebinding. This does not cover different providers/windows or cross-epoch
 handoff safety.
 
+The Qwen bash-output guard trigger screen is complete as a mechanism receipt.
+Its preregistration and audit are in
+[`optimizer/docs/PREREG_QWEN35B_BASH_OUTPUT_GUARD_2026-09-02.md`](optimizer/docs/PREREG_QWEN35B_BASH_OUTPUT_GUARD_2026-09-02.md)
+and
+[`optimizer/docs/QWEN35B_BASH_OUTPUT_GUARD_AUDIT_2026-09-02.md`](optimizer/docs/QWEN35B_BASH_OUTPUT_GUARD_AUDIT_2026-09-02.md).
+One 12,000-character bash result was withheld at the 8,000-character limit in
+one fresh session; the process settled cleanly and retained no raw command or
+output. The candidate remains dark pending paired noisy/ordinary false-positive
+and recovery-cost evidence.
+
 ## 2026-09-02 pre-request handoff abort ordering — mirrored, Qwen smoke pending
 
 The settled-turn repair exposed one final race in the real Pi lifecycle:
