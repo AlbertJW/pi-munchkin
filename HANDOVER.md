@@ -22,25 +22,24 @@ outcome, one cancelled oversized request, and one successful post-compaction
 response, with 58 hash-stamped safe rows and zero stderr. The audit is in
 [`optimizer/docs/QWEN35B_CONTEXT_HANDOFF_THRESHOLD_V4_AUDIT_2026-09-02.md`](optimizer/docs/QWEN35B_CONTEXT_HANDOFF_THRESHOLD_V4_AUDIT_2026-09-02.md).
 
-The prior v5/v6/v7 diagnostics remain quarantined. The next evidence is
-separate preregistration for no-goal rearm, active-goal preservation, and a
-provider/model/window switch; none of these receipts supplies capacity,
-quality, or adoption evidence.
+The prior v5/v6/v7 diagnostics remain quarantined. The no-goal rearm,
+active-goal preservation, and same-router model-switch screens are now complete;
+none of those receipts supplies capacity, quality, or adoption evidence. A
+different-provider or differing-window switch remains a future safety study.
 
-The no-goal rearm screen is now prepared in
+The no-goal rearm screen was preregistered in
 [`optimizer/docs/PREREG_QWEN35B_CONTEXT_HANDOFF_REARM_2026-09-02.md`](optimizer/docs/PREREG_QWEN35B_CONTEXT_HANDOFF_REARM_2026-09-02.md),
 bound to source `accdf89` and loaded hash
-`251708fed05114ef0cb1617812d8662a96c39efeeb587ab829748ab5688f2b89`. It will
-require exactly two successful handoffs separated by a below-70% rearm and
-will run before the active-goal and cross-epoch screens.
+`251708fed05114ef0cb1617812d8662a96c39efeeb587ab829748ab5688f2b89` and is
+closed by the clean receipt below.
 
 That rearm screen is complete and clean: 96 unique hash-stamped rows, two
 `ok:true` handoffs, two cancelled oversized requests, three successful
 provider responses, two `model-handoff` compactions, and zero native
 compactions. The audit is in
 [`optimizer/docs/QWEN35B_CONTEXT_HANDOFF_REARM_AUDIT_2026-09-02.md`](optimizer/docs/QWEN35B_CONTEXT_HANDOFF_REARM_AUDIT_2026-09-02.md).
-The next evidence is the separately prepared active-goal preservation screen;
-this receipt does not imply goal or cross-epoch safety.
+This receipt does not imply active-goal or cross-epoch safety; those are
+recorded separately below.
 
 The active-goal screen was preregistered in
 [`optimizer/docs/PREREG_QWEN35B_CONTEXT_HANDOFF_ACTIVE_GOAL_2026-09-02.md`](optimizer/docs/PREREG_QWEN35B_CONTEXT_HANDOFF_ACTIVE_GOAL_2026-09-02.md),
@@ -52,7 +51,7 @@ brief, and the same non-null active `current_goal_id` before and after
 compaction. The full audit is in
 [`optimizer/docs/QWEN35B_CONTEXT_HANDOFF_ACTIVE_GOAL_AUDIT_2026-09-02.md`](optimizer/docs/QWEN35B_CONTEXT_HANDOFF_ACTIVE_GOAL_AUDIT_2026-09-02.md).
 This closes only the active-goal preservation mechanism gate; the separate
-provider/model/window-switch screen remains.
+same-router model-switch screen is recorded below.
 
 The model-switch context-epoch screen is now also complete. Its preregistration
 and audit are in
@@ -141,8 +140,7 @@ and
 Keep `LOOP_EPISODE_MODE=shadow`; the planner graph remains blocked until the
 active-tool tail and semantic-delivery boundary are characterized.
 
-The next independent dark-candidate action is the prepared dynamic-context
-epoch smoke in
+The earlier independent dynamic-context epoch smoke was preregistered in
 [`optimizer/docs/PREREG_QWEN35B_CONTEXT_EPOCHS_2026-09-02.md`](optimizer/docs/PREREG_QWEN35B_CONTEXT_EPOCHS_2026-09-02.md).
 It is a single no-tool, no-goal reachability run with local serving discovery
 and one-token calibration enabled, while automatic handoff stays off to keep
@@ -154,9 +152,9 @@ stderr; 72 safe rows included the model profile, local serving truth
 (`65536/61440`, verdict `ok`), the post-probe budget update, and a successful
 reachability calibration labelled `observed`. The audit is in
 [`optimizer/docs/QWEN35B_CONTEXT_EPOCHS_AUDIT_2026-09-02.md`](optimizer/docs/QWEN35B_CONTEXT_EPOCHS_AUDIT_2026-09-02.md).
-It is wiring evidence only. The next context study must exercise an 85%
-threshold crossing, one-shot handoff/rearm, and at least one model/provider or
-window switch; no conclusion about those behaviours is drawn from this run.
+It is wiring evidence only. The subsequent threshold, rearm, active-goal, and
+same-router model-switch receipts are recorded above; no conclusion about
+different-provider/window safety is drawn from them.
 
 The first threshold probe then exposed a real lifecycle gap. A read-only usage
 probe saw the assembled context above the safe budget in `before_provider_request`

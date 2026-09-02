@@ -112,20 +112,18 @@ downstream of the semantic-loop gate and must not bypass it.
    `bigdata` remained in active mutation tails and are voided. Record and keep
    those rows separate; the next work is bounded active-tool cancellation and
    semantic-loop recovery, not a longer unqualified retry.
-3. Preserve the context-epoch wiring smoke and the threshold diagnostics. The
-   source repairs (`aad8e84`, `8f5d475`, and `715f6d8`) now cover the late
-   check, initial prompts, and settled-turn history. Mirror the latest commit,
-   then run the v4 two-turn preregistration when the router is explicitly
-   switched back to the Qwen subject, before any active-goal or model-switch
-   study.
-4. Do not rerun the completed context-epoch wiring smoke; keep both defaults
-   and dark flags unchanged. After the threshold receipt is clean, prepare the
-   separate multi-turn handoff/rearm/model-switch screen.
-5. Reissue the semantic-loop preregistration if its prerequisite is still
-   active, or record its explicit retirement. A current Qwen 35B mechanism
-   screen is now complete but failed closed: only `sweep-b` settled, with no
+3. Preserve the context-epoch wiring smoke and threshold diagnostics. The
+   source repairs now cover the late check, initial prompts, and settled-turn
+   history. The v4 threshold, rearm, active-goal, and same-router model-switch
+   receipts are complete and hash-bound; no capacity or adoption claim follows.
+4. Do not rerun those completed context screens. A future safety study may test
+   a different provider or declared window, but it requires its own
+   preregistration and must not pool with these same-router receipts.
+5. Reissue the semantic-loop preregistration against the current source if its
+   prerequisite remains active, or record its explicit retirement. The current
+   Qwen 35B mechanism screen failed closed: only `sweep-b` settled, with no
    valid delivered semantic intervention; the other two fixtures were voided
-   at the timeout boundary. Do not treat its proposed exposure artifacts as
+   at the timeout boundary. Do not treat proposed exposure artifacts as
    delivery evidence.
 6. Run research-ledger Run 3 and the targeted bash-guard trigger screen as
    separate studies.
