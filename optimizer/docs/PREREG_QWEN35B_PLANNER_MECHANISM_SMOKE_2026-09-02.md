@@ -86,3 +86,17 @@ its private transcript remains outside Git. Commit `07f555a` adds
 an explicit `--run`, caps combined stdout/stderr bytes, terminates the complete
 process group on wall timeout or cap, and emits only safe counts/classifications.
 Use that launcher for the next preregistered run.
+
+## Bounded exact-surface run receipt
+
+The first run through `planner_smoke --run` used the frozen loaded surface and
+returned a safe `pi.planner-smoke/v1` result after 52.667 seconds: `reason` was
+`output_cap`, `exit_code` was 143, combined stdout/stderr was exactly 350,000
+bytes, and stderr was zero bytes. Telemetry contained one
+`plan-runner/research-start`, one `plan-runner/ended-open`, one failure-episode
+settlement, and no branch merge or plan settlement; the project graph still had
+two pending depth-one branches. Tool execution reached one `capability`, one
+`research_plan_start`, and one `bash` call before the bound. This is a valid
+bounded-run/lifecycle receipt but an **incomplete mechanism result**, not an
+efficacy result. The new launcher prevented another unbounded session; keep the
+flags dark and do not count this run toward the six-session mechanism gate.

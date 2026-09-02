@@ -55,6 +55,13 @@ adds the offline-tested `optimizer/v2/planner_smoke.py` launcher, so the next
 attempt can enforce the hash, a shared output ceiling, and a process-group wall
 without retaining raw model output in the result summary.
 
+The first run through that launcher used the exact frozen mirror and stopped
+cleanly at the 350,000-byte cap after 52.7 seconds. It produced one
+`research-start`, two pending branches, and no branch merge or parent settlement;
+the result is a bounded lifecycle receipt, not planner mechanism or quality
+evidence. Keep both planner flags dark. The detailed receipt is in
+[`optimizer/docs/PREREG_QWEN35B_PLANNER_MECHANISM_SMOKE_2026-09-02.md`](optimizer/docs/PREREG_QWEN35B_PLANNER_MECHANISM_SMOKE_2026-09-02.md).
+
 ## 2026-09-02 bash-output-guard paired receipt
 
 The preregistered Qwen 35B paired mechanism screen is clean. Four fresh RPC
