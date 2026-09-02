@@ -99,9 +99,24 @@ python3 -m optimizer.v2.cli run --manifest optimizer/v2/examples/campaign.json -
 python3 -m optimizer.v2.cli resume --manifest optimizer/v2/examples/campaign.json --approve-sha <same-sha> --run-root /private/path
 python3 -m optimizer.v2.cli status --manifest optimizer/v2/examples/campaign.json --run-root /private/path
 python3 -m optimizer.v2.cli replay --manifest optimizer/v2/examples/campaign.json --run-root /private/path
+
+# dark planner mechanism smoke (no execution unless --run is explicit)
+python3 -m optimizer.v2.planner_smoke --selftest
+python3 -m optimizer.v2.planner_smoke --dry --agent-dir /private/agent-copy \
+  --project-dir /private/research-project --prompt-file /private/prompt.txt \
+  --expected-surface <loaded-surface-sha256> --model local-llamacpp/qwen36-35b-iq3s
 ```
 
 The example is deterministic and performs no network or model inference.
+
+The planner smoke launcher is a separate dark measurement utility. It refuses
+to start unless the disposable agent directory hashes to the preregistered
+loaded surface. Its only model-executing mode is an explicit `--run`, which
+requires private output, stderr, and telemetry paths; stdout and stderr are
+captured under one byte ceiling and the whole child process group is stopped on
+either that ceiling or the wall-clock limit. `--selftest` and `--dry` never
+launch Pi and print only bounded classifications. The utility does not alter
+defaults, the live mirror, or optimizer candidate state.
 
 The first prepared live manifest is
 `campaigns/qwen35b-config-tiny-20260827/campaign.json`. `prepare` and `dry` are

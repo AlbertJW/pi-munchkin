@@ -48,6 +48,13 @@ bound, admitted research fixtures, and fact-lookup negative controls. Details
 and the frozen identity are recorded in
 [`optimizer/docs/PREREG_QWEN35B_PLANNER_MECHANISM_SMOKE_2026-09-02.md`](optimizer/docs/PREREG_QWEN35B_PLANNER_MECHANISM_SMOKE_2026-09-02.md).
 
+A subsequent disposable copy made directly from the live mirror matched the
+frozen loaded hash but still stopped with two pending branches and no merge or
+settlement. It is incomplete and cannot count as exposure. Commit `07f555a`
+adds the offline-tested `optimizer/v2/planner_smoke.py` launcher, so the next
+attempt can enforce the hash, a shared output ceiling, and a process-group wall
+without retaining raw model output in the result summary.
+
 ## 2026-09-02 bash-output-guard paired receipt
 
 The preregistered Qwen 35B paired mechanism screen is clean. Four fresh RPC

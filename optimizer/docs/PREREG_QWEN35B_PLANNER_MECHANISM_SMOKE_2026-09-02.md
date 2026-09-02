@@ -73,3 +73,16 @@ The planner flags remain dark. Before any longer run, reproduce against the
 exact mirrored surface (or issue a new preregistration for a fully content-
 identical disposable copy), add admitted research fixtures and fact-lookup
 controls, and enforce an outer wall-clock/stream-size bound.
+
+## Exact-copy probe and launcher boundary
+
+A follow-up disposable copy was made directly from the live mirror and resolved
+to the frozen loaded hash `251708fed05114ef0cb1617812d8662a96c39efeeb587ab829748ab5688f2b89`.
+The probe then emitted one `plan-runner/research-start` and two pending branches,
+but no branch merge or parent settlement before observation stopped. It is
+**incomplete, not mechanism evidence**; the probe predates the reusable bound and
+its private transcript remains outside Git. Commit `07f555a` adds
+`optimizer/v2/planner_smoke.py`, which verifies this hash before launch, requires
+an explicit `--run`, caps combined stdout/stderr bytes, terminates the complete
+process group on wall timeout or cap, and emits only safe counts/classifications.
+Use that launcher for the next preregistered run.

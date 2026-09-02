@@ -43,7 +43,7 @@ and URLs were not retained in the report.
 | Working memory | Exit 0; one `upsert` and one `list` event, with both private working-memory projections present. | **Mechanism fired.** Needs paired multi-turn tasks to measure whether retained notes repay their context cost. |
 | Research ledger (earlier single-source contract) | Exit 0 with exactly one bounded `web_read`, one `research_note`, and a `run-summary`; zero stderr. | **Mechanism fired.** This earlier smoke proves citation-recording wiring only; it is superseded by the Run 3 receipt below for current status. |
 | Minimal tool surface | Exit 0; the disposable file was created and the run emitted a first-useful-mutation signal. | **Happy path works.** Needs representative read/edit/verify tasks and comparison against the base surface. |
-| Research planner / graph | The corrected ambient Qwen smoke emitted one `research-start` and persisted two pending schema-v5 branches, then entered an unbounded tool-call stream and ended with an open plan. Its disposable agent copy had surface hash `4f5516aa…`, not the frozen live-mirror hash, so the run is invalid evidence. | **Activation lead only; no valid mechanism receipt.** The explicit `--tools` path also showed that manual selection intentionally prevents planner-family reactivation. Reproduce against an exact mirrored surface with an outer stream bound, then author/admit research fixtures and fact-lookup controls before the six-session screen. |
+| Research planner / graph | The first corrected ambient Qwen smoke emitted one `research-start` and two pending schema-v5 branches, then entered an unbounded tool-call stream; its disposable copy had hash `4f5516aa…` and was invalid. A follow-up exact-copy probe matched `251708fed…` and again stopped with an open plan before branch merge or settlement. | **Activation lead only; no valid mechanism receipt.** The explicit `--tools` path intentionally prevents planner-family reactivation. The exact-copy probe is incomplete, not evidence. Use the new hash-verifying, process-bounded launcher, then author/admit research fixtures and fact-lookup controls before the six-session screen. |
 
 These probes do not repair the stale mirror, create gate rows, or qualify any
 candidate for adoption. They only identify which mechanisms are reachable on
@@ -132,8 +132,8 @@ downstream of the semantic-loop gate and must not bypass it.
    ledger comparison. Preserve the clean paired bash-guard mechanism receipt;
    a value screen on representative coding fixtures is still optional and
    must report recovery cost, context use, false positives, and correctness.
-7. With semantic-loop enforcement explicitly retired for this cohort, fix the
-   planner smoke boundary (exact surface copy plus outer stream limit), author
+7. With semantic-loop enforcement explicitly retired for this cohort, use the
+   committed hash-verifying planner launcher with an outer stream limit, author
    and admit research fixtures with negative controls, and then run the
    hierarchical planner/deep-research mechanism screen. Follow with a separate
    powered comparative evaluation; keep planner and deep-research flags dark
