@@ -1,6 +1,6 @@
 # Handover — pi_munchkin, 2026-08-24
 
-## 2026-09-02 committed handoff outcome — mirrored, fresh Qwen smoke pending
+## 2026-09-02 committed handoff outcome — clean Qwen mechanism receipt
 
 The first mirrored smoke showed that Pi can commit the handoff compaction and
 then report `Nothing to compact` from a later callback/racing lifecycle path.
@@ -16,10 +16,16 @@ The approved mirror refresh is complete: `mirror:apply` wrote 122 first-party
 artifacts and `mirror:check` reports 122/122 with no unmanaged extensions or
 orphans. The loaded surface hash is
 `251708fed05114ef0cb1617812d8662a96c39efeeb587ab829748ab5688f2b89`, and the
-v4 preregistration is bound to it. The prior v5/v6/v7 diagnostic sessions
-remain quarantined; the next model action is one fresh two-turn smoke with a
-new telemetry path. None of those prior sessions supplies capacity, quality,
-or adoption evidence.
+v4 preregistration is bound to it. The fresh two-turn screen is a clean
+mechanism receipt: one `model-handoff` compaction, one `ok:true` runtime
+outcome, one cancelled oversized request, and one successful post-compaction
+response, with 58 hash-stamped safe rows and zero stderr. The audit is in
+[`optimizer/docs/QWEN35B_CONTEXT_HANDOFF_THRESHOLD_V4_AUDIT_2026-09-02.md`](optimizer/docs/QWEN35B_CONTEXT_HANDOFF_THRESHOLD_V4_AUDIT_2026-09-02.md).
+
+The prior v5/v6/v7 diagnostics remain quarantined. The next evidence is
+separate preregistration for no-goal rearm, active-goal preservation, and a
+provider/model/window switch; none of these receipts supplies capacity,
+quality, or adoption evidence.
 
 ## 2026-09-02 pre-request handoff abort ordering — mirrored, Qwen smoke pending
 
