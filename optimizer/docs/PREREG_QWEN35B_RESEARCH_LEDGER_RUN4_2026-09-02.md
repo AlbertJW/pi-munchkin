@@ -16,7 +16,7 @@ surface/model epoch.
 - Source surface SHA-256:
   `62b1e565748394ec7aaccadcc4d9e3f5167dea31ca974d0ed9461d0d76fc0234`.
 - Loaded Pi-agent surface SHA-256:
-  `0c09cb637992c35176bd7ae4b0865850cb6a17bc2f1e5efaf4c06e59d2c1b4ef`.
+  `9629b4dbd3d871703a82edbf12db76db813863a4c369b6d45edf2e3cb0671970`.
 - Arm A (control): current skill, `RESEARCH_LEDGER=off`,
   `RESEARCH_BUDGET=on`.
 - Arm B (treatment): current skill, `RESEARCH_LEDGER=on`, with the hard

@@ -33,6 +33,11 @@ All notable changes to pi-munchkin are documented here. Releases follow semantic
   absent. The preregistration now binds this control explicitly, preventing a
   ledger comparison from crediting simple overrun prevention as ledger value.
 
+- **The approved budget-control surface is now mirrored.** `mirror:apply`
+  wrote all 122 first-party artifacts and `mirror:check` reports zero drift;
+  the loaded hash is `9629b4db…`. No model session, calibration, or adoption
+  decision followed the rollout; the pinned smoke remains a separate gate.
+
 ### Fixed (2026-09-02 — research-ledger budget wall)
 
 - **The budget-only control is now expressible through optimizer configs.**

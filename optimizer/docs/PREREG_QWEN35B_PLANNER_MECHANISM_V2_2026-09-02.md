@@ -16,7 +16,7 @@ enable either planner flag.
 - Source surface SHA-256:
   `62b1e565748394ec7aaccadcc4d9e3f5167dea31ca974d0ed9461d0d76fc0234`.
 - Loaded mirror surface SHA-256:
-  `0c09cb637992c35176bd7ae4b0865850cb6a17bc2f1e5efaf4c06e59d2c1b4ef`.
+  `9629b4dbd3d871703a82edbf12db76db813863a4c369b6d45edf2e3cb0671970`.
 - Candidate configuration `deep-research-planning.json`:
   `0d01aab9292db845b5f228174e2a1a4c10328883daebd482dcd9c9c9f5f5fd1e`.
 - Control configuration `deep-research-planning-control.json`:
@@ -70,7 +70,7 @@ python3 optimizer/research-fixtures/preflight.py --dry \
 ```
 
 On 2026-09-02 it returned `pi.planner-preflight/v1` with source
-`62b1e565…`, loaded surface `0c09cb63…`, the exact Qwen subject, both expected
+`62b1e565…`, loaded surface `9629b4db…`, the exact Qwen subject, both expected
 flag maps, and all three fixture IDs. This output is a readiness receipt only;
 the command never contacts the model server or starts Pi.
 

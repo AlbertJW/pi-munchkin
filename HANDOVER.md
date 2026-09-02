@@ -16,7 +16,7 @@ receipt hashes are frozen in
 This is instrument admission only: sources have not been fetched, answers have
 not been judged, and no planner flag changed. The next action is a human
 preflight against the current loaded surface
-`0c09cb637992c35176bd7ae4b0865850cb6a17bc2f1e5efaf4c06e59d2c1b4ef`, then an
+`9629b4dbd3d871703a82edbf12db76db813863a4c369b6d45edf2e3cb0671970`, then an
 explicitly approved six-session mechanism screen plus three fact-lookup
 controls. Any timeout, branch failure, or missing parent evidence remains
 incomplete rather than a quality result.
@@ -25,14 +25,14 @@ The preflight's frozen source identity is now kept current by a selftest
 freshness assertion. After the budget-control source change it was red against
 the stale `5b84241c…` default; the repaired planner preregistration and default
 are bound to source `62b1e565…` at the current tip `abc39e2` (implementation
-`62b9bfb`). The loaded mirror remains `0c09cb63…`, and no planner session has
+`62b9bfb`). The loaded mirror is now `9629b4db…`, and no planner session has
 started.
 
 ## 2026-09-02 research-ledger Run 4 preparation
 
 The fresh ledger comparison is preregistered in
 `optimizer/docs/PREREG_QWEN35B_RESEARCH_LEDGER_RUN4_2026-09-02.md`. It is
-bound to source `62b1e565…`, loaded surface `0c09cb63…`, and Qwen 35B. It uses
+bound to source `62b1e565…`, loaded surface `9629b4db…`, and Qwen 35B. It uses
 five existing research questions, randomized A/B order, a complete-baseline
 requirement, an independent judge gate, and the same three-search/five-read
 allowance for both arms. No Run 4 session has started; `RESEARCH_LEDGER`
@@ -53,9 +53,9 @@ The control arm now sets `RESEARCH_LEDGER=off` and `RESEARCH_BUDGET=on`.
 wrap-up steering. Treatment keeps `RESEARCH_LEDGER=on`, which implies the same
 wall and adds the verified-citation surface. The current source tip is
 `abc39e2`, with source hash `62b1e565…` (the implementation commit is
-`62b9bfb`); the mirror remains on the earlier loaded hash, so
-Run 4 is still repository-only and requires a fresh human preflight after any
-approved mirror.
+`62b9bfb`); the mirror is now at loaded hash `9629b4db…`. Run 4 remains
+inference-pending and requires the human review and explicit run approval
+specified by its preregistration.
 
 The optimizer config schema now also accepts `RESEARCH_BUDGET` and the config
 selftest exercises `config_env({thresholds: {RESEARCH_BUDGET: "on"}})`.
