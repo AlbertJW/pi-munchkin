@@ -1,5 +1,31 @@
 # Handover — pi_munchkin, 2026-08-24
 
+## 2026-09-02 dark-candidate DD mechanism probes
+
+The router was reachable and Qwen 35B completed a bounded transport smoke.
+Isolated exploratory probes then exercised the dark-candidate wiring: bash
+output withholding, semantic-loop enforcement, working-memory upsert/list,
+minimal-surface file mutation, context-epoch discovery, and a single-source
+research-ledger read/note all emitted their expected safe signals. The original
+goal probes failed before inference because Qwen rejected nested goal-schema
+limits at the llama.cpp grammar boundary. A red-green source fix now caps the
+model-visible goal strings at 1,999 while retaining the runtime 2,000-byte
+ledger bound; a source-wired Qwen smoke then exited 0, created/read the ledger,
+and completed a goal. The live mirror still has the old surface, so this is
+mechanism evidence only until an approved rollout. A research-shaped run did
+start a schema-v5 graph but left its branch pending at the 240-second bound.
+These are mechanism observations only, not efficacy or adoption evidence; no
+defaults, mirror, gate rows, or rollout changed. Full classifications and the
+longer-run gates are in
+[`optimizer/docs/DARK_CANDIDATE_DD_MINI_SCREEN_2026-09-02.md`](optimizer/docs/DARK_CANDIDATE_DD_MINI_SCREEN_2026-09-02.md).
+
+The source fix is recorded in the worktree at source hash
+`03ed0ab76427cc3aa9c1cb160b2641b574362b5d268030bfd29716966448af1d`; it has
+not been committed, pushed, mirrored, or loaded by the live Pi. The targeted
+schema test is red before the fix and green after it, and the full offline
+verification is green (663/663 tests; all six `npm run verify` stages). Do not
+pool the source-wired smoke with live or gate evidence.
+
 ## 2026-09-02 dark-candidate DD mini-screen
 
 The DD endpoint was unavailable, so no model run was attempted. Candidate

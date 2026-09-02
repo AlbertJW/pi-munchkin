@@ -2,23 +2,19 @@
 
 ## Status
 
-This is an offline qualification note, not an efficacy result. The daily-driver
+This is a mechanism-screen note, not an efficacy result. The daily-driver
 (DD) endpoint for `local-llamacpp/qwen36-35b-iq3s` was probed at
-`127.0.0.1:8080/health` and refused the connection. No model, calibration, A/B
-round, mirror, or rollout was started. The current source tree therefore has
-no new DD observations to pool.
+`127.0.0.1:8080/health` and returned `OK`; the model was listed as loaded. A
+bounded transport smoke then completed with `READY`, exit 0, zero stderr, and
+23 safe telemetry rows. The candidate probes below are exploratory wiring
+observations only: they are not gate rows, calibration, A/B evidence, or an
+adoption decision.
 
 The live mirror is also intentionally stale: `npm run mirror:check --
 /Users/Albert.Wessels/.pi/agent` reports exactly **1 of 122** first-party files
 different, `extensions/pi-munchkin/extensions/telemetry-flush.ts`. This is the
 graceful-shutdown implementation boundary and must be resolved by an approved
 mirror before any DD row can be authoritative.
-
-On 2026-09-02 the host-network recheck returned `/health = OK` and listed
-`qwen36-35b-iq3s` as `loaded`. This confirms serving reachability only; it is
-not a model result. The first attempted DD transport smoke was refused by the
-execution gate because this continuation authorized a health check, not an
-inference run.
 
 The cheapest deterministic probe did run: the candidate-specific suites for
 planning, research ledger, working memory, bash-output guarding, semantic-loop
@@ -30,6 +26,38 @@ unavailable only because this managed sandbox denies `sandbox-exec`.
 Passing these tests establishes contracts and safety boundaries. It does not
 show that a model invokes a mechanism, recovers with it, or produces better
 work. The run lengths below are the minimum useful next evidence, not results.
+
+## DD mechanism probes (2026-09-02, exploratory)
+
+All runs used an isolated temporary Pi agent directory and the loaded Qwen
+35B DD endpoint. Summaries contain only exit status, byte counts, event kinds,
+and structural artifact fields; model text, tool arguments, source contents,
+and URLs were not retained in the report.
+
+| Probe | Safe observation | Classification |
+|---|---|---|
+| Goal mode (full and narrowed goal-tool surfaces) | The original full and narrowed probes exited 1 before a model response because Qwen returned `failed to parse grammar`. A red-green compatibility fix then lowered the model-visible nested string limits to 1,999; a fresh source-wired smoke exited 0, created and read a goal ledger, reached `complete`, and emitted the expected lifecycle events with no model/tool stderr. | **Source fix verified; live rollout pending.** This is a protocol/mechanism smoke only. The live mirror is still stale, so no authoritative DD or quality evidence exists yet. |
+| Context discovery / serving epoch | Exit 0; `context-profile`, `context-calibration`, `context-budget`, and `serving-truth` events appeared once each. No threshold-crossing handoff was attempted. | **Wiring exposed.** Requires a multi-turn near-budget run and a cross-epoch switch for safety evidence. |
+| Bash-output guard | Exit 0; a bounded 12,000-character bash result produced one `withheld` event, with no stderr. | **Mechanism fired.** Run noisy and ordinary paired fixtures to estimate false positives and recovery cost. |
+| Enforced semantic loop | Exit 0 after three instructed missing-file attempts; three observations/receipts, a tier observation, two steers, one steer injection, one post-steer progress signal, and two unavailable notices were recorded. | **Mechanism ladder exposed.** Needs the preregistered repeated-failure fixture set; this is not an efficacy score. |
+| Working memory | Exit 0; one `upsert` and one `list` event, with both private working-memory projections present. | **Mechanism fired.** Needs paired multi-turn tasks to measure whether retained notes repay their context cost. |
+| Research ledger (single-source contract) | Exit 0 with exactly one bounded `web_read`, one `research_note`, and a `run-summary`; zero stderr. | **Mechanism fired.** This proves citation-recording wiring only; it is not the post-fix Run 3 comparison. |
+| Minimal tool surface | Exit 0; the disposable file was created and the run emitted a first-useful-mutation signal. | **Happy path works.** Needs representative read/edit/verify tasks and comparison against the base surface. |
+| Research planner / graph | A research-shaped run emitted `research-start` and persisted a schema-v5 graph with one pending branch, but did not settle inside the 240-second bound. | **Activation exposed, execution incomplete.** Needs a shorter fixture-shaped planner run for contract timing, then the six-session comparative screen. |
+
+These probes do not repair the stale mirror, create gate rows, or qualify any
+candidate for adoption. They only identify which mechanisms are reachable on
+the DD and which studies are worth the longer budget.
+
+The goal failure had a specific source-level cause. Goal schemas exposed nested
+`maxLength: 2_000` bounds for objective text, criterion text, delivered value,
+and deferral rationale, while the existing `web_read` schema documents that
+this llama.cpp grammar path fails at nested limits of 2,000 or more. The
+worktree now lowers only those model-visible caps to 1,999 while retaining the
+runtime ledger's independent 2,000-byte validation bound. The targeted schema
+test was red before the change and green after it; the source-wired Qwen smoke
+confirmed grammar initialization and goal completion. This fix is not yet in
+the live mirror and therefore is not an authoritative DD result.
 
 ## Current candidate configuration hashes
 
@@ -48,29 +76,33 @@ older unassigned or stale preregistration values:
 
 | Candidate | Minimal result now | DD evidence currently available | Next useful run | Longer run? |
 |---|---|---|---|---|
-| Hierarchical planner / deep-research graph | Graph, branch, budget, depth, evidence, and settlement contracts pass. Existing screen is still a blocked draft. | None on DD; flags remain off and the current source is not loaded. | After semantic-loop precondition, fixture admission, mirror, and a new loaded hash: six candidate mechanism sessions plus three fact-lookup negative controls, using the existing preregistration. | **Yes.** A later comparative A/B needs multiple complex, contested, and comparative questions; one session cannot expose branch quality or synthesis trade-offs. |
-| Persistent goal mode | Goal migration, authority, blocked state, paging, inactive recovery, tool removal, and lifecycle tests pass. | None on DD for the repaired source; it is pending rollout. | First run a 1–3-session pinned DD lifecycle smoke covering start, pause, resume, block, complete/80-20, and compaction recovery. | **Conditional.** If the smoke is clean, use paired long-horizon goal tasks to measure persistence and steering cost; do not judge benefit from the smoke. |
-| Dynamic context epochs / handoff | 32K↔128K profiles, endpoint/model rearm, shrinkage, one-shot handoff, stale lease, wording, and endpoint redaction tests pass. | No new DD evidence on this source; the loaded receipt is stale. | One no-goal and one active-goal DD session crossing a safe-budget boundary, followed by a model/provider switch when the serving box supports it. | **Yes.** Handoff safety needs multi-turn, near-budget sessions and at least one cross-epoch switch; a short turn only tests wiring. |
-| Working memory | Private ledger, byte/record caps, hostile-note framing, exact restoration, capsule identity, and off-by-default tests pass. | No authoritative DD evidence; the feature is dark. | A small paired smoke with a task that explicitly needs a durable note, checking note use, context cost, and recovery. | **Yes.** Net value is a context trade-off; use several multi-turn tasks with memory on/off and inspect both success and added tokens before considering adoption. |
-| Bash-output guard | Oversize withholding, small-output pass-through, non-bash isolation, path-escape messaging, and integration tests pass. | Prior DD round was neutral (89% vs 89%, n=9/arm) and the guard never fired. | A targeted DD fixture that deliberately requests a bounded but noisy shell listing, with guard exposure as the primary outcome. | **Conditional.** Do not spend a broad A/B until the trigger is observed; if it fires, run several noisy and ordinary tasks to measure false positives and recovery. |
-| Research ledger | Citation containment, unique re-attribution, refusal recovery, private ledger, quarantine, budget, and wrap-up tests pass. | DD Run 2 supplied weak 10-session evidence: 11 notes recorded, 18 refusals, and one empty answer; fixes were applied afterward. | Execute the already specified post-fix Run 3: five preregistered questions × two arms (10 sessions), with deterministic ledger metrics and an independent judge for synthesis. | **Yes.** The mechanism is opt-in and stochastic; a single DD smoke cannot measure refusal storms, zero-note answers, or answer-quality cost. |
-| Enforced semantic-loop recovery | Semantic/session ladders, rejected-plan progress, recovery receipts, shadow isolation, and abort policy tests pass. | No DD efficacy evidence; the enforce screen remains design-only and its current preregistration is for the 4B subject. | Finish or explicitly retire the existing semantic-loop prerequisite, then run its mechanism screen with repeated-failure fixtures before any planner graph screen. | **Yes.** Recovery requires repeated failures across several fixtures and arms; one ordinary coding task is almost guaranteed to miss the mechanism. |
-| Minimal tool surface | Core-profile selection, explicit allowlist preservation, capability activation, and surface-parity tests pass. | No DD efficacy result for `MUNCHKIN_TOOL_SURFACE=minimal`; it remains opt-in. | One happy-path DD coding smoke to catch missing tool dependencies, then a paired base/minimal run on representative read/edit/verify tasks. | **Yes.** Tool removal can trade context savings for recovery failures; use multiple task shapes and report tool errors, turns, context, and correctness together. |
+| Hierarchical planner / deep-research graph | Graph, branch, budget, depth, evidence, and settlement contracts pass; a DD run emitted `research-start` and persisted one pending schema-v5 branch before its 240-second bound. | Mechanism activation observed, but no settled branch or answer-quality evidence; flags remain dark and the mirror is stale. | After semantic-loop precondition, fixture admission, mirror, and a new loaded hash: six candidate mechanism sessions plus three fact-lookup negative controls, using the existing preregistration. | **Yes.** A later comparative A/B needs multiple complex, contested, and comparative questions; one session cannot expose branch quality or synthesis trade-offs. |
+| Persistent goal mode | Goal migration, authority, blocked state, paging, inactive recovery, tool removal, and lifecycle tests pass. The pre-fix DD probes failed before inference with Qwen `failed to parse grammar`; the post-fix source-wired smoke exited 0, created/read the ledger, and settled a goal as `complete`. | **Source-wired mechanism evidence only.** The live mirror remains stale; no gate, behavior, or quality row is valid yet. | After an approved code boundary is mirrored and a new loaded hash is recorded, run the 1–3-session lifecycle smoke covering start, pause, resume, block, complete/80-20, and compaction recovery. | **Conditional.** If the smoke is clean, use paired long-horizon goal tasks to measure persistence and steering cost; do not judge benefit from the smoke. |
+| Dynamic context epochs / handoff | A DD run emitted one each of `context-profile`, `context-calibration`, `context-budget`, and `serving-truth` with exit 0. | Startup/epoch wiring observed; no threshold-crossing handoff or model switch was exercised, and the loaded receipt is stale. | One no-goal and one active-goal DD session crossing a safe-budget boundary, followed by a model/provider switch when the serving box supports it. | **Yes.** Handoff safety needs multi-turn, near-budget sessions and at least one cross-epoch switch; a short turn only tests wiring. |
+| Working memory | Exit 0 with one `upsert` and one `list`; both private projections were present. | Mechanism fired, but no comparative value evidence. | A small paired smoke with a task that explicitly needs a durable note, checking note use, context cost, and recovery. | **Yes.** Net value is a context trade-off; use several multi-turn tasks with memory on/off and inspect both success and added tokens before considering adoption. |
+| Bash-output guard | Exit 0; a bounded 12,000-character bash result produced one `withheld` event. | Trigger mechanism observed; no false-positive or recovery estimate. | A targeted DD fixture that deliberately requests a bounded but noisy shell listing, with guard exposure as the primary outcome. | **Conditional.** Do not spend a broad A/B until the trigger is observed; now that it fired, run several noisy and ordinary tasks to measure false positives and recovery. |
+| Research ledger | Citation containment, unique re-attribution, refusal recovery, private ledger, quarantine, budget, and wrap-up tests pass. A single-source DD contract smoke recorded one read and one note cleanly. | DD Run 2 supplied weak 10-session evidence: 11 notes recorded, 18 refusals, and one empty answer; fixes were applied afterward. The new smoke is wiring evidence only. | Execute the already specified post-fix Run 3: five preregistered questions × two arms (10 sessions), with deterministic ledger metrics and an independent judge for synthesis. | **Yes.** The mechanism is opt-in and stochastic; a single DD smoke cannot measure refusal storms, zero-note answers, or answer-quality cost. |
+| Enforced semantic-loop recovery | Semantic/session ladders, rejected-plan progress, recovery receipts, shadow isolation, and abort policy tests pass. A DD exact-three-failure probe emitted three observations/receipts, tier observation, two steers, one steer injection, post-steer progress, and two unavailable notices. | Mechanism ladder observed; no efficacy evidence. | Finish or explicitly retire the existing semantic-loop prerequisite, then run its mechanism screen with repeated-failure fixtures before any planner graph screen. | **Yes.** Recovery requires repeated failures across several fixtures and arms; one ordinary coding task is almost guaranteed to miss the mechanism. |
+| Minimal tool surface | Exit 0; the disposable file was created and a first-useful-mutation signal appeared. | Happy-path mechanism observed; no comparative efficacy result. | One happy-path DD coding smoke to catch missing tool dependencies, then a paired base/minimal run on representative read/edit/verify tasks. | **Yes.** Tool removal can trade context savings for recovery failures; use multiple task shapes and report tool errors, turns, context, and correctness together. |
 
 ## What can be concluded now
 
-The local contracts are healthy, but the DD instrument is unavailable and the
+The local contracts are healthy and the DD transport is reachable, but the
 source-only repairs cannot be inferred from the stale live mirror. No candidate
-earns adoption or retirement from this note. The only candidate with a useful
-prior DD signal is the bash guard's non-firing neutral round; that result
-supports a trigger-focused follow-up, not a default flip. The research ledger's
-post-fix comparison and the semantic-loop screen both require longer runs by
-design. The planner graph is downstream of the semantic-loop gate and must not
-be used to bypass it.
+earns adoption or retirement from this note. Bash guarding, semantic recovery,
+working memory, minimal tools, and context discovery all exposed their wiring;
+the goal grammar defect is fixed and green in a source-wired smoke, but its
+live rollout is still pending; and the research graph started but did not
+settle within its bound. The research ledger's post-fix comparison, the
+semantic-loop screen, context handoff safety, and the planner graph all require
+longer runs by design. The planner graph remains downstream of the
+semantic-loop gate and must not bypass it.
 
 ## Ordered next actions
 
-1. Human-approve the source boundary, mirror it, and record a new loaded hash.
+1. Complete review of the goal-schema compatibility fix, then obtain human
+   approval to commit/push the source boundary, mirror it, and record a new
+   loaded hash. Do not interpret the pre-fix failures as goal efficacy.
 2. Run the prepared Qwen35B graceful-shutdown settlement smoke in
    `PREREG_QWEN35B_GRACEFUL_SHUTDOWN_2026-09-01.md`.
 3. If lifecycle evidence is authoritative, run the short goal/context smoke;

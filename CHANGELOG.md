@@ -4,6 +4,16 @@ All notable changes to pi-munchkin are documented here. Releases follow semantic
 
 ## Unreleased
 
+### Fixed (2026-09-02 — goal tool schemas remain compatible with llama.cpp)
+
+- **Model-visible goal strings now cap at 1,999.** llama.cpp's JSON-schema to
+  GBNF path rejects nested `maxLength` values at 2,000 or above, so objective,
+  criterion, delivered-value, and deferral-rationale schemas use a shared
+  1,999 cap while runtime goal validation retains its independent 2,000-byte
+  bound. A red-green schema test and a source-wired Qwen 35B smoke confirm
+  grammar initialization and goal completion; the live mirror and defaults
+  remain unchanged pending rollout.
+
 ### Fixed (2026-09-01 — graceful shutdown gives active gate runs a settlement window)
 
 - **Active agents now abort before runtime disposal.** Pi's print-mode `SIGTERM` path emits
