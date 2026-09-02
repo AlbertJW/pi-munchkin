@@ -10,9 +10,9 @@ comparison, or adoption decision.
 ## Frozen identity
 
 - Subject: `local-llamacpp/qwen36-35b-iq3s`
-- Source commit: `8f5d475`
-- Package-source surface SHA-256: `18d9b372b936bd9d00ae1ebcc9fee504ab4771fe110ef6c0e792fa170f769e27`
-- Loaded Pi agent surface SHA-256: `59d7c389326745faa2d11e865c7a09b58ed1e69fd518ef465a1d68a3a47ca82f`
+- Source commit: `715f6d8`
+- Package-source surface SHA-256: `8822a6ffeb61be2ae0ec4f563b71c6787de4ef919a969cd747a3b82cddaa5fb2`
+- Loaded Pi agent surface SHA-256: **TO BE RECORDED AFTER APPROVED MIRROR**
 - Model registry SHA-256: `ac7ba5ebd4b8136d2ae127e77d0dc799e8c805552cb755ed2422693e605a7ccf`
 - Synthetic-input revision: `context-padding-v3-subnative` (first-turn prompt,
   then the first 210,000 bytes of the fixed padding fixture)

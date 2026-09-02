@@ -112,6 +112,17 @@ hash-bound two-turn follow-up screen is prepared in
 it requires a fresh mirror before execution. No handoff-safety, capacity,
 quality, or adoption claim is valid yet.
 
+The v3 two-turn probe then exposed the follow-on edge inside that guard: the
+first successful turn was removed from `completed` during `agent_settled`, so
+the second request was misclassified as another initial prompt. Safe hook
+telemetry confirmed that the second request had 53,716 tokens (87.4%), a
+working `compact()` API, and no active coordinator lease. The targeted test
+was red before the repair and green after commit `715f6d8`; the new source
+surface is `8822a6ffeb61be2ae0ec4f563b71c6787de4ef919a969cd747a3b82cddaa5fb2`.
+The updated v4 preregistration is prepared, but the current mirror still
+contains the earlier `59d7c389…` surface and must be refreshed before another
+model run. No handoff-safety, capacity, quality, or adoption claim is valid.
+
 ## 2026-09-02 pre-fix dark-candidate DD mechanism probes
 
 The router was reachable and Qwen 35B completed a bounded transport smoke.

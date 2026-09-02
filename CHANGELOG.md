@@ -4,6 +4,15 @@ All notable changes to pi-munchkin are documented here. Releases follow semantic
 
 ## Unreleased
 
+### Fixed (2026-09-02 — settled-turn handoff eligibility)
+
+- **A prior provider turn now survives the timing projection reset.** The
+  runtime clears per-turn timing records after `agent_settled`, but that made
+  the next user turn look like an initial prompt and silently skipped the
+  handoff check. A sticky successful-turn marker now remains until session
+  reset. The lifecycle regression is red-green proven; this supplies no
+  capacity, quality, or adoption evidence.
+
 ### Fixed (2026-09-02 — initial context handoff guard)
 
 - **Automatic handoff now skips an oversized initial prompt.** A first request has
