@@ -8,6 +8,12 @@ This is an offline qualification note, not an efficacy result. The daily-driver
 round, mirror, or rollout was started. The current source tree therefore has
 no new DD observations to pool.
 
+The live mirror is also intentionally stale: `npm run mirror:check --
+/Users/Albert.Wessels/.pi/agent` reports exactly **1 of 122** first-party files
+different, `extensions/pi-munchkin/extensions/telemetry-flush.ts`. This is the
+graceful-shutdown implementation boundary and must be resolved by an approved
+mirror before any DD row can be authoritative.
+
 The cheapest deterministic probe did run: the candidate-specific suites for
 planning, research ledger, working memory, bash-output guarding, semantic-loop
 recovery, context epochs, and dynamic tool activation passed **118/118** tests.
