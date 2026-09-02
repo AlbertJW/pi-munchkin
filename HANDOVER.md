@@ -1,5 +1,22 @@
 # Handover — pi_munchkin, 2026-08-24
 
+## 2026-09-02 research-ledger budget wall
+
+Run 3 exposed that the ledger footer was only informational outside a plan
+graph: ledger-enabled sessions reached as high as 28 searches and 17 reads
+despite the documented 3/5 envelope. The policy decision is now explicit:
+`RESEARCH_LEDGER=on` applies a hard session-level wall of three search units and
+five distinct source-read units when no graph allocation exists. Planned child
+and parent-validation budgets remain governed by their existing allocations;
+the ledger-off legacy path is unchanged.
+
+Commit `073eb21` adds the red-green regression and the enforcement. The skill,
+README, and candidate notes now describe exhaustion as an evidence gap rather
+than a retry instruction. This is a model-visible boundary only when the dark
+ledger flag is enabled; no default changed and no live inference ran for this
+repair. Repeat the ledger comparison with a complete baseline and judge only
+after a fresh preregistration bound to the new loaded surface.
+
 ## 2026-09-02 terminal invalid branch-report handling
 
 The fresh zero-budget nested probe did not expose another report-validation

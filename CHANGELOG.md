@@ -4,6 +4,16 @@ All notable changes to pi-munchkin are documented here. Releases follow semantic
 
 ## Unreleased
 
+### Fixed (2026-09-02 — research-ledger budget wall)
+
+- **Ledger-enabled non-graph research now enforces its advertised envelope.**
+  `RESEARCH_LEDGER=on` sessions stop after three search units or five distinct
+  source-read units and return an explicit evidence-gap result. Planned graph
+  branches retain their own allocated remainder and parent validation budget;
+  the ledger-off legacy path is unchanged. The new budget regression was red
+  before the fix and green afterward. Planner and ledger flags remain dark for
+  rollout purposes.
+
 ### Fixed (2026-09-02 — terminal invalid branch reports)
 
 - **A clean depth-one child exit cannot masquerade as a successful planned

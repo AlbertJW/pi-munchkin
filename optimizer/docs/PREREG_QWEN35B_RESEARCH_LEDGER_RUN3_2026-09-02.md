@@ -80,3 +80,14 @@ reads; the note-attempt classes were 22 `ok`, 11 `quote_not_found`, and 13
 `degraded`, with zero `corrected` events. No independent judge endpoint was
 available, so synthesis is **UNAVAILABLE**. The complete sanitized audit is
 in [`QWEN35B_RESEARCH_LEDGER_RUN3_AUDIT_2026-09-02.md`](QWEN35B_RESEARCH_LEDGER_RUN3_AUDIT_2026-09-02.md).
+
+## Follow-up policy boundary (2026-09-02)
+
+The run's observed 28-search/17-read non-graph overrun was resolved as a
+separate instrumentation decision, not retroactively applied to these results.
+Commit `073eb21` adds a red-green regression and makes `RESEARCH_LEDGER=on`
+enforce the 3-search/5-distinct-read skill envelope outside a plan graph;
+planned branch allocations and parent validation reads remain independently
+accounted. Exhaustion returns an explicit evidence-gap result. The ledger flag
+remains dark, and any repeat comparison needs a fresh preregistration and
+current loaded surface hash.
