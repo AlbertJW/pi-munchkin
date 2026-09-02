@@ -223,3 +223,28 @@ After mirroring, rerun the zero-budget nested probe with a child coverage
 receipt. Record whether the validated blocked report reaches the parent merge;
 this remains lifecycle evidence only and must not be pooled across the new
 surface boundary.
+
+## Terminal invalid-report boundary
+
+Source commit `dab25d4` closes the adjacent parent-facing contract hole: a
+depth-one child that exits cleanly without a branch report is no longer returned
+as a retryable-looking success. The wrapper emits the existing blocked
+`plan/branch-result` signal and a bounded stop instruction for both
+`missing_report` and `invalid_report`. The targeted policy test was red before
+the change and green afterward. Source hash:
+`1779a0f63b4b799e07c8a0643babfc61585e366c3038a762f13cc48b570f492b`.
+
+The repair was mirrored at `1e111c416843ba3998092b91a2bd2137c8944c442dceef564487abd8ef3542a`
+with 122/122 files matching and no unmanaged extensions or orphans. A fresh
+Qwen 35B run, using a disposable project, `--thinking minimal`,
+`PI_SUBAGENT_TIMEOUT_MS=30000`, and a 180-second outer bound, asked the child
+to exit without calling `branch_plan`. The child timed out before producing its
+final sentence, but the parent still received the terminal `child_failed`
+classification and stopped; no retry loop or evidence mutation occurred.
+
+The follow-up clean-exit contract is therefore covered by the deterministic
+policy test, while the live run supplies a bounded fail-closed lifecycle
+receipt. The graph contained one blocked depth-one branch with
+`branch:missing_report`, no evidence gaps beyond that classification, and no
+settlement. This remains operability evidence only; planner flags stay dark and
+the result cannot count toward the six-session mechanism gate.

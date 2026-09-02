@@ -13,9 +13,15 @@ The new `isTerminalPlannedFailureResult` policy and wrapper path close that
 hole. Missing or invalid reports now emit the existing blocked branch signal
 and a bounded terminal stop instruction; only ordinary and depth-two failures
 retain retryable error semantics. The targeted policy test was red before the
-change and green afterward. This source boundary is pushed but not yet
-mirrored or measured; keep both planner flags dark and treat future smoke
-results as lifecycle evidence only.
+change and green afterward. Source commit `dab25d4` is mirrored cleanly at
+loaded hash `1e111c416843ba3998092b91a2bd2137c8944c442dceef564487abd8ef3542a`
+(122/122, no unmanaged files).
+
+A fresh disposable Qwen 35B probe asked a depth-one child to exit without a
+branch report. The child hit the bounded 30-second child timeout, and the
+parent stopped on one terminal `child_failed` result; the graph contains one
+blocked branch, no evidence, and no settlement. This is lifecycle evidence
+only, not a planner-quality or adoption result. Keep both planner flags dark.
 
 ## 2026-09-02 terminal-child coverage guidance
 
