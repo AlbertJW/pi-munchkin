@@ -46,6 +46,16 @@ remain quarantined.
 That fresh full screen is now recorded in
 [`optimizer/docs/QWEN35B_GRACEFUL_SHUTDOWN_V2_AUDIT_2026-09-02.md`](optimizer/docs/QWEN35B_GRACEFUL_SHUTDOWN_V2_AUDIT_2026-09-02.md): all three fixture gates passed, but `parens` and `bigdata` were still actively mutating at the 480-second bound and failed infrastructure validity; only `equil` completed with one authoritative settlement. Keep the two voids isolated. This confirms the foreground signal fix is active, while the remaining issue is an unfinished model/tool loop rather than duplicate shutdown signalling.
 
+The current Qwen semantic-loop mechanism screen is also complete and failed
+closed: `sweep-b` settled at 344/480 seconds but had no valid delivered semantic
+intervention, while `sweep-c` and `ling-exact-gate-recovery` remained active at
+the bound and were voided. The preregistration and audit are in
+[`optimizer/docs/PREREG_QWEN35B_SEMANTIC_LOOP_MECHANISM_2026-09-02.md`](optimizer/docs/PREREG_QWEN35B_SEMANTIC_LOOP_MECHANISM_2026-09-02.md)
+and
+[`optimizer/docs/QWEN35B_SEMANTIC_LOOP_MECHANISM_AUDIT_2026-09-02.md`](optimizer/docs/QWEN35B_SEMANTIC_LOOP_MECHANISM_AUDIT_2026-09-02.md).
+Keep `LOOP_EPISODE_MODE=shadow`; the planner graph remains blocked until the
+active-tool tail and semantic-delivery boundary are characterized.
+
 The next independent dark-candidate action is the prepared dynamic-context
 epoch smoke in
 [`optimizer/docs/PREREG_QWEN35B_CONTEXT_EPOCHS_2026-09-02.md`](optimizer/docs/PREREG_QWEN35B_CONTEXT_EPOCHS_2026-09-02.md).

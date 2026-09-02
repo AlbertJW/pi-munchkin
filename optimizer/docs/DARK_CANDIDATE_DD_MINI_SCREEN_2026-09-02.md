@@ -116,7 +116,11 @@ downstream of the semantic-loop gate and must not bypass it.
    flags unchanged. Treat it as reachability evidence only, then prepare a
    separate multi-turn handoff/rearm/model-switch screen.
 4. Reissue the semantic-loop preregistration if its prerequisite is still
-   active, or record its explicit retirement.
+   active, or record its explicit retirement. A current Qwen 35B mechanism
+   screen is now complete but failed closed: only `sweep-b` settled, with no
+   valid delivered semantic intervention; the other two fixtures were voided
+   at the timeout boundary. Do not treat its proposed exposure artifacts as
+   delivery evidence.
 5. Run research-ledger Run 3 and the targeted bash-guard trigger screen as
    separate studies.
 6. Only after those gates, admit fixtures and run the hierarchical planner /
