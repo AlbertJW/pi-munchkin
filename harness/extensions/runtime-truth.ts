@@ -238,6 +238,17 @@ export default function (pi: ExtensionAPI): void {
 		protocolDirty = true;
 		currentModel = ctx?.model as typeof currentModel;
 		observeModel(ctx?.model);
+		// This is the last lifecycle point before Pi hands the assembled payload
+		// to the provider. A large transcript can cross the model-specific safe
+		// budget between turn_end and the next request (for example, after a
+		// queued follow-up or a model-side context expansion). Checking only at
+		// turn_end is too late for that path: the response can be smaller than
+		// the pre-request transcript, leaving the over-budget request unguarded.
+		// `ctx.compact()` aborts the in-flight agent operation before compacting;
+		// its completion callback queues the single follow-up turn. Keep this
+		// check before opening a new timing record so the handoff owns the
+		// boundary and the provider never silently receives the stale payload.
+		if (contextProfile) requestHandoff(ctx, contextProfile.epoch, contextProfile);
 		if (pendingBudgetHandoff) {
 			const pending = pendingBudgetHandoff;
 			pendingBudgetHandoff = null;

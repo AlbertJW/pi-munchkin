@@ -155,6 +155,28 @@ test("runtime model switching creates a new epoch and automatically hands off an
 	}
 });
 
+test("an over-budget pre-request context is handed off before another request starts", async () => {
+	const prior = process.env.CONTEXT_HANDOFF;
+	delete process.env.CONTEXT_HANDOFF;
+	try {
+		const fp = makeFakePi();
+		const mod = await import(`../extensions/runtime-truth.ts?pre-request-handoff=${Date.now()}-${Math.random()}`);
+		mod.default(fp.pi as never);
+		await fire(fp, "session_start", {}, {});
+		const model = { provider: "local", id: "pre-request-large", contextWindow: 32_768 };
+		let compactions = 0;
+		await fire(fp, "before_provider_request", {}, {
+			model,
+			getContextUsage: () => ({ tokens: 30_000, percent: 92 }),
+			compact: (options: { onComplete?: () => void }) => { compactions += 1; options.onComplete?.(); },
+		});
+		assert.equal(compactions, 1, "an over-budget follow-up must compact before it is sent");
+		assert.ok(fp.sent.some((message) => /Model handoff complete/.test(message)));
+	} finally {
+		if (prior === undefined) delete process.env.CONTEXT_HANDOFF; else process.env.CONTEXT_HANDOFF = prior;
+	}
+});
+
 test("automatic handoff is one-shot until the context falls below the rearm threshold", async () => {
 	const prior = process.env.CONTEXT_HANDOFF;
 	delete process.env.CONTEXT_HANDOFF;
