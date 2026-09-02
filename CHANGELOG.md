@@ -4,6 +4,12 @@ All notable changes to pi-munchkin are documented here. Releases follow semantic
 
 ## Unreleased
 
+### Documentation provenance correction (2026-09-02)
+
+- Rebound the current planner and research-ledger preregistrations to branch
+  tip `98df5ed`. The model-visible source hash remains `62b1e565…`; this is a
+  documentation/provenance correction only and does not authorize inference.
+
 ### Added (2026-09-02 — planner research-fixture admission)
 
 - **The dark planner screen now has a structural fixture boundary.** Three
