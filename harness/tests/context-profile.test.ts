@@ -165,11 +165,15 @@ test("an over-budget pre-request context is handed off before another request st
 		await fire(fp, "session_start", {}, {});
 		const model = { provider: "local", id: "pre-request-large", contextWindow: 32_768 };
 		let compactions = 0;
-		await fire(fp, "before_provider_request", {}, {
+		const ctx = {
 			model,
 			getContextUsage: () => ({ tokens: 30_000, percent: 92 }),
 			compact: (options: { onComplete?: () => void }) => { compactions += 1; options.onComplete?.(); },
-		});
+		};
+		await fire(fp, "before_provider_request", {}, ctx);
+		assert.equal(compactions, 0, "an oversized initial prompt has no prior turn to compact");
+		await fire(fp, "before_provider_request", {}, { ...ctx, getContextUsage: () => ({ tokens: 8_000, percent: 25 }) });
+		await fire(fp, "before_provider_request", {}, ctx);
 		assert.equal(compactions, 1, "an over-budget follow-up must compact before it is sent");
 		assert.ok(fp.sent.some((message) => /Model handoff complete/.test(message)));
 	} finally {

@@ -163,6 +163,16 @@ export default function (pi: ExtensionAPI): void {
 		return typeof usage.percent === "number" && usage.percent < 70;
 	}
 
+	// A first provider request may itself contain a large user payload, but there
+	// is no prior assistant turn for Pi's compactor to summarize. Calling
+	// ctx.compact() in that state aborts the only request and normally fails with
+	// "Nothing to compact". Pre-request handoff is therefore meaningful only once
+	// a provider turn exists (current or completed); the built-in overflow path
+	// remains responsible for an oversized initial prompt.
+	function hasPriorProviderTurn(): boolean {
+		return current !== null || completed.length > 0;
+	}
+
 	function requestHandoff(ctx: { getContextUsage?: () => { tokens: number | null; percent: number | null } | undefined; compact?: (options?: { customInstructions?: string; onComplete?: () => void; onError?: (error: Error) => void }) => void } | undefined, fromEpoch: number, profile: ContextProfile): void {
 		if (!ctx) return;
 		if (process.env.CONTEXT_HANDOFF === "off" || handoffInFlight || typeof ctx.compact !== "function") return;
@@ -238,6 +248,7 @@ export default function (pi: ExtensionAPI): void {
 		protocolDirty = true;
 		currentModel = ctx?.model as typeof currentModel;
 		observeModel(ctx?.model);
+		closeCurrent();
 		// This is the last lifecycle point before Pi hands the assembled payload
 		// to the provider. A large transcript can cross the model-specific safe
 		// budget between turn_end and the next request (for example, after a
@@ -248,13 +259,12 @@ export default function (pi: ExtensionAPI): void {
 		// its completion callback queues the single follow-up turn. Keep this
 		// check before opening a new timing record so the handoff owns the
 		// boundary and the provider never silently receives the stale payload.
-		if (contextProfile) requestHandoff(ctx, contextProfile.epoch, contextProfile);
+		if (contextProfile && hasPriorProviderTurn()) requestHandoff(ctx, contextProfile.epoch, contextProfile);
 		if (pendingBudgetHandoff) {
 			const pending = pendingBudgetHandoff;
 			pendingBudgetHandoff = null;
 			requestHandoff(ctx, pending.fromEpoch, pending.profile);
 		}
-		closeCurrent();
 		current = {
 			seq: ++nextSeq, started: performance.now(), headersAt: null,
 			firstTokenAt: null, streamAt: null, status: null,
@@ -265,7 +275,7 @@ export default function (pi: ExtensionAPI): void {
 		const previous = contextProfile;
 		observeModel(event.model);
 		if (!previous || !contextProfile || previous.fingerprint === contextProfile.fingerprint || process.env.CONTEXT_HANDOFF === "off") return;
-		requestHandoff(ctx, previous.epoch, contextProfile);
+		if (hasPriorProviderTurn()) requestHandoff(ctx, previous.epoch, contextProfile);
 	});
 
 	// Dynamic, model-aware compaction also applies without a model switch. A
