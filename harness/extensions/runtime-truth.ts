@@ -10,7 +10,7 @@ import {
 } from "../lib/protocol-parity.ts";
 import { record } from "../lib/telemetry.ts";
 import { calibrateContext, contextNeedsHandoff, contextProfileFor, handoffReason, modelFingerprint, withServingWindow, type ContextProfile } from "../lib/context-profile.ts";
-import { beginCompaction, finishCompaction } from "../lib/compaction-coordinator.ts";
+import { beginCompaction, currentCompactionOwner, finishCompaction } from "../lib/compaction-coordinator.ts";
 
 type ProviderTiming = {
 	seq: number;
@@ -126,6 +126,8 @@ export default function (pi: ExtensionAPI): void {
 	let calibrationPending: { model: { provider?: unknown; id?: unknown; baseUrl?: unknown; contextWindow?: unknown }; profile: ContextProfile } | null = null;
 	let handoffInFlight = false;
 	let handoffDisarmedKey: string | null = null;
+	let handoffActiveKey: string | null = null;
+	let handoffCompactedEpoch: number | null = null;
 	let pendingBudgetHandoff: { profile: ContextProfile; fromEpoch: number } | null = null;
 	// `completed` is cleared after each settled lifecycle for the provider
 	// timing projection. Keep this independent sticky bit so a later user turn
@@ -139,6 +141,16 @@ export default function (pi: ExtensionAPI): void {
 		else delete shared.__pi_context_profile;
 	}
 
+	// Pi emits `session_compact` after the compaction entry has been committed,
+	// but a later observer hook can still make the public compact() promise
+	// reject. Remember the durable event while our lease is active so that a
+	// callback error cannot downgrade a committed handoff or start a duplicate.
+	pi.on("session_compact", async (event) => {
+		if (event.reason === "manual" && currentCompactionOwner() === "model-handoff" && handoffActiveKey && contextProfile) {
+			handoffCompactedEpoch = contextProfile.epoch;
+		}
+	});
+
 	function observeModel(model: unknown): void {
 		const metadata = (model ?? {}) as { provider?: unknown; id?: unknown; baseUrl?: unknown; contextWindow?: unknown };
 		if (metadata.provider == null && metadata.id == null && metadata.contextWindow == null) return;
@@ -147,6 +159,7 @@ export default function (pi: ExtensionAPI): void {
 			if (contextProfile) contextEpoch += 1;
 			publishContextProfile(contextProfileFor(metadata, contextEpoch));
 			handoffDisarmedKey = null;
+			handoffCompactedEpoch = null;
 			calibrationPending = { model: metadata, profile: contextProfile! };
 			record("runtime", "context-profile", {
 				epoch: contextProfile!.epoch, provider: contextProfile!.provider, model: contextProfile!.model,
@@ -185,11 +198,16 @@ export default function (pi: ExtensionAPI): void {
 		if (handoffDisarmedKey === key) {
 			if (belowHandoffRearmThreshold(profile, usage)) handoffDisarmedKey = null;
 		}
+		if (handoffCompactedEpoch === profile.epoch) {
+			if (belowHandoffRearmThreshold(profile, usage)) handoffCompactedEpoch = null;
+			else return;
+		}
 		if (!contextNeedsHandoff(profile, usage)) return;
 		if (handoffDisarmedKey === key) return;
 		const lease = beginCompaction("model-handoff");
 		if (!lease) return;
 		handoffInFlight = true;
+		handoffActiveKey = key;
 		const reason = handoffReason(profile, usage);
 		const finish = (resume: boolean) => {
 			// Clear the in-flight latch BEFORE the lease check: a stale lease
@@ -197,10 +215,13 @@ export default function (pi: ExtensionAPI): void {
 			// rest of the session. The outcome row is recorded here, once the
 			// result is known — a failed handoff must not look like a success.
 			handoffInFlight = false;
+			handoffActiveKey = null;
 			if (!finishCompaction(lease)) return;
 			handoffDisarmedKey = key;
-			record("runtime", "context-handoff", { from_epoch: fromEpoch, to_epoch: profile.epoch, reason_class: fromEpoch === profile.epoch ? "budget_threshold" : "smaller_target_window", ok: resume });
-			if (!resume) return;
+			const committed = handoffCompactedEpoch === profile.epoch;
+			const outcome = resume || committed;
+			record("runtime", "context-handoff", { from_epoch: fromEpoch, to_epoch: profile.epoch, reason_class: fromEpoch === profile.epoch ? "budget_threshold" : "smaller_target_window", ok: outcome });
+			if (!outcome) return;
 			const activeGoal = (globalThis as Record<string, unknown>).__pi_active_goal_context as { status?: unknown } | undefined;
 			const continuation = activeGoal?.status === "active"
 				? "Model handoff complete. Continue from the preserved active goal, plan item IDs, and current filesystem evidence."
@@ -245,6 +266,8 @@ export default function (pi: ExtensionAPI): void {
 		calibrationPending = null;
 		handoffInFlight = false;
 		handoffDisarmedKey = null;
+		handoffActiveKey = null;
+		handoffCompactedEpoch = null;
 		pendingBudgetHandoff = null;
 		providerTurnObserved = false;
 		delete (globalThis as Record<string, unknown>).__pi_context_profile;

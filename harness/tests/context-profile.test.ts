@@ -302,3 +302,35 @@ test("context-handoff telemetry reports the outcome, not the attempt", async () 
 		}
 	}
 });
+
+test("a committed handoff compaction stays successful if a later callback reports an error", async () => {
+	const prior = process.env.CONTEXT_HANDOFF;
+	delete process.env.CONTEXT_HANDOFF;
+	try {
+		resetCompactionCoordinator();
+		const fp = makeFakePi();
+		const mod = await import(`../extensions/runtime-truth.ts?handoff-committed=${Date.now()}-${Math.random()}`);
+		mod.default(fp.pi as never);
+		await fire(fp, "session_start", {}, {});
+		const model = { provider: "local", id: "committed-handoff", contextWindow: 32_768 };
+		await fire(fp, "before_provider_request", {}, { model, getContextUsage: () => ({ tokens: 100, percent: 1 }) });
+		let compactions = 0;
+		let fail: (() => void) | undefined;
+		const ctx = {
+			model,
+			getContextUsage: () => ({ tokens: 30_000, percent: 92 }),
+			compact: (options: { onError?: (error: Error) => void }) => {
+				compactions += 1;
+				fail = () => options.onError?.(new Error("Nothing to compact (session too small)"));
+			},
+		};
+		await fire(fp, "before_provider_request", {}, ctx);
+		await fire(fp, "session_compact", { reason: "manual" }, ctx);
+		fail?.();
+		await fire(fp, "turn_end", {}, ctx);
+		assert.equal(compactions, 1, "a committed handoff must not be retried");
+		assert.ok(fp.sent.some((message) => /Model handoff complete/.test(message)), "the committed compaction still resumes the task");
+	} finally {
+		if (prior === undefined) delete process.env.CONTEXT_HANDOFF; else process.env.CONTEXT_HANDOFF = prior;
+	}
+});
