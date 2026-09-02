@@ -10,12 +10,10 @@ bounded transport smoke then completed with `READY`, exit 0, zero stderr, and
 observations only: they are not gate rows, calibration, A/B evidence, or an
 adoption decision.
 
-The live mirror is also intentionally stale: `npm run mirror:check --
-/Users/Albert.Wessels/.pi/agent` reports **3 of 122** first-party files
-different: `extensions/pi-munchkin/extensions/plan-runner.ts`,
-`extensions/pi-munchkin/lib/goal-state.ts`, and the earlier
-`extensions/pi-munchkin/extensions/telemetry-flush.ts` boundary. These changes
-must be resolved by an approved mirror before any DD row can be authoritative.
+The live mirror is now current: `npm run mirror:check --
+/Users/Albert.Wessels/.pi/agent` reports **122 of 122** first-party files match,
+with no unmanaged extensions or orphans. The loaded surface SHA-256 is
+`7624ee447fb6a9a77f96e4abf5ee9b01580ddd478f3ae67b329f858761e07ca7`.
 
 The cheapest deterministic probe did run: the candidate-specific suites for
 planning, research ledger, working memory, bash-output guarding, semantic-loop
@@ -37,7 +35,7 @@ and URLs were not retained in the report.
 
 | Probe | Safe observation | Classification |
 |---|---|---|
-| Goal mode (full and narrowed goal-tool surfaces) | The original full and narrowed probes exited 1 before a model response because Qwen returned `failed to parse grammar`. A red-green compatibility fix then lowered the model-visible nested string limits to 1,999; a fresh source-wired smoke exited 0, created and read a goal ledger, reached `complete`, and emitted the expected lifecycle events with no model/tool stderr. | **Source fix verified; live rollout pending.** This is a protocol/mechanism smoke only. The live mirror is still stale, so no authoritative DD or quality evidence exists yet. |
+| Goal mode (full and narrowed goal-tool surfaces) | The original full and narrowed probes exited 1 before a model response because Qwen returned `failed to parse grammar`. A red-green compatibility fix then lowered the model-visible nested string limits to 1,999. After mirroring, the authoritative live-surface smoke exited 0 with zero stderr, created/read a goal ledger, reached `complete`, and emitted the expected lifecycle events. | **Live mechanism smoke passed.** The receipt is bound to the loaded hash above, but it is still one happy-path lifecycle, not a gate row or quality result. |
 | Context discovery / serving epoch | Exit 0; `context-profile`, `context-calibration`, `context-budget`, and `serving-truth` events appeared once each. No threshold-crossing handoff was attempted. | **Wiring exposed.** Requires a multi-turn near-budget run and a cross-epoch switch for safety evidence. |
 | Bash-output guard | Exit 0; a bounded 12,000-character bash result produced one `withheld` event, with no stderr. | **Mechanism fired.** Run noisy and ordinary paired fixtures to estimate false positives and recovery cost. |
 | Enforced semantic loop | Exit 0 after three instructed missing-file attempts; three observations/receipts, a tier observation, two steers, one steer injection, one post-steer progress signal, and two unavailable notices were recorded. | **Mechanism ladder exposed.** Needs the preregistered repeated-failure fixture set; this is not an efficacy score. |
@@ -56,9 +54,10 @@ and deferral rationale, while the existing `web_read` schema documents that
 this llama.cpp grammar path fails at nested limits of 2,000 or more. The
 worktree now lowers only those model-visible caps to 1,999 while retaining the
 runtime ledger's independent 2,000-byte validation bound. The targeted schema
-test was red before the change and green after it; the source-wired Qwen smoke
-confirmed grammar initialization and goal completion. This fix is not yet in
-the live mirror and therefore is not an authoritative DD result.
+test was red before the change and green after it; the live-surface Qwen smoke
+confirmed grammar initialization and goal completion. The receipt is recorded
+in `PREREG_QWEN35B_GOAL_GRAMMAR_2026-09-02.md` and is authoritative only for
+protocol reachability on this loaded surface, not for efficacy.
 
 ## Current candidate configuration hashes
 
@@ -78,7 +77,7 @@ older unassigned or stale preregistration values:
 | Candidate | Minimal result now | DD evidence currently available | Next useful run | Longer run? |
 |---|---|---|---|---|
 | Hierarchical planner / deep-research graph | Graph, branch, budget, depth, evidence, and settlement contracts pass; a DD run emitted `research-start` and persisted one pending schema-v5 branch before its 240-second bound. | Mechanism activation observed, but no settled branch or answer-quality evidence; flags remain dark and the mirror is stale. | After semantic-loop precondition, fixture admission, mirror, and a new loaded hash: six candidate mechanism sessions plus three fact-lookup negative controls, using the existing preregistration. | **Yes.** A later comparative A/B needs multiple complex, contested, and comparative questions; one session cannot expose branch quality or synthesis trade-offs. |
-| Persistent goal mode | Goal migration, authority, blocked state, paging, inactive recovery, tool removal, and lifecycle tests pass. The pre-fix DD probes failed before inference with Qwen `failed to parse grammar`; the post-fix source-wired smoke exited 0, created/read the ledger, and settled a goal as `complete`. | **Source-wired mechanism evidence only.** The live mirror remains stale; no gate, behavior, or quality row is valid yet. | After an approved code boundary is mirrored and a new loaded hash is recorded, run the 1–3-session lifecycle smoke covering start, pause, resume, block, complete/80-20, and compaction recovery. | **Conditional.** If the smoke is clean, use paired long-horizon goal tasks to measure persistence and steering cost; do not judge benefit from the smoke. |
+| Persistent goal mode | Goal migration, authority, blocked state, paging, inactive recovery, tool removal, and lifecycle tests pass. The pre-fix DD probes failed before inference with Qwen `failed to parse grammar`; the post-fix live-surface smoke exited 0, created/read the ledger, and settled a goal as `complete`. | **Live mechanism receipt recorded.** The loaded hash is bound and the mirror is clean; no gate, behavior, or quality row is valid yet. | Reissue a current-hash 1–3-session lifecycle screen covering start, pause, resume, block, complete/80-20, and compaction recovery. | **Conditional.** If the lifecycle screen is clean, use paired long-horizon goal tasks to measure persistence and steering cost; do not judge benefit from the smoke. |
 | Dynamic context epochs / handoff | A DD run emitted one each of `context-profile`, `context-calibration`, `context-budget`, and `serving-truth` with exit 0. | Startup/epoch wiring observed; no threshold-crossing handoff or model switch was exercised, and the loaded receipt is stale. | One no-goal and one active-goal DD session crossing a safe-budget boundary, followed by a model/provider switch when the serving box supports it. | **Yes.** Handoff safety needs multi-turn, near-budget sessions and at least one cross-epoch switch; a short turn only tests wiring. |
 | Working memory | Exit 0 with one `upsert` and one `list`; both private projections were present. | Mechanism fired, but no comparative value evidence. | A small paired smoke with a task that explicitly needs a durable note, checking note use, context cost, and recovery. | **Yes.** Net value is a context trade-off; use several multi-turn tasks with memory on/off and inspect both success and added tokens before considering adoption. |
 | Bash-output guard | Exit 0; a bounded 12,000-character bash result produced one `withheld` event. | Trigger mechanism observed; no false-positive or recovery estimate. | A targeted DD fixture that deliberately requests a bounded but noisy shell listing, with guard exposure as the primary outcome. | **Conditional.** Do not spend a broad A/B until the trigger is observed; now that it fired, run several noisy and ordinary tasks to measure false positives and recovery. |
@@ -88,25 +87,23 @@ older unassigned or stale preregistration values:
 
 ## What can be concluded now
 
-The local contracts are healthy and the DD transport is reachable, but the
-source-only repairs cannot be inferred from the stale live mirror. No candidate
-earns adoption or retirement from this note. Bash guarding, semantic recovery,
-working memory, minimal tools, and context discovery all exposed their wiring;
-the goal grammar defect is fixed and green in a source-wired smoke, but its
-live rollout is still pending; and the research graph started but did not
-settle within its bound. The research ledger's post-fix comparison, the
-semantic-loop screen, context handoff safety, and the planner graph all require
-longer runs by design. The planner graph remains downstream of the
-semantic-loop gate and must not bypass it.
+The local contracts are healthy and the DD transport is reachable. The goal
+grammar defect is fixed, mirrored, and green in a hash-bound live mechanism
+smoke, but that receipt is not a quality result. No candidate earns adoption or
+retirement from this note. Bash guarding, semantic recovery, working memory,
+minimal tools, context discovery, and goal execution have exposed their wiring;
+the research graph started but did not settle within its bound. The research
+ledger's post-fix comparison, semantic-loop screen, context handoff safety, and
+planner graph all require longer runs by design. The planner graph remains
+downstream of the semantic-loop gate and must not bypass it.
 
 ## Ordered next actions
 
-1. Complete review of the goal-schema compatibility fix, then obtain human
-   approval to commit/push the source boundary, mirror it, and record a new
-   loaded hash. Do not interpret the pre-fix failures as goal efficacy.
-2. Run the prepared Qwen35B graceful-shutdown settlement smoke in
-   `PREREG_QWEN35B_GRACEFUL_SHUTDOWN_2026-09-01.md`.
-3. If lifecycle evidence is authoritative, run the short goal/context smoke;
+1. Preserve the goal receipt in `PREREG_QWEN35B_GOAL_GRAMMAR_2026-09-02.md`;
+   do not interpret the pre-fix failures or this happy path as goal efficacy.
+2. Reissue the Qwen35B graceful-shutdown preregistration against the current
+   source and loaded hashes before running that settlement smoke.
+3. After an authoritative lifecycle result, run the short goal/context smoke;
    keep both defaults and dark flags unchanged.
 4. Reissue the semantic-loop preregistration if its prerequisite is still
    active, or record its explicit retirement.

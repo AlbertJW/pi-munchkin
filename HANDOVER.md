@@ -1,6 +1,27 @@
 # Handover — pi_munchkin, 2026-08-24
 
-## 2026-09-02 dark-candidate DD mechanism probes
+## 2026-09-02 goal grammar boundary — mirrored and smoked
+
+The goal-schema compatibility fix is now pushed (`b225d20`, with boundary
+documentation `daaab6f`/`342451e`), mirrored into `/Users/Albert.Wessels/.pi/agent`,
+and verified at 122/122 with no unmanaged extensions or orphans. The loaded
+surface hash is `7624ee447fb6a9a77f96e4abf5ee9b01580ddd478f3ae67b329f858761e07ca7`.
+
+The pinned Qwen 35B live mechanism smoke exited 0 with zero stderr. Its private
+`pi.goal-ledger/v2` record has one goal at `complete`, one met criterion, and
+`current_goal_id: null`; 128 safe telemetry rows include one each of
+`goal-runner/started`, `goal-runner/updated`, and `goal-runner/settled`, with
+five goal-surface activations and four deactivations. Every summarized row
+carries the loaded hash and no sensitive payload key appears. This is a
+protocol/lifecycle receipt only, not gate, quality, or adoption evidence.
+
+The preregistration and receipt are in
+[`optimizer/docs/PREREG_QWEN35B_GOAL_GRAMMAR_2026-09-02.md`](optimizer/docs/PREREG_QWEN35B_GOAL_GRAMMAR_2026-09-02.md).
+The next model work requires a fresh hash-bound lifecycle preregistration; the
+older graceful-shutdown preregistration is stale against this source and must
+not be reused.
+
+## 2026-09-02 pre-fix dark-candidate DD mechanism probes
 
 The router was reachable and Qwen 35B completed a bounded transport smoke.
 Isolated exploratory probes then exercised the dark-candidate wiring: bash
@@ -14,9 +35,10 @@ ledger bound; a source-wired Qwen smoke then exited 0, created/read the ledger,
 and completed a goal. The live mirror still has the old surface, so this is
 mechanism evidence only until an approved rollout. A research-shaped run did
 start a schema-v5 graph but left its branch pending at the 240-second bound.
-These are mechanism observations only, not efficacy or adoption evidence; no
-defaults, mirror, gate rows, or rollout changed. Full classifications and the
-longer-run gates are in
+These remain pre-fix mechanism observations only, not efficacy or adoption
+evidence. The later goal fix and rollout are recorded above; no dark defaults,
+gate rows, or candidate adoption changed. Full classifications and the longer-
+run gates are in
 [`optimizer/docs/DARK_CANDIDATE_DD_MINI_SCREEN_2026-09-02.md`](optimizer/docs/DARK_CANDIDATE_DD_MINI_SCREEN_2026-09-02.md).
 
 The source fix is recorded in the worktree at source hash

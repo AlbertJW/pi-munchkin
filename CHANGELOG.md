@@ -11,8 +11,9 @@ All notable changes to pi-munchkin are documented here. Releases follow semantic
   criterion, delivered-value, and deferral-rationale schemas use a shared
   1,999 cap while runtime goal validation retains its independent 2,000-byte
   bound. A red-green schema test and a source-wired Qwen 35B smoke confirm
-  grammar initialization and goal completion; the live mirror and defaults
-  remain unchanged pending rollout.
+  grammar initialization and goal completion. The source was subsequently
+  mirrored at loaded hash `7624ee44…` and passed one live mechanism smoke;
+  defaults remain unchanged and no quality or adoption claim is made.
 
 ### Fixed (2026-09-01 — graceful shutdown gives active gate runs a settlement window)
 
