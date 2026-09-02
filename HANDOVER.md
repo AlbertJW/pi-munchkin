@@ -57,6 +57,12 @@ wall and adds the verified-citation surface. The current source tip is
 Run 4 is still repository-only and requires a fresh human preflight after any
 approved mirror.
 
+The optimizer config schema now also accepts `RESEARCH_BUDGET` and the config
+selftest exercises `config_env({thresholds: {RESEARCH_BUDGET: "on"}})`.
+Before this fix the runtime flag existed but a real-gate config rejected it as
+unknown; commit `e5e2461` closes that pre-launch contract gap. No model-visible
+surface or default changed.
+
 ## 2026-09-02 research-ledger budget wall
 
 Run 3 exposed that the ledger footer was only informational outside a plan

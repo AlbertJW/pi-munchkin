@@ -35,6 +35,12 @@ All notable changes to pi-munchkin are documented here. Releases follow semantic
 
 ### Fixed (2026-09-02 — research-ledger budget wall)
 
+- **The budget-only control is now expressible through optimizer configs.**
+  `RESEARCH_BUDGET` is registered in `optimizer/prompt-lab/configs/schema.json`
+  and pinned by the config selftest, so a real-gate configuration cannot reject
+  the preregistered control before it starts. This is optimizer plumbing only;
+  defaults and the live mirror are unchanged.
+
 - **Ledger-enabled non-graph research now enforces its advertised envelope.**
   `RESEARCH_LEDGER=on` sessions stop after three search units or five distinct
   source-read units and return an explicit evidence-gap result. Planned graph
