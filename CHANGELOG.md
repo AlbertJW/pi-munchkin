@@ -13,8 +13,10 @@ All notable changes to pi-munchkin are documented here. Releases follow semantic
   could not dispatch a valid scout and the branch was rejected as
   `child_failed`. The returned contexts are now included in bounded,
   model-visible result text and covered by a red-green integration test. This
-  source-only repair creates a new planner surface boundary; no planner
-  quality, adoption, or efficacy evidence is implied.
+  repair creates a new planner surface boundary. It is now mirrored, but the
+  first exact-hash Qwen smoke still hit its bounded wall before a branch report
+  and remains incomplete; no planner quality, adoption, or efficacy evidence is
+  implied.
 
 ### Fixed (2026-09-02 — committed handoff outcome survives callback races)
 

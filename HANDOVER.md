@@ -13,10 +13,17 @@ integration test. The new source surface hash is
 `043f35a8f6358616a9cd9eec65fafbc734b127b2f410a9034435b366ad950dfd`.
 
 This is a transport/lifecycle repair, not planner quality evidence. The live
-mirror remains on the prior loaded hash, and the earlier bounded runs remain
-quarantined. The next action is a normal human-approved mirror checkpoint,
-followed by a fresh preregistration and exact-hash planner mechanism screen;
-keep `PLAN_GRAPH` and `DEEP_RESEARCH_PLANNING` dark until that screen completes.
+mirror is now clean at 122/122 with loaded hash
+`dc692af100770c84f50959c3c261c76eace603637da1d1b52de136d0560bad2a`.
+
+The first exact-hash rerun then hit the launcher’s 180-second wall with zero
+stderr, one `research-start`, one `child_failed`, three `ended-open` notices,
+and no branch report, merge, or parent settlement. The graph remained open
+(`pending`/`blocked`), so this is an incomplete operability receipt rather than
+planner evidence; raw output and telemetry remain private. The previous runs
+and this rerun cannot be pooled into a quality decision. Keep
+`PLAN_GRAPH` and `DEEP_RESEARCH_PLANNING` dark, and prepare a fresh bounded
+screen against this loaded hash before attempting any longer evaluation.
 
 ## 2026-09-02 semantic-loop shutdown retest — lifecycle blocker retired
 

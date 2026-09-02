@@ -130,3 +130,22 @@ mirror and the frozen preregistration above still identify the prior loaded hash
 bounded run may be pooled with a rerun after rollout. Re-prepare this smoke
 against the new loaded hash before collecting any planner mechanism or quality
 evidence. The planner flags remain dark.
+
+## Exact-hash post-repair smoke receipt
+
+After the source repair was pushed and mirrored, `mirror:check` reported 122/122
+files and the loaded surface resolved to
+`dc692af100770c84f50959c3c261c76eace603637da1d1b52de136d0560bad2a`. A fresh
+launcher run used that exact hash, the pinned Qwen 35B subject, the existing
+private prompt, and the same 350,000-byte cap. It stopped at the 180-second wall
+with exit code 143, 289,506 stdout bytes, zero stderr bytes, one
+`research-start`, one `child_failed` (`failure_class=child_failed`), three
+`ended-open` notices, and no branch report, merge, or parent settlement. The
+project graph remained open with one `pending` and one `blocked` branch.
+
+This is an incomplete operability receipt. It does not establish whether the
+repaired model-visible scout-context transport survives a completed child
+planner, and it cannot count toward mechanism or quality evidence. The raw
+transcript and telemetry remain outside Git; all previous runs stay quarantined
+across the new loaded-surface boundary. Keep both planner flags dark and issue a
+new preregistration before any rerun.
