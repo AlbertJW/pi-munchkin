@@ -12,7 +12,7 @@ comparison, or adoption decision.
 - Subject: `local-llamacpp/qwen36-35b-iq3s`
 - Source commit: `accdf89`
 - Package-source surface SHA-256: `b929b6b2239f364be90a9bb012881d291260caf11bb38b10c2c22afc79a07917`
-- Loaded Pi agent surface SHA-256: **PENDING APPROVED MIRROR** (do not execute until this field is replaced by the post-mirror hash)
+- Loaded Pi agent surface SHA-256: `251708fed05114ef0cb1617812d8662a96c39efeeb587ab829748ab5688f2b89`
 - Model registry SHA-256: `ac7ba5ebd4b8136d2ae127e77d0dc799e8c805552cb755ed2422693e605a7ccf`
 - Synthetic-input revision: `context-padding-v3-subnative` (first-turn prompt,
   then the first 210,000 bytes of the fixed padding fixture)

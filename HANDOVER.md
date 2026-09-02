@@ -1,6 +1,6 @@
 # Handover — pi_munchkin, 2026-08-24
 
-## 2026-09-02 committed handoff outcome — source repaired, mirror pending
+## 2026-09-02 committed handoff outcome — mirrored, fresh Qwen smoke pending
 
 The first mirrored smoke showed that Pi can commit the handoff compaction and
 then report `Nothing to compact` from a later callback/racing lifecycle path.
@@ -12,10 +12,14 @@ handoff in the same epoch. The new regression was red before the repair and
 the 14-test context suite plus typecheck are green afterward; the source
 surface is `b929b6b2239f364be90a9bb012881d291260caf11bb38b10c2c22afc79a07917`.
 
-The mirror must be refreshed through the normal approved ceremony. The v4
-preregistration is rebound to this source with no executable loaded hash until
-that mirror is checked. The prior v5/v6/v7 diagnostic sessions remain
-quarantined; none supplies capacity, quality, or adoption evidence.
+The approved mirror refresh is complete: `mirror:apply` wrote 122 first-party
+artifacts and `mirror:check` reports 122/122 with no unmanaged extensions or
+orphans. The loaded surface hash is
+`251708fed05114ef0cb1617812d8662a96c39efeeb587ab829748ab5688f2b89`, and the
+v4 preregistration is bound to it. The prior v5/v6/v7 diagnostic sessions
+remain quarantined; the next model action is one fresh two-turn smoke with a
+new telemetry path. None of those prior sessions supplies capacity, quality,
+or adoption evidence.
 
 ## 2026-09-02 pre-request handoff abort ordering — mirrored, Qwen smoke pending
 

@@ -14,7 +14,7 @@ The live mirror was current for the earlier goal smoke, and has now been
 refreshed after the context handoff repair: `npm run mirror:check --
 /Users/Albert.Wessels/.pi/agent` reports **122 of 122** first-party files match,
 with no unmanaged extensions or orphans. The current loaded surface SHA-256 is
-`f5cdd5b6cf94e7d5687ff2cda1d1e87af6c535b96ed9456481b194af2c55dddb`.
+`251708fed05114ef0cb1617812d8662a96c39efeeb587ab829748ab5688f2b89`.
 
 The cheapest deterministic probe did run: the candidate-specific suites for
 planning, research ledger, working memory, bash-output guarding, semantic-loop
