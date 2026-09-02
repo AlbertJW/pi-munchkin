@@ -1,5 +1,23 @@
 # Handover — pi_munchkin, 2026-08-24
 
+## 2026-09-02 pre-request handoff abort ordering — source repaired, mirror pending
+
+The settled-turn repair exposed one final race in the real Pi lifecycle:
+`ctx.compact()` is fire-and-forget and Pi's session compactor waits for an
+abort internally. At the final `before_provider_request` boundary, that could
+leave the active oversized request alive while compaction started, so the
+stale payload could still reach the provider. Commit `392fcdc` now invokes
+the synchronous abort hook before launching the compactor. The new assertion
+was red before the change and the complete 13-test context suite plus
+typecheck are green afterward; the source surface is
+`c73d86a5c704253293d7458823e591e4e30424ce626a95bb91e397c3d0cf37c0`.
+
+The current mirror differs in this one first-party file and must be refreshed
+through the normal approved ceremony. The v4 preregistration has been
+rebound to this source and deliberately has no executable loaded hash until
+that mirror is checked. No Qwen inference, capacity, quality, or adoption
+claim is attached to this repair.
+
 ## 2026-09-02 goal grammar boundary — mirrored and smoked
 
 The goal-schema compatibility fix is now pushed (`b225d20`, with boundary

@@ -4,6 +4,16 @@ All notable changes to pi-munchkin are documented here. Releases follow semantic
 
 ## Unreleased
 
+### Fixed (2026-09-02 — pre-request handoff abort ordering)
+
+- **Automatic handoff now cancels the active request before compaction begins.**
+  Pi's `compact()` API is fire-and-forget and internally waits for an abort;
+  calling it at the final pre-request boundary could therefore lose the race
+  and allow the oversized payload to proceed. The runtime now invokes the
+  synchronous abort hook before starting that compaction path. A targeted test
+  was red without this ordering and green after it. This source-only repair is
+  pending mirror and supplies no capacity, quality, or adoption evidence.
+
 ### Fixed (2026-09-02 — settled-turn handoff eligibility)
 
 - **A prior provider turn now survives the timing projection reset.** The
