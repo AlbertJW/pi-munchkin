@@ -162,3 +162,17 @@ before the 180-second launcher wall: the safe result was `wall_timeout`, exit
 notices, and no branch merge or parent settlement; the single graph branch was
 `blocked`. This is a child-completion/lifecycle diagnostic, not planner quality
 or exposure evidence, and remains quarantined from every prior run.
+
+## Circuit-breaker source boundary (pending rerun)
+
+The prior loaded surface `2f6976b4309cefa30344a9ca45d75b8b81f385452611ada5b1ab44552834dc73`
+still allowed a model to loop after receiving the coverage-truth correction;
+that output-capped run is quarantined. Source commit `21e2d10` adds one bounded
+corrective retry and then writes a terminal blocked branch report with no
+accepted evidence, usage, or child claims. Its source surface hash is
+`ca573070b0ba40959ccb1dfeda13f97a71a358db79a85a5d20a5c25e7da719a4`.
+
+This section is a pending model-visible boundary, not a run receipt. After a
+clean mirror, rerun this exact one-branch smoke with the newly loaded hash and
+record only safe lifecycle classifications. The planner flags remain dark; no
+mechanism, efficacy, or adoption evidence may be pooled across this boundary.

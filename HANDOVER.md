@@ -1,5 +1,22 @@
 # Handover — pi_munchkin, 2026-08-24
 
+## 2026-09-02 planner malformed-report circuit breaker
+
+The nested Qwen planner probe showed that explicit coverage guidance alone did
+not stop a model from repeating the same invalid `complete:false` report. The
+branch tool now allows one corrective retry, then writes a terminal `blocked`
+`branch_report` with zero accepted evidence, usage, and child claims. This is a
+branch-local protocol failure, not a quality judgment. Commit `21e2d10` adds the
+counterfactual integration test and the fail-closed circuit breaker; the new
+source surface is `ca573070b0ba40959ccb1dfeda13f97a71a358db79a85a5d20a5c25e7da719a4`.
+
+The source is pushed but not yet mirrored. The prior loaded surface
+`2f6976b4309cefa30344a9ca45d75b8b81f385452611ada5b1ab44552834dc73` still
+produced an output-capped one-branch diagnostic after the guidance-only repair;
+that run is quarantined. Mirror this new boundary, then rerun the approved
+bounded Qwen smoke with a fresh hash binding. Keep both planner flags dark and
+count the result only as lifecycle/operability evidence.
+
 ## 2026-09-02 planner branch-context transport repair
 
 The second bounded Qwen planner smoke reached delegation but recorded

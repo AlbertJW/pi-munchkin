@@ -4,6 +4,17 @@ All notable changes to pi-munchkin are documented here. Releases follow semantic
 
 ## Unreleased
 
+### Fixed (2026-09-02 — bounded malformed branch reports)
+
+- **Repeated invalid branch coverage reports now fail closed.** The first
+  `complete:false` report without a declared failure reason still receives the
+  corrective schema guidance. If the same branch repeats the malformed report,
+  `branch_plan` writes a terminal `blocked` report with zero accepted evidence,
+  usage, or child claims and tells the model to stop. This prevents a planner
+  from looping forever on a protocol error while preserving the fail-closed
+  evidence boundary. The regression was red before the fix and green after it;
+  planner flags remain dark and this is operability evidence only.
+
 ### Fixed (2026-09-02 — planner branch contexts are model-visible)
 
 - **Delegated research planners now receive the exact scout contexts they must
