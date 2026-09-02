@@ -1,5 +1,23 @@
 # Handover — pi_munchkin, 2026-08-24
 
+## 2026-09-02 semantic-loop shutdown retest — lifecycle blocker retired
+
+The current loaded surface (`251708fed05114ef0cb1617812d8662a96c39efeeb587ab829748ab5688f2b89`)
+was tested with two candidate-only Qwen 35B sessions under a 30-second active-tail
+bound. Both sessions received the external abort and emitted exactly one
+authenticated `failure-episode/settled` summary before gate cleanup; rows were
+complete, authoritative, provenance-bound, serving-stable, and passed the
+infrastructure/low-timeout validity checks. The Pi output ended with
+`Request was aborted`, so this exercised shutdown rather than normal completion.
+
+This retires the missing-settlement portion of the semantic-loop blocker and
+confirms the `telemetry-flush` shutdown-abort repair is live. It is not semantic
+exposure or efficacy evidence: no intervention was counted by design. The
+semantic candidate remains dark until a fresh, completion-bounded mechanism
+screen demonstrates a delivered `winner_reason=semantic_tier` arbiter decision.
+The full boundary and receipt are in
+[`optimizer/docs/PREREG_QWEN35B_SEMANTIC_LOOP_SHUTDOWN_RETEST_2026-09-02.md`](optimizer/docs/PREREG_QWEN35B_SEMANTIC_LOOP_SHUTDOWN_RETEST_2026-09-02.md).
+
 ## 2026-09-02 bash-output-guard paired receipt
 
 The preregistered Qwen 35B paired mechanism screen is clean. Four fresh RPC

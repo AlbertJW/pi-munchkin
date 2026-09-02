@@ -2,7 +2,7 @@
 
 ## Status and purpose
 
-**PREPARED — lifecycle characterization only.** This boundary retests the
+**EXECUTED — lifecycle characterization passed 2026-09-02.** This boundary retests the
 active-tool timeout path after the `telemetry-flush` shutdown-abort fix. It is
 not an efficacy screen, adoption request, or claim that semantic-loop recovery
 works. A timeout remains incomplete evidence even when the shutdown receipt is
@@ -56,10 +56,28 @@ keep `LOOP_EPISODE_MODE=shadow`, retain the blocker, and treat the result as
 subject/fixture suitability evidence only. In neither case may this retest
 unlock `PLAN_GRAPH` or change live defaults.
 
+## Execution receipt
+
+Private manifest digest: `7938e2f21fdc29c90386468b593d66d3d41f3aedcd63a1709193a7c34f656605`.
+The two candidate sessions (`sweep-c` and `ling-exact-gate-recovery`) were
+externally aborted at the 30-second probe bound and both emitted exactly one
+authenticated `failure-episode/settled` summary before the gate cleanup sweep.
+Both rows were complete, authoritative, provenance-bound, and serving-stable;
+the trial-validity sidecars reported infrastructure and low-timeout PASS. The
+Pi output ended with `Request was aborted`, confirming that the termination path
+was exercised rather than a normal task completion. No semantic intervention was
+counted (the probe is lifecycle-only), and no efficacy or adoption inference is
+permitted.
+
+This retires the *missing settlement after active-tool cancellation* portion of
+the blocker for the current loaded surface. The semantic-loop candidate remains
+dark because delivery/exposure has not been demonstrated on a powered,
+fixture-suitable screen; the next boundary must use a completion envelope that
+can produce an arbiter-delivered intervention within its declared bound.
+
 ## Rollback and privacy
 
 This is a documentation/procedure boundary. Delete the private run root to
 discard raw traces; the committed preregistration remains the audit record.
 Summaries must contain classifications and digests only, never prompts, source
 contents, tool arguments, URLs, or endpoint identities.
-
