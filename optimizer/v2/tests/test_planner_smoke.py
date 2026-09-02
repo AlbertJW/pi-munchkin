@@ -6,10 +6,17 @@ import unittest
 ROOT = pathlib.Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT.parent))
 
-from optimizer.v2.planner_smoke import classify_result, run_bounded_command  # noqa: E402
+from optimizer.v2.planner_smoke import build_pi_command, classify_result, run_bounded_command  # noqa: E402
 
 
 class PlannerSmokeTests(unittest.TestCase):
+    def test_explicit_thinking_is_pinned_in_the_model_command(self):
+        command = build_pi_command(
+            pi_bin="pi", model="local-llamacpp/qwen36-35b-iq3s",
+            prompt="bounded probe", thinking="minimal",
+        )
+        self.assertEqual(command[-3:], ["--thinking", "minimal", "bounded probe"])
+
     def test_classification_prioritises_bound_reason(self):
         self.assertEqual(classify_result(exit_code=-15, reason="output_cap"), "output_cap")
         self.assertEqual(classify_result(exit_code=-15, reason="wall_timeout"), "wall_timeout")

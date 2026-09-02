@@ -13,6 +13,7 @@ import argparse
 import json
 import os
 import pathlib
+import re
 import selectors
 import signal
 import subprocess
@@ -23,6 +24,7 @@ from typing import IO, Iterable
 
 
 BOUND_REASONS = {"output_cap", "wall_timeout"}
+THINKING_RE = re.compile(r"^[A-Za-z0-9_-]{1,32}$")
 
 
 @dataclass(frozen=True)
@@ -50,6 +52,15 @@ def classify_result(*, exit_code: int | None, reason: str | None) -> str:
     if reason in BOUND_REASONS:
         return reason
     return "completed" if exit_code == 0 else "failed"
+
+
+def build_pi_command(*, pi_bin: str, model: str, prompt: str, thinking: str | None = None) -> list[str]:
+    """Build the non-interactive Pi command with an optional explicit thinking level."""
+    command = [pi_bin, "-p", "--approve", "--no-session", "--mode", "json", "--model", model]
+    if thinking is not None:
+        command.extend(["--thinking", thinking])
+    command.append(prompt)
+    return command
 
 
 def _terminate_group(process: subprocess.Popen[bytes]) -> None:
@@ -221,6 +232,8 @@ def _validate_run_inputs(args: argparse.Namespace) -> tuple[pathlib.Path, pathli
         raise ValueError("--expected-surface must be a lowercase SHA-256 digest")
     if not args.model or any(char in args.model for char in "\r\n"):
         raise ValueError("--model must be a non-empty single-line identifier")
+    if args.thinking is not None and (not isinstance(args.thinking, str) or not THINKING_RE.fullmatch(args.thinking)):
+        raise ValueError("--thinking must be a short single-line level")
     return agent_dir, project_dir, prompt_file
 
 
@@ -246,10 +259,7 @@ def run_planner(args: argparse.Namespace) -> dict[str, object]:
         "TELEMETRY": "on", "TELEMETRY_SOURCE": "interactive", "TELEMETRY_WRITER": "sync",
         "TELEMETRY_FILE": str(telemetry_path), "LOOP_EPISODE_MODE": "shadow",
     })
-    command = [
-        args.pi_bin, "-p", "--approve", "--no-session", "--mode", "json",
-        "--model", args.model, prompt,
-    ]
+    command = build_pi_command(pi_bin=args.pi_bin, model=args.model, prompt=prompt, thinking=args.thinking)
     result = run_bounded_command(
         command, cwd=project_dir, wall_seconds=args.wall_seconds,
         max_output_bytes=args.max_output_bytes, env=env,
@@ -257,6 +267,8 @@ def run_planner(args: argparse.Namespace) -> dict[str, object]:
     )
     summary = result.to_summary()
     summary.update({"surface_sha256": actual, "model": args.model})
+    if args.thinking is not None:
+        summary["thinking"] = args.thinking
     return summary
 
 
@@ -287,6 +299,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--prompt-file")
     parser.add_argument("--expected-surface")
     parser.add_argument("--model")
+    parser.add_argument("--thinking")
     parser.add_argument("--output")
     parser.add_argument("--stderr")
     parser.add_argument("--telemetry")
@@ -312,6 +325,7 @@ def main(argv: list[str] | None = None) -> int:
                 "surface_sha256": actual, "model": args.model,
                 "project_dir_present": project_dir.is_dir(), "prompt_bytes": prompt_file.stat().st_size,
                 "wall_seconds": args.wall_seconds, "max_output_bytes": args.max_output_bytes,
+                **({"thinking": args.thinking} if args.thinking is not None else {}),
             }, sort_keys=True))
             return 0
         for field in ("output", "stderr", "telemetry"):
