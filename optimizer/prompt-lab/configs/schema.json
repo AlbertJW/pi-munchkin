@@ -184,6 +184,10 @@
           "on",
           "off"
         ],
+        "RESEARCH_BUDGET": [
+          "on",
+          "off"
+        ],
         "TOOL_CALL_RESCUE": [
           "on",
           "off"

@@ -282,6 +282,11 @@ def selftest():
     # c49/c50 (2026-07-30): sensor candidates for the two coverage-table gaps.
     assert thresholds["TOOL_CALL_RESCUE"] == ["on", "off"]
     assert config_env({"thresholds": {"TOOL_CALL_RESCUE": "on"}}) == {"TOOL_CALL_RESCUE": "on"}
+    # The ledger comparison's control arm needs the same discovery wall without
+    # the ledger surface. Keep this flag in the canonical config schema so a
+    # real_gate config cannot silently reject the preregistered control.
+    assert thresholds["RESEARCH_BUDGET"] == ["on", "off"]
+    assert config_env({"thresholds": {"RESEARCH_BUDGET": "on"}}) == {"RESEARCH_BUDGET": "on"}
     for invalid in ({"CONTEXT_WATCHER": "off"}, {"CTX_WATCH_PCT": 70}, {"MICRO_GATE": "on"}, {"STATE_LENS": "view"}):
         try:
             config_env({"thresholds": invalid})
