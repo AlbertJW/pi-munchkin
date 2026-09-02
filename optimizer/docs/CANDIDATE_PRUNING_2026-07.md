@@ -3,6 +3,12 @@
 > **HISTORICAL / UNSUPPORTED:** Recorded `NEUTRAL` labels predating 2026-07-27 are preserved as
 > historical data; their current interpretation is **UNTESTED**, not evidence of no effect.
 
+> **Superseded c35 note (2026-09-02):** The c35 row below predates the Qwen
+> paired mechanism screen. The guard has now fired once on a deliberate noisy
+> fixture and spared an ordinary fixture; see
+> `QWEN35B_BASH_OUTPUT_GUARD_PAIRED_AUDIT_2026-09-02.md`. The historical row
+> remains unchanged, but “mechanism never fired” is no longer current status.
+
 Draft removal recommendations for the dark-candidate roster under
 `optimizer/prompt-lab/configs/static/`. Companion to `optimizer/docs/HARNESS_SELF_IMPROVEMENT.md`
 (the full ledger — every status claim below is sourced from it) and Tier 1 item #5 of

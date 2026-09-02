@@ -2,7 +2,7 @@
 
 ## Status and scope
 
-**PREPARED — no model session has run under this preregistration.** This
+**EXECUTED — clean paired mechanism receipt recorded 2026-09-02.** This
 screen compares the dark `BASH_OUTPUT_GUARD` surface on one deliberately noisy
 bash task and one ordinary small-output task. It measures trigger reachability,
 false positives, and bounded recovery only. It is not an efficacy, quality,
@@ -47,3 +47,14 @@ cannot establish that the guard improves coding or research quality.
 `BASH_OUTPUT_GUARD` remains dark regardless of this screen. A later value
 study, if justified, needs representative coding fixtures and must report
 recovery cost alongside correctness and context use.
+
+## Execution receipt
+
+The four declared sessions completed in order B-noisy, A-ordinary, B-ordinary,
+A-noisy, all with exit 0 and zero stderr. The treatment withheld exactly one
+12,000-character result at the 8,000-character cap, returned one bounded
+error-shaped diagnostic, and made no second oversized call. The ordinary
+treatment session produced no withheld event; both controls produced none. All
+four telemetry files had one run identity, the frozen loaded surface hash, and
+no raw payload fields. The sanitized audit is in
+[`QWEN35B_BASH_OUTPUT_GUARD_PAIRED_AUDIT_2026-09-02.md`](QWEN35B_BASH_OUTPUT_GUARD_PAIRED_AUDIT_2026-09-02.md).

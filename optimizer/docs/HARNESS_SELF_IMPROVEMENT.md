@@ -29,6 +29,15 @@ frontier pairwise judge.
 > Path to a real verdict per candidate:
 > **[ADOPT_OR_RETIRE_PROTOCOL_2026-07.md](ADOPT_OR_RETIRE_PROTOCOL_2026-07.md)**.
 
+> **2026-09-02 update — bash-output guard paired mechanism receipt.** A
+> preregistered Qwen 35B screen ran noisy and ordinary fixtures with the guard
+> on and off. The guarded noisy result was withheld exactly once at the
+> 8,000-character cap and recovered through a bounded error; the ordinary
+> treatment and both controls were not withheld. All four sessions were
+> hash-bound and payload-free. This establishes reachability and specificity,
+> not task value or adoption; keep `BASH_OUTPUT_GUARD` dark pending a value
+> screen. See `QWEN35B_BASH_OUTPUT_GUARD_PAIRED_AUDIT_2026-09-02.md`.
+
 ---
 
 ## 1. The rule that governs everything: the benchmark class decides the surface

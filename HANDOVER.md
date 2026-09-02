@@ -1,5 +1,19 @@
 # Handover — pi_munchkin, 2026-08-24
 
+## 2026-09-02 bash-output-guard paired receipt
+
+The preregistered Qwen 35B paired mechanism screen is clean. Four fresh RPC
+sessions (B-noisy, A-ordinary, B-ordinary, A-noisy) all exited 0 with zero
+stderr and the same loaded surface hash
+`251708fed05114ef0cb1617812d8662a96c39efeeb587ab829748ab5688f2b89`. The
+guard withheld exactly one 12,000-character noisy result at the 8,000-character
+cap, returned a bounded error-shaped diagnostic, and made no second oversized
+call. It did not withhold the ordinary treatment result, and neither control
+withheld anything. This proves reachability and specificity only; it supplies
+no quality or adoption evidence. Keep `BASH_OUTPUT_GUARD` dark pending a
+representative value screen. The full audit is in
+[`optimizer/docs/QWEN35B_BASH_OUTPUT_GUARD_PAIRED_AUDIT_2026-09-02.md`](optimizer/docs/QWEN35B_BASH_OUTPUT_GUARD_PAIRED_AUDIT_2026-09-02.md).
+
 ## 2026-09-02 research-ledger Run 3 — deterministic receipt
 
 The post-fix Qwen 35B research-ledger comparison is complete as a
