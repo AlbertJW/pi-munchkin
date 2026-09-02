@@ -191,3 +191,20 @@ remain retryable errors. The new source surface is
 After mirroring, rerun the same one-branch smoke with the exact newly loaded
 hash. Record only whether the bounded parent exits after the blocked branch;
 keep this separate from every earlier surface and from planner quality claims.
+
+## Terminal-branch rerun receipt
+
+The source was mirrored cleanly at loaded hash
+`ef4305289114abed9c19da99663addaf7dc0de81be7db901a3ad5aa097c78807` (122/122
+first-party files, no unmanaged extensions or orphans). The exact one-branch
+Qwen 35B run used `--thinking minimal`, `PI_SUBAGENT_TIMEOUT_MS=30000`, the
+existing private prompt, a 180-second wall, and a 350,000-byte combined cap.
+It completed in 131.331 seconds with exit 0, 268,385 bounded stdout bytes, and
+zero stderr. Safe telemetry recorded one `research-start`, one
+`branch-failed(child_failed)`, and one `ended-open`; the graph contained one
+blocked depth-one branch and no settlement. The parent produced one short
+diagnostic after the terminal blocked result and made no repeated branch
+dispatch. This is a successful lifecycle/operability receipt for the guard,
+not a clean graph mechanism pass or any research-quality/effectiveness result.
+It remains quarantined from all previous surfaces and cannot justify enabling
+either planner flag.

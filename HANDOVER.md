@@ -19,6 +19,16 @@ quarantined. Mirror this source, rerun the approved one-branch Qwen smoke at the
 new loaded hash, and inspect whether the parent exits after the blocked branch;
 do not treat it as planner quality or adoption evidence.
 
+The rerun against loaded hash `ef4305289114abed9c19da99663addaf7dc0de81be7db901a3ad5aa097c78807`
+completed in 131.331 seconds with exit 0, 268,385 bounded stdout bytes, and
+zero stderr. Safe inspection found one `research-start`, one `branch-failed`
+(`child_failed`), one `ended-open`, and a single blocked depth-one branch. The
+parent returned its one-sentence diagnostic after the terminal branch result;
+there was no repeated parent delegation, output cap, or wall timeout. This is a
+successful lifecycle/operability receipt for the new guard, not a graph
+settlement, research-quality, or adoption result: the smoke deliberately stops
+after the blocked branch and leaves the graph executing/blocked.
+
 ## 2026-09-02 planner malformed-report circuit breaker
 
 The nested Qwen planner probe showed that explicit coverage guidance alone did
