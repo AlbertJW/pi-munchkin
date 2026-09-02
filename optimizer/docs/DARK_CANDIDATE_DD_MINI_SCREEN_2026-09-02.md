@@ -83,7 +83,7 @@ older unassigned or stale preregistration values:
 | Working memory | Exit 0 with one `upsert` and one `list`; both private projections were present. | Mechanism fired, but no comparative value evidence. | A small paired smoke with a task that explicitly needs a durable note, checking note use, context cost, and recovery. | **Yes.** Net value is a context trade-off; use several multi-turn tasks with memory on/off and inspect both success and added tokens before considering adoption. |
 | Bash-output guard | Preregistered Qwen 35B paired screen completed: B-noisy, A-ordinary, B-ordinary, A-noisy all exited 0 with zero stderr. Treatment withheld exactly one 12,000-character result at the 8,000-character cap; ordinary treatment and both controls had no withheld event. | **Clean paired mechanism receipt.** One bounded recovery error, no second oversized call, one true loaded hash/session per file, and no raw payload fields. No quality or cost claim; the candidate remains dark. | Prepare a later value screen on representative coding fixtures, reporting false positives, recovery cost, context use, and correctness together. | **Conditional.** Do not enable by default from this mechanism receipt. |
 | Research ledger | Citation containment, unique re-attribution, refusal recovery, private ledger, quarantine, budget, and wrap-up tests pass. | Post-fix Run 3 completed its deterministic half: 9/10 sessions completed; Q9-A hit the 15-minute bound without an answer. Arm B recorded 22 notes and rejected 24 attempts across 52 searches and 48 reads; all ten telemetry files were hash/run bound and payload-free. The correction path was not exercised (`corrected=0`), refusals/degradation remained (11 `quote_not_found`, 13 `degraded`), and no independent judge was available. The nominal search/read envelope was exceeded outside plan context (up to 28/17). | Decide and test whether ledger budgets are hard outside plan context, then repeat a judge-backed comparison with a complete baseline. | **Yes.** This run cannot establish quality or net context value, and the candidate remains opt-in/dark. |
-| Enforced semantic-loop recovery | Semantic/session ladders, rejected-plan progress, recovery receipts, shadow isolation, and abort policy tests pass. The first Qwen 35B mechanism screen settled only `sweep-b`; two fixtures reached the bound without settlement. The current-surface shutdown retest then externally aborted `sweep-c` and `ling-exact-gate-recovery` at 30 seconds and each emitted exactly one authenticated settlement. | **Lifecycle blocker retired; candidate still dark.** The shutdown-abort path now settles safely on the loaded surface. No arbiter-delivered `winner_reason=semantic_tier` intervention has been demonstrated, so the prior screen remains protocol/subject-suitability evidence only. | Prepare a fresh, powered semantic mechanism screen with a completion-bounded fixture envelope and require delivered arbiter decisions separately from proposal telemetry. Planner graph remains blocked. | **Yes.** Recovery requires repeated failures across several fixtures and arms; lifecycle reachability alone cannot establish delivery or value. |
+| Enforced semantic-loop recovery | Semantic/session ladders, rejected-plan progress, recovery receipts, shadow isolation, and abort policy tests pass. The first Qwen 35B mechanism screen settled only `sweep-b`; two fixtures reached the bound without settlement. The current-surface shutdown retest proved safe abort settlement. A fresh 180-second delivery probe then reached 31 turns/36 tool calls with six episodes but no intervention or settlement and was stopped before the second fixture. | **Retired from the near-term Qwen adoption queue; candidate remains dark.** Shutdown lifecycle is repaired, but repeated Qwen/fixture runs cannot deliver a bounded arbiter decision. This is an operability/subject-suitability retirement, not negative efficacy evidence. | Keep `LOOP_EPISODE_MODE=shadow`. Redesign the fixture envelope only if semantic recovery becomes a priority; otherwise proceed to the planner graph with this candidate explicitly retired and isolated from defaults. | **Yes.** Any future semantic study needs a new bounded fixture and powered preregistration; existing rows cannot be pooled. |
 | Minimal tool surface | Exit 0; the disposable file was created and a first-useful-mutation signal appeared. | Happy-path mechanism observed; no comparative efficacy result. | One happy-path DD coding smoke to catch missing tool dependencies, then a paired base/minimal run on representative read/edit/verify tasks. | **Yes.** Tool removal can trade context savings for recovery failures; use multiple task shapes and report tool errors, turns, context, and correctness together. |
 
 ## What can be concluded now
@@ -119,20 +119,23 @@ downstream of the semantic-loop gate and must not bypass it.
 4. Do not rerun those completed context screens. A future safety study may test
    a different provider or declared window, but it requires its own
    preregistration and must not pool with these same-router receipts.
-5. Preserve the failed Qwen semantic mechanism screen as non-efficacy evidence.
-   The current-surface shutdown retest retired the missing-settlement blocker,
-   but it produced no semantic intervention by design. Prepare a fresh
-   completion-bounded, powered mechanism preregistration and keep proposed
-   exposure artifacts distinct from delivered arbiter decisions.
+5. Preserve the failed Qwen semantic mechanism screen and the incomplete
+   delivery probe as non-efficacy evidence. The shutdown retest retires the
+   missing-settlement blocker; repeated Qwen/fixture loops still produced no
+   bounded delivery, so semantic-loop enforcement is retired from the near-term
+   adoption queue. Only a redesigned fixture and fresh preregistration may
+   reopen it; proposed exposure artifacts remain distinct from delivered
+   arbiter decisions.
 6. Preserve the completed research-ledger Run 3 receipt. Decide whether the
    nominal search/read budget should be hard-enforced outside plan context,
    add a red-green test for that policy, and only then repeat a judge-backed
    ledger comparison. Preserve the clean paired bash-guard mechanism receipt;
    a value screen on representative coding fixtures is still optional and
    must report recovery cost, context use, false positives, and correctness.
-7. Only after those gates, admit fixtures and run the hierarchical planner /
-   deep-research mechanism screen, followed by a separately powered
-   comparative evaluation.
+7. With semantic-loop enforcement explicitly retired for this cohort, admit
+   fixtures and run the hierarchical planner/deep-research mechanism screen,
+   followed by a separately powered comparative evaluation. Keep planner and
+   deep-research flags dark until that screen is complete.
 
 Every model run must bind the current loaded surface, provider/model,
 configuration, registry, and serving identity. Rows across a surface or model

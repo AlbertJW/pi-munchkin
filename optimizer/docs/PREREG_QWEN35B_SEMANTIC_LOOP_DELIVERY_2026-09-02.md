@@ -2,7 +2,7 @@
 
 ## Status and purpose
 
-**PREPARED — mechanism exposure only.** This is the follow-up to the failed
+**EXECUTED — incomplete/voided 2026-09-02.** This is the follow-up to the failed
 Qwen mechanism screen and the successful shutdown-lifecycle retest. It asks
 whether the current `LOOP_EPISODE_MODE=enforce` surface can deliver a semantic
 failure-episode intervention and an arbiter decision within a bounded session.
@@ -59,9 +59,25 @@ In either case, leave `LOOP_EPISODE_MODE=shadow`, `PLAN_GRAPH=off`, and
 delivery boundary is closed or explicitly retired, with its own research-shaped
 screen and fresh hash.
 
+## Execution receipt
+
+Private manifest digest: `ac2e465afec55c997c484d6709f8d94838a48eed1705b2c5b3ae927039f64d51`.
+The first candidate session (`sweep-c`) ran under the 180-second bound and was
+still mutating when the gate stopped it: 31 turns, 36 tool calls, six tool
+errors, and six failure episodes opened. It emitted zero
+`failure-episode/intervention` events and no authenticated settlement summary;
+the row was therefore incomplete/voided by trial validity. The second fixture
+was not started after the declared stop condition. No semantic exposure,
+efficacy, or adoption inference is valid.
+
+Together with the earlier three-fixture screen, this is repeated evidence that
+the current Qwen/fixture envelope is not a practical delivery subject. The
+semantic-loop candidate is retired from the near-term Qwen adoption queue,
+pending a redesigned, bounded fixture and a fresh preregistration. This is a
+scope/operability retirement, not proof that the mechanism is ineffective.
+
 ## Privacy and rollback
 
 All manifests, rows, traces, and validity sidecars remain outside the repository
 with private permissions. Summaries contain classifications and digests only.
 No source, mirror, default, or historical evidence is changed by this screen.
-

@@ -18,6 +18,24 @@ screen demonstrates a delivered `winner_reason=semantic_tier` arbiter decision.
 The full boundary and receipt are in
 [`optimizer/docs/PREREG_QWEN35B_SEMANTIC_LOOP_SHUTDOWN_RETEST_2026-09-02.md`](optimizer/docs/PREREG_QWEN35B_SEMANTIC_LOOP_SHUTDOWN_RETEST_2026-09-02.md).
 
+## 2026-09-02 semantic-loop delivery probe — retired for near-term Qwen queue
+
+The fresh delivery preregistration then ran its first fixture (`sweep-c`) with
+`LOOP_EPISODE_MODE=enforce` and a 180-second bound. Qwen reached 31 turns, 36
+tool calls, six tool errors, and six opened failure episodes, but emitted zero
+semantic interventions and no authenticated settlement before the bound. Trial
+validity voided the row as incomplete; the second fixture was not started. With
+the earlier three-fixture mechanism screen showing the same non-delivery
+pattern, semantic-loop enforcement is explicitly retired from the near-term
+Qwen adoption queue. This is subject/fixture operability evidence, not a claim
+of mechanism ineffectiveness. Keep `LOOP_EPISODE_MODE=shadow` and do not pool
+these rows. The boundary is in
+[`optimizer/docs/PREREG_QWEN35B_SEMANTIC_LOOP_DELIVERY_2026-09-02.md`](optimizer/docs/PREREG_QWEN35B_SEMANTIC_LOOP_DELIVERY_2026-09-02.md).
+
+The hierarchical planner/deep-research graph is now the next dark-candidate
+screen: it still requires fresh fixture admission, current-hash preregistration,
+and a mechanism-only run before any quality comparison or default change.
+
 ## 2026-09-02 bash-output-guard paired receipt
 
 The preregistered Qwen 35B paired mechanism screen is clean. Four fresh RPC
