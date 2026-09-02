@@ -176,3 +176,18 @@ This section is a pending model-visible boundary, not a run receipt. After a
 clean mirror, rerun this exact one-branch smoke with the newly loaded hash and
 record only safe lifecycle classifications. The planner flags remain dark; no
 mechanism, efficacy, or adoption evidence may be pooled across this boundary.
+
+## Terminal planned-branch boundary (pending rerun)
+
+The circuit-breaker probe on loaded hash
+`abf0e6fa9b2f97c1109911183701f641b3e0a2c10223bc88da84b1a60a9b6f4e` still
+timed out after a nested child failure; safe telemetry showed one blocked branch
+but repeated parent delegation. Source commit `87a0cde` changes only the
+parent-facing lifecycle classification: a failed depth-one planned branch is
+returned as a terminal blocked result, while ordinary and depth-two failures
+remain retryable errors. The new source surface is
+`03f1c9de7489333cd361253ca1d957370eb79763fa4e7553294ccf7d3200edc9`.
+
+After mirroring, rerun the same one-branch smoke with the exact newly loaded
+hash. Record only whether the bounded parent exits after the blocked branch;
+keep this separate from every earlier surface and from planner quality claims.

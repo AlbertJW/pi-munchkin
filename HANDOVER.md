@@ -1,5 +1,24 @@
 # Handover — pi_munchkin, 2026-08-24
 
+## 2026-09-02 terminal planned-branch failure handling
+
+The hash-pinned Qwen probe on the circuit-breaker surface still timed out after
+its nested scout failed: the parent-facing `subagent` result was marked as an
+ordinary error, so Qwen retried the same depth-one branch 27 times. The parent
+graph was already blocked, but the model had no terminal protocol signal.
+
+Commit `87a0cde` makes depth-one planned child failures terminal at the wrapper:
+the existing branch-result signal records the branch as blocked, and the model
+receives a bounded stop instruction without `isError`. Ordinary and depth-two
+subagent failures remain retryable errors. The source surface is
+`03f1c9de7489333cd361253ca1d957370eb79763fa4e7553294ccf7d3200edc9`.
+
+This is a new model-visible boundary. It is pushed but not yet mirrored. The
+previous circuit-breaker run was a bounded lifecycle diagnostic only and remains
+quarantined. Mirror this source, rerun the approved one-branch Qwen smoke at the
+new loaded hash, and inspect whether the parent exits after the blocked branch;
+do not treat it as planner quality or adoption evidence.
+
 ## 2026-09-02 planner malformed-report circuit breaker
 
 The nested Qwen planner probe showed that explicit coverage guidance alone did

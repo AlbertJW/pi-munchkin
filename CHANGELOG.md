@@ -4,6 +4,16 @@ All notable changes to pi-munchkin are documented here. Releases follow semantic
 
 ## Unreleased
 
+### Fixed (2026-09-02 — terminal planned-branch failures)
+
+- **A failed depth-one research branch is now terminal at the parent.** After
+  the branch is recorded as blocked, the subagent wrapper returns a bounded
+  terminal result instead of an ordinary retryable tool error. This prevents a
+  model from repeatedly dispatching the same failed branch; ordinary and
+  depth-two subagent failures retain their existing error behavior. The policy
+  regression was red before the fix and green afterward. Planner flags remain
+  dark and this is lifecycle evidence only.
+
 ### Fixed (2026-09-02 — bounded malformed branch reports)
 
 - **Repeated invalid branch coverage reports now fail closed.** The first
