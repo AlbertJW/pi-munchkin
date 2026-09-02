@@ -110,3 +110,23 @@ branch merge or parent settlement. The model made three capability calls, one
 `research_plan_start`, and one `subagent` call before the cap. This is a useful
 child-failure diagnostic and bounded lifecycle receipt, but it is still an
 **incomplete mechanism result** and does not count toward the six-session gate.
+
+## Child-failure diagnosis and new surface boundary
+
+The `child_failed` result has a concrete protocol cause, not an inference about
+Qwen's research ability. `branch_plan` wrote the exact depth-two contexts to its
+private details object, but its model-visible result text omitted those contexts
+while instructing the planner to copy them into each `research-scout` call. The
+model consequently dispatched a scout without `plan_context`; the existing
+fail-closed wrapper correctly rejected that call and marked the owning branch
+failed. Commit `10b3faa` repairs the transport and adds a deterministic red-green
+integration test asserting that the child ID, depth, and owner reference appear
+in model-visible content.
+
+This is a new model-visible source boundary with source hash
+`043f35a8f6358616a9cd9eec65fafbc734b127b2f410a9034435b366ad950dfd`. The live
+mirror and the frozen preregistration above still identify the prior loaded hash
+`251708fed05114ef0cb1617812d8662a96c39efeeb587ab829748ab5688f2b89`; neither
+bounded run may be pooled with a rerun after rollout. Re-prepare this smoke
+against the new loaded hash before collecting any planner mechanism or quality
+evidence. The planner flags remain dark.

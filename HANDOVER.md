@@ -1,5 +1,23 @@
 # Handover — pi_munchkin, 2026-08-24
 
+## 2026-09-02 planner branch-context transport repair
+
+The second bounded Qwen planner smoke reached delegation but recorded
+`child_failed`: the child wrapper correctly rejected a scout call that lacked
+its required `plan_context`. The root cause was in the parent-facing transport:
+`branch_plan` persisted the exact depth-two contexts in private tool details but
+did not include them in the model-visible result text, even though the result
+instructed the planner to copy them unchanged. Source commit `10b3faa` now
+includes those contexts in bounded result text, with a targeted red-green
+integration test. The new source surface hash is
+`043f35a8f6358616a9cd9eec65fafbc734b127b2f410a9034435b366ad950dfd`.
+
+This is a transport/lifecycle repair, not planner quality evidence. The live
+mirror remains on the prior loaded hash, and the earlier bounded runs remain
+quarantined. The next action is a normal human-approved mirror checkpoint,
+followed by a fresh preregistration and exact-hash planner mechanism screen;
+keep `PLAN_GRAPH` and `DEEP_RESEARCH_PLANNING` dark until that screen completes.
+
 ## 2026-09-02 semantic-loop shutdown retest — lifecycle blocker retired
 
 The current loaded surface (`251708fed05114ef0cb1617812d8662a96c39efeeb587ab829748ab5688f2b89`)

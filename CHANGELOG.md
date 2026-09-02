@@ -4,6 +4,18 @@ All notable changes to pi-munchkin are documented here. Releases follow semantic
 
 ## Unreleased
 
+### Fixed (2026-09-02 — planner branch contexts are model-visible)
+
+- **Delegated research planners now receive the exact scout contexts they must
+  forward.** `branch_plan` previously persisted depth-two `plan_context` values
+  only in its private details payload, while the model-visible result told the
+  planner to copy them without showing them. A compliant planner therefore
+  could not dispatch a valid scout and the branch was rejected as
+  `child_failed`. The returned contexts are now included in bounded,
+  model-visible result text and covered by a red-green integration test. This
+  source-only repair creates a new planner surface boundary; no planner
+  quality, adoption, or efficacy evidence is implied.
+
 ### Fixed (2026-09-02 — committed handoff outcome survives callback races)
 
 - **A committed model-handoff compaction can no longer be downgraded by a
