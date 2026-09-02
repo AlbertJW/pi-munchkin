@@ -24,7 +24,7 @@ if (!CHILD) {
 			const output = execFileSync(process.execPath, [
 				"--experimental-strip-types", "--experimental-loader", resolve("harness/tests/ts-js-resolver.mjs"), "--test", import.meta.filename,
 			], { cwd: process.cwd(), env, encoding: "utf8", stdio: "pipe" });
-			assert.match(output, /pass 9/);
+			assert.match(output, /pass 10/);
 		} finally { rmSync(artifacts, { recursive: true, force: true }); }
 	});
 } else {
@@ -205,6 +205,16 @@ if (!CHILD) {
 		assert.equal(report.status, "blocked");
 		assert.equal(report.coverage.failed, true);
 		assert.match(report.evidence_gaps[0], /invalid coverage/i);
+		resetPiGlobals();
+	});
+
+	test("branch_plan explains missing terminal-child coverage receipts", async () => {
+		const fp = fresh(); const cwd = tmp();
+		await expectToolError(fp, "branch_plan", {
+			status: "blocked", note: "blocked after a bounded probe", consumed: { searches: 0, reads: 0 },
+			children: [{ item_id: "missing-receipt", title: "Missing receipt", status: "blocked", budget: { allocated: { searches: 0, reads: 0 }, used: { searches: 0, reads: 0 } } }],
+			source_leads: [], evidence_gaps: ["probe stopped"], coverage,
+		}, cwd, /terminal child .*coverage/i);
 		resetPiGlobals();
 	});
 }

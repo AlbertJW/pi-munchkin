@@ -398,9 +398,14 @@ function coverageNeedsFailureReason(value: unknown): boolean {
 	return coverage.complete === false && coverage.truncated !== true && coverage.budget_exhausted !== true && coverage.failed !== true;
 }
 
-function explainCoverageInvariant(report: BranchReportV1): string | null {
+function explainCoverageInvariant(report: BranchReportV1, terminal = false): string | null {
+	const terminalStatuses = new Set(["done", "blocked", "deferred"]);
+	if (terminal && !report.coverage) return "top-level coverage receipt";
 	if (coverageNeedsFailureReason(report.coverage)) return "top-level coverage";
-	for (const child of report.children) if (coverageNeedsFailureReason(child.coverage)) return `child ${child.item_id} coverage`;
+	for (const child of report.children) {
+		if (terminal && terminalStatuses.has(child.status) && !child.coverage) return `terminal child ${child.item_id} coverage receipt`;
+		if (coverageNeedsFailureReason(child.coverage)) return `child ${child.item_id} coverage`;
+	}
 	return null;
 }
 
@@ -863,12 +868,18 @@ const branchPlan = defineTool({
 		const reportPath = process.env[BRANCH_REPORT_ENV];
 		if (!context || !reportPath) rejectPlanTool("branch_plan rejected: no valid parent plan context");
 		const report: BranchReportV1 = { v: 1, parent_item_id: context.parent_item_id, owner_ref: context.owner_ref, ...params } as BranchReportV1;
-		const invalidCoverage = explainCoverageInvariant(report);
+		const terminal = ["done", "blocked", "deferred"].includes(report.status);
+		const invalidCoverage = explainCoverageInvariant(report, terminal);
 		const attemptKey = `${context.run_id}:${context.owner_ref}`;
 		if (invalidCoverage) {
 			const attempt = (invalidCoverageAttempts.get(attemptKey) ?? 0) + 1;
 			invalidCoverageAttempts.set(attemptKey, attempt);
-			if (attempt <= INVALID_COVERAGE_RETRY_LIMIT) rejectPlanTool(`branch_plan rejected: ${invalidCoverage} is incomplete but has no failure reason; set truncated, budget_exhausted, or failed=true (and keep complete=false), or use complete=true for clean bounded coverage`);
+			if (attempt <= INVALID_COVERAGE_RETRY_LIMIT) {
+				const guidance = invalidCoverage.endsWith("coverage receipt")
+					? `${invalidCoverage} is required for every terminal branch and child; include strategy, scope, returned_count, truncated, budget_exhausted, failed, and complete`
+					: `${invalidCoverage} is incomplete but has no failure reason; set truncated, budget_exhausted, or failed=true (and keep complete=false), or use complete=true for clean bounded coverage`;
+				rejectPlanTool(`branch_plan rejected: ${guidance}`);
+			}
 
 			// A second malformed report is a branch-local protocol failure. Fail closed
 			// with a valid terminal report so an unhelpful model cannot keep the parent
@@ -890,7 +901,6 @@ const branchPlan = defineTool({
 			};
 		}
 		invalidCoverageAttempts.delete(attemptKey);
-		const terminal = ["done", "blocked", "deferred"].includes(report.status);
 		const shared = globalThis as Record<string, unknown>;
 		const own = shared.__pi_research_state as { searches?: unknown; reads?: unknown } | undefined;
 		const ownUsage = { searches: typeof own?.searches === "number" ? own.searches : 0, reads: typeof own?.reads === "number" ? own.reads : 0 };
