@@ -12,9 +12,9 @@ surface/model epoch.
 ## Frozen identity
 
 - Subject: `local-llamacpp/qwen36-35b-iq3s`.
-- Source branch tip: `codex/qwen35b-provenance` at `98df5ed` (the later commits
-  are optimizer/preflight and documentation changes; the model-visible source
-  surface remains the hash recorded below).
+- Frozen source/config snapshot: `codex/qwen35b-provenance` at `98df5ed` (later
+  documentation-only commits do not alter the model-visible source surface or
+  the hash recorded below).
 - Source surface SHA-256:
   `62b1e565748394ec7aaccadcc4d9e3f5167dea31ca974d0ed9461d0d76fc0234`.
 - Loaded Pi-agent surface SHA-256:

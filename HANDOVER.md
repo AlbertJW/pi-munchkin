@@ -24,8 +24,8 @@ incomplete rather than a quality result.
 The preflight's frozen source identity is now kept current by a selftest
 freshness assertion. After the budget-control source change it was red against
 the stale `5b84241c…` default; the repaired planner preregistration and default
-are bound to source `62b1e565…` at the current branch tip `98df5ed` (the
-model-visible surface last changed in `62b9bfb`; later commits are
+are bound to source `62b1e565…` at the frozen source/config snapshot `98df5ed`
+(the model-visible surface last changed in `62b9bfb`; later commits are
 optimizer/preflight and documentation changes). The loaded mirror is now
 `9629b4db…`, and no planner session has started.
 
@@ -52,8 +52,8 @@ The control arm now sets `RESEARCH_LEDGER=off` and `RESEARCH_BUDGET=on`.
 `RESEARCH_BUDGET` is an opt-in accounting wall only: it shares the three-search
 /five-read limit but registers no ledger tools, notes, cache, state, footer, or
 wrap-up steering. Treatment keeps `RESEARCH_LEDGER=on`, which implies the same
-wall and adds the verified-citation surface. The current branch tip is
-`98df5ed`, with source hash `62b1e565…` (the model-visible implementation
+wall and adds the verified-citation surface. The frozen source/config snapshot
+is `98df5ed`, with source hash `62b1e565…` (the model-visible implementation
 commit is `62b9bfb`); the mirror is now at loaded hash `9629b4db…`. Run 4 remains
 inference-pending and requires the human review and explicit run approval
 specified by its preregistration.

@@ -16,7 +16,8 @@ The snapshot below predates the ledger-free budget-control documentation and
 therefore records the earlier source hash `5b84241c…` as a historical
 measurement identity. The current source is `62b1e565…`; the canonical Run 4
 preregistration and planner preregistration have been rebound to that hash at
-the current branch tip `98df5ed` (the model-visible source hash is unchanged).
+the frozen source/config snapshot `98df5ed` (later documentation-only commits
+do not alter the model-visible source hash).
 The loaded mirror is now `9629b4db…`, and no model session was
 started by this amendment.
 
