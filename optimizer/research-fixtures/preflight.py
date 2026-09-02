@@ -24,7 +24,7 @@ from typing import Any
 ROOT = pathlib.Path(__file__).resolve().parent
 REPO = ROOT.parents[1]
 HEX64 = re.compile(r"^[0-9a-f]{64}$")
-DEFAULT_SOURCE = "5b84241cbd47bdd61c1d4641166e6ec44f124ddac706778d5c477c3efac551bf"
+DEFAULT_SOURCE = "62b1e565748394ec7aaccadcc4d9e3f5167dea31ca974d0ed9461d0d76fc0234"
 DEFAULT_LOADED = "0c09cb637992c35176bd7ae4b0865850cb6a17bc2f1e5efaf4c06e59d2c1b4ef"
 DEFAULT_MODEL = "local-llamacpp/qwen36-35b-iq3s"
 CONFIGS = {
@@ -159,6 +159,10 @@ def selftest() -> None:
     records = admission.check_slate()
     assert len(records) == 3
     assert {record["kind"] for record in records} == {"comparative", "contested", "multi_part"}
+    # Keep the no-argument dry command honest when the model-visible source
+    # surface moves.  A stale frozen default must fail this selftest instead of
+    # leaving the planner launcher apparently ready against the wrong surface.
+    assert DEFAULT_SOURCE == _source_hash(node_bin="node")
     for label, expected in CONFIGS.items():
         config = _validate_config(label, expected)
         assert config["thresholds"] == expected["thresholds"]
