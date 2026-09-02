@@ -17,9 +17,11 @@ protocol/lifecycle receipt only, not gate, quality, or adoption evidence.
 
 The preregistration and receipt are in
 [`optimizer/docs/PREREG_QWEN35B_GOAL_GRAMMAR_2026-09-02.md`](optimizer/docs/PREREG_QWEN35B_GOAL_GRAMMAR_2026-09-02.md).
-The next model work requires a fresh hash-bound lifecycle preregistration; the
-older graceful-shutdown preregistration is stale against this source and must
-not be reused.
+The old graceful-shutdown preregistration is stale against this source and must
+not be reused. A fresh hash-bound screen is now prepared at
+[`optimizer/docs/PREREG_QWEN35B_GRACEFUL_SHUTDOWN_2026-09-02.md`](optimizer/docs/PREREG_QWEN35B_GRACEFUL_SHUTDOWN_2026-09-02.md),
+bound to the same source and loaded hashes. Its no-inference dry preflight
+passed; the three-row execution is the next explicitly approved model action.
 
 ## 2026-09-02 pre-fix dark-candidate DD mechanism probes
 
