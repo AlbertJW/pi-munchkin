@@ -11,10 +11,11 @@ observations only: they are not gate rows, calibration, A/B evidence, or an
 adoption decision.
 
 The live mirror is also intentionally stale: `npm run mirror:check --
-/Users/Albert.Wessels/.pi/agent` reports exactly **1 of 122** first-party files
-different, `extensions/pi-munchkin/extensions/telemetry-flush.ts`. This is the
-graceful-shutdown implementation boundary and must be resolved by an approved
-mirror before any DD row can be authoritative.
+/Users/Albert.Wessels/.pi/agent` reports **3 of 122** first-party files
+different: `extensions/pi-munchkin/extensions/plan-runner.ts`,
+`extensions/pi-munchkin/lib/goal-state.ts`, and the earlier
+`extensions/pi-munchkin/extensions/telemetry-flush.ts` boundary. These changes
+must be resolved by an approved mirror before any DD row can be authoritative.
 
 The cheapest deterministic probe did run: the candidate-specific suites for
 planning, research ledger, working memory, bash-output guarding, semantic-loop
