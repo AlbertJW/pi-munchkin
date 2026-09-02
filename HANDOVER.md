@@ -1,5 +1,14 @@
 # Handover — pi_munchkin, 2026-08-24
 
+## 2026-09-02 dark-candidate DD mini-screen
+
+The DD endpoint was unavailable, so no model run was attempted. Candidate
+contract suites passed 118/118 and the offline optimizer verification passed.
+The per-candidate evidence status and minimum useful run lengths are recorded
+in [`optimizer/docs/DARK_CANDIDATE_DD_MINI_SCREEN_2026-09-02.md`](optimizer/docs/DARK_CANDIDATE_DD_MINI_SCREEN_2026-09-02.md).
+The prepared Qwen35B graceful-shutdown smoke remains the next human-gated
+action; no dark flag, default, mirror, or adoption decision changed.
+
 ## 2026-09-01 graceful gate shutdown settlement — source-only
 
 The gate's hard timeout was not the only lifecycle boundary: Pi print mode handles
