@@ -87,6 +87,16 @@ earlier loaded hash. A new hash-bound screen is prepared in
 and requires a separately approved mirror before any model run. No handoff
 safety or adoption claim is valid yet.
 
+The approved mirror rollout has now been applied: `mirror:apply` and
+`mirror:check` report 122/122 first-party files with no unmanaged extensions or
+orphans. The loaded surface hash is
+`2c3449b84ab1ca3ca8cb5b88bfe2dfa79399def57301e20406d5be969dae11f6`, and the
+v2 preregistration is updated to bind it. The router is currently serving
+`defiant-9b`, not the Qwen subject, so no inference was started during this
+rollout. The next model action is the explicitly approved Qwen threshold screen
+under the new preregistration; until then, the source-only diagnostic and the
+loaded rollout receipt remain separate from model evidence.
+
 ## 2026-09-02 pre-fix dark-candidate DD mechanism probes
 
 The router was reachable and Qwen 35B completed a bounded transport smoke.

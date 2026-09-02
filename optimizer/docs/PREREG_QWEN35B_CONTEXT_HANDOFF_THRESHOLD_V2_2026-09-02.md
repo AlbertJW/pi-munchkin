@@ -12,13 +12,13 @@ benchmark, quality result, model comparison, or adoption decision.
 - Source branch: `codex/qwen35b-provenance`
 - Code commit: `aad8e84`
 - Package-source surface SHA-256: `704ca8201022509eba1be456966b840689adc2f370146e1ba23be6e2d539ae83`
-- Loaded Pi agent surface SHA-256: **TO BE RECORDED AFTER APPROVED MIRROR**
+- Loaded Pi agent surface SHA-256: `2c3449b84ab1ca3ca8cb5b88bfe2dfa79399def57301e20406d5be969dae11f6`
 - Model-registry SHA-256: `ac7ba5ebd4b8136d2ae127e77d0dc799e8c805552cb755ed2422693e605a7ccf`
 - Synthetic-input revision: `context-padding-v1`
 
-The loaded surface and serving identity must match after the mirror receipt is
-recorded. Raw padding, prompts, responses, and endpoint URLs are not retained
-in the audit.
+The loaded surface now matches the approved mirror receipt (122/122 files,
+zero unmanaged extensions or orphans). Raw padding, prompts, responses, and
+endpoint URLs are not retained in the audit.
 
 ## Bound fixture and expected behavior
 
