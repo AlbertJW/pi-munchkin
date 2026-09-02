@@ -27,7 +27,7 @@ import { record } from "../lib/telemetry.ts";
 import { CORE_NAMES, profileFromEnvironment } from "./tool-activation.ts";
 import {
 	acceptGoal, blockGoal, cancelGoal, createGoal, goalAmbientSummary, goalsEnabled, inspectGoal, mutateGoal, pauseGoal, readCurrentGoal,
-	readExecutableGoal, readGoals, resumeGoal, settleGoal, updateGoal, GOAL_MAX_CRITERIA, goalScope, renderGoalRecoveryBrief,
+	readExecutableGoal, readGoals, resumeGoal, settleGoal, updateGoal, GOAL_MAX_CRITERIA, GOAL_MODEL_TEXT_MAX_BYTES, goalScope, renderGoalRecoveryBrief,
 	type CriterionStatus, type DeferredGoalItem, type GoalInspectSection, type GoalState,
 } from "../lib/goal-state.ts";
 
@@ -590,7 +590,7 @@ const planUpdate = defineTool({
 
 const GoalCriterionSchema = Type.Object({
 	id: Type.Optional(Type.String({ minLength: 1, maxLength: 64 })),
-	text: Type.String({ minLength: 1, maxLength: 2_000 }),
+	text: Type.String({ minLength: 1, maxLength: GOAL_MODEL_TEXT_MAX_BYTES }),
 	required: Type.Optional(Type.Boolean()),
 });
 
@@ -598,7 +598,7 @@ const goalPropose = defineTool({
 	name: "goal_propose", label: "Propose Goal", description: "Propose a persistent project/worktree goal for user acceptance. Proposal is advisory and does not activate execution.",
 	promptSnippet: "goal_propose: suggest a persistent goal; the user must accept it before activation",
 	parameters: Type.Object({
-		objective: Type.String({ minLength: 1, maxLength: 2_000 }),
+		objective: Type.String({ minLength: 1, maxLength: GOAL_MODEL_TEXT_MAX_BYTES }),
 		constraints: Type.Optional(Type.Array(Type.String({ maxLength: 500 }), { maxItems: 16 })),
 		criteria: Type.Optional(Type.Array(GoalCriterionSchema, { minItems: 1, maxItems: GOAL_MAX_CRITERIA })),
 		note: Type.Optional(Type.String({ maxLength: 500 })),
@@ -644,10 +644,10 @@ const goalSettle = defineTool({
 	promptSnippet: "goal_settle: close a goal with evidence, delivered value, confidence, risks, and deferrals",
 	parameters: Type.Object({
 		outcome: Type.Union([Type.Literal("complete"), Type.Literal("accepted_80_20")]),
-		delivered_value: Type.String({ minLength: 1, maxLength: 2_000 }),
+		delivered_value: Type.String({ minLength: 1, maxLength: GOAL_MODEL_TEXT_MAX_BYTES }),
 		confidence: Type.Number({ minimum: 0, maximum: 1 }),
 		residual_risks: Type.Array(Type.String({ maxLength: 500 }), { maxItems: 16 }),
-		deferred: Type.Optional(Type.Array(Type.Object({ value: Type.String({ minLength: 1, maxLength: 500 }), risk: Type.String({ minLength: 1, maxLength: 500 }), rationale: Type.String({ minLength: 1, maxLength: 2_000 }) }), { maxItems: 16 })),
+		deferred: Type.Optional(Type.Array(Type.Object({ value: Type.String({ minLength: 1, maxLength: 500 }), risk: Type.String({ minLength: 1, maxLength: 500 }), rationale: Type.String({ minLength: 1, maxLength: GOAL_MODEL_TEXT_MAX_BYTES }) }), { maxItems: 16 })),
 		evidence: Type.Array(Type.String({ maxLength: 500 }), { minItems: 1, maxItems: 16 }),
 	}),
 	async execute(_id, params, _signal, _update, ctx) {

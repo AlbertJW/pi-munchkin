@@ -16,6 +16,11 @@ export const GOAL_MAX_BYTES = 48 * 1024;
 export const GOAL_LEDGER_MAX_BYTES = 256 * 1024;
 export const GOAL_MAX_CRITERIA = 24;
 export const GOAL_MAX_HISTORY = 32;
+// llama.cpp's JSON-schema → GBNF converter rejects nested string maxLength
+// values at 2,000 or above (see the web_read schema workaround). Keep the
+// model-visible contract just below that parser ceiling while the runtime
+// ledger validator retains its independent 2,000-byte text bound.
+export const GOAL_MODEL_TEXT_MAX_BYTES = 1_999;
 
 export type GoalStatus =
 	| "proposed"

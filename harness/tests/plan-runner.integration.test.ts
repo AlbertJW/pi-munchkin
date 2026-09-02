@@ -342,6 +342,26 @@ test("GOALS=off removes the whole goal surface as one rollback switch", async ()
 	}
 });
 
+function schemaMaxLengths(value: unknown): number[] {
+	if (!value || typeof value !== "object") return [];
+	if (Array.isArray(value)) return value.flatMap(schemaMaxLengths);
+	const object = value as Record<string, unknown>;
+	const own = typeof object.maxLength === "number" ? [object.maxLength] : [];
+	return [...own, ...Object.values(object).flatMap(schemaMaxLengths)];
+}
+
+test("goal tool schemas stay below the llama.cpp nested-string grammar ceiling", () => {
+	const fp = makeFakePi();
+	planRunner(fp.pi as any);
+	for (const name of ["goal_propose", "goal_inspect", "goal_update", "goal_settle", "goal_block"]) {
+		const tool = fp.tools.get(name) as any;
+		assert.ok(tool, `${name} is registered`);
+		const offending = schemaMaxLengths(tool.parameters).filter((limit) => limit >= 2_000);
+		assert.deepEqual(offending, [], `${name} exposes a grammar-incompatible maxLength`);
+	}
+	resetPiGlobals();
+});
+
 test("/goal enters a persistent model-visible execution mode", async () => {
 	// A ledger write and a toast are not a mode. The user-visible command must
 	// start one agent turn, expose the goal lifecycle tools for that goal, and
