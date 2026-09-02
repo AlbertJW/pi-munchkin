@@ -27,6 +27,13 @@ separate preregistration for no-goal rearm, active-goal preservation, and a
 provider/model/window switch; none of these receipts supplies capacity,
 quality, or adoption evidence.
 
+The no-goal rearm screen is now prepared in
+[`optimizer/docs/PREREG_QWEN35B_CONTEXT_HANDOFF_REARM_2026-09-02.md`](optimizer/docs/PREREG_QWEN35B_CONTEXT_HANDOFF_REARM_2026-09-02.md),
+bound to source `accdf89` and loaded hash
+`251708fed05114ef0cb1617812d8662a96c39efeeb587ab829748ab5688f2b89`. It will
+require exactly two successful handoffs separated by a below-70% rearm and
+will run before the active-goal and cross-epoch screens.
+
 ## 2026-09-02 pre-request handoff abort ordering — mirrored, Qwen smoke pending
 
 The settled-turn repair exposed one final race in the real Pi lifecycle:
