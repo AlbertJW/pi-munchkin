@@ -390,7 +390,13 @@ TIMEOUT_TOOL="$(command -v timeout 2>/dev/null || command -v gtimeout 2>/dev/nul
 run_with_timeout() { # $1=seconds $2=kill grace, remaining args=command
 	local limit="$1" grace="$2" pid timer rc; shift 2
 	if [[ -n "$TIMEOUT_TOOL" ]]; then
-		"$TIMEOUT_TOOL" -k "$grace" "$limit" "$@"
+		# The gate owns process-group cleanup below. GNU timeout's default mode
+		# forwards TERM to both the timeout wrapper and its child when the child is
+		# a sandbox-exec jail, which can deliver duplicate SIGTERM to pi and abort
+		# its single-flight shutdown before agent_settled is emitted. Keep the
+		# command in the foreground process group and let the gate's cleanup sweep
+		# reclaim descendants after the grace period.
+		"$TIMEOUT_TOOL" --foreground -k "$grace" "$limit" "$@"
 		return $?
 	fi
 	set +m # keep fallback children in the session process group for watchdog/cleanup

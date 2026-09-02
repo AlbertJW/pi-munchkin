@@ -744,6 +744,43 @@ def test_trial_validity_is_authoritative():
         "validity must settle before real_gate advertises the result population"
 
 
+def test_gate_timeout_uses_foreground_signal_contract():
+    """The GNU timeout wrapper must not forward duplicate SIGTERM into pi.
+
+    In the jailed gate path, GNU timeout's default process-group handling sends
+    one TERM to the sandbox wrapper and another to pi. Pi's signal handler is
+    deliberately single-flight: the second signal can observe an already
+    disposed runtime and abort before ``agent_settled`` is emitted. The gate
+    owns process-group cleanup itself, so ``--foreground`` is the required
+    contract for the external timeout helper. Keep this assertion close to the
+    gate source so a future timeout refactor cannot silently reintroduce the
+    duplicate-signal path.
+    """
+    gate = (admission.ROOT / "real_gate.sh").read_text()
+    start = gate.index("run_with_timeout()")
+    end = gate.index("\n}\n", start)
+    invocation = gate[start:end]
+    assert '"$TIMEOUT_TOOL"' in invocation, \
+        "run_with_timeout must invoke the discovered timeout helper"
+    assert "--foreground" in invocation, \
+        "timeout must stay in the foreground process group; gate cleanup owns the sweep"
+
+    # A tiny local signal probe verifies the supported GNU timeout behavior
+    # without starting pi or touching the live mirror. If this platform has no
+    # timeout implementation, the source contract above remains authoritative.
+    timeout_tool = shutil.which("timeout") or shutil.which("gtimeout")
+    if not timeout_tool:
+        return
+    probe = "import signal,time; signal.signal(signal.SIGTERM,lambda *_: print('TERM',flush=True)); time.sleep(10)"
+    proc = subprocess.run(
+        [timeout_tool, "--foreground", "-k", "1", "1", sys.executable, "-c", probe],
+        capture_output=True,
+        text=True,
+        timeout=5,
+    )
+    assert proc.stdout.count("TERM") <= 1, proc.stdout
+
+
 def main():
     # AUTO-DISCOVERED, not a hand-maintained list. The list form silently
     # skipped any test_* someone forgot to register — which is exactly how the
