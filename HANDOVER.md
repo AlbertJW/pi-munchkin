@@ -1,5 +1,22 @@
 # Handover — pi_munchkin, 2026-08-24
 
+## 2026-09-02 committed handoff outcome — source repaired, mirror pending
+
+The first mirrored smoke showed that Pi can commit the handoff compaction and
+then report `Nothing to compact` from a later callback/racing lifecycle path.
+That left a false `ok:false` outcome and no continuation even though the
+context had already been rewritten. Commit `accdf89` records the durable
+`session_compact` event while the model-handoff lease is active, treats that
+event as authoritative if a later callback errors, and blocks a duplicate
+handoff in the same epoch. The new regression was red before the repair and
+the 14-test context suite plus typecheck are green afterward; the source
+surface is `b929b6b2239f364be90a9bb012881d291260caf11bb38b10c2c22afc79a07917`.
+
+The mirror must be refreshed through the normal approved ceremony. The v4
+preregistration is rebound to this source with no executable loaded hash until
+that mirror is checked. The prior v5/v6/v7 diagnostic sessions remain
+quarantined; none supplies capacity, quality, or adoption evidence.
+
 ## 2026-09-02 pre-request handoff abort ordering — mirrored, Qwen smoke pending
 
 The settled-turn repair exposed one final race in the real Pi lifecycle:

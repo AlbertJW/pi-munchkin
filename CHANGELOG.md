@@ -4,6 +4,16 @@ All notable changes to pi-munchkin are documented here. Releases follow semantic
 
 ## Unreleased
 
+### Fixed (2026-09-02 — committed handoff outcome survives callback races)
+
+- **A committed model-handoff compaction can no longer be downgraded by a
+  later callback error.** Pi emits `session_compact` after the compaction entry
+  is durable, but another lifecycle observer may then report `Nothing to
+  compact`; the runtime now treats the committed event as authoritative,
+  resumes once, and suppresses a duplicate handoff in that epoch. The
+  regression is red-green proven. This source-only repair is pending mirror
+  and supplies no capacity, quality, or adoption evidence.
+
 ### Fixed (2026-09-02 — pre-request handoff abort ordering)
 
 - **Automatic handoff now cancels the active request before compaction begins.**
