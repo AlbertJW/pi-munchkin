@@ -34,6 +34,14 @@ bound to source `accdf89` and loaded hash
 require exactly two successful handoffs separated by a below-70% rearm and
 will run before the active-goal and cross-epoch screens.
 
+That rearm screen is complete and clean: 96 unique hash-stamped rows, two
+`ok:true` handoffs, two cancelled oversized requests, three successful
+provider responses, two `model-handoff` compactions, and zero native
+compactions. The audit is in
+[`optimizer/docs/QWEN35B_CONTEXT_HANDOFF_REARM_AUDIT_2026-09-02.md`](optimizer/docs/QWEN35B_CONTEXT_HANDOFF_REARM_AUDIT_2026-09-02.md).
+The next evidence is the separately prepared active-goal preservation screen;
+this receipt does not imply goal or cross-epoch safety.
+
 ## 2026-09-02 pre-request handoff abort ordering — mirrored, Qwen smoke pending
 
 The settled-turn repair exposed one final race in the real Pi lifecycle:
