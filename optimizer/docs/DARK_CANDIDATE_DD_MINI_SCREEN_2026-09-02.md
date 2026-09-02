@@ -103,8 +103,10 @@ downstream of the semantic-loop gate and must not bypass it.
    do not interpret the pre-fix failures or this happy path as goal efficacy.
 2. Preserve the fresh Qwen35B graceful-shutdown run as an invalid lifecycle
    receipt: all three rows reached the task gate but lacked authenticated
-   settlement. Do not resume or pool them; isolate active-tool cancellation
-   before preparing another model screen.
+   settlement. Do not resume or pool them. The duplicate-SIGTERM timeout cause
+   is fixed in gate commit `6ef1464` and the bounded jailed fixture now emits
+   `session_shutdown` then `agent_settled`; prepare a new full gate
+   preregistration before collecting rows.
 3. Run the prepared context-epoch wiring smoke in
    `PREREG_QWEN35B_CONTEXT_EPOCHS_2026-09-02.md`; keep both defaults and dark
    flags unchanged. Treat it as reachability evidence only, then prepare a

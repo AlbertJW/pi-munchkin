@@ -29,6 +29,20 @@ Do not resume or pool those rows. The next source work is a deterministic
 active-tool cancellation fixture; a fresh preregistration is required after any
 fix.
 
+The timeout-side root cause is now isolated and fixed in gate commit `6ef1464`:
+GNU `timeout` was forwarding duplicate `SIGTERM` through the Seatbelt wrapper.
+The wrapper now uses `--foreground` and leaves descendant cleanup to the gate's
+existing process-group sweep. A fresh pinned Qwen fixture emitted exactly one
+`session_shutdown` followed by one `agent_settled` before the expected timeout
+status `124`. This is an infrastructure mechanism receipt, not a gate row; the
+new preregistration and audit are in
+[`optimizer/docs/PREREG_QWEN35B_GRACEFUL_SHUTDOWN_FOREGROUND_2026-09-02.md`](optimizer/docs/PREREG_QWEN35B_GRACEFUL_SHUTDOWN_FOREGROUND_2026-09-02.md)
+and
+[`optimizer/docs/QWEN35B_GRACEFUL_SHUTDOWN_FOREGROUND_AUDIT_2026-09-02.md`](optimizer/docs/QWEN35B_GRACEFUL_SHUTDOWN_FOREGROUND_AUDIT_2026-09-02.md).
+Before collecting real gate rows, prepare a new full preregistration bound to
+the current gate commit and run its dry preflight. The earlier invalid rows
+remain quarantined.
+
 The next independent dark-candidate action is the prepared dynamic-context
 epoch smoke in
 [`optimizer/docs/PREREG_QWEN35B_CONTEXT_EPOCHS_2026-09-02.md`](optimizer/docs/PREREG_QWEN35B_CONTEXT_EPOCHS_2026-09-02.md).
@@ -66,12 +80,12 @@ gate rows, or candidate adoption changed. Full classifications and the longer-
 run gates are in
 [`optimizer/docs/DARK_CANDIDATE_DD_MINI_SCREEN_2026-09-02.md`](optimizer/docs/DARK_CANDIDATE_DD_MINI_SCREEN_2026-09-02.md).
 
-The source fix is recorded in the worktree at source hash
-`03ed0ab76427cc3aa9c1cb160b2641b574362b5d268030bfd29716966448af1d`; it has
-not been committed, pushed, mirrored, or loaded by the live Pi. The targeted
-schema test is red before the fix and green after it, and the full offline
-verification is green (663/663 tests; all six `npm run verify` stages). Do not
-pool the source-wired smoke with live or gate evidence.
+At the time of those pre-fix probes, the goal schema source change was
+uncommitted and unmirrored. It is now committed and loaded at the hash recorded
+in the goal receipt above; the targeted schema test was red before the fix and
+green after it, and the full offline verification is green (663/663 tests; all
+six `npm run verify` stages). Do not pool the historical source-wired smoke
+with live or gate evidence.
 
 ## 2026-09-02 dark-candidate DD mini-screen
 

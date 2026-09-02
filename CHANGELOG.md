@@ -4,6 +4,16 @@ All notable changes to pi-munchkin are documented here. Releases follow semantic
 
 ## Unreleased
 
+### Fixed (2026-09-02 — gate timeout preserves Pi settlement)
+
+- **The external gate timeout no longer duplicates `SIGTERM` in the Seatbelt path.**
+  GNU `timeout --foreground` keeps the sandbox wrapper and Pi in one foreground
+  process group while the gate retains its explicit descendant sweep. The exact
+  pinned Qwen 35B fixture now emits one `session_shutdown` followed by one
+  `agent_settled` before the expected timeout status. This is an infrastructure
+  lifecycle fix only; it changes no Pi package defaults and supplies no quality
+  or adoption evidence.
+
 ### Fixed (2026-09-02 — goal tool schemas remain compatible with llama.cpp)
 
 - **Model-visible goal strings now cap at 1,999.** llama.cpp's JSON-schema to
