@@ -42,6 +42,15 @@ compactions. The audit is in
 The next evidence is the separately prepared active-goal preservation screen;
 this receipt does not imply goal or cross-epoch safety.
 
+The active-goal screen is now preregistered in
+[`optimizer/docs/PREREG_QWEN35B_CONTEXT_HANDOFF_ACTIVE_GOAL_2026-09-02.md`](optimizer/docs/PREREG_QWEN35B_CONTEXT_HANDOFF_ACTIVE_GOAL_2026-09-02.md),
+bound to source `1c0fbfd` and the loaded hash above. A first attempt was
+discarded before inference because the router was not serving; it produced no
+authoritative provider or handoff evidence. Re-run only when the pinned Qwen
+router health check is positive, using a fresh private telemetry path. The
+acceptance target is one active goal, one successful model-handoff continuation,
+and the same non-null `current_goal_id` before and after compaction.
+
 ## 2026-09-02 pre-request handoff abort ordering — mirrored, Qwen smoke pending
 
 The settled-turn repair exposed one final race in the real Pi lifecycle:
