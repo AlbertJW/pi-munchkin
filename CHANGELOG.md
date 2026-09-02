@@ -18,6 +18,10 @@ All notable changes to pi-munchkin are documented here. Releases follow semantic
   and remains incomplete; no planner quality, adoption, or efficacy evidence is
   implied.
 
+- The repository-only planner smoke launcher now accepts an explicit, validated
+  `--thinking` level, allowing bounded mechanism probes to be reproduced across
+  registered models without changing their production role defaults.
+
 ### Fixed (2026-09-02 — committed handoff outcome survives callback races)
 
 - **A committed model-handoff compaction can no longer be downgraded by a

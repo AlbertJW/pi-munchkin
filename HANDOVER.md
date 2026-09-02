@@ -25,6 +25,14 @@ and this rerun cannot be pooled into a quality decision. Keep
 `PLAN_GRAPH` and `DEEP_RESEARCH_PLANNING` dark, and prepare a fresh bounded
 screen against this loaded hash before attempting any longer evaluation.
 
+The launcher is now more reproducible as well: `69c77d3` adds a validated
+`--thinking` option to `optimizer/v2/planner_smoke.py`. A private
+role-authentic child probe using `--thinking minimal` completed the repaired
+transport sequence: the branch planner received the returned depth-two context,
+forwarded it unchanged to a scout, and produced a bounded blocked report with
+an explicit no-retrieval gap. This is operability evidence only; it is not a
+planner quality result and does not change any live default.
+
 ## 2026-09-02 semantic-loop shutdown retest — lifecycle blocker retired
 
 The current loaded surface (`251708fed05114ef0cb1617812d8662a96c39efeeb587ab829748ab5688f2b89`)
