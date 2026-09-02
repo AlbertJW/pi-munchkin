@@ -2,7 +2,7 @@
 
 ## Status and scope
 
-**PREPARED — mechanism/lifecycle screen only.** This bounded screen tests that
+**EXECUTED — clean mechanism receipt recorded 2026-09-02.** This bounded screen tests that
 an RPC model switch creates a new serving epoch, rebinds discovery and runtime
 telemetry to the destination model, and preserves the ability to complete the
 active task. It is not a capacity benchmark, quality result, provider
@@ -46,3 +46,26 @@ This screen does not claim that the task was performed equally well by either
 model. It proves only that model switching rebinds context identity and keeps
 the protocol usable. The context handoff, goal, planner, and deep-research
 defaults remain unchanged.
+
+## Execution receipt
+
+- Result: **CLEAN MECHANISM RECEIPT**; no quality, capacity, comparison, gate,
+  or adoption decision.
+- Process: exit `0`, `stderr_bytes=0`, two settled agent lifecycles, and both
+  provider turns returned status `200`.
+- Provenance: one fresh telemetry session with 83 safe rows; every row carries
+  the loaded surface hash
+  `251708fed05114ef0cb1617812d8662a96c39efeeb587ab829748ab5688f2b89`.
+- Epochs: exactly two `runtime/context-profile` rows: epoch `0` for
+  `local-llamacpp/qwen36-35b-iq3s` and epoch `1` for
+  `local-llamacpp/ling3-tiny-fast`. Each profile had the expected declared
+  61,440-token window and 52,224-token safe-input budget, with distinct hashed
+  serving fingerprints. Two context-budget and two serving-truth rows were
+  observed, one per model.
+- Handoff: none requested because `CONTEXT_HANDOFF=off`; the screen isolates
+  model-epoch rebinding rather than compaction behavior.
+- Safety: no raw endpoint, prompt, response, tool argument, or source content
+  was retained.
+
+The companion audit is
+[`optimizer/docs/QWEN35B_CONTEXT_EPOCH_SWITCH_AUDIT_2026-09-02.md`](QWEN35B_CONTEXT_EPOCH_SWITCH_AUDIT_2026-09-02.md).

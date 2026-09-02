@@ -54,6 +54,17 @@ compaction. The full audit is in
 This closes only the active-goal preservation mechanism gate; the separate
 provider/model/window-switch screen remains.
 
+The model-switch context-epoch screen is now also complete. Its preregistration
+and audit are in
+[`optimizer/docs/PREREG_QWEN35B_CONTEXT_EPOCH_SWITCH_2026-09-02.md`](optimizer/docs/PREREG_QWEN35B_CONTEXT_EPOCH_SWITCH_2026-09-02.md)
+and
+[`optimizer/docs/QWEN35B_CONTEXT_EPOCH_SWITCH_AUDIT_2026-09-02.md`](optimizer/docs/QWEN35B_CONTEXT_EPOCH_SWITCH_AUDIT_2026-09-02.md).
+The clean receipt used one fresh session, two successful provider turns, and
+exactly epoch 0 (Qwen) then epoch 1 (Ling) profiles, each with separate hashed
+serving identity and discovery facts. Handoff was disabled to isolate epoch
+rebinding. This does not cover different providers/windows or cross-epoch
+handoff safety.
+
 ## 2026-09-02 pre-request handoff abort ordering — mirrored, Qwen smoke pending
 
 The settled-turn repair exposed one final race in the real Pi lifecycle:
