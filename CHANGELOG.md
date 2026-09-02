@@ -21,6 +21,12 @@ All notable changes to pi-munchkin are documented here. Releases follow semantic
   any launcher command. It emits a readiness classification and explicitly
   requires human approval; it never contacts the model server or starts Pi.
 
+- **Research-ledger Run 4 is prepared under the repaired budget wall.** The
+  fresh preregistration binds the current surface, uses five frozen questions,
+  holds both arms to the same three-search/five-read allowance, requires a
+  complete baseline and independent judge, and keeps the ledger dark. No model
+  session has started.
+
 ### Fixed (2026-09-02 — research-ledger budget wall)
 
 - **Ledger-enabled non-graph research now enforces its advertised envelope.**

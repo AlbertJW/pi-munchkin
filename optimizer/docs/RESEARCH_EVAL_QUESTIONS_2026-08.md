@@ -313,3 +313,10 @@ skill-level budget should be hard-enforced outside a plan context, add a
 targeted red-green test for that policy, and then rerun a judge-backed
 comparison without pooling this incomplete, unjudged result with earlier
 epochs.
+
+### Run 4 preparation — 2026-09-02
+
+The non-graph budget decision is now implemented: `RESEARCH_LEDGER=on` stops
+after three searches or five distinct source reads, with an explicit evidence
+gap. A fresh five-question A/B preregistration is prepared in
+[`PREREG_QWEN35B_RESEARCH_LEDGER_RUN4_2026-09-02.md`](PREREG_QWEN35B_RESEARCH_LEDGER_RUN4_2026-09-02.md), bound to the current loaded surface and requiring a complete baseline and an independent judge. No Run 4 inference has started; the ledger remains dark.

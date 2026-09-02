@@ -21,6 +21,17 @@ explicitly approved six-session mechanism screen plus three fact-lookup
 controls. Any timeout, branch failure, or missing parent evidence remains
 incomplete rather than a quality result.
 
+## 2026-09-02 research-ledger Run 4 preparation
+
+The fresh ledger comparison is preregistered in
+`optimizer/docs/PREREG_QWEN35B_RESEARCH_LEDGER_RUN4_2026-09-02.md`. It is
+bound to source `5b84241c…`, loaded surface `0c09cb63…`, and Qwen 35B. It uses
+five existing research questions, randomized A/B order, a complete-baseline
+requirement, an independent judge gate, and the same three-search/five-read
+allowance for both arms. No Run 4 session has started; `RESEARCH_LEDGER`
+remains dark. The next safe action is human review and explicit approval of the
+two-arm command, not an automatic run.
+
 The preflight is now codified as
 `python3 optimizer/research-fixtures/preflight.py --dry --agent-dir
 /Users/Albert.Wessels/.pi/agent`. It has been run successfully at the current
