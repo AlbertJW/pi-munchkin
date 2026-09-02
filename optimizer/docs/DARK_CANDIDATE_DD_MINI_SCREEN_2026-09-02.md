@@ -11,11 +11,13 @@ observations only: they are not gate rows, calibration, A/B evidence, or an
 adoption decision.
 
 The live mirror was current for the earlier goal smoke, and has now been
-refreshed after the context handoff repair: `npm run mirror:check --
-/Users/Albert.Wessels/.pi/agent` reports **122 of 122** first-party files match,
-with no unmanaged extensions or orphans. After the planner transport repair,
-the current loaded surface SHA-256 is
-`dc692af100770c84f50959c3c261c76eace603637da1d1b52de136d0560bad2a`.
+refreshed after the context handoff and ledger-budget repairs: `npm run
+mirror:check -- /Users/Albert.Wessels/.pi/agent` reports **122 of 122**
+first-party files match, with no unmanaged extensions or orphans. The current
+source surface SHA-256 is
+`5b84241cbd47bdd61c1d4641166e6ec44f124ddac706778d5c477c3efac551bf`; the
+current loaded mirror surface SHA-256 is
+`0c09cb637992c35176bd7ae4b0865850cb6a17bc2f1e5efaf4c06e59d2c1b4ef`.
 
 The cheapest deterministic probe did run: the candidate-specific suites for
 planning, research ledger, working memory, bash-output guarding, semantic-loop
@@ -78,7 +80,7 @@ older unassigned or stale preregistration values:
 
 | Candidate | Minimal result now | DD evidence currently available | Next useful run | Longer run? |
 |---|---|---|---|---|
-| Hierarchical planner / deep-research graph | Graph, branch, budget, depth, evidence, and settlement contracts pass; the post-repair exact-hash Qwen smoke emitted `research-start` and `child_failed` before its 180-second bound, with one pending and one blocked branch. | Mechanism activation and bounded failure receipts only; no settled branch or answer-quality evidence. Flags remain dark. | Re-preregister against loaded hash `dc692af1…`, then use admitted fixtures and fact-lookup negative controls for a bounded mechanism screen. | **Yes.** A later comparative A/B needs multiple complex, contested, and comparative questions; one session cannot expose branch quality or synthesis trade-offs. |
+| Hierarchical planner / deep-research graph | Graph, branch, budget, depth, evidence, and settlement contracts pass; the post-repair exact-hash Qwen smoke emitted `research-start` and `child_failed` before its 180-second bound, with one pending and one blocked branch. | Mechanism activation and bounded failure receipts only; no settled branch or answer-quality evidence. Flags remain dark. | Three research fixtures are now structurally admitted (manifest/receipt hashes are frozen in `PREREG_QWEN35B_PLANNER_MECHANISM_V2_2026-09-02.md`). Human preflight must bind loaded hash `0c09cb63…`, then run the six-session mechanism screen plus fact-lookup negative controls. | **Yes.** A later comparative A/B needs multiple complex, contested, and comparative questions; one session cannot expose branch quality or synthesis trade-offs. |
 | Persistent goal mode | Goal migration, authority, blocked state, paging, inactive recovery, tool removal, and lifecycle tests pass. The pre-fix DD probes failed before inference with Qwen `failed to parse grammar`; the post-fix live-surface smoke exited 0, created/read the ledger, and settled a goal as `complete`. | **Live mechanism receipt recorded.** The loaded hash is bound and the mirror is clean; no gate, behavior, or quality row is valid yet. | Reissue a current-hash 1–3-session lifecycle screen covering start, pause, resume, block, complete/80-20, and compaction recovery. | **Conditional.** If the lifecycle screen is clean, use paired long-horizon goal tasks to measure persistence and steering cost; do not judge benefit from the smoke. |
 | Dynamic context epochs / handoff | The Qwen startup smoke confirmed epoch wiring. The v1 threshold probe exposed a late-check gap; v2 correctly failed closed on an oversized initial prompt; v3 established two turns but the settled-turn marker was lost before the second handoff check. The follow-up source repairs now abort the active request synchronously before Pi's asynchronous compactor starts and preserve a committed compaction when a later callback reports `Nothing to compact`. | **Clean mechanism receipts recorded.** On loaded hash `251708fe…`, v4 proved one threshold handoff; the rearm screen then proved exactly two one-shot handoffs after below-70% rearming, with two cancelled oversized requests, three successful responses, and zero native compactions. The active-goal preservation screen proved one `ok=true` handoff with a recovery brief and the same active goal ID before and after compaction. The model-switch screen then proved epoch 0 Qwen → epoch 1 Ling rebinding with two successful turns and separate discovery facts. | Prepare and run the remaining dark-candidate mechanism/value screens. A broader cross-provider/window switch remains a later safety study; only afterward decide whether a small paired efficacy study is warranted. | **Yes.** The receipts prove lifecycle reachability, rearming, active-goal preservation, and model-identity epoch rebinding only; they do not measure capacity, quality, or cross-provider/window safety. |
 | Working memory | Exit 0 with one `upsert` and one `list`; both private projections were present. | Mechanism fired, but no comparative value evidence. | A small paired smoke with a task that explicitly needs a durable note, checking note use, context cost, and recovery. | **Yes.** Net value is a context trade-off; use several multi-turn tasks with memory on/off and inspect both success and added tokens before considering adoption. |

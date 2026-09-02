@@ -4,6 +4,17 @@ All notable changes to pi-munchkin are documented here. Releases follow semantic
 
 ## Unreleased
 
+### Added (2026-09-02 — planner research-fixture admission)
+
+- **The dark planner screen now has a structural fixture boundary.** Three
+  research-shaped manifests (comparative, contested, and multi-part) declare
+  independent evidence families, bounded official-source leads, and
+  straightforward fact-lookup negative controls. A fail-closed admission
+  selftest binds prompt hashes, provenance, oracle containment, and receipt
+  digests without fetching sources or running inference. The manifests are
+  prerequisites for the mechanism screen, not quality evidence; planner flags
+  remain dark.
+
 ### Fixed (2026-09-02 — research-ledger budget wall)
 
 - **Ledger-enabled non-graph research now enforces its advertised envelope.**

@@ -1,5 +1,25 @@
 # Handover — pi_munchkin, 2026-08-24
 
+## 2026-09-02 planner research-fixture admission
+
+The hierarchical planner screen now has three structurally admitted research
+fixtures under `optimizer/research-fixtures/`: comparative
+(`compare-http-api-styles`), contested (`password-expiration-guidance`), and
+multi-part (`sqlite-postgres-selection`). `admission.py --selftest` and
+`verify:optimizer` validate their prompt hashes, HTTPS source leads,
+evidence-family/claim coverage, negative controls, bounded local oracle, and
+provenance without network or inference. The exact manifest and admission
+receipt hashes are frozen in
+`optimizer/docs/PREREG_QWEN35B_PLANNER_MECHANISM_V2_2026-09-02.md`.
+
+This is instrument admission only: sources have not been fetched, answers have
+not been judged, and no planner flag changed. The next action is a human
+preflight against the current loaded surface
+`0c09cb637992c35176bd7ae4b0865850cb6a17bc2f1e5efaf4c06e59d2c1b4ef`, then an
+explicitly approved six-session mechanism screen plus three fact-lookup
+controls. Any timeout, branch failure, or missing parent evidence remains
+incomplete rather than a quality result.
+
 ## 2026-09-02 research-ledger budget wall
 
 Run 3 exposed that the ledger footer was only informational outside a plan

@@ -44,6 +44,22 @@ activate `research_plan_start`. Existing coding fixtures are ineligible because
 they cannot expose research branching or parent evidence validation. Fixture
 admission, source manifests, and oracles are prerequisites, not model evidence.
 
+The structural admission pass is now complete for the first slate. It validated
+`optimizer/research-fixtures/admission.py` without network or inference and
+emitted these content-addressed receipts:
+
+| fixture | kind | manifest SHA-256 | admission receipt SHA-256 |
+|---|---|---|---|
+| `compare-http-api-styles` | comparative | `f4543130e6e2414e1acfdc259f457ffab904135291887b8f0dfff48ff51773ad` | `206d6e66eabbb9ee5274fbfe2f05c88e408605d794c7b6171ca9b4ef4ba09b4c` |
+| `password-expiration-guidance` | contested | `786c66c9e8a7a19c8d85afd36729282be6f3360d74e67de8316d000a3e99ccf3` | `8890d33adbeaabd3873752030cbb36e13f995a85b671c9877a12839f3ee2e92f` |
+| `sqlite-postgres-selection` | multi-part | `9aca1c35b47c6054e6cee938bfb91997f97b37abb7a37cd797980db3c625e975` | `d0ce6db9d6c664f1bc8515850ba4103885e0293e072244569e594fa3b58fa7cd` |
+
+This is structural admission only. The URLs are bounded leads, not fetched
+evidence; the local oracle checks only the shape of a future answer artifact.
+The exact source-time cutoff, provenance, and negative-control rules remain
+bound to each manifest. A human still must review the slate and explicitly
+start any model session.
+
 ## Arms and run sequence
 
 The control uses the current deep-research skill with the ledger but with
@@ -88,6 +104,6 @@ efficacy evidence. Only after this mechanism screen passes may a separate
 powered comparative preregistration compare graph and control on evidence
 coverage, synthesis correctness, completeness, context/tool cost, and latency.
 
-No execution is authorized by this file. The next allowed action is fixture
-authoring and admission, followed by an explicit human approval of the exact
-launcher command and current loaded hash.
+No execution is authorized by this file. The next allowed action is a human
+preflight of these admitted manifests, followed by explicit approval of the
+exact launcher command and current loaded hash.
