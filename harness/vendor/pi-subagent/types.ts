@@ -77,6 +77,20 @@ export interface SingleResult {
 	branchReportFailure?: "missing_report" | "invalid_report";
 }
 
+/**
+ * Whether a depth-one planned branch must terminate at the parent boundary.
+ * A clean child exit does not make an absent or invalid branch report safe to
+ * retry: the report is the authoritative hand-off contract, so its failure is
+ * terminal for that branch just like a process error.
+ */
+export function isTerminalPlannedFailureResult(
+	context: Pick<PlanContextV1, "depth"> | undefined,
+	result: Pick<SingleResult, "exitCode" | "stopReason" | "messages" | "sawAgentEnd" | "branchReport" | "branchReportFailure">,
+): boolean {
+	if (!isTerminalPlannedFailure(context)) return false;
+	return Boolean(result.branchReportFailure) || isResultError(result as SingleResult);
+}
+
 /** Metadata attached to every tool result for rendering. */
 export interface SubagentDetails {
 	mode: "single" | "parallel";

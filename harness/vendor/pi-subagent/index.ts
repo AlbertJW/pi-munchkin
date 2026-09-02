@@ -28,6 +28,7 @@ import {
   emptyUsage,
   formatParallelSummaryText,
   isTerminalPlannedFailure,
+  isTerminalPlannedFailureResult,
   parseDelegationMode,
   isResultError,
 } from "./types.js";
@@ -793,12 +794,19 @@ This guard prevents self-recursion and cyclic handoffs (for example A -> B -> A)
       onUpdate,
       makeDetails: makeDetails("single"),
     });
-		publishScoutReceipt(planContext, result);
+	    publishScoutReceipt(planContext, result);
 
-	    if (isResultError(result)) {
-		const terminalPlannedFailure = isTerminalPlannedFailure(planContext);
-		if (terminalPlannedFailure) emitHarnessSignal(pi.events, { v: 1, type: "plan/branch-result", context: planContext!, report: null, failureClass: "child_failed" });
-		const summary = getResultSummaryText(result);
+	    const terminalPlanned = isTerminalPlannedFailure(planContext);
+	    const terminalPlannedFailure = isTerminalPlannedFailureResult(planContext, result);
+	    if (isResultError(result) || terminalPlannedFailure) {
+		if (terminalPlanned) emitHarnessSignal(pi.events, {
+			v: 1,
+			type: "plan/branch-result",
+			context: planContext!,
+			report: null,
+			failureClass: isResultError(result) ? "child_failed" : (result.branchReportFailure ?? "invalid_report"),
+		});
+      const summary = getResultSummaryText(result);
       return {
         content: [
           {

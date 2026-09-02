@@ -4,12 +4,20 @@ import { resolveSubagentTimeoutMs } from "../vendor/pi-subagent/timeout.ts";
 import { parseInheritedCliArgs } from "../vendor/pi-subagent/runner-cli.js";
 import { buildSubagentEnv } from "../vendor/pi-subagent/runner-env.js";
 import { normalizeCompletedResult, emptyUsage, isResultSuccess, type SingleResult } from "../vendor/pi-subagent/types.ts";
-import { isTerminalPlannedFailure } from "../vendor/pi-subagent/types.ts";
+import { isTerminalPlannedFailure, isTerminalPlannedFailureResult } from "../vendor/pi-subagent/types.ts";
 
 test("planned depth-one branch failures are terminal, ordinary failures remain retryable", () => {
 	assert.equal(isTerminalPlannedFailure({ depth: 1 }), true);
 	assert.equal(isTerminalPlannedFailure({ depth: 2 }), false);
 	assert.equal(isTerminalPlannedFailure(undefined), false);
+});
+
+test("clean planned branch exits with an invalid report are terminal, not retryable successes", () => {
+	const base = { exitCode: 0, stopReason: "stop", messages: [], sawAgentEnd: true } as any;
+	assert.equal(isTerminalPlannedFailureResult({ depth: 1 }, { ...base, branchReportFailure: "invalid_report" }), true);
+	assert.equal(isTerminalPlannedFailureResult({ depth: 1 }, { ...base, branchReportFailure: "missing_report" }), true);
+	assert.equal(isTerminalPlannedFailureResult({ depth: 1 }, { ...base, branchReport: {} }), false);
+	assert.equal(isTerminalPlannedFailureResult({ depth: 2 }, { ...base, branchReportFailure: "invalid_report" }), false);
 });
 
 test("subagent argv never inherits API keys", () => {
