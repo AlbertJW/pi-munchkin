@@ -1,5 +1,22 @@
 # Handover — pi_munchkin, 2026-08-24
 
+## 2026-09-02 terminal invalid branch-report handling
+
+The fresh zero-budget nested probe did not expose another report-validation
+loop: its depth-one child timed out while the nested scout was running, and
+the parent correctly stopped after one `child_failed` result. A separate
+contract hole remained, however. A depth-one child that exits cleanly while
+leaving no report (or an invalid report) was returned as an ordinary successful
+tool result, even though the parent graph had no authoritative branch outcome.
+
+The new `isTerminalPlannedFailureResult` policy and wrapper path close that
+hole. Missing or invalid reports now emit the existing blocked branch signal
+and a bounded terminal stop instruction; only ordinary and depth-two failures
+retain retryable error semantics. The targeted policy test was red before the
+change and green afterward. This source boundary is pushed but not yet
+mirrored or measured; keep both planner flags dark and treat future smoke
+results as lifecycle evidence only.
+
 ## 2026-09-02 terminal-child coverage guidance
 
 The zero-budget nested probe reached a fully completed child, but its final

@@ -4,6 +4,16 @@ All notable changes to pi-munchkin are documented here. Releases follow semantic
 
 ## Unreleased
 
+### Fixed (2026-09-02 — terminal invalid branch reports)
+
+- **A clean depth-one child exit cannot masquerade as a successful planned
+  branch.** When a planned child exits with `missing_report` or
+  `invalid_report`, the subagent wrapper now emits the blocked branch signal
+  and a bounded terminal stop message instead of returning a retryable-looking
+  success. Ordinary and depth-two failures are unchanged. The targeted policy
+  regression was red before the fix and green afterward; planner flags remain
+  dark and this is lifecycle evidence only.
+
 ### Fixed (2026-09-02 — terminal child coverage guidance)
 
 - **Terminal research children now get an actionable coverage error.** A
