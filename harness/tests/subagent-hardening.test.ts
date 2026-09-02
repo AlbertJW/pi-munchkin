@@ -4,6 +4,13 @@ import { resolveSubagentTimeoutMs } from "../vendor/pi-subagent/timeout.ts";
 import { parseInheritedCliArgs } from "../vendor/pi-subagent/runner-cli.js";
 import { buildSubagentEnv } from "../vendor/pi-subagent/runner-env.js";
 import { normalizeCompletedResult, emptyUsage, isResultSuccess, type SingleResult } from "../vendor/pi-subagent/types.ts";
+import { isTerminalPlannedFailure } from "../vendor/pi-subagent/types.ts";
+
+test("planned depth-one branch failures are terminal, ordinary failures remain retryable", () => {
+	assert.equal(isTerminalPlannedFailure({ depth: 1 }), true);
+	assert.equal(isTerminalPlannedFailure({ depth: 2 }), false);
+	assert.equal(isTerminalPlannedFailure(undefined), false);
+});
 
 test("subagent argv never inherits API keys", () => {
 	const parsed = parseInheritedCliArgs(["node", "pi", "--provider", "openai", "--api-key", "super-secret", "--model", "gpt"]);

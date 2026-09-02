@@ -27,6 +27,7 @@ import {
   agentDescriptionForPrompt,
   emptyUsage,
   formatParallelSummaryText,
+  isTerminalPlannedFailure,
   parseDelegationMode,
   isResultError,
 } from "./types.js";
@@ -794,17 +795,21 @@ This guard prevents self-recursion and cyclic handoffs (for example A -> B -> A)
     });
 		publishScoutReceipt(planContext, result);
 
-    if (isResultError(result)) {
-		if (planContext?.depth === 1) emitHarnessSignal(pi.events, { v: 1, type: "plan/branch-result", context: planContext, report: null, failureClass: "child_failed" });
+	    if (isResultError(result)) {
+		const terminalPlannedFailure = isTerminalPlannedFailure(planContext);
+		if (terminalPlannedFailure) emitHarnessSignal(pi.events, { v: 1, type: "plan/branch-result", context: planContext!, report: null, failureClass: "child_failed" });
+		const summary = getResultSummaryText(result);
       return {
         content: [
           {
             type: "text" as const,
-            text: `Agent ${result.stopReason || "failed"}: ${getResultSummaryText(result)}`,
+            text: terminalPlannedFailure
+				? `Branch blocked after delegated child failure. ${summary} Stop this branch; do not retry it or call more tools for it.`
+				: `Agent ${result.stopReason || "failed"}: ${summary}`,
           },
         ],
         details: makeDetails("single")([result]),
-        isError: true,
+			...(terminalPlannedFailure ? {} : { isError: true }),
       };
     }
 		if (planContext?.depth === 1) emitHarnessSignal(pi.events, {

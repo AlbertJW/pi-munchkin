@@ -24,6 +24,17 @@ export function parseDelegationMode(raw: unknown): DelegationMode | null {
   return null;
 }
 
+/**
+ * A depth-one planned research branch has an authoritative parent-side
+ * lifecycle. Once its child process fails, the parent graph records that
+ * branch as blocked; returning a generic tool error would invite a model to
+ * retry the same branch indefinitely. Ordinary and depth-two failures retain
+ * retryable error semantics.
+ */
+export function isTerminalPlannedFailure(context: Pick<PlanContextV1, "depth"> | undefined): boolean {
+	return context?.depth === 1;
+}
+
 // c36 (LIVE default-on since 2026-08-07; was dark candidate): the executor
 // role file recommends fork in its description. Rewrite exactly that sentence
 // at injection time — the file on disk stays fork-worded so SPAWN_DELEGATION=off
