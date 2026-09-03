@@ -1,5 +1,19 @@
 # Handover — pi_munchkin, 2026-08-24
 
+## 2026-09-03 planner recovery storage in the gate jail (repository-only)
+
+The authoritative gate audit found a concrete integration gap before another
+planner screen: recovery-mode plan state is written inside the private run
+capsule at `~/.pi/agent/artifacts/run-capsules`, but both Seatbelt profiles
+denied that subtree. The profiles now grant only that capsule subtree, and
+`real_gate.sh` pre-creates its fixed parent before entering the jail; the
+existing workdir, harness, mirror, and unrelated `~/.pi` write denials remain.
+The profile regression was red before the fix and green afterward. The
+managed environment cannot execute `sandbox-exec`, so the selftest statically
+checks both templates and retains the actual mkdir/touch probe for a macOS
+host with the primitive available. This is repository-only: planner flags stay
+dark, the source branch is not mirrored, and no model run occurred.
+
 ## 2026-09-03 planner child-runner setup and redispatch closure (repository-only)
 
 The lease audit found two same-process lifecycle gaps: a planned child

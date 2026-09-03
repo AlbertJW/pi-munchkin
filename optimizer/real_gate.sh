@@ -435,7 +435,7 @@ run_guarded_session() {
 	if [[ "$redir" == ">>" ]]; then
 		# The only caller that genuinely knows it's re-running the SAME interrupted
 		# task in the SAME workdir; plan-runner's session-start resume notice
-		# surfaces any .pi/plan-state.json the aborted first session left behind.
+		# surfaces any private run-capsule plan state the aborted first session left behind.
 		# --no-skills (2026-07-29): skills are part of the descriptor/hash, but gate
 		# prompts deliberately exclude them so skill discovery cannot add a task-
 		# dependent prompt variable. The receipt still identifies the installed

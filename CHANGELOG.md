@@ -4,6 +4,17 @@ All notable changes to pi-munchkin are documented here. Releases follow semantic
 
 ## Unreleased
 
+### Fixed (2026-09-03 — planner recovery storage in the gate jail)
+
+- The authoritative and exploratory Seatbelt profiles now allow only the
+  private `~/.pi/agent/artifacts/run-capsules` subtree needed by
+  `RUN_CAPSULE=recovery`, including hierarchical planner state. `real_gate.sh`
+  pre-creates that fixed root before entering the jail; workdir, harness, and
+  other `~/.pi` paths remain denied. A red profile regression was green after
+  the fix, with a real jailed write probe retained for hosts that provide
+  `sandbox-exec`. Planner flags remain dark; this changes no live default and
+  no model session, mirror, or rollout occurred.
+
 ### Fixed (2026-09-03 — planner child-runner setup and redispatch closure)
 
 - A planned child can fail before its process starts while creating a private
