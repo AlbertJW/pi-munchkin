@@ -1,5 +1,122 @@
 # Handover — pi_munchkin, 2026-08-24
 
+## 2026-09-03 planner child-runner setup failure closure (repository-only)
+
+The lease audit found one remaining same-process failure path: a planned child
+could throw before `runner.ts` returned a structured result while creating its
+private prompt, fork snapshot, or branch-context artifact. The subagent wrapper
+now turns that exception into the bounded child-failure result used by ordinary
+process, timeout, and report failures. Parent branch-result handling therefore
+blocks the branch and releases its durable lease for both single and parallel
+delegation. The diagnostic remains generic so private setup paths do not reach
+the model. A filesystem setup regression was red before the fix and green
+afterward; planner flags stay dark, and there was no model run or mirror
+mutation.
+
+## 2026-09-03 durable deep-research dispatch leases (repository-only)
+
+The planner audit found that reload-safe dispatch ledgers still disappeared on
+a full parent-process restart. Root research branches now carry a durable,
+parent-owned dispatch lease in the v5 graph. Acquisition happens before the
+child process starts and is serialized with graph writes and a cross-process
+plan-state lock; a second process sees
+the lease and is rejected before launch. Validated branch results and explicit
+terminal updates clear it. Recovery converts a stale lease into a bounded
+`blocked` branch with an interruption evidence gap, so retry requires an
+explicit plan update and late child reports cannot reopen the graph. Red-green
+coverage includes restart persistence, result/terminal release, and stale-lease
+recovery. Plan-state replacement is covered by the same lock, and state writes
+fsync the file before rename plus the containing directory. Source hash is
+recorded in the boundary row below; planner flags stay dark, with no inference
+or mirror mutation.
+
+## 2026-09-03 root research dispatch reload durability (repository-only)
+
+The continuing planner audit found the same lifecycle failure one level higher:
+the head planner's set of dispatched depth-one branches lived in the extension
+closure, so an in-process reload could dispatch the same root branch again. Root
+dispatch identity now lives in a run-keyed private `globalThis` ledger that
+survives reload and resets only when the active research run changes. Root
+contexts must also carry the deterministic owner reference derived from their
+run and node, and must be present in the active graph's bounded root-context
+set. A red reload regression, forged-owner check, and inactive-branch check now
+pass, with rejection occurring before the child runner is launched. This remains
+repository-only: planner flags stay dark, no model run or mirror mutation
+occurred, and the source hash is recorded in the boundary row below.
+
+## 2026-09-03 scout-dispatch reload durability (repository-only)
+
+The planner audit found that the two-scout ceiling lived only in the
+depth-one extension closure. An in-process Pi extension reload could therefore
+reset the count and dispatch a third scout. Branch-local dispatch count,
+parent IDs, and owner references now live in a bounded `globalThis` ledger keyed
+by the full branch context; a changed branch identity resets it safely. A
+reload regression was red before the fix and green afterward. This is
+repository-only: flags remain dark, no model run or mirror mutation occurred,
+and the fresh source hash is `012810e8…`.
+
+## 2026-09-03 depth-two context binding (repository-only)
+
+The follow-up planner audit found that a depth-two scout context was checked
+for shape and depth but not bound to the depth-one branch that dispatched it.
+Scout dispatch now requires the full parent branch context, the same run ID, a
+different child node, and the deterministic owner reference minted from that
+run and node. A foreign-run regression was red before the fix and green
+afterward. This is repository-only: planner flags remain dark, no model run or
+mirror mutation occurred, and the fresh source hash is `351dde3d…`.
+
+## 2026-09-03 parent-only planner lease fence (repository-only)
+
+The bottom-up lease audit found that `PI_SUBAGENT_ENV_ALLOW` could reintroduce
+variables explicitly classified as parent-only, including the headless planner
+lease, private branch artifact paths, and parent run identity. The allowlist is
+now additive only: excluded keys remain filtered even when named explicitly.
+A regression was red before the fix and green afterward. This closes the
+child-boundary escape hatch without changing planner defaults; flags remain
+dark, no model run occurred, and the live mirror was not changed.
+
+## 2026-09-03 deep-research parent capability activation (repository-only)
+
+The bottom-up planner audit found that the core-profile skill route could start
+`research_plan_start` after enabling the planning family, but still had no
+`web_search`, `web_read`, or `subagent` tools to execute the new graph. A
+successful start now emits the existing `capability/need` signals for research
+and delegation, so the parent receives those families while preserving explicit
+tool selections and the one-attempt activation latch. The headless lease remains
+parent-only. A red test reproduced the missing tools before the change; the
+integration suite is green afterward. This is repository-only: planner flags and
+defaults remain dark, no model run occurred, and the live mirror was not changed.
+
+## 2026-09-03 planner branch merge and scout identity hardening (repository-only)
+
+The planner audit found two fail-open paths. A delegated report whose child ID
+collided with an unrelated graph node was silently ignored, and a report that
+passed transport validation but violated graph invariants (for example, a
+zero-allocation child) was swallowed by the merge promise; both left the
+owning branch pending indefinitely. The merge now blocks that branch with a
+bounded `merge_collision` or `merge_rejected` reason, admits no incoming child
+claims, and emits the existing `branch-failed` lifecycle receipt. A depth-one
+planner also tracks dispatched leaf IDs and owner references across sequential
+calls, closing the gap where the same scout could be dispatched twice while
+the count stayed below two.
+
+The regressions were red before the fix and green afterward. The targeted
+planner/branch suite passes 8/8 and typecheck is green. This is repository-only
+planner hardening: `PLAN_GRAPH` and `DEEP_RESEARCH_PLANNING` remain dark, no
+model/inference run occurred, and the live mirror was not changed.
+
+## 2026-09-03 Pi consumer compatibility replay (partial)
+
+The current source tarball passes the packaging-only consumer protocol for Pi
+`0.80`: strict peer installation, tarball typecheck, all 30 extension entry
+points, and both bundled skills load cleanly. The `0.81` replay stalled while
+resolving its peer set in the managed environment; after several minutes it
+was stopped, and the required network escalation endpoint returned an
+infrastructure `404` on retry. Pi `0.82` and `0.83` were not run. Treat those
+three ranges as pending for this source surface rather than borrowing the
+older archived compatibility receipts. No Pi process, model, inference, or
+live mirror was involved.
+
 ## 2026-09-03 optimizer V2 recovery hardening (repository-only)
 
 `ae0c44e` fixes three bottom-up audit findings with red-green regressions:

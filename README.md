@@ -205,7 +205,7 @@ model's own window in place with one resume handoff.
 | `CONTEXT_HANDOFF` | on; model switches and safe-budget crossings may request one bounded native compaction and follow-up; rearm is strictly below 75% of the safe-input token budget when absolute tokens are available, otherwise below 70% of Pi's native usage percentage | `off` disables automatic handoff while retaining context profiles |
 | `CONTEXT_DISCOVERY` | off; context profiles use model metadata and local serving truth only | `on` sends one synthetic, local-only handshake per serving fingerprint; it never sends transcript or tool data |
 | `PLAN_GRAPH` | `off`; graph schemas, `plan_expand`, `plan_settle`, and branch reports are absent. The `planning` capability family itself is always available and additively activates the flat `plan_write`/`plan_update` pair, so skills and models can structure multi-item work without `/plan` (2026-08-25) | `on` enables the reusable v5 graph substrate without activating a skill profile |
-| `DEEP_RESEARCH_PLANNING` | `off`; complex research follows the existing bounded skill path | requires `PLAN_GRAPH=on` and `RESEARCH_LEDGER=on`; exposes complex-only `research_plan_start` with a hard 3-search/5-distinct-source-read global envelope, one-shot branch leases, and five parent validation reads |
+| `DEEP_RESEARCH_PLANNING` | `off`; complex research follows the existing bounded skill path | requires `PLAN_GRAPH=on` and `RESEARCH_LEDGER=on`; exposes complex-only `research_plan_start` with a hard 3-search/5-distinct-source-read global envelope, one-shot branch leases, and five parent validation reads. A successful graph start activates the parent research and delegation families through the normal capability boundary. |
 | `SPAWN_DELEGATION` | default-on; delegation guidance recommends `mode=spawn` with self-contained tasks | `off` restores the fork wording |
 | `TOOL_CALL_RESCUE` | default-on; one corrective steer (max 2/session) when a session dies on a text-only pseudo tool call | `off` |
 | `CONTEXT_BRIEF` | default-on; a cached per-session environment brief appended to the system prompt (`CONTEXT_BRIEF_BYTES` bounds it) | `off` |
@@ -292,7 +292,9 @@ sessions.
   run identity deliberately do not cross. Values are never logged.
 - Graph-planned research passes a bounded context through a private per-call temporary artifact.
   A depth-one `research-planner` may dispatch at most two non-planning `research-scout` leaves;
-  its validated terminal report returns to the parent through the event bus. Children never write
+  its parent-owned dispatch lease is persisted in the v5 graph and guarded by a cross-process plan
+  lock; stale leases recover as blocked
+  branches; its validated terminal report returns to the parent through the event bus. Children never write
   the parent capsule, and every delegated source used at settlement must have a successful
   parent-session `research_note` record.
 - `npm run secret-scan:diff` inspects staged, unstaged, and untracked added lines, plus the added

@@ -4,6 +4,95 @@ All notable changes to pi-munchkin are documented here. Releases follow semantic
 
 ## Unreleased
 
+### Fixed (2026-09-03 — planner child-runner setup failure closure)
+
+- A planned child can fail before its process starts while creating a private
+  prompt, fork snapshot, or branch-context artifact. That exception is now
+  converted into the existing bounded child-failure result path, so the parent
+  records a terminal branch failure and releases its durable dispatch lease in
+  both single and parallel delegation modes. The underlying exception is not
+  exposed to the model. The regression was red before the fix and green after
+  it; planner flags and defaults remain dark, with no model run or mirror
+  mutation.
+
+### Fixed (2026-09-03 — durable deep-research dispatch leases)
+
+- Root research branches now acquire a parent-authoritative lease in the v5
+  graph immediately before a child starts. The lease survives a full parent
+  process restart, so a recovered session cannot launch the same branch twice.
+- Validated branch results and explicit terminal plan updates release the lease;
+  stale leases found during recovery become blocked with a bounded evidence gap
+  and require an explicit reopen before retrying. Plan-state mutations now also
+  use a bounded cross-process lock and durable file/directory sync, including
+  atomic plan replacement. Planner flags and defaults remain dark; no model run
+  occurred.
+
+### Fixed (2026-09-03 — root research dispatch reload durability)
+
+- The head planner's one-dispatch-per-depth-one-branch guard now survives an
+  in-process extension reload through a run-keyed private runtime ledger. Root
+  contexts also require their deterministic owner reference, so a forged branch
+  cannot consume a child slot or create an unmergeable delegated run.
+- Red-green coverage proves a duplicate root dispatch is rejected before launch
+  after reload. Planner flags and defaults remain dark; no model run occurred.
+
+### Fixed (2026-09-03 — scout-dispatch reload durability)
+
+- The depth-one research planner's two-scout ceiling now survives an in-process
+  extension reload. Count, child identities, and owner references are retained
+  in a branch-keyed private runtime ledger and reset only for a new branch.
+- Red-green coverage proves a third scout is rejected before launch after a
+  reload. Planner flags and defaults remain dark; no model run occurred.
+
+### Fixed (2026-09-03 — depth-two context binding)
+
+- Planned research scouts must now use a depth-two context belonging to the
+  dispatching branch's run, with a deterministic owner reference and a distinct
+  child node. Foreign or forged contexts fail before a child process starts.
+- Red-green coverage exercises the foreign-run rejection. Planner flags and
+  defaults remain dark; no model run occurred.
+
+### Fixed (2026-09-03 — parent-only planner lease fence)
+
+- Explicit subagent environment allowlists can no longer reintroduce
+  parent-only planner leases, private branch artifacts, telemetry handles, or
+  parent run identity. The allowlist remains additive while the exclusion
+  fence stays authoritative.
+- Red-green coverage exercises the escape hatch directly. Planner flags and
+  defaults remain dark; no model run occurred.
+
+### Fixed (2026-09-03 — planner branch merge fail-closed boundary)
+
+- Delegated research results with a child-ID collision or a graph-invariant
+  violation now block only the owning branch instead of being silently ignored
+  or leaving the graph open. Incoming child claims are not admitted on the
+  failure path, and a `branch-failed` receipt records the bounded reason.
+- A depth-one research planner now rejects sequential reuse of the same
+  depth-two leaf/owner, not just duplicates within one dispatch call. This
+  preserves the two-leaf ceiling across the entire branch lifecycle.
+- Red-green coverage exercises both merge failures and the cross-call scout
+  identity fence. Planner flags and defaults remain dark; no model run occurred.
+
+### Fixed (2026-09-03 — deep-research parent capability activation)
+
+- A successful `research_plan_start` now requests the parent research and
+  delegation capability families through the existing activation boundary. The
+  normal core-profile skill route can therefore search and delegate after
+  creating a graph while preserving explicit tool selections and the
+  one-attempt activation latch.
+- A red-green integration test covers the complete planning-to-execution route.
+  Planner flags and defaults remain dark; no model run occurred.
+
+### Partial (2026-09-03 — Pi consumer compatibility replay)
+
+- The current `7cd1ac5` source tarball was rechecked against Pi `0.80` with
+  strict peer installation, typecheck, all 30 extension entry points, and both
+  bundled skills loaded successfully. The `0.81` replay could not resolve its
+  peer set in the managed environment and was stopped after the network
+  escalation endpoint returned an infrastructure `404`; `0.82` and `0.83`
+  were not attempted. These ranges remain pending for this source surface and
+  must not be inferred from older compatibility receipts.
+
 ### Verified (2026-09-03 — Pi 0.84 consumer compatibility)
 
 - `npm run compat:consumer -- 0.84` now completes cleanly: the packed tarball
