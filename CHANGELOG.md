@@ -12,7 +12,9 @@ All notable changes to pi-munchkin are documented here. Releases follow semantic
   descendant diff directly to the baseline.
 - Event-store readers now treat an unterminated final JSONL record as a
   reportable EOF tail; status/inspect/replay remain non-mutating and explicit
-  recovery records only the tail's byte count and digest.
+  recovery records only the tail's byte count and digest. A complete
+  unterminated event is delimiter-repaired and retained; only an incomplete or
+  invalid suffix is truncated.
 - Branch reports now sync their bytes before close and sync the containing
   directory after rename. The optimizer preflight source pin was rebound to
   the new source surface; all changes remain repository-only and dark.
