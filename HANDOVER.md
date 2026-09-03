@@ -1,5 +1,22 @@
 # Handover — pi_munchkin, 2026-08-24
 
+## 2026-09-03 fixture-bound planner launcher (repository-only)
+
+The planner screen launcher no longer relies on an operator copying prompt text
+from a manifest. `e8afded` adds a checked-in admission path: pass
+`--fixture-manifest` and its canonical `--expected-fixture-sha256` to derive the
+primary prompt, or add `--negative-control` to derive the embedded lightweight
+fact lookup. The launcher rejects digest drift, symlink/out-of-slate manifests,
+and prompt-file mismatches, and reports only fixture ID, role, and digest in its
+safe summary. Legacy `--prompt-file` use remains available for older diagnostics.
+
+The targeted fixture-binding tests were red before the helper/CLI existed and
+are green afterward; Optimizer V2 offline verification passes (44 Python tests
+in the v2 suite). This is optimizer tooling only: source surface remains
+`d1b17fd8…`, loaded mirror remains `d83baa71…`, planner flags remain dark, and
+no provider or Pi session ran. The v7 preregistration now has a reproducible
+manifest-bound command for all four candidates and all four controls.
+
 ## 2026-09-03 planner completion-shaped fixture (prepared, no sessions)
 
 The next useful planner step is prepared but deliberately unexecuted. The

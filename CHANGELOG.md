@@ -4,6 +4,14 @@ All notable changes to pi-munchkin are documented here. Releases follow semantic
 
 ## Unreleased
 
+### Fixed (2026-09-03 — fixture-bound planner launcher)
+
+- The dark planner smoke launcher can now validate an admitted research
+  manifest against its canonical digest, derive its primary prompt or embedded
+  negative control, and label the safe summary without retaining prompt text.
+  Legacy prompt files remain supported, but a supplied file must exactly match
+  the admitted prompt. No model execution or default changed.
+
 ### Prepared (2026-09-03 — planner completion-shaped fixture screen)
 
 - Added the admitted `compare-json-yaml-config` fixture and relaxed the stale

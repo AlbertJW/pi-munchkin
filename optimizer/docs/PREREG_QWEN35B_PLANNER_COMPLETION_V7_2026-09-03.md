@@ -72,6 +72,27 @@ The preflight output must report four fixture IDs, the exact hashes above, both
 arm flag maps, `inference_started:false`, and the Qwen subject. These commands
 never contact the model server, fetch a source, or launch Pi.
 
+For each session, use the fixture-bound launcher path so the prompt cannot drift
+from the admitted manifest. For example, the completion-shaped candidate is
+prepared with:
+
+```sh
+python3 -m optimizer.v2.planner_smoke --dry \
+  --agent-dir /Users/Albert.Wessels/.pi/agent \
+  --project-dir /private/research-project \
+  --fixture-manifest optimizer/research-fixtures/manifests/compare-json-yaml-config.json \
+  --expected-fixture-sha256 c59fd0a480fc370b17e3df7fb8fccbbbf0279b2932ef6049791f7cd03adab646 \
+  --expected-surface d83baa71d3eb6d9d79afac7d1adda2b2cf08f96e92c1f7c7785b524bae6fdc09 \
+  --model local-llamacpp/qwen36-35b-iq3s --arm candidate
+```
+
+Replace only the manifest and its digest for the other three primary fixtures.
+For each negative control, add `--negative-control` to the same fixture-bound
+arguments; the launcher derives the embedded fact-lookup prompt and labels the
+safe result `fixture_role:negative_control`. The `--run` command uses the same
+arguments plus private `--output`, `--stderr`, and `--telemetry` paths; it still
+requires a separate human approval.
+
 ## Arms and bounded run order
 
 Use the hash-verifying `optimizer/v2/planner_smoke.py` launcher with the exact

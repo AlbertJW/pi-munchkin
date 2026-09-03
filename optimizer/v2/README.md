@@ -106,6 +106,14 @@ python3 -m optimizer.v2.planner_smoke --dry --agent-dir /private/agent-copy \
   --project-dir /private/research-project --prompt-file /private/prompt.txt \
   --expected-surface <loaded-surface-sha256> --model local-llamacpp/qwen36-35b-iq3s \
   --arm candidate
+
+# use an admitted fixture (the prompt is derived and digest-checked)
+python3 -m optimizer.v2.planner_smoke --dry --agent-dir /private/agent-copy \
+  --project-dir /private/research-project \
+  --fixture-manifest optimizer/research-fixtures/manifests/compare-json-yaml-config.json \
+  --expected-fixture-sha256 <fixture-manifest-sha256> \
+  --expected-surface <loaded-surface-sha256> --model local-llamacpp/qwen36-35b-iq3s \
+  --arm candidate
 ```
 
 The example is deterministic and performs no network or model inference.
@@ -120,6 +128,15 @@ captured under one byte ceiling and the whole child process group is stopped on
 either that ceiling or the wall-clock limit. `--selftest` and `--dry` never
 launch Pi and print only bounded classifications. The utility does not alter
 defaults, the live mirror, or optimizer candidate state.
+
+For a fixture-bound screen, pass `--fixture-manifest` together with its
+canonical admission digest in `--expected-fixture-sha256`. The launcher then
+validates the manifest against the checked-in admission rules, derives the
+prompt from that manifest, and includes only the fixture ID and digest in the
+safe summary. A legacy `--prompt-file` remains supported; when both forms are
+provided, their text must match exactly. Add `--negative-control` to derive the
+manifest's fact-lookup prompt instead; it requires the manifest path and is
+labelled `fixture_role:negative_control` in the safe summary.
 
 The first prepared live manifest is
 `campaigns/qwen35b-config-tiny-20260827/campaign.json`. `prepare` and `dry` are
