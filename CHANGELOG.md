@@ -4,6 +4,17 @@ All notable changes to pi-munchkin are documented here. Releases follow semantic
 
 ## Unreleased
 
+### Fixed (2026-09-03 — planner headless activation boundary)
+
+- **The dark deep-research graph now has an explicit parent-only headless
+  lease.** `PI_MUNCHKIN_HEADLESS_PLAN=on` activates the graph entrypoint,
+  bounded graph mutations, research tools, citation ledger, and delegation at
+  startup for an explicitly opted-in parent launcher. Delegated children do
+  not inherit the lease; they receive only their typed private plan context.
+  Ordinary sessions and planner defaults remain unchanged. The regression was
+  red before the fix and green afterward; a fresh v3 preregistration is
+  required before any further model session.
+
 ### Measured (2026-09-03 — first planner-screen receipt)
 
 - The first bounded Qwen 35B comparative planner-screen session reached the

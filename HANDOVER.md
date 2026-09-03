@@ -43,7 +43,17 @@ the stale `5b84241c…` default; the repaired planner preregistration and defaul
 are bound to source `62b1e565…` at the frozen source/config snapshot `98df5ed`
 (the model-visible surface last changed in `62b9bfb`; later commits are
 optimizer/preflight and documentation changes). The loaded mirror is now
-`9629b4db…`, and no planner session has started.
+`9629b4db…`, and no planner session has started under the new boundary.
+
+The first receipt exposed a startup reachability gap: `research_plan_start`,
+graph mutations, web tools, and delegation were all deferred even with the
+candidate flags enabled. Source commit `db61e8e` adds the explicit
+parent-only `PI_MUNCHKIN_HEADLESS_PLAN=on` lease to the planner launcher and
+excludes it from child environments. The targeted activation test is red→green
+and the full offline suite is green. See
+`optimizer/docs/PREREG_QWEN35B_PLANNER_MECHANISM_V3_2026-09-03.md`; mirror and
+loaded-hash rebinding remain the next gated steps. The old receipt cannot pool
+with a fresh lease-enabled screen.
 
 ## 2026-09-02 research-ledger Run 4 preparation
 
