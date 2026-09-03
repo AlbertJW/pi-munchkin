@@ -4,6 +4,24 @@ All notable changes to pi-munchkin are documented here. Releases follow semantic
 
 ## Unreleased
 
+### Fixed (2026-09-03 — planner ownership and budget audit)
+
+- Bound delegated branch results to the parent-issued lease and retry epoch;
+  unleased, late, and cross-generation reports are ignored safely.
+- Preserved global discovery accounting across retries, burned uncertain
+  budget for missing/malformed reports, fenced scout allocations to the
+  branch remainder, and prevented already-dispatched scout leaves from being
+  replaced in later reports.
+- Kept `branch_plan` available to depth-one planner children and prevented
+  delegated processes from reclaiming a live parent lease during startup;
+  private report directories are explicitly tightened before publication.
+
+Targeted planner integration, branch-report, subagent-hardening,
+tool-activation, graph-unit tests, and typecheck pass. Planner flags remain
+dark; this is repository-only with no model inference, mirror, rollout, or
+push. The current source surface is `4d37bc8a…`; the loaded mirror remains
+`73bbd494…` and must be rebound before any future smoke.
+
 ### Fixed (2026-09-03 — complete planner graph export)
 
 - `/plan-export` now writes a recursive graph to `.pi/TODO.md`, including

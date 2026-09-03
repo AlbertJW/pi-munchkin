@@ -152,6 +152,8 @@ npm run surface:hash:source
 
 | 2026-09-03 (75) | planner preflight source rebinding after complete-graph export: stale source identity fails closed and the no-inference dry path binds the current checkout | `pending source boundary` | source `9cf1476a16450c1611d3e07c41d11574b1b2810f58362ac75940a3e33fc71641` / loaded `73bbd494f5c23f3b7262bd9f17c44b57574ca23d4b211c07dbd1d6067c23c315` | **VERIFIED OFFLINE.** `preflight.py --selftest` and `--dry` pass after rebinding; no model, mirror, planner-default, or adoption change occurred. |
 
+| 2026-09-03 (76) | bottom-up planner ownership and budget audit: leased/epoch-bound results, cumulative retry accounting, uncertain-budget burn, scout remainder fencing, dispatched-leaf retention, delegated-child startup isolation, and private report-directory tightening | `b41b7fc` + pending docs boundary | source `4d37bc8a972064ffe81ffd34d3e5f161b319f03c6bc199990d60609ee0408898` / loaded `73bbd494f5c23f3b7262bd9f17c44b57574ca23d4b211c07dbd1d6067c23c315` | **REPOSITORY-ONLY; PENDING ROLLOUT.** 58 targeted planner/branch/subagent/tool-activation tests, typecheck, preflight selftest, and no-inference dry path pass. Planner flags remain dark; the source branch is not pushed or mirrored, no model session occurred, and any future smoke requires a fresh human-approved preflight plus loaded-hash rebind. |
+
 The older packaging-series PR 4 changed package, CI, operational tooling, and narrative without
 entering the runtime manifest. That historical statement does not apply to the spiral-control PR 4
 retirement draft above, which deliberately changes the descriptor and therefore gets its own row.

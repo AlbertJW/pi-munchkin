@@ -1,5 +1,27 @@
 # Handover — pi_munchkin, 2026-08-24
 
+## 2026-09-03 planner bottom-up audit: ownership and budget fences (repository-only)
+
+The deep-research graph audit found four integrity gaps and closed them with
+targeted red-green regressions. A branch result now requires the parent-issued
+lease and dispatch epoch, so an unlaunched or late child cannot mutate an open
+branch. Reopened branches receive only the authoritative unspent remainder;
+invalid or missing reports conservatively consume uncertain discovery budget,
+and repeated malformed coverage reports fail closed. Depth-two scout
+allocations are checked against the branch remainder, and a report cannot drop
+a scout after it has been dispatched (which would otherwise hide its usage and
+permit envelope reuse). Finally, delegated planner/scout processes no longer
+run parent stale-lease recovery when they share a project-storage directory,
+and depth-one planner children retain the `branch_plan` protocol tool after
+startup narrowing. Private branch-report directories are tightened to `0700`
+before publication.
+
+The offline planner suites and typecheck are green (58 targeted tests); the
+planner remains dark and repository-only. Source pin is now `4d37bc8a…` while
+the loaded mirror remains `73bbd494…`; no inference, mirror, rollout, or push
+occurred. The next safe step is a fresh approved preflight and, only after a
+human gate, a bounded complex-research screen.
+
 ## 2026-09-03 complete planner graph export (repository-only)
 
 The graph presentation audit found that `/plan-export` wrote a root-only
