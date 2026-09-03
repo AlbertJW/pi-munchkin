@@ -4,6 +4,16 @@ All notable changes to pi-munchkin are documented here. Releases follow semantic
 
 ## Unreleased
 
+### Fixed (2026-09-03 — require actual retrieval receipts for planner completion)
+
+- A deep-research branch or scout can no longer declare complete coverage without
+  at least one safe retrieval execution receipt. Split branches may still rely on
+  their scouts' receipts; direct branches and terminal scouts fail closed when
+  coverage metadata is absent. The targeted regressions were red before the guard
+  and green afterward. The source surface is `015c4fe3…`; the loaded mirror
+  remains `73bbd494…`. Planner flags remain dark; no model execution, mirror,
+  rollout, or push occurred.
+
 ### Fixed (2026-09-03 — rebind planner preflight after receipt hardening)
 
 - The no-inference planner preflight now pins the current source surface after

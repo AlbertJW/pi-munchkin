@@ -1,5 +1,21 @@
 # Handover — pi_munchkin, 2026-08-24
 
+## 2026-09-03 require actual retrieval receipts for planner completion (repository-only)
+
+The bottom-up planner audit found one remaining receipt fail-open: a direct
+branch, or a terminal scout with no coverage metadata, could claim complete
+coverage without any observed web retrieval. Direct branches now require at
+least one actual safe retrieval receipt; terminal scouts require the same from
+their returned receipt. Split parents may have zero local calls when their
+children supply the terminal coverage. Counterfactual regressions were red
+before the guard and green afterward.
+
+The isolated planner integration suite is green at 38/38; the source surface is
+`015c4fe3e94436d432ef5d002d7edae239f2dc282fa482ff359fca576aeaedc3`; loaded
+mirror remains `73bbd494f5c23f3b7262bd9f17c44b57574ca23d4b211c07dbd1d6067c23c315`.
+Planner flags remain dark. No model execution, mirror, rollout, or push occurred;
+a future smoke needs a fresh approved preflight and loaded-hash rebind.
+
 ## 2026-09-03 rebind planner preflight after receipt hardening (repository-only)
 
 The receipt-boundary source change invalidated the planner preflight's pinned
