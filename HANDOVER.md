@@ -1,5 +1,14 @@
 # Handover — pi_munchkin, 2026-08-24
 
+## 2026-09-03 planner screen order binding (documentation-only)
+
+The v7 preregistration now records the deterministic seed
+`planner-v7-2026-09-03` and the exact eight candidate plus four control fixture
+order generated from it. This closes an auditability gap in the phrase
+“randomized order”: a future approved run can be replayed and checked for order
+effects without regenerating a different sequence. No source, launcher, mirror,
+model, or default changed.
+
 ## 2026-09-03 fixture-bound planner launcher (repository-only)
 
 The planner screen launcher no longer relies on an operator copying prompt text

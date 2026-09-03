@@ -4,6 +4,12 @@ All notable changes to pi-munchkin are documented here. Releases follow semantic
 
 ## Unreleased
 
+### Fixed (2026-09-03 — planner screen order binding)
+
+- Recorded the v7 planner screen's seeded randomization string and exact
+  candidate/control fixture order so an approved run can be replayed and
+  audited for order effects. No runtime, model surface, or default changed.
+
 ### Fixed (2026-09-03 — fixture-bound planner launcher)
 
 - The dark planner smoke launcher can now validate an admitted research

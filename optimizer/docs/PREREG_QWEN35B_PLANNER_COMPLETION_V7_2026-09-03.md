@@ -104,10 +104,27 @@ profile, context, endpoint, semantic-loop, or tool setting may differ.
 
 Run eight candidate sessions, two for each fixture, in a preregistered
 randomized order. Then run four negative controls, one for each fixture, in a
-separately randomized order. Use a fresh disposable Pi agent directory and
-private output paths for every session. A timeout, output cap, missing report,
-or interrupted child is an incomplete lifecycle observation, never a pass or
-quality score.
+separately randomized order. The order is generated with Python's seeded
+`random.Random("planner-v7-2026-09-03")` and is fixed here before execution:
+
+```text
+candidate: password-expiration-guidance,
+           sqlite-postgres-selection,
+           compare-http-api-styles,
+           compare-json-yaml-config,
+           sqlite-postgres-selection,
+           compare-http-api-styles,
+           compare-json-yaml-config,
+           password-expiration-guidance
+control:   compare-http-api-styles,
+           sqlite-postgres-selection,
+           password-expiration-guidance,
+           compare-json-yaml-config
+```
+
+Use a fresh disposable Pi agent directory and private output paths for every
+session. A timeout, output cap, missing report, or interrupted child is an
+incomplete lifecycle observation, never a pass or quality score.
 
 ## Mechanism acceptance and stop rules
 
