@@ -182,6 +182,17 @@ test("research budget control propagates while ledger remains independently sele
 	assert.equal(env.RESEARCH_LEDGER, "off");
 });
 
+test("Jina Reader opt-in propagates to children without leaking private reader state", () => {
+	const env = buildSubagentEnv({
+		PATH: "/bin", JINA_READER: "on",
+		PI_MUNCHKIN_PLAN_CONTEXT_PATH: "/private/context.json",
+		PI_MUNCHKIN_BRANCH_REPORT_PATH: "/private/report.json",
+	});
+	assert.equal(env.JINA_READER, "on");
+	assert.equal(env.PI_MUNCHKIN_PLAN_CONTEXT_PATH, undefined);
+	assert.equal(env.PI_MUNCHKIN_BRANCH_REPORT_PATH, undefined);
+});
+
 test("subagent summary cap is tunable via PI_SUBAGENT_MAX_SUMMARY_CHARS", async () => {
 	const result = { messages: [{ role: "assistant", content: [{ type: "text", text: "x".repeat(20000) }] }] };
 	const prev = process.env.PI_SUBAGENT_MAX_SUMMARY_CHARS;

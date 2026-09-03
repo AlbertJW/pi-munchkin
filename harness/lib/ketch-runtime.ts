@@ -2,6 +2,36 @@ import { spawn } from "node:child_process";
 
 export const MIN_KETCH_VERSION = "0.12.0";
 export const DEFAULT_SEARCH_BACKENDS = ["ddg", "exa", "keenable"] as const;
+export const JINA_READER_ORIGIN = "https://r.jina.ai/";
+const JINA_READER_HOST = "r.jina.ai";
+const MAX_READER_URL_LENGTH = 1_999;
+
+function normalizeReaderTarget(raw: string): URL {
+	if (typeof raw !== "string" || /[\u0000-\u001f\u007f]/.test(raw)) throw new Error("URL is malformed");
+	let url: URL;
+	try { url = new URL(raw.trim()); } catch { throw new Error("URL is malformed"); }
+	if (url.protocol !== "http:" && url.protocol !== "https:") throw new Error("only public HTTP(S) URLs are allowed");
+	if (url.username || url.password) throw new Error("URL credentials are not allowed");
+	if (url.toString().length > MAX_READER_URL_LENGTH) throw new Error("URL is too long");
+	// Fragments are never sent to an HTTP server and can make the wrapped URL
+	// look like it targets a different resource. Keep the formatter canonical.
+	url.hash = "";
+	return url;
+}
+
+/** Return the static no-key Jina Reader URL for a validated HTTP(S) target. */
+export function formatJinaReaderUrl(raw: string): string {
+	const url = normalizeReaderTarget(raw);
+	if (url.hostname.toLowerCase() === JINA_READER_HOST) return url.toString();
+	return `${JINA_READER_ORIGIN}${url.toString()}`;
+}
+
+/** Recover the original target when a Reader response echoes its wrapped URL. */
+export function unwrapJinaReaderUrl(raw: string): string | null {
+	if (typeof raw !== "string" || !raw.startsWith(JINA_READER_ORIGIN)) return null;
+	const target = raw.slice(JINA_READER_ORIGIN.length);
+	try { return normalizeReaderTarget(target).toString(); } catch { return null; }
+}
 
 // Homebrew is the natural default on macOS, but pointing Linux/other users at
 // `brew install` produces a confusing "brew: command not found" dead end.

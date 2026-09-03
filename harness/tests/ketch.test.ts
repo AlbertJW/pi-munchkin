@@ -5,6 +5,7 @@ import { join } from "node:path";
 import test from "node:test";
 import {
 	buildKetchEnv,
+	formatJinaReaderUrl,
 	formatReadResults,
 	formatSearchResults,
 	ketchInstallHint,
@@ -12,6 +13,7 @@ import {
 	parseSearchResults,
 	parseSemver,
 	runKetchProcess,
+	unwrapJinaReaderUrl,
 	versionAtLeast,
 } from "../lib/ketch-runtime.ts";
 import { callTool, makeFakePi } from "./integration-harness.ts";
@@ -80,6 +82,15 @@ test("Ketch version and JSON normalizers are strict, compact, and source-preserv
 		assert.ok(long.text.includes(`URL: ${row.url}`), `every URL must survive: ${row.url.slice(0, 40)}…`);
 	}
 	assert.ok(long.text.includes("SOURCE 5"), "no later source may be dropped");
+});
+
+test("Jina Reader URL formatting is static, idempotent, and rejects unsafe inputs", () => {
+	assert.equal(formatJinaReaderUrl("https://example.com/path?q=1#fragment"), "https://r.jina.ai/https://example.com/path?q=1");
+	assert.equal(formatJinaReaderUrl("https://r.jina.ai/https://example.com/path?q=1"), "https://r.jina.ai/https://example.com/path?q=1");
+	assert.equal(unwrapJinaReaderUrl("https://r.jina.ai/https://example.com/path?q=1"), "https://example.com/path?q=1");
+	assert.equal(unwrapJinaReaderUrl("https://example.com/path"), null);
+	assert.throws(() => formatJinaReaderUrl("file:///etc/passwd"), /HTTP\(S\)/);
+	assert.throws(() => formatJinaReaderUrl("https://user:pass@example.com/private"), /credentials/);
 });
 
 test("Ketch child environment excludes unrelated model and shell credentials", () => {
@@ -213,6 +224,41 @@ test("planned research enforces assigned search and distinct-source read budgets
 		delete (globalThis as Record<string, unknown>).__pi_ketch_version_checks_v1;
 		delete (globalThis as Record<string, unknown>).__pi_research_state;
 		delete (globalThis as Record<string, unknown>).__pi_active_plan_context;
+	}
+});
+
+test("opt-in Jina Reader mode rewrites only the fetch URL and restores the cited source URL", async () => {
+	const dir = mkdtempSync(join(tmpdir(), "ketch-jina-reader-"));
+	const argFile = join(dir, "scrape-args.txt");
+	const mock = join(dir, "ketch-jina");
+	writeFileSync(mock, `#!/bin/sh
+case "$1" in
+  version) printf 'ketch v0.12.0\\n' ;;
+  scrape) shift; printf '%s\\n' "$*" > "$KETCH_ARGFILE"; printf '{"url":"https://r.jina.ai/https://example.com/a","title":"Reader page","markdown":"Jina-normalized source text"}\\n' ;;
+  *) exit 2 ;;
+esac
+`);
+	chmodSync(mock, 0o755);
+	const snapshot = Object.fromEntries(["KETCH", "KETCH_BIN", "JINA_READER", "KETCH_ARGFILE", "TELEMETRY_FILE", "TELEMETRY_SOURCE"].map((key) => [key, process.env[key]]));
+	try {
+		delete process.env.KETCH;
+		process.env.KETCH_BIN = mock;
+		process.env.JINA_READER = "on";
+		process.env.KETCH_ARGFILE = argFile;
+		process.env.TELEMETRY_FILE = join(dir, "events.jsonl");
+		process.env.TELEMETRY_SOURCE = "test";
+		const fp = makeFakePi();
+		const mod = await import(`../extensions/ketch.ts?jina=${Date.now()}-${Math.random()}`);
+		mod.registerKetch(fp.pi as never, { resolvePublicUrl: async (raw: string) => new URL(raw).toString() });
+		const out = await callTool(fp, "web_read", { urls: ["https://example.com/a"], reader: "jina" }, dir);
+		assert.equal(out.details.reader, "jina");
+		assert.match(out.content[0].text, /URL: https:\/\/example\.com\/a/);
+		assert.doesNotMatch(out.content[0].text, /URL: https:\/\/r\.jina\.ai\//);
+		assert.match(readFileSync(argFile, "utf8"), /https:\/\/r\.jina\.ai\/https:\/\/example\.com\/a/);
+	} finally {
+		restoreEnv(snapshot);
+		rmSync(dir, { recursive: true, force: true });
+		delete (globalThis as Record<string, unknown>).__pi_ketch_version_checks_v1;
 	}
 });
 

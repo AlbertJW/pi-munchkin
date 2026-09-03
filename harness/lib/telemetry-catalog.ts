@@ -173,7 +173,7 @@ export const EVENT_CATALOG = {
 		duration_ms: "number", truncated: "boolean", outcome: "string",
 	},
 	"ketch/read": {
-		sources: "number", succeeded: "number", failed: "number", chars: "number",
+		reader: "string", sources: "number", succeeded: "number", failed: "number", chars: "number",
 		duration_ms: "number", truncated: "boolean", outcome: "string",
 	},
 	"context-watcher/compacted": { ...usage, requester: "string", contentProvider: "string", reason: "string", willRetry: "boolean", tokensBefore: "number" },
