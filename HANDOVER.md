@@ -1,5 +1,21 @@
 # Handover — pi_munchkin, 2026-08-24
 
+## 2026-09-03 delegated failure provenance repair
+
+The v6 planner diagnostic exposed one more harness-side defect: a failed
+subagent could return a nested `{isError:true}` result while Pi’s outer
+`tool_execution_end` event carried `isError:false`. The run kernel then wrote a
+successful receipt for a failed child. A targeted red-green test now covers
+that boundary, and `cde0c84` promotes the nested flag into the effective error
+classification and receipt. The full suite passes 676/676; no planner default
+or model-facing route changed.
+
+The new source surface is
+`8e4c6d21e6e336f4d4c11f534f952e0767a999e1b41725dc231ff8857c29f582`.
+The next ceremony step is a pushed pending boundary, a clean mirror rebind,
+and a small pinned runtime smoke to verify the telemetry path. This repair is
+observability/provenance evidence only and does not qualify the planner.
+
 ## 2026-09-03 planner budget guidance diagnostic
 
 The v6 preregistered diagnostic ran after the source fix was pushed and

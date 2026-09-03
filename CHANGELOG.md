@@ -4,6 +4,15 @@ All notable changes to pi-munchkin are documented here. Releases follow semantic
 
 ## Unreleased
 
+### Fixed (2026-09-03 — nested delegated-tool failure provenance)
+
+- **Run-kernel receipts now honor nested tool-result errors.** Pi’s JSON
+  execution envelope can carry `{isError:true}` inside a result while the
+  outer event is not marked as an error; those delegated failures are now
+  classified as failed receipts instead of successful work. The targeted
+  regression and full offline suite pass. Planner flags and defaults remain
+  unchanged.
+
 ### Fixed (2026-09-03 — planner preflight identity rebind)
 
 - Rebound the no-inference planner preflight defaults to the current source
