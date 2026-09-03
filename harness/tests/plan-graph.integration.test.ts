@@ -25,7 +25,7 @@ if (!CHILD) {
 			const output = execFileSync(process.execPath, [
 				"--experimental-strip-types", "--experimental-loader", resolve("harness/tests/ts-js-resolver.mjs"), "--test", import.meta.filename,
 			], { cwd: process.cwd(), env, encoding: "utf8", stdio: "pipe" });
-			assert.match(output, /pass 21/);
+			assert.match(output, /pass 22/);
 		} finally { rmSync(artifacts, { recursive: true, force: true }); }
 	});
 } else {
@@ -261,6 +261,35 @@ if (!CHILD) {
 		fp.pi.events.emit(HARNESS_SIGNAL_CHANNEL, { v: 1, type: "plan/branch-result", context, report: { ...report, note: "late child result" }, failureClass: null });
 		await fire(fp, "before_agent_start", {}, makeCtx(cwd).ctx);
 		assert.equal(readFileSync(join(cwd, ".pi", "plan-state.json"), "utf8"), frozen, "late child results cannot mutate a settled graph");
+		resetPiGlobals();
+	});
+
+	test("explicit branch retries receive only the unspent budget and accumulate usage", async () => {
+		const fp = fresh(); const cwd = tmp();
+		const started = await callTool(fp, "research_plan_start", { request: "Retry bounded research", summary: "one branch", branches: [{ title: "Evidence", budget: { searches: 2, reads: 3 } }] }, cwd);
+		const context = started.details.contexts[0];
+		const firstReport = {
+			v: 1, parent_item_id: context.parent_item_id, owner_ref: context.owner_ref, status: "done", note: "first attempt",
+			consumed: { searches: 1, reads: 1 }, evidence_gaps: [], source_leads: [], children: [], coverage,
+		};
+		fp.pi.events.emit(HARNESS_SIGNAL_CHANNEL, { v: 1, type: "plan/branch-result", context, report: firstReport, failureClass: null });
+		await fire(fp, "before_agent_start", {}, makeCtx(cwd).ctx);
+		assert.deepEqual(JSON.parse(readFileSync(join(cwd, ".pi", "plan-state.json"), "utf8")).items[0].budget.used, { searches: 1, reads: 1 }, "first merge should record usage");
+		await callTool(fp, "plan_update", { deltas: [{ item_id: context.parent_item_id, status: "pending", note: "explicitly retry with the remaining envelope" }] }, cwd);
+		const refreshed = await planRunnerModule.researchBranchDispatchContext(cwd, context);
+		assert.deepEqual(refreshed?.budget, { searches: 1, reads: 2 }, "retry context must be rebound to the graph remainder");
+		const stale = await planRunnerModule.acquireResearchBranchLease(cwd, context);
+		assert.deepEqual(stale, { ok: false, reason: "stale-context" }, "the original full-allocation context must be rejected");
+		const leased = await planRunnerModule.acquireResearchBranchLease(cwd, refreshed!);
+		assert.equal(leased.ok, true);
+		const secondReport = {
+			v: 1, parent_item_id: refreshed!.parent_item_id, owner_ref: refreshed!.owner_ref, status: "done", note: "retry attempt",
+			consumed: refreshed!.budget, evidence_gaps: [], source_leads: [], children: [], coverage,
+		};
+		fp.pi.events.emit(HARNESS_SIGNAL_CHANNEL, { v: 1, type: "plan/branch-result", context: refreshed, report: secondReport, failureClass: null });
+		await fire(fp, "before_agent_start", {}, makeCtx(cwd).ctx);
+		const state = JSON.parse(readFileSync(join(cwd, ".pi", "plan-state.json"), "utf8"));
+		assert.deepEqual(state.items[0].budget.used, { searches: 2, reads: 3 }, "merge must retain cumulative usage across retries");
 		resetPiGlobals();
 	});
 

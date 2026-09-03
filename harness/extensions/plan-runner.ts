@@ -16,7 +16,7 @@ import {
 import { applyPlanDeltas, type PlanDelta } from "../lib/plan-delta.ts";
 import {
 	DEEP_RESEARCH_MAX_CHILDREN, DEEP_RESEARCH_MAX_DEPTH, DEEP_RESEARCH_MAX_ROOTS,
-	childrenOf, descendantCount, expandGraph, graphItemId, graphTerminal, ownerRef, settleErrors, validateGraph,
+	addBudget, budgetWithin, childrenOf, descendantCount, expandGraph, graphItemId, graphTerminal, ownerRef, settleErrors, validateGraph,
 	type BranchChildInput, type GraphPlanItem, type GraphPlanState, type PlanStatus, type ResearchBranchLease, type ResearchBudget,
 } from "../lib/plan-graph.ts";
 import { planStorageMode, privatePlanProjectionPath, privatePlanStatePath, privatePlanTracePath } from "../lib/plan-state-storage.ts";
@@ -500,7 +500,31 @@ async function mutatePlan<T>(cwd: string, fn: (state: PlanState | undefined) => 
 
 export type ResearchBranchLeaseResult =
 	| { ok: true; lease_id: string }
-	| { ok: false; reason: "no-plan" | "wrong-plan" | "unknown-branch" | "terminal-branch" | "already-leased" | "invalid-context" };
+	| { ok: false; reason: "no-plan" | "wrong-plan" | "unknown-branch" | "terminal-branch" | "already-leased" | "stale-context" | "budget-exhausted" | "invalid-context" };
+
+function sameBudget(a: ResearchBudget, b: ResearchBudget): boolean {
+	return a.searches === b.searches && a.reads === b.reads;
+}
+
+/**
+ * Refresh the budget in a model-visible depth-one context from the authoritative
+ * graph. A context returned when a branch was first created contains the full
+ * allocation; after an explicit retry only the unspent remainder is executable.
+ * Returning a fresh value here prevents stale model output from multiplying the
+ * global discovery envelope across retry generations.
+ */
+export async function researchBranchDispatchContext(cwd: string, context: PlanContextV1): Promise<PlanContextV1 | null> {
+	if (context.depth !== 1 || context.owner_ref !== ownerRef(context.run_id, context.parent_item_id)) return null;
+	const state = await readState(cwd);
+	if (!state || state.schema_version !== 5 || state.run_id !== context.run_id || state.profile?.name !== "deep-research" || state.settled_at) return null;
+	const item = state.items.find((candidate) => candidate.id === context.parent_item_id);
+	if (!item || item.parent_id !== undefined || item.kind !== "research_branch" || item.owner_ref !== context.owner_ref || graphTerminal(item) || !item.budget) return null;
+	const remaining = {
+		searches: Math.max(0, item.budget.allocated.searches - item.budget.used.searches),
+		reads: Math.max(0, item.budget.allocated.reads - item.budget.used.reads),
+	};
+	return { ...context, budget: remaining };
+}
 
 /**
  * Acquire the parent-owned durable lease immediately before starting a root
@@ -520,6 +544,13 @@ export async function acquireResearchBranchLease(cwd: string, context: PlanConte
 		}
 		if (graphTerminal(parent)) return { result: { ok: false, reason: "terminal-branch" } };
 		if (parent.lease) return { result: { ok: false, reason: "already-leased" } };
+		if (!parent.budget) return { result: { ok: false, reason: "wrong-plan" } };
+		const remaining = {
+			searches: Math.max(0, parent.budget.allocated.searches - parent.budget.used.searches),
+			reads: Math.max(0, parent.budget.allocated.reads - parent.budget.used.reads),
+		};
+		if (!sameBudget(context.budget, remaining)) return { result: { ok: false, reason: "stale-context" } };
+		if (remaining.searches === 0 && remaining.reads === 0) return { result: { ok: false, reason: "budget-exhausted" } };
 		const lease: ResearchBranchLease = { lease_id: randomUUID(), issued_at: isoNow(), owner_ref: context.owner_ref };
 		const state: PlanState = { ...previous, items: previous.items.map((item) => item.id === parent.id ? { ...item, lease } : item) };
 		return { state, result: { ok: true, lease_id: lease.lease_id } };
@@ -1334,9 +1365,15 @@ async function mergeBranchResult(cwd: string, context: import("../lib/branch-rep
 			title: cleanText(child.title), note: cleanText(child.note) || undefined, status: child.status,
 			budget: child.budget, evidence_gaps: child.evidence_gaps?.map(cleanText).filter(Boolean), coverage: child.coverage, defer: child.defer,
 		}));
+		const priorUsed = parent.budget?.used ?? { searches: 0, reads: 0 };
+		const cumulativeUsed = addBudget(priorUsed, report.consumed);
+		// A reopened branch receives only the remainder of its original allocation.
+		// Keep consumption cumulative in the authoritative graph; replacing it with
+		// the latest attempt would make a retry look as if earlier calls never ran.
+		if (parent.budget && !budgetWithin(cumulativeUsed, parent.budget.allocated)) return blockParent(previous, parent, "merge_over_budget");
 		const items = retained.map((item) => item.id === parent.id ? {
 			...releaseLease(item), status: report.status, note: cleanText(report.note), defer: report.defer,
-			budget: item.budget ? { ...item.budget, used: report.consumed } : item.budget,
+			budget: item.budget ? { ...item.budget, used: cumulativeUsed } : item.budget,
 			evidence_gaps: report.evidence_gaps.map(cleanText).filter(Boolean), source_leads: report.source_leads.map((lead) => storedUrl(lead.url).display), coverage: report.coverage,
 		} : item).concat(children);
 		const next = { ...previous, items };

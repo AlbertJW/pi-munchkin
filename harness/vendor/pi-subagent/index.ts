@@ -35,7 +35,7 @@ import {
 import { ACTIVE_TOOL_PROMPTS } from "../../lib/active-tool-prompts.ts";
 import { emitHarnessSignal } from "../../lib/harness-signals.ts";
 import { PLAN_CONTEXT_ENV, RESEARCH_SCOUT_ENV, readPlanContext, researchUsageFromMessages, validateRootResearchDispatch, validateScoutDispatch, type PlanContextV1, type ScoutReceiptV1 } from "../../lib/branch-report.ts";
-import { acquireResearchBranchLease, releaseResearchBranchLease, researchBranchDispatchEpoch } from "../../extensions/plan-runner.ts";
+import { acquireResearchBranchLease, releaseResearchBranchLease, researchBranchDispatchContext, researchBranchDispatchEpoch } from "../../extensions/plan-runner.ts";
 
 // ---------------------------------------------------------------------------
 // Limits
@@ -898,10 +898,32 @@ This guard prevents self-recursion and cyclic handoffs (for example A -> B -> A)
           }
         }
 
+		// The model may replay the context object returned when the graph was
+		// created. Rebind every depth-one context to the branch's current unspent
+		// budget before acquiring its lease; otherwise an explicit retry could spend
+		// the original allocation again. Depth-two scout contexts are already
+		// minted from the branch remainder by branch_plan and stay unchanged here.
+		let effectiveRootContexts = plannedRootContexts;
+		if (plannedRootContexts.length > 0) {
+			const refreshed: PlanContextV1[] = [];
+			for (const context of plannedRootContexts) {
+				const next = await researchBranchDispatchContext(ctx.cwd, context);
+				if (!next) return {
+					content: [{ type: "text", text: "Blocked: planned root research context is stale or no longer executable. Inspect the active graph before retrying." }],
+					details: makeDetails(hasTasks ? "parallel" : "single")([]), isError: true,
+				};
+				refreshed.push(next);
+			}
+			effectiveRootContexts = refreshed;
+		}
+		const effectiveRootByParent = new Map(effectiveRootContexts.map((context) => [context.parent_item_id, context]));
+		const rebindRootContext = (context: PlanContextV1 | undefined): PlanContextV1 | undefined =>
+			context?.depth === 1 ? effectiveRootByParent.get(context.parent_item_id) : context;
+
 		// ── Parallel mode ──
 		if (params.tasks && params.tasks.length > 0) {
-		  if (plannedRootContexts.length > 0) {
-			const prepared = await prepareRootDispatch(ctx.cwd, plannedRootContexts, rootDispatch);
+		  if (effectiveRootContexts.length > 0) {
+			const prepared = await prepareRootDispatch(ctx.cwd, effectiveRootContexts, rootDispatch);
 			if (!prepared.ok) return {
 				content: [{ type: "text", text: `Blocked: planned root research branch is ${prepared.reason}. Inspect the parent graph before retrying.` }],
 				details: makeDetails("parallel")([]), isError: true,
@@ -912,8 +934,10 @@ This guard prevents self-recursion and cyclic handoffs (for example A -> B -> A)
 			 if (!scoutDispatch.parents.includes(context.parent_item_id)) scoutDispatch.parents.push(context.parent_item_id);
 			 if (!scoutDispatch.owners.includes(context.owner_ref)) scoutDispatch.owners.push(context.owner_ref);
 		  }
-          return executeParallel(
-			params.tasks as Array<{ agent: string; task: string; cwd?: string; plan_context?: PlanContextV1 }>,
+		  return executeParallel(
+			(params.tasks as Array<{ agent: string; task: string; cwd?: string; plan_context?: PlanContextV1 }>).map((task) => ({
+				...task, plan_context: rebindRootContext(task.plan_context),
+			})),
             delegationMode,
             forkSessionSnapshotJsonl,
             agents,
@@ -927,8 +951,8 @@ This guard prevents self-recursion and cyclic handoffs (for example A -> B -> A)
 
 		// ── Single mode ──
 		if (params.agent && params.task) {
-		  if (plannedRootContexts.length > 0) {
-			const prepared = await prepareRootDispatch(ctx.cwd, plannedRootContexts, rootDispatch);
+		  if (effectiveRootContexts.length > 0) {
+			const prepared = await prepareRootDispatch(ctx.cwd, effectiveRootContexts, rootDispatch);
 			if (!prepared.ok) return {
 				content: [{ type: "text", text: `Blocked: planned root research branch is ${prepared.reason}. Inspect the parent graph before retrying.` }],
 				details: makeDetails("single")([]), isError: true,
@@ -943,7 +967,7 @@ This guard prevents self-recursion and cyclic handoffs (for example A -> B -> A)
             params.agent,
             params.task,
             params.cwd,
-			(params as typeof params & { plan_context?: PlanContextV1 }).plan_context,
+			rebindRootContext((params as typeof params & { plan_context?: PlanContextV1 }).plan_context),
             delegationMode,
             forkSessionSnapshotJsonl,
             agents,
