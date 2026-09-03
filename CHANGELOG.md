@@ -4,6 +4,17 @@ All notable changes to pi-munchkin are documented here. Releases follow semantic
 
 ## Unreleased
 
+### Fixed (2026-09-03 — research-branch reopen evidence reset)
+
+- Reopening a terminal deep-research branch now clears its prior coverage,
+  delegated source leads, evidence gaps, and deferral. Cumulative budget use is
+  retained, but a manually reopened branch must earn a fresh validated report
+  before it can settle. The regression was red before the fix and green after;
+  planner flags remain dark and no inference, mirror, rollout, or push occurred.
+
+The source surface is now `fcc74b8c…`; the loaded mirror remains
+`73bbd494…` and must be rebound before any future smoke.
+
 ### Fixed (2026-09-03 — parent-only planner branch merge)
 
 - Branch-result signals are now ignored by delegated planner processes, so a

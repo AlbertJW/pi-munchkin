@@ -1,5 +1,18 @@
 # Handover — pi_munchkin, 2026-08-24
 
+## 2026-09-03 research-branch reopen evidence reset (repository-only)
+
+The bottom-up audit found that an explicitly reopened terminal research branch
+kept its prior completion receipt and delegated source leads. A parent could
+therefore flip the branch back to `done` without a fresh validated child report.
+Reopening now preserves cumulative budget consumption but clears coverage,
+source leads, evidence gaps, and deferral; a new validated report is required
+before settlement. The regression was red before the fix and green afterward.
+Planner flags remain dark; no inference, mirror, rollout, or push occurred.
+
+Source pin is `fcc74b8c…`; loaded mirror remains `73bbd494…`. A future smoke
+needs a fresh approved preflight and loaded-hash rebind.
+
 ## 2026-09-03 parent-only planner branch merge (repository-only)
 
 The ownership audit found that a delegated process could still process a local
