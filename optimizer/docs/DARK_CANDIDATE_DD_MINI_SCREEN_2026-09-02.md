@@ -18,8 +18,9 @@ measurement identity. The current source is `70c202d4…`; the canonical Run 4
 preregistration and planner preregistration have been rebound to that hash at
 the frozen source/config snapshot `98df5ed` (later documentation-only commits
 do not alter the model-visible source hash).
-The loaded mirror is still `9629b4db…` until the headless-lease boundary is
-approved and mirrored; no model session was started by this amendment.
+The approved headless-lease boundary is now mirrored at loaded hash
+`a4856f91…`; `mirror:check` reports 122/122 first-party files with zero drift.
+No model session was started by this amendment.
 
 ### Planner activation-boundary repair (2026-09-03)
 
@@ -48,13 +49,13 @@ remaining five candidate sessions and three fact-lookup controls are still
 required, and the sandbox failure cannot be pooled.
 
 The live mirror was current for the earlier goal smoke, and has now been
-refreshed after the context handoff and ledger-budget repairs: `npm run
-mirror:check -- /Users/Albert.Wessels/.pi/agent` reports **122 of 122**
+refreshed after the context handoff, ledger-budget, and headless planner
+repairs: `npm run mirror:check -- /Users/Albert.Wessels/.pi/agent` reports **122 of 122**
 first-party files match, with no unmanaged extensions or orphans. The current
 source surface SHA-256 is
-`62b1e565748394ec7aaccadcc4d9e3f5167dea31ca974d0ed9461d0d76fc0234`; the
+`70c202d47b49d21e73255d163ad6a8d46c9c0bc4b7f25cb2b0c8d2676238105f`; the
 current loaded mirror surface SHA-256 is
-`9629b4dbd3d871703a82edbf12db76db813863a4c369b6d45edf2e3cb0671970`.
+`a4856f916419d26da39b80aa77ce4737a4dc08acb86c8a46cb95ab58a4ddeeb5`.
 
 The cheapest deterministic probe did run: the candidate-specific suites for
 planning, research ledger, working memory, bash-output guarding, semantic-loop
@@ -117,7 +118,7 @@ older unassigned or stale preregistration values:
 
 | Candidate | Minimal result now | DD evidence currently available | Next useful run | Longer run? |
 |---|---|---|---|---|
-| Hierarchical planner / deep-research graph | Graph, branch, budget, depth, evidence, and settlement contracts pass; the pre-lease Qwen receipts reached only incomplete starts/failures. The new parent-only headless lease is now red-green tested but has no model receipt yet. | Mechanism activation and bounded failure receipts only; no settled branch or answer-quality evidence. Flags remain dark. | Mirror the `db61e8e` boundary, bind the new loaded hash, then use `PREREG_QWEN35B_PLANNER_MECHANISM_V3_2026-09-03.md` for the six-session mechanism screen plus fact-lookup negative controls. | **Yes.** A later comparative A/B needs multiple complex, contested, and comparative questions; one session cannot expose branch quality or synthesis trade-offs. |
+| Hierarchical planner / deep-research graph | Graph, branch, budget, depth, evidence, and settlement contracts pass; the pre-lease Qwen receipts reached only incomplete starts/failures. The new parent-only headless lease is now mirrored and red-green tested but has no v3 model receipt yet. | Mechanism activation and bounded failure receipts only; no settled branch or answer-quality evidence. Flags remain dark. | Use loaded hash `a4856f91…` and `PREREG_QWEN35B_PLANNER_MECHANISM_V3_2026-09-03.md` for the six-session mechanism screen plus fact-lookup negative controls. | **Yes.** A later comparative A/B needs multiple complex, contested, and comparative questions; one session cannot expose branch quality or synthesis trade-offs. |
 | Persistent goal mode | Goal migration, authority, blocked state, paging, inactive recovery, tool removal, and lifecycle tests pass. The pre-fix DD probes failed before inference with Qwen `failed to parse grammar`; the post-fix live-surface smoke exited 0, created/read the ledger, and settled a goal as `complete`. | **Live mechanism receipt recorded.** The loaded hash is bound and the mirror is clean; no gate, behavior, or quality row is valid yet. | Reissue a current-hash 1–3-session lifecycle screen covering start, pause, resume, block, complete/80-20, and compaction recovery. | **Conditional.** If the lifecycle screen is clean, use paired long-horizon goal tasks to measure persistence and steering cost; do not judge benefit from the smoke. |
 | Dynamic context epochs / handoff | The Qwen startup smoke confirmed epoch wiring. The v1 threshold probe exposed a late-check gap; v2 correctly failed closed on an oversized initial prompt; v3 established two turns but the settled-turn marker was lost before the second handoff check. The follow-up source repairs now abort the active request synchronously before Pi's asynchronous compactor starts and preserve a committed compaction when a later callback reports `Nothing to compact`. | **Clean mechanism receipts recorded.** On loaded hash `251708fe…`, v4 proved one threshold handoff; the rearm screen then proved exactly two one-shot handoffs after below-70% rearming, with two cancelled oversized requests, three successful responses, and zero native compactions. The active-goal preservation screen proved one `ok=true` handoff with a recovery brief and the same active goal ID before and after compaction. The model-switch screen then proved epoch 0 Qwen → epoch 1 Ling rebinding with two successful turns and separate discovery facts. | Prepare and run the remaining dark-candidate mechanism/value screens. A broader cross-provider/window switch remains a later safety study; only afterward decide whether a small paired efficacy study is warranted. | **Yes.** The receipts prove lifecycle reachability, rearming, active-goal preservation, and model-identity epoch rebinding only; they do not measure capacity, quality, or cross-provider/window safety. |
 | Working memory | Exit 0 with one `upsert` and one `list`; both private projections were present. | Mechanism fired, but no comparative value evidence. | A small paired smoke with a task that explicitly needs a durable note, checking note use, context cost, and recovery. | **Yes.** Net value is a context trade-off; use several multi-turn tasks with memory on/off and inspect both success and added tokens before considering adoption. |

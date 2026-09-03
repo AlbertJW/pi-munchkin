@@ -16,8 +16,10 @@ authorize an efficacy comparison.
 - Source commit: `db61e8e` (`fix(planner): add explicit headless research lease`).
 - Source surface SHA-256:
   `70c202d47b49d21e73255d163ad6a8d46c9c0bc4b7f25cb2b0c8d2676238105f`.
-- Loaded mirror surface SHA-256: **must be recorded after the approved mirror
-  apply; no v3 run may start against the old `9629b4db…` surface.**
+- Loaded mirror surface SHA-256:
+  `a4856f916419d26da39b80aa77ce4737a4dc08acb86c8a46cb95ab58a4ddeeb5`.
+  `mirror:check` reports 122/122 first-party files with zero drift; no v3 run
+  may start against an older surface.
 - Candidate and control configuration hashes remain those in v2:
   `0d01aab9292db845b5f228174e2a1a4c10328883daebd482dcd9c9c9f5f5fd1e` and
   `a2e5efef3ab36d90ab58ee91920b766e5c7a162905da970778e9439c3c1c92f7`.

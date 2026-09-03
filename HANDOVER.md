@@ -40,10 +40,10 @@ incomplete rather than a quality result.
 The preflight's frozen source identity is now kept current by a selftest
 freshness assertion. After the budget-control source change it was red against
 the stale `5b84241c…` default; the repaired planner preregistration and default
-are bound to source `62b1e565…` at the frozen source/config snapshot `98df5ed`
-(the model-visible surface last changed in `62b9bfb`; later commits are
+are bound to source `70c202d4…` at the new planner activation snapshot
+`db61e8e` (the model-visible surface last changed in `db61e8e`; later commits are
 optimizer/preflight and documentation changes). The loaded mirror is now
-`9629b4db…`, and no planner session has started under the new boundary.
+`a4856f91…`, and no planner session has started under the new boundary.
 
 The first receipt exposed a startup reachability gap: `research_plan_start`,
 graph mutations, web tools, and delegation were all deferred even with the
