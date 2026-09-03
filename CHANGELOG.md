@@ -4,6 +4,18 @@ All notable changes to pi-munchkin are documented here. Releases follow semantic
 
 ## Unreleased
 
+### Fixed (2026-09-03 — delegated planner capsule-signal fence)
+
+- A delegated planner child now marks its process identity on the shared
+  lifecycle bus. Older/reloaded plan-runner subscribers therefore skip capsule
+  identity rebinding instead of reclaiming the parent branch lease. The
+  regression emits a late capsule signal after child startup and proves the
+  parent lease remains pending. Planner flags remain dark; no model inference,
+  mirror, rollout, or push occurred.
+
+The source surface is now `94060815…`; the loaded mirror remains
+`73bbd494…` and must be rebound before any future smoke.
+
 ### Fixed (2026-09-03 — planner ownership and budget audit)
 
 - Bound delegated branch results to the parent-issued lease and retry epoch;

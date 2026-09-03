@@ -1,5 +1,20 @@
 # Handover — pi_munchkin, 2026-08-24
 
+## 2026-09-03 delegated planner capsule-signal fence (repository-only)
+
+The final child-lifecycle probe found one reload/embedding race beyond startup:
+an older `plan-runner` signal subscriber could process the later capsule
+identity event and reclaim the parent branch lease even after the delegated
+child had correctly skipped startup rebinding. A shared delegated-process marker
+now fences every subscriber in that process. The regression emits the capsule
+signal after child startup and proves the parent branch remains pending with
+its original lease. Full offline tests, typecheck, and the targeted source
+identity checks are green; planner flags remain dark and no inference, mirror,
+rollout, or push occurred.
+
+Source pin is `94060815…`; loaded mirror remains `73bbd494…`. A future smoke
+needs a fresh approved preflight and loaded-hash rebind.
+
 ## 2026-09-03 planner bottom-up audit: ownership and budget fences (repository-only)
 
 The deep-research graph audit found four integrity gaps and closed them with
