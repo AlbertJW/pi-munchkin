@@ -2,7 +2,7 @@
 
 ## Status and purpose
 
-**PREPARED — NO MODEL EXECUTION.** This amendment follows the incomplete v5
+**SCREENED — INCOMPLETE MECHANISM; GATE NOT MET.** This amendment follows the incomplete v5
 mechanism screen and addresses a concrete model-facing contract defect found in
 its structural traces. When root allocations exceeded the shared discovery
 envelope, `research_plan_start` returned only “root budgets exceed the
@@ -18,9 +18,9 @@ to enable planner defaults.
 - Source commit: `cc74517` (`fix(planner): explain discovery budget rejection`).
 - Source surface SHA-256:
   `0d3c7871a22d210ba52cf2f3117a5da9cef087fb4caee4e6c46c3601224a88e6`.
-- Loaded mirror surface SHA-256: **pending mirror**. No session may start until
-  `mirror:check` reports zero drift and this field is replaced by the observed
-  loaded hash.
+- Loaded mirror surface SHA-256:
+  `12fbe4cd2f6555f24810af69d914037d0d20d9a1c3c930f47e2a8c4b52ab27e9`.
+  `mirror:check` reports 122/122 first-party files with zero drift.
 - Candidate and control configuration hashes remain those in v2–v5:
   `0d01aab9292db845b5f228174e2a1a4c10328883daebd482dcd9c9c9f5f5fd1e` and
   `a2e5efef3ab36d90ab58ee91920b766e5c7a162905da970778e9439c3c1c92f7`.
@@ -38,6 +38,13 @@ one short, explicit diagnostic against the exact loaded hash after mirroring.
 The diagnostic records only safe lifecycle aggregates and checks whether an
 over-budget request receives the actionable envelope and whether a corrected
 request can reach `research-start`; it does not claim a qualifying screen.
+
+The single v6 diagnostic then ran against the exact loaded hash. It reached
+one `research-start`, nine source receipts, and the bounded output cap after
+60.514 seconds (exit 143), with 113 payload-free authenticated rows, no branch
+merge, and no parent settlement. The new actionable envelope appeared four
+times and the old generic error zero times. The diagnostic is an incomplete
+operability observation, not a qualifying screen.
 
 The full six-candidate/three-control screen remains invalidated by v5’s
 incomplete mechanism gate. Any new multi-session screen requires a fresh

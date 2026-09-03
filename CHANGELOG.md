@@ -4,6 +4,15 @@ All notable changes to pi-munchkin are documented here. Releases follow semantic
 
 ## Unreleased
 
+### Measured (2026-09-03 — planner mechanism v6 diagnostic)
+
+- The single hash-bound Qwen 35B diagnostic reached one `research-start` and
+  nine source receipts before the 350,000-byte output cap; it produced no
+  branch merge or parent settlement. The repaired actionable budget guidance
+  appeared four times and the old vague rejection did not. This is incomplete
+  operability evidence, not a quality or adoption result; planner flags remain
+  dark.
+
 ### Fixed (2026-09-03 — planner budget rejection guidance)
 
 - **Over-budget `research_plan_start` calls now explain the shared discovery

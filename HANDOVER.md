@@ -1,5 +1,24 @@
 # Handover — pi_munchkin, 2026-08-24
 
+## 2026-09-03 planner budget guidance diagnostic
+
+The v6 preregistered diagnostic ran after the source fix was pushed and
+mirrored. It used Qwen 35B, candidate-arm config
+`0d01aab9292db845b5f228174e2a1a4c10328883daebd482dcd9c9c9f5f5fd1e`, source
+hash `0d3c7871…`, and loaded hash `12fbe4cd…`. The bounded launcher exited at
+the 350,000-byte cap after 60.514 seconds (143), with zero stderr and 113
+authenticated payload-free telemetry rows. Qwen emitted one `research-start`
+and nine receipts; the graph stayed open with no merge or parent settlement.
+The new three-search/five-read guidance appeared four times and the old vague
+error zero times. This is incomplete operability evidence only; see
+`optimizer/docs/QWEN35B_PLANNER_MECHANISM_V6_AUDIT_2026-09-03.md`.
+
+The planner flags remain dark. V5 is still the failed six-candidate/three-
+control mechanism screen; v6 does not qualify a rerun or a quality study. The
+next useful step is a fresh preregistration with a completion-shaped fixture if
+the planner remains a priority, followed by a separately approved multi-session
+screen. No default, adoption, or source-tree change follows from this receipt.
+
 ## 2026-09-03 planner budget guidance repair
 
 The v5 screen’s structural traces showed repeated invalid
