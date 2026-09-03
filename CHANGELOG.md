@@ -4,12 +4,32 @@ All notable changes to pi-munchkin are documented here. Releases follow semantic
 
 ## Unreleased
 
+### Measured (2026-09-03 — planner completion screen v8 stopped)
+
+- The frozen direct-branch repair smoke ran one Qwen 35B candidate invocation
+  and stopped at the 350,000-byte output cap after approximately 173 seconds.
+  Safe telemetry recorded two missing branch reports and no validated merge or
+  parent settlement; the negative control was not started. The result is
+  incomplete mechanism evidence only and is recorded in
+  `QWEN35B_PLANNER_COMPLETION_V8_AUDIT_2026-09-03.md`. Planner defaults remain
+  dark.
+
+### Fixed (2026-09-03 — context handoff rearm contract)
+
+- Added explicit boundary coverage for both rearm paths: absolute token usage
+  rearms strictly below 75% of the model-specific safe-input budget, while the
+  percentage fallback rearms strictly below 70% of Pi's native 0–100 usage
+  value. The README now states the two representations separately; runtime
+  defaults and thresholds are unchanged.
+
 ### Fixed (2026-09-03 — planner repair mirror identity rebind)
 
 - Rebound the no-inference planner preflight and V8 repair preregistration to
   loaded surface `73bbd494…` after the direct-completion contract was mirrored.
   The mirror reports 122/122 first-party artifacts with zero drift. No V8
-  inference, planner default, or adoption decision has occurred.
+  inference had occurred at the time of this rebind; the later candidate-only
+  observation is recorded in the V8 audit. Planner defaults and adoption remain
+  unchanged.
 
 ### Fixed (2026-09-03 — optional direct planner branch completion)
 
@@ -33,9 +53,10 @@ All notable changes to pi-munchkin are documented here. Releases follow semantic
 ### Prepared (2026-09-03 — planner direct-completion repair smoke v8)
 
 - Added `PREREG_QWEN35B_PLANNER_COMPLETION_V8_2026-09-03.md`, binding the new
-  model-visible source surface and a one-fixture candidate/control smoke. It
-  remains pending mirror/hash rebinding and explicit execution; no planner
-  default or historical evidence changes.
+  model-visible source surface and a one-fixture candidate/control smoke. At
+  the time of this entry it was pending mirror/hash rebinding and explicit
+  execution; the later candidate-only observation is recorded in the V8 audit.
+  No planner default or historical evidence changes.
 
 ### Fixed (2026-09-03 — planner screen order binding)
 

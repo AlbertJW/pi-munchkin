@@ -2,7 +2,7 @@
 
 ## Status and purpose
 
-**PREPARED — NO SESSIONS RUN.** This bounded repair smoke follows the stopped v7
+**REGISTRATION SNAPSHOT — EXECUTED; INCOMPLETE.** This bounded repair smoke follows the stopped v7
 screen. V7 was terminated after two candidate sessions made its hard acceptance
 gate impossible: the first reached the output cap with two pending branches and
 the second reached the wall while delegated children were still running, leaving
@@ -10,7 +10,10 @@ two `child_failed` branches and no merge. The source contract required every
 depth-one branch to create scouts even though the profile only permits optional
 expansion. V8 tests the corrected contract on one deliberately small,
 completion-shaped fixture. It is mechanism evidence only, not a quality study or
-permission to enable planner defaults.
+permission to enable planner defaults. The single candidate observation and its
+stopped control decision are recorded in
+`QWEN35B_PLANNER_COMPLETION_V8_AUDIT_2026-09-03.md`; the pre-run identity and
+commands below remain the frozen registration snapshot.
 
 ## Frozen identity
 

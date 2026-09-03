@@ -238,6 +238,67 @@ test("automatic handoff is one-shot until the context falls below the rearm thre
 	}
 });
 
+test("token-based handoff rearm is strictly below 75% of the safe-input budget", async () => {
+	const prior = process.env.CONTEXT_HANDOFF;
+	delete process.env.CONTEXT_HANDOFF;
+	try {
+		const fp = makeFakePi();
+		const mod = await import(`../extensions/runtime-truth.ts?handoff-token-rearm-boundary=${Date.now()}-${Math.random()}`);
+		mod.default(fp.pi as never);
+		await fire(fp, "session_start", {}, {});
+		const model = { provider: "local", id: "token-rearm-boundary", contextWindow: 32_768 };
+		await fire(fp, "before_provider_request", {}, { model });
+		let usage: { tokens: number | null; percent: number | null } = { tokens: 30_000, percent: 91 };
+		let compactions = 0;
+		const ctx = {
+			getContextUsage: () => usage,
+			compact: (options: { onComplete?: () => void }) => { compactions += 1; options.onComplete?.(); },
+		};
+		await fire(fp, "turn_end", {}, ctx);
+		assert.equal(compactions, 1);
+		const threshold = safeInputBudget(model.contextWindow)! * 0.75;
+		usage = { tokens: Math.ceil(threshold), percent: 61 };
+		await fire(fp, "turn_end", {}, ctx);
+		usage = { tokens: Math.ceil(threshold) - 1, percent: 61 };
+		await fire(fp, "turn_end", {}, ctx);
+		usage = { tokens: 30_000, percent: 91 };
+		await fire(fp, "turn_end", {}, ctx);
+		assert.equal(compactions, 2, "only a value strictly below the token threshold rearms the epoch");
+	} finally {
+		if (prior === undefined) delete process.env.CONTEXT_HANDOFF; else process.env.CONTEXT_HANDOFF = prior;
+	}
+});
+
+test("percentage-based handoff rearm is strictly below 70% when tokens are unavailable", async () => {
+	const prior = process.env.CONTEXT_HANDOFF;
+	delete process.env.CONTEXT_HANDOFF;
+	try {
+		const fp = makeFakePi();
+		const mod = await import(`../extensions/runtime-truth.ts?handoff-percent-rearm-boundary=${Date.now()}-${Math.random()}`);
+		mod.default(fp.pi as never);
+		await fire(fp, "session_start", {}, {});
+		const model = { provider: "local", id: "percent-rearm-boundary", contextWindow: 32_768 };
+		await fire(fp, "before_provider_request", {}, { model });
+		let usage: { tokens: number | null; percent: number | null } = { tokens: null, percent: 90 };
+		let compactions = 0;
+		const ctx = {
+			getContextUsage: () => usage,
+			compact: (options: { onComplete?: () => void }) => { compactions += 1; options.onComplete?.(); },
+		};
+		await fire(fp, "turn_end", {}, ctx);
+		assert.equal(compactions, 1);
+		usage = { tokens: null, percent: 70 };
+		await fire(fp, "turn_end", {}, ctx);
+		usage = { tokens: null, percent: 69.9 };
+		await fire(fp, "turn_end", {}, ctx);
+		usage = { tokens: null, percent: 90 };
+		await fire(fp, "turn_end", {}, ctx);
+		assert.equal(compactions, 2, "only a value strictly below 70% rearms the percentage fallback");
+	} finally {
+		if (prior === undefined) delete process.env.CONTEXT_HANDOFF; else process.env.CONTEXT_HANDOFF = prior;
+	}
+});
+
 test("a stale compaction lease does not permanently disable automatic handoff", async () => {
 	const prior = process.env.CONTEXT_HANDOFF;
 	delete process.env.CONTEXT_HANDOFF;

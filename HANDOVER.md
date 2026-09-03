@@ -1,6 +1,20 @@
 # Handover — pi_munchkin, 2026-08-24
 
-## 2026-09-03 planner v7 stopped and direct-completion repair (pending mirror)
+## 2026-09-03 planner v8 repair smoke audit (current)
+
+The v8 completion-shaped repair smoke was executed once against the pinned
+Qwen 35B subject and the mirrored surface `73bbd494…`. The candidate hit the
+350,000-byte output cap (exit 143, approximately 173 seconds, stderr 0) after
+one graph start. Safe telemetry recorded two `missing_report` branch failures
+and open/blocked graph state; no validated branch merge or parent settlement
+occurred. The negative-control arm was not run because the candidate lifecycle
+was already incomplete. The full audit is
+[`optimizer/docs/screens/QWEN35B_PLANNER_COMPLETION_V8_AUDIT_2026-09-03.md`](optimizer/docs/screens/QWEN35B_PLANNER_COMPLETION_V8_AUDIT_2026-09-03.md).
+
+This is incomplete mechanism evidence only. Planner flags remain dark, raw
+streams remain private, and no quality, adoption, or default decision follows.
+
+## 2026-09-03 planner v7 stopped and direct-completion repair (historical; superseded by V8 audit)
 
 The prepared v7 screen was revalidated against source surface
 `d1b17fd8…`, loaded surface `d83baa71…`, the pinned Qwen 35B subject, and the
@@ -19,15 +33,16 @@ required every branch to create scouts. `97629b5` makes expansion conditional:
 single bounded gaps can be researched directly and closed with one terminal
 `branch_plan` report; only genuinely independent gaps create scouts. The new
 contract test was red before the edit and green afterward. A fresh v8 repair
-smoke is prepared in
+smoke was then prepared in
 `optimizer/docs/screens/PREREG_QWEN35B_PLANNER_COMPLETION_V8_2026-09-03.md`, bound to
-source `324aa214…` and awaiting mirror/hash rebinding. Planner flags remain
-dark; no quality, efficacy, or adoption claim follows.
+source `324aa214…`. Its subsequent candidate-only execution is recorded in
+the current V8 audit above. Planner flags remain dark; no quality, efficacy, or
+adoption claim follows.
 
 The source was subsequently pushed and mirrored cleanly at loaded hash
 `73bbd494…` (122/122 first-party artifacts, zero drift). The V8 preflight and
-preregistration now bind that loaded identity; no V8 model session has started
-under the new boundary yet.
+preregistration then bound that loaded identity. The later V8 candidate run is
+recorded in the current audit section above.
 
 ## 2026-09-03 planner screen order binding (documentation-only)
 
@@ -55,9 +70,10 @@ in the v2 suite). This is optimizer tooling only: source surface remains
 no provider or Pi session ran. The v7 preregistration now has a reproducible
 manifest-bound command for all four candidates and all four controls.
 
-## 2026-09-03 planner completion-shaped fixture (prepared, no sessions)
+## 2026-09-03 planner completion-shaped fixture (preparation snapshot)
 
-The next useful planner step is prepared but deliberately unexecuted. The
+The next useful planner step was prepared at this point and later exercised
+once as V8; see the current audit section above. The
 research-fixture slate now contains a fourth admitted manifest,
 `compare-json-yaml-config`, designed to finish within the shared three-search /
 five-read envelope: one bounded branch for JSON, one for YAML, one cited claim
