@@ -372,7 +372,7 @@ def score_gen(gen, runs_dir, render_only):
       default        judges each transcript and writes results/<gen>.judge.jsonl
                      with provenance (rubric/endpoint/model hashes). SECONDARY
                      evidence only; citable only after --calibrate passes its
-                     per-dimension gates (workflow: JUDGE_LABELING_2026-08.md).
+                     per-dimension gates (workflow: docs/archive/JUDGE_LABELING_2026-08.md).
     """
     import trial_validity
     import judge_render

@@ -1,6 +1,6 @@
 # Research notes
 
-Approaches evaluated for the pi-munchkin substrate — recorded so the reasoning isn't re-litigated. Moved out of the top-level README; see [`optimizer/docs/HARNESS_SELF_IMPROVEMENT.md`](../optimizer/docs/HARNESS_SELF_IMPROVEMENT.md) for the full living queue.
+Approaches evaluated for the pi-munchkin substrate — recorded so the reasoning isn't re-litigated. Moved out of the top-level README; see [`optimizer/docs/ROUND_LEDGER.md`](../optimizer/docs/ROUND_LEDGER.md) for the full living queue.
 
 
 - **AgentBench** (THUDM) — rejected as a task source: wrong skill axis (bash/SQL agency, not
@@ -9,7 +9,7 @@ Approaches evaluated for the pi-munchkin substrate — recorded so the reasoning
 - **design.md** (Google Labs) — not adopted (frontend-specific, no benchmarks). Pocketed two
   ideas: a *design-fidelity task class* (edge-case-rich, deterministically lintable — candidate
   in-band fuel for models that saturate clean single-function tasks) and the `add-rationale`
-  operator hypothesis (see Queued candidates in `optimizer/docs/HARNESS_SELF_IMPROVEMENT.md`).
+  operator hypothesis (see Queued candidates in `optimizer/docs/ROUND_LEDGER.md`).
 - **nuclear-grade-context-engineering** (FlyFission) — rejected wholesale: it encodes discipline
   as process prose for the model to follow, while this harness encodes the same load-bearing
   ideas as mechanisms the model can't bypass (hidden tests = independent checker, verify-gate =

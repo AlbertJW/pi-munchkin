@@ -387,7 +387,7 @@ Start with:
   invalidity boundary and replacement method.
 - [`MOTHBALLED_2026-08-03.md`](optimizer/docs/MOTHBALLED_2026-08-03.md) — archive status and restart
   conditions.
-- [`HARNESS_SELF_IMPROVEMENT.md`](optimizer/docs/HARNESS_SELF_IMPROVEMENT.md) — historical ledger,
+- [`ROUND_LEDGER.md`](optimizer/docs/ROUND_LEDGER.md) — historical ledger,
   with its unsupported-verdict warning.
 
 No gate round starts automatically. Only one round may run on a serving box at a time, and every
