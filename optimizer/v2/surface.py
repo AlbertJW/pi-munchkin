@@ -90,35 +90,42 @@ class PatchSurfaceAdapter:
         return compose_candidates(left, right, accepted_ids=set(candidates_by_id), candidates_by_id=candidates_by_id)
 
     def _apply_chain(self, workspace: pathlib.Path, candidate: Candidate,
-                     candidates_by_id: dict[str, Candidate] | None, seen: set[str]) -> None:
-        if candidate.candidate_id in seen:
+                     candidates_by_id: dict[str, Candidate] | None,
+                     visiting: set[str], applied: set[str]) -> None:
+        """Materialize a candidate DAG exactly once, then apply local mutations.
+
+        Composition candidates are graph nodes, not patches to apply to the
+        baseline. Their two parent chains are materialized (with shared
+        ancestors de-duplicated), and the composed node is verified as the
+        resulting workspace. Treating a DAG as a tree here was the source of
+        the old grandchild-composition failure.
+        """
+        candidate_id = candidate.candidate_id
+        if candidate_id in applied:
+            return
+        if candidate_id in visiting:
             raise CandidateError("candidate ancestry cycle")
-        seen.add(candidate.candidate_id)
-        if candidate.mutation_family == "composition":
-            patch_path = workspace / ".optimizer-candidate.patch"
-            patch_path.write_text(candidate.diff, encoding="utf-8")
-            check = subprocess.run(["git", "apply", "--check", str(patch_path)], cwd=workspace, capture_output=True, text=True)
-            if check.returncode:
-                raise CandidateError("composition diff does not apply to baseline")
-            applied = subprocess.run(["git", "apply", str(patch_path)], cwd=workspace, capture_output=True, text=True)
-            if applied.returncode:
-                raise CandidateError("composition diff failed to apply")
-            return
-        for parent_id in candidate.parent_ids:
-            parent = candidates_by_id.get(parent_id) if candidates_by_id else None
-            if parent is None:
-                raise CandidateError("candidate parent is unavailable for materialization")
-            self._apply_chain(workspace, parent, candidates_by_id, seen)
-        if candidate.mutation_family == "seed":
-            return
-        patch_path = workspace / f".optimizer-{candidate.candidate_id.removeprefix('sha256:')}.patch"
-        patch_path.write_text(candidate.diff, encoding="utf-8")
-        check = subprocess.run(["git", "apply", "--check", str(patch_path)], cwd=workspace, capture_output=True, text=True)
-        if check.returncode:
-            raise CandidateError("ancestor materialization diff does not apply")
-        applied = subprocess.run(["git", "apply", str(patch_path)], cwd=workspace, capture_output=True, text=True)
-        if applied.returncode:
-            raise CandidateError("ancestor materialization diff failed to apply")
+        visiting.add(candidate_id)
+        try:
+            if candidate.mutation_family == "composition" and len(candidate.parent_ids) != 2:
+                raise CandidateError("composition candidate requires two parents")
+            for parent_id in candidate.parent_ids:
+                parent = candidates_by_id.get(parent_id) if candidates_by_id else None
+                if parent is None:
+                    raise CandidateError("candidate parent is unavailable for materialization")
+                self._apply_chain(workspace, parent, candidates_by_id, visiting, applied)
+            if candidate.mutation_family not in ("seed", "composition"):
+                patch_path = workspace / f".optimizer-{candidate_id.removeprefix('sha256:')}.patch"
+                patch_path.write_text(candidate.diff, encoding="utf-8")
+                check = subprocess.run(["git", "apply", "--check", str(patch_path)], cwd=workspace, capture_output=True, text=True)
+                if check.returncode:
+                    raise CandidateError("ancestor materialization diff does not apply")
+                applied_result = subprocess.run(["git", "apply", str(patch_path)], cwd=workspace, capture_output=True, text=True)
+                if applied_result.returncode:
+                    raise CandidateError("ancestor materialization diff failed to apply")
+        finally:
+            visiting.remove(candidate_id)
+        applied.add(candidate_id)
 
     def verify(self, candidate: Candidate, campaign, *, candidates_by_id: dict[str, Candidate] | None = None) -> dict:
         if candidate.mutation_family not in self.family_allowlists and candidate.mutation_family != "composition":
@@ -133,7 +140,7 @@ class PatchSurfaceAdapter:
         try:
             shutil.copytree(self.source_root, workspace, dirs_exist_ok=True, ignore=shutil.ignore_patterns(".git", ".lavish", "__pycache__"))
             try:
-                self._apply_chain(workspace, candidate, candidates_by_id, set())
+                self._apply_chain(workspace, candidate, candidates_by_id, set(), set())
             except CandidateError as exc:
                 return {"verified": False, "reason": str(exc), "diff_sha256": candidate.diff_sha256}
             checks = []

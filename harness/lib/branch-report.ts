@@ -183,13 +183,29 @@ export async function readBranchReport(path: string | undefined, context: PlanCo
 	} catch { return null; }
 }
 
+async function syncDirectory(path: string): Promise<void> {
+	const handle = await open(path, "r");
+	try { await handle.sync(); }
+	finally { await handle.close(); }
+}
+
 export async function writeBranchReport(path: string, report: BranchReportV1, context: PlanContextV1): Promise<void> {
 	if (!validateBranchReport(report, context, false)) throw new Error("branch_report rejected: invalid or over-budget report");
 	await mkdir(dirname(path), { recursive: true, mode: 0o700 });
 	const temporary = `${path}.tmp-${process.pid}-${randomUUID().slice(0, 8)}`;
-	const handle = await open(temporary, "wx", 0o600);
-	try { await handle.writeFile(`${JSON.stringify(report)}\n`, "utf8"); await handle.chmod(0o600); }
-	finally { await handle.close(); }
-	try { await rename(temporary, path); await chmod(path, 0o600); }
-	catch (error) { await unlink(temporary).catch(() => undefined); throw error; }
+	let published = false;
+	try {
+		const handle = await open(temporary, "wx", 0o600);
+		try {
+			await handle.writeFile(`${JSON.stringify(report)}\n`, "utf8");
+			await handle.chmod(0o600);
+			await handle.sync();
+		} finally { await handle.close(); }
+		await rename(temporary, path);
+		await chmod(path, 0o600);
+		await syncDirectory(dirname(path));
+		published = true;
+	} finally {
+		if (!published) await unlink(temporary).catch(() => undefined);
+	}
 }

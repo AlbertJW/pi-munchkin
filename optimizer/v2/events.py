@@ -78,6 +78,11 @@ class EventStore:
             lines = data.splitlines(keepends=True)
             for number, line in enumerate(lines, 1):
                 line_end = valid_offset + len(line)
+                if number == len(lines) and line and not line.endswith(b"\n"):
+                    if allow_malformed_eof:
+                        suffix = data[valid_offset:]
+                        return events, {"byte_count": len(suffix), "sha256": hashlib.sha256(suffix).hexdigest(), "offset": valid_offset}
+                    raise EventStoreError(f"unterminated event at line {number}")
                 try:
                     event = json.loads(line.decode("utf-8"))
                 except (UnicodeDecodeError, json.JSONDecodeError) as exc:

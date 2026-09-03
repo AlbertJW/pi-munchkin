@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { mkdtempSync, statSync } from "node:fs";
+import { mkdtempSync, readFileSync, readdirSync, statSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { readBranchReport, researchUsageFromMessages, validateBranchReport, validatePlanContext, validatePlanContextRole, validateRootResearchDispatch, validateScoutDispatch, writeBranchReport, type BranchReportV1, type PlanContextV1 } from "../lib/branch-report.ts";
@@ -48,6 +48,14 @@ test("branch report transport is private, atomic, and refuses malformed final ou
 	assert.equal(statSync(path).mode & 0o777, 0o600);
 	assert.deepEqual(await readBranchReport(path, context), report);
 	await assert.rejects(writeBranchReport(path, { ...report, children: [{ ...report.children[0], status: "deferred" }] }, context), /invalid or over-budget/);
+});
+
+test("branch report transport keeps file and containing-directory durability barriers", () => {
+	const source = readFileSync(new URL("../lib/branch-report.ts", import.meta.url), "utf8");
+	assert.match(source, /await handle\.sync\(\)/, "report bytes must be synced before close");
+	assert.match(source, /syncDirectory\(/, "published reports must sync their containing directory");
+	const dir = mkdtempSync(join(tmpdir(), "pi-branch-report-durability-"));
+	assert.deepEqual(readdirSync(dir), [], "test fixture starts without temporary reports");
 });
 
 test("branch planners may dispatch only two distinct depth-two scouts", () => {

@@ -272,6 +272,44 @@ class CandidateTests(unittest.TestCase):
             with self.assertRaisesRegex(CandidateError, "conflict"):
                 adapter.compose(left, conflict, candidates_by_id=graph, campaign=campaign)
 
+    def test_patch_composition_materializes_grandchild_and_sibling_from_common_baseline(self) -> None:
+        with tempfile.TemporaryDirectory() as td:
+            root = pathlib.Path(td)
+            source = root / "source"
+            (source / "skills").mkdir(parents=True)
+            (source / "skills" / "a.txt").write_text("base\n", encoding="utf-8")
+            (source / "skills" / "b.txt").write_text("base-b\n", encoding="utf-8")
+            subprocess.run(["git", "init", "-q"], cwd=source, check=True)
+            subprocess.run(["git", "config", "user.email", "optimizer@test.invalid"], cwd=source, check=True)
+            subprocess.run(["git", "config", "user.name", "Optimizer Test"], cwd=source, check=True)
+            subprocess.run(["git", "add", "skills"], cwd=source, check=True)
+            subprocess.run(["git", "commit", "-qm", "baseline"], cwd=source, check=True)
+            manifest_raw = campaign_dict()
+            manifest_raw["permitted_surface_families"] = ["capability"]
+            manifest = load_campaign(manifest_raw)
+            adapter = PatchSurfaceAdapter(source, root / "workspaces", {"capability": ("skills/",)})
+            seed = adapter.seed_candidate(manifest)
+            child = adapter.build_candidate(seed, diagnosis_for({
+                "family": "capability",
+                "diff": "--- a/skills/a.txt\n+++ b/skills/a.txt\n@@ -1 +1 @@\n-base\n+left\n",
+                "changed_units": ["skills/a.txt"],
+            }), manifest)
+            grandchild = adapter.build_candidate(child, diagnosis_for({
+                "family": "capability",
+                "diff": "--- a/skills/a.txt\n+++ b/skills/a.txt\n@@ -1 +1 @@\n-left\n+grandchild\n",
+                "changed_units": ["skills/a.txt"],
+            }), manifest)
+            sibling = adapter.build_candidate(seed, diagnosis_for({
+                "family": "capability",
+                "diff": "--- a/skills/b.txt\n+++ b/skills/b.txt\n@@ -1 +1 @@\n-base-b\n+sibling\n",
+                "changed_units": ["skills/b.txt"],
+            }), manifest)
+            graph = {candidate.candidate_id: candidate for candidate in (seed, child, grandchild, sibling)}
+            composed = adapter.compose(grandchild, sibling, candidates_by_id=graph, campaign=manifest)
+            graph[composed.candidate_id] = composed
+            verification = adapter.verify(composed, manifest, candidates_by_id=graph)
+            self.assertTrue(verification["verified"], verification)
+
 
 class EventStoreTests(unittest.TestCase):
     def test_append_is_fsynced_idempotent_and_replayable(self) -> None:
@@ -312,6 +350,24 @@ class EventStoreTests(unittest.TestCase):
                 recovered = store.recover_tail()
             self.assertEqual(recovered["type"], "event-store.tail-recovered")
             self.assertEqual(store.read_all()[-1]["payload"], {"byte_count": len(suffix), "sha256": tail["sha256"]})
+
+    def test_unterminated_valid_event_is_a_recoverable_eof_tail(self) -> None:
+        with tempfile.TemporaryDirectory() as td:
+            store = EventStore(pathlib.Path(td))
+            store.append("op-1", "campaign.prepared", {"sha256": HEX})
+            raw = store.events_path.read_bytes()
+            self.assertTrue(raw.endswith(b"\n"))
+            store.events_path.write_bytes(raw[:-1])
+            before = store.events_path.read_bytes()
+            with self.assertRaisesRegex(EventStoreError, "unterminated"):
+                store.read_all()
+            events, tail = store.read_with_recovery()
+            self.assertEqual(events, [])
+            self.assertEqual(tail["byte_count"], len(before))
+            self.assertEqual(store.events_path.read_bytes(), before)
+            recovered = store.recover_tail()
+            self.assertEqual(recovered["type"], "event-store.tail-recovered")
+            self.assertEqual(store.read_all()[-1]["payload"]["byte_count"], len(before))
 
     def test_midstream_corruption_is_fatal_and_projection_failure_is_rebuildable(self) -> None:
         with tempfile.TemporaryDirectory() as td:
