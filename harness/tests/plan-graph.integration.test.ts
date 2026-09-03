@@ -25,7 +25,7 @@ if (!CHILD) {
 			const output = execFileSync(process.execPath, [
 				"--experimental-strip-types", "--experimental-loader", resolve("harness/tests/ts-js-resolver.mjs"), "--test", import.meta.filename,
 			], { cwd: process.cwd(), env, encoding: "utf8", stdio: "pipe" });
-			assert.match(output, /pass 30/);
+			assert.match(output, /pass 31/);
 		} finally { rmSync(artifacts, { recursive: true, force: true }); }
 	});
 } else {
@@ -61,6 +61,23 @@ if (!CHILD) {
 		assert.equal(migrated.schema_version, 5); assert.equal(migrated.items[0].kind, "work"); assert.equal(migrated.items[0].parent_id, undefined);
 		const { ctx, notes } = makeCtx(cwd); await fp.commands.get("plan-status").handler("", ctx);
 		assert.match(notes.at(-1) ?? "", /# Status\ncompleted/, "flat v5 plans preserve ordinary completion behavior");
+		resetPiGlobals();
+	});
+
+	test("an oversized persisted v5 graph is rejected instead of silently truncated", async () => {
+		const fp = fresh(); const cwd = tmp();
+		const items = Array.from({ length: 25 }, (_, index) => ({ id: `node-${index + 1}`, title: `Node ${index + 1}`, status: "pending", kind: "work" }));
+		const persisted = {
+			schema_version: 5, run_id: "oversized", request: "oversized graph", summary: "must fail closed", autonomy: "lean", phase: "executing",
+			created_at: "2026-08-25T00:00:00.000Z", updated_at: "2026-08-25T00:00:00.000Z", items,
+		};
+		const path = join(cwd, ".pi", "plan-state.json");
+		const { mkdirSync, readFileSync, writeFileSync } = await import("node:fs");
+		mkdirSync(join(cwd, ".pi"), { recursive: true });
+		const original = `${JSON.stringify(persisted)}\n`;
+		writeFileSync(path, original, { mode: 0o600 });
+		await expectToolError(fp, "plan_update", { deltas: [{ item_id: "node-1", status: "done" }] }, cwd, /no plan exists yet/);
+		assert.equal(readFileSync(path, "utf8"), original, "a malformed oversized graph must remain untouched");
 		resetPiGlobals();
 	});
 

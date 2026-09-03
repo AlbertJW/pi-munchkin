@@ -330,6 +330,13 @@ async function atomicWrite(path: string, contents: string, privateFile: boolean)
 
 function migrateState(raw: any): PlanState | undefined {
 	if (!raw || typeof raw !== "object" || !Array.isArray(raw.items)) return undefined;
+	// A persisted graph that exceeds the structural limit is corrupt, not a
+	// large plan to be helpfully shortened. Slicing before validation used to
+	// drop the tail on reload, allowing a later mutation or settlement to act on
+	// a different graph than the one that was written (and potentially hide
+	// unresolved work). Fail closed for both legacy and v5 state; callers can
+	// inspect or remove the damaged private state explicitly.
+	if (raw.items.length > MAX_ITEMS) return undefined;
 	if (raw.schema_version === 5 && !PLAN_GRAPH) return undefined;
 	const items: PlanItem[] = raw.items.slice(0, MAX_ITEMS).map((item: any) => ({
 		id: typeof item.id === "string" && /^[A-Za-z0-9._:-]{1,96}$/.test(item.id) ? item.id : itemId(),
