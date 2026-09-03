@@ -15,6 +15,14 @@ green. `c5bd34b` additionally makes tail recovery own the campaign lock for the
 entire repair/truncate and recovery-event transaction. No inference, campaign,
 mirror, default, or adoption action occurred.
 
+## 2026-09-03 Pi 0.84 consumer compatibility receipt
+
+`npm run compat:consumer -- 0.84` completed successfully after the earlier
+dependency-install stall: strict peer installation, tarball typecheck, loading
+of all 30 extension entry points, and discovery of both skills passed. This is
+packaging/compatibility evidence only; it does not change the model-visible
+surface or authorize a live rollout.
+
 ## 2026-09-03 planner v8 repair smoke audit (current)
 
 The v8 completion-shaped repair smoke was executed once against the pinned

@@ -4,6 +4,13 @@ All notable changes to pi-munchkin are documented here. Releases follow semantic
 
 ## Unreleased
 
+### Verified (2026-09-03 — Pi 0.84 consumer compatibility)
+
+- `npm run compat:consumer -- 0.84` now completes cleanly: the packed tarball
+  installs under strict peer resolution, typechecks, loads all 30 extension
+  entry points, and discovers both bundled skills. The earlier stalled install
+  was an environment/network interruption, not a compatibility failure.
+
 ### Fixed (2026-09-03 — optimizer V2 graph and handoff durability)
 
 - Hardened patch-surface composition so a composed candidate materializes each
