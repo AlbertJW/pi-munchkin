@@ -12,9 +12,17 @@ or model-facing route changed.
 
 The new source surface is
 `8e4c6d21e6e336f4d4c11f534f952e0767a999e1b41725dc231ff8857c29f582`.
-The next ceremony step is a pushed pending boundary, a clean mirror rebind,
-and a small pinned runtime smoke to verify the telemetry path. This repair is
-observability/provenance evidence only and does not qualify the planner.
+The repair is mirrored at loaded hash
+`9495e42754557772333e59a9336790c54bb9205c18ab5eef8cbcce99c6829b84` (122/122,
+zero drift). A short pinned Qwen 35B smoke exited 0 with zero stderr and one
+session of 70 hash-bound telemetry rows; no raw payload keys were present.
+This is observability/provenance evidence only and does not qualify the
+planner.
+
+The first post-smoke optimizer verification also caught the expected stale
+preflight pin. `preflight.py` now binds source `8e4c6d21…` and loaded
+`9495e427…`; its selftest is green. This is optimizer provenance maintenance,
+not a new model-facing behavior or inference result.
 
 ## 2026-09-03 planner budget guidance diagnostic
 

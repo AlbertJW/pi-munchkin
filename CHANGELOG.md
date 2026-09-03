@@ -4,6 +4,19 @@ All notable changes to pi-munchkin are documented here. Releases follow semantic
 
 ## Unreleased
 
+### Measured (2026-09-03 — nested delegated-failure smoke)
+
+- The mirrored run-kernel repair passed a short pinned Qwen 35B smoke with
+  exit 0, zero stderr, one session, 70 hash-bound telemetry rows, and no raw
+  payload keys. This validates loading and telemetry provenance only; it is
+  not planner or model-quality evidence.
+
+### Fixed (2026-09-03 — planner preflight identity rebind)
+
+- Rebound the no-inference planner preflight defaults after the run-kernel
+  provenance repair changed the canonical source and loaded hashes. The stale
+  pin failed closed during verification; the corrected selftest is green.
+
 ### Fixed (2026-09-03 — nested delegated-tool failure provenance)
 
 - **Run-kernel receipts now honor nested tool-result errors.** Pi’s JSON
