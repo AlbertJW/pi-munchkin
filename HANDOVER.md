@@ -11,7 +11,9 @@ file and containing directory around atomic publication. The source surface is
 now `8150c80d…`; the live mirror remains at `73bbd494…` because this
 optimizer/recovery package was not rolled out. `npm run verify:optimizer`, the
 full harness test suite (682/682), typecheck, package smoke, and peer checks are
-green. No inference, campaign, mirror, default, or adoption action occurred.
+green. `c5bd34b` additionally makes tail recovery own the campaign lock for the
+entire repair/truncate and recovery-event transaction. No inference, campaign,
+mirror, default, or adoption action occurred.
 
 ## 2026-09-03 planner v8 repair smoke audit (current)
 

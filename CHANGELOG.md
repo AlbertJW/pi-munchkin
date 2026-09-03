@@ -18,6 +18,9 @@ All notable changes to pi-munchkin are documented here. Releases follow semantic
 - Branch reports now sync their bytes before close and sync the containing
   directory after rename. The optimizer preflight source pin was rebound to
   the new source surface; all changes remain repository-only and dark.
+- Tail recovery now owns the run campaign lock for the complete repair/truncate
+  plus recovery-event transaction; a second process cannot recover the same
+  run concurrently.
 
 ### Measured (2026-09-03 — planner completion screen v8 stopped)
 
