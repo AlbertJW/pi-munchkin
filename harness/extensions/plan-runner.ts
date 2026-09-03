@@ -5,7 +5,7 @@ import { createHash, randomUUID } from "node:crypto";
 import { defineTool, withFileMutationQueue, type ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { Type } from "typebox";
 import { ACTIVE_TOOL_PROMPTS } from "../lib/active-tool-prompts.ts";
-import { BRANCH_REPORT_ENV, PLAN_CONTEXT_ENV, RESEARCH_RESERVED_BUDGET_KEY, readPlanContext, writeBranchReport, type BranchReportV1, type PlanContextV1 } from "../lib/branch-report.ts";
+import { BRANCH_REPORT_ENV, PLAN_CONTEXT_ENV, RESEARCH_RESERVED_BUDGET_KEY, RESEARCH_SCOUT_DISPATCHED_KEY, readPlanContext, writeBranchReport, type BranchReportV1, type PlanContextV1 } from "../lib/branch-report.ts";
 import { classifyBashCommand } from "../lib/command-policy.ts";
 import { emitHarnessSignal, onHarnessSignal, signalRunId } from "../lib/harness-signals.ts";
 import { PLAN_SURFACE_TOOLS } from "../lib/capability-surface.ts";
@@ -526,7 +526,12 @@ export async function researchBranchDispatchContext(cwd: string, context: PlanCo
 		searches: Math.max(0, item.budget.allocated.searches - item.budget.used.searches),
 		reads: Math.max(0, item.budget.allocated.reads - item.budget.used.reads),
 	};
-	return { ...context, budget: remaining };
+	const next = { ...context, budget: remaining, dispatch_epoch: item.dispatch_epoch ?? 0 };
+	// A context is reusable as a branch identity, but a lease is single-use. Do
+	// not let a model replay a context carrying an old credential into a new
+	// dispatch generation.
+	delete next.lease_id;
+	return next;
 }
 
 /**
@@ -548,6 +553,9 @@ export async function acquireResearchBranchLease(cwd: string, context: PlanConte
 		if (graphTerminal(parent)) return { result: { ok: false, reason: "terminal-branch" } };
 		if (parent.lease) return { result: { ok: false, reason: "already-leased" } };
 		if (!parent.budget) return { result: { ok: false, reason: "wrong-plan" } };
+		if (context.dispatch_epoch !== undefined && context.dispatch_epoch !== (parent.dispatch_epoch ?? 0)) {
+			return { result: { ok: false, reason: "stale-context" } };
+		}
 		const remaining = {
 			searches: Math.max(0, parent.budget.allocated.searches - parent.budget.used.searches),
 			reads: Math.max(0, parent.budget.allocated.reads - parent.budget.used.reads),
@@ -1011,7 +1019,8 @@ const researchPlanStart = defineTool({
 		planEvent("research-start", state.run_id, { items: state.items.length, open_items: openItemCount(state) });
 		const contexts = state.items.map((item) => ({
 			v: 1, profile: "deep-research", run_id: state.run_id, parent_item_id: item.id, owner_ref: item.owner_ref,
-			depth: 1, budget: item.budget!.allocated, limits: { max_depth: DEEP_RESEARCH_MAX_DEPTH, max_children: DEEP_RESEARCH_MAX_CHILDREN },
+			depth: 1, budget: item.budget!.allocated, dispatch_epoch: item.dispatch_epoch ?? 0,
+			limits: { max_depth: DEEP_RESEARCH_MAX_DEPTH, max_children: DEEP_RESEARCH_MAX_CHILDREN },
 		}));
 		return { content: [{ type: "text" as const, text: `Deep-research plan started (${state.items.length} branches). Pass the matching plan_context unchanged to each research-planner subagent.\n${JSON.stringify(contexts)}` }], details: { tool_name: "research_plan_start", success: true, contexts } };
 	},
@@ -1109,7 +1118,11 @@ const branchPlan = defineTool({
 			const blockedReport: BranchReportV1 = {
 				v: 1, parent_item_id: context.parent_item_id, owner_ref: context.owner_ref, status: "blocked",
 				note: `Blocked after repeated invalid ${invalidCoverage} reports; no evidence accepted.`,
-				consumed: { searches: 0, reads: 0 }, children: [], source_leads: [],
+				// The report protocol itself is no longer trustworthy after the
+				// corrective retry. Conservatively consume this attempt's entire
+				// allocated remainder so an explicit reopen cannot regain an envelope
+				// whose actual tool usage we could not validate.
+				consumed: context.budget, children: [], source_leads: [],
 				evidence_gaps: ["invalid coverage report rejected after one corrective retry"],
 				coverage: { strategy: "direct", scope: "bounded", returned_count: 0, truncated: false, budget_exhausted: false, failed: true, complete: false },
 			};
@@ -1126,6 +1139,19 @@ const branchPlan = defineTool({
 		const shared = globalThis as Record<string, unknown>;
 		const own = shared.__pi_research_state as { searches?: unknown; reads?: unknown } | undefined;
 		const ownUsage = { searches: typeof own?.searches === "number" ? own.searches : 0, reads: typeof own?.reads === "number" ? own.reads : 0 };
+		const dispatchRecord = shared[RESEARCH_SCOUT_DISPATCHED_KEY] as { key?: unknown; ids?: unknown } | undefined;
+		const dispatchKey = `${context.run_id}:${context.parent_item_id}:${context.owner_ref}`;
+		const dispatchedScoutIds = dispatchRecord?.key === dispatchKey && Array.isArray(dispatchRecord.ids)
+			? dispatchRecord.ids.filter((value): value is string => typeof value === "string") : [];
+		// Once a scout has been handed to the subagent runner, later branch reports
+		// must retain its leaf. Otherwise a planner could replace an in-flight leaf,
+		// discard its receipt, and spend the same global envelope again on a fresh
+		// leaf while the original work is still consuming tools.
+		for (const dispatchedId of dispatchedScoutIds) {
+			if (!report.children.some((child) => child.item_id === dispatchedId)) {
+				rejectPlanTool(`branch_plan rejected: retain dispatched scout leaf ${dispatchedId} in later branch reports`);
+			}
+		}
 		const receipts = Array.isArray(shared.__pi_research_scout_receipts) ? shared.__pi_research_scout_receipts as Array<{ owner_ref?: unknown; searches?: unknown; reads?: unknown }> : [];
 		const receiptByOwner = new Map(receipts.filter((receipt) => typeof receipt.owner_ref === "string").map((receipt) => [receipt.owner_ref as string, receipt]));
 		let observedSearches = ownUsage.searches;
@@ -1284,6 +1310,7 @@ async function rebindActivePlan(cwd: string): Promise<Rebound | null> {
 			items: previous.items.map((item) => {
 				if (!staleIds.has(item.id)) return item;
 				const next = { ...item, status: "blocked" as const, note: "Delegated branch interrupted before a validated result; inspect evidence and explicitly reopen before retrying.", evidence_gaps: ["branch:interrupted"] };
+				if (next.budget) next.budget = { ...next.budget, used: { ...next.budget.allocated } };
 				delete next.lease;
 				return next;
 			}),
@@ -1335,9 +1362,13 @@ async function mergeBranchResult(cwd: string, context: import("../lib/branch-rep
 		delete next.lease;
 		return next;
 	};
+	const consumeUncertainBudget = (item: PlanItem): PlanItem => {
+		if (!item.budget) return item;
+		return { ...item, budget: { ...item.budget, used: { ...item.budget.allocated } } };
+	};
 	const blockParent = (previous: PlanState, parent: PlanItem, failure: string): { state: PlanState; result: MergeOutcome } => {
 		const state = { ...previous, items: previous.items.map((item) => item.id === parent.id ? {
-			...releaseLease(item), status: "blocked" as const, note: `Delegated branch failed: ${failure}.`, evidence_gaps: [`branch:${failure}`],
+			...consumeUncertainBudget(releaseLease(item)), status: "blocked" as const, note: `Delegated branch failed: ${failure}.`, evidence_gaps: [`branch:${failure}`],
 		} : item) };
 		// The fallback state deliberately contains no incoming child claims. It is
 		// therefore safe to persist even when the report that triggered the merge
@@ -1352,10 +1383,17 @@ async function mergeBranchResult(cwd: string, context: import("../lib/branch-rep
 		const parent = previous.items.find((item) => item.id === context.parent_item_id);
 		if (!parent || parent.owner_ref !== context.owner_ref || parent.parent_id) return { result: { kind: "ignored" } };
 		if (graphTerminal(parent)) return { result: { kind: "ignored" } };
+		// A branch-result is authoritative only when it carries the credential and
+		// retry generation issued for the currently leased dispatch. Matching the
+		// deterministic owner alone is insufficient: an unlaunched or late child
+		// could otherwise inject a valid-looking report into an open branch.
+		if (!context.lease_id || !parent.lease || parent.lease.lease_id !== context.lease_id ||
+			(context.dispatch_epoch ?? 0) !== (parent.dispatch_epoch ?? 0)) return { result: { kind: "ignored" } };
 		if (!report) {
 			const failure = failureClass ?? "missing_report";
 			const items = previous.items.map((item) => item.id === parent.id ? {
-				...releaseLease(item), status: "blocked" as const, note: `Delegated branch failed: ${failure}.`, evidence_gaps: [`branch:${failure}`],
+				...(failure === "child_failed" ? releaseLease(item) : consumeUncertainBudget(releaseLease(item))),
+				status: "blocked" as const, note: `Delegated branch failed: ${failure}.`, evidence_gaps: [`branch:${failure}`],
 			} : item);
 			return { state: { ...previous, items }, result: { kind: "failed", runId: previous.run_id, failureClass: failure } };
 		}
@@ -1447,11 +1485,24 @@ export default function (pi: ExtensionAPI): void {
 		if (GOALS_ENABLED) await rebindActiveGoal(ctx.cwd);
 		lastNotify = (message: string) => ctx.ui.notify(message, "info");
 		reboundAnnounced = false;
-		const rebound = await rebindActivePlan(ctx.cwd);
+		// A delegated research planner shares the project cwd with its parent in
+		// project-storage mode, but it is not a restarted parent. Rebinding here
+		// would see the parent's writer marker, classify the live dispatch lease as
+		// stale, and block the branch before the child can publish its report.
+		const delegatedContext = await readPlanContext(process.env[PLAN_CONTEXT_ENV]);
+		const delegatedState = delegatedContext ? await readState(ctx.cwd) : undefined;
+		const delegatedBranchProcess = Boolean(delegatedContext && delegatedState?.run_id === delegatedContext.run_id);
+		const rebound = delegatedBranchProcess ? null : await rebindActivePlan(ctx.cwd);
 		if (rebound?.interrupted) { reboundAnnounced = true; lastNotify(interruptedPlanNotice(rebound.openItems)); }
 		if (!FORCE_PLAN_WRITE) {
 			const hidden = new Set(PLAN_SURFACE_TOOLS);
 			pi.setActiveTools(pi.getActiveTools().filter((name) => !hidden.has(name)));
+		}
+		// A depth-one research planner is a protocol child, not an ordinary user
+		// session. Its only parent-write capability is branch_plan; keep that tool
+		// available even though the normal core profile parks specialist tools.
+		if (process.env[PLAN_CONTEXT_ENV] && process.env[BRANCH_REPORT_ENV] && pi.getAllTools().some((tool) => tool.name === "branch_plan") && !pi.getActiveTools().includes("branch_plan")) {
+			pi.setActiveTools([...pi.getActiveTools(), "branch_plan"]);
 		}
 	});
 

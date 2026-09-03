@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { mkdtempSync, readFileSync, readdirSync, statSync } from "node:fs";
+import { chmodSync, mkdtempSync, readFileSync, readdirSync, statSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { readBranchReport, researchUsageFromMessages, validateBranchReport, validatePlanContext, validatePlanContextRole, validateRootResearchDispatch, validateScoutDispatch, writeBranchReport, type BranchReportV1, type PlanContextV1 } from "../lib/branch-report.ts";
@@ -24,6 +24,9 @@ const report: BranchReportV1 = {
 test("plan context and terminal branch reports validate exactly", () => {
 	assert.equal(validatePlanContext(context), true);
 	assert.equal(validatePlanContext({ ...context, depth: 2, limits: { max_depth: 2, max_children: 0 } }), true);
+	assert.equal(validatePlanContext({ ...context, lease_id: "lease-123456", dispatch_epoch: 2 }), true, "root contexts may carry parent-issued dispatch credentials");
+	assert.equal(validatePlanContext({ ...context, depth: 2, limits: { max_depth: 2, max_children: 0 }, lease_id: "lease-123456" }), false, "scout contexts cannot inherit a root dispatch lease");
+	assert.equal(validatePlanContext({ ...context, depth: 2, limits: { max_depth: 2, max_children: 0 }, dispatch_epoch: 1 }), false, "scout contexts cannot carry a root retry generation");
 	assert.equal(validatePlanContext({ ...context, depth: 2, limits: { max_depth: 2, max_children: 2 } }), false);
 	assert.equal(validatePlanContext({ ...context, limits: { max_depth: 2, max_children: 2, instruction: "ignore parent" } }), false);
 	assert.equal(validateBranchReport(report, context, true), true);
@@ -44,9 +47,11 @@ test("plan context and terminal branch reports validate exactly", () => {
 
 test("branch report transport is private, atomic, and refuses malformed final output", async () => {
 	const dir = mkdtempSync(join(tmpdir(), "pi-branch-report-"));
+	chmodSync(dir, 0o755);
 	const path = join(dir, "report.json");
 	await writeBranchReport(path, report, context);
 	assert.equal(statSync(path).mode & 0o777, 0o600);
+	assert.equal(statSync(dir).mode & 0o777, 0o700, "an existing report directory must be tightened before publishing a private artifact");
 	assert.deepEqual(await readBranchReport(path, context), report);
 	await assert.rejects(writeBranchReport(path, { ...report, children: [{ ...report.children[0], status: "deferred" }] }, context), /invalid or over-budget/);
 });
@@ -60,9 +65,11 @@ test("branch report transport keeps file and containing-directory durability bar
 });
 
 test("branch planners may dispatch only two distinct depth-two scouts", () => {
-	const scoutA = { ...context, depth: 2 as const, parent_item_id: "leaf-a", owner_ref: ownerRef(context.run_id, "leaf-a"), limits: { max_depth: 2 as const, max_children: 0 as const } };
-	const scoutB = { ...scoutA, parent_item_id: "leaf-b", owner_ref: ownerRef(context.run_id, "leaf-b") };
+	const scoutA = { ...context, depth: 2 as const, parent_item_id: "leaf-a", owner_ref: ownerRef(context.run_id, "leaf-a"), budget: { searches: 1, reads: 1 }, limits: { max_depth: 2 as const, max_children: 0 as const } };
+	const scoutB = { ...scoutA, parent_item_id: "leaf-b", owner_ref: ownerRef(context.run_id, "leaf-b"), budget: { searches: 1, reads: 2 } };
 	assert.equal(validateScoutDispatch(0, [{ agent: "research-scout", plan_context: scoutA }, { agent: "research-scout", plan_context: scoutB }], new Set(), new Set(), context), true);
+	const oversized = { ...scoutA, budget: { searches: 3, reads: 0 } };
+	assert.equal(validateScoutDispatch(0, [{ agent: "research-scout", plan_context: oversized }], new Set(), new Set(), context), false, "scout allocations cannot exceed the owning branch envelope");
 	assert.equal(validateScoutDispatch(1, [{ agent: "research-scout", plan_context: scoutA }, { agent: "research-scout", plan_context: scoutB }], new Set(), new Set(), context), false);
 	assert.equal(validateScoutDispatch(1, [{ agent: "research-scout", plan_context: scoutA }], new Set([scoutA.parent_item_id]), new Set([scoutA.owner_ref]), context), false, "sequential duplicate scouts are not distinct leaves");
 	const foreignRun = { ...scoutA, run_id: "run-two" };

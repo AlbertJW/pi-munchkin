@@ -34,7 +34,7 @@ import {
 } from "./types.js";
 import { ACTIVE_TOOL_PROMPTS } from "../../lib/active-tool-prompts.ts";
 import { emitHarnessSignal } from "../../lib/harness-signals.ts";
-import { PLAN_CONTEXT_ENV, RESEARCH_SCOUT_ENV, readPlanContext, researchUsageFromMessages, validateRootResearchDispatch, validateScoutDispatch, type PlanContextV1, type ScoutReceiptV1 } from "../../lib/branch-report.ts";
+import { PLAN_CONTEXT_ENV, RESEARCH_SCOUT_ENV, RESEARCH_SCOUT_DISPATCHED_KEY, readPlanContext, researchUsageFromMessages, validateRootResearchDispatch, validateScoutDispatch, type PlanContextV1, type ScoutReceiptV1 } from "../../lib/branch-report.ts";
 import { acquireResearchBranchLease, releaseResearchBranchLease, researchBranchDispatchContext, researchBranchDispatchEpoch } from "../../extensions/plan-runner.ts";
 
 // ---------------------------------------------------------------------------
@@ -97,6 +97,18 @@ function alignScoutDispatchState(state: ScoutDispatchState, context: PlanContext
 	state.count = 0;
 	state.parents = [];
 	state.owners = [];
+}
+
+function recordDispatchedScouts(context: PlanContextV1 | null, children: PlanContextV1[]): void {
+	if (!context || context.depth !== 1) return;
+	const shared = globalThis as Record<string, unknown>;
+	const key = `${context.run_id}:${context.parent_item_id}:${context.owner_ref}`;
+	const existing = shared[RESEARCH_SCOUT_DISPATCHED_KEY] as { key?: unknown; ids?: unknown } | undefined;
+	const ids = existing?.key === key && Array.isArray(existing.ids)
+		? existing.ids.filter((value): value is string => typeof value === "string")
+		: [];
+	for (const child of children) if (!ids.includes(child.parent_item_id)) ids.push(child.parent_item_id);
+	shared[RESEARCH_SCOUT_DISPATCHED_KEY] = { key, ids };
 }
 
 function rootDispatchState(): RootDispatchState {
@@ -193,7 +205,7 @@ export async function acquireRootLeases(
 	}
 }
 
-export async function prepareRootDispatch(cwd: string, contexts: PlanContextV1[], state: RootDispatchState, operations: RootDispatchOperations = {}): Promise<{ ok: true } | { ok: false; reason: string }> {
+export async function prepareRootDispatch(cwd: string, contexts: PlanContextV1[], state: RootDispatchState, operations: RootDispatchOperations = {}): Promise<{ ok: true; contexts: PlanContextV1[] } | { ok: false; reason: string }> {
 	const leases = await acquireRootLeases(cwd, contexts, operations);
 	if (!leases.ok) return leases;
 	// Stage runtime-ledger changes until every persisted epoch has been read. A
@@ -213,7 +225,12 @@ export async function prepareRootDispatch(cwd: string, contexts: PlanContextV1[]
 		state.parents = parents;
 		state.owners = owners;
 		state.epochs = epochs;
-		return { ok: true };
+		const leaseByParent = new Map(leases.leases.map((lease) => [lease.context.parent_item_id, lease.leaseId]));
+		return { ok: true, contexts: contexts.map((context) => ({
+			...context,
+			dispatch_epoch: context.dispatch_epoch ?? epochs[context.owner_ref] ?? 0,
+			lease_id: leaseByParent.get(context.parent_item_id),
+		})) };
 	} catch {
 		const release = operations.release ?? releaseResearchBranchLease;
 		await Promise.all(leases.leases.map((lease) => release(cwd, lease.context, lease.leaseId).catch(() => false)));
@@ -270,6 +287,8 @@ const PlanContextSchema = Type.Object({
 	owner_ref: Type.String({ minLength: 24, maxLength: 24 }), depth: Type.Union([Type.Literal(1), Type.Literal(2)]),
 	budget: Type.Object({ searches: Type.Integer({ minimum: 0, maximum: 100 }), reads: Type.Integer({ minimum: 0, maximum: 100 }) }),
 	limits: Type.Object({ max_depth: Type.Literal(2), max_children: Type.Union([Type.Literal(0), Type.Literal(2)]) }),
+	lease_id: Type.Optional(Type.String({ minLength: 8, maxLength: 96 })),
+	dispatch_epoch: Type.Optional(Type.Integer({ minimum: 0, maximum: 1_000_000 })),
 });
 
 const TaskItem = Type.Object({
@@ -803,7 +822,22 @@ Use single mode for one task, parallel mode when tasks are independent and can r
 			alignScoutDispatchState(scoutDispatch, branchBinding);
 			const planned = params.tasks ?? (params.agent && params.task ? [{ agent: params.agent, task: params.task, plan_context: (params as typeof params & { plan_context?: PlanContextV1 }).plan_context }] : []);
 			plannedScoutCount = planned.length;
-			if (!validateScoutDispatch(scoutDispatch.count, planned as Array<{ agent: string; plan_context?: unknown }>, new Set(scoutDispatch.parents), new Set(scoutDispatch.owners), branchBinding ?? undefined)) {
+			const shared = globalThis as Record<string, unknown>;
+			const usage = shared.__pi_research_state as { searches?: unknown; reads?: unknown } | undefined;
+			const reserved = shared.__pi_research_reserved_budget as { searches?: unknown; reads?: unknown } | undefined;
+			const localUsed = {
+				searches: typeof usage?.searches === "number" && Number.isSafeInteger(usage.searches) ? usage.searches : 0,
+				reads: typeof usage?.reads === "number" && Number.isSafeInteger(usage.reads) ? usage.reads : 0,
+			};
+			const alreadyReserved = {
+				searches: typeof reserved?.searches === "number" && Number.isSafeInteger(reserved.searches) ? reserved.searches : 0,
+				reads: typeof reserved?.reads === "number" && Number.isSafeInteger(reserved.reads) ? reserved.reads : 0,
+			};
+			const availableBudget = branchBinding ? {
+				searches: Math.max(0, branchBinding.budget.searches - localUsed.searches - alreadyReserved.searches),
+				reads: Math.max(0, branchBinding.budget.reads - localUsed.reads - alreadyReserved.reads),
+			} : undefined;
+			if (!validateScoutDispatch(scoutDispatch.count, planned as Array<{ agent: string; plan_context?: unknown }>, new Set(scoutDispatch.parents), new Set(scoutDispatch.owners), branchBinding ?? undefined, availableBudget)) {
 				return {
 					content: [{ type: "text", text: "Blocked: a planned research branch may dispatch at most two research-scout leaves, each with its returned depth-two plan_context." }],
 						details: makeDetails(hasTasks ? "parallel" : "single")([]), isError: true,
@@ -916,7 +950,7 @@ This guard prevents self-recursion and cyclic handoffs (for example A -> B -> A)
 			}
 			effectiveRootContexts = refreshed;
 		}
-		const effectiveRootByParent = new Map(effectiveRootContexts.map((context) => [context.parent_item_id, context]));
+		let effectiveRootByParent = new Map(effectiveRootContexts.map((context) => [context.parent_item_id, context]));
 		const rebindRootContext = (context: PlanContextV1 | undefined): PlanContextV1 | undefined =>
 			context?.depth === 1 ? effectiveRootByParent.get(context.parent_item_id) : context;
 
@@ -928,8 +962,11 @@ This guard prevents self-recursion and cyclic handoffs (for example A -> B -> A)
 				content: [{ type: "text", text: `Blocked: planned root research branch is ${prepared.reason}. Inspect the parent graph before retrying.` }],
 				details: makeDetails("parallel")([]), isError: true,
 			};
+			effectiveRootContexts = prepared.contexts;
+			effectiveRootByParent = new Map(effectiveRootContexts.map((context) => [context.parent_item_id, context]));
 		  }
 		  scoutDispatch.count += plannedScoutCount;
+		  recordDispatchedScouts(BRANCH_PLANNER_PROCESS ? await readPlanContext(process.env[PLAN_CONTEXT_ENV]) : null, plannedScoutContexts);
 		  for (const context of plannedScoutContexts) {
 			 if (!scoutDispatch.parents.includes(context.parent_item_id)) scoutDispatch.parents.push(context.parent_item_id);
 			 if (!scoutDispatch.owners.includes(context.owner_ref)) scoutDispatch.owners.push(context.owner_ref);
@@ -957,8 +994,11 @@ This guard prevents self-recursion and cyclic handoffs (for example A -> B -> A)
 				content: [{ type: "text", text: `Blocked: planned root research branch is ${prepared.reason}. Inspect the parent graph before retrying.` }],
 				details: makeDetails("single")([]), isError: true,
 			};
+			effectiveRootContexts = prepared.contexts;
+			effectiveRootByParent = new Map(effectiveRootContexts.map((context) => [context.parent_item_id, context]));
 		  }
 		  scoutDispatch.count += plannedScoutCount;
+		  recordDispatchedScouts(BRANCH_PLANNER_PROCESS ? await readPlanContext(process.env[PLAN_CONTEXT_ENV]) : null, plannedScoutContexts);
 		  for (const context of plannedScoutContexts) {
 			 if (!scoutDispatch.parents.includes(context.parent_item_id)) scoutDispatch.parents.push(context.parent_item_id);
 			 if (!scoutDispatch.owners.includes(context.owner_ref)) scoutDispatch.owners.push(context.owner_ref);

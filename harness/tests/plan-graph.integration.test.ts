@@ -25,7 +25,7 @@ if (!CHILD) {
 			const output = execFileSync(process.execPath, [
 				"--experimental-strip-types", "--experimental-loader", resolve("harness/tests/ts-js-resolver.mjs"), "--test", import.meta.filename,
 			], { cwd: process.cwd(), env, encoding: "utf8", stdio: "pipe" });
-			assert.match(output, /pass 22/);
+			assert.match(output, /pass 28/);
 		} finally { rmSync(artifacts, { recursive: true, force: true }); }
 	});
 } else {
@@ -103,7 +103,8 @@ if (!CHILD) {
 		const context = started.details.contexts[0];
 		const acquired = await planRunnerModule.acquireResearchBranchLease(cwd, context);
 		assert.equal(acquired.ok, true);
-		fp.pi.events.emit(HARNESS_SIGNAL_CHANNEL, { v: 1, type: "plan/branch-result", context, report: {
+		const leasedContext = { ...context, lease_id: acquired.lease_id, dispatch_epoch: 0 };
+		fp.pi.events.emit(HARNESS_SIGNAL_CHANNEL, { v: 1, type: "plan/branch-result", context: leasedContext, report: {
 			v: 1, parent_item_id: context.parent_item_id, owner_ref: context.owner_ref, status: "blocked", note: "bounded failure",
 			consumed: { searches: 0, reads: 0 }, evidence_gaps: ["bounded failure"], source_leads: [], children: [],
 			coverage: { strategy: "direct", scope: "bounded", returned_count: 0, truncated: false, budget_exhausted: true, failed: false, complete: false },
@@ -112,6 +113,52 @@ if (!CHILD) {
 		const state = JSON.parse(readFileSync(join(cwd, ".pi", "plan-state.json"), "utf8"));
 		assert.equal(state.items[0].status, "blocked");
 		assert.equal(state.items[0].lease, undefined, "merge closes the lease before publishing the branch outcome");
+		resetPiGlobals();
+	});
+
+	test("unleased branch results cannot mutate an open research branch", async () => {
+		const fp = fresh(); const cwd = tmp();
+		const started = await callTool(fp, "research_plan_start", { request: "Unleased report", summary: "one branch", branches: [{ title: "Evidence", budget: { searches: 1, reads: 1 } }] }, cwd);
+		const context = started.details.contexts[0];
+		const report = {
+			v: 1, parent_item_id: context.parent_item_id, owner_ref: context.owner_ref, status: "done", note: "forged report",
+			consumed: { searches: 1, reads: 1 }, evidence_gaps: [], source_leads: [], children: [], coverage,
+		};
+		// A valid owner reference is not proof that this process acquired the
+		// parent-owned dispatch lease. Before the fix this signal was merged and
+		// could create a child without any corresponding dispatch.
+		fp.pi.events.emit(HARNESS_SIGNAL_CHANNEL, { v: 1, type: "plan/branch-result", context, report, failureClass: null });
+		await fire(fp, "before_agent_start", {}, makeCtx(cwd).ctx);
+		const state = JSON.parse(readFileSync(join(cwd, ".pi", "plan-state.json"), "utf8"));
+		assert.equal(state.items[0].status, "pending");
+		assert.equal(state.items.length, 1, "unleased report must not add child claims");
+		resetPiGlobals();
+	});
+
+	test("late results from an earlier dispatch generation cannot claim a retried branch", async () => {
+		const fp = fresh(); const cwd = tmp();
+		const started = await callTool(fp, "research_plan_start", { request: "Late report", summary: "one branch", branches: [{ title: "Evidence", budget: { searches: 2, reads: 2 } }] }, cwd);
+		const context = started.details.contexts[0];
+		const firstLease = await planRunnerModule.acquireResearchBranchLease(cwd, context);
+		assert.equal(firstLease.ok, true);
+		const firstContext = { ...context, lease_id: firstLease.lease_id, dispatch_epoch: 0 };
+		const report = {
+			v: 1, parent_item_id: context.parent_item_id, owner_ref: context.owner_ref, status: "done", note: "first generation",
+			consumed: { searches: 0, reads: 0 }, evidence_gaps: [], source_leads: [], children: [], coverage,
+		};
+		fp.pi.events.emit(HARNESS_SIGNAL_CHANNEL, { v: 1, type: "plan/branch-result", context: firstContext, report, failureClass: null });
+		await fire(fp, "before_agent_start", {}, makeCtx(cwd).ctx);
+		await callTool(fp, "plan_update", { deltas: [{ item_id: context.parent_item_id, status: "pending", note: "retry after first generation" }] }, cwd);
+		const refreshed = await planRunnerModule.researchBranchDispatchContext(cwd, context);
+		const secondLease = await planRunnerModule.acquireResearchBranchLease(cwd, refreshed!);
+		assert.equal(secondLease.ok, true);
+		// The old lease and epoch must not be accepted merely because this branch
+		// has been reopened and is leased again.
+		fp.pi.events.emit(HARNESS_SIGNAL_CHANNEL, { v: 1, type: "plan/branch-result", context: firstContext, report: { ...report, note: "late first generation" }, failureClass: null });
+		await fire(fp, "before_agent_start", {}, makeCtx(cwd).ctx);
+		const state = JSON.parse(readFileSync(join(cwd, ".pi", "plan-state.json"), "utf8"));
+		assert.equal(state.items[0].status, "pending");
+		assert.equal(state.items[0].lease.lease_id, secondLease.lease_id);
 		resetPiGlobals();
 	});
 
@@ -239,13 +286,16 @@ if (!CHILD) {
 		const fp = fresh(); const cwd = tmp();
 		const started = await callTool(fp, "research_plan_start", { request: "Investigate", summary: "one branch", branches: [{ title: "Evidence", budget: { searches: 2, reads: 3 } }] }, cwd);
 		const context = started.details.contexts[0];
+		const acquired = await planRunnerModule.acquireResearchBranchLease(cwd, context);
+		assert.equal(acquired.ok, true);
+		const leasedContext = { ...context, lease_id: acquired.lease_id, dispatch_epoch: 0 };
 		const report = {
 			v: 1, parent_item_id: context.parent_item_id, owner_ref: context.owner_ref, status: "done", note: "branch synthesized",
 			consumed: { searches: 2, reads: 3 }, evidence_gaps: [], coverage,
 			children: [{ item_id: "leaf-one", title: "Leaf", status: "done", coverage, budget: { allocated: { searches: 2, reads: 3 }, used: { searches: 2, reads: 3 } } }],
 			source_leads: [{ url: "https://example.test/source", claim: "claim", quote: "quote" }],
 		};
-		fp.pi.events.emit(HARNESS_SIGNAL_CHANNEL, { v: 1, type: "plan/branch-result", context, report, failureClass: null });
+		fp.pi.events.emit(HARNESS_SIGNAL_CHANNEL, { v: 1, type: "plan/branch-result", context: leasedContext, report, failureClass: null });
 		await fire(fp, "before_agent_start", {}, makeCtx(cwd).ctx);
 		let state = JSON.parse(readFileSync(join(cwd, ".pi", "plan-state.json"), "utf8"));
 		assert.equal(state.items.length, 2); assert.equal(state.items[1].parent_id, state.items[0].id);
@@ -270,11 +320,14 @@ if (!CHILD) {
 		const fp = fresh(); const cwd = tmp();
 		const started = await callTool(fp, "research_plan_start", { request: "Retry bounded research", summary: "one branch", branches: [{ title: "Evidence", budget: { searches: 2, reads: 3 } }] }, cwd);
 		const context = started.details.contexts[0];
+		const firstLease = await planRunnerModule.acquireResearchBranchLease(cwd, context);
+		assert.equal(firstLease.ok, true);
+		const firstLeasedContext = { ...context, lease_id: firstLease.lease_id, dispatch_epoch: 0 };
 		const firstReport = {
 			v: 1, parent_item_id: context.parent_item_id, owner_ref: context.owner_ref, status: "done", note: "first attempt",
 			consumed: { searches: 1, reads: 1 }, evidence_gaps: [], source_leads: [], children: [], coverage,
 		};
-		fp.pi.events.emit(HARNESS_SIGNAL_CHANNEL, { v: 1, type: "plan/branch-result", context, report: firstReport, failureClass: null });
+		fp.pi.events.emit(HARNESS_SIGNAL_CHANNEL, { v: 1, type: "plan/branch-result", context: firstLeasedContext, report: firstReport, failureClass: null });
 		await fire(fp, "before_agent_start", {}, makeCtx(cwd).ctx);
 		assert.deepEqual(JSON.parse(readFileSync(join(cwd, ".pi", "plan-state.json"), "utf8")).items[0].budget.used, { searches: 1, reads: 1 }, "first merge should record usage");
 		await callTool(fp, "plan_update", { deltas: [{ item_id: context.parent_item_id, status: "pending", note: "explicitly retry with the remaining envelope" }] }, cwd);
@@ -284,11 +337,12 @@ if (!CHILD) {
 		assert.deepEqual(stale, { ok: false, reason: "stale-context" }, "the original full-allocation context must be rejected");
 		const leased = await planRunnerModule.acquireResearchBranchLease(cwd, refreshed!);
 		assert.equal(leased.ok, true);
+		const secondLeasedContext = { ...refreshed!, lease_id: leased.lease_id };
 		const secondReport = {
 			v: 1, parent_item_id: refreshed!.parent_item_id, owner_ref: refreshed!.owner_ref, status: "done", note: "retry attempt",
 			consumed: refreshed!.budget, evidence_gaps: [], source_leads: [], children: [], coverage,
 		};
-		fp.pi.events.emit(HARNESS_SIGNAL_CHANNEL, { v: 1, type: "plan/branch-result", context: refreshed, report: secondReport, failureClass: null });
+		fp.pi.events.emit(HARNESS_SIGNAL_CHANNEL, { v: 1, type: "plan/branch-result", context: secondLeasedContext, report: secondReport, failureClass: null });
 		await fire(fp, "before_agent_start", {}, makeCtx(cwd).ctx);
 		const state = JSON.parse(readFileSync(join(cwd, ".pi", "plan-state.json"), "utf8"));
 		assert.deepEqual(state.items[0].budget.used, { searches: 2, reads: 3 }, "merge must retain cumulative usage across retries");
@@ -299,12 +353,37 @@ if (!CHILD) {
 		const fp = fresh(); const cwd = tmp();
 		const started = await callTool(fp, "research_plan_start", { request: "Investigate", summary: "one branch", branches: [{ title: "Evidence", budget: { searches: 1, reads: 2 } }] }, cwd);
 		const context = started.details.contexts[0];
-		fp.pi.events.emit(HARNESS_SIGNAL_CHANNEL, { v: 1, type: "plan/branch-result", context, report: null, failureClass: "missing_report" });
+		const acquired = await planRunnerModule.acquireResearchBranchLease(cwd, context);
+		assert.equal(acquired.ok, true);
+		const leasedContext = { ...context, lease_id: acquired.lease_id, dispatch_epoch: 0 };
+		fp.pi.events.emit(HARNESS_SIGNAL_CHANNEL, { v: 1, type: "plan/branch-result", context: leasedContext, report: null, failureClass: "missing_report" });
 		await fire(fp, "before_agent_start", {}, makeCtx(cwd).ctx);
 		const state = JSON.parse(readFileSync(join(cwd, ".pi", "plan-state.json"), "utf8"));
 		assert.equal(state.items[0].status, "blocked"); assert.match(state.items[0].note, /missing_report/);
 		const { ctx, notes } = makeCtx(cwd); await fp.commands.get("plan-status").handler(context.parent_item_id, ctx);
 		assert.match(notes.at(-1) ?? "", new RegExp(`Subtree ${context.parent_item_id}`));
+		resetPiGlobals();
+	});
+
+	test("invalid branch reports burn the uncertain discovery envelope before reopen", async () => {
+		const fp = fresh(); const cwd = tmp();
+		const started = await callTool(fp, "research_plan_start", { request: "Invalid report", summary: "one branch", branches: [{ title: "Evidence", budget: { searches: 2, reads: 2 } }] }, cwd);
+		const context = started.details.contexts[0];
+		const acquired = await planRunnerModule.acquireResearchBranchLease(cwd, context);
+		assert.equal(acquired.ok, true);
+		const leasedContext = { ...context, lease_id: acquired.lease_id, dispatch_epoch: 0 };
+		fp.pi.events.emit(HARNESS_SIGNAL_CHANNEL, { v: 1, type: "plan/branch-result", context: leasedContext, report: null, failureClass: "invalid_report" });
+		await fire(fp, "before_agent_start", {}, makeCtx(cwd).ctx);
+		let state = JSON.parse(readFileSync(join(cwd, ".pi", "plan-state.json"), "utf8"));
+		assert.equal(state.items[0].status, "blocked");
+		assert.deepEqual(state.items[0].budget.used, state.items[0].budget.allocated, "unknown report usage must be conservatively consumed");
+		await callTool(fp, "plan_update", { deltas: [{ item_id: context.parent_item_id, status: "pending", note: "reopen must not regain uncertain budget" }] }, cwd);
+		const refreshed = await planRunnerModule.researchBranchDispatchContext(cwd, context);
+		assert.deepEqual(refreshed?.budget, { searches: 0, reads: 0 });
+		const retry = await planRunnerModule.acquireResearchBranchLease(cwd, refreshed!);
+		assert.deepEqual(retry, { ok: false, reason: "budget-exhausted" });
+		state = JSON.parse(readFileSync(join(cwd, ".pi", "plan-state.json"), "utf8"));
+		assert.equal(state.items[0].status, "pending");
 		resetPiGlobals();
 	});
 
@@ -316,14 +395,19 @@ if (!CHILD) {
 				{ title: "Branch B", budget: { searches: 1, reads: 2 } },
 			],
 		}, cwd);
-		const reports = started.details.contexts.map((context: any, index: number) => ({
-			context,
+		const reports = [] as Array<{ context: any; report: any }>;
+		for (const [index, context] of started.details.contexts.entries() as IterableIterator<[number, any]>) {
+			const acquired = await planRunnerModule.acquireResearchBranchLease(cwd, context);
+			assert.equal(acquired.ok, true);
+			reports.push({
+				context: { ...context, lease_id: acquired.lease_id, dispatch_epoch: 0 },
 				report: {
 					v: 1, parent_item_id: context.parent_item_id, owner_ref: context.owner_ref, status: "done", note: `branch ${index} synthesized`,
 					consumed: context.budget, evidence_gaps: [], source_leads: [], coverage,
 					children: [{ item_id: `parallel-leaf-${index}`, title: `Leaf ${index}`, status: "done", coverage, budget: { allocated: context.budget, used: context.budget } }],
-			},
-		}));
+				},
+			});
+		}
 		for (const entry of reports) fp.pi.events.emit(HARNESS_SIGNAL_CHANNEL, { v: 1, type: "plan/branch-result", ...entry, failureClass: null });
 		await fire(fp, "before_agent_start", {}, makeCtx(cwd).ctx);
 		const state = JSON.parse(readFileSync(join(cwd, ".pi", "plan-state.json"), "utf8"));
@@ -336,13 +420,16 @@ if (!CHILD) {
 		const fp = fresh(); const cwd = tmp();
 		const started = await callTool(fp, "research_plan_start", { request: "Investigate", summary: "one branch", branches: [{ title: "Evidence", budget: { searches: 1, reads: 1 } }] }, cwd);
 		const context = started.details.contexts[0];
+		const acquired = await planRunnerModule.acquireResearchBranchLease(cwd, context);
+		assert.equal(acquired.ok, true);
+		const leasedContext = { ...context, lease_id: acquired.lease_id, dispatch_epoch: 0 };
 		const report = {
 			v: 1, parent_item_id: context.parent_item_id, owner_ref: context.owner_ref, status: "done", note: "first terminal result",
 			consumed: context.budget, evidence_gaps: [], source_leads: [], coverage,
 			children: [{ item_id: "winning-leaf", title: "Winner", status: "done", coverage, budget: { allocated: context.budget, used: context.budget } }],
 		};
-		fp.pi.events.emit(HARNESS_SIGNAL_CHANNEL, { v: 1, type: "plan/branch-result", context, report, failureClass: null });
-		fp.pi.events.emit(HARNESS_SIGNAL_CHANNEL, { v: 1, type: "plan/branch-result", context, report: null, failureClass: "child_failed" });
+		fp.pi.events.emit(HARNESS_SIGNAL_CHANNEL, { v: 1, type: "plan/branch-result", context: leasedContext, report, failureClass: null });
+		fp.pi.events.emit(HARNESS_SIGNAL_CHANNEL, { v: 1, type: "plan/branch-result", context: leasedContext, report: null, failureClass: "child_failed" });
 		await fire(fp, "before_agent_start", {}, makeCtx(cwd).ctx);
 		const state = JSON.parse(readFileSync(join(cwd, ".pi", "plan-state.json"), "utf8"));
 		assert.equal(state.items[0].status, "done");
@@ -361,6 +448,9 @@ if (!CHILD) {
 			],
 		}, cwd);
 		const [context] = started.details.contexts;
+		const acquired = await planRunnerModule.acquireResearchBranchLease(cwd, context);
+		assert.equal(acquired.ok, true);
+		const leasedContext = { ...context, lease_id: acquired.lease_id, dispatch_epoch: 0 };
 		const stateBefore = JSON.parse(readFileSync(join(cwd, ".pi", "plan-state.json"), "utf8"));
 		const collidingId = stateBefore.items[1].id;
 		const report = {
@@ -369,7 +459,7 @@ if (!CHILD) {
 			children: [{ item_id: collidingId, title: "Colliding leaf", status: "done", coverage,
 				budget: { allocated: context.budget, used: context.budget } }],
 		};
-		fp.pi.events.emit(HARNESS_SIGNAL_CHANNEL, { v: 1, type: "plan/branch-result", context, report, failureClass: null });
+		fp.pi.events.emit(HARNESS_SIGNAL_CHANNEL, { v: 1, type: "plan/branch-result", context: leasedContext, report, failureClass: null });
 		await fire(fp, "before_agent_start", {}, makeCtx(cwd).ctx);
 		const state = JSON.parse(readFileSync(join(cwd, ".pi", "plan-state.json"), "utf8"));
 		assert.equal(state.items[0].status, "blocked");
@@ -385,6 +475,9 @@ if (!CHILD) {
 			branches: [{ title: "Evidence", budget: { searches: 1, reads: 1 } }],
 		}, cwd);
 		const context = started.details.contexts[0];
+		const acquired = await planRunnerModule.acquireResearchBranchLease(cwd, context);
+		assert.equal(acquired.ok, true);
+		const leasedContext = { ...context, lease_id: acquired.lease_id, dispatch_epoch: 0 };
 		const incomplete = { strategy: "direct", scope: "bounded", returned_count: 0, truncated: false, budget_exhausted: true, failed: false, complete: false };
 		const report = {
 			v: 1, parent_item_id: context.parent_item_id, owner_ref: context.owner_ref, status: "blocked", note: "no allocation",
@@ -392,7 +485,7 @@ if (!CHILD) {
 			children: [{ item_id: "zero-budget", title: "Zero budget", status: "blocked", evidence_gaps: ["no allocation"], coverage: incomplete,
 				budget: { allocated: { searches: 0, reads: 0 }, used: { searches: 0, reads: 0 } } }],
 		};
-		fp.pi.events.emit(HARNESS_SIGNAL_CHANNEL, { v: 1, type: "plan/branch-result", context, report, failureClass: null });
+		fp.pi.events.emit(HARNESS_SIGNAL_CHANNEL, { v: 1, type: "plan/branch-result", context: leasedContext, report, failureClass: null });
 		await fire(fp, "before_agent_start", {}, makeCtx(cwd).ctx);
 		const state = JSON.parse(readFileSync(join(cwd, ".pi", "plan-state.json"), "utf8"));
 		assert.equal(state.items[0].status, "blocked");
@@ -413,6 +506,61 @@ if (!CHILD) {
 		await expectToolError(fp, "branch_plan", {
 			...base, children: [{ ...base.children[0], budget: { allocated: { searches: 2, reads: 2 }, used: { searches: 0, reads: 0 } } }],
 		}, cwd, /child allocations exceed the branch remainder/);
+		resetPiGlobals();
+	});
+
+	test("research-planner children retain their branch report tool after startup narrowing", async () => {
+		const fp = makeFakePi(); const cwd = tmp();
+		for (const name of ["read", "bash", "edit", "write", "capability", "plan_write", "plan_update", "plan_expand", "plan_settle", "research_plan_start", "branch_plan", "web_search", "web_read", "subagent"]) {
+			fp.pi.registerTool({ name, parameters: {} } as any);
+		}
+		planRunner(fp.pi as any);
+		toolActivation(fp.pi as any);
+		fp.pi.setActiveTools([...fp.tools.keys()]);
+		await fire(fp, "session_start", {}, makeCtx(cwd).ctx);
+		assert.ok(fp.pi.getActiveTools().includes("branch_plan"), "a branch planner must be able to publish its validated report");
+		resetPiGlobals();
+	});
+
+	test("delegated branch startup never reclaims the parent lease", async () => {
+		const parent = fresh(); const cwd = tmp();
+		const started = await callTool(parent, "research_plan_start", { request: "Parent lease", summary: "one branch", branches: [{ title: "Evidence", budget: { searches: 1, reads: 1 } }] }, cwd);
+		const context = started.details.contexts[0];
+		const acquired = await planRunnerModule.acquireResearchBranchLease(cwd, context);
+		assert.equal(acquired.ok, true);
+		const contextArtifactPath = process.env.PI_MUNCHKIN_PLAN_CONTEXT_PATH!;
+		const originalContextArtifact = readFileSync(contextArtifactPath);
+		writeFileSync(contextArtifactPath, `${JSON.stringify(context)}\n`, { mode: 0o600 });
+		// A real branch planner is a new process. Its plan-runner must not mistake
+		// the parent process's writer marker for an interrupted parent session and
+		// reclaim the lease before the child can publish its report.
+		resetPiGlobals();
+		const child = makeFakePi();
+		for (const name of ["read", "bash", "edit", "write", "capability", "plan_write", "plan_update", "plan_expand", "plan_settle", "research_plan_start", "branch_plan", "web_search", "web_read", "subagent"]) {
+			child.pi.registerTool({ name, parameters: {} } as any);
+		}
+		(await import(`../extensions/plan-runner.ts?delegated-child=${Date.now()}-${Math.random()}`)).default(child.pi as any);
+		(await import(`../extensions/tool-activation.ts?delegated-child=${Date.now()}-${Math.random()}`)).default(child.pi as any);
+		child.pi.setActiveTools([...child.tools.keys()]);
+		await fire(child, "session_start", {}, makeCtx(cwd).ctx);
+		try {
+			const state = JSON.parse(readFileSync(join(cwd, ".pi", "plan-state.json"), "utf8"));
+			assert.equal(state.items[0].status, "pending", "the branch child must not perform parent stale-lease recovery");
+			assert.equal(state.items[0].lease.lease_id, acquired.lease_id, "parent dispatch lease remains authoritative until its result arrives");
+		} finally {
+			writeFileSync(contextArtifactPath, originalContextArtifact, { mode: 0o600 });
+		}
+		resetPiGlobals();
+	});
+
+	test("branch reports cannot drop a scout after it has been dispatched", async () => {
+		const fp = fresh(); const cwd = tmp();
+		const contextKey = "branch-budget-run:branch-budget-root:" + ownerRef("branch-budget-run", "branch-budget-root");
+		(globalThis as Record<string, unknown>).__pi_research_scout_dispatched_v1 = { key: contextKey, ids: ["already-dispatched"] };
+		await expectToolError(fp, "branch_plan", {
+			status: "pending", note: "replace the in-flight scout", consumed: { searches: 0, reads: 0 },
+			children: [], source_leads: [], evidence_gaps: [],
+		}, cwd, /retain dispatched scout leaf already-dispatched/);
 		resetPiGlobals();
 	});
 
@@ -443,6 +591,7 @@ if (!CHILD) {
 		const report = JSON.parse(readFileSync(join(process.env.PI_MUNCHKIN_BRANCH_REPORT_PATH!), "utf8"));
 		assert.equal(report.status, "blocked");
 		assert.equal(report.coverage.failed, true);
+		assert.deepEqual(report.consumed, { searches: 2, reads: 3 }, "repeated malformed reports burn the untrusted attempt remainder");
 		assert.match(report.evidence_gaps[0], /invalid coverage/i);
 		resetPiGlobals();
 	});

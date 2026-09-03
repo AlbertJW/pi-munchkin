@@ -9,6 +9,7 @@ import { classifyBashCommand } from "../lib/command-policy.ts";
 import { record } from "../lib/telemetry.ts";
 import { initialToolSurface } from "../lib/session-bootstrap.ts";
 import { onHarnessSignal } from "../lib/harness-signals.ts";
+import { BRANCH_REPORT_ENV, PLAN_CONTEXT_ENV } from "../lib/branch-report.ts";
 
 type Profile = "ambient" | "core";
 type LegacyMode = "ambient" | "dynamic" | "phase";
@@ -18,6 +19,7 @@ const DEEP_RESEARCH_PLANNING_ENABLED = PLAN_GRAPH_ENABLED && process.env.DEEP_RE
 // deliberately a separate, parent-only opt-in: ordinary sessions keep the
 // bounded core surface, and delegated children must not inherit the lease.
 const HEADLESS_PLAN_ENABLED = DEEP_RESEARCH_PLANNING_ENABLED && process.env.PI_MUNCHKIN_HEADLESS_PLAN === "on";
+const BRANCH_PLANNER_PROCESS = PLAN_GRAPH_ENABLED && Boolean(process.env[PLAN_CONTEXT_ENV] && process.env[BRANCH_REPORT_ENV]);
 const HEADLESS_PLAN_TOOLS = new Set([
 	"plan_write", "plan_update", "plan_expand", "plan_settle", "research_plan_start",
 	"web_search", "web_read", "research_note", "research_recall", "subagent",
@@ -353,7 +355,8 @@ export default function (pi: ExtensionAPI): void {
 			const activeGoalTools = new Set(activeGoal ? familyTools("goals", allNames) : []);
 			const core = [...pool].filter((name) =>
 				(CORE_NAMES.has(name) && (activePlan || (name !== "plan_write" && name !== "plan_update"))) ||
-				activeGoalTools.has(name) || (HEADLESS_PLAN_ENABLED && HEADLESS_PLAN_TOOLS.has(name)));
+				activeGoalTools.has(name) || (HEADLESS_PLAN_ENABLED && HEADLESS_PLAN_TOOLS.has(name)) ||
+				(BRANCH_PLANNER_PROCESS && name === "branch_plan"));
 			setTo(deferred, [...pool].filter((name) => !core.includes(name)));
 			for (const name of activeGoalTools) if (core.includes(name)) owned.add(name);
 			if (DEEP_RESEARCH_PLANNING_ENABLED) for (const name of familyTools("planning", allNames)) if (!core.includes(name)) deferred.add(name);
@@ -385,6 +388,8 @@ export default function (pi: ExtensionAPI): void {
 	// never inherit this instruction or gain an implicit planning route.
 	pi.on("before_agent_start", async (event) => {
 		if (!HEADLESS_PLAN_ENABLED) return;
+		const activePlan = g.__pi_active_plan_context as { settled?: unknown } | undefined;
+		if (activePlan?.settled === true) return;
 		const existing = typeof event.systemPrompt === "string" ? event.systemPrompt : "";
 		if (existing.includes(HEADLESS_PLAN_ROUTE_HINT)) return;
 		return { systemPrompt: existing ? `${existing}\n\n${HEADLESS_PLAN_ROUTE_HINT}` : HEADLESS_PLAN_ROUTE_HINT };

@@ -2,12 +2,16 @@ import { PLAN_NOTE_MAX_BYTES, PLAN_TITLE_MAX_BYTES } from "./plan-limits.ts";
 import { chmod, mkdir, open, readFile, rename, unlink } from "node:fs/promises";
 import { dirname } from "node:path";
 import { randomUUID } from "node:crypto";
-import { boundedInteger, budgetWithin, ownerRef, validBudget, validCoverage, validDeferral, type Deferral, type PlanStatus, type ResearchBudget, type RetrievalCoverage } from "./plan-graph.ts";
+import { addBudget, boundedInteger, budgetWithin, ownerRef, validBudget, validCoverage, validDeferral, type Deferral, type PlanStatus, type ResearchBudget, type RetrievalCoverage } from "./plan-graph.ts";
 
 export const PLAN_CONTEXT_ENV = "PI_MUNCHKIN_PLAN_CONTEXT_PATH";
 export const BRANCH_REPORT_ENV = "PI_MUNCHKIN_BRANCH_REPORT_PATH";
 export const RESEARCH_SCOUT_ENV = "PI_MUNCHKIN_RESEARCH_SCOUT";
 export const RESEARCH_RESERVED_BUDGET_KEY = "__pi_research_reserved_budget";
+/** Shared parent-process ledger of scout identities already handed to pi.
+ * Branch reports may be revised before dispatch, but once a scout is launched
+ * its leaf must remain in every later report so its usage cannot disappear. */
+export const RESEARCH_SCOUT_DISPATCHED_KEY = "__pi_research_scout_dispatched_v1";
 
 export type PlanContextV1 = {
 	v: 1;
@@ -18,6 +22,9 @@ export type PlanContextV1 = {
 	depth: 1 | 2;
 	budget: ResearchBudget;
 	limits: { max_depth: 2; max_children: 0 | 2 };
+	/** Parent-issued dispatch credentials. Depth-two scouts never receive them. */
+	lease_id?: string;
+	dispatch_epoch?: number;
 };
 
 export type BranchReportChildV1 = {
@@ -50,6 +57,7 @@ export type BranchReportV1 = {
 
 const ID = /^[A-Za-z0-9._:-]{1,96}$/;
 const OWNER = /^[a-f0-9]{24}$/;
+const LEASE = /^[A-Za-z0-9._:-]{8,96}$/;
 const httpUrl = (value: unknown): value is string => {
 	if (typeof value !== "string" || value.length > 1_999) return false;
 	try {
@@ -61,11 +69,14 @@ const boundedText = (value: unknown, bytes: number): value is string => typeof v
 export function validatePlanContext(value: unknown): value is PlanContextV1 {
 	if (!value || typeof value !== "object" || Array.isArray(value)) return false;
 	const item = value as Record<string, any>;
-	return Object.keys(item).every((key) => ["v", "profile", "run_id", "parent_item_id", "owner_ref", "depth", "budget", "limits"].includes(key)) &&
+	return Object.keys(item).every((key) => ["v", "profile", "run_id", "parent_item_id", "owner_ref", "depth", "budget", "limits", "lease_id", "dispatch_epoch"].includes(key)) &&
 		item.v === 1 && item.profile === "deep-research" && boundedText(item.run_id, 200) && ID.test(String(item.parent_item_id)) &&
 		OWNER.test(String(item.owner_ref)) && (item.depth === 1 || item.depth === 2) && validBudget(item.budget) && item.limits?.max_depth === 2 &&
 		Object.keys(item.limits ?? {}).length === 2 && Object.keys(item.limits ?? {}).every((key) => ["max_depth", "max_children"].includes(key)) &&
-		((item.depth === 1 && item.limits?.max_children === 2) || (item.depth === 2 && item.limits?.max_children === 0));
+		((item.depth === 1 && item.limits?.max_children === 2) || (item.depth === 2 && item.limits?.max_children === 0)) &&
+		(item.lease_id === undefined || (item.depth === 1 && typeof item.lease_id === "string" && LEASE.test(item.lease_id))) &&
+		(item.dispatch_epoch === undefined || (item.depth === 1 && boundedInteger(item.dispatch_epoch, 1_000_000))) &&
+		(item.lease_id === undefined || item.dispatch_epoch !== undefined);
 }
 
 export function validatePlanContextRole(agentName: string, context: unknown): context is PlanContextV1 | undefined {
@@ -80,6 +91,7 @@ export function validateScoutDispatch(
 	dispatchedParents: ReadonlySet<string> = new Set(),
 	dispatchedOwners: ReadonlySet<string> = new Set(),
 	branchBinding?: PlanContextV1,
+	availableBudget?: ResearchBudget,
 ): boolean {
 	if (!boundedInteger(currentCount, 2) || requested.length < 1 || currentCount + requested.length > 2) return false;
 	if (!branchBinding || !validatePlanContext(branchBinding as PlanContextV1) || branchBinding.depth !== 1 ||
@@ -90,11 +102,14 @@ export function validateScoutDispatch(
 	// request, without mutating the caller's sets on a rejected request.
 	const owners = new Set(dispatchedOwners);
 	const nodes = new Set(dispatchedParents);
+	let allocated: ResearchBudget = { searches: 0, reads: 0 };
 	for (const entry of requested) {
 		if (entry.agent !== "research-scout" || !validatePlanContext(entry.plan_context) || entry.plan_context.depth !== 2 ||
 			entry.plan_context.run_id !== branchBinding.run_id || entry.plan_context.parent_item_id === branchBinding.parent_item_id ||
 			entry.plan_context.owner_ref !== ownerRef(entry.plan_context.run_id, entry.plan_context.parent_item_id)) return false;
 		if (owners.has(entry.plan_context.owner_ref) || nodes.has(entry.plan_context.parent_item_id)) return false;
+		allocated = addBudget(allocated, entry.plan_context.budget);
+		if (!budgetWithin(allocated, availableBudget ?? branchBinding.budget)) return false;
 		owners.add(entry.plan_context.owner_ref);
 		nodes.add(entry.plan_context.parent_item_id);
 	}
@@ -209,6 +224,10 @@ async function syncDirectory(path: string): Promise<void> {
 export async function writeBranchReport(path: string, report: BranchReportV1, context: PlanContextV1): Promise<void> {
 	if (!validateBranchReport(report, context, false)) throw new Error("branch_report rejected: invalid or over-budget report");
 	await mkdir(dirname(path), { recursive: true, mode: 0o700 });
+	// mkdir's mode is ignored for an existing directory. Tighten it explicitly
+	// before creating the temporary report so a caller cannot place this private
+	// artifact in a world-readable pre-existing directory.
+	await chmod(dirname(path), 0o700);
 	const temporary = `${path}.tmp-${process.pid}-${randomUUID().slice(0, 8)}`;
 	let published = false;
 	try {

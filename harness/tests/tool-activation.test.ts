@@ -266,6 +266,32 @@ test("headless deep-research lease injects a parent-only planner-first route hin
 	}
 });
 
+test("headless planner route hint stops after the graph settles", async () => {
+	const oldGraph = process.env.PLAN_GRAPH;
+	const oldResearch = process.env.DEEP_RESEARCH_PLANNING;
+	const oldHeadless = process.env.PI_MUNCHKIN_HEADLESS_PLAN;
+	process.env.PLAN_GRAPH = "on";
+	process.env.DEEP_RESEARCH_PLANNING = "on";
+	process.env.PI_MUNCHKIN_HEADLESS_PLAN = "on";
+	const run = await load("core", [...names]);
+	try {
+		const before = await fire(run.fp, "before_agent_start", { systemPrompt: "BASE" }, { cwd: process.cwd() });
+		assert.match(before?.systemPrompt ?? "", /research_plan_start/);
+		// plan-runner publishes this status after the durable settlement write. A
+		// settled graph must not keep steering a subsequent user request toward a
+		// graph entrypoint whose tools have been removed.
+		(globalThis as Record<string, unknown>).__pi_active_plan_context = { settled: true };
+		const after = await fire(run.fp, "before_agent_start", { systemPrompt: "BASE" }, { cwd: process.cwd() });
+		assert.equal(after, undefined);
+	} finally {
+		run.restore();
+		delete (globalThis as Record<string, unknown>).__pi_active_plan_context;
+		if (oldGraph === undefined) delete process.env.PLAN_GRAPH; else process.env.PLAN_GRAPH = oldGraph;
+		if (oldResearch === undefined) delete process.env.DEEP_RESEARCH_PLANNING; else process.env.DEEP_RESEARCH_PLANNING = oldResearch;
+		if (oldHeadless === undefined) delete process.env.PI_MUNCHKIN_HEADLESS_PLAN; else process.env.PI_MUNCHKIN_HEADLESS_PLAN = oldHeadless;
+	}
+});
+
 test("planner-first route hint stays absent without the headless lease", async () => {
 	const oldGraph = process.env.PLAN_GRAPH;
 	const oldResearch = process.env.DEEP_RESEARCH_PLANNING;
