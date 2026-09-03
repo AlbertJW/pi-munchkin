@@ -65,6 +65,10 @@ const EXCLUDED_HARNESS_ENV_KEYS = [
   // Per-call private artifacts are minted by runner.ts and must never be copied
   // from an ancestor into a grandchild.
   "PI_MUNCHKIN_PLAN_CONTEXT_PATH", "PI_MUNCHKIN_BRANCH_REPORT_PATH", "PI_MUNCHKIN_RESEARCH_SCOUT",
+  // A headless planner lease belongs only to the parent skill invocation. A
+  // delegated branch must earn its own bounded surface from plan_context; if
+  // this flag crossed the boundary, depth-two scouts could regain graph tools.
+  "PI_MUNCHKIN_HEADLESS_PLAN",
   "CHAOS", "TELEMETRY_FD", "TELEMETRY_HMAC_FD",
   "PI_MODEL_ID", "PI_MODEL_PROVIDER", "PI_REQUESTED_MODEL", "PI_REQUESTED_PROVIDER", "PI_RUN_ID", "PI_GATE_INVOCATION_ID", "PI_SANDBOX_POSTURE",
   "PI_SUBAGENT_DEPTH",

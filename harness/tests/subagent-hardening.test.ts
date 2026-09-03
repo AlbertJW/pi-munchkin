@@ -163,6 +163,7 @@ test("explicit =off suppression survives into the subagent environment", () => {
 test("planner flags propagate but private branch artifact paths never do", () => {
 	const env = buildSubagentEnv({
 		PATH: "/bin", PLAN_GRAPH: "on", DEEP_RESEARCH_PLANNING: "on",
+		PI_MUNCHKIN_HEADLESS_PLAN: "on",
 		PI_MUNCHKIN_PLAN_CONTEXT_PATH: "/private/parent-context.json",
 		PI_MUNCHKIN_BRANCH_REPORT_PATH: "/private/parent-report.json",
 		PI_MUNCHKIN_RESEARCH_SCOUT: "1",
@@ -172,6 +173,7 @@ test("planner flags propagate but private branch artifact paths never do", () =>
 	assert.equal(env.PI_MUNCHKIN_PLAN_CONTEXT_PATH, undefined);
 	assert.equal(env.PI_MUNCHKIN_BRANCH_REPORT_PATH, undefined);
 	assert.equal(env.PI_MUNCHKIN_RESEARCH_SCOUT, undefined);
+	assert.equal(env.PI_MUNCHKIN_HEADLESS_PLAN, undefined);
 });
 
 test("research budget control propagates while ledger remains independently selectable", () => {

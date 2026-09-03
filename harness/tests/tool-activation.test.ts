@@ -20,6 +20,7 @@ async function load(profile: "ambient" | "core" | undefined, activeInitial: stri
 	const oldActivation = process.env.MUNCHKIN_TOOL_ACTIVATION;
 	const oldTelemetry = process.env.TELEMETRY;
 	const oldAgent = process.env.PI_CODING_AGENT_DIR;
+	const oldHeadlessPlan = process.env.PI_MUNCHKIN_HEADLESS_PLAN;
 	const oldArgv = process.argv;
 	if (profile === undefined) delete process.env.MUNCHKIN_TOOL_PROFILE;
 	else process.env.MUNCHKIN_TOOL_PROFILE = profile;
@@ -54,6 +55,7 @@ async function load(profile: "ambient" | "core" | undefined, activeInitial: stri
 			if (oldActivation === undefined) delete process.env.MUNCHKIN_TOOL_ACTIVATION; else process.env.MUNCHKIN_TOOL_ACTIVATION = oldActivation;
 			if (oldTelemetry === undefined) delete process.env.TELEMETRY; else process.env.TELEMETRY = oldTelemetry;
 			if (oldAgent === undefined) delete process.env.PI_CODING_AGENT_DIR; else process.env.PI_CODING_AGENT_DIR = oldAgent;
+			if (oldHeadlessPlan === undefined) delete process.env.PI_MUNCHKIN_HEADLESS_PLAN; else process.env.PI_MUNCHKIN_HEADLESS_PLAN = oldHeadlessPlan;
 			process.argv = oldArgv;
 			resetPiGlobals();
 		},
@@ -218,6 +220,25 @@ test("deep-research planning family is dark by default and additively activated 
 		const result = await callTool(run.fp, "capability", { action: "enable", family: "planning" }, process.cwd());
 		assert.equal(result.isError, false);
 		for (const name of ["research_plan_start", "plan_expand", "plan_settle"]) assert.equal(run.fp.pi.getActiveTools().includes(name), true);
+	} finally {
+		run.restore();
+		if (oldGraph === undefined) delete process.env.PLAN_GRAPH; else process.env.PLAN_GRAPH = oldGraph;
+		if (oldResearch === undefined) delete process.env.DEEP_RESEARCH_PLANNING; else process.env.DEEP_RESEARCH_PLANNING = oldResearch;
+	}
+});
+
+test("headless deep-research lease exposes the graph entrypoint at startup", async () => {
+	const oldGraph = process.env.PLAN_GRAPH;
+	const oldResearch = process.env.DEEP_RESEARCH_PLANNING;
+	process.env.PLAN_GRAPH = "on";
+	process.env.DEEP_RESEARCH_PLANNING = "on";
+	process.env.PI_MUNCHKIN_HEADLESS_PLAN = "on";
+	const run = await load("core", [...names]);
+	try {
+		const active = run.fp.pi.getActiveTools();
+		assert.ok(active.includes("research_plan_start"), "headless lease must expose research_plan_start");
+		assert.ok(active.includes("plan_expand"), "headless lease must expose plan_expand");
+		assert.ok(active.includes("plan_settle"), "headless lease must expose plan_settle");
 	} finally {
 		run.restore();
 		if (oldGraph === undefined) delete process.env.PLAN_GRAPH; else process.env.PLAN_GRAPH = oldGraph;

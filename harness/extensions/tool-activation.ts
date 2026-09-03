@@ -14,6 +14,14 @@ type Profile = "ambient" | "core";
 type LegacyMode = "ambient" | "dynamic" | "phase";
 const PLAN_GRAPH_ENABLED = process.env.PLAN_GRAPH === "on";
 const DEEP_RESEARCH_PLANNING_ENABLED = PLAN_GRAPH_ENABLED && process.env.DEEP_RESEARCH_PLANNING === "on";
+// A skill-scoped parent lease for the dark deep-research graph. This is
+// deliberately a separate, parent-only opt-in: ordinary sessions keep the
+// bounded core surface, and delegated children must not inherit the lease.
+const HEADLESS_PLAN_ENABLED = DEEP_RESEARCH_PLANNING_ENABLED && process.env.PI_MUNCHKIN_HEADLESS_PLAN === "on";
+const HEADLESS_PLAN_TOOLS = new Set([
+	"plan_write", "plan_update", "plan_expand", "plan_settle", "research_plan_start",
+	"web_search", "web_read", "research_note", "research_recall", "subagent",
+]);
 type Family = "research" | "delegation" | "browser" | "canvas" | "context" | "planning" | "goals";
 
 export const MUNCHKIN_TOOL_PROFILE_DEFAULT: Profile = "core";
@@ -343,11 +351,17 @@ export default function (pi: ExtensionAPI): void {
 			for (const name of PLAN_SURFACE_TOOLS) if (registered.has(name)) pool.add(name);
 			const activeGoalTools = new Set(activeGoal ? familyTools("goals", allNames) : []);
 			const core = [...pool].filter((name) =>
-				(CORE_NAMES.has(name) && (activePlan || (name !== "plan_write" && name !== "plan_update"))) || activeGoalTools.has(name));
+				(CORE_NAMES.has(name) && (activePlan || (name !== "plan_write" && name !== "plan_update"))) ||
+				activeGoalTools.has(name) || (HEADLESS_PLAN_ENABLED && HEADLESS_PLAN_TOOLS.has(name)));
 			setTo(deferred, [...pool].filter((name) => !core.includes(name)));
 			for (const name of activeGoalTools) if (core.includes(name)) owned.add(name);
 			if (DEEP_RESEARCH_PLANNING_ENABLED) for (const name of familyTools("planning", allNames)) if (!core.includes(name)) deferred.add(name);
 			pi.setActiveTools(core);
+			if (HEADLESS_PLAN_ENABLED) {
+				for (const name of core.filter((candidate) => HEADLESS_PLAN_TOOLS.has(candidate))) {
+					record("tool-activation", "activated", { tool: name, reason: "headless-plan-lease" });
+				}
+			}
 			for (const name of deferred) record("tool-activation", "deferred", { tool: name, reason: "core-startup" });
 			publish("core-startup");
 			surfaceTelemetry();

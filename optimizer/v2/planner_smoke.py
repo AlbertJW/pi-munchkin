@@ -256,6 +256,9 @@ def run_planner(args: argparse.Namespace) -> dict[str, object]:
         "PLAN_GRAPH": "on", "DEEP_RESEARCH_PLANNING": "on", "RESEARCH_LEDGER": "on",
         "PLAN_STORAGE": "project", "FORCE_PLAN_WRITE": "on",
         "MUNCHKIN_TOOL_PROFILE": "ambient", "MUNCHKIN_TOOL_ACTIVATION": "ambient",
+        # Parent-only skill lease. Delegated children receive plan_context and
+        # cannot inherit this broad startup activation.
+        "PI_MUNCHKIN_HEADLESS_PLAN": "on",
         "TELEMETRY": "on", "TELEMETRY_SOURCE": "interactive", "TELEMETRY_WRITER": "sync",
         "TELEMETRY_FILE": str(telemetry_path), "LOOP_EPISODE_MODE": "shadow",
     })
