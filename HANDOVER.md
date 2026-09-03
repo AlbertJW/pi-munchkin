@@ -57,8 +57,12 @@ The planner launcher now has explicit `--arm candidate` and `--arm control`
 paths. It verifies the matching config digest, clears inherited planner flags,
 and reports the arm identity in its safe summary; both dry paths pass against
 loaded hash `ff5c7ce7…`. This is optimizer-only plumbing and does not change
-the model-visible surface. The next real action is still the human-approved
-v5 six-session mechanism screen plus three controls.
+the model-visible surface. The v5 screen has now run six candidate sessions and
+three controls: starts 3/6, merges 0/6, parent settlements 0/6, and zero graph
+events in all controls. It is an incomplete mechanism result; see
+`optimizer/docs/QWEN35B_PLANNER_MECHANISM_V5_AUDIT_2026-09-03.md`. Planner
+defaults remain dark, and any rerun requires diagnosis plus a fresh explicit
+approval.
 
 ## 2026-09-02 planner research-fixture admission
 

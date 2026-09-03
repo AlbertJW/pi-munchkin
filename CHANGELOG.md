@@ -12,6 +12,14 @@ All notable changes to pi-munchkin are documented here. Releases follow semantic
   summary. This is optimizer-only plumbing; the model-visible surface and all
   live defaults remain unchanged.
 
+### Measured (2026-09-03 — planner mechanism v5)
+
+- The hash-bound Qwen 35B screen ran six candidate sessions and three controls.
+  Candidate graph starts were 3/6, with zero validated merges and zero parent
+  settlements; all controls had zero graph events. The result is an incomplete
+  mechanism observation, not an efficacy result. Planner flags remain dark and
+  the raw streams remain private.
+
 ### Fixed (2026-09-03 — parent planner route hint boundary)
 
 - **The opted-in headless planner lease now adds a parent-only routing hint at

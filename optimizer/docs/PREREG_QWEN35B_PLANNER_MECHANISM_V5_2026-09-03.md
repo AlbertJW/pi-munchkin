@@ -2,13 +2,14 @@
 
 ## Status and purpose
 
-**PREPARED — NO QUALIFYING MODEL SCREEN UNDER THIS BOUNDARY.** This amendment
+**SCREENED — INCOMPLETE MECHANISM; GATE NOT MET.** This amendment
 supersedes v4 because the skill-description route was insufficient in the
 ordinary comparative fixture: the graph lease was active, but Qwen still chose
 direct web research. The parent-only lease now adds a bounded model-visible
 planner-first route hint at `before_agent_start`. This remains a routing
 operability screen, not an efficacy comparison or authorization to enable
-defaults.
+defaults. The bounded outcome is recorded in
+`QWEN35B_PLANNER_MECHANISM_V5_AUDIT_2026-09-03.md`.
 
 ## Frozen identity
 
@@ -42,10 +43,15 @@ cannot be pooled with v2–v4 or with the qualifying screen. The v5 screen must
 use the frozen fixture prompts, with no explicit planner-first instruction in
 those prompts; the route hint is the sole intervention.
 
+The v5 screen then ran six candidate sessions and three controls. Candidate
+starts were 3/6, merges 0/6, and terminal parent settlements 0/6; all three
+controls had zero graph events. The gate therefore failed as incomplete, and
+no quality or adoption claim follows.
+
 ## Execution and acceptance
 
-After human review and an explicit run command, execute the same six candidate
-mechanism sessions and three fact-lookup negative controls under the existing
+The execution protocol used six candidate mechanism sessions and three
+fact-lookup negative controls under the existing
 180-second / 350,000-byte bounds, balanced and randomized as preregistered.
 Each invocation must pass `--arm candidate` or `--arm control`; the launcher
 verifies the corresponding config digest and clears inherited planner flags
@@ -59,6 +65,6 @@ Any identity drift, malformed telemetry, payload retention, budget inflation,
 depth violation, missing child report, or incomplete lifecycle invalidates the
 affected session. A clean screen establishes only graph operability on Qwen
 35B. A separate answer-quality comparison is required before either planner
-flag can be considered for activation. This amendment authorizes no model
-execution, calibration, mirror mutation, or adoption beyond a separately
-approved screen command.
+flag can be considered for activation. This amendment authorizes no further
+model execution, calibration, mirror mutation, or adoption. Any rerun requires
+a fresh preregistration and explicit approval after diagnosis.
