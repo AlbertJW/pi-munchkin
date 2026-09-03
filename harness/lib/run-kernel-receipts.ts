@@ -179,15 +179,22 @@ export class ReceiptNormalizerV1 {
 		this.rememberCompleted(event.toolCallId);
 
 		const text = boundedReceiptText(event.result);
+		// Pi's JSON-mode execution boundary can wrap a tool's own `{ isError: true }`
+		// result inside an outer event whose `isError` flag is false. Treat the
+		// nested flag as authoritative too; otherwise a failed delegated child is
+		// recorded as a successful receipt and recovery/diagnosis loses the failure.
+		const nestedIsError = Boolean(event.result && typeof event.result === "object" &&
+			(event.result as { isError?: unknown }).isError === true);
+		const effectiveIsError = event.isError || nestedIsError;
 		const failureObservation = {
 			toolName: pending.toolName,
 			args: pending.args,
 			text,
-			isError: event.isError,
+			isError: effectiveIsError,
 		};
 		const failed = isFailureObservation(failureObservation);
 		const status = !pending.hadToolResult
-			? (event.isError ? "rejected" : "missing_result")
+			? (effectiveIsError ? "rejected" : "missing_result")
 			: (failed ? "failed" : "succeeded");
 		return {
 			v: 1,
@@ -201,7 +208,7 @@ export class ReceiptNormalizerV1 {
 			startedAtMs: pending.startedAtMs,
 			endedAtMs: atMs,
 			status,
-			isError: event.isError,
+			isError: effectiveIsError,
 			mutation: pending.mutation,
 			verification: pending.verification,
 			failureClass: failed ? classifyFailure(failureObservation) : null,

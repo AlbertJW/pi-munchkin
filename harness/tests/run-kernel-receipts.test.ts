@@ -48,6 +48,19 @@ test("validation rejection without tool_result remains an observable failure", (
 	assert.equal(JSON.stringify(receipt).includes("secret"), false);
 });
 
+test("nested tool-result errors remain failures at the Pi execution boundary", () => {
+	const n = normalizer(null);
+	n.start({ toolCallId: "nested-error", toolName: "subagent", args: { agent: "researcher" } }, 1, 1);
+	n.noteToolResult(result("nested-error", "subagent", { agent: "researcher" }), 2, 2);
+	const receipt = n.finish({
+		toolCallId: "nested-error", toolName: "subagent",
+		result: { isError: true, content: [{ type: "text", text: "UNTRUSTED_SUBAGENT_DIAGNOSTIC" }] },
+		isError: false,
+	}, 3, 3);
+	assert.equal(receipt?.status, "failed");
+	assert.equal(receipt?.isError, true);
+});
+
 test("missing start/result facts are explicit and successful output text is not retained", () => {
 	const n = normalizer(null);
 	const input = { path: "/Users/private/project/secret.txt" };
