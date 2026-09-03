@@ -211,6 +211,10 @@ function rejectChildGoalMutation(): void {
 	if (IS_SUBAGENT_PROCESS) throw new Error("persistent goal mutation is parent-owned; child processes may report findings but cannot write the goal ledger");
 }
 
+function rejectChildPlanMutation(): void {
+	if (IS_SUBAGENT_PROCESS) throw new Error("persistent plan mutation is parent-owned; child processes may publish only their delegated branch report");
+}
+
 async function rebindActiveGoal(cwd: string): Promise<GoalState | undefined> {
 	const goal = await readCurrentGoal(cwd);
 	publishGoal(goal);
@@ -736,6 +740,7 @@ const planWrite = defineTool({
 		}), { minItems: 1, maxItems: MAX_ITEMS }),
 	}),
 	async execute(_toolCallId, params, _signal, _onUpdate, ctx) {
+		rejectChildPlanMutation();
 		rememberModel(ctx);
 		const result = await mutatePlan(ctx.cwd, async (previous) => {
 			// No headless reject: pi only dispatches ACTIVE tools, and outside /plan the
@@ -786,6 +791,7 @@ const planUpdate = defineTool({
 		})) } : {}),
 	}), { minItems: 1, maxItems: MAX_DELTAS }) }),
 	async execute(_toolCallId, params, _signal, _onUpdate, ctx) {
+		rejectChildPlanMutation();
 		rememberModel(ctx);
 		const outcome = await mutatePlan(ctx.cwd, async (previous) => {
 			// Not "/plan": that is a slash command only a HUMAN can type, so naming it
@@ -974,6 +980,7 @@ const researchPlanStart = defineTool({
 		}), { minItems: 1, maxItems: DEEP_RESEARCH_MAX_ROOTS }),
 	}),
 	async execute(_id, params, _signal, _update, ctx) {
+		rejectChildPlanMutation();
 		rememberModel(ctx);
 		lastSessionCwd = ctx.cwd;
 		if (process.env.RESEARCH_LEDGER !== "on") rejectPlanTool("research_plan_start is unavailable: this session cannot parent-verify delegated sources. Research directly and cite inline instead.");
@@ -1041,6 +1048,7 @@ const planExpand = defineTool({
 		}), { minItems: 1, maxItems: 8 }),
 	}),
 	async execute(_id, params, _signal, _update, ctx) {
+		rejectChildPlanMutation();
 		const state = await mutatePlan(ctx.cwd, async (previous) => {
 			if (!previous || previous.schema_version !== 5) rejectPlanTool("plan_expand requires an active graph plan");
 			if (previous.settled_at) rejectPlanTool("plan_expand rejected: settled plans are immutable");
@@ -1058,6 +1066,7 @@ const planSettle = defineTool({
 	promptSnippet: "plan_settle: close a verified graph plan; the head agent alone may call this",
 	parameters: Type.Object({ summary: Type.String({ minLength: 1, maxLength: PLAN_DEFER_FIELD_MAX_BYTES }) }),
 	async execute(_id, params, _signal, _update, ctx) {
+		rejectChildPlanMutation();
 		const state = await mutatePlan(ctx.cwd, async (previous) => {
 			if (!previous || previous.schema_version !== 5) rejectPlanTool("plan_settle requires an active graph plan");
 			if (previous.settled_at) rejectPlanTool("plan_settle rejected: plan is already settled and immutable");
@@ -1220,6 +1229,7 @@ async function clearPlan(cwd: string, replacement?: () => Promise<void>): Promis
 }
 
 async function startPlanCommand(args: string, ctx: any, pi: ExtensionAPI): Promise<void> {
+	rejectChildPlanMutation();
 	const request = cleanText(args);
 	if (!request) { ctx.ui.notify("Usage: /plan <request>", "error"); return; }
 	if (!enterPlanningSurface(pi)) { ctx.ui.notify("Planning cannot start because the explicit tool selection excludes plan_write.", "error"); return; }
@@ -1257,6 +1267,7 @@ async function startPlanCommand(args: string, ctx: any, pi: ExtensionAPI): Promi
 }
 
 async function goCommand(ctx: any, pi: ExtensionAPI): Promise<void> {
+	rejectChildPlanMutation();
 	const outcome = await goTransition(ctx.cwd);
 	if (!outcome.ok) { ctx.ui.notify(outcome.reason === "no-plan" ? "No plan to run. Start with /plan <request>." : "Plan has no open items.", "error"); return; }
 	setPlanning(false);
@@ -1648,6 +1659,7 @@ export default function (pi: ExtensionAPI): void {
 	pi.registerCommand("plan-cancel", {
 		description: "Discard the active plan and restore the previous tool selection.",
 		handler: async (_args, ctx) => {
+			rejectChildPlanMutation();
 			await clearPlan(ctx.cwd);
 			setPlanning(false);
 			awaitingReview = false;
@@ -1663,6 +1675,7 @@ export default function (pi: ExtensionAPI): void {
 		ctx.ui.notify(state ? renderTodo(state, selected) : "No current plan found.", "info");
 	} });
 	pi.registerCommand("plan-export", { description: "Export the private plan review snapshot.", handler: async (_args, ctx) => {
+		rejectChildPlanMutation();
 		const state = await readState(ctx.cwd);
 		if (!state) { ctx.ui.notify("No plan to export.", "info"); return; }
 		await mkdir(dirname(todoPath(ctx.cwd)), { recursive: true });

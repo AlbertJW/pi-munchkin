@@ -578,6 +578,16 @@ if (!CHILD) {
 			(await import(`../extensions/plan-runner.ts?ordinary-child=${Date.now()}-${Math.random()}`)).default(child.pi as any);
 			child.pi.setActiveTools([...child.tools.keys()]);
 			await fire(child, "session_start", {}, makeCtx(cwd).ctx);
+			const parentOnly = /persistent plan mutation is parent-owned/i;
+			await expectToolError(child, "plan_write", { items: [{ title: "forbidden" }] }, cwd, parentOnly);
+			await expectToolError(child, "plan_update", { deltas: [{ item_id: context.parent_item_id, status: "done" }] }, cwd, parentOnly);
+			await expectToolError(child, "plan_expand", { parent_item_id: context.parent_item_id, children: [{ title: "forbidden", budget: { searches: 1, reads: 0 } }] }, cwd, parentOnly);
+			await expectToolError(child, "plan_settle", { summary: "forbidden" }, cwd, parentOnly);
+			await expectToolError(child, "research_plan_start", { request: "forbidden", summary: "forbidden", branches: [{ title: "forbidden", budget: { searches: 1, reads: 1 } }] }, cwd, parentOnly);
+			await assert.rejects(
+				() => child.commands.get("plan-cancel")!.handler("", makeCtx(cwd).ctx),
+				parentOnly,
+			);
 			child.pi.events.emit(HARNESS_SIGNAL_CHANNEL, { v: 1, type: "capsule/identity" });
 			await fire(child, "before_agent_start", {}, makeCtx(cwd).ctx);
 			const recovered = JSON.parse(readFileSync(path, "utf8"));
