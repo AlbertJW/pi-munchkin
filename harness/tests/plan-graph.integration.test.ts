@@ -25,7 +25,7 @@ if (!CHILD) {
 			const output = execFileSync(process.execPath, [
 				"--experimental-strip-types", "--experimental-loader", resolve("harness/tests/ts-js-resolver.mjs"), "--test", import.meta.filename,
 			], { cwd: process.cwd(), env, encoding: "utf8", stdio: "pipe" });
-			assert.match(output, /pass 29/);
+			assert.match(output, /pass 30/);
 		} finally { rmSync(artifacts, { recursive: true, force: true }); }
 	});
 } else {
@@ -346,6 +346,31 @@ if (!CHILD) {
 		await fire(fp, "before_agent_start", {}, makeCtx(cwd).ctx);
 		const state = JSON.parse(readFileSync(join(cwd, ".pi", "plan-state.json"), "utf8"));
 		assert.deepEqual(state.items[0].budget.used, { searches: 2, reads: 3 }, "merge must retain cumulative usage across retries");
+		resetPiGlobals();
+	});
+
+	test("reopening a research branch clears stale evidence receipts", async () => {
+		const fp = fresh(); const cwd = tmp();
+		const started = await callTool(fp, "research_plan_start", { request: "Reopen evidence", summary: "one branch", branches: [{ title: "Evidence", budget: { searches: 2, reads: 2 } }] }, cwd);
+		const context = started.details.contexts[0];
+		const acquired = await planRunnerModule.acquireResearchBranchLease(cwd, context);
+		assert.equal(acquired.ok, true);
+		const leasedContext = { ...context, lease_id: acquired.lease_id, dispatch_epoch: 0 };
+		const firstReport = {
+			v: 1, parent_item_id: context.parent_item_id, owner_ref: context.owner_ref, status: "done", note: "first evidence",
+			consumed: { searches: 1, reads: 1 }, evidence_gaps: [],
+			source_leads: [{ url: "https://example.test/old-source", claim: "old claim", quote: "old quote" }], children: [], coverage,
+		};
+		fp.pi.events.emit(HARNESS_SIGNAL_CHANNEL, { v: 1, type: "plan/branch-result", context: leasedContext, report: firstReport, failureClass: null });
+		await fire(fp, "before_agent_start", {}, makeCtx(cwd).ctx);
+		let state = JSON.parse(readFileSync(join(cwd, ".pi", "plan-state.json"), "utf8"));
+		assert.equal(state.items[0].coverage.complete, true);
+		assert.deepEqual(state.items[0].source_leads, ["https://example.test/old-source"]);
+		await callTool(fp, "plan_update", { deltas: [{ item_id: context.parent_item_id, status: "pending", note: "retry with fresh evidence" }] }, cwd);
+		state = JSON.parse(readFileSync(join(cwd, ".pi", "plan-state.json"), "utf8"));
+		assert.equal(state.items[0].coverage, undefined, "a reopened branch must not retain a prior completion receipt");
+		assert.equal(state.items[0].source_leads, undefined, "a reopened branch must not retain stale delegated sources");
+		assert.equal(state.items[0].defer, undefined, "a reopened branch must not retain a prior deferral");
 		resetPiGlobals();
 	});
 

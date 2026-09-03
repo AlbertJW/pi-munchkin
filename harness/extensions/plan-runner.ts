@@ -812,7 +812,16 @@ const planUpdate = defineTool({
 				if (reopened) {
 					const nextEpoch = (prior!.dispatch_epoch ?? 0) + 1;
 					if (nextEpoch > 1_000_000) rejectPlanTool(`plan_update rejected: dispatch retry limit reached for ${item.id}`);
-					return { ...item, dispatch_epoch: nextEpoch };
+					// A reopened research branch must earn a fresh terminal report. Keep
+					// cumulative budget usage for conservation, but discard the prior
+					// attempt's coverage, delegated source leads, gaps, and deferral so
+					// a manual status flip cannot settle the head on stale evidence.
+					const next = { ...item, dispatch_epoch: nextEpoch };
+					delete next.coverage;
+					delete next.source_leads;
+					delete next.evidence_gaps;
+					delete next.defer;
+					return next;
 				}
 				if (!item.lease || !graphTerminal(item)) return item;
 				const next = { ...item };
