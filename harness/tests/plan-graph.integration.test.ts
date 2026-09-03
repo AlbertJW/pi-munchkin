@@ -543,6 +543,8 @@ if (!CHILD) {
 		(await import(`../extensions/tool-activation.ts?delegated-child=${Date.now()}-${Math.random()}`)).default(child.pi as any);
 		child.pi.setActiveTools([...child.tools.keys()]);
 		await fire(child, "session_start", {}, makeCtx(cwd).ctx);
+		child.pi.events.emit(HARNESS_SIGNAL_CHANNEL, { v: 1, type: "capsule/identity" });
+		await fire(child, "before_agent_start", {}, makeCtx(cwd).ctx);
 		try {
 			const state = JSON.parse(readFileSync(join(cwd, ".pi", "plan-state.json"), "utf8"));
 			assert.equal(state.items[0].status, "pending", "the branch child must not perform parent stale-lease recovery");

@@ -117,6 +117,8 @@ let pendingBranchMerge: Promise<void> | null = null;
 let awaitingReview = false;
 let planningSurfaceBefore: string[] | null = null;
 let planningSurfaceApplied: string[] | null = null;
+let delegatedBranchProcess = false;
+const DELEGATED_BRANCH_PROCESS_GLOBAL = "__pi_delegated_branch_process_v1";
 
 const PLAN_FLAG = "__pi_plan_phase_active";
 const EXPLICIT_FLAG = "__pi_tool_selection_explicit";
@@ -1491,7 +1493,15 @@ export default function (pi: ExtensionAPI): void {
 		// stale, and block the branch before the child can publish its report.
 		const delegatedContext = await readPlanContext(process.env[PLAN_CONTEXT_ENV]);
 		const delegatedState = delegatedContext ? await readState(ctx.cwd) : undefined;
-		const delegatedBranchProcess = Boolean(delegatedContext && delegatedState?.run_id === delegatedContext.run_id);
+		delegatedBranchProcess = Boolean(
+			delegatedContext &&
+			(IS_SUBAGENT_PROCESS || delegatedState?.run_id === delegatedContext.run_id),
+		);
+		// Signals are subscribed once per process. Test harnesses and embedders can
+		// reload this extension in the same process, so keep the child marker on a
+		// shared global as well as this module instance. An older subscription must
+		// not reclaim a parent lease after a delegated child has started.
+		(globalThis as Record<string, unknown>)[DELEGATED_BRANCH_PROCESS_GLOBAL] = delegatedBranchProcess;
 		const rebound = delegatedBranchProcess ? null : await rebindActivePlan(ctx.cwd);
 		if (rebound?.interrupted) { reboundAnnounced = true; lastNotify(interruptedPlanNotice(rebound.openItems)); }
 		if (!FORCE_PLAN_WRITE) {
@@ -1509,6 +1519,7 @@ export default function (pi: ExtensionAPI): void {
 	subscribeOnce("plan-runner:domain-signal", () => onHarnessSignal(pi.events, (signal) => {
 		if (!lastSessionCwd) return;
 		if (signal.type === "capsule/identity") {
+			if (delegatedBranchProcess || (globalThis as Record<string, unknown>)[DELEGATED_BRANCH_PROCESS_GLOBAL] === true) return;
 			const cwd = lastSessionCwd;
 			pendingRebind = rebindActivePlan(cwd).then((rebound) => {
 				if (!rebound) return;
