@@ -1476,6 +1476,7 @@ export default function (pi: ExtensionAPI): void {
 		pi.registerTool(defineTool({
 			name: "plan_go", label: "Start Plan Execution", description: "Headless opt-in: start the saved plan.", parameters: Type.Object({}),
 			async execute(_id, _params, _signal, _update, ctx) {
+				rejectChildPlanMutation();
 				if (awaitingReview) rejectPlanTool("plan_go rejected: this plan is still awaiting user review. Stop here; the user starts execution.");
 				const outcome = await goTransition(ctx.cwd);
 				if (!outcome.ok) rejectPlanTool(`plan_go rejected: ${outcome.reason}`);

@@ -17,7 +17,7 @@ if (!CHILD) {
 			depth: 1, budget: { searches: 2, reads: 3 }, limits: { max_depth: 2, max_children: 2 },
 		}));
 		const env = {
-			...process.env, PLAN_GRAPH_TEST_CHILD: "1", PLAN_GRAPH: "on", DEEP_RESEARCH_PLANNING: "on", RESEARCH_LEDGER: "on", PLAN_STORAGE: "project",
+			...process.env, PLAN_GRAPH_TEST_CHILD: "1", PLAN_GRAPH: "on", DEEP_RESEARCH_PLANNING: "on", RESEARCH_LEDGER: "on", PLAN_TOOL_GO: "on", PLAN_STORAGE: "project",
 			PI_MUNCHKIN_PLAN_CONTEXT_PATH: contextPath, PI_MUNCHKIN_BRANCH_REPORT_PATH: join(artifacts, "report.json"),
 		};
 		delete (env as Record<string, string | undefined>).NODE_TEST_CONTEXT;
@@ -572,7 +572,7 @@ if (!CHILD) {
 			// disabled for them just as it is for planned research children.
 			resetPiGlobals();
 			const child = makeFakePi();
-			for (const name of ["read", "bash", "edit", "write", "capability", "plan_write", "plan_update", "plan_expand", "plan_settle", "research_plan_start", "web_search", "web_read", "subagent"]) {
+			for (const name of ["read", "bash", "edit", "write", "capability", "plan_write", "plan_update", "plan_expand", "plan_settle", "research_plan_start", "plan_go", "web_search", "web_read", "subagent"]) {
 				child.pi.registerTool({ name, parameters: {} } as any);
 			}
 			(await import(`../extensions/plan-runner.ts?ordinary-child=${Date.now()}-${Math.random()}`)).default(child.pi as any);
@@ -584,6 +584,7 @@ if (!CHILD) {
 			await expectToolError(child, "plan_expand", { parent_item_id: context.parent_item_id, children: [{ title: "forbidden", budget: { searches: 1, reads: 0 } }] }, cwd, parentOnly);
 			await expectToolError(child, "plan_settle", { summary: "forbidden" }, cwd, parentOnly);
 			await expectToolError(child, "research_plan_start", { request: "forbidden", summary: "forbidden", branches: [{ title: "forbidden", budget: { searches: 1, reads: 1 } }] }, cwd, parentOnly);
+			await expectToolError(child, "plan_go", {}, cwd, parentOnly);
 			await assert.rejects(
 				() => child.commands.get("plan-cancel")!.handler("", makeCtx(cwd).ctx),
 				parentOnly,
