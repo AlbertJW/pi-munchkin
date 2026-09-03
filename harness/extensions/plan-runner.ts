@@ -1192,6 +1192,13 @@ const branchPlan = defineTool({
 		if (report.status === "done" && report.coverage?.complete && ownCoverage?.incomplete) {
 			rejectPlanTool("branch_plan rejected: top-level coverage claims complete despite an incomplete retrieval receipt");
 		}
+		// A direct branch must also prove that retrieval happened at all. An absent
+		// receipt is not the same as a clean receipt: otherwise a child could invent
+		// source leads and mark a zero-call branch complete. Split branches may have
+		// zero local calls because their terminal coverage is supplied by scouts.
+		if (report.status === "done" && report.coverage?.complete && report.children.length === 0 && (!ownCoverage || ownCoverage.calls < 1)) {
+			rejectPlanTool("branch_plan rejected: top-level coverage claims complete coverage without an actual retrieval receipt");
+		}
 		const dispatchRecord = shared[RESEARCH_SCOUT_DISPATCHED_KEY] as { key?: unknown; ids?: unknown } | undefined;
 		const dispatchKey = `${context.run_id}:${context.parent_item_id}:${context.owner_ref}`;
 		const dispatchedScoutIds = dispatchRecord?.key === dispatchKey && Array.isArray(dispatchRecord.ids)
@@ -1226,6 +1233,9 @@ const branchPlan = defineTool({
 			const scoutCoverage = validResearchCoverageObservation(receipt.coverage) ? receipt.coverage : undefined;
 			if (child.status === "done" && child.coverage?.complete && scoutCoverage?.incomplete) {
 				rejectPlanTool(`branch_plan rejected: child ${child.item_id} claims complete coverage despite an incomplete scout retrieval receipt`);
+			}
+			if (child.status === "done" && child.coverage?.complete && (!scoutCoverage || scoutCoverage.calls < 1)) {
+				rejectPlanTool(`branch_plan rejected: child ${child.item_id} claims complete coverage without an actual retrieval receipt`);
 			}
 			observedSearches += searches; observedReads += reads;
 		}

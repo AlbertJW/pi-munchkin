@@ -25,7 +25,7 @@ if (!CHILD) {
 			const output = execFileSync(process.execPath, [
 				"--experimental-strip-types", "--experimental-loader", resolve("harness/tests/ts-js-resolver.mjs"), "--test", import.meta.filename,
 			], { cwd: process.cwd(), env, encoding: "utf8", stdio: "pipe" });
-			assert.match(output, /pass 36/);
+			assert.match(output, /pass 38/);
 		} finally { rmSync(artifacts, { recursive: true, force: true }); }
 	});
 } else {
@@ -786,6 +786,15 @@ if (!CHILD) {
 		resetPiGlobals();
 	});
 
+	test("branch_plan cannot claim complete coverage without an actual retrieval receipt", async () => {
+		const fp = fresh(); const cwd = tmp();
+		await expectToolError(fp, "branch_plan", {
+			status: "done", note: "forged complete retrieval", consumed: { searches: 0, reads: 0 },
+			children: [], source_leads: [], evidence_gaps: [], coverage,
+		}, cwd, /claims complete coverage without an actual retrieval receipt/i);
+		resetPiGlobals();
+	});
+
 	test("branch_plan cannot promote a scout whose tool receipt is incomplete", async () => {
 		const fp = fresh(); const cwd = tmp();
 		const childId = "scout-incomplete";
@@ -798,6 +807,20 @@ if (!CHILD) {
 			children: [{ item_id: childId, title: "Scout", status: "done", coverage, budget: { allocated: { searches: 0, reads: 0 }, used: { searches: 0, reads: 0 } } }],
 			source_leads: [], evidence_gaps: [], coverage,
 		}, cwd, /child scout-incomplete claims complete coverage despite an incomplete scout retrieval receipt/i);
+		resetPiGlobals();
+	});
+
+	test("branch_plan cannot promote a scout with no retrieval coverage receipt", async () => {
+		const fp = fresh(); const cwd = tmp();
+		const childId = "scout-no-coverage";
+		(globalThis as Record<string, unknown>).__pi_research_scout_receipts = [{
+			owner_ref: ownerRef("branch-budget-run", childId), searches: 0, reads: 0,
+		}];
+		await expectToolError(fp, "branch_plan", {
+			status: "done", note: "scout complete without receipt", consumed: { searches: 0, reads: 0 },
+			children: [{ item_id: childId, title: "Scout", status: "done", coverage, budget: { allocated: { searches: 0, reads: 0 }, used: { searches: 0, reads: 0 } } }],
+			source_leads: [], evidence_gaps: [], coverage,
+		}, cwd, /child scout-no-coverage claims complete coverage without an actual retrieval receipt/i);
 		resetPiGlobals();
 	});
 }
