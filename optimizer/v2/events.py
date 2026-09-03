@@ -124,7 +124,16 @@ class EventStore:
         return self._read_bytes(allow_malformed_eof=True)
 
     def recover_tail(self) -> dict | None:
-        """Repair a complete unterminated event or discard a malformed suffix."""
+        """Recover the EOF tail while holding the run's campaign lock."""
+        with self.campaign_lock():
+            return self._recover_tail_locked()
+
+    def _recover_tail_locked(self) -> dict | None:
+        """Repair a complete unterminated event or discard a malformed suffix.
+
+        Callers must hold ``campaign_lock`` so truncation/repair and the
+        hash-bound recovery event form one exclusive recovery transaction.
+        """
         tail = None
         with self.writer_lock():
             events, tail = self.read_with_recovery()

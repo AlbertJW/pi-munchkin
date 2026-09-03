@@ -5,6 +5,7 @@ import json
 import os
 import pathlib
 import subprocess
+import sys
 import tempfile
 import time
 import unittest
@@ -346,8 +347,7 @@ class EventStoreTests(unittest.TestCase):
             projection, reported = store.project_with_recovery()
             self.assertTrue(reported and reported["sha256"] == tail["sha256"])
             self.assertEqual(projection["event_count"], 1)
-            with store.campaign_lock():
-                recovered = store.recover_tail()
+            recovered = store.recover_tail()
             self.assertEqual(recovered["type"], "event-store.tail-recovered")
             self.assertEqual(store.read_all()[-1]["payload"], {"byte_count": len(suffix), "sha256": tail["sha256"]})
 
@@ -371,6 +371,35 @@ class EventStoreTests(unittest.TestCase):
             recovered_events = store.read_all()
             self.assertEqual(recovered_events[0]["operation_id"], "op-1")
             self.assertEqual(recovered_events[-1]["payload"]["byte_count"], len(before))
+
+    def test_tail_recovery_refuses_a_run_owned_by_another_campaign_writer(self) -> None:
+        with tempfile.TemporaryDirectory() as td:
+            root = pathlib.Path(td)
+            store = EventStore(root)
+            store.append("op-1", "campaign.prepared", {"sha256": HEX})
+            with store.events_path.open("ab") as fh:
+                fh.write(b'{"torn":')
+            ready = root / "ready"
+            holder = subprocess.Popen([
+                sys.executable, "-c", (
+                    "import pathlib,sys,time\n"
+                    "from optimizer.v2.events import EventStore\n"
+                    "root=pathlib.Path(sys.argv[1]); ready=pathlib.Path(sys.argv[2])\n"
+                    "store=EventStore(root, create=False)\n"
+                    "with store.campaign_lock():\n"
+                    "    ready.write_text('ready'); time.sleep(2)\n"
+                ), str(root), str(ready),
+            ], cwd=pathlib.Path(__file__).resolve().parents[3])
+            try:
+                deadline = time.time() + 2
+                while not ready.exists() and time.time() < deadline:
+                    time.sleep(0.01)
+                self.assertTrue(ready.exists(), "campaign lock holder did not start")
+                with self.assertRaisesRegex(EventStoreError, "another optimizer writer"):
+                    store.recover_tail()
+            finally:
+                holder.terminate()
+                holder.wait(timeout=5)
 
     def test_midstream_corruption_is_fatal_and_projection_failure_is_rebuildable(self) -> None:
         with tempfile.TemporaryDirectory() as td:

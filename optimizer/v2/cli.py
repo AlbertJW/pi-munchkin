@@ -236,10 +236,7 @@ def main(argv: list[str] | None = None) -> int:
                 store.write_projections(projection)
             print(json.dumps(projection, sort_keys=True)); return 0
         if args.command == "resume":
-            with store.campaign_lock():
-                _, tail = store.read_with_recovery()
-                if tail is not None:
-                    store.recover_tail()
+            store.recover_tail()
         scenario, surface, provider = _components(campaign, pack, manifest_path.resolve(), store.run_root)
         result = CampaignEngine(campaign, store, scenario, surface, provider).run(approve_sha=args.approve_sha)
         print(json.dumps(result, sort_keys=True)); return 0
