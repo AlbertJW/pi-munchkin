@@ -1,5 +1,14 @@
 # Handover — pi_munchkin, 2026-08-24
 
+## 2026-09-03 planner preflight rebind after retry hardening (repository-only)
+
+The retry-budget change moved the source surface hash, so the planner
+preflight's stale default correctly failed closed during full verification. Its
+pin now matches `d333be72…`; the preflight selftest and no-inference dry path
+pass against the existing loaded `73bbd494…` mirror with four admitted
+fixtures. This is an identity repair only: planner flags remain dark, no
+inference or mirror mutation occurred, and no model-quality claim follows.
+
 ## 2026-09-03 planner retry-budget conservation (repository-only)
 
 The bottom-up deep-research audit found that an explicitly reopened terminal

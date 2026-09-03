@@ -4,6 +4,13 @@ All notable changes to pi-munchkin are documented here. Releases follow semantic
 
 ## Unreleased
 
+### Fixed (2026-09-03 — planner preflight rebind after retry hardening)
+
+- Rebound the planner preflight's stale default source pin after the retry-budget
+  surface change. Selftest and the four-fixture no-inference dry path now pass
+  while retaining the loaded-mirror and human-approval bindings. No planner
+  flag, inference, mirror, rollout, or adoption decision changed.
+
 ### Fixed (2026-09-03 — planner retry-budget conservation)
 
 - Explicitly reopened deep-research branches now receive only the authoritative
