@@ -25,7 +25,7 @@ if (!CHILD) {
 			const output = execFileSync(process.execPath, [
 				"--experimental-strip-types", "--experimental-loader", resolve("harness/tests/ts-js-resolver.mjs"), "--test", import.meta.filename,
 			], { cwd: process.cwd(), env, encoding: "utf8", stdio: "pipe" });
-			assert.match(output, /pass 32/);
+			assert.match(output, /pass 33/);
 		} finally { rmSync(artifacts, { recursive: true, force: true }); }
 	});
 } else {
@@ -98,6 +98,23 @@ if (!CHILD) {
 		writeFileSync(path, original, { mode: 0o600 });
 		await expectToolError(fp, "plan_settle", { summary: "forged completion" }, cwd, /requires an active graph plan/);
 		assert.equal(readFileSync(path, "utf8"), original, "tampered research state must remain untouched");
+		resetPiGlobals();
+	});
+
+	test("research evidence gaps cannot reload as an ordinary graph without its profile", async () => {
+		const fp = fresh(); const cwd = tmp();
+		const persisted = {
+			schema_version: 5, run_id: "orphaned-gaps", request: "research", summary: "must fail closed", autonomy: "lean", phase: "executing",
+			created_at: "2026-08-25T00:00:00.000Z", updated_at: "2026-08-25T00:00:00.000Z",
+			items: [{ id: "work-with-gaps", title: "Work with delegated evidence", status: "done", evidence_gaps: ["source:unverified"] }],
+		};
+		const path = join(cwd, ".pi", "plan-state.json");
+		const { mkdirSync, readFileSync, writeFileSync } = await import("node:fs");
+		mkdirSync(join(cwd, ".pi"), { recursive: true });
+		const original = `${JSON.stringify(persisted)}\n`;
+		writeFileSync(path, original, { mode: 0o600 });
+		await expectToolError(fp, "plan_settle", { summary: "forged completion" }, cwd, /requires an active graph plan/);
+		assert.equal(readFileSync(path, "utf8"), original, "orphaned research evidence must remain untouched");
 		resetPiGlobals();
 	});
 

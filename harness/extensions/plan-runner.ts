@@ -346,7 +346,7 @@ function migrateState(raw: any): PlanState | undefined {
 		if (raw.profile === undefined && raw.items.some((item: any) => item && (
 			item.kind === "research_branch" || item.kind === "research_leaf" ||
 			item.owner_ref !== undefined || item.coverage !== undefined || item.source_leads !== undefined ||
-			item.lease !== undefined || item.dispatch_epoch !== undefined
+			item.evidence_gaps !== undefined || item.lease !== undefined || item.dispatch_epoch !== undefined
 		))) return undefined;
 	}
 	const items: PlanItem[] = raw.items.slice(0, MAX_ITEMS).map((item: any) => ({

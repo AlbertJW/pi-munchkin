@@ -502,6 +502,24 @@ test("root dispatch preparation rolls back leases and runtime ledger when epoch 
 	assert.deepEqual(released.sort(), ["lease-first", "lease-second"]);
 });
 
+test("root dispatch preparation rejects an unavailable epoch and releases every lease", async () => {
+	const module = await import(`../vendor/pi-subagent/index.ts?lease-null-epoch=${Date.now()}`);
+	const prepareRootDispatch = (module as any).prepareRootDispatch as Function;
+	const first = { parent_item_id: "first", owner_ref: "owner-first" };
+	const second = { parent_item_id: "second", owner_ref: "owner-second" };
+	const state = { key: "run", parents: [], owners: [], epochs: {} };
+	const before = structuredClone(state);
+	const released: string[] = [];
+	const result = await prepareRootDispatch("/tmp/lease-seam", [first, second], state, {
+		acquire: async (_cwd: string, context: any) => ({ ok: true, lease_id: `lease-${context.parent_item_id}` }),
+		release: async (_cwd: string, _context: any, leaseId: string) => { released.push(leaseId); return true; },
+		epoch: async (_cwd: string, context: any) => context === first ? 0 : null,
+	});
+	assert.deepEqual(result, { ok: false, reason: "epoch_unavailable" });
+	assert.deepEqual(state, before, "an unavailable epoch must not consume the in-process dispatch guard");
+	assert.deepEqual(released.sort(), ["lease-first", "lease-second"]);
+});
+
 test("subagent summary cap is tunable via PI_SUBAGENT_MAX_SUMMARY_CHARS", async () => {
 	const result = { messages: [{ role: "assistant", content: [{ type: "text", text: "x".repeat(20000) }] }] };
 	const prev = process.env.PI_SUBAGENT_MAX_SUMMARY_CHARS;

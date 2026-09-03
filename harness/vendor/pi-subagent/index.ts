@@ -213,13 +213,18 @@ export async function prepareRootDispatch(cwd: string, contexts: PlanContextV1[]
 	const parents = [...state.parents];
 	const owners = [...state.owners];
 	const epochs = { ...state.epochs };
+	let epochUnavailable = false;
 	try {
 		for (const context of contexts) {
 			if (!parents.includes(context.parent_item_id)) parents.push(context.parent_item_id);
 			if (!owners.includes(context.owner_ref)) owners.push(context.owner_ref);
 			if (epochs[context.owner_ref] === undefined) {
 				const epoch = await (operations.epoch ?? researchBranchDispatchEpoch)(cwd, context);
-				if (epoch !== null) epochs[context.owner_ref] = epoch;
+				if (epoch === null) {
+					epochUnavailable = true;
+					throw new Error("research branch dispatch epoch unavailable");
+				}
+				epochs[context.owner_ref] = epoch;
 			}
 		}
 		state.parents = parents;
@@ -234,7 +239,7 @@ export async function prepareRootDispatch(cwd: string, contexts: PlanContextV1[]
 	} catch {
 		const release = operations.release ?? releaseResearchBranchLease;
 		await Promise.all(leases.leases.map((lease) => release(cwd, lease.context, lease.leaseId).catch(() => false)));
-		return { ok: false, reason: "lease_unavailable" };
+		return { ok: false, reason: epochUnavailable ? "epoch_unavailable" : "lease_unavailable" };
 	}
 }
 
