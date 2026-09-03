@@ -145,18 +145,80 @@ function activeResearchRootContexts(): ReadonlySet<string> {
 	return new Set(raw);
 }
 
-async function acquireRootLeases(cwd: string, contexts: PlanContextV1[]): Promise<{ ok: true } | { ok: false; reason: string }> {
-	const acquired: Array<{ context: PlanContextV1; leaseId: string }> = [];
-	for (const context of contexts) {
-		const result = await acquireResearchBranchLease(cwd, context);
-		if (!result.ok) {
-			for (const prior of acquired) await releaseResearchBranchLease(cwd, prior.context, prior.leaseId).catch(() => false);
-			const reason = result.reason === "already-leased" ? "already in-flight (durable dispatch lease)" : result.reason;
-			return { ok: false, reason };
+type AcquiredRootLease = { context: PlanContextV1; leaseId: string };
+type RootLeaseOperations = {
+	acquire: typeof acquireResearchBranchLease;
+	release: typeof releaseResearchBranchLease;
+};
+type RootDispatchOperations = Partial<RootLeaseOperations> & { epoch?: typeof researchBranchDispatchEpoch };
+
+/**
+ * Acquire every root lease before any child is launched. A provider or
+ * filesystem exception during a later acquisition is still a failed
+ * dispatch, not a reason to strand the leases already acquired. The optional
+ * operations are a deterministic fault-injection seam for this lifecycle
+ * boundary; production callers use the graph-backed defaults above.
+ */
+export async function acquireRootLeases(
+	cwd: string,
+	contexts: PlanContextV1[],
+	operations: Partial<RootLeaseOperations> = {},
+): Promise<{ ok: true; leases: AcquiredRootLease[] } | { ok: false; reason: string }> {
+	const acquire = operations.acquire ?? acquireResearchBranchLease;
+	const release = operations.release ?? releaseResearchBranchLease;
+	const acquired: AcquiredRootLease[] = [];
+	const releaseAcquired = async (): Promise<void> => {
+		await Promise.all(acquired.map((prior) => release(cwd, prior.context, prior.leaseId).catch(() => false)));
+	};
+	try {
+		for (const context of contexts) {
+			let result: Awaited<ReturnType<typeof acquire>>;
+			try {
+				result = await acquire(cwd, context);
+			} catch {
+				await releaseAcquired();
+				return { ok: false, reason: "lease_unavailable" };
+			}
+			if (!result.ok) {
+				await releaseAcquired();
+				const reason = result.reason === "already-leased" ? "already in-flight (durable dispatch lease)" : result.reason;
+				return { ok: false, reason };
+			}
+			acquired.push({ context, leaseId: result.lease_id });
 		}
-		acquired.push({ context, leaseId: result.lease_id });
+		return { ok: true, leases: acquired };
+	} catch {
+		await releaseAcquired();
+		return { ok: false, reason: "lease_unavailable" };
 	}
-	return { ok: true };
+}
+
+export async function prepareRootDispatch(cwd: string, contexts: PlanContextV1[], state: RootDispatchState, operations: RootDispatchOperations = {}): Promise<{ ok: true } | { ok: false; reason: string }> {
+	const leases = await acquireRootLeases(cwd, contexts, operations);
+	if (!leases.ok) return leases;
+	// Stage runtime-ledger changes until every persisted epoch has been read. A
+	// failure must release all leases and leave the in-process guard unchanged.
+	const parents = [...state.parents];
+	const owners = [...state.owners];
+	const epochs = { ...state.epochs };
+	try {
+		for (const context of contexts) {
+			if (!parents.includes(context.parent_item_id)) parents.push(context.parent_item_id);
+			if (!owners.includes(context.owner_ref)) owners.push(context.owner_ref);
+			if (epochs[context.owner_ref] === undefined) {
+				const epoch = await (operations.epoch ?? researchBranchDispatchEpoch)(cwd, context);
+				if (epoch !== null) epochs[context.owner_ref] = epoch;
+			}
+		}
+		state.parents = parents;
+		state.owners = owners;
+		state.epochs = epochs;
+		return { ok: true };
+	} catch {
+		const release = operations.release ?? releaseResearchBranchLease;
+		await Promise.all(leases.leases.map((lease) => release(cwd, lease.context, lease.leaseId).catch(() => false)));
+		return { ok: false, reason: "lease_unavailable" };
+	}
 }
 
 function publishScoutReceipt(context: PlanContextV1 | undefined, result: SingleResult): void {
@@ -839,9 +901,9 @@ This guard prevents self-recursion and cyclic handoffs (for example A -> B -> A)
 		// ── Parallel mode ──
 		if (params.tasks && params.tasks.length > 0) {
 		  if (plannedRootContexts.length > 0) {
-			const leases = await acquireRootLeases(ctx.cwd, plannedRootContexts);
-			if (!leases.ok) return {
-				content: [{ type: "text", text: `Blocked: planned root research branch is ${leases.reason}. Inspect the parent graph before retrying.` }],
+			const prepared = await prepareRootDispatch(ctx.cwd, plannedRootContexts, rootDispatch);
+			if (!prepared.ok) return {
+				content: [{ type: "text", text: `Blocked: planned root research branch is ${prepared.reason}. Inspect the parent graph before retrying.` }],
 				details: makeDetails("parallel")([]), isError: true,
 			};
 		  }
@@ -850,14 +912,6 @@ This guard prevents self-recursion and cyclic handoffs (for example A -> B -> A)
 			 if (!scoutDispatch.parents.includes(context.parent_item_id)) scoutDispatch.parents.push(context.parent_item_id);
 			 if (!scoutDispatch.owners.includes(context.owner_ref)) scoutDispatch.owners.push(context.owner_ref);
 		  }
-			for (const context of plannedRootContexts) {
-				if (!rootDispatch.parents.includes(context.parent_item_id)) rootDispatch.parents.push(context.parent_item_id);
-				if (!rootDispatch.owners.includes(context.owner_ref)) rootDispatch.owners.push(context.owner_ref);
-				if (rootDispatch.epochs[context.owner_ref] === undefined) {
-					const epoch = await researchBranchDispatchEpoch(ctx.cwd, context);
-					if (epoch !== null) rootDispatch.epochs[context.owner_ref] = epoch;
-				}
-			}
           return executeParallel(
 			params.tasks as Array<{ agent: string; task: string; cwd?: string; plan_context?: PlanContextV1 }>,
             delegationMode,
@@ -874,9 +928,9 @@ This guard prevents self-recursion and cyclic handoffs (for example A -> B -> A)
 		// ── Single mode ──
 		if (params.agent && params.task) {
 		  if (plannedRootContexts.length > 0) {
-			const leases = await acquireRootLeases(ctx.cwd, plannedRootContexts);
-			if (!leases.ok) return {
-				content: [{ type: "text", text: `Blocked: planned root research branch is ${leases.reason}. Inspect the parent graph before retrying.` }],
+			const prepared = await prepareRootDispatch(ctx.cwd, plannedRootContexts, rootDispatch);
+			if (!prepared.ok) return {
+				content: [{ type: "text", text: `Blocked: planned root research branch is ${prepared.reason}. Inspect the parent graph before retrying.` }],
 				details: makeDetails("single")([]), isError: true,
 			};
 		  }
@@ -885,14 +939,6 @@ This guard prevents self-recursion and cyclic handoffs (for example A -> B -> A)
 			 if (!scoutDispatch.parents.includes(context.parent_item_id)) scoutDispatch.parents.push(context.parent_item_id);
 			 if (!scoutDispatch.owners.includes(context.owner_ref)) scoutDispatch.owners.push(context.owner_ref);
 		  }
-			for (const context of plannedRootContexts) {
-				if (!rootDispatch.parents.includes(context.parent_item_id)) rootDispatch.parents.push(context.parent_item_id);
-				if (!rootDispatch.owners.includes(context.owner_ref)) rootDispatch.owners.push(context.owner_ref);
-				if (rootDispatch.epochs[context.owner_ref] === undefined) {
-					const epoch = await researchBranchDispatchEpoch(ctx.cwd, context);
-					if (epoch !== null) rootDispatch.epochs[context.owner_ref] = epoch;
-				}
-			}
           return executeSingle(
             params.agent,
             params.task,

@@ -469,6 +469,39 @@ test("Jina Reader opt-in propagates to children without leaking private reader s
 	assert.equal(env.PI_MUNCHKIN_BRANCH_REPORT_PATH, undefined);
 });
 
+test("root lease acquisition releases earlier leases when a later acquire throws", async () => {
+	const module = await import(`../vendor/pi-subagent/index.ts?lease-acquire-seam=${Date.now()}`);
+	const acquireRootLeases = (module as any).acquireRootLeases as Function;
+	const first = { parent_item_id: "first" };
+	const second = { parent_item_id: "second" };
+	const released: string[] = [];
+	const result = await acquireRootLeases("/tmp/lease-seam", [first, second], {
+		acquire: async (_cwd: string, context: any) => context === first ? { ok: true, lease_id: "lease-first" } : Promise.reject(new Error("synthetic lock failure")),
+		release: async (_cwd: string, _context: any, leaseId: string) => { released.push(leaseId); return true; },
+	});
+	assert.deepEqual(result, { ok: false, reason: "lease_unavailable" });
+	assert.deepEqual(released, ["lease-first"], "all leases acquired before the exception must be released");
+});
+
+test("root dispatch preparation rolls back leases and runtime ledger when epoch lookup throws", async () => {
+	const module = await import(`../vendor/pi-subagent/index.ts?lease-prepare-seam=${Date.now()}`);
+	const prepareRootDispatch = (module as any).prepareRootDispatch as Function;
+	const first = { parent_item_id: "first", owner_ref: "owner-first" };
+	const second = { parent_item_id: "second", owner_ref: "owner-second" };
+	const state = { key: "run", parents: ["existing"], owners: ["owner-existing"], epochs: { "owner-existing": 0 } };
+	const before = structuredClone(state);
+	const released: string[] = [];
+	let epochsRead = 0;
+	const result = await prepareRootDispatch("/tmp/lease-seam", [first, second], state, {
+		acquire: async (_cwd: string, context: any) => ({ ok: true, lease_id: `lease-${context.parent_item_id}` }),
+		release: async (_cwd: string, _context: any, leaseId: string) => { released.push(leaseId); return true; },
+		epoch: async () => { epochsRead += 1; if (epochsRead === 2) throw new Error("synthetic epoch read failure"); return 0; },
+	});
+	assert.deepEqual(result, { ok: false, reason: "lease_unavailable" });
+	assert.deepEqual(state, before, "a failed epoch read must not consume the in-process dispatch guard");
+	assert.deepEqual(released.sort(), ["lease-first", "lease-second"]);
+});
+
 test("subagent summary cap is tunable via PI_SUBAGENT_MAX_SUMMARY_CHARS", async () => {
 	const result = { messages: [{ role: "assistant", content: [{ type: "text", text: "x".repeat(20000) }] }] };
 	const prev = process.env.PI_SUBAGENT_MAX_SUMMARY_CHARS;
