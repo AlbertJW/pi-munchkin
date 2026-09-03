@@ -27,6 +27,8 @@ HEX64 = re.compile(r"^[0-9a-f]{64}$")
 DEFAULT_SOURCE = "d1b17fd8dbe1114e5185f68c36809d80ed1d4160c9822c2f1b0faf8ad4db0f18"
 DEFAULT_LOADED = "d83baa71d3eb6d9d79afac7d1adda2b2cf08f96e92c1f7c7785b524bae6fdc09"
 DEFAULT_MODEL = "local-llamacpp/qwen36-35b-iq3s"
+REQUIRED_KINDS = {"comparative", "contested", "multi_part"}
+COMPLETION_FIXTURE_ID = "compare-json-yaml-config"
 CONFIGS = {
     "candidate": {
         "path": REPO / "optimizer/prompt-lab/configs/pending/deep-research-planning.json",
@@ -157,8 +159,9 @@ def run_preflight(
 def selftest() -> None:
     admission = _load_admission_module()
     records = admission.check_slate()
-    assert len(records) == 3
-    assert {record["kind"] for record in records} == {"comparative", "contested", "multi_part"}
+    assert len(records) >= 3
+    assert REQUIRED_KINDS.issubset({record["kind"] for record in records})
+    assert COMPLETION_FIXTURE_ID in {record["fixture_id"] for record in records}
     # Keep the no-argument dry command honest when the model-visible source
     # surface moves.  A stale frozen default must fail this selftest instead of
     # leaving the planner launcher apparently ready against the wrong surface.

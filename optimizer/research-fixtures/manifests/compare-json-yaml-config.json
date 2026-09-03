@@ -1,0 +1,49 @@
+{
+  "schema": "pi.research-fixture/v1",
+  "fixture_id": "compare-json-yaml-config",
+  "revision": "2026-09-03",
+  "kind": "comparative",
+  "prompt": {
+    "text": "For a small team choosing a human-edited configuration format, compare JSON and YAML. Use one bounded evidence branch for each format, read at most one official source per branch, then synthesize a conditional recommendation. Finish once each branch has one cited claim and one limitation; explicitly mark anything not verified. Do not broaden the question.",
+    "sha256": "8ba24399cf8e6f30b073968a26d0251be90f6565b8f32812e96d78268f692912"
+  },
+  "source_time_cutoff": "2026-09-03T00:00:00Z",
+  "evidence_families": [
+    {
+      "id": "json-primary",
+      "role": "primary",
+      "source_refs": [
+        {"id": "json-rfc", "url": "https://www.rfc-editor.org/rfc/rfc8259", "publisher": "RFC Editor"}
+      ]
+    },
+    {
+      "id": "yaml-primary",
+      "role": "primary",
+      "source_refs": [
+        {"id": "yaml-spec", "url": "https://yaml.org/spec/1.2.2/", "publisher": "YAML"}
+      ]
+    }
+  ],
+  "required_claims": [
+    {"id": "json-tradeoff", "evidence_family": "json-primary", "grading_rule": "cite-json-property-and-limitation"},
+    {"id": "yaml-tradeoff", "evidence_family": "yaml-primary", "grading_rule": "cite-yaml-property-and-limitation"}
+  ],
+  "negative_control": {
+    "text": "What are the two JSON structural types? Give a short answer from one official source.",
+    "sha256": "f5a8780cf908678b4656e995ab1386be082761d5a4d0f9fe17c36194c4317aec",
+    "expected_plan_start": false,
+    "max_source_reads": 1
+  },
+  "oracle": {
+    "schema": "pi.research-oracle/v1",
+    "entrypoint": "../oracles/research_shape.py",
+    "query_budget": 3,
+    "timeout_ms": 2000,
+    "output_cap_bytes": 4096
+  },
+  "provenance": {
+    "authoring_timestamp": "2026-09-03T00:00:00Z",
+    "model_snapshot_boundary": "qwen35b-screen-2026-09-03",
+    "contamination_canary_hash": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+  }
+}
