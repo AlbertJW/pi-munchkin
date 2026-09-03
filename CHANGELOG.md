@@ -4,7 +4,7 @@ All notable changes to pi-munchkin are documented here. Releases follow semantic
 
 ## Unreleased
 
-### Fixed (2026-09-03 — planner child-runner setup failure closure)
+### Fixed (2026-09-03 — planner child-runner setup and redispatch closure)
 
 - A planned child can fail before its process starts while creating a private
   prompt, fork snapshot, or branch-context artifact. That exception is now
@@ -12,8 +12,10 @@ All notable changes to pi-munchkin are documented here. Releases follow semantic
   records a terminal branch failure and releases its durable dispatch lease in
   both single and parallel delegation modes. The underlying exception is not
   exposed to the model. The regression was red before the fix and green after
-  it; planner flags and defaults remain dark, with no model run or mirror
-  mutation.
+  it. An explicit reopen now increments a durable branch dispatch epoch, which
+  clears the old in-process identity without weakening the active lease fence;
+  the reopen regression is also red-green covered. Planner flags and defaults
+  remain dark, with no model run or mirror mutation.
 
 ### Fixed (2026-09-03 — durable deep-research dispatch leases)
 

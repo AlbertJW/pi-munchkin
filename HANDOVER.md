@@ -1,17 +1,19 @@
 # Handover — pi_munchkin, 2026-08-24
 
-## 2026-09-03 planner child-runner setup failure closure (repository-only)
+## 2026-09-03 planner child-runner setup and redispatch closure (repository-only)
 
-The lease audit found one remaining same-process failure path: a planned child
+The lease audit found two same-process lifecycle gaps: a planned child
 could throw before `runner.ts` returned a structured result while creating its
 private prompt, fork snapshot, or branch-context artifact. The subagent wrapper
 now turns that exception into the bounded child-failure result used by ordinary
 process, timeout, and report failures. Parent branch-result handling therefore
 blocks the branch and releases its durable lease for both single and parallel
-delegation. The diagnostic remains generic so private setup paths do not reach
-the model. A filesystem setup regression was red before the fix and green
-afterward; planner flags stay dark, and there was no model run or mirror
-mutation.
+delegation. An explicit reopen increments a durable branch dispatch epoch, so
+the old in-process identity is cleared only after the user/model has reopened
+the terminal branch; an active lease still blocks duplicates. The diagnostic
+remains generic so private setup paths do not reach the model. Filesystem setup
+and reopen regressions were red before the fixes and green afterward; planner
+flags stay dark, and there was no model run or mirror mutation.
 
 ## 2026-09-03 durable deep-research dispatch leases (repository-only)
 
