@@ -4,6 +4,13 @@ All notable changes to pi-munchkin are documented here. Releases follow semantic
 
 ## Unreleased
 
+### Fixed (2026-09-03 — planner preflight identity rebind)
+
+- Rebound the no-inference planner preflight defaults to the current source
+  and loaded surface hashes after the budget-guidance repair. The stale-pin
+  selftest had failed closed; `verify:optimizer` is green again. This is
+  optimizer provenance plumbing only and does not alter planner defaults.
+
 ### Measured (2026-09-03 — planner mechanism v6 diagnostic)
 
 - The single hash-bound Qwen 35B diagnostic reached one `research-start` and

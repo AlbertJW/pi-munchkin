@@ -19,6 +19,12 @@ next useful step is a fresh preregistration with a completion-shaped fixture if
 the planner remains a priority, followed by a separately approved multi-session
 screen. No default, adoption, or source-tree change follows from this receipt.
 
+The first post-receipt `verify:optimizer` correctly caught a stale
+`preflight.py` source/loaded default. Those pins are now rebound to
+`0d3c7871…` / `12fbe4cd…`; the preflight selftest and full optimizer
+verification pass. This is an optimizer-only provenance correction, not a new
+model-visible surface or inference result.
+
 ## 2026-09-03 planner budget guidance repair
 
 The v5 screen’s structural traces showed repeated invalid
