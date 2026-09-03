@@ -87,6 +87,14 @@ equivalent cross-platform *evaluation integrity*. A run without the Seatbelt jai
 level read isolation and no write jail — it is a strictly weaker guarantee than a sandboxed run,
 and results must be labeled accordingly, matching what `real_gate.sh` already does mechanically.
 
+The explicit write allowlist under the blanket deny is narrower than that summary: the gate grants
+the workdir and per-run temp directory, `~/.pi/agent/sessions`,
+`~/.pi/agent/telemetry`, and the private `~/.pi/agent/artifacts/run-capsules` subtree used by
+`RUN_CAPSULE=recovery` (including hierarchical planner state), plus the three Pi lock directories.
+`real_gate.sh` creates those fixed private roots before entering Seatbelt because the parent
+`~/.pi/agent` directory itself remains write-denied. The exploratory open-network profile mirrors
+this same filesystem allowlist; only its network policy differs.
+
 ## Plan gates execute outside the tool guards (accepted risk, stated explicitly)
 
 Surfaced by Albert's 2026-07-30 QA session and verified here. `plan_write` accepts an
