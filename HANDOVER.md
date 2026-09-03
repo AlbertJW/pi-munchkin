@@ -15,8 +15,11 @@ credentials, or Jina API key, and Jina fetches the page server-side. The separat
 Jina search endpoint is not wired in; Ketch remains the search provider. The
 feature is dark by default, has a child-environment propagation test, and does
 not change any active default or evidence interpretation. Source hash for this
-boundary is `d1b17fd8…`; mirror/load smoke and any research-quality measurement
-remain pending. If enabled for a future screen, use a fresh preregistration and
+boundary is `d1b17fd8…`; it is now mirrored at loaded hash `d83baa71…`
+(122/122, zero drift). A pinned Qwen 35B load smoke exited 0 with zero stderr,
+one session, 70 telemetry rows, and exact hash binding; Jina stayed off, so this
+is a provenance receipt rather than formatter-quality evidence. Any
+research-quality measurement remains pending. If enabled for a future screen, use a fresh preregistration and
 record the Jina service/rate-limit conditions separately from Ketch-native rows.
 
 ## 2026-09-03 planner delegated-role contract repair (mirrored + smoked)

@@ -4,6 +4,14 @@ All notable changes to pi-munchkin are documented here. Releases follow semantic
 
 ## Unreleased
 
+### Measured (2026-09-03 — Jina surface load smoke)
+
+- The mirrored Jina-capable surface loaded in a pinned Qwen 35B smoke with exit
+  0, zero stderr, one session, 70 telemetry rows, and exact loaded hash
+  `d83baa71…`; no raw URL/content/prompt/credential fields were present. Jina
+  stayed off for this load-only receipt, so this is provenance evidence rather
+  than a formatter-quality or research-efficacy result.
+
 ### Fixed (2026-09-03 — opt-in Jina Reader research formatting)
 
 - Added the dark `JINA_READER=on` path to `web_read`. It statically formats a
