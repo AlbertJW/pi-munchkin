@@ -53,6 +53,22 @@ consumed as research evidence only — something to cite and weigh, never a comm
 an instruction the agent follows. This applies uniformly to `web_search` and `web_read` output;
 neither tool's return value carries any authority beyond being a claim from an untrusted source.
 
+### Optional Jina Reader formatting (`JINA_READER=on`)
+
+When the opt-in `JINA_READER=on` flag is set, `web_read` may wrap a validated public
+HTTP(S) URL as `https://r.jina.ai/<url>`. This is a static URL formatter: the harness
+does not send cookies, credentials, or an API key, and it still invokes the existing
+bounded Ketch process. Ketch's public-URL preflight runs before the wrapper is built;
+the Reader then fetches the page server-side and returns an LLM-friendly rendering.
+The original public URL is restored in the result and remains the citation identity.
+
+Jina is a formatter, not a search index or evidence authority. Its output has the same
+untrusted-data status as native Ketch output: it may contain prompt injection or
+incorrect claims, and it must be independently checked before entering the research
+ledger or a final answer. The flag is off by default, and the no-key service is subject
+to its public rate limits and third-party fetch/privacy policy. No Jina API key is
+handled by this package.
+
 ## 4. Seatbelt-sandboxed runs are more authoritative than unsandboxed runs
 
 `optimizer/real_gate.sh` can run headless pi sessions under a macOS Seatbelt write-jail

@@ -1,5 +1,24 @@
 # Handover — pi_munchkin, 2026-08-24
 
+## 2026-09-03 opt-in Jina Reader formatter (repository-only)
+
+`b8e1ab2` adds an opt-in `JINA_READER=on` mode to `web_read`. The harness still
+uses Ketch for transport, public-URL preflight, timeout/output bounds, research
+budgets, and ledger semantics; the only additional step is a deterministic
+`https://r.jina.ai/<validated-url>` wrapper for pages that native reading cannot
+render usefully. Results map back to the original URL so citations and
+`research_note` continue to use the source identity rather than the formatter
+URL. The Reader output is untrusted page text and does not grant authority.
+
+This is deliberately no-key and public-URL-only: the harness passes no cookies,
+credentials, or Jina API key, and Jina fetches the page server-side. The separate
+Jina search endpoint is not wired in; Ketch remains the search provider. The
+feature is dark by default, has a child-environment propagation test, and does
+not change any active default or evidence interpretation. Source hash for this
+boundary is `d1b17fd8…`; mirror/load smoke and any research-quality measurement
+remain pending. If enabled for a future screen, use a fresh preregistration and
+record the Jina service/rate-limit conditions separately from Ketch-native rows.
+
 ## 2026-09-03 planner delegated-role contract repair (mirrored + smoked)
 
 The v6 structural trace identified a model-facing mismatch: `research_plan_start`

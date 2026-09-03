@@ -4,6 +4,14 @@ All notable changes to pi-munchkin are documented here. Releases follow semantic
 
 ## Unreleased
 
+### Fixed (2026-09-03 — opt-in Jina Reader research formatting)
+
+- Added the dark `JINA_READER=on` path to `web_read`. It statically formats a
+  validated public URL through Jina's free no-key Reader endpoint, keeps Ketch's
+  existing bounds and preflight, restores the original URL for citations, and
+  treats returned text as untrusted evidence. No API key, cookie, or live default
+  changed; the regular Ketch reader and search path remain the default.
+
 ### Measured (2026-09-03 — planner delegated-role boundary smoke)
 
 - The newly mirrored role-guidance surface loaded in a pinned Qwen 35B smoke
