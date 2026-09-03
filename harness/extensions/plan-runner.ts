@@ -1545,6 +1545,11 @@ export default function (pi: ExtensionAPI): void {
 			}).catch(() => undefined).finally(() => { pendingRebind = null; });
 		}
 		if (signal.type === "plan/branch-result") {
+			// Only the owning parent may merge a delegated result into the graph. A
+			// child has its own event bus in production, but reloads and embedders can
+			// share one; the process marker keeps a local signal from becoming a
+			// parent-state mutation through this subscriber.
+			if (delegatedBranchProcess || (globalThis as Record<string, unknown>)[DELEGATED_BRANCH_PROCESS_GLOBAL] === true) return;
 			const prior = pendingBranchMerge ?? Promise.resolve();
 			const next = prior.catch(() => undefined).then(() => mergeBranchResult(lastSessionCwd!, signal.context, signal.report, signal.failureClass)).catch(() => undefined);
 			pendingBranchMerge = next;

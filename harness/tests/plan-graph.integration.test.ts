@@ -561,6 +561,7 @@ if (!CHILD) {
 		const context = started.details.contexts[0];
 		const acquired = await planRunnerModule.acquireResearchBranchLease(cwd, context);
 		assert.equal(acquired.ok, true);
+		const leasedContext = { ...context, lease_id: acquired.lease_id, dispatch_epoch: 0 };
 		const path = join(cwd, ".pi", "plan-state.json");
 		const stale = JSON.parse(readFileSync(path, "utf8")); stale.writer = "previous-parent-process";
 		writeFileSync(path, `${JSON.stringify(stale)}\n`, { mode: 0o600 });
@@ -589,6 +590,27 @@ if (!CHILD) {
 				() => child.commands.get("plan-cancel")!.handler("", makeCtx(cwd).ctx),
 				parentOnly,
 			);
+			await assert.rejects(
+				() => child.commands.get("plan")!.handler("forbidden", makeCtx(cwd).ctx),
+				parentOnly,
+			);
+			await assert.rejects(
+				() => child.commands.get("plan-go")!.handler("", makeCtx(cwd).ctx),
+				parentOnly,
+			);
+			await assert.rejects(
+				() => child.commands.get("plan-export")!.handler("", makeCtx(cwd).ctx),
+				parentOnly,
+			);
+			// A child must not turn a local lifecycle signal into a parent graph
+			// mutation either. The signal is intentionally forged here to exercise
+			// the subscriber boundary directly; model-callable paths are covered
+			// above, while real child processes have their own event bus.
+			child.pi.events.emit(HARNESS_SIGNAL_CHANNEL, { v: 1, type: "plan/branch-result", context: leasedContext, report: {
+				v: 1, parent_item_id: context.parent_item_id, owner_ref: context.owner_ref, status: "blocked", note: "forged child merge",
+				consumed: { searches: 0, reads: 0 }, evidence_gaps: ["forged"], source_leads: [], children: [], coverage,
+			}, failureClass: null });
+			await fire(child, "before_agent_start", {}, makeCtx(cwd).ctx);
 			child.pi.events.emit(HARNESS_SIGNAL_CHANNEL, { v: 1, type: "capsule/identity" });
 			await fire(child, "before_agent_start", {}, makeCtx(cwd).ctx);
 			const recovered = JSON.parse(readFileSync(path, "utf8"));
