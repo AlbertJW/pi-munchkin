@@ -4,6 +4,15 @@ All notable changes to pi-munchkin are documented here. Releases follow semantic
 
 ## Unreleased
 
+### Fixed (2026-09-03 — parent planner route hint boundary)
+
+- **The opted-in headless planner lease now adds a parent-only routing hint at
+  `before_agent_start`.** Complex research is directed to
+  `research_plan_start` before web tools, while straightforward lookup stays
+  lightweight and delegated children remain planner-free. The targeted
+  red-green test and full offline suite pass; planner flags and defaults remain
+  dark pending the v5 hash-bound mechanism screen.
+
 ### Fixed (2026-09-03 — deep-research planner routing boundary)
 
 - **The deep-research skill now advertises its planner-first route in the

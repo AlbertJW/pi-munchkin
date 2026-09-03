@@ -38,8 +38,13 @@ with one `research-start`, no branch merge or settlement, and payload-free
 telemetry. This proves the lease and graph entrypoint are reachable, but it is
 not screen evidence. The model-visible deep-research skill description now
 advertises the planner-first route for complex work. Source commit `db3e5cd`
-has source hash `c52d1af7…`; the mirror is now clean at loaded hash
-`8d7d210f…` (122/122), and the fresh v4 preregistration is bound to it.
+has source hash `c52d1af7…`; the mirror was clean at loaded hash
+`8d7d210f…` (122/122), and v4 was bound to that earlier boundary. The
+ordinary comparative diagnostic still bypassed the graph, so commit `4f014ad`
+adds a parent-only `before_agent_start` planner-first route hint. The current
+source hash is `a31ef6d4…`, the mirror is clean at loaded hash `ff5c7ce7…`
+(122/122), and v5 is the current preregistration. No qualifying screen has
+started under v5.
 
 ## 2026-09-02 planner research-fixture admission
 
