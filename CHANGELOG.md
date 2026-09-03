@@ -4,6 +4,20 @@ All notable changes to pi-munchkin are documented here. Releases follow semantic
 
 ## Unreleased
 
+### Fixed (2026-09-03 — fail closed on planner dispatch and profile gaps)
+
+- Root research dispatch now rejects a missing dispatch epoch instead of
+  defaulting it to epoch zero. Every lease acquired for that attempt is
+  released and the parent dispatch guard remains unchanged, so a branch that
+  disappears cannot launch an unmergeable child. v5 reload also treats
+  `evidence_gaps` as a research marker: gaps without a valid deep-research
+  profile are rejected rather than downgraded to ordinary work. Both targeted
+  regressions were red before their fixes and green afterward; planner flags
+  remain dark and no inference, mirror, rollout, or push occurred.
+
+The source surface is now `f2400010…`; the loaded mirror remains
+`73bbd494…` and must be rebound before any future smoke.
+
 ### Fixed (2026-09-03 — preserve research profile settlement gates)
 
 - v5 planner reload now rejects a malformed or missing deep-research profile

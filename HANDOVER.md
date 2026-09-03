@@ -1,5 +1,18 @@
 # Handover — pi_munchkin, 2026-08-24
 
+## 2026-09-03 fail closed on planner dispatch and profile gaps (repository-only)
+
+The bottom-up planner audit found two adjacent integrity gaps. A root dispatch
+whose persisted research epoch had disappeared was previously treated as epoch
+zero, so it could launch a child whose result could never merge; preparation now
+fails closed and releases every acquired lease. A v5 graph carrying only
+research evidence gaps could also reload without its profile and bypass
+research settlement gates; those markers now require a valid deep-research
+profile. Both regressions were red before the fixes and green afterward.
+
+The source surface is `f2400010…`; the loaded mirror remains `73bbd494…`.
+Planner flags remain dark; no inference, mirror, rollout, or push occurred.
+
 ## 2026-09-03 preserve research profile settlement gates (repository-only)
 
 The follow-up planner audit found that a v5 research graph with a malformed
