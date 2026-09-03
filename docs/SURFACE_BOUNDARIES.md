@@ -142,6 +142,8 @@ npm run surface:hash:source
 
 | 2026-09-03 (70) | transactional planner root dispatch: later lease/epoch exceptions release all pre-launch leases and leave the in-process dispatch ledger unchanged | pending source boundary | source `720d9242491403c891fd4e775c78286a7ba1c466733e7a974145aef64d4081f4` / loaded `73bbd494f5c23f3b7262bd9f17c44b57574ca23d4b211c07dbd1d6067c23c315` | **REPOSITORY-ONLY; PENDING ROLLOUT.** Two deterministic fault-injection tests are red before the fix and green afterward; targeted planner tests and typecheck pass. Planner flags remain dark, the source branch is not pushed or mirrored, no model session occurred, and a future rollout must rebind the loaded hash. |
 
+| 2026-09-03 (71) | planner preflight source rebinding after dispatch hardening: stale default source identity now fails closed and the no-inference dry path binds the current checkout | pending source boundary | source `00d00ec07504e882e8e8fcc6201d79af5bed3d1182774b7cbc8dfd6435f9ad9a` / loaded `73bbd494f5c23f3b7262bd9f17c44b57574ca23d4b211c07dbd1d6067c23c315` | **REPOSITORY-ONLY; PREPARED.** `preflight.py --selftest` and `--dry --agent-dir /Users/Albert.Wessels/.pi/agent` pass with `execution:false` and `inference_started:false`; no model, mirror, or flag change occurred. |
+
 The older packaging-series PR 4 changed package, CI, operational tooling, and narrative without
 entering the runtime manifest. That historical statement does not apply to the spiral-control PR 4
 retirement draft above, which deliberately changes the descriptor and therefore gets its own row.

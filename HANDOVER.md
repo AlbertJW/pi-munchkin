@@ -1,5 +1,15 @@
 # Handover — pi_munchkin, 2026-08-24
 
+## 2026-09-03 planner preflight source rebinding (repository-only)
+
+The dispatch changes moved the package source surface, so the frozen planner
+preflight default was stale and `verify:optimizer` correctly failed closed.
+The default source pin now matches `00d00ec0…`; the dry preflight passes against
+the currently loaded `73bbd494…` mirror with four admitted fixtures and
+`inference_started:false`. This is an identity/readiness repair, not planner
+evidence: approval is still required, the source remains ahead of the mirror,
+and no model run occurred.
+
 ## 2026-09-03 transactional planner root dispatch preparation (repository-only)
 
 The lease audit reproduced two exception paths that were safe only by eventual

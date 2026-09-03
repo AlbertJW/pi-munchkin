@@ -4,6 +4,14 @@ All notable changes to pi-munchkin are documented here. Releases follow semantic
 
 ## Unreleased
 
+### Fixed (2026-09-03 — planner preflight source rebinding)
+
+- The no-inference planner preflight now pins the current source surface after
+  the transactional dispatch hardening. Its default dry run passes against the
+  existing loaded mirror while still requiring human approval and reporting
+  `inference_started:false`; stale source defaults fail closed. No planner
+  flags, model sessions, mirror, or adoption state changed.
+
 ### Fixed (2026-09-03 — transactional planner root dispatch preparation)
 
 - Root research lease acquisition now treats every lease and persisted retry
