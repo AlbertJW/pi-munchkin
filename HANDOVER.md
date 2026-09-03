@@ -1,5 +1,22 @@
 # Handover — pi_munchkin, 2026-08-24
 
+## 2026-09-03 planner delegated-role contract repair (pending rollout)
+
+The v6 structural trace identified a model-facing mismatch: `research_plan_start`
+and its active-tool guidance told the model to pass `plan_context` to a
+“researcher” subagent, while the validator correctly requires the depth-one
+`research-planner` role. Qwen therefore made a valid-looking call that was
+blocked before child execution. `0ea5bcf` changes both strings and adds a
+red-green integration test; the full offline suite remains green at 676/676.
+
+This is a new model-visible source boundary. The current source surface is
+`8993f671b417ab2b85a8b051b9c68311a085e6fc80c53730211571b40f7de9e0`.
+It has not yet been mirrored or measured. Planner flags remain dark, and the
+v6 diagnostic remains incomplete operability evidence only. After the normal
+pending-boundary push, mirror, and smoke ceremony, any planner rerun requires a
+fresh preregistration bound to the newly loaded hash; prior v5/v6 runs cannot be
+pooled.
+
 ## 2026-09-03 delegated failure provenance repair
 
 The v6 planner diagnostic exposed one more harness-side defect: a failed

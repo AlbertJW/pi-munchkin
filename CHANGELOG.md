@@ -4,6 +4,15 @@ All notable changes to pi-munchkin are documented here. Releases follow semantic
 
 ## Unreleased
 
+### Fixed (2026-09-03 — planner delegated-role contract)
+
+- **The deep-research planner handoff now names the enforced `research-planner`
+  role.** The tool guidance and returned `plan_context` message previously said
+  “researcher,” which led a model to call the ordinary scout role and receive a
+  correct-but-blocking contract error. A targeted integration test now keeps the
+  model-visible role name aligned with the validator. Planner flags remain dark;
+  no quality or adoption claim follows.
+
 ### Measured (2026-09-03 — nested delegated-failure smoke)
 
 - The mirrored run-kernel repair passed a short pinned Qwen 35B smoke with
