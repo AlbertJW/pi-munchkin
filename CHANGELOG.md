@@ -4,6 +4,16 @@ All notable changes to pi-munchkin are documented here. Releases follow semantic
 
 ## Unreleased
 
+### Fixed (2026-09-03 — deep-research planner routing boundary)
+
+- **The deep-research skill now advertises its planner-first route in the
+  model-visible description.** Complex, contested, comparative, multi-part,
+  and delegated requests are directed to read the skill and call
+  `research_plan_start` before web tools when available; straightforward fact
+  lookup remains lightweight. The red-green routing regression is covered by
+  the offline suite. This is a new model-visible boundary; planner flags and
+  defaults remain dark pending a fresh hash-bound screen.
+
 ### Fixed (2026-09-03 — planner headless activation boundary)
 
 - **The dark deep-research graph now has an explicit parent-only headless

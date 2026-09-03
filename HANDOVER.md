@@ -27,6 +27,20 @@ observation only. The raw transcript and telemetry remain in a private
 temporary directory, and the planner flags remain dark. The remaining five
 candidate sessions plus three fact-lookup controls require separate approval.
 
+## 2026-09-03 planner routing repair
+
+A sharper diagnostic then used an explicit planner-first instruction against
+the same loaded hash. Qwen called `research_plan_start` twice: its first
+three-branch request allocated six reads and failed validation, then it
+corrected to the five-read envelope, successfully started the graph, and began
+one subagent. The run hit the 350,000-byte cap after 84.961 seconds (exit 143),
+with one `research-start`, no branch merge or settlement, and payload-free
+telemetry. This proves the lease and graph entrypoint are reachable, but it is
+not screen evidence. The model-visible deep-research skill description now
+advertises the planner-first route for complex work. Source commit `db3e5cd`
+has source hash `c52d1af7…`; a fresh v4 preregistration is required after the
+mirror hash is rebound.
+
 ## 2026-09-02 planner research-fixture admission
 
 The hierarchical planner screen now has three structurally admitted research
