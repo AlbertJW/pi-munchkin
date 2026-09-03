@@ -25,7 +25,7 @@ ROOT = pathlib.Path(__file__).resolve().parent
 REPO = ROOT.parents[1]
 HEX64 = re.compile(r"^[0-9a-f]{64}$")
 DEFAULT_SOURCE = "c52d1af7f0dd7d9e8057fa1ff5f2194657d1a9acc2c85827e8958d1a019608f7"
-DEFAULT_LOADED = "a4856f916419d26da39b80aa77ce4737a4dc08acb86c8a46cb95ab58a4ddeeb5"
+DEFAULT_LOADED = "8d7d210f41e4ca5a3eac8202ea2a7b725d25847b2f73ac0f14a418d2bfd84823"
 DEFAULT_MODEL = "local-llamacpp/qwen36-35b-iq3s"
 CONFIGS = {
     "candidate": {

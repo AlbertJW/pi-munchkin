@@ -16,8 +16,10 @@ not an efficacy comparison or an authorization to enable defaults.
 - Source commit: `db3e5cd` (`fix(research): advertise planner-first routing`).
 - Source surface SHA-256:
   `c52d1af7f0dd7d9e8057fa1ff5f2194657d1a9acc2c85827e8958d1a019608f7`.
-- Loaded mirror surface SHA-256: **to be bound after mirror apply; no screen
-  may start against an older loaded surface**.
+- Loaded mirror surface SHA-256:
+  `8d7d210f41e4ca5a3eac8202ea2a7b725d25847b2f73ac0f14a418d2bfd84823`.
+  `mirror:check` reports 122/122 first-party files with zero drift; no screen
+  may start against an older loaded surface.
 - Candidate and control configuration hashes remain those in v2/v3:
   `0d01aab9292db845b5f228174e2a1a4c10328883daebd482dcd9c9c9f5f5fd1e` and
   `a2e5efef3ab36d90ab58ee91920b766e5c7a162905da970778e9439c3c1c92f7`.
