@@ -24,7 +24,7 @@ if (!CHILD) {
 			const output = execFileSync(process.execPath, [
 				"--experimental-strip-types", "--experimental-loader", resolve("harness/tests/ts-js-resolver.mjs"), "--test", import.meta.filename,
 			], { cwd: process.cwd(), env, encoding: "utf8", stdio: "pipe" });
-			assert.match(output, /pass 12/);
+			assert.match(output, /pass 13/);
 		} finally { rmSync(artifacts, { recursive: true, force: true }); }
 	});
 } else {
@@ -87,6 +87,14 @@ if (!CHILD) {
 		assert.match(text, /research-planner/);
 		assert.doesNotMatch(text, /matching researcher subagent/);
 		resetPiGlobals();
+	});
+
+	test("research planner may finish a bounded branch directly without scout fan-out", () => {
+		const instructions = readFileSync(new URL("../agents/research-planner.md", import.meta.url), "utf8");
+		assert.match(instructions, /complete the branch directly/i);
+		assert.match(instructions, /do not create scout leaves/i);
+		assert.match(instructions, /call `branch_plan` once with a terminal status/i);
+		assert.doesNotMatch(instructions, /Call `branch_plan` before expanding the branch\. Create at most two pending child leaves/);
 	});
 
 	test("research plan rejects over-budget roots with the actionable discovery envelope", async () => {
