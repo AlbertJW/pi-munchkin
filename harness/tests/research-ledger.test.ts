@@ -389,6 +389,14 @@ test("deep-research contracts remove verifier delegation and require parent re-r
 	assert.match(researcher, /parent must re-read/i);
 });
 
+test("deep-research skill description advertises planner-first routing for complex research", () => {
+	const skill = readFileSync(new URL("../../skills/deep-research/SKILL.md", import.meta.url), "utf8");
+	const description = /^description:\s*(.+)$/m.exec(skill)?.[1] ?? "";
+	assert.match(description, /research_plan_start/);
+	assert.match(description, /before .*web/i);
+	assert.match(description, /straightforward fact lookup/i);
+});
+
 test("legacy counterfactual fixtures violate the new proof and serialization contracts", () => {
 	const legacySkill = "delegate its reading to subagent(researcher, urls); the parent records the citations it returns";
 	assert.doesNotMatch(legacySkill, /PARENT must call `web_read`/,

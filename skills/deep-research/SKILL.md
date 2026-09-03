@@ -1,6 +1,6 @@
 ---
 name: deep-research
-description: Research current, contested, comparative, or multi-source questions using bounded public-web search and page reading, and record each claim against a verbatim source quote. Use when the user asks to research, investigate, compare sources, fact-check, find current information, or produce a cited synthesis. Do not use for local codebase search or when the user supplied all required source material.
+description: Research current, contested, comparative, or multi-source questions using bounded public-web search and page reading, and record each claim against a verbatim source quote. For complex, contested, comparative, multi-part, or delegated research, read this skill and call `research_plan_start` before any `web_search` or `web_read` when available; straightforward fact lookup stays lightweight. Use when the user asks to research, investigate, compare sources, fact-check, find current information, or produce a cited synthesis. Do not use for local codebase search or when the user supplied all required source material.
 ---
 
 # Deep Research
