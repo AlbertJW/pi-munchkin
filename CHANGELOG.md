@@ -4,6 +4,21 @@ All notable changes to pi-munchkin are documented here. Releases follow semantic
 
 ## Unreleased
 
+### Fixed (2026-09-03 — reject unknown planner schema downgrades)
+
+- Planner reload now accepts only schema versions with defined migration
+  semantics (`v4` and `v5`). A future or forged version fails closed before
+  legacy migration can strip research fields and turn the graph into ordinary
+  settleable work; the persisted state is left untouched. The regression was
+  red before the guard and green afterward. The isolated planner process now
+  has 34 passing tests; the full offline suite is 691/691, with typecheck,
+  health, package smoke, optimizer verification, and secret scan also clean.
+  Planner flags remain dark and no inference, mirror, rollout, or push
+  occurred.
+
+The source surface is now `fb68dc56…`; the loaded mirror remains
+`73bbd494…` and must be rebound before any future smoke.
+
 ### Fixed (2026-09-03 — fail closed on planner dispatch and profile gaps)
 
 - Root research dispatch now rejects a missing dispatch epoch instead of

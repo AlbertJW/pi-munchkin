@@ -1,5 +1,20 @@
 # Handover — pi_munchkin, 2026-08-24
 
+## 2026-09-03 reject unknown planner schema downgrades (repository-only)
+
+The next planner reload probe found that any schema number other than `v5`
+was treated as legacy `v4`. A forged future research graph could therefore
+lose its research markers during migration and settle as ordinary work. Only
+the two versions with defined migration semantics are now accepted; unknown
+versions fail closed and the private state file remains byte-identical. The
+counterfactual regression was red before the guard and green afterward.
+
+The full offline suite is green at 691/691, including typecheck, health,
+package smoke, optimizer verification, and secret scan. Source pin is
+`fb68dc56…`; loaded mirror remains `73bbd494…`. Planner flags remain dark; no
+inference, mirror, rollout, or push occurred. A future smoke needs a fresh
+approved preflight and loaded-hash rebind.
+
 ## 2026-09-03 fail closed on planner dispatch and profile gaps (repository-only)
 
 The bottom-up planner audit found two adjacent integrity gaps. A root dispatch
