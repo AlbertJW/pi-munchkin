@@ -4,6 +4,14 @@ All notable changes to pi-munchkin are documented here. Releases follow semantic
 
 ## Unreleased
 
+### Fixed (2026-09-03 — planner budget rejection guidance)
+
+- **Over-budget `research_plan_start` calls now explain the shared discovery
+  envelope.** The rejection names the three-search/five-read total and the
+  requested allocation, so a model can correct its plan instead of retrying
+  the same invalid request. This is a model-visible boundary; planner flags
+  remain dark and v6 is prepared for one bounded diagnostic only.
+
 ### Changed (2026-09-03 — planner screen arm qualification)
 
 - **The dark planner launcher now supports explicit `candidate` and `control`

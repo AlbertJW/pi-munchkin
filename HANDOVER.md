@@ -1,5 +1,23 @@
 # Handover — pi_munchkin, 2026-08-24
 
+## 2026-09-03 planner budget guidance repair
+
+The v5 screen’s structural traces showed repeated invalid
+`research_plan_start` calls because the rejection said only that root budgets
+exceeded the envelope; it did not expose the three-search/five-read limit that
+the skill guidance already advertised. A targeted red-green test now requires
+the actionable limit, and `cc74517` adds it while keeping the global budget and
+graph semantics unchanged. The source surface is
+`0d3c7871a22d210ba52cf2f3117a5da9cef087fb4caee4e6c46c3601224a88e6`.
+
+The v6 preregistration is prepared at
+`optimizer/docs/PREREG_QWEN35B_PLANNER_MECHANISM_V6_2026-09-03.md`. It requires
+the mirror to be rebound to a newly observed loaded hash, then authorizes one
+bounded Qwen diagnostic to check whether corrected budget calls can reach a
+graph start. It does not authorize a new multi-session screen, quality claim,
+default change, or adoption. The v5 six-candidate/three-control result remains
+incomplete and is not pooled.
+
 ## 2026-09-03 first Qwen planner-screen receipt
 
 The repaired parent-only lease was then exercised once in a separate bounded
