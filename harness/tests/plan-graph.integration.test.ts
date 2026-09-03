@@ -25,7 +25,7 @@ if (!CHILD) {
 			const output = execFileSync(process.execPath, [
 				"--experimental-strip-types", "--experimental-loader", resolve("harness/tests/ts-js-resolver.mjs"), "--test", import.meta.filename,
 			], { cwd: process.cwd(), env, encoding: "utf8", stdio: "pipe" });
-			assert.match(output, /pass 33/);
+			assert.match(output, /pass 34/);
 		} finally { rmSync(artifacts, { recursive: true, force: true }); }
 	});
 } else {
