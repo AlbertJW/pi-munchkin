@@ -4,6 +4,14 @@ All notable changes to pi-munchkin are documented here. Releases follow semantic
 
 ## Unreleased
 
+### Changed (2026-09-03 — planner screen arm qualification)
+
+- **The dark planner launcher now supports explicit `candidate` and `control`
+  arms.** Each arm verifies its preregistered configuration digest, clears
+  inherited planner flags, and reports the arm/config identity in its bounded
+  summary. This is optimizer-only plumbing; the model-visible surface and all
+  live defaults remain unchanged.
+
 ### Fixed (2026-09-03 — parent planner route hint boundary)
 
 - **The opted-in headless planner lease now adds a parent-only routing hint at

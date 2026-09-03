@@ -53,6 +53,13 @@ payload-free rows (stdout digest `a7380025…`, telemetry digest
 receipt; the six-session mechanism screen plus three controls remains the next
 human-gated action.
 
+The planner launcher now has explicit `--arm candidate` and `--arm control`
+paths. It verifies the matching config digest, clears inherited planner flags,
+and reports the arm identity in its safe summary; both dry paths pass against
+loaded hash `ff5c7ce7…`. This is optimizer-only plumbing and does not change
+the model-visible surface. The next real action is still the human-approved
+v5 six-session mechanism screen plus three controls.
+
 ## 2026-09-02 planner research-fixture admission
 
 The hierarchical planner screen now has three structurally admitted research

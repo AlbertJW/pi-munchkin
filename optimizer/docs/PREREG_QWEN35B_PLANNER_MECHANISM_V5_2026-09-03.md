@@ -47,6 +47,9 @@ those prompts; the route hint is the sole intervention.
 After human review and an explicit run command, execute the same six candidate
 mechanism sessions and three fact-lookup negative controls under the existing
 180-second / 350,000-byte bounds, balanced and randomized as preregistered.
+Each invocation must pass `--arm candidate` or `--arm control`; the launcher
+verifies the corresponding config digest and clears inherited planner flags
+before starting Pi, so the two arms cannot silently collapse into one.
 Require at least four of six candidate `research-start` events, one validated
 branch merge, no branch failure, and one terminal parent settlement after
 parent evidence rereads. Controls must contain zero graph starts, merges, and

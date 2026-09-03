@@ -10,6 +10,7 @@ terminates the whole child process group on a wall-clock or output limit.
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import os
 import pathlib
@@ -25,6 +26,27 @@ from typing import IO, Iterable
 
 BOUND_REASONS = {"output_cap", "wall_timeout"}
 THINKING_RE = re.compile(r"^[A-Za-z0-9_-]{1,32}$")
+HEX64_RE = re.compile(r"^[0-9a-f]{64}$")
+REPO_ROOT = pathlib.Path(__file__).resolve().parents[2]
+
+# The screen has two deliberately explicit arms. Keeping this map here makes
+# the launcher unable to inherit a stale graph lease or silently run the
+# control with candidate flags. The digests bind the executable arm to the
+# exact preregistered config bytes before Pi is started.
+ARM_SPECS: dict[str, dict[str, object]] = {
+    "candidate": {
+        "config_path": REPO_ROOT / "optimizer/prompt-lab/configs/pending/deep-research-planning.json",
+        "config_sha256": "0d01aab9292db845b5f228174e2a1a4c10328883daebd482dcd9c9c9f5f5fd1e",
+        "flags": {"RESEARCH_LEDGER": "on", "PLAN_GRAPH": "on", "DEEP_RESEARCH_PLANNING": "on"},
+        "headless_plan": True,
+    },
+    "control": {
+        "config_path": REPO_ROOT / "optimizer/prompt-lab/configs/pending/deep-research-planning-control.json",
+        "config_sha256": "a2e5efef3ab36d90ab58ee91920b766e5c7a162905da970778e9439c3c1c92f7",
+        "flags": {"RESEARCH_LEDGER": "on", "PLAN_GRAPH": "off", "DEEP_RESEARCH_PLANNING": "off"},
+        "headless_plan": False,
+    },
+}
 
 
 @dataclass(frozen=True)
@@ -46,6 +68,61 @@ class BoundedResult:
             "stderr_bytes": self.stderr_bytes,
             "total_bytes": self.stdout_bytes + self.stderr_bytes,
         }
+
+
+def _sha256_file(path: pathlib.Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as stream:
+        for block in iter(lambda: stream.read(1024 * 1024), b""):
+            digest.update(block)
+    return digest.hexdigest()
+
+
+def arm_spec(arm: str) -> dict[str, object]:
+    """Return a defensive copy of a preregistered planner-screen arm."""
+    if arm not in ARM_SPECS:
+        raise ValueError("arm must be candidate or control")
+    spec = ARM_SPECS[arm]
+    path = spec["config_path"]
+    expected = spec["config_sha256"]
+    if not isinstance(path, pathlib.Path) or not isinstance(expected, str) or not HEX64_RE.fullmatch(expected):
+        raise ValueError("planner arm has an invalid config binding")
+    if not path.is_file() or path.is_symlink():
+        raise ValueError(f"planner arm config is unavailable: {path}")
+    actual = _sha256_file(path)
+    if actual != expected:
+        raise ValueError(f"planner arm config hash mismatch for {arm}")
+    flags = spec["flags"]
+    if not isinstance(flags, dict) or any(key not in {"RESEARCH_LEDGER", "PLAN_GRAPH", "DEEP_RESEARCH_PLANNING"} or value not in {"on", "off"} for key, value in flags.items()):
+        raise ValueError("planner arm has invalid flags")
+    return {"config_path": path, "config_sha256": expected, "flags": dict(flags), "headless_plan": bool(spec["headless_plan"])}
+
+
+def build_planner_env(
+    *, arm: str, agent_dir: pathlib.Path, expected_surface: str,
+    telemetry_path: pathlib.Path, base_env: dict[str, str] | None = None,
+) -> dict[str, str]:
+    """Build an arm-pinned environment and clear inherited planner controls."""
+    spec = arm_spec(arm)
+    env = dict(os.environ if base_env is None else base_env)
+    for key in ("RESEARCH_LEDGER", "PLAN_GRAPH", "DEEP_RESEARCH_PLANNING", "PI_MUNCHKIN_HEADLESS_PLAN"):
+        env.pop(key, None)
+    flags = spec["flags"]
+    assert isinstance(flags, dict)
+    env.update({
+        "PI_CODING_AGENT_DIR": str(agent_dir),
+        "HARNESS_SURFACE_SHA256": expected_surface,
+        "RESEARCH_LEDGER": str(flags["RESEARCH_LEDGER"]),
+        "PLAN_GRAPH": str(flags["PLAN_GRAPH"]),
+        "DEEP_RESEARCH_PLANNING": str(flags["DEEP_RESEARCH_PLANNING"]),
+        "PLAN_STORAGE": "project", "FORCE_PLAN_WRITE": "on",
+        "MUNCHKIN_TOOL_PROFILE": "ambient", "MUNCHKIN_TOOL_ACTIVATION": "ambient",
+        "TELEMETRY": "on", "TELEMETRY_SOURCE": "interactive", "TELEMETRY_WRITER": "sync",
+        "TELEMETRY_FILE": str(telemetry_path), "LOOP_EPISODE_MODE": "shadow",
+    })
+    if bool(spec["headless_plan"]):
+        env["PI_MUNCHKIN_HEADLESS_PLAN"] = "on"
+    return env
 
 
 def classify_result(*, exit_code: int | None, reason: str | None) -> str:
@@ -203,7 +280,7 @@ def resolve_surface_hash(agent_dir: pathlib.Path, *, node_bin: str = "node") -> 
     """Resolve the loaded-surface digest without launching Pi."""
     if not agent_dir.is_dir() or agent_dir.is_symlink():
         raise ValueError("agent_dir must be a real directory")
-    root = pathlib.Path(__file__).resolve().parents[2]
+    root = REPO_ROOT
     script = root / "harness" / "scripts" / "surface-hash.ts"
     completed = subprocess.run(
         [node_bin, "--experimental-strip-types", str(script), str(agent_dir)],
@@ -217,7 +294,7 @@ def resolve_surface_hash(agent_dir: pathlib.Path, *, node_bin: str = "node") -> 
     return digest
 
 
-def _validate_run_inputs(args: argparse.Namespace) -> tuple[pathlib.Path, pathlib.Path, pathlib.Path]:
+def _validate_run_inputs(args: argparse.Namespace) -> tuple[pathlib.Path, pathlib.Path, pathlib.Path, dict[str, object]]:
     agent_dir = pathlib.Path(args.agent_dir).expanduser().resolve()
     project_dir = pathlib.Path(args.project_dir).expanduser().resolve()
     prompt_file = pathlib.Path(args.prompt_file).expanduser().resolve()
@@ -234,11 +311,12 @@ def _validate_run_inputs(args: argparse.Namespace) -> tuple[pathlib.Path, pathli
         raise ValueError("--model must be a non-empty single-line identifier")
     if args.thinking is not None and (not isinstance(args.thinking, str) or not THINKING_RE.fullmatch(args.thinking)):
         raise ValueError("--thinking must be a short single-line level")
-    return agent_dir, project_dir, prompt_file
+    spec = arm_spec(args.arm)
+    return agent_dir, project_dir, prompt_file, spec
 
 
 def run_planner(args: argparse.Namespace) -> dict[str, object]:
-    agent_dir, project_dir, prompt_file = _validate_run_inputs(args)
+    agent_dir, project_dir, prompt_file, spec = _validate_run_inputs(args)
     actual = resolve_surface_hash(agent_dir, node_bin=args.node_bin)
     if actual != args.expected_surface:
         raise ValueError("loaded surface hash does not match --expected-surface")
@@ -249,19 +327,10 @@ def run_planner(args: argparse.Namespace) -> dict[str, object]:
     output_path = pathlib.Path(args.output).expanduser().resolve()
     stderr_path = pathlib.Path(args.stderr).expanduser().resolve()
     telemetry_path = pathlib.Path(args.telemetry).expanduser().resolve()
-    env = os.environ.copy()
-    env.update({
-        "PI_CODING_AGENT_DIR": str(agent_dir),
-        "HARNESS_SURFACE_SHA256": args.expected_surface,
-        "PLAN_GRAPH": "on", "DEEP_RESEARCH_PLANNING": "on", "RESEARCH_LEDGER": "on",
-        "PLAN_STORAGE": "project", "FORCE_PLAN_WRITE": "on",
-        "MUNCHKIN_TOOL_PROFILE": "ambient", "MUNCHKIN_TOOL_ACTIVATION": "ambient",
-        # Parent-only skill lease. Delegated children receive plan_context and
-        # cannot inherit this broad startup activation.
-        "PI_MUNCHKIN_HEADLESS_PLAN": "on",
-        "TELEMETRY": "on", "TELEMETRY_SOURCE": "interactive", "TELEMETRY_WRITER": "sync",
-        "TELEMETRY_FILE": str(telemetry_path), "LOOP_EPISODE_MODE": "shadow",
-    })
+    env = build_planner_env(
+        arm=args.arm, agent_dir=agent_dir, expected_surface=args.expected_surface,
+        telemetry_path=telemetry_path,
+    )
     command = build_pi_command(pi_bin=args.pi_bin, model=args.model, prompt=prompt, thinking=args.thinking)
     result = run_bounded_command(
         command, cwd=project_dir, wall_seconds=args.wall_seconds,
@@ -269,7 +338,7 @@ def run_planner(args: argparse.Namespace) -> dict[str, object]:
         stdout_path=output_path, stderr_path=stderr_path,
     )
     summary = result.to_summary()
-    summary.update({"surface_sha256": actual, "model": args.model})
+    summary.update({"surface_sha256": actual, "model": args.model, "arm": args.arm, "config_sha256": spec["config_sha256"]})
     if args.thinking is not None:
         summary["thinking"] = args.thinking
     return summary
@@ -302,6 +371,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--prompt-file")
     parser.add_argument("--expected-surface")
     parser.add_argument("--model")
+    parser.add_argument("--arm", choices=tuple(ARM_SPECS))
     parser.add_argument("--thinking")
     parser.add_argument("--output")
     parser.add_argument("--stderr")
@@ -315,17 +385,18 @@ def main(argv: list[str] | None = None) -> int:
         if args.selftest:
             selftest()
             return 0
-        required = ("agent_dir", "project_dir", "prompt_file", "expected_surface", "model")
+        required = ("agent_dir", "project_dir", "prompt_file", "expected_surface", "model", "arm")
         if any(not getattr(args, field) for field in required):
-            raise ValueError("--dry/--run require --agent-dir, --project-dir, --prompt-file, --expected-surface, and --model")
+            raise ValueError("--dry/--run require --agent-dir, --project-dir, --prompt-file, --expected-surface, --model, and --arm")
         if args.dry:
-            agent_dir, project_dir, prompt_file = _validate_run_inputs(args)
+            agent_dir, project_dir, prompt_file, spec = _validate_run_inputs(args)
             actual = resolve_surface_hash(agent_dir, node_bin=args.node_bin)
             if actual != args.expected_surface:
                 raise ValueError("loaded surface hash does not match --expected-surface")
             print(json.dumps({
                 "schema": "pi.planner-smoke/v1", "execution": False,
                 "surface_sha256": actual, "model": args.model,
+                "arm": args.arm, "config_sha256": spec["config_sha256"], "flags": spec["flags"],
                 "project_dir_present": project_dir.is_dir(), "prompt_bytes": prompt_file.stat().st_size,
                 "wall_seconds": args.wall_seconds, "max_output_bytes": args.max_output_bytes,
                 **({"thinking": args.thinking} if args.thinking is not None else {}),

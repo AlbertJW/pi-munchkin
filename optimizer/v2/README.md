@@ -104,7 +104,8 @@ python3 -m optimizer.v2.cli replay --manifest optimizer/v2/examples/campaign.jso
 python3 -m optimizer.v2.planner_smoke --selftest
 python3 -m optimizer.v2.planner_smoke --dry --agent-dir /private/agent-copy \
   --project-dir /private/research-project --prompt-file /private/prompt.txt \
-  --expected-surface <loaded-surface-sha256> --model local-llamacpp/qwen36-35b-iq3s
+  --expected-surface <loaded-surface-sha256> --model local-llamacpp/qwen36-35b-iq3s \
+  --arm candidate
 ```
 
 The example is deterministic and performs no network or model inference.
@@ -112,7 +113,9 @@ The example is deterministic and performs no network or model inference.
 The planner smoke launcher is a separate dark measurement utility. It refuses
 to start unless the disposable agent directory hashes to the preregistered
 loaded surface. Its only model-executing mode is an explicit `--run`, which
-requires private output, stderr, and telemetry paths; stdout and stderr are
+requires an explicit `--arm candidate` or `--arm control` plus private output,
+stderr, and telemetry paths; each arm is bound to its config digest and clears
+inherited planner flags before Pi starts. Stdout and stderr are
 captured under one byte ceiling and the whole child process group is stopped on
 either that ceiling or the wall-clock limit. `--selftest` and `--dry` never
 launch Pi and print only bounded classifications. The utility does not alter
