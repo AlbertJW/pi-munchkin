@@ -1,5 +1,18 @@
 # Handover — pi_munchkin, 2026-08-24
 
+## 2026-09-03 preserve research profile settlement gates (repository-only)
+
+The follow-up planner audit found that a v5 research graph with a malformed
+profile could reload without that profile and become an ordinary graph. That
+removed the deep-research source-verification requirements and allowed
+`plan_settle` to succeed without parent rereads. Reload now fails closed for
+invalid profiles and for research-only node markers without a valid profile;
+the persisted file is left untouched. The settlement-bypass regression was red
+before the fix and green afterward.
+
+The source surface is `9dadc7d1…`; the loaded mirror remains `73bbd494…`.
+Planner flags remain dark; no inference, mirror, rollout, or push occurred.
+
 ## 2026-09-03 reject oversized persisted planner graphs (repository-only)
 
 The bottom-up planner audit found that `migrateState` truncated persisted

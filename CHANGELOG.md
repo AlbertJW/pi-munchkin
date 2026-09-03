@@ -4,6 +4,18 @@ All notable changes to pi-munchkin are documented here. Releases follow semantic
 
 ## Unreleased
 
+### Fixed (2026-09-03 — preserve research profile settlement gates)
+
+- v5 planner reload now rejects a malformed or missing deep-research profile
+  when research node markers are present. Previously a tampered profile could
+  be discarded and the graph reloaded as ordinary work, bypassing parent-source
+  validation at settlement. The targeted settlement regression is red before
+  the fix and green afterward; planner flags remain dark and no inference,
+  mirror, rollout, or push occurred.
+
+The source surface is now `9dadc7d1…`; the loaded mirror remains
+`73bbd494…` and must be rebound before any future smoke.
+
 ### Fixed (2026-09-03 — reject oversized persisted planner graphs)
 
 - Planner reload now fails closed when private state contains more than the
