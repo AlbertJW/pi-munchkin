@@ -251,6 +251,8 @@ if (!CHILD) {
 		assert.equal(state.items.length, 2); assert.equal(state.items[1].parent_id, state.items[0].id);
 		const { ctx: statusCtx, notes } = makeCtx(cwd); await fp.commands.get("plan-status").handler("", statusCtx);
 		assert.match(notes.at(-1) ?? "", /ready for settlement/);
+		await fp.commands.get("plan-export").handler("", makeCtx(cwd).ctx);
+		assert.match(readFileSync(join(cwd, ".pi", "TODO.md"), "utf8"), new RegExp(state.items[1].id), "text export must disclose descendants, not only ambient roots");
 		await expectToolError(fp, "plan_settle", { summary: "done" }, cwd, /delegated source not parent-verified/);
 		(globalThis as Record<string, unknown>).__pi_plan_validation_urls = ["https://example.test/source", "https://second.example.test/source"];
 		assert.equal((await callTool(fp, "plan_settle", { summary: "verified and complete" }, cwd)).isError, false);

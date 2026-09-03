@@ -16,7 +16,7 @@ import {
 import { applyPlanDeltas, type PlanDelta } from "../lib/plan-delta.ts";
 import {
 	DEEP_RESEARCH_MAX_CHILDREN, DEEP_RESEARCH_MAX_DEPTH, DEEP_RESEARCH_MAX_ROOTS,
-	addBudget, budgetWithin, childrenOf, descendantCount, expandGraph, graphItemId, graphTerminal, ownerRef, settleErrors, validateGraph,
+	addBudget, budgetWithin, childrenOf, descendantCount, depthOf, expandGraph, graphItemId, graphTerminal, ownerRef, settleErrors, validateGraph,
 	type BranchChildInput, type GraphPlanItem, type GraphPlanState, type PlanStatus, type ResearchBranchLease, type ResearchBudget,
 } from "../lib/plan-graph.ts";
 import { planStorageMode, privatePlanProjectionPath, privatePlanStatePath, privatePlanTracePath } from "../lib/plan-state-storage.ts";
@@ -398,7 +398,7 @@ function derivedStatus(state: PlanState): string {
 	return state.phase === "planned" ? "planned (awaiting /plan-go)" : "executing";
 }
 
-function renderItems(state: PlanState, selectedId?: string): string {
+function renderItems(state: PlanState, selectedId?: string, includeDescendants = false): string {
 	const selected = selectedId ? state.items.find((item) => item.id === selectedId) : undefined;
 	const subtree = new Set<string>();
 	if (selected) {
@@ -410,22 +410,25 @@ function renderItems(state: PlanState, selectedId?: string): string {
 			for (const child of childrenOf(state.items, id)) queue.push(child.id);
 		}
 	}
-	const visible = selected ? state.items.filter((item) => subtree.has(item.id)) : state.items.filter((item) => !item.parent_id);
+	const visible = selected ? state.items.filter((item) => subtree.has(item.id)) : includeDescendants ? state.items : state.items.filter((item) => !item.parent_id);
+	const selectedDepth = selected && state.schema_version === 5 ? (depthOf(state.items, selected.id) ?? 0) : 0;
 	return visible.flatMap((item) => {
+		const itemDepth = state.schema_version === 5 ? (depthOf(state.items, item.id) ?? 0) : 0;
+		const indent = "  ".repeat(selected || includeDescendants ? Math.max(0, itemDepth - selectedDepth) : 0);
 		const descendants = state.schema_version === 5 ? descendantCount(state.items, item.id) : 0;
 		const gaps = item.evidence_gaps?.filter((gap) => !gap.startsWith("source:")).length ?? 0;
 		const budget = item.budget ? ` budget=${item.budget.used.searches}/${item.budget.allocated.searches}s ${item.budget.used.reads}/${item.budget.allocated.reads}r` : "";
 		const lease = item.lease ? " dispatch=in-flight" : "";
 		const coverage = item.coverage ? ` coverage=${item.coverage.complete ? "complete" : "incomplete"}:${item.coverage.strategy}` : "";
 		const graph = descendants || gaps || lease ? ` descendants=${descendants} gaps=${gaps}${budget}${lease}${coverage}` : `${budget}${coverage}`;
-		const first = `${item.id}  [${item.status.replace("_", " ")}] ${item.title}`;
+		const first = `${indent}${item.id}  [${item.status.replace("_", " ")}] ${item.title}`;
 		if (!item.note) return [`${first}${graph}`];
-		return [`${first}${graph}`, ...item.note.split("\n").filter(Boolean).map((line) => `  - ${line.replace(/^[-*]\s*/, "")}`)];
+		return [`${first}${graph}`, ...item.note.split("\n").filter(Boolean).map((line) => `${indent}  - ${line.replace(/^[-*]\s*/, "")}`)];
 	}).join("\n");
 }
 
-function renderTodo(state: PlanState, selectedId?: string): string {
-	const lines = renderItems(state, selectedId);
+function renderTodo(state: PlanState, selectedId?: string, includeDescendants = false): string {
+	const lines = renderItems(state, selectedId, includeDescendants);
 	return [
 		"# Active Request", state.request, "", "# Status", derivedStatus(state), "",
 		"# Plan Summary", state.summary || "(none)", "", selectedId ? `# Subtree ${selectedId}` : "# Todo", lines || "(none)", "",
@@ -1601,7 +1604,7 @@ export default function (pi: ExtensionAPI): void {
 		const state = await readState(ctx.cwd);
 		if (!state) { ctx.ui.notify("No plan to export.", "info"); return; }
 		await mkdir(dirname(todoPath(ctx.cwd)), { recursive: true });
-		await atomicWrite(todoPath(ctx.cwd), renderTodo(state), false);
+		await atomicWrite(todoPath(ctx.cwd), renderTodo(state, undefined, true), false);
 		await atomicWrite(reviewExportPath(ctx.cwd), `${JSON.stringify(state, null, 2)}\n`, false);
 		ctx.ui.notify("Plan exported to .pi/TODO.md and .pi/plan-review.json.", "info");
 	} });
