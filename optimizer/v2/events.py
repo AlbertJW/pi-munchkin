@@ -78,11 +78,7 @@ class EventStore:
             lines = data.splitlines(keepends=True)
             for number, line in enumerate(lines, 1):
                 line_end = valid_offset + len(line)
-                if number == len(lines) and line and not line.endswith(b"\n"):
-                    if allow_malformed_eof:
-                        suffix = data[valid_offset:]
-                        return events, {"byte_count": len(suffix), "sha256": hashlib.sha256(suffix).hexdigest(), "offset": valid_offset}
-                    raise EventStoreError(f"unterminated event at line {number}")
+                unterminated = number == len(lines) and bool(line) and not line.endswith(b"\n")
                 try:
                     event = json.loads(line.decode("utf-8"))
                 except (UnicodeDecodeError, json.JSONDecodeError) as exc:
@@ -104,6 +100,14 @@ class EventStore:
                         suffix = data[valid_offset:]
                         return events, {"byte_count": len(suffix), "sha256": hashlib.sha256(suffix).hexdigest(), "offset": valid_offset}
                     raise EventStoreError(f"event chain mismatch at line {number}")
+                if unterminated:
+                    suffix = data[valid_offset:]
+                    if allow_malformed_eof:
+                        return events, {
+                            "byte_count": len(suffix), "sha256": hashlib.sha256(suffix).hexdigest(),
+                            "offset": valid_offset, "repairable": True,
+                        }
+                    raise EventStoreError(f"unterminated event at line {number}")
                 previous = claimed
                 events.append(event)
                 valid_offset = line_end
@@ -120,15 +124,20 @@ class EventStore:
         return self._read_bytes(allow_malformed_eof=True)
 
     def recover_tail(self) -> dict | None:
-        """Under the campaign lock, discard only a malformed final suffix."""
+        """Repair a complete unterminated event or discard a malformed suffix."""
         tail = None
         with self.writer_lock():
             events, tail = self.read_with_recovery()
             if tail is None:
                 return None
-            with self.events_path.open("r+b") as fh:
-                fh.truncate(tail["offset"])
-                fh.flush(); os.fsync(fh.fileno())
+            if tail.get("repairable"):
+                with self.events_path.open("ab", buffering=0) as fh:
+                    fh.write(b"\n")
+                    os.fsync(fh.fileno())
+            else:
+                with self.events_path.open("r+b") as fh:
+                    fh.truncate(tail["offset"])
+                    fh.flush(); os.fsync(fh.fileno())
             self._fsync_directory()
         digest = tail["sha256"]
         return self.append(

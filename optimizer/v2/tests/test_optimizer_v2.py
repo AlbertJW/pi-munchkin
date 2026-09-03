@@ -364,10 +364,13 @@ class EventStoreTests(unittest.TestCase):
             events, tail = store.read_with_recovery()
             self.assertEqual(events, [])
             self.assertEqual(tail["byte_count"], len(before))
+            self.assertTrue(tail["repairable"])
             self.assertEqual(store.events_path.read_bytes(), before)
             recovered = store.recover_tail()
             self.assertEqual(recovered["type"], "event-store.tail-recovered")
-            self.assertEqual(store.read_all()[-1]["payload"]["byte_count"], len(before))
+            recovered_events = store.read_all()
+            self.assertEqual(recovered_events[0]["operation_id"], "op-1")
+            self.assertEqual(recovered_events[-1]["payload"]["byte_count"], len(before))
 
     def test_midstream_corruption_is_fatal_and_projection_failure_is_rebuildable(self) -> None:
         with tempfile.TemporaryDirectory() as td:
