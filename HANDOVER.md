@@ -1,5 +1,19 @@
 # Handover — pi_munchkin, 2026-08-24
 
+## 2026-09-03 parent-only planner recovery (repository-only)
+
+The broader child-process probe found that the earlier delegated-context fence
+still left ordinary subagents eligible for parent stale-lease recovery. Any
+subagent can share the project directory while the parent is dispatching a
+research branch, so recovery is now explicitly parent-only for every non-zero
+`PI_SUBAGENT_DEPTH`. A no-context child regression covers startup plus a late
+capsule signal and proves the parent lease remains pending. Full offline tests
+and verification remain green; planner flags are dark and no inference, mirror,
+rollout, or push occurred.
+
+Source pin is `b94c2e48…`; loaded mirror remains `73bbd494…`. A future smoke
+needs a fresh approved preflight and loaded-hash rebind.
+
 ## 2026-09-03 delegated planner capsule-signal fence (repository-only)
 
 The final child-lifecycle probe found one reload/embedding race beyond startup:

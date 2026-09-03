@@ -156,6 +156,8 @@ npm run surface:hash:source
 
 | 2026-09-03 (77) | delegated planner capsule-signal fence: shared child-process marker prevents reloaded/older subscribers from reclaiming a parent branch lease after child startup | `0e394aa` + pending docs boundary | source `94060815370bc293c870cfa5b1504f067f9989a999b47d9725371c82ed91a359` / loaded `73bbd494f5c23f3b7262bd9f17c44b57574ca23d4b211c07dbd1d6067c23c315` | **REPOSITORY-ONLY; PENDING ROLLOUT.** Full 690-test suite, typecheck, optimizer checks, pack smoke, and secret scan pass. Planner flags remain dark; the source branch is not pushed or mirrored, no model session occurred, and any future smoke requires a fresh human-approved preflight plus loaded-hash rebind. |
 
+| 2026-09-03 (78) | parent-only planner recovery: every non-zero-depth subagent skips parent stale-lease rebinding, including ordinary children without a research context | `8fb3221` + pending docs boundary | source `b94c2e48d279f068061369b04b73dcb7862c7f81a948a43a0221ae12f5e3a02f` / loaded `73bbd494f5c23f3b7262bd9f17c44b57574ca23d4b211c07dbd1d6067c23c315` | **REPOSITORY-ONLY; PENDING ROLLOUT.** Full 690-test suite, typecheck, optimizer checks, pack smoke, and secret scan pass. Planner flags remain dark; the source branch is not pushed or mirrored, no model session occurred, and any future smoke requires a fresh human-approved preflight plus loaded-hash rebind. |
+
 The older packaging-series PR 4 changed package, CI, operational tooling, and narrative without
 entering the runtime manifest. That historical statement does not apply to the spiral-control PR 4
 retirement draft above, which deliberately changes the descriptor and therefore gets its own row.

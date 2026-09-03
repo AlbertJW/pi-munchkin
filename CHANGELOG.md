@@ -4,6 +4,18 @@ All notable changes to pi-munchkin are documented here. Releases follow semantic
 
 ## Unreleased
 
+### Fixed (2026-09-03 — parent-only planner recovery)
+
+- Planner stale-lease recovery is now disabled for every subagent process, not
+  only children carrying a research `plan_context`. Ordinary delegated agents
+  share the project directory and could otherwise reclaim a parent lease during
+  startup. The new no-context child regression covers startup and the late
+  capsule signal. Planner flags remain dark; no model inference, mirror,
+  rollout, or push occurred.
+
+The source surface is now `b94c2e48…`; the loaded mirror remains
+`73bbd494…` and must be rebound before any future smoke.
+
 ### Fixed (2026-09-03 — delegated planner capsule-signal fence)
 
 - A delegated planner child now marks its process identity on the shared
