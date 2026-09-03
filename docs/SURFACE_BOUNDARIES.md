@@ -148,6 +148,10 @@ npm run surface:hash:source
 
 | 2026-09-03 (73) | planner preflight source rebinding after retry-budget hardening: stale source identity fails closed and the no-inference dry path binds the current checkout | `abffc4f` | source `d333be721bc9eecb41d54ba732d96f65e5edc9eb286a367893be63f6152b1440` / loaded `73bbd494f5c23f3b7262bd9f17c44b57574ca23d4b211c07dbd1d6067c23c315` | **VERIFIED OFFLINE.** `preflight.py --selftest`, `--dry`, typecheck, targeted planner tests, and secret scan pass; no model, mirror, planner-default, or adoption change occurred. |
 
+| 2026-09-03 (74) | complete planner graph export: `/plan-export` recursively renders descendants while ambient status remains root-only and subtree status remains bounded | `f162a47` | source `9cf1476a16450c1611d3e07c41d11574b1b2810f58362ac75940a3e33fc71641` / loaded `73bbd494f5c23f3b7262bd9f17c44b57574ca23d4b211c07dbd1d6067c23c315` | **VERIFIED OFFLINE; REPOSITORY-ONLY.** Export regression, full 689-test suite, typecheck, pack smoke, optimizer verification, and secret scan pass. No model, mirror, planner-default, or adoption change occurred. |
+
+| 2026-09-03 (75) | planner preflight source rebinding after complete-graph export: stale source identity fails closed and the no-inference dry path binds the current checkout | `pending source boundary` | source `9cf1476a16450c1611d3e07c41d11574b1b2810f58362ac75940a3e33fc71641` / loaded `73bbd494f5c23f3b7262bd9f17c44b57574ca23d4b211c07dbd1d6067c23c315` | **VERIFIED OFFLINE.** `preflight.py --selftest` and `--dry` pass after rebinding; no model, mirror, planner-default, or adoption change occurred. |
+
 The older packaging-series PR 4 changed package, CI, operational tooling, and narrative without
 entering the runtime manifest. That historical statement does not apply to the spiral-control PR 4
 retirement draft above, which deliberately changes the descriptor and therefore gets its own row.

@@ -4,6 +4,13 @@ All notable changes to pi-munchkin are documented here. Releases follow semantic
 
 ## Unreleased
 
+### Fixed (2026-09-03 — complete planner graph export)
+
+- `/plan-export` now writes a recursive graph to `.pi/TODO.md`, including
+  descendants with relative indentation; ambient status remains root-only and
+  subtree status remains bounded. The export regression and full offline suite
+  pass. Planner flags, mirrors, defaults, and model evidence are unchanged.
+
 ### Fixed (2026-09-03 — planner preflight rebind after retry hardening)
 
 - Rebound the planner preflight's stale default source pin after the retry-budget

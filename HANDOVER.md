@@ -1,5 +1,15 @@
 # Handover — pi_munchkin, 2026-08-24
 
+## 2026-09-03 complete planner graph export (repository-only)
+
+The graph presentation audit found that `/plan-export` wrote a root-only
+ambient rendering to `.pi/TODO.md`; only the JSON sidecar contained child
+nodes. Export now renders the complete graph with relative indentation, while
+ordinary status remains compact and `/plan-status <node-id>` remains
+progressively disclosed. The regression proves a merged child appears in the
+text export. Full offline verification is green; planner flags stay dark, the
+source branch is not mirrored, and no model run occurred.
+
 ## 2026-09-03 planner preflight rebind after retry hardening (repository-only)
 
 The retry-budget change moved the source surface hash, so the planner
