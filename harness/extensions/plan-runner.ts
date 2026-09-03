@@ -1176,6 +1176,7 @@ const branchPlan = defineTool({
 			return {
 				content: [{ type: "text" as const, text: "Branch blocked after repeated invalid coverage reports. Stop this branch and return the blocked result; do not call more tools." }],
 				details: { tool_name: "branch_plan", success: true, terminal: true, failure_class: "invalid_coverage", contexts: [] },
+				terminate: true,
 			};
 		}
 		invalidCoverageAttempts.delete(attemptKey);
@@ -1251,7 +1252,11 @@ const branchPlan = defineTool({
 			limits: { max_depth: 2 as const, max_children: 0 as const },
 		}));
 		const contextText = contexts.length > 0 ? ` Scout plan_context (copy exactly): ${JSON.stringify(contexts)}` : "";
-		return { content: [{ type: "text" as const, text: `Branch report saved (${report.children.length}/${context.limits.max_children} children, ${report.consumed.searches}/${context.budget.searches} searches, ${report.consumed.reads}/${context.budget.reads} reads).${contextText}` }], details: { tool_name: "branch_plan", success: true, terminal: false, failure_class: "none", contexts } };
+		return {
+			content: [{ type: "text" as const, text: `Branch report saved (${report.children.length}/${context.limits.max_children} children, ${report.consumed.searches}/${context.budget.searches} searches, ${report.consumed.reads}/${context.budget.reads} reads).${contextText}` }],
+			details: { tool_name: "branch_plan", success: true, terminal, failure_class: "none", contexts },
+			...(terminal ? { terminate: true } : {}),
+		};
 	},
 });
 

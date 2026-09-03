@@ -22,10 +22,10 @@ if (!CHILD) {
 		};
 		delete (env as Record<string, string | undefined>).NODE_TEST_CONTEXT;
 		try {
-			const output = execFileSync(process.execPath, [
+	const output = execFileSync(process.execPath, [
 				"--experimental-strip-types", "--experimental-loader", resolve("harness/tests/ts-js-resolver.mjs"), "--test", import.meta.filename,
 			], { cwd: process.cwd(), env, encoding: "utf8", stdio: "pipe" });
-			assert.match(output, /pass 38/);
+			assert.match(output, /pass 39/);
 		} finally { rmSync(artifacts, { recursive: true, force: true }); }
 	});
 } else {
@@ -604,6 +604,23 @@ if (!CHILD) {
 		await expectToolError(fp, "branch_plan", {
 			...base, children: [{ ...base.children[0], budget: { allocated: { searches: 2, reads: 2 }, used: { searches: 0, reads: 0 } } }],
 		}, cwd, /child allocations exceed the branch remainder/);
+		resetPiGlobals();
+	});
+
+	test("terminal branch_plan stops the child loop after saving a valid report", async () => {
+		const fp = fresh(); const cwd = tmp();
+		(globalThis as Record<string, unknown>).__pi_research_state = { searches: 1, reads: 0 };
+		(globalThis as Record<string, unknown>)[RESEARCH_COVERAGE_KEY] = {
+			calls: 1, returned_count: 1, incomplete: false, truncated: false, failed: false, budget_exhausted: false,
+		};
+		const result = await callTool(fp, "branch_plan", {
+			status: "done", note: "bounded evidence collected", consumed: { searches: 1, reads: 0 },
+			children: [], source_leads: [{ url: "https://example.com/source", claim: "claim", quote: "quote" }],
+			evidence_gaps: [], coverage,
+		}, cwd);
+		assert.equal(result.isError, false);
+		assert.equal(result.details.terminal, true);
+		assert.equal(result.terminate, true, "a terminal report must suppress the child follow-up model turn");
 		resetPiGlobals();
 	});
 
