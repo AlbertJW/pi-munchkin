@@ -25,7 +25,7 @@ if (!CHILD) {
 	const output = execFileSync(process.execPath, [
 				"--experimental-strip-types", "--experimental-loader", resolve("harness/tests/ts-js-resolver.mjs"), "--test", import.meta.filename,
 			], { cwd: process.cwd(), env, encoding: "utf8", stdio: "pipe" });
-			assert.match(output, /pass 39/);
+			assert.match(output, /pass 41/);
 		} finally { rmSync(artifacts, { recursive: true, force: true }); }
 	});
 } else {
@@ -217,7 +217,7 @@ if (!CHILD) {
 		const firstContext = { ...context, lease_id: firstLease.lease_id, dispatch_epoch: 0 };
 		const report = {
 			v: 1, parent_item_id: context.parent_item_id, owner_ref: context.owner_ref, status: "done", note: "first generation",
-			consumed: { searches: 0, reads: 0 }, evidence_gaps: [], source_leads: [], children: [], coverage,
+			consumed: { searches: 0, reads: 0 }, evidence_gaps: [], source_leads: [{ url: "https://example.test/late-report", claim: "claim", quote: "quote" }], children: [], coverage,
 		};
 		fp.pi.events.emit(HARNESS_SIGNAL_CHANNEL, { v: 1, type: "plan/branch-result", context: firstContext, report, failureClass: null });
 		await fire(fp, "before_agent_start", {}, makeCtx(cwd).ctx);
@@ -398,7 +398,7 @@ if (!CHILD) {
 		const firstLeasedContext = { ...context, lease_id: firstLease.lease_id, dispatch_epoch: 0 };
 		const firstReport = {
 			v: 1, parent_item_id: context.parent_item_id, owner_ref: context.owner_ref, status: "done", note: "first attempt",
-			consumed: { searches: 1, reads: 1 }, evidence_gaps: [], source_leads: [], children: [], coverage,
+			consumed: { searches: 1, reads: 1 }, evidence_gaps: [], source_leads: [{ url: "https://example.test/retry-first", claim: "claim", quote: "quote" }], children: [], coverage,
 		};
 		fp.pi.events.emit(HARNESS_SIGNAL_CHANNEL, { v: 1, type: "plan/branch-result", context: firstLeasedContext, report: firstReport, failureClass: null });
 		await fire(fp, "before_agent_start", {}, makeCtx(cwd).ctx);
@@ -413,7 +413,7 @@ if (!CHILD) {
 		const secondLeasedContext = { ...refreshed!, lease_id: leased.lease_id };
 		const secondReport = {
 			v: 1, parent_item_id: refreshed!.parent_item_id, owner_ref: refreshed!.owner_ref, status: "done", note: "retry attempt",
-			consumed: refreshed!.budget, evidence_gaps: [], source_leads: [], children: [], coverage,
+			consumed: refreshed!.budget, evidence_gaps: [], source_leads: [{ url: "https://example.test/retry-second", claim: "claim", quote: "quote" }], children: [], coverage,
 		};
 		fp.pi.events.emit(HARNESS_SIGNAL_CHANNEL, { v: 1, type: "plan/branch-result", context: secondLeasedContext, report: secondReport, failureClass: null });
 		await fire(fp, "before_agent_start", {}, makeCtx(cwd).ctx);
@@ -809,6 +809,37 @@ if (!CHILD) {
 			status: "done", note: "forged complete retrieval", consumed: { searches: 0, reads: 0 },
 			children: [], source_leads: [], evidence_gaps: [], coverage,
 		}, cwd, /claims complete coverage without an actual retrieval receipt/i);
+		resetPiGlobals();
+	});
+
+	test("branch_plan cannot mark a direct zero-result branch done", async () => {
+		const fp = fresh(); const cwd = tmp();
+		(globalThis as Record<string, unknown>).__pi_research_state = { searches: 1, reads: 0 };
+		(globalThis as Record<string, unknown>)[RESEARCH_COVERAGE_KEY] = {
+			calls: 1, returned_count: 0, incomplete: false, truncated: false, failed: false, budget_exhausted: false,
+		};
+		await expectToolError(fp, "branch_plan", {
+			status: "done", note: "no usable sources", consumed: { searches: 1, reads: 0 },
+			children: [], source_leads: [], evidence_gaps: [], coverage: { ...coverage, returned_count: 0 },
+		}, cwd, /at least one usable source lead/i);
+		resetPiGlobals();
+	});
+
+	test("branch_plan cannot mark a zero-result scout done", async () => {
+		const fp = fresh(); const cwd = tmp();
+		const childId = "scout-zero-result";
+		(globalThis as Record<string, unknown>).__pi_research_state = { searches: 0, reads: 0 };
+		const empty = { ...coverage, returned_count: 0 };
+		(globalThis as Record<string, unknown>).__pi_research_scout_receipts = [{
+			owner_ref: ownerRef("branch-budget-run", childId), searches: 0, reads: 1,
+			coverage: { calls: 1, returned_count: 0, incomplete: false, truncated: false, failed: false, budget_exhausted: false },
+		}];
+		await expectToolError(fp, "branch_plan", {
+			status: "done", note: "scout found no usable sources", consumed: { searches: 0, reads: 1 },
+			children: [{ item_id: childId, title: "Scout", status: "done", coverage: empty,
+				budget: { allocated: { searches: 0, reads: 1 }, used: { searches: 0, reads: 1 } } }],
+			source_leads: [], evidence_gaps: [], coverage: empty,
+		}, cwd, /at least one usable source lead/i);
 		resetPiGlobals();
 	});
 

@@ -98,6 +98,27 @@ export type BranchReportV1 = {
 	defer?: Deferral;
 };
 
+/**
+ * A clean transport receipt is not, by itself, evidence. A terminal direct
+ * branch must expose at least one usable source lead and a positive retrieval
+ * yield; a terminal scout leaf must likewise report a positive yield. A split
+ * parent may have no local yield because its children supply the evidence.
+ * Blocked/deferred work is allowed to carry zero yield, but cannot masquerade
+ * as done.
+ */
+export function branchEvidenceYieldError(report: Pick<BranchReportV1, "status" | "children" | "source_leads" | "coverage">): string | null {
+	for (const child of report.children) {
+		if (child.status === "done" && (child.coverage?.returned_count ?? 0) < 1) {
+			return `done child ${child.item_id} requires at least one usable source lead (positive retrieval yield)`;
+		}
+	}
+	if (report.status === "done" && report.children.length === 0 &&
+		((report.coverage?.returned_count ?? 0) < 1 || report.source_leads.length < 1)) {
+		return "a direct done branch requires at least one usable source lead and a positive retrieval yield";
+	}
+	return null;
+}
+
 const ID = /^[A-Za-z0-9._:-]{1,96}$/;
 const OWNER = /^[a-f0-9]{24}$/;
 const LEASE = /^[A-Za-z0-9._:-]{8,96}$/;
@@ -239,6 +260,7 @@ export function validateBranchReport(value: unknown, context: PlanContextV1, ter
 	if (!budgetWithin(childUsed, item.consumed)) return false;
 	for (const lead of item.source_leads as Record<string, unknown>[]) if (!lead || !Object.keys(lead).every((key) => ["url", "claim", "quote"].includes(key)) || !httpUrl(lead.url) || !boundedText(lead.claim, 500) || !boundedText(lead.quote, 800)) return false;
 	if ((item.evidence_gaps as unknown[]).some((gap) => !boundedText(gap, 300))) return false;
+	if (branchEvidenceYieldError(item as BranchReportV1)) return false;
 	return boundedInteger(item.consumed.searches, context.budget.searches) && boundedInteger(item.consumed.reads, context.budget.reads);
 }
 

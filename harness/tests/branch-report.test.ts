@@ -37,6 +37,8 @@ test("plan context and terminal branch reports validate exactly", () => {
 	assert.equal(validateBranchReport({ ...report, coverage: undefined }, context, true), false, "terminal branches require coverage");
 	assert.equal(validateBranchReport({ ...report, coverage: { ...completeCoverage, truncated: true } }, context, true), false, "coverage truth table cannot be forged");
 	assert.equal(validateBranchReport({ ...report, evidence_gaps: ["unknown"], coverage: { ...completeCoverage, complete: false, budget_exhausted: true } }, context, true), false, "incomplete branches cannot be done");
+	assert.equal(validateBranchReport({ ...report, source_leads: [], children: [], coverage: completeCoverage }, context, true), false, "direct done branches require a usable source lead");
+	assert.equal(validateBranchReport({ ...report, children: [{ ...report.children[0], coverage: { ...completeCoverage, returned_count: 0 } }] }, context, true), false, "done scout leaves require positive retrieval yield");
 	assert.equal(validateBranchReport({
 		...report, status: "deferred", evidence_gaps: ["lower-degree symbols remain unmeasured"],
 		coverage: { ...completeCoverage, complete: false, budget_exhausted: true },

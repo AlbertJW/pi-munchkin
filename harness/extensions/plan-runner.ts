@@ -5,7 +5,7 @@ import { createHash, randomUUID } from "node:crypto";
 import { defineTool, withFileMutationQueue, type ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { Type } from "typebox";
 import { ACTIVE_TOOL_PROMPTS } from "../lib/active-tool-prompts.ts";
-import { BRANCH_REPORT_ENV, PLAN_CONTEXT_ENV, RESEARCH_COVERAGE_KEY, RESEARCH_RESERVED_BUDGET_KEY, RESEARCH_SCOUT_DISPATCHED_KEY, readPlanContext, validResearchCoverageObservation, writeBranchReport, type BranchReportV1, type PlanContextV1, type ResearchCoverageObservation } from "../lib/branch-report.ts";
+import { BRANCH_REPORT_ENV, PLAN_CONTEXT_ENV, RESEARCH_COVERAGE_KEY, RESEARCH_RESERVED_BUDGET_KEY, RESEARCH_SCOUT_DISPATCHED_KEY, branchEvidenceYieldError, readPlanContext, validResearchCoverageObservation, writeBranchReport, type BranchReportV1, type PlanContextV1, type ResearchCoverageObservation } from "../lib/branch-report.ts";
 import { classifyBashCommand } from "../lib/command-policy.ts";
 import { emitHarnessSignal, onHarnessSignal, signalRunId } from "../lib/harness-signals.ts";
 import { PLAN_SURFACE_TOOLS } from "../lib/capability-surface.ts";
@@ -1241,6 +1241,8 @@ const branchPlan = defineTool({
 			observedSearches += searches; observedReads += reads;
 		}
 		if (report.consumed.searches !== observedSearches || report.consumed.reads !== observedReads) rejectPlanTool("branch_plan rejected: branch consumption does not match observed research calls");
+		const evidenceYieldError = branchEvidenceYieldError(report);
+		if (evidenceYieldError) rejectPlanTool(`branch_plan rejected: ${evidenceYieldError}; use blocked or deferred with an explicit evidence gap when no usable source was found`);
 		if (ownUsage.searches + reservedSearches > context.budget.searches || ownUsage.reads + reservedReads > context.budget.reads) {
 			rejectPlanTool("branch_plan rejected: child allocations exceed the branch remainder after local research");
 		}
