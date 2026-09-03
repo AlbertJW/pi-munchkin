@@ -140,6 +140,8 @@ npm run surface:hash:source
 
 | 2026-09-03 (69) | planner recovery storage gate: authoritative and exploratory Seatbelt profiles allow the private run-capsule subtree, and `real_gate.sh` pre-creates its fixed parent before jail entry | `a6d13d0` | source `720d9242491403c891fd4e775c78286a7ba1c466733e7a974145aef64d4081f4` / loaded `73bbd494f5c23f3b7262bd9f17c44b57574ca23d4b211c07dbd1d6067c23c315` | **REPOSITORY-ONLY; PENDING ROLLOUT.** The static profile regression was red before the fix and green afterward; the selftest also retains a real mkdir/touch probe for macOS hosts with `sandbox-exec`. Offline verification and typecheck pass. The source branch is not pushed or mirrored, planner flags remain dark, no model session or mirror mutation occurred, and a future rollout must rebind the loaded hash. |
 
+| 2026-09-03 (70) | transactional planner root dispatch: later lease/epoch exceptions release all pre-launch leases and leave the in-process dispatch ledger unchanged | pending source boundary | source `720d9242491403c891fd4e775c78286a7ba1c466733e7a974145aef64d4081f4` / loaded `73bbd494f5c23f3b7262bd9f17c44b57574ca23d4b211c07dbd1d6067c23c315` | **REPOSITORY-ONLY; PENDING ROLLOUT.** Two deterministic fault-injection tests are red before the fix and green afterward; targeted planner tests and typecheck pass. Planner flags remain dark, the source branch is not pushed or mirrored, no model session occurred, and a future rollout must rebind the loaded hash. |
+
 The older packaging-series PR 4 changed package, CI, operational tooling, and narrative without
 entering the runtime manifest. That historical statement does not apply to the spiral-control PR 4
 retirement draft above, which deliberately changes the descriptor and therefore gets its own row.

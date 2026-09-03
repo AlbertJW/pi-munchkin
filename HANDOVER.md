@@ -1,5 +1,18 @@
 # Handover — pi_munchkin, 2026-08-24
 
+## 2026-09-03 transactional planner root dispatch preparation (repository-only)
+
+The lease audit reproduced two exception paths that were safe only by eventual
+stale recovery: a later root lease acquisition could throw after earlier leases
+were acquired, and a persisted retry-epoch read could throw after the lease
+transaction but before the in-process dispatch guard was updated. Root dispatch
+preparation is now transactional. It stages parent/owner/epoch changes, releases
+every acquired lease on any exception, and returns the bounded
+`lease_unavailable` failure without consuming the runtime guard. Two
+fault-injection regressions were red before the fix and green afterward. This
+is repository-only: planner flags stay dark, the branch is not mirrored, and
+no model run occurred.
+
 ## 2026-09-03 planner recovery storage in the gate jail (repository-only)
 
 The authoritative gate audit found a concrete integration gap before another

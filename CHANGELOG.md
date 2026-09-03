@@ -4,6 +4,16 @@ All notable changes to pi-munchkin are documented here. Releases follow semantic
 
 ## Unreleased
 
+### Fixed (2026-09-03 — transactional planner root dispatch preparation)
+
+- Root research lease acquisition now treats every lease and persisted retry
+  epoch as one pre-launch transaction. A later acquisition or epoch-read
+  exception releases all earlier leases and leaves the in-process dispatch
+  ledger unchanged, returning a bounded `lease_unavailable` result instead of
+  stranding a branch. Deterministic fault-injection regressions were red before
+  the fix and green afterward. Planner flags remain dark; no model session,
+  mirror, or rollout occurred.
+
 ### Fixed (2026-09-03 — planner recovery storage in the gate jail)
 
 - The authoritative and exploratory Seatbelt profiles now allow only the
