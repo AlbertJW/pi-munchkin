@@ -544,6 +544,26 @@ test("subagent summary cap is tunable via PI_SUBAGENT_MAX_SUMMARY_CHARS", async 
 	}
 });
 
+test("delegated retrieval coverage is bound to tool execution results, not assistant claims", async () => {
+	const { processPiEvent } = await import(`../vendor/pi-subagent/runner-events.js?coverage=${Date.now()}`);
+	const result: any = { messages: [], usage: emptyUsage() };
+	assert.equal(processPiEvent({
+		type: "tool_execution_end", toolCallId: "read-1", toolName: "web_read",
+		args: { urls: ["https://private.example/should-not-persist"] }, isError: true,
+		result: { details: { coverage: { strategy: "direct", scope: "bounded", returned_count: 0, truncated: false, budget_exhausted: false, failed: true, complete: false } } },
+	}, result), true);
+	assert.deepEqual(result.researchCoverage, {
+		calls: 1, returned_count: 0, incomplete: true, truncated: false, failed: true, budget_exhausted: false,
+	});
+	assert.doesNotMatch(JSON.stringify(result), /private\.example|should-not-persist/);
+	// A duplicate completion event must not double-count one tool call.
+	processPiEvent({
+		type: "tool_execution_end", toolCallId: "read-1", toolName: "web_read",
+		result: { details: { coverage: { strategy: "direct", scope: "bounded", returned_count: 1, truncated: false, budget_exhausted: false, failed: false, complete: true } } },
+	}, result);
+	assert.equal(result.researchCoverage.calls, 1);
+});
+
 test("child failure summaries are bounded untrusted diagnostics, never raw process output", async () => {
 	const { getResultSummaryText, renderSubagentDiagnostic } = await import("../vendor/pi-subagent/runner-events.js");
 	const secret = "DUMMY_CHILD_SECRET_VALUE";

@@ -75,10 +75,58 @@ function addAssistantMessages(result, messages) {
   return changed;
 }
 
+// Keep delegated retrieval evidence independently bound to the tool execution
+// stream. Assistant messages contain the model's requested tool calls, but not
+// the executed tool result metadata; counting prose or calls alone lets a
+// child claim complete coverage after a failed/truncated read. Only the safe
+// aggregate receipt is retained — never arguments, URLs, or page content.
+function observeResearchToolResult(result, event) {
+  if (event.toolName !== "web_search" && event.toolName !== "web_read") return false;
+  if (!Object.prototype.hasOwnProperty.call(result, "__seenResearchToolCalls")) {
+    Object.defineProperty(result, "__seenResearchToolCalls", {
+      value: new Set(), enumerable: false, configurable: false, writable: false,
+    });
+  }
+  const key = typeof event.toolCallId === "string" && event.toolCallId.length > 0
+    ? event.toolCallId : `${event.toolName}:${result.__seenResearchToolCalls.size}`;
+  if (result.__seenResearchToolCalls.has(key)) return false;
+  result.__seenResearchToolCalls.add(key);
+
+  const details = event.result && typeof event.result === "object" ? event.result.details : undefined;
+  const coverage = details && typeof details === "object" ? details.coverage : undefined;
+  const valid = coverage && typeof coverage === "object" && !Array.isArray(coverage) &&
+    Number.isSafeInteger(coverage.returned_count) && coverage.returned_count >= 0 &&
+    typeof coverage.truncated === "boolean" && typeof coverage.failed === "boolean" &&
+    typeof coverage.budget_exhausted === "boolean" && typeof coverage.complete === "boolean" &&
+    coverage.complete === (!coverage.truncated && !coverage.failed && !coverage.budget_exhausted);
+  const prior = result.researchCoverage || {
+    calls: 0, returned_count: 0, incomplete: false, truncated: false, failed: false, budget_exhausted: false,
+  };
+  if (!valid) {
+    result.researchCoverage = {
+      calls: prior.calls + 1, returned_count: prior.returned_count, incomplete: true,
+      truncated: prior.truncated, failed: true, budget_exhausted: prior.budget_exhausted,
+    };
+    return true;
+  }
+  result.researchCoverage = {
+    calls: prior.calls + 1,
+    returned_count: prior.returned_count + coverage.returned_count,
+    incomplete: prior.incomplete || !coverage.complete,
+    truncated: prior.truncated || coverage.truncated,
+    failed: prior.failed || coverage.failed,
+    budget_exhausted: prior.budget_exhausted || coverage.budget_exhausted,
+  };
+  return true;
+}
+
 export function processPiEvent(event, result) {
   if (!event || typeof event !== "object") return false;
 
   switch (event.type) {
+    case "tool_execution_end":
+      return observeResearchToolResult(result, event);
+
     case "message_end":
       return addAssistantMessage(result, event.message);
 

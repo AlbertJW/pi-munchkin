@@ -26,8 +26,8 @@ import {
 import { record } from "../lib/telemetry.ts";
 import { emitHarnessSignal } from "../lib/harness-signals.ts";
 import { buildControlProposal, controlEnforces, emitControlProposal } from "../lib/control-proposal.ts";
-import { PLAN_CONTEXT_ENV, RESEARCH_RESERVED_BUDGET_KEY, readPlanContext, type PlanContextV1 } from "../lib/branch-report.ts";
-import type { ResearchBudget } from "../lib/plan-graph.ts";
+import { PLAN_CONTEXT_ENV, RESEARCH_COVERAGE_KEY, RESEARCH_RESERVED_BUDGET_KEY, observeResearchCoverage, readPlanContext, validResearchCoverageObservation, type PlanContextV1, type ResearchCoverageObservation } from "../lib/branch-report.ts";
+import { validCoverage, type ResearchBudget } from "../lib/plan-graph.ts";
 
 // Ketch is the host-side network adapter for local models. The steady-state
 // surface is deliberately only FIND + READ; deep orchestration lives in the
@@ -74,6 +74,13 @@ const PLAN_GRAPH_RENDER = (process.env.PLAN_GRAPH ?? "off") === "on";
 
 function text(value: string, details: Record<string, unknown> = {}) {
 	const coverage = details.coverage as Record<string, unknown> | undefined;
+	if (coverage && validCoverage(coverage)) {
+		const shared = globalThis as Record<string, unknown>;
+		const prior = validResearchCoverageObservation(shared[RESEARCH_COVERAGE_KEY])
+			? shared[RESEARCH_COVERAGE_KEY] as ResearchCoverageObservation
+			: undefined;
+		shared[RESEARCH_COVERAGE_KEY] = observeResearchCoverage(prior, coverage);
+	}
 	const receipt = coverage && PLAN_GRAPH_RENDER
 		? `\n\nretrieval coverage: strategy=${String(coverage.strategy)} scope=${String(coverage.scope)} complete=${String(coverage.complete)} returned=${String(coverage.returned_count)} total=${coverage.total_count === undefined ? "unknown" : String(coverage.total_count)} truncated=${String(coverage.truncated)} failed=${String(coverage.failed)} budget_exhausted=${String(coverage.budget_exhausted)}`
 		: "";

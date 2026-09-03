@@ -5,7 +5,7 @@ import { createHash, randomUUID } from "node:crypto";
 import { defineTool, withFileMutationQueue, type ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { Type } from "typebox";
 import { ACTIVE_TOOL_PROMPTS } from "../lib/active-tool-prompts.ts";
-import { BRANCH_REPORT_ENV, PLAN_CONTEXT_ENV, RESEARCH_RESERVED_BUDGET_KEY, RESEARCH_SCOUT_DISPATCHED_KEY, readPlanContext, writeBranchReport, type BranchReportV1, type PlanContextV1 } from "../lib/branch-report.ts";
+import { BRANCH_REPORT_ENV, PLAN_CONTEXT_ENV, RESEARCH_COVERAGE_KEY, RESEARCH_RESERVED_BUDGET_KEY, RESEARCH_SCOUT_DISPATCHED_KEY, readPlanContext, validResearchCoverageObservation, writeBranchReport, type BranchReportV1, type PlanContextV1, type ResearchCoverageObservation } from "../lib/branch-report.ts";
 import { classifyBashCommand } from "../lib/command-policy.ts";
 import { emitHarnessSignal, onHarnessSignal, signalRunId } from "../lib/harness-signals.ts";
 import { PLAN_SURFACE_TOOLS } from "../lib/capability-surface.ts";
@@ -1045,6 +1045,7 @@ const researchPlanStart = defineTool({
 			return { state: next, result: next };
 		});
 		(globalThis as Record<string, unknown>).__pi_plan_validation_urls = [];
+		delete (globalThis as Record<string, unknown>)[RESEARCH_COVERAGE_KEY];
 		activateGraphTools();
 		// Starting the graph is also the parent skill's request to execute it. In
 		// the core profile research and delegation are deferred independently from
@@ -1181,6 +1182,16 @@ const branchPlan = defineTool({
 		const shared = globalThis as Record<string, unknown>;
 		const own = shared.__pi_research_state as { searches?: unknown; reads?: unknown } | undefined;
 		const ownUsage = { searches: typeof own?.searches === "number" ? own.searches : 0, reads: typeof own?.reads === "number" ? own.reads : 0 };
+		const ownCoverage = validResearchCoverageObservation(shared[RESEARCH_COVERAGE_KEY])
+			? shared[RESEARCH_COVERAGE_KEY] as ResearchCoverageObservation
+			: undefined;
+		// A terminal branch may declare a model-level evidence gap, but it may
+		// never call retrieval complete when an actual web tool returned a
+		// truncated, failed, or budget-exhausted receipt. The receipt is kept
+		// process-local and contains no sensitive request or source data.
+		if (report.status === "done" && report.coverage?.complete && ownCoverage?.incomplete) {
+			rejectPlanTool("branch_plan rejected: top-level coverage claims complete despite an incomplete retrieval receipt");
+		}
 		const dispatchRecord = shared[RESEARCH_SCOUT_DISPATCHED_KEY] as { key?: unknown; ids?: unknown } | undefined;
 		const dispatchKey = `${context.run_id}:${context.parent_item_id}:${context.owner_ref}`;
 		const dispatchedScoutIds = dispatchRecord?.key === dispatchKey && Array.isArray(dispatchRecord.ids)
@@ -1194,7 +1205,7 @@ const branchPlan = defineTool({
 				rejectPlanTool(`branch_plan rejected: retain dispatched scout leaf ${dispatchedId} in later branch reports`);
 			}
 		}
-		const receipts = Array.isArray(shared.__pi_research_scout_receipts) ? shared.__pi_research_scout_receipts as Array<{ owner_ref?: unknown; searches?: unknown; reads?: unknown }> : [];
+		const receipts = Array.isArray(shared.__pi_research_scout_receipts) ? shared.__pi_research_scout_receipts as Array<{ owner_ref?: unknown; searches?: unknown; reads?: unknown; coverage?: unknown }> : [];
 		const receiptByOwner = new Map(receipts.filter((receipt) => typeof receipt.owner_ref === "string").map((receipt) => [receipt.owner_ref as string, receipt]));
 		let observedSearches = ownUsage.searches;
 		let observedReads = ownUsage.reads;
@@ -1212,6 +1223,10 @@ const branchPlan = defineTool({
 			const searches = typeof receipt.searches === "number" ? receipt.searches : 0;
 			const reads = typeof receipt.reads === "number" ? receipt.reads : 0;
 			if (child.budget.used.searches !== searches || child.budget.used.reads !== reads) rejectPlanTool(`branch_plan rejected: scout budget receipt mismatch for ${child.item_id}`);
+			const scoutCoverage = validResearchCoverageObservation(receipt.coverage) ? receipt.coverage : undefined;
+			if (child.status === "done" && child.coverage?.complete && scoutCoverage?.incomplete) {
+				rejectPlanTool(`branch_plan rejected: child ${child.item_id} claims complete coverage despite an incomplete scout retrieval receipt`);
+			}
 			observedSearches += searches; observedReads += reads;
 		}
 		if (report.consumed.searches !== observedSearches || report.consumed.reads !== observedReads) rejectPlanTool("branch_plan rejected: branch consumption does not match observed research calls");

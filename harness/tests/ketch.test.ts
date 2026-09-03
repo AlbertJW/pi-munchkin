@@ -16,6 +16,7 @@ import {
 	unwrapJinaReaderUrl,
 	versionAtLeast,
 } from "../lib/ketch-runtime.ts";
+import { RESEARCH_COVERAGE_KEY } from "../lib/branch-report.ts";
 import { callTool, makeFakePi } from "./integration-harness.ts";
 
 function restoreEnv(snapshot: Record<string, string | undefined>): void {
@@ -130,6 +131,7 @@ test("extension is default-on with two tools; quick search falls back and broad 
 	const snapshot = Object.fromEntries(["KETCH", "KETCH_BIN", "KETCH_BACKEND", "KETCH_MULTI_BACKENDS", "TELEMETRY_FILE", "TELEMETRY_SOURCE", "TELEMETRY_STRICT"].map((key) => [key, process.env[key]]));
 	try {
 		delete process.env.KETCH;
+		delete (globalThis as Record<string, unknown>)[RESEARCH_COVERAGE_KEY];
 		process.env.KETCH_BIN = mockKetch(dir);
 		process.env.KETCH_BACKEND = "ddg";
 		process.env.KETCH_MULTI_BACKENDS = "ddg,exa,keenable";
@@ -151,6 +153,9 @@ test("extension is default-on with two tools; quick search falls back and broad 
 			strategy: "direct", scope: "exhaustive", returned_count: 1, total_count: 1,
 			truncated: false, budget_exhausted: false, failed: false, complete: true,
 		});
+		assert.deepEqual((globalThis as Record<string, unknown>)[RESEARCH_COVERAGE_KEY], {
+			calls: 1, returned_count: 1, incomplete: false, truncated: false, failed: false, budget_exhausted: false,
+		}, "the process-local observation must reflect the executed tool receipt only");
 
 		const broad = await callTool(fp, "web_search", { query: "test", mode: "broad" }, dir);
 		assert.match(broad.content[0].text, /Consensus result/);
@@ -167,6 +172,7 @@ test("extension is default-on with two tools; quick search falls back and broad 
 	} finally {
 		restoreEnv(snapshot);
 		rmSync(dir, { recursive: true, force: true });
+		delete (globalThis as Record<string, unknown>)[RESEARCH_COVERAGE_KEY];
 	}
 });
 
@@ -259,6 +265,7 @@ esac
 		restoreEnv(snapshot);
 		rmSync(dir, { recursive: true, force: true });
 		delete (globalThis as Record<string, unknown>).__pi_ketch_version_checks_v1;
+		delete (globalThis as Record<string, unknown>)[RESEARCH_COVERAGE_KEY];
 	}
 });
 

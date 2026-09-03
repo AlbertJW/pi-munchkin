@@ -8,6 +8,11 @@ export const PLAN_CONTEXT_ENV = "PI_MUNCHKIN_PLAN_CONTEXT_PATH";
 export const BRANCH_REPORT_ENV = "PI_MUNCHKIN_BRANCH_REPORT_PATH";
 export const RESEARCH_SCOUT_ENV = "PI_MUNCHKIN_RESEARCH_SCOUT";
 export const RESEARCH_RESERVED_BUDGET_KEY = "__pi_research_reserved_budget";
+/** Process-local, safe retrieval observations used to bind branch claims to
+ * actual web-tool outcomes. It intentionally contains no query, URL, or page
+ * content. The parent process owns the graph; child processes return this
+ * bounded summary through the subagent result only. */
+export const RESEARCH_COVERAGE_KEY = "__pi_research_coverage_observation_v1";
 /** Shared parent-process ledger of scout identities already handed to pi.
  * Branch reports may be revised before dispatch, but once a scout is launched
  * its leaf must remain in every later report so its usage cannot disappear. */
@@ -39,7 +44,45 @@ export type BranchReportChildV1 = {
 };
 
 export type SourceLeadV1 = { url: string; claim: string; quote: string };
-export type ScoutReceiptV1 = { owner_ref: string; searches: number; reads: number };
+export type ScoutReceiptV1 = { owner_ref: string; searches: number; reads: number; coverage?: ResearchCoverageObservation };
+
+export type ResearchCoverageObservation = {
+	calls: number;
+	returned_count: number;
+	incomplete: boolean;
+	truncated: boolean;
+	failed: boolean;
+	budget_exhausted: boolean;
+};
+
+export function emptyResearchCoverageObservation(): ResearchCoverageObservation {
+	return { calls: 0, returned_count: 0, incomplete: false, truncated: false, failed: false, budget_exhausted: false };
+}
+
+export function observeResearchCoverage(
+	prior: ResearchCoverageObservation | undefined,
+	coverage: RetrievalCoverage,
+): ResearchCoverageObservation {
+	const current = prior ?? emptyResearchCoverageObservation();
+	return {
+		calls: current.calls + 1,
+		returned_count: current.returned_count + coverage.returned_count,
+		incomplete: current.incomplete || !coverage.complete,
+		truncated: current.truncated || coverage.truncated,
+		failed: current.failed || coverage.failed,
+		budget_exhausted: current.budget_exhausted || coverage.budget_exhausted,
+	};
+}
+
+export function validResearchCoverageObservation(value: unknown): value is ResearchCoverageObservation {
+	if (!value || typeof value !== "object" || Array.isArray(value)) return false;
+	const item = value as Record<string, unknown>;
+	return Object.keys(item).length === 6 &&
+		boundedInteger(item.calls, 100) && boundedInteger(item.returned_count, 100_000) &&
+		typeof item.incomplete === "boolean" && typeof item.truncated === "boolean" &&
+		typeof item.failed === "boolean" && typeof item.budget_exhausted === "boolean" &&
+		(!item.incomplete || item.truncated || item.failed || item.budget_exhausted);
+}
 
 export type BranchReportV1 = {
 	v: 1;

@@ -248,7 +248,10 @@ function publishScoutReceipt(context: PlanContextV1 | undefined, result: SingleR
 	const shared = globalThis as Record<string, unknown>;
 	const prior = Array.isArray(shared[SCOUT_RECEIPTS_KEY]) ? shared[SCOUT_RECEIPTS_KEY] as ScoutReceiptV1[] : [];
 	const usage = researchUsageFromMessages(result.messages);
-	shared[SCOUT_RECEIPTS_KEY] = [...prior.filter((receipt) => receipt.owner_ref !== context.owner_ref), { owner_ref: context.owner_ref, ...usage }];
+	shared[SCOUT_RECEIPTS_KEY] = [...prior.filter((receipt) => receipt.owner_ref !== context.owner_ref), {
+		owner_ref: context.owner_ref, ...usage,
+		...(result.researchCoverage ? { coverage: result.researchCoverage } : {}),
+	}];
 }
 
 /**

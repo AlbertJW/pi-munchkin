@@ -3,7 +3,7 @@
  */
 
 import type { Message } from "@earendil-works/pi-ai";
-import type { BranchReportV1, PlanContextV1 } from "../../lib/branch-report.ts";
+import type { BranchReportV1, PlanContextV1, ResearchCoverageObservation } from "../../lib/branch-report.ts";
 import { getFinalAssistantText, getResultSummaryText } from "./runner-events.js";
 
 /** Context mode for delegated runs. */
@@ -75,6 +75,8 @@ export interface SingleResult {
 	planContext?: PlanContextV1;
 	branchReport?: BranchReportV1;
 	branchReportFailure?: "missing_report" | "invalid_report";
+	/** Safe aggregate of actual web-tool coverage observed in the child stream. */
+	researchCoverage?: ResearchCoverageObservation;
 }
 
 /**
