@@ -4,6 +4,16 @@ All notable changes to pi-munchkin are documented here. Releases follow semantic
 
 ## Unreleased
 
+### Fixed (2026-09-03 — parent-only planner branch merge)
+
+- Branch-result signals are now ignored by delegated planner processes, so a
+  child-local or reload-shared lifecycle signal cannot merge claims into the
+  parent graph. Mutating planner commands remain parent-only. Planner flags are
+  dark; no inference, mirror, rollout, or push occurred.
+
+The source surface is now `f64124f7…`; the loaded mirror remains
+`73bbd494…` and must be rebound before any future smoke.
+
 ### Fixed (2026-09-03 — parent-owned planner mutation fence)
 
 - All model-callable planner mutations now fail closed in subagent processes:

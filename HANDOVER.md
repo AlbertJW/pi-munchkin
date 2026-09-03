@@ -1,5 +1,18 @@
 # Handover — pi_munchkin, 2026-08-24
 
+## 2026-09-03 parent-only planner branch merge (repository-only)
+
+The ownership audit found that a delegated process could still process a local
+`plan/branch-result` signal through the merge subscriber, even though direct
+planner tools and commands were fenced. The subscriber now fails closed for
+delegated processes and shared reload markers. A regression forges that signal,
+exercises every mutating planner command, and proves the parent lease and graph
+remain unchanged. Planner flags remain dark; no inference, mirror, rollout, or
+push occurred.
+
+Source pin is `f64124f7…`; loaded mirror remains `73bbd494…`. A future smoke
+needs a fresh approved preflight and loaded-hash rebind.
+
 ## 2026-09-03 parent-owned planner mutation fence (repository-only)
 
 The ownership audit continued past recovery and found that an unusually broad
