@@ -44,7 +44,14 @@ ordinary comparative diagnostic still bypassed the graph, so commit `4f014ad`
 adds a parent-only `before_agent_start` planner-first route hint. The current
 source hash is `a31ef6d4…`, the mirror is clean at loaded hash `ff5c7ce7…`
 (122/122), and v5 is the current preregistration. No qualifying screen has
-started under v5.
+started under v5. A bounded v5 diagnostic against the frozen comparative
+fixture then reached one `research-start` with five receipts, but hit the
+350,000-byte cap at 83.884 seconds (exit 143), leaving one item open and no
+branch merge or parent settlement. It produced 97 authenticated,
+payload-free rows (stdout digest `a7380025…`, telemetry digest
+`0b51c85b…`, private raw streams only). This is an incomplete operability
+receipt; the six-session mechanism screen plus three controls remains the next
+human-gated action.
 
 ## 2026-09-02 planner research-fixture admission
 

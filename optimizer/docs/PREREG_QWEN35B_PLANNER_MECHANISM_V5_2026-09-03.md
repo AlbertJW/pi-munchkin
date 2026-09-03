@@ -33,10 +33,14 @@ excluded from delegated child environments.
 ## Evidence boundary
 
 The post-v4 bounded diagnostic against the comparative fixture still reached
-the router but emitted no graph start before its output cap. It is an
-incomplete mechanism observation and cannot be pooled with v2–v4. The v5
-screen must use the frozen fixture prompts, with no explicit planner-first
-instruction in those prompts; the route hint is the sole intervention.
+the router but emitted no graph start before its output cap. It is superseded
+by a v5 diagnostic at the exact loaded hash: 83.884 seconds, exit 143 at the
+350,000-byte cap, zero stderr, 97 authenticated payload-free rows, one
+`research-start`, five successful source receipts, one open item, and no branch
+merge or parent settlement. It is an incomplete mechanism observation and
+cannot be pooled with v2–v4 or with the qualifying screen. The v5 screen must
+use the frozen fixture prompts, with no explicit planner-first instruction in
+those prompts; the route hint is the sole intervention.
 
 ## Execution and acceptance
 
