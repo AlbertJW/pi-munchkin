@@ -1,5 +1,19 @@
 # Handover — pi_munchkin, 2026-08-24
 
+## 2026-09-03 parent-owned planner mutation fence (repository-only)
+
+The ownership audit continued past recovery and found that an unusually broad
+child tool allowlist could still call model-facing planner mutations directly.
+Every subagent now fails closed for `plan_write`, `plan_update`, `plan_expand`,
+`plan_settle`, and `research_plan_start`, and mutating planner commands are
+fenced too. `branch_plan` remains the one bounded child publication protocol.
+The ordinary-child regression proves the calls and `/plan-cancel` cannot alter a
+parent lease. Full offline verification remains green; planner flags are dark
+and no inference, mirror, rollout, or push occurred.
+
+Source pin is `63b1a952…`; loaded mirror remains `73bbd494…`. A future smoke
+needs a fresh approved preflight and loaded-hash rebind.
+
 ## 2026-09-03 parent-only planner recovery (repository-only)
 
 The broader child-process probe found that the earlier delegated-context fence

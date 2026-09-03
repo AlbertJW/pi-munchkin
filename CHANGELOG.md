@@ -4,6 +4,19 @@ All notable changes to pi-munchkin are documented here. Releases follow semantic
 
 ## Unreleased
 
+### Fixed (2026-09-03 — parent-owned planner mutation fence)
+
+- All model-callable planner mutations now fail closed in subagent processes:
+  `plan_write`, `plan_update`, `plan_expand`, `plan_settle`, and
+  `research_plan_start` cannot write the parent graph. Mutating planner
+  commands are fenced as well; `branch_plan` remains the sole delegated child
+  publication path. The ordinary-child regression exercises the tool surface
+  and `/plan-cancel` against a live parent lease. Planner flags remain dark; no
+  model inference, mirror, rollout, or push occurred.
+
+The source surface is now `63b1a952…`; the loaded mirror remains
+`73bbd494…` and must be rebound before any future smoke.
+
 ### Fixed (2026-09-03 — parent-only planner recovery)
 
 - Planner stale-lease recovery is now disabled for every subagent process, not
