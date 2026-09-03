@@ -10,12 +10,17 @@ blocked before child execution. `0ea5bcf` changes both strings and adds a
 red-green integration test; the full offline suite remains green at 676/676.
 
 This is a new model-visible source boundary. The current source surface is
-`8993f671b417ab2b85a8b051b9c68311a085e6fc80c53730211571b40f7de9e0`.
-It has not yet been mirrored or measured. Planner flags remain dark, and the
-v6 diagnostic remains incomplete operability evidence only. After the normal
-pending-boundary push, mirror, and smoke ceremony, any planner rerun requires a
-fresh preregistration bound to the newly loaded hash; prior v5/v6 runs cannot be
-pooled.
+`8993f671b417ab2b85a8b051b9c68311a085e6fc80c53730211571b40f7de9e0`, mirrored
+cleanly at loaded hash `8976ab90262b99a9be314ae045f3fe08a7bdf69d8bf635d590e6d3d1e5de9e90`.
+It has not yet had a runtime smoke or planner measurement. Planner flags remain
+dark, and the v6 diagnostic remains incomplete operability evidence only. Any
+planner rerun requires a fresh preregistration bound to this loaded hash; prior
+v5/v6 runs cannot be pooled.
+
+After this boundary was mirrored, the first optimizer verification correctly
+caught the stale planner preflight identity. `fd722d2` rebinds its no-inference
+defaults to source `8993f671…` and loaded `8976ab90…`; the stale check was red
+before the update and `verify:optimizer` is green afterward.
 
 ## 2026-09-03 delegated failure provenance repair
 

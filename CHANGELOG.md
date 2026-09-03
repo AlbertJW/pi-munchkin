@@ -4,6 +4,12 @@ All notable changes to pi-munchkin are documented here. Releases follow semantic
 
 ## Unreleased
 
+### Fixed (2026-09-03 — planner preflight identity rebind)
+
+- Rebound the no-inference planner preflight to source `8993f671…` and the
+  newly mirrored loaded surface `8976ab90…`; the stale identity failed closed
+  before the update and `verify:optimizer` is green afterward.
+
 ### Fixed (2026-09-03 — planner delegated-role contract)
 
 - **The deep-research planner handoff now names the enforced `research-planner`
