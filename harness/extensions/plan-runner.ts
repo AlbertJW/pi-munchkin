@@ -749,7 +749,7 @@ const researchPlanStart = defineTool({
 	promptSnippet: "research_plan_start: create up to three evidence branches under one global discovery budget",
 	promptGuidelines: ACTIVE_TOOL_PROMPTS ? [
 		"Use only for contested, comparative, multi-part, or delegated research. Allocate at most 3 searches and 5 reads across all branches.",
-		"Copy the returned plan_context exactly into the matching researcher subagent call.",
+		"Copy the returned plan_context exactly into the matching research-planner subagent call.",
 	] : undefined,
 	parameters: Type.Object({
 		request: Type.String({ minLength: 1, maxLength: 1_000 }),
@@ -799,7 +799,7 @@ const researchPlanStart = defineTool({
 			v: 1, profile: "deep-research", run_id: state.run_id, parent_item_id: item.id, owner_ref: item.owner_ref,
 			depth: 1, budget: item.budget!.allocated, limits: { max_depth: DEEP_RESEARCH_MAX_DEPTH, max_children: DEEP_RESEARCH_MAX_CHILDREN },
 		}));
-		return { content: [{ type: "text" as const, text: `Deep-research plan started (${state.items.length} branches). Pass the matching plan_context unchanged to each researcher subagent.\n${JSON.stringify(contexts)}` }], details: { tool_name: "research_plan_start", success: true, contexts } };
+		return { content: [{ type: "text" as const, text: `Deep-research plan started (${state.items.length} branches). Pass the matching plan_context unchanged to each research-planner subagent.\n${JSON.stringify(contexts)}` }], details: { tool_name: "research_plan_start", success: true, contexts } };
 	},
 });
 

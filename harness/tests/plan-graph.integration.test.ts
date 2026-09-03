@@ -24,7 +24,7 @@ if (!CHILD) {
 			const output = execFileSync(process.execPath, [
 				"--experimental-strip-types", "--experimental-loader", resolve("harness/tests/ts-js-resolver.mjs"), "--test", import.meta.filename,
 			], { cwd: process.cwd(), env, encoding: "utf8", stdio: "pipe" });
-			assert.match(output, /pass 11/);
+			assert.match(output, /pass 12/);
 		} finally { rmSync(artifacts, { recursive: true, force: true }); }
 	});
 } else {
@@ -74,6 +74,18 @@ if (!CHILD) {
 		assert.equal(state.schema_version, 5); assert.equal(state.profile.name, "deep-research");
 		assert.equal(result.details.contexts.length, 2); assert.equal(result.details.contexts[0].parent_item_id, state.items[0].id);
 		await expectToolError(fp, "research_plan_start", { request: "bad", summary: "over budget", branches: [{ title: "bad", budget: { searches: 4, reads: 6 } }] }, cwd, /active or unsettled graph plan already exists/);
+		resetPiGlobals();
+	});
+
+	test("research plan names the role required by the planned delegation contract", async () => {
+		const fp = fresh(); const cwd = tmp();
+		const result = await callTool(fp, "research_plan_start", {
+			request: "Compare approaches", summary: "one evidence branch",
+			branches: [{ title: "Evidence", budget: { searches: 1, reads: 1 } }],
+		}, cwd);
+		const text = result.content.map((block: any) => block?.text ?? "").join("\n");
+		assert.match(text, /research-planner/);
+		assert.doesNotMatch(text, /matching researcher subagent/);
 		resetPiGlobals();
 	});
 
