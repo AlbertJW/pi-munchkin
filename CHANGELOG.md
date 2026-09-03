@@ -4,6 +4,14 @@ All notable changes to pi-munchkin are documented here. Releases follow semantic
 
 ## Unreleased
 
+### Measured (2026-09-03 — planner delegated-role boundary smoke)
+
+- The newly mirrored role-guidance surface loaded in a pinned Qwen 35B smoke
+  with exit 0, zero stderr, one session, and 70 authenticated rows bound to
+  loaded hash `8976ab90…`; no unsafe telemetry keys were present. This is a
+  loading/provenance receipt only. Planner flags remain dark and no graph
+  mechanism or quality claim follows.
+
 ### Fixed (2026-09-03 — planner preflight identity rebind)
 
 - Rebound the no-inference planner preflight to source `8993f671…` and the

@@ -1,6 +1,6 @@
 # Handover — pi_munchkin, 2026-08-24
 
-## 2026-09-03 planner delegated-role contract repair (pending rollout)
+## 2026-09-03 planner delegated-role contract repair (mirrored + smoked)
 
 The v6 structural trace identified a model-facing mismatch: `research_plan_start`
 and its active-tool guidance told the model to pass `plan_context` to a
@@ -12,10 +12,12 @@ red-green integration test; the full offline suite remains green at 676/676.
 This is a new model-visible source boundary. The current source surface is
 `8993f671b417ab2b85a8b051b9c68311a085e6fc80c53730211571b40f7de9e0`, mirrored
 cleanly at loaded hash `8976ab90262b99a9be314ae045f3fe08a7bdf69d8bf635d590e6d3d1e5de9e90`.
-It has not yet had a runtime smoke or planner measurement. Planner flags remain
-dark, and the v6 diagnostic remains incomplete operability evidence only. Any
-planner rerun requires a fresh preregistration bound to this loaded hash; prior
-v5/v6 runs cannot be pooled.
+The short pinned Qwen 35B smoke exited 0 with zero stderr, one session, and 70
+authenticated rows carrying that exact hash; no unsafe telemetry keys were
+present. This is a loading/provenance receipt only, not planner measurement.
+Planner flags remain dark, and the v6 diagnostic remains incomplete operability
+evidence only. Any planner rerun requires a fresh preregistration bound to this
+loaded hash; prior v5/v6 runs cannot be pooled.
 
 After this boundary was mirrored, the first optimizer verification correctly
 caught the stale planner preflight identity. `fd722d2` rebinds its no-inference
