@@ -4,6 +4,16 @@ All notable changes to pi-munchkin are documented here. Releases follow semantic
 
 ## Unreleased
 
+### Fixed (2026-09-03 — rebind planner preflight after receipt hardening)
+
+- The no-inference planner preflight now pins the current source surface after
+  the retrieval-receipt change. `verify:optimizer` again passes its deliberate
+  source/config/fixture identity gate; no model execution, mirror, rollout, or
+  push occurred.
+
+The source surface remains `4adffc34…`; the loaded mirror remains
+`73bbd494…` and must be rebound before any future smoke.
+
 ### Fixed (2026-09-03 — bind planner completion to retrieval receipts)
 
 - Deep-research branch reports now bind `done` coverage claims to the actual

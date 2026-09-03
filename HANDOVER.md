@@ -1,5 +1,17 @@
 # Handover — pi_munchkin, 2026-08-24
 
+## 2026-09-03 rebind planner preflight after receipt hardening (repository-only)
+
+The receipt-boundary source change invalidated the planner preflight's pinned
+source digest. The expected digest is now current, so `verify:optimizer` passes
+its no-inference identity gate again. The full aggregate verification is clean;
+no model execution, mirror, rollout, or push occurred.
+
+Source pin remains `4adffc342d095ebd584835d57102cc156d68bf3fea812cac56542bcdffc7339f`;
+loaded mirror remains `73bbd494f5c23f3b7262bd9f17c44b57574ca23d4b211c07dbd1d6067c23c315`.
+Planner flags remain dark and a future smoke needs a fresh approved preflight plus
+loaded-hash rebind.
+
 ## 2026-09-03 bind planner completion to retrieval receipts (repository-only)
 
 The planner audit found that a model-declared complete branch report was not
