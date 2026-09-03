@@ -4,6 +4,17 @@ All notable changes to pi-munchkin are documented here. Releases follow semantic
 
 ## Unreleased
 
+### Fixed (2026-09-03 — terminal planner reports stop child follow-up)
+
+- A validated terminal `branch_plan` report now returns Pi's runtime termination
+  hint after the report is durably written, including the fail-closed blocked
+  report. Nonterminal reports remain resumable so delegated scouts can run. The
+  targeted regression was red before the fix and green afterward. Planner flags
+  remain dark; no model execution, mirror, rollout, or push occurred.
+
+The source surface is `9710fa43…`; the loaded mirror remains `73bbd494…`.
+Future planner smoke requires a fresh approved preflight and loaded-hash rebind.
+
 ### Fixed (2026-09-03 — require actual retrieval receipts for planner completion)
 
 - A deep-research branch or scout can no longer declare complete coverage without

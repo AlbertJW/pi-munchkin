@@ -1,5 +1,19 @@
 # Handover — pi_munchkin, 2026-08-24
 
+## 2026-09-03 terminal planner reports stop child follow-up (repository-only)
+
+The planner audit found that `branch_plan` persisted terminal reports but did
+not tell Pi to stop the child agent loop, so a child could spend its bounded run
+on an unnecessary follow-up turn after it had already published its result.
+Terminal valid and fail-closed blocked reports now return `terminate: true`;
+pending reports remain resumable. The counterfactual regression was red before
+the fix and green afterward. The isolated planner suite is 39/39.
+
+Source surface is `9710fa437ae97b36aa6c6a2ad53af5d953dd7f597e89bd3519bd11d2dd032503`;
+loaded mirror remains `73bbd494f5c23f3b7262bd9f17c44b57574ca23d4b211c07dbd1d6067c23c315`.
+Planner flags remain dark. No model execution, mirror, rollout, or push occurred;
+the preflight source pin is updated for the next approved smoke.
+
 ## 2026-09-03 require actual retrieval receipts for planner completion (repository-only)
 
 The bottom-up planner audit found one remaining receipt fail-open: a direct
