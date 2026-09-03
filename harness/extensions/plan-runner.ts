@@ -340,6 +340,7 @@ function migrateState(raw: any): PlanState | undefined {
 		...(raw.schema_version === 5 && item.coverage ? { coverage: item.coverage } : {}),
 		...(raw.schema_version === 5 && item.defer ? { defer: item.defer } : {}),
 		...(raw.schema_version === 5 && item.lease ? { lease: item.lease } : {}),
+		...(raw.schema_version === 5 && item.dispatch_epoch !== undefined ? { dispatch_epoch: item.dispatch_epoch } : {}),
 	}));
 	const now = isoNow();
 	const state: PlanState = {
@@ -365,6 +366,21 @@ async function readState(cwd: string): Promise<PlanState | undefined> {
 	if (!path || !(await exists(path))) return undefined;
 	try { return migrateState(JSON.parse(await readFile(path, "utf8"))); }
 	catch { return undefined; }
+}
+
+/**
+ * Return the durable retry generation for one parent-owned research root.
+ * A generation changes only when an explicit plan_update reopens a terminal
+ * branch, giving the subagent runtime a safe, persisted signal with which to
+ * forget an earlier in-process dispatch identity.
+ */
+export async function researchBranchDispatchEpoch(cwd: string, context: PlanContextV1): Promise<number | null> {
+	if (context.depth !== 1 || context.owner_ref !== ownerRef(context.run_id, context.parent_item_id)) return null;
+	const state = await readState(cwd);
+	if (!state || state.schema_version !== 5 || state.run_id !== context.run_id || state.profile?.name !== "deep-research") return null;
+	const item = state.items.find((candidate) => candidate.id === context.parent_item_id);
+	if (!item || item.parent_id !== undefined || item.kind !== "research_branch" || item.owner_ref !== context.owner_ref) return null;
+	return item.dispatch_epoch ?? 0;
 }
 
 function currentItem(state: PlanState): PlanItem | undefined {
@@ -741,6 +757,13 @@ const planUpdate = defineTool({
 			// child result becomes a harmless late arrival instead of making cancellation
 			// impossible or leaving a permanently leased branch.
 			const state = { ...previous, items: (applied.items as PlanItem[]).map((item) => {
+				const prior = previous.items.find((candidate) => candidate.id === item.id);
+				const reopened = Boolean(previous.profile?.name === "deep-research" && prior && item.kind === "research_branch" && graphTerminal(prior) && !graphTerminal(item));
+				if (reopened) {
+					const nextEpoch = (prior!.dispatch_epoch ?? 0) + 1;
+					if (nextEpoch > 1_000_000) rejectPlanTool(`plan_update rejected: dispatch retry limit reached for ${item.id}`);
+					return { ...item, dispatch_epoch: nextEpoch };
+				}
 				if (!item.lease || !graphTerminal(item)) return item;
 				const next = { ...item };
 				delete next.lease;
@@ -928,6 +951,7 @@ const researchPlanStart = defineTool({
 					id, title: cleanText(branch.title), note: cleanText(branch.note) || undefined,
 					status: "pending", kind: "research_branch", owner_ref: ownerRef(runId, id),
 					budget: { allocated: branch.budget as ResearchBudget, used: { searches: 0, reads: 0 } },
+					dispatch_epoch: 0,
 				};
 			});
 			const next: PlanState = {

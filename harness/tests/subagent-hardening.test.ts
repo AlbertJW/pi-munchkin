@@ -421,6 +421,18 @@ test("unexpected child-runner setup failures settle leased roots in single and p
 		assert.equal(state.items[0].status, "blocked", "a runner setup failure must not leave the lease pending forever");
 		assert.equal(state.items[0].lease, undefined, "the failed setup releases the durable lease");
 
+		await callTool(fp, "plan_update", {
+			deltas: [{ item_id: branchId, status: "pending", note: "explicitly reopen after setup failure" }],
+		}, dir);
+		const reopened = JSON.parse(await (await import("node:fs/promises")).readFile(join(dir, ".pi", "plan-state.json"), "utf8"));
+		assert.equal(reopened.items[0].dispatch_epoch, 1, "explicit reopen records a durable retry generation");
+		const retry = await callTool(fp, "subagent", {
+			agent: "research-planner", task: "retry reopened branch", confirmProjectAgents: false, plan_context: rootContext,
+		}, dir);
+		assert.equal(retry.isError, false, "an explicitly reopened branch must be dispatchable again");
+		assert.equal(retry.details?.results?.length, 1, "the retry must reach the child runner instead of the stale runtime ledger");
+		await fire(fp, "before_agent_start", {}, makeCtx(dir).ctx);
+
 		const parallel = await callTool(fp, "subagent", {
 			tasks: [{ agent: "research-planner", task: "parallel bounded branch", plan_context: parallelRootContext }],
 			confirmProjectAgents: false,

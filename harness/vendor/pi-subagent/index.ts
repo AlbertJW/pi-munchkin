@@ -35,7 +35,7 @@ import {
 import { ACTIVE_TOOL_PROMPTS } from "../../lib/active-tool-prompts.ts";
 import { emitHarnessSignal } from "../../lib/harness-signals.ts";
 import { PLAN_CONTEXT_ENV, RESEARCH_SCOUT_ENV, readPlanContext, researchUsageFromMessages, validateRootResearchDispatch, validateScoutDispatch, type PlanContextV1, type ScoutReceiptV1 } from "../../lib/branch-report.ts";
-import { acquireResearchBranchLease, releaseResearchBranchLease } from "../../extensions/plan-runner.ts";
+import { acquireResearchBranchLease, releaseResearchBranchLease, researchBranchDispatchEpoch } from "../../extensions/plan-runner.ts";
 
 // ---------------------------------------------------------------------------
 // Limits
@@ -75,6 +75,7 @@ type RootDispatchState = {
 	key: string;
 	parents: string[];
 	owners: string[];
+	epochs: Record<string, number>;
 };
 
 function scoutDispatchState(): ScoutDispatchState {
@@ -103,9 +104,10 @@ function rootDispatchState(): RootDispatchState {
 	const existing = shared[ROOT_DISPATCH_STATE_KEY] as Partial<RootDispatchState> | undefined;
 	if (existing && typeof existing.key === "string" && Array.isArray(existing.parents) && Array.isArray(existing.owners) &&
 		existing.parents.every((value) => typeof value === "string") && existing.owners.every((value) => typeof value === "string")) {
+		if (!existing.epochs || typeof existing.epochs !== "object" || Array.isArray(existing.epochs)) existing.epochs = {};
 		return existing as RootDispatchState;
 	}
-	const fresh: RootDispatchState = { key: "", parents: [], owners: [] };
+	const fresh: RootDispatchState = { key: "", parents: [], owners: [], epochs: {} };
 	shared[ROOT_DISPATCH_STATE_KEY] = fresh;
 	return fresh;
 }
@@ -116,6 +118,25 @@ function alignRootDispatchState(state: RootDispatchState, runId: string | undefi
 	state.key = runId;
 	state.parents = [];
 	state.owners = [];
+	state.epochs = {};
+}
+
+function forgetRootDispatch(state: RootDispatchState, context: PlanContextV1): void {
+	state.parents = state.parents.filter((parent) => parent !== context.parent_item_id);
+	state.owners = state.owners.filter((owner) => owner !== context.owner_ref);
+}
+
+async function reconcileReopenedRoots(cwd: string, contexts: PlanContextV1[], state: RootDispatchState): Promise<void> {
+	for (const context of contexts) {
+		if (!state.parents.includes(context.parent_item_id)) continue;
+		let epoch: number | null;
+		try { epoch = await researchBranchDispatchEpoch(cwd, context); }
+		catch { continue; }
+		if (epoch === null) continue;
+		const prior = state.epochs[context.owner_ref];
+		if (prior !== undefined && epoch > prior) forgetRootDispatch(state, context);
+		if (prior === undefined || epoch > prior) state.epochs[context.owner_ref] = epoch;
+	}
 }
 
 function activeResearchRootContexts(): ReadonlySet<string> {
@@ -734,6 +755,7 @@ Use single mode for one task, parallel mode when tasks are independent and can r
 				const active = (globalThis as Record<string, unknown>).__pi_active_plan_context as { run_id?: unknown; profile?: unknown; settled?: unknown } | undefined;
 				const activeRunId = active?.profile === "deep-research" && active.settled !== true && typeof active.run_id === "string" ? active.run_id : undefined;
 				alignRootDispatchState(rootDispatch, activeRunId);
+				await reconcileReopenedRoots(ctx.cwd, withContext.map((entry) => entry.plan_context as PlanContextV1), rootDispatch);
 				if (withContext.length !== planned.length || !validateRootResearchDispatch(activeRunId, new Set(rootDispatch.parents), new Set(rootDispatch.owners), planned as Array<{ agent: string; plan_context?: unknown }>, activeResearchRootContexts())) {
 					return {
 						content: [{ type: "text", text: "Blocked: planned root research requires one unused depth-one context from the active graph for every research-planner child." }],
@@ -828,10 +850,14 @@ This guard prevents self-recursion and cyclic handoffs (for example A -> B -> A)
 			 if (!scoutDispatch.parents.includes(context.parent_item_id)) scoutDispatch.parents.push(context.parent_item_id);
 			 if (!scoutDispatch.owners.includes(context.owner_ref)) scoutDispatch.owners.push(context.owner_ref);
 		  }
-		  for (const context of plannedRootContexts) {
-			if (!rootDispatch.parents.includes(context.parent_item_id)) rootDispatch.parents.push(context.parent_item_id);
-			if (!rootDispatch.owners.includes(context.owner_ref)) rootDispatch.owners.push(context.owner_ref);
-		  }
+			for (const context of plannedRootContexts) {
+				if (!rootDispatch.parents.includes(context.parent_item_id)) rootDispatch.parents.push(context.parent_item_id);
+				if (!rootDispatch.owners.includes(context.owner_ref)) rootDispatch.owners.push(context.owner_ref);
+				if (rootDispatch.epochs[context.owner_ref] === undefined) {
+					const epoch = await researchBranchDispatchEpoch(ctx.cwd, context);
+					if (epoch !== null) rootDispatch.epochs[context.owner_ref] = epoch;
+				}
+			}
           return executeParallel(
 			params.tasks as Array<{ agent: string; task: string; cwd?: string; plan_context?: PlanContextV1 }>,
             delegationMode,
@@ -859,10 +885,14 @@ This guard prevents self-recursion and cyclic handoffs (for example A -> B -> A)
 			 if (!scoutDispatch.parents.includes(context.parent_item_id)) scoutDispatch.parents.push(context.parent_item_id);
 			 if (!scoutDispatch.owners.includes(context.owner_ref)) scoutDispatch.owners.push(context.owner_ref);
 		  }
-		  for (const context of plannedRootContexts) {
-			if (!rootDispatch.parents.includes(context.parent_item_id)) rootDispatch.parents.push(context.parent_item_id);
-			if (!rootDispatch.owners.includes(context.owner_ref)) rootDispatch.owners.push(context.owner_ref);
-		  }
+			for (const context of plannedRootContexts) {
+				if (!rootDispatch.parents.includes(context.parent_item_id)) rootDispatch.parents.push(context.parent_item_id);
+				if (!rootDispatch.owners.includes(context.owner_ref)) rootDispatch.owners.push(context.owner_ref);
+				if (rootDispatch.epochs[context.owner_ref] === undefined) {
+					const epoch = await researchBranchDispatchEpoch(ctx.cwd, context);
+					if (epoch !== null) rootDispatch.epochs[context.owner_ref] = epoch;
+				}
+			}
           return executeSingle(
             params.agent,
             params.task,

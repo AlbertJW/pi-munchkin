@@ -39,6 +39,8 @@ export type GraphPlanItem = {
 	defer?: Deferral;
 	/** Parent-authoritative marker preventing duplicate root dispatch after restart. */
 	lease?: ResearchBranchLease;
+	/** Durable generation incremented only when a terminal research root is explicitly reopened. */
+	dispatch_epoch?: number;
 };
 
 export type ResearchProfile = {
@@ -203,11 +205,15 @@ export function validateGraph(state: GraphPlanState): string[] {
 		if (item.coverage && !validCoverage(item.coverage)) errors.push(`invalid retrieval coverage: ${item.id}`);
 		if (item.defer !== undefined && !validDeferral(item.defer)) errors.push(`invalid deferral: ${item.id}`);
 		if (item.lease !== undefined && !validResearchBranchLease(item.lease)) errors.push(`invalid dispatch lease: ${item.id}`);
+		if (item.dispatch_epoch !== undefined && !boundedInteger(item.dispatch_epoch, 1_000_000)) errors.push(`invalid dispatch epoch: ${item.id}`);
 		if (item.status === "deferred" && !validDeferral(item.defer)) {
 			errors.push(`deferred node requires value, risk, and rationale: ${item.id}`);
 		}
 		if (item.lease && (!state.profile || item.parent_id !== undefined || item.kind !== "research_branch" || graphTerminal(item) || item.lease.owner_ref !== item.owner_ref)) {
 			errors.push(`dispatch lease requires an open deep-research root branch: ${item.id}`);
+		}
+		if (item.dispatch_epoch !== undefined && (!state.profile || item.parent_id !== undefined || item.kind !== "research_branch")) {
+			errors.push(`dispatch epoch requires a deep-research root branch: ${item.id}`);
 		}
 	}
 	for (const item of state.items) {
