@@ -1,5 +1,23 @@
 # Handover — pi_munchkin, 2026-08-24
 
+## 2026-09-03 bind planner completion to retrieval receipts (repository-only)
+
+The planner audit found that a model-declared complete branch report was not
+bound to the result metadata from the web tools that actually ran. A failed or
+truncated search/read could therefore be described as complete. Parent Ketch
+calls now publish a process-local safe aggregate, and delegated scouts return
+their aggregate through the runner; branch reports reject complete claims when
+the observed retrieval was incomplete. No query, URL, or page text enters this
+receipt. Two counterfactual regressions were red before the guards and green
+afterward.
+
+The full offline suite is green at 692/692, with typecheck, optimizer
+verification, pack/health checks, and secret scan clean. Source pin is
+`4adffc342d095ebd584835d57102cc156d68bf3fea812cac56542bcdffc7339f`; loaded
+mirror remains `73bbd494f5c23f3b7262bd9f17c44b57574ca23d4b211c07dbd1d6067c23c315`.
+Planner flags remain dark; no inference, mirror, rollout, or push occurred. A
+future smoke needs a fresh approved preflight and loaded-hash rebind.
+
 ## 2026-09-03 reject unknown planner schema downgrades (repository-only)
 
 The next planner reload probe found that any schema number other than `v5`
