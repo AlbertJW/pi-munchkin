@@ -161,3 +161,12 @@ boundary rather than treating the result as negative efficacy evidence.
 This document authorizes no model execution by itself. A human must review the
 preflight output and explicitly approve each launcher invocation. No mirror,
 source-tree, default, adoption, or historical-evidence change is permitted.
+
+## Execution status (appended 2026-09-03)
+
+Two candidate invocations were run under this envelope before its hard guard
+made further sessions non-informative. The bounded classifications and private
+receipt digests are recorded in
+`QWEN35B_PLANNER_COMPLETION_V7_AUDIT_2026-09-03.md`. The preregistration is
+therefore closed as incomplete; no control sessions were run and no rows may be
+pooled with later source boundaries.

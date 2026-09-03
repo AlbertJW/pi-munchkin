@@ -1,5 +1,15 @@
 # The optimizer is mothballed again — 2026-08-21
 
+> **CORRECTION (2026-09-03), appended not edited.** This charter's operative claim — "no
+> further rounds, no candidate trials, no box time" — no longer describes the programme. The
+> stop recorded below was explicitly conditional on finding "a subject that can actually drive
+> the tools"; the Qwen 35B cohort met that condition, and roughly thirty screens ran on
+> 2026-09-01 through 2026-09-03. See [`SCREENS.md`](SCREENS.md) for what was executed and
+> [`PROGRAMME_HISTORY.md`](PROGRAMME_HISTORY.md) for the arc. Everything below stands as
+> written: the reasoning for stopping was sound, and its "What must NOT be re-derived" list is
+> still binding.
+
+
 > **Supersedes [`UNMOTHBALL_2026-08.md`](UNMOTHBALL_2026-08.md) operationally.** That charter's
 > instrument work is DONE and its rules stand — `PREREG_FIXTURE_ADMISSION_2026-08.md` remains the
 > one admission rule, and nothing in it is retracted. What stops is the *programme*: no further

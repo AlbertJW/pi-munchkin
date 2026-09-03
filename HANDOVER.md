@@ -1,5 +1,29 @@
 # Handover — pi_munchkin, 2026-08-24
 
+## 2026-09-03 planner v7 stopped and direct-completion repair (pending mirror)
+
+The prepared v7 screen was revalidated against source surface
+`d1b17fd8…`, loaded surface `d83baa71…`, the pinned Qwen 35B subject, and the
+four admitted fixtures. Two candidate sessions then ran in the fixed order.
+Session one reached the 350,000-byte output cap after a graph start with two
+pending branches. Session two reached the 180-second wall while its three
+`research-planner` children were still in their branch-expansion sequence; two
+were classified `child_failed`, leaving blocked branches and no merge or parent
+settlement. The v7 hard guard forbids any candidate branch failure, so the
+remaining ten sessions were correctly not run. These are incomplete lifecycle
+observations only and remain quarantined outside the repository.
+
+The root cause was a model-visible contract mismatch: the profile permits a
+depth-one branch to split once, but `harness/agents/research-planner.md`
+required every branch to create scouts. `97629b5` makes expansion conditional:
+single bounded gaps can be researched directly and closed with one terminal
+`branch_plan` report; only genuinely independent gaps create scouts. The new
+contract test was red before the edit and green afterward. A fresh v8 repair
+smoke is prepared in
+`optimizer/docs/screens/PREREG_QWEN35B_PLANNER_COMPLETION_V8_2026-09-03.md`, bound to
+source `324aa214…` and awaiting mirror/hash rebinding. Planner flags remain
+dark; no quality, efficacy, or adoption claim follows.
+
 ## 2026-09-03 planner screen order binding (documentation-only)
 
 The v7 preregistration now records the deterministic seed

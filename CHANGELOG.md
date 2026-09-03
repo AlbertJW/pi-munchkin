@@ -4,6 +4,32 @@ All notable changes to pi-munchkin are documented here. Releases follow semantic
 
 ## Unreleased
 
+### Fixed (2026-09-03 — optional direct planner branch completion)
+
+- **Depth-one research planners may now finish a bounded branch directly.** The
+  role guidance previously required every branch to create depth-two scouts,
+  multiplying local-model turns even for a single-source gap. It now reserves
+  scout expansion for genuinely independent gaps and requires a terminal,
+  covered `branch_plan` report for direct completion. The targeted contract
+  test is red-green; planner flags and defaults remain dark.
+
+### Measured (2026-09-03 — planner completion screen v7 stopped)
+
+- The first two hash-bound Qwen 35B candidate observations were run against the
+  frozen v7 envelope. Session one reached the 350,000-byte cap with a graph
+  start and two pending branches; session two reached the 180-second wall with
+  two delegated child failures and no merge or parent settlement. The
+  preregistered hard guard is therefore impossible to satisfy, so the remaining
+  ten sessions were not run. These are incomplete mechanism diagnostics, not
+  planner-quality or adoption evidence; raw streams remain private.
+
+### Prepared (2026-09-03 — planner direct-completion repair smoke v8)
+
+- Added `PREREG_QWEN35B_PLANNER_COMPLETION_V8_2026-09-03.md`, binding the new
+  model-visible source surface and a one-fixture candidate/control smoke. It
+  remains pending mirror/hash rebinding and explicit execution; no planner
+  default or historical evidence changes.
+
 ### Fixed (2026-09-03 — planner screen order binding)
 
 - Recorded the v7 planner screen's seeded randomization string and exact
