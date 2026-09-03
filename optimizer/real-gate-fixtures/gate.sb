@@ -45,6 +45,9 @@
   (subpath "__TMPDIR__")
   (subpath "__PI_AGENT__/sessions")
   (subpath "__PI_AGENT__/telemetry")
+  ;; RUN_CAPSULE=recovery stores private run state, including planner state,
+  ;; below this subtree. Keep it outside the project workdir but writable.
+  (subpath "__PI_AGENT__/artifacts/run-capsules")
   (subpath "__PI_AGENT__/settings.json.lock")
   (subpath "__PI_AGENT__/auth.json.lock")
   (subpath "__PI_AGENT__/models.json.lock")

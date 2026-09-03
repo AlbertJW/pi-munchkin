@@ -25,6 +25,9 @@
   (subpath "__TMPDIR__")
   (subpath "__PI_AGENT__/sessions")
   (subpath "__PI_AGENT__/telemetry")
+  ;; Keep exploratory recovery storage identical to the endpoint profile;
+  ;; planner state lives below this private subtree.
+  (subpath "__PI_AGENT__/artifacts/run-capsules")
   (subpath "__PI_AGENT__/settings.json.lock")
   (subpath "__PI_AGENT__/auth.json.lock")
   (subpath "__PI_AGENT__/models.json.lock")

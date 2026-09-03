@@ -90,6 +90,22 @@ def main():
         assert "__UNKNOWN__" in str(exc)
     else:
         raise AssertionError("unresolved Seatbelt placeholder was accepted")
+    open_source = ROOT / "real-gate-fixtures/gate-open.sb"
+    endpoint_source = ROOT / "real-gate-fixtures/gate.sb"
+    gate_script = (ROOT / "real_gate.sh").read_text()
+    open_text = open_source.read_text()
+    endpoint_text = endpoint_source.read_text()
+    assert "(deny network*)" not in open_text
+    assert "(deny network*)" in endpoint_text
+    # Recovery-mode plan state is written below the same private agent root as
+    # sessions and telemetry. Keep both gate profiles in lockstep or a planner
+    # session will pass ordinary Pi startup but fail closed on its first durable
+    # graph write with EPERM.
+    for name, text in (("gate-open.sb", open_text), ("gate.sb", endpoint_text)):
+        assert '(subpath "__PI_AGENT__/artifacts/run-capsules")' in text, \
+            f"{name} must allow the private run-capsule subtree"
+    assert '"$AGENT_DIR/artifacts/run-capsules"' in gate_script, \
+        "real_gate.sh must pre-create the capsule root before entering Seatbelt"
     if platform.system() != "Darwin" or not shutil.which("sandbox-exec"):
         print("seatbelt_network_selftest: SKIP (macOS sandbox-exec unavailable)")
         return
@@ -100,10 +116,6 @@ def main():
         if probe.returncode != 0:
             print("seatbelt_network_selftest: SKIP (sandbox-exec unavailable in managed sandbox)")
             return
-    open_source = ROOT / "real-gate-fixtures/gate-open.sb"
-    endpoint_source = ROOT / "real-gate-fixtures/gate.sb"
-    assert "(deny network*)" not in open_source.read_text()
-    assert "(deny network*)" in endpoint_source.read_text()
     # Keep the synthetic work/state tree outside the real macOS TMPDIR so the
     # assertions distinguish explicit work/state grants from the temp grant.
     with tempfile.TemporaryDirectory(prefix=".pi-seatbelt-network-", dir=ROOT) as td:
@@ -112,6 +124,7 @@ def main():
         work.mkdir(); harness.mkdir(); state.mkdir(); mirror.mkdir(); home.mkdir()
         (home / ".ssh").mkdir(); (home / ".ssh" / "sentinel").write_text("host-secret")
         (state / "sessions").mkdir(); (state / "telemetry").mkdir()
+        capsules = state / "artifacts" / "run-capsules"; capsules.mkdir(parents=True)
         (harness / "secret").write_text("hidden")
         (mirror / "grader").write_text("hidden-grader-copy")
         server = http.server.ThreadingHTTPServer(("127.0.0.1", 0), Handler)
@@ -138,6 +151,12 @@ def main():
             assert run(open_profile, "/usr/bin/touch", str(state / "sessions" / "s.jsonl")).returncode == 0
             assert run(open_profile, "/usr/bin/touch", str(state / "telemetry" / "events.jsonl")).returncode == 0
             assert run(open_profile, "/bin/mkdir", str(state / "settings.json.lock")).returncode == 0
+            capsule = capsules / "cwd-hash" / "capsule-id"
+            assert run(open_profile, "/bin/mkdir", "-p", str(capsule)).returncode == 0
+            assert run(open_profile, "/usr/bin/touch", str(capsule / "plan-state.json")).returncode == 0
+            endpoint_capsule = capsules / "endpoint-cwd" / "capsule-id"
+            assert run(endpoint_profile, "/bin/mkdir", "-p", str(endpoint_capsule)).returncode == 0
+            assert run(endpoint_profile, "/usr/bin/touch", str(endpoint_capsule / "plan-state.json")).returncode == 0
             assert run(open_profile, "/usr/bin/touch", str(state / "settings.json")).returncode != 0
             assert run(endpoint_profile, "/usr/bin/touch", str(state / "debris.js")).returncode != 0
             if args.remote_url:

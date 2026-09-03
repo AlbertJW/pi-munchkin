@@ -359,9 +359,11 @@ PI_SELECT=()
 [[ -n "$PI_MODEL" ]] && PI_SELECT+=(--model "$PI_MODEL")
 [[ "$MODEL" != "$DD" ]] && echo "[real_gate] WARNING: loaded model '$MODEL' != daily driver '$DD'" >&2
 mkdir -p "$RUNS"
-# The narrowed write-jail allows only these two ~/.pi subpaths; creating THEM would
-# need a write on ~/.pi/agent (denied), so ensure they exist before any session starts.
-mkdir -p "$AGENT_DIR/sessions" "$AGENT_DIR/telemetry"
+# The narrowed write-jail allows only the explicitly listed ~/.pi subtrees;
+# creating their parents would need a write on ~/.pi/agent (denied), so ensure
+# the fixed roots exist before any session starts. Recovery-mode capsules (and
+# planner state stored inside them) are private run artifacts, not workdir data.
+mkdir -p "$AGENT_DIR/sessions" "$AGENT_DIR/telemetry" "$AGENT_DIR/artifacts/run-capsules"
 # A direct invocation owns its result file and starts clean. Fleet orchestration
 # explicitly selects append mode after truncating once at the round boundary.
 # This prevents a reused GEN or rerun model from silently contaminating a verdict.
