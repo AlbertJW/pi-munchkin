@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import argparse
 import hashlib
+import importlib.util
 import json
 import os
 import pathlib
@@ -21,13 +22,14 @@ import subprocess
 import sys
 import time
 from dataclasses import dataclass
-from typing import IO, Iterable
+from typing import IO, Any, Iterable
 
 
 BOUND_REASONS = {"output_cap", "wall_timeout"}
 THINKING_RE = re.compile(r"^[A-Za-z0-9_-]{1,32}$")
 HEX64_RE = re.compile(r"^[0-9a-f]{64}$")
 REPO_ROOT = pathlib.Path(__file__).resolve().parents[2]
+FIXTURE_ROOT = REPO_ROOT / "optimizer/research-fixtures/manifests"
 
 # The screen has two deliberately explicit arms. Keeping this map here makes
 # the launcher unable to inherit a stale graph lease or silently run the
@@ -76,6 +78,57 @@ def _sha256_file(path: pathlib.Path) -> str:
         for block in iter(lambda: stream.read(1024 * 1024), b""):
             digest.update(block)
     return digest.hexdigest()
+
+
+def _load_fixture_admission() -> Any:
+    """Load the repository admission rules without importing a package at runtime."""
+    path = REPO_ROOT / "optimizer/research-fixtures/admission.py"
+    spec = importlib.util.spec_from_file_location("planner_fixture_admission", path)
+    if spec is None or spec.loader is None:
+        raise ValueError("fixture admission rules are unavailable")
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+def fixture_spec(
+    path: pathlib.Path, *, expected_sha256: str, negative_control: bool = False,
+) -> dict[str, str]:
+    """Validate one admitted fixture and return only its bounded prompt metadata.
+
+    The digest is the admission module's canonical JSON digest, not a mutable
+    workspace or formatting-dependent byte hash. Restricting paths to the
+    checked-in manifest directory prevents a caller from presenting an
+    unrelated structurally-valid fixture as a preregistered case.
+    """
+    raw_path = pathlib.Path(path).expanduser()
+    if raw_path.is_symlink():
+        raise ValueError("fixture manifest must not be a symlink")
+    resolved = raw_path.resolve()
+    if resolved.parent != FIXTURE_ROOT.resolve() or not resolved.is_file():
+        raise ValueError("fixture manifest must be a regular file in the admitted slate")
+    if not HEX64_RE.fullmatch(expected_sha256):
+        raise ValueError("expected fixture digest must be a lowercase SHA-256")
+    admission = _load_fixture_admission()
+    try:
+        obj, actual_sha256 = admission.load_manifest(resolved)
+    except Exception as exc:
+        raise ValueError("fixture manifest failed admission") from exc
+    if actual_sha256 != expected_sha256:
+        raise ValueError("fixture manifest digest does not match the preregistration")
+    prompt = obj.get("prompt")
+    negative = obj.get("negative_control")
+    if not isinstance(prompt, dict) or not isinstance(prompt.get("text"), str):
+        raise ValueError("fixture manifest has no admitted prompt")
+    if not isinstance(negative, dict) or not isinstance(negative.get("text"), str):
+        raise ValueError("fixture manifest has no admitted negative control")
+    return {
+        "fixture_id": str(obj["fixture_id"]),
+        "kind": str(obj["kind"]),
+        "fixture_sha256": actual_sha256,
+        "fixture_role": "negative_control" if negative_control else "primary",
+        "prompt": negative["text"] if negative_control else prompt["text"],
+    }
 
 
 def arm_spec(arm: str) -> dict[str, object]:
@@ -294,16 +347,46 @@ def resolve_surface_hash(agent_dir: pathlib.Path, *, node_bin: str = "node") -> 
     return digest
 
 
-def _validate_run_inputs(args: argparse.Namespace) -> tuple[pathlib.Path, pathlib.Path, pathlib.Path, dict[str, object]]:
+def _validate_run_inputs(
+    args: argparse.Namespace,
+) -> tuple[pathlib.Path, pathlib.Path, str, dict[str, object], dict[str, str] | None]:
     agent_dir = pathlib.Path(args.agent_dir).expanduser().resolve()
     project_dir = pathlib.Path(args.project_dir).expanduser().resolve()
-    prompt_file = pathlib.Path(args.prompt_file).expanduser().resolve()
     if not agent_dir.is_dir() or agent_dir.is_symlink():
         raise ValueError("--agent-dir must resolve to a real directory")
     if not project_dir.is_dir() or project_dir.is_symlink():
         raise ValueError("--project-dir must resolve to a real directory")
-    if not prompt_file.is_file() or prompt_file.is_symlink():
-        raise ValueError("--prompt-file must resolve to a regular file")
+    prompt_file: pathlib.Path | None = None
+    if args.prompt_file:
+        raw_prompt_file = pathlib.Path(args.prompt_file).expanduser()
+        if raw_prompt_file.is_symlink():
+            raise ValueError("--prompt-file must not be a symlink")
+        prompt_file = raw_prompt_file.resolve()
+        if not prompt_file.is_file():
+            raise ValueError("--prompt-file must resolve to a regular file")
+    fixture: dict[str, str] | None = None
+    fixture_manifest = getattr(args, "fixture_manifest", None)
+    expected_fixture_sha256 = getattr(args, "expected_fixture_sha256", None)
+    negative_control = bool(getattr(args, "negative_control", False))
+    if fixture_manifest:
+        if not expected_fixture_sha256:
+            raise ValueError("--fixture-manifest requires --expected-fixture-sha256")
+        fixture = fixture_spec(
+            pathlib.Path(fixture_manifest), expected_sha256=expected_fixture_sha256,
+            negative_control=negative_control,
+        )
+    elif expected_fixture_sha256:
+        raise ValueError("--expected-fixture-sha256 requires --fixture-manifest")
+    elif negative_control:
+        raise ValueError("--negative-control requires --fixture-manifest")
+    if prompt_file is None and fixture is None:
+        raise ValueError("one of --prompt-file or --fixture-manifest is required")
+    prompt = fixture["prompt"] if fixture is not None else prompt_file.read_text(encoding="utf-8")
+    if prompt_file is not None:
+        prompt_file_text = prompt_file.read_text(encoding="utf-8")
+        if fixture is not None and prompt_file_text != prompt:
+            raise ValueError("--prompt-file does not match the admitted fixture prompt")
+        prompt = prompt_file_text
     expected = args.expected_surface
     if len(expected) != 64 or any(char not in "0123456789abcdef" for char in expected):
         raise ValueError("--expected-surface must be a lowercase SHA-256 digest")
@@ -312,17 +395,16 @@ def _validate_run_inputs(args: argparse.Namespace) -> tuple[pathlib.Path, pathli
     if args.thinking is not None and (not isinstance(args.thinking, str) or not THINKING_RE.fullmatch(args.thinking)):
         raise ValueError("--thinking must be a short single-line level")
     spec = arm_spec(args.arm)
-    return agent_dir, project_dir, prompt_file, spec
+    if not prompt.strip():
+        raise ValueError("planner prompt must not be empty")
+    return agent_dir, project_dir, prompt, spec, fixture
 
 
 def run_planner(args: argparse.Namespace) -> dict[str, object]:
-    agent_dir, project_dir, prompt_file, spec = _validate_run_inputs(args)
+    agent_dir, project_dir, prompt, spec, fixture = _validate_run_inputs(args)
     actual = resolve_surface_hash(agent_dir, node_bin=args.node_bin)
     if actual != args.expected_surface:
         raise ValueError("loaded surface hash does not match --expected-surface")
-    prompt = prompt_file.read_text(encoding="utf-8")
-    if not prompt.strip():
-        raise ValueError("--prompt-file must not be empty")
 
     output_path = pathlib.Path(args.output).expanduser().resolve()
     stderr_path = pathlib.Path(args.stderr).expanduser().resolve()
@@ -339,6 +421,12 @@ def run_planner(args: argparse.Namespace) -> dict[str, object]:
     )
     summary = result.to_summary()
     summary.update({"surface_sha256": actual, "model": args.model, "arm": args.arm, "config_sha256": spec["config_sha256"]})
+    if fixture is not None:
+        summary.update({
+            "fixture_id": fixture["fixture_id"],
+            "fixture_sha256": fixture["fixture_sha256"],
+            "fixture_role": fixture["fixture_role"],
+        })
     if args.thinking is not None:
         summary["thinking"] = args.thinking
     return summary
@@ -369,6 +457,9 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--agent-dir")
     parser.add_argument("--project-dir")
     parser.add_argument("--prompt-file")
+    parser.add_argument("--fixture-manifest")
+    parser.add_argument("--expected-fixture-sha256")
+    parser.add_argument("--negative-control", action="store_true")
     parser.add_argument("--expected-surface")
     parser.add_argument("--model")
     parser.add_argument("--arm", choices=tuple(ARM_SPECS))
@@ -385,22 +476,30 @@ def main(argv: list[str] | None = None) -> int:
         if args.selftest:
             selftest()
             return 0
-        required = ("agent_dir", "project_dir", "prompt_file", "expected_surface", "model", "arm")
+        required = ("agent_dir", "project_dir", "expected_surface", "model", "arm")
         if any(not getattr(args, field) for field in required):
-            raise ValueError("--dry/--run require --agent-dir, --project-dir, --prompt-file, --expected-surface, --model, and --arm")
+            raise ValueError("--dry/--run require --agent-dir, --project-dir, --expected-surface, --model, and --arm")
         if args.dry:
-            agent_dir, project_dir, prompt_file, spec = _validate_run_inputs(args)
+            agent_dir, project_dir, prompt, spec, fixture = _validate_run_inputs(args)
             actual = resolve_surface_hash(agent_dir, node_bin=args.node_bin)
             if actual != args.expected_surface:
                 raise ValueError("loaded surface hash does not match --expected-surface")
-            print(json.dumps({
+            summary: dict[str, object] = {
                 "schema": "pi.planner-smoke/v1", "execution": False,
                 "surface_sha256": actual, "model": args.model,
                 "arm": args.arm, "config_sha256": spec["config_sha256"], "flags": spec["flags"],
-                "project_dir_present": project_dir.is_dir(), "prompt_bytes": prompt_file.stat().st_size,
+                "project_dir_present": project_dir.is_dir(), "prompt_bytes": len(prompt.encode("utf-8")),
                 "wall_seconds": args.wall_seconds, "max_output_bytes": args.max_output_bytes,
-                **({"thinking": args.thinking} if args.thinking is not None else {}),
-            }, sort_keys=True))
+            }
+            if fixture is not None:
+                summary.update({
+                    "fixture_id": fixture["fixture_id"],
+                    "fixture_sha256": fixture["fixture_sha256"],
+                    "fixture_role": fixture["fixture_role"],
+                })
+            if args.thinking is not None:
+                summary["thinking"] = args.thinking
+            print(json.dumps(summary, sort_keys=True))
             return 0
         for field in ("output", "stderr", "telemetry"):
             if not getattr(args, field):

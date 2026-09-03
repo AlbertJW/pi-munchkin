@@ -6,10 +6,39 @@ import unittest
 ROOT = pathlib.Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT.parent))
 
-from optimizer.v2.planner_smoke import arm_spec, build_planner_env, build_pi_command, classify_result, run_bounded_command  # noqa: E402
+from optimizer.v2.planner_smoke import (  # noqa: E402
+    arm_spec, build_planner_env, build_pi_command, classify_result,
+    fixture_spec, run_bounded_command,
+)
 
 
 class PlannerSmokeTests(unittest.TestCase):
+    def test_fixture_manifest_is_canonically_bound_and_supplies_prompt(self):
+        fixture = fixture_spec(
+            ROOT / "research-fixtures/manifests/compare-json-yaml-config.json",
+            expected_sha256="c59fd0a480fc370b17e3df7fb8fccbbbf0279b2932ef6049791f7cd03adab646",
+        )
+        self.assertEqual(fixture["fixture_id"], "compare-json-yaml-config")
+        self.assertEqual(fixture["kind"], "comparative")
+        self.assertIn("one bounded evidence branch", fixture["prompt"])
+        self.assertEqual(fixture["fixture_sha256"], "c59fd0a480fc370b17e3df7fb8fccbbbf0279b2932ef6049791f7cd03adab646")
+
+    def test_fixture_manifest_digest_mismatch_fails_closed(self):
+        with self.assertRaises(ValueError):
+            fixture_spec(
+                ROOT / "research-fixtures/manifests/compare-json-yaml-config.json",
+                expected_sha256="0" * 64,
+            )
+
+    def test_fixture_manifest_can_supply_only_its_negative_control(self):
+        fixture = fixture_spec(
+            ROOT / "research-fixtures/manifests/compare-json-yaml-config.json",
+            expected_sha256="c59fd0a480fc370b17e3df7fb8fccbbbf0279b2932ef6049791f7cd03adab646",
+            negative_control=True,
+        )
+        self.assertEqual(fixture["fixture_role"], "negative_control")
+        self.assertIn("two JSON structural types", fixture["prompt"])
+
     def test_candidate_and_control_arms_have_distinct_bound_flags(self):
         candidate = arm_spec("candidate")
         control = arm_spec("control")
