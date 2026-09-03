@@ -1,5 +1,17 @@
 # Handover — pi_munchkin, 2026-08-24
 
+## 2026-09-03 optimizer V2 recovery hardening (repository-only)
+
+`ae0c44e` fixes three bottom-up audit findings with red-green regressions:
+patch-surface composition now materializes an accepted candidate DAG once with
+shared-ancestor de-duplication; an unterminated final event is reported as a
+recoverable EOF tail rather than poisoning the next append; and branch reports
+sync the file and containing directory around atomic publication. The source
+surface is now `8150c80d…`; the live mirror remains at `73bbd494…` because this
+optimizer/recovery package was not rolled out. `npm run verify:optimizer`, the
+full harness test suite (682/682), typecheck, package smoke, and peer checks are
+green. No inference, campaign, mirror, default, or adoption action occurred.
+
 ## 2026-09-03 planner v8 repair smoke audit (current)
 
 The v8 completion-shaped repair smoke was executed once against the pinned

@@ -4,6 +4,19 @@ All notable changes to pi-munchkin are documented here. Releases follow semantic
 
 ## Unreleased
 
+### Fixed (2026-09-03 — optimizer V2 graph and handoff durability)
+
+- Hardened patch-surface composition so a composed candidate materializes each
+  accepted parent chain exactly once, de-duplicates shared ancestors, detects
+  ancestry cycles, and verifies the complete result instead of applying a
+  descendant diff directly to the baseline.
+- Event-store readers now treat an unterminated final JSONL record as a
+  reportable EOF tail; status/inspect/replay remain non-mutating and explicit
+  recovery records only the tail's byte count and digest.
+- Branch reports now sync their bytes before close and sync the containing
+  directory after rename. The optimizer preflight source pin was rebound to
+  the new source surface; all changes remain repository-only and dark.
+
 ### Measured (2026-09-03 — planner completion screen v8 stopped)
 
 - The frozen direct-branch repair smoke ran one Qwen 35B candidate invocation
