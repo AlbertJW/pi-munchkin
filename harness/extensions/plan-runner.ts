@@ -72,6 +72,7 @@ export const PLAN_GRAPH_DEFAULT: "on" | "off" = "off";
 export const DEEP_RESEARCH_PLANNING_DEFAULT: "on" | "off" = "off";
 const PLAN_GRAPH = (process.env.PLAN_GRAPH ?? PLAN_GRAPH_DEFAULT) === "on";
 const DEEP_RESEARCH_PLANNING = PLAN_GRAPH && (process.env.DEEP_RESEARCH_PLANNING ?? DEEP_RESEARCH_PLANNING_DEFAULT) === "on";
+const DEEP_RESEARCH_DISCOVERY_BUDGET = { searches: 3, reads: 5 } as const;
 // Child identity is runner-owned. Fail closed for any non-parent marker rather
 // than letting malformed/injected depth metadata silently regain write access
 // to the parent-owned goal ledger.
@@ -766,6 +767,13 @@ const researchPlanStart = defineTool({
 		const state = await mutatePlan(ctx.cwd, async (previous) => {
 			const unsettledGraph = previous && !previous.settled_at && Boolean(previous.profile || previous.items.some((item) => item.parent_id));
 			if (previous && !previous.settled_at && (openItemCount(previous) > 0 || unsettledGraph)) rejectPlanTool("an active or unsettled graph plan already exists");
+			const requestedBudget = params.branches.reduce((total, branch) => ({
+				searches: total.searches + branch.budget.searches,
+				reads: total.reads + branch.budget.reads,
+			}), { searches: 0, reads: 0 });
+			if (requestedBudget.searches > DEEP_RESEARCH_DISCOVERY_BUDGET.searches || requestedBudget.reads > DEEP_RESEARCH_DISCOVERY_BUDGET.reads) {
+				rejectPlanTool(`research_plan_start rejected: root allocations must fit the global discovery envelope (at most ${DEEP_RESEARCH_DISCOVERY_BUDGET.searches} searches and ${DEEP_RESEARCH_DISCOVERY_BUDGET.reads} reads total; requested ${requestedBudget.searches} searches and ${requestedBudget.reads} reads)`);
+			}
 			const now = isoNow();
 			const runId = `research-plan-${timestamp()}`;
 			const items: PlanItem[] = params.branches.map((branch) => {
@@ -779,7 +787,7 @@ const researchPlanStart = defineTool({
 			const next: PlanState = {
 				schema_version: 5, run_id: runId, request: cleanText(params.request), summary: cleanText(params.summary),
 				autonomy: "lean", phase: "executing", created_at: now, updated_at: now, items,
-				profile: { name: "deep-research", max_depth: 2, max_children: 2, discovery_budget: { searches: 3, reads: 5 }, validation_reads: 5 },
+				profile: { name: "deep-research", max_depth: 2, max_children: 2, discovery_budget: DEEP_RESEARCH_DISCOVERY_BUDGET, validation_reads: 5 },
 			};
 			validateStateSize(next);
 			return { state: next, result: next };

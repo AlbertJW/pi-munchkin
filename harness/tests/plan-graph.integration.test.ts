@@ -24,7 +24,7 @@ if (!CHILD) {
 			const output = execFileSync(process.execPath, [
 				"--experimental-strip-types", "--experimental-loader", resolve("harness/tests/ts-js-resolver.mjs"), "--test", import.meta.filename,
 			], { cwd: process.cwd(), env, encoding: "utf8", stdio: "pipe" });
-			assert.match(output, /pass 10/);
+			assert.match(output, /pass 11/);
 		} finally { rmSync(artifacts, { recursive: true, force: true }); }
 	});
 } else {
@@ -74,6 +74,16 @@ if (!CHILD) {
 		assert.equal(state.schema_version, 5); assert.equal(state.profile.name, "deep-research");
 		assert.equal(result.details.contexts.length, 2); assert.equal(result.details.contexts[0].parent_item_id, state.items[0].id);
 		await expectToolError(fp, "research_plan_start", { request: "bad", summary: "over budget", branches: [{ title: "bad", budget: { searches: 4, reads: 6 } }] }, cwd, /active or unsettled graph plan already exists/);
+		resetPiGlobals();
+	});
+
+	test("research plan rejects over-budget roots with the actionable discovery envelope", async () => {
+		const fp = fresh(); const cwd = tmp();
+		await expectToolError(fp, "research_plan_start", {
+			request: "Compare approaches", summary: "too much discovery", branches: [
+				{ title: "Primary evidence", budget: { searches: 4, reads: 6 } },
+			],
+		}, cwd, /at most 3 searches and 5 reads total/);
 		resetPiGlobals();
 	});
 
