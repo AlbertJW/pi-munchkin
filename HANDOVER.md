@@ -24,6 +24,11 @@ smoke is prepared in
 source `324aa214…` and awaiting mirror/hash rebinding. Planner flags remain
 dark; no quality, efficacy, or adoption claim follows.
 
+The source was subsequently pushed and mirrored cleanly at loaded hash
+`73bbd494…` (122/122 first-party artifacts, zero drift). The V8 preflight and
+preregistration now bind that loaded identity; no V8 model session has started
+under the new boundary yet.
+
 ## 2026-09-03 planner screen order binding (documentation-only)
 
 The v7 preregistration now records the deterministic seed

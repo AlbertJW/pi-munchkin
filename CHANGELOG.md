@@ -4,6 +4,13 @@ All notable changes to pi-munchkin are documented here. Releases follow semantic
 
 ## Unreleased
 
+### Fixed (2026-09-03 — planner repair mirror identity rebind)
+
+- Rebound the no-inference planner preflight and V8 repair preregistration to
+  loaded surface `73bbd494…` after the direct-completion contract was mirrored.
+  The mirror reports 122/122 first-party artifacts with zero drift. No V8
+  inference, planner default, or adoption decision has occurred.
+
 ### Fixed (2026-09-03 — optional direct planner branch completion)
 
 - **Depth-one research planners may now finish a bounded branch directly.** The

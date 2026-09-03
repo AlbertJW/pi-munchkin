@@ -16,7 +16,7 @@ permission to enable planner defaults.
 
 - Subject: `local-llamacpp/qwen36-35b-iq3s`.
 - Source surface SHA-256: `324aa214006f2f67c2350304f39ab45d063e61209c97cb0d4d52e889377e4c9`.
-- Loaded mirror surface SHA-256: `d83baa71d3eb6d9d79afac7d1adda2b2cf08f96e92c1f7c7785b524bae6fdc09`.
+- Loaded mirror surface SHA-256: `73bbd494f5c23f3b7262bd9f17c44b57574ca23d4b211c07dbd1d6067c23c315`.
 - Candidate configuration SHA-256: `0d01aab9292db845b5f228174e2a1a4c10328883daebd482dcd9c9c9f5f5fd1e`.
 - Control configuration SHA-256: `a2e5efef3ab36d90ab58ee91920b766e5c7a162905da970778e9439c3c1c92f7`.
 
