@@ -1,5 +1,18 @@
 # Handover — pi_munchkin, 2026-08-24
 
+## 2026-09-03 planner retry-budget conservation (repository-only)
+
+The bottom-up deep-research audit found that an explicitly reopened terminal
+branch could replay its original full-allocation `plan_context`; the graph then
+overwrote `budget.used` with the latest attempt. That violated the single
+3-search/5-read discovery envelope. Root dispatch now rebinds depth-one
+contexts to the authoritative unspent remainder, rejects stale contexts, and
+refuses dispatch when the remainder is exhausted. Branch merges add usage
+cumulatively, so a retry cannot multiply budget or erase prior consumption.
+The new integration regression covers stale-context rejection, remaining-budget
+rebinding, and cumulative merge usage. This is repository-only: planner flags
+remain dark, the source branch is not mirrored, and no model run occurred.
+
 ## 2026-09-03 planner preflight source rebinding (repository-only)
 
 The dispatch changes moved the package source surface, so the frozen planner

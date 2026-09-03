@@ -4,6 +4,15 @@ All notable changes to pi-munchkin are documented here. Releases follow semantic
 
 ## Unreleased
 
+### Fixed (2026-09-03 — planner retry-budget conservation)
+
+- Explicitly reopened deep-research branches now receive only the authoritative
+  unspent portion of their original discovery allocation. Replayed full-budget
+  contexts are rejected, exhausted branches fail closed, and merged usage is
+  cumulative across attempts instead of being overwritten. This preserves the
+  global 3-search/5-read envelope. Planner flags remain dark; no model session,
+  mirror, rollout, or adoption decision occurred.
+
 ### Fixed (2026-09-03 — planner preflight source rebinding)
 
 - The no-inference planner preflight now pins the current source surface after

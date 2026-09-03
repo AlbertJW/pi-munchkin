@@ -144,6 +144,8 @@ npm run surface:hash:source
 
 | 2026-09-03 (71) | planner preflight source rebinding after dispatch hardening: stale default source identity now fails closed and the no-inference dry path binds the current checkout | pending source boundary | source `00d00ec07504e882e8e8fcc6201d79af5bed3d1182774b7cbc8dfd6435f9ad9a` / loaded `73bbd494f5c23f3b7262bd9f17c44b57574ca23d4b211c07dbd1d6067c23c315` | **REPOSITORY-ONLY; PREPARED.** `preflight.py --selftest` and `--dry --agent-dir /Users/Albert.Wessels/.pi/agent` pass with `execution:false` and `inference_started:false`; no model, mirror, or flag change occurred. |
 
+| 2026-09-03 (72) | planner retry-budget conservation: depth-one contexts rebind to the authoritative unspent remainder, stale full-allocation contexts are rejected, and branch usage accumulates across explicit retries | `ac2a0f4` | source `d333be721bc9eecb41d54ba732d96f65e5edc9eb286a367893be63f6152b1440` / loaded `73bbd494f5c23f3b7262bd9f17c44b57574ca23d4b211c07dbd1d6067c23c315` | **REPOSITORY-ONLY; PENDING ROLLOUT.** The retry-budget regression is green, targeted planner tests and typecheck pass, and no model, mirror, or default change occurred. |
+
 The older packaging-series PR 4 changed package, CI, operational tooling, and narrative without
 entering the runtime manifest. That historical statement does not apply to the spiral-control PR 4
 retirement draft above, which deliberately changes the descriptor and therefore gets its own row.
