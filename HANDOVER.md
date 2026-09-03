@@ -1,5 +1,20 @@
 # Handover — pi_munchkin, 2026-08-24
 
+## 2026-09-03 first Qwen planner-screen receipt
+
+The router was recovered from a stale listener and is now verified healthy on
+`127.0.0.1:8080` with no backend loaded. The first comparative planner-screen
+fixture was attempted in the default sandbox, where Pi could not reach the
+router; that attempt is excluded. An identical host-network rerun reached
+Qwen 35B and completed in 70.669 seconds with zero stderr, the expected loaded
+surface `9629b4db…`, 98 payload-free authenticated telemetry rows, and no
+identity drift. It observed protocol parity and three successful tool
+receipts, but no research-plan activation, branch merge, or graph settlement;
+the core session settled without a graph. This is an incomplete mechanism
+observation only. The raw transcript and telemetry remain in a private
+temporary directory, and the planner flags remain dark. The remaining five
+candidate sessions plus three fact-lookup controls require separate approval.
+
 ## 2026-09-02 planner research-fixture admission
 
 The hierarchical planner screen now has three structurally admitted research
@@ -13,9 +28,10 @@ provenance without network or inference. These receipts are explicitly
 receipt hashes are frozen in
 `optimizer/docs/PREREG_QWEN35B_PLANNER_MECHANISM_V2_2026-09-02.md`.
 
-This is instrument admission only: sources have not been fetched, answers have
-not been judged, and no planner flag changed. The next action is a human
-preflight against the current loaded surface
+This is instrument admission plus one incomplete mechanism observation: sources
+have not been fetched for an answer judgment, no planner flag changed, and the
+sandbox attempt was excluded. The next action is human review of the receipt
+and a separately approved continuation against the current loaded surface
 `9629b4dbd3d871703a82edbf12db76db813863a4c369b6d45edf2e3cb0671970`, then an
 explicitly approved six-session mechanism screen plus three fact-lookup
 controls. Any timeout, branch failure, or missing parent evidence remains

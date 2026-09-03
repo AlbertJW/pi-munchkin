@@ -4,6 +4,15 @@ All notable changes to pi-munchkin are documented here. Releases follow semantic
 
 ## Unreleased
 
+### Measured (2026-09-03 — first planner-screen receipt)
+
+- The first bounded Qwen 35B comparative planner-screen session reached the
+  router after a sandbox transport failure was excluded. The host-network
+  rerun completed with zero stderr and the expected loaded hash, but emitted no
+  research-plan activation, branch merge, or graph settlement. It is an
+  incomplete mechanism observation only; planner flags remain dark and no
+  quality or adoption claim follows.
+
 ### Documentation provenance correction (2026-09-02)
 
 - Rebound the current planner and research-ledger preregistrations to branch

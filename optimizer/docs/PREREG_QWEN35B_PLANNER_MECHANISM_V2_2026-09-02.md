@@ -2,7 +2,8 @@
 
 ## Status and purpose
 
-**PREPARED — NO MODEL SESSIONS STARTED.** This document replaces the stale
+**IN PROGRESS — ONE QUARANTINED SESSION OBSERVED; GATE INCOMPLETE.** This
+document replaces the stale
 2026-08-25 draft as the execution envelope for the dark hierarchical
 deep-research graph. It asks only whether the parent/child lifecycle can
 activate, conserve budget, validate delegated evidence, merge branches, and
@@ -76,6 +77,26 @@ On 2026-09-02 it returned `pi.planner-preflight/v1` with source
 flag maps, and all three fixture IDs. This output is a readiness receipt only;
 the command never contacts the model server or starts Pi.
 
+### First bounded session (quarantined, 2026-09-02)
+
+The first comparative fixture was attempted once from the default sandbox and
+was excluded because Pi received `connection_refused`; it produced no backend
+load and is not a model observation. The identical launcher invocation was
+then rerun with host access to the already-running router. It completed in
+70.669 seconds with exit code 0, zero stderr, 327,476 bounded stdout bytes, and
+loaded surface `9629b4db…`. The private telemetry contained 98 authenticated
+`pi.harness-event/v2` rows, provider `local-llamacpp`, model
+`qwen36-35b-iq3s`, no payload-looking keys, and matching telemetry/stdout
+digests `cb560086…` / `1404db35…`.
+
+This session observed protocol parity and three successful tool receipts, but
+no `research-start`, branch merge, graph settlement, or activation request;
+Qwen used only `bash` and `read`, and the core session settled without a
+research graph. It is therefore an incomplete mechanism observation, not a
+pass, quality result, or evidence for changing either planner flag. The
+remaining five candidate sessions and three negative controls retain the
+preregistered acceptance rule and must not pool the excluded sandbox attempt.
+
 ## Arms and run sequence
 
 The control uses the current deep-research skill with the ledger but with
@@ -120,6 +141,6 @@ efficacy evidence. Only after this mechanism screen passes may a separate
 powered comparative preregistration compare graph and control on evidence
 coverage, synthesis correctness, completeness, context/tool cost, and latency.
 
-No execution is authorized by this file. The next allowed action is a human
-preflight of these admitted manifests, followed by explicit approval of the
-exact launcher command and current loaded hash.
+This file authorizes no additional execution. The next allowed action is a
+human review of this first receipt and explicit approval of each further
+launcher command against the current loaded hash.

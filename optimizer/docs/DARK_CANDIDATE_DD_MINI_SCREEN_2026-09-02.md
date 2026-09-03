@@ -18,15 +18,27 @@ measurement identity. The current source is `62b1e565…`; the canonical Run 4
 preregistration and planner preregistration have been rebound to that hash at
 the frozen source/config snapshot `98df5ed` (later documentation-only commits
 do not alter the model-visible source hash).
-The loaded mirror is now `9629b4db…`, and no model session was
-started by this amendment.
+The loaded mirror is now `9629b4db…`, and no model session was started by this
+amendment.
+
+### Planner screen progress (2026-09-03)
+
+The first comparative Qwen 35B planner-screen session reached the router only
+after a sandbox `connection_refused` attempt was excluded. The host-network
+rerun completed in 70.669 seconds with zero stderr and the expected loaded
+surface `9629b4db…`. It recorded protocol parity and three successful tool
+receipts, but no `research-start`, branch merge, graph settlement, or
+activation request; the core session settled without a research graph. This is
+an incomplete mechanism observation, not a pass or quality result. The
+remaining five candidate sessions and three fact-lookup controls are still
+required, and the sandbox failure cannot be pooled.
 
 The live mirror was current for the earlier goal smoke, and has now been
 refreshed after the context handoff and ledger-budget repairs: `npm run
 mirror:check -- /Users/Albert.Wessels/.pi/agent` reports **122 of 122**
 first-party files match, with no unmanaged extensions or orphans. The current
 source surface SHA-256 is
-`5b84241cbd47bdd61c1d4641166e6ec44f124ddac706778d5c477c3efac551bf`; the
+`62b1e565748394ec7aaccadcc4d9e3f5167dea31ca974d0ed9461d0d76fc0234`; the
 current loaded mirror surface SHA-256 is
 `9629b4dbd3d871703a82edbf12db76db813863a4c369b6d45edf2e3cb0671970`.
 
