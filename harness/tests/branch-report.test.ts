@@ -4,9 +4,10 @@ import { mkdtempSync, readFileSync, readdirSync, statSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { readBranchReport, researchUsageFromMessages, validateBranchReport, validatePlanContext, validatePlanContextRole, validateRootResearchDispatch, validateScoutDispatch, writeBranchReport, type BranchReportV1, type PlanContextV1 } from "../lib/branch-report.ts";
+import { ownerRef } from "../lib/plan-graph.ts";
 
 const context: PlanContextV1 = {
-	v: 1, profile: "deep-research", run_id: "run-one", parent_item_id: "root", owner_ref: "a".repeat(24), depth: 1,
+	v: 1, profile: "deep-research", run_id: "run-one", parent_item_id: "root", owner_ref: ownerRef("run-one", "root"), depth: 1,
 	budget: { searches: 2, reads: 3 }, limits: { max_depth: 2, max_children: 2 },
 };
 const completeCoverage = {
@@ -14,7 +15,7 @@ const completeCoverage = {
 	truncated: false, budget_exhausted: false, failed: false, complete: true,
 };
 const report: BranchReportV1 = {
-	v: 1, parent_item_id: "root", owner_ref: "a".repeat(24), status: "done", note: "settled",
+	v: 1, parent_item_id: "root", owner_ref: ownerRef("run-one", "root"), status: "done", note: "settled",
 	consumed: { searches: 2, reads: 3 }, evidence_gaps: [], coverage: completeCoverage,
 	children: [{ item_id: "leaf", title: "Leaf", status: "done", coverage: completeCoverage, budget: { allocated: { searches: 2, reads: 3 }, used: { searches: 2, reads: 3 } } }],
 	source_leads: [{ url: "https://example.test/source", claim: "claim", quote: "quote" }],
@@ -59,24 +60,35 @@ test("branch report transport keeps file and containing-directory durability bar
 });
 
 test("branch planners may dispatch only two distinct depth-two scouts", () => {
-	const scoutA = { ...context, depth: 2 as const, parent_item_id: "leaf-a", owner_ref: "b".repeat(24), limits: { max_depth: 2 as const, max_children: 0 as const } };
-	const scoutB = { ...scoutA, parent_item_id: "leaf-b", owner_ref: "c".repeat(24) };
-	assert.equal(validateScoutDispatch(0, [{ agent: "research-scout", plan_context: scoutA }, { agent: "research-scout", plan_context: scoutB }]), true);
-	assert.equal(validateScoutDispatch(1, [{ agent: "research-scout", plan_context: scoutA }, { agent: "research-scout", plan_context: scoutB }]), false);
+	const scoutA = { ...context, depth: 2 as const, parent_item_id: "leaf-a", owner_ref: ownerRef(context.run_id, "leaf-a"), limits: { max_depth: 2 as const, max_children: 0 as const } };
+	const scoutB = { ...scoutA, parent_item_id: "leaf-b", owner_ref: ownerRef(context.run_id, "leaf-b") };
+	assert.equal(validateScoutDispatch(0, [{ agent: "research-scout", plan_context: scoutA }, { agent: "research-scout", plan_context: scoutB }], new Set(), new Set(), context), true);
+	assert.equal(validateScoutDispatch(1, [{ agent: "research-scout", plan_context: scoutA }, { agent: "research-scout", plan_context: scoutB }], new Set(), new Set(), context), false);
+	assert.equal(validateScoutDispatch(1, [{ agent: "research-scout", plan_context: scoutA }], new Set([scoutA.parent_item_id]), new Set([scoutA.owner_ref]), context), false, "sequential duplicate scouts are not distinct leaves");
+	const foreignRun = { ...scoutA, run_id: "run-two" };
+	assert.equal(validateScoutDispatch(0, [{ agent: "research-scout", plan_context: foreignRun }], new Set(), new Set(), context), false, "scout context must belong to the owning branch run");
+	const wrongOwner = { ...scoutA, owner_ref: "d".repeat(24) };
+	assert.equal(validateScoutDispatch(0, [{ agent: "research-scout", plan_context: wrongOwner }], new Set(), new Set(), context), false, "scout owner must be derived from its run and node");
+	const selfParent = { ...scoutA, parent_item_id: context.parent_item_id, owner_ref: ownerRef(context.run_id, context.parent_item_id) };
+	assert.equal(validateScoutDispatch(0, [{ agent: "research-scout", plan_context: selfParent }], new Set(), new Set(), context), false, "scout cannot claim its branch node as its own parent");
 	assert.equal(validateScoutDispatch(0, [{ agent: "researcher", plan_context: scoutA }]), false);
 	assert.equal(validateScoutDispatch(0, [{ agent: "research-scout", plan_context: context }]), false);
 	assert.equal(validateScoutDispatch(0, [{ agent: "research-scout", plan_context: scoutA }, { agent: "research-scout", plan_context: scoutA }]), false);
 });
 
 test("head planners dispatch each active depth-one branch exactly once", () => {
-	const second = { ...context, parent_item_id: "root-b", owner_ref: "b".repeat(24) };
+	const second = { ...context, parent_item_id: "root-b", owner_ref: ownerRef(context.run_id, "root-b") };
 	assert.equal(validateRootResearchDispatch("run-one", new Set(), new Set(), [
 		{ agent: "research-planner", plan_context: context }, { agent: "research-planner", plan_context: second },
 	]), true);
+	assert.equal(validateRootResearchDispatch("run-one", new Set(), new Set(), [{ agent: "research-planner", plan_context: context }], new Set([`run-one:root:${context.owner_ref}`])), true);
+	assert.equal(validateRootResearchDispatch("run-one", new Set(), new Set(), [{ agent: "research-planner", plan_context: context }], new Set([`run-one:other:${ownerRef("run-one", "other")}`])), false, "root dispatch must target an active graph branch");
 	assert.equal(validateRootResearchDispatch("other-run", new Set(), new Set(), [{ agent: "research-planner", plan_context: context }]), false);
 	assert.equal(validateRootResearchDispatch("run-one", new Set(["root"]), new Set(), [{ agent: "research-planner", plan_context: context }]), false);
 	assert.equal(validateRootResearchDispatch("run-one", new Set(), new Set([context.owner_ref]), [{ agent: "research-planner", plan_context: context }]), false);
 	assert.equal(validateRootResearchDispatch("run-one", new Set(), new Set(), [{ agent: "research-scout", plan_context: context }]), false);
+	const forgedOwner = { ...context, owner_ref: "d".repeat(24) };
+	assert.equal(validateRootResearchDispatch("run-one", new Set(), new Set(), [{ agent: "research-planner", plan_context: forgedOwner }]), false, "root owner must be derived from its run and node");
 });
 
 test("planned research roles fail closed without their exact depth context", () => {

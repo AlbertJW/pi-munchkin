@@ -2,7 +2,7 @@ import { PLAN_NOTE_MAX_BYTES, PLAN_TITLE_MAX_BYTES } from "./plan-limits.ts";
 import { chmod, mkdir, open, readFile, rename, unlink } from "node:fs/promises";
 import { dirname } from "node:path";
 import { randomUUID } from "node:crypto";
-import { boundedInteger, budgetWithin, validBudget, validCoverage, validDeferral, type Deferral, type PlanStatus, type ResearchBudget, type RetrievalCoverage } from "./plan-graph.ts";
+import { boundedInteger, budgetWithin, ownerRef, validBudget, validCoverage, validDeferral, type Deferral, type PlanStatus, type ResearchBudget, type RetrievalCoverage } from "./plan-graph.ts";
 
 export const PLAN_CONTEXT_ENV = "PI_MUNCHKIN_PLAN_CONTEXT_PATH";
 export const BRANCH_REPORT_ENV = "PI_MUNCHKIN_BRANCH_REPORT_PATH";
@@ -74,12 +74,26 @@ export function validatePlanContextRole(agentName: string, context: unknown): co
 	return context === undefined;
 }
 
-export function validateScoutDispatch(currentCount: number, requested: Array<{ agent: string; plan_context?: unknown }>): boolean {
+export function validateScoutDispatch(
+	currentCount: number,
+	requested: Array<{ agent: string; plan_context?: unknown }>,
+	dispatchedParents: ReadonlySet<string> = new Set(),
+	dispatchedOwners: ReadonlySet<string> = new Set(),
+	branchBinding?: PlanContextV1,
+): boolean {
 	if (!boundedInteger(currentCount, 2) || requested.length < 1 || currentCount + requested.length > 2) return false;
-	const owners = new Set<string>();
-	const nodes = new Set<string>();
+	if (!branchBinding || !validatePlanContext(branchBinding as PlanContextV1) || branchBinding.depth !== 1 ||
+		branchBinding.owner_ref !== ownerRef(branchBinding.run_id, branchBinding.parent_item_id)) return false;
+	// The count alone is not enough: two sequential calls could dispatch the same
+	// leaf twice while still staying under the two-leaf ceiling. Validate against
+	// the branch's already-dispatched identities as well as duplicates in this
+	// request, without mutating the caller's sets on a rejected request.
+	const owners = new Set(dispatchedOwners);
+	const nodes = new Set(dispatchedParents);
 	for (const entry of requested) {
-		if (entry.agent !== "research-scout" || !validatePlanContext(entry.plan_context) || entry.plan_context.depth !== 2) return false;
+		if (entry.agent !== "research-scout" || !validatePlanContext(entry.plan_context) || entry.plan_context.depth !== 2 ||
+			entry.plan_context.run_id !== branchBinding.run_id || entry.plan_context.parent_item_id === branchBinding.parent_item_id ||
+			entry.plan_context.owner_ref !== ownerRef(entry.plan_context.run_id, entry.plan_context.parent_item_id)) return false;
 		if (owners.has(entry.plan_context.owner_ref) || nodes.has(entry.plan_context.parent_item_id)) return false;
 		owners.add(entry.plan_context.owner_ref);
 		nodes.add(entry.plan_context.parent_item_id);
@@ -92,12 +106,15 @@ export function validateRootResearchDispatch(
 	dispatchedParents: ReadonlySet<string>,
 	dispatchedOwners: ReadonlySet<string>,
 	requested: Array<{ agent: string; plan_context?: unknown }>,
+	activeBranches?: ReadonlySet<string>,
 ): boolean {
 	if (!activeRunId || requested.length < 1 || requested.length > 3) return false;
 	const parents = new Set<string>();
 	const owners = new Set<string>();
 	for (const entry of requested) {
-		if (entry.agent !== "research-planner" || !validatePlanContext(entry.plan_context) || entry.plan_context.depth !== 1 || entry.plan_context.run_id !== activeRunId) return false;
+		if (entry.agent !== "research-planner" || !validatePlanContext(entry.plan_context) || entry.plan_context.depth !== 1 || entry.plan_context.run_id !== activeRunId ||
+			entry.plan_context.owner_ref !== ownerRef(entry.plan_context.run_id, entry.plan_context.parent_item_id)) return false;
+		if (activeBranches && !activeBranches.has(`${entry.plan_context.run_id}:${entry.plan_context.parent_item_id}:${entry.plan_context.owner_ref}`)) return false;
 		if (parents.has(entry.plan_context.parent_item_id) || owners.has(entry.plan_context.owner_ref) ||
 			dispatchedParents.has(entry.plan_context.parent_item_id) || dispatchedOwners.has(entry.plan_context.owner_ref)) return false;
 		parents.add(entry.plan_context.parent_item_id);

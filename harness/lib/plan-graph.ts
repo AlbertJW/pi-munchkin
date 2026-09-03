@@ -12,6 +12,7 @@ export type PlanNodeKind = "work" | "research_branch" | "research_leaf";
 export type ResearchBudget = { searches: number; reads: number };
 export type BudgetAccount = { allocated: ResearchBudget; used: ResearchBudget };
 export type Deferral = { value: string; risk: string; rationale: string };
+export type ResearchBranchLease = { lease_id: string; issued_at: string; owner_ref: string };
 export type RetrievalCoverage = {
 	strategy: "direct" | "structural" | "hybrid";
 	scope: "bounded" | "exhaustive";
@@ -36,6 +37,8 @@ export type GraphPlanItem = {
 	source_leads?: string[];
 	coverage?: RetrievalCoverage;
 	defer?: Deferral;
+	/** Parent-authoritative marker preventing duplicate root dispatch after restart. */
+	lease?: ResearchBranchLease;
 };
 
 export type ResearchProfile = {
@@ -101,6 +104,16 @@ export function validDeferral(value: unknown): value is Deferral {
 
 function boundedText(value: unknown, bytes: number): value is string {
 	return typeof value === "string" && value.trim().length > 0 && Buffer.byteLength(value, "utf8") <= bytes && !/\r/.test(value);
+}
+
+function validResearchBranchLease(value: unknown): value is ResearchBranchLease {
+	if (!value || typeof value !== "object" || Array.isArray(value)) return false;
+	const item = value as Record<string, unknown>;
+	if (Object.keys(item).length !== 3 || !Object.keys(item).every((key) => ["lease_id", "issued_at", "owner_ref"].includes(key))) return false;
+	if (!boundedText(item.lease_id, 96) || !/^[A-Za-z0-9._:-]{8,96}$/.test(String(item.lease_id))) return false;
+	if (!/^[a-f0-9]{24}$/.test(String(item.owner_ref))) return false;
+	if (!boundedText(item.issued_at, 40) || !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/.test(String(item.issued_at)) || !Number.isFinite(Date.parse(String(item.issued_at)))) return false;
+	return true;
 }
 
 function publicUrl(value: unknown): value is string {
@@ -189,8 +202,12 @@ export function validateGraph(state: GraphPlanState): string[] {
 		if (item.source_leads !== undefined && (!Array.isArray(item.source_leads) || item.source_leads.length > 10 || item.source_leads.some((url) => !publicUrl(url)))) errors.push(`invalid source leads: ${item.id}`);
 		if (item.coverage && !validCoverage(item.coverage)) errors.push(`invalid retrieval coverage: ${item.id}`);
 		if (item.defer !== undefined && !validDeferral(item.defer)) errors.push(`invalid deferral: ${item.id}`);
+		if (item.lease !== undefined && !validResearchBranchLease(item.lease)) errors.push(`invalid dispatch lease: ${item.id}`);
 		if (item.status === "deferred" && !validDeferral(item.defer)) {
 			errors.push(`deferred node requires value, risk, and rationale: ${item.id}`);
+		}
+		if (item.lease && (!state.profile || item.parent_id !== undefined || item.kind !== "research_branch" || graphTerminal(item) || item.lease.owner_ref !== item.owner_ref)) {
+			errors.push(`dispatch lease requires an open deep-research root branch: ${item.id}`);
 		}
 	}
 	for (const item of state.items) {
@@ -238,6 +255,7 @@ export function expandGraph(state: GraphPlanState, parentId: string, incoming: B
 	const parent = state.items.find((item) => item.id === parentId);
 	if (!parent) throw new Error(`unknown parent_item_id: ${parentId}`);
 	if (["done", "blocked", "deferred"].includes(parent.status)) throw new Error(`terminal node cannot be expanded: ${parentId}`);
+	if (parent.lease) throw new Error(`leased research branch cannot be expanded while dispatch is in flight: ${parentId}`);
 	if (state.profile && (parent.parent_id || parent.kind === "research_leaf")) throw new Error(`deep-research branches may expand only once: ${parentId}`);
 	const maximum = state.profile?.max_children ?? 8;
 	if (incoming.length < 1 || incoming.length > maximum) throw new Error(`provide 1-${maximum} child nodes`);

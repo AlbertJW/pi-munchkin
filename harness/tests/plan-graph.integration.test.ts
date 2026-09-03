@@ -1,9 +1,10 @@
 import assert from "node:assert/strict";
-import { execFileSync } from "node:child_process";
+import { execFileSync, spawn } from "node:child_process";
 import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import test from "node:test";
+import { ownerRef } from "../lib/plan-graph.ts";
 
 const CHILD = process.env.PLAN_GRAPH_TEST_CHILD === "1";
 
@@ -12,7 +13,7 @@ if (!CHILD) {
 		const artifacts = mkdtempSync(join(tmpdir(), "pi-plan-branch-artifacts-"));
 		const contextPath = join(artifacts, "context.json");
 		writeFileSync(contextPath, JSON.stringify({
-			v: 1, profile: "deep-research", run_id: "branch-budget-run", parent_item_id: "branch-budget-root", owner_ref: "a".repeat(24),
+			v: 1, profile: "deep-research", run_id: "branch-budget-run", parent_item_id: "branch-budget-root", owner_ref: ownerRef("branch-budget-run", "branch-budget-root"),
 			depth: 1, budget: { searches: 2, reads: 3 }, limits: { max_depth: 2, max_children: 2 },
 		}));
 		const env = {
@@ -24,7 +25,7 @@ if (!CHILD) {
 			const output = execFileSync(process.execPath, [
 				"--experimental-strip-types", "--experimental-loader", resolve("harness/tests/ts-js-resolver.mjs"), "--test", import.meta.filename,
 			], { cwd: process.cwd(), env, encoding: "utf8", stdio: "pipe" });
-			assert.match(output, /pass 13/);
+			assert.match(output, /pass 21/);
 		} finally { rmSync(artifacts, { recursive: true, force: true }); }
 	});
 } else {
@@ -33,7 +34,9 @@ if (!CHILD) {
 	const { join } = await import("node:path");
 	const { callTool, expectToolError, fire, makeCtx, makeFakePi, resetPiGlobals } = await import("./integration-harness.ts");
 	const { HARNESS_SIGNAL_CHANNEL } = await import("../lib/harness-signals.ts");
-	const planRunner = (await import("../extensions/plan-runner.ts")).default;
+	const planRunnerModule = await import("../extensions/plan-runner.ts");
+	const planRunner = planRunnerModule.default;
+	const toolActivation = (await import("../extensions/tool-activation.ts")).default;
 	const tmp = () => mkdtempSync(join(tmpdir(), "pi-plan-graph-"));
 	const coverage = { strategy: "direct", scope: "bounded", returned_count: 1, truncated: false, budget_exhausted: false, failed: false, complete: true };
 	function fresh() {
@@ -74,6 +77,131 @@ if (!CHILD) {
 		assert.equal(state.schema_version, 5); assert.equal(state.profile.name, "deep-research");
 		assert.equal(result.details.contexts.length, 2); assert.equal(result.details.contexts[0].parent_item_id, state.items[0].id);
 		await expectToolError(fp, "research_plan_start", { request: "bad", summary: "over budget", branches: [{ title: "bad", budget: { searches: 4, reads: 6 } }] }, cwd, /active or unsettled graph plan already exists/);
+		resetPiGlobals();
+	});
+
+	test("durable root dispatch leases are cleared by an explicit terminal update", async () => {
+		const fp = fresh(); const cwd = tmp();
+		const started = await callTool(fp, "research_plan_start", { request: "Lease branch", summary: "one branch", branches: [{ title: "Evidence", budget: { searches: 1, reads: 1 } }] }, cwd);
+		const context = started.details.contexts[0];
+		const acquired = await planRunnerModule.acquireResearchBranchLease(cwd, context);
+		assert.equal(acquired.ok, true);
+		await expectToolError(fp, "plan_expand", { parent_item_id: context.parent_item_id, children: [{ title: "Concurrent leaf" }] }, cwd, /leased research branch cannot be expanded/);
+		let state = JSON.parse(readFileSync(join(cwd, ".pi", "plan-state.json"), "utf8"));
+		assert.equal(typeof state.items[0].lease.lease_id, "string");
+		await callTool(fp, "plan_update", { deltas: [{ item_id: context.parent_item_id, status: "blocked", note: "user cancelled delegated branch" }] }, cwd);
+		state = JSON.parse(readFileSync(join(cwd, ".pi", "plan-state.json"), "utf8"));
+		assert.equal(state.items[0].status, "blocked");
+		assert.equal(state.items[0].lease, undefined, "terminal user transition releases the durable lease");
+		resetPiGlobals();
+	});
+
+	test("validated branch results release their parent dispatch lease", async () => {
+		const fp = fresh(); const cwd = tmp();
+		await fire(fp, "session_start", {}, makeCtx(cwd).ctx);
+		const started = await callTool(fp, "research_plan_start", { request: "Lease merge", summary: "one branch", branches: [{ title: "Evidence", budget: { searches: 1, reads: 1 } }] }, cwd);
+		const context = started.details.contexts[0];
+		const acquired = await planRunnerModule.acquireResearchBranchLease(cwd, context);
+		assert.equal(acquired.ok, true);
+		fp.pi.events.emit(HARNESS_SIGNAL_CHANNEL, { v: 1, type: "plan/branch-result", context, report: {
+			v: 1, parent_item_id: context.parent_item_id, owner_ref: context.owner_ref, status: "blocked", note: "bounded failure",
+			consumed: { searches: 0, reads: 0 }, evidence_gaps: ["bounded failure"], source_leads: [], children: [],
+			coverage: { strategy: "direct", scope: "bounded", returned_count: 0, truncated: false, budget_exhausted: true, failed: false, complete: false },
+		}, failureClass: null });
+		await fire(fp, "before_agent_start", {}, makeCtx(cwd).ctx);
+		const state = JSON.parse(readFileSync(join(cwd, ".pi", "plan-state.json"), "utf8"));
+		assert.equal(state.items[0].status, "blocked");
+		assert.equal(state.items[0].lease, undefined, "merge closes the lease before publishing the branch outcome");
+		resetPiGlobals();
+	});
+
+	test("recovery marks a stale leased branch blocked before it can be retried", async () => {
+		const fp = fresh(); const cwd = tmp();
+		await fire(fp, "session_start", {}, makeCtx(cwd).ctx);
+		const started = await callTool(fp, "research_plan_start", { request: "Lease recovery", summary: "one branch", branches: [{ title: "Evidence", budget: { searches: 1, reads: 1 } }] }, cwd);
+		const context = started.details.contexts[0];
+		const acquired = await planRunnerModule.acquireResearchBranchLease(cwd, context);
+		assert.equal(acquired.ok, true);
+		const path = join(cwd, ".pi", "plan-state.json");
+		const stale = JSON.parse(readFileSync(path, "utf8")); stale.writer = "previous-parent-process";
+		writeFileSync(path, `${JSON.stringify(stale)}\n`, { mode: 0o600 });
+		resetPiGlobals();
+		const next = makeFakePi();
+		const reloaded = await import(`../extensions/plan-runner.ts?stale-recovery=${Date.now()}`);
+		reloaded.default(next.pi as any);
+		await fire(next, "session_start", {}, makeCtx(cwd).ctx);
+		const recovered = JSON.parse(readFileSync(path, "utf8"));
+		assert.equal(recovered.items[0].status, "blocked");
+		assert.equal(recovered.items[0].lease, undefined);
+		assert.match(recovered.items[0].note, /interrupted before a validated result/);
+		resetPiGlobals();
+	});
+
+	test("cross-process plan mutations wait on the parent graph lock", async () => {
+		const fp = fresh(); const cwd = tmp();
+		await fire(fp, "session_start", {}, makeCtx(cwd).ctx);
+		const started = await callTool(fp, "research_plan_start", { request: "Cross-process lock", summary: "one branch", branches: [{ title: "Evidence", budget: { searches: 1, reads: 1 } }] }, cwd);
+		const context = started.details.contexts[0];
+		const lockPath = join(cwd, ".pi", "plan-state.json.lock");
+		writeFileSync(lockPath, `${JSON.stringify({ pid: process.pid, token: "test-holder", created_at: new Date().toISOString() })}\n`, { mode: 0o600 });
+		const childCode = `import { acquireResearchBranchLease } from ${JSON.stringify(resolve("harness/extensions/plan-runner.ts"))}; process.stdout.write("ready\\n"); const result = await acquireResearchBranchLease(process.env.LEASE_CWD, JSON.parse(process.env.LEASE_CONTEXT)); process.stdout.write(JSON.stringify(result) + "\\n");`;
+		const child = spawn(process.execPath, ["--experimental-strip-types", "--input-type=module", "-e", childCode], {
+			cwd: process.cwd(), env: { ...process.env, LEASE_CWD: cwd, LEASE_CONTEXT: JSON.stringify(context) },
+			stdio: ["ignore", "pipe", "pipe"],
+		});
+		child.stdout.setEncoding("utf8");
+		let output = "";
+		const ready = new Promise<void>((resolveReady, rejectReady) => {
+			const timer = setTimeout(() => rejectReady(new Error("lock child did not initialize")), 5_000);
+			child.stdout.on("data", (chunk: string) => { output += chunk; if (output.includes("ready\n")) { clearTimeout(timer); resolveReady(); } });
+			child.once("error", (error) => { clearTimeout(timer); rejectReady(error); });
+		});
+		try {
+			await ready;
+			await new Promise((resolve) => setTimeout(resolve, 150));
+			assert.equal(output.trim(), "ready", "a second parent must wait instead of acquiring during the lock");
+			await import("node:fs/promises").then(({ unlink }) => unlink(lockPath));
+			await new Promise<void>((resolveDone, rejectDone) => {
+				child.once("exit", (code) => code === 0 ? resolveDone() : rejectDone(new Error(`lock child exited ${code}: ${output}`)));
+			});
+			assert.match(output, /\"ok\":true/);
+		} finally {
+			await import("node:fs/promises").then(({ unlink }) => unlink(lockPath).catch(() => undefined));
+			if (!child.killed) child.kill("SIGTERM");
+		}
+		resetPiGlobals();
+	});
+
+	test("a lock left by a dead parent process is reclaimed safely", async () => {
+		const fp = fresh(); const cwd = tmp();
+		await fire(fp, "session_start", {}, makeCtx(cwd).ctx);
+		const started = await callTool(fp, "research_plan_start", { request: "Dead lock", summary: "one branch", branches: [{ title: "Evidence", budget: { searches: 1, reads: 1 } }] }, cwd);
+		const context = started.details.contexts[0];
+		const lockPath = join(cwd, ".pi", "plan-state.json.lock");
+		writeFileSync(lockPath, `${JSON.stringify({ pid: 9_999_999, lock_id: "dead-parent", created_at: new Date().toISOString() })}\n`, { mode: 0o600 });
+		const acquired = await planRunnerModule.acquireResearchBranchLease(cwd, context);
+		assert.equal(acquired.ok, true, "a lock whose owner no longer exists must not strand the graph");
+		resetPiGlobals();
+	});
+
+	test("starting a research graph activates the parent research and delegation families", async () => {
+		const fp = makeFakePi(); const cwd = tmp();
+		for (const name of ["read", "bash", "edit", "write", "capability", "plan_write", "plan_update", "plan_expand", "plan_settle", "research_plan_start", "web_search", "web_read", "research_note", "research_recall", "subagent"]) {
+			fp.pi.registerTool({ name, parameters: {} } as any);
+		}
+		planRunner(fp.pi as any);
+		toolActivation(fp.pi as any);
+		fp.pi.setActiveTools([...fp.tools.keys()]);
+		await fire(fp, "session_start", {}, makeCtx(cwd).ctx);
+		assert.equal(fp.pi.getActiveTools().includes("web_search"), false);
+		assert.equal(fp.pi.getActiveTools().includes("subagent"), false);
+		await callTool(fp, "capability", { action: "enable", family: "planning" }, cwd);
+		await callTool(fp, "research_plan_start", {
+			request: "Compare two approaches", summary: "one branch", branches: [{ title: "Evidence", budget: { searches: 1, reads: 1 } }],
+		}, cwd);
+		assert.ok(fp.pi.getActiveTools().includes("web_search"), "research graph must expose web search after start");
+		assert.ok(fp.pi.getActiveTools().includes("web_read"), "research graph must expose web reads after start");
+		assert.ok(fp.pi.getActiveTools().includes("subagent"), "research graph must expose delegation after start");
 		resetPiGlobals();
 	});
 
@@ -189,6 +317,56 @@ if (!CHILD) {
 		assert.equal(state.items[0].status, "done");
 		assert.equal(state.items[0].note, "first terminal result");
 		await expectToolError(fp, "research_plan_start", { request: "replace", summary: "must not replace", branches: [{ title: "New", budget: { searches: 1, reads: 1 } }] }, cwd, /unsettled graph plan already exists/);
+		resetPiGlobals();
+	});
+
+	test("a delegated child ID collision blocks the owning branch instead of leaving it open", async () => {
+		const fp = fresh(); const cwd = tmp();
+		const started = await callTool(fp, "research_plan_start", {
+			request: "Compare two evidence families", summary: "two branches",
+			branches: [
+				{ title: "Branch A", budget: { searches: 2, reads: 2 } },
+				{ title: "Branch B", budget: { searches: 1, reads: 1 } },
+			],
+		}, cwd);
+		const [context] = started.details.contexts;
+		const stateBefore = JSON.parse(readFileSync(join(cwd, ".pi", "plan-state.json"), "utf8"));
+		const collidingId = stateBefore.items[1].id;
+		const report = {
+			v: 1, parent_item_id: context.parent_item_id, owner_ref: context.owner_ref, status: "done", note: "collision",
+			consumed: context.budget, evidence_gaps: [], source_leads: [], coverage,
+			children: [{ item_id: collidingId, title: "Colliding leaf", status: "done", coverage,
+				budget: { allocated: context.budget, used: context.budget } }],
+		};
+		fp.pi.events.emit(HARNESS_SIGNAL_CHANNEL, { v: 1, type: "plan/branch-result", context, report, failureClass: null });
+		await fire(fp, "before_agent_start", {}, makeCtx(cwd).ctx);
+		const state = JSON.parse(readFileSync(join(cwd, ".pi", "plan-state.json"), "utf8"));
+		assert.equal(state.items[0].status, "blocked");
+		assert.match(state.items[0].note, /merge_collision/);
+		assert.equal(state.items.length, 2, "the colliding child must not be admitted");
+		resetPiGlobals();
+	});
+
+	test("a report that violates graph invariants blocks the branch instead of being swallowed", async () => {
+		const fp = fresh(); const cwd = tmp();
+		const started = await callTool(fp, "research_plan_start", {
+			request: "Investigate", summary: "one branch",
+			branches: [{ title: "Evidence", budget: { searches: 1, reads: 1 } }],
+		}, cwd);
+		const context = started.details.contexts[0];
+		const incomplete = { strategy: "direct", scope: "bounded", returned_count: 0, truncated: false, budget_exhausted: true, failed: false, complete: false };
+		const report = {
+			v: 1, parent_item_id: context.parent_item_id, owner_ref: context.owner_ref, status: "blocked", note: "no allocation",
+			consumed: { searches: 0, reads: 0 }, evidence_gaps: ["no allocation"], source_leads: [], coverage: incomplete,
+			children: [{ item_id: "zero-budget", title: "Zero budget", status: "blocked", evidence_gaps: ["no allocation"], coverage: incomplete,
+				budget: { allocated: { searches: 0, reads: 0 }, used: { searches: 0, reads: 0 } } }],
+		};
+		fp.pi.events.emit(HARNESS_SIGNAL_CHANNEL, { v: 1, type: "plan/branch-result", context, report, failureClass: null });
+		await fire(fp, "before_agent_start", {}, makeCtx(cwd).ctx);
+		const state = JSON.parse(readFileSync(join(cwd, ".pi", "plan-state.json"), "utf8"));
+		assert.equal(state.items[0].status, "blocked");
+		assert.match(state.items[0].note, /merge_rejected/);
+		assert.equal(state.items.length, 1, "invalid children must not be admitted");
 		resetPiGlobals();
 	});
 

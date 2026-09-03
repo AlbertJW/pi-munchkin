@@ -34,7 +34,8 @@ import {
 } from "./types.js";
 import { ACTIVE_TOOL_PROMPTS } from "../../lib/active-tool-prompts.ts";
 import { emitHarnessSignal } from "../../lib/harness-signals.ts";
-import { PLAN_CONTEXT_ENV, RESEARCH_SCOUT_ENV, researchUsageFromMessages, validateRootResearchDispatch, validateScoutDispatch, type PlanContextV1, type ScoutReceiptV1 } from "../../lib/branch-report.ts";
+import { PLAN_CONTEXT_ENV, RESEARCH_SCOUT_ENV, readPlanContext, researchUsageFromMessages, validateRootResearchDispatch, validateScoutDispatch, type PlanContextV1, type ScoutReceiptV1 } from "../../lib/branch-report.ts";
+import { acquireResearchBranchLease, releaseResearchBranchLease } from "../../extensions/plan-runner.ts";
 
 // ---------------------------------------------------------------------------
 // Limits
@@ -59,6 +60,83 @@ const PLAN_GRAPH_ENABLED = process.env.PLAN_GRAPH === "on";
 const BRANCH_PLANNER_PROCESS = Boolean(process.env[PLAN_CONTEXT_ENV]);
 const RESEARCH_SCOUT_PROCESS = process.env[RESEARCH_SCOUT_ENV] === "1";
 const SCOUT_RECEIPTS_KEY = "__pi_research_scout_receipts";
+const SCOUT_DISPATCH_STATE_KEY = "__pi_research_scout_dispatch_v1";
+const ROOT_DISPATCH_STATE_KEY = "__pi_research_root_dispatch_v1";
+const ROOT_CONTEXTS_KEY = "__pi_research_root_contexts_v1";
+
+type ScoutDispatchState = {
+	key: string;
+	count: number;
+	parents: string[];
+	owners: string[];
+};
+
+type RootDispatchState = {
+	key: string;
+	parents: string[];
+	owners: string[];
+};
+
+function scoutDispatchState(): ScoutDispatchState {
+	const shared = globalThis as Record<string, unknown>;
+	const existing = shared[SCOUT_DISPATCH_STATE_KEY] as Partial<ScoutDispatchState> | undefined;
+	if (existing && typeof existing.key === "string" && typeof existing.count === "number" && Number.isSafeInteger(existing.count) && existing.count >= 0 &&
+		Array.isArray(existing.parents) && Array.isArray(existing.owners) && existing.parents.every((value) => typeof value === "string") &&
+		existing.owners.every((value) => typeof value === "string")) return existing as ScoutDispatchState;
+	const fresh: ScoutDispatchState = { key: "", count: 0, parents: [], owners: [] };
+	shared[SCOUT_DISPATCH_STATE_KEY] = fresh;
+	return fresh;
+}
+
+function alignScoutDispatchState(state: ScoutDispatchState, context: PlanContextV1 | null): void {
+	if (!context) return;
+	const key = `${context.run_id}:${context.parent_item_id}:${context.owner_ref}`;
+	if (state.key === key) return;
+	state.key = key;
+	state.count = 0;
+	state.parents = [];
+	state.owners = [];
+}
+
+function rootDispatchState(): RootDispatchState {
+	const shared = globalThis as Record<string, unknown>;
+	const existing = shared[ROOT_DISPATCH_STATE_KEY] as Partial<RootDispatchState> | undefined;
+	if (existing && typeof existing.key === "string" && Array.isArray(existing.parents) && Array.isArray(existing.owners) &&
+		existing.parents.every((value) => typeof value === "string") && existing.owners.every((value) => typeof value === "string")) {
+		return existing as RootDispatchState;
+	}
+	const fresh: RootDispatchState = { key: "", parents: [], owners: [] };
+	shared[ROOT_DISPATCH_STATE_KEY] = fresh;
+	return fresh;
+}
+
+function alignRootDispatchState(state: RootDispatchState, runId: string | undefined): void {
+	if (!runId) return;
+	if (state.key === runId) return;
+	state.key = runId;
+	state.parents = [];
+	state.owners = [];
+}
+
+function activeResearchRootContexts(): ReadonlySet<string> {
+	const raw = (globalThis as Record<string, unknown>)[ROOT_CONTEXTS_KEY];
+	if (!Array.isArray(raw) || !raw.every((value) => typeof value === "string" && value.length <= 300)) return new Set();
+	return new Set(raw);
+}
+
+async function acquireRootLeases(cwd: string, contexts: PlanContextV1[]): Promise<{ ok: true } | { ok: false; reason: string }> {
+	const acquired: Array<{ context: PlanContextV1; leaseId: string }> = [];
+	for (const context of contexts) {
+		const result = await acquireResearchBranchLease(cwd, context);
+		if (!result.ok) {
+			for (const prior of acquired) await releaseResearchBranchLease(cwd, prior.context, prior.leaseId).catch(() => false);
+			const reason = result.reason === "already-leased" ? "already in-flight (durable dispatch lease)" : result.reason;
+			return { ok: false, reason };
+		}
+		acquired.push({ context, leaseId: result.lease_id });
+	}
+	return { ok: true };
+}
 
 function publishScoutReceipt(context: PlanContextV1 | undefined, result: SingleResult): void {
 	if (context?.depth !== 2) return;
@@ -66,6 +144,37 @@ function publishScoutReceipt(context: PlanContextV1 | undefined, result: SingleR
 	const prior = Array.isArray(shared[SCOUT_RECEIPTS_KEY]) ? shared[SCOUT_RECEIPTS_KEY] as ScoutReceiptV1[] : [];
 	const usage = researchUsageFromMessages(result.messages);
 	shared[SCOUT_RECEIPTS_KEY] = [...prior.filter((receipt) => receipt.owner_ref !== context.owner_ref), { owner_ref: context.owner_ref, ...usage }];
+}
+
+/**
+ * A runner can fail before it has spawned a child (for example while creating
+ * the private prompt or plan-context artifact). Planned branches still need a
+ * normal result so the parent can publish the branch-result signal and release
+ * its durable dispatch lease. Keep the diagnostic deliberately generic: the
+ * real exception may contain a private path or other process detail, and the
+ * model-facing renderer already has a bounded untrusted failure contract.
+ */
+function runnerFailureResult(
+	agentName: string,
+	task: string,
+	agents: AgentConfig[],
+	planContext: PlanContextV1 | undefined,
+	sessionModel: string | undefined,
+): SingleResult {
+	const agent = agents.find((candidate) => candidate.name === agentName);
+	return {
+		agent: agentName,
+		agentSource: agent?.source ?? "unknown",
+		task,
+		exitCode: 1,
+		messages: [],
+		stderr: "Subagent runner failed before the child process completed.",
+		usage: emptyUsage(),
+		model: agent?.model ?? sessionModel,
+		stopReason: "error",
+		errorMessage: "Subagent runner failed before the child process completed.",
+		...(planContext ? { planContext } : {}),
+	};
 }
 
 // ---------------------------------------------------------------------------
@@ -404,22 +513,18 @@ export default function (pi: ExtensionAPI) {
     type: "boolean",
   });
 
-  const depthConfig = resolveDelegationDepthConfig(pi);
-  const { currentDepth, maxDepth, ancestorAgentStack, preventCycles } = depthConfig;
-  const canDelegate = depthConfig.canDelegate && !RESEARCH_SCOUT_PROCESS;
-  let researchScoutDispatches = 0;
-  const researchBranchParents = new Set<string>();
-  const researchBranchOwners = new Set<string>();
+	const depthConfig = resolveDelegationDepthConfig(pi);
+	const { currentDepth, maxDepth, ancestorAgentStack, preventCycles } = depthConfig;
+	const canDelegate = depthConfig.canDelegate && !RESEARCH_SCOUT_PROCESS;
+	const scoutDispatch = scoutDispatchState();
+	const rootDispatch = rootDispatchState();
 
   let discoveredAgents: AgentConfig[] = [];
 
   // Auto-discover agents on session start
-  pi.on("session_start", async (_event, ctx) => {
+	pi.on("session_start", async (_event, ctx) => {
 	delete (globalThis as Record<string, unknown>)[SCOUT_RECEIPTS_KEY];
-	researchScoutDispatches = 0;
-	researchBranchParents.clear();
-	researchBranchOwners.clear();
-    if (!canDelegate) return;
+	    if (!canDelegate) return;
 
     const starterDiscovery = discoverAgentsWithStarter(ctx.cwd);
     const discovery = starterDiscovery.discovery;
@@ -608,23 +713,28 @@ Use single mode for one task, parallel mode when tasks are independent and can r
         }
 
 		let plannedScoutCount = 0;
+		let plannedScoutContexts: PlanContextV1[] = [];
 		let plannedRootContexts: PlanContextV1[] = [];
 		if (BRANCH_PLANNER_PROCESS) {
+			const branchBinding = await readPlanContext(process.env[PLAN_CONTEXT_ENV]);
+			alignScoutDispatchState(scoutDispatch, branchBinding);
 			const planned = params.tasks ?? (params.agent && params.task ? [{ agent: params.agent, task: params.task, plan_context: (params as typeof params & { plan_context?: PlanContextV1 }).plan_context }] : []);
 			plannedScoutCount = planned.length;
-			if (!validateScoutDispatch(researchScoutDispatches, planned as Array<{ agent: string; plan_context?: unknown }>)) {
+			if (!validateScoutDispatch(scoutDispatch.count, planned as Array<{ agent: string; plan_context?: unknown }>, new Set(scoutDispatch.parents), new Set(scoutDispatch.owners), branchBinding ?? undefined)) {
 				return {
 					content: [{ type: "text", text: "Blocked: a planned research branch may dispatch at most two research-scout leaves, each with its returned depth-two plan_context." }],
-					details: makeDetails(hasTasks ? "parallel" : "single")([]), isError: true,
-				};
-			}
+						details: makeDetails(hasTasks ? "parallel" : "single")([]), isError: true,
+					};
+				}
+			plannedScoutContexts = planned.map((entry) => entry.plan_context as PlanContextV1);
 		} else if (PLAN_GRAPH_ENABLED) {
 			const planned = params.tasks ?? (params.agent && params.task ? [{ agent: params.agent, task: params.task, plan_context: (params as typeof params & { plan_context?: PlanContextV1 }).plan_context }] : []);
 			const withContext = planned.filter((entry) => entry.plan_context !== undefined);
 			if (withContext.length > 0) {
 				const active = (globalThis as Record<string, unknown>).__pi_active_plan_context as { run_id?: unknown; profile?: unknown; settled?: unknown } | undefined;
 				const activeRunId = active?.profile === "deep-research" && active.settled !== true && typeof active.run_id === "string" ? active.run_id : undefined;
-				if (withContext.length !== planned.length || !validateRootResearchDispatch(activeRunId, researchBranchParents, researchBranchOwners, planned as Array<{ agent: string; plan_context?: unknown }>)) {
+				alignRootDispatchState(rootDispatch, activeRunId);
+				if (withContext.length !== planned.length || !validateRootResearchDispatch(activeRunId, new Set(rootDispatch.parents), new Set(rootDispatch.owners), planned as Array<{ agent: string; plan_context?: unknown }>, activeResearchRootContexts())) {
 					return {
 						content: [{ type: "text", text: "Blocked: planned root research requires one unused depth-one context from the active graph for every research-planner child." }],
 						details: makeDetails(hasTasks ? "parallel" : "single")([]), isError: true,
@@ -704,10 +814,24 @@ This guard prevents self-recursion and cyclic handoffs (for example A -> B -> A)
           }
         }
 
-        // ── Parallel mode ──
-        if (params.tasks && params.tasks.length > 0) {
-		  researchScoutDispatches += plannedScoutCount;
-		  for (const context of plannedRootContexts) { researchBranchParents.add(context.parent_item_id); researchBranchOwners.add(context.owner_ref); }
+		// ── Parallel mode ──
+		if (params.tasks && params.tasks.length > 0) {
+		  if (plannedRootContexts.length > 0) {
+			const leases = await acquireRootLeases(ctx.cwd, plannedRootContexts);
+			if (!leases.ok) return {
+				content: [{ type: "text", text: `Blocked: planned root research branch is ${leases.reason}. Inspect the parent graph before retrying.` }],
+				details: makeDetails("parallel")([]), isError: true,
+			};
+		  }
+		  scoutDispatch.count += plannedScoutCount;
+		  for (const context of plannedScoutContexts) {
+			 if (!scoutDispatch.parents.includes(context.parent_item_id)) scoutDispatch.parents.push(context.parent_item_id);
+			 if (!scoutDispatch.owners.includes(context.owner_ref)) scoutDispatch.owners.push(context.owner_ref);
+		  }
+		  for (const context of plannedRootContexts) {
+			if (!rootDispatch.parents.includes(context.parent_item_id)) rootDispatch.parents.push(context.parent_item_id);
+			if (!rootDispatch.owners.includes(context.owner_ref)) rootDispatch.owners.push(context.owner_ref);
+		  }
           return executeParallel(
 			params.tasks as Array<{ agent: string; task: string; cwd?: string; plan_context?: PlanContextV1 }>,
             delegationMode,
@@ -721,10 +845,24 @@ This guard prevents self-recursion and cyclic handoffs (for example A -> B -> A)
           );
         }
 
-        // ── Single mode ──
-        if (params.agent && params.task) {
-		  researchScoutDispatches += plannedScoutCount;
-		  for (const context of plannedRootContexts) { researchBranchParents.add(context.parent_item_id); researchBranchOwners.add(context.owner_ref); }
+		// ── Single mode ──
+		if (params.agent && params.task) {
+		  if (plannedRootContexts.length > 0) {
+			const leases = await acquireRootLeases(ctx.cwd, plannedRootContexts);
+			if (!leases.ok) return {
+				content: [{ type: "text", text: `Blocked: planned root research branch is ${leases.reason}. Inspect the parent graph before retrying.` }],
+				details: makeDetails("single")([]), isError: true,
+			};
+		  }
+		  scoutDispatch.count += plannedScoutCount;
+		  for (const context of plannedScoutContexts) {
+			 if (!scoutDispatch.parents.includes(context.parent_item_id)) scoutDispatch.parents.push(context.parent_item_id);
+			 if (!scoutDispatch.owners.includes(context.owner_ref)) scoutDispatch.owners.push(context.owner_ref);
+		  }
+		  for (const context of plannedRootContexts) {
+			if (!rootDispatch.parents.includes(context.parent_item_id)) rootDispatch.parents.push(context.parent_item_id);
+			if (!rootDispatch.owners.includes(context.owner_ref)) rootDispatch.owners.push(context.owner_ref);
+		  }
           return executeSingle(
             params.agent,
             params.task,
@@ -776,24 +914,31 @@ This guard prevents self-recursion and cyclic handoffs (for example A -> B -> A)
     onUpdate: ((partial: any) => void) | undefined,
     makeDetails: ReturnType<typeof makeDetailsFactory>,
   ) {
-    const result = await runAgent({
-      cwd: defaultCwd,
-      agents,
-      agentName,
-      task,
-      taskCwd: cwd,
-      delegationMode,
-      forkSessionSnapshotJsonl,
-      parentDepth: currentDepth,
-      parentAgentStack: ancestorAgentStack,
-      maxDepth,
-      preventCycles,
-      sessionModel,
-		planContext,
-      signal,
-      onUpdate,
-      makeDetails: makeDetails("single"),
-    });
+	let result: SingleResult;
+	try {
+		result = await runAgent({
+			cwd: defaultCwd,
+			agents,
+			agentName,
+			task,
+			taskCwd: cwd,
+			delegationMode,
+			forkSessionSnapshotJsonl,
+			parentDepth: currentDepth,
+			parentAgentStack: ancestorAgentStack,
+			maxDepth,
+			preventCycles,
+			sessionModel,
+			planContext,
+			signal,
+			onUpdate,
+			makeDetails: makeDetails("single"),
+		});
+	} catch {
+		// Preserve the planned-branch lifecycle even when setup fails before
+		// runner.ts can return its usual structured result.
+		result = runnerFailureResult(agentName, task, agents, planContext, sessionModel);
+	}
 	    publishScoutReceipt(planContext, result);
 
 	    const terminalPlanned = isTerminalPlannedFailure(planContext);
@@ -898,29 +1043,34 @@ This guard prevents self-recursion and cyclic handoffs (for example A -> B -> A)
         tasks,
         MAX_CONCURRENCY,
         async (t, index) => {
-          const result = await runAgent({
-            cwd: defaultCwd,
-            agents,
-            agentName: t.agent,
-            task: t.task,
-            taskCwd: t.cwd,
-			planContext: t.plan_context,
-            delegationMode,
-            forkSessionSnapshotJsonl,
-            parentDepth: currentDepth,
-            parentAgentStack: ancestorAgentStack,
-            maxDepth,
-            preventCycles,
-            sessionModel,
-            signal,
-            onUpdate: (partial) => {
-              if (partial.details?.results[0]) {
-                allResults[index] = partial.details.results[0];
-                emitProgress();
-              }
-            },
-            makeDetails: makeDetails("parallel"),
-          });
+		  let result: SingleResult;
+		  try {
+			  result = await runAgent({
+				cwd: defaultCwd,
+				agents,
+				agentName: t.agent,
+				task: t.task,
+				taskCwd: t.cwd,
+				planContext: t.plan_context,
+				delegationMode,
+				forkSessionSnapshotJsonl,
+				parentDepth: currentDepth,
+				parentAgentStack: ancestorAgentStack,
+				maxDepth,
+				preventCycles,
+				sessionModel,
+				signal,
+				onUpdate: (partial) => {
+				  if (partial.details?.results[0]) {
+					allResults[index] = partial.details.results[0];
+					emitProgress();
+				  }
+				},
+				makeDetails: makeDetails("parallel"),
+			  });
+		  } catch {
+			  result = runnerFailureResult(t.agent, t.task, agents, t.plan_context, sessionModel);
+		  }
           allResults[index] = result;
 		  publishScoutReceipt(t.plan_context, result);
 		  if (t.plan_context?.depth === 1) emitHarnessSignal(pi.events, {

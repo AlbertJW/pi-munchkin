@@ -87,6 +87,9 @@ export function buildSubagentEnv(source = process.env, options = {}) {
   const extra = String(source.PI_SUBAGENT_ENV_ALLOW ?? "")
     .split(",").map((name) => name.trim()).filter((name) => /^[A-Z_][A-Z0-9_]*$/.test(name));
   for (const key of new Set([...CHILD_ENV_KEYS, ...HARNESS_CONFIG_KEYS, ...extra])) {
+    // The explicit allowlist is additive, never an escape hatch from the
+    // parent-only identity, artifact, telemetry, and planner fences above.
+    if (EXCLUDED_HARNESS_ENV_KEYS.includes(key)) continue;
     if (source[key] !== undefined) env[key] = source[key];
   }
   for (const key of Object.keys(source)) {

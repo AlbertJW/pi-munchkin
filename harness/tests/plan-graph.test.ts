@@ -90,6 +90,11 @@ test("graph validation rejects cycles, missing parents, depth overflow, and exce
 		const zero = state();
 		zero.items[0].budget = { allocated: { searches: 0, reads: 0 }, used: { searches: 0, reads: 0 } };
 		assert.ok(validateGraph(zero).some((error) => /non-zero allocation/.test(error)));
+		const leased = state();
+		leased.items[0].lease = { lease_id: "lease-1234", issued_at: "2026-08-25T00:00:00.000Z", owner_ref: leased.items[0].owner_ref! };
+		assert.deepEqual(validateGraph(leased), [], "an open root may carry a valid dispatch lease");
+		leased.items[0].status = "done";
+		assert.ok(validateGraph(leased).some((error) => /open deep-research root branch/.test(error)), "terminal branches cannot retain a lease");
 	});
 
 test("settlement requires terminal unblocked work, complete deferrals, and parent-verified leads", () => {

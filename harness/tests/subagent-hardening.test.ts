@@ -1,10 +1,23 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { resolveSubagentTimeoutMs } from "../vendor/pi-subagent/timeout.ts";
 import { parseInheritedCliArgs } from "../vendor/pi-subagent/runner-cli.js";
 import { buildSubagentEnv } from "../vendor/pi-subagent/runner-env.js";
 import { normalizeCompletedResult, emptyUsage, isResultSuccess, type SingleResult } from "../vendor/pi-subagent/types.ts";
 import { isTerminalPlannedFailure, isTerminalPlannedFailureResult } from "../vendor/pi-subagent/types.ts";
+import { ownerRef } from "../lib/plan-graph.ts";
+import { callTool, fire, makeCtx, makeFakePi, resetPiGlobals } from "./integration-harness.ts";
+
+// The vendored subagent uses NodeNext `.js` sibling specifiers while its source
+// remains TypeScript. The repository test runner uses Node's native strip-types
+// loader, so register the local test-only resolver before the reload probe
+// dynamically imports the extension (the same boundary used by the manifest
+// boot test).
+const { register } = await import("node:module");
+register(new URL("./ts-js-resolver.mjs", import.meta.url), import.meta.url);
 
 test("planned depth-one branch failures are terminal, ordinary failures remain retryable", () => {
 	assert.equal(isTerminalPlannedFailure({ depth: 1 }), true);
@@ -174,6 +187,257 @@ test("planner flags propagate but private branch artifact paths never do", () =>
 	assert.equal(env.PI_MUNCHKIN_BRANCH_REPORT_PATH, undefined);
 	assert.equal(env.PI_MUNCHKIN_RESEARCH_SCOUT, undefined);
 	assert.equal(env.PI_MUNCHKIN_HEADLESS_PLAN, undefined);
+});
+
+test("explicit child env allowlist cannot override parent-only planner and identity fences", () => {
+	const env = buildSubagentEnv({
+		PATH: "/bin",
+		PI_SUBAGENT_ENV_ALLOW: "PI_MUNCHKIN_HEADLESS_PLAN,PI_MUNCHKIN_PLAN_CONTEXT_PATH,PI_RUN_ID,TELEMETRY_FD,TELEMETRY_HMAC_FD,CUSTOM_SENTINEL",
+		PI_MUNCHKIN_HEADLESS_PLAN: "on",
+		PI_MUNCHKIN_PLAN_CONTEXT_PATH: "/private/parent-context.json",
+		PI_RUN_ID: "parent-run",
+		TELEMETRY_FD: "7",
+		TELEMETRY_HMAC_FD: "8",
+		CUSTOM_SENTINEL: "allowed",
+	});
+	assert.equal(env.PI_MUNCHKIN_HEADLESS_PLAN, undefined);
+	assert.equal(env.PI_MUNCHKIN_PLAN_CONTEXT_PATH, undefined);
+	assert.equal(env.PI_RUN_ID, undefined);
+	assert.equal(env.TELEMETRY_FD, undefined);
+	assert.equal(env.TELEMETRY_HMAC_FD, undefined);
+	assert.equal(env.CUSTOM_SENTINEL, "allowed");
+});
+
+test("depth-two scout ceiling survives a child extension reload", async () => {
+	const previous = {
+		PLAN_GRAPH: process.env.PLAN_GRAPH,
+		PI_MUNCHKIN_PLAN_CONTEXT_PATH: process.env.PI_MUNCHKIN_PLAN_CONTEXT_PATH,
+		PI_SUBAGENT_DEPTH: process.env.PI_SUBAGENT_DEPTH,
+	};
+	const dir = mkdtempSync(join(tmpdir(), "pi-scout-dispatch-reload-"));
+	const contextPath = join(dir, "context.json");
+	const runId = "dispatch-reload-run";
+	const branchId = "dispatch-branch";
+	const branchContext = {
+		v: 1, profile: "deep-research", run_id: runId, parent_item_id: branchId,
+		owner_ref: ownerRef(runId, branchId), depth: 1,
+		budget: { searches: 2, reads: 3 }, limits: { max_depth: 2, max_children: 2 },
+	};
+	writeFileSync(contextPath, `${JSON.stringify(branchContext)}\n`, { mode: 0o600 });
+	process.env.PLAN_GRAPH = "on";
+	process.env.PI_MUNCHKIN_PLAN_CONTEXT_PATH = contextPath;
+	delete process.env.PI_SUBAGENT_DEPTH;
+	try {
+		const params = (leaf: string) => ({
+			agent: "research-scout", task: "bounded scout", confirmProjectAgents: false,
+			plan_context: {
+				...branchContext, parent_item_id: leaf, owner_ref: ownerRef(runId, leaf), depth: 2,
+				limits: { max_depth: 2, max_children: 0 },
+			},
+		});
+		const firstPi = makeFakePi();
+		const firstModule = await import(`../vendor/pi-subagent/index.ts?dispatch-reload-a=${Date.now()}`);
+		firstModule.default(firstPi.pi as never);
+		const first = await callTool(firstPi, "subagent", params("dispatch-leaf-a"), dir);
+		const second = await callTool(firstPi, "subagent", params("dispatch-leaf-b"), dir);
+		assert.doesNotMatch(first.content.map((block: any) => block?.text ?? "").join("\n"), /at most two research-scout leaves/i);
+		assert.doesNotMatch(second.content.map((block: any) => block?.text ?? "").join("\n"), /at most two research-scout leaves/i);
+
+		// Pi reloads extension modules in-process. The second generation must see
+		// the same branch-local dispatch ledger rather than resetting the ceiling.
+		const secondPi = makeFakePi();
+		const secondModule = await import(`../vendor/pi-subagent/index.ts?dispatch-reload-b=${Date.now()}`);
+		secondModule.default(secondPi.pi as never);
+		const blocked = await callTool(secondPi, "subagent", params("dispatch-leaf-c"), dir);
+		assert.match(blocked.content.map((block: any) => block?.text ?? "").join("\n"), /at most two research-scout leaves/i);
+		assert.deepEqual(blocked.details?.results, [], "a dispatch rejection must happen before a child process is launched");
+	} finally {
+		if (previous.PLAN_GRAPH === undefined) delete process.env.PLAN_GRAPH; else process.env.PLAN_GRAPH = previous.PLAN_GRAPH;
+		if (previous.PI_MUNCHKIN_PLAN_CONTEXT_PATH === undefined) delete process.env.PI_MUNCHKIN_PLAN_CONTEXT_PATH; else process.env.PI_MUNCHKIN_PLAN_CONTEXT_PATH = previous.PI_MUNCHKIN_PLAN_CONTEXT_PATH;
+		if (previous.PI_SUBAGENT_DEPTH === undefined) delete process.env.PI_SUBAGENT_DEPTH; else process.env.PI_SUBAGENT_DEPTH = previous.PI_SUBAGENT_DEPTH;
+		rmSync(dir, { recursive: true, force: true });
+		resetPiGlobals();
+	}
+});
+
+test("root research branch dispatch identity survives a parent extension reload", async () => {
+	const previous = {
+		PLAN_GRAPH: process.env.PLAN_GRAPH,
+		PLAN_STORAGE: process.env.PLAN_STORAGE,
+		PI_MUNCHKIN_PLAN_CONTEXT_PATH: process.env.PI_MUNCHKIN_PLAN_CONTEXT_PATH,
+	};
+	const dir = mkdtempSync(join(tmpdir(), "pi-root-dispatch-reload-"));
+	const runId = "root-dispatch-reload-run";
+	const branchId = "root-dispatch-branch";
+	const rootContext = {
+		v: 1, profile: "deep-research", run_id: runId, parent_item_id: branchId,
+		owner_ref: ownerRef(runId, branchId), depth: 1,
+		budget: { searches: 1, reads: 1 }, limits: { max_depth: 2, max_children: 2 },
+	};
+	mkdirSync(join(dir, ".pi"), { recursive: true });
+	writeFileSync(join(dir, ".pi", "plan-state.json"), `${JSON.stringify({
+		schema_version: 5, run_id: runId, request: "reload proof", summary: "one branch", autonomy: "lean", phase: "executing",
+		created_at: "2026-01-01T00:00:00.000Z", updated_at: "2026-01-01T00:00:00.000Z", items: [{
+			id: branchId, title: "Reload branch", status: "pending", kind: "research_branch", owner_ref: rootContext.owner_ref,
+			budget: { allocated: { searches: 1, reads: 1 }, used: { searches: 0, reads: 0 } },
+		}], profile: { name: "deep-research", max_depth: 2, max_children: 2, discovery_budget: { searches: 3, reads: 5 }, validation_reads: 5 },
+	})}\n`, { mode: 0o600 });
+	process.env.PLAN_GRAPH = "on";
+	process.env.PLAN_STORAGE = "project";
+	delete process.env.PI_MUNCHKIN_PLAN_CONTEXT_PATH;
+	(globalThis as Record<string, unknown>).__pi_active_plan_context = { run_id: runId, profile: "deep-research", settled: false };
+	(globalThis as Record<string, unknown>).__pi_research_root_contexts_v1 = [`${runId}:${branchId}:${rootContext.owner_ref}`];
+	try {
+		const params = { agent: "research-planner", task: "bounded branch", confirmProjectAgents: false, plan_context: rootContext };
+		const firstPi = makeFakePi();
+		const firstModule = await import(`../vendor/pi-subagent/index.ts?root-dispatch-reload-a=${Date.now()}`);
+		firstModule.default(firstPi.pi as never);
+		const first = await callTool(firstPi, "subagent", params, dir);
+		assert.doesNotMatch(first.content.map((block: any) => block?.text ?? "").join("\n"), /unused depth-one context/i);
+		assert.equal(first.details?.results?.length, 1, "the first dispatch reaches the child runner");
+
+		const secondPi = makeFakePi();
+		const secondModule = await import(`../vendor/pi-subagent/index.ts?root-dispatch-reload-b=${Date.now()}`);
+		secondModule.default(secondPi.pi as never);
+		const blocked = await callTool(secondPi, "subagent", params, dir);
+		assert.match(blocked.content.map((block: any) => block?.text ?? "").join("\n"), /unused depth-one context/i);
+		assert.deepEqual(blocked.details?.results, [], "a duplicate root dispatch must be rejected before a child process is launched");
+	} finally {
+		if (previous.PLAN_GRAPH === undefined) delete process.env.PLAN_GRAPH; else process.env.PLAN_GRAPH = previous.PLAN_GRAPH;
+		if (previous.PLAN_STORAGE === undefined) delete process.env.PLAN_STORAGE; else process.env.PLAN_STORAGE = previous.PLAN_STORAGE;
+		if (previous.PI_MUNCHKIN_PLAN_CONTEXT_PATH === undefined) delete process.env.PI_MUNCHKIN_PLAN_CONTEXT_PATH; else process.env.PI_MUNCHKIN_PLAN_CONTEXT_PATH = previous.PI_MUNCHKIN_PLAN_CONTEXT_PATH;
+		rmSync(dir, { recursive: true, force: true });
+		resetPiGlobals();
+	}
+});
+
+test("root research dispatch lease survives a parent process restart", async () => {
+	const previous = { PLAN_GRAPH: process.env.PLAN_GRAPH, PLAN_STORAGE: process.env.PLAN_STORAGE, PI_MUNCHKIN_PLAN_CONTEXT_PATH: process.env.PI_MUNCHKIN_PLAN_CONTEXT_PATH };
+	const dir = mkdtempSync(join(tmpdir(), "pi-root-dispatch-restart-"));
+	const runId = "root-dispatch-restart-run";
+	const branchId = "root-dispatch-restart-branch";
+	const rootContext = {
+		v: 1, profile: "deep-research", run_id: runId, parent_item_id: branchId,
+		owner_ref: ownerRef(runId, branchId), depth: 1,
+		budget: { searches: 1, reads: 1 }, limits: { max_depth: 2, max_children: 2 },
+	};
+	mkdirSync(join(dir, ".pi"), { recursive: true });
+	writeFileSync(join(dir, ".pi", "plan-state.json"), `${JSON.stringify({
+		schema_version: 5, run_id: runId, request: "restart proof", summary: "one branch", autonomy: "lean", phase: "executing",
+		created_at: "2026-01-01T00:00:00.000Z", updated_at: "2026-01-01T00:00:00.000Z", items: [{
+			id: branchId, title: "Restart branch", status: "pending", kind: "research_branch", owner_ref: rootContext.owner_ref,
+			budget: { allocated: { searches: 1, reads: 1 }, used: { searches: 0, reads: 0 } },
+		}], profile: { name: "deep-research", max_depth: 2, max_children: 2, discovery_budget: { searches: 3, reads: 5 }, validation_reads: 5 },
+	})}\n`, { mode: 0o600 });
+	const restorePersistedGraphFacts = () => {
+		(globalThis as Record<string, unknown>).__pi_active_plan_context = { run_id: runId, profile: "deep-research", settled: false };
+		(globalThis as Record<string, unknown>).__pi_research_root_contexts_v1 = [`${runId}:${branchId}:${rootContext.owner_ref}`];
+	};
+	process.env.PLAN_GRAPH = "on";
+	process.env.PLAN_STORAGE = "project";
+	delete process.env.PI_MUNCHKIN_PLAN_CONTEXT_PATH;
+	try {
+		restorePersistedGraphFacts();
+		const firstPi = makeFakePi();
+		const firstModule = await import(`../vendor/pi-subagent/index.ts?root-dispatch-restart-a=${Date.now()}`);
+		firstModule.default(firstPi.pi as never);
+		const params = { agent: "research-planner", task: "bounded branch", confirmProjectAgents: false, plan_context: rootContext };
+		const first = await callTool(firstPi, "subagent", params, dir);
+		assert.equal(first.details?.results?.length, 1, "the first dispatch reaches the child runner");
+
+		// A parent process restart loses globalThis, but the persisted graph still
+		// identifies the same unfinished root branch. A durable lease must prevent
+		// recovery from launching a duplicate child while the original may survive.
+		resetPiGlobals();
+		restorePersistedGraphFacts();
+		const secondPi = makeFakePi();
+		const secondModule = await import(`../vendor/pi-subagent/index.ts?root-dispatch-restart-b=${Date.now()}`);
+		secondModule.default(secondPi.pi as never);
+		const duplicate = await callTool(secondPi, "subagent", params, dir);
+		assert.match(duplicate.content.map((block: any) => block?.text ?? "").join("\n"), /in-flight|leased|already dispatched|unused depth-one context/i);
+		assert.deepEqual(duplicate.details?.results, [], "recovery must reject a duplicate before launching a child process");
+	} finally {
+		if (previous.PLAN_GRAPH === undefined) delete process.env.PLAN_GRAPH; else process.env.PLAN_GRAPH = previous.PLAN_GRAPH;
+		if (previous.PLAN_STORAGE === undefined) delete process.env.PLAN_STORAGE; else process.env.PLAN_STORAGE = previous.PLAN_STORAGE;
+		if (previous.PI_MUNCHKIN_PLAN_CONTEXT_PATH === undefined) delete process.env.PI_MUNCHKIN_PLAN_CONTEXT_PATH; else process.env.PI_MUNCHKIN_PLAN_CONTEXT_PATH = previous.PI_MUNCHKIN_PLAN_CONTEXT_PATH;
+		rmSync(dir, { recursive: true, force: true });
+		resetPiGlobals();
+	}
+});
+
+test("unexpected child-runner setup failures settle leased roots in single and parallel modes", async () => {
+	const previous = {
+		PLAN_GRAPH: process.env.PLAN_GRAPH,
+		PLAN_STORAGE: process.env.PLAN_STORAGE,
+		TMPDIR: process.env.TMPDIR,
+	};
+	const dir = mkdtempSync(join(tmpdir(), "pi-root-dispatch-setup-failure-"));
+	const runId = "root-dispatch-setup-failure-run";
+	const branchId = "root-dispatch-setup-failure-branch";
+	const parallelBranchId = "root-dispatch-setup-failure-parallel-branch";
+	const rootContext = {
+		v: 1, profile: "deep-research", run_id: runId, parent_item_id: branchId,
+		owner_ref: ownerRef(runId, branchId), depth: 1,
+		budget: { searches: 1, reads: 1 }, limits: { max_depth: 2, max_children: 2 },
+	};
+	const parallelRootContext = {
+		...rootContext, parent_item_id: parallelBranchId, owner_ref: ownerRef(runId, parallelBranchId),
+	};
+	mkdirSync(join(dir, ".pi"), { recursive: true });
+	writeFileSync(join(dir, ".pi", "plan-state.json"), `${JSON.stringify({
+		schema_version: 5, run_id: runId, request: "setup failure proof", summary: "one branch", autonomy: "lean", phase: "executing",
+		created_at: "2026-01-01T00:00:00.000Z", updated_at: "2026-01-01T00:00:00.000Z", items: [{
+			id: branchId, title: "Setup failure branch", status: "pending", kind: "research_branch", owner_ref: rootContext.owner_ref,
+			budget: { allocated: { searches: 1, reads: 1 }, used: { searches: 0, reads: 0 } },
+		}, {
+			id: parallelBranchId, title: "Parallel setup failure branch", status: "pending", kind: "research_branch", owner_ref: parallelRootContext.owner_ref,
+			budget: { allocated: { searches: 1, reads: 1 }, used: { searches: 0, reads: 0 } },
+		}], profile: { name: "deep-research", max_depth: 2, max_children: 2, discovery_budget: { searches: 3, reads: 5 }, validation_reads: 5 },
+	})}\n`, { mode: 0o600 });
+	process.env.PLAN_GRAPH = "on";
+	process.env.PLAN_STORAGE = "project";
+	const tmpBlocker = join(dir, "tmp-is-a-file");
+	writeFileSync(tmpBlocker, "not a directory\n", { mode: 0o600 });
+	process.env.TMPDIR = tmpBlocker;
+	(globalThis as Record<string, unknown>).__pi_active_plan_context = { run_id: runId, profile: "deep-research", settled: false };
+	(globalThis as Record<string, unknown>).__pi_research_root_contexts_v1 = [
+		`${runId}:${branchId}:${rootContext.owner_ref}`,
+		`${runId}:${parallelBranchId}:${parallelRootContext.owner_ref}`,
+	];
+	try {
+		const fp = makeFakePi();
+		const planRunner = await import(`../extensions/plan-runner.ts?setup-failure=${Date.now()}`);
+		planRunner.default(fp.pi as never);
+		const subagent = await import(`../vendor/pi-subagent/index.ts?setup-failure=${Date.now()}`);
+		subagent.default(fp.pi as never);
+		await fire(fp, "session_start", {}, makeCtx(dir).ctx);
+		const result = await callTool(fp, "subagent", {
+			agent: "research-planner", task: "bounded branch", confirmProjectAgents: false, plan_context: rootContext,
+		}, dir);
+		assert.equal(result.isError, false, "the setup failure is converted into a bounded branch result");
+		assert.match(result.content.map((block: any) => block?.text ?? "").join("\n"), /branch|failed|blocked|setup/i);
+		await fire(fp, "before_agent_start", {}, makeCtx(dir).ctx);
+		const state = JSON.parse(await (await import("node:fs/promises")).readFile(join(dir, ".pi", "plan-state.json"), "utf8"));
+		assert.equal(state.items[0].status, "blocked", "a runner setup failure must not leave the lease pending forever");
+		assert.equal(state.items[0].lease, undefined, "the failed setup releases the durable lease");
+
+		const parallel = await callTool(fp, "subagent", {
+			tasks: [{ agent: "research-planner", task: "parallel bounded branch", plan_context: parallelRootContext }],
+			confirmProjectAgents: false,
+		}, dir);
+		assert.equal(parallel.isError, false, "parallel setup failures are converted into bounded branch results");
+		await fire(fp, "before_agent_start", {}, makeCtx(dir).ctx);
+		const afterParallel = JSON.parse(await (await import("node:fs/promises")).readFile(join(dir, ".pi", "plan-state.json"), "utf8"));
+		const parallelItem = afterParallel.items.find((item: any) => item.id === parallelBranchId);
+		assert.equal(parallelItem?.status, "blocked", "parallel setup failure blocks its owning branch");
+		assert.equal(parallelItem?.lease, undefined, "parallel setup failure releases its durable lease");
+	} finally {
+		if (previous.PLAN_GRAPH === undefined) delete process.env.PLAN_GRAPH; else process.env.PLAN_GRAPH = previous.PLAN_GRAPH;
+		if (previous.PLAN_STORAGE === undefined) delete process.env.PLAN_STORAGE; else process.env.PLAN_STORAGE = previous.PLAN_STORAGE;
+		if (previous.TMPDIR === undefined) delete process.env.TMPDIR; else process.env.TMPDIR = previous.TMPDIR;
+		rmSync(dir, { recursive: true, force: true });
+		resetPiGlobals();
+	}
 });
 
 test("research budget control propagates while ledger remains independently selectable", () => {

@@ -1,11 +1,11 @@
 import { subscribeOnce } from "../lib/extension-lifecycle.ts";
-import { chmod, mkdir, open, readFile, rename, stat, unlink, writeFile } from "node:fs/promises";
+import { chmod, mkdir, open, readFile, rename, stat, unlink } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { createHash, randomUUID } from "node:crypto";
 import { defineTool, withFileMutationQueue, type ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { Type } from "typebox";
 import { ACTIVE_TOOL_PROMPTS } from "../lib/active-tool-prompts.ts";
-import { BRANCH_REPORT_ENV, PLAN_CONTEXT_ENV, RESEARCH_RESERVED_BUDGET_KEY, readPlanContext, writeBranchReport, type BranchReportV1 } from "../lib/branch-report.ts";
+import { BRANCH_REPORT_ENV, PLAN_CONTEXT_ENV, RESEARCH_RESERVED_BUDGET_KEY, readPlanContext, writeBranchReport, type BranchReportV1, type PlanContextV1 } from "../lib/branch-report.ts";
 import { classifyBashCommand } from "../lib/command-policy.ts";
 import { emitHarnessSignal, onHarnessSignal, signalRunId } from "../lib/harness-signals.ts";
 import { PLAN_SURFACE_TOOLS } from "../lib/capability-surface.ts";
@@ -17,7 +17,7 @@ import { applyPlanDeltas, type PlanDelta } from "../lib/plan-delta.ts";
 import {
 	DEEP_RESEARCH_MAX_CHILDREN, DEEP_RESEARCH_MAX_DEPTH, DEEP_RESEARCH_MAX_ROOTS,
 	childrenOf, descendantCount, expandGraph, graphItemId, graphTerminal, ownerRef, settleErrors, validateGraph,
-	type BranchChildInput, type GraphPlanItem, type GraphPlanState, type PlanStatus, type ResearchBudget,
+	type BranchChildInput, type GraphPlanItem, type GraphPlanState, type PlanStatus, type ResearchBranchLease, type ResearchBudget,
 } from "../lib/plan-graph.ts";
 import { planStorageMode, privatePlanProjectionPath, privatePlanStatePath, privatePlanTracePath } from "../lib/plan-state-storage.ts";
 import { processWriterMarker } from "../lib/process-writer.ts";
@@ -120,6 +120,7 @@ let planningSurfaceApplied: string[] | null = null;
 
 const PLAN_FLAG = "__pi_plan_phase_active";
 const EXPLICIT_FLAG = "__pi_tool_selection_explicit";
+const RESEARCH_ROOT_CONTEXTS_KEY = "__pi_research_root_contexts_v1";
 const SAFE_PLAN_TOOLS = new Set([
 	"read", "grep", "find", "ls", "search_spans", "read_span", "recall", "plan_write", "capability",
 ]);
@@ -237,21 +238,87 @@ function usesPrivateStorage(cwd: string): boolean {
 	return planStorageMode() === "capsule" && privatePlanStatePath(cwd) !== null;
 }
 
+type PlanFileLock = { path: string; lockId: string };
+const PLAN_LOCK_TIMEOUT_MS = 10_000;
+const PLAN_LOCK_RETRY_MS = 25;
+const PLAN_LOCK_STALE_MS = 60_000;
+
+async function lockOwnerAlive(pid: number): Promise<boolean> {
+	if (!Number.isSafeInteger(pid) || pid <= 0) return false;
+	try { process.kill(pid, 0); return true; }
+	catch (error) { return (error as NodeJS.ErrnoException).code === "EPERM"; }
+}
+
+async function stalePlanLock(path: string): Promise<boolean> {
+	try {
+		const raw = JSON.parse(await readFile(path, "utf8")) as { pid?: unknown; created_at?: unknown };
+		if (typeof raw.pid === "number") return !(await lockOwnerAlive(raw.pid));
+		if (typeof raw.created_at === "string" && Number.isFinite(Date.parse(raw.created_at))) return Date.now() - Date.parse(raw.created_at) > PLAN_LOCK_STALE_MS;
+	} catch { /* malformed locks are only recoverable after the bounded age */ }
+	try {
+		const info = await stat(path);
+		return Date.now() - info.mtimeMs > PLAN_LOCK_STALE_MS;
+	} catch { return false; }
+}
+
+async function acquirePlanFileLock(path: string): Promise<PlanFileLock> {
+	const lockPath = `${path}.lock`;
+	const deadline = Date.now() + PLAN_LOCK_TIMEOUT_MS;
+	while (Date.now() <= deadline) {
+		const lockId = randomUUID();
+		try {
+			const handle = await open(lockPath, "wx", 0o600);
+			try {
+				await handle.writeFile(`${JSON.stringify({ pid: process.pid, lock_id: lockId, created_at: isoNow() })}\n`, "utf8");
+				await handle.chmod(0o600);
+				await handle.sync();
+			} finally { await handle.close(); }
+			return { path: lockPath, lockId };
+		} catch (error) {
+			if ((error as NodeJS.ErrnoException).code !== "EEXIST") throw error;
+			if (await stalePlanLock(lockPath)) { await unlink(lockPath).catch(() => undefined); continue; }
+			await new Promise((resolve) => setTimeout(resolve, PLAN_LOCK_RETRY_MS));
+		}
+	}
+	throw new Error("plan state is busy in another parent process; retry after it exits");
+}
+
+async function releasePlanFileLock(lock: PlanFileLock): Promise<void> {
+	try {
+		const raw = JSON.parse(await readFile(lock.path, "utf8")) as { lock_id?: unknown };
+		if (raw.lock_id !== lock.lockId) return;
+	} catch { return; }
+	await unlink(lock.path).catch(() => undefined);
+}
+
+async function withPlanFileLock<T>(path: string, fn: () => Promise<T>): Promise<T> {
+	const lock = await acquirePlanFileLock(path);
+	try { return await fn(); }
+	finally { await releasePlanFileLock(lock); }
+}
+
+async function syncDirectory(path: string): Promise<void> {
+	const handle = await open(path, "r");
+	try { await handle.sync(); }
+	finally { await handle.close(); }
+}
+
 async function atomicWrite(path: string, contents: string, privateFile: boolean): Promise<void> {
 	const tmp = `${path}.tmp-${process.pid}-${randomUUID().slice(0, 8)}`;
-	if (privateFile) {
-		const handle = await open(tmp, "wx", 0o600);
-		try { await handle.writeFile(contents, "utf8"); await handle.chmod(0o600); }
-		finally { await handle.close(); }
-	} else {
-		await writeFile(tmp, contents, "utf8");
-	}
+	let published = false;
 	try {
+		const handle = await open(tmp, "wx", privateFile ? 0o600 : 0o644);
+		try {
+			await handle.writeFile(contents, "utf8");
+			if (privateFile) await handle.chmod(0o600);
+			await handle.sync();
+		} finally { await handle.close(); }
 		await rename(tmp, path);
 		if (privateFile) await chmod(path, 0o600);
-	} catch (error) {
-		await unlink(tmp).catch(() => undefined);
-		throw error;
+		await syncDirectory(dirname(path));
+		published = true;
+	} finally {
+		if (!published) await unlink(tmp).catch(() => undefined);
 	}
 }
 
@@ -272,6 +339,7 @@ function migrateState(raw: any): PlanState | undefined {
 		...(raw.schema_version === 5 && Array.isArray(item.source_leads) ? { source_leads: item.source_leads.filter((value: unknown) => typeof value === "string").slice(0, 10) } : {}),
 		...(raw.schema_version === 5 && item.coverage ? { coverage: item.coverage } : {}),
 		...(raw.schema_version === 5 && item.defer ? { defer: item.defer } : {}),
+		...(raw.schema_version === 5 && item.lease ? { lease: item.lease } : {}),
 	}));
 	const now = isoNow();
 	const state: PlanState = {
@@ -331,8 +399,9 @@ function renderItems(state: PlanState, selectedId?: string): string {
 		const descendants = state.schema_version === 5 ? descendantCount(state.items, item.id) : 0;
 		const gaps = item.evidence_gaps?.filter((gap) => !gap.startsWith("source:")).length ?? 0;
 		const budget = item.budget ? ` budget=${item.budget.used.searches}/${item.budget.allocated.searches}s ${item.budget.used.reads}/${item.budget.allocated.reads}r` : "";
+		const lease = item.lease ? " dispatch=in-flight" : "";
 		const coverage = item.coverage ? ` coverage=${item.coverage.complete ? "complete" : "incomplete"}:${item.coverage.strategy}` : "";
-		const graph = descendants || gaps ? ` descendants=${descendants} gaps=${gaps}${budget}${coverage}` : `${budget}${coverage}`;
+		const graph = descendants || gaps || lease ? ` descendants=${descendants} gaps=${gaps}${budget}${lease}${coverage}` : `${budget}${coverage}`;
 		const first = `${item.id}  [${item.status.replace("_", " ")}] ${item.title}`;
 		if (!item.note) return [`${first}${graph}`];
 		return [`${first}${graph}`, ...item.note.split("\n").filter(Boolean).map((line) => `  - ${line.replace(/^[-*]\s*/, "")}`)];
@@ -357,7 +426,22 @@ function validateStateSize(state: PlanState): void {
 	if (bytes > MAX_PLAN_BYTES) rejectPlanTool(`plan rejected: authoritative state would be ${bytes} bytes; maximum is ${MAX_PLAN_BYTES}`);
 }
 
-async function writeState(cwd: string, state: PlanState): Promise<void> {
+function publishResearchRootContexts(state: PlanState | undefined): void {
+	const shared = globalThis as Record<string, unknown>;
+	if (!state?.profile || state.settled_at || state.profile.name !== "deep-research") {
+		delete shared[RESEARCH_ROOT_CONTEXTS_KEY];
+		return;
+	}
+	// The subagent extension cannot safely infer graph membership from a model-
+	// supplied plan_context. Publish only the still-open root branches minted by
+	// this parent plan; the child-side validator uses this bounded identity set to
+	// reject forged or stale roots before starting a process.
+	shared[RESEARCH_ROOT_CONTEXTS_KEY] = state.items
+		.filter((item) => !item.parent_id && !graphTerminal(item) && item.kind === "research_branch" && typeof item.owner_ref === "string")
+		.map((item) => `${state.run_id}:${item.id}:${item.owner_ref}`);
+}
+
+async function writeStateUnlocked(cwd: string, state: PlanState): Promise<void> {
 	state.updated_at = isoNow();
 	state.writer = PROC_MARK;
 	validateStateSize(state);
@@ -376,6 +460,13 @@ async function writeState(cwd: string, state: PlanState): Promise<void> {
 		run_id: state.run_id, item_id: currentItem(state)?.id, open_items: openItemCount(state), blocked_items: blockedItemCount(state),
 		graph: state.schema_version === 5, profile: state.profile?.name, settled: Boolean(state.settled_at),
 	};
+	publishResearchRootContexts(state);
+}
+
+async function writeState(cwd: string, state: PlanState): Promise<void> {
+	const path = statePath(cwd);
+	if (!path) throw new Error("private plan storage is not ready; retry after session startup");
+	await withPlanFileLock(path, () => writeStateUnlocked(cwd, state));
 }
 
 async function mutatePlan<T>(cwd: string, fn: (state: PlanState | undefined) => Promise<{ state?: PlanState; result: T }>): Promise<T> {
@@ -384,10 +475,56 @@ async function mutatePlan<T>(cwd: string, fn: (state: PlanState | undefined) => 
 	const privateFile = planStorageMode() === "capsule";
 	await mkdir(dirname(path), { recursive: true, mode: privateFile ? 0o700 : undefined });
 	if (privateFile) await chmod(dirname(path), 0o700);
-	return withFileMutationQueue(path, async () => {
+	return withFileMutationQueue(path, () => withPlanFileLock(path, async () => {
 		const out = await fn(await readState(cwd));
-		if (out.state) await writeState(cwd, out.state);
+		if (out.state) await writeStateUnlocked(cwd, out.state);
 		return out.result;
+	}));
+}
+
+export type ResearchBranchLeaseResult =
+	| { ok: true; lease_id: string }
+	| { ok: false; reason: "no-plan" | "wrong-plan" | "unknown-branch" | "terminal-branch" | "already-leased" | "invalid-context" };
+
+/**
+ * Acquire the parent-owned durable lease immediately before starting a root
+ * research child. The graph file is the authority, so a new parent process
+ * cannot forget an in-flight branch just because its module globals were reset.
+ */
+export async function acquireResearchBranchLease(cwd: string, context: PlanContextV1): Promise<ResearchBranchLeaseResult> {
+	if (context.depth !== 1 || context.owner_ref !== ownerRef(context.run_id, context.parent_item_id)) return { ok: false, reason: "invalid-context" };
+	return mutatePlan<ResearchBranchLeaseResult>(cwd, async (previous) => {
+		if (!previous) return { result: { ok: false, reason: "no-plan" } };
+		if (previous.schema_version !== 5 || previous.run_id !== context.run_id || previous.profile?.name !== "deep-research" || previous.settled_at) {
+			return { result: { ok: false, reason: "wrong-plan" } };
+		}
+		const parent = previous.items.find((item) => item.id === context.parent_item_id);
+		if (!parent || parent.parent_id !== undefined || parent.kind !== "research_branch" || parent.owner_ref !== context.owner_ref) {
+			return { result: { ok: false, reason: "unknown-branch" } };
+		}
+		if (graphTerminal(parent)) return { result: { ok: false, reason: "terminal-branch" } };
+		if (parent.lease) return { result: { ok: false, reason: "already-leased" } };
+		const lease: ResearchBranchLease = { lease_id: randomUUID(), issued_at: isoNow(), owner_ref: context.owner_ref };
+		const state: PlanState = { ...previous, items: previous.items.map((item) => item.id === parent.id ? { ...item, lease } : item) };
+		return { state, result: { ok: true, lease_id: lease.lease_id } };
+	});
+}
+
+/** Release only the exact lease acquired for this branch. Used when a multi-arm
+ * dispatch cannot acquire all of its leases before any child is launched. */
+export async function releaseResearchBranchLease(cwd: string, context: PlanContextV1, leaseId: string): Promise<boolean> {
+	if (context.depth !== 1 || context.owner_ref !== ownerRef(context.run_id, context.parent_item_id)) return false;
+	return mutatePlan<boolean>(cwd, async (previous) => {
+		if (!previous || previous.schema_version !== 5 || previous.run_id !== context.run_id) return { result: false };
+		const parent = previous.items.find((item) => item.id === context.parent_item_id);
+		if (!parent?.lease || parent.owner_ref !== context.owner_ref || parent.lease.lease_id !== leaseId) return { result: false };
+		const items = previous.items.map((item) => {
+			if (item.id !== parent.id) return item;
+			const next = { ...item };
+			delete next.lease;
+			return next;
+		});
+		return { state: { ...previous, items }, result: true };
 	});
 }
 
@@ -599,7 +736,16 @@ const planUpdate = defineTool({
 			if (previous.settled_at) rejectPlanTool("plan_update rejected: settled plans are immutable");
 			const applied = applyPlanDeltas(previous.items, params.deltas as PlanDelta[]);
 			if (!applied.ok) rejectPlanTool(`plan_update rejected: ${applied.errors.join("; ")}`);
-			const state = { ...previous, items: applied.items as PlanItem[] };
+			// A user-authorized terminal transition is also an explicit cancellation of
+			// any in-flight delegated work for that item. Clear its durable lease so the
+			// child result becomes a harmless late arrival instead of making cancellation
+			// impossible or leaving a permanently leased branch.
+			const state = { ...previous, items: (applied.items as PlanItem[]).map((item) => {
+				if (!item.lease || !graphTerminal(item)) return item;
+				const next = { ...item };
+				delete next.lease;
+				return next;
+			}) };
 			validateStateSize(state);
 			return { state, result: { state, changed: applied.changed, idempotent: applied.idempotent } };
 		});
@@ -794,6 +940,16 @@ const researchPlanStart = defineTool({
 		});
 		(globalThis as Record<string, unknown>).__pi_plan_validation_urls = [];
 		activateGraphTools();
+		// Starting the graph is also the parent skill's request to execute it. In
+		// the core profile research and delegation are deferred independently from
+		// the planning family, so exposing only the graph tools would leave the
+		// parent with a plan it cannot search or delegate. Route both requests
+		// through the existing capability activation boundary; it still respects
+		// explicit tool selections and the one-attempt/manual-disable latch.
+		if (api) {
+			emitHarnessSignal(api.events, { v: 1, type: "capability/need", capability: "web_read", reason: "deep-research" });
+			emitHarnessSignal(api.events, { v: 1, type: "capability/need", capability: "subagent", reason: "deep-research" });
+		}
 		planEvent("research-start", state.run_id, { items: state.items.length, open_items: openItemCount(state) });
 		const contexts = state.items.map((item) => ({
 			v: 1, profile: "deep-research", run_id: state.run_id, parent_item_id: item.id, owner_ref: item.owner_ref,
@@ -959,14 +1115,22 @@ async function goTransition(cwd: string): Promise<GoOutcome> {
 	});
 }
 
-async function clearPlan(cwd: string): Promise<void> {
+async function clearPlan(cwd: string, replacement?: () => Promise<void>): Promise<void> {
 	const path = statePath(cwd);
-	if (path) await withFileMutationQueue(path, async () => {
+	if (!path && replacement) throw new Error("private plan storage is not ready; retry after session startup");
+	if (path) {
+		const privateFile = usesPrivateStorage(cwd);
+		await mkdir(dirname(path), { recursive: true, mode: privateFile ? 0o700 : undefined });
+		if (privateFile) await chmod(dirname(path), 0o700);
+	}
+	if (path) await withFileMutationQueue(path, () => withPlanFileLock(path, async () => {
 		await unlink(path).catch(() => undefined);
 		const projection = privatePlanProjectionPath(cwd);
 		if (projection) await unlink(projection).catch(() => undefined);
-	});
+		if (replacement) await replacement();
+	}));
 	delete (globalThis as Record<string, unknown>).__pi_active_plan_context;
+	delete (globalThis as Record<string, unknown>)[RESEARCH_ROOT_CONTEXTS_KEY];
 }
 
 async function startPlanCommand(args: string, ctx: any, pi: ExtensionAPI): Promise<void> {
@@ -976,12 +1140,12 @@ async function startPlanCommand(args: string, ctx: any, pi: ExtensionAPI): Promi
 	const runId = `plan-${timestamp()}`;
 	try {
 		rememberModel(ctx);
-		await clearPlan(ctx.cwd);
 		const now = isoNow();
-		await writeState(ctx.cwd, {
+		const initialState: PlanState = {
 			schema_version: PLAN_GRAPH ? 5 : 4, run_id: runId, request, summary: "Planning pending.", autonomy: "lean",
 			phase: "planned", created_at: now, updated_at: now, items: [],
-		});
+		};
+		await clearPlan(ctx.cwd, () => writeStateUnlocked(ctx.cwd, initialState));
 	} catch (error) {
 		leavePlanningSurface(pi, false);
 		throw error;
@@ -1050,14 +1214,37 @@ type Rebound = { openItems: number; interrupted: boolean };
  * discarding them.
  */
 async function rebindActivePlan(cwd: string): Promise<Rebound | null> {
-	const state = await readState(cwd);
-	if (!state) return null;
+	if (!statePath(cwd)) return null;
+	const rebound = await mutatePlan<{ state: PlanState; staleLeases: number; interrupted: boolean } | null>(cwd, async (previous) => {
+		if (!previous) return { result: null };
+		const interrupted = previous.writer !== PROC_MARK;
+		const staleLeases = interrupted ? previous.items.filter((item) => Boolean(item.lease) && !graphTerminal(item)) : [];
+		if (!staleLeases.length) return { result: { state: previous, staleLeases: 0, interrupted } };
+		const staleIds = new Set(staleLeases.map((item) => item.id));
+		const state: PlanState = {
+			...previous,
+			items: previous.items.map((item) => {
+				if (!staleIds.has(item.id)) return item;
+				const next = { ...item, status: "blocked" as const, note: "Delegated branch interrupted before a validated result; inspect evidence and explicitly reopen before retrying.", evidence_gaps: ["branch:interrupted"] };
+				delete next.lease;
+				return next;
+			}),
+		};
+		return { state, result: { state, staleLeases: staleLeases.length, interrupted: true } };
+	});
+	const state = rebound?.state;
+	if (!state) {
+		delete (globalThis as Record<string, unknown>)[RESEARCH_ROOT_CONTEXTS_KEY];
+		return null;
+	}
 	const openItems = openItemCount(state);
+	if ((rebound?.staleLeases ?? 0) > 0) planEvent("branch-failed", state.run_id, { failure_class: "interrupted", stale_leases: rebound?.staleLeases });
 	(globalThis as Record<string, unknown>).__pi_active_plan_context = {
 		run_id: state.run_id, item_id: currentItem(state)?.id, open_items: openItems, blocked_items: blockedItemCount(state),
 		graph: state.schema_version === 5, profile: state.profile?.name, settled: Boolean(state.settled_at),
 	};
-	return { openItems, interrupted: state.writer !== PROC_MARK && openItems > 0 };
+	publishResearchRootContexts(state);
+	return { openItems, interrupted: Boolean(rebound?.interrupted) && openItems > 0 };
 }
 
 const interruptedPlanNotice = (openItems: number) =>
@@ -1084,7 +1271,25 @@ export function policyBlock(_autonomy: Autonomy, subagentAvailable: boolean): st
 
 async function mergeBranchResult(cwd: string, context: import("../lib/branch-report.ts").PlanContextV1, report: BranchReportV1 | null, failureClass: string | null): Promise<void> {
 	type MergeOutcome = { kind: "ignored" } | { kind: "failed"; runId: string; failureClass: string } | { kind: "merged"; runId: string; children: number; leads: number; gaps: number };
-	const outcome = await mutatePlan<MergeOutcome>(cwd, async (previous) => {
+	const releaseLease = (item: PlanItem): PlanItem => {
+		if (!item.lease || item.owner_ref !== context.owner_ref) return item;
+		const next = { ...item };
+		delete next.lease;
+		return next;
+	};
+	const blockParent = (previous: PlanState, parent: PlanItem, failure: string): { state: PlanState; result: MergeOutcome } => {
+		const state = { ...previous, items: previous.items.map((item) => item.id === parent.id ? {
+			...releaseLease(item), status: "blocked" as const, note: `Delegated branch failed: ${failure}.`, evidence_gaps: [`branch:${failure}`],
+		} : item) };
+		// The fallback state deliberately contains no incoming child claims. It is
+		// therefore safe to persist even when the report that triggered the merge
+		// violated a graph invariant.
+		validateStateSize(state);
+		return { state, result: { kind: "failed", runId: previous.run_id, failureClass: failure } };
+	};
+	let outcome: MergeOutcome;
+	try {
+		outcome = await mutatePlan<MergeOutcome>(cwd, async (previous) => {
 		if (!previous || previous.schema_version !== 5 || previous.run_id !== context.run_id || previous.settled_at) return { result: { kind: "ignored" } };
 		const parent = previous.items.find((item) => item.id === context.parent_item_id);
 		if (!parent || parent.owner_ref !== context.owner_ref || parent.parent_id) return { result: { kind: "ignored" } };
@@ -1092,13 +1297,13 @@ async function mergeBranchResult(cwd: string, context: import("../lib/branch-rep
 		if (!report) {
 			const failure = failureClass ?? "missing_report";
 			const items = previous.items.map((item) => item.id === parent.id ? {
-				...item, status: "blocked" as const, note: `Delegated branch failed: ${failure}.`, evidence_gaps: [`branch:${failure}`],
+				...releaseLease(item), status: "blocked" as const, note: `Delegated branch failed: ${failure}.`, evidence_gaps: [`branch:${failure}`],
 			} : item);
 			return { state: { ...previous, items }, result: { kind: "failed", runId: previous.run_id, failureClass: failure } };
 		}
 		const incomingIds = new Set(report.children.map((child) => child.item_id));
 		const collision = previous.items.find((item) => incomingIds.has(item.id) && item.parent_id !== parent.id);
-		if (collision) return { result: { kind: "ignored" } };
+		if (collision) return blockParent(previous, parent, "merge_collision");
 		const retained = previous.items.filter((item) => item.parent_id !== parent.id);
 		const children: PlanItem[] = report.children.map((child) => ({
 			id: child.item_id, parent_id: parent.id, kind: "research_leaf", owner_ref: ownerRef(previous.run_id, child.item_id),
@@ -1106,14 +1311,30 @@ async function mergeBranchResult(cwd: string, context: import("../lib/branch-rep
 			budget: child.budget, evidence_gaps: child.evidence_gaps?.map(cleanText).filter(Boolean), coverage: child.coverage, defer: child.defer,
 		}));
 		const items = retained.map((item) => item.id === parent.id ? {
-			...item, status: report.status, note: cleanText(report.note), defer: report.defer,
+			...releaseLease(item), status: report.status, note: cleanText(report.note), defer: report.defer,
 			budget: item.budget ? { ...item.budget, used: report.consumed } : item.budget,
 			evidence_gaps: report.evidence_gaps.map(cleanText).filter(Boolean), source_leads: report.source_leads.map((lead) => storedUrl(lead.url).display), coverage: report.coverage,
 		} : item).concat(children);
 		const next = { ...previous, items };
-		validateStateSize(next);
+		try { validateStateSize(next); }
+		catch { return blockParent(previous, parent, "merge_rejected"); }
 		return { state: next, result: { kind: "merged", runId: previous.run_id, children: children.length, leads: report.source_leads.length, gaps: report.evidence_gaps.length } };
-	});
+		});
+	} catch {
+		// Unexpected merge failures (for example a transient report projection
+		// error) must not look like a retryable success. Make one bounded attempt
+		// to close the owning branch without accepting any child claims.
+		try {
+			outcome = await mutatePlan<MergeOutcome>(cwd, async (previous) => {
+				if (!previous || previous.schema_version !== 5 || previous.run_id !== context.run_id || previous.settled_at) return { result: { kind: "ignored" } };
+				const parent = previous.items.find((item) => item.id === context.parent_item_id);
+				if (!parent || parent.owner_ref !== context.owner_ref || parent.parent_id || graphTerminal(parent)) return { result: { kind: "ignored" } };
+				return blockParent(previous, parent, "merge_rejected");
+			});
+		} catch {
+			outcome = { kind: "ignored" };
+		}
+	}
 	if (outcome.kind === "merged") planEvent("branch-merged", outcome.runId, { children: outcome.children, lead_count: outcome.leads, evidence_gaps: outcome.gaps });
 	if (outcome.kind === "failed") planEvent("branch-failed", outcome.runId, { failure_class: outcome.failureClass });
 }
