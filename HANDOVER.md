@@ -1,5 +1,25 @@
 # Handover — pi_munchkin, 2026-08-24
 
+## 2026-09-03 planner completion-shaped fixture (prepared, no sessions)
+
+The next useful planner step is prepared but deliberately unexecuted. The
+research-fixture slate now contains a fourth admitted manifest,
+`compare-json-yaml-config`, designed to finish within the shared three-search /
+five-read envelope: one bounded branch for JSON, one for YAML, one cited claim
+and limitation per branch, then a conditional synthesis. The stale
+`preflight.py` exact-three assertion was red when this manifest was added and
+is now green with a four-fixture self-test that still requires the comparative,
+contested, and multi-part kinds.
+
+The fresh execution envelope is
+`optimizer/docs/PREREG_QWEN35B_PLANNER_COMPLETION_V7_2026-09-03.md`. It binds
+source `d1b17fd8…`, loaded mirror `d83baa71…`, the unchanged candidate/control
+configuration hashes, and all four manifest/admission digests. It proposes eight
+candidate sessions (two per fixture) plus four randomized fact-lookup controls,
+but authorizes no model run by itself. Planner flags remain dark; v5/v6
+observations stay quarantined and cannot pool with v7. No mirror or source
+surface changed for this optimizer-only preparation.
+
 ## 2026-09-03 opt-in Jina Reader formatter (repository-only)
 
 `b8e1ab2` adds an opt-in `JINA_READER=on` mode to `web_read`. The harness still

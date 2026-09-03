@@ -4,6 +4,16 @@ All notable changes to pi-munchkin are documented here. Releases follow semantic
 
 ## Unreleased
 
+### Prepared (2026-09-03 — planner completion-shaped fixture screen)
+
+- Added the admitted `compare-json-yaml-config` fixture and relaxed the stale
+  planner preflight count check to support the four-fixture slate while still
+  requiring the comparative, contested, and multi-part kinds. The new
+  completion-shaped fixture is bound in
+  `PREREG_QWEN35B_PLANNER_COMPLETION_V7_2026-09-03.md` for a future,
+  human-approved screen; no provider, Pi session, default, mirror, or source
+  surface changed.
+
 ### Measured (2026-09-03 — Jina surface load smoke)
 
 - The mirrored Jina-capable surface loaded in a pinned Qwen 35B smoke with exit

@@ -1,11 +1,12 @@
 # Planner research-fixture slate
 
 This directory is the fixture-admission boundary for the dark hierarchical
-deep-research mechanism screen. The three manifests are structural research
-instruments: comparative, contested, and multi-part. Each declares independent
-evidence families, bounded source references, a negative-control fact lookup,
-and a local oracle entrypoint. The negative controls are required to remain
-lightweight and must not activate `research_plan_start`.
+deep-research mechanism screen. The four manifests are structural research
+instruments: comparative, contested, multi-part, and one deliberately
+completion-shaped comparative question. Each declares independent evidence
+families, bounded source references, a negative-control fact lookup, and a local
+oracle entrypoint. The negative controls are required to remain lightweight and
+must not activate `research_plan_start`.
 
 Run `python3 optimizer/research-fixtures/admission.py --selftest` or
 `python3 optimizer/research-fixtures/admission.py check` to validate the slate.
