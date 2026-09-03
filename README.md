@@ -293,8 +293,8 @@ sessions.
 - Graph-planned research passes a bounded context through a private per-call temporary artifact.
   A depth-one `research-planner` may dispatch at most two non-planning `research-scout` leaves;
   its parent-owned dispatch lease is persisted in the v5 graph and guarded by a cross-process plan
-  lock; stale leases recover as blocked
-  branches; its validated terminal report returns to the parent through the event bus. Children never write
+  lock; stale leases recover as blocked branches, and an explicit `plan_update` reopen records a
+  new retry epoch; its validated terminal report returns to the parent through the event bus. Children never write
   the parent capsule, and every delegated source used at settlement must have a successful
   parent-session `research_note` record.
 - `npm run secret-scan:diff` inspects staged, unstaged, and untracked added lines, plus the added
