@@ -206,6 +206,10 @@ export function validateGraph(state: GraphPlanState): string[] {
 		if (item.defer !== undefined && !validDeferral(item.defer)) errors.push(`invalid deferral: ${item.id}`);
 		if (item.lease !== undefined && !validResearchBranchLease(item.lease)) errors.push(`invalid dispatch lease: ${item.id}`);
 		if (item.dispatch_epoch !== undefined && !boundedInteger(item.dispatch_epoch, 1_000_000)) errors.push(`invalid dispatch epoch: ${item.id}`);
+		if (!state.profile && item.kind !== undefined && item.kind !== "work") errors.push(`research node requires a deep-research profile: ${item.id}`);
+		if (!state.profile && (item.owner_ref !== undefined || item.coverage !== undefined || item.source_leads !== undefined || item.lease !== undefined || item.dispatch_epoch !== undefined)) {
+			errors.push(`research evidence requires a deep-research profile: ${item.id}`);
+		}
 		if (item.status === "deferred" && !validDeferral(item.defer)) {
 			errors.push(`deferred node requires value, risk, and rationale: ${item.id}`);
 		}

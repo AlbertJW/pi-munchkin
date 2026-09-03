@@ -338,6 +338,17 @@ function migrateState(raw: any): PlanState | undefined {
 	// inspect or remove the damaged private state explicitly.
 	if (raw.items.length > MAX_ITEMS) return undefined;
 	if (raw.schema_version === 5 && !PLAN_GRAPH) return undefined;
+	if (raw.schema_version === 5) {
+		// v5 state is already the graph format. Do not quietly discard a malformed
+		// profile or downgrade research nodes to ordinary work during reload: that
+		// would remove the profile's evidence and settlement gates.
+		if (raw.profile !== undefined && raw.profile?.name !== "deep-research") return undefined;
+		if (raw.profile === undefined && raw.items.some((item: any) => item && (
+			item.kind === "research_branch" || item.kind === "research_leaf" ||
+			item.owner_ref !== undefined || item.coverage !== undefined || item.source_leads !== undefined ||
+			item.lease !== undefined || item.dispatch_epoch !== undefined
+		))) return undefined;
+	}
 	const items: PlanItem[] = raw.items.slice(0, MAX_ITEMS).map((item: any) => ({
 		id: typeof item.id === "string" && /^[A-Za-z0-9._:-]{1,96}$/.test(item.id) ? item.id : itemId(),
 		title: truncateBytes(cleanText(item.title), MAX_TITLE_BYTES),
