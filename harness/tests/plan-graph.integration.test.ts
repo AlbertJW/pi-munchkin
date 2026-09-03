@@ -25,7 +25,7 @@ if (!CHILD) {
 			const output = execFileSync(process.execPath, [
 				"--experimental-strip-types", "--experimental-loader", resolve("harness/tests/ts-js-resolver.mjs"), "--test", import.meta.filename,
 			], { cwd: process.cwd(), env, encoding: "utf8", stdio: "pipe" });
-			assert.match(output, /pass 28/);
+			assert.match(output, /pass 29/);
 		} finally { rmSync(artifacts, { recursive: true, force: true }); }
 	});
 } else {
@@ -551,6 +551,41 @@ if (!CHILD) {
 			assert.equal(state.items[0].lease.lease_id, acquired.lease_id, "parent dispatch lease remains authoritative until its result arrives");
 		} finally {
 			writeFileSync(contextArtifactPath, originalContextArtifact, { mode: 0o600 });
+		}
+		resetPiGlobals();
+	});
+
+	test("ordinary subagent startup never reclaims a parent research lease", async () => {
+		const parent = fresh(); const cwd = tmp();
+		const started = await callTool(parent, "research_plan_start", { request: "Parent lease", summary: "one branch", branches: [{ title: "Evidence", budget: { searches: 1, reads: 1 } }] }, cwd);
+		const context = started.details.contexts[0];
+		const acquired = await planRunnerModule.acquireResearchBranchLease(cwd, context);
+		assert.equal(acquired.ok, true);
+		const path = join(cwd, ".pi", "plan-state.json");
+		const stale = JSON.parse(readFileSync(path, "utf8")); stale.writer = "previous-parent-process";
+		writeFileSync(path, `${JSON.stringify(stale)}\n`, { mode: 0o600 });
+		const previousDepth = process.env.PI_SUBAGENT_DEPTH;
+		process.env.PI_SUBAGENT_DEPTH = "1";
+		try {
+			// Ordinary delegated agents have no plan_context or branch report path,
+			// but they still share the project cwd. Parent graph recovery must remain
+			// disabled for them just as it is for planned research children.
+			resetPiGlobals();
+			const child = makeFakePi();
+			for (const name of ["read", "bash", "edit", "write", "capability", "plan_write", "plan_update", "plan_expand", "plan_settle", "research_plan_start", "web_search", "web_read", "subagent"]) {
+				child.pi.registerTool({ name, parameters: {} } as any);
+			}
+			(await import(`../extensions/plan-runner.ts?ordinary-child=${Date.now()}-${Math.random()}`)).default(child.pi as any);
+			child.pi.setActiveTools([...child.tools.keys()]);
+			await fire(child, "session_start", {}, makeCtx(cwd).ctx);
+			child.pi.events.emit(HARNESS_SIGNAL_CHANNEL, { v: 1, type: "capsule/identity" });
+			await fire(child, "before_agent_start", {}, makeCtx(cwd).ctx);
+			const recovered = JSON.parse(readFileSync(path, "utf8"));
+			assert.equal(recovered.items[0].status, "pending", "ordinary children must not perform parent stale-lease recovery");
+			assert.equal(recovered.items[0].lease.lease_id, acquired.lease_id, "the parent dispatch lease remains authoritative");
+		} finally {
+			if (previousDepth === undefined) delete process.env.PI_SUBAGENT_DEPTH;
+			else process.env.PI_SUBAGENT_DEPTH = previousDepth;
 		}
 		resetPiGlobals();
 	});

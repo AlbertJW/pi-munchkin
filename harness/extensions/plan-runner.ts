@@ -1494,8 +1494,8 @@ export default function (pi: ExtensionAPI): void {
 		const delegatedContext = await readPlanContext(process.env[PLAN_CONTEXT_ENV]);
 		const delegatedState = delegatedContext ? await readState(ctx.cwd) : undefined;
 		delegatedBranchProcess = Boolean(
-			delegatedContext &&
-			(IS_SUBAGENT_PROCESS || delegatedState?.run_id === delegatedContext.run_id),
+			IS_SUBAGENT_PROCESS ||
+			(delegatedContext && delegatedState?.run_id === delegatedContext.run_id),
 		);
 		// Signals are subscribed once per process. Test harnesses and embedders can
 		// reload this extension in the same process, so keep the child marker on a
