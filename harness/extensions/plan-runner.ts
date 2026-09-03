@@ -330,6 +330,10 @@ async function atomicWrite(path: string, contents: string, privateFile: boolean)
 
 function migrateState(raw: any): PlanState | undefined {
 	if (!raw || typeof raw !== "object" || !Array.isArray(raw.items)) return undefined;
+	// Only v4 and v5 have defined migration semantics. Treating a future or
+	// forged version as legacy would strip graph fields and silently downgrade
+	// research state into ordinary work before settlement validation runs.
+	if (raw.schema_version !== 4 && raw.schema_version !== 5) return undefined;
 	// A persisted graph that exceeds the structural limit is corrupt, not a
 	// large plan to be helpfully shortened. Slicing before validation used to
 	// drop the tail on reload, allowing a later mutation or settlement to act on

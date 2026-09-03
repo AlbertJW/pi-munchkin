@@ -118,6 +118,24 @@ if (!CHILD) {
 		resetPiGlobals();
 	});
 
+	test("unknown planner schema versions cannot downgrade research state to legacy work", async () => {
+		const fp = fresh(); const cwd = tmp();
+		const persisted = {
+			schema_version: 6, run_id: "unknown-schema", request: "research", summary: "must fail closed", autonomy: "lean", phase: "executing",
+			created_at: "2026-08-25T00:00:00.000Z", updated_at: "2026-08-25T00:00:00.000Z",
+			items: [{ id: "research-root", title: "Research root", status: "done", kind: "research_branch", owner_ref: "a".repeat(24),
+				budget: { allocated: { searches: 1, reads: 1 }, used: { searches: 1, reads: 1 } }, evidence_gaps: ["source:unverified"] }],
+		};
+		const path = join(cwd, ".pi", "plan-state.json");
+		const { mkdirSync, readFileSync, writeFileSync } = await import("node:fs");
+		mkdirSync(join(cwd, ".pi"), { recursive: true });
+		const original = `${JSON.stringify(persisted)}\n`;
+		writeFileSync(path, original, { mode: 0o600 });
+		await expectToolError(fp, "plan_settle", { summary: "forged completion" }, cwd, /requires an active graph plan/);
+		assert.equal(readFileSync(path, "utf8"), original, "unknown schema state must remain untouched");
+		resetPiGlobals();
+	});
+
 	test("headless research activation creates a bounded v5 graph and exact delegation contexts", async () => {
 		const fp = fresh(); const cwd = tmp();
 		const result = await callTool(fp, "research_plan_start", {
