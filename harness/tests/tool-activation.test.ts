@@ -246,6 +246,45 @@ test("headless deep-research lease exposes the graph entrypoint at startup", asy
 	}
 });
 
+test("headless deep-research lease injects a parent-only planner-first route hint", async () => {
+	const oldGraph = process.env.PLAN_GRAPH;
+	const oldResearch = process.env.DEEP_RESEARCH_PLANNING;
+	process.env.PLAN_GRAPH = "on";
+	process.env.DEEP_RESEARCH_PLANNING = "on";
+	process.env.PI_MUNCHKIN_HEADLESS_PLAN = "on";
+	const run = await load("core", [...names]);
+	try {
+		const result = await fire(run.fp, "before_agent_start", { systemPrompt: "BASE" }, { cwd: process.cwd() });
+		assert.ok(result?.systemPrompt, "the active parent lease must add a route hint");
+		assert.match(result.systemPrompt, /research_plan_start/);
+		assert.match(result.systemPrompt, /before any web_search or web_read/);
+		assert.match(result.systemPrompt, /children.*plan/i);
+	} finally {
+		run.restore();
+		if (oldGraph === undefined) delete process.env.PLAN_GRAPH; else process.env.PLAN_GRAPH = oldGraph;
+		if (oldResearch === undefined) delete process.env.DEEP_RESEARCH_PLANNING; else process.env.DEEP_RESEARCH_PLANNING = oldResearch;
+	}
+});
+
+test("planner-first route hint stays absent without the headless lease", async () => {
+	const oldGraph = process.env.PLAN_GRAPH;
+	const oldResearch = process.env.DEEP_RESEARCH_PLANNING;
+	const oldHeadless = process.env.PI_MUNCHKIN_HEADLESS_PLAN;
+	process.env.PLAN_GRAPH = "on";
+	process.env.DEEP_RESEARCH_PLANNING = "on";
+	delete process.env.PI_MUNCHKIN_HEADLESS_PLAN;
+	const run = await load("core", [...names]);
+	try {
+		const result = await fire(run.fp, "before_agent_start", { systemPrompt: "BASE" }, { cwd: process.cwd() });
+		assert.equal(result, undefined);
+	} finally {
+		run.restore();
+		if (oldGraph === undefined) delete process.env.PLAN_GRAPH; else process.env.PLAN_GRAPH = oldGraph;
+		if (oldResearch === undefined) delete process.env.DEEP_RESEARCH_PLANNING; else process.env.DEEP_RESEARCH_PLANNING = oldResearch;
+		if (oldHeadless === undefined) delete process.env.PI_MUNCHKIN_HEADLESS_PLAN; else process.env.PI_MUNCHKIN_HEADLESS_PLAN = oldHeadless;
+	}
+});
+
 test("planning restricts capability activation to research", async () => {
 	const run = await load("core", [...names]);
 	try {

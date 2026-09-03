@@ -22,6 +22,7 @@ const HEADLESS_PLAN_TOOLS = new Set([
 	"plan_write", "plan_update", "plan_expand", "plan_settle", "research_plan_start",
 	"web_search", "web_read", "research_note", "research_recall", "subagent",
 ]);
+const HEADLESS_PLAN_ROUTE_HINT = "[pi planner lease] A bounded deep-research planner lease is active for this parent session. For contested, comparative, multi-part, or delegated research, call research_plan_start before any web_search or web_read; do not begin direct web research first. Straightforward fact lookup may stay lightweight. The lease does not authorize children to plan.";
 type Family = "research" | "delegation" | "browser" | "canvas" | "context" | "planning" | "goals";
 
 export const MUNCHKIN_TOOL_PROFILE_DEFAULT: Profile = "core";
@@ -375,6 +376,18 @@ export default function (pi: ExtensionAPI): void {
 		}
 		publish(activationMode === "ambient" ? "ambient-startup" : "dynamic-startup");
 		surfaceTelemetry();
+	});
+
+	// The headless lease is deliberately model-visible as well as tool-visible.
+	// Without this route hint, a model that habitually reaches for web_search first
+	// can bypass the graph entrypoint even though the parent has every graph tool.
+	// The environment variable is excluded by the subagent runner, so children
+	// never inherit this instruction or gain an implicit planning route.
+	pi.on("before_agent_start", async (event) => {
+		if (!HEADLESS_PLAN_ENABLED) return;
+		const existing = typeof event.systemPrompt === "string" ? event.systemPrompt : "";
+		if (existing.includes(HEADLESS_PLAN_ROUTE_HINT)) return;
+		return { systemPrompt: existing ? `${existing}\n\n${HEADLESS_PLAN_ROUTE_HINT}` : HEADLESS_PLAN_ROUTE_HINT };
 	});
 
 	pi.on("context", async (_event, ctx) => {
