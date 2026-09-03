@@ -2,6 +2,18 @@
 
 ## 2026-09-03 first Qwen planner-screen receipt
 
+The repaired parent-only lease was then exercised once in a separate bounded
+diagnostic against the exact loaded hash `a4856f91…` (Qwen 35B, comparative
+prompt, 180-second wall, 350,000-byte cap). The parent activated all ten leased
+planner/research tools and obeyed the shared three-search/five-read wall; the
+run exited at the output cap (143) after 95.478 seconds with 101 safe,
+payload-free telemetry rows. It still emitted no `research-start`, branch
+merge, or graph settlement, so it is not screen evidence and cannot pool with
+the pre-lease receipt. The lease is reachable; the remaining reachability
+question is why the model chooses the direct research path despite the graph
+entrypoint being available. The v3 preregistration now records this diagnostic
+explicitly.
+
 The router was recovered from a stale listener and is now verified healthy on
 `127.0.0.1:8080` with no backend loaded. The first comparative planner-screen
 fixture was attempted in the default sandbox, where Pi could not reach the
