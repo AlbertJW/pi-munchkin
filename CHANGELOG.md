@@ -4,6 +4,17 @@ All notable changes to pi-munchkin are documented here. Releases follow semantic
 
 ## Unreleased
 
+### Fixed (2026-09-03 — reject oversized persisted planner graphs)
+
+- Planner reload now fails closed when private state contains more than the
+  bounded 24-node graph limit. Previously migration sliced the tail before
+  validation, allowing a later mutation to operate on a silently different
+  graph. A targeted regression is red before the guard and green afterward;
+  planner flags remain dark and no inference, mirror, rollout, or push occurred.
+
+The source surface is now `0d045321…`; the loaded mirror remains
+`73bbd494…` and must be rebound before any future smoke.
+
 ### Fixed (2026-09-03 — research-branch reopen evidence reset)
 
 - Reopening a terminal deep-research branch now clears its prior coverage,

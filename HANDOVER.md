@@ -1,5 +1,17 @@
 # Handover — pi_munchkin, 2026-08-24
 
+## 2026-09-03 reject oversized persisted planner graphs (repository-only)
+
+The bottom-up planner audit found that `migrateState` truncated persisted
+graphs to the first 24 nodes before running graph validation. A corrupt or
+stale v5 graph could therefore lose unresolved tail work on reload and then
+accept a mutation against the shortened state. Reload now rejects any state
+whose item array exceeds the structural limit, leaving the private file
+untouched. The new regression was red before the guard and green afterward.
+
+The source surface is `0d045321…`; the loaded mirror remains `73bbd494…`.
+Planner flags remain dark; no inference, mirror, rollout, or push occurred.
+
 ## 2026-09-03 research-branch reopen evidence reset (repository-only)
 
 The bottom-up audit found that an explicitly reopened terminal research branch
