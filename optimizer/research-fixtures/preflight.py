@@ -24,7 +24,7 @@ from typing import Any
 ROOT = pathlib.Path(__file__).resolve().parent
 REPO = ROOT.parents[1]
 HEX64 = re.compile(r"^[0-9a-f]{64}$")
-DEFAULT_SOURCE = "ee4fd6c127a50f31310f9d4a7d368a502b1425263465816d67af233c578259b1"
+DEFAULT_SOURCE = "9e290b2cf3db24108f57c842249060bbae91307ef484b692ae9704f87e25af65"
 DEFAULT_LOADED = "73bbd494f5c23f3b7262bd9f17c44b57574ca23d4b211c07dbd1d6067c23c315"
 DEFAULT_MODEL = "local-llamacpp/qwen36-35b-iq3s"
 REQUIRED_KINDS = {"comparative", "contested", "multi_part"}

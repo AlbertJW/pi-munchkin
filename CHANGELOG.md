@@ -4,6 +4,20 @@ All notable changes to pi-munchkin are documented here. Releases follow semantic
 
 ## Unreleased
 
+### Fixed (2026-09-04 — require productive split evidence)
+
+- A split deep-research branch can no longer report `done` when every child is
+  blocked or deferred and the parent has no usable evidence. Completion now
+  requires parent yield plus a source lead, or at least one productive done
+  child; incomplete done coverage is rejected during graph validation as well.
+  Productive child splits and ordinary flat plans remain valid. The regression
+  was red before the fix and green afterward. Full offline tests pass 693/693
+  and planner integration is 43/43; planner flags remain dark with no model
+  execution, mirror, rollout, or push.
+
+The source surface is `9e290b2c…`; the loaded mirror remains `73bbd494…`.
+Future planner smoke requires a fresh approved preflight and loaded-hash rebind.
+
 ### Fixed (2026-09-04 — require terminal child resolution)
 
 - A research branch can no longer return a terminal `done` report while a

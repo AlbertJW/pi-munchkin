@@ -1,5 +1,20 @@
 # Handover — pi_munchkin, 2026-08-24
 
+## 2026-09-04 require productive split evidence (repository-only)
+
+The planner audit found that a split branch could mark itself `done` after all
+children were blocked or deferred despite producing no usable evidence. A split
+completion now needs parent yield plus a source lead or at least one productive
+done child; graph reload and settlement enforce the same rule. Productive child
+splits and flat plans remain valid. The counterfactual regression was red before
+the fix and green afterward; planner integration is 43/43 and the full suite is
+693/693.
+
+Source surface is `9e290b2cf3db24108f57c842249060bbae91307ef484b692ae9704f87e25af65`;
+loaded mirror remains `73bbd494f5c23f3b7262bd9f17c44b57574ca23d4b211c07dbd1d6067c23c315`.
+Planner flags remain dark. No model execution, mirror, rollout, or push occurred;
+the preflight source pin is updated for the next approved smoke.
+
 ## 2026-09-04 require terminal child resolution (repository-only)
 
 The bottom-up planner audit found that a branch could return terminal `done`
