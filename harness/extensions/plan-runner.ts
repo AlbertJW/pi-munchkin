@@ -405,6 +405,14 @@ async function readState(cwd: string): Promise<PlanState | undefined> {
 	catch { return undefined; }
 }
 
+/** Creation must not treat a present but unreadable plan as an empty slot. */
+async function rejectUnreadablePlanState(cwd: string): Promise<void> {
+	const path = statePath(cwd);
+	if (path && await exists(path) && !await readState(cwd)) {
+		rejectPlanTool("plan creation rejected: existing plan state is malformed; inspect or explicitly cancel it before creating a replacement");
+	}
+}
+
 /**
  * Return the durable retry generation for one parent-owned research root.
  * A generation changes only when an explicit plan_update reopens a terminal
@@ -778,6 +786,7 @@ const planWrite = defineTool({
 		rejectChildPlanMutation();
 		rememberModel(ctx);
 		const result = await mutatePlan(ctx.cwd, async (previous) => {
+			if (!previous) await rejectUnreadablePlanState(ctx.cwd);
 			// No headless reject: pi only dispatches ACTIVE tools, and outside /plan the
 			// tool is active only via capability(enable, "planning") — the sanctioned
 			// model route (skills structure multi-item work this way). The old
@@ -1042,6 +1051,7 @@ const researchPlanStart = defineTool({
 		if (process.env.RESEARCH_LEDGER !== "on") rejectPlanTool("research_plan_start is unavailable: this session cannot parent-verify delegated sources. Research directly and cite inline instead.");
 		if (!graphLifecycleAvailable()) rejectPlanTool("research_plan_start rejected: explicit tool selection excludes graph lifecycle tools (plan_update, plan_expand, plan_settle)");
 		const state = await mutatePlan(ctx.cwd, async (previous) => {
+			if (!previous) await rejectUnreadablePlanState(ctx.cwd);
 			const unsettledGraph = previous && !previous.settled_at && Boolean(previous.profile || previous.items.some((item) => item.parent_id));
 			if (previous && !previous.settled_at && (openItemCount(previous) > 0 || unsettledGraph)) rejectPlanTool("an active or unsettled graph plan already exists");
 			const requestedBudget = params.branches.reduce((total, branch) => ({
