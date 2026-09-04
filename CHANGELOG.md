@@ -4,6 +4,29 @@ All notable changes to pi-munchkin are documented here. Releases follow semantic
 
 ## Unreleased
 
+### Fixed (2026-09-04 — citation guard package receipt)
+
+The integration correction is now committed as `9653746`. Strict telemetry
+catalogs cover both citation-audit events, and the test dependency boundary pins
+research-ledger enablement instead of reading a racing process-wide flag. The
+source surface remains
+`9c04d76a40158c085bed1403336360b262c441ce899273dedb6abc2d20c84962`; this
+package is still repository-only and dark.
+
+### Fixed (2026-09-04 — research guard integration and catalog coverage)
+
+- Registered the citation-guard telemetry events in both machine-readable catalogs,
+  so strict telemetry no longer rejects the new bounded audit receipts.
+- Added explicit dependency injection for research-ledger enablement in extension
+  fixtures, preventing parallel test workers from changing process-wide environment
+  state underneath the citation-boundary test. Production still reads the normal
+  environment defaults.
+
+The corrected source surface is
+`9c04d76a40158c085bed1403336360b262c441ce899273dedb6abc2d20c84962`. This is
+repository-only: no model execution, mirror, rollout, or push occurred before the
+requested delivery step.
+
 ### Fixed (2026-09-04 — research citation and private artifact durability)
 
 - Final deep-research answers now receive one bounded correction when they cite a

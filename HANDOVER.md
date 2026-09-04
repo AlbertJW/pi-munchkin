@@ -1,5 +1,26 @@
 # Handover — pi_munchkin, 2026-08-24
 
+## 2026-09-04 citation-guard package receipt (repository-only)
+
+Commit `9653746` records the integration correction: citation-audit events are
+catalogued in both strict event registries, and research-ledger enablement is
+injectable at the fixture boundary so parallel tests cannot race a process-wide
+environment flag. The source surface is
+`9c04d76a40158c085bed1403336360b262c441ce899273dedb6abc2d20c84962`.
+
+## 2026-09-04 citation-guard integration correction (repository-only)
+
+The first offline full-suite run caught two integration omissions in the citation
+guard package: its two new telemetry kinds were absent from the strict catalogs,
+and its environment-driven fixture could race other parallel test workers. Both
+are corrected. The extension accepts explicit research-ledger enablement only for
+its test dependency boundary; production continues to derive the setting from the
+normal environment. Focused research and catalog tests pass, with no model,
+mirror, rollout, or push activity.
+
+Corrected source surface is
+`9c04d76a40158c085bed1403336360b262c441ce899273dedb6abc2d20c84962`.
+
 ## 2026-09-04 citation and artifact-writer integration cleanup (repository-only)
 
 The bottom-up integration pass closed two cross-cutting gaps. Final answers from
