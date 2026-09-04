@@ -1,5 +1,18 @@
 # Handover — pi_munchkin, 2026-08-24
 
+## 2026-09-04 expose source evidence gaps in planner status (repository-only)
+
+The compact graph renderer filtered out `source:`-prefixed evidence gaps, so a
+branch with only an unverified-source gap appeared gap-free. It now reports a
+bounded count for all evidence gaps while keeping their text private. The
+counterfactual rendering regression was red before the fix and green
+afterward. No model execution, mirror, rollout, or push occurred.
+
+Source surface is `c5c774a4da25b199ce838e90662c9a0b6f1cded98e2112e332f1f0c40296163c`;
+loaded mirror remains `73bbd494f5c23f3b7262bd9f17c44b57574ca23d4b211c07dbd1d6067c23c315`.
+Planner flags remain dark; future smoke requires a fresh approved preflight plus
+loaded-hash rebind.
+
 ## 2026-09-04 reject forged settled planner state (repository-only)
 
 The bottom-up audit found that a persisted v5 `settled_at` marker was accepted

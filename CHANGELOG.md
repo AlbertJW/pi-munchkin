@@ -4,6 +4,17 @@ All notable changes to pi-munchkin are documented here. Releases follow semantic
 
 ## Unreleased
 
+### Fixed (2026-09-04 — expose source evidence gaps in planner status)
+
+- Compact planner status now counts every evidence gap, including
+  source-validation gaps, without exposing gap text or URLs. This keeps the
+  ambient graph view honest while preserving the bounded presentation. The
+  targeted rendering regression was red before the fix and green afterward;
+  planner flags remain dark with no model execution, mirror, rollout, or push.
+
+The source surface is `c5c774a4…`; the loaded mirror remains `73bbd494…`.
+Future planner smoke requires a fresh approved preflight and loaded-hash rebind.
+
 ### Fixed (2026-09-04 — reject forged settled planner state)
 
 - Schema-v5 graph recovery now rejects a `settled_at` marker when the graph is
