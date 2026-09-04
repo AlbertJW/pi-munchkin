@@ -40,6 +40,14 @@ test("deep-research graph expansion preserves parent identity and conserves budg
 		assert.ok(validateGraph(premature).some((error) => /terminal parent has open children/.test(error)));
 });
 
+test("deep-research expansion allocates only the parent budget remainder", () => {
+	const used = state();
+	used.items[0].budget!.used = { searches: 1, reads: 1 };
+	assert.throws(() => expandGraph(used, "root", [
+		{ item_id: "remainder-overrun", title: "Overrun", budget: { searches: 2, reads: 3 } },
+	]), /child budgets exceed parent remainder/);
+});
+
 test("ordinary graph expansion does not manufacture delegation ownership", () => {
 	const ordinary = state();
 	delete ordinary.profile;

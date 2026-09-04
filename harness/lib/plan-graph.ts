@@ -311,6 +311,15 @@ export function expandGraph(state: GraphPlanState, parentId: string, incoming: B
 			...(item.budget ? { budget: { allocated: item.budget, used: { searches: 0, reads: 0 } } } : {}),
 		};
 	});
+	if (state.profile && parent.budget) {
+		const allocated = nextChildren.reduce((sum, child) => addBudget(sum, child.budget?.allocated ?? { searches: 0, reads: 0 }), { searches: 0, reads: 0 });
+		if (!budgetWithin(allocated, parent.budget.allocated)) throw new Error(`child budgets exceed parent allocation: ${parentId}`);
+		const remainder = {
+			searches: Math.max(0, parent.budget.allocated.searches - parent.budget.used.searches),
+			reads: Math.max(0, parent.budget.allocated.reads - parent.budget.used.reads),
+		};
+		if (!budgetWithin(allocated, remainder)) throw new Error(`child budgets exceed parent remainder: ${parentId}`);
+	}
 	const next = { ...state, items: [...state.items, ...nextChildren] };
 	const errors = validateGraph(next);
 	if (errors.length) throw new Error(errors.join("; "));
