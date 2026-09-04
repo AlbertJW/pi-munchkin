@@ -169,6 +169,8 @@ async function loadKetch(ledger: boolean) {
 		// boundary (covered independently by public-url.test.ts). Keep this suite
 		// deterministic and network-independent while retaining production's guard.
 		resolvePublicUrl: async (raw: string) => new URL(raw).toString(),
+		researchLedgerEnabled: ledger,
+		researchBudgetEnabled: ledger,
 	});
 	if (prev === undefined) delete process.env.RESEARCH_LEDGER; else process.env.RESEARCH_LEDGER = prev;
 	return fp;

@@ -167,11 +167,16 @@ async function invoke(args: string[], timeoutMs: number, signal?: AbortSignal): 
 
 export type KetchDependencies = {
 	resolvePublicUrl?: typeof resolvePublicHttpUrl;
+	/** Test-only injection keeps concurrent extension fixtures independent of process env. */
+	researchLedgerEnabled?: boolean;
+	researchBudgetEnabled?: boolean;
 };
 
 export function registerKetch(pi: ExtensionAPI, dependencies: KetchDependencies = {}) {
 	if (!ENABLED) return;
 	const resolvePublicUrl = dependencies.resolvePublicUrl ?? resolvePublicHttpUrl;
+	const ledgerEnabled = dependencies.researchLedgerEnabled ?? LEDGER_ENABLED;
+	const budgetEnabled = dependencies.researchBudgetEnabled ?? BUDGET_ENABLED;
 
 	// --- research-ledger session state (budget wall is separately opt-in) ---
 	const pageCache = new PageCache();
@@ -197,11 +202,11 @@ export function registerKetch(pi: ExtensionAPI, dependencies: KetchDependencies 
 	let lastCitationAudit: ResearchCitationAudit | null = null;
 	let displayedBudget: ResearchBudget = { ...SKILL_BUDGET };
 	function publishResearchState(): void {
-		if (!LEDGER_ENABLED) return;
+		if (!ledgerEnabled) return;
 		(globalThis as Record<string, unknown>).__pi_research_state = { ...counts };
 	}
 	async function activePlanBudget(): Promise<{ context: PlanContextV1 | null; limit: ResearchBudget } | null> {
-		if (!BUDGET_ENABLED) return null;
+		if (!budgetEnabled) return null;
 		const context = await readPlanContext(process.env[PLAN_CONTEXT_ENV]);
 		if (context) {
 			const reserved = context.depth === 1 ? (globalThis as Record<string, unknown>)[RESEARCH_RESERVED_BUDGET_KEY] : undefined;
@@ -225,8 +230,8 @@ export function registerKetch(pi: ExtensionAPI, dependencies: KetchDependencies 
 			// keeping the ledger tools and prompt additions disabled. The completely
 			// legacy path remains inert when both flags are off.
 			const limit = SKILL_BUDGET[kind];
-			if (BUDGET_ENABLED && counts[kind] + units > limit) return { allowed: false, limit };
-			if (BUDGET_ENABLED) {
+			if (budgetEnabled && counts[kind] + units > limit) return { allowed: false, limit };
+			if (budgetEnabled) {
 				counts[kind] += units;
 				publishResearchState();
 			}
@@ -240,7 +245,7 @@ export function registerKetch(pi: ExtensionAPI, dependencies: KetchDependencies 
 		return { allowed: true, limit: budget.limit[kind] };
 	}
 	function budgetFooter(): string {
-		if (!LEDGER_ENABLED) return "";
+		if (!ledgerEnabled) return "";
 		const ledger = activeLedgerPath ? " · private ledger active" : "";
 		return `\n\nresearch budget: searches ${counts.searches}/${displayedBudget.searches} · source reads ${counts.reads}/${displayedBudget.reads} · notes ${counts.notes}${ledger}`;
 	}
@@ -249,7 +254,7 @@ export function registerKetch(pi: ExtensionAPI, dependencies: KetchDependencies 
 		ledgerWriteTail = pending.then(() => undefined, () => undefined);
 		await pending;
 	}
-	if (BUDGET_ENABLED) {
+	if (budgetEnabled) {
 		pi.on("session_start", async () => {
 			pageCache.clear();
 			counts = { searches: 0, reads: 0, notes: 0, notesRejected: 0, cacheHits: 0 };
@@ -270,7 +275,7 @@ export function registerKetch(pi: ExtensionAPI, dependencies: KetchDependencies 
 			delete (globalThis as Record<string, unknown>)[RESEARCH_RESERVED_BUDGET_KEY];
 		});
 	}
-	if (LEDGER_ENABLED) {
+	if (ledgerEnabled) {
 		// The opt-in hole (eval Run 2, defect 3): research_note is a tool the model
 		// must CHOOSE to call, and this corpus's finding is that small models don't
 		// choose (1 voluntary subagent call in 942 base sessions). On q8/B the model
@@ -498,7 +503,7 @@ export function registerKetch(pi: ExtensionAPI, dependencies: KetchDependencies 
 				// serving the cache makes it free instead of a network round-trip.
 				// Partial hits still fetch the whole batch (mixed-source formatting
 				// and ketch's own batching stay untouched).
-				if (reader === "ketch" && LEDGER_ENABLED && safeUrls.length > 0 && blockedCount === 0 && safeUrls.every((url) => pageCache.has(url))) {
+				if (reader === "ketch" && ledgerEnabled && safeUrls.length > 0 && blockedCount === 0 && safeUrls.every((url) => pageCache.has(url))) {
 					const rows = safeUrls.map((url) => ({ url, title: "", markdown: pageCache.get(url)?.text ?? "", error: "" }));
 					const formatted = formatReadResults(rows, READ_OUTPUT_CAP);
 					counts.cacheHits += 1;
@@ -540,7 +545,7 @@ export function registerKetch(pi: ExtensionAPI, dependencies: KetchDependencies 
 					const readFailed = rows.filter((row) => row.error || !row.markdown).length;
 					const failed = readFailed + blockedCount;
 					record("ketch", "read", { reader, sources: params.urls.length, succeeded: rows.length - readFailed, failed, chars: formatted.text.length, duration_ms: Date.now() - started, truncated: formatted.truncated || result.truncated, outcome: "ok" });
-					if (LEDGER_ENABLED) {
+					if (ledgerEnabled) {
 						// Cache the PARSED page text (pre-format): the formatter's body
 						// truncation is an output bound, and quote verification should
 						// see everything ketch actually returned for the page.
@@ -562,7 +567,7 @@ export function registerKetch(pi: ExtensionAPI, dependencies: KetchDependencies 
 		}),
 	);
 
-	if (!LEDGER_ENABLED) return;
+		if (!ledgerEnabled) return;
 
 	pi.registerTool(
 		defineTool({

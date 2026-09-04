@@ -60,6 +60,8 @@
     "plan-runner/start",
     "plan-runner/write",
     "plan-runner/write-rejected",
+    "research/citation-guard",
+    "research/citation-unverified-end",
     "research/note",
     "research/recall",
     "research/run-summary",

@@ -211,6 +211,8 @@ export const EVENT_CATALOG = {
 	"research/note": { ok: "boolean", reason_class: "string", failure_class: "string", quote_chars: "number" },
 	"research/recall": { shown: "number", omitted: "number", suffix_truncated: "boolean" },
 	"research/run-summary": { searches: "number", reads: "number", notes: "number", notes_rejected: "number", cache_hits: "number" },
+	"research/citation-guard": { cited: "number", unverified: "number", explicitly_unverified: "number", injected_chars: "number" },
+	"research/citation-unverified-end": { cited: "number", unverified: "number", explicitly_unverified: "number" },
 	// Fired once when an answer wraps up after web reads with zero recorded notes.
 	"research/wrap-steer": { reads: "number", notes: "number", injected_chars: "number" },
 	"context-brief/injected": { brief_bytes: "number", entries: "number", truncated: "boolean" },
