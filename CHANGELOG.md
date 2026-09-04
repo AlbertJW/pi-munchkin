@@ -4,6 +4,25 @@ All notable changes to pi-munchkin are documented here. Releases follow semantic
 
 ## Unreleased
 
+### Fixed (2026-09-04 — research citation and private artifact durability)
+
+- Final deep-research answers now receive one bounded correction when they cite a
+  URL that the parent evidence ledger has not reread. URL credentials are rejected
+  at storage validation, explicit `[unverified]` markers remain honest, and repeated
+  bad answers cannot create a correction loop. This remains dark behind
+  `RESEARCH_LEDGER=on`.
+- Branch reports, loop-recovery receipts, planner state/projections/exports, and the
+  session cockpit now share one atomic single-file writer. It fsyncs bytes before
+  publication, atomically renames, tightens private modes, syncs the containing
+  directory, and removes failed temporary files. The storage change also closes the
+  durability gap in the former loop-recovery and cockpit writers.
+
+The citation guard was tested at source surface
+`7a6b96bbc681d23db583000d73cc78ff2bb266c7931e2c3a15e0c216738f4685`; the shared
+writer is the current source surface
+`06568985010592dd6f24cd75b15725f047806ad16dc2e5d36335099b58df3eff`. Neither
+package has been mirrored, pushed, rolled out, or used for model inference.
+
 ### Fixed (2026-09-04 — reject independent research leaf reopen)
 
 - Terminal depth-two deep-research leaves are now treated as terminal evidence

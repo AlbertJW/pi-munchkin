@@ -1,5 +1,29 @@
 # Handover — pi_munchkin, 2026-08-24
 
+## 2026-09-04 citation and artifact-writer integration cleanup (repository-only)
+
+The bottom-up integration pass closed two cross-cutting gaps. Final answers from
+an active research ledger now get one bounded correction when they cite a URL the
+parent has not reread; credentials are refused by URL validation, explicit
+`[unverified]` markers remain available for honest uncertainty, and the guard
+cannot loop across repeated bad answers. The research feature remains dark behind
+`RESEARCH_LEDGER=on`.
+
+The same pass removed five copies of single-file durability code. Branch reports,
+loop recovery, planner state and exports, and the session cockpit all use the
+private-artifact atomic writer, which fsyncs the file, publishes by rename, syncs
+the directory, applies the requested mode, and cleans a failed temporary file.
+This also repairs the former unsynced loop-recovery and cockpit paths. Targeted
+tests are green (32/32); no model, mirror, rollout, or push was used.
+
+Citation-guard source surface is
+`7a6b96bbc681d23db583000d73cc78ff2bb266c7931e2c3a15e0c216738f4685`; the current
+post-writer source surface is
+`06568985010592dd6f24cd75b15725f047806ad16dc2e5d36335099b58df3eff`.
+The loaded mirror remains the older
+`73bbd494f5c23f3b7262bd9f17c44b57574ca23d4b211c07dbd1d6067c23c315`; rollout
+requires a fresh review and hash rebind.
+
 ## 2026-09-04 reject independent research leaf reopen (repository-only)
 
 The planner audit found that a terminal depth-two research leaf could be
