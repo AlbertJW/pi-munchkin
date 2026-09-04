@@ -34,7 +34,8 @@ import {
 } from "./types.js";
 import { ACTIVE_TOOL_PROMPTS } from "../../lib/active-tool-prompts.ts";
 import { emitHarnessSignal } from "../../lib/harness-signals.ts";
-import { PLAN_CONTEXT_ENV, RESEARCH_SCOUT_ENV, RESEARCH_SCOUT_DISPATCHED_KEY, readPlanContext, researchUsageFromMessages, validateRootResearchDispatch, validateScoutDispatch, type PlanContextV1, type ScoutReceiptV1 } from "../../lib/branch-report.ts";
+import { BRANCH_REPORT_ENV, PLAN_CONTEXT_ENV, RESEARCH_SCOUT_ENV, RESEARCH_SCOUT_DISPATCHED_KEY, readBranchReport, readPlanContext, researchUsageFromMessages, validateRootResearchDispatch, validateScoutDispatch, type PlanContextV1, type ScoutReceiptV1 } from "../../lib/branch-report.ts";
+import type { PlanStatus, ResearchBudget } from "../../lib/plan-graph.ts";
 import { acquireResearchBranchLease, releaseResearchBranchLease, researchBranchDispatchContext, researchBranchDispatchEpoch } from "../../extensions/plan-runner.ts";
 
 // ---------------------------------------------------------------------------
@@ -828,6 +829,12 @@ Use single mode for one task, parallel mode when tasks are independent and can r
 		if (BRANCH_PLANNER_PROCESS) {
 			const branchBinding = await readPlanContext(process.env[PLAN_CONTEXT_ENV]);
 			alignScoutDispatchState(scoutDispatch, branchBinding);
+			const branchReport = branchBinding?.depth === 1
+				? await readBranchReport(process.env[BRANCH_REPORT_ENV], branchBinding, false)
+				: null;
+			const declaredScoutLeaves = branchReport?.children.map((child) => ({
+				item_id: child.item_id, status: child.status, budget: child.budget.allocated,
+			})) as Array<{ item_id: string; status: PlanStatus; budget: ResearchBudget }> | undefined;
 			const planned = params.tasks ?? (params.agent && params.task ? [{ agent: params.agent, task: params.task, plan_context: (params as typeof params & { plan_context?: PlanContextV1 }).plan_context }] : []);
 			plannedScoutCount = planned.length;
 			const shared = globalThis as Record<string, unknown>;
@@ -845,9 +852,9 @@ Use single mode for one task, parallel mode when tasks are independent and can r
 				searches: Math.max(0, branchBinding.budget.searches - localUsed.searches - alreadyReserved.searches),
 				reads: Math.max(0, branchBinding.budget.reads - localUsed.reads - alreadyReserved.reads),
 			} : undefined;
-			if (!validateScoutDispatch(scoutDispatch.count, planned as Array<{ agent: string; plan_context?: unknown }>, new Set(scoutDispatch.parents), new Set(scoutDispatch.owners), branchBinding ?? undefined, availableBudget)) {
+			if (!validateScoutDispatch(scoutDispatch.count, planned as Array<{ agent: string; plan_context?: unknown }>, new Set(scoutDispatch.parents), new Set(scoutDispatch.owners), branchBinding ?? undefined, availableBudget, declaredScoutLeaves)) {
 				return {
-					content: [{ type: "text", text: "Blocked: a planned research branch may dispatch at most two research-scout leaves, each with its returned depth-two plan_context." }],
+					content: [{ type: "text", text: branchReport ? "Blocked: a planned research branch may dispatch at most two research-scout leaves, and only pending leaves declared by its current branch_plan report with unchanged allocations." : "Blocked: publish a non-terminal branch_plan report before dispatching research-scout leaves; the branch may dispatch at most two research-scout leaves." }],
 						details: makeDetails(hasTasks ? "parallel" : "single")([]), isError: true,
 					};
 				}

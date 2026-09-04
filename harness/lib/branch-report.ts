@@ -127,6 +127,7 @@ const httpUrl = (value: unknown): value is string => {
 	} catch { return false; }
 };
 const boundedText = (value: unknown, bytes: number): value is string => typeof value === "string" && value.trim().length > 0 && Buffer.byteLength(value, "utf8") <= bytes && !/\r/.test(value);
+const sameBudget = (a: ResearchBudget, b: ResearchBudget): boolean => a.searches === b.searches && a.reads === b.reads;
 export function validatePlanContext(value: unknown): value is PlanContextV1 {
 	if (!value || typeof value !== "object" || Array.isArray(value)) return false;
 	const item = value as Record<string, any>;
@@ -153,10 +154,21 @@ export function validateScoutDispatch(
 	dispatchedOwners: ReadonlySet<string> = new Set(),
 	branchBinding?: PlanContextV1,
 	availableBudget?: ResearchBudget,
+	declaredLeaves?: ReadonlyArray<{ item_id: string; status: PlanStatus; budget: ResearchBudget }>,
 ): boolean {
 	if (!boundedInteger(currentCount, 2) || requested.length < 1 || currentCount + requested.length > 2) return false;
 	if (!branchBinding || !validatePlanContext(branchBinding as PlanContextV1) || branchBinding.depth !== 1 ||
 		branchBinding.owner_ref !== ownerRef(branchBinding.run_id, branchBinding.parent_item_id)) return false;
+	// A valid depth-two context is not enough to authorize a dispatch: the branch
+	// planner must first publish the leaf in its current branch_plan report. This
+	// binds the child process to the parent's declared structure and allocation,
+	// rather than allowing a model to mint an arbitrary owner/item pair.
+	if (!declaredLeaves) return false;
+	const declaredById = new Map<string, { status: PlanStatus; budget: ResearchBudget }>();
+	for (const leaf of declaredLeaves) {
+		if (declaredById.has(leaf.item_id) || !ID.test(leaf.item_id) || !validBudget(leaf.budget)) return false;
+		declaredById.set(leaf.item_id, { status: leaf.status, budget: leaf.budget });
+	}
 	// The count alone is not enough: two sequential calls could dispatch the same
 	// leaf twice while still staying under the two-leaf ceiling. Validate against
 	// the branch's already-dispatched identities as well as duplicates in this
@@ -168,6 +180,9 @@ export function validateScoutDispatch(
 		if (entry.agent !== "research-scout" || !validatePlanContext(entry.plan_context) || entry.plan_context.depth !== 2 ||
 			entry.plan_context.run_id !== branchBinding.run_id || entry.plan_context.parent_item_id === branchBinding.parent_item_id ||
 			entry.plan_context.owner_ref !== ownerRef(entry.plan_context.run_id, entry.plan_context.parent_item_id)) return false;
+		const declared = declaredById.get(entry.plan_context.parent_item_id);
+		if (!declared || !["pending", "in_progress"].includes(declared.status) ||
+			!sameBudget(declared.budget, entry.plan_context.budget)) return false;
 		if (owners.has(entry.plan_context.owner_ref) || nodes.has(entry.plan_context.parent_item_id)) return false;
 		allocated = addBudget(allocated, entry.plan_context.budget);
 		if (!budgetWithin(allocated, availableBudget ?? branchBinding.budget)) return false;
@@ -269,11 +284,11 @@ export async function readPlanContext(path: string | undefined): Promise<PlanCon
 	} catch { return null; }
 }
 
-export async function readBranchReport(path: string | undefined, context: PlanContextV1): Promise<BranchReportV1 | null> {
+export async function readBranchReport(path: string | undefined, context: PlanContextV1, terminal = true): Promise<BranchReportV1 | null> {
 	if (!path) return null;
 	try {
 		const parsed = JSON.parse(await readFile(path, "utf8"));
-		return validateBranchReport(parsed, context, true) ? parsed : null;
+		return validateBranchReport(parsed, context, terminal) ? parsed : null;
 	} catch { return null; }
 }
 

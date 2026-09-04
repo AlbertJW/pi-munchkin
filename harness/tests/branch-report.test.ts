@@ -69,7 +69,11 @@ test("branch report transport keeps file and containing-directory durability bar
 test("branch planners may dispatch only two distinct depth-two scouts", () => {
 	const scoutA = { ...context, depth: 2 as const, parent_item_id: "leaf-a", owner_ref: ownerRef(context.run_id, "leaf-a"), budget: { searches: 1, reads: 1 }, limits: { max_depth: 2 as const, max_children: 0 as const } };
 	const scoutB = { ...scoutA, parent_item_id: "leaf-b", owner_ref: ownerRef(context.run_id, "leaf-b"), budget: { searches: 1, reads: 2 } };
-	assert.equal(validateScoutDispatch(0, [{ agent: "research-scout", plan_context: scoutA }, { agent: "research-scout", plan_context: scoutB }], new Set(), new Set(), context), true);
+	const declared = [
+		{ item_id: scoutA.parent_item_id, status: "pending" as const, budget: scoutA.budget },
+		{ item_id: scoutB.parent_item_id, status: "pending" as const, budget: scoutB.budget },
+	];
+	assert.equal(validateScoutDispatch(0, [{ agent: "research-scout", plan_context: scoutA }, { agent: "research-scout", plan_context: scoutB }], new Set(), new Set(), context, undefined, declared), true);
 	const oversized = { ...scoutA, budget: { searches: 3, reads: 0 } };
 	assert.equal(validateScoutDispatch(0, [{ agent: "research-scout", plan_context: oversized }], new Set(), new Set(), context), false, "scout allocations cannot exceed the owning branch envelope");
 	assert.equal(validateScoutDispatch(1, [{ agent: "research-scout", plan_context: scoutA }, { agent: "research-scout", plan_context: scoutB }], new Set(), new Set(), context), false);
@@ -83,6 +87,17 @@ test("branch planners may dispatch only two distinct depth-two scouts", () => {
 	assert.equal(validateScoutDispatch(0, [{ agent: "researcher", plan_context: scoutA }]), false);
 	assert.equal(validateScoutDispatch(0, [{ agent: "research-scout", plan_context: context }]), false);
 	assert.equal(validateScoutDispatch(0, [{ agent: "research-scout", plan_context: scoutA }, { agent: "research-scout", plan_context: scoutA }]), false);
+});
+
+test("scout dispatch must use leaves declared by the current branch report", () => {
+	const scoutA = { ...context, depth: 2 as const, parent_item_id: "declared-leaf", owner_ref: ownerRef(context.run_id, "declared-leaf"), budget: { searches: 1, reads: 1 }, limits: { max_depth: 2 as const, max_children: 0 as const } };
+	const declared = [{ item_id: "declared-leaf", status: "pending" as const, budget: scoutA.budget }];
+	assert.equal(validateScoutDispatch(0, [{ agent: "research-scout", plan_context: scoutA }], new Set(), new Set(), context, undefined, declared), true);
+
+	const forged = { ...scoutA, parent_item_id: "undeclared-leaf", owner_ref: ownerRef(context.run_id, "undeclared-leaf") };
+	assert.equal(validateScoutDispatch(0, [{ agent: "research-scout", plan_context: forged }], new Set(), new Set(), context, undefined, declared), false, "a planner cannot dispatch a leaf absent from its branch report");
+	const wrongBudget = { ...scoutA, budget: { searches: 0, reads: 2 } };
+	assert.equal(validateScoutDispatch(0, [{ agent: "research-scout", plan_context: wrongBudget }], new Set(), new Set(), context, undefined, declared), false, "a scout context must preserve the declared leaf allocation");
 });
 
 test("head planners dispatch each active depth-one branch exactly once", () => {

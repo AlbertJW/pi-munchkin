@@ -212,10 +212,12 @@ test("depth-two scout ceiling survives a child extension reload", async () => {
 	const previous = {
 		PLAN_GRAPH: process.env.PLAN_GRAPH,
 		PI_MUNCHKIN_PLAN_CONTEXT_PATH: process.env.PI_MUNCHKIN_PLAN_CONTEXT_PATH,
+		PI_MUNCHKIN_BRANCH_REPORT_PATH: process.env.PI_MUNCHKIN_BRANCH_REPORT_PATH,
 		PI_SUBAGENT_DEPTH: process.env.PI_SUBAGENT_DEPTH,
 	};
 	const dir = mkdtempSync(join(tmpdir(), "pi-scout-dispatch-reload-"));
 	const contextPath = join(dir, "context.json");
+	const reportPath = join(dir, "report.json");
 	const runId = "dispatch-reload-run";
 	const branchId = "dispatch-branch";
 	const branchContext = {
@@ -224,14 +226,23 @@ test("depth-two scout ceiling survives a child extension reload", async () => {
 		budget: { searches: 2, reads: 3 }, limits: { max_depth: 2, max_children: 2 },
 	};
 	writeFileSync(contextPath, `${JSON.stringify(branchContext)}\n`, { mode: 0o600 });
+	writeFileSync(reportPath, `${JSON.stringify({
+		v: 1, parent_item_id: branchId, owner_ref: branchContext.owner_ref, status: "pending", note: "declared leaves",
+		consumed: { searches: 0, reads: 0 }, children: [
+			{ item_id: "dispatch-leaf-a", title: "Leaf A", status: "pending", budget: { allocated: { searches: 1, reads: 1 }, used: { searches: 0, reads: 0 } } },
+			{ item_id: "dispatch-leaf-b", title: "Leaf B", status: "pending", budget: { allocated: { searches: 1, reads: 2 }, used: { searches: 0, reads: 0 } } },
+		], source_leads: [], evidence_gaps: [],
+	})}\n`, { mode: 0o600 });
 	process.env.PLAN_GRAPH = "on";
 	process.env.PI_MUNCHKIN_PLAN_CONTEXT_PATH = contextPath;
+	process.env.PI_MUNCHKIN_BRANCH_REPORT_PATH = reportPath;
 	delete process.env.PI_SUBAGENT_DEPTH;
 	try {
 		const params = (leaf: string) => ({
 			agent: "research-scout", task: "bounded scout", confirmProjectAgents: false,
 			plan_context: {
 				...branchContext, parent_item_id: leaf, owner_ref: ownerRef(runId, leaf), depth: 2,
+				budget: leaf === "dispatch-leaf-a" ? { searches: 1, reads: 1 } : leaf === "dispatch-leaf-b" ? { searches: 1, reads: 2 } : { searches: 1, reads: 1 },
 				limits: { max_depth: 2, max_children: 0 },
 			},
 		});
@@ -254,6 +265,7 @@ test("depth-two scout ceiling survives a child extension reload", async () => {
 	} finally {
 		if (previous.PLAN_GRAPH === undefined) delete process.env.PLAN_GRAPH; else process.env.PLAN_GRAPH = previous.PLAN_GRAPH;
 		if (previous.PI_MUNCHKIN_PLAN_CONTEXT_PATH === undefined) delete process.env.PI_MUNCHKIN_PLAN_CONTEXT_PATH; else process.env.PI_MUNCHKIN_PLAN_CONTEXT_PATH = previous.PI_MUNCHKIN_PLAN_CONTEXT_PATH;
+		if (previous.PI_MUNCHKIN_BRANCH_REPORT_PATH === undefined) delete process.env.PI_MUNCHKIN_BRANCH_REPORT_PATH; else process.env.PI_MUNCHKIN_BRANCH_REPORT_PATH = previous.PI_MUNCHKIN_BRANCH_REPORT_PATH;
 		if (previous.PI_SUBAGENT_DEPTH === undefined) delete process.env.PI_SUBAGENT_DEPTH; else process.env.PI_SUBAGENT_DEPTH = previous.PI_SUBAGENT_DEPTH;
 		rmSync(dir, { recursive: true, force: true });
 		resetPiGlobals();
