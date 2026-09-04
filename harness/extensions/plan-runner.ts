@@ -17,11 +17,12 @@ import { applyPlanDeltas, type PlanDelta } from "../lib/plan-delta.ts";
 import {
 	DEEP_RESEARCH_MAX_CHILDREN, DEEP_RESEARCH_MAX_DEPTH, DEEP_RESEARCH_MAX_ROOTS,
 	addBudget, budgetWithin, childrenOf, descendantCount, depthOf, expandGraph, graphItemId, graphTerminal, ownerRef, settleErrors, validateGraph,
-	type BranchChildInput, type GraphPlanItem, type GraphPlanState, type PlanStatus, type ResearchBranchLease, type ResearchBudget,
+	type BranchChildInput, type GraphPlanItem, type GraphPlanState, type ParentEvidenceCard, type PlanStatus, type ResearchBranchLease, type ResearchBudget,
 } from "../lib/plan-graph.ts";
 import { planStorageMode, privatePlanProjectionPath, privatePlanStatePath, privatePlanTracePath } from "../lib/plan-state-storage.ts";
 import { processWriterMarker } from "../lib/process-writer.ts";
 import { storedUrl } from "../lib/research-ledger.ts";
+import { RESEARCH_EVIDENCE_CARDS_KEY } from "../lib/research-evidence.ts";
 import { atomicWriteFile } from "../lib/private-artifact.ts";
 import { initialToolSurface } from "../lib/session-bootstrap.ts";
 import { record } from "../lib/telemetry.ts";
@@ -1182,7 +1183,19 @@ const planSettle = defineTool({
 			if (previous.settled_at) rejectPlanTool("plan_settle rejected: plan is already settled and immutable");
 			const verifiedRaw = (globalThis as Record<string, unknown>).__pi_plan_validation_urls;
 			const verified = new Set(Array.isArray(verifiedRaw) ? verifiedRaw.filter((value): value is string => typeof value === "string") : []);
-			const errors = settleErrors(previous as GraphPlanState, verified);
+			const rawCards = (globalThis as Record<string, unknown>)[RESEARCH_EVIDENCE_CARDS_KEY];
+			const evidenceCards: ParentEvidenceCard[] = Array.isArray(rawCards)
+				? rawCards.flatMap((card): ParentEvidenceCard[] => {
+					if (!card || typeof card !== "object" || Array.isArray(card)) return [];
+					const value = card as Record<string, unknown>;
+					return typeof value.card_id === "string" && /^[a-f0-9]{32}$/.test(value.card_id) && typeof value.original_url === "string" && Array.isArray(value.claim_ids) &&
+						typeof value.truncated === "boolean" && typeof value.parent_validated === "boolean" &&
+						value.claim_ids.every((id) => typeof id === "string")
+						? [{ card_id: value.card_id, original_url: value.original_url, claim_ids: value.claim_ids as string[], truncated: value.truncated, parent_validated: value.parent_validated }]
+						: [];
+				})
+				: [];
+			const errors = settleErrors(previous as GraphPlanState, verified, evidenceCards);
 			if (errors.length) rejectPlanTool(`plan_settle rejected: ${errors.join("; ")}`);
 			const next = { ...previous, summary: cleanText(params.summary), settled_at: isoNow() };
 			return { state: next, result: next };
@@ -1614,6 +1627,41 @@ async function mergeBranchResult(cwd: string, context: import("../lib/branch-rep
 	if (outcome.kind === "failed") planEvent("branch-failed", outcome.runId, { failure_class: outcome.failureClass });
 }
 
+/**
+ * A parent agent_end is the boundary at which an abandoned research attempt
+ * must become explicit graph state. Leaving an undispatched pending node in
+ * the plan made a completed Pi run look executable on recovery and prevented
+ * the head from ever acquiring a terminal marker. Close only unleased nodes;
+ * an in-flight lease is handled by the existing stale-lease recovery path.
+ */
+async function closeUndispatchedResearchBranches(cwd: string): Promise<{ runId: string; closed: number } | null> {
+	return mutatePlan<{ runId: string; closed: number } | null>(cwd, async (previous) => {
+		if (!previous || previous.schema_version !== 5 || previous.profile?.name !== "deep-research" || previous.settled_at) return { result: null };
+		const pending = previous.items.filter((item) => item.status === "pending" && !item.lease);
+		if (pending.length === 0) return { result: null };
+		const pendingIds = new Set(pending.map((item) => item.id));
+		const items = previous.items.map((item) => {
+			if (!pendingIds.has(item.id)) return item;
+			const next: PlanItem = {
+				...item,
+				status: "blocked",
+				note: "Research branch ended before dispatch; inspect the evidence gap and explicitly reopen the owning branch before retrying.",
+				evidence_gaps: [...new Set([...(item.evidence_gaps ?? []), "branch:parent_ended_before_dispatch"])],
+			};
+			if (next.budget) next.budget = { ...next.budget, used: { ...next.budget.allocated } };
+			delete next.lease;
+			return next;
+		});
+		const state: PlanState = {
+			...previous,
+			items,
+			...(items.every((item) => graphTerminal(item)) ? { head_terminal_at: previous.head_terminal_at ?? isoNow() } : { head_terminal_at: undefined }),
+		};
+		validateStateSize(state);
+		return { state, result: { runId: state.run_id, closed: pending.length } };
+	});
+}
+
 export default function (pi: ExtensionAPI): void {
 	api = pi;
 	pi.registerTool(planWrite);
@@ -1888,6 +1936,10 @@ export default function (pi: ExtensionAPI): void {
 	});
 
 	pi.on("agent_end", async (_event, ctx) => {
+		if (!delegatedBranchProcess) {
+			const closed = await closeUndispatchedResearchBranches(ctx.cwd);
+			if (closed) planEvent("branches-closed", closed.runId, { closed: closed.closed, reason_class: "parent_ended_before_dispatch" });
+		}
 		const state = await readState(ctx.cwd);
 		if (!state || state.phase !== "executing" || openItemCount(state) === 0) return;
 		record("plan-runner", "ended-open", { run_id: state.run_id, open_items: openItemCount(state) });

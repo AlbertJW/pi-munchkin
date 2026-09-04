@@ -1,6 +1,10 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import { mkdtemp, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { canonicalResearchUrl, makeEvidenceCard, ResearchCoverageLedger } from "../lib/research-evidence.ts";
+import { researchReservationRoot, reservationCount, reserveResearchKey } from "../lib/research-reservations.ts";
 
 test("research evidence uses one canonical URL and content digest", () => {
 	assert.equal(canonicalResearchUrl("HTTPS://Example.com:443/a/?utm_source=x&b=2&a=1#frag"), "https://example.com/a?a=1&b=2");
@@ -33,4 +37,23 @@ test("untrusted delegated cards cannot satisfy the parent ledger", () => {
 	const card = makeEvidenceCard({ original_url: "https://example.test/a", content: "source", claim_ids: ["claim-a"], truncated: false, parent_validated: false, retrieval_method: "jina" });
 	assert.equal(ledger.addCard(card), false);
 	assert.deepEqual(ledger.unmetClaimIds(), ["claim-a"]);
+});
+
+test("research reservations deduplicate keys across concurrent branch writers", async () => {
+	const dir = await mkdtemp(join(tmpdir(), "research-reservations-"));
+	const prior = process.env.PI_CODING_AGENT_DIR;
+	process.env.PI_CODING_AGENT_DIR = join(dir, "agent");
+	try {
+		const root = researchReservationRoot(dir, "run-123");
+		const results = await Promise.all(Array.from({ length: 8 }, () => reserveResearchKey(root, "query", "same claim")));
+		assert.equal(results.filter(Boolean).length, 1);
+		assert.equal(await reservationCount(root, "query"), 1);
+		assert.equal(await reserveResearchKey(root, "url", "https://example.test/source"), true);
+		assert.equal(await reserveResearchKey(root, "url", "https://example.test/source"), false);
+		assert.equal(await reservationCount(root, "url"), 1);
+	} finally {
+		if (prior === undefined) delete process.env.PI_CODING_AGENT_DIR;
+		else process.env.PI_CODING_AGENT_DIR = prior;
+		await rm(dir, { recursive: true, force: true });
+	}
 });

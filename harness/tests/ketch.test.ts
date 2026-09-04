@@ -18,7 +18,7 @@ import {
 } from "../lib/ketch-runtime.ts";
 import { RESEARCH_COVERAGE_KEY } from "../lib/branch-report.ts";
 import { RESEARCH_EVIDENCE_CARDS_KEY } from "../lib/research-evidence.ts";
-import { callTool, makeFakePi } from "./integration-harness.ts";
+import { callTool, makeFakePi, resetPiGlobals } from "./integration-harness.ts";
 
 function restoreEnv(snapshot: Record<string, string | undefined>): void {
 	for (const [key, value] of Object.entries(snapshot)) {
@@ -389,6 +389,41 @@ test("bounded research deduplicates repeated queries before spending a search un
 		restoreEnv(snapshot);
 		rmSync(dir, { recursive: true, force: true });
 		delete (globalThis as Record<string, unknown>).__pi_research_state;
+	}
+});
+
+test("planned research deduplicates a query across independently loaded branch processes", async () => {
+	const dir = mkdtempSync(join(tmpdir(), "ketch-cross-process-dedup-"));
+	const snapshot = Object.fromEntries(["KETCH", "KETCH_BIN", "RESEARCH_BUDGET", "PI_CODING_AGENT_DIR", "PI_MUNCHKIN_PLAN_CONTEXT_PATH", "TELEMETRY_FILE", "TELEMETRY_SOURCE"].map((key) => [key, process.env[key]]));
+	try {
+		delete process.env.KETCH;
+		process.env.KETCH_BIN = mockKetch(dir);
+		process.env.RESEARCH_BUDGET = "on";
+		process.env.PI_CODING_AGENT_DIR = join(dir, "agent");
+		process.env.PI_MUNCHKIN_PLAN_CONTEXT_PATH = join(dir, "context.json");
+		writeFileSync(process.env.PI_MUNCHKIN_PLAN_CONTEXT_PATH, JSON.stringify({
+			v: 1, profile: "deep-research", run_id: "cross-process-run", parent_item_id: "leaf", owner_ref: "a".repeat(24), depth: 2,
+			budget: { searches: 1, reads: 1 }, limits: { max_depth: 2, max_children: 0 },
+		}));
+		process.env.TELEMETRY_FILE = join(dir, "events.jsonl");
+		process.env.TELEMETRY_SOURCE = "test";
+		const first = makeFakePi();
+		const second = makeFakePi();
+		const modA = await import(`../extensions/ketch.ts?cross-a=${Date.now()}-${Math.random()}`);
+		const modB = await import(`../extensions/ketch.ts?cross-b=${Date.now()}-${Math.random()}`);
+		modA.registerKetch(first.pi as never, { resolvePublicUrl: async (raw: string) => new URL(raw).toString() });
+		modB.registerKetch(second.pi as never, { resolvePublicUrl: async (raw: string) => new URL(raw).toString() });
+		await first.handlers.get("session_start")?.[0]?.({}, { cwd: dir, ui: { notify() {} } });
+		await second.handlers.get("session_start")?.[0]?.({}, { cwd: dir, ui: { notify() {} } });
+		const initial = await callTool(first, "web_search", { query: "same cross-branch claim", limit: 1 }, dir);
+		const duplicate = await callTool(second, "web_search", { query: "same   cross-branch claim", limit: 1 }, dir);
+		assert.equal(initial.details.result_count, 1);
+		assert.equal(duplicate.details.outcome, "duplicate_query");
+	} finally {
+		restoreEnv(snapshot);
+		rmSync(dir, { recursive: true, force: true });
+		resetPiGlobals();
+		delete (globalThis as Record<string, unknown>).__pi_ketch_version_checks_v1;
 	}
 });
 

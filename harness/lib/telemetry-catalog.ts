@@ -65,6 +65,7 @@ export const EVENT_CATALOG = {
 	"plan-runner/expand": { parent_item_id: "string", children: "number", open_items: "number" },
 	"plan-runner/branch-merged": { children: "number", lead_count: "number", evidence_gaps: "number" },
 	"plan-runner/branch-failed": { failure_class: "string" },
+	"plan-runner/branches-closed": { closed: "number", reason_class: "string" },
 	"plan-runner/settled": { items: "number", deferred: "number" },
 	"goal-runner/proposed": { goal_id_hash: "string", status: "string", open_criteria: "number" },
 	"goal-runner/started": { goal_id_hash: "string", status: "string", open_criteria: "number" },

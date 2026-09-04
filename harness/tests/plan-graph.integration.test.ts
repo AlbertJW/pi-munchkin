@@ -25,7 +25,7 @@ if (!CHILD) {
 	const output = execFileSync(process.execPath, [
 				"--experimental-strip-types", "--experimental-loader", resolve("harness/tests/ts-js-resolver.mjs"), "--test", import.meta.filename,
 			], { cwd: process.cwd(), env, encoding: "utf8", stdio: "pipe" });
-			assert.match(output, /pass 51/);
+		assert.match(output, /pass 53/);
 		} finally { rmSync(artifacts, { recursive: true, force: true }); }
 	});
 } else {
@@ -35,6 +35,7 @@ if (!CHILD) {
 	const { callTool, expectToolError, fire, makeCtx, makeFakePi, resetPiGlobals } = await import("./integration-harness.ts");
 	const { HARNESS_SIGNAL_CHANNEL } = await import("../lib/harness-signals.ts");
 	const { RESEARCH_COVERAGE_KEY } = await import("../lib/branch-report.ts");
+	const { RESEARCH_EVIDENCE_CARDS_KEY } = await import("../lib/research-evidence.ts");
 	const planRunnerModule = await import("../extensions/plan-runner.ts");
 	const planRunner = planRunnerModule.default;
 	const toolActivation = (await import("../extensions/tool-activation.ts")).default;
@@ -493,6 +494,11 @@ if (!CHILD) {
 		assert.match(readFileSync(join(cwd, ".pi", "TODO.md"), "utf8"), new RegExp(state.items[1].id), "text export must disclose descendants, not only ambient roots");
 		await expectToolError(fp, "plan_settle", { summary: "done" }, cwd, /delegated source not parent-verified/);
 		(globalThis as Record<string, unknown>).__pi_plan_validation_urls = ["https://example.test/source", "https://second.example.test/source"];
+		await expectToolError(fp, "plan_settle", { summary: "missing card map" }, cwd, /claim evidence card/);
+		(globalThis as Record<string, unknown>)[RESEARCH_EVIDENCE_CARDS_KEY] = [
+			{ v: 1, card_id: "a".repeat(32), original_url: "https://example.test/source", claim_ids: ["claim-a"], truncated: false, parent_validated: true },
+			{ v: 1, card_id: "b".repeat(32), original_url: "https://second.example.test/source", claim_ids: ["claim-b"], truncated: false, parent_validated: true },
+		];
 		assert.equal((await callTool(fp, "plan_settle", { summary: "verified and complete" }, cwd)).isError, false);
 		state = JSON.parse(readFileSync(join(cwd, ".pi", "plan-state.json"), "utf8"));
 		assert.ok(state.settled_at); assert.equal(fp.pi.getActiveTools().includes("plan_settle"), false);
@@ -501,6 +507,56 @@ if (!CHILD) {
 		fp.pi.events.emit(HARNESS_SIGNAL_CHANNEL, { v: 1, type: "plan/branch-result", context, report: { ...report, note: "late child result" }, failureClass: null });
 		await fire(fp, "before_agent_start", {}, makeCtx(cwd).ctx);
 		assert.equal(readFileSync(join(cwd, ".pi", "plan-state.json"), "utf8"), frozen, "late child results cannot mutate a settled graph");
+		resetPiGlobals();
+	});
+
+	test("fake provider lifecycle requires terminal branch output and mapped parent evidence cards", async () => {
+		const fp = fresh(); const cwd = tmp();
+		const started = await callTool(fp, "research_plan_start", {
+			request: "Fake provider synthesis", summary: "one bounded branch",
+			branches: [{ title: "Evidence", budget: { searches: 2, reads: 2 } }],
+		}, cwd);
+		const context = started.details.contexts[0];
+		const lease = await planRunnerModule.acquireResearchBranchLease(cwd, context);
+		assert.equal(lease.ok, true);
+		const leased = { ...context, lease_id: lease.lease_id, dispatch_epoch: 0 };
+		// A fake provider that exits without its terminal report is represented by a
+		// missing branch result. The parent must close the branch explicitly rather
+		// than leaving an executable pending node behind.
+		fp.pi.events.emit(HARNESS_SIGNAL_CHANNEL, { v: 1, type: "plan/branch-result", context: leased, report: null, failureClass: "missing_report" });
+		await fire(fp, "before_agent_start", {}, makeCtx(cwd).ctx);
+		let state = JSON.parse(readFileSync(join(cwd, ".pi", "plan-state.json"), "utf8"));
+		assert.equal(state.items[0].status, "blocked");
+		assert.equal(typeof state.head_terminal_at, "string");
+		assert.ok(state.items[0].evidence_gaps.includes("branch:missing_report"));
+
+		// A fresh fake run with a valid terminal report still cannot settle until
+		// every delegated URL has a parent-validated claim-bearing evidence card.
+		const cwd2 = tmp();
+		const second = await callTool(fp, "research_plan_start", {
+			request: "Fake provider evidence", summary: "terminal branch",
+			branches: [{ title: "Evidence", budget: { searches: 2, reads: 2 } }],
+		}, cwd2);
+		const secondContext = second.details.contexts[0];
+		const secondLease = await planRunnerModule.acquireResearchBranchLease(cwd2, secondContext);
+		assert.equal(secondLease.ok, true);
+		const report = {
+			v: 1, parent_item_id: secondContext.parent_item_id, owner_ref: secondContext.owner_ref,
+			status: "done", note: "fake provider returned terminal evidence", consumed: { searches: 1, reads: 2 },
+			children: [], source_leads: [{ url: "https://example.test/fake-source", claim: "fake claim", quote: "fake quote" }],
+			evidence_gaps: [], coverage,
+		};
+		fp.pi.events.emit(HARNESS_SIGNAL_CHANNEL, { v: 1, type: "plan/branch-result", context: { ...secondContext, lease_id: secondLease.lease_id, dispatch_epoch: 0 }, report, failureClass: null });
+		await fire(fp, "before_agent_start", {}, makeCtx(cwd2).ctx);
+		(globalThis as Record<string, unknown>).__pi_plan_validation_urls = ["https://example.test/fake-source", "https://example.test/independent"];
+		await expectToolError(fp, "plan_settle", { summary: "unmapped evidence" }, cwd2, /claim evidence card/);
+		(globalThis as Record<string, unknown>)[RESEARCH_EVIDENCE_CARDS_KEY] = [
+			{ v: 1, card_id: "c".repeat(32), original_url: "https://example.test/fake-source", claim_ids: ["fake-claim"], truncated: false, parent_validated: true },
+			{ v: 1, card_id: "d".repeat(32), original_url: "https://example.test/independent", claim_ids: ["independent-claim"], truncated: false, parent_validated: true },
+		];
+		assert.equal((await callTool(fp, "plan_settle", { summary: "fake provider validated" }, cwd2)).isError, false);
+		state = JSON.parse(readFileSync(join(cwd2, ".pi", "plan-state.json"), "utf8"));
+		assert.equal(typeof state.settled_at, "string");
 		resetPiGlobals();
 	});
 
@@ -603,6 +659,20 @@ if (!CHILD) {
 		assert.equal(typeof state.head_terminal_at, "string", "a missing report closes the final branch and records head termination");
 		const { ctx, notes } = makeCtx(cwd); await fp.commands.get("plan-status").handler(context.parent_item_id, ctx);
 		assert.match(notes.at(-1) ?? "", new RegExp(`Subtree ${context.parent_item_id}`));
+		resetPiGlobals();
+	});
+
+	test("an ended research run closes undispatched branches with an explicit head terminal marker", async () => {
+		const fp = fresh(); const cwd = tmp();
+		await callTool(fp, "research_plan_start", { request: "Investigate", summary: "two branches", branches: [
+			{ title: "First", budget: { searches: 1, reads: 1 } },
+			{ title: "Second", budget: { searches: 1, reads: 1 } },
+		] }, cwd);
+		await fire(fp, "agent_end", {}, makeCtx(cwd).ctx);
+		const state = JSON.parse(readFileSync(join(cwd, ".pi", "plan-state.json"), "utf8"));
+		assert.deepEqual(state.items.map((item: any) => item.status), ["blocked", "blocked"]);
+		assert.equal(typeof state.head_terminal_at, "string");
+		assert.ok(state.items.every((item: any) => item.evidence_gaps?.includes("branch:parent_ended_before_dispatch")));
 		resetPiGlobals();
 	});
 

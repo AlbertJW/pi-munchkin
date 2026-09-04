@@ -1,5 +1,6 @@
 import { PLAN_NOTE_MAX_BYTES, PLAN_TITLE_MAX_BYTES } from "./plan-limits.ts";
 import { createHash, randomUUID } from "node:crypto";
+import { canonicalResearchUrl } from "./research-evidence.ts";
 
 export const PLAN_GRAPH_MAX_NODES = 24;
 export const PLAN_GRAPH_MAX_DEPTH = 3;
@@ -22,6 +23,15 @@ export type RetrievalCoverage = {
 	budget_exhausted: boolean;
 	failed: boolean;
 	complete: boolean;
+};
+
+/** Minimal parent-owned evidence-card shape used by settlement validation. */
+export type ParentEvidenceCard = {
+	card_id: string;
+	original_url: string;
+	claim_ids: string[];
+	truncated: boolean;
+	parent_validated: boolean;
 };
 
 export type GraphPlanItem = {
@@ -389,7 +399,7 @@ export function graphTerminal(item: GraphPlanItem): boolean {
 	return item.status === "done" || item.status === "blocked" || item.status === "deferred";
 }
 
-export function settleErrors(state: GraphPlanState, verifiedUrls: ReadonlySet<string>): string[] {
+export function settleErrors(state: GraphPlanState, verifiedUrls: ReadonlySet<string>, evidenceCards?: readonly ParentEvidenceCard[]): string[] {
 	const errors: string[] = [];
 	for (const item of state.items) if (!graphTerminal(item)) errors.push(`open node: ${item.id}`);
 	for (const item of state.items) {
@@ -409,10 +419,32 @@ export function settleErrors(state: GraphPlanState, verifiedUrls: ReadonlySet<st
 			}
 		}
 		const leads = [...new Set(state.items.flatMap((item) => item.source_leads ?? []))];
-		if (verifiedUrls.size < 2) errors.push("deep-research settlement requires at least two parent-verified sources");
-		if (verifiedUrls.size > state.profile.validation_reads) errors.push(`parent validation-read budget exceeded: ${verifiedUrls.size}/${state.profile.validation_reads}`);
+		const canonicalVerified = new Set<string>();
+		for (const url of verifiedUrls) {
+			try { canonicalVerified.add(canonicalResearchUrl(url)); } catch { /* malformed evidence is not authoritative */ }
+		}
+		if (canonicalVerified.size < 2) errors.push("deep-research settlement requires at least two parent-verified sources");
+		if (canonicalVerified.size > state.profile.validation_reads) errors.push(`parent validation-read budget exceeded: ${canonicalVerified.size}/${state.profile.validation_reads}`);
+		const canonicalLeads = new Map<string, string>();
 		for (const url of leads) {
-			if (!verifiedUrls.has(url)) errors.push(`delegated source not parent-verified: ${url}`);
+			try { canonicalLeads.set(canonicalResearchUrl(url), url); } catch { canonicalLeads.set(url, url); }
+		}
+		for (const [canonical, display] of canonicalLeads) {
+			if (!canonicalVerified.has(canonical)) errors.push(`delegated source not parent-verified: ${display}`);
+		}
+		if (evidenceCards !== undefined) {
+			const cardsByUrl = new Map<string, ParentEvidenceCard[]>();
+			for (const card of evidenceCards) {
+				if (!card.parent_validated || card.truncated || !Array.isArray(card.claim_ids) || card.claim_ids.length === 0 || typeof card.original_url !== "string") continue;
+				let key: string;
+				try { key = canonicalResearchUrl(card.original_url); } catch { continue; }
+				const prior = cardsByUrl.get(key) ?? [];
+				prior.push(card);
+				cardsByUrl.set(key, prior);
+			}
+			for (const [canonical, display] of canonicalLeads) if ((cardsByUrl.get(canonical)?.length ?? 0) === 0) {
+				errors.push(`delegated source lacks a parent-validated claim evidence card: ${display}`);
+			}
 		}
 	}
 	return [...new Set(errors)].slice(0, 16);

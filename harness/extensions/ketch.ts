@@ -30,6 +30,7 @@ import { PLAN_CONTEXT_ENV, RESEARCH_COVERAGE_KEY, RESEARCH_RESERVED_BUDGET_KEY, 
 import { validCoverage, type ResearchBudget } from "../lib/plan-graph.ts";
 import { claimIdForText, makeEvidenceCard, rememberEvidenceCard } from "../lib/research-evidence.ts";
 import { canonicalResearchUrl } from "../lib/research-evidence.ts";
+import { normalizeResearchQuery, researchReservationRoot, reserveResearchKey } from "../lib/research-reservations.ts";
 
 // Ketch is the host-side network adapter for local models. The steady-state
 // surface is deliberately only FIND + READ; deep orchestration lives in the
@@ -206,6 +207,19 @@ export function registerKetch(pi: ExtensionAPI, dependencies: KetchDependencies 
 	let citationGuardFired = false;
 	let lastCitationAudit: ResearchCitationAudit | null = null;
 	let displayedBudget: ResearchBudget = { ...SKILL_BUDGET };
+	let activeResearchCwd: string | null = null;
+	/** Resolve the shared run scope without exposing the run id to the model. */
+	async function activeResearchReservationRoot(): Promise<string | null> {
+		if (!budgetEnabled) return null;
+		const shared = globalThis as Record<string, unknown>;
+		const active = shared.__pi_active_plan_context as { profile?: unknown; run_id?: unknown; settled?: unknown } | undefined;
+		if (active?.profile === "deep-research" && active.settled !== true && typeof active.run_id === "string") {
+			return researchReservationRoot(activeResearchCwd ?? process.cwd(), active.run_id);
+		}
+		const context = await readPlanContext(process.env[PLAN_CONTEXT_ENV]);
+		if (context?.profile === "deep-research") return researchReservationRoot(activeResearchCwd ?? process.cwd(), context.run_id);
+		return null;
+	}
 	function publishResearchState(): void {
 		if (!ledgerEnabled) return;
 		(globalThis as Record<string, unknown>).__pi_research_state = { ...counts };
@@ -260,7 +274,8 @@ export function registerKetch(pi: ExtensionAPI, dependencies: KetchDependencies 
 		await pending;
 	}
 	if (budgetEnabled) {
-		pi.on("session_start", async () => {
+		pi.on("session_start", async (_event, ctx) => {
+			activeResearchCwd = typeof ctx?.cwd === "string" ? ctx.cwd : null;
 			pageCache.clear();
 			counts = { searches: 0, reads: 0, notes: 0, notesRejected: 0, cacheHits: 0 };
 			noteCount = 0;
@@ -390,15 +405,22 @@ export function registerKetch(pi: ExtensionAPI, dependencies: KetchDependencies 
 				mode: Type.Optional(Type.Union([Type.Literal("quick"), Type.Literal("broad")], { description: "quick (default) or broad multi-backend search." })),
 				limit: Type.Optional(Type.Integer({ minimum: 1, maximum: 8, description: "Results to return (default 5)." })),
 			}),
-				async execute(_id, params, signal) {
-					const started = Date.now();
-					const mode = params.mode ?? "quick";
-					const queryKey = params.query.replace(/\s+/g, " ").trim().toLocaleLowerCase();
-					if (budgetEnabled && seenQueries.has(queryKey)) {
+			async execute(_id, params, signal) {
+				const started = Date.now();
+				const mode = params.mode ?? "quick";
+				const queryKey = normalizeResearchQuery(params.query);
+				if (budgetEnabled && seenQueries.has(queryKey)) {
+					record("ketch", "search", { mode, backends: [], attempts: 0, results: 0, chars: 0, duration_ms: Date.now() - started, truncated: false, outcome: "duplicate_query" });
+					return text("This research query was already issued in this run. Name an unmet claim gap before searching again.", { outcome: "duplicate_query", coverage: coverageReceipt(0, undefined, false, false) });
+				}
+				if (budgetEnabled) {
+					const reservationRoot = await activeResearchReservationRoot();
+					if (reservationRoot && !(await reserveResearchKey(reservationRoot, "query", queryKey))) {
 						record("ketch", "search", { mode, backends: [], attempts: 0, results: 0, chars: 0, duration_ms: Date.now() - started, truncated: false, outcome: "duplicate_query" });
-						return text("This research query was already issued in this run. Name an unmet claim gap before searching again.", { outcome: "duplicate_query", coverage: coverageReceipt(0, undefined, false, false) });
+						return text("This research query was already issued in another branch of this run. Name a different unmet claim gap before searching again.", { outcome: "duplicate_query", coverage: coverageReceipt(0, undefined, false, false) });
 					}
-					if (budgetEnabled) seenQueries.add(queryKey);
+					seenQueries.add(queryKey);
+				}
 					const budget = await consumePlanBudget("searches");
 				if (!budget.allowed) {
 					record("ketch", "search", { mode, backends: [], attempts: 0, results: 0, chars: 0, duration_ms: Date.now() - started, truncated: false, outcome: "budget_exhausted" });
@@ -436,12 +458,22 @@ export function registerKetch(pi: ExtensionAPI, dependencies: KetchDependencies 
 
 				try {
 						const parsedResults = parseSearchResults(successful.result.stdout);
-						const results = budgetEnabled
-							? parsedResults.filter((result) => {
-								try { const key = canonicalResearchUrl(result.url); if (seenSearchUrls.has(key)) return false; seenSearchUrls.add(key); return true; }
-								catch { return false; }
-							}).slice(0, limit)
-							: parsedResults.slice(0, limit);
+						let results = parsedResults.slice(0, limit);
+						if (budgetEnabled) {
+							const reservationRoot = await activeResearchReservationRoot();
+							const unique: typeof parsedResults = [];
+							for (const result of parsedResults) {
+								if (unique.length >= limit) break;
+								try {
+									const key = canonicalResearchUrl(result.url);
+									if (seenSearchUrls.has(key)) continue;
+									if (reservationRoot && !(await reserveResearchKey(reservationRoot, "url", key))) continue;
+									seenSearchUrls.add(key);
+									unique.push(result);
+								} catch { /* malformed lead is not a usable result */ }
+							}
+							results = unique;
+						}
 					const formatted = formatSearchResults(results, SEARCH_OUTPUT_CAP);
 					const backends = [...new Set(results.flatMap((result) => result.backends.length ? result.backends : [successful.backend]))];
 					const limitReached = results.length >= limit;
