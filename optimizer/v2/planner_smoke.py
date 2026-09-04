@@ -168,11 +168,15 @@ def build_planner_env(
         "RESEARCH_LEDGER": str(flags["RESEARCH_LEDGER"]),
         "PLAN_GRAPH": str(flags["PLAN_GRAPH"]),
         "DEEP_RESEARCH_PLANNING": str(flags["DEEP_RESEARCH_PLANNING"]),
-        "PLAN_STORAGE": "project", "FORCE_PLAN_WRITE": "on",
+        "PLAN_STORAGE": "project",
         "MUNCHKIN_TOOL_PROFILE": "ambient", "MUNCHKIN_TOOL_ACTIVATION": "ambient",
         "TELEMETRY": "on", "TELEMETRY_SOURCE": "interactive", "TELEMETRY_WRITER": "sync",
         "TELEMETRY_FILE": str(telemetry_path), "LOOP_EPISODE_MODE": "shadow",
     })
+    # The control arm is deliberately graph-off and must not inherit the
+    # legacy flat-plan forcing knob. Candidate planning is activated by its
+    # graph/headless flags and therefore needs no FORCE_PLAN_WRITE either.
+    env.pop("FORCE_PLAN_WRITE", None)
     if bool(spec["headless_plan"]):
         env["PI_MUNCHKIN_HEADLESS_PLAN"] = "on"
     return env

@@ -18,7 +18,7 @@ import { Type } from "typebox";
 import { type AgentConfig, discoverAgents, discoverAgentsWithStarter } from "./agents.js";
 import { renderCall, renderResult } from "./render.js";
 import { getResultSummaryText } from "./runner-events.js";
-import { mapConcurrent, plannedResultGuidance, runAgent, shouldStreamParallelUpdates, shouldStreamSubagentUpdates } from "./runner.js";
+import { mapConcurrent, plannedResultGuidance, resolveTaskConcurrency, runAgent, shouldStreamParallelUpdates, shouldStreamSubagentUpdates } from "./runner.js";
 import {
   type DelegationMode,
   type SingleResult,
@@ -1198,7 +1198,7 @@ This guard prevents self-recursion and cyclic handoffs (for example A -> B -> A)
     try {
       results = await mapConcurrent(
         tasks,
-        MAX_CONCURRENCY,
+		resolveTaskConcurrency(tasks, MAX_CONCURRENCY),
         async (t, index) => {
 		  let result: SingleResult;
 		  try {

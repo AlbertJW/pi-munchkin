@@ -42,6 +42,12 @@ You own exactly the branch named by the supplied private `plan_context`.
    `done`, `blocked`, or `deferred`. A deferral needs value, risk, and rationale.
 7. Stay within the supplied budget. You cannot settle the head plan or write its capsule.
 
+Scheduling invariant: planned child Pi sessions share the serving endpoint with
+the parent. The runner queues them at the declared research concurrency (one by
+default for local routers); do not compensate for a slow child by dispatching a
+second copy. Web fetches may be concurrent inside a child, but model-backed
+delegation is capacity-aware and duplicate query/URL work is not useful.
+
 Protocol gate (mandatory): you MUST invoke the `branch_plan` tool before ending this child run,
 with the validated report for this branch. A plain-text RESULT is not a valid completion and is
 treated as a missing report by the parent. Use a terminal report (`done`, `blocked`, or `deferred`)

@@ -486,6 +486,7 @@ if (!CHILD) {
 		await fire(fp, "before_agent_start", {}, makeCtx(cwd).ctx);
 		let state = JSON.parse(readFileSync(join(cwd, ".pi", "plan-state.json"), "utf8"));
 		assert.equal(state.items.length, 2); assert.equal(state.items[1].parent_id, state.items[0].id);
+		assert.equal(typeof state.head_terminal_at, "string", "a fully terminal branch graph records an explicit head-terminal marker before evidence settlement");
 		const { ctx: statusCtx, notes } = makeCtx(cwd); await fp.commands.get("plan-status").handler("", statusCtx);
 		assert.match(notes.at(-1) ?? "", /ready for settlement/);
 		await fp.commands.get("plan-export").handler("", makeCtx(cwd).ctx);
@@ -599,6 +600,7 @@ if (!CHILD) {
 		await fire(fp, "before_agent_start", {}, makeCtx(cwd).ctx);
 		const state = JSON.parse(readFileSync(join(cwd, ".pi", "plan-state.json"), "utf8"));
 		assert.equal(state.items[0].status, "blocked"); assert.match(state.items[0].note, /missing_report/);
+		assert.equal(typeof state.head_terminal_at, "string", "a missing report closes the final branch and records head termination");
 		const { ctx, notes } = makeCtx(cwd); await fp.commands.get("plan-status").handler(context.parent_item_id, ctx);
 		assert.match(notes.at(-1) ?? "", new RegExp(`Subtree ${context.parent_item_id}`));
 		resetPiGlobals();

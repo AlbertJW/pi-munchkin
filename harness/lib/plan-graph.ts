@@ -62,6 +62,7 @@ export type GraphPlanState = {
 	updated_at: string;
 	items: GraphPlanItem[];
 	profile?: ResearchProfile;
+	head_terminal_at?: string;
 	settled_at?: string;
 	writer?: string;
 };
@@ -202,7 +203,7 @@ export function descendantCount(items: GraphPlanItem[], itemId: string): number 
 	return count;
 }
 
-const GRAPH_STATE_FIELDS = new Set(["schema_version", "run_id", "request", "summary", "autonomy", "phase", "created_at", "updated_at", "items", "profile", "settled_at", "writer"]);
+const GRAPH_STATE_FIELDS = new Set(["schema_version", "run_id", "request", "summary", "autonomy", "phase", "created_at", "updated_at", "items", "profile", "head_terminal_at", "settled_at", "writer"]);
 const GRAPH_ITEM_FIELDS = new Set(["id", "title", "note", "status", "parent_id", "kind", "owner_ref", "budget", "evidence_gaps", "source_leads", "coverage", "defer", "lease", "dispatch_epoch"]);
 const GRAPH_PROFILE_FIELDS = new Set(["name", "max_depth", "max_children", "discovery_budget", "validation_reads"]);
 
@@ -233,6 +234,7 @@ export function validateGraph(state: GraphPlanState): string[] {
 	if (!validTimestamp(state.created_at)) errors.push("invalid graph created_at");
 	if (!validTimestamp(state.updated_at)) errors.push("invalid graph updated_at");
 	if (state.settled_at !== undefined && !validTimestamp(state.settled_at)) errors.push("invalid graph settled_at");
+	if (state.head_terminal_at !== undefined && !validTimestamp(state.head_terminal_at)) errors.push("invalid graph head_terminal_at");
 	if (state.writer !== undefined && !validStateText(state.writer, 96)) errors.push("invalid graph writer");
 	if (!Array.isArray(state.items) || state.items.length < 1 || state.items.length > PLAN_GRAPH_MAX_NODES) {
 		errors.push(`graph must contain 1-${PLAN_GRAPH_MAX_NODES} nodes`);
@@ -327,6 +329,7 @@ export function validateGraph(state: GraphPlanState): string[] {
 		if (!validItems.every((item) => graphTerminal(item))) errors.push("settled graph cannot contain open nodes");
 		if (validItems.some((item) => item.status === "blocked")) errors.push("settled graph cannot contain blocked nodes");
 	}
+	if (state.head_terminal_at !== undefined && validItems.length === state.items.length && !validItems.every((item) => graphTerminal(item))) errors.push("terminal head cannot contain open nodes");
 	if (state.profile) {
 		if (!state.profile || typeof state.profile !== "object" || Array.isArray(state.profile) || !Object.keys(state.profile).every((key) => GRAPH_PROFILE_FIELDS.has(key))) errors.push("unknown deep-research profile field");
 		if (state.profile.name !== "deep-research" || state.profile.max_depth !== DEEP_RESEARCH_MAX_DEPTH ||

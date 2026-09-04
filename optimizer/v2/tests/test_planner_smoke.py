@@ -58,6 +58,7 @@ class PlannerSmokeTests(unittest.TestCase):
         self.assertEqual(env["DEEP_RESEARCH_PLANNING"], "off")
         self.assertEqual(env["RESEARCH_LEDGER"], "on")
         self.assertNotIn("PI_MUNCHKIN_HEADLESS_PLAN", env)
+        self.assertNotIn("FORCE_PLAN_WRITE", env, "the graph-off control must not contaminate its arm with flat planner writes")
 
     def test_explicit_thinking_is_pinned_in_the_model_command(self):
         command = build_pi_command(

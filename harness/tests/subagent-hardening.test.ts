@@ -18,7 +18,14 @@ import { callTool, fire, makeCtx, makeFakePi, resetPiGlobals } from "./integrati
 // boot test).
 const { register } = await import("node:module");
 register(new URL("./ts-js-resolver.mjs", import.meta.url), import.meta.url);
-const { buildPlannedBranchTask, plannedResultGuidance, shouldStreamParallelUpdates, shouldStreamSubagentUpdates } = await import("../vendor/pi-subagent/runner.ts");
+const { buildPlannedBranchTask, plannedResultGuidance, shouldStreamParallelUpdates, shouldStreamSubagentUpdates, resolveTaskConcurrency } = await import("../vendor/pi-subagent/runner.ts");
+
+test("planned research dispatch is serialized even when ordinary delegation allows parallelism", () => {
+	const planned = [{ plan_context: { depth: 1 } }, { plan_context: { depth: 1 } }];
+	assert.equal(resolveTaskConcurrency(planned, 4), 1, "single-slot serving must not be outrun by graph fan-out");
+	assert.equal(resolveTaskConcurrency([{ plan_context: { depth: 2 } }], 4), 1, "scouts remain serialized within their owning child");
+	assert.equal(resolveTaskConcurrency([{}], 4), 4, "ordinary delegation keeps configured capacity");
+});
 
 test("planned depth-one branch failures are terminal, ordinary failures remain retryable", () => {
 	assert.equal(isTerminalPlannedFailure({ depth: 1 }), true);
@@ -47,6 +54,8 @@ test("depth-one planned child task makes branch_report publication a hard final 
 	assert.match(task, /prefer `deferred`.*partial evidence/i);
 	assert.match(task, /coverage\.complete MUST be true only when truncated=false/i);
 	assert.match(task, /Do not invent total_count for bounded coverage/i);
+	assert.match(task, /at most one web_search and one web_read call/i);
+	assert.match(task, /call `branch_plan` immediately after the first source read/i);
 	const scout = { ...context, parent_item_id: "protocol-leaf", owner_ref: ownerRef("protocol-run", "protocol-leaf"), depth: 2, limits: { max_depth: 2, max_children: 0 } } as const;
 	assert.equal(buildPlannedBranchTask("Answer the narrow gap.", scout), "Answer the narrow gap.");
 });

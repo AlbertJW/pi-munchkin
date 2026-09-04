@@ -28,6 +28,8 @@ import { emitHarnessSignal } from "../lib/harness-signals.ts";
 import { buildControlProposal, controlEnforces, emitControlProposal } from "../lib/control-proposal.ts";
 import { PLAN_CONTEXT_ENV, RESEARCH_COVERAGE_KEY, RESEARCH_RESERVED_BUDGET_KEY, observeResearchCoverage, readPlanContext, validResearchCoverageObservation, type PlanContextV1, type ResearchCoverageObservation } from "../lib/branch-report.ts";
 import { validCoverage, type ResearchBudget } from "../lib/plan-graph.ts";
+import { claimIdForText, makeEvidenceCard, rememberEvidenceCard } from "../lib/research-evidence.ts";
+import { canonicalResearchUrl } from "../lib/research-evidence.ts";
 
 // Ketch is the host-side network adapter for local models. The steady-state
 // surface is deliberately only FIND + READ; deep orchestration lives in the
@@ -180,6 +182,9 @@ export function registerKetch(pi: ExtensionAPI, dependencies: KetchDependencies 
 
 	// --- research-ledger session state (budget wall is separately opt-in) ---
 	const pageCache = new PageCache();
+	const pageReaders = new Map<string, "ketch" | "jina">();
+	const seenQueries = new Set<string>();
+	const seenSearchUrls = new Set<string>();
 	let counts = { searches: 0, reads: 0, notes: 0, notesRejected: 0, cacheHits: 0 };
 	let noteCount = 0;
 	let activeLedgerPath: string | null = null;
@@ -385,10 +390,16 @@ export function registerKetch(pi: ExtensionAPI, dependencies: KetchDependencies 
 				mode: Type.Optional(Type.Union([Type.Literal("quick"), Type.Literal("broad")], { description: "quick (default) or broad multi-backend search." })),
 				limit: Type.Optional(Type.Integer({ minimum: 1, maximum: 8, description: "Results to return (default 5)." })),
 			}),
-			async execute(_id, params, signal) {
-				const started = Date.now();
-				const mode = params.mode ?? "quick";
-				const budget = await consumePlanBudget("searches");
+				async execute(_id, params, signal) {
+					const started = Date.now();
+					const mode = params.mode ?? "quick";
+					const queryKey = params.query.replace(/\s+/g, " ").trim().toLocaleLowerCase();
+					if (budgetEnabled && seenQueries.has(queryKey)) {
+						record("ketch", "search", { mode, backends: [], attempts: 0, results: 0, chars: 0, duration_ms: Date.now() - started, truncated: false, outcome: "duplicate_query" });
+						return text("This research query was already issued in this run. Name an unmet claim gap before searching again.", { outcome: "duplicate_query", coverage: coverageReceipt(0, undefined, false, false) });
+					}
+					if (budgetEnabled) seenQueries.add(queryKey);
+					const budget = await consumePlanBudget("searches");
 				if (!budget.allowed) {
 					record("ketch", "search", { mode, backends: [], attempts: 0, results: 0, chars: 0, duration_ms: Date.now() - started, truncated: false, outcome: "budget_exhausted" });
 					return text(`Research search allocation exhausted (${counts.searches}/${budget.limit}). Record an evidence gap instead of retrying.`, { outcome: "budget_exhausted", coverage: coverageReceipt(0, undefined, false, false, true) });
@@ -424,7 +435,13 @@ export function registerKetch(pi: ExtensionAPI, dependencies: KetchDependencies 
 				}
 
 				try {
-					const results = parseSearchResults(successful.result.stdout).slice(0, limit);
+						const parsedResults = parseSearchResults(successful.result.stdout);
+						const results = budgetEnabled
+							? parsedResults.filter((result) => {
+								try { const key = canonicalResearchUrl(result.url); if (seenSearchUrls.has(key)) return false; seenSearchUrls.add(key); return true; }
+								catch { return false; }
+							}).slice(0, limit)
+							: parsedResults.slice(0, limit);
 					const formatted = formatSearchResults(results, SEARCH_OUTPUT_CAP);
 					const backends = [...new Set(results.flatMap((result) => result.backends.length ? result.backends : [successful.backend]))];
 					const limitReached = results.length >= limit;
@@ -518,6 +535,7 @@ export function registerKetch(pi: ExtensionAPI, dependencies: KetchDependencies 
 					return text("web_read blocked every URL as non-public, malformed, or an unsafe redirect.", { reader, outcome: "blocked_url", coverage: coverageReceipt(0, params.urls.length, false, true) });
 				}
 				let fetchUrls = safeUrls;
+				let effectiveReader: "ketch" | "jina" = reader;
 				try {
 					if (reader === "jina") fetchUrls = safeUrls.map((url) => formatJinaReaderUrl(url));
 				} catch {
@@ -525,17 +543,23 @@ export function registerKetch(pi: ExtensionAPI, dependencies: KetchDependencies 
 					return text("Jina Reader rejected a source URL as invalid.", { reader, outcome: "invalid_url", coverage: coverageReceipt(0, params.urls.length, false, true) });
 				}
 				const input = fetchUrls.length === 1 ? fetchUrls[0] : JSON.stringify(fetchUrls);
-				const result = await invoke(["scrape", input, "--max-chars", String(params.max_chars ?? 5_000), "--trim", "--json"], READ_TIMEOUT, signal);
+				let result = await invoke(["scrape", input, "--max-chars", String(params.max_chars ?? 5_000), "--trim", "--json"], READ_TIMEOUT, signal);
+				if (reader === "ketch" && JINA_READER_ENABLED && (result.code !== 0 || result.timedOut || result.aborted)) {
+					effectiveReader = "jina";
+					fetchUrls = safeUrls.map((url) => formatJinaReaderUrl(url));
+					const jinaInput = fetchUrls.length === 1 ? fetchUrls[0] : JSON.stringify(fetchUrls);
+					result = await invoke(["scrape", jinaInput, "--max-chars", String(params.max_chars ?? 5_000), "--trim", "--json"], READ_TIMEOUT, signal);
+				}
 				if (result.code !== 0 || result.timedOut || result.aborted) {
 					const outcome = ketchFailureClass(result);
-					record("ketch", "read", { reader, sources: params.urls.length, succeeded: 0, failed: params.urls.length, chars: 0, duration_ms: Date.now() - started, truncated: result.truncated, outcome });
-					return text(failureText(result), { reader, outcome, coverage: coverageReceipt(0, params.urls.length, result.truncated, true) });
+					record("ketch", "read", { reader: effectiveReader, sources: params.urls.length, succeeded: 0, failed: params.urls.length, chars: 0, duration_ms: Date.now() - started, truncated: result.truncated, outcome });
+					return text(failureText(result), { reader: effectiveReader, fallback: effectiveReader !== reader, outcome, coverage: coverageReceipt(0, params.urls.length, result.truncated, true) });
 				}
 				try {
 					// Never trust ketch to return more rows than URLs requested.
 					const parsedRows = parseReadResults(result.stdout).slice(0, safeUrls.length);
 					const sourceByReaderUrl = new Map(fetchUrls.map((url, index) => [url, safeUrls[index]]));
-					const rows = reader === "jina"
+					const rows = effectiveReader === "jina"
 						? parsedRows.map((row) => {
 							const original = sourceByReaderUrl.get(row.url) ?? unwrapJinaReaderUrl(row.url);
 							return original && safeUrls.includes(original) ? { ...row, url: original } : { ...row, error: row.error || "reader returned an unexpected source URL" };
@@ -544,19 +568,19 @@ export function registerKetch(pi: ExtensionAPI, dependencies: KetchDependencies 
 					const formatted = formatReadResults(rows, READ_OUTPUT_CAP);
 					const readFailed = rows.filter((row) => row.error || !row.markdown).length;
 					const failed = readFailed + blockedCount;
-					record("ketch", "read", { reader, sources: params.urls.length, succeeded: rows.length - readFailed, failed, chars: formatted.text.length, duration_ms: Date.now() - started, truncated: formatted.truncated || result.truncated, outcome: "ok" });
+					record("ketch", "read", { reader: effectiveReader, sources: params.urls.length, succeeded: rows.length - readFailed, failed, chars: formatted.text.length, duration_ms: Date.now() - started, truncated: formatted.truncated || result.truncated, outcome: "ok" });
 					if (ledgerEnabled) {
 						// Cache the PARSED page text (pre-format): the formatter's body
 						// truncation is an output bound, and quote verification should
 						// see everything ketch actually returned for the page.
 						for (const row of rows) {
-							if (!row.error && row.markdown) pageCache.put(row.url, row.markdown);
+							if (!row.error && row.markdown) { pageCache.put(row.url, row.markdown); pageReaders.set(row.url, effectiveReader); }
 						}
 					}
 					const succeeded = rows.length - readFailed;
 					const truncated = formatted.truncated || result.truncated;
 					return text(formatted.text + budgetFooter(), {
-						source_count: rows.length, failed, truncated, reader,
+						source_count: rows.length, failed, truncated, reader: effectiveReader, fallback: effectiveReader !== reader,
 						coverage: coverageReceipt(succeeded, params.urls.length, truncated, failed > 0),
 					});
 				} catch {
@@ -654,6 +678,11 @@ export function registerKetch(pi: ExtensionAPI, dependencies: KetchDependencies 
 				}
 				counts.notes += 1;
 				verifiedUrls.add(storedUrl(sourceUrl).display);
+				const evidenceCard = makeEvidenceCard({
+					original_url: sourceUrl, content: verdict.page.text, claim_ids: [claimIdForText(params.claim)],
+					truncated: false, parent_validated: true, retrieval_method: pageReaders.get(sourceUrl) ?? "ketch",
+				});
+				rememberEvidenceCard(evidenceCard);
 				(globalThis as Record<string, unknown>).__pi_research_verified_urls = [...verifiedUrls].sort();
 				const shared = globalThis as Record<string, unknown>;
 				const activePlan = shared.__pi_active_plan_context as { profile?: unknown; settled?: unknown } | undefined;
@@ -664,12 +693,12 @@ export function registerKetch(pi: ExtensionAPI, dependencies: KetchDependencies 
 				}
 				consecutiveRefusals = 0; // a recorded note proves the model can still verify
 				publishResearchState();
-				record("research", "note", { ok: true, reason_class: verdict.corrected ? "corrected" : "ok", quote_chars: params.quote.length });
+				record("research", "note", { ok: true, reason_class: verdict.corrected ? "corrected" : "ok", quote_chars: params.quote.length, evidence_card_id: evidenceCard.card_id, evidence_method: evidenceCard.retrieval_method });
 				const displaySource = storedUrl(sourceUrl).display;
 				const note = verdict.corrected
 					? `recorded #${noteCount} under ${displaySource} — that quote is from there, not the source you typed; cite the corrected source. (${counts.notes} verified this session)`
 					: `recorded #${noteCount} (${counts.notes} verified note${counts.notes === 1 ? "" : "s"} this session)`;
-				return text(note + budgetFooter(), { note: noteCount, corrected: verdict.corrected });
+				return text(note + budgetFooter(), { note: noteCount, corrected: verdict.corrected, evidence_card: evidenceCard });
 			},
 		}),
 	);

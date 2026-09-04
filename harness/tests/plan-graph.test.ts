@@ -82,6 +82,16 @@ test("coverage receipts cannot call partial or truncated retrieval complete", ()
 	assert.equal(validCoverage({ ...completeCoverage, truncated: true }), false);
 });
 
+test("head-terminal marker is accepted only for a fully terminal graph", () => {
+	const open = state();
+	open.head_terminal_at = "2026-08-25T00:01:00.000Z";
+	assert.ok(validateGraph(open).some((error) => /terminal head cannot contain open nodes/.test(error)));
+	const terminal = state();
+	terminal.items[0] = { ...terminal.items[0], status: "deferred", evidence_gaps: ["bounded gap"], coverage: { ...completeCoverage, complete: false, budget_exhausted: true }, defer: { value: "low", risk: "bounded", rationale: "budget" } };
+	terminal.head_terminal_at = "2026-08-25T00:01:00.000Z";
+	assert.deepEqual(validateGraph(terminal), []);
+});
+
 test("graph validation rejects cycles, missing parents, depth overflow, and excess roots", () => {
 	const missing = state();
 	missing.items.push({ id: "orphan", parent_id: "missing", title: "bad", status: "pending" });

@@ -113,6 +113,10 @@ const inheritedCliArgs = parseInheritedCliArgs(process.argv);
  */
 export function buildPlannedBranchTask(task: string, context?: PlanContextV1): string {
 	if (context?.depth !== 1) return task;
+	// Keep the first attempt deliberately small: one search, one source read,
+	// then publish the branch report. This prevents a child from spending its
+	// entire envelope on exploratory retries before it can close its lease.
+	task = `${task}\n\nBRANCH BUDGET: You have at most one web_search and one web_read call for this branch; call \`branch_plan\` immediately after the first source read (or immediately with a deferred/blocked report if retrieval is unavailable).`;
 	return `${task}\n\nPLANNED BRANCH PROTOCOL (mandatory):\nYou MUST invoke the \`branch_plan\` tool before ending this child run, with a validated report: use a terminal status (done, blocked, or deferred) for a resolved branch, or a pending status only when declaring bounded scout leaves. A plain-text RESULT is not a valid completion and will be treated as a missing report. Do not stop or return text until \`branch_plan\` has been accepted.\n\nCoverage invariant (copy exactly): coverage.complete MUST be true only when truncated=false, budget_exhausted=false, failed=false, and scope=bounded (or scope=exhaustive with returned_count=total_count). If the web tool says the result is truncated, failed, or budget-limited, set that flag true, set complete=false, include at least one evidence_gaps entry, and prefer \`deferred\` when partial evidence remains (with defer.value, defer.risk, and defer.rationale); use blocked only when there is no viable path. A done report requires complete=true, no evidence_gaps, and at least one source lead with positive retrieval yield. Minimal deferred shape: status=deferred; consumed={searches:<observed>,reads:<observed>}; children=[]; source_leads=[one usable lead if any]; evidence_gaps=[short unresolved gap]; coverage={strategy:\"direct\",scope:\"bounded\",returned_count:<leads>,truncated:<flag>,budget_exhausted:<flag>,failed:<flag>,complete:false}; defer={value:\"what remains useful\",risk:\"what may be wrong\",rationale:\"why it is deferred\"}. Do not invent total_count for bounded coverage. After \`branch_plan\` returns, stop this branch and do not perform further research or delegation.`;
 }
 
@@ -149,6 +153,30 @@ export function plannedResultGuidance(results: ReadonlyArray<SingleResult>): str
 		return "\n\nAll planned branches are terminal. The parent must reread every delegated source lead, then call plan_settle once the parent evidence ledger is complete; do not redispatch these branches.";
 	}
 	return "\n\nA planned branch report is not terminal yet. Continue only with the declared branch context; do not start a new research plan.";
+}
+
+/**
+ * Choose a safe worker count for one dispatch. Ordinary delegation can use the
+ * configured cloud concurrency, but planned research children are model calls
+ * against the same serving endpoint. Keep that queue at the explicitly
+ * declared research capacity (one by default for local routers) so a graph
+ * fan-out cannot turn into N simultaneous Pi processes. Operators with a
+ * measured multi-slot endpoint may opt in via PI_RESEARCH_CONCURRENCY; it is
+ * always capped by the ordinary delegation limit.
+ */
+export function resolveTaskConcurrency(
+	 tasks: ReadonlyArray<{ plan_context?: PlanContextV1 | { depth?: number } }>,
+	 configured: number,
+): number {
+	const ordinary = Number.isFinite(configured) && configured > 0 ? Math.floor(configured) : 1;
+	const planned = tasks.some((task) => {
+		const depth = task.plan_context?.depth;
+		return depth === 1 || depth === 2;
+	});
+	if (!planned) return ordinary;
+	const raw = (process.env.PI_RESEARCH_CONCURRENCY ?? "1").trim();
+	const declared = /^\d+$/.test(raw) ? Number.parseInt(raw, 10) : 1;
+	return Math.max(1, Math.min(ordinary, Number.isFinite(declared) && declared > 0 ? declared : 1));
 }
 
 function buildPiArgs(

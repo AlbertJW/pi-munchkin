@@ -26,8 +26,11 @@ subject model, and fixture slate. A successful preflight still requires a
 separate human approval before `planner_smoke.py --run` is used.
 
 The manifests intentionally contain no answer text, quotes, transcripts, or
-gold outputs. The oracle checks only the shape of a future answer artifact, and
-the parent planner remains responsible for rereading and validating every
+gold outputs. `oracles/research_shape.py` is a deterministic metadata oracle:
+when given required claim IDs, declared source-family URLs, and citation
+records, it accepts only parent-validated citations to original HTTP(S) URLs
+(never a `r.jina.ai` formatter URL). It emits aggregate coverage only; the
+parent planner remains responsible for rereading and validating every
 delegated source before settlement.
 
 For ledger value screens, use `RESEARCH_BUDGET=on` with

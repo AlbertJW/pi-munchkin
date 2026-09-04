@@ -17,6 +17,7 @@ import {
 	versionAtLeast,
 } from "../lib/ketch-runtime.ts";
 import { RESEARCH_COVERAGE_KEY } from "../lib/branch-report.ts";
+import { RESEARCH_EVIDENCE_CARDS_KEY } from "../lib/research-evidence.ts";
 import { callTool, makeFakePi } from "./integration-harness.ts";
 
 function restoreEnv(snapshot: Record<string, string | undefined>): void {
@@ -269,6 +270,73 @@ esac
 	}
 });
 
+test("Jina Reader is one bounded fallback after direct extraction fails", async () => {
+	const dir = mkdtempSync(join(tmpdir(), "ketch-jina-fallback-"));
+	const counter = join(dir, "scrape-count");
+	const mock = join(dir, "ketch-fallback");
+	writeFileSync(mock, `#!/bin/sh
+case "$1" in
+  version) printf 'ketch v0.12.0\\n' ;;
+  scrape)
+    if [ ! -f "$KETCH_COUNT" ]; then touch "$KETCH_COUNT"; exit 7; fi
+    printf '{"url":"https://r.jina.ai/https://example.com/a","title":"Reader page","markdown":"fallback text"}\\n' ;;
+  *) exit 2 ;;
+esac
+`);
+	chmodSync(mock, 0o755);
+	const snapshot = Object.fromEntries(["KETCH", "KETCH_BIN", "JINA_READER", "KETCH_COUNT", "TELEMETRY_FILE", "TELEMETRY_SOURCE"].map((key) => [key, process.env[key]]));
+	try {
+		delete process.env.KETCH;
+		process.env.KETCH_BIN = mock;
+		process.env.JINA_READER = "on";
+		process.env.KETCH_COUNT = counter;
+		process.env.TELEMETRY_FILE = join(dir, "events.jsonl");
+		process.env.TELEMETRY_SOURCE = "test";
+		const fp = makeFakePi();
+		const mod = await import(`../extensions/ketch.ts?jina-fallback=${Date.now()}-${Math.random()}`);
+		mod.registerKetch(fp.pi as never, { resolvePublicUrl: async (raw: string) => new URL(raw).toString() });
+		const out = await callTool(fp, "web_read", { urls: ["https://example.com/a"] }, dir);
+		assert.equal(out.isError, false);
+		assert.equal(out.details.reader, "jina");
+		assert.equal(out.details.fallback, true);
+		assert.match(out.content[0].text, /URL: https:\/\/example\.com\/a/);
+		assert.doesNotMatch(out.content[0].text, /r\.jina\.ai/);
+	} finally {
+		restoreEnv(snapshot);
+		rmSync(dir, { recursive: true, force: true });
+	}
+});
+
+test("verified research notes publish compact evidence cards without page content", async () => {
+	const dir = mkdtempSync(join(tmpdir(), "ketch-evidence-card-"));
+	const snapshot = Object.fromEntries(["KETCH", "KETCH_BIN", "RESEARCH_LEDGER", "PI_CODING_AGENT_DIR", "TELEMETRY_FILE", "TELEMETRY_SOURCE"].map((key) => [key, process.env[key]]));
+	try {
+		delete process.env.KETCH;
+		process.env.KETCH_BIN = mockKetch(dir);
+		process.env.RESEARCH_LEDGER = "on";
+		process.env.PI_CODING_AGENT_DIR = join(dir, "agent");
+		process.env.TELEMETRY_FILE = join(dir, "events.jsonl");
+		process.env.TELEMETRY_SOURCE = "test";
+		delete (globalThis as Record<string, unknown>)[RESEARCH_EVIDENCE_CARDS_KEY];
+		const fp = makeFakePi();
+		const mod = await import(`../extensions/ketch.ts?evidence=${Date.now()}-${Math.random()}`);
+		mod.registerKetch(fp.pi as never, { resolvePublicUrl: async (raw: string) => new URL(raw).toString() });
+		await fp.handlers.get("session_start")?.[0]?.({}, { cwd: dir, ui: { notify() {} } });
+		await callTool(fp, "web_read", { urls: ["https://example.com/a"] }, dir);
+		const note = await callTool(fp, "research_note", { claim: "The source is useful.", url: "https://example.com/a", quote: "Useful source text" }, dir);
+		const card = (note.details as Record<string, any>).evidence_card;
+		assert.equal(card.parent_validated, true);
+		assert.equal(card.original_url, "https://example.com/a");
+		assert.match(card.content_sha256, /^[a-f0-9]{64}$/);
+		assert.equal(JSON.stringify(note).includes("Useful source text"), false, "card details must not expose page content");
+		assert.equal((globalThis as Record<string, any>)[RESEARCH_EVIDENCE_CARDS_KEY].length, 1);
+	} finally {
+		restoreEnv(snapshot);
+		rmSync(dir, { recursive: true, force: true });
+		delete (globalThis as Record<string, unknown>)[RESEARCH_EVIDENCE_CARDS_KEY];
+	}
+});
+
 test("ledger sessions hard-stop the skill budget outside a plan graph", async () => {
 	const dir = mkdtempSync(join(tmpdir(), "ketch-ledger-budget-"));
 	const snapshot = Object.fromEntries(["KETCH", "KETCH_BIN", "KETCH_BACKEND", "RESEARCH_LEDGER", "PI_MUNCHKIN_PLAN_CONTEXT_PATH", "TELEMETRY_FILE", "TELEMETRY_SOURCE"].map((key) => [key, process.env[key]]));
@@ -298,6 +366,29 @@ test("ledger sessions hard-stop the skill budget outside a plan graph", async ()
 		delete (globalThis as Record<string, unknown>).__pi_ketch_version_checks_v1;
 		delete (globalThis as Record<string, unknown>).__pi_research_state;
 		delete (globalThis as Record<string, unknown>).__pi_active_plan_context;
+	}
+});
+
+test("bounded research deduplicates repeated queries before spending a search unit", async () => {
+	const dir = mkdtempSync(join(tmpdir(), "ketch-query-dedup-"));
+	const snapshot = Object.fromEntries(["KETCH", "KETCH_BIN", "RESEARCH_BUDGET", "TELEMETRY_FILE", "TELEMETRY_SOURCE"].map((key) => [key, process.env[key]]));
+	try {
+		delete process.env.KETCH;
+		process.env.KETCH_BIN = mockKetch(dir);
+		process.env.RESEARCH_BUDGET = "on";
+		process.env.TELEMETRY_FILE = join(dir, "events.jsonl");
+		process.env.TELEMETRY_SOURCE = "test";
+		const fp = makeFakePi();
+		const mod = await import(`../extensions/ketch.ts?query-dedup=${Date.now()}-${Math.random()}`);
+		mod.registerKetch(fp.pi as never, { resolvePublicUrl: async (raw: string) => new URL(raw).toString() });
+		const first = await callTool(fp, "web_search", { query: "same   claim", limit: 1 }, dir);
+		const second = await callTool(fp, "web_search", { query: " same claim ", limit: 1 }, dir);
+		assert.equal(first.details.result_count, 1);
+		assert.equal(second.details.outcome, "duplicate_query");
+	} finally {
+		restoreEnv(snapshot);
+		rmSync(dir, { recursive: true, force: true });
+		delete (globalThis as Record<string, unknown>).__pi_research_state;
 	}
 });
 

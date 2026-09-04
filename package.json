@@ -169,6 +169,7 @@
     "harness/lib/telemetry-catalog.ts",
     "harness/lib/ketch-runtime.ts",
     "harness/lib/research-ledger.ts",
+    "harness/lib/research-evidence.ts",
     "harness/lib/project-gate.ts",
     "harness/lib/goal-state.ts",
     "harness/lib/run-capsule-renderer.ts",

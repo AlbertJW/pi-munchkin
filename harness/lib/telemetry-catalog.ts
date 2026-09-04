@@ -208,7 +208,7 @@ export const EVENT_CATALOG = {
 	// it recorded under the true source; `quote_ambiguous` ships with ok:false.
 	// `failure_class` appears only on persistence/capacity failures; quote refusals
 	// are deterministically classified by failure-episodes from their fixed text.
-	"research/note": { ok: "boolean", reason_class: "string", failure_class: "string", quote_chars: "number" },
+	"research/note": { ok: "boolean", reason_class: "string", failure_class: "string", quote_chars: "number", evidence_card_id: "string", evidence_method: "string" },
 	"research/recall": { shown: "number", omitted: "number", suffix_truncated: "boolean" },
 	"research/run-summary": { searches: "number", reads: "number", notes: "number", notes_rejected: "number", cache_hits: "number" },
 	"research/citation-guard": { cited: "number", unverified: "number", explicitly_unverified: "number", injected_chars: "number" },

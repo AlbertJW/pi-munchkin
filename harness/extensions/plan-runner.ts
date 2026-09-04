@@ -101,6 +101,7 @@ type PlanState = {
 	updated_at: string;
 	items: PlanItem[];
 	profile?: GraphPlanState["profile"];
+	head_terminal_at?: string;
 	settled_at?: string;
 	writer?: string;
 };
@@ -367,6 +368,7 @@ function migrateState(raw: any): PlanState | undefined {
 		updated_at: now,
 		items,
 		...(raw.schema_version === 5 && PLAN_GRAPH && raw.profile?.name === "deep-research" ? { profile: raw.profile } : {}),
+		...(raw.schema_version === 5 && PLAN_GRAPH && typeof raw.head_terminal_at === "string" ? { head_terminal_at: raw.head_terminal_at } : {}),
 		...(raw.schema_version === 5 && PLAN_GRAPH && typeof raw.settled_at === "string" ? { settled_at: raw.settled_at } : {}),
 		writer: typeof raw.writer === "string" ? raw.writer : undefined,
 	};
@@ -460,7 +462,7 @@ function renderTodo(state: PlanState, selectedId?: string, includeDescendants = 
 	return [
 		"# Active Request", state.request, "", "# Status", derivedStatus(state), "",
 		"# Plan Summary", state.summary || "(none)", "", selectedId ? `# Subtree ${selectedId}` : "# Todo", lines || "(none)", "",
-		"# Meta", `Phase: ${state.phase}`, `Updated: ${state.updated_at}`, `Run ID: ${state.run_id}`, "",
+		"# Meta", `Phase: ${state.phase}`, `Head terminal: ${state.head_terminal_at ? "yes" : "no"}`, `Updated: ${state.updated_at}`, `Run ID: ${state.run_id}`, "",
 	].join("\n");
 }
 
@@ -910,7 +912,7 @@ const planUpdate = defineTool({
 				const next = { ...item };
 				delete next.lease;
 				return next;
-			}) };
+			}), ...((applied.items as PlanItem[]).every((item) => graphTerminal(item)) ? { head_terminal_at: previous.head_terminal_at ?? isoNow() } : { head_terminal_at: undefined }) };
 			validateStateSize(state);
 			return { state, result: { state, changed: applied.changed, idempotent: applied.idempotent } };
 		});
@@ -1476,16 +1478,14 @@ async function rebindActivePlan(cwd: string): Promise<Rebound | null> {
 		const staleLeases = interrupted ? previous.items.filter((item) => Boolean(item.lease) && !graphTerminal(item)) : [];
 		if (!staleLeases.length) return { result: { state: previous, staleLeases: 0, interrupted } };
 		const staleIds = new Set(staleLeases.map((item) => item.id));
-		const state: PlanState = {
-			...previous,
-			items: previous.items.map((item) => {
+		const items = previous.items.map((item) => {
 				if (!staleIds.has(item.id)) return item;
 				const next = { ...item, status: "blocked" as const, note: "Delegated branch interrupted before a validated result; inspect evidence and explicitly reopen before retrying.", evidence_gaps: ["branch:interrupted"] };
 				if (next.budget) next.budget = { ...next.budget, used: { ...next.budget.allocated } };
 				delete next.lease;
 				return next;
-			}),
-		};
+			});
+		const state: PlanState = { ...previous, items, ...(items.every((item) => graphTerminal(item)) ? { head_terminal_at: previous.head_terminal_at ?? isoNow() } : { head_terminal_at: undefined }) };
 		return { state, result: { state, staleLeases: staleLeases.length, interrupted: true } };
 	});
 	const state = rebound?.state;
@@ -1538,9 +1538,10 @@ async function mergeBranchResult(cwd: string, context: import("../lib/branch-rep
 		return { ...item, budget: { ...item.budget, used: { ...item.budget.allocated } } };
 	};
 	const blockParent = (previous: PlanState, parent: PlanItem, failure: string): { state: PlanState; result: MergeOutcome } => {
-		const state = { ...previous, items: previous.items.map((item) => item.id === parent.id ? {
+		const items = previous.items.map((item) => item.id === parent.id ? {
 			...consumeUncertainBudget(releaseLease(item)), status: "blocked" as const, note: `Delegated branch failed: ${failure}.`, evidence_gaps: [`branch:${failure}`],
-		} : item) };
+		} : item);
+		const state = { ...previous, items, ...(items.every((item) => graphTerminal(item)) ? { head_terminal_at: previous.head_terminal_at ?? isoNow() } : { head_terminal_at: undefined }) };
 		// The fallback state deliberately contains no incoming child claims. It is
 		// therefore safe to persist even when the report that triggered the merge
 		// violated a graph invariant.
@@ -1566,7 +1567,8 @@ async function mergeBranchResult(cwd: string, context: import("../lib/branch-rep
 				...(failure === "child_failed" ? releaseLease(item) : consumeUncertainBudget(releaseLease(item))),
 				status: "blocked" as const, note: `Delegated branch failed: ${failure}.`, evidence_gaps: [`branch:${failure}`],
 			} : item);
-			return { state: { ...previous, items }, result: { kind: "failed", runId: previous.run_id, failureClass: failure } };
+			const state = { ...previous, items, ...(items.every((item) => graphTerminal(item)) ? { head_terminal_at: previous.head_terminal_at ?? isoNow() } : { head_terminal_at: undefined }) };
+			return { state, result: { kind: "failed", runId: previous.run_id, failureClass: failure } };
 		}
 		const incomingIds = new Set(report.children.map((child) => child.item_id));
 		const collision = previous.items.find((item) => incomingIds.has(item.id) && item.parent_id !== parent.id);
@@ -1588,7 +1590,7 @@ async function mergeBranchResult(cwd: string, context: import("../lib/branch-rep
 			budget: item.budget ? { ...item.budget, used: cumulativeUsed } : item.budget,
 			evidence_gaps: report.evidence_gaps.map(cleanText).filter(Boolean), source_leads: report.source_leads.map((lead) => storedUrl(lead.url).display), coverage: report.coverage,
 		} : item).concat(children);
-		const next = { ...previous, items };
+		const next = { ...previous, items, ...(items.every((item) => graphTerminal(item)) ? { head_terminal_at: previous.head_terminal_at ?? isoNow() } : { head_terminal_at: undefined }) };
 		try { validateStateSize(next); }
 		catch { return blockParent(previous, parent, "merge_rejected"); }
 		return { state: next, result: { kind: "merged", runId: previous.run_id, children: children.length, leads: report.source_leads.length, gaps: report.evidence_gaps.length } };
