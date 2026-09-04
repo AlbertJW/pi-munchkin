@@ -24,8 +24,8 @@ from typing import Any
 ROOT = pathlib.Path(__file__).resolve().parent
 REPO = ROOT.parents[1]
 HEX64 = re.compile(r"^[0-9a-f]{64}$")
-DEFAULT_SOURCE = "0d4ff9f5afd5e066ad4801c78c312cabbbce330429cf5ee19551a8787ce34d8b"
-DEFAULT_LOADED = "f306b0480b7fdb7a171154d83ce865061025091047cfff92eb67f0689d9e8489"
+DEFAULT_SOURCE = "ae60bdc167b12add717649056019748f42a423315630424ef988f5121cfcc175"
+DEFAULT_LOADED = "41ff832c8df9fbc611b8192384bcc2959073435686db60f68dc01839d820f97d"
 DEFAULT_MODEL = "local-llamacpp/qwen36-35b-iq3s"
 REQUIRED_KINDS = {"comparative", "contested", "multi_part"}
 COMPLETION_FIXTURE_ID = "compare-json-yaml-config"
