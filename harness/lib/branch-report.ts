@@ -110,6 +110,7 @@ export function branchEvidenceYieldError(report: Pick<BranchReportV1, "status" |
 	if (!validResearchEvidenceYield(report.status, report.coverage, report.source_leads.length, report.children, true)) {
 		const child = report.children.find((entry) => entry.status === "done" && (entry.coverage?.returned_count ?? 0) < 1);
 		if (child) return `done child ${child.item_id} requires at least one usable source lead (positive retrieval yield)`;
+		if (report.status === "done" && report.children.length > 0) return "a done split branch requires at least one usable source lead or a productive done child";
 		return "a direct done branch requires at least one usable source lead and a positive retrieval yield";
 	}
 	return null;

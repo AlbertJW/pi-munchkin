@@ -1241,9 +1241,10 @@ const branchPlan = defineTool({
 			observedSearches += searches; observedReads += reads;
 		}
 		if (report.consumed.searches !== observedSearches || report.consumed.reads !== observedReads) rejectPlanTool("branch_plan rejected: branch consumption does not match observed research calls");
+		const terminalHasOpenChild = terminal && report.children.some((child) => !["done", "blocked", "deferred"].includes(child.status));
+		if (terminalHasOpenChild) rejectPlanTool("branch_plan rejected: terminal branch must resolve every child before completion");
 		const evidenceYieldError = branchEvidenceYieldError(report);
 		if (evidenceYieldError) rejectPlanTool(`branch_plan rejected: ${evidenceYieldError}; use blocked or deferred with an explicit evidence gap when no usable source was found`);
-		const terminalHasOpenChild = terminal && report.children.some((child) => !["done", "blocked", "deferred"].includes(child.status));
 		if (!validateBranchReport(report, context, terminal)) {
 			if (terminalHasOpenChild) {
 				rejectPlanTool("branch_plan rejected: terminal branch must resolve every child before completion");

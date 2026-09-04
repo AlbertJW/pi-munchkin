@@ -110,11 +110,14 @@ export function validResearchEvidenceYield(
 	children: ReadonlyArray<{ status: PlanStatus; coverage?: RetrievalCoverage }>,
 	requireDirectLead: boolean,
 ): boolean {
+	const childYield = children.some((child) => child.status === "done" && (child.coverage?.returned_count ?? 0) >= 1);
 	for (const child of children) {
 		if (child.status === "done" && (child.coverage?.returned_count ?? 0) < 1) return false;
 	}
-	if (status === "done" && children.length === 0 &&
-		((coverage?.returned_count ?? 0) < 1 || (requireDirectLead && sourceLeadCount < 1))) return false;
+	if (status === "done") {
+		const ownYield = (coverage?.returned_count ?? 0) >= 1 && (!requireDirectLead || sourceLeadCount >= 1);
+		if (!ownYield && !childYield) return false;
+	}
 	return true;
 }
 
@@ -252,6 +255,10 @@ export function validateGraph(state: GraphPlanState): string[] {
 			if (depth > maximumDepth) errors.push(`maximum graph depth exceeded at ${item.id}`);
 		}
 		const children = childrenOf(state.items, item.id);
+		if (state.profile && (item.kind === "research_branch" || item.kind === "research_leaf") && item.status === "done" &&
+			(!item.coverage?.complete || (item.evidence_gaps?.length ?? 0) > 0)) {
+			errors.push(`done research node lacks complete gap-free coverage: ${item.id}`);
+		}
 		if (state.profile && (item.kind === "research_branch" || item.kind === "research_leaf") &&
 			!validResearchEvidenceYield(item.status, item.coverage, item.source_leads?.length ?? 0, children, item.kind === "research_branch")) {
 			errors.push(`done research node lacks usable evidence yield: ${item.id}`);

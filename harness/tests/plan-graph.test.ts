@@ -113,6 +113,12 @@ test("research completion requires evidence yield but split parents may rely on 
 	split.items[0] = { ...split.items[0], status: "done", coverage: { ...completeCoverage, returned_count: 0 }, source_leads: [], budget: { allocated: { searches: 2, reads: 3 }, used: { searches: 1, reads: 1 } } };
 	split.items[1] = { ...split.items[1], status: "done", coverage: completeCoverage, budget: { allocated: { searches: 1, reads: 1 }, used: { searches: 1, reads: 1 } } };
 	assert.deepEqual(validateGraph(split), [], "a split parent may have zero local yield when its child is productive");
+
+	const emptySplit = expandGraph(state(), "root", [{ item_id: "blocked-leaf", title: "Blocked leaf", budget: { searches: 1, reads: 1 } }]);
+	emptySplit.items[0] = { ...emptySplit.items[0], status: "done", coverage: { ...completeCoverage, returned_count: 0 }, source_leads: [] };
+	emptySplit.items[1] = { ...emptySplit.items[1], status: "blocked", evidence_gaps: ["no usable source"], coverage: { ...completeCoverage, returned_count: 0, complete: false, failed: true }, budget: { allocated: { searches: 1, reads: 1 }, used: { searches: 1, reads: 1 } } };
+	emptySplit.items[0].budget = { allocated: { searches: 2, reads: 3 }, used: { searches: 1, reads: 1 } };
+	assert.ok(validateGraph(emptySplit).some((error) => /usable evidence yield/.test(error)), "a split parent with no productive child must not validate as done");
 });
 
 test("settlement requires terminal unblocked work, complete deferrals, and parent-verified leads", () => {

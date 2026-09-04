@@ -25,7 +25,7 @@ if (!CHILD) {
 	const output = execFileSync(process.execPath, [
 				"--experimental-strip-types", "--experimental-loader", resolve("harness/tests/ts-js-resolver.mjs"), "--test", import.meta.filename,
 			], { cwd: process.cwd(), env, encoding: "utf8", stdio: "pipe" });
-			assert.match(output, /pass 42/);
+			assert.match(output, /pass 43/);
 		} finally { rmSync(artifacts, { recursive: true, force: true }); }
 	});
 } else {
@@ -636,6 +636,21 @@ if (!CHILD) {
 			children: [{ item_id: "open-leaf", title: "Open leaf", status: "pending",
 				budget: { allocated: { searches: 1, reads: 1 }, used: { searches: 0, reads: 0 } } }],
 		}, cwd, /terminal branch must resolve every child/i);
+		resetPiGlobals();
+	});
+
+	test("branch_plan cannot mark a split branch done without productive evidence", async () => {
+		const fp = fresh(); const cwd = tmp();
+		(globalThis as Record<string, unknown>).__pi_research_state = { searches: 0, reads: 0 };
+		(globalThis as Record<string, unknown>).__pi_research_scout_receipts = [{
+			owner_ref: ownerRef("branch-budget-run", "blocked-leaf"), searches: 0, reads: 0,
+			coverage: { calls: 0, returned_count: 0, incomplete: false, truncated: false, failed: false, budget_exhausted: false },
+		}];
+		await expectToolError(fp, "branch_plan", {
+			status: "done", note: "all split evidence failed", consumed: { searches: 0, reads: 0 }, source_leads: [], evidence_gaps: [], coverage: { ...coverage, returned_count: 0 },
+			children: [{ item_id: "blocked-leaf", title: "Blocked leaf", status: "blocked", evidence_gaps: ["no usable source"], coverage: { ...coverage, returned_count: 0, complete: false, failed: true },
+				budget: { allocated: { searches: 1, reads: 1 }, used: { searches: 0, reads: 0 } } }],
+		}, cwd, /productive done child|usable source lead/i);
 		resetPiGlobals();
 	});
 
