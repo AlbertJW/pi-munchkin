@@ -406,9 +406,13 @@ async function readState(cwd: string): Promise<PlanState | undefined> {
 }
 
 /** Creation must not treat a present but unreadable plan as an empty slot. */
-async function rejectUnreadablePlanState(cwd: string): Promise<void> {
+async function planStateFilePresent(cwd: string): Promise<boolean> {
 	const path = statePath(cwd);
-	if (path && await exists(path) && !await readState(cwd)) {
+	return Boolean(path && await exists(path));
+}
+
+async function rejectUnreadablePlanState(cwd: string): Promise<void> {
+	if (await planStateFilePresent(cwd) && !await readState(cwd)) {
 		rejectPlanTool("plan creation rejected: existing plan state is malformed; inspect or explicitly cancel it before creating a replacement");
 	}
 }
@@ -1794,7 +1798,9 @@ export default function (pi: ExtensionAPI): void {
 		const state = await readState(ctx.cwd);
 		const selected = cleanText(args) || undefined;
 		if (selected && state && !state.items.some((item) => item.id === selected)) { ctx.ui.notify(`Unknown plan item: ${selected}`, "error"); return; }
-		ctx.ui.notify(state ? renderTodo(state, selected) : "No current plan found.", "info");
+		if (state) ctx.ui.notify(renderTodo(state, selected), "info");
+		else if (await planStateFilePresent(ctx.cwd)) ctx.ui.notify("Planner state is malformed and has been preserved. Use /plan-cancel to discard it before creating a replacement.", "error");
+		else ctx.ui.notify("No current plan found.", "info");
 	} });
 	pi.registerCommand("plan-export", { description: "Export the private plan review snapshot.", handler: async (_args, ctx) => {
 		rejectChildPlanMutation();

@@ -130,6 +130,8 @@ if (!CHILD) {
 		writeFileSync(path, original, { mode: 0o600 });
 		await expectToolError(fp, "plan_update", { deltas: [{ item_id: "item-1", status: "done" }] }, cwd, /no plan exists yet/i);
 		assert.equal(readFileSync(path, "utf8"), original, "malformed top-level lifecycle state must remain untouched");
+		const { ctx, notes } = makeCtx(cwd); await fp.commands.get("plan-status").handler("", ctx);
+		assert.match(notes.at(-1) ?? "", /malformed.*preserved|preserved.*malformed/i, "status should explain that the persisted plan is malformed and preserved");
 		resetPiGlobals();
 	});
 
