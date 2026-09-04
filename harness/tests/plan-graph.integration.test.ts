@@ -25,7 +25,7 @@ if (!CHILD) {
 	const output = execFileSync(process.execPath, [
 				"--experimental-strip-types", "--experimental-loader", resolve("harness/tests/ts-js-resolver.mjs"), "--test", import.meta.filename,
 			], { cwd: process.cwd(), env, encoding: "utf8", stdio: "pipe" });
-			assert.match(output, /pass 47/);
+			assert.match(output, /pass 48/);
 		} finally { rmSync(artifacts, { recursive: true, force: true }); }
 	});
 } else {
@@ -136,6 +136,24 @@ if (!CHILD) {
 		await fp.commands.get("plan-export").handler("", exportCtx.ctx);
 		const exportNotes = exportCtx.notes;
 		assert.match(exportNotes.at(-1) ?? "", /malformed.*preserved|preserved.*malformed/i, "export should explain that malformed persisted state was preserved");
+		resetPiGlobals();
+	});
+
+	test("a forged settled timestamp cannot reload while work remains open", async () => {
+		const fp = fresh(); const cwd = tmp();
+		const persisted = {
+			schema_version: 5, run_id: "forged-settlement", request: "research", summary: "must remain inspectable", autonomy: "lean", phase: "executing",
+			created_at: "2026-08-25T00:00:00.000Z", updated_at: "2026-08-25T00:00:00.000Z", settled_at: "2026-08-25T00:01:00.000Z",
+			items: [{ id: "open-item", title: "Still open", status: "pending", kind: "work" }],
+		};
+		const path = join(cwd, ".pi", "plan-state.json");
+		const { mkdirSync, readFileSync, writeFileSync } = await import("node:fs");
+		mkdirSync(join(cwd, ".pi"), { recursive: true });
+		const original = `${JSON.stringify(persisted)}\n`;
+		writeFileSync(path, original, { mode: 0o600 });
+		const { ctx, notes } = makeCtx(cwd); await fp.commands.get("plan-status").handler("", ctx);
+		assert.match(notes.at(-1) ?? "", /malformed.*preserved|preserved.*malformed/i, "settled state with open work must fail closed");
+		assert.equal(readFileSync(path, "utf8"), original, "forged settled state must remain untouched");
 		resetPiGlobals();
 	});
 

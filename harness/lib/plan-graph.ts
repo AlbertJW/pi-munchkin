@@ -307,6 +307,16 @@ export function validateGraph(state: GraphPlanState): string[] {
 			if (!budgetWithin(used, item.budget.used)) errors.push(`child budget use exceeds parent consumption: ${item.id}`);
 		}
 	}
+	// `settled_at` is an authoritative lifecycle marker, not a display hint. A
+	// forged or torn snapshot must not present an executable node as completed;
+	// settlement itself already rejects blocked work. Only run these checks when
+	// every entry has an object shape so malformed input remains a total,
+	// non-throwing validation path.
+	if (state.settled_at !== undefined && validItems.length === state.items.length) {
+		if (state.phase !== "executing") errors.push("settled graph must be in executing phase");
+		if (!validItems.every((item) => graphTerminal(item))) errors.push("settled graph cannot contain open nodes");
+		if (validItems.some((item) => item.status === "blocked")) errors.push("settled graph cannot contain blocked nodes");
+	}
 	if (state.profile) {
 		if (!state.profile || typeof state.profile !== "object" || Array.isArray(state.profile) || !Object.keys(state.profile).every((key) => GRAPH_PROFILE_FIELDS.has(key))) errors.push("unknown deep-research profile field");
 		if (state.profile.name !== "deep-research" || state.profile.max_depth !== DEEP_RESEARCH_MAX_DEPTH ||
