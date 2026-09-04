@@ -1805,7 +1805,12 @@ export default function (pi: ExtensionAPI): void {
 	pi.registerCommand("plan-export", { description: "Export the private plan review snapshot.", handler: async (_args, ctx) => {
 		rejectChildPlanMutation();
 		const state = await readState(ctx.cwd);
-		if (!state) { ctx.ui.notify("No plan to export.", "info"); return; }
+		if (!state) {
+			if (await planStateFilePresent(ctx.cwd)) {
+				ctx.ui.notify("Planner state is malformed and has been preserved; export is unavailable. Use /plan-cancel to discard it before creating a replacement.", "error");
+			} else ctx.ui.notify("No plan to export.", "info");
+			return;
+		}
 		await mkdir(dirname(todoPath(ctx.cwd)), { recursive: true });
 		await atomicWrite(todoPath(ctx.cwd), renderTodo(state, undefined, true), false);
 		await atomicWrite(reviewExportPath(ctx.cwd), `${JSON.stringify(state, null, 2)}\n`, false);

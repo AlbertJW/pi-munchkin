@@ -132,6 +132,10 @@ if (!CHILD) {
 		assert.equal(readFileSync(path, "utf8"), original, "malformed top-level lifecycle state must remain untouched");
 		const { ctx, notes } = makeCtx(cwd); await fp.commands.get("plan-status").handler("", ctx);
 		assert.match(notes.at(-1) ?? "", /malformed.*preserved|preserved.*malformed/i, "status should explain that the persisted plan is malformed and preserved");
+		const exportCtx = makeCtx(cwd);
+		await fp.commands.get("plan-export").handler("", exportCtx.ctx);
+		const exportNotes = exportCtx.notes;
+		assert.match(exportNotes.at(-1) ?? "", /malformed.*preserved|preserved.*malformed/i, "export should explain that malformed persisted state was preserved");
 		resetPiGlobals();
 	});
 
