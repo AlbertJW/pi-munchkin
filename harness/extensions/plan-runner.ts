@@ -853,6 +853,19 @@ const planUpdate = defineTool({
 			if (previous.settled_at) rejectPlanTool("plan_update rejected: settled plans are immutable");
 			const applied = applyPlanDeltas(previous.items, params.deltas as PlanDelta[]);
 			if (!applied.ok) rejectPlanTool(`plan_update rejected: ${applied.errors.join("; ")}`);
+			// Depth-two scouts are terminal evidence leaves, not independently
+			// dispatchable work. Reopening one would leave a pending node that no
+			// runtime path can execute (only depth-one research branches own leases
+			// and may mint a fresh bounded child set). Reopen the owning branch
+			// instead; its retry epoch and branch report replace the leaf set
+			// transactionally.
+			if (previous.profile?.name === "deep-research") {
+				for (const prior of previous.items) {
+					if (prior.kind !== "research_leaf" || !graphTerminal(prior)) continue;
+					const next = (applied.items as PlanItem[]).find((item) => item.id === prior.id);
+					if (next && !graphTerminal(next)) rejectPlanTool(`plan_update rejected: research leaves cannot be reopened independently; reopen owning branch ${prior.parent_id ?? "(unknown)"}`);
+				}
+			}
 			// A user-authorized terminal transition is also an explicit cancellation of
 			// any in-flight delegated work for that item. Clear its durable lease so the
 			// child result becomes a harmless late arrival instead of making cancellation

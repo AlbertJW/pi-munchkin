@@ -25,7 +25,7 @@ if (!CHILD) {
 	const output = execFileSync(process.execPath, [
 				"--experimental-strip-types", "--experimental-loader", resolve("harness/tests/ts-js-resolver.mjs"), "--test", import.meta.filename,
 			], { cwd: process.cwd(), env, encoding: "utf8", stdio: "pipe" });
-			assert.match(output, /pass 49/);
+			assert.match(output, /pass 50/);
 		} finally { rmSync(artifacts, { recursive: true, force: true }); }
 	});
 } else {
@@ -552,6 +552,33 @@ if (!CHILD) {
 		assert.equal(state.items[0].coverage, undefined, "a reopened branch must not retain a prior completion receipt");
 		assert.equal(state.items[0].source_leads, undefined, "a reopened branch must not retain stale delegated sources");
 		assert.equal(state.items[0].defer, undefined, "a reopened branch must not retain a prior deferral");
+		resetPiGlobals();
+	});
+
+	test("a depth-two research leaf cannot be reopened independently", async () => {
+		const fp = fresh(); const cwd = tmp();
+		const started = await callTool(fp, "research_plan_start", { request: "Reopen leaf", summary: "one branch", branches: [{ title: "Evidence", budget: { searches: 1, reads: 1 } }] }, cwd);
+		const context = started.details.contexts[0];
+		const acquired = await planRunnerModule.acquireResearchBranchLease(cwd, context);
+		assert.equal(acquired.ok, true);
+		const leasedContext = { ...context, lease_id: acquired.lease_id, dispatch_epoch: 0 };
+		const report = {
+			v: 1, parent_item_id: context.parent_item_id, owner_ref: context.owner_ref, status: "done", note: "branch complete",
+			consumed: { searches: 1, reads: 1 }, evidence_gaps: [],
+			source_leads: [{ url: "https://example.test/leaf-source", claim: "claim", quote: "quote" }], children: [
+				{ item_id: "leaf-to-reopen", title: "Leaf", status: "done", coverage, budget: { allocated: { searches: 1, reads: 1 }, used: { searches: 1, reads: 1 } } },
+			], coverage,
+		};
+		fp.pi.events.emit(HARNESS_SIGNAL_CHANNEL, { v: 1, type: "plan/branch-result", context: leasedContext, report, failureClass: null });
+		await fire(fp, "before_agent_start", {}, makeCtx(cwd).ctx);
+		const state = JSON.parse(readFileSync(join(cwd, ".pi", "plan-state.json"), "utf8"));
+		assert.equal(state.items[1].status, "done");
+		await expectToolError(fp, "plan_update", {
+			deltas: [
+				{ item_id: context.parent_item_id, status: "pending", note: "reopen owning branch" },
+				{ item_id: state.items[1].id, status: "pending", note: "reopen leaf" },
+			],
+		}, cwd, /research leaves cannot be reopened/i);
 		resetPiGlobals();
 	});
 
