@@ -194,6 +194,22 @@ test("/plan-go restores execution tools and /plan-cancel restores without execut
 	resetPiGlobals();
 });
 
+test("/plan-go respects an explicit allowlist that omits plan_update", async () => {
+	const fp = fresh();
+	const cwd = tmp();
+	const shared = globalThis as Record<string, unknown>;
+	shared.__pi_tool_selection_explicit = true;
+	fp.pi.setActiveTools(["read", "plan_write"]);
+	const made = makeCtx(cwd);
+	await fp.commands.get("plan").handler("process meetings", made.ctx);
+	await callTool(fp, "plan_write", { items: [{ title: "One" }] }, cwd);
+	await fp.commands.get("plan-go").handler("", made.ctx);
+	assert.equal(fp.pi.getActiveTools().includes("plan_update"), false, "explicit omission must not be widened");
+	assert.equal(JSON.parse(readFileSync(stateFile(cwd), "utf8")).phase, "planned", "execution must not begin without its status tool");
+	assert.match(made.notes.at(-1) ?? "", /explicit tool selection excludes plan_update/i);
+	resetPiGlobals();
+});
+
 test("manifest load order: capability(planning) activates plan tools stripped by plan-runner", async () => {
 	// Audit A2 (2026-08-25): plan-runner (manifest index 6) strips plan_write/
 	// plan_update at session_start BEFORE tool-activation (index 22) computes its

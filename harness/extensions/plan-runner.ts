@@ -719,7 +719,10 @@ function leavePlanningSurface(pi: ExtensionAPI, keepPlanTools: boolean): void {
 				if (coreProfile && !CORE_NAMES.has(name)) continue;
 				restored.add(name);
 			}
-			if (keepPlanTools) for (const name of ["plan_write", "plan_update"]) if (registered.has(name)) restored.add(name);
+			const explicit = (globalThis as Record<string, unknown>)[EXPLICIT_FLAG] === true;
+			// An explicit allowlist is authoritative even after a restart; only the
+			// ordinary derived surface may regain the flat planner tools here.
+			if (keepPlanTools && !explicit) for (const name of ["plan_write", "plan_update"]) if (registered.has(name)) restored.add(name);
 			pi.setActiveTools([...restored]);
 		}
 		planningSurfaceBefore = null;
@@ -733,7 +736,8 @@ function leavePlanningSurface(pi: ExtensionAPI, keepPlanTools: boolean): void {
 		const activatedDuringPlan = active.filter((name) => !applied.has(name));
 		const restored = planningSurfaceBefore.filter((name) => !manuallyRemoved.has(name));
 		for (const name of activatedDuringPlan) if (!restored.includes(name)) restored.push(name);
-		if (keepPlanTools) {
+		const explicit = (globalThis as Record<string, unknown>)[EXPLICIT_FLAG] === true;
+		if (keepPlanTools && !explicit) {
 			for (const name of ["plan_write", "plan_update"]) {
 				if (!manuallyRemoved.has(name) && pi.getAllTools().some((tool) => tool.name === name) && !restored.includes(name)) restored.push(name);
 			}
@@ -1361,6 +1365,15 @@ async function startPlanCommand(args: string, ctx: any, pi: ExtensionAPI): Promi
 
 async function goCommand(ctx: any, pi: ExtensionAPI): Promise<void> {
 	rejectChildPlanMutation();
+	const explicit = (globalThis as Record<string, unknown>)[EXPLICIT_FLAG] === true;
+	if (explicit) {
+		const baseline = initialToolSurface();
+		const updateAvailable = pi.getActiveTools().includes("plan_update") || baseline?.active.includes("plan_update");
+		if (!updateAvailable) {
+			ctx.ui.notify("Plan cannot resume: explicit tool selection excludes plan_update. Relaunch with plan_update enabled.", "error");
+			return;
+		}
+	}
 	const outcome = await goTransition(ctx.cwd);
 	if (!outcome.ok) { ctx.ui.notify(outcome.reason === "no-plan" ? "No plan to run. Start with /plan <request>." : "Plan has no open items.", "error"); return; }
 	setPlanning(false);
@@ -1371,9 +1384,9 @@ async function goCommand(ctx: any, pi: ExtensionAPI): Promise<void> {
 	// stripped the plan tools. Resuming execution then steered the model to call
 	// plan_update while it was hidden (observed live 2026-08-25: "plan-write not
 	// available" loop on an interrupted plan). /plan-go is the user's explicit
-	// resume, so it re-activates the flat plan tools unconditionally.
+	// resume, so it restores the flat plan tools only when they were not explicitly omitted.
 	const activeNow = pi.getActiveTools();
-	const restorable = ["plan_write", "plan_update"].filter((name) =>
+	const restorable = explicit ? [] : ["plan_write", "plan_update"].filter((name) =>
 		!activeNow.includes(name) && pi.getAllTools().some((tool) => tool.name === name));
 	if (restorable.length) pi.setActiveTools([...activeNow, ...restorable]);
 	planEvent("go", outcome.state.run_id, { resumed: outcome.stale.length > 0 });
