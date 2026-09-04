@@ -4,6 +4,43 @@ All notable changes to pi-munchkin are documented here. Releases follow semantic
 
 ## Unreleased
 
+### Fixed (2026-09-04 — preserve explicit planner tool boundaries)
+
+- `research_plan_start` now refuses to begin when an explicit tool allowlist
+  omits the graph lifecycle tools (`plan_update`, `plan_expand`, and
+  `plan_settle`). Non-explicit sessions retain additive graph activation, while
+  explicit user selection is never widened behind the user's back. The
+  counterfactual integration test was red before the guard and green afterward.
+  Full offline tests pass 694/694 and planner integration is 45/45; planner
+  flags remain dark with no model execution, mirror, rollout, or push.
+
+The source surface is `9bd8e7e8…`; the loaded mirror remains `73bbd494…`.
+Future planner smoke requires a fresh approved preflight and loaded-hash rebind.
+
+### Fixed (2026-09-04 — require an open branch report for scouts)
+
+- Depth-two dispatch now requires the branch’s current report to be
+  non-terminal (`pending` or `in_progress`) as well as declaring the exact
+  pending leaf and allocation. A terminal or malformed lifecycle state cannot
+  launch more scouts. The targeted regression was red before the guard and
+  green afterward. Planner flags remain dark with no model execution, mirror,
+  rollout, or push.
+
+The source surface is `3128d2a6…`; the loaded mirror remains `73bbd494…`.
+Future planner smoke requires a fresh approved preflight and loaded-hash rebind.
+
+### Fixed (2026-09-04 — fail closed on malformed v5 planner state)
+
+- Persisted schema-v5 planner items are now validated before migration cleanup.
+  Invalid statuses and other graph fields remain untouched and unreadable rather
+  than being normalized into executable work. The counterfactual regression was
+  red before the guard and green afterward. Full offline tests pass 694/694 and
+  planner integration is 44/44; planner flags remain dark with no model
+  execution, mirror, rollout, or push.
+
+The source surface is `faa05349…`; the loaded mirror remains `73bbd494…`.
+Future planner smoke requires a fresh approved preflight and loaded-hash rebind.
+
 ### Fixed (2026-09-04 — bind scout dispatch to declared leaves)
 
 - Depth-two research scouts can now be dispatched only from pending leaves

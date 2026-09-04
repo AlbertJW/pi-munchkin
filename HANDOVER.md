@@ -1,5 +1,47 @@
 # Handover — pi_munchkin, 2026-08-24
 
+## 2026-09-04 preserve explicit planner tool boundaries (repository-only)
+
+The planner audit found that `research_plan_start` could add graph lifecycle
+tools after a caller had supplied an explicit tool allowlist. Graph activation
+is still additive for ordinary sessions, but an explicit allowlist must already
+contain `plan_update`, `plan_expand`, and `plan_settle`; otherwise graph start
+fails before writing state. The counterfactual integration test is green after
+the guard. Full offline tests are 694/694 and planner integration is 45/45; no
+model execution, mirror, rollout, or push occurred.
+
+Source surface is `9bd8e7e84826db9ebd79f3ce72c1133dd15223ac055c4af76ee6a483696da1d3`;
+loaded mirror remains `73bbd494f5c23f3b7262bd9f17c44b57574ca23d4b211c07dbd1d6067c23c315`.
+Planner flags remain dark; the preflight source pin is updated for the next
+approved smoke.
+
+## 2026-09-04 require an open branch report for scouts (repository-only)
+
+The planner audit found that a non-terminal read of a terminal branch report
+could expose pending leaves to the scout dispatcher. Dispatch now requires an
+open parent report (`pending` or `in_progress`), in addition to the declared
+leaf and exact allocation checks. The targeted regression is green after the
+guard; no model execution, mirror, rollout, or push occurred.
+
+Source surface is `3128d2a69ba7364a31a3085445aa82e402ade3b200f6598abf9e06dbc6193a1f`;
+loaded mirror remains `73bbd494f5c23f3b7262bd9f17c44b57574ca23d4b211c07dbd1d6067c23c315`.
+Planner flags remain dark; the preflight source pin is updated for the next
+approved smoke.
+
+## 2026-09-04 fail closed on malformed v5 planner state (repository-only)
+
+The planner audit found that v5 recovery normalized an invalid item status into
+`pending`, allowing corrupted state to become executable. v5 graphs now pass
+through strict graph validation before any bounded migration cleanup; malformed
+state remains untouched and fails closed. The counterfactual regression was red
+before the fix and green afterward; planner integration is 44/44, the full
+suite is 694/694, and no model execution, mirror, rollout, or push occurred.
+
+Source surface is `faa0534944512e79e1d3394e06feced673316735359f3e5ebd4511aff654c146`;
+loaded mirror remains `73bbd494f5c23f3b7262bd9f17c44b57574ca23d4b211c07dbd1d6067c23c315`.
+Planner flags remain dark; the preflight source pin is updated for the next
+approved smoke.
+
 ## 2026-09-04 bind scout dispatch to declared leaves (repository-only)
 
 The planner audit found that a depth-one branch could mint a valid-looking
