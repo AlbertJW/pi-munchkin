@@ -1,5 +1,20 @@
 # Handover — pi_munchkin, 2026-08-24
 
+## 2026-09-04 explain preserved malformed planner state (repository-only)
+
+After strict v5 recovery was made fail-closed, `/plan-status` still answered
+“No current plan found” for a damaged state file. The command now reports that
+the planner state is malformed and preserved, and gives the safe explicit
+recovery action `/plan-cancel` without exposing private paths or raw contents.
+The inspection regression is green; full offline tests remain 697/697 and
+planner integration is 47/47. No model execution, mirror, rollout, or push
+occurred.
+
+Source surface is `c2383c89288000999a4b9ae1218687ed987b57be2ed77fac952a81d85db43ae6`;
+loaded mirror remains `73bbd494f5c23f3b7262bd9f17c44b57574ca23d4b211c07dbd1d6067c23c315`.
+Planner flags remain dark; future smoke requires a fresh approved preflight plus
+loaded-hash rebind.
+
 ## 2026-09-04 reject malformed v5 planner metadata (repository-only)
 
 The planner audit found that v5 recovery validated node fields but silently

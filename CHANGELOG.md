@@ -4,6 +4,18 @@ All notable changes to pi-munchkin are documented here. Releases follow semantic
 
 ## Unreleased
 
+### Fixed (2026-09-04 — explain preserved malformed planner state)
+
+- `/plan-status` now distinguishes a missing plan from a present but malformed
+  private planner state. It reports that the state was preserved and points to
+  `/plan-cancel` without exposing a path or raw contents. The targeted
+  inspection regression is green; full offline tests remain 697/697 and
+  planner integration is 47/47. Planner flags remain dark with no model
+  execution, mirror, rollout, or push.
+
+The source surface is `c2383c89…`; the loaded mirror remains `73bbd494…`.
+Future planner smoke requires a fresh approved preflight and loaded-hash rebind.
+
 ### Fixed (2026-09-04 — reject malformed v5 planner metadata)
 
 - Schema-v5 graph recovery now validates top-level identity/lifecycle fields,
