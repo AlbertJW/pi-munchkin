@@ -4,6 +4,19 @@ All notable changes to pi-munchkin are documented here. Releases follow semantic
 
 ## Unreleased
 
+### Fixed (2026-09-04 — preserve malformed planner state on creation)
+
+- New `plan_write` and `research_plan_start` calls now distinguish a missing
+  state file from a present but malformed v5 planner state. Creation fails
+  closed and leaves the damaged state untouched for inspection or explicit
+  cancellation; it can no longer overwrite evidence of corruption. The
+  targeted regression was red before the guard and green afterward. Full
+  offline tests pass 696/696; planner integration is 46/46. Planner flags
+  remain dark with no model execution, mirror, rollout, or push.
+
+The source surface is `0f770e94…`; the loaded mirror remains `73bbd494…`.
+Future planner smoke requires a fresh approved preflight and loaded-hash rebind.
+
 ### Fixed (2026-09-04 — honor explicit planner resume boundaries)
 
 - `/plan-go` and the post-restart planner restore now refuse to widen an

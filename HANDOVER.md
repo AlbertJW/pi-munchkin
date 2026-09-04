@@ -1,5 +1,20 @@
 # Handover — pi_munchkin, 2026-08-24
 
+## 2026-09-04 preserve malformed planner state on creation (repository-only)
+
+The planner audit found that `readState()` uses `undefined` for both a missing
+file and malformed persisted state. A new `plan_write` or
+`research_plan_start` could therefore treat corruption as an empty slot and
+overwrite it. Creation now checks for an existing unreadable state first and
+fails closed, preserving the bytes for inspection or explicit cancellation.
+The counterfactual regression is green; planner integration is 46/46 and the
+full suite is 696/696. No model execution, mirror, rollout, or push occurred.
+
+Source surface is `0f770e94dca9bc81e1cd5e0aefc0747b3a717ea404bfb3ff8e759055c992dcf9`;
+loaded mirror remains `73bbd494f5c23f3b7262bd9f17c44b57574ca23d4b211c07dbd1d6067c23c315`.
+Planner flags remain dark; future smoke requires a fresh approved preflight plus
+loaded-hash rebind.
+
 ## 2026-09-04 honor explicit planner resume boundaries (repository-only)
 
 The planner audit found a second explicit-surface leak in `/plan-go`: after a
