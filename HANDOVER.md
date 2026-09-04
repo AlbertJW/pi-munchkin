@@ -1,5 +1,20 @@
 # Handover — pi_munchkin, 2026-08-24
 
+## 2026-09-04 require terminal child resolution (repository-only)
+
+The bottom-up planner audit found that a branch could return terminal `done`
+while leaving a delegated child open. Terminal `branch_plan` writes now use the
+terminal report validator and fail with an actionable child-resolution error.
+Persisted v5 graph validation also shares the evidence-yield rule, while split
+parents may still have zero local yield when a productive child supplies the
+evidence. The counterfactual regression was red before the fix and green
+afterward; the isolated planner suite is 42/42 and the full suite is 693/693.
+
+Source surface is `ee4fd6c127a50f31310f9d4a7d368a502b1425263465816d67af233c578259b1`;
+loaded mirror remains `73bbd494f5c23f3b7262bd9f17c44b57574ca23d4b211c07dbd1d6067c23c315`.
+Planner flags remain dark. No model execution, mirror, rollout, or push occurred;
+the preflight source pin is updated for the next approved smoke.
+
 ## 2026-09-03 reject zero-evidence planner completion (repository-only)
 
 The bottom-up planner audit found that a transport-complete retrieval with zero

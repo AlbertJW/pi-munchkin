@@ -4,6 +4,20 @@ All notable changes to pi-munchkin are documented here. Releases follow semantic
 
 ## Unreleased
 
+### Fixed (2026-09-04 — require terminal child resolution)
+
+- A research branch can no longer return a terminal `done` report while a
+  delegated child remains `pending` or `in_progress`. Terminal branch writes
+  now use the terminal report validator, and persisted v5 graphs apply the same
+  evidence-yield rule: direct roots need a positive result plus a source lead,
+  while productive scout leaves may supply a split parent with zero local yield.
+  The regression was red before the fix and green afterward. Full offline tests
+  pass 693/693 and planner integration is 42/42; planner flags remain dark with
+  no model execution, mirror, rollout, or push.
+
+The source surface is `ee4fd6c1…`; the loaded mirror remains `73bbd494…`.
+Future planner smoke requires a fresh approved preflight and loaded-hash rebind.
+
 ### Fixed (2026-09-03 — reject zero-evidence planner completion)
 
 - A deep-research branch can no longer label a clean transport receipt as
