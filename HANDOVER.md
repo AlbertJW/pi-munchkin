@@ -1,5 +1,22 @@
 # Handover — pi_munchkin, 2026-08-24
 
+## 2026-09-04 reject malformed v5 planner metadata (repository-only)
+
+The planner audit found that v5 recovery validated node fields but silently
+defaulted malformed top-level lifecycle metadata. An invalid phase could become
+`planned`, then accept a status mutation; a malformed node could also throw
+during the validator's second pass. Graph validation now rejects unknown or
+malformed state, profile, item, lifecycle, identity, and timestamp fields before
+migration cleanup, and remains total for bad node shapes. The counterfactual
+regressions are green; planner integration is 47/47, graph unit coverage is
+8/8, and the full suite is 697/697. No model execution, mirror, rollout, or
+push occurred.
+
+Source surface is `d136b527a01b7c576e764a20a7a549a1ac5e9d6d5f448adc6dc08e22d4df8472`;
+loaded mirror remains `73bbd494f5c23f3b7262bd9f17c44b57574ca23d4b211c07dbd1d6067c23c315`.
+Planner flags remain dark; future smoke requires a fresh approved preflight plus
+loaded-hash rebind.
+
 ## 2026-09-04 preserve malformed planner state on creation (repository-only)
 
 The planner audit found that `readState()` uses `undefined` for both a missing

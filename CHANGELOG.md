@@ -4,6 +4,20 @@ All notable changes to pi-munchkin are documented here. Releases follow semantic
 
 ## Unreleased
 
+### Fixed (2026-09-04 — reject malformed v5 planner metadata)
+
+- Schema-v5 graph recovery now validates top-level identity/lifecycle fields,
+  timestamps, profile shape, unknown fields, and malformed node entries before
+  any migration cleanup. An invalid `phase` can no longer default to `planned`
+  and become executable, and malformed nodes return validation errors instead
+  of throwing. The counterfactual regression was red before the guard and green
+  afterward. Full offline tests pass 697/697; planner integration is 47/47 and
+  graph unit coverage is 8/8. Planner flags remain dark with no model
+  execution, mirror, rollout, or push.
+
+The source surface is `d136b527…`; the loaded mirror remains `73bbd494…`.
+Future planner smoke requires a fresh approved preflight and loaded-hash rebind.
+
 ### Fixed (2026-09-04 — preserve malformed planner state on creation)
 
 - New `plan_write` and `research_plan_start` calls now distinguish a missing
