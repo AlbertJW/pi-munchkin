@@ -1,5 +1,20 @@
 # Handover — pi_munchkin, 2026-08-24
 
+## 2026-09-03 reject zero-evidence planner completion (repository-only)
+
+The bottom-up planner audit found that a transport-complete retrieval with zero
+usable results could still be marked `done`. Direct terminal branches now need a
+positive retrieval yield and at least one source lead; terminal scout leaves need
+positive yield as well. Split parents may have zero local yield when their child
+coverage supplies the evidence. “Not found” work must be blocked or deferred with
+an explicit gap. Both the child tool and parent report validator enforce the same
+rule, and the isolated planner suite is 41/41.
+
+Source surface is `2c2e077350e4f5e5b96c3d2659a420abf9a87be1e756d1f150427d6e4f841602`;
+loaded mirror remains `73bbd494f5c23f3b7262bd9f17c44b57574ca23d4b211c07dbd1d6067c23c315`.
+Planner flags remain dark. No model execution, mirror, rollout, or push occurred;
+the preflight source pin is updated for the next approved smoke.
+
 ## 2026-09-03 terminal planner reports stop child follow-up (repository-only)
 
 The planner audit found that `branch_plan` persisted terminal reports but did

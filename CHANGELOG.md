@@ -4,6 +4,20 @@ All notable changes to pi-munchkin are documented here. Releases follow semantic
 
 ## Unreleased
 
+### Fixed (2026-09-03 — reject zero-evidence planner completion)
+
+- A deep-research branch can no longer label a clean transport receipt as
+  `done` when it produced no usable evidence. Direct terminal branches require
+  a positive retrieval yield and at least one source lead; terminal scout
+  leaves require positive retrieval yield. Split parents may still have zero
+  local yield when their children supply the evidence. “Not found” work must be
+  reported as blocked or deferred with an explicit gap. The regressions were
+  red before the guard and green afterward; planner flags remain dark and no
+  model execution, mirror, rollout, or push occurred.
+
+The source surface is `2c2e0773…`; the loaded mirror remains `73bbd494…`.
+Future planner smoke requires a fresh approved preflight and loaded-hash rebind.
+
 ### Fixed (2026-09-03 — terminal planner reports stop child follow-up)
 
 - A validated terminal `branch_plan` report now returns Pi's runtime termination
