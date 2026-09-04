@@ -11,7 +11,7 @@ import { classifyFailure, FailureEpisodeTracker, isFailureObservation } from "..
 import {
 	appendToLedger, checkNote, ledgerPath, MAX_CACHE_BYTES, MAX_CACHED_PAGES, MAX_LEDGER_BYTES,
 	MAX_RECALL_OUTPUT_BYTES, MAX_RECALL_RECORDS, normalizeForContainment, PageCache, quoteContained,
-	recallLedger, researchRecord, ResearchLedgerCapacityError, sha256Hex, storedUrl,
+	recallLedger, researchRecord, ResearchLedgerCapacityError, sha256Hex, storedUrl, auditResearchCitations,
 } from "../lib/research-ledger.ts";
 import { callTool, callToolRaw, fire, makeFakePi, resetPiGlobals } from "./integration-harness.ts";
 
@@ -379,6 +379,42 @@ test("wrap-up steer fires once after reads with zero notes and stays silent afte
 	}
 });
 
+test("final research answers cannot leave an unread citation unverified", async () => {
+	const dir = mkdtempSync(join(tmpdir(), "rl-final-citation-"));
+	const prevBin = process.env.KETCH_BIN;
+	const prevAgent = process.env.PI_CODING_AGENT_DIR;
+	process.env.KETCH_BIN = mockKetchBin(dir);
+	process.env.PI_CODING_AGENT_DIR = join(dir, "agent");
+	const ctxFor = { cwd: dir, ui: { notify() {} } };
+	try {
+		const fp = await loadKetch(true);
+		delete (globalThis as Record<string, unknown>).__pi_ketch_version_checks_v1;
+		fp.pi.setActiveTools(["web_search", "web_read", "research_note"]);
+		await fire(fp, "session_start", {}, ctxFor);
+		await callToolRaw(fp, "web_read", { urls: ["https://example.com/a"] }, dir);
+		assert.equal((globalThis as any).__pi_research_state?.reads, 1, "the final-answer guard must observe parent reads");
+		await callToolRaw(fp, "research_note", { claim: "c", url: "https://example.com/a", quote: "page a content" }, dir);
+		await fire(fp, "agent_end", {
+			messages: [{ role: "assistant", content: [{ type: "text", text: "The result is documented at https://unread.example/report." }] }],
+		}, ctxFor);
+		assert.equal(fp.sent.length, 1, "an unverified final citation must trigger one bounded correction turn");
+		assert.match(fp.sent[0], /reread.*web_read|research_note/i);
+		await fire(fp, "agent_end", {
+			messages: [{ role: "assistant", content: [{ type: "text", text: "Still citing https://unread.example/report." }] }],
+		}, ctxFor);
+		assert.equal(fp.sent.length, 1, "one bad answer cannot create a correction loop across continuation attempts");
+
+		await fire(fp, "agent_end", {
+			messages: [{ role: "assistant", content: [{ type: "text", text: "The result is documented at https://unread.example/report [unverified]." }] }],
+		}, ctxFor);
+		assert.equal(fp.sent.length, 1, "an explicit [unverified] label does not trigger another correction");
+	} finally {
+		if (prevBin === undefined) delete process.env.KETCH_BIN; else process.env.KETCH_BIN = prevBin;
+		if (prevAgent === undefined) delete process.env.PI_CODING_AGENT_DIR; else process.env.PI_CODING_AGENT_DIR = prevAgent;
+		resetPiGlobals();
+	}
+});
+
 test("deep-research contracts remove verifier delegation and require parent re-read", () => {
 	const skill = readFileSync(new URL("../../skills/deep-research/SKILL.md", import.meta.url), "utf8");
 	const researcher = readFileSync(new URL("../agents/researcher.md", import.meta.url), "utf8");
@@ -503,6 +539,18 @@ test("storedUrl fails closed to http(s) — the writer is never more permissive 
 	assert.equal(ok.display, "https://example.com/a/b");
 	assert.equal(ok.query_removed, true);
 	assert.equal(storedUrl("http://example.com/x").display, "http://example.com/x");
+});
+
+test("citation audit canonicalizes prose URLs and honors explicit uncertainty", () => {
+	const audit = auditResearchCitations(
+		"Verified https://example.com/a?tracking=1#section; unknown https://example.com/b). Explicit https://example.com/c [unverified].",
+		["https://example.com/a"],
+	);
+	assert.deepEqual(audit.cited, ["https://example.com/a", "https://example.com/b", "https://example.com/c"]);
+	assert.deepEqual(audit.unverified, ["https://example.com/b"]);
+	assert.deepEqual(audit.explicitlyUnverified, ["https://example.com/c"]);
+	const hostile = auditResearchCitations("Do not trust https://user:pass@example.com/private.", ["https://example.com/private"]);
+	assert.deepEqual(hostile.unverified, ["[invalid-url]"]);
 });
 
 test("a hostile claimed_source round-trips: written AND recallable, never a write-only record", async () => {

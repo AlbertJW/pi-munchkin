@@ -115,15 +115,65 @@ export function storedUrl(raw: string): StoredUrl {
 		// that could be written but never recalled. The writer must never be more
 		// permissive than the reader; both fail closed to http(s).
 		if (parsed.protocol !== "http:" && parsed.protocol !== "https:") throw new Error("non-web scheme");
+		if (parsed.username || parsed.password) throw new Error("URL credentials are not allowed");
 		const queryRemoved = parsed.search.length > 0 || parsed.hash.length > 0;
-		parsed.username = "";
-		parsed.password = "";
 		parsed.search = "";
 		parsed.hash = "";
 		return { display: parsed.toString(), sha256: digest, query_removed: queryRemoved };
 	} catch {
 		return { display: "[invalid-url]", sha256: digest, query_removed: true };
 	}
+}
+
+export type ResearchCitationAudit = {
+	cited: string[];
+	unverified: string[];
+	explicitlyUnverified: string[];
+};
+
+const CITATION_URL = /https?:\/\/[^\s<>"'`]+/gi;
+
+function trimCitationUrl(value: string): string {
+	let trimmed = value;
+	// Markdown and prose commonly attach punctuation to a URL. Strip only
+	// delimiters that cannot be meaningful in the final citation surface; query
+	// and fragment content is retained for storedUrl's canonical comparison.
+	while (/[.,;:!?]$/.test(trimmed)) trimmed = trimmed.slice(0, -1);
+	while (/[\]}]$/.test(trimmed)) trimmed = trimmed.slice(0, -1);
+	// A closing parenthesis is prose punctuation unless the URL has a matching
+	// opening parenthesis in its path. This bounded balance check avoids changing
+	// legitimate Wikipedia-style paths while handling `[label](url)` reliably.
+	while (trimmed.endsWith(")") && (trimmed.match(/\(/g)?.length ?? 0) < (trimmed.match(/\)/g)?.length ?? 0)) trimmed = trimmed.slice(0, -1);
+	return trimmed;
+}
+
+function hasExplicitUnverifiedMarker(text: string, start: number, end: number): boolean {
+	const before = text.slice(Math.max(0, start - 32), start);
+	const after = text.slice(end, Math.min(text.length, end + 32));
+	return /\[unverified\]\s*$/.test(before) || /^\s*\[unverified\]/.test(after);
+}
+
+/**
+ * Compare public URLs rendered in a final answer with the parent session's
+ * verified ledger set. Only canonical URL displays leave this function; raw
+ * answer text is never returned to telemetry or persisted state.
+ */
+export function auditResearchCitations(text: string, verifiedUrls: Iterable<string>): ResearchCitationAudit {
+	const verified = new Set([...verifiedUrls].filter((url): url is string => typeof url === "string"));
+	const cited: string[] = [];
+	const unverified: string[] = [];
+	const explicitlyUnverified: string[] = [];
+	for (const match of text.matchAll(CITATION_URL)) {
+		const raw = trimCitationUrl(match[0]);
+		const canonical = storedUrl(raw).display;
+		if (!canonical || cited.includes(canonical)) continue;
+		cited.push(canonical);
+		if (verified.has(canonical)) continue;
+		const start = match.index ?? 0;
+		if (hasExplicitUnverifiedMarker(text, start, start + match[0].length)) explicitlyUnverified.push(canonical);
+		else unverified.push(canonical);
+	}
+	return { cited, unverified, explicitlyUnverified };
 }
 
 export type ResearchLedgerRecordV2 = {

@@ -21,7 +21,7 @@ import {
 import { resolvePublicHttpUrl } from "../lib/public-url.ts";
 import {
 	appendToLedger, checkNote, ledgerPath, PageCache, recallLedger, researchRecord,
-	ResearchLedgerCapacityError, SKILL_BUDGET, storedUrl,
+	ResearchLedgerCapacityError, SKILL_BUDGET, storedUrl, auditResearchCitations, type ResearchCitationAudit,
 } from "../lib/research-ledger.ts";
 import { record } from "../lib/telemetry.ts";
 import { emitHarnessSignal } from "../lib/harness-signals.ts";
@@ -193,6 +193,8 @@ export function registerKetch(pi: ExtensionAPI, dependencies: KetchDependencies 
 	let consecutiveRefusals = 0;
 	let verificationDegraded = false;
 	let verifiedUrls = new Set<string>();
+	let citationGuardFired = false;
+	let lastCitationAudit: ResearchCitationAudit | null = null;
 	let displayedBudget: ResearchBudget = { ...SKILL_BUDGET };
 	function publishResearchState(): void {
 		if (!LEDGER_ENABLED) return;
@@ -259,6 +261,8 @@ export function registerKetch(pi: ExtensionAPI, dependencies: KetchDependencies 
 			consecutiveRefusals = 0;
 			verificationDegraded = false;
 			verifiedUrls = new Set<string>();
+			citationGuardFired = false;
+			lastCitationAudit = null;
 			displayedBudget = { ...SKILL_BUDGET };
 			delete (globalThis as Record<string, unknown>).__pi_research_state;
 			delete (globalThis as Record<string, unknown>).__pi_research_verified_urls;
@@ -303,12 +307,51 @@ export function registerKetch(pi: ExtensionAPI, dependencies: KetchDependencies 
 			}), { message: msg });
 			if (legacyActed) pi.sendUserMessage(msg, { deliverAs: "steer" });
 		});
+		pi.on("agent_end", async (event) => {
+			// Keep one guard allowance across retries, compaction, and queued
+			// continuation turns. Reset only at settled/session boundaries; Pi emits
+			// agent_start for every continue(), so resetting there would loop forever.
+			// A child researcher has an isolated page cache and no research_note tool;
+			// it must return leads to the parent rather than receive an impossible
+			// citation correction. The active-tool check also respects explicit
+			// allowlists that intentionally omit the ledger writer.
+			if (counts.reads === 0 || !pi.getActiveTools().includes("research_note")) return;
+			const messages = Array.isArray((event as any)?.messages) ? (event as any).messages : [];
+			const lastAssistant = [...messages].reverse().find((message: any) => message?.role === "assistant");
+			const content = lastAssistant?.content;
+			const answer = typeof content === "string"
+				? content
+				: Array.isArray(content)
+					? content.filter((block: any) => block?.type === "text" && typeof block.text === "string").map((block: any) => block.text).join("\n")
+					: "";
+			if (!answer) return;
+			const audit = auditResearchCitations(answer, verifiedUrls);
+			lastCitationAudit = audit;
+			if (citationGuardFired || audit.unverified.length === 0) return;
+			citationGuardFired = true;
+			const correction = "Your answer contains a source URL that this parent session has not verified. Before finalizing, reread each cited page with web_read and record a short verbatim quote with research_note, or mark the affected claim [unverified]. Do not present an unverified citation as established fact.";
+			record("research", "citation-guard", {
+				cited: audit.cited.length, unverified: audit.unverified.length,
+				explicitly_unverified: audit.explicitlyUnverified.length,
+				injected_chars: correction.length,
+			});
+			pi.sendMessage({ customType: "pi-munchkin:research-citation-guard", content: correction, display: true }, { deliverAs: "followUp", triggerTurn: true });
+		});
 		pi.on("agent_settled", async () => {
 			if (counts.searches + counts.reads + counts.notes + counts.notesRejected === 0) return;
+			if (lastCitationAudit?.unverified.length) {
+				record("research", "citation-unverified-end", {
+					cited: lastCitationAudit.cited.length,
+					unverified: lastCitationAudit.unverified.length,
+					explicitly_unverified: lastCitationAudit.explicitlyUnverified.length,
+				});
+			}
 			record("research", "run-summary", {
 				searches: counts.searches, reads: counts.reads, notes: counts.notes,
 				notes_rejected: counts.notesRejected, cache_hits: counts.cacheHits,
 			});
+			citationGuardFired = false;
+			lastCitationAudit = null;
 		});
 	}
 
