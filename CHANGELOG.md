@@ -4,6 +4,17 @@ All notable changes to pi-munchkin are documented here. Releases follow semantic
 
 ## Unreleased
 
+### Added (2026-09-04 — bounded hierarchical research evaluation)
+
+The dark deep-research graph now queues model-backed children at the declared
+serving capacity, deduplicates normalized search results, records compact
+parent-validated evidence cards, and offers a bounded Jina Reader fallback
+while preserving original source URLs. Branch failures close explicitly and
+the deterministic research oracle checks claim/citation coverage without
+reading answer prose. The Qwen 35B screen (three fixtures, two repetitions,
+plus negative controls) produced a protocol-quality **no-go**: defaults remain
+`PLAN_GRAPH=off` and `DEEP_RESEARCH_PLANNING=off`, with no mirror or adoption.
+
 ### Fixed (2026-09-04 — planner preflight loaded-surface rebind)
 
 The no-inference planner preflight now defaults to the verified loaded surface
