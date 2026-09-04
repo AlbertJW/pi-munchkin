@@ -4,6 +4,30 @@ All notable changes to pi-munchkin are documented here. Releases follow semantic
 
 ## Unreleased
 
+### Fixed (2026-09-04 — honor explicit planner resume boundaries)
+
+- `/plan-go` and the post-restart planner restore now refuse to widen an
+  explicit tool allowlist. A plan cannot enter execution unless `plan_update`
+  was selected; ordinary derived sessions retain the existing flat-tool restore.
+  The counterfactual integration test was red before the guard and green
+  afterward. Full offline tests pass 695/695 and planner integration is 45/45;
+  planner flags remain dark with no model execution, mirror, rollout, or push.
+
+The source surface is `92c22a49…`; the loaded mirror remains `73bbd494…`.
+Future planner smoke requires a fresh approved preflight and loaded-hash rebind.
+
+### Fixed (2026-09-04 — conserve planner expansion remainder)
+
+- Reusable research graph expansion now allocates children only from the
+  parent’s unspent discovery remainder. A parent that has already consumed
+  searches or reads cannot reserve the same units again through `plan_expand`.
+  The counterfactual unit test was red before the guard and green afterward.
+  Planner flags remain dark; no model execution, mirror, rollout, or push
+  occurred.
+
+The source surface is `b3b53dd4…`; the loaded mirror remains `73bbd494…`.
+Future planner smoke requires a fresh approved preflight and loaded-hash rebind.
+
 ### Fixed (2026-09-04 — preserve explicit planner tool boundaries)
 
 - `research_plan_start` now refuses to begin when an explicit tool allowlist

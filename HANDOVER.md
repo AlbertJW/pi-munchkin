@@ -1,5 +1,33 @@
 # Handover — pi_munchkin, 2026-08-24
 
+## 2026-09-04 honor explicit planner resume boundaries (repository-only)
+
+The planner audit found a second explicit-surface leak in `/plan-go`: after a
+user omitted `plan_update`, the command could still add it while restoring the
+execution surface, including after a restart. `/plan-go` now refuses to enter
+execution unless the status tool was explicitly selected, and both restore
+paths skip planner additions for explicit allowlists. The counterfactual test is
+green; the planner suite is 45/45 and the full suite is 695/695. No model
+execution, mirror, rollout, or push occurred.
+
+Source surface is `92c22a49aa0ff412c235b34851cc50ee7adb37f33ba9ca53d205b5b9401f6e2b`;
+loaded mirror remains `73bbd494f5c23f3b7262bd9f17c44b57574ca23d4b211c07dbd1d6067c23c315`.
+Planner flags remain dark; the preflight source pin is updated for the next
+approved smoke.
+
+## 2026-09-04 conserve planner expansion remainder (repository-only)
+
+The reusable `plan_expand` path could reserve a research branch’s original
+allocation again after that branch had already consumed part of it. Expansion
+now checks the parent’s unspent search/read remainder before writing children;
+the targeted regression was red before the guard and green afterward. No model
+execution, mirror, rollout, or push occurred.
+
+Source surface was `b3b53dd48e6522f80801a42c9dcef20853d65733795d7b3b3eb3ba3d4899c271`;
+loaded mirror remains `73bbd494f5c23f3b7262bd9f17c44b57574ca23d4b211c07dbd1d6067c23c315`.
+Planner flags remain dark; the preflight source pin is updated for the next
+approved smoke.
+
 ## 2026-09-04 preserve explicit planner tool boundaries (repository-only)
 
 The planner audit found that `research_plan_start` could add graph lifecycle
