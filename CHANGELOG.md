@@ -4,6 +4,14 @@ All notable changes to pi-munchkin are documented here. Releases follow semantic
 
 ## Unreleased
 
+### Fixed (2026-09-04 — planner preflight loaded-surface rebind)
+
+The no-inference planner preflight now defaults to the verified loaded surface
+receipt `184c9178950c38c2caf469f68bfee242bddbbf24af299172bd3a91d68511417a`.
+Its default `--dry` command therefore validates the synchronized mirror instead
+of rejecting it against a stale historical hash. This changes no runtime
+defaults and starts no model session.
+
 ### Delivered (2026-09-04 — planner completion repair promoted and synchronized)
 
 The bounded deep-research branch-report repair and its planner preflight source
