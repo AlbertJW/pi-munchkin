@@ -352,6 +352,15 @@ function migrateState(raw: any): PlanState | undefined {
 			item.owner_ref !== undefined || item.coverage !== undefined || item.source_leads !== undefined ||
 			item.evidence_gaps !== undefined || item.lease !== undefined || item.dispatch_epoch !== undefined
 		))) return undefined;
+		// Validate the persisted v5 shape before applying the migration's bounded
+		// text cleanup. Normalizing an invalid status, ID, budget, or evidence field
+		// could turn corrupted state into executable work and make the original
+		// damage impossible to diagnose. v4 has explicit legacy cleanup semantics;
+		// v5 must either validate as-is or remain untouched for inspection/recovery.
+		if (raw.items.some((item: unknown) => !item || typeof item !== "object" || Array.isArray(item))) return undefined;
+		try {
+			if (validateGraph(raw as GraphPlanState).length) return undefined;
+		} catch { return undefined; }
 	}
 	const items: PlanItem[] = raw.items.slice(0, MAX_ITEMS).map((item: any) => ({
 		id: typeof item.id === "string" && /^[A-Za-z0-9._:-]{1,96}$/.test(item.id) ? item.id : itemId(),
