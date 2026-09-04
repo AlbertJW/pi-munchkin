@@ -852,7 +852,7 @@ Use single mode for one task, parallel mode when tasks are independent and can r
 				searches: Math.max(0, branchBinding.budget.searches - localUsed.searches - alreadyReserved.searches),
 				reads: Math.max(0, branchBinding.budget.reads - localUsed.reads - alreadyReserved.reads),
 			} : undefined;
-			if (!validateScoutDispatch(scoutDispatch.count, planned as Array<{ agent: string; plan_context?: unknown }>, new Set(scoutDispatch.parents), new Set(scoutDispatch.owners), branchBinding ?? undefined, availableBudget, declaredScoutLeaves)) {
+			if (!validateScoutDispatch(scoutDispatch.count, planned as Array<{ agent: string; plan_context?: unknown }>, new Set(scoutDispatch.parents), new Set(scoutDispatch.owners), branchBinding ?? undefined, availableBudget, declaredScoutLeaves, branchReport?.status)) {
 				return {
 					content: [{ type: "text", text: branchReport ? "Blocked: a planned research branch may dispatch at most two research-scout leaves, and only pending leaves declared by its current branch_plan report with unchanged allocations." : "Blocked: publish a non-terminal branch_plan report before dispatching research-scout leaves; the branch may dispatch at most two research-scout leaves." }],
 						details: makeDetails(hasTasks ? "parallel" : "single")([]), isError: true,

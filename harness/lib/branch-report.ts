@@ -155,6 +155,7 @@ export function validateScoutDispatch(
 	branchBinding?: PlanContextV1,
 	availableBudget?: ResearchBudget,
 	declaredLeaves?: ReadonlyArray<{ item_id: string; status: PlanStatus; budget: ResearchBudget }>,
+	branchStatus?: PlanStatus,
 ): boolean {
 	if (!boundedInteger(currentCount, 2) || requested.length < 1 || currentCount + requested.length > 2) return false;
 	if (!branchBinding || !validatePlanContext(branchBinding as PlanContextV1) || branchBinding.depth !== 1 ||
@@ -163,7 +164,7 @@ export function validateScoutDispatch(
 	// planner must first publish the leaf in its current branch_plan report. This
 	// binds the child process to the parent's declared structure and allocation,
 	// rather than allowing a model to mint an arbitrary owner/item pair.
-	if (!declaredLeaves) return false;
+	if (!declaredLeaves || !branchStatus || !["pending", "in_progress"].includes(branchStatus)) return false;
 	const declaredById = new Map<string, { status: PlanStatus; budget: ResearchBudget }>();
 	for (const leaf of declaredLeaves) {
 		if (declaredById.has(leaf.item_id) || !ID.test(leaf.item_id) || !validBudget(leaf.budget)) return false;
