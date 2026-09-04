@@ -202,15 +202,49 @@ export function descendantCount(items: GraphPlanItem[], itemId: string): number 
 	return count;
 }
 
+const GRAPH_STATE_FIELDS = new Set(["schema_version", "run_id", "request", "summary", "autonomy", "phase", "created_at", "updated_at", "items", "profile", "settled_at", "writer"]);
+const GRAPH_ITEM_FIELDS = new Set(["id", "title", "note", "status", "parent_id", "kind", "owner_ref", "budget", "evidence_gaps", "source_leads", "coverage", "defer", "lease", "dispatch_epoch"]);
+const GRAPH_PROFILE_FIELDS = new Set(["name", "max_depth", "max_children", "discovery_budget", "validation_reads"]);
+
+function isGraphItem(value: unknown): value is GraphPlanItem {
+	return Boolean(value) && typeof value === "object" && !Array.isArray(value);
+}
+
+function validStateText(value: unknown, maxBytes: number, allowEmpty = false): value is string {
+	return typeof value === "string" && (allowEmpty || value.trim().length > 0) && Buffer.byteLength(value, "utf8") <= maxBytes && !/[\u0000-\u001f\u007f-\u009f\r]/u.test(value);
+}
+
+function validTimestamp(value: unknown): value is string {
+	return typeof value === "string" && /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/.test(value) && Number.isFinite(Date.parse(value));
+}
+
 export function validateGraph(state: GraphPlanState): string[] {
 	const errors: string[] = [];
+	if (!state || typeof state !== "object" || Array.isArray(state)) return ["graph state must be an object"];
+	const stateRecord = state as unknown as Record<string, unknown>;
+	if (!Object.keys(stateRecord).every((key) => GRAPH_STATE_FIELDS.has(key))) errors.push("unknown graph state field");
 	if (state.schema_version !== 5) errors.push("graph state must use schema_version 5");
+	if (!validStateText(state.run_id, 200)) errors.push("invalid graph run_id");
+	if (!validStateText(state.request, 1_000)) errors.push("invalid graph request");
+	if (!validStateText(state.summary, 300, true)) errors.push("invalid graph summary");
+	if (state.autonomy !== "lean" && state.autonomy !== "yolo") errors.push("invalid graph autonomy");
+	if (state.phase !== "planned" && state.phase !== "executing") errors.push("invalid graph phase");
+	if (!validTimestamp(state.created_at)) errors.push("invalid graph created_at");
+	if (!validTimestamp(state.updated_at)) errors.push("invalid graph updated_at");
+	if (state.settled_at !== undefined && !validTimestamp(state.settled_at)) errors.push("invalid graph settled_at");
+	if (state.writer !== undefined && !validStateText(state.writer, 96)) errors.push("invalid graph writer");
 	if (!Array.isArray(state.items) || state.items.length < 1 || state.items.length > PLAN_GRAPH_MAX_NODES) {
 		errors.push(`graph must contain 1-${PLAN_GRAPH_MAX_NODES} nodes`);
 		return errors;
 	}
+	const validItems = state.items.filter(isGraphItem);
 	const byId = new Map<string, GraphPlanItem>();
 	for (const item of state.items) {
+		if (!item || typeof item !== "object" || Array.isArray(item)) {
+			errors.push("invalid graph item");
+			continue;
+		}
+		if (!Object.keys(item).every((key) => GRAPH_ITEM_FIELDS.has(key))) errors.push("unknown graph item field");
 		if (!/^[A-Za-z0-9._:-]{1,96}$/.test(item.id)) errors.push("invalid node id");
 		if (byId.has(item.id)) errors.push(`duplicate node id: ${item.id}`);
 		byId.set(item.id, item);
@@ -245,8 +279,9 @@ export function validateGraph(state: GraphPlanState): string[] {
 		}
 	}
 	for (const item of state.items) {
+		if (!item || typeof item !== "object" || Array.isArray(item)) continue;
 		if (item.parent_id && !byId.has(item.parent_id)) errors.push(`missing parent for ${item.id}: ${item.parent_id}`);
-		const depth = depthOf(state.items, item.id);
+		const depth = depthOf(validItems, item.id);
 		if (depth === null) errors.push(`cycle or orphan detected at ${item.id}`);
 		else {
 			// Delegation calls the root planner depth 1 and its scout depth 2;
@@ -254,7 +289,7 @@ export function validateGraph(state: GraphPlanState): string[] {
 			const maximumDepth = state.profile ? state.profile.max_depth - 1 : PLAN_GRAPH_MAX_DEPTH;
 			if (depth > maximumDepth) errors.push(`maximum graph depth exceeded at ${item.id}`);
 		}
-		const children = childrenOf(state.items, item.id);
+		const children = childrenOf(validItems, item.id);
 		if (state.profile && (item.kind === "research_branch" || item.kind === "research_leaf") && item.status === "done" &&
 			(!item.coverage?.complete || (item.evidence_gaps?.length ?? 0) > 0)) {
 			errors.push(`done research node lacks complete gap-free coverage: ${item.id}`);
@@ -273,15 +308,16 @@ export function validateGraph(state: GraphPlanState): string[] {
 		}
 	}
 	if (state.profile) {
+		if (!state.profile || typeof state.profile !== "object" || Array.isArray(state.profile) || !Object.keys(state.profile).every((key) => GRAPH_PROFILE_FIELDS.has(key))) errors.push("unknown deep-research profile field");
 		if (state.profile.name !== "deep-research" || state.profile.max_depth !== DEEP_RESEARCH_MAX_DEPTH ||
 			state.profile.max_children !== DEEP_RESEARCH_MAX_CHILDREN || !validBudget(state.profile.discovery_budget) ||
 			state.profile.discovery_budget.searches !== 3 || state.profile.discovery_budget.reads !== 5 || state.profile.validation_reads !== 5) {
 			errors.push("invalid deep-research profile constants");
 		}
-		const roots = state.items.filter((item) => !item.parent_id);
+		const roots = validItems.filter((item) => !item.parent_id);
 		if (roots.length > DEEP_RESEARCH_MAX_ROOTS) errors.push(`deep-research allows at most ${DEEP_RESEARCH_MAX_ROOTS} roots`);
-		for (const item of state.items) {
-			const depth = depthOf(state.items, item.id);
+		for (const item of validItems) {
+			const depth = depthOf(validItems, item.id);
 			if (depth === 0 && item.kind !== "research_branch") errors.push(`deep-research root must be a research_branch: ${item.id}`);
 			if (depth === 1 && item.kind !== "research_leaf") errors.push(`deep-research child must be a research_leaf: ${item.id}`);
 			if (!item.owner_ref || !item.budget) errors.push(`deep-research node requires owner and budget: ${item.id}`);

@@ -105,6 +105,19 @@ test("graph validation rejects cycles, missing parents, depth overflow, and exce
 		assert.ok(validateGraph(leased).some((error) => /open deep-research root branch/.test(error)), "terminal branches cannot retain a lease");
 	});
 
+
+test("graph validation rejects unknown and malformed persisted schema fields", () => {
+	const unknownState = state() as GraphPlanState & Record<string, unknown>;
+	unknownState.untrusted = true;
+	assert.ok(validateGraph(unknownState).some((error) => /unknown graph state field/.test(error)));
+	const unknownItem = structuredClone(state()) as GraphPlanState & { items: Array<Record<string, unknown>> };
+	unknownItem.items[0].untrusted = true;
+	assert.ok(validateGraph(unknownItem as GraphPlanState).some((error) => /unknown graph item field/.test(error)));
+	const malformedNode = structuredClone(state()) as any;
+	malformedNode.items[0] = null;
+	assert.ok(validateGraph(malformedNode as GraphPlanState).some((error) => /invalid graph item/.test(error)));
+});
+
 test("research completion requires evidence yield but split parents may rely on children", () => {
 	const direct = state();
 	direct.items[0] = { ...direct.items[0], status: "done", coverage: { ...completeCoverage, returned_count: 0 }, source_leads: [] };

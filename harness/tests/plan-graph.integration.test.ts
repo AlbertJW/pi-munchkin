@@ -25,7 +25,7 @@ if (!CHILD) {
 	const output = execFileSync(process.execPath, [
 				"--experimental-strip-types", "--experimental-loader", resolve("harness/tests/ts-js-resolver.mjs"), "--test", import.meta.filename,
 			], { cwd: process.cwd(), env, encoding: "utf8", stdio: "pipe" });
-			assert.match(output, /pass 46/);
+			assert.match(output, /pass 47/);
 		} finally { rmSync(artifacts, { recursive: true, force: true }); }
 	});
 } else {
@@ -113,6 +113,23 @@ if (!CHILD) {
 		writeFileSync(path, original, { mode: 0o600 });
 		await expectToolError(fp, "plan_write", { items: [{ title: "replacement" }] }, cwd, /existing plan state is malformed/i);
 		assert.equal(readFileSync(path, "utf8"), original, "new plan creation must not discard malformed state");
+		resetPiGlobals();
+	});
+
+	test("malformed v5 top-level lifecycle metadata cannot be normalized into an executable plan", async () => {
+		const fp = fresh(); const cwd = tmp();
+		const persisted = {
+			schema_version: 5, run_id: "malformed-phase", request: "research", summary: "must remain inspectable", autonomy: "lean", phase: "not-a-phase",
+			created_at: "2026-08-25T00:00:00.000Z", updated_at: "2026-08-25T00:00:00.000Z",
+			items: [{ id: "item-1", title: "Persisted item", status: "pending", kind: "work" }],
+		};
+		const path = join(cwd, ".pi", "plan-state.json");
+		const { mkdirSync, readFileSync, writeFileSync } = await import("node:fs");
+		mkdirSync(join(cwd, ".pi"), { recursive: true });
+		const original = `${JSON.stringify(persisted)}\n`;
+		writeFileSync(path, original, { mode: 0o600 });
+		await expectToolError(fp, "plan_update", { deltas: [{ item_id: "item-1", status: "done" }] }, cwd, /no plan exists yet/i);
+		assert.equal(readFileSync(path, "utf8"), original, "malformed top-level lifecycle state must remain untouched");
 		resetPiGlobals();
 	});
 
