@@ -18,6 +18,7 @@ import { callTool, fire, makeCtx, makeFakePi, resetPiGlobals } from "./integrati
 // boot test).
 const { register } = await import("node:module");
 register(new URL("./ts-js-resolver.mjs", import.meta.url), import.meta.url);
+const { buildPlannedBranchTask, plannedResultGuidance, shouldStreamParallelUpdates, shouldStreamSubagentUpdates } = await import("../vendor/pi-subagent/runner.ts");
 
 test("planned depth-one branch failures are terminal, ordinary failures remain retryable", () => {
 	assert.equal(isTerminalPlannedFailure({ depth: 1 }), true);
@@ -31,6 +32,44 @@ test("clean planned branch exits with an invalid report are terminal, not retrya
 	assert.equal(isTerminalPlannedFailureResult({ depth: 1 }, { ...base, branchReportFailure: "missing_report" }), true);
 	assert.equal(isTerminalPlannedFailureResult({ depth: 1 }, { ...base, branchReport: {} }), false);
 	assert.equal(isTerminalPlannedFailureResult({ depth: 2 }, { ...base, branchReportFailure: "invalid_report" }), false);
+});
+
+test("depth-one planned child task makes branch_report publication a hard final protocol step", () => {
+	const context = {
+		v: 1, profile: "deep-research", run_id: "protocol-run", parent_item_id: "protocol-branch",
+		owner_ref: ownerRef("protocol-run", "protocol-branch"), depth: 1,
+		budget: { searches: 1, reads: 1 }, limits: { max_depth: 2, max_children: 2 },
+	} as const;
+	const task = buildPlannedBranchTask("Resolve the assigned evidence gap.", context);
+	assert.match(task, /MUST invoke the `branch_plan` tool before ending this child run/i);
+	assert.match(task, /plain-text.*not a valid completion/i);
+	assert.match(task, /after `branch_plan` returns/i);
+	assert.match(task, /prefer `deferred`.*partial evidence/i);
+	assert.match(task, /coverage\.complete MUST be true only when truncated=false/i);
+	assert.match(task, /Do not invent total_count for bounded coverage/i);
+	const scout = { ...context, parent_item_id: "protocol-leaf", owner_ref: ownerRef("protocol-run", "protocol-leaf"), depth: 2, limits: { max_depth: 2, max_children: 0 } } as const;
+	assert.equal(buildPlannedBranchTask("Answer the narrow gap.", scout), "Answer the narrow gap.");
+});
+
+test("planned child transcripts do not stream cumulative progress into the parent", () => {
+	const root = {
+		v: 1, profile: "deep-research", run_id: "stream-run", parent_item_id: "stream-branch",
+		owner_ref: ownerRef("stream-run", "stream-branch"), depth: 1,
+		budget: { searches: 1, reads: 1 }, limits: { max_depth: 2, max_children: 2 },
+	} as const;
+	const leaf = { ...root, parent_item_id: "stream-leaf", owner_ref: ownerRef("stream-run", "stream-leaf"), depth: 2, limits: { max_depth: 2, max_children: 0 } } as const;
+	assert.equal(shouldStreamSubagentUpdates(undefined), true, "ordinary delegation retains progress updates");
+	assert.equal(shouldStreamSubagentUpdates(root), false, "depth-one report channel is the progress boundary");
+	assert.equal(shouldStreamSubagentUpdates(leaf), false, "depth-two scout output is also report-bounded");
+	assert.equal(shouldStreamParallelUpdates([{ plan_context: root }, { plan_context: leaf }]), false, "planned parallel reports suppress aggregate heartbeats");
+	assert.equal(shouldStreamParallelUpdates([{ plan_context: root }, {}]), true, "mixed parallel work retains progress updates");
+});
+
+test("planned dispatch results give the parent one bounded next action", () => {
+	const base = { agent: "research-planner", agentSource: "user", task: "branch", exitCode: 0, messages: [], stderr: "", usage: emptyUsage(), planContext: { depth: 1 } } as any;
+	assert.match(plannedResultGuidance([{ ...base, branchReport: { status: "deferred" } }]), /all planned branches are terminal.*plan_settle/i);
+	assert.match(plannedResultGuidance([{ ...base, branchReport: { status: "blocked" } }]), /blocked branch prevents plan_settle/i);
+	assert.match(plannedResultGuidance([{ ...base, branchReportFailure: "missing_report" }]), /do not retry a failed branch/i);
 });
 
 test("subagent argv never inherits API keys", () => {

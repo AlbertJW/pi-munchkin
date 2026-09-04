@@ -18,7 +18,7 @@ import { Type } from "typebox";
 import { type AgentConfig, discoverAgents, discoverAgentsWithStarter } from "./agents.js";
 import { renderCall, renderResult } from "./render.js";
 import { getResultSummaryText } from "./runner-events.js";
-import { mapConcurrent, runAgent } from "./runner.js";
+import { mapConcurrent, plannedResultGuidance, runAgent, shouldStreamParallelUpdates, shouldStreamSubagentUpdates } from "./runner.js";
 import {
   type DelegationMode,
   type SingleResult,
@@ -64,6 +64,7 @@ const SCOUT_RECEIPTS_KEY = "__pi_research_scout_receipts";
 const SCOUT_DISPATCH_STATE_KEY = "__pi_research_scout_dispatch_v1";
 const ROOT_DISPATCH_STATE_KEY = "__pi_research_root_dispatch_v1";
 const ROOT_CONTEXTS_KEY = "__pi_research_root_contexts_v1";
+
 
 type ScoutDispatchState = {
 	key: string;
@@ -986,17 +987,18 @@ This guard prevents self-recursion and cyclic handoffs (for example A -> B -> A)
 			 if (!scoutDispatch.parents.includes(context.parent_item_id)) scoutDispatch.parents.push(context.parent_item_id);
 			 if (!scoutDispatch.owners.includes(context.owner_ref)) scoutDispatch.owners.push(context.owner_ref);
 		  }
-		  return executeParallel(
-			(params.tasks as Array<{ agent: string; task: string; cwd?: string; plan_context?: PlanContextV1 }>).map((task) => ({
+		  const plannedTasks = (params.tasks as Array<{ agent: string; task: string; cwd?: string; plan_context?: PlanContextV1 }>).map((task) => ({
 				...task, plan_context: rebindRootContext(task.plan_context),
-			})),
+			}));
+		  return executeParallel(
+			plannedTasks,
             delegationMode,
             forkSessionSnapshotJsonl,
             agents,
             ctx.cwd,
             sessionModel,
             signal,
-            onUpdate,
+			shouldStreamParallelUpdates(plannedTasks) ? onUpdate : undefined,
             makeDetails,
           );
         }
@@ -1086,7 +1088,7 @@ This guard prevents self-recursion and cyclic handoffs (for example A -> B -> A)
 			sessionModel,
 			planContext,
 			signal,
-			onUpdate,
+			onUpdate: shouldStreamSubagentUpdates(planContext) ? onUpdate : undefined,
 			makeDetails: makeDetails("single"),
 		});
 	} catch {
@@ -1128,7 +1130,7 @@ This guard prevents self-recursion and cyclic handoffs (for example A -> B -> A)
       content: [
         {
           type: "text" as const,
-          text: getResultSummaryText(result),
+            text: `${getResultSummaryText(result)}${plannedResultGuidance([result])}`,
         },
       ],
       details: makeDetails("single")([result]),
@@ -1215,12 +1217,12 @@ This guard prevents self-recursion and cyclic handoffs (for example A -> B -> A)
 				preventCycles,
 				sessionModel,
 				signal,
-				onUpdate: (partial) => {
+				onUpdate: shouldStreamSubagentUpdates(t.plan_context) ? (partial) => {
 				  if (partial.details?.results[0]) {
 					allResults[index] = partial.details.results[0];
 					emitProgress();
 				  }
-				},
+				} : undefined,
 				makeDetails: makeDetails("parallel"),
 			  });
 		  } catch {
@@ -1244,7 +1246,7 @@ This guard prevents self-recursion and cyclic handoffs (for example A -> B -> A)
       content: [
         {
           type: "text" as const,
-          text: formatParallelSummaryText(results),
+          text: `${formatParallelSummaryText(results)}${plannedResultGuidance(results)}`,
         },
       ],
       details: makeDetails("parallel")(results),

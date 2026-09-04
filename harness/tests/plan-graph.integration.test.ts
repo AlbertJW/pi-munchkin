@@ -25,7 +25,7 @@ if (!CHILD) {
 	const output = execFileSync(process.execPath, [
 				"--experimental-strip-types", "--experimental-loader", resolve("harness/tests/ts-js-resolver.mjs"), "--test", import.meta.filename,
 			], { cwd: process.cwd(), env, encoding: "utf8", stdio: "pipe" });
-			assert.match(output, /pass 50/);
+			assert.match(output, /pass 51/);
 		} finally { rmSync(artifacts, { recursive: true, force: true }); }
 	});
 } else {
@@ -441,6 +441,8 @@ if (!CHILD) {
 		}, cwd);
 		const text = result.content.map((block: any) => block?.text ?? "").join("\n");
 		assert.match(text, /research-planner/);
+		assert.match(text, /immediately dispatch/i);
+		assert.match(text, /Do not call `research_plan_start` again/i);
 		assert.doesNotMatch(text, /matching researcher subagent/);
 		resetPiGlobals();
 	});
@@ -450,6 +452,10 @@ if (!CHILD) {
 		assert.match(instructions, /complete the branch directly/i);
 		assert.match(instructions, /do not create scout leaves/i);
 		assert.match(instructions, /call `branch_plan` once with a terminal status/i);
+		assert.match(instructions, /MUST invoke the `branch_plan` tool before ending this child run/i);
+		assert.match(instructions, /plain-text.*not a valid completion/i);
+		assert.match(instructions, /partial evidence exists/i);
+		assert.match(instructions, /reserve `blocked` for a branch with no viable path/i);
 		assert.doesNotMatch(instructions, /Call `branch_plan` before expanding the branch\. Create at most two pending child leaves/);
 	});
 
@@ -756,6 +762,28 @@ if (!CHILD) {
 		assert.equal(result.isError, false);
 		assert.equal(result.details.terminal, true);
 		assert.equal(result.terminate, true, "a terminal report must suppress the child follow-up model turn");
+		resetPiGlobals();
+	});
+
+	test("branch_plan downgrades a done claim when its retrieval receipt is incomplete", async () => {
+		const fp = fresh(); const cwd = tmp();
+		(globalThis as Record<string, unknown>).__pi_research_state = { searches: 1, reads: 1 };
+		(globalThis as Record<string, unknown>)[RESEARCH_COVERAGE_KEY] = {
+			calls: 1, returned_count: 1, incomplete: true, truncated: true, failed: false, budget_exhausted: false,
+		};
+		const result = await callTool(fp, "branch_plan", {
+			status: "done", note: "partial evidence found", consumed: { searches: 1, reads: 1 },
+			children: [], source_leads: [{ url: "https://example.com/source", claim: "claim", quote: "quote" }],
+			evidence_gaps: [], coverage,
+		}, cwd);
+		assert.equal(result.isError, false, "a partial done claim should be safely normalized, not rejected");
+		assert.equal(result.details.terminal, true);
+		const report = JSON.parse(readFileSync(join(process.env.PI_MUNCHKIN_BRANCH_REPORT_PATH!), "utf8"));
+		assert.equal(report.status, "deferred");
+		assert.equal(report.coverage.complete, false);
+		assert.equal(report.coverage.truncated, true);
+		assert.ok(report.evidence_gaps.length > 0);
+		assert.ok(report.defer?.value && report.defer?.risk && report.defer?.rationale);
 		resetPiGlobals();
 	});
 

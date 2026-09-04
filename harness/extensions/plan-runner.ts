@@ -631,6 +631,51 @@ function explainCoverageInvariant(report: BranchReportV1, terminal = false): str
 	return null;
 }
 
+/** Models sometimes report a productive branch as `done` even though the
+ * process-local retrieval receipt says that the bounded search/read was
+ * truncated, failed, or otherwise incomplete. This is a recoverable protocol
+ * mistake: retain the source leads, but downgrade the claim to `deferred` so
+ * the parent can validate the evidence rather than accepting a false terminal
+ * success. We never upgrade an incomplete receipt to `done`. */
+function normalizePartialDoneReport(report: BranchReportV1, ownCoverage?: ResearchCoverageObservation): BranchReportV1 {
+	if (report.status !== "done" || report.source_leads.length === 0) return report;
+	const partial = report.evidence_gaps.length > 0 || report.coverage?.complete === false || ownCoverage?.incomplete === true;
+	if (!partial) return report;
+	const base = report.coverage ?? {
+		strategy: report.children.length > 0 ? "hybrid" as const : "direct" as const,
+		scope: "bounded" as const,
+		returned_count: ownCoverage?.returned_count ?? 0,
+		truncated: false, budget_exhausted: false, failed: false, complete: false,
+	};
+	const coverage = {
+		...base,
+		truncated: base.truncated || ownCoverage?.truncated === true,
+		budget_exhausted: base.budget_exhausted || ownCoverage?.budget_exhausted === true,
+		failed: base.failed || ownCoverage?.failed === true,
+		complete: false,
+	};
+	// The schema requires every incomplete receipt to name a bounded reason. If
+	// neither the model nor the retrieval observer supplied one, conservatively
+	// classify the unresolved envelope as exhausted rather than inventing a
+	// successful completion. This does not add budget or permit another call.
+	if (!coverage.truncated && !coverage.budget_exhausted && !coverage.failed) coverage.budget_exhausted = true;
+	const evidence_gaps = [...new Set([
+		...report.evidence_gaps,
+		"partial retrieval evidence requires parent validation before settlement",
+	])].slice(0, 8);
+	return {
+		...report,
+		status: "deferred",
+		evidence_gaps,
+		coverage,
+		defer: report.defer ?? {
+			value: "Retain the bounded source leads for parent synthesis",
+			risk: "The incomplete retrieval may not support the final claim",
+			rationale: "The branch produced usable leads but its coverage receipt is incomplete; the parent must reread and validate them.",
+		},
+	};
+}
+
 function validateIncoming(items: Array<{ item_id?: string; title: string; note?: string }>): void {
 	if (items.length < 1 || items.length > MAX_ITEMS) rejectPlanTool(`plan_write rejected: provide 1-${MAX_ITEMS} top-level items`);
 	const ids = new Set<string>();
@@ -1028,6 +1073,7 @@ const researchPlanStart = defineTool({
 	promptGuidelines: ACTIVE_TOOL_PROMPTS ? [
 		"Use only for contested, comparative, multi-part, or delegated research. Allocate at most 3 searches and 5 reads across all branches.",
 		"Copy the returned plan_context exactly into the matching research-planner subagent call.",
+		"After a successful start, immediately dispatch one research-planner child for each returned context; do not call research_plan_start again or spend parent retrieval budget first.",
 	] : undefined,
 	parameters: Type.Object({
 		request: Type.String({ minLength: 1, maxLength: 1_000 }),
@@ -1093,7 +1139,7 @@ const researchPlanStart = defineTool({
 			depth: 1, budget: item.budget!.allocated, dispatch_epoch: item.dispatch_epoch ?? 0,
 			limits: { max_depth: DEEP_RESEARCH_MAX_DEPTH, max_children: DEEP_RESEARCH_MAX_CHILDREN },
 		}));
-		return { content: [{ type: "text" as const, text: `Deep-research plan started (${state.items.length} branches). Pass the matching plan_context unchanged to each research-planner subagent.\n${JSON.stringify(contexts)}` }], details: { tool_name: "research_plan_start", success: true, contexts } };
+		return { content: [{ type: "text" as const, text: `Deep-research plan started (${state.items.length} branches). Do not call \`research_plan_start\` again. Immediately dispatch one \`research-planner\` child for each returned context, copying each \`plan_context\` unchanged; do not spend parent retrieval budget before those dispatches.\n${JSON.stringify(contexts)}` }], details: { tool_name: "research_plan_start", success: true, contexts } };
 	},
 });
 
@@ -1171,8 +1217,16 @@ const branchPlan = defineTool({
 		const context = await readPlanContext(process.env[PLAN_CONTEXT_ENV]);
 		const reportPath = process.env[BRANCH_REPORT_ENV];
 		if (!context || !reportPath) rejectPlanTool("branch_plan rejected: no valid parent plan context");
-		const report: BranchReportV1 = { v: 1, parent_item_id: context.parent_item_id, owner_ref: context.owner_ref, ...params } as BranchReportV1;
-		const terminal = ["done", "blocked", "deferred"].includes(report.status);
+		let report: BranchReportV1 = { v: 1, parent_item_id: context.parent_item_id, owner_ref: context.owner_ref, ...params } as BranchReportV1;
+		let terminal = ["done", "blocked", "deferred"].includes(report.status);
+		const shared = globalThis as Record<string, unknown>;
+		const own = shared.__pi_research_state as { searches?: unknown; reads?: unknown } | undefined;
+		const ownUsage = { searches: typeof own?.searches === "number" ? own.searches : 0, reads: typeof own?.reads === "number" ? own.reads : 0 };
+		const ownCoverage = validResearchCoverageObservation(shared[RESEARCH_COVERAGE_KEY])
+			? shared[RESEARCH_COVERAGE_KEY] as ResearchCoverageObservation
+			: undefined;
+		report = normalizePartialDoneReport(report, ownCoverage);
+		terminal = ["done", "blocked", "deferred"].includes(report.status);
 		const invalidCoverage = explainCoverageInvariant(report, terminal);
 		const attemptKey = `${context.run_id}:${context.owner_ref}`;
 		if (invalidCoverage) {
@@ -1210,12 +1264,6 @@ const branchPlan = defineTool({
 			};
 		}
 		invalidCoverageAttempts.delete(attemptKey);
-		const shared = globalThis as Record<string, unknown>;
-		const own = shared.__pi_research_state as { searches?: unknown; reads?: unknown } | undefined;
-		const ownUsage = { searches: typeof own?.searches === "number" ? own.searches : 0, reads: typeof own?.reads === "number" ? own.reads : 0 };
-		const ownCoverage = validResearchCoverageObservation(shared[RESEARCH_COVERAGE_KEY])
-			? shared[RESEARCH_COVERAGE_KEY] as ResearchCoverageObservation
-			: undefined;
 		// A terminal branch may declare a model-level evidence gap, but it may
 		// never call retrieval complete when an actual web tool returned a
 		// truncated, failed, or budget-exhausted receipt. The receipt is kept

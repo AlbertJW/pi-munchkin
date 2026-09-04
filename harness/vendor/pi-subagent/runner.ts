@@ -22,6 +22,7 @@ import {
   emptyUsage,
   getFinalOutput,
   normalizeCompletedResult,
+  isResultError,
 } from "./types.js";
 
 const isWindows = process.platform === "win32";
@@ -102,13 +103,62 @@ function writePlanContextToTemp(context: PlanContextV1): { dir: string; contextP
 
 const inheritedCliArgs = parseInheritedCliArgs(process.argv);
 
+/**
+ * A depth-one research planner has a private report channel in addition to
+ * Pi's ordinary assistant transcript.  A natural-language final answer is not
+ * sufficient to close that channel: the parent cannot safely merge claims or
+ * release the branch lease without a validated branch_plan artifact.  Keep
+ * this instruction at the runner boundary so it is present even when an agent
+ * prompt is stale, reordered, or supplied by a project-local override.
+ */
+export function buildPlannedBranchTask(task: string, context?: PlanContextV1): string {
+	if (context?.depth !== 1) return task;
+	return `${task}\n\nPLANNED BRANCH PROTOCOL (mandatory):\nYou MUST invoke the \`branch_plan\` tool before ending this child run, with a validated report: use a terminal status (done, blocked, or deferred) for a resolved branch, or a pending status only when declaring bounded scout leaves. A plain-text RESULT is not a valid completion and will be treated as a missing report. Do not stop or return text until \`branch_plan\` has been accepted.\n\nCoverage invariant (copy exactly): coverage.complete MUST be true only when truncated=false, budget_exhausted=false, failed=false, and scope=bounded (or scope=exhaustive with returned_count=total_count). If the web tool says the result is truncated, failed, or budget-limited, set that flag true, set complete=false, include at least one evidence_gaps entry, and prefer \`deferred\` when partial evidence remains (with defer.value, defer.risk, and defer.rationale); use blocked only when there is no viable path. A done report requires complete=true, no evidence_gaps, and at least one source lead with positive retrieval yield. Minimal deferred shape: status=deferred; consumed={searches:<observed>,reads:<observed>}; children=[]; source_leads=[one usable lead if any]; evidence_gaps=[short unresolved gap]; coverage={strategy:\"direct\",scope:\"bounded\",returned_count:<leads>,truncated:<flag>,budget_exhausted:<flag>,failed:<flag>,complete:false}; defer={value:\"what remains useful\",risk:\"what may be wrong\",rationale:\"why it is deferred\"}. Do not invent total_count for bounded coverage. After \`branch_plan\` returns, stop this branch and do not perform further research or delegation.`;
+}
+
+/** Planned children communicate through their bounded report/receipt channel.
+ * Streaming each cumulative child transcript through the parent creates an
+ * unbounded series of repeated tool-execution payloads and can hit the
+ * parent's output cap before the child reaches its final report. Ordinary
+ * delegation keeps the interactive progress stream. */
+export function shouldStreamSubagentUpdates(context?: PlanContextV1): boolean {
+	return context === undefined;
+}
+
+/** A planned parallel dispatch has a bounded report channel for every task;
+ * aggregate heartbeat snapshots would still replay the cumulative result
+ * envelope into the parent. Ordinary progress remains enabled when any task
+ * is an unplanned delegation. */
+export function shouldStreamParallelUpdates(tasks: ReadonlyArray<{ plan_context?: PlanContextV1 }>): boolean {
+	return tasks.some((task) => shouldStreamSubagentUpdates(task.plan_context));
+}
+
+/** Turn a completed planned dispatch into an explicit next action for the
+ * parent model. The generic child summary intentionally omits branch state;
+ * without this bounded, status-only cue a parent can keep rereading or retrying
+ * after every branch is already terminal. */
+export function plannedResultGuidance(results: ReadonlyArray<SingleResult>): string {
+	const planned = results.filter((result) => result.planContext?.depth === 1);
+	if (planned.length === 0) return "";
+	if (planned.some((result) => isResultError(result) || result.branchReportFailure)) {
+		return "\n\nPlanned branch dispatch is terminal for this attempt. Do not retry a failed branch; inspect the graph and report any blocked branch as an explicit evidence gap in the parent answer.";
+	}
+	const statuses = planned.map((result) => result.branchReport?.status);
+	if (statuses.every((status) => status && ["done", "blocked", "deferred"].includes(status))) {
+		if (statuses.includes("blocked")) return "\n\nAll planned branches are terminal, including a blocked branch. Do not dispatch again; a blocked branch prevents plan_settle, so state the bounded evidence gap and stop.";
+		return "\n\nAll planned branches are terminal. The parent must reread every delegated source lead, then call plan_settle once the parent evidence ledger is complete; do not redispatch these branches.";
+	}
+	return "\n\nA planned branch report is not terminal yet. Continue only with the declared branch context; do not start a new research plan.";
+}
+
 function buildPiArgs(
   agent: AgentConfig,
   systemPromptPath: string | null,
   task: string,
-  delegationMode: DelegationMode,
-  forkSessionPath: string | null,
-  sessionModel: string | undefined,
+	delegationMode: DelegationMode,
+	forkSessionPath: string | null,
+	sessionModel: string | undefined,
+	planContext: PlanContextV1 | undefined,
 ): string[] {
   const args: string[] = [
     "--mode",
@@ -141,8 +191,8 @@ function buildPiArgs(
   }
 
   if (systemPromptPath) args.push("--append-system-prompt", systemPromptPath);
-  args.push(`Task: ${task}`);
-  return args;
+	args.push(`Task: ${buildPlannedBranchTask(task, planContext)}`);
+	return args;
 }
 
 // ---------------------------------------------------------------------------
@@ -316,10 +366,11 @@ export async function runAgent(opts: RunAgentOptions): Promise<SingleResult> {
       agent,
       promptTmpPath,
       task,
-      delegationMode,
-      forkSessionTmpPath,
-      sessionModel,
-    );
+		delegationMode,
+		forkSessionTmpPath,
+		sessionModel,
+		planContext,
+	);
     let wasAborted = false;
     let wasTimedOut = false;
 

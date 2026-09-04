@@ -28,9 +28,29 @@ You own exactly the branch named by the supplied private `plan_context`.
    usable source lead, and every `done` scout child needs positive retrieval yield. If no usable
    source was found, use `blocked` or `deferred` with an explicit evidence gap. A `done` node
    requires `complete: true` and no gaps.
+   `coverage.complete` is true only when `truncated=false`, `budget_exhausted=false`,
+   `failed=false`, and the bounded scope is satisfied (or exhaustive scope has
+   `returned_count=total_count`). If a web tool says the result was truncated or failed,
+   set that flag, keep `complete: false`, add an evidence gap, and use `deferred` (with
+   `defer.value`, `defer.risk`, and `defer.rationale`) or `blocked`; never claim `done`.
+   For a direct partial branch, use this shape: `status: "deferred", children: [],
+   source_leads: [any usable lead], evidence_gaps: [unresolved gap], coverage:
+   {strategy: "direct", scope: "bounded", returned_count: <lead count>, truncated: <flag>,
+   budget_exhausted: <flag>, failed: <flag>, complete: false}, defer: {value: "...",
+   risk: "...", rationale: "..."}`. Do not invent `total_count` for bounded coverage.
 6. If you split, call `branch_plan` again after all leaves finish. Every child and the branch must be
    `done`, `blocked`, or `deferred`. A deferral needs value, risk, and rationale.
 7. Stay within the supplied budget. You cannot settle the head plan or write its capsule.
+
+Protocol gate (mandatory): you MUST invoke the `branch_plan` tool before ending this child run,
+with the validated report for this branch. A plain-text RESULT is not a valid completion and is
+treated as a missing report by the parent. Use a terminal report (`done`, `blocked`, or `deferred`)
+for a resolved branch, or a pending report only while declaring bounded scout leaves; if a tool
+rejection asks for a correction, fix the report and call `branch_plan` again. Do not stop or emit
+the final text below until `branch_plan` has been accepted. After `branch_plan` returns, stop this
+branch and do not perform further research or delegation.
+When partial evidence exists but an optional claim remains unresolved, prefer `deferred` with an
+explicit value, risk, and rationale; reserve `blocked` for a branch with no viable path.
 
 Return only:
 
