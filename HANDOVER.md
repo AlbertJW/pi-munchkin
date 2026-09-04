@@ -1,5 +1,20 @@
 # Handover — pi_munchkin, 2026-08-24
 
+## 2026-09-04 bind research ownership to graph identity (repository-only)
+
+The planner audit found that a persisted deep-research node could carry a
+syntactically valid owner reference unrelated to its `(run_id, item_id)`, and
+two research nodes could share one owner. Graph validation now derives and
+checks every research owner and rejects collisions, so reload and concurrent
+dispatch cannot accept forged or ambiguous delegation identities. The
+counterfactual regression was red before the guard and green afterward. No
+model execution, mirror, rollout, or push occurred.
+
+Source surface is `d7a27c91fff68cdfbd41c53b0d16b78b64f9531fe81724a66623fc6c495cf533`;
+loaded mirror remains `73bbd494f5c23f3b7262bd9f17c44b57574ca23d4b211c07dbd1d6067c23c315`.
+Planner flags remain dark; future smoke requires a fresh approved preflight plus
+loaded-hash rebind.
+
 ## 2026-09-04 expose source evidence gaps in planner status (repository-only)
 
 The compact graph renderer filtered out `source:`-prefixed evidence gaps, so a

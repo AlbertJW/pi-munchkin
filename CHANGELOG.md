@@ -4,6 +4,18 @@ All notable changes to pi-munchkin are documented here. Releases follow semantic
 
 ## Unreleased
 
+### Fixed (2026-09-04 — bind research ownership to graph identity)
+
+- Deep-research graph recovery now requires every research node's owner reference
+  to equal the deterministic `(run_id, item_id)` derivation and rejects duplicate
+  owners. This closes a persisted-state ownership forgery and preserves distinct
+  concurrent delegation identities. The targeted regression was red before the
+  guard and green afterward; planner flags remain dark with no model execution,
+  mirror, rollout, or push.
+
+The source surface is `d7a27c91…`; the loaded mirror remains `73bbd494…`.
+Future planner smoke requires a fresh approved preflight and loaded-hash rebind.
+
 ### Fixed (2026-09-04 — expose source evidence gaps in planner status)
 
 - Compact planner status now counts every evidence gap, including
