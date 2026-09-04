@@ -1,8 +1,7 @@
 import { PLAN_NOTE_MAX_BYTES, PLAN_TITLE_MAX_BYTES } from "./plan-limits.ts";
-import { chmod, mkdir, open, readFile, rename, unlink } from "node:fs/promises";
-import { dirname } from "node:path";
-import { randomUUID } from "node:crypto";
+import { readFile } from "node:fs/promises";
 import { addBudget, boundedInteger, budgetWithin, ownerRef, validBudget, validCoverage, validDeferral, validResearchEvidenceYield, type Deferral, type PlanStatus, type ResearchBudget, type RetrievalCoverage } from "./plan-graph.ts";
+import { atomicWriteFile } from "./private-artifact.ts";
 
 export const PLAN_CONTEXT_ENV = "PI_MUNCHKIN_PLAN_CONTEXT_PATH";
 export const BRANCH_REPORT_ENV = "PI_MUNCHKIN_BRANCH_REPORT_PATH";
@@ -293,33 +292,7 @@ export async function readBranchReport(path: string | undefined, context: PlanCo
 	} catch { return null; }
 }
 
-async function syncDirectory(path: string): Promise<void> {
-	const handle = await open(path, "r");
-	try { await handle.sync(); }
-	finally { await handle.close(); }
-}
-
 export async function writeBranchReport(path: string, report: BranchReportV1, context: PlanContextV1, terminal = false): Promise<void> {
 	if (!validateBranchReport(report, context, terminal)) throw new Error("branch_report rejected: invalid or over-budget report");
-	await mkdir(dirname(path), { recursive: true, mode: 0o700 });
-	// mkdir's mode is ignored for an existing directory. Tighten it explicitly
-	// before creating the temporary report so a caller cannot place this private
-	// artifact in a world-readable pre-existing directory.
-	await chmod(dirname(path), 0o700);
-	const temporary = `${path}.tmp-${process.pid}-${randomUUID().slice(0, 8)}`;
-	let published = false;
-	try {
-		const handle = await open(temporary, "wx", 0o600);
-		try {
-			await handle.writeFile(`${JSON.stringify(report)}\n`, "utf8");
-			await handle.chmod(0o600);
-			await handle.sync();
-		} finally { await handle.close(); }
-		await rename(temporary, path);
-		await chmod(path, 0o600);
-		await syncDirectory(dirname(path));
-		published = true;
-	} finally {
-		if (!published) await unlink(temporary).catch(() => undefined);
-	}
+	await atomicWriteFile(path, `${JSON.stringify(report)}\n`, { mode: 0o600, directoryMode: 0o700 });
 }

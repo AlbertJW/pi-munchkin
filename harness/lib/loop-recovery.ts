@@ -1,8 +1,7 @@
-import { randomUUID } from "node:crypto";
-import { chmod, mkdir, rename, unlink, writeFile } from "node:fs/promises";
-import { dirname, join } from "node:path";
+import { join } from "node:path";
 import { agentDir } from "./agent-dir.ts";
 import { sha256, type FailureClass, type FailureEpisode } from "./failure-episodes.ts";
+import { atomicWriteFile } from "./private-artifact.ts";
 
 export type LoopTier = 0 | 1 | 2 | 3;
 
@@ -56,16 +55,6 @@ export async function writeLoopRecoveryReceipt(
 	env: NodeJS.ProcessEnv = process.env,
 ): Promise<string> {
 	const path = loopRecoveryPath(cwd, env);
-	const tmp = `${path}.${process.pid}.${randomUUID()}.tmp`;
-	await mkdir(dirname(path), { recursive: true, mode: 0o700 });
-	await chmod(dirname(path), 0o700);
-	try {
-		await writeFile(tmp, `${JSON.stringify(receipt)}\n`, { encoding: "utf8", mode: 0o600 });
-		await rename(tmp, path);
-		await chmod(path, 0o600);
-		return path;
-	} catch (error) {
-		await unlink(tmp).catch(() => {});
-		throw error;
-	}
+	await atomicWriteFile(path, `${JSON.stringify(receipt)}\n`, { mode: 0o600, directoryMode: 0o700 });
+	return path;
 }

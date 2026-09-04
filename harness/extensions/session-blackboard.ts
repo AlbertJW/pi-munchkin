@@ -1,9 +1,8 @@
 import { createDeliveryCharge } from "../lib/control-charge.ts";
 import { subscribeOnce } from "../lib/extension-lifecycle.ts";
 import { isEffectiveResume } from "../lib/session-resume.ts";
-import { createHash, randomUUID } from "node:crypto";
-import { chmod, mkdir, rename, unlink, writeFile } from "node:fs/promises";
-import { dirname, join } from "node:path";
+import { createHash } from "node:crypto";
+import { join } from "node:path";
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import {
 	boardState, noteTool, noteHarnessSignal, syncBus, renderLens, renderCockpitHtml,
@@ -12,6 +11,7 @@ import {
 import { record } from "../lib/telemetry.ts";
 import { agentDir } from "../lib/agent-dir.ts";
 import { onHarnessSignal } from "../lib/harness-signals.ts";
+import { atomicWriteFile } from "../lib/private-artifact.ts";
 import {
 	buildControlProposal, controlEnforces, emitControlProposal, onControlProposal,
 } from "../lib/control-proposal.ts";
@@ -123,16 +123,11 @@ export default function (pi: ExtensionAPI): void {
 		const state = boardState();
 		syncBus(state);
 		const path = artifactPath;
-		const tmp = `${path}.${process.pid}.${randomUUID()}.tmp`;
 		try {
-			await mkdir(dirname(path), { recursive: true, mode: 0o700 });
-			await chmod(dirname(path), 0o700);
 			const html = renderCockpitHtml(state, { cwd, renderedAt: new Date().toISOString() });
-			await writeFile(tmp, html, { encoding: "utf8", mode: 0o600 });
-			await rename(tmp, path);
-			await chmod(path, 0o600);
+			await atomicWriteFile(path, html, { mode: 0o600, directoryMode: 0o700 });
 			record("blackboard", "rendered", { chars: html.length, attempts: Object.keys(state.attempts).length });
-		} catch { try { await unlink(tmp); } catch { /* absent temp */ } }
+		} catch { /* a stale cockpit must not break the agent lifecycle */ }
 	}
 
 	async function renderCockpit(force = false): Promise<void> {

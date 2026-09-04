@@ -60,8 +60,10 @@ test("branch report transport is private, atomic, and refuses malformed final ou
 
 test("branch report transport keeps file and containing-directory durability barriers", () => {
 	const source = readFileSync(new URL("../lib/branch-report.ts", import.meta.url), "utf8");
-	assert.match(source, /await handle\.sync\(\)/, "report bytes must be synced before close");
-	assert.match(source, /syncDirectory\(/, "published reports must sync their containing directory");
+	assert.match(source, /atomicWriteFile/, "reports must use the shared durable writer");
+	const primitive = readFileSync(new URL("../lib/private-artifact.ts", import.meta.url), "utf8");
+	assert.match(primitive, /await handle\.sync\(\)/, "artifact bytes must be synced before close");
+	assert.match(primitive, /syncDirectory\(/, "published artifacts must sync their containing directory");
 	const dir = mkdtempSync(join(tmpdir(), "pi-branch-report-durability-"));
 	assert.deepEqual(readdirSync(dir), [], "test fixture starts without temporary reports");
 });

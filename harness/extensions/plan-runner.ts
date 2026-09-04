@@ -22,6 +22,7 @@ import {
 import { planStorageMode, privatePlanProjectionPath, privatePlanStatePath, privatePlanTracePath } from "../lib/plan-state-storage.ts";
 import { processWriterMarker } from "../lib/process-writer.ts";
 import { storedUrl } from "../lib/research-ledger.ts";
+import { atomicWriteFile } from "../lib/private-artifact.ts";
 import { initialToolSurface } from "../lib/session-bootstrap.ts";
 import { record } from "../lib/telemetry.ts";
 import { CORE_NAMES, profileFromEnvironment } from "./tool-activation.ts";
@@ -303,31 +304,6 @@ async function withPlanFileLock<T>(path: string, fn: () => Promise<T>): Promise<
 	finally { await releasePlanFileLock(lock); }
 }
 
-async function syncDirectory(path: string): Promise<void> {
-	const handle = await open(path, "r");
-	try { await handle.sync(); }
-	finally { await handle.close(); }
-}
-
-async function atomicWrite(path: string, contents: string, privateFile: boolean): Promise<void> {
-	const tmp = `${path}.tmp-${process.pid}-${randomUUID().slice(0, 8)}`;
-	let published = false;
-	try {
-		const handle = await open(tmp, "wx", privateFile ? 0o600 : 0o644);
-		try {
-			await handle.writeFile(contents, "utf8");
-			if (privateFile) await handle.chmod(0o600);
-			await handle.sync();
-		} finally { await handle.close(); }
-		await rename(tmp, path);
-		if (privateFile) await chmod(path, 0o600);
-		await syncDirectory(dirname(path));
-		published = true;
-	} finally {
-		if (!published) await unlink(tmp).catch(() => undefined);
-	}
-}
-
 function migrateState(raw: any): PlanState | undefined {
 	if (!raw || typeof raw !== "object" || !Array.isArray(raw.items)) return undefined;
 	// Only v4 and v5 have defined migration semantics. Treating a future or
@@ -519,13 +495,11 @@ async function writeStateUnlocked(cwd: string, state: PlanState): Promise<void> 
 	const path = statePath(cwd);
 	if (!path) throw new Error("private plan storage is not ready; retry after session startup");
 	const privateFile = usesPrivateStorage(cwd);
-	await mkdir(dirname(path), { recursive: true, mode: privateFile ? 0o700 : undefined });
-	if (privateFile) await chmod(dirname(path), 0o700);
-	await atomicWrite(path, `${JSON.stringify(state, null, 2)}\n`, privateFile);
+	await atomicWriteFile(path, `${JSON.stringify(state, null, 2)}\n`, { mode: privateFile ? 0o600 : 0o644, ...(privateFile ? { directoryMode: 0o700 } : {}) });
 	if (privateFile) {
 		const projection = privatePlanProjectionPath(cwd);
 		if (!projection) throw new Error("private plan projection is not ready");
-		await atomicWrite(projection, renderTodo(state), true);
+		await atomicWriteFile(projection, renderTodo(state), { mode: 0o600, directoryMode: 0o700 });
 	}
 	(globalThis as Record<string, unknown>).__pi_active_plan_context = {
 		run_id: state.run_id, item_id: currentItem(state)?.id, open_items: openItemCount(state), blocked_items: blockedItemCount(state),
@@ -1827,9 +1801,8 @@ export default function (pi: ExtensionAPI): void {
 			} else ctx.ui.notify("No plan to export.", "info");
 			return;
 		}
-		await mkdir(dirname(todoPath(ctx.cwd)), { recursive: true });
-		await atomicWrite(todoPath(ctx.cwd), renderTodo(state, undefined, true), false);
-		await atomicWrite(reviewExportPath(ctx.cwd), `${JSON.stringify(state, null, 2)}\n`, false);
+		await atomicWriteFile(todoPath(ctx.cwd), renderTodo(state, undefined, true), { mode: 0o644 });
+		await atomicWriteFile(reviewExportPath(ctx.cwd), `${JSON.stringify(state, null, 2)}\n`, { mode: 0o644 });
 		ctx.ui.notify("Plan exported to .pi/TODO.md and .pi/plan-review.json.", "info");
 	} });
 	pi.registerCommand("plan-trace", { description: "Show bounded historical plan trace lines.", handler: async (args, ctx) => {
