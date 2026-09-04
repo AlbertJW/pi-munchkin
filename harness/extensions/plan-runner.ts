@@ -996,10 +996,22 @@ const CoverageSchema = Type.Object({
 function activateGraphTools(): void {
 	if (!api || !PLAN_GRAPH) return;
 	const active = api.getActiveTools();
+	const explicit = (globalThis as Record<string, unknown>)[EXPLICIT_FLAG] === true;
 	for (const name of ["plan_write", "plan_update", "plan_expand", "plan_settle"]) {
-		if (api.getAllTools().some((tool) => tool.name === name) && !active.includes(name)) active.push(name);
+		if ((!explicit || active.includes(name)) && api.getAllTools().some((tool) => tool.name === name) && !active.includes(name)) active.push(name);
 	}
 	api.setActiveTools(active);
+}
+
+function graphLifecycleAvailable(): boolean {
+	if (!api || !PLAN_GRAPH) return false;
+	const explicit = (globalThis as Record<string, unknown>)[EXPLICIT_FLAG] === true;
+	if (!explicit) return true;
+	const active = new Set(api.getActiveTools());
+	// Starting a graph needs a way to update branches, expand generic graph
+	// structure, and settle the parent. Under an explicit allowlist, refuse the
+	// start rather than silently adding omitted tools after the graph is written.
+	return ["plan_update", "plan_expand", "plan_settle"].every((name) => active.has(name));
 }
 
 const researchPlanStart = defineTool({
@@ -1024,6 +1036,7 @@ const researchPlanStart = defineTool({
 		rememberModel(ctx);
 		lastSessionCwd = ctx.cwd;
 		if (process.env.RESEARCH_LEDGER !== "on") rejectPlanTool("research_plan_start is unavailable: this session cannot parent-verify delegated sources. Research directly and cite inline instead.");
+		if (!graphLifecycleAvailable()) rejectPlanTool("research_plan_start rejected: explicit tool selection excludes graph lifecycle tools (plan_update, plan_expand, plan_settle)");
 		const state = await mutatePlan(ctx.cwd, async (previous) => {
 			const unsettledGraph = previous && !previous.settled_at && Boolean(previous.profile || previous.items.some((item) => item.parent_id));
 			if (previous && !previous.settled_at && (openItemCount(previous) > 0 || unsettledGraph)) rejectPlanTool("an active or unsettled graph plan already exists");

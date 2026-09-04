@@ -25,7 +25,7 @@ if (!CHILD) {
 	const output = execFileSync(process.execPath, [
 				"--experimental-strip-types", "--experimental-loader", resolve("harness/tests/ts-js-resolver.mjs"), "--test", import.meta.filename,
 			], { cwd: process.cwd(), env, encoding: "utf8", stdio: "pipe" });
-			assert.match(output, /pass 44/);
+			assert.match(output, /pass 45/);
 		} finally { rmSync(artifacts, { recursive: true, force: true }); }
 	});
 } else {
@@ -339,6 +339,19 @@ if (!CHILD) {
 		assert.ok(fp.pi.getActiveTools().includes("web_search"), "research graph must expose web search after start");
 		assert.ok(fp.pi.getActiveTools().includes("web_read"), "research graph must expose web reads after start");
 		assert.ok(fp.pi.getActiveTools().includes("subagent"), "research graph must expose delegation after start");
+		resetPiGlobals();
+	});
+
+	test("research graph start respects an explicit tool allowlist", async () => {
+		const fp = fresh(); const cwd = tmp();
+		const shared = globalThis as Record<string, unknown>;
+		shared.__pi_tool_selection_explicit = true;
+		fp.pi.setActiveTools(["research_plan_start", "web_search", "web_read"]);
+		await expectToolError(fp, "research_plan_start", {
+			request: "Respect explicit tools", summary: "must not widen the surface",
+			branches: [{ title: "Evidence", budget: { searches: 1, reads: 1 } }],
+		}, cwd, /explicit tool selection excludes graph lifecycle/i);
+		assert.deepEqual(fp.pi.getActiveTools(), ["research_plan_start", "web_search", "web_read"], "explicit tools must not be added behind the user's back");
 		resetPiGlobals();
 	});
 
