@@ -4,6 +4,19 @@ All notable changes to pi-munchkin are documented here. Releases follow semantic
 
 ## Unreleased
 
+### Fixed (2026-09-04 — explain malformed planner export state)
+
+- `/plan-export` now distinguishes a missing plan from a present but malformed
+  private planner state. It fails closed, preserves the damaged bytes, and
+  gives the same bounded `/plan-cancel` recovery instruction as
+  `/plan-status`; no projection is written from unreadable state. The targeted
+  regression was red before the guard and green afterward. Full offline tests
+  and planner integration remain green; planner flags stay dark with no model
+  execution, mirror, rollout, or push.
+
+The source surface is `f3d93aa5…`; the loaded mirror remains `73bbd494…`.
+Future planner smoke requires a fresh approved preflight and loaded-hash rebind.
+
 ### Fixed (2026-09-04 — explain preserved malformed planner state)
 
 - `/plan-status` now distinguishes a missing plan from a present but malformed

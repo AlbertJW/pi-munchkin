@@ -1,5 +1,19 @@
 # Handover — pi_munchkin, 2026-08-24
 
+## 2026-09-04 explain malformed planner export state (repository-only)
+
+After `/plan-status` was hardened to surface preserved malformed state,
+`/plan-export` still reported the same damaged file as if no plan existed. The
+export command now fails closed with a bounded preservation/recovery message and
+does not write `TODO.md` or `plan-review.json` from unreadable state. The
+counterfactual regression was red before the guard and green afterward. No model
+execution, mirror, rollout, or push occurred.
+
+Source surface is `f3d93aa52e8c5eb78704903d5551373e76bf6950484db58f9440398bae63da0a`;
+loaded mirror remains `73bbd494f5c23f3b7262bd9f17c44b57574ca23d4b211c07dbd1d6067c23c315`.
+Planner flags remain dark; future smoke requires a fresh approved preflight plus
+loaded-hash rebind.
+
 ## 2026-09-04 explain preserved malformed planner state (repository-only)
 
 After strict v5 recovery was made fail-closed, `/plan-status` still answered
