@@ -4,6 +4,14 @@ All notable changes to pi-munchkin are documented here. Releases follow semantic
 
 ## Unreleased
 
+### Delivered (2026-09-04 — merge, push, and live mirror sync)
+
+The tested branch was fast-forward merged into `main` and both `main` and
+`codex/qwen35b-provenance` were pushed. The gated mirror copied all 122
+first-party artifacts into `~/.pi/agent`; mirror verification reports zero drift
+and no unmanaged extensions or orphans. The loaded surface receipt is
+`02fb21afada7f9872a66bf62378890416720f258178e61b87ff56ffb79cc3764`.
+
 ### Fixed (2026-09-04 — citation guard package receipt)
 
 The integration correction is now committed as `9653746`. Strict telemetry

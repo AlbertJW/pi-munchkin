@@ -1,5 +1,14 @@
 # Handover — pi_munchkin, 2026-08-24
 
+## 2026-09-04 merge, push, and mirror receipt
+
+The tested `codex/qwen35b-provenance` branch was fast-forward merged into
+`main`; both branch refs are pushed. The gated mirror then wrote all 122
+first-party artifacts to `/Users/Albert.Wessels/.pi/agent` while the local Pi
+endpoint was down. `mirror:check` reports 122/122 with no unmanaged extensions
+or orphans. Loaded surface hash:
+`02fb21afada7f9872a66bf62378890416720f258178e61b87ff56ffb79cc3764`.
+
 ## 2026-09-04 citation-guard package receipt (repository-only)
 
 Commit `9653746` records the integration correction: citation-audit events are
