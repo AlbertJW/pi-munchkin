@@ -5,7 +5,7 @@ import { createHash, randomUUID } from "node:crypto";
 import { defineTool, withFileMutationQueue, type ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { Type } from "typebox";
 import { ACTIVE_TOOL_PROMPTS } from "../lib/active-tool-prompts.ts";
-import { BRANCH_REPORT_ENV, PLAN_CONTEXT_ENV, RESEARCH_COVERAGE_KEY, RESEARCH_RESERVED_BUDGET_KEY, RESEARCH_SCOUT_DISPATCHED_KEY, branchEvidenceYieldError, readPlanContext, validResearchCoverageObservation, writeBranchReport, type BranchReportV1, type PlanContextV1, type ResearchCoverageObservation } from "../lib/branch-report.ts";
+import { BRANCH_REPORT_ENV, PLAN_CONTEXT_ENV, RESEARCH_COVERAGE_KEY, RESEARCH_RESERVED_BUDGET_KEY, RESEARCH_SCOUT_DISPATCHED_KEY, branchEvidenceYieldError, readPlanContext, validateBranchReport, validResearchCoverageObservation, writeBranchReport, type BranchReportV1, type PlanContextV1, type ResearchCoverageObservation } from "../lib/branch-report.ts";
 import { classifyBashCommand } from "../lib/command-policy.ts";
 import { emitHarnessSignal, onHarnessSignal, signalRunId } from "../lib/harness-signals.ts";
 import { PLAN_SURFACE_TOOLS } from "../lib/capability-surface.ts";
@@ -1243,10 +1243,17 @@ const branchPlan = defineTool({
 		if (report.consumed.searches !== observedSearches || report.consumed.reads !== observedReads) rejectPlanTool("branch_plan rejected: branch consumption does not match observed research calls");
 		const evidenceYieldError = branchEvidenceYieldError(report);
 		if (evidenceYieldError) rejectPlanTool(`branch_plan rejected: ${evidenceYieldError}; use blocked or deferred with an explicit evidence gap when no usable source was found`);
+		const terminalHasOpenChild = terminal && report.children.some((child) => !["done", "blocked", "deferred"].includes(child.status));
+		if (!validateBranchReport(report, context, terminal)) {
+			if (terminalHasOpenChild) {
+				rejectPlanTool("branch_plan rejected: terminal branch must resolve every child before completion");
+			}
+			rejectPlanTool(`branch_plan rejected: ${terminal ? "terminal report is invalid or incomplete" : "branch report is invalid or over-budget"}`);
+		}
 		if (ownUsage.searches + reservedSearches > context.budget.searches || ownUsage.reads + reservedReads > context.budget.reads) {
 			rejectPlanTool("branch_plan rejected: child allocations exceed the branch remainder after local research");
 		}
-		await writeBranchReport(reportPath, report, context);
+		await writeBranchReport(reportPath, report, context, terminal);
 		shared[RESEARCH_RESERVED_BUDGET_KEY] = { searches: reservedSearches, reads: reservedReads };
 		const contexts = report.children.map((child) => ({
 			v: 1 as const, profile: "deep-research" as const, run_id: context.run_id, parent_item_id: child.item_id,

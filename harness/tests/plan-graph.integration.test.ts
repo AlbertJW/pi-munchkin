@@ -25,7 +25,7 @@ if (!CHILD) {
 	const output = execFileSync(process.execPath, [
 				"--experimental-strip-types", "--experimental-loader", resolve("harness/tests/ts-js-resolver.mjs"), "--test", import.meta.filename,
 			], { cwd: process.cwd(), env, encoding: "utf8", stdio: "pipe" });
-			assert.match(output, /pass 41/);
+			assert.match(output, /pass 42/);
 		} finally { rmSync(artifacts, { recursive: true, force: true }); }
 	});
 } else {
@@ -621,6 +621,21 @@ if (!CHILD) {
 		assert.equal(result.isError, false);
 		assert.equal(result.details.terminal, true);
 		assert.equal(result.terminate, true, "a terminal report must suppress the child follow-up model turn");
+		resetPiGlobals();
+	});
+
+	test("terminal branch_plan cannot leave an open child", async () => {
+		const fp = fresh(); const cwd = tmp();
+		(globalThis as Record<string, unknown>).__pi_research_state = { searches: 0, reads: 0 };
+		(globalThis as Record<string, unknown>).__pi_research_scout_receipts = [{
+			owner_ref: ownerRef("branch-budget-run", "open-leaf"), searches: 0, reads: 0,
+			coverage: { calls: 0, returned_count: 0, incomplete: false, truncated: false, failed: false, budget_exhausted: false },
+		}];
+		await expectToolError(fp, "branch_plan", {
+			status: "done", note: "unfinished split", consumed: { searches: 0, reads: 0 }, source_leads: [], evidence_gaps: [], coverage,
+			children: [{ item_id: "open-leaf", title: "Open leaf", status: "pending",
+				budget: { allocated: { searches: 1, reads: 1 }, used: { searches: 0, reads: 0 } } }],
+		}, cwd, /terminal branch must resolve every child/i);
 		resetPiGlobals();
 	});
 

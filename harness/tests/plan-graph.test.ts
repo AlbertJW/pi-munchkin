@@ -97,6 +97,24 @@ test("graph validation rejects cycles, missing parents, depth overflow, and exce
 		assert.ok(validateGraph(leased).some((error) => /open deep-research root branch/.test(error)), "terminal branches cannot retain a lease");
 	});
 
+test("research completion requires evidence yield but split parents may rely on children", () => {
+	const direct = state();
+	direct.items[0] = { ...direct.items[0], status: "done", coverage: { ...completeCoverage, returned_count: 0 }, source_leads: [] };
+	assert.ok(validateGraph(direct).some((error) => /usable evidence yield/.test(error)));
+	assert.ok(settleErrors(direct, new Set(["https://example.test/source", "https://second.example.test/source"])).some((error) => /usable evidence yield/.test(error)));
+
+	const leaf = expandGraph(state(), "root", [{ item_id: "leaf", title: "Leaf", budget: { searches: 1, reads: 1 } }]);
+	leaf.items[0] = { ...leaf.items[0], status: "done", coverage: completeCoverage, source_leads: [] };
+	leaf.items[1] = { ...leaf.items[1], status: "done", coverage: { ...completeCoverage, returned_count: 0 }, budget: { allocated: { searches: 1, reads: 1 }, used: { searches: 1, reads: 1 } } };
+	leaf.items[0].budget = { allocated: { searches: 2, reads: 3 }, used: { searches: 1, reads: 1 } };
+	assert.ok(validateGraph(leaf).some((error) => /usable evidence yield/.test(error)), "a zero-yield done scout leaf must not validate");
+
+	const split = expandGraph(state(), "root", [{ item_id: "good-leaf", title: "Good leaf", budget: { searches: 1, reads: 1 } }]);
+	split.items[0] = { ...split.items[0], status: "done", coverage: { ...completeCoverage, returned_count: 0 }, source_leads: [], budget: { allocated: { searches: 2, reads: 3 }, used: { searches: 1, reads: 1 } } };
+	split.items[1] = { ...split.items[1], status: "done", coverage: completeCoverage, budget: { allocated: { searches: 1, reads: 1 }, used: { searches: 1, reads: 1 } } };
+	assert.deepEqual(validateGraph(split), [], "a split parent may have zero local yield when its child is productive");
+});
+
 test("settlement requires terminal unblocked work, complete deferrals, and parent-verified leads", () => {
 	const candidate = state();
 	candidate.items[0] = { ...candidate.items[0], status: "done", coverage: completeCoverage, source_leads: ["https://example.test/source"] };

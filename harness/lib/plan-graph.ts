@@ -97,6 +97,27 @@ export function validCoverage(value: unknown): value is RetrievalCoverage {
 	return item.complete === (!item.truncated && !item.budget_exhausted && !item.failed && countComplete);
 }
 
+/**
+ * A complete retrieval transport receipt does not prove that a research node
+ * found usable evidence. Direct branches additionally carry source leads;
+ * research leaves carry only their positive retrieval yield. Split parents may
+ * have zero local yield when a completed child supplies the evidence.
+ */
+export function validResearchEvidenceYield(
+	status: PlanStatus,
+	coverage: RetrievalCoverage | undefined,
+	sourceLeadCount: number,
+	children: ReadonlyArray<{ status: PlanStatus; coverage?: RetrievalCoverage }>,
+	requireDirectLead: boolean,
+): boolean {
+	for (const child of children) {
+		if (child.status === "done" && (child.coverage?.returned_count ?? 0) < 1) return false;
+	}
+	if (status === "done" && children.length === 0 &&
+		((coverage?.returned_count ?? 0) < 1 || (requireDirectLead && sourceLeadCount < 1))) return false;
+	return true;
+}
+
 export function validDeferral(value: unknown): value is Deferral {
 	if (!value || typeof value !== "object" || Array.isArray(value)) return false;
 	const item = value as Record<string, unknown>;
@@ -231,6 +252,10 @@ export function validateGraph(state: GraphPlanState): string[] {
 			if (depth > maximumDepth) errors.push(`maximum graph depth exceeded at ${item.id}`);
 		}
 		const children = childrenOf(state.items, item.id);
+		if (state.profile && (item.kind === "research_branch" || item.kind === "research_leaf") &&
+			!validResearchEvidenceYield(item.status, item.coverage, item.source_leads?.length ?? 0, children, item.kind === "research_branch")) {
+			errors.push(`done research node lacks usable evidence yield: ${item.id}`);
+		}
 		if (state.profile && children.length > state.profile.max_children) errors.push(`maximum children exceeded at ${item.id}`);
 		if (children.some((child) => !graphTerminal(child)) && graphTerminal(item)) errors.push(`terminal parent has open children: ${item.id}`);
 		if (item.budget && children.length) {
@@ -302,6 +327,11 @@ export function settleErrors(state: GraphPlanState, verifiedUrls: ReadonlySet<st
 				errors.push(`done research node lacks complete gap-free coverage: ${item.id}`);
 			}
 			if (item.status === "deferred" && !item.coverage) errors.push(`deferred research node lacks a coverage receipt: ${item.id}`);
+			const children = childrenOf(state.items, item.id);
+			if ((item.kind === "research_branch" || item.kind === "research_leaf") &&
+				!validResearchEvidenceYield(item.status, item.coverage, item.source_leads?.length ?? 0, children, item.kind === "research_branch")) {
+				errors.push(`done research node lacks usable evidence yield: ${item.id}`);
+			}
 		}
 		const leads = [...new Set(state.items.flatMap((item) => item.source_leads ?? []))];
 		if (verifiedUrls.size < 2) errors.push("deep-research settlement requires at least two parent-verified sources");

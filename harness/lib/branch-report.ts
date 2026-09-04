@@ -2,7 +2,7 @@ import { PLAN_NOTE_MAX_BYTES, PLAN_TITLE_MAX_BYTES } from "./plan-limits.ts";
 import { chmod, mkdir, open, readFile, rename, unlink } from "node:fs/promises";
 import { dirname } from "node:path";
 import { randomUUID } from "node:crypto";
-import { addBudget, boundedInteger, budgetWithin, ownerRef, validBudget, validCoverage, validDeferral, type Deferral, type PlanStatus, type ResearchBudget, type RetrievalCoverage } from "./plan-graph.ts";
+import { addBudget, boundedInteger, budgetWithin, ownerRef, validBudget, validCoverage, validDeferral, validResearchEvidenceYield, type Deferral, type PlanStatus, type ResearchBudget, type RetrievalCoverage } from "./plan-graph.ts";
 
 export const PLAN_CONTEXT_ENV = "PI_MUNCHKIN_PLAN_CONTEXT_PATH";
 export const BRANCH_REPORT_ENV = "PI_MUNCHKIN_BRANCH_REPORT_PATH";
@@ -107,13 +107,9 @@ export type BranchReportV1 = {
  * as done.
  */
 export function branchEvidenceYieldError(report: Pick<BranchReportV1, "status" | "children" | "source_leads" | "coverage">): string | null {
-	for (const child of report.children) {
-		if (child.status === "done" && (child.coverage?.returned_count ?? 0) < 1) {
-			return `done child ${child.item_id} requires at least one usable source lead (positive retrieval yield)`;
-		}
-	}
-	if (report.status === "done" && report.children.length === 0 &&
-		((report.coverage?.returned_count ?? 0) < 1 || report.source_leads.length < 1)) {
+	if (!validResearchEvidenceYield(report.status, report.coverage, report.source_leads.length, report.children, true)) {
+		const child = report.children.find((entry) => entry.status === "done" && (entry.coverage?.returned_count ?? 0) < 1);
+		if (child) return `done child ${child.item_id} requires at least one usable source lead (positive retrieval yield)`;
 		return "a direct done branch requires at least one usable source lead and a positive retrieval yield";
 	}
 	return null;
@@ -286,8 +282,8 @@ async function syncDirectory(path: string): Promise<void> {
 	finally { await handle.close(); }
 }
 
-export async function writeBranchReport(path: string, report: BranchReportV1, context: PlanContextV1): Promise<void> {
-	if (!validateBranchReport(report, context, false)) throw new Error("branch_report rejected: invalid or over-budget report");
+export async function writeBranchReport(path: string, report: BranchReportV1, context: PlanContextV1, terminal = false): Promise<void> {
+	if (!validateBranchReport(report, context, terminal)) throw new Error("branch_report rejected: invalid or over-budget report");
 	await mkdir(dirname(path), { recursive: true, mode: 0o700 });
 	// mkdir's mode is ignored for an existing directory. Tighten it explicitly
 	// before creating the temporary report so a caller cannot place this private
