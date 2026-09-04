@@ -4,6 +4,19 @@ All notable changes to pi-munchkin are documented here. Releases follow semantic
 
 ## Unreleased
 
+### Evaluated (2026-09-04 — hierarchical planner parent synthesis V3)
+
+After the parent-synthesis repair, an explicitly approved Qwen 35B diagnostic
+screen used source `ae60bdc167b12add717649056019748f42a423315630424ef988f5121cfcc175`
+and loaded disposable surface `41ff832c8df9fbc611b8192384bcc2959073435686db60f68dc01839d820f97d`.
+Three admitted complex candidate fixtures produced zero parent settlements (two
+deferred terminal graphs and one intentional 300-second wall timeout with an
+open branch), so the screen stopped early as a mechanism **NO-GO**. The
+matching control completed without planner activation. The claim-obligation
+card mapping and cross-process query/URL reservations are covered by offline
+red-green tests, but no model-quality claim is made and planner defaults remain
+off. See `optimizer/docs/screens/QWEN35B_PLANNER_DEEP_RESEARCH_EVALUATION_2026-09-04-V3.md`.
+
 ### Added (2026-09-04 — bounded hierarchical research evaluation)
 
 The dark deep-research graph now queues model-backed children at the declared
