@@ -4,6 +4,18 @@ All notable changes to pi-munchkin are documented here. Releases follow semantic
 
 ## Unreleased
 
+### Fixed (2026-09-04 — reject independent research leaf reopen)
+
+- Terminal depth-two deep-research leaves are now treated as terminal evidence
+  records rather than independently dispatchable work. A `plan_update` that
+  reopens one fails closed and directs the caller to reopen its owning branch,
+  whose retry epoch and bounded child set are regenerated transactionally. The
+  targeted lifecycle regression was red before the guard and green afterward;
+  planner flags remain dark with no model execution, mirror, rollout, or push.
+
+The source surface is `30f65e66…`; the loaded mirror remains `73bbd494…`.
+Future planner smoke requires a fresh approved preflight and loaded-hash rebind.
+
 ### Fixed (2026-09-04 — bind research ownership to graph identity)
 
 - Deep-research graph recovery now requires every research node's owner reference

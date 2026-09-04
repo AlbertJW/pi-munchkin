@@ -1,5 +1,20 @@
 # Handover — pi_munchkin, 2026-08-24
 
+## 2026-09-04 reject independent research leaf reopen (repository-only)
+
+The planner audit found that a terminal depth-two research leaf could be
+reopened independently, leaving pending work that no runtime path can
+dispatch. `plan_update` now rejects that transition and directs the caller to
+reopen the owning depth-one branch, where a fresh retry epoch and bounded child
+set replace the old evidence transactionally. The counterfactual regression
+was red before the guard and green afterward. No model execution, mirror,
+rollout, or push occurred.
+
+Source surface is `30f65e66f9af8ef25067bea48e36164dfd90799e74611830c0fe8287497f1323`;
+loaded mirror remains `73bbd494f5c23f3b7262bd9f17c44b57574ca23d4b211c07dbd1d6067c23c315`.
+Planner flags remain dark; future smoke requires a fresh approved preflight plus
+loaded-hash rebind.
+
 ## 2026-09-04 bind research ownership to graph identity (repository-only)
 
 The planner audit found that a persisted deep-research node could carry a
