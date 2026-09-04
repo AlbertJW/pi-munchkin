@@ -220,6 +220,7 @@ function validTimestamp(value: unknown): value is string {
 
 export function validateGraph(state: GraphPlanState): string[] {
 	const errors: string[] = [];
+	const researchOwners = new Map<string, string>();
 	if (!state || typeof state !== "object" || Array.isArray(state)) return ["graph state must be an object"];
 	const stateRecord = state as unknown as Record<string, unknown>;
 	if (!Object.keys(stateRecord).every((key) => GRAPH_STATE_FIELDS.has(key))) errors.push("unknown graph state field");
@@ -255,6 +256,15 @@ export function validateGraph(state: GraphPlanState): string[] {
 		if (item.parent_id !== undefined && !/^[A-Za-z0-9._:-]{1,96}$/.test(item.parent_id)) errors.push(`invalid parent id: ${item.id}`);
 		if (item.parent_id === item.id) errors.push(`node cannot parent itself: ${item.id}`);
 		if (item.owner_ref !== undefined && !/^[a-f0-9]{24}$/.test(item.owner_ref)) errors.push(`invalid owner reference: ${item.id}`);
+		if (state.profile && (item.kind === "research_branch" || item.kind === "research_leaf") && item.owner_ref !== undefined &&
+			item.owner_ref !== ownerRef(state.run_id, item.id)) {
+			errors.push(`owner reference must match derived owner: ${item.id}`);
+		}
+		if (state.profile && (item.kind === "research_branch" || item.kind === "research_leaf") && /^[a-f0-9]{24}$/.test(String(item.owner_ref))) {
+			const prior = researchOwners.get(item.owner_ref!);
+			if (prior && prior !== item.id) errors.push(`duplicate research owner reference: ${item.owner_ref}`);
+			else researchOwners.set(item.owner_ref!, item.id);
+		}
 		if (item.budget && (!validBudget(item.budget.allocated) || !validBudget(item.budget.used) || !budgetWithin(item.budget.used, item.budget.allocated))) {
 			errors.push(`invalid budget: ${item.id}`);
 		}

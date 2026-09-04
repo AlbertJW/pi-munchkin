@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { expandGraph, settleErrors, validCoverage, validateGraph, type GraphPlanState } from "../lib/plan-graph.ts";
+import { expandGraph, ownerRef, settleErrors, validCoverage, validateGraph, type GraphPlanState } from "../lib/plan-graph.ts";
 
 const completeCoverage = {
 	strategy: "direct" as const, scope: "bounded" as const, returned_count: 1,
@@ -13,11 +13,24 @@ function state(): GraphPlanState {
 		created_at: "2026-08-25T00:00:00.000Z", updated_at: "2026-08-25T00:00:00.000Z",
 		profile: { name: "deep-research", max_depth: 2, max_children: 2, discovery_budget: { searches: 3, reads: 5 }, validation_reads: 5 },
 		items: [{
-			id: "root", title: "Root", status: "pending", kind: "research_branch", owner_ref: "a".repeat(24),
+			id: "root", title: "Root", status: "pending", kind: "research_branch", owner_ref: ownerRef("run-one", "root"),
 			budget: { allocated: { searches: 2, reads: 3 }, used: { searches: 0, reads: 0 } },
 		}],
 	};
 }
+
+test("research ownership is derived from the run and node and cannot collide", () => {
+	const forged = state();
+	forged.items[0].owner_ref = "a".repeat(24);
+	assert.ok(validateGraph(forged).some((error) => /owner reference must match derived owner/i.test(error)), "syntactically valid forged owners must fail closed");
+
+	const duplicate = state();
+	duplicate.items.push({
+		id: "root-b", title: "Second root", status: "pending", kind: "research_branch", owner_ref: duplicate.items[0].owner_ref,
+		budget: { allocated: { searches: 1, reads: 1 }, used: { searches: 0, reads: 0 } },
+	});
+	assert.ok(validateGraph(duplicate).some((error) => /duplicate research owner reference/i.test(error)), "concurrent research roots must have distinct owners");
+});
 
 test("deep-research graph expansion preserves parent identity and conserves budget", () => {
 	const next = expandGraph(state(), "root", [
