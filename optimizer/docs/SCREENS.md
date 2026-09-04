@@ -32,6 +32,7 @@ result may be pooled with.
 | `QWEN35B_CONTEXT_HANDOFF_THRESHOLD_V3` | [prereg](screens/PREREG_QWEN35B_CONTEXT_HANDOFF_THRESHOLD_V3_2026-09-02.md) | [audit](screens/QWEN35B_CONTEXT_HANDOFF_THRESHOLD_V3_AUDIT_2026-09-02.md) | Classification: INCOMPLETE MECHANISM PROBE; FAILED CLOSED |
 | `QWEN35B_CONTEXT_HANDOFF_THRESHOLD_V4` | [prereg](screens/PREREG_QWEN35B_CONTEXT_HANDOFF_THRESHOLD_V4_2026-09-02.md) | [audit](screens/QWEN35B_CONTEXT_HANDOFF_THRESHOLD_V4_AUDIT_2026-09-02.md) | CLEAN MECHANISM RECEIPT |
 | `QWEN35B_GOAL_GRAMMAR` | [prereg](screens/PREREG_QWEN35B_GOAL_GRAMMAR_2026-09-02.md) | _none_ | COMPLETED — mechanism/lifecycle smoke only |
+| `QWEN35B_GRACEFUL_SHUTDOWN` (2026-09-01, superseded) | [prereg](screens/PREREG_QWEN35B_GRACEFUL_SHUTDOWN_2026-09-01.md) | _none_ | SUPERSEDED by 2026-09-02 version before any session ran |
 | `QWEN35B_GRACEFUL_SHUTDOWN` | [prereg](screens/PREREG_QWEN35B_GRACEFUL_SHUTDOWN_2026-09-02.md) | [audit](screens/QWEN35B_GRACEFUL_SHUTDOWN_AUDIT_2026-09-02.md) | INVALID / lifecycle incomplete |
 | `QWEN35B_GRACEFUL_SHUTDOWN_FOREGROUND` | [prereg](screens/PREREG_QWEN35B_GRACEFUL_SHUTDOWN_FOREGROUND_2026-09-02.md) | [audit](screens/QWEN35B_GRACEFUL_SHUTDOWN_FOREGROUND_AUDIT_2026-09-02.md) | Classification: VALID INFRASTRUCTURE MECHANISM RECEIPT ONLY |
 | `QWEN35B_GRACEFUL_SHUTDOWN_V2` | [prereg](screens/PREREG_QWEN35B_GRACEFUL_SHUTDOWN_V2_2026-09-02.md) | [audit](screens/QWEN35B_GRACEFUL_SHUTDOWN_V2_AUDIT_2026-09-02.md) | Classification: INCOMPLETE INFRASTRUCTURE SCREEN |
@@ -51,4 +52,4 @@ result may be pooled with.
 | `RUN3_4B` | [prereg](screens/PREREG_RUN3_4B_2026-08-06.md) | _none_ | Primary — deterministic, no judge: |
 | `SEMANTIC_LOOP_SCREEN` | [prereg](screens/PREREG_SEMANTIC_LOOP_SCREEN_2026-08.md) | _none_ | STATUS: PREPARED. No stage of this study may be started without Albert's explicit, > per-stage approval |
 
-_39 screens; 20 carry an audit. Generated 2026-09-03._
+_40 screens; 21 carry an audit. Updated 2026-09-04._
