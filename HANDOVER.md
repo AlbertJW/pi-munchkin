@@ -1,5 +1,19 @@
 # Handover — pi_munchkin, 2026-08-24
 
+## 2026-09-04 reject forged settled planner state (repository-only)
+
+The bottom-up audit found that a persisted v5 `settled_at` marker was accepted
+even when an item was still open, so `/plan-status` rendered a forged snapshot
+as completed. Graph recovery now requires settled graphs to be executing,
+fully terminal, and free of blocked nodes; malformed bytes remain untouched.
+The counterfactual regression was red before the guard and green afterward. No
+model execution, mirror, rollout, or push occurred.
+
+Source surface is `b55c47908a5e4ea4495c0261c8773a6d546d6621f6c54be791cfb573eae1b745`;
+loaded mirror remains `73bbd494f5c23f3b7262bd9f17c44b57574ca23d4b211c07dbd1d6067c23c315`.
+Planner flags remain dark; future smoke requires a fresh approved preflight plus
+loaded-hash rebind.
+
 ## 2026-09-04 explain malformed planner export state (repository-only)
 
 After `/plan-status` was hardened to surface preserved malformed state,

@@ -200,6 +200,8 @@ npm run surface:hash:source
 
 | 2026-09-04 (101) | planner export inspection distinguishes a missing plan from preserved malformed state and refuses to write projections from unreadable bytes | `fe4b319` + pending docs boundary | source `f3d93aa52e8c5eb78704903d5551373e76bf6950484db58f9440398bae63da0a` / loaded `73bbd494f5c23f3b7262bd9f17c44b57574ca23d4b211c07dbd1d6067c23c315` | **REPOSITORY-ONLY; PENDING ROLLOUT.** The export-inspection regression was red before the guard and green afterward; full offline tests and planner integration remain green. Planner flags remain dark; no model execution, mirror, rollout, or push occurred; future smoke requires a fresh approved preflight plus loaded-hash rebind. |
 
+| 2026-09-04 (102) | planner recovery rejects forged settled timestamps on open or blocked graphs and preserves the malformed state | `2cb0e3d` + pending docs boundary | source `b55c47908a5e4ea4495c0261c8773a6d546d6621f6c54be791cfb573eae1b745` / loaded `73bbd494f5c23f3b7262bd9f17c44b57574ca23d4b211c07dbd1d6067c23c315` | **REPOSITORY-ONLY; PENDING ROLLOUT.** The forged-settlement recovery regression was red before the guard and green afterward; planner flags remain dark with no model execution, mirror, rollout, or push. Future smoke requires a fresh approved preflight plus loaded-hash rebind. |
+
 The older packaging-series PR 4 changed package, CI, operational tooling, and narrative without
 entering the runtime manifest. That historical statement does not apply to the spiral-control PR 4
 retirement draft above, which deliberately changes the descriptor and therefore gets its own row.

@@ -4,6 +4,17 @@ All notable changes to pi-munchkin are documented here. Releases follow semantic
 
 ## Unreleased
 
+### Fixed (2026-09-04 — reject forged settled planner state)
+
+- Schema-v5 graph recovery now rejects a `settled_at` marker when the graph is
+  still in review/planning, contains open nodes, or contains blocked nodes.
+  This prevents a forged or torn snapshot from rendering as completed. The
+  persisted-state regression was red before the guard and green afterward;
+  planner flags remain dark with no model execution, mirror, rollout, or push.
+
+The source surface is `b55c4790…`; the loaded mirror remains `73bbd494…`.
+Future planner smoke requires a fresh approved preflight and loaded-hash rebind.
+
 ### Fixed (2026-09-04 — explain malformed planner export state)
 
 - `/plan-export` now distinguishes a missing plan from a present but malformed
