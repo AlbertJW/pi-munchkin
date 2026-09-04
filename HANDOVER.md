@@ -1,5 +1,20 @@
 # Handover — pi_munchkin, 2026-08-24
 
+## 2026-09-04 bind scout dispatch to declared leaves (repository-only)
+
+The planner audit found that a depth-one branch could mint a valid-looking
+depth-two context for a leaf absent from its current `branch_plan` report, or
+change the declared allocation before dispatch. Scout validation now reads the
+parent's non-terminal report and requires a pending/in-progress declared leaf
+with an unchanged budget before launching any child. The counterfactual
+regression was red before the fix and green afterward; planner integration is
+43/43, the full suite is 693/693, and the subagent hardening suite is 28/28.
+
+Source surface is `177ea8b7532b17528c560fc4e7962bf56039e0bec5efc26bf10a7203b2cbf173`;
+loaded mirror remains `73bbd494f5c23f3b7262bd9f17c44b57574ca23d4b211c07dbd1d6067c23c315`.
+Planner flags remain dark. No model execution, mirror, rollout, or push occurred;
+the preflight source pin is updated for the next approved smoke.
+
 ## 2026-09-04 require productive split evidence (repository-only)
 
 The planner audit found that a split branch could mark itself `done` after all

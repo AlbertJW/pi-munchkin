@@ -4,6 +4,19 @@ All notable changes to pi-munchkin are documented here. Releases follow semantic
 
 ## Unreleased
 
+### Fixed (2026-09-04 — bind scout dispatch to declared leaves)
+
+- Depth-two research scouts can now be dispatched only from pending leaves
+  declared in the current non-terminal `branch_plan` report, with the exact
+  declared allocation. Forged or stale leaf IDs and altered budgets are
+  rejected before a child process starts. Regression was red before the guard
+  and green afterward. Full offline tests pass 693/693 and planner integration
+  is 43/43; planner flags remain dark with no model execution, mirror, rollout,
+  or push.
+
+The source surface is `177ea8b7…`; the loaded mirror remains `73bbd494…`.
+Future planner smoke requires a fresh approved preflight and loaded-hash rebind.
+
 ### Fixed (2026-09-04 — require productive split evidence)
 
 - A split deep-research branch can no longer report `done` when every child is
