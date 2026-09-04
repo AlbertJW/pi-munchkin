@@ -69,7 +69,7 @@ which deleted `harness/extensions/plan-weaver.ts`,
 `harness/lib/plan-contract.ts`, their tests, and
 `optimizer/prompt-lab/configs/static/c22-plan-weaver.json` — but that
 candidate predates and falls outside the c25-c39 roster
-`optimizer/docs/CANDIDATE_PRUNING_2026-07.md` tracks, and its own flag
+`optimizer/docs/archive/CANDIDATE_PRUNING_2026-07.md` tracks, and its own flag
 (`PLAN_MODE === "v4"`) was never registered in `schema.json` to begin with.
 The 16-candidate active roster has never had a single graduation or
 retirement executed against it, with the 2026-09-03 "win or retire"
@@ -89,10 +89,10 @@ example, contrasted with candidates like `PLAN_SUBAGENT_ONLY`/`PLAN_DELEGATE_ALL
 ## Relevant paths / subsystems
 
 `harness/extensions/*.ts` (every flag listed in
-`optimizer/docs/CANDIDATE_PRUNING_2026-07.md`'s roster), `optimizer/prompt-lab/configs/schema.json`,
+`optimizer/docs/archive/CANDIDATE_PRUNING_2026-07.md`'s roster), `optimizer/prompt-lab/configs/schema.json`,
 `optimizer/prompt-lab/configs/static/*.json`, `optimizer/real_gate.sh` (tool-grant
 logic, per ADR 0001), `optimizer/prompt-lab/fleet_report.py` (the verdict
-layer this checklist acts on), `optimizer/docs/CANDIDATE_PRUNING_2026-07.md`
+layer this checklist acts on), `optimizer/docs/archive/CANDIDATE_PRUNING_2026-07.md`
 (the roster this checklist is executed against).
 
 ## Review / invalidation condition

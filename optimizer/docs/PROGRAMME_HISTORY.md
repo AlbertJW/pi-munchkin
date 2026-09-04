@@ -28,12 +28,13 @@ preregistered fixture-admission rule. (`archive/UNMOTHBALL_2026-08.md`)
 
 **2026-08-21 — second mothball, for the opposite reason.** The instrument now worked; the
 *subject* could not drive the harness. Ling3 scored 0/8 on `audit-sweep` with ~70% tool-call
-failure. Stopping was the honest call. ([`MOTHBALLED_2026-08-21.md`](MOTHBALLED_2026-08-21.md))
+failure. Stopping was the honest call. ([`MOTHBALLED_2026-08-21.md`](archive/MOTHBALLED_2026-08-21.md))
 
 **2026-08-27 onward — the Qwen 35B cohort.** A subject that *can* drive the tools, which was the
 stated restart condition. This is where the programme actually is; see
-[`NEXT_STEP_MODEL_QUALIFICATION_2026-08.md`](NEXT_STEP_MODEL_QUALIFICATION_2026-08.md) and the
-per-screen record in [`SCREENS.md`](SCREENS.md).
+[`NEXT_STEP_MODEL_QUALIFICATION_2026-08.md`](archive/NEXT_STEP_MODEL_QUALIFICATION_2026-08.md) and the
+per-screen record in [`SCREENS.md`](SCREENS.md) and the full run log in
+[`ROUND_LEDGER.md`](ROUND_LEDGER.md).
 
 ## What carried through every restart
 

@@ -1,3 +1,5 @@
+> Archive — settled decisions; not a live research queue.
+
 # Research notes
 
 Approaches evaluated for the pi-munchkin substrate — recorded so the reasoning isn't re-litigated. Moved out of the top-level README; see [`optimizer/docs/ROUND_LEDGER.md`](../optimizer/docs/ROUND_LEDGER.md) for the full living queue.
