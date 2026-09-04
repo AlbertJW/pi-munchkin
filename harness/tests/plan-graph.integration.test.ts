@@ -25,7 +25,7 @@ if (!CHILD) {
 	const output = execFileSync(process.execPath, [
 				"--experimental-strip-types", "--experimental-loader", resolve("harness/tests/ts-js-resolver.mjs"), "--test", import.meta.filename,
 			], { cwd: process.cwd(), env, encoding: "utf8", stdio: "pipe" });
-			assert.match(output, /pass 48/);
+			assert.match(output, /pass 49/);
 		} finally { rmSync(artifacts, { recursive: true, force: true }); }
 	});
 } else {
@@ -154,6 +154,26 @@ if (!CHILD) {
 		const { ctx, notes } = makeCtx(cwd); await fp.commands.get("plan-status").handler("", ctx);
 		assert.match(notes.at(-1) ?? "", /malformed.*preserved|preserved.*malformed/i, "settled state with open work must fail closed");
 		assert.equal(readFileSync(path, "utf8"), original, "forged settled state must remain untouched");
+		resetPiGlobals();
+	});
+
+	test("ambient planner status counts source evidence gaps", async () => {
+		const fp = fresh(); const cwd = tmp();
+		const runId = "source-gap-render";
+		const rootId = "research-root";
+		const persisted = {
+			schema_version: 5, run_id: runId, request: "research", summary: "show the gap", autonomy: "lean", phase: "executing",
+			created_at: "2026-08-25T00:00:00.000Z", updated_at: "2026-08-25T00:00:00.000Z",
+			profile: { name: "deep-research", max_depth: 2, max_children: 2, discovery_budget: { searches: 3, reads: 5 }, validation_reads: 5 },
+			items: [{ id: rootId, title: "Evidence branch", status: "pending", kind: "research_branch", owner_ref: ownerRef(runId, rootId),
+				budget: { allocated: { searches: 1, reads: 1 }, used: { searches: 0, reads: 0 } }, evidence_gaps: ["source:unverified"] }],
+		};
+		const path = join(cwd, ".pi", "plan-state.json");
+		const { mkdirSync, writeFileSync } = await import("node:fs");
+		mkdirSync(join(cwd, ".pi"), { recursive: true });
+		writeFileSync(path, `${JSON.stringify(persisted)}\n`, { mode: 0o600 });
+		const { ctx, notes } = makeCtx(cwd); await fp.commands.get("plan-status").handler("", ctx);
+		assert.match(notes.at(-1) ?? "", /gaps=1/, "source evidence gaps must remain visible as a bounded count");
 		resetPiGlobals();
 	});
 

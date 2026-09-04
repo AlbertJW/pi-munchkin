@@ -465,7 +465,10 @@ function renderItems(state: PlanState, selectedId?: string, includeDescendants =
 		const itemDepth = state.schema_version === 5 ? (depthOf(state.items, item.id) ?? 0) : 0;
 		const indent = "  ".repeat(selected || includeDescendants ? Math.max(0, itemDepth - selectedDepth) : 0);
 		const descendants = state.schema_version === 5 ? descendantCount(state.items, item.id) : 0;
-		const gaps = item.evidence_gaps?.filter((gap) => !gap.startsWith("source:")).length ?? 0;
+		// Ambient status intentionally exposes only a bounded count, never the gap
+		// text. Source-validation gaps are still evidence gaps and must not vanish
+		// from the compact view merely because their internal label uses `source:`.
+		const gaps = item.evidence_gaps?.length ?? 0;
 		const budget = item.budget ? ` budget=${item.budget.used.searches}/${item.budget.allocated.searches}s ${item.budget.used.reads}/${item.budget.allocated.reads}r` : "";
 		const lease = item.lease ? " dispatch=in-flight" : "";
 		const coverage = item.coverage ? ` coverage=${item.coverage.complete ? "complete" : "incomplete"}:${item.coverage.strategy}` : "";
