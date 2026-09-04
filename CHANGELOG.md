@@ -4,6 +4,16 @@ All notable changes to pi-munchkin are documented here. Releases follow semantic
 
 ## Unreleased
 
+### Delivered (2026-09-04 — planner completion repair promoted and synchronized)
+
+The bounded deep-research branch-report repair and its planner preflight source
+binding are now pushed on `main` (`9ca2f31`, `057c4c7`) and synchronized to the
+live Pi agent. The mirror reports 122/122 first-party files with zero drift and
+the loaded surface receipt is `184c9178950c38c2caf469f68bfee242bddbbf24af299172bd3a91d68511417a`.
+This is an implementation and lifecycle promotion only: `PLAN_GRAPH` and
+`DEEP_RESEARCH_PLANNING` remain off by default, and no new live inference or
+quality/adoption decision is implied.
+
 ### Delivered (2026-09-04 — merge, push, and live mirror sync)
 
 The tested branch was fast-forward merged into `main` and both `main` and
