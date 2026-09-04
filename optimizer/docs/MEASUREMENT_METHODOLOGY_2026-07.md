@@ -31,7 +31,7 @@ verdicts were guaranteed before the round started.** The 34-candidate gemma swee
 have produced a significant result at any effect size, so every delta it reported — including the
 headline ±44pp — sits below its own design's detection floor.
 
-Reproduce: `effort_report.py` docstring, or the Fisher enumeration in `CANDIDATE_PRUNING_2026-07.md`.
+Reproduce: `effort_report.py` docstring, or the Fisher enumeration in `archive/CANDIDATE_PRUNING_2026-07.md`.
 
 ## 2. Pass/fail is the wrong outcome variable
 

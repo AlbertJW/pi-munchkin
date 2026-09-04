@@ -12,7 +12,7 @@
 ## Primary-source review: the AVO system itself (2026-08-24)
 
 The NVIDIA blog (Aug 21 2026) and arXiv 2603.24517 were reviewed directly, not only through the
-session's reading. The primary source confirms the dispositions in this document and HANDOVER, and
+session's reading. The primary source confirms the dispositions in this document and [`docs/OPERATIONS.md`](OPERATIONS.md), and
 converges with three standing rules of this repo — independently arrived at on both sides:
 
 1. **"Evaluating a model is not the same as evaluating an agent."** NVIDIA states their own
@@ -307,7 +307,7 @@ fixture (candidate) → run under gate (real_gate.sh) → grade (grade_reporter.
 Files: `optimizer/real_gate.sh`, `optimizer/grade_reporter.py`, `optimizer/trial_validity.py`,
 `optimizer/prompt-lab/` (judge_render, rft_harvest, trajectory_check). This is AVO's candidate
 lineage/selection loop in miniature. It is **mothballed again (2026-08-21 — see
-`optimizer/docs/MOTHBALLED_2026-08-21.md`)**: the instrument is validated and preserved; no rounds
+`optimizer/docs/archive/MOTHBALLED_2026-08-21.md`)**: the instrument is validated and preserved; no rounds
 run until its restart conditions are met.
 
 **Graph-judgment:** both graphs earn their structure: the plan graph represents genuinely independent
@@ -401,3 +401,13 @@ candidate selection. That is the correct shape.
 > dispatcher; the 300s wall was Pi's `httpIdleTimeoutMs` (default 300,000ms), now raised to
 > 1,800,000 in the live settings. A lesson in this document's own Step-6 spirit: the deterministic
 > fix was a SETTING, not a node.
+
+---
+
+## 2026-09 addendum
+
+The September planner hardening rounds (ownership fencing, malformed-state recovery,
+leaf-reopen rejection, scout-dispatch binding) layer additional validation onto the §8
+plan-graph surfaces without changing the structural shape of either graph. The node types,
+edge directions, and lifecycle stages described above remain current; the hardening rounds
+add enforcement that previously existed only as documentation conventions.

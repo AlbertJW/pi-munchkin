@@ -391,6 +391,8 @@ Start with:
   conditions.
 - [`ROUND_LEDGER.md`](optimizer/docs/ROUND_LEDGER.md) — historical ledger,
   with its unsupported-verdict warning.
+- [`docs/THE-HONEST-FINDING.md`](docs/THE-HONEST-FINDING.md) — epistemic anchor on what the gate
+  actually measures.
 
 No gate round starts automatically. Only one round may run on a serving box at a time, and every
 adoption or deletion remains a human decision.
