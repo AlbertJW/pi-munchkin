@@ -22,7 +22,7 @@ import {
 import { planStorageMode, privatePlanProjectionPath, privatePlanStatePath, privatePlanTracePath } from "../lib/plan-state-storage.ts";
 import { processWriterMarker } from "../lib/process-writer.ts";
 import { storedUrl } from "../lib/research-ledger.ts";
-import { RESEARCH_EVIDENCE_CARDS_KEY } from "../lib/research-evidence.ts";
+import { claimIdForText, RESEARCH_EVIDENCE_CARDS_KEY } from "../lib/research-evidence.ts";
 import { atomicWriteFile } from "../lib/private-artifact.ts";
 import { initialToolSurface } from "../lib/session-bootstrap.ts";
 import { record } from "../lib/telemetry.ts";
@@ -328,7 +328,7 @@ function migrateState(raw: any): PlanState | undefined {
 		if (raw.profile === undefined && raw.items.some((item: any) => item && (
 			item.kind === "research_branch" || item.kind === "research_leaf" ||
 			item.owner_ref !== undefined || item.coverage !== undefined || item.source_leads !== undefined ||
-			item.evidence_gaps !== undefined || item.lease !== undefined || item.dispatch_epoch !== undefined
+			item.claim_ids !== undefined || item.evidence_gaps !== undefined || item.lease !== undefined || item.dispatch_epoch !== undefined
 		))) return undefined;
 		// Validate the persisted v5 shape before applying the migration's bounded
 		// text cleanup. Normalizing an invalid status, ID, budget, or evidence field
@@ -352,6 +352,7 @@ function migrateState(raw: any): PlanState | undefined {
 		...(raw.schema_version === 5 && item.budget ? { budget: item.budget } : {}),
 		...(raw.schema_version === 5 && Array.isArray(item.evidence_gaps) ? { evidence_gaps: item.evidence_gaps.map(cleanText).filter(Boolean).slice(0, 8) } : {}),
 		...(raw.schema_version === 5 && Array.isArray(item.source_leads) ? { source_leads: item.source_leads.filter((value: unknown) => typeof value === "string").slice(0, 10) } : {}),
+		...(raw.schema_version === 5 && Array.isArray(item.claim_ids) ? { claim_ids: item.claim_ids.filter((value: unknown) => typeof value === "string").slice(0, 16) } : {}),
 		...(raw.schema_version === 5 && item.coverage ? { coverage: item.coverage } : {}),
 		...(raw.schema_version === 5 && item.defer ? { defer: item.defer } : {}),
 		...(raw.schema_version === 5 && item.lease ? { lease: item.lease } : {}),
@@ -905,6 +906,7 @@ const planUpdate = defineTool({
 					const next = { ...item, dispatch_epoch: nextEpoch };
 					delete next.coverage;
 					delete next.source_leads;
+					delete next.claim_ids;
 					delete next.evidence_gaps;
 					delete next.defer;
 					return next;
@@ -1601,7 +1603,8 @@ async function mergeBranchResult(cwd: string, context: import("../lib/branch-rep
 		const items = retained.map((item) => item.id === parent.id ? {
 			...releaseLease(item), status: report.status, note: cleanText(report.note), defer: report.defer,
 			budget: item.budget ? { ...item.budget, used: cumulativeUsed } : item.budget,
-			evidence_gaps: report.evidence_gaps.map(cleanText).filter(Boolean), source_leads: report.source_leads.map((lead) => storedUrl(lead.url).display), coverage: report.coverage,
+			evidence_gaps: report.evidence_gaps.map(cleanText).filter(Boolean), source_leads: report.source_leads.map((lead) => storedUrl(lead.url).display),
+			claim_ids: [...new Set(report.source_leads.map((lead) => claimIdForText(lead.claim)))], coverage: report.coverage,
 		} : item).concat(children);
 		const next = { ...previous, items, ...(items.every((item) => graphTerminal(item)) ? { head_terminal_at: previous.head_terminal_at ?? isoNow() } : { head_terminal_at: undefined }) };
 		try { validateStateSize(next); }

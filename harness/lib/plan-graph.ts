@@ -45,6 +45,8 @@ export type GraphPlanItem = {
 	budget?: BudgetAccount;
 	evidence_gaps?: string[];
 	source_leads?: string[];
+	/** Stable claim-obligation IDs derived from delegated source leads. */
+	claim_ids?: string[];
 	coverage?: RetrievalCoverage;
 	defer?: Deferral;
 	/** Parent-authoritative marker preventing duplicate root dispatch after restart. */
@@ -214,7 +216,7 @@ export function descendantCount(items: GraphPlanItem[], itemId: string): number 
 }
 
 const GRAPH_STATE_FIELDS = new Set(["schema_version", "run_id", "request", "summary", "autonomy", "phase", "created_at", "updated_at", "items", "profile", "head_terminal_at", "settled_at", "writer"]);
-const GRAPH_ITEM_FIELDS = new Set(["id", "title", "note", "status", "parent_id", "kind", "owner_ref", "budget", "evidence_gaps", "source_leads", "coverage", "defer", "lease", "dispatch_epoch"]);
+const GRAPH_ITEM_FIELDS = new Set(["id", "title", "note", "status", "parent_id", "kind", "owner_ref", "budget", "evidence_gaps", "source_leads", "claim_ids", "coverage", "defer", "lease", "dispatch_epoch"]);
 const GRAPH_PROFILE_FIELDS = new Set(["name", "max_depth", "max_children", "discovery_budget", "validation_reads"]);
 
 function isGraphItem(value: unknown): value is GraphPlanItem {
@@ -282,12 +284,13 @@ export function validateGraph(state: GraphPlanState): string[] {
 		}
 		if (item.evidence_gaps !== undefined && (!Array.isArray(item.evidence_gaps) || item.evidence_gaps.length > 8 || item.evidence_gaps.some((gap) => !boundedText(gap, 300)))) errors.push(`invalid evidence gaps: ${item.id}`);
 		if (item.source_leads !== undefined && (!Array.isArray(item.source_leads) || item.source_leads.length > 10 || item.source_leads.some((url) => !publicUrl(url)))) errors.push(`invalid source leads: ${item.id}`);
+		if (item.claim_ids !== undefined && (!Array.isArray(item.claim_ids) || item.claim_ids.length > 16 || new Set(item.claim_ids).size !== item.claim_ids.length || item.claim_ids.some((id) => typeof id !== "string" || !/^[A-Za-z0-9._:-]{1,96}$/.test(id)))) errors.push(`invalid claim obligations: ${item.id}`);
 		if (item.coverage && !validCoverage(item.coverage)) errors.push(`invalid retrieval coverage: ${item.id}`);
 		if (item.defer !== undefined && !validDeferral(item.defer)) errors.push(`invalid deferral: ${item.id}`);
 		if (item.lease !== undefined && !validResearchBranchLease(item.lease)) errors.push(`invalid dispatch lease: ${item.id}`);
 		if (item.dispatch_epoch !== undefined && !boundedInteger(item.dispatch_epoch, 1_000_000)) errors.push(`invalid dispatch epoch: ${item.id}`);
 		if (!state.profile && item.kind !== undefined && item.kind !== "work") errors.push(`research node requires a deep-research profile: ${item.id}`);
-		if (!state.profile && (item.owner_ref !== undefined || item.coverage !== undefined || item.source_leads !== undefined || item.evidence_gaps !== undefined || item.lease !== undefined || item.dispatch_epoch !== undefined)) {
+		if (!state.profile && (item.owner_ref !== undefined || item.coverage !== undefined || item.source_leads !== undefined || item.claim_ids !== undefined || item.evidence_gaps !== undefined || item.lease !== undefined || item.dispatch_epoch !== undefined)) {
 			errors.push(`research evidence requires a deep-research profile: ${item.id}`);
 		}
 		if (item.status === "deferred" && !validDeferral(item.defer)) {
@@ -442,8 +445,28 @@ export function settleErrors(state: GraphPlanState, verifiedUrls: ReadonlySet<st
 				prior.push(card);
 				cardsByUrl.set(key, prior);
 			}
-			for (const [canonical, display] of canonicalLeads) if ((cardsByUrl.get(canonical)?.length ?? 0) === 0) {
-				errors.push(`delegated source lacks a parent-validated claim evidence card: ${display}`);
+			const obligationsByUrl = new Map<string, Set<string>>();
+			for (const item of state.items) {
+				const itemClaims = item.claim_ids ?? [];
+				if (itemClaims.length === 0 || !item.source_leads) continue;
+				for (const url of item.source_leads) {
+					let key: string;
+					try { key = canonicalResearchUrl(url); } catch { continue; }
+					const prior = obligationsByUrl.get(key) ?? new Set<string>();
+					for (const claimId of itemClaims) prior.add(claimId);
+					obligationsByUrl.set(key, prior);
+				}
+			}
+			for (const [canonical, display] of canonicalLeads) {
+				const cards = cardsByUrl.get(canonical) ?? [];
+				if (cards.length === 0) {
+					errors.push(`delegated source lacks a parent-validated claim evidence card: ${display}`);
+					continue;
+				}
+				const coveredClaims = new Set(cards.flatMap((card) => card.claim_ids));
+				for (const claimId of obligationsByUrl.get(canonical) ?? []) if (!coveredClaims.has(claimId)) {
+					errors.push(`delegated source lacks a parent-validated card for claim obligation ${claimId}: ${display}`);
+				}
 			}
 		}
 	}

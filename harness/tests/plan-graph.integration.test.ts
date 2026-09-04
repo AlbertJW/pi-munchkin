@@ -35,7 +35,7 @@ if (!CHILD) {
 	const { callTool, expectToolError, fire, makeCtx, makeFakePi, resetPiGlobals } = await import("./integration-harness.ts");
 	const { HARNESS_SIGNAL_CHANNEL } = await import("../lib/harness-signals.ts");
 	const { RESEARCH_COVERAGE_KEY } = await import("../lib/branch-report.ts");
-	const { RESEARCH_EVIDENCE_CARDS_KEY } = await import("../lib/research-evidence.ts");
+	const { claimIdForText, RESEARCH_EVIDENCE_CARDS_KEY } = await import("../lib/research-evidence.ts");
 	const planRunnerModule = await import("../extensions/plan-runner.ts");
 	const planRunner = planRunnerModule.default;
 	const toolActivation = (await import("../extensions/tool-activation.ts")).default;
@@ -496,7 +496,12 @@ if (!CHILD) {
 		(globalThis as Record<string, unknown>).__pi_plan_validation_urls = ["https://example.test/source", "https://second.example.test/source"];
 		await expectToolError(fp, "plan_settle", { summary: "missing card map" }, cwd, /claim evidence card/);
 		(globalThis as Record<string, unknown>)[RESEARCH_EVIDENCE_CARDS_KEY] = [
-			{ v: 1, card_id: "a".repeat(32), original_url: "https://example.test/source", claim_ids: ["claim-a"], truncated: false, parent_validated: true },
+			{ v: 1, card_id: "a".repeat(32), original_url: "https://example.test/source", claim_ids: ["unrelated-claim"], truncated: false, parent_validated: true },
+			{ v: 1, card_id: "b".repeat(32), original_url: "https://second.example.test/source", claim_ids: ["claim-b"], truncated: false, parent_validated: true },
+		];
+		await expectToolError(fp, "plan_settle", { summary: "unmapped claim" }, cwd, /claim obligation/);
+		(globalThis as Record<string, unknown>)[RESEARCH_EVIDENCE_CARDS_KEY] = [
+			{ v: 1, card_id: "a".repeat(32), original_url: "https://example.test/source", claim_ids: [claimIdForText("claim")], truncated: false, parent_validated: true },
 			{ v: 1, card_id: "b".repeat(32), original_url: "https://second.example.test/source", claim_ids: ["claim-b"], truncated: false, parent_validated: true },
 		];
 		assert.equal((await callTool(fp, "plan_settle", { summary: "verified and complete" }, cwd)).isError, false);
@@ -551,7 +556,7 @@ if (!CHILD) {
 		(globalThis as Record<string, unknown>).__pi_plan_validation_urls = ["https://example.test/fake-source", "https://example.test/independent"];
 		await expectToolError(fp, "plan_settle", { summary: "unmapped evidence" }, cwd2, /claim evidence card/);
 		(globalThis as Record<string, unknown>)[RESEARCH_EVIDENCE_CARDS_KEY] = [
-			{ v: 1, card_id: "c".repeat(32), original_url: "https://example.test/fake-source", claim_ids: ["fake-claim"], truncated: false, parent_validated: true },
+			{ v: 1, card_id: "c".repeat(32), original_url: "https://example.test/fake-source", claim_ids: [claimIdForText("fake claim")], truncated: false, parent_validated: true },
 			{ v: 1, card_id: "d".repeat(32), original_url: "https://example.test/independent", claim_ids: ["independent-claim"], truncated: false, parent_validated: true },
 		];
 		assert.equal((await callTool(fp, "plan_settle", { summary: "fake provider validated" }, cwd2)).isError, false);
