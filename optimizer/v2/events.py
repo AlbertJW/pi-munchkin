@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import contextlib
+import copy
 import fcntl
 import hashlib
 import json
@@ -177,8 +178,14 @@ class EventStore:
                 self.write_projections(self._project(events + [event]))
                 self.projection_dirty_path.unlink(missing_ok=True)
             except Exception:
-                self.projection_dirty_path.write_text("dirty\n", encoding="utf-8")
-                os.chmod(self.projection_dirty_path, 0o600)
+                try:
+                    self.projection_dirty_path.write_text("dirty\n", encoding="utf-8")
+                    os.chmod(self.projection_dirty_path, 0o600)
+                except OSError:
+                    # The event is already fsynced. A second projection I/O
+                    # failure must not turn a committed operation into failure.
+                    # project() always reconstructs state from events.
+                    pass
             return event
 
     def find(self, operation_id: str) -> dict | None:
@@ -188,7 +195,8 @@ class EventStore:
     def _project(events: list[dict]) -> dict:
         state: dict = {"schema": "pi.optimizer-projection/v1", "event_count": len(events), "campaign": {}, "candidates": {}, "evaluations": {}, "sessions": {}, "calibrations": {}, "budget": {"provider_sessions": 0, "train_rollouts": 0, "development_rollouts": 0}, "status": "new"}
         for event in events:
-            payload = event["payload"]
+            # Projections may enrich candidates; event payloads remain immutable.
+            payload = copy.deepcopy(event["payload"])
             if event["type"] == "campaign.prepared":
                 state["campaign"] = payload
                 state["status"] = "prepared"

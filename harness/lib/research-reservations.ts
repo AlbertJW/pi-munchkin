@@ -21,7 +21,7 @@ function digest(value: string): string {
 }
 
 function safeRunId(runId: string): string {
-	return /^[A-Za-z0-9._:-]{1,200}$/.test(runId) ? runId : digest(runId);
+	return runId !== "." && runId !== ".." && /^[A-Za-z0-9._:-]{1,200}$/.test(runId) ? runId : digest(runId);
 }
 
 export function researchReservationRoot(cwd: string, runId: string, env: NodeJS.ProcessEnv = process.env): string {

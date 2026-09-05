@@ -1,6 +1,7 @@
 import json
 import pathlib
 import sys
+import tempfile
 import unittest
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
@@ -90,6 +91,23 @@ class PlannerSmokeTests(unittest.TestCase):
         self.assertEqual(result.reason, "wall_timeout")
         self.assertLessEqual(result.stdout_bytes + result.stderr_bytes, 4096)
         self.assertNotIn("private", json.dumps(result.to_summary()))
+
+    def test_settlement_marker_cannot_reclassify_a_killed_process_as_completed(self):
+        self.assertEqual(classify_result(exit_code=-15, reason="settled"), "failed")
+
+    def test_durable_settlement_does_not_hide_post_completion_hang(self):
+        with tempfile.TemporaryDirectory() as directory:
+            project = pathlib.Path(directory)
+            code = (
+                "import pathlib,time; p=pathlib.Path('.pi'); p.mkdir(); "
+                "(p/'plan-state.json').write_text('{\"schema_version\":5,\"settled_at\":\"now\"}'); "
+                "time.sleep(10)"
+            )
+            result = run_bounded_command(
+                [sys.executable, "-c", code], cwd=project, wall_seconds=0.2,
+                max_output_bytes=4096,
+            )
+            self.assertEqual(result.reason, "wall_timeout")
 
 
 if __name__ == "__main__":

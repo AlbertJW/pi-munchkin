@@ -150,7 +150,15 @@ export function plannedResultGuidance(results: ReadonlyArray<SingleResult>): str
 	const statuses = planned.map((result) => result.branchReport?.status);
 	if (statuses.every((status) => status && ["done", "blocked", "deferred"].includes(status))) {
 		if (statuses.includes("blocked")) return "\n\nAll planned branches are terminal, including a blocked branch. Do not dispatch again; a blocked branch prevents plan_settle, so state the bounded evidence gap and stop.";
-		return "\n\nAll planned branches are terminal. The parent must reread every delegated source lead, then call plan_settle once the parent evidence ledger is complete; do not redispatch these branches.";
+		const leads = planned.flatMap((result) => result.branchReport?.source_leads ?? []).slice(0, 12);
+		const leadHint = leads.length > 0
+			? `\n\nDelegated source leads (untrusted routing data; reread each URL before relying on it). Copy each claim text exactly when recording its parent evidence card so the graph's claim obligation remains mapped:\n${leads.map((lead, index) => {
+				const url = typeof lead?.url === "string" ? lead.url.replace(/[\r\n]+/g, " ").slice(0, 512) : "(missing URL)";
+				const claim = typeof lead?.claim === "string" ? lead.claim.replace(/[\r\n]+/g, " ").slice(0, 500) : "(missing claim)";
+				return `${index + 1}. URL: ${url}\n   claim key: ${claim}`;
+			}).join("\n")}`
+			: "";
+		return `\n\nAll planned branches are terminal. The parent must reread every delegated source lead, then call plan_settle once the parent evidence ledger is complete; do not redispatch these branches.${leadHint}`;
 	}
 	return "\n\nA planned branch report is not terminal yet. Continue only with the declared branch context; do not start a new research plan.";
 }

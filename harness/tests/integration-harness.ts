@@ -425,6 +425,7 @@ export async function fire(fp: FakePi, ev: string, event: unknown, ctx?: unknown
 			let currentMessages = structuredClone((event as any)?.messages ?? []);
 			for (const fn of fns) {
 				const r = await safe(fn, { ...(event as any), messages: currentMessages }, ctx);
+				// Callbacks return { messages }; emitContext itself returns the array.
 				if (r && r.messages) currentMessages = r.messages;
 			}
 			return currentMessages;

@@ -1,0 +1,49 @@
+{
+  "schema": "pi.research-fixture/v1",
+  "fixture_id": "compare-json-yaml-config-settle-mini",
+  "revision": "2026-09-04",
+  "kind": "comparative",
+  "prompt": {
+    "text": "Complete this bounded research task exactly: compare JSON and YAML for human-edited configuration. Call research_plan_start with exactly two branches, JSON and YAML, each budget {searches:0, reads:2}. The JSON branch must read https://www.rfc-editor.org/info/rfc8259 once; the YAML branch must read https://yaml.org/ once. Immediately dispatch one research-planner child per branch. Each child must publish branch_plan done with exactly one source lead and exactly one combined claim stating one property and one limitation, using the original URL; do not use the second read. When both reports are terminal, the parent must web_read those two lead URLs, record exactly one parent-validated evidence card per lead using the exact claim text, then call plan_settle with a summary shorter than 240 characters. Do not search, delegate again, add extra leads, or broaden the question. If a source fails or its quote cannot support the combined claim, mark only that branch deferred with value, risk, and rationale.",
+    "sha256": "04f9ecb05bd7234ab827a29e2e95f7fc0a836cbc38865f185ef2abb2b1ac2e8d"
+  },
+  "source_time_cutoff": "2026-09-04T00:00:00Z",
+  "evidence_families": [
+    {
+      "id": "json-primary",
+      "role": "primary",
+      "source_refs": [
+        {"id": "json-rfc", "url": "https://www.rfc-editor.org/info/rfc8259", "publisher": "RFC Editor"}
+      ]
+    },
+    {
+      "id": "yaml-primary",
+      "role": "primary",
+      "source_refs": [
+        {"id": "yaml-home", "url": "https://yaml.org/", "publisher": "YAML"}
+      ]
+    }
+  ],
+  "required_claims": [
+    {"id": "json-tradeoff", "evidence_family": "json-primary", "grading_rule": "cite-json-property-and-limitation"},
+    {"id": "yaml-tradeoff", "evidence_family": "yaml-primary", "grading_rule": "cite-yaml-property-and-limitation"}
+  ],
+  "negative_control": {
+    "text": "What are the two JSON structural types? Give a short answer from one official source.",
+    "sha256": "f5a8780cf908678b4656e995ab1386be082761d5a4d0f9fe17c36194c4317aec",
+    "expected_plan_start": false,
+    "max_source_reads": 1
+  },
+  "oracle": {
+    "schema": "pi.research-oracle/v1",
+    "entrypoint": "../oracles/research_shape.py",
+    "query_budget": 2,
+    "timeout_ms": 2000,
+    "output_cap_bytes": 4096
+  },
+  "provenance": {
+    "authoring_timestamp": "2026-09-04T00:00:00Z",
+    "model_snapshot_boundary": "qwen35b-parent-synthesis-diagnostic-2026-09-04",
+    "contamination_canary_hash": "2222222222222222222222222222222222222222222222222222222222222222"
+  }
+}

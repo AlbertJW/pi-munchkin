@@ -25,7 +25,7 @@ if (!CHILD) {
 	const output = execFileSync(process.execPath, [
 				"--experimental-strip-types", "--experimental-loader", resolve("harness/tests/ts-js-resolver.mjs"), "--test", import.meta.filename,
 			], { cwd: process.cwd(), env, encoding: "utf8", stdio: "pipe" });
-		assert.match(output, /pass 53/);
+		assert.match(output, /pass 54/);
 		} finally { rmSync(artifacts, { recursive: true, force: true }); }
 	});
 } else {
@@ -494,7 +494,9 @@ if (!CHILD) {
 		assert.match(readFileSync(join(cwd, ".pi", "TODO.md"), "utf8"), new RegExp(state.items[1].id), "text export must disclose descendants, not only ambient roots");
 		await expectToolError(fp, "plan_settle", { summary: "done" }, cwd, /delegated source not parent-verified/);
 		(globalThis as Record<string, unknown>).__pi_plan_validation_urls = ["https://example.test/source", "https://second.example.test/source"];
-		await expectToolError(fp, "plan_settle", { summary: "missing card map" }, cwd, /claim evidence card/);
+		const missingCard = await expectToolError(fp, "plan_settle", { summary: "missing card map" }, cwd, /claim evidence card/);
+		assert.match(missingCard.content.map((c: any) => c.text ?? "").join("\n"), /copy.*delegated.*claim.*exactly|research_note.*exact/i,
+			"settlement refusal must tell the parent how to repair an unmapped delegated claim instead of inviting another retrieval loop");
 		(globalThis as Record<string, unknown>)[RESEARCH_EVIDENCE_CARDS_KEY] = [
 			{ v: 1, card_id: "a".repeat(32), original_url: "https://example.test/source", claim_ids: ["unrelated-claim"], truncated: false, parent_validated: true },
 			{ v: 1, card_id: "b".repeat(32), original_url: "https://second.example.test/source", claim_ids: ["claim-b"], truncated: false, parent_validated: true },
@@ -504,7 +506,9 @@ if (!CHILD) {
 			{ v: 1, card_id: "a".repeat(32), original_url: "https://example.test/source", claim_ids: [claimIdForText("claim")], truncated: false, parent_validated: true },
 			{ v: 1, card_id: "b".repeat(32), original_url: "https://second.example.test/source", claim_ids: ["claim-b"], truncated: false, parent_validated: true },
 		];
-		assert.equal((await callTool(fp, "plan_settle", { summary: "verified and complete" }, cwd)).isError, false);
+		const settledResult = await callTool(fp, "plan_settle", { summary: "verified and complete" }, cwd);
+		assert.equal(settledResult.isError, false);
+		assert.equal(settledResult.terminate, true, "settlement must terminate the active planner turn so queued calls cannot run past completion");
 		state = JSON.parse(readFileSync(join(cwd, ".pi", "plan-state.json"), "utf8"));
 		assert.ok(state.settled_at); assert.equal(fp.pi.getActiveTools().includes("plan_settle"), false);
 		const frozen = readFileSync(join(cwd, ".pi", "plan-state.json"), "utf8");
@@ -512,6 +516,45 @@ if (!CHILD) {
 		fp.pi.events.emit(HARNESS_SIGNAL_CHANNEL, { v: 1, type: "plan/branch-result", context, report: { ...report, note: "late child result" }, failureClass: null });
 		await fire(fp, "before_agent_start", {}, makeCtx(cwd).ctx);
 		assert.equal(readFileSync(join(cwd, ".pi", "plan-state.json"), "utf8"), frozen, "late child results cannot mutate a settled graph");
+		resetPiGlobals();
+	});
+
+	test("late terminal branch results queue one parent synthesis follow-up", async () => {
+		const fp = fresh(); const cwd = tmp();
+		await fire(fp, "session_start", {}, makeCtx(cwd).ctx);
+		fp.pi.setActiveTools([...fp.tools.keys()]);
+		const started = await callTool(fp, "research_plan_start", {
+			request: "Late branch synthesis", summary: "one bounded branch",
+			branches: [{ title: "Evidence", budget: { searches: 1, reads: 1 } }],
+		}, cwd);
+		const context = started.details.contexts[0];
+		const acquired = await planRunnerModule.acquireResearchBranchLease(cwd, context);
+		assert.equal(acquired.ok, true);
+		const leasedContext = { ...context, lease_id: acquired.lease_id, dispatch_epoch: 0 };
+		// The parent turn has already ended when the child result arrives. This is
+		// the production failure shape: the merge can make the graph terminal, but
+		// there is no subsequent parent turn to reread and call plan_settle.
+		await fire(fp, "agent_end", {}, makeCtx(cwd).ctx);
+		const report = {
+			v: 1, parent_item_id: context.parent_item_id, owner_ref: context.owner_ref,
+			status: "done", note: "late terminal branch", consumed: { searches: 1, reads: 1 },
+			evidence_gaps: [], source_leads: [{ url: "https://example.test/late-source", claim: "late branch claim", quote: "late branch quote" }], children: [], coverage,
+		};
+		fp.pi.events.emit(HARNESS_SIGNAL_CHANNEL, { v: 1, type: "plan/branch-result", context: leasedContext, report, failureClass: null });
+		// Flush the asynchronous bus subscriber without starting a second model
+		// turn. A repaired runner should queue exactly one follow-up here.
+		await fire(fp, "before_agent_start", {}, makeCtx(cwd).ctx);
+		const state = JSON.parse(readFileSync(join(cwd, ".pi", "plan-state.json"), "utf8"));
+		assert.equal(typeof state.head_terminal_at, "string", "late result must actually close the graph before follow-up");
+		assert.ok(fp.pi.getActiveTools().includes("plan_settle"), `parent tools were ${fp.pi.getActiveTools().join(",")}`);
+		const followUps = fp.customDeliveries.filter((delivery) => delivery.api === "sendMessage" && /reread/i.test(delivery.text));
+		assert.equal(followUps.length, 1, "a late terminal merge must queue one parent synthesis follow-up");
+		assert.equal(followUps[0].deliverAs, "followUp");
+		assert.equal(followUps[0].triggerTurn, true);
+		assert.match(followUps[0].text, /plan_settle/);
+		fp.pi.events.emit(HARNESS_SIGNAL_CHANNEL, { v: 1, type: "plan/branch-result", context: leasedContext, report, failureClass: null });
+		await fire(fp, "before_agent_start", {}, makeCtx(cwd).ctx);
+		assert.equal(fp.customDeliveries.filter((delivery) => /reread/i.test(delivery.text)).length, 1, "duplicate terminal arrivals must not queue another synthesis turn");
 		resetPiGlobals();
 	});
 

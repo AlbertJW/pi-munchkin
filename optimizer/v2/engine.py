@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import math
 import hashlib
 import os
 import pathlib
@@ -78,7 +79,7 @@ def _guard_margin(evaluation: dict, guards: tuple[dict, ...]) -> float:
     margins = []
     for guard in guards:
         value = evaluation.get("guards", {}).get(guard["metric"])
-        if not isinstance(value, (int, float)) or isinstance(value, bool):
+        if not isinstance(value, (int, float)) or isinstance(value, bool) or not math.isfinite(value):
             return float("-inf")
         margins.append(guard["threshold"] - value if guard["direction"] == "at_most" else value - guard["threshold"])
     return min(margins)
@@ -371,10 +372,7 @@ class CampaignEngine:
             if last_decision["accepted"]:
                 for index, model in enumerate(self.manifest.guard_models):
                     guard = self._evaluation(f"evaluation:candidate-{iteration}:development:guard-{index}", candidate, "development", model)
-                    guard_failed = any(
-                        (guard_def["direction"] == "at_most" and guard.get("guards", {}).get(guard_def["metric"], float("inf")) > guard_def["threshold"]) or
-                        (guard_def["direction"] == "at_least" and guard.get("guards", {}).get(guard_def["metric"], float("-inf")) < guard_def["threshold"])
-                        for guard_def in self.manifest.hard_guards)
+                    guard_failed = _guard_margin(guard, self.manifest.hard_guards) < 0
                     iteration_guards.append({"model": model, "passed": not guard_failed})
                     if guard_failed:
                         last_decision = {**last_decision, "accepted": False, "guard_model_failure": model}
@@ -387,7 +385,7 @@ class CampaignEngine:
             last_reflection = self._provider_session("reflect", {
                 "schema": "pi.optimizer-reflection-input/v2", "classification": classification,
                 "stochasticity_check": "matched case, seed, repetition, and randomized-arm ledger",
-                "generalization_validated": bool(candidate_dev is not None), "candidate_id": candidate.candidate_id,
+                "generalization_validated": bool(candidate_dev is not None and last_decision["accepted"]), "candidate_id": candidate.candidate_id,
             }, iteration)
             if candidate_dev is not None and last_decision["accepted"]:
                 positive_lessons.append(last_reflection["lesson"])

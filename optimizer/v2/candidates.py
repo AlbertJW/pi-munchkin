@@ -28,7 +28,13 @@ class Candidate:
     diff: str
     diff_sha256: str
     changed_units: tuple[str, ...]
-    provenance: dict
+    _provenance_json: str = dataclasses.field(repr=False)
+
+    @property
+    def provenance(self) -> dict:
+        # frozen=True only freezes field assignment, not nested dictionaries.
+        # Keep the addressed bytes immutable and expose detached JSON values.
+        return json.loads(self._provenance_json)
 
     @classmethod
     def create(cls, *, parent_ids: tuple[str, ...], mutation_family: str,
@@ -48,7 +54,7 @@ class Candidate:
         }
         candidate_id = "sha256:" + hashlib.sha256(_canonical(body)).hexdigest()
         return cls(candidate_id, parent_ids, mutation_family, hypothesis, predicted_mechanism,
-                   expected_exposure, diff, body["diff_sha256"], changed_units, dict(provenance))
+                   expected_exposure, diff, body["diff_sha256"], changed_units, _canonical(provenance).decode())
 
     def to_dict(self) -> dict:
         return {

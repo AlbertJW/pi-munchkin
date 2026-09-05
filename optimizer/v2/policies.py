@@ -15,9 +15,15 @@ def _cells(evaluation: dict) -> dict[tuple[str, int, int], dict]:
         raise PolicyError("evaluation has no observations")
     cells = {}
     for row in observations:
+        if not isinstance(row, dict):
+            raise PolicyError("evaluation contains a malformed observation")
         key = (row.get("case_id"), row.get("seed"), row.get("repetition", 0))
-        if not isinstance(key[0], str) or not isinstance(key[1], int) or key in cells:
+        if (not isinstance(key[0], str) or not key[0] or type(key[1]) is not int
+                or type(key[2]) is not int or key[2] < 0 or key in cells):
             raise PolicyError("evaluation contains malformed or duplicate paired cells")
+        value = row.get("score")
+        if type(value) not in (int, float) or not math.isfinite(value):
+            raise PolicyError("evaluation score must be a finite number")
         cells[key] = row
     return cells
 
@@ -45,7 +51,7 @@ def _guards_pass(evaluation: dict, guards: Iterable[dict]) -> tuple[bool, list[s
     failures = []
     for guard in guards:
         value = measured.get(guard["metric"])
-        if not isinstance(value, (int, float)) or isinstance(value, bool):
+        if not isinstance(value, (int, float)) or isinstance(value, bool) or not math.isfinite(value):
             failures.append(f"missing guard metric {guard['metric']}")
         elif guard["direction"] == "at_most" and value > guard["threshold"]:
             failures.append(f"{guard['metric']} exceeds {guard['threshold']}")
@@ -79,11 +85,14 @@ def accept_training_candidate(parent: dict, candidate: dict, campaign) -> dict:
     classification = matched_classification(parent, candidate)
     policy = campaign.primary_metric["paired_policy"]
     if campaign.primary_metric["kind"] == "binary":
+        if any(row["score"] not in (0, 1) for row in [*before.values(), *after.values()]):
+            raise PolicyError("binary outcomes must be zero or one")
         if policy["name"] != "exact-sign":
             raise PolicyError("binary campaigns require exact-sign paired policy")
         minimum = policy.get("minimum_net_fixes", 1)
-        improved = classification["fixed"] - classification["regressed"] >= minimum
-        policy_detail = {"net_fixes": classification["fixed"] - classification["regressed"], "minimum_net_fixes": minimum}
+        net_fixes = (classification["fixed"] - classification["regressed"]) * direction
+        improved = net_fixes >= minimum
+        policy_detail = {"net_fixes": net_fixes, "minimum_net_fixes": minimum}
     else:
         if policy["name"] != "paired-permutation":
             raise PolicyError("continuous campaigns require paired-permutation policy")
@@ -103,4 +112,3 @@ def accept_training_candidate(parent: dict, candidate: dict, campaign) -> dict:
 def score(evaluation: dict) -> float:
     cells = _cells(evaluation)
     return sum(value["score"] for value in cells.values()) / len(cells)
-

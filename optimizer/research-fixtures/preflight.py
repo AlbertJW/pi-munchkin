@@ -24,7 +24,7 @@ from typing import Any
 ROOT = pathlib.Path(__file__).resolve().parent
 REPO = ROOT.parents[1]
 HEX64 = re.compile(r"^[0-9a-f]{64}$")
-DEFAULT_SOURCE = "ae60bdc167b12add717649056019748f42a423315630424ef988f5121cfcc175"
+DEFAULT_SOURCE = "c220e38316866124b2dfe9e4e50e9b9ee1dde878aa4ccb20adafbc3128d9427e"
 DEFAULT_LOADED = "41ff832c8df9fbc611b8192384bcc2959073435686db60f68dc01839d820f97d"
 DEFAULT_MODEL = "local-llamacpp/qwen36-35b-iq3s"
 REQUIRED_KINDS = {"comparative", "contested", "multi_part"}
@@ -121,6 +121,11 @@ def _validate_config(label: str, expected: dict) -> dict[str, Any]:
     return raw
 
 
+def _require_surface_match(actual: str, expected: str, label: str) -> None:
+    if actual != expected:
+        raise PreflightError(f"{label} surface hash does not match the preregistration")
+
+
 def run_preflight(
     *, agent_dir: pathlib.Path, expected_source: str, expected_loaded: str,
     model: str, node_bin: str = "node",
@@ -132,11 +137,9 @@ def run_preflight(
     if model != DEFAULT_MODEL or any(char in model for char in "\r\n"):
         raise PreflightError(f"model must be the preregistered subject {DEFAULT_MODEL}")
     source = _source_hash(node_bin=node_bin)
-    if source != expected_source:
-        raise PreflightError("source surface hash does not match the preregistration")
+    _require_surface_match(source, expected_source, "source")
     loaded = _surface_hash(agent_dir, node_bin=node_bin)
-    if loaded != expected_loaded:
-        raise PreflightError("loaded surface hash does not match the preregistration")
+    _require_surface_match(loaded, expected_loaded, "loaded")
     configs = {label: _validate_config(label, expected) for label, expected in CONFIGS.items()}
     admission = _load_admission_module()
     records = admission.check_slate()
@@ -162,15 +165,22 @@ def selftest() -> None:
     assert len(records) >= 3
     assert REQUIRED_KINDS.issubset({record["kind"] for record in records})
     assert COMPLETION_FIXTURE_ID in {record["fixture_id"] for record in records}
-    # Keep the no-argument dry command honest when the model-visible source
-    # surface moves.  A stale frozen default must fail this selftest instead of
-    # leaving the planner launcher apparently ready against the wrong surface.
-    assert DEFAULT_SOURCE == _source_hash(node_bin="node")
+    # Verification tests the binding mechanism, not an experiment's readiness.
+    # --dry still resolves both actual surfaces and rejects stale identities.
+    assert HEX64.fullmatch(DEFAULT_SOURCE) and HEX64.fullmatch(DEFAULT_LOADED)
+    for label in ("source", "loaded"):
+        _require_surface_match("a" * 64, "a" * 64, label)
+        try:
+            _require_surface_match("a" * 64, "b" * 64, label)
+        except PreflightError:
+            pass
+        else:
+            raise AssertionError("mismatched surfaces were accepted")
     for label, expected in CONFIGS.items():
         config = _validate_config(label, expected)
         assert config["thresholds"] == expected["thresholds"]
     assert _digest({"a": 1, "b": 2}) == _digest({"b": 2, "a": 1})
-    print("planner preflight selftest: OK (identity, config, fixture slate, no inference)")
+    print("planner preflight selftest: OK (identity rejection, config, fixture slate; campaign readiness requires --dry)")
 
 
 def main(argv: list[str] | None = None) -> int:

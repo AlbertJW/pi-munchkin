@@ -29,7 +29,7 @@ import {
   formatParallelSummaryText,
   isTerminalPlannedFailure,
   isTerminalPlannedFailureResult,
-  parseDelegationMode,
+  resolveDelegationMode,
   isResultError,
 } from "./types.js";
 import { ACTIVE_TOOL_PROMPTS } from "../../lib/active-tool-prompts.ts";
@@ -741,6 +741,7 @@ Use single mode for one task, parallel mode when tasks are independent and can r
 			"",
 			"Optional planned-research context:",
 			"  plan_context -> copy the exact object returned for that branch by research_plan_start; never invent or edit it.",
+			"  Planned research contexts always run in isolated spawn mode, even if mode=\"fork\" is supplied.",
 		] : []),
         "",
         'Example single:   { agent: "writer", task: "Rewrite README.md", mode: "spawn" }',
@@ -751,6 +752,11 @@ Use single mode for one task, parallel mode when tasks are independent and can r
         "Use spawn for isolated reproducible tasks. Use fork only when the child genuinely needs the current conversation, because it carries more context and may include sensitive material.",
       ] : undefined,
       parameters: SubagentParams,
+      // A model can emit multiple subagent calls in one response even when it
+      // says it will dispatch sequentially. Serialize the tool at Pi's
+      // execution boundary so those calls cannot race a single-slot local
+      // router or overlap parent-owned branch leases.
+      executionMode: "sequential",
 
       async execute(_toolCallId, params, signal, onUpdate, ctx) {
         const starterDiscovery = discoverAgentsWithStarter(ctx.cwd);
@@ -766,7 +772,12 @@ Use single mode for one task, parallel mode when tasks are independent and can r
           ? `${ctx.model.provider}/${ctx.model.id}`
           : undefined;
 
-        const delegationMode = parseDelegationMode(params.mode);
+        const plannedResearch = (params.plan_context as { depth?: unknown } | undefined)?.depth === 1 ||
+          (params.tasks?.some((task) => {
+            const depth = (task.plan_context as { depth?: unknown } | undefined)?.depth;
+            return depth === 1 || depth === 2;
+          }) ?? false);
+        const delegationMode = resolveDelegationMode(params.mode, plannedResearch);
         if (!delegationMode) {
           const fallbackDetails = makeDetailsFactory(
             discovery.projectAgentsDir,

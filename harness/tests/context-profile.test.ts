@@ -52,6 +52,28 @@ test("serving metadata wins over an optimistic registry value without changing t
 	assert.equal(profile.confidence, "measured");
 });
 
+test("sub-token context windows are invalid and calibration cannot follow redirects", async () => {
+	assert.equal(safeInputBudget(0.5), null);
+	const model = { id: "local", baseUrl: ["http", "://127.0.0.1:1234/v1"].join(""), contextWindow: 8192 };
+	let calls = 0;
+	const fetchFn = (async (_url: unknown, init?: RequestInit) => {
+		calls += 1;
+		assert.equal(init?.redirect, "error", "calibration must stay on the explicitly allowed endpoint");
+		return { ok: true, status: 200 } as Response;
+	}) as typeof fetch;
+	assert.equal((await calibrateContext({ model, profile: contextProfileFor(model), enabled: true, fetchFn })).ok, true);
+	const wrongProtocol = new URL(model.baseUrl);
+	wrongProtocol.protocol = "ftp:";
+	const credentialed = new URL(model.baseUrl);
+	credentialed.username = "fixture";
+	credentialed.password = "fixture";
+	for (const baseUrl of [wrongProtocol.href, credentialed.href]) {
+		const result = await calibrateContext({ model: { ...model, baseUrl }, profile: contextProfileFor(model), enabled: true, fetchFn });
+		assert.equal(result.failure, "unsafe_host");
+	}
+	assert.equal(calls, 1);
+});
+
 test("active calibration is isolated, local-only, bounded, and opt-in", async () => {
 	let calls = 0;
 	const model = { provider: "local", id: "ling", contextWindow: 8_192, baseUrl: ["http", "://127.0.0.1:1234/v1"].join("") };

@@ -28,7 +28,7 @@ import { initialToolSurface } from "../lib/session-bootstrap.ts";
 import { record } from "../lib/telemetry.ts";
 import { CORE_NAMES, profileFromEnvironment } from "./tool-activation.ts";
 import {
-	acceptGoal, blockGoal, cancelGoal, createGoal, goalAmbientSummary, goalsEnabled, inspectGoal, mutateGoal, pauseGoal, readCurrentGoal,
+	acceptGoal, blockGoal, cancelGoal, createGoal, goalAmbientSummary, goalContinuationDecision, goalsEnabled, inspectGoal, mutateGoal, pauseGoal, readCurrentGoal,
 	readExecutableGoal, readGoals, resumeGoal, settleGoal, updateGoal, GOAL_MAX_CRITERIA, GOAL_MODEL_TEXT_MAX_BYTES, goalScope, renderGoalRecoveryBrief,
 	type CriterionStatus, type DeferredGoalItem, type GoalInspectSection, type GoalState,
 } from "../lib/goal-state.ts";
@@ -91,6 +91,11 @@ type Autonomy = "lean" | "yolo";
 
 type PlanItem = GraphPlanItem;
 
+type MergeOutcome =
+	| { kind: "ignored" }
+	| { kind: "failed"; runId: string; failureClass: string; headTerminal: boolean; headTerminalAt?: string; openItems: number }
+	| { kind: "merged"; runId: string; children: number; leads: number; gaps: number; headTerminal: boolean; headTerminalAt?: string; openItems: number };
+
 type PlanState = {
 	schema_version: 4 | 5;
 	run_id: string;
@@ -117,6 +122,20 @@ let lastNotify: ((message: string) => void) | null = null;
 let reboundAnnounced = false;
 let pendingRebind: Promise<void> | null = null;
 let pendingBranchMerge: Promise<void> | null = null;
+// One autonomous offer per persisted goal revision. A model that makes no
+// durable progress cannot cause an unbounded follow-up loop; a changed goal
+// revision earns one fresh offer.
+const GOAL_CONTINUATION_OFFERS = "__pi_goal_continuation_offers_v1";
+function goalContinuationOffers(): Set<string> {
+	const shared = globalThis as Record<string, unknown>;
+	if (!(shared[GOAL_CONTINUATION_OFFERS] instanceof Set)) shared[GOAL_CONTINUATION_OFFERS] = new Set<string>();
+	return shared[GOAL_CONTINUATION_OFFERS] as Set<string>;
+}
+// A child result can arrive after the parent agent has ended. The merge may
+// make the graph terminal, but without a fresh parent turn the model never
+// rereads delegated sources or calls plan_settle. Keep one follow-up per
+// terminal generation (reopened branches receive a new head-terminal marker).
+const researchSynthesisFollowUps = new Set<string>();
 let awaitingReview = false;
 let planningSurfaceBefore: string[] | null = null;
 let planningSurfaceApplied: string[] | null = null;
@@ -1198,14 +1217,19 @@ const planSettle = defineTool({
 				})
 				: [];
 			const errors = settleErrors(previous as GraphPlanState, verified, evidenceCards);
-			if (errors.length) rejectPlanTool(`plan_settle rejected: ${errors.join("; ")}`);
+			if (errors.length) {
+				const claimRepair = errors.some((error) => /delegated source (?:lacks|not parent-verified)|claim evidence card|claim obligation/i.test(error))
+					? " Repair delegated evidence by rereading each unverified URL only once, then call research_note with the delegated claim text copied exactly (do not shorten or rewrite it) before retrying; do not search or redispatch."
+					: "";
+				rejectPlanTool(`plan_settle rejected: ${errors.join("; ")}.${claimRepair}`);
+			}
 			const next = { ...previous, summary: cleanText(params.summary), settled_at: isoNow() };
 			return { state: next, result: next };
 		});
 		const active = api?.getActiveTools() ?? [];
 		api?.setActiveTools(active.filter((name) => !["plan_write", "plan_update", "plan_expand", "plan_settle", "research_plan_start"].includes(name)));
 		planEvent("settled", state.run_id, { items: state.items.length, deferred: state.items.filter((item) => item.status === "deferred").length });
-		return { content: [{ type: "text" as const, text: "Plan settled. Planner guidance and task-scoped plan tools are no longer active." }], details: { tool_name: "plan_settle", success: true } };
+		return { content: [{ type: "text" as const, text: "Plan settled. Planner guidance and task-scoped plan tools are no longer active." }], details: { tool_name: "plan_settle", success: true }, terminate: true };
 	},
 });
 
@@ -1540,8 +1564,7 @@ export function policyBlock(_autonomy: Autonomy, subagentAvailable: boolean): st
 	return `Work one bounded plan item at a time. Update status by item ID.${subagentAvailable ? " Delegate only independent, well-scoped work." : ""}`;
 }
 
-async function mergeBranchResult(cwd: string, context: import("../lib/branch-report.ts").PlanContextV1, report: BranchReportV1 | null, failureClass: string | null): Promise<void> {
-	type MergeOutcome = { kind: "ignored" } | { kind: "failed"; runId: string; failureClass: string } | { kind: "merged"; runId: string; children: number; leads: number; gaps: number };
+async function mergeBranchResult(cwd: string, context: import("../lib/branch-report.ts").PlanContextV1, report: BranchReportV1 | null, failureClass: string | null): Promise<MergeOutcome> {
 	const releaseLease = (item: PlanItem): PlanItem => {
 		if (!item.lease || item.owner_ref !== context.owner_ref) return item;
 		const next = { ...item };
@@ -1556,12 +1579,13 @@ async function mergeBranchResult(cwd: string, context: import("../lib/branch-rep
 		const items = previous.items.map((item) => item.id === parent.id ? {
 			...consumeUncertainBudget(releaseLease(item)), status: "blocked" as const, note: `Delegated branch failed: ${failure}.`, evidence_gaps: [`branch:${failure}`],
 		} : item);
-		const state = { ...previous, items, ...(items.every((item) => graphTerminal(item)) ? { head_terminal_at: previous.head_terminal_at ?? isoNow() } : { head_terminal_at: undefined }) };
+		const headTerminal = items.every((item) => graphTerminal(item));
+		const state = { ...previous, items, ...(headTerminal ? { head_terminal_at: previous.head_terminal_at ?? isoNow() } : { head_terminal_at: undefined }) };
 		// The fallback state deliberately contains no incoming child claims. It is
 		// therefore safe to persist even when the report that triggered the merge
 		// violated a graph invariant.
 		validateStateSize(state);
-		return { state, result: { kind: "failed", runId: previous.run_id, failureClass: failure } };
+		return { state, result: { kind: "failed", runId: previous.run_id, failureClass: failure, headTerminal, headTerminalAt: state.head_terminal_at, openItems: openItemCount(state) } };
 	};
 	let outcome: MergeOutcome;
 	try {
@@ -1582,8 +1606,9 @@ async function mergeBranchResult(cwd: string, context: import("../lib/branch-rep
 				...(failure === "child_failed" ? releaseLease(item) : consumeUncertainBudget(releaseLease(item))),
 				status: "blocked" as const, note: `Delegated branch failed: ${failure}.`, evidence_gaps: [`branch:${failure}`],
 			} : item);
-			const state = { ...previous, items, ...(items.every((item) => graphTerminal(item)) ? { head_terminal_at: previous.head_terminal_at ?? isoNow() } : { head_terminal_at: undefined }) };
-			return { state, result: { kind: "failed", runId: previous.run_id, failureClass: failure } };
+			const headTerminal = items.every((item) => graphTerminal(item));
+			const state = { ...previous, items, ...(headTerminal ? { head_terminal_at: previous.head_terminal_at ?? isoNow() } : { head_terminal_at: undefined }) };
+			return { state, result: { kind: "failed", runId: previous.run_id, failureClass: failure, headTerminal, headTerminalAt: state.head_terminal_at, openItems: openItemCount(state) } };
 		}
 		const incomingIds = new Set(report.children.map((child) => child.item_id));
 		const collision = previous.items.find((item) => incomingIds.has(item.id) && item.parent_id !== parent.id);
@@ -1606,10 +1631,11 @@ async function mergeBranchResult(cwd: string, context: import("../lib/branch-rep
 			evidence_gaps: report.evidence_gaps.map(cleanText).filter(Boolean), source_leads: report.source_leads.map((lead) => storedUrl(lead.url).display),
 			claim_ids: [...new Set(report.source_leads.map((lead) => claimIdForText(lead.claim)))], coverage: report.coverage,
 		} : item).concat(children);
-		const next = { ...previous, items, ...(items.every((item) => graphTerminal(item)) ? { head_terminal_at: previous.head_terminal_at ?? isoNow() } : { head_terminal_at: undefined }) };
+		const headTerminal = items.every((item) => graphTerminal(item));
+		const next = { ...previous, items, ...(headTerminal ? { head_terminal_at: previous.head_terminal_at ?? isoNow() } : { head_terminal_at: undefined }) };
 		try { validateStateSize(next); }
 		catch { return blockParent(previous, parent, "merge_rejected"); }
-		return { state: next, result: { kind: "merged", runId: previous.run_id, children: children.length, leads: report.source_leads.length, gaps: report.evidence_gaps.length } };
+		return { state: next, result: { kind: "merged", runId: previous.run_id, children: children.length, leads: report.source_leads.length, gaps: report.evidence_gaps.length, headTerminal, headTerminalAt: next.head_terminal_at, openItems: openItemCount(next) } };
 		});
 	} catch {
 		// Unexpected merge failures (for example a transient report projection
@@ -1628,6 +1654,46 @@ async function mergeBranchResult(cwd: string, context: import("../lib/branch-rep
 	}
 	if (outcome.kind === "merged") planEvent("branch-merged", outcome.runId, { children: outcome.children, lead_count: outcome.leads, evidence_gaps: outcome.gaps });
 	if (outcome.kind === "failed") planEvent("branch-failed", outcome.runId, { failure_class: outcome.failureClass });
+	return outcome;
+}
+
+const RESEARCH_SYNTHESIS_FOLLOW_UP = [
+	"[pi-munchkin:research-synthesis-follow-up]",
+	"Delegated research branches have returned and the parent graph is now terminal.",
+	"Act as the parent synthesizer for this run:",
+	"1. Reread every delegated source lead with web_read; do not trust child quotes or summaries.",
+	"2. Record one parent-validated research_note/evidence card for each material claim you will use.",
+	"3. If all required evidence is validated and only explicit deferred work remains, call plan_settle.",
+	"If a branch is blocked or a required card is still missing, do not force settlement: leave the bounded gap explicit with its value, risk, and rationale. Do not start fresh searches or delegate again.",
+].join("\n");
+
+async function queueResearchSynthesisFollowUp(outcome: MergeOutcome): Promise<void> {
+	if (!api || outcome.kind === "ignored" || !outcome.headTerminal || !outcome.headTerminalAt) return;
+	// A branch result can race the parent's final settlement. Never enqueue a
+	// stale synthesis turn after the authoritative graph has already settled;
+	// Pi drains follow-ups after a terminating tool batch.
+	if (lastSessionCwd) {
+		const current = await readState(lastSessionCwd);
+		if (current?.settled_at) return;
+	}
+	// Respect an explicit tool selection. A follow-up that asks for unavailable
+	// web_read/plan_settle tools would only make a small model spin on an
+	// impossible contract; graph start normally guarantees these are active.
+	const active = api.getActiveTools();
+	if (!active.includes("web_read") || !active.includes("plan_settle")) return;
+	const key = `${outcome.runId}:${outcome.headTerminalAt}`;
+	if (researchSynthesisFollowUps.has(key)) return;
+	if (researchSynthesisFollowUps.size >= 24) {
+		const oldest = researchSynthesisFollowUps.values().next().value;
+		if (typeof oldest === "string") researchSynthesisFollowUps.delete(oldest);
+	}
+	researchSynthesisFollowUps.add(key);
+	api.sendMessage({
+		customType: "pi-munchkin:research-synthesis-follow-up",
+		content: `${RESEARCH_SYNTHESIS_FOLLOW_UP}\n\nOpen graph items: ${outcome.openItems}.`,
+		display: true,
+		details: { run_id_hash: signalRunId(outcome.runId), open_items: outcome.openItems },
+	}, { deliverAs: "followUp", triggerTurn: true });
 }
 
 /**
@@ -1706,6 +1772,8 @@ export default function (pi: ExtensionAPI): void {
 		delete (globalThis as Record<string, unknown>).__pi_active_plan_context;
 		delete (globalThis as Record<string, unknown>).__pi_active_goal_context;
 		lastSessionCwd = ctx.cwd;
+		researchSynthesisFollowUps.clear();
+		goalContinuationOffers().clear();
 		rememberModel(ctx);
 		if (GOALS_ENABLED) await rebindActiveGoal(ctx.cwd);
 		lastNotify = (message: string) => ctx.ui.notify(message, "info");
@@ -1762,7 +1830,10 @@ export default function (pi: ExtensionAPI): void {
 			// parent-state mutation through this subscriber.
 			if (delegatedBranchProcess || (globalThis as Record<string, unknown>)[DELEGATED_BRANCH_PROCESS_GLOBAL] === true) return;
 			const prior = pendingBranchMerge ?? Promise.resolve();
-			const next = prior.catch(() => undefined).then(() => mergeBranchResult(lastSessionCwd!, signal.context, signal.report, signal.failureClass)).catch(() => undefined);
+			const next = prior.catch(() => undefined).then(async () => {
+				const outcome = await mergeBranchResult(lastSessionCwd!, signal.context, signal.report, signal.failureClass);
+				await queueResearchSynthesisFollowUp(outcome);
+			}).catch(() => undefined);
 			pendingBranchMerge = next;
 			void next.finally(() => { if (pendingBranchMerge === next) pendingBranchMerge = null; });
 		}
@@ -1944,7 +2015,59 @@ export default function (pi: ExtensionAPI): void {
 			if (closed) planEvent("branches-closed", closed.runId, { closed: closed.closed, reason_class: "parent_ended_before_dispatch" });
 		}
 		const state = await readState(ctx.cwd);
-		if (!state || state.phase !== "executing" || openItemCount(state) === 0) return;
-		record("plan-runner", "ended-open", { run_id: state.run_id, open_items: openItemCount(state) });
+		if (state && state.phase === "executing" && openItemCount(state) > 0) {
+			record("plan-runner", "ended-open", { run_id: state.run_id, open_items: openItemCount(state) });
+		}
+		if (!GOALS_ENABLED || IS_SUBAGENT_PROCESS) return;
+		const goal = await readExecutableGoal(ctx.cwd);
+		const decision = goalContinuationDecision(goal);
+		if (decision === "stop" || !goal) return;
+		const revision = createHash("sha256").update(JSON.stringify(goal)).digest("hex");
+		const offerKey = `${goal.goal_id}:${revision}`;
+		if (goalContinuationOffers().has(offerKey)) return;
+		goalContinuationOffers().add(offerKey);
+		const instruction = decision === "settle"
+			? goal.criteria.some((criterion) => criterion.status === "deferred")
+				? "[pi-munchkin:goal-continuation] Required criteria are met and optional work is deferred. Verify the delivered value, then call goal_settle with outcome=accepted_80_20, concrete evidence, and value, risk, and rationale for the deferrals. If evidence is insufficient, leave the goal active and explain the gap."
+				: "[pi-munchkin:goal-continuation] All goal criteria are recorded as met. Perform the final verification you can justify, then call goal_settle with outcome=complete and concrete evidence; if evidence is insufficient, leave the goal active and explain the gap."
+			: "[pi-munchkin:goal-continuation] The active goal still has open criteria. Continue with one highest-value next action, then record the resulting evidence with goal_update. Do not repeat work that produced no new evidence.";
+		try {
+			pi.sendMessage({ customType: "pi-munchkin:goal-continuation", content: instruction, display: true, details: { goal_id_hash: createHash("sha256").update(goal.goal_id).digest("hex"), decision } }, { deliverAs: "followUp", triggerTurn: true });
+		} catch { /* session may have been replaced at agent_end */ }
+	});
+	pi.on("input", async (event, ctx) => {
+		if (event.source !== "extension") return { action: "continue" as const };
+		if (event.text.startsWith("[pi-munchkin:goal-continuation]")) {
+			if (goalContinuationDecision(await readExecutableGoal(ctx.cwd)) === "stop") return { action: "handled" as const };
+		}
+		if (event.text.startsWith("[pi-munchkin:research-citation-guard]")) {
+			const goal = (globalThis as Record<string, unknown>).__pi_active_goal_context as { status?: unknown } | undefined;
+			if (goal && goal.status !== "active") return { action: "handled" as const };
+		}
+		if (event.text.startsWith("[pi-munchkin:research-synthesis-follow-up]") && lastSessionCwd) {
+			if ((await readState(lastSessionCwd))?.settled_at) return { action: "handled" as const };
+		}
+		return { action: "continue" as const };
+	});
+	// Extension callbacks return { messages }; Pi's dispatcher returns the array.
+	pi.on("context", async (event, ctx) => {
+		const messages = event.messages;
+		const sessionCwd = ctx.cwd ?? lastSessionCwd;
+		const executableGoal = sessionCwd ? await readExecutableGoal(sessionCwd) : undefined;
+		const goalInactive = !GOALS_ENABLED || goalContinuationDecision(executableGoal) === "stop";
+		const goalIdHash = executableGoal ? createHash("sha256").update(executableGoal.goal_id).digest("hex") : undefined;
+		const goalContext = (globalThis as Record<string, unknown>).__pi_active_goal_context as { status?: unknown } | undefined;
+		const planSettled = sessionCwd ? Boolean((await readState(sessionCwd))?.settled_at) : false;
+		const filtered = messages.filter((message) => {
+			if (message?.role !== "custom" || typeof message.content !== "string") return true;
+			if (message.content.startsWith("[pi-munchkin:goal-continuation]")) {
+				const details = message.details as { goal_id_hash?: unknown } | undefined;
+				return !goalInactive && details?.goal_id_hash === goalIdHash;
+			}
+			if (message.content.startsWith("[pi-munchkin:research-citation-guard]")) return !(goalContext && goalContext.status !== "active");
+			if (message.content.startsWith("[pi-munchkin:research-synthesis-follow-up]")) return !planSettled;
+			return true;
+		});
+		return filtered.length === messages.length ? undefined : { messages: filtered };
 	});
 }

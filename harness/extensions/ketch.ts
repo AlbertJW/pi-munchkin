@@ -333,6 +333,12 @@ export function registerKetch(pi: ExtensionAPI, dependencies: KetchDependencies 
 			if (legacyActed) pi.sendUserMessage(msg, { deliverAs: "steer" });
 		});
 		pi.on("agent_end", async (event) => {
+			// Goal settlement/pause/cancellation is authoritative. A citation
+			// correction queued by this handler must never revive an inactive goal
+			// after its terminating turn; ordinary research sessions have no goal
+			// context and retain the guard.
+			const goalContext = (globalThis as Record<string, unknown>).__pi_active_goal_context as { status?: unknown } | undefined;
+			if (goalContext && goalContext.status !== "active") return;
 			// Keep one guard allowance across retries, compaction, and queued
 			// continuation turns. Reset only at settled/session boundaries; Pi emits
 			// agent_start for every continue(), so resetting there would loop forever.
@@ -354,7 +360,7 @@ export function registerKetch(pi: ExtensionAPI, dependencies: KetchDependencies 
 			lastCitationAudit = audit;
 			if (citationGuardFired || audit.unverified.length === 0) return;
 			citationGuardFired = true;
-			const correction = "Your answer contains a source URL that this parent session has not verified. Before finalizing, reread each cited page with web_read and record a short verbatim quote with research_note, or mark the affected claim [unverified]. Do not present an unverified citation as established fact.";
+			const correction = "[pi-munchkin:research-citation-guard] Your answer contains a source URL that this parent session has not verified. Before finalizing, reread each cited page with web_read and record a short verbatim quote with research_note, or mark the affected claim [unverified]. Do not present an unverified citation as established fact.";
 			record("research", "citation-guard", {
 				cited: audit.cited.length, unverified: audit.unverified.length,
 				explicitly_unverified: audit.explicitlyUnverified.length,

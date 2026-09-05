@@ -33,7 +33,7 @@ const FALLBACK_WINDOW = 8_192;
 const DEFAULT_OVERHEAD = 1_024;
 
 function finitePositive(value: unknown): number | null {
-	return typeof value === "number" && Number.isFinite(value) && value > 0 ? Math.floor(value) : null;
+	return typeof value === "number" && Number.isFinite(value) && value >= 1 ? Math.floor(value) : null;
 }
 function isoNow(): string { return new Date().toISOString(); }
 function hash(value: string): string { return createHash("sha256").update(value).digest("hex"); }
@@ -120,7 +120,9 @@ export type CalibrationResult = { ok: boolean; status: number | null; safe_input
 
 function probeableHost(baseUrl: string): boolean {
 	try {
-		const hostname = new URL(baseUrl).hostname.toLowerCase().replace(/^\[|\]$/g, "");
+		const url = new URL(baseUrl);
+		if (!["http:", "https:"].includes(url.protocol) || url.username || url.password) return false;
+		const hostname = url.hostname.toLowerCase().replace(/^\[|\]$/g, "");
 		if (hostname === "localhost" || hostname.endsWith(".localhost")) return true;
 		const ip = isIP(hostname);
 		return ip === 4 ? hostname.startsWith("10.") || hostname.startsWith("192.168.") || hostname.startsWith("127.") || hostname.startsWith("169.254.") || /^172\.(1[6-9]|2\d|3[0-1])\./.test(hostname) : ip === 6 && (hostname === "::1" || hostname.startsWith("fc") || hostname.startsWith("fd"));
@@ -147,7 +149,7 @@ export async function calibrateContext(input: {
 	const timer = setTimeout(() => controller.abort(), input.timeoutMs ?? 3_000);
 	try {
 		const response = await fetchFn(`${base}/chat/completions`, {
-			method: "POST", signal: controller.signal,
+			method: "POST", signal: controller.signal, redirect: "error",
 			headers: { "content-type": "application/json", "x-pi-munchkin-calibration": "v1" },
 			body: JSON.stringify({ model: String(input.model.id ?? ""), messages: [{ role: "user", content: "Return one token: OK" }], max_tokens: 1, stream: false }),
 		});

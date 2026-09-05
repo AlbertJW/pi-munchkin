@@ -4,10 +4,32 @@ import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import test from "node:test";
 import {
-	acceptGoal, blockGoal, cancelGoal, createGoal, goalAmbientSummary, goalContextBudget, goalScopeIdentity, goalStoragePath, inspectGoal,
+	acceptGoal, blockGoal, cancelGoal, createGoal, goalAmbientSummary, goalContextBudget, goalContinuationDecision, goalScopeIdentity, goalStoragePath, inspectGoal,
 	mutateGoal, pauseGoal, readCurrentGoal, readExecutableGoal, readGoal, readGoals, settleGoal, updateGoal, validateGoal,
 	renderGoalRecoveryBrief,
 } from "../lib/goal-state.ts";
+
+test("continuation policy is status-authoritative and bounded to useful work", () => {
+	const { cwd } = fixture();
+	const active = createGoal({ cwd, objective: "Continue only while criteria remain", criteria: [{ id: "one", text: "One thing", required: true }] });
+	assert.equal(goalContinuationDecision(active), "continue");
+	const met = updateGoal(active, { criteria: [{ id: "one", status: "met", evidence: ["verified"] }] });
+	assert.equal(goalContinuationDecision(met), "settle");
+	assert.equal(goalContinuationDecision({ ...met, status: "paused" }), "stop");
+});
+
+test("goal creation rejects oversized objectives instead of silently losing requirements", () => {
+	const { cwd } = fixture();
+	assert.throws(() => createGoal({ cwd, objective: "x".repeat(2_001) }), /exceeds/);
+});
+
+test("goal completion cannot claim evidence-free criteria or settlement", () => {
+	const { cwd } = fixture();
+	const goal = createGoal({ cwd, objective: "Require evidence", criteria: [{ id: "proof", text: "Proof exists", required: true }] });
+	assert.throws(() => updateGoal(goal, { criteria: [{ id: "proof", status: "met" }] }), /without evidence/);
+	const marked = updateGoal(goal, { criteria: [{ id: "proof", status: "met", evidence: ["test passed"] }] });
+	assert.throws(() => settleGoal(marked, { outcome: "complete", deliveredValue: "done", confidence: 1, residualRisks: [], evidence: [" "] }), /non-empty evidence/);
+});
 
 function fixture() {
 	const root = mkdtempSync(join(tmpdir(), "pi-goal-"));
@@ -15,6 +37,33 @@ function fixture() {
 	const cwd = join(root, "worktree");
 	return { root, env, cwd };
 }
+
+test("a damaged current ledger cannot revive an older active goal", async () => {
+	const { root, env, cwd } = fixture();
+	try {
+		const goal = createGoal({ cwd, objective: "Do not revive stopped work" });
+		const path = goalStoragePath(cwd, env);
+		mkdirSync(dirname(path), { recursive: true });
+		writeFileSync(path.replace("goal-v2.json", "goal-v1.json"), JSON.stringify({ ...goal, schema_version: 1 }));
+		assert.equal((await readExecutableGoal(cwd, env))?.goal_id, goal.goal_id, "migration still works when v2 is absent");
+		for (const damaged of ["{", "null", "{}"]) {
+			writeFileSync(path, damaged);
+			assert.equal(await readExecutableGoal(cwd, env), undefined, "existing v2 is authoritative even when damaged");
+		}
+	} finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+test("no-op goal updates preserve the revision and required criteria cannot be deferred", () => {
+	const { root, cwd } = fixture();
+	try {
+		const goal = createGoal({ cwd, objective: "Only real progress earns continuation" });
+		goal.updated_at = "2000-01-01T00:00:00.000Z";
+		assert.deepEqual(updateGoal(goal, {}), goal);
+		assert.throws(() => updateGoal(goal, { criteria: [{ id: "criterion-1", status: "deferred" }] }), /required.*deferred/);
+		const legacy = { ...goal, criteria: goal.criteria.map((criterion) => ({ ...criterion, status: "deferred" as const })) };
+		assert.equal(goalContinuationDecision(legacy), "continue");
+	} finally { rmSync(root, { recursive: true, force: true }); }
+});
 
 test("goal state is private, persistent, and supports an advisory proposal before activation", async () => {
 	const { root, env, cwd } = fixture();

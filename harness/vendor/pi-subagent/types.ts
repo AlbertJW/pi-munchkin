@@ -25,6 +25,18 @@ export function parseDelegationMode(raw: unknown): DelegationMode | null {
 }
 
 /**
+ * Planned research children are report-bearing, isolated workers.  They must
+ * not inherit the parent's transcript: fork mode multiplies the local model's
+ * context cost and can race the single-slot serving endpoint.  Ordinary
+ * follow-up delegation keeps the caller's explicit mode unchanged.
+ */
+export function resolveDelegationMode(raw: unknown, plannedResearch: boolean): DelegationMode | null {
+  const parsed = parseDelegationMode(raw);
+  if (!parsed) return null;
+  return plannedResearch ? "spawn" : parsed;
+}
+
+/**
  * A depth-one planned research branch has an authoritative parent-side
  * lifecycle. Once its child process fails, the parent graph records that
  * branch as blocked; returning a generic tool error would invite a model to

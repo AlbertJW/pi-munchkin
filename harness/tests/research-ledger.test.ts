@@ -417,6 +417,29 @@ test("final research answers cannot leave an unread citation unverified", async 
 	}
 });
 
+test("citation correction cannot revive an inactive persistent goal", async () => {
+	const dir = mkdtempSync(join(tmpdir(), "rl-goal-settled-"));
+	const prevBin = process.env.KETCH_BIN;
+	const prevAgent = process.env.PI_CODING_AGENT_DIR;
+	process.env.KETCH_BIN = mockKetchBin(dir);
+	process.env.PI_CODING_AGENT_DIR = join(dir, "agent");
+	const ctxFor = { cwd: dir, ui: { notify() {} } };
+	try {
+		const fp = await loadKetch(true);
+		delete (globalThis as Record<string, unknown>).__pi_ketch_version_checks_v1;
+		(globalThis as Record<string, unknown>).__pi_active_goal_context = { status: "complete" };
+		fp.pi.setActiveTools(["web_search", "web_read", "research_note"]);
+		await fire(fp, "session_start", {}, ctxFor);
+		await callToolRaw(fp, "web_read", { urls: ["https://example.com/a"] }, dir);
+		await fire(fp, "agent_end", { messages: [{ role: "assistant", content: "citing https://unread.example/report" }] }, ctxFor);
+		assert.equal(fp.sent.length, 0);
+	} finally {
+		if (prevBin === undefined) delete process.env.KETCH_BIN; else process.env.KETCH_BIN = prevBin;
+		if (prevAgent === undefined) delete process.env.PI_CODING_AGENT_DIR; else process.env.PI_CODING_AGENT_DIR = prevAgent;
+		resetPiGlobals();
+	}
+});
+
 test("deep-research contracts remove verifier delegation and require parent re-read", () => {
 	const skill = readFileSync(new URL("../../skills/deep-research/SKILL.md", import.meta.url), "utf8");
 	const researcher = readFileSync(new URL("../agents/researcher.md", import.meta.url), "utf8");

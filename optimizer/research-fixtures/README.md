@@ -1,12 +1,18 @@
 # Planner research-fixture slate
 
 This directory is the fixture-admission boundary for the dark hierarchical
-deep-research mechanism screen. The four manifests are structural research
-instruments: comparative, contested, multi-part, and one deliberately
-completion-shaped comparative question. Each declares independent evidence
-families, bounded source references, a negative-control fact lookup, and a local
-oracle entrypoint. The negative controls are required to remain lightweight and
-must not activate `research_plan_start`.
+deep-research mechanism screen. The ten manifests are structural research
+instruments: comparative, contested, multi-part, and six deliberately
+completion-shaped comparative questions. The
+`compare-json-yaml-config-mini`, `compare-json-yaml-config-direct-mini`,
+`compare-json-yaml-config-canonical-mini`,
+`compare-json-yaml-config-settle-mini`,
+`compare-json-yaml-config-sequential-mini`, and
+`compare-json-yaml-config-exact-mini` manifests are the smaller
+completion-shaped prompts for the parent-synthesis diagnostic. Each declares
+independent evidence families, bounded source references, a negative-control
+fact lookup, and a local oracle entrypoint. The negative controls are required
+to remain lightweight and must not activate `research_plan_start`.
 
 Run `python3 optimizer/research-fixtures/admission.py --selftest` or
 `python3 optimizer/research-fixtures/admission.py check` to validate the slate.
@@ -15,6 +21,11 @@ manifests, call a provider, fetch a source, or launch Pi. The receipts are
 prerequisites for a future planner screen; they are not model-quality evidence.
 
 Before a screen, run the no-inference identity check:
+
+`preflight.py --selftest` checks the binding mechanism with deterministic
+identities; it does not establish campaign readiness. Only `--dry` resolves
+the actual source and loaded surfaces. It rejects stale preregistrations even
+when the repository's offline verification is green.
 
 ```sh
 python3 optimizer/research-fixtures/preflight.py --dry \

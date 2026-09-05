@@ -1,0 +1,49 @@
+{
+  "schema": "pi.research-fixture/v1",
+  "fixture_id": "compare-json-yaml-config-exact-mini",
+  "revision": "2026-09-04",
+  "kind": "comparative",
+  "prompt": {
+    "text": "Complete this bounded research task exactly: compare JSON and YAML for human-edited configuration. Call research_plan_start with exactly two branches, JSON and YAML, each budget {searches:0, reads:2}. Dispatch exactly one research-planner child for each branch; no scouts, no fork, no parallel dispatch, no searches, and no retries. The JSON child must read https://www.rfc-editor.org/info/rfc8259 once and publish done with exactly one source lead whose claim and quote are both exactly: JSON is a lightweight, text-based, language-independent data interchange format. The YAML child must read https://yaml.org/ once and publish done with exactly one source lead whose claim and quote are both exactly: YAML is a human-friendly data serialization language for all programming languages. After both reports are terminal, the parent must web_read both lead URLs once, record one parent-validated research_note per lead using the exact claim and quote text supplied by that lead, then call plan_settle with a summary shorter than 240 characters. If a source fails, mark only that branch deferred with value, risk, and rationale. Do not broaden or add evidence.",
+    "sha256": "b878fabe54b9ef35e7dd529f145a308356b8448a27ba9db22826c992ae944301"
+  },
+  "source_time_cutoff": "2026-09-04T00:00:00Z",
+  "evidence_families": [
+    {
+      "id": "json-primary",
+      "role": "primary",
+      "source_refs": [
+        {"id": "json-rfc", "url": "https://www.rfc-editor.org/info/rfc8259", "publisher": "RFC Editor"}
+      ]
+    },
+    {
+      "id": "yaml-primary",
+      "role": "primary",
+      "source_refs": [
+        {"id": "yaml-home", "url": "https://yaml.org/", "publisher": "YAML"}
+      ]
+    }
+  ],
+  "required_claims": [
+    {"id": "json-property", "evidence_family": "json-primary", "grading_rule": "cite-json-property"},
+    {"id": "yaml-property", "evidence_family": "yaml-primary", "grading_rule": "cite-yaml-property"}
+  ],
+  "negative_control": {
+    "text": "What are the two JSON structural types? Give a short answer from one official source.",
+    "sha256": "f5a8780cf908678b4656e995ab1386be082761d5a4d0f9fe17c36194c4317aec",
+    "expected_plan_start": false,
+    "max_source_reads": 1
+  },
+  "oracle": {
+    "schema": "pi.research-oracle/v1",
+    "entrypoint": "../oracles/research_shape.py",
+    "query_budget": 2,
+    "timeout_ms": 2000,
+    "output_cap_bytes": 4096
+  },
+  "provenance": {
+    "authoring_timestamp": "2026-09-04T00:00:00Z",
+    "model_snapshot_boundary": "qwen35b-parent-synthesis-diagnostic-2026-09-04",
+    "contamination_canary_hash": "3333333333333333333333333333333333333333333333333333333333333333"
+  }
+}

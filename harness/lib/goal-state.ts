@@ -83,6 +83,14 @@ export type GoalLedgerV2 = {
 	goals: GoalState[];
 };
 
+export type GoalContinuationDecision = "continue" | "settle" | "stop";
+
+/** Lifecycle-only policy; the model still chooses the next useful action. */
+export function goalContinuationDecision(goal: GoalState | undefined): GoalContinuationDecision {
+	if (!goal || goal.status !== "active") return "stop";
+	return goal.criteria.some((criterion) => criterion.status === "open" || (criterion.required && criterion.status !== "met")) ? "continue" : "settle";
+}
+
 const GOAL_ID = /^goal-[a-f0-9-]{8,80}$/;
 const CRITERION_ID = /^[A-Za-z0-9._:-]{1,64}$/;
 const MAX_TEXT = 2_000;
@@ -224,6 +232,7 @@ export function createGoal(input: {
 	status?: "active" | "proposed";
 	proposal?: { source: "skill" | "system"; note: string };
 }): GoalState {
+	if (typeof input.objective !== "string" || bytes(input.objective.trim()) > MAX_TEXT) throw new Error("goal objective exceeds the 2,000-byte limit");
 	const objective = clean(input.objective);
 	if (!objective) throw new Error("goal requires a non-empty objective");
 	const criteria = (input.criteria?.length ? input.criteria : [{ text: "Deliver the requested outcome with evidence.", required: true }]).map((item, index) => ({
@@ -303,12 +312,18 @@ export function updateGoal(goal: GoalState, input: {
 	for (const update of input.criteria ?? []) {
 		const criterion = byId.get(update.id);
 		if (!criterion) throw new Error(`unknown criterion ${update.id}`);
+		if (criterion.required && update.status === "deferred") throw new Error("required criteria cannot be deferred");
+		if (update.status === "met" && (!update.evidence || !update.evidence.some((entry) => clean(entry, MAX_SHORT)))) {
+			throw new Error(`criterion ${update.id} cannot be marked met without evidence`);
+		}
 		criterion.status = update.status;
 		if (update.evidence) criterion.evidence = [...new Set(update.evidence.map((entry) => clean(entry, MAX_SHORT)))].slice(0, MAX_LIST);
 	}
 	next.evidence = [...new Set([...next.evidence, ...(input.progressEvidence ?? []).map((entry) => clean(entry, MAX_SHORT))])].filter(Boolean).slice(-MAX_LIST);
 	next.residual_risks = (input.residualRisks ?? next.residual_risks).map((entry) => clean(entry, MAX_SHORT)).filter(Boolean).slice(0, MAX_LIST);
-	next.updated_at = now();
+	// Repeating an update without new evidence must not earn another autonomous
+	// continuation merely by changing its timestamp.
+	if (JSON.stringify(next) !== JSON.stringify(goal)) next.updated_at = now();
 	assertValid(next);
 	return next;
 }
@@ -326,6 +341,8 @@ export function settleGoal(goal: GoalState, input: {
 	if (!Number.isFinite(input.confidence) || input.confidence < 0 || input.confidence > 1) throw new Error("settlement confidence must be between 0 and 1");
 	const requiredOpen = goal.criteria.filter((criterion) => criterion.required && criterion.status !== "met");
 	if (requiredOpen.length) throw new Error(`required criteria remain open: ${requiredOpen.map((criterion) => criterion.id).join(", ")}`);
+	if (goal.criteria.some((criterion) => criterion.status === "met" && criterion.required && criterion.evidence.length === 0)) throw new Error("required met criteria must carry evidence");
+	if (!input.evidence.some((entry) => clean(entry, MAX_SHORT))) throw new Error("settlement requires non-empty evidence");
 	if (input.outcome === "complete" && goal.criteria.some((criterion) => criterion.status !== "met")) throw new Error("complete settlement requires every criterion to be met");
 	if (input.outcome === "accepted_80_20") {
 		// Correspondence, not a count: every unmet optional criterion must be
@@ -403,7 +420,12 @@ async function readGoalLedger(cwd: string, env: NodeJS.ProcessEnv): Promise<Goal
 			if (goal && goal.scope === scope && goal.cwd_hash === expectedHash) {
 				return { schema_version: GOAL_SCHEMA_VERSION, scope, cwd_hash: expectedHash, current_goal_id: ["complete", "cancelled"].includes(goal.status) ? null : goal.goal_id, goals: [goal] };
 			}
-		} catch { /* missing or malformed private state is fail-closed */ }
+			return undefined;
+		} catch (error) {
+			// Only absence permits migration. A damaged or unreadable current
+			// authority must never fall back to an older active goal.
+			if ((error as NodeJS.ErrnoException)?.code !== "ENOENT") return undefined;
+		}
 	}
 	return undefined;
 }

@@ -1,0 +1,49 @@
+{
+  "schema": "pi.research-fixture/v1",
+  "fixture_id": "compare-json-yaml-config-direct-mini",
+  "revision": "2026-09-04",
+  "kind": "comparative",
+  "prompt": {
+    "text": "Complete this bounded research task exactly: compare JSON and YAML for human-edited configuration. Call research_plan_start with two branches, JSON and YAML, each budget {searches:0, reads:1}. Put the assigned URL in each branch task: JSON https://www.rfc-editor.org/rfc/rfc8259; YAML https://yaml.org/spec/1.2.2/. Immediately dispatch one research-planner child per branch. Each child must web_read its assigned URL once and branch_plan done with one cited property and one limitation, using the original URL. When both reports are terminal, the parent must web_read each lead URL, record parent-validated cards using the exact claim text, then call plan_settle. Do not search, delegate again, or broaden the question. Return a short conditional recommendation; if a source fails, mark only that branch deferred with value, risk, and rationale.",
+    "sha256": "815827275101f654e9a9b6b10ed2a1baf22490f89899c980e6b9c4443022002f"
+  },
+  "source_time_cutoff": "2026-09-04T00:00:00Z",
+  "evidence_families": [
+    {
+      "id": "json-primary",
+      "role": "primary",
+      "source_refs": [
+        {"id": "json-rfc", "url": "https://www.rfc-editor.org/rfc/rfc8259", "publisher": "RFC Editor"}
+      ]
+    },
+    {
+      "id": "yaml-primary",
+      "role": "primary",
+      "source_refs": [
+        {"id": "yaml-spec", "url": "https://yaml.org/spec/1.2.2/", "publisher": "YAML"}
+      ]
+    }
+  ],
+  "required_claims": [
+    {"id": "json-tradeoff", "evidence_family": "json-primary", "grading_rule": "cite-json-property-and-limitation"},
+    {"id": "yaml-tradeoff", "evidence_family": "yaml-primary", "grading_rule": "cite-yaml-property-and-limitation"}
+  ],
+  "negative_control": {
+    "text": "What are the two JSON structural types? Give a short answer from one official source.",
+    "sha256": "f5a8780cf908678b4656e995ab1386be082761d5a4d0f9fe17c36194c4317aec",
+    "expected_plan_start": false,
+    "max_source_reads": 1
+  },
+  "oracle": {
+    "schema": "pi.research-oracle/v1",
+    "entrypoint": "../oracles/research_shape.py",
+    "query_budget": 2,
+    "timeout_ms": 2000,
+    "output_cap_bytes": 4096
+  },
+  "provenance": {
+    "authoring_timestamp": "2026-09-04T00:00:00Z",
+    "model_snapshot_boundary": "qwen35b-parent-synthesis-diagnostic-2026-09-04",
+    "contamination_canary_hash": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
+  }
+}

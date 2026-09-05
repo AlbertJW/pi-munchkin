@@ -6,7 +6,7 @@ import { join } from "node:path";
 import { resolveSubagentTimeoutMs } from "../vendor/pi-subagent/timeout.ts";
 import { parseInheritedCliArgs } from "../vendor/pi-subagent/runner-cli.js";
 import { buildSubagentEnv } from "../vendor/pi-subagent/runner-env.js";
-import { normalizeCompletedResult, emptyUsage, isResultSuccess, type SingleResult } from "../vendor/pi-subagent/types.ts";
+import { normalizeCompletedResult, emptyUsage, isResultSuccess, resolveDelegationMode, type SingleResult } from "../vendor/pi-subagent/types.ts";
 import { isTerminalPlannedFailure, isTerminalPlannedFailureResult } from "../vendor/pi-subagent/types.ts";
 import { ownerRef } from "../lib/plan-graph.ts";
 import { callTool, fire, makeCtx, makeFakePi, resetPiGlobals } from "./integration-harness.ts";
@@ -25,6 +25,13 @@ test("planned research dispatch is serialized even when ordinary delegation allo
 	assert.equal(resolveTaskConcurrency(planned, 4), 1, "single-slot serving must not be outrun by graph fan-out");
 	assert.equal(resolveTaskConcurrency([{ plan_context: { depth: 2 } }], 4), 1, "scouts remain serialized within their owning child");
 	assert.equal(resolveTaskConcurrency([{}], 4), 4, "ordinary delegation keeps configured capacity");
+});
+
+test("planned research context cannot opt into fork mode", () => {
+	assert.equal(resolveDelegationMode("fork", true), "spawn", "planned children must not inherit the parent's transcript or single-slot fork race");
+	assert.equal(resolveDelegationMode(undefined, true), "spawn");
+	assert.equal(resolveDelegationMode("fork", false), "fork", "ordinary follow-up delegation retains explicit fork mode");
+	assert.equal(resolveDelegationMode("invalid", true), null);
 });
 
 test("planned depth-one branch failures are terminal, ordinary failures remain retryable", () => {
@@ -79,6 +86,20 @@ test("planned dispatch results give the parent one bounded next action", () => {
 	assert.match(plannedResultGuidance([{ ...base, branchReport: { status: "deferred" } }]), /all planned branches are terminal.*plan_settle/i);
 	assert.match(plannedResultGuidance([{ ...base, branchReport: { status: "blocked" } }]), /blocked branch prevents plan_settle/i);
 	assert.match(plannedResultGuidance([{ ...base, branchReportFailure: "missing_report" }]), /do not retry a failed branch/i);
+});
+
+test("planned dispatch guidance exposes bounded delegated leads for parent card mapping", () => {
+	const base = { agent: "research-planner", agentSource: "user", task: "branch", exitCode: 0, messages: [], stderr: "", usage: emptyUsage(), planContext: { depth: 1 } } as any;
+	const guidance = plannedResultGuidance([{
+		...base,
+		branchReport: {
+			status: "done",
+			source_leads: [{ url: "https://example.test/source", claim: "exact delegated claim", quote: "bounded quote" }],
+		},
+	}]);
+	assert.match(guidance, /delegated source leads/i);
+	assert.match(guidance, /https:\/\/example\.test\/source/);
+	assert.match(guidance, /exact delegated claim/);
 });
 
 test("subagent argv never inherits API keys", () => {
