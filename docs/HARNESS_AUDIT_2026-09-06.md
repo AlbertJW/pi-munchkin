@@ -84,6 +84,9 @@ The research preregistration remains frozen and stale for the new source;
 passing self-tests does not make it ready to execute. Planner/deep-research
 default flags and other dark candidates were not promoted.
 
-Changes are uncommitted. The worktree also contains earlier planner changes
-and preregistrations; isolate those carefully when forming reviewable commits.
-No push or mirror was performed during this audit.
+At the audit snapshot, changes were uncommitted and included earlier planner
+work and preregistrations. They were subsequently committed in `cac3926` and
+pushed with boundary documentation in `8badd9a`. The first live-sync attempt
+was refused before copying because a user Pi session remained open. See
+`NEXT_HARNESS_IMPROVEMENTS_2026-09-06.md` for the recommended follow-up order and
+`SURFACE_BOUNDARIES.md` for any later live receipt.
