@@ -232,6 +232,17 @@ hash.
 
 ---
 
+## Pending audit boundary — 2026-09-06
+
+Source commit `cac3926`, pending live sync: goal ledger recovery and continuation,
+context calibration routing, and research reservation containment. Package
+source SHA-256:
+`cebc32aa4d451ad9c06bbf2abfe5fd8864dd68070ccb87f8b9e3115d0efe4720`.
+Offline verification passes all six stages, including 728 harness tests.
+There is no new loaded-surface receipt and no mirror or model execution.
+Historical research fingerprints remain frozen; a future campaign needs a
+fresh preregistration. Full findings: `docs/HARNESS_AUDIT_2026-09-06.md`.
+
 ## Data at rest: where a research session actually lands (updated 2026-08-10)
 
 A surface hash bounds what the MODEL sees. It says nothing about what a session LEAVES. Those are

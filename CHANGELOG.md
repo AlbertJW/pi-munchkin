@@ -4,6 +4,19 @@ All notable changes to pi-munchkin are documented here. Releases follow semantic
 
 ## Unreleased
 
+### Fixed (2026-09-06 — source audit; pending release)
+
+Goal recovery no longer revives an older ledger when current state is damaged,
+no-op updates no longer renew continuation, and optional deferrals request
+80/20 settlement. Context calibration refuses redirects, and research
+reservation paths contain dot identifiers. Optimizer candidates and projections
+retain immutable authority; invalid numeric evidence fails closed, binary
+minimization follows its declared direction, and reflection reports validation
+only after guard success. Offline preflight self-tests are independent of
+campaign readiness; real readiness still requires matching frozen hashes.
+See `docs/HARNESS_AUDIT_2026-09-06.md` for regressions and limitations.
+
+
 ### Evaluated (2026-09-04 — hierarchical planner parent synthesis V3)
 
 After the parent-synthesis repair, an explicitly approved Qwen 35B diagnostic
