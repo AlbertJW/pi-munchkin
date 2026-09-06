@@ -21,7 +21,7 @@ Use the stable IDs below when referring to work, tests, commits, and evidence.
 
 | ID | Goal | Main outcome | Dependencies |
 |---|---|---|---|
-| G01 | Authoritative continuation and stopping | One owner decides whether another harness-driven turn may run | Implemented + offline verified (745/745 tests, 2026-09-06); live smoke pending explicit approval — evidence: `docs/evidence/G01.md` |
+| G01 | Authoritative continuation and stopping | One owner decides whether another harness-driven turn may run | Implemented + offline verified (746/746 tests, 2026-09-06); live smoke pending explicit approval — evidence: `docs/evidence/G01.md` |
 | G02 | Aggregate context admission | Every request fits a justified budget for its serving epoch | Use G01 for compaction/resume ownership |
 | G03 | Representative evaluation baseline | A reusable, trustworthy way to measure task benefit and harm | Fixture preparation can start immediately; freeze the measured baseline after G01/G02 |
 | G04 | Evidence-gap research orchestration | Bounded research reaches a supported answer or an explicit unresolved gap | G01/G02 for execution; G03 for evaluation |
