@@ -73,7 +73,11 @@ Object.assign(childEnv, {
 try {
 	const result = spawnSync(
 		process.execPath,
-		["--experimental-strip-types", "--test", ...tests],
+		// The harness deliberately shares process-local coordinators and event-bus
+		// identity across extension generations. Serial test execution is therefore
+		// part of the fixture contract; Node's default parallel top-level scheduling
+		// can reset a live compaction lease from an unrelated test.
+		["--experimental-strip-types", "--test-concurrency=1", "--test", ...tests],
 		{
 			cwd: process.cwd(),
 			env: childEnv,

@@ -26,6 +26,10 @@ import { claimIdForText, RESEARCH_EVIDENCE_CARDS_KEY } from "../lib/research-evi
 import { atomicWriteFile } from "../lib/private-artifact.ts";
 import { initialToolSurface } from "../lib/session-bootstrap.ts";
 import { record } from "../lib/telemetry.ts";
+import {
+	continuationDispatcherActive, emitContinuationRequest, hashContinuationIdentity,
+	type ContinuationRequestV1,
+} from "../lib/continuation-authority.ts";
 import { CORE_NAMES, profileFromEnvironment } from "./tool-activation.ts";
 import {
 	acceptGoal, blockGoal, cancelGoal, createGoal, goalAmbientSummary, goalContinuationDecision, goalsEnabled, inspectGoal, mutateGoal, pauseGoal, readCurrentGoal,
@@ -116,6 +120,7 @@ type ModelIdentity = { provider: string; id: string };
 let activeModel: ModelIdentity = { provider: "unknown", id: "unknown" };
 let api: ExtensionAPI | undefined;
 let lastSessionCwd: string | null = null;
+let lastSessionIdHash: string | null = null;
 // Captured at session_start so the LATE capsule-identity rebind — the only point at
 // which plan state is readable under the shipped defaults — can still reach the user.
 let lastNotify: ((message: string) => void) | null = null;
@@ -175,6 +180,56 @@ function planEvent(kind: string, runId: string, detail: Record<string, unknown> 
 		emitHarnessSignal(api.events, { v: 1, type: "plan/write", runIdHash: signalRunId(runId), items: detail.items, openItems: detail.open_items });
 	}
 	if (kind === "go") emitHarnessSignal(api.events, { v: 1, type: "plan/go", runIdHash: signalRunId(runId) });
+}
+
+function offerContinuation(
+	pi: ExtensionAPI,
+	request: ContinuationRequestV1,
+	authorize: () => boolean | Promise<boolean>,
+): void {
+	if (continuationDispatcherActive(pi.events)) {
+		emitContinuationRequest(pi.events, { request, authorize });
+	}
+}
+
+function goalContinuationInstruction(goal: GoalState, decision: "continue" | "settle"): string {
+	if (decision === "settle") {
+		return goal.criteria.some((criterion) => criterion.status === "deferred")
+			? "[pi-munchkin:goal-continuation] Required criteria are met and optional work is deferred. Verify the delivered value, then call goal_settle with outcome=accepted_80_20, concrete evidence, and value, risk, and rationale for the deferrals. If evidence is insufficient, leave the goal active and explain the gap."
+			: "[pi-munchkin:goal-continuation] All goal criteria are recorded as met. Perform the final verification you can justify, then call goal_settle with outcome=complete and concrete evidence; if evidence is insufficient, leave the goal active and explain the gap.";
+	}
+	return "[pi-munchkin:goal-continuation] The active goal still has open criteria. Continue with one highest-value next action, then record the resulting evidence with goal_update. Do not repeat work that produced no new evidence.";
+}
+
+async function offerGoalContinuation(pi: ExtensionAPI, ctx: { cwd: string; sessionManager: { getSessionId(): string } }): Promise<void> {
+	if (!GOALS_ENABLED || IS_SUBAGENT_PROCESS) return;
+	const goal = await readExecutableGoal(ctx.cwd);
+	const decision = goalContinuationDecision(goal);
+	if (decision === "stop" || !goal) return;
+	const revision = createHash("sha256").update(JSON.stringify(goal)).digest("hex");
+	const goalIdHash = createHash("sha256").update(goal.goal_id).digest("hex");
+	const sessionIdHash = hashContinuationIdentity(ctx.sessionManager?.getSessionId?.() ?? `compat:${ctx.cwd}`);
+	const offerKey = `${goal.goal_id}:${revision}`;
+	if (goalContinuationOffers().has(offerKey)) return;
+	goalContinuationOffers().add(offerKey);
+	offerContinuation(pi, {
+		v: 1,
+		session_id_hash: sessionIdHash,
+		owner_id_hash: goalIdHash,
+		generation: revision,
+		scope: "goal",
+		reason: "goal",
+		priority: 500,
+		idempotency_key: `goal:${sessionIdHash}:${goalIdHash}:${revision}:${decision}`,
+		message: goalContinuationInstruction(goal, decision),
+		expires_at_ms: Date.now() + 60_000,
+	}, async () => {
+		const current = await readExecutableGoal(ctx.cwd);
+		return Boolean(current &&
+			createHash("sha256").update(current.goal_id).digest("hex") === goalIdHash &&
+			createHash("sha256").update(JSON.stringify(current)).digest("hex") === revision &&
+			goalContinuationDecision(current) === decision);
+	});
 }
 
 function goalEvent(kind: string, goal: GoalState | undefined, detail: Record<string, unknown> = {}): void {
@@ -1668,7 +1723,7 @@ const RESEARCH_SYNTHESIS_FOLLOW_UP = [
 ].join("\n");
 
 async function queueResearchSynthesisFollowUp(outcome: MergeOutcome): Promise<void> {
-	if (!api || outcome.kind === "ignored" || !outcome.headTerminal || !outcome.headTerminalAt) return;
+	if (!api || !lastSessionCwd || !lastSessionIdHash || outcome.kind === "ignored" || !outcome.headTerminal || !outcome.headTerminalAt) return;
 	// A branch result can race the parent's final settlement. Never enqueue a
 	// stale synthesis turn after the authoritative graph has already settled;
 	// Pi drains follow-ups after a terminating tool batch.
@@ -1688,12 +1743,24 @@ async function queueResearchSynthesisFollowUp(outcome: MergeOutcome): Promise<vo
 		if (typeof oldest === "string") researchSynthesisFollowUps.delete(oldest);
 	}
 	researchSynthesisFollowUps.add(key);
-	api.sendMessage({
-		customType: "pi-munchkin:research-synthesis-follow-up",
-		content: `${RESEARCH_SYNTHESIS_FOLLOW_UP}\n\nOpen graph items: ${outcome.openItems}.`,
-		display: true,
-		details: { run_id_hash: signalRunId(outcome.runId), open_items: outcome.openItems },
-	}, { deliverAs: "followUp", triggerTurn: true });
+	const cwd = lastSessionCwd;
+	const runIdHash = signalRunId(outcome.runId);
+	const terminalGeneration = outcome.headTerminalAt;
+	offerContinuation(api, {
+		v: 1,
+		session_id_hash: lastSessionIdHash,
+		owner_id_hash: runIdHash,
+		generation: terminalGeneration,
+		scope: "plan",
+		reason: "research_synthesis",
+		priority: 350,
+		idempotency_key: `research-synthesis:${lastSessionIdHash}:${runIdHash}:${terminalGeneration}`,
+		message: `${RESEARCH_SYNTHESIS_FOLLOW_UP}\n\nOpen graph items: ${outcome.openItems}.`,
+		expires_at_ms: Date.now() + 60_000,
+	}, async () => {
+		const current = await readState(cwd);
+		return current?.run_id === outcome.runId && current.head_terminal_at === terminalGeneration && !current.settled_at;
+	});
 }
 
 /**
@@ -1772,6 +1839,7 @@ export default function (pi: ExtensionAPI): void {
 		delete (globalThis as Record<string, unknown>).__pi_active_plan_context;
 		delete (globalThis as Record<string, unknown>).__pi_active_goal_context;
 		lastSessionCwd = ctx.cwd;
+		lastSessionIdHash = hashContinuationIdentity(ctx.sessionManager?.getSessionId?.() ?? `compat:${ctx.cwd}`);
 		researchSynthesisFollowUps.clear();
 		goalContinuationOffers().clear();
 		rememberModel(ctx);
@@ -2018,56 +2086,6 @@ export default function (pi: ExtensionAPI): void {
 		if (state && state.phase === "executing" && openItemCount(state) > 0) {
 			record("plan-runner", "ended-open", { run_id: state.run_id, open_items: openItemCount(state) });
 		}
-		if (!GOALS_ENABLED || IS_SUBAGENT_PROCESS) return;
-		const goal = await readExecutableGoal(ctx.cwd);
-		const decision = goalContinuationDecision(goal);
-		if (decision === "stop" || !goal) return;
-		const revision = createHash("sha256").update(JSON.stringify(goal)).digest("hex");
-		const offerKey = `${goal.goal_id}:${revision}`;
-		if (goalContinuationOffers().has(offerKey)) return;
-		goalContinuationOffers().add(offerKey);
-		const instruction = decision === "settle"
-			? goal.criteria.some((criterion) => criterion.status === "deferred")
-				? "[pi-munchkin:goal-continuation] Required criteria are met and optional work is deferred. Verify the delivered value, then call goal_settle with outcome=accepted_80_20, concrete evidence, and value, risk, and rationale for the deferrals. If evidence is insufficient, leave the goal active and explain the gap."
-				: "[pi-munchkin:goal-continuation] All goal criteria are recorded as met. Perform the final verification you can justify, then call goal_settle with outcome=complete and concrete evidence; if evidence is insufficient, leave the goal active and explain the gap."
-			: "[pi-munchkin:goal-continuation] The active goal still has open criteria. Continue with one highest-value next action, then record the resulting evidence with goal_update. Do not repeat work that produced no new evidence.";
-		try {
-			pi.sendMessage({ customType: "pi-munchkin:goal-continuation", content: instruction, display: true, details: { goal_id_hash: createHash("sha256").update(goal.goal_id).digest("hex"), decision } }, { deliverAs: "followUp", triggerTurn: true });
-		} catch { /* session may have been replaced at agent_end */ }
-	});
-	pi.on("input", async (event, ctx) => {
-		if (event.source !== "extension") return { action: "continue" as const };
-		if (event.text.startsWith("[pi-munchkin:goal-continuation]")) {
-			if (goalContinuationDecision(await readExecutableGoal(ctx.cwd)) === "stop") return { action: "handled" as const };
-		}
-		if (event.text.startsWith("[pi-munchkin:research-citation-guard]")) {
-			const goal = (globalThis as Record<string, unknown>).__pi_active_goal_context as { status?: unknown } | undefined;
-			if (goal && goal.status !== "active") return { action: "handled" as const };
-		}
-		if (event.text.startsWith("[pi-munchkin:research-synthesis-follow-up]") && lastSessionCwd) {
-			if ((await readState(lastSessionCwd))?.settled_at) return { action: "handled" as const };
-		}
-		return { action: "continue" as const };
-	});
-	// Extension callbacks return { messages }; Pi's dispatcher returns the array.
-	pi.on("context", async (event, ctx) => {
-		const messages = event.messages;
-		const sessionCwd = ctx.cwd ?? lastSessionCwd;
-		const executableGoal = sessionCwd ? await readExecutableGoal(sessionCwd) : undefined;
-		const goalInactive = !GOALS_ENABLED || goalContinuationDecision(executableGoal) === "stop";
-		const goalIdHash = executableGoal ? createHash("sha256").update(executableGoal.goal_id).digest("hex") : undefined;
-		const goalContext = (globalThis as Record<string, unknown>).__pi_active_goal_context as { status?: unknown } | undefined;
-		const planSettled = sessionCwd ? Boolean((await readState(sessionCwd))?.settled_at) : false;
-		const filtered = messages.filter((message) => {
-			if (message?.role !== "custom" || typeof message.content !== "string") return true;
-			if (message.content.startsWith("[pi-munchkin:goal-continuation]")) {
-				const details = message.details as { goal_id_hash?: unknown } | undefined;
-				return !goalInactive && details?.goal_id_hash === goalIdHash;
-			}
-			if (message.content.startsWith("[pi-munchkin:research-citation-guard]")) return !(goalContext && goalContext.status !== "active");
-			if (message.content.startsWith("[pi-munchkin:research-synthesis-follow-up]")) return !planSettled;
-			return true;
-		});
-		return filtered.length === messages.length ? undefined : { messages: filtered };
+		await offerGoalContinuation(pi, ctx);
 	});
 }

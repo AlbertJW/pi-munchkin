@@ -8,7 +8,9 @@ import { runCapsuleMode } from "../lib/run-capsule-store.ts";
 import { onRunStateSnapshot } from "../lib/run-kernel-snapshot.ts";
 import { renderRecoveryBrief } from "../lib/recovery-brief.ts";
 import type { RunStateV1 } from "../lib/run-kernel-types.ts";
-import { goalsEnabled, readGoal, renderGoalRecoveryBrief } from "../lib/goal-state.ts";
+import { goalsEnabled, readCurrentGoal, readGoal, renderGoalRecoveryBrief } from "../lib/goal-state.ts";
+import { continuationDispatcherActive, emitContinuationRequest, hashContinuationIdentity } from "../lib/continuation-authority.ts";
+import { createHash } from "node:crypto";
 
 // Model-driven in-place context compaction.
 //
@@ -80,24 +82,36 @@ export default function (pi: ExtensionAPI) {
 				const focus = params.focus?.trim();
 				inFlight = true;
 				let settled = false;
-				const resume = (status: "complete" | "failed", detail: Record<string, unknown>) => {
+				const sessionIdHash = hashContinuationIdentity(ctx.sessionManager?.getSessionId?.() ?? `compat:${ctx.cwd}`);
+				const resume = async (status: "complete" | "failed", detail: Record<string, unknown>) => {
 					if (settled || !finishCompaction(token)) return;
 					settled = true;
 					inFlight = false;
-					// MUST be followUp, not nextTurn: pi 0.83's docs (extensions.md:1408-1409)
-					// state nextTurn is "Queued for next user prompt. Does not interrupt or
-					// trigger anything" and that triggerTurn "Only applies to `steer` and
-					// `followUp` modes (ignored for `nextTurn`)". With nextTurn the tool
-					// aborted the operation, compacted, and then sat idle until the user
-					// typed — while its own description promised it "automatically resumes
-					// exactly once". followUp delivers once the agent has no more tool calls,
-					// which is exactly the post-compaction moment we want. (Found by Albert's
-					// 2026-07-30 QA session; it also explains why compact-tool completions
-					// were never observed live despite requests being recorded.)
-					pi.sendMessage(
-						{ customType: "pi-munchkin:compact-resume", content: RESUME, display: true, details: { status, ...detail } },
-						{ triggerTurn: true, deliverAs: "followUp" },
-					);
+					// The post-compaction turn is dispatched by the shared continuation
+					// authority only after the session is idle and the request is
+					// re-authorized. No private follow-up/next-turn queue is used, so a
+					// pause or cancellation can revoke this request before it reaches Pi.
+					const goal = goalsEnabled() ? await readCurrentGoal(ctx.cwd) : undefined;
+					if (goal && goal.status !== "active") return;
+					const ownerIdHash = goal ? createHash("sha256").update(goal.goal_id).digest("hex") : sessionIdHash;
+					const generation = goal ? createHash("sha256").update(JSON.stringify(goal)).digest("hex") : `compact:${token.generation}:${token.request}:${status}`;
+					const request = {
+						v: 1 as const, session_id_hash: sessionIdHash, owner_id_hash: ownerIdHash, generation,
+						scope: goal ? "goal" as const : "session" as const, reason: "compaction_resume" as const, priority: 400,
+						idempotency_key: `compact:${sessionIdHash}:${generation}`,
+						message: RESUME, expires_at_ms: Date.now() + 60_000,
+					};
+					const authorize = async () => {
+						const current = goalsEnabled() ? await readCurrentGoal(ctx.cwd) : undefined;
+						if (!goal) return !current || current.status === "active";
+						return Boolean(current && current.status === "active" &&
+							createHash("sha256").update(current.goal_id).digest("hex") === ownerIdHash &&
+							createHash("sha256").update(JSON.stringify(current)).digest("hex") === generation);
+					};
+					// A compacted turn may only resume through the shared authority. If the
+					// arbiter is unavailable, fail closed rather than creating an unaudited
+					// private follow-up that pause/cancel cannot revoke.
+					if (continuationDispatcherActive(pi.events)) emitContinuationRequest(pi.events, { request, authorize });
 				};
 				try {
 					const goalBrief = goalsEnabled() ? renderGoalRecoveryBrief(await readGoal(ctx.cwd)) : "";
@@ -109,13 +123,13 @@ export default function (pi: ExtensionAPI) {
 						onComplete: (r) => {
 							if (settled) return;
 							ctx.ui.notify(`context compacted (~${r.tokensBefore} tok before compaction)`, "info");
-							resume("complete", { tokensBefore: r.tokensBefore, estimatedTokensAfter: r.estimatedTokensAfter ?? null });
+							void resume("complete", { tokensBefore: r.tokensBefore, estimatedTokensAfter: r.estimatedTokensAfter ?? null });
 						},
 						onError: (e) => {
 							if (settled) return;
 							const failureClass = compactionFailureClass(e);
 							ctx.ui.notify(`compaction failed (failure_class=${failureClass})`, "warning");
-							resume("failed", { failureClass });
+							void resume("failed", { failureClass });
 						},
 					});
 				} catch (error) {

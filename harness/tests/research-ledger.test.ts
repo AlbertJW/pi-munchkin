@@ -14,6 +14,7 @@ import {
 	recallLedger, researchRecord, ResearchLedgerCapacityError, sha256Hex, storedUrl, auditResearchCitations,
 } from "../lib/research-ledger.ts";
 import { callTool, callToolRaw, fire, makeFakePi, resetPiGlobals } from "./integration-harness.ts";
+import { onContinuationRequest, setContinuationDispatcherActive, type ContinuationEnvelope } from "../lib/continuation-authority.ts";
 
 test("quote containment is verbatim modulo whitespace, and rejects paraphrase", () => {
 	const page = "The release shipped on August 5, 2026, with 256 experts.";
@@ -260,8 +261,8 @@ test("delegated evidence is refused until the parent web_read proves it, then re
 	const prevAgent = process.env.PI_CODING_AGENT_DIR;
 	process.env.KETCH_BIN = mockKetchBin(root);
 	process.env.PI_CODING_AGENT_DIR = agent;
-	try {
-		const fp = await loadKetch(true);
+		try {
+			const fp = await loadKetch(true);
 		delete (globalThis as Record<string, unknown>).__pi_ketch_version_checks_v1;
 		await fire(fp, "session_start", {}, { cwd: project, ui: { notify() {} } });
 		const childLead = await callTool(fp, "research_note", { claim: "c", url: "https://example.com/a", quote: "page a content" }, project);
@@ -390,26 +391,29 @@ test("final research answers cannot leave an unread citation unverified", async 
 	const ctxFor = { cwd: dir, ui: { notify() {} } };
 	try {
 		const fp = await loadKetch(true);
+		const offers: ContinuationEnvelope[] = [];
+		setContinuationDispatcherActive(fp.pi.events as never, true);
+		onContinuationRequest(fp.pi.events as never, (offer) => offers.push(offer));
 		delete (globalThis as Record<string, unknown>).__pi_ketch_version_checks_v1;
 		fp.pi.setActiveTools(["web_search", "web_read", "research_note"]);
 		await fire(fp, "session_start", {}, ctxFor);
 		await callToolRaw(fp, "web_read", { urls: ["https://example.com/a"] }, dir);
 		assert.equal((globalThis as any).__pi_research_state?.reads, 1, "the final-answer guard must observe parent reads");
 		await callToolRaw(fp, "research_note", { claim: "c", url: "https://example.com/a", quote: "page a content" }, dir);
-		await fire(fp, "agent_end", {
-			messages: [{ role: "assistant", content: [{ type: "text", text: "The result is documented at https://unread.example/report." }] }],
+		await fire(fp, "turn_end", {
+			message: { role: "assistant", content: [{ type: "text", text: "The result is documented at https://unread.example/report." }] },
 		}, ctxFor);
-		assert.equal(fp.sent.length, 1, "an unverified final citation must trigger one bounded correction turn");
-		assert.match(fp.sent[0], /reread.*web_read|research_note/i);
-		await fire(fp, "agent_end", {
-			messages: [{ role: "assistant", content: [{ type: "text", text: "Still citing https://unread.example/report." }] }],
+		assert.equal(offers.length, 1, "an unverified final citation must offer one bounded correction turn");
+		assert.match(offers[0]!.request.message, /reread.*web_read|research_note/i);
+		await fire(fp, "turn_end", {
+			message: { role: "assistant", content: [{ type: "text", text: "Still citing https://unread.example/report." }] },
 		}, ctxFor);
-		assert.equal(fp.sent.length, 1, "one bad answer cannot create a correction loop across continuation attempts");
+		assert.equal(offers.length, 1, "one bad answer cannot create a correction loop across continuation attempts");
 
-		await fire(fp, "agent_end", {
-			messages: [{ role: "assistant", content: [{ type: "text", text: "The result is documented at https://unread.example/report [unverified]." }] }],
+		await fire(fp, "turn_end", {
+			message: { role: "assistant", content: [{ type: "text", text: "The result is documented at https://unread.example/report [unverified]." }] },
 		}, ctxFor);
-		assert.equal(fp.sent.length, 1, "an explicit [unverified] label does not trigger another correction");
+		assert.equal(offers.length, 1, "an explicit [unverified] label does not trigger another correction");
 	} finally {
 		if (prevBin === undefined) delete process.env.KETCH_BIN; else process.env.KETCH_BIN = prevBin;
 		if (prevAgent === undefined) delete process.env.PI_CODING_AGENT_DIR; else process.env.PI_CODING_AGENT_DIR = prevAgent;

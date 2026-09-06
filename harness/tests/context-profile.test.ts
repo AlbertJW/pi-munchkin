@@ -8,6 +8,18 @@ import {
 	calibrateContext, contextNeedsHandoff, contextProfileFor, handoffReason, modelFingerprint, outputReserveFor, safeInputBudget,
 } from "../lib/context-profile.ts";
 import { fire, makeFakePi } from "./integration-harness.ts";
+import { onContinuationRequest, setContinuationDispatcherActive, type ContinuationEnvelope } from "../lib/continuation-authority.ts";
+
+function watchContinuations(fp: ReturnType<typeof makeFakePi>): ContinuationEnvelope[] {
+	const offers: ContinuationEnvelope[] = [];
+	setContinuationDispatcherActive(fp.pi.events as never, true);
+	onContinuationRequest(fp.pi.events as never, (offer) => offers.push(offer));
+	return offers;
+}
+
+async function settleOffers(): Promise<void> {
+	for (let turn = 0; turn < 4; turn += 1) await new Promise<void>((resolve) => setImmediate(resolve));
+}
 
 test("context profiles derive a model-specific safe budget and stable serving fingerprint", () => {
 	const model = { provider: "local", id: "qwen35b", contextWindow: 32_768, baseUrl: ["http", "://127.0.0.1:8080/v1"].join("") };
@@ -111,6 +123,7 @@ test("a served-window shrink at settlement immediately triggers the one-shot han
 	try {
 		globalThis.fetch = (async () => ({ ok: true, json: async () => ({ default_generation_settings: { n_ctx: 4_096 } }) }) as Response) as typeof fetch;
 		const fp = makeFakePi();
+		const offers = watchContinuations(fp);
 		const mod = await import(`../extensions/runtime-truth.ts?served-shrink=${Date.now()}-${Math.random()}`);
 		mod.default(fp.pi as never);
 		await fire(fp, "session_start", {}, {});
@@ -125,8 +138,9 @@ test("a served-window shrink at settlement immediately triggers the one-shot han
 		await fire(fp, "after_provider_response", { status: 200 }, ctx);
 		await fire(fp, "agent_settled", {}, ctx);
 		assert.equal(compactions, 1, "the lower served budget must be enforced before another provider request");
-		assert.ok(fp.sent.some((message) => /preserved active task state/.test(message)));
-		assert.equal(fp.sent.some((message) => /preserved goal/.test(message)), false, "ordinary tasks must not claim a goal exists");
+		await settleOffers();
+		assert.ok(offers.some((offer) => /preserved active task state/.test(offer.request.message)));
+		assert.equal(offers.some((offer) => /preserved goal/.test(offer.request.message)), false, "ordinary tasks must not claim a goal exists");
 	} finally {
 		globalThis.fetch = realFetch;
 		if (prior === undefined) delete process.env.CONTEXT_HANDOFF; else process.env.CONTEXT_HANDOFF = prior;
@@ -139,6 +153,7 @@ test("serving discovery rearms for the same model ID on a different endpoint", a
 	try {
 		globalThis.fetch = (async () => { fetches += 1; return { ok: true, json: async () => ({ default_generation_settings: { n_ctx: 8_192 } }) } as Response; }) as typeof fetch;
 		const fp = makeFakePi();
+		const offers = watchContinuations(fp);
 		const mod = await import(`../extensions/runtime-truth.ts?endpoint-epoch=${Date.now()}-${Math.random()}`);
 		mod.default(fp.pi as never);
 		await fire(fp, "session_start", {}, {});
@@ -157,6 +172,7 @@ test("runtime model switching creates a new epoch and automatically hands off an
 	delete process.env.CONTEXT_HANDOFF;
 	try {
 		const fp = makeFakePi();
+		const offers = watchContinuations(fp);
 		const mod = await import(`../extensions/runtime-truth.ts?handoff=${Date.now()}-${Math.random()}`);
 		mod.default(fp.pi as never);
 		await fire(fp, "session_start", {}, {});
@@ -171,7 +187,8 @@ test("runtime model switching creates a new epoch and automatically hands off an
 		assert.equal(profile.epoch, 1);
 		assert.equal(profile.model, "small");
 		assert.match(compacted, /Model handoff/);
-		assert.ok(fp.sent.some((message) => /Model handoff complete/.test(message)));
+		await settleOffers();
+		assert.ok(offers.some((offer) => /Model handoff complete/.test(offer.request.message)));
 	} finally {
 		if (prior === undefined) delete process.env.CONTEXT_HANDOFF; else process.env.CONTEXT_HANDOFF = prior;
 	}
@@ -182,6 +199,7 @@ test("an over-budget pre-request context is handed off before another request st
 	delete process.env.CONTEXT_HANDOFF;
 	try {
 		const fp = makeFakePi();
+		const offers = watchContinuations(fp);
 		const mod = await import(`../extensions/runtime-truth.ts?pre-request-handoff=${Date.now()}-${Math.random()}`);
 		mod.default(fp.pi as never);
 		await fire(fp, "session_start", {}, {});
@@ -200,7 +218,8 @@ test("an over-budget pre-request context is handed off before another request st
 		await fire(fp, "before_provider_request", {}, ctx);
 		assert.equal(compactions, 1, "an over-budget follow-up must compact before it is sent");
 		assert.equal(aborts, 1, "the in-flight request must be aborted before asynchronous compaction starts");
-		assert.ok(fp.sent.some((message) => /Model handoff complete/.test(message)));
+		await settleOffers();
+		assert.ok(offers.some((offer) => /Model handoff complete/.test(offer.request.message)));
 	} finally {
 		if (prior === undefined) delete process.env.CONTEXT_HANDOFF; else process.env.CONTEXT_HANDOFF = prior;
 	}
@@ -326,7 +345,7 @@ test("a stale compaction lease does not permanently disable automatic handoff", 
 	delete process.env.CONTEXT_HANDOFF;
 	try {
 		resetCompactionCoordinator();
-		const fp = makeFakePi();
+			const fp = makeFakePi();
 		const mod = await import(`../extensions/runtime-truth.ts?handoff-latch=${Date.now()}-${Math.random()}`);
 		mod.default(fp.pi as never);
 		await fire(fp, "session_start", {}, {});
@@ -392,6 +411,7 @@ test("a committed handoff compaction stays successful if a later callback report
 	try {
 		resetCompactionCoordinator();
 		const fp = makeFakePi();
+		const offers = watchContinuations(fp);
 		const mod = await import(`../extensions/runtime-truth.ts?handoff-committed=${Date.now()}-${Math.random()}`);
 		mod.default(fp.pi as never);
 		await fire(fp, "session_start", {}, {});
@@ -412,7 +432,8 @@ test("a committed handoff compaction stays successful if a later callback report
 		fail?.();
 		await fire(fp, "turn_end", {}, ctx);
 		assert.equal(compactions, 1, "a committed handoff must not be retried");
-		assert.ok(fp.sent.some((message) => /Model handoff complete/.test(message)), "the committed compaction still resumes the task");
+		await settleOffers();
+		assert.ok(offers.some((offer) => /Model handoff complete/.test(offer.request.message)), "the committed compaction still offers resumption through the authority");
 	} finally {
 		if (prior === undefined) delete process.env.CONTEXT_HANDOFF; else process.env.CONTEXT_HANDOFF = prior;
 	}

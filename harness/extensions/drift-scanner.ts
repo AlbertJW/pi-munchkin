@@ -2,19 +2,21 @@ import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { completeSimple } from "@earendil-works/pi-ai/compat";
 import { buildTruncatedDiff, extractFindings, isReviewableCommit, MAX_DIFF, REVIEW_PROMPT } from "../lib/drift-policy.ts";
 import { record } from "../lib/telemetry.ts";
+import { continuationDispatcherActive, emitContinuationRequest, hashContinuationIdentity } from "../lib/continuation-authority.ts";
 
 // Advisory drift / dead-code reviewer.
 //
 // When a turn ran a `git commit` via the bash tool, ask THE CURRENTLY-SELECTED
 // SESSION MODEL (ctx.model) to flag only drift the commit introduced: dead
 // references, orphaned definitions, and stale comments/docs — the class of defect
-// a deterministic gate can't catch. Surfaced as a non-blocking `followUp` so the
-// agent can make a fixup commit.
+// a deterministic gate can't catch. Surfaced as a non-blocking continuation
+// offer so the agent can make a fixup commit only after lifecycle authorization.
 //
 // `turn_end` captures the landed HEAD and bounded diff. Model review starts only
 // after `agent_settled`, and is aborted by the next `before_agent_start` or shutdown,
 // so an advisory review cannot contend with the coding run on a single-slot
-// local server. HEAD and session generation are rechecked before delivery.
+// local server. Its eventual provider turn is offered to the continuation
+// authority only after the review and session generation are rechecked.
 //
 // Reviewer = the live session model, so the diff only ever goes where the session
 // is already going (local→local, cloud→cloud — no new data egress). Auth is
@@ -34,12 +36,13 @@ export default function (pi: ExtensionAPI) {
 
 	const handledHead = new Map<string, string>();
 	type Pending = {
-		cwd: string; headHash: string; body: string; truncated: boolean; generation: number;
+		cwd: string; headHash: string; body: string; truncated: boolean; generation: number; sessionIdHash: string;
 		model: any; modelRegistry: any;
 	};
 	const pending = new Map<string, Pending>();
 	let generation = 0;
 	let active: { controller: AbortController; generation: number } | null = null;
+	let sessionIdHash: string | null = null;
 
 	function abortBusy(): void {
 		if (!active || active.controller.signal.aborted) return;
@@ -56,8 +59,9 @@ export default function (pi: ExtensionAPI) {
 	// review already in flight kept running against the previous session — its advisory
 	// could deliver into the next one. Every other reset here hangs off shutdown, which
 	// a /reload does not reliably reach.
-	pi.on("session_start", async () => {
+	pi.on("session_start", async (_event, ctx) => {
 		generation += 1;
+		sessionIdHash = hashContinuationIdentity(ctx.sessionManager?.getSessionId?.() ?? `compat:${ctx.cwd}`);
 		handledHead.clear();
 		pending.clear();
 		abortBusy();
@@ -65,6 +69,7 @@ export default function (pi: ExtensionAPI) {
 
 	pi.on("session_shutdown", async () => {
 		generation += 1;
+		sessionIdHash = null;
 		pending.clear();
 		abortBusy();
 	});
@@ -113,6 +118,7 @@ export default function (pi: ExtensionAPI) {
 			// so it never contends with the coding run on a single-slot server.
 			pending.set(ctx.cwd, {
 				cwd: ctx.cwd, headHash, body, truncated, generation,
+				sessionIdHash: sessionIdHash ?? hashContinuationIdentity(`compat:${ctx.cwd}`),
 				model, modelRegistry: ctx.modelRegistry,
 			});
 		} catch (e) {
@@ -172,12 +178,24 @@ export default function (pi: ExtensionAPI) {
 			// verbatim can dump thousands of tokens into a 30k window.
 			const clamped = findings.length > 4000 ? `${findings.slice(0, 4000)}\n…[drift review truncated]` : findings;
 
-			pi.sendUserMessage(
-				"[drift-scanner] Advisory review of your latest commit — possible drift it introduced " +
-					"(non-blocking). Make a fixup commit if real; ignore false positives. (DRIFT_SCANNER=off disables.)\n\n" +
-					clamped,
-				{ deliverAs: "followUp" },
+			const request = {
+				v: 1 as const,
+				session_id_hash: next.sessionIdHash,
+				owner_id_hash: hashContinuationIdentity(next.headHash),
+				generation: `${next.generation}:${next.headHash}`,
+				scope: "session" as const,
+				reason: "drift_review" as const,
+				priority: 150,
+				idempotency_key: `drift:${next.sessionIdHash}:${next.headHash}`,
+				message: "[drift-scanner] Advisory review of your latest commit — possible drift it introduced " +
+					"(non-blocking). Make a fixup commit if real; ignore false positives. (DRIFT_SCANNER=off disables.)\n\n" + clamped,
+				expires_at_ms: Date.now() + 60_000,
+			};
+			const authorize = () => Boolean(
+				continuationDispatcherActive(pi.events) &&
+				generation === next.generation && sessionIdHash === next.sessionIdHash,
 			);
+			if (continuationDispatcherActive(pi.events)) emitContinuationRequest(pi.events, { request, authorize });
 			} catch (e) {
 				if (controller.signal.aborted) return;
 				record("drift-scanner", "review-error", { error: String((e as Error)?.message ?? e).slice(0, 150) });

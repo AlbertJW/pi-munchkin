@@ -1,0 +1,418 @@
+# Harness improvement plan
+
+Created: 2026-09-06
+Status: G01 implementation and offline verification complete; live validation is pending explicit approval and no live experiment is activated by this document.
+Reference: audit `docs/HARNESS_AUDIT_2026-09-06.md`, recommendations `docs/NEXT_HARNESS_IMPROVEMENTS_2026-09-06.md`.
+
+## Purpose and starting point
+
+Make Munchkin reliably preserve the user's objective, continue useful work,
+stop when instructed or finished, and fit the active model's context window.
+Then measure whether its research and optimization machinery improve actual
+outcomes. Prefer fewer independent control paths and stronger runtime evidence.
+
+The starting audit repairs are committed in `cac3926`; `c7ea142` contains the
+published recommendations. The last observed live-sync attempt was blocked by
+an open Pi session. These are historical observations, not a fresh readiness
+check. Read the current source, worktree state, mirror receipt, and runtime
+version before implementing any goal.
+
+Use the stable IDs below when referring to work, tests, commits, and evidence.
+
+| ID | Goal | Main outcome | Dependencies |
+|---|---|---|---|
+| G01 | Authoritative continuation and stopping | One owner decides whether another harness-driven turn may run | Implemented + offline verified (742/742 tests, 2026-09-06); live smoke pending explicit approval — evidence: `docs/evidence/G01.md` |
+| G02 | Aggregate context admission | Every request fits a justified budget for its serving epoch | Use G01 for compaction/resume ownership |
+| G03 | Representative evaluation baseline | A reusable, trustworthy way to measure task benefit and harm | Fixture preparation can start immediately; freeze the measured baseline after G01/G02 |
+| G04 | Evidence-gap research orchestration | Bounded research reaches a supported answer or an explicit unresolved gap | G01/G02 for execution; G03 for evaluation |
+| G05 | Qualified optimizer decision policies | Search and selection obey explicit, tested statistical rules | Can develop offline alongside G03; required before automatic campaigns |
+
+Recommended sequence: G01, G02, then establish G03. Develop G04 against that
+baseline. Complete G05 before using the optimizer to select candidates. G05
+does not prevent manually specified, human-approved mechanism screens; those
+screens still need their own preregistered decision rules.
+
+## Shared working and completion rules
+
+Each goal has three separately recorded milestones:
+
+1. **Implemented:** source and documentation are complete and reviewable.
+2. **Offline verified:** required regression and integration evidence passes.
+3. **Live validated:** any specified human-approved smoke or evaluation has
+   run against the recorded source/config/model/loaded-surface identities.
+
+Passing tests does not imply live validation. Synchronizing files does not
+establish runtime behavior. A smoke proves only the behaviors it actually
+exercises; it does not establish model-quality improvement.
+
+For each goal, retain a goal-specific evidence note containing the defect or
+hypothesis, failing-before/passing-after results, actual runtime version,
+verification commands and outcomes, commit IDs, surface fingerprints,
+remaining limitations, and rollout/rollback status. Use proposed paths
+`docs/evidence/G01.md` through `docs/evidence/G05.md`; create them as work begins.
+
+Use private fixtures and scripted providers for offline tests. Add a failing
+regression before repairing a reproduced defect. Preserve unrelated changes,
+stage explicit paths, and run the public-repository secret scan before pushing.
+Do not change historical receipts or pool measurements across model, config,
+benchmark, or surface identities.
+
+Human approval remains required for live inference, calibration, campaigns,
+and promotion. Prepare the exact command, limits, identities, and expected
+receipt before requesting execution. Existing approval for a particular action
+should not be requested again. Check that Pi is stopped before mirroring.
+
+80/20 settlement can defer optional polish or broader coverage with value,
+risk, and rationale. It cannot waive user control, evidence integrity, budget
+enforcement, required tests, or an unperformed live-validation requirement.
+If a goal stops after offline verification, record it at that milestone.
+
+## G01 — Authoritative continuation and stopping
+
+### Goal statement
+
+Make every harness-generated continuation pass through one authoritative
+runtime decision, so useful unfinished work continues once when appropriate,
+while paused, cancelled, replaced, blocked, or settled work cannot be restarted
+by obsolete queued messages or late callbacks.
+
+### Why this matters
+
+Goals, research synthesis, citation checks, verification, and model handoff
+currently have separate ways to request more work. The repaired context filter
+can remove stale instructions, but does not prove that an already queued
+provider turn is cancelled. A test double also previously hid a real callback
+contract error. The next proof must exercise actual scheduling.
+
+### Implementation work
+
+1. Inventory every first-party `sendMessage`, `sendUserMessage`, automatic
+   follow-up, abort, compaction, and recovery trigger. Record its owner,
+   lifecycle hook, queue behavior, and supported Pi callback contract.
+2. Define typed continuation requests with session identity, goal/plan identity
+   where applicable, revision or cancellation generation, reason, idempotency
+   key, and bounded expiry. The decision rechecks persisted authority at dispatch.
+3. Extend the existing control arbiter where appropriate. Preserve its safety
+   priorities and verification duties. Avoid a second competing dispatcher.
+   An extension proposes work; the owner authorizes and records its delivery.
+4. Specify priority and merge rules. User pause/cancel/replacement and hard-stop
+   conditions invalidate obsolete requests. Several compatible requests at one
+   boundary produce at most one provider continuation, with bounded content.
+5. Define cancellation's precise boundary. Once the authoritative transition
+   commits, queued obsolete requests must not start. Already executing provider
+   requests or tools receive the supported cancellation signal; partial effects
+   are reported, not claimed to have been undone. Preserve unrelated user work.
+6. Migrate goal continuation, research synthesis/citation correction, and context
+   handoff to this ownership model. Bind late results to the originating session
+   and generation. Completion must still allow delivery of the final answer.
+7. Persist the minimum decision state needed across compaction and recovery.
+   An unchanged goal update cannot earn another retry. Recovery must neither
+   lose useful pending work nor replay an already consumed request.
+8. Build a no-network fixture with a real Pi `AgentSession` and scripted provider.
+   If Pi lacks a necessary queue operation, document that API gap and implement
+   a supported integration change; do not conceal it with casts or a permissive
+   test double.
+
+Likely starting files: `harness/extensions/plan-runner.ts`, `ketch.ts`,
+`runtime-truth.ts`, `control-arbiter.ts`; `harness/lib/control-proposal.ts`,
+`control-arbiter.ts`, `goal-state.ts`, and `compaction-coordinator.ts`.
+
+### Required acceptance criteria
+
+- **G01-A:** Real-session fixtures count actual provider requests and tool
+  executions. Pausing/cancelling/replacing at each tested queue boundary starts
+  zero obsolete requests after the authoritative transition.
+- **G01-B:** Duplicate events, late child results, competing correction requests,
+  reloads, and repeated no-op goal updates cannot manufacture duplicate work.
+- **G01-C:** Pause, block, cancellation, full completion, and 80/20 settlement
+  stop autonomous steering. Only a user-owned transition resumes an inactive goal.
+- **G01-D:** A live active goal with justified pending work receives one valid
+  continuation. An ordinary user message is never discarded as stale harness work.
+- **G01-E:** Compaction and recovery preserve the complete objective through
+  authoritative storage and bounded inspection. Final-answer delivery remains
+  possible after plan settlement.
+- **G01-F:** A bounded, pinned-model lifecycle smoke confirms the exercised
+  control transitions, with a fresh loaded-surface and telemetry receipt.
+
+### Completion evidence and permitted deferrals
+
+Deliver the inventory, transition/ownership contract, real-session race tests,
+and smoke receipt. UI polish and additional explanatory status views may be
+deferred. Queue ownership and the actual-provider-call assertions may not.
+
+## G02 — Aggregate context admission per serving epoch
+
+### Goal statement
+
+Before every provider request, account for the combined context being sent and
+admit it only within a justified input budget for the active serving epoch,
+while preserving the user's objective and access to essential evidence.
+
+### Why this matters
+
+Individually bounded tools can still overflow a request when several results,
+schemas, notes, and history are combined. Switching from a large context window
+to a smaller one must change the admission decision immediately.
+
+### Implementation work
+
+1. Inventory all context contributors: system instructions, tool schemas,
+   retained history, user input, goal/recovery briefs, research cards, tool
+   results, and any working-memory notes. Identify double-counting risks.
+2. Define one accounting record per request and serving epoch. Include effective
+   window, input allowance, completion reserve, overhead, estimated/observed
+   usage, uncertainty margin, and reservations for outstanding tool results.
+   State whether the tokenizer is exact, estimated, or unavailable.
+3. Count completion reserve and overhead once. Reconcile the assembled provider
+   payload with the admission record; metadata from an earlier model cannot
+   authorize a request for the new model.
+4. Allocate retrieval/output allowances from the remaining aggregate budget.
+   Concurrent results share reservations; they do not each receive the entire
+   remainder. Store full artifacts privately and expose bounded pages or excerpts.
+5. Establish a preservation order: user objective and constraints, active state,
+   required evidence references, and the next action precede optional commentary.
+   Never silently discard requirements. Truncation must be explicit and recoverable.
+6. Recompute on provider/model/endpoint/window changes and served-window shrinkage.
+   Route compaction and continuation through G01. Retain the documented handoff
+   hysteresis unless evidence supports an independently reviewed policy change.
+7. Handle unknown usage, an oversized initial prompt, failed compaction, and
+   stale callbacks explicitly. If safe admission cannot be justified, return a
+   bounded actionable reason rather than silently sending the oversized request.
+
+Likely starting files: `harness/lib/context-profile.ts`; extensions
+`runtime-truth.ts`, `context-inlet-guard.ts`, `context-surface.ts`,
+`compact-tool.ts`, and the consumers that supply retrieval/recovery text.
+
+### Required acceptance criteria
+
+- **G02-A:** Fixtures assemble competing context contributors and prove the
+  combined admitted payload plus reserves stays within the declared accounting
+  envelope. An underestimated token count is distinguishable from a verified count.
+- **G02-B:** A populated 128K session switching to 32K, and the reverse switch,
+  preserve objective/criteria identity and recalculate the budget before dispatch.
+- **G02-C:** The same model ID on different providers/endpoints creates distinct
+  accounting epochs. Served-window shrinkage invalidates the old allowance.
+- **G02-D:** Concurrent tool outputs, repeated compaction callbacks, and recovery
+  cannot multiply reservations or send an unauthorized follow-up.
+- **G02-E:** Failed compaction and oversized initial input have deterministic,
+  bounded outcomes. Required state remains inspectable after compaction.
+- **G02-F:** Telemetry contains counts, hashes, confidence, and outcome classes;
+  it contains no raw endpoints or private context. A pinned model-switch smoke
+  records actual usage and the exercised handoff behavior.
+
+### Completion evidence and permitted deferrals
+
+Deliver the accounting contract, preservation policy, stress fixtures, and
+model-switch smoke receipt. Exact tokenizers for every provider and visual
+budget dashboards may be deferred if the fallback is conservative, labelled,
+and tested. Aggregate admission and requirement preservation are mandatory.
+
+## G03 — Representative, reproducible evaluation baseline
+
+### Goal statement
+
+Create a small governed benchmark that measures whether harness changes improve
+real task outcomes without hiding regressions, invalid trials, excess context,
+or unwanted continuation.
+
+### Implementation work
+
+1. Inventory and reuse admitted fixtures. Propose an initial 12-case slate:
+   two coding edits, two failure-recovery tasks, two documentation tasks, two
+   long-context tasks, and four research tasks (comparative, contested,
+   multi-part, and lightweight fact lookup). Adjust only before freezing the pack.
+2. Define deterministic local oracles wherever possible: persisted edits,
+   verification outcomes, required artifacts, evidence coverage, source identity,
+   stop behavior, and isolation. Any human/model rubric needs a documented
+   procedure and must not turn eloquent prose into correctness evidence.
+3. Version the pack, admission receipts, split assignment, seeds, repetitions,
+   timeouts, and resource limits. Keep development/test payloads quarantined from
+   optimizer diagnosis. A small pilot may expose insufficient discrimination;
+   record that and revise the next pack rather than changing an active campaign.
+4. Separate protocol qualification from effectiveness. Ling remains a portability
+   smoke subject. Qwen 35B is the first adoption cohort. Resolve the registered
+   model and actual serving configuration at preparation time.
+5. Freeze an explicit baseline and one candidate contrast. Preserve provenance,
+   grading, isolation, and privacy controls in both arms. Match case, seed,
+   repetition, context configuration, and time limits; randomize arm order.
+6. Record primary task outcome plus hard guards and secondary costs: unsupported
+   claims, unwanted continuation, tool calls/retries, wall time, input/output
+   tokens, compactions, and invalid-trial reasons. Missing child telemetry remains
+   unavailable and must not be reported as zero cost.
+7. Prepare and run an explicitly approved bounded baseline screen. Report per-case
+   and per-cohort outcomes. A separately labelled Codex reference can provide
+   context; its observations must never be pooled with local-model trials.
+
+Likely starting areas: `optimizer/real-gate-fixtures`,
+`optimizer/research-fixtures`, `optimizer/prompt-lab/tool_contract.py`,
+`optimizer/v2/benchmark.py`, `pi_gate.py`, and existing provenance/reporting tools.
+
+### Required acceptance criteria
+
+- **G03-A:** Every admitted case has a versioned specification, oracle, limits,
+  split membership, and isolation receipt. Duplicate/leaking splits are rejected.
+- **G03-B:** Offline fake runs prove pairing, arm identity, configuration binding,
+  telemetry binding, invalid-trial handling, and deterministic report generation.
+- **G03-C:** The first real baseline has a complete provenance audit and reports
+  every attempted trial, including exclusions and timeouts with reasons.
+- **G03-D:** Ceiling/floor or insufficient-sample results are explicitly
+  uninformative/inconclusive. The 12-case pilot does not automatically establish
+  statistical power or authorize adoption.
+- **G03-E:** Protocol results, model-quality results, and external references are
+  visibly distinct. Historical surface/model identities remain separate.
+- **G03-F:** A reviewer can reconstruct the reported result from immutable
+  manifests and private receipts without rerunning inference.
+
+### Completion evidence and permitted deferrals
+
+Deliver the admitted pack, frozen baseline preregistration, executed baseline
+report, and reconstruction instructions. Large fleets, many repetitions, and
+external reference runs may be deferred. Provenance, useful oracles, a completed
+baseline, and honest uncertainty may not. Adoption remains a later decision.
+
+## G04 — Research driven by explicit evidence gaps
+
+### Goal statement
+
+Make complex research progress from named missing evidence to a supported final
+answer, using the existing bounded graph and parent-owned ledger, with a clear
+stop or escalation when the remaining budget cannot resolve the gaps.
+
+### Implementation work
+
+1. Represent required claim obligations and unresolved questions explicitly.
+   Record what is missing, why it matters, and which next action could resolve it.
+   Keep these records separate from untrusted text retrieved from the web.
+2. Add a bounded research-round record: selected gaps, proposed queries, chosen
+   sources, reads performed, evidence cards, budget consumption, conflicts,
+   and next permitted action. Validate model proposals as data.
+3. Use the existing graph and budget authority. Preserve at most three top-level
+   branches, the bounded researcher/scout hierarchy, and the allocated discovery
+   envelope of three searches/five reads plus up to five parent validation reads
+   unless a later separately evaluated profile explicitly changes those limits.
+4. Reserve shared budget before dispatch. Repeated queries, canonical duplicate
+   URLs, failed children, and retries cannot create a fresh allowance or satisfy
+   a claim without usable evidence. Exhaustion records a specific unresolved gap.
+5. Bound retrieval with G02. Use existing Ketch/Jina Reader paths; additional
+   search backends are optional later work. Preserve original citation URLs,
+   retrieval method, truncation, and parent-validation status.
+6. Make parent synthesis a G01-owned action. Late/duplicate reports merge once;
+   child summaries and citations remain unverified until the parent rereads the
+   material source and records matching evidence cards.
+7. Define answer readiness separately from graph terminality. Blocked required
+   branches cannot silently settle. Optional deferrals require value, risk, and
+   rationale. Settlement must lead to a useful final answer, with uncertainty and
+   unresolved obligations visible, rather than another research loop.
+8. Evaluate against G03 with research-shaped controls and a fresh preregistration.
+   Historical no-go screens remain unchanged and inform the new falsifiers.
+
+Likely starting areas: `skills/deep-research`, `harness/extensions/ketch.ts`,
+`plan-runner.ts`, `harness/lib/plan-graph.ts`, `branch-report.ts`,
+`research-evidence.ts`, `research-ledger.ts`, `research-reservations.ts`, and
+`harness/vendor/pi-subagent`.
+
+### Required acceptance criteria
+
+- **G04-A:** Scripted research fixtures prove global budget conservation through
+  child failures, duplicate reports, delayed arrival, restart, and compaction.
+- **G04-B:** Child-only evidence, fabricated quotes, truncated reads, conflicting
+  sources, or missing required cards cannot manufacture successful settlement.
+- **G04-C:** When evidence permits synthesis, exactly one valid parent action is
+  scheduled and the final answer is delivered. After stopping, late reports do
+  not restart the run.
+- **G04-D:** Exhausted or blocked work ends with explicit gaps and a bounded
+  explanation. It does not claim full completion or silently increase budgets.
+- **G04-E:** Straightforward fact lookup remains lightweight without graph
+  activation. Complex research uses the profile when authorized.
+- **G04-F:** An approved Qwen 35B screen measures correctness, material citation
+  support, completion, and cost against the frozen comparison. A no-go or
+  inconclusive result is a valid completed evaluation, not grounds to alter data.
+
+### Completion evidence and permitted deferrals
+
+Deliver the round/stop contract, fake retrieval and parent-synthesis tests,
+recovery evidence, and the complex-research screen report. More search engines,
+deeper delegation, and richer source-quality scoring may be deferred. Parent
+verification, bounded spending, final-answer delivery, and explicit gaps may not.
+
+## G05 — Qualified optimizer decision and learning policies
+
+### Goal statement
+
+Make optimizer acceptance, reflection, and final selection follow unambiguous,
+preregistered rules whose numerical behavior is independently tested and whose
+evidence cannot be inflated by retries, selection, or missing guard cohorts.
+
+### Implementation work
+
+1. Inventory every policy name, manifest field, decision calculation, report
+   label, and reflection classification. Document the present exact-sign naming
+   mismatch: a net-fix threshold is not a statistical significance test.
+2. Version future policy contracts. Expose an engineering threshold as such;
+   provide a separately named statistical rule when required. Do not reinterpret
+   previously approved manifests or rewrite historical policy results.
+3. Specify binary direction, ties, discordant pairs, minimum observations,
+   alpha/thresholds, and the independent sampling unit. Repetitions of one case
+   must not automatically count as independent cases.
+4. Specify continuous paired differences, direction, exact versus sampled
+   permutation behavior, maximum exact workload, seeds, numeric tolerance,
+   and stopping rule. Reject unused or contradictory configuration fields.
+5. Audit repeated candidate testing and development selection. Quarantine dev/test
+   payloads from diagnosis; state how much dev feedback search receives and what
+   generalization claim is justified. Positive lessons require complete validation.
+6. Use task outcomes for fixed/regressed/still-failing/still-passing classifications
+   where those labels are defined. Do not label arbitrary continuous score changes
+   as task success without a preregistered success criterion.
+7. Require complete matched cells and declared guard cohorts. Missing, duplicate,
+   nonfinite, unstable-serving, invalid-provenance, and unexposed observations
+   cannot advance candidates. Preserve direction and uncertainty in final ranking.
+8. Add independent golden calculations and adversarial synthetic outcomes.
+   Prove replay/resume preserve decisions and candidate IDs without duplicate
+   provider sessions or task rollouts. Maintain human-only adoption.
+
+Likely starting files: `optimizer/v2/policies.py`, `manifest.py`, `engine.py`,
+`events.py`, `provider.py`, `pi_gate.py`, and their tests/reporting interfaces.
+
+### Required acceptance criteria
+
+- **G05-A:** Policy names and every accepted manifest field correspond to actual
+  documented behavior. Historical manifests retain their original meaning.
+- **G05-B:** Independently calculated binary and continuous examples match results
+  for both metric directions, ties, small samples, boundary values, and uncertainty.
+- **G05-C:** Malformed policies start zero sessions. Invalid observations and
+  incomplete guard cohorts yield rejection or an explicit invalid/inconclusive
+  result, never acceptance.
+- **G05-D:** Reflection and evolution cannot receive development payloads/traces
+  or positive lessons from rejected candidates. Continuous classifications have
+  an explicit outcome definition.
+- **G05-E:** Interrupted/replayed fake campaigns produce identical decisions and
+  candidate graphs without duplicate logical sessions or charged rollouts.
+- **G05-F:** A first real campaign is prepared with G03's admitted pack, one
+  permitted family, one iteration, explicit approval identity, bounded spend,
+  and a review packet. If live validation is approved, execute and audit it;
+  otherwise leave this milestone explicitly pending. No automatic deployment.
+
+### Completion evidence and permitted deferrals
+
+Deliver the policy specification, golden calculations, malformed-data and
+quarantine tests, replay evidence, and prepared campaign. Before claiming live
+qualification, include the audited campaign receipt. Advanced search strategies,
+large fleets, and alternative statistical families may be deferred; correct
+policy semantics and evidence integrity may not.
+
+## Progress register
+
+Keep this register current as work is actually completed. Link evidence rather
+than replacing pending cells with verbal assurances.
+
+| Goal | Implemented | Offline verified | Live validated | Evidence |
+|---|---|---|---|---|
+| G01 | Pending | Pending | Pending | Not yet created |
+| G02 | Pending | Pending | Pending | Not yet created |
+| G03 | Pending | Pending | Pending | Not yet created |
+| G04 | Pending | Pending | Pending | Not yet created |
+| G05 | Pending | Pending | Pending | Not yet created |
+
+Existing repairs are prerequisites, not proof that these larger goals are done.
+Working memory, extra steering, deeper delegation, and broad tool-surface
+promotion stay outside this plan until a measured failure justifies them.

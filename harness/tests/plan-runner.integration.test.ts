@@ -10,6 +10,7 @@ import { HARNESS_SIGNAL_CHANNEL } from "../lib/harness-signals.ts";
 import { captureInitialToolSurface } from "../lib/session-bootstrap.ts";
 import { privatePlanStatePath } from "../lib/plan-state-storage.ts";
 import { goalStoragePath, mutateGoal } from "../lib/goal-state.ts";
+import { onContinuationRequest, setContinuationDispatcherActive, type ContinuationEnvelope } from "../lib/continuation-authority.ts";
 
 // This suite used to pin `PLAN_STORAGE=project` at module scope, so all fifteen of
 // its tests ran in the ROLLBACK configuration and none of them ever exercised what
@@ -441,37 +442,25 @@ test("/goal enters a persistent model-visible execution mode", async () => {
 	resetPiGlobals();
 });
 
-test("goal agent_end offers one bounded continuation per revision and stops after settlement", async () => {
+test("goal agent_end offers one bounded continuation request per revision and stops after settlement", async () => {
 	const fp = makeFakePi();
 	for (const name of ["read", "bash", "edit", "write", "verify_project"]) fp.pi.registerTool({ name, parameters: {} } as any);
 	planRunner(fp.pi as any);
 	fp.pi.setActiveTools([...fp.tools.keys()]);
 	const cwd = tmp();
 	const { ctx } = makeCtx(cwd);
+	const offers: ContinuationEnvelope[] = [];
+	setContinuationDispatcherActive(fp.pi.events as never, true);
+	onContinuationRequest(fp.pi.events as never, (offer) => offers.push(offer));
 	await fp.commands.get("goal").handler("finish one bounded task", ctx);
-	const afterStart = fp.customDeliveries.length;
 	await fire(fp, "agent_end", {}, { ...ctx, cwd });
-	assert.equal(fp.customDeliveries.length, afterStart + 1, "an active goal receives one continuation offer");
-	assert.match(fp.customDeliveries.at(-1)?.text ?? "", /highest-value next action/);
+	assert.equal(offers.length, 1, "an active goal offers one request to the authority");
+	assert.match(offers[0]!.request.message, /highest-value next action/);
 	await fire(fp, "agent_end", {}, { ...ctx, cwd });
-	assert.equal(fp.customDeliveries.length, afterStart + 1, "an unchanged goal revision cannot spin");
+	assert.equal(offers.length, 1, "an unchanged goal revision cannot spin");
 	await fp.commands.get("goal-pause").handler("", ctx);
 	await fire(fp, "agent_end", {}, { ...ctx, cwd });
-	assert.equal(fp.customDeliveries.length, afterStart + 1, "pause is authoritative over a queued continuation decision");
-	const stale = await fire(fp, "input", { text: "[pi-munchkin:goal-continuation] continue", source: "extension" }, { ...ctx, cwd });
-	assert.equal(stale?.action, "handled", "a queued continuation is discarded at the input boundary after pause");
-	// Execute Pi's installed dispatcher, not our test double's combining logic.
-	const runtime = Object.assign(Object.create(ExtensionRunner.prototype), {
-		extensions: [{ path: "plan-runner", handlers: fp.handlers }],
-		createContext: () => ctx,
-		emitError: (error: unknown) => assert.fail(JSON.stringify(error)),
-	});
-	const context = await runtime.emitContext([
-		{ role: "user", content: [{ type: "text", text: "keep this user request" }] },
-		{ role: "custom", content: "[pi-munchkin:goal-continuation] stale" },
-	]);
-	assert.equal(context.length, 1, "the provider context boundary removes a queued stale continuation");
-	assert.equal(context[0].role, "user");
+	assert.equal(offers.length, 1, "pause is authoritative over any later continuation offer");
 	resetPiGlobals();
 });
 
@@ -496,6 +485,9 @@ test("goal settlement continuation distinguishes deferred optional work from com
 	const fp = fresh();
 	const cwd = tmp();
 	const { ctx } = makeCtx(cwd);
+	const offers: ContinuationEnvelope[] = [];
+	setContinuationDispatcherActive(fp.pi.events as never, true);
+	onContinuationRequest(fp.pi.events as never, (offer) => offers.push(offer));
 	await fp.commands.get("goal").handler("deliver core behavior", ctx);
 	await mutateGoal(cwd, async (previous) => {
 		const goal = { ...previous!, criteria: [
@@ -505,50 +497,21 @@ test("goal settlement continuation distinguishes deferred optional work from com
 		return { goal, result: goal };
 	});
 	await fire(fp, "agent_end", {}, ctx);
-	const instruction = fp.customDeliveries.at(-1)!.text;
+	const instruction = offers.at(-1)!.request.message;
 	assert.match(instruction, /accepted_80_20/);
 	assert.doesNotMatch(instruction, /All goal criteria are recorded as met/);
 	resetPiGlobals();
 });
 
-test("real Pi context dispatch obeys terminal goal states and rejects replaced-goal continuations", async () => {
-	for (const status of ["paused", "blocked", "cancelled", "complete", "accepted_80_20", "replaced"]) {
-		resetPiGlobals();
-		const fp = fresh();
-		const cwd = tmp();
-		const { ctx } = makeCtx(cwd);
-		await fp.commands.get("goal").handler("verify this objective", ctx);
-		await fire(fp, "agent_end", {}, ctx);
-		const queued = { role: "custom", ...fp.customDeliveries.at(-1)!.message as object };
-		const user = { role: "user", content: "[pi-munchkin:goal-continuation] user text must survive" };
-		const runtime = Object.assign(Object.create(ExtensionRunner.prototype), {
-			extensions: [{ path: "plan-runner", handlers: fp.handlers }],
-			createContext: () => ctx,
-			emitError: (error: unknown) => assert.fail(JSON.stringify(error)),
-		});
-		assert.equal((await runtime.emitContext([user, queued])).length, 2, "active continuation survives");
-		if (status === "paused") await fp.commands.get("goal-pause").handler("", ctx);
-		else if (status === "blocked") {
-			const result = await callTool(fp, "goal_block", { reason: "fixture unavailable", evidence: ["fixture refused"], unblock_condition: "restore fixture" }, cwd);
-			assert.equal(result.isError, false);
-		} else if (status === "cancelled" || status === "replaced") {
-			await fp.commands.get("goal-cancel").handler("", ctx);
-			if (status === "replaced") await fp.commands.get("goal").handler("a different objective", ctx);
-		} else {
-			const update = await callTool(fp, "goal_update", {
-				criteria: [{ id: "criterion-1", status: "met", evidence: ["fixture passed"] }],
-				progress_evidence: ["fixture passed"], residual_risks: [],
-			}, cwd);
-			assert.equal(update.isError, false);
-			const settled = await callTool(fp, "goal_settle", {
-				outcome: status, delivered_value: "fixture checked", confidence: 1,
-				residual_risks: [], evidence: ["fixture passed"],
-			}, cwd);
-			assert.equal(settled.isError, false);
-		}
-		assert.deepEqual(await runtime.emitContext([user, queued]), [user], status);
-		assert.equal(queued.role, "custom", "dispatcher does not mutate stored history");
-	}
+test("ordinary user text is never filtered merely for resembling a continuation", async () => {
+	resetPiGlobals();
+	const fp = fresh();
+	const runtime = Object.assign(Object.create(ExtensionRunner.prototype), {
+		extensions: [{ path: "plan-runner", handlers: fp.handlers }],
+		createContext: () => ({}), emitError: (error: unknown) => assert.fail(JSON.stringify(error)),
+	});
+	const user = { role: "user", content: "[pi-munchkin:goal-continuation] user text must survive" };
+	assert.deepEqual(await runtime.emitContext([user]), [user]);
 	resetPiGlobals();
 });
 

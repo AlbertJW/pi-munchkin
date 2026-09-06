@@ -11,6 +11,7 @@ import {
 } from "../lib/control-proposal.ts";
 import { emitRivalProposal, fire, makeFakePi, resetPiGlobals } from "./integration-harness.ts";
 import { boardState, noteTool, resetBoard } from "../lib/blackboard.ts";
+import { CONTINUATION_RECEIPT_TYPE, emitContinuationRequest, hashContinuationIdentity } from "../lib/continuation-authority.ts";
 
 function envelope(kind: ControlKind, boundarySequence = 1, effect: ControlEffect = "message"): ControlProposalEnvelope {
 	return {
@@ -178,6 +179,155 @@ test("shadow compares a winner without delivering; enforce delivers exactly one"
 		assert.equal(fp.sent.length, mode === "enforce" ? 1 : 0);
 		if (mode === "enforce") assert.equal(fp.sent[0], "verification_required");
 	}
+});
+
+test("continuations are re-authorized after settlement and never occupy Pi's follow-up queue", async () => {
+	const { fp } = await installed("enforce", "off");
+	const cwd = mkdtempSync(join(tmpdir(), "pi-continuation-"));
+	await fire(fp, "session_start", {}, { cwd });
+	await fire(fp, "agent_start", {}, { cwd });
+	const sessionHash = hashContinuationIdentity(`compat:${cwd}`);
+	emitContinuationRequest(fp.pi.events as never, {
+		request: {
+			v: 1, session_id_hash: sessionHash, owner_id_hash: sessionHash, generation: "revision-1",
+			scope: "goal", reason: "goal", priority: 500, idempotency_key: "goal:one",
+			message: "[pi-munchkin:goal-continuation] continue once", expires_at_ms: Date.now() + 10_000,
+		},
+		authorize: () => true,
+	});
+	await Promise.resolve();
+	assert.equal(fp.deliveries.length, 0, "the active agent cannot receive an unrevocable follow-up");
+	await fire(fp, "agent_settled", {}, { cwd });
+	await Promise.resolve();
+	assert.equal(fp.deliveries.length, 1);
+	assert.equal(fp.deliveries[0].deliverAs, undefined, "idle dispatch opens one fresh Pi turn directly");
+	resetPiGlobals();
+});
+
+test("an authority transition before settlement rejects the queued continuation", async () => {
+	const { fp } = await installed("enforce", "off");
+	const cwd = mkdtempSync(join(tmpdir(), "pi-continuation-reject-"));
+	await fire(fp, "session_start", {}, { cwd });
+	await fire(fp, "agent_start", {}, { cwd });
+	const sessionHash = hashContinuationIdentity(`compat:${cwd}`);
+	let active = true;
+	emitContinuationRequest(fp.pi.events as never, {
+		request: {
+			v: 1, session_id_hash: sessionHash, owner_id_hash: sessionHash, generation: "revision-1",
+			scope: "goal", reason: "goal", priority: 500, idempotency_key: "goal:cancelled",
+			message: "[pi-munchkin:goal-continuation] must not run", expires_at_ms: Date.now() + 10_000,
+		},
+		authorize: () => active,
+	});
+	active = false;
+	await fire(fp, "agent_settled", {}, { cwd });
+	await Promise.resolve();
+	assert.equal(fp.deliveries.length, 0);
+	resetPiGlobals();
+});
+
+test("a transition racing authorization is rechecked before the provider turn", async () => {
+	const { fp } = await installed("enforce", "off");
+	const cwd = mkdtempSync(join(tmpdir(), "pi-continuation-race-"));
+	await fire(fp, "session_start", {}, { cwd });
+	await fire(fp, "agent_start", {}, { cwd });
+	const sessionHash = hashContinuationIdentity(`compat:${cwd}`);
+	let active = true;
+	let calls = 0;
+	let release!: () => void;
+	const held = new Promise<void>((resolve) => { release = resolve; });
+	emitContinuationRequest(fp.pi.events as never, {
+		request: {
+			v: 1, session_id_hash: sessionHash, owner_id_hash: sessionHash, generation: "revision-race",
+			scope: "goal", reason: "goal", priority: 500, idempotency_key: "goal:racing",
+			message: "must not race a pause", expires_at_ms: Date.now() + 10_000,
+		},
+		authorize: async () => {
+			calls += 1;
+			if (calls === 1) { await held; return true; }
+			return active;
+		},
+	});
+	await fire(fp, "agent_settled", {}, { cwd });
+	for (let turn = 0; turn < 4 && calls < 1; turn += 1) await new Promise<void>((resolve) => setImmediate(resolve));
+	assert.equal(calls, 1, "the first authorization read is held open for the transition race");
+	active = false;
+	release();
+	for (let turn = 0; turn < 4; turn += 1) await new Promise<void>((resolve) => setImmediate(resolve));
+	assert.equal(calls, 2, "the authority performs a final generation check");
+	assert.equal(fp.deliveries.length, 0, "the raced continuation is rejected before dispatch");
+	resetPiGlobals();
+});
+
+test("competing continuation offers produce one deterministic winner", async () => {
+	const { fp } = await installed("enforce", "off");
+	const cwd = mkdtempSync(join(tmpdir(), "pi-continuation-competing-"));
+	await fire(fp, "session_start", {}, { cwd });
+	await fire(fp, "agent_start", {}, { cwd });
+	const sessionHash = hashContinuationIdentity(`compat:${cwd}`);
+	const offer = (id: string, priority: number, message: string) => emitContinuationRequest(fp.pi.events as never, {
+		request: {
+			v: 1, session_id_hash: sessionHash, owner_id_hash: sessionHash, generation: `generation-${id}`,
+			scope: "session", reason: "goal", priority, idempotency_key: `goal:${id}`, message, expires_at_ms: Date.now() + 10_000,
+		},
+		authorize: () => true,
+	});
+	offer("low", 100, "low priority");
+	offer("high", 200, "high priority");
+	await fire(fp, "agent_settled", {}, { cwd });
+	await new Promise<void>((resolve) => setImmediate(resolve));
+	assert.equal(fp.deliveries.length, 1, "one idle boundary can start only one provider turn");
+	assert.equal(fp.deliveries[0].text, "high priority");
+	resetPiGlobals();
+});
+
+test("a stale high-priority offer does not suppress a valid lower-priority continuation", async () => {
+	const { fp } = await installed("enforce", "off");
+	const cwd = mkdtempSync(join(tmpdir(), "pi-continuation-fallback-"));
+	await fire(fp, "session_start", {}, { cwd });
+	await fire(fp, "agent_start", {}, { cwd });
+	const sessionHash = hashContinuationIdentity(`compat:${cwd}`);
+	const emit = (id: string, priority: number, message: string, authorize: () => boolean) => emitContinuationRequest(fp.pi.events as never, {
+		request: {
+			v: 1, session_id_hash: sessionHash, owner_id_hash: sessionHash, generation: id,
+			scope: "session", reason: "goal", priority, idempotency_key: `goal:${id}`, message, expires_at_ms: Date.now() + 10_000,
+		}, authorize,
+	});
+	emit("stale", 900, "stale", () => false);
+	emit("valid", 100, "valid fallback", () => true);
+	await fire(fp, "agent_settled", {}, { cwd });
+	await new Promise<void>((resolve) => setImmediate(resolve));
+	assert.equal(fp.deliveries.length, 1);
+	assert.equal(fp.deliveries[0].text, "valid fallback");
+	resetPiGlobals();
+});
+
+test("a reload restores durable continuation receipts and rejects duplicate delivery", async () => {
+	const { fp } = await installed("enforce", "off");
+	const cwd = mkdtempSync(join(tmpdir(), "pi-continuation-reload-"));
+	const reloaded = await import(`../extensions/control-arbiter.ts?reload=${Date.now()}-${Math.random()}`);
+	reloaded.default(fp.pi as never);
+	const sessionId = `reload:${cwd}`;
+	const sessionHash = hashContinuationIdentity(sessionId);
+	const idempotencyKey = "goal:already-delivered";
+	const sessionManager = {
+		getSessionId: () => sessionId,
+		getEntries: () => [{ type: "custom", customType: CONTINUATION_RECEIPT_TYPE, data: { v: 1, idempotency_key: idempotencyKey, session_id_hash: sessionHash, delivered_at_ms: Date.now() } }],
+	};
+	await fire(fp, "session_start", {}, { cwd, sessionManager });
+	await fire(fp, "agent_start", {}, { cwd });
+	emitContinuationRequest(fp.pi.events as never, {
+		request: {
+			v: 1, session_id_hash: sessionHash, owner_id_hash: sessionHash, generation: "generation-1",
+			scope: "session", reason: "goal", priority: 500, idempotency_key: idempotencyKey,
+			message: "duplicate must not run", expires_at_ms: Date.now() + 10_000,
+		},
+		authorize: () => true,
+	});
+	await fire(fp, "agent_settled", {}, { cwd });
+	await new Promise<void>((resolve) => setImmediate(resolve));
+	assert.equal(fp.deliveries.length, 0, "reloaded authority must honor the durable receipt");
+	resetPiGlobals();
 });
 
 test("enforce emits one merged message with correction intact", async () => {

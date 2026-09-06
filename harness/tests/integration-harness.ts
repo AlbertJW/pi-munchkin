@@ -123,7 +123,7 @@ export type RecordedDelivery = {
 	swallowedError?: string;
 };
 
-export function makeFakePi(options: { streaming?: boolean; busHandlers?: Map<string, Set<(data: unknown) => void>> } = {}) {
+export function makeFakePi(options: { streaming?: boolean; busHandlers?: Map<string, Set<(data: unknown) => void>>; eventBus?: { emit: (channel: string, data: unknown) => void; on: (channel: string, handler: (data: unknown) => void) => () => void } } = {}) {
 	const tools = new Map<string, any>();
 	const commands = new Map<string, any>();
 	const handlers = new Map<string, any[]>();
@@ -177,6 +177,23 @@ export function makeFakePi(options: { streaming?: boolean; busHandlers?: Map<str
 		return deliverAs === "followUp" ? "queued-follow-up" : "queued-steer";
 	};
 
+	const events = options.eventBus ?? {
+		// event-bus.js:9-17 wraps EVERY subscriber in an async safeHandler with
+		// try/catch, so one throwing tap can never break emit() or starve later taps.
+		emit: (channel: string, data: unknown) => {
+			for (const handler of busHandlers.get(channel) ?? []) {
+				try {
+					const r: any = handler(data);
+					if (r && typeof r.catch === "function") r.catch((error: unknown) => swallowedErrors.push(error instanceof Error ? error.message : String(error)));
+				} catch (error) { swallowedErrors.push(error instanceof Error ? error.message : String(error)); }
+			}
+		},
+		on: (channel: string, handler: (data: unknown) => void) => {
+			const current = busHandlers.get(channel) ?? new Set();
+			current.add(handler); busHandlers.set(channel, current);
+			return () => current.delete(handler);
+		},
+	};
 	const pi = {
 		registerTool: (t: any) => tools.set(t.name, t),
 		registerCommand: (name: string, def: any) => commands.set(name, def),
@@ -229,33 +246,11 @@ export function makeFakePi(options: { streaming?: boolean; busHandlers?: Map<str
 			description: command.description ?? "",
 			sourceInfo: { source: "test", path: "test" },
 		})),
-		events: {
-			// event-bus.js:9-17 wraps EVERY subscriber in an async safeHandler with
-			// try/catch, so one throwing tap can never break emit() or starve the
-			// subscribers registered after it.
-			emit: (channel: string, data: unknown) => {
-				for (const handler of busHandlers.get(channel) ?? []) {
-					try {
-						const r: any = handler(data);
-						if (r && typeof r.catch === "function") {
-							r.catch((error: unknown) => swallowedErrors.push(error instanceof Error ? error.message : String(error)));
-						}
-					} catch (error) {
-						swallowedErrors.push(error instanceof Error ? error.message : String(error));
-					}
-				}
-			},
-			on: (channel: string, handler: (data: unknown) => void) => {
-				const current = busHandlers.get(channel) ?? new Set();
-				current.add(handler);
-				busHandlers.set(channel, current);
-				return () => current.delete(handler);
-			},
-		},
+		events,
 		appendEntry: (type: string, data: unknown) => entries.push({ type, data }),
 	};
 	return {
-		pi, tools, commands, handlers, sent, deliveries, customDeliveries, entries, busHandlers,
+		pi, tools, commands, handlers, sent, deliveries, customDeliveries, entries, busHandlers, events,
 		swallowedErrors,
 		/** Put the session into/out of the streaming state so delivery rules apply. */
 		setStreaming(value: boolean) { streaming = value; },

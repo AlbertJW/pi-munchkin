@@ -23,6 +23,7 @@ export const EVENT_CATALOG = {
 		winner_kind: "string", winner_source: "string", winner_reason: "string", boundary_sequence: "number",
 		lens_merged: "boolean", verification_merged: "boolean",
 	},
+	"control-arbiter/continuation": { reason: "string", outcome: "string", contenders: "number" },
 	"verify-gate/gate-green-consumed": {},
 	"verify-gate/gate-green-execution-ordered": { started_sequence: "number", ended_sequence: "number" },
 	"verify-gate/steer": { failed: "boolean", fires: "number", sessionFires: "number", injected_chars: "number", turnIndex: "number" },

@@ -31,6 +31,9 @@ import { validCoverage, type ResearchBudget } from "../lib/plan-graph.ts";
 import { claimIdForText, makeEvidenceCard, rememberEvidenceCard } from "../lib/research-evidence.ts";
 import { canonicalResearchUrl } from "../lib/research-evidence.ts";
 import { normalizeResearchQuery, researchReservationRoot, reserveResearchKey } from "../lib/research-reservations.ts";
+import { continuationDispatcherActive, emitContinuationRequest, hashContinuationIdentity } from "../lib/continuation-authority.ts";
+import { goalsEnabled, readCurrentGoal } from "../lib/goal-state.ts";
+import { createHash } from "node:crypto";
 
 // Ketch is the host-side network adapter for local models. The steady-state
 // surface is deliberately only FIND + READ; deep orchestration lives in the
@@ -208,6 +211,7 @@ export function registerKetch(pi: ExtensionAPI, dependencies: KetchDependencies 
 	let lastCitationAudit: ResearchCitationAudit | null = null;
 	let displayedBudget: ResearchBudget = { ...SKILL_BUDGET };
 	let activeResearchCwd: string | null = null;
+	let sessionIdHash: string | null = null;
 	/** Resolve the shared run scope without exposing the run id to the model. */
 	async function activeResearchReservationRoot(): Promise<string | null> {
 		if (!budgetEnabled) return null;
@@ -276,6 +280,7 @@ export function registerKetch(pi: ExtensionAPI, dependencies: KetchDependencies 
 	if (budgetEnabled) {
 		pi.on("session_start", async (_event, ctx) => {
 			activeResearchCwd = typeof ctx?.cwd === "string" ? ctx.cwd : null;
+			sessionIdHash = hashContinuationIdentity(ctx.sessionManager?.getSessionId?.() ?? `compat:${ctx.cwd}`);
 			pageCache.clear();
 			counts = { searches: 0, reads: 0, notes: 0, notesRejected: 0, cacheHits: 0 };
 			noteCount = 0;
@@ -332,13 +337,17 @@ export function registerKetch(pi: ExtensionAPI, dependencies: KetchDependencies 
 			}), { message: msg });
 			if (legacyActed) pi.sendUserMessage(msg, { deliverAs: "steer" });
 		});
-		pi.on("agent_end", async (event) => {
+		pi.on("turn_end", async (event, ctx) => {
+			if (event.message?.role !== "assistant") return;
+			const blocks = "content" in event.message && Array.isArray(event.message.content) ? event.message.content : [];
+			const hasToolCall = blocks.some((block: { type?: unknown }) => block.type === "toolCall");
+			if (hasToolCall) return;
 			// Goal settlement/pause/cancellation is authoritative. A citation
-			// correction queued by this handler must never revive an inactive goal
+			// correction requested by this handler must never revive an inactive goal
 			// after its terminating turn; ordinary research sessions have no goal
 			// context and retain the guard.
-			const goalContext = (globalThis as Record<string, unknown>).__pi_active_goal_context as { status?: unknown } | undefined;
-			if (goalContext && goalContext.status !== "active") return;
+			const goal = goalsEnabled() ? await readCurrentGoal(ctx.cwd) : undefined;
+			if (goal && goal.status !== "active") return;
 			// Keep one guard allowance across retries, compaction, and queued
 			// continuation turns. Reset only at settled/session boundaries; Pi emits
 			// agent_start for every continue(), so resetting there would loop forever.
@@ -347,9 +356,7 @@ export function registerKetch(pi: ExtensionAPI, dependencies: KetchDependencies 
 			// citation correction. The active-tool check also respects explicit
 			// allowlists that intentionally omit the ledger writer.
 			if (counts.reads === 0 || !pi.getActiveTools().includes("research_note")) return;
-			const messages = Array.isArray((event as any)?.messages) ? (event as any).messages : [];
-			const lastAssistant = [...messages].reverse().find((message: any) => message?.role === "assistant");
-			const content = lastAssistant?.content;
+			const content = blocks;
 			const answer = typeof content === "string"
 				? content
 				: Array.isArray(content)
@@ -366,7 +373,31 @@ export function registerKetch(pi: ExtensionAPI, dependencies: KetchDependencies 
 				explicitly_unverified: audit.explicitlyUnverified.length,
 				injected_chars: correction.length,
 			});
-			pi.sendMessage({ customType: "pi-munchkin:research-citation-guard", content: correction, display: true }, { deliverAs: "followUp", triggerTurn: true });
+			const currentSession = sessionIdHash ?? hashContinuationIdentity(ctx.sessionManager?.getSessionId?.() ?? `compat:${ctx.cwd}`);
+			const goalIdHash = goal ? createHash("sha256").update(goal.goal_id).digest("hex") : currentSession;
+			const generation = goal ? createHash("sha256").update(JSON.stringify(goal)).digest("hex") : createHash("sha256").update(answer).digest("hex");
+			const request = {
+				v: 1 as const,
+				session_id_hash: currentSession,
+				owner_id_hash: goalIdHash,
+				generation,
+				scope: goal ? "goal" as const : "session" as const,
+				reason: "citation_correction" as const,
+				priority: 600,
+				idempotency_key: `citation:${currentSession}:${goalIdHash}:${generation}`,
+				message: correction,
+				expires_at_ms: Date.now() + 60_000,
+			};
+			const authorize = async () => {
+				const current = goalsEnabled() ? await readCurrentGoal(ctx.cwd) : undefined;
+				if (!goal) return !current || current.status === "active";
+				return Boolean(current && current.status === "active" &&
+					createHash("sha256").update(current.goal_id).digest("hex") === goalIdHash &&
+					createHash("sha256").update(JSON.stringify(current)).digest("hex") === generation);
+			};
+			// Citation correction is a provider continuation, so it cannot bypass the
+			// shared lifecycle authority when that authority is unavailable.
+			if (continuationDispatcherActive(pi.events)) emitContinuationRequest(pi.events, { request, authorize });
 		});
 		pi.on("agent_settled", async () => {
 			if (counts.searches + counts.reads + counts.notes + counts.notesRejected === 0) return;

@@ -80,9 +80,9 @@ function activationState(): { deferred?: string[]; attempted?: string[]; reason?
  * runtime from the surface the previous generation left behind, NOT from a
  * pristine one.
  */
-async function boot(options: { cwd?: string; carryActive?: string[]; carryBus?: FakePi["busHandlers"] } = {}): Promise<Boot> {
+async function boot(options: { cwd?: string; carryActive?: string[]; carryBus?: FakePi["busHandlers"]; eventBus?: FakePi["events"] } = {}): Promise<Boot> {
 	const cwd = options.cwd ?? projectCwd();
-	const fp = makeFakePi({ busHandlers: options.carryBus });
+	const fp = makeFakePi({ busHandlers: options.carryBus, eventBus: options.eventBus });
 	for (const name of BUILTINS) fp.pi.registerTool({ name, parameters: { type: "object" } } as never);
 	await loadExtensions(fp, specifiers());
 
@@ -241,7 +241,7 @@ test("/reload: bus subscriptions do not accumulate across generations", async ()
 		// swallows it to console.error. Node's default maxListeners is 10 and nothing
 		// raises it, so the FIRST reload already trips MaxListenersExceededWarning on
 		// the domain-signal channel.
-		const warm = await boot({ cwd: cold.cwd, carryActive: cold.active, carryBus: cold.fp.busHandlers });
+		const warm = await boot({ cwd: cold.cwd, carryActive: cold.active, carryBus: cold.fp.busHandlers, eventBus: cold.fp.events });
 
 		const grown = [...before].filter(([channel, count]) => (warm.fp.busHandlers.get(channel)?.size ?? 0) > count)
 			.map(([channel, count]) => `${channel}: ${count} -> ${warm.fp.busHandlers.get(channel)?.size}`);

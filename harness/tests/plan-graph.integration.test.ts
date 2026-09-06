@@ -36,6 +36,7 @@ if (!CHILD) {
 	const { HARNESS_SIGNAL_CHANNEL } = await import("../lib/harness-signals.ts");
 	const { RESEARCH_COVERAGE_KEY } = await import("../lib/branch-report.ts");
 	const { claimIdForText, RESEARCH_EVIDENCE_CARDS_KEY } = await import("../lib/research-evidence.ts");
+	const { onContinuationRequest, setContinuationDispatcherActive } = await import("../lib/continuation-authority.ts");
 	const planRunnerModule = await import("../extensions/plan-runner.ts");
 	const planRunner = planRunnerModule.default;
 	const toolActivation = (await import("../extensions/tool-activation.ts")).default;
@@ -521,6 +522,9 @@ if (!CHILD) {
 
 	test("late terminal branch results queue one parent synthesis follow-up", async () => {
 		const fp = fresh(); const cwd = tmp();
+		const offers: any[] = [];
+		setContinuationDispatcherActive(fp.pi.events as never, true);
+		onContinuationRequest(fp.pi.events as never, (offer: unknown) => offers.push(offer));
 		await fire(fp, "session_start", {}, makeCtx(cwd).ctx);
 		fp.pi.setActiveTools([...fp.tools.keys()]);
 		const started = await callTool(fp, "research_plan_start", {
@@ -547,14 +551,11 @@ if (!CHILD) {
 		const state = JSON.parse(readFileSync(join(cwd, ".pi", "plan-state.json"), "utf8"));
 		assert.equal(typeof state.head_terminal_at, "string", "late result must actually close the graph before follow-up");
 		assert.ok(fp.pi.getActiveTools().includes("plan_settle"), `parent tools were ${fp.pi.getActiveTools().join(",")}`);
-		const followUps = fp.customDeliveries.filter((delivery) => delivery.api === "sendMessage" && /reread/i.test(delivery.text));
-		assert.equal(followUps.length, 1, "a late terminal merge must queue one parent synthesis follow-up");
-		assert.equal(followUps[0].deliverAs, "followUp");
-		assert.equal(followUps[0].triggerTurn, true);
-		assert.match(followUps[0].text, /plan_settle/);
+		assert.equal(offers.length, 1, "a late terminal merge must offer one parent synthesis continuation");
+		assert.match(offers[0].request.message, /plan_settle/);
 		fp.pi.events.emit(HARNESS_SIGNAL_CHANNEL, { v: 1, type: "plan/branch-result", context: leasedContext, report, failureClass: null });
 		await fire(fp, "before_agent_start", {}, makeCtx(cwd).ctx);
-		assert.equal(fp.customDeliveries.filter((delivery) => /reread/i.test(delivery.text)).length, 1, "duplicate terminal arrivals must not queue another synthesis turn");
+		assert.equal(offers.length, 1, "duplicate terminal arrivals must not offer another synthesis turn");
 		resetPiGlobals();
 	});
 

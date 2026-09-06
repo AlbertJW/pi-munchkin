@@ -1,5 +1,8 @@
 # Recommended harness improvements — 2026-09-06
 
+Detailed goals, implementation steps, acceptance criteria, dependencies, and
+progress tracking: [Harness improvement plan](HARNESS_IMPROVEMENT_PLAN_2026-09-06.md).
+
 The audit repairs are committed in `cac3926`; release documentation is in
 `8badd9a`. Both are on main and pushed. The first live-sync attempt was refused
 because a user Pi session remained open. No files were copied by that attempt.

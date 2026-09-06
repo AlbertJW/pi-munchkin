@@ -12,6 +12,7 @@
     "context-surface/summary",
     "context-watcher/compacted",
     "control-arbiter/decision",
+    "control-arbiter/continuation",
     "did-you-mean/hint",
     "drift-scanner/advisory",
     "drift-scanner/review-error",
