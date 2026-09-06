@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import test from "node:test";
+import test, { describe } from "node:test";
 import compactTool from "../extensions/compact-tool.ts";
 import { resetCompactionCoordinator } from "../lib/compaction-coordinator.ts";
 import { fire, makeFakePi } from "./integration-harness.ts";
@@ -13,7 +13,11 @@ process.env.PLAN_STORAGE = "project";
 import { onContinuationRequest, setContinuationDispatcherActive, type ContinuationEnvelope } from "../lib/continuation-authority.ts";
 
 async function flushAsync(): Promise<void> {
-	for (let turn = 0; turn < 4; turn += 1) await new Promise<void>((resolve) => setImmediate(resolve));
+	// Continuation authorization rereads the private goal ledger asynchronously.
+	// A few immediate ticks are insufficient under the full 700+ test process;
+	// yield long enough for the filesystem promise and the event-bus callback to
+	// settle without weakening the production boundary.
+	for (let turn = 0; turn < 20; turn += 1) await new Promise<void>((resolve) => setImmediate(resolve));
 }
 
 function setup() {
@@ -36,6 +40,7 @@ function setup() {
 	return { fp, ctx, notes, offers, execute, get calls() { return calls; }, get options() { return options; } };
 }
 
+describe("compact-tool shared coordinator", { concurrency: 1 }, () => {
 test("compact_context deduplicates and resumes exactly once after completion", { concurrency: false }, async () => {
 	const h = setup();
 	await fire(h.fp, "session_start", {});
@@ -71,7 +76,7 @@ test("compact_context resumes after failure because Pi already aborted the turn"
 	assert.doesNotMatch(visible, /DUMMY_COMPACTION_SECRET|private\.invalid|\/Users\/alice/);
 });
 
-test("default compaction focus is a structured recall-first capsule", async () => {
+test("default compaction focus is a structured recall-first capsule", { concurrency: false }, async () => {
 	const h = setup();
 	await h.execute();
 	assert.match(h.options.customInstructions, /active task and constraints/);
@@ -97,7 +102,7 @@ test("session replacement clears an orphaned in-flight latch", { concurrency: fa
 	assert.equal(h.offers.length, 1);
 });
 
-test("synchronous compact failure releases the shared slot", async () => {
+test("synchronous compact failure releases the shared slot", { concurrency: false }, async () => {
 	resetCompactionCoordinator();
 	const fp = makeFakePi();
 	compactTool(fp.pi as any);
@@ -117,4 +122,5 @@ test("synchronous compact failure releases the shared slot", async () => {
 	assert.doesNotMatch(JSON.stringify({ first, notes }), /DUMMY_SYNC_COMPACTION_SECRET|private\.invalid|\/tmp\/private/);
 	await execute();
 	assert.equal(calls, 2, "a synchronous failure must not wedge future requests");
+});
 });

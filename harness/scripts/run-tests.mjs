@@ -74,9 +74,10 @@ try {
 	const result = spawnSync(
 		process.execPath,
 		// The harness deliberately shares process-local coordinators and event-bus
-		// identity across extension generations. Serial test execution is therefore
-		// part of the fixture contract; Node's default parallel top-level scheduling
-		// can reset a live compaction lease from an unrelated test.
+		// identity across extension generations. Serial test-file execution is part
+		// of the fixture contract; individual tests that hold a shared coordinator
+		// also opt out of Node's intra-file concurrency. Parallel scheduling can
+		// otherwise reset a live compaction lease from an unrelated test.
 		["--experimental-strip-types", "--test-concurrency=1", "--test", ...tests],
 		{
 			cwd: process.cwd(),
