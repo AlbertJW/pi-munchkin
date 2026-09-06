@@ -186,10 +186,8 @@ function offerContinuation(
 	pi: ExtensionAPI,
 	request: ContinuationRequestV1,
 	authorize: () => boolean | Promise<boolean>,
-): void {
-	if (continuationDispatcherActive(pi.events)) {
-		emitContinuationRequest(pi.events, { request, authorize });
-	}
+): boolean {
+	return continuationDispatcherActive(pi.events) && emitContinuationRequest(pi.events, { request, authorize });
 }
 
 function goalContinuationInstruction(goal: GoalState, decision: "continue" | "settle"): string {
@@ -211,8 +209,7 @@ async function offerGoalContinuation(pi: ExtensionAPI, ctx: { cwd: string; sessi
 	const sessionIdHash = hashContinuationIdentity(ctx.sessionManager?.getSessionId?.() ?? `compat:${ctx.cwd}`);
 	const offerKey = `${goal.goal_id}:${revision}`;
 	if (goalContinuationOffers().has(offerKey)) return;
-	goalContinuationOffers().add(offerKey);
-	offerContinuation(pi, {
+	const accepted = offerContinuation(pi, {
 		v: 1,
 		session_id_hash: sessionIdHash,
 		owner_id_hash: goalIdHash,
@@ -230,6 +227,7 @@ async function offerGoalContinuation(pi: ExtensionAPI, ctx: { cwd: string; sessi
 			createHash("sha256").update(JSON.stringify(current)).digest("hex") === revision &&
 			goalContinuationDecision(current) === decision);
 	});
+	if (accepted) goalContinuationOffers().add(offerKey);
 }
 
 function goalEvent(kind: string, goal: GoalState | undefined, detail: Record<string, unknown> = {}): void {
@@ -1742,11 +1740,10 @@ async function queueResearchSynthesisFollowUp(outcome: MergeOutcome): Promise<vo
 		const oldest = researchSynthesisFollowUps.values().next().value;
 		if (typeof oldest === "string") researchSynthesisFollowUps.delete(oldest);
 	}
-	researchSynthesisFollowUps.add(key);
 	const cwd = lastSessionCwd;
 	const runIdHash = signalRunId(outcome.runId);
 	const terminalGeneration = outcome.headTerminalAt;
-	offerContinuation(api, {
+	const accepted = offerContinuation(api, {
 		v: 1,
 		session_id_hash: lastSessionIdHash,
 		owner_id_hash: runIdHash,
@@ -1761,6 +1758,7 @@ async function queueResearchSynthesisFollowUp(outcome: MergeOutcome): Promise<vo
 		const current = await readState(cwd);
 		return current?.run_id === outcome.runId && current.head_terminal_at === terminalGeneration && !current.settled_at;
 	});
+	if (accepted) researchSynthesisFollowUps.add(key);
 }
 
 /**

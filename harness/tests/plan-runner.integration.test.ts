@@ -464,6 +464,25 @@ test("goal agent_end offers one bounded continuation request per revision and st
 	resetPiGlobals();
 });
 
+test("an unavailable continuation authority does not consume the goal retry key", async () => {
+	const fp = makeFakePi();
+	for (const name of ["read", "bash", "edit", "write", "verify_project"]) fp.pi.registerTool({ name, parameters: {} } as any);
+	planRunner(fp.pi as any);
+	fp.pi.setActiveTools([...fp.tools.keys()]);
+	const cwd = tmp();
+	const { ctx } = makeCtx(cwd);
+	const offers: ContinuationEnvelope[] = [];
+	onContinuationRequest(fp.pi.events as never, (offer) => offers.push(offer));
+	await fp.commands.get("goal").handler("retry after authority startup", ctx);
+	setContinuationDispatcherActive(fp.pi.events as never, false);
+	await fire(fp, "agent_end", {}, { ...ctx, cwd });
+	assert.equal(offers.length, 0);
+	setContinuationDispatcherActive(fp.pi.events as never, true);
+	await fire(fp, "agent_end", {}, { ...ctx, cwd });
+	assert.equal(offers.length, 1, "the same revision can be offered once the authority is available");
+	resetPiGlobals();
+});
+
 test("context test double matches installed Pi for valid and invalid callback return shapes", async () => {
 	const messages = [{ role: "user", content: "retain" }];
 	for (const result of [undefined, [], { messages: [] }]) {
