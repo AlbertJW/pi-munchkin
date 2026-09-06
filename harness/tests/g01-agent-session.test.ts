@@ -6,7 +6,7 @@ import test from "node:test";
 import { Agent, type AgentTool } from "@earendil-works/pi-agent-core";
 import {
 	AgentSession, AuthStorage, createEventBus,
-	ModelRegistry, SessionManager, SettingsManager, type ResourceLoader,
+	ModelRegistry, SessionManager, SettingsManager, convertToLlm, type ResourceLoader,
 } from "@earendil-works/pi-coding-agent";
 import { createExtensionRuntime, loadExtensionFromFactory } from "../../node_modules/@earendil-works/pi-coding-agent/dist/core/extensions/index.js";
 import { createAssistantMessageEventStream, type AssistantMessage, type Model } from "@earendil-works/pi-ai";
@@ -90,13 +90,19 @@ async function sessionFixture(cwd: string, afterFirstEnd?: () => Promise<void>, 
 	const requestTexts: string[] = [];
 	const agent = new Agent({
 		initialState: { systemPrompt: "", model, thinkingLevel: "off", tools: [] },
+		// AgentSession's SDK path supplies coding-agent's converter, which turns
+		// extension custom messages into LLM user messages. Use that real converter
+		// here instead of Agent's low-level default (which intentionally filters
+		// custom roles) so this fixture exercises the production contract.
+		convertToLlm,
 		streamFn: (_model, context) => {
 			requestCount += 1;
-		requestTexts.push(context.messages.map((message) => {
-			if (message.role !== "user") return message.role;
-			if (typeof message.content === "string") return message.content;
-			return message.content.map((part) => part.type === "text" ? part.text : "[image]").join("\n");
-		}).join(" | "));
+			requestTexts.push(context.messages.map((message) => {
+				const content = message.content;
+				if (typeof content === "string") return content;
+				if (Array.isArray(content)) return content.map((part) => part.type === "text" ? part.text : "[non-text]").join("\n");
+				return message.role;
+			}).join(" | "));
 			const stream = createAssistantMessageEventStream();
 			const message = withCompaction && requestCount === 1
 				? { ...response(), content: [{ type: "toolCall" as const, id: "g01-compact-call", name: "compact_context", arguments: {} }], stopReason: "toolUse" as const }
@@ -234,4 +240,23 @@ test("G01-E: real AgentSession compaction cannot resume an inactive goal", async
 	assert.equal((await readCurrentGoal(cwd))?.status, "paused", "compaction must preserve the inactive status");
 	assert.equal(continuationOffers(), 0, "inactive goals cannot enqueue a continuation after compaction");
 	assert.equal(requests(), 2, "the compact tool's tool-call and tool-result exchange remains one user turn; no hidden continuation was started");
+});
+
+test("G01-E: a fresh real AgentSession recovers the active goal after compaction", async () => {
+	const cwd = mkdtempSync(join(tmpdir(), "pi-g01-recovery-"));
+	const goal = createGoal({ cwd, objective: "Recover the complete objective", criteria: [{ id: "evidence", text: "Retain the required evidence criterion", required: true }] });
+	await mutateGoal(cwd, async () => ({ goal, result: undefined }));
+	const first = await sessionFixture(cwd, undefined, false, true);
+	await first.session.sendUserMessage("compact before restarting the session");
+	await first.session.waitForIdle();
+	for (let turns = 0; turns < 80 && first.compactions() < 1; turns += 1) await new Promise<void>((resolve) => setImmediate(resolve));
+	assert.equal(first.compactions(), 1, "the first real session committed a compaction entry");
+	assert.equal((await readExecutableGoal(cwd))?.objective, goal.objective, "the durable ledger still owns the full objective");
+
+	const recovered = await sessionFixture(cwd);
+	await recovered.session.sendUserMessage("continue from the recovered goal");
+	await recovered.session.waitForIdle();
+	assert.match(recovered.requestTexts()[0]!, /Recover the complete objective/, "the new AgentSession received the recovered objective");
+	assert.match(recovered.requestTexts()[0]!, /Retain the required evidence criterion/, "the new AgentSession received the recovered criterion");
+	assert.equal((await readExecutableGoal(cwd))?.status, "active", "recovery does not downgrade the executable goal");
 });
