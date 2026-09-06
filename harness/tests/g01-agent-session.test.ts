@@ -12,7 +12,9 @@ import { createExtensionRuntime, loadExtensionFromFactory } from "../../node_mod
 import { createAssistantMessageEventStream, type AssistantMessage, type Model } from "@earendil-works/pi-ai";
 import planRunner from "../extensions/plan-runner.ts";
 import controlArbiter from "../extensions/control-arbiter.ts";
-import { blockGoal, cancelGoal, createGoal, mutateGoal, pauseGoal, readCurrentGoal, settleGoal } from "../lib/goal-state.ts";
+import compactTool from "../extensions/compact-tool.ts";
+import { resetCompactionCoordinator } from "../lib/compaction-coordinator.ts";
+import { blockGoal, cancelGoal, createGoal, mutateGoal, pauseGoal, readCurrentGoal, readExecutableGoal, settleGoal } from "../lib/goal-state.ts";
 import { onContinuationRequest } from "../lib/continuation-authority.ts";
 import { Type } from "typebox";
 
@@ -33,19 +35,45 @@ function response(): AssistantMessage {
 	};
 }
 
-async function sessionFixture(cwd: string, afterFirstEnd?: () => Promise<void>, withTool = false): Promise<{ session: AgentSession; requests: () => number; requestTexts: () => string[]; settles: () => number; toolExecutions: () => number; continuationOffers: () => number }> {
+async function sessionFixture(cwd: string, afterFirstEnd?: () => Promise<void>, withTool = false, withCompaction = false): Promise<{ session: AgentSession; requests: () => number; requestTexts: () => string[]; settles: () => number; toolExecutions: () => number; continuationOffers: () => number; compactions: () => number }> {
 	(globalThis as Record<string, unknown>).__pi_run_capsule_identity = { cwd, capsuleId: "g01-agent-session", runIdHash: null };
 	const bus = createEventBus();
 	const runtime = createExtensionRuntime();
 	let ends = 0;
 	let settled = 0;
 	let toolExecutions = 0;
+	let compactions = 0;
+	resetCompactionCoordinator();
+	const sessionManager = SessionManager.inMemory(cwd);
+	const settingsManager = SettingsManager.inMemory(withCompaction ? { compaction: { keepRecentTokens: 1 } } : {});
+	// Seed enough real session history for Pi's cut-point algorithm to have
+	// something to summarize. These are persisted through SessionManager, then
+	// loaded into Agent.state by the actual AgentSession constructor.
+	if (withCompaction) {
+		for (let index = 0; index < 6; index += 1) {
+			sessionManager.appendMessage({ role: "user", content: `old user context ${index}`, timestamp: Date.now() } as any);
+			sessionManager.appendMessage({ role: "assistant", content: [{ type: "text", text: `old assistant context ${index}` }], api: model.api, provider: model.provider, model: model.id, stopReason: "stop", timestamp: Date.now(), usage: response().usage } as any);
+		}
+	}
 	const pauseExtension = afterFirstEnd
 		? [(pi: Parameters<typeof planRunner>[0]) => pi.on("agent_end", async () => { if (++ends === 1) await afterFirstEnd(); })]
 		: [];
 	const extensions = await Promise.all([
 		loadExtensionFromFactory(planRunner, cwd, bus, runtime, "g01-plan-runner"),
 		loadExtensionFromFactory(controlArbiter, cwd, bus, runtime, "g01-control-arbiter"),
+		...(withCompaction ? [loadExtensionFromFactory(compactTool, cwd, bus, runtime, "g01-compact-tool")] : []),
+		...(withCompaction ? [loadExtensionFromFactory((pi) => {
+			pi.on("session_before_compact", async (event: any) => {
+				compactions += 1;
+				return { compaction: {
+					summary: "G01 deterministic compaction preserved the active task and goal state.",
+					firstKeptEntryId: event.preparation.firstKeptEntryId,
+					tokensBefore: event.preparation.tokensBefore,
+					estimatedTokensAfter: 12,
+					details: { source: "g01-real-agent-session" },
+				} };
+			});
+		}, cwd, bus, runtime, "g01-compaction-source")] : []),
 		loadExtensionFromFactory((pi) => {
 			pi.on("agent_settled", async () => { settled += 1; });
 			pi.on("tool_execution_start", async () => { toolExecutions += 1; });
@@ -70,7 +98,9 @@ async function sessionFixture(cwd: string, afterFirstEnd?: () => Promise<void>, 
 			return message.content.map((part) => part.type === "text" ? part.text : "[image]").join("\n");
 		}).join(" | "));
 			const stream = createAssistantMessageEventStream();
-			const message = withTool && requestCount === 1
+			const message = withCompaction && requestCount === 1
+				? { ...response(), content: [{ type: "toolCall" as const, id: "g01-compact-call", name: "compact_context", arguments: {} }], stopReason: "toolUse" as const }
+				: withTool && requestCount === 1
 				? { ...response(), content: [{ type: "toolCall" as const, id: "g01-tool-call", name: "g01_echo", arguments: { value: "fixture" } }], stopReason: "toolUse" as const }
 				: response();
 			stream.push({ type: "start", partial: message });
@@ -84,14 +114,15 @@ async function sessionFixture(cwd: string, afterFirstEnd?: () => Promise<void>, 
 	};
 	const authStorage = AuthStorage.inMemory({ test: { type: "api_key", key: "scripted-no-network" } });
 	const session = new AgentSession({
-		agent, cwd, sessionManager: SessionManager.inMemory(cwd), settingsManager: SettingsManager.inMemory(),
+		agent, cwd, sessionManager, settingsManager,
 		resourceLoader, modelRegistry: ModelRegistry.inMemory(authStorage), initialActiveToolNames: withTool ? ["g01_echo"] : [],
 		baseToolsOverride: withTool ? { g01_echo: tool } : {},
 	});
+	if (withCompaction) session.setActiveToolsByName(["compact_context"]);
 	await session.bindExtensions({ onError: (error) => assert.fail(`${error.extensionPath}:${error.event}:${error.error}`) });
 	let offers = 0;
 	onContinuationRequest(bus, () => { offers += 1; });
-	return { session, requests: () => requestCount, requestTexts: () => requestTexts, settles: () => settled, toolExecutions: () => toolExecutions, continuationOffers: () => offers };
+	return { session, requests: () => requestCount, requestTexts: () => requestTexts, settles: () => settled, toolExecutions: () => toolExecutions, continuationOffers: () => offers, compactions: () => compactions };
 }
 
 test("G01-A: a real AgentSession does not start a queued goal turn after pause commits", async () => {
@@ -170,4 +201,37 @@ test("G01-E: request and tool execution counts come from one real AgentSession l
 	assert.equal(requests(), 2, "the provider sees the tool-call turn and the tool-result turn");
 	assert.equal(toolExecutions(), 1, "the harness counts the actual AgentSession tool execution event");
 	assert.equal(settles(), 1, "the tool call and result remain one settled user turn");
+});
+
+test("G01-E: real AgentSession compaction preserves an active goal and resumes once", async () => {
+	const cwd = mkdtempSync(join(tmpdir(), "pi-g01-compaction-active-"));
+	const goal = createGoal({ cwd, objective: "Survive real compaction" });
+	await mutateGoal(cwd, async () => ({ goal, result: undefined }));
+	const { session, requests, compactions, continuationOffers } = await sessionFixture(cwd, undefined, false, true);
+	await session.sendUserMessage("compact the active goal context");
+	await session.waitForIdle();
+	for (let turns = 0; turns < 40 && requests() < 2; turns += 1) {
+		await new Promise<void>((resolve) => setImmediate(resolve));
+	}
+	for (let turns = 0; turns < 80 && compactions() < 1; turns += 1) await new Promise<void>((resolve) => setImmediate(resolve));
+	assert.equal(compactions(), 1, "Pi emitted session_before_compact and used the deterministic compaction result");
+	assert.equal((await readExecutableGoal(cwd))?.status, "active", "compaction must not change the authoritative active goal");
+	assert.equal(continuationOffers(), 1, "the compact tool emits one authority offer after real compaction");
+	assert.equal(requests(), 2, "the authority-approved post-compaction turn is a second real provider request");
+	assert.equal(session.sessionManager.getEntries().some((entry) => entry.type === "compaction" && entry.fromHook === true), true, "Pi persisted the extension-provided compaction entry");
+});
+
+test("G01-E: real AgentSession compaction cannot resume an inactive goal", async () => {
+	const cwd = mkdtempSync(join(tmpdir(), "pi-g01-compaction-paused-"));
+	const goal = createGoal({ cwd, objective: "Do not resume after pause" });
+	await mutateGoal(cwd, async () => ({ goal, result: undefined }));
+	await mutateGoal(cwd, async (current) => ({ goal: pauseGoal(current!), result: undefined }));
+	const { session, requests, compactions, continuationOffers } = await sessionFixture(cwd, undefined, false, true);
+	await session.sendUserMessage("compact the paused goal context");
+	await session.waitForIdle();
+	for (let turns = 0; turns < 20; turns += 1) await new Promise<void>((resolve) => setImmediate(resolve));
+	assert.equal(compactions(), 1, "the real compaction lifecycle still ran for a paused goal");
+	assert.equal((await readCurrentGoal(cwd))?.status, "paused", "compaction must preserve the inactive status");
+	assert.equal(continuationOffers(), 0, "inactive goals cannot enqueue a continuation after compaction");
+	assert.equal(requests(), 2, "the compact tool's tool-call and tool-result exchange remains one user turn; no hidden continuation was started");
 });
