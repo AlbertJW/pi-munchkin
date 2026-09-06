@@ -66,7 +66,11 @@ export default function (pi: ExtensionAPI): void {
 			// turn here avoids placing an irrevocable message in Pi's private queue;
 			// the lifecycle authority has therefore checked the durable state at the
 			// exact dispatch boundary.
-			void pi.sendUserMessage(candidate.request.message);
+			// Pi 0.80.6 can report `agent_settled` one event before its
+			// sendUserMessage guard observes idle. `followUp` is safe in both
+			// states: it queues while still processing and starts immediately
+			// once idle, so the receipt cannot be recorded for a lost message.
+			void pi.sendUserMessage(candidate.request.message, { deliverAs: "followUp" });
 			return;
 		}
 	};
@@ -100,6 +104,8 @@ export default function (pi: ExtensionAPI): void {
 		continuationLive = false;
 		pendingContinuations = [];
 		disposeContinuation();
+		setControlArbiterActive(pi.events, false);
+		setContinuationDispatcherActive(pi.events, false);
 	});
 	pi.on("agent_start", async () => {
 		agentActive = true;

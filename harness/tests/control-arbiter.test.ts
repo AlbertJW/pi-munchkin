@@ -11,7 +11,7 @@ import {
 } from "../lib/control-proposal.ts";
 import { emitRivalProposal, fire, makeFakePi, resetPiGlobals } from "./integration-harness.ts";
 import { boardState, noteTool, resetBoard } from "../lib/blackboard.ts";
-import { CONTINUATION_RECEIPT_TYPE, emitContinuationRequest, hashContinuationIdentity } from "../lib/continuation-authority.ts";
+import { CONTINUATION_RECEIPT_TYPE, continuationDispatcherActive, emitContinuationRequest, hashContinuationIdentity, setContinuationDispatcherActive } from "../lib/continuation-authority.ts";
 
 function envelope(kind: ControlKind, boundarySequence = 1, effect: ControlEffect = "message"): ControlProposalEnvelope {
 	return {
@@ -200,7 +200,32 @@ test("continuations are re-authorized after settlement and never occupy Pi's fol
 	await fire(fp, "agent_settled", {}, { cwd });
 	await Promise.resolve();
 	assert.equal(fp.deliveries.length, 1);
-	assert.equal(fp.deliveries[0].deliverAs, undefined, "idle dispatch opens one fresh Pi turn directly");
+	assert.equal(fp.deliveries[0].effective, "delivered", "an idle dispatch still opens one fresh Pi turn directly");
+	resetPiGlobals();
+});
+
+test("continuation dispatch queues a follow-up when Pi still reports processing at agent_settled", async () => {
+	const { fp } = await installed("enforce", "off");
+	const cwd = mkdtempSync(join(tmpdir(), "pi-continuation-processing-boundary-"));
+	await fire(fp, "session_start", {}, { cwd });
+	await fire(fp, "agent_start", {}, { cwd });
+	fp.setStreaming(true); // Pi 0.80.6 can emit agent_settled before sendUserMessage observes idle.
+	const sessionHash = hashContinuationIdentity(`compat:${cwd}`);
+	emitContinuationRequest(fp.pi.events as never, {
+		request: {
+			v: 1, session_id_hash: sessionHash, owner_id_hash: sessionHash, generation: "revision-processing",
+			scope: "goal", reason: "goal", priority: 500, idempotency_key: "goal:processing-boundary",
+			message: "[pi-munchkin:goal-continuation] queue safely", expires_at_ms: Date.now() + 10_000,
+		},
+		authorize: () => true,
+	});
+	await Promise.resolve();
+	await fire(fp, "agent_settled", {}, { cwd });
+	await new Promise((resolve) => setTimeout(resolve, 0));
+	assert.equal(fp.deliveries.length, 1);
+	assert.equal(fp.deliveries[0].deliverAs, "followUp", "a processing boundary must queue, not lose, the continuation");
+	assert.equal(fp.deliveries[0].effective, "queued-follow-up");
+	assert.equal(fp.swallowedErrors.length, 0);
 	resetPiGlobals();
 });
 
@@ -467,6 +492,32 @@ test("enforce fails safe when an explicitly selected surface omits the arbiter",
 		setControlArbiterActive(fp.pi.events as never, false);
 		assert.equal(controlEnforces(fp.pi.events as never), false);
 	} finally {
+		if (previous === undefined) delete process.env.CONTROL_ARBITER; else process.env.CONTROL_ARBITER = previous;
+	}
+});
+
+test("arbiter and dispatcher state crosses Pi per-extension event wrappers", () => {
+	const previous = process.env.CONTROL_ARBITER;
+	process.env.CONTROL_ARBITER = "enforce";
+	resetPiGlobals();
+	try {
+		const fp = makeFakePi();
+		const wrap = () => ({
+			emit: fp.pi.events.emit.bind(fp.pi.events),
+			on: fp.pi.events.on.bind(fp.pi.events),
+		}) as never;
+		const arbiterWrapper = wrap();
+		const producerWrapper = wrap();
+		setControlArbiterActive(arbiterWrapper, true);
+		setContinuationDispatcherActive(arbiterWrapper, true);
+		assert.equal(controlEnforces(producerWrapper), true, "control enforcement must see the shared emitter");
+		assert.equal(continuationDispatcherActive(producerWrapper), true, "continuation producers must see the shared dispatcher");
+		setControlArbiterActive(arbiterWrapper, false);
+		setContinuationDispatcherActive(arbiterWrapper, false);
+		assert.equal(controlEnforces(producerWrapper), false);
+		assert.equal(continuationDispatcherActive(producerWrapper), false);
+	} finally {
+		resetPiGlobals();
 		if (previous === undefined) delete process.env.CONTROL_ARBITER; else process.env.CONTROL_ARBITER = previous;
 	}
 });

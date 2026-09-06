@@ -52,20 +52,39 @@ const HASH = /^[a-f0-9]{64}$/;
 const REASONS = new Set<ContinuationReason>(["goal", "research_synthesis", "citation_correction", "context_handoff", "compaction_resume", "drift_review"]);
 const SCOPES = new Set<ContinuationScope>(["goal", "plan", "session"]);
 const ACTIVE_DISPATCHER_KEY = "__pi_continuation_dispatcher_active_v1";
+const DISPATCHER_PROBE_CHANNEL = "pi-munchkin/continuation-dispatcher-probe/v1";
+const DISPATCHER_PROBE_DISPOSER_KEY = "__pi_continuation_dispatcher_probe_disposer_v1";
 
 export function hashContinuationIdentity(value: string): string {
 	return createHash("sha256").update(value).digest("hex");
 }
 
 export function continuationDispatcherActive(bus: EventBus): boolean {
-	// Extensions are evaluated by Pi's isolated loader. A module-global WeakSet
-	// is not reliable across those loader realms, while the EventBus object is
-	// the one stable identity all extensions actually share.
-	return Reflect.get(bus, ACTIVE_DISPATCHER_KEY) === true;
+	// Pi gives each extension a distinct `events` wrapper, even though all
+	// wrappers delegate to the same underlying emitter. A property on one
+	// wrapper is therefore invisible to the next extension. Probe the shared
+	// channel instead; the active arbiter answers synchronously before emit()
+	// returns, while unrelated AgentSessions have different emitters.
+	if (Reflect.get(bus, ACTIVE_DISPATCHER_KEY) === true) return true;
+	const probe = { active: false };
+	bus.emit(DISPATCHER_PROBE_CHANNEL, probe);
+	return probe.active;
 }
 
 export function setContinuationDispatcherActive(bus: EventBus, active: boolean): void {
+	const previous = Reflect.get(bus, DISPATCHER_PROBE_DISPOSER_KEY);
+	if (typeof previous === "function") {
+		try { previous(); } catch { /* stale extension wrapper */ }
+		Reflect.deleteProperty(bus, DISPATCHER_PROBE_DISPOSER_KEY);
+	}
 	Reflect.set(bus, ACTIVE_DISPATCHER_KEY, active);
+	if (!active) return;
+	const dispose = bus.on(DISPATCHER_PROBE_CHANNEL, (value) => {
+		if (value && typeof value === "object" && !Array.isArray(value)) {
+			Reflect.set(value, "active", true);
+		}
+	});
+	Reflect.set(bus, DISPATCHER_PROBE_DISPOSER_KEY, dispose);
 }
 
 export function isContinuationRequest(value: unknown): value is ContinuationRequestV1 {

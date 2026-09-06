@@ -128,6 +128,8 @@ const FACTORIES = new Set<MessageFactoryId>([
 const EFFECTS = new Set<ControlEffect>(["message", "abort", "shutdown"]);
 const HASH = /^[a-f0-9]{64}$/;
 const ACTIVE_ARBITERS_KEY = "__pi_control_arbiter_buses_v1";
+const ARBITER_PROBE_CHANNEL = "pi-munchkin/control-arbiter-probe/v1";
+const ARBITER_PROBE_DISPOSER_KEY = "__pi_control_arbiter_probe_disposer_v1";
 export const CONTROL_ARBITER_DEFAULT: ControlArbiterMode = "enforce";
 
 function activeArbiters(): WeakSet<object> {
@@ -145,11 +147,31 @@ export function controlArbiterMode(
 }
 
 export function setControlArbiterActive(bus: EventBus, active: boolean): void {
-	if (active) activeArbiters().add(bus as object); else activeArbiters().delete(bus as object);
+	// The Pi loader exposes a fresh events wrapper to every extension. Keep the
+	// local marker for the conformance double, and publish a probe on the shared
+	// emitter so production wrappers can discover the same arbiter.
+	const previous = Reflect.get(bus, ARBITER_PROBE_DISPOSER_KEY);
+	if (typeof previous === "function") {
+		try { previous(); } catch { /* stale extension wrapper */ }
+		Reflect.deleteProperty(bus, ARBITER_PROBE_DISPOSER_KEY);
+	}
+	if (active) {
+		activeArbiters().add(bus as object);
+		const dispose = bus.on(ARBITER_PROBE_CHANNEL, (value) => {
+			if (value && typeof value === "object" && !Array.isArray(value)) Reflect.set(value, "active", true);
+		});
+		Reflect.set(bus, ARBITER_PROBE_DISPOSER_KEY, dispose);
+	} else {
+		activeArbiters().delete(bus as object);
+	}
 }
 
 export function controlEnforces(bus: EventBus, env: NodeJS.ProcessEnv = process.env): boolean {
-	return controlArbiterMode(env) === "enforce" && activeArbiters().has(bus as object);
+	if (controlArbiterMode(env) !== "enforce") return false;
+	if (activeArbiters().has(bus as object)) return true;
+	const probe = { active: false };
+	bus.emit(ARBITER_PROBE_CHANNEL, probe);
+	return probe.active;
 }
 
 function hash(value: string): string {
