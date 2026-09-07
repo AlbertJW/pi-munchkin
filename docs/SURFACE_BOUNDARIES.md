@@ -285,6 +285,19 @@ The live mirror has not yet been updated. After a clean pushed commit is
 applied, record the exact loaded hash and require `mirror:check` to report zero
 drift before treating this boundary as synchronized.
 
+## Live mirror receipt — 2026-09-07 (G02–G04 package sync)
+
+Source commits `c9a558d` and `e7722f5` are pushed to `origin/main`. The clean
+source surface is
+`68d1152c8e30673f67a2ae0ee6e06acc43e859536b9d36d391b1184ddc26e0f2`; the
+loaded surface at `/Users/Albert.Wessels/.pi/agent` is
+`bd369952472888b99d2e04642b0a2edb1ed9d08a575fc33e43ea970e630ffa84`.
+With no Pi process running, `mirror:apply` wrote 128 first-party artifacts and
+`mirror:check` reported zero drift, with no unmanaged extensions or orphans.
+The context-admission and planner/research surfaces remain opt-in or dark;
+this receipt records synchronization only, not model-quality evidence or
+candidate adoption.
+
 ## Data at rest: where a research session actually lands (updated 2026-08-10)
 
 A surface hash bounds what the MODEL sees. It says nothing about what a session LEAVES. Those are
