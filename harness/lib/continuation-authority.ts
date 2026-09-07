@@ -1,4 +1,4 @@
-import { createHash } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import type { EventBus } from "@earendil-works/pi-coding-agent";
 
 /**
@@ -54,6 +54,8 @@ const SCOPES = new Set<ContinuationScope>(["goal", "plan", "session"]);
 const ACTIVE_DISPATCHER_KEY = "__pi_continuation_dispatcher_active_v1";
 const DISPATCHER_PROBE_CHANNEL = "pi-munchkin/continuation-dispatcher-probe/v1";
 const DISPATCHER_PROBE_DISPOSER_KEY = "__pi_continuation_dispatcher_probe_disposer_v1";
+const DISPATCHER_REPLACE_CHANNEL = "pi-munchkin/continuation-dispatcher-replace/v1";
+const AUTHORITY_REPLACE_CHANNEL = "pi-munchkin/continuation-authority-replace/v1";
 
 export function hashContinuationIdentity(value: string): string {
 	return createHash("sha256").update(value).digest("hex");
@@ -78,11 +80,30 @@ export function setContinuationDispatcherActive(bus: EventBus, active: boolean):
 		Reflect.deleteProperty(bus, DISPATCHER_PROBE_DISPOSER_KEY);
 	}
 	Reflect.set(bus, ACTIVE_DISPATCHER_KEY, active);
+	// As with continuation authority, the event wrapper is replaced on reload
+	// while the underlying emitter survives. Notify the old generation even when
+	// this generation is disabling the dispatcher, otherwise producers on a new
+	// wrapper can still observe the stale probe and bypass the intended rollback.
+	const generation = active ? randomUUID() : null;
+	bus.emit(DISPATCHER_REPLACE_CHANNEL, { v: 1, generation });
 	if (!active) return;
-	const dispose = bus.on(DISPATCHER_PROBE_CHANNEL, (value) => {
-		if (value && typeof value === "object" && !Array.isArray(value)) {
-			Reflect.set(value, "active", true);
-		}
+	let disposed = false;
+	let disposeProbe: (() => void) | undefined;
+	let disposeReplacement: (() => void) | undefined;
+	const dispose = () => {
+		if (disposed) return;
+		disposed = true;
+		try { disposeProbe?.(); } catch { /* stale event wrapper */ }
+		try { disposeReplacement?.(); } catch { /* stale event wrapper */ }
+		if (Reflect.get(bus, DISPATCHER_PROBE_DISPOSER_KEY) === dispose) Reflect.deleteProperty(bus, DISPATCHER_PROBE_DISPOSER_KEY);
+	};
+	disposeProbe = bus.on(DISPATCHER_PROBE_CHANNEL, (value) => {
+		if (value && typeof value === "object" && !Array.isArray(value)) Reflect.set(value, "active", true);
+	});
+	disposeReplacement = bus.on(DISPATCHER_REPLACE_CHANNEL, (value) => {
+		if (!value || typeof value !== "object" || Array.isArray(value)) return;
+		const replacement = value as { v?: unknown; generation?: unknown };
+		if (replacement.v === 1 && replacement.generation !== generation) dispose();
 	});
 	Reflect.set(bus, DISPATCHER_PROBE_DISPOSER_KEY, dispose);
 }
@@ -137,13 +158,31 @@ export function replaceContinuationAuthority(bus: EventBus, handler: (envelope: 
 	if (typeof previous === "function") {
 		try { previous(); } catch { /* a stale Pi generation is already inert */ }
 	}
-	const dispose = onContinuationRequest(bus, handler);
-	Reflect.set(bus, AUTHORITY_DISPOSER_KEY, dispose);
-	return () => {
-		if (Reflect.get(bus, AUTHORITY_DISPOSER_KEY) !== dispose) return;
-		dispose();
-		Reflect.deleteProperty(bus, AUTHORITY_DISPOSER_KEY);
+	// Pi creates a fresh EventBus wrapper for each extension reload, while the
+	// underlying emitter (and its subscriptions) survives. A marker on `bus`
+	// alone cannot see the previous wrapper. Broadcast a replacement token on a
+	// shared channel so the prior generation removes both its request and
+	// replacement listeners before this generation is installed.
+	const generation = randomUUID();
+	bus.emit(AUTHORITY_REPLACE_CHANNEL, { v: 1, generation });
+	let disposed = false;
+	let disposeRequests: (() => void) | undefined;
+	let disposeReplacement: (() => void) | undefined;
+	const dispose = () => {
+		if (disposed) return;
+		disposed = true;
+		try { disposeRequests?.(); } catch { /* stale event wrapper */ }
+		try { disposeReplacement?.(); } catch { /* stale event wrapper */ }
+		if (Reflect.get(bus, AUTHORITY_DISPOSER_KEY) === dispose) Reflect.deleteProperty(bus, AUTHORITY_DISPOSER_KEY);
 	};
+	disposeReplacement = bus.on(AUTHORITY_REPLACE_CHANNEL, (value) => {
+		if (!value || typeof value !== "object" || Array.isArray(value)) return;
+		const replacement = value as { v?: unknown; generation?: unknown };
+		if (replacement.v === 1 && typeof replacement.generation === "string" && replacement.generation !== generation) dispose();
+	});
+	disposeRequests = onContinuationRequest(bus, handler);
+	Reflect.set(bus, AUTHORITY_DISPOSER_KEY, dispose);
+	return dispose;
 }
 
 export function continuationReceipts(entries: readonly unknown[], sessionIdHash: string): Set<string> {

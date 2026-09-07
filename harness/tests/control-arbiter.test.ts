@@ -11,7 +11,7 @@ import {
 } from "../lib/control-proposal.ts";
 import { emitRivalProposal, fire, makeFakePi, resetPiGlobals } from "./integration-harness.ts";
 import { boardState, noteTool, resetBoard } from "../lib/blackboard.ts";
-import { CONTINUATION_RECEIPT_TYPE, continuationDispatcherActive, emitContinuationRequest, hashContinuationIdentity, setContinuationDispatcherActive } from "../lib/continuation-authority.ts";
+import { CONTINUATION_RECEIPT_TYPE, continuationDispatcherActive, emitContinuationRequest, hashContinuationIdentity, replaceContinuationAuthority, setContinuationDispatcherActive } from "../lib/continuation-authority.ts";
 
 function envelope(kind: ControlKind, boundarySequence = 1, effect: ControlEffect = "message"): ControlProposalEnvelope {
 	return {
@@ -284,6 +284,39 @@ test("a transition racing authorization is rechecked before the provider turn", 
 	resetPiGlobals();
 });
 
+test("continuation authorization is single-flight when a second offer arrives", async () => {
+	const { fp } = await installed("enforce", "off");
+	const cwd = mkdtempSync(join(tmpdir(), "pi-continuation-single-flight-"));
+	await fire(fp, "session_start", {}, { cwd });
+	await fire(fp, "agent_start", {}, { cwd });
+	const sessionHash = hashContinuationIdentity(`compat:${cwd}`);
+	let release!: () => void;
+	const held = new Promise<void>((resolve) => { release = resolve; });
+	let firstAuthorization = true;
+	const emit = (id: string, authorize: () => boolean | Promise<boolean>) => emitContinuationRequest(fp.pi.events as never, {
+		request: {
+			v: 1, session_id_hash: sessionHash, owner_id_hash: sessionHash, generation: id,
+			scope: "session", reason: "goal", priority: id === "first" ? 200 : 100,
+			idempotency_key: `single-flight:${id}`, message: id, expires_at_ms: Date.now() + 10_000,
+		}, authorize,
+	});
+	emit("first", async () => {
+		if (firstAuthorization) {
+			firstAuthorization = false;
+			await held;
+		}
+		return true;
+	});
+	await fire(fp, "agent_settled", {}, { cwd });
+	for (let turn = 0; turn < 4 && !firstAuthorization; turn += 1) await new Promise<void>((resolve) => setImmediate(resolve));
+	emit("second", () => true);
+	release();
+	for (let turn = 0; turn < 8; turn += 1) await new Promise<void>((resolve) => setImmediate(resolve));
+	assert.equal(fp.deliveries.length, 1, "one idle boundary must dispatch at most one continuation");
+	assert.equal(fp.deliveries[0]?.text, "first", "the deterministic priority winner is preserved");
+	resetPiGlobals();
+});
+
 test("competing continuation offers produce one deterministic winner", async () => {
 	const { fp } = await installed("enforce", "off");
 	const cwd = mkdtempSync(join(tmpdir(), "pi-continuation-competing-"));
@@ -353,6 +386,93 @@ test("a reload restores durable continuation receipts and rejects duplicate deli
 	await new Promise<void>((resolve) => setImmediate(resolve));
 	assert.equal(fp.deliveries.length, 0, "reloaded authority must honor the durable receipt");
 	resetPiGlobals();
+});
+
+test("session reload cancels an in-flight continuation flush before admitting the new session", async () => {
+	const { fp } = await installed("enforce", "off");
+	const cwd = mkdtempSync(join(tmpdir(), "pi-continuation-session-reload-"));
+	let releaseOld!: () => void;
+	const oldAuthorization = new Promise<void>((resolve) => { releaseOld = resolve; });
+	const oldSession = "session-old";
+	const newSession = "session-new";
+	const oldHash = hashContinuationIdentity(oldSession);
+	const newHash = hashContinuationIdentity(newSession);
+	const context = (sessionId: string) => ({ cwd, sessionManager: { getSessionId: () => sessionId, getEntries: () => [] } });
+
+	await fire(fp, "session_start", {}, context(oldSession));
+	await fire(fp, "agent_start", {}, context(oldSession));
+	emitContinuationRequest(fp.pi.events as never, {
+		request: {
+			v: 1, session_id_hash: oldHash, owner_id_hash: oldHash, generation: "old-generation",
+			scope: "session", reason: "goal", priority: 500, idempotency_key: "reload:old",
+			message: "old session must not dispatch", expires_at_ms: Date.now() + 10_000,
+		},
+		authorize: async () => { await oldAuthorization; return true; },
+	});
+	await fire(fp, "agent_settled", {}, context(oldSession));
+	await new Promise<void>((resolve) => setImmediate(resolve));
+
+	await fire(fp, "session_start", { reason: "reload" }, context(newSession));
+	await fire(fp, "agent_start", {}, context(newSession));
+	emitContinuationRequest(fp.pi.events as never, {
+		request: {
+			v: 1, session_id_hash: newHash, owner_id_hash: newHash, generation: "new-generation",
+			scope: "session", reason: "goal", priority: 500, idempotency_key: "reload:new",
+			message: "new session dispatches", expires_at_ms: Date.now() + 10_000,
+		},
+		authorize: () => true,
+	});
+	await fire(fp, "agent_settled", {}, context(newSession));
+	for (let turn = 0; turn < 4 && fp.deliveries.length === 0; turn += 1) await new Promise<void>((resolve) => setImmediate(resolve));
+	assert.equal(fp.deliveries.length, 1, "a fresh session must not wait on an old authorization promise");
+	assert.equal(fp.deliveries[0]?.text, "new session dispatches");
+
+	releaseOld();
+	for (let turn = 0; turn < 4; turn += 1) await new Promise<void>((resolve) => setImmediate(resolve));
+	assert.equal(fp.deliveries.length, 1, "the cancelled old flush cannot dispatch after its promise resolves");
+	resetPiGlobals();
+});
+
+test("authority replacement across Pi event wrappers leaves only the newest handler", () => {
+	const fp = makeFakePi();
+	const wrap = () => ({
+		emit: fp.pi.events.emit.bind(fp.pi.events),
+		on: fp.pi.events.on.bind(fp.pi.events),
+	}) as never;
+	const firstWrapper = wrap();
+	const secondWrapper = wrap();
+	let firstCalls = 0;
+	let secondCalls = 0;
+	const disposeFirst = replaceContinuationAuthority(firstWrapper, () => { firstCalls += 1; });
+	const disposeSecond = replaceContinuationAuthority(secondWrapper, () => { secondCalls += 1; });
+	const sessionHash = hashContinuationIdentity("authority-wrapper-reload");
+	emitContinuationRequest(fp.pi.events as never, {
+		request: {
+			v: 1, session_id_hash: sessionHash, owner_id_hash: sessionHash, generation: "reload-generation",
+			scope: "session", reason: "goal", priority: 100, idempotency_key: "reload-authority",
+			message: "one handler only", expires_at_ms: Date.now() + 10_000,
+		},
+		authorize: () => true,
+	});
+	assert.equal(firstCalls, 0, "a replaced extension generation must be detached");
+	assert.equal(secondCalls, 1, "the newest extension generation receives the request");
+	disposeFirst();
+	disposeSecond();
+});
+
+test("dispatcher deactivation across Pi event wrappers removes stale probe listeners", () => {
+	const fp = makeFakePi();
+	const wrap = () => ({
+		emit: fp.pi.events.emit.bind(fp.pi.events),
+		on: fp.pi.events.on.bind(fp.pi.events),
+	}) as never;
+	const firstWrapper = wrap();
+	const reloadedWrapper = wrap();
+	const producerWrapper = wrap();
+	setContinuationDispatcherActive(firstWrapper, true);
+	assert.equal(continuationDispatcherActive(producerWrapper), true, "the first generation exposes the dispatcher");
+	setContinuationDispatcherActive(reloadedWrapper, false);
+	assert.equal(continuationDispatcherActive(producerWrapper), false, "a reload into disabled mode removes the prior generation");
 });
 
 test("enforce emits one merged message with correction intact", async () => {

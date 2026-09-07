@@ -22,56 +22,77 @@ export default function (pi: ExtensionAPI): void {
 	let deliveredContinuations = new Set<string>();
 	let pendingContinuations: ContinuationEnvelope[] = [];
 	let continuationFlushScheduled = false;
+	let continuationFlushInFlight = false;
+	let continuationLifecycleGeneration = 0;
 	let continuationLive = true;
 	let agentActive = false;
 
 	const flushContinuations = async (): Promise<void> => {
 		continuationFlushScheduled = false;
-		if (!continuationLive || !sessionIdHash || agentActive) {
-			return;
-		}
-		const pending = pendingContinuations;
-		pendingContinuations = [];
-		const candidates = pending
-			.filter(({ request }) => request.session_id_hash === sessionIdHash && request.expires_at_ms >= Date.now() && !deliveredContinuations.has(request.idempotency_key))
-			.map((envelope, index) => ({ envelope, index }))
-			.sort((left, right) => right.envelope.request.priority - left.envelope.request.priority || left.index - right.index);
-		for (const { envelope: candidate } of candidates) {
-			let authorized = false;
-			try { authorized = await candidate.authorize(); } catch { authorized = false; }
-			// The first read may yield to a user command or a durable child-result
-			// commit. Re-read immediately before dispatch so a transition that lands
-			// during authorization cannot slip through the cancellation boundary.
-			if (authorized) {
+		if (continuationFlushInFlight) return;
+		continuationFlushInFlight = true;
+		const lifecycleGeneration = continuationLifecycleGeneration;
+		let dispatched = false;
+		try {
+			if (!continuationLive || !sessionIdHash || agentActive) return;
+			const pending = pendingContinuations;
+			pendingContinuations = [];
+			const candidates = pending
+				.filter(({ request }) => request.session_id_hash === sessionIdHash && request.expires_at_ms >= Date.now() && !deliveredContinuations.has(request.idempotency_key))
+				.map((envelope, index) => ({ envelope, index }))
+				.sort((left, right) => right.envelope.request.priority - left.envelope.request.priority || left.index - right.index);
+			for (const { envelope: candidate } of candidates) {
+				let authorized = false;
 				try { authorized = await candidate.authorize(); } catch { authorized = false; }
-			}
-			if (!authorized || !continuationLive || candidate.request.session_id_hash !== sessionIdHash || candidate.request.expires_at_ms < Date.now()) {
-				record("control-arbiter", "continuation", {
-					reason: candidate.request.reason, outcome: "rejected", contenders: candidates.length,
+				if (lifecycleGeneration !== continuationLifecycleGeneration) return;
+				// The first read may yield to a user command or a durable child-result
+				// commit. Re-read immediately before dispatch so a transition that lands
+				// during authorization cannot slip through the cancellation boundary.
+				if (authorized) {
+					try { authorized = await candidate.authorize(); } catch { authorized = false; }
+				}
+				if (lifecycleGeneration !== continuationLifecycleGeneration) return;
+				if (!authorized || !continuationLive || candidate.request.session_id_hash !== sessionIdHash || candidate.request.expires_at_ms < Date.now()) {
+					record("control-arbiter", "continuation", {
+						reason: candidate.request.reason, outcome: "rejected", contenders: candidates.length,
+					});
+					if (!continuationLive) return;
+					continue;
+				}
+				deliveredContinuations.add(candidate.request.idempotency_key);
+				pi.appendEntry("pi-munchkin:continuation-receipt/v1", {
+					v: 1,
+					idempotency_key: candidate.request.idempotency_key,
+					session_id_hash: sessionIdHash,
+					delivered_at_ms: Date.now(),
 				});
-				if (!continuationLive) return;
-				continue;
+				record("control-arbiter", "continuation", {
+					reason: candidate.request.reason, outcome: "delivered", contenders: candidates.length,
+				});
+				// `agent_settled` has made Pi idle before this flush. Starting the next
+				// turn here avoids placing an irrevocable message in Pi's private queue;
+				// the lifecycle authority has therefore checked the durable state at the
+				// exact dispatch boundary.
+				// Pi 0.80.6 can report `agent_settled` one event before its
+				// sendUserMessage guard observes idle. `followUp` is safe in both
+				// states: it queues while still processing and starts immediately
+				// once idle, so the receipt cannot be recorded for a lost message.
+				dispatched = true;
+				void pi.sendUserMessage(candidate.request.message, { deliverAs: "followUp" });
+				return;
 			}
-			deliveredContinuations.add(candidate.request.idempotency_key);
-			pi.appendEntry("pi-munchkin:continuation-receipt/v1", {
-				v: 1,
-				idempotency_key: candidate.request.idempotency_key,
-				session_id_hash: sessionIdHash,
-				delivered_at_ms: Date.now(),
-			});
-			record("control-arbiter", "continuation", {
-				reason: candidate.request.reason, outcome: "delivered", contenders: candidates.length,
-			});
-			// `agent_settled` has made Pi idle before this flush. Starting the next
-			// turn here avoids placing an irrevocable message in Pi's private queue;
-			// the lifecycle authority has therefore checked the durable state at the
-			// exact dispatch boundary.
-			// Pi 0.80.6 can report `agent_settled` one event before its
-			// sendUserMessage guard observes idle. `followUp` is safe in both
-			// states: it queues while still processing and starts immediately
-			// once idle, so the receipt cannot be recorded for a lost message.
-			void pi.sendUserMessage(candidate.request.message, { deliverAs: "followUp" });
-			return;
+		} finally {
+			// A session reload/shutdown cancels the old generation. Its promise may
+			// still settle later, but it must not clear the new generation's lock or
+			// reschedule stale offers.
+			if (lifecycleGeneration !== continuationLifecycleGeneration) return;
+			continuationFlushInFlight = false;
+			// Offers arriving while authorization was in flight belong to the same
+			// settled boundary. Once one continuation was dispatched they must be
+			// discarded, not replayed as a second provider turn. If no candidate was
+			// dispatched, retain them for another bounded authorization pass.
+			if (dispatched) pendingContinuations = [];
+			else if (continuationLive && !agentActive && pendingContinuations.length > 0) scheduleContinuationFlush();
 		}
 	};
 
@@ -94,6 +115,9 @@ export default function (pi: ExtensionAPI): void {
 		scheduleContinuationFlush();
 	});
 	pi.on("session_start", async (_event, ctx) => {
+		continuationLifecycleGeneration += 1;
+		continuationFlushScheduled = false;
+		continuationFlushInFlight = false;
 		queue.clear();
 		continuationLive = true;
 		sessionIdHash = hashContinuationIdentity(ctx.sessionManager?.getSessionId?.() ?? `compat:${ctx.cwd}`);
@@ -101,6 +125,9 @@ export default function (pi: ExtensionAPI): void {
 		pendingContinuations = [];
 	});
 	pi.on("session_shutdown", async () => {
+		continuationLifecycleGeneration += 1;
+		continuationFlushScheduled = false;
+		continuationFlushInFlight = false;
 		continuationLive = false;
 		pendingContinuations = [];
 		disposeContinuation();

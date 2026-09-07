@@ -1,7 +1,8 @@
 # Harness improvement plan
 
 Created: 2026-09-06
-Status: G01 implementation and offline verification complete; live validation is pending explicit approval and no live experiment is activated by this document.
+Reviewed: 2026-09-07, against the current worktree and test bodies.
+Status: G01 has bounded historical live receipts but needs re-validation after 2026-09-07 continuation-authority hardening. G02–G04 have implementation and verification gaps; G04's approved screen returned no-go/inconclusive. G05 is pending. This document does not activate an experiment.
 Reference: audit `docs/HARNESS_AUDIT_2026-09-06.md`, recommendations `docs/NEXT_HARNESS_IMPROVEMENTS_2026-09-06.md`.
 
 ## Purpose and starting point
@@ -21,9 +22,9 @@ Use the stable IDs below when referring to work, tests, commits, and evidence.
 
 | ID | Goal | Main outcome | Dependencies |
 |---|---|---|---|
-| G01 | Authoritative continuation and stopping | One owner decides whether another harness-driven turn may run | Implemented + offline verified (746/746 tests, 2026-09-06); live smoke pending explicit approval — evidence: `docs/evidence/G01.md` |
+| G01 | Authoritative continuation and stopping | One owner decides whether another harness-driven turn may run | Foundation for G02/G04; bounded Ling and Qwen receipts exist |
 | G02 | Aggregate context admission | Every request fits a justified budget for its serving epoch | Use G01 for compaction/resume ownership |
-| G03 | Representative evaluation baseline | A reusable, trustworthy way to measure task benefit and harm | Fixture preparation can start immediately; freeze the measured baseline after G01/G02 |
+| G03 | Representative evaluation baseline | A reusable, trustworthy way to measure task benefit and harm | Registry and offline protocol exist; real baseline remains pending |
 | G04 | Evidence-gap research orchestration | Bounded research reaches a supported answer or an explicit unresolved gap | G01/G02 for execution; G03 for evaluation |
 | G05 | Qualified optimizer decision policies | Search and selection obey explicit, tested statistical rules | Can develop offline alongside G03; required before automatic campaigns |
 
@@ -31,6 +32,134 @@ Recommended sequence: G01, G02, then establish G03. Develop G04 against that
 baseline. Complete G05 before using the optimizer to select candidates. G05
 does not prevent manually specified, human-approved mechanism screens; those
 screens still need their own preregistered decision rules.
+
+## Current review: what worked, what remains, and what is next
+
+The earlier declaration that G04 was fully complete is superseded by this
+review. A valid no-go evaluation satisfies an evaluation outcome; it does not
+waive the implementation or end-to-end acceptance criteria. Keep the original
+criteria below unchanged and close them with direct evidence.
+
+Useful work is present: explicit claim obligations and gaps, a typed research
+round ledger, bounded allocations, duplicate handling, parent evidence checks,
+G01 synthesis offers, and private persistence. Post-screen repairs close
+undispatched branch reservations and correct the six-field child-receipt
+validator. The focused review reran the research and planner integration suites:
+11 ledger tests and one wrapper exercising 55 child tests pass. A subsequent
+G01 audit added red-green regressions for cross-wrapper authority replacement,
+cross-wrapper dispatcher deactivation, single-flight continuation flushing, and
+session-reload cancellation; the focused control suite is now 35/35 and the
+real-session/planner integration set is 75/75. The fresh repository-wide
+offline gate passes 777/777 tests and all six stages. These repairs still need
+a new pinned live smoke; historical receipts remain bound to their old surface.
+
+The approved screen used a disposable mirror. Ling's complex treatment exited
+after 156.945 seconds with three blocked branches and no settled answer; its
+control timed out after 181.017 seconds. Its simple fact lookup completed after
+28.480 seconds without graph activation. Qwen's candidate and control timed
+out after 300.182 and 301.026 seconds, respectively; neither produced a terminal
+answer, and the candidate did not start the graph. These outcomes establish no
+quality improvement. Correctness and citation support remain unscored or
+inconclusive, and output bytes are a transport measurement, not token usage.
+
+The source used for that screen was
+`5d333e03d863c7374f7a45b3d277e85b54725b7c33f08140eda90bcc0253c62f`,
+with disposable loaded hash
+`7d5353d80cd2ee75acc8ceab6d0d0633aaef1701ee8d716061a107764c77319d`.
+The subsequent offline repair has source hash
+`92f2e6d6c24335a5e7f1c1bf2df1af3c0ea860c7d1d8315d49d4676c44b307ef`;
+the earlier runs do not validate that repaired surface. Current work includes
+uncommitted G02–G04 changes on `main`; HEAD is `782b42c`. Implementation,
+commit/push, mirror synchronization, and adoption are separate milestones.
+The current post-audit source-surface hash, including the continuation fixes, is
+`ed78767b24c08ab5f7f97ea8ad42af64f6bb5e2350db6a18aa70859d1ad5de7f` and has
+not yet been loaded into the live agent directory.
+
+### Findings that prevent full completion
+
+- **G01 reload and flush authority (repaired, awaiting re-receipt):** the
+  continuation and dispatcher markers were wrapper-local even though Pi keeps
+  the underlying event bus across extension reloads, and asynchronous
+  authorization could overlap two flushes. An in-flight authorization also
+  survived a session reload and could hold the next session behind a stale
+  promise. The current worktree broadcasts replacement/deactivation,
+  serializes flushes, and cancels stale lifecycle generations. The focused
+  regressions pass 35/35, the combined real-session/planner set passes 75/75,
+  and the fresh offline gate passes 777/777; run a fresh pinned smoke before
+  treating the old G01 live receipt as current.
+
+- **G04 settlement authority:** `plan_settle` checks the round ledger only when
+  `roundRaw?.rounds.length` is nonzero. A new graph with an empty ledger, or a
+  ledger that cannot be read, bypasses the new obligation check while retaining
+  the older graph checks. Require the new contract for new G04 runs; distinguish
+  genuine legacy plans explicitly rather than treating missing evidence as legacy.
+- **G04 final-answer proof:** the synthesis fixture counts continuation offers.
+  The fixture named "fake provider lifecycle" calls tools through `makeFakePi`
+  and sets evidence globals directly; it does not run a provider or assert an
+  emitted final answer. `plan_settle` also returns `terminate: true`. Exercise
+  this exact sequence through a real Pi `AgentSession`, proving one authorized
+  synthesis and an observable final answer after evidence validation.
+- **G04 recovery proof:** the restart/compaction test writes and reloads JSON
+  and bounds a summary. It does not perform Pi compaction and recover the research
+  obligations in a fresh session. Add that lifecycle proof, including outstanding
+  reservations and a late child report.
+- **G04 merge authority:** the branch-result handler attempts the ledger merge
+  even when the graph merge returns `ignored`. Bind ledger acceptance to the same
+  accepted lease/generation and prove that stale, unleased, or conflicting reports
+  cannot alter either store. Exercise races between parent round writes, child
+  arrivals, and shutdown; in-memory unit transactions alone do not prove shared
+  persistence is serialized.
+- **G02 production integration:** the admission extension creates a reservation
+  ledger but never reserves tokens or passes its reservations into accounting.
+  `allocateContextAllowance` and `preserveContextSections` have no production
+  callers in the inspected TypeScript surface. Connect producers to shared
+  allowance allocation and preservation before claiming aggregate enforcement.
+- **G03/G04 evaluation coverage:** G03 has a registry and an offline runner, but
+  its real baseline is still pending. The G04 early-stop sample is not that
+  baseline or a completed quality comparison. Reconcile execution receipts with
+  the preregistered order, stop rules, and exclusions before preparing a rerun;
+  report deviations rather than changing the historical protocol.
+
+These findings narrow previous completion claims, not the intended goals.
+Goal-specific evidence notes remain historical records where they disagree
+with this review; their acceptance labels need reconciliation during remediation.
+
+### Ordered next work
+
+1. **Re-receipt G01 after the continuation hardening.** Run the full offline
+   verification, typecheck, secret scan, and the existing pinned Ling smoke
+   against the repaired loaded surface. Confirm reload/disable and one-shot
+   flush behavior in the receipt; do not reuse the historical hash.
+2. **Finish G04 runtime enforcement and proof.** Add regressions for empty or
+   malformed ledger settlement, rejected graph reports reaching the ledger,
+   concurrent writes, and compaction/recovery. Repair the reproduced failures.
+   Add a real-session fake-retrieval test that validates required claims, delivers
+   exactly one final answer through G01, and rejects late restarts. Exit condition:
+   G04-A through G04-D have direct lifecycle evidence, not only helper tests.
+3. **Finish G02 integration.** Wire retrieval/tool producers into the shared
+   reservation and preservation contract. Prove combined requests and concurrent
+   results respect the active serving epoch, then prepare the 128K/32K switch
+   smoke with concrete limits and usage receipts. Reuse applicable existing
+   approval; do not infer that a research-screen approval covers unrelated runs.
+4. **Complete the G03 baseline and diagnose research activation.** Inspect the
+   saved Qwen traces to separate routing, tool-contract, scheduling, and inference
+   latency. Prepare a reproducible real baseline with actual outcome oracles and
+   reconstructable provenance. Do not simply lengthen the timeout or change the
+   task until the failure mechanism is understood.
+5. **Repeat the G04 screen on the repaired surface.** Issue a fresh preregistration
+   with the required research controls, arm order, stopping policy, source/config/
+   loaded identities, and explicit outcome scoring. Run within the applicable
+   approved scope, Ling for protocol smoke and Qwen for effectiveness. Keep the
+   previous no-go results intact. Promotion requires a separate evidence-based
+   decision.
+6. **Then complete G05.** Qualify numerical acceptance and learning policies with
+   independent golden calculations before optimizer-driven selection. Prepare a
+   tiny review-only campaign after the baseline and policy gates are satisfied.
+
+Immediate priority is steps 1 and 2. More search engines, deeper delegation,
+working memory, and broader optimizer autonomy do not address the demonstrated
+completion and enforcement gaps. `PLAN_GRAPH` and `DEEP_RESEARCH_PLANNING`
+remain off by default.
 
 ## Shared working and completion rules
 
@@ -272,6 +401,13 @@ baseline, and honest uncertainty may not. Adoption remains a later decision.
 
 ## G04 — Research driven by explicit evidence gaps
 
+Progress (reviewed 2026-09-07): the contract and helper tests are present, but
+full implementation and end-to-end verification remain incomplete. The review
+above identifies settlement, merge-authority, final-answer, and recovery gaps.
+The parent-only `research_round` tool remains dark. An approved disposable Ling
+and Qwen screen produced a no-go/inconclusive outcome; it supplies diagnostic
+evidence but does not close the unproven implementation criteria.
+
 ### Goal statement
 
 Make complex research progress from named missing evidence to a supported final
@@ -407,10 +543,10 @@ than replacing pending cells with verbal assurances.
 
 | Goal | Implemented | Offline verified | Live validated | Evidence |
 |---|---|---|---|---|
-| G01 | Pending | Pending | Pending | Not yet created |
-| G02 | Pending | Pending | Pending | Not yet created |
-| G03 | Pending | Pending | Pending | Not yet created |
-| G04 | Pending | Pending | Pending | Not yet created |
+| G01 | Implemented; 2026-09-07 reload/flush hardening is in the current worktree | Focused 35-test control suite, 75-test real-session/planner integration, and fresh 777-test offline gate pass | Historical Ling receipt and supplemental Qwen RPC receipt predate the hardening; fresh pinned smoke pending | `docs/evidence/G01.md`; current review above |
+| G02 | Partial: accounting exists; producer reservation/preservation wiring incomplete | Helper and admission tests pass; aggregate producer integration remains unproven | Model-switch smoke not run | `docs/evidence/G02.md`; current review above |
+| G03 | Registry and offline protocol implemented; executed baseline outstanding | Fake pairing/registry checks recorded | Real Qwen baseline not run | `docs/evidence/G03.md` |
+| G04 | Partial: contracts exist; runtime enforcement gaps remain | Focused suites pass; real synthesis delivery and compaction/recovery proof outstanding | Approved early-stop no-go/inconclusive screen; repaired source has no new live receipt | `docs/evidence/G04.md`, `optimizer/docs/screens/G04_DEEP_RESEARCH_EVALUATION_2026-09-07.md`; current review above |
 | G05 | Pending | Pending | Pending | Not yet created |
 
 Existing repairs are prerequisites, not proof that these larger goals are done.
