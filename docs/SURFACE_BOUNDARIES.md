@@ -311,6 +311,17 @@ no inference, rollout, adoption, or default change occurred. A fresh pinned
 model-switch smoke remains required for G02-F before this boundary can receive
 a live mirror receipt.
 
+## Pending surface boundary — 2026-09-07 (G02 invariant repairs)
+
+Source commit `5e5dab8`, pending live sync. Package source SHA-256:
+`2ea73f29383607cbef5473e0edf1b620f13f3e70602c95c05ec018a946e45d96`.
+This boundary makes context-rejected `web_read` calls fail before spending a
+research-read allowance and keeps preservation projections within every caller
+cap, including caps shorter than the full truncation marker. Focused regressions
+and typecheck pass; optimizer verification remains offline-only. The live
+mirror is not updated because an interactive Pi process is still running; no
+inference, rollout, adoption, or default activation occurred.
+
 ## Data at rest: where a research session actually lands (updated 2026-08-10)
 
 A surface hash bounds what the MODEL sees. It says nothing about what a session LEAVES. Those are

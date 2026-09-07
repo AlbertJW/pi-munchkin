@@ -4,6 +4,13 @@ All notable changes to pi-munchkin are documented here. Releases follow semantic
 
 ## Unreleased
 
+### Fixed (2026-09-07 — G02 reservation and cap invariants; repository-only)
+
+Context-rejected `web_read` calls now fail before consuming a research-read
+allowance, and preservation projections remain within even sub-marker caller
+caps. Focused regressions cover both invariants. The admission feature remains
+opt-in and dark; no inference, rollout, or default changed.
+
 ### Fixed (2026-09-07 — G02 aggregate context producer integration; repository-only)
 
 Connected the opt-in aggregate context admission coordinator to real producers.
