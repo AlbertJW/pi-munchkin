@@ -1,0 +1,49 @@
+{
+  "schema": "pi.research-fixture/v1",
+  "fixture_id": "python-release-fact-lookup",
+  "revision": "2026-09-06",
+  "kind": "fact_lookup",
+  "prompt": {
+    "text": "What is the current Python release series, and which official Python source states it? Return a short factual answer with one authoritative citation.",
+    "sha256": "4a81f3cc8f44b52a80c98ba0f51dfa948fb4d19146f98bbd7b2482be0fa42a69"
+  },
+  "source_time_cutoff": "2026-09-06T00:00:00Z",
+  "evidence_families": [
+    {
+      "id": "python-releases",
+      "role": "primary",
+      "source_refs": [
+        {"id": "python-downloads", "url": "https://www.python.org/downloads/", "publisher": "Python Software Foundation"}
+      ]
+    },
+    {
+      "id": "python-docs",
+      "role": "context",
+      "source_refs": [
+        {"id": "python-docs-index", "url": "https://docs.python.org/3/", "publisher": "Python Software Foundation"}
+      ]
+    }
+  ],
+  "required_claims": [
+    {"id": "current-series", "evidence_family": "python-releases", "grading_rule": "state-current-series-with-official-citation"},
+    {"id": "source-authority", "evidence_family": "python-docs", "grading_rule": "identify-original-official-source"}
+  ],
+  "negative_control": {
+    "text": "What is the capital of France? Give the short answer and one authoritative source.",
+    "sha256": "cc2a3dbb424cd45f9619761ef82fa766b169fdd2fbc58b728d2a3c1c706107da",
+    "expected_plan_start": false,
+    "max_source_reads": 1
+  },
+  "oracle": {
+    "schema": "pi.research-oracle/v1",
+    "entrypoint": "../oracles/research_shape.py",
+    "query_budget": 1,
+    "timeout_ms": 2000,
+    "output_cap_bytes": 4096
+  },
+  "provenance": {
+    "authoring_timestamp": "2026-09-06T00:00:00Z",
+    "model_snapshot_boundary": "g03-pilot-2026-09-06",
+    "contamination_canary_hash": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+  }
+}

@@ -22,8 +22,12 @@ import {
 import { planStorageMode, privatePlanProjectionPath, privatePlanStatePath, privatePlanTracePath } from "../lib/plan-state-storage.ts";
 import { processWriterMarker } from "../lib/process-writer.ts";
 import { storedUrl } from "../lib/research-ledger.ts";
-import { claimIdForText, RESEARCH_EVIDENCE_CARDS_KEY } from "../lib/research-evidence.ts";
+import { canonicalResearchUrl, claimIdForText, RESEARCH_EVIDENCE_CARDS_KEY } from "../lib/research-evidence.ts";
 import { atomicWriteFile } from "../lib/private-artifact.ts";
+import {
+	RESEARCH_ROUND_MAX_GAPS, ResearchRoundLedger, readResearchRoundLedger, researchRoundPath, writeResearchRoundLedger,
+	type ClaimObligationV1, type EvidenceGapV1, type EvidenceCardRefV1, type ResearchRoundProposalV1, type ChildResearchReportV1,
+} from "../lib/research-round.ts";
 import { initialToolSurface } from "../lib/session-bootstrap.ts";
 import { record } from "../lib/telemetry.ts";
 import {
@@ -150,6 +154,7 @@ const DELEGATED_BRANCH_PROCESS_GLOBAL = "__pi_delegated_branch_process_v1";
 const PLAN_FLAG = "__pi_plan_phase_active";
 const EXPLICIT_FLAG = "__pi_tool_selection_explicit";
 const RESEARCH_ROOT_CONTEXTS_KEY = "__pi_research_root_contexts_v1";
+const RESEARCH_ROUND_PATH_KEY = "__pi_research_round_path_v1";
 const SAFE_PLAN_TOOLS = new Set([
 	"read", "grep", "find", "ls", "search_spans", "read_span", "recall", "plan_write", "capability",
 ]);
@@ -1126,7 +1131,7 @@ function activateGraphTools(): void {
 	if (!api || !PLAN_GRAPH) return;
 	const active = api.getActiveTools();
 	const explicit = (globalThis as Record<string, unknown>)[EXPLICIT_FLAG] === true;
-	for (const name of ["plan_write", "plan_update", "plan_expand", "plan_settle"]) {
+	for (const name of ["plan_write", "plan_update", "plan_expand", "plan_settle", ...(DEEP_RESEARCH_PLANNING ? ["research_round"] : [])]) {
 		if ((!explicit || active.includes(name)) && api.getAllTools().some((tool) => tool.name === name) && !active.includes(name)) active.push(name);
 	}
 	api.setActiveTools(active);
@@ -1140,7 +1145,105 @@ function graphLifecycleAvailable(): boolean {
 	// Starting a graph needs a way to update branches, expand generic graph
 	// structure, and settle the parent. Under an explicit allowlist, refuse the
 	// start rather than silently adding omitted tools after the graph is written.
-	return ["plan_update", "plan_expand", "plan_settle"].every((name) => active.has(name));
+	const required = ["plan_update", "plan_expand", "plan_settle"];
+	if (DEEP_RESEARCH_PLANNING) required.push("research_round");
+	return required.every((name) => active.has(name));
+}
+
+const ResearchRoundClaimSchema = Type.Object({
+	claim_id: Type.String({ minLength: 1, maxLength: 96 }), text: Type.String({ minLength: 1, maxLength: 500 }),
+	required: Type.Boolean(), missing: Type.String({ minLength: 1, maxLength: 300 }), why: Type.String({ minLength: 1, maxLength: 300 }),
+	next_action: Type.String({ minLength: 1, maxLength: 300 }),
+});
+const ResearchRoundQuerySchema = Type.Object({ query_id: Type.String({ minLength: 1, maxLength: 96 }), claim_id: Type.String({ minLength: 1, maxLength: 96 }), query: Type.String({ minLength: 1, maxLength: 500 }) });
+const ResearchRoundLeadSchema = Type.Object({
+	lead_id: Type.String({ minLength: 1, maxLength: 96 }), url: Type.String({ minLength: 1, maxLength: 1_999 }),
+	claim_ids: Type.Array(Type.String({ minLength: 1, maxLength: 96 }), { minItems: 1, maxItems: 16 }),
+	triage: Type.Union([Type.Literal("selected"), Type.Literal("rejected"), Type.Literal("duplicate")]), reason: Type.Optional(Type.String({ maxLength: 300 })),
+});
+const ResearchRoundReadSchema = Type.Object({
+	url: Type.String({ minLength: 1, maxLength: 1_999 }), phase: Type.Union([Type.Literal("discovery"), Type.Literal("parent_validation")]),
+	method: Type.Union([Type.Literal("ketch"), Type.Literal("jina")]), outcome: Type.Union([Type.Literal("completed"), Type.Literal("failed"), Type.Literal("truncated"), Type.Literal("blocked")]),
+	truncated: Type.Boolean(), parent_validated: Type.Boolean(),
+});
+const ResearchRoundCardSchema = Type.Object({
+	card_id: Type.String({ minLength: 32, maxLength: 32 }), original_url: Type.String({ minLength: 1, maxLength: 1_999 }), content_sha256: Type.String({ minLength: 64, maxLength: 64 }),
+	claim_ids: Type.Array(Type.String({ minLength: 1, maxLength: 96 }), { minItems: 1, maxItems: 16 }), truncated: Type.Boolean(), parent_validated: Type.Boolean(),
+	retrieval_method: Type.Union([Type.Literal("ketch"), Type.Literal("jina")]),
+});
+const ResearchRoundConflictSchema = Type.Object({
+	conflict_id: Type.String({ minLength: 1, maxLength: 96 }), claim_id: Type.String({ minLength: 1, maxLength: 96 }),
+	card_ids: Type.Array(Type.String({ minLength: 32, maxLength: 32 }), { minItems: 2, maxItems: 8 }),
+	status: Type.Union([Type.Literal("open"), Type.Literal("resolved"), Type.Literal("deferred")]), note: Type.Optional(Type.String({ maxLength: 300 })),
+});
+const ResearchRoundGapSchema = Type.Object({
+	gap_id: Type.String({ minLength: 1, maxLength: 96 }), claim_id: Type.String({ minLength: 1, maxLength: 96 }), missing: Type.String({ minLength: 1, maxLength: 300 }),
+	why: Type.String({ minLength: 1, maxLength: 300 }), next_action: Type.String({ minLength: 1, maxLength: 300 }),
+	status: Type.Union([Type.Literal("open"), Type.Literal("resolved"), Type.Literal("blocked"), Type.Literal("deferred")]),
+});
+const ResearchRoundDeferralSchema = Type.Object({ claim_id: Type.String({ minLength: 1, maxLength: 96 }), value: Type.String({ minLength: 1, maxLength: 200 }), risk: Type.String({ minLength: 1, maxLength: 200 }), rationale: Type.String({ minLength: 1, maxLength: PLAN_DEFER_FIELD_MAX_BYTES }) });
+const ResearchRoundParameters = Type.Object({
+	action: Type.Union([Type.Literal("start"), Type.Literal("record"), Type.Literal("inspect"), Type.Literal("settle")]),
+	run_id: Type.Optional(Type.String({ minLength: 1, maxLength: 200 })), round_id: Type.Optional(Type.String({ minLength: 1, maxLength: 96 })),
+	claim_obligations: Type.Optional(Type.Array(ResearchRoundClaimSchema, { minItems: 1, maxItems: 16 })), selected_gaps: Type.Optional(Type.Array(Type.String({ minLength: 1, maxLength: 96 }), { maxItems: RESEARCH_ROUND_MAX_GAPS })),
+	queries: Type.Optional(Type.Array(ResearchRoundQuerySchema, { maxItems: 3 })), source_leads: Type.Optional(Type.Array(ResearchRoundLeadSchema, { maxItems: 16 })),
+	reads: Type.Optional(Type.Array(ResearchRoundReadSchema, { maxItems: 10 })), evidence_cards: Type.Optional(Type.Array(ResearchRoundCardSchema, { maxItems: 32 })),
+	conflicts: Type.Optional(Type.Array(ResearchRoundConflictSchema, { maxItems: 12 })), gaps: Type.Optional(Type.Array(ResearchRoundGapSchema, { maxItems: RESEARCH_ROUND_MAX_GAPS })),
+	proposed_next_action: Type.Optional(Type.Union([Type.Literal("search"), Type.Literal("read"), Type.Literal("validate"), Type.Literal("synthesize"), Type.Literal("stop"), Type.Literal("escalate")])),
+	optional_deferrals: Type.Optional(Type.Array(ResearchRoundDeferralSchema, { maxItems: 16 })), note: Type.Optional(Type.String({ maxLength: 500 })), summary: Type.Optional(Type.String({ maxLength: 300 })),
+});
+
+type ResearchRoundToolParams = {
+	action: "start" | "record" | "inspect" | "settle"; run_id?: string; round_id?: string; claim_obligations?: ClaimObligationV1[];
+	selected_gaps?: string[]; queries?: ResearchRoundProposalV1["queries"]; source_leads?: ResearchRoundProposalV1["source_leads"];
+	reads?: ResearchRoundProposalV1["reads"]; evidence_cards?: EvidenceCardRefV1[]; conflicts?: ResearchRoundProposalV1["conflicts"];
+	gaps?: EvidenceGapV1[]; proposed_next_action?: ResearchRoundProposalV1["proposed_next_action"];
+	optional_deferrals?: Array<{ claim_id: string; value: string; risk: string; rationale: string }>; note?: string; summary?: string;
+};
+
+async function loadResearchRound(cwd: string, runId?: string): Promise<{ path: string; ledger: ResearchRoundLedger } | null> {
+	const shared = globalThis as Record<string, unknown>;
+	const state = await readState(cwd);
+	const selectedRun = runId ?? state?.run_id;
+	if (!selectedRun || (state && state.run_id !== selectedRun)) return null;
+	// The path is derived from the authenticated run identity every time. A
+	// stale process-global pointer must never select another run's ledger.
+	const path = researchRoundPath(cwd, selectedRun, process.env);
+	const raw = await readResearchRoundLedger(path);
+	if (!raw || raw.run_id !== selectedRun) return null;
+	shared[RESEARCH_ROUND_PATH_KEY] = path;
+	return { path, ledger: ResearchRoundLedger.fromState(raw) };
+}
+
+function defaultResearchObligation(request: string): ClaimObligationV1 {
+	return { claim_id: claimIdForText(request), text: cleanText(request).slice(0, 500), required: true, status: "open", missing: "An authoritative parent-validated source is required.", why: "The research request must be supported by evidence before synthesis.", next_action: "Search for an authoritative source." };
+}
+
+function roundTelemetry(ledger: ResearchRoundLedger, round: { consumed: { searches: number; reads: number; validation_reads: number }; duplicate_count: number; status: string; next_action: string }): void {
+	const state = ledger.state;
+	record("research", "round", {
+		round: state.rounds.length, status: round.status, next_action: round.next_action,
+		consumed_searches: round.consumed.searches, consumed_reads: round.consumed.reads, validation_reads: round.consumed.validation_reads,
+		duplicate_count: round.duplicate_count, open_gaps: state.gaps.filter((gap) => gap.status !== "resolved").length, conflicts: state.conflicts.filter((conflict) => conflict.status === "open").length,
+	});
+}
+
+function parentEvidenceCardIsAuthoritative(card: EvidenceCardRefV1): boolean {
+	const raw = (globalThis as Record<string, unknown>)[RESEARCH_EVIDENCE_CARDS_KEY];
+	if (!Array.isArray(raw)) return false;
+	return raw.some((entry) => {
+		if (!entry || typeof entry !== "object" || Array.isArray(entry)) return false;
+		const value = entry as Record<string, unknown>;
+		if (value.parent_validated !== true || value.truncated === true || value.content_sha256 !== card.content_sha256 || typeof value.original_url !== "string" || !Array.isArray(value.claim_ids)) return false;
+		try {
+			const claimIds = value.claim_ids.filter((claim): claim is string => typeof claim === "string");
+			return canonicalResearchUrl(value.original_url) === card.original_url && card.claim_ids.every((claim) => claimIds.includes(claim));
+		} catch { return false; }
+	});
+}
+
+function requireAuthoritativeParentCards(cards: readonly EvidenceCardRefV1[]): void {
+	for (const card of cards) if (card.parent_validated && !card.truncated && !parentEvidenceCardIsAuthoritative(card)) rejectPlanTool("research_round rejected: parent evidence card is not backed by a verified parent research note");
 }
 
 const researchPlanStart = defineTool({
@@ -1152,10 +1255,11 @@ const researchPlanStart = defineTool({
 		"Copy the returned plan_context exactly into the matching research-planner subagent call.",
 		"After a successful start, immediately dispatch one research-planner child for each returned context; do not call research_plan_start again or spend parent retrieval budget first.",
 	] : undefined,
-	parameters: Type.Object({
-		request: Type.String({ minLength: 1, maxLength: 1_000 }),
-		summary: Type.String({ minLength: 1, maxLength: PLAN_DEFER_FIELD_MAX_BYTES }),
-		branches: Type.Array(Type.Object({
+		parameters: Type.Object({
+			request: Type.String({ minLength: 1, maxLength: 1_000 }),
+			summary: Type.String({ minLength: 1, maxLength: PLAN_DEFER_FIELD_MAX_BYTES }),
+			claim_obligations: Type.Optional(Type.Array(ResearchRoundClaimSchema, { minItems: 1, maxItems: 16 })),
+			branches: Type.Array(Type.Object({
 			title: Type.String({ minLength: 1, maxLength: PLAN_TITLE_MAX_BYTES }),
 			note: Type.Optional(Type.String({ maxLength: PLAN_NOTE_MAX_BYTES })),
 			budget: BudgetSchema,
@@ -1197,6 +1301,14 @@ const researchPlanStart = defineTool({
 			validateStateSize(next);
 			return { state: next, result: next };
 		});
+		// Reserve every root allocation before child dispatch. This is the shared
+		// discovery envelope; child completion releases only its unspent remainder.
+		const obligations = params.claim_obligations?.length ? params.claim_obligations.map((claim) => ({ ...claim, status: "open" as const })) : [defaultResearchObligation(params.request)];
+		const roundLedger = new ResearchRoundLedger({ run_id: state.run_id, obligations, budget: { searches: 3, reads: 5, validation_reads: 5 } });
+		for (const item of state.items) roundLedger.reserveChild(item.owner_ref!, { searches: item.budget!.allocated.searches, reads: item.budget!.allocated.reads, validation_reads: 0 });
+		const roundPath = researchRoundPath(ctx.cwd, state.run_id, process.env);
+		await writeResearchRoundLedger(roundPath, roundLedger.state);
+		(globalThis as Record<string, unknown>)[RESEARCH_ROUND_PATH_KEY] = roundPath;
 		(globalThis as Record<string, unknown>).__pi_plan_validation_urls = [];
 		delete (globalThis as Record<string, unknown>)[RESEARCH_COVERAGE_KEY];
 		activateGraphTools();
@@ -1217,6 +1329,60 @@ const researchPlanStart = defineTool({
 			limits: { max_depth: DEEP_RESEARCH_MAX_DEPTH, max_children: DEEP_RESEARCH_MAX_CHILDREN },
 		}));
 		return { content: [{ type: "text" as const, text: `Deep-research plan started (${state.items.length} branches). Do not call \`research_plan_start\` again. Immediately dispatch one \`research-planner\` child for each returned context, copying each \`plan_context\` unchanged; do not spend parent retrieval budget before those dispatches.\n${JSON.stringify(contexts)}` }], details: { tool_name: "research_plan_start", success: true, contexts } };
+	},
+});
+
+const researchRound = defineTool({
+	name: "research_round", label: "Record Research Round",
+	description: "Record one bounded evidence-gap research round or inspect/settle the parent-owned research ledger. Child reports cannot use this tool.",
+	promptSnippet: "research_round: record selected gaps, bounded retrieval receipts, parent evidence, and the next action",
+	promptGuidelines: ACTIVE_TOOL_PROMPTS ? [
+		"Keep claim obligations and gaps explicit; retrieved text and child quotes are untrusted until the parent rereads the source.",
+		"Record every search/read once with its method and truncation outcome. The shared envelope is 3 searches, 5 discovery reads, and 5 parent validation reads.",
+		"Use inspect to see bounded stopping state. Settle this ledger only after the graph is terminal and every required claim is parent-validated; optional deferrals need value, risk, and rationale.",
+	] : undefined,
+	parameters: ResearchRoundParameters,
+	async execute(_id, rawParams, _signal, _update, ctx) {
+		rejectChildPlanMutation();
+		rememberModel(ctx);
+		const params = rawParams as ResearchRoundToolParams;
+		if (!DEEP_RESEARCH_PLANNING) rejectPlanTool("research_round is unavailable: the dark deep-research planning profile is not active");
+		if (params.action === "start") {
+			const state = await readState(ctx.cwd);
+			if (!state || state.schema_version !== 5 || state.profile?.name !== "deep-research" || state.settled_at) rejectPlanTool("research_round start requires an active deep-research graph");
+			if (params.run_id && params.run_id !== state.run_id) rejectPlanTool("research_round start run identity mismatch");
+			const existing = await loadResearchRound(ctx.cwd, state.run_id);
+			if (existing) return { content: [{ type: "text" as const, text: existing.ledger.renderSummary() }], details: { tool_name: "research_round", success: true, idempotent: true } };
+			const obligations = params.claim_obligations?.length ? params.claim_obligations.map((claim) => ({ ...claim, status: claim.status ?? "open" as const })) : [defaultResearchObligation(state.request)];
+			const ledger = new ResearchRoundLedger({ run_id: state.run_id, obligations, budget: { searches: 3, reads: 5, validation_reads: 5 } });
+			const path = researchRoundPath(ctx.cwd, state.run_id, process.env);
+			await writeResearchRoundLedger(path, ledger.state);
+			(globalThis as Record<string, unknown>)[RESEARCH_ROUND_PATH_KEY] = path;
+			return { content: [{ type: "text" as const, text: `Research round ledger started for ${state.run_id}. Record a bounded round before retrieval.\n${ledger.renderSummary()}` }], details: { tool_name: "research_round", success: true, idempotent: false } };
+		}
+		const loaded = await loadResearchRound(ctx.cwd, params.run_id);
+		if (!loaded) rejectPlanTool("research_round rejected: no valid parent research ledger exists");
+		const { path, ledger } = loaded;
+		if (params.action === "inspect") return { content: [{ type: "text" as const, text: ledger.renderSummary() }], details: { tool_name: "research_round", success: true, idempotent: true } };
+		if (params.action === "record") {
+			if (!params.round_id || !params.proposed_next_action) rejectPlanTool("research_round record requires round_id and proposed_next_action");
+			const proposal: ResearchRoundProposalV1 = {
+				schema: "pi.research-round/v1", run_id: ledger.runId, round_id: params.round_id,
+				selected_gaps: params.selected_gaps ?? [], queries: params.queries ?? [], source_leads: params.source_leads ?? [], reads: params.reads ?? [],
+				evidence_cards: params.evidence_cards ?? [], conflicts: params.conflicts ?? [], gaps: params.gaps ?? [], proposed_next_action: params.proposed_next_action, ...(params.note === undefined ? {} : { note: params.note }),
+			};
+			requireAuthoritativeParentCards(proposal.evidence_cards);
+			const round = ledger.recordRound(proposal);
+			await writeResearchRoundLedger(path, ledger.state);
+			roundTelemetry(ledger, round);
+			return { content: [{ type: "text" as const, text: `Research round ${round.round_id} recorded: ${round.status}; next action=${round.next_action}.\n${ledger.renderSummary()}` }], details: { tool_name: "research_round", success: true, round_id: round.round_id, status: round.status } };
+		}
+		const graph = await readState(ctx.cwd);
+		const graphTerminalNow = Boolean(graph && graph.run_id === ledger.runId && graph.items.every((item) => graphTerminal(item)));
+		requireAuthoritativeParentCards(ledger.state.evidence_cards);
+		const result = ledger.settle({ graph_terminal: graphTerminalNow, optional_deferrals: params.optional_deferrals ?? [], reason: params.summary ?? "Parent evidence obligations satisfied." });
+		await writeResearchRoundLedger(path, result);
+		return { content: [{ type: "text" as const, text: `Research evidence is settled for ${ledger.runId}. The parent may now call plan_settle.\n${ledger.renderSummary()}` }], details: { tool_name: "research_round", success: true, settled: true }, };
 	},
 });
 
@@ -1269,18 +1435,30 @@ const planSettle = defineTool({
 						: [];
 				})
 				: [];
-			const errors = settleErrors(previous as GraphPlanState, verified, evidenceCards);
-			if (errors.length) {
+				const errors = settleErrors(previous as GraphPlanState, verified, evidenceCards);
+				if (errors.length) {
 				const claimRepair = errors.some((error) => /delegated source (?:lacks|not parent-verified)|claim evidence card|claim obligation/i.test(error))
 					? " Repair delegated evidence by rereading each unverified URL only once, then call research_note with the delegated claim text copied exactly (do not shorten or rewrite it) before retrying; do not search or redispatch."
 					: "";
-				rejectPlanTool(`plan_settle rejected: ${errors.join("; ")}.${claimRepair}`);
-			}
-			const next = { ...previous, summary: cleanText(params.summary), settled_at: isoNow() };
+					rejectPlanTool(`plan_settle rejected: ${errors.join("; ")}.${claimRepair}`);
+				}
+				if (previous.profile?.name === "deep-research") {
+					const roundPath = researchRoundPath(ctx.cwd, previous.run_id, process.env);
+					const roundRaw = await readResearchRoundLedger(roundPath);
+					// Graphs created before the round tool was used retain the original
+					// plan/evidence contract. Once a parent records an explicit round,
+					// settlement is additionally gated by that durable ledger.
+					if (roundRaw?.rounds.length) {
+						const roundLedger = ResearchRoundLedger.fromState(roundRaw);
+						const roundCheck = roundLedger.settlementCheck({ graph_terminal: previous.items.every((item) => graphTerminal(item)) });
+						if (roundRaw.status !== "settled" || !roundCheck.ready) rejectPlanTool(`plan_settle rejected: research evidence is not settled (${roundCheck.reasons.join(", ") || "call research_round settle after parent validation"})`);
+					}
+				}
+				const next = { ...previous, summary: cleanText(params.summary), settled_at: isoNow() };
 			return { state: next, result: next };
 		});
 		const active = api?.getActiveTools() ?? [];
-		api?.setActiveTools(active.filter((name) => !["plan_write", "plan_update", "plan_expand", "plan_settle", "research_plan_start"].includes(name)));
+			api?.setActiveTools(active.filter((name) => !["plan_write", "plan_update", "plan_expand", "plan_settle", "research_plan_start", "research_round"].includes(name)));
 		planEvent("settled", state.run_id, { items: state.items.length, deferred: state.items.filter((item) => item.status === "deferred").length });
 		return { content: [{ type: "text" as const, text: "Plan settled. Planner guidance and task-scoped plan tools are no longer active." }], details: { tool_name: "plan_settle", success: true }, terminate: true };
 	},
@@ -1710,13 +1888,57 @@ async function mergeBranchResult(cwd: string, context: import("../lib/branch-rep
 	return outcome;
 }
 
+/**
+ * Mirror a delegated branch result into the parent-owned evidence-gap ledger.
+ * Child quotes and page contents are intentionally discarded; parent rereads
+ * are the only operation that can create validating evidence cards.
+ */
+async function mergeResearchRoundChildResult(cwd: string, context: PlanContextV1, report: BranchReportV1 | null, failureClass: string | null): Promise<void> {
+	if (!DEEP_RESEARCH_PLANNING || context.depth !== 1) return;
+	try {
+		const state = await readState(cwd);
+		if (!state || state.run_id !== context.run_id || state.profile?.name !== "deep-research" || state.settled_at) return;
+		const path = researchRoundPath(cwd, context.run_id, process.env);
+		const raw = await readResearchRoundLedger(path);
+		if (!raw) return;
+		const ledger = ResearchRoundLedger.fromState(raw);
+		if (!ledger.state.child_reservations.some((reservation) => reservation.owner_ref === context.owner_ref)) {
+			ledger.reserveChild(context.owner_ref, { searches: context.budget.searches, reads: context.budget.reads, validation_reads: 0 });
+		}
+		const obligations = ledger.state.obligations;
+		const claimForText = (claimText: string): string | undefined => obligations.find((obligation) => obligation.text === claimText)?.claim_id ?? (obligations.length === 1 ? obligations[0].claim_id : undefined);
+		const sourceLeads = (report?.source_leads ?? []).flatMap((lead) => {
+			let url: string;
+			try { url = canonicalResearchUrl(lead.url); } catch { return []; }
+			const claim = claimForText(lead.claim); return claim ? [{ url, claim_ids: [claim] }] : [];
+		});
+		const fallbackClaim = obligations[0]?.claim_id;
+		const gaps = (report?.evidence_gaps ?? []).flatMap((missing, index) => fallbackClaim ? [{ gap_id: `child-gap-${context.parent_item_id}-${index}`, claim_id: fallbackClaim, missing: cleanText(missing).slice(0, 300) || "Child reported an unresolved evidence gap.", why: "Delegated evidence remains unverified until the parent rereads it.", next_action: "Parent reread and validate a source card.", status: report?.status === "deferred" ? "deferred" as const : "open" as const }] : []);
+		const childReport: ChildResearchReportV1 = {
+			report_id: `child-${createHash("sha256").update(`${context.run_id}:${context.owner_ref}:${context.dispatch_epoch ?? 0}`).digest("hex").slice(0, 48)}`,
+			run_id: context.run_id, parent_item_id: context.parent_item_id, owner_ref: context.owner_ref,
+			status: report ? (report.status === "done" ? "done" : report.status === "deferred" ? "deferred" : "blocked") : "blocked",
+			allocated: { searches: context.budget.searches, reads: context.budget.reads, validation_reads: 0 },
+			consumed: report ? { searches: report.consumed.searches, reads: report.consumed.reads, validation_reads: 0 } : { searches: 0, reads: 0, validation_reads: 0 },
+			source_leads: sourceLeads, evidence_cards: [], gaps,
+			...(failureClass ? { failure_class: failureClass === "interrupted" ? "interrupted" as const : "child_failed" as const } : {}),
+		};
+		const merged = ledger.mergeChildReport(childReport);
+		if (merged.merged) await writeResearchRoundLedger(path, ledger.state);
+	} catch {
+		// The graph merge remains authoritative. A malformed evidence projection is
+		// non-authoritative and is surfaced by the parent's bounded inspect state.
+	}
+}
+
 const RESEARCH_SYNTHESIS_FOLLOW_UP = [
 	"[pi-munchkin:research-synthesis-follow-up]",
 	"Delegated research branches have returned and the parent graph is now terminal.",
 	"Act as the parent synthesizer for this run:",
 	"1. Reread every delegated source lead with web_read; do not trust child quotes or summaries.",
 	"2. Record one parent-validated research_note/evidence card for each material claim you will use.",
-	"3. If all required evidence is validated and only explicit deferred work remains, call plan_settle.",
+	"3. Record the parent reads, evidence cards, conflicts, and remaining gaps with research_round; inspect its next_action before settling.",
+	"4. If all required evidence is validated and only explicit deferred work remains, call research_round settle, then plan_settle.",
 	"If a branch is blocked or a required card is still missing, do not force settlement: leave the bounded gap explicit with its value, risk, and rationale. Do not start fresh searches or delegate again.",
 ].join("\n");
 
@@ -1733,7 +1955,7 @@ async function queueResearchSynthesisFollowUp(outcome: MergeOutcome): Promise<vo
 	// web_read/plan_settle tools would only make a small model spin on an
 	// impossible contract; graph start normally guarantees these are active.
 	const active = api.getActiveTools();
-	if (!active.includes("web_read") || !active.includes("plan_settle")) return;
+	if (!active.includes("web_read") || !active.includes("plan_settle") || (DEEP_RESEARCH_PLANNING && !active.includes("research_round"))) return;
 	const key = `${outcome.runId}:${outcome.headTerminalAt}`;
 	if (researchSynthesisFollowUps.has(key)) return;
 	if (researchSynthesisFollowUps.size >= 24) {
@@ -1768,8 +1990,8 @@ async function queueResearchSynthesisFollowUp(outcome: MergeOutcome): Promise<vo
  * the head from ever acquiring a terminal marker. Close only unleased nodes;
  * an in-flight lease is handled by the existing stale-lease recovery path.
  */
-async function closeUndispatchedResearchBranches(cwd: string): Promise<{ runId: string; closed: number } | null> {
-	return mutatePlan<{ runId: string; closed: number } | null>(cwd, async (previous) => {
+async function closeUndispatchedResearchBranches(cwd: string): Promise<{ runId: string; closed: number; contexts: PlanContextV1[] } | null> {
+	return mutatePlan<{ runId: string; closed: number; contexts: PlanContextV1[] } | null>(cwd, async (previous) => {
 		if (!previous || previous.schema_version !== 5 || previous.profile?.name !== "deep-research" || previous.settled_at) return { result: null };
 		const pending = previous.items.filter((item) => item.status === "pending" && !item.lease);
 		if (pending.length === 0) return { result: null };
@@ -1792,7 +2014,20 @@ async function closeUndispatchedResearchBranches(cwd: string): Promise<{ runId: 
 			...(items.every((item) => graphTerminal(item)) ? { head_terminal_at: previous.head_terminal_at ?? isoNow() } : { head_terminal_at: undefined }),
 		};
 		validateStateSize(state);
-		return { state, result: { runId: state.run_id, closed: pending.length } };
+		// The graph transition closes the work item, but its research-round
+		// reservation is a separate parent-owned ledger. Return the exact branch
+		// credentials so agent_end can append a terminal interruption receipt and
+		// burn the allocation transactionally instead of leaving budget in flight.
+		const contexts = pending.flatMap((item): PlanContextV1[] => {
+			if (!item.owner_ref || !item.budget) return [];
+			return [{
+				v: 1, profile: "deep-research", run_id: state.run_id, parent_item_id: item.id,
+				owner_ref: item.owner_ref, depth: 1, budget: { ...item.budget.allocated },
+				limits: { max_depth: 2, max_children: 2 },
+				dispatch_epoch: item.dispatch_epoch ?? 0,
+			}];
+		});
+		return { state, result: { runId: state.run_id, closed: pending.length, contexts } };
 	});
 }
 
@@ -1811,7 +2046,10 @@ export default function (pi: ExtensionAPI): void {
 		pi.registerTool(planExpand);
 		pi.registerTool(planSettle);
 		if (process.env[PLAN_CONTEXT_ENV] && process.env[BRANCH_REPORT_ENV]) pi.registerTool(branchPlan);
-		if (DEEP_RESEARCH_PLANNING) pi.registerTool(researchPlanStart);
+		if (DEEP_RESEARCH_PLANNING) {
+			pi.registerTool(researchPlanStart);
+			pi.registerTool(researchRound);
+		}
 	}
 
 	if (PLAN_TOOL_GO) {
@@ -1836,6 +2074,7 @@ export default function (pi: ExtensionAPI): void {
 		planningSurfaceApplied = null;
 		delete (globalThis as Record<string, unknown>).__pi_active_plan_context;
 		delete (globalThis as Record<string, unknown>).__pi_active_goal_context;
+		delete (globalThis as Record<string, unknown>)[RESEARCH_ROUND_PATH_KEY];
 		lastSessionCwd = ctx.cwd;
 		lastSessionIdHash = hashContinuationIdentity(ctx.sessionManager?.getSessionId?.() ?? `compat:${ctx.cwd}`);
 		researchSynthesisFollowUps.clear();
@@ -1860,6 +2099,13 @@ export default function (pi: ExtensionAPI): void {
 		// not reclaim a parent lease after a delegated child has started.
 		(globalThis as Record<string, unknown>)[DELEGATED_BRANCH_PROCESS_GLOBAL] = delegatedBranchProcess;
 		const rebound = delegatedBranchProcess ? null : await rebindActivePlan(ctx.cwd);
+		if (!delegatedBranchProcess) {
+			const restoredPlan = await readState(ctx.cwd);
+			if (restoredPlan?.profile?.name === "deep-research" && !restoredPlan.settled_at) {
+				const restoredPath = researchRoundPath(ctx.cwd, restoredPlan.run_id, process.env);
+				if (await readResearchRoundLedger(restoredPath)) (globalThis as Record<string, unknown>)[RESEARCH_ROUND_PATH_KEY] = restoredPath;
+			}
+		}
 		if (rebound?.interrupted) { reboundAnnounced = true; lastNotify(interruptedPlanNotice(rebound.openItems)); }
 		if (!FORCE_PLAN_WRITE) {
 			const hidden = new Set(PLAN_SURFACE_TOOLS);
@@ -1896,9 +2142,10 @@ export default function (pi: ExtensionAPI): void {
 			// parent-state mutation through this subscriber.
 			if (delegatedBranchProcess || (globalThis as Record<string, unknown>)[DELEGATED_BRANCH_PROCESS_GLOBAL] === true) return;
 			const prior = pendingBranchMerge ?? Promise.resolve();
-			const next = prior.catch(() => undefined).then(async () => {
-				const outcome = await mergeBranchResult(lastSessionCwd!, signal.context, signal.report, signal.failureClass);
-				await queueResearchSynthesisFollowUp(outcome);
+				const next = prior.catch(() => undefined).then(async () => {
+					const outcome = await mergeBranchResult(lastSessionCwd!, signal.context, signal.report, signal.failureClass);
+					await mergeResearchRoundChildResult(lastSessionCwd!, signal.context, signal.report, signal.failureClass);
+					await queueResearchSynthesisFollowUp(outcome);
 			}).catch(() => undefined);
 			pendingBranchMerge = next;
 			void next.finally(() => { if (pendingBranchMerge === next) pendingBranchMerge = null; });
@@ -2018,7 +2265,7 @@ export default function (pi: ExtensionAPI): void {
 			setPlanning(false);
 			awaitingReview = false;
 			leavePlanningSurface(pi, false);
-			if (PLAN_GRAPH) pi.setActiveTools(pi.getActiveTools().filter((name) => !["plan_write", "plan_update", "plan_expand", "plan_settle", "research_plan_start"].includes(name)));
+			if (PLAN_GRAPH) pi.setActiveTools(pi.getActiveTools().filter((name) => !["plan_write", "plan_update", "plan_expand", "plan_settle", "research_plan_start", "research_round"].includes(name)));
 			ctx.ui.notify("Plan cancelled.", "info");
 		},
 	});
@@ -2078,7 +2325,10 @@ export default function (pi: ExtensionAPI): void {
 	pi.on("agent_end", async (_event, ctx) => {
 		if (!delegatedBranchProcess) {
 			const closed = await closeUndispatchedResearchBranches(ctx.cwd);
-			if (closed) planEvent("branches-closed", closed.runId, { closed: closed.closed, reason_class: "parent_ended_before_dispatch" });
+			if (closed) {
+				for (const context of closed.contexts) await mergeResearchRoundChildResult(ctx.cwd, context, null, "interrupted");
+				planEvent("branches-closed", closed.runId, { closed: closed.closed, reason_class: "parent_ended_before_dispatch" });
+			}
 		}
 		const state = await readState(ctx.cwd);
 		if (state && state.phase === "executing" && openItemCount(state) > 0) {

@@ -1,0 +1,43 @@
+{
+  "schema": "pi.optimizer-baseline-preregistration/v1",
+  "preregistration_id": "g03-qwen35b-baseline-20260907",
+  "benchmark_pack": {
+    "path": "optimizer/v2/benchmarks/g03-representative-pilot-v1.json",
+    "sha256": "c17737ae192126e014f2895cca61b2d85cdeb40896c91602b331755ba62561e7",
+    "pack_id": "g03-representative-pilot",
+    "revision": "2026-09-07.r1"
+  },
+  "primary_metric": {"name": "task_success", "direction": "maximize", "kind": "binary"},
+  "subject_model": {"provider": "local-llamacpp", "model": "qwen36-35b-iq3s", "role": "adoption-cohort"},
+  "guard_models": [],
+  "surface_identity": {
+    "source_sha256": "b0fae0e28b68a4fcac6c952be214b45e8bec9cb7880eb4ca284e1c161411f082",
+    "config_sha256": "5306ecc5a68682ce8fe6d52d59e0171367cfae0f390965bc4956c0f9d706d379",
+    "surface_sha256": "184c9178950c38c2caf469f68bfee242bddbbf24af299172bd3a91d68511417a"
+  },
+  "arms": {
+    "baseline": {
+      "config_path": "optimizer/prompt-lab/configs/baseline.json",
+      "config_sha256": "5306ecc5a68682ce8fe6d52d59e0171367cfae0f390965bc4956c0f9d706d379",
+      "surface_sha256": "184c9178950c38c2caf469f68bfee242bddbbf24af299172bd3a91d68511417a",
+      "label": "baseline"
+    },
+    "candidate": {
+      "config_path": "optimizer/prompt-lab/configs/static/c46-prompt-lean.json",
+      "config_sha256": "47c9a04ca233ff552ff71e4e4f77003244cb148d8704f38fb62d2f5cf615b639",
+      "surface_sha256": "184c9178950c38c2caf469f68bfee242bddbbf24af299172bd3a91d68511417a",
+      "label": "candidate"
+    }
+  },
+  "seeds": [11, 29],
+  "repetitions": 1,
+  "randomization": {"method": "deterministic-hash", "seed": 20260907, "arm_order": ["baseline", "candidate"]},
+  "limits": {
+    "case_timeout_seconds": 900,
+    "pack_timeout_seconds": 14400,
+    "max_tool_calls": 80,
+    "max_retries": 8,
+    "max_output_bytes": 65536
+  },
+  "quarantine": {"development_payloads": true, "test_payloads": true, "optimizer_diagnosis": "forbidden"}
+}

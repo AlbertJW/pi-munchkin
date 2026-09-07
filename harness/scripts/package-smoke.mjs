@@ -61,6 +61,9 @@ const expectedExtensions = [
   "harness/extensions/tool-activation.ts",
   // Reads the activation manager's redacted state for /munchkin-doctor.
   "harness/extensions/runtime-truth.ts",
+  // Aggregate provider-payload admission runs after runtime-truth has published
+  // the current serving epoch, and before downstream observers record receipts.
+  "harness/extensions/context-admission.ts",
   // Last intervention producer wins nothing directly in enforce mode: the
   // arbiter is loaded after every producer and decides once at turn_end.
   "harness/extensions/control-arbiter.ts",

@@ -201,10 +201,16 @@ export default function (pi: ExtensionAPI): void {
 		const usage = ctx.getContextUsage?.();
 		const key = handoffKey(profile);
 		if (handoffDisarmedKey === key) {
-			if (belowHandoffRearmThreshold(profile, usage)) handoffDisarmedKey = null;
+			if (belowHandoffRearmThreshold(profile, usage)) {
+				handoffDisarmedKey = null;
+				record("runtime", "context-rearm", { epoch: profile.epoch, state: "rearmed", trigger: "below_hysteresis" });
+			}
 		}
 		if (handoffCompactedEpoch === profile.epoch) {
-			if (belowHandoffRearmThreshold(profile, usage)) handoffCompactedEpoch = null;
+			if (belowHandoffRearmThreshold(profile, usage)) {
+				handoffCompactedEpoch = null;
+				record("runtime", "context-rearm", { epoch: profile.epoch, state: "rearmed", trigger: "post_compaction_below_hysteresis" });
+			}
 			else return;
 		}
 		if (!contextNeedsHandoff(profile, usage)) return;

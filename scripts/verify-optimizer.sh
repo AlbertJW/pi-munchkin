@@ -55,6 +55,7 @@ selftests=(
   prompt-lab/tool_contract.py
   research-fixtures/admission.py
   research-fixtures/preflight.py
+  v2/baseline.py
   v2/planner_smoke.py
 )
 # Completeness guard for the hand-maintained list above: any optimizer .py that

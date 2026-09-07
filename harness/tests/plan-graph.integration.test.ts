@@ -25,7 +25,7 @@ if (!CHILD) {
 	const output = execFileSync(process.execPath, [
 				"--experimental-strip-types", "--experimental-loader", resolve("harness/tests/ts-js-resolver.mjs"), "--test", import.meta.filename,
 			], { cwd: process.cwd(), env, encoding: "utf8", stdio: "pipe" });
-		assert.match(output, /pass 54/);
+		assert.match(output, /pass 55/);
 		} finally { rmSync(artifacts, { recursive: true, force: true }); }
 	});
 } else {
@@ -36,6 +36,7 @@ if (!CHILD) {
 	const { HARNESS_SIGNAL_CHANNEL } = await import("../lib/harness-signals.ts");
 	const { RESEARCH_COVERAGE_KEY } = await import("../lib/branch-report.ts");
 	const { claimIdForText, RESEARCH_EVIDENCE_CARDS_KEY } = await import("../lib/research-evidence.ts");
+	const { readResearchRoundLedger, researchRoundPath } = await import("../lib/research-round.ts");
 	const { onContinuationRequest, setContinuationDispatcherActive } = await import("../lib/continuation-authority.ts");
 	const planRunnerModule = await import("../extensions/plan-runner.ts");
 	const planRunner = planRunnerModule.default;
@@ -247,6 +248,23 @@ if (!CHILD) {
 		assert.equal(state.schema_version, 5); assert.equal(state.profile.name, "deep-research");
 		assert.equal(result.details.contexts.length, 2); assert.equal(result.details.contexts[0].parent_item_id, state.items[0].id);
 		await expectToolError(fp, "research_plan_start", { request: "bad", summary: "over budget", branches: [{ title: "bad", budget: { searches: 4, reads: 6 } }] }, cwd, /active or unsettled graph plan already exists/);
+		resetPiGlobals();
+	});
+
+	test("parent end burns undispatched research reservations instead of leaving them in flight", async () => {
+		const fp = fresh(); const cwd = tmp();
+		const started = await callTool(fp, "research_plan_start", { request: "Close abandoned branches", summary: "one reserved branch", branches: [{ title: "Evidence", budget: { searches: 1, reads: 1 } }] }, cwd);
+		const context = started.details.contexts[0];
+		const before = await readResearchRoundLedger(researchRoundPath(cwd, context.run_id, process.env));
+		assert.equal(before?.child_reservations.length, 1);
+		await fire(fp, "agent_end", {}, makeCtx(cwd).ctx);
+		const after = await readResearchRoundLedger(researchRoundPath(cwd, context.run_id, process.env));
+		assert.ok(after);
+		assert.equal(after?.child_reservations.length, 0, "an undispatched branch cannot remain reserved after parent end");
+		assert.equal(after?.child_reports.length, 1, "the interruption must be represented by one terminal child receipt");
+		assert.deepEqual(after?.child_reports[0].charged, { searches: 1, reads: 1, validation_reads: 0 }, "undispatched allocation is charged as interrupted");
+		const state = JSON.parse(readFileSync(join(cwd, ".pi", "plan-state.json"), "utf8"));
+		assert.equal(state.items[0].status, "blocked");
 		resetPiGlobals();
 	});
 
