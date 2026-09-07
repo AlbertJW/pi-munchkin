@@ -46,6 +46,22 @@ class G03RegistryTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "path_allowlist"):
             BenchmarkPack.from_dict(raw)
 
+    def test_case_kind_and_versioned_spec_must_agree(self) -> None:
+        raw = json.loads(PACK_PATH.read_text(encoding="utf-8"))
+        # Point a research case at a coding fixture. The digest is intentionally
+        # left unchanged: schema/kind validation must fail before any artifact
+        # identity can be trusted.
+        raw["splits"]["train"][4]["spec_path"] = "optimizer/real-gate-fixtures/manifests/access-log-triage.json"
+        mutated = BenchmarkPack.from_dict(raw)
+        with self.assertRaisesRegex(ValueError, "research kind requires"):
+            mutated.validate_artifacts(REPO)
+
+        raw = json.loads(PACK_PATH.read_text(encoding="utf-8"))
+        raw["splits"]["train"][0]["spec_path"] = "optimizer/research-fixtures/manifests/comparative.json"
+        mutated = BenchmarkPack.from_dict(raw)
+        with self.assertRaisesRegex(ValueError, "research kind does not match"):
+            mutated.validate_artifacts(REPO)
+
     def test_prepare_binds_pack_and_requires_the_complete_slate(self) -> None:
         prepared = prepare_baseline(self.pack, self.prereg, REPO)
         self.assertEqual(prepared["case_count"], 12)

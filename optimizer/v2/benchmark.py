@@ -221,6 +221,19 @@ class BenchmarkPack:
                 spec_schema = raw.get("schema")
                 if spec_schema not in {"pi.fixture/v1", "pi.research-fixture/v1"}:
                     raise ValueError(f"benchmark case {case.case_id} spec has unsupported schema")
+                if spec_schema == "pi.fixture/v1":
+                    if case.is_research:
+                        raise ValueError(f"benchmark case {case.case_id} research kind requires a research fixture spec")
+                    if (not isinstance(raw.get("task_id"), str) or not raw["task_id"] or
+                            not isinstance(raw.get("fixture_version"), str) or not raw["fixture_version"]):
+                        raise ValueError(f"benchmark case {case.case_id} fixture spec is not versioned")
+                else:
+                    expected_kind = case.kind.removeprefix("research_") if case.kind else None
+                    if not case.is_research or raw.get("kind") != expected_kind:
+                        raise ValueError(f"benchmark case {case.case_id} research kind does not match its spec")
+                    for field in ("fixture_id", "revision", "prompt", "required_claims", "oracle", "provenance"):
+                        if field not in raw:
+                            raise ValueError(f"benchmark case {case.case_id} research spec is missing {field}")
                 body = {key: value for key, value in raw.items() if key != "admission"} if spec_schema == "pi.fixture/v1" else raw
                 # The trusted Pi gate uses json.dumps' default ASCII escaping
                 # when it computes fixture digests. Keep the registry verifier
