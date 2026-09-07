@@ -353,6 +353,21 @@ committed and separately approved for synchronization.
 Current source-surface SHA-256 (uncommitted):
 `9aed85c14ebae22b7f255d00fbe9eb7a8a90b023a450291837ef9cf40e67bc18`.
 
+## Pending surface boundary — 2026-09-07 (G03 baseline coverage/oracle hardening)
+
+Repository-only follow-up to the governed G03 benchmark. The offline baseline
+report now records all twelve case memberships, including explicit opaque-test
+exclusions, and carries a reconstruction receipt binding fixture, admission,
+oracle, and isolation digests. Isolation allowlists are restricted to safe
+relative paths, and the redacted oracle requires evidence coverage plus a
+bounded stop class. Focused and full offline verification pass; no model
+inference, calibration, campaign, mirror, rollout, or adoption occurred. The
+Qwen 35B real baseline (G03-C) remains pending a separately approved screen.
+
+Source commit: `7ea9652`.
+Current source-surface SHA-256:
+`9aed85c14ebae22b7f255d00fbe9eb7a8a90b023a450291837ef9cf40e67bc18`.
+
 ## Data at rest: where a research session actually lands (updated 2026-08-10)
 
 A surface hash bounds what the MODEL sees. It says nothing about what a session LEAVES. Those are

@@ -83,6 +83,17 @@ records per-case/cohort outcomes and secondary costs without treating contained
 child telemetry as zero, and it cannot authorize adoption. No live inference,
 calibration, campaign, mirroring, or rollout was performed.
 
+### Fixed (2026-09-07 — G03 baseline coverage and oracle contract; repository-only)
+
+The offline baseline report now carries a twelve-case coverage ledger, marking
+opaque-test exclusions with an explicit quarantine reason, and a reconstruction
+receipt binding every fixture, admission, oracle, and isolation digest to the
+frozen pack. The redacted local oracle now requires explicit evidence coverage
+and a bounded stop classification. New regressions cover path-safe isolation
+allowlists, opaque exclusions, missing evidence, and invalid stop classes. The
+report remains protocol-only and no inference, calibration, campaign, mirror,
+or rollout was performed.
+
 ### Added (2026-09-06 — G02 aggregate context admission; repository-only)
 
 Added the `pi.context-accounting/v1` aggregate admission contract and the
