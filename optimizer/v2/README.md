@@ -133,6 +133,9 @@ python3 -m optimizer.v2.real_baseline --verify \
 
 # read-only host preflight; exit 1 means the router is healthy but the target
 # is not loaded (no chat request is ever sent)
+# The result also includes a pi.g03-execution-plan/v1.  Ordinary cases are
+# explicitly routed to real_gate.sh; research cases are routed to the parent
+# research recorder and must never be sent to real_gate.sh.
 python3 -m optimizer.v2.g03_readiness --dry \
   --pack optimizer/v2/benchmarks/g03-representative-pilot-r2.json \
   --preregistration optimizer/v2/examples/g03-baseline-preregistration-r2.json \

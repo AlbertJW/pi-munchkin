@@ -424,6 +424,19 @@ unavailable rather than treating missing telemetry as zero. The offline suite
 now passes 111 tests. This is not a model-visible harness change; G03-C remains
 pending the approved Qwen 35B baseline.
 
+## Pending surface boundary — 2026-09-07 (G03 executor-aware readiness)
+
+Repository-only optimizer commit `377043f` adds the offline
+`pi.g03-execution-plan/v1` readiness contract. It verifies that ordinary
+train/development cases have a contained regular real-gate manifest and routes
+research cases to the parent recording boundary, where no real-gate manifest
+is required. The focused optimizer suite passes 114 tests. No inference,
+calibration, campaign, mirror, rollout, or adoption occurred; G03-C remains
+pending the approved Qwen 35B baseline.
+
+Current source-surface SHA-256:
+`9aed85c14ebae22b7f255d00fbe9eb7a8a90b023a450291837ef9cf40e67bc18`.
+
 ## Data at rest: where a research session actually lands (updated 2026-08-10)
 
 A surface hash bounds what the MODEL sees. It says nothing about what a session LEAVES. Those are
