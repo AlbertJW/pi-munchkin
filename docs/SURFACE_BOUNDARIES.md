@@ -381,6 +381,19 @@ Pi/llama-swap and the research adapter are available.
 Current source-surface SHA-256:
 `9aed85c14ebae22b7f255d00fbe9eb7a8a90b023a450291837ef9cf40e67bc18`.
 
+## Pending surface boundary — 2026-09-07 (G03 research oracle binding)
+
+The frozen G03 pack now routes its four research-shaped cases to the dedicated
+research oracle, while coding/recovery/documentation/long-context cases retain
+the redacted baseline oracle. Case/schema validation remains fail-closed, and
+the pack plus preregistration identities were refreshed together. Source
+commit: `5c889c2`.
+No inference, calibration, campaign, mirror, rollout, or adoption occurred;
+G03-C remains open.
+
+Current source-surface SHA-256:
+`9aed85c14ebae22b7f255d00fbe9eb7a8a90b023a450291837ef9cf40e67bc18`.
+
 ## Data at rest: where a research session actually lands (updated 2026-08-10)
 
 A surface hash bounds what the MODEL sees. It says nothing about what a session LEAVES. Those are

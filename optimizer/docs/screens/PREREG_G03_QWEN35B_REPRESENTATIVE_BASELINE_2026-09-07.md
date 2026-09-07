@@ -11,10 +11,10 @@ approves the resolved hashes below and Pi/llama-swap is confirmed healthy.
 ## Frozen identities
 
 - Subject: `local-llamacpp/qwen36-35b-iq3s` (Qwen 35B adoption cohort)
-- Benchmark file SHA-256: `c17737ae192126e014f2895cca61b2d85cdeb40896c91602b331755ba62561e7`
-- Benchmark canonical identity: `146484896d16d15b19546d40ca22c84bdeef3054b67a9cd3355f0a3785f789c7`
-- Preregistration canonical identity: `d794fea7af33afd0d329d5e135c74b85f1ed618a060e3b8fbf6c2cc0e6fefd7e`
-- Source commit: `7ea9652`
+- Benchmark file SHA-256: `1fbe72a6d5c008ddc174e86d98c70c0e9616a3c586a624755f7b40462265292d`
+- Benchmark canonical identity: `3cf87cdaad18b2cca4c8e8280140d924e269a238ec95d5b0d2f3dc972f5bf1da`
+- Preregistration canonical identity: `b994cbe0e93e5b470a2b918f2104c39b272c099d75edea798142baef3dad2a28`
+- Source commit: `5c889c2`
 - Baseline config SHA-256: `5306ecc5a68682ce8fe6d52d59e0171367cfae0f390965bc4956c0f9d706d379`
 - Candidate config SHA-256: `47c9a04ca233ff552ff71e4e4f77003244cb148d8704f38fb62d2f5cf615b639`
 - Loaded surface SHA-256: `9aed85c14ebae22b7f255d00fbe9eb7a8a90b023a450291837ef9cf40e67bc18`
@@ -35,7 +35,7 @@ python3 -m optimizer.v2.baseline --dry \
 ```
 
 The resulting protocol report is expected to be
-`5b24391d650ea5371e4b0b09d28d0e588f7e6155c0b92094384af4a0b3989c61`.
+`8cb81cfcad62b096135e09a8e55381eb7d4326f84cd7c428004fb8db56eb1a60`.
 It must remain `model_quality_evidence=false`; its twelve-case coverage ledger
 must mark both opaque test cases as `excluded` with reason
 `opaque_test_quarantined`.

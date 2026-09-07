@@ -111,6 +111,10 @@ version fields. Research manifests must expose their claim and provenance
 sections before their receipt can be accepted. No live inference, calibration,
 campaign, mirror, rollout, or adoption occurred.
 
+The four research cases in the frozen G03 pack now bind the dedicated research
+oracle entrypoint, and the pack/preregistration hashes were refreshed together.
+Historical receipts from the prior pack revision remain excluded.
+
 ### Added (2026-09-06 — G02 aggregate context admission; repository-only)
 
 Added the `pi.context-accounting/v1` aggregate admission contract and the
