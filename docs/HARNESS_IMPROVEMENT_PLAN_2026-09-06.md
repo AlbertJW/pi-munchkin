@@ -2,7 +2,7 @@
 
 Created: 2026-09-06
 Reviewed: 2026-09-07, against the current worktree and test bodies.
-Status: G01 has a fresh disposable pinned Ling protocol receipt after the 2026-09-07 continuation-authority hardening. G02 now has producer integration, offline verification, and a clean pinned Qwen→Ling mechanism receipt; it remains opt-in and has no quality evidence. G03 now has a fail-closed ingestor for fresh real gate rows and exact validity sidecars (commits `1da150a`, `20adf3a`, `88faf05`), but its Qwen 35B baseline has not run. G04's approved screen returned no-go/inconclusive. G05 is pending. This document does not activate an experiment.
+Status: G01 has a fresh disposable pinned Ling protocol receipt after the 2026-09-07 continuation-authority hardening. G02 now has producer integration, offline verification, and a clean pinned Qwen→Ling mechanism receipt; it remains opt-in and has no quality evidence. G03 now has a fail-closed ingestor for fresh real gate rows, exact validity sidecars, and a strict research-shaped row adapter (commits `1da150a`, `20adf3a`, `88faf05`, `8f30f10`, `6a30858`), but its Qwen 35B baseline has not run. G04's approved screen returned no-go/inconclusive. G05 is pending. This document does not activate an experiment.
 Reference: audit `docs/HARNESS_AUDIT_2026-09-06.md`, recommendations `docs/NEXT_HARNESS_IMPROVEMENTS_2026-09-06.md`.
 
 ## Purpose and starting point
@@ -154,7 +154,9 @@ with this review; their acceptance labels need reconciliation during remediation
    proves epoch rebinding and admitted requests. Prepare a later 128K/32K value
    and safety screen with concrete limits and usage receipts; do not infer that
    this protocol smoke establishes capacity or quality.
-3. **Complete the G03 baseline and diagnose research activation.** Inspect the
+3. **Complete the G03 baseline and diagnose research activation.** The shared
+   reducer and strict research-shaped row adapter are now wired; the remaining
+   work is to emit the private research artifacts during a live run. Inspect the
    saved Qwen traces to separate routing, tool-contract, scheduling, and inference
    latency. Prepare a reproducible real baseline with actual outcome oracles and
    reconstructable provenance. Do not simply lengthen the timeout or change the
@@ -556,7 +558,7 @@ than replacing pending cells with verbal assurances.
 |---|---|---|---|---|
 | G01 | Implemented in `6a2d4ec` + `a9cab65`; dispatch proof in `36cfeab`, shutdown cancellation proof in `b2b7777` | Focused 37-test control suite and 75-test real-session/planner integration pass; the earlier 779-test gate count is historical, and the current full gate has three pre-existing compact timing failures | Fresh 2026-09-07 disposable Ling receipt: one real goal update, one authority continuation, two provider turns, clean exit; no mirror or adoption claim | `docs/evidence/G01.md`; current review above |
 | G02 | Implemented behind `CONTEXT_ADMISSION=on`; producer reservation and recovery-preservation wiring complete | Focused producer, recovery, catalog, typecheck, package smoke, and optimizer verification pass; prior full suite passed 782/782, with five unrelated flaky probes on a later parallel run | Clean 2026-09-07 Qwen→Ling mechanism receipt: two status-200 turns, epochs 0/1, two admitted requests, one bound session/surface; no quality or capacity claim | `docs/evidence/G02.md`; `optimizer/docs/screens/PREREG_QWEN35B_CONTEXT_ADMISSION_SWITCH_2026-09-07.md`; current review above |
-| G03 | Registry, offline protocol, and fail-closed real-row ingestor implemented (`1da150a`, `20adf3a`, `88faf05`); executed baseline outstanding | Fake pairing/registry/ingestion checks and 64 focused tests recorded; optimizer verification passes | Real Qwen baseline not run | `docs/evidence/G03.md` |
+| G03 | Registry, offline protocol, fail-closed real-row ingestor, and strict research row adapter implemented (`1da150a`, `20adf3a`, `88faf05`, `8f30f10`, `6a30858`); executed baseline outstanding | Fake pairing/registry/ingestion/research-adapter checks and 71 focused tests recorded; optimizer verification passes | Real Qwen baseline not run | `docs/evidence/G03.md` |
 | G04 | Implemented: bounded research contracts, runtime enforcement, merge authority, final-answer proof, and recovery handling are committed | Focused research/planner suites plus real synthesis delivery and compaction/recovery probes pass | Approved early-stop no-go/inconclusive screen remains bound to its older surface; repaired source has no new live receipt | `docs/evidence/G04.md`, `optimizer/docs/screens/G04_DEEP_RESEARCH_EVALUATION_2026-09-07.md`; current review above |
 | G05 | Pending | Pending | Pending | Not yet created |
 
