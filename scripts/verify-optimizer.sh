@@ -57,6 +57,7 @@ selftests=(
   research-fixtures/preflight.py
   v2/baseline.py
   v2/real_baseline.py
+  v2/research_baseline.py
   v2/planner_smoke.py
 )
 # Completeness guard for the hand-maintained list above: any optimizer .py that
