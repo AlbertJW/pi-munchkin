@@ -119,6 +119,7 @@ export const EVENT_CATALOG = {
 		reservation_count: "number", request_digest: "string", epoch_digest: "string", outcome: "string",
 		reason_class: "string", truncated: "boolean",
 	},
+	"context-admission/reservation": { id_hash: "string", requested_tokens: "number", outcome: "string", reason_class: "string" },
 	"runtime/provider-timing": {
 		request_seq: "number", request_to_headers_ms: ["number", "null"],
 		first_token_ms: ["number", "null"], stream_completion_ms: ["number", "null"],
@@ -200,11 +201,11 @@ export const EVENT_CATALOG = {
 	"span-tools/read": { start: "number", end: "number" },
 	"ketch/search": {
 		mode: "string", backends: "string[]", attempts: "number", results: "number", chars: "number",
-		duration_ms: "number", truncated: "boolean", outcome: "string",
+		duration_ms: "number", truncated: "boolean", outcome: "string", reason_class: "string",
 	},
 	"ketch/read": {
 		reader: "string", sources: "number", succeeded: "number", failed: "number", chars: "number",
-		duration_ms: "number", truncated: "boolean", outcome: "string",
+		duration_ms: "number", truncated: "boolean", outcome: "string", reason_class: "string",
 	},
 	"context-watcher/compacted": { ...usage, requester: "string", contentProvider: "string", reason: "string", willRetry: "boolean", tokensBefore: "number" },
 	"blackboard/rendered": { chars: "number", attempts: "number" },

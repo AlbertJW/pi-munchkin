@@ -276,7 +276,9 @@ export function buildContextAccounting(payload: unknown, profile: ContextProfile
 
 type Reservation = { id: string; epoch: string; tokens: number };
 
-export type ReservationResult = { ok: true; id: string; epoch: string; tokens: number; idempotent: boolean } | { ok: false; reason: "invalid" | "inflation" | "budget_exceeded" };
+export type ReservationResult =
+	| { ok: true; id: string; epoch: string; tokens: number; idempotent: boolean }
+	| { ok: false; reason: "invalid" | "inflation" | "budget_exceeded" | "unavailable" };
 
 /**
  * Session-local, idempotent reservations. A repeated callback with the same
@@ -319,70 +321,110 @@ export function allocateContextAllowance(ledger: ContextReservationLedger, id: s
 	return ledger.reserve(id, epoch, requestedTokens, allowance);
 }
 
+/**
+ * The provider-payload observer owns the ledger, while retrieval extensions
+ * need a very small, process-local capability to reserve the output they are
+ * about to add to the transcript. Keeping this boundary typed and digest-only
+ * prevents producers from reaching into the admission extension or exporting
+ * profile/payload contents. The API is intentionally absent when the feature
+ * is disabled; callers can therefore remain byte-compatible with the legacy
+ * path without reading CONTEXT_ADMISSION themselves.
+ */
+export const CONTEXT_RESERVATION_KEY = "__pi_context_reservation_v1" as const;
+export const CONTEXT_RESERVATION_SCHEMA = "pi.context-reservation/v1" as const;
+
+export type ContextReservationSnapshot = { reserved_tokens: number; reservation_count: number };
+export type ContextReservationAPI = {
+	schema_version: typeof CONTEXT_RESERVATION_SCHEMA;
+	/** Whether the owning admission extension is currently enforcing reservations. */
+	enabled: () => boolean;
+	reserve: (id: string, requestedTokens: number) => ReservationResult;
+	release: (id: string) => void;
+	snapshot: () => ContextReservationSnapshot;
+	epoch: () => string | null;
+};
+
+function reservationAPI(): ContextReservationAPI | undefined {
+	const candidate = (globalThis as Record<string, unknown>)[CONTEXT_RESERVATION_KEY];
+	if (!candidate || typeof candidate !== "object") return undefined;
+	const api = candidate as Partial<ContextReservationAPI>;
+	return typeof api.enabled === "function" && typeof api.reserve === "function" &&
+		typeof api.release === "function" && typeof api.snapshot === "function" &&
+		typeof api.epoch === "function" ? candidate as ContextReservationAPI : undefined;
+}
+
+/** Reserve a bounded retrieval/tool result, or return null when admission is off. */
+export function reserveContextOutput(id: string, requestedTokens: number): ReservationResult | null {
+	const api = reservationAPI();
+	if (!api || !api.enabled()) return null;
+	return api.reserve(id, requestedTokens);
+}
+
+/** Release a producer reservation after Pi has finalized its tool result. */
+export function releaseContextOutput(id: string): void {
+	reservationAPI()?.release(id);
+}
+
+/** Read the current safe aggregate reservation without exposing model metadata. */
+export function contextReservationSnapshot(): ContextReservationSnapshot | null {
+	const api = reservationAPI();
+	return api && api.enabled() ? api.snapshot() : null;
+}
+
 export type PreservationSections = Partial<Record<(typeof PRESERVATION_ORDER)[number], string>>;
 
 export function preserveContextSections(sections: PreservationSections, maxChars: number): { text: string; truncated: boolean; omitted: string[] } {
 	const cap = Number.isFinite(maxChars) && maxChars > 0 ? Math.floor(maxChars) : 0;
+	if (cap === 0) return { text: "", truncated: false, omitted: [] };
+	const entries = PRESERVATION_ORDER.flatMap((key) => sections[key] ? [{ key, line: `${key}: ${sections[key]}` }] : []);
+	if (entries.length === 0) return { text: "", truncated: false, omitted: [] };
+	// Reserve a conservative marker before selecting content. The previous
+	// backwards-shortening loop could reach a line whose computed room equalled
+	// its current length and spin forever for narrow caps. This forward pass and
+	// the bounded suffix trim below are both monotone and always terminate.
+	const markerFloor = "...[truncated; retrieve omitted context: x]".length;
+	const contentCap = Math.max(0, cap - markerFloor - 1);
 	const lines: string[] = [];
 	const omitted: string[] = [];
 	let used = 0;
-	for (const key of PRESERVATION_ORDER) {
-		const value = sections[key];
-		if (!value) continue;
-		const line = `${key}: ${value}`;
-		if (used + line.length + 1 <= cap) {
+	for (const { key, line } of entries) {
+		const remaining = Math.max(0, contentCap - used);
+		if (line.length <= remaining) {
 			lines.push(line);
 			used += line.length + 1;
 			continue;
 		}
-		const prefix = `${key}: `;
-		const room = Math.max(0, cap - used - prefix.length - 1);
-		// Required sections are never silently removed. Keep a bounded prefix
-		// with its field name, and mark the omission so goal/evidence consumers
-		// can retrieve the complete private artifact later.
-		if (key !== "optional" && room > 0) {
-			lines.push(`${prefix}${value.slice(0, room)}`);
-			used += prefix.length + room + 1;
+		// Required sections retain a bounded prefix when there is room; optional
+		// commentary is omitted first. In either case the marker records the full
+		// field name so callers can retrieve the private artifact.
+		if (key !== "optional" && remaining > 0) {
+			const clipped = line.slice(0, remaining);
+			lines.push(clipped);
+			used += clipped.length + 1;
 		}
 		omitted.push(key);
 	}
-	const marker = omitted.length > 0 ? `...[truncated; retrieve omitted context: ${omitted.join(",")}]` : "";
-	if (marker) {
-		// The marker is part of the contract, not an optional decoration. If the
-		// first pass filled the cap with required lines, shorten the lowest
-		// priority lines until the recoverable omission marker fits. Never remove
-		// a required field name; its value may be a bounded prefix.
-		while (used + marker.length + (lines.length > 0 ? 1 : 0) > cap && lines.length > 0) {
-			const index = lines.length - 1;
-			const line = lines[index];
-			const separator = line.indexOf(": ");
-			const key = separator >= 0 ? line.slice(0, separator) : line;
-			if (key === "optional") {
-				lines.pop();
-				used -= line.length + 1;
-				if (!omitted.includes(key)) omitted.push(key);
-				continue;
+	if (omitted.length === 0) return { text: lines.join("\n"), truncated: false, omitted };
+	const markerFor = () => `...[truncated; retrieve omitted context: ${omitted.join(",")}]`;
+	while (lines.length > 0 && lines.join("\n").length + 1 + markerFor().length > cap) {
+		const body = lines.join("\n");
+		const allowance = Math.max(0, cap - markerFor().length - 1);
+		if (body.length > allowance) {
+			const previous = lines.slice(0, -1).join("\n");
+			const roomForLast = Math.max(0, allowance - (previous ? previous.length + 1 : 0));
+			if (roomForLast > 0) {
+				lines[lines.length - 1] = lines[lines.length - 1].slice(0, roomForLast);
+				break;
 			}
-			const room = Math.max(0, cap - marker.length - (lines.length > 1 ? lines.length : 1) - (used - line.length - 1));
-			const prefix = separator >= 0 ? line.slice(0, separator + 2) : "";
-			const shortened = `${prefix}${line.slice(prefix.length, prefix.length + Math.max(0, room - prefix.length))}`;
-			used -= line.length + 1;
-			if (shortened.length > prefix.length) {
-				lines[index] = shortened;
-				used += shortened.length + 1;
-			} else {
-				lines[index] = prefix.slice(0, Math.max(0, room));
-				used += lines[index].length + 1;
-			}
-			if (!omitted.includes(key)) omitted.push(key);
 		}
-		if (used + marker.length + (lines.length > 0 ? 1 : 0) <= cap) lines.push(marker);
-		else if (cap > 0) {
-			lines.length = 0;
-			lines.push(marker.slice(0, cap));
-		}
+		const removed = lines.pop()!;
+		const key = removed.split(": ", 1)[0];
+		if (!omitted.includes(key)) omitted.unshift(key);
 	}
-	return { text: lines.join("\n"), truncated: omitted.length > 0, omitted };
+	const marker = markerFor();
+	const body = lines.join("\n");
+	const text = body && body.length + 1 + marker.length <= cap ? `${body}\n${marker}` : marker.slice(0, cap);
+	return { text, truncated: true, omitted };
 }
 
 export { PRESERVATION_ORDER };

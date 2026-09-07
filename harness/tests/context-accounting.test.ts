@@ -9,6 +9,7 @@ import {
 	buildContextAccounting,
 	contextEpochKey,
 	preserveContextSections,
+	reserveContextOutput,
 } from "../lib/context-accounting.ts";
 import { contextProfileFor, withServingWindow } from "../lib/context-profile.ts";
 import { fire, makeFakePi } from "./integration-harness.ts";
@@ -248,5 +249,33 @@ test("admission telemetry carries safe digests and counts, never endpoints or pr
 			else process.env[key] = value as string;
 		}
 		await rm(root, { recursive: true, force: true });
+	}
+});
+
+test("admission coordinator accounts producer reservations and releases them at tool finalization", async () => {
+	const prior = Object.fromEntries(["CONTEXT_ADMISSION", "TELEMETRY", "TELEMETRY_FILE", "TELEMETRY_SOURCE"].map((key) => [key, process.env[key]]));
+	process.env.CONTEXT_ADMISSION = "on";
+	process.env.TELEMETRY = "off";
+	try {
+		const fp = makeFakePi();
+		const mod = await import(`../extensions/context-admission.ts?reservation=${Date.now()}-${Math.random()}`);
+		mod.default(fp.pi as never);
+		await fire(fp, "session_start", {}, { cwd: "/tmp", model });
+		const reservation = reserveContextOutput("tool-1", 500);
+		assert.equal(reservation?.ok, true);
+		await fire(fp, "before_provider_request", { payload: { messages: [{ role: "user", content: "small" }] } }, { cwd: "/tmp", model });
+		const accounting = (globalThis as Record<string, any>).__pi_context_accounting;
+		assert.equal(accounting.reserved_tokens, 500);
+		assert.equal(accounting.reservation_count, 1);
+		await fire(fp, "tool_result", { toolCallId: "tool-1" }, { cwd: "/tmp", model });
+		await fire(fp, "before_provider_request", { payload: { messages: [{ role: "user", content: "small" }] } }, { cwd: "/tmp", model });
+		assert.equal((globalThis as Record<string, any>).__pi_context_accounting.reserved_tokens, 0);
+	} finally {
+		for (const [key, value] of Object.entries(prior)) {
+			if (value === undefined) delete process.env[key];
+			else process.env[key] = value as string;
+		}
+		delete (globalThis as Record<string, unknown>).__pi_context_reservation_v1;
+		delete (globalThis as Record<string, unknown>).__pi_context_accounting;
 	}
 });

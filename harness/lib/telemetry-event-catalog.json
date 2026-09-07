@@ -87,6 +87,7 @@
     "context-admission/admitted",
     "context-admission/rejected",
     "context-admission/unavailable",
+	"context-admission/reservation",
     "runtime/context-profile",
     "runtime/provider-timing",
     "runtime/serving-truth",

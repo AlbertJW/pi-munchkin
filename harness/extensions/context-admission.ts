@@ -1,7 +1,8 @@
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { contextProfileFor, modelFingerprint, type ContextProfile } from "../lib/context-profile.ts";
-import { buildContextAccounting, ContextReservationLedger } from "../lib/context-accounting.ts";
+import { buildContextAccounting, CONTEXT_RESERVATION_KEY, CONTEXT_RESERVATION_SCHEMA, contextEpochKey, ContextReservationLedger } from "../lib/context-accounting.ts";
 import { record } from "../lib/telemetry.ts";
+import { createHash } from "node:crypto";
 
 type RuntimeContext = {
 	model?: unknown;
@@ -58,12 +59,78 @@ function safeRecord(accounting: ReturnType<typeof buildContextAccounting>): Reco
  */
 export default function installContextAdmission(pi: ExtensionAPI): void {
 	const ledger = new ContextReservationLedger();
-	const outstanding = new Set<string>();
+	let currentProfile: ContextProfile | null = null;
+	let currentEpochDigest: string | null = null;
+	const activeReservations = new Set<string>();
+	const shared = globalThis as Record<string, unknown>;
 
-	pi.on("session_start", async () => {
+	function syncEpoch(profile: ContextProfile | null): string | null {
+		if (!profile) {
+			currentEpochDigest = null;
+			ledger.reset();
+			return null;
+		}
+		const epoch = contextEpochKey(profile);
+		if (currentEpochDigest !== epoch) {
+			// A provider/model/endpoint/window change invalidates every reservation
+			// from the previous serving epoch. Never let a large-window reservation
+			// authorize a later small-window request.
+			ledger.reset(epoch);
+			activeReservations.clear();
+			currentEpochDigest = epoch;
+		}
+		return epoch;
+	}
+
+	function profileFromModel(model: unknown): ContextProfile | null {
+		return profileFor({ model } as RuntimeContext);
+	}
+
+	const reservationAPI = {
+		schema_version: CONTEXT_RESERVATION_SCHEMA,
+		enabled: () => process.env.CONTEXT_ADMISSION === "on",
+		reserve: (id: string, requestedTokens: number) => {
+			const idHash = createHash("sha256").update(id).digest("hex");
+			if (!currentProfile) {
+				record("context-admission", "reservation", { id_hash: idHash, requested_tokens: Number.isFinite(requestedTokens) ? Math.max(0, Math.floor(requestedTokens)) : 0, outcome: "unavailable", reason_class: "context_profile_unavailable" });
+				return { ok: false as const, reason: "unavailable" as const };
+			}
+			const epoch = syncEpoch(currentProfile);
+			if (!epoch || currentProfile.safe_input_tokens == null) {
+				record("context-admission", "reservation", { id_hash: idHash, requested_tokens: Number.isFinite(requestedTokens) ? Math.max(0, Math.floor(requestedTokens)) : 0, outcome: "unavailable", reason_class: "context_budget_unavailable" });
+				return { ok: false as const, reason: "unavailable" as const };
+			}
+			const result = ledger.reserve(id, epoch, requestedTokens, currentProfile.safe_input_tokens);
+			if (result.ok) {
+				activeReservations.add(id);
+				record("context-admission", "reservation", { id_hash: idHash, requested_tokens: result.tokens, outcome: "reserved", reason_class: result.idempotent ? "idempotent" : "ok" });
+			} else {
+				record("context-admission", "reservation", { id_hash: idHash, requested_tokens: Number.isFinite(requestedTokens) ? Math.max(0, Math.floor(requestedTokens)) : 0, outcome: "rejected", reason_class: result.reason });
+			}
+			return result;
+		},
+		release: (id: string) => {
+			if (!activeReservations.has(id)) return;
+			activeReservations.delete(id);
+			ledger.release(id);
+		},
+		snapshot: () => currentEpochDigest ? ledger.snapshot(currentEpochDigest) : { reserved_tokens: 0, reservation_count: 0 },
+		epoch: () => currentEpochDigest,
+	};
+	shared[CONTEXT_RESERVATION_KEY] = reservationAPI;
+
+	pi.on("session_start", async (_event, rawCtx) => {
 		ledger.reset();
-		outstanding.clear();
-		delete (globalThis as Record<string, unknown>).__pi_context_accounting;
+		activeReservations.clear();
+		currentProfile = profileFromModel((rawCtx as RuntimeContext | undefined)?.model);
+		currentEpochDigest = null;
+		syncEpoch(currentProfile);
+		delete shared.__pi_context_accounting;
+	});
+
+	pi.on("model_select", async (event) => {
+		currentProfile = profileFromModel((event as { model?: unknown }).model);
+		syncEpoch(currentProfile);
 	});
 
 	pi.on("before_provider_request", async (event, rawCtx) => {
@@ -87,10 +154,15 @@ export default function installContextAdmission(pi: ExtensionAPI): void {
 			try { ctx.ui?.notify?.("Context admission stopped this request: serving context window is unknown. Select a model with a declared context window or inspect the runtime profile.", "warning"); } catch { /* stale ui */ }
 			return undefined;
 		}
+		currentProfile = profile;
+		const epoch = syncEpoch(profile);
 		let accounting: ReturnType<typeof buildContextAccounting>;
 		try {
+			const reservations = epoch ? ledger.snapshot(epoch) : { reserved_tokens: 0, reservation_count: 0 };
 			accounting = buildContextAccounting((event as { payload?: unknown }).payload, profile, {
 				observedUsage: ctx.getContextUsage?.(),
+				reservedTokens: reservations.reserved_tokens,
+				reservationCount: reservations.reservation_count,
 			});
 		} catch {
 			// Malformed/cyclic provider payloads must not escape through the runner's
@@ -118,16 +190,25 @@ export default function installContextAdmission(pi: ExtensionAPI): void {
 			try { ctx.ui?.notify?.(`Context admission stopped this request (${accounting.reason_class}; remaining=${accounting.remaining_tokens} tokens). Compact or retrieve a bounded page before retrying.`, "warning"); } catch { /* stale ui */ }
 			return undefined;
 		}
-		outstanding.add(accounting.request_digest);
 		record("context-admission", "admitted", detail);
 		return undefined;
 	});
 
-	const release = () => {
-		for (const id of outstanding) ledger.release(id);
-		outstanding.clear();
+	const releaseTool = (event: unknown) => {
+		const id = (event as { toolCallId?: unknown } | undefined)?.toolCallId;
+		if (typeof id === "string") reservationAPI.release(id);
 	};
-	pi.on("after_provider_response", async () => { release(); });
-	pi.on("agent_settled", async () => { release(); });
-	pi.on("session_shutdown", async () => { release(); ledger.reset(); });
+	// Pi emits tool_execution_end before the tool-result message is appended;
+	// tool_result is the equivalent finalization boundary in the test double and
+	// for blocked/throwing tools. Both are idempotent through activeReservations.
+	pi.on("tool_execution_end", async (event) => { releaseTool(event); });
+	pi.on("tool_result", async (event) => { releaseTool(event); });
+	pi.on("agent_settled", async () => { ledger.reset(); activeReservations.clear(); });
+	pi.on("session_shutdown", async () => {
+		ledger.reset();
+		activeReservations.clear();
+		currentProfile = null;
+		currentEpochDigest = null;
+		if (shared[CONTEXT_RESERVATION_KEY] === reservationAPI) delete shared[CONTEXT_RESERVATION_KEY];
+	});
 }

@@ -13,6 +13,30 @@ import { emitHarnessSignal, onHarnessSignal } from "../lib/harness-signals.ts";
 import type { RunStateV1 } from "../lib/run-kernel-types.ts";
 import { record } from "../lib/telemetry.ts";
 import { goalsEnabled, readGoal, renderGoalRecoveryBrief } from "../lib/goal-state.ts";
+import { preserveContextSections } from "../lib/context-accounting.ts";
+
+function recoveryContextBudget(): number {
+	const profile = (globalThis as Record<string, unknown>).__pi_context_profile as { safe_input_tokens?: unknown } | undefined;
+	const safe = typeof profile?.safe_input_tokens === "number" && Number.isFinite(profile.safe_input_tokens) ? profile.safe_input_tokens : null;
+	return safe == null ? 4_096 : Math.max(2_304, Math.min(6_144, Math.floor(safe * 0.12)));
+}
+
+/**
+ * Assemble recovery data through the same priority contract used by aggregate
+ * admission. The legacy path remains byte-compatible; the bounded assembly is
+ * enabled only with CONTEXT_ADMISSION so the dark candidate cannot alter live
+ * recovery prompts before its smoke is accepted.
+ */
+export function assembleRecoveryBrief(recoveryBrief: string, goalBrief: string, maxChars = recoveryContextBudget()): string {
+	const combined = `${recoveryBrief}${goalBrief ? `\n${goalBrief}` : ""}`;
+	if (process.env.CONTEXT_ADMISSION !== "on") return combined;
+	const preserved = preserveContextSections({
+		objective: goalBrief || "No active goal; preserve the current task objective from the run state.",
+		active_state: recoveryBrief,
+		next_action: "Re-ground from current filesystem evidence and continue only after required state is recoverable.",
+	}, maxChars);
+	return preserved.text;
+}
 
 export default function (pi: ExtensionAPI): void {
 	const mode = runCapsuleMode();
@@ -142,7 +166,7 @@ export default function (pi: ExtensionAPI): void {
 			pendingCompactionGeneration = null;
 			pendingProviderRecovery = false;
 			const goalBrief = goalsEnabled() ? renderGoalRecoveryBrief(await readGoal(ctx.cwd)) : "";
-			const brief = `${renderRecoveryBrief(latestState, { reason })}${goalBrief ? `\n${goalBrief}` : ""}`;
+			const brief = assembleRecoveryBrief(renderRecoveryBrief(latestState, { reason }), goalBrief);
 			record("run-capsule", "recovery-brief", { reason, brief_bytes: Buffer.byteLength(brief, "utf8"), generation: latestState.context.compactionGeneration });
 			return {
 				messages: [...event.messages, {
@@ -159,7 +183,7 @@ export default function (pi: ExtensionAPI): void {
 
 	subscribeOnce("run-capsule:domain-signal", () => onHarnessSignal(pi.events, (signal) => {
 		if (mode !== "recovery" || signal.type !== "recovery/resumed" || !latestState) return;
-		const brief = renderRecoveryBrief(latestState, { reason: "manual_resume" });
+		const brief = assembleRecoveryBrief(renderRecoveryBrief(latestState, { reason: "manual_resume" }), "");
 		try {
 			pi.sendMessage({
 				customType: "pi-munchkin:recovery-brief",

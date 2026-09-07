@@ -18,7 +18,7 @@ import {
 } from "../lib/ketch-runtime.ts";
 import { RESEARCH_COVERAGE_KEY } from "../lib/branch-report.ts";
 import { RESEARCH_EVIDENCE_CARDS_KEY } from "../lib/research-evidence.ts";
-import { callTool, makeFakePi, resetPiGlobals } from "./integration-harness.ts";
+import { callTool, fire, makeFakePi, resetPiGlobals } from "./integration-harness.ts";
 
 function restoreEnv(snapshot: Record<string, string | undefined>): void {
 	for (const [key, value] of Object.entries(snapshot)) {
@@ -174,6 +174,36 @@ test("extension is default-on with two tools; quick search falls back and broad 
 		restoreEnv(snapshot);
 		rmSync(dir, { recursive: true, force: true });
 		delete (globalThis as Record<string, unknown>)[RESEARCH_COVERAGE_KEY];
+	}
+});
+
+test("web search reserves aggregate context before invoking the network adapter", async () => {
+	const dir = mkdtempSync(join(tmpdir(), "ketch-context-reservation-"));
+	const snapshot = Object.fromEntries(["KETCH", "KETCH_BIN", "KETCH_BACKEND", "CONTEXT_ADMISSION", "TELEMETRY", "TELEMETRY_FILE", "TELEMETRY_SOURCE"].map((key) => [key, process.env[key]]));
+	try {
+		delete process.env.KETCH;
+		process.env.KETCH_BIN = mockKetch(dir);
+		process.env.KETCH_BACKEND = "exa";
+		process.env.CONTEXT_ADMISSION = "on";
+		process.env.TELEMETRY = "off";
+		const fp = makeFakePi();
+		const admission = await import(`../extensions/context-admission.ts?ketch-reservation=${Date.now()}-${Math.random()}`);
+		admission.default(fp.pi as never);
+		const mod = await import(`../extensions/ketch.ts?context-reservation=${Date.now()}-${Math.random()}`);
+		mod.registerKetch(fp.pi as never, { resolvePublicUrl: async (raw: string) => new URL(raw).toString() });
+		// 2K is deliberately below the fixed search output reservation. The
+		// producer must fail before checkVersion/search invokes the child process.
+		const model = { provider: "local", id: "tiny", contextWindow: 2_048, baseUrl: "http://127.0.0.1:8080/v1" };
+		await fire(fp, "session_start", {}, { cwd: dir, model });
+		const result = await callTool(fp, "web_search", { query: "must not run", limit: 1 }, dir);
+		assert.equal(result.details.outcome, "context_budget_exhausted");
+		assert.equal(result.isError, false);
+	} finally {
+		restoreEnv(snapshot);
+		rmSync(dir, { recursive: true, force: true });
+		delete (globalThis as Record<string, unknown>).__pi_context_reservation_v1;
+		delete (globalThis as Record<string, unknown>).__pi_context_accounting;
+		delete (globalThis as Record<string, unknown>).__pi_ketch_version_checks_v1;
 	}
 });
 

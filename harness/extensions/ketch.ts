@@ -34,6 +34,7 @@ import { normalizeResearchQuery, researchReservationRoot, reserveResearchKey } f
 import { continuationDispatcherActive, emitContinuationRequest, hashContinuationIdentity } from "../lib/continuation-authority.ts";
 import { goalsEnabled, readCurrentGoal } from "../lib/goal-state.ts";
 import { createHash } from "node:crypto";
+import { reserveContextOutput } from "../lib/context-accounting.ts";
 
 // Ketch is the host-side network adapter for local models. The steady-state
 // surface is deliberately only FIND + READ; deep orchestration lives in the
@@ -64,6 +65,17 @@ function boundedEnvInt(name: string, fallback: number, min: number, max: number)
 	// underscore-grouped value.
 	if (!/^\d+$/.test(raw)) return fallback;
 	return Math.min(max, Math.max(min, Number.parseInt(raw, 10)));
+}
+
+function outputReservation(id: string, maxChars: number): { ok: true } | { ok: false; reason: string } | null {
+	// Four bytes/token is the same conservative estimate used by the aggregate
+	// accounting contract. A small framing margin covers SOURCE/URL headers;
+	// reservations are released at Pi's tool-result boundary, before the next
+	// provider payload is assembled.
+	const requestedTokens = Math.max(1, Math.ceil((Math.max(0, maxChars) + 256) / 4));
+	const result = reserveContextOutput(id, requestedTokens);
+	if (result === null || result.ok) return result === null ? null : { ok: true };
+	return { ok: false, reason: result.reason };
 }
 
 const QUICK_TIMEOUT = boundedEnvInt("KETCH_TIMEOUT_MS", 30_000, 1_000, 120_000);
@@ -442,13 +454,18 @@ export function registerKetch(pi: ExtensionAPI, dependencies: KetchDependencies 
 				mode: Type.Optional(Type.Union([Type.Literal("quick"), Type.Literal("broad")], { description: "quick (default) or broad multi-backend search." })),
 				limit: Type.Optional(Type.Integer({ minimum: 1, maximum: 8, description: "Results to return (default 5)." })),
 			}),
-			async execute(_id, params, signal) {
+			async execute(toolCallId, params, signal) {
 				const started = Date.now();
 				const mode = params.mode ?? "quick";
 				const queryKey = normalizeResearchQuery(params.query);
 				if (budgetEnabled && seenQueries.has(queryKey)) {
 					record("ketch", "search", { mode, backends: [], attempts: 0, results: 0, chars: 0, duration_ms: Date.now() - started, truncated: false, outcome: "duplicate_query" });
 					return text("This research query was already issued in this run. Name an unmet claim gap before searching again.", { outcome: "duplicate_query", coverage: coverageReceipt(0, undefined, false, false) });
+				}
+				const reservation = outputReservation(toolCallId, SEARCH_OUTPUT_CAP);
+				if (reservation && !reservation.ok) {
+					record("ketch", "search", { mode, backends: [], attempts: 0, results: 0, chars: 0, duration_ms: Date.now() - started, truncated: false, outcome: "context_budget_exhausted", reason_class: reservation.reason });
+					return text("This search result would exceed the remaining context budget. Narrow the query or compact before searching again.", { outcome: "context_budget_exhausted", reason_class: reservation.reason, coverage: coverageReceipt(0, undefined, false, true) });
 				}
 				if (budgetEnabled) {
 					const reservationRoot = await activeResearchReservationRoot();
@@ -558,7 +575,7 @@ export function registerKetch(pi: ExtensionAPI, dependencies: KetchDependencies 
 					], { description: "ketch (default) or jina (free public URL-to-Markdown formatter)." })),
 				} : {}),
 			}),
-			async execute(_id, params, signal) {
+			async execute(toolCallId, params, signal) {
 				const started = Date.now();
 				const requestedReader = (params as { reader?: unknown }).reader;
 				const reader = requestedReader === undefined || requestedReader === "ketch" ? "ketch" : requestedReader === "jina" ? "jina" : "invalid";
@@ -584,6 +601,11 @@ export function registerKetch(pi: ExtensionAPI, dependencies: KetchDependencies 
 				const resolved = await Promise.allSettled(params.urls.map((url) => resolvePublicUrl(url, { signal: preflightSignal })));
 				const safeUrls = resolved.flatMap((entry) => entry.status === "fulfilled" ? [entry.value] : []);
 				const blockedCount = params.urls.length - safeUrls.length; // preflight-rejected: still real failures
+				const reservation = outputReservation(toolCallId, Math.min(READ_OUTPUT_CAP, Math.max(1, (params.max_chars ?? 5_000) * Math.max(1, safeUrls.length))));
+				if (reservation && !reservation.ok) {
+					record("ketch", "read", { reader, sources: params.urls.length, succeeded: 0, failed: params.urls.length, chars: 0, duration_ms: Date.now() - started, truncated: false, outcome: "context_budget_exhausted", reason_class: reservation.reason });
+					return text("These source pages would exceed the remaining context budget. Read fewer pages or request a smaller bounded page.", { reader, outcome: "context_budget_exhausted", reason_class: reservation.reason, coverage: coverageReceipt(0, params.urls.length, false, true) });
+				}
 				// Full-batch session-cache hit: serve without refetching. A repeat
 				// web_read of already-fetched pages is the read-side spiral shape;
 				// serving the cache makes it free instead of a network round-trip.

@@ -6,7 +6,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
 import { installRunKernel } from "../extensions/run-kernel.ts";
-import runCapsule from "../extensions/run-capsule.ts";
+import runCapsule, { assembleRecoveryBrief } from "../extensions/run-capsule.ts";
 import loopBreaker from "../extensions/loop-breaker.ts";
 import { emptyState, projectRunStateToBlackboard } from "../lib/blackboard.ts";
 import {
@@ -413,6 +413,15 @@ test("recovery mode injects one brief after compaction and none on ordinary cont
 		assert.match(String(injected.content), /recovery_reason: compaction/);
 		const second = await fire(fp, "context", { messages: [{ role: "user", content: [{ type: "text", text: "ordinary" }] }] }, ctx);
 		assert.equal(second.length, 1);
+	});
+});
+
+test("aggregate recovery assembly uses the preservation contract when admission is enabled", async () => {
+	await withEnv({ CONTEXT_ADMISSION: "on" }, async () => {
+		const result = assembleRecoveryBrief("ACTIVE-STATE", "OBJECTIVE\n" + "criterion evidence ".repeat(200), 512);
+		assert.ok(result.length <= 512, `preserved recovery exceeded cap: ${result.length}`);
+		assert.match(result, /objective:/);
+		assert.match(result, /truncated; retrieve omitted context/);
 	});
 });
 
