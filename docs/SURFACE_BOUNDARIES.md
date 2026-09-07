@@ -368,6 +368,19 @@ Source commit: `7ea9652`.
 Current source-surface SHA-256:
 `9aed85c14ebae22b7f255d00fbe9eb7a8a90b023a450291837ef9cf40e67bc18`.
 
+## Pending surface boundary — 2026-09-07 (G03 fixture/spec identity)
+
+The G03 registry verifier now requires the declared case kind to agree with
+the versioned fixture schema, checks required fixture/research specification
+fields, and rejects unsafe isolation allowlist paths before artifact hashes are
+trusted. Targeted regressions and the complete offline optimizer verification
+pass. Source commit: `5c889c2`; no inference, calibration, campaign, mirror,
+rollout, or adoption occurred. G03-C remains pending a fresh Qwen 35B run once
+Pi/llama-swap and the research adapter are available.
+
+Current source-surface SHA-256:
+`9aed85c14ebae22b7f255d00fbe9eb7a8a90b023a450291837ef9cf40e67bc18`.
+
 ## Data at rest: where a research session actually lands (updated 2026-08-10)
 
 A surface hash bounds what the MODEL sees. It says nothing about what a session LEAVES. Those are

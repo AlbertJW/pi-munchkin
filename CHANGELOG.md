@@ -103,6 +103,14 @@ reconstruction procedure. It records that Pi/llama-swap is currently down and
 that research-shaped live execution still needs its adapter; no model session
 or adoption action was started.
 
+### Fixed (2026-09-07 — G03 fixture/spec identity validation; repository-only)
+
+Benchmark admission now checks that each case's declared kind agrees with its
+versioned fixture schema and that fixture specifications carry their required
+version fields. Research manifests must expose their claim and provenance
+sections before their receipt can be accepted. No live inference, calibration,
+campaign, mirror, rollout, or adoption occurred.
+
 ### Added (2026-09-06 — G02 aggregate context admission; repository-only)
 
 Added the `pi.context-accounting/v1` aggregate admission contract and the
