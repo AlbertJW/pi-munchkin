@@ -100,6 +100,43 @@ def _validate_case_tasks(pack: BenchmarkPack, case_tasks: dict[str, str]) -> dic
     return {task: case_id for case_id, task in case_tasks.items()}
 
 
+def _case_tasks_digest(case_tasks: dict[str, str]) -> str:
+    """Digest the exact case→real-gate task binding used for ingestion."""
+
+    return _digest(case_tasks)
+
+
+def load_case_tasks(value: str | pathlib.Path) -> dict[str, str]:
+    """Load a task map without following a symlink or accepting raw payload files.
+
+    The map is part of the reconstruction boundary.  A caller may still pass
+    an inline JSON object for tests, but a filesystem-backed map must be a
+    regular file so an operator cannot silently substitute a moved binding.
+    """
+
+    raw = str(value)
+    candidate = pathlib.Path(raw).expanduser()
+    try:
+        is_file_candidate = candidate.exists() or candidate.is_symlink()
+    except OSError:
+        is_file_candidate = False
+    if is_file_candidate:
+        if candidate.is_symlink() or not candidate.is_file():
+            raise RealBaselineError("case_tasks must be a regular non-symlink file")
+        try:
+            parsed = json.loads(candidate.read_text(encoding="utf-8"))
+        except (OSError, UnicodeError, json.JSONDecodeError) as exc:
+            raise RealBaselineError("case_tasks file is malformed") from exc
+    else:
+        try:
+            parsed = json.loads(raw)
+        except (UnicodeError, json.JSONDecodeError) as exc:
+            raise RealBaselineError("case_tasks must be a JSON object or readable file") from exc
+    if not isinstance(parsed, dict):
+        raise RealBaselineError("case_tasks must contain one JSON object")
+    return parsed
+
+
 def _normalized_repetition(row: dict, prereg: BaselinePreregistration) -> int | None:
     """Return the preregistered repetition represented by a V4 gate row.
 
@@ -262,6 +299,7 @@ def ingest_gate_baseline(
         raise RealBaselineError("run_id is invalid")
     prepared = prepare_baseline(pack, prereg, repository_root)
     reverse_tasks = _validate_case_tasks(pack, case_tasks)
+    case_tasks_sha256 = _case_tasks_digest(case_tasks)
     resolved = _resolved_model(resolved_model, prereg.subject_model)
     sidecar = _sidecar_map(validity_records)
     arm_config = {
@@ -389,6 +427,7 @@ def ingest_gate_baseline(
         "prepared": prepared,
         "preregistration_sha256": prereg.sha256,
         "benchmark_pack_sha256": pack.sha256,
+        "case_tasks_sha256": case_tasks_sha256,
         "run_id_sha256": _digest(run_id),
         "requested_model": prereg.subject_model,
         "resolved_model": resolved,
@@ -402,7 +441,7 @@ def ingest_gate_baseline(
         "trial_count": len(trials),
         "external_references": [], "reference_pooling": "forbidden",
         "decision": {"status": decision_status, "reason": decision_reason, "statistical_power": "not-established"},
-        "reconstruction": {"pack_path": prereg.pack_path, "preregistration_sha256": prereg.sha256, "benchmark_pack_sha256": pack.sha256, "validity_sidecar_required": True, "raw_payloads_in_report": False, "rerun_inference_required": False},
+        "reconstruction": {"pack_path": prereg.pack_path, "preregistration_sha256": prereg.sha256, "benchmark_pack_sha256": pack.sha256, "case_tasks_sha256": case_tasks_sha256, "validity_sidecar_required": True, "raw_payloads_in_report": False, "rerun_inference_required": False},
         "human_review_required": True, "adoption_authorized": False,
     }
     report["report_sha256"] = _digest(report)
@@ -414,6 +453,12 @@ def validate_real_report(report: dict, pack: BenchmarkPack, prereg: BaselinePrer
         raise RealBaselineError("real baseline report schema is invalid")
     if report.get("preregistration_sha256") != prereg.sha256 or report.get("benchmark_pack_sha256") != pack.sha256:
         raise RealBaselineError("real baseline identity is not bound")
+    case_tasks_sha256 = report.get("case_tasks_sha256")
+    if not isinstance(case_tasks_sha256, str) or not HEX64.fullmatch(case_tasks_sha256):
+        raise RealBaselineError("real baseline case-task binding digest is missing")
+    reconstruction = report.get("reconstruction") if isinstance(report.get("reconstruction"), dict) else {}
+    if reconstruction.get("case_tasks_sha256") != case_tasks_sha256:
+        raise RealBaselineError("real baseline reconstruction task-map digest is inconsistent")
     report_without_hash = dict(report)
     report_digest = report_without_hash.pop("report_sha256", None)
     if not isinstance(report_digest, str) or report_digest != _digest(report_without_hash):
@@ -527,7 +572,7 @@ if __name__ == "__main__":
             prereg = BaselinePreregistration.load(prereg_path)
             pack_path = (repository / prereg.pack_path).resolve()
             pack = BenchmarkPack.load(pack_path)
-            case_tasks = json.loads(pathlib.Path(args.case_tasks).read_text(encoding="utf-8")) if pathlib.Path(args.case_tasks).is_file() else json.loads(args.case_tasks)
+            case_tasks = load_case_tasks(args.case_tasks)
             report = ingest_gate_baseline(
                 pack, prereg, repository, load_jsonl(args.rows), load_jsonl(args.validity),
                 case_tasks=case_tasks, run_id=args.run_id,

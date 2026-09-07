@@ -114,6 +114,15 @@ python3 -m optimizer.v2.baseline --selftest
 python3 -m optimizer.v2.baseline --dry --preregistration optimizer/v2/examples/g03-baseline-preregistration.json
 python3 -m optimizer.v2.research_runner --selftest
 
+# the complete, versioned train/development task binding (digest is recorded
+# in the resulting private baseline report)
+python3 -m optimizer.v2.real_baseline --ingest \
+  --case-tasks optimizer/v2/examples/g03-baseline-task-map-r2.json \
+  --rows /private/rows.jsonl --validity /private/rows.jsonl.validity.jsonl \
+  --preregistration optimizer/v2/examples/g03-baseline-preregistration-r2.json \
+  --run-id <gate-run-id> --resolved-provider <provider> \
+  --resolved-model qwen36-35b-iq3s --output /private/g03-report.json
+
 # prepare a prompt-free research-cell plan (the checked-in map binds admitted case IDs)
 python3 -m optimizer.v2.research_runner --prepare --run-id g03-run \
   --task-map optimizer/v2/examples/g03-research-task-map-r2.json \
@@ -176,6 +185,12 @@ After a run, `research_baseline.py --reduce-plan` validates that plan and
 reduces each present receipt through the shared research oracle. Missing receipt
 paths are returned as explicit `missing_cells` for the final baseline reducer
 to classify as exclusions; they are never treated as zero-cost successes.
+
+The complete r2 case-to-task binding is versioned at
+`examples/g03-baseline-task-map-r2.json`. The ingestor rejects symlinked map
+files and records a canonical SHA-256 of the exact mapping in both the report
+and its reconstruction block, so a reviewer can verify the private map used by
+the run without exposing prompts or transcripts.
 
 For a fixture-bound screen, pass `--fixture-manifest` together with its
 canonical admission digest in `--expected-fixture-sha256`. The launcher then

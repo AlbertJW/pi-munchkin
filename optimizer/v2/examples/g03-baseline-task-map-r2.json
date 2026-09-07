@@ -1,0 +1,12 @@
+{
+  "coding-edit-access": "access-log-triage",
+  "coding-edit-audit": "audit-sweep",
+  "documentation-escape": "documented-escape",
+  "documentation-steps": "ordered-steps",
+  "failure-recovery-qs": "qs-error-swallow",
+  "failure-recovery-retry": "retry-trap",
+  "long-context-bigdata": "bigdata",
+  "long-context-pressure": "context-pressure",
+  "research-comparative": "g03-research-comparative",
+  "research-contested": "g03-research-contested"
+}

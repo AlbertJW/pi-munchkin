@@ -7,13 +7,14 @@ import unittest
 
 from optimizer.v2.baseline import BaselinePreregistration
 from optimizer.v2.benchmark import BenchmarkPack
-from optimizer.v2.real_baseline import RealBaselineError, _row_digest, _row_key, ingest_gate_baseline, validate_real_report
+from optimizer.v2.real_baseline import RealBaselineError, _row_digest, _row_key, ingest_gate_baseline, load_case_tasks, validate_real_report
 
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
 REPO = ROOT.parent
 PACK = BenchmarkPack.load(ROOT / "v2/benchmarks/g03-representative-pilot-v1.json")
 PREREG = BaselinePreregistration.load(ROOT / "v2/examples/g03-baseline-preregistration.json")
+R2_TASK_MAP = json.loads((ROOT / "v2/examples/g03-baseline-task-map-r2.json").read_text(encoding="utf-8"))
 CASE_TASKS = {
     case.case_id: f"g03-{case.case_id}"
     for split in ("train", "development")
@@ -74,6 +75,27 @@ def complete_rows() -> tuple[list[dict], list[dict]]:
 
 
 class G03RealBaselineIngestTests(unittest.TestCase):
+    def test_checked_in_r2_task_map_covers_exact_train_development_cases(self) -> None:
+        expected = {
+            case.case_id
+            for split in ("train", "development")
+            for case in BenchmarkPack.load(ROOT / "v2/benchmarks/g03-representative-pilot-r2.json").splits[split]
+        }
+        self.assertEqual(set(R2_TASK_MAP), expected)
+        self.assertEqual(len(set(R2_TASK_MAP.values())), len(R2_TASK_MAP))
+
+    def test_case_task_map_loader_is_inline_or_regular_file_only(self) -> None:
+        self.assertEqual(load_case_tasks(json.dumps(CASE_TASKS)), CASE_TASKS)
+        with __import__("tempfile").TemporaryDirectory() as directory:
+            root = pathlib.Path(directory)
+            target = root / "tasks.json"
+            target.write_text(json.dumps(CASE_TASKS), encoding="utf-8")
+            self.assertEqual(load_case_tasks(target), CASE_TASKS)
+            alias = root / "tasks-alias.json"
+            alias.symlink_to(target)
+            with self.assertRaises(RealBaselineError):
+                load_case_tasks(alias)
+
     def test_complete_paired_grid_is_quality_bound_but_not_adoption(self) -> None:
         rows, validity = complete_rows()
         report = ingest_gate_baseline(PACK, PREREG, REPO, rows, validity, case_tasks=CASE_TASKS, run_id="g03-real-run", resolved_model={"provider": "llama", "model": "qwen36-35b-iq3s"})
@@ -86,6 +108,13 @@ class G03RealBaselineIngestTests(unittest.TestCase):
         self.assertEqual(len(report["serving_identity_sha256"]), 1)
         self.assertEqual({trial["repetition"] for trial in report["trials"]}, {0})
         self.assertNotIn("prompt", json.dumps(report))
+        self.assertRegex(report["case_tasks_sha256"], r"^[0-9a-f]{64}$")
+        self.assertEqual(
+            report["case_tasks_sha256"],
+            __import__("hashlib").sha256(
+                json.dumps(CASE_TASKS, sort_keys=True, separators=(",", ":"), ensure_ascii=False).encode()
+            ).hexdigest(),
+        )
 
     def test_timeout_and_missing_cells_are_retained_as_non_authoritative(self) -> None:
         row = make_row("coding-edit-access", "base", 1, "session-timeout", timeout=True)
