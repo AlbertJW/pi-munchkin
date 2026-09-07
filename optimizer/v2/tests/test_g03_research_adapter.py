@@ -12,7 +12,8 @@ import unittest
 from optimizer.v2.baseline import BaselinePreregistration
 from optimizer.v2.benchmark import BenchmarkPack
 from optimizer.v2.real_baseline import ingest_gate_baseline
-from optimizer.v2.research_baseline import ResearchBaselineError, research_artifact_to_row
+from optimizer.v2.research_baseline import ResearchBaselineError, reduce_research_plan, research_artifact_to_row
+from optimizer.v2.research_runner import make_cell_request, prepare_research_plan, record_research_artifact
 
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
@@ -21,6 +22,10 @@ PACK_PATH = ROOT / "v2/benchmarks/g03-representative-pilot-v1.json"
 PREREG_PATH = ROOT / "v2/examples/g03-baseline-preregistration.json"
 PACK = BenchmarkPack.load(PACK_PATH)
 PREREG = BaselinePreregistration.load(PREREG_PATH)
+PACK_R2_PATH = ROOT / "v2/benchmarks/g03-representative-pilot-r2.json"
+PREREG_R2_PATH = ROOT / "v2/examples/g03-baseline-preregistration-r2.json"
+PACK_R2 = BenchmarkPack.load(PACK_R2_PATH)
+PREREG_R2 = BaselinePreregistration.load(PREREG_R2_PATH)
 CASE_ID = "research-comparative"
 CASE = PACK.case(CASE_ID)
 CASE_TASKS = {case.case_id: f"g03-{case.case_id}" for split in ("train", "development") for case in PACK.splits[split]}
@@ -79,6 +84,101 @@ def valid_artifact() -> dict:
 
 
 class G03ResearchAdapterTests(unittest.TestCase):
+    def test_research_plan_reduces_private_receipts_and_reports_missing_cells(self) -> None:
+        task_map = {
+            case.case_id: f"g03-{case.case_id}"
+            for split in ("train", "development")
+            for case in PACK_R2.splits[split]
+            if case.is_research
+        }
+        plan = prepare_research_plan(PACK_R2, PREREG_R2, run_id="g03-research-batch", task_map=task_map, repository_root=REPO)
+        with tempfile.TemporaryDirectory() as directory:
+            run_root = pathlib.Path(directory)
+            for cell in plan["cells"]:
+                request = {
+                    "schema": "pi.research-cell/v1", "case_id": cell["case_id"], "split": cell["split"],
+                    "arm": cell["arm"], "rep": cell["rep"], "repetition": cell["repetition"],
+                    "run": plan["run_id"], "task": cell["task"], "model": cell["model"],
+                    "requested_provider": cell["requested_provider"], "resolved_provider": "llama",
+                    "resolved_model": cell["model"], "config_sha256": cell["config_sha256"],
+                    "surface_sha256": cell["surface_sha256"], "experiment_sha256": cell["experiment_sha256"],
+                    "gate_session_id": f"session-{cell['cell_id']}",
+                }
+                destination = run_root / cell["artifact_relpath"]
+                record_research_artifact(
+                    destination, run_root=run_root, cell=make_cell_request(PACK_R2, PREREG_R2, request, repository_root=REPO),
+                    pack=PACK_R2, prereg=PREREG_R2,
+                    process={"reason": "completed", "exit_code": 0, "elapsed_seconds": 1.0},
+                    serving={"stable": True, "pre": {"status": "complete", "full_sha256": "d" * 64}, "post": {"status": "complete", "full_sha256": "d" * 64}},
+                    parent_report=None, repository_root=REPO,
+                )
+            reduced = reduce_research_plan(plan, artifact_root=run_root, pack=PACK_R2, prereg=PREREG_R2, repository_root=REPO)
+            self.assertEqual(len(reduced["rows"]), 8)
+            self.assertEqual(len(reduced["validity"]), 8)
+            self.assertEqual(reduced["missing_cells"], [])
+            missing = run_root / plan["cells"][0]["artifact_relpath"]
+            missing.unlink()
+            reduced = reduce_research_plan(plan, artifact_root=run_root, pack=PACK_R2, prereg=PREREG_R2, repository_root=REPO)
+            self.assertEqual(len(reduced["rows"]), 7)
+            self.assertEqual(reduced["missing_cells"], [plan["cells"][0]["cell_id"]])
+
+    def test_research_plan_reduction_rejects_cell_binding_drift(self) -> None:
+        task_map = {
+            case.case_id: f"g03-{case.case_id}"
+            for split in ("train", "development")
+            for case in PACK_R2.splits[split]
+            if case.is_research
+        }
+        plan = prepare_research_plan(PACK_R2, PREREG_R2, run_id="g03-research-batch", task_map=task_map, repository_root=REPO)
+        with tempfile.TemporaryDirectory() as directory:
+            run_root = pathlib.Path(directory)
+            cell = plan["cells"][0]
+            request = {
+                "schema": "pi.research-cell/v1", "case_id": cell["case_id"], "split": cell["split"],
+                "arm": cell["arm"], "rep": cell["rep"], "repetition": cell["repetition"],
+                "run": "different-run", "task": cell["task"], "model": cell["model"],
+                "requested_provider": cell["requested_provider"], "resolved_provider": "llama",
+                "resolved_model": cell["model"], "config_sha256": cell["config_sha256"],
+                "surface_sha256": cell["surface_sha256"], "experiment_sha256": cell["experiment_sha256"],
+                "gate_session_id": "session-binding-drift",
+            }
+            destination = run_root / cell["artifact_relpath"]
+            record_research_artifact(
+                destination, run_root=run_root, cell=make_cell_request(PACK_R2, PREREG_R2, request, repository_root=REPO),
+                pack=PACK_R2, prereg=PREREG_R2,
+                process={"reason": "completed", "exit_code": 0, "elapsed_seconds": 1.0},
+                serving={"stable": True, "pre": {"status": "complete", "full_sha256": "d" * 64}, "post": {"status": "complete", "full_sha256": "d" * 64}},
+                parent_report=None, repository_root=REPO,
+            )
+            with self.assertRaisesRegex(ResearchBaselineError, "run"):
+                reduce_research_plan(plan, artifact_root=run_root, pack=PACK_R2, prereg=PREREG_R2, repository_root=REPO)
+
+    def test_reduce_plan_cli_is_offline_and_reports_missing_receipts(self) -> None:
+        task_map = {
+            case.case_id: f"g03-{case.case_id}"
+            for split in ("train", "development")
+            for case in PACK_R2.splits[split]
+            if case.is_research
+        }
+        plan = prepare_research_plan(PACK_R2, PREREG_R2, run_id="g03-research-cli", task_map=task_map, repository_root=REPO)
+        with tempfile.TemporaryDirectory() as directory:
+            root = pathlib.Path(directory)
+            plan_path = root / "plan.json"
+            plan_path.write_text(json.dumps(plan), encoding="utf-8")
+            completed = subprocess.run(
+                [sys.executable, str(ROOT / "v2/research_baseline.py"), "--reduce-plan",
+                 "--plan", str(plan_path), "--artifact-root", str(root),
+                 "--pack", str(PACK_R2_PATH), "--preregistration", str(PREREG_R2_PATH),
+                 "--repository-root", str(REPO)],
+                cwd=str(REPO), text=True, capture_output=True, check=False,
+            )
+            self.assertEqual(completed.returncode, 0, completed.stderr)
+            summary = json.loads(completed.stdout)
+            self.assertFalse(summary["execution"])
+            self.assertEqual(summary["expected_cell_count"], 8)
+            self.assertEqual(summary["reduced_cell_count"], 0)
+            self.assertEqual(summary["missing_cell_count"], 8)
+
     def test_valid_parent_evidence_emits_redacted_v4_row_and_sidecar(self) -> None:
         row, validity = research_artifact_to_row(valid_artifact(), pack=PACK, prereg=PREREG, repository_root=REPO)
         self.assertEqual(row["schema"], "pi.eval-row/v4")

@@ -20,17 +20,18 @@ from typing import Any
 from urllib.parse import parse_qsl, urlencode, urlparse, urlunparse
 
 try:
-    from .baseline import BaselinePreregistration
+    from .baseline import BaselinePreregistration, arm_order
     from .benchmark import BenchmarkCase, BenchmarkPack
     from .real_baseline import _row_digest, _row_key, write_private_report
 except ImportError:  # direct ``python3 optimizer/v2/research_baseline.py --selftest``
     sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[2]))
-    from optimizer.v2.baseline import BaselinePreregistration
+    from optimizer.v2.baseline import BaselinePreregistration, arm_order
     from optimizer.v2.benchmark import BenchmarkCase, BenchmarkPack
     from optimizer.v2.real_baseline import _row_digest, _row_key, write_private_report
 
 
 RESEARCH_TRIAL_SCHEMA = "pi.research-trial/v1"
+RESEARCH_PLAN_SCHEMA = "pi.g03-research-cell-plan/v1"
 ORACLE_SCHEMA = "pi.research-oracle/v2"
 HEX64 = re.compile(r"^[0-9a-f]{64}$")
 ID = re.compile(r"^[a-z][a-z0-9._:-]{0,95}$")
@@ -41,6 +42,10 @@ MAX_REASON = 96
 
 class ResearchBaselineError(ValueError):
     pass
+
+
+def _canonical(value: Any) -> bytes:
+    return json.dumps(value, sort_keys=True, separators=(",", ":"), ensure_ascii=False).encode("utf-8")
 
 
 def _strict(value: Any, name: str, required: set[str], optional: set[str] = frozenset()) -> dict:
@@ -140,6 +145,199 @@ def _validate_pack_binding(pack: BenchmarkPack, prereg: BaselinePreregistration,
         raise ResearchBaselineError("benchmark pack content does not match the preregistration")
     if pack.pack_id != prereg.raw["benchmark_pack"]["pack_id"] or pack.revision != prereg.raw["benchmark_pack"]["revision"] or pack.metric != prereg.primary_metric["name"]:
         raise ResearchBaselineError("benchmark pack identity does not match the preregistration")
+
+
+def _validate_research_plan(
+    plan: dict, *, pack: BenchmarkPack, prereg: BaselinePreregistration,
+    repository_root: pathlib.Path,
+) -> dict:
+    """Validate a prompt-free cell plan before reading any private receipt."""
+
+    required = {
+        "schema", "run_id", "preregistration_sha256", "benchmark_pack_sha256", "pack_revision",
+        "source_surface_sha256", "subject_model", "guard_models", "task_map", "opaque_test_cases_excluded",
+        "arm_randomization", "cell_count", "cells", "artifact_schema", "model_execution", "reconstruction",
+        "plan_sha256",
+    }
+    value = _strict(plan, "research cell plan", required)
+    if value["schema"] != RESEARCH_PLAN_SCHEMA:
+        raise ResearchBaselineError(f"research plan schema must be {RESEARCH_PLAN_SCHEMA}")
+    plan_hash = value["plan_sha256"]
+    _sha(plan_hash, "plan_sha256")
+    body = {key: value[key] for key in required if key != "plan_sha256"}
+    if hashlib.sha256(_canonical(body)).hexdigest() != plan_hash:
+        raise ResearchBaselineError("research plan digest is invalid")
+    run_id = _id(value["run_id"], "run_id")
+    if value["preregistration_sha256"] != prereg.sha256 or value["benchmark_pack_sha256"] != pack.sha256 or value["pack_revision"] != pack.revision:
+        raise ResearchBaselineError("research plan is not bound to the frozen pack/preregistration")
+    if value["source_surface_sha256"] != prereg.surface_identity["source_sha256"]:
+        raise ResearchBaselineError("research plan source surface identity does not match")
+    if value["artifact_schema"] != RESEARCH_TRIAL_SCHEMA or value["model_execution"] is not False:
+        raise ResearchBaselineError("research plan artifact or execution contract is invalid")
+    subject = value["subject_model"]
+    if subject != prereg.subject_model:
+        raise ResearchBaselineError("research plan subject model does not match")
+    if value["guard_models"] != list(prereg.guard_models):
+        raise ResearchBaselineError("research plan guard models do not match")
+    task_map = value["task_map"]
+    expected_cases = {
+        case.case_id
+        for split in ("train", "development")
+        for case in pack.splits[split]
+        if case.is_research
+    }
+    if not isinstance(task_map, dict) or set(task_map) != expected_cases:
+        raise ResearchBaselineError("research plan task map is incomplete or includes an opaque case")
+    if any(not isinstance(task, str) or not ID.fullmatch(task) for task in task_map.values()) or len(set(task_map.values())) != len(task_map):
+        raise ResearchBaselineError("research plan task map contains invalid or duplicate task IDs")
+    expected_opaque = [case.case_id for case in pack.splits["test"]]
+    if value["opaque_test_cases_excluded"] != expected_opaque:
+        raise ResearchBaselineError("research plan opaque-test exclusion is not exact")
+    randomization = value["arm_randomization"]
+    if not isinstance(randomization, dict) or set(randomization) != {"method", "seed"} or randomization["method"] != prereg.randomization["method"] or randomization["seed"] != prereg.randomization["seed"]:
+        raise ResearchBaselineError("research plan arm randomization does not match")
+    cells = value["cells"]
+    if not isinstance(cells, list) or value["cell_count"] != len(cells) or len(cells) > 256:
+        raise ResearchBaselineError("research plan cell list is malformed")
+    cell_required = {
+        "cell_id", "case_id", "fixture_id", "fixture_sha256", "kind", "split", "arm", "rep", "repetition", "seed",
+        "task", "model", "requested_provider", "config_sha256", "surface_sha256", "experiment_sha256", "arm_order", "artifact_relpath",
+    }
+    seen: set[str] = set()
+    coordinates: set[tuple[str, int, int, str]] = set()
+    for index, raw_cell in enumerate(cells):
+        cell = _strict(raw_cell, f"research plan cells[{index}]", cell_required)
+        cell_id = cell["cell_id"]
+        if not isinstance(cell_id, str) or not re.fullmatch(r"cell-[0-9a-f]{32}", cell_id) or cell_id in seen:
+            raise ResearchBaselineError("research plan cell IDs are invalid or duplicated")
+        seen.add(cell_id)
+        try:
+            case = pack.case(cell["case_id"])
+        except (KeyError, TypeError) as exc:
+            raise ResearchBaselineError("research plan references an unknown case") from exc
+        if not case.is_research or cell["case_id"] not in expected_cases or cell["split"] not in ("train", "development") or case not in pack.splits[cell["split"]]:
+            raise ResearchBaselineError("research plan cell is outside train/development research scope")
+        if cell["fixture_id"] != _research_fixture_id(case, repository_root):
+            raise ResearchBaselineError("research plan fixture identity does not match the pack")
+        _sha(cell["fixture_sha256"], f"research plan cells[{index}].fixture_sha256")
+        if cell["fixture_sha256"] != case.fixture_sha256 or cell["kind"] != case.kind.removeprefix("research_"):
+            raise ResearchBaselineError("research plan fixture digest or kind does not match")
+        if cell["arm"] not in ("baseline", "candidate"):
+            raise ResearchBaselineError("research plan cell arm is invalid")
+        rep = cell["rep"]
+        repetition = cell["repetition"]
+        seed = cell["seed"]
+        if not isinstance(rep, int) or isinstance(rep, bool) or not 1 <= rep <= len(prereg.seeds) or seed != prereg.seeds[rep - 1]:
+            raise ResearchBaselineError("research plan cell seed/rep binding is invalid")
+        if not isinstance(repetition, int) or isinstance(repetition, bool) or not 0 <= repetition < prereg.repetitions:
+            raise ResearchBaselineError("research plan cell repetition is invalid")
+        coordinate = (case.case_id, seed, repetition, cell["arm"])
+        if coordinate in coordinates:
+            raise ResearchBaselineError("research plan contains duplicate paired coordinates")
+        coordinates.add(coordinate)
+        if cell["task"] != task_map[case.case_id] or cell["model"] != prereg.subject_model["model"] or cell["requested_provider"] != prereg.subject_model["provider"]:
+            raise ResearchBaselineError("research plan cell task/model binding is invalid")
+        if cell["config_sha256"] != prereg.arms[cell["arm"]]["config_sha256"] or cell["surface_sha256"] != prereg.arms[cell["arm"]]["surface_sha256"] or cell["experiment_sha256"] != prereg.sha256:
+            raise ResearchBaselineError("research plan cell arm or experiment identity is invalid")
+        expected_order = arm_order(case.case_id, seed, repetition, prereg.randomization["seed"])
+        if cell["arm_order"] != expected_order:
+            raise ResearchBaselineError("research plan arm order is invalid")
+        relpath = cell["artifact_relpath"]
+        path = pathlib.PurePosixPath(relpath) if isinstance(relpath, str) else None
+        if path is None or path.is_absolute() or ".." in path.parts or path.parts[:1] != ("research-artifacts",) or relpath != f"research-artifacts/{cell_id}.json":
+            raise ResearchBaselineError("research plan artifact path is invalid")
+    expected_coordinates = {
+        (case.case_id, seed, repetition, arm)
+        for case_id in expected_cases
+        for case in [pack.case(case_id)]
+        for seed in prereg.seeds
+        for repetition in range(prereg.repetitions)
+        for arm in ("baseline", "candidate")
+    }
+    if coordinates != expected_coordinates:
+        raise ResearchBaselineError("research plan does not cover the complete paired research grid")
+    return {**value, "run_id": run_id}
+
+
+def _research_fixture_id(case: Any, repository_root: pathlib.Path) -> str:
+    """Read only the admitted fixture ID while reusing the reducer's digest checks."""
+
+    # The full fixture validation (including its content digest) happens in
+    # ``_research_spec``.  Calling it here keeps plan validation tied to the
+    # same immutable manifest path and schema as reduction.
+    raw = _research_spec(case, repository_root)
+    fixture_id = raw.get("fixture_id")
+    if not isinstance(fixture_id, str) or not ID.fullmatch(fixture_id):
+        raise ResearchBaselineError("research fixture ID is invalid")
+    return fixture_id
+
+
+def _plan_artifact_path(artifact_root: str | pathlib.Path, relpath: str) -> pathlib.Path | None:
+    raw_root = pathlib.Path(artifact_root).expanduser()
+    if raw_root.is_symlink():
+        raise ResearchBaselineError("research artifact root must not be a symlink")
+    root = raw_root.resolve()
+    if not root.is_dir():
+        raise ResearchBaselineError("research artifact root must be a directory")
+    relative = pathlib.PurePosixPath(relpath)
+    current = root
+    for component in relative.parts:
+        current = current / component
+        if current.is_symlink():
+            raise ResearchBaselineError("research artifact path must not traverse a symlink")
+    target = current
+    if not target.exists():
+        return None
+    if not target.is_file():
+        raise ResearchBaselineError("research artifact path must be a regular file")
+    if target.stat().st_mode & 0o077:
+        raise ResearchBaselineError("research artifact must be private")
+    return target
+
+
+def _assert_artifact_matches_plan(artifact: dict, cell: dict, run_id: str) -> None:
+    for field in ("case_id", "fixture_id", "kind", "split", "arm", "rep", "repetition", "task", "model", "requested_provider", "requested_model", "config_sha256", "surface_sha256", "experiment_sha256"):
+        expected = cell["model"] if field == "requested_model" else cell.get(field)
+        actual = artifact.get(field)
+        if actual != expected:
+            raise ResearchBaselineError(f"research artifact {field} does not match its planned cell")
+    if artifact.get("run") != run_id:
+        raise ResearchBaselineError("research artifact run does not match the plan")
+
+
+def reduce_research_plan(
+    plan: dict, *, artifact_root: str | pathlib.Path, pack: BenchmarkPack,
+    prereg: BaselinePreregistration, repository_root: str | pathlib.Path,
+) -> dict:
+    """Reduce all present private plan receipts without silently hiding gaps.
+
+    Missing cells are returned explicitly so the shared baseline reducer can
+    classify them as exclusions. Present cells are validated and reduced in a
+    local list before any result is returned, preventing partial acceptance.
+    """
+
+    root = pathlib.Path(repository_root).expanduser().resolve()
+    _validate_pack_binding(pack, prereg, root)
+    normalized = _validate_research_plan(plan, pack=pack, prereg=prereg, repository_root=root)
+    rows: list[dict] = []
+    validity: list[dict] = []
+    missing: list[str] = []
+    for cell in normalized["cells"]:
+        path = _plan_artifact_path(artifact_root, cell["artifact_relpath"])
+        if path is None:
+            missing.append(cell["cell_id"])
+            continue
+        artifact = _load_object(path)
+        _assert_artifact_matches_plan(artifact, cell, normalized["run_id"])
+        row, sidecar = research_artifact_to_row(artifact, pack=pack, prereg=prereg, repository_root=root)
+        rows.append(row)
+        validity.append(sidecar)
+    return {
+        "schema": "pi.optimizer-research-plan-reduction/v1", "plan_sha256": normalized["plan_sha256"],
+        "run_id": normalized["run_id"], "expected_cell_count": len(normalized["cells"]),
+        "reduced_cell_count": len(rows), "missing_cells": missing, "rows": rows, "validity": validity,
+        "model_execution": False,
+    }
 
 
 def _validate_artifact(artifact: dict, *, case: BenchmarkCase, prereg: BaselinePreregistration, root: pathlib.Path) -> dict:
@@ -377,16 +575,46 @@ def main(argv: list[str] | None = None) -> int:
     modes = parser.add_mutually_exclusive_group(required=True)
     modes.add_argument("--selftest", action="store_true")
     modes.add_argument("--reduce", action="store_true", help="reduce a private research artifact; never launches inference")
+    modes.add_argument("--reduce-plan", action="store_true", help="reduce present private receipts from a prepared research plan; never launches inference")
     parser.add_argument("--artifact")
+    parser.add_argument("--plan")
+    parser.add_argument("--artifact-root")
     parser.add_argument("--pack")
     parser.add_argument("--preregistration")
     parser.add_argument("--repository-root", default=str(pathlib.Path(__file__).resolve().parents[2]))
     parser.add_argument("--row-output")
     parser.add_argument("--validity-output")
+    parser.add_argument("--output")
     args = parser.parse_args(argv)
     if args.selftest:
         selftest()
         return 0
+    if args.reduce_plan:
+        required = (args.plan, args.artifact_root, args.pack, args.preregistration)
+        if any(value is None for value in required):
+            parser.error("--reduce-plan requires --plan, --artifact-root, --pack, and --preregistration")
+        try:
+            root = pathlib.Path(args.repository_root).expanduser().resolve()
+            pack = BenchmarkPack.load(pathlib.Path(args.pack).expanduser().resolve())
+            prereg = BaselinePreregistration.load(pathlib.Path(args.preregistration).expanduser().resolve())
+            reduction = reduce_research_plan(
+                _load_object(args.plan), artifact_root=args.artifact_root, pack=pack,
+                prereg=prereg, repository_root=root,
+            )
+            if args.output:
+                write_private_report(args.output, reduction)
+            summary = {
+                "schema": "pi.optimizer-research-plan-reduction/v1", "execution": False,
+                "plan_sha256": reduction["plan_sha256"], "expected_cell_count": reduction["expected_cell_count"],
+                "reduced_cell_count": reduction["reduced_cell_count"], "missing_cell_count": len(reduction["missing_cells"]),
+            }
+            if args.output:
+                summary["output"] = str(pathlib.Path(args.output).expanduser().resolve())
+            print(json.dumps(summary, sort_keys=True))
+            return 0
+        except (OSError, UnicodeError, json.JSONDecodeError, ResearchBaselineError) as exc:
+            print(f"g03-research-baseline: {exc}", file=sys.stderr)
+            return 2
     required = (args.artifact, args.pack, args.preregistration, args.row_output, args.validity_output)
     if any(value is None for value in required):
         parser.error("--reduce requires --artifact, --pack, --preregistration, --row-output, and --validity-output")

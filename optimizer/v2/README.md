@@ -120,6 +120,11 @@ python3 -m optimizer.v2.research_runner --prepare --run-id g03-run \
   --pack optimizer/v2/benchmarks/g03-representative-pilot-r2.json \
   --preregistration optimizer/v2/examples/g03-baseline-preregistration-r2.json \
   --repository-root .
+python3 -m optimizer.v2.research_baseline --reduce-plan \
+  --plan /private/research-plan.json --artifact-root /private/research-run \
+  --pack optimizer/v2/benchmarks/g03-representative-pilot-r2.json \
+  --preregistration optimizer/v2/examples/g03-baseline-preregistration-r2.json \
+  --repository-root .
 
 # dark planner mechanism smoke (no execution unless --run is explicit)
 python3 -m optimizer.v2.planner_smoke --selftest
@@ -166,6 +171,11 @@ train/development research case ID to one unique bounded task ID. It prints the
 plan digest and cell count; adding `--plan-output <path> --run-root <private-root>`
 stores the complete plan as a private `0600` artifact. The plan excludes opaque
 test payloads and contains no prompt or answer text.
+
+After a run, `research_baseline.py --reduce-plan` validates that plan and
+reduces each present receipt through the shared research oracle. Missing receipt
+paths are returned as explicit `missing_cells` for the final baseline reducer
+to classify as exclusions; they are never treated as zero-cost successes.
 
 For a fixture-bound screen, pass `--fixture-manifest` together with its
 canonical admission digest in `--expected-fixture-sha256`. The launcher then
