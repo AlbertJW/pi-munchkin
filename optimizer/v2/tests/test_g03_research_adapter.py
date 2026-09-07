@@ -3,6 +3,7 @@ from __future__ import annotations
 import copy
 import json
 import pathlib
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -134,6 +135,21 @@ class G03ResearchAdapterTests(unittest.TestCase):
         artifact["surface_sha256"] = "a" * 64
         with self.assertRaisesRegex(ResearchBaselineError, "surface"):
             research_artifact_to_row(artifact, pack=PACK, prereg=PREREG, repository_root=REPO)
+
+    def test_fixture_content_drift_is_rejected_even_when_identity_fields_match(self) -> None:
+        artifact = valid_artifact()
+        artifact["plan"] = {"status": "in_progress", "evidence_validated": False}
+        with tempfile.TemporaryDirectory() as directory:
+            root = pathlib.Path(directory)
+            source = REPO / "optimizer"
+            destination = root / "optimizer"
+            shutil.copytree(source, destination)
+            fixture_path = destination / "research-fixtures/manifests/comparative.json"
+            fixture = json.loads(fixture_path.read_text(encoding="utf-8"))
+            fixture["revision"] = "tampered"
+            fixture_path.write_text(json.dumps(fixture), encoding="utf-8")
+            with self.assertRaisesRegex(ResearchBaselineError, "fixture"):
+                research_artifact_to_row(artifact, pack=PACK, prereg=PREREG, repository_root=root)
 
     def test_reduce_cli_is_artifact_only_and_writes_private_row_pair(self) -> None:
         with tempfile.TemporaryDirectory() as directory:

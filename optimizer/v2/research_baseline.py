@@ -117,7 +117,29 @@ def _research_spec(case: BenchmarkCase, root: pathlib.Path) -> dict:
         raise ResearchBaselineError("research fixture identity is incomplete")
     if case.kind != f"research_{raw['kind']}":
         raise ResearchBaselineError("research case kind does not match its fixture")
+    # The pack's fixture digest is the immutable admission binding.  Checking
+    # only fixture_id/kind would allow a same-shaped manifest to replace the
+    # admitted prompt, claim obligations, or source set between preparation
+    # and reduction.
+    actual_digest = hashlib.sha256(json.dumps(raw, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
+    if actual_digest != case.fixture_sha256:
+        raise ResearchBaselineError("research fixture content digest does not match the benchmark pack")
     return raw
+
+
+def _validate_pack_binding(pack: BenchmarkPack, prereg: BaselinePreregistration, root: pathlib.Path) -> None:
+    """Verify the reducer is using the frozen pack named by the preregistration."""
+
+    raw_path = root / prereg.pack_path
+    if raw_path.is_symlink():
+        raise ResearchBaselineError("benchmark pack must not be a symlink")
+    path = raw_path.resolve()
+    if path.is_symlink() or root not in path.parents or not path.is_file():
+        raise ResearchBaselineError("benchmark pack is outside the repository")
+    if hashlib.sha256(path.read_bytes()).hexdigest() != prereg.pack_sha256:
+        raise ResearchBaselineError("benchmark pack content does not match the preregistration")
+    if pack.pack_id != prereg.raw["benchmark_pack"]["pack_id"] or pack.revision != prereg.raw["benchmark_pack"]["revision"] or pack.metric != prereg.primary_metric["name"]:
+        raise ResearchBaselineError("benchmark pack identity does not match the preregistration")
 
 
 def _validate_artifact(artifact: dict, *, case: BenchmarkCase, prereg: BaselinePreregistration, root: pathlib.Path) -> dict:
@@ -300,6 +322,7 @@ def _row_from_artifact(value: dict, *, case: BenchmarkCase, prereg: BaselinePrer
 def research_artifact_to_row(artifact: dict, *, pack: BenchmarkPack, prereg: BaselinePreregistration, repository_root: str | pathlib.Path) -> tuple[dict, dict]:
     """Validate one private research artifact and emit a redacted V4 row."""
     root = pathlib.Path(repository_root).resolve()
+    _validate_pack_binding(pack, prereg, root)
     if not isinstance(artifact, dict):
         raise ResearchBaselineError("research artifact must be an object")
     case_id = artifact.get("case_id")

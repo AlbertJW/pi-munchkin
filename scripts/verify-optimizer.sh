@@ -58,6 +58,7 @@ selftests=(
   v2/baseline.py
   v2/real_baseline.py
   v2/research_baseline.py
+  v2/research_runner.py
   v2/g03_reissue.py
   v2/planner_smoke.py
 )

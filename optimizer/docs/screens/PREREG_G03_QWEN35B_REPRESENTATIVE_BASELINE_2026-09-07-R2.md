@@ -53,9 +53,18 @@ runbook's procedure. The parent runner must emit one private
 research rows. Every attempted cell, timeout, and exclusion must be retained.
 Ling remains protocol-only and is never pooled with this cohort.
 
+The repository recording boundary for that parent runner is
+`optimizer/v2/research_runner.py`. After the explicitly approved Pi process
+exits, the runner should pass its bounded process summary, pre/post serving
+fingerprints, and a private metadata-only `pi.research-parent-report/v1` file to
+`record_research_artifact`. The boundary revalidates the cell against this
+pack/preregistration, makes missing or malformed parent reports incomplete, and
+publishes one idempotent `0600` artifact under the private run root. It never
+launches inference itself. Use `--dry` or `--record` for offline preparation;
+only the separately approved parent Pi invocation may execute a model.
+
 Stop on any source, loaded-surface, model/provider, serving, sidecar, fixture,
 isolation, or telemetry drift. A complete-looking answer without a settled
 plan and parent-validated citations is not a passing research trial. The run
 produces a private review packet only; it cannot mirror, commit, or adopt a
 candidate.
-

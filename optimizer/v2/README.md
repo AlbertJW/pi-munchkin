@@ -112,6 +112,7 @@ python3 -m optimizer.v2.cli status --manifest optimizer/v2/examples/campaign.jso
 python3 -m optimizer.v2.cli replay --manifest optimizer/v2/examples/campaign.json --run-root /private/path
 python3 -m optimizer.v2.baseline --selftest
 python3 -m optimizer.v2.baseline --dry --preregistration optimizer/v2/examples/g03-baseline-preregistration.json
+python3 -m optimizer.v2.research_runner --selftest
 
 # dark planner mechanism smoke (no execution unless --run is explicit)
 python3 -m optimizer.v2.planner_smoke --selftest
@@ -141,6 +142,17 @@ captured under one byte ceiling and the whole child process group is stopped on
 either that ceiling or the wall-clock limit. `--selftest` and `--dry` never
 launch Pi and print only bounded classifications. The utility does not alter
 defaults, the live mirror, or optimizer candidate state.
+
+For G03 research cells, the explicitly approved parent process remains the only
+model executor. After it exits, call `optimizer.v2.research_runner` (or its
+`record_research_artifact` function) with the frozen cell identity, bounded
+process/serving observations, and a private `pi.research-parent-report/v1`
+summary. The recorder emits one idempotent, `0600` `pi.research-trial/v1`
+artifact under the private run root. `--dry` validates the cell without writing;
+`--record` writes only the artifact and never launches Pi. A missing or malformed
+parent report is retained as an explicit incomplete attempt, with no accepted
+research usage or authority, so the existing `research_baseline.py --reduce`
+step can classify it without silently dropping the cell.
 
 For a fixture-bound screen, pass `--fixture-manifest` together with its
 canonical admission digest in `--expected-fixture-sha256`. The launcher then

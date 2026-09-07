@@ -2,7 +2,7 @@
 
 Created: 2026-09-06
 Reviewed: 2026-09-07, against the current worktree and test bodies.
-Status: G01 has a fresh disposable pinned Ling protocol receipt after the 2026-09-07 continuation-authority hardening. G02 now has producer integration, offline verification, and a clean pinned Qwen→Ling mechanism receipt; it remains opt-in and has no quality evidence. G03 now has a fail-closed ingestor for fresh real gate rows, exact validity sidecars, a strict research-shaped row adapter with timeout and symlink hardening, a no-inference `g03_reissue.py` utility for producing a fresh identity-bound pack/preregistration pair, and explicit requested-model dry-state reporting (commits `1da150a`, `20adf3a`, `88faf05`, `8f30f10`, `6a30858`, `3039087`, `06938ed`, `a329a6f`, `26fa287`). Source and mirror are now stabilized and a new `2026-09-07.r2` pack/preregistration is prepared and validated offline, but its Qwen 35B baseline has not run. The latest explicit dry gate reports Qwen 35B as `unloaded`; execution still requires model selection/warm-up and separate human approval. G04's approved screen returned no-go/inconclusive. G05 is pending. This document does not activate an experiment.
+Status: G01 has a fresh disposable pinned Ling protocol receipt after the 2026-09-07 continuation-authority hardening. G02 now has producer integration, offline verification, and a clean pinned Qwen→Ling mechanism receipt; it remains opt-in and has no quality evidence. G03 now has a fail-closed ingestor for fresh real gate rows, exact validity sidecars, a strict research-shaped row adapter with timeout, fixture-digest, pack-binding, and symlink hardening, a no-inference `g03_reissue.py` utility for producing a fresh identity-bound pack/preregistration pair, explicit requested-model dry-state reporting, and an identity-bound parent research receipt recorder (commits `1da150a`, `20adf3a`, `88faf05`, `8f30f10`, `6a30858`, `3039087`, `06938ed`, `a329a6f`, `26fa287`, plus the pending runner package). Source and mirror are now stabilized and a new `2026-09-07.r2` pack/preregistration is prepared and validated offline, but its Qwen 35B baseline has not run. The latest explicit dry gate reports Qwen 35B as `unloaded`; execution still requires model selection/warm-up and separate human approval. G04's approved screen returned no-go/inconclusive. G05 is pending. This document does not activate an experiment.
 Reference: audit `docs/HARNESS_AUDIT_2026-09-06.md`, recommendations `docs/NEXT_HARNESS_IMPROVEMENTS_2026-09-06.md`.
 
 ## Purpose and starting point
@@ -155,12 +155,13 @@ with this review; their acceptance labels need reconciliation during remediation
    and safety screen with concrete limits and usage receipts; do not infer that
    this protocol smoke establishes capacity or quality.
 3. **Complete the G03 baseline and diagnose research activation.** The shared
-   reducer and strict research-shaped row adapter are now wired; the remaining
-   work is to emit the private research artifacts during a live run. Inspect the
-   saved Qwen traces to separate routing, tool-contract, scheduling, and inference
-   latency. Prepare a reproducible real baseline with actual outcome oracles and
-   reconstructable provenance. Do not simply lengthen the timeout or change the
-   task until the failure mechanism is understood.
+   reducer, strict research-shaped row adapter, and identity-bound parent receipt
+   recorder are now wired; the remaining work is to connect the recorder to the
+   approved parent runner and emit one private artifact per research cell during
+   a live run. Inspect the saved Qwen traces to separate routing, tool-contract,
+   scheduling, and inference latency. Prepare a reproducible real baseline with
+   actual outcome oracles and reconstructable provenance. Do not simply lengthen
+   the timeout or change the task until the failure mechanism is understood.
 4. **Keep historical G04 evidence isolated.** The prior Ling/Qwen no-go remains
    valid only for its recorded source and loaded hashes. Do not pool it with the
    repaired-surface run; promotion still requires a separate evidence-based
