@@ -2,7 +2,7 @@
 
 Created: 2026-09-06
 Reviewed: 2026-09-07, against the current worktree and test bodies.
-Status: G01 now has a fresh disposable pinned Ling protocol receipt after the 2026-09-07 continuation-authority hardening. G02–G04 have implementation and verification gaps; G04's approved screen returned no-go/inconclusive. G05 is pending. This document does not activate an experiment.
+Status: G01 has a fresh disposable pinned Ling protocol receipt after the 2026-09-07 continuation-authority hardening. G02 now has producer integration, offline verification, and a clean pinned Qwen→Ling mechanism receipt; it remains opt-in and has no quality evidence. G04's approved screen returned no-go/inconclusive. G05 is pending. This document does not activate an experiment.
 Reference: audit `docs/HARNESS_AUDIT_2026-09-06.md`, recommendations `docs/NEXT_HARNESS_IMPROVEMENTS_2026-09-06.md`.
 
 ## Purpose and starting point
@@ -145,12 +145,11 @@ with this review; their acceptance labels need reconciliation during remediation
    Add a real-session fake-retrieval test that validates required claims, delivers
    exactly one final answer through G01, and rejects late restarts. Exit condition:
    G04-A through G04-D have direct lifecycle evidence, not only helper tests.
-2. **Validate G02 in a pinned switch smoke.** Producer reservations and recovery
-   preservation are now wired under the opt-in admission flag. Prove combined
-   requests and concurrent results respect the active serving epoch, then run
-   the 128K/32K switch with concrete limits and usage receipts. Reuse applicable
-   existing approval; do not infer that a research-screen approval covers an
-   unrelated run.
+2. **Keep G02 dark and measure value separately.** Producer reservations and
+   recovery preservation are wired, and the pinned Qwen→Ling mechanism smoke
+   proves epoch rebinding and admitted requests. Prepare a later 128K/32K value
+   and safety screen with concrete limits and usage receipts; do not infer that
+   this protocol smoke establishes capacity or quality.
 3. **Complete the G03 baseline and diagnose research activation.** Inspect the
    saved Qwen traces to separate routing, tool-contract, scheduling, and inference
    latency. Prepare a reproducible real baseline with actual outcome oracles and
@@ -554,7 +553,7 @@ than replacing pending cells with verbal assurances.
 | Goal | Implemented | Offline verified | Live validated | Evidence |
 |---|---|---|---|---|
 | G01 | Implemented in `6a2d4ec` + `a9cab65`; dispatch proof in `36cfeab`, shutdown cancellation proof in `b2b7777` | Focused 37-test control suite, 75-test real-session/planner integration, and fresh 779-test offline gate pass | Fresh 2026-09-07 disposable Ling receipt: one real goal update, one authority continuation, two provider turns, clean exit; no mirror or adoption claim | `docs/evidence/G01.md`; current review above |
-| G02 | Implemented behind `CONTEXT_ADMISSION=on`; producer reservation and recovery-preservation wiring complete | Focused producer, recovery, catalog, typecheck, and full offline suites pass; aggregate behavior is still dark | Pinned model-switch smoke pending | `docs/evidence/G02.md`; current review above |
+| G02 | Implemented behind `CONTEXT_ADMISSION=on`; producer reservation and recovery-preservation wiring complete | Focused producer, recovery, catalog, typecheck, package smoke, and optimizer verification pass; prior full suite passed 782/782, with five unrelated flaky probes on a later parallel run | Clean 2026-09-07 Qwen→Ling mechanism receipt: two status-200 turns, epochs 0/1, two admitted requests, one bound session/surface; no quality or capacity claim | `docs/evidence/G02.md`; `optimizer/docs/screens/PREREG_QWEN35B_CONTEXT_ADMISSION_SWITCH_2026-09-07.md`; current review above |
 | G03 | Registry and offline protocol implemented; executed baseline outstanding | Fake pairing/registry checks recorded | Real Qwen baseline not run | `docs/evidence/G03.md` |
 | G04 | Partial: contracts exist; runtime enforcement gaps remain | Focused suites pass; real synthesis delivery and compaction/recovery proof outstanding | Approved early-stop no-go/inconclusive screen; repaired source has no new live receipt | `docs/evidence/G04.md`, `optimizer/docs/screens/G04_DEEP_RESEARCH_EVALUATION_2026-09-07.md`; current review above |
 | G05 | Pending | Pending | Pending | Not yet created |

@@ -4,6 +4,17 @@ All notable changes to pi-munchkin are documented here. Releases follow semantic
 
 ## Unreleased
 
+### Added (2026-09-07 — G02 pinned model-switch mechanism receipt)
+
+After the live mirror was synchronized and verified at 128/128 artifacts, an
+approved disposable RPC screen ran one Qwen turn, switched to Ling, and ran a
+second turn with aggregate admission enabled. Both provider timings returned
+status 200; epochs 0 and 1 were distinct and correctly bound; both requests
+were admitted; and all telemetry rows shared one session and loaded-surface
+identity without raw payloads. Handoff was disabled to isolate epoch binding;
+the admission flag remains opt-in and no quality, capacity, or adoption claim
+is made.
+
 ### Fixed (2026-09-07 — G02 reservation and cap invariants; repository-only)
 
 Context-rejected `web_read` calls now fail before consuming a research-read

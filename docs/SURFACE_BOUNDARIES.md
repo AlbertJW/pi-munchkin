@@ -322,6 +322,22 @@ and typecheck pass; optimizer verification remains offline-only. The live
 mirror is not updated because an interactive Pi process is still running; no
 inference, rollout, adoption, or default activation occurred.
 
+## Live mirror receipt — 2026-09-07 (G02 context admission)
+
+Source commits `5e5dab8` and `41d4c4c` are pushed to `origin/main`. The clean
+package-source surface is
+`2ea73f29383607cbef5473e0edf1b620f13f3e70602c95c05ec018a946e45d96`; after
+`mirror:apply`, the loaded surface at `/Users/Albert.Wessels/.pi/agent` is
+`5d7216b4e209c40033ec84b5929d68e7678e4a95046280f7c2c914a1ff061025`.
+`mirror:check` reports 128/128 first-party files with no unmanaged extensions
+or orphans. An approved disposable RPC smoke then ran one Qwen turn, switched
+to Ling, and ran one Ling turn with `CONTEXT_ADMISSION=on`: two provider
+timings returned status 200, epochs 0 and 1 were distinct, both requests were
+admitted, and all 43 telemetry rows shared one session and this loaded hash.
+Handoff was disabled to isolate epoch rebinding. No raw endpoint, prompt,
+response, tool argument, URL, or source content was recorded; no default,
+rollout, quality, capacity, or adoption decision changed.
+
 ## Data at rest: where a research session actually lands (updated 2026-08-10)
 
 A surface hash bounds what the MODEL sees. It says nothing about what a session LEAVES. Those are
