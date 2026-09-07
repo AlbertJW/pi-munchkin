@@ -433,6 +433,35 @@ test("session reload cancels an in-flight continuation flush before admitting th
 	resetPiGlobals();
 });
 
+test("session shutdown cancels an in-flight continuation flush", async () => {
+	const { fp } = await installed("enforce", "off");
+	const cwd = mkdtempSync(join(tmpdir(), "pi-continuation-session-shutdown-"));
+	let release!: () => void;
+	const authorization = new Promise<void>((resolve) => { release = resolve; });
+	const sessionId = "session-shutdown";
+	const sessionHash = hashContinuationIdentity(sessionId);
+	const context = { cwd, sessionManager: { getSessionId: () => sessionId, getEntries: () => [] } };
+
+	await fire(fp, "session_start", {}, context);
+	await fire(fp, "agent_start", {}, context);
+	emitContinuationRequest(fp.pi.events as never, {
+		request: {
+			v: 1, session_id_hash: sessionHash, owner_id_hash: sessionHash, generation: "shutdown-generation",
+			scope: "session", reason: "goal", priority: 500, idempotency_key: "shutdown:old",
+			message: "shutdown must cancel this", expires_at_ms: Date.now() + 10_000,
+		},
+		authorize: async () => { await authorization; return true; },
+	});
+	await fire(fp, "agent_settled", {}, context);
+	await new Promise<void>((resolve) => setImmediate(resolve));
+
+	await fire(fp, "session_shutdown", {}, context);
+	release();
+	for (let turn = 0; turn < 4; turn += 1) await new Promise<void>((resolve) => setImmediate(resolve));
+	assert.equal(fp.deliveries.length, 0, "a shutdown must prevent an in-flight old authorization from starting a provider turn");
+	resetPiGlobals();
+});
+
 test("a new session after shutdown reactivates the continuation authority", async () => {
 	const { fp } = await installed("enforce", "off");
 	const cwd = mkdtempSync(join(tmpdir(), "pi-continuation-shutdown-restart-"));
