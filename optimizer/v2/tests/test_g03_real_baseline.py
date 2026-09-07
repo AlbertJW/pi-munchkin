@@ -112,6 +112,57 @@ class G03RealBaselineIngestTests(unittest.TestCase):
         second = ingest_gate_baseline(PACK, PREREG, REPO, rows, validity, **kwargs)
         self.assertEqual(first, second)
 
+    def test_provenance_exposure_and_split_mismatches_are_non_authoritative(self) -> None:
+        rows, validity = complete_rows()
+        rows[0]["context"]["provenance"]["complete"] = False
+        validity[0]["row_sha256"] = _row_digest(rows[0])
+        report = ingest_gate_baseline(
+            PACK, PREREG, REPO, rows, validity, case_tasks=CASE_TASKS,
+            run_id="g03-real-run",
+            resolved_model={"provider": "llama", "model": "qwen36-35b-iq3s"},
+        )
+        self.assertTrue(any(trial["invalid_reason"] == "provenance_incomplete" for trial in report["trials"]))
+        rows, validity = complete_rows()
+        candidate = next(row for row in rows if row["arm"] == "cand")
+        candidate["exposure"]["status"] = "control"
+        candidate_validity = next(item for item in validity if item["row_key"] == _row_key(candidate))
+        candidate_validity["row_sha256"] = _row_digest(candidate)
+        report = ingest_gate_baseline(
+            PACK, PREREG, REPO, rows, validity, case_tasks=CASE_TASKS,
+            run_id="g03-real-run",
+            resolved_model={"provider": "llama", "model": "qwen36-35b-iq3s"},
+        )
+        self.assertTrue(any(trial["invalid_reason"] == "candidate_exposure" for trial in report["trials"]))
+        rows, validity = complete_rows()
+        rows[0]["split"] = "development"
+        validity[0]["row_key"] = _row_key(rows[0])
+        validity[0]["row_sha256"] = _row_digest(rows[0])
+        report = ingest_gate_baseline(
+            PACK, PREREG, REPO, rows, validity, case_tasks=CASE_TASKS,
+            run_id="g03-real-run",
+            resolved_model={"provider": "llama", "model": "qwen36-35b-iq3s"},
+        )
+        self.assertTrue(any(trial["invalid_reason"] == "split_binding" for trial in report["trials"]))
+
+    def test_sidecar_extras_and_report_digest_tampering_fail_closed(self) -> None:
+        rows, validity = complete_rows()
+        validity.append({"row_key": "extra-row-key", "row_sha256": "a" * 64, "void": False})
+        with self.assertRaises(RealBaselineError):
+            ingest_gate_baseline(
+                PACK, PREREG, REPO, rows, validity, case_tasks=CASE_TASKS,
+                run_id="g03-real-run",
+                resolved_model={"provider": "llama", "model": "qwen36-35b-iq3s"},
+            )
+        rows, validity = complete_rows()
+        report = ingest_gate_baseline(
+            PACK, PREREG, REPO, rows, validity, case_tasks=CASE_TASKS,
+            run_id="g03-real-run",
+            resolved_model={"provider": "llama", "model": "qwen36-35b-iq3s"},
+        )
+        report["trial_count"] += 1
+        with self.assertRaises(RealBaselineError):
+            validate_real_report(report, PACK, PREREG)
+
 
 if __name__ == "__main__":
     unittest.main()

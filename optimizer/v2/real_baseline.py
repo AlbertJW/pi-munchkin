@@ -279,6 +279,7 @@ def ingest_gate_baseline(
     trials: list[dict] = []
     seen: set[tuple[str, int, int, str]] = set()
     serving_ids: set[str] = set()
+    sessions: set[str] = set()
     row_keys: set[str] = set()
     for row in rows:
         if not isinstance(row, dict):
@@ -304,6 +305,11 @@ def ingest_gate_baseline(
         if row_key in row_keys:
             raise RealBaselineError("gate rows contain duplicate row keys")
         row_keys.add(row_key)
+        session = row.get("gate_session_id")
+        if isinstance(session, str) and session:
+            if session in sessions:
+                raise RealBaselineError("gate rows contain duplicate parent sessions")
+            sessions.add(session)
         expected_split = None if case is None else next((split for split in ("train", "development", "test") if case in pack.splits[split]), None)
         errors = _identity_errors(row, case_id=case_id, expected_split=expected_split, arm_config=arm_config, prereg=prereg, resolved=resolved, run_id=run_id, validity=validity)
         if case is None or key not in expected:
