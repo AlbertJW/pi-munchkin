@@ -2,7 +2,7 @@
 
 Created: 2026-09-06
 Reviewed: 2026-09-07, against the current worktree and test bodies.
-Status: G01 has a fresh disposable pinned Ling protocol receipt after the 2026-09-07 continuation-authority hardening. G02 now has producer integration, offline verification, and a clean pinned Qwen→Ling mechanism receipt; it remains opt-in and has no quality evidence. G03 now has a fail-closed ingestor for fresh real gate rows, exact validity sidecars, a strict research-shaped row adapter with timeout, fixture-digest, pack-binding, and symlink hardening, a no-inference `g03_reissue.py` utility for producing a fresh identity-bound pack/preregistration pair, explicit requested-model dry-state reporting, and an identity-bound parent research receipt recorder (`62562e0`). Source and mirror are now stabilized and a new `2026-09-07.r2` pack/preregistration is prepared and validated offline, but its Qwen 35B baseline has not run. The latest explicit dry gate reports Qwen 35B as `unloaded`; execution still requires model selection/warm-up and separate human approval. G04's approved screen returned no-go/inconclusive. G05 is pending. This document does not activate an experiment.
+Status: G01 has a fresh disposable pinned Ling protocol receipt after the 2026-09-07 continuation-authority hardening. G02 now has producer integration, offline verification, and a clean pinned Qwen→Ling mechanism receipt; it remains opt-in and has no quality evidence. G03 now has a fail-closed ingestor for fresh real gate rows, exact validity sidecars, a strict research-shaped row adapter with timeout, fixture-digest, pack-binding, and symlink hardening, a no-inference `g03_reissue.py` utility for producing a fresh identity-bound pack/preregistration pair, explicit requested-model dry-state reporting, an identity-bound parent research receipt recorder (`62562e0`), and a deterministic prompt-free research-cell plan plus checked-in r2 task map (`c74bc4a`). Source and mirror are now stabilized and a new `2026-09-07.r2` pack/preregistration is prepared and validated offline, but its Qwen 35B baseline has not run. The latest explicit dry gate reports Qwen 35B as `unloaded`; execution still requires model selection/warm-up and separate human approval. G04's approved screen returned no-go/inconclusive. G05 is pending. This document does not activate an experiment.
 Reference: audit `docs/HARNESS_AUDIT_2026-09-06.md`, recommendations `docs/NEXT_HARNESS_IMPROVEMENTS_2026-09-06.md`.
 
 ## Purpose and starting point
@@ -155,13 +155,14 @@ with this review; their acceptance labels need reconciliation during remediation
    and safety screen with concrete limits and usage receipts; do not infer that
    this protocol smoke establishes capacity or quality.
 3. **Complete the G03 baseline and diagnose research activation.** The shared
-   reducer, strict research-shaped row adapter, and identity-bound parent receipt
-   recorder are now wired; the remaining work is to connect the recorder to the
-   approved parent runner and emit one private artifact per research cell during
-   a live run. Inspect the saved Qwen traces to separate routing, tool-contract,
-   scheduling, and inference latency. Prepare a reproducible real baseline with
-   actual outcome oracles and reconstructable provenance. Do not simply lengthen
-   the timeout or change the task until the failure mechanism is understood.
+   reducer, strict research-shaped row adapter, identity-bound parent receipt
+   recorder, and deterministic r2 cell plan are now wired; the remaining work is
+   to connect the recorder to the approved parent runner and emit one private
+   artifact per research cell during a live run. Inspect the saved Qwen traces to
+   separate routing, tool-contract, scheduling, and inference latency. Prepare a
+   reproducible real baseline with actual outcome oracles and reconstructable
+   provenance. Do not simply lengthen the timeout or change the task until the
+   failure mechanism is understood.
 4. **Keep historical G04 evidence isolated.** The prior Ling/Qwen no-go remains
    valid only for its recorded source and loaded hashes. Do not pool it with the
    repaired-surface run; promotion still requires a separate evidence-based
@@ -559,7 +560,7 @@ than replacing pending cells with verbal assurances.
 |---|---|---|---|---|
 | G01 | Implemented in `6a2d4ec` + `a9cab65`; dispatch proof in `36cfeab`, shutdown cancellation proof in `b2b7777` | Focused 37-test control suite and 75-test real-session/planner integration pass; the earlier 779-test gate count is historical, and the current full gate has three pre-existing compact timing failures | Fresh 2026-09-07 disposable Ling receipt: one real goal update, one authority continuation, two provider turns, clean exit; no mirror or adoption claim | `docs/evidence/G01.md`; current review above |
 | G02 | Implemented behind `CONTEXT_ADMISSION=on`; producer reservation and recovery-preservation wiring complete | Focused producer, recovery, catalog, typecheck, package smoke, and optimizer verification pass; prior full suite passed 782/782, with five unrelated flaky probes on a later parallel run | Clean 2026-09-07 Qwen→Ling mechanism receipt: two status-200 turns, epochs 0/1, two admitted requests, one bound session/surface; no quality or capacity claim | `docs/evidence/G02.md`; `optimizer/docs/screens/PREREG_QWEN35B_CONTEXT_ADMISSION_SWITCH_2026-09-07.md`; current review above |
-| G03 | Registry, offline protocol, fail-closed real-row ingestor, strict research row adapter, no-inference identity reissue utility, and explicit requested-model dry reporting implemented (`1da150a`, `20adf3a`, `88faf05`, `8f30f10`, `6a30858`, `3039087`, `06938ed`, `a329a6f`, `26fa287`); executed baseline outstanding | Fake pairing/registry/ingestion/research-adapter/reissue/dry-state checks and 75 focused tests recorded; optimizer verification passes; r2 pack/preregistration strictly revalidated offline | Real Qwen baseline not run; explicit dry run reports Qwen `unloaded`, and execution still needs a loaded serving selection plus human approval | `docs/evidence/G03.md` |
+| G03 | Registry, offline protocol, fail-closed real-row ingestor, strict research row adapter, no-inference identity reissue utility, explicit requested-model dry reporting, parent research receipt recorder, deterministic research-cell plan, and checked-in r2 task map implemented (`1da150a`, `20adf3a`, `88faf05`, `8f30f10`, `6a30858`, `3039087`, `06938ed`, `a329a6f`, `26fa287`, `62562e0`, `c74bc4a`); executed baseline outstanding | Fake pairing/registry/ingestion/research-adapter/reissue/dry-state/plan checks and 85 focused tests recorded; optimizer verification passes; r2 pack/preregistration strictly revalidated offline | Real Qwen baseline not run; explicit dry run reports Qwen `unloaded`, and execution still needs a loaded serving selection plus human approval | `docs/evidence/G03.md` |
 | G04 | Implemented: bounded research contracts, runtime enforcement, merge authority, final-answer proof, and recovery handling are committed | Focused research/planner suites plus real synthesis delivery and compaction/recovery probes pass | Approved early-stop no-go/inconclusive screen remains bound to its older surface; repaired source has no new live receipt | `docs/evidence/G04.md`, `optimizer/docs/screens/G04_DEEP_RESEARCH_EVALUATION_2026-09-07.md`; current review above |
 | G05 | Pending | Pending | Pending | Not yet created |
 
