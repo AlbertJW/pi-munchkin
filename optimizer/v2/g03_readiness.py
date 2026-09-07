@@ -220,8 +220,14 @@ def run_readiness(
     agent_raw = pathlib.Path(agent_dir).expanduser()
     if agent_raw.is_symlink() or not agent_raw.is_dir():
         raise ReadinessError("agent_dir must be a real directory")
-    pack = BenchmarkPack.load(pathlib.Path(pack_path).expanduser().resolve())
-    prereg = BaselinePreregistration.load(pathlib.Path(preregistration_path).expanduser().resolve())
+    pack_raw = pathlib.Path(pack_path).expanduser()
+    prereg_raw = pathlib.Path(preregistration_path).expanduser()
+    if pack_raw.is_symlink() or prereg_raw.is_symlink():
+        raise ReadinessError("frozen pack/preregistration must not be symlinks")
+    if not pack_raw.is_file() or not prereg_raw.is_file():
+        raise ReadinessError("frozen pack/preregistration must be regular files")
+    pack = BenchmarkPack.load(pack_raw.resolve())
+    prereg = BaselinePreregistration.load(prereg_raw.resolve())
     requested_model = model or prereg.subject_model["model"]
     if requested_model != prereg.subject_model["model"]:
         raise ReadinessError("model does not match the preregistered subject")

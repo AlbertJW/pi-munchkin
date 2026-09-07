@@ -1,16 +1,36 @@
 from __future__ import annotations
 
+import pathlib
+import tempfile
 import unittest
 
 from optimizer.v2.g03_readiness import (
     ReadinessError,
     assess_readiness,
+    run_readiness,
     classify_model_state,
     validate_loopback_endpoint,
 )
 
 
+ROOT = pathlib.Path(__file__).resolve().parents[2]
+PACK = ROOT / "v2/benchmarks/g03-representative-pilot-r2.json"
+PREREG = ROOT / "v2/examples/g03-baseline-preregistration-r2.json"
+MAP = ROOT / "v2/examples/g03-baseline-task-map-r2.json"
+
+
 class G03ReadinessTests(unittest.TestCase):
+    def test_frozen_manifest_paths_reject_symlinks_before_any_probe(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            alias = pathlib.Path(directory) / "pack.json"
+            alias.symlink_to(PACK)
+            with self.assertRaisesRegex(ReadinessError, "symlink"):
+                run_readiness(
+                    pack_path=alias, preregistration_path=PREREG,
+                    repository_root=ROOT.parent, agent_dir=ROOT.parent,
+                    case_tasks=MAP, endpoint="not-a-url", model="qwen36-35b-iq3s",
+                )
+
     def test_model_state_requires_the_requested_member_to_be_loaded(self) -> None:
         models = [
             {"id": "qwen36-35b-iq3s", "status": {"value": "unloaded"}},
