@@ -102,9 +102,11 @@ preregistration, authenticated parent provenance, arm exposure, stable serving
 identity, and resolved Qwen subject; normalizes the legacy one-repetition gate
 shape; verifies a content digest; and emits only redacted private reports.
 Missing, malformed, duplicate, timeout, and mismatched cells remain explicit
-non-authoritative classifications. The `--ingest` CLI is artifact-only and
-cannot launch Pi or a model. No live baseline, calibration, campaign, mirror,
-or adoption action was performed.
+non-authoritative classifications. Complete ceiling/floor cohorts are marked
+inconclusive rather than informative, while mixed complete cohorts remain
+descriptive with power explicitly unestablished. The `--ingest` CLI is
+artifact-only and cannot launch Pi or a model. No live baseline, calibration,
+campaign, mirror, or adoption action was performed.
 
 ### Added (2026-09-07 — G03 Qwen representative-baseline runbook; prepared)
 

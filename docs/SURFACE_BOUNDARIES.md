@@ -396,7 +396,8 @@ Current source-surface SHA-256:
 
 ## Pending surface boundary — 2026-09-07 (G03 real-baseline evidence bridge)
 
-Repository-only optimizer tooling at source commits `1da150a` and `20adf3a`. The new
+Repository-only optimizer tooling at source commits `1da150a`, `20adf3a`, and
+`88faf05`. The new
 `real_baseline.py` ingestor accepts only fresh `pi.eval-row/v4` rows with exact
 trial-validity sidecars, binds authenticated parent provenance and arm/serving
 identities, normalizes the legacy one-repetition gate shape, and emits a
