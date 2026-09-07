@@ -37,6 +37,7 @@ HEX64 = re.compile(r"^[0-9a-f]{64}$")
 MODEL_STATES = {"loaded", "running", "unloaded", "absent", "unknown"}
 LOOPBACK_HOSTS = {"127.0.0.1", "localhost", "::1"}
 DEFAULT_TASK_MAP_SHA256 = "856d57e09ddc2a93ef4076395ee184777c14d8256f23bfa726a77d490b53f0ae"
+TASK_ID = re.compile(r"^[a-z][a-z0-9._-]{0,127}$")
 
 
 class ReadinessError(ValueError):
@@ -87,6 +88,75 @@ def classify_model_state(models: Any, requested_model: str) -> str:
         value = status.get("value") if isinstance(status, dict) else None
         return value if isinstance(value, str) and value in MODEL_STATES - {"absent", "unknown"} else "unknown"
     return "absent"
+
+
+def validate_execution_plan(
+    pack: BenchmarkPack, case_tasks: dict[str, str], repository_root: str | pathlib.Path,
+) -> dict[str, Any]:
+    """Bind each case to the executor that is allowed to run its shape.
+
+    The G03 map intentionally combines two execution surfaces: ordinary
+    cases go through the trusted ``real_gate.sh`` evaluator, while research
+    cases are recorded by the parent research runner and reduced later.  A
+    plain case-to-task map is not enough to communicate that distinction, so
+    readiness emits an explicit, validated execution plan.  This function is
+    offline and never reads prompts or starts a process.
+    """
+
+    try:
+        _validate_case_tasks(pack, case_tasks)
+    except ValueError as exc:
+        raise ReadinessError(f"case task binding is invalid: {exc}") from exc
+    raw_root = pathlib.Path(repository_root).expanduser()
+    if raw_root.is_symlink():
+        raise ReadinessError("repository_root must not be a symlink")
+    root = raw_root.resolve()
+    if not root.is_dir():
+        raise ReadinessError("repository_root must be a directory")
+
+    cases: list[dict[str, Any]] = []
+    executors: dict[str, list[str]] = {"real_gate": [], "research_parent": []}
+    for split in ("train", "development"):
+        for case in pack.splits[split]:
+            task = case_tasks[case.case_id]
+            if not isinstance(task, str) or not TASK_ID.fullmatch(task):
+                raise ReadinessError(f"task identifier for {case.case_id} is invalid")
+            if case.is_research:
+                # Research cases have no real-gate manifest by design.  The
+                # parent runner uses the admitted research spec and publishes
+                # a private receipt for the reducer; verify that spec remains
+                # a contained regular file at the same boundary.
+                if not case.spec_path:
+                    raise ReadinessError(f"research case {case.case_id} has no fixture spec")
+                spec = root / case.spec_path
+                resolved_spec = spec.resolve()
+                if spec.is_symlink() or resolved_spec.is_symlink() or root not in resolved_spec.parents or not resolved_spec.is_file():
+                    raise ReadinessError(f"research fixture spec for {case.case_id} is not a contained regular file")
+                executor = "research_parent"
+                item: dict[str, Any] = {
+                    "case_id": case.case_id, "split": split, "kind": case.kind,
+                    "task": task, "executor": executor, "spec_relpath": case.spec_path,
+                }
+            else:
+                manifest_relpath = pathlib.PurePosixPath("optimizer", "real-gate-fixtures", "manifests", f"{task}.json")
+                manifest = root.joinpath(*manifest_relpath.parts)
+                resolved_manifest = manifest.resolve()
+                if manifest.is_symlink() or resolved_manifest.is_symlink() or root not in resolved_manifest.parents or not resolved_manifest.is_file():
+                    raise ReadinessError(f"real-gate manifest for {case.case_id} is missing or not a regular file")
+                executor = "real_gate"
+                item = {
+                    "case_id": case.case_id, "split": split, "kind": case.kind,
+                    "task": task, "executor": executor, "manifest_relpath": str(manifest_relpath),
+                }
+            cases.append(item)
+            executors[executor].append(case.case_id)
+    return {
+        "schema": "pi.g03-execution-plan/v1",
+        "cases": cases,
+        "executors": executors,
+        "research_cases_are_parent_recorded": True,
+        "real_gate_is_trusted_evaluator": True,
+    }
 
 
 def assess_readiness(
@@ -232,7 +302,7 @@ def run_readiness(
     if requested_model != prereg.subject_model["model"]:
         raise ReadinessError("model does not match the preregistered subject")
     mapping = load_case_tasks(case_tasks)
-    _validate_case_tasks(pack, mapping)
+    execution_plan = validate_execution_plan(pack, mapping, root)
     expected_task_map_sha256 = _sha(expected_task_map_sha256, "expected_task_map_sha256")
     actual_source = _resolve_hash(root / "harness/scripts/source-surface-hash.mjs", root, node_bin=node_bin)
     actual_loaded = _resolve_hash(root / "harness/scripts/surface-hash.ts", agent_raw.resolve(), node_bin=node_bin)
@@ -245,6 +315,7 @@ def run_readiness(
     )
     result["preregistration_sha256"] = prereg.sha256
     result["benchmark_pack_sha256"] = pack.sha256
+    result["execution_plan"] = execution_plan
     result["server"] = server
     return result
 

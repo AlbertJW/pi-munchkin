@@ -9,8 +9,10 @@ from optimizer.v2.g03_readiness import (
     assess_readiness,
     run_readiness,
     classify_model_state,
+    validate_execution_plan,
     validate_loopback_endpoint,
 )
+from optimizer.v2.benchmark import BenchmarkPack
 
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
@@ -71,6 +73,30 @@ class G03ReadinessTests(unittest.TestCase):
         )
         self.assertTrue(ready["ready"])
         self.assertFalse(ready["inference_started"])
+
+    def test_execution_plan_routes_research_away_from_real_gate(self) -> None:
+        mapping = __import__("json").loads(MAP.read_text(encoding="utf-8"))
+        plan = validate_execution_plan(BenchmarkPack.load(PACK), mapping, ROOT.parent)
+        self.assertEqual(plan["schema"], "pi.g03-execution-plan/v1")
+        self.assertEqual(plan["executors"]["research_parent"], ["research-comparative", "research-contested"])
+        self.assertEqual(len(plan["executors"]["real_gate"]), 8)
+        research = next(item for item in plan["cases"] if item["case_id"] == "research-comparative")
+        self.assertEqual(research["executor"], "research_parent")
+        coding = next(item for item in plan["cases"] if item["case_id"] == "coding-edit-access")
+        self.assertEqual(coding["executor"], "real_gate")
+        self.assertTrue(coding["manifest_relpath"].endswith("access-log-triage.json"))
+
+    def test_execution_plan_requires_real_gate_manifest_for_nonresearch_case(self) -> None:
+        mapping = __import__("json").loads(MAP.read_text(encoding="utf-8"))
+        mapping["coding-edit-access"] = "missing-gate-task"
+        with self.assertRaisesRegex(ReadinessError, "real-gate manifest"):
+            validate_execution_plan(BenchmarkPack.load(PACK), mapping, ROOT.parent)
+
+    def test_execution_plan_rejects_unsafe_task_ids(self) -> None:
+        mapping = __import__("json").loads(MAP.read_text(encoding="utf-8"))
+        mapping["coding-edit-access"] = "../escape"
+        with self.assertRaisesRegex(ReadinessError, "task identifier"):
+            validate_execution_plan(BenchmarkPack.load(PACK), mapping, ROOT.parent)
 
 
 if __name__ == "__main__":
