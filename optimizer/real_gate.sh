@@ -282,6 +282,15 @@ REP_END=$((REP_START + N - 1))
 # mislabel would have become every row's model field. Falls back to data[0] only
 # for single-model servers that carry no status at all.
 loaded_alias() { curl -fsS -m 5 ${LLAMA_API_KEY:+-K <(printf 'header = "Authorization: Bearer %s"\n' "$LLAMA_API_KEY")} "$LLAMA_URL/v1/models" 2>/dev/null | python3 -c 'import sys,json;d=json.load(sys.stdin)["data"];print(next((m["id"] for m in d if (m.get("status") or {}).get("value") in ("loaded","running")), d[0]["id"] if d else ""))' 2>/dev/null; }
+# A router can list many members while none is loaded.  The legacy dry output
+# used loaded_alias() in that state, so an alphabetically-first member looked
+# like the selected model (e.g. defiant-9b) even when PI_MODEL requested Qwen.
+# Keep the dry path read-only and report the explicit request's state instead.
+model_state() {
+	local requested="$1"
+	curl -fsS -m 5 ${LLAMA_API_KEY:+-K <(printf 'header = "Authorization: Bearer %s"\n' "$LLAMA_API_KEY")} "$LLAMA_URL/v1/models" 2>/dev/null |
+		python3 -c 'import json,sys; requested=sys.argv[1]; data=json.load(sys.stdin).get("data",[]); print(next((str((m.get("status") or {}).get("value", "absent")) for m in data if m.get("id") == requested), "absent"))' "$requested"
+}
 ensure_model_loaded() {
 	local state
 	state="$(curl -fsS -m 5 ${LLAMA_API_KEY:+-K <(printf 'header = "Authorization: Bearer %s"\n' "$LLAMA_API_KEY")} "$LLAMA_URL/v1/models" 2>/dev/null | python3 -c 'import json,sys; m=sys.argv[1]; d=json.load(sys.stdin).get("data",[]); print(next((str((x.get("status") or {}).get("value", "")) for x in d if x.get("id")==m), ""))' "$MODEL" 2>/dev/null)"
@@ -296,7 +305,12 @@ if [[ "$DRY" == 1 ]]; then
 	echo "execution: network=$GATE_NETWORK model_control=$MODEL_CONTROL provider=${PI_PROVIDER:-auto} model=${PI_MODEL:-auto}"
 	echo "tools: $GATE_BASE_TOOLS (PLAN_TOOL_GO=off / SPAN_TOOLS=off strip their tools)"
 	if [[ "$MODEL_CONTROL" == "llama" ]]; then
-		echo "server: $(health && loaded_alias || echo DOWN)"
+		if [[ -n "${PI_MODEL:-}" ]]; then
+			requested_state="$(health && model_state "$PI_MODEL" || echo DOWN)"
+			echo "server: requested=$PI_MODEL state=$requested_state"
+		else
+			echo "server: $(health && loaded_alias || echo DOWN)"
+		fi
 	else
 		echo "server: pi-native (llama health/warm-up bypassed)"
 	fi

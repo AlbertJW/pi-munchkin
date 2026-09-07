@@ -686,6 +686,15 @@ class PiGateTests(unittest.TestCase):
         self.assertIn("would run", completed.stdout)
         self.assertNotIn("\nrows ->", completed.stdout)
 
+    def test_trusted_gate_dry_reports_explicit_requested_model_state(self) -> None:
+        gate = pathlib.Path(__file__).resolve().parents[2] / "real_gate.sh"
+        env = dict(os.environ, PI_MODEL="qwen36-35b-iq3s")
+        completed = subprocess.run([str(gate), "--dry"], cwd=gate.parent, env=env,
+                                   stdin=subprocess.DEVNULL, capture_output=True, text=True, timeout=20)
+        self.assertEqual(completed.returncode, 0)
+        self.assertRegex(completed.stdout, r"server: requested=qwen36-35b-iq3s state=(?:loaded|running|unloaded|absent|DOWN)")
+        self.assertNotIn("server: defiant-9b\n", completed.stdout)
+
     def test_interrupted_gate_attempt_refuses_duplicate_model_sessions(self) -> None:
         with tempfile.TemporaryDirectory() as td:
             root = pathlib.Path(td); baseline = root / "baseline.json"
