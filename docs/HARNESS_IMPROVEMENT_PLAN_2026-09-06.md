@@ -69,7 +69,8 @@ with disposable loaded hash
 The subsequent offline repair has source hash
 `92f2e6d6c24335a5e7f1c1bf2df1af3c0ea860c7d1d8315d49d4676c44b307ef`;
 the earlier runs do not validate that repaired surface. Current work includes
-uncommitted G02–G04 changes on `main`; HEAD is `782b42c`. Implementation,
+uncommitted G02–G04 changes on `main`; the G01 hardening is committed at
+`6a2d4ec`. Implementation,
 commit/push, mirror synchronization, and adoption are separate milestones.
 The current post-audit source-surface hash, including the continuation fixes, is
 `ed78767b24c08ab5f7f97ea8ad42af64f6bb5e2350db6a18aa70859d1ad5de7f` and has
@@ -543,7 +544,7 @@ than replacing pending cells with verbal assurances.
 
 | Goal | Implemented | Offline verified | Live validated | Evidence |
 |---|---|---|---|---|
-| G01 | Implemented; 2026-09-07 reload/flush hardening is in the current worktree | Focused 35-test control suite, 75-test real-session/planner integration, and fresh 777-test offline gate pass | Historical Ling receipt and supplemental Qwen RPC receipt predate the hardening; fresh pinned smoke pending | `docs/evidence/G01.md`; current review above |
+| G01 | Implemented in `6a2d4ec`; 2026-09-07 reload/flush hardening is committed | Focused 35-test control suite, 75-test real-session/planner integration, and fresh 777-test offline gate pass | Historical Ling receipt and supplemental Qwen RPC receipt predate the hardening; fresh pinned smoke pending | `docs/evidence/G01.md`; current review above |
 | G02 | Partial: accounting exists; producer reservation/preservation wiring incomplete | Helper and admission tests pass; aggregate producer integration remains unproven | Model-switch smoke not run | `docs/evidence/G02.md`; current review above |
 | G03 | Registry and offline protocol implemented; executed baseline outstanding | Fake pairing/registry checks recorded | Real Qwen baseline not run | `docs/evidence/G03.md` |
 | G04 | Partial: contracts exist; runtime enforcement gaps remain | Focused suites pass; real synthesis delivery and compaction/recovery proof outstanding | Approved early-stop no-go/inconclusive screen; repaired source has no new live receipt | `docs/evidence/G04.md`, `optimizer/docs/screens/G04_DEEP_RESEARCH_EVALUATION_2026-09-07.md`; current review above |
