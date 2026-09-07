@@ -186,6 +186,15 @@ class G03ResearchRunnerTests(unittest.TestCase):
                     root.parent / "escape.json", run_root=root, cell=cell, pack=PACK, prereg=PREREG,
                     process=process(), serving=serving(), parent_report=parent_report(),
                 )
+            real_root = root / "real-run-root"
+            real_root.mkdir()
+            root_alias = root / "run-root-alias"
+            root_alias.symlink_to(real_root, target_is_directory=True)
+            with self.assertRaises(ResearchRunnerError):
+                record_research_artifact(
+                    root_alias / "artifact.json", run_root=root_alias, cell=cell, pack=PACK, prereg=PREREG,
+                    process=process(), serving=serving(), parent_report=parent_report(),
+                )
 
     def test_cli_dry_mode_is_non_executing_and_does_not_write(self) -> None:
         with tempfile.TemporaryDirectory() as directory:

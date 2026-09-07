@@ -191,8 +191,11 @@ def prepare_research_plan(
     """
 
     run_id = _id(run_id, "run_id")
-    root = pathlib.Path(repository_root).expanduser().resolve()
-    if not root.is_dir() or root.is_symlink():
+    raw_root = pathlib.Path(repository_root).expanduser()
+    if raw_root.is_symlink():
+        raise ResearchRunnerError("repository_root must not be a symlink")
+    root = raw_root.resolve()
+    if not root.is_dir():
         raise ResearchRunnerError("repository_root must be a real directory")
     try:
         prepared = prepare_baseline(pack, prereg, root)
@@ -451,8 +454,11 @@ def _reject_symlink_components(path: pathlib.Path, root: pathlib.Path, name: str
 
 
 def _private_destination(path: str | pathlib.Path, run_root: str | pathlib.Path) -> pathlib.Path:
-    root = pathlib.Path(run_root).expanduser().resolve()
-    if not root.is_dir() or root.is_symlink():
+    raw_root = pathlib.Path(run_root).expanduser()
+    if raw_root.is_symlink():
+        raise ResearchRunnerError("run_root must not be a symlink")
+    root = raw_root.resolve()
+    if not root.is_dir():
         raise ResearchRunnerError("run_root must be a real directory")
     raw = pathlib.Path(path).expanduser()
     _reject_symlink_components(raw, root, "artifact")
