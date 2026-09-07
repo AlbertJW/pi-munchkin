@@ -101,6 +101,29 @@ prints only the report digest, decision, evidence class, and trial count; the
 full report remains mode `0600` and contains no prompts, transcripts, source
 contents, or tool arguments.
 
+## Reissue after identity stabilization (artifact-only)
+
+Once the source and loaded mirror are intentionally stabilized, prepare a new
+revision with `optimizer/v2/g03_reissue.py`. Supply the actual source and
+loaded-surface hashes from that same boundary; do not hand-edit the frozen
+manifests or run inference as part of reissue:
+
+```sh
+python3 optimizer/v2/g03_reissue.py --reissue \
+  --pack-path optimizer/v2/benchmarks/g03-representative-pilot-v1.json \
+  --preregistration-path optimizer/v2/examples/g03-baseline-preregistration.json \
+  --output-pack optimizer/v2/benchmarks/g03-representative-pilot-r2.json \
+  --output-preregistration optimizer/v2/examples/g03-baseline-preregistration-r2.json \
+  --repository-root . \
+  --source-sha256 <stabilized-source-sha256> \
+  --surface-sha256 <stabilized-loaded-surface-sha256> \
+  --revision 2026-09-07.r2
+```
+
+Review the printed file digests and rerun offline preparation before requesting
+a pinned Qwen 35B execution approval. The utility refuses output paths that
+would overwrite the frozen inputs.
+
 ## Stop and reconstruction rules
 
 Stop the run on identity drift, malformed or missing sidecars, an unverified
