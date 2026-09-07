@@ -3,17 +3,23 @@ from __future__ import annotations
 import copy
 import json
 import pathlib
+import subprocess
+import sys
+import tempfile
 import unittest
 
 from optimizer.v2.baseline import BaselinePreregistration
 from optimizer.v2.benchmark import BenchmarkPack
+from optimizer.v2.real_baseline import ingest_gate_baseline
 from optimizer.v2.research_baseline import ResearchBaselineError, research_artifact_to_row
 
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
 REPO = ROOT.parent
-PACK = BenchmarkPack.load(ROOT / "v2/benchmarks/g03-representative-pilot-v1.json")
-PREREG = BaselinePreregistration.load(ROOT / "v2/examples/g03-baseline-preregistration.json")
+PACK_PATH = ROOT / "v2/benchmarks/g03-representative-pilot-v1.json"
+PREREG_PATH = ROOT / "v2/examples/g03-baseline-preregistration.json"
+PACK = BenchmarkPack.load(PACK_PATH)
+PREREG = BaselinePreregistration.load(PREREG_PATH)
 CASE_ID = "research-comparative"
 CASE = PACK.case(CASE_ID)
 CASE_TASKS = {case.case_id: f"g03-{case.case_id}" for split in ("train", "development") for case in PACK.splits[split]}
@@ -111,6 +117,38 @@ class G03ResearchAdapterTests(unittest.TestCase):
         artifact["surface_sha256"] = "a" * 64
         with self.assertRaisesRegex(ResearchBaselineError, "surface"):
             research_artifact_to_row(artifact, pack=PACK, prereg=PREREG, repository_root=REPO)
+
+    def test_reduce_cli_is_artifact_only_and_writes_private_row_pair(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = pathlib.Path(directory)
+            artifact_path = root / "research-artifact.json"
+            row_path = root / "row.json"
+            validity_path = root / "row.validity.json"
+            artifact_path.write_text(json.dumps(valid_artifact()), encoding="utf-8")
+            completed = subprocess.run(
+                [sys.executable, str(ROOT / "v2/research_baseline.py"), "--reduce",
+                 "--artifact", str(artifact_path), "--pack", str(PACK_PATH.relative_to(REPO)),
+                 "--preregistration", str(PREREG_PATH.relative_to(REPO)), "--repository-root", str(REPO),
+                 "--row-output", str(row_path), "--validity-output", str(validity_path)],
+                cwd=str(REPO), text=True, capture_output=True, check=False,
+            )
+            self.assertEqual(completed.returncode, 0, completed.stderr)
+            summary = json.loads(completed.stdout)
+            self.assertFalse(summary["execution"])
+            row = json.loads(row_path.read_text(encoding="utf-8"))
+            self.assertEqual(row["schema"], "pi.eval-row/v4")
+            self.assertNotIn("citations", json.dumps(row))
+            self.assertEqual(json.loads(validity_path.read_text(encoding="utf-8"))["void"], False)
+
+    def test_research_row_is_accepted_by_the_shared_real_baseline_reducer(self) -> None:
+        row, validity = research_artifact_to_row(valid_artifact(), pack=PACK, prereg=PREREG, repository_root=REPO)
+        report = ingest_gate_baseline(
+            PACK, PREREG, REPO, [row], [validity], case_tasks=CASE_TASKS,
+            run_id="g03-research-run", resolved_model={"provider": "llama", "model": "qwen36-35b-iq3s"},
+        )
+        trial = next(item for item in report["trials"] if item["case_id"] == CASE_ID and item["arm"] == "baseline")
+        self.assertEqual(trial["status"], "completed")
+        self.assertEqual(trial["score"], 1)
 
 
 if __name__ == "__main__":

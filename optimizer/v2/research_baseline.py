@@ -22,12 +22,12 @@ from urllib.parse import parse_qsl, urlencode, urlparse, urlunparse
 try:
     from .baseline import BaselinePreregistration
     from .benchmark import BenchmarkCase, BenchmarkPack
-    from .real_baseline import _row_digest, _row_key
+    from .real_baseline import _row_digest, _row_key, write_private_report
 except ImportError:  # direct ``python3 optimizer/v2/research_baseline.py --selftest``
     sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[2]))
     from optimizer.v2.baseline import BaselinePreregistration
     from optimizer.v2.benchmark import BenchmarkCase, BenchmarkPack
-    from optimizer.v2.real_baseline import _row_digest, _row_key
+    from optimizer.v2.real_baseline import _row_digest, _row_key, write_private_report
 
 
 RESEARCH_TRIAL_SCHEMA = "pi.research-trial/v1"
@@ -321,11 +321,56 @@ def selftest() -> None:
     print("g03 research-baseline adapter selftest: OK (strict private artifact, metadata oracle, redacted V4 row)")
 
 
-if __name__ == "__main__":
-    parser = __import__("argparse").ArgumentParser()
-    parser.add_argument("--selftest", action="store_true")
-    args = parser.parse_args()
+def _load_object(path: str | pathlib.Path) -> dict:
+    target = pathlib.Path(path).expanduser().resolve()
+    if target.is_symlink() or not target.is_file():
+        raise ResearchBaselineError("research artifact must be a regular file")
+    try:
+        value = json.loads(target.read_text(encoding="utf-8"))
+    except (OSError, UnicodeError, json.JSONDecodeError) as exc:
+        raise ResearchBaselineError("research artifact cannot be read") from exc
+    if not isinstance(value, dict):
+        raise ResearchBaselineError("research artifact must contain one object")
+    return value
+
+
+def main(argv: list[str] | None = None) -> int:
+    import argparse
+
+    parser = argparse.ArgumentParser(prog="python3 -m optimizer.v2.research_baseline")
+    modes = parser.add_mutually_exclusive_group(required=True)
+    modes.add_argument("--selftest", action="store_true")
+    modes.add_argument("--reduce", action="store_true", help="reduce a private research artifact; never launches inference")
+    parser.add_argument("--artifact")
+    parser.add_argument("--pack")
+    parser.add_argument("--preregistration")
+    parser.add_argument("--repository-root", default=str(pathlib.Path(__file__).resolve().parents[2]))
+    parser.add_argument("--row-output")
+    parser.add_argument("--validity-output")
+    args = parser.parse_args(argv)
     if args.selftest:
         selftest()
-    else:
-        parser.error("choose --selftest; live research execution is not launched by this module")
+        return 0
+    required = (args.artifact, args.pack, args.preregistration, args.row_output, args.validity_output)
+    if any(value is None for value in required):
+        parser.error("--reduce requires --artifact, --pack, --preregistration, --row-output, and --validity-output")
+    try:
+        root = pathlib.Path(args.repository_root).expanduser().resolve()
+        pack = BenchmarkPack.load(pathlib.Path(args.pack).expanduser().resolve())
+        prereg = BaselinePreregistration.load(pathlib.Path(args.preregistration).expanduser().resolve())
+        row, validity = research_artifact_to_row(_load_object(args.artifact), pack=pack, prereg=prereg, repository_root=root)
+        write_private_report(args.row_output, row)
+        write_private_report(args.validity_output, validity)
+        print(json.dumps({
+            "schema": "pi.optimizer-research-baseline/v1", "execution": False,
+            "row_key": validity["row_key"], "row_sha256": validity["row_sha256"],
+            "authoritative": row["authoritative"], "status": row["status"], "score": row["score"],
+        }, sort_keys=True))
+        return 0
+    except (OSError, UnicodeError, json.JSONDecodeError, ResearchBaselineError) as exc:
+        print(f"g03-research-baseline: {exc}", file=sys.stderr)
+        return 2
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
