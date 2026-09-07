@@ -7,7 +7,7 @@ import unittest
 
 from optimizer.v2.baseline import BaselinePreregistration
 from optimizer.v2.benchmark import BenchmarkPack
-from optimizer.v2.real_baseline import RealBaselineError, _row_digest, _row_key, ingest_gate_baseline, load_case_tasks, validate_real_report
+from optimizer.v2.real_baseline import RealBaselineError, _row_digest, _row_key, ingest_gate_baseline, load_case_tasks, validate_input_receipts, validate_real_report, write_private_report
 
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
@@ -116,6 +116,30 @@ class G03RealBaselineIngestTests(unittest.TestCase):
             ).hexdigest(),
         )
 
+    def test_report_binds_canonical_input_receipts_for_reconstruction(self) -> None:
+        rows, validity = complete_rows()
+        report = ingest_gate_baseline(
+            PACK, PREREG, REPO, rows, validity, case_tasks=CASE_TASKS,
+            run_id="g03-real-run",
+            resolved_model={"provider": "llama", "model": "qwen36-35b-iq3s"},
+        )
+        receipts = report["reconstruction"]["input_artifacts"]
+        self.assertEqual(set(receipts), {"rows", "validity"})
+        self.assertEqual(receipts["rows"]["record_count"], len(rows))
+        self.assertEqual(receipts["validity"]["record_count"], len(validity))
+        self.assertRegex(receipts["rows"]["canonical_sha256"], r"^[0-9a-f]{64}$")
+        self.assertRegex(receipts["validity"]["canonical_sha256"], r"^[0-9a-f]{64}$")
+        self.assertEqual(report["reconstruction"]["run_id"], "g03-real-run")
+        validate_real_report(report, PACK, PREREG)
+        validate_input_receipts(report, rows, validity)
+        tampered = copy.deepcopy(report)
+        tampered["reconstruction"]["input_artifacts"]["rows"]["canonical_sha256"] = "0" * 64
+        tampered["report_sha256"] = __import__("hashlib").sha256(
+            json.dumps({key: value for key, value in tampered.items() if key != "report_sha256"}, sort_keys=True, separators=(",", ":"), ensure_ascii=False).encode()
+        ).hexdigest()
+        with self.assertRaises(RealBaselineError):
+            validate_input_receipts(tampered, rows, validity)
+
     def test_timeout_and_missing_cells_are_retained_as_non_authoritative(self) -> None:
         row = make_row("coding-edit-access", "base", 1, "session-timeout", timeout=True)
         validity = [{"row_key": _row_key(row), "row_sha256": _row_digest(row), "void": True}]
@@ -159,6 +183,32 @@ class G03RealBaselineIngestTests(unittest.TestCase):
         first = ingest_gate_baseline(PACK, PREREG, REPO, rows, validity, **kwargs)
         second = ingest_gate_baseline(PACK, PREREG, REPO, rows, validity, **kwargs)
         self.assertEqual(first, second)
+
+    def test_verify_cli_rebuilds_report_from_private_inputs(self) -> None:
+        rows, validity = complete_rows()
+        report = ingest_gate_baseline(
+            PACK, PREREG, REPO, rows, validity, case_tasks=CASE_TASKS,
+            run_id="g03-real-run",
+            resolved_model={"provider": "llama", "model": "qwen36-35b-iq3s"},
+        )
+        with __import__("tempfile").TemporaryDirectory() as directory:
+            root = pathlib.Path(directory)
+            rows_path = root / "rows.jsonl"
+            validity_path = root / "rows.jsonl.validity.jsonl"
+            report_path = root / "report.json"
+            rows_path.write_text("".join(json.dumps(row, sort_keys=True) + "\n" for row in rows), encoding="utf-8")
+            validity_path.write_text("".join(json.dumps(item, sort_keys=True) + "\n" for item in validity), encoding="utf-8")
+            write_private_report(report_path, report)
+            completed = __import__("subprocess").run(
+                [
+                    __import__("sys").executable, str(ROOT / "v2/real_baseline.py"), "--verify",
+                    "--rows", str(rows_path), "--validity", str(validity_path),
+                    "--report", str(report_path), "--preregistration", str(ROOT / "v2/examples/g03-baseline-preregistration.json"),
+                    "--case-tasks", json.dumps(CASE_TASKS), "--repository-root", str(REPO),
+                ], cwd=str(REPO), text=True, capture_output=True, check=False,
+            )
+            self.assertEqual(completed.returncode, 0, completed.stderr)
+            self.assertTrue(json.loads(completed.stdout)["reconstructed"])
 
     def test_provenance_exposure_and_split_mismatches_are_non_authoritative(self) -> None:
         rows, validity = complete_rows()

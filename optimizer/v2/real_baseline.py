@@ -49,6 +49,21 @@ def _row_digest(row: dict) -> str:
     return _digest(row)
 
 
+def _jsonl_digest(records: Iterable[dict]) -> str:
+    """Digest the semantic JSONL records used by an ingestion operation.
+
+    The raw files stay private, while this stable digest lets a reviewer prove
+    that a later reconstruction used the same ordered row and sidecar records
+    without depending on whitespace or filesystem paths.
+    """
+
+    digest = hashlib.sha256()
+    for record in records:
+        digest.update(_canonical(record))
+        digest.update(b"\n")
+    return digest.hexdigest()
+
+
 def _row_key(row: dict) -> str:
     variant = ((row.get("prompt") or {}).get("variant")) or "canonical"
     variant = re.sub(r"[^A-Za-z0-9._-]", "-", str(variant))
@@ -428,6 +443,7 @@ def ingest_gate_baseline(
         "preregistration_sha256": prereg.sha256,
         "benchmark_pack_sha256": pack.sha256,
         "case_tasks_sha256": case_tasks_sha256,
+        "run_id": run_id,
         "run_id_sha256": _digest(run_id),
         "requested_model": prereg.subject_model,
         "resolved_model": resolved,
@@ -441,7 +457,28 @@ def ingest_gate_baseline(
         "trial_count": len(trials),
         "external_references": [], "reference_pooling": "forbidden",
         "decision": {"status": decision_status, "reason": decision_reason, "statistical_power": "not-established"},
-        "reconstruction": {"pack_path": prereg.pack_path, "preregistration_sha256": prereg.sha256, "benchmark_pack_sha256": pack.sha256, "case_tasks_sha256": case_tasks_sha256, "validity_sidecar_required": True, "raw_payloads_in_report": False, "rerun_inference_required": False},
+        "reconstruction": {
+            "pack_path": prereg.pack_path,
+            "preregistration_sha256": prereg.sha256,
+            "benchmark_pack_sha256": pack.sha256,
+            "case_tasks_sha256": case_tasks_sha256,
+            "run_id": run_id,
+            "validity_sidecar_required": True,
+            "raw_payloads_in_report": False,
+            "rerun_inference_required": False,
+            "input_artifacts": {
+                "rows": {
+                    "schema": "pi.eval-row/v4",
+                    "record_count": len(rows),
+                    "canonical_sha256": _jsonl_digest(rows),
+                },
+                "validity": {
+                    "schema": "pi.trial-validity-sidecar/v1",
+                    "record_count": len(validity_records),
+                    "canonical_sha256": _jsonl_digest(validity_records),
+                },
+            },
+        },
         "human_review_required": True, "adoption_authorized": False,
     }
     report["report_sha256"] = _digest(report)
@@ -456,9 +493,31 @@ def validate_real_report(report: dict, pack: BenchmarkPack, prereg: BaselinePrer
     case_tasks_sha256 = report.get("case_tasks_sha256")
     if not isinstance(case_tasks_sha256, str) or not HEX64.fullmatch(case_tasks_sha256):
         raise RealBaselineError("real baseline case-task binding digest is missing")
+    run_id = report.get("run_id")
+    if not isinstance(run_id, str) or not run_id or len(run_id) > 256:
+        raise RealBaselineError("real baseline run identity is missing")
+    if report.get("run_id_sha256") != _digest(run_id):
+        raise RealBaselineError("real baseline run identity digest is inconsistent")
     reconstruction = report.get("reconstruction") if isinstance(report.get("reconstruction"), dict) else {}
-    if reconstruction.get("case_tasks_sha256") != case_tasks_sha256:
+    if reconstruction.get("case_tasks_sha256") != case_tasks_sha256 or reconstruction.get("run_id") != run_id:
         raise RealBaselineError("real baseline reconstruction task-map digest is inconsistent")
+    input_artifacts = reconstruction.get("input_artifacts")
+    if not isinstance(input_artifacts, dict) or set(input_artifacts) != {"rows", "validity"}:
+        raise RealBaselineError("real baseline input receipts are missing")
+    expected_input_schemas = {
+        "rows": "pi.eval-row/v4",
+        "validity": "pi.trial-validity-sidecar/v1",
+    }
+    for name, expected_schema in expected_input_schemas.items():
+        receipt = input_artifacts.get(name)
+        if not isinstance(receipt, dict) or set(receipt) != {"schema", "record_count", "canonical_sha256"}:
+            raise RealBaselineError(f"real baseline {name} input receipt is malformed")
+        if receipt.get("schema") != expected_schema:
+            raise RealBaselineError(f"real baseline {name} input receipt schema is invalid")
+        if not isinstance(receipt.get("record_count"), int) or isinstance(receipt.get("record_count"), bool) or receipt["record_count"] < 0:
+            raise RealBaselineError(f"real baseline {name} input receipt count is invalid")
+        if not isinstance(receipt.get("canonical_sha256"), str) or not HEX64.fullmatch(receipt["canonical_sha256"]):
+            raise RealBaselineError(f"real baseline {name} input receipt digest is invalid")
     report_without_hash = dict(report)
     report_digest = report_without_hash.pop("report_sha256", None)
     if not isinstance(report_digest, str) or report_digest != _digest(report_without_hash):
@@ -493,6 +552,35 @@ def validate_real_report(report: dict, pack: BenchmarkPack, prereg: BaselinePrer
         raise RealBaselineError("real baseline report contains raw payload fields")
     if report.get("reconstruction", {}).get("raw_payloads_in_report") is not False:
         raise RealBaselineError("real baseline reconstruction is not redacted")
+
+
+def validate_input_receipts(report: dict, rows: list[dict], validity_records: list[dict]) -> None:
+    """Verify raw private inputs against the report's semantic receipts.
+
+    This is intentionally separate from :func:`validate_real_report`: the
+    report is redacted and can be checked without exposing private rows, while
+    a reviewer holding the private inputs can additionally prove that the
+    report was rebuilt from exactly these ordered records.
+    """
+
+    if not isinstance(rows, list) or not isinstance(validity_records, list):
+        raise RealBaselineError("reconstruction inputs must be record lists")
+    reconstruction = report.get("reconstruction") if isinstance(report, dict) else None
+    receipts = reconstruction.get("input_artifacts") if isinstance(reconstruction, dict) else None
+    if not isinstance(receipts, dict):
+        raise RealBaselineError("real baseline input receipts are missing")
+    expected = {
+        "rows": (rows, "pi.eval-row/v4"),
+        "validity": (validity_records, "pi.trial-validity-sidecar/v1"),
+    }
+    for name, (records, schema) in expected.items():
+        receipt = receipts.get(name)
+        if not isinstance(receipt, dict):
+            raise RealBaselineError(f"real baseline {name} input receipt is missing")
+        if receipt.get("schema") != schema or receipt.get("record_count") != len(records):
+            raise RealBaselineError(f"real baseline {name} input receipt does not match records")
+        if receipt.get("canonical_sha256") != _jsonl_digest(records):
+            raise RealBaselineError(f"real baseline {name} input digest does not match records")
 
 
 def write_private_report(path: str | pathlib.Path, report: dict) -> pathlib.Path:
@@ -540,6 +628,21 @@ def load_jsonl(path: str | pathlib.Path) -> list[dict]:
     return result
 
 
+def load_json_object(path: str | pathlib.Path, name: str = "JSON artifact") -> dict:
+    """Load one private JSON object without following symlinks."""
+
+    raw_target = pathlib.Path(path).expanduser()
+    if raw_target.is_symlink() or not raw_target.is_file():
+        raise RealBaselineError(f"{name} must be a regular file")
+    try:
+        value = json.loads(raw_target.read_text(encoding="utf-8"))
+    except (OSError, UnicodeError, json.JSONDecodeError) as exc:
+        raise RealBaselineError(f"{name} is malformed") from exc
+    if not isinstance(value, dict):
+        raise RealBaselineError(f"{name} must contain one object")
+    return value
+
+
 def selftest() -> None:
     print("g03 real-baseline ingestor selftest: OK (redacted rows, explicit exclusions, fail-closed identity)")
 
@@ -549,6 +652,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--selftest", action="store_true")
     parser.add_argument("--ingest", action="store_true", help="ingest existing gate artifacts; never launches Pi")
+    parser.add_argument("--verify", action="store_true", help="rebuild a private report from its inputs; never launches Pi")
     parser.add_argument("--rows")
     parser.add_argument("--validity")
     parser.add_argument("--preregistration")
@@ -558,6 +662,7 @@ if __name__ == "__main__":
     parser.add_argument("--resolved-model")
     parser.add_argument("--repository-root", default=str(pathlib.Path(__file__).resolve().parents[2]))
     parser.add_argument("--output")
+    parser.add_argument("--report", help="existing private report for --verify")
     args = parser.parse_args()
     if args.selftest:
         selftest()
@@ -592,5 +697,37 @@ if __name__ == "__main__":
             }, sort_keys=True))
         except (BaselineError, OSError, UnicodeError, json.JSONDecodeError) as exc:
             parser.exit(2, f"g03-real-baseline: {exc}\n")
+    elif args.verify:
+        required = (args.rows, args.validity, args.preregistration, args.case_tasks, args.report)
+        if any(value is None for value in required):
+            parser.error("--verify requires --rows, --validity, --preregistration, --case-tasks, and --report")
+        try:
+            repository = pathlib.Path(args.repository_root).expanduser().resolve()
+            prereg_path = pathlib.Path(args.preregistration).expanduser().resolve()
+            prereg = BaselinePreregistration.load(prereg_path)
+            pack_path = (repository / prereg.pack_path).resolve()
+            pack = BenchmarkPack.load(pack_path)
+            case_tasks = load_case_tasks(args.case_tasks)
+            rows = load_jsonl(args.rows)
+            validity = load_jsonl(args.validity)
+            report = load_json_object(args.report, "real baseline report")
+            validate_real_report(report, pack, prereg)
+            validate_input_receipts(report, rows, validity)
+            reconstructed = ingest_gate_baseline(
+                pack, prereg, repository, rows, validity,
+                case_tasks=case_tasks, run_id=report["run_id"],
+                resolved_model=report["resolved_model"],
+            )
+            if reconstructed != report:
+                raise RealBaselineError("reconstructed report differs from the recorded report")
+            print(json.dumps({
+                "schema": REAL_REPORT_SCHEMA,
+                "report_sha256": report["report_sha256"],
+                "reconstructed": True,
+                "trial_count": report["trial_count"],
+                "execution": False,
+            }, sort_keys=True))
+        except (BaselineError, OSError, UnicodeError, json.JSONDecodeError) as exc:
+            parser.exit(2, f"g03-real-baseline: {exc}\n")
     else:
-        parser.error("choose --selftest or --ingest; inference is never launched by this module")
+        parser.error("choose --selftest, --ingest, or --verify; inference is never launched by this module")
