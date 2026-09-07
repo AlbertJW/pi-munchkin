@@ -11,7 +11,7 @@ import {
 } from "../lib/control-proposal.ts";
 import { emitRivalProposal, fire, makeFakePi, resetPiGlobals } from "./integration-harness.ts";
 import { boardState, noteTool, resetBoard } from "../lib/blackboard.ts";
-import { CONTINUATION_RECEIPT_TYPE, continuationDispatcherActive, emitContinuationRequest, hashContinuationIdentity, replaceContinuationAuthority, setContinuationDispatcherActive } from "../lib/continuation-authority.ts";
+import { CONTINUATION_RECEIPT_TYPE, continuationDispatcherActive, emitContinuationRequest, hashContinuationIdentity, onContinuationRequest, replaceContinuationAuthority, setContinuationDispatcherActive } from "../lib/continuation-authority.ts";
 
 function envelope(kind: ControlKind, boundarySequence = 1, effect: ControlEffect = "message"): ControlProposalEnvelope {
 	return {
@@ -430,6 +430,32 @@ test("session reload cancels an in-flight continuation flush before admitting th
 	releaseOld();
 	for (let turn = 0; turn < 4; turn += 1) await new Promise<void>((resolve) => setImmediate(resolve));
 	assert.equal(fp.deliveries.length, 1, "the cancelled old flush cannot dispatch after its promise resolves");
+	resetPiGlobals();
+});
+
+test("a new session after shutdown reactivates the continuation authority", async () => {
+	const { fp } = await installed("enforce", "off");
+	const cwd = mkdtempSync(join(tmpdir(), "pi-continuation-shutdown-restart-"));
+	const session = (id: string) => ({ cwd, sessionManager: { getSessionId: () => id, getEntries: () => [] } });
+	await fire(fp, "session_start", {}, session("before-shutdown"));
+	assert.equal(controlEnforces(fp.pi.events as never), true);
+	assert.equal(continuationDispatcherActive(fp.pi.events as never), true);
+	await fire(fp, "session_shutdown", {}, session("before-shutdown"));
+	await fire(fp, "session_start", {}, session("after-shutdown"));
+	assert.equal(controlEnforces(fp.pi.events as never), true, "the arbiter must be live for a subsequent session in the same process");
+	assert.equal(continuationDispatcherActive(fp.pi.events as never), true, "the continuation dispatcher must be rebound after shutdown");
+	const sessionHash = hashContinuationIdentity("after-shutdown");
+	let delivered = 0;
+	onContinuationRequest(fp.pi.events as never, () => { delivered += 1; });
+	emitContinuationRequest(fp.pi.events as never, {
+		request: {
+			v: 1, session_id_hash: sessionHash, owner_id_hash: sessionHash, generation: "restart-generation",
+			scope: "session", reason: "goal", priority: 500, idempotency_key: "restart:continuation",
+			message: "new session continuation", expires_at_ms: Date.now() + 10_000,
+		},
+		authorize: () => true,
+	});
+	assert.equal(delivered, 1, "the rebound authority must receive new-session offers");
 	resetPiGlobals();
 });
 

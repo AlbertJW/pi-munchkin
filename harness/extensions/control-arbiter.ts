@@ -106,14 +106,15 @@ export default function (pi: ExtensionAPI): void {
 	// Continuation ownership is per Pi event bus. Unlike reloads, isolated
 	// AgentSessions legitimately have distinct buses in one process, so do not
 	// share this subscription through the reload-only subscription registry.
-	const disposeContinuation = replaceContinuationAuthority(pi.events, (envelope) => {
+	const continuationHandler = (envelope: ContinuationEnvelope): void => {
 		if (!continuationLive || !sessionIdHash) return;
 		// Keep mismatched envelopes until the bounded flush, where the session
 		// identity filter rejects them. This avoids depending on load-order timing
 		// while still making a foreign/stale session incapable of dispatch.
 		pendingContinuations.push(envelope);
 		scheduleContinuationFlush();
-	});
+	};
+	let disposeContinuation = replaceContinuationAuthority(pi.events, continuationHandler);
 	pi.on("session_start", async (_event, ctx) => {
 		continuationLifecycleGeneration += 1;
 		continuationFlushScheduled = false;
@@ -123,6 +124,13 @@ export default function (pi: ExtensionAPI): void {
 		sessionIdHash = hashContinuationIdentity(ctx.sessionManager?.getSessionId?.() ?? `compat:${ctx.cwd}`);
 		deliveredContinuations = continuationReceipts(ctx.sessionManager?.getEntries?.() ?? [], sessionIdHash);
 		pendingContinuations = [];
+		// Pi may reuse this extension instance for /new, /fork, or a same-cwd
+		// resume after session_shutdown. Rebind both shared authorities instead of
+		// leaving producers on the legacy direct-send path for the new session.
+		disposeContinuation();
+		disposeContinuation = replaceContinuationAuthority(pi.events, continuationHandler);
+		setControlArbiterActive(pi.events, mode === "enforce");
+		setContinuationDispatcherActive(pi.events, true);
 	});
 	pi.on("session_shutdown", async () => {
 		continuationLifecycleGeneration += 1;
