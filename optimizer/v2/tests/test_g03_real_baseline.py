@@ -148,6 +148,8 @@ class G03RealBaselineIngestTests(unittest.TestCase):
         self.assertFalse(report["model_quality_evidence"])
         self.assertEqual(sum(trial["status"] == "timeout" for trial in report["trials"]), 1)
         self.assertGreater(sum(trial["status"] == "excluded" for trial in report["trials"]), 0)
+        self.assertIsNone(report["hard_guards"]["unsupported_claims"])
+        self.assertIsNone(report["hard_guards"]["unwanted_continuation"])
         self.assertEqual(report["decision"]["status"], "inconclusive")
 
     def test_complete_non_ceiling_grid_is_descriptively_informative(self) -> None:
@@ -166,6 +168,22 @@ class G03RealBaselineIngestTests(unittest.TestCase):
             "reason": "complete-authoritative-paired-grid",
             "statistical_power": "not-established",
         })
+
+    def test_complete_grid_aggregates_guard_counters(self) -> None:
+        rows, validity = complete_rows()
+        for row, sidecar in zip(rows, validity):
+            row["unsupported_claims"] = 1
+            row["unwanted_continuation"] = 0
+            sidecar["row_sha256"] = _row_digest(row)
+        report = ingest_gate_baseline(
+            PACK, PREREG, REPO, rows, validity, case_tasks=CASE_TASKS,
+            run_id="g03-real-run",
+            resolved_model={"provider": "llama", "model": "qwen36-35b-iq3s"},
+        )
+        self.assertEqual(report["hard_guards"]["unsupported_claims"], 40)
+        self.assertEqual(report["hard_guards"]["unwanted_continuation"], 0)
+        self.assertEqual(report["cohorts"]["subject"]["unsupported_claims"], 20)
+        self.assertEqual(report["cohorts"]["candidate"]["unsupported_claims"], 20)
 
     def test_model_identity_and_sidecar_mismatches_fail_closed(self) -> None:
         rows, validity = complete_rows()

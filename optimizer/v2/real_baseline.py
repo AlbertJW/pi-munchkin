@@ -394,6 +394,15 @@ def ingest_gate_baseline(
     for trial in trials:
         if trial["arm"] in by_arm:
             by_arm[trial["arm"]].append(trial)
+    def guard_total(values: list[dict], field: str) -> int | None:
+        """Sum a guard only when every authoritative value is observable."""
+
+        completed = [value for value in values if value["status"] == "completed"]
+        observed = [value.get(field) for value in completed]
+        if not completed or any(not isinstance(item, int) or isinstance(item, bool) or item < 0 for item in observed):
+            return None
+        return sum(observed)
+
     def summary(arm: str) -> dict:
         values = by_arm[arm]
         completed = [value for value in values if value["status"] == "completed"]
@@ -404,6 +413,8 @@ def ingest_gate_baseline(
             "invalid_trials": sum(value["status"] == "invalid" for value in values),
             "timeouts": sum(value["status"] == "timeout" for value in values),
             "exclusions": sum(value["status"] == "excluded" for value in values),
+            "unsupported_claims": guard_total(values, "unsupported_claims") if len(completed) == len(values) else None,
+            "unwanted_continuation": guard_total(values, "unwanted_continuation") if len(completed) == len(values) else None,
             "child_telemetry": "unavailable-contained",
         }
     test_exclusions = [{"case_id": case.case_id, "split": "test", "status": "excluded", "reason": "opaque_test_quarantined"} for case in pack.splits["test"]]
@@ -451,7 +462,11 @@ def ingest_gate_baseline(
         "serving_identity_sha256": sorted(serving_ids),
         "case_coverage": case_coverage,
         "primary_metric": prereg.primary_metric,
-        "hard_guards": {"unsupported_claims": None, "unwanted_continuation": None, "invalid_or_non_authoritative": sum(trial["status"] != "completed" for trial in trials)},
+        "hard_guards": {
+            "unsupported_claims": guard_total(trials, "unsupported_claims") if complete else None,
+            "unwanted_continuation": guard_total(trials, "unwanted_continuation") if complete else None,
+            "invalid_or_non_authoritative": sum(trial["status"] != "completed" for trial in trials),
+        },
         "cohorts": {"subject": summary("baseline"), "candidate": summary("candidate"), "guards": [{"model": model, "status": "not-declared"} for model in prereg.guard_models]},
         "trials": sorted(trials, key=lambda value: (str(value["case_id"]), str(value["arm"]), str(value["seed"]), str(value["repetition"]))),
         "trial_count": len(trials),
