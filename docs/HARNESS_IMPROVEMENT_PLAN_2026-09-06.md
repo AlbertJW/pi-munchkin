@@ -74,19 +74,20 @@ with disposable loaded hash
 `7d5353d80cd2ee75acc8ceab6d0d0633aaef1701ee8d716061a107764c77319d`.
 The subsequent offline repair has source hash
 `92f2e6d6c24335a5e7f1c1bf2df1af3c0ea860c7d1d8315d49d4676c44b307ef`;
-the earlier runs do not validate that repaired surface. Current work includes
-uncommitted G02–G04 changes on `main`; the G01 hardening is committed at
+the earlier runs do not validate that repaired surface. The G02–G04 changes
+referenced by this review are now committed on `main`; the G01 hardening is committed at
 `6a2d4ec` and `a9cab65`, with the post-shutdown dispatch proof in `36cfeab`.
 Implementation,
 commit/push, mirror synchronization, and adoption are separate milestones.
-The current post-audit source-surface hash, including the continuation fixes, is
+The earlier post-audit source-surface hash, including the continuation fixes, was
 `68d1152c8e30673f67a2ae0ee6e06acc43e859536b9d36d391b1184ddc26e0f2` and has
-not yet been loaded into the live agent directory. A clean committed G01-only
+not been loaded into the live agent directory. The latest repaired worktree
+source-surface hash is
+`9aed85c14ebae22b7f255d00fbe9eb7a8a90b023a450291837ef9cf40e67bc18`.
+A clean committed G01-only
 snapshot was separately materialized in a disposable agent directory for the
 fresh protocol receipt below; its loaded hash is recorded in `docs/evidence/G01.md`.
-The latest repaired G04 worktree source-surface hash is
-`9aed85c14ebae22b7f255d00fbe9eb7a8a90b023a450291837ef9cf40e67bc18`; it is
-also repository-only and has no live mirror receipt.
+It is also repository-only and has no live mirror receipt.
 
 ### Findings that prevent full completion
 
@@ -553,10 +554,10 @@ than replacing pending cells with verbal assurances.
 
 | Goal | Implemented | Offline verified | Live validated | Evidence |
 |---|---|---|---|---|
-| G01 | Implemented in `6a2d4ec` + `a9cab65`; dispatch proof in `36cfeab`, shutdown cancellation proof in `b2b7777` | Focused 37-test control suite, 75-test real-session/planner integration, and fresh 779-test offline gate pass | Fresh 2026-09-07 disposable Ling receipt: one real goal update, one authority continuation, two provider turns, clean exit; no mirror or adoption claim | `docs/evidence/G01.md`; current review above |
+| G01 | Implemented in `6a2d4ec` + `a9cab65`; dispatch proof in `36cfeab`, shutdown cancellation proof in `b2b7777` | Focused 37-test control suite and 75-test real-session/planner integration pass; the earlier 779-test gate count is historical, and the current full gate has three pre-existing compact timing failures | Fresh 2026-09-07 disposable Ling receipt: one real goal update, one authority continuation, two provider turns, clean exit; no mirror or adoption claim | `docs/evidence/G01.md`; current review above |
 | G02 | Implemented behind `CONTEXT_ADMISSION=on`; producer reservation and recovery-preservation wiring complete | Focused producer, recovery, catalog, typecheck, package smoke, and optimizer verification pass; prior full suite passed 782/782, with five unrelated flaky probes on a later parallel run | Clean 2026-09-07 Qwen→Ling mechanism receipt: two status-200 turns, epochs 0/1, two admitted requests, one bound session/surface; no quality or capacity claim | `docs/evidence/G02.md`; `optimizer/docs/screens/PREREG_QWEN35B_CONTEXT_ADMISSION_SWITCH_2026-09-07.md`; current review above |
 | G03 | Registry, offline protocol, and fail-closed real-row ingestor implemented (`1da150a`, `20adf3a`, `88faf05`); executed baseline outstanding | Fake pairing/registry/ingestion checks and 64 focused tests recorded; optimizer verification passes | Real Qwen baseline not run | `docs/evidence/G03.md` |
-| G04 | Partial: contracts exist; runtime enforcement gaps remain | Focused suites pass; real synthesis delivery and compaction/recovery proof outstanding | Approved early-stop no-go/inconclusive screen; repaired source has no new live receipt | `docs/evidence/G04.md`, `optimizer/docs/screens/G04_DEEP_RESEARCH_EVALUATION_2026-09-07.md`; current review above |
+| G04 | Implemented: bounded research contracts, runtime enforcement, merge authority, final-answer proof, and recovery handling are committed | Focused research/planner suites plus real synthesis delivery and compaction/recovery probes pass | Approved early-stop no-go/inconclusive screen remains bound to its older surface; repaired source has no new live receipt | `docs/evidence/G04.md`, `optimizer/docs/screens/G04_DEEP_RESEARCH_EVALUATION_2026-09-07.md`; current review above |
 | G05 | Pending | Pending | Pending | Not yet created |
 
 Existing repairs are prerequisites, not proof that these larger goals are done.
