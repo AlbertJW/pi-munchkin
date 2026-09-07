@@ -18,6 +18,7 @@ result may be pooled with.
 | `FIXTURE_BAND` | [prereg](screens/PREREG_FIXTURE_BAND_2026-08-11.md) | _none_ | mean gate-pass rate per fixture |
 | `HIERARCHICAL_PLANNER_SCREEN` | [prereg](screens/PREREG_HIERARCHICAL_PLANNER_SCREEN_2026-08.md) | _none_ | STATUS: BLOCKED DRAFT — NO SESSION MAY START |
 | `QWEN35B_BASELINE` | [prereg](screens/PREREG_QWEN35B_BASELINE_2026-09-01.md) | [audit](screens/QWEN35B_BASELINE_AUDIT_2026-09-01.md) | The explicitly approved, current-surface screen ran one base replicate for parens, equil, and bigdata under invocation 96faf8 |
+| `G03_QWEN35B_REPRESENTATIVE_BASELINE` | [prereg](screens/PREREG_G03_QWEN35B_REPRESENTATIVE_BASELINE_2026-09-07.md) | _none_ | Prepared against the frozen twelve-case pack; execution pending Pi/llama-swap and the research adapter |
 | `QWEN35B_BASELINE_REPLACEMENT` | [prereg](screens/PREREG_QWEN35B_BASELINE_REPLACEMENT_2026-08-27.md) | _none_ | This replaces PREREG_QWEN35B_BASELINE_SHADOW_2026-08-27.md, whose partial rows are permanently non-authoritative and must not be resumed or pooled |
 | `QWEN35B_BASELINE_SHADOW` | [prereg](screens/PREREG_QWEN35B_BASELINE_SHADOW_2026-08-27.md) | _none_ | Prepared before inference |
 | `QWEN35B_BASELINE_TIMEOUT_RETRY` | [prereg](screens/PREREG_QWEN35B_BASELINE_TIMEOUT_RETRY_2026-09-01.md) | [audit](screens/QWEN35B_BASELINE_TIMEOUT_RETRY_AUDIT_2026-09-01.md) | The explicitly approved timeout-only replacement run completed one base replicate for parens, equil, and bigdata under invocation 3c3dd2 with PI_TIMEO |
@@ -52,4 +53,4 @@ result may be pooled with.
 | `RUN3_4B` | [prereg](screens/PREREG_RUN3_4B_2026-08-06.md) | _none_ | Primary — deterministic, no judge: |
 | `SEMANTIC_LOOP_SCREEN` | [prereg](screens/PREREG_SEMANTIC_LOOP_SCREEN_2026-08.md) | _none_ | STATUS: PREPARED. No stage of this study may be started without Albert's explicit, > per-stage approval |
 
-_40 screens; 21 carry an audit. Updated 2026-09-04._
+_41 screens; 21 carry an audit. Updated 2026-09-07._

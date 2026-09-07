@@ -94,6 +94,15 @@ allowlists, opaque exclusions, missing evidence, and invalid stop classes. The
 report remains protocol-only and no inference, calibration, campaign, mirror,
 or rollout was performed.
 
+### Added (2026-09-07 — G03 Qwen representative-baseline runbook; prepared)
+
+Added `optimizer/docs/screens/PREREG_G03_QWEN35B_REPRESENTATIVE_BASELINE_2026-09-07.md`,
+which binds the twelve-case pack, Qwen 35B cohort, frozen arms, source/surface
+identities, no-inference preparation receipt, execution stop rules, and
+reconstruction procedure. It records that Pi/llama-swap is currently down and
+that research-shaped live execution still needs its adapter; no model session
+or adoption action was started.
+
 ### Added (2026-09-06 — G02 aggregate context admission; repository-only)
 
 Added the `pi.context-accounting/v1` aggregate admission contract and the
