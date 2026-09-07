@@ -108,6 +108,23 @@ class G03ResearchAdapterTests(unittest.TestCase):
         self.assertIsNone(row["score"])
         self.assertEqual(row["authority_reason"], "plan_not_settled")
 
+    def test_timeout_artifact_is_retained_as_a_bounded_non_authoritative_row(self) -> None:
+        artifact = valid_artifact()
+        artifact.update({
+            "execution_authoritative": False,
+            "authoritative": False,
+            "status": "timeout",
+            "authority_reason": "wall_timeout",
+            "stop_class": "timeout",
+            "plan": {"status": "in_progress", "evidence_validated": False},
+            "coverage": {"searches": 1, "reads": 1, "complete": False, "truncated": False, "failed": True, "budget_exhausted": False},
+        })
+        row, validity = research_artifact_to_row(artifact, pack=PACK, prereg=PREREG, repository_root=REPO)
+        self.assertEqual(row["status"], "timeout")
+        self.assertFalse(row["authoritative"])
+        self.assertIsNone(row["score"])
+        self.assertTrue(validity["void"])
+
     def test_identity_or_fixture_drift_is_rejected_before_oracle(self) -> None:
         artifact = valid_artifact()
         artifact["fixture_id"] = "other-fixture"

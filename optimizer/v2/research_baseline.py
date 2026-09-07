@@ -168,10 +168,14 @@ def _validate_artifact(artifact: dict, *, case: BenchmarkCase, prereg: BaselineP
         serving_hashes.append(_sha(item["full_sha256"], f"serving.{label}.full_sha256"))
     if serving_hashes[0] != serving_hashes[1]:
         raise ResearchBaselineError("research serving identity changed during the trial")
-    if value["execution_authoritative"] is not True or value["authoritative"] is not True:
-        raise ResearchBaselineError("research execution is not authoritative")
+    if not isinstance(value["execution_authoritative"], bool) or not isinstance(value["authoritative"], bool):
+        raise ResearchBaselineError("research authority flags are invalid")
     if value["status"] not in SAFE_STATUS or value["stop_class"] not in SAFE_STOP:
         raise ResearchBaselineError("research status or stop class is invalid")
+    if value["status"] == "complete" and (value["execution_authoritative"] is not True or value["authoritative"] is not True):
+        raise ResearchBaselineError("completed research execution must be authoritative")
+    if value["status"] == "timeout" and value["stop_class"] != "timeout":
+        raise ResearchBaselineError("timed-out research execution must use the timeout stop class")
     _text(value["authority_reason"], "authority_reason", 160)
     if value["exposure"] not in {"control", "targeted"}:
         raise ResearchBaselineError("research exposure is invalid")
