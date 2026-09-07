@@ -144,6 +144,12 @@ class PiGateScenario:
         if not isinstance(adapter_config, dict) or set(adapter_config) - required - optional or required - set(adapter_config):
             raise ValueError("pi-gate adapter_config has missing or unknown fields")
         case_ids = {case.case_id for split in benchmark.splits.values() for case in split}
+        research_case_ids = sorted(case.case_id for case in benchmark.all_cases() if case.is_research)
+        if research_case_ids:
+            raise ValueError(
+                "pi-gate cannot execute research cases; use the parent research runner: "
+                + ", ".join(research_case_ids)
+            )
         case_tasks = adapter_config["case_tasks"]
         if not isinstance(case_tasks, dict) or set(case_tasks) != case_ids or any(not isinstance(value, str) or not value for value in case_tasks.values()):
             raise ValueError("pi-gate case_tasks must map every benchmark case exactly once")

@@ -13,6 +13,7 @@ from optimizer.v2.g03_readiness import (
     validate_loopback_endpoint,
 )
 from optimizer.v2.benchmark import BenchmarkPack
+from optimizer.v2.pi_gate import PiGateScenario
 
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
@@ -97,6 +98,20 @@ class G03ReadinessTests(unittest.TestCase):
         mapping["coding-edit-access"] = "../escape"
         with self.assertRaisesRegex(ReadinessError, "task identifier"):
             validate_execution_plan(BenchmarkPack.load(PACK), mapping, ROOT.parent)
+
+    def test_pi_gate_refuses_a_research_benchmark_at_construction(self) -> None:
+        pack = BenchmarkPack.load(PACK)
+        mapping = {case.case_id: case.case_id for case in pack.all_cases()}
+        with tempfile.TemporaryDirectory() as directory:
+            with self.assertRaisesRegex(ValueError, "cannot execute research"):
+                PiGateScenario(
+                    ROOT, pack, None, pathlib.Path(directory) / "run",
+                    {
+                        "case_tasks": mapping, "model_control": "llama", "gate_network": "endpoint",
+                        "llama_endpoint": {"scheme": "http", "host": "loopback", "port": 8080},
+                        "model_registry_sha256": "a" * 64,
+                    }, None,
+                )
 
 
 if __name__ == "__main__":
