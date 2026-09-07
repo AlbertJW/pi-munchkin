@@ -444,6 +444,7 @@ test("a new session after shutdown reactivates the continuation authority", asyn
 	await fire(fp, "session_start", {}, session("after-shutdown"));
 	assert.equal(controlEnforces(fp.pi.events as never), true, "the arbiter must be live for a subsequent session in the same process");
 	assert.equal(continuationDispatcherActive(fp.pi.events as never), true, "the continuation dispatcher must be rebound after shutdown");
+	await fire(fp, "agent_start", {}, session("after-shutdown"));
 	const sessionHash = hashContinuationIdentity("after-shutdown");
 	let delivered = 0;
 	onContinuationRequest(fp.pi.events as never, () => { delivered += 1; });
@@ -456,6 +457,10 @@ test("a new session after shutdown reactivates the continuation authority", asyn
 		authorize: () => true,
 	});
 	assert.equal(delivered, 1, "the rebound authority must receive new-session offers");
+	await fire(fp, "agent_settled", {}, session("after-shutdown"));
+	for (let turn = 0; turn < 4 && fp.deliveries.length === 0; turn += 1) await new Promise<void>((resolve) => setImmediate(resolve));
+	assert.equal(fp.deliveries.length, 1, "the rebound arbiter must dispatch a new-session continuation");
+	assert.equal(fp.deliveries[0]?.text, "new session continuation");
 	resetPiGlobals();
 });
 
