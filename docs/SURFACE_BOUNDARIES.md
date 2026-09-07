@@ -415,6 +415,15 @@ offline suite is 110 tests; changed inputs fail closed. This is not a
 model-visible harness change, and G03-C remains pending the approved Qwen 35B
 baseline.
 
+## Pending surface boundary — 2026-09-07 (G03 guard aggregation)
+
+Repository-only optimizer commit `53d65f0` makes complete authoritative
+reports aggregate `unsupported_claims` and `unwanted_continuation` for each
+cohort and overall hard guards. Incomplete cohorts keep these values explicitly
+unavailable rather than treating missing telemetry as zero. The offline suite
+now passes 111 tests. This is not a model-visible harness change; G03-C remains
+pending the approved Qwen 35B baseline.
+
 ## Data at rest: where a research session actually lands (updated 2026-08-10)
 
 A surface hash bounds what the MODEL sees. It says nothing about what a session LEAVES. Those are
