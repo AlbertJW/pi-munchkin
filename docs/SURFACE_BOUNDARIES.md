@@ -437,6 +437,19 @@ pending the approved Qwen 35B baseline.
 Current source-surface SHA-256:
 `9aed85c14ebae22b7f255d00fbe9eb7a8a90b023a450291837ef9cf40e67bc18`.
 
+## Pending surface boundary — 2026-09-07 (G03 Pi-gate research fence)
+
+Repository-only optimizer commit `16ad46a` adds a defense-in-depth
+constructor guard to `PiGateScenario`: a benchmark containing any research
+case is rejected with an explicit instruction to use the parent research
+runner. This prevents a caller that bypasses the readiness plan from sending
+research tasks to `real_gate.sh`. The offline optimizer suite passes 115 tests.
+No inference, calibration, campaign, mirror, rollout, or adoption occurred;
+G03-C remains pending the approved Qwen 35B baseline.
+
+Current source-surface SHA-256:
+`9aed85c14ebae22b7f255d00fbe9eb7a8a90b023a450291837ef9cf40e67bc18`.
+
 ## Data at rest: where a research session actually lands (updated 2026-08-10)
 
 A surface hash bounds what the MODEL sees. It says nothing about what a session LEAVES. Those are
