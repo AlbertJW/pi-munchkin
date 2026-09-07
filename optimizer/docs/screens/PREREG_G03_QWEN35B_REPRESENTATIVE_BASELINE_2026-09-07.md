@@ -8,6 +8,16 @@ decision. Ling remains a protocol-qualification subject and must not be pooled
 with this Qwen cohort. No model session may start until the human explicitly
 approves the resolved hashes below and Pi/llama-swap is confirmed healthy.
 
+Readiness is currently invalidated by identity drift. The frozen values below
+are historical bindings for this document, not permission to run: the current
+worktree source resolves to `9aed85c14ebae22b7f255d00fbe9eb7a8a90b023a450291837ef9cf40e67bc18`
+(frozen source `b0fae0e28b68a4fcac6c952be214b45e8bec9cb7880eb4ca284e1c161411f082`),
+and the current live agent directory resolves to loaded surface
+`5d7216b4e209c40033ec84b5929d68e7678e4a95046280f7c2c914a1ff061025`
+(frozen loaded surface `184c9178950c38c2caf469f68bfee242bddbbf24af299172bd3a91d68511417a`).
+Do not rewrite this frozen record. Reissue the pack/preregistration against a
+stabilized source and loaded mirror before requesting execution approval.
+
 ## Frozen identities
 
 - Subject: `local-llamacpp/qwen36-35b-iq3s` (Qwen 35B adoption cohort)
@@ -103,6 +113,8 @@ to reconstruct all classifications without rerunning inference. Selection and
 adoption remain human-only and are not authorized by this runbook.
 
 Current external blocker: Pi/llama-swap is down (`real_gate.sh --dry` reports
-`server: DOWN`). The offline registry, shared reducer, and research row adapter
-are complete; G03-C remains open until a fresh, fully bound Qwen run covers the
-declared cohort and emits the required private research artifacts.
+`server: DOWN`), and the frozen source/loaded-surface bindings have drifted.
+The offline registry, shared reducer, and research row adapter are complete;
+G03-C remains open until a fresh pack/preregistration revision and a fully bound
+Qwen run cover the declared cohort and emit the required private research
+artifacts.
