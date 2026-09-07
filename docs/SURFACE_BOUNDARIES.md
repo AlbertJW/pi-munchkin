@@ -394,6 +394,16 @@ G03-C remains open.
 Current source-surface SHA-256:
 `9aed85c14ebae22b7f255d00fbe9eb7a8a90b023a450291837ef9cf40e67bc18`.
 
+## Pending surface boundary — 2026-09-07 (G03 real-baseline evidence bridge)
+
+Repository-only optimizer tooling at source commits `1da150a` and `20adf3a`. The new
+`real_baseline.py` ingestor accepts only fresh `pi.eval-row/v4` rows with exact
+trial-validity sidecars, binds authenticated parent provenance and arm/serving
+identities, normalizes the legacy one-repetition gate shape, and emits a
+redacted private report. Its `--ingest` mode never launches Pi or a model.
+This is not a model-visible harness surface change: no live surface was loaded,
+and G03-C remains pending the separately approved Qwen 35B run.
+
 ## Data at rest: where a research session actually lands (updated 2026-08-10)
 
 A surface hash bounds what the MODEL sees. It says nothing about what a session LEAVES. Those are

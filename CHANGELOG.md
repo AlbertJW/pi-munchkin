@@ -94,6 +94,18 @@ allowlists, opaque exclusions, missing evidence, and invalid stop classes. The
 report remains protocol-only and no inference, calibration, campaign, mirror,
 or rollout was performed.
 
+### Fixed (2026-09-07 — G03 real-baseline evidence bridge; repository-only)
+
+Added a fail-closed ingestor for fresh `pi.eval-row/v4` rows and exact
+trial-validity sidecars. It binds each attempted cell to the frozen benchmark,
+preregistration, authenticated parent provenance, arm exposure, stable serving
+identity, and resolved Qwen subject; normalizes the legacy one-repetition gate
+shape; verifies a content digest; and emits only redacted private reports.
+Missing, malformed, duplicate, timeout, and mismatched cells remain explicit
+non-authoritative classifications. The `--ingest` CLI is artifact-only and
+cannot launch Pi or a model. No live baseline, calibration, campaign, mirror,
+or adoption action was performed.
+
 ### Added (2026-09-07 — G03 Qwen representative-baseline runbook; prepared)
 
 Added `optimizer/docs/screens/PREREG_G03_QWEN35B_REPRESENTATIVE_BASELINE_2026-09-07.md`,
