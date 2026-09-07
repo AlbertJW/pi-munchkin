@@ -3,7 +3,7 @@
   "preregistration_id": "g03-qwen35b-baseline-20260907",
   "benchmark_pack": {
     "path": "optimizer/v2/benchmarks/g03-representative-pilot-v1.json",
-    "sha256": "c17737ae192126e014f2895cca61b2d85cdeb40896c91602b331755ba62561e7",
+    "sha256": "1fbe72a6d5c008ddc174e86d98c70c0e9616a3c586a624755f7b40462265292d",
     "pack_id": "g03-representative-pilot",
     "revision": "2026-09-07.r1"
   },

@@ -67,7 +67,7 @@
         "admission_receipt_sha256": "84d6cd5c82a4fb9c48c13d91bb656cefc62141641aeecf7d0a75e17332972413",
         "kind": "research_comparative",
         "spec_path": "optimizer/research-fixtures/manifests/comparative.json",
-        "oracle": {"entrypoint": "optimizer/v2/oracles/baseline_shape.py", "query_budget": 3, "timeout_ms": 2000, "output_cap_bytes": 4096},
+        "oracle": {"entrypoint": "optimizer/research-fixtures/oracles/research_shape.py", "query_budget": 3, "timeout_ms": 2000, "output_cap_bytes": 4096},
         "limits": {"timeout_seconds": 900, "max_tool_calls": 80, "max_retries": 8, "max_output_bytes": 65536},
         "isolation": {"network": "disabled", "workspace": "disposable", "path_allowlist": ["optimizer/research-fixtures/"], "hidden_tests": true},
         "isolation_receipt_sha256": "0b729d0770b5658c7f33bf56d43b227aae25b1426aabba09543b6201a43870ff"
@@ -78,7 +78,7 @@
         "admission_receipt_sha256": "7a2de48a4e7fc0638d4e3e9f420b8280d6a381666dd8c1235ee2d7b4e45e2766",
         "kind": "research_contested",
         "spec_path": "optimizer/research-fixtures/manifests/contested.json",
-        "oracle": {"entrypoint": "optimizer/v2/oracles/baseline_shape.py", "query_budget": 3, "timeout_ms": 2000, "output_cap_bytes": 4096},
+        "oracle": {"entrypoint": "optimizer/research-fixtures/oracles/research_shape.py", "query_budget": 3, "timeout_ms": 2000, "output_cap_bytes": 4096},
         "limits": {"timeout_seconds": 900, "max_tool_calls": 80, "max_retries": 8, "max_output_bytes": 65536},
         "isolation": {"network": "disabled", "workspace": "disposable", "path_allowlist": ["optimizer/research-fixtures/"], "hidden_tests": true},
         "isolation_receipt_sha256": "0b729d0770b5658c7f33bf56d43b227aae25b1426aabba09543b6201a43870ff"
@@ -137,7 +137,7 @@
         "admission_receipt_sha256": "0be1e9162d9d8b1afec9dd6d52ebe0f27274a9f8a9c91c90660035187a242ed4",
         "kind": "research_multi_part",
         "spec_path": "optimizer/research-fixtures/manifests/multi-part.json",
-        "oracle": {"entrypoint": "optimizer/v2/oracles/baseline_shape.py", "query_budget": 3, "timeout_ms": 2000, "output_cap_bytes": 4096},
+        "oracle": {"entrypoint": "optimizer/research-fixtures/oracles/research_shape.py", "query_budget": 3, "timeout_ms": 2000, "output_cap_bytes": 4096},
         "limits": {"timeout_seconds": 900, "max_tool_calls": 80, "max_retries": 8, "max_output_bytes": 65536},
         "isolation": {"network": "disabled", "workspace": "disposable", "path_allowlist": ["optimizer/research-fixtures/"], "hidden_tests": true},
         "isolation_receipt_sha256": "0b729d0770b5658c7f33bf56d43b227aae25b1426aabba09543b6201a43870ff"
@@ -148,7 +148,7 @@
         "admission_receipt_sha256": "78f1f9bbdc041fc4ed31e90cfab9291b4e960e0ee0f1ab0be90911217c6747ae",
         "kind": "research_fact_lookup",
         "spec_path": "optimizer/research-fixtures/manifests/python-release-fact-lookup.json",
-        "oracle": {"entrypoint": "optimizer/v2/oracles/baseline_shape.py", "query_budget": 1, "timeout_ms": 2000, "output_cap_bytes": 4096},
+        "oracle": {"entrypoint": "optimizer/research-fixtures/oracles/research_shape.py", "query_budget": 1, "timeout_ms": 2000, "output_cap_bytes": 4096},
         "limits": {"timeout_seconds": 900, "max_tool_calls": 80, "max_retries": 8, "max_output_bytes": 65536},
         "isolation": {"network": "disabled", "workspace": "disposable", "path_allowlist": ["optimizer/research-fixtures/"], "hidden_tests": true},
         "isolation_receipt_sha256": "0b729d0770b5658c7f33bf56d43b227aae25b1426aabba09543b6201a43870ff"
