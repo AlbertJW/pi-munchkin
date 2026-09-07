@@ -124,6 +124,13 @@ python3 -m optimizer.v2.real_baseline --ingest \
   --run-id <gate-run-id> --resolved-provider <provider> \
   --resolved-model qwen36-35b-iq3s --output /private/g03-report.json
 
+# verify that a private report rebuilds from its exact inputs; no inference
+python3 -m optimizer.v2.real_baseline --verify \
+  --case-tasks optimizer/v2/examples/g03-baseline-task-map-r2.json \
+  --rows /private/rows.jsonl --validity /private/rows.jsonl.validity.jsonl \
+  --report /private/g03-report.json \
+  --preregistration optimizer/v2/examples/g03-baseline-preregistration-r2.json
+
 # read-only host preflight; exit 1 means the router is healthy but the target
 # is not loaded (no chat request is ever sent)
 python3 -m optimizer.v2.g03_readiness --dry \
@@ -201,6 +208,12 @@ The complete r2 case-to-task binding is versioned at
 files and records a canonical SHA-256 of the exact mapping in both the report
 and its reconstruction block, so a reviewer can verify the private map used by
 the run without exposing prompts or transcripts.
+
+Real reports also carry a private-safe run identity and semantic JSONL receipts
+for the exact ordered V4 rows and validity sidecar consumed by ingestion.
+`--verify` validates those receipts and rebuilds the report from the private
+inputs, proving reconstruction without rerunning inference; changed rows or
+sidecars are rejected.
 
 For a fixture-bound screen, pass `--fixture-manifest` together with its
 canonical admission digest in `--expected-fixture-sha256`. The launcher then

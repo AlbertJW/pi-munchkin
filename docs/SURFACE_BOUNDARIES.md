@@ -405,6 +405,16 @@ redacted private report. Its `--ingest` mode never launches Pi or a model.
 This is not a model-visible harness surface change: no live surface was loaded,
 and G03-C remains pending the separately approved Qwen 35B run.
 
+## Pending surface boundary — 2026-09-07 (G03 report reconstruction)
+
+Repository-only optimizer commit `856df55` adds semantic receipts for the
+ordered V4 rows and trial-validity sidecar used by the G03 real-baseline
+ingestor, records the private run identity, and adds a `--verify` path that
+rebuilds a report from those private inputs without inference. The focused
+offline suite is 110 tests; changed inputs fail closed. This is not a
+model-visible harness change, and G03-C remains pending the approved Qwen 35B
+baseline.
+
 ## Data at rest: where a research session actually lands (updated 2026-08-10)
 
 A surface hash bounds what the MODEL sees. It says nothing about what a session LEAVES. Those are
