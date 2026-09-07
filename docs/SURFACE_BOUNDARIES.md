@@ -243,6 +243,48 @@ There is no new loaded-surface receipt and no mirror or model execution.
 Historical research fingerprints remain frozen; a future campaign needs a
 fresh preregistration. Full findings: `docs/HARNESS_AUDIT_2026-09-06.md`.
 
+## Pending surface boundary — 2026-09-07
+
+Source SHA-256:
+`5d333e03d863c7374f7a45b3d277e85b54725b7c33f08140eda90bcc0253c62f`.
+This boundary adds the parent-owned `pi.research-round/v1` evidence-gap ledger,
+bounded parent-only `research_round` actions, transactional child-report
+merges, explicit research settlement gating, and continued parent validation
+after discovery exhaustion. Offline tests, typecheck, package smoke,
+optimizer verification, aggregate verification, and secret scan pass. The
+explicitly approved G04 screen used a private disposable mirror with loaded
+hash `7d5353d80cd2ee75acc8ceab6d0d0633aaef1701ee8d716061a107764c77319d`;
+Ling was smoke-only and the Qwen pair stopped as no-go/inconclusive at the
+timeout guard. No live mirror, rollout, adoption action, or default change
+occurred; `PLAN_GRAPH` and `DEEP_RESEARCH_PLANNING` remain off.
+See `optimizer/docs/screens/G04_DEEP_RESEARCH_EVALUATION_2026-09-07.md`.
+
+## Pending surface boundary — 2026-09-07 (post-screen durability repair)
+
+Source SHA-256:
+`92f2e6d6c24335a5e7f1c1bf2df1af3c0ea860c7d1d8315d49d4676c44b307ef`.
+After the disposable G04 screen, parent-end research closure now releases
+undispatched child reservations through an explicit interrupted receipt, and
+the ledger validator accepts its persisted six-field child-receipt shape.
+The targeted regression and full offline verification are green. No loaded
+surface exists for this repair yet; the earlier G04 execution remains bound to
+source `5d333e03d863c7374f7a45b3d277e85b54725b7c33f08140eda90bcc0253c62f`
+and disposable loaded `7d5353d80cd2ee75acc8ceab6d0d0633aaef1701ee8d716061a107764c77319d`.
+No mirror, rollout, adoption, or default activation occurred.
+
+## Pending surface boundary — 2026-09-07 (G02–G04 package sync)
+
+Source commit `c9a558d`, pending live sync. Package source SHA-256:
+`68d1152c8e30673f67a2ae0ee6e06acc43e859536b9d36d391b1184ddc26e0f2`.
+This boundary includes aggregate context admission, the parent-owned research
+round ledger, the governed G03 baseline protocol, and the associated fixtures,
+tests, and dark-surface documentation. Offline verification passes 779 tests
+and all six stages. `CONTEXT_ADMISSION`, `PLAN_GRAPH`, and
+`DEEP_RESEARCH_PLANNING` remain opt-in/dark; no candidate adoption is implied.
+The live mirror has not yet been updated. After a clean pushed commit is
+applied, record the exact loaded hash and require `mirror:check` to report zero
+drift before treating this boundary as synchronized.
+
 ## Data at rest: where a research session actually lands (updated 2026-08-10)
 
 A surface hash bounds what the MODEL sees. It says nothing about what a session LEAVES. Those are

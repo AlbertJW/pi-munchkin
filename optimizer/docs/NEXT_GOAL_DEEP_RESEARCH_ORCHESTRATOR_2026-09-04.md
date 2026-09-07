@@ -1,6 +1,10 @@
 # Next goal — evidence-first deep-research orchestration
 
-Status: proposed follow-on goal. The current Qwen parent-synthesis diagnostic remains active; this goal must not replace it until that diagnostic is closed.
+Status: first implementation slice delivered 2026-09-07 as G04. The typed
+research-round ledger, parent-only round tool, shared reservations, and
+settlement gate are implemented but remain dark. Jina search, adaptive shaping,
+and the Qwen 35B research-shaped evaluation remain follow-on work; this slice
+does not replace the historical Qwen parent-synthesis diagnostic.
 
 ## Goal
 

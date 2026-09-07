@@ -52,6 +52,17 @@ selection uses development primary score, guard margin, verified diff size, and
 stable candidate ID in that order. The only output with adoption implications is
 a human review packet.
 
+Goal 3's governed pilot registry is
+`benchmarks/g03-representative-pilot-v1.json`. It contains twelve immutable
+cases (two coding edits, two recovery tasks, two documentation tasks, two
+long-context tasks, and four research shapes), with split membership, fixture
+and admission digests, a local oracle, limits, and an isolation receipt for
+every case. `examples/g03-baseline-preregistration.json` freezes the Qwen 35B
+adoption cohort, baseline/candidate arm identities, seeds, pairing, resource
+limits, and development/test quarantine. The offline runner reports protocol
+qualification only; it cannot access the opaque test split or authorize
+adoption.
+
 ## Pi gate bridge
 
 `PiGateScenario` keeps `real_gate.sh` as the trusted evaluator. Its offline `dry`
@@ -99,6 +110,8 @@ python3 -m optimizer.v2.cli run --manifest optimizer/v2/examples/campaign.json -
 python3 -m optimizer.v2.cli resume --manifest optimizer/v2/examples/campaign.json --approve-sha <same-sha> --run-root /private/path
 python3 -m optimizer.v2.cli status --manifest optimizer/v2/examples/campaign.json --run-root /private/path
 python3 -m optimizer.v2.cli replay --manifest optimizer/v2/examples/campaign.json --run-root /private/path
+python3 -m optimizer.v2.baseline --selftest
+python3 -m optimizer.v2.baseline --dry --preregistration optimizer/v2/examples/g03-baseline-preregistration.json
 
 # dark planner mechanism smoke (no execution unless --run is explicit)
 python3 -m optimizer.v2.planner_smoke --selftest

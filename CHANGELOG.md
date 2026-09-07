@@ -4,6 +4,56 @@ All notable changes to pi-munchkin are documented here. Releases follow semantic
 
 ## Unreleased
 
+### Added (2026-09-07 — G04 evidence-gap research rounds; dark)
+
+Added the parent-owned `pi.research-round/v1` ledger and dark `research_round`
+tool. Complex research now records explicit claim obligations, bounded search
+and read receipts, parent-validated evidence cards, conflicts, next actions,
+and explicit exhaustion gaps under one shared budget. Child reports require a
+prior reservation and remain unverified until the parent rereads their sources;
+when a parent records explicit rounds, `plan_settle` requires that research
+ledger to be settled. Safe round-count telemetry and deterministic offline tests
+were added.
+The explicitly approved disposable Ling smoke and Qwen 35B G04-F comparison
+were then run under the fresh hash-bound preregistration. The screen stopped
+on its first Qwen treatment timeout: no terminal answer or quality estimate
+was established, so the result is no-go/inconclusive. No live mirror,
+adoption, rollout, or default activation occurred. See
+`optimizer/docs/screens/G04_DEEP_RESEARCH_EVALUATION_2026-09-07.md`.
+
+### Fixed (2026-09-07 — G04 parent-end ledger durability)
+
+Parent shutdown now burns undispatched deep-research branch reservations with a
+single bounded `interrupted` child receipt, so blocked graph branches cannot
+leave discovery budget permanently reserved. The research-round validator also
+accepts the persisted six-field child-receipt shape. Both defects were found
+by the approved disposable screen and repaired with red/green regressions;
+the screen's historical no-go result and bound hashes are unchanged, and the
+planner flags remain dark.
+
+### Added (2026-09-07 — G03 governed evaluation baseline; repository-only)
+
+Added the twelve-case `g03-representative-pilot-v1` registry, immutable fixture
+and admission-receipt binding, deterministic local oracle, Qwen 35B baseline
+preregistration, and an offline paired protocol runner. Development and opaque
+test payloads remain quarantined; Ling remains qualification-only. The runner
+records per-case/cohort outcomes and secondary costs without treating contained
+child telemetry as zero, and it cannot authorize adoption. No live inference,
+calibration, campaign, mirroring, or rollout was performed.
+
+### Added (2026-09-06 — G02 aggregate context admission; repository-only)
+
+Added the `pi.context-accounting/v1` aggregate admission contract and the
+model-aware `context-admission` observer. Provider payloads are partitioned
+once into named contributors, conservatively counted against the active
+serving epoch, and aborted when the combined request plus reserves cannot be
+justified. Epoch-scoped reservations are idempotent, required state has an
+explicit preservation order and truncation marker, and telemetry records only
+safe counts, confidence, outcomes, and digests. The observer is opt-in behind
+`CONTEXT_ADMISSION=on` while live evidence is gathered, so active defaults are
+unchanged. No inference, calibration, mirroring, or rollout was performed; a
+pinned model-switch smoke is still required for G02-F.
+
 ### Fixed (2026-09-06 — source audit; pending release)
 
 Goal recovery no longer revives an older ledger when current state is damaged,

@@ -1,7 +1,7 @@
 # Planner research-fixture slate
 
 This directory is the fixture-admission boundary for the dark hierarchical
-deep-research mechanism screen. The ten manifests are structural research
+deep-research mechanism screen. The eleven manifests are structural research
 instruments: comparative, contested, multi-part, and six deliberately
 completion-shaped comparative questions. The
 `compare-json-yaml-config-mini`, `compare-json-yaml-config-direct-mini`,
