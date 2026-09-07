@@ -48,8 +48,10 @@ validator. The focused review reran the research and planner integration suites:
 11 ledger tests and one wrapper exercising 55 child tests pass. A subsequent
 G01 audit added red-green regressions for cross-wrapper authority replacement,
 cross-wrapper dispatcher deactivation, single-flight continuation flushing,
-session-reload cancellation, and shutdown rebind; the focused control suite is
-now 36/36 and the real-session/planner integration set is 75/75. The fresh
+session-reload cancellation, and shutdown rebind; follow-up test proof now
+drives the rebound authority through an actual provider delivery. The focused
+control suite is now 36/36 and the real-session/planner integration set is
+75/75. The fresh
 repository-wide offline gate passes 778/778 tests and all six stages. These
 repairs still need
 a new pinned live smoke; historical receipts remain bound to their old surface.
@@ -547,7 +549,7 @@ than replacing pending cells with verbal assurances.
 
 | Goal | Implemented | Offline verified | Live validated | Evidence |
 |---|---|---|---|---|
-| G01 | Implemented in `6a2d4ec` + `a9cab65`; 2026-09-07 fixes are committed | Focused 36-test control suite, 75-test real-session/planner integration, and fresh 778-test offline gate pass | Historical Ling receipt and supplemental Qwen RPC receipt predate the hardening; fresh pinned smoke pending | `docs/evidence/G01.md`; current review above |
+| G01 | Implemented in `6a2d4ec` + `a9cab65`; dispatch proof in `36cfeab` | Focused 36-test control suite, 75-test real-session/planner integration, and fresh 778-test offline gate pass | Historical Ling receipt and supplemental Qwen RPC receipt predate the hardening; fresh pinned smoke pending | `docs/evidence/G01.md`; current review above |
 | G02 | Partial: accounting exists; producer reservation/preservation wiring incomplete | Helper and admission tests pass; aggregate producer integration remains unproven | Model-switch smoke not run | `docs/evidence/G02.md`; current review above |
 | G03 | Registry and offline protocol implemented; executed baseline outstanding | Fake pairing/registry checks recorded | Real Qwen baseline not run | `docs/evidence/G03.md` |
 | G04 | Partial: contracts exist; runtime enforcement gaps remain | Focused suites pass; real synthesis delivery and compaction/recovery proof outstanding | Approved early-stop no-go/inconclusive screen; repaired source has no new live receipt | `docs/evidence/G04.md`, `optimizer/docs/screens/G04_DEEP_RESEARCH_EVALUATION_2026-09-07.md`; current review above |
