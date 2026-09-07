@@ -14,7 +14,7 @@ approves the resolved hashes below and Pi/llama-swap is confirmed healthy.
 - Benchmark file SHA-256: `1fbe72a6d5c008ddc174e86d98c70c0e9616a3c586a624755f7b40462265292d`
 - Benchmark canonical identity: `3cf87cdaad18b2cca4c8e8280140d924e269a238ec95d5b0d2f3dc972f5bf1da`
 - Preregistration canonical identity: `b994cbe0e93e5b470a2b918f2104c39b272c099d75edea798142baef3dad2a28`
-- Source commits: `1da150a`, `20adf3a`, `88faf05`
+- Source commits: `1da150a`, `20adf3a`, `88faf05`, `8f30f10`
 - Baseline config SHA-256: `5306ecc5a68682ce8fe6d52d59e0171367cfae0f390965bc4956c0f9d706d379`
 - Candidate config SHA-256: `47c9a04ca233ff552ff71e4e4f77003244cb148d8704f38fb62d2f5cf615b639`
 - Loaded surface SHA-256: `9aed85c14ebae22b7f255d00fbe9eb7a8a90b023a450291837ef9cf40e67bc18`
@@ -49,9 +49,13 @@ baseline and candidate arms over the train/development cells only. The existing
 Pi gate remains authoritative for coding, recovery, documentation, and
 long-context fixtures. After the run, pass its rows and exact validity sidecar
 through `optimizer/v2/real_baseline.py --ingest` so every attempted cell is
-classified under the frozen report contract. Research-shaped fixtures still
-require the research adapter to emit that same redacted row contract before
-this twelve-case baseline can be called complete. Do not substitute the older
+classified under the frozen report contract. For each research-shaped cell, the
+parent runner must first write one private `pi.research-trial/v1` artifact and
+reduce it with `optimizer/v2/research_baseline.py --reduce`; the resulting V4
+row/validity pair joins the gate rows before the shared reducer is invoked. The
+adapter's metadata oracle checks only admitted claim IDs and parent-validated
+original URLs, so an eloquent answer or a delegated citation cannot score by
+itself. Do not substitute the older
 three-fixture Qwen screens: their
 surface and lifecycle identities differ and their rows are permanently
 non-authoritative.
@@ -99,6 +103,6 @@ to reconstruct all classifications without rerunning inference. Selection and
 adoption remain human-only and are not authorized by this runbook.
 
 Current external blocker: Pi/llama-swap is down (`real_gate.sh --dry` reports
-`server: DOWN`), and the research-shaped live adapter is not yet wired. The
-offline registry and protocol are complete; G03-C remains open until a fresh,
-fully bound Qwen run covers the declared cohort.
+`server: DOWN`). The offline registry, shared reducer, and research row adapter
+are complete; G03-C remains open until a fresh, fully bound Qwen run covers the
+declared cohort and emits the required private research artifacts.
