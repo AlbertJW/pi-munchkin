@@ -101,7 +101,10 @@ def _safe_reason(value: str) -> str:
 def _research_spec(case: BenchmarkCase, root: pathlib.Path) -> dict:
     if not case.is_research or not case.spec_path or not case.oracle:
         raise ResearchBaselineError("case is not a typed research fixture")
-    path = (root / case.spec_path).resolve()
+    raw_path = root / case.spec_path
+    if raw_path.is_symlink():
+        raise ResearchBaselineError("research fixture must not be a symlink")
+    path = raw_path.resolve()
     if path.is_symlink() or root not in path.parents or not path.is_file():
         raise ResearchBaselineError("research fixture is outside the repository")
     try:
@@ -222,7 +225,10 @@ def _validate_artifact(artifact: dict, *, case: BenchmarkCase, prereg: BaselineP
 def _run_oracle(*, artifact: dict, case: BenchmarkCase, spec: dict, root: pathlib.Path) -> bool:
     if not case.oracle:
         raise ResearchBaselineError("research case has no oracle")
-    path = (root / case.oracle["entrypoint"]).resolve()
+    raw_path = root / case.oracle["entrypoint"]
+    if raw_path.is_symlink():
+        raise ResearchBaselineError("research oracle must not be a symlink")
+    path = raw_path.resolve()
     if path.is_symlink() or root not in path.parents or not path.is_file() or not path.stat().st_mode & 0o111:
         raise ResearchBaselineError("research oracle is outside the repository")
     payload = {"required_claims": spec["required_claims"], "evidence_families": spec["evidence_families"], "citations": artifact["citations"]}
@@ -326,7 +332,10 @@ def selftest() -> None:
 
 
 def _load_object(path: str | pathlib.Path) -> dict:
-    target = pathlib.Path(path).expanduser().resolve()
+    raw_target = pathlib.Path(path).expanduser()
+    if raw_target.is_symlink():
+        raise ResearchBaselineError("research artifact must not be a symlink")
+    target = raw_target.resolve()
     if target.is_symlink() or not target.is_file():
         raise ResearchBaselineError("research artifact must be a regular file")
     try:

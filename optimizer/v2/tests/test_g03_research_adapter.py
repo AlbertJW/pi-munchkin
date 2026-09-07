@@ -157,6 +157,23 @@ class G03ResearchAdapterTests(unittest.TestCase):
             self.assertNotIn("citations", json.dumps(row))
             self.assertEqual(json.loads(validity_path.read_text(encoding="utf-8"))["void"], False)
 
+    def test_reduce_cli_rejects_symlinked_private_artifact(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = pathlib.Path(directory)
+            artifact_path = root / "research-artifact.json"
+            link_path = root / "research-artifact-link.json"
+            artifact_path.write_text(json.dumps(valid_artifact()), encoding="utf-8")
+            link_path.symlink_to(artifact_path)
+            completed = subprocess.run(
+                [sys.executable, str(ROOT / "v2/research_baseline.py"), "--reduce",
+                 "--artifact", str(link_path), "--pack", str(PACK_PATH.relative_to(REPO)),
+                 "--preregistration", str(PREREG_PATH.relative_to(REPO)), "--repository-root", str(REPO),
+                 "--row-output", str(root / "row.json"), "--validity-output", str(root / "validity.json")],
+                cwd=str(REPO), text=True, capture_output=True, check=False,
+            )
+            self.assertNotEqual(completed.returncode, 0)
+            self.assertIn("symlink", completed.stderr)
+
     def test_research_row_is_accepted_by_the_shared_real_baseline_reducer(self) -> None:
         row, validity = research_artifact_to_row(valid_artifact(), pack=PACK, prereg=PREREG, repository_root=REPO)
         report = ingest_gate_baseline(
