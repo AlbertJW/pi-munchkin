@@ -21,11 +21,11 @@ import {
 } from "../lib/plan-graph.ts";
 import { planStorageMode, privatePlanProjectionPath, privatePlanStatePath, privatePlanTracePath } from "../lib/plan-state-storage.ts";
 import { processWriterMarker } from "../lib/process-writer.ts";
-import { storedUrl } from "../lib/research-ledger.ts";
+import { auditResearchCitations, storedUrl } from "../lib/research-ledger.ts";
 import { canonicalResearchUrl, claimIdForText, RESEARCH_EVIDENCE_CARDS_KEY } from "../lib/research-evidence.ts";
 import { atomicWriteFile } from "../lib/private-artifact.ts";
 import {
-	RESEARCH_ROUND_MAX_GAPS, ResearchRoundLedger, readResearchRoundLedger, researchRoundPath, writeResearchRoundLedger,
+	RESEARCH_ROUND_MAX_GAPS, ResearchRoundLedger, mutateResearchRoundLedger, readResearchRoundLedger, researchRoundPath, writeResearchRoundLedger,
 	type ClaimObligationV1, type EvidenceGapV1, type EvidenceCardRefV1, type ResearchRoundProposalV1, type ChildResearchReportV1,
 } from "../lib/research-round.ts";
 import { initialToolSurface } from "../lib/session-bootstrap.ts";
@@ -115,6 +115,7 @@ type PlanState = {
 	updated_at: string;
 	items: PlanItem[];
 	profile?: GraphPlanState["profile"];
+	research_round_contract?: GraphPlanState["research_round_contract"];
 	head_terminal_at?: string;
 	settled_at?: string;
 	writer?: string;
@@ -446,7 +447,10 @@ function migrateState(raw: any): PlanState | undefined {
 		created_at: typeof raw.created_at === "string" ? raw.created_at : now,
 		updated_at: now,
 		items,
-		...(raw.schema_version === 5 && PLAN_GRAPH && raw.profile?.name === "deep-research" ? { profile: raw.profile } : {}),
+			...(raw.schema_version === 5 && PLAN_GRAPH && raw.profile?.name === "deep-research" ? { profile: raw.profile } : {}),
+			...(raw.schema_version === 5 && PLAN_GRAPH && raw.profile?.name === "deep-research"
+				? { research_round_contract: raw.research_round_contract === "v1" ? "v1" as const : "legacy" as const }
+				: {}),
 		...(raw.schema_version === 5 && PLAN_GRAPH && typeof raw.head_terminal_at === "string" ? { head_terminal_at: raw.head_terminal_at } : {}),
 		...(raw.schema_version === 5 && PLAN_GRAPH && typeof raw.settled_at === "string" ? { settled_at: raw.settled_at } : {}),
 		writer: typeof raw.writer === "string" ? raw.writer : undefined,
@@ -1297,6 +1301,7 @@ const researchPlanStart = defineTool({
 				schema_version: 5, run_id: runId, request: cleanText(params.request), summary: cleanText(params.summary),
 				autonomy: "lean", phase: "executing", created_at: now, updated_at: now, items,
 				profile: { name: "deep-research", max_depth: 2, max_children: 2, discovery_budget: DEEP_RESEARCH_DISCOVERY_BUDGET, validation_reads: 5 },
+				research_round_contract: "v1",
 			};
 			validateStateSize(next);
 			return { state: next, result: next };
@@ -1372,17 +1377,24 @@ const researchRound = defineTool({
 				evidence_cards: params.evidence_cards ?? [], conflicts: params.conflicts ?? [], gaps: params.gaps ?? [], proposed_next_action: params.proposed_next_action, ...(params.note === undefined ? {} : { note: params.note }),
 			};
 			requireAuthoritativeParentCards(proposal.evidence_cards);
-			const round = ledger.recordRound(proposal);
-			await writeResearchRoundLedger(path, ledger.state);
-			roundTelemetry(ledger, round);
-			return { content: [{ type: "text" as const, text: `Research round ${round.round_id} recorded: ${round.status}; next action=${round.next_action}.\n${ledger.renderSummary()}` }], details: { tool_name: "research_round", success: true, round_id: round.round_id, status: round.status } };
+			const result = await mutateResearchRoundLedger(path, (latest) => {
+				if (latest.runId !== proposal.run_id) throw new Error("research round run identity mismatch");
+				const round = latest.recordRound(proposal);
+				return { round, state: latest.state, summary: latest.renderSummary() };
+			});
+			const committedLedger = ResearchRoundLedger.fromState(result.state);
+			roundTelemetry(committedLedger, result.round);
+			return { content: [{ type: "text" as const, text: `Research round ${result.round.round_id} recorded: ${result.round.status}; next action=${result.round.next_action}.\n${result.summary}` }], details: { tool_name: "research_round", success: true, round_id: result.round.round_id, status: result.round.status } };
 		}
-		const graph = await readState(ctx.cwd);
-		const graphTerminalNow = Boolean(graph && graph.run_id === ledger.runId && graph.items.every((item) => graphTerminal(item)));
-		requireAuthoritativeParentCards(ledger.state.evidence_cards);
-		const result = ledger.settle({ graph_terminal: graphTerminalNow, optional_deferrals: params.optional_deferrals ?? [], reason: params.summary ?? "Parent evidence obligations satisfied." });
-		await writeResearchRoundLedger(path, result);
-		return { content: [{ type: "text" as const, text: `Research evidence is settled for ${ledger.runId}. The parent may now call plan_settle.\n${ledger.renderSummary()}` }], details: { tool_name: "research_round", success: true, settled: true }, };
+		const result = await mutateResearchRoundLedger(path, async (latest) => {
+			if (latest.runId !== ledger.runId) throw new Error("research round run identity mismatch");
+			const graph = await readState(ctx.cwd);
+			const graphTerminalNow = Boolean(graph && graph.run_id === latest.runId && graph.items.every((item) => graphTerminal(item)));
+			requireAuthoritativeParentCards(latest.state.evidence_cards);
+			const settled = latest.settle({ graph_terminal: graphTerminalNow, optional_deferrals: params.optional_deferrals ?? [], reason: params.summary ?? "Parent evidence obligations satisfied." });
+			return { state: settled, summary: latest.renderSummary() };
+		});
+		return { content: [{ type: "text" as const, text: `Research evidence is settled for ${ledger.runId}. The parent may now call plan_settle.\n${result.summary}` }], details: { tool_name: "research_round", success: true, settled: true }, };
 	},
 });
 
@@ -1413,11 +1425,15 @@ const planExpand = defineTool({
 
 const planSettle = defineTool({
 	name: "plan_settle", label: "Settle Plan",
-	description: "Request terminal settlement after required nodes and parent-owned evidence verification are complete.",
-	promptSnippet: "plan_settle: close a verified graph plan; the head agent alone may call this",
-	parameters: Type.Object({ summary: Type.String({ minLength: 1, maxLength: PLAN_DEFER_FIELD_MAX_BYTES }) }),
+	description: "Request terminal settlement after required nodes and parent-owned evidence verification are complete. Deep research must include the useful final answer to deliver to the user.",
+	promptSnippet: "plan_settle: close a verified graph plan; include the final answer for deep research",
+	parameters: Type.Object({
+		summary: Type.String({ minLength: 1, maxLength: PLAN_DEFER_FIELD_MAX_BYTES }),
+		final_answer: Type.Optional(Type.String({ minLength: 1, maxLength: 16_000 })),
+	}),
 	async execute(_id, params, _signal, _update, ctx) {
 		rejectChildPlanMutation();
+		let settledFinalAnswer: string | undefined;
 		const state = await mutatePlan(ctx.cwd, async (previous) => {
 			if (!previous || previous.schema_version !== 5) rejectPlanTool("plan_settle requires an active graph plan");
 			if (previous.settled_at) rejectPlanTool("plan_settle rejected: plan is already settled and immutable");
@@ -1442,17 +1458,22 @@ const planSettle = defineTool({
 					: "";
 					rejectPlanTool(`plan_settle rejected: ${errors.join("; ")}.${claimRepair}`);
 				}
-				if (previous.profile?.name === "deep-research") {
+				if (previous.profile?.name === "deep-research" && previous.research_round_contract === "v1") {
 					const roundPath = researchRoundPath(ctx.cwd, previous.run_id, process.env);
 					const roundRaw = await readResearchRoundLedger(roundPath);
-					// Graphs created before the round tool was used retain the original
-					// plan/evidence contract. Once a parent records an explicit round,
-					// settlement is additionally gated by that durable ledger.
-					if (roundRaw?.rounds.length) {
-						const roundLedger = ResearchRoundLedger.fromState(roundRaw);
-						const roundCheck = roundLedger.settlementCheck({ graph_terminal: previous.items.every((item) => graphTerminal(item)) });
-						if (roundRaw.status !== "settled" || !roundCheck.ready) rejectPlanTool(`plan_settle rejected: research evidence is not settled (${roundCheck.reasons.join(", ") || "call research_round settle after parent validation"})`);
-					}
+					if (!roundRaw) rejectPlanTool("plan_settle rejected: research evidence ledger is missing or malformed; record and settle the parent ledger first");
+					const roundLedger = ResearchRoundLedger.fromState(roundRaw);
+					const roundCheck = roundLedger.settlementCheck({ graph_terminal: previous.items.every((item) => graphTerminal(item)) });
+					if (roundRaw.status !== "settled" || !roundCheck.ready) rejectPlanTool(`plan_settle rejected: research evidence is not settled (${roundCheck.reasons.join(", ") || "call research_round settle after parent validation"})`);
+					const finalAnswer = cleanText(params.final_answer);
+					if (!finalAnswer || utf8Bytes(finalAnswer) > 16_000) rejectPlanTool("plan_settle rejected: deep-research settlement requires a bounded final_answer");
+					const citationUrls = evidenceCards.flatMap((card) => {
+						if (!card.parent_validated || card.truncated) return [];
+						try { return [canonicalResearchUrl(card.original_url)]; } catch { return []; }
+					});
+					const citationAudit = auditResearchCitations(finalAnswer, citationUrls);
+					if (citationAudit.unverified.length || citationAudit.explicitlyUnverified.length) rejectPlanTool("plan_settle rejected: final_answer cites a URL that the parent has not validated");
+					settledFinalAnswer = finalAnswer;
 				}
 				const next = { ...previous, summary: cleanText(params.summary), settled_at: isoNow() };
 			return { state: next, result: next };
@@ -1460,7 +1481,10 @@ const planSettle = defineTool({
 		const active = api?.getActiveTools() ?? [];
 			api?.setActiveTools(active.filter((name) => !["plan_write", "plan_update", "plan_expand", "plan_settle", "research_plan_start", "research_round"].includes(name)));
 		planEvent("settled", state.run_id, { items: state.items.length, deferred: state.items.filter((item) => item.status === "deferred").length });
-		return { content: [{ type: "text" as const, text: "Plan settled. Planner guidance and task-scoped plan tools are no longer active." }], details: { tool_name: "plan_settle", success: true }, terminate: true };
+		const message = settledFinalAnswer
+			? `Final answer:\n${settledFinalAnswer}\n\nResearch plan settled. No further research or delegation will be scheduled.`
+			: "Plan settled. Planner guidance and task-scoped plan tools are no longer active.";
+		return { content: [{ type: "text" as const, text: message }], details: { tool_name: "plan_settle", success: true, ...(settledFinalAnswer ? { final_answer: true } : {}) }, terminate: true };
 	},
 });
 
@@ -1893,38 +1917,40 @@ async function mergeBranchResult(cwd: string, context: import("../lib/branch-rep
  * Child quotes and page contents are intentionally discarded; parent rereads
  * are the only operation that can create validating evidence cards.
  */
-async function mergeResearchRoundChildResult(cwd: string, context: PlanContextV1, report: BranchReportV1 | null, failureClass: string | null): Promise<void> {
-	if (!DEEP_RESEARCH_PLANNING || context.depth !== 1) return;
+async function mergeResearchRoundChildResult(cwd: string, context: PlanContextV1, report: BranchReportV1 | null, failureClass: string | null, outcome: MergeOutcome): Promise<void> {
+	if (!DEEP_RESEARCH_PLANNING || context.depth !== 1 || outcome.kind === "ignored") return;
 	try {
 		const state = await readState(cwd);
 		if (!state || state.run_id !== context.run_id || state.profile?.name !== "deep-research" || state.settled_at) return;
 		const path = researchRoundPath(cwd, context.run_id, process.env);
-		const raw = await readResearchRoundLedger(path);
-		if (!raw) return;
-		const ledger = ResearchRoundLedger.fromState(raw);
-		if (!ledger.state.child_reservations.some((reservation) => reservation.owner_ref === context.owner_ref)) {
-			ledger.reserveChild(context.owner_ref, { searches: context.budget.searches, reads: context.budget.reads, validation_reads: 0 });
-		}
-		const obligations = ledger.state.obligations;
-		const claimForText = (claimText: string): string | undefined => obligations.find((obligation) => obligation.text === claimText)?.claim_id ?? (obligations.length === 1 ? obligations[0].claim_id : undefined);
-		const sourceLeads = (report?.source_leads ?? []).flatMap((lead) => {
-			let url: string;
-			try { url = canonicalResearchUrl(lead.url); } catch { return []; }
-			const claim = claimForText(lead.claim); return claim ? [{ url, claim_ids: [claim] }] : [];
+		const result = await mutateResearchRoundLedger(path, (ledger) => {
+			// Graph lease validation is authoritative. A report that was ignored by
+			// the graph (stale, unleased, settled, or wrong owner) must never mint a
+			// ledger reservation or otherwise change evidence state.
+			if (!ledger.state.child_reservations.some((reservation) => reservation.owner_ref === context.owner_ref)) return { merged: false };
+			const acceptedReport = outcome.kind === "merged" ? report : null;
+			const effectiveFailure = outcome.kind === "failed" ? outcome.failureClass : failureClass;
+			const obligations = ledger.state.obligations;
+			const claimForText = (claimText: string): string | undefined => obligations.find((obligation) => obligation.text === claimText)?.claim_id ?? (obligations.length === 1 ? obligations[0].claim_id : undefined);
+			const sourceLeads = (acceptedReport?.source_leads ?? []).flatMap((lead) => {
+				let url: string;
+				try { url = canonicalResearchUrl(lead.url); } catch { return []; }
+				const claim = claimForText(lead.claim); return claim ? [{ url, claim_ids: [claim] }] : [];
+			});
+			const fallbackClaim = obligations[0]?.claim_id;
+			const gaps = (acceptedReport?.evidence_gaps ?? []).flatMap((missing, index) => fallbackClaim ? [{ gap_id: `child-gap-${context.parent_item_id}-${index}`, claim_id: fallbackClaim, missing: cleanText(missing).slice(0, 300) || "Child reported an unresolved evidence gap.", why: "Delegated evidence remains unverified until the parent rereads it.", next_action: "Parent reread and validate a source card.", status: acceptedReport?.status === "deferred" ? "deferred" as const : "open" as const }] : []);
+			const childReport: ChildResearchReportV1 = {
+				report_id: `child-${createHash("sha256").update(`${context.run_id}:${context.owner_ref}:${context.dispatch_epoch ?? 0}`).digest("hex").slice(0, 48)}`,
+				run_id: context.run_id, parent_item_id: context.parent_item_id, owner_ref: context.owner_ref,
+				status: acceptedReport ? (acceptedReport.status === "done" ? "done" : acceptedReport.status === "deferred" ? "deferred" : "blocked") : "blocked",
+				allocated: { searches: context.budget.searches, reads: context.budget.reads, validation_reads: 0 },
+				consumed: acceptedReport ? { searches: acceptedReport.consumed.searches, reads: acceptedReport.consumed.reads, validation_reads: 0 } : { searches: 0, reads: 0, validation_reads: 0 },
+				source_leads: sourceLeads, evidence_cards: [], gaps,
+				...(effectiveFailure ? { failure_class: effectiveFailure === "interrupted" ? "interrupted" as const : "child_failed" as const } : {}),
+			};
+			return { merged: ledger.mergeChildReport(childReport).merged };
 		});
-		const fallbackClaim = obligations[0]?.claim_id;
-		const gaps = (report?.evidence_gaps ?? []).flatMap((missing, index) => fallbackClaim ? [{ gap_id: `child-gap-${context.parent_item_id}-${index}`, claim_id: fallbackClaim, missing: cleanText(missing).slice(0, 300) || "Child reported an unresolved evidence gap.", why: "Delegated evidence remains unverified until the parent rereads it.", next_action: "Parent reread and validate a source card.", status: report?.status === "deferred" ? "deferred" as const : "open" as const }] : []);
-		const childReport: ChildResearchReportV1 = {
-			report_id: `child-${createHash("sha256").update(`${context.run_id}:${context.owner_ref}:${context.dispatch_epoch ?? 0}`).digest("hex").slice(0, 48)}`,
-			run_id: context.run_id, parent_item_id: context.parent_item_id, owner_ref: context.owner_ref,
-			status: report ? (report.status === "done" ? "done" : report.status === "deferred" ? "deferred" : "blocked") : "blocked",
-			allocated: { searches: context.budget.searches, reads: context.budget.reads, validation_reads: 0 },
-			consumed: report ? { searches: report.consumed.searches, reads: report.consumed.reads, validation_reads: 0 } : { searches: 0, reads: 0, validation_reads: 0 },
-			source_leads: sourceLeads, evidence_cards: [], gaps,
-			...(failureClass ? { failure_class: failureClass === "interrupted" ? "interrupted" as const : "child_failed" as const } : {}),
-		};
-		const merged = ledger.mergeChildReport(childReport);
-		if (merged.merged) await writeResearchRoundLedger(path, ledger.state);
+		if (!result.merged) return;
 	} catch {
 		// The graph merge remains authoritative. A malformed evidence projection is
 		// non-authoritative and is surfaced by the parent's bounded inspect state.
@@ -2142,9 +2168,9 @@ export default function (pi: ExtensionAPI): void {
 			// parent-state mutation through this subscriber.
 			if (delegatedBranchProcess || (globalThis as Record<string, unknown>)[DELEGATED_BRANCH_PROCESS_GLOBAL] === true) return;
 			const prior = pendingBranchMerge ?? Promise.resolve();
-				const next = prior.catch(() => undefined).then(async () => {
+			const next = prior.catch(() => undefined).then(async () => {
 					const outcome = await mergeBranchResult(lastSessionCwd!, signal.context, signal.report, signal.failureClass);
-					await mergeResearchRoundChildResult(lastSessionCwd!, signal.context, signal.report, signal.failureClass);
+					await mergeResearchRoundChildResult(lastSessionCwd!, signal.context, signal.report, signal.failureClass, outcome);
 					await queueResearchSynthesisFollowUp(outcome);
 			}).catch(() => undefined);
 			pendingBranchMerge = next;
@@ -2326,7 +2352,7 @@ export default function (pi: ExtensionAPI): void {
 		if (!delegatedBranchProcess) {
 			const closed = await closeUndispatchedResearchBranches(ctx.cwd);
 			if (closed) {
-				for (const context of closed.contexts) await mergeResearchRoundChildResult(ctx.cwd, context, null, "interrupted");
+				for (const context of closed.contexts) await mergeResearchRoundChildResult(ctx.cwd, context, null, "interrupted", { kind: "failed", runId: closed.runId, failureClass: "interrupted", headTerminal: true, openItems: 0 });
 				planEvent("branches-closed", closed.runId, { closed: closed.closed, reason_class: "parent_ended_before_dispatch" });
 			}
 		}

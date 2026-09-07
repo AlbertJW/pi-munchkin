@@ -1,6 +1,6 @@
-import { createHash } from "node:crypto";
-import { readFile } from "node:fs/promises";
-import { join } from "node:path";
+import { createHash, randomUUID } from "node:crypto";
+import { chmod, mkdir, open, readFile, stat, unlink } from "node:fs/promises";
+import { dirname, join } from "node:path";
 import { agentDir } from "./agent-dir.ts";
 import { atomicWriteFile } from "./private-artifact.ts";
 import { canonicalResearchUrl, type EvidenceCardV1 } from "./research-evidence.ts";
@@ -33,6 +33,9 @@ const SHA256 = /^[a-f0-9]{64}$/;
 const CARD_ID = /^[a-f0-9]{32}$/;
 const SAFE_RUN = /^[A-Za-z0-9._:-]{1,200}$/;
 const MAX_NOTE_BYTES = 500;
+const LEDGER_LOCK_TIMEOUT_MS = 10_000;
+const LEDGER_LOCK_RETRY_MS = 25;
+const LEDGER_LOCK_STALE_MS = 60_000;
 
 export type ResearchGapStatus = "open" | "resolved" | "blocked" | "deferred";
 export type ResearchRoundStatus = "recorded" | "blocked" | "deferred" | "ready";
@@ -869,9 +872,89 @@ export async function readResearchRoundLedger(path: string): Promise<ResearchRou
 	} catch { return null; }
 }
 
-export async function writeResearchRoundLedger(path: string, state: ResearchRoundLedgerStateV1): Promise<void> {
+type LedgerFileLock = { path: string; lockId: string };
+
+async function lockOwnerAlive(pid: number): Promise<boolean> {
+	if (!Number.isSafeInteger(pid) || pid <= 0) return false;
+	try { process.kill(pid, 0); return true; }
+	catch (error) { return (error as NodeJS.ErrnoException).code === "EPERM"; }
+}
+
+async function staleLedgerLock(path: string): Promise<boolean> {
+	try {
+		const raw = JSON.parse(await readFile(path, "utf8")) as { pid?: unknown; created_at?: unknown };
+		if (typeof raw.pid === "number") return !(await lockOwnerAlive(raw.pid));
+		if (typeof raw.created_at === "string" && Number.isFinite(Date.parse(raw.created_at))) return Date.now() - Date.parse(raw.created_at) > LEDGER_LOCK_STALE_MS;
+	} catch { /* malformed locks are recoverable only by the bounded age check below */ }
+	try {
+		const info = await stat(path);
+		return Date.now() - info.mtimeMs > LEDGER_LOCK_STALE_MS;
+	} catch { return false; }
+}
+
+async function acquireLedgerFileLock(path: string): Promise<LedgerFileLock> {
+	const directory = dirname(path);
+	await mkdir(directory, { recursive: true, mode: 0o700 });
+	await chmod(directory, 0o700);
+	const lockPath = `${path}.lock`;
+	const deadline = Date.now() + LEDGER_LOCK_TIMEOUT_MS;
+	while (Date.now() <= deadline) {
+		const lockId = randomUUID();
+		try {
+			const handle = await open(lockPath, "wx", 0o600);
+			try {
+				await handle.writeFile(`${JSON.stringify({ pid: process.pid, lock_id: lockId, created_at: new Date().toISOString() })}\n`, "utf8");
+				await handle.chmod(0o600);
+				await handle.sync();
+			} finally { await handle.close(); }
+			return { path: lockPath, lockId };
+		} catch (error) {
+			if ((error as NodeJS.ErrnoException)?.code !== "EEXIST") throw error;
+			if (await staleLedgerLock(lockPath)) { await unlink(lockPath).catch(() => undefined); continue; }
+			await new Promise((resolve) => setTimeout(resolve, LEDGER_LOCK_RETRY_MS));
+		}
+	}
+	throw new ResearchRoundError("research round ledger is busy in another parent process; retry after it exits");
+}
+
+async function releaseLedgerFileLock(lock: LedgerFileLock): Promise<void> {
+	try {
+		const raw = JSON.parse(await readFile(lock.path, "utf8")) as { lock_id?: unknown };
+		if (raw.lock_id !== lock.lockId) return;
+	} catch { return; }
+	await unlink(lock.path).catch(() => undefined);
+}
+
+async function withLedgerFileLock<T>(path: string, fn: () => Promise<T>): Promise<T> {
+	const lock = await acquireLedgerFileLock(path);
+	try { return await fn(); }
+	finally { await releaseLedgerFileLock(lock); }
+}
+
+async function writeResearchRoundLedgerUnlocked(path: string, state: ResearchRoundLedgerStateV1): Promise<void> {
 	if (!validateResearchRoundLedger(state)) throw new ResearchRoundError("refusing to write invalid research round ledger");
 	await atomicWriteFile(path, `${JSON.stringify(state, null, 2)}\n`, { mode: 0o600, directoryMode: 0o700 });
+}
+
+/** Publish a validated ledger snapshot under a cross-process lock. */
+export async function writeResearchRoundLedger(path: string, state: ResearchRoundLedgerStateV1): Promise<void> {
+	await withLedgerFileLock(path, () => writeResearchRoundLedgerUnlocked(path, state));
+}
+
+/** Read, mutate, and publish one ledger snapshot while holding its lock. The
+ * callback runs against the latest durable state, so concurrent parent rounds
+ * cannot overwrite each other's evidence or budget consumption. */
+export async function mutateResearchRoundLedger<T>(path: string, fn: (ledger: ResearchRoundLedger) => Promise<T> | T): Promise<T> {
+	return withLedgerFileLock(path, async () => {
+		let parsed: unknown;
+		try { parsed = JSON.parse(await readFile(path, "utf8")); }
+		catch { throw new ResearchRoundError("research round ledger is missing or malformed"); }
+		if (!validateResearchRoundLedger(parsed)) throw new ResearchRoundError("research round ledger is missing or malformed");
+		const ledger = ResearchRoundLedger.fromState(parsed);
+		const result = await fn(ledger);
+		await writeResearchRoundLedgerUnlocked(path, ledger.state);
+		return result;
+	});
 }
 
 /** Convert an existing evidence card without retaining page text. */

@@ -74,6 +74,9 @@ export type GraphPlanState = {
 	updated_at: string;
 	items: GraphPlanItem[];
 	profile?: ResearchProfile;
+	/** Explicitly identifies graphs that use the parent-owned research-round
+	 * settlement contract. Omitted values are migrated as legacy graph plans. */
+	research_round_contract?: "legacy" | "v1";
 	head_terminal_at?: string;
 	settled_at?: string;
 	writer?: string;
@@ -215,7 +218,7 @@ export function descendantCount(items: GraphPlanItem[], itemId: string): number 
 	return count;
 }
 
-const GRAPH_STATE_FIELDS = new Set(["schema_version", "run_id", "request", "summary", "autonomy", "phase", "created_at", "updated_at", "items", "profile", "head_terminal_at", "settled_at", "writer"]);
+const GRAPH_STATE_FIELDS = new Set(["schema_version", "run_id", "request", "summary", "autonomy", "phase", "created_at", "updated_at", "items", "profile", "research_round_contract", "head_terminal_at", "settled_at", "writer"]);
 const GRAPH_ITEM_FIELDS = new Set(["id", "title", "note", "status", "parent_id", "kind", "owner_ref", "budget", "evidence_gaps", "source_leads", "claim_ids", "coverage", "defer", "lease", "dispatch_epoch"]);
 const GRAPH_PROFILE_FIELDS = new Set(["name", "max_depth", "max_children", "discovery_budget", "validation_reads"]);
 
@@ -342,6 +345,10 @@ export function validateGraph(state: GraphPlanState): string[] {
 		if (!validItems.every((item) => graphTerminal(item))) errors.push("settled graph cannot contain open nodes");
 		if (validItems.some((item) => item.status === "blocked")) errors.push("settled graph cannot contain blocked nodes");
 	}
+	if (state.research_round_contract !== undefined && state.research_round_contract !== "legacy" && state.research_round_contract !== "v1") {
+		errors.push("invalid research-round contract marker");
+	}
+	if (state.research_round_contract === "v1" && state.profile?.name !== "deep-research") errors.push("research-round contract requires a deep-research profile");
 	if (state.head_terminal_at !== undefined && validItems.length === state.items.length && !validItems.every((item) => graphTerminal(item))) errors.push("terminal head cannot contain open nodes");
 	if (state.profile) {
 		if (!state.profile || typeof state.profile !== "object" || Array.isArray(state.profile) || !Object.keys(state.profile).every((key) => GRAPH_PROFILE_FIELDS.has(key))) errors.push("unknown deep-research profile field");

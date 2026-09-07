@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { execFileSync, spawn } from "node:child_process";
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdtempSync, rmSync, unlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import test from "node:test";
@@ -25,11 +25,11 @@ if (!CHILD) {
 	const output = execFileSync(process.execPath, [
 				"--experimental-strip-types", "--experimental-loader", resolve("harness/tests/ts-js-resolver.mjs"), "--test", import.meta.filename,
 			], { cwd: process.cwd(), env, encoding: "utf8", stdio: "pipe" });
-		assert.match(output, /pass 55/);
+		assert.match(output, /pass 57/);
 		} finally { rmSync(artifacts, { recursive: true, force: true }); }
 	});
 } else {
-	const { mkdtempSync, readFileSync } = await import("node:fs");
+	const { mkdtempSync, readFileSync, unlinkSync } = await import("node:fs");
 	const { tmpdir } = await import("node:os");
 	const { join } = await import("node:path");
 	const { callTool, expectToolError, fire, makeCtx, makeFakePi, resetPiGlobals } = await import("./integration-harness.ts");
@@ -308,6 +308,8 @@ if (!CHILD) {
 		const fp = fresh(); const cwd = tmp();
 		const started = await callTool(fp, "research_plan_start", { request: "Unleased report", summary: "one branch", branches: [{ title: "Evidence", budget: { searches: 1, reads: 1 } }] }, cwd);
 		const context = started.details.contexts[0];
+		const ledgerPath = researchRoundPath(cwd, context.run_id, process.env);
+		const ledgerBefore = await readResearchRoundLedger(ledgerPath);
 		const report = {
 			v: 1, parent_item_id: context.parent_item_id, owner_ref: context.owner_ref, status: "done", note: "forged report",
 			consumed: { searches: 1, reads: 1 }, evidence_gaps: [], source_leads: [], children: [], coverage,
@@ -320,6 +322,50 @@ if (!CHILD) {
 		const state = JSON.parse(readFileSync(join(cwd, ".pi", "plan-state.json"), "utf8"));
 		assert.equal(state.items[0].status, "pending");
 		assert.equal(state.items.length, 1, "unleased report must not add child claims");
+		const ledgerAfter = await readResearchRoundLedger(ledgerPath);
+		assert.deepEqual(ledgerAfter?.child_reports, ledgerBefore?.child_reports, "an unleased report must not enter the parent evidence ledger");
+		assert.deepEqual(ledgerAfter?.child_reservations, ledgerBefore?.child_reservations, "an unleased report must not consume or release the parent reservation");
+		resetPiGlobals();
+	});
+
+	test("new research graphs require a valid round ledger before settlement", async () => {
+		const fp = fresh(); const cwd = tmp();
+		const started = await callTool(fp, "research_plan_start", { request: "Require durable evidence", summary: "one branch", branches: [{ title: "Evidence", budget: { searches: 1, reads: 1 } }] }, cwd);
+		const statePath = join(cwd, ".pi", "plan-state.json");
+		const state = JSON.parse(readFileSync(statePath, "utf8"));
+		const urls = ["https://example.test/one", "https://example.test/two"];
+		state.items[0] = { ...state.items[0], status: "done", source_leads: urls, claim_ids: ["claim-a"], coverage };
+		writeFileSync(statePath, `${JSON.stringify(state)}\n`, { mode: 0o600 });
+		(globalThis as Record<string, unknown>).__pi_plan_validation_urls = urls;
+		(globalThis as Record<string, unknown>)[RESEARCH_EVIDENCE_CARDS_KEY] = urls.map((original_url, index) => ({
+			v: 1, card_id: String.fromCharCode(97 + index).repeat(32), original_url, claim_ids: ["claim-a"], truncated: false, parent_validated: true,
+		}));
+		unlinkSync(researchRoundPath(cwd, started.details.contexts[0].run_id, process.env));
+		await expectToolError(fp, "plan_settle", { summary: "missing required ledger" }, cwd, /research evidence.*ledger|research evidence is not settled|ledger/i);
+		resetPiGlobals();
+	});
+
+	test("concurrent parent research rounds serialize without losing a record", async () => {
+		const fp = fresh(); const cwd = tmp();
+		const request = "Concurrent evidence";
+		const started = await callTool(fp, "research_plan_start", { request, summary: "one branch", branches: [{ title: "Evidence", budget: { searches: 1, reads: 1 } }] }, cwd);
+		const runId = started.details.contexts[0].run_id;
+		await callTool(fp, "research_round", { action: "start", run_id: runId }, cwd);
+		const claimId = claimIdForText(request);
+		const gapId = `gap-${claimId}`;
+		const makeRecord = (round_id: string, url: string) => ({ action: "record", run_id: runId, round_id, selected_gaps: [gapId],
+			queries: [{ query_id: `query-${round_id}`, claim_id: claimId, query: `${round_id} authoritative evidence` }],
+			source_leads: [{ lead_id: `lead-${round_id}`, url, claim_ids: [claimId], triage: "selected" }],
+			reads: [{ url, phase: "discovery", method: "ketch", outcome: "completed", truncated: false, parent_validated: false }],
+			evidence_cards: [], conflicts: [], gaps: [{ gap_id: gapId, claim_id: claimId, missing: "A parent-read source is missing.", why: "The final answer depends on this claim.", next_action: "Read an authoritative source.", status: "open" }], proposed_next_action: "read" });
+		const results = await Promise.all([
+			callTool(fp, "research_round", makeRecord("round-a", "https://example.test/concurrent-a"), cwd),
+			callTool(fp, "research_round", makeRecord("round-b", "https://example.test/concurrent-b"), cwd),
+		]);
+		assert.ok(results.every((result) => !result.isError), results.map((result) => result.content).join("\n"));
+		const ledger = await readResearchRoundLedger(researchRoundPath(cwd, runId, process.env));
+		assert.equal(ledger?.rounds.length, 2, "both concurrent round records must survive the serialized write boundary");
+		assert.deepEqual(ledger?.budget.consumed, { searches: 2, reads: 2, validation_reads: 0 });
 		resetPiGlobals();
 	});
 
@@ -522,12 +568,24 @@ if (!CHILD) {
 		];
 		await expectToolError(fp, "plan_settle", { summary: "unmapped claim" }, cwd, /claim obligation/);
 		(globalThis as Record<string, unknown>)[RESEARCH_EVIDENCE_CARDS_KEY] = [
-			{ v: 1, card_id: "a".repeat(32), original_url: "https://example.test/source", claim_ids: [claimIdForText("claim")], truncated: false, parent_validated: true },
-			{ v: 1, card_id: "b".repeat(32), original_url: "https://second.example.test/source", claim_ids: ["claim-b"], truncated: false, parent_validated: true },
+			{ v: 1, card_id: "a".repeat(32), original_url: "https://example.test/source", content_sha256: "c".repeat(64), claim_ids: [claimIdForText("claim")], truncated: false, parent_validated: true, retrieval_method: "ketch" },
+			{ v: 1, card_id: "b".repeat(32), original_url: "https://second.example.test/source", content_sha256: "d".repeat(64), claim_ids: [claimIdForText("claim")], truncated: false, parent_validated: true, retrieval_method: "ketch" },
 		];
-		const settledResult = await callTool(fp, "plan_settle", { summary: "verified and complete" }, cwd);
+		unlinkSync(researchRoundPath(cwd, state.run_id, process.env));
+		await callTool(fp, "research_round", { action: "start", run_id: state.run_id, claim_obligations: [{ claim_id: claimIdForText("claim"), text: "claim", required: true, missing: "Parent evidence", why: "Required claim", next_action: "Validate source" }] }, cwd);
+		await callTool(fp, "research_round", { action: "record", run_id: state.run_id, round_id: "parent-validation", selected_gaps: [`gap-${claimIdForText("claim")}`], queries: [], source_leads: [], reads: [
+			{ url: "https://example.test/source", phase: "parent_validation", method: "ketch", outcome: "completed", truncated: false, parent_validated: true },
+			{ url: "https://second.example.test/source", phase: "parent_validation", method: "ketch", outcome: "completed", truncated: false, parent_validated: true },
+		], evidence_cards: [
+			{ card_id: "a".repeat(32), original_url: "https://example.test/source", content_sha256: "c".repeat(64), claim_ids: [claimIdForText("claim")], truncated: false, parent_validated: true, retrieval_method: "ketch" },
+			{ card_id: "b".repeat(32), original_url: "https://second.example.test/source", content_sha256: "d".repeat(64), claim_ids: [claimIdForText("claim")], truncated: false, parent_validated: true, retrieval_method: "ketch" },
+		], conflicts: [], gaps: [], proposed_next_action: "synthesize" }, cwd);
+		await callTool(fp, "research_round", { action: "settle", run_id: state.run_id, summary: "Parent validation complete" }, cwd);
+		await expectToolError(fp, "plan_settle", { summary: "untrusted answer", final_answer: "Unsupported https://untrusted.example.test/source" }, cwd, /final_answer cites a URL/);
+		const settledResult = await callTool(fp, "plan_settle", { summary: "verified and complete", final_answer: "The parent-validated answer is supported by https://example.test/source and https://second.example.test/source." }, cwd);
 		assert.equal(settledResult.isError, false);
 		assert.equal(settledResult.terminate, true, "settlement must terminate the active planner turn so queued calls cannot run past completion");
+		assert.match(settledResult.content.map((c: any) => c.text ?? "").join("\n"), /Final answer:/);
 		state = JSON.parse(readFileSync(join(cwd, ".pi", "plan-state.json"), "utf8"));
 		assert.ok(state.settled_at); assert.equal(fp.pi.getActiveTools().includes("plan_settle"), false);
 		const frozen = readFileSync(join(cwd, ".pi", "plan-state.json"), "utf8");
@@ -615,13 +673,24 @@ if (!CHILD) {
 		};
 		fp.pi.events.emit(HARNESS_SIGNAL_CHANNEL, { v: 1, type: "plan/branch-result", context: { ...secondContext, lease_id: secondLease.lease_id, dispatch_epoch: 0 }, report, failureClass: null });
 		await fire(fp, "before_agent_start", {}, makeCtx(cwd2).ctx);
+		state = JSON.parse(readFileSync(join(cwd2, ".pi", "plan-state.json"), "utf8"));
 		(globalThis as Record<string, unknown>).__pi_plan_validation_urls = ["https://example.test/fake-source", "https://example.test/independent"];
 		await expectToolError(fp, "plan_settle", { summary: "unmapped evidence" }, cwd2, /claim evidence card/);
 		(globalThis as Record<string, unknown>)[RESEARCH_EVIDENCE_CARDS_KEY] = [
-			{ v: 1, card_id: "c".repeat(32), original_url: "https://example.test/fake-source", claim_ids: [claimIdForText("fake claim")], truncated: false, parent_validated: true },
-			{ v: 1, card_id: "d".repeat(32), original_url: "https://example.test/independent", claim_ids: ["independent-claim"], truncated: false, parent_validated: true },
+			{ v: 1, card_id: "c".repeat(32), original_url: "https://example.test/fake-source", content_sha256: "e".repeat(64), claim_ids: [claimIdForText("fake claim")], truncated: false, parent_validated: true, retrieval_method: "ketch" },
+			{ v: 1, card_id: "d".repeat(32), original_url: "https://example.test/independent", content_sha256: "f".repeat(64), claim_ids: [claimIdForText("fake claim")], truncated: false, parent_validated: true, retrieval_method: "ketch" },
 		];
-		assert.equal((await callTool(fp, "plan_settle", { summary: "fake provider validated" }, cwd2)).isError, false);
+		try { unlinkSync(researchRoundPath(cwd2, state.run_id, process.env)); } catch { /* the fake lifecycle may not have projected a ledger */ }
+		await callTool(fp, "research_round", { action: "start", run_id: state.run_id, claim_obligations: [{ claim_id: claimIdForText("fake claim"), text: "fake claim", required: true, missing: "Parent evidence", why: "Required claim", next_action: "Validate source" }] }, cwd2);
+		await callTool(fp, "research_round", { action: "record", run_id: state.run_id, round_id: "fake-parent-validation", selected_gaps: [`gap-${claimIdForText("fake claim")}`], queries: [], source_leads: [], reads: [
+			{ url: "https://example.test/fake-source", phase: "parent_validation", method: "ketch", outcome: "completed", truncated: false, parent_validated: true },
+			{ url: "https://example.test/independent", phase: "parent_validation", method: "ketch", outcome: "completed", truncated: false, parent_validated: true },
+		], evidence_cards: [
+			{ card_id: "c".repeat(32), original_url: "https://example.test/fake-source", content_sha256: "e".repeat(64), claim_ids: [claimIdForText("fake claim")], truncated: false, parent_validated: true, retrieval_method: "ketch" },
+			{ card_id: "d".repeat(32), original_url: "https://example.test/independent", content_sha256: "f".repeat(64), claim_ids: [claimIdForText("fake claim")], truncated: false, parent_validated: true, retrieval_method: "ketch" },
+		], conflicts: [], gaps: [], proposed_next_action: "synthesize" }, cwd2);
+		await callTool(fp, "research_round", { action: "settle", run_id: state.run_id, summary: "Parent validation complete" }, cwd2);
+		assert.equal((await callTool(fp, "plan_settle", { summary: "fake provider validated", final_answer: "The validated result is supported by https://example.test/fake-source and https://example.test/independent." }, cwd2)).isError, false);
 		state = JSON.parse(readFileSync(join(cwd2, ".pi", "plan-state.json"), "utf8"));
 		assert.equal(typeof state.settled_at, "string");
 		resetPiGlobals();
