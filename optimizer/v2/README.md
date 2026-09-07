@@ -114,6 +114,13 @@ python3 -m optimizer.v2.baseline --selftest
 python3 -m optimizer.v2.baseline --dry --preregistration optimizer/v2/examples/g03-baseline-preregistration.json
 python3 -m optimizer.v2.research_runner --selftest
 
+# prepare a prompt-free research-cell plan (the checked-in map binds admitted case IDs)
+python3 -m optimizer.v2.research_runner --prepare --run-id g03-run \
+  --task-map optimizer/v2/examples/g03-research-task-map-r2.json \
+  --pack optimizer/v2/benchmarks/g03-representative-pilot-r2.json \
+  --preregistration optimizer/v2/examples/g03-baseline-preregistration-r2.json \
+  --repository-root .
+
 # dark planner mechanism smoke (no execution unless --run is explicit)
 python3 -m optimizer.v2.planner_smoke --selftest
 python3 -m optimizer.v2.planner_smoke --dry --agent-dir /private/agent-copy \
@@ -153,6 +160,12 @@ artifact under the private run root. `--dry` validates the cell without writing;
 parent report is retained as an explicit incomplete attempt, with no accepted
 research usage or authority, so the existing `research_baseline.py --reduce`
 step can classify it without silently dropping the cell.
+
+`--prepare` is an offline binding step. It requires a JSON object mapping every
+train/development research case ID to one unique bounded task ID. It prints the
+plan digest and cell count; adding `--plan-output <path> --run-root <private-root>`
+stores the complete plan as a private `0600` artifact. The plan excludes opaque
+test payloads and contains no prompt or answer text.
 
 For a fixture-bound screen, pass `--fixture-manifest` together with its
 canonical admission digest in `--expected-fixture-sha256`. The launcher then

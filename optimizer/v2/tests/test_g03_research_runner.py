@@ -14,6 +14,7 @@ from optimizer.v2.research_runner import (
     ResearchRunnerError,
     build_research_artifact,
     make_cell_request,
+    prepare_research_plan,
     record_research_artifact,
 )
 
@@ -81,6 +82,35 @@ def parent_report() -> dict:
 
 
 class G03ResearchRunnerTests(unittest.TestCase):
+    def test_research_plan_is_deterministic_and_covers_only_non_opaque_cells(self) -> None:
+        task_map = {
+            case.case_id: f"g03-{case.case_id}"
+            for split in ("train", "development")
+            for case in PACK.splits[split]
+            if case.is_research
+        }
+        first = prepare_research_plan(PACK, PREREG, run_id="g03-research-run", task_map=task_map, repository_root=REPO)
+        second = prepare_research_plan(PACK, PREREG, run_id="g03-research-run", task_map=task_map, repository_root=REPO)
+        self.assertEqual(first, second)
+        self.assertEqual(first["schema"], "pi.g03-research-cell-plan/v1")
+        self.assertEqual(len(first["cells"]), 8)  # two research train/dev cases × two seeds × two arms
+        self.assertNotIn("research-multipart", {cell["case_id"] for cell in first["cells"]})
+        self.assertNotIn("prompt", json.dumps(first))
+        self.assertEqual(len({cell["cell_id"] for cell in first["cells"]}), 8)
+
+    def test_research_plan_rejects_missing_or_duplicate_task_bindings(self) -> None:
+        task_map = {CASE_ID: "g03-research-comparative"}
+        with self.assertRaises(ResearchRunnerError):
+            prepare_research_plan(PACK, PREREG, run_id="g03-research-run", task_map=task_map, repository_root=REPO)
+        task_map = {
+            case.case_id: "same-task"
+            for split in ("train", "development")
+            for case in PACK.splits[split]
+            if case.is_research
+        }
+        with self.assertRaises(ResearchRunnerError):
+            prepare_research_plan(PACK, PREREG, run_id="g03-research-run", task_map=task_map, repository_root=REPO)
+
     def test_completed_parent_report_builds_reducible_authoritative_artifact(self) -> None:
         cell = make_cell_request(PACK, PREREG, cell_request())
         artifact = build_research_artifact(cell, process=process(), serving=serving(), parent_report=parent_report())
@@ -178,6 +208,37 @@ class G03ResearchRunnerTests(unittest.TestCase):
             summary = json.loads(completed.stdout)
             self.assertFalse(summary["execution"])
             self.assertFalse((root / "artifact.json").exists())
+
+    def test_cli_prepare_writes_only_a_private_prompt_free_plan(self) -> None:
+        task_map = {
+            case.case_id: f"g03-{case.case_id}"
+            for split in ("train", "development")
+            for case in PACK.splits[split]
+            if case.is_research
+        }
+        with tempfile.TemporaryDirectory() as directory:
+            root = pathlib.Path(directory)
+            task_map_path = root / "task-map.json"
+            plan_path = root / "run" / "research-plan.json"
+            task_map_path.write_text(json.dumps(task_map), encoding="utf-8")
+            completed = __import__("subprocess").run(
+                [
+                    __import__("sys").executable, str(ROOT / "v2/research_runner.py"), "--prepare",
+                    "--run-id", "g03-research-run", "--task-map", str(task_map_path),
+                    "--plan-output", str(plan_path), "--run-root", str(root),
+                    "--pack", str(PACK_PATH), "--preregistration", str(PREREG_PATH),
+                    "--repository-root", str(REPO),
+                ], cwd=str(REPO), text=True, capture_output=True, check=False,
+            )
+            self.assertEqual(completed.returncode, 0, completed.stderr)
+            summary = json.loads(completed.stdout)
+            self.assertFalse(summary["execution"])
+            self.assertFalse(summary["model_execution"])
+            self.assertEqual(summary["cell_count"], 8)
+            self.assertEqual(stat.S_IMODE(plan_path.stat().st_mode), 0o600)
+            plan = json.loads(plan_path.read_text(encoding="utf-8"))
+            self.assertEqual(plan["schema"], "pi.g03-research-cell-plan/v1")
+            self.assertNotIn("prompt", json.dumps(plan))
 
 
 if __name__ == "__main__":

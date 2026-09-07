@@ -21,19 +21,20 @@ import tempfile
 from typing import Any
 
 try:
-    from .baseline import BaselinePreregistration
+    from .baseline import BaselinePreregistration, arm_order, prepare_baseline
     from .benchmark import BenchmarkPack
 except ImportError:  # direct ``python3 optimizer/v2/research_runner.py --selftest``
     import sys
 
     sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[2]))
-    from optimizer.v2.baseline import BaselinePreregistration
+    from optimizer.v2.baseline import BaselinePreregistration, arm_order, prepare_baseline
     from optimizer.v2.benchmark import BenchmarkPack
 
 
 SCHEMA = "pi.research-trial/v1"
 CELL_SCHEMA = "pi.research-cell/v1"
 PARENT_REPORT_SCHEMA = "pi.research-parent-report/v1"
+PLAN_SCHEMA = "pi.g03-research-cell-plan/v1"
 HEX64 = re.compile(r"^[0-9a-f]{64}$")
 ID = re.compile(r"^[a-z][a-z0-9._:-]{0,95}$")
 SAFE_REASON = re.compile(r"^[a-z][a-z0-9_.-]{1,95}$")
@@ -168,6 +169,86 @@ def make_cell_request(
         "surface_sha256": surface_sha256, "experiment_sha256": prereg.sha256,
         "gate_session_id": gate_session_id,
     }
+
+
+def _canonical(value: Any) -> bytes:
+    return json.dumps(value, sort_keys=True, separators=(",", ":"), ensure_ascii=False).encode("utf-8")
+
+
+def prepare_research_plan(
+    pack: BenchmarkPack,
+    prereg: BaselinePreregistration,
+    *,
+    run_id: str,
+    task_map: dict[str, str],
+    repository_root: str | pathlib.Path,
+) -> dict:
+    """Create a deterministic, prompt-free execution plan for research cells.
+
+    The plan is an offline preparation artifact.  It does not allocate a model
+    session or invent a gate-session identity; the approved parent runner must
+    mint those identities immediately before each cell executes.
+    """
+
+    run_id = _id(run_id, "run_id")
+    root = pathlib.Path(repository_root).expanduser().resolve()
+    if not root.is_dir() or root.is_symlink():
+        raise ResearchRunnerError("repository_root must be a real directory")
+    try:
+        prepared = prepare_baseline(pack, prereg, root)
+    except Exception as exc:
+        raise ResearchRunnerError("benchmark/preregistration binding is invalid") from exc
+    expected = {
+        case.case_id
+        for split in ("train", "development")
+        for case in pack.splits[split]
+        if case.is_research
+    }
+    if not isinstance(task_map, dict) or set(task_map) != expected:
+        raise ResearchRunnerError("task_map must bind every train/development research case exactly once")
+    if any(not isinstance(task, str) or not ID.fullmatch(task) for task in task_map.values()):
+        raise ResearchRunnerError("task_map values must be bounded identifiers")
+    if len(set(task_map.values())) != len(task_map):
+        raise ResearchRunnerError("task_map values must be globally unique")
+    cells: list[dict] = []
+    for split in ("train", "development"):
+        for case in pack.splits[split]:
+            if not case.is_research:
+                continue
+            for repetition in range(prereg.repetitions):
+                for seed in prereg.seeds:
+                    pair_order = arm_order(case.case_id, seed, repetition, prereg.randomization["seed"])
+                    # The arm order is a property of the pair.  The cell ID is
+                    # content-addressed over the exact pair coordinates and
+                    # never depends on a mutable workspace path.
+                    for arm in pair_order:
+                        cell_key = f"{run_id}:{case.case_id}:{seed}:{repetition}:{arm}"
+                        cell_id = "cell-" + hashlib.sha256(cell_key.encode()).hexdigest()[:32]
+                        cells.append({
+                            "cell_id": cell_id, "case_id": case.case_id, "fixture_id": _fixture_id(pack, case.case_id, root),
+                            "fixture_sha256": case.fixture_sha256, "kind": case.kind.removeprefix("research_"),
+                            "split": split, "arm": arm, "rep": prereg.seeds.index(seed) + 1,
+                            "repetition": repetition, "seed": seed, "task": task_map[case.case_id],
+                            "model": prereg.subject_model["model"], "requested_provider": prereg.subject_model["provider"],
+                            "config_sha256": prereg.arms[arm]["config_sha256"], "surface_sha256": prereg.arms[arm]["surface_sha256"],
+                            "experiment_sha256": prereg.sha256, "arm_order": pair_order,
+                            "artifact_relpath": f"research-artifacts/{cell_id}.json",
+                        })
+    # A duplicate check protects future edits to the ordering logic.
+    if len(cells) != len(expected) * len(prereg.seeds) * prereg.repetitions * 2 or len({cell["cell_id"] for cell in cells}) != len(cells):
+        raise ResearchRunnerError("research cell plan cardinality or identity is invalid")
+    body = {
+        "schema": PLAN_SCHEMA, "run_id": run_id, "preregistration_sha256": prereg.sha256,
+        "benchmark_pack_sha256": pack.sha256, "pack_revision": pack.revision,
+        "source_surface_sha256": prereg.surface_identity["source_sha256"],
+        "subject_model": prereg.subject_model, "guard_models": list(prereg.guard_models),
+        "task_map": dict(sorted(task_map.items())), "opaque_test_cases_excluded": [case.case_id for case in pack.splits["test"]],
+        "arm_randomization": {"method": prereg.randomization["method"], "seed": prereg.randomization["seed"]},
+        "cell_count": len(cells), "cells": cells,
+        "artifact_schema": SCHEMA, "model_execution": False,
+        "reconstruction": {"prepared_schema": prepared["schema"], "inference_required": True},
+    }
+    return {**body, "plan_sha256": hashlib.sha256(_canonical(body)).hexdigest()}
 
 
 def _fixture_id(pack: BenchmarkPack, case_id: str, repository_root: str | pathlib.Path | None) -> str:
@@ -467,8 +548,12 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="python3 -m optimizer.v2.research_runner")
     modes = parser.add_mutually_exclusive_group(required=True)
     modes.add_argument("--selftest", action="store_true")
+    modes.add_argument("--prepare", action="store_true")
     modes.add_argument("--dry", action="store_true")
     modes.add_argument("--record", action="store_true")
+    parser.add_argument("--run-id")
+    parser.add_argument("--task-map")
+    parser.add_argument("--plan-output")
     parser.add_argument("--request")
     parser.add_argument("--process")
     parser.add_argument("--serving")
@@ -482,6 +567,36 @@ def main(argv: list[str] | None = None) -> int:
     if args.selftest:
         selftest()
         return 0
+    if args.prepare:
+        required = (args.run_id, args.task_map, args.pack, args.preregistration)
+        if any(value is None for value in required):
+            parser.error("--prepare requires --run-id, --task-map, --pack, and --preregistration")
+        if args.plan_output is not None and args.run_root is None:
+            parser.error("--prepare --plan-output requires --run-root")
+        try:
+            repository_root = pathlib.Path(args.repository_root).expanduser().resolve()
+            pack = BenchmarkPack.load(pathlib.Path(args.pack).expanduser().resolve())
+            prereg = BaselinePreregistration.load(pathlib.Path(args.preregistration).expanduser().resolve())
+            task_map = _load_object(args.task_map, "task map")
+            plan = prepare_research_plan(
+                pack, prereg, run_id=args.run_id, task_map=task_map,
+                repository_root=repository_root,
+            )
+            if args.plan_output is not None:
+                target = _private_destination(args.plan_output, args.run_root)
+                _write_private(target, plan)
+            summary = {
+                "schema": PLAN_SCHEMA, "execution": False, "model_execution": False,
+                "run_id": plan["run_id"], "plan_sha256": plan["plan_sha256"],
+                "cell_count": plan["cell_count"], "opaque_test_cases_excluded": len(plan["opaque_test_cases_excluded"]),
+            }
+            if args.plan_output is not None:
+                summary["plan_output"] = str(target)
+            print(json.dumps(summary, sort_keys=True))
+            return 0
+        except (OSError, UnicodeError, json.JSONDecodeError, ResearchRunnerError, ValueError) as exc:
+            print(f"g03-research-runner: {exc}", file=__import__("sys").stderr)
+            return 2
     required = (args.request, args.process, args.serving, args.pack, args.preregistration)
     if any(value is None for value in required):
         parser.error("--dry/--record require --request, --process, --serving, --pack, and --preregistration")
