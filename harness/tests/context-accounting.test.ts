@@ -135,6 +135,15 @@ test("preservation order keeps required state and marks truncation explicitly", 
 	assert.match(result.text, /truncated; retrieve omitted context/);
 });
 
+test("preservation projection never exceeds an extremely small caller cap", () => {
+	for (const cap of [1, 2, 8, 32]) {
+		const result = preserveContextSections({ objective: "required objective", next_action: "continue safely" }, cap);
+		assert.ok(result.text.length <= cap, `cap=${cap} must remain hard`);
+		assert.equal(result.truncated, true);
+		assert.deepEqual(result.omitted, ["objective", "next_action"]);
+	}
+});
+
 test("serving-window shrink creates a distinct accounting epoch", () => {
 	const before = contextProfileFor(model, 3);
 	const after = withServingWindow(before, 16_384);

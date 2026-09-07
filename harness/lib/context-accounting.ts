@@ -406,6 +406,13 @@ export function preserveContextSections(sections: PreservationSections, maxChars
 	}
 	if (omitted.length === 0) return { text: lines.join("\n"), truncated: false, omitted };
 	const markerFor = () => `...[truncated; retrieve omitted context: ${omitted.join(",")}]`;
+	if (markerFor().length > cap) {
+		// Preserve the hard cap even for diagnostic callers that request less
+		// space than the complete marker needs. The omitted-field list remains in
+		// the returned structured value for recovery; the text is only a bounded
+		// projection and must never overflow its caller's budget.
+		return { text: markerFor().slice(0, cap), truncated: true, omitted };
+	}
 	while (lines.length > 0 && lines.join("\n").length + 1 + markerFor().length > cap) {
 		const body = lines.join("\n");
 		const allowance = Math.max(0, cap - markerFor().length - 1);

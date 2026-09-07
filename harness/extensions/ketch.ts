@@ -582,6 +582,15 @@ export function registerKetch(pi: ExtensionAPI, dependencies: KetchDependencies 
 				if (reader === "invalid" || (reader === "jina" && !JINA_READER_ENABLED)) {
 					return text("Requested web reader is unavailable in this session.", { reader: String(requestedReader ?? "unknown"), outcome: "precondition", coverage: coverageReceipt(0, params.urls.length, false, true) });
 				}
+				// Reserve the worst-case requested page set before spending a research
+				// read unit or touching URL/DNS preflight. A context rejection must not
+				// burn the separate 3/5 research allowance. Blocked URLs may make this
+				// conservative, but the reservation is released at tool finalization.
+				const reservation = outputReservation(toolCallId, Math.min(READ_OUTPUT_CAP, Math.max(1, (params.max_chars ?? 5_000) * Math.max(1, params.urls.length))));
+				if (reservation && !reservation.ok) {
+					record("ketch", "read", { reader, sources: params.urls.length, succeeded: 0, failed: params.urls.length, chars: 0, duration_ms: Date.now() - started, truncated: false, outcome: "context_budget_exhausted", reason_class: reservation.reason });
+					return text("These source pages would exceed the remaining context budget. Read fewer pages or request a smaller bounded page.", { reader, outcome: "context_budget_exhausted", reason_class: reservation.reason, coverage: coverageReceipt(0, params.urls.length, false, true) });
+				}
 				const readUnits = new Set(params.urls).size;
 				const budget = await consumePlanBudget("reads", readUnits);
 				if (!budget.allowed) {
@@ -601,11 +610,6 @@ export function registerKetch(pi: ExtensionAPI, dependencies: KetchDependencies 
 				const resolved = await Promise.allSettled(params.urls.map((url) => resolvePublicUrl(url, { signal: preflightSignal })));
 				const safeUrls = resolved.flatMap((entry) => entry.status === "fulfilled" ? [entry.value] : []);
 				const blockedCount = params.urls.length - safeUrls.length; // preflight-rejected: still real failures
-				const reservation = outputReservation(toolCallId, Math.min(READ_OUTPUT_CAP, Math.max(1, (params.max_chars ?? 5_000) * Math.max(1, safeUrls.length))));
-				if (reservation && !reservation.ok) {
-					record("ketch", "read", { reader, sources: params.urls.length, succeeded: 0, failed: params.urls.length, chars: 0, duration_ms: Date.now() - started, truncated: false, outcome: "context_budget_exhausted", reason_class: reservation.reason });
-					return text("These source pages would exceed the remaining context budget. Read fewer pages or request a smaller bounded page.", { reader, outcome: "context_budget_exhausted", reason_class: reservation.reason, coverage: coverageReceipt(0, params.urls.length, false, true) });
-				}
 				// Full-batch session-cache hit: serve without refetching. A repeat
 				// web_read of already-fetched pages is the read-side spiral shape;
 				// serving the cache makes it free instead of a network round-trip.

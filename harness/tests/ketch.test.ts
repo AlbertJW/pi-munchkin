@@ -207,6 +207,40 @@ test("web search reserves aggregate context before invoking the network adapter"
 	}
 });
 
+test("web read rejects on context budget before consuming its research allowance", async () => {
+	const dir = mkdtempSync(join(tmpdir(), "ketch-read-context-reservation-"));
+	const snapshot = Object.fromEntries(["KETCH", "KETCH_BIN", "KETCH_BACKEND", "CONTEXT_ADMISSION", "RESEARCH_LEDGER", "RESEARCH_BUDGET", "TELEMETRY"].map((key) => [key, process.env[key]]));
+	try {
+		delete process.env.KETCH;
+		process.env.KETCH_BIN = mockKetch(dir);
+		process.env.KETCH_BACKEND = "exa";
+		process.env.CONTEXT_ADMISSION = "on";
+		delete process.env.RESEARCH_LEDGER;
+		process.env.RESEARCH_BUDGET = "on";
+		process.env.TELEMETRY = "off";
+		const fp = makeFakePi();
+		const admission = await import(`../extensions/context-admission.ts?ketch-read-reservation=${Date.now()}-${Math.random()}`);
+		admission.default(fp.pi as never);
+		const mod = await import(`../extensions/ketch.ts?context-read-reservation=${Date.now()}-${Math.random()}`);
+		mod.registerKetch(fp.pi as never);
+		const model = { provider: "local", id: "tiny-read", contextWindow: 1_024, baseUrl: "https://example.invalid/v1" };
+		await fire(fp, "session_start", {}, { cwd: dir, model });
+		const blocked = await callTool(fp, "web_read", { urls: ["https://example.com/a"], max_chars: 5_000 }, dir);
+		assert.equal(blocked.details.outcome, "context_budget_exhausted");
+		// Turning admission off lets the same call prove that the first rejection
+		// did not consume the separate research budget unit.
+		process.env.CONTEXT_ADMISSION = "off";
+		const allowed = await callTool(fp, "web_read", { urls: ["https://example.com/a"], max_chars: 1_000 }, dir);
+		assert.notEqual(allowed.details.outcome, "budget_exhausted");
+	} finally {
+		restoreEnv(snapshot);
+		rmSync(dir, { recursive: true, force: true });
+		delete (globalThis as Record<string, unknown>).__pi_context_reservation_v1;
+		delete (globalThis as Record<string, unknown>).__pi_context_accounting;
+		delete (globalThis as Record<string, unknown>).__pi_ketch_version_checks_v1;
+	}
+});
+
 test("KETCH=off remains an explicit emergency kill switch", async () => {
 	const previous = process.env.KETCH;
 	try {
