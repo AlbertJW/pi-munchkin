@@ -60,6 +60,19 @@ by the approved disposable screen and repaired with red/green regressions;
 the screen's historical no-go result and bound hashes are unchanged, and the
 planner flags remain dark.
 
+### Fixed (2026-09-07 — G04 settlement, merge, and recovery authority; repository-only)
+
+New deep-research graphs now fail closed when their parent evidence ledger is
+missing or malformed, and settlement requires an explicitly settled ledger plus
+a bounded final answer whose citations are parent-validated. Parent round
+records serialize through a private single-writer lock. Branch reports reach the
+ledger only when the graph accepted the same lease and dispatch generation;
+ignored reports cannot create reservations or mutate evidence, while rejected
+reports consume only their bounded allocation. Added real scripted Pi
+`AgentSession` fixtures for one-shot final-answer delivery, late-result
+rejection, and compaction/fresh-session preservation of outstanding research
+reservations. No live inference, mirror, rollout, or default activation changed.
+
 ### Added (2026-09-07 — G03 governed evaluation baseline; repository-only)
 
 Added the twelve-case `g03-representative-pilot-v1` registry, immutable fixture

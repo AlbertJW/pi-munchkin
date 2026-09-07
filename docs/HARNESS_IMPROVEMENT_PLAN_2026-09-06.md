@@ -45,14 +45,14 @@ round ledger, bounded allocations, duplicate handling, parent evidence checks,
 G01 synthesis offers, and private persistence. Post-screen repairs close
 undispatched branch reservations and correct the six-field child-receipt
 validator. The focused review reran the research and planner integration suites:
-11 ledger tests and one wrapper exercising 55 child tests pass. A subsequent
+12 ledger tests and one wrapper exercising 57 child tests pass. A subsequent
 G01 audit added red-green regressions for cross-wrapper authority replacement,
 cross-wrapper dispatcher deactivation, single-flight continuation flushing,
 session-reload cancellation, and shutdown rebind; follow-up test proof now
 drives the rebound authority through an actual provider delivery. The focused
 control suite is now 37/37 and the real-session/planner integration set is
 75/75. The fresh
-repository-wide offline gate passes 779/779 tests and all six stages. These
+repository-wide offline gate passes 786/786 tests and all six stages. These
 repairs still need
 a new pinned live smoke; historical receipts remain bound to their old surface.
 
@@ -81,6 +81,9 @@ The current post-audit source-surface hash, including the continuation fixes, is
 not yet been loaded into the live agent directory. A clean committed G01-only
 snapshot was separately materialized in a disposable agent directory for the
 fresh protocol receipt below; its loaded hash is recorded in `docs/evidence/G01.md`.
+The latest repaired G04 worktree source-surface hash is
+`9aed85c14ebae22b7f255d00fbe9eb7a8a90b023a450291837ef9cf40e67bc18`; it is
+also repository-only and has no live mirror receipt.
 
 ### Findings that prevent full completion
 
@@ -93,33 +96,30 @@ fresh protocol receipt below; its loaded hash is recorded in `docs/evidence/G01.
   serializes flushes, cancels stale lifecycle generations, and rebinds the
   authorities when a process-reused session starts after shutdown. The focused
   regressions pass 37/37, the combined real-session/planner set passes 75/75,
-  and the fresh offline gate passes 779/779. The 2026-09-07 disposable Ling
+and the fresh offline gate passes 786/786. The 2026-09-07 disposable Ling
   receipt drives one real goal update, one arbiter-delivered continuation, and
   a clean exit; it validates the protocol path without changing the live
   mirror or providing model-quality evidence. An unrestricted full-tool Ling
   attempt timed out and remains an explicit loop-risk limitation.
 
-- **G04 settlement authority:** `plan_settle` checks the round ledger only when
-  `roundRaw?.rounds.length` is nonzero. A new graph with an empty ledger, or a
-  ledger that cannot be read, bypasses the new obligation check while retaining
-  the older graph checks. Require the new contract for new G04 runs; distinguish
-  genuine legacy plans explicitly rather than treating missing evidence as legacy.
-- **G04 final-answer proof:** the synthesis fixture counts continuation offers.
-  The fixture named "fake provider lifecycle" calls tools through `makeFakePi`
-  and sets evidence globals directly; it does not run a provider or assert an
-  emitted final answer. `plan_settle` also returns `terminate: true`. Exercise
-  this exact sequence through a real Pi `AgentSession`, proving one authorized
-  synthesis and an observable final answer after evidence validation.
-- **G04 recovery proof:** the restart/compaction test writes and reloads JSON
-  and bounds a summary. It does not perform Pi compaction and recover the research
-  obligations in a fresh session. Add that lifecycle proof, including outstanding
-  reservations and a late child report.
-- **G04 merge authority:** the branch-result handler attempts the ledger merge
-  even when the graph merge returns `ignored`. Bind ledger acceptance to the same
-  accepted lease/generation and prove that stale, unleased, or conflicting reports
-  cannot alter either store. Exercise races between parent round writes, child
-  arrivals, and shutdown; in-memory unit transactions alone do not prove shared
-  persistence is serialized.
+- **G04 runtime enforcement (repaired 2026-09-07):** new v1 deep-research
+  graphs now fail closed when the ledger is missing or malformed, and settlement
+  requires an explicitly settled parent ledger. Legacy graphs are marked
+  explicitly and retain their compatibility path. Ledger mutations use a
+  single-writer file lock with atomic publication, so concurrent parent rounds
+  preserve every record and budget unit.
+- **G04 final-answer proof (repaired 2026-09-07):** `plan_settle` requires a
+  bounded `final_answer` for the v1 research contract, rejects citations that
+  are not parent-validated, returns the answer exactly once, and terminates the
+  loop. A real scripted `AgentSession` fixture proves the persisted answer and
+  that a late branch signal cannot start another provider turn.
+- **G04 recovery proof (repaired 2026-09-07):** a real Pi compaction lifecycle
+  and a fresh session preserve the parent ledger's outstanding reservation and
+  unresolved claim. The helper persistence tests remain as lower-level coverage.
+- **G04 merge authority (repaired 2026-09-07):** the branch-result handler now
+  binds ledger acceptance to the graph merge outcome. Ignored reports cannot
+  create reservations or mutate evidence; rejected reports are charged as
+  bounded failures. Duplicate and late reports remain idempotent.
 - **G02 production integration (superseded 2026-09-07):** the initial review
   found that the admission extension created a reservation ledger without
   connecting producers. The remediation now exposes an epoch-scoped,
@@ -139,12 +139,12 @@ with this review; their acceptance labels need reconciliation during remediation
 
 ### Ordered next work
 
-1. **Finish G04 runtime enforcement and proof.** Add regressions for empty or
-   malformed ledger settlement, rejected graph reports reaching the ledger,
-   concurrent writes, and compaction/recovery. Repair the reproduced failures.
-   Add a real-session fake-retrieval test that validates required claims, delivers
-   exactly one final answer through G01, and rejects late restarts. Exit condition:
-   G04-A through G04-D have direct lifecycle evidence, not only helper tests.
+1. **Re-run the repaired G04 screen when approved.** The runtime enforcement and
+   direct lifecycle proofs are now green offline (G04-A through G04-D). Preserve
+   the approved no-go report, issue a fresh preregistration against the repaired
+   surface, and run Ling for protocol smoke followed by Qwen 35B for effectiveness.
+   Keep the graph flags dark until the new screen separates activation, latency,
+   citation correctness, and completion outcomes.
 2. **Keep G02 dark and measure value separately.** Producer reservations and
    recovery preservation are wired, and the pinned Qwen→Ling mechanism smoke
    proves epoch rebinding and admitted requests. Prepare a later 128K/32K value
@@ -155,11 +155,9 @@ with this review; their acceptance labels need reconciliation during remediation
    latency. Prepare a reproducible real baseline with actual outcome oracles and
    reconstructable provenance. Do not simply lengthen the timeout or change the
    task until the failure mechanism is understood.
-4. **Repeat the G04 screen on the repaired surface.** Issue a fresh preregistration
-   with the required research controls, arm order, stopping policy, source/config/
-   loaded identities, and explicit outcome scoring. Run within the applicable
-   approved scope, Ling for protocol smoke and Qwen for effectiveness. Keep the
-   previous no-go results intact. Promotion requires a separate evidence-based
+4. **Keep historical G04 evidence isolated.** The prior Ling/Qwen no-go remains
+   valid only for its recorded source and loaded hashes. Do not pool it with the
+   repaired-surface run; promotion still requires a separate evidence-based
    decision.
 5. **Then complete G05.** Qualify numerical acceptance and learning policies with
    independent golden calculations before optimizer-driven selection. Prepare a

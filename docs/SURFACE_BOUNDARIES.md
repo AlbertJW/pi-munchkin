@@ -338,6 +338,21 @@ Handoff was disabled to isolate epoch rebinding. No raw endpoint, prompt,
 response, tool argument, URL, or source content was recorded; no default,
 rollout, quality, capacity, or adoption decision changed.
 
+## Pending surface boundary — 2026-09-07 (G04 evidence-gap runtime enforcement)
+
+Repository-only pending boundary for the dark deep-research profile. New v1
+graphs require a valid settled parent ledger; parent ledger mutations are
+single-writer and atomic; branch reports are accepted only after the graph
+accepts their lease/generation; and `plan_settle` delivers one bounded,
+parent-citation-validated `final_answer` before terminating the loop. Added
+offline regressions and real scripted Pi `AgentSession` lifecycle probes for
+late-result rejection and compaction/recovery. No live inference, mirror,
+rollout, adoption, or default activation occurred. A source hash and a fresh
+loaded-surface receipt are intentionally deferred until the package is
+committed and separately approved for synchronization.
+Current source-surface SHA-256 (uncommitted):
+`9aed85c14ebae22b7f255d00fbe9eb7a8a90b023a450291837ef9cf40e67bc18`.
+
 ## Data at rest: where a research session actually lands (updated 2026-08-10)
 
 A surface hash bounds what the MODEL sees. It says nothing about what a session LEAVES. Those are
