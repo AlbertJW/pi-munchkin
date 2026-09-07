@@ -74,7 +74,7 @@ uncommitted G02–G04 changes on `main`; the G01 hardening is committed at
 `6a2d4ec`. Implementation,
 commit/push, mirror synchronization, and adoption are separate milestones.
 The current post-audit source-surface hash, including the continuation fixes, is
-`ed78767b24c08ab5f7f97ea8ad42af64f6bb5e2350db6a18aa70859d1ad5de7f` and has
+`68d1152c8e30673f67a2ae0ee6e06acc43e859536b9d36d391b1184ddc26e0f2` and has
 not yet been loaded into the live agent directory.
 
 ### Findings that prevent full completion
