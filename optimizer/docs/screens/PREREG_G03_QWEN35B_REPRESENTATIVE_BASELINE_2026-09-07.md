@@ -112,9 +112,9 @@ receipt directory, safe trial rows, and review packet; a reviewer must be able
 to reconstruct all classifications without rerunning inference. Selection and
 adoption remain human-only and are not authorized by this runbook.
 
-Current external blocker: Pi/llama-swap is down (`real_gate.sh --dry` reports
-`server: DOWN`), and the frozen source/loaded-surface bindings have drifted.
-The offline registry, shared reducer, and research row adapter are complete;
-G03-C remains open until a fresh pack/preregistration revision and a fully bound
-Qwen run cover the declared cohort and emit the required private research
-artifacts.
+Current external blocker: the latest read-only `real_gate.sh --dry` reports
+llama-swap serving `defiant-9b`, not the preregistered Qwen 35B subject, and the
+frozen source/loaded-surface bindings have drifted. The offline registry, shared
+reducer, and research row adapter are complete; G03-C remains open until a fresh
+pack/preregistration revision and a fully bound Qwen run cover the declared
+cohort and emit the required private research artifacts.
