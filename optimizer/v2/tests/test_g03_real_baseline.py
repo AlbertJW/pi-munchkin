@@ -79,10 +79,12 @@ class G03RealBaselineIngestTests(unittest.TestCase):
         report = ingest_gate_baseline(PACK, PREREG, REPO, rows, validity, case_tasks=CASE_TASKS, run_id="g03-real-run", resolved_model={"provider": "llama", "model": "qwen36-35b-iq3s"})
         validate_real_report(report, PACK, PREREG)
         self.assertTrue(report["model_quality_evidence"])
-        self.assertEqual(report["decision"]["status"], "informative")
+        self.assertEqual(report["decision"]["status"], "inconclusive")
+        self.assertEqual(report["decision"]["reason"], "ceiling")
         self.assertFalse(report["adoption_authorized"])
         self.assertEqual(report["trial_count"], 40)
         self.assertEqual(len(report["serving_identity_sha256"]), 1)
+        self.assertEqual({trial["repetition"] for trial in report["trials"]}, {0})
         self.assertNotIn("prompt", json.dumps(report))
 
     def test_timeout_and_missing_cells_are_retained_as_non_authoritative(self) -> None:
@@ -94,6 +96,23 @@ class G03RealBaselineIngestTests(unittest.TestCase):
         self.assertEqual(sum(trial["status"] == "timeout" for trial in report["trials"]), 1)
         self.assertGreater(sum(trial["status"] == "excluded" for trial in report["trials"]), 0)
         self.assertEqual(report["decision"]["status"], "inconclusive")
+
+    def test_complete_non_ceiling_grid_is_descriptively_informative(self) -> None:
+        rows, validity = complete_rows()
+        rows[0]["score"] = 0
+        validity[0]["row_sha256"] = _row_digest(rows[0])
+        report = ingest_gate_baseline(
+            PACK, PREREG, REPO, rows, validity, case_tasks=CASE_TASKS,
+            run_id="g03-real-run",
+            resolved_model={"provider": "llama", "model": "qwen36-35b-iq3s"},
+        )
+        validate_real_report(report, PACK, PREREG)
+        self.assertTrue(report["model_quality_evidence"])
+        self.assertEqual(report["decision"], {
+            "status": "informative",
+            "reason": "complete-authoritative-paired-grid",
+            "statistical_power": "not-established",
+        })
 
     def test_model_identity_and_sidecar_mismatches_fail_closed(self) -> None:
         rows, validity = complete_rows()

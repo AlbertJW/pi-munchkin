@@ -317,6 +317,7 @@ def ingest_gate_baseline(
         timeout = any("timeout" in str(value).lower() for value in (row.get("status"), row.get("authority_reason"), row.get("outcome")))
         trial = _safe_trial(row, case_id=case_id, split=("test" if case is not None and case in pack.splits["test"] else "unknown" if case is None else next(split for split in ("train", "development") if case in pack.splits[split])), errors=errors, timeout=timeout, arm=canonical_arm)
         trial["seed"] = seed
+        trial["repetition"] = repetition
         trials.append(trial)
     if row_keys != set(sidecar):
         raise RealBaselineError("trial-validity sidecar has missing or extra row keys")
@@ -367,6 +368,19 @@ def ingest_gate_baseline(
                 "completed": completed_for_case,
                 "reason": None if completed_for_case == expected_for_case else "missing_or_non_authoritative_cells",
             })
+    scores = [trial["score"] for trial in authoritative if trial["score"] in (0, 1)]
+    if not complete:
+        decision_status = "inconclusive"
+        decision_reason = "incomplete_or_non_authoritative_cells"
+    elif scores and all(score == 1 for score in scores):
+        decision_status = "inconclusive"
+        decision_reason = "ceiling"
+    elif scores and all(score == 0 for score in scores):
+        decision_status = "inconclusive"
+        decision_reason = "floor"
+    else:
+        decision_status = "informative"
+        decision_reason = "complete-authoritative-paired-grid"
     report = {
         "schema": REAL_REPORT_SCHEMA,
         "evidence_class": "model-quality-baseline" if complete else "incomplete-model-quality-baseline",
@@ -387,7 +401,7 @@ def ingest_gate_baseline(
         "trials": sorted(trials, key=lambda value: (str(value["case_id"]), str(value["arm"]), str(value["seed"]), str(value["repetition"]))),
         "trial_count": len(trials),
         "external_references": [], "reference_pooling": "forbidden",
-        "decision": {"status": "informative" if complete else "inconclusive", "reason": "complete-authoritative-paired-grid" if complete else "incomplete_or_non_authoritative_cells", "statistical_power": "not-established"},
+        "decision": {"status": decision_status, "reason": decision_reason, "statistical_power": "not-established"},
         "reconstruction": {"pack_path": prereg.pack_path, "preregistration_sha256": prereg.sha256, "benchmark_pack_sha256": pack.sha256, "validity_sidecar_required": True, "raw_payloads_in_report": False, "rerun_inference_required": False},
         "human_review_required": True, "adoption_authorized": False,
     }
@@ -404,11 +418,19 @@ def validate_real_report(report: dict, pack: BenchmarkPack, prereg: BaselinePrer
     report_digest = report_without_hash.pop("report_sha256", None)
     if not isinstance(report_digest, str) or report_digest != _digest(report_without_hash):
         raise RealBaselineError("real baseline report digest is invalid")
-    if report.get("model_quality_evidence") is not (report.get("decision", {}).get("status") == "informative"):
-        raise RealBaselineError("real baseline quality classification is inconsistent")
+    decision = report.get("decision") if isinstance(report.get("decision"), dict) else {}
+    if decision.get("status") not in {"informative", "inconclusive"}:
+        raise RealBaselineError("real baseline decision status is invalid")
+    if decision.get("status") == "informative" and report.get("model_quality_evidence") is not True:
+        raise RealBaselineError("informative real baseline lacks quality evidence")
+    if decision.get("reason") in {"ceiling", "floor"} and decision.get("status") != "inconclusive":
+        raise RealBaselineError("ceiling/floor baseline cannot be informative")
     trials = report.get("trials")
     if not isinstance(trials, list) or report.get("trial_count") != len(trials):
         raise RealBaselineError("real baseline trial list is malformed")
+    complete = bool(trials) and all(isinstance(trial, dict) and trial.get("status") == "completed" for trial in trials)
+    if report.get("model_quality_evidence") is not complete:
+        raise RealBaselineError("real baseline quality classification is inconsistent")
     for trial in trials:
         if not isinstance(trial, dict) or trial.get("child_telemetry") != "unavailable-contained":
             raise RealBaselineError("real baseline trial is malformed")
