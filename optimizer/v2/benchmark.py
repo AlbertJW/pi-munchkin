@@ -138,8 +138,11 @@ class BenchmarkPack:
                         raise ValueError(f"{split}[{index}].isolation.network is invalid")
                     if isolation["workspace"] not in ("disposable", "fixture_private"):
                         raise ValueError(f"{split}[{index}].isolation.workspace is invalid")
-                    if not isinstance(isolation["path_allowlist"], list) or not isolation["path_allowlist"] or any(not isinstance(item, str) or not item for item in isolation["path_allowlist"]):
+                    if (not isinstance(isolation["path_allowlist"], list) or not isolation["path_allowlist"] or
+                            any(not isinstance(item, str) or not item for item in isolation["path_allowlist"])):
                         raise ValueError(f"{split}[{index}].isolation.path_allowlist is invalid")
+                    for allowlisted in isolation["path_allowlist"]:
+                        _safe_relative_path(allowlisted, f"{split}[{index}].isolation.path_allowlist")
                     if not isinstance(isolation["hidden_tests"], bool):
                         raise ValueError(f"{split}[{index}].isolation.hidden_tests must be boolean")
                     isolation_receipt = _sha(case.get("isolation_receipt_sha256"), f"{split}[{index}].isolation_receipt_sha256")
@@ -213,7 +216,12 @@ class BenchmarkPack:
                 if path.is_symlink() or base not in path.parents or not path.is_file():
                     raise ValueError(f"benchmark case {case.case_id} spec is outside the registry")
                 raw = json.loads(path.read_text(encoding="utf-8"))
-                body = {key: value for key, value in raw.items() if key != "admission"} if isinstance(raw, dict) and raw.get("schema", "").startswith("pi.fixture/") else raw
+                if not isinstance(raw, dict):
+                    raise ValueError(f"benchmark case {case.case_id} spec must be an object")
+                spec_schema = raw.get("schema")
+                if spec_schema not in {"pi.fixture/v1", "pi.research-fixture/v1"}:
+                    raise ValueError(f"benchmark case {case.case_id} spec has unsupported schema")
+                body = {key: value for key, value in raw.items() if key != "admission"} if spec_schema == "pi.fixture/v1" else raw
                 # The trusted Pi gate uses json.dumps' default ASCII escaping
                 # when it computes fixture digests. Keep the registry verifier
                 # byte-for-byte compatible with that canonical form.
@@ -221,7 +229,7 @@ class BenchmarkPack:
                 if fixture_digest != case.fixture_sha256:
                     raise ValueError(f"benchmark case {case.case_id} fixture digest mismatch")
                 admission = raw.get("admission") if isinstance(raw, dict) else None
-                if admission is None and isinstance(raw, dict) and raw.get("schema") == "pi.research-fixture/v1":
+                if admission is None and spec_schema == "pi.research-fixture/v1":
                     admission = {
                         "schema": "pi.research-fixture-admission/v1", "status": "structural_pass",
                         "manifest_sha256": fixture_digest,
@@ -241,5 +249,13 @@ class BenchmarkPack:
                     expected = hashlib.sha256(json.dumps(case.isolation, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
                     if expected != case.isolation_receipt_sha256:
                         raise ValueError(f"benchmark case {case.case_id} isolation receipt mismatch")
-                records.append({"case_id": case.case_id, "split": split, "kind": case.kind, "fixture_sha256": fixture_digest, "admission_receipt_sha256": receipt_digest, "status": "validated"})
+                records.append({
+                    "case_id": case.case_id, "split": split, "kind": case.kind,
+                    "fixture_sha256": fixture_digest,
+                    "admission_receipt_sha256": receipt_digest,
+                    "spec_sha256": hashlib.sha256(path.read_bytes()).hexdigest(),
+                    "oracle_entrypoint": case.oracle["entrypoint"],
+                    "isolation_receipt_sha256": case.isolation_receipt_sha256,
+                    "status": "validated",
+                })
         return records

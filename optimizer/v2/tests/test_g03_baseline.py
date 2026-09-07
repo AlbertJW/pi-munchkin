@@ -40,6 +40,12 @@ class G03RegistryTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "reuse a fixture"):
             BenchmarkPack.from_dict(raw)
 
+    def test_isolation_allowlist_must_be_relative_and_contained(self) -> None:
+        raw = json.loads(PACK_PATH.read_text(encoding="utf-8"))
+        raw["splits"]["train"][0]["isolation"]["path_allowlist"] = ["../outside"]
+        with self.assertRaisesRegex(ValueError, "path_allowlist"):
+            BenchmarkPack.from_dict(raw)
+
     def test_prepare_binds_pack_and_requires_the_complete_slate(self) -> None:
         prepared = prepare_baseline(self.pack, self.prereg, REPO)
         self.assertEqual(prepared["case_count"], 12)
@@ -94,12 +100,39 @@ class G03OfflineBaselineTests(unittest.TestCase):
         payload = {
             "case_id": "coding-edit-access", "kind": "coding_edit", "arm": "baseline",
             "outcome": "success", "artifact_persisted": True, "verification_passed": True,
+            "evidence_coverage": True,
             "source_identity_bound": True, "stop_class": "normal", "child_telemetry": "unavailable-contained",
         }
         completed = subprocess.run([str(oracle)], input=json.dumps(payload), text=True, capture_output=True, check=False)
         self.assertEqual(completed.returncode, 0, completed.stderr)
         self.assertIn('"passed":true', completed.stdout)
         self.assertNotIn("private", completed.stdout)
+
+    def test_oracle_rejects_missing_evidence_or_unknown_stop_class(self) -> None:
+        oracle = REPO / "optimizer/v2/oracles/baseline_shape.py"
+        payload = {
+            "case_id": "research-comparative", "kind": "research_comparative", "arm": "baseline",
+            "outcome": "success", "artifact_persisted": True, "verification_passed": True,
+            "evidence_coverage": False, "source_identity_bound": True,
+            "stop_class": "model-made-this-up", "child_telemetry": "unavailable-contained",
+        }
+        completed = subprocess.run([str(oracle)], input=json.dumps(payload), text=True, capture_output=True, check=False)
+        self.assertEqual(completed.returncode, 1)
+        self.assertIn('"evidence_coverage":false', completed.stdout)
+        self.assertIn('"stop_class_valid":false', completed.stdout)
+
+    def test_case_coverage_records_opaque_exclusions(self) -> None:
+        report = run_offline_baseline(self.pack, self.prereg, REPO)
+        validate_offline_report(report, self.pack, self.prereg)
+        coverage = {item["case_id"]: item for item in report["case_coverage"]}
+        self.assertEqual(len(coverage), 12)
+        self.assertEqual(coverage["research-multipart"]["status"], "excluded")
+        self.assertEqual(coverage["research-multipart"]["reason"], "opaque_test_quarantined")
+        self.assertEqual(coverage["coding-edit-access"]["status"], "evaluated")
+        malformed = json.loads(json.dumps(report))
+        malformed["case_coverage"][-1]["reason"] = None
+        with self.assertRaisesRegex(BaselineError, "exclusion reason"):
+            validate_offline_report(malformed, self.pack, self.prereg)
 
     def test_preregistration_rejects_non_adoption_subject_or_unknown_fields(self) -> None:
         bad = copy.deepcopy(self.prereg.raw)

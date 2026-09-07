@@ -195,6 +195,9 @@ def prepare_baseline(pack: BenchmarkPack, prereg: BaselinePreregistration, repos
         raise BaselineError("G03 pilot taxonomy does not contain the required 12-case slate")
     if len(artifacts) != len(pack.all_cases()):
         raise BaselineError("benchmark artifact validation is incomplete")
+    artifact_by_case = {record["case_id"]: {
+        key: record[key] for key in ("split", "kind", "fixture_sha256", "admission_receipt_sha256", "spec_sha256", "oracle_entrypoint", "isolation_receipt_sha256")
+    } for record in artifacts}
     return {
         "schema": "pi.optimizer-baseline-prepared/v1",
         "preregistration_sha256": prereg.sha256,
@@ -207,6 +210,15 @@ def prepare_baseline(pack: BenchmarkPack, prereg: BaselinePreregistration, repos
         "development_quarantined": True,
         "opaque_test_unreachable": True,
         "model_execution": False,
+        "artifact_receipts": artifact_by_case,
+        "reconstruction": {
+            "manifest": prereg.pack_path,
+            "preregistration_sha256": prereg.sha256,
+            "benchmark_pack_sha256": pack.sha256,
+            "artifact_receipts_complete": True,
+            "offline_command": "python3 -m optimizer.v2.baseline --dry --preregistration optimizer/v2/examples/g03-baseline-preregistration.json",
+            "inference_required": False,
+        },
     }
 
 
@@ -305,7 +317,25 @@ def run_offline_baseline(pack: BenchmarkPack, prereg: BaselinePreregistration, r
         "telemetry_binding": {"status": "protocol-fixture", "authenticated": True, "raw_payloads": False},
         "cohorts": {"subject": summary("baseline"), "candidate": summary("candidate"), "guards": [{"model": model, "status": "not-executed-offline"} for model in prereg.guard_models]},
         "per_case": per_case, "trial_count": len(rows), "trials": rows,
-        "reconstruction": {"pack_path": prereg.pack_path, "preregistration_sha256": prereg.sha256, "immutable_receipts": True, "rerun_inference_required": False},
+        "case_coverage": [
+            {
+                "case_id": case.case_id,
+                "split": split,
+                "status": "excluded" if split == "test" else "evaluated",
+                "reason": "opaque_test_quarantined" if split == "test" else None,
+            }
+            for split in ("train", "development", "test")
+            for case in pack.splits[split]
+        ],
+        "reconstruction": {
+            "pack_path": prereg.pack_path,
+            "preregistration_sha256": prereg.sha256,
+            "benchmark_pack_sha256": pack.sha256,
+            "immutable_receipts": True,
+            "artifact_receipts": prepared["artifact_receipts"],
+            "offline_command": prepared["reconstruction"]["offline_command"],
+            "rerun_inference_required": False,
+        },
         "human_review_required": True, "adoption_authorized": False,
     }
     report["report_sha256"] = digest(report)
@@ -322,6 +352,29 @@ def validate_offline_report(report: dict, pack: BenchmarkPack, prereg: BaselineP
         raise BaselineError("offline report cannot be presented as model-quality evidence")
     if report.get("opaque_test_cases_evaluated") is not False or report.get("development_payloads_quarantined") is not True:
         raise BaselineError("offline report violated benchmark quarantine")
+    coverage = report.get("case_coverage")
+    if not isinstance(coverage, list) or len(coverage) != len(pack.all_cases()):
+        raise BaselineError("offline report has incomplete case coverage")
+    expected_coverage = {
+        case.case_id: (split, "excluded" if split == "test" else "evaluated")
+        for split in ("train", "development", "test") for case in pack.splits[split]
+    }
+    seen_coverage = set()
+    for item in coverage:
+        if not isinstance(item, dict) or set(item) != {"case_id", "split", "status", "reason"}:
+            raise BaselineError("offline report case coverage is malformed")
+        case_id = item["case_id"]
+        if case_id in seen_coverage or case_id not in expected_coverage:
+            raise BaselineError("offline report case coverage has duplicate or unknown cases")
+        seen_coverage.add(case_id)
+        split, status = expected_coverage[case_id]
+        if item["split"] != split or item["status"] != status:
+            raise BaselineError("offline report case coverage does not match the pack")
+        expected_reason = "opaque_test_quarantined" if split == "test" else None
+        if item["reason"] != expected_reason:
+            raise BaselineError("offline report case exclusion reason is not explicit")
+    if seen_coverage != set(expected_coverage):
+        raise BaselineError("offline report case coverage is incomplete")
     rows = report.get("trials")
     if not isinstance(rows, list):
         raise BaselineError("offline report has no trial rows")
@@ -346,6 +399,12 @@ def validate_offline_report(report: dict, pack: BenchmarkPack, prereg: BaselineP
         raise BaselineError("offline report does not cover the complete paired grid")
     if report.get("decision", {}).get("status") != "inconclusive":
         raise BaselineError("offline protocol must remain inconclusive")
+    reconstruction = report.get("reconstruction")
+    expected_receipts = prepare_baseline(pack, prereg, pathlib.Path(__file__).resolve().parents[2])["artifact_receipts"]
+    if (not isinstance(reconstruction, dict) or reconstruction.get("preregistration_sha256") != prereg.sha256 or
+            reconstruction.get("benchmark_pack_sha256") != pack.sha256 or reconstruction.get("immutable_receipts") is not True or
+            reconstruction.get("rerun_inference_required") is not False or reconstruction.get("artifact_receipts") != expected_receipts):
+        raise BaselineError("offline reconstruction receipt is incomplete")
 
 
 def write_private_json(path: str | pathlib.Path, value: dict) -> pathlib.Path:

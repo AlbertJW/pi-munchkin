@@ -17,22 +17,27 @@ def main() -> int:
     value = json.load(sys.stdin)
     if not isinstance(value, dict):
         return 2
-    required = {"case_id", "kind", "arm", "outcome", "artifact_persisted", "verification_passed", "source_identity_bound", "stop_class", "child_telemetry"}
+    required = {"case_id", "kind", "arm", "outcome", "artifact_persisted", "verification_passed", "evidence_coverage", "source_identity_bound", "stop_class", "child_telemetry"}
     if set(value) != required:
         return 2
     if any(not isinstance(value[key], str) or not value[key] for key in ("case_id", "kind", "arm", "outcome", "stop_class", "child_telemetry")):
         return 2
     if value["arm"] not in {"baseline", "candidate"} or value["outcome"] not in {"success", "failure", "invalid", "timeout"}:
         return 1
-    if any(type(value[key]) is not bool for key in ("artifact_persisted", "verification_passed", "source_identity_bound")):
+    if any(type(value[key]) is not bool for key in ("artifact_persisted", "verification_passed", "evidence_coverage", "source_identity_bound")):
         return 2
     if value["child_telemetry"] not in {"available", "unavailable-contained", "not-applicable"}:
         return 2
     checks = {
         "artifact_persisted": value["artifact_persisted"],
         "verification_passed": value["verification_passed"],
+        # Research-shaped cases cannot pass on an unsupported/uncited answer.
+        # For non-research fixtures this remains a required, explicit signal so
+        # callers cannot silently omit evidence accounting.
+        "evidence_coverage": value["evidence_coverage"],
         "source_identity_bound": value["source_identity_bound"],
         "outcome_valid": value["outcome"] != "invalid",
+        "stop_class_valid": value["stop_class"] in {"normal", "timeout", "recovered", "bounded_failure"},
     }
     print(json.dumps({"schema": "pi.baseline-oracle/v1", "checks": checks, "passed": all(checks.values())}, sort_keys=True, separators=(",", ":")))
     return 0 if all(checks.values()) else 1
