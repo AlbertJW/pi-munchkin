@@ -298,6 +298,19 @@ The context-admission and planner/research surfaces remain opt-in or dark;
 this receipt records synchronization only, not model-quality evidence or
 candidate adoption.
 
+## Pending surface boundary — 2026-09-07 (G02 producer integration)
+
+Source commit `8cd551c`, pending live sync. Package source SHA-256:
+`f8afd5db11981b8b6f64a67b05b56fd59f36857d4286331a0f89134a31ba27bb`.
+This boundary connects the opt-in aggregate context admission coordinator to
+Ketch search/read output reservations and Pi tool-finalization release, adds
+epoch invalidation and bounded recovery preservation, and records safe
+reservation telemetry. Targeted tests, typecheck, and the full offline suite
+(782 tests) pass. `CONTEXT_ADMISSION` remains off unless explicitly enabled;
+no inference, rollout, adoption, or default change occurred. A fresh pinned
+model-switch smoke remains required for G02-F before this boundary can receive
+a live mirror receipt.
+
 ## Data at rest: where a research session actually lands (updated 2026-08-10)
 
 A surface hash bounds what the MODEL sees. It says nothing about what a session LEAVES. Those are

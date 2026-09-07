@@ -193,7 +193,7 @@ test("web search reserves aggregate context before invoking the network adapter"
 		mod.registerKetch(fp.pi as never, { resolvePublicUrl: async (raw: string) => new URL(raw).toString() });
 		// 2K is deliberately below the fixed search output reservation. The
 		// producer must fail before checkVersion/search invokes the child process.
-		const model = { provider: "local", id: "tiny", contextWindow: 2_048, baseUrl: "http://127.0.0.1:8080/v1" };
+		const model = { provider: "local", id: "tiny", contextWindow: 2_048, baseUrl: "https://example.invalid/v1" };
 		await fire(fp, "session_start", {}, { cwd: dir, model });
 		const result = await callTool(fp, "web_search", { query: "must not run", limit: 1 }, dir);
 		assert.equal(result.details.outcome, "context_budget_exhausted");

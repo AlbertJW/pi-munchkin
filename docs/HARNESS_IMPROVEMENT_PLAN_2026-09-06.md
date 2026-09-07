@@ -120,11 +120,13 @@ fresh protocol receipt below; its loaded hash is recorded in `docs/evidence/G01.
   cannot alter either store. Exercise races between parent round writes, child
   arrivals, and shutdown; in-memory unit transactions alone do not prove shared
   persistence is serialized.
-- **G02 production integration:** the admission extension creates a reservation
-  ledger but never reserves tokens or passes its reservations into accounting.
-  `allocateContextAllowance` and `preserveContextSections` have no production
-  callers in the inspected TypeScript surface. Connect producers to shared
-  allowance allocation and preservation before claiming aggregate enforcement.
+- **G02 production integration (superseded 2026-09-07):** the initial review
+  found that the admission extension created a reservation ledger without
+  connecting producers. The remediation now exposes an epoch-scoped,
+  digest-only reservation boundary, wires Ketch search/read output caps into
+  it, releases reservations at Pi tool finalization, and routes recovery
+  assembly through the preservation contract when admission is enabled. The
+  aggregate feature remains dark pending its pinned model-switch smoke.
 - **G03/G04 evaluation coverage:** G03 has a registry and an offline runner, but
   its real baseline is still pending. The G04 early-stop sample is not that
   baseline or a completed quality comparison. Reconcile execution receipts with
@@ -143,11 +145,12 @@ with this review; their acceptance labels need reconciliation during remediation
    Add a real-session fake-retrieval test that validates required claims, delivers
    exactly one final answer through G01, and rejects late restarts. Exit condition:
    G04-A through G04-D have direct lifecycle evidence, not only helper tests.
-2. **Finish G02 integration.** Wire retrieval/tool producers into the shared
-   reservation and preservation contract. Prove combined requests and concurrent
-   results respect the active serving epoch, then prepare the 128K/32K switch
-   smoke with concrete limits and usage receipts. Reuse applicable existing
-   approval; do not infer that a research-screen approval covers unrelated runs.
+2. **Validate G02 in a pinned switch smoke.** Producer reservations and recovery
+   preservation are now wired under the opt-in admission flag. Prove combined
+   requests and concurrent results respect the active serving epoch, then run
+   the 128K/32K switch with concrete limits and usage receipts. Reuse applicable
+   existing approval; do not infer that a research-screen approval covers an
+   unrelated run.
 3. **Complete the G03 baseline and diagnose research activation.** Inspect the
    saved Qwen traces to separate routing, tool-contract, scheduling, and inference
    latency. Prepare a reproducible real baseline with actual outcome oracles and
@@ -551,7 +554,7 @@ than replacing pending cells with verbal assurances.
 | Goal | Implemented | Offline verified | Live validated | Evidence |
 |---|---|---|---|---|
 | G01 | Implemented in `6a2d4ec` + `a9cab65`; dispatch proof in `36cfeab`, shutdown cancellation proof in `b2b7777` | Focused 37-test control suite, 75-test real-session/planner integration, and fresh 779-test offline gate pass | Fresh 2026-09-07 disposable Ling receipt: one real goal update, one authority continuation, two provider turns, clean exit; no mirror or adoption claim | `docs/evidence/G01.md`; current review above |
-| G02 | Partial: accounting exists; producer reservation/preservation wiring incomplete | Helper and admission tests pass; aggregate producer integration remains unproven | Model-switch smoke not run | `docs/evidence/G02.md`; current review above |
+| G02 | Implemented behind `CONTEXT_ADMISSION=on`; producer reservation and recovery-preservation wiring complete | Focused producer, recovery, catalog, typecheck, and full offline suites pass; aggregate behavior is still dark | Pinned model-switch smoke pending | `docs/evidence/G02.md`; current review above |
 | G03 | Registry and offline protocol implemented; executed baseline outstanding | Fake pairing/registry checks recorded | Real Qwen baseline not run | `docs/evidence/G03.md` |
 | G04 | Partial: contracts exist; runtime enforcement gaps remain | Focused suites pass; real synthesis delivery and compaction/recovery proof outstanding | Approved early-stop no-go/inconclusive screen; repaired source has no new live receipt | `docs/evidence/G04.md`, `optimizer/docs/screens/G04_DEEP_RESEARCH_EVALUATION_2026-09-07.md`; current review above |
 | G05 | Pending | Pending | Pending | Not yet created |

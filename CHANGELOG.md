@@ -4,6 +4,17 @@ All notable changes to pi-munchkin are documented here. Releases follow semantic
 
 ## Unreleased
 
+### Fixed (2026-09-07 — G02 aggregate context producer integration; repository-only)
+
+Connected the opt-in aggregate context admission coordinator to real producers.
+Ketch search and read now reserve their bounded output before side effects, Pi
+tool-finalization releases reservations idempotently, serving-epoch changes
+invalidate stale reservations, and recovery briefs use the required-field
+preservation contract when `CONTEXT_ADMISSION=on`. Added safe reservation
+telemetry and regressions for producer admission, release, and bounded recovery
+assembly. The feature remains dark and no defaults, inference, rollout, or
+adoption decision changed; a fresh pinned model-switch smoke is still required.
+
 ### Added (2026-09-07 — G04 evidence-gap research rounds; dark)
 
 Added the parent-owned `pi.research-round/v1` ledger and dark `research_round`
