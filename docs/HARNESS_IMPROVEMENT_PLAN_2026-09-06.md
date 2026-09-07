@@ -71,7 +71,8 @@ The subsequent offline repair has source hash
 `92f2e6d6c24335a5e7f1c1bf2df1af3c0ea860c7d1d8315d49d4676c44b307ef`;
 the earlier runs do not validate that repaired surface. Current work includes
 uncommitted G02–G04 changes on `main`; the G01 hardening is committed at
-`6a2d4ec`. Implementation,
+`6a2d4ec` and `a9cab65`, with the post-shutdown dispatch proof in `36cfeab`.
+Implementation,
 commit/push, mirror synchronization, and adoption are separate milestones.
 The current post-audit source-surface hash, including the continuation fixes, is
 `68d1152c8e30673f67a2ae0ee6e06acc43e859536b9d36d391b1184ddc26e0f2` and has
