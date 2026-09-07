@@ -52,9 +52,12 @@ session-reload cancellation, and shutdown rebind; follow-up test proof now
 drives the rebound authority through an actual provider delivery. The focused
 control suite is now 37/37 and the real-session/planner integration set is
 75/75. The fresh
-repository-wide offline gate passes 786/786 tests and all six stages. These
-repairs still need
-a new pinned live smoke; historical receipts remain bound to their old surface.
+repository-wide offline gate previously passed 786/786 tests and all six
+stages. The current G03 change leaves harness sources untouched; its optimizer
+verification is green, while a repeated full verification currently reproduces
+three pre-existing compact-tool/AgentSession timing failures in the harness
+test stage. These repairs still need a new pinned live smoke; historical
+receipts remain bound to their old surface.
 
 The approved screen used a disposable mirror. Ling's complex treatment exited
 after 156.945 seconds with three blocked branches and no settled answer; its
