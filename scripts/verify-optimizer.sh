@@ -60,6 +60,7 @@ selftests=(
   v2/research_baseline.py
   v2/research_runner.py
   v2/g03_reissue.py
+  v2/g03_readiness.py
   v2/planner_smoke.py
 )
 # Completeness guard for the hand-maintained list above: any optimizer .py that

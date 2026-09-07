@@ -113,6 +113,7 @@ python3 -m optimizer.v2.cli replay --manifest optimizer/v2/examples/campaign.jso
 python3 -m optimizer.v2.baseline --selftest
 python3 -m optimizer.v2.baseline --dry --preregistration optimizer/v2/examples/g03-baseline-preregistration.json
 python3 -m optimizer.v2.research_runner --selftest
+python3 -m optimizer.v2.g03_readiness --selftest
 
 # the complete, versioned train/development task binding (digest is recorded
 # in the resulting private baseline report)
@@ -122,6 +123,15 @@ python3 -m optimizer.v2.real_baseline --ingest \
   --preregistration optimizer/v2/examples/g03-baseline-preregistration-r2.json \
   --run-id <gate-run-id> --resolved-provider <provider> \
   --resolved-model qwen36-35b-iq3s --output /private/g03-report.json
+
+# read-only host preflight; exit 1 means the router is healthy but the target
+# is not loaded (no chat request is ever sent)
+python3 -m optimizer.v2.g03_readiness --dry \
+  --pack optimizer/v2/benchmarks/g03-representative-pilot-r2.json \
+  --preregistration optimizer/v2/examples/g03-baseline-preregistration-r2.json \
+  --repository-root . --agent-dir /Users/Albert.Wessels/.pi/agent \
+  --case-tasks optimizer/v2/examples/g03-baseline-task-map-r2.json \
+  --endpoint http://127.0.0.1:8080 --model qwen36-35b-iq3s
 
 # prepare a prompt-free research-cell plan (the checked-in map binds admitted case IDs)
 python3 -m optimizer.v2.research_runner --prepare --run-id g03-run \
