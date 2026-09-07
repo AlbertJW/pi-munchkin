@@ -1,0 +1,375 @@
+{
+  "metric": "task_success",
+  "pack_id": "g03-representative-pilot",
+  "protocol": {
+    "randomization": {
+      "method": "deterministic-arm-order",
+      "seed": 20260907
+    },
+    "repetitions": 1,
+    "resource_limits": {
+      "max_output_bytes": 65536,
+      "max_retries": 8,
+      "max_tool_calls": 80
+    },
+    "seeds": [
+      11,
+      29
+    ],
+    "timeouts": {
+      "case_seconds": 900,
+      "pack_seconds": 14400
+    }
+  },
+  "provenance": {
+    "authoring_sha256": "622e62f3f8760deb2b278bba3af24ca9134e0b7d8d06f7fc9e638e3fabd568ce",
+    "config_sha256": "5306ecc5a68682ce8fe6d52d59e0171367cfae0f390965bc4956c0f9d706d379",
+    "source_surface_sha256": "9aed85c14ebae22b7f255d00fbe9eb7a8a90b023a450291837ef9cf40e67bc18"
+  },
+  "revision": "2026-09-07.r2",
+  "schema": "pi.optimizer-benchmark-pack/v1",
+  "splits": {
+    "development": [
+      {
+        "admission_receipt_sha256": "81e175a8ad155257e63dd7a3204d071eacf3210d83ede4570da50dfeeb61c6ed",
+        "fixture_sha256": "16cea5264eadbd1bc712f7c1db4dd45da3f8c3c1e517a2e8a32c7ac258deac09",
+        "id": "documentation-escape",
+        "isolation": {
+          "hidden_tests": true,
+          "network": "disabled",
+          "path_allowlist": [
+            "optimizer/real-gate-fixtures/"
+          ],
+          "workspace": "disposable"
+        },
+        "isolation_receipt_sha256": "e997fdba35c50e583ea3aa605e2697111473db159f6712e2beb6a43a8969a28e",
+        "kind": "documentation",
+        "limits": {
+          "max_output_bytes": 65536,
+          "max_retries": 8,
+          "max_tool_calls": 80,
+          "timeout_seconds": 900
+        },
+        "oracle": {
+          "entrypoint": "optimizer/v2/oracles/baseline_shape.py",
+          "output_cap_bytes": 4096,
+          "query_budget": 1,
+          "timeout_ms": 2000
+        },
+        "spec_path": "optimizer/real-gate-fixtures/manifests/documented-escape.json"
+      },
+      {
+        "admission_receipt_sha256": "c2f39f5d9b6e9b779f3fe80453d454c76d5af5215b1ad917673a752765ea653a",
+        "fixture_sha256": "2b7b06dc90b94ced4b33676f8f74ec5a2cbae01d6624a04ca7b52748cd4e6c19",
+        "id": "documentation-steps",
+        "isolation": {
+          "hidden_tests": true,
+          "network": "disabled",
+          "path_allowlist": [
+            "optimizer/real-gate-fixtures/"
+          ],
+          "workspace": "disposable"
+        },
+        "isolation_receipt_sha256": "e997fdba35c50e583ea3aa605e2697111473db159f6712e2beb6a43a8969a28e",
+        "kind": "documentation",
+        "limits": {
+          "max_output_bytes": 65536,
+          "max_retries": 8,
+          "max_tool_calls": 80,
+          "timeout_seconds": 900
+        },
+        "oracle": {
+          "entrypoint": "optimizer/v2/oracles/baseline_shape.py",
+          "output_cap_bytes": 4096,
+          "query_budget": 1,
+          "timeout_ms": 2000
+        },
+        "spec_path": "optimizer/real-gate-fixtures/manifests/ordered-steps.json"
+      },
+      {
+        "admission_receipt_sha256": "5f5ea70d11850639f348b1ad03196577a20d676ed75d26c6ea7889f70f568313",
+        "fixture_sha256": "49003acebae420954d7a02775b58e8e77e6ceaa2eef791f5cf1069ac5b934e35",
+        "id": "long-context-bigdata",
+        "isolation": {
+          "hidden_tests": true,
+          "network": "disabled",
+          "path_allowlist": [
+            "optimizer/real-gate-fixtures/"
+          ],
+          "workspace": "disposable"
+        },
+        "isolation_receipt_sha256": "e997fdba35c50e583ea3aa605e2697111473db159f6712e2beb6a43a8969a28e",
+        "kind": "long_context",
+        "limits": {
+          "max_output_bytes": 65536,
+          "max_retries": 8,
+          "max_tool_calls": 80,
+          "timeout_seconds": 900
+        },
+        "oracle": {
+          "entrypoint": "optimizer/v2/oracles/baseline_shape.py",
+          "output_cap_bytes": 4096,
+          "query_budget": 1,
+          "timeout_ms": 2000
+        },
+        "spec_path": "optimizer/real-gate-fixtures/manifests/bigdata.json"
+      },
+      {
+        "admission_receipt_sha256": "b8f8ea76a00e95a0dc24932c6414a4c792f9bf836025cf0f86813f31259bc42e",
+        "fixture_sha256": "69ec7fb559d0aceb2438f55c268a13177f7667d7cef346a4736eb2b59ba663b1",
+        "id": "long-context-pressure",
+        "isolation": {
+          "hidden_tests": true,
+          "network": "disabled",
+          "path_allowlist": [
+            "optimizer/real-gate-fixtures/"
+          ],
+          "workspace": "disposable"
+        },
+        "isolation_receipt_sha256": "e997fdba35c50e583ea3aa605e2697111473db159f6712e2beb6a43a8969a28e",
+        "kind": "long_context",
+        "limits": {
+          "max_output_bytes": 65536,
+          "max_retries": 8,
+          "max_tool_calls": 80,
+          "timeout_seconds": 900
+        },
+        "oracle": {
+          "entrypoint": "optimizer/v2/oracles/baseline_shape.py",
+          "output_cap_bytes": 4096,
+          "query_budget": 1,
+          "timeout_ms": 2000
+        },
+        "spec_path": "optimizer/real-gate-fixtures/manifests/context-pressure.json"
+      }
+    ],
+    "test": [
+      {
+        "admission_receipt_sha256": "0be1e9162d9d8b1afec9dd6d52ebe0f27274a9f8a9c91c90660035187a242ed4",
+        "fixture_sha256": "9aca1c35b47c6054e6cee938bfb91997f97b37abb7a37cd797980db3c625e975",
+        "id": "research-multipart",
+        "isolation": {
+          "hidden_tests": true,
+          "network": "disabled",
+          "path_allowlist": [
+            "optimizer/research-fixtures/"
+          ],
+          "workspace": "disposable"
+        },
+        "isolation_receipt_sha256": "0b729d0770b5658c7f33bf56d43b227aae25b1426aabba09543b6201a43870ff",
+        "kind": "research_multi_part",
+        "limits": {
+          "max_output_bytes": 65536,
+          "max_retries": 8,
+          "max_tool_calls": 80,
+          "timeout_seconds": 900
+        },
+        "oracle": {
+          "entrypoint": "optimizer/research-fixtures/oracles/research_shape.py",
+          "output_cap_bytes": 4096,
+          "query_budget": 3,
+          "timeout_ms": 2000
+        },
+        "spec_path": "optimizer/research-fixtures/manifests/multi-part.json"
+      },
+      {
+        "admission_receipt_sha256": "78f1f9bbdc041fc4ed31e90cfab9291b4e960e0ee0f1ab0be90911217c6747ae",
+        "fixture_sha256": "cfd5453a505f6c4da954140a00b69fe6233f599227b1b19b3b5590b9fffbf59f",
+        "id": "research-fact-lookup",
+        "isolation": {
+          "hidden_tests": true,
+          "network": "disabled",
+          "path_allowlist": [
+            "optimizer/research-fixtures/"
+          ],
+          "workspace": "disposable"
+        },
+        "isolation_receipt_sha256": "0b729d0770b5658c7f33bf56d43b227aae25b1426aabba09543b6201a43870ff",
+        "kind": "research_fact_lookup",
+        "limits": {
+          "max_output_bytes": 65536,
+          "max_retries": 8,
+          "max_tool_calls": 80,
+          "timeout_seconds": 900
+        },
+        "oracle": {
+          "entrypoint": "optimizer/research-fixtures/oracles/research_shape.py",
+          "output_cap_bytes": 4096,
+          "query_budget": 1,
+          "timeout_ms": 2000
+        },
+        "spec_path": "optimizer/research-fixtures/manifests/python-release-fact-lookup.json"
+      }
+    ],
+    "train": [
+      {
+        "admission_receipt_sha256": "4f7726fddbe5ab2e86f30c69911cbb06f3ab274430fdb64e9203c3475d3f1917",
+        "fixture_sha256": "fa6280ec9c72c595f53d4af445f788ee4a912c79a9b7f40be9f176ae5be9d1bd",
+        "id": "coding-edit-access",
+        "isolation": {
+          "hidden_tests": true,
+          "network": "disabled",
+          "path_allowlist": [
+            "optimizer/real-gate-fixtures/"
+          ],
+          "workspace": "disposable"
+        },
+        "isolation_receipt_sha256": "e997fdba35c50e583ea3aa605e2697111473db159f6712e2beb6a43a8969a28e",
+        "kind": "coding_edit",
+        "limits": {
+          "max_output_bytes": 65536,
+          "max_retries": 8,
+          "max_tool_calls": 80,
+          "timeout_seconds": 900
+        },
+        "oracle": {
+          "entrypoint": "optimizer/v2/oracles/baseline_shape.py",
+          "output_cap_bytes": 4096,
+          "query_budget": 1,
+          "timeout_ms": 2000
+        },
+        "spec_path": "optimizer/real-gate-fixtures/manifests/access-log-triage.json"
+      },
+      {
+        "admission_receipt_sha256": "5a6288ca5227635cfea2351a2efb1944bef1b0ce3fa6b7f817cdd3d3230873b8",
+        "fixture_sha256": "c42b16fe8dbb97486c75e6fbf3c1a3ee37664f9b6c4f6ea15e3d3d89507412dd",
+        "id": "coding-edit-audit",
+        "isolation": {
+          "hidden_tests": true,
+          "network": "disabled",
+          "path_allowlist": [
+            "optimizer/real-gate-fixtures/"
+          ],
+          "workspace": "disposable"
+        },
+        "isolation_receipt_sha256": "e997fdba35c50e583ea3aa605e2697111473db159f6712e2beb6a43a8969a28e",
+        "kind": "coding_edit",
+        "limits": {
+          "max_output_bytes": 65536,
+          "max_retries": 8,
+          "max_tool_calls": 80,
+          "timeout_seconds": 900
+        },
+        "oracle": {
+          "entrypoint": "optimizer/v2/oracles/baseline_shape.py",
+          "output_cap_bytes": 4096,
+          "query_budget": 1,
+          "timeout_ms": 2000
+        },
+        "spec_path": "optimizer/real-gate-fixtures/manifests/audit-sweep.json"
+      },
+      {
+        "admission_receipt_sha256": "f5c8b7f09f42ea86002bf29c383fbc0fd44826598a2dcabfc355f5816b6bb370",
+        "fixture_sha256": "29f8e2cc691a12bf9b95797e9e90f2b0e72400870b2acee07790d582f2386687",
+        "id": "failure-recovery-qs",
+        "isolation": {
+          "hidden_tests": true,
+          "network": "disabled",
+          "path_allowlist": [
+            "optimizer/real-gate-fixtures/"
+          ],
+          "workspace": "disposable"
+        },
+        "isolation_receipt_sha256": "e997fdba35c50e583ea3aa605e2697111473db159f6712e2beb6a43a8969a28e",
+        "kind": "failure_recovery",
+        "limits": {
+          "max_output_bytes": 65536,
+          "max_retries": 8,
+          "max_tool_calls": 80,
+          "timeout_seconds": 900
+        },
+        "oracle": {
+          "entrypoint": "optimizer/v2/oracles/baseline_shape.py",
+          "output_cap_bytes": 4096,
+          "query_budget": 1,
+          "timeout_ms": 2000
+        },
+        "spec_path": "optimizer/real-gate-fixtures/manifests/qs-error-swallow.json"
+      },
+      {
+        "admission_receipt_sha256": "df0f2876aa3437239787ac89d5a5ce54b844d80399260a35d3b01b6d07835769",
+        "fixture_sha256": "baa8fdc98d3833849edaaa408d902f4056d32f0106c1ac99e92023f7c2d8ba25",
+        "id": "failure-recovery-retry",
+        "isolation": {
+          "hidden_tests": true,
+          "network": "disabled",
+          "path_allowlist": [
+            "optimizer/real-gate-fixtures/"
+          ],
+          "workspace": "disposable"
+        },
+        "isolation_receipt_sha256": "e997fdba35c50e583ea3aa605e2697111473db159f6712e2beb6a43a8969a28e",
+        "kind": "failure_recovery",
+        "limits": {
+          "max_output_bytes": 65536,
+          "max_retries": 8,
+          "max_tool_calls": 80,
+          "timeout_seconds": 900
+        },
+        "oracle": {
+          "entrypoint": "optimizer/v2/oracles/baseline_shape.py",
+          "output_cap_bytes": 4096,
+          "query_budget": 1,
+          "timeout_ms": 2000
+        },
+        "spec_path": "optimizer/real-gate-fixtures/manifests/retry-trap.json"
+      },
+      {
+        "admission_receipt_sha256": "84d6cd5c82a4fb9c48c13d91bb656cefc62141641aeecf7d0a75e17332972413",
+        "fixture_sha256": "f4543130e6e2414e1acfdc259f457ffab904135291887b8f0dfff48ff51773ad",
+        "id": "research-comparative",
+        "isolation": {
+          "hidden_tests": true,
+          "network": "disabled",
+          "path_allowlist": [
+            "optimizer/research-fixtures/"
+          ],
+          "workspace": "disposable"
+        },
+        "isolation_receipt_sha256": "0b729d0770b5658c7f33bf56d43b227aae25b1426aabba09543b6201a43870ff",
+        "kind": "research_comparative",
+        "limits": {
+          "max_output_bytes": 65536,
+          "max_retries": 8,
+          "max_tool_calls": 80,
+          "timeout_seconds": 900
+        },
+        "oracle": {
+          "entrypoint": "optimizer/research-fixtures/oracles/research_shape.py",
+          "output_cap_bytes": 4096,
+          "query_budget": 3,
+          "timeout_ms": 2000
+        },
+        "spec_path": "optimizer/research-fixtures/manifests/comparative.json"
+      },
+      {
+        "admission_receipt_sha256": "7a2de48a4e7fc0638d4e3e9f420b8280d6a381666dd8c1235ee2d7b4e45e2766",
+        "fixture_sha256": "786c66c9e8a7a19c8d85afd36729282be6f3360d74e67de8316d000a3e99ccf3",
+        "id": "research-contested",
+        "isolation": {
+          "hidden_tests": true,
+          "network": "disabled",
+          "path_allowlist": [
+            "optimizer/research-fixtures/"
+          ],
+          "workspace": "disposable"
+        },
+        "isolation_receipt_sha256": "0b729d0770b5658c7f33bf56d43b227aae25b1426aabba09543b6201a43870ff",
+        "kind": "research_contested",
+        "limits": {
+          "max_output_bytes": 65536,
+          "max_retries": 8,
+          "max_tool_calls": 80,
+          "timeout_seconds": 900
+        },
+        "oracle": {
+          "entrypoint": "optimizer/research-fixtures/oracles/research_shape.py",
+          "output_cap_bytes": 4096,
+          "query_budget": 3,
+          "timeout_ms": 2000
+        },
+        "spec_path": "optimizer/research-fixtures/manifests/contested.json"
+      }
+    ]
+  }
+}

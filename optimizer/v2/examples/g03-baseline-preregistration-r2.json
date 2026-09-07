@@ -1,0 +1,65 @@
+{
+  "arms": {
+    "baseline": {
+      "config_path": "optimizer/prompt-lab/configs/baseline.json",
+      "config_sha256": "5306ecc5a68682ce8fe6d52d59e0171367cfae0f390965bc4956c0f9d706d379",
+      "label": "baseline",
+      "surface_sha256": "f188bb01b175d1fec2b52a3142e615584cc2b14b5fe1ba883ea2b2b4e447a114"
+    },
+    "candidate": {
+      "config_path": "optimizer/prompt-lab/configs/static/c46-prompt-lean.json",
+      "config_sha256": "47c9a04ca233ff552ff71e4e4f77003244cb148d8704f38fb62d2f5cf615b639",
+      "label": "candidate",
+      "surface_sha256": "f188bb01b175d1fec2b52a3142e615584cc2b14b5fe1ba883ea2b2b4e447a114"
+    }
+  },
+  "benchmark_pack": {
+    "pack_id": "g03-representative-pilot",
+    "path": "optimizer/v2/benchmarks/g03-representative-pilot-r2.json",
+    "revision": "2026-09-07.r2",
+    "sha256": "bcb607346e68e97c26ec69f48543a79c1844c82e04b9f546a069af8a54d94f5e"
+  },
+  "guard_models": [],
+  "limits": {
+    "case_timeout_seconds": 900,
+    "max_output_bytes": 65536,
+    "max_retries": 8,
+    "max_tool_calls": 80,
+    "pack_timeout_seconds": 14400
+  },
+  "preregistration_id": "g03-qwen35b-baseline-20260907-reissue-2026-09-07.r2",
+  "primary_metric": {
+    "direction": "maximize",
+    "kind": "binary",
+    "name": "task_success"
+  },
+  "quarantine": {
+    "development_payloads": true,
+    "optimizer_diagnosis": "forbidden",
+    "test_payloads": true
+  },
+  "randomization": {
+    "arm_order": [
+      "baseline",
+      "candidate"
+    ],
+    "method": "deterministic-hash",
+    "seed": 20260907
+  },
+  "repetitions": 1,
+  "schema": "pi.optimizer-baseline-preregistration/v1",
+  "seeds": [
+    11,
+    29
+  ],
+  "subject_model": {
+    "model": "qwen36-35b-iq3s",
+    "provider": "local-llamacpp",
+    "role": "adoption-cohort"
+  },
+  "surface_identity": {
+    "config_sha256": "5306ecc5a68682ce8fe6d52d59e0171367cfae0f390965bc4956c0f9d706d379",
+    "source_sha256": "9aed85c14ebae22b7f255d00fbe9eb7a8a90b023a450291837ef9cf40e67bc18",
+    "surface_sha256": "f188bb01b175d1fec2b52a3142e615584cc2b14b5fe1ba883ea2b2b4e447a114"
+  }
+}
