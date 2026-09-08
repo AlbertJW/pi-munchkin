@@ -172,6 +172,20 @@ def _normalized_repetition(row: dict, prereg: BaselinePreregistration) -> int | 
     return value if 0 <= value < prereg.repetitions else None
 
 
+def _split_matches_legacy_gate(row_split: Any, expected_split: str | None) -> bool:
+    """Accept the legacy gate's bounded ``val`` alias for V2 split identity.
+
+    ``real_gate.sh`` predates the V2 benchmark registry and writes ``val`` for
+    every canonical cell.  The case-to-task map and the immutable pack still
+    determine whether that cell belongs to train or development; ``val`` is
+    therefore only an input spelling, never a third split or a way to bypass
+    pack membership.  Any other mismatch remains non-authoritative.
+    """
+    if expected_split is None:
+        return False
+    return row_split == expected_split or (row_split == "val" and expected_split in {"train", "development"})
+
+
 def _sidecar_map(validity_records: Iterable[dict]) -> dict[str, dict]:
     result: dict[str, dict] = {}
     for value in validity_records:
@@ -219,7 +233,7 @@ def _identity_errors(
         errors.append("preregistration_binding")
     if case_id is None:
         errors.append("unknown_task")
-    elif expected_split is not None and row.get("split") != expected_split:
+    elif not _split_matches_legacy_gate(row.get("split"), expected_split):
         errors.append("split_binding")
     if row.get("run") != run_id:
         errors.append("run_binding")

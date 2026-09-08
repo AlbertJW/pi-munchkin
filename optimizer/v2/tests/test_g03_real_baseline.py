@@ -250,6 +250,21 @@ class G03RealBaselineIngestTests(unittest.TestCase):
         )
         self.assertTrue(any(trial["invalid_reason"] == "candidate_exposure" for trial in report["trials"]))
         rows, validity = complete_rows()
+        # The legacy real_gate writer labels canonical cells ``val`` even
+        # though the V2 pack assigns the case to train/development.  The
+        # ingestor must normalize that bounded legacy alias using the case
+        # map, otherwise every real-gate observation is rejected.
+        rows[0]["split"] = "val"
+        validity[0]["row_key"] = _row_key(rows[0])
+        validity[0]["row_sha256"] = _row_digest(rows[0])
+        report = ingest_gate_baseline(
+            PACK, PREREG, REPO, rows, validity, case_tasks=CASE_TASKS,
+            run_id="g03-real-run", resolved_model={"provider": "llama", "model": "qwen36-35b-iq3s"},
+        )
+        normalized = next(trial for trial in report["trials"] if trial["case_id"] == "coding-edit-access" and trial["arm"] == "baseline" and trial["seed"] == 11)
+        self.assertEqual(normalized["status"], "completed")
+        self.assertNotEqual(normalized.get("invalid_reason"), "split_binding")
+        rows, validity = complete_rows()
         rows[0]["split"] = "development"
         validity[0]["row_key"] = _row_key(rows[0])
         validity[0]["row_sha256"] = _row_digest(rows[0])
