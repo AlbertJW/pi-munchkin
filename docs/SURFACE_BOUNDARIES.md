@@ -450,6 +450,25 @@ G03-C remains pending the approved Qwen 35B baseline.
 Current source-surface SHA-256:
 `9aed85c14ebae22b7f255d00fbe9eb7a8a90b023a450291837ef9cf40e67bc18`.
 
+## Pending surface boundary — 2026-09-08 (G03 reducer compatibility and first Qwen attempt)
+
+Repository-only optimizer commit `2d36193` adds a regression-tested, bounded
+normalization for the legacy `real_gate.sh` canonical-cell `split=val` label.
+The ingestor still binds the task to the immutable train/development split in
+the V2 pack; unrelated split values remain non-authoritative. The focused
+optimizer verification remains green at 115 tests.
+
+The approved Qwen 35B attempt (`g03-qwen35b-r2-20260907`, gate run `999801`)
+now has 16 ordinary rows and 16 validity records under the same run and stable
+serving identity. Its private report is explicitly inconclusive because ten
+rows were voided by trial-validity guards and the research-parent cells were
+not executed. No model-quality or adoption claim is made, and the private
+artifacts must not be pooled with a fresh run. G03-C remains pending a clean
+complete nonresearch slate plus the eight bounded research-parent receipts.
+
+Current source-surface SHA-256:
+`9aed85c14ebae22b7f255d00fbe9eb7a8a90b023a450291837ef9cf40e67bc18`.
+
 ## Data at rest: where a research session actually lands (updated 2026-08-10)
 
 A surface hash bounds what the MODEL sees. It says nothing about what a session LEAVES. Those are
