@@ -26,6 +26,7 @@
     "typecheck": "tsc -p harness/.typecheck/tsconfig.json --noEmit",
     "health": "bash harness/scripts/pi-health.sh",
     "pack:smoke": "node --experimental-strip-types harness/scripts/package-smoke.mjs",
+    "vision:benchmark": "node --experimental-strip-types harness/scripts/vision-benchmark.mjs",
     "compat:consumer": "node harness/scripts/compat-consumer.mjs",
     "compat:peers": "node harness/scripts/peer-boundary-smoke.mjs",
     "mirror:check": "node harness/scripts/live-mirror-check.mjs",
@@ -196,6 +197,8 @@
     "harness/lib/working-memory.ts",
     "harness/lib/visual-observation.ts",
     "harness/lib/visual-grounding.ts",
+    "harness/lib/visual-capture.ts",
+    "harness/lib/sam2-tiny.ts",
     "harness/agents",
     "harness/vendor",
     "skills/deep-research",
@@ -209,6 +212,8 @@
     "harness/scripts/verify-all.mjs",
     "harness/scripts/live-mirror-apply.mjs",
     "harness/scripts/pi-watchdog.sh",
-    "harness/scripts/redact-node-report.mjs"
+    "harness/scripts/redact-node-report.mjs",
+    "harness/scripts/vision-benchmark.mjs",
+    "harness/tests/fixtures/vision-contract-v1.json"
   ]
 }

@@ -4,6 +4,17 @@ All notable changes to pi-munchkin are documented here. Releases follow semantic
 
 ## Unreleased
 
+### Added (2026-09-09 — dark vision qualification boundary)
+
+Added provider-neutral `visual_observe` capture plumbing, a cancellable
+macOS-window adapter, epoch-scoped exact/pHash cache records, bounded context
+reservations, and an optional local SAM 2.1 Tiny JSON adapter. A frozen
+vision-contract fixture and explicit `vision:benchmark` selftest/dry/run
+protocol now measure orchestration without inference. `VISION` and
+`VISION_GROUNDING` remain off by default; Ling is protocol-only and Qwen 35B
+is a separate quality cohort. No desktop capture, model execution, mirror, or
+automatic action was performed.
+
 ### Fixed (2026-09-09 — single-transition branch merge; repository-only)
 
 Parent branch-result handling now relies on its aggregate-first projection and

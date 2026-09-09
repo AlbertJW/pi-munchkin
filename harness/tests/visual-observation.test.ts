@@ -63,6 +63,26 @@ test("cache partitions by window and reuses exact or near frames only", () => {
 	assert.equal(cache.decide({ ...first, exact_sha256: imageDigest(new Uint8Array([8])), force: true }).decision, "forced");
 });
 
+test("segmenter frames are ephemeral and never survive cache invalidation", () => {
+	const cache = new VisualObservationCache(1);
+	const first = request();
+	const entry = cache.put(first, undefined, new Uint8Array([7, 8, 9]));
+	assert.deepEqual(cache.findFrame(entry.observation_id), new Uint8Array([7, 8, 9]));
+	const second = { ...first, source_id: "window-2" };
+	const secondEntry = cache.put(second, undefined, new Uint8Array([1]));
+	assert.equal(cache.findFrame(entry.observation_id), null, "eviction removes image bytes before they can leak or be reused");
+	cache.clear();
+	assert.equal(cache.findFrame(secondEntry.observation_id), null);
+});
+
+test("ephemeral segmenter bytes obey an independent memory ceiling", () => {
+	const cache = new VisualObservationCache(4, 8, 4);
+	const first = cache.put(request(), undefined, new Uint8Array([1, 2, 3, 4]));
+	const second = cache.put({ ...request(), source_id: "window-2" }, undefined, new Uint8Array([5, 6]));
+	assert.equal(cache.findFrame(first.observation_id), null, "oldest frame is evicted before the byte ceiling is exceeded");
+	assert.deepEqual(cache.findFrame(second.observation_id), new Uint8Array([5, 6]));
+});
+
 test("near matches are hints and forced refresh bypasses them", () => {
 	const cache = new VisualObservationCache(8, 8);
 	const first = request(); cache.put(first, "layout");

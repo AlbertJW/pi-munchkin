@@ -13,6 +13,9 @@ export type GroundingRequest = {
 	hint: GroundingHint;
 	purpose: "click" | "drag" | "crop" | "verify";
 	expected_label?: string;
+	/** Ephemeral bytes supplied only to an in-process/local segmenter. */
+	image_bytes?: Uint8Array;
+	signal?: AbortSignal;
 };
 
 export type GroundingResult = {

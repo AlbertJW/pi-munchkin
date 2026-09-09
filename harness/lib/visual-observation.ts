@@ -34,6 +34,7 @@ export type VisualObservationRequest = {
 	now?: number;
 	ttl_ms?: number;
 	force?: boolean;
+	captured_at?: number;
 };
 
 export type VisualObservation = {
@@ -50,6 +51,7 @@ export type VisualObservation = {
 	analysis_version: string;
 	created_at: number;
 	last_used_at: number;
+	captured_at: number;
 	interpretation?: string;
 	interpretation_digest?: string;
 };
@@ -225,12 +227,19 @@ export function cropPng(bytes: Uint8Array, crop: { x: number; y: number; width: 
 
 export class VisualObservationCache {
 	private readonly entries = new Map<string, VisualObservation>();
+	/** Ephemeral frame bytes are kept only for an optional in-process segmenter;
+	 * they are never part of the observation record, telemetry, or persistence. */
+	private readonly frames = new Map<string, Uint8Array>();
+	private frameBytes = 0;
 	private readonly maxEntries: number;
 	private readonly nearDistance: number;
-	constructor(maxEntries = 128, nearDistance = 8) {
+	private readonly maxFrameBytes: number;
+	constructor(maxEntries = 128, nearDistance = 8, maxFrameBytes = 32 * 1024 * 1024) {
 		this.maxEntries = maxEntries;
 		this.nearDistance = nearDistance;
 		if (!Number.isSafeInteger(maxEntries) || maxEntries < 1 || maxEntries > 10_000) throw new Error("invalid visual cache size");
+		if (!Number.isSafeInteger(maxFrameBytes) || maxFrameBytes < 1 || maxFrameBytes > 256 * 1024 * 1024) throw new Error("invalid visual frame budget");
+		this.maxFrameBytes = maxFrameBytes;
 	}
 
 	decide(request: VisualObservationRequest): VisualObservationDecision {
@@ -241,7 +250,7 @@ export class VisualObservationCache {
 		assertGeometry(request.geometry);
 		const now = request.now ?? Date.now();
 		const ttl = request.ttl_ms ?? 30_000;
-		if (!Number.isFinite(now) || !Number.isFinite(ttl) || ttl < 0 || ttl > 86_400_000) throw new Error("invalid visual cache clock");
+		if (!Number.isFinite(now) || !Number.isFinite(ttl) || ttl < 0 || ttl > 86_400_000 || (request.captured_at != null && !Number.isFinite(request.captured_at))) throw new Error("invalid visual cache clock");
 		const key = cacheKey(request);
 		const candidates = [...this.entries.values()].filter((entry) => digest({ session: entry.session_id, source: entry.source, source_id: entry.source_id, geometry: entry.geometry }) === key && entry.question === request.question && entry.model_fingerprint === request.model_fingerprint && entry.analysis_version === request.analysis_version);
 		const exact = candidates.find((entry) => entry.exact_sha256 === request.exact_sha256);
@@ -251,21 +260,54 @@ export class VisualObservationCache {
 		return { decision: request.force ? "forced" : candidates.length ? "stale" : "fresh", observation: null, matched_observation_id: null, phash_distance: null, cache_key: key };
 	}
 
-	put(request: VisualObservationRequest, interpretation?: string): VisualObservation {
+	put(request: VisualObservationRequest, interpretation?: string, frame?: Uint8Array): VisualObservation {
 		const now = request.now ?? Date.now();
 		const id = digest({ schema: VISUAL_OBSERVATION_SCHEMA, session: request.session_id, source: request.source, source_id: request.source_id, geometry: request.geometry, exact: request.exact_sha256, question: request.question, model: request.model_fingerprint, version: request.analysis_version });
-		const entry: VisualObservation = { schema: VISUAL_OBSERVATION_SCHEMA, observation_id: id, session_id: request.session_id, source: request.source, source_id: request.source_id, geometry: request.geometry, exact_sha256: request.exact_sha256, phash: request.phash ?? null, question: request.question, model_fingerprint: request.model_fingerprint, analysis_version: request.analysis_version, created_at: now, last_used_at: now, ...(interpretation === undefined ? {} : { interpretation, interpretation_digest: digest(interpretation) }) };
-		this.entries.delete(cacheKey(request));
+		const capturedAt = request.captured_at ?? now;
+		if (!Number.isFinite(capturedAt)) throw new Error("invalid visual capture timestamp");
+		const entry: VisualObservation = { schema: VISUAL_OBSERVATION_SCHEMA, observation_id: id, session_id: request.session_id, source: request.source, source_id: request.source_id, geometry: request.geometry, exact_sha256: request.exact_sha256, phash: request.phash ?? null, question: request.question, model_fingerprint: request.model_fingerprint, analysis_version: request.analysis_version, created_at: now, last_used_at: now, captured_at: capturedAt, ...(interpretation === undefined ? {} : { interpretation, interpretation_digest: digest(interpretation) }) };
+		const key = cacheKey(request);
+		const replaced = this.entries.get(key);
+		this.entries.delete(key);
+		if (replaced) {
+			this.frameBytes -= this.frames.get(replaced.observation_id)?.byteLength ?? 0;
+			this.frames.delete(replaced.observation_id);
+		}
 		this.entries.set(cacheKey(request), entry);
-		while (this.entries.size > this.maxEntries) this.entries.delete(this.entries.keys().next().value!);
+		if (frame && frame.byteLength <= this.maxFrameBytes) {
+			const copy = frame.slice();
+			this.frames.set(entry.observation_id, copy);
+			this.frameBytes += copy.byteLength;
+		}
+		while (this.entries.size > this.maxEntries) {
+			const oldestKey = this.entries.keys().next().value!;
+			const oldest = this.entries.get(oldestKey);
+			if (oldest) {
+				this.frameBytes -= this.frames.get(oldest.observation_id)?.byteLength ?? 0;
+				this.frames.delete(oldest.observation_id);
+			}
+			this.entries.delete(oldestKey);
+		}
+		while (this.frameBytes > this.maxFrameBytes) {
+			const oldestFrameId = this.frames.keys().next().value;
+			if (!oldestFrameId) break;
+			this.frameBytes -= this.frames.get(oldestFrameId)?.byteLength ?? 0;
+			this.frames.delete(oldestFrameId);
+		}
 		return entry;
 	}
 
-	clear(): void { this.entries.clear(); }
+	clear(): void { this.entries.clear(); this.frames.clear(); this.frameBytes = 0; }
 
 	find(observationId: string): VisualObservation | null {
 		const entry = [...this.entries.values()].find((candidate) => candidate.observation_id === observationId);
 		return entry ?? null;
+	}
+
+	findFrame(observationId: string): Uint8Array | null {
+		if (!this.find(observationId)) return null;
+		const frame = this.frames.get(observationId);
+		return frame ? frame.slice() : null;
 	}
 }
 
