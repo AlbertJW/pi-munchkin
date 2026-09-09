@@ -1,0 +1,47 @@
+# Munchkin upgrade: reliable execution and simpler research
+
+Approved specification, 2026-09-08. Implementation is in progress; this document is not a release receipt. Retired goals remain archived.
+
+Implementation checkpoint: [foundation and aggregate corrections](evidence/HARNESS_UPGRADE_FOUNDATION_2026-09-08.md). Packages 1 and 2 have landed as source-only rollback points; package 3 is partially wired (parent-owned budget/deadline guard and bounded status views), while its simplified receipt contract and terminal delivery remain pending. Packages 4 and 5 remain pending. Existing repository changes predating this upgrade are not evidence that these packages have landed.
+
+## Direction and acceptance
+
+Preserve the working goal lifecycle, continuation arbiter, planner, evidence validation and optimizer boundaries. Ship independently reversible packages, each with targeted failing regressions before corrective changes, offline evidence and a rollback commit. The reviewed starting point was 786 harness tests, 130 Optimizer V2 tests, typecheck and optimizer verification; managed-sandbox scoring was unavailable. Those are offline results, not evidence of research quality.
+
+Complex research has ten minutes including queueing, retries, children and compaction. Discovery stops after seven minutes, reserving three for validation and synthesis. The parent researches directly, optionally delegating one bounded branch when isolation helps. Missing required evidence causes a useful extension request before final synthesis; wait for the user. Simple fact lookup remains lightweight.
+
+## Package 1 — foundation
+
+Bind observed context usage to serving epoch and compaction generation. Over-budget observations block another request until a newer valid measurement establishes room. Allocate output after retained context, destination completion reserve, uncertainty and outstanding reservations; invalidate reservations on model switching. Serialized-JSON token estimates are advisory, not verified rendered-request counts. Introduce a provider-request counting adapter; unsupported counting remains explicitly estimated or unavailable. Reuse the compaction coordinator, with at most one recovery attempt per unchanged request/epoch, and stop actionably if insufficient room remains.
+
+Cache retrieval method, source identity, content digest and completeness. Derive evidence metadata from these receipts, never from quote presence alone. Keep quote presence, parent access, claim association and coverage distinct. Preserve meaningful URL query ordering and path distinctions; aliases require canonicalization evidence. Use one deadline across direct reading and fallback, never start Jina after cancellation, and reject unexpected source rows rather than caching them. Repair explicit ambient tool-profile rollback and precedence. Keep the run kernel observational and use typed domain accessors where touched.
+
+## Package 2 — atomic research authority
+
+One private atomic aggregate owns graph, evidence-round state, execution phase, budget and revision, reusing existing validators and reducers. Creation, reservation, merge, pause and settlement transact through it. Graph and ledger exports are rebuildable views. Migrate only valid graph/ledger pairs sharing run identity; incomplete/conflicting pairs remain inspectable but cannot execute automatically. Preserve flat-plan storage and interactive /plan behavior.
+
+## Package 3 — simpler parent research
+
+The dark RESEARCH_WORKFLOW=parent profile requires the existing graph, research-planning and ledger flags. Start one to three required/optional evidence questions, with three searches, five discovery reads and five parent validation reads shared across the run. Local parent-owned branches do not require delegation. At most one child receives a subdivision of remaining discovery resources and cannot delegate. Keep hierarchical mode separately available. Capability status distinguishes available from active planning; skills can activate a deferred entrypoint while respecting user restrictions and planner disable.
+
+Retrieval tools record execution facts through the controller before returning success. research_note accepts an existing claim ID and publishes evidence automatically. Models provide relevance, gaps, conflicts and deferral judgments, not copied receipts, hashes, budget counts or generated IDs. Legacy forms are compatibility adapters. One research_finish validates obligations, citations, deferrals and branches and atomically settles through existing continuation authority.
+
+Use a deterministic coverage digest (required claims, card IDs, conflicts, resources, next action), at most 2,400 bytes and reduced for available context. Report omissions and retrieval cursors. Inspection pages are revision-bound and at most 4,096 bytes; stale cursors explicitly request restart. Private artifacts preserve complete evidence; digests never restore authority. Synthesis selects by claim/conflict and preserves qualifications, without another router or synthesis-model call.
+
+Persist deadline and phase. At seven minutes stop discovery/delegation; at ten cancel work and pause unless completed. Deterministic progress remains available when a provider hangs. Add /research-status, /research-extend and /research-cancel. Bare extension grants another ten-minute interval with the same finish reserve, not fresh retrieval allowances; increases require explicit resource grants. Restart, compaction and model switching preserve spending, run identity and deadline. Only committed pauses exclude paused time. A linked goal cannot restart research waiting for extension. Stable terminal message IDs reconcile against Pi history; ambiguous delivery must not launch synthesis again.
+
+## Package 4 — optimizer durability and execution qualification
+
+Persist operation intent, request digest, provider/model and reserved session charge before dispatch. Persist validated responses before completion. Resume finalizes durable responses without another call; unresolved intents become uncertain and stop ordinary resume. Explicit reconciliation supplies a validated artifact, abandons, or authorizes a charged new attempt linked to the original. Provider reconciliation is optional; prompt operation IDs do not imply server idempotency. Preserve Pi-gate attempt markers/fresh-evidence checks. Failed and uncertain dispatched sessions count against limits.
+
+Baseline execution must enforce case/campaign deadlines, tool/retry/output limits and complete cohorts; schedule declared matched blocks and arm order. Bind sampling seeds to actual requests in authenticated receipts; refuse unsupported seed protocols at preparation, never substitute repetition ordinals. Retain an explicit outcome for every attempted cell, including timeout, refusal, uncertainty and invalid evidence. Contained child telemetry stays incomplete, never zero. Preserve case-level policies, development quarantine and human adoption.
+
+## Package 5 — verification and release review
+
+Offline tests cover 32K/128K switches, shrinking windows, stale usage, concurrent reservations, multilingual/code payloads, failed compaction; incomplete/mismatched/changed sources and forged metadata; duplicate reports and interruption at every research transition; fake-clock seven/ten-minute boundaries, cancellation, extensions, goal suppression and restart without fresh allowances. A scripted real Pi AgentSession proves completion, optional deferral, required gaps and exactly-once terminal delivery.
+
+Fresh-process optimizer crash tests cover before/after dispatch, response receipt and persistence without in-memory deduplication hiding repeats. Test overruns, wrong seeds/arm order, incomplete cohorts, malformed responses and quarantine. Run harness/optimizer suites, typecheck, package checks, mirror comparison and secret scan; report unavailable sandbox-dependent checks honestly.
+
+No automatic inference, calibration, mirroring, rollout or default change. Record resolved flags in surface/experiment identities. Prepare a frozen-source small screen for separate approval: Ling protocol qualification, then matched Qwen research evaluation. Measure answer support, required coverage, completion, extension requests, calls, context volume and elapsed time. Valid extension requests are correct lifecycle outcomes, not completed answers. Human release review is required.
+
+Cross-run memory, vector storage, browser infrastructure, deeper default delegation and speculative streaming are deferred until measured need.
