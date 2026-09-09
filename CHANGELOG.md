@@ -4,6 +4,18 @@ All notable changes to pi-munchkin are documented here. Releases follow semantic
 
 ## Unreleased
 
+### Fixed (2026-09-09 — aggregate-first research ledger transitions; repository-only)
+
+Evidence-round `start`, `record`, `settle`, delegated child-report merges,
+automatic parent retrieval receipts and recovery rebinding now prepare the next
+research aggregate projection while the plan lock is held, before publishing
+their compatibility ledger or graph view. A failed projection therefore cannot
+leave a newer compatibility record that the parent authority cannot validate.
+The aggregate remains the authoritative parent read boundary, while the
+ledger/graph files remain rebuildable compatibility views until the remaining
+cross-file transitions are moved behind one aggregate writer. Planner and
+parent-research flags remain dark; no inference, mirror or default change.
+
 ### Fixed (2026-09-09 — aggregate-first branch merge; repository-only)
 
 Delegated branch merges now prepare the next aggregate projection while the

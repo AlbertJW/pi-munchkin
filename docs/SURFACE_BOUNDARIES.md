@@ -680,6 +680,27 @@ ordering authority.
 
 Current package-source SHA-256: `c57f514ca640db5c321dfe72a5a3fe27625099606efff3e938bb8481c9e12da0`.
 
+## Pending surface boundary — 2026-09-09 (aggregate-first research ledger transitions)
+
+Repository-only package-2/3 correction prepares evidence-round `start`,
+`record` and `settle`, delegated child-report merges, automatic parent
+retrieval receipts and recovery rebinding in the durable research aggregate
+before publishing their compatibility ledger or graph views. The plan lock
+serializes the projection and view write; a failed projection leaves the
+compatibility state unchanged. This boundary closes the touched ledger-first
+windows but does not yet make the aggregate the sole cross-file writer or make
+view rebuild transactional.
+
+The full offline harness suite passes 816/816, typecheck and optimizer
+verification pass, and the focused ledger hook regression is green after an
+explicit red counterfactual. No inference, calibration, mirror, rollout or
+default change occurred; planner and parent-research flags remain dark. This
+boundary supersedes neither the creation, lease-reservation nor branch-merge
+receipts; it records the ledger-transition ordering correction.
+
+Source commit: `b95dcc3`.
+Current package-source SHA-256: `3f5ca0bdd67a98ba4b461ef048234fce2535ef473ecce132108368113552b9e7`.
+
 ## Data at rest: where a research session actually lands (updated 2026-08-10)
 
 A surface hash bounds what the MODEL sees. It says nothing about what a session LEAVES. Those are
