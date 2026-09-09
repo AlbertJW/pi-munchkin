@@ -1624,10 +1624,16 @@ const researchFinish = defineTool({
 		// exposing one model-facing terminal operation. The ledger settles first;
 		// plan_settle then validates the now-settled ledger, citations, deferrals,
 		// and terminal graph before it writes the final state and terminates.
-		await researchRound.execute(id, {
-			action: "settle", run_id: runId, summary: params.summary,
-			optional_deferrals: params.optional_deferrals,
-		}, signal, update, ctx);
+		// The ledger is durable before the final graph/citation checks. If a
+		// process or validator fails after that boundary, a retry must resume at
+		// plan_settle rather than attempting to settle an immutable ledger again.
+		const latest = await loadResearchRound(ctx.cwd, runId);
+		if (!latest || latest.ledger.state.status !== "settled") {
+			await researchRound.execute(id, {
+				action: "settle", run_id: runId, summary: params.summary,
+				optional_deferrals: params.optional_deferrals,
+			}, signal, update, ctx);
+		}
 		return await planSettle.execute(id, {
 			summary: params.summary, final_answer: params.final_answer,
 		}, signal, update, ctx);

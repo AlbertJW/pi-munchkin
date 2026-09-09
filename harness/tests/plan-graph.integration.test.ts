@@ -89,7 +89,7 @@ if (!CHILD) {
 			const state = JSON.parse(readFileSync(join(cwd, ".pi", "plan-state.json"), "utf8"));
 			await callTool(fp, "plan_update", { deltas: [{ item_id: state.items[0].id, status: "done" }] }, cwd);
 			const claim = claimIdForText("claim");
-			(globalThis as Record<string, unknown>).__pi_plan_validation_urls = ["https://example.test/source", "https://example.test/independent"];
+			delete (globalThis as Record<string, unknown>).__pi_plan_validation_urls;
 			(globalThis as Record<string, unknown>)[RESEARCH_EVIDENCE_CARDS_KEY] = [
 				{ v: 1, card_id: "a".repeat(32), original_url: "https://example.test/source", content_sha256: "c".repeat(64), claim_ids: [claim], truncated: false, parent_validated: true, retrieval_method: "ketch" },
 				{ v: 1, card_id: "b".repeat(32), original_url: "https://example.test/independent", content_sha256: "d".repeat(64), claim_ids: [claim], truncated: false, parent_validated: true, retrieval_method: "ketch" },
@@ -101,6 +101,9 @@ if (!CHILD) {
 				{ card_id: "a".repeat(32), original_url: "https://example.test/source", content_sha256: "c".repeat(64), claim_ids: [claim], truncated: false, parent_validated: true, retrieval_method: "ketch" },
 				{ card_id: "b".repeat(32), original_url: "https://example.test/independent", content_sha256: "d".repeat(64), claim_ids: [claim], truncated: false, parent_validated: true, retrieval_method: "ketch" },
 			], conflicts: [], gaps: [], proposed_next_action: "synthesize" }, cwd);
+			const firstAttempt = await callTool(fp, "research_finish", { run_id: state.run_id, summary: "verified", final_answer: "The claim is supported by https://example.test/source and https://example.test/independent." }, cwd);
+			assert.equal(firstAttempt.isError, true, "missing parent validation must fail after the ledger boundary without corrupting it");
+			(globalThis as Record<string, unknown>).__pi_plan_validation_urls = ["https://example.test/source", "https://example.test/independent"];
 			const result = await callTool(fp, "research_finish", { run_id: state.run_id, summary: "verified", final_answer: "The claim is supported by https://example.test/source and https://example.test/independent." }, cwd);
 			assert.equal(result.isError, false, result.content.map((block: any) => block?.text ?? "").join("\n"));
 			assert.equal(result.terminate, true);
