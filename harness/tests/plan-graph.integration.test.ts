@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { execFileSync, spawn } from "node:child_process";
-import { mkdtempSync, rmSync, unlinkSync, writeFileSync } from "node:fs";
+import { existsSync, mkdtempSync, rmSync, unlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import test from "node:test";
@@ -25,7 +25,7 @@ if (!CHILD) {
 	const output = execFileSync(process.execPath, [
 				"--experimental-strip-types", "--experimental-loader", resolve("harness/tests/ts-js-resolver.mjs"), "--test", import.meta.filename,
 			], { cwd: process.cwd(), env, encoding: "utf8", stdio: "pipe" });
-		assert.match(output, /pass 64/);
+			assert.match(output, /pass 65/);
 		} finally { rmSync(artifacts, { recursive: true, force: true }); }
 	});
 } else {
@@ -230,6 +230,45 @@ if (!CHILD) {
 			assert.equal((await readResearchAggregate(aggregatePath))?.phase, "active", "the seven-minute boundary closes discovery without expiring the whole run");
 		} finally {
 			if (previous === undefined) delete process.env.RESEARCH_WORKFLOW; else process.env.RESEARCH_WORKFLOW = previous;
+			resetPiGlobals();
+		}
+	});
+
+	test("research creation does not persist an executable graph when its ledger cannot be prepared", async () => {
+		// The production resolver reads process.env, so exercise the broken path in
+		// a one-test child process. Keeping the parent suite's environment untouched
+		// prevents this fault-injection case from racing unrelated lifecycle tests.
+		if (process.env.PLAN_GRAPH_CREATE_FAILURE_TEST !== "1") {
+			execFileSync(process.execPath, [
+				"--experimental-strip-types", "--experimental-loader", resolve("harness/tests/ts-js-resolver.mjs"), "--test",
+				"--test-name-pattern", "research creation does not persist an executable graph", import.meta.filename,
+			], {
+				cwd: process.cwd(),
+				env: { ...process.env, PLAN_GRAPH_TEST_CHILD: "1", PLAN_GRAPH_CREATE_FAILURE_TEST: "1", PLAN_GRAPH: "on", DEEP_RESEARCH_PLANNING: "on", RESEARCH_LEDGER: "on", PLAN_TOOL_GO: "on", PLAN_STORAGE: "project" },
+				encoding: "utf8", stdio: "pipe",
+			});
+			return;
+		}
+		const previousWorkflow = process.env.RESEARCH_WORKFLOW;
+		const previousStorage = process.env.PLAN_STORAGE;
+		const previousAgentDir = process.env.PI_CODING_AGENT_DIR;
+		const cwd = tmp();
+		const blockedAgentDir = join(cwd, "blocked-agent");
+		writeFileSync(blockedAgentDir, "not a directory\n");
+		process.env.RESEARCH_WORKFLOW = "parent";
+		process.env.PLAN_STORAGE = "project";
+		process.env.PI_CODING_AGENT_DIR = blockedAgentDir;
+		try {
+			const fp = makeFakePi();
+			for (const name of ["read", "bash", "edit", "write", "capability", "plan_write", "plan_update", "plan_expand", "plan_settle", "research_plan_start", "research_round", "web_search", "web_read", "research_note", "research_recall", "subagent"]) fp.pi.registerTool({ name, parameters: {} } as any);
+			const module = await import(`../extensions/plan-runner.ts?research-create-atomic=${Date.now()}-${Math.random()}`);
+			module.default(fp.pi as any);
+			await expectToolError(fp, "research_plan_start", { request: "Atomic create", summary: "ledger must fail before graph persistence", branches: [{ title: "Evidence", budget: { searches: 1, reads: 1 } }] }, cwd, /ENOTDIR|not a directory|research round ledger/i);
+			assert.equal(existsSync(join(cwd, ".pi", "plan-state.json")), false, "a failed ledger preparation must not leave an executable plan graph");
+		} finally {
+			if (previousWorkflow === undefined) delete process.env.RESEARCH_WORKFLOW; else process.env.RESEARCH_WORKFLOW = previousWorkflow;
+			if (previousStorage === undefined) delete process.env.PLAN_STORAGE; else process.env.PLAN_STORAGE = previousStorage;
+			if (previousAgentDir === undefined) delete process.env.PI_CODING_AGENT_DIR; else process.env.PI_CODING_AGENT_DIR = previousAgentDir;
 			resetPiGlobals();
 		}
 	});

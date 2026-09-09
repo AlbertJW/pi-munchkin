@@ -679,7 +679,13 @@ async function writeState(cwd: string, state: PlanState): Promise<void> {
 	await withPlanFileLock(path, () => writeStateUnlocked(cwd, state));
 }
 
-async function mutatePlan<T>(cwd: string, fn: (state: PlanState | undefined) => Promise<{ state?: PlanState; result: T }>): Promise<T> {
+type MutatePlanOptions = {
+	/** Prepare dependent durable views while the plan lock is still held. If
+	 * preparation fails, the executable compatibility graph is not published. */
+	beforePersist?: (state: PlanState) => Promise<void> | void;
+};
+
+async function mutatePlan<T>(cwd: string, fn: (state: PlanState | undefined) => Promise<{ state?: PlanState; result: T }>, options: MutatePlanOptions = {}): Promise<T> {
 	const path = statePath(cwd);
 	if (!path) throw new Error("private plan storage is not ready; retry after session startup");
 	const privateFile = planStorageMode() === "capsule";
@@ -687,7 +693,10 @@ async function mutatePlan<T>(cwd: string, fn: (state: PlanState | undefined) => 
 	if (privateFile) await chmod(dirname(path), 0o700);
 	return withFileMutationQueue(path, () => withPlanFileLock(path, async () => {
 		const out = await fn(await readState(cwd));
-		if (out.state) await writeStateUnlocked(cwd, out.state);
+		if (out.state) {
+			if (options.beforePersist) await options.beforePersist(out.state);
+			await writeStateUnlocked(cwd, out.state);
+		}
 		return out.result;
 	}));
 }
@@ -1388,6 +1397,7 @@ const researchPlanStart = defineTool({
 		lastSessionCwd = ctx.cwd;
 		if (process.env.RESEARCH_LEDGER !== "on") rejectPlanTool("research_plan_start is unavailable: this session cannot parent-verify delegated sources. Research directly and cite inline instead.");
 		if (!graphLifecycleAvailable()) rejectPlanTool("research_plan_start rejected: explicit tool selection excludes graph lifecycle tools (plan_update, plan_expand, plan_settle)");
+		let roundPath = "";
 		const state = await mutatePlan(ctx.cwd, async (previous) => {
 			if (!previous) await rejectUnreadablePlanState(ctx.cwd);
 			const unsettledGraph = previous && !previous.settled_at && Boolean(previous.profile || previous.items.some((item) => item.parent_id));
@@ -1418,25 +1428,29 @@ const researchPlanStart = defineTool({
 			};
 			validateStateSize(next);
 			return { state: next, result: next };
+		}, {
+			beforePersist: async (nextState) => {
+				// Prepare the round ledger and (for the parent profile) its aggregate
+				// before publishing the executable graph. The plan lock spans both
+				// steps, so a failed dependent write leaves no runnable graph behind.
+				const obligations = params.claim_obligations?.length ? params.claim_obligations.map((claim) => ({ ...claim, status: "open" as const })) : [defaultResearchObligation(params.request)];
+				const roundLedger = new ResearchRoundLedger({ run_id: nextState.run_id, obligations, budget: { searches: 3, reads: 5, validation_reads: 5 } });
+				// In the parent-owned profile these root budgets are planning hints, not
+				// child reservations. Reserving them would make every local branch look
+				// like an in-flight delegated process and permanently block settlement.
+				if (!PARENT_RESEARCH_WORKFLOW) {
+					for (const item of nextState.items) roundLedger.reserveChild(item.owner_ref!, { searches: item.budget!.allocated.searches, reads: item.budget!.allocated.reads, validation_reads: 0 });
+				}
+				roundPath = researchRoundPath(ctx.cwd, nextState.run_id, process.env);
+				await writeResearchRoundLedger(roundPath, roundLedger.state);
+				if (PARENT_RESEARCH_WORKFLOW) {
+					const aggregatePath = researchAggregatePath(ctx.cwd, nextState.run_id, process.env);
+					const aggregate = migrateResearchPair(nextState, roundLedger.state);
+					aggregate.deadline = deadlineFor();
+					await writeResearchAggregate(aggregatePath, aggregate);
+				}
+			},
 		});
-		// Reserve every root allocation before child dispatch. This is the shared
-		// discovery envelope; child completion releases only its unspent remainder.
-		const obligations = params.claim_obligations?.length ? params.claim_obligations.map((claim) => ({ ...claim, status: "open" as const })) : [defaultResearchObligation(params.request)];
-		const roundLedger = new ResearchRoundLedger({ run_id: state.run_id, obligations, budget: { searches: 3, reads: 5, validation_reads: 5 } });
-		// In the parent-owned profile these root budgets are planning hints, not
-		// child reservations. Reserving them would make every local branch look
-		// like an in-flight delegated process and permanently block settlement.
-		if (!PARENT_RESEARCH_WORKFLOW) {
-			for (const item of state.items) roundLedger.reserveChild(item.owner_ref!, { searches: item.budget!.allocated.searches, reads: item.budget!.allocated.reads, validation_reads: 0 });
-		}
-		const roundPath = researchRoundPath(ctx.cwd, state.run_id, process.env);
-		await writeResearchRoundLedger(roundPath, roundLedger.state);
-		if (PARENT_RESEARCH_WORKFLOW) {
-			const aggregatePath = researchAggregatePath(ctx.cwd, state.run_id, process.env);
-			const aggregate = migrateResearchPair(state, roundLedger.state);
-			aggregate.deadline = deadlineFor();
-			await writeResearchAggregate(aggregatePath, aggregate);
-		}
 		(globalThis as Record<string, unknown>)[RESEARCH_ROUND_PATH_KEY] = roundPath;
 		(globalThis as Record<string, unknown>).__pi_plan_validation_urls = [];
 		delete (globalThis as Record<string, unknown>)[RESEARCH_COVERAGE_KEY];
