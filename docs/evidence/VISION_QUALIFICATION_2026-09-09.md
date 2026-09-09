@@ -68,7 +68,7 @@ fresh observation and independent target validation.
 
 ## Offline evidence
 
-- 25 focused visual/capture/SAM/benchmark tests pass, including a real scripted Pi
+- 26 focused visual/capture/SAM/benchmark tests pass, including a real scripted Pi
   `AgentSession` image block, cancellation, local-target validation, ephemeral
   frame cleanup, digest binding, geometry and adapter validation, bounded
   automatic lifecycle checkpoints, and no-click authority.

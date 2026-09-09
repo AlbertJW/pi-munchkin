@@ -12,7 +12,7 @@ The capability family `vision` is available through the existing activation boun
 
 The follow-up lifecycle boundary adds a bounded watcher: an explicit screen/browser observation arms a checkpoint every third context assembly, successful UI-changing tools force the next checkpoint, and agent settlement or shutdown tears the watcher down. The watcher reuses the same epoch-scoped cache and geometry reservation path as the explicit tool, and stale in-flight captures cannot repopulate state after compaction, model selection, or settlement.
 
-Offline evidence now includes sixteen visual-observation tests (25 focused visual/capture/SAM/benchmark tests in total), and the complete harness suite passes 843/843 tests. Typecheck and the 196-file package smoke pass. No model inference, desktop capture, SAM process, mirroring, or rollout was performed.
+Offline evidence now includes sixteen visual-observation tests (26 focused visual/capture/SAM/benchmark tests in total), and the complete harness suite passes 843/843 tests. Typecheck and the 196-file package smoke pass. No model inference, desktop capture, SAM process, mirroring, or rollout was performed at this foundation checkpoint.
 
 Known limits: the repository now ships a cancellable macOS window adapter, but no browser accessibility backend or installed SAM 2.1 Tiny runner. JPEG/GIF/WebP decoding, model-specific visual-token counting, and collection of the model's generated interpretation into the cache remain open. The qualification packet and frozen benchmark define the next explicit real-model screen.
 
