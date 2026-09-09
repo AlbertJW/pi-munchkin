@@ -2070,9 +2070,12 @@ async function rebindActivePlan(cwd: string): Promise<Rebound | null> {
 			});
 		const state: PlanState = { ...previous, items, ...(items.every((item) => graphTerminal(item)) ? { head_terminal_at: previous.head_terminal_at ?? isoNow() } : { head_terminal_at: undefined }) };
 		return { state, result: { state, staleLeases: staleLeases.length, interrupted: true } };
+	}, {
+		beforePersist: async (nextState) => {
+			if (PARENT_RESEARCH_WORKFLOW && nextState.profile?.name === "deep-research") await projectResearchAggregate(cwd, nextState.run_id, nextState, "active");
+		},
 	});
 	const state = rebound?.state;
-	if (PARENT_RESEARCH_WORKFLOW && state?.profile?.name === "deep-research") await syncResearchAggregate(cwd, state.run_id, "active");
 	if (!state) {
 		delete (globalThis as Record<string, unknown>)[RESEARCH_ROOT_CONTEXTS_KEY];
 		return null;
@@ -2253,9 +2256,12 @@ async function mergeResearchRoundChildResult(cwd: string, context: PlanContextV1
 				...(effectiveFailure ? { failure_class: effectiveFailure === "interrupted" ? "interrupted" as const : "child_failed" as const } : {}),
 			};
 			return { merged: ledger.mergeChildReport(childReport).merged };
+		}, {
+			beforePersist: async (nextRound) => {
+				if (PARENT_RESEARCH_WORKFLOW) await projectResearchRoundAggregate(cwd, context.run_id, nextRound, "active");
+			},
 		});
 		if (!result.merged) return;
-		await syncResearchAggregate(cwd, context.run_id, "active");
 	} catch {
 		// The graph merge remains authoritative. A malformed evidence projection is
 		// non-authoritative and is surfaced by the parent's bounded inspect state.
