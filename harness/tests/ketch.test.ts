@@ -488,6 +488,39 @@ test("verified research notes publish compact evidence cards without page conten
 	}
 });
 
+test("research_note reuses a supplied claim identifier instead of re-hashing claim text", async () => {
+	const dir = mkdtempSync(join(tmpdir(), "ketch-claim-id-"));
+	const snapshot = Object.fromEntries(["KETCH", "KETCH_BIN", "RESEARCH_LEDGER", "PI_CODING_AGENT_DIR", "TELEMETRY_FILE", "TELEMETRY_SOURCE"].map((key) => [key, process.env[key]]));
+	try {
+		delete process.env.KETCH;
+		process.env.KETCH_BIN = mockKetch(dir);
+		process.env.RESEARCH_LEDGER = "on";
+		process.env.PI_CODING_AGENT_DIR = join(dir, "agent");
+		process.env.TELEMETRY_FILE = join(dir, "events.jsonl");
+		process.env.TELEMETRY_SOURCE = "test";
+		delete (globalThis as Record<string, unknown>)[RESEARCH_EVIDENCE_CARDS_KEY];
+		const fp = makeFakePi();
+		const mod = await import(`../extensions/ketch.ts?claim-id=${Date.now()}-${Math.random()}`);
+		mod.registerKetch(fp.pi as never, { resolvePublicUrl: async (raw: string) => new URL(raw).toString() });
+		await fp.handlers.get("session_start")?.[0]?.({}, { cwd: dir, ui: { notify() {} } });
+		await callTool(fp, "web_read", { urls: ["https://example.com/a"] }, dir);
+		const note = await callTool(fp, "research_note", {
+			claim: "A rewritten claim which must retain the plan identity.",
+			claim_id: "claim-plan-123",
+			url: "https://example.com/a",
+			quote: "Useful source text",
+		}, dir);
+		assert.equal(note.isError, false);
+		const card = (note.details as Record<string, any>).evidence_card;
+		assert.deepEqual(card.claim_ids, ["claim-plan-123"]);
+		assert.notEqual(card.claim_ids[0], "claim-" + "0".repeat(24));
+	} finally {
+		restoreEnv(snapshot);
+		rmSync(dir, { recursive: true, force: true });
+		delete (globalThis as Record<string, unknown>)[RESEARCH_EVIDENCE_CARDS_KEY];
+	}
+});
+
 test("reader parser preserves complete, truncated and unknown extraction receipts", () => {
 	const rows = parseReadResults(JSON.stringify([
 		{ url: "https://example.com/a", markdown: "a", truncated: true },

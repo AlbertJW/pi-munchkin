@@ -750,12 +750,13 @@ export function registerKetch(pi: ExtensionAPI, dependencies: KetchDependencies 
 			name: "research_note",
 			label: "Record a verified research note",
 			description: "Record one cited claim in the research ledger. The quote must appear verbatim in a page already read with web_read this session — unverifiable citations are refused.",
-			promptSnippet: "research_note(claim, url, quote): record a claim with its verbatim source quote, immediately after web_read.",
+			promptSnippet: "research_note(claim, url, quote, claim_id?): record a claim with its verbatim source quote; reuse the existing claim_id when one was supplied by the research plan.",
 			promptGuidelines: [
-				"Call this right after web_read, once per material claim, while the page text is in view. The quote must be copied exactly from the page.",
+				"Call this right after web_read, once per material claim, while the page text is in view. The quote must be copied exactly from the page. If research_plan_start or research_round gave this claim a claim_id, pass it unchanged.",
 			],
 			parameters: Type.Object({
 				claim: Type.String({ minLength: 1, maxLength: 500, description: "The factual claim, in one sentence." }),
+				claim_id: Type.Optional(Type.String({ minLength: 1, maxLength: 96, description: "Existing research-plan claim identifier; omit to derive a stable ID from claim text." })),
 				// Same GBNF ceiling as web_read: nested string maxLength must stay < 2000
 				// (ggml-org/llama.cpp#25746).
 				url: Type.String({ minLength: 1, maxLength: 1_999, description: "The exact URL the quote comes from (must have been web_read this session)." }),
@@ -830,8 +831,9 @@ export function registerKetch(pi: ExtensionAPI, dependencies: KetchDependencies 
 				}
 				counts.notes += 1;
 				verifiedUrls.add(canonicalResearchUrl(sourceUrl));
+				const claimId = params.claim_id ?? claimIdForText(params.claim);
 				const evidenceCard = makeEvidenceCard({
-					original_url: sourceUrl, content: verdict.page.text, claim_ids: [claimIdForText(params.claim)],
+					original_url: sourceUrl, content: verdict.page.text, claim_ids: [claimId],
 					// V1's boolean cannot express unknown: conservatively prevent
 					// coverage settlement and return the full receipt separately.
 					truncated: verdict.page.retrieval.completeness !== "complete", parent_validated: true,
