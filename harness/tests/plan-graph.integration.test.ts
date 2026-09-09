@@ -25,7 +25,7 @@ if (!CHILD) {
 	const output = execFileSync(process.execPath, [
 				"--experimental-strip-types", "--experimental-loader", resolve("harness/tests/ts-js-resolver.mjs"), "--test", import.meta.filename,
 			], { cwd: process.cwd(), env, encoding: "utf8", stdio: "pipe" });
-		assert.match(output, /pass 61/);
+		assert.match(output, /pass 62/);
 		} finally { rmSync(artifacts, { recursive: true, force: true }); }
 	});
 } else {
@@ -159,6 +159,29 @@ if (!CHILD) {
 			assert.equal(await module.releaseResearchBranchLease(cwd, context, acquired.lease_id), true);
 			const released = await readResearchAggregate(aggregatePath);
 			assert.equal((released?.graph?.items as any[] | undefined)?.find((item: any) => item.id === context.parent_item_id)?.lease, undefined, "lease release must refresh aggregate state");
+		} finally {
+			if (previous === undefined) delete process.env.RESEARCH_WORKFLOW; else process.env.RESEARCH_WORKFLOW = previous;
+			resetPiGlobals();
+		}
+	});
+
+	test("cancelling parent research stops graph mutation until an explicit extension", async () => {
+		const previous = process.env.RESEARCH_WORKFLOW;
+		process.env.RESEARCH_WORKFLOW = "parent";
+		try {
+			const fp = makeFakePi(); const cwd = tmp();
+			for (const name of ["read", "bash", "edit", "write", "capability", "plan_write", "plan_update", "plan_expand", "plan_settle", "research_plan_start", "research_round", "web_search", "web_read", "research_note", "research_recall", "subagent"]) fp.pi.registerTool({ name, parameters: {} } as any);
+			const module = await import(`../extensions/plan-runner.ts?aggregate-cancel=${Date.now()}-${Math.random()}`);
+			module.default(fp.pi as any);
+			const started = await callTool(fp, "research_plan_start", { request: "Cancel research", summary: "one branch", branches: [{ title: "Evidence", budget: { searches: 1, reads: 1 } }] }, cwd);
+			assert.equal(started.isError, false);
+			const { ctx } = makeCtx(cwd);
+			await fp.commands.get("research-cancel")?.handler("", ctx);
+			const itemId = started.details.contexts[0].parent_item_id;
+			await expectToolError(fp, "plan_update", { deltas: [{ item_id: itemId, note: "must not continue" }] }, cwd, /paused|cancelled|extension/i);
+			await fp.commands.get("research-extend")?.handler("", ctx);
+			const resumed = await callTool(fp, "plan_update", { deltas: [{ item_id: itemId, note: "extension granted" }] }, cwd);
+			assert.equal(resumed.isError, false);
 		} finally {
 			if (previous === undefined) delete process.env.RESEARCH_WORKFLOW; else process.env.RESEARCH_WORKFLOW = previous;
 			resetPiGlobals();

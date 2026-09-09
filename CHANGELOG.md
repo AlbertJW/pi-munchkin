@@ -4,6 +4,15 @@ All notable changes to pi-munchkin are documented here. Releases follow semantic
 
 ## Unreleased
 
+### Fixed (2026-09-09 — parent research pause authority; repository-only)
+
+Parent research mutations now honor the aggregate lifecycle: cancellation and
+blocked states reject graph/ledger continuation until the user grants an
+explicit `/research-extend`. Expired runs may still finish only when their
+evidence is already complete, and a freshness projection cannot resurrect a
+paused or extension-boundary run. Added cancellation/extension regressions;
+planner and research flags remain dark.
+
 ### Fixed (2026-09-09 — parent research aggregate read authority; repository-only)
 
 Parent deep-research status and recovery now read the private aggregate as the

@@ -509,6 +509,24 @@ async function readCompatibilityState(cwd: string): Promise<PlanState | undefine
 	try { return migrateState(JSON.parse(await readFile(path, "utf8"))); } catch { return undefined; }
 }
 
+async function requireActiveParentResearch(cwd: string, runId: string, operation: string): Promise<void> {
+	if (!PARENT_RESEARCH_WORKFLOW) return;
+	const aggregate = await readResearchAggregate(researchAggregatePath(cwd, runId, process.env));
+	if (!aggregate || aggregate.run_id !== runId) rejectPlanTool(`${operation} rejected: parent research aggregate is missing or malformed`);
+	if (aggregate.phase !== "active") rejectPlanTool(`${operation} rejected: parent research is ${aggregate.phase}; continuation is unavailable until the user extends the run`);
+}
+
+async function requireFinishableParentResearch(cwd: string, runId: string): Promise<void> {
+	if (!PARENT_RESEARCH_WORKFLOW) return;
+	const aggregate = await readResearchAggregate(researchAggregatePath(cwd, runId, process.env));
+	if (!aggregate || aggregate.run_id !== runId) rejectPlanTool("research_finish rejected: parent research aggregate is missing or malformed");
+	// An expired run is represented as awaiting_extension. Finishing is still
+	// allowed when evidence is already complete; explicit cancellation/blocked
+	// states must remain terminal until the user resumes them.
+	if (aggregate.phase === "settled" && typeof (aggregate.graph as { settled_at?: unknown }).settled_at !== "string") return;
+	if (aggregate.phase !== "active" && aggregate.phase !== "awaiting_extension") rejectPlanTool(`research_finish rejected: parent research is ${aggregate.phase}; continuation is unavailable until the user extends the run`);
+}
+
 /** Creation must not treat a present but unreadable plan as an empty slot. */
 async function planStateFilePresent(cwd: string): Promise<boolean> {
 	const path = statePath(cwd);
@@ -700,6 +718,7 @@ export async function acquireResearchBranchLease(cwd: string, context: PlanConte
 		if (previous.schema_version !== 5 || previous.run_id !== context.run_id || previous.profile?.name !== "deep-research" || previous.settled_at) {
 			return { result: { ok: false, reason: "wrong-plan" } };
 		}
+		await requireActiveParentResearch(cwd, previous.run_id, "research branch lease");
 		const parent = previous.items.find((item) => item.id === context.parent_item_id);
 		if (!parent || parent.parent_id !== undefined || parent.kind !== "research_branch" || parent.owner_ref !== context.owner_ref) {
 			return { result: { ok: false, reason: "unknown-branch" } };
@@ -1002,6 +1021,7 @@ const planUpdate = defineTool({
 			// it is the remedy that actually exists for the caller being spoken to.
 			if (!previous) rejectPlanTool("plan_update rejected: no plan exists yet. Call plan_write first to create one, then plan_update for status changes.");
 			if (previous.settled_at) rejectPlanTool("plan_update rejected: settled plans are immutable");
+			if (previous.profile?.name === "deep-research") await requireActiveParentResearch(ctx.cwd, previous.run_id, "plan_update");
 			const applied = applyPlanDeltas(previous.items, params.deltas as PlanDelta[]);
 			if (!applied.ok) rejectPlanTool(`plan_update rejected: ${applied.errors.join("; ")}`);
 			// Depth-two scouts are terminal evidence leaves, not independently
@@ -1282,7 +1302,10 @@ async function syncResearchAggregate(cwd: string, runId: string, phase?: Researc
 		await writeResearchAggregate(path, migrateResearchPair(graph, round));
 	} else {
 		await mutateResearchAggregate(path, (state) => ({
-			state: transitionAggregate(state, { graph, evidence_round: round, phase: phase ?? state.phase, budget: (round.budget as any).consumed ?? { searches: 0, reads: 0, validation_reads: 0 } }),
+			// A freshness projection must never resurrect a run that was explicitly
+			// paused, blocked, or placed at the extension boundary. Only terminal
+			// requests may advance a non-active lifecycle phase.
+			state: transitionAggregate(state, { graph, evidence_round: round, phase: phase && phase !== "active" ? phase : state.phase, budget: (round.budget as any).consumed ?? { searches: 0, reads: 0, validation_reads: 0 } }),
 			result: undefined,
 		}));
 	}
@@ -1443,6 +1466,7 @@ const researchRound = defineTool({
 			const state = await readState(ctx.cwd);
 			if (!state || state.schema_version !== 5 || state.profile?.name !== "deep-research" || state.settled_at) rejectPlanTool("research_round start requires an active deep-research graph");
 			if (params.run_id && params.run_id !== state.run_id) rejectPlanTool("research_round start run identity mismatch");
+			await requireActiveParentResearch(ctx.cwd, state.run_id, "research_round start");
 			const existing = await loadResearchRound(ctx.cwd, state.run_id);
 			if (existing) return { content: [{ type: "text" as const, text: existing.ledger.renderSummary() }], details: { tool_name: "research_round", success: true, idempotent: true } };
 			const obligations = params.claim_obligations?.length ? params.claim_obligations.map((claim) => ({ ...claim, status: claim.status ?? "open" as const })) : [defaultResearchObligation(state.request)];
@@ -1459,6 +1483,7 @@ const researchRound = defineTool({
 		if (params.action === "inspect") return { content: [{ type: "text" as const, text: ledger.renderSummary() }], details: { tool_name: "research_round", success: true, idempotent: true } };
 		if (params.action === "record") {
 			if (!params.round_id || !params.proposed_next_action) rejectPlanTool("research_round record requires round_id and proposed_next_action");
+			await requireActiveParentResearch(ctx.cwd, ledger.runId, "research_round record");
 			const proposal: ResearchRoundProposalV1 = {
 				schema: "pi.research-round/v1", run_id: ledger.runId, round_id: params.round_id,
 				selected_gaps: params.selected_gaps ?? [], queries: params.queries ?? [], source_leads: params.source_leads ?? [], reads: params.reads ?? [],
@@ -1475,6 +1500,7 @@ const researchRound = defineTool({
 			roundTelemetry(committedLedger, result.round);
 			return { content: [{ type: "text" as const, text: `Research round ${result.round.round_id} recorded: ${result.round.status}; next action=${result.round.next_action}.\n${result.summary}` }], details: { tool_name: "research_round", success: true, round_id: result.round.round_id, status: result.round.status } };
 		}
+		await requireFinishableParentResearch(ctx.cwd, ledger.runId);
 		const result = await mutateResearchRoundLedger(path, async (latest) => {
 			if (latest.runId !== ledger.runId) throw new Error("research round run identity mismatch");
 			const graph = await readState(ctx.cwd);
@@ -1505,6 +1531,7 @@ const planExpand = defineTool({
 		const state = await mutatePlan(ctx.cwd, async (previous) => {
 			if (!previous || previous.schema_version !== 5) rejectPlanTool("plan_expand requires an active graph plan");
 			if (previous.settled_at) rejectPlanTool("plan_expand rejected: settled plans are immutable");
+			if (previous.profile?.name === "deep-research") await requireActiveParentResearch(ctx.cwd, previous.run_id, "plan_expand");
 			const next = expandGraph(previous as GraphPlanState, params.parent_item_id, params.children as BranchChildInput[]);
 			return { state: next, result: next };
 		});
@@ -1641,6 +1668,7 @@ const researchFinish = defineTool({
 		}
 		const runId = params.run_id ?? state.run_id;
 		if (runId !== state.run_id) rejectPlanTool("research_finish rejected: run identity mismatch");
+		await requireFinishableParentResearch(ctx.cwd, runId);
 		await finalizeParentResearchGraph(ctx.cwd, runId, params.optional_deferrals);
 		// The graph view was just advanced by the compatibility reducer. Project
 		// that committed view before the ledger settlement reads the aggregate;
