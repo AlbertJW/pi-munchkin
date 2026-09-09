@@ -93,7 +93,11 @@ used from an isolated temporary environment. Both target cases produced no
 valid mask, so the receipt records two grounding failures and deliberately
 does not claim a grounding accuracy score. A follow-up quality pack still
 needs real screenshot cases with answer and geometry oracles. Ling remains a
-protocol-only cohort and must not be pooled with this result.
+protocol-only cohort and must not be pooled with this result. Separately, the
+full harness suite verifies that delegated research evidence cannot settle a
+parent branch until the parent rereads each source and records a validated
+research note; that evidence-integrity check is independent of this vision
+screen.
 
 ## Reproduction boundary
 

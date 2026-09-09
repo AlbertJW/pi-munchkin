@@ -88,7 +88,10 @@ near-cache measurements, but the frozen one-pixel fixture has no semantic
 answer oracle. Near-cache correctly exposes two missed required changes and
 one stale-target refusal. The SAM arm executed with the isolated official
 SAM2.1 Tiny runner, but both target frames produced no valid mask and therefore
-no grounding accuracy claim.
+no grounding accuracy claim. A separate exploratory run on the bundled
+fantasy-warrior image confirms a supported Qwen `sword` answer and valid SAM
+mask output, but it has no preregistered geometry oracle and is not pooled with
+the frozen measurements.
 
 The real quality screen therefore remains pending. A human must first install
 or point to a local SAM 2.1 Tiny runner and a vision-capable model, then run
