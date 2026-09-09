@@ -766,8 +766,11 @@ export async function acquireResearchBranchLease(cwd: string, context: PlanConte
 		const lease: ResearchBranchLease = { lease_id: randomUUID(), issued_at: isoNow(), owner_ref: context.owner_ref };
 		const state: PlanState = { ...previous, items: previous.items.map((item) => item.id === parent.id ? { ...item, lease } : item) };
 		return { state, result: { ok: true, lease_id: lease.lease_id } };
+	}, {
+		beforePersist: async (nextState) => {
+			if (PARENT_RESEARCH_WORKFLOW) await projectResearchAggregate(cwd, context.run_id, nextState, "active");
+		},
 	});
-	if (PARENT_RESEARCH_WORKFLOW && result.ok) await syncResearchAggregate(cwd, context.run_id, "active");
 	return result;
 }
 
@@ -786,8 +789,11 @@ export async function releaseResearchBranchLease(cwd: string, context: PlanConte
 			return next;
 		});
 		return { state: { ...previous, items }, result: true };
+	}, {
+		beforePersist: async (nextState) => {
+			if (PARENT_RESEARCH_WORKFLOW) await projectResearchAggregate(cwd, context.run_id, nextState, "active");
+		},
 	});
-	if (PARENT_RESEARCH_WORKFLOW && released) await syncResearchAggregate(cwd, context.run_id, "active");
 	return released;
 }
 
@@ -1318,9 +1324,11 @@ async function loadResearchRound(cwd: string, runId?: string): Promise<{ path: s
 	return { path, ledger: ResearchRoundLedger.fromState(raw as any) };
 }
 
-async function syncResearchAggregate(cwd: string, runId: string, phase?: ResearchAggregatePhase): Promise<void> {
+/** Project a graph transition into the parent aggregate before publishing the
+ * compatibility graph. The caller must hold the plan mutation lock; this
+ * ordering makes the aggregate authoritative even if the graph write fails. */
+async function projectResearchAggregate(cwd: string, runId: string, graph: PlanState, phase?: ResearchAggregatePhase): Promise<void> {
 	if (!PARENT_RESEARCH_WORKFLOW) return;
-	const graph = await readCompatibilityState(cwd);
 	const roundPath = researchRoundPath(cwd, runId, process.env);
 	const round = await readResearchRoundLedger(roundPath);
 	if (!graph || graph.run_id !== runId || !round || round.run_id !== runId) throw new Error("research aggregate migration refused: graph/round pair is missing or has mismatched identity");
@@ -1338,6 +1346,13 @@ async function syncResearchAggregate(cwd: string, runId: string, phase?: Researc
 		}));
 	}
 	(globalThis as Record<string, unknown>)[RESEARCH_AGGREGATE_PATH_KEY] = path;
+}
+
+async function syncResearchAggregate(cwd: string, runId: string, phase?: ResearchAggregatePhase): Promise<void> {
+	if (!PARENT_RESEARCH_WORKFLOW) return;
+	const graph = await readCompatibilityState(cwd);
+	if (!graph) throw new Error("research aggregate migration refused: compatibility graph is missing or malformed");
+	await projectResearchAggregate(cwd, runId, graph, phase);
 }
 
 function defaultResearchObligation(request: string): ClaimObligationV1 {
