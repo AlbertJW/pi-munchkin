@@ -7,7 +7,7 @@ import { resolveReadPath } from "../lib/context-inlet.ts";
 import { modelFingerprint as contextModelFingerprint } from "../lib/context-profile.ts";
 import { reserveContextOutput } from "../lib/context-accounting.ts";
 import { record } from "../lib/telemetry.ts";
-import { cropPng, imageDigest, perceptualHash, pngLuma, VisualObservationCache, visualTelemetry, type VisualGeometry } from "../lib/visual-observation.ts";
+import { cropPng, imageDigest, perceptualHash, pngLuma, regionDigests, VisualObservationCache, visualTelemetry, type VisualGeometry } from "../lib/visual-observation.ts";
 import { refineWithSam, type SamAdapter, type GroundingHint } from "../lib/visual-grounding.ts";
 import { createMacScreenCapture, type CaptureCrop } from "../lib/visual-capture.ts";
 
@@ -127,7 +127,7 @@ export function registerVisualTools(pi: ExtensionAPI, options: VisualToolOptions
 			const png = mime === "image/png" ? pngLuma(bytes) : null;
 			if (source !== "image") validateCrop(params.crop, width, height);
 			const geometry = geometryFor(width, height, deviceScale, viewport);
-			const request = { session_id: sessionId, source, source_id: sourceId, geometry, exact_sha256: digest, phash: png ? perceptualHash(png.luma, png.width, png.height) : null, question: params.question, model_fingerprint: modelFingerprint(model), analysis_version: "visual-observe/v1", ttl_ms: params.ttl_ms ?? DEFAULT_TTL_MS, force: params.force, captured_at: capturedAt };
+			const request = { session_id: sessionId, source, source_id: sourceId, geometry, exact_sha256: digest, phash: png ? perceptualHash(png.luma, png.width, png.height) : null, region_digests: png ? regionDigests(png.luma, png.width, png.height) : null, question: params.question, model_fingerprint: modelFingerprint(model), analysis_version: "visual-observe/v1", ttl_ms: params.ttl_ms ?? DEFAULT_TTL_MS, force: params.force, captured_at: capturedAt };
 			const decision = cache.decide(request);
 			record("visual-observe", "cache", visualTelemetry(decision));
 			const metadata = `[visual ${decision.decision} observation=${decision.matched_observation_id ?? "new"} sha256=${digest.slice(0, 16)} size=${bytes.byteLength} geometry=${width}x${height}@${geometry.device_scale} captured_at=${capturedAt} model_epoch=${request.model_fingerprint.slice(0, 16)}]`;

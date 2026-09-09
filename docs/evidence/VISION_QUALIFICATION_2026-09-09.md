@@ -45,7 +45,8 @@ Browser capture remains an attested adapter seam rather than an implicit URL
 fetch.
 
 The cache keeps only bounded, latest-frame references and ephemeral in-process
-bytes needed by an optional segmenter. It is cleared at session start,
+bytes needed by an optional segmenter. PNG observations also carry a fixed
+local-region digest grid; any changed region disables pHash reuse. It is cleared at session start,
 compaction, and model selection; it never writes screenshots, OCR, base64, or
 paths to telemetry. Exact SHA-256 is identity; PNG pHash is only a near-match
 hint. A fresh image is required after uncertainty or action-relevant changes.
@@ -59,12 +60,13 @@ fresh observation and independent target validation.
 
 ## Offline evidence
 
-- 22 focused visual/capture/SAM/benchmark tests pass, including a real scripted Pi
+- 24 focused visual/capture/SAM/benchmark tests pass, including a real scripted Pi
   `AgentSession` image block, cancellation, local-target validation, ephemeral
   frame cleanup, digest binding, geometry and adapter validation, and no-click
   authority.
-- The complete harness suite passes 839/839; TypeScript typecheck and the
-  195-file package smoke pass after this package.
+- The complete harness suite passes 841/841; the focused suite and TypeScript
+  typecheck pass after the local-region and cancellation additions. The
+  195-file package smoke passes after this package.
 - The benchmark passes `--selftest`, `--dry`, and explicit approval-hash
   validation. No network or inference is used by the benchmark.
 - Package entries include the capture, SAM, benchmark, and fixture files.

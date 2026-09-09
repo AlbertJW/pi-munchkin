@@ -20,3 +20,10 @@ test("SAM adapter refuses an image whose bytes do not match the observation", as
 	const adapter = createSam2TinyAdapter({ command: process.execPath, args: ["-e", "process.stdin.resume()"], version: "fixture" });
 	await assert.rejects(() => adapter.refine({ ...request, image_bytes: new Uint8Array([9]) }), (error: unknown) => error instanceof Sam2TinyError && error.reason === "invalid");
 });
+
+test("SAM runner cancellation terminates one local attempt without retry", async () => {
+	const adapter = createSam2TinyAdapter({ command: process.execPath, args: ["-e", "process.stdin.on('data',()=>{});setTimeout(()=>{},10000)"], version: "fixture", timeout_ms: 20_000 });
+	const controller = new AbortController();
+	setTimeout(() => controller.abort(), 20);
+	await assert.rejects(() => adapter.refine({ ...request, image_bytes: image, signal: controller.signal }), (error: unknown) => error instanceof Sam2TinyError && error.reason === "cancelled");
+});

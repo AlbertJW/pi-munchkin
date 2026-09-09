@@ -4,6 +4,13 @@ All notable changes to pi-munchkin are documented here. Releases follow semantic
 
 ## Unreleased
 
+### Fixed (2026-09-09 — vision cache safety)
+
+Added fixed-grid local-region digests so a changed popup or text quadrant
+cannot be hidden by a similar pHash, and extended cancellation through the
+SAM runner boundary. The complete offline harness now passes 841/841 tests;
+vision remains dark and no model or desktop run was performed.
+
 ### Added (2026-09-09 — dark vision qualification boundary)
 
 Added provider-neutral `visual_observe` capture plumbing, a cancellable

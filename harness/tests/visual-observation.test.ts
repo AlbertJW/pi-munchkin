@@ -5,7 +5,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { deflateSync } from "node:zlib";
 import { CONTEXT_RESERVATION_KEY } from "../lib/context-accounting.ts";
-import { cropPng, hammingDistance, imageDigest, perceptualHash, pngLuma, VisualObservationCache } from "../lib/visual-observation.ts";
+import { cropPng, hammingDistance, imageDigest, perceptualHash, pngLuma, regionDigests, VisualObservationCache } from "../lib/visual-observation.ts";
 import { refineWithSam, validateGroundingResult, type GroundingRequest } from "../lib/visual-grounding.ts";
 
 const geometry = { width: 32, height: 32, device_scale: 2 };
@@ -91,6 +91,15 @@ test("near matches are hints and forced refresh bypasses them", () => {
 	assert.equal(decision.decision, "near_reuse");
 	assert.equal(decision.observation?.interpretation, "layout");
 	assert.equal(cache.decide({ ...near, force: true }).decision, "forced");
+});
+
+test("a changed local visual region disables near-cache reuse", () => {
+	const cache = new VisualObservationCache();
+	const left = new Uint8Array(16); const right = left.slice(); right[15] = 255;
+	const first = { ...request(), phash: "0000000000000000", region_digests: regionDigests(left, 4, 4) };
+	cache.put(first, "layout");
+	const changed = { ...first, exact_sha256: imageDigest(new Uint8Array([99])), region_digests: regionDigests(right, 4, 4) };
+	assert.notEqual(cache.decide(changed).decision, "near_reuse", "pHash similarity cannot hide a changed local region");
 });
 
 test("SAM grounding binds result to the exact observation and never asserts click safety", async () => {
