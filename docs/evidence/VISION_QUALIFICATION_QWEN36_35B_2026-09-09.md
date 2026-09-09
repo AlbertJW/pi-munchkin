@@ -141,6 +141,27 @@ geometry/interior points; no UI action was attempted. Frame hashes were
 but it is still a synthetic corpus and cannot establish general screenshot
 understanding, robustness to layout variation, or real-world grounding.
 
+## Exploratory desktop screenshot attachment
+
+Using the local Computer Use capture, a page-only screenshot of the visible
+Chrome window was copied to a private temporary file (PNG, 646×360) and sent
+through Pi's normal `@image` attachment path with
+`local-llamacpp/qwen36-35b-iq3s-vision`. The image digest is
+`98d496a76295b7d26e04878c7155b68cc8e5374fa18bba53920ba64a36c8241a`; the
+no-session Pi run returned the expected `YES` for “Is a Reddit-style feed
+visible?”. No transcript, image bytes, page URL, or response text was saved.
+
+The same screenshot was passed to the configured SAM2.1 Tiny runner with a
+point inside a visible post title. It returned valid geometry (box
+`{x:17,y:25,width:764,height:46}`, safe point `{x:120,y:47}`) and score
+`0.4447`, with mask digest
+`816cdda0bf932965a2f5f1c9ff54319381fda63c371f23758abd5902e1244369`. The
+large, low-confidence row mask is diagnostic only; no click or other action
+was attempted. Chrome's browser chrome is not present in the captured image,
+so an earlier “identify Chrome” question was an invalid oracle. This desktop
+probe validates the attachment and segmentation paths, but is not pooled with
+the preregistered semantic/geometry scores.
+
 ## Reproduction boundary
 
 The canonical four-arm run used the live local router with temperature `0`,
