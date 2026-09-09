@@ -86,8 +86,9 @@ The first explicit Qwen run is recorded in
 transport and records separate epoch-bound uncached, exact-cache, and
 near-cache measurements, but the frozen one-pixel fixture has no semantic
 answer oracle. Near-cache correctly exposes two missed required changes and
-one stale-target refusal. The SAM arm is explicitly unavailable because no
-local SAM 2.1 Tiny runner is installed.
+one stale-target refusal. The SAM arm executed with the isolated official
+SAM2.1 Tiny runner, but both target frames produced no valid mask and therefore
+no grounding accuracy claim.
 
 The real quality screen therefore remains pending. A human must first install
 or point to a local SAM 2.1 Tiny runner and a vision-capable model, then run

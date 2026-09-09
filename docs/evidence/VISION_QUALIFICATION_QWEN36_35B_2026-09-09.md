@@ -29,7 +29,7 @@ correctness score because this frozen transport fixture has no answer oracle.
 | uncached | 5 | 0 | 0 | 0 | 5 | 2/5 | 278 | 1,155 | 1,433 | 78,961.62 | 78,964.31 | 88,768,512 | unavailable (router metrics disabled) |
 | exact-cache | 4 | 1 | 0 | 0 | 4 | 1/4 | 223 | 943 | 1,166 | 64,369.75 | 64,371.78 | 64,028,672 | unavailable (router metrics disabled) |
 | near-cache | 2 | 3 | 2 | 1 | 2 | 0/2 | 110 | 512 | 622 | 34,856.53 | 34,858.86 | 57,573,376 | unavailable (router metrics disabled) |
-| SAM-assisted | 0 | — | — | — | 0 | — | — | — | — | — | — | — | unavailable: no local SAM2.1 Tiny runner or importable `sam2` package |
+| SAM-assisted | 3 | 2 | 1 | 0 | 3 | 2/3 | 125 | 664 | 789 | 57,091.11 | 57,093 (approx.) | 42,909,696 | unavailable (router metrics disabled) |
 
 The exact-cache arm behaved safely for the frozen repeated frame. The
 near-cache arm demonstrates why perceptual reuse remains hint-only: it reused
@@ -49,14 +49,18 @@ metrics endpoint. SAM grounding accuracy is not measured because fabricating
 a segmenter result would invalidate the receipt.
 
 The screen is therefore **protocol-valid but not promotion-ready**. Keep
-`VISION=off` and `VISION_GROUNDING=sam` dark. A follow-up quality pack needs
-real screenshot cases with answer and geometry oracles, an installed local
-SAM2.1 Tiny runner, and a separate Qwen epoch-bound run. Ling remains a
+`VISION=off` and `VISION_GROUNDING=sam` dark. A real SAM2.1 Tiny Hiera-Tiny
+runner (`sam2==1.1.0`, checkpoint SHA-256
+`7402e0d864fa82708a20fbd15bc84245c2f26dff0eb43a4b5b93452deb34be69`) was
+used from an isolated temporary environment. Both target cases produced no
+valid mask, so the receipt records two grounding failures and deliberately
+does not claim a grounding accuracy score. A follow-up quality pack still
+needs real screenshot cases with answer and geometry oracles. Ling remains a
 protocol-only cohort and must not be pooled with this result.
 
 ## Reproduction boundary
 
 The three executable arms were run once against the live local router with
 temperature `0`, bounded `max_tokens=256`, and one request per fresh case.
-The SAM arm was probed for availability and stopped before execution. No
+The SAM arm used the isolated runner and official checkpoint above. No
 mirror, deployment, source-default change, or adoption decision occurred.
