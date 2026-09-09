@@ -18,7 +18,8 @@ import {
 } from "../lib/ketch-runtime.ts";
 import { RESEARCH_COVERAGE_KEY } from "../lib/branch-report.ts";
 import { RESEARCH_EVIDENCE_CARDS_KEY } from "../lib/research-evidence.ts";
-import { createResearchAggregate, deadlineFor, readResearchAggregate, researchAggregatePath, writeResearchAggregate } from "../lib/research-aggregate.ts";
+import { createResearchAggregate, deadlineFor, migrateResearchPair, readResearchAggregate, researchAggregatePath, writeResearchAggregate } from "../lib/research-aggregate.ts";
+import { ResearchRoundLedger, readResearchRoundLedger, researchRoundPath, writeResearchRoundLedger } from "../lib/research-round.ts";
 import { callTool, fire, makeFakePi, resetPiGlobals } from "./integration-harness.ts";
 
 function restoreEnv(snapshot: Record<string, string | undefined>): void {
@@ -518,6 +519,45 @@ test("research_note reuses a supplied claim identifier instead of re-hashing cla
 		restoreEnv(snapshot);
 		rmSync(dir, { recursive: true, force: true });
 		delete (globalThis as Record<string, unknown>)[RESEARCH_EVIDENCE_CARDS_KEY];
+	}
+});
+
+test("parent web_read records a bounded read receipt before returning success", async () => {
+	const dir = mkdtempSync(join(tmpdir(), "ketch-auto-receipt-"));
+	const snapshot = Object.fromEntries(["KETCH", "KETCH_BIN", "RESEARCH_LEDGER", "DEEP_RESEARCH_PLANNING", "RESEARCH_WORKFLOW", "PI_CODING_AGENT_DIR", "TELEMETRY_FILE", "TELEMETRY_SOURCE"].map((key) => [key, process.env[key]]));
+	try {
+		delete process.env.KETCH;
+		process.env.KETCH_BIN = mockKetch(dir);
+		process.env.RESEARCH_LEDGER = "on";
+		process.env.DEEP_RESEARCH_PLANNING = "on";
+		process.env.RESEARCH_WORKFLOW = "parent";
+		process.env.PI_CODING_AGENT_DIR = join(dir, "agent");
+		process.env.TELEMETRY_FILE = join(dir, "events.jsonl");
+		process.env.TELEMETRY_SOURCE = "test";
+		const runId = "research-plan-auto-read";
+		const ledger = new ResearchRoundLedger({ run_id: runId, obligations: [{ claim_id: "claim-a", text: "A", required: true, status: "open", missing: "evidence", why: "test", next_action: "read" }], budget: { searches: 3, reads: 5, validation_reads: 5 } });
+		const roundPath = researchRoundPath(dir, runId, process.env);
+		await writeResearchRoundLedger(roundPath, ledger.state);
+		const aggregatePath = researchAggregatePath(dir, runId, process.env);
+		await writeResearchAggregate(aggregatePath, migrateResearchPair({ run_id: runId }, ledger.state));
+		const fp = makeFakePi();
+		const mod = await import(`../extensions/ketch.ts?auto-receipt=${Date.now()}-${Math.random()}`);
+		mod.registerKetch(fp.pi as never, { resolvePublicUrl: async (raw: string) => new URL(raw).toString() });
+		await fp.handlers.get("session_start")?.[0]?.({}, { cwd: dir, ui: { notify() {} } });
+		(globalThis as Record<string, unknown>).__pi_active_plan_context = { profile: "deep-research", run_id: runId, settled: false };
+		const result = await callTool(fp, "web_read", { urls: ["https://example.com/a"] }, dir);
+		assert.equal(result.isError, false);
+		const persisted = await readResearchRoundLedger(roundPath);
+		assert.equal(persisted?.rounds.length, 1, "the retrieval tool should publish one automatic round receipt");
+		assert.equal(persisted?.rounds[0]?.reads[0]?.url, "https://example.com/a");
+		assert.equal(persisted?.rounds[0]?.reads[0]?.outcome, "truncated", "unknown extraction completeness must remain non-complete");
+		assert.equal(persisted?.rounds[0]?.reads[0]?.truncated, true);
+		const aggregate = await readResearchAggregate(aggregatePath);
+		assert.equal((aggregate?.evidence_round as any)?.rounds.length, 1, "aggregate projection must carry the receipt");
+	} finally {
+		restoreEnv(snapshot);
+		rmSync(dir, { recursive: true, force: true });
+		delete (globalThis as Record<string, unknown>).__pi_active_plan_context;
 	}
 });
 

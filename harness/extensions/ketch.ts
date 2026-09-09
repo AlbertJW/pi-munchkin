@@ -16,7 +16,7 @@ import {
 	runKetchProcess,
 	unwrapJinaReaderUrl,
 	versionAtLeast,
-	type KetchProcessResult,
+	type KetchProcessResult, type ReadResult,
 } from "../lib/ketch-runtime.ts";
 import { resolvePublicHttpUrl } from "../lib/public-url.ts";
 import {
@@ -36,6 +36,7 @@ import { goalsEnabled, readCurrentGoal } from "../lib/goal-state.ts";
 import { createHash } from "node:crypto";
 import { reserveContextOutput } from "../lib/context-accounting.ts";
 import { deadlinePhase, mutateResearchAggregate, readResearchAggregate, researchAggregatePath, transitionAggregate } from "../lib/research-aggregate.ts";
+import { mutateResearchRoundLedger, readResearchRoundLedger, researchRoundPath, type ResearchRoundProposalV1 } from "../lib/research-round.ts";
 
 // Ketch is the host-side network adapter for local models. The steady-state
 // surface is deliberately only FIND + READ; deep orchestration lives in the
@@ -323,6 +324,73 @@ export function registerKetch(pi: ExtensionAPI, dependencies: KetchDependencies 
 		const pending = ledgerWriteTail.then(() => appendToLedger(path, record));
 		ledgerWriteTail = pending.then(() => undefined, () => undefined);
 		await pending;
+	}
+	/**
+	 * Parent-owned research records the facts already known by the retrieval
+	 * adapter. This is deliberately a compatibility bridge: the existing
+	 * research-round reducer remains the validator, and a failed projection never
+	 * turns a successful web read into a false failure. The generated round ID is
+	 * content-addressed, so a retry or duplicate tool-result callback is a no-op.
+	 */
+	async function recordParentReadReceipt(requestedUrls: readonly string[], rows: readonly ReadResult[], overallTruncated: boolean, method: "ketch" | "jina"): Promise<void> {
+		if (!PARENT_RESEARCH_WORKFLOW || !activeResearchCwd) return;
+		const active = (globalThis as Record<string, unknown>).__pi_active_plan_context as { profile?: unknown; run_id?: unknown; settled?: unknown } | undefined;
+		if (active?.profile !== "deep-research" || active.settled === true || typeof active.run_id !== "string") return;
+		const runId = active.run_id;
+		const path = researchRoundPath(activeResearchCwd, runId, process.env);
+		const existing = await readResearchRoundLedger(path);
+		if (!existing || existing.run_id !== runId || existing.status === "settled") return;
+		const byUrl = new Map<string, ReadResult>();
+		for (const row of rows) {
+			try { byUrl.set(canonicalResearchUrl(row.url), row); } catch { /* source binding rejected elsewhere */ }
+		}
+		const reads = requestedUrls.flatMap((rawUrl) => {
+			let url: string;
+			try { url = canonicalResearchUrl(rawUrl); } catch { return []; }
+			const row = byUrl.get(url);
+			const truncated = overallTruncated || row?.completeness === "truncated" || row?.completeness === "unknown";
+			const failed = !row || Boolean(row.error) || !row.markdown;
+			return [{ url, phase: "discovery" as const, method, outcome: failed ? "failed" as const : truncated ? "truncated" as const : "completed" as const, truncated, parent_validated: false }];
+		});
+		if (!reads.length) return;
+		const receiptIdentity = JSON.stringify({ run_id: runId, reads });
+		const roundId = `auto-read-${createHash("sha256").update(receiptIdentity, "utf8").digest("hex").slice(0, 48)}`;
+		let committed: Awaited<ReturnType<typeof readResearchRoundLedger>> = null;
+		try {
+			const outcome = await mutateResearchRoundLedger(path, (ledger) => {
+				const proposal: ResearchRoundProposalV1 = {
+					schema: "pi.research-round/v1", run_id: runId, round_id: roundId,
+					selected_gaps: [], queries: [], source_leads: [], reads, evidence_cards: [], conflicts: [], gaps: [], proposed_next_action: "read",
+				};
+				ledger.recordRound(proposal);
+				return { state: ledger.state, result: ledger.state };
+			});
+			committed = outcome.state;
+		} catch {
+			// The legacy ledger remains the compatibility authority until aggregate
+			// writes become sole-source. Retrieval success is still useful, but the
+			// parent must not infer a durable receipt from this best-effort bridge.
+			return;
+		}
+		if (!committed) return;
+		try {
+			const aggregatePath = researchAggregatePath(activeResearchCwd, runId, process.env);
+			const currentAggregate = await readResearchAggregate(aggregatePath);
+			if (!currentAggregate || currentAggregate.run_id !== runId || currentAggregate.phase !== "active") return;
+			await mutateResearchAggregate(aggregatePath, (aggregate) => {
+				if (aggregate.phase !== "active") throw new Error("aggregate is no longer active");
+				return {
+					state: transitionAggregate(aggregate, {
+						evidence_round: committed,
+						budget: committed.budget.consumed,
+					}),
+					result: undefined,
+				};
+			});
+		} catch {
+			// A stale or unavailable aggregate is non-authoritative for this bridge;
+			// plan-runner will surface it on the next inspect/recovery boundary.
+		}
 	}
 	if (budgetEnabled) {
 		pi.on("session_start", async (_event, ctx) => {
@@ -673,6 +741,7 @@ export function registerKetch(pi: ExtensionAPI, dependencies: KetchDependencies 
 					const incomplete = rows.some((row) => row.completeness !== "complete");
 					counts.cacheHits += 1;
 					record("ketch", "read", { reader, sources: params.urls.length, succeeded: rows.length, failed: 0, chars: formatted.text.length, duration_ms: Date.now() - started, truncated: formatted.truncated, outcome: "ok" });
+					await recordParentReadReceipt(params.urls, rows, formatted.truncated, reader);
 					return text(`${formatted.text}\n\n(served from session cache — pages fetched earlier this session)${budgetFooter()}`, {
 						source_count: rows.length, failed: 0, truncated: formatted.truncated, cache: true, reader,
 						completeness: incomplete ? "unknown_or_truncated" : "complete",
@@ -731,6 +800,7 @@ export function registerKetch(pi: ExtensionAPI, dependencies: KetchDependencies 
 					}
 					const succeeded = rows.length - readFailed;
 					const truncated = formatted.truncated || result.truncated;
+					await recordParentReadReceipt(params.urls, rows, truncated, effectiveReader);
 					return text(formatted.text + budgetFooter(), {
 						source_count: rows.length, failed, truncated, reader: effectiveReader, fallback: effectiveReader !== reader,
 						coverage: coverageReceipt(succeeded, params.urls.length, truncated, failed > 0),
