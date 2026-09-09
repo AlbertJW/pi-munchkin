@@ -596,6 +596,22 @@ authority guard.
 
 Current package-source SHA-256: `7ebf0204b9d5998496f355a0066af0ac7f86c81a607f6402ea1098b9b2708d7e`.
 
+## Pending surface boundary — 2026-09-09 (research pause clock)
+
+Repository-only package-3 correction persists the instant a parent research
+run enters a paused or extension-boundary phase. An explicit extension removes
+the measured paused interval from both the total and discovery deadlines before
+adding the next ten-minute window; restart therefore cannot silently charge
+time spent waiting for the user. The aggregate keeps the pause marker private
+and clears it only in the durable resume transition.
+
+The deadline/aggregate suite passes 8/8 and the parent Ketch/planner suites
+remain green. No inference, calibration, mirror, rollout, or default change
+occurred; planner and parent-research flags remain dark. This boundary does not
+supersede the prior retrieval-authority boundary; it records deadline accounting.
+
+Current package-source SHA-256: `0eb506630be4713a2ef4640d9cdb847e6d31c0b2d55dd07a493de73fc54081e8`.
+
 ## Data at rest: where a research session actually lands (updated 2026-08-10)
 
 A surface hash bounds what the MODEL sees. It says nothing about what a session LEAVES. Those are
