@@ -52,6 +52,20 @@ dispatched server computation. The probe image is identified only by SHA-256
 `01ead08826c19e5e6e14f0ff6f93111fcb42dc12b2a3a94f35a1626c1c41faee` and is not
 pooled with the frozen-arm metrics.
 
+## Exploratory real-image semantic and grounding probe
+
+To verify that the adapters work beyond the one-pixel transport fixture, the
+bundled `assets/pi-munchkin.png` was sent once to Qwen with the fixed question
+“What object is held in the raised hand?”. The route returned HTTP 200 and a
+non-empty answer containing `sword` in 18,738 ms (1,566 prompt tokens and 128
+completion tokens). With a manually supplied sword-region hint, the isolated
+SAM2.1 Tiny runner returned a valid mask in 23,918 ms with score `0.9686`,
+bounding box `{x:791,y:53,width:268,height:712}`, and an interior candidate
+point `{x:925,y:315}`. No action was issued. This is an exploratory transport
+and adapter check, not grounding accuracy: the image has no preregistered
+pixel mask or geometry oracle, so neither result is pooled with the frozen-arm
+score.
+
 ## Interpretation and limits
 
 Qwen accepted the multimodal transport and returned supported final
