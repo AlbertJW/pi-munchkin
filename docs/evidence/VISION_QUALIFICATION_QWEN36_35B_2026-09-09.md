@@ -48,6 +48,13 @@ grounding accuracy. Client RSS is measured; the router exposes no memory
 metrics endpoint. SAM grounding accuracy is not measured because fabricating
 a segmenter result would invalidate the receipt.
 
+As a separate, non-arm semantic smoke, `pi -p` sent
+`assets/pi-munchkin.png` through the same Qwen vision route and received a
+non-empty final description identifying the cartoon fantasy warrior, sword,
+and potion. That confirms usable image understanding at the transport level,
+but it is not pooled with the frozen-arm measurements because it has no
+preregistered answer or geometry oracle.
+
 The screen is therefore **protocol-valid but not promotion-ready**. Keep
 `VISION=off` and `VISION_GROUNDING=sam` dark. A real SAM2.1 Tiny Hiera-Tiny
 runner (`sam2==1.1.0`, checkpoint SHA-256
