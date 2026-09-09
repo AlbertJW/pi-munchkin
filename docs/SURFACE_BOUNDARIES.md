@@ -646,6 +646,23 @@ the prior mutation-deadline boundary; it records creation ordering.
 
 Current package-source SHA-256: `273e1bc605157c3e59466cddc2797e68db8f16083418e54ed41237b2af9e4b4c`.
 
+## Pending surface boundary — 2026-09-09 (aggregate-first branch reservation)
+
+Repository-only package-2 correction projects branch lease acquisition and
+release into the durable research aggregate while the plan-file lock is held,
+before publishing the compatibility graph. If the evidence-round ledger is
+missing or malformed, the lease transition fails without leaving an executable
+graph lease. Merge, pause, and settlement still require the same sole-writer
+transition.
+
+The isolated hierarchical-planner wrapper passes 66/66, including the injected
+missing-ledger lease regression. No inference, calibration, mirror, rollout,
+or default change occurred; planner and parent-research flags remain dark. This
+boundary does not supersede the creation-ordering boundary; it records lease
+reservation authority.
+
+Current package-source SHA-256: `407f217572842de201818165040eb495485e21bcc79ca2d813d9871b3a6d386b`.
+
 ## Data at rest: where a research session actually lands (updated 2026-08-10)
 
 A surface hash bounds what the MODEL sees. It says nothing about what a session LEAVES. Those are
