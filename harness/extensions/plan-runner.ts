@@ -1741,7 +1741,7 @@ async function finalizeParentResearchGraph(
 const researchFinish = defineTool({
 	name: "research_finish", label: "Finish Research",
 	description: "Validate the parent-owned research ledger and graph, then settle them and deliver one bounded final answer.",
-	promptSnippet: "research_finish: atomically finish validated research and deliver the answer",
+	promptSnippet: "research_finish: validate and settle research, then deliver the answer",
 	promptGuidelines: ACTIVE_TOOL_PROMPTS ? [
 		"Use only after every required claim is parent-validated and the graph is terminal; optional deferrals must include value, risk, and rationale.",
 		"This replaces the separate research_round settle and plan_settle calls for the parent-owned workflow.",

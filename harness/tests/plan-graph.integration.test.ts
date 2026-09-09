@@ -367,10 +367,7 @@ if (!CHILD) {
 			const acquired = await module.acquireResearchBranchLease(cwd, context);
 			assert.equal(acquired.ok, true);
 			unlinkSync(researchRoundPath(cwd, context.run_id, process.env));
-			// Use a non-parent depth here to isolate the graph merge from the
-			// separate evidence-ledger child-report bridge; the redundant sync under
-			// test would otherwise be hidden by that legitimate second transition.
-			fp.pi.events.emit(HARNESS_SIGNAL_CHANNEL, { v: 1, type: "plan/branch-result", context: { ...context, depth: 2, lease_id: acquired.lease_id, dispatch_epoch: 0 }, report: {
+			fp.pi.events.emit(HARNESS_SIGNAL_CHANNEL, { v: 1, type: "plan/branch-result", context: { ...context, lease_id: acquired.lease_id, dispatch_epoch: 0 }, report: {
 				v: 1, parent_item_id: context.parent_item_id, owner_ref: context.owner_ref, status: "blocked", note: "bounded failure",
 				consumed: { searches: 0, reads: 0 }, evidence_gaps: ["bounded failure"], source_leads: [], children: [],
 				coverage: { strategy: "direct", scope: "bounded", returned_count: 0, truncated: false, budget_exhausted: true, failed: false, complete: false },
