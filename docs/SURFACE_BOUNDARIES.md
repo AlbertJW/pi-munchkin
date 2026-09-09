@@ -612,6 +612,22 @@ supersede the prior retrieval-authority boundary; it records deadline accounting
 
 Current package-source SHA-256: `0eb506630be4713a2ef4640d9cdb847e6d31c0b2d55dd07a493de73fc54081e8`.
 
+## Pending surface boundary — 2026-09-09 (research mutation deadline)
+
+Repository-only package-3 correction applies deadline state to parent graph
+operations as well as retrieval. At seven minutes, `plan_expand` and branch
+leases are refused while validation updates remain available. At ten minutes,
+the first mutation attempt durably transitions the run to `awaiting_extension`
+before refusing, so an idle provider or restart cannot continue discovery under
+an old active phase.
+
+The isolated hierarchical-planner wrapper passes 64/64 and typecheck passes.
+No inference, calibration, mirror, rollout, or default change occurred;
+planner and parent-research flags remain dark. This boundary does not supersede
+the prior pause-clock boundary; it records mutation-side deadline enforcement.
+
+Current package-source SHA-256: `b3ac94139dee5e7adff61cd6b1c06803df1d682ab126d1a35f2841b87d1e1f95`.
+
 ## Data at rest: where a research session actually lands (updated 2026-08-10)
 
 A surface hash bounds what the MODEL sees. It says nothing about what a session LEAVES. Those are
