@@ -186,8 +186,8 @@ test("/reload: a capability family still activates after the factories are re-in
 
 // --- invariant 4: every deferred tool has a route back --------------------
 
-// The dark flags register FIVE more tools (plan_go, plan_expand, plan_settle,
-// research_plan_start, branch_plan). Running the invariants only at defaults means
+// The dark flags register additional tools (plan_go, plan_expand, plan_settle,
+// research_plan_start, research_finish, branch_plan). Running the invariants only at defaults means
 // a tool that exists solely behind a flag is never checked for a route back — which
 // is precisely how `plan_go` came to be registered, stripped, and uncallable.
 test("dark-flag boot: nothing a flag registers is stripped without a route", async () => {

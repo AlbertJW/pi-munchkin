@@ -20,6 +20,7 @@ export type CapabilityTool = {
  */
 export const PLAN_SURFACE_TOOLS: readonly string[] = [
 	"plan_write", "plan_update", "plan_go", "plan_expand", "plan_settle", "research_plan_start",
+	"research_finish",
 ];
 
 /** The two flat plan tools any session may hold, graph flags or not. */

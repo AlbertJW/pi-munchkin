@@ -22,7 +22,7 @@ const HEADLESS_PLAN_ENABLED = DEEP_RESEARCH_PLANNING_ENABLED && process.env.PI_M
 const BRANCH_PLANNER_PROCESS = PLAN_GRAPH_ENABLED && Boolean(process.env[PLAN_CONTEXT_ENV] && process.env[BRANCH_REPORT_ENV]);
 const HEADLESS_PLAN_TOOLS = new Set([
 	"plan_write", "plan_update", "plan_expand", "plan_settle", "research_plan_start",
-	"web_search", "web_read", "research_note", "research_recall", "subagent",
+	"research_finish", "web_search", "web_read", "research_note", "research_recall", "subagent",
 ]);
 const HEADLESS_PLAN_ROUTE_HINT = "[pi planner lease] A bounded deep-research planner lease is active for this parent session. For contested, comparative, multi-part, or delegated research, call research_plan_start before any web_search or web_read; do not begin direct web research first. Straightforward fact lookup may stay lightweight. The lease does not authorize children to plan.";
 type Family = "research" | "delegation" | "browser" | "canvas" | "context" | "planning" | "goals";

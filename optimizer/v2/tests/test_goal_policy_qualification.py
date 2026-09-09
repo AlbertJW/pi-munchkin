@@ -127,9 +127,24 @@ class QualifiedPolicies(unittest.TestCase):
                 interrupted = CampaignEngine(c, store, FakeScenario(pack), FakeSurface(), provider, crash_after_transition=boundary)
                 try: interrupted.run(approve_sha=c.sha256)
                 except InjectedCrash: pass
+                calls_before_resume = dict(provider.calls_by_kind)
                 resumed = CampaignEngine(c, store, FakeScenario(pack), FakeSurface(), provider).run(approve_sha=c.sha256)
-                self.assertEqual(resumed, reference)
-                self.assertEqual(provider.calls_by_kind, calls)
+                # An intent is deliberately durable before dispatch.  If the
+                # process dies at that boundary, ordinary resume cannot know
+                # whether an external request escaped and therefore stops
+                # uncertain rather than risking a duplicate call.  All later
+                # boundaries have a recoverable response/session and resume
+                # must converge to the reference result.
+                if boundary in {
+                    index + 1
+                    for index, event in enumerate(store.read_all())
+                    if event["type"] == "provider.operation-intent"
+                }:
+                    self.assertEqual(resumed["status"], "uncertain_external_operation")
+                    self.assertEqual(provider.calls_by_kind, calls_before_resume)
+                else:
+                    self.assertEqual(resumed, reference)
+                    self.assertEqual(provider.calls_by_kind, calls)
 
 
 if __name__ == "__main__":

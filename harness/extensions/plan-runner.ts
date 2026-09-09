@@ -1162,7 +1162,7 @@ function activateGraphTools(): void {
 	if (!api || !PLAN_GRAPH) return;
 	const active = api.getActiveTools();
 	const explicit = (globalThis as Record<string, unknown>)[EXPLICIT_FLAG] === true;
-	for (const name of ["plan_write", "plan_update", "plan_expand", "plan_settle", ...(DEEP_RESEARCH_PLANNING ? ["research_round"] : [])]) {
+	for (const name of ["plan_write", "plan_update", "plan_expand", "plan_settle", ...(DEEP_RESEARCH_PLANNING ? ["research_round"] : []), ...(PARENT_RESEARCH_WORKFLOW ? ["research_finish"] : [])]) {
 		if ((!explicit || active.includes(name)) && api.getAllTools().some((tool) => tool.name === name) && !active.includes(name)) active.push(name);
 	}
 	api.setActiveTools(active);
@@ -1178,6 +1178,7 @@ function graphLifecycleAvailable(): boolean {
 	// start rather than silently adding omitted tools after the graph is written.
 	const required = ["plan_update", "plan_expand", "plan_settle"];
 	if (DEEP_RESEARCH_PLANNING) required.push("research_round");
+	if (PARENT_RESEARCH_WORKFLOW) required.push("research_finish");
 	return required.every((name) => active.has(name));
 }
 
@@ -1359,7 +1360,12 @@ const researchPlanStart = defineTool({
 		// discovery envelope; child completion releases only its unspent remainder.
 		const obligations = params.claim_obligations?.length ? params.claim_obligations.map((claim) => ({ ...claim, status: "open" as const })) : [defaultResearchObligation(params.request)];
 		const roundLedger = new ResearchRoundLedger({ run_id: state.run_id, obligations, budget: { searches: 3, reads: 5, validation_reads: 5 } });
-		for (const item of state.items) roundLedger.reserveChild(item.owner_ref!, { searches: item.budget!.allocated.searches, reads: item.budget!.allocated.reads, validation_reads: 0 });
+		// In the parent-owned profile these root budgets are planning hints, not
+		// child reservations. Reserving them would make every local branch look
+		// like an in-flight delegated process and permanently block settlement.
+		if (!PARENT_RESEARCH_WORKFLOW) {
+			for (const item of state.items) roundLedger.reserveChild(item.owner_ref!, { searches: item.budget!.allocated.searches, reads: item.budget!.allocated.reads, validation_reads: 0 });
+		}
 		const roundPath = researchRoundPath(ctx.cwd, state.run_id, process.env);
 		await writeResearchRoundLedger(roundPath, roundLedger.state);
 		if (PARENT_RESEARCH_WORKFLOW) {
@@ -1458,8 +1464,8 @@ const researchRound = defineTool({
 		});
 		await syncResearchAggregate(ctx.cwd, ledger.runId, "settled");
 		return { content: [{ type: "text" as const, text: `Research evidence is settled for ${ledger.runId}. The parent may now call plan_settle.\n${result.summary}` }], details: { tool_name: "research_round", success: true, settled: true }, };
-	},
-});
+		},
+	});
 
 const planExpand = defineTool({
 	name: "plan_expand", label: "Expand Plan Branch",
@@ -1545,12 +1551,86 @@ const planSettle = defineTool({
 		});
 		if (PARENT_RESEARCH_WORKFLOW && state.profile?.name === "deep-research") await syncResearchAggregate(ctx.cwd, state.run_id, "settled");
 		const active = api?.getActiveTools() ?? [];
-			api?.setActiveTools(active.filter((name) => !["plan_write", "plan_update", "plan_expand", "plan_settle", "research_plan_start", "research_round"].includes(name)));
+			api?.setActiveTools(active.filter((name) => !["plan_write", "plan_update", "plan_expand", "plan_settle", "research_plan_start", "research_round", "research_finish"].includes(name)));
 		planEvent("settled", state.run_id, { items: state.items.length, deferred: state.items.filter((item) => item.status === "deferred").length });
 		const message = settledFinalAnswer
 			? `Final answer:\n${settledFinalAnswer}\n\nResearch plan settled. No further research or delegation will be scheduled.`
 			: "Plan settled. Planner guidance and task-scoped plan tools are no longer active.";
 		return { content: [{ type: "text" as const, text: message }], details: { tool_name: "plan_settle", success: true, ...(settledFinalAnswer ? { final_answer: true } : {}) }, terminate: true };
+	},
+});
+
+async function finalizeParentResearchGraph(
+	cwd: string,
+	runId: string,
+	optionalDeferrals: ResearchRoundToolParams["optional_deferrals"] | undefined,
+): Promise<void> {
+	const loaded = await loadResearchRound(cwd, runId);
+	if (!loaded) rejectPlanTool("research_finish rejected: no valid parent research ledger exists");
+	const check = loaded.ledger.settlementCheck({ graph_terminal: true, optional_deferrals: optionalDeferrals ?? [] });
+	if (!check.ready) rejectPlanTool(`research_finish rejected: evidence is not ready (${check.reasons.join(", ")})`);
+	const cards = loaded.ledger.state.evidence_cards.filter((card) => card.parent_validated && !card.truncated);
+	if (cards.length === 0) rejectPlanTool("research_finish rejected: no complete parent-validated evidence cards exist");
+	const urls = [...new Set(cards.map((card) => card.original_url))];
+	const claimIds = [...new Set(cards.flatMap((card) => card.claim_ids))];
+	const coverage = {
+		strategy: "direct" as const, scope: "bounded" as const, returned_count: cards.length,
+		truncated: false, budget_exhausted: false, failed: false, complete: true,
+	};
+	await mutatePlan(cwd, async (previous) => {
+		if (!previous || previous.run_id !== runId || previous.profile?.name !== "deep-research" || previous.settled_at) {
+			rejectPlanTool("research_finish rejected: the parent graph changed or is no longer active");
+		}
+		const roots = previous.items.filter((item) => item.kind === "research_branch" && item.parent_id === undefined && !graphTerminal(item));
+		if (roots.length === 0) return { result: undefined };
+		// Parent-owned branches do not require a second model call just to copy
+		// receipts into graph metadata. The validated ledger is authoritative; the
+		// graph receives a compact derived view immediately before terminal checks.
+		const items = previous.items.map((item) => {
+			if (!roots.some((root) => root.id === item.id)) return item;
+			return { ...item, status: "done" as const, coverage, source_leads: urls, claim_ids: claimIds, evidence_gaps: [] };
+		});
+		const state = { ...previous, items, head_terminal_at: previous.head_terminal_at ?? isoNow() };
+		validateStateSize(state);
+		return { state, result: undefined };
+	});
+}
+
+const researchFinish = defineTool({
+	name: "research_finish", label: "Finish Research",
+	description: "Validate the parent-owned research ledger and graph, then settle them and deliver one bounded final answer.",
+	promptSnippet: "research_finish: atomically finish validated research and deliver the answer",
+	promptGuidelines: ACTIVE_TOOL_PROMPTS ? [
+		"Use only after every required claim is parent-validated and the graph is terminal; optional deferrals must include value, risk, and rationale.",
+		"This replaces the separate research_round settle and plan_settle calls for the parent-owned workflow.",
+	] : undefined,
+	parameters: Type.Object({
+		run_id: Type.Optional(Type.String({ minLength: 1, maxLength: 200 })),
+		summary: Type.String({ minLength: 1, maxLength: PLAN_DEFER_FIELD_MAX_BYTES }),
+		final_answer: Type.String({ minLength: 1, maxLength: 16_000 }),
+		optional_deferrals: Type.Optional(Type.Array(ResearchRoundDeferralSchema, { maxItems: 16 })),
+	}),
+	async execute(id, params, signal, update, ctx) {
+		rejectChildPlanMutation();
+		if (!PARENT_RESEARCH_WORKFLOW) rejectPlanTool("research_finish is unavailable: the parent research workflow is not active");
+		const state = await readState(ctx.cwd);
+		if (!state || state.schema_version !== 5 || state.profile?.name !== "deep-research" || state.settled_at) {
+			rejectPlanTool("research_finish requires an active deep-research graph");
+		}
+		const runId = params.run_id ?? state.run_id;
+		if (runId !== state.run_id) rejectPlanTool("research_finish rejected: run identity mismatch");
+		await finalizeParentResearchGraph(ctx.cwd, runId, params.optional_deferrals);
+		// Keep the two existing validators as the implementation boundary while
+		// exposing one model-facing terminal operation. The ledger settles first;
+		// plan_settle then validates the now-settled ledger, citations, deferrals,
+		// and terminal graph before it writes the final state and terminates.
+		await researchRound.execute(id, {
+			action: "settle", run_id: runId, summary: params.summary,
+			optional_deferrals: params.optional_deferrals,
+		}, signal, update, ctx);
+		return await planSettle.execute(id, {
+			summary: params.summary, final_answer: params.final_answer,
+		}, signal, update, ctx);
 	},
 });
 
@@ -2030,8 +2110,9 @@ const RESEARCH_SYNTHESIS_FOLLOW_UP = [
 	"Act as the parent synthesizer for this run:",
 	"1. Reread every delegated source lead with web_read; do not trust child quotes or summaries.",
 	"2. Record one parent-validated research_note/evidence card for each material claim you will use.",
-	"3. Record the parent reads, evidence cards, conflicts, and remaining gaps with research_round; inspect its next_action before settling.",
-	"4. If all required evidence is validated and only explicit deferred work remains, call research_round settle, then plan_settle.",
+	...(PARENT_RESEARCH_WORKFLOW
+		? ["3. Record the parent reads, evidence cards, conflicts, and remaining gaps with research_round; inspect its next_action before finishing.", "4. If all required evidence is validated and only explicit deferred work remains, call research_finish once with the final answer and any deferrals."]
+		: ["3. Record the parent reads, evidence cards, conflicts, and remaining gaps with research_round; inspect its next_action before settling.", "4. If all required evidence is validated and only explicit deferred work remains, call research_round settle, then plan_settle."]),
 	"If a branch is blocked or a required card is still missing, do not force settlement: leave the bounded gap explicit with its value, risk, and rationale. Do not start fresh searches or delegate again.",
 ].join("\n");
 
@@ -2048,7 +2129,7 @@ async function queueResearchSynthesisFollowUp(outcome: MergeOutcome): Promise<vo
 	// web_read/plan_settle tools would only make a small model spin on an
 	// impossible contract; graph start normally guarantees these are active.
 	const active = api.getActiveTools();
-	if (!active.includes("web_read") || !active.includes("plan_settle") || (DEEP_RESEARCH_PLANNING && !active.includes("research_round"))) return;
+	if (!active.includes("web_read") || !active.includes("plan_settle") || (DEEP_RESEARCH_PLANNING && !active.includes("research_round")) || (PARENT_RESEARCH_WORKFLOW && !active.includes("research_finish"))) return;
 	const key = `${outcome.runId}:${outcome.headTerminalAt}`;
 	if (researchSynthesisFollowUps.has(key)) return;
 	if (researchSynthesisFollowUps.size >= 24) {
@@ -2142,6 +2223,7 @@ export default function (pi: ExtensionAPI): void {
 		if (DEEP_RESEARCH_PLANNING) {
 			pi.registerTool(researchPlanStart);
 			pi.registerTool(researchRound);
+			if (PARENT_RESEARCH_WORKFLOW) pi.registerTool(researchFinish);
 		}
 	}
 
@@ -2358,7 +2440,7 @@ export default function (pi: ExtensionAPI): void {
 			setPlanning(false);
 			awaitingReview = false;
 			leavePlanningSurface(pi, false);
-			if (PLAN_GRAPH) pi.setActiveTools(pi.getActiveTools().filter((name) => !["plan_write", "plan_update", "plan_expand", "plan_settle", "research_plan_start", "research_round"].includes(name)));
+			if (PLAN_GRAPH) pi.setActiveTools(pi.getActiveTools().filter((name) => !["plan_write", "plan_update", "plan_expand", "plan_settle", "research_plan_start", "research_round", "research_finish"].includes(name)));
 			ctx.ui.notify("Plan cancelled.", "info");
 		},
 	});

@@ -220,16 +220,27 @@ export default function (pi: ExtensionAPI): void {
 		handoffInFlight = true;
 		handoffActiveKey = key;
 		const reason = handoffReason(profile, usage);
+		let finished = false;
 		const finish = async (resume: boolean) => {
+			// Pi may report both a durable session_compact event and a later
+			// callback error.  Consume the callback exactly once so the same
+			// handoff cannot emit duplicate outcome rows or continuation offers.
+			if (finished) return;
+			finished = true;
 			// Clear the in-flight latch BEFORE the lease check: a stale lease
 			// (coordinator reset mid-compaction) must not disable handoff for the
 			// rest of the session. The outcome row is recorded here, once the
 			// result is known — a failed handoff must not look like a success.
 			handoffInFlight = false;
 			handoffActiveKey = null;
-			if (!finishCompaction(lease)) return;
-			handoffDisarmedKey = key;
+			// `session_compact` is the durable commit boundary.  A later callback
+			// can observe a stale coordinator lease (for example after another
+			// extension released it), but that must not downgrade the committed
+			// handoff.  A non-committed stale lease still fails closed.
 			const committed = handoffCompactedEpoch === profile.epoch;
+			const leaseFinished = finishCompaction(lease);
+			if (!leaseFinished && !committed) return;
+			handoffDisarmedKey = key;
 			const outcome = resume || committed;
 			record("runtime", "context-handoff", { from_epoch: fromEpoch, to_epoch: profile.epoch, reason_class: fromEpoch === profile.epoch ? "budget_threshold" : "smaller_target_window", ok: outcome });
 			if (!outcome) return;

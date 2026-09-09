@@ -25,7 +25,7 @@ if (!CHILD) {
 	const output = execFileSync(process.execPath, [
 				"--experimental-strip-types", "--experimental-loader", resolve("harness/tests/ts-js-resolver.mjs"), "--test", import.meta.filename,
 			], { cwd: process.cwd(), env, encoding: "utf8", stdio: "pipe" });
-		assert.match(output, /pass 57/);
+		assert.match(output, /pass 59/);
 		} finally { rmSync(artifacts, { recursive: true, force: true }); }
 	});
 } else {
@@ -50,6 +50,68 @@ if (!CHILD) {
 		fp.pi.setActiveTools([...fp.tools.keys()]);
 		return fp;
 	}
+
+	test("parent research profile exposes one unified finish operation", async () => {
+		const previous = process.env.RESEARCH_WORKFLOW;
+		process.env.RESEARCH_WORKFLOW = "parent";
+		try {
+			const fp = makeFakePi();
+			for (const name of ["read", "bash", "edit", "write", "capability", "plan_write", "plan_update", "plan_expand", "plan_settle", "research_plan_start", "research_round", "web_search", "web_read", "research_note", "research_recall", "subagent"]) {
+				fp.pi.registerTool({ name, parameters: {} } as any);
+			}
+			const module = await import(`../extensions/plan-runner.ts?parent-finish=${Date.now()}-${Math.random()}`);
+			module.default(fp.pi as any);
+			const finish = fp.tools.get("research_finish");
+			assert.ok(finish, "the parent profile must register the unified terminal operation");
+			assert.match(finish.description, /settle.*deliver.*final answer/i);
+			assert.ok(finish.parameters?.properties?.final_answer, "the final answer is required at the one terminal boundary");
+		} finally {
+			if (previous === undefined) delete process.env.RESEARCH_WORKFLOW; else process.env.RESEARCH_WORKFLOW = previous;
+			resetPiGlobals();
+		}
+	});
+
+	test("parent finish operation settles the ledger and graph in one call", async () => {
+		const previous = process.env.RESEARCH_WORKFLOW;
+		process.env.RESEARCH_WORKFLOW = "parent";
+		try {
+			const fp = makeFakePi(); const cwd = tmp();
+			for (const name of ["read", "bash", "edit", "write", "capability", "plan_write", "plan_update", "plan_expand", "plan_settle", "research_plan_start", "research_round", "web_search", "web_read", "research_note", "research_recall", "subagent"]) {
+				fp.pi.registerTool({ name, parameters: {} } as any);
+			}
+			const module = await import(`../extensions/plan-runner.ts?parent-finish-exec=${Date.now()}-${Math.random()}`);
+			module.default(fp.pi as any);
+			const started = await callTool(fp, "research_plan_start", {
+				request: "Unified finish", summary: "one branch", claim_obligations: [{ claim_id: claimIdForText("claim"), text: "claim", required: true, missing: "evidence", why: "required", next_action: "validate" }],
+				branches: [{ title: "Evidence", budget: { searches: 1, reads: 1 } }],
+			}, cwd);
+			assert.equal(started.isError, false);
+			const state = JSON.parse(readFileSync(join(cwd, ".pi", "plan-state.json"), "utf8"));
+			await callTool(fp, "plan_update", { deltas: [{ item_id: state.items[0].id, status: "done" }] }, cwd);
+			const claim = claimIdForText("claim");
+			(globalThis as Record<string, unknown>).__pi_plan_validation_urls = ["https://example.test/source", "https://example.test/independent"];
+			(globalThis as Record<string, unknown>)[RESEARCH_EVIDENCE_CARDS_KEY] = [
+				{ v: 1, card_id: "a".repeat(32), original_url: "https://example.test/source", content_sha256: "c".repeat(64), claim_ids: [claim], truncated: false, parent_validated: true, retrieval_method: "ketch" },
+				{ v: 1, card_id: "b".repeat(32), original_url: "https://example.test/independent", content_sha256: "d".repeat(64), claim_ids: [claim], truncated: false, parent_validated: true, retrieval_method: "ketch" },
+			];
+			await callTool(fp, "research_round", { action: "record", run_id: state.run_id, round_id: "validation", selected_gaps: [`gap-${claim}`], queries: [], source_leads: [], reads: [
+				{ url: "https://example.test/source", phase: "parent_validation", method: "ketch", outcome: "completed", truncated: false, parent_validated: true },
+				{ url: "https://example.test/independent", phase: "parent_validation", method: "ketch", outcome: "completed", truncated: false, parent_validated: true },
+			], evidence_cards: [
+				{ card_id: "a".repeat(32), original_url: "https://example.test/source", content_sha256: "c".repeat(64), claim_ids: [claim], truncated: false, parent_validated: true, retrieval_method: "ketch" },
+				{ card_id: "b".repeat(32), original_url: "https://example.test/independent", content_sha256: "d".repeat(64), claim_ids: [claim], truncated: false, parent_validated: true, retrieval_method: "ketch" },
+			], conflicts: [], gaps: [], proposed_next_action: "synthesize" }, cwd);
+			const result = await callTool(fp, "research_finish", { run_id: state.run_id, summary: "verified", final_answer: "The claim is supported by https://example.test/source and https://example.test/independent." }, cwd);
+			assert.equal(result.isError, false, result.content.map((block: any) => block?.text ?? "").join("\n"));
+			assert.equal(result.terminate, true);
+			assert.match(result.content.map((block: any) => block?.text ?? "").join("\n"), /Final answer:/);
+			const settled = JSON.parse(readFileSync(join(cwd, ".pi", "plan-state.json"), "utf8"));
+			assert.equal(typeof settled.settled_at, "string");
+		} finally {
+			if (previous === undefined) delete process.env.RESEARCH_WORKFLOW; else process.env.RESEARCH_WORKFLOW = previous;
+			resetPiGlobals();
+		}
+	});
 
 	test("a v4 plan migrates to a flat v5 graph on its next mutation", async () => {
 		const fp = fresh(); const cwd = tmp();
