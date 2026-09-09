@@ -10,6 +10,14 @@ and test synchronization changed; no packaged model-visible harness source or
 live surface changed. No new loaded hash or smoke receipt is claimed. Frozen
 experiment artifacts and older boundary rows remain intact.
 
+2026-09-09 repository-only vision qualification work: local screen capture,
+optional SAM 2.1 Tiny grounding, ephemeral perceptual caching, and a frozen
+four-arm visual benchmark were added behind `VISION=off` and
+`VISION_GROUNDING` opt-ins. No live capture, model inference, mirror, or
+automatic action was performed. Ling remains protocol-only; Qwen 35B quality
+evaluation is a separate human-gated screen. Future measurements must bind a
+newly loaded hash and may not pool with earlier surfaces.
+
 Generate the current deterministic package-source code/role surface with:
 
 ```sh
@@ -18,6 +26,7 @@ npm run surface:hash:source
 
 | Date | Sequential change | Commit | Package-source surface SHA-256 | Live status |
 |---|---|---|---|---|
+| 2026-09-09 | local visual capture and qualification boundary: cancellable macOS window screenshots, epoch-scoped exact/pHash cache, ephemeral SAM frame handoff, local SAM 2.1 Tiny protocol, frozen vision benchmark and approval/model binding | `61f9ee9` | `5c931e31cefa50a7de815192c9509af56afdfc0e0f03ccf5c578391843db66a1` | **DARK, REPOSITORY-ONLY.** `VISION` and `VISION_GROUNDING` remain off by default; 839/839 tests, typecheck, 195-file package smoke, and secret scan pass. No desktop capture, model inference, mirror, rollout, or click authority. Real Ling protocol and Qwen quality screens require separate explicit approval. |
 | 2026-08-04 | gate and repeat-loop correctness | `36b3f80` | `090f867525f79ed61fe25e7a047d7c6c7dbc7e8f84a1ddb9ff00db3f45746103` | included in approved batch rollout; not measured separately |
 | 2026-08-04 | security, privacy, bounded I/O | `e3dfc0b` | `16b0e1495c5c708c991549c6b506d81d3993a7351a900be2d314609579ee06a0` | included in approved batch rollout; not measured separately |
 | 2026-08-04 | dynamic surface implementation | `5c0d2bc` | `48a4f31e7455a31d3320dd43f4231dd1c9ba340b6f371a13ddcbd99cab498fc8` | included in approved batch rollout; not measured separately |
