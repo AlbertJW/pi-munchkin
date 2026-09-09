@@ -4,6 +4,14 @@ All notable changes to pi-munchkin are documented here. Releases follow semantic
 
 ## Unreleased
 
+### Added (2026-09-09 — bounded visual lifecycle)
+
+An explicit screen or browser observation now arms a dark, bounded watcher that
+samples every third context assembly and forces a fresh frame after successful
+UI-changing tools. Compaction, model selection, settlement, shutdown, and
+stale in-flight captures invalidate the watcher safely. `VISION` remains off by
+default; no model or desktop run was performed.
+
 ### Fixed (2026-09-09 — verifier scheduling)
 
 The aggregate verifier now runs stages serially by default. Its previous

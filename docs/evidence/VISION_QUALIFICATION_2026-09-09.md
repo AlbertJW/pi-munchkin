@@ -60,12 +60,12 @@ fresh observation and independent target validation.
 
 ## Offline evidence
 
-- 24 focused visual/capture/SAM/benchmark tests pass, including a real scripted Pi
+- 25 focused visual/capture/SAM/benchmark tests pass, including a real scripted Pi
   `AgentSession` image block, cancellation, local-target validation, ephemeral
-  frame cleanup, digest binding, geometry and adapter validation, and no-click
-  authority.
-- The complete harness suite passes 841/841; the focused suite and TypeScript
-  typecheck pass after the local-region and cancellation additions. The
+  frame cleanup, digest binding, geometry and adapter validation, bounded
+  automatic lifecycle checkpoints, and no-click authority.
+- The complete harness suite passes 842/842; the focused suite and TypeScript
+  typecheck pass after the local-region, cancellation, and lifecycle additions. The
   195-file package smoke passes after this package.
 - The benchmark passes `--selftest`, `--dry`, and explicit approval-hash
   validation. No network or inference is used by the benchmark.
@@ -83,9 +83,10 @@ and model-call count. Results must be stored separately by model and serving
 epoch, and only a human review may promote a dark surface.
 
 Known limits are JPEG/GIF/WebP pHash decoding, provider-specific visual-token
-counting, automatic post-action hooks, browser accessibility capture, and
-persisted interpretation collection. These are deliberately deferred until
-the first real screen shows they are needed.
+counting, browser accessibility capture, and persisted interpretation
+collection. The local lifecycle watcher is deliberately bounded and does not
+replace a browser accessibility backend or claim model-quality benefit until
+the first real screen shows it.
 
 ## Rollback
 

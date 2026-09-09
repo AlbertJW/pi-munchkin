@@ -751,6 +751,27 @@ deduplication and does not claim sole-writer view rebuild or live adoption.
 Source commit: `4e460ba`.
 Current package-source SHA-256: `5e705ade2ac1fef76a92e7f9d32d26f3c2f9261b375f033e3ef2615e0adfbd2c`.
 
+## Pending surface boundary — 2026-09-09 (bounded visual observation lifecycle)
+
+The dark vision surface now arms a bounded screen/browser watcher after an
+explicit visual observation. It samples every third context assembly, forces a
+fresh capture after successful UI-changing tools, and tears down on agent
+settlement or session shutdown. Compaction, model selection, and stale
+in-flight captures invalidate the prior generation, so an old frame cannot
+repopulate the cache after a lifecycle boundary. The watcher uses the same
+serving-epoch cache and geometry-based context reservation as the explicit
+tool; raw image bytes remain model-only.
+
+The focused visual/capture/SAM/benchmark suite is 25/25, the complete harness
+suite is 842/842, typecheck and package smoke pass, and the secret scan is
+clean. No model inference, desktop capture, SAM process, mirror, rollout, or
+default change occurred. `VISION` and `VISION_GROUNDING` remain dark; browser
+accessibility capture, non-PNG perceptual decoding, provider-exact visual
+token counting, and persisted interpretation collection remain open.
+
+Source commit: `c4e44d8`.
+Current package-source SHA-256: `d830498dcf583068a28ca2d357ebc51987a9c99e09a93ec9db762d2bde0d0f12`.
+
 ## Data at rest: where a research session actually lands (updated 2026-08-10)
 
 A surface hash bounds what the MODEL sees. It says nothing about what a session LEAVES. Those are
