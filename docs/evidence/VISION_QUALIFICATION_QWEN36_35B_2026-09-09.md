@@ -24,12 +24,12 @@ Each fresh delivery was sent to the loaded Qwen route as a multimodal
 means the provider returned non-empty final answer text; it is not a semantic
 correctness score because this frozen transport fixture has no answer oracle.
 
-| arm | image deliveries | cache hits | missed required changes | stale-target refusals | model calls | answer present | prompt tokens | completion tokens | total tokens | model latency (ms) | wall (ms) | client peak RSS | server memory |
-| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | --- |
-| uncached | 5 | 0 | 0 | 0 | 5 | 2/5 | 278 | 1,155 | 1,433 | 78,961.62 | 78,964.31 | 88,768,512 | unavailable (router metrics disabled) |
-| exact-cache | 4 | 1 | 0 | 0 | 4 | 1/4 | 223 | 943 | 1,166 | 64,369.75 | 64,371.78 | 64,028,672 | unavailable (router metrics disabled) |
-| near-cache | 2 | 3 | 2 | 1 | 2 | 0/2 | 110 | 512 | 622 | 34,856.53 | 34,858.86 | 57,573,376 | unavailable (router metrics disabled) |
-| SAM-assisted | 3 | 2 | 1 | 0 | 3 | 2/3 | 125 | 664 | 789 | 57,091.11 | 57,093 (approx.) | 42,909,696 | unavailable (router metrics disabled) |
+| arm | image deliveries | cache hits | missed required changes | stale-target refusals | model calls | answer present | grounding | prompt tokens | completion tokens | total tokens | model latency (ms) | wall (ms) | client peak RSS | server memory |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | --- | ---: | ---: | ---: | ---: | ---: | ---: | --- |
+| uncached | 5 | 0 | 0 | 0 | 5 | 2/5 | not run | 278 | 1,155 | 1,433 | 78,961.62 | 78,964.31 | 88,768,512 | unavailable (router metrics disabled) |
+| exact-cache | 4 | 1 | 0 | 0 | 4 | 1/4 | not run | 223 | 943 | 1,166 | 64,369.75 | 64,371.78 | 64,028,672 | unavailable (router metrics disabled) |
+| near-cache | 2 | 3 | 2 | 1 | 2 | 0/2 | not run | 110 | 512 | 622 | 34,856.53 | 34,858.86 | 57,573,376 | unavailable (router metrics disabled) |
+| SAM-assisted | 3 | 2 | 1 | 0 | 3 | 2/3 | 0 valid / 2 failed (not scored) | 125 | 664 | 789 | 57,091.11 | 57,093 (approx.) | 42,909,696 | unavailable (router metrics disabled) |
 
 The exact-cache arm behaved safely for the frozen repeated frame. The
 near-cache arm demonstrates why perceptual reuse remains hint-only: it reused
