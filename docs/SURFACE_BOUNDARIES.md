@@ -663,6 +663,23 @@ reservation authority.
 
 Current package-source SHA-256: `407f217572842de201818165040eb495485e21bcc79ca2d813d9871b3a6d386b`.
 
+## Pending surface boundary — 2026-09-09 (aggregate-first branch merge)
+
+Repository-only package-2 correction prepares a delegated branch merge in the
+durable research aggregate while the plan-file lock is held, before publishing
+the compatibility graph result. If aggregate projection cannot be prepared,
+the existing lease and pending branch remain unchanged; no graph result is
+published into an authority that failed closed. Pause and settlement still need
+the same sole-writer transition.
+
+The isolated hierarchical-planner wrapper passes 67/67, including the injected
+missing-ledger merge regression. No inference, calibration, mirror, rollout,
+or default change occurred; planner and parent-research flags remain dark. This
+boundary does not supersede the lease-reservation boundary; it records merge
+ordering authority.
+
+Current package-source SHA-256: `c57f514ca640db5c321dfe72a5a3fe27625099606efff3e938bb8481c9e12da0`.
+
 ## Data at rest: where a research session actually lands (updated 2026-08-10)
 
 A surface hash bounds what the MODEL sees. It says nothing about what a session LEAVES. Those are
