@@ -504,6 +504,23 @@ occurred; a separate human release decision is required.
 Current package-source SHA-256:
 `029aef79b07be5cdbc3a9ab22448eff69a180ad49266035f460c91c0d3b6e771`.
 
+## Pending surface boundary — 2026-09-09 (automatic parent evidence publication)
+
+Repository-only package-3 correction adds a parent-only bridge after
+`research_note`: when the supplied claim ID belongs to the active ledger, its
+validated evidence-card reference and a bounded parent-validation read are
+recorded automatically, then projected to the compatibility aggregate. Unknown
+claim IDs and malformed/settled ledgers remain non-authoritative and leave the
+existing note path intact. Focused Ketch tests pass 27/27; the full harness
+suite is 811/811.
+
+This removes model retyping of card hashes for the supported parent profile, but
+does not add automatic search receipts or make the aggregate the sole source of
+truth. No inference, calibration, mirror, rollout, or default change occurred.
+
+Current package-source SHA-256:
+`48dc081dfaf272c90e6d641bc26b13b1a5998efcec5fcf94942883c8a7024810`.
+
 ## Data at rest: where a research session actually lands (updated 2026-08-10)
 
 A surface hash bounds what the MODEL sees. It says nothing about what a session LEAVES. Those are
