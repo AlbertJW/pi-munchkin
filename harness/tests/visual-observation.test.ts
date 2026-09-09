@@ -234,6 +234,33 @@ test("visual cache is partitioned by the complete serving epoch and reset by com
 	}
 });
 
+test("visual cache refuses reuse when provider, endpoint, or model changes", async () => {
+	const previous = process.env.VISION;
+	process.env.VISION = "on";
+	try {
+		const { makeFakePi } = await import("./integration-harness.ts");
+		const { registerVisualTools } = await import(`../extensions/visual-observe.ts?identity-fixture=${Date.now()}-${Math.random()}`);
+		const fp = makeFakePi(); const cwd = mkdtempSync(join(tmpdir(), "pi-visual-identity-"));
+		registerVisualTools(fp.pi as any, { sessionId: "identity-session", capture: async () => ({ bytes: new Uint8Array([3, 2, 1]), mime: "image/png", width: 10, height: 10 }) });
+		const tool = fp.tools.get("visual_observe");
+		const base = { cwd, model: { provider: "router-a", id: "vision-a", baseUrl: "http://127.0.0.1:9000/v1", contextWindow: 32_768, input: ["text", "image"] } };
+		const first = await tool.execute("one", { source: "screen", source_id: "window-a", question: "what is visible?" }, undefined, undefined, base);
+		assert.equal(first.details.decision, "fresh");
+		const same = await tool.execute("two", { source: "screen", source_id: "window-a", question: "what is visible?" }, undefined, undefined, base);
+		assert.equal(same.details.decision, "exact_reuse");
+		for (const model of [
+			{ ...base.model, provider: "router-b" },
+			{ ...base.model, baseUrl: "http://127.0.0.1:9001/v1" },
+			{ ...base.model, id: "vision-b" },
+		]) {
+			const changed = await tool.execute("changed", { source: "screen", source_id: "window-a", question: "what is visible?" }, undefined, undefined, { ...base, model });
+			assert.equal(changed.details.decision, "fresh");
+		}
+	} finally {
+		if (previous === undefined) delete process.env.VISION; else process.env.VISION = previous;
+	}
+});
+
 test("grounding rejects forged adapter identity and malformed mask digests", async () => {
 	const groundingRequest: GroundingRequest = { observation_id: "a".repeat(64), exact_sha256: "b".repeat(64), geometry, hint: { kind: "point", x: 16, y: 16 }, purpose: "verify" };
 	await assert.rejects(() => refineWithSam({ name: "sam2.1-tiny", version: "2.1", refine: async () => ({ segmenter: "other", segmenter_version: "2.1", mask_digest: "c".repeat(64), box: { x: 8, y: 8, width: 16, height: 16 }, safe_point: { x: 16, y: 16 }, model_score: null }) }, groundingRequest), /identity mismatch/);

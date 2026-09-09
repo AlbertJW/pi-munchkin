@@ -1,0 +1,52 @@
+{
+  "schema": "pi.vision-quality/v1",
+  "revision": "2026-09-09-qwen-quality-synthetic-ui-pack-1",
+  "model_roles": {
+    "quality": "local-llamacpp/qwen36-35b-iq3s-vision"
+  },
+  "generator": "vision-quality-probe.mjs#synthetic-ui-pack-v1",
+  "canvas": { "width": 640, "height": 360, "device_scale": 1 },
+  "cases": [
+    {
+      "id": "right-blue-button",
+      "frame": "buttons",
+      "question": "Which colored button is on the right side of the interface? Answer BLUE or RED.",
+      "answer_regex": "\\bBLUE\\b",
+      "oracle_box": { "x": 440, "y": 278, "width": 120, "height": 20 },
+      "hint": { "kind": "point", "x": 500, "y": 288 }
+    },
+    {
+      "id": "toolbar-green-action",
+      "frame": "toolbar",
+      "question": "Which colored action is in the middle of the toolbar? Answer GREEN, YELLOW, or GRAY.",
+      "answer_regex": "\\bGREEN\\b",
+      "oracle_box": { "x": 216, "y": 120, "width": 80, "height": 20 },
+      "hint": { "kind": "point", "x": 256, "y": 130 }
+    },
+    {
+      "id": "dialog-confirm",
+      "frame": "dialog",
+      "question": "Which colored button confirms the dialog? Answer GREEN or GRAY.",
+      "answer_regex": "\\bGREEN\\b",
+      "oracle_box": { "x": 364, "y": 232, "width": 80, "height": 20 },
+      "hint": { "kind": "point", "x": 404, "y": 242 }
+    }
+  ],
+  "frames": {
+    "buttons": { "variant": "buttons", "generator_revision": "synthetic-ui-pack-v1/buttons", "sha256": "5217a3bbe56bd9143b08001fb7f5c4354d5e605077f43595bd4c6e96dfc20c15" },
+    "toolbar": { "variant": "toolbar", "generator_revision": "synthetic-ui-pack-v1/toolbar", "sha256": "f955dccd9d08615b01a23cb580aafc1a8b1c9f932111876b747d376e1db20829" },
+    "dialog": { "variant": "dialog", "generator_revision": "synthetic-ui-pack-v1/dialog", "sha256": "816682fb7d353d1c0840203dc1e194b888f056601027c521de3a2c1439bb92fc" }
+  },
+  "metrics": [
+    "answer_present",
+    "answer_supported",
+    "required_claim_coverage",
+    "grounding_iou",
+    "grounding_score",
+    "model_latency_ms",
+    "prompt_tokens",
+    "completion_tokens",
+    "total_tokens",
+    "client_peak_rss_bytes"
+  ]
+}

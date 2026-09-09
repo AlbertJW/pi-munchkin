@@ -5,6 +5,7 @@ import { fileURLToPath } from "node:url";
 
 const script = fileURLToPath(new URL("../scripts/vision-quality-probe.mjs", import.meta.url));
 const run = (...args: string[]) => execFileSync(process.execPath, ["--experimental-strip-types", script, ...args], { encoding: "utf8" });
+const multiManifest = fileURLToPath(new URL("./fixtures/vision-quality-qwen36-35b-vision-v2.json", import.meta.url));
 
 test("vision quality probe prepares a deterministic frame and approval digest offline", () => {
 	const first = JSON.parse(run("--prepare"));
@@ -23,4 +24,14 @@ test("vision quality probe dry mode never executes a model", () => {
 
 test("vision quality probe rejects missing approval before any provider call", () => {
 	assert.throws(() => run("--run", "--approve-sha", "0".repeat(64), "--model", "local-llamacpp/qwen36-35b-iq3s-vision"), /vision quality probe requires/);
+});
+
+test("vision quality probe binds every frame in a multi-case quality pack", () => {
+	const first = JSON.parse(run("--prepare", "--manifest", multiManifest));
+	const second = JSON.parse(run("--prepare", "--manifest", multiManifest));
+	assert.deepEqual(first, second);
+	assert.equal(first.case_count, 3);
+	assert.deepEqual(Object.keys(first.frame_sha256).sort(), ["buttons", "dialog", "toolbar"]);
+	assert.equal(new Set(Object.values(first.frame_sha256)).size, 3);
+	for (const digest of Object.values(first.frame_sha256)) assert.match(String(digest), /^[0-9a-f]{64}$/);
 });
