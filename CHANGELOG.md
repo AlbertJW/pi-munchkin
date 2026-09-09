@@ -4,6 +4,16 @@ All notable changes to pi-munchkin are documented here. Releases follow semantic
 
 ## Unreleased
 
+### Fixed (2026-09-09 — visual uncertainty and action fencing)
+
+Visual observations now carry an explicit uncertainty fence that blocks exact
+and perceptual reuse until a fresh frame replaces it. Any UI action, including
+an errored action that may have partially mutated the interface, clears cached
+image observations. The full harness suite is 845/845. The live Qwen 35B
+vision qualification remains dark and is recorded in
+`docs/evidence/VISION_QUALIFICATION_QWEN36_35B_2026-09-09.md`; no default,
+deployment, mirror, or click authority changed.
+
 ### Added (2026-09-09 — bounded visual lifecycle)
 
 An explicit screen or browser observation now arms a dark, bounded watcher that
