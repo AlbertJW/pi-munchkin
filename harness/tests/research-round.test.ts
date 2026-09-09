@@ -66,6 +66,26 @@ test("duplicate queries, URLs, and reports cannot buy another allowance", () => 
 	assert.throws(() => ledger.recordRound({ ...baseProposal("run-b", "round-1", "claim-a"), note: "changed" }), ResearchRoundError);
 });
 
+test("automatic search receipts are idempotent and do not double-charge a model-reserved query", () => {
+	const ledger = new ResearchRoundLedger({ run_id: "run-search-receipt", obligations: [obligation("claim-a")] });
+	const input = {
+		receipt_id: "auto-search-receipt-1", query: "bounded source query", mode: "quick" as const,
+		backends: ["exa"], result_urls: ["https://example.test/source"], result_count: 1,
+		truncated: false, outcome: "completed" as const, created_at: "2026-09-09T00:00:00.000Z",
+	};
+	const first = ledger.recordSearchReceipt(input);
+	assert.equal(first.charged, true);
+	assert.equal(ledger.state.budget.consumed.searches, 1);
+	assert.deepEqual(ledger.recordSearchReceipt(input), first);
+	assert.equal(ledger.state.budget.consumed.searches, 1);
+	const reserved = new ResearchRoundLedger({ run_id: "run-search-reserved", obligations: [obligation("claim-a")] });
+	reserved.recordRound({ ...baseProposal("run-search-reserved", "round-1", "claim-a"), reads: [], source_leads: [], queries: [{ query_id: "query-round-1", claim_id: "claim-a", query: "bounded source query" }] });
+	const compatibility = reserved.recordSearchReceipt(input);
+	assert.equal(compatibility.charged, false);
+	assert.equal(reserved.state.budget.consumed.searches, 1);
+	assert.equal(validateResearchRoundLedger(reserved.state), true);
+});
+
 test("failed child reports burn their reserved allocation and duplicate or late reports are harmless", () => {
 	const ledger = new ResearchRoundLedger({ run_id: "run-c", obligations: [obligation("claim-a")] });
 	ledger.reserveChild("owner-c", { searches: 1, reads: 1, validation_reads: 0 });

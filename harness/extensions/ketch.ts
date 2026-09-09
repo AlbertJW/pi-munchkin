@@ -396,6 +396,39 @@ export function registerKetch(pi: ExtensionAPI, dependencies: KetchDependencies 
 		if (!committed) return;
 		await projectParentResearchAggregate(runId, committed);
 	}
+	/**
+	 * Parent-owned research records the search adapter's bounded query and lead
+	 * identities before returning a successful result. The ledger reducer owns
+	 * budget charging and deduplication; result snippets never cross this
+	 * boundary. This remains a best-effort compatibility bridge until the
+	 * aggregate becomes the sole research authority.
+	 */
+	async function recordParentSearchReceipt(toolCallId: string, started: number, query: string, mode: "quick" | "broad", backends: readonly string[], resultUrls: readonly string[], truncated: boolean, outcome: "completed" | "failed" | "blocked"): Promise<void> {
+		if (!PARENT_RESEARCH_WORKFLOW || !activeResearchCwd) return;
+		const active = (globalThis as Record<string, unknown>).__pi_active_plan_context as { profile?: unknown; run_id?: unknown; settled?: unknown } | undefined;
+		if (active?.profile !== "deep-research" || active.settled === true || typeof active.run_id !== "string") return;
+		const runId = active.run_id;
+		const path = researchRoundPath(activeResearchCwd, runId, process.env);
+		const existing = await readResearchRoundLedger(path);
+		if (!existing || existing.run_id !== runId || existing.status === "settled") return;
+		const urls = [...new Set(resultUrls.flatMap((raw) => { try { return [canonicalResearchUrl(raw)]; } catch { return []; } }))].slice(0, 8);
+		const identity = JSON.stringify({ run_id: runId, tool_call_id: toolCallId, query, mode, backends: [...backends], result_urls: urls, truncated, outcome });
+		const receiptId = `auto-search-${createHash("sha256").update(identity, "utf8").digest("hex").slice(0, 48)}`;
+		try {
+			const outcomeState = await mutateResearchRoundLedger(path, (ledger) => {
+				const receipt = ledger.recordSearchReceipt({
+					receipt_id: receiptId, query, mode, backends: [...new Set(backends)].slice(0, 8), result_urls: urls,
+					result_count: urls.length, truncated, outcome, created_at: new Date(started).toISOString(),
+				});
+				return { state: ledger.state, result: receipt };
+			});
+			await projectParentResearchAggregate(runId, outcomeState.state);
+		} catch {
+			// A stale or unavailable aggregate/compatibility ledger must never turn a
+			// valid search response into a tool failure. The next inspect/recovery
+			// boundary will surface missing authoritative receipts.
+		}
+	}
 	async function recordParentEvidenceCard(card: EvidenceCardV1): Promise<void> {
 		if (!PARENT_RESEARCH_WORKFLOW || !activeResearchCwd) return;
 		const active = (globalThis as Record<string, unknown>).__pi_active_plan_context as { profile?: unknown; run_id?: unknown; settled?: unknown } | undefined;
@@ -627,6 +660,7 @@ export function registerKetch(pi: ExtensionAPI, dependencies: KetchDependencies 
 				const versionError = await checkVersion();
 				if (versionError) {
 					record("ketch", "search", { mode, backends: [], attempts: 0, results: 0, chars: 0, duration_ms: Date.now() - started, truncated: false, outcome: "precondition" });
+					await recordParentSearchReceipt(toolCallId, started, params.query, mode, [], [], false, "blocked");
 					return text(versionError, { outcome: "precondition", coverage: coverageReceipt(0, undefined, false, true) });
 				}
 
@@ -651,6 +685,7 @@ export function registerKetch(pi: ExtensionAPI, dependencies: KetchDependencies 
 					const last = attempts.at(-1)?.result;
 					const outcome = last ? ketchFailureClass(last) : "unknown";
 					record("ketch", "search", { mode, backends: attempts.map(({ backend }) => backend), attempts: attempts.length, results: 0, chars: 0, duration_ms: Date.now() - started, truncated: false, outcome });
+					await recordParentSearchReceipt(toolCallId, started, params.query, mode, attempts.map(({ backend }) => backend), [], Boolean(last?.truncated), "failed");
 					return text(last ? failureText(last) : "Ketch search did not run.", { outcome, coverage: coverageReceipt(0, undefined, Boolean(last?.truncated), true) });
 				}
 
@@ -684,6 +719,7 @@ export function registerKetch(pi: ExtensionAPI, dependencies: KetchDependencies 
 						? `results ${results.length} (limit reached — narrow the query or raise limit for more) · backends: ${backends.join(", ")}\n\n`
 						: `results ${results.length} of all found for this query · backends: ${backends.join(", ")}\n\n`;
 					record("ketch", "search", { mode, backends, attempts: attempts.length, results: results.length, chars: formatted.text.length, duration_ms: Date.now() - started, truncated, outcome: "ok" });
+					await recordParentSearchReceipt(toolCallId, started, params.query, mode, backends, results.map((result) => result.url), truncated, "completed");
 					emitHarnessSignal(pi.events, { v: 1, type: "capability/need", capability: "web_read", reason: "selected-search-result" });
 					return text(receipt + formatted.text + budgetFooter(), {
 						mode, backends, result_count: results.length, truncated,
@@ -691,6 +727,7 @@ export function registerKetch(pi: ExtensionAPI, dependencies: KetchDependencies 
 					});
 				} catch {
 					record("ketch", "search", { mode, backends: [successful.backend], attempts: attempts.length, results: 0, chars: 0, duration_ms: Date.now() - started, truncated: successful.result.truncated, outcome: "invalid_json" });
+					await recordParentSearchReceipt(toolCallId, started, params.query, mode, [successful.backend], [], successful.result.truncated, "failed");
 					return text("Ketch returned malformed search data; treat this lookup as failed.", { outcome: "invalid_json", coverage: coverageReceipt(0, undefined, successful.result.truncated, true) });
 				}
 			},

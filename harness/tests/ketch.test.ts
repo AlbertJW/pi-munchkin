@@ -574,6 +574,45 @@ test("parent web_read records a bounded read receipt before returning success", 
 	}
 });
 
+test("parent web_search publishes its query and bounded source leads automatically", async () => {
+	const dir = mkdtempSync(join(tmpdir(), "ketch-auto-search-"));
+	const snapshot = Object.fromEntries(["KETCH", "KETCH_BIN", "RESEARCH_LEDGER", "DEEP_RESEARCH_PLANNING", "RESEARCH_WORKFLOW", "PI_CODING_AGENT_DIR", "TELEMETRY_FILE", "TELEMETRY_SOURCE"].map((key) => [key, process.env[key]]));
+	try {
+		delete process.env.KETCH;
+		process.env.KETCH_BIN = mockKetch(dir);
+		process.env.RESEARCH_LEDGER = "on";
+		process.env.DEEP_RESEARCH_PLANNING = "on";
+		process.env.RESEARCH_WORKFLOW = "parent";
+		process.env.PI_CODING_AGENT_DIR = join(dir, "agent");
+		process.env.TELEMETRY_FILE = join(dir, "events.jsonl");
+		process.env.TELEMETRY_SOURCE = "test";
+		const runId = "research-plan-auto-search";
+		const ledger = new ResearchRoundLedger({ run_id: runId, obligations: [{ claim_id: "claim-a", text: "A", required: true, status: "open", missing: "evidence", why: "test", next_action: "search" }], budget: { searches: 3, reads: 5, validation_reads: 5 } });
+		const roundPath = researchRoundPath(dir, runId, process.env);
+		await writeResearchRoundLedger(roundPath, ledger.state);
+		const aggregatePath = researchAggregatePath(dir, runId, process.env);
+		await writeResearchAggregate(aggregatePath, migrateResearchPair({ run_id: runId }, ledger.state));
+		const fp = makeFakePi();
+		const mod = await import(`../extensions/ketch.ts?auto-search=${Date.now()}-${Math.random()}`);
+		mod.registerKetch(fp.pi as never, { resolvePublicUrl: async (raw: string) => new URL(raw).toString() });
+		await fp.handlers.get("session_start")?.[0]?.({}, { cwd: dir, ui: { notify() {} } });
+		(globalThis as Record<string, unknown>).__pi_active_plan_context = { profile: "deep-research", run_id: runId, settled: false };
+		const result = await callTool(fp, "web_search", { query: "bounded source query", limit: 1 }, dir);
+		assert.equal(result.isError, false);
+		const persisted = await readResearchRoundLedger(roundPath);
+		assert.equal(persisted?.search_receipts?.length, 1, "the search tool should publish one automatic receipt");
+		assert.equal(persisted?.search_receipts?.[0]?.query, "bounded source query");
+		assert.deepEqual(persisted?.search_receipts?.[0]?.result_urls, ["https://example.com/a"]);
+		assert.equal(persisted?.budget.consumed.searches, 1);
+		const aggregate = await readResearchAggregate(aggregatePath);
+		assert.equal((aggregate?.evidence_round as any)?.search_receipts.length, 1, "aggregate projection must carry the search receipt");
+	} finally {
+		restoreEnv(snapshot);
+		rmSync(dir, { recursive: true, force: true });
+		delete (globalThis as Record<string, unknown>).__pi_active_plan_context;
+	}
+});
+
 test("parent research_note publishes its evidence card and validation receipt automatically", async () => {
 	const dir = mkdtempSync(join(tmpdir(), "ketch-auto-card-"));
 	const snapshot = Object.fromEntries(["KETCH", "KETCH_BIN", "RESEARCH_LEDGER", "DEEP_RESEARCH_PLANNING", "RESEARCH_WORKFLOW", "PI_CODING_AGENT_DIR", "TELEMETRY_FILE", "TELEMETRY_SOURCE"].map((key) => [key, process.env[key]]));

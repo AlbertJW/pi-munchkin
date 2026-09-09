@@ -91,6 +91,23 @@ export type ReadReceiptV1 = {
 	reason?: "duplicate" | "budget_exhausted" | "unknown_source";
 };
 
+/** Facts captured by the parent retrieval adapter after a search attempt. The
+ * query and source URLs are bounded metadata; no result snippets or page
+ * content are persisted here. `charged` distinguishes an adapter receipt from
+ * a query the model had already reserved in a compatibility round. */
+export type SearchReceiptV1 = {
+	receipt_id: string;
+	query: string;
+	mode: "quick" | "broad";
+	backends: string[];
+	result_urls: string[];
+	result_count: number;
+	truncated: boolean;
+	outcome: "completed" | "failed" | "blocked";
+	charged: boolean;
+	created_at: string;
+};
+
 export type EvidenceCardRefV1 = {
 	card_id: string;
 	original_url: string;
@@ -191,6 +208,7 @@ export type ResearchRoundLedgerStateV1 = {
 	reserved_queries: string[];
 	reserved_discovery_urls: string[];
 	reserved_validation_urls: string[];
+	search_receipts?: SearchReceiptV1[];
 	child_reservations: ChildReservationV1[];
 	child_reports: ChildReportReceiptV1[];
 	deferrals: ResearchDeferralV1[];
@@ -294,6 +312,23 @@ function validTimestamp(value: unknown): value is string {
 function validUrl(value: unknown): value is string {
 	if (typeof value !== "string" || value.length > 1_999) return false;
 	try { return canonicalResearchUrl(value) === value; } catch { return false; }
+}
+
+function validateSearchReceipt(value: unknown, name: string): SearchReceiptV1 {
+	if (!value || typeof value !== "object" || Array.isArray(value)) throw new ResearchRoundError(`${name} is invalid`);
+	const item = value as Record<string, unknown>;
+	const fields = ["receipt_id", "query", "mode", "backends", "result_urls", "result_count", "truncated", "outcome", "charged", "created_at"];
+	if (Object.keys(item).length !== fields.length || fields.some((field) => !(field in item))) throw new ResearchRoundError(`${name} has unknown or missing fields`);
+	const receiptId = id(item.receipt_id, `${name}.receipt_id`);
+	const query = text(item.query, 500);
+	if (item.mode !== "quick" && item.mode !== "broad") throw new ResearchRoundError(`${name}.mode is invalid`);
+	if (!Array.isArray(item.backends) || item.backends.length > 8 || item.backends.some((backend) => typeof backend !== "string" || backend.length < 1 || backend.length > 64 || /[\u0000-\u001f\u007f-\u009f\r]/u.test(backend))) throw new ResearchRoundError(`${name}.backends is invalid`);
+	const backends = [...new Set(item.backends as string[])];
+	if (!Array.isArray(item.result_urls) || item.result_urls.length > 8 || item.result_urls.some((url) => !validUrl(url))) throw new ResearchRoundError(`${name}.result_urls is invalid`);
+	const resultUrls = [...new Set(item.result_urls as string[])];
+	if (!Number.isSafeInteger(item.result_count) || Number(item.result_count) < 0 || Number(item.result_count) > 8 || Number(item.result_count) !== resultUrls.length) throw new ResearchRoundError(`${name}.result_count is invalid`);
+	if (typeof item.truncated !== "boolean" || !["completed", "failed", "blocked"].includes(String(item.outcome)) || typeof item.charged !== "boolean" || !validTimestamp(item.created_at)) throw new ResearchRoundError(`${name} outcome is invalid`);
+	return { receipt_id: receiptId, query, mode: item.mode, backends, result_urls: resultUrls, result_count: Number(item.result_count), truncated: item.truncated, outcome: item.outcome as SearchReceiptV1["outcome"], charged: item.charged, created_at: item.created_at as string };
 }
 
 function validateObligation(value: unknown, name: string): ClaimObligationV1 {
@@ -511,7 +546,7 @@ export class ResearchRoundLedger {
 		const allocated = defaultBudget(options.budget);
 		this.current = {
 			schema: RESEARCH_ROUND_LEDGER_SCHEMA, run_id: text(options.run_id, 200), budget: { allocated, consumed: budgetZero(), reserved: budgetZero() },
-			obligations, gaps: obligations.filter((item) => item.status !== "resolved").map((item) => gapForClaim(item, item.status)), conflicts: [], evidence_cards: [], rounds: [], reserved_queries: [], reserved_discovery_urls: [], reserved_validation_urls: [], child_reservations: [], child_reports: [], deferrals: [], status: "active",
+			obligations, gaps: obligations.filter((item) => item.status !== "resolved").map((item) => gapForClaim(item, item.status)), conflicts: [], evidence_cards: [], rounds: [], reserved_queries: [], reserved_discovery_urls: [], reserved_validation_urls: [], search_receipts: [], child_reservations: [], child_reports: [], deferrals: [], status: "active",
 		};
 	}
 
@@ -526,6 +561,36 @@ export class ResearchRoundLedger {
 
 	openGaps(): EvidenceGapV1[] { return clone(this.current.gaps.filter((gap) => gap.status === "open" || gap.status === "blocked" || gap.status === "deferred")); }
 	validatedClaimIds(): string[] { return [...claimCoverage(this.current.evidence_cards)].sort(); }
+
+	/** Record one search adapter outcome without asking the model to copy query or
+	 * result metadata into a later research_round proposal. This transition is
+	 * idempotent by receipt ID and conserves the same global search envelope used
+	 * by model-authored query proposals. */
+	recordSearchReceipt(input: Omit<SearchReceiptV1, "charged">): SearchReceiptV1 {
+		if (this.current.status === "settled") throw new ResearchRoundError("research round ledger is settled and immutable");
+		const parsed = validateSearchReceipt({ ...input, charged: false }, "search receipt");
+		const receipts = this.current.search_receipts ?? [];
+		const prior = receipts.find((receipt) => receipt.receipt_id === parsed.receipt_id);
+		if (prior) {
+			const comparable = (value: SearchReceiptV1) => { const { charged: _charged, ...rest } = value; return rest; };
+			if (digest(comparable(prior)) !== digest(comparable(parsed))) throw new ResearchRoundError("search receipt identity conflicts with prior content");
+			return clone(prior);
+		}
+		if (receipts.length >= RESEARCH_ROUND_MAX_ROUNDS) throw new ResearchRoundError("search receipt capacity reached");
+		const normalized = parsed.query.replace(/\s+/g, " ").trim().toLocaleLowerCase();
+		const alreadyReserved = this.current.reserved_queries.includes(normalized);
+		if (!alreadyReserved && this.current.budget.consumed.searches + this.current.budget.reserved.searches >= this.current.budget.allocated.searches) throw new ResearchRoundError("research search budget exhausted");
+		const working = clone(this.current);
+		working.search_receipts = [...(working.search_receipts ?? [])];
+		const charged = !alreadyReserved;
+		if (charged) working.budget.consumed.searches += 1;
+		if (!working.reserved_queries.includes(normalized)) working.reserved_queries.push(normalized);
+		for (const url of parsed.result_urls) if (!working.reserved_discovery_urls.includes(url)) working.reserved_discovery_urls.push(url);
+		const receipt = { ...parsed, charged };
+		working.search_receipts.push(receipt);
+		this.current = working;
+		return clone(receipt);
+	}
 
 	/** Reserve one child allocation before launching its process. */
 	reserveChild(ownerRef: string, allocated: ResearchBudgetEnvelope): ChildReservationV1 {
@@ -779,7 +844,7 @@ export function validateResearchRoundLedger(value: unknown): value is ResearchRo
 		if (!value || typeof value !== "object" || Array.isArray(value)) throw new ResearchRoundError("ledger is invalid");
 		const item = value as Record<string, unknown>;
 		const fields = ["schema", "run_id", "budget", "obligations", "gaps", "conflicts", "evidence_cards", "rounds", "reserved_queries", "reserved_discovery_urls", "reserved_validation_urls", "child_reservations", "child_reports", "deferrals", "status"];
-		if (Object.keys(item).some((key) => !fields.includes(key) && key !== "terminal_reason") || !fields.every((key) => key in item)) throw new ResearchRoundError("ledger has unknown or missing fields");
+		if (Object.keys(item).some((key) => !fields.includes(key) && key !== "terminal_reason" && key !== "search_receipts") || !fields.every((key) => key in item)) throw new ResearchRoundError("ledger has unknown or missing fields");
 		if (item.schema !== RESEARCH_ROUND_LEDGER_SCHEMA) throw new ResearchRoundError("ledger schema is invalid");
 		text(item.run_id, 200); if (item.terminal_reason !== undefined) text(item.terminal_reason, 300);
 		if (!item.budget || typeof item.budget !== "object" || Array.isArray(item.budget)) throw new ResearchRoundError("ledger budget is invalid");
@@ -815,6 +880,17 @@ export function validateResearchRoundLedger(value: unknown): value is ResearchRo
 			roundUsage.validation_reads += parsed.consumed.validation_reads;
 		}
 		for (const name of ["reserved_queries", "reserved_discovery_urls", "reserved_validation_urls"] as const) { validateLedgerArray(item[name], `ledger ${name}`, 128); if ((item[name] as unknown[]).some((entry) => typeof entry !== "string" || entry.length > 2_000)) throw new ResearchRoundError(`ledger ${name} is invalid`); }
+		const searchReceipts = item.search_receipts === undefined ? [] : item.search_receipts;
+		validateLedgerArray(searchReceipts, "ledger search receipts", RESEARCH_ROUND_MAX_ROUNDS);
+		const searchReceiptIds = new Set<string>();
+		let searchReceiptUsage = 0;
+		for (const [index, receipt] of (searchReceipts as unknown[]).entries()) {
+			const parsed = validateSearchReceipt(receipt, `ledger search_receipts[${index}]`);
+			if (searchReceiptIds.has(parsed.receipt_id)) throw new ResearchRoundError("duplicate ledger search receipt");
+			searchReceiptIds.add(parsed.receipt_id);
+			if (!((item.reserved_queries as unknown[]).includes(parsed.query.replace(/\s+/g, " ").trim().toLocaleLowerCase()))) throw new ResearchRoundError("search receipt query is not reserved");
+			if (parsed.charged) searchReceiptUsage += 1;
+		}
 		validateLedgerArray(item.child_reservations, "ledger child reservations", RESEARCH_ROUND_MAX_CHILD_REPORTS);
 		const owners = new Set<string>();
 		let reservedUsage = budgetZero();
@@ -835,7 +911,7 @@ export function validateResearchRoundLedger(value: unknown): value is ResearchRo
 			if (!SHA256.test(String(row.digest)) || !validTimestamp(row.merged_at)) throw new ResearchRoundError("child receipt identity is invalid");
 			const charged = envelope(row.charged, "child receipt charged"); childUsage = add(childUsage, charged);
 		}
-		if (!equal(budget.consumed as ResearchBudgetEnvelope, add(roundUsage, childUsage))) throw new ResearchRoundError("ledger budget consumption does not match its rounds and child reports");
+		if (!equal(budget.consumed as ResearchBudgetEnvelope, add(add(roundUsage, childUsage), { searches: searchReceiptUsage, reads: 0, validation_reads: 0 }))) throw new ResearchRoundError("ledger budget consumption does not match its rounds, search receipts and child reports");
 		if (!equal(budget.reserved as ResearchBudgetEnvelope, reservedUsage)) throw new ResearchRoundError("ledger budget reservations do not match child reservations");
 		validateLedgerArray(item.deferrals, "ledger deferrals", RESEARCH_ROUND_MAX_OBLIGATIONS);
 		const deferredClaims = new Set<string>();
