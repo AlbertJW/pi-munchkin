@@ -67,6 +67,7 @@
       "harness/extensions/run-capsule.ts",
       "harness/extensions/working-memory.ts",
       "harness/extensions/context-surface.ts",
+      "harness/extensions/visual-observe.ts",
       "harness/extensions/telemetry-flush.ts"
     ],
     "skills": [
@@ -119,6 +120,7 @@
     "harness/extensions/run-kernel.ts",
     "harness/extensions/run-capsule.ts",
     "harness/extensions/working-memory.ts",
+    "harness/extensions/visual-observe.ts",
     "harness/extensions/telemetry-flush.ts",
     "harness/lib/active-tool-prompts.ts",
     "harness/lib/agent-dir.ts",
@@ -192,6 +194,8 @@
     "harness/lib/verification-frontier.ts",
     "harness/lib/verification-plateau.ts",
     "harness/lib/working-memory.ts",
+    "harness/lib/visual-observation.ts",
+    "harness/lib/visual-grounding.ts",
     "harness/agents",
     "harness/vendor",
     "skills/deep-research",

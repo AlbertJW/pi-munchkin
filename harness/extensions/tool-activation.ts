@@ -25,7 +25,7 @@ const HEADLESS_PLAN_TOOLS = new Set([
 	"research_finish", "web_search", "web_read", "research_note", "research_recall", "subagent",
 ]);
 const HEADLESS_PLAN_ROUTE_HINT = "[pi planner lease] A bounded deep-research planner lease is active for this parent session. For contested, comparative, multi-part, or delegated research, call research_plan_start before any web_search or web_read; do not begin direct web research first. Straightforward fact lookup may stay lightweight. The lease does not authorize children to plan.";
-type Family = "research" | "delegation" | "browser" | "canvas" | "context" | "planning" | "goals";
+type Family = "research" | "delegation" | "browser" | "canvas" | "context" | "planning" | "goals" | "vision";
 
 export const MUNCHKIN_TOOL_PROFILE_DEFAULT: Profile = "core";
 // Exported for plan-runner's post-restart surface restore (audit A6, 2026-08-25):
@@ -116,6 +116,7 @@ function familyTools(family: Family, all: readonly string[]): string[] {
 		case "canvas": return all.filter((name) => name.startsWith("tldraw_"));
 		case "context": return all.filter((name) => name === "compact_context");
 		case "goals": return all.filter((name) => ["goal_propose", "goal_inspect", "goal_update", "goal_settle", "goal_block"].includes(name));
+		case "vision": return all.filter((name) => name === "visual_observe" || name === "visual_refine_target");
 		// Flat plan tools are activatable in ANY session: skills and models may
 		// legitimately structure multi-item work without the human /plan surface
 		// (measured live 2026-08-25: the process-circleback skill instructs
@@ -249,19 +250,19 @@ export default function (pi: ExtensionAPI): void {
 		name: "capability",
 		label: "Capability Switch",
 		description: "Enable one specialist tool family for this session, or report bounded family status.",
-		promptSnippet: "capability: enable research, delegation, browser, canvas, context, planning, or goals tools only when needed",
+		promptSnippet: "capability: enable research, delegation, browser, canvas, context, planning, goals, or vision tools only when needed",
 		parameters: Type.Object({
 			action: Type.Union([Type.Literal("enable"), Type.Literal("status")]),
 			family: Type.Optional(Type.Union([
 				Type.Literal("research"), Type.Literal("delegation"), Type.Literal("browser"),
 				Type.Literal("canvas"), Type.Literal("context"), Type.Literal("planning"),
-				Type.Literal("goals"),
+				Type.Literal("goals"), Type.Literal("vision"),
 			])),
 		}),
 		async execute(_toolCallId, params) {
 			if (params.action === "enable" && !params.family) throw new Error("capability: family is required for enable");
 			const result = params.action === "enable" ? activateFamily(params.family as Family, "model-request") : null;
-			const activeFamilies = (["research", "delegation", "browser", "canvas", "context", "planning", "goals"] as Family[])
+			const activeFamilies = (["research", "delegation", "browser", "canvas", "context", "planning", "goals", "vision"] as Family[])
 				.filter((family) => familyTools(family, allNames).some((name) => pi.getActiveTools().includes(name)));
 			return {
 				content: [{ type: "text" as const, text: JSON.stringify({ profile, explicit, active_families: activeFamilies, result }) }],

@@ -117,6 +117,8 @@
     "verify-gate/gate-green-execution-ordered",
     "verify-gate/steer",
     "verify-gate/unverified-end",
+    "visual-observe/cache",
+    "visual-observe/grounding",
     "working-memory/list",
     "working-memory/resolve",
     "working-memory/settled",

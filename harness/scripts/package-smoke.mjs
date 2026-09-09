@@ -84,6 +84,9 @@ const expectedExtensions = [
   // This expectation moved deliberately WITH the
   // manifest; it was not adjusted to silence a firing tripwire.
   "harness/extensions/context-surface.ts",
+  // Dark visual observation and optional grounding remain after context
+  // mutation so their image/cache receipts see the final serving envelope.
+  "harness/extensions/visual-observe.ts",
   // Durability boundary is registered last so settled/shutdown rows from every
   // first-party extension are queued before the final async flush.
   "harness/extensions/telemetry-flush.ts",
