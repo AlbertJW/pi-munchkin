@@ -521,6 +521,25 @@ truth. No inference, calibration, mirror, rollout, or default change occurred.
 Current package-source SHA-256:
 `48dc081dfaf272c90e6d641bc26b13b1a5998efcec5fcf94942883c8a7024810`.
 
+## Pending surface boundary — 2026-09-09 (automatic parent search receipts)
+
+Repository-only package-3 correction adds a bounded `search_receipts` view to
+the parent research-round ledger. `web_search` records the query, selected
+canonical lead URLs, backend names, truncation and outcome before returning a
+result; the reducer charges the shared search envelope exactly once and treats
+retries as idempotent by a content-addressed tool receipt. A query already
+reserved by a compatibility `research_round` proposal is recorded without a
+second charge. Result snippets and page contents are never persisted in this
+receipt. Focused Ketch and research-round suites pass, with the full harness
+suite rerun pending this source boundary.
+
+This remains a compatibility bridge: the research aggregate still receives a
+projection and is not yet the sole authority for graph, ledger, deadline and
+delivery transitions. No inference, calibration, mirror, rollout, or default
+change occurred.
+
+Current package-source SHA-256: `c6973ed682def2d74aee2b63fe7545b9d378ceb76bed5dd2ddc7ad9a75bfa010`.
+
 ## Data at rest: where a research session actually lands (updated 2026-08-10)
 
 A surface hash bounds what the MODEL sees. It says nothing about what a session LEAVES. Those are
