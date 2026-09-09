@@ -81,14 +81,23 @@ fresh observation and independent target validation.
 
 ## Remaining qualification work
 
-The real quality screen is intentionally pending. A human must first install
+The first explicit Qwen run is recorded in
+`VISION_QUALIFICATION_QWEN36_35B_2026-09-09.md`. It proves multimodal
+transport and records separate epoch-bound uncached, exact-cache, and
+near-cache measurements, but the frozen one-pixel fixture has no semantic
+answer oracle. Near-cache correctly exposes two missed required changes and
+one stale-target refusal. The SAM arm is explicitly unavailable because no
+local SAM 2.1 Tiny runner is installed.
+
+The real quality screen therefore remains pending. A human must first install
 or point to a local SAM 2.1 Tiny runner and a vision-capable model, then run
 the identical case pack separately for Ling (protocol qualification) and
-Qwen 35B vision using the newly prepared manifest. The screen should compare uncached, exact-cache,
-near-cache, and SAM-assisted arms on answer support, missed UI changes,
-grounding accuracy, stale-target refusals, context volume, latency, memory,
-and model-call count. Results must be stored separately by model and serving
-epoch, and only a human review may promote a dark surface.
+Qwen 35B vision using meaningful screenshot cases with answer and geometry
+oracles. The screen should compare uncached, exact-cache, near-cache, and
+SAM-assisted arms on answer support, missed UI changes, grounding accuracy,
+stale-target refusals, context volume, latency, memory, and model-call count.
+Results must be stored separately by model and serving epoch, and only a
+human review may promote a dark surface.
 
 Known limits are JPEG/GIF/WebP pHash decoding, provider-specific visual-token
 counting, browser accessibility capture, and persisted interpretation
