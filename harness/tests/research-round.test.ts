@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
 import {
-	ResearchRoundError, ResearchRoundLedger, evidenceCardRef, readResearchRoundLedger, researchRoundPath,
+	ResearchRoundError, ResearchRoundLedger, evidenceCardRef, mutateResearchRoundLedger, readResearchRoundLedger, researchRoundPath,
 	validateResearchRoundLedger, validateResearchRoundProposal, writeResearchRoundLedger,
 } from "../lib/research-round.ts";
 import { makeEvidenceCard } from "../lib/research-evidence.ts";
@@ -136,6 +136,29 @@ test("budget exhaustion becomes an explicit gap and persistence survives restart
 	assert.equal((await readFile(path, "utf8")).includes("quote"), false);
 	assert.doesNotThrow(() => JSON.parse(ledger.renderSummary(600)));
 	assert.ok(Buffer.byteLength(ledger.renderSummary(128), "utf8") <= 128, "compact summary respects its byte ceiling");
+	} finally { await rm(root, { recursive: true, force: true }); }
+});
+
+test("ledger mutation prepares the dependent authority before publishing the compatibility view", async () => {
+	const root = await mkdtemp(join(tmpdir(), "research-round-before-persist-"));
+	try {
+		const path = researchRoundPath(root, "run-before-persist", { PI_CODING_AGENT_DIR: join(root, "agent") });
+		const ledger = new ResearchRoundLedger({ run_id: "run-before-persist", obligations: [obligation("claim-a")] });
+		await writeResearchRoundLedger(path, ledger.state);
+		const before = await readFile(path, "utf8");
+		let candidate: unknown;
+		await assert.rejects(() => mutateResearchRoundLedger(path, (current) => {
+			current.recordRound(baseProposal("run-before-persist", "round-1", "claim-a"));
+			return undefined;
+		}, {
+			beforePersist: (state) => {
+				candidate = state;
+				throw new Error("dependent authority unavailable");
+			},
+		}), /dependent authority unavailable/);
+		assert.ok(candidate, "the dependent authority hook must receive the candidate state");
+		assert.notEqual(JSON.stringify(candidate), before, "the candidate must contain the proposed transition");
+		assert.equal(await readFile(path, "utf8"), before, "a vetoed dependent write must leave the compatibility ledger unchanged");
 	} finally { await rm(root, { recursive: true, force: true }); }
 });
 

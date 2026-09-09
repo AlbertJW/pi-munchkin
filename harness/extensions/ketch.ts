@@ -380,25 +380,23 @@ export function registerKetch(pi: ExtensionAPI, dependencies: KetchDependencies 
 		if (!reads.length) return;
 		const receiptIdentity = JSON.stringify({ run_id: runId, reads });
 		const roundId = `auto-read-${createHash("sha256").update(receiptIdentity, "utf8").digest("hex").slice(0, 48)}`;
-		let committed: Awaited<ReturnType<typeof readResearchRoundLedger>> = null;
 		try {
-			const outcome = await mutateResearchRoundLedger(path, (ledger) => {
+			await mutateResearchRoundLedger(path, (ledger) => {
 				const proposal: ResearchRoundProposalV1 = {
 					schema: "pi.research-round/v1", run_id: runId, round_id: roundId,
 					selected_gaps: [], queries: [], source_leads: [], reads, evidence_cards: [], conflicts: [], gaps: [], proposed_next_action: "read",
 				};
 				ledger.recordRound(proposal);
 				return { state: ledger.state, result: ledger.state };
+			}, {
+				beforePersist: async (nextState) => { await projectParentResearchAggregate(runId, nextState); },
 			});
-			committed = outcome.state;
 		} catch {
 			// The legacy ledger remains the compatibility authority until aggregate
 			// writes become sole-source. Retrieval success is still useful, but the
 			// parent must not infer a durable receipt from this best-effort bridge.
 			return;
 		}
-		if (!committed) return;
-		await projectParentResearchAggregate(runId, committed);
 	}
 	/**
 	 * Parent-owned research records the search adapter's bounded query and lead
@@ -419,14 +417,15 @@ export function registerKetch(pi: ExtensionAPI, dependencies: KetchDependencies 
 		const identity = JSON.stringify({ run_id: runId, tool_call_id: toolCallId, query, mode, backends: [...backends], result_urls: urls, truncated, outcome });
 		const receiptId = `auto-search-${createHash("sha256").update(identity, "utf8").digest("hex").slice(0, 48)}`;
 		try {
-			const outcomeState = await mutateResearchRoundLedger(path, (ledger) => {
+			await mutateResearchRoundLedger(path, (ledger) => {
 				const receipt = ledger.recordSearchReceipt({
 					receipt_id: receiptId, query, mode, backends: [...new Set(backends)].slice(0, 8), result_urls: urls,
 					result_count: urls.length, truncated, outcome, created_at: new Date(started).toISOString(),
 				});
 				return { state: ledger.state, result: receipt };
+			}, {
+				beforePersist: async (nextState) => { await projectParentResearchAggregate(runId, nextState); },
 			});
-			await projectParentResearchAggregate(runId, outcomeState.state);
 		} catch {
 			// A stale or unavailable aggregate/compatibility ledger must never turn a
 			// valid search response into a tool failure. The next inspect/recovery
@@ -445,23 +444,22 @@ export function registerKetch(pi: ExtensionAPI, dependencies: KetchDependencies 
 		const read = { url: card.original_url, phase: "parent_validation" as const, method: card.retrieval_method, outcome: truncated ? "truncated" as const : "completed" as const, truncated, parent_validated: true };
 		const receiptIdentity = JSON.stringify({ run_id: runId, card_id: card.card_id, read });
 		const roundId = `auto-note-${createHash("sha256").update(receiptIdentity, "utf8").digest("hex").slice(0, 48)}`;
-		let committed: ResearchRoundLedgerStateV1 | null = null;
 		try {
-			const outcome = await mutateResearchRoundLedger(path, (ledger) => {
+			await mutateResearchRoundLedger(path, (ledger) => {
 				const proposal: ResearchRoundProposalV1 = {
 					schema: "pi.research-round/v1", run_id: runId, round_id: roundId,
 					selected_gaps: [], queries: [], source_leads: [], reads: [read], evidence_cards: [evidenceCardRef(card)], conflicts: [], gaps: [], proposed_next_action: "synthesize",
 				};
 				ledger.recordRound(proposal);
 				return { state: ledger.state, result: ledger.state };
+			}, {
+				beforePersist: async (nextState) => { await projectParentResearchAggregate(runId, nextState); },
 			});
-			committed = outcome.state;
 		} catch {
 			// Unknown plan claim IDs and malformed legacy ledgers stay on the existing
 			// model-facing compatibility path; the note itself remains valid JSONL.
 			return;
 		}
-		if (committed) await projectParentResearchAggregate(runId, committed);
 	}
 	if (budgetEnabled) {
 		pi.on("session_start", async (_event, ctx) => {

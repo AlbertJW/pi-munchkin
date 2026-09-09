@@ -26,7 +26,7 @@ import { canonicalResearchUrl, claimIdForText, RESEARCH_EVIDENCE_CARDS_KEY } fro
 import { atomicWriteFile } from "../lib/private-artifact.ts";
 import {
 	RESEARCH_ROUND_MAX_GAPS, ResearchRoundLedger, mutateResearchRoundLedger, readResearchRoundLedger, researchRoundPath, writeResearchRoundLedger,
-	validateResearchRoundLedger, type ClaimObligationV1, type EvidenceGapV1, type EvidenceCardRefV1, type ResearchRoundProposalV1, type ChildResearchReportV1,
+	validateResearchRoundLedger, type ClaimObligationV1, type EvidenceGapV1, type EvidenceCardRefV1, type ResearchRoundProposalV1, type ChildResearchReportV1, type ResearchRoundLedgerStateV1,
 } from "../lib/research-round.ts";
 import {
 	deadlineFor, deadlinePhase, extendDeadline, migrateResearchPair, mutateResearchAggregate, readResearchAggregate, researchAggregatePath, transitionAggregate, writeResearchAggregate,
@@ -1100,8 +1100,11 @@ const planUpdate = defineTool({
 			}), ...((applied.items as PlanItem[]).every((item) => graphTerminal(item)) ? { head_terminal_at: previous.head_terminal_at ?? isoNow() } : { head_terminal_at: undefined }) };
 			validateStateSize(state);
 			return { state, result: { state, changed: applied.changed, idempotent: applied.idempotent } };
+		}, {
+			beforePersist: async (nextState) => {
+				if (PARENT_RESEARCH_WORKFLOW && nextState.profile?.name === "deep-research") await projectResearchAggregate(ctx.cwd, nextState.run_id, nextState, "active");
+			},
 		});
-		if (PARENT_RESEARCH_WORKFLOW && outcome.state.profile?.name === "deep-research") await syncResearchAggregate(ctx.cwd, outcome.state.run_id, "active");
 		planEvent("delta", outcome.state.run_id, { changed: outcome.changed, idempotent: outcome.idempotent, open_items: openItemCount(outcome.state) });
 		return { content: [{ type: "text" as const, text: `Plan updated: ${outcome.changed} changed, ${outcome.idempotent} already current, ${openItemCount(outcome.state)} open.` }], details: { tool_name: "plan_update", success: true } };
 	},
@@ -1324,13 +1327,12 @@ async function loadResearchRound(cwd: string, runId?: string): Promise<{ path: s
 	return { path, ledger: ResearchRoundLedger.fromState(raw as any) };
 }
 
-/** Project a graph transition into the parent aggregate before publishing the
- * compatibility graph. The caller must hold the plan mutation lock; this
- * ordering makes the aggregate authoritative even if the graph write fails. */
-async function projectResearchAggregate(cwd: string, runId: string, graph: PlanState, phase?: ResearchAggregatePhase): Promise<void> {
+/** Project a graph/evidence transition into the parent aggregate before
+ * publishing either compatibility view. The caller holds the relevant file
+ * lock; this ordering makes the aggregate authoritative even if the later
+ * graph or ledger write fails. */
+async function projectResearchAggregateSnapshot(cwd: string, runId: string, graph: PlanState, round: ResearchRoundLedgerStateV1, phase?: ResearchAggregatePhase): Promise<void> {
 	if (!PARENT_RESEARCH_WORKFLOW) return;
-	const roundPath = researchRoundPath(cwd, runId, process.env);
-	const round = await readResearchRoundLedger(roundPath);
 	if (!graph || graph.run_id !== runId || !round || round.run_id !== runId) throw new Error("research aggregate migration refused: graph/round pair is missing or has mismatched identity");
 	const path = researchAggregatePath(cwd, runId, process.env);
 	const existing = await readResearchAggregate(path);
@@ -1346,6 +1348,22 @@ async function projectResearchAggregate(cwd: string, runId: string, graph: PlanS
 		}));
 	}
 	(globalThis as Record<string, unknown>)[RESEARCH_AGGREGATE_PATH_KEY] = path;
+}
+
+/** Project a graph transition using the latest durable evidence ledger. */
+async function projectResearchAggregate(cwd: string, runId: string, graph: PlanState, phase?: ResearchAggregatePhase): Promise<void> {
+	if (!PARENT_RESEARCH_WORKFLOW) return;
+	const round = await readResearchRoundLedger(researchRoundPath(cwd, runId, process.env));
+	if (!round) throw new Error("research aggregate migration refused: research round ledger is missing or malformed");
+	await projectResearchAggregateSnapshot(cwd, runId, graph, round, phase);
+}
+
+/** Project a ledger transition using the current compatibility graph. */
+async function projectResearchRoundAggregate(cwd: string, runId: string, round: ResearchRoundLedgerStateV1, phase?: ResearchAggregatePhase): Promise<void> {
+	if (!PARENT_RESEARCH_WORKFLOW) return;
+	const graph = await readCompatibilityState(cwd);
+	if (!graph) throw new Error("research aggregate migration refused: compatibility graph is missing or malformed");
+	await projectResearchAggregateSnapshot(cwd, runId, graph, round, phase);
 }
 
 async function syncResearchAggregate(cwd: string, runId: string, phase?: ResearchAggregatePhase): Promise<void> {
@@ -1520,8 +1538,10 @@ const researchRound = defineTool({
 			const obligations = params.claim_obligations?.length ? params.claim_obligations.map((claim) => ({ ...claim, status: claim.status ?? "open" as const })) : [defaultResearchObligation(state.request)];
 			const ledger = new ResearchRoundLedger({ run_id: state.run_id, obligations, budget: { searches: 3, reads: 5, validation_reads: 5 } });
 			const path = researchRoundPath(ctx.cwd, state.run_id, process.env);
+			if (PARENT_RESEARCH_WORKFLOW) {
+				await projectResearchRoundAggregate(ctx.cwd, state.run_id, ledger.state, "active");
+			}
 			await writeResearchRoundLedger(path, ledger.state);
-			await syncResearchAggregate(ctx.cwd, state.run_id, "active");
 			(globalThis as Record<string, unknown>)[RESEARCH_ROUND_PATH_KEY] = path;
 			return { content: [{ type: "text" as const, text: `Research round ledger started for ${state.run_id}. Record a bounded round before retrieval.\n${ledger.renderSummary()}` }], details: { tool_name: "research_round", success: true, idempotent: false } };
 		}
@@ -1542,9 +1562,15 @@ const researchRound = defineTool({
 				if (latest.runId !== proposal.run_id) throw new Error("research round run identity mismatch");
 				const round = latest.recordRound(proposal);
 				return { round, state: latest.state, summary: latest.renderSummary() };
+			}, {
+				beforePersist: async (nextRound) => {
+					if (PARENT_RESEARCH_WORKFLOW) {
+						const phase = nextRound.status === "blocked" ? "blocked" : "active";
+						await projectResearchRoundAggregate(ctx.cwd, ledger.runId, nextRound, phase);
+					}
+				},
 			});
 			const committedLedger = ResearchRoundLedger.fromState(result.state);
-			await syncResearchAggregate(ctx.cwd, ledger.runId, result.state.status === "blocked" ? "blocked" : "active");
 			roundTelemetry(committedLedger, result.round);
 			return { content: [{ type: "text" as const, text: `Research round ${result.round.round_id} recorded: ${result.round.status}; next action=${result.round.next_action}.\n${result.summary}` }], details: { tool_name: "research_round", success: true, round_id: result.round.round_id, status: result.round.status } };
 		}
@@ -1556,8 +1582,11 @@ const researchRound = defineTool({
 			requireAuthoritativeParentCards(latest.state.evidence_cards);
 			const settled = latest.settle({ graph_terminal: graphTerminalNow, optional_deferrals: params.optional_deferrals ?? [], reason: params.summary ?? "Parent evidence obligations satisfied." });
 			return { state: settled, summary: latest.renderSummary() };
+		}, {
+			beforePersist: async (nextRound) => {
+				if (PARENT_RESEARCH_WORKFLOW) await projectResearchRoundAggregate(ctx.cwd, ledger.runId, nextRound, "settled");
+			},
 		});
-		await syncResearchAggregate(ctx.cwd, ledger.runId, "settled");
 		return { content: [{ type: "text" as const, text: `Research evidence is settled for ${ledger.runId}. The parent may now call plan_settle.\n${result.summary}` }], details: { tool_name: "research_round", success: true, settled: true }, };
 		},
 	});
@@ -1582,9 +1611,12 @@ const planExpand = defineTool({
 			if (previous.profile?.name === "deep-research") await requireActiveParentResearch(ctx.cwd, previous.run_id, "plan_expand");
 			const next = expandGraph(previous as GraphPlanState, params.parent_item_id, params.children as BranchChildInput[]);
 			return { state: next, result: next };
-		});
-		if (PARENT_RESEARCH_WORKFLOW && state.profile?.name === "deep-research") await syncResearchAggregate(ctx.cwd, state.run_id, "active");
-		planEvent("expand", state.run_id, { parent_item_id: params.parent_item_id, children: params.children.length, open_items: openItemCount(state) });
+	}, {
+		beforePersist: async (nextState) => {
+			if (PARENT_RESEARCH_WORKFLOW && nextState.profile?.name === "deep-research") await projectResearchAggregate(ctx.cwd, nextState.run_id, nextState, "active");
+		},
+	});
+	planEvent("expand", state.run_id, { parent_item_id: params.parent_item_id, children: params.children.length, open_items: openItemCount(state) });
 		return { content: [{ type: "text" as const, text: `Plan branch expanded: ${params.parent_item_id} now has ${childrenOf(state.items, params.parent_item_id).length} child node(s).` }], details: { tool_name: "plan_expand", success: true } };
 	},
 });
@@ -1645,8 +1677,11 @@ const planSettle = defineTool({
 				}
 				const next = { ...previous, summary: cleanText(params.summary), settled_at: isoNow() };
 			return { state: next, result: next };
+		}, {
+			beforePersist: async (nextState) => {
+				if (PARENT_RESEARCH_WORKFLOW && nextState.profile?.name === "deep-research") await projectResearchAggregate(ctx.cwd, nextState.run_id, nextState, "settled");
+			},
 		});
-		if (PARENT_RESEARCH_WORKFLOW && state.profile?.name === "deep-research") await syncResearchAggregate(ctx.cwd, state.run_id, "settled");
 		const active = api?.getActiveTools() ?? [];
 			api?.setActiveTools(active.filter((name) => !["plan_write", "plan_update", "plan_expand", "plan_settle", "research_plan_start", "research_round", "research_finish"].includes(name)));
 		planEvent("settled", state.run_id, { items: state.items.length, deferred: state.items.filter((item) => item.status === "deferred").length });
@@ -1690,6 +1725,10 @@ async function finalizeParentResearchGraph(
 		const state = { ...previous, items, head_terminal_at: previous.head_terminal_at ?? isoNow() };
 		validateStateSize(state);
 		return { state, result: undefined };
+	}, {
+		beforePersist: async (nextState) => {
+			if (PARENT_RESEARCH_WORKFLOW) await projectResearchAggregate(cwd, runId, nextState, "active");
+		},
 	});
 }
 
@@ -1718,11 +1757,6 @@ const researchFinish = defineTool({
 		if (runId !== state.run_id) rejectPlanTool("research_finish rejected: run identity mismatch");
 		await requireFinishableParentResearch(ctx.cwd, runId);
 		await finalizeParentResearchGraph(ctx.cwd, runId, params.optional_deferrals);
-		// The graph view was just advanced by the compatibility reducer. Project
-		// that committed view before the ledger settlement reads the aggregate;
-		// otherwise the authoritative graph would still report open branches after
-		// this process has terminally marked them done.
-		await syncResearchAggregate(ctx.cwd, runId, "active");
 		// Keep the two existing validators as the implementation boundary while
 		// exposing one model-facing terminal operation. The ledger settles first;
 		// plan_settle then validates the now-settled ledger, citations, deferrals,

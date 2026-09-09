@@ -1020,14 +1020,25 @@ export async function writeResearchRoundLedger(path: string, state: ResearchRoun
 /** Read, mutate, and publish one ledger snapshot while holding its lock. The
  * callback runs against the latest durable state, so concurrent parent rounds
  * cannot overwrite each other's evidence or budget consumption. */
-export async function mutateResearchRoundLedger<T>(path: string, fn: (ledger: ResearchRoundLedger) => Promise<T> | T): Promise<T> {
+export type ResearchRoundPersistOptions = {
+	/** Prepare the authoritative research aggregate before the compatibility
+	 * ledger is published. Throwing leaves the ledger unchanged. */
+	beforePersist?: (state: ResearchRoundLedgerStateV1) => Promise<void> | void;
+};
+
+export async function mutateResearchRoundLedger<T>(path: string, fn: (ledger: ResearchRoundLedger) => Promise<T> | T, options: ResearchRoundPersistOptions = {}): Promise<T> {
 	return withLedgerFileLock(path, async () => {
 		let parsed: unknown;
 		try { parsed = JSON.parse(await readFile(path, "utf8")); }
 		catch { throw new ResearchRoundError("research round ledger is missing or malformed"); }
 		if (!validateResearchRoundLedger(parsed)) throw new ResearchRoundError("research round ledger is missing or malformed");
 		const ledger = ResearchRoundLedger.fromState(parsed);
+		const before = ledger.state;
 		const result = await fn(ledger);
+		// Idempotent duplicate callbacks do not need another aggregate revision.
+		// For a real transition, the aggregate is prepared first so it remains the
+		// authority if the compatibility ledger write is interrupted.
+		if (options.beforePersist && digest(before) !== digest(ledger.state)) await options.beforePersist(ledger.state);
 		await writeResearchRoundLedgerUnlocked(path, ledger.state);
 		return result;
 	});
