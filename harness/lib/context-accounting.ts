@@ -64,13 +64,18 @@ export type ContextAccounting = {
 type TokenCounter = (value: string) => number;
 
 export type ContextAccountingOptions = {
-	/** A provider-specific tokenizer may be supplied by a trusted adapter. */
+	/** Advisory tokenizer for serialized fields; not the rendered provider prompt. */
 	tokenCounter?: TokenCounter;
+	/** Trusted adapter must count the actual rendered provider request, including templates. */
+	requestCounter?: (payload: unknown, binding: { request_digest: string; epoch_digest: string }) => {
+		request_digest: string; epoch_digest: string; tokens: number; representation: "provider-rendered";
+	};
 	/** Reservations held by concurrent retrieval/tool work for this epoch. */
 	reservedTokens?: number;
 	reservationCount?: number;
 	/** Pi's observed context usage at the admission boundary, when available. */
-	observedUsage?: { tokens?: number | null; contextWindow?: number | null; percent?: number | null };
+	observedUsage?: { tokens?: number | null; contextWindow?: number | null; percent?: number | null; epoch_digest?: string; compaction_generation?: number };
+	compactionGeneration?: number;
 	/** Set when a caller has explicitly truncated a recoverable view. */
 	truncated?: boolean;
 };
@@ -109,14 +114,13 @@ function boundedTokenCount(value: string, tokenCounter?: TokenCounter): { bytes:
 	if (tokenCounter) {
 		try {
 			const tokens = tokenCounter(value);
-			if (Number.isFinite(tokens) && tokens >= 0) return { bytes, tokens: Math.ceil(tokens), confidence: "verified" };
+			if (Number.isFinite(tokens) && tokens >= 0) return { bytes, tokens: Math.ceil(tokens), confidence: "estimated" };
 		} catch {
 			// A broken adapter must not make the request appear safe.
 		}
 	}
-	// Four bytes/token is a deliberately conservative, language-neutral
-	// estimate for UTF-8 text.  The uncertainty margin below covers the
-	// remaining tokenizer and serialization variance.
+	// Advisory only: neither this heuristic nor a percentage margin bounds all
+	// tokenizers, languages, code, or provider chat templates.
 	return { bytes, tokens: Math.ceil(bytes / 4), confidence: "estimated" };
 }
 
@@ -178,6 +182,16 @@ export function buildContextAccounting(payload: unknown, profile: ContextProfile
 	const requestDigest = sha256(requestSerialized);
 	const payloadCounted = boundedTokenCount(requestSerialized, tokenCounter);
 	const epochDigest = contextEpochKey(profile);
+	if (options.requestCounter) {
+		try {
+			const receipt = options.requestCounter(payload, { request_digest: requestDigest, epoch_digest: epochDigest });
+			if (receipt.representation !== "provider-rendered" || receipt.request_digest !== requestDigest || receipt.epoch_digest !== epochDigest || !Number.isSafeInteger(receipt.tokens) || receipt.tokens < 0) throw new Error("invalid counting receipt");
+			payloadCounted.tokens = receipt.tokens;
+			payloadCounted.confidence = "verified";
+		} catch {
+			payloadCounted.confidence = "unavailable";
+		}
+	}
 	const isObject = payload !== null && typeof payload === "object" && !Array.isArray(payload);
 
 	if (isObject) {
@@ -208,7 +222,7 @@ export function buildContextAccounting(payload: unknown, profile: ContextProfile
 	const payloadTokens = payloadCounted.tokens;
 	const accountedBytes = contributors.reduce((sum, item) => sum + item.bytes, 0);
 	const payloadBytes = payloadCounted.bytes;
-	const tokenization: ContextTokenization = contributors.length === 0
+	const tokenization: ContextTokenization = contributors.length === 0 || payloadCounted.confidence === "unavailable"
 		? "unavailable"
 		: payloadCounted.confidence === "verified" ? "exact" : "estimated";
 	const confidence: ContextConfidence = tokenization === "exact" ? "verified" : tokenization === "estimated" ? "estimated" : "unavailable";
@@ -220,13 +234,15 @@ export function buildContextAccounting(payload: unknown, profile: ContextProfile
 	const total = payloadTokens + windowInfo.overhead + uncertaintyMargin + reserved + windowInfo.completion;
 	const inputAllowance = windowInfo.window === null
 		? 0
-		: Math.max(0, windowInfo.window - windowInfo.completion - windowInfo.overhead);
-	const remaining = inputAllowance - payloadTokens - uncertaintyMargin - reserved;
+		: Math.max(0, Math.min(profile.safe_input_tokens ?? 0, windowInfo.window - windowInfo.completion - windowInfo.overhead));
 	const observedTokens = finitePositive(options.observedUsage?.tokens);
 	const observedWindow = finitePositive(options.observedUsage?.contextWindow);
+	const staleBinding = (options.observedUsage?.epoch_digest !== undefined && options.observedUsage.epoch_digest !== epochDigest)
+		|| (options.observedUsage?.compaction_generation !== undefined && options.observedUsage.compaction_generation !== (options.compactionGeneration ?? 0));
+	const remaining = inputAllowance - Math.max(payloadTokens, observedTokens ?? 0) - uncertaintyMargin - reserved;
 	const usageRelation = observedTokens === null
 		? "not_available" as const
-		: observedWindow !== null && windowInfo.window !== null && observedWindow !== windowInfo.window
+		: staleBinding || (observedWindow !== null && windowInfo.window !== null && observedWindow !== windowInfo.window)
 			? "mismatch" as const
 			: observedTokens <= inputAllowance ? "within" as const : "over" as const;
 	let outcome: ContextAdmissionOutcome = "admitted";
@@ -240,6 +256,9 @@ export function buildContextAccounting(payload: unknown, profile: ContextProfile
 	} else if (usageRelation === "mismatch") {
 		outcome = "rejected";
 		reasonClass = "stale_usage_epoch";
+	} else if (usageRelation === "over") {
+		outcome = "rejected";
+		reasonClass = "observed_budget_exceeded";
 	} else if (remaining < 0) {
 		outcome = "rejected";
 		reasonClass = "aggregate_budget_exceeded";

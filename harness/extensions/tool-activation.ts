@@ -68,6 +68,7 @@ function setTo<T>(target: Set<T>, values: Iterable<T>): void {
 }
 
 export function profileFromEnvironment(): Profile {
+	if (process.env.MUNCHKIN_TOOL_PROFILE === "ambient") return "ambient";
 	if (process.env.MUNCHKIN_TOOL_PROFILE === "core" || process.env.MUNCHKIN_TOOL_SURFACE === "minimal") return "core";
 	return MUNCHKIN_TOOL_PROFILE_DEFAULT;
 }

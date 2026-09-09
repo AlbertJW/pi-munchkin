@@ -64,6 +64,7 @@
     "plan-runner/write-rejected",
     "research/citation-guard",
     "research/citation-unverified-end",
+    "research/deadline",
     "research/note",
     "research/recall",
     "research/round",

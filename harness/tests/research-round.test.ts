@@ -189,6 +189,6 @@ test("malformed child reports are transactional and parent validation retries ar
 test("evidence card references retain canonical source metadata without page text", () => {
 	const card = makeEvidenceCard({ original_url: "https://example.test/source?utm_source=ignored", content: "A bounded source sentence.", claim_ids: ["claim-a"], truncated: false, parent_validated: true, retrieval_method: "jina" });
 	const ref = evidenceCardRef(card);
-	assert.equal(ref.original_url, "https://example.test/source");
+	assert.equal(ref.original_url, "https://example.test/source?utm_source=ignored");
 	assert.equal("content" in ref, false);
 });

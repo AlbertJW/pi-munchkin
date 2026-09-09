@@ -18,6 +18,7 @@ import {
 } from "../lib/ketch-runtime.ts";
 import { RESEARCH_COVERAGE_KEY } from "../lib/branch-report.ts";
 import { RESEARCH_EVIDENCE_CARDS_KEY } from "../lib/research-evidence.ts";
+import { createResearchAggregate, deadlineFor, readResearchAggregate, researchAggregatePath, writeResearchAggregate } from "../lib/research-aggregate.ts";
 import { callTool, fire, makeFakePi, resetPiGlobals } from "./integration-harness.ts";
 
 function restoreEnv(snapshot: Record<string, string | undefined>): void {
@@ -47,6 +48,36 @@ esac
 	chmodSync(file, 0o755);
 	return file;
 }
+
+test("direct reader cannot cache an unrequested source", async () => {
+	const dir = mkdtempSync(join(tmpdir(), "ketch-source-binding-"));
+	const prior = Object.fromEntries(["KETCH_BIN", "RESEARCH_LEDGER", "PI_CODING_AGENT_DIR", "TELEMETRY"].map((key) => [key, process.env[key]]));
+	try {
+		Object.assign(process.env, { KETCH_BIN: mockKetch(dir), RESEARCH_LEDGER: "on", PI_CODING_AGENT_DIR: join(dir, "agent"), TELEMETRY: "off" });
+		const fp = makeFakePi();
+		const mod = await import(`../extensions/ketch.ts?binding=${Math.random()}`);
+		mod.registerKetch(fp.pi as never, { resolvePublicUrl: async (url: string) => url });
+		const result = await callTool(fp, "web_read", { urls: ["https://example.com/b"] }, dir);
+		assert.equal(result.details.failed, 1);
+		const note = await callTool(fp, "research_note", { claim: "claim", url: "https://example.com/a", quote: "Useful source text" }, dir);
+		assert.equal(note.details.evidence_card, undefined);
+	} finally { restoreEnv(prior); rmSync(dir, { recursive: true, force: true }); resetPiGlobals(); }
+});
+
+test("cancellation never starts the Jina fallback", async () => {
+	const dir = mkdtempSync(join(tmpdir(), "ketch-cancel-"));
+	const prior = Object.fromEntries(["KETCH_BIN", "JINA_READER", "TELEMETRY"].map((key) => [key, process.env[key]]));
+	try {
+		Object.assign(process.env, { KETCH_BIN: mockKetch(dir), JINA_READER: "on", TELEMETRY: "off" });
+		const fp = makeFakePi();
+		const controller = new AbortController();
+		const mod = await import(`../extensions/ketch.ts?cancel=${Math.random()}`);
+		mod.registerKetch(fp.pi as never, { resolvePublicUrl: async (url: string) => { controller.abort(); return url; } });
+		const result = await fp.tools.get("web_read")!.execute("cancel", { urls: ["https://example.com/a"] }, controller.signal, undefined, { cwd: dir });
+		assert.equal((result.details as any).fallback, false);
+		assert.equal((result.details as any).outcome, "aborted");
+	} finally { restoreEnv(prior); rmSync(dir, { recursive: true, force: true }); resetPiGlobals(); }
+});
 
 test("Ketch version and JSON normalizers are strict, compact, and source-preserving", () => {
 	assert.deepEqual(parseSemver("ketch v0.12.0"), [0, 12, 0]);
@@ -298,6 +329,57 @@ test("planned research enforces assigned search and distinct-source read budgets
 	}
 });
 
+test("parent research workflow retains the shared discovery envelope for local research", async () => {
+	const dir = mkdtempSync(join(tmpdir(), "ketch-parent-budget-"));
+	const snapshot = Object.fromEntries(["KETCH", "KETCH_BIN", "KETCH_BACKEND", "RESEARCH_LEDGER", "DEEP_RESEARCH_PLANNING", "RESEARCH_WORKFLOW", "TELEMETRY"].map((key) => [key, process.env[key]]));
+	try {
+		delete process.env.KETCH;
+		Object.assign(process.env, { KETCH_BIN: mockKetch(dir), KETCH_BACKEND: "exa", RESEARCH_LEDGER: "on", DEEP_RESEARCH_PLANNING: "on", RESEARCH_WORKFLOW: "parent", TELEMETRY: "off" });
+		const fp = makeFakePi();
+		const mod = await import(`../extensions/ketch.ts?parent-budget=${Date.now()}-${Math.random()}`);
+		mod.registerKetch(fp.pi as never, { resolvePublicUrl: async (raw: string) => new URL(raw).toString() });
+		await fp.handlers.get("session_start")?.[0]?.({}, { cwd: dir, ui: { notify() {} } });
+		(globalThis as Record<string, unknown>).__pi_active_plan_context = { run_id: "parent-run", profile: "deep-research", settled: false };
+		const result = await callTool(fp, "web_search", { query: "parent-owned discovery", limit: 3 }, dir);
+		assert.equal(result.details.coverage.budget_exhausted, false);
+		assert.equal(result.details.coverage.complete, true);
+		assert.equal((globalThis as Record<string, any>).__pi_research_state.searches, 1);
+	} finally {
+		restoreEnv(snapshot);
+		rmSync(dir, { recursive: true, force: true });
+		delete (globalThis as Record<string, unknown>).__pi_active_plan_context;
+		delete (globalThis as Record<string, unknown>).__pi_research_state;
+		resetPiGlobals();
+	}
+});
+
+test("parent research hard deadline pauses discovery before another provider call", async () => {
+	const dir = mkdtempSync(join(tmpdir(), "ketch-parent-deadline-"));
+	const snapshot = Object.fromEntries(["KETCH", "KETCH_BIN", "KETCH_BACKEND", "RESEARCH_LEDGER", "DEEP_RESEARCH_PLANNING", "RESEARCH_WORKFLOW", "PI_CODING_AGENT_DIR", "TELEMETRY"].map((key) => [key, process.env[key]]));
+	try {
+		delete process.env.KETCH;
+		Object.assign(process.env, { KETCH_BIN: mockKetch(dir), KETCH_BACKEND: "exa", RESEARCH_LEDGER: "on", DEEP_RESEARCH_PLANNING: "on", RESEARCH_WORKFLOW: "parent", PI_CODING_AGENT_DIR: join(dir, "agent"), TELEMETRY: "off" });
+		const runId = "deadline-run";
+		const aggregatePath = researchAggregatePath(dir, runId, process.env);
+		const expired = createResearchAggregate({ run_id: runId, phase: "active", graph: {}, evidence_round: { run_id: runId }, budget: { searches: 3, reads: 5, validation_reads: 5 }, deadline: deadlineFor(Date.now() - 11 * 60_000) });
+		await writeResearchAggregate(aggregatePath, expired);
+		const fp = makeFakePi();
+		const mod = await import(`../extensions/ketch.ts?parent-deadline=${Date.now()}-${Math.random()}`);
+		mod.registerKetch(fp.pi as never, { resolvePublicUrl: async (raw: string) => new URL(raw).toString() });
+		await fp.handlers.get("session_start")?.[0]?.({}, { cwd: dir, ui: { notify() {} } });
+		(globalThis as Record<string, unknown>).__pi_active_plan_context = { run_id: runId, profile: "deep-research", settled: false };
+		const result = await callTool(fp, "web_search", { query: "must not run after deadline", limit: 3 }, dir);
+		assert.equal(result.details.outcome, "awaiting_extension");
+		assert.equal((await readResearchAggregate(aggregatePath))?.phase, "awaiting_extension");
+	} finally {
+		restoreEnv(snapshot);
+		rmSync(dir, { recursive: true, force: true });
+		delete (globalThis as Record<string, unknown>).__pi_active_plan_context;
+		delete (globalThis as Record<string, unknown>).__pi_research_state;
+		resetPiGlobals();
+	}
+});
+
 test("opt-in Jina Reader mode rewrites only the fetch URL and restores the cited source URL", async () => {
 	const dir = mkdtempSync(join(tmpdir(), "ketch-jina-reader-"));
 	const argFile = join(dir, "scrape-args.txt");
@@ -390,6 +472,11 @@ test("verified research notes publish compact evidence cards without page conten
 		const note = await callTool(fp, "research_note", { claim: "The source is useful.", url: "https://example.com/a", quote: "Useful source text" }, dir);
 		const card = (note.details as Record<string, any>).evidence_card;
 		assert.equal(card.parent_validated, true);
+		assert.equal(card.truncated, true, "unknown extraction completeness cannot close coverage");
+		assert.equal(note.details.retrieval_receipt.completeness, "unknown");
+		const cached = await callTool(fp, "web_read", { urls: ["https://example.com/a"] }, dir);
+		assert.equal(cached.details.cache, true);
+		assert.equal(cached.details.coverage.complete, false, "cache hits retain incomplete source coverage");
 		assert.equal(card.original_url, "https://example.com/a");
 		assert.match(card.content_sha256, /^[a-f0-9]{64}$/);
 		assert.equal(JSON.stringify(note).includes("Useful source text"), false, "card details must not expose page content");
@@ -399,6 +486,15 @@ test("verified research notes publish compact evidence cards without page conten
 		rmSync(dir, { recursive: true, force: true });
 		delete (globalThis as Record<string, unknown>)[RESEARCH_EVIDENCE_CARDS_KEY];
 	}
+});
+
+test("reader parser preserves complete, truncated and unknown extraction receipts", () => {
+	const rows = parseReadResults(JSON.stringify([
+		{ url: "https://example.com/a", markdown: "a", truncated: true },
+		{ url: "https://example.com/b", markdown: "b", truncated: false },
+		{ url: "https://example.com/c", markdown: "c" },
+	]));
+	assert.deepEqual(rows.map((row: any) => row.completeness), ["truncated", "complete", "unknown"]);
 });
 
 test("ledger sessions hard-stop the skill budget outside a plan graph", async () => {

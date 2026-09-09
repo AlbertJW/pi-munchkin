@@ -68,6 +68,7 @@ export type ReadResult = {
 	url: string;
 	markdown: string;
 	error?: string;
+	completeness?: "complete" | "truncated" | "unknown";
 };
 
 /** Ketch needs its own config/cache paths and optional proxy settings, but it
@@ -225,6 +226,7 @@ export function parseReadResults(stdout: string): ReadResult[] {
 			title: clean(item.title, 200),
 			url,
 			markdown: typeof item.markdown === "string" ? item.markdown.trim() : "",
+			completeness: item.truncated === true ? "truncated" : item.truncated === false ? "complete" : "unknown",
 			...(error ? { error } : {}),
 		}];
 	});

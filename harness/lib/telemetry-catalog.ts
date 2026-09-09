@@ -243,6 +243,7 @@ export const EVENT_CATALOG = {
 	"research/recall": { shown: "number", omitted: "number", suffix_truncated: "boolean" },
 	"research/run-summary": { searches: "number", reads: "number", notes: "number", notes_rejected: "number", cache_hits: "number" },
 	"research/round": { round: "number", status: "string", next_action: "string", consumed_searches: "number", consumed_reads: "number", validation_reads: "number", duplicate_count: "number", open_gaps: "number", conflicts: "number" },
+	"research/deadline": { phase: "string", action: "string", phase_kind: "string" },
 	"research/citation-guard": { cited: "number", unverified: "number", explicitly_unverified: "number", injected_chars: "number" },
 	"research/citation-unverified-end": { cited: "number", unverified: "number", explicitly_unverified: "number" },
 	// Fired once when an answer wraps up after web reads with zero recorded notes.

@@ -3,10 +3,12 @@ import { contextProfileFor, modelFingerprint, type ContextProfile } from "../lib
 import { buildContextAccounting, CONTEXT_RESERVATION_KEY, CONTEXT_RESERVATION_SCHEMA, contextEpochKey, ContextReservationLedger } from "../lib/context-accounting.ts";
 import { record } from "../lib/telemetry.ts";
 import { createHash } from "node:crypto";
+import { beginCompaction, finishCompaction } from "../lib/compaction-coordinator.ts";
 
 type RuntimeContext = {
 	model?: unknown;
 	abort?: () => void;
+	compact?: (options: { customInstructions: string; onComplete: () => void; onError: (error: Error) => void }) => void;
 	getContextUsage?: () => { tokens?: number | null; contextWindow?: number | null; percent?: number | null } | undefined;
 	ui?: { notify?: (message: string, level?: "info" | "warning" | "error") => void };
 };
@@ -61,17 +63,25 @@ export default function installContextAdmission(pi: ExtensionAPI): void {
 	const ledger = new ContextReservationLedger();
 	let currentProfile: ContextProfile | null = null;
 	let currentEpochDigest: string | null = null;
+	let outputAllowance: number | null = null;
+	let overflowObservation: { tokens: number; contextWindow: number } | null = null;
+	let pendingRecovery: string | null = null;
+	const attemptedRecovery = new Set<string>();
 	const activeReservations = new Set<string>();
 	const shared = globalThis as Record<string, unknown>;
 
 	function syncEpoch(profile: ContextProfile | null): string | null {
 		if (!profile) {
+			outputAllowance = null;
 			currentEpochDigest = null;
 			ledger.reset();
 			return null;
 		}
 		const epoch = contextEpochKey(profile);
 		if (currentEpochDigest !== epoch) {
+			pendingRecovery = null;
+			outputAllowance = null;
+			overflowObservation = null;
 			// A provider/model/endpoint/window change invalidates every reservation
 			// from the previous serving epoch. Never let a large-window reservation
 			// authorize a later small-window request.
@@ -100,7 +110,10 @@ export default function installContextAdmission(pi: ExtensionAPI): void {
 				record("context-admission", "reservation", { id_hash: idHash, requested_tokens: Number.isFinite(requestedTokens) ? Math.max(0, Math.floor(requestedTokens)) : 0, outcome: "unavailable", reason_class: "context_budget_unavailable" });
 				return { ok: false as const, reason: "unavailable" as const };
 			}
-			const result = ledger.reserve(id, epoch, requestedTokens, currentProfile.safe_input_tokens);
+			// No observation is not an empty context. A fresh payload accounting
+			// boundary must establish capacity before tools can reserve output.
+			if (outputAllowance === null) return { ok: false as const, reason: "unavailable" as const };
+			const result = ledger.reserve(id, epoch, requestedTokens, outputAllowance);
 			if (result.ok) {
 				activeReservations.add(id);
 				record("context-admission", "reservation", { id_hash: idHash, requested_tokens: result.tokens, outcome: "reserved", reason_class: result.idempotent ? "idempotent" : "ok" });
@@ -120,6 +133,8 @@ export default function installContextAdmission(pi: ExtensionAPI): void {
 	shared[CONTEXT_RESERVATION_KEY] = reservationAPI;
 
 	pi.on("session_start", async (_event, rawCtx) => {
+		pendingRecovery = null;
+		attemptedRecovery.clear();
 		ledger.reset();
 		activeReservations.clear();
 		currentProfile = profileFromModel((rawCtx as RuntimeContext | undefined)?.model);
@@ -138,6 +153,7 @@ export default function installContextAdmission(pi: ExtensionAPI): void {
 		// pinned model-switch smoke supplies live evidence. Unset and any value
 		// other than the explicit `on` preserve the existing admission behavior.
 		if (process.env.CONTEXT_ADMISSION !== "on") return undefined;
+		pendingRecovery = null;
 		const ctx = rawCtx as RuntimeContext;
 		const profile = profileFor(ctx);
 		if (!profile) {
@@ -159,11 +175,17 @@ export default function installContextAdmission(pi: ExtensionAPI): void {
 		let accounting: ReturnType<typeof buildContextAccounting>;
 		try {
 			const reservations = epoch ? ledger.snapshot(epoch) : { reserved_tokens: 0, reservation_count: 0 };
+			const observed = ctx.getContextUsage?.();
+			// Pi intentionally returns null after compaction until a new provider
+			// observation exists. Absence must not erase a known overflow.
+			const usableObservation = typeof observed?.tokens === "number" && Number.isFinite(observed.tokens) && observed.tokens >= 0;
 			accounting = buildContextAccounting((event as { payload?: unknown }).payload, profile, {
-				observedUsage: ctx.getContextUsage?.(),
+				observedUsage: usableObservation ? observed : overflowObservation ?? observed,
 				reservedTokens: reservations.reserved_tokens,
 				reservationCount: reservations.reservation_count,
 			});
+			if (accounting.usage_relation === "over") overflowObservation = { tokens: accounting.observed_context_tokens!, contextWindow: accounting.observed_context_window ?? accounting.effective_window_tokens };
+			else if (accounting.usage_relation === "within" && usableObservation) overflowObservation = null;
 		} catch {
 			// Malformed/cyclic provider payloads must not escape through the runner's
 			// swallowed-hook-error path. Abort and emit only a bounded class.
@@ -181,9 +203,14 @@ export default function installContextAdmission(pi: ExtensionAPI): void {
 		}
 		const shared = globalThis as Record<string, unknown>;
 		shared.__pi_context_accounting = structuredClone(accounting);
+		outputAllowance = accounting.outcome === "admitted"
+			? Math.max(0, accounting.remaining_tokens + accounting.reserved_tokens) : 0;
 		const detail = safeRecord(accounting);
 		detail.epoch = profile.epoch;
 		if (accounting.outcome !== "admitted") {
+			if (accounting.reason_class === "aggregate_budget_exceeded" || accounting.reason_class === "observed_budget_exceeded") {
+				pendingRecovery = `${accounting.epoch_digest}:${accounting.request_digest}`;
+			}
 			try { ctx.abort?.(); } catch { /* stale lifecycle */ }
 			if (accounting.outcome === "rejected") record("context-admission", "rejected", detail);
 			else record("context-admission", "unavailable", detail);
@@ -203,7 +230,29 @@ export default function installContextAdmission(pi: ExtensionAPI): void {
 	// for blocked/throwing tools. Both are idempotent through activeReservations.
 	pi.on("tool_execution_end", async (event) => { releaseTool(event); });
 	pi.on("tool_result", async (event) => { releaseTool(event); });
-	pi.on("agent_settled", async () => { ledger.reset(); activeReservations.clear(); });
+	pi.on("agent_settled", async (_event, rawCtx) => {
+		ledger.reset(); activeReservations.clear();
+		const key = pendingRecovery;
+		const ctx = rawCtx as RuntimeContext;
+		if (!key || attemptedRecovery.has(key) || !key.startsWith(`${currentEpochDigest}:`) || process.env.CONTEXT_ADMISSION !== "on") return;
+		// Bound the session-local retry set as well as each individual request.
+		if (!ctx.compact || attemptedRecovery.size >= 32) return;
+		const lease = beginCompaction("context-admission");
+		if (!lease) return; // The existing owner keeps authority; no competing call.
+		pendingRecovery = null;
+		attemptedRecovery.add(key);
+		const epoch = currentEpochDigest;
+		const finish = (ok: boolean) => {
+			if (!finishCompaction(lease) || epoch !== currentEpochDigest) return;
+			outputAllowance = null;
+			try { ctx.ui?.notify?.(ok
+				? "Context recovery compacted the session. Retry only after a fresh context measurement establishes room; no provider request was automatically repeated."
+				: "Context recovery failed. This request remains stopped. Reduce the input, select a larger serving window, or compact manually before retrying.", "warning"); } catch { /* stale UI */ }
+		};
+		try {
+			ctx.compact({ customInstructions: "Preserve the active task, goal and plan identities, evidence references, constraints and next action. Reduce optional context. Do not execute external work.", onComplete: () => finish(true), onError: () => finish(false) });
+		} catch { finish(false); }
+	});
 	pi.on("session_shutdown", async () => {
 		ledger.reset();
 		activeReservations.clear();

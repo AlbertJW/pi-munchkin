@@ -21,6 +21,126 @@ const model = {
 	baseUrl: ["http", "://127.0.0.1:8080/v1"].join(""),
 };
 
+test("observed overflow cannot admit a deceptively small assembled request", () => {
+	const result = buildContextAccounting({ messages: [{ role: "user", content: "hello" }] }, contextProfileFor(model), {
+		observedUsage: { tokens: 32_768, contextWindow: 32_768 },
+	});
+	assert.equal(result.usage_relation, "over");
+	assert.equal(result.outcome, "rejected");
+	assert.equal(result.reason_class, "observed_budget_exceeded");
+});
+
+test("missing usage cannot erase an observed overflow", async () => {
+	const prior = process.env.CONTEXT_ADMISSION;
+	process.env.CONTEXT_ADMISSION = "on";
+	const fp = makeFakePi();
+	try {
+		const mod = await import("../extensions/context-admission.ts");
+		mod.default(fp.pi as never);
+		await fire(fp, "session_start", {}, { model });
+		let aborted = 0;
+		const payload = { messages: [{ role: "user", content: "small" }] };
+		await fire(fp, "before_provider_request", { payload }, { model, abort: () => { aborted++; }, getContextUsage: () => ({ tokens: 32_768, contextWindow: 32_768 }) });
+		await fire(fp, "session_compact", {}, { model });
+		await fire(fp, "before_provider_request", { payload }, { model, abort: () => { aborted++; }, getContextUsage: () => ({ tokens: null, contextWindow: 32_768 }) });
+		assert.equal(aborted, 2, "compaction with no newer measurement is not proof of sufficient room");
+	} finally {
+		await fire(fp, "session_shutdown", {}, {});
+		if (prior === undefined) delete process.env.CONTEXT_ADMISSION; else process.env.CONTEXT_ADMISSION = prior;
+	}
+});
+
+test("unsafe admission makes only one coordinated compaction attempt for an unchanged request", async () => {
+	const prior = process.env.CONTEXT_ADMISSION;
+	process.env.CONTEXT_ADMISSION = "on";
+	const fp = makeFakePi();
+	try {
+		const mod = await import("../extensions/context-admission.ts");
+		mod.default(fp.pi as never);
+		let attempts = 0;
+		const ctx = { model, abort() {}, compact(options: any) { attempts++; options.onError(new Error("fixture compaction failure")); } };
+		await fire(fp, "session_start", {}, ctx);
+		for (let i = 0; i < 2; i++) {
+			await fire(fp, "before_provider_request", { payload: { messages: [{ role: "user", content: "x".repeat(200_000) }] } }, ctx);
+			await fire(fp, "agent_settled", {}, ctx);
+		}
+		assert.equal(attempts, 1);
+	} finally {
+		await fire(fp, "session_shutdown", {}, {});
+		if (prior === undefined) delete process.env.CONTEXT_ADMISSION; else process.env.CONTEXT_ADMISSION = prior;
+	}
+});
+
+test("a corrected request cancels obsolete pending compaction", async () => {
+	const prior = process.env.CONTEXT_ADMISSION;
+	process.env.CONTEXT_ADMISSION = "on";
+	const fp = makeFakePi();
+	try {
+		const mod = await import("../extensions/context-admission.ts");
+		mod.default(fp.pi as never);
+		let attempts = 0;
+		const ctx = { model, abort() {}, compact(options: any) { attempts++; options.onError(new Error("fixture")); } };
+		await fire(fp, "session_start", {}, ctx);
+		for (const content of ["x".repeat(200_000), "small"]) await fire(fp, "before_provider_request", { payload: { messages: [{ role: "user", content }] } }, ctx);
+		await fire(fp, "agent_settled", {}, ctx);
+		assert.equal(attempts, 0);
+	} finally {
+		await fire(fp, "session_shutdown", {}, {});
+		if (prior === undefined) delete process.env.CONTEXT_ADMISSION; else process.env.CONTEXT_ADMISSION = prior;
+	}
+});
+
+test("provider-rendered counts are bound to the exact request and serving epoch", () => {
+	const profile = contextProfileFor(model);
+	const payload = { messages: [{ role: "user", content: "中文 code λ" }] };
+	const exact = buildContextAccounting(payload, profile, { requestCounter: (_payload, binding) => ({ ...binding, tokens: 42, representation: "provider-rendered" }) });
+	assert.equal(exact.confidence, "verified");
+	assert.equal(exact.payload_tokens, 42);
+	const invalid = buildContextAccounting(payload, profile, { requestCounter: (_payload, binding) => ({ ...binding, epoch_digest: "wrong", tokens: 1, representation: "provider-rendered" }) });
+	assert.equal(invalid.outcome, "unavailable");
+});
+
+test("bound observations reject stale serving epochs and compaction generations", () => {
+	const profile = contextProfileFor(model);
+	const payload = { messages: [{ role: "user", content: "small" }] };
+	for (const binding of [{ epoch_digest: "other", compaction_generation: 2 }, { epoch_digest: contextEpochKey(profile), compaction_generation: 1 }]) {
+		const result = buildContextAccounting(payload, profile, {
+			compactionGeneration: 2,
+			observedUsage: { tokens: 100, contextWindow: 32_768, ...binding },
+		} as any);
+		assert.equal(result.outcome, "rejected");
+		assert.equal(result.reason_class, "stale_usage_epoch");
+	}
+});
+
+test("observed retained context reduces remaining output allowance", () => {
+	const profile = contextProfileFor(model);
+	const result = buildContextAccounting({ messages: [{ role: "user", content: "hello" }] }, profile, {
+		observedUsage: { tokens: 26_000, contextWindow: 32_768 }, reservedTokens: 500,
+	});
+	assert.ok(result.remaining_tokens <= profile.safe_input_tokens! - 26_000 - 500);
+});
+
+test("tool reservations cannot spend context already retained by the provider", async () => {
+	const prior = process.env.CONTEXT_ADMISSION;
+	process.env.CONTEXT_ADMISSION = "on";
+	const fp = makeFakePi();
+	try {
+		const mod = await import("../extensions/context-admission.ts");
+		mod.default(fp.pi as never);
+		await fire(fp, "session_start", {}, { model });
+		await fire(fp, "before_provider_request", { payload: { messages: [{ role: "user", content: "small" }] } }, {
+			model, getContextUsage: () => ({ tokens: 26_000, contextWindow: 32_768 }),
+		});
+		assert.equal(reserveContextOutput("too-large", 2_000)?.ok, false);
+		assert.equal(reserveContextOutput("fits", 500)?.ok, true);
+		assert.equal(reserveContextOutput("concurrent", 500)?.ok, false);
+	} finally {
+		await fire(fp, "session_shutdown", {}, {});
+		if (prior === undefined) delete process.env.CONTEXT_ADMISSION; else process.env.CONTEXT_ADMISSION = prior;
+	}
+});
+
 test("aggregate accounting inventories competing contributors without double-counting", () => {
 	const profile = contextProfileFor(model, 2);
 	const payload = {
@@ -62,14 +182,14 @@ test("legacy and normalized system/tool payload keys stay in their named partiti
 	assert.equal(accounting.contributors.filter((item) => item.kind === "request_metadata").length, 0);
 });
 
-test("exact token counter is distinguishable from conservative estimate", () => {
+test("serialized JSON token counts are advisory, not rendered request verification", () => {
 	const profile = contextProfileFor(model);
 	const payload = { messages: [{ role: "user", content: "hello world" }] };
 	const estimated = buildContextAccounting(payload, profile);
 	const exact = buildContextAccounting(payload, profile, { tokenCounter: (value) => value.length });
 	assert.equal(estimated.tokenization, "estimated");
-	assert.equal(exact.tokenization, "exact");
-	assert.equal(exact.confidence, "verified");
+	assert.equal(exact.tokenization, "estimated");
+	assert.equal(exact.confidence, "estimated");
 	assert.notEqual(exact.payload_tokens, estimated.payload_tokens);
 });
 
@@ -270,6 +390,8 @@ test("admission coordinator accounts producer reservations and releases them at 
 		const mod = await import(`../extensions/context-admission.ts?reservation=${Date.now()}-${Math.random()}`);
 		mod.default(fp.pi as never);
 		await fire(fp, "session_start", {}, { cwd: "/tmp", model });
+		assert.equal(reserveContextOutput("unmeasured", 500)?.ok, false);
+		await fire(fp, "before_provider_request", { payload: { messages: [{ role: "user", content: "small" }] } }, { cwd: "/tmp", model });
 		const reservation = reserveContextOutput("tool-1", 500);
 		assert.equal(reservation?.ok, true);
 		await fire(fp, "before_provider_request", { payload: { messages: [{ role: "user", content: "small" }] } }, { cwd: "/tmp", model });

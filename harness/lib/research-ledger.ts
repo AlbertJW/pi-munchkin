@@ -2,6 +2,7 @@ import { createHash } from "node:crypto";
 import { chmod, mkdir, open, stat } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { agentDir } from "./agent-dir.ts";
+import { canonicalResearchUrl } from "./research-evidence.ts";
 
 // research-ledger: the deterministic half of the deep-research pipeline.
 //
@@ -10,7 +11,12 @@ import { agentDir } from "./agent-dir.ts";
 // resulting audit record is private, bounded JSONL. It is data, never prompt
 // structure, and is not written into the project worktree.
 
-export type CachedPage = { text: string; sha256: string; fetchedAt: string };
+export type RetrievalMetadata = {
+	source_url: string;
+	retrieval_method: "ketch" | "jina";
+	completeness: "complete" | "truncated" | "unknown";
+};
+export type CachedPage = { text: string; sha256: string; fetchedAt: string; retrieval: RetrievalMetadata };
 
 export const MAX_CACHED_PAGES = 20;
 export const MAX_CACHE_BYTES = 2 * 1024 * 1024;
@@ -29,14 +35,16 @@ export class PageCache {
 	private pages = new Map<string, CachedPage>();
 	private totalBytes = 0;
 
-	put(url: string, text: string, now = new Date().toISOString()): void {
+	put(url: string, text: string, now = new Date().toISOString(), metadata?: RetrievalMetadata): void {
 		if (!url || !text) return;
 		const existing = this.pages.get(url);
 		if (existing) {
 			this.totalBytes -= Buffer.byteLength(existing.text);
 			this.pages.delete(url);
 		}
-		this.pages.set(url, { text, sha256: sha256Hex(text), fetchedAt: now });
+		this.pages.set(url, { text, sha256: sha256Hex(text), fetchedAt: now,
+			retrieval: metadata ? { ...metadata, source_url: url } : { source_url: url, retrieval_method: "ketch", completeness: "unknown" },
+		});
 		this.totalBytes += Buffer.byteLength(text);
 		this.evict();
 	}
@@ -159,16 +167,22 @@ function hasExplicitUnverifiedMarker(text: string, start: number, end: number): 
  * answer text is never returned to telemetry or persisted state.
  */
 export function auditResearchCitations(text: string, verifiedUrls: Iterable<string>): ResearchCitationAudit {
-	const verified = new Set([...verifiedUrls].filter((url): url is string => typeof url === "string"));
+	const verified = new Set([...verifiedUrls].flatMap((url) => {
+		try { return [canonicalResearchUrl(url)]; } catch { return []; }
+	}));
+	const seen = new Set<string>();
 	const cited: string[] = [];
 	const unverified: string[] = [];
 	const explicitlyUnverified: string[] = [];
 	for (const match of text.matchAll(CITATION_URL)) {
 		const raw = trimCitationUrl(match[0]);
 		const canonical = storedUrl(raw).display;
-		if (!canonical || cited.includes(canonical)) continue;
+		let identity: string;
+		try { identity = canonicalResearchUrl(raw); } catch { identity = "[invalid-url]"; }
+		if (!canonical || seen.has(identity)) continue;
+		seen.add(identity);
 		cited.push(canonical);
-		if (verified.has(canonical)) continue;
+		if (verified.has(identity)) continue;
 		const start = match.index ?? 0;
 		if (hasExplicitUnverifiedMarker(text, start, start + match[0].length)) explicitlyUnverified.push(canonical);
 		else unverified.push(canonical);
@@ -196,7 +210,7 @@ export function researchRecord(
 	claim: string,
 	url: string,
 	quote: string,
-	page: CachedPage,
+	page: Pick<CachedPage, "text" | "sha256" | "fetchedAt">,
 	claimedUrl?: string,
 	now = new Date().toISOString(),
 ): ResearchLedgerRecordV2 {

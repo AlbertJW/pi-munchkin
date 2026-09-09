@@ -15,6 +15,19 @@ const names = [
 	"browser_open", "browser_click", "tldraw_create",
 ];
 
+test("explicit ambient rollback wins over legacy minimal surface", async () => {
+	const prior = process.env.MUNCHKIN_TOOL_SURFACE;
+	process.env.MUNCHKIN_TOOL_SURFACE = "minimal";
+	const run = await load("ambient");
+	try {
+		const { profileFromEnvironment } = await import("../extensions/tool-activation.ts");
+		assert.equal(profileFromEnvironment(), "ambient");
+	} finally {
+		run.restore();
+		if (prior === undefined) delete process.env.MUNCHKIN_TOOL_SURFACE; else process.env.MUNCHKIN_TOOL_SURFACE = prior;
+	}
+});
+
 async function load(profile: "ambient" | "core" | undefined, activeInitial: string[] = names.filter((name) => !["grep", "find", "ls"].includes(name)), argv = process.argv) {
 	const oldProfile = process.env.MUNCHKIN_TOOL_PROFILE;
 	const oldActivation = process.env.MUNCHKIN_TOOL_ACTIVATION;

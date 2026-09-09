@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import test, { describe } from "node:test";
 import compactTool from "../extensions/compact-tool.ts";
 import { resetCompactionCoordinator } from "../lib/compaction-coordinator.ts";
-import { fire, makeFakePi } from "./integration-harness.ts";
+import { fire, makeFakePi, waitForCondition } from "./integration-harness.ts";
 import { mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -13,11 +13,16 @@ process.env.PLAN_STORAGE = "project";
 import { onContinuationRequest, setContinuationDispatcherActive, type ContinuationEnvelope } from "../lib/continuation-authority.ts";
 
 async function flushAsync(): Promise<void> {
-	// Continuation authorization rereads the private goal ledger asynchronously.
-	// A few immediate ticks are insufficient under the full 700+ test process;
-	// yield long enough for the filesystem promise and the event-bus callback to
-	// settle without weakening the production boundary.
-	for (let turn = 0; turn < 20; turn += 1) await new Promise<void>((resolve) => setImmediate(resolve));
+	// Stale callbacks return before ledger I/O. Positive offers instead use
+	// waitForOffers below; immediate ticks cannot certify filesystem completion.
+	await new Promise<void>((resolve) => setImmediate(resolve));
+}
+
+async function waitForOffers(offers: ContinuationEnvelope[], count: number): Promise<void> {
+	// Wait for the observable contract, not a CPU-dependent number of ticks.
+	// Ledger lookup includes filesystem I/O, which setImmediate does not drain.
+	await waitForCondition(() => offers.length >= count, "continuation offer");
+	assert.equal(offers.length, count, "expected bounded continuation offer");
 }
 
 function setup() {
@@ -53,7 +58,7 @@ test("compact_context deduplicates and resumes exactly once after completion", {
 	h.options.onComplete({ tokensBefore: 9000, estimatedTokensAfter: 2500 });
 	h.options.onComplete({ tokensBefore: 9000, estimatedTokensAfter: 2500 });
 	h.options.onError(new Error("late duplicate callback"));
-	await flushAsync();
+	await waitForOffers(h.offers, 1);
 	assert.equal(h.fp.customDeliveries.length, 0, "compaction cannot bypass the authority with a private follow-up");
 	assert.equal(h.offers.length, 1);
 	assert.match(h.offers[0]!.request.message, /Do not repeat completed work/);
@@ -61,7 +66,7 @@ test("compact_context deduplicates and resumes exactly once after completion", {
 	await h.execute();
 	assert.equal(h.calls, 2, "completion must re-arm a future explicit request");
 	h.options.onComplete({ tokensBefore: 2500, estimatedTokensAfter: 1000 });
-	await flushAsync();
+	await waitForOffers(h.offers, 2);
 });
 
 test("compact_context resumes after failure because Pi already aborted the turn", { concurrency: false }, async () => {
@@ -69,7 +74,7 @@ test("compact_context resumes after failure because Pi already aborted the turn"
 	await h.execute();
 	const secret = "DUMMY_COMPACTION_SECRET";
 	h.options.onError(new Error(`provider unavailable at https://private.invalid/v1?token=${secret} /Users/alice/private.txt`));
-	await flushAsync();
+	await waitForOffers(h.offers, 1);
 	assert.equal(h.offers.length, 1);
 	assert.match(h.notes[0], /compaction failed \(failure_class=provider\)/);
 	const visible = JSON.stringify({ notes: h.notes, offers: h.offers });
@@ -98,7 +103,7 @@ test("session replacement clears an orphaned in-flight latch", { concurrency: fa
 	await h.execute();
 	assert.equal(h.calls, 2);
 	h.options.onComplete({ tokensBefore: 6000, estimatedTokensAfter: 2000 });
-	await flushAsync();
+	await waitForOffers(h.offers, 1);
 	assert.equal(h.offers.length, 1);
 });
 

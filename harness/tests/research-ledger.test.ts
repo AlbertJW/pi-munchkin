@@ -573,13 +573,22 @@ test("storedUrl fails closed to http(s) — the writer is never more permissive 
 test("citation audit canonicalizes prose URLs and honors explicit uncertainty", () => {
 	const audit = auditResearchCitations(
 		"Verified https://example.com/a?tracking=1#section; unknown https://example.com/b). Explicit https://example.com/c [unverified].",
-		["https://example.com/a"],
+		["https://example.com/a?tracking=1"],
 	);
 	assert.deepEqual(audit.cited, ["https://example.com/a", "https://example.com/b", "https://example.com/c"]);
 	assert.deepEqual(audit.unverified, ["https://example.com/b"]);
 	assert.deepEqual(audit.explicitlyUnverified, ["https://example.com/c"]);
 	const hostile = auditResearchCitations("Do not trust https://user:pass@example.com/private.", ["https://example.com/private"]);
 	assert.deepEqual(hostile.unverified, ["[invalid-url]"]);
+});
+
+test("a redacted citation display cannot validate a different query resource", () => {
+	assert.deepEqual(auditResearchCitations("https://example.com/a?version=1", ["https://example.com/a?version=1"]).unverified, []);
+	assert.deepEqual(auditResearchCitations("https://example.com/a?version=2", ["https://example.com/a"]).unverified, ["https://example.com/a"]);
+	const audit = auditResearchCitations("Source https://example.com/a?version=2", ["https://example.com/a?version=1"]);
+	assert.deepEqual(audit.unverified, ["https://example.com/a"]);
+	const duplicateDisplay = auditResearchCitations("https://example.com/a?version=1 https://example.com/a?version=2", ["https://example.com/a?version=1"]);
+	assert.deepEqual(duplicateDisplay.unverified, ["https://example.com/a"]);
 });
 
 test("a hostile claimed_source round-trips: written AND recallable, never a write-only record", async () => {

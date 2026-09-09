@@ -16,7 +16,6 @@ export type ClaimObligation = { id: string; text?: string; required?: boolean };
 export type GapQuery = { claim_id: string; query: string };
 export const RESEARCH_EVIDENCE_CARDS_KEY = "__pi_research_evidence_cards_v1";
 
-const TRACKING = /^(?:utm_[a-z0-9_]+|fbclid|gclid|dclid|msclkid|mc_cid|mc_eid)$/i;
 const ID = /^[A-Za-z0-9._:-]{1,96}$/;
 
 /** Canonical identity used for global URL deduplication and citations. */
@@ -28,12 +27,8 @@ export function canonicalResearchUrl(raw: string): string {
 	url.hash = "";
 	url.hostname = url.hostname.toLowerCase();
 	if ((url.protocol === "http:" && url.port === "80") || (url.protocol === "https:" && url.port === "443")) url.port = "";
-	for (const key of [...url.searchParams.keys()]) if (TRACKING.test(key)) url.searchParams.delete(key);
-	// Query order is not semantically meaningful for deduplication in this
-	// retrieval layer; sorting gives stable identities without dropping useful
-	// non-tracking parameters.
-	url.searchParams.sort();
-	if (url.pathname.length > 1) url.pathname = url.pathname.replace(/\/+$/, "");
+	// Query bytes/order and trailing slashes can select distinct resources.
+	// Alias merging requires an observed redirect/canonicalization receipt.
 	return url.toString();
 }
 
