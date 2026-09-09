@@ -52,6 +52,18 @@ test("deadline is persisted as one ten-minute interval with a seven-minute disco
 	assert.throws(() => extendDeadline(state, now), /only be extended/);
 });
 
+test("explicit pauses exclude paused time from the next research deadline", () => {
+	const now = Date.parse("2026-09-09T00:00:00.000Z");
+	const state = createResearchAggregate({ run_id: "run-paused-clock", phase: "active", graph: {}, evidence_round: {}, budget: { searches: 3, reads: 5, validation_reads: 5 }, deadline: deadlineFor(now), now: new Date(now).toISOString() });
+	const paused = transitionAggregate(state, { phase: "paused" }, new Date(now + 2 * 60_000).toISOString());
+	assert.equal(paused.deadline?.paused_at, new Date(now + 2 * 60_000).toISOString());
+	const extended = extendDeadline(paused, now + 5 * 60_000);
+	assert.equal(extended.deadline?.paused_ms, 3 * 60_000);
+	assert.equal(extended.deadline?.paused_at, undefined);
+	assert.equal(extended.deadline?.deadline_at, new Date(now + 23 * 60_000).toISOString(), "three paused minutes plus one ten-minute extension are excluded from the next deadline");
+	assert.equal(extended.deadline?.discovery_deadline_at, new Date(now + 20 * 60_000).toISOString());
+});
+
 test("aggregate transitions are immutable, monotonic and atomic", async () => {
 	const root = await mkdtemp(join(tmpdir(), "research-aggregate-"));
 	const path = aggregatePath(root, "run-1");

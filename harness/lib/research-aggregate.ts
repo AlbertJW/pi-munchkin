@@ -12,7 +12,7 @@ import { agentDir } from "./agent-dir.ts";
 export const RESEARCH_AGGREGATE_SCHEMA = "pi.research-aggregate/v1" as const;
 export type ResearchAggregatePhase = "active" | "paused" | "awaiting_extension" | "blocked" | "settled";
 export type ResearchAggregateBudget = { searches: number; reads: number; validation_reads: number };
-export type ResearchAggregateDeadline = { started_at: string; deadline_at: string; discovery_deadline_at: string; paused_ms: number; extension_count: number };
+export type ResearchAggregateDeadline = { started_at: string; deadline_at: string; discovery_deadline_at: string; paused_ms: number; extension_count: number; paused_at?: string };
 export type ResearchAggregateState = {
 	schema: typeof RESEARCH_AGGREGATE_SCHEMA;
 	run_id: string;
@@ -46,7 +46,7 @@ function validBudget(value: unknown): value is ResearchAggregateBudget {
 export function validateResearchAggregate(value: unknown): value is ResearchAggregateState {
 	if (!plainObject(value) || Object.keys(value).some((key) => !["schema", "run_id", "revision", "phase", "graph", "evidence_round", "budget", "deadline", "created_at", "updated_at"].includes(key))) return false;
 	const deadline = value.deadline;
-	const validDeadline = deadline === undefined || (plainObject(deadline) && typeof deadline.started_at === "string" && typeof deadline.deadline_at === "string" && typeof deadline.discovery_deadline_at === "string" && finiteInt(deadline.paused_ms) && finiteInt(deadline.extension_count));
+	const validDeadline = deadline === undefined || (plainObject(deadline) && typeof deadline.started_at === "string" && typeof deadline.deadline_at === "string" && typeof deadline.discovery_deadline_at === "string" && finiteInt(deadline.paused_ms) && finiteInt(deadline.extension_count) && (deadline.paused_at === undefined || typeof deadline.paused_at === "string"));
 	return value.schema === RESEARCH_AGGREGATE_SCHEMA && typeof value.run_id === "string" && RUN.test(value.run_id) && finiteInt(value.revision) && PHASES.has(value.phase as ResearchAggregatePhase) && plainObject(value.graph) && plainObject(value.evidence_round) && validBudget(value.budget) && validDeadline && typeof value.created_at === "string" && typeof value.updated_at === "string";
 }
 
@@ -63,11 +63,31 @@ export function deadlinePhase(state: ResearchAggregateState, now = Date.now()): 
 	return now >= Date.parse(state.deadline.discovery_deadline_at) ? "validation" : "discovery";
 }
 
+function shiftIso(value: string, elapsedMs: number): string {
+	const parsed = Date.parse(value);
+	return Number.isFinite(parsed) ? new Date(parsed + elapsedMs).toISOString() : value;
+}
+
+function resumedDeadline(deadline: ResearchAggregateDeadline | undefined, now: number): ResearchAggregateDeadline | undefined {
+	if (!deadline) return undefined;
+	if (!deadline.paused_at) return { ...deadline };
+	const pausedAt = Date.parse(deadline.paused_at);
+	const elapsed = Number.isFinite(pausedAt) ? Math.max(0, now - pausedAt) : 0;
+	const resumed = {
+		...deadline,
+		paused_ms: deadline.paused_ms + elapsed,
+		deadline_at: shiftIso(deadline.deadline_at, elapsed),
+		discovery_deadline_at: shiftIso(deadline.discovery_deadline_at, elapsed),
+	};
+	delete resumed.paused_at;
+	return resumed;
+}
+
 export function extendDeadline(state: ResearchAggregateState, now = Date.now()): ResearchAggregateState {
 	if (!(["paused", "awaiting_extension"] as ResearchAggregatePhase[]).includes(state.phase)) {
 		throw new ResearchAggregateError("extension-not-available", "research can only be extended while paused or awaiting extension");
 	}
-	const prior = state.deadline ?? deadlineFor(now);
+	const prior = resumedDeadline(state.deadline ?? deadlineFor(now), now) ?? deadlineFor(now);
 	const base = Math.max(now, Date.parse(prior.deadline_at));
 	return transitionAggregate(state, { phase: "active", deadline: { ...prior, deadline_at: new Date(base + RESEARCH_TOTAL_MS).toISOString(), discovery_deadline_at: new Date(base + RESEARCH_TOTAL_MS - 3 * 60_000).toISOString(), extension_count: prior.extension_count + 1 } });
 }
@@ -154,7 +174,16 @@ export async function mutateResearchAggregate<T>(path: string, fn: (state: Resea
 }
 
 export function transitionAggregate(state: ResearchAggregateState, patch: Partial<Pick<ResearchAggregateState, "phase" | "graph" | "evidence_round" | "budget" | "deadline">>, now = new Date().toISOString()): ResearchAggregateState {
-	const next: ResearchAggregateState = { ...state, revision: state.revision + 1, updated_at: now, ...(patch.phase === undefined ? {} : { phase: patch.phase }), ...(patch.graph === undefined ? {} : { graph: structuredClone(patch.graph) }), ...(patch.evidence_round === undefined ? {} : { evidence_round: structuredClone(patch.evidence_round) }), ...(patch.budget === undefined ? {} : { budget: { ...patch.budget } }), ...(patch.deadline === undefined ? {} : { deadline: { ...patch.deadline } }) };
+	const nextPhase = patch.phase ?? state.phase;
+	let nextDeadline = patch.deadline === undefined ? (state.deadline ? { ...state.deadline } : undefined) : { ...patch.deadline };
+	// Committing a non-active phase starts the pause clock. This marker is part of
+	// the durable transition, so a crash after cancellation cannot lose the time
+	// that must later be excluded from the research envelope.
+	if (nextDeadline && state.phase === "active" && nextPhase !== "active" && !nextDeadline.paused_at) nextDeadline.paused_at = now;
+	// Explicit deadline patches (used by extendDeadline) already account for the
+	// paused interval; ordinary active transitions can use the shared helper.
+	if (nextDeadline && state.phase !== "active" && nextPhase === "active" && patch.deadline === undefined) nextDeadline = resumedDeadline(nextDeadline, Date.parse(now));
+	const next: ResearchAggregateState = { ...state, revision: state.revision + 1, updated_at: now, ...(patch.phase === undefined ? {} : { phase: patch.phase }), ...(patch.graph === undefined ? {} : { graph: structuredClone(patch.graph) }), ...(patch.evidence_round === undefined ? {} : { evidence_round: structuredClone(patch.evidence_round) }), ...(patch.budget === undefined ? {} : { budget: { ...patch.budget } }), ...(nextDeadline === undefined ? {} : { deadline: nextDeadline }) };
 	if (!validateResearchAggregate(next)) throw new ResearchAggregateError("invalid-transition", "aggregate transition is invalid");
 	return next;
 }

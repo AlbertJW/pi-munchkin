@@ -4,6 +4,13 @@ All notable changes to pi-munchkin are documented here. Releases follow semantic
 
 ## Unreleased
 
+### Fixed (2026-09-09 — research pause clock; repository-only)
+
+Explicit parent-research pauses now persist a pause-start marker. Extending a
+run carries forward the elapsed paused interval before adding its next bounded
+ten-minute window, so paused time cannot silently consume the research budget.
+The deadline and discovery boundary remain durable across restart.
+
 ### Fixed (2026-09-09 — parent retrieval authority; repository-only)
 
 Parent deep-research web search and source reads now fail closed when the
