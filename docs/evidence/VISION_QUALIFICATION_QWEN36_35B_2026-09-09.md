@@ -117,6 +117,30 @@ parent branch until the parent rereads each source and records a validated
 research note; that evidence-integrity check is independent of this vision
 screen.
 
+## Preregistered three-frame quality pack
+
+To strengthen the single-case result without changing the runtime surface, a
+second manifest was prepared before execution:
+`harness/tests/fixtures/vision-quality-qwen36-35b-vision-v2.json`. Its
+approval SHA-256 is
+`c5213eac6179c8e53ae1e038715f4f3049f2da2341dc014c0964e06e9ac23b9d`, and it
+contains three distinct deterministic frames with independent hashes and
+actionable-interior oracles. The same Qwen route and isolated SAM runner were
+used for every case.
+
+| case | semantic result | required coverage | SAM IoU | SAM score | model latency (ms) | total tokens | client RSS |
+| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| right-blue-button | supported `BLUE` | 1/1 | 0.8942 | 0.9478 | 43,144 | 599 | 47,857,664 |
+| toolbar-green-action | supported `GREEN` | 1/1 | 0.8869 | 0.9125 | 20,267 | 468 | 49,201,152 |
+| dialog-confirm | supported `GREEN` | 1/1 | 0.8869 | 0.8909 | 31,478 | 664 | 33,538,048 |
+
+All three calls returned HTTP 200 with supported answers and valid SAM
+geometry/interior points; no UI action was attempted. Frame hashes were
+`buttons=5217a3bb…20c15`, `toolbar=f955dccd…20829`, and
+`dialog=816682fb…92fc`. This is stronger than the one-case transport check,
+but it is still a synthetic corpus and cannot establish general screenshot
+understanding, robustness to layout variation, or real-world grounding.
+
 ## Reproduction boundary
 
 The canonical four-arm run used the live local router with temperature `0`,

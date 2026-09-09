@@ -830,6 +830,27 @@ multi-case screenshot corpus with independent semantic and geometry oracles.
 Source commit: `7e2d672`.
 Current package-source SHA-256: `db6d674db53aabef32ba3fb7352d71e87cee806eda772a29e143841f8d70e214`.
 
+## Pending measurement boundary — 2026-09-09 (three-frame vision quality pack)
+
+The approval-gated quality runner now supports a separate frozen three-frame
+pack with per-frame digests, independent semantic questions, and actionable
+geometry oracles. Manifest revision
+`2026-09-09-qwen-quality-synthetic-ui-pack-1` was prepared with approval SHA
+`c5213eac6179c8e53ae1e038715f4f3049f2da2341dc014c0964e06e9ac23b9d` and then
+run explicitly against the registered
+`local-llamacpp/qwen36-35b-iq3s-vision` route. Qwen achieved 3/3 supported
+answers and SAM2.1 Tiny achieved valid geometry on all three cases with IoU
+0.8869–0.8942. The cache identity regression also verifies fresh evidence
+after provider, endpoint, and model changes.
+
+This is still synthetic, diagnostic evidence; it does not authorize clicks or
+promotion. `VISION=off` and `VISION_GROUNDING=sam` remain unchanged. The
+offline suite is 850/850, typecheck and package smoke (200 files) pass, and no
+mirror or deployment occurred.
+
+Source commit: `86c423b`.
+Current package-source SHA-256: `db6d674db53aabef32ba3fb7352d71e87cee806eda772a29e143841f8d70e214`.
+
 ## Data at rest: where a research session actually lands (updated 2026-08-10)
 
 A surface hash bounds what the MODEL sees. It says nothing about what a session LEAVES. Those are

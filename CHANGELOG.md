@@ -4,6 +4,17 @@ All notable changes to pi-munchkin are documented here. Releases follow semantic
 
 ## Unreleased
 
+### Added (2026-09-09 — multi-frame vision quality pack)
+
+The approval-gated vision quality runner now accepts a frozen three-frame
+synthetic screenshot pack (buttons, toolbar, and dialog), binding every case
+to its own frame digest and preregistered semantic and geometry oracle. The
+explicit Qwen 35B run passed all three semantic cases; SAM2.1 Tiny produced
+valid geometry with IoU 0.8869–0.8942. This remains diagnostic evidence only:
+`VISION=off` and `VISION_GROUNDING=sam` stay dark, and no click, mirror, or
+deployment occurred. The complete harness suite is 850/850 and package smoke
+is 200 files.
+
 ### Fixed (2026-09-09 — visual uncertainty and action fencing)
 
 Visual observations now carry an explicit uncertainty fence that blocks exact
