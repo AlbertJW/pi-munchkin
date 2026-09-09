@@ -487,6 +487,23 @@ No inference, calibration, mirror, rollout, or default change occurred. The
 boundary is pending a separately approved release; measurements cannot pool
 across it.
 
+## Pending surface boundary — 2026-09-09 (parent read-receipt bridge)
+
+Repository-only package-3 correction `4da5126` makes parent-owned `web_read`
+publish a bounded, content-addressed discovery-read receipt before returning.
+The existing research-round reducer validates the receipt and the compatibility
+aggregate projection is updated when active; duplicate/cache retries reuse the
+same round identity. Child, non-parent and legacy ledger paths are unchanged.
+Focused Ketch tests pass 26/26 and the full harness suite passes 810/810.
+
+This is a compatibility bridge, not the final aggregate authority: automatic
+search receipts, automatic evidence-card merging, and sole-source recovery are
+still pending. No inference, calibration, mirror, rollout, or default change
+occurred; a separate human release decision is required.
+
+Current package-source SHA-256:
+`029aef79b07be5cdbc3a9ab22448eff69a180ad49266035f460c91c0d3b6e771`.
+
 ## Data at rest: where a research session actually lands (updated 2026-08-10)
 
 A surface hash bounds what the MODEL sees. It says nothing about what a session LEAVES. Those are
