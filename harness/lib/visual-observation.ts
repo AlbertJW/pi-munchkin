@@ -35,6 +35,8 @@ export type VisualObservationRequest = {
 	now?: number;
 	ttl_ms?: number;
 	force?: boolean;
+	/** The caller cannot trust the previous interpretation and requires a fresh frame. */
+	uncertain?: boolean;
 	captured_at?: number;
 };
 
@@ -254,6 +256,8 @@ export class VisualObservationCache {
 	/** Ephemeral frame bytes are kept only for an optional in-process segmenter;
 	 * they are never part of the observation record, telemetry, or persistence. */
 	private readonly frames = new Map<string, Uint8Array>();
+	/** Cache scopes that must not reuse an interpretation until a fresh frame replaces them. */
+	private readonly uncertainKeys = new Set<string>();
 	private frameBytes = 0;
 	private readonly maxEntries: number;
 	private readonly nearDistance: number;
@@ -277,12 +281,14 @@ export class VisualObservationCache {
 		const ttl = request.ttl_ms ?? 30_000;
 		if (!Number.isFinite(now) || !Number.isFinite(ttl) || ttl < 0 || ttl > 86_400_000 || (request.captured_at != null && !Number.isFinite(request.captured_at))) throw new Error("invalid visual cache clock");
 		const key = cacheKey(request);
+		const uncertain = request.uncertain === true || this.uncertainKeys.has(key);
+		if (request.uncertain === true) this.uncertainKeys.add(key);
 		const candidates = [...this.entries.values()].filter((entry) => digest({ session: entry.session_id, source: entry.source, source_id: entry.source_id, geometry: entry.geometry }) === key && entry.question === request.question && entry.model_fingerprint === request.model_fingerprint && entry.analysis_version === request.analysis_version);
 		const exact = candidates.find((entry) => entry.exact_sha256 === request.exact_sha256);
-		if (exact && now - exact.created_at <= ttl && !request.force) { exact.last_used_at = now; return { decision: "exact_reuse", observation: exact, matched_observation_id: exact.observation_id, phash_distance: 0, cache_key: key }; }
-		const near = !request.force && request.phash ? candidates.map((entry) => ({ entry, distance: hammingDistance(entry.phash, request.phash) })).filter((item): item is { entry: VisualObservation; distance: number } => item.distance != null && item.distance <= this.nearDistance && now - item.entry.created_at <= ttl && regionDifference(item.entry.region_digests, request.region_digests).length === 0).sort((a, b) => a.distance - b.distance)[0] : undefined;
+		if (exact && now - exact.created_at <= ttl && !request.force && !uncertain) { exact.last_used_at = now; return { decision: "exact_reuse", observation: exact, matched_observation_id: exact.observation_id, phash_distance: 0, cache_key: key }; }
+		const near = !request.force && !uncertain && request.phash ? candidates.map((entry) => ({ entry, distance: hammingDistance(entry.phash, request.phash) })).filter((item): item is { entry: VisualObservation; distance: number } => item.distance != null && item.distance <= this.nearDistance && now - item.entry.created_at <= ttl && regionDifference(item.entry.region_digests, request.region_digests).length === 0).sort((a, b) => a.distance - b.distance)[0] : undefined;
 		if (near) { near.entry.last_used_at = now; return { decision: "near_reuse", observation: near.entry, matched_observation_id: near.entry.observation_id, phash_distance: near.distance, cache_key: key }; }
-		return { decision: request.force ? "forced" : candidates.length ? "stale" : "fresh", observation: null, matched_observation_id: null, phash_distance: null, cache_key: key };
+		return { decision: request.force || uncertain ? "forced" : candidates.length ? "stale" : "fresh", observation: null, matched_observation_id: null, phash_distance: null, cache_key: key };
 	}
 
 	put(request: VisualObservationRequest, interpretation?: string, frame?: Uint8Array): VisualObservation {
@@ -292,6 +298,7 @@ export class VisualObservationCache {
 		if (!Number.isFinite(capturedAt)) throw new Error("invalid visual capture timestamp");
 		const entry: VisualObservation = { schema: VISUAL_OBSERVATION_SCHEMA, observation_id: id, session_id: request.session_id, source: request.source, source_id: request.source_id, geometry: request.geometry, exact_sha256: request.exact_sha256, phash: request.phash ?? null, region_digests: request.region_digests ? [...request.region_digests] : null, question: request.question, model_fingerprint: request.model_fingerprint, analysis_version: request.analysis_version, created_at: now, last_used_at: now, captured_at: capturedAt, ...(interpretation === undefined ? {} : { interpretation, interpretation_digest: digest(interpretation) }) };
 		const key = cacheKey(request);
+		this.uncertainKeys.delete(key);
 		const replaced = this.entries.get(key);
 		this.entries.delete(key);
 		if (replaced) {
@@ -322,7 +329,7 @@ export class VisualObservationCache {
 		return entry;
 	}
 
-	clear(): void { this.entries.clear(); this.frames.clear(); this.frameBytes = 0; }
+	clear(): void { this.entries.clear(); this.frames.clear(); this.uncertainKeys.clear(); this.frameBytes = 0; }
 
 	find(observationId: string): VisualObservation | null {
 		const entry = [...this.entries.values()].find((candidate) => candidate.observation_id === observationId);

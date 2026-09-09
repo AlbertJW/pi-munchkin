@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { mkdtempSync } from "node:fs";
+import { mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { deflateSync } from "node:zlib";
@@ -94,6 +94,16 @@ test("near matches are hints and forced refresh bypasses them", () => {
 	assert.equal(cache.decide({ ...near, force: true }).decision, "forced");
 });
 
+test("explicit uncertainty blocks reuse until a fresh observation replaces it", () => {
+	const cache = new VisualObservationCache();
+	const first = request(); cache.put(first, "layout");
+	assert.equal(cache.decide({ ...first, uncertain: true }).decision, "forced");
+	assert.equal(cache.decide(first).decision, "forced", "uncertainty must persist beyond the signalling call");
+	const refreshed = { ...first, exact_sha256: imageDigest(new Uint8Array([77])) };
+	cache.put(refreshed, "new layout");
+	assert.equal(cache.decide(refreshed).decision, "exact_reuse", "a fresh replacement clears the uncertainty fence");
+});
+
 test("a changed local visual region disables near-cache reuse", () => {
 	const cache = new VisualObservationCache();
 	const left = new Uint8Array(16); const right = left.slice(); right[15] = 255;
@@ -128,6 +138,8 @@ test("visual observe delivers image content to a vision model and reuses exact f
 		const second = await tool.execute("two", { source: "screen", source_id: "window-a", question: "what is visible?" }, undefined, undefined, ctx);
 		assert.equal(second.details.decision, "exact_reuse");
 		assert.equal(second.content.every((part: { type: string }) => part.type === "text"), true);
+		const uncertain = await tool.execute("uncertain", { source: "screen", source_id: "window-a", question: "what is visible?", uncertain: true }, undefined, undefined, ctx);
+		assert.equal(uncertain.details.decision, "forced", "an explicit uncertainty signal must bypass the interpretation cache");
 		const unsupported = await tool.execute("three", { source: "screen", source_id: "window-a", question: "what is visible?" }, undefined, undefined, { cwd, model: { provider: "fixture", id: "text-only" } });
 		assert.equal(unsupported.details.reason, "vision-unavailable");
 		const bad = makeFakePi();
@@ -170,6 +182,28 @@ test("visual lifecycle observes bounded checkpoints, forces after UI actions, an
 		await fire(fp, "agent_settled", { type: "agent_settled" }, { cwd, model });
 		await context();
 		assert.equal(captures, 3, "settled agents do not keep observing the screen");
+	} finally {
+		if (previous === undefined) delete process.env.VISION; else process.env.VISION = previous;
+	}
+});
+
+test("a UI action invalidates cached image observations even without a screen watcher", async () => {
+	const previous = process.env.VISION;
+	process.env.VISION = "on";
+	try {
+		const { makeFakePi } = await import("./integration-harness.ts");
+		const { registerVisualTools } = await import(`../extensions/visual-observe.ts?action-image-fixture=${Date.now()}-${Math.random()}`);
+		const fp = makeFakePi(); const cwd = mkdtempSync(join(tmpdir(), "pi-visual-action-image-"));
+		writeFileSync(join(cwd, "frame.png"), fixturePng());
+		registerVisualTools(fp.pi as any, { sessionId: "action-image-session" });
+		const model = { provider: "fixture", id: "vision", supportsVision: true };
+		const ctx = { cwd, model };
+		const tool = fp.tools.get("visual_observe");
+		const first = await tool.execute("one", { source: "image", path: "frame.png", question: "what is visible?" }, undefined, undefined, ctx);
+		assert.equal(first.details.decision, "fresh");
+		await fire(fp, "tool_execution_end", { type: "tool_execution_end", toolCallId: "click", toolName: "click", result: {}, isError: true }, ctx);
+		const second = await tool.execute("two", { source: "image", path: "frame.png", question: "what is visible?" }, undefined, undefined, ctx);
+		assert.equal(second.details.decision, "fresh", "an action must not permit stale image reuse");
 	} finally {
 		if (previous === undefined) delete process.env.VISION; else process.env.VISION = previous;
 	}
