@@ -27,12 +27,12 @@ answer described the frozen near-black pixel oracle (`black`, `dark`, `blank`,
 or `empty`); this is deliberately a narrow transport oracle, not a UI-quality
 claim.
 
-| arm | image deliveries | cache hits | missed required changes | stale-target refusals | model calls | answer present | answer supported | grounding | prompt tokens | completion tokens | total tokens | model latency (ms) | wall (ms) | client peak RSS | server memory |
-| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | --- | ---: | ---: | ---: | ---: | ---: | ---: | --- |
-| uncached | 5 | 0 | 0 | 0 | 5 | 5/5 | 5/5 | not run | 228 | 1,565 | 1,793 | 122,311.21 | 122,315.59 | 58,032,128 | unavailable (router metrics disabled) |
-| exact-cache | 4 | 1 | 0 | 0 | 4 | 4/4 | 4/4 | not run | 183 | 1,269 | 1,452 | 99,431.67 | 99,433.08 | 56,950,784 | unavailable (router metrics disabled) |
-| near-cache | 2 | 3 | 2 | 1 | 2 | 2/2 | 2/2 | not run | 90 | 479 | 569 | 37,737.52 | 37,738.46 | 56,279,040 | unavailable (router metrics disabled) |
-| SAM-assisted | 3 | 2 | 1 | 0 | 3 | 3/3 | 3/3 | 0 valid / 2 failed (not scored) | 137 | 991 | 1,128 | 67,181.04 | 98,117.38 | 52,559,872 | unavailable (router metrics disabled) |
+| arm | image deliveries | cache hits | missed required changes | stale-target refusals | model calls | answer present | answer supported | required-claim coverage | grounding | prompt tokens | completion tokens | total tokens | model latency (ms) | wall (ms) | client peak RSS | server memory |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | --- | ---: | ---: | ---: | ---: | ---: | ---: | --- |
+| uncached | 5 | 0 | 0 | 0 | 5 | 5/5 | 5/5 | 5/5 | not run | 228 | 1,565 | 1,793 | 122,311.21 | 122,315.59 | 58,032,128 | unavailable (router metrics disabled) |
+| exact-cache | 4 | 1 | 0 | 0 | 4 | 4/4 | 4/4 | 4/4 | not run | 183 | 1,269 | 1,452 | 99,431.67 | 99,433.08 | 56,950,784 | unavailable (router metrics disabled) |
+| near-cache | 2 | 3 | 2 | 1 | 2 | 2/2 | 2/2 | 2/2 | not run | 90 | 479 | 569 | 37,737.52 | 37,738.46 | 56,279,040 | unavailable (router metrics disabled) |
+| SAM-assisted | 3 | 2 | 1 | 0 | 3 | 3/3 | 3/3 | 3/3 | 0 valid / 2 failed (not scored) | 137 | 991 | 1,128 | 67,181.04 | 98,117.38 | 52,559,872 | unavailable (router metrics disabled) |
 
 The exact-cache arm behaved safely for the frozen repeated frame. The
 near-cache arm demonstrates why perceptual reuse remains hint-only: it reused
@@ -45,10 +45,12 @@ refusal. No click or other UI action was issued.
 Qwen accepted the multimodal transport and returned supported final
 descriptions for every fresh call under the canonical rerun. The tiny frozen
 frames are still transport/cache fixtures rather than a meaningful UI
-benchmark, so the near-black oracle does not qualify general answer quality or
-grounding accuracy. Client RSS is measured; the router exposes no memory
-metrics endpoint. SAM grounding accuracy is not measured because fabricating
-a segmenter result would invalidate the receipt.
+benchmark. The 5/5, 4/4, 2/2, and 3/3 required-claim coverage values therefore
+mean only that narrow pixel claim was present; they do not measure coverage of
+general UI or research obligations, and the near-black oracle does not qualify
+general answer quality or grounding accuracy. Client RSS is measured; the
+router exposes no memory metrics endpoint. SAM grounding accuracy is not
+measured because fabricating a segmenter result would invalidate the receipt.
 
 As a separate, non-arm semantic smoke, `pi -p` sent
 `assets/pi-munchkin.png` through the same Qwen vision route and received a
