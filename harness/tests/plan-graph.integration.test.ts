@@ -25,7 +25,7 @@ if (!CHILD) {
 	const output = execFileSync(process.execPath, [
 				"--experimental-strip-types", "--experimental-loader", resolve("harness/tests/ts-js-resolver.mjs"), "--test", import.meta.filename,
 			], { cwd: process.cwd(), env, encoding: "utf8", stdio: "pipe" });
-		assert.match(output, /pass 62/);
+		assert.match(output, /pass 64/);
 		} finally { rmSync(artifacts, { recursive: true, force: true }); }
 	});
 } else {
@@ -182,6 +182,52 @@ if (!CHILD) {
 			await fp.commands.get("research-extend")?.handler("", ctx);
 			const resumed = await callTool(fp, "plan_update", { deltas: [{ item_id: itemId, note: "extension granted" }] }, cwd);
 			assert.equal(resumed.isError, false);
+		} finally {
+			if (previous === undefined) delete process.env.RESEARCH_WORKFLOW; else process.env.RESEARCH_WORKFLOW = previous;
+			resetPiGlobals();
+		}
+	});
+
+	test("expired parent research transitions to awaiting extension before graph mutation", async () => {
+		const previous = process.env.RESEARCH_WORKFLOW;
+		process.env.RESEARCH_WORKFLOW = "parent";
+		try {
+			const fp = makeFakePi(); const cwd = tmp();
+			for (const name of ["read", "bash", "edit", "write", "capability", "plan_write", "plan_update", "plan_expand", "plan_settle", "research_plan_start", "research_round", "research_finish", "web_search", "web_read", "research_note", "research_recall", "subagent"]) fp.pi.registerTool({ name, parameters: {} } as any);
+			const module = await import(`../extensions/plan-runner.ts?aggregate-expired=${Date.now()}-${Math.random()}`);
+			module.default(fp.pi as any);
+			const started = await callTool(fp, "research_plan_start", { request: "Expired research", summary: "one branch", branches: [{ title: "Evidence", budget: { searches: 1, reads: 1 } }] }, cwd);
+			assert.equal(started.isError, false);
+			const runId = started.details.contexts[0].run_id;
+			const aggregatePath = researchAggregatePath(cwd, runId, process.env);
+			const aggregateModule = await import("../lib/research-aggregate.ts");
+			await aggregateModule.mutateResearchAggregate(aggregatePath, (current: any) => ({ state: aggregateModule.transitionAggregate(current, { deadline: aggregateModule.deadlineFor(Date.now() - 11 * 60_000) }), result: undefined }));
+			const itemId = started.details.contexts[0].parent_item_id;
+			await expectToolError(fp, "plan_update", { deltas: [{ item_id: itemId, note: "must not continue after expiry" }] }, cwd, /awaiting_extension|extension/i);
+			assert.equal((await readResearchAggregate(aggregatePath))?.phase, "awaiting_extension");
+		} finally {
+			if (previous === undefined) delete process.env.RESEARCH_WORKFLOW; else process.env.RESEARCH_WORKFLOW = previous;
+			resetPiGlobals();
+		}
+	});
+
+	test("parent research closes discovery and delegation at the seven-minute boundary", async () => {
+		const previous = process.env.RESEARCH_WORKFLOW;
+		process.env.RESEARCH_WORKFLOW = "parent";
+		try {
+			const fp = makeFakePi(); const cwd = tmp();
+			for (const name of ["read", "bash", "edit", "write", "capability", "plan_write", "plan_update", "plan_expand", "plan_settle", "research_plan_start", "research_round", "research_finish", "web_search", "web_read", "research_note", "research_recall", "subagent"]) fp.pi.registerTool({ name, parameters: {} } as any);
+			const module = await import(`../extensions/plan-runner.ts?aggregate-discovery-boundary=${Date.now()}-${Math.random()}`);
+			module.default(fp.pi as any);
+			const started = await callTool(fp, "research_plan_start", { request: "Discovery boundary", summary: "one branch", branches: [{ title: "Evidence", budget: { searches: 1, reads: 1 } }] }, cwd);
+			assert.equal(started.isError, false);
+			const runId = started.details.contexts[0].run_id;
+			const aggregatePath = researchAggregatePath(cwd, runId, process.env);
+			const aggregateModule = await import("../lib/research-aggregate.ts");
+			await aggregateModule.mutateResearchAggregate(aggregatePath, (current: any) => ({ state: aggregateModule.transitionAggregate(current, { deadline: aggregateModule.deadlineFor(Date.now() - 8 * 60_000) }), result: undefined }));
+			const parentId = started.details.contexts[0].parent_item_id;
+			await expectToolError(fp, "plan_expand", { parent_item_id: parentId, children: [{ title: "late delegation", budget: { searches: 1, reads: 1 } }] }, cwd, /discovery phase|extension/i);
+			assert.equal((await readResearchAggregate(aggregatePath))?.phase, "active", "the seven-minute boundary closes discovery without expiring the whole run");
 		} finally {
 			if (previous === undefined) delete process.env.RESEARCH_WORKFLOW; else process.env.RESEARCH_WORKFLOW = previous;
 			resetPiGlobals();

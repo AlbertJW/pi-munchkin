@@ -4,6 +4,13 @@ All notable changes to pi-munchkin are documented here. Releases follow semantic
 
 ## Unreleased
 
+### Fixed (2026-09-09 — research discovery deadline authority; repository-only)
+
+Parent graph mutations now consult the durable deadline before executing. An
+expired run transitions to `awaiting_extension`, while the seven-minute
+discovery boundary rejects new branch expansion and delegation but still allows
+bounded validation and synthesis. No extra search/read allowance is created.
+
 ### Fixed (2026-09-09 — research pause clock; repository-only)
 
 Explicit parent-research pauses now persist a pause-start marker. Extending a

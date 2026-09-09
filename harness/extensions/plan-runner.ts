@@ -29,7 +29,7 @@ import {
 	validateResearchRoundLedger, type ClaimObligationV1, type EvidenceGapV1, type EvidenceCardRefV1, type ResearchRoundProposalV1, type ChildResearchReportV1,
 } from "../lib/research-round.ts";
 import {
-	deadlineFor, extendDeadline, migrateResearchPair, mutateResearchAggregate, readResearchAggregate, researchAggregatePath, transitionAggregate, writeResearchAggregate,
+	deadlineFor, deadlinePhase, extendDeadline, migrateResearchPair, mutateResearchAggregate, readResearchAggregate, researchAggregatePath, transitionAggregate, writeResearchAggregate,
 	type ResearchAggregatePhase,
 } from "../lib/research-aggregate.ts";
 import { inspectResearchPage, renderCoverageDigest } from "../lib/research-view.ts";
@@ -511,20 +511,39 @@ async function readCompatibilityState(cwd: string): Promise<PlanState | undefine
 
 async function requireActiveParentResearch(cwd: string, runId: string, operation: string): Promise<void> {
 	if (!PARENT_RESEARCH_WORKFLOW) return;
-	const aggregate = await readResearchAggregate(researchAggregatePath(cwd, runId, process.env));
+	const path = researchAggregatePath(cwd, runId, process.env);
+	const aggregate = await readResearchAggregate(path);
 	if (!aggregate || aggregate.run_id !== runId) rejectPlanTool(`${operation} rejected: parent research aggregate is missing or malformed`);
-	if (aggregate.phase !== "active") rejectPlanTool(`${operation} rejected: parent research is ${aggregate.phase}; continuation is unavailable until the user extends the run`);
+	let phase = aggregate.phase;
+	if (phase === "active" && deadlinePhase(aggregate) === "expired") {
+		await mutateResearchAggregate(path, (state) => ({ state: transitionAggregate(state, { phase: "awaiting_extension" }), result: undefined }));
+		const refreshed = await readResearchAggregate(path);
+		if (!refreshed || refreshed.run_id !== runId) rejectPlanTool(`${operation} rejected: parent research aggregate is missing or malformed`);
+		phase = refreshed.phase;
+	}
+	if (phase === "active" && deadlinePhase(aggregate) === "validation" && (operation === "plan_expand" || operation === "research branch lease")) {
+		rejectPlanTool(`${operation} rejected: the discovery phase has ended; continuation is unavailable until the user extends the run`);
+	}
+	if (phase !== "active") rejectPlanTool(`${operation} rejected: parent research is ${phase}; continuation is unavailable until the user extends the run`);
 }
 
 async function requireFinishableParentResearch(cwd: string, runId: string): Promise<void> {
 	if (!PARENT_RESEARCH_WORKFLOW) return;
-	const aggregate = await readResearchAggregate(researchAggregatePath(cwd, runId, process.env));
+	const path = researchAggregatePath(cwd, runId, process.env);
+	const aggregate = await readResearchAggregate(path);
 	if (!aggregate || aggregate.run_id !== runId) rejectPlanTool("research_finish rejected: parent research aggregate is missing or malformed");
+	let phase = aggregate.phase;
+	if (phase === "active" && deadlinePhase(aggregate) === "expired") {
+		await mutateResearchAggregate(path, (state) => ({ state: transitionAggregate(state, { phase: "awaiting_extension" }), result: undefined }));
+		const refreshed = await readResearchAggregate(path);
+		if (!refreshed || refreshed.run_id !== runId) rejectPlanTool("research_finish rejected: parent research aggregate is missing or malformed");
+		phase = refreshed.phase;
+	}
 	// An expired run is represented as awaiting_extension. Finishing is still
 	// allowed when evidence is already complete; explicit cancellation/blocked
 	// states must remain terminal until the user resumes them.
-	if (aggregate.phase === "settled" && typeof (aggregate.graph as { settled_at?: unknown }).settled_at !== "string") return;
-	if (aggregate.phase !== "active" && aggregate.phase !== "awaiting_extension") rejectPlanTool(`research_finish rejected: parent research is ${aggregate.phase}; continuation is unavailable until the user extends the run`);
+	if (phase === "settled" && typeof (aggregate.graph as { settled_at?: unknown }).settled_at !== "string") return;
+	if (phase !== "active" && phase !== "awaiting_extension") rejectPlanTool(`research_finish rejected: parent research is ${phase}; continuation is unavailable until the user extends the run`);
 }
 
 /** Creation must not treat a present but unreadable plan as an empty slot. */
