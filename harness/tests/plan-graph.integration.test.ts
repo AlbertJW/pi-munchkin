@@ -140,6 +140,36 @@ if (!CHILD) {
 		}
 	});
 
+	test("ledger-first projection never regresses an aggregate from a stale graph view", async () => {
+		const previous = process.env.RESEARCH_WORKFLOW;
+		process.env.RESEARCH_WORKFLOW = "parent";
+		try {
+			const fp = makeFakePi(); const cwd = tmp();
+			for (const name of ["read", "bash", "edit", "write", "capability", "plan_write", "plan_update", "plan_expand", "plan_settle", "research_plan_start", "research_round", "web_search", "web_read", "research_note", "research_recall", "subagent"]) fp.pi.registerTool({ name, parameters: {} } as any);
+			const module = await import(`../extensions/plan-runner.ts?aggregate-ledger-stale=${Date.now()}-${Math.random()}`);
+			module.default(fp.pi as any);
+			const started = await callTool(fp, "research_plan_start", { request: "Aggregate ledger", summary: "one branch", branches: [{ title: "Evidence", budget: { searches: 1, reads: 1 } }] }, cwd);
+			assert.equal(started.isError, false);
+			const runId = started.details.contexts[0].run_id;
+			const planPath = join(cwd, ".pi", "plan-state.json");
+			const initial = JSON.parse(readFileSync(planPath, "utf8"));
+			const itemId = started.details.contexts[0].parent_item_id;
+			const updated = await callTool(fp, "plan_update", { deltas: [{ item_id: itemId, status: "in_progress" }] }, cwd);
+			assert.equal(updated.isError, false);
+			const aggregatePath = researchAggregatePath(cwd, runId, process.env);
+			const advanced = await readResearchAggregate(aggregatePath);
+			assert.equal((advanced?.graph?.items as any[] | undefined)?.find((item: any) => item.id === itemId)?.status, "in_progress");
+			writeFileSync(planPath, `${JSON.stringify(initial)}\n`);
+			const recorded = await callTool(fp, "research_round", { action: "record", run_id: runId, round_id: "stale-graph-round", queries: [], source_leads: [], reads: [], evidence_cards: [], conflicts: [], gaps: [], proposed_next_action: "search" }, cwd);
+			assert.equal(recorded.isError, false, recorded.content?.map((block: any) => block?.text ?? "").join("\n"));
+			const preserved = await readResearchAggregate(aggregatePath);
+			assert.equal((preserved?.graph?.items as any[] | undefined)?.find((item: any) => item.id === itemId)?.status, "in_progress", "a ledger transition must use the aggregate graph when the compatibility graph is stale");
+		} finally {
+			if (previous === undefined) delete process.env.RESEARCH_WORKFLOW; else process.env.RESEARCH_WORKFLOW = previous;
+			resetPiGlobals();
+		}
+	});
+
 	test("parent branch lease mutations refresh the authoritative aggregate", async () => {
 		const previous = process.env.RESEARCH_WORKFLOW;
 		process.env.RESEARCH_WORKFLOW = "parent";

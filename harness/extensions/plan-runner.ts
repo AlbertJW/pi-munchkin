@@ -1353,16 +1353,29 @@ async function projectResearchAggregateSnapshot(cwd: string, runId: string, grap
 /** Project a graph transition using the latest durable evidence ledger. */
 async function projectResearchAggregate(cwd: string, runId: string, graph: PlanState, phase?: ResearchAggregatePhase): Promise<void> {
 	if (!PARENT_RESEARCH_WORKFLOW) return;
-	const round = await readResearchRoundLedger(researchRoundPath(cwd, runId, process.env));
-	if (!round) throw new Error("research aggregate migration refused: research round ledger is missing or malformed");
+	const aggregatePath = researchAggregatePath(cwd, runId, process.env);
+	const existing = await readResearchAggregate(aggregatePath);
+	// Once an aggregate exists it is authoritative. A compatibility ledger may
+	// still be stale when its later view write was interrupted, so never project
+	// that older snapshot back over the durable evidence-round state.
+	const round = existing
+		? (validateResearchRoundLedger(existing.evidence_round) ? existing.evidence_round as ResearchRoundLedgerStateV1 : null)
+		: await readResearchRoundLedger(researchRoundPath(cwd, runId, process.env));
+	if (!round || round.run_id !== runId) throw new Error("research aggregate migration refused: research round ledger is missing or malformed");
 	await projectResearchAggregateSnapshot(cwd, runId, graph, round, phase);
 }
 
 /** Project a ledger transition using the current compatibility graph. */
 async function projectResearchRoundAggregate(cwd: string, runId: string, round: ResearchRoundLedgerStateV1, phase?: ResearchAggregatePhase): Promise<void> {
 	if (!PARENT_RESEARCH_WORKFLOW) return;
-	const graph = await readCompatibilityState(cwd);
-	if (!graph) throw new Error("research aggregate migration refused: compatibility graph is missing or malformed");
+	const aggregatePath = researchAggregatePath(cwd, runId, process.env);
+	const existing = await readResearchAggregate(aggregatePath);
+	// Mirror the graph from the aggregate when available. Falling back to the
+	// compatibility file is only safe during initial creation, before an
+	// authoritative aggregate exists; otherwise an interrupted graph write could
+	// regress a newer graph revision during an unrelated ledger transition.
+	const graph = existing ? migrateState(existing.graph) : await readCompatibilityState(cwd);
+	if (!graph || graph.run_id !== runId) throw new Error("research aggregate migration refused: compatibility graph is missing or malformed");
 	await projectResearchAggregateSnapshot(cwd, runId, graph, round, phase);
 }
 
