@@ -353,11 +353,38 @@ test("parent research workflow retains the shared discovery envelope for local r
 		const mod = await import(`../extensions/ketch.ts?parent-budget=${Date.now()}-${Math.random()}`);
 		mod.registerKetch(fp.pi as never, { resolvePublicUrl: async (raw: string) => new URL(raw).toString() });
 		await fp.handlers.get("session_start")?.[0]?.({}, { cwd: dir, ui: { notify() {} } });
-		(globalThis as Record<string, unknown>).__pi_active_plan_context = { run_id: "parent-run", profile: "deep-research", settled: false };
+		const runId = "parent-run";
+		await writeResearchAggregate(researchAggregatePath(dir, runId, process.env), createResearchAggregate({ run_id: runId, phase: "active", graph: { run_id: runId }, evidence_round: { run_id: runId }, budget: { searches: 3, reads: 5, validation_reads: 5 } }));
+		(globalThis as Record<string, unknown>).__pi_active_plan_context = { run_id: runId, profile: "deep-research", settled: false };
 		const result = await callTool(fp, "web_search", { query: "parent-owned discovery", limit: 3 }, dir);
 		assert.equal(result.details.coverage.budget_exhausted, false);
 		assert.equal(result.details.coverage.complete, true);
 		assert.equal((globalThis as Record<string, any>).__pi_research_state.searches, 1);
+	} finally {
+		restoreEnv(snapshot);
+		rmSync(dir, { recursive: true, force: true });
+		delete (globalThis as Record<string, unknown>).__pi_active_plan_context;
+		delete (globalThis as Record<string, unknown>).__pi_research_state;
+		resetPiGlobals();
+	}
+});
+
+test("parent research retrieval fails closed when its aggregate is missing", async () => {
+	const dir = mkdtempSync(join(tmpdir(), "ketch-parent-missing-aggregate-"));
+	const snapshot = Object.fromEntries(["KETCH", "KETCH_BIN", "KETCH_BACKEND", "RESEARCH_LEDGER", "DEEP_RESEARCH_PLANNING", "RESEARCH_WORKFLOW", "PI_CODING_AGENT_DIR", "TELEMETRY"].map((key) => [key, process.env[key]]));
+	try {
+		delete process.env.KETCH;
+		Object.assign(process.env, { KETCH_BIN: mockKetch(dir), KETCH_BACKEND: "exa", RESEARCH_LEDGER: "on", DEEP_RESEARCH_PLANNING: "on", RESEARCH_WORKFLOW: "parent", PI_CODING_AGENT_DIR: join(dir, "agent"), TELEMETRY: "off" });
+		const fp = makeFakePi();
+		const mod = await import(`../extensions/ketch.ts?parent-missing-aggregate=${Date.now()}-${Math.random()}`);
+		mod.registerKetch(fp.pi as never, { resolvePublicUrl: async (raw: string) => new URL(raw).toString() });
+		await fp.handlers.get("session_start")?.[0]?.({}, { cwd: dir, ui: { notify() {} } });
+		(globalThis as Record<string, unknown>).__pi_active_plan_context = { run_id: "missing-parent", profile: "deep-research", settled: false };
+		const result = await callTool(fp, "web_search", { query: "must not run without aggregate", limit: 3 }, dir);
+		assert.equal(result.details.outcome, "aggregate_unavailable");
+		const read = await callTool(fp, "web_read", { urls: ["https://example.com/a"] }, dir);
+		assert.equal(read.details.outcome, "aggregate_unavailable");
+		assert.equal((globalThis as Record<string, any>).__pi_research_state?.searches ?? 0, 0, "missing authority must not spend discovery budget");
 	} finally {
 		restoreEnv(snapshot);
 		rmSync(dir, { recursive: true, force: true });

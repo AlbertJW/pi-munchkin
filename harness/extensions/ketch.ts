@@ -293,13 +293,17 @@ export function registerKetch(pi: ExtensionAPI, dependencies: KetchDependencies 
 	 * validation. At the hard deadline, transition the durable aggregate before
 	 * returning so a restart cannot silently resume discovery.
 	 */
-	async function researchDeadlineStatus(kind: "search" | "read"): Promise<"ok" | "discovery_closed" | "awaiting_extension" | "paused" | "settled" | "blocked"> {
+	async function researchDeadlineStatus(kind: "search" | "read"): Promise<"ok" | "discovery_closed" | "awaiting_extension" | "paused" | "settled" | "blocked" | "aggregate_unavailable"> {
 		if (!PARENT_RESEARCH_WORKFLOW) return "ok";
 		const active = (globalThis as Record<string, unknown>).__pi_active_plan_context as { profile?: unknown; run_id?: unknown; settled?: unknown } | undefined;
 		if (active?.profile !== "deep-research" || active.settled === true || typeof active.run_id !== "string") return "ok";
 		const path = researchAggregatePath(activeResearchCwd ?? process.cwd(), active.run_id, process.env);
 		const aggregate = await readResearchAggregate(path);
-		if (!aggregate) return "ok";
+		// Parent retrieval is executable only while the durable aggregate exists and
+		// belongs to the active run. A missing or mismatched authority must not fall
+		// through to the legacy budget path, which could spend network and ledger
+		// capacity without a recoverable lifecycle record.
+		if (!aggregate || aggregate.run_id !== active.run_id) return "aggregate_unavailable";
 		if (aggregate.phase !== "active") return aggregate.phase;
 		const phase = deadlinePhase(aggregate);
 		if (phase === "expired") {
@@ -631,7 +635,13 @@ export function registerKetch(pi: ExtensionAPI, dependencies: KetchDependencies 
 				if (deadline !== "ok") {
 					const message = deadline === "discovery_closed"
 						? "The discovery phase has ended. Validate the sources already found and synthesize, or request a research extension before searching again."
-						: "Research is paused awaiting an explicit extension. Review the supported findings and gaps, then ask the user for more time before continuing.";
+						: deadline === "aggregate_unavailable"
+							? "Parent research state is unavailable or belongs to a different run. Preserve the supported findings and stop before searching again."
+							: deadline === "settled"
+								? "Parent research is already settled. Do not start another search in this run."
+								: deadline === "blocked"
+									? "Parent research is blocked. Preserve the supported findings and report the unresolved gap before continuing."
+									: "Research is paused awaiting an explicit extension. Review the supported findings and gaps, then ask the user for more time before continuing.";
 					return text(message, { outcome: deadline, coverage: coverageReceipt(0, undefined, false, true) });
 				}
 				const queryKey = normalizeResearchQuery(params.query);
@@ -760,7 +770,14 @@ export function registerKetch(pi: ExtensionAPI, dependencies: KetchDependencies 
 				const started = Date.now();
 				const deadline = await researchDeadlineStatus("read");
 				if (deadline !== "ok") {
-					return text("Research is paused awaiting an explicit extension. Preserve the supported findings and report the remaining evidence gap before continuing.", { outcome: deadline, coverage: coverageReceipt(0, params.urls.length, false, true) });
+					const message = deadline === "aggregate_unavailable"
+						? "Parent research state is unavailable or belongs to a different run. Preserve the supported findings and stop before reading again."
+						: deadline === "settled"
+							? "Parent research is already settled. Do not read more sources in this run."
+							: deadline === "blocked"
+								? "Parent research is blocked. Preserve the supported findings and report the unresolved gap before continuing."
+								: "Research is paused awaiting an explicit extension. Preserve the supported findings and report the remaining evidence gap before continuing.";
+					return text(message, { outcome: deadline, coverage: coverageReceipt(0, params.urls.length, false, true) });
 				}
 				const requestedReader = (params as { reader?: unknown }).reader;
 				const readDeadline = started + READ_TIMEOUT;

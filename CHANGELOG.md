@@ -4,6 +4,14 @@ All notable changes to pi-munchkin are documented here. Releases follow semantic
 
 ## Unreleased
 
+### Fixed (2026-09-09 — parent retrieval authority; repository-only)
+
+Parent deep-research web search and source reads now fail closed when the
+durable research aggregate is missing or belongs to another run. Retrieval no
+longer spends network, context, or research budget without a recoverable
+lifecycle record; settled and blocked runs also return explicit bounded
+outcomes. Planner and parent-research flags remain dark.
+
 ### Fixed (2026-09-09 — parent research pause authority; repository-only)
 
 Parent research mutations now honor the aggregate lifecycle: cancellation and
