@@ -4,6 +4,15 @@ All notable changes to pi-munchkin are documented here. Releases follow semantic
 
 ## Unreleased
 
+### Fixed (2026-09-09 — research creation durability; repository-only)
+
+Research startup now prepares its evidence-round ledger and parent aggregate
+while the plan-file lock is held, before publishing the executable graph. A
+ledger or aggregate preparation failure therefore cannot leave a runnable
+compatibility plan without its authority records. The compatibility graph and
+ledger remain rebuildable views pending the full aggregate sole-writer
+transition; planner and parent-research flags remain dark.
+
 ### Fixed (2026-09-09 — research discovery deadline authority; repository-only)
 
 Parent graph mutations now consult the durable deadline before executing. An
