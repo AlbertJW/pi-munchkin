@@ -561,6 +561,24 @@ authority correction only.
 
 Current package-source SHA-256: `bcad8266ab683d868b3d136eb042169ba7c2bbb724cab81b43d5f05a2177315e`.
 
+## Pending surface boundary — 2026-09-09 (parent research pause authority)
+
+Repository-only package-3 correction makes the parent research lifecycle
+authoritative for continuation. `/research-cancel` places the aggregate in a
+durable `paused` phase; parent graph and ledger mutations reject while paused,
+and `/research-extend` is the explicit user-owned transition back to `active`.
+An expired `awaiting_extension` run may finish only when its evidence is already
+complete. Aggregate freshness projections preserve paused, blocked, settled and
+extension-boundary phases instead of silently reviving them.
+
+The isolated hierarchical-planner wrapper passes 62/62 and the full harness
+suite remains 813/813. No inference, calibration, mirror, rollout, or default
+change occurred; planner and parent-research flags remain dark. Future smoke
+requires a fresh approved preflight and loaded-hash rebind. This boundary does
+not supersede the prior aggregate-read boundary; it records lifecycle gating.
+
+Current package-source SHA-256: `9fddd787a0ade888468d9a3799de08539295b37341701e37cc0d7c2a7c4fc3af`.
+
 ## Data at rest: where a research session actually lands (updated 2026-08-10)
 
 A surface hash bounds what the MODEL sees. It says nothing about what a session LEAVES. Those are
