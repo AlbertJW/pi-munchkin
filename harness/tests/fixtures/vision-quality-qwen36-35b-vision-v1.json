@@ -1,0 +1,37 @@
+{
+  "schema": "pi.vision-quality/v1",
+  "revision": "2026-09-09-qwen-quality-synthetic-ui-1",
+  "model_roles": {
+    "quality": "local-llamacpp/qwen36-35b-iq3s-vision"
+  },
+  "generator": "vision-quality-probe.mjs#synthetic-ui-v1",
+  "canvas": { "width": 640, "height": 360, "device_scale": 1 },
+  "cases": [
+    {
+      "id": "right-blue-button",
+      "frame": "base",
+      "question": "Which colored button is on the right side of the interface? Answer BLUE or RED.",
+      "answer_regex": "\\bBLUE\\b",
+      "oracle_box": { "x": 420, "y": 260, "width": 160, "height": 56 },
+      "hint_box": { "x": 400, "y": 240, "width": 200, "height": 96 }
+    }
+  ],
+  "frames": {
+    "base": {
+      "generator_revision": "synthetic-ui-v1",
+      "sha256": "5217a3bbe56bd9143b08001fb7f5c4354d5e605077f43595bd4c6e96dfc20c15"
+    }
+  },
+  "metrics": [
+    "answer_present",
+    "answer_supported",
+    "required_claim_coverage",
+    "grounding_iou",
+    "grounding_score",
+    "model_latency_ms",
+    "prompt_tokens",
+    "completion_tokens",
+    "total_tokens",
+    "client_peak_rss_bytes"
+  ]
+}

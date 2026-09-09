@@ -214,7 +214,9 @@
     "harness/scripts/pi-watchdog.sh",
     "harness/scripts/redact-node-report.mjs",
     "harness/scripts/vision-benchmark.mjs",
+    "harness/scripts/vision-quality-probe.mjs",
     "harness/tests/fixtures/vision-contract-v1.json",
-    "harness/tests/fixtures/vision-contract-qwen36-35b-vision-v1.json"
+    "harness/tests/fixtures/vision-contract-qwen36-35b-vision-v1.json",
+    "harness/tests/fixtures/vision-quality-qwen36-35b-vision-v1.json"
   ]
 }
