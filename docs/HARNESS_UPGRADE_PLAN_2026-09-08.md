@@ -2,7 +2,7 @@
 
 Approved specification, 2026-09-08. Implementation is in progress; this document is not a release receipt. Retired goals remain archived.
 
-Implementation checkpoint: [foundation and aggregate corrections](evidence/HARNESS_UPGRADE_FOUNDATION_2026-09-08.md). Packages 1 and 2 have landed as source-only rollback points; package 3 now has the parent-owned budget/deadline guard, bounded status views, a dark one-call `research_finish` terminal contract, a compatibility-safe `research_note` claim-ID input, parent read receipts, automatic parent evidence-card publication, and automatic bounded search receipts. Sole aggregate authority and full deadline/delivery qualification remain pending. Packages 4 and 5 remain pending. Existing repository changes predating this upgrade are not evidence that these packages have landed.
+Implementation checkpoint: [foundation and aggregate corrections](evidence/HARNESS_UPGRADE_FOUNDATION_2026-09-08.md). Packages 1 and 2 have landed as source-only rollback points; package 3 now has the parent-owned budget/deadline guard, bounded status views, aggregate-authoritative parent status/recovery reads, freshness projection after parent graph mutations, a dark one-call `research_finish` terminal contract, a compatibility-safe `research_note` claim-ID input, parent read receipts, automatic parent evidence-card publication, and automatic bounded search receipts. Full aggregate transition authority and deadline/delivery qualification remain pending. Packages 4 and 5 remain pending. Existing repository changes predating this upgrade are not evidence that these packages have landed.
 
 ## Direction and acceptance
 
@@ -18,7 +18,7 @@ Cache retrieval method, source identity, content digest and completeness. Derive
 
 ## Package 2 — atomic research authority
 
-One private atomic aggregate owns graph, evidence-round state, execution phase, budget and revision, reusing existing validators and reducers. Creation, reservation, merge, pause and settlement transact through it. Graph and ledger exports are rebuildable views. Migrate only valid graph/ledger pairs sharing run identity; incomplete/conflicting pairs remain inspectable but cannot execute automatically. Preserve flat-plan storage and interactive /plan behavior.
+One private atomic aggregate owns graph, evidence-round state, execution phase, budget and revision, reusing existing validators and reducers. Parent status and recovery reads now treat that aggregate as authoritative, and parent graph mutations refresh it before the next read. Creation, reservation, merge, pause and settlement still need to transact through the same aggregate before this package is complete; graph and ledger files remain compatibility views until then. Migrate only valid graph/ledger pairs sharing run identity; incomplete/conflicting pairs remain inspectable but cannot execute automatically. Preserve flat-plan storage and interactive /plan behavior.
 
 ## Package 3 — simpler parent research
 

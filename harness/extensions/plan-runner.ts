@@ -471,26 +471,42 @@ function migrateState(raw: any): PlanState | undefined {
 
 async function readState(cwd: string): Promise<PlanState | undefined> {
 	const path = statePath(cwd);
+	let rawState: any;
+	let persisted: PlanState | undefined;
 	if (path && await exists(path)) {
 		try {
-			const state = migrateState(JSON.parse(await readFile(path, "utf8")));
-			if (state) return state;
+			rawState = JSON.parse(await readFile(path, "utf8"));
+			persisted = migrateState(rawState);
 		} catch { /* fall through to the private aggregate recovery view */ }
 	}
-	// Parent-owned research keeps an atomic aggregate alongside the legacy graph
-	// view. If a crash leaves the view absent or malformed, recover only the graph
-	// with the authenticated aggregate path already published by this process.
+	// Parent-owned research treats the aggregate as the authority, not merely as
+	// a fallback when the compatibility graph happens to be unreadable. A valid
+	// but stale graph must never shadow a newer aggregate revision. Derive the
+	// aggregate path from the persisted run identity so this remains safe across
+	// process restarts where the in-memory pointer has not yet been rebound.
 	if (PARENT_RESEARCH_WORKFLOW) {
-		const aggregatePath = (globalThis as Record<string, unknown>)[RESEARCH_AGGREGATE_PATH_KEY];
-		if (typeof aggregatePath === "string") {
+		const parentResearch = rawState?.profile?.name === "deep-research" || persisted?.profile?.name === "deep-research" || rawState?.research_round_contract === "v1";
+		const runId = typeof persisted?.run_id === "string" ? persisted.run_id : typeof rawState?.run_id === "string" ? rawState.run_id : undefined;
+		if (parentResearch && runId) {
+			const aggregatePath = researchAggregatePath(cwd, runId, process.env);
 			const aggregate = await readResearchAggregate(aggregatePath);
-			if (aggregate && aggregate.graph && typeof aggregate.graph === "object") {
-				const recovered = migrateState(aggregate.graph);
-				if (recovered && recovered.run_id === aggregate.run_id) return recovered;
-			}
+			if (!aggregate || aggregate.run_id !== runId || !aggregate.graph || typeof aggregate.graph !== "object") return undefined;
+			(globalThis as Record<string, unknown>)[RESEARCH_AGGREGATE_PATH_KEY] = aggregatePath;
+			const recovered = migrateState(aggregate.graph);
+			return recovered && recovered.run_id === aggregate.run_id ? recovered : undefined;
 		}
 	}
-	return undefined;
+	return persisted;
+}
+
+/** Read the graph compatibility view without consulting the aggregate. Sync
+ * operations use this deliberately: the aggregate is authoritative for reads,
+ * but a freshly committed graph mutation is the input that must be projected
+ * into that aggregate before the next authoritative read. */
+async function readCompatibilityState(cwd: string): Promise<PlanState | undefined> {
+	const path = statePath(cwd);
+	if (!path || !(await exists(path))) return undefined;
+	try { return migrateState(JSON.parse(await readFile(path, "utf8"))); } catch { return undefined; }
 }
 
 /** Creation must not treat a present but unreadable plan as an empty slot. */
@@ -679,7 +695,7 @@ export async function researchBranchDispatchContext(cwd: string, context: PlanCo
  */
 export async function acquireResearchBranchLease(cwd: string, context: PlanContextV1): Promise<ResearchBranchLeaseResult> {
 	if (context.depth !== 1 || context.owner_ref !== ownerRef(context.run_id, context.parent_item_id)) return { ok: false, reason: "invalid-context" };
-	return mutatePlan<ResearchBranchLeaseResult>(cwd, async (previous) => {
+	const result = await mutatePlan<ResearchBranchLeaseResult>(cwd, async (previous) => {
 		if (!previous) return { result: { ok: false, reason: "no-plan" } };
 		if (previous.schema_version !== 5 || previous.run_id !== context.run_id || previous.profile?.name !== "deep-research" || previous.settled_at) {
 			return { result: { ok: false, reason: "wrong-plan" } };
@@ -704,13 +720,15 @@ export async function acquireResearchBranchLease(cwd: string, context: PlanConte
 		const state: PlanState = { ...previous, items: previous.items.map((item) => item.id === parent.id ? { ...item, lease } : item) };
 		return { state, result: { ok: true, lease_id: lease.lease_id } };
 	});
+	if (PARENT_RESEARCH_WORKFLOW && result.ok) await syncResearchAggregate(cwd, context.run_id, "active");
+	return result;
 }
 
 /** Release only the exact lease acquired for this branch. Used when a multi-arm
  * dispatch cannot acquire all of its leases before any child is launched. */
 export async function releaseResearchBranchLease(cwd: string, context: PlanContextV1, leaseId: string): Promise<boolean> {
 	if (context.depth !== 1 || context.owner_ref !== ownerRef(context.run_id, context.parent_item_id)) return false;
-	return mutatePlan<boolean>(cwd, async (previous) => {
+	const released = await mutatePlan<boolean>(cwd, async (previous) => {
 		if (!previous || previous.schema_version !== 5 || previous.run_id !== context.run_id) return { result: false };
 		const parent = previous.items.find((item) => item.id === context.parent_item_id);
 		if (!parent?.lease || parent.owner_ref !== context.owner_ref || parent.lease.lease_id !== leaseId) return { result: false };
@@ -722,6 +740,8 @@ export async function releaseResearchBranchLease(cwd: string, context: PlanConte
 		});
 		return { state: { ...previous, items }, result: true };
 	});
+	if (PARENT_RESEARCH_WORKFLOW && released) await syncResearchAggregate(cwd, context.run_id, "active");
+	return released;
 }
 
 function rejectPlanTool(text: string): never { throw new Error(text); }
@@ -1027,6 +1047,7 @@ const planUpdate = defineTool({
 			validateStateSize(state);
 			return { state, result: { state, changed: applied.changed, idempotent: applied.idempotent } };
 		});
+		if (PARENT_RESEARCH_WORKFLOW && outcome.state.profile?.name === "deep-research") await syncResearchAggregate(ctx.cwd, outcome.state.run_id, "active");
 		planEvent("delta", outcome.state.run_id, { changed: outcome.changed, idempotent: outcome.idempotent, open_items: openItemCount(outcome.state) });
 		return { content: [{ type: "text" as const, text: `Plan updated: ${outcome.changed} changed, ${outcome.idempotent} already current, ${openItemCount(outcome.state)} open.` }], details: { tool_name: "plan_update", success: true } };
 	},
@@ -1251,7 +1272,7 @@ async function loadResearchRound(cwd: string, runId?: string): Promise<{ path: s
 
 async function syncResearchAggregate(cwd: string, runId: string, phase?: ResearchAggregatePhase): Promise<void> {
 	if (!PARENT_RESEARCH_WORKFLOW) return;
-	const graph = await readState(cwd);
+	const graph = await readCompatibilityState(cwd);
 	const roundPath = researchRoundPath(cwd, runId, process.env);
 	const round = await readResearchRoundLedger(roundPath);
 	if (!graph || graph.run_id !== runId || !round || round.run_id !== runId) throw new Error("research aggregate migration refused: graph/round pair is missing or has mismatched identity");
@@ -1487,6 +1508,7 @@ const planExpand = defineTool({
 			const next = expandGraph(previous as GraphPlanState, params.parent_item_id, params.children as BranchChildInput[]);
 			return { state: next, result: next };
 		});
+		if (PARENT_RESEARCH_WORKFLOW && state.profile?.name === "deep-research") await syncResearchAggregate(ctx.cwd, state.run_id, "active");
 		planEvent("expand", state.run_id, { parent_item_id: params.parent_item_id, children: params.children.length, open_items: openItemCount(state) });
 		return { content: [{ type: "text" as const, text: `Plan branch expanded: ${params.parent_item_id} now has ${childrenOf(state.items, params.parent_item_id).length} child node(s).` }], details: { tool_name: "plan_expand", success: true } };
 	},
@@ -1620,6 +1642,11 @@ const researchFinish = defineTool({
 		const runId = params.run_id ?? state.run_id;
 		if (runId !== state.run_id) rejectPlanTool("research_finish rejected: run identity mismatch");
 		await finalizeParentResearchGraph(ctx.cwd, runId, params.optional_deferrals);
+		// The graph view was just advanced by the compatibility reducer. Project
+		// that committed view before the ledger settlement reads the aggregate;
+		// otherwise the authoritative graph would still report open branches after
+		// this process has terminally marked them done.
+		await syncResearchAggregate(ctx.cwd, runId, "active");
 		// Keep the two existing validators as the implementation boundary while
 		// exposing one model-facing terminal operation. The ledger settles first;
 		// plan_settle then validates the now-settled ledger, citations, deferrals,
@@ -1935,6 +1962,7 @@ async function rebindActivePlan(cwd: string): Promise<Rebound | null> {
 		return { state, result: { state, staleLeases: staleLeases.length, interrupted: true } };
 	});
 	const state = rebound?.state;
+	if (PARENT_RESEARCH_WORKFLOW && state?.profile?.name === "deep-research") await syncResearchAggregate(cwd, state.run_id, "active");
 	if (!state) {
 		delete (globalThis as Record<string, unknown>)[RESEARCH_ROOT_CONTEXTS_KEY];
 		return null;
@@ -2058,6 +2086,12 @@ async function mergeBranchResult(cwd: string, context: import("../lib/branch-rep
 		} catch {
 			outcome = { kind: "ignored" };
 		}
+	}
+	if (PARENT_RESEARCH_WORKFLOW && outcome.kind !== "ignored") {
+		// The compatibility reducer has committed a lease/result transition. Keep
+		// the aggregate fresh before any parent-side evidence merge or status read;
+		// otherwise the authoritative view would still expose the pre-merge branch.
+		await syncResearchAggregate(cwd, outcome.runId, outcome.kind === "failed" ? "blocked" : "active");
 	}
 	if (outcome.kind === "merged") planEvent("branch-merged", outcome.runId, { children: outcome.children, lead_count: outcome.leads, evidence_gaps: outcome.gaps });
 	if (outcome.kind === "failed") planEvent("branch-failed", outcome.runId, { failure_class: outcome.failureClass });

@@ -4,6 +4,28 @@ All notable changes to pi-munchkin are documented here. Releases follow semantic
 
 ## Unreleased
 
+### Fixed (2026-09-09 — parent research aggregate read authority; repository-only)
+
+Parent deep-research status and recovery now read the private aggregate as the
+authority instead of allowing a stale compatibility graph to shadow it. Parent
+`plan_update`, `plan_expand`, and `research_finish` refresh that aggregate after
+their committed graph mutation. Missing or mismatched aggregate state fails
+closed; flat plans and legacy research behavior remain unchanged. The aggregate
+is not yet the sole writer for creation, branch reservation/merge, pause, or
+settlement, and planner flags remain dark. Added an isolated stale-view
+regression; full offline harness tests remain 813/813.
+
+### Fixed (2026-09-08 — goal implementation audit; repository-only)
+
+Added explicitly versioned case-level optimizer policies while preserving legacy
+manifest meanings. Reject incomplete/wrong-model development cohorts and primary
+development/guard regressions before accepting lessons. Real baseline ingestion
+now rejects unverified seed bindings, resource overruns/missing counts, and wrong
+arm order; the legacy execution adapter remains unqualified. Corrected the claim
+that 16 Qwen rows covered eight tasks: they covered four. Replaced CPU-tick waits
+in goal/compaction fixtures with bounded waits for actual lifecycle signals.
+No production harness surface, flags, inference, mirror, or adoption changed.
+
 ### Added (2026-09-07 — G02 pinned model-switch mechanism receipt)
 
 After the live mirror was synchronized and verified at 128/128 artifacts, an

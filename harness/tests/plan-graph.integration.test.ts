@@ -25,7 +25,7 @@ if (!CHILD) {
 	const output = execFileSync(process.execPath, [
 				"--experimental-strip-types", "--experimental-loader", resolve("harness/tests/ts-js-resolver.mjs"), "--test", import.meta.filename,
 			], { cwd: process.cwd(), env, encoding: "utf8", stdio: "pipe" });
-		assert.match(output, /pass 59/);
+		assert.match(output, /pass 61/);
 		} finally { rmSync(artifacts, { recursive: true, force: true }); }
 	});
 } else {
@@ -37,6 +37,7 @@ if (!CHILD) {
 	const { RESEARCH_COVERAGE_KEY } = await import("../lib/branch-report.ts");
 	const { claimIdForText, RESEARCH_EVIDENCE_CARDS_KEY } = await import("../lib/research-evidence.ts");
 	const { readResearchRoundLedger, researchRoundPath } = await import("../lib/research-round.ts");
+	const { readResearchAggregate, researchAggregatePath } = await import("../lib/research-aggregate.ts");
 	const { onContinuationRequest, setContinuationDispatcherActive } = await import("../lib/continuation-authority.ts");
 	const planRunnerModule = await import("../extensions/plan-runner.ts");
 	const planRunner = planRunnerModule.default;
@@ -110,6 +111,54 @@ if (!CHILD) {
 			assert.match(result.content.map((block: any) => block?.text ?? "").join("\n"), /Final answer:/);
 			const settled = JSON.parse(readFileSync(join(cwd, ".pi", "plan-state.json"), "utf8"));
 			assert.equal(typeof settled.settled_at, "string");
+		} finally {
+			if (previous === undefined) delete process.env.RESEARCH_WORKFLOW; else process.env.RESEARCH_WORKFLOW = previous;
+			resetPiGlobals();
+		}
+	});
+
+	test("parent status treats the aggregate graph as authoritative over a stale compatibility view", async () => {
+		const previous = process.env.RESEARCH_WORKFLOW;
+		process.env.RESEARCH_WORKFLOW = "parent";
+		try {
+			const fp = makeFakePi(); const cwd = tmp();
+			for (const name of ["read", "bash", "edit", "write", "capability", "plan_write", "plan_update", "plan_expand", "plan_settle", "research_plan_start", "research_round", "web_search", "web_read", "research_note", "research_recall", "subagent"]) fp.pi.registerTool({ name, parameters: {} } as any);
+			const module = await import(`../extensions/plan-runner.ts?aggregate-authority=${Date.now()}-${Math.random()}`);
+			module.default(fp.pi as any);
+			const started = await callTool(fp, "research_plan_start", { request: "Aggregate authority", summary: "one branch", branches: [{ title: "Evidence", budget: { searches: 1, reads: 1 } }] }, cwd);
+			assert.equal(started.isError, false);
+			const planPath = join(cwd, ".pi", "plan-state.json");
+			const stale = JSON.parse(readFileSync(planPath, "utf8"));
+			stale.items[0].title = "Stale compatibility title";
+			writeFileSync(planPath, `${JSON.stringify(stale)}\n`);
+			const { ctx, notes } = makeCtx(cwd);
+			await fp.commands.get("plan-status")?.handler("", ctx);
+			assert.doesNotMatch(notes.at(-1) ?? "", /Stale compatibility title/, "status must render the aggregate graph, not a stale compatibility file");
+		} finally {
+			if (previous === undefined) delete process.env.RESEARCH_WORKFLOW; else process.env.RESEARCH_WORKFLOW = previous;
+			resetPiGlobals();
+		}
+	});
+
+	test("parent branch lease mutations refresh the authoritative aggregate", async () => {
+		const previous = process.env.RESEARCH_WORKFLOW;
+		process.env.RESEARCH_WORKFLOW = "parent";
+		try {
+			const fp = makeFakePi(); const cwd = tmp();
+			for (const name of ["read", "bash", "edit", "write", "capability", "plan_write", "plan_update", "plan_expand", "plan_settle", "research_plan_start", "research_round", "web_search", "web_read", "research_note", "research_recall", "subagent"]) fp.pi.registerTool({ name, parameters: {} } as any);
+			const module = await import(`../extensions/plan-runner.ts?aggregate-lease=${Date.now()}-${Math.random()}`);
+			module.default(fp.pi as any);
+			const started = await callTool(fp, "research_plan_start", { request: "Aggregate lease", summary: "one branch", branches: [{ title: "Evidence", budget: { searches: 1, reads: 1 } }] }, cwd);
+			assert.equal(started.isError, false);
+			const context = started.details.contexts[0];
+			const aggregatePath = researchAggregatePath(cwd, context.run_id, process.env);
+			const acquired = await module.acquireResearchBranchLease(cwd, context);
+			assert.equal(acquired.ok, true);
+			const leased = await readResearchAggregate(aggregatePath);
+			assert.equal((leased?.graph?.items as any[] | undefined)?.find((item: any) => item.id === context.parent_item_id)?.lease?.lease_id, acquired.lease_id, "lease acquisition must refresh aggregate state");
+			assert.equal(await module.releaseResearchBranchLease(cwd, context, acquired.lease_id), true);
+			const released = await readResearchAggregate(aggregatePath);
+			assert.equal((released?.graph?.items as any[] | undefined)?.find((item: any) => item.id === context.parent_item_id)?.lease, undefined, "lease release must refresh aggregate state");
 		} finally {
 			if (previous === undefined) delete process.env.RESEARCH_WORKFLOW; else process.env.RESEARCH_WORKFLOW = previous;
 			resetPiGlobals();
