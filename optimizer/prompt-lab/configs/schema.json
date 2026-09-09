@@ -191,6 +191,10 @@
         "TOOL_CALL_RESCUE": [
           "on",
           "off"
+        ],
+        "GREP_FIND_TOOLS": [
+          "on",
+          "off"
         ]
       }
     },

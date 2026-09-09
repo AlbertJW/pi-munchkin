@@ -1,0 +1,12 @@
+{
+  "name": "c51-grep-find-tools",
+  "prediction": "Enabling pi's native grep (ripgrep) and find (fd) tools at the default tool-activation tier should improve code-comprehension accuracy on multi-file search tasks without harming efficiency (tools are already shipped in pi core, so cost is schema-token only; no new binary deps). If search-heavy fixtures show no accuracy gain, the tools stay dark (context overhead unjustified). grep/find are pi builtins and emit no munchkin record() event on use, so exposure is 'configuration' (the treatment is the activated surface); usage is measured out-of-band from the pi trajectory tool-call log (grep/find call counts vs the bash-rg baseline), per the prereg. Config-applied status only proves the tools were placed on the surface, never that the model called them.",
+  "thresholds": {
+    "GREP_FIND_TOOLS": "on"
+  },
+  "exposure": {
+    "mode": "configuration",
+    "target": [],
+    "diagnostic": []
+  }
+}
