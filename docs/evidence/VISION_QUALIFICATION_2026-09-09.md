@@ -93,6 +93,12 @@ fantasy-warrior image confirms a supported Qwen `sword` answer and valid SAM
 mask output, but it has no preregistered geometry oracle and is not pooled with
 the frozen measurements.
 
+The follow-up quality probe now adds one committed, deterministic synthetic UI
+case with a preregistered actionable-interior oracle. Qwen achieved 1/1 answer
+coverage and SAM achieved IoU 0.8942 on that case. This is a useful end-to-end
+qualification signal, but one case is insufficient for promotion or broad
+model-quality claims.
+
 The real quality screen therefore remains pending. A human must first install
 or point to a local SAM 2.1 Tiny runner and a vision-capable model, then run
 the identical case pack separately for Ling (protocol qualification) and

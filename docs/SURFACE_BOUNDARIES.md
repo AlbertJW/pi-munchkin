@@ -810,6 +810,26 @@ with semantic and geometry oracles.
 Source commit: `1f2bb9b`.
 Current package-source SHA-256: `db6d674db53aabef32ba3fb7352d71e87cee806eda772a29e143841f8d70e214`.
 
+## Pending measurement boundary — 2026-09-09 (synthetic UI quality case)
+
+A separate approval-gated quality probe is now available at
+`harness/scripts/vision-quality-probe.mjs`, bound to manifest revision
+`2026-09-09-qwen-quality-synthetic-ui-1` and approval SHA
+`b43f60c6981708bbda67bca7f038beedf8883774c3941c0e68c9d82b3c2cfefe`. The
+single deterministic UI case has a preregistered actionable-interior geometry
+oracle. Explicit Qwen execution achieved `BLUE` answer coverage `1/1`; real
+SAM2.1 Tiny achieved grounding IoU `0.8942` with no click authority. This
+result is diagnostic and cannot establish broad model quality from one case.
+
+The quality probe is disconnected from live defaults and requires an explicit
+approval hash and registered model on every run. `VISION=off` and
+`VISION_GROUNDING=sam` remain unchanged; no mirror, deployment, or automatic
+action occurred. The overall vision boundary remains **DARK** pending a
+multi-case screenshot corpus with independent semantic and geometry oracles.
+
+Source commit: `7e2d672`.
+Current package-source SHA-256: `db6d674db53aabef32ba3fb7352d71e87cee806eda772a29e143841f8d70e214`.
+
 ## Data at rest: where a research session actually lands (updated 2026-08-10)
 
 A surface hash bounds what the MODEL sees. It says nothing about what a session LEAVES. Those are

@@ -85,6 +85,24 @@ and potion. That confirms usable image understanding at the transport level,
 but it is not pooled with the frozen-arm measurements because it has no
 preregistered answer or geometry oracle.
 
+## Preregistered semantic/geometry quality case
+
+The dedicated quality manifest
+`harness/tests/fixtures/vision-quality-qwen36-35b-vision-v1.json` was prepared
+and committed before this run. Its approval SHA-256 is
+`b43f60c6981708bbda67bca7f038beedf8883774c3941c0e68c9d82b3c2cfefe`; the
+deterministic UI frame SHA-256 is
+`5217a3bbe56bd9143b08001fb7f5c4354d5e605077f43595bd4c6e96dfc20c15`.
+Against the same Qwen route, the right-button case returned HTTP 200, a
+supported `BLUE` answer, and required-claim coverage `1/1` in 26,607 ms
+(249 prompt, 350 completion, 599 total tokens). The real SAM2.1 Tiny runner,
+using the preregistered point hint, returned a valid mask with model score
+`0.9478` and box `{x:439,y:277,width:122,height:22}`. Its IoU against the
+actionable-interior oracle `{x:440,y:278,width:120,height:20}` was `0.8942`,
+with safe point `{x:449,y:287}`; no action was issued. This is one frozen
+synthetic UI case and does not establish broad semantic or grounding
+generalization.
+
 The screen is therefore **protocol-valid but not promotion-ready**. Keep
 `VISION=off` and `VISION_GROUNDING=sam` dark. A real SAM2.1 Tiny Hiera-Tiny
 runner (`sam2==1.1.0`, checkpoint SHA-256

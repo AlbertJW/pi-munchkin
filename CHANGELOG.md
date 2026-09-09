@@ -15,6 +15,15 @@ vision qualification remains dark and is recorded in
 `docs/evidence/VISION_QUALIFICATION_QWEN36_35B_2026-09-09.md`; no default,
 deployment, mirror, or click authority changed.
 
+### Added (2026-09-09 — approval-gated vision quality probe)
+
+Added a deterministic synthetic UI case with a preregistered actionable
+geometry oracle. `vision-quality-probe.mjs` requires an explicit `--run`,
+registered model, and manifest approval SHA; `--prepare` and `--dry` never
+execute a provider. The first Qwen run achieved 1/1 semantic coverage and
+SAM IoU 0.8942, a single-case diagnostic that does not promote the dark
+vision surface.
+
 ### Added (2026-09-09 — bounded visual lifecycle)
 
 An explicit screen or browser observation now arms a dark, bounded watcher that
