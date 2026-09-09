@@ -40,6 +40,18 @@ two changed required cases and therefore recorded two missed changes; the
 action case still forced a fresh delivery and produced one stale-target
 refusal. No click or other UI action was issued.
 
+## Live cancellation and recovery probe
+
+One additional request on the same Qwen route and serving epoch was aborted
+by the client after 250 ms. The abort completed at 257 ms with `AbortError`;
+no response body was retained. A bounded recovery request was then admitted
+and returned HTTP 200 with a non-empty choice after 27,071 ms. The probe
+therefore demonstrates client-side cancellation followed by a successful fresh
+request, but it cannot establish whether the router stopped the already-
+dispatched server computation. The probe image is identified only by SHA-256
+`01ead08826c19e5e6e14f0ff6f93111fcb42dc12b2a3a94f35a1626c1c41faee` and is not
+pooled with the frozen-arm metrics.
+
 ## Interpretation and limits
 
 Qwen accepted the multimodal transport and returned supported final
