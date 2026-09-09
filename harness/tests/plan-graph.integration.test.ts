@@ -25,7 +25,7 @@ if (!CHILD) {
 	const output = execFileSync(process.execPath, [
 				"--experimental-strip-types", "--experimental-loader", resolve("harness/tests/ts-js-resolver.mjs"), "--test", import.meta.filename,
 			], { cwd: process.cwd(), env, encoding: "utf8", stdio: "pipe" });
-			assert.match(output, /pass 66/);
+			assert.match(output, /pass 67/);
 		} finally { rmSync(artifacts, { recursive: true, force: true }); }
 	});
 } else {
@@ -302,6 +302,50 @@ if (!CHILD) {
 			await assert.rejects(() => module.acquireResearchBranchLease(cwd, context), /aggregate migration refused|research round ledger|missing/i);
 			const plan = JSON.parse(readFileSync(join(cwd, ".pi", "plan-state.json"), "utf8"));
 			assert.equal(plan.items[0].lease, undefined, "a failed aggregate projection must not leave a runnable graph lease");
+		} finally {
+			if (previousWorkflow === undefined) delete process.env.RESEARCH_WORKFLOW; else process.env.RESEARCH_WORKFLOW = previousWorkflow;
+			if (previousStorage === undefined) delete process.env.PLAN_STORAGE; else process.env.PLAN_STORAGE = previousStorage;
+			resetPiGlobals();
+		}
+	});
+
+	test("branch merge does not publish a graph result when aggregate projection cannot be prepared", async () => {
+		if (process.env.PLAN_GRAPH_MERGE_FAILURE_TEST !== "1") {
+			execFileSync(process.execPath, [
+				"--experimental-strip-types", "--experimental-loader", resolve("harness/tests/ts-js-resolver.mjs"), "--test",
+				"--test-name-pattern", "branch merge does not publish a graph result", import.meta.filename,
+			], {
+				cwd: process.cwd(),
+				env: { ...process.env, PLAN_GRAPH_TEST_CHILD: "1", PLAN_GRAPH_MERGE_FAILURE_TEST: "1", PLAN_GRAPH: "on", DEEP_RESEARCH_PLANNING: "on", RESEARCH_LEDGER: "on", PLAN_TOOL_GO: "on", PLAN_STORAGE: "project" },
+				encoding: "utf8", stdio: "pipe",
+			});
+			return;
+		}
+		const previousWorkflow = process.env.RESEARCH_WORKFLOW;
+		const previousStorage = process.env.PLAN_STORAGE;
+		process.env.RESEARCH_WORKFLOW = "parent";
+		process.env.PLAN_STORAGE = "project";
+		try {
+			const fp = makeFakePi(); const cwd = tmp();
+			for (const name of ["read", "bash", "edit", "write", "capability", "plan_write", "plan_update", "plan_expand", "plan_settle", "research_plan_start", "research_round", "web_search", "web_read", "research_note", "research_recall", "subagent"]) fp.pi.registerTool({ name, parameters: {} } as any);
+			const module = await import(`../extensions/plan-runner.ts?research-merge-atomic=${Date.now()}-${Math.random()}`);
+			module.default(fp.pi as any);
+			await fire(fp, "session_start", {}, makeCtx(cwd).ctx);
+			const started = await callTool(fp, "research_plan_start", { request: "Atomic merge", summary: "aggregate projection must precede graph result", branches: [{ title: "Evidence", budget: { searches: 1, reads: 1 } }] }, cwd);
+			assert.equal(started.isError, false);
+			const context = started.details.contexts[0];
+			const acquired = await module.acquireResearchBranchLease(cwd, context);
+			assert.equal(acquired.ok, true);
+			unlinkSync(researchRoundPath(cwd, context.run_id, process.env));
+			fp.pi.events.emit(HARNESS_SIGNAL_CHANNEL, { v: 1, type: "plan/branch-result", context: { ...context, lease_id: acquired.lease_id, dispatch_epoch: 0 }, report: {
+				v: 1, parent_item_id: context.parent_item_id, owner_ref: context.owner_ref, status: "blocked", note: "bounded failure",
+				consumed: { searches: 0, reads: 0 }, evidence_gaps: ["bounded failure"], source_leads: [], children: [],
+				coverage: { strategy: "direct", scope: "bounded", returned_count: 0, truncated: false, budget_exhausted: true, failed: false, complete: false },
+			}, failureClass: null });
+			await fire(fp, "before_agent_start", {}, makeCtx(cwd).ctx);
+			const state = JSON.parse(readFileSync(join(cwd, ".pi", "plan-state.json"), "utf8"));
+			assert.equal(state.items[0].status, "pending", "a failed aggregate projection must not publish the merged branch result");
+			assert.equal(typeof state.items[0].lease?.lease_id, "string", "the existing lease remains authoritative when merge preparation fails");
 		} finally {
 			if (previousWorkflow === undefined) delete process.env.RESEARCH_WORKFLOW; else process.env.RESEARCH_WORKFLOW = previousWorkflow;
 			if (previousStorage === undefined) delete process.env.PLAN_STORAGE; else process.env.PLAN_STORAGE = previousStorage;

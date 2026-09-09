@@ -2147,6 +2147,10 @@ async function mergeBranchResult(cwd: string, context: import("../lib/branch-rep
 		try { validateStateSize(next); }
 		catch { return blockParent(previous, parent, "merge_rejected"); }
 		return { state: next, result: { kind: "merged", runId: previous.run_id, children: children.length, leads: report.source_leads.length, gaps: report.evidence_gaps.length, headTerminal, headTerminalAt: next.head_terminal_at, openItems: openItemCount(next) } };
+		}, {
+			beforePersist: async (nextState) => {
+				if (PARENT_RESEARCH_WORKFLOW) await projectResearchAggregate(cwd, context.run_id, nextState, "active");
+			},
 		});
 	} catch {
 		// Unexpected merge failures (for example a transient report projection
@@ -2158,6 +2162,10 @@ async function mergeBranchResult(cwd: string, context: import("../lib/branch-rep
 				const parent = previous.items.find((item) => item.id === context.parent_item_id);
 				if (!parent || parent.owner_ref !== context.owner_ref || parent.parent_id || graphTerminal(parent)) return { result: { kind: "ignored" } };
 				return blockParent(previous, parent, "merge_rejected");
+			}, {
+				beforePersist: async (nextState) => {
+					if (PARENT_RESEARCH_WORKFLOW) await projectResearchAggregate(cwd, context.run_id, nextState, "blocked");
+				},
 			});
 		} catch {
 			outcome = { kind: "ignored" };
