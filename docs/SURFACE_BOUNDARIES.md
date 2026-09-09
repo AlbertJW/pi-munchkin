@@ -628,6 +628,24 @@ the prior pause-clock boundary; it records mutation-side deadline enforcement.
 
 Current package-source SHA-256: `b3ac94139dee5e7adff61cd6b1c06803df1d682ab126d1a35f2841b87d1e1f95`.
 
+## Pending surface boundary — 2026-09-09 (research creation durability)
+
+Repository-only package-3 correction prepares the research evidence-round
+ledger and parent aggregate while the plan-file lock is held, before publishing
+the executable compatibility graph. A failed dependent write therefore leaves
+no runnable graph without its authority records. This removes the graph-first
+orphan window; the graph and ledger remain compatibility views until all later
+reservation, merge, pause, and settlement transitions use the aggregate as the
+sole writer.
+
+The isolated hierarchical-planner wrapper passes 65/65, including the injected
+failed-ledger regression, and the full offline suite remains the release gate.
+No inference, calibration, mirror, rollout, or default change occurred;
+planner and parent-research flags remain dark. This boundary does not supersede
+the prior mutation-deadline boundary; it records creation ordering.
+
+Current package-source SHA-256: `273e1bc605157c3e59466cddc2797e68db8f16083418e54ed41237b2af9e4b4c`.
+
 ## Data at rest: where a research session actually lands (updated 2026-08-10)
 
 A surface hash bounds what the MODEL sees. It says nothing about what a session LEAVES. Those are
