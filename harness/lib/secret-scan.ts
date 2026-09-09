@@ -12,9 +12,22 @@ const credentialAssignment = new RegExp([
 ].join(""), "i");
 const placeholder = /(?:\$\{|dummy|sentinel|example|test|redacted|placeholder|change[_-]?me|x{4,})/i;
 
+// Loopback literals (127.0.0.0/8, ::1) are NOT diff secrets: every host has them,
+// they disclose nothing machine-specific, and SSRF-hardening code legitimately embeds
+// them (a loopback-only endpoint validator's own fixtures require 127.0.0.1). This is
+// scoped to the secret scanner alone — public-url.ts's isPrivateAddress still treats
+// loopback as private and blocks it for outbound fetches, which is the SSRF guard.
+function isLoopbackHost(host: string): boolean {
+  const version = isIP(host);
+  if (version === 4) return host.split(".", 1)[0] === "127";
+  if (version === 6) return host === "::1" || host === "0:0:0:0:0:0:0:1";
+  return false;
+}
+
 function isPrivateHost(hostname: string): boolean {
   const host = hostname.toLowerCase().replace(/^\[|\]$/g, "");
   if (host === ["local", "host"].join("") || host.endsWith(".local")) return true;
+  if (isLoopbackHost(host)) return false;
   return isIP(host) !== 0 && isPrivateAddress(host);
 }
 

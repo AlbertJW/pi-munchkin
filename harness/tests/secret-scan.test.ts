@@ -8,8 +8,10 @@ import { parseUnifiedDiff, scanAddedLines } from "../lib/secret-scan.ts";
 
 test("diff secret scan reports only location and pattern identifiers", () => {
   const credential = ["sk", "-abcdefghijklmnopqrstuvwxyz123456"].join("");
-  const endpoint = ["http://", "127.0.0.1:9000/internal"].join("");
-  const ipv6Endpoint = ["https://", "[::1]/internal"].join("");
+  // PRIVATE_ENDPOINT is a private-NETWORK disclosure guard (RFC1918 v4, unique-local
+  // v6): those reveal internal topology. Loopback (127.0.0.0/8, ::1) is exempt below.
+  const endpoint = ["http://", "192.168.1.10:9000/internal"].join("");
+  const ipv6Endpoint = ["https://", "[fd12:3456::1]/internal"].join("");
   const diff = [
     "diff --git a/example.txt b/example.txt",
     "--- a/example.txt",
@@ -31,6 +33,27 @@ test("diff secret scan reports only location and pattern identifiers", () => {
   assert(!output.includes(endpoint));
   assert(!output.includes(ipv6Endpoint));
   assert(!output.includes("token="));
+});
+
+test("loopback endpoints are not secrets, but private-network endpoints still are", () => {
+  // A loopback literal (127.0.0.0/8, ::1) reveals nothing machine-specific and is
+  // exactly what SSRF-hardening code and its own validator fixtures must embed, so it
+  // is NOT a diff secret. Private-network (RFC1918 / unique-local) addresses stay
+  // findings — they disclose internal topology. SSRF's isPrivateAddress still blocks
+  // loopback for outbound fetches; only the diff secret scanner is relaxed here.
+  const line = (n: number, text: string) => ({ file: "e.txt", line: n, text });
+  const findings = scanAddedLines([
+    line(1, ["ep=http://", "127.0.0.1:8080/x"].join("")),
+    line(2, ["ep=http://", "127.13.9.4:9000"].join("")),
+    line(3, ["ep=https://", "[::1]:8080/x"].join("")),
+    line(4, ["ep=http://", "u:p@127.0.0.1:8080"].join("")),
+    line(5, ["ep=http://", "10.0.0.5:9000/internal"].join("")),
+    line(6, ["ep=https://", "[fd00::1]/internal"].join("")),
+  ]);
+  assert.deepEqual(findings, [
+    { file: "e.txt", line: 5, pattern: "PRIVATE_ENDPOINT" },
+    { file: "e.txt", line: 6, pattern: "PRIVATE_ENDPOINT" },
+  ]);
 });
 
 test("PROVIDER_TOKEN placeholder suppression is scoped to the token, not the line", () => {
