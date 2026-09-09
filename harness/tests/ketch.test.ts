@@ -50,6 +50,19 @@ esac
 	return file;
 }
 
+function mockCompleteKetch(dir: string): string {
+	const file = join(dir, "ketch-complete-mock");
+	writeFileSync(file, `#!/bin/sh
+case "$1" in
+  version) printf 'ketch v0.12.0\\n' ;;
+  scrape) printf '{"url":"https://example.com/a","title":"A page","markdown":"Useful source text","truncated":false}\\n' ;;
+  *) exit 2 ;;
+esac
+`);
+	chmodSync(file, 0o755);
+	return file;
+}
+
 test("direct reader cannot cache an unrequested source", async () => {
 	const dir = mkdtempSync(join(tmpdir(), "ketch-source-binding-"));
 	const prior = Object.fromEntries(["KETCH_BIN", "RESEARCH_LEDGER", "PI_CODING_AGENT_DIR", "TELEMETRY"].map((key) => [key, process.env[key]]));
@@ -554,6 +567,45 @@ test("parent web_read records a bounded read receipt before returning success", 
 		assert.equal(persisted?.rounds[0]?.reads[0]?.truncated, true);
 		const aggregate = await readResearchAggregate(aggregatePath);
 		assert.equal((aggregate?.evidence_round as any)?.rounds.length, 1, "aggregate projection must carry the receipt");
+	} finally {
+		restoreEnv(snapshot);
+		rmSync(dir, { recursive: true, force: true });
+		delete (globalThis as Record<string, unknown>).__pi_active_plan_context;
+	}
+});
+
+test("parent research_note publishes its evidence card and validation receipt automatically", async () => {
+	const dir = mkdtempSync(join(tmpdir(), "ketch-auto-card-"));
+	const snapshot = Object.fromEntries(["KETCH", "KETCH_BIN", "RESEARCH_LEDGER", "DEEP_RESEARCH_PLANNING", "RESEARCH_WORKFLOW", "PI_CODING_AGENT_DIR", "TELEMETRY_FILE", "TELEMETRY_SOURCE"].map((key) => [key, process.env[key]]));
+	try {
+		delete process.env.KETCH;
+		process.env.KETCH_BIN = mockCompleteKetch(dir);
+		process.env.RESEARCH_LEDGER = "on";
+		process.env.DEEP_RESEARCH_PLANNING = "on";
+		process.env.RESEARCH_WORKFLOW = "parent";
+		process.env.PI_CODING_AGENT_DIR = join(dir, "agent");
+		process.env.TELEMETRY_FILE = join(dir, "events.jsonl");
+		process.env.TELEMETRY_SOURCE = "test";
+		const runId = "research-plan-auto-card";
+		const ledger = new ResearchRoundLedger({ run_id: runId, obligations: [{ claim_id: "claim-a", text: "A", required: true, status: "open", missing: "evidence", why: "test", next_action: "read" }], budget: { searches: 3, reads: 5, validation_reads: 5 } });
+		const roundPath = researchRoundPath(dir, runId, process.env);
+		await writeResearchRoundLedger(roundPath, ledger.state);
+		const aggregatePath = researchAggregatePath(dir, runId, process.env);
+		await writeResearchAggregate(aggregatePath, migrateResearchPair({ run_id: runId }, ledger.state));
+		const fp = makeFakePi();
+		const mod = await import(`../extensions/ketch.ts?auto-card=${Date.now()}-${Math.random()}`);
+		mod.registerKetch(fp.pi as never, { resolvePublicUrl: async (raw: string) => new URL(raw).toString() });
+		await fp.handlers.get("session_start")?.[0]?.({}, { cwd: dir, ui: { notify() {} } });
+		(globalThis as Record<string, unknown>).__pi_active_plan_context = { profile: "deep-research", run_id: runId, settled: false };
+		assert.equal((await callTool(fp, "web_read", { urls: ["https://example.com/a"] }, dir)).isError, false);
+		const note = await callTool(fp, "research_note", { claim: "A rewritten claim", claim_id: "claim-a", url: "https://example.com/a", quote: "Useful source text" }, dir);
+		assert.equal(note.isError, false);
+		const persisted = await readResearchRoundLedger(roundPath);
+		assert.equal(persisted?.evidence_cards.length, 1, "the verified note should publish its evidence reference");
+		assert.deepEqual(persisted?.evidence_cards[0]?.claim_ids, ["claim-a"]);
+		assert.equal(persisted?.rounds.some((round) => round.reads.some((read) => read.phase === "parent_validation")), true, "publishing a card must charge a parent-validation receipt");
+		const aggregate = await readResearchAggregate(aggregatePath);
+		assert.equal((aggregate?.evidence_round as any)?.evidence_cards.length, 1, "aggregate projection must carry the evidence reference");
 	} finally {
 		restoreEnv(snapshot);
 		rmSync(dir, { recursive: true, force: true });

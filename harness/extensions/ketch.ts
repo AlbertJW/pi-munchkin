@@ -28,7 +28,7 @@ import { emitHarnessSignal } from "../lib/harness-signals.ts";
 import { buildControlProposal, controlEnforces, emitControlProposal } from "../lib/control-proposal.ts";
 import { PLAN_CONTEXT_ENV, RESEARCH_COVERAGE_KEY, RESEARCH_RESERVED_BUDGET_KEY, observeResearchCoverage, readPlanContext, validResearchCoverageObservation, type PlanContextV1, type ResearchCoverageObservation } from "../lib/branch-report.ts";
 import { validCoverage, type ResearchBudget } from "../lib/plan-graph.ts";
-import { claimIdForText, makeEvidenceCard, rememberEvidenceCard } from "../lib/research-evidence.ts";
+import { claimIdForText, makeEvidenceCard, rememberEvidenceCard, type EvidenceCardV1 } from "../lib/research-evidence.ts";
 import { canonicalResearchUrl } from "../lib/research-evidence.ts";
 import { normalizeResearchQuery, researchReservationRoot, reserveResearchKey } from "../lib/research-reservations.ts";
 import { continuationDispatcherActive, emitContinuationRequest, hashContinuationIdentity } from "../lib/continuation-authority.ts";
@@ -36,7 +36,7 @@ import { goalsEnabled, readCurrentGoal } from "../lib/goal-state.ts";
 import { createHash } from "node:crypto";
 import { reserveContextOutput } from "../lib/context-accounting.ts";
 import { deadlinePhase, mutateResearchAggregate, readResearchAggregate, researchAggregatePath, transitionAggregate } from "../lib/research-aggregate.ts";
-import { mutateResearchRoundLedger, readResearchRoundLedger, researchRoundPath, type ResearchRoundProposalV1 } from "../lib/research-round.ts";
+import { evidenceCardRef, mutateResearchRoundLedger, readResearchRoundLedger, researchRoundPath, type ResearchRoundLedgerStateV1, type ResearchRoundProposalV1 } from "../lib/research-round.ts";
 
 // Ketch is the host-side network adapter for local models. The steady-state
 // surface is deliberately only FIND + READ; deep orchestration lives in the
@@ -325,6 +325,27 @@ export function registerKetch(pi: ExtensionAPI, dependencies: KetchDependencies 
 		ledgerWriteTail = pending.then(() => undefined, () => undefined);
 		await pending;
 	}
+	async function projectParentResearchAggregate(runId: string, state: ResearchRoundLedgerStateV1): Promise<void> {
+		if (!activeResearchCwd) return;
+		try {
+			const aggregatePath = researchAggregatePath(activeResearchCwd, runId, process.env);
+			const currentAggregate = await readResearchAggregate(aggregatePath);
+			if (!currentAggregate || currentAggregate.run_id !== runId || currentAggregate.phase !== "active") return;
+			await mutateResearchAggregate(aggregatePath, (aggregate) => {
+				if (aggregate.phase !== "active") throw new Error("aggregate is no longer active");
+				return {
+					state: transitionAggregate(aggregate, {
+						evidence_round: state,
+						budget: state.budget.consumed,
+					}),
+					result: undefined,
+				};
+			});
+		} catch {
+			// A stale or unavailable aggregate is non-authoritative for this bridge;
+			// plan-runner will surface it on the next inspect/recovery boundary.
+		}
+	}
 	/**
 	 * Parent-owned research records the facts already known by the retrieval
 	 * adapter. This is deliberately a compatibility bridge: the existing
@@ -373,24 +394,37 @@ export function registerKetch(pi: ExtensionAPI, dependencies: KetchDependencies 
 			return;
 		}
 		if (!committed) return;
+		await projectParentResearchAggregate(runId, committed);
+	}
+	async function recordParentEvidenceCard(card: EvidenceCardV1): Promise<void> {
+		if (!PARENT_RESEARCH_WORKFLOW || !activeResearchCwd) return;
+		const active = (globalThis as Record<string, unknown>).__pi_active_plan_context as { profile?: unknown; run_id?: unknown; settled?: unknown } | undefined;
+		if (active?.profile !== "deep-research" || active.settled === true || typeof active.run_id !== "string") return;
+		const runId = active.run_id;
+		const path = researchRoundPath(activeResearchCwd, runId, process.env);
+		const existing = await readResearchRoundLedger(path);
+		if (!existing || existing.run_id !== runId || existing.status === "settled") return;
+		const truncated = card.truncated;
+		const read = { url: card.original_url, phase: "parent_validation" as const, method: card.retrieval_method, outcome: truncated ? "truncated" as const : "completed" as const, truncated, parent_validated: true };
+		const receiptIdentity = JSON.stringify({ run_id: runId, card_id: card.card_id, read });
+		const roundId = `auto-note-${createHash("sha256").update(receiptIdentity, "utf8").digest("hex").slice(0, 48)}`;
+		let committed: ResearchRoundLedgerStateV1 | null = null;
 		try {
-			const aggregatePath = researchAggregatePath(activeResearchCwd, runId, process.env);
-			const currentAggregate = await readResearchAggregate(aggregatePath);
-			if (!currentAggregate || currentAggregate.run_id !== runId || currentAggregate.phase !== "active") return;
-			await mutateResearchAggregate(aggregatePath, (aggregate) => {
-				if (aggregate.phase !== "active") throw new Error("aggregate is no longer active");
-				return {
-					state: transitionAggregate(aggregate, {
-						evidence_round: committed,
-						budget: committed.budget.consumed,
-					}),
-					result: undefined,
+			const outcome = await mutateResearchRoundLedger(path, (ledger) => {
+				const proposal: ResearchRoundProposalV1 = {
+					schema: "pi.research-round/v1", run_id: runId, round_id: roundId,
+					selected_gaps: [], queries: [], source_leads: [], reads: [read], evidence_cards: [evidenceCardRef(card)], conflicts: [], gaps: [], proposed_next_action: "synthesize",
 				};
+				ledger.recordRound(proposal);
+				return { state: ledger.state, result: ledger.state };
 			});
+			committed = outcome.state;
 		} catch {
-			// A stale or unavailable aggregate is non-authoritative for this bridge;
-			// plan-runner will surface it on the next inspect/recovery boundary.
+			// Unknown plan claim IDs and malformed legacy ledgers stay on the existing
+			// model-facing compatibility path; the note itself remains valid JSONL.
+			return;
 		}
+		if (committed) await projectParentResearchAggregate(runId, committed);
 	}
 	if (budgetEnabled) {
 		pi.on("session_start", async (_event, ctx) => {
@@ -910,6 +944,7 @@ export function registerKetch(pi: ExtensionAPI, dependencies: KetchDependencies 
 					retrieval_method: verdict.page.retrieval.retrieval_method,
 				});
 				rememberEvidenceCard(evidenceCard);
+				await recordParentEvidenceCard(evidenceCard);
 				(globalThis as Record<string, unknown>).__pi_research_verified_urls = [...verifiedUrls].sort();
 				const shared = globalThis as Record<string, unknown>;
 				const activePlan = shared.__pi_active_plan_context as { profile?: unknown; settled?: unknown } | undefined;
