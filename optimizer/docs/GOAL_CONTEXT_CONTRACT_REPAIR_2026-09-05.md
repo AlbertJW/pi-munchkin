@@ -1,5 +1,8 @@
 # Goal context contract repair — 2026-09-05
 
+> Retired as a goal on 2026-09-08 at Albert's request. The repair evidence
+> below remains a historical record; it schedules no further work.
+
 ## Correction to the earlier audit
 
 The earlier claim that Pi context callbacks return a bare array was wrong.

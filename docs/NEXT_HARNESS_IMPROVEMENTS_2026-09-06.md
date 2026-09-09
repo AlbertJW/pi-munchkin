@@ -1,5 +1,8 @@
 # Recommended harness improvements — 2026-09-06
 
+> Retired backlog: Albert cleared the repository goals on 2026-09-08.
+> Recommendations below are historical, not an active work queue.
+
 Detailed goals, implementation steps, acceptance criteria, dependencies, and
 progress tracking: [Harness improvement plan](HARNESS_IMPROVEMENT_PLAN_2026-09-06.md).
 

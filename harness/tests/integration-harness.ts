@@ -624,3 +624,11 @@ export function emitRivalProposal(
 		? { abort: () => {} }
 		: { message: options.message ?? "[rival] change strategy now" });
 }
+/** Wait for an observable asynchronous contract, never a count of CPU ticks. */
+export async function waitForCondition(predicate: () => boolean, message: string, timeoutMs = 2_000): Promise<void> {
+	const deadline = Date.now() + timeoutMs;
+	while (!predicate() && Date.now() < deadline) {
+		await new Promise<void>((resolve) => setTimeout(resolve, 5));
+	}
+	if (!predicate()) throw new Error(`Timed out: ${message}`);
+}

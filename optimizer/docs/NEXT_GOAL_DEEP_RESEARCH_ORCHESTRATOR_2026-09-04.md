@@ -1,5 +1,8 @@
 # Next goal — evidence-first deep-research orchestration
 
+> Retired on 2026-09-08 at Albert's request. This is a historical proposal,
+> not an active goal, follow-on queue, or authorization to run a screen.
+
 Status: first implementation slice delivered 2026-09-07 as G04. The typed
 research-round ledger, parent-only round tool, shared reservations, and
 settlement gate are implemented but remain dark. Jina search, adaptive shaping,

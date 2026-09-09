@@ -3,6 +3,7 @@ import { mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
+import { waitForCondition } from "./integration-harness.ts";
 import { Agent, type AgentTool } from "@earendil-works/pi-agent-core";
 import {
 	AgentSession, AuthStorage, createEventBus,
@@ -35,7 +36,7 @@ function response(): AssistantMessage {
 	};
 }
 
-async function sessionFixture(cwd: string, afterFirstEnd?: () => Promise<void>, withTool = false, withCompaction = false): Promise<{ session: AgentSession; requests: () => number; requestTexts: () => string[]; settles: () => number; toolExecutions: () => number; continuationOffers: () => number; compactions: () => number }> {
+async function sessionFixture(cwd: string, afterFirstEnd?: () => Promise<void>, withTool = false, withCompaction = false): Promise<{ session: AgentSession; requests: () => number; requestTexts: () => string[]; settles: () => number; toolExecutions: () => number; continuationOffers: (reason?: string) => number; compactions: () => number }> {
 	(globalThis as Record<string, unknown>).__pi_run_capsule_identity = { cwd, capsuleId: "g01-agent-session", runIdHash: null };
 	const bus = createEventBus();
 	const runtime = createExtensionRuntime();
@@ -126,9 +127,9 @@ async function sessionFixture(cwd: string, afterFirstEnd?: () => Promise<void>, 
 	});
 	if (withCompaction) session.setActiveToolsByName(["compact_context"]);
 	await session.bindExtensions({ onError: (error) => assert.fail(`${error.extensionPath}:${error.event}:${error.error}`) });
-	let offers = 0;
-	onContinuationRequest(bus, () => { offers += 1; });
-	return { session, requests: () => requestCount, requestTexts: () => requestTexts, settles: () => settled, toolExecutions: () => toolExecutions, continuationOffers: () => offers, compactions: () => compactions };
+	const offers: string[] = [];
+	onContinuationRequest(bus, (offer) => { offers.push(offer.request.reason); });
+	return { session, requests: () => requestCount, requestTexts: () => requestTexts, settles: () => settled, toolExecutions: () => toolExecutions, continuationOffers: (reason?: string) => offers.filter((value) => !reason || value === reason).length, compactions: () => compactions };
 }
 
 test("G01-A: a real AgentSession does not start a queued goal turn after pause commits", async () => {
@@ -187,9 +188,7 @@ test("G01-D: a real AgentSession gives an unchanged active goal exactly one cont
 	await mutateGoal(cwd, async () => ({ goal, result: undefined }));
 	const { session, requests, continuationOffers, settles } = await sessionFixture(cwd);
 	await session.sendUserMessage("start the goal");
-	for (let turns = 0; turns < 20 && requests() < 2; turns += 1) {
-		await new Promise<void>((resolve) => setImmediate(resolve));
-	}
+	await waitForCondition(() => requests() >= 2, "active goal continuation request");
 	await session.waitForIdle();
 	assert.equal(continuationOffers(), 1, "plan-runner must offer an active-goal continuation");
 	assert.equal(session.sessionManager.getEntries().filter((entry) => entry.type === "custom" && entry.customType === "pi-munchkin:continuation-receipt/v1").length, 1, "the arbiter must record its one delivery");
@@ -216,14 +215,16 @@ test("G01-E: real AgentSession compaction preserves an active goal and resumes o
 	const { session, requests, compactions, continuationOffers } = await sessionFixture(cwd, undefined, false, true);
 	await session.sendUserMessage("compact the active goal context");
 	await session.waitForIdle();
-	for (let turns = 0; turns < 40 && requests() < 2; turns += 1) {
-		await new Promise<void>((resolve) => setImmediate(resolve));
-	}
-	for (let turns = 0; turns < 80 && compactions() < 1; turns += 1) await new Promise<void>((resolve) => setImmediate(resolve));
+	await waitForCondition(() => compactions() >= 1 && continuationOffers("compaction_resume") >= 1 && requests() >= 2,
+		"real compaction and authority-approved continuation");
+	await session.waitForIdle();
 	assert.equal(compactions(), 1, "Pi emitted session_before_compact and used the deterministic compaction result");
 	assert.equal((await readExecutableGoal(cwd))?.status, "active", "compaction must not change the authoritative active goal");
-	assert.equal(continuationOffers(), 1, "the compact tool emits one authority offer after real compaction");
-	assert.equal(requests(), 2, "the authority-approved post-compaction turn is a second real provider request");
+	assert.equal(continuationOffers("compaction_resume"), 1, "the compact tool emits one authority offer after real compaction");
+	const receipts = session.sessionManager.getEntries().filter((entry) => entry.type === "custom" && entry.customType === "pi-munchkin:continuation-receipt/v1");
+	assert.equal(receipts.length, 1, "compaction and goal offers must coalesce into one delivered continuation");
+	assert.match((receipts[0] as any).data.idempotency_key, /^compact:/, "the delivered continuation belongs to compaction");
+	assert.equal(requests(), 3, "two tool-call/result requests plus exactly one authority-approved continuation");
 	assert.equal(session.sessionManager.getEntries().some((entry) => entry.type === "compaction" && entry.fromHook === true), true, "Pi persisted the extension-provided compaction entry");
 });
 
@@ -249,7 +250,9 @@ test("G01-E: a fresh real AgentSession recovers the active goal after compaction
 	const first = await sessionFixture(cwd, undefined, false, true);
 	await first.session.sendUserMessage("compact before restarting the session");
 	await first.session.waitForIdle();
-	for (let turns = 0; turns < 80 && first.compactions() < 1; turns += 1) await new Promise<void>((resolve) => setImmediate(resolve));
+	await waitForCondition(() => first.compactions() >= 1 && first.continuationOffers() >= 1,
+		"first session compaction completion");
+	await first.session.waitForIdle();
 	assert.equal(first.compactions(), 1, "the first real session committed a compaction entry");
 	assert.equal((await readExecutableGoal(cwd))?.objective, goal.objective, "the durable ledger still owns the full objective");
 

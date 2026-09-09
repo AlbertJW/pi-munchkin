@@ -5,6 +5,11 @@ boundary, even when both sides pass the same task gate. Each gate row must carry
 `HARNESS_SURFACE_SHA256`; the source hashes below are review aids and are not substitutes for the
 loaded live receipt.
 
+2026-09-08 repository-only qualification work: optimizer policy/evidence checks
+and test synchronization changed; no packaged model-visible harness source or
+live surface changed. No new loaded hash or smoke receipt is claimed. Frozen
+experiment artifacts and older boundary rows remain intact.
+
 Generate the current deterministic package-source code/role surface with:
 
 ```sh
