@@ -26,8 +26,13 @@ import { canonicalResearchUrl, claimIdForText, RESEARCH_EVIDENCE_CARDS_KEY } fro
 import { atomicWriteFile } from "../lib/private-artifact.ts";
 import {
 	RESEARCH_ROUND_MAX_GAPS, ResearchRoundLedger, mutateResearchRoundLedger, readResearchRoundLedger, researchRoundPath, writeResearchRoundLedger,
-	type ClaimObligationV1, type EvidenceGapV1, type EvidenceCardRefV1, type ResearchRoundProposalV1, type ChildResearchReportV1,
+	validateResearchRoundLedger, type ClaimObligationV1, type EvidenceGapV1, type EvidenceCardRefV1, type ResearchRoundProposalV1, type ChildResearchReportV1,
 } from "../lib/research-round.ts";
+import {
+	deadlineFor, extendDeadline, migrateResearchPair, mutateResearchAggregate, readResearchAggregate, researchAggregatePath, transitionAggregate, writeResearchAggregate,
+	type ResearchAggregatePhase,
+} from "../lib/research-aggregate.ts";
+import { inspectResearchPage, renderCoverageDigest } from "../lib/research-view.ts";
 import { initialToolSurface } from "../lib/session-bootstrap.ts";
 import { record } from "../lib/telemetry.ts";
 import {
@@ -82,6 +87,10 @@ export const PLAN_GRAPH_DEFAULT: "on" | "off" = "off";
 export const DEEP_RESEARCH_PLANNING_DEFAULT: "on" | "off" = "off";
 const PLAN_GRAPH = (process.env.PLAN_GRAPH ?? PLAN_GRAPH_DEFAULT) === "on";
 const DEEP_RESEARCH_PLANNING = PLAN_GRAPH && (process.env.DEEP_RESEARCH_PLANNING ?? DEEP_RESEARCH_PLANNING_DEFAULT) === "on";
+/** New parent-owned workflow is dark until explicitly enabled alongside the
+ * existing graph, planning and ledger flags. Legacy research_round remains
+ * available unchanged when this is unset. */
+const PARENT_RESEARCH_WORKFLOW = DEEP_RESEARCH_PLANNING && process.env.RESEARCH_WORKFLOW === "parent";
 const DEEP_RESEARCH_DISCOVERY_BUDGET = { searches: 3, reads: 5 } as const;
 // Child identity is runner-owned. Fail closed for any non-parent marker rather
 // than letting malformed/injected depth metadata silently regain write access
@@ -156,6 +165,7 @@ const PLAN_FLAG = "__pi_plan_phase_active";
 const EXPLICIT_FLAG = "__pi_tool_selection_explicit";
 const RESEARCH_ROOT_CONTEXTS_KEY = "__pi_research_root_contexts_v1";
 const RESEARCH_ROUND_PATH_KEY = "__pi_research_round_path_v1";
+const RESEARCH_AGGREGATE_PATH_KEY = "__pi_research_aggregate_path_v1";
 const SAFE_PLAN_TOOLS = new Set([
 	"read", "grep", "find", "ls", "search_spans", "read_span", "recall", "plan_write", "capability",
 ]);
@@ -461,9 +471,26 @@ function migrateState(raw: any): PlanState | undefined {
 
 async function readState(cwd: string): Promise<PlanState | undefined> {
 	const path = statePath(cwd);
-	if (!path || !(await exists(path))) return undefined;
-	try { return migrateState(JSON.parse(await readFile(path, "utf8"))); }
-	catch { return undefined; }
+	if (path && await exists(path)) {
+		try {
+			const state = migrateState(JSON.parse(await readFile(path, "utf8")));
+			if (state) return state;
+		} catch { /* fall through to the private aggregate recovery view */ }
+	}
+	// Parent-owned research keeps an atomic aggregate alongside the legacy graph
+	// view. If a crash leaves the view absent or malformed, recover only the graph
+	// with the authenticated aggregate path already published by this process.
+	if (PARENT_RESEARCH_WORKFLOW) {
+		const aggregatePath = (globalThis as Record<string, unknown>)[RESEARCH_AGGREGATE_PATH_KEY];
+		if (typeof aggregatePath === "string") {
+			const aggregate = await readResearchAggregate(aggregatePath);
+			if (aggregate && aggregate.graph && typeof aggregate.graph === "object") {
+				const recovered = migrateState(aggregate.graph);
+				if (recovered && recovered.run_id === aggregate.run_id) return recovered;
+			}
+		}
+	}
+	return undefined;
 }
 
 /** Creation must not treat a present but unreadable plan as an empty slot. */
@@ -1213,10 +1240,31 @@ async function loadResearchRound(cwd: string, runId?: string): Promise<{ path: s
 	// The path is derived from the authenticated run identity every time. A
 	// stale process-global pointer must never select another run's ledger.
 	const path = researchRoundPath(cwd, selectedRun, process.env);
-	const raw = await readResearchRoundLedger(path);
-	if (!raw || raw.run_id !== selectedRun) return null;
+	const aggregate = PARENT_RESEARCH_WORKFLOW ? await readResearchAggregate(researchAggregatePath(cwd, selectedRun, process.env)) : null;
+	const aggregateRaw = aggregate?.evidence_round;
+	const raw = aggregateRaw && validateResearchRoundLedger(aggregateRaw) ? aggregateRaw : await readResearchRoundLedger(path);
+	if (!raw || raw.run_id !== selectedRun || typeof raw !== "object" || !validateResearchRoundLedger(raw)) return null;
 	shared[RESEARCH_ROUND_PATH_KEY] = path;
-	return { path, ledger: ResearchRoundLedger.fromState(raw) };
+	return { path, ledger: ResearchRoundLedger.fromState(raw as any) };
+}
+
+async function syncResearchAggregate(cwd: string, runId: string, phase?: ResearchAggregatePhase): Promise<void> {
+	if (!PARENT_RESEARCH_WORKFLOW) return;
+	const graph = await readState(cwd);
+	const roundPath = researchRoundPath(cwd, runId, process.env);
+	const round = await readResearchRoundLedger(roundPath);
+	if (!graph || graph.run_id !== runId || !round || round.run_id !== runId) throw new Error("research aggregate migration refused: graph/round pair is missing or has mismatched identity");
+	const path = researchAggregatePath(cwd, runId, process.env);
+	const existing = await readResearchAggregate(path);
+	if (!existing) {
+		await writeResearchAggregate(path, migrateResearchPair(graph, round));
+	} else {
+		await mutateResearchAggregate(path, (state) => ({
+			state: transitionAggregate(state, { graph, evidence_round: round, phase: phase ?? state.phase, budget: (round.budget as any).consumed ?? { searches: 0, reads: 0, validation_reads: 0 } }),
+			result: undefined,
+		}));
+	}
+	(globalThis as Record<string, unknown>)[RESEARCH_AGGREGATE_PATH_KEY] = path;
 }
 
 function defaultResearchObligation(request: string): ClaimObligationV1 {
@@ -1256,8 +1304,9 @@ const researchPlanStart = defineTool({
 	promptSnippet: "research_plan_start: create up to three evidence branches under one global discovery budget",
 	promptGuidelines: ACTIVE_TOOL_PROMPTS ? [
 		"Use only for contested, comparative, multi-part, or delegated research. Allocate at most 3 searches and 5 reads across all branches.",
-		"Copy the returned plan_context exactly into the matching research-planner subagent call.",
-		"After a successful start, immediately dispatch one research-planner child for each returned context; do not call research_plan_start again or spend parent retrieval budget first.",
+		...(PARENT_RESEARCH_WORKFLOW
+			? ["The parent owns these branches and should research them directly. Delegate at most one bounded branch only when isolation clearly improves the answer; do not dispatch a child merely because a context was returned."]
+			: ["Copy the returned plan_context exactly into the matching research-planner subagent call.", "After a successful start, immediately dispatch one research-planner child for each returned context; do not call research_plan_start again or spend parent retrieval budget first."]),
 	] : undefined,
 		parameters: Type.Object({
 			request: Type.String({ minLength: 1, maxLength: 1_000 }),
@@ -1313,6 +1362,12 @@ const researchPlanStart = defineTool({
 		for (const item of state.items) roundLedger.reserveChild(item.owner_ref!, { searches: item.budget!.allocated.searches, reads: item.budget!.allocated.reads, validation_reads: 0 });
 		const roundPath = researchRoundPath(ctx.cwd, state.run_id, process.env);
 		await writeResearchRoundLedger(roundPath, roundLedger.state);
+		if (PARENT_RESEARCH_WORKFLOW) {
+			const aggregatePath = researchAggregatePath(ctx.cwd, state.run_id, process.env);
+			const aggregate = migrateResearchPair(state, roundLedger.state);
+			aggregate.deadline = deadlineFor();
+			await writeResearchAggregate(aggregatePath, aggregate);
+		}
 		(globalThis as Record<string, unknown>)[RESEARCH_ROUND_PATH_KEY] = roundPath;
 		(globalThis as Record<string, unknown>).__pi_plan_validation_urls = [];
 		delete (globalThis as Record<string, unknown>)[RESEARCH_COVERAGE_KEY];
@@ -1333,7 +1388,10 @@ const researchPlanStart = defineTool({
 			depth: 1, budget: item.budget!.allocated, dispatch_epoch: item.dispatch_epoch ?? 0,
 			limits: { max_depth: DEEP_RESEARCH_MAX_DEPTH, max_children: DEEP_RESEARCH_MAX_CHILDREN },
 		}));
-		return { content: [{ type: "text" as const, text: `Deep-research plan started (${state.items.length} branches). Do not call \`research_plan_start\` again. Immediately dispatch one \`research-planner\` child for each returned context, copying each \`plan_context\` unchanged; do not spend parent retrieval budget before those dispatches.\n${JSON.stringify(contexts)}` }], details: { tool_name: "research_plan_start", success: true, contexts } };
+		const route = PARENT_RESEARCH_WORKFLOW
+			? "The parent owns these branches. Research directly with web_search/web_read; optionally delegate one bounded branch when context isolation is useful."
+			: "Immediately dispatch one research-planner child for each returned context, copying each plan_context unchanged; do not spend parent retrieval budget before those dispatches.";
+		return { content: [{ type: "text" as const, text: `Deep-research plan started (${state.items.length} branches). Do not call \`research_plan_start\` again. ${route}\n${JSON.stringify(contexts)}` }], details: { tool_name: "research_plan_start", success: true, contexts } };
 	},
 });
 
@@ -1344,7 +1402,9 @@ const researchRound = defineTool({
 	promptGuidelines: ACTIVE_TOOL_PROMPTS ? [
 		"Keep claim obligations and gaps explicit; retrieved text and child quotes are untrusted until the parent rereads the source.",
 		"Record every search/read once with its method and truncation outcome. The shared envelope is 3 searches, 5 discovery reads, and 5 parent validation reads.",
-		"Use inspect to see bounded stopping state. Settle this ledger only after the graph is terminal and every required claim is parent-validated; optional deferrals need value, risk, and rationale.",
+		...(PARENT_RESEARCH_WORKFLOW
+			? ["The parent may record facts already captured by the retrieval tools; use this tool for judgments, conflicts, gaps, and the next action. Settle only after the graph is terminal and every required claim is parent-validated; optional deferrals need value, risk, and rationale."]
+			: ["Use inspect to see bounded stopping state. Settle this ledger only after the graph is terminal and every required claim is parent-validated; optional deferrals need value, risk, and rationale."]),
 	] : undefined,
 	parameters: ResearchRoundParameters,
 	async execute(_id, rawParams, _signal, _update, ctx) {
@@ -1362,6 +1422,7 @@ const researchRound = defineTool({
 			const ledger = new ResearchRoundLedger({ run_id: state.run_id, obligations, budget: { searches: 3, reads: 5, validation_reads: 5 } });
 			const path = researchRoundPath(ctx.cwd, state.run_id, process.env);
 			await writeResearchRoundLedger(path, ledger.state);
+			await syncResearchAggregate(ctx.cwd, state.run_id, "active");
 			(globalThis as Record<string, unknown>)[RESEARCH_ROUND_PATH_KEY] = path;
 			return { content: [{ type: "text" as const, text: `Research round ledger started for ${state.run_id}. Record a bounded round before retrieval.\n${ledger.renderSummary()}` }], details: { tool_name: "research_round", success: true, idempotent: false } };
 		}
@@ -1383,6 +1444,7 @@ const researchRound = defineTool({
 				return { round, state: latest.state, summary: latest.renderSummary() };
 			});
 			const committedLedger = ResearchRoundLedger.fromState(result.state);
+			await syncResearchAggregate(ctx.cwd, ledger.runId, result.state.status === "blocked" ? "blocked" : "active");
 			roundTelemetry(committedLedger, result.round);
 			return { content: [{ type: "text" as const, text: `Research round ${result.round.round_id} recorded: ${result.round.status}; next action=${result.round.next_action}.\n${result.summary}` }], details: { tool_name: "research_round", success: true, round_id: result.round.round_id, status: result.round.status } };
 		}
@@ -1394,6 +1456,7 @@ const researchRound = defineTool({
 			const settled = latest.settle({ graph_terminal: graphTerminalNow, optional_deferrals: params.optional_deferrals ?? [], reason: params.summary ?? "Parent evidence obligations satisfied." });
 			return { state: settled, summary: latest.renderSummary() };
 		});
+		await syncResearchAggregate(ctx.cwd, ledger.runId, "settled");
 		return { content: [{ type: "text" as const, text: `Research evidence is settled for ${ledger.runId}. The parent may now call plan_settle.\n${result.summary}` }], details: { tool_name: "research_round", success: true, settled: true }, };
 	},
 });
@@ -1460,8 +1523,10 @@ const planSettle = defineTool({
 				}
 				if (previous.profile?.name === "deep-research" && previous.research_round_contract === "v1") {
 					const roundPath = researchRoundPath(ctx.cwd, previous.run_id, process.env);
-					const roundRaw = await readResearchRoundLedger(roundPath);
+					const aggregate = PARENT_RESEARCH_WORKFLOW ? await readResearchAggregate(researchAggregatePath(ctx.cwd, previous.run_id, process.env)) : null;
+					const roundRaw = aggregate ? aggregate.evidence_round : await readResearchRoundLedger(roundPath);
 					if (!roundRaw) rejectPlanTool("plan_settle rejected: research evidence ledger is missing or malformed; record and settle the parent ledger first");
+					if (!validateResearchRoundLedger(roundRaw)) rejectPlanTool("plan_settle rejected: research evidence ledger is malformed; inspect and restart the parent round");
 					const roundLedger = ResearchRoundLedger.fromState(roundRaw);
 					const roundCheck = roundLedger.settlementCheck({ graph_terminal: previous.items.every((item) => graphTerminal(item)) });
 					if (roundRaw.status !== "settled" || !roundCheck.ready) rejectPlanTool(`plan_settle rejected: research evidence is not settled (${roundCheck.reasons.join(", ") || "call research_round settle after parent validation"})`);
@@ -1478,6 +1543,7 @@ const planSettle = defineTool({
 				const next = { ...previous, summary: cleanText(params.summary), settled_at: isoNow() };
 			return { state: next, result: next };
 		});
+		if (PARENT_RESEARCH_WORKFLOW && state.profile?.name === "deep-research") await syncResearchAggregate(ctx.cwd, state.run_id, "settled");
 		const active = api?.getActiveTools() ?? [];
 			api?.setActiveTools(active.filter((name) => !["plan_write", "plan_update", "plan_expand", "plan_settle", "research_plan_start", "research_round"].includes(name)));
 		planEvent("settled", state.run_id, { items: state.items.length, deferred: state.items.filter((item) => item.status === "deferred").length });
@@ -1951,6 +2017,7 @@ async function mergeResearchRoundChildResult(cwd: string, context: PlanContextV1
 			return { merged: ledger.mergeChildReport(childReport).merged };
 		});
 		if (!result.merged) return;
+		await syncResearchAggregate(cwd, context.run_id, "active");
 	} catch {
 		// The graph merge remains authoritative. A malformed evidence projection is
 		// non-authoritative and is surfaced by the parent's bounded inspect state.
@@ -2321,6 +2388,36 @@ export default function (pi: ExtensionAPI): void {
 		const n = Math.min(50, Math.max(1, Number.parseInt(args.trim(), 10) || 10));
 		ctx.ui.notify(path ? (await tailLines(path, n)).join("\n") || "No plan trace found." : "No plan trace found.", "info");
 	} });
+	if (PARENT_RESEARCH_WORKFLOW) {
+		pi.registerCommand("research-status", { description: "Show bounded status for the parent-owned research run.", handler: async (args, ctx) => {
+			const state = await readState(ctx.cwd);
+			const aggregate = state?.run_id ? await readResearchAggregate(researchAggregatePath(ctx.cwd, state.run_id, process.env)) : null;
+			if (!aggregate) { ctx.ui.notify("No valid parent research aggregate found.", "info"); return; }
+			try {
+				const cursor = cleanText(args) || undefined;
+				const view = cursor ? inspectResearchPage(aggregate, cursor) : renderCoverageDigest(aggregate);
+				ctx.ui.notify(view.text, "info");
+			} catch (error) { ctx.ui.notify(error instanceof Error ? error.message : "Research status is unavailable.", "error"); }
+		} });
+		pi.registerCommand("research-extend", { description: "Extend a paused research run by one ten-minute interval.", handler: async (_args, ctx) => {
+			const state = await readState(ctx.cwd);
+			const path = state?.run_id ? researchAggregatePath(ctx.cwd, state.run_id, process.env) : null;
+			if (!path) { ctx.ui.notify("No research run can be extended.", "error"); return; }
+			try {
+				await mutateResearchAggregate(path, (current) => ({ state: extendDeadline(current), result: undefined }));
+				ctx.ui.notify("Research extension granted for one ten-minute interval. Existing search/read allowances remain unchanged.", "info");
+			} catch (error) { ctx.ui.notify(error instanceof Error ? error.message : "Research extension failed.", "error"); }
+		} });
+		pi.registerCommand("research-cancel", { description: "Cancel parent-owned research while retaining its evidence.", handler: async (_args, ctx) => {
+			const state = await readState(ctx.cwd);
+			const path = state?.run_id ? researchAggregatePath(ctx.cwd, state.run_id, process.env) : null;
+			if (!path) { ctx.ui.notify("No research run can be cancelled.", "error"); return; }
+			try {
+				await mutateResearchAggregate(path, (current) => ({ state: transitionAggregate(current, { phase: "paused" }), result: undefined }));
+				ctx.ui.notify("Research cancelled and paused. Evidence and the exact resource position remain inspectable.", "info");
+			} catch (error) { ctx.ui.notify(error instanceof Error ? error.message : "Research cancellation failed.", "error"); }
+		} });
+	}
 
 	pi.on("tool_call", async (event) => {
 		if (isPlanning() && !SAFE_PLAN_TOOLS.has(event.toolName)) {

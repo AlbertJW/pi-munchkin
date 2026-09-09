@@ -175,6 +175,8 @@
     "harness/lib/research-ledger.ts",
     "harness/lib/research-evidence.ts",
     "harness/lib/research-round.ts",
+    "harness/lib/research-aggregate.ts",
+    "harness/lib/research-view.ts",
     "harness/lib/research-reservations.ts",
     "harness/lib/project-gate.ts",
     "harness/lib/goal-state.ts",
