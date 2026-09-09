@@ -367,7 +367,10 @@ if (!CHILD) {
 			const acquired = await module.acquireResearchBranchLease(cwd, context);
 			assert.equal(acquired.ok, true);
 			unlinkSync(researchRoundPath(cwd, context.run_id, process.env));
-			fp.pi.events.emit(HARNESS_SIGNAL_CHANNEL, { v: 1, type: "plan/branch-result", context: { ...context, lease_id: acquired.lease_id, dispatch_epoch: 0 }, report: {
+			// Use a non-parent depth here to isolate the graph merge from the
+			// separate evidence-ledger child-report bridge; the redundant sync under
+			// test would otherwise be hidden by that legitimate second transition.
+			fp.pi.events.emit(HARNESS_SIGNAL_CHANNEL, { v: 1, type: "plan/branch-result", context: { ...context, depth: 2, lease_id: acquired.lease_id, dispatch_epoch: 0 }, report: {
 				v: 1, parent_item_id: context.parent_item_id, owner_ref: context.owner_ref, status: "blocked", note: "bounded failure",
 				consumed: { searches: 0, reads: 0 }, evidence_gaps: ["bounded failure"], source_leads: [], children: [],
 				coverage: { strategy: "direct", scope: "bounded", returned_count: 0, truncated: false, budget_exhausted: true, failed: false, complete: false },
@@ -634,6 +637,39 @@ if (!CHILD) {
 		assert.equal(state.items[0].status, "blocked");
 		assert.equal(state.items[0].lease, undefined, "merge closes the lease before publishing the branch outcome");
 		resetPiGlobals();
+	});
+
+	test("parent branch merge performs one aggregate transition", async () => {
+		const previousWorkflow = process.env.RESEARCH_WORKFLOW;
+		const previousPlanning = process.env.DEEP_RESEARCH_PLANNING;
+		process.env.RESEARCH_WORKFLOW = "parent";
+		process.env.DEEP_RESEARCH_PLANNING = "on";
+		try {
+			const fp = makeFakePi(); const cwd = tmp();
+			for (const name of ["read", "bash", "edit", "write", "capability", "plan_write", "plan_update", "plan_expand", "plan_settle", "research_plan_start", "research_round", "web_search", "web_read", "research_note", "research_recall", "subagent"]) fp.pi.registerTool({ name, parameters: {} } as any);
+			const module = await import(`../extensions/plan-runner.ts?aggregate-merge-once=${Date.now()}-${Math.random()}`);
+			module.default(fp.pi as any);
+			const started = await callTool(fp, "research_plan_start", { request: "Aggregate merge once", summary: "one branch", branches: [{ title: "Evidence", budget: { searches: 1, reads: 1 } }] }, cwd);
+			assert.equal(started.isError, false);
+			const context = started.details.contexts[0];
+			const aggregatePath = researchAggregatePath(cwd, context.run_id, process.env);
+			const acquired = await module.acquireResearchBranchLease(cwd, context);
+			assert.equal(acquired.ok, true);
+			const before = await readResearchAggregate(aggregatePath);
+			assert.equal(before?.revision, 1);
+			fp.pi.events.emit(HARNESS_SIGNAL_CHANNEL, { v: 1, type: "plan/branch-result", context: { ...context, lease_id: acquired.lease_id, dispatch_epoch: 0 }, report: {
+				v: 1, parent_item_id: context.parent_item_id, owner_ref: context.owner_ref, status: "blocked", note: "bounded failure",
+				consumed: { searches: 0, reads: 0 }, evidence_gaps: ["bounded failure"], source_leads: [], children: [],
+				coverage: { strategy: "direct", scope: "bounded", returned_count: 0, truncated: false, budget_exhausted: true, failed: false, complete: false },
+			}, failureClass: null });
+			await fire(fp, "before_agent_start", {}, makeCtx(cwd).ctx);
+			const after = await readResearchAggregate(aggregatePath);
+			assert.equal(after?.revision, 2, "the aggregate-first merge must not be followed by a redundant compatibility sync transition");
+		} finally {
+			if (previousWorkflow === undefined) delete process.env.RESEARCH_WORKFLOW; else process.env.RESEARCH_WORKFLOW = previousWorkflow;
+			if (previousPlanning === undefined) delete process.env.DEEP_RESEARCH_PLANNING; else process.env.DEEP_RESEARCH_PLANNING = previousPlanning;
+			resetPiGlobals();
+		}
 	});
 
 	test("unleased branch results cannot mutate an open research branch", async () => {

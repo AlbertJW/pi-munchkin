@@ -1350,7 +1350,7 @@ async function projectResearchAggregateSnapshot(cwd: string, runId: string, grap
 	(globalThis as Record<string, unknown>)[RESEARCH_AGGREGATE_PATH_KEY] = path;
 }
 
-/** Project a graph transition using the latest durable evidence ledger. */
+/** Project a graph transition using the latest authoritative evidence ledger. */
 async function projectResearchAggregate(cwd: string, runId: string, graph: PlanState, phase?: ResearchAggregatePhase): Promise<void> {
 	if (!PARENT_RESEARCH_WORKFLOW) return;
 	const aggregatePath = researchAggregatePath(cwd, runId, process.env);
@@ -1377,13 +1377,6 @@ async function projectResearchRoundAggregate(cwd: string, runId: string, round: 
 	const graph = existing ? migrateState(existing.graph) : await readCompatibilityState(cwd);
 	if (!graph || graph.run_id !== runId) throw new Error("research aggregate migration refused: compatibility graph is missing or malformed");
 	await projectResearchAggregateSnapshot(cwd, runId, graph, round, phase);
-}
-
-async function syncResearchAggregate(cwd: string, runId: string, phase?: ResearchAggregatePhase): Promise<void> {
-	if (!PARENT_RESEARCH_WORKFLOW) return;
-	const graph = await readCompatibilityState(cwd);
-	if (!graph) throw new Error("research aggregate migration refused: compatibility graph is missing or malformed");
-	await projectResearchAggregate(cwd, runId, graph, phase);
 }
 
 function defaultResearchObligation(request: string): ClaimObligationV1 {
@@ -2220,12 +2213,6 @@ async function mergeBranchResult(cwd: string, context: import("../lib/branch-rep
 		} catch {
 			outcome = { kind: "ignored" };
 		}
-	}
-	if (PARENT_RESEARCH_WORKFLOW && outcome.kind !== "ignored") {
-		// The compatibility reducer has committed a lease/result transition. Keep
-		// the aggregate fresh before any parent-side evidence merge or status read;
-		// otherwise the authoritative view would still expose the pre-merge branch.
-		await syncResearchAggregate(cwd, outcome.runId, outcome.kind === "failed" ? "blocked" : "active");
 	}
 	if (outcome.kind === "merged") planEvent("branch-merged", outcome.runId, { children: outcome.children, lead_count: outcome.leads, evidence_gaps: outcome.gaps });
 	if (outcome.kind === "failed") planEvent("branch-failed", outcome.runId, { failure_class: outcome.failureClass });
