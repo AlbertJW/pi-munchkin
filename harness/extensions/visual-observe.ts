@@ -176,7 +176,7 @@ export function registerVisualTools(pi: ExtensionAPI, options: VisualToolOptions
 		name: "visual_observe",
 		label: "Visual observe",
 		description: "Inspect one explicitly selected image. Returns an image only when a fresh visual observation is required; exact or near cache matches are hints and do not authorize actions.",
-		promptSnippet: "visual_observe(path, question, crop?, force?): inspect an image with bounded visual caching",
+		promptSnippet: "visual_observe(path, question, crop?, force?, uncertain?): inspect an image with bounded visual caching",
 		parameters: Type.Object({
 			path: Type.Optional(Type.String({ minLength: 1, maxLength: 2_000 })),
 			source: Type.Optional(Type.Union([Type.Literal("image"), Type.Literal("screen"), Type.Literal("browser")])),
