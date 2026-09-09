@@ -772,6 +772,28 @@ token counting, and persisted interpretation collection remain open.
 Source commit: `c4e44d8`.
 Current package-source SHA-256: `d830498dcf583068a28ca2d357ebc51987a9c99e09a93ec9db762d2bde0d0f12`.
 
+## Pending surface boundary — 2026-09-09 (vision cache uncertainty and Qwen qualification)
+
+The visual cache now persists an explicit uncertainty fence until a fresh
+observation replaces it, and every UI action invalidates cached image
+observations even when no screen watcher is active (including failed actions,
+which may have partially changed the UI). The Qwen 35B vision route then
+completed the frozen four-arm protocol screen and a separate cancellation /
+recovery probe. A real image semantic smoke returned `sword`, and the isolated
+SAM2.1 Tiny runner returned a valid high-confidence mask, but neither is a
+grounding score because the image has no preregistered geometry oracle.
+
+The focused visual/capture/SAM/benchmark suite is 28/28 and the complete
+harness suite is 845/845; typecheck and secret scan pass. The Qwen receipt
+records the serving epoch and all arm metrics without raw endpoints, image
+bytes, or response text. The boundary remains **DARK, NOT PROMOTION-READY**:
+`VISION=off` and `VISION_GROUNDING=sam` are unchanged, no click authority was
+granted, and no mirror or deployment occurred. A meaningful screenshot pack
+with preregistered semantic and geometry oracles is still required.
+
+Source commit: `4d5dfc7`.
+Current package-source SHA-256: `50e1e7b87104181c6a539b1287a14c1be17723afdc1981704f8d4e51a1304cdc`.
+
 ## Data at rest: where a research session actually lands (updated 2026-08-10)
 
 A surface hash bounds what the MODEL sees. It says nothing about what a session LEAVES. Those are
