@@ -540,6 +540,27 @@ change occurred.
 
 Current package-source SHA-256: `c6973ed682def2d74aee2b63fe7545b9d378ceb76bed5dd2ddc7ad9a75bfa010`.
 
+## Pending surface boundary — 2026-09-09 (aggregate-authoritative parent reads)
+
+Repository-only package-2/3 correction makes the private research aggregate
+authoritative for parent deep-research status and recovery reads. A valid
+compatibility graph can no longer shadow a newer aggregate revision; a missing,
+mismatched or malformed aggregate fails closed. Parent `plan_update`,
+`plan_expand`, and `research_finish` project their committed compatibility view
+back into the aggregate before the next authoritative read, preserving current
+flat-plan and legacy behavior. The aggregate is not yet the sole transition
+authority: research creation, branch reservation/merge, pause and settlement
+still require the existing compatibility reducers.
+
+The focused hierarchical-planner wrapper passes 61/61 and the full harness
+suite passes 813/813. No inference, calibration, mirror, rollout, or default
+change occurred; planner and parent-research flags remain dark. Future smoke
+requires a fresh approved preflight and loaded-hash rebind. This boundary does
+not supersede earlier planner or research boundaries; it records the read-side
+authority correction only.
+
+Current package-source SHA-256: `bcad8266ab683d868b3d136eb042169ba7c2bbb724cab81b43d5f05a2177315e`.
+
 ## Data at rest: where a research session actually lands (updated 2026-08-10)
 
 A surface hash bounds what the MODEL sees. It says nothing about what a session LEAVES. Those are
