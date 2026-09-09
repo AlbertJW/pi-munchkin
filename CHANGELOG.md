@@ -4,6 +4,15 @@ All notable changes to pi-munchkin are documented here. Releases follow semantic
 
 ## Unreleased
 
+### Fixed (2026-09-09 — aggregate-first branch reservation; repository-only)
+
+Parent branch lease acquisition and release now project the next graph state
+into the durable research aggregate while the plan lock is held, before
+publishing the compatibility graph. A missing or malformed evidence-round
+ledger therefore cannot leave an executable lease behind. Branch merge and
+settlement still need the same sole-writer treatment; planner and
+parent-research flags remain dark.
+
 ### Fixed (2026-09-09 — research creation durability; repository-only)
 
 Research startup now prepares its evidence-round ledger and parent aggregate
