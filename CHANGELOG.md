@@ -4,6 +4,14 @@ All notable changes to pi-munchkin are documented here. Releases follow semantic
 
 ## Unreleased
 
+### Fixed (2026-09-09 — aggregate-first branch merge; repository-only)
+
+Delegated branch merges now prepare the next aggregate projection while the
+plan lock is held, before publishing the compatibility graph result. If the
+evidence-round authority is unavailable, the existing lease and pending branch
+remain unchanged instead of being marked terminal in a graph the parent cannot
+trust. Planner and parent-research flags remain dark.
+
 ### Fixed (2026-09-09 — aggregate-first branch reservation; repository-only)
 
 Parent branch lease acquisition and release now project the next graph state
