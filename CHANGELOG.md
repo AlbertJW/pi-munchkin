@@ -4,6 +4,14 @@ All notable changes to pi-munchkin are documented here. Releases follow semantic
 
 ## Unreleased
 
+### Fixed (2026-09-09 — single-transition branch merge; repository-only)
+
+Parent branch-result handling now relies on its aggregate-first projection and
+does not immediately re-project the same compatibility graph a second time.
+The merge remains one durable transition; a separate evidence-ledger child
+receipt is still recorded when the delegated profile requires it. Planner and
+parent-research flags remain dark, with no inference, mirror or default change.
+
 ### Fixed (2026-09-09 — stale compatibility-view protection; repository-only)
 
 Aggregate projections now continue from the authoritative graph and evidence

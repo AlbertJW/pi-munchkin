@@ -719,6 +719,23 @@ cross-file writer or that view rebuild is transactional.
 Source commit: `603ae89`.
 Current package-source SHA-256: `3eca52d4a4d1e3b0d9c513b0272bed555511489856219ade591c4f610c9737cf`.
 
+## Pending surface boundary — 2026-09-09 (single-transition branch merge)
+
+Repository-only correction removes the post-merge compatibility resync. A
+delegated parent branch result now prepares one aggregate transition before its
+graph view is written; the separate child evidence receipt remains a distinct
+ledger transition only when that profile requires it. The aggregate revision
+therefore reflects real state changes rather than duplicate projections.
+
+The focused regression is red against the preceding implementation and green
+after the fix; the hierarchical-planner wrapper is 69/69 and typecheck passes.
+No inference, calibration, mirror, rollout or default change occurred; planner
+and parent-research flags remain dark. This boundary records transition
+deduplication and does not claim sole-writer view rebuild or live adoption.
+
+Source commit: `4e460ba`.
+Current package-source SHA-256: `5e705ade2ac1fef76a92e7f9d32d26f3c2f9261b375f033e3ef2615e0adfbd2c`.
+
 ## Data at rest: where a research session actually lands (updated 2026-08-10)
 
 A surface hash bounds what the MODEL sees. It says nothing about what a session LEAVES. Those are
