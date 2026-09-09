@@ -4,6 +4,14 @@ All notable changes to pi-munchkin are documented here. Releases follow semantic
 
 ## Unreleased
 
+### Fixed (2026-09-09 — stale compatibility-view protection; repository-only)
+
+Aggregate projections now continue from the authoritative graph and evidence
+state once a parent aggregate exists. An interrupted compatibility-view write
+can no longer be read back by a later ledger transition and regress the newer
+aggregate. A focused regression covers the stale-graph case; planner and
+parent-research flags remain dark, with no inference, mirror or default change.
+
 ### Fixed (2026-09-09 — aggregate-first research ledger transitions; repository-only)
 
 Evidence-round `start`, `record`, `settle`, delegated child-report merges,

@@ -701,6 +701,24 @@ receipts; it records the ledger-transition ordering correction.
 Source commit: `b95dcc3`.
 Current package-source SHA-256: `3f5ca0bdd67a98ba4b461ef048234fce2535ef473ecce132108368113552b9e7`.
 
+## Pending surface boundary — 2026-09-09 (stale compatibility-view protection)
+
+Repository-only correction makes aggregate projection bidirectionally
+authoritative after creation: graph transitions use the aggregate's evidence
+round, and ledger transitions use the aggregate's graph. If a compatibility
+view write was interrupted, a later transition cannot read that stale file and
+regress the durable aggregate.
+
+The focused stale-view regression is red against the preceding implementation
+and green after the fix; the full offline harness suite is 817/817 and
+typecheck passes. No inference, calibration, mirror, rollout or default change
+occurred; planner and parent-research flags remain dark. This boundary records
+the protection and does not claim that the aggregate is yet the sole
+cross-file writer or that view rebuild is transactional.
+
+Source commit: `603ae89`.
+Current package-source SHA-256: `3eca52d4a4d1e3b0d9c513b0272bed555511489856219ade591c4f610c9737cf`.
+
 ## Data at rest: where a research session actually lands (updated 2026-08-10)
 
 A surface hash bounds what the MODEL sees. It says nothing about what a session LEAVES. Those are
