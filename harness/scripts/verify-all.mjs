@@ -1,19 +1,19 @@
 #!/usr/bin/env node
-// verify-all — run the five verification stages concurrently.
+// verify-all — run the verification stages with the test corpus isolated from
+// the other process-heavy stages.
 //
-// The stages are genuinely independent: each writes only to its own mkdtemp
-// directory (package-smoke packs into its own --pack-destination; the optimizer
-// check runs real_gate.sh --dry, which touches nothing). Serially they cost
-// ~40s, dominated by the two slowest; concurrently they cost about as much as
-// the slowest one alone.
+// Most stages are independent, but the test corpus contains isolated Pi/plan
+// children that are timing-sensitive under process contention. The reliable
+// default is serial; an explicit --parallel is available for a human who has a
+// quiet machine and accepts the scheduling risk. Coverage is identical.
 //
 // Output is captured per stage and printed grouped, in a fixed order — never
 // interleaved, because a failure you cannot attribute to a stage is worse than
 // a slow suite. Every stage runs to completion even after one fails, so a
 // single run reports every problem instead of only the first.
 //
-//   npm run verify              concurrent (default)
-//   npm run verify -- --serial  one at a time, original ordering
+//   npm run verify              one stage at a time (reliable default)
+//   npm run verify -- --parallel  opt-in concurrent mode
 
 import { spawn } from "node:child_process";
 
@@ -54,7 +54,7 @@ function run(stage) {
   });
 }
 
-const serial = process.argv.includes("--serial");
+const serial = !process.argv.includes("--parallel");
 const started = Date.now();
 let results;
 if (serial) {

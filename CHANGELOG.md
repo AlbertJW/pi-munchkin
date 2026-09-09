@@ -4,6 +4,13 @@ All notable changes to pi-munchkin are documented here. Releases follow semantic
 
 ## Unreleased
 
+### Fixed (2026-09-09 — verifier scheduling)
+
+The aggregate verifier now runs stages serially by default. Its previous
+concurrent mode intermittently starved the timing-sensitive Pi/planner child;
+`--parallel` remains an explicit opt-in for controlled environments, with the
+same coverage.
+
 ### Fixed (2026-09-09 — vision cache safety)
 
 Added fixed-grid local-region digests so a changed popup or text quadrant
