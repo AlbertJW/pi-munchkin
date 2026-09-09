@@ -55,3 +55,11 @@ result may be pooled with.
 | `SEMANTIC_LOOP_SCREEN` | [prereg](screens/PREREG_SEMANTIC_LOOP_SCREEN_2026-08.md) | _none_ | STATUS: PREPARED. No stage of this study may be started without Albert's explicit, > per-stage approval |
 
 _42 screens; 21 carry an audit. Updated 2026-09-09._
+
+## Current candidate roster (2026-09-09)
+
+The active Qwen dark-candidate queue is closed. See
+[`DARK_CANDIDATE_DISPOSITION_QWEN_2026-09-09.md`](DARK_CANDIDATE_DISPOSITION_QWEN_2026-09-09.md)
+for the three bounded approvals, eight retirements, preserved historical
+receipts, and the rule that any reopening needs a fresh preregistration. This
+note does not edit the append-only screen rows above.

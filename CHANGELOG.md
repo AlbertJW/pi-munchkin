@@ -4,6 +4,18 @@ All notable changes to pi-munchkin are documented here. Releases follow semantic
 
 ## Unreleased
 
+### Decided (2026-09-09 — Qwen dark-candidate roster)
+
+The current Qwen-facing dark-candidate queue is now closed. `CONTEXT_ADMISSION`,
+the Qwen vision/screenshot path, and `BASH_OUTPUT_GUARD` are approved only for
+explicit bounded use behind their existing flags. The planner/deep-research
+graph, research ledger, enforced semantic loop, working memory, minimal tool
+surface, context discovery, Jina Reader candidate, and grep/find activation are
+retired from the active Qwen candidate roster. Defaults remain unchanged and
+historical screens remain immutable. See
+`optimizer/docs/DARK_CANDIDATE_DISPOSITION_QWEN_2026-09-09.md` for the evidence,
+router availability note, and reopening rules.
+
 ### Added (2026-09-09 — multi-frame vision quality pack)
 
 The approval-gated vision quality runner now accepts a frozen three-frame

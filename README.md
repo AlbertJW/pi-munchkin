@@ -110,6 +110,13 @@ per-trial validity rubric. It is still not part of the getting-started path; rou
 human-started, one at a time, and no candidate is adopted or deleted without a separate human
 decision.
 
+The Qwen-facing dark-candidate queue was dispositioned on 2026-09-09. Three mechanisms are
+approved for explicit bounded use (`CONTEXT_ADMISSION`, the vision/screenshot path, and
+`BASH_OUTPUT_GUARD`); the remaining eight are retired from the active queue. Their flags and
+compatibility paths remain off or opt-in, and a retired item can return only through a new
+preregistration and fresh evidence. The authoritative register is
+[`optimizer/docs/DARK_CANDIDATE_DISPOSITION_QWEN_2026-09-09.md`](optimizer/docs/DARK_CANDIDATE_DISPOSITION_QWEN_2026-09-09.md).
+
 ---
 
 Everything below is implementation detail: installation, day-to-day commands, the full
