@@ -10,15 +10,23 @@ weights download, mirror, deployment, or automatic click was performed.
 
 ## Frozen benchmark
 
-The immutable fixture is
+The original immutable fixture is
 `harness/tests/fixtures/vision-contract-v1.json` (revision
 `2026-09-09-frozen-1`). Its prepared manifest digest is
 `35ec5d9e3ccc6dad72d687d7eae10f1cd992c90af0f61035b8b86fc525a4f05a`.
 Run `npm run vision:benchmark -- --selftest` to validate it, `--dry` to print
 the digest without executing anything, or use `--run --approve-sha <digest>
 --model <registered-model>` for the explicit deterministic fixture run. The
-fixture names Ling as the protocol role and Qwen 35B as the separate quality
-role; it never turns a fixture result into efficacy evidence.
+fixture names Ling as the protocol role and the original Qwen 35B alias as the
+separate quality role; it never turns a fixture result into efficacy evidence.
+
+Because the router now serves a distinct vision alias, the unchanged case pack
+also has a newly prepared binding at
+`harness/tests/fixtures/vision-contract-qwen36-35b-vision-v1.json` (revision
+`2026-09-09-qwen-vision-1`, digest
+`f6f93cf6cce89b81a2ce128b8cc69469f3dc6ad9d16c35424a81ab1e6b5f954a`). The
+runner accepts it only through explicit `--manifest` selection and the exact
+approval hash, so a router alias cannot silently replace a frozen cohort.
 
 The Ling-role deterministic run produced the following orchestration result:
 
@@ -75,8 +83,8 @@ fresh observation and independent target validation.
 
 The real quality screen is intentionally pending. A human must first install
 or point to a local SAM 2.1 Tiny runner and a vision-capable model, then run
-the identical frozen fixture separately for Ling (protocol qualification) and
-Qwen 35B (quality). The screen should compare uncached, exact-cache,
+the identical case pack separately for Ling (protocol qualification) and
+Qwen 35B vision using the newly prepared manifest. The screen should compare uncached, exact-cache,
 near-cache, and SAM-assisted arms on answer support, missed UI changes,
 grounding accuracy, stale-target refusals, context volume, latency, memory,
 and model-call count. Results must be stored separately by model and serving

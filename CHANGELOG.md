@@ -12,6 +12,13 @@ UI-changing tools. Compaction, model selection, settlement, shutdown, and
 stale in-flight captures invalidate the watcher safely. `VISION` remains off by
 default; no model or desktop run was performed.
 
+### Added (2026-09-09 — vision manifest binding)
+
+The offline vision benchmark now accepts an explicitly selected manifest. The
+original frozen fixture remains unchanged, while a separately hashed Qwen 35B
+vision binding records `local-llamacpp/qwen36-35b-iq3s-vision`; approval and
+registered-model checks remain mandatory and no inference is performed.
+
 ### Fixed (2026-09-09 — verifier scheduling)
 
 The aggregate verifier now runs stages serially by default. Its previous
