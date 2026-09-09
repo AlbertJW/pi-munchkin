@@ -203,6 +203,11 @@ def main(argv: list[str] | None = None) -> int:
         item = commands.add_parser(name); item.add_argument("--manifest", required=True)
     for name in ("run", "resume"):
         item = commands.add_parser(name); item.add_argument("--manifest", required=True); item.add_argument("--approve-sha", required=True); item.add_argument("--run-root")
+    reconcile = commands.add_parser("reconcile")
+    reconcile.add_argument("--manifest", required=True); reconcile.add_argument("--approve-sha", required=True)
+    reconcile.add_argument("--run-root"); reconcile.add_argument("--operation-id", required=True)
+    reconcile.add_argument("--action", choices=("supply_response", "abandon", "retry"), required=True)
+    reconcile.add_argument("--response", help="regular JSON file containing the provider session response")
     status = commands.add_parser("status"); status.add_argument("--manifest", required=True); status.add_argument("--run-root")
     inspect = commands.add_parser("inspect"); inspect.add_argument("--manifest", required=True); inspect.add_argument("--run-root")
     replay = commands.add_parser("replay"); replay.add_argument("--manifest", required=True); replay.add_argument("--run-root")
@@ -222,7 +227,7 @@ def main(argv: list[str] | None = None) -> int:
                 prepared["resolved_plugins"] = {"provider": campaign.optimizer_provider["plugin"], "scenario": campaign.benchmark["plugin"]}
             print(json.dumps(prepared, sort_keys=True)); return 0
         root = _assert_run_root_outside_git(pathlib.Path(args.run_root) if args.run_root else _default_run_root())
-        if args.command in ("run", "resume") and args.approve_sha != campaign.sha256:
+        if args.command in ("run", "resume", "reconcile") and args.approve_sha != campaign.sha256:
             raise ValueError("approval SHA does not match the resolved campaign")
         run_dir = _run_dir(root, campaign)
         if args.command == "run" and run_dir.exists():
@@ -238,6 +243,20 @@ def main(argv: list[str] | None = None) -> int:
         if args.command == "resume":
             store.recover_tail()
         scenario, surface, provider = _components(campaign, pack, manifest_path.resolve(), store.run_root)
+        if args.command == "reconcile":
+            response = None
+            if args.response:
+                response_path = pathlib.Path(args.response).expanduser().resolve()
+                if response_path.is_symlink() or not response_path.is_file():
+                    raise ValueError("reconciliation response must be a regular file")
+                try:
+                    response = json.loads(response_path.read_text(encoding="utf-8"))
+                except (OSError, UnicodeError, json.JSONDecodeError) as exc:
+                    raise ValueError("reconciliation response is malformed") from exc
+                if not isinstance(response, dict):
+                    raise ValueError("reconciliation response must contain one object")
+            result = CampaignEngine(campaign, store, scenario, surface, provider).reconcile_operation(args.operation_id, args.action, response)
+            print(json.dumps(result, sort_keys=True)); return 0
         result = CampaignEngine(campaign, store, scenario, surface, provider).run(approve_sha=args.approve_sha)
         print(json.dumps(result, sort_keys=True)); return 0
     except (ManifestError, ValueError, OSError, EventStoreError) as exc:

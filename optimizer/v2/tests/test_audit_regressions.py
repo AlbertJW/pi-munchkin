@@ -58,7 +58,7 @@ class AuditRegressions(unittest.TestCase):
         class BrokenGuard(FakeScenario):
             def evaluate(self, candidate, **kwargs):
                 result = super().evaluate(candidate, **kwargs)
-                if kwargs["model"]["model"] == "guard":
+                if kwargs["model"]["model"] == "guard" and candidate.mutation_family != "seed":
                     result["guards"]["security_failures"] = float("nan")
                 return result
 

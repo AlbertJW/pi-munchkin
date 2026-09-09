@@ -5,7 +5,7 @@ import json
 import pathlib
 import unittest
 
-from optimizer.v2.baseline import BaselinePreregistration
+from optimizer.v2.baseline import BaselinePreregistration, arm_order
 from optimizer.v2.benchmark import BenchmarkPack
 from optimizer.v2.real_baseline import RealBaselineError, _row_digest, _row_key, ingest_gate_baseline, load_case_tasks, validate_input_receipts, validate_real_report, write_private_report
 
@@ -44,6 +44,7 @@ def make_row(case_id: str, arm: str, rep: int, session: str, *, timeout: bool = 
         "serving": {"stable": True, "pre": {"status": "complete", "full_sha256": "d" * 64}, "post": {"status": "complete", "full_sha256": "d" * 64}},
         "context": {
             "schema": "pi.context-telemetry/v4", "authenticated": True,
+            "request_seed": PREREG.seeds[rep - 1],
             "provenance": {
                 "schema": "pi.gate-session/v1", "complete": True,
                 "session_id": session, "invocation_id": "g03-real-run",
@@ -55,6 +56,7 @@ def make_row(case_id: str, arm: str, rep: int, session: str, *, timeout: bool = 
         },
         "exposure": {"status": "control" if arm == "base" else "targeted"},
         "trajectory": {"tool_calls": 3, "compactions": 0}, "retried": 0,
+        "wall_ms": 1000, "out_bytes": 100,
         "usage": {"input_tokens": 100, "output_tokens": 50},
     }
 
@@ -66,7 +68,8 @@ def complete_rows() -> tuple[list[dict], list[dict]]:
     for split in ("train", "development"):
         for case in PACK.splits[split]:
             for rep in (1, 2):
-                for arm in ("base", "cand"):
+                for label in arm_order(case.case_id, PREREG.seeds[rep - 1], 0, PREREG.randomization["seed"]):
+                    arm = "base" if label == "baseline" else "cand"
                     n += 1
                     row = make_row(case.case_id, arm, rep, f"session-{n:02d}")
                     rows.append(row)

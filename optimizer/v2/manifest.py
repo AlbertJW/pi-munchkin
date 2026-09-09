@@ -119,12 +119,27 @@ def load_campaign(source: dict | str | pathlib.Path) -> Campaign:
         permutations = _positive_int(policy["permutations"], "primary_metric.paired_policy.permutations")
         if permutations < 2 or permutations > 1_000_000:
             raise ManifestError("primary_metric.paired_policy.permutations must be between 2 and 1000000")
+    elif policy_name in {"net-case-wins/v1", "case-sign/v1", "case-permutation/v1"}:
+        fields = {"name", "minimum_cases"}
+        fields |= {"minimum_net_wins"} if policy_name == "net-case-wins/v1" else {"alpha"}
+        if policy_name == "case-permutation/v1":
+            fields.add("max_exact_cases")
+        policy = _strict(metric["paired_policy"], "primary_metric.paired_policy", fields)
+        minimum = _positive_int(policy["minimum_cases"], "minimum_cases")
+        if "minimum_net_wins" in policy:
+            _positive_int(policy["minimum_net_wins"], "minimum_net_wins")
+        if "alpha" in policy and (type(policy["alpha"]) not in (int, float) or not math.isfinite(policy["alpha"]) or not 0 < policy["alpha"] < 1):
+            raise ManifestError("alpha must be a finite number between 0 and 1")
+        if "max_exact_cases" in policy:
+            maximum = _positive_int(policy["max_exact_cases"], "max_exact_cases")
+            if not minimum <= maximum <= 20:
+                raise ManifestError("minimum_cases <= max_exact_cases <= 20 is required")
     else:
         raise ManifestError("primary_metric.paired_policy.name is unsupported")
-    if metric["kind"] == "binary" and policy_name != "exact-sign":
-        raise ManifestError("binary primary metrics require exact-sign paired policy")
-    if metric["kind"] == "continuous" and policy_name != "paired-permutation":
-        raise ManifestError("continuous primary metrics require paired-permutation policy")
+    if metric["kind"] == "binary" and policy_name not in {"exact-sign", "net-case-wins/v1", "case-sign/v1"}:
+        raise ManifestError("binary primary metric has an incompatible policy")
+    if metric["kind"] == "continuous" and policy_name not in {"paired-permutation", "case-permutation/v1"}:
+        raise ManifestError("continuous primary metric has an incompatible policy")
     guards = obj["hard_guards"]
     if not isinstance(guards, list) or not guards:
         raise ManifestError("hard_guards must be a non-empty list")

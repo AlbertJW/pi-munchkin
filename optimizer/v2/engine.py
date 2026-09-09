@@ -12,7 +12,7 @@ from typing import Any
 
 from .candidates import Candidate, compose_candidates
 from .events import EventStore
-from .policies import accept_training_candidate, matched_classification, score
+from .policies import _cells, accept_training_candidate, score
 from .ports import require_plugin
 
 
@@ -25,6 +25,10 @@ class InjectedCrash(RuntimeError):
 
 class CampaignBudgetExhausted(RuntimeError):
     pass
+
+
+class UncertainOperation(RuntimeError):
+    """An external call was durably intended but has no recoverable response."""
 
 
 def _validate_session(kind: str, value: Any) -> dict:
@@ -120,18 +124,135 @@ class CampaignEngine:
             raise InjectedCrash(f"injected after durable transition {self.transitions}")
         return payload
 
+    def _durable_transition(self, operation_id: str, event_type: str, payload: dict) -> dict:
+        event = self.store.append(operation_id, event_type, payload)
+        self.transitions += 1
+        if self.crash_after_transition == self.transitions:
+            raise InjectedCrash(f"injected after durable transition {self.transitions}")
+        return event["payload"]
+
+    @staticmethod
+    def _request_digest(payload: dict) -> str:
+        return hashlib.sha256(json.dumps(payload, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
+
     def _provider_session(self, kind: str, payload: dict, iteration: int) -> dict:
-        operation_id = f"provider:{kind}:iteration-{iteration}"
-        prior_sessions = sum(1 for event in self.store.read_all() if event["type"] == "provider.session")
-        if self.store.find(operation_id) is None and prior_sessions >= self.manifest.limits["provider_sessions"]:
+        base_operation_id = f"provider:{kind}:iteration-{iteration}"
+        # A human-authorized reconciliation may explicitly open one charged
+        # retry. The original uncertain operation remains immutable and linked
+        # by the reconciliation event; this fresh ID prevents accidental
+        # double-use of an ambiguous external request.
+        operation_id = base_operation_id
+        retry = self.store.find(f"{base_operation_id}:reconciliation")
+        if retry is not None and retry["payload"].get("action") == "retry":
+            attempt = retry["payload"].get("attempt")
+            if type(attempt) is int and attempt >= 1:
+                operation_id = f"{base_operation_id}:retry-{attempt}"
+        final = self.store.find(operation_id)
+        if final is not None:
+            if final["type"] != "provider.session": raise ValueError(f"operation {operation_id} was previously recorded with an incompatible type")
+            return final["payload"]
+        events = self.store.read_all()
+        prior_sessions = len({
+            event.get("payload", {}).get("operation_id", event["operation_id"])
+            for event in events if event["type"] in ("provider.session", "provider.operation-intent")
+        })
+        if prior_sessions >= self.manifest.limits["provider_sessions"]:
             raise ValueError("provider session budget exhausted")
-        result = self._operation(
-            operation_id, "provider.session",
-            lambda: _validate_session(kind, self.provider.session(kind, payload, operation_id=operation_id)),
-        )
+        request_digest = self._request_digest(payload)
+        intent_id = f"{operation_id}:intent"
+        response_id = f"{operation_id}:response"
+        intent = self.store.find(intent_id)
+        response = self.store.find(response_id)
+        if intent is None:
+            self._durable_transition(intent_id, "provider.operation-intent", {
+                "schema": "pi.optimizer-operation/v1", "operation_id": operation_id, "kind": kind,
+                "request_digest": request_digest, "provider": self.manifest.optimizer_provider["plugin"],
+                "model": self.manifest.subject_model, "reserved_session_charge": 1,
+            })
+        elif intent["type"] != "provider.operation-intent" or intent["payload"].get("request_digest") != request_digest:
+            raise ValueError("provider operation intent does not match this request")
+        elif response is None:
+            raise UncertainOperation(f"provider operation {operation_id} has an intent but no recoverable response")
+        if response is None:
+            try:
+                raw = _validate_session(kind, self.provider.session(kind, payload, operation_id=operation_id))
+            except InjectedCrash:
+                raise
+            except Exception as exc:
+                raise UncertainOperation(f"provider operation {operation_id} has no recoverable response ({type(exc).__name__})") from exc
+            self._durable_transition(response_id, "provider.operation-response", {
+                "schema": "pi.optimizer-operation-response/v1", "operation_id": operation_id,
+                "request_digest": request_digest, "response": raw,
+            })
+            response = self.store.find(response_id)
+        if response is None or response["type"] != "provider.operation-response" or response["payload"].get("request_digest") != request_digest:
+            raise ValueError("provider operation response does not match its intent")
+        result = self._durable_transition(operation_id, "provider.session", response["payload"]["response"])
         if kind == "reflect" and result["classification"] != payload.get("classification"):
             raise ValueError("optimizer reflection changed the matched-case classification")
         return result
+
+    def reconcile_operation(self, operation_id: str, action: str, response: dict | None = None) -> dict:
+        """Resolve an uncertain provider operation without hiding the original.
+
+        ``supply_response`` accepts a validated provider-session payload and
+        durably completes the original operation without another external call.
+        ``abandon`` leaves the campaign stopped. ``retry`` authorizes exactly
+        one newly charged operation; the next approved resume uses a linked
+        retry ID and keeps the uncertain attempt in the event history.
+        """
+        if not isinstance(operation_id, str) or not operation_id.startswith("provider:") or len(operation_id) > 256:
+            raise ValueError("reconciliation operation ID is invalid")
+        if action not in ("supply_response", "abandon", "retry"):
+            raise ValueError("reconciliation action is invalid")
+        with self.store.campaign_lock():
+            intent = self.store.find(f"{operation_id}:intent")
+            if intent is None or intent["type"] != "provider.operation-intent":
+                raise ValueError("provider operation intent is missing")
+            existing = self.store.find(operation_id)
+            if existing is not None:
+                return {"status": "already-complete", "operation_id": operation_id}
+            prior = self.store.find(f"{operation_id}:reconciliation")
+            if prior is not None:
+                return prior["payload"]
+            kind = intent["payload"].get("kind")
+            request_digest = intent["payload"].get("request_digest")
+            if not isinstance(kind, str) or not isinstance(request_digest, str):
+                raise ValueError("provider operation intent is malformed")
+            if action == "supply_response":
+                if not isinstance(response, dict):
+                    raise ValueError("supply_response requires a provider response object")
+                validated = _validate_session(kind, response)
+                response_id = f"{operation_id}:response"
+                self._durable_transition(response_id, "provider.operation-response", {
+                    "schema": "pi.optimizer-operation-response/v1", "operation_id": operation_id,
+                    "request_digest": request_digest, "response": validated,
+                })
+                self._durable_transition(operation_id, "provider.session", validated)
+                result = {"status": "completed", "operation_id": operation_id, "action": action}
+            elif action == "retry":
+                result = {"status": "retry-authorized", "operation_id": operation_id, "action": action, "attempt": 1}
+            else:
+                result = {"status": "abandoned", "operation_id": operation_id, "action": action}
+            self._durable_transition(f"{operation_id}:reconciliation", "provider.operation-reconciled", result)
+            return result
+
+    def _validate_observations(self, result: dict, split: str, model: dict) -> None:
+        cells = _cells(result)
+        if self.manifest.primary_metric["kind"] == "binary" and any(row["score"] not in (0, 1) for row in cells.values()):
+            raise ValueError("binary evaluation contains a nonbinary score")
+        if result.get("model") != model:
+            raise ValueError("evaluation model does not match the requested cohort")
+        key = json.dumps(model, sort_keys=True, separators=(",", ":"))
+        allowed = self.calibrated_cases.get(key, set())
+        split_cases = {case.case_id for case in self.scenario.benchmark.splits[split]} & allowed
+        observed = {cell[0] for cell in cells}
+        expected_cases = split_cases if split == "development" else observed
+        expected = {(case, seed, 0) for case in expected_cases for seed in self.manifest.seeds}
+        if not observed <= split_cases or set(cells) != expected:
+            raise ValueError("evaluation has incomplete, duplicate, or out-of-split paired coverage")
+        if len(observed) < self.manifest.benchmark["discrimination_band"]["minimum_cases"]:
+            raise ValueError("evaluation contains insufficient independent cases")
 
     def _evaluation(self, operation_id: str, candidate: Candidate, split: str, model: dict) -> dict:
         def produce() -> dict:
@@ -147,6 +268,7 @@ class CampaignEngine:
             allowed = self.calibrated_cases.get(model_key)
             if allowed is None or any(row.get("case_id") not in allowed for row in observations):
                 raise ValueError("evaluation contains a case outside this model's calibrated band")
+            self._validate_observations(result, split, model)
             return result
         return self._operation(operation_id, "evaluation.recorded", produce)
 
@@ -169,9 +291,10 @@ class CampaignEngine:
                 allowed = self.calibrated_cases.get(subject_key)
                 if allowed is None or any(row.get("case_id") not in allowed for row in evaluation.get("observations") or []):
                     raise ValueError("paired evaluation contains a case outside the subject model's calibrated band")
+                self._validate_observations(evaluation, "train", self.manifest.subject_model)
             expected_cells = {(row["case_id"], row["seed"], row.get("repetition", 0)) for row in value["parent"]["observations"]}
             order_cells = {(row.get("case_id"), row.get("seed"), row.get("repetition", 0)) for row in value.get("arm_order") or []}
-            if expected_cells != order_cells or any(sorted(row.get("order") or []) != ["candidate", "parent"] for row in value.get("arm_order") or []):
+            if expected_cells != set(_cells(value["candidate"])) or len(value.get("arm_order") or []) != len(expected_cells) or expected_cells != order_cells or any(sorted(row.get("order") or []) != ["candidate", "parent"] for row in value.get("arm_order") or []):
                 raise ValueError("paired evaluation lacks a complete randomized arm-order ledger")
             return value
         return self._operation(operation_id, "evaluation.paired", produce)
@@ -226,7 +349,11 @@ class CampaignEngine:
         if approve_sha != self.manifest.sha256:
             raise ValueError("approval SHA does not match the resolved campaign")
         with self.store.campaign_lock():
-            terminal = next((event for event in reversed(self.store.read_all()) if event["type"] in ("campaign.stopped", "campaign.completed")), None)
+            events = self.store.read_all()
+            terminal = next((event for event in reversed(events) if event["type"] in ("campaign.stopped", "campaign.completed")), None)
+            retry_authorized = any(event["type"] == "provider.operation-reconciled" and event["payload"].get("action") == "retry" for event in events)
+            if terminal is not None and terminal["payload"].get("status") == "uncertain_external_operation" and retry_authorized:
+                terminal = None
             if terminal is not None:
                 if not (self.store.run_root / "review-packet.json").is_file():
                     candidates, development = self._review_inputs_from_events()
@@ -240,6 +367,11 @@ class CampaignEngine:
                 })
             except InjectedCrash:
                 raise
+            except UncertainOperation as exc:
+                return self._stop("campaign:stop:uncertain-operation", {
+                    "status": "uncertain_external_operation", "reason": str(exc),
+                    "deployment_performed": False, "human_review_required": True,
+                })
             except Exception as exc:
                 terminal = next((event for event in reversed(self.store.read_all()) if event["type"] in ("campaign.stopped", "campaign.completed")), None)
                 if terminal is not None:
@@ -287,6 +419,12 @@ class CampaignEngine:
         seed_dev = self._evaluation("evaluation:seed:development:subject", seed, "development", self.manifest.subject_model)
         if _guard_margin(seed_dev, self.manifest.hard_guards) < 0:
             return self._stop("campaign:stop:seed-guard", {"status": "invalid_seed", "reason": "seed candidate fails a hard development guard"}, candidates=[seed], development={seed.candidate_id: seed_dev})
+        seed_guard_evaluations = []
+        for index, model in enumerate(self.manifest.guard_models):
+            guard = self._evaluation(f"evaluation:seed:development:guard-{index}", seed, "development", model)
+            if _guard_margin(guard, self.manifest.hard_guards) < 0:
+                return self._stop("campaign:stop:seed-cohort", {"status": "invalid_seed", "reason": "seed guard cohort failed"})
+            seed_guard_evaluations.append(guard)
         candidates_by_id = {seed.candidate_id: seed}
         accepted_ids = [seed.candidate_id]
         development = {seed.candidate_id: seed_dev}
@@ -369,10 +507,14 @@ class CampaignEngine:
                 candidate_dev = self._evaluation(f"evaluation:candidate-{iteration}:development:subject", candidate, "development", self.manifest.subject_model)
                 if _guard_margin(candidate_dev, self.manifest.hard_guards) < 0:
                     last_decision = {**last_decision, "accepted": False, "development_guard_failure": True}
+                direction = 1 if self.manifest.primary_metric["direction"] == "maximize" else -1
+                if (score(candidate_dev) - score(development[parent.candidate_id])) * direction < -1e-12:
+                    last_decision = {**last_decision, "accepted": False, "development_primary_regression": True}
             if last_decision["accepted"]:
                 for index, model in enumerate(self.manifest.guard_models):
                     guard = self._evaluation(f"evaluation:candidate-{iteration}:development:guard-{index}", candidate, "development", model)
-                    guard_failed = _guard_margin(guard, self.manifest.hard_guards) < 0
+                    guard_failed = (_guard_margin(guard, self.manifest.hard_guards) < 0 or
+                                    (score(guard) - score(seed_guard_evaluations[index])) * direction < -1e-12)
                     iteration_guards.append({"model": model, "passed": not guard_failed})
                     if guard_failed:
                         last_decision = {**last_decision, "accepted": False, "guard_model_failure": model}
@@ -381,7 +523,7 @@ class CampaignEngine:
             if last_decision["accepted"]:
                 accepted_ids.append(candidate.candidate_id)
                 development[candidate.candidate_id] = candidate_dev
-            classification = matched_classification(parent_train, candidate_train)
+            classification = last_decision["classification"]
             last_reflection = self._provider_session("reflect", {
                 "schema": "pi.optimizer-reflection-input/v2", "classification": classification,
                 "stochasticity_check": "matched case, seed, repetition, and randomized-arm ledger",

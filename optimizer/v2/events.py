@@ -193,7 +193,7 @@ class EventStore:
 
     @staticmethod
     def _project(events: list[dict]) -> dict:
-        state: dict = {"schema": "pi.optimizer-projection/v1", "event_count": len(events), "campaign": {}, "candidates": {}, "evaluations": {}, "sessions": {}, "calibrations": {}, "budget": {"provider_sessions": 0, "train_rollouts": 0, "development_rollouts": 0}, "status": "new"}
+        state: dict = {"schema": "pi.optimizer-projection/v1", "event_count": len(events), "campaign": {}, "candidates": {}, "evaluations": {}, "sessions": {}, "operations": {}, "calibrations": {}, "budget": {"provider_sessions": 0, "train_rollouts": 0, "development_rollouts": 0}, "status": "new"}
         for event in events:
             # Projections may enrich candidates; event payloads remain immutable.
             payload = copy.deepcopy(event["payload"])
@@ -216,6 +216,10 @@ class EventStore:
                     count = len(evaluation.get("observations") or [])
                     if split == "train": state["budget"]["train_rollouts"] += count
                     elif split == "development": state["budget"]["development_rollouts"] += count
+            elif event["type"] in ("provider.operation-intent", "provider.operation-response", "provider.operation-reconciled"):
+                operation_id = event["payload"].get("operation_id", event["operation_id"])
+                field = {"provider.operation-intent": "intent", "provider.operation-response": "response", "provider.operation-reconciled": "reconciliation"}[event["type"]]
+                state["operations"].setdefault(operation_id, {})[field] = payload
             elif event["type"] == "provider.session":
                 state["sessions"][event["operation_id"]] = payload
                 state["budget"]["provider_sessions"] += 1

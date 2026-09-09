@@ -28,13 +28,23 @@ def _cells(evaluation: dict) -> dict[tuple[str, int, int], dict]:
     return cells
 
 
-def matched_classification(parent: dict, candidate: dict) -> dict:
+def matched_classification(parent: dict, candidate: dict, metric: dict | None = None) -> dict:
     before, after = _cells(parent), _cells(candidate)
     if set(before) != set(after):
         raise PolicyError("parent and candidate do not cover identical paired cells")
+    direction = -1 if metric and metric["direction"] == "minimize" else 1
+    if metric and metric["kind"] == "continuous":
+        changes = [(after[key]["score"] - before[key]["score"]) * direction for key in before]
+        return {"improved": sum(x > 1e-12 for x in changes),
+                "regressed": sum(x < -1e-12 for x in changes),
+                "unchanged": sum(abs(x) <= 1e-12 for x in changes)}
     classes = {name: [] for name in ("fixed", "regressed", "still_failing", "still_passing")}
     for key in sorted(before):
         old, new = before[key]["score"], after[key]["score"]
+        if old not in (0, 1) or new not in (0, 1):
+            raise PolicyError("task outcome classification requires binary outcomes")
+        if direction == -1:
+            old, new = 1 - old, 1 - new
         if old == 0 and new == 1:
             classes["fixed"].append(key)
         elif old == 1 and new == 0:
@@ -82,11 +92,41 @@ def accept_training_candidate(parent: dict, candidate: dict, campaign) -> dict:
         raise PolicyError("parent and candidate do not cover identical paired cells")
     direction = 1 if campaign.primary_metric["direction"] == "maximize" else -1
     differences = [(after[key]["score"] - before[key]["score"]) * direction for key in sorted(before)]
-    classification = matched_classification(parent, candidate)
     policy = campaign.primary_metric["paired_policy"]
+    modern = policy["name"].endswith("/v1")
+    # Legacy binary reporting retains its historical direction convention.
+    classification = matched_classification(parent, candidate, campaign.primary_metric if modern or campaign.primary_metric["kind"] == "continuous" else None)
     if campaign.primary_metric["kind"] == "binary":
         if any(row["score"] not in (0, 1) for row in [*before.values(), *after.values()]):
             raise PolicyError("binary outcomes must be zero or one")
+    if modern:
+        # Average repeated measurements within a case before inference. More
+        # seeds improve a case estimate; they never mint independent cases.
+        grouped: dict[str, list[float]] = {}
+        for key, delta in zip(sorted(before), differences):
+            grouped.setdefault(key[0], []).append(delta)
+        deltas = [math.fsum(values) / len(values) for values in grouped.values()]
+        wins, losses = sum(x > 1e-12 for x in deltas), sum(x < -1e-12 for x in deltas)
+        pvalue = None
+        if policy["name"] == "net-case-wins/v1":
+            improved = wins - losses >= policy["minimum_net_wins"]
+        elif policy["name"] == "case-sign/v1":
+            discordant = wins + losses
+            pvalue = sum(math.comb(discordant, k) for k in range(wins, discordant + 1)) / 2**discordant
+            improved = wins > losses and pvalue <= policy["alpha"]
+        elif policy["name"] == "case-permutation/v1":
+            if len(deltas) > policy["max_exact_cases"]:
+                raise PolicyError("exact case permutation workload exceeded")
+            pvalue = _permutation_pvalue(deltas)
+            improved = math.fsum(deltas) / len(deltas) > 1e-12 and pvalue <= policy["alpha"]
+        else:
+            raise PolicyError("unsupported versioned policy")
+        improved = improved and len(deltas) >= policy["minimum_cases"]
+        policy_detail = {"name": policy["name"], "sampling_unit": "case",
+                         "independent_cases": len(deltas), "wins": wins, "losses": losses,
+                         "ties": len(deltas) - wins - losses, "pvalue": pvalue,
+                         "mean_paired_difference": math.fsum(deltas) / len(deltas)}
+    elif campaign.primary_metric["kind"] == "binary":
         if policy["name"] != "exact-sign":
             raise PolicyError("binary campaigns require exact-sign paired policy")
         minimum = policy.get("minimum_net_fixes", 1)

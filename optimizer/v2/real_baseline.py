@@ -17,16 +17,16 @@ import tempfile
 from typing import Any, Iterable
 
 try:
-    from .baseline import BaselineError, BaselinePreregistration, prepare_baseline
+    from .baseline import BaselineError, BaselinePreregistration, prepare_baseline, arm_order
     from .benchmark import BenchmarkPack
 except ImportError:  # direct `python optimizer/v2/real_baseline.py --selftest`
     import sys
     sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[2]))
-    from optimizer.v2.baseline import BaselineError, BaselinePreregistration, prepare_baseline
+    from optimizer.v2.baseline import BaselineError, BaselinePreregistration, prepare_baseline, arm_order
     from optimizer.v2.benchmark import BenchmarkPack
 
 
-REAL_REPORT_SCHEMA = "pi.optimizer-real-baseline-report/v1"
+REAL_REPORT_SCHEMA = "pi.optimizer-real-baseline-report/v2"
 HEX64 = re.compile(r"^[0-9a-f]{64}$")
 ROW_KEY_FIELDS = ("run", "model", "split", "task")
 EXPOSURES = {"control", "targeted", "engaged_only", "unexposed"}
@@ -272,12 +272,28 @@ def _identity_errors(
         errors.append("baseline_exposure")
     elif arm in {"candidate", "cand"} and (row.get("exposure") or {}).get("status") != "targeted":
         errors.append("candidate_exposure")
-    if row.get("score") not in (0, 1):
+    if type(row.get("score")) not in (int, float) or row.get("score") not in (0, 1):
         errors.append("score")
     if row.get("authoritative") is not True or row.get("status") != "complete":
         errors.append("row_authority")
     if validity is None or validity.get("row_sha256") != _row_digest(row) or validity.get("void") is not False:
         errors.append("trial_validity")
+    costs = _safe_costs(row)
+    for field, limit in (("tool_calls", prereg.limits["max_tool_calls"]),
+                         ("retries", prereg.limits["max_retries"]),
+                         ("wall_ms", prereg.limits["case_timeout_seconds"] * 1000)):
+        if costs[field] is None or costs[field] > limit:
+            errors.append("resource_" + field)
+    output_bytes = _nonnegative(row.get("out_bytes"))
+    if output_bytes is None or output_bytes > prereg.limits["max_output_bytes"]:
+        errors.append("resource_output_bytes")
+    # Rep is an ordinal, never evidence that a sampling seed reached a request.
+    # The legacy gate has no authenticated request-seed receipt: its rows stay
+    # readable but unqualified until the execution adapter supplies one.
+    rep = row.get("rep")
+    seed = prereg.seeds[rep - 1] if type(rep) is int and 1 <= rep <= len(prereg.seeds) else None
+    if type(context.get("request_seed")) is not int or context["request_seed"] != seed:
+        errors.append("request_seed_unverified")
     return errors
 
 
@@ -348,6 +364,7 @@ def ingest_gate_baseline(
     serving_ids: set[str] = set()
     sessions: set[str] = set()
     row_keys: set[str] = set()
+    observed_orders: dict[tuple, list[str]] = {}
     for row in rows:
         if not isinstance(row, dict):
             raise RealBaselineError("gate rows contain a malformed record")
@@ -379,6 +396,7 @@ def ingest_gate_baseline(
             sessions.add(session)
         expected_split = None if case is None else next((split for split in ("train", "development", "test") if case in pack.splits[split]), None)
         errors = _identity_errors(row, case_id=case_id, expected_split=expected_split, arm_config=arm_config, prereg=prereg, resolved=resolved, run_id=run_id, validity=validity)
+        observed_orders.setdefault((case_id, seed, repetition), []).append(canonical_arm)
         if case is None or key not in expected:
             errors.append("unexpected_cell")
         timeout = any("timeout" in str(value).lower() for value in (row.get("status"), row.get("authority_reason"), row.get("outcome")))
@@ -386,6 +404,20 @@ def ingest_gate_baseline(
         trial["seed"] = seed
         trial["repetition"] = repetition
         trials.append(trial)
+    for trial in trials:
+        block = (trial["case_id"], trial["seed"], trial["repetition"])
+        if trial["status"] == "completed" and observed_orders[block] != arm_order(*block, prereg.randomization["seed"]):
+            trial.update(status="invalid", outcome="invalid", score=None,
+                         invalid_reason="arm_order", authority="non_authoritative")
+    # The gate is single-slot. Sum is a lower bound (idle/setup time is absent),
+    # sufficient to reject overruns but not to certify a campaign deadline.
+    elapsed = sum(trial["costs"]["wall_ms"] or 0 for trial in trials)
+    if elapsed > prereg.limits["pack_timeout_seconds"] * 1000 or prereg.guard_models:
+        reason = "pack_wall_budget" if elapsed > prereg.limits["pack_timeout_seconds"] * 1000 else "guard_cohort_unmeasured"
+        for trial in trials:
+            if trial["status"] == "completed":
+                trial.update(status="invalid", outcome="invalid", score=None,
+                             invalid_reason=reason, authority="non_authoritative")
     if row_keys != set(sidecar):
         raise RealBaselineError("trial-validity sidecar has missing or extra row keys")
     for case_id, seed, repetition, arm in sorted(expected - seen):

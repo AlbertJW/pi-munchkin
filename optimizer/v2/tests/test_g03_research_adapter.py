@@ -290,15 +290,16 @@ class G03ResearchAdapterTests(unittest.TestCase):
             self.assertNotEqual(completed.returncode, 0)
             self.assertIn("symlink", completed.stderr)
 
-    def test_research_row_is_accepted_by_the_shared_real_baseline_reducer(self) -> None:
+    def test_research_row_without_execution_receipts_remains_unqualified(self) -> None:
         row, validity = research_artifact_to_row(valid_artifact(), pack=PACK, prereg=PREREG, repository_root=REPO)
         report = ingest_gate_baseline(
             PACK, PREREG, REPO, [row], [validity], case_tasks=CASE_TASKS,
             run_id="g03-research-run", resolved_model={"provider": "llama", "model": "qwen36-35b-iq3s"},
         )
         trial = next(item for item in report["trials"] if item["case_id"] == CASE_ID and item["arm"] == "baseline")
-        self.assertEqual(trial["status"], "completed")
-        self.assertEqual(trial["score"], 1)
+        self.assertEqual(trial["status"], "invalid")
+        self.assertIsNone(trial["score"])
+        self.assertFalse(report["model_quality_evidence"])
 
 
 if __name__ == "__main__":

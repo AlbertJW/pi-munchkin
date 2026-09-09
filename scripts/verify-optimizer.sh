@@ -109,6 +109,7 @@ python3 "$OPT/prompt-lab/grade_jail_selftest.py"
 PYTHONPATH="$ROOT" python3 -m unittest discover -s "$OPT/v2/tests" -p 'test_*.py'
 PYTHONPATH="$ROOT" python3 -m optimizer.v2.cli selftest
 PYTHONPATH="$ROOT" python3 -m optimizer.v2.cli dry --manifest "$OPT/v2/examples/campaign.json"
+PYTHONPATH="$ROOT" python3 -m optimizer.v2.cli dry --manifest "$OPT/v2/examples/campaign-qualified.json"
 
 node --test "$OPT"/pi-test/test/*.test.js
 dry_output="$(cd "$OPT" && ./real_gate.sh --dry)"

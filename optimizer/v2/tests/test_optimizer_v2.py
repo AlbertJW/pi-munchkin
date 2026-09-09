@@ -12,7 +12,7 @@ import unittest
 
 from optimizer.v2.benchmark import BenchmarkPack
 from optimizer.v2.candidates import Candidate, CandidateError, compose_candidates
-from optimizer.v2.engine import CampaignEngine, InjectedCrash, _validate_session
+from optimizer.v2.engine import CampaignEngine, InjectedCrash, UncertainOperation, _validate_session
 from optimizer.v2.events import EventStore, EventStoreError
 from optimizer.v2.fake import FakeProvider, FakeScenario, FakeSurface
 from optimizer.v2.manifest import ManifestError, load_campaign
@@ -492,7 +492,13 @@ class EngineTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as baseline_td:
             baseline_store = EventStore(pathlib.Path(baseline_td))
             CampaignEngine(manifest, baseline_store, FakeScenario(BenchmarkPack.from_dict(benchmark_dict())), FakeSurface(), FakeProvider()).run(approve_sha=manifest.sha256)
-            transition_count = len(baseline_store.read_all())
+            baseline_events = baseline_store.read_all()
+            transition_count = len(baseline_events)
+            uncertain_boundaries = {
+                index + 1
+                for index, event in enumerate(baseline_events)
+                if event["type"] == "provider.operation-intent"
+            }
         for crash_after in range(1, transition_count + 1):
             with self.subTest(crash_after=crash_after), tempfile.TemporaryDirectory() as td:
                 provider = FakeProvider()
@@ -505,7 +511,8 @@ class EngineTests(unittest.TestCase):
                     pass
                 resumed = CampaignEngine(manifest, store, scenario, FakeSurface(), provider)
                 result = resumed.run(approve_sha=manifest.sha256)
-                self.assertEqual(result["status"], "complete")
+                expected_status = "uncertain_external_operation" if crash_after in uncertain_boundaries else "complete"
+                self.assertEqual(result["status"], expected_status)
                 self.assertLessEqual(provider.calls_by_kind.get("diagnose_patch", 0), 1)
                 self.assertLessEqual(provider.calls_by_kind.get("reflect", 0), 1)
                 self.assertLessEqual(provider.calls_by_kind.get("evolve", 0), 1)
@@ -518,6 +525,66 @@ class EngineTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, "approval"):
                 engine.run(approve_sha="d" * 64)
             self.assertEqual(provider.calls_by_kind, {})
+
+    def test_provider_intent_crash_is_uncertain_and_resume_never_retries(self) -> None:
+        manifest = load_campaign(campaign_dict())
+        with tempfile.TemporaryDirectory() as td:
+            store = EventStore(pathlib.Path(td)); provider = FakeProvider()
+            engine = CampaignEngine(manifest, store, FakeScenario(BenchmarkPack.from_dict(benchmark_dict())), FakeSurface(), provider, crash_after_transition=1)
+            payload = {"schema": "fixture", "accepted_parent_ids": ["seed"], "accepted_candidate_ids": ["seed"]}
+            with self.assertRaises(InjectedCrash):
+                engine._provider_session("evolve", payload, 1)
+            self.assertEqual(provider.calls_by_kind, {})
+            resumed_provider = FakeProvider()
+            resumed = CampaignEngine(manifest, store, FakeScenario(BenchmarkPack.from_dict(benchmark_dict())), FakeSurface(), resumed_provider)
+            with self.assertRaises(UncertainOperation):
+                resumed._provider_session("evolve", payload, 1)
+            self.assertEqual(resumed_provider.calls_by_kind, {})
+
+    def test_response_receipt_finishes_without_a_second_provider_call(self) -> None:
+        manifest = load_campaign(campaign_dict())
+        with tempfile.TemporaryDirectory() as td:
+            store = EventStore(pathlib.Path(td)); first = FakeProvider()
+            crashing = CampaignEngine(manifest, store, FakeScenario(BenchmarkPack.from_dict(benchmark_dict())), FakeSurface(), first, crash_after_transition=2)
+            with self.assertRaises(InjectedCrash):
+                payload = {"schema": "fixture", "accepted_parent_ids": ["seed"], "accepted_candidate_ids": ["seed"]}
+                crashing._provider_session("evolve", payload, 1)
+            self.assertEqual(first.calls_by_kind, {"evolve": 1})
+            second = FakeProvider(); resumed = CampaignEngine(manifest, store, FakeScenario(BenchmarkPack.from_dict(benchmark_dict())), FakeSurface(), second)
+            result = resumed._provider_session("evolve", payload, 1)
+            self.assertEqual(result["kind"], "evolve")
+            self.assertEqual(second.calls_by_kind, {})
+            self.assertIsNotNone(store.find("provider:evolve:iteration-1"))
+
+    def test_reconcile_can_supply_a_validated_response_without_recalling_provider(self) -> None:
+        manifest = load_campaign(campaign_dict())
+        with tempfile.TemporaryDirectory() as td:
+            store = EventStore(pathlib.Path(td)); first = FakeProvider()
+            payload = {"schema": "fixture", "accepted_parent_ids": ["seed"], "accepted_candidate_ids": ["seed"]}
+            crashing = CampaignEngine(manifest, store, FakeScenario(BenchmarkPack.from_dict(benchmark_dict())), FakeSurface(), first, crash_after_transition=1)
+            with self.assertRaises(InjectedCrash):
+                crashing._provider_session("evolve", payload, 1)
+            response = FakeProvider().session("evolve", payload, operation_id="reconciled")
+            result = CampaignEngine(manifest, store, FakeScenario(BenchmarkPack.from_dict(benchmark_dict())), FakeSurface(), FakeProvider()).reconcile_operation("provider:evolve:iteration-1", "supply_response", response)
+            self.assertEqual(result["status"], "completed")
+            self.assertIsNotNone(store.find("provider:evolve:iteration-1:response"))
+            self.assertIsNotNone(store.find("provider:evolve:iteration-1"))
+
+    def test_reconcile_retry_is_explicitly_charged_and_uses_a_linked_operation(self) -> None:
+        manifest = load_campaign(campaign_dict())
+        with tempfile.TemporaryDirectory() as td:
+            store = EventStore(pathlib.Path(td)); first = FakeProvider()
+            payload = {"schema": "fixture", "accepted_parent_ids": ["seed"], "accepted_candidate_ids": ["seed"]}
+            crashing = CampaignEngine(manifest, store, FakeScenario(BenchmarkPack.from_dict(benchmark_dict())), FakeSurface(), first, crash_after_transition=1)
+            with self.assertRaises(InjectedCrash):
+                crashing._provider_session("evolve", payload, 1)
+            reconciled = CampaignEngine(manifest, store, FakeScenario(BenchmarkPack.from_dict(benchmark_dict())), FakeSurface(), FakeProvider()).reconcile_operation("provider:evolve:iteration-1", "retry")
+            self.assertEqual(reconciled["status"], "retry-authorized")
+            provider = FakeProvider()
+            result = CampaignEngine(manifest, store, FakeScenario(BenchmarkPack.from_dict(benchmark_dict())), FakeSurface(), provider)._provider_session("evolve", payload, 1)
+            self.assertEqual(result["kind"], "evolve")
+            self.assertEqual(provider.calls_by_kind, {"evolve": 1})
+            self.assertIsNotNone(store.find("provider:evolve:iteration-1:retry-1"))
 
     def test_multiple_iterations_evolve_without_promoting_a_non_improvement(self) -> None:
         with tempfile.TemporaryDirectory() as td:
@@ -574,7 +641,7 @@ class EngineTests(unittest.TestCase):
             manifest = load_campaign(campaign_dict())
             provider = Malformed(); store = EventStore(pathlib.Path(td))
             result = CampaignEngine(manifest, store, FakeScenario(BenchmarkPack.from_dict(benchmark_dict())), FakeSurface(), provider).run(approve_sha=manifest.sha256)
-            self.assertEqual(result["status"], "execution_error")
+            self.assertEqual(result["status"], "uncertain_external_operation")
             self.assertTrue((pathlib.Path(td) / "review-packet.json").is_file())
             calls = dict(provider.calls_by_kind)
             resumed = CampaignEngine(manifest, store, FakeScenario(BenchmarkPack.from_dict(benchmark_dict())), FakeSurface(), provider).run(approve_sha=manifest.sha256)
