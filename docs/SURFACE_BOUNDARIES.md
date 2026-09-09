@@ -579,6 +579,23 @@ not supersede the prior aggregate-read boundary; it records lifecycle gating.
 
 Current package-source SHA-256: `9fddd787a0ade888468d9a3799de08539295b37341701e37cc0d7c2a7c4fc3af`.
 
+## Pending surface boundary — 2026-09-09 (parent retrieval fail-closed)
+
+Repository-only package-3 correction makes parent web retrieval depend on the
+same durable aggregate that authorizes planner mutations. When the aggregate is
+missing or belongs to another run, `web_search` and `web_read` stop before
+network access, context reservation, or research-budget consumption and return
+the bounded `aggregate_unavailable` outcome. Settled and blocked runs also
+return explicit non-executable outcomes.
+
+The targeted Ketch authority suite passes 29/29; the full offline verification
+gate remains clean. No inference, calibration, mirror, rollout, or default
+change occurred; planner and parent-research flags remain dark. This boundary
+does not supersede the prior lifecycle boundary; it records the retrieval
+authority guard.
+
+Current package-source SHA-256: `7ebf0204b9d5998496f355a0066af0ac7f86c81a607f6402ea1098b9b2708d7e`.
+
 ## Data at rest: where a research session actually lands (updated 2026-08-10)
 
 A surface hash bounds what the MODEL sees. It says nothing about what a session LEAVES. Those are
