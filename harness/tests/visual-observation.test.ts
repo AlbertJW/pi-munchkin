@@ -7,6 +7,7 @@ import { deflateSync } from "node:zlib";
 import { CONTEXT_RESERVATION_KEY } from "../lib/context-accounting.ts";
 import { cropPng, hammingDistance, imageDigest, perceptualHash, pngLuma, regionDigests, VisualObservationCache } from "../lib/visual-observation.ts";
 import { refineWithSam, validateGroundingResult, type GroundingRequest } from "../lib/visual-grounding.ts";
+import { fire } from "./integration-harness.ts";
 
 const geometry = { width: 32, height: 32, device_scale: 2 };
 const base = new Uint8Array(32 * 32);
@@ -133,6 +134,42 @@ test("visual observe delivers image content to a vision model and reuses exact f
 		const { registerVisualTools: registerBadVisualTools } = await import(`../extensions/visual-observe.ts?bad-capture=${Date.now()}-${Math.random()}`);
 		registerBadVisualTools(bad.pi as any, { capture: async () => ({ bytes: new Uint8Array([1]), mime: "text/plain", width: 10, height: 10 } as any) });
 		await assert.rejects(() => bad.tools.get("visual_observe").execute("bad", { source: "screen", source_id: "window-a", question: "bad" }, undefined, undefined, ctx), /invalid image metadata/);
+	} finally {
+		if (previous === undefined) delete process.env.VISION; else process.env.VISION = previous;
+	}
+});
+
+test("visual lifecycle observes bounded checkpoints, forces after UI actions, and stops at settlement", async () => {
+	const previous = process.env.VISION;
+	process.env.VISION = "on";
+	try {
+		const { makeFakePi } = await import("./integration-harness.ts");
+		const { registerVisualTools } = await import(`../extensions/visual-observe.ts?lifecycle-fixture=${Date.now()}-${Math.random()}`);
+		const fp = makeFakePi(); const cwd = mkdtempSync(join(tmpdir(), "pi-visual-lifecycle-"));
+		let captures = 0;
+		registerVisualTools(fp.pi as any, {
+			sessionId: "lifecycle-session",
+			capture: async () => ({ bytes: new Uint8Array([captures += 1]), mime: "image/jpeg", width: 64, height: 64 }),
+		});
+		const model = { provider: "fixture", id: "vision", supportsVision: true };
+		const tool = fp.tools.get("visual_observe");
+		const observed = await tool.execute("observe", { source: "screen", source_id: "window-a", question: "watch the screen" }, undefined, undefined, { cwd, model });
+		assert.equal(observed.content[0].type, "image");
+		assert.equal(captures, 1);
+		const context = async () => fire(fp, "context", { type: "context", messages: [] }, { cwd, model });
+		assert.equal((await context()).length, 0);
+		assert.equal((await context()).length, 0);
+		const checkpoint = await context();
+		assert.ok(checkpoint.some((message: any) => message.customType === "pi-munchkin:visual-checkpoint"));
+		assert.ok(checkpoint.some((message: any) => message.content?.some?.((part: any) => part.type === "image")));
+		assert.equal(captures, 2, "a checkpoint is bounded rather than capturing every provider request");
+		await fire(fp, "tool_execution_end", { type: "tool_execution_end", toolCallId: "click", toolName: "click", result: {}, isError: false }, { cwd, model });
+		const afterAction = await context();
+		assert.ok(afterAction.some((message: any) => message.customType === "pi-munchkin:visual-checkpoint"));
+		assert.equal(captures, 3, "a successful UI action forces the next checkpoint");
+		await fire(fp, "agent_settled", { type: "agent_settled" }, { cwd, model });
+		await context();
+		assert.equal(captures, 3, "settled agents do not keep observing the screen");
 	} finally {
 		if (previous === undefined) delete process.env.VISION; else process.env.VISION = previous;
 	}

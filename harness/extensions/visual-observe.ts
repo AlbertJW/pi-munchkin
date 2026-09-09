@@ -20,6 +20,7 @@ const IMAGE_MIME: Record<string, string> = { ".png": "image/png", ".jpg": "image
 type VisualModel = { provider?: unknown; id?: unknown; baseUrl?: unknown; contextWindow?: unknown; input?: unknown; modalities?: unknown; supportsVision?: unknown; capabilities?: { input?: unknown } };
 export type VisualCapture = { bytes: Uint8Array; mime: string; width: number; height: number; device_scale?: number; viewport?: CaptureCrop; captured_at?: number };
 export type VisualToolOptions = { samAdapter?: SamAdapter; sessionId?: string; capture?: (source: "screen" | "browser", sourceId: string, crop?: CaptureCrop, signal?: AbortSignal) => Promise<VisualCapture> };
+type ActiveVisual = { source: "screen" | "browser"; source_id: string; question: string; crop?: CaptureCrop; force: boolean; checkpoint_count: number };
 
 function modelFingerprint(model: VisualModel): string {
 	// Context epochs already normalize provider, model, declared window, and an
@@ -62,18 +63,110 @@ function visualTokenEstimate(width: number, height: number): number {
 	return Math.min(16_384, Math.max(256, Math.ceil(width * height / 256)));
 }
 
+function validateCapture(captured: VisualCapture): void {
+	if (!captured || typeof captured !== "object" || !(captured.bytes instanceof Uint8Array) || !Object.values(IMAGE_MIME).includes(captured.mime) ||
+		!Number.isSafeInteger(captured.width) || !Number.isSafeInteger(captured.height) || captured.width < 1 || captured.height < 1 ||
+		captured.width > 32_000 || captured.height > 32_000) throw new Error("visual capture has invalid image metadata");
+	if (captured.bytes.byteLength > MAX_IMAGE_BYTES) throw new Error(`visual_observe refuses captures over ${MAX_IMAGE_BYTES} bytes`);
+}
+
 export function registerVisualTools(pi: ExtensionAPI, options: VisualToolOptions = {}): void {
 	if (!ENABLED) return;
 	const cache = new VisualObservationCache();
 	const sessionId = options.sessionId ?? randomUUID();
 	const defaultCapture = createMacScreenCapture();
 	const capture = options.capture ?? defaultCapture;
-	pi.on("session_start", async () => cache.clear());
+	let activeVisual: ActiveVisual | null = null;
+	let checkpointInFlight: Promise<unknown> | null = null;
+	let checkpointAbort: AbortController | null = null;
+	let lifecycleGeneration = 0;
+	pi.on("session_start", async () => { lifecycleGeneration += 1; checkpointAbort?.abort(); checkpointAbort = null; cache.clear(); activeVisual = null; });
 	// A cache match is only meaningful in the same transcript and serving epoch.
 	// Pi emits these lifecycle events before the next model request, so invalidate
 	// rather than relying on the model to remember the force-refresh instruction.
-	pi.on("session_compact", async () => cache.clear());
-	pi.on("model_select", async () => cache.clear());
+	pi.on("session_compact", async () => { lifecycleGeneration += 1; checkpointAbort?.abort(); checkpointAbort = null; cache.clear(); if (activeVisual) { activeVisual.force = true; activeVisual.checkpoint_count = 0; } });
+	pi.on("model_select", async () => { lifecycleGeneration += 1; checkpointAbort?.abort(); checkpointAbort = null; cache.clear(); if (activeVisual) { activeVisual.force = true; activeVisual.checkpoint_count = 0; } });
+	pi.on("agent_settled", async () => { lifecycleGeneration += 1; checkpointAbort?.abort(); checkpointAbort = null; activeVisual = null; cache.clear(); });
+	pi.on("session_shutdown", async () => { lifecycleGeneration += 1; checkpointAbort?.abort(); checkpointAbort = null; activeVisual = null; cache.clear(); });
+	pi.on("tool_execution_end", async (event) => {
+		if (!activeVisual || event.isError || typeof event.toolName !== "string") return;
+		if (/click|type|drag|drop|scroll|navigate|submit|close|open|select|keypress|mouse/i.test(event.toolName)) {
+			activeVisual.force = true;
+			activeVisual.checkpoint_count = 0;
+		}
+	});
+
+	// A visual observation explicitly arms a lightweight watcher. The watcher is
+	// intentionally bounded: it samples every third context assembly, and a
+	// successful UI-changing tool or lifecycle boundary forces the next sample.
+	// Images are returned through the context event, never written to telemetry.
+	pi.on("context", async (event, ctx) => {
+		if (!activeVisual) return;
+		if (checkpointInFlight) await checkpointInFlight.catch(() => undefined);
+		const active = activeVisual;
+		if (!active) return;
+		active.checkpoint_count += 1;
+		if (!active.force && active.checkpoint_count % 3 !== 0) return;
+		if (!supportsVision(modelFor(ctx))) return;
+		const generation = lifecycleGeneration;
+		const abort = new AbortController();
+		checkpointAbort = abort;
+		const run = (async () => {
+			try {
+				const captured = await capture(active.source, active.source_id, active.crop, abort.signal);
+				if (activeVisual !== active || lifecycleGeneration !== generation || abort.signal.aborted) return null;
+				validateCapture(captured);
+				const model = modelFor(ctx);
+				const deviceScale = captured.device_scale ?? 1;
+				const capturedAt = captured.captured_at ?? Date.now();
+				const png = captured.mime === "image/png" ? pngLuma(captured.bytes) : null;
+				const digest = imageDigest(captured.bytes);
+				const geometry = geometryFor(captured.width, captured.height, deviceScale, captured.viewport ?? active.crop);
+				const request = {
+					session_id: sessionId, source: active.source, source_id: active.source_id, geometry,
+					exact_sha256: digest, phash: png ? perceptualHash(png.luma, png.width, png.height) : null,
+					region_digests: png ? regionDigests(png.luma, png.width, png.height) : null,
+					question: active.question, model_fingerprint: modelFingerprint(model), analysis_version: "visual-observe/v1",
+					ttl_ms: DEFAULT_TTL_MS, force: active.force, captured_at: capturedAt,
+				};
+				const decision = cache.decide(request);
+				record("visual-observe", "cache", visualTelemetry(decision));
+				if (activeVisual !== active || lifecycleGeneration !== generation) return null;
+				active.force = false;
+				active.checkpoint_count = 0;
+				if (decision.decision === "exact_reuse" || decision.decision === "near_reuse") return null;
+				const reservation = reserveContextOutput(`visual-checkpoint-${randomUUID()}`, visualTokenEstimate(captured.width, captured.height));
+				if (reservation && !reservation.ok) throw new Error("visual evidence exceeds the remaining context allowance; compact or crop the image before retrying");
+				const observation = cache.put(request, undefined, captured.bytes);
+				const metadata = `[visual checkpoint ${decision.decision} observation=${observation.observation_id} sha256=${digest.slice(0, 16)} size=${captured.bytes.byteLength} geometry=${captured.width}x${captured.height}@${geometry.device_scale} captured_at=${capturedAt}]`;
+				return {
+					role: "custom" as const,
+					customType: "pi-munchkin:visual-checkpoint",
+					content: [
+						{ type: "image" as const, data: Buffer.from(captured.bytes).toString("base64"), mimeType: captured.mime },
+						{ type: "text" as const, text: `${metadata} Fresh visual evidence after a bounded checkpoint; use it to validate the current UI.` },
+					],
+					display: false,
+					details: { decision: decision.decision, observation_id: observation.observation_id, geometry, captured_at: capturedAt },
+					timestamp: Date.now(),
+				};
+			} catch {
+				// Keep force set so a failed capture/admission is retried at the next
+				// safe context boundary, without exposing raw adapter errors to the model.
+				if (activeVisual === active && lifecycleGeneration === generation) active.force = true;
+				return null;
+			}
+		})();
+		checkpointInFlight = run;
+		try {
+			const message = await run;
+			if (!message) return;
+			return { messages: [...event.messages, message] };
+		} finally {
+			if (checkpointInFlight === run) checkpointInFlight = null;
+			if (checkpointAbort === abort) checkpointAbort = null;
+		}
+	});
 
 	pi.registerTool(defineTool({
 		name: "visual_observe",
@@ -116,8 +209,7 @@ export function registerVisualTools(pi: ExtensionAPI, options: VisualToolOptions
 				if (!params.source_id) throw new Error("visual_observe requires source_id for screen or browser sources");
 				if (signal?.aborted) throw new Error("visual observation cancelled");
 				const captured = await capture(source, params.source_id, params.crop, signal);
-				if (!captured || typeof captured !== "object" || !(captured.bytes instanceof Uint8Array) || !Object.values(IMAGE_MIME).includes(captured.mime) || !Number.isSafeInteger(captured.width) || !Number.isSafeInteger(captured.height) || captured.width < 1 || captured.height < 1 || captured.width > 32_000 || captured.height > 32_000) throw new Error("visual capture has invalid image metadata");
-				if (captured.bytes.byteLength > MAX_IMAGE_BYTES) throw new Error(`visual_observe refuses captures over ${MAX_IMAGE_BYTES} bytes`);
+				validateCapture(captured);
 				bytes = captured.bytes; mime = captured.mime; width = captured.width; height = captured.height; sourceId = params.source_id;
 				if (captured.device_scale != null) deviceScale = captured.device_scale;
 				if (captured.captured_at != null) capturedAt = captured.captured_at;
@@ -132,6 +224,12 @@ export function registerVisualTools(pi: ExtensionAPI, options: VisualToolOptions
 			record("visual-observe", "cache", visualTelemetry(decision));
 			const metadata = `[visual ${decision.decision} observation=${decision.matched_observation_id ?? "new"} sha256=${digest.slice(0, 16)} size=${bytes.byteLength} geometry=${width}x${height}@${geometry.device_scale} captured_at=${capturedAt} model_epoch=${request.model_fingerprint.slice(0, 16)}]`;
 			const reuse = decision.decision === "exact_reuse" || decision.decision === "near_reuse";
+			if (source !== "image") {
+				lifecycleGeneration += 1;
+				checkpointAbort?.abort();
+				checkpointAbort = null;
+				activeVisual = { source, source_id: sourceId, question: params.question, crop: params.crop, force: false, checkpoint_count: 0 };
+			}
 			if (!reuse) {
 				const reservation = reserveContextOutput(_id, visualTokenEstimate(width, height));
 				if (reservation && !reservation.ok) throw new Error("visual evidence exceeds the remaining context allowance; compact or crop the image before retrying");
