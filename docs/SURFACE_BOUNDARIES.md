@@ -469,6 +469,24 @@ complete nonresearch slate plus the eight bounded research-parent receipts.
 Current source-surface SHA-256:
 `9aed85c14ebae22b7f255d00fbe9eb7a8a90b023a450291837ef9cf40e67bc18`.
 
+## Pending surface boundary — 2026-09-09 (research claim identity compatibility)
+
+Repository-only package-3 correction `94b012b` adds an optional `claim_id` to
+`research_note`. When a research plan supplies an identifier, the evidence card
+now preserves that identifier even if the model paraphrases the claim text;
+omitting it retains the prior deterministic text-derived ID. The focused Ketch
+suite passes 25/25 and the full harness suite passes 809/809. This is a
+compatibility input, not automatic retrieval-to-ledger recording: notes still
+need the existing research-round boundary until the aggregate integration is
+complete.
+
+Current package-source SHA-256:
+`14a30d13e43149e01dfd4d1ac4e5676d3032187143874b368332a52f9f1619b2`.
+
+No inference, calibration, mirror, rollout, or default change occurred. The
+boundary is pending a separately approved release; measurements cannot pool
+across it.
+
 ## Data at rest: where a research session actually lands (updated 2026-08-10)
 
 A surface hash bounds what the MODEL sees. It says nothing about what a session LEAVES. Those are

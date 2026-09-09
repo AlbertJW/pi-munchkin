@@ -2,7 +2,7 @@
 
 Approved specification, 2026-09-08. Implementation is in progress; this document is not a release receipt. Retired goals remain archived.
 
-Implementation checkpoint: [foundation and aggregate corrections](evidence/HARNESS_UPGRADE_FOUNDATION_2026-09-08.md). Packages 1 and 2 have landed as source-only rollback points; package 3 now has the parent-owned budget/deadline guard, bounded status views, and a dark one-call `research_finish` terminal contract. Automatic retrieval-to-ledger receipts, sole aggregate authority, and full deadline/delivery qualification remain pending. Packages 4 and 5 remain pending. Existing repository changes predating this upgrade are not evidence that these packages have landed.
+Implementation checkpoint: [foundation and aggregate corrections](evidence/HARNESS_UPGRADE_FOUNDATION_2026-09-08.md). Packages 1 and 2 have landed as source-only rollback points; package 3 now has the parent-owned budget/deadline guard, bounded status views, a dark one-call `research_finish` terminal contract, and a compatibility-safe `research_note` claim-ID input. Automatic retrieval-to-ledger receipts, sole aggregate authority, and full deadline/delivery qualification remain pending. Packages 4 and 5 remain pending. Existing repository changes predating this upgrade are not evidence that these packages have landed.
 
 ## Direction and acceptance
 
