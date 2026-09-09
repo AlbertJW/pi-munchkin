@@ -1,0 +1,35 @@
+{
+  "schema": "pi.vision-contract/v1",
+  "revision": "2026-09-09-qwen-vision-1",
+  "model_roles": {
+    "protocol": "local-llamacpp/ling3-tiny-fast",
+    "quality": "local-llamacpp/qwen36-35b-iq3s-vision"
+  },
+  "arms": ["uncached", "exact_cache", "near_cache", "sam_assisted"],
+  "metrics": [
+    "image_delivery",
+    "cache_hit_quality",
+    "missed_changes",
+    "stale_target_refusals",
+    "targeting_errors",
+    "grounding_attempts",
+    "grounding_accuracy",
+    "unsafe_actions_blocked",
+    "model_calls",
+    "context_tokens",
+    "latency_ms",
+    "memory_bytes"
+  ],
+  "frames": {
+    "base": "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=",
+    "text_change": "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+AcAAQUBAScY42YAAAAASUVORK5CYII=",
+    "popup": "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+Q8AAQUBAScY42YAAAAASUVORK5CYII="
+  },
+  "cases": [
+    { "id": "stable-window", "frame": "base", "change": "none", "required_fresh": false, "target": false },
+    { "id": "repeated-window", "frame": "base", "change": "none", "required_fresh": false, "target": false },
+    { "id": "tiny-text-change", "frame": "text_change", "change": "text", "required_fresh": true, "target": false },
+    { "id": "popup-appears", "frame": "popup", "change": "popup", "required_fresh": true, "target": true },
+    { "id": "stale-target", "frame": "base", "change": "action", "required_fresh": true, "target": true }
+  ]
+}

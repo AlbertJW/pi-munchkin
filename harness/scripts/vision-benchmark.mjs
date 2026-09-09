@@ -7,8 +7,7 @@ import { dirname, join } from "node:path";
 import { VisualObservationCache, imageDigest, pngLuma, perceptualHash } from "../lib/visual-observation.ts";
 
 const root = dirname(fileURLToPath(import.meta.url));
-const fixturePath = join(root, "..", "tests", "fixtures", "vision-contract-v1.json");
-const fixture = JSON.parse(await readFile(fixturePath, "utf8"));
+const defaultFixturePath = join(root, "..", "tests", "fixtures", "vision-contract-v1.json");
 
 function stable(value) {
   if (value === null || typeof value !== "object") return JSON.stringify(value);
@@ -24,6 +23,15 @@ function args() {
     else if (value.startsWith("--") && process.argv[i + 1]) out[value.slice(2)] = process.argv[++i];
   }
   return out;
+}
+const options = args();
+const fixturePath = typeof options.manifest === "string" ? options.manifest : defaultFixturePath;
+let fixture;
+try {
+  fixture = JSON.parse(await readFile(fixturePath, "utf8"));
+} catch {
+  console.error("vision benchmark could not load the requested manifest");
+  process.exitCode = 4;
 }
 function validateManifest(value) {
   if (!value || value.schema !== "pi.vision-contract/v1" || typeof value.revision !== "string" || !value.model_roles || typeof value.model_roles.protocol !== "string" || typeof value.model_roles.quality !== "string") throw new Error("invalid vision fixture manifest");
@@ -59,10 +67,19 @@ function runArm(arm) {
   return { arm, image_delivery: imageDelivery, cache_hit_quality: cacheHits === 0 ? "uncached" : missedChanges === 0 ? "safe" : "hint_only", missed_changes: missedChanges, stale_target_refusals: staleTargetRefusals, targeting_errors: targetingErrors, grounding_attempts: groundingAttempts, grounding_accuracy: groundingAttempts ? `${groundingValid}/${groundingAttempts}` : "not_measured", unsafe_actions_blocked: unsafeActionsBlocked, model_calls: modelCalls, context_tokens: contextTokens, latency_ms: Math.round((performance.now() - started) * 100) / 100, memory_bytes: process.memoryUsage().heapUsed };
 }
 
-validateManifest(fixture);
-const options = args();
-const manifestSha = digest(fixture);
-if (!options.selftest && !options.dry && !options.run) {
+if (fixture) {
+  try {
+    validateManifest(fixture);
+  } catch {
+    console.error("invalid vision fixture manifest");
+    process.exitCode = 4;
+  }
+}
+const manifestSha = fixture ? digest(fixture) : null;
+if (!fixture || process.exitCode === 4) {
+  // Loading and validation failures are terminal and never reach a model or
+  // mutate a result directory.
+} else if (!options.selftest && !options.dry && !options.run) {
   console.error("vision benchmark requires --selftest, --dry, or explicit --run --approve-sha <sha256>");
   process.exitCode = 2;
 } else if (options.selftest) {

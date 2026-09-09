@@ -4,6 +4,7 @@ import { spawnSync } from "node:child_process";
 import { join } from "node:path";
 
 const script = join(process.cwd(), "harness", "scripts", "vision-benchmark.mjs");
+const qwenVisionManifest = join(process.cwd(), "harness", "tests", "fixtures", "vision-contract-qwen36-35b-vision-v1.json");
 const run = (...args: string[]) => spawnSync(process.execPath, ["--experimental-strip-types", script, ...args], { encoding: "utf8", env: { ...process.env, TELEMETRY: "off" } });
 
 test("vision benchmark selftest and dry modes are deterministic and offline", () => {
@@ -31,4 +32,14 @@ test("vision benchmark approval and model binding fail closed", () => {
 	assert.equal(measured.inference, false);
 	assert.deepEqual(measured.arms.map((arm: { arm: string }) => arm.arm), ["uncached", "exact_cache", "near_cache", "sam_assisted"]);
 	assert.equal(measured.arms.find((arm: { arm: string }) => arm.arm === "near_cache").missed_changes, 2);
+});
+
+test("vision benchmark binds a newly prepared manifest and its registered vision model", () => {
+	const dry = run("--dry", "--manifest", qwenVisionManifest);
+	assert.equal(dry.status, 0);
+	const prepared = JSON.parse(dry.stdout);
+	assert.equal(prepared.quality_model, "local-llamacpp/qwen36-35b-iq3s-vision");
+	const result = run("--run", "--manifest", qwenVisionManifest, "--approve-sha", prepared.manifest_sha256, "--model", prepared.quality_model);
+	assert.equal(result.status, 0);
+	assert.equal(JSON.parse(result.stdout).model, prepared.quality_model);
 });
