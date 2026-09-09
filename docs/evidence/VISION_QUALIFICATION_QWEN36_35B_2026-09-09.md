@@ -110,7 +110,9 @@ runner (`sam2==1.1.0`, checkpoint SHA-256
 used from an isolated temporary environment. Both target cases produced no
 valid mask, so the receipt records two grounding failures and deliberately
 does not claim a grounding accuracy score. A follow-up quality pack still
-needs real screenshot cases with answer and geometry oracles. Ling remains a
+needs a controlled real-UI screenshot with independently captured geometry
+ground truth; the three-frame synthetic pack and exploratory desktop
+attachment below are not that evidence. Ling remains a
 protocol-only cohort and must not be pooled with this result. Separately, the
 full harness suite verifies that delegated research evidence cannot settle a
 parent branch until the parent rereads each source and records a validated
