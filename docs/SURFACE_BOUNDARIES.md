@@ -794,6 +794,22 @@ with preregistered semantic and geometry oracles is still required.
 Source commit: `4d5dfc7`.
 Current package-source SHA-256: `50e1e7b87104181c6a539b1287a14c1be17723afdc1981704f8d4e51a1304cdc`.
 
+## Pending surface boundary — 2026-09-09 (explicit visual uncertainty contract)
+
+`visual_observe` now exposes an optional `uncertain` input in its model-facing
+contract. Setting it fences the current cache scope and forces fresh evidence;
+the fence remains until a fresh observation is successfully stored. This is a
+small model-visible addition to the safety fix above and does not authorize
+clicks or alter the dark defaults.
+
+Focused visual tests remain 18/18; the preceding complete harness verification
+is 845/845, with typecheck and secret scan passing. The live Qwen qualification
+is still **DARK, NOT PROMOTION-READY** pending a preregistered screenshot pack
+with semantic and geometry oracles.
+
+Source commit: `1f2bb9b`.
+Current package-source SHA-256: `db6d674db53aabef32ba3fb7352d71e87cee806eda772a29e143841f8d70e214`.
+
 ## Data at rest: where a research session actually lands (updated 2026-08-10)
 
 A surface hash bounds what the MODEL sees. It says nothing about what a session LEAVES. Those are
