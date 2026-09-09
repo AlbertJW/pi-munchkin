@@ -20,16 +20,19 @@ No raw endpoint, image bytes, or model response text is retained here.
 ## Live arm results
 
 Each fresh delivery was sent to the loaded Qwen route as a multimodal
-`image_url` request. Cache-hit cases made no provider request. `answer_present`
-means the provider returned non-empty final answer text; it is not a semantic
-correctness score because this frozen transport fixture has no answer oracle.
+`image_url` request. Cache-hit cases made no provider request. The canonical
+rerun used `temperature=0`, `reasoning_format=none`, and `max_tokens=512` so a
+complete final answer could be scored. `answer_supported` means the final
+answer described the frozen near-black pixel oracle (`black`, `dark`, `blank`,
+or `empty`); this is deliberately a narrow transport oracle, not a UI-quality
+claim.
 
-| arm | image deliveries | cache hits | missed required changes | stale-target refusals | model calls | answer present | grounding | prompt tokens | completion tokens | total tokens | model latency (ms) | wall (ms) | client peak RSS | server memory |
-| --- | ---: | ---: | ---: | ---: | ---: | ---: | --- | ---: | ---: | ---: | ---: | ---: | ---: | --- |
-| uncached | 5 | 0 | 0 | 0 | 5 | 2/5 | not run | 278 | 1,155 | 1,433 | 78,961.62 | 78,964.31 | 88,768,512 | unavailable (router metrics disabled) |
-| exact-cache | 4 | 1 | 0 | 0 | 4 | 1/4 | not run | 223 | 943 | 1,166 | 64,369.75 | 64,371.78 | 64,028,672 | unavailable (router metrics disabled) |
-| near-cache | 2 | 3 | 2 | 1 | 2 | 0/2 | not run | 110 | 512 | 622 | 34,856.53 | 34,858.86 | 57,573,376 | unavailable (router metrics disabled) |
-| SAM-assisted | 3 | 2 | 1 | 0 | 3 | 2/3 | 0 valid / 2 failed (not scored) | 125 | 664 | 789 | 57,091.11 | 57,093 (approx.) | 42,909,696 | unavailable (router metrics disabled) |
+| arm | image deliveries | cache hits | missed required changes | stale-target refusals | model calls | answer present | answer supported | grounding | prompt tokens | completion tokens | total tokens | model latency (ms) | wall (ms) | client peak RSS | server memory |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | --- | ---: | ---: | ---: | ---: | ---: | ---: | --- |
+| uncached | 5 | 0 | 0 | 0 | 5 | 5/5 | 5/5 | not run | 228 | 1,565 | 1,793 | 122,311.21 | 122,315.59 | 58,032,128 | unavailable (router metrics disabled) |
+| exact-cache | 4 | 1 | 0 | 0 | 4 | 4/4 | 4/4 | not run | 183 | 1,269 | 1,452 | 99,431.67 | 99,433.08 | 56,950,784 | unavailable (router metrics disabled) |
+| near-cache | 2 | 3 | 2 | 1 | 2 | 2/2 | 2/2 | not run | 90 | 479 | 569 | 37,737.52 | 37,738.46 | 56,279,040 | unavailable (router metrics disabled) |
+| SAM-assisted | 3 | 2 | 1 | 0 | 3 | 3/3 | 3/3 | 0 valid / 2 failed (not scored) | 137 | 991 | 1,128 | 67,181.04 | 98,117.38 | 52,559,872 | unavailable (router metrics disabled) |
 
 The exact-cache arm behaved safely for the frozen repeated frame. The
 near-cache arm demonstrates why perceptual reuse remains hint-only: it reused
@@ -39,11 +42,10 @@ refusal. No click or other UI action was issued.
 
 ## Interpretation and limits
 
-Qwen accepted the multimodal transport and returned image-grounded reasoning;
-the earlier Pi `AgentSession` smoke on the repository image also produced a
-specific visual description. The tiny frozen frames are transport/cache
-fixtures rather than a meaningful UI benchmark, and their manifest contains
-no semantic answer oracle, so this receipt does not qualify answer quality or
+Qwen accepted the multimodal transport and returned supported final
+descriptions for every fresh call under the canonical rerun. The tiny frozen
+frames are still transport/cache fixtures rather than a meaningful UI
+benchmark, so the near-black oracle does not qualify general answer quality or
 grounding accuracy. Client RSS is measured; the router exposes no memory
 metrics endpoint. SAM grounding accuracy is not measured because fabricating
 a segmenter result would invalidate the receipt.
@@ -67,7 +69,9 @@ protocol-only cohort and must not be pooled with this result.
 
 ## Reproduction boundary
 
-The three executable arms were run once against the live local router with
-temperature `0`, bounded `max_tokens=256`, and one request per fresh case.
-The SAM arm used the isolated runner and official checkpoint above. No
+The canonical four-arm run used the live local router with temperature `0`,
+`reasoning_format=none`, bounded `max_tokens=512`, and one request per fresh
+case. The SAM arm used the isolated runner and official checkpoint above. The
+earlier 256-token pass is retained as diagnostic history but is superseded by
+the complete-answer measurements in the table. No
 mirror, deployment, source-default change, or adoption decision occurred.
