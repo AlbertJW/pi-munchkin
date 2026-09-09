@@ -12,8 +12,8 @@
       "frame": "base",
       "question": "Which colored button is on the right side of the interface? Answer BLUE or RED.",
       "answer_regex": "\\bBLUE\\b",
-      "oracle_box": { "x": 420, "y": 260, "width": 160, "height": 56 },
-      "hint_box": { "x": 400, "y": 240, "width": 200, "height": 96 }
+      "oracle_box": { "x": 440, "y": 278, "width": 120, "height": 20 },
+      "hint": { "kind": "point", "x": 500, "y": 288 }
     }
   ],
   "frames": {
