@@ -72,9 +72,9 @@ fresh observation and independent target validation.
   `AgentSession` image block, cancellation, local-target validation, ephemeral
   frame cleanup, digest binding, geometry and adapter validation, bounded
   automatic lifecycle checkpoints, and no-click authority.
-- The complete harness suite passes 842/842; the focused suite and TypeScript
+- The complete harness suite passes 843/843; the focused suite and TypeScript
   typecheck pass after the local-region, cancellation, and lifecycle additions. The
-  195-file package smoke passes after this package.
+  196-file package smoke passes after this package.
 - The benchmark passes `--selftest`, `--dry`, and explicit approval-hash
   validation. No network or inference is used by the benchmark.
 - Package entries include the capture, SAM, benchmark, and fixture files.
