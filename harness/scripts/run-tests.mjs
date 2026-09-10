@@ -70,6 +70,14 @@ Object.assign(childEnv, {
 	HOME: tempHome,
 	XDG_CONFIG_HOME: join(tempHome, ".config"),
 });
+// A hung test must fail the build, not linger. `--test-timeout` bounds any single
+// ASYNC test (the runner interrupts between awaits and keeps going). The spawnSync
+// `timeout` is the hard backstop for a SYNCHRONOUS spin that never yields — the
+// 3-day 100%-CPU zombie a pre-fix `preserveContextSections` left behind, which the
+// runner could not self-abort. The whole serial suite runs in ~2 min healthy;
+// 15 min is a generous ceiling that still turns an infinite hang into a fast fail.
+const PER_TEST_TIMEOUT_MS = 120_000;
+const SUITE_TIMEOUT_MS = 900_000;
 try {
 	const result = spawnSync(
 		process.execPath,
@@ -78,15 +86,20 @@ try {
 		// of the fixture contract; individual tests that hold a shared coordinator
 		// also opt out of Node's intra-file concurrency. Parallel scheduling can
 		// otherwise reset a live compaction lease from an unrelated test.
-		["--experimental-strip-types", "--test-concurrency=1", "--test", ...tests],
+		["--experimental-strip-types", "--test-concurrency=1", `--test-timeout=${PER_TEST_TIMEOUT_MS}`, "--test", ...tests],
 		{
 			cwd: process.cwd(),
 			env: childEnv,
 			stdio: "inherit",
+			timeout: SUITE_TIMEOUT_MS,
+			killSignal: "SIGKILL",
 		},
 	);
 	const leaks = escapedTestRows();
-	if (leaks.length) {
+	if (result.signal === "SIGKILL" && result.status === null) {
+		console.error(`test suite exceeded ${SUITE_TIMEOUT_MS / 1000}s wall clock and was killed — a test is hung. Inspect the last file printed above.`);
+		process.exitCode = 1;
+	} else if (leaks.length) {
 		console.error(`test telemetry isolation failure: ${leaks.length} test-tagged row(s) escaped to ${liveFile}:`);
 		for (const leak of leaks) console.error(`  ${leak}`);
 		process.exitCode = 1;

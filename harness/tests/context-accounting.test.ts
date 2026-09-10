@@ -285,6 +285,20 @@ test("preservation projection never exceeds an extremely small caller cap", () =
 	}
 });
 
+test("preservation projection terminates on a long input against a narrow cap", () => {
+	// Regression: the earlier backwards-shortening loop could reach a line whose
+	// computed room equalled its current length and spin forever for narrow caps.
+	// A pre-fix dev run of this exact shape left a 3-day 100%-CPU zombie. A correct
+	// monotone pass returns in microseconds; assert it returns at all, fast.
+	const long = "criterion evidence ".repeat(400);
+	const start = performance.now();
+	for (const cap of [7, 13, 41, 64, 100, 511, 512, 1000]) {
+		const result = preserveContextSections({ active_state: "ACTIVE", objective: long, next_action: long }, cap);
+		assert.ok(result.text.length <= cap, `cap=${cap} must remain hard`);
+	}
+	assert.ok(performance.now() - start < 1000, "preserveContextSections must not spin on a narrow cap");
+});
+
 test("serving-window shrink creates a distinct accounting epoch", () => {
 	const before = contextProfileFor(model, 3);
 	const after = withServingWindow(before, 16_384);

@@ -24,7 +24,7 @@ if (!CHILD) {
 		try {
 	const output = execFileSync(process.execPath, [
 				"--experimental-strip-types", "--experimental-loader", resolve("harness/tests/ts-js-resolver.mjs"), "--test", import.meta.filename,
-			], { cwd: process.cwd(), env, encoding: "utf8", stdio: "pipe" });
+			], { cwd: process.cwd(), env, encoding: "utf8", stdio: "pipe", timeout: 120_000, killSignal: "SIGKILL" });
 			assert.match(output, /pass 69/);
 		} finally { rmSync(artifacts, { recursive: true, force: true }); }
 	});
@@ -275,7 +275,7 @@ if (!CHILD) {
 			], {
 				cwd: process.cwd(),
 				env: { ...process.env, PLAN_GRAPH_TEST_CHILD: "1", PLAN_GRAPH_CREATE_FAILURE_TEST: "1", PLAN_GRAPH: "on", DEEP_RESEARCH_PLANNING: "on", RESEARCH_LEDGER: "on", PLAN_TOOL_GO: "on", PLAN_STORAGE: "project" },
-				encoding: "utf8", stdio: "pipe",
+				encoding: "utf8", stdio: "pipe", timeout: 120_000, killSignal: "SIGKILL",
 			});
 			return;
 		}
@@ -311,7 +311,7 @@ if (!CHILD) {
 			], {
 				cwd: process.cwd(),
 				env: { ...process.env, PLAN_GRAPH_TEST_CHILD: "1", PLAN_GRAPH_RESERVATION_FAILURE_TEST: "1", PLAN_GRAPH: "on", DEEP_RESEARCH_PLANNING: "on", RESEARCH_LEDGER: "on", PLAN_TOOL_GO: "on", PLAN_STORAGE: "project" },
-				encoding: "utf8", stdio: "pipe",
+				encoding: "utf8", stdio: "pipe", timeout: 120_000, killSignal: "SIGKILL",
 			});
 			return;
 		}
@@ -347,7 +347,7 @@ if (!CHILD) {
 			], {
 				cwd: process.cwd(),
 				env: { ...process.env, PLAN_GRAPH_TEST_CHILD: "1", PLAN_GRAPH_MERGE_FAILURE_TEST: "1", PLAN_GRAPH: "on", DEEP_RESEARCH_PLANNING: "on", RESEARCH_LEDGER: "on", PLAN_TOOL_GO: "on", PLAN_STORAGE: "project" },
-				encoding: "utf8", stdio: "pipe",
+				encoding: "utf8", stdio: "pipe", timeout: 120_000, killSignal: "SIGKILL",
 			});
 			return;
 		}
@@ -795,6 +795,7 @@ if (!CHILD) {
 			cwd: process.cwd(), env: { ...process.env, LEASE_CWD: cwd, LEASE_CONTEXT: JSON.stringify(context) },
 			stdio: ["ignore", "pipe", "pipe"],
 		});
+		child.unref();
 		child.stdout.setEncoding("utf8");
 		let output = "";
 		const ready = new Promise<void>((resolveReady, rejectReady) => {
@@ -813,7 +814,11 @@ if (!CHILD) {
 			assert.match(output, /\"ok\":true/);
 		} finally {
 			await import("node:fs/promises").then(({ unlink }) => unlink(lockPath).catch(() => undefined));
-			if (!child.killed) child.kill("SIGTERM");
+			if (!child.killed) {
+				child.kill("SIGTERM");
+				const hardKill = setTimeout(() => child.kill("SIGKILL"), 2_000);
+				child.once("exit", () => clearTimeout(hardKill));
+			}
 		}
 		resetPiGlobals();
 	});
