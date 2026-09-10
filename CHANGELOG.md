@@ -35,6 +35,15 @@ of native calls is incomplete evidence rather than proof the model ignored the
 feature. `GREP_FIND_TOOLS` remains dark and unresolved; no retry, default,
 mirror, deployment, or adoption decision occurred.
 
+### Evaluated (2026-09-10 — bounded Jina Reader extraction screen)
+
+The direct-Ketch versus Reader-wrapped fixed-source screen completed all four
+reads while preserving original citation identity. Reader found all four
+frozen terms where direct Ketch found three, and was faster in this one
+observation. This is a retrieval mechanism/utility receipt only; it does not
+establish task-model answer quality, context cost, or a default. `JINA_READER`
+remains off and unresolved, with no mirror, deployment, or adoption decision.
+
 ### Evaluated (2026-09-10 — browser-rendered Qwen Vision screen)
 
 Added a hash-bound real-UI vision probe: it renders a fixed local Chrome dialog,

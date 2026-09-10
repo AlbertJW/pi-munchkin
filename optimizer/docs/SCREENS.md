@@ -17,6 +17,7 @@ result may be pooled with.
 | `FAILURE_EPISODE_BASELINE` | [prereg](screens/PREREG_FAILURE_EPISODE_BASELINE_2026-08.md) | _none_ | SUPERSEDED 2026-08-25 by PREREG_SEMANTIC_LOOP_SCREEN_2026-08.md |
 | `FIXTURE_BAND` | [prereg](screens/PREREG_FIXTURE_BAND_2026-08-11.md) | _none_ | mean gate-pass rate per fixture |
 | `HIERARCHICAL_PLANNER_SCREEN` | [prereg](screens/PREREG_HIERARCHICAL_PLANNER_SCREEN_2026-08.md) | _none_ | STATUS: BLOCKED DRAFT — NO SESSION MAY START |
+| `JINA_READER_CURRENT` | [prereg](screens/PREREG_JINA_READER_CURRENT_2026-09-10.md) | [audit](screens/JINA_READER_CURRENT_AUDIT_2026-09-10.md) | CLEAN NARROW RETRIEVAL RECEIPT — source identity held; 4/4 required terms versus direct Ketch 3/4 in one fixed-source observation; no adoption claim |
 | `QWEN35B_BASELINE` | [prereg](screens/PREREG_QWEN35B_BASELINE_2026-09-01.md) | [audit](screens/QWEN35B_BASELINE_AUDIT_2026-09-01.md) | The explicitly approved, current-surface screen ran one base replicate for parens, equil, and bigdata under invocation 96faf8 |
 | `G03_QWEN35B_REPRESENTATIVE_BASELINE` | [prereg](screens/PREREG_G03_QWEN35B_REPRESENTATIVE_BASELINE_2026-09-07.md) | _none_ | Prepared against the frozen twelve-case pack; execution pending Pi/llama-swap and the research adapter |
 | `GREP_FIND_TOOLS` | [prereg](screens/PREREG_GREP_FIND_TOOLS_2026-09-09.md) | _none_ | STATUS: PREPARED. Activating pi's native grep/find tools in the default surface; mechanism screen verifies they are called before powered trial |
@@ -62,7 +63,7 @@ result may be pooled with.
 | `RUN3_4B` | [prereg](screens/PREREG_RUN3_4B_2026-08-06.md) | _none_ | Primary — deterministic, no judge: |
 | `SEMANTIC_LOOP_SCREEN` | [prereg](screens/PREREG_SEMANTIC_LOOP_SCREEN_2026-08.md) | _none_ | STATUS: PREPARED. No stage of this study may be started without Albert's explicit, > per-stage approval |
 
-_50 screens; 28 carry separate audit files, and the current real-UI vision
+_51 screens; 29 carry separate audit files, and the current real-UI vision
 screen records its frozen protocol and result together. Updated 2026-09-10._
 
 ## Current candidate roster (2026-09-10)

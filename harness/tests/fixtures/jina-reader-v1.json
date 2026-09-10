@@ -1,0 +1,19 @@
+{
+  "schema": "pi.jina-reader-live-screen/v1",
+  "revision": "jina-reader-fixed-public-v1",
+  "ketch_bin": "ketch",
+  "timeout_ms": 30000,
+  "max_chars": 4000,
+  "sources": [
+    {
+      "id": "reader-readme",
+      "url": "https://github.com/jina-ai/Reader",
+      "required_terms": ["LLM-friendly", "Reader"]
+    },
+    {
+      "id": "rfc-2606",
+      "url": "https://www.rfc-editor.org/rfc/rfc2606",
+      "required_terms": ["localhost", "reserved"]
+    }
+  ]
+}
