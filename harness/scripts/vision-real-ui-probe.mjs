@@ -11,7 +11,7 @@ import { execFile } from "node:child_process";
 import { tmpdir } from "node:os";
 import { dirname, resolve } from "node:path";
 import { promisify } from "node:util";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import { atomicWriteFile } from "../lib/private-artifact.ts";
 
 const exec = promisify(execFile);
@@ -62,11 +62,12 @@ async function render(chrome, htmlPath, canvas) {
     const version = String((await exec(chrome, ["--version"], { timeout: 10_000, windowsHide: true })).stdout).trim();
     if (!version) throw new Error("browser renderer did not report a version");
     const chromeArgs = ["--headless=new", "--disable-gpu", "--hide-scrollbars", "--force-device-scale-factor=1", `--window-size=${canvas.width},${canvas.height}`];
-    const dom = String((await exec(chrome, [...chromeArgs, "--dump-dom", `file://${htmlPath}`], { timeout: 30_000, windowsHide: true })).stdout);
+    const htmlUrl = pathToFileURL(htmlPath).href;
+    const dom = String((await exec(chrome, [...chromeArgs, "--dump-dom", htmlUrl], { timeout: 30_000, windowsHide: true })).stdout);
     const match = dom.match(/data-confirm-box="(\d+),(\d+),(\d+),(\d+)"/);
     if (!match) throw new Error("renderer did not expose a geometry oracle");
     const oracle_box = { x: Number(match[1]), y: Number(match[2]), width: Number(match[3]), height: Number(match[4]) };
-    await exec(chrome, [...chromeArgs, `--screenshot=${png}`, `file://${htmlPath}`], { timeout: 30_000, windowsHide: true });
+    await exec(chrome, [...chromeArgs, `--screenshot=${png}`, htmlUrl], { timeout: 30_000, windowsHide: true });
     const bytes = await readFile(png);
     const geometry = pngGeometry(bytes);
     if (geometry.width !== canvas.width || geometry.height !== canvas.height) throw new Error("renderer screenshot geometry does not match manifest");

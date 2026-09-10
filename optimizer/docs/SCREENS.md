@@ -55,7 +55,8 @@ result may be pooled with.
 | `RUN3_4B` | [prereg](screens/PREREG_RUN3_4B_2026-08-06.md) | _none_ | Primary — deterministic, no judge: |
 | `SEMANTIC_LOOP_SCREEN` | [prereg](screens/PREREG_SEMANTIC_LOOP_SCREEN_2026-08.md) | _none_ | STATUS: PREPARED. No stage of this study may be started without Albert's explicit, > per-stage approval |
 
-_42 screens; 21 carry an audit. Updated 2026-09-09._
+_43 screens; 21 carry separate audit files, and the current real-UI vision
+screen records its frozen protocol and result together. Updated 2026-09-10._
 
 ## Current candidate roster (2026-09-10)
 
