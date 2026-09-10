@@ -13,6 +13,13 @@ type RuntimeContext = {
 	ui?: { notify?: (message: string, level?: "info" | "warning" | "error") => void };
 };
 
+type BoundUsage = {
+	tokens: number;
+	contextWindow: number | null;
+	epoch_digest: string;
+	compaction_generation: number;
+};
+
 function profileFor(ctx: RuntimeContext): ContextProfile | null {
 	const model = (ctx.model ?? {}) as { provider?: unknown; id?: unknown; baseUrl?: unknown; contextWindow?: unknown };
 	const shared = globalThis as Record<string, unknown>;
@@ -64,7 +71,8 @@ export default function installContextAdmission(pi: ExtensionAPI): void {
 	let currentProfile: ContextProfile | null = null;
 	let currentEpochDigest: string | null = null;
 	let outputAllowance: number | null = null;
-	let overflowObservation: { tokens: number; contextWindow: number } | null = null;
+	let overflowObservation: BoundUsage | null = null;
+	let compactionGeneration = 0;
 	let pendingRecovery: string | null = null;
 	const attemptedRecovery = new Set<string>();
 	const activeReservations = new Set<string>();
@@ -137,6 +145,7 @@ export default function installContextAdmission(pi: ExtensionAPI): void {
 		attemptedRecovery.clear();
 		ledger.reset();
 		activeReservations.clear();
+		compactionGeneration = 0;
 		currentProfile = profileFromModel((rawCtx as RuntimeContext | undefined)?.model);
 		currentEpochDigest = null;
 		syncEpoch(currentProfile);
@@ -146,6 +155,14 @@ export default function installContextAdmission(pi: ExtensionAPI): void {
 	pi.on("model_select", async (event) => {
 		currentProfile = profileFromModel((event as { model?: unknown }).model);
 		syncEpoch(currentProfile);
+	});
+
+	// Pi reports null usage immediately after compaction. Keep any earlier
+	// overflow as a bound stale observation until a fresh measurement arrives;
+	// it may stop a request, but can never certify capacity in the new generation.
+	pi.on("session_compact", async () => {
+		compactionGeneration += 1;
+		outputAllowance = null;
 	});
 
 	pi.on("before_provider_request", async (event, rawCtx) => {
@@ -179,12 +196,17 @@ export default function installContextAdmission(pi: ExtensionAPI): void {
 			// Pi intentionally returns null after compaction until a new provider
 			// observation exists. Absence must not erase a known overflow.
 			const usableObservation = typeof observed?.tokens === "number" && Number.isFinite(observed.tokens) && observed.tokens >= 0;
+			const binding = epoch ?? contextEpochKey(profile);
+			const currentObservation = usableObservation
+				? { tokens: observed!.tokens!, contextWindow: observed!.contextWindow!, epoch_digest: binding, compaction_generation: compactionGeneration }
+				: overflowObservation ?? observed;
 			accounting = buildContextAccounting((event as { payload?: unknown }).payload, profile, {
-				observedUsage: usableObservation ? observed : overflowObservation ?? observed,
+				observedUsage: currentObservation,
+				compactionGeneration,
 				reservedTokens: reservations.reserved_tokens,
 				reservationCount: reservations.reservation_count,
 			});
-			if (accounting.usage_relation === "over") overflowObservation = { tokens: accounting.observed_context_tokens!, contextWindow: accounting.observed_context_window ?? accounting.effective_window_tokens };
+			if (accounting.usage_relation === "over" && usableObservation) overflowObservation = { tokens: accounting.observed_context_tokens!, contextWindow: accounting.observed_context_window ?? accounting.effective_window_tokens, epoch_digest: binding, compaction_generation: compactionGeneration };
 			else if (accounting.usage_relation === "within" && usableObservation) overflowObservation = null;
 		} catch {
 			// Malformed/cyclic provider payloads must not escape through the runner's

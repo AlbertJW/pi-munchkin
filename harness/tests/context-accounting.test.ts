@@ -50,6 +50,27 @@ test("missing usage cannot erase an observed overflow", async () => {
 	}
 });
 
+test("a retained overflow observation is generation-bound across compaction", async () => {
+	const prior = process.env.CONTEXT_ADMISSION;
+	process.env.CONTEXT_ADMISSION = "on";
+	const fp = makeFakePi();
+	try {
+		const mod = await import(`../extensions/context-admission.ts?generation=${Date.now()}-${Math.random()}`);
+		mod.default(fp.pi as never);
+		const payload = { messages: [{ role: "user", content: "small" }] };
+		let aborted = 0;
+		await fire(fp, "session_start", {}, { model });
+		await fire(fp, "before_provider_request", { payload }, { model, abort: () => { aborted += 1; }, getContextUsage: () => ({ tokens: 32_768, contextWindow: 32_768 }) });
+		await fire(fp, "session_compact", {}, { model });
+		await fire(fp, "before_provider_request", { payload }, { model, abort: () => { aborted += 1; }, getContextUsage: () => ({ tokens: null, contextWindow: 32_768 }) });
+		assert.equal(aborted, 2);
+		assert.equal((globalThis as Record<string, any>).__pi_context_accounting.reason_class, "stale_usage_epoch", "a pre-compaction measurement cannot silently certify post-compaction room");
+	} finally {
+		await fire(fp, "session_shutdown", {}, {});
+		if (prior === undefined) delete process.env.CONTEXT_ADMISSION; else process.env.CONTEXT_ADMISSION = prior;
+	}
+});
+
 test("unsafe admission makes only one coordinated compaction attempt for an unchanged request", async () => {
 	const prior = process.env.CONTEXT_ADMISSION;
 	process.env.CONTEXT_ADMISSION = "on";

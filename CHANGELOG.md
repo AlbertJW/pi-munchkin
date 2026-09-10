@@ -34,6 +34,16 @@ The one-request Qwen Vision screen was a valid negative (`HTTP 200`, no final
 answer, `0/1` coverage), so vision remains dark and unresolved. It was not
 rerun or extended; no default, mirror, click, or adoption decision changed.
 
+### Fixed (2026-09-10 — bind admission observations to their context generation)
+
+Aggregate admission now stamps Pi usage observations with the active serving
+epoch and compaction generation. A pre-compaction overflow keeps blocking an
+unsafe next request, but is classified as stale until a fresh measurement
+arrives; it can no longer be mistaken for current capacity evidence. The
+targeted regression was red before the change and green after it. This changes
+the source boundary, leaves `CONTEXT_ADMISSION=off` by default, and requires a
+new Qwen safety/recovery screen before any adoption decision.
+
 ### Added (2026-09-09 — multi-frame vision quality pack)
 
 The approval-gated vision quality runner now accepts a frozen three-frame
