@@ -1,0 +1,17 @@
+{
+  "schema": "pi.context-admission-live-screen/v1",
+  "revision": "qwen35b-context-admission-v1",
+  "model": "local-llamacpp/qwen36-35b-iq3s",
+  "served_model": "qwen36-35b-iq3s",
+  "declared_context_window": 32768,
+  "max_tokens": 128,
+  "normal_prompt": "Reply with exactly READY.",
+  "oversize_bytes": 200000,
+  "required": {
+    "normal_outcome": "admitted",
+    "oversize_outcome": "rejected",
+    "oversize_reason": "aggregate_budget_exceeded",
+    "normal_forwarded_requests": 1,
+    "oversize_forwarded_requests": 0
+  }
+}

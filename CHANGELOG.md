@@ -11,7 +11,8 @@ was closed. Existing mechanism receipts and absent evaluations do not prove
 adoption or retirement. The corrected register restores unresolved candidates,
 records `MUNCHKIN_TOOL_SURFACE=minimal` as a verified alias of the default
 `core` profile, retains only the existing semantic-loop enforcement no-go, and
-notes that `GREP_FIND_TOOLS` has no runtime implementation. Historical screens
+records the then-inert `GREP_FIND_TOOLS` declaration before its later runtime
+implementation. Historical screens
 are unchanged; no default, mirror, deployment, or deletion decision occurred.
 See `optimizer/docs/QWEN_EXPERIMENTAL_CANDIDATE_REGISTER_2026-09-10.md`.
 
@@ -43,6 +44,17 @@ arrives; it can no longer be mistaken for current capacity evidence. The
 targeted regression was red before the change and green after it. This changes
 the source boundary, leaves `CONTEXT_ADMISSION=off` by default, and requires a
 new Qwen safety/recovery screen before any adoption decision.
+
+### Added (2026-09-10 — bounded current-source context-admission screen)
+
+Added an approval-gated, isolated-Pi context-admission screen with a private
+local forwarding proxy. It binds source, manifest, model, and fixture digests,
+permits one ordinary Qwen request, and verifies that an oversized private
+system-prompt fixture is rejected before dispatch. The first launcher attempt
+never started Pi; the separately frozen V2 exposed both admission outcomes but
+its normal Pi subprocess exited non-zero. A regression now refuses to call that
+a passing screen. `CONTEXT_ADMISSION` remains off and unresolved; no default,
+mirror, deployment, or adoption decision changed.
 
 ### Added (2026-09-09 — multi-frame vision quality pack)
 
