@@ -25,6 +25,15 @@ covered by a targeted red/green activation regression and subagent environment
 classification coverage. This establishes a measurable treatment, not a Qwen
 quality or adoption result.
 
+### Evaluated (2026-09-10 — browser-rendered Qwen Vision screen)
+
+Added a hash-bound real-UI vision probe: it renders a fixed local Chrome dialog,
+independently reads the renderer's target geometry, binds the screenshot and
+renderer identity before inference, and stores a redacted receipt privately.
+The one-request Qwen Vision screen was a valid negative (`HTTP 200`, no final
+answer, `0/1` coverage), so vision remains dark and unresolved. It was not
+rerun or extended; no default, mirror, click, or adoption decision changed.
+
 ### Added (2026-09-09 — multi-frame vision quality pack)
 
 The approval-gated vision quality runner now accepts a frozen three-frame
