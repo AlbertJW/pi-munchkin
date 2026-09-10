@@ -26,6 +26,7 @@
     "typecheck": "tsc -p harness/.typecheck/tsconfig.json --noEmit",
     "health": "bash harness/scripts/pi-health.sh",
     "pack:smoke": "node --experimental-strip-types harness/scripts/package-smoke.mjs",
+    "screen:grep-find": "node --experimental-strip-types harness/scripts/grep-find-live-probe.mjs",
     "vision:benchmark": "node --experimental-strip-types harness/scripts/vision-benchmark.mjs",
     "compat:consumer": "node harness/scripts/compat-consumer.mjs",
     "compat:peers": "node harness/scripts/peer-boundary-smoke.mjs",
@@ -225,6 +226,7 @@
     "harness/scripts/vision-benchmark.mjs",
     "harness/scripts/vision-quality-probe.mjs",
     "harness/scripts/vision-real-ui-probe.mjs",
+    "harness/scripts/grep-find-live-probe.mjs",
     "harness/tests/fixtures/vision-contract-v1.json",
     "harness/tests/fixtures/vision-contract-qwen36-35b-vision-v1.json",
     "harness/tests/fixtures/vision-quality-qwen36-35b-vision-v1.json",
@@ -232,6 +234,7 @@
     "harness/tests/fixtures/vision-real-ui-chrome-v1.json",
     "harness/tests/fixtures/vision-real-ui-lfm25-vl-3b-v1.json",
     "harness/tests/fixtures/vision-real-ui-lfm25-vl-3b-v2.json",
+    "harness/tests/fixtures/grep-find-qwen-v1.json",
     "harness/tests/fixtures/vision-quality-qwen36-35b-vision-v2.json"
   ]
 }

@@ -20,6 +20,7 @@ result may be pooled with.
 | `QWEN35B_BASELINE` | [prereg](screens/PREREG_QWEN35B_BASELINE_2026-09-01.md) | [audit](screens/QWEN35B_BASELINE_AUDIT_2026-09-01.md) | The explicitly approved, current-surface screen ran one base replicate for parens, equil, and bigdata under invocation 96faf8 |
 | `G03_QWEN35B_REPRESENTATIVE_BASELINE` | [prereg](screens/PREREG_G03_QWEN35B_REPRESENTATIVE_BASELINE_2026-09-07.md) | _none_ | Prepared against the frozen twelve-case pack; execution pending Pi/llama-swap and the research adapter |
 | `GREP_FIND_TOOLS` | [prereg](screens/PREREG_GREP_FIND_TOOLS_2026-09-09.md) | _none_ | STATUS: PREPARED. Activating pi's native grep/find tools in the default surface; mechanism screen verifies they are called before powered trial |
+| `QWEN35B_GREP_FIND_CURRENT` | [prereg](screens/PREREG_QWEN35B_GREP_FIND_CURRENT_2026-09-10.md) | [audit](screens/QWEN35B_GREP_FIND_CURRENT_AUDIT_2026-09-10.md) | INCOMPLETE / UNRESOLVED — both arms made no tool call and missed the final oracle; treatment active surface was not independently captured |
 | `QWEN35B_BASELINE_REPLACEMENT` | [prereg](screens/PREREG_QWEN35B_BASELINE_REPLACEMENT_2026-08-27.md) | _none_ | This replaces PREREG_QWEN35B_BASELINE_SHADOW_2026-08-27.md, whose partial rows are permanently non-authoritative and must not be resumed or pooled |
 | `QWEN35B_BASELINE_SHADOW` | [prereg](screens/PREREG_QWEN35B_BASELINE_SHADOW_2026-08-27.md) | _none_ | Prepared before inference |
 | `QWEN35B_BASELINE_TIMEOUT_RETRY` | [prereg](screens/PREREG_QWEN35B_BASELINE_TIMEOUT_RETRY_2026-09-01.md) | [audit](screens/QWEN35B_BASELINE_TIMEOUT_RETRY_AUDIT_2026-09-01.md) | The explicitly approved timeout-only replacement run completed one base replicate for parens, equil, and bigdata under invocation 3c3dd2 with PI_TIMEO |
@@ -61,7 +62,7 @@ result may be pooled with.
 | `RUN3_4B` | [prereg](screens/PREREG_RUN3_4B_2026-08-06.md) | _none_ | Primary — deterministic, no judge: |
 | `SEMANTIC_LOOP_SCREEN` | [prereg](screens/PREREG_SEMANTIC_LOOP_SCREEN_2026-08.md) | _none_ | STATUS: PREPARED. No stage of this study may be started without Albert's explicit, > per-stage approval |
 
-_49 screens; 27 carry separate audit files, and the current real-UI vision
+_50 screens; 28 carry separate audit files, and the current real-UI vision
 screen records its frozen protocol and result together. Updated 2026-09-10._
 
 ## Current candidate roster (2026-09-10)

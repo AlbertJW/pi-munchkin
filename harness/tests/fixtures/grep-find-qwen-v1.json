@@ -1,0 +1,14 @@
+{
+  "schema": "pi.grep-find-live-screen/v1",
+  "revision": "qwen35b-grep-find-v1",
+  "model": "local-llamacpp/qwen36-35b-iq3s",
+  "served_model": "qwen36-35b-iq3s",
+  "declared_context_window": 32768,
+  "max_tokens": 128,
+  "max_provider_requests_per_case": 4,
+  "expected_final_sha256": "0debc05369e59b38c70f7f3acade35ad350bda743b0dc0273d72efcf4df29135",
+  "cases": [
+    { "id": "control", "grep_find": "off" },
+    { "id": "treatment", "grep_find": "on" }
+  ]
+}

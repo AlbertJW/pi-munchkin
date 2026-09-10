@@ -12,6 +12,7 @@ test("Pi JSON screen summaries retain tool counts and final-answer digest withou
 	const summary = summarizePiJsonScreen(raw);
 	assert.deepEqual(summary, {
 		bash_starts: 1, bash_ends: 1, bash_errors: 1, max_visible_bash_chars: 9001,
+		tool_starts: { bash: 1 }, tool_ends: { bash: 1 }, tool_errors: { bash: 1 },
 		final_text_sha256: createHash("sha256").update("NOISY_RECOVERED").digest("hex"), final_text_bytes: 15,
 	});
 	assert.equal(JSON.stringify(summary).includes("NOISY_RECOVERED"), false);

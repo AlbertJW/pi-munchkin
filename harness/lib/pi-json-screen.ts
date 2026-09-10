@@ -7,9 +7,20 @@ export type PiJsonScreenStats = {
 	bash_ends: number;
 	bash_errors: number;
 	max_visible_bash_chars: number;
+	/** Counts only stable Pi builtin names; never captures model-controlled tool labels. */
+	tool_starts: Record<string, number>;
+	tool_ends: Record<string, number>;
+	tool_errors: Record<string, number>;
 	final_text_sha256: string | null;
 	final_text_bytes: number;
 };
+
+const SAFE_TOOL_NAMES = new Set(["bash", "read", "grep", "find", "edit", "write"]);
+
+function increment(target: Record<string, number>, name: unknown): void {
+	if (typeof name !== "string" || !SAFE_TOOL_NAMES.has(name)) return;
+	target[name] = (target[name] ?? 0) + 1;
+}
 
 function textChars(value: unknown): number {
 	if (!Array.isArray(value)) return 0;
@@ -30,10 +41,15 @@ function finalText(value: unknown): string | null {
 
 /** Convert ephemeral Pi JSON mode output into safe, content-free outcome facts. */
 export function summarizePiJsonScreen(text: string): PiJsonScreenStats {
-	const stats: PiJsonScreenStats = { bash_starts: 0, bash_ends: 0, bash_errors: 0, max_visible_bash_chars: 0, final_text_sha256: null, final_text_bytes: 0 };
+	const stats: PiJsonScreenStats = { bash_starts: 0, bash_ends: 0, bash_errors: 0, max_visible_bash_chars: 0, tool_starts: {}, tool_ends: {}, tool_errors: {}, final_text_sha256: null, final_text_bytes: 0 };
 	for (const line of text.split("\n")) {
 		let event: JsonRecord;
 		try { event = JSON.parse(line) as JsonRecord; } catch { continue; }
+		if (event.type === "tool_execution_start") increment(stats.tool_starts, event.toolName);
+		if (event.type === "tool_execution_end") {
+			increment(stats.tool_ends, event.toolName);
+			if (event.isError === true) increment(stats.tool_errors, event.toolName);
+		}
 		if (event.type === "tool_execution_start" && event.toolName === "bash") stats.bash_starts += 1;
 		if (event.type === "tool_execution_end" && event.toolName === "bash") {
 			stats.bash_ends += 1;

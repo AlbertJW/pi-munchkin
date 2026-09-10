@@ -26,6 +26,15 @@ covered by a targeted red/green activation regression and subagent environment
 classification coverage. This establishes a measurable treatment, not a Qwen
 quality or adoption result.
 
+### Evaluated (2026-09-10 — current-source Qwen native grep/find screen)
+
+A frozen two-arm Qwen mechanism screen completed without timeouts or cap
+breaches, but both arms made no tool call and missed the fixed final oracle.
+The treatment's active roster was not captured before dispatch, so the absence
+of native calls is incomplete evidence rather than proof the model ignored the
+feature. `GREP_FIND_TOOLS` remains dark and unresolved; no retry, default,
+mirror, deployment, or adoption decision occurred.
+
 ### Evaluated (2026-09-10 — browser-rendered Qwen Vision screen)
 
 Added a hash-bound real-UI vision probe: it renders a fixed local Chrome dialog,
