@@ -230,6 +230,8 @@
     "harness/tests/fixtures/vision-quality-qwen36-35b-vision-v1.json",
     "harness/tests/fixtures/vision-real-ui-chrome-v1.html",
     "harness/tests/fixtures/vision-real-ui-chrome-v1.json",
+    "harness/tests/fixtures/vision-real-ui-lfm25-vl-3b-v1.json",
+    "harness/tests/fixtures/vision-real-ui-lfm25-vl-3b-v2.json",
     "harness/tests/fixtures/vision-quality-qwen36-35b-vision-v2.json"
   ]
 }

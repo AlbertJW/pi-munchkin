@@ -35,6 +35,17 @@ The one-request Qwen Vision screen was a valid negative (`HTTP 200`, no final
 answer, `0/1` coverage), so vision remains dark and unresolved. It was not
 rerun or extended; no default, mirror, click, or adoption decision changed.
 
+### Fixed and evaluated (2026-09-10 — real-UI vision provenance and LFM 2.5 VL 3B)
+
+The real-UI vision runner now includes its own source SHA-256 in the prepared
+approval record. A first 3B VLM diagnostic was correctly rejected because it
+lacked that binding; a separately frozen V2 then returned the required answer
+on one browser-rendered image in 176 ms. This is a narrow model-specific
+transport/semantic receipt, not a comparison with Qwen or evidence for visual
+cache, grounding, computer use, or a default change. `VISION=off` and
+`VISION_GROUNDING=sam` remain dark and unresolved; no mirror, deployment, or
+adoption decision occurred.
+
 ### Fixed (2026-09-10 — bind admission observations to their context generation)
 
 Aggregate admission now stamps Pi usage observations with the active serving

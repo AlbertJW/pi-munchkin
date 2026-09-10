@@ -16,6 +16,7 @@ import { atomicWriteFile } from "../lib/private-artifact.ts";
 
 const exec = promisify(execFile);
 const ROOT = fileURLToPath(new URL("..", import.meta.url));
+const SCRIPT_PATH = fileURLToPath(import.meta.url);
 const DEFAULT_MANIFEST = resolve(ROOT, "tests/fixtures/vision-real-ui-chrome-v1.json");
 const DEFAULT_ENDPOINT = "http://127.0.0.1:8080/v1";
 
@@ -93,8 +94,9 @@ if (!htmlPath.startsWith(`${dirname(manifestPath)}/`)) throw new Error("fixture 
 const html = await readFile(htmlPath);
 if (sha(html) !== manifest.fixture_html_sha256) throw new Error("fixture HTML digest does not match manifest");
 const manifestSha = sha(stable(manifest));
+const source = { probe_sha256: sha(await readFile(SCRIPT_PATH)) };
 if (options.dry) {
-  console.log(JSON.stringify({ schema: manifest.schema, revision: manifest.revision, manifest_sha256: manifestSha, fixture_html_sha256: manifest.fixture_html_sha256, quality_model: manifest.model_roles.quality, inference: false }, null, 2));
+  console.log(JSON.stringify({ schema: manifest.schema, revision: manifest.revision, manifest_sha256: manifestSha, source, fixture_html_sha256: manifest.fixture_html_sha256, quality_model: manifest.model_roles.quality, inference: false }, null, 2));
   process.exit(0);
 }
 if (!options.prepare && !options.run) {
@@ -107,7 +109,7 @@ if (typeof options.chrome !== "string") {
 }
 const rendered = await render(options.chrome, htmlPath, manifest.canvas);
 if (JSON.stringify(rendered.oracle_box) !== JSON.stringify(manifest.case.oracle_box)) throw new Error("renderer geometry oracle does not match manifest");
-const prepared = { schema: "pi.vision-real-ui-preparation/v1", revision: manifest.revision, manifest_sha256: manifestSha, fixture_html_sha256: manifest.fixture_html_sha256, screenshot_sha256: sha(rendered.bytes), geometry: rendered.geometry, renderer_oracle_box: rendered.oracle_box, renderer_sha256: rendered.renderer_sha256, quality_model: manifest.model_roles.quality };
+const prepared = { schema: "pi.vision-real-ui-preparation/v1", revision: manifest.revision, manifest_sha256: manifestSha, source, fixture_html_sha256: manifest.fixture_html_sha256, screenshot_sha256: sha(rendered.bytes), geometry: rendered.geometry, renderer_oracle_box: rendered.oracle_box, renderer_sha256: rendered.renderer_sha256, quality_model: manifest.model_roles.quality };
 const approvalSha = sha(stable(prepared));
 if (options.prepare) {
   console.log(JSON.stringify({ ...prepared, approval_sha256: approvalSha, inference: false }, null, 2));

@@ -14,6 +14,7 @@ test("real-UI probe dry mode binds the browser fixture without launching a rende
 	assert.equal(first.quality_model, "local-llamacpp/qwen36-35b-iq3s-vision");
 	assert.match(first.fixture_html_sha256, /^[0-9a-f]{64}$/);
 	assert.match(first.manifest_sha256, /^[0-9a-f]{64}$/);
+	assert.match(first.source.probe_sha256, /^[0-9a-f]{64}$/, "the runnable probe itself must be approval-bound");
 });
 
 test("real-UI probe refuses model mode before renderer execution when approval inputs are absent", () => {

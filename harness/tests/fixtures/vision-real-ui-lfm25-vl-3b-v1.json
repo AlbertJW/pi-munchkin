@@ -1,0 +1,17 @@
+{
+  "schema": "pi.vision-real-ui/v1",
+  "revision": "2026-09-10-lfm25-vl-3b-chrome-confirm-1",
+  "fixture_html": "vision-real-ui-chrome-v1.html",
+  "fixture_html_sha256": "8e2d7e21cc357280a2076841c221bca99ef01036e759b09f6a52348531e31b59",
+  "model_roles": {
+    "quality": "local-llamacpp/lfm25-vl-3b"
+  },
+  "canvas": { "width": 640, "height": 360, "device_scale": 1 },
+  "case": {
+    "id": "confirm-green-button",
+    "question": "What color is the Confirm button in the dialog? Answer GREEN or another single color.",
+    "answer_regex": "\\bGREEN\\b",
+    "oracle_box": { "x": 360, "y": 214, "width": 120, "height": 40 },
+    "hint": { "kind": "point", "x": 420, "y": 234 }
+  }
+}
