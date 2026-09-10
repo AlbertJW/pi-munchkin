@@ -66,6 +66,16 @@ proved its oversized request was blocked before dispatch. This is a narrow
 mechanism/safety receipt only: `CONTEXT_ADMISSION=off` remains the default and
 broader recovery, capacity, and value questions remain unresolved.
 
+### Evaluated (2026-09-10 — current-source Qwen bash-output guard screen)
+
+The isolated, approval-gated four-case Qwen screen completed all final-answer
+oracles, but Qwen duplicated the noisy Bash command in both arms. Treatment
+withheld both oversized results and therefore failed its preregistered
+one-command recovery/exposure rule, even though it reduced visible noisy output
+and did not withhold the ordinary task. The result is recorded as incomplete
+and unresolved; `BASH_OUTPUT_GUARD=off` remains the default. No retry, mirror,
+deployment, or adoption decision occurred.
+
 ### Added (2026-09-09 — multi-frame vision quality pack)
 
 The approval-gated vision quality runner now accepts a frozen three-frame
