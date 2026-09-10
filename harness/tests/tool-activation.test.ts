@@ -144,6 +144,21 @@ test("core profile removes specialists and preserves a small execution spine", a
 	} finally { run.restore(); }
 });
 
+test("GREP_FIND_TOOLS exposes only Pi's native grep/find pair at core startup", async () => {
+	const prior = process.env.GREP_FIND_TOOLS;
+	process.env.GREP_FIND_TOOLS = "on";
+	const run = await load("core", [...names]);
+	try {
+		const active = run.fp.pi.getActiveTools();
+		assert.ok(active.includes("grep"), "candidate must activate native grep");
+		assert.ok(active.includes("find"), "candidate must activate native find");
+		assert.equal(active.includes("ls"), false, "candidate must not widen the core surface beyond its declared pair");
+	} finally {
+		run.restore();
+		if (prior === undefined) delete process.env.GREP_FIND_TOOLS; else process.env.GREP_FIND_TOOLS = prior;
+	}
+});
+
 test("capability activation is additive and a later manual disable wins", async () => {
 	const run = await load("core", [...names]);
 	try {

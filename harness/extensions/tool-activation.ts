@@ -15,6 +15,10 @@ type Profile = "ambient" | "core";
 type LegacyMode = "ambient" | "dynamic" | "phase";
 const PLAN_GRAPH_ENABLED = process.env.PLAN_GRAPH === "on";
 const DEEP_RESEARCH_PLANNING_ENABLED = PLAN_GRAPH_ENABLED && process.env.DEEP_RESEARCH_PLANNING === "on";
+// The candidate is deliberately narrow: Pi-native grep/find become part of the
+// core surface only when explicitly opted in. `ls` and every other optional
+// builtin remain deferred, and an explicit user allowlist still wins below.
+const NATIVE_GREP_FIND_ENABLED = process.env.GREP_FIND_TOOLS === "on";
 // A skill-scoped parent lease for the dark deep-research graph. This is
 // deliberately a separate, parent-only opt-in: ordinary sessions keep the
 // bounded core surface, and delegated children must not inherit the lease.
@@ -357,6 +361,7 @@ export default function (pi: ExtensionAPI): void {
 			const activeGoalTools = new Set(activeGoal ? familyTools("goals", allNames) : []);
 			const core = [...pool].filter((name) =>
 				(CORE_NAMES.has(name) && (activePlan || (name !== "plan_write" && name !== "plan_update"))) ||
+				(NATIVE_GREP_FIND_ENABLED && (name === "grep" || name === "find")) ||
 				activeGoalTools.has(name) || (HEADLESS_PLAN_ENABLED && HEADLESS_PLAN_TOOLS.has(name)) ||
 				(BRANCH_PLANNER_PROCESS && name === "branch_plan"));
 			setTo(deferred, [...pool].filter((name) => !core.includes(name)));

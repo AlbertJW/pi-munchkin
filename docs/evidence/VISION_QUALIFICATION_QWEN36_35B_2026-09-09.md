@@ -1,5 +1,21 @@
 # Qwen 35B vision qualification receipt — 2026-09-09
 
+## Correction — 2026-09-10: exploratory desktop grounding is non-authoritative
+
+The exploratory desktop row below reports a `646×360` capture and a SAM box
+`{x:17,y:25,width:764,height:46}`, which ends at x=781. Those facts cannot
+describe the same harness observation: `refineWithSam` rejects a box outside
+the exact capture geometry before exposing a result. The direct runner used for
+that exploratory probe therefore either received a differently sized image or
+reported a different coordinate space. Its geometry, score, and “valid” label
+are non-authoritative and are not evidence of grounding quality or safety.
+
+The original paragraph is retained below as historical diagnostic text. The
+synthetic transport/geometry rows remain only the narrow evidence stated in
+their own limits. A future real-UI screen must retain the original frame,
+capture geometry, runner input geometry, transform record, and harness-checked
+output in one bound private artifact.
+
 ## Scope and provenance
 
 This is the first explicit live screen for the router's

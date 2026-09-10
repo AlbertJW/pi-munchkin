@@ -56,10 +56,11 @@ result may be pooled with.
 
 _42 screens; 21 carry an audit. Updated 2026-09-09._
 
-## Current candidate roster (2026-09-09)
+## Current candidate roster (2026-09-10)
 
-The active Qwen dark-candidate queue is closed. See
-[`DARK_CANDIDATE_DISPOSITION_QWEN_2026-09-09.md`](DARK_CANDIDATE_DISPOSITION_QWEN_2026-09-09.md)
-for the three bounded approvals, eight retirements, preserved historical
-receipts, and the rule that any reopening needs a fresh preregistration. This
+The 2026-09-09 closure was premature and is superseded. See
+[`QWEN_EXPERIMENTAL_CANDIDATE_REGISTER_2026-09-10.md`](QWEN_EXPERIMENTAL_CANDIDATE_REGISTER_2026-09-10.md)
+for the current unresolved roster, the verified minimal-profile alias, the
+retained semantic-loop no-go, preserved historical receipts, and the requirement
+that every new Qwen screen be freshly preregistered. This
 note does not edit the append-only screen rows above.

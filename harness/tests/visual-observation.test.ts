@@ -120,6 +120,7 @@ test("SAM grounding binds result to the exact observation and never asserts clic
 	assert.equal(result.click_safe, null);
 	validateGroundingResult(request, result);
 	await assert.rejects(() => refineWithSam({ name: "sam", version: "v", refine: async () => ({ segmenter: "sam", segmenter_version: "v", mask_digest: "c".repeat(64), box: { x: 8, y: 8, width: 16, height: 16 }, safe_point: { x: 8, y: 8 }, model_score: 0.9 }) }, request), /interior/);
+	await assert.rejects(() => refineWithSam({ name: "sam", version: "v", refine: async () => ({ segmenter: "sam", segmenter_version: "v", mask_digest: "c".repeat(64), box: { x: 17, y: 25, width: 764, height: 46 }, safe_point: { x: 120, y: 47 }, model_score: 0.4 }) }, { ...request, geometry: { width: 646, height: 360, device_scale: 1 } }), /outside observation/, "a result in another image coordinate space must never cross the harness boundary");
 });
 
 test("visual observe delivers image content to a vision model and reuses exact frames", async () => {

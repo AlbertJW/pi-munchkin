@@ -110,12 +110,11 @@ per-trial validity rubric. It is still not part of the getting-started path; rou
 human-started, one at a time, and no candidate is adopted or deleted without a separate human
 decision.
 
-The Qwen-facing dark-candidate queue was dispositioned on 2026-09-09. Three mechanisms are
-approved for explicit bounded use (`CONTEXT_ADMISSION`, the vision/screenshot path, and
-`BASH_OUTPUT_GUARD`); the remaining eight are retired from the active queue. Their flags and
-compatibility paths remain off or opt-in, and a retired item can return only through a new
-preregistration and fresh evidence. The authoritative register is
-[`optimizer/docs/DARK_CANDIDATE_DISPOSITION_QWEN_2026-09-09.md`](optimizer/docs/DARK_CANDIDATE_DISPOSITION_QWEN_2026-09-09.md).
+The 2026-09-09 Qwen dark-candidate closure was premature: mechanism receipts and missing
+evaluations cannot establish adoption or retirement. Experimental flags remain off or opt-in;
+the current register identifies the one verified redundant alias, the retained semantic-loop
+no-go, and the candidates that still need a hash-bound Qwen screen. See
+[`optimizer/docs/QWEN_EXPERIMENTAL_CANDIDATE_REGISTER_2026-09-10.md`](optimizer/docs/QWEN_EXPERIMENTAL_CANDIDATE_REGISTER_2026-09-10.md).
 
 ---
 
@@ -211,6 +210,7 @@ model's own window in place with one resume handoff.
 | `GOAL_SCOPE` | `worktree`; goal ledgers are private to the current worktree | `project` shares one private ledger across linked Git worktrees via the repository's common root; non-Git directories fall back to their resolved cwd |
 | `CONTEXT_HANDOFF` | on; model switches and safe-budget crossings may request one bounded native compaction and follow-up; rearm is strictly below 75% of the safe-input token budget when absolute tokens are available, otherwise below 70% of Pi's native usage percentage | `off` disables automatic handoff while retaining context profiles |
 | `CONTEXT_DISCOVERY` | off; context profiles use model metadata and local serving truth only | `on` sends one synthetic, local-only handshake per serving fingerprint; it never sends transcript or tool data |
+| `GREP_FIND_TOOLS` | unset; Pi-native `grep` and `find` remain outside the bounded core surface | `on` adds only those two native tools at core startup; it does not enable `ls` or override an explicit user tool selection |
 | `PLAN_GRAPH` | `off`; graph schemas, `plan_expand`, `plan_settle`, and branch reports are absent. The `planning` capability family itself is always available and additively activates the flat `plan_write`/`plan_update` pair, so skills and models can structure multi-item work without `/plan` (2026-08-25) | `on` enables the reusable v5 graph substrate without activating a skill profile |
 | `DEEP_RESEARCH_PLANNING` | `off`; complex research follows the existing bounded skill path | requires `PLAN_GRAPH=on` and `RESEARCH_LEDGER=on`; exposes complex-only `research_plan_start` plus the parent-only `research_round` evidence-gap ledger with a hard 3-search/5-distinct-source-read global envelope, one-shot branch leases, and five parent validation reads. A successful graph start activates the parent research and delegation families through the normal capability boundary. |
 | `SPAWN_DELEGATION` | default-on; delegation guidance recommends `mode=spawn` with self-contained tasks | `off` restores the fork wording |

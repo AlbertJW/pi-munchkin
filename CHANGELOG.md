@@ -4,17 +4,26 @@ All notable changes to pi-munchkin are documented here. Releases follow semantic
 
 ## Unreleased
 
-### Decided (2026-09-09 — Qwen dark-candidate roster)
+### Corrected (2026-09-10 — Qwen experimental-candidate record)
 
-The current Qwen-facing dark-candidate queue is now closed. `CONTEXT_ADMISSION`,
-the Qwen vision/screenshot path, and `BASH_OUTPUT_GUARD` are approved only for
-explicit bounded use behind their existing flags. The planner/deep-research
-graph, research ledger, enforced semantic loop, working memory, minimal tool
-surface, context discovery, Jina Reader candidate, and grep/find activation are
-retired from the active Qwen candidate roster. Defaults remain unchanged and
-historical screens remain immutable. See
-`optimizer/docs/DARK_CANDIDATE_DISPOSITION_QWEN_2026-09-09.md` for the evidence,
-router availability note, and reopening rules.
+Superseded the premature 2026-09-09 claim that the Qwen dark-candidate queue
+was closed. Existing mechanism receipts and absent evaluations do not prove
+adoption or retirement. The corrected register restores unresolved candidates,
+records `MUNCHKIN_TOOL_SURFACE=minimal` as a verified alias of the default
+`core` profile, retains only the existing semantic-loop enforcement no-go, and
+notes that `GREP_FIND_TOOLS` has no runtime implementation. Historical screens
+are unchanged; no default, mirror, deployment, or deletion decision occurred.
+See `optimizer/docs/QWEN_EXPERIMENTAL_CANDIDATE_REGISTER_2026-09-10.md`.
+
+### Fixed (2026-09-10 — native grep/find candidate reaches its declared surface)
+
+`GREP_FIND_TOOLS=on` previously existed only in optimizer configuration and
+had no harness runtime reader. It now adds exactly Pi's native `grep` and
+`find` tools to the bounded core profile, while leaving `ls` and other optional
+tools deferred and preserving explicit user tool selection. The change is
+covered by a targeted red/green activation regression and subagent environment
+classification coverage. This establishes a measurable treatment, not a Qwen
+quality or adoption result.
 
 ### Added (2026-09-09 — multi-frame vision quality pack)
 
