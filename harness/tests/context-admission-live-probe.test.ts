@@ -14,6 +14,8 @@ test("context-admission probe dry mode freezes fixture and source inputs without
 	assert.equal(first.model, "local-llamacpp/qwen36-35b-iq3s");
 	assert.match(first.approval_sha256, /^[0-9a-f]{64}$/);
 	assert.match(first.source.context_admission_sha256, /^[0-9a-f]{64}$/);
+	assert.match(first.source.probe_sha256, /^[0-9a-f]{64}$/, "the runnable probe itself must be approval-bound");
+	assert.match(first.source.local_proxy_route_sha256, /^[0-9a-f]{64}$/, "the forwarding route policy must be approval-bound");
 });
 
 test("context-admission probe refuses a model run without the frozen approval", () => {

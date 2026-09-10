@@ -56,6 +56,16 @@ its normal Pi subprocess exited non-zero. A regression now refuses to call that
 a passing screen. `CONTEXT_ADMISSION` remains off and unresolved; no default,
 mirror, deployment, or adoption decision changed.
 
+### Fixed (2026-09-10 — context-screen proxy and provenance binding)
+
+The isolated context-screen proxy now preserves a provider request that already
+contains the configured API base path instead of forwarding it as `/v1/v1/...`.
+The probe, its evaluation policy, and its route policy are now included in the
+approval digest. A fresh V3 screen then completed its normal Qwen request and
+proved its oversized request was blocked before dispatch. This is a narrow
+mechanism/safety receipt only: `CONTEXT_ADMISSION=off` remains the default and
+broader recovery, capacity, and value questions remain unresolved.
+
 ### Added (2026-09-09 — multi-frame vision quality pack)
 
 The approval-gated vision quality runner now accepts a frozen three-frame

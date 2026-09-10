@@ -16,12 +16,16 @@ import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { atomicWriteFile } from "../lib/private-artifact.ts";
 import { evaluateContextAdmissionScreen } from "../lib/context-admission-screen.ts";
+import { localProxyTarget } from "../lib/local-proxy-route.ts";
 
+const SCRIPT_PATH = fileURLToPath(import.meta.url);
 const ROOT = fileURLToPath(new URL("..", import.meta.url));
 const DEFAULT_MANIFEST = resolve(ROOT, "tests/fixtures/context-admission-qwen-v1.json");
 const DEFAULT_ENDPOINT = "http://127.0.0.1:8080/v1";
 const CONTEXT_ADMISSION = resolve(ROOT, "extensions/context-admission.ts");
 const TELEMETRY_FLUSH = resolve(ROOT, "extensions/telemetry-flush.ts");
+const SCREEN_EVALUATOR = resolve(ROOT, "lib/context-admission-screen.ts");
+const LOCAL_PROXY_ROUTE = resolve(ROOT, "lib/local-proxy-route.ts");
 
 function sha(value) { return createHash("sha256").update(value).digest("hex"); }
 function stable(value) {
@@ -80,7 +84,7 @@ async function makeProxy(target) {
     for await (const chunk of request) chunks.push(chunk);
     requests += 1;
     try {
-      const upstream = await fetch(`${target}${request.url ?? "/"}`, { method: request.method, headers: { "content-type": String(request.headers["content-type"] ?? "application/json") }, body: Buffer.concat(chunks) });
+      const upstream = await fetch(localProxyTarget(target, request.url ?? "/"), { method: request.method, headers: { "content-type": String(request.headers["content-type"] ?? "application/json") }, body: Buffer.concat(chunks) });
       response.statusCode = upstream.status;
       const contentType = upstream.headers.get("content-type");
       if (contentType) response.setHeader("content-type", contentType);
@@ -144,7 +148,13 @@ const manifestPath = resolve(typeof options.manifest === "string" ? options.mani
 const manifest = JSON.parse(await readFile(manifestPath, "utf8"));
 validateManifest(manifest);
 const manifestSha = sha(stable(manifest));
-const source = { context_admission_sha256: sha(await readFile(CONTEXT_ADMISSION)), telemetry_flush_sha256: sha(await readFile(TELEMETRY_FLUSH)) };
+const source = {
+  probe_sha256: sha(await readFile(SCRIPT_PATH)),
+  context_admission_sha256: sha(await readFile(CONTEXT_ADMISSION)),
+  telemetry_flush_sha256: sha(await readFile(TELEMETRY_FLUSH)),
+  screen_evaluator_sha256: sha(await readFile(SCREEN_EVALUATOR)),
+  local_proxy_route_sha256: sha(await readFile(LOCAL_PROXY_ROUTE)),
+};
 const prepared = { schema: "pi.context-admission-live-preparation/v1", revision: manifest.revision, manifest_sha256: manifestSha, source, model: manifest.model, served_model: manifest.served_model, declared_context_window: manifest.declared_context_window, normal_prompt_sha256: sha(manifest.normal_prompt), oversize_fixture_sha256: sha("x".repeat(manifest.oversize_bytes)) };
 const approvalSha = sha(stable(prepared));
 if (options.dry) {
