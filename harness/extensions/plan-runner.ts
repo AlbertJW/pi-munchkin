@@ -1,4 +1,5 @@
 import { subscribeOnce } from "../lib/extension-lifecycle.ts";
+import { currentCompactionOwner } from "../lib/compaction-coordinator.ts";
 import { chmod, mkdir, open, readFile, rename, stat, unlink } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { createHash, randomUUID } from "node:crypto";
@@ -217,6 +218,15 @@ function goalContinuationInstruction(goal: GoalState, decision: "continue" | "se
 
 async function offerGoalContinuation(pi: ExtensionAPI, ctx: { cwd: string; sessionManager: { getSessionId(): string } }): Promise<void> {
 	if (!GOALS_ENABLED || IS_SUBAGENT_PROCESS) return;
+	// A compact_context call resolves asynchronously, well after the tool result
+	// and this agent_end handler. If one is in flight, its own resume offer
+	// already carries this same goal forward (compact-tool reads the current
+	// goal and scopes its continuation to it) once compaction settles. Offering
+	// a second, independent goal continuation here raced the compaction offer
+	// under real timing and delivered two receipts for one lifecycle boundary
+	// (2026-09 G01-E). Defer to the compaction outcome instead of competing
+	// with it; a normal turn re-offers on its own next agent_end regardless.
+	if (currentCompactionOwner() !== null) return;
 	const goal = await readExecutableGoal(ctx.cwd);
 	const decision = goalContinuationDecision(goal);
 	if (decision === "stop" || !goal) return;
