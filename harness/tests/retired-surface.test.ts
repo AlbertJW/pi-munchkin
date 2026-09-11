@@ -37,6 +37,14 @@ test("retired environment options have no loadable runtime reader", () => {
 		// during an incident gets nothing, and this is what stops a reader quietly
 		// reappearing and making the claim half-true.
 		"PLAN_GATE_DIAGNOSTICS", "PLAN_MODE",
+		// 2026-09-10 retirements (c39, c31, c34): all three code gates are deleted, not
+		// merely defaulted off. PLAN_TOOL_GO's plan_go tool is gone entirely; PLAN_UNCERTAINTY
+		// and PLAN_ITEM_GUIDANCE_V2's mechanisms were already deleted by the 2026-08-24
+		// planning refactor (dbf90f4) — this finishes their paperwork. LOOP_EPISODE_MODE is
+		// deliberately NOT here: only its "enforce" hypothesis retired, and the code path for
+		// it stays live and env-reachable per the reopen condition (see the schema-field list
+		// below, and CANDIDATE_RETIREMENTS_2026-09.md).
+		"PLAN_TOOL_GO", "PLAN_UNCERTAINTY", "PLAN_ITEM_GUIDANCE_V2",
 	];
 	const files = ["extensions", "lib", "vendor"]
 		.flatMap((directory) => sourceFiles(join(root, "harness", directory)));
@@ -76,6 +84,13 @@ test("retired extensions and policy are absent from package and active optimizer
 	for (const option of [
 		"CTX_REDUNDANCY_NUDGE", "CTX_REDUNDANCY_PCT", "PLAN_SUBAGENT_ONLY",
 		"MICRO_GATE", "MICRO_GATE_SLOP", "RETRY_FRESH", "RETRY_MODE",
+		// 2026-09-10: PLAN_TOOL_GO/PLAN_UNCERTAINTY/PLAN_ITEM_GUIDANCE_V2 retired outright
+		// (see the loadable-source list above). LOOP_EPISODE_MODE is here ONLY because its
+		// schema field (a value, not a boolean gate) was removed — the code path for its
+		// retired "enforce" value stays live and reachable by explicit env; this line checks
+		// optimizer selectability, not runtime reachability, so it belongs here and nowhere
+		// else in this file (ADR-0006's value/mode-field retirement checklist).
+		"PLAN_TOOL_GO", "PLAN_UNCERTAINTY", "PLAN_ITEM_GUIDANCE_V2", "LOOP_EPISODE_MODE",
 	]) assert.equal(option in thresholds, false, `${option} remains optimizer-active`);
 	assert.deepEqual(thresholds.STATE_LENS, ["off", "steer"]);
 });

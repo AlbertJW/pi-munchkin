@@ -19,7 +19,7 @@ export type CapabilityTool = {
  * every deferred pool, and permanently uncallable whenever their flags were on.
  */
 export const PLAN_SURFACE_TOOLS: readonly string[] = [
-	"plan_write", "plan_update", "plan_go", "plan_expand", "plan_settle", "research_plan_start",
+	"plan_write", "plan_update", "plan_expand", "plan_settle", "research_plan_start",
 	"research_finish",
 ];
 

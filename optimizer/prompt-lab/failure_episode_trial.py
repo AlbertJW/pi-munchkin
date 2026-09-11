@@ -28,7 +28,9 @@ REPO = OPTIMIZER.parent
 REAL_GATE = OPTIMIZER / "real_gate.sh"
 CONFIG_ROOT = LAB / "configs"
 BASE_CONFIG = CONFIG_ROOT / "baseline.json"
-CAND_CONFIG = CONFIG_ROOT / "pending" / "semantic-loop-enforce.json"
+# Retired 2026-09-10 (optimizer/docs/archive/CANDIDATE_RETIREMENTS_2026-09.md);
+# moved out of pending/ with its bytes unchanged, so this binds the same config.
+CAND_CONFIG = CONFIG_ROOT / "retired" / "semantic-loop-enforce.json"
 STAGES = ("preflight", "calibrate", "power", "primary", "primary-report", "replication", "final-report")
 SCHEMA = "pi.failure-episode-study/v1"
 HASH = re.compile(r"^[0-9a-f]{64}$")

@@ -2214,3 +2214,37 @@ Evidence the ordering fix bites, from the same smoke: `run-capsule` now emits an
 checkpoints. Under alphabetical order it loaded before the kernel and its `session_start`
 readiness was immediately disarmed by the kernel's starting snapshot — the exact symptom the
 inspection predicted, now absent.
+
+---
+
+## 2026-09-10 — first multi-candidate retirement under ADR-0006; a paperwork correction
+
+Retired four dark candidates in one pass, each on its own already-recorded grounds — full
+mechanics and reasoning in `optimizer/docs/archive/CANDIDATE_RETIREMENTS_2026-09.md`:
+`PLAN_TOOL_GO` (c39, zero remaining clients since the 2026-08-12 batch), `PLAN_UNCERTAINTY`
+(c31) and `PLAN_ITEM_GUIDANCE_V2` (c34) (finishing paperwork the 2026-08-24 planning refactor,
+`dbf90f4`, left half-done when it deleted their code gates), and the `LOOP_EPISODE_MODE=enforce`
+hypothesis (register verdict: "Retire the current enforcement hypothesis... reopen only with a
+concrete repair"). The c31/c34 verdicts recorded above (2026-08-07, `NEUTRAL`) are unedited.
+
+`LOOP_EPISODE_MODE` doesn't fit either boolean checklist — it's one value of a multi-value
+schema field, not its own gate — so `optimizer/docs/adr/0006-…md` gained a third, "value/mode-
+field", checklist: remove the value from schema.json, move its pending config to `retired/`,
+leave the code dark and env-reachable per the reopen condition. `shadow` (the default) and
+`off` are untouched.
+
+**Correction to this ADR's own status line:** it read `proposed` since 2026-07-24, but its
+stated Review condition — "promote to `active` once used for a real graduation or retirement"
+— was actually satisfied on **2026-07-29**, when `c33-subagent-fork-default`'s retirement (named
+in the ADR as "the intended first exercise") was ratified and landed (`6192559`, `50f21d9`).
+The status field was simply never updated. Today's four-candidate batch is this ADR's *second*
+real execution, not its first, and the first covering more than one candidate at once. `active`
+is set now, five weeks late.
+
+Also recorded, not part of this retirement batch: `FORCE_PLAN_WRITE` and
+`VERIFICATION_PLATEAU=enforce` were separately ratified as judgment adoptions in kill-switch
+form (2026-08-24) — deliberately *not* this ADR's graduation checklist, which removes the flag
+entirely. See `optimizer/docs/DARK_CANDIDATE_VERDICTS_2026-09-10.md`.
+
+Full verification receipt, source surface hash, and the accompanying bottom-up audit:
+`docs/HARNESS_AUDIT_2026-09-10.md`.

@@ -34,7 +34,12 @@ DEFAULT_FIXTURES = [
     "audit-sweep",
 ]
 BASE_CONFIG = os.path.join(HERE, "configs", "baseline.json")
-CAND_CONFIG = os.path.join(HERE, "configs", "pending", "semantic-loop-enforce.json")
+# The LOOP_EPISODE_MODE=enforce hypothesis was retired 2026-09-10 (see
+# optimizer/docs/archive/CANDIDATE_RETIREMENTS_2026-09.md); this config moved to
+# retired/ with its bytes unchanged, so the hash this script binds is unaffected.
+# The reopen condition that doc states ("a concrete repair and a fresh
+# preregistration") is exactly what this manifest-builder exists to support.
+CAND_CONFIG = os.path.join(HERE, "configs", "retired", "semantic-loop-enforce.json")
 
 
 def sha256_file(path):

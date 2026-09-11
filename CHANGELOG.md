@@ -4,6 +4,40 @@ All notable changes to pi-munchkin are documented here. Releases follow semantic
 
 ## Unreleased
 
+### Fixed (2026-09-10 — a pending compaction could deliver a duplicate goal continuation)
+
+`compact_context`'s own continuation resolves asynchronously, after its tool
+call returns; plan-runner's `agent_end` handler offered a competing goal
+continuation for the same turn synchronously. Under real timing the two could
+land in separate arbiter flushes and both dispatch, delivering two receipts
+for one lifecycle boundary (reproduced 1/40 runs; 0/60 after the fix, under
+the same loop). `offerGoalContinuation` now defers to a compaction already in
+flight; the compaction's own continuation already carries the active goal
+forward once it settles.
+
+### Removed (2026-09-10 — four dark candidates retired; ADR-0006's first multi-candidate pass)
+
+`PLAN_TOOL_GO` (c39; zero remaining clients since the 2026-08-12 batch — the
+`plan_go` tool it registered, and its grant in the optimizer gate's base tool
+list, are both gone; the user-facing `/plan-go` command is unaffected),
+`PLAN_UNCERTAINTY` (c31) and `PLAN_ITEM_GUIDANCE_V2` (c34) (finishing
+schema/gate paperwork the 2026-08-24 planning refactor left behind when it
+deleted their code), and the `LOOP_EPISODE_MODE=enforce` hypothesis (register
+verdict: retire the hypothesis, reopen only with a concrete repair — `shadow`
+and `off` are unaffected). Full mechanics in
+`optimizer/docs/archive/CANDIDATE_RETIREMENTS_2026-09.md`.
+
+### Corrected (2026-09-10 — ADR-0006's status was five weeks stale)
+
+`optimizer/docs/adr/0006-candidate-graduation-and-retirement-playbook.md` read
+`proposed` since 2026-07-24, but its own promotion condition — a real
+graduation or retirement having actually run — was satisfied 2026-07-29 by the
+c33-subagent-fork-default retirement. The status field was never updated;
+this pass corrects it to `active` and separately records `FORCE_PLAN_WRITE`
+and `VERIFICATION_PLATEAU=enforce` as judgment adoptions in kill-switch form
+(2026-08-24, `41ab87b`/`079cc9b`) rather than this ADR's graduation checklist.
+See `optimizer/docs/DARK_CANDIDATE_VERDICTS_2026-09-10.md`.
+
 ### Corrected (2026-09-10 — Qwen experimental-candidate record)
 
 Superseded the premature 2026-09-09 claim that the Qwen dark-candidate queue

@@ -186,12 +186,13 @@ test("/reload: a capability family still activates after the factories are re-in
 
 // --- invariant 4: every deferred tool has a route back --------------------
 
-// The dark flags register additional tools (plan_go, plan_expand, plan_settle,
+// The dark flags register additional tools (plan_expand, plan_settle,
 // research_plan_start, research_finish, branch_plan). Running the invariants only at defaults means
 // a tool that exists solely behind a flag is never checked for a route back — which
-// is precisely how `plan_go` came to be registered, stripped, and uncallable.
+// is precisely how the retired `plan_go` tool (c39, removed 2026-09-10) once came to
+// be registered, stripped, and uncallable.
 test("dark-flag boot: nothing a flag registers is stripped without a route", async () => {
-	await withEnv({ ...BASE_ENV(), PLAN_TOOL_GO: "on", PLAN_GRAPH: "on" }, async () => {
+	await withEnv({ ...BASE_ENV(), PLAN_GRAPH: "on" }, async () => {
 		const { baseline, active, deferred } = await boot();
 		const accounted = new Set([...active, ...deferred]);
 		const orphaned = baseline.filter((name) => !accounted.has(name));
@@ -203,7 +204,7 @@ test("dark-flag boot: nothing a flag registers is stripped without a route", asy
 });
 
 test("cold boot: every deferred tool is reachable through some capability family", async () => {
-	await withEnv({ ...BASE_ENV(), PLAN_TOOL_GO: "on" }, async () => {
+	await withEnv({ ...BASE_ENV() }, async () => {
 		const { fp, cwd, deferred } = await boot();
 		const families = ["research", "delegation", "browser", "canvas", "context", "planning", "goals"] as const;
 		const reachable = new Set<string>();

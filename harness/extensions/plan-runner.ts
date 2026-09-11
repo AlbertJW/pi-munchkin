@@ -83,7 +83,6 @@ export function truncateBytes(value: string, maxBytes: number): string {
 }
 export const FORCE_PLAN_WRITE_DEFAULT: "on" | "off" = "off";
 const FORCE_PLAN_WRITE = (process.env.FORCE_PLAN_WRITE ?? FORCE_PLAN_WRITE_DEFAULT) !== "off";
-const PLAN_TOOL_GO = process.env.PLAN_TOOL_GO === "on";
 export const PLAN_GRAPH_DEFAULT: "on" | "off" = "off";
 export const DEEP_RESEARCH_PLANNING_DEFAULT: "on" | "off" = "off";
 const PLAN_GRAPH = (process.env.PLAN_GRAPH ?? PLAN_GRAPH_DEFAULT) === "on";
@@ -2399,21 +2398,6 @@ export default function (pi: ExtensionAPI): void {
 			pi.registerTool(researchRound);
 			if (PARENT_RESEARCH_WORKFLOW) pi.registerTool(researchFinish);
 		}
-	}
-
-	if (PLAN_TOOL_GO) {
-		pi.registerTool(defineTool({
-			name: "plan_go", label: "Start Plan Execution", description: "Headless opt-in: start the saved plan.", parameters: Type.Object({}),
-			async execute(_id, _params, _signal, _update, ctx) {
-				rejectChildPlanMutation();
-				if (awaitingReview) rejectPlanTool("plan_go rejected: this plan is still awaiting user review. Stop here; the user starts execution.");
-				const outcome = await goTransition(ctx.cwd);
-				if (!outcome.ok) rejectPlanTool(`plan_go rejected: ${outcome.reason}`);
-				setPlanning(false);
-				planEvent("go", outcome.state.run_id, { resumed: false });
-				return { content: [{ type: "text" as const, text: executionPrompt(outcome.state) }], details: { tool_name: "plan_go", success: true } };
-			},
-		}));
 	}
 
 	pi.on("session_start", async (_event, ctx) => {

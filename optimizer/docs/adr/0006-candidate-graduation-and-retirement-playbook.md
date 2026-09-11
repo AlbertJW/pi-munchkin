@@ -1,6 +1,7 @@
 # 0006-candidate-graduation-and-retirement-playbook
 
-- **Status:** proposed
+- **Status:** active (see "Executed" below — belatedly promoted 2026-09-10;
+  this ADR's own Review condition was actually satisfied 2026-07-29)
 - **Date:** 2026-07-24
 - **Superseded by:** none
 
@@ -43,6 +44,25 @@ decides.
 4. Requires the same explicit human sign-off as graduation — this checklist
    documents mechanics, it does not authorize skipping that sign-off.
 
+**Value/mode-field retirement checklist** (added 2026-09-10 — a candidate that is one
+value of a multi-value schema field, not its own boolean gate, so neither list above
+fits cleanly; per the Review condition below, extended rather than replacing them):
+
+1. Remove the retired value from `schema.json`'s field (or the whole field if no
+   other value remains an active candidate); do **not** touch the code path that
+   value selects — it stays reachable by explicit env for the stated reopen
+   condition, which is the entire point of retiring the *hypothesis*, not the
+   *mechanism*.
+2. Move its dedicated static/pending config to `configs/retired/`, bytes
+   unchanged.
+3. Do **not** add the option to `retired-surface.test.ts`'s "no loadable runtime
+   reader" list — that list asserts the option is unreachable, which is false
+   here by design. Do add it to the schema-field list, since it is no longer
+   optimizer-selectable.
+4. Requires the same explicit human sign-off as the other two checklists, and
+   the retirement record must state the reopen condition (a concrete repair
+   and a fresh preregistration), not just "retired."
+
 ## Rationale
 
 `fleet_report.py` already has a fully objective statistical layer (a
@@ -54,6 +74,20 @@ figure out, from scratch, exactly which files change. A written checklist
 turns "win a round" into a mechanical, low-risk operation instead of a
 bespoke exercise invented under whatever time pressure exists when the
 decision finally has to be made.
+
+**Judgment adoptions recorded, not graduated (added 2026-09-10).** Several
+candidates were separately adopted by flipping their default from
+`=== "on"` to `!== "off"` while deliberately keeping the flag as a kill switch
+and the schema field for suppression arms — most recently `FORCE_PLAN_WRITE`
+(explicit-only planning became the default, `41ab87b`, 2026-08-24) and
+`VERIFICATION_PLATEAU=enforce` (`079cc9b`, 2026-08-24). See
+`optimizer/docs/DARK_CANDIDATE_VERDICTS_2026-09-10.md` for the ratified list.
+This is a **deliberately different, reversible action** from this ADR's
+graduation checklist, which removes the flag entirely — "reversible
+deployments, not measured wins" per
+`optimizer/docs/archive/DARK_CANDIDATE_VERDICTS_2026-08-03.md`. Do not read a
+kill-switch-form adoption as this ADR's graduation checklist having run; it
+has not, for either flag, and nothing here proposes running it.
 
 ## Evidence / incident that triggered it
 
@@ -103,3 +137,23 @@ proposal is the intended first exercise). Revisit the checklist itself if a
 future candidate's shape doesn't fit either list cleanly — e.g. a candidate
 that changes a schema field's *values* rather than gating a boolean, or one
 that spans multiple extension files — and extend rather than replace it.
+
+## Executed
+
+This condition was actually satisfied on **2026-07-29**: the c33-subagent-fork-default
+retirement named above as "the intended first exercise" was ratified and landed
+(`6192559`, `50f21d9`; recorded as "First retirement dry-run" in
+`optimizer/docs/archive/CANDIDATE_PRUNING_2026-07.md`). The status line above was
+never updated to reflect it — this is a paperwork correction, not a claim that
+anything new happened just now.
+
+**Second execution, and first *multi-candidate* execution — 2026-09-10 (PR1):**
+retired `PLAN_TOOL_GO` (c39; boolean checklist, `harness/extensions/plan-runner.ts`
++ `optimizer/real_gate.sh` tool-grant per step 5), `PLAN_UNCERTAINTY` (c31) and
+`PLAN_ITEM_GUIDANCE_V2` (c34) (boolean checklist; their code gates were already
+deleted in the 2026-08-24 planning refactor, `dbf90f4` — this finished the
+schema/`real_gate.sh` paperwork left behind), and `LOOP_EPISODE_MODE`'s `enforce`
+value (the new value/mode-field checklist above — the code stays dark and
+env-reachable per the reopen condition recorded in
+`optimizer/docs/QWEN_EXPERIMENTAL_CANDIDATE_REGISTER_2026-09-10.md`). See
+`optimizer/docs/archive/CANDIDATE_RETIREMENTS_2026-09.md` for the full record.

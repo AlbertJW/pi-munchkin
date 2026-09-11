@@ -31,11 +31,13 @@ ARM="${ARM:-both}"                 # base | cand | both
 # the live agent's standard surface (minus deliberate exclusions) or rounds measure
 # a harness that doesn't exist — see the resolution block in run_one() for the
 # 2026-07-23 (plan_write) and 2026-07-28 (subagent, write) incidents this encodes.
-# 2026-08-07: plan_go + span tools joined the base list when their flags went
-# default-on in the harness (ADR-0001: gate tools must mirror the harness
-# surface). A suppression arm setting PLAN_TOOL_GO=off / SPAN_TOOLS=off strips
-# them again below, keeping --tools consistent with what the extension registers.
-GATE_BASE_TOOLS="read,edit,write,bash,plan_write,subagent,plan_go,search_spans,read_span"
+# 2026-08-07: span tools joined the base list when their flag went default-on
+# in the harness (ADR-0001: gate tools must mirror the harness surface). A
+# suppression arm setting SPAN_TOOLS=off strips it again below, keeping
+# --tools consistent with what the extension registers. (plan_go joined this
+# list the same day but the c39 candidate it existed for was retired
+# 2026-09-10 with zero remaining clients; the plan_go tool itself is gone.)
+GATE_BASE_TOOLS="read,edit,write,bash,plan_write,subagent,search_spans,read_span"
 DD="${DD:-qwen36-35b-iq3s}"; PI_TIMEOUT="${PI_TIMEOUT:-1800}"
 PI_MODEL="${PI_MODEL:-}"   # pi model id for the sessions (else pi uses its default — beware external defaults)
 PI_PROVIDER="${PI_PROVIDER:-}"
@@ -303,7 +305,7 @@ ensure_model_loaded() {
 if [[ "$DRY" == 1 ]]; then
 	echo "== real_gate DRY ==  GEN=$GEN  N=$N  base=$(basename "$BASE")  cand=$(basename "$CAND")"
 	echo "execution: network=$GATE_NETWORK model_control=$MODEL_CONTROL provider=${PI_PROVIDER:-auto} model=${PI_MODEL:-auto}"
-	echo "tools: $GATE_BASE_TOOLS (PLAN_TOOL_GO=off / SPAN_TOOLS=off strip their tools)"
+	echo "tools: $GATE_BASE_TOOLS (SPAN_TOOLS=off strips its tools)"
 	if [[ "$MODEL_CONTROL" == "llama" ]]; then
 		if [[ -n "${PI_MODEL:-}" ]]; then
 			requested_state="$(health && model_state "$PI_MODEL" || echo DOWN)"
@@ -599,14 +601,8 @@ PY
 	# unavailable tool (c37's own remote-box round measured nothing useful before
 	# this was caught — every blocked call fell through to the no-subagent path).
 	local env_spawn_delegation=""
-	local env_force_plan_write="" env_plan_uncertainty="" env_plan_item_guidance_v2=""
-	local env_plan_tool_go="" # c39: standalone flag, not folded into the subagent-family branch below
 	for entry in ${session_env[@]+"${session_env[@]}"}; do
 		[[ "$entry" == SPAWN_DELEGATION=* ]] && env_spawn_delegation="${entry#*=}"
-		[[ "$entry" == FORCE_PLAN_WRITE=* ]] && env_force_plan_write="${entry#*=}"
-		[[ "$entry" == PLAN_UNCERTAINTY=* ]] && env_plan_uncertainty="${entry#*=}"
-		[[ "$entry" == PLAN_ITEM_GUIDANCE_V2=* ]] && env_plan_item_guidance_v2="${entry#*=}"
-		[[ "$entry" == PLAN_TOOL_GO=* ]] && env_plan_tool_go="${entry#*=}"
 	done
 	# plan_write is part of the standard harness surface in every real
 	# interactive session; omitting it here measured a harness that doesn't
@@ -624,14 +620,11 @@ PY
 	# the explorer was never measured once (EXPLORER_BACKSTOP_RESEARCH_2026-07.md
 	# blocker 1), while write's absence pushed models to bash heredocs the live
 	# agent never needs. Deliberate exclusions from the base surface: web tools
-	# (network nondeterminism). plan_go and span tools joined the base list
-	# 2026-08-07 when their harness flags went default-on (ADR-0001); an
-	# explicit =off suppression arm strips them here so --tools always mirrors
-	# what the extensions actually register under that arm's env.
+	# (network nondeterminism). span tools joined the base list 2026-08-07 when
+	# its harness flag went default-on (ADR-0001); an explicit =off suppression
+	# arm strips it here so --tools always mirrors what the extension actually
+	# registers under that arm's env.
 	local tools="$GATE_BASE_TOOLS"
-	if [[ "$env_plan_tool_go" == "off" ]]; then
-		tools="${tools//,plan_go/}"
-	fi
 	if [[ "$env_span_tools" == "off" ]]; then
 		tools="${tools//,search_spans/}"; tools="${tools//,read_span/}"
 	fi
@@ -639,7 +632,11 @@ PY
 	# $tools is finalized): a future edit that re-gates a base tool or replaces
 	# $tools wholesale must fail loudly here instead of silently measuring a harness
 	# that doesn't exist — the exact failure mode of the plan_write (2026-07-23) and
-	# subagent/write (2026-07-28) incidents.
+	# subagent/write (2026-07-28) incidents. plan_write is unconditional above
+	# precisely so FORCE_PLAN_WRITE (and, historically, PLAN_UNCERTAINTY /
+	# PLAN_ITEM_GUIDANCE_V2, retired 2026-09-10) can never point at a tool this
+	# loop hasn't already guaranteed present — their own dedicated refuse-to-run
+	# check was redundant with this one and was removed with the retirement.
 	local required_tool
 	for required_tool in read edit write bash plan_write subagent; do
 		if [[ ",$tools," != *",$required_tool,"* ]]; then
@@ -665,21 +662,6 @@ PY
 	fi
 	if [[ "$env_span_tools" != "off" && ( ",$tools," != *",search_spans,"* || ",$tools," != *",read_span,"* ) ]]; then
 		echo "[real_gate] SPAN_TOOLS=on requires 'search_spans,read_span' but --tools resolved to '$tools' for $pat/$task — refusing to measure a nonexistent harness surface" >&2
-		exit 2
-	fi
-	# plan_write is meant to be unconditional in the base list above (now that the
-	# t4/subagent branch appends instead of replacing), so this should never actually
-	# trip today — it exists as a regression guard against exactly the kind of silent
-	# drift that caused tonight's bug: a future edit re-gating plan_write, or a new
-	# branch that replaces $tools wholesale instead of appending, would trip it.
-	if [[ ( "$env_force_plan_write" != "off" || "$env_plan_uncertainty" != "off" || \
-	        "$env_plan_item_guidance_v2" != "off" ) && \
-	      ",$tools," != *",plan_write,"* ]]; then
-		echo "[real_gate] FORCE_PLAN_WRITE/PLAN_UNCERTAINTY/PLAN_ITEM_GUIDANCE_V2 requires 'plan_write' but --tools resolved to '$tools' for $pat/$task — refusing to measure a nonexistent harness surface" >&2
-		exit 2
-	fi
-	if [[ "$env_plan_tool_go" != "off" && ",$tools," != *",plan_go,"* ]]; then
-		echo "[real_gate] PLAN_TOOL_GO=on requires 'plan_go' but --tools resolved to '$tools' for $pat/$task — refusing to measure a nonexistent harness surface" >&2
 		exit 2
 	fi
 	# Child tools receive a deliberately minimal environment. Frontier, cloud,
