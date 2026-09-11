@@ -880,3 +880,23 @@ Three consequences worth stating plainly:
    Markdown sections, and `research_recall` validates and bounds records before returning them.
    Claims and quotes are still untrusted evidence: neither the parent nor a delegated child may
    follow instructions embedded in those fields. No automatic verifier subprocess reads them.
+
+## Pending surface boundary — 2026-09-10 (continuation-ownership fix + c39 retirement)
+
+Two model-visible source changes in this pass: `plan-runner.ts`'s `offerGoalContinuation`
+now defers to a compaction already in flight instead of racing its continuation
+(fixes an intermittent double-continuation-receipt bug, reproduced 1/40 runs,
+0/60 after); and the retired `PLAN_TOOL_GO` (c39) candidate's `plan_go` tool is
+deleted outright (its only two clients were retired 2026-08-12). Neither
+changes any currently-adopted default: `PLAN_TOOL_GO` was already off by
+default with no live config setting it on, so no gate row before this boundary
+ever exercised the removed tool.
+
+`npm run verify`: all six stages pass, 882 harness tests. The continuation fix
+has its own reproduction-loop-backed regression (G01-E, 1/40 failing before,
+0/60 after); the retirement is enforced going forward by
+`retired-surface.test.ts`. No inference, calibration, mirror, or rollout
+occurred; no other dark flag's default changed.
+
+Source commits: `5a88904`, `9cfc847`.
+Current package-source SHA-256: `c5ede8b116ad260929abf6bdc44f3570251c7bc4719efc330a8e27c3b71922e5`.
