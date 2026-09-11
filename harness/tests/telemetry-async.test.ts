@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, statSync } from "node:fs";
+import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import test from "node:test";
@@ -84,6 +84,26 @@ test("a full queue does not count a failed overflow-receipt attempt as lost data
 		assert.equal(writer.pendingDroppedTelemetryRows(file), 1);
 		await writer.flushTelemetryWriters();
 	});
+});
+
+test("a persistently unwritable sink drains and drops instead of hanging or spinning", async () => {
+	const root = mkdtempSync(join(tmpdir(), "telemetry-unwritable-"));
+	// A regular FILE standing where the writer expects a directory component makes
+	// every mkdir(dirname(file), {recursive:true}) fail identically forever — a
+	// permanent sink failure, not a transient one. Distinct from the CPU-spin class
+	// of bug (an unbounded synchronous loop): this queue is always finite, so
+	// draining it — even every write failing — must terminate, not hang.
+	const blocker = join(root, "not-a-directory");
+	writeFileSync(blocker, "");
+	const file = join(blocker, "nested", "events.jsonl");
+	const writer = await import(`../lib/telemetry-writer.ts?unwritable=${Date.now()}-${Math.random()}`);
+	const enqueued = 20;
+	for (let index = 0; index < enqueued; index++) assert.equal(writer.enqueueTelemetryLine(file, `${index}\n`), true);
+	const before = Date.now();
+	await writer.flushTelemetryWriters();
+	assert.ok(Date.now() - before < 5_000, "draining a permanently failing sink must terminate promptly, not hang");
+	assert.equal(writer.pendingDroppedTelemetryRows(file), enqueued, "every batch failed to write, so every row is accounted as dropped");
+	assert.equal(existsSync(file), false, "nothing was ever written to the blocked path");
 });
 
 test("gate and inherited-FD posture remains synchronous", async () => {
