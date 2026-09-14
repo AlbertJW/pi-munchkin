@@ -10,6 +10,7 @@ import { record } from "../lib/telemetry.ts";
 import { cropPng, imageDigest, perceptualHash, pngLuma, regionDigests, VisualObservationCache, visualTelemetry, type VisualGeometry } from "../lib/visual-observation.ts";
 import { refineWithSam, type SamAdapter, type GroundingHint } from "../lib/visual-grounding.ts";
 import { createMacScreenCapture, type CaptureCrop } from "../lib/visual-capture.ts";
+import { createSam2TinyAdapter } from "../lib/sam2-tiny.ts";
 
 const ENABLED = process.env.VISION === "on";
 const SAM_ENABLED = process.env.VISION_GROUNDING === "sam";
@@ -269,4 +270,18 @@ export function registerVisualTools(pi: ExtensionAPI, options: VisualToolOptions
 	}));
 }
 
-export default function (pi: ExtensionAPI): void { registerVisualTools(pi); }
+// PI_SAM2_COMMAND names a locally installed SAM 2.1 Tiny runner (see
+// harness/scripts/install-sam2-runner.sh) — never a URL, never auto-installed.
+// Absent (the default), visual_refine_target reports sam-unavailable; VISION_GROUNDING
+// must also be "sam" for the adapter to be used at all (SAM_ENABLED, above).
+export function samAdapterFromEnv(): SamAdapter | undefined {
+	const command = process.env.PI_SAM2_COMMAND;
+	if (!SAM_ENABLED || !command) return undefined;
+	try {
+		return createSam2TinyAdapter({ command });
+	} catch {
+		return undefined;
+	}
+}
+
+export default function (pi: ExtensionAPI): void { registerVisualTools(pi, { samAdapter: samAdapterFromEnv() }); }

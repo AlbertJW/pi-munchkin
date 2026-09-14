@@ -227,6 +227,8 @@
     "harness/scripts/vision-benchmark.mjs",
     "harness/scripts/vision-quality-probe.mjs",
     "harness/scripts/vision-real-ui-probe.mjs",
+    "harness/scripts/sam2-runner.py",
+    "harness/scripts/install-sam2-runner.sh",
     "harness/scripts/grep-find-live-probe.mjs",
     "harness/scripts/jina-reader-live-probe.mjs",
     "harness/tests/fixtures/vision-contract-v1.json",

@@ -31,6 +31,7 @@ result may be pooled with.
 | `LFM25_VL_3B_VISION_REAL_UI` | [prereg](screens/PREREG_LFM25_VL_3B_VISION_REAL_UI_2026-09-10.md) | [audit](screens/LFM25_VL_3B_VISION_REAL_UI_AUDIT_2026-09-10.md) | INVALID DIAGNOSTIC — runner source was absent from V1 approval binding; superseded by separately frozen V2 |
 | `LFM25_VL_3B_VISION_REAL_UI_V2` | [prereg](screens/PREREG_LFM25_VL_3B_VISION_REAL_UI_V2_2026-09-10.md) | [audit](screens/LFM25_VL_3B_VISION_REAL_UI_V2_AUDIT_2026-09-10.md) | CLEAN NARROW PROTOCOL / SEMANTIC RECEIPT — one bound 3B VLM image-answer case; no adoption claim |
 | `QWEN_VISION_REAL_UI` | [frozen screen](screens/QWEN_VISION_REAL_UI_2026-09-10.md) | [result](screens/QWEN_VISION_REAL_UI_2026-09-10.md) | VALID NEGATIVE — transport/geometry bound, semantic coverage 0/1; do not rerun this screen |
+| `VISION_GROUNDING_QUALIFICATION` | [prereg](screens/PREREG_VISION_GROUNDING_QUALIFICATION_2026-09-11.md) | _none_ | STATUS: PREPARED. Five-case study (cache, uncertainty, action, model-switch, harness-checked SAM) against a real installed SAM 2.1 Tiny runner; no session may start without explicit per-stage approval |
 | `QWEN35B_CONTEXT_ADMISSION_CURRENT_V1` | [prereg](screens/PREREG_QWEN35B_CONTEXT_ADMISSION_CURRENT_2026-09-10.md) | [audit](screens/QWEN35B_CONTEXT_ADMISSION_CURRENT_V1_AUDIT_2026-09-10.md) | INVALID LAUNCHER FAILURE — zero forwarded requests; superseded by separately frozen V2 |
 | `QWEN35B_CONTEXT_ADMISSION_CURRENT_V2` | [prereg](screens/PREREG_QWEN35B_CONTEXT_ADMISSION_CURRENT_V2_2026-09-10.md) | [audit](screens/QWEN35B_CONTEXT_ADMISSION_CURRENT_V2_AUDIT_2026-09-10.md) | INCOMPLETE / UNRESOLVED — pre-dispatch treatment exposed, but normal Pi completion failed; do not rerun V2 |
 | `QWEN35B_CONTEXT_ADMISSION_CURRENT_V3` | [prereg](screens/PREREG_QWEN35B_CONTEXT_ADMISSION_CURRENT_V3_2026-09-10.md) | [audit](screens/QWEN35B_CONTEXT_ADMISSION_CURRENT_V3_AUDIT_2026-09-10.md) | CLEAN NARROW MECHANISM / SAFETY RECEIPT — normal admission and oversized pre-dispatch refusal; no adoption claim |
@@ -63,8 +64,8 @@ result may be pooled with.
 | `RUN3_4B` | [prereg](screens/PREREG_RUN3_4B_2026-08-06.md) | _none_ | Primary — deterministic, no judge: |
 | `SEMANTIC_LOOP_SCREEN` | [prereg](screens/PREREG_SEMANTIC_LOOP_SCREEN_2026-08.md) | _none_ | STATUS: PREPARED. No stage of this study may be started without Albert's explicit, > per-stage approval |
 
-_51 screens; 29 carry separate audit files, and the current real-UI vision
-screen records its frozen protocol and result together. Updated 2026-09-10._
+_52 screens; 29 carry separate audit files, and the current real-UI vision
+screen records its frozen protocol and result together. Updated 2026-09-11._
 
 ## Current candidate roster (2026-09-10)
 

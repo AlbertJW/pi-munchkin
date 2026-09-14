@@ -343,3 +343,63 @@ test("SAM refinement requires a cached observation with matching geometry", asyn
 		if (previousGrounding === undefined) delete process.env.VISION_GROUNDING; else process.env.VISION_GROUNDING = previousGrounding;
 	}
 });
+
+test("PI_SAM2_COMMAND wires a real local adapter into visual_refine_target — the actual production path, not direct injection", async () => {
+	const previousVision = process.env.VISION;
+	const previousGrounding = process.env.VISION_GROUNDING;
+	const previousCommand = process.env.PI_SAM2_COMMAND;
+	process.env.VISION = "on";
+	process.env.VISION_GROUNDING = "sam";
+	// A single directly-executable command, no args — exactly what
+	// createSam2TinyAdapter({command}) is given in production (visual-observe.ts's
+	// samAdapterFromEnv reads PI_SAM2_COMMAND as one string, no argv). A real
+	// installed runner is a shell/python script with a shebang; this fixture is
+	// the same shape, just a fake segmenter instead of real SAM inference.
+	const script = mkdtempSync(join(tmpdir(), "pi-sam2-fixture-")) + "/fake-sam2-runner";
+	writeFileSync(script, `#!/usr/bin/env ${process.execPath}
+let s='';process.stdin.on('data',d=>s+=d).on('end',()=>{JSON.parse(s);process.stdout.write(JSON.stringify({segmenter:'sam2.1-tiny',segmenter_version:'2.1-tiny',mask_digest:'${"d".repeat(64)}',box:{x:20,y:20,width:50,height:30},safe_point:{x:45,y:35},model_score:0.9}))});
+`, { mode: 0o755 });
+	process.env.PI_SAM2_COMMAND = script;
+	try {
+		const { makeFakePi } = await import("./integration-harness.ts");
+		const { registerVisualTools, samAdapterFromEnv } = await import(`../extensions/visual-observe.ts?env-wired-sam=${Date.now()}-${Math.random()}`);
+		const fp = makeFakePi(); const cwd = mkdtempSync(join(tmpdir(), "pi-visual-env-sam-"));
+		const bytes = new Uint8Array([1, 2, 3]);
+		const adapter = samAdapterFromEnv();
+		assert.ok(adapter, "PI_SAM2_COMMAND set + VISION_GROUNDING=sam must produce an adapter, exactly what the default export wires in");
+		registerVisualTools(fp.pi as any, {
+			sessionId: "env-sam-session", capture: async () => ({ bytes, mime: "image/jpeg", width: 100, height: 80 }),
+			samAdapter: adapter,
+		});
+		const model = { provider: "fixture", id: "vision", supportsVision: true };
+		const observed = await fp.tools.get("visual_observe").execute("observe", { source: "screen", source_id: "window-a", question: "find save" }, undefined, undefined, { cwd, model });
+		const exact = imageDigest(bytes);
+		const params = { observation_id: observed.details.observation_id, exact_sha256: exact, geometry: { width: 100, height: 80, device_scale: 1 }, hint: { kind: "point" as const, x: 45, y: 35 }, purpose: "click" as const };
+		const refined = await fp.tools.get("visual_refine_target").execute("refine", params, undefined, undefined, { cwd, model });
+		assert.equal(refined.details.success, true, "the env-wired adapter must produce a validated result, not sam-unavailable");
+		assert.equal(refined.details.reason, undefined);
+		const parsed = JSON.parse(refined.content[0].text);
+		assert.equal(parsed.click_safe, "requires fresh snapshot and independent target validation");
+	} finally {
+		if (previousVision === undefined) delete process.env.VISION; else process.env.VISION = previousVision;
+		if (previousGrounding === undefined) delete process.env.VISION_GROUNDING; else process.env.VISION_GROUNDING = previousGrounding;
+		if (previousCommand === undefined) delete process.env.PI_SAM2_COMMAND; else process.env.PI_SAM2_COMMAND = previousCommand;
+	}
+});
+
+test("without PI_SAM2_COMMAND, the production wiring still reports sam-unavailable", async () => {
+	const previousVision = process.env.VISION;
+	const previousGrounding = process.env.VISION_GROUNDING;
+	const previousCommand = process.env.PI_SAM2_COMMAND;
+	process.env.VISION = "on";
+	process.env.VISION_GROUNDING = "sam";
+	delete process.env.PI_SAM2_COMMAND;
+	try {
+		const { samAdapterFromEnv } = await import(`../extensions/visual-observe.ts?env-sam-absent=${Date.now()}-${Math.random()}`);
+		assert.equal(samAdapterFromEnv(), undefined, "no command configured must never fabricate an adapter");
+	} finally {
+		if (previousVision === undefined) delete process.env.VISION; else process.env.VISION = previousVision;
+		if (previousGrounding === undefined) delete process.env.VISION_GROUNDING; else process.env.VISION_GROUNDING = previousGrounding;
+		if (previousCommand === undefined) delete process.env.PI_SAM2_COMMAND; else process.env.PI_SAM2_COMMAND = previousCommand;
+	}
+});
