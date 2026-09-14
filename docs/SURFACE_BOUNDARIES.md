@@ -900,3 +900,21 @@ occurred; no other dark flag's default changed.
 
 Source commits: `5a88904`, `9cfc847`.
 Current package-source SHA-256: `c5ede8b116ad260929abf6bdc44f3570251c7bc4719efc330a8e27c3b71922e5`.
+
+## Pending surface boundary — 2026-09-11 (SAM adapter wiring)
+
+`visual-observe.ts`'s default export now builds a `samAdapter` from
+`PI_SAM2_COMMAND` when `VISION_GROUNDING=sam` (previously always undefined,
+so `visual_refine_target` reported `sam-unavailable` unconditionally even
+under that flag). `VISION` and `VISION_GROUNDING` remain dark — this changes
+what a *dark* code path does when explicitly enabled, not any default. No
+config sets `PI_SAM2_COMMAND` or `VISION_GROUNDING=sam`, so no gate row
+before this boundary ever exercised the wired path.
+
+`npm run verify`: all six stages pass, 196.6s. Two new tests exercise the
+actual production wiring end-to-end against a real single-executable runner
+fixture (not direct option injection, already covered). No inference,
+calibration, mirror, or rollout occurred.
+
+Source commit: `1b8628e`.
+Current package-source SHA-256: `2a1e6c4987264d089826f9e9c9df55c4889e9a65ae6e03a96ade63f9f6a1b01e`.
