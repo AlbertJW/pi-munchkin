@@ -918,3 +918,28 @@ calibration, mirror, or rollout occurred.
 
 Source commit: `1b8628e`.
 Current package-source SHA-256: `2a1e6c4987264d089826f9e9c9df55c4889e9a65ae6e03a96ade63f9f6a1b01e`.
+
+## Pending surface boundary — 2026-09-15 (CONTEXT_ADMISSION bounded recovery assembly)
+
+`run-capsule.ts`'s `assembleRecoveryBrief` now normalizes the character
+cap before the availability check (a sub-one-character budget floors to
+zero and surfaces as unavailable, never a false ok with an empty brief),
+derives the required keys from the actual recovery sections (objective,
+active_state, next_action) so "optional" never enters the omitted set,
+records an honest delivery-failure receipt (ok:false,
+status:"delivery_failed") when the manual resume sendMessage throws, and
+preserves a failed compaction assembly across agent_settled (stale provider
+recovery is still cleared at settlement; stale recovery is cleaned at
+session_start). A bounded, actionable user-visible status is surfaced on
+the manual resume path so an insufficient assembly is discoverable;
+telemetry stays diagnostic-only. `CONTEXT_ADMISSION` remains dark and the
+flag-off path is byte-compatible, so no live recovery prompt changes until
+the candidate is accepted.
+
+`npm run verify`: all six stages pass, 142.0s. The five new/updated
+regression tests fail before the fix and pass after (red-then-green).
+No inference, calibration, mirror, or rollout occurred; no other dark
+flag's default changed.
+
+Source commit: `da3445b`.
+Current package-source SHA-256: `6d5e85496ded7b4a70fdefaea1d911b6aaf409a5e5b0bcd0c9e2327be54bdf64`.
