@@ -1,0 +1,17 @@
+{
+  "schema": "pi.context-admission-live-screen/v1",
+  "revision": "ling3-tiny-fast-context-admission-v1",
+  "model": "local-llamacpp/ling3-tiny-fast",
+  "served_model": "ling3-tiny-fast",
+  "declared_context_window": 61440,
+  "max_tokens": 128,
+  "normal_prompt": "Reply with exactly READY.",
+  "oversize_bytes": 250000,
+  "required": {
+    "normal_outcome": "admitted",
+    "oversize_outcome": "rejected",
+    "oversize_reason": "aggregate_budget_exceeded",
+    "normal_forwarded_requests": 1,
+    "oversize_forwarded_requests": 0
+  }
+}

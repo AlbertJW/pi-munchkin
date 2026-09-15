@@ -943,3 +943,26 @@ flag's default changed.
 
 Source commit: `da3445b`.
 Current package-source SHA-256: `6d5e85496ded7b4a70fdefaea1d911b6aaf409a5e5b0bcd0c9e2327be54bdf64`.
+
+## Pending surface boundary — 2026-09-15 (CONTEXT_ADMISSION Scope A provenance, same commit da3445b)
+
+Append-only clarification of the `da3445b` boundary above, which describes
+mainly Scope B (recovery-assembly defects). `da3445b` also carries the
+Scope A items named in `HARNESS_UPGRADE_PLAN_2026-09-08.md` Package 1, which
+the prior row does not state:
+- explicit `observed_usage_provenance` (`estimated` / `unavailable`) on every
+  `buildContextAccounting` result (`context-accounting.ts`);
+- admission telemetry carrying that provenance on every admitted, rejected,
+  and unavailable row (`telemetry-catalog.ts`);
+- confidence handling when exact provider-rendered payload counts coexist with
+  estimated advisory usage: a `verified` exact payload alongside `estimated`
+  observed usage is downgraded to `estimated` and never reported `verified`.
+
+No historical evidence is rewritten; this row is an append-only clarification
+of the already-committed `da3445b` boundary. No source changed in this pass,
+so the recomputed hash matches the prior row.
+
+Source commit: `da3445b`.
+Current package-source SHA-256: `6d5e85496ded7b4a70fdefaea1d911b6aaf409a5e5b0bcd0c9e2327be54bdf64`
+(recomputed via `npm run surface:hash:source` on 2026-09-15; matches the
+preceding row).
