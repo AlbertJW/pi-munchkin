@@ -48,6 +48,7 @@ function safeRecord(accounting: ReturnType<typeof buildContextAccounting>): Reco
 		remaining_tokens: accounting.remaining_tokens,
 		confidence: accounting.confidence,
 		tokenization: accounting.tokenization,
+		observed_usage_provenance: accounting.observed_usage_provenance,
 		contributors: accounting.contributors.length,
 		reservation_count: accounting.reservation_count,
 		request_digest: accounting.request_digest,
@@ -180,7 +181,7 @@ export default function installContextAdmission(pi: ExtensionAPI): void {
 				overhead: 0, uncertainty_margin: 0, payload_tokens: 0, reserved_tokens: 0,
 				payload_bytes: 0, accounted_bytes: 0, unaccounted_bytes: 0,
 				observed_context_tokens: null, observed_context_window: null, usage_relation: "not_available",
-				remaining_tokens: 0, confidence: "unavailable", tokenization: "unavailable",
+				remaining_tokens: 0, confidence: "unavailable", tokenization: "unavailable", observed_usage_provenance: "unavailable",
 				contributors: 0, reservation_count: 0, request_digest: "unknown", epoch_digest: "unknown",
 				outcome: "unavailable", reason_class: "context_profile_unavailable", truncated: false,
 			});
@@ -217,7 +218,7 @@ export default function installContextAdmission(pi: ExtensionAPI): void {
 				overhead: 0, uncertainty_margin: 0, payload_tokens: 0, reserved_tokens: 0,
 				payload_bytes: 0, accounted_bytes: 0, unaccounted_bytes: 0,
 				observed_context_tokens: null, observed_context_window: null, usage_relation: "not_available",
-				remaining_tokens: 0, confidence: "unavailable", tokenization: "unavailable",
+				remaining_tokens: 0, confidence: "unavailable", tokenization: "unavailable", observed_usage_provenance: "unavailable",
 				contributors: 0, reservation_count: 0, request_digest: "unknown", epoch_digest: "unknown",
 				outcome: "unavailable", reason_class: "payload_malformed", truncated: false,
 			});

@@ -134,6 +134,43 @@ test("bound observations reject stale serving epochs and compaction generations"
 	}
 });
 
+test("ordinary Pi usage is explicitly estimated provenance", () => {
+	const profile = contextProfileFor(model);
+	const result = buildContextAccounting({ messages: [{ role: "user", content: "hello" }] }, profile, {
+		observedUsage: { tokens: 26_000, contextWindow: 32_768 },
+	});
+	assert.equal(result.observed_usage_provenance, "estimated");
+});
+
+test("missing usage is explicitly unavailable provenance", () => {
+	const profile = contextProfileFor(model);
+	const result = buildContextAccounting({ messages: [{ role: "user", content: "hello" }] }, profile);
+	assert.equal(result.observed_usage_provenance, "unavailable");
+});
+
+test("exact request counts and advisory Pi usage remain distinguishable", () => {
+	const profile = contextProfileFor(model);
+	const payload = { messages: [{ role: "user", content: "中文 λ" }] };
+	const result = buildContextAccounting(payload, profile, {
+		requestCounter: (_payload, binding) => ({ ...binding, tokens: 42, representation: "provider-rendered" }),
+		observedUsage: { tokens: 12, contextWindow: 32_768 },
+	});
+	assert.equal(result.tokenization, "exact", "payload count stays exact from the provider-rendered receipt");
+	assert.equal(result.observed_usage_provenance, "estimated", "advisory Pi usage is an estimate, never exact");
+	assert.equal(result.confidence, "estimated", "overall confidence must not certify an estimated advisory usage");
+	assert.equal(result.payload_tokens, 42);
+});
+
+test("exact request counts stay verified when no advisory usage is present", () => {
+	const profile = contextProfileFor(model);
+	const exact = buildContextAccounting({ messages: [{ role: "user", content: "x" }] }, profile, {
+		requestCounter: (_payload, binding) => ({ ...binding, tokens: 7, representation: "provider-rendered" }),
+	});
+	assert.equal(exact.tokenization, "exact");
+	assert.equal(exact.confidence, "verified");
+	assert.equal(exact.observed_usage_provenance, "unavailable");
+});
+
 test("observed retained context reduces remaining output allowance", () => {
 	const profile = contextProfileFor(model);
 	const result = buildContextAccounting({ messages: [{ role: "user", content: "hello" }] }, profile, {

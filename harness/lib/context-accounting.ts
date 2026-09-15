@@ -12,6 +12,8 @@ export const CONTEXT_ACCOUNTING_SCHEMA = "pi.context-accounting/v1" as const;
 export type ContextTokenization = "exact" | "estimated" | "unavailable";
 export type ContextConfidence = "verified" | "estimated" | "unavailable";
 export type ContextAdmissionOutcome = "admitted" | "rejected" | "unavailable";
+type ObservedUsageProvenance = "estimated" | "unavailable";
+
 export type ContextContributorKind =
 	| "system_instructions"
 	| "tool_schemas"
@@ -53,6 +55,8 @@ export type ContextAccounting = {
 	remaining_tokens: number;
 	tokenization: ContextTokenization;
 	confidence: ContextConfidence;
+	observed_usage_provenance: ObservedUsageProvenance;
+
 	contributors: ContextContributor[];
 	reservation_count: number;
 	outcome: ContextAdmissionOutcome;
@@ -225,7 +229,8 @@ export function buildContextAccounting(payload: unknown, profile: ContextProfile
 	const tokenization: ContextTokenization = contributors.length === 0 || payloadCounted.confidence === "unavailable"
 		? "unavailable"
 		: payloadCounted.confidence === "verified" ? "exact" : "estimated";
-	const confidence: ContextConfidence = tokenization === "exact" ? "verified" : tokenization === "estimated" ? "estimated" : "unavailable";
+	const payloadConfidence: ContextConfidence = tokenization === "exact" ? "verified" : tokenization === "estimated" ? "estimated" : "unavailable";
+
 	const uncertaintyMargin = tokenization === "exact"
 		? 0
 		: tokenization === "estimated" ? Math.max(32, Math.ceil(payloadTokens * 0.12)) : 0;
@@ -236,6 +241,8 @@ export function buildContextAccounting(payload: unknown, profile: ContextProfile
 		? 0
 		: Math.max(0, Math.min(profile.safe_input_tokens ?? 0, windowInfo.window - windowInfo.completion - windowInfo.overhead));
 	const observedTokens = finitePositive(options.observedUsage?.tokens);
+	const observedUsageProvenance: ObservedUsageProvenance = observedTokens !== null ? "estimated" : "unavailable";
+	const confidence: ContextConfidence = payloadConfidence === "verified" && observedUsageProvenance === "estimated" ? "estimated" : payloadConfidence;
 	const observedWindow = finitePositive(options.observedUsage?.contextWindow);
 	const staleBinding = (options.observedUsage?.epoch_digest !== undefined && options.observedUsage.epoch_digest !== epochDigest)
 		|| (options.observedUsage?.compaction_generation !== undefined && options.observedUsage.compaction_generation !== (options.compactionGeneration ?? 0));
@@ -284,6 +291,7 @@ export function buildContextAccounting(payload: unknown, profile: ContextProfile
 		remaining_tokens: remaining,
 		tokenization,
 		confidence,
+		observed_usage_provenance: observedUsageProvenance,
 		contributors,
 		reservation_count: reservationCount,
 		outcome,

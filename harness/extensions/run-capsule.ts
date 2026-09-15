@@ -18,7 +18,7 @@ import { preserveContextSections } from "../lib/context-accounting.ts";
 function recoveryContextBudget(): number {
 	const profile = (globalThis as Record<string, unknown>).__pi_context_profile as { safe_input_tokens?: unknown } | undefined;
 	const safe = typeof profile?.safe_input_tokens === "number" && Number.isFinite(profile.safe_input_tokens) ? profile.safe_input_tokens : null;
-	return safe == null ? 4_096 : Math.max(2_304, Math.min(6_144, Math.floor(safe * 0.12)));
+	return safe == null ? 4_096 : Math.min(6_144, Math.floor(safe * 0.12));
 }
 
 /**
@@ -27,15 +27,56 @@ function recoveryContextBudget(): number {
  * enabled only with CONTEXT_ADMISSION so the dark candidate cannot alter live
  * recovery prompts before its smoke is accepted.
  */
-export function assembleRecoveryBrief(recoveryBrief: string, goalBrief: string, maxChars = recoveryContextBudget()): string {
+export type RecoveryAssemblyResult = {
+	ok: boolean;
+	brief: string;
+	budget: number;
+	status: "ok" | "insufficient" | "unavailable";
+	omitted: string[];
+};
+
+/**
+ * Assemble recovery data through the same priority contract used by aggregate
+ * admission. The legacy path remains byte-compatible; the bounded assembly is
+ * enabled only with CONTEXT_ADMISSION so the dark candidate cannot alter live
+ * recovery prompts before its smoke is accepted. The budget floor is gone: tiny,
+ * zero and invalid budgets are surfaced as structured insufficient/unavailable
+ * results so callers can avoid false success and keep the pending recovery.
+ */
+export function assembleRecoveryBrief(recoveryBrief: string, goalBrief: string, maxChars = recoveryContextBudget()): RecoveryAssemblyResult {
 	const combined = `${recoveryBrief}${goalBrief ? `\n${goalBrief}` : ""}`;
-	if (process.env.CONTEXT_ADMISSION !== "on") return combined;
-	const preserved = preserveContextSections({
+	if (process.env.CONTEXT_ADMISSION !== "on") return { ok: true, brief: combined, budget: maxChars, status: "ok", omitted: [] };
+	// Normalize the cap BEFORE the availability check: a sub-one-character
+	// budget floors to zero chars and must surface as unavailable, never as a
+	// false ok with an empty brief (the old floor check passed 0.5 through and
+	// preserveContextSections returned empty text with no omissions).
+	const cap = Number.isFinite(maxChars) ? Math.floor(maxChars) : 0;
+	// Required keys are derived from the ACTUAL recovery sections this assembly
+	// supplies, not the full preservation order — "optional" is never supplied
+	// here, so it must never appear in the omitted set.
+	const sections = {
 		objective: goalBrief || "No active goal; preserve the current task objective from the run state.",
 		active_state: recoveryBrief,
 		next_action: "Re-ground from current filesystem evidence and continue only after required state is recoverable.",
-	}, maxChars);
-	return preserved.text;
+	} as const;
+	const requiredKeys = Object.keys(sections);
+	if (cap <= 0) {
+		return { ok: false, brief: "", budget: maxChars, status: "unavailable", omitted: requiredKeys };
+	}
+	const preserved = preserveContextSections(sections, cap);
+	if (preserved.omitted.length > 0) {
+		return { ok: false, brief: preserved.text, budget: maxChars, status: "insufficient", omitted: preserved.omitted };
+	}
+	return { ok: true, brief: preserved.text, budget: maxChars, status: "ok", omitted: [] };
+}
+
+/**
+ * Bounded, actionable, user-visible status for a manual recovery attempt that
+ * could not assemble a brief. Telemetry is diagnostic-only and is NOT a
+ * user-visible channel — this is the only user-facing signal on that path.
+ */
+export function recoveryFailureStatus(status: string, budget: number): string {
+	return `Recovery brief could not be assembled (status: ${status}; budget: ${budget} chars). The pending recovery is preserved — increase the recovery context budget (CONTEXT_ADMISSION profile) or reduce the recovery payload, then retry the resume command.`;
 }
 
 export default function (pi: ExtensionAPI): void {
@@ -154,8 +195,12 @@ export default function (pi: ExtensionAPI): void {
 	});
 
 	pi.on("agent_settled", async () => {
+		// A provider retry window is consumed at settlement if it was never
+		// injected, so a stale provider recovery cannot leak into the next run.
+		// A compaction recovery is PRESERVED across settlement: a failed assembly
+		// must survive settlement so the next context can retry with a valid
+		// budget. Stale recovery is cleaned at session_start, not here.
 		pendingProviderRecovery = false;
-		pendingCompactionGeneration = null;
 	});
 
 	if (mode === "recovery") {
@@ -163,16 +208,34 @@ export default function (pi: ExtensionAPI): void {
 			if (!latestState) return;
 			const reason = pendingCompactionGeneration !== null ? "compaction" : pendingProviderRecovery ? "provider_retry" : null;
 			if (!reason) return;
+			const goalBrief = goalsEnabled() ? renderGoalRecoveryBrief(await readGoal(ctx.cwd)) : "";
+			const assembly = assembleRecoveryBrief(renderRecoveryBrief(latestState, { reason }), goalBrief);
+			if (!assembly.ok) {
+				record("run-capsule", "recovery-brief", {
+					reason,
+					ok: false,
+					status: assembly.status,
+					brief_bytes: Buffer.byteLength(assembly.brief, "utf8"),
+					omitted: assembly.omitted,
+					generation: latestState.context.compactionGeneration,
+				});
+				return;
+			}
 			pendingCompactionGeneration = null;
 			pendingProviderRecovery = false;
-			const goalBrief = goalsEnabled() ? renderGoalRecoveryBrief(await readGoal(ctx.cwd)) : "";
-			const brief = assembleRecoveryBrief(renderRecoveryBrief(latestState, { reason }), goalBrief);
-			record("run-capsule", "recovery-brief", { reason, brief_bytes: Buffer.byteLength(brief, "utf8"), generation: latestState.context.compactionGeneration });
+			record("run-capsule", "recovery-brief", {
+				reason,
+				ok: true,
+				status: assembly.status,
+				brief_bytes: Buffer.byteLength(assembly.brief, "utf8"),
+				omitted: assembly.omitted,
+				generation: latestState.context.compactionGeneration,
+			});
 			return {
 				messages: [...event.messages, {
 					role: "custom" as const,
 					customType: "pi-munchkin:recovery-brief",
-					content: brief,
+					content: assembly.brief,
 					display: false,
 					details: { reason },
 					timestamp: Date.now(),
@@ -183,17 +246,56 @@ export default function (pi: ExtensionAPI): void {
 
 	subscribeOnce("run-capsule:domain-signal", () => onHarnessSignal(pi.events, (signal) => {
 		if (mode !== "recovery" || signal.type !== "recovery/resumed" || !latestState) return;
-		const brief = assembleRecoveryBrief(renderRecoveryBrief(latestState, { reason: "manual_resume" }), "");
+		const assembly = assembleRecoveryBrief(renderRecoveryBrief(latestState, { reason: "manual_resume" }), "");
+		if (!assembly.ok) {
+			record("run-capsule", "recovery-brief", {
+				reason: "manual_resume",
+				ok: false,
+				status: assembly.status,
+				brief_bytes: Buffer.byteLength(assembly.brief, "utf8"),
+				omitted: assembly.omitted,
+				generation: latestState.context.compactionGeneration,
+			});
+			// Telemetry is diagnostic-only and is NOT a user-visible channel. The
+			// manual resume path is the user's recovery channel, so surface one
+			// bounded, actionable status so the failure is discoverable.
+			try {
+				pi.sendMessage({
+					customType: "pi-munchkin:recovery-brief-status",
+					content: recoveryFailureStatus(assembly.status, assembly.budget),
+					display: true,
+				}, { triggerTurn: false, deliverAs: "nextTurn" });
+			} catch {
+				// fail open: a delivery-channel failure must never break the harness
+			}
+			return;
+		}
 		try {
 			pi.sendMessage({
 				customType: "pi-munchkin:recovery-brief",
-				content: brief,
+				content: assembly.brief,
 				display: true,
 				details: { origin: signal.origin, cleared: signal.cleared, blocked: signal.blocked },
 			}, { triggerTurn: false, deliverAs: "nextTurn" });
-			record("run-capsule", "recovery-brief", { reason: "manual_resume", brief_bytes: Buffer.byteLength(brief, "utf8"), generation: latestState.context.compactionGeneration });
+			record("run-capsule", "recovery-brief", {
+				reason: "manual_resume",
+				ok: true,
+				status: assembly.status,
+				brief_bytes: Buffer.byteLength(assembly.brief, "utf8"),
+				omitted: assembly.omitted,
+				generation: latestState.context.compactionGeneration,
+			});
 		} catch {
-			record("run-capsule", "recovery-brief", { reason: "manual_resume", brief_bytes: 0, generation: latestState.context.compactionGeneration });
+			// Distinguish successful assembly from failed delivery: a throwing
+			// sendMessage must produce an honest failure receipt, never ok:true.
+			record("run-capsule", "recovery-brief", {
+				reason: "manual_resume",
+				ok: false,
+				status: "delivery_failed",
+				brief_bytes: 0,
+				omitted: assembly.omitted,
+				generation: latestState.context.compactionGeneration,
+			});
 		}
 	}));
 

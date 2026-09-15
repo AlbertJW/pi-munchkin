@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import {
-	existsSync, mkdirSync, mkdtempSync, readdirSync, statSync, writeFileSync,
+	existsSync, mkdirSync, mkdtempSync, readdirSync, rm, statSync, writeFileSync, readFile,
 } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -53,6 +53,12 @@ function withEnv(values: Record<string, string | undefined>, work: () => Promise
 	});
 }
 
+async function readTelemetryRows(file: string): Promise<Array<Record<string, unknown>>> {
+	const text = await new Promise<string>((resolve, reject) => {
+		readFile(file, (error, data) => { if (error) reject(error); else resolve(data.toString("utf8")); });
+	});
+	return text.split("\n").filter(Boolean).map((line) => JSON.parse(line));
+}
 test("private capsule writes atomically outside the worktree with private modes", async () => {
 	const agentDirectory = mkdtempSync(join(tmpdir(), "run-capsule-agent-"));
 	const cwd = mkdtempSync(join(tmpdir(), "run-capsule-worktree-"));
@@ -419,9 +425,247 @@ test("recovery mode injects one brief after compaction and none on ordinary cont
 test("aggregate recovery assembly uses the preservation contract when admission is enabled", async () => {
 	await withEnv({ CONTEXT_ADMISSION: "on" }, async () => {
 		const result = assembleRecoveryBrief("ACTIVE-STATE", "OBJECTIVE\n" + "criterion evidence ".repeat(200), 512);
-		assert.ok(result.length <= 512, `preserved recovery exceeded cap: ${result.length}`);
-		assert.match(result, /objective:/);
-		assert.match(result, /truncated; retrieve omitted context/);
+		assert.equal(result.ok, false, "512 cannot preserve the full section set");
+		assert.ok(result.brief.length <= 512, `preserved recovery exceeded cap: ${result.brief.length}`);
+		assert.match(result.brief, /objective:/);
+		assert.match(result.brief, /truncated; retrieve omitted context/);
+	});
+});
+
+test("admission-on with a fit budget returns ok and preserves the sections", async () => {
+	await withEnv({ CONTEXT_ADMISSION: "on" }, async () => {
+		const result = assembleRecoveryBrief("ACTIVE-STATE", "OBJECTIVE", 4096);
+		assert.equal(result.ok, true);
+		assert.equal(result.omitted.length, 0);
+		assert.match(result.brief, /objective:/);
+		assert.match(result.brief, /active_state:/);
+	});
+});
+
+test("small budgets do not regain the old floor", async () => {
+	await withEnv({ CONTEXT_ADMISSION: "on" }, async () => {
+		const profile = globalThis as Record<string, unknown>;
+		const prev = profile.__pi_context_profile;
+		profile.__pi_context_profile = { safe_input_tokens: 100 };
+		try {
+			const result = assembleRecoveryBrief("ACTIVE-STATE", "OBJECTIVE");
+			assert.equal(result.budget, 12, `budget regained the old floor: ${result.budget}`);
+		} finally {
+			if (prev === undefined) delete profile.__pi_context_profile; else profile.__pi_context_profile = prev;
+		}
+	});
+});
+
+test("unknown budget falls back to the advisory default", async () => {
+	await withEnv({ CONTEXT_ADMISSION: "on" }, async () => {
+		const profile = globalThis as Record<string, unknown>;
+		const prev = profile.__pi_context_profile;
+		delete profile.__pi_context_profile;
+		try {
+			const result = assembleRecoveryBrief("ACTIVE-STATE", "OBJECTIVE");
+			assert.equal(result.budget, 4096, "unknown budget uses the advisory default");
+		} finally {
+			if (prev === undefined) delete profile.__pi_context_profile; else profile.__pi_context_profile = prev;
+		}
+	});
+});
+
+test("zero, invalid and tiny budgets are explicitly unavailable or insufficient", async () => {
+	await withEnv({ CONTEXT_ADMISSION: "on" }, async () => {
+		const zero = assembleRecoveryBrief("ACTIVE-STATE", "OBJECTIVE", 0);
+		assert.equal(zero.ok, false);
+		assert.equal(zero.status, "unavailable");
+		assert.equal(zero.brief, "");
+		// Required keys are derived from the actual recovery sections, not the
+		// full preservation order — "optional" is never supplied by this assembly.
+		assert.deepEqual(zero.omitted, ["objective", "active_state", "next_action"]);
+		const invalid = assembleRecoveryBrief("ACTIVE-STATE", "OBJECTIVE", Number.NaN);
+		assert.equal(invalid.ok, false);
+		assert.equal(invalid.status, "unavailable");
+		assert.deepEqual(invalid.omitted, ["objective", "active_state", "next_action"]);
+		const tiny = assembleRecoveryBrief("ACTIVE-STATE", "OBJECTIVE\n" + "criterion evidence ".repeat(200), 20);
+		assert.equal(tiny.ok, false);
+		assert.equal(tiny.status, "insufficient");
+		assert.ok(tiny.brief.length <= 20, `tiny brief exceeded cap: ${tiny.brief.length}`);
+	});
+});
+
+test("missing required content is detected even when some text survives", async () => {
+	await withEnv({ CONTEXT_ADMISSION: "on" }, async () => {
+		const result = assembleRecoveryBrief("ACTIVE-STATE\n" + "evidence ".repeat(50), "OBJECTIVE " + "x".repeat(60), 80);
+		assert.equal(result.ok, false, "required content cannot all fit in 80 chars");
+		assert.equal(result.status, "insufficient");
+		assert.ok(result.omitted.length > 0, "omitted required keys recorded");
+		assert.match(result.omitted.join(","), /objective|active_state|next_action|evidence/, "structured metadata names the missing keys");
+	});
+});
+
+test("flag-off returns the full combined brief unchanged", async () => {
+	await withEnv({ CONTEXT_ADMISSION: undefined }, async () => {
+		const result = assembleRecoveryBrief("ACTIVE-STATE", "OBJECTIVE\n" + "criterion evidence ".repeat(200));
+		assert.equal(result.ok, true);
+		assert.equal(result.brief, "ACTIVE-STATE" + "\n" + "OBJECTIVE\n" + "criterion evidence ".repeat(200), "flag-off must be byte-compatible");
+	});
+});
+
+test("a sub-one-character budget cannot return ok with an empty brief", async () => {
+	await withEnv({ CONTEXT_ADMISSION: "on" }, async () => {
+		// 0.5 floors to zero chars. The old floor check passed it through and
+		// preserveContextSections returned empty text with no omissions, so the
+		// caller reported a false ok. The cap must be normalized before the
+		// availability check.
+		const result = assembleRecoveryBrief("ACTIVE-STATE", "OBJECTIVE", 0.5);
+		assert.equal(result.ok, false, "a sub-one-character budget cannot be ok");
+		assert.equal(result.status, "unavailable");
+		assert.equal(result.brief, "", "an unavailable budget yields no brief");
+	});
+});
+
+test("a throwing sendMessage produces an honest failure receipt, not ok:true", async () => {
+	const root = mkdtempSync(join(tmpdir(), "run-capsule-delivery-fail-"));
+	const file = join(root, "events.jsonl");
+	const agentDirectory = mkdtempSync(join(tmpdir(), "run-capsule-delivery-fail-agent-"));
+	const cwd = mkdtempSync(join(tmpdir(), "run-capsule-delivery-fail-cwd-"));
+	await withEnv({ PI_CODING_AGENT_DIR: agentDirectory, RUN_CAPSULE: "recovery", LOOP_EPISODE_MODE: "shadow", CONTEXT_ADMISSION: "on", TELEMETRY: "on", TELEMETRY_FILE: file, TELEMETRY_SOURCE: "test" }, async () => {
+		const fp = makeFakePi();
+		installRunKernel(fp.pi as never, { idFactory: () => "delivery-fail-id", detectGate: async () => null, surfaceHash: () => H });
+		runCapsule(fp.pi as never);
+		loopBreaker(fp.pi as never);
+		const { ctx } = makeCtx(cwd);
+		await fire(fp, "session_start", { reason: "new" }, ctx);
+		await fire(fp, "agent_start", {}, ctx);
+		// Force the manual resume delivery to throw. The assembly itself is
+		// fine (default budget); only delivery fails.
+		const originalSend = (fp.pi as any).sendMessage;
+		(fp.pi as any).sendMessage = () => { throw new Error("delivery channel down"); };
+		try {
+			await fp.commands.get("loop-resume")?.handler("", ctx);
+		} finally {
+			(fp.pi as any).sendMessage = originalSend;
+		}
+		// No custom delivery reached the model: the sendMessage that was forced to
+		// throw never delivered.
+		assert.equal(fp.customDeliveries.length, 0, "a throwing sendMessage must not deliver");
+		const rows = await readTelemetryRows(file);
+		const briefRows = rows.filter((r) => r.ext === "run-capsule" && r.kind === "recovery-brief" && r.reason === "manual_resume");
+		assert.ok(briefRows.length >= 1, "an honest receipt must be recorded for the manual resume");
+		const deliveryFail = briefRows.find((r) => r.status === "delivery_failed");
+		assert.ok(deliveryFail, "a throwing sendMessage must record a delivery_failed receipt");
+		assert.equal(deliveryFail.ok, false, "delivery failure must be ok:false, never ok:true");
+	});
+});
+
+test("real lifecycle: compaction -> insufficient assembly -> settlement -> valid-budget retry injects", async () => {
+	const agentDirectory = mkdtempSync(join(tmpdir(), "run-capsule-real-lifecycle-"));
+	const cwd = mkdtempSync(join(tmpdir(), "run-capsule-real-lifecycle-cwd-"));
+	await withEnv({ PI_CODING_AGENT_DIR: agentDirectory, RUN_CAPSULE: "recovery", TELEMETRY: "off", CONTEXT_ADMISSION: "on" }, async () => {
+		const fp = makeFakePi();
+		installRunKernel(fp.pi as never, { idFactory: () => "lifecycle-id", detectGate: async () => null, surfaceHash: () => H });
+		runCapsule(fp.pi as never);
+		const { ctx } = makeCtx(cwd);
+		await fire(fp, "session_start", { reason: "new" }, ctx);
+		await fire(fp, "agent_start", {}, ctx);
+		await fire(fp, "session_compact", { reason: "manual", willRetry: false }, ctx);
+		const profile = globalThis as Record<string, unknown>;
+		const prev = profile.__pi_context_profile;
+		profile.__pi_context_profile = { safe_input_tokens: 20 };
+		try {
+			// Insufficient assembly: the tiny budget cannot preserve the sections,
+			// so no brief is injected and the pending recovery must be preserved.
+			const first = await fire(fp, "context", { messages: [{ role: "user", content: [{ type: "text", text: "continue" }] }] }, ctx);
+			assert.equal(first.length, 1, "insufficient assembly: no brief injected");
+			// Settlement must not silently clear the pending compaction recovery.
+			await fire(fp, "agent_settled", {}, ctx);
+			// Valid-budget retry: the preserved pending recovery now injects.
+			profile.__pi_context_profile = { safe_input_tokens: 30_000 };
+			const second = await fire(fp, "context", { messages: [{ role: "user", content: [{ type: "text", text: "continue" }] }] }, ctx);
+			const injected = second.at(-1) as { role?: string; customType?: string; content?: string };
+			assert.equal(injected.role, "custom");
+			assert.equal(injected.customType, "pi-munchkin:recovery-brief");
+			assert.match(String(injected.content), /recovery_reason: compaction/);
+		} finally {
+			if (prev === undefined) delete profile.__pi_context_profile; else profile.__pi_context_profile = prev;
+		}
+	});
+});
+
+test("automatic caller reports failure and preserves pending on tiny budget", async () => {
+	const agentDirectory = mkdtempSync(join(tmpdir(), "run-capsule-recovery-tiny-"));
+	const cwd = mkdtempSync(join(tmpdir(), "run-capsule-recovery-tiny-cwd-"));
+	await withEnv({ PI_CODING_AGENT_DIR: agentDirectory, RUN_CAPSULE: "recovery", TELEMETRY: "off", CONTEXT_ADMISSION: "on" }, async () => {
+		const fp = makeFakePi();
+		installRunKernel(fp.pi as never, { idFactory: () => "tiny-id", detectGate: async () => null, surfaceHash: () => H });
+		runCapsule(fp.pi as never);
+		const { ctx } = makeCtx(cwd);
+		await fire(fp, "session_start", { reason: "new" }, ctx);
+		await fire(fp, "agent_start", {}, ctx);
+		await fire(fp, "session_compact", { reason: "manual", willRetry: false }, ctx);
+		const profile = globalThis as Record<string, unknown>;
+		const prev = profile.__pi_context_profile;
+		profile.__pi_context_profile = { safe_input_tokens: 20 };
+		try {
+			const first = await fire(fp, "context", { messages: [{ role: "user", content: [{ type: "text", text: "continue" }] }] }, ctx);
+			assert.equal(first.length, 1, "tiny budget must not inject a bounded/garbled brief");
+		} finally {
+			if (prev === undefined) delete profile.__pi_context_profile; else profile.__pi_context_profile = prev;
+		}
+	});
+});
+
+test("pending recovery later succeeds with a valid budget", async () => {
+	const agentDirectory = mkdtempSync(join(tmpdir(), "run-capsule-recovery-later-"));
+	const cwd = mkdtempSync(join(tmpdir(), "run-capsule-recovery-later-cwd-"));
+	await withEnv({ PI_CODING_AGENT_DIR: agentDirectory, RUN_CAPSULE: "recovery", TELEMETRY: "off", CONTEXT_ADMISSION: "on" }, async () => {
+		const fp = makeFakePi();
+		installRunKernel(fp.pi as never, { idFactory: () => "later-id", detectGate: async () => null, surfaceHash: () => H });
+		runCapsule(fp.pi as never);
+		const { ctx } = makeCtx(cwd);
+		await fire(fp, "session_start", { reason: "new" }, ctx);
+		await fire(fp, "agent_start", {}, ctx);
+		await fire(fp, "session_compact", { reason: "manual", willRetry: false }, ctx);
+		const profile = globalThis as Record<string, unknown>;
+		const prev = profile.__pi_context_profile;
+		profile.__pi_context_profile = { safe_input_tokens: 20 };
+		try {
+			const first = await fire(fp, "context", { messages: [{ role: "user", content: [{ type: "text", text: "continue" }] }] }, ctx);
+			assert.equal(first.length, 1, "tiny budget: no injection");
+			profile.__pi_context_profile = { safe_input_tokens: 30_000 };
+			const second = await fire(fp, "context", { messages: [{ role: "user", content: [{ type: "text", text: "continue" }] }] }, ctx);
+			const injected = second.at(-1) as { role?: string; customType?: string; content?: string };
+			assert.equal(injected.role, "custom");
+			assert.equal(injected.customType, "pi-munchkin:recovery-brief");
+			assert.match(String(injected.content), /recovery_reason: compaction/);
+		} finally {
+			if (prev === undefined) delete profile.__pi_context_profile; else profile.__pi_context_profile = prev;
+		}
+	});
+});
+
+test("manual caller reports failure on tiny budget without sending", async () => {
+	const agentDirectory = mkdtempSync(join(tmpdir(), "run-capsule-recovery-manual-tiny-"));
+	const cwd = mkdtempSync(join(tmpdir(), "run-capsule-recovery-manual-tiny-cwd-"));
+	await withEnv({ PI_CODING_AGENT_DIR: agentDirectory, RUN_CAPSULE: "recovery", LOOP_EPISODE_MODE: "shadow", TELEMETRY: "off", CONTEXT_ADMISSION: "on" }, async () => {
+		const fp = makeFakePi();
+		installRunKernel(fp.pi as never, { idFactory: () => "manual-tiny-id", detectGate: async () => null, surfaceHash: () => H });
+		loopBreaker(fp.pi as never);
+		runCapsule(fp.pi as never);
+		const { ctx } = makeCtx(cwd);
+		await fire(fp, "session_start", { reason: "new" }, ctx);
+		await fire(fp, "agent_start", {}, ctx);
+		const profile = globalThis as Record<string, unknown>;
+		const prev = profile.__pi_context_profile;
+		profile.__pi_context_profile = { safe_input_tokens: 20 };
+		try {
+			await fp.commands.get("loop-resume")?.handler("", ctx);
+			await fp.commands.get("run-resume")?.handler("", ctx);
+			const briefs = fp.customDeliveries.filter((d) => (d.content as { customType?: string })?.customType === "pi-munchkin:recovery-brief");
+			assert.equal(briefs.length, 0, "tiny budget: manual brief must not be sent");
+			const statuses = fp.customDeliveries.filter((d) => (d.content as { customType?: string })?.customType === "pi-munchkin:recovery-brief-status");
+			assert.equal(statuses.length, 2, "tiny budget: each manual resume reports a bounded honest status");
+			assert.ok(statuses.every((d) => { const text = (d.content as { content?: string }).content; return typeof text === "string" && text.length > 0; }), "status must carry bounded actionable text");
+		} finally {
+			if (prev === undefined) delete profile.__pi_context_profile; else profile.__pi_context_profile = prev;
+		}
 	});
 });
 
