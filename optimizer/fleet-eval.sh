@@ -1,4 +1,7 @@
 #!/usr/bin/env bash
+# Mothballed: stop before any setup, model access, or child process.
+printf "%s\n" 'Optimizer mothballed by Albert on 2026-09-16. Execution is disabled; explicit restoration is required.' >&2
+exit 78
 # Fleet sweep: run the prompt-surface eval across a fleet of local models, one at a
 # time on :8080 (they share the port — see run-*.sh). Each model is launched, the
 # eval auto-tags results by the loaded alias, then the server is stopped. Combined

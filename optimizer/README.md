@@ -1,29 +1,17 @@
-# Optimizer — the measurement programme
+# Optimizer — mothballed
 
-This directory is the instrument, not the harness. It exists to answer one question honestly:
-does a given harness change actually help a small local model, or does it only look like it
-does?
+**Switched off by Albert on 2026-09-16.** The optimizer has not produced useful
+results for his workflow. Its launchers refuse execution; no campaigns,
+calibration, proposal loops or optimizer improvement work are active.
 
-## Where the programme actually is
+See [the current mothball decision](docs/MOTHBALLED_2026-09-16.md) and
+[the disabled-entrypoint inventory](MOTHBALLED.json). Earlier restart charters
+are historical and do not authorize revival. Restoration requires explicit
+human instruction and a reviewed source change; there is no environment override.
 
-The Qwen 35B cohort has been running screens since 2026-08-27; roughly thirty ran on
-2026-09-01 through 2026-09-03. [`docs/SCREENS.md`](docs/SCREENS.md) is the authority on what has
-been executed and what each run concluded.
-
-Two mothball charters in `docs/archive/` and `docs/MOTHBALLED_2026-08-21.md` declare the
-programme stopped. Both record genuine stops with sound reasoning, and neither describes the
-present — the 2026-08-21 stop was conditional on finding "a subject that can drive the tools",
-and the Qwen cohort is that subject. [`docs/PROGRAMME_HISTORY.md`](docs/PROGRAMME_HISTORY.md)
-tells the whole arc in one page.
-
-**Nothing about that makes a round self-starting.** Restarting a gate round, adopting a
-candidate, or deleting optimizer material still requires explicit human approval, every time.
-
-## New campaigns
-
-Use the dark, review-only [Optimizer V2](v2/README.md). The original scripts and results here
-are frozen under [LEGACY.md](LEGACY.md): still readable and verifiable, but they cannot seed or
-satisfy V2 evidence.
+Code and evidence remain archived. The offline `prompt-lab/config.py` validator
+is retained for harness schema consumers. `npm run verify:optimizer` now checks
+shutdown barriers, not the archived optimizer test battery.
 
 ## The rules, which outlived every restart
 

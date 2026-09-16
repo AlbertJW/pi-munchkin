@@ -47,3 +47,13 @@ Fresh-process optimizer crash tests cover before/after dispatch, response receip
 No automatic inference, calibration, mirroring, rollout or default change. Record resolved flags in surface/experiment identities. Prepare a frozen-source small screen for separate approval: Ling protocol qualification, then matched Qwen research evaluation. Measure answer support, required coverage, completion, extension requests, calls, context volume and elapsed time. Valid extension requests are correct lifecycle outcomes, not completed answers. Human release review is required.
 
 Cross-run memory, vector storage, browser infrastructure, deeper default delegation and speculative streaming are deferred until measured need.
+
+## Scope supersession — 2026-09-16
+
+Albert has mothballed and switched off the optimizer. Package 4 optimizer durability
+and baseline execution work, plus optimizer-specific qualification in Package 5,
+are no longer active harness deliverables. Preserve the historical requirements
+above; do not execute them without a new explicit instruction to restore the
+optimizer. Harness transaction/recovery implementation and offline testing remain
+active. See `../optimizer/docs/MOTHBALLED_2026-09-16.md` for the executable shutdown
+boundary and retained config/schema validator.

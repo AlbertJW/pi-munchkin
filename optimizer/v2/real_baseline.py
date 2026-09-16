@@ -1,5 +1,11 @@
 from __future__ import annotations
 
+# Optimizer mothballed 2026-09-16: refuse CLI execution before imports or side effects.
+if __name__ == "__main__":
+    import sys as _mothball_sys
+    print('Optimizer mothballed by Albert on 2026-09-16. Execution is disabled; explicit restoration is required.', file=_mothball_sys.stderr)
+    raise SystemExit(78)
+
 """Offline ingestion of a real Pi-gate baseline.
 
 This module never launches Pi or a model.  It turns freshly produced V4 gate

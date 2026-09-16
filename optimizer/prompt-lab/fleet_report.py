@@ -22,6 +22,12 @@ Env: FLEET_DD (daily driver), FLEET_COST_CEILING (max cand/base token ratio, def
      The effective alpha is echoed into the report -- an undeclared threshold is an
      unrecorded analysis choice.
 """
+
+# Optimizer mothballed 2026-09-16: refuse CLI execution before imports or side effects.
+if __name__ == "__main__":
+    import sys as _mothball_sys
+    print('Optimizer mothballed by Albert on 2026-09-16. Execution is disabled; explicit restoration is required.', file=_mothball_sys.stderr)
+    raise SystemExit(78)
 import collections, json, math, os, sys
 
 LAB = os.path.dirname(os.path.abspath(__file__))

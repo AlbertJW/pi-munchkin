@@ -104,11 +104,10 @@ measurably better — only to do the specific thing it was built to do.
 > candidate mechanisms fired. Every pre-2026-07-27 `NEUTRAL` is a historically recorded verdict
 > whose current status is **UNTESTED**, not rejected.
 
-The optimizer was [mothballed 2026-08-03](optimizer/docs/MOTHBALLED_2026-08-03.md) and
-[rebooted 2026-08-15](optimizer/docs/UNMOTHBALL_2026-08.md) around graded outcomes and a
-per-trial validity rubric. It is still not part of the getting-started path; rounds are
-human-started, one at a time, and no candidate is adopted or deleted without a separate human
-decision.
+The optimizer is [mothballed and switched off as of 2026-09-16](optimizer/docs/MOTHBALLED_2026-09-16.md)
+at Albert's request. Launchers refuse execution; source and evidence remain archived.
+Restart requires explicit human instruction and a reviewed source change. The offline
+config/schema validator remains available for harness development.
 
 The 2026-09-09 Qwen dark-candidate closure was premature: mechanism receipts and missing
 evaluations cannot establish adoption or retirement. Experimental flags remain off or opt-in;
@@ -342,7 +341,7 @@ npm run verify
 
 `verify` is network-independent and runs the complete discovered Node test suite, TypeScript
 checking against the locked Pi 0.80.6 lower bound, health checks, a local pack/extract/load smoke,
-and the archived optimizer's offline integrity battery. Do not rely on a hard-coded test count;
+a check that optimizer execution remains disabled, and the secret scan. Do not rely on a hard-coded test count;
 the command output is authoritative.
 
 Useful lanes:
@@ -352,7 +351,7 @@ npm test
 npm run typecheck
 npm run health
 npm run pack:smoke
-npm run verify:optimizer
+npm run verify:optimizer     # shutdown checks only; no optimizer battery
 npm run secret-scan:diff
 npm run verify -- --serial   # stages one at a time, if a concurrent failure is hard to read
 npm run mirror:apply         # copy the manifest's first-party files into a live agent dir
@@ -393,7 +392,7 @@ Start with:
 
 - [`MEASUREMENT_METHODOLOGY_2026-07.md`](optimizer/docs/MEASUREMENT_METHODOLOGY_2026-07.md) — the
   invalidity boundary and replacement method.
-- [`MOTHBALLED_2026-08-03.md`](optimizer/docs/MOTHBALLED_2026-08-03.md) — archive status and restart
+- [`MOTHBALLED_2026-09-16.md`](optimizer/docs/MOTHBALLED_2026-09-16.md) — archive status and restart
   conditions.
 - [`ROUND_LEDGER.md`](optimizer/docs/ROUND_LEDGER.md) — historical ledger,
   with its unsupported-verdict warning.

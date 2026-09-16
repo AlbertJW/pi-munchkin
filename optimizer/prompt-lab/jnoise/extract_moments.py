@@ -44,6 +44,12 @@ CONFAB_BLIND / STALE / CONFAB_EXACT separately.
   ./extract_moments.py <sessions_glob> -o moments.jsonl
   ./extract_moments.py --selftest
 """
+
+# Optimizer mothballed 2026-09-16: refuse CLI execution before imports or side effects.
+if __name__ == "__main__":
+    import sys as _mothball_sys
+    print('Optimizer mothballed by Albert on 2026-09-16. Execution is disabled; explicit restoration is required.', file=_mothball_sys.stderr)
+    raise SystemExit(78)
 import glob as globmod
 import json, os, re, sys
 

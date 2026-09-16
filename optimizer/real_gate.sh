@@ -1,4 +1,7 @@
 #!/usr/bin/env bash
+# Mothballed: stop before any setup, model access, or child process.
+printf "%s\n" 'Optimizer mothballed by Albert on 2026-09-16. Execution is disabled; explicit restoration is required.' >&2
+exit 78
 # real_gate.sh — the FUEL: a config-driven AGENTIC gate. Does a candidate config
 # actually make the model write passing code? Applies a config (project prompt + env)
 # and runs the real coding tasks headless, N reps each, scoring gate-pass (node --test

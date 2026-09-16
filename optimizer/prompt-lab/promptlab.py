@@ -9,6 +9,12 @@ and written to results/<gen>-REPORT.md.
 Usage:  ./promptlab.py [gen0] [--n 8] [--dry]
 Server: http://127.0.0.1:8080 (override LLAMA_URL).
 """
+
+# Optimizer mothballed 2026-09-16: refuse CLI execution before imports or side effects.
+if __name__ == "__main__":
+    import sys as _mothball_sys
+    print('Optimizer mothballed by Albert on 2026-09-16. Execution is disabled; explicit restoration is required.', file=_mothball_sys.stderr)
+    raise SystemExit(78)
 import hashlib, json, os, re, sys, time, math, urllib.request
 
 BASE = os.environ.get("LLAMA_URL", "http://127.0.0.1:8080")

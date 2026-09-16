@@ -14,6 +14,12 @@ Usage:  propose.py <gen> [--prompt ~/.pi/agent/APPEND_SYSTEM.md] [--n 3] [--max-
         propose.py --selftest          # no network
 Needs FRONTIER_BASE_URL / FRONTIER_API_KEY (reused from judge.py).
 """
+
+# Optimizer mothballed 2026-09-16: refuse CLI execution before imports or side effects.
+if __name__ == "__main__":
+    import sys as _mothball_sys
+    print('Optimizer mothballed by Albert on 2026-09-16. Execution is disabled; explicit restoration is required.', file=_mothball_sys.stderr)
+    raise SystemExit(78)
 import difflib, hashlib, json, os, re, sys
 
 LAB = os.path.dirname(os.path.abspath(__file__))

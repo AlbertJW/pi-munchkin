@@ -2,6 +2,12 @@
 """Run one receipt-checked span-tools off/on screen on approved bigdata."""
 from __future__ import annotations
 
+# Optimizer mothballed 2026-09-16: refuse CLI execution before imports or side effects.
+if __name__ == "__main__":
+    import sys as _mothball_sys
+    print('Optimizer mothballed by Albert on 2026-09-16. Execution is disabled; explicit restoration is required.', file=_mothball_sys.stderr)
+    raise SystemExit(78)
+
 import argparse
 import datetime as dt
 import hashlib

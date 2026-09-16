@@ -1,4 +1,7 @@
 #!/usr/bin/env bash
+# Mothballed: stop before any setup, model access, or child process.
+printf "%s\n" 'Optimizer mothballed by Albert on 2026-09-16. Execution is disabled; explicit restoration is required.' >&2
+exit 78
 # fleet_round.sh — run a gate sweep across the model ZOO (llama-swap router),
 # batched per model (never interleave: swaps cost a reload). Two modes:
 #

@@ -10,6 +10,12 @@ randomized order). Needs FRONTIER_* env; run manually after a sweep.
 Usage:  judge_diffs.py <arm_a_workdir> <arm_b_workdir> --task <taskfile>
         judge_diffs.py --selftest      # no network, no disk
 """
+
+# Optimizer mothballed 2026-09-16: refuse CLI execution before imports or side effects.
+if __name__ == "__main__":
+    import sys as _mothball_sys
+    print('Optimizer mothballed by Albert on 2026-09-16. Execution is disabled; explicit restoration is required.', file=_mothball_sys.stderr)
+    raise SystemExit(78)
 import difflib, os, sys
 
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "prompt-lab"))

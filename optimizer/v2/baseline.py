@@ -1,5 +1,11 @@
 from __future__ import annotations
 
+# Optimizer mothballed 2026-09-16: refuse CLI execution before imports or side effects.
+if __name__ == "__main__":
+    import sys as _mothball_sys
+    print('Optimizer mothballed by Albert on 2026-09-16. Execution is disabled; explicit restoration is required.', file=_mothball_sys.stderr)
+    raise SystemExit(78)
+
 """Governed baseline preparation and deterministic offline execution for G03.
 
 The real Pi gate remains the only model-quality evaluator.  This module gives

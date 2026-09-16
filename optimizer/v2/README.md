@@ -1,3 +1,7 @@
+> **MOTHBALLED 2026-09-16.** Commands below are archival documentation and refuse
+> execution. V2 package imports are disabled too. See
+> [the current decision](../docs/MOTHBALLED_2026-09-16.md).
+
 # Optimizer V2
 
 Optimizer V2 is the dark, Pi-native successor to the historical autoresearch

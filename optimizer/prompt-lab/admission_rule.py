@@ -15,6 +15,12 @@ Two deliberately separate questions:
                                  error this module corrects)
 """
 
+# Optimizer mothballed 2026-09-16: refuse CLI execution before imports or side effects.
+if __name__ == "__main__":
+    import sys as _mothball_sys
+    print('Optimizer mothballed by Albert on 2026-09-16. Execution is disabled; explicit restoration is required.', file=_mothball_sys.stderr)
+    raise SystemExit(78)
+
 # Preregistered thresholds — PREREG_FIXTURE_ADMISSION_2026-08.md, verbatim.
 N_REQUIRED = 6            # base-arm sessions per fixture per model tier
 COVERAGE_MIN = 5          # A1: rows carrying subscores (of N_REQUIRED)

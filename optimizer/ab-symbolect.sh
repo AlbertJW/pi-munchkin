@@ -1,4 +1,7 @@
 #!/usr/bin/env bash
+# Mothballed: stop before any setup, model access, or child process.
+printf "%s\n" 'Optimizer mothballed by Albert on 2026-09-16. Execution is disabled; explicit restoration is required.' >&2
+exit 78
 # A/B: symbolect identity lines vs baseline prompts (see AB_SYMBOLECT.md).
 #
 #   SYMBOLECT=on|off ./ab-symbolect.sh [t1 t2 t3 t4]     (default: all four)

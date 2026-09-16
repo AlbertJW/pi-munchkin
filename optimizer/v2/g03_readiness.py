@@ -1,5 +1,11 @@
 from __future__ import annotations
 
+# Optimizer mothballed 2026-09-16: refuse CLI execution before imports or side effects.
+if __name__ == "__main__":
+    import sys as _mothball_sys
+    print('Optimizer mothballed by Albert on 2026-09-16. Execution is disabled; explicit restoration is required.', file=_mothball_sys.stderr)
+    raise SystemExit(78)
+
 """No-inference readiness probe for the G03 representative baseline.
 
 The real baseline has two independent gates: the source/loaded surface and the

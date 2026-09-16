@@ -20,6 +20,12 @@ Usage:  munchkin.py [--gen m0] [--rounds 3] [--candidates 2] [--n 4] [--tasks pa
         munchkin.py --selftest   # offline loop proof
 GPU cost ≈ rounds × candidates × (tasks × n) agentic sessions on the model — keep small.
 """
+
+# Optimizer mothballed 2026-09-16: refuse CLI execution before imports or side effects.
+if __name__ == "__main__":
+    import sys as _mothball_sys
+    print('Optimizer mothballed by Albert on 2026-09-16. Execution is disabled; explicit restoration is required.', file=_mothball_sys.stderr)
+    raise SystemExit(78)
 import glob, hashlib, ipaddress, json, os, re, shutil, subprocess, sys, tempfile, urllib.parse
 
 HERE = os.path.dirname(os.path.abspath(__file__))

@@ -75,3 +75,10 @@ for the current unresolved roster, the verified minimal-profile alias, the
 retained semantic-loop no-go, preserved historical receipts, and the requirement
 that every new Qwen screen be freshly preregistered. This
 note does not edit the append-only screen rows above.
+
+## 2026-09-16 — programme mothballed
+
+Optimizer execution and campaign work are stopped by Albert's explicit decision.
+Existing screens and preregistrations are preserved as history; none was run or
+reclassified by this action. See `MOTHBALLED_2026-09-16.md`. A prepared study is not
+restart authorization.

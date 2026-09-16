@@ -27,6 +27,12 @@ whatever arms happened to exist):
                    adoption (multiplicity control by procedure).
 Telemetry joins prefer the rows' `run` id ({gen_arm}-{run}-) when present —
 exact per-run; legacy rows fall back to the bare arm prefix."""
+
+# Optimizer mothballed 2026-09-16: refuse CLI execution before imports or side effects.
+if __name__ == "__main__":
+    import sys as _mothball_sys
+    print('Optimizer mothballed by Albert on 2026-09-16. Execution is disabled; explicit restoration is required.', file=_mothball_sys.stderr)
+    raise SystemExit(78)
 import collections, json, os, sys
 
 LAB = os.path.dirname(os.path.abspath(__file__))

@@ -2248,3 +2248,9 @@ entirely. See `optimizer/docs/DARK_CANDIDATE_VERDICTS_2026-09-10.md`.
 
 Full verification receipt, source surface hash, and the accompanying bottom-up audit:
 `docs/HARNESS_AUDIT_2026-09-10.md`.
+
+## 2026-09-16 — optimizer execution stopped by user decision
+
+Albert requested complete mothballing because the optimizer has not produced useful
+results for his workflow. Launchers are disabled; no new round or candidate verdict
+is recorded. Historical rows remain unchanged. See `MOTHBALLED_2026-09-16.md`.

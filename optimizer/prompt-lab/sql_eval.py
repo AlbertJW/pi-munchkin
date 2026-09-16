@@ -13,6 +13,12 @@ Usage:  ./sql_eval.py [gen] [--variants A,F] [--prompt-file P=path ...]
         ./sql_eval.py --selftest          # no server, no network
 Server: http://127.0.0.1:8080 (override LLAMA_URL), reused from promptlab.
 """
+
+# Optimizer mothballed 2026-09-16: refuse CLI execution before imports or side effects.
+if __name__ == "__main__":
+    import sys as _mothball_sys
+    print('Optimizer mothballed by Albert on 2026-09-16. Execution is disabled; explicit restoration is required.', file=_mothball_sys.stderr)
+    raise SystemExit(78)
 import json, os, re, sqlite3, sys
 
 LAB = os.path.dirname(os.path.abspath(__file__))

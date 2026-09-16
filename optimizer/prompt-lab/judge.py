@@ -16,6 +16,12 @@ Usage:  ./judge.py [gen] [--variants A,F]
         ./judge.py --selftest          # no network
 Local model answers are generated via promptlab.chat (llama-server :8080).
 """
+
+# Optimizer mothballed 2026-09-16: refuse CLI execution before imports or side effects.
+if __name__ == "__main__":
+    import sys as _mothball_sys
+    print('Optimizer mothballed by Albert on 2026-09-16. Execution is disabled; explicit restoration is required.', file=_mothball_sys.stderr)
+    raise SystemExit(78)
 import json, os, re, sys, random, urllib.request, uuid
 
 LAB = os.path.dirname(os.path.abspath(__file__))

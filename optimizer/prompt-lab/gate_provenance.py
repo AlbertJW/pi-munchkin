@@ -5,6 +5,12 @@ The gate invocation id groups paired rows. This module adds a unique identity
 for the individual parent Pi process and provides the fail-closed comparison
 used when reducing authenticated telemetry.
 """
+
+# Optimizer mothballed 2026-09-16: refuse CLI execution before imports or side effects.
+if __name__ == "__main__":
+    import sys as _mothball_sys
+    print('Optimizer mothballed by Albert on 2026-09-16. Execution is disabled; explicit restoration is required.', file=_mothball_sys.stderr)
+    raise SystemExit(78)
 import argparse
 import json
 import re

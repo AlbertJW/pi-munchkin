@@ -23,6 +23,12 @@ Corpus note (2026-07-14): the 4B lens was fitted on a local Gutenberg prose corp
 port's wikitext default) was persistently 503; same generic-prose role, recorded
 as a recipe deviation.
 """
+
+# Optimizer mothballed 2026-09-16: refuse CLI execution before imports or side effects.
+if __name__ == "__main__":
+    import sys as _mothball_sys
+    print('Optimizer mothballed by Albert on 2026-09-16. Execution is disabled; explicit restoration is required.', file=_mothball_sys.stderr)
+    raise SystemExit(78)
 import collections, hashlib, json, math, os, sys, tempfile
 
 # Late-layer window + top-K, matching the community study (L30-34 avg, top-50).

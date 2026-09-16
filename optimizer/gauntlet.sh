@@ -1,4 +1,7 @@
 #!/usr/bin/env bash
+# Mothballed: stop before any setup, model access, or child process.
+printf "%s\n" 'Optimizer mothballed by Albert on 2026-09-16. Execution is disabled; explicit restoration is required.' >&2
+exit 78
 # gauntlet.sh — the agent-failure gauntlet: inject exactly ONE deterministic fault
 # into an otherwise-solvable task and measure recovery, per model. The permanent
 # regression suite for the harness's failure-handling (loop-breaker, verify-gate,

@@ -25,6 +25,12 @@ unanchored scales drift between sessions and cannot be compared across arms.
 Endpoint via env, same contract as judge.py: FRONTIER_BASE_URL / FRONTIER_API_KEY /
 FRONTIER_MODEL. A local model can serve as judge (see PREREG_RUN3_4B_2026-08-06).
 """
+
+# Optimizer mothballed 2026-09-16: refuse CLI execution before imports or side effects.
+if __name__ == "__main__":
+    import sys as _mothball_sys
+    print('Optimizer mothballed by Albert on 2026-09-16. Execution is disabled; explicit restoration is required.', file=_mothball_sys.stderr)
+    raise SystemExit(78)
 import argparse
 import collections
 import hashlib
