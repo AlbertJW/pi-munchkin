@@ -997,3 +997,47 @@ changed.
 Source commit: `c3861e3`.
 Current package-source SHA-256: `f7ca7e8f7492616414e22228de81f0be5b96904e13ba02d124695254687e480e`
 (recomputed via `npm run surface:hash:source` on 2026-09-17).
+
+## Correction and closeout — 2026-09-17 (Phase 3B.2 deadline/lifecycle recheck)
+
+Correction: the six tests in `parent-ledger-transaction.test.ts` are NOT
+"six lifecycle-safety cases" as the `c3861e3` commit message and the row
+above state. They cover run identity, missing/malformed aggregate storage,
+concurrency, and idempotent-duplicate protection. Lifecycle and deadline
+safety of the parent transition was only partially closed at `c3861e3`:
+phase eligibility was rechecked under the aggregate lock, but the deadline
+was checked only in the caller preflight outside the lock.
+
+What Phase 3B.2 now completes: `mutateParentResearchRoundLedger` rechecks
+the deadline under the aggregate lock before the reducer runs, via an
+explicit per-operation `rejectExpired` option. The rule mirrors the
+existing preflight semantics and is NOT a blanket rejection: `research_round
+record` and the three ketch receipt bridges (search/read/evidence-card) pass
+`rejectExpired: true`; settlement (`RESEARCH_SETTLE_ELIGIBLE_PHASES`) and
+branch-result reservation accounting omit it, so legitimate settlement and
+accounting stay allowed after expiry. A rejected transition commits nothing:
+aggregate revision, evidence, budget and the compatibility view are all
+unchanged, and the reducer is never invoked. The optimizer's offline
+configuration validator now registers `RESEARCH_WORKFLOW=parent` in the
+canonical schema with a selftest rendering check (optimizer execution stays
+mothballed).
+
+Demonstrated by: `parent-ledger-deadline-transaction.test.ts` — (1) a
+lifecycle change (active→paused) between preflight and transaction is
+refused under the lock with state unchanged (regression coverage of the
+existing phase check); (2) a deadline crossing between preflight and
+transaction is refused under the lock with state unchanged (RED before the
+fix: the record committed on the expired aggregate; GREEN after); (3) a
+legitimate settlement after expiry succeeds (regression coverage against a
+blanket deadline rejection). All three use the real transaction primitive.
+`npm run verify`: all six stages pass.
+
+Outstanding: the graph-snapshot writers (initial aggregate creation in
+`research_plan_start`/`projectResearchAggregateSnapshot`, the `research_round
+start` initial ledger, and the legacy non-parent `mutateResearchRoundLedger`
+path) remain compatibility writers, and the broader Phase 3B
+graph-transaction migration is not started.
+
+Source commit: `7ac99c5`.
+Current package-source SHA-256: `09b2b392a4eb6c1f528e0c016d5a7e7ef7ea5eee4bf9af9dc2ae374b324c213a`
+(recomputed via `npm run surface:hash:source` on 2026-09-17).
