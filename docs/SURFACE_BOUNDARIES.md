@@ -966,3 +966,34 @@ Source commit: `da3445b`.
 Current package-source SHA-256: `6d5e85496ded7b4a70fdefaea1d911b6aaf409a5e5b0bcd0c9e2327be54bdf64`
 (recomputed via `npm run surface:hash:source` on 2026-09-15; matches the
 preceding row).
+
+## Pending surface boundary — 2026-09-17 (Phase 3B.2 parent-owned ledger transitions)
+
+`mutateParentResearchRoundLedger` (research-round.ts) is the new sole
+mutation path for parent-owned research-round state: the aggregate lock
+spans read, reduce, and commit, and the compatibility ledger file is
+published as a derived post-commit output (a `mutateResearchAggregate`
+`afterCommit` hook). The ketch search/read/evidence-card receipt bridges
+and the `research_round` record/settle + branch-merge paths all use it,
+so a stale or missing compatibility view can no longer suppress a parent
+receipt or drive a transition from an older snapshot. Identity and phase
+eligibility are validated under the lock before the reducer runs; a
+mismatched run or ineligible phase fails closed and the reducer is never
+invoked. A post-commit compatibility publication failure never rolls back
+the committed aggregate — the stale view is rebuilt on the next parent
+transition. A no-op reducer (idempotent duplicate) returns a null state
+to `mutateResearchAggregate`, mints no revision, and republishes nothing,
+so a branch merge performs exactly one aggregate transition.
+
+`npm run verify`: all six stages pass, 108.6s (910 tests). New coverage:
+`parent-ledger-transaction.test.ts` (6 lifecycle-safety cases),
+`research-aggregate-transaction.regression.test.ts`, and three ketch
+compatibility-ledger cases through the real web_search/web_read/
+research_note tool path (missing view, malformed view, forced post-commit
+publication failure with a no-double-charge retry). No inference,
+calibration, mirror, or rollout occurred; no other dark flag's default
+changed.
+
+Source commit: `c3861e3`.
+Current package-source SHA-256: `f7ca7e8f7492616414e22228de81f0be5b96904e13ba02d124695254687e480e`
+(recomputed via `npm run surface:hash:source` on 2026-09-17).
