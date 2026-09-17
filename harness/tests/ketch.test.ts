@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { chmodSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { chmodSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
@@ -672,6 +672,168 @@ test("parent research_note publishes its evidence card and validation receipt au
 		assert.equal(persisted?.rounds.some((round) => round.reads.some((read) => read.phase === "parent_validation")), true, "publishing a card must charge a parent-validation receipt");
 		const aggregate = await readResearchAggregate(aggregatePath);
 		assert.equal((aggregate?.evidence_round as any)?.evidence_cards.length, 1, "aggregate projection must carry the evidence reference");
+	} finally {
+		restoreEnv(snapshot);
+		rmSync(dir, { recursive: true, force: true });
+		delete (globalThis as Record<string, unknown>).__pi_active_plan_context;
+	}
+});
+
+test("parent retrieval commits receipts when the compatibility ledger is missing", async () => {
+	const dir = mkdtempSync(join(tmpdir(), "ketch-missing-compat-"));
+	const snapshot = Object.fromEntries(["KETCH", "KETCH_BIN", "RESEARCH_LEDGER", "DEEP_RESEARCH_PLANNING", "RESEARCH_WORKFLOW", "PI_CODING_AGENT_DIR", "TELEMETRY_FILE", "TELEMETRY_SOURCE"].map((key) => [key, process.env[key]]));
+	try {
+		delete process.env.KETCH;
+		process.env.KETCH_BIN = mockKetch(dir);
+		process.env.RESEARCH_LEDGER = "on";
+		process.env.DEEP_RESEARCH_PLANNING = "on";
+		process.env.RESEARCH_WORKFLOW = "parent";
+		process.env.PI_CODING_AGENT_DIR = join(dir, "agent");
+		process.env.TELEMETRY_FILE = join(dir, "events.jsonl");
+		process.env.TELEMETRY_SOURCE = "test";
+		const runId = "research-plan-missing-compat";
+		const ledger = new ResearchRoundLedger({ run_id: runId, obligations: [{ claim_id: "claim-a", text: "A", required: true, status: "open", missing: "evidence", why: "test", next_action: "search" }], budget: { searches: 3, reads: 5, validation_reads: 5 } });
+		const roundPath = researchRoundPath(dir, runId, process.env);
+		const aggregatePath = researchAggregatePath(dir, runId, process.env);
+		// Seed ONLY the aggregate: the compatibility ledger file is intentionally absent.
+		await writeResearchAggregate(aggregatePath, migrateResearchPair({ run_id: runId }, ledger.state));
+		assert.equal(await readResearchRoundLedger(roundPath), null, "compatibility ledger must start missing");
+		const fp = makeFakePi();
+		const mod = await import(`../extensions/ketch.ts?missing-compat=${Date.now()}-${Math.random()}`);
+		mod.registerKetch(fp.pi as never, { resolvePublicUrl: async (raw: string) => new URL(raw).toString() });
+		await fp.handlers.get("session_start")?.[0]?.({}, { cwd: dir, ui: { notify() {} } });
+		(globalThis as Record<string, unknown>).__pi_active_plan_context = { profile: "deep-research", run_id: runId, settled: false };
+		const search = await callTool(fp, "web_search", { query: "missing compat search", limit: 1 }, dir);
+		assert.equal(search.isError, false, "a valid aggregate must keep the search path usable");
+		const read = await callTool(fp, "web_read", { urls: ["https://example.com/a"] }, dir);
+		assert.equal(read.isError, false, "a valid aggregate must keep the read path usable");
+		const note = await callTool(fp, "research_note", { claim: "A rewritten claim", claim_id: "claim-a", url: "https://example.com/a", quote: "Useful source text" }, dir);
+		assert.equal(note.isError, false, "a valid aggregate must keep the note path usable");
+		const aggregate = await readResearchAggregate(aggregatePath);
+		const round = aggregate?.evidence_round as any;
+		assert.equal(round.search_receipts.length, 1, "the search receipt must reach the aggregate");
+		assert.equal(round.search_receipts[0].query, "missing compat search");
+		assert.deepEqual(round.search_receipts[0].result_urls, ["https://example.com/a"]);
+		assert.equal(round.budget.consumed.searches, 1, "the search charge must reach the aggregate");
+		assert.equal(round.budget.consumed.reads, 1, "the discovery read charge must reach the aggregate");
+		assert.equal(round.evidence_cards.length, 1, "the evidence card must reach the aggregate");
+		assert.ok(round.rounds.some((item: any) => item.reads.some((read: any) => read.phase === "parent_validation")), "the validation receipt must reach the aggregate");
+		assert.equal(round.budget.consumed.validation_reads, 1, "the validation charge must reach the aggregate");
+		const compat = await readResearchRoundLedger(roundPath);
+		assert.ok(compat, "the compatibility ledger must be rebuilt from the aggregate");
+		assert.equal(compat.search_receipts?.length, 1);
+		assert.equal(compat.evidence_cards.length, 1);
+		assert.equal(compat.budget.consumed.searches, 1);
+		assert.equal(compat.budget.consumed.reads, 1);
+		assert.equal(compat.budget.consumed.validation_reads, 1);
+	} finally {
+		restoreEnv(snapshot);
+		rmSync(dir, { recursive: true, force: true });
+		delete (globalThis as Record<string, unknown>).__pi_active_plan_context;
+	}
+});
+
+test("parent retrieval ignores a malformed compatibility ledger and keeps aggregate authority", async () => {
+	const dir = mkdtempSync(join(tmpdir(), "ketch-malformed-compat-"));
+	const snapshot = Object.fromEntries(["KETCH", "KETCH_BIN", "RESEARCH_LEDGER", "DEEP_RESEARCH_PLANNING", "RESEARCH_WORKFLOW", "PI_CODING_AGENT_DIR", "TELEMETRY_FILE", "TELEMETRY_SOURCE"].map((key) => [key, process.env[key]]));
+	try {
+		delete process.env.KETCH;
+		process.env.KETCH_BIN = mockCompleteKetch(dir);
+		process.env.RESEARCH_LEDGER = "on";
+		process.env.DEEP_RESEARCH_PLANNING = "on";
+		process.env.RESEARCH_WORKFLOW = "parent";
+		process.env.PI_CODING_AGENT_DIR = join(dir, "agent");
+		process.env.TELEMETRY_FILE = join(dir, "events.jsonl");
+		process.env.TELEMETRY_SOURCE = "test";
+		const runId = "research-plan-malformed-compat";
+		const ledger = new ResearchRoundLedger({ run_id: runId, obligations: [{ claim_id: "claim-a", text: "A", required: true, status: "open", missing: "evidence", why: "test", next_action: "search" }], budget: { searches: 3, reads: 5, validation_reads: 5 } });
+		const roundPath = researchRoundPath(dir, runId, process.env);
+		const aggregatePath = researchAggregatePath(dir, runId, process.env);
+		await writeResearchRoundLedger(roundPath, ledger.state);
+		await writeResearchAggregate(aggregatePath, migrateResearchPair({ run_id: runId }, ledger.state));
+		const fp = makeFakePi();
+		const mod = await import(`../extensions/ketch.ts?malformed-compat=${Date.now()}-${Math.random()}`);
+		mod.registerKetch(fp.pi as never, { resolvePublicUrl: async (raw: string) => new URL(raw).toString() });
+		await fp.handlers.get("session_start")?.[0]?.({}, { cwd: dir, ui: { notify() {} } });
+		(globalThis as Record<string, unknown>).__pi_active_plan_context = { profile: "deep-research", run_id: runId, settled: false };
+		assert.equal((await callTool(fp, "web_search", { query: "first compat query", limit: 1 }, dir)).isError, false);
+		writeFileSync(roundPath, '{"schema":"research-round-ledger/v1","run_id":');
+		const second = await callTool(fp, "web_search", { query: "second compat query", limit: 1 }, dir);
+		assert.equal(second.isError, false, "a malformed compatibility ledger must not block retrieval");
+		assert.equal((await callTool(fp, "web_read", { urls: ["https://example.com/a"] }, dir)).isError, false);
+		const note = await callTool(fp, "research_note", { claim: "A rewritten claim", claim_id: "claim-a", url: "https://example.com/a", quote: "Useful source text" }, dir);
+		assert.equal(note.isError, false);
+		const aggregate = await readResearchAggregate(aggregatePath);
+		const round = aggregate?.evidence_round as any;
+		assert.equal(round.search_receipts.length, 2, "receipts must accumulate in the aggregate across the corruption");
+		assert.deepEqual(round.search_receipts.map((receipt: any) => receipt.query).sort(), ["first compat query", "second compat query"]);
+		assert.equal(round.budget.consumed.searches, 2, "both search charges must reach the aggregate");
+		assert.equal(round.evidence_cards.length, 1);
+		assert.equal(round.budget.consumed.validation_reads, 1, "the note's validation charge must reach the aggregate");
+		assert.equal(round.budget.consumed.reads, 1, "the discovery read charge must reach the aggregate");
+		const compat = await readResearchRoundLedger(roundPath);
+		assert.ok(compat, "the compatibility ledger must be rebuilt after a malformed view");
+		assert.equal(compat.search_receipts?.length, 2);
+		assert.equal(compat.evidence_cards.length, 1);
+		assert.equal(compat.budget.consumed.searches, 2);
+		assert.equal(compat.budget.consumed.validation_reads, 1);
+		assert.equal(compat.budget.consumed.reads, 1);
+	} finally {
+		restoreEnv(snapshot);
+		rmSync(dir, { recursive: true, force: true });
+		delete (globalThis as Record<string, unknown>).__pi_active_plan_context;
+	}
+});
+
+test("post-commit compatibility publication failure keeps the aggregate committed", async () => {
+	const dir = mkdtempSync(join(tmpdir(), "ketch-publish-fail-"));
+	const snapshot = Object.fromEntries(["KETCH", "KETCH_BIN", "RESEARCH_LEDGER", "DEEP_RESEARCH_PLANNING", "RESEARCH_WORKFLOW", "PI_CODING_AGENT_DIR", "TELEMETRY_FILE", "TELEMETRY_SOURCE"].map((key) => [key, process.env[key]]));
+	try {
+		delete process.env.KETCH;
+		process.env.KETCH_BIN = mockKetch(dir);
+		process.env.RESEARCH_LEDGER = "on";
+		process.env.DEEP_RESEARCH_PLANNING = "on";
+		process.env.RESEARCH_WORKFLOW = "parent";
+		process.env.PI_CODING_AGENT_DIR = join(dir, "agent");
+		process.env.TELEMETRY_FILE = join(dir, "events.jsonl");
+		process.env.TELEMETRY_SOURCE = "test";
+		const runId = "research-plan-publish-fail";
+		const ledger = new ResearchRoundLedger({ run_id: runId, obligations: [{ claim_id: "claim-a", text: "A", required: true, status: "open", missing: "evidence", why: "test", next_action: "search" }], budget: { searches: 3, reads: 5, validation_reads: 5 } });
+		const roundPath = researchRoundPath(dir, runId, process.env);
+		const aggregatePath = researchAggregatePath(dir, runId, process.env);
+		await writeResearchRoundLedger(roundPath, ledger.state);
+		await writeResearchAggregate(aggregatePath, migrateResearchPair({ run_id: runId }, ledger.state));
+		const fp = makeFakePi();
+		const mod = await import(`../extensions/ketch.ts?publish-fail=${Date.now()}-${Math.random()}`);
+		mod.registerKetch(fp.pi as never, { resolvePublicUrl: async (raw: string) => new URL(raw).toString() });
+		await fp.handlers.get("session_start")?.[0]?.({}, { cwd: dir, ui: { notify() {} } });
+		(globalThis as Record<string, unknown>).__pi_active_plan_context = { profile: "deep-research", run_id: runId, settled: false };
+		// Narrow seam: make the compatibility ledger path a directory so the
+		// post-commit compatibility write fails while the aggregate commit succeeds.
+		rmSync(roundPath, { recursive: true, force: true });
+		mkdirSync(roundPath);
+		const first = await callTool(fp, "web_search", { query: "publish failure query", limit: 1 }, dir);
+		assert.equal(first.isError, false, "a failed compatibility publication must not look like a rollback to the caller");
+		let aggregate = await readResearchAggregate(aggregatePath);
+		let round = aggregate?.evidence_round as any;
+		assert.equal(round.search_receipts.length, 1, "the round must stay committed despite the failed compatibility write");
+		assert.equal(round.search_receipts[0].charged, true);
+		assert.equal(round.budget.consumed.searches, 1, "the budget must stay committed despite the failed compatibility write");
+		assert.equal(await readResearchRoundLedger(roundPath), null, "the compatibility view must stay broken while the destination is a directory");
+		const retry = await callTool(fp, "web_search", { query: "publish failure query", limit: 1 }, dir);
+		assert.equal(retry.isError, false);
+		aggregate = await readResearchAggregate(aggregatePath);
+		round = aggregate?.evidence_round as any;
+		assert.equal(round.search_receipts.length, 1, "retrying the identical operation must re-record idempotently, not add a second receipt");
+		assert.equal(round.budget.consumed.searches, 1, "retrying the same query must not double-charge the budget");
+		rmSync(roundPath, { recursive: true, force: true });
+		const repaired = await callTool(fp, "web_search", { query: "repair transition query", limit: 1 }, dir);
+		assert.equal(repaired.isError, false);
+		const compat = await readResearchRoundLedger(roundPath);
+		assert.ok(compat, "repairing the destination must let a later transition rebuild the compatibility view");
+		assert.equal(compat.search_receipts?.length, 2, "the rebuilt view must carry every committed receipt");
+		assert.equal(compat.budget.consumed.searches, 2);
+		assert.equal(compat.reserved_queries.length, 2, "the retry must not have reserved a second search unit");
 	} finally {
 		restoreEnv(snapshot);
 		rmSync(dir, { recursive: true, force: true });

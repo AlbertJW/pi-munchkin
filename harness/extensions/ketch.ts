@@ -36,7 +36,7 @@ import { goalsEnabled, readCurrentGoal } from "../lib/goal-state.ts";
 import { createHash } from "node:crypto";
 import { reserveContextOutput } from "../lib/context-accounting.ts";
 import { deadlinePhase, mutateResearchAggregate, readResearchAggregate, researchAggregatePath, transitionAggregate } from "../lib/research-aggregate.ts";
-import { evidenceCardRef, mutateResearchRoundLedger, readResearchRoundLedger, researchRoundPath, type ResearchRoundLedgerStateV1, type ResearchRoundProposalV1 } from "../lib/research-round.ts";
+import { evidenceCardRef, mutateParentResearchRoundLedger, type ResearchRoundLedgerStateV1, type ResearchRoundProposalV1 } from "../lib/research-round.ts";
 
 // Ketch is the host-side network adapter for local models. The steady-state
 // surface is deliberately only FIND + READ; deep orchestration lives in the
@@ -329,42 +329,21 @@ export function registerKetch(pi: ExtensionAPI, dependencies: KetchDependencies 
 		ledgerWriteTail = pending.then(() => undefined, () => undefined);
 		await pending;
 	}
-	async function projectParentResearchAggregate(runId: string, state: ResearchRoundLedgerStateV1): Promise<void> {
-		if (!activeResearchCwd) return;
-		try {
-			const aggregatePath = researchAggregatePath(activeResearchCwd, runId, process.env);
-			const currentAggregate = await readResearchAggregate(aggregatePath);
-			if (!currentAggregate || currentAggregate.run_id !== runId || currentAggregate.phase !== "active") return;
-			await mutateResearchAggregate(aggregatePath, (aggregate) => {
-				if (aggregate.phase !== "active") throw new Error("aggregate is no longer active");
-				return {
-					state: transitionAggregate(aggregate, {
-						evidence_round: state,
-						budget: state.budget.consumed,
-					}),
-					result: undefined,
-				};
-			});
-		} catch {
-			// A stale or unavailable aggregate is non-authoritative for this bridge;
-			// plan-runner will surface it on the next inspect/recovery boundary.
-		}
-	}
 	/**
 	 * Parent-owned research records the facts already known by the retrieval
-	 * adapter. This is deliberately a compatibility bridge: the existing
-	 * research-round reducer remains the validator, and a failed projection never
-	 * turns a successful web read into a false failure. The generated round ID is
-	 * content-addressed, so a retry or duplicate tool-result callback is a no-op.
+	 * adapter. The authoritative aggregate is the sole base for these receipts:
+	 * the primitive reads, reduces, and commits under the aggregate lock and
+	 * publishes the compatibility ledger as a derived output, so a stale or
+	 * missing compatibility view never suppresses a parent receipt. A failed
+	 * projection never turns a successful web read into a false failure. The
+	 * generated round ID is content-addressed, so a retry or duplicate
+	 * tool-result callback is a no-op.
 	 */
 	async function recordParentReadReceipt(requestedUrls: readonly string[], rows: readonly ReadResult[], overallTruncated: boolean, method: "ketch" | "jina"): Promise<void> {
 		if (!PARENT_RESEARCH_WORKFLOW || !activeResearchCwd) return;
 		const active = (globalThis as Record<string, unknown>).__pi_active_plan_context as { profile?: unknown; run_id?: unknown; settled?: unknown } | undefined;
 		if (active?.profile !== "deep-research" || active.settled === true || typeof active.run_id !== "string") return;
 		const runId = active.run_id;
-		const path = researchRoundPath(activeResearchCwd, runId, process.env);
-		const existing = await readResearchRoundLedger(path);
-		if (!existing || existing.run_id !== runId || existing.status === "settled") return;
 		const byUrl = new Map<string, ReadResult>();
 		for (const row of rows) {
 			try { byUrl.set(canonicalResearchUrl(row.url), row); } catch { /* source binding rejected elsewhere */ }
@@ -381,55 +360,49 @@ export function registerKetch(pi: ExtensionAPI, dependencies: KetchDependencies 
 		const receiptIdentity = JSON.stringify({ run_id: runId, reads });
 		const roundId = `auto-read-${createHash("sha256").update(receiptIdentity, "utf8").digest("hex").slice(0, 48)}`;
 		try {
-			await mutateResearchRoundLedger(path, (ledger) => {
+			await mutateParentResearchRoundLedger(activeResearchCwd, runId, (ledger) => {
 				const proposal: ResearchRoundProposalV1 = {
 					schema: "pi.research-round/v1", run_id: runId, round_id: roundId,
 					selected_gaps: [], queries: [], source_leads: [], reads, evidence_cards: [], conflicts: [], gaps: [], proposed_next_action: "read",
 				};
 				ledger.recordRound(proposal);
 				return { state: ledger.state, result: ledger.state };
-			}, {
-				beforePersist: async (nextState) => { await projectParentResearchAggregate(runId, nextState); },
 			});
 		} catch {
-			// The legacy ledger remains the compatibility authority until aggregate
-			// writes become sole-source. Retrieval success is still useful, but the
-			// parent must not infer a durable receipt from this best-effort bridge.
+			// A transient aggregate-lock contention or a phase gate never turns a
+			// successful web read into a tool failure; the parent's next
+			// inspect/recovery boundary surfaces the missing authoritative receipt.
 			return;
 		}
 	}
 	/**
 	 * Parent-owned research records the search adapter's bounded query and lead
-	 * identities before returning a successful result. The ledger reducer owns
-	 * budget charging and deduplication; result snippets never cross this
-	 * boundary. This remains a best-effort compatibility bridge until the
-	 * aggregate becomes the sole research authority.
+	 * identities before returning a successful result. The authoritative
+	 * aggregate is the sole base: the primitive reads, reduces, and commits
+	 * under the aggregate lock and publishes the compatibility ledger as a
+	 * derived output. The ledger reducer owns budget charging and
+	 * deduplication; result snippets never cross this boundary.
 	 */
 	async function recordParentSearchReceipt(toolCallId: string, started: number, query: string, mode: "quick" | "broad", backends: readonly string[], resultUrls: readonly string[], truncated: boolean, outcome: "completed" | "failed" | "blocked"): Promise<void> {
 		if (!PARENT_RESEARCH_WORKFLOW || !activeResearchCwd) return;
 		const active = (globalThis as Record<string, unknown>).__pi_active_plan_context as { profile?: unknown; run_id?: unknown; settled?: unknown } | undefined;
 		if (active?.profile !== "deep-research" || active.settled === true || typeof active.run_id !== "string") return;
 		const runId = active.run_id;
-		const path = researchRoundPath(activeResearchCwd, runId, process.env);
-		const existing = await readResearchRoundLedger(path);
-		if (!existing || existing.run_id !== runId || existing.status === "settled") return;
 		const urls = [...new Set(resultUrls.flatMap((raw) => { try { return [canonicalResearchUrl(raw)]; } catch { return []; } }))].slice(0, 8);
 		const identity = JSON.stringify({ run_id: runId, tool_call_id: toolCallId, query, mode, backends: [...backends], result_urls: urls, truncated, outcome });
 		const receiptId = `auto-search-${createHash("sha256").update(identity, "utf8").digest("hex").slice(0, 48)}`;
 		try {
-			await mutateResearchRoundLedger(path, (ledger) => {
+			await mutateParentResearchRoundLedger(activeResearchCwd, runId, (ledger) => {
 				const receipt = ledger.recordSearchReceipt({
 					receipt_id: receiptId, query, mode, backends: [...new Set(backends)].slice(0, 8), result_urls: urls,
 					result_count: urls.length, truncated, outcome, created_at: new Date(started).toISOString(),
 				});
 				return { state: ledger.state, result: receipt };
-			}, {
-				beforePersist: async (nextState) => { await projectParentResearchAggregate(runId, nextState); },
 			});
 		} catch {
-			// A stale or unavailable aggregate/compatibility ledger must never turn a
+			// A transient aggregate-lock contention or a phase gate never turns a
 			// valid search response into a tool failure. The next inspect/recovery
-			// boundary will surface missing authoritative receipts.
+			// boundary surfaces the missing authoritative receipt.
 		}
 	}
 	async function recordParentEvidenceCard(card: EvidenceCardV1): Promise<void> {
@@ -437,27 +410,23 @@ export function registerKetch(pi: ExtensionAPI, dependencies: KetchDependencies 
 		const active = (globalThis as Record<string, unknown>).__pi_active_plan_context as { profile?: unknown; run_id?: unknown; settled?: unknown } | undefined;
 		if (active?.profile !== "deep-research" || active.settled === true || typeof active.run_id !== "string") return;
 		const runId = active.run_id;
-		const path = researchRoundPath(activeResearchCwd, runId, process.env);
-		const existing = await readResearchRoundLedger(path);
-		if (!existing || existing.run_id !== runId || existing.status === "settled") return;
 		const truncated = card.truncated;
 		const read = { url: card.original_url, phase: "parent_validation" as const, method: card.retrieval_method, outcome: truncated ? "truncated" as const : "completed" as const, truncated, parent_validated: true };
 		const receiptIdentity = JSON.stringify({ run_id: runId, card_id: card.card_id, read });
 		const roundId = `auto-note-${createHash("sha256").update(receiptIdentity, "utf8").digest("hex").slice(0, 48)}`;
 		try {
-			await mutateResearchRoundLedger(path, (ledger) => {
+			await mutateParentResearchRoundLedger(activeResearchCwd, runId, (ledger) => {
 				const proposal: ResearchRoundProposalV1 = {
 					schema: "pi.research-round/v1", run_id: runId, round_id: roundId,
 					selected_gaps: [], queries: [], source_leads: [], reads: [read], evidence_cards: [evidenceCardRef(card)], conflicts: [], gaps: [], proposed_next_action: "synthesize",
 				};
 				ledger.recordRound(proposal);
 				return { state: ledger.state, result: ledger.state };
-			}, {
-				beforePersist: async (nextState) => { await projectParentResearchAggregate(runId, nextState); },
 			});
 		} catch {
-			// Unknown plan claim IDs and malformed legacy ledgers stay on the existing
-			// model-facing compatibility path; the note itself remains valid JSONL.
+			// A transient aggregate-lock contention or a phase gate never turns a
+			// valid evidence note into a false failure; the note remains valid JSONL
+			// and the parent's inspect/recovery boundary surfaces the missing receipt.
 			return;
 		}
 	}

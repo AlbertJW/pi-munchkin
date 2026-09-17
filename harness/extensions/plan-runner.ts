@@ -26,7 +26,7 @@ import { auditResearchCitations, storedUrl } from "../lib/research-ledger.ts";
 import { canonicalResearchUrl, claimIdForText, RESEARCH_EVIDENCE_CARDS_KEY } from "../lib/research-evidence.ts";
 import { atomicWriteFile } from "../lib/private-artifact.ts";
 import {
-	RESEARCH_ROUND_MAX_GAPS, ResearchRoundLedger, mutateResearchRoundLedger, readResearchRoundLedger, researchRoundPath, writeResearchRoundLedger,
+	RESEARCH_ROUND_MAX_GAPS, ResearchRoundLedger, mutateResearchRoundLedger, mutateParentResearchRoundLedger, RESEARCH_SETTLE_ELIGIBLE_PHASES, readResearchRoundLedger, researchRoundPath, writeResearchRoundLedger,
 	validateResearchRoundLedger, type ClaimObligationV1, type EvidenceGapV1, type EvidenceCardRefV1, type ResearchRoundProposalV1, type ChildResearchReportV1, type ResearchRoundLedgerStateV1,
 } from "../lib/research-round.ts";
 import {
@@ -1573,35 +1573,30 @@ const researchRound = defineTool({
 				evidence_cards: params.evidence_cards ?? [], conflicts: params.conflicts ?? [], gaps: params.gaps ?? [], proposed_next_action: params.proposed_next_action, ...(params.note === undefined ? {} : { note: params.note }),
 			};
 			requireAuthoritativeParentCards(proposal.evidence_cards);
-			const result = await mutateResearchRoundLedger(path, (latest) => {
+			const record = (latest: ResearchRoundLedger) => {
 				if (latest.runId !== proposal.run_id) throw new Error("research round run identity mismatch");
 				const round = latest.recordRound(proposal);
 				return { round, state: latest.state, summary: latest.renderSummary() };
-			}, {
-				beforePersist: async (nextRound) => {
-					if (PARENT_RESEARCH_WORKFLOW) {
-						const phase = nextRound.status === "blocked" ? "blocked" : "active";
-						await projectResearchRoundAggregate(ctx.cwd, ledger.runId, nextRound, phase);
-					}
-				},
-			});
+			};
+			const result = PARENT_RESEARCH_WORKFLOW
+				? await mutateParentResearchRoundLedger(ctx.cwd, ledger.runId, record)
+				: await mutateResearchRoundLedger(path, record);
 			const committedLedger = ResearchRoundLedger.fromState(result.state);
 			roundTelemetry(committedLedger, result.round);
 			return { content: [{ type: "text" as const, text: `Research round ${result.round.round_id} recorded: ${result.round.status}; next action=${result.round.next_action}.\n${result.summary}` }], details: { tool_name: "research_round", success: true, round_id: result.round.round_id, status: result.round.status } };
 		}
 		await requireFinishableParentResearch(ctx.cwd, ledger.runId);
-		const result = await mutateResearchRoundLedger(path, async (latest) => {
+		const settle = async (latest: ResearchRoundLedger) => {
 			if (latest.runId !== ledger.runId) throw new Error("research round run identity mismatch");
 			const graph = await readState(ctx.cwd);
 			const graphTerminalNow = Boolean(graph && graph.run_id === latest.runId && graph.items.every((item) => graphTerminal(item)));
 			requireAuthoritativeParentCards(latest.state.evidence_cards);
 			const settled = latest.settle({ graph_terminal: graphTerminalNow, optional_deferrals: params.optional_deferrals ?? [], reason: params.summary ?? "Parent evidence obligations satisfied." });
 			return { state: settled, summary: latest.renderSummary() };
-		}, {
-			beforePersist: async (nextRound) => {
-				if (PARENT_RESEARCH_WORKFLOW) await projectResearchRoundAggregate(ctx.cwd, ledger.runId, nextRound, "settled");
-			},
-		});
+		};
+		const result = PARENT_RESEARCH_WORKFLOW
+			? await mutateParentResearchRoundLedger(ctx.cwd, ledger.runId, settle, RESEARCH_SETTLE_ELIGIBLE_PHASES)
+			: await mutateResearchRoundLedger(path, settle);
 		return { content: [{ type: "text" as const, text: `Research evidence is settled for ${ledger.runId}. The parent may now call plan_settle.\n${result.summary}` }], details: { tool_name: "research_round", success: true, settled: true }, };
 		},
 	});
@@ -2238,8 +2233,7 @@ async function mergeResearchRoundChildResult(cwd: string, context: PlanContextV1
 	try {
 		const state = await readState(cwd);
 		if (!state || state.run_id !== context.run_id || state.profile?.name !== "deep-research" || state.settled_at) return;
-		const path = researchRoundPath(cwd, context.run_id, process.env);
-		const result = await mutateResearchRoundLedger(path, (ledger) => {
+		const mergeReducer = (ledger: ResearchRoundLedger) => {
 			// Graph lease validation is authoritative. A report that was ignored by
 			// the graph (stale, unleased, settled, or wrong owner) must never mint a
 			// ledger reservation or otherwise change evidence state.
@@ -2265,11 +2259,10 @@ async function mergeResearchRoundChildResult(cwd: string, context: PlanContextV1
 				...(effectiveFailure ? { failure_class: effectiveFailure === "interrupted" ? "interrupted" as const : "child_failed" as const } : {}),
 			};
 			return { merged: ledger.mergeChildReport(childReport).merged };
-		}, {
-			beforePersist: async (nextRound) => {
-				if (PARENT_RESEARCH_WORKFLOW) await projectResearchRoundAggregate(cwd, context.run_id, nextRound, "active");
-			},
-		});
+		};
+		const result = PARENT_RESEARCH_WORKFLOW
+			? await mutateParentResearchRoundLedger(cwd, context.run_id, mergeReducer)
+			: await mutateResearchRoundLedger(researchRoundPath(cwd, context.run_id, process.env), mergeReducer);
 		if (!result.merged) return;
 	} catch {
 		// The graph merge remains authoritative. A malformed evidence projection is

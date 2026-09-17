@@ -160,15 +160,23 @@ export async function writeResearchAggregate(path: string, state: ResearchAggreg
 	if (!validateResearchAggregate(state)) throw new ResearchAggregateError("invalid-state", "refusing to write an invalid research aggregate");
 	await atomicWriteFile(path, `${JSON.stringify(state, null, 2)}\n`, { mode: 0o600, directoryMode: 0o700 });
 }
-export async function mutateResearchAggregate<T>(path: string, fn: (state: ResearchAggregateState) => { state: ResearchAggregateState; result: T } | Promise<{ state: ResearchAggregateState; result: T }>): Promise<T> {
+export async function mutateResearchAggregate<T>(path: string, fn: (state: ResearchAggregateState) => { state: ResearchAggregateState | null; result: T } | Promise<{ state: ResearchAggregateState | null; result: T }>, afterCommit?: (state: ResearchAggregateState) => Promise<void> | void): Promise<T> {
 	const lock = await acquire(path);
 	try {
 		const current = await readResearchAggregate(path);
 		if (!current) throw new ResearchAggregateError("missing", "research aggregate is missing or malformed");
 		const out = await fn(structuredClone(current));
+		// A null state is an explicit no-op: the reducer left the aggregate
+		// unchanged, so no revision is minted and no compatibility view is
+		// republished. Idempotent duplicates must not burn a transition.
+		if (out.state === null) return out.result;
 		if (!validateResearchAggregate(out.state) || out.state.run_id !== current.run_id || out.state.revision !== current.revision + 1) throw new ResearchAggregateError("invalid-transition", "aggregate transition must increment revision exactly once and preserve run identity");
 		out.state.updated_at = new Date().toISOString();
 		await writeResearchAggregate(path, out.state);
+		// Post-commit publisher runs under the lock AFTER the aggregate is the
+		// durable authority. It publishes a derived compatibility view; its failure
+		// is the caller's concern, not a roll-back of the committed aggregate.
+		if (afterCommit) await afterCommit(out.state);
 		return out.result;
 	} finally { await release(lock); }
 }

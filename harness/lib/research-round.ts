@@ -5,6 +5,7 @@ import { agentDir } from "./agent-dir.ts";
 import { atomicWriteFile } from "./private-artifact.ts";
 import { canonicalResearchUrl, type EvidenceCardV1 } from "./research-evidence.ts";
 import { PLAN_DEFER_FIELD_MAX_BYTES } from "./plan-limits.ts";
+import { mutateResearchAggregate, researchAggregatePath, transitionAggregate, type ResearchAggregatePhase } from "./research-aggregate.ts";
 
 /**
  * Parent-owned, evidence-first research-round state.
@@ -1041,6 +1042,78 @@ export async function mutateResearchRoundLedger<T>(path: string, fn: (ledger: Re
 		if (options.beforePersist && digest(before) !== digest(ledger.state)) await options.beforePersist(ledger.state);
 		await writeResearchRoundLedgerUnlocked(path, ledger.state);
 		return result;
+	});
+}
+
+/**
+ * Parent-owned research-round transition. The authoritative aggregate is the
+ * sole base: the aggregate lock spans read, reduce and commit, and the
+ * compatibility ledger file is published as a derived output. This is the
+ * parent counterpart to {@link mutateResearchRoundLedger}, which locks the
+ * compatibility ledger file and reads its base from that file. A stale
+ * compatibility view can therefore never drive a parent transition.
+ *
+ * Lock order: aggregate lock (outer) -> compatibility ledger file write
+ * (innermost, no separate lock). The parent path never takes the ledger file
+ * lock, so it cannot invert the legacy ledger -> aggregate order.
+ *
+ * Identity is validated BEFORE the reducer runs, and eligibility is checked
+ * against the locked aggregate state (not only a preflight read): a mismatched
+ * run, or an aggregate that is no longer in an eligible phase, fails closed and
+ * the reducer callback is never invoked. If the aggregate is missing/malformed
+ * the transition fails closed. If the post-commit compatibility publication
+ * fails, the committed aggregate is the authority and the stale view is rebuilt
+ * on the next parent transition.
+ */
+export const RESEARCH_SETTLE_ELIGIBLE_PHASES: readonly ResearchAggregatePhase[] = ["active", "awaiting_extension", "settled"];
+
+export async function mutateParentResearchRoundLedger<T>(
+	cwd: string,
+	runId: string,
+	fn: (ledger: ResearchRoundLedger) => Promise<T> | T,
+	eligiblePhases: readonly ResearchAggregatePhase[] = ["active"],
+): Promise<T> {
+	const aggregatePath = researchAggregatePath(cwd, runId, process.env);
+	const ledgerPath = researchRoundPath(cwd, runId, process.env);
+	let committed: ResearchRoundLedgerStateV1 | null = null;
+	return mutateResearchAggregate(aggregatePath, async (aggregate) => {
+		// Identity first: the aggregate at this path must own the requested run,
+		// and its evidence round must agree with its own run identity. Both are
+		// checked before the reducer so the callback never sees the wrong run.
+		if (aggregate.run_id !== runId) throw new ResearchRoundError("research aggregate run identity mismatch");
+		if (typeof aggregate.evidence_round.run_id === "string" && aggregate.evidence_round.run_id !== aggregate.run_id) throw new ResearchRoundError("research aggregate evidence round run identity mismatch");
+		// Eligibility under the lock (not only a preflight read): refuse the
+		// operation in a phase the existing lifecycle already refused, so the new
+		// path never silently permits post-pause/settled/expired work.
+		if (!eligiblePhases.includes(aggregate.phase)) throw new ResearchRoundError(`research aggregate is not eligible (phase: ${aggregate.phase})`);
+		if (!validateResearchRoundLedger(aggregate.evidence_round)) throw new ResearchRoundError("research aggregate evidence round is missing or malformed");
+		const ledger = ResearchRoundLedger.fromState(aggregate.evidence_round as ResearchRoundLedgerStateV1);
+		const before = digest(ledger.state);
+		const result = await fn(ledger);
+		const state = ledger.state;
+		// An idempotent duplicate callback (for example a branch result with no
+		// matching reservation) leaves the round unchanged and must not mint an
+		// aggregate revision or republish the compatibility view.
+		if (digest(state) === before) return { state: null, result };
+		if (!validateResearchRoundLedger(state)) throw new ResearchRoundError("research round transition produced an invalid ledger");
+		if (state.run_id !== aggregate.run_id) throw new ResearchRoundError("research round transition preserved the wrong run identity");
+		committed = state;
+		// Settlement and blocking advance the aggregate; a paused/awaiting
+		// extension aggregate keeps its phase on an ordinary record.
+		const nextPhase: ResearchAggregatePhase =
+			state.status === "settled" ? "settled"
+			: state.status === "blocked" ? "blocked"
+			: aggregate.phase !== "active" ? aggregate.phase
+			: "active";
+		return {
+			state: transitionAggregate(aggregate, { evidence_round: state, budget: state.budget.consumed, phase: nextPhase }),
+			result,
+		};
+	}, async () => {
+		if (committed) {
+			try { await writeResearchRoundLedgerUnlocked(ledgerPath, committed); }
+			catch { /* committed aggregate is the authority; a stale compatibility view is rebuilt on the next parent transition */ }
+		}
 	});
 }
 
