@@ -172,6 +172,9 @@
           "on",
           "off"
         ],
+        "RESEARCH_WORKFLOW": [
+          "parent"
+        ],
         "TOOL_CALL_RESCUE": [
           "on",
           "off"

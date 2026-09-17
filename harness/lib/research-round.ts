@@ -5,7 +5,7 @@ import { agentDir } from "./agent-dir.ts";
 import { atomicWriteFile } from "./private-artifact.ts";
 import { canonicalResearchUrl, type EvidenceCardV1 } from "./research-evidence.ts";
 import { PLAN_DEFER_FIELD_MAX_BYTES } from "./plan-limits.ts";
-import { mutateResearchAggregate, researchAggregatePath, transitionAggregate, type ResearchAggregatePhase } from "./research-aggregate.ts";
+import { deadlinePhase, mutateResearchAggregate, researchAggregatePath, transitionAggregate, type ResearchAggregatePhase } from "./research-aggregate.ts";
 
 /**
  * Parent-owned, evidence-first research-round state.
@@ -1060,10 +1060,17 @@ export async function mutateResearchRoundLedger<T>(path: string, fn: (ledger: Re
  * Identity is validated BEFORE the reducer runs, and eligibility is checked
  * against the locked aggregate state (not only a preflight read): a mismatched
  * run, or an aggregate that is no longer in an eligible phase, fails closed and
- * the reducer callback is never invoked. If the aggregate is missing/malformed
- * the transition fails closed. If the post-commit compatibility publication
- * fails, the committed aggregate is the authority and the stale view is rebuilt
- * on the next parent transition.
+ * the reducer callback is never invoked. When `rejectExpired` is set, the
+ * deadline is rechecked under the lock as well: the caller preflights the
+ * deadline outside the lock, and a crossing between preflight and transaction
+ * must not commit new retrieval work. The rule is per-operation — settlement
+ * and reservation accounting stay allowed after expiry, so those callers omit
+ * the flag. A rejected transition commits nothing: aggregate revision,
+ * evidence, budget and the compatibility view are all unchanged.
+ *
+ * If the aggregate is missing/malformed the transition fails closed. If the
+ * post-commit compatibility publication fails, the committed aggregate is the
+ * authority and the stale view is rebuilt on the next parent transition.
  */
 export const RESEARCH_SETTLE_ELIGIBLE_PHASES: readonly ResearchAggregatePhase[] = ["active", "awaiting_extension", "settled"];
 
@@ -1072,6 +1079,7 @@ export async function mutateParentResearchRoundLedger<T>(
 	runId: string,
 	fn: (ledger: ResearchRoundLedger) => Promise<T> | T,
 	eligiblePhases: readonly ResearchAggregatePhase[] = ["active"],
+	options: { rejectExpired?: boolean } = {},
 ): Promise<T> {
 	const aggregatePath = researchAggregatePath(cwd, runId, process.env);
 	const ledgerPath = researchRoundPath(cwd, runId, process.env);
@@ -1086,7 +1094,10 @@ export async function mutateParentResearchRoundLedger<T>(
 		// operation in a phase the existing lifecycle already refused, so the new
 		// path never silently permits post-pause/settled/expired work.
 		if (!eligiblePhases.includes(aggregate.phase)) throw new ResearchRoundError(`research aggregate is not eligible (phase: ${aggregate.phase})`);
-		if (!validateResearchRoundLedger(aggregate.evidence_round)) throw new ResearchRoundError("research aggregate evidence round is missing or malformed");
+		// Deadline recheck under the lock: the caller preflight ran outside the
+		// lock, so a crossing in between must not commit new retrieval work.
+		// Settle and reservation accounting intentionally omit this flag.
+		if (options.rejectExpired && deadlinePhase(aggregate) === "expired") throw new ResearchRoundError("research aggregate deadline has expired");
 		const ledger = ResearchRoundLedger.fromState(aggregate.evidence_round as ResearchRoundLedgerStateV1);
 		const before = digest(ledger.state);
 		const result = await fn(ledger);

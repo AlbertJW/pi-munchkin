@@ -367,7 +367,7 @@ export function registerKetch(pi: ExtensionAPI, dependencies: KetchDependencies 
 				};
 				ledger.recordRound(proposal);
 				return { state: ledger.state, result: ledger.state };
-			});
+			}, ["active"], { rejectExpired: true });
 		} catch {
 			// A transient aggregate-lock contention or a phase gate never turns a
 			// successful web read into a tool failure; the parent's next
@@ -398,7 +398,7 @@ export function registerKetch(pi: ExtensionAPI, dependencies: KetchDependencies 
 					result_count: urls.length, truncated, outcome, created_at: new Date(started).toISOString(),
 				});
 				return { state: ledger.state, result: receipt };
-			});
+			}, ["active"], { rejectExpired: true });
 		} catch {
 			// A transient aggregate-lock contention or a phase gate never turns a
 			// valid search response into a tool failure. The next inspect/recovery
@@ -422,7 +422,7 @@ export function registerKetch(pi: ExtensionAPI, dependencies: KetchDependencies 
 				};
 				ledger.recordRound(proposal);
 				return { state: ledger.state, result: ledger.state };
-			});
+			}, ["active"], { rejectExpired: true });
 		} catch {
 			// A transient aggregate-lock contention or a phase gate never turns a
 			// valid evidence note into a false failure; the note remains valid JSONL

@@ -287,6 +287,10 @@ def selftest():
     # real_gate config cannot silently reject the preregistered control.
     assert thresholds["RESEARCH_BUDGET"] == ["on", "off"]
     assert config_env({"thresholds": {"RESEARCH_BUDGET": "on"}}) == {"RESEARCH_BUDGET": "on"}
+    # RESEARCH_WORKFLOW=parent is the parent-owned research authority. Register it
+    # in the canonical schema so a real_gate config cannot silently reject the arm.
+    assert thresholds["RESEARCH_WORKFLOW"] == ["parent"]
+    assert config_env({"thresholds": {"RESEARCH_WORKFLOW": "parent"}}) == {"RESEARCH_WORKFLOW": "parent"}
     for invalid in ({"CONTEXT_WATCHER": "off"}, {"CTX_WATCH_PCT": 70}, {"MICRO_GATE": "on"}, {"STATE_LENS": "view"}):
         try:
             config_env({"thresholds": invalid})

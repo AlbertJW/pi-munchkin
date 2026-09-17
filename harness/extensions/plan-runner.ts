@@ -1579,7 +1579,7 @@ const researchRound = defineTool({
 				return { round, state: latest.state, summary: latest.renderSummary() };
 			};
 			const result = PARENT_RESEARCH_WORKFLOW
-				? await mutateParentResearchRoundLedger(ctx.cwd, ledger.runId, record)
+				? await mutateParentResearchRoundLedger(ctx.cwd, ledger.runId, record, ["active"], { rejectExpired: true })
 				: await mutateResearchRoundLedger(path, record);
 			const committedLedger = ResearchRoundLedger.fromState(result.state);
 			roundTelemetry(committedLedger, result.round);
