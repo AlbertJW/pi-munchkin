@@ -1041,3 +1041,44 @@ graph-transaction migration is not started.
 Source commit: `7ac99c5`.
 Current package-source SHA-256: `09b2b392a4eb6c1f528e0c016d5a7e7ef7ea5eee4bf9af9dc2ae374b324c213a`
 (recomputed via `npm run surface:hash:source` on 2026-09-17).
+
+## Correction and final closeout — 2026-09-18 (Phase 3B.2 authorized-outcome receipts and terminal-run refusal)
+
+Correction: the row above states that the three ketch receipt bridges
+(search/read/evidence-card) pass `rejectExpired: true`. That was wrong for
+the lifecycle the deadline exists to protect: those bridges record the
+OUTCOME of retrieval already authorized before the crossing (preflight
+passed, budget consumed, adapter invoked), and rejecting the record under
+the lock lost the durable accounting of authorized work — the search was
+charged in the session counters and its results returned to the model,
+while the authoritative aggregate kept no receipt. The per-operation rule
+now reads: new retrieval work (`research_round record`) keeps
+`rejectExpired: true`; outcome receipts, settlement, and reservation
+accounting omit it. The `["active"]` phase gate and content-addressed
+receipt idempotency still refuse reactivation and double-charge; the next
+preflight after the crossing performs the active→awaiting_extension
+lifecycle transition.
+
+Second closeout item: `researchDeadlineStatus` short-circuited on the
+in-memory `__pi_active_plan_context.settled` hint and returned `ok`, so a
+terminal (settled) run fell through to the legacy budget path and invoked
+ketch. The durable aggregate phase now governs: a paused or settled
+aggregate refuses new retrieval BEFORE the adapter is invoked, matching
+the fail-closed intent documented at the aggregate-availability check.
+
+Demonstrated by: `research-late-receipt.test.ts` — (1) a search authorized
+before the deadline records its receipt durably when it completes after
+the deadline (charged exactly once, phase stays active, compatibility
+view published from the committed aggregate; RED before the fix: the
+receipt was dropped. After the fix, the replay of the same completion is
+refused at the boundary without double-charging); (2) a late completion cannot reactivate a paused or
+terminal run (refused before any retrieval; the settled case was RED
+before the fix: ketch was invoked and timed out). Full suite: 915/915.
+
+Outstanding: unchanged from the row above — the graph-snapshot writers
+remain compatibility writers and the broader Phase 3B graph-transaction
+migration is not started.
+
+Source commit: `a2e0541`.
+Current package-source SHA-256: `75c6774448c616d9f50d485b984b78537738dffb8c9a40a1d6d95a088aedba67`
+(recomputed via `npm run surface:hash:source` on 2026-09-18).
