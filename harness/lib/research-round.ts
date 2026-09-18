@@ -1063,9 +1063,9 @@ export async function mutateResearchRoundLedger<T>(path: string, fn: (ledger: Re
  * the reducer callback is never invoked. When `rejectExpired` is set, the
  * deadline is rechecked under the lock as well: the caller preflights the
  * deadline outside the lock, and a crossing between preflight and transaction
- * must not commit new retrieval work. The rule is per-operation — settlement
- * and reservation accounting stay allowed after expiry, so those callers omit
- * the flag. A rejected transition commits nothing: aggregate revision,
+ * must not commit new retrieval work. The rule is per-operation — settlement,
+ * reservation accounting, and outcome receipts for already-authorized
+ * retrievals stay allowed after expiry, so those callers omit the flag.
  * evidence, budget and the compatibility view are all unchanged.
  *
  * If the aggregate is missing/malformed the transition fails closed. If the

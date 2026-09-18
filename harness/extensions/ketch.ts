@@ -296,7 +296,7 @@ export function registerKetch(pi: ExtensionAPI, dependencies: KetchDependencies 
 	async function researchDeadlineStatus(kind: "search" | "read"): Promise<"ok" | "discovery_closed" | "awaiting_extension" | "paused" | "settled" | "blocked" | "aggregate_unavailable"> {
 		if (!PARENT_RESEARCH_WORKFLOW) return "ok";
 		const active = (globalThis as Record<string, unknown>).__pi_active_plan_context as { profile?: unknown; run_id?: unknown; settled?: unknown } | undefined;
-		if (active?.profile !== "deep-research" || active.settled === true || typeof active.run_id !== "string") return "ok";
+		if (active?.profile !== "deep-research" || typeof active.run_id !== "string") return "ok";
 		const path = researchAggregatePath(activeResearchCwd ?? process.cwd(), active.run_id, process.env);
 		const aggregate = await readResearchAggregate(path);
 		// Parent retrieval is executable only while the durable aggregate exists and
@@ -367,7 +367,7 @@ export function registerKetch(pi: ExtensionAPI, dependencies: KetchDependencies 
 				};
 				ledger.recordRound(proposal);
 				return { state: ledger.state, result: ledger.state };
-			}, ["active"], { rejectExpired: true });
+			}, ["active"]);
 		} catch {
 			// A transient aggregate-lock contention or a phase gate never turns a
 			// successful web read into a tool failure; the parent's next
@@ -398,7 +398,7 @@ export function registerKetch(pi: ExtensionAPI, dependencies: KetchDependencies 
 					result_count: urls.length, truncated, outcome, created_at: new Date(started).toISOString(),
 				});
 				return { state: ledger.state, result: receipt };
-			}, ["active"], { rejectExpired: true });
+			}, ["active"]);
 		} catch {
 			// A transient aggregate-lock contention or a phase gate never turns a
 			// valid search response into a tool failure. The next inspect/recovery
@@ -422,7 +422,7 @@ export function registerKetch(pi: ExtensionAPI, dependencies: KetchDependencies 
 				};
 				ledger.recordRound(proposal);
 				return { state: ledger.state, result: ledger.state };
-			}, ["active"], { rejectExpired: true });
+			}, ["active"]);
 		} catch {
 			// A transient aggregate-lock contention or a phase gate never turns a
 			// valid evidence note into a false failure; the note remains valid JSONL
