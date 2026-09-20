@@ -246,6 +246,9 @@ export const EVENT_CATALOG = {
 	"research/run-summary": { searches: "number", reads: "number", notes: "number", notes_rejected: "number", cache_hits: "number" },
 	"research/round": { round: "number", status: "string", next_action: "string", consumed_searches: "number", consumed_reads: "number", validation_reads: "number", duplicate_count: "number", open_gaps: "number", conflicts: "number" },
 	"research/deadline": { phase: "string", action: "string", phase_kind: "string" },
+	// A parent-owned search/read completion whose authoritative receipt commit
+	// was refused (lock contention or a lifecycle the receipt gate refuses).
+	"research/receipt-failed": { path: "string" },
 	"research/citation-guard": { cited: "number", unverified: "number", explicitly_unverified: "number", injected_chars: "number" },
 	"research/citation-unverified-end": { cited: "number", unverified: "number", explicitly_unverified: "number" },
 	// Fired once when an answer wraps up after web reads with zero recorded notes.

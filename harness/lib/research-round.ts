@@ -1128,6 +1128,39 @@ export async function mutateParentResearchRoundLedger<T>(
 	});
 }
 
+/**
+ * Phases in which the outcome of an already-authorized retrieval may be
+ * recorded durably. The receipt is accounting for work that was authorized
+ * before the lifecycle change (preflight passed, budget consumed, adapter
+ * invoked), so it must survive the transition; recording it never reactivates
+ * the run. A settled round is immutable and stays excluded.
+ */
+export const RESEARCH_OUTCOME_RECEIPT_PHASES: readonly ResearchAggregatePhase[] = ["active", "paused", "awaiting_extension", "blocked"];
+
+/** Content-addressed receipt identity for a search outcome: a replay of the
+ * same completion (same run, operation, and result identity) derives the same
+ * ID, so the ledger reducer treats it as an idempotent duplicate. */
+export function searchReceiptId(identity: { run_id: string; tool_call_id: string; query: string; mode: string; backends: readonly string[]; result_urls: readonly string[]; truncated: boolean; outcome: string }): string {
+	return `auto-search-${createHash("sha256").update(JSON.stringify(identity), "utf8").digest("hex").slice(0, 48)}`;
+}
+
+/** Production accounting function for one authorized search outcome: committed
+ * under the aggregate lock with the outcome-receipt phase gate, idempotent by
+ * receipt ID, charged at most once per query, and never reactivating the run.
+ */
+export async function recordAuthorizedSearchReceipt(cwd: string, runId: string, input: Omit<SearchReceiptV1, "charged">): Promise<SearchReceiptV1> {
+	return mutateParentResearchRoundLedger(cwd, runId, (ledger) => ledger.recordSearchReceipt(input), RESEARCH_OUTCOME_RECEIPT_PHASES);
+}
+
+/** Production accounting function for one authorized read outcome: the same
+ * gate and idempotence rules as the search receipt. */
+export async function recordAuthorizedReadRound(cwd: string, runId: string, proposal: ResearchRoundProposalV1): Promise<ResearchRoundLedgerStateV1> {
+	return mutateParentResearchRoundLedger(cwd, runId, (ledger) => {
+		ledger.recordRound(proposal);
+		return ledger.state;
+	}, RESEARCH_OUTCOME_RECEIPT_PHASES);
+}
+
 /** Convert an existing evidence card without retaining page text. */
 export function evidenceCardRef(card: EvidenceCardV1): EvidenceCardRefV1 {
 	if (!card || card.v !== 1) throw new ResearchRoundError("evidence card is invalid");
