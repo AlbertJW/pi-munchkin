@@ -1082,3 +1082,50 @@ migration is not started.
 Source commit: `a2e0541`.
 Current package-source SHA-256: `75c6774448c616d9f50d485b984b78537738dffb8c9a40a1d6d95a088aedba67`
 (recomputed via `npm run surface:hash:source` on 2026-09-18).
+
+## Pending surface boundary — 2026-09-20 (Phase 3B.2 in-flight lifecycle change: run-bound outcome receipts)
+
+Boundary: a retrieval authorized on run A (preflight admitted, budget
+consumed, adapter invoked) completed after an in-flight lifecycle change
+was accounted against whatever the GLOBAL run context happened to be at
+completion time — the receipt helpers re-read `__pi_active_plan_context`
+at completion, mutated only aggregates in phase `active`, and swallowed
+receipt-write failures. A pause (or a context switch to run B) during the
+in-flight window therefore lost the durable accounting of authorized work
+or associated it with the wrong run.
+
+Fix: the dispatch site now captures a `ResearchAuthorization` (run id +
+cwd) at the moment preflight admits the request, and the search/read
+receipt bridges commit the eventual outcome through the production
+accounting functions (`recordAuthorizedSearchReceipt` /
+`recordAuthorizedReadRound`) bound to that authorization. The commit runs
+under the aggregate lock: the outcome-receipt phase gate admits
+`active`/`paused`/`awaiting_extension`/`blocked` (settled stays excluded),
+idempotency is content-addressed by receipt id so a replay cannot
+double-charge, and conflicting, wrong-run, or unauthorized completions
+refuse without mutation. The compatibility ledger is published from the
+committed aggregate. A refused commit (lock contention or a refused
+lifecycle) is telemetry-visible as `research/receipt-failed` and never
+turns a valid result into a tool failure.
+
+Demonstrated by: `research-late-receipt.test.ts` — (1) the pause
+regression: a search authorized on active run A, held at a barrier, A
+paused via the aggregate transaction, then released — the receipt and
+charge are durable, A stays paused, and a new request cannot invoke the
+adapter (RED before the fix: the receipt was dropped, 0 !== 1); (2)
+in-flight transitions to awaiting_extension/blocked/settled preserve
+permitted accounting without reactivation; (3) the registered web_read
+path behaves the same; (4) switching the global context from A to B while
+A is pending records the completion only against A; (5) replaying the
+same completion through the production accounting function cannot
+duplicate receipts or charges; (6) wrong-run, unauthorized, and
+conflicting completions fail without mutation. Full suite: 921/921;
+`npm run verify` all 6 stages passed.
+
+Outstanding: unchanged — the graph-snapshot writers remain compatibility
+writers and the broader Phase 3B graph-transaction migration is not
+started.
+
+Source commit: `a86e962`.
+Current package-source SHA-256: `f009860bcbb4b4e5d12f1c6ee53ea95c0d4964344a23f474031cbe889061d85c`
+(recomputed via `npm run surface:hash:source` on 2026-09-20).
