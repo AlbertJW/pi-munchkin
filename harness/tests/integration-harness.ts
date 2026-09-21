@@ -295,13 +295,13 @@ export type PiToolResult = {
  * THROW becomes content:[{type:"text",text:err.message}], details:{}, and the
  * tool's own details/terminate are LOST.
  */
-export async function callTool(fp: FakePi, name: string, params: unknown, cwd: string): Promise<PiToolResult> {
+export async function callTool(fp: FakePi, name: string, params: unknown, cwd: string, toolCallId: string = "tc-test"): Promise<PiToolResult> {
 	const tool = fp.tools.get(name);
 	if (!tool) throw new Error(`tool not registered: ${name}`);
 	const ctx = { cwd, model: { provider: "test-provider", id: "test-model" } };
 	let result: PiToolResult;
 	try {
-		const raw = await tool.execute("tc-test", params, undefined, undefined, ctx);
+		const raw = await tool.execute(toolCallId, params, undefined, undefined, ctx);
 		// LOOP:466 hard-codes isError:false. Content is left UNNORMALIZED here on
 		// purpose: pi normalizes at LOOP:537, i.e. AFTER the tool_result chain, so a
 		// handler doing `event.content.push(...)` throws in pi. Normalizing first
@@ -321,7 +321,7 @@ export async function callTool(fp: FakePi, name: string, params: unknown, cwd: s
 	// pi event teaches) was a silent no-op here while running fine in production.
 	const patch: any = await fire(fp, "tool_result", {
 		type: "tool_result",
-		toolCallId: "tc-test", toolName: name, input: params,
+		toolCallId, toolName: name, input: params,
 		content: result.content, details: result.details, isError: result.isError, usage: result.usage,
 	}, ctx);
 	if (patch) {

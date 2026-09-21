@@ -354,7 +354,8 @@ test("parent research workflow retains the shared discovery envelope for local r
 		mod.registerKetch(fp.pi as never, { resolvePublicUrl: async (raw: string) => new URL(raw).toString() });
 		await fp.handlers.get("session_start")?.[0]?.({}, { cwd: dir, ui: { notify() {} } });
 		const runId = "parent-run";
-		await writeResearchAggregate(researchAggregatePath(dir, runId, process.env), createResearchAggregate({ run_id: runId, phase: "active", graph: { run_id: runId }, evidence_round: { run_id: runId }, budget: { searches: 3, reads: 5, validation_reads: 5 } }));
+		const ledger = new ResearchRoundLedger({ run_id: runId, obligations: [{ claim_id: "claim-a", text: "A", required: true, status: "open", missing: "evidence", why: "test", next_action: "search" }], budget: { searches: 3, reads: 5, validation_reads: 5 } });
+		await writeResearchAggregate(researchAggregatePath(dir, runId, process.env), migrateResearchPair({ run_id: runId }, ledger.state));
 		(globalThis as Record<string, unknown>).__pi_active_plan_context = { run_id: runId, profile: "deep-research", settled: false };
 		const result = await callTool(fp, "web_search", { query: "parent-owned discovery", limit: 3 }, dir);
 		assert.equal(result.details.coverage.budget_exhausted, false);
@@ -756,11 +757,11 @@ test("parent retrieval ignores a malformed compatibility ledger and keeps aggreg
 		mod.registerKetch(fp.pi as never, { resolvePublicUrl: async (raw: string) => new URL(raw).toString() });
 		await fp.handlers.get("session_start")?.[0]?.({}, { cwd: dir, ui: { notify() {} } });
 		(globalThis as Record<string, unknown>).__pi_active_plan_context = { profile: "deep-research", run_id: runId, settled: false };
-		assert.equal((await callTool(fp, "web_search", { query: "first compat query", limit: 1 }, dir)).isError, false);
+		assert.equal((await callTool(fp, "web_search", { query: "first compat query", limit: 1 }, dir, "tc-first")).isError, false);
 		writeFileSync(roundPath, '{"schema":"research-round-ledger/v1","run_id":');
-		const second = await callTool(fp, "web_search", { query: "second compat query", limit: 1 }, dir);
+		const second = await callTool(fp, "web_search", { query: "second compat query", limit: 1 }, dir, "tc-second");
 		assert.equal(second.isError, false, "a malformed compatibility ledger must not block retrieval");
-		assert.equal((await callTool(fp, "web_read", { urls: ["https://example.com/a"] }, dir)).isError, false);
+		assert.equal((await callTool(fp, "web_read", { urls: ["https://example.com/a"] }, dir, "tc-read")).isError, false);
 		const note = await callTool(fp, "research_note", { claim: "A rewritten claim", claim_id: "claim-a", url: "https://example.com/a", quote: "Useful source text" }, dir);
 		assert.equal(note.isError, false);
 		const aggregate = await readResearchAggregate(aggregatePath);
@@ -812,7 +813,7 @@ test("post-commit compatibility publication failure keeps the aggregate committe
 		// post-commit compatibility write fails while the aggregate commit succeeds.
 		rmSync(roundPath, { recursive: true, force: true });
 		mkdirSync(roundPath);
-		const first = await callTool(fp, "web_search", { query: "publish failure query", limit: 1 }, dir);
+		const first = await callTool(fp, "web_search", { query: "publish failure query", limit: 1 }, dir, "tc-pub");
 		assert.equal(first.isError, false, "a failed compatibility publication must not look like a rollback to the caller");
 		let aggregate = await readResearchAggregate(aggregatePath);
 		let round = aggregate?.evidence_round as any;
@@ -820,14 +821,14 @@ test("post-commit compatibility publication failure keeps the aggregate committe
 		assert.equal(round.search_receipts[0].charged, true);
 		assert.equal(round.budget.consumed.searches, 1, "the budget must stay committed despite the failed compatibility write");
 		assert.equal(await readResearchRoundLedger(roundPath), null, "the compatibility view must stay broken while the destination is a directory");
-		const retry = await callTool(fp, "web_search", { query: "publish failure query", limit: 1 }, dir);
+		const retry = await callTool(fp, "web_search", { query: "publish failure query", limit: 1 }, dir, "tc-pub");
 		assert.equal(retry.isError, false);
 		aggregate = await readResearchAggregate(aggregatePath);
 		round = aggregate?.evidence_round as any;
 		assert.equal(round.search_receipts.length, 1, "retrying the identical operation must re-record idempotently, not add a second receipt");
 		assert.equal(round.budget.consumed.searches, 1, "retrying the same query must not double-charge the budget");
 		rmSync(roundPath, { recursive: true, force: true });
-		const repaired = await callTool(fp, "web_search", { query: "repair transition query", limit: 1 }, dir);
+		const repaired = await callTool(fp, "web_search", { query: "repair transition query", limit: 1 }, dir, "tc-repair");
 		assert.equal(repaired.isError, false);
 		const compat = await readResearchRoundLedger(roundPath);
 		assert.ok(compat, "repairing the destination must let a later transition rebuild the compatibility view");

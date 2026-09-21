@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
 import { createResearchAggregate, deadlineFor, mutateResearchAggregate, readResearchAggregate, researchAggregatePath, transitionAggregate, writeResearchAggregate } from "../lib/research-aggregate.ts";
-import { readResearchRoundLedger, recordAuthorizedSearchReceipt, researchRoundPath, ResearchRoundLedger, type SearchReceiptV1 } from "../lib/research-round.ts";
+import { authorizeResearchOperation, readResearchRoundLedger, recordAuthorizedSearchReceipt, researchRoundPath, ResearchRoundLedger, type SearchReceiptV1 } from "../lib/research-round.ts";
 import { callTool, makeFakePi, resetPiGlobals } from "./integration-harness.ts";
 
 function restoreEnv(snapshot: Record<string, string | undefined>): void {
@@ -227,6 +227,29 @@ test("switching the global run context while A is pending records the completion
 		teardownRun(snapshot, dir);
 	}
 });
+test("a well-formed completion for an operation that was never authorized is refused without mutation", async () => {
+	const { dir, snapshot, aggregatePath, runId } = await setupBarrierRun("unauth-run", "active", "unauth");
+	try {
+		const base = (await readResearchAggregate(aggregatePath))!;
+		// A well-formed, bounded completion for an operation the run never
+		// authorized: no dispatch, no persisted authorization. The production
+		// accounting function must refuse it — not the settled-run or
+		// missing-run gates, which do not demonstrate authorization validation.
+		const completion = {
+			receipt_id: "auto-search-unauthorized-1", query: "never authorized query", mode: "quick" as const,
+			backends: ["exa"], result_urls: ["https://example.com/a"], result_count: 1,
+			truncated: false, outcome: "completed" as const, created_at: new Date().toISOString(),
+		};
+		await assert.rejects(recordAuthorizedSearchReceipt(dir, runId, completion), /unauthorized|authorization/);
+		const after = (await readResearchAggregate(aggregatePath))!;
+		assert.equal(after.revision, base.revision, "no revision minted");
+		assert.equal(searchReceipts(after).length, 0, "no receipt recorded");
+		assert.equal(consumedSearches(after), 0, "no charge");
+		assert.equal(JSON.stringify(after.evidence_round), JSON.stringify(base.evidence_round), "compatibility view unchanged");
+	} finally {
+		teardownRun(snapshot, dir);
+	}
+});
 
 test("replaying the same completion through the production accounting function cannot duplicate receipts or charges", async () => {
 	const { dir, barrier, snapshot, aggregatePath, fp, ctx, runId } = await setupBarrierRun("replay-run", "active", "replay");
@@ -376,6 +399,234 @@ test("a late completion cannot reactivate a paused or terminal run", async () =>
 			assert.equal(after.phase, phase, `a late completion must not reactivate a ${phase} run`);
 			assert.equal((after.evidence_round as { budget?: { consumed?: { searches?: number } } }).budget?.consumed?.searches ?? 0, 0);
 		}
+	} finally {
+		restoreEnv(snapshot);
+		rmSync(dir, { recursive: true, force: true });
+		delete (globalThis as Record<string, unknown>).__pi_active_plan_context;
+		delete (globalThis as Record<string, unknown>).__pi_research_state;
+		resetPiGlobals();
+	}
+});
+
+/** Non-blocking counting mock: records each adapter invocation and returns
+ * immediately. Used for dispatch-gate regressions where a wrongly-dispatched
+ * adapter must not hang the test on a barrier. */
+function countingKetchNoBarrier(dir: string, barrier: string): string {
+	const file = join(dir, "ketch-count-nobarrier");
+	writeFileSync(file, `#!/bin/sh
+case "$1" in
+  version) printf 'ketch v0.12.0\\n' ;;
+  search)
+    mkdir -p "$KETCH_BARRIER"
+    printf 'x\\n' >> "$KETCH_BARRIER/invocations"
+    printf '[{"title":"Primary result","url":"https://example.com/a","description":"bounded snippet"}]\\n' ;;
+  scrape)
+    mkdir -p "$KETCH_BARRIER"
+    printf 'x\\n' >> "$KETCH_BARRIER/invocations"
+    printf '[{"url":"https://example.com/a","title":"Primary result","markdown":"bounded page text","truncated":false}]\\n' ;;
+  *) exit 2 ;;
+esac
+`);
+	chmodSync(file, 0o755);
+	return file;
+}
+
+function adapterInvocations(barrier: string): number {
+	try { return readFileSync(join(barrier, "invocations"), "utf8").split("\n").filter((line) => line === "x").length; }
+	catch { return 0; }
+}
+
+test("A: a malformed aggregate authority refuses the search before the adapter is invoked", async () => {
+	const dir = mkdtempSync(join(tmpdir(), "dispatch-auth-A-"));
+	const barrier = join(dir, "barrier");
+	const snapshot = Object.fromEntries(ENV_KEYS.map((key) => [key, process.env[key]]));
+	try {
+		delete process.env.KETCH;
+		Object.assign(process.env, { KETCH_BIN: countingKetchNoBarrier(dir, barrier), KETCH_BACKEND: "exa", KETCH_BARRIER: barrier, RESEARCH_LEDGER: "on", DEEP_RESEARCH_PLANNING: "on", RESEARCH_WORKFLOW: "parent", PI_CODING_AGENT_DIR: join(dir, "agent"), TELEMETRY: "off" });
+		const runId = "auth-A";
+		const aggregatePath = researchAggregatePath(dir, runId, process.env);
+		// The aggregate exists, owns the run, is active, and its deadline is
+		// open — the preflight admits it. But its evidence_round is a bare
+		// migration shape, not a full validated ledger: the durable authority
+		// is invalid, so dispatch must be refused fail-closed.
+		await writeResearchAggregate(aggregatePath, createResearchAggregate({ run_id: runId, phase: "active", graph: { run_id: runId }, evidence_round: { run_id: runId }, budget: { searches: 3, reads: 5, validation_reads: 5 }, deadline: deadlineFor(Date.now()) }));
+		const fp = makeFakePi();
+		const mod = await import(`../extensions/ketch.ts?dispatch-auth-A=${Date.now()}-${Math.random()}`);
+		mod.registerKetch(fp.pi as never, { resolvePublicUrl: async (raw: string) => new URL(raw).toString() });
+		await fp.handlers.get("session_start")?.[0]?.({}, { cwd: dir, ui: { notify() {} } });
+		(globalThis as Record<string, unknown>).__pi_active_plan_context = { run_id: runId, profile: "deep-research", settled: false };
+		const ctx = { cwd: dir, model: { provider: "test-provider", id: "test-model" } };
+		const tool = fp.tools.get("web_search")!;
+		const result = await tool.execute("tc-auth-A", { query: "malformed authority query" }, undefined, undefined, ctx as never);
+		assert.notEqual(result.details.outcome, "completed", "an invalid authority must not complete a retrieval");
+		assert.equal(adapterInvocations(barrier), 0, "the adapter must be invoked zero times");
+		const after = (await readResearchAggregate(aggregatePath))!;
+		assert.equal(searchReceipts(after).length, 0, "no receipt is fabricated");
+		assert.equal(consumedSearches(after), 0, "no charge is fabricated");
+	} finally {
+		teardownRun(snapshot, dir);
+	}
+});
+
+test("B: the under-lock recheck refuses an op whose deadline/phase is no longer eligible", async () => {
+	const dir = mkdtempSync(join(tmpdir(), "dispatch-auth-B-"));
+	const snapshot = Object.fromEntries(ENV_KEYS.map((key) => [key, process.env[key]]));
+	try {
+		Object.assign(process.env, { RESEARCH_LEDGER: "on", DEEP_RESEARCH_PLANNING: "on", RESEARCH_WORKFLOW: "parent", PI_CODING_AGENT_DIR: join(dir, "agent"), TELEMETRY: "off" });
+		const now = Date.now();
+		const past = new Date(now - 1_000).toISOString();
+		const future = new Date(now + 120_000).toISOString();
+		// Each aggregate is `active` (the phase the preflight admits); the
+		// deadline/phase below is what the under-lock recheck must enforce.
+		const cases: Array<{ runId: string; kind: "search" | "read"; deadline: { started_at: string; deadline_at: string; discovery_deadline_at: string; paused_ms: number; extension_count: number }; eligible: boolean }> = [
+			{ runId: "b-search-validation", kind: "search", deadline: { started_at: past, deadline_at: future, discovery_deadline_at: past, paused_ms: 0, extension_count: 0 }, eligible: false }, // discovery closed
+			{ runId: "b-search-expired", kind: "search", deadline: { started_at: past, deadline_at: past, discovery_deadline_at: past, paused_ms: 0, extension_count: 0 }, eligible: false }, // expired
+			{ runId: "b-read-expired", kind: "read", deadline: { started_at: past, deadline_at: past, discovery_deadline_at: past, paused_ms: 0, extension_count: 0 }, eligible: false }, // expired
+			{ runId: "b-read-validation", kind: "read", deadline: { started_at: past, deadline_at: future, discovery_deadline_at: past, paused_ms: 0, extension_count: 0 }, eligible: true }, // validation: reads remain legitimate
+		];
+		for (const c of cases) {
+			const aggregatePath = researchAggregatePath(dir, c.runId, process.env);
+			await writeResearchAggregate(aggregatePath, createResearchAggregate({ run_id: c.runId, phase: "active", graph: { run_id: c.runId }, evidence_round: ledgerState(c.runId), budget: { searches: 3, reads: 5, validation_reads: 5 }, deadline: c.deadline }));
+			const before = (await readResearchAggregate(aggregatePath))!;
+			const request = c.kind === "search" ? "a bounded query" : JSON.stringify(["https://example.com/a"]);
+			if (c.eligible) {
+				await authorizeResearchOperation(dir, c.runId, c.kind, `tc-${c.runId}`, request);
+				const after = (await readResearchAggregate(aggregatePath))!;
+				assert.equal((after.evidence_round as { operation_authorizations?: unknown[] }).operation_authorizations?.length, 1, `${c.runId}: a legitimate op commits an authorization`);
+			} else {
+				await assert.rejects(authorizeResearchOperation(dir, c.runId, c.kind, `tc-${c.runId}`, request), /deadline|discovery|expired|not eligible/i, `${c.runId}: the ineligible op must be refused`);
+				const after = (await readResearchAggregate(aggregatePath))!;
+				assert.equal(after.revision, before.revision, `${c.runId}: no revision minted`);
+				assert.equal((after.evidence_round as { operation_authorizations?: unknown[] }).operation_authorizations?.length ?? 0, 0, `${c.runId}: no authorization committed`);
+			}
+		}
+	} finally {
+		restoreEnv(snapshot);
+		rmSync(dir, { recursive: true, force: true });
+		resetPiGlobals();
+	}
+});
+
+test("C: with capacity for one operation, two concurrent authorizations cannot both succeed", async () => {
+	const dir = mkdtempSync(join(tmpdir(), "dispatch-auth-C-"));
+	const snapshot = Object.fromEntries(ENV_KEYS.map((key) => [key, process.env[key]]));
+	try {
+		Object.assign(process.env, { RESEARCH_LEDGER: "on", DEEP_RESEARCH_PLANNING: "on", RESEARCH_WORKFLOW: "parent", PI_CODING_AGENT_DIR: join(dir, "agent"), TELEMETRY: "off" });
+		const runId = "auth-C";
+		const aggregatePath = researchAggregatePath(dir, runId, process.env);
+		const state = ledgerState(runId);
+		state.budget.allocated.searches = 1; // capacity for exactly one search
+		await writeResearchAggregate(aggregatePath, createResearchAggregate({ run_id: runId, phase: "active", graph: { run_id: runId }, evidence_round: state, budget: { searches: 1, reads: 5, validation_reads: 5 }, deadline: deadlineFor(Date.now()) }));
+		const [r1, r2] = await Promise.allSettled([
+			authorizeResearchOperation(dir, runId, "search", "tc-C-1", "query one"),
+			authorizeResearchOperation(dir, runId, "search", "tc-C-2", "query two"),
+		]);
+		const successes = [r1, r2].filter((r) => r.status === "fulfilled").length;
+		assert.equal(successes, 1, "exactly one concurrent authorization succeeds");
+		const after = (await readResearchAggregate(aggregatePath))!;
+		const auths = (after.evidence_round as { operation_authorizations?: unknown[] }).operation_authorizations ?? [];
+		assert.equal(auths.length, 1, "only one authorization is committed");
+		const budget = (after.evidence_round as { budget: { consumed: { searches: number }; reserved: { searches: number } } }).budget;
+		assert.equal(budget.consumed.searches + budget.reserved.searches, 1, "the reserved capacity is counted durably");
+	} finally {
+		restoreEnv(snapshot);
+		rmSync(dir, { recursive: true, force: true });
+		resetPiGlobals();
+	}
+});
+
+test("D: authorization identity is stable — replay is idempotent, a conflicting request is refused", async () => {
+	const dir = mkdtempSync(join(tmpdir(), "dispatch-auth-D-"));
+	const snapshot = Object.fromEntries(ENV_KEYS.map((key) => [key, process.env[key]]));
+	try {
+		Object.assign(process.env, { RESEARCH_LEDGER: "on", DEEP_RESEARCH_PLANNING: "on", RESEARCH_WORKFLOW: "parent", PI_CODING_AGENT_DIR: join(dir, "agent"), TELEMETRY: "off" });
+		const runId = "auth-D";
+		const aggregatePath = researchAggregatePath(dir, runId, process.env);
+		const state = ledgerState(runId);
+		await writeResearchAggregate(aggregatePath, createResearchAggregate({ run_id: runId, phase: "active", graph: { run_id: runId }, evidence_round: state, budget: { searches: 3, reads: 5, validation_reads: 5 }, deadline: deadlineFor(Date.now()) }));
+		const first = await authorizeResearchOperation(dir, runId, "search", "tc-D", "query one");
+		// Identical replay: same operation identity + same request → idempotent,
+		// no second reservation, no new revision.
+		const replay = await authorizeResearchOperation(dir, runId, "search", "tc-D", "query one");
+		assert.equal(replay.op_id, first.op_id, "replay derives the same operation identity");
+		const afterReplay = (await readResearchAggregate(aggregatePath))!;
+		const auths = (afterReplay.evidence_round as { operation_authorizations?: unknown[] }).operation_authorizations ?? [];
+		assert.equal(auths.length, 1, "replay commits no second authorization");
+		const budget = (afterReplay.evidence_round as { budget: { reserved: { searches: number } } }).budget;
+		assert.equal(budget.reserved.searches, 1, "replay reserves no second unit");
+		// Same operation identity (tool_call_id) + different request → refused.
+		await assert.rejects(
+			authorizeResearchOperation(dir, runId, "search", "tc-D", "query two"),
+			/operation identity|conflict/i,
+			"same operation identity with a different request is refused",
+		);
+		const afterConflict = (await readResearchAggregate(aggregatePath))!;
+		const auths2 = (afterConflict.evidence_round as { operation_authorizations?: unknown[] }).operation_authorizations ?? [];
+		assert.equal(auths2.length, 1, "a conflicting request commits nothing");
+	} finally {
+		restoreEnv(snapshot);
+		rmSync(dir, { recursive: true, force: true });
+		resetPiGlobals();
+	}
+});
+
+test("E: read request identity preserves case-sensitive path and query", async () => {
+	const dir = mkdtempSync(join(tmpdir(), "dispatch-auth-E-"));
+	const snapshot = Object.fromEntries(ENV_KEYS.map((key) => [key, process.env[key]]));
+	try {
+		Object.assign(process.env, { RESEARCH_LEDGER: "on", DEEP_RESEARCH_PLANNING: "on", RESEARCH_WORKFLOW: "parent", PI_CODING_AGENT_DIR: join(dir, "agent"), TELEMETRY: "off" });
+		const runId = "auth-E";
+		const aggregatePath = researchAggregatePath(dir, runId, process.env);
+		const state = ledgerState(runId);
+		await writeResearchAggregate(aggregatePath, createResearchAggregate({ run_id: runId, phase: "active", graph: { run_id: runId }, evidence_round: state, budget: { searches: 3, reads: 5, validation_reads: 5 }, deadline: deadlineFor(Date.now()) }));
+		const url = "https://example.com/Path/To/Page?Query=Value";
+		await authorizeResearchOperation(dir, runId, "read", "tc-E", url);
+		const after = (await readResearchAggregate(aggregatePath))!;
+		const auths = (after.evidence_round as { operation_authorizations?: { request?: string }[] }).operation_authorizations ?? [];
+		assert.ok(auths.some((a) => a.request === url), "the read request preserves the case-sensitive path and query");
+		// A case-variant of the same operation identity is a different request → refused.
+		await assert.rejects(
+			authorizeResearchOperation(dir, runId, "read", "tc-E", url.toLowerCase()),
+			/operation identity|conflict/i,
+			"a case-variant of the same operation identity is refused",
+		);
+	} finally {
+		restoreEnv(snapshot);
+		rmSync(dir, { recursive: true, force: true });
+		resetPiGlobals();
+	}
+});
+
+test("F: a successful authorization is durable before the adapter is invoked", async () => {
+	const dir = mkdtempSync(join(tmpdir(), "dispatch-auth-F-"));
+	const barrier = join(dir, "barrier");
+	const snapshot = Object.fromEntries(ENV_KEYS.map((key) => [key, process.env[key]]));
+	try {
+		delete process.env.KETCH;
+		Object.assign(process.env, { KETCH_BIN: barrierKetch(dir, barrier), KETCH_BACKEND: "exa", KETCH_BARRIER: barrier, RESEARCH_LEDGER: "on", DEEP_RESEARCH_PLANNING: "on", RESEARCH_WORKFLOW: "parent", PI_CODING_AGENT_DIR: join(dir, "agent"), TELEMETRY: "off" });
+		const runId = "auth-F";
+		const aggregatePath = researchAggregatePath(dir, runId, process.env);
+		await writeResearchAggregate(aggregatePath, createResearchAggregate({ run_id: runId, phase: "active", graph: { run_id: runId }, evidence_round: ledgerState(runId), budget: { searches: 3, reads: 5, validation_reads: 5 }, deadline: deadlineFor(Date.now()) }));
+		const fp = makeFakePi();
+		const mod = await import(`../extensions/ketch.ts?dispatch-f=${Date.now()}-${Math.random()}`);
+		mod.registerKetch(fp.pi as never, { resolvePublicUrl: async (raw: string) => new URL(raw).toString() });
+		await fp.handlers.get("session_start")?.[0]?.({}, { cwd: dir, ui: { notify() {} } });
+		(globalThis as Record<string, unknown>).__pi_active_plan_context = { run_id: runId, profile: "deep-research", settled: false };
+		const tool = fp.tools.get("web_search")!;
+		const ctx = { cwd: dir, model: { provider: "test-provider", id: "test-model" } };
+		// The adapter blocks on the barrier only after the authorization has
+		// committed, so the persisted state is inspectable while it is pending.
+		const pending = tool.execute("tc-F-1", { query: "durable before dispatch" }, undefined, undefined, ctx as never);
+		await waitFor(join(barrier, "started"));
+		const mid = (await readResearchAggregate(aggregatePath))!;
+		const auths = (mid.evidence_round as { operation_authorizations?: Array<{ kind: string; request: string }> }).operation_authorizations ?? [];
+		assert.equal(auths.length, 1, "the authorization is committed before the adapter runs");
+		assert.equal(auths[0].kind, "search");
+		assert.ok(auths[0].request.length > 0, "the committed authorization carries the canonical request");
+		assert.equal((mid.evidence_round as { budget: { reserved: { searches: number } } }).budget.reserved.searches, 1, "the reserved unit is durable before dispatch");
+		writeFileSync(join(barrier, "proceed"), "go\n");
+		const result = await pending;
+		assert.equal(result.details.result_count, 1, "the authorized retrieval returns its result");
 	} finally {
 		restoreEnv(snapshot);
 		rmSync(dir, { recursive: true, force: true });

@@ -36,7 +36,7 @@ import { goalsEnabled, readCurrentGoal } from "../lib/goal-state.ts";
 import { createHash } from "node:crypto";
 import { reserveContextOutput } from "../lib/context-accounting.ts";
 import { deadlinePhase, mutateResearchAggregate, readResearchAggregate, researchAggregatePath, transitionAggregate } from "../lib/research-aggregate.ts";
-import { evidenceCardRef, mutateParentResearchRoundLedger, recordAuthorizedReadRound, recordAuthorizedSearchReceipt, searchReceiptId, type ResearchRoundLedgerStateV1, type ResearchRoundProposalV1 } from "../lib/research-round.ts";
+import { authorizeResearchOperation, evidenceCardRef, mutateParentResearchRoundLedger, recordAuthorizedReadRound, recordAuthorizedSearchReceipt, searchReceiptId, type ResearchRoundLedgerStateV1, type ResearchRoundProposalV1 } from "../lib/research-round.ts";
 
 // Ketch is the host-side network adapter for local models. The steady-state
 // surface is deliberately only FIND + READ; deep orchestration lives in the
@@ -396,7 +396,7 @@ export function registerKetch(pi: ExtensionAPI, dependencies: KetchDependencies 
 		if (!auth) return;
 		const { runId, cwd } = auth;
 		const urls = [...new Set(resultUrls.flatMap((raw) => { try { return [canonicalResearchUrl(raw)]; } catch { return []; } }))].slice(0, 8);
-		const receiptId = searchReceiptId({ run_id: runId, tool_call_id: toolCallId, query, mode, backends: [...backends], result_urls: urls, truncated, outcome });
+		const receiptId = searchReceiptId({ run_id: runId, query });
 		try {
 			await recordAuthorizedSearchReceipt(cwd, runId, {
 				receipt_id: receiptId, query, mode, backends: [...new Set(backends)].slice(0, 8), result_urls: urls,
@@ -640,6 +640,19 @@ export function registerKetch(pi: ExtensionAPI, dependencies: KetchDependencies 
 					record("ketch", "search", { mode, backends: [], attempts: 0, results: 0, chars: 0, duration_ms: Date.now() - started, truncated: false, outcome: "budget_exhausted" });
 					return text(`Research search allocation exhausted (${counts.searches}/${budget.limit}). Record an evidence gap instead of retrying.`, { outcome: "budget_exhausted", coverage: coverageReceipt(0, undefined, false, false, true) });
 				}
+				// Durable operation authorization, committed under the aggregate
+				// lock before the adapter is invoked: the completion is later
+				// validated against this record, so an unauthorized completion
+				// cannot mint accounting. A persistence failure refuses the
+				// retrieval — unaccounted work is worse than a refused one.
+				if (auth) {
+					try {
+						await authorizeResearchOperation(auth.cwd, auth.runId, "search", toolCallId, queryKey);
+					} catch {
+						record("ketch", "search", { mode, backends: [], attempts: 0, results: 0, chars: 0, duration_ms: Date.now() - started, truncated: false, outcome: "authorization_unavailable" });
+						return text("Research state could not be updated to authorize this search. Preserve the supported findings and stop before searching again.", { outcome: "authorization_unavailable", coverage: coverageReceipt(0, undefined, false, true) });
+					}
+				}
 				const versionError = await checkVersion();
 				if (versionError) {
 					record("ketch", "search", { mode, backends: [], attempts: 0, results: 0, chars: 0, duration_ms: Date.now() - started, truncated: false, outcome: "precondition" });
@@ -775,6 +788,20 @@ export function registerKetch(pi: ExtensionAPI, dependencies: KetchDependencies 
 				if (!budget.allowed) {
 					record("ketch", "read", { reader, sources: params.urls.length, succeeded: 0, failed: 0, chars: 0, duration_ms: Date.now() - started, truncated: false, outcome: "budget_exhausted" });
 					return text(`Research source-read allocation exhausted (${counts.reads}/${budget.limit}); requested ${readUnits}. Record an evidence gap instead of retrying.`, { reader, outcome: "budget_exhausted", coverage: coverageReceipt(0, params.urls.length, false, false, true) });
+				}
+				// Durable operation authorization for the requested page set,
+				// committed under the aggregate lock before any fetch: the
+				// completion is validated against this record later.
+				if (auth) {
+					const authorizedUrls = params.urls.flatMap((rawUrl) => { try { return [canonicalResearchUrl(rawUrl)]; } catch { return []; } });
+					if (authorizedUrls.length > 0) {
+						try {
+							await authorizeResearchOperation(auth.cwd, auth.runId, "read", toolCallId, authorizedUrls.join(","));
+						} catch {
+							record("ketch", "read", { reader, sources: params.urls.length, succeeded: 0, failed: params.urls.length, chars: 0, duration_ms: Date.now() - started, truncated: false, outcome: "authorization_unavailable" });
+							return text("Research state could not be updated to authorize this read. Preserve the supported findings and stop before reading again.", { reader, outcome: "authorization_unavailable", coverage: coverageReceipt(0, params.urls.length, false, true) });
+						}
+					}
 				}
 				const versionError = await checkVersion();
 				if (versionError) {

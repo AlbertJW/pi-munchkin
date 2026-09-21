@@ -5,7 +5,7 @@ import { agentDir } from "./agent-dir.ts";
 import { atomicWriteFile } from "./private-artifact.ts";
 import { canonicalResearchUrl, type EvidenceCardV1 } from "./research-evidence.ts";
 import { PLAN_DEFER_FIELD_MAX_BYTES } from "./plan-limits.ts";
-import { deadlinePhase, mutateResearchAggregate, researchAggregatePath, transitionAggregate, type ResearchAggregatePhase } from "./research-aggregate.ts";
+import { deadlinePhase, mutateResearchAggregate, readResearchAggregate, researchAggregatePath, transitionAggregate, type ResearchAggregatePhase } from "./research-aggregate.ts";
 
 /**
  * Parent-owned, evidence-first research-round state.
@@ -28,6 +28,7 @@ export const RESEARCH_ROUND_MAX_VALIDATION_READS = 5;
 export const RESEARCH_ROUND_MAX_LEADS = 16;
 export const RESEARCH_ROUND_MAX_CARDS = 32;
 export const RESEARCH_ROUND_MAX_CHILD_REPORTS = 24;
+export const RESEARCH_ROUND_MAX_OPERATIONS = 32;
 
 const ID = /^[A-Za-z0-9._:-]{1,96}$/;
 const SHA256 = /^[a-f0-9]{64}$/;
@@ -106,6 +107,33 @@ export type SearchReceiptV1 = {
 	truncated: boolean;
 	outcome: "completed" | "failed" | "blocked";
 	charged: boolean;
+	created_at: string;
+};
+/** Durable, bounded authorization for one parent retrieval operation,
+ * persisted in the ledger at dispatch. The op identity is derived from the
+ * run and the request only — never from result content — so a completion can
+ * be validated against the operation that was actually dispatched, after any
+ * lifecycle change and across process restarts. */
+export type OperationAuthorizationV1 = {
+	op_id: string;
+	kind: "search" | "read";
+	tool_call_id: string;
+	request: string;
+	authorized_at: string;
+	completed_at?: string;
+};
+
+/** Operational read accounting for an authorized read that completes after
+ * settlement: terminal evidence (rounds, cards, gaps) stays immutable, and
+ * this receipt plus its charge is the separate operational record. */
+export type ReadOutcomeReceiptV1 = {
+	receipt_id: string;
+	urls: string[];
+	phase: ResearchRoundPhase;
+	method: "ketch" | "jina";
+	outcome: ResearchReceiptOutcome;
+	truncated: boolean;
+	charged: number;
 	created_at: string;
 };
 
@@ -210,6 +238,8 @@ export type ResearchRoundLedgerStateV1 = {
 	reserved_discovery_urls: string[];
 	reserved_validation_urls: string[];
 	search_receipts?: SearchReceiptV1[];
+	read_receipts?: ReadOutcomeReceiptV1[];
+	operation_authorizations?: OperationAuthorizationV1[];
 	child_reservations: ChildReservationV1[];
 	child_reports: ChildReportReceiptV1[];
 	deferrals: ResearchDeferralV1[];
@@ -330,6 +360,37 @@ function validateSearchReceipt(value: unknown, name: string): SearchReceiptV1 {
 	if (!Number.isSafeInteger(item.result_count) || Number(item.result_count) < 0 || Number(item.result_count) > 8 || Number(item.result_count) !== resultUrls.length) throw new ResearchRoundError(`${name}.result_count is invalid`);
 	if (typeof item.truncated !== "boolean" || !["completed", "failed", "blocked"].includes(String(item.outcome)) || typeof item.charged !== "boolean" || !validTimestamp(item.created_at)) throw new ResearchRoundError(`${name} outcome is invalid`);
 	return { receipt_id: receiptId, query, mode: item.mode, backends, result_urls: resultUrls, result_count: Number(item.result_count), truncated: item.truncated, outcome: item.outcome as SearchReceiptV1["outcome"], charged: item.charged, created_at: item.created_at as string };
+}
+
+function validateOperationAuthorization(value: unknown, name: string): OperationAuthorizationV1 {
+	if (!value || typeof value !== "object" || Array.isArray(value)) throw new ResearchRoundError(`${name} is invalid`);
+	const item = value as Record<string, unknown>;
+	const fields = ["op_id", "kind", "tool_call_id", "request", "authorized_at", "completed_at"];
+	if (Object.keys(item).length > fields.length || fields.slice(0, 5).some((field) => !(field in item))) throw new ResearchRoundError(`${name} has unknown or missing fields`);
+	const opId = id(item.op_id, `${name}.op_id`);
+	if (item.kind !== "search" && item.kind !== "read") throw new ResearchRoundError(`${name}.kind is invalid`);
+	const toolCallId = text(item.tool_call_id, 128);
+	const request = text(item.request, 500);
+	if (!validTimestamp(item.authorized_at) || (item.completed_at !== undefined && !validTimestamp(item.completed_at))) throw new ResearchRoundError(`${name} timestamps are invalid`);
+	const authorization: OperationAuthorizationV1 = { op_id: opId, kind: item.kind, tool_call_id: toolCallId, request, authorized_at: item.authorized_at as string };
+	if (item.completed_at !== undefined) authorization.completed_at = item.completed_at as string;
+	return authorization;
+}
+
+function validateReadOutcomeReceipt(value: unknown, name: string): ReadOutcomeReceiptV1 {
+	if (!value || typeof value !== "object" || Array.isArray(value)) throw new ResearchRoundError(`${name} is invalid`);
+	const item = value as Record<string, unknown>;
+	const fields = ["receipt_id", "urls", "phase", "method", "outcome", "truncated", "charged", "created_at"];
+	if (Object.keys(item).length !== fields.length || fields.some((field) => !(field in item))) throw new ResearchRoundError(`${name} has unknown or missing fields`);
+	const receiptId = id(item.receipt_id, `${name}.receipt_id`);
+	if (!Array.isArray(item.urls) || item.urls.length < 1 || item.urls.length > 8 || item.urls.some((url) => !validUrl(url))) throw new ResearchRoundError(`${name}.urls is invalid`);
+	const urls = [...new Set(item.urls as string[])];
+	if (item.phase !== "discovery" && item.phase !== "parent_validation") throw new ResearchRoundError(`${name}.phase is invalid`);
+	if (item.method !== "ketch" && item.method !== "jina") throw new ResearchRoundError(`${name}.method is invalid`);
+	if (!["completed", "failed", "truncated", "blocked"].includes(String(item.outcome))) throw new ResearchRoundError(`${name}.outcome is invalid`);
+	if (typeof item.truncated !== "boolean" || !Number.isSafeInteger(item.charged) || (item.charged as number) < 1 || (item.charged as number) > 8) throw new ResearchRoundError(`${name} charge is invalid`);
+	if (!validTimestamp(item.created_at)) throw new ResearchRoundError(`${name}.created_at is invalid`);
+	return { receipt_id: receiptId, urls, phase: item.phase, method: item.method, outcome: item.outcome as ReadOutcomeReceiptV1["outcome"], truncated: item.truncated, charged: item.charged as number, created_at: item.created_at as string };
 }
 
 function validateObligation(value: unknown, name: string): ClaimObligationV1 {
@@ -547,7 +608,7 @@ export class ResearchRoundLedger {
 		const allocated = defaultBudget(options.budget);
 		this.current = {
 			schema: RESEARCH_ROUND_LEDGER_SCHEMA, run_id: text(options.run_id, 200), budget: { allocated, consumed: budgetZero(), reserved: budgetZero() },
-			obligations, gaps: obligations.filter((item) => item.status !== "resolved").map((item) => gapForClaim(item, item.status)), conflicts: [], evidence_cards: [], rounds: [], reserved_queries: [], reserved_discovery_urls: [], reserved_validation_urls: [], search_receipts: [], child_reservations: [], child_reports: [], deferrals: [], status: "active",
+			obligations, gaps: obligations.filter((item) => item.status !== "resolved").map((item) => gapForClaim(item, item.status)), conflicts: [], evidence_cards: [], rounds: [], reserved_queries: [], reserved_discovery_urls: [], reserved_validation_urls: [], search_receipts: [], read_receipts: [], operation_authorizations: [], child_reservations: [], child_reports: [], deferrals: [], status: "active",
 		};
 	}
 
@@ -591,6 +652,65 @@ export class ResearchRoundLedger {
 		working.search_receipts.push(receipt);
 		this.current = working;
 		return clone(receipt);
+	}
+
+	/** Persist the durable authorization for one retrieval operation at dispatch.
+	 * The op identity is derived from the run and the normalized request only —
+	 * never from result content — so a later completion can be validated against
+	 * the operation that was actually dispatched. Idempotent per operation. */
+	authorizeOperation(kind: "search" | "read", toolCallId: string, request: string): OperationAuthorizationV1 {
+		if (this.current.status === "settled") throw new ResearchRoundError("research round ledger is settled and immutable");
+		// Reads carry case-sensitive URLs (path/query select distinct resources),
+		// so their request is trimmed but never lowercased. Search queries are
+		// case-insensitive for identity and stay lowercased.
+		const normalized = kind === "read" ? request.replace(/\s+/g, " ").trim() : request.replace(/\s+/g, " ").trim().toLocaleLowerCase();
+		if (!normalized || normalized.length > 500) throw new ResearchRoundError("operation request is invalid");
+		const opId = `op-${kind}-${createHash("sha256").update(`${this.current.run_id}:${kind}:${text(toolCallId, 128)}`, "utf8").digest("hex").slice(0, 48)}`;
+		const existing = (this.current.operation_authorizations ?? []).find((item) => item.op_id === opId);
+		if (existing) {
+			if (existing.request !== normalized) throw new ResearchRoundError("operation identity conflicts with a prior request");
+			return clone(existing);
+		}
+		// Atomic budget reservation: the unit for this operation is reserved
+		// durably in budget.reserved under the aggregate lock (never a
+		// process-local counter), so two concurrent authorizations cannot both
+		// fit in a single unit. The reservation is released when the operation's
+		// outcome is recorded, so each unit is charged at most once.
+		const unit: ResearchBudgetEnvelope = kind === "search" ? { searches: 1, reads: 0, validation_reads: 0 } : { searches: 0, reads: 1, validation_reads: 0 };
+		if (!within(add(this.current.budget.consumed, add(this.current.budget.reserved, unit)), this.current.budget.allocated)) throw new ResearchRoundError("research budget exhausted");
+		const working = clone(this.current);
+		working.budget = { allocated: working.budget.allocated, consumed: working.budget.consumed, reserved: add(working.budget.reserved, unit) };
+		const authorizations = [...(working.operation_authorizations ?? [])];
+		if (authorizations.length >= RESEARCH_ROUND_MAX_OPERATIONS) throw new ResearchRoundError("operation authorization capacity reached");
+		const authorization: OperationAuthorizationV1 = { op_id: opId, kind, tool_call_id: text(toolCallId, 128), request: normalized, authorized_at: now() };
+		authorizations.push(authorization);
+		working.operation_authorizations = authorizations;
+		this.current = working;
+		return clone(authorization);
+	}
+
+	/** Mark one authorized operation as settled by its recorded outcome.
+	 * Idempotent: an already-completed operation is left unchanged. */
+	completeOperation(opId: string, at: string): void {
+		const authorizations = this.current.operation_authorizations ?? [];
+		const index = authorizations.findIndex((item) => item.op_id === opId);
+		if (index === -1) throw new ResearchRoundError("operation authorization is unknown");
+		if (authorizations[index].completed_at !== undefined) return;
+		const working = clone(this.current);
+		working.operation_authorizations = [...(working.operation_authorizations ?? [])];
+		working.operation_authorizations[index] = { ...working.operation_authorizations[index], completed_at: text(at, 64) };
+		this.current = working;
+	}
+	/** Release the budget unit reserved for an authorized operation when its
+	 * outcome is recorded. Idempotent: an unknown or already-completed
+	 * operation releases nothing, so a replay cannot underflow the envelope. */
+	releaseOperationReservation(opId: string): void {
+		const authorization = (this.current.operation_authorizations ?? []).find((item) => item.op_id === opId);
+		if (!authorization || authorization.completed_at !== undefined) return;
+		const unit: ResearchBudgetEnvelope = authorization.kind === "search" ? { searches: 1, reads: 0, validation_reads: 0 } : { searches: 0, reads: 1, validation_reads: 0 };
+		const working = clone(this.current);
+		working.budget = { allocated: working.budget.allocated, consumed: working.budget.consumed, reserved: subtract(working.budget.reserved, unit) };
+		this.current = working;
 	}
 
 	/** Reserve one child allocation before launching its process. */
@@ -845,7 +965,7 @@ export function validateResearchRoundLedger(value: unknown): value is ResearchRo
 		if (!value || typeof value !== "object" || Array.isArray(value)) throw new ResearchRoundError("ledger is invalid");
 		const item = value as Record<string, unknown>;
 		const fields = ["schema", "run_id", "budget", "obligations", "gaps", "conflicts", "evidence_cards", "rounds", "reserved_queries", "reserved_discovery_urls", "reserved_validation_urls", "child_reservations", "child_reports", "deferrals", "status"];
-		if (Object.keys(item).some((key) => !fields.includes(key) && key !== "terminal_reason" && key !== "search_receipts") || !fields.every((key) => key in item)) throw new ResearchRoundError("ledger has unknown or missing fields");
+		if (Object.keys(item).some((key) => !fields.includes(key) && key !== "terminal_reason" && key !== "search_receipts" && key !== "operation_authorizations" && key !== "read_receipts") || !fields.every((key) => key in item)) throw new ResearchRoundError("ledger has unknown or missing fields");
 		if (item.schema !== RESEARCH_ROUND_LEDGER_SCHEMA) throw new ResearchRoundError("ledger schema is invalid");
 		text(item.run_id, 200); if (item.terminal_reason !== undefined) text(item.terminal_reason, 300);
 		if (!item.budget || typeof item.budget !== "object" || Array.isArray(item.budget)) throw new ResearchRoundError("ledger budget is invalid");
@@ -892,6 +1012,26 @@ export function validateResearchRoundLedger(value: unknown): value is ResearchRo
 			if (!((item.reserved_queries as unknown[]).includes(parsed.query.replace(/\s+/g, " ").trim().toLocaleLowerCase()))) throw new ResearchRoundError("search receipt query is not reserved");
 			if (parsed.charged) searchReceiptUsage += 1;
 		}
+		const operationAuthorizations = item.operation_authorizations === undefined ? [] : item.operation_authorizations;
+		validateLedgerArray(operationAuthorizations, "ledger operation authorizations", RESEARCH_ROUND_MAX_OPERATIONS);
+		const operationIds = new Set<string>();
+		let operationUsage = budgetZero();
+		for (const [index, authorization] of (operationAuthorizations as unknown[]).entries()) {
+			const parsed = validateOperationAuthorization(authorization, `ledger operation_authorizations[${index}]`);
+			if (operationIds.has(parsed.op_id)) throw new ResearchRoundError("duplicate ledger operation authorization");
+			operationIds.add(parsed.op_id);
+			// In-flight (authorized, not yet completed) operations hold their
+			// budget unit in budget.reserved until their outcome is recorded.
+			if (parsed.completed_at === undefined) operationUsage = add(operationUsage, parsed.kind === "search" ? { searches: 1, reads: 0, validation_reads: 0 } : { searches: 0, reads: 1, validation_reads: 0 });
+		}
+		const readReceipts = item.read_receipts === undefined ? [] : item.read_receipts;
+		validateLedgerArray(readReceipts, "ledger read receipts", RESEARCH_ROUND_MAX_OPERATIONS);
+		const readReceiptIds = new Set<string>();
+		for (const [index, receipt] of (readReceipts as unknown[]).entries()) {
+			const parsed = validateReadOutcomeReceipt(receipt, `ledger read_receipts[${index}]`);
+			if (readReceiptIds.has(parsed.receipt_id)) throw new ResearchRoundError("duplicate ledger read receipt");
+			readReceiptIds.add(parsed.receipt_id);
+		}
 		validateLedgerArray(item.child_reservations, "ledger child reservations", RESEARCH_ROUND_MAX_CHILD_REPORTS);
 		const owners = new Set<string>();
 		let reservedUsage = budgetZero();
@@ -913,7 +1053,7 @@ export function validateResearchRoundLedger(value: unknown): value is ResearchRo
 			const charged = envelope(row.charged, "child receipt charged"); childUsage = add(childUsage, charged);
 		}
 		if (!equal(budget.consumed as ResearchBudgetEnvelope, add(add(roundUsage, childUsage), { searches: searchReceiptUsage, reads: 0, validation_reads: 0 }))) throw new ResearchRoundError("ledger budget consumption does not match its rounds, search receipts and child reports");
-		if (!equal(budget.reserved as ResearchBudgetEnvelope, reservedUsage)) throw new ResearchRoundError("ledger budget reservations do not match child reservations");
+		if (!equal(budget.reserved as ResearchBudgetEnvelope, add(reservedUsage, operationUsage))) throw new ResearchRoundError("ledger budget reservations do not match child and operation reservations");
 		validateLedgerArray(item.deferrals, "ledger deferrals", RESEARCH_ROUND_MAX_OBLIGATIONS);
 		const deferredClaims = new Set<string>();
 		const coveredClaims = new Set(cards.filter((card) => card.parent_validated && !card.truncated).flatMap((card) => card.claim_ids));
@@ -1079,7 +1219,7 @@ export async function mutateParentResearchRoundLedger<T>(
 	runId: string,
 	fn: (ledger: ResearchRoundLedger) => Promise<T> | T,
 	eligiblePhases: readonly ResearchAggregatePhase[] = ["active"],
-	options: { rejectExpired?: boolean } = {},
+	options: { rejectExpired?: boolean; requireDiscovery?: boolean } = {},
 ): Promise<T> {
 	const aggregatePath = researchAggregatePath(cwd, runId, process.env);
 	const ledgerPath = researchRoundPath(cwd, runId, process.env);
@@ -1098,6 +1238,10 @@ export async function mutateParentResearchRoundLedger<T>(
 		// lock, so a crossing in between must not commit new retrieval work.
 		// Settle and reservation accounting intentionally omit this flag.
 		if (options.rejectExpired && deadlinePhase(aggregate) === "expired") throw new ResearchRoundError("research aggregate deadline has expired");
+		// Search is discovery-only: a crossing into validation (or expiry) after
+		// the caller preflight must not commit a new search. Reads stay eligible
+		// through validation, so they only take the expiry gate above.
+		if (options.requireDiscovery && deadlinePhase(aggregate) !== "discovery") throw new ResearchRoundError("research discovery phase is closed");
 		const ledger = ResearchRoundLedger.fromState(aggregate.evidence_round as ResearchRoundLedgerStateV1);
 		const before = digest(ledger.state);
 		const result = await fn(ledger);
@@ -1137,26 +1281,56 @@ export async function mutateParentResearchRoundLedger<T>(
  */
 export const RESEARCH_OUTCOME_RECEIPT_PHASES: readonly ResearchAggregatePhase[] = ["active", "paused", "awaiting_extension", "blocked"];
 
-/** Content-addressed receipt identity for a search outcome: a replay of the
- * same completion (same run, operation, and result identity) derives the same
- * ID, so the ledger reducer treats it as an idempotent duplicate. */
-export function searchReceiptId(identity: { run_id: string; tool_call_id: string; query: string; mode: string; backends: readonly string[]; result_urls: readonly string[]; truncated: boolean; outcome: string }): string {
-	return `auto-search-${createHash("sha256").update(JSON.stringify(identity), "utf8").digest("hex").slice(0, 48)}`;
+/** Content-addressed receipt identity for a search outcome, derived from the
+ * operation identity (run + normalized query) only — never from result
+ * content. A replay of the same operation derives the same ID, so the ledger
+ * reducer treats it as an idempotent duplicate, and a conflicting outcome for
+ * the same operation cannot mint a new ID to evade the conflict check. */
+export function searchReceiptId(identity: { run_id: string; query: string }): string {
+	const normalized = identity.query.replace(/\s+/g, " ").trim().toLocaleLowerCase();
+	return `auto-search-${createHash("sha256").update(`${identity.run_id}:search:${normalized}`, "utf8").digest("hex").slice(0, 48)}`;
+}
+
+/** Persist the durable authorization for one parent retrieval operation at
+ * dispatch, under the aggregate lock and only while the run is active. The
+ * adapter is invoked only after this commits, so every completion has a
+ * persisted operation to validate against. A missing, mismatched, or
+ * malformed authority fails closed: the caller refuses the retrieval rather
+ * than dispatch unaccounted work. */
+export async function authorizeResearchOperation(cwd: string, runId: string, kind: "search" | "read", toolCallId: string, request: string): Promise<OperationAuthorizationV1> {
+	const aggregate = await readResearchAggregate(researchAggregatePath(cwd, runId, process.env));
+	if (!aggregate || aggregate.run_id !== runId) throw new ResearchRoundError("research aggregate is missing or belongs to a different run");
+	if (!validateResearchRoundLedger(aggregate.evidence_round)) throw new ResearchRoundError("research aggregate evidence round is not a valid ledger");
+	return mutateParentResearchRoundLedger(cwd, runId, (ledger) => ledger.authorizeOperation(kind, toolCallId, request), ["active"], { rejectExpired: true, requireDiscovery: kind === "search" });
 }
 
 /** Production accounting function for one authorized search outcome: committed
- * under the aggregate lock with the outcome-receipt phase gate, idempotent by
- * receipt ID, charged at most once per query, and never reactivating the run.
- */
+ * under the aggregate lock with the outcome-receipt phase gate, refused when
+ * the operation was never authorized, idempotent by receipt ID, charged at
+ * most once per query, and never reactivating the run. */
 export async function recordAuthorizedSearchReceipt(cwd: string, runId: string, input: Omit<SearchReceiptV1, "charged">): Promise<SearchReceiptV1> {
-	return mutateParentResearchRoundLedger(cwd, runId, (ledger) => ledger.recordSearchReceipt(input), RESEARCH_OUTCOME_RECEIPT_PHASES);
+	return mutateParentResearchRoundLedger(cwd, runId, (ledger) => {
+		const normalized = input.query.replace(/\s+/g, " ").trim().toLocaleLowerCase();
+		const authorization = (ledger.state.operation_authorizations ?? []).find((item) => item.kind === "search" && item.request === normalized);
+		if (!authorization) throw new ResearchRoundError("search receipt lacks a durable operation authorization");
+		ledger.releaseOperationReservation(authorization.op_id);
+		const receipt = ledger.recordSearchReceipt(input);
+		ledger.completeOperation(authorization.op_id, receipt.created_at);
+		return receipt;
+	}, RESEARCH_OUTCOME_RECEIPT_PHASES);
 }
 
 /** Production accounting function for one authorized read outcome: the same
- * gate and idempotence rules as the search receipt. */
+ * gate, authorization validation, and idempotence rules as the search
+ * receipt. */
 export async function recordAuthorizedReadRound(cwd: string, runId: string, proposal: ResearchRoundProposalV1): Promise<ResearchRoundLedgerStateV1> {
 	return mutateParentResearchRoundLedger(cwd, runId, (ledger) => {
+		const request = proposal.reads.map((read) => read.url).join(",");
+		const authorization = (ledger.state.operation_authorizations ?? []).find((item) => item.kind === "read" && item.request === request);
+		if (!authorization) throw new ResearchRoundError("read round lacks a durable operation authorization");
+		ledger.releaseOperationReservation(authorization.op_id);
 		ledger.recordRound(proposal);
+		ledger.completeOperation(authorization.op_id, new Date().toISOString());
 		return ledger.state;
 	}, RESEARCH_OUTCOME_RECEIPT_PHASES);
 }
