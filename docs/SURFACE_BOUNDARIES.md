@@ -1179,3 +1179,45 @@ Source commit: `317707f0830d82b977bdd9a3b4bf2a4f14560549`.
 Current package-source SHA-256:
 `765b13e88a35c3a5760dbd00acf0fe83234a21e8e8d53b4eec8f9602b9010ad0`
 (recomputed via `npm run surface:hash:source` on 2026-09-22).
+
+## Phase 3B lease/lock/recovery hardening — 2026-09-22
+
+Commit `1b3473a` closes three gaps found in closeout review of the
+frozen Phase 3B implementation:
+
+1. **Child lease budget is reserved atomically.** `acquireResearchBranchLease`
+   reserves the child's envelope under the aggregate lock (one bounded
+   child per run; a second reservation throws), and
+   `releaseResearchBranchLease` frees an undispatched reservation. The
+   parent-workflow merge reducer accepts `active`/`paused`/
+   `awaiting_extension`/`blocked` phases, and `planStateFilePresent`
+   treats the aggregate pointer as present state so a present unreadable
+   state is never an empty slot.
+2. **No age-based lock stealing.** A live writer owns its aggregate lock
+   regardless of age; stealing after a slow filesystem operation would
+   permit two concurrent commits. Malformed locks remain recoverable.
+3. **No delegation below the parent.** In parent research mode,
+   subagents at depth > 0 cannot delegate.
+
+Demonstrated by: plan-graph integration (atomic reservation at lease; a
+failed child burns its reserved envelope exactly once), transaction
+closeout (deadline extension reactivates the run; an abandoned
+authorization from an exited real process is recovered once from
+durable state, charged once, accepting no evidence). All behaviour is
+dark behind `RESEARCH_WORKFLOW=parent` + `DEEP_RESEARCH_PLANNING=on`;
+deployed defaults are unchanged.
+
+**Promotion-screen supersession:** this commit supersedes the frozen
+source pin in
+`optimizer/docs/screens/PREREG_PARENT_RESEARCH_PHASE3B_PROMOTION_2026-09-22.md`
+(`317707f` / `765b13e8…`). The screen must be re-pinned to this commit
+and the source hash below before execution; the preregistration itself
+is not rewritten.
+
+Status: REPOSITORY-ONLY; PENDING ROLLOUT. No inference, mirror, or
+default change occurred.
+
+Source commit: `1b3473a`.
+Package-source SHA-256:
+`55247e92ffdfb6c6be86b467499f80a3f5998dae1a06d6cd962640b90c0faca7`
+(recomputed via `npm run surface:hash:source` on 2026-09-22).
