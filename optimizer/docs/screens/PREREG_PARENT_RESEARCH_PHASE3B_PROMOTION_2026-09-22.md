@@ -8,12 +8,17 @@ run.
 
 ## Frozen implementation
 
-- Source commit: `317707f0830d82b977bdd9a3b4bf2a4f14560549`
+- Source commit: `1b3473aeb461b4037304c3518f1002de4506c58d`
 - Package-source SHA-256:
-  `765b13e88a35c3a5760dbd00acf0fe83234a21e8e8d53b4eec8f9602b9010ad0`
-- Offline verification: `npm run verify`, all six stages passed in 124.6s;
-  935/935 harness tests passed; typecheck, health, package smoke, optimizer
+  `55247e92ffdfb6c6be86b467499f80a3f5998dae1a06d6cd962640b90c0faca7`
+- Offline verification: `npm run verify`, all six stages passed in 160.9s;
+  936/936 harness tests passed; typecheck, health, package smoke, optimizer
   mothball enforcement, and secret scan passed.
+- Re-pinned 2026-09-22 from `317707f0830d82b977bdd9a3b4bf2a4f14560549`
+  (`765b13e8…`) to the Phase 3B lease/lock/recovery hardening commit, as
+  mandated by the boundary row in `docs/SURFACE_BOUNDARIES.md`. Only the
+  implementation pin moved; the frozen acceptance cases and decision rules
+  are unchanged, and the rollback parent remains `706d75b`.
 - Promotion flags remain opt-in:
   `PLAN_GRAPH=on`, `DEEP_RESEARCH_PLANNING=on`, `RESEARCH_LEDGER=on`, and
   `RESEARCH_WORKFLOW=parent`.
