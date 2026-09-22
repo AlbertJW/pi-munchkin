@@ -689,6 +689,7 @@ if (!CHILD) {
 			assert.equal(acquired.ok, true);
 			const before = await readResearchAggregate(aggregatePath);
 			assert.equal(before?.revision, 1);
+			assert.deepEqual((before?.evidence_round as any).budget.reserved, { searches: 1, reads: 1, validation_reads: 0 }, "child allowance must be reserved atomically with the lease");
 			fp.pi.events.emit(HARNESS_SIGNAL_CHANNEL, { v: 1, type: "plan/branch-result", context: { ...context, lease_id: acquired.lease_id, dispatch_epoch: 0 }, report: {
 				v: 1, parent_item_id: context.parent_item_id, owner_ref: context.owner_ref, status: "blocked", note: "bounded failure",
 				consumed: { searches: 0, reads: 0 }, evidence_gaps: ["bounded failure"], source_leads: [], children: [],
@@ -697,6 +698,8 @@ if (!CHILD) {
 			await fire(fp, "before_agent_start", {}, makeCtx(cwd).ctx);
 			const after = await readResearchAggregate(aggregatePath);
 			assert.equal(after?.revision, 2, "the aggregate-first merge must not be followed by a redundant compatibility sync transition");
+			assert.deepEqual((after?.evidence_round as any).budget.reserved, { searches: 0, reads: 0, validation_reads: 0 });
+			assert.deepEqual((after?.evidence_round as any).budget.consumed, { searches: 1, reads: 1, validation_reads: 0 }, "failed child burns its actual reserved envelope once");
 		} finally {
 			if (previousWorkflow === undefined) delete process.env.RESEARCH_WORKFLOW; else process.env.RESEARCH_WORKFLOW = previousWorkflow;
 			if (previousPlanning === undefined) delete process.env.DEEP_RESEARCH_PLANNING; else process.env.DEEP_RESEARCH_PLANNING = previousPlanning;

@@ -627,7 +627,7 @@ export default function (pi: ExtensionAPI) {
 
 	const depthConfig = resolveDelegationDepthConfig(pi);
 	const { currentDepth, maxDepth, ancestorAgentStack, preventCycles } = depthConfig;
-	const canDelegate = depthConfig.canDelegate && !RESEARCH_SCOUT_PROCESS;
+	const canDelegate = depthConfig.canDelegate && !RESEARCH_SCOUT_PROCESS && !(process.env.RESEARCH_WORKFLOW === "parent" && currentDepth > 0);
 	const scoutDispatch = scoutDispatchState();
 	const rootDispatch = rootDispatchState();
 

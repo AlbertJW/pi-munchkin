@@ -802,6 +802,13 @@ export class ResearchRoundLedger {
 	}
 
 	/** Merge one child report exactly once. Late reports cannot reopen a settled ledger. */
+	releaseUndispatchedChild(ownerRef: string): void {
+		const reservation = this.current.child_reservations.find(item => item.owner_ref === ownerRef);
+		if (!reservation) return;
+		this.current.budget.reserved = subtract(this.current.budget.reserved, reservation.allocated);
+		this.current.child_reservations = this.current.child_reservations.filter(item => item !== reservation);
+	}
+
 	mergeChildReport(report: ChildResearchReportV1): { merged: boolean; reason: "merged" | "duplicate" | "settled" } {
 		if (this.current.status === "settled") return { merged: false, reason: "settled" };
 		const claims = new Set(this.current.obligations.map((item) => item.claim_id));

@@ -1,9 +1,10 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import { execFileSync } from "node:child_process";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { createResearchAggregate, expireResearchDeadline, mutateResearchAggregate, readResearchAggregate, transitionAggregate, writeResearchAggregate } from "../lib/research-aggregate.ts";
+import { createResearchAggregate, expireResearchDeadline, extendDeadline, mutateResearchAggregate, readResearchAggregate, transitionAggregate, writeResearchAggregate } from "../lib/research-aggregate.ts";
 import { ResearchRoundLedger } from "../lib/research-round.ts";
 
 function ledger() {
@@ -37,9 +38,9 @@ test("a caught nested failure restores its transaction savepoint", async () => {
  try {
   await writeResearchAggregate(path, initial);
   await mutateResearchAggregate(path, async state => {
-   await assert.rejects(mutateResearchAggregate(path, nested => {
-    const changed = transitionAggregate(nested, { graph: { leaked: true } });
-    throw Object.assign(new Error("nested rejected"), { changed });
+   await assert.rejects(mutateResearchAggregate(path, async () => {
+    await mutateResearchAggregate(path, nested => ({ state: transitionAggregate(nested, { graph: { leaked: true } }), result: undefined }));
+    throw new Error("nested rejected");
    }), /nested rejected/);
    return { state: transitionAggregate(state, { graph: { committed: true } }), result: undefined };
   });
@@ -91,5 +92,22 @@ test("deadline expiry is fake-clock deterministic and stale timers cannot pause 
   assert.equal(await expireResearchDeadline(path, started + 600_000), true);
   assert.equal((await readResearchAggregate(path))?.phase, "awaiting_extension");
   assert.equal(await expireResearchDeadline(path, started + 600_001), false);
+  await mutateResearchAggregate(path, state => ({ state: extendDeadline(state, started + 600_002), result: undefined }));
+  assert.equal(await expireResearchDeadline(path, started + 600_003), false);
+  assert.equal((await readResearchAggregate(path))?.phase, "active");
  } finally { await rm(dir, { recursive: true, force: true }); }
+});
+
+test("authorization from an exited real process is recovered from its durable state", () => {
+ const moduleUrl = new URL("../lib/research-round.ts", import.meta.url).href;
+ const state = ledger().state;
+ const source = `import { ResearchRoundLedger } from ${JSON.stringify(moduleUrl)}; const ledger = ResearchRoundLedger.fromState(${JSON.stringify(state)}); ledger.authorizeOperation("read", "process-read", '["https://example.com/A"]'); console.log(JSON.stringify(ledger.state));`;
+ const persisted = JSON.parse(execFileSync(process.execPath, ["--experimental-strip-types", "--input-type=module", "-e", source], { encoding: "utf8" }));
+ const restored = ResearchRoundLedger.fromState(persisted);
+ assert.notEqual(persisted.operation_authorizations[0].owner_pid, process.pid);
+ assert.equal(restored.recoverAbandonedOperations(pid => { try { process.kill(pid, 0); return true; } catch { return false; } }), 1);
+ assert.equal(restored.state.budget.consumed.reads, 1);
+ assert.equal(restored.state.budget.reserved.reads, 0);
+ assert.equal(restored.state.evidence_cards.length, 0);
+ assert.equal(restored.recoverAbandonedOperations(() => false), 0);
 });

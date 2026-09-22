@@ -600,6 +600,7 @@ async function requireFinishableParentResearch(cwd: string, runId: string): Prom
 
 /** Creation must not treat a present but unreadable plan as an empty slot. */
 async function planStateFilePresent(cwd: string): Promise<boolean> {
+	if (PARENT_RESEARCH_WORKFLOW && await exists(`${researchAggregatePath(cwd, "current", process.env)}.pointer`)) return true;
 	const path = statePath(cwd);
 	return Boolean(path && await exists(path));
 }
@@ -837,6 +838,13 @@ export async function acquireResearchBranchLease(cwd: string, context: PlanConte
 		};
 		if (!sameBudget(context.budget, remaining)) return { result: { ok: false, reason: "stale-context" } };
 		if (remaining.searches === 0 && remaining.reads === 0) return { result: { ok: false, reason: "budget-exhausted" } };
+		if (PARENT_RESEARCH_WORKFLOW) {
+			if (previous.items.some(item => item.lease)) return { result: { ok: false, reason: "already-leased" } };
+			await mutateParentResearchRoundLedger(cwd, context.run_id, ledger => {
+				if (ledger.state.child_reservations.length || ledger.state.child_reports.length) throw new Error("parent research permits only one bounded child per run");
+				ledger.reserveChild(context.owner_ref, { ...remaining, validation_reads: 0 });
+			}, ["active"], { rejectExpired: true, requireDiscovery: true });
+		}
 		const lease: ResearchBranchLease = { lease_id: randomUUID(), issued_at: isoNow(), owner_ref: context.owner_ref };
 		const state: PlanState = { ...previous, items: previous.items.map((item) => item.id === parent.id ? { ...item, lease } : item) };
 		return { state, result: { ok: true, lease_id: lease.lease_id } };
@@ -856,6 +864,7 @@ export async function releaseResearchBranchLease(cwd: string, context: PlanConte
 		if (!previous || previous.schema_version !== 5 || previous.run_id !== context.run_id) return { result: false };
 		const parent = previous.items.find((item) => item.id === context.parent_item_id);
 		if (!parent?.lease || parent.owner_ref !== context.owner_ref || parent.lease.lease_id !== leaseId) return { result: false };
+		if (PARENT_RESEARCH_WORKFLOW) await mutateParentResearchRoundLedger(cwd, context.run_id, ledger => ledger.releaseUndispatchedChild(context.owner_ref), ["active", "paused", "awaiting_extension", "blocked"]);
 		const items = previous.items.map((item) => {
 			if (item.id !== parent.id) return item;
 			const next = { ...item };
@@ -2344,7 +2353,7 @@ async function mergeResearchRoundChildResult(cwd: string, context: PlanContextV1
 			return { merged: ledger.mergeChildReport(childReport).merged };
 		};
 		const result = PARENT_RESEARCH_WORKFLOW
-			? await mutateParentResearchRoundLedger(cwd, context.run_id, mergeReducer)
+			? await mutateParentResearchRoundLedger(cwd, context.run_id, mergeReducer, ["active", "paused", "awaiting_extension", "blocked"])
 			: await mutateResearchRoundLedger(researchRoundPath(cwd, context.run_id, process.env), mergeReducer);
 		if (!result.merged) return;
 	} catch (error) {

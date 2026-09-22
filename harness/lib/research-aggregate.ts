@@ -31,7 +31,6 @@ const RUN = /^[A-Za-z0-9._:-]{1,200}$/;
 const PHASES = new Set<ResearchAggregatePhase>(["active", "paused", "awaiting_extension", "blocked", "settled"]);
 const LOCK_TIMEOUT_MS = 10_000;
 const LOCK_RETRY_MS = 20;
-const LOCK_STALE_MS = 60_000;
 export const RESEARCH_TOTAL_MS = 10 * 60_000;
 export const RESEARCH_DISCOVERY_MS = 7 * 60_000;
 
@@ -152,7 +151,8 @@ async function acquire(path: string): Promise<Lock> {
 			try {
 				const owner = JSON.parse(await readFile(lockPath, "utf8")) as { pid?: unknown; created_at?: unknown };
 				if (typeof owner.pid === "number") { try { process.kill(owner.pid, 0); } catch (probe) { stale = (probe as NodeJS.ErrnoException).code !== "EPERM"; } }
-				if (!stale && typeof owner.created_at === "string") stale = Date.now() - Date.parse(owner.created_at) > LOCK_STALE_MS;
+				// A live writer owns its lock regardless of age. Stealing it after a
+				// slow filesystem operation would permit two concurrent commits.
 			} catch { /* age below decides whether malformed lock is recoverable */ }
 			if (stale) { await unlink(lockPath).catch(() => undefined); continue; }
 			await new Promise((resolve) => setTimeout(resolve, LOCK_RETRY_MS));
