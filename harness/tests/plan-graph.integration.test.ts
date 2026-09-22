@@ -25,7 +25,7 @@ if (!CHILD) {
 	const output = execFileSync(process.execPath, [
 				"--experimental-strip-types", "--experimental-loader", resolve("harness/tests/ts-js-resolver.mjs"), "--test", import.meta.filename,
 			], { cwd: process.cwd(), env, encoding: "utf8", stdio: "pipe", timeout: 120_000, killSignal: "SIGKILL" });
-			assert.match(output, /pass 69/);
+			assert.match(output, /pass 70/);
 		} finally { rmSync(artifacts, { recursive: true, force: true }); }
 	});
 } else {
@@ -102,15 +102,24 @@ if (!CHILD) {
 				{ card_id: "a".repeat(32), original_url: "https://example.test/source", content_sha256: "c".repeat(64), claim_ids: [claim], truncated: false, parent_validated: true, retrieval_method: "ketch" },
 				{ card_id: "b".repeat(32), original_url: "https://example.test/independent", content_sha256: "d".repeat(64), claim_ids: [claim], truncated: false, parent_validated: true, retrieval_method: "ketch" },
 			], conflicts: [], gaps: [], proposed_next_action: "synthesize" }, cwd);
-			const firstAttempt = await callTool(fp, "research_finish", { run_id: state.run_id, summary: "verified", final_answer: "The claim is supported by https://example.test/source and https://example.test/independent." }, cwd);
-			assert.equal(firstAttempt.isError, true, "missing parent validation must fail after the ledger boundary without corrupting it");
-			(globalThis as Record<string, unknown>).__pi_plan_validation_urls = ["https://example.test/source", "https://example.test/independent"];
+			const aggregatePath = researchAggregatePath(cwd, state.run_id, process.env);
+			const beforeFinish = await readResearchAggregate(aggregatePath);
+			const firstAttempt = await callTool(fp, "research_finish", { run_id: state.run_id, summary: "verified", final_answer: "Unsupported citation https://unverified.example/source" }, cwd);
+			assert.equal(firstAttempt.isError, true, "invalid final citation must reject the entire finish transaction");
+			assert.deepEqual(await readResearchAggregate(aggregatePath), beforeFinish, "graph, ledger, budget and lifecycle roll back together");
+			delete (globalThis as Record<string, unknown>)[RESEARCH_EVIDENCE_CARDS_KEY];
+			unlinkSync(join(cwd, ".pi", "plan-state.json"));
+			unlinkSync(researchRoundPath(cwd, state.run_id, process.env));
 			const result = await callTool(fp, "research_finish", { run_id: state.run_id, summary: "verified", final_answer: "The claim is supported by https://example.test/source and https://example.test/independent." }, cwd);
 			assert.equal(result.isError, false, result.content.map((block: any) => block?.text ?? "").join("\n"));
 			assert.equal(result.terminate, true);
 			assert.match(result.content.map((block: any) => block?.text ?? "").join("\n"), /Final answer:/);
 			const settled = JSON.parse(readFileSync(join(cwd, ".pi", "plan-state.json"), "utf8"));
 			assert.equal(typeof settled.settled_at, "string");
+			assert.equal((await readResearchAggregate(aggregatePath))!.revision, beforeFinish!.revision + 1, "finish is exactly one authoritative commit");
+			const replay = await callTool(fp, "research_finish", { run_id: state.run_id, summary: "verified", final_answer: settled.final_answer }, cwd);
+			assert.equal(replay.isError, false, "a lost terminal response can be retrieved without resettling");
+			assert.equal((await readResearchAggregate(aggregatePath))!.revision, beforeFinish!.revision + 1);
 		} finally {
 			if (previous === undefined) delete process.env.RESEARCH_WORKFLOW; else process.env.RESEARCH_WORKFLOW = previous;
 			resetPiGlobals();
@@ -235,6 +244,32 @@ if (!CHILD) {
 			const itemId = started.details.contexts[0].parent_item_id;
 			await expectToolError(fp, "plan_update", { deltas: [{ item_id: itemId, note: "must not continue after expiry" }] }, cwd, /awaiting_extension|extension/i);
 			assert.equal((await readResearchAggregate(aggregatePath))?.phase, "awaiting_extension");
+		} finally {
+			if (previous === undefined) delete process.env.RESEARCH_WORKFLOW; else process.env.RESEARCH_WORKFLOW = previous;
+			resetPiGlobals();
+		}
+	});
+
+	test("the ten-minute watchdog aborts a hung turn and durably pauses the run", async () => {
+		const previous = process.env.RESEARCH_WORKFLOW;
+		process.env.RESEARCH_WORKFLOW = "parent";
+		try {
+			const fp = makeFakePi(); const cwd = tmp();
+			for (const name of ["read", "bash", "edit", "write", "capability", "plan_write", "plan_update", "plan_expand", "plan_settle", "research_plan_start", "research_round", "web_search", "web_read", "research_note", "research_recall", "subagent"]) fp.pi.registerTool({ name, parameters: {} } as any);
+			const module = await import(`../extensions/plan-runner.ts?aggregate-watchdog=${Date.now()}-${Math.random()}`);
+			module.default(fp.pi as any);
+			const started = await callTool(fp, "research_plan_start", { request: "Hung provider", summary: "one branch", branches: [{ title: "Evidence", budget: { searches: 1, reads: 1 } }] }, cwd);
+			const runId = started.details.contexts[0].run_id;
+			const aggregatePath = researchAggregatePath(cwd, runId, process.env);
+			const aggregateModule = await import("../lib/research-aggregate.ts");
+			await aggregateModule.mutateResearchAggregate(aggregatePath, (current: any) => ({ state: aggregateModule.transitionAggregate(current, { deadline: aggregateModule.deadlineFor(Date.now() - 11 * 60_000) }), result: undefined }));
+			const made = makeCtx(cwd); let aborted = 0;
+			(made.ctx as any).abort = () => { aborted += 1; };
+			await fire(fp, "before_agent_start", {}, made.ctx);
+			for (let attempt = 0; attempt < 50 && aborted === 0; attempt++) await new Promise(resolve => setTimeout(resolve, 20));
+			assert.equal(aborted, 1);
+			assert.equal((await readResearchAggregate(aggregatePath))?.phase, "awaiting_extension");
+			assert.match(made.notes.join("\n"), /ten-minute limit.*paused/i);
 		} finally {
 			if (previous === undefined) delete process.env.RESEARCH_WORKFLOW; else process.env.RESEARCH_WORKFLOW = previous;
 			resetPiGlobals();

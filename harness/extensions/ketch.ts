@@ -36,7 +36,7 @@ import { goalsEnabled, readCurrentGoal } from "../lib/goal-state.ts";
 import { createHash } from "node:crypto";
 import { reserveContextOutput } from "../lib/context-accounting.ts";
 import { deadlinePhase, mutateResearchAggregate, readResearchAggregate, researchAggregatePath, transitionAggregate } from "../lib/research-aggregate.ts";
-import { authorizeResearchOperation, evidenceCardRef, mutateParentResearchRoundLedger, recordAuthorizedReadRound, recordAuthorizedSearchReceipt, searchReceiptId, type ResearchRoundLedgerStateV1, type ResearchRoundProposalV1 } from "../lib/research-round.ts";
+import { authorizeResearchOperation, canonicalReadRequest, evidenceCardRef, mutateParentResearchRoundLedger, recordAuthorizedReadRound, recordAuthorizedSearchReceipt, searchReceiptId, type ResearchRoundLedgerStateV1, type ResearchRoundProposalV1 } from "../lib/research-round.ts";
 
 // Ketch is the host-side network adapter for local models. The steady-state
 // surface is deliberately only FIND + READ; deep orchestration lives in the
@@ -294,7 +294,7 @@ export function registerKetch(pi: ExtensionAPI, dependencies: KetchDependencies 
 	 * against whatever the global run context happens to be when the adapter
 	 * returns.
 	 */
-	type ResearchAuthorization = { runId: string; cwd: string };
+	type ResearchAuthorization = { runId: string; cwd: string; opId?: string; completed?: boolean };
 	function researchAuthorization(): ResearchAuthorization | null {
 		if (!PARENT_RESEARCH_WORKFLOW) return null;
 		const active = (globalThis as Record<string, unknown>).__pi_active_plan_context as { profile?: unknown; run_id?: unknown; settled?: unknown } | undefined;
@@ -370,12 +370,13 @@ export function registerKetch(pi: ExtensionAPI, dependencies: KetchDependencies 
 		});
 		if (!reads.length) return;
 		const receiptIdentity = JSON.stringify({ run_id: runId, reads });
-		const roundId = `auto-read-${createHash("sha256").update(receiptIdentity, "utf8").digest("hex").slice(0, 48)}`;
+		const roundId = auth.opId ?? `auto-read-${createHash("sha256").update(receiptIdentity, "utf8").digest("hex").slice(0, 48)}`;
 		try {
 			await recordAuthorizedReadRound(cwd, runId, {
 				schema: "pi.research-round/v1", run_id: runId, round_id: roundId,
 				selected_gaps: [], queries: [], source_leads: [], reads, evidence_cards: [], conflicts: [], gaps: [], proposed_next_action: "read",
-			});
+			}, auth.opId);
+			auth.completed = true;
 		} catch {
 			// A transient aggregate-lock contention or a lifecycle the receipt
 			// gate refuses never turns a successful web read into a tool failure;
@@ -396,12 +397,13 @@ export function registerKetch(pi: ExtensionAPI, dependencies: KetchDependencies 
 		if (!auth) return;
 		const { runId, cwd } = auth;
 		const urls = [...new Set(resultUrls.flatMap((raw) => { try { return [canonicalResearchUrl(raw)]; } catch { return []; } }))].slice(0, 8);
-		const receiptId = searchReceiptId({ run_id: runId, query });
+		const receiptId = auth.opId ?? searchReceiptId({ run_id: runId, query });
 		try {
 			await recordAuthorizedSearchReceipt(cwd, runId, {
 				receipt_id: receiptId, query, mode, backends: [...new Set(backends)].slice(0, 8), result_urls: urls,
 				result_count: urls.length, truncated, outcome, created_at: new Date(started).toISOString(),
-			});
+			}, auth.opId);
+			auth.completed = true;
 		} catch {
 			// A transient aggregate-lock contention or a lifecycle the receipt
 			// gate refuses never turns a valid search response into a tool
@@ -647,12 +649,13 @@ export function registerKetch(pi: ExtensionAPI, dependencies: KetchDependencies 
 				// retrieval — unaccounted work is worse than a refused one.
 				if (auth) {
 					try {
-						await authorizeResearchOperation(auth.cwd, auth.runId, "search", toolCallId, queryKey);
+						auth.opId = (await authorizeResearchOperation(auth.cwd, auth.runId, "search", toolCallId, queryKey)).op_id;
 					} catch {
 						record("ketch", "search", { mode, backends: [], attempts: 0, results: 0, chars: 0, duration_ms: Date.now() - started, truncated: false, outcome: "authorization_unavailable" });
 						return text("Research state could not be updated to authorize this search. Preserve the supported findings and stop before searching again.", { outcome: "authorization_unavailable", coverage: coverageReceipt(0, undefined, false, true) });
 					}
 				}
+				try {
 				const versionError = await checkVersion();
 				if (versionError) {
 					record("ketch", "search", { mode, backends: [], attempts: 0, results: 0, chars: 0, duration_ms: Date.now() - started, truncated: false, outcome: "precondition" });
@@ -726,6 +729,7 @@ export function registerKetch(pi: ExtensionAPI, dependencies: KetchDependencies 
 					await recordParentSearchReceipt(auth, toolCallId, started, params.query, mode, [successful.backend], [], successful.result.truncated, "failed");
 					return text("Ketch returned malformed search data; treat this lookup as failed.", { outcome: "invalid_json", coverage: coverageReceipt(0, undefined, successful.result.truncated, true) });
 				}
+				} finally { if (auth?.opId && !auth.completed) { await recordParentSearchReceipt(auth, toolCallId, started, params.query, mode, [], [], false, "failed"); } }
 			},
 		}),
 	);
@@ -796,13 +800,14 @@ export function registerKetch(pi: ExtensionAPI, dependencies: KetchDependencies 
 					const authorizedUrls = params.urls.flatMap((rawUrl) => { try { return [canonicalResearchUrl(rawUrl)]; } catch { return []; } });
 					if (authorizedUrls.length > 0) {
 						try {
-							await authorizeResearchOperation(auth.cwd, auth.runId, "read", toolCallId, authorizedUrls.join(","));
+							auth.opId = (await authorizeResearchOperation(auth.cwd, auth.runId, "read", toolCallId, canonicalReadRequest(authorizedUrls))).op_id;
 						} catch {
 							record("ketch", "read", { reader, sources: params.urls.length, succeeded: 0, failed: params.urls.length, chars: 0, duration_ms: Date.now() - started, truncated: false, outcome: "authorization_unavailable" });
 							return text("Research state could not be updated to authorize this read. Preserve the supported findings and stop before reading again.", { reader, outcome: "authorization_unavailable", coverage: coverageReceipt(0, params.urls.length, false, true) });
 						}
 					}
 				}
+				try {
 				const versionError = await checkVersion();
 				if (versionError) {
 					record("ketch", "read", { reader, sources: params.urls.length, succeeded: 0, failed: params.urls.length, chars: 0, duration_ms: Date.now() - started, truncated: false, outcome: "precondition" });
@@ -898,6 +903,7 @@ export function registerKetch(pi: ExtensionAPI, dependencies: KetchDependencies 
 					record("ketch", "read", { reader, sources: params.urls.length, succeeded: 0, failed: params.urls.length, chars: 0, duration_ms: Date.now() - started, truncated: result.truncated, outcome: "invalid_json" });
 					return text("Ketch returned malformed page data; treat these sources as unread.", { reader, outcome: "invalid_json", coverage: coverageReceipt(0, params.urls.length, result.truncated, true) });
 				}
+				} finally { if (auth?.opId && !auth.completed) { await recordParentReadReceipt(auth, params.urls, [], false, reader); } }
 			},
 		}),
 	);

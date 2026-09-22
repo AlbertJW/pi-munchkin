@@ -79,6 +79,7 @@ export type GraphPlanState = {
 	research_round_contract?: "legacy" | "v1";
 	head_terminal_at?: string;
 	settled_at?: string;
+	final_answer?: string;
 	writer?: string;
 };
 
@@ -218,7 +219,7 @@ export function descendantCount(items: GraphPlanItem[], itemId: string): number 
 	return count;
 }
 
-const GRAPH_STATE_FIELDS = new Set(["schema_version", "run_id", "request", "summary", "autonomy", "phase", "created_at", "updated_at", "items", "profile", "research_round_contract", "head_terminal_at", "settled_at", "writer"]);
+const GRAPH_STATE_FIELDS = new Set(["schema_version", "run_id", "request", "summary", "autonomy", "phase", "created_at", "updated_at", "items", "profile", "research_round_contract", "head_terminal_at", "settled_at", "final_answer", "writer"]);
 const GRAPH_ITEM_FIELDS = new Set(["id", "title", "note", "status", "parent_id", "kind", "owner_ref", "budget", "evidence_gaps", "source_leads", "claim_ids", "coverage", "defer", "lease", "dispatch_epoch"]);
 const GRAPH_PROFILE_FIELDS = new Set(["name", "max_depth", "max_children", "discovery_budget", "validation_reads"]);
 
@@ -249,6 +250,7 @@ export function validateGraph(state: GraphPlanState): string[] {
 	if (!validTimestamp(state.created_at)) errors.push("invalid graph created_at");
 	if (!validTimestamp(state.updated_at)) errors.push("invalid graph updated_at");
 	if (state.settled_at !== undefined && !validTimestamp(state.settled_at)) errors.push("invalid graph settled_at");
+	if (state.final_answer !== undefined && (typeof state.final_answer !== "string" || !state.settled_at || Buffer.byteLength(state.final_answer, "utf8") > 16_000)) errors.push("invalid persisted final answer");
 	if (state.head_terminal_at !== undefined && !validTimestamp(state.head_terminal_at)) errors.push("invalid graph head_terminal_at");
 	if (state.writer !== undefined && !validStateText(state.writer, 96)) errors.push("invalid graph writer");
 	if (!Array.isArray(state.items) || state.items.length < 1 || state.items.length > PLAN_GRAPH_MAX_NODES) {

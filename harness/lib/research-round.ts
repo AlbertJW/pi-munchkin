@@ -111,7 +111,7 @@ export type SearchReceiptV1 = {
 };
 /** Durable, bounded authorization for one parent retrieval operation,
  * persisted in the ledger at dispatch. The op identity is derived from the
- * run and the request only — never from result content — so a completion can
+ * run, operation kind and tool call identity — never result content — so a completion can
  * be validated against the operation that was actually dispatched, after any
  * lifecycle change and across process restarts. */
 export type OperationAuthorizationV1 = {
@@ -121,7 +121,22 @@ export type OperationAuthorizationV1 = {
 	request: string;
 	authorized_at: string;
 	completed_at?: string;
+	reservation?: ResearchBudgetEnvelope;
+	outcome_digest?: string;
+	owner_pid?: number;
 };
+
+export function canonicalReadRequest(urls: readonly string[]): string {
+	return JSON.stringify([...new Set(urls.map(canonicalResearchUrl))].sort());
+}
+function readRequestUrls(request: string): string[] {
+	const value = request.startsWith("[") ? JSON.parse(request) : [request];
+	if (!Array.isArray(value) || !value.length || value.length > 8 || value.some(url => typeof url !== "string")) throw new ResearchRoundError("invalid read request");
+	return JSON.parse(canonicalReadRequest(value));
+}
+function operationReservation(op: OperationAuthorizationV1): ResearchBudgetEnvelope {
+	return op.reservation ?? (op.kind === "search" ? { searches: 1, reads: 0, validation_reads: 0 } : { searches: 0, reads: 1, validation_reads: 0 });
+}
 
 /** Operational read accounting for an authorized read that completes after
  * settlement: terminal evidence (rounds, cards, gaps) stays immutable, and
@@ -365,15 +380,24 @@ function validateSearchReceipt(value: unknown, name: string): SearchReceiptV1 {
 function validateOperationAuthorization(value: unknown, name: string): OperationAuthorizationV1 {
 	if (!value || typeof value !== "object" || Array.isArray(value)) throw new ResearchRoundError(`${name} is invalid`);
 	const item = value as Record<string, unknown>;
-	const fields = ["op_id", "kind", "tool_call_id", "request", "authorized_at", "completed_at"];
-	if (Object.keys(item).length > fields.length || fields.slice(0, 5).some((field) => !(field in item))) throw new ResearchRoundError(`${name} has unknown or missing fields`);
+	const fields = ["op_id", "kind", "tool_call_id", "request", "authorized_at", "completed_at", "reservation", "outcome_digest", "owner_pid"];
+	if (Object.keys(item).some(key => !fields.includes(key)) || fields.slice(0, 5).some((field) => !(field in item))) throw new ResearchRoundError(`${name} has unknown or missing fields`);
 	const opId = id(item.op_id, `${name}.op_id`);
 	if (item.kind !== "search" && item.kind !== "read") throw new ResearchRoundError(`${name}.kind is invalid`);
 	const toolCallId = text(item.tool_call_id, 128);
-	const request = text(item.request, 500);
+	const request = text(item.request, 20_000);
 	if (!validTimestamp(item.authorized_at) || (item.completed_at !== undefined && !validTimestamp(item.completed_at))) throw new ResearchRoundError(`${name} timestamps are invalid`);
 	const authorization: OperationAuthorizationV1 = { op_id: opId, kind: item.kind, tool_call_id: toolCallId, request, authorized_at: item.authorized_at as string };
 	if (item.completed_at !== undefined) authorization.completed_at = item.completed_at as string;
+	if (item.owner_pid !== undefined) {
+		if (!Number.isSafeInteger(item.owner_pid) || Number(item.owner_pid) <= 0) throw new ResearchRoundError("invalid operation owner");
+		authorization.owner_pid = Number(item.owner_pid);
+	}
+	if (item.reservation !== undefined) authorization.reservation = envelope(item.reservation, `${name}.reservation`);
+	if (item.outcome_digest !== undefined) {
+		if (!SHA256.test(String(item.outcome_digest))) throw new ResearchRoundError("invalid outcome digest");
+		authorization.outcome_digest = String(item.outcome_digest);
+	}
 	return authorization;
 }
 
@@ -388,7 +412,7 @@ function validateReadOutcomeReceipt(value: unknown, name: string): ReadOutcomeRe
 	if (item.phase !== "discovery" && item.phase !== "parent_validation") throw new ResearchRoundError(`${name}.phase is invalid`);
 	if (item.method !== "ketch" && item.method !== "jina") throw new ResearchRoundError(`${name}.method is invalid`);
 	if (!["completed", "failed", "truncated", "blocked"].includes(String(item.outcome))) throw new ResearchRoundError(`${name}.outcome is invalid`);
-	if (typeof item.truncated !== "boolean" || !Number.isSafeInteger(item.charged) || (item.charged as number) < 1 || (item.charged as number) > 8) throw new ResearchRoundError(`${name} charge is invalid`);
+	if (typeof item.truncated !== "boolean" || !Number.isSafeInteger(item.charged) || (item.charged as number) < 0 || (item.charged as number) > 8) throw new ResearchRoundError(`${name} charge is invalid`);
 	if (!validTimestamp(item.created_at)) throw new ResearchRoundError(`${name}.created_at is invalid`);
 	return { receipt_id: receiptId, urls, phase: item.phase, method: item.method, outcome: item.outcome as ReadOutcomeReceiptV1["outcome"], truncated: item.truncated, charged: item.charged as number, created_at: item.created_at as string };
 }
@@ -628,8 +652,8 @@ export class ResearchRoundLedger {
 	 * result metadata into a later research_round proposal. This transition is
 	 * idempotent by receipt ID and conserves the same global search envelope used
 	 * by model-authored query proposals. */
-	recordSearchReceipt(input: Omit<SearchReceiptV1, "charged">): SearchReceiptV1 {
-		if (this.current.status === "settled") throw new ResearchRoundError("research round ledger is settled and immutable");
+	recordSearchReceipt(input: Omit<SearchReceiptV1, "charged">, authorized = false): SearchReceiptV1 {
+		if (this.current.status === "settled" && !authorized) throw new ResearchRoundError("research round ledger is settled and immutable");
 		const parsed = validateSearchReceipt({ ...input, charged: false }, "search receipt");
 		const receipts = this.current.search_receipts ?? [];
 		const prior = receipts.find((receipt) => receipt.receipt_id === parsed.receipt_id);
@@ -647,7 +671,7 @@ export class ResearchRoundLedger {
 		const charged = !alreadyReserved;
 		if (charged) working.budget.consumed.searches += 1;
 		if (!working.reserved_queries.includes(normalized)) working.reserved_queries.push(normalized);
-		for (const url of parsed.result_urls) if (!working.reserved_discovery_urls.includes(url)) working.reserved_discovery_urls.push(url);
+		if (working.status !== "settled") for (const url of parsed.result_urls) if (!working.reserved_discovery_urls.includes(url)) working.reserved_discovery_urls.push(url);
 		const receipt = { ...parsed, charged };
 		working.search_receipts.push(receipt);
 		this.current = working;
@@ -663,8 +687,8 @@ export class ResearchRoundLedger {
 		// Reads carry case-sensitive URLs (path/query select distinct resources),
 		// so their request is trimmed but never lowercased. Search queries are
 		// case-insensitive for identity and stay lowercased.
-		const normalized = kind === "read" ? request.replace(/\s+/g, " ").trim() : request.replace(/\s+/g, " ").trim().toLocaleLowerCase();
-		if (!normalized || normalized.length > 500) throw new ResearchRoundError("operation request is invalid");
+		const normalized = kind === "read" ? canonicalReadRequest(readRequestUrls(request)) : request.replace(/\s+/g, " ").trim().toLocaleLowerCase();
+		if (!normalized || normalized.length > (kind === "read" ? 20_000 : 500)) throw new ResearchRoundError("operation request is invalid");
 		const opId = `op-${kind}-${createHash("sha256").update(`${this.current.run_id}:${kind}:${text(toolCallId, 128)}`, "utf8").digest("hex").slice(0, 48)}`;
 		const existing = (this.current.operation_authorizations ?? []).find((item) => item.op_id === opId);
 		if (existing) {
@@ -676,13 +700,14 @@ export class ResearchRoundLedger {
 		// process-local counter), so two concurrent authorizations cannot both
 		// fit in a single unit. The reservation is released when the operation's
 		// outcome is recorded, so each unit is charged at most once.
-		const unit: ResearchBudgetEnvelope = kind === "search" ? { searches: 1, reads: 0, validation_reads: 0 } : { searches: 0, reads: 1, validation_reads: 0 };
+		const readCost = kind === "read" ? readRequestUrls(normalized).filter(url => !this.current.rounds.some(round => round.reads.some(read => read.url === url && read.phase === "discovery" && read.disposition === "accepted")) && !(this.current.read_receipts ?? []).some(receipt => receipt.urls.includes(url))).length : 0;
+		const unit: ResearchBudgetEnvelope = kind === "search" ? { searches: this.current.reserved_queries.includes(normalized) ? 0 : 1, reads: 0, validation_reads: 0 } : { searches: 0, reads: readCost, validation_reads: 0 };
 		if (!within(add(this.current.budget.consumed, add(this.current.budget.reserved, unit)), this.current.budget.allocated)) throw new ResearchRoundError("research budget exhausted");
 		const working = clone(this.current);
 		working.budget = { allocated: working.budget.allocated, consumed: working.budget.consumed, reserved: add(working.budget.reserved, unit) };
 		const authorizations = [...(working.operation_authorizations ?? [])];
 		if (authorizations.length >= RESEARCH_ROUND_MAX_OPERATIONS) throw new ResearchRoundError("operation authorization capacity reached");
-		const authorization: OperationAuthorizationV1 = { op_id: opId, kind, tool_call_id: text(toolCallId, 128), request: normalized, authorized_at: now() };
+		const authorization: OperationAuthorizationV1 = { op_id: opId, kind, tool_call_id: text(toolCallId, 128), request: normalized, authorized_at: now(), reservation: unit, owner_pid: process.pid };
 		authorizations.push(authorization);
 		working.operation_authorizations = authorizations;
 		this.current = working;
@@ -701,13 +726,58 @@ export class ResearchRoundLedger {
 		working.operation_authorizations[index] = { ...working.operation_authorizations[index], completed_at: text(at, 64) };
 		this.current = working;
 	}
+	completeAuthorizedOperation(opId: string | undefined, kind: "search" | "read", request: string, outcome: unknown, apply: (op: OperationAuthorizationV1) => void): void {
+		const candidates = (this.current.operation_authorizations ?? []).filter(op => op.kind === kind && op.request === request && (!opId || op.op_id === opId));
+		if (candidates.length !== 1) throw new ResearchRoundError("missing or ambiguous operation authorization");
+		const op = candidates[0], outcomeDigest = digest(outcome);
+		if (op.completed_at) {
+			if (op.outcome_digest !== outcomeDigest) throw new ResearchRoundError("operation outcome conflicts with prior content");
+			return;
+		}
+		const before = clone(this.current);
+		try {
+			this.releaseOperationReservation(op.op_id);
+			apply(op);
+			this.completeOperation(op.op_id, now());
+			this.current.operation_authorizations!.find(item => item.op_id === op.op_id)!.outcome_digest = outcomeDigest;
+		} catch (error) { this.current = before; throw error; }
+	}
+
+	/** A dead dispatcher cannot prove whether the provider spent the allowance.
+	 * Charge it once as failed operational work, accepting no evidence. */
+	recoverAbandonedOperations(alive: (pid: number) => boolean): number {
+		let recovered = 0;
+		for (const op of this.current.operation_authorizations ?? []) {
+			// Ownerless entries were written by the previous schema and can only be
+			// encountered after loading durable state, so conservatively recover them.
+			if (op.completed_at || (op.owner_pid !== undefined && alive(op.owner_pid))) continue;
+			this.completeAuthorizedOperation(op.op_id, op.kind, op.request, { recovery: "dispatcher-exited", op_id: op.op_id }, () => {
+				if (op.kind === "search") this.recordSearchReceipt({ receipt_id: op.op_id, query: op.request, mode: "quick", backends: [], result_urls: [], result_count: 0, truncated: false, outcome: "failed", created_at: now() }, true);
+				else {
+					const charged = operationReservation(op).reads;
+					this.current.read_receipts = [...(this.current.read_receipts ?? []), { receipt_id: op.op_id, urls: readRequestUrls(op.request), phase: "discovery", method: "ketch", outcome: "failed", truncated: false, charged, created_at: now() }];
+					this.current.budget.consumed.reads += charged;
+				}
+			});
+			recovered++;
+		}
+		return recovered;
+	}
+
+	recordTerminalRead(op: OperationAuthorizationV1, proposal: ResearchRoundProposalV1): void {
+		const urls = readRequestUrls(op.request);
+		const charged = operationReservation(op).reads;
+		this.current.read_receipts = [...(this.current.read_receipts ?? []), { receipt_id: op.op_id, urls, phase: "discovery", method: proposal.reads[0].method, outcome: proposal.reads.every(read => read.outcome === "completed") ? "completed" : "failed", truncated: proposal.reads.some(read => read.truncated), charged, created_at: now() }];
+		this.current.budget.consumed.reads += charged;
+	}
+
 	/** Release the budget unit reserved for an authorized operation when its
 	 * outcome is recorded. Idempotent: an unknown or already-completed
 	 * operation releases nothing, so a replay cannot underflow the envelope. */
 	releaseOperationReservation(opId: string): void {
 		const authorization = (this.current.operation_authorizations ?? []).find((item) => item.op_id === opId);
 		if (!authorization || authorization.completed_at !== undefined) return;
-		const unit: ResearchBudgetEnvelope = authorization.kind === "search" ? { searches: 1, reads: 0, validation_reads: 0 } : { searches: 0, reads: 1, validation_reads: 0 };
+		const unit = operationReservation(authorization);
 		const working = clone(this.current);
 		working.budget = { allocated: working.budget.allocated, consumed: working.budget.consumed, reserved: subtract(working.budget.reserved, unit) };
 		this.current = working;
@@ -905,6 +975,7 @@ export class ResearchRoundLedger {
 		if (openRequired.length) reasons.push("required_claims_unresolved");
 		if (this.current.conflicts.some((conflict) => conflict.status === "open")) reasons.push("conflicting_sources_unresolved");
 		if (this.current.child_reservations.length) reasons.push("child_dispatch_in_flight");
+		if ((this.current.operation_authorizations ?? []).some(operation => !operation.completed_at)) reasons.push("retrieval_in_flight");
 		const deferrals = input.optional_deferrals ?? this.current.deferrals;
 		for (const claimId of openOptional) {
 			const item = deferrals.find((entry) => entry.claim_id === claimId);
@@ -1022,7 +1093,7 @@ export function validateResearchRoundLedger(value: unknown): value is ResearchRo
 			operationIds.add(parsed.op_id);
 			// In-flight (authorized, not yet completed) operations hold their
 			// budget unit in budget.reserved until their outcome is recorded.
-			if (parsed.completed_at === undefined) operationUsage = add(operationUsage, parsed.kind === "search" ? { searches: 1, reads: 0, validation_reads: 0 } : { searches: 0, reads: 1, validation_reads: 0 });
+			if (parsed.completed_at === undefined) operationUsage = add(operationUsage, operationReservation(parsed));
 		}
 		const readReceipts = item.read_receipts === undefined ? [] : item.read_receipts;
 		validateLedgerArray(readReceipts, "ledger read receipts", RESEARCH_ROUND_MAX_OPERATIONS);
@@ -1052,7 +1123,7 @@ export function validateResearchRoundLedger(value: unknown): value is ResearchRo
 			if (!SHA256.test(String(row.digest)) || !validTimestamp(row.merged_at)) throw new ResearchRoundError("child receipt identity is invalid");
 			const charged = envelope(row.charged, "child receipt charged"); childUsage = add(childUsage, charged);
 		}
-		if (!equal(budget.consumed as ResearchBudgetEnvelope, add(add(roundUsage, childUsage), { searches: searchReceiptUsage, reads: 0, validation_reads: 0 }))) throw new ResearchRoundError("ledger budget consumption does not match its rounds, search receipts and child reports");
+		if (!equal(budget.consumed as ResearchBudgetEnvelope, add(add(roundUsage, childUsage), { searches: searchReceiptUsage, reads: (readReceipts as ReadOutcomeReceiptV1[]).reduce((n, r) => n + r.charged, 0), validation_reads: 0 }))) throw new ResearchRoundError("ledger budget consumption does not match its rounds, search receipts and child reports");
 		if (!equal(budget.reserved as ResearchBudgetEnvelope, add(reservedUsage, operationUsage))) throw new ResearchRoundError("ledger budget reservations do not match child and operation reservations");
 		validateLedgerArray(item.deferrals, "ledger deferrals", RESEARCH_ROUND_MAX_OBLIGATIONS);
 		const deferredClaims = new Set<string>();
@@ -1223,7 +1294,6 @@ export async function mutateParentResearchRoundLedger<T>(
 ): Promise<T> {
 	const aggregatePath = researchAggregatePath(cwd, runId, process.env);
 	const ledgerPath = researchRoundPath(cwd, runId, process.env);
-	let committed: ResearchRoundLedgerStateV1 | null = null;
 	return mutateResearchAggregate(aggregatePath, async (aggregate) => {
 		// Identity first: the aggregate at this path must own the requested run,
 		// and its evidence round must agree with its own run identity. Both are
@@ -1252,7 +1322,6 @@ export async function mutateParentResearchRoundLedger<T>(
 		if (digest(state) === before) return { state: null, result };
 		if (!validateResearchRoundLedger(state)) throw new ResearchRoundError("research round transition produced an invalid ledger");
 		if (state.run_id !== aggregate.run_id) throw new ResearchRoundError("research round transition preserved the wrong run identity");
-		committed = state;
 		// Settlement and blocking advance the aggregate; a paused/awaiting
 		// extension aggregate keeps its phase on an ordinary record.
 		const nextPhase: ResearchAggregatePhase =
@@ -1264,11 +1333,9 @@ export async function mutateParentResearchRoundLedger<T>(
 			state: transitionAggregate(aggregate, { evidence_round: state, budget: state.budget.consumed, phase: nextPhase }),
 			result,
 		};
-	}, async () => {
-		if (committed) {
-			try { await writeResearchRoundLedgerUnlocked(ledgerPath, committed); }
-			catch { /* committed aggregate is the authority; a stale compatibility view is rebuilt on the next parent transition */ }
-		}
+	}, async final => {
+		try { await writeResearchRoundLedgerUnlocked(ledgerPath, final.evidence_round as ResearchRoundLedgerStateV1); }
+		catch { /* committed aggregate is the authority; retry rebuilds the view even for a duplicate */ }
 	});
 }
 
@@ -1277,9 +1344,9 @@ export async function mutateParentResearchRoundLedger<T>(
  * recorded durably. The receipt is accounting for work that was authorized
  * before the lifecycle change (preflight passed, budget consumed, adapter
  * invoked), so it must survive the transition; recording it never reactivates
- * the run. A settled round is immutable and stays excluded.
+ * the run. Settled evidence stays immutable; operational receipts may complete.
  */
-export const RESEARCH_OUTCOME_RECEIPT_PHASES: readonly ResearchAggregatePhase[] = ["active", "paused", "awaiting_extension", "blocked"];
+export const RESEARCH_OUTCOME_RECEIPT_PHASES: readonly ResearchAggregatePhase[] = ["active", "paused", "awaiting_extension", "blocked", "settled"];
 
 /** Content-addressed receipt identity for a search outcome, derived from the
  * operation identity (run + normalized query) only — never from result
@@ -1308,29 +1375,26 @@ export async function authorizeResearchOperation(cwd: string, runId: string, kin
  * under the aggregate lock with the outcome-receipt phase gate, refused when
  * the operation was never authorized, idempotent by receipt ID, charged at
  * most once per query, and never reactivating the run. */
-export async function recordAuthorizedSearchReceipt(cwd: string, runId: string, input: Omit<SearchReceiptV1, "charged">): Promise<SearchReceiptV1> {
+export async function recordAuthorizedSearchReceipt(cwd: string, runId: string, input: Omit<SearchReceiptV1, "charged">, opId?: string): Promise<SearchReceiptV1> {
 	return mutateParentResearchRoundLedger(cwd, runId, (ledger) => {
 		const normalized = input.query.replace(/\s+/g, " ").trim().toLocaleLowerCase();
-		const authorization = (ledger.state.operation_authorizations ?? []).find((item) => item.kind === "search" && item.request === normalized);
-		if (!authorization) throw new ResearchRoundError("search receipt lacks a durable operation authorization");
-		ledger.releaseOperationReservation(authorization.op_id);
-		const receipt = ledger.recordSearchReceipt(input);
-		ledger.completeOperation(authorization.op_id, receipt.created_at);
-		return receipt;
+		const { created_at: _at, ...content } = input;
+		ledger.completeAuthorizedOperation(opId, "search", normalized, content, () => { ledger.recordSearchReceipt(input, true); });
+		return ledger.state.search_receipts!.find(receipt => receipt.receipt_id === input.receipt_id)!;
 	}, RESEARCH_OUTCOME_RECEIPT_PHASES);
 }
 
 /** Production accounting function for one authorized read outcome: the same
  * gate, authorization validation, and idempotence rules as the search
  * receipt. */
-export async function recordAuthorizedReadRound(cwd: string, runId: string, proposal: ResearchRoundProposalV1): Promise<ResearchRoundLedgerStateV1> {
+export async function recordAuthorizedReadRound(cwd: string, runId: string, proposal: ResearchRoundProposalV1, opId?: string): Promise<ResearchRoundLedgerStateV1> {
 	return mutateParentResearchRoundLedger(cwd, runId, (ledger) => {
-		const request = proposal.reads.map((read) => read.url).join(",");
-		const authorization = (ledger.state.operation_authorizations ?? []).find((item) => item.kind === "read" && item.request === request);
-		if (!authorization) throw new ResearchRoundError("read round lacks a durable operation authorization");
-		ledger.releaseOperationReservation(authorization.op_id);
-		ledger.recordRound(proposal);
-		ledger.completeOperation(authorization.op_id, new Date().toISOString());
+		if (proposal.run_id !== runId) throw new ResearchRoundError("read outcome run identity mismatch");
+		const request = canonicalReadRequest(proposal.reads.map(read => read.url));
+		ledger.completeAuthorizedOperation(opId, "read", request, proposal, op => {
+			if (ledger.state.status === "settled") ledger.recordTerminalRead(op, proposal);
+			else ledger.recordRound(proposal);
+		});
 		return ledger.state;
 	}, RESEARCH_OUTCOME_RECEIPT_PHASES);
 }

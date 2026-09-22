@@ -1,4 +1,5 @@
 import { createHash } from "node:crypto";
+import { AsyncLocalStorage } from "node:async_hooks";
 import { chmod, mkdir, open, readFile, unlink } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { atomicWriteFile } from "./private-artifact.ts";
@@ -61,6 +62,15 @@ export function deadlinePhase(state: ResearchAggregateState, now = Date.now()): 
 	if (!state.deadline) return "discovery";
 	if (now >= Date.parse(state.deadline.deadline_at)) return "expired";
 	return now >= Date.parse(state.deadline.discovery_deadline_at) ? "validation" : "discovery";
+}
+
+/** Recheck lifecycle under the writer lock: a stale timer cannot pause a
+ * settled run or an explicitly extended deadline. */
+export async function expireResearchDeadline(path: string, now = Date.now()): Promise<boolean> {
+	return mutateResearchAggregate(path, state => {
+		const expired = state.phase === "active" && deadlinePhase(state, now) === "expired";
+		return { state: expired ? transitionAggregate(state, { phase: "awaiting_extension" }, new Date(now).toISOString()) : null, result: expired };
+	});
 }
 
 function shiftIso(value: string, elapsedMs: number): string {
@@ -153,6 +163,8 @@ async function acquire(path: string): Promise<Lock> {
 async function release(lock: Lock): Promise<void> { try { const value = JSON.parse(await readFile(lock.path, "utf8")); if (value.id === lock.id) await unlink(lock.path); } catch { /* another owner recovered it */ } }
 
 export async function readResearchAggregate(path: string): Promise<ResearchAggregateState | null> {
+	const tx = transactions.getStore();
+	if (tx?.path === path) return structuredClone(tx.state);
 	try { const state: unknown = JSON.parse(await readFile(path, "utf8")); return validateResearchAggregate(state) ? structuredClone(state) : null; }
 	catch { return null; }
 }
@@ -160,24 +172,49 @@ export async function writeResearchAggregate(path: string, state: ResearchAggreg
 	if (!validateResearchAggregate(state)) throw new ResearchAggregateError("invalid-state", "refusing to write an invalid research aggregate");
 	await atomicWriteFile(path, `${JSON.stringify(state, null, 2)}\n`, { mode: 0o600, directoryMode: 0o700 });
 }
+type Transaction = { path: string; state: ResearchAggregateState; dirty: boolean; publishers: Array<(state: ResearchAggregateState) => Promise<void> | void> };
+const transactions = new AsyncLocalStorage<Transaction>();
+export function inResearchTransaction(path: string): boolean { return transactions.getStore()?.path === path; }
+
+/** Nested reducers share a draft. Only the outer transaction commits, and an
+ * exception discards every draft change and every pending compatibility write. */
 export async function mutateResearchAggregate<T>(path: string, fn: (state: ResearchAggregateState) => { state: ResearchAggregateState | null; result: T } | Promise<{ state: ResearchAggregateState | null; result: T }>, afterCommit?: (state: ResearchAggregateState) => Promise<void> | void): Promise<T> {
+	const reduce = async (tx: Transaction): Promise<T> => {
+		const before = structuredClone(tx.state);
+		const out = await fn(before);
+		if (out.state) {
+			if (!validateResearchAggregate(out.state) || out.state.run_id !== tx.state.run_id) throw new ResearchAggregateError("invalid-transition", "aggregate run identity must be preserved");
+			// A reducer may have invoked nested reducers; it must return their
+			// current draft, not overwrite it with a snapshot taken before them.
+			if (tx.state.revision !== before.revision && out.state.revision <= tx.state.revision) throw new ResearchAggregateError("stale-transition", "nested reducer returned stale aggregate state");
+			if (tx.state.revision === before.revision && out.state.revision !== before.revision + 1) throw new ResearchAggregateError("invalid-transition", "aggregate must increment revision exactly once");
+			tx.state = out.state; tx.dirty = true;
+		}
+		if (afterCommit) tx.publishers.push(afterCommit);
+		return out.result;
+	};
+	const active = transactions.getStore();
+	if (active?.path === path) {
+		const state = structuredClone(active.state), dirty = active.dirty, count = active.publishers.length;
+		try { return await reduce(active); }
+		catch (error) { active.state = state; active.dirty = dirty; active.publishers.length = count; throw error; }
+	}
 	const lock = await acquire(path);
 	try {
 		const current = await readResearchAggregate(path);
 		if (!current) throw new ResearchAggregateError("missing", "research aggregate is missing or malformed");
-		const out = await fn(structuredClone(current));
-		// A null state is an explicit no-op: the reducer left the aggregate
-		// unchanged, so no revision is minted and no compatibility view is
-		// republished. Idempotent duplicates must not burn a transition.
-		if (out.state === null) return out.result;
-		if (!validateResearchAggregate(out.state) || out.state.run_id !== current.run_id || out.state.revision !== current.revision + 1) throw new ResearchAggregateError("invalid-transition", "aggregate transition must increment revision exactly once and preserve run identity");
-		out.state.updated_at = new Date().toISOString();
-		await writeResearchAggregate(path, out.state);
-		// Post-commit publisher runs under the lock AFTER the aggregate is the
-		// durable authority. It publishes a derived compatibility view; its failure
-		// is the caller's concern, not a roll-back of the committed aggregate.
-		if (afterCommit) await afterCommit(out.state);
-		return out.result;
+		const tx: Transaction = { path, state: current, dirty: false, publishers: [] };
+		const result = await transactions.run(tx, () => reduce(tx));
+		if (tx.dirty) {
+			tx.state.revision = current.revision + 1;
+			tx.state.updated_at = new Date().toISOString();
+			await writeResearchAggregate(path, tx.state);
+		}
+		// The atomic bundle is a revision-bound, rebuildable pair. Legacy files
+		// can tear on interruption, but never become independent authority.
+		try { await atomicWriteFile(`${path}.views.json`, `${JSON.stringify({ revision: tx.state.revision, graph: tx.state.graph, evidence_round: tx.state.evidence_round })}\n`, { mode: 0o600, directoryMode: 0o700 }); } catch { /* rebuild on next transition */ }
+		for (const publish of tx.publishers) await publish(tx.state);
+		return result;
 	} finally { await release(lock); }
 }
 

@@ -3,7 +3,7 @@ import { currentCompactionOwner } from "../lib/compaction-coordinator.ts";
 import { chmod, mkdir, open, readFile, rename, stat, unlink } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { createHash, randomUUID } from "node:crypto";
-import { defineTool, withFileMutationQueue, type ExtensionAPI } from "@earendil-works/pi-coding-agent";
+import { defineTool, withFileMutationQueue, type ExtensionAPI, type ExtensionContext } from "@earendil-works/pi-coding-agent";
 import { Type } from "typebox";
 import { ACTIVE_TOOL_PROMPTS } from "../lib/active-tool-prompts.ts";
 import { BRANCH_REPORT_ENV, PLAN_CONTEXT_ENV, RESEARCH_COVERAGE_KEY, RESEARCH_RESERVED_BUDGET_KEY, RESEARCH_SCOUT_DISPATCHED_KEY, branchEvidenceYieldError, readPlanContext, validateBranchReport, validResearchCoverageObservation, writeBranchReport, type BranchReportV1, type PlanContextV1, type ResearchCoverageObservation } from "../lib/branch-report.ts";
@@ -30,7 +30,7 @@ import {
 	validateResearchRoundLedger, type ClaimObligationV1, type EvidenceGapV1, type EvidenceCardRefV1, type ResearchRoundProposalV1, type ChildResearchReportV1, type ResearchRoundLedgerStateV1,
 } from "../lib/research-round.ts";
 import {
-	deadlineFor, deadlinePhase, extendDeadline, migrateResearchPair, mutateResearchAggregate, readResearchAggregate, researchAggregatePath, transitionAggregate, writeResearchAggregate,
+	deadlineFor, deadlinePhase, expireResearchDeadline, extendDeadline, inResearchTransaction, migrateResearchPair, mutateResearchAggregate, readResearchAggregate, researchAggregatePath, transitionAggregate, writeResearchAggregate,
 	type ResearchAggregatePhase,
 } from "../lib/research-aggregate.ts";
 import { inspectResearchPage, renderCoverageDigest } from "../lib/research-view.ts";
@@ -127,6 +127,7 @@ type PlanState = {
 	research_round_contract?: GraphPlanState["research_round_contract"];
 	head_terminal_at?: string;
 	settled_at?: string;
+	final_answer?: string;
 	writer?: string;
 };
 
@@ -472,6 +473,7 @@ function migrateState(raw: any): PlanState | undefined {
 				: {}),
 		...(raw.schema_version === 5 && PLAN_GRAPH && typeof raw.head_terminal_at === "string" ? { head_terminal_at: raw.head_terminal_at } : {}),
 		...(raw.schema_version === 5 && PLAN_GRAPH && typeof raw.settled_at === "string" ? { settled_at: raw.settled_at } : {}),
+		...(typeof raw.final_answer === "string" ? { final_answer: raw.final_answer } : {}),
 		writer: typeof raw.writer === "string" ? raw.writer : undefined,
 	};
 	if (state.schema_version === 5 && !(state.phase === "planned" && state.items.length === 0) && validateGraph(state as GraphPlanState).length) return undefined;
@@ -479,6 +481,14 @@ function migrateState(raw: any): PlanState | undefined {
 }
 
 async function readState(cwd: string): Promise<PlanState | undefined> {
+	if (PARENT_RESEARCH_WORKFLOW) {
+		try {
+			const runId = JSON.parse(await readFile(`${researchAggregatePath(cwd, "current", process.env)}.pointer`, "utf8")).run_id;
+			const aggregate = await readResearchAggregate(researchAggregatePath(cwd, runId, process.env));
+			if (aggregate) return migrateState(aggregate.graph);
+			return undefined; // a bound but missing authority must not fall back
+		} catch (error) { if ((error as NodeJS.ErrnoException).code !== "ENOENT") return undefined; }
+	}
 	const path = statePath(cwd);
 	let rawState: any;
 	let persisted: PlanState | undefined;
@@ -518,6 +528,39 @@ async function readCompatibilityState(cwd: string): Promise<PlanState | undefine
 	try { return migrateState(JSON.parse(await readFile(path, "utf8"))); } catch { return undefined; }
 }
 
+let researchTimer: ReturnType<typeof setTimeout> | undefined;
+let researchTimerGeneration = 0;
+function stopResearchDeadline(): void {
+	researchTimerGeneration++;
+	if (researchTimer) clearTimeout(researchTimer);
+	researchTimer = undefined;
+}
+async function armResearchDeadline(ctx: ExtensionContext): Promise<void> {
+	if (!PARENT_RESEARCH_WORKFLOW || delegatedBranchProcess) return;
+	stopResearchDeadline();
+	const generation = researchTimerGeneration;
+	const graph = await readState(ctx.cwd);
+	if (!graph || graph.profile?.name !== "deep-research" || graph.settled_at) return;
+	const path = researchAggregatePath(ctx.cwd, graph.run_id, process.env);
+	const aggregate = await readResearchAggregate(path);
+	if (generation !== researchTimerGeneration || aggregate?.phase !== "active" || !aggregate.deadline) return;
+	const delay = Math.max(0, Date.parse(aggregate.deadline.deadline_at) - Date.now());
+	if (!Number.isFinite(delay)) return;
+	researchTimer = setTimeout(() => {
+		void (async () => {
+			if (generation !== researchTimerGeneration) return;
+			if (!await expireResearchDeadline(path) || generation !== researchTimerGeneration) return;
+			ctx.abort();
+			ctx.ui.notify("Research reached its ten-minute limit and was paused. Evidence is saved. Use /research-status to inspect it or /research-extend to continue.", "info");
+		})().catch(() => {
+			if (generation !== researchTimerGeneration) return;
+			ctx.abort();
+			ctx.ui.notify("Research deadline reached, but its pause could not be saved. Execution stopped; inspect /research-status before resuming.", "error");
+		});
+	}, Math.min(delay, 2_147_483_647));
+	researchTimer.unref();
+}
+
 async function requireActiveParentResearch(cwd: string, runId: string, operation: string): Promise<void> {
 	if (!PARENT_RESEARCH_WORKFLOW) return;
 	const path = researchAggregatePath(cwd, runId, process.env);
@@ -525,7 +568,7 @@ async function requireActiveParentResearch(cwd: string, runId: string, operation
 	if (!aggregate || aggregate.run_id !== runId) rejectPlanTool(`${operation} rejected: parent research aggregate is missing or malformed`);
 	let phase = aggregate.phase;
 	if (phase === "active" && deadlinePhase(aggregate) === "expired") {
-		await mutateResearchAggregate(path, (state) => ({ state: transitionAggregate(state, { phase: "awaiting_extension" }), result: undefined }));
+		await expireResearchDeadline(path);
 		const refreshed = await readResearchAggregate(path);
 		if (!refreshed || refreshed.run_id !== runId) rejectPlanTool(`${operation} rejected: parent research aggregate is missing or malformed`);
 		phase = refreshed.phase;
@@ -543,7 +586,7 @@ async function requireFinishableParentResearch(cwd: string, runId: string): Prom
 	if (!aggregate || aggregate.run_id !== runId) rejectPlanTool("research_finish rejected: parent research aggregate is missing or malformed");
 	let phase = aggregate.phase;
 	if (phase === "active" && deadlinePhase(aggregate) === "expired") {
-		await mutateResearchAggregate(path, (state) => ({ state: transitionAggregate(state, { phase: "awaiting_extension" }), result: undefined }));
+		await expireResearchDeadline(path);
 		const refreshed = await readResearchAggregate(path);
 		if (!refreshed || refreshed.run_id !== runId) rejectPlanTool("research_finish rejected: parent research aggregate is missing or malformed");
 		phase = refreshed.phase;
@@ -689,12 +732,34 @@ async function writeState(cwd: string, state: PlanState): Promise<void> {
 }
 
 type MutatePlanOptions = {
+	newRun?: boolean;
 	/** Prepare dependent durable views while the plan lock is still held. If
 	 * preparation fails, the executable compatibility graph is not published. */
 	beforePersist?: (state: PlanState) => Promise<void> | void;
 };
 
 async function mutatePlan<T>(cwd: string, fn: (state: PlanState | undefined) => Promise<{ state?: PlanState; result: T }>, options: MutatePlanOptions = {}): Promise<T> {
+	const current = PARENT_RESEARCH_WORKFLOW && !options.newRun ? await readState(cwd) : undefined;
+	if (current?.profile?.name === "deep-research") {
+		const aggregatePath = researchAggregatePath(cwd, current.run_id, process.env);
+		return mutateResearchAggregate(aggregatePath, async aggregate => {
+			const out = await fn(migrateState(aggregate.graph));
+			if (out.state) {
+				validateStateSize(out.state);
+				if (out.state.run_id !== aggregate.run_id) throw new Error("parent graph run identity mismatch");
+				if (options.beforePersist) await options.beforePersist(out.state);
+				const latest = (await readResearchAggregate(aggregatePath))!;
+				return { state: transitionAggregate(latest, { graph: out.state }), result: out.result };
+			}
+			return { state: null, result: out.result };
+		}, async committed => {
+			try { await writeStateUnlocked(cwd, migrateState(committed.graph)!); } catch { /* aggregate/bundle remains authoritative */ }
+			try { await writeResearchRoundLedger(researchRoundPath(cwd, committed.run_id, process.env), committed.evidence_round as ResearchRoundLedgerStateV1); } catch { /* rebuild on retry */ }
+		}).catch(async error => {
+			if (!inResearchTransaction(aggregatePath)) await mutateResearchAggregate(aggregatePath, state => ({ state: state.phase === "active" && deadlinePhase(state) === "expired" ? transitionAggregate(state, { phase: "awaiting_extension" }) : null, result: undefined }));
+			throw error;
+		});
+	}
 	const path = statePath(cwd);
 	if (!path) throw new Error("private plan storage is not ready; retry after session startup");
 	const privateFile = planStorageMode() === "capsule";
@@ -1330,7 +1395,7 @@ async function loadResearchRound(cwd: string, runId?: string): Promise<{ path: s
 	const path = researchRoundPath(cwd, selectedRun, process.env);
 	const aggregate = PARENT_RESEARCH_WORKFLOW ? await readResearchAggregate(researchAggregatePath(cwd, selectedRun, process.env)) : null;
 	const aggregateRaw = aggregate?.evidence_round;
-	const raw = aggregateRaw && validateResearchRoundLedger(aggregateRaw) ? aggregateRaw : await readResearchRoundLedger(path);
+	const raw = PARENT_RESEARCH_WORKFLOW ? aggregateRaw : await readResearchRoundLedger(path);
 	if (!raw || raw.run_id !== selectedRun || typeof raw !== "object" || !validateResearchRoundLedger(raw)) return null;
 	shared[RESEARCH_ROUND_PATH_KEY] = path;
 	return { path, ledger: ResearchRoundLedger.fromState(raw as any) };
@@ -1352,7 +1417,7 @@ async function projectResearchAggregateSnapshot(cwd: string, runId: string, grap
 			// A freshness projection must never resurrect a run that was explicitly
 			// paused, blocked, or placed at the extension boundary. Only terminal
 			// requests may advance a non-active lifecycle phase.
-			state: transitionAggregate(state, { graph, evidence_round: round, phase: phase && phase !== "active" ? phase : state.phase, budget: (round.budget as any).consumed ?? { searches: 0, reads: 0, validation_reads: 0 } }),
+			state: transitionAggregate(state, { graph, phase: phase && phase !== "active" ? phase : state.phase }),
 			result: undefined,
 		}));
 	}
@@ -1477,6 +1542,7 @@ const researchPlanStart = defineTool({
 			validateStateSize(next);
 			return { state: next, result: next };
 		}, {
+			newRun: true,
 			beforePersist: async (nextState) => {
 				// Prepare the round ledger and (for the parent profile) its aggregate
 				// before publishing the executable graph. The plan lock spans both
@@ -1496,6 +1562,7 @@ const researchPlanStart = defineTool({
 					const aggregate = migrateResearchPair(nextState, roundLedger.state);
 					aggregate.deadline = deadlineFor();
 					await writeResearchAggregate(aggregatePath, aggregate);
+					await atomicWriteFile(`${researchAggregatePath(ctx.cwd, "current", process.env)}.pointer`, JSON.stringify({ run_id: aggregate.run_id }), { mode: 0o600, directoryMode: 0o700 });
 				}
 			},
 		});
@@ -1514,6 +1581,7 @@ const researchPlanStart = defineTool({
 			emitHarnessSignal(api.events, { v: 1, type: "capability/need", capability: "subagent", reason: "deep-research" });
 		}
 		planEvent("research-start", state.run_id, { items: state.items.length, open_items: openItemCount(state) });
+		await armResearchDeadline(ctx);
 		const contexts = state.items.map((item) => ({
 			v: 1, profile: "deep-research", run_id: state.run_id, parent_item_id: item.id, owner_ref: item.owner_ref,
 			depth: 1, budget: item.budget!.allocated, dispatch_epoch: item.dispatch_epoch ?? 0,
@@ -1590,7 +1658,9 @@ const researchRound = defineTool({
 			if (latest.runId !== ledger.runId) throw new Error("research round run identity mismatch");
 			const graph = await readState(ctx.cwd);
 			const graphTerminalNow = Boolean(graph && graph.run_id === latest.runId && graph.items.every((item) => graphTerminal(item)));
-			requireAuthoritativeParentCards(latest.state.evidence_cards);
+			// Parent aggregate cards were verified at insertion. A restarted
+			// process must not require the old process's in-memory note cache.
+			if (!PARENT_RESEARCH_WORKFLOW) requireAuthoritativeParentCards(latest.state.evidence_cards);
 			const settled = latest.settle({ graph_terminal: graphTerminalNow, optional_deferrals: params.optional_deferrals ?? [], reason: params.summary ?? "Parent evidence obligations satisfied." });
 			return { state: settled, summary: latest.renderSummary() };
 		};
@@ -1659,6 +1729,12 @@ const planSettle = defineTool({
 						: [];
 				})
 				: [];
+				if (PARENT_RESEARCH_WORKFLOW && previous.profile?.name === "deep-research") {
+					const durable = await readResearchAggregate(researchAggregatePath(ctx.cwd, previous.run_id, process.env));
+					if (durable && validateResearchRoundLedger(durable.evidence_round)) {
+						for (const card of durable.evidence_round.evidence_cards) if (card.parent_validated && !card.truncated) { verified.add(card.original_url); evidenceCards.push(card); }
+					}
+				}
 				const errors = settleErrors(previous as GraphPlanState, verified, evidenceCards);
 				if (errors.length) {
 				const claimRepair = errors.some((error) => /delegated source (?:lacks|not parent-verified)|claim evidence card|claim obligation/i.test(error))
@@ -1685,7 +1761,7 @@ const planSettle = defineTool({
 					if (citationAudit.unverified.length || citationAudit.explicitlyUnverified.length) rejectPlanTool("plan_settle rejected: final_answer cites a URL that the parent has not validated");
 					settledFinalAnswer = finalAnswer;
 				}
-				const next = { ...previous, summary: cleanText(params.summary), settled_at: isoNow() };
+				const next = { ...previous, summary: cleanText(params.summary), settled_at: isoNow(), ...(settledFinalAnswer ? { final_answer: settledFinalAnswer } : {}) };
 			return { state: next, result: next };
 		}, {
 			beforePersist: async (nextState) => {
@@ -1756,24 +1832,30 @@ const researchFinish = defineTool({
 		final_answer: Type.String({ minLength: 1, maxLength: 16_000 }),
 		optional_deferrals: Type.Optional(Type.Array(ResearchRoundDeferralSchema, { maxItems: 16 })),
 	}),
-	async execute(id, params, signal, update, ctx) {
+	async execute(id, params, signal, update, ctx): Promise<Awaited<ReturnType<typeof planSettle.execute>>> {
 		rejectChildPlanMutation();
 		if (!PARENT_RESEARCH_WORKFLOW) rejectPlanTool("research_finish is unavailable: the parent research workflow is not active");
 		const state = await readState(ctx.cwd);
+		if (state?.settled_at && state.final_answer && (!params.run_id || params.run_id === state.run_id)) {
+			if (cleanText(params.final_answer) !== state.final_answer) rejectPlanTool("research_finish conflicts with the committed final answer");
+			return { content: [{ type: "text" as const, text: `Final answer:\n${state.final_answer}` }], details: { tool_name: "research_finish", success: true, idempotent: true }, terminate: true };
+		}
 		if (!state || state.schema_version !== 5 || state.profile?.name !== "deep-research" || state.settled_at) {
 			rejectPlanTool("research_finish requires an active deep-research graph");
 		}
 		const runId = params.run_id ?? state.run_id;
 		if (runId !== state.run_id) rejectPlanTool("research_finish rejected: run identity mismatch");
+		const aggregatePath = researchAggregatePath(ctx.cwd, runId, process.env);
+		if (!inResearchTransaction(aggregatePath)) {
+			return mutateResearchAggregate(aggregatePath, async () => {
+				const result = await researchFinish.execute(id, params, signal, update, ctx);
+				return { state: null, result };
+			});
+		}
 		await requireFinishableParentResearch(ctx.cwd, runId);
 		await finalizeParentResearchGraph(ctx.cwd, runId, params.optional_deferrals);
-		// Keep the two existing validators as the implementation boundary while
-		// exposing one model-facing terminal operation. The ledger settles first;
-		// plan_settle then validates the now-settled ledger, citations, deferrals,
-		// and terminal graph before it writes the final state and terminates.
-		// The ledger is durable before the final graph/citation checks. If a
-		// process or validator fails after that boundary, a retry must resume at
-		// plan_settle rather than attempting to settle an immutable ledger again.
+		// Both validators operate on the same transaction draft. Nothing becomes
+		// durable until graph, evidence, citations and final answer all validate.
 		const latest = await loadResearchRound(ctx.cwd, runId);
 		if (!latest || latest.ledger.state.status !== "settled") {
 			await researchRound.execute(id, {
@@ -1963,6 +2045,7 @@ async function clearPlan(cwd: string, replacement?: () => Promise<void>): Promis
 		if (privateFile) await chmod(dirname(path), 0o700);
 	}
 	if (path) await withFileMutationQueue(path, () => withPlanFileLock(path, async () => {
+		if (PARENT_RESEARCH_WORKFLOW) await unlink(`${researchAggregatePath(cwd, "current", process.env)}.pointer`).catch(error => { if (error.code !== "ENOENT") throw error; });
 		await unlink(path).catch(() => undefined);
 		const projection = privatePlanProjectionPath(cwd);
 		if (projection) await unlink(projection).catch(() => undefined);
@@ -2264,9 +2347,9 @@ async function mergeResearchRoundChildResult(cwd: string, context: PlanContextV1
 			? await mutateParentResearchRoundLedger(cwd, context.run_id, mergeReducer)
 			: await mutateResearchRoundLedger(researchRoundPath(cwd, context.run_id, process.env), mergeReducer);
 		if (!result.merged) return;
-	} catch {
-		// The graph merge remains authoritative. A malformed evidence projection is
-		// non-authoritative and is surfaced by the parent's bounded inspect state.
+	} catch (error) {
+		if (PARENT_RESEARCH_WORKFLOW) throw error;
+		// Legacy compatibility remains best effort.
 	}
 }
 
@@ -2394,6 +2477,7 @@ export default function (pi: ExtensionAPI): void {
 	}
 
 	pi.on("session_start", async (_event, ctx) => {
+		stopResearchDeadline();
 		setPlanning(false);
 		awaitingReview = false;
 		planningSurfaceBefore = null;
@@ -2427,6 +2511,11 @@ export default function (pi: ExtensionAPI): void {
 		const rebound = delegatedBranchProcess ? null : await rebindActivePlan(ctx.cwd);
 		if (!delegatedBranchProcess) {
 			const restoredPlan = await readState(ctx.cwd);
+			if (PARENT_RESEARCH_WORKFLOW && restoredPlan?.profile?.name === "deep-research") {
+				await mutateParentResearchRoundLedger(ctx.cwd, restoredPlan.run_id, ledger => ledger.recoverAbandonedOperations(pid => {
+					try { process.kill(pid, 0); return true; } catch (error) { return (error as NodeJS.ErrnoException).code !== "ESRCH"; }
+				}), ["active", "paused", "awaiting_extension", "blocked", "settled"]);
+			}
 			if (restoredPlan?.profile?.name === "deep-research" && !restoredPlan.settled_at) {
 				const restoredPath = researchRoundPath(ctx.cwd, restoredPlan.run_id, process.env);
 				if (await readResearchRoundLedger(restoredPath)) (globalThis as Record<string, unknown>)[RESEARCH_ROUND_PATH_KEY] = restoredPath;
@@ -2469,17 +2558,26 @@ export default function (pi: ExtensionAPI): void {
 			if (delegatedBranchProcess || (globalThis as Record<string, unknown>)[DELEGATED_BRANCH_PROCESS_GLOBAL] === true) return;
 			const prior = pendingBranchMerge ?? Promise.resolve();
 			const next = prior.catch(() => undefined).then(async () => {
-					const outcome = await mergeBranchResult(lastSessionCwd!, signal.context, signal.report, signal.failureClass);
-					await mergeResearchRoundChildResult(lastSessionCwd!, signal.context, signal.report, signal.failureClass, outcome);
+					const merge = async () => {
+						const outcome = await mergeBranchResult(lastSessionCwd!, signal.context, signal.report, signal.failureClass);
+						await mergeResearchRoundChildResult(lastSessionCwd!, signal.context, signal.report, signal.failureClass, outcome);
+						return outcome;
+					};
+					const outcome = PARENT_RESEARCH_WORKFLOW
+						? await mutateResearchAggregate(researchAggregatePath(lastSessionCwd!, signal.context.run_id, process.env), async () => ({ state: null, result: await merge() }))
+						: await merge();
 					await queueResearchSynthesisFollowUp(outcome);
 			}).catch(() => undefined);
 			pendingBranchMerge = next;
 			void next.finally(() => { if (pendingBranchMerge === next) pendingBranchMerge = null; });
 		}
 	}));
-	pi.on("before_agent_start", async () => {
+	pi.on("session_shutdown", async () => { stopResearchDeadline(); });
+	pi.on("tool_result", async (_event, ctx) => { await armResearchDeadline(ctx); });
+	pi.on("before_agent_start", async (_event, ctx) => {
 		if (pendingRebind) await pendingRebind;
 		if (pendingBranchMerge) await pendingBranchMerge;
+		await armResearchDeadline(ctx);
 		if (!GOALS_ENABLED || !lastSessionCwd) return;
 		const goal = await rebindActiveGoal(lastSessionCwd);
 		if (goal?.status === "active") return {
@@ -2622,6 +2720,10 @@ export default function (pi: ExtensionAPI): void {
 		ctx.ui.notify(path ? (await tailLines(path, n)).join("\n") || "No plan trace found." : "No plan trace found.", "info");
 	} });
 	if (PARENT_RESEARCH_WORKFLOW) {
+		pi.registerCommand("research-result", { description: "Retrieve the committed research answer after interruption.", handler: async (_args, ctx) => {
+			const state = await readState(ctx.cwd);
+			ctx.ui.notify(state?.settled_at && state.final_answer ? state.final_answer : "No committed research answer is available.", "info");
+		} });
 		pi.registerCommand("research-status", { description: "Show bounded status for the parent-owned research run.", handler: async (args, ctx) => {
 			const state = await readState(ctx.cwd);
 			const aggregate = state?.run_id ? await readResearchAggregate(researchAggregatePath(ctx.cwd, state.run_id, process.env)) : null;
@@ -2638,6 +2740,7 @@ export default function (pi: ExtensionAPI): void {
 			if (!path) { ctx.ui.notify("No research run can be extended.", "error"); return; }
 			try {
 				await mutateResearchAggregate(path, (current) => ({ state: extendDeadline(current), result: undefined }));
+				await armResearchDeadline(ctx);
 				ctx.ui.notify("Research extension granted for one ten-minute interval. Existing search/read allowances remain unchanged.", "info");
 			} catch (error) { ctx.ui.notify(error instanceof Error ? error.message : "Research extension failed.", "error"); }
 		} });
@@ -2646,7 +2749,9 @@ export default function (pi: ExtensionAPI): void {
 			const path = state?.run_id ? researchAggregatePath(ctx.cwd, state.run_id, process.env) : null;
 			if (!path) { ctx.ui.notify("No research run can be cancelled.", "error"); return; }
 			try {
-				await mutateResearchAggregate(path, (current) => ({ state: transitionAggregate(current, { phase: "paused" }), result: undefined }));
+				await mutateResearchAggregate(path, (current) => ({ state: current.phase === "settled" ? null : transitionAggregate(current, { phase: "paused" }), result: undefined }));
+				stopResearchDeadline();
+				ctx.abort();
 				ctx.ui.notify("Research cancelled and paused. Evidence and the exact resource position remain inspectable.", "info");
 			} catch (error) { ctx.ui.notify(error instanceof Error ? error.message : "Research cancellation failed.", "error"); }
 		} });
@@ -2680,11 +2785,16 @@ export default function (pi: ExtensionAPI): void {
 
 	pi.on("agent_end", async (_event, ctx) => {
 		if (!delegatedBranchProcess) {
-			const closed = await closeUndispatchedResearchBranches(ctx.cwd);
-			if (closed) {
-				for (const context of closed.contexts) await mergeResearchRoundChildResult(ctx.cwd, context, null, "interrupted", { kind: "failed", runId: closed.runId, failureClass: "interrupted", headTerminal: true, openItems: 0 });
-				planEvent("branches-closed", closed.runId, { closed: closed.closed, reason_class: "parent_ended_before_dispatch" });
-			}
+			const close = async () => {
+				const closed = await closeUndispatchedResearchBranches(ctx.cwd);
+				if (closed) for (const context of closed.contexts) await mergeResearchRoundChildResult(ctx.cwd, context, null, "interrupted", { kind: "failed", runId: closed.runId, failureClass: "interrupted", headTerminal: true, openItems: 0 });
+				return closed;
+			};
+			const active = await readState(ctx.cwd);
+			const closed = PARENT_RESEARCH_WORKFLOW && active?.profile?.name === "deep-research"
+				? await mutateResearchAggregate(researchAggregatePath(ctx.cwd, active.run_id, process.env), async () => ({ state: null, result: await close() }))
+				: await close();
+			if (closed) planEvent("branches-closed", closed.runId, { closed: closed.closed, reason_class: "parent_ended_before_dispatch" });
 		}
 		const state = await readState(ctx.cwd);
 		if (state && state.phase === "executing" && openItemCount(state) > 0) {

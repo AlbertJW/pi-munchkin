@@ -143,7 +143,7 @@ test("a search authorized before a pause keeps its durable accounting when it co
 });
 
 test("in-flight lifecycle transitions preserve permitted accounting without reactivation", async () => {
-	for (const [toPhase, receiptExpected] of [["awaiting_extension", true], ["blocked", true], ["settled", false]] as const) {
+	for (const [toPhase, receiptExpected] of [["awaiting_extension", true], ["blocked", true], ["settled", true]] as const) {
 		const { dir, barrier, snapshot, aggregatePath, fp, ctx, runId } = await setupBarrierRun(`lifecycle-${toPhase}`, "active", `lifecycle-${toPhase}`);
 		try {
 			const tool = fp.tools.get("web_search")!;
@@ -293,10 +293,10 @@ test("wrong-run, unauthorized, and conflicting completions fail without mutation
 		after = (await readResearchAggregate(aggregatePath))!;
 		assert.equal(after.revision, base.revision, "conflicting: no revision minted");
 		assert.equal(JSON.stringify(after.evidence_round), JSON.stringify(base.evidence_round), "conflicting: evidence round unchanged");
-		// Unauthorized: the run is settled, so the outcome gate refuses.
+		// An authorized duplicate remains a no-op after settlement.
 		await transitionRun(aggregatePath, "settled");
 		const settledBase = (await readResearchAggregate(aggregatePath))!;
-		await assert.rejects(recordAuthorizedSearchReceipt(dir, runId, recorded), /not eligible/);
+		await recordAuthorizedSearchReceipt(dir, runId, recorded);
 		after = (await readResearchAggregate(aggregatePath))!;
 		assert.equal(after.revision, settledBase.revision, "settled: no revision minted");
 		assert.equal(after.phase, "settled", "settled: the lifecycle is preserved");
@@ -583,7 +583,7 @@ test("E: read request identity preserves case-sensitive path and query", async (
 		await authorizeResearchOperation(dir, runId, "read", "tc-E", url);
 		const after = (await readResearchAggregate(aggregatePath))!;
 		const auths = (after.evidence_round as { operation_authorizations?: { request?: string }[] }).operation_authorizations ?? [];
-		assert.ok(auths.some((a) => a.request === url), "the read request preserves the case-sensitive path and query");
+		assert.ok(auths.some((a) => a.request === JSON.stringify([url])), "the read request preserves the case-sensitive path and query");
 		// A case-variant of the same operation identity is a different request → refused.
 		await assert.rejects(
 			authorizeResearchOperation(dir, runId, "read", "tc-E", url.toLowerCase()),
