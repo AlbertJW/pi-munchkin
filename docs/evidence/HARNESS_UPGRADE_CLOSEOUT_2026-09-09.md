@@ -29,3 +29,18 @@ Typecheck, package smoke (185 files, 31 extension entrypoints, two skills), and 
 Source surface after the wording correction: `e06b76000ac1a6b140e69b452379262e886612413c0d24d20bb38ccc8288819b`. This is not a loaded/live receipt.
 
 Mirror comparison reports 16 of 130 first-party files different. This is expected source/live drift, not a passed parity check; no sync was attempted. The commit containing this closeout is the rollback point for the test-context and snippet corrections only.
+
+## Phase 3B closure update — 2026-09-22
+
+The research release blockers listed above are now implemented and verified at
+source commit `317707f`: aggregate-only parent mutation, shared graph/ledger
+serialization, rebuildable compatibility views, provider-hung ten-minute
+cancellation, extension behavior, branch coverage/lease enforcement,
+recoverable terminal delivery, and fresh-process uncertain-operation recovery.
+The full offline gate passed 935/935 tests and all six verification stages.
+
+Phase 3B is therefore implementation-complete and ready for its separately
+approved live qualification. It is not yet live: the parent workflow remains
+opt-in, no mirror or inference was run, and no default was changed. The frozen
+qualification and rollback contract is
+`optimizer/docs/screens/PREREG_PARENT_RESEARCH_PHASE3B_PROMOTION_2026-09-22.md`.

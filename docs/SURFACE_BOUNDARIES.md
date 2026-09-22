@@ -1129,3 +1129,53 @@ started.
 Source commit: `a86e962`.
 Current package-source SHA-256: `f009860bcbb4b4e5d12f1c6ee53ea95c0d4964344a23f474031cbe889061d85c`
 (recomputed via `npm run surface:hash:source` on 2026-09-20).
+
+## Dispatch authorization boundary — 2026-09-21 (Phase 3B prerequisite)
+
+Commit `706d75b` made durable authorization a prerequisite for every parent
+search/read dispatch. Authorization is bound to run, operation kind, tool call
+identity, and canonical request; it reserves budget under the aggregate lock,
+rechecks lifecycle/deadline eligibility, preserves case-sensitive URL
+semantics, and fails before adapter invocation when authority is unavailable.
+This entry repairs the missing append-only source-boundary record for that
+already-committed prerequisite; it does not claim Phase 3B completion.
+
+Source commit: `706d75b08c3edc7703bbc6a0c9302a74f1e81d67`.
+Historical package-source SHA-256:
+`12c05a777deeae0f5f659e5a0efad882e736e67928cd616e9612554a83a4f708`
+(recomputed from the isolated commit tree on 2026-09-22).
+
+## Phase 3B implementation closeout — 2026-09-22
+
+The parent workflow now treats the research aggregate as its sole mutation
+authority. Nested graph, evidence-round, budget, lifecycle, branch-result, and
+terminal-answer reducers share one aggregate lock and one outer commit;
+exceptions restore the nested savepoint and publish nothing. Compatibility
+graph/ledger files and the revision-bound view bundle are rebuildable outputs.
+Restart reads bind through a private current-run pointer and fail closed when
+the bound aggregate is missing or malformed.
+
+Retrieval accounting is bound to the exact durable operation. Multi-URL reads
+reserve the whole unique batch before dispatch, outcome digests make replay
+idempotent, settlement cannot overtake in-flight retrieval, and a fresh process
+charges abandoned or legacy ownerless authorizations once without accepting
+evidence. Late authorized accounting cannot reactivate a paused, blocked, or
+settled run.
+
+The persisted ten-minute deadline now has a real timer: expiry changes the
+aggregate to `awaiting_extension`, aborts a hung active turn, and emits bounded
+recovery guidance. Explicit extension retains spent budget. The final answer is
+stored in the settled graph and can be replayed after interrupted delivery via
+`research_finish` or `/research-result` without another revision.
+
+Offline verification at the frozen source commit: `npm run verify`, all six
+stages passed in 124.6s; 935/935 harness tests passed, and typecheck, health,
+package smoke, optimizer mothball enforcement, and secret scan passed. No
+inference, mirror, live rollout, or default change occurred. The promotion
+screen is frozen in
+`optimizer/docs/screens/PREREG_PARENT_RESEARCH_PHASE3B_PROMOTION_2026-09-22.md`.
+
+Source commit: `317707f0830d82b977bdd9a3b4bf2a4f14560549`.
+Current package-source SHA-256:
+`765b13e88a35c3a5760dbd00acf0fe83234a21e8e8d53b4eec8f9602b9010ad0`
+(recomputed via `npm run surface:hash:source` on 2026-09-22).
