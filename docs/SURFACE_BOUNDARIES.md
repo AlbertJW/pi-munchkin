@@ -1221,3 +1221,15 @@ Source commit: `1b3473a`.
 Package-source SHA-256:
 `55247e92ffdfb6c6be86b467499f80a3f5998dae1a06d6cd962640b90c0faca7`
 (recomputed via `npm run surface:hash:source` on 2026-09-22).
+
+2026-09-23 Phase 3B cancellation-accounting boundary: a leased child closed by
+terminal plan update or fresh-process recovery now gets one charged
+interruption receipt in the same aggregate transition. A paused or awaiting
+extension phase stays paused; pre-dispatch lease release still refunds.
+Implementation commit `ae289e0`; package-source SHA-256
+`fd23bb28d6b811c8b09fe61b28d51f8310152d460af995b63b65c9bb84ae691c`.
+**DARK, REPOSITORY-ONLY:** 936/936 harness tests and all six `npm run verify`
+stages passed. An isolated Qwen Q2 qualification attempt was incomplete after
+the model backend failed; no live install or default change is claimed. The
+previous Phase 3B promotion pin `1b3473a` is superseded; the
+ten-case decision rule remains in force.
