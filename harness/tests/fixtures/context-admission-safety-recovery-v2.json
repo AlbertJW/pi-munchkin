@@ -1,0 +1,81 @@
+{
+  "schema": "pi.context-admission-safety-recovery-screen/v2",
+  "revision": "phase3a-occamy-safety-recovery-v2",
+  "model": "local-llamacpp/occamy",
+  "served_model": "occamy",
+  "artifact": "occamy-1.0.Q3_K_M.gguf",
+  "required_case_count": 11,
+  "deterministic_cases": [
+    {
+      "case": 3,
+      "tests": [
+        ["harness/tests/context-accounting.test.ts", "ordinary Pi usage is explicitly estimated provenance"],
+        ["harness/tests/context-accounting.test.ts", "missing usage is explicitly unavailable provenance"],
+        ["harness/tests/context-accounting.test.ts", "exact request counts and advisory Pi usage remain distinguishable"],
+        ["harness/tests/context-accounting.test.ts", "exact request counts stay verified when no advisory usage is present"]
+      ]
+    },
+    {
+      "case": 4,
+      "tests": [
+        ["harness/tests/context-accounting.test.ts", "missing usage cannot erase an observed overflow"],
+        ["harness/tests/context-accounting.test.ts", "a retained overflow observation is generation-bound across compaction"]
+      ]
+    },
+    {
+      "case": 5,
+      "tests": [
+        ["harness/tests/context-accounting.test.ts", "bound observations reject stale serving epochs and compaction generations"],
+        ["harness/tests/context-accounting.test.ts", "serving-window shrink creates a distinct accounting epoch"],
+        ["harness/tests/context-accounting.test.ts", "window switches preserve the goal/evidence identity while recalculating admission"],
+        ["harness/tests/context-accounting.test.ts", "reservation ledger is idempotent, shared, and epoch-scoped"]
+      ]
+    },
+    {
+      "case": 6,
+      "tests": [
+        ["harness/tests/context-accounting.test.ts", "observed retained context reduces remaining output allowance"],
+        ["harness/tests/context-accounting.test.ts", "reservation ledger is idempotent, shared, and epoch-scoped"],
+        ["harness/tests/context-accounting.test.ts", "allowance allocation cannot multiply the remaining budget"],
+        ["harness/tests/context-accounting.test.ts", "admission coordinator accounts producer reservations and releases them at tool finalization"]
+      ]
+    },
+    {
+      "case": 7,
+      "tests": [
+        ["harness/tests/context-accounting.test.ts", "unsafe admission makes only one coordinated compaction attempt for an unchanged request"],
+        ["harness/tests/context-accounting.test.ts", "a corrected request cancels obsolete pending compaction"]
+      ]
+    },
+    {
+      "case": 8,
+      "tests": [
+        ["harness/tests/run-capsule.test.ts", "zero, invalid and tiny budgets are explicitly unavailable or insufficient"],
+        ["harness/tests/run-capsule.test.ts", "missing required content is detected even when some text survives"],
+        ["harness/tests/run-capsule.test.ts", "small budgets do not regain the old floor"],
+        ["harness/tests/run-capsule.test.ts", "automatic caller reports failure and preserves pending on tiny budget"],
+        ["harness/tests/run-capsule.test.ts", "manual caller reports failure on tiny budget without sending"]
+      ]
+    },
+    {
+      "case": 9,
+      "tests": [
+        ["harness/tests/run-capsule.test.ts", "real lifecycle: compaction -> insufficient assembly -> settlement -> valid-budget retry injects"],
+        ["harness/tests/run-capsule.test.ts", "pending recovery later succeeds with a valid budget"]
+      ]
+    },
+    {
+      "case": 10,
+      "tests": [
+        ["harness/tests/run-capsule.test.ts", "a throwing sendMessage produces an honest failure receipt, not ok:true"]
+      ]
+    },
+    {
+      "case": 11,
+      "tests": [
+        ["harness/tests/run-capsule.test.ts", "flag-off returns the full combined brief unchanged"],
+        ["harness/tests/context-accounting.test.ts", "aggregate admission remains inactive until explicitly enabled"]
+      ]
+    }
+  ]
+}
