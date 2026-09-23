@@ -1,0 +1,18 @@
+{
+  "schema": "pi.phase3a-installed-flag-off-smoke/v1",
+  "candidate_commit": "632409ddbc12085064f4953b1c1eaec73999ba91",
+  "loaded_surface_sha256": "d74ec2ddc07aa1e7ca40091c26634be9bb9db375959bb9c5f1366367ee3f3f1e",
+  "model": "occamy",
+  "flag": "off",
+  "exit_code": 0,
+  "forwarded_requests": 1,
+  "admission_receipt_count": 0,
+  "surface_receipts": [
+    "d74ec2ddc07aa1e7ca40091c26634be9bb9db375959bb9c5f1366367ee3f3f1e"
+  ],
+  "stdout_sha256": "1db677e0b2d3f9fdf3efc0b6ef57af082dbb95dd6ad40471a8aaa09c50dd7f7a",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_bytes": 7,
+  "stderr_bytes": 0,
+  "passed": true
+}

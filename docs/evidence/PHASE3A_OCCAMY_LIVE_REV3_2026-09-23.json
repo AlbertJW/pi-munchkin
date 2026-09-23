@@ -1,0 +1,65 @@
+{
+  "schema": "pi.context-admission-live-result/v1",
+  "run_id": "db23a461-ed9a-4ba2-885d-50b35d00140d",
+  "prepared": {
+    "schema": "pi.context-admission-live-preparation/v1",
+    "revision": "occamy-context-admission-v1",
+    "manifest_sha256": "58a3b82b6e0058aab4489120c3143ea5266f3486a753ee57c6c9c5e2a81d0d25",
+    "source": {
+      "probe_sha256": "c1d482d6db5a1d6eb535fff94327664befc6435f1c344f76a294521fe885b4fa",
+      "context_admission_sha256": "2df2fa7ab7f0fc5993f9521ee806b706363c3b3f0e75574b297f63bcaa9ead80",
+      "telemetry_flush_sha256": "571128f7fc6e70312f345a808b39144954e6c2af876be0957fe708723386d532",
+      "screen_evaluator_sha256": "a0a041558ff41b5b3afe7b1545697f7782cfdb2f01cfab6fce3364baa7d0a68e",
+      "local_proxy_route_sha256": "5ed9cac3fca57c816862d67fc71778d2803bcb078421a263bc5b070df4fb46a3"
+    },
+    "model": "local-llamacpp/occamy",
+    "served_model": "occamy",
+    "declared_context_window": 131072,
+    "normal_prompt_sha256": "85c84eca54af29002c1fe79488bdfefe2b43e6f051bc6e951354a5e86be259cd",
+    "oversize_fixture_sha256": "34e95fe8877d07873716a3f575a4ea908b2e776b18e0b5122d33f7a93ff012b4"
+  },
+  "approval_sha256": "840451ddaa0605fdd56dea0d86556413a48d0c6939b56838cdacca6bb1c9dde0",
+  "requested_model": "local-llamacpp/occamy",
+  "served_model": "occamy",
+  "endpoint_fingerprint": "067b7debf00185d81a0a81582e12881f4b1bae72cf7e61f47dab7b80a3627b0e",
+  "inference": true,
+  "normal": {
+    "exit_code": 0,
+    "signal": null,
+    "timed_out": false,
+    "stdout_sha256": "1db677e0b2d3f9fdf3efc0b6ef57af082dbb95dd6ad40471a8aaa09c50dd7f7a",
+    "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "stdout_bytes": 7,
+    "stderr_bytes": 0,
+    "forwarded_requests": 1,
+    "telemetry": {
+      "present": true,
+      "outcome": "admitted",
+      "reason_class": "within_budget",
+      "request_digest": "c27d8ad7da17e8aaded58becba4efcf633c3caca7df2db7d3bc6032a96220d0c",
+      "epoch_digest": "9c87e9475b1d1f76754a1453c4a269cf751510529fc4d4a421b43513148c72cf"
+    }
+  },
+  "oversize": {
+    "exit_code": 1,
+    "signal": null,
+    "timed_out": false,
+    "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "stderr_sha256": "6e2488c8dcd4fc705d14a4323e05aaaea79f4ba6feba278a19698c61f1bfd1dd",
+    "stdout_bytes": 0,
+    "stderr_bytes": 16,
+    "forwarded_requests": 0,
+    "telemetry": {
+      "present": true,
+      "outcome": "rejected",
+      "reason_class": "aggregate_budget_exceeded",
+      "request_digest": "8d097cc61a99fd196706fc1eecb704196d96726b5f751a77ab7db1eeddb29a8c",
+      "epoch_digest": "9c87e9475b1d1f76754a1453c4a269cf751510529fc4d4a421b43513148c72cf"
+    }
+  },
+  "acceptance": {
+    "normal_exposed": true,
+    "oversize_blocked_pre_dispatch": true,
+    "passed": true
+  }
+}

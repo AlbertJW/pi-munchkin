@@ -1257,3 +1257,27 @@ Repository source surface SHA-256:
 `8a9e5e7d2989c17a74ea0393d90ae4a93bec17f177423af0525e77b3ef148c89`.
 Parent research remains opt-in; no optimizer execution, default flip, or push
 occurred.
+
+## Phase 3A Occamy qualification and live promotion — 2026-09-23
+
+The revision-3 Occamy qualification passed all eleven safety cases: two live
+pre-dispatch admission cells and nine deterministic injected-fault cases (26
+test executions). All six `npm run verify` stages passed. Revision 2's exact
+case-2 reason-class failure and the fix are recorded separately; its evidence
+was not pooled into revision 3.
+
+The reviewed four-file Phase 3A overlay is installed. All four selected files
+match the qualified candidate; all 115 nonselected files match their pre-install
+hashes. Fresh installed Pi smokes passed with `CONTEXT_ADMISSION=off` and `on`.
+The rollback package and full file inventory are recorded in
+`docs/evidence/PHASE3A_LIVE_INVENTORY_2026-09-23.json`. The installed loaded
+surface SHA-256 is
+`d74ec2ddc07aa1e7ca40091c26634be9bb9db375959bb9c5f1366367ee3f3f1e`.
+
+Implementation candidate: `632409ddbc12085064f4953b1c1eaec73999ba91`.
+Package-source SHA-256:
+`121bd19bf1203f89493c782635b3275bb02e75d4d310d059dabd17c6f827086c`.
+`CONTEXT_ADMISSION` remains off by default and available by explicit opt-in;
+the optimizer remains mothballed. No push or default change occurred. Full
+case evidence is in
+`optimizer/docs/screens/PHASE3A_OCCAMY_SCREEN_2026-09-23.md`.

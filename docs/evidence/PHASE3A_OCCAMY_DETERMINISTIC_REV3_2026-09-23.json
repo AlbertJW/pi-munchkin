@@ -1,0 +1,522 @@
+{
+  "schema": "pi.context-admission-safety-recovery-deterministic-result/v2",
+  "binding": {
+    "manifest_sha256": "6ed64ab0329d3c8c7916fc75091285ca8f129414377a55190f9c9d4360d363a1",
+    "runner_sha256": "fa1c656cbcaa06600a418c584d42cead37f5cd536214fbbdb649e03fb3302de3",
+    "source_hashes": {
+      "harness/extensions/context-admission.ts": "2df2fa7ab7f0fc5993f9521ee806b706363c3b3f0e75574b297f63bcaa9ead80",
+      "harness/extensions/run-capsule.ts": "97a480d83c46fa1a9d43d8d3a6e849a98b8af636b1a0da2ce36099f10a7bb626",
+      "harness/extensions/telemetry-flush.ts": "571128f7fc6e70312f345a808b39144954e6c2af876be0957fe708723386d532",
+      "harness/lib/context-accounting.ts": "30f7feeacefbf9956e57017b09f4633967a335f1c8749b77a66eb68eb6e292f7",
+      "harness/lib/context-profile.ts": "1b06698345f51ad5828267cade1e6c345957671892126f1f05dcc962c57b5c07",
+      "harness/lib/telemetry-catalog.ts": "95d4b2d4a62941daa431ac5a572098b0ac6a3d37e6ac16478b2e9d0c05c9d0cb",
+      "harness/tests/context-accounting.test.ts": "fd1d47f552c366f2d8b942dc2edafa8d5582cc44bc02504302a1be6ca0af4d66",
+      "harness/tests/run-capsule.test.ts": "9b90997a36ab19df8c1d7593758427628d18da64444fc19bb6987c608766b0dd"
+    },
+    "model": "local-llamacpp/occamy",
+    "served_model": "occamy",
+    "artifact": "occamy-1.0.Q3_K_M.gguf"
+  },
+  "cases": [
+    {
+      "case": 3,
+      "status": "PASS",
+      "tests": [
+        {
+          "file": "harness/tests/context-accounting.test.ts",
+          "test_name": "ordinary Pi usage is explicitly estimated provenance",
+          "test_source_sha256": "fd1d47f552c366f2d8b942dc2edafa8d5582cc44bc02504302a1be6ca0af4d66",
+          "result": {
+            "ok": true,
+            "exit_code": 0,
+            "signal": null,
+            "timed_out": false,
+            "output_sha256": "c084fa1863f9303676c9c0644c720e4882d4e9d80e67771ad404ad8d1dd9eaab",
+            "output_bytes": 183,
+            "tests": 1,
+            "passed": 1,
+            "failed": 0,
+            "skipped": 0
+          }
+        },
+        {
+          "file": "harness/tests/context-accounting.test.ts",
+          "test_name": "missing usage is explicitly unavailable provenance",
+          "test_source_sha256": "fd1d47f552c366f2d8b942dc2edafa8d5582cc44bc02504302a1be6ca0af4d66",
+          "result": {
+            "ok": true,
+            "exit_code": 0,
+            "signal": null,
+            "timed_out": false,
+            "output_sha256": "dc622905f463916e3eb5f9c03a3b8cf94eb7429955da53c31eb9a27ad3f06c10",
+            "output_bytes": 182,
+            "tests": 1,
+            "passed": 1,
+            "failed": 0,
+            "skipped": 0
+          }
+        },
+        {
+          "file": "harness/tests/context-accounting.test.ts",
+          "test_name": "exact request counts and advisory Pi usage remain distinguishable",
+          "test_source_sha256": "fd1d47f552c366f2d8b942dc2edafa8d5582cc44bc02504302a1be6ca0af4d66",
+          "result": {
+            "ok": true,
+            "exit_code": 0,
+            "signal": null,
+            "timed_out": false,
+            "output_sha256": "a95953c1233cd3f3c9adec8cee16a4f811945576ca5da66fd084276dd732c19a",
+            "output_bytes": 197,
+            "tests": 1,
+            "passed": 1,
+            "failed": 0,
+            "skipped": 0
+          }
+        },
+        {
+          "file": "harness/tests/context-accounting.test.ts",
+          "test_name": "exact request counts stay verified when no advisory usage is present",
+          "test_source_sha256": "fd1d47f552c366f2d8b942dc2edafa8d5582cc44bc02504302a1be6ca0af4d66",
+          "result": {
+            "ok": true,
+            "exit_code": 0,
+            "signal": null,
+            "timed_out": false,
+            "output_sha256": "f0a52a69f101ab564e0e522311abf70e1a03080ef85b577b8927a074fc2711e6",
+            "output_bytes": 200,
+            "tests": 1,
+            "passed": 1,
+            "failed": 0,
+            "skipped": 0
+          }
+        }
+      ]
+    },
+    {
+      "case": 4,
+      "status": "PASS",
+      "tests": [
+        {
+          "file": "harness/tests/context-accounting.test.ts",
+          "test_name": "missing usage cannot erase an observed overflow",
+          "test_source_sha256": "fd1d47f552c366f2d8b942dc2edafa8d5582cc44bc02504302a1be6ca0af4d66",
+          "result": {
+            "ok": true,
+            "exit_code": 0,
+            "signal": null,
+            "timed_out": false,
+            "output_sha256": "b2162b042097b573844ebf8801dc62af8430e385632fd7c1bb727dcda07b7a87",
+            "output_bytes": 180,
+            "tests": 1,
+            "passed": 1,
+            "failed": 0,
+            "skipped": 0
+          }
+        },
+        {
+          "file": "harness/tests/context-accounting.test.ts",
+          "test_name": "a retained overflow observation is generation-bound across compaction",
+          "test_source_sha256": "fd1d47f552c366f2d8b942dc2edafa8d5582cc44bc02504302a1be6ca0af4d66",
+          "result": {
+            "ok": true,
+            "exit_code": 0,
+            "signal": null,
+            "timed_out": false,
+            "output_sha256": "8dbb5e180369474befbc7e70f3dda0e686cf5cdc8ad488b990e5b1532ac1f68a",
+            "output_bytes": 203,
+            "tests": 1,
+            "passed": 1,
+            "failed": 0,
+            "skipped": 0
+          }
+        }
+      ]
+    },
+    {
+      "case": 5,
+      "status": "PASS",
+      "tests": [
+        {
+          "file": "harness/tests/context-accounting.test.ts",
+          "test_name": "bound observations reject stale serving epochs and compaction generations",
+          "test_source_sha256": "fd1d47f552c366f2d8b942dc2edafa8d5582cc44bc02504302a1be6ca0af4d66",
+          "result": {
+            "ok": true,
+            "exit_code": 0,
+            "signal": null,
+            "timed_out": false,
+            "output_sha256": "6e12bf338777b7c73fa7b891e775ab3845787928b3ab5b4139c66382c5f6d962",
+            "output_bytes": 205,
+            "tests": 1,
+            "passed": 1,
+            "failed": 0,
+            "skipped": 0
+          }
+        },
+        {
+          "file": "harness/tests/context-accounting.test.ts",
+          "test_name": "serving-window shrink creates a distinct accounting epoch",
+          "test_source_sha256": "fd1d47f552c366f2d8b942dc2edafa8d5582cc44bc02504302a1be6ca0af4d66",
+          "result": {
+            "ok": true,
+            "exit_code": 0,
+            "signal": null,
+            "timed_out": false,
+            "output_sha256": "7ad0b36629ffdbbf98fb1c04008effb8dbf075a2c952856c6dffd273ff2bdfdc",
+            "output_bytes": 189,
+            "tests": 1,
+            "passed": 1,
+            "failed": 0,
+            "skipped": 0
+          }
+        },
+        {
+          "file": "harness/tests/context-accounting.test.ts",
+          "test_name": "window switches preserve the goal/evidence identity while recalculating admission",
+          "test_source_sha256": "fd1d47f552c366f2d8b942dc2edafa8d5582cc44bc02504302a1be6ca0af4d66",
+          "result": {
+            "ok": true,
+            "exit_code": 0,
+            "signal": null,
+            "timed_out": false,
+            "output_sha256": "6e5c1b18bc20132a884e48a87828e20d9ada08635ec98d07f3e294f61915c867",
+            "output_bytes": 212,
+            "tests": 1,
+            "passed": 1,
+            "failed": 0,
+            "skipped": 0
+          }
+        },
+        {
+          "file": "harness/tests/context-accounting.test.ts",
+          "test_name": "reservation ledger is idempotent, shared, and epoch-scoped",
+          "test_source_sha256": "fd1d47f552c366f2d8b942dc2edafa8d5582cc44bc02504302a1be6ca0af4d66",
+          "result": {
+            "ok": true,
+            "exit_code": 0,
+            "signal": null,
+            "timed_out": false,
+            "output_sha256": "8374ad69c2044aacb85fd3fb7bb66cbb73babd905e978fbac52c0a3b978b4f25",
+            "output_bytes": 188,
+            "tests": 1,
+            "passed": 1,
+            "failed": 0,
+            "skipped": 0
+          }
+        }
+      ]
+    },
+    {
+      "case": 6,
+      "status": "PASS",
+      "tests": [
+        {
+          "file": "harness/tests/context-accounting.test.ts",
+          "test_name": "observed retained context reduces remaining output allowance",
+          "test_source_sha256": "fd1d47f552c366f2d8b942dc2edafa8d5582cc44bc02504302a1be6ca0af4d66",
+          "result": {
+            "ok": true,
+            "exit_code": 0,
+            "signal": null,
+            "timed_out": false,
+            "output_sha256": "7dcd5fdd931156dea6c0870e85dd846a87df549438df92de719679426f196720",
+            "output_bytes": 191,
+            "tests": 1,
+            "passed": 1,
+            "failed": 0,
+            "skipped": 0
+          }
+        },
+        {
+          "file": "harness/tests/context-accounting.test.ts",
+          "test_name": "reservation ledger is idempotent, shared, and epoch-scoped",
+          "test_source_sha256": "fd1d47f552c366f2d8b942dc2edafa8d5582cc44bc02504302a1be6ca0af4d66",
+          "result": {
+            "ok": true,
+            "exit_code": 0,
+            "signal": null,
+            "timed_out": false,
+            "output_sha256": "84d0c0ee93f435d9e6e4917e770742d859c81c1854d457339ecd3a1d4abebc7d",
+            "output_bytes": 190,
+            "tests": 1,
+            "passed": 1,
+            "failed": 0,
+            "skipped": 0
+          }
+        },
+        {
+          "file": "harness/tests/context-accounting.test.ts",
+          "test_name": "allowance allocation cannot multiply the remaining budget",
+          "test_source_sha256": "fd1d47f552c366f2d8b942dc2edafa8d5582cc44bc02504302a1be6ca0af4d66",
+          "result": {
+            "ok": true,
+            "exit_code": 0,
+            "signal": null,
+            "timed_out": false,
+            "output_sha256": "fced5de1ea3d6f704b6291d4787232ea3062856081c73ac8e0cc119a459ff6c3",
+            "output_bytes": 189,
+            "tests": 1,
+            "passed": 1,
+            "failed": 0,
+            "skipped": 0
+          }
+        },
+        {
+          "file": "harness/tests/context-accounting.test.ts",
+          "test_name": "admission coordinator accounts producer reservations and releases them at tool finalization",
+          "test_source_sha256": "fd1d47f552c366f2d8b942dc2edafa8d5582cc44bc02504302a1be6ca0af4d66",
+          "result": {
+            "ok": true,
+            "exit_code": 0,
+            "signal": null,
+            "timed_out": false,
+            "output_sha256": "ade3fe7271e30b22175147011768ec1d3d03ffdc14c6ddf16c0bb8574eb1ee4c",
+            "output_bytes": 220,
+            "tests": 1,
+            "passed": 1,
+            "failed": 0,
+            "skipped": 0
+          }
+        }
+      ]
+    },
+    {
+      "case": 7,
+      "status": "PASS",
+      "tests": [
+        {
+          "file": "harness/tests/context-accounting.test.ts",
+          "test_name": "unsafe admission makes only one coordinated compaction attempt for an unchanged request",
+          "test_source_sha256": "fd1d47f552c366f2d8b942dc2edafa8d5582cc44bc02504302a1be6ca0af4d66",
+          "result": {
+            "ok": true,
+            "exit_code": 0,
+            "signal": null,
+            "timed_out": false,
+            "output_sha256": "495ac7083a44b46757cf2496e50dd0821732ec5a2a23298dc9e03a4d50049452",
+            "output_bytes": 221,
+            "tests": 1,
+            "passed": 1,
+            "failed": 0,
+            "skipped": 0
+          }
+        },
+        {
+          "file": "harness/tests/context-accounting.test.ts",
+          "test_name": "a corrected request cancels obsolete pending compaction",
+          "test_source_sha256": "fd1d47f552c366f2d8b942dc2edafa8d5582cc44bc02504302a1be6ca0af4d66",
+          "result": {
+            "ok": true,
+            "exit_code": 0,
+            "signal": null,
+            "timed_out": false,
+            "output_sha256": "f285375b526afc0af4b04b1d79d4e0bde3d74dffe8149209323bd40a9260d586",
+            "output_bytes": 189,
+            "tests": 1,
+            "passed": 1,
+            "failed": 0,
+            "skipped": 0
+          }
+        }
+      ]
+    },
+    {
+      "case": 8,
+      "status": "PASS",
+      "tests": [
+        {
+          "file": "harness/tests/run-capsule.test.ts",
+          "test_name": "zero, invalid and tiny budgets are explicitly unavailable or insufficient",
+          "test_source_sha256": "9b90997a36ab19df8c1d7593758427628d18da64444fc19bb6987c608766b0dd",
+          "result": {
+            "ok": true,
+            "exit_code": 0,
+            "signal": null,
+            "timed_out": false,
+            "output_sha256": "568eec6ae1af4d5456173c73a79d849fafbd882bf35448f01dc15d022edb623c",
+            "output_bytes": 207,
+            "tests": 1,
+            "passed": 1,
+            "failed": 0,
+            "skipped": 0
+          }
+        },
+        {
+          "file": "harness/tests/run-capsule.test.ts",
+          "test_name": "missing required content is detected even when some text survives",
+          "test_source_sha256": "9b90997a36ab19df8c1d7593758427628d18da64444fc19bb6987c608766b0dd",
+          "result": {
+            "ok": true,
+            "exit_code": 0,
+            "signal": null,
+            "timed_out": false,
+            "output_sha256": "0993b28bd54bff595995e6969fc49b8ec1b0ad330b8f6e513e753b4317813b51",
+            "output_bytes": 195,
+            "tests": 1,
+            "passed": 1,
+            "failed": 0,
+            "skipped": 0
+          }
+        },
+        {
+          "file": "harness/tests/run-capsule.test.ts",
+          "test_name": "small budgets do not regain the old floor",
+          "test_source_sha256": "9b90997a36ab19df8c1d7593758427628d18da64444fc19bb6987c608766b0dd",
+          "result": {
+            "ok": true,
+            "exit_code": 0,
+            "signal": null,
+            "timed_out": false,
+            "output_sha256": "a2bae50591262dd836a40dc5cc0a66293130a0005de73e90799271d725ef1c85",
+            "output_bytes": 174,
+            "tests": 1,
+            "passed": 1,
+            "failed": 0,
+            "skipped": 0
+          }
+        },
+        {
+          "file": "harness/tests/run-capsule.test.ts",
+          "test_name": "automatic caller reports failure and preserves pending on tiny budget",
+          "test_source_sha256": "9b90997a36ab19df8c1d7593758427628d18da64444fc19bb6987c608766b0dd",
+          "result": {
+            "ok": true,
+            "exit_code": 0,
+            "signal": null,
+            "timed_out": false,
+            "output_sha256": "e9d29b04dcc099716f021eb2d87a088705ce4a917453c12701c841575781bfa9",
+            "output_bytes": 203,
+            "tests": 1,
+            "passed": 1,
+            "failed": 0,
+            "skipped": 0
+          }
+        },
+        {
+          "file": "harness/tests/run-capsule.test.ts",
+          "test_name": "manual caller reports failure on tiny budget without sending",
+          "test_source_sha256": "9b90997a36ab19df8c1d7593758427628d18da64444fc19bb6987c608766b0dd",
+          "result": {
+            "ok": true,
+            "exit_code": 0,
+            "signal": null,
+            "timed_out": false,
+            "output_sha256": "0ceba7ba2bfc1863653e94caa2c5afe4096cf54d2deff8c86ee95590f13cafe5",
+            "output_bytes": 193,
+            "tests": 1,
+            "passed": 1,
+            "failed": 0,
+            "skipped": 0
+          }
+        }
+      ]
+    },
+    {
+      "case": 9,
+      "status": "PASS",
+      "tests": [
+        {
+          "file": "harness/tests/run-capsule.test.ts",
+          "test_name": "real lifecycle: compaction -> insufficient assembly -> settlement -> valid-budget retry injects",
+          "test_source_sha256": "9b90997a36ab19df8c1d7593758427628d18da64444fc19bb6987c608766b0dd",
+          "result": {
+            "ok": true,
+            "exit_code": 0,
+            "signal": null,
+            "timed_out": false,
+            "output_sha256": "41720407e38e435d1fab4bd6dd4e6a205f6bb2b8a3dd225dd51adafbf1cc0ad9",
+            "output_bytes": 228,
+            "tests": 1,
+            "passed": 1,
+            "failed": 0,
+            "skipped": 0
+          }
+        },
+        {
+          "file": "harness/tests/run-capsule.test.ts",
+          "test_name": "pending recovery later succeeds with a valid budget",
+          "test_source_sha256": "9b90997a36ab19df8c1d7593758427628d18da64444fc19bb6987c608766b0dd",
+          "result": {
+            "ok": true,
+            "exit_code": 0,
+            "signal": null,
+            "timed_out": false,
+            "output_sha256": "b99445eb181669d64d4eadc1d9f87b86b7ade28c7c88d425e5061f5903647726",
+            "output_bytes": 185,
+            "tests": 1,
+            "passed": 1,
+            "failed": 0,
+            "skipped": 0
+          }
+        }
+      ]
+    },
+    {
+      "case": 10,
+      "status": "PASS",
+      "tests": [
+        {
+          "file": "harness/tests/run-capsule.test.ts",
+          "test_name": "a throwing sendMessage produces an honest failure receipt, not ok:true",
+          "test_source_sha256": "9b90997a36ab19df8c1d7593758427628d18da64444fc19bb6987c608766b0dd",
+          "result": {
+            "ok": true,
+            "exit_code": 0,
+            "signal": null,
+            "timed_out": false,
+            "output_sha256": "a1d9ff98a4c0f70d396e613b485f56dd08ff07bc4504001360c4db544a01eca7",
+            "output_bytes": 204,
+            "tests": 1,
+            "passed": 1,
+            "failed": 0,
+            "skipped": 0
+          }
+        }
+      ]
+    },
+    {
+      "case": 11,
+      "status": "PASS",
+      "tests": [
+        {
+          "file": "harness/tests/run-capsule.test.ts",
+          "test_name": "flag-off returns the full combined brief unchanged",
+          "test_source_sha256": "9b90997a36ab19df8c1d7593758427628d18da64444fc19bb6987c608766b0dd",
+          "result": {
+            "ok": true,
+            "exit_code": 0,
+            "signal": null,
+            "timed_out": false,
+            "output_sha256": "399810b30b381bd169b5556f84cd1d836f8bd4a1701bdad15dc94748241718b3",
+            "output_bytes": 181,
+            "tests": 1,
+            "passed": 1,
+            "failed": 0,
+            "skipped": 0
+          }
+        },
+        {
+          "file": "harness/tests/context-accounting.test.ts",
+          "test_name": "aggregate admission remains inactive until explicitly enabled",
+          "test_source_sha256": "fd1d47f552c366f2d8b942dc2edafa8d5582cc44bc02504302a1be6ca0af4d66",
+          "result": {
+            "ok": true,
+            "exit_code": 0,
+            "signal": null,
+            "timed_out": false,
+            "output_sha256": "4c2a6bf0fd64299e6034d00a98584fa50640802a61f328511b5c8a2f74711fec",
+            "output_bytes": 191,
+            "tests": 1,
+            "passed": 1,
+            "failed": 0,
+            "skipped": 0
+          }
+        }
+      ]
+    }
+  ],
+  "passed": 9,
+  "total": 9,
+  "complete": true,
+  "raw_output_retained": false
+}
