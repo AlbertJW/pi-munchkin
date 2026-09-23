@@ -855,7 +855,13 @@ export function registerKetch(pi: ExtensionAPI, dependencies: KetchDependencies 
 					return text("Jina Reader rejected a source URL as invalid.", { reader, outcome: "invalid_url", coverage: coverageReceipt(0, params.urls.length, false, true) });
 				}
 				const input = fetchUrls.length === 1 ? fetchUrls[0] : JSON.stringify(fetchUrls);
-				let result = await invoke(["scrape", input, "--max-chars", String(params.max_chars ?? 5_000), "--trim", "--json"], remainingReadMs(), readSignal);
+				const requestedMaxChars = params.max_chars ?? 5_000;
+				// Ketch 0.12 omits `truncated` from its JSON even when --max-chars
+				// clips a page. Parent evidence cannot call that unknown extraction
+				// complete. Fetch the uncapped extraction, then apply the advertised
+				// per-page cap ourselves; the process output still has a 1 MiB ceiling.
+				const uncappedParentRead = PARENT_RESEARCH_WORKFLOW && reader === "ketch";
+				let result = await invoke(["scrape", input, "--max-chars", String(uncappedParentRead ? 0 : requestedMaxChars), "--trim", "--json"], remainingReadMs(), readSignal);
 				if (reader === "ketch" && JINA_READER_ENABLED && !readSignal.aborted && !result.aborted && !result.timedOut && Date.now() < readDeadline && result.code !== 0) {
 					effectiveReader = "jina";
 					fetchUrls = safeUrls.map((url) => formatJinaReaderUrl(url));
@@ -871,16 +877,27 @@ export function registerKetch(pi: ExtensionAPI, dependencies: KetchDependencies 
 					// Never trust ketch to return more rows than URLs requested.
 					const parsedRows = parseReadResults(result.stdout).slice(0, safeUrls.length);
 					const sourceByReaderUrl = new Map(fetchUrls.map((url, index) => [url, safeUrls[index]]));
-					const rows = effectiveReader === "jina"
+					const parsedSourceRows = effectiveReader === "jina"
 						? parsedRows.map((row) => {
 							const original = sourceByReaderUrl.get(row.url) ?? unwrapJinaReaderUrl(row.url);
 							return original && safeUrls.includes(original) ? { ...row, url: original } : { ...row, error: row.error || "reader returned an unexpected source URL" };
 						})
 						: parsedRows.map((row) => safeUrls.includes(row.url) ? row : { ...row, markdown: "", error: "reader returned an unexpected source URL" });
+					const rows = uncappedParentRead && effectiveReader === "ketch"
+						? parsedSourceRows.map((row) => {
+							const clipped = row.markdown.length > requestedMaxChars;
+							return { ...row, markdown: row.markdown.slice(0, requestedMaxChars),
+								completeness: row.completeness === "truncated" || clipped || result.truncated ? "truncated" as const : "complete" as const };
+						})
+						: parsedSourceRows;
 					const formatted = formatReadResults(rows, READ_OUTPUT_CAP);
+					// The model may see less than the cached text when the shared output
+					// cap clips a batch. Do not certify those pages as fully observed.
+					if (formatted.truncated) for (const row of rows) row.completeness = "truncated";
+					const truncated = formatted.truncated || result.truncated || rows.some((row) => row.completeness === "truncated");
 					const readFailed = rows.filter((row) => row.error || !row.markdown).length;
 					const failed = readFailed + blockedCount;
-					record("ketch", "read", { reader: effectiveReader, sources: params.urls.length, succeeded: rows.length - readFailed, failed, chars: formatted.text.length, duration_ms: Date.now() - started, truncated: formatted.truncated || result.truncated, outcome: "ok" });
+					record("ketch", "read", { reader: effectiveReader, sources: params.urls.length, succeeded: rows.length - readFailed, failed, chars: formatted.text.length, duration_ms: Date.now() - started, truncated, outcome: "ok" });
 					if (ledgerEnabled) {
 						// Cache the PARSED page text (pre-format): the formatter's body
 						// truncation is an output bound, and quote verification should
@@ -893,7 +910,6 @@ export function registerKetch(pi: ExtensionAPI, dependencies: KetchDependencies 
 						}
 					}
 					const succeeded = rows.length - readFailed;
-					const truncated = formatted.truncated || result.truncated;
 					await recordParentReadReceipt(auth, params.urls, rows, truncated, effectiveReader);
 					return text(formatted.text + budgetFooter(), {
 						source_count: rows.length, failed, truncated, reader: effectiveReader, fallback: effectiveReader !== reader,

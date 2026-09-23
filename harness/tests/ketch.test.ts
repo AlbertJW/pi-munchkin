@@ -63,6 +63,22 @@ esac
 	return file;
 }
 
+function mockUncappedParentKetch(dir: string, markdown = "Useful source text"): string {
+	const file = join(dir, "ketch-uncapped-parent-mock");
+	const response = JSON.stringify({ url: "https://example.com/a", title: "A page", markdown });
+	writeFileSync(file, `#!/bin/sh
+case "$1" in
+  version) printf 'ketch v0.12.0\\n' ;;
+  scrape)
+    [ "$3" = "--max-chars" ] && [ "$4" = "0" ] || exit 9
+    printf '%s\\n' '${response}' ;;
+  *) exit 2 ;;
+esac
+`);
+	chmodSync(file, 0o755);
+	return file;
+}
+
 test("direct reader cannot cache an unrequested source", async () => {
 	const dir = mkdtempSync(join(tmpdir(), "ketch-source-binding-"));
 	const prior = Object.fromEntries(["KETCH_BIN", "RESEARCH_LEDGER", "PI_CODING_AGENT_DIR", "TELEMETRY"].map((key) => [key, process.env[key]]));
@@ -563,12 +579,12 @@ test("research_note reuses a supplied claim identifier instead of re-hashing cla
 	}
 });
 
-test("parent web_read records a bounded read receipt before returning success", async () => {
+test("parent web_read certifies an uncapped short extraction and records its read receipt", async () => {
 	const dir = mkdtempSync(join(tmpdir(), "ketch-auto-receipt-"));
 	const snapshot = Object.fromEntries(["KETCH", "KETCH_BIN", "RESEARCH_LEDGER", "DEEP_RESEARCH_PLANNING", "RESEARCH_WORKFLOW", "PI_CODING_AGENT_DIR", "TELEMETRY_FILE", "TELEMETRY_SOURCE"].map((key) => [key, process.env[key]]));
 	try {
 		delete process.env.KETCH;
-		process.env.KETCH_BIN = mockKetch(dir);
+		process.env.KETCH_BIN = mockUncappedParentKetch(dir);
 		process.env.RESEARCH_LEDGER = "on";
 		process.env.DEEP_RESEARCH_PLANNING = "on";
 		process.env.RESEARCH_WORKFLOW = "parent";
@@ -591,14 +607,43 @@ test("parent web_read records a bounded read receipt before returning success", 
 		const persisted = await readResearchRoundLedger(roundPath);
 		assert.equal(persisted?.rounds.length, 1, "the retrieval tool should publish one automatic round receipt");
 		assert.equal(persisted?.rounds[0]?.reads[0]?.url, "https://example.com/a");
-		assert.equal(persisted?.rounds[0]?.reads[0]?.outcome, "truncated", "unknown extraction completeness must remain non-complete");
-		assert.equal(persisted?.rounds[0]?.reads[0]?.truncated, true);
+		assert.equal(persisted?.rounds[0]?.reads[0]?.outcome, "completed", "an uncapped extraction shorter than the declared cap is complete");
+		assert.equal(persisted?.rounds[0]?.reads[0]?.truncated, false);
 		const aggregate = await readResearchAggregate(aggregatePath);
 		assert.equal((aggregate?.evidence_round as any)?.rounds.length, 1, "aggregate projection must carry the receipt");
 	} finally {
 		restoreEnv(snapshot);
 		rmSync(dir, { recursive: true, force: true });
 		delete (globalThis as Record<string, unknown>).__pi_active_plan_context;
+	}
+});
+
+test("parent web_read keeps an uncapped extraction above the caller cap incomplete", async () => {
+	const dir = mkdtempSync(join(tmpdir(), "ketch-parent-clip-"));
+	const snapshot = Object.fromEntries(["KETCH", "KETCH_BIN", "RESEARCH_LEDGER", "DEEP_RESEARCH_PLANNING", "RESEARCH_WORKFLOW", "PI_CODING_AGENT_DIR"].map((key) => [key, process.env[key]]));
+	try {
+		delete process.env.KETCH;
+		process.env.KETCH_BIN = mockUncappedParentKetch(dir, `Useful source text ${"x".repeat(1_200)}`);
+		process.env.RESEARCH_LEDGER = "on";
+		process.env.DEEP_RESEARCH_PLANNING = "on";
+		process.env.RESEARCH_WORKFLOW = "parent";
+		process.env.PI_CODING_AGENT_DIR = join(dir, "agent");
+		const fp = makeFakePi();
+		const mod = await import(`../extensions/ketch.ts?parent-clip=${Date.now()}-${Math.random()}`);
+		mod.registerKetch(fp.pi as never, { resolvePublicUrl: async (raw: string) => new URL(raw).toString() });
+		await fp.handlers.get("session_start")?.[0]?.({}, { cwd: dir, ui: { notify() {} } });
+		const result = await callTool(fp, "web_read", { urls: ["https://example.com/a"], max_chars: 1_000 }, dir);
+		assert.equal(result.isError, false);
+		assert.equal(result.details.truncated, true);
+		assert.equal(result.details.coverage.complete, false);
+		const note = await callTool(fp, "research_note", { claim: "The source is useful.", url: "https://example.com/a", quote: "Useful source text" }, dir);
+		assert.equal(note.isError, false, JSON.stringify(note));
+		assert.equal(note.details.evidence_card.truncated, true);
+		assert.equal(note.details.retrieval_receipt.completeness, "truncated");
+	} finally {
+		restoreEnv(snapshot);
+		rmSync(dir, { recursive: true, force: true });
+		resetPiGlobals();
 	}
 });
 
