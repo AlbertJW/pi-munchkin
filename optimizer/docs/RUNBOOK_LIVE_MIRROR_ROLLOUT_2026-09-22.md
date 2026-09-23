@@ -1,8 +1,9 @@
 # RUNBOOK — Phase 3B live promotion (revised 2026-09-23)
 
-Status: **TEN-CASE OCCAMY SCREEN PASS; LIVE OVERLAY NOT YET INSTALLED**. This
-runbook covers the Phase 3B parent research surface. A package copy or a
-fresh-session load alone does not pass the promotion screen.
+Status: **PROMOTED LIVE — OCCAMY QUALIFIED**. The six-file Phase 3B overlay is
+installed, selected-file parity and nonselected-file preservation passed, and
+fresh parent-mode and legacy-mode Pi smokes passed. Parent research remains
+opt-in.
 
 2026-09-23 attempt: the isolated candidate imported successfully and had
 loaded surface hash `f0546aeab78d63c8c61a6579ae1cf1c65e79f788cff7bd041fb261cc6c6701d8`.
@@ -22,6 +23,18 @@ Occamy `occamy-1.0.Q3_K_M.gguf` (SHA-256
 fresh model-backed case passed; the separate under-specified diagnostic run
 and the earlier Qwen attempt remain recorded and are not pooled into this
 screen.
+
+Live promotion completed 2026-09-23. Installed surface hash:
+`0f032911df7e4bc7907a465d19c5c4c981e56d013f965151d9a18240f4e93bfb`. The
+parent-mode smoke settled run `research-plan-2026-09-23T13-24-02-200Z` at
+aggregate revision 8 and matched its compatibility graph/ledger projection.
+The separate `RESEARCH_WORKFLOW`-unset smoke returned `LEGACY_OK` and used the
+same installed surface hash. All six selected hashes match the qualified
+candidate; all 113 nonselected inventory hashes match the pre-install receipt.
+The rollback package remains at
+`/Users/Albert.Wessels/LLM/phase3b-live-backup-20260923/extensions/pi-munchkin`.
+Full install and smoke receipts are in
+`docs/evidence/PHASE3B_OCCAMY_PROMOTION_2026-09-23.json`.
 
 ## Freeze and preflight
 
@@ -73,7 +86,8 @@ screen.
    fresh session with `RESEARCH_WORKFLOW` unset for the legacy route. Record
    both session receipts and the loaded hash in `docs/SURFACE_BOUNDARIES.md`.
 
-`npm run mirror:check` checks all 138 declared files against the entire current
+The steps above were completed for this promotion. `npm run mirror:check`
+checks all 138 declared files against the entire current
 repository. It will show unrelated context-admission, recovery, and vision
 drift after a Phase 3B-only overlay; **0/138 is not the parity criterion for
 this rollout**. Do not use whole-tree `live-mirror-apply.mjs` here.

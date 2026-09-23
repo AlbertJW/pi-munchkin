@@ -1,7 +1,6 @@
 # Phase 3B Occamy promotion screen — 2026-09-23
 
-Status: **10/10 PASS; ALL SIX VERIFICATION STAGES PASS — READY FOR LIVE
-OVERLAY, NOT YET INSTALLED**. This is a
+Status: **10/10 PASS; ALL SIX VERIFICATION STAGES PASS; PROMOTED LIVE**. This is a
 separate model qualification selected by the user. It does not convert the
 earlier Qwen Q2 `INCOMPLETE` result into a pass, and it does not change the
 frozen acceptance cases in
@@ -98,3 +97,14 @@ Final verification passed on this candidate: `npm run verify` completed all
 six stages in 128.4 seconds (937/937 harness tests; typecheck, health,
 pack:smoke, optimizer mothball check, and secret scan all PASS). Log:
 `/private/tmp/phase3b-occamy-verify-20260923.log`.
+
+Post-install checks also passed. The six selected live files match the
+qualified candidate and all 113 nonselected files match their pre-install
+hashes. A fresh parent-mode live Pi session completed `research_finish` for
+run `research-plan-2026-09-23T13-24-02-200Z`; aggregate revision 8 and its
+compatibility projection match. A separate fresh Pi session with
+`RESEARCH_WORKFLOW` unset returned `LEGACY_OK` and did not load the parent-only
+`research_finish` tool. Both sessions reported installed loaded-surface SHA-256
+`0f032911df7e4bc7907a465d19c5c4c981e56d013f965151d9a18240f4e93bfb`.
+Detailed receipts are in
+`docs/evidence/PHASE3B_OCCAMY_PROMOTION_2026-09-23.json`.

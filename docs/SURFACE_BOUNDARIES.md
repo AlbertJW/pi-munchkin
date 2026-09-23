@@ -1233,3 +1233,27 @@ stages passed. An isolated Qwen Q2 qualification attempt was incomplete after
 the model backend failed; no live install or default change is claimed. The
 previous Phase 3B promotion pin `1b3473a` is superseded; the
 ten-case decision rule remains in force.
+
+## Phase 3B Occamy qualification and live promotion — 2026-09-23
+
+The user-selected Occamy arm passed all ten frozen Phase 3B acceptance cases.
+The case-by-case evidence and the separate prior Qwen `INCOMPLETE` result are
+recorded in `optimizer/docs/screens/PHASE3B_OCCAMY_SCREEN_2026-09-23.md`;
+the implementation, rollback, install, and smoke receipts are in
+`docs/evidence/PHASE3B_OCCAMY_PROMOTION_2026-09-23.json`.
+
+The six-file overlay was installed after the full verification passed
+(937/937 tests; all six stages green). A fresh parent-mode live run completed
+`research_finish`, settled aggregate revision 8, and matched the compatibility
+graph/ledger projection. A separate fresh session with `RESEARCH_WORKFLOW`
+unset confirmed the legacy route; the parent-only `research_finish` tool was
+absent. All six selected files match the qualified candidate, all 113
+nonselected files match their pre-install hashes, and the rollback package is
+preserved. The loaded surface SHA-256 is
+`0f032911df7e4bc7907a465d19c5c4c981e56d013f965151d9a18240f4e93bfb`.
+
+Implementation commit: `0ae16e71c4e6e676f2bad92661f5c34571a58695`.
+Repository source surface SHA-256:
+`8a9e5e7d2989c17a74ea0393d90ae4a93bec17f177423af0525e77b3ef148c89`.
+Parent research remains opt-in; no optimizer execution, default flip, or push
+occurred.
