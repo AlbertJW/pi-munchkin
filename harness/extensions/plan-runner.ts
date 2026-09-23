@@ -880,6 +880,27 @@ export async function releaseResearchBranchLease(cwd: string, context: PlanConte
 	return released;
 }
 
+/** A removed lease may already have launched its child. Charge its entire
+ * reserved allowance and retain a terminal receipt in the same aggregate
+ * transaction as the graph change. Only releaseResearchBranchLease, which is
+ * called before dispatch, may refund a reservation. */
+async function closeInterruptedResearchLease(cwd: string, runId: string, item: PlanItem): Promise<void> {
+	if (!PARENT_RESEARCH_WORKFLOW || !item.lease || !item.owner_ref) return;
+	const owner = item.owner_ref;
+	await mutateParentResearchRoundLedger(cwd, runId, ledger => {
+		const reservation = ledger.state.child_reservations.find(entry => entry.owner_ref === owner);
+		if (!reservation) throw new Error(`leased research branch ${item.id} has no budget reservation`);
+		const report: ChildResearchReportV1 = {
+			report_id: `child-${createHash("sha256").update(`${runId}:${owner}:${item.dispatch_epoch ?? 0}`).digest("hex").slice(0, 48)}`,
+			run_id: runId, parent_item_id: item.id, owner_ref: owner,
+			status: "blocked", allocated: reservation.allocated,
+			consumed: { searches: 0, reads: 0, validation_reads: 0 },
+			source_leads: [], evidence_cards: [], gaps: [], failure_class: "interrupted",
+		};
+		ledger.mergeChildReport(report);
+	}, ["active", "paused", "awaiting_extension", "blocked"]);
+}
+
 function rejectPlanTool(text: string): never { throw new Error(text); }
 
 function coverageNeedsFailureReason(value: unknown): boolean {
@@ -1152,6 +1173,12 @@ const planUpdate = defineTool({
 					if (prior.kind !== "research_leaf" || !graphTerminal(prior)) continue;
 					const next = (applied.items as PlanItem[]).find((item) => item.id === prior.id);
 					if (next && !graphTerminal(next)) rejectPlanTool(`plan_update rejected: research leaves cannot be reopened independently; reopen owning branch ${prior.parent_id ?? "(unknown)"}`);
+				}
+			}
+			if (PARENT_RESEARCH_WORKFLOW && previous.profile?.name === "deep-research") {
+				for (const prior of previous.items) {
+					const next = (applied.items as PlanItem[]).find(item => item.id === prior.id);
+					if (prior.lease && next && graphTerminal(next)) await closeInterruptedResearchLease(ctx.cwd, previous.run_id, prior);
 				}
 			}
 			// A user-authorized terminal transition is also an explicit cancellation of
@@ -2162,6 +2189,7 @@ async function rebindActivePlan(cwd: string): Promise<Rebound | null> {
 		const interrupted = previous.writer !== PROC_MARK;
 		const staleLeases = interrupted ? previous.items.filter((item) => Boolean(item.lease) && !graphTerminal(item)) : [];
 		if (!staleLeases.length) return { result: { state: previous, staleLeases: 0, interrupted } };
+		for (const item of staleLeases) await closeInterruptedResearchLease(cwd, previous.run_id, item);
 		const staleIds = new Set(staleLeases.map((item) => item.id));
 		const items = previous.items.map((item) => {
 				if (!staleIds.has(item.id)) return item;

@@ -1333,9 +1333,8 @@ export async function mutateParentResearchRoundLedger<T>(
 		// extension aggregate keeps its phase on an ordinary record.
 		const nextPhase: ResearchAggregatePhase =
 			state.status === "settled" ? "settled"
-			: state.status === "blocked" ? "blocked"
 			: aggregate.phase !== "active" ? aggregate.phase
-			: "active";
+			: state.status === "blocked" ? "blocked" : "active";
 		return {
 			state: transitionAggregate(aggregate, { evidence_round: state, budget: state.budget.consumed, phase: nextPhase }),
 			result,

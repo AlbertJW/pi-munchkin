@@ -25,7 +25,7 @@ if (!CHILD) {
 	const output = execFileSync(process.execPath, [
 				"--experimental-strip-types", "--experimental-loader", resolve("harness/tests/ts-js-resolver.mjs"), "--test", import.meta.filename,
 			], { cwd: process.cwd(), env, encoding: "utf8", stdio: "pipe", timeout: 120_000, killSignal: "SIGKILL" });
-			assert.match(output, /pass 70/);
+			assert.match(output, /pass 73/);
 		} finally { rmSync(artifacts, { recursive: true, force: true }); }
 	});
 } else {
@@ -198,6 +198,100 @@ if (!CHILD) {
 			assert.equal(await module.releaseResearchBranchLease(cwd, context, acquired.lease_id), true);
 			const released = await readResearchAggregate(aggregatePath);
 			assert.equal((released?.graph?.items as any[] | undefined)?.find((item: any) => item.id === context.parent_item_id)?.lease, undefined, "lease release must refresh aggregate state");
+			assert.deepEqual((released?.evidence_round as any).budget.reserved, { searches: 0, reads: 0, validation_reads: 0 }, "failed pre-dispatch setup refunds its reservation");
+			assert.deepEqual((released?.evidence_round as any).budget.consumed, { searches: 0, reads: 0, validation_reads: 0 });
+			assert.equal((released?.evidence_round as any).child_reports.length, 0);
+		} finally {
+			if (previous === undefined) delete process.env.RESEARCH_WORKFLOW; else process.env.RESEARCH_WORKFLOW = previous;
+			resetPiGlobals();
+		}
+	});
+
+	test("terminal parent update charges and closes a leased child atomically", async () => {
+		const previous = process.env.RESEARCH_WORKFLOW;
+		process.env.RESEARCH_WORKFLOW = "parent";
+		try {
+			const fp = makeFakePi(); const cwd = tmp();
+			for (const name of ["read", "bash", "edit", "write", "capability", "plan_write", "plan_update", "plan_expand", "plan_settle", "research_plan_start", "research_round", "web_search", "web_read", "research_note", "research_recall", "subagent"]) fp.pi.registerTool({ name, parameters: {} } as any);
+			const module = await import(`../extensions/plan-runner.ts?parent-terminal-charge=${Date.now()}-${Math.random()}`);
+			module.default(fp.pi as any);
+			const started = await callTool(fp, "research_plan_start", { request: "Cancel leased work", summary: "one branch", branches: [{ title: "Evidence", budget: { searches: 1, reads: 1 } }] }, cwd);
+			const context = started.details.contexts[0];
+			const path = researchAggregatePath(cwd, context.run_id, process.env);
+			const acquired = await module.acquireResearchBranchLease(cwd, context);
+			assert.equal(acquired.ok, true);
+			const before = await readResearchAggregate(path);
+			const updated = await callTool(fp, "plan_update", { deltas: [{ item_id: context.parent_item_id, status: "blocked", note: "cancel child" }] }, cwd);
+			assert.equal(updated.isError, false);
+			const after = await readResearchAggregate(path);
+			assert.equal(after?.revision, before!.revision + 1);
+			assert.equal((after?.graph.items as any[])[0].lease, undefined);
+			assert.deepEqual((after?.evidence_round as any).budget.reserved, { searches: 0, reads: 0, validation_reads: 0 });
+			assert.deepEqual((after?.evidence_round as any).budget.consumed, { searches: 1, reads: 1, validation_reads: 0 });
+			assert.equal((after?.evidence_round as any).child_reports.length, 1);
+			assert.equal((after?.evidence_round as any).child_reports[0].status, "blocked");
+			fp.pi.events.emit(HARNESS_SIGNAL_CHANNEL, { v: 1, type: "plan/branch-result", context: { ...context, lease_id: acquired.lease_id, dispatch_epoch: 0 }, report: null, failureClass: "late" });
+			await fire(fp, "before_agent_start", {}, makeCtx(cwd).ctx);
+			assert.deepEqual(await readResearchAggregate(path), after, "late results cannot revise or recharge a terminal cancellation");
+		} finally {
+			if (previous === undefined) delete process.env.RESEARCH_WORKFLOW; else process.env.RESEARCH_WORKFLOW = previous;
+			resetPiGlobals();
+		}
+	});
+
+	test("fresh process closes a stale lease once and preserves a paused parent", async () => {
+		const previous = process.env.RESEARCH_WORKFLOW;
+		process.env.RESEARCH_WORKFLOW = "parent";
+		try {
+			const fp = makeFakePi(); const cwd = tmp();
+			for (const name of ["read", "bash", "edit", "write", "capability", "plan_write", "plan_update", "plan_expand", "plan_settle", "research_plan_start", "research_round", "web_search", "web_read", "research_note", "research_recall", "subagent"]) fp.pi.registerTool({ name, parameters: {} } as any);
+			const module = await import(`../extensions/plan-runner.ts?parent-stale-charge=${Date.now()}-${Math.random()}`);
+			module.default(fp.pi as any);
+			const started = await callTool(fp, "research_plan_start", { request: "Restart leased work", summary: "one branch", branches: [{ title: "Evidence", budget: { searches: 1, reads: 1 } }] }, cwd);
+			const context = started.details.contexts[0];
+			const path = researchAggregatePath(cwd, context.run_id, process.env);
+			assert.equal((await module.acquireResearchBranchLease(cwd, context)).ok, true);
+			const { mutateResearchAggregate, transitionAggregate } = await import("../lib/research-aggregate.ts");
+			await mutateResearchAggregate(path, state => ({ state: transitionAggregate(state, { phase: "paused" }), result: undefined }));
+			const before = await readResearchAggregate(path);
+			const childCode = `const root=${JSON.stringify(resolve("harness"))}; const {makeFakePi,makeCtx,fire}=await import(root+"/tests/integration-harness.ts"); const mod=await import(root+"/extensions/plan-runner.ts"); const fp=makeFakePi(); mod.default(fp.pi); await fire(fp,"session_start",{},makeCtx(process.env.RESTART_CWD).ctx); await fire(fp,"before_agent_start",{},makeCtx(process.env.RESTART_CWD).ctx);`;
+			const env = { ...process.env, RESTART_CWD: cwd, RESEARCH_WORKFLOW: "parent" };
+			delete (env as Record<string, string | undefined>).PI_MUNCHKIN_PLAN_CONTEXT_PATH;
+			delete (env as Record<string, string | undefined>).NODE_TEST_CONTEXT;
+			execFileSync(process.execPath, ["--experimental-strip-types", "--experimental-loader", resolve("harness/tests/ts-js-resolver.mjs"), "--input-type=module", "-e", childCode], { cwd: process.cwd(), env, stdio: "pipe", timeout: 30_000 });
+			const after = await readResearchAggregate(path);
+			assert.equal(after?.revision, before!.revision + 1);
+			assert.equal(after?.phase, "paused");
+			assert.equal((after?.graph.items as any[])[0].lease, undefined);
+			assert.deepEqual((after?.evidence_round as any).budget.reserved, { searches: 0, reads: 0, validation_reads: 0 });
+			assert.deepEqual((after?.evidence_round as any).budget.consumed, { searches: 1, reads: 1, validation_reads: 0 });
+			assert.equal((after?.evidence_round as any).child_reports.length, 1);
+			execFileSync(process.execPath, ["--experimental-strip-types", "--experimental-loader", resolve("harness/tests/ts-js-resolver.mjs"), "--input-type=module", "-e", childCode], { cwd: process.cwd(), env, stdio: "pipe", timeout: 30_000 });
+			assert.deepEqual(await readResearchAggregate(path), after, "restart replay must not charge or revise again");
+		} finally {
+			if (previous === undefined) delete process.env.RESEARCH_WORKFLOW; else process.env.RESEARCH_WORKFLOW = previous;
+			resetPiGlobals();
+		}
+	});
+
+	test("terminal cancellation fails closed when its child reservation is missing", async () => {
+		const previous = process.env.RESEARCH_WORKFLOW;
+		process.env.RESEARCH_WORKFLOW = "parent";
+		try {
+			const fp = makeFakePi(); const cwd = tmp();
+			for (const name of ["read", "bash", "edit", "write", "capability", "plan_write", "plan_update", "plan_expand", "plan_settle", "research_plan_start", "research_round", "web_search", "web_read", "research_note", "research_recall", "subagent"]) fp.pi.registerTool({ name, parameters: {} } as any);
+			const module = await import(`../extensions/plan-runner.ts?parent-missing-reservation=${Date.now()}-${Math.random()}`);
+			module.default(fp.pi as any);
+			const started = await callTool(fp, "research_plan_start", { request: "Missing reservation", summary: "one branch", branches: [{ title: "Evidence", budget: { searches: 1, reads: 1 } }] }, cwd);
+			const context = started.details.contexts[0];
+			const path = researchAggregatePath(cwd, context.run_id, process.env);
+			assert.equal((await module.acquireResearchBranchLease(cwd, context)).ok, true);
+			const { mutateParentResearchRoundLedger } = await import("../lib/research-round.ts");
+			await mutateParentResearchRoundLedger(cwd, context.run_id, ledger => ledger.releaseUndispatchedChild(context.owner_ref));
+			const before = await readResearchAggregate(path);
+			const result = await callTool(fp, "plan_update", { deltas: [{ item_id: context.parent_item_id, status: "blocked", note: "cannot silently lose child" }] }, cwd);
+			assert.equal(result.isError, true);
+			assert.deepEqual(await readResearchAggregate(path), before, "failed ledger accounting must roll back the graph transition");
 		} finally {
 			if (previous === undefined) delete process.env.RESEARCH_WORKFLOW; else process.env.RESEARCH_WORKFLOW = previous;
 			resetPiGlobals();
