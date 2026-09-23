@@ -263,7 +263,11 @@ export function buildContextAccounting(payload: unknown, profile: ContextProfile
 	} else if (usageRelation === "mismatch") {
 		outcome = "rejected";
 		reasonClass = "stale_usage_epoch";
-	} else if (usageRelation === "over") {
+	} else if (usageRelation === "over" && total <= (windowInfo.window ?? 0)) {
+		// Prefer the advisory-overflow class only when the request's own
+		// aggregate estimate fits. If both the observation and aggregate payload
+	// exceed capacity, retain the independent aggregate-preflight reason while
+	// leaving usage_relation="over" visible in the receipt.
 		outcome = "rejected";
 		reasonClass = "observed_budget_exceeded";
 	} else if (remaining < 0) {

@@ -30,6 +30,16 @@ test("observed overflow cannot admit a deceptively small assembled request", () 
 	assert.equal(result.reason_class, "observed_budget_exceeded");
 });
 
+test("aggregate overflow stays explicit when advisory usage is also over", () => {
+	const profile = contextProfileFor(model);
+	const result = buildContextAccounting({ messages: [{ role: "user", content: "x".repeat(200_000) }] }, profile, {
+		observedUsage: { tokens: 32_768, contextWindow: 32_768 },
+	});
+	assert.equal(result.usage_relation, "over", "the advisory observation remains visible");
+	assert.equal(result.outcome, "rejected");
+	assert.equal(result.reason_class, "aggregate_budget_exceeded", "aggregate payload overflow must not be hidden by a simultaneous observation overflow");
+});
+
 test("missing usage cannot erase an observed overflow", async () => {
 	const prior = process.env.CONTEXT_ADMISSION;
 	process.env.CONTEXT_ADMISSION = "on";
