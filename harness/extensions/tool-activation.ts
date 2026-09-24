@@ -376,6 +376,23 @@ export default function (pi: ExtensionAPI): void {
 			for (const name of deferred) record("tool-activation", "deferred", { tool: name, reason: "core-startup" });
 			publish("core-startup");
 			surfaceTelemetry();
+			// Package extensions may register opt-in tools from their own
+			// session_start handler, after this startup snapshot. Reconcile only
+			// obs_recall after the event handlers finish; preserve explicit user
+			// allowlists and leave the tool absent when the feature is disabled.
+			setTimeout(() => {
+				if (explicit) return;
+				let registeredNames: string[];
+				try { registeredNames = pi.getAllTools().map((tool) => String(tool.name)); }
+				catch { return; }
+				if (!registeredNames.includes("obs_recall")) return;
+				const current = pi.getActiveTools();
+				if (current.includes("obs_recall")) return;
+				pi.setActiveTools([...current, "obs_recall"]);
+				record("tool-activation", "activated", { tool: "obs_recall", reason: "late-core-registration" });
+				publish("core-late-tool-registration");
+				surfaceTelemetry();
+			}, 0);
 			return;
 		}
 
