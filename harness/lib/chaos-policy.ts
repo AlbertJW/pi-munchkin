@@ -9,7 +9,7 @@ export type ChaosSpec = { tool: string; nth: number; fault: string };
 export const FAULTS: Record<string, string> = {
 	"perm-denied": "EACCES: permission denied — the file is not writable by this process",
 	// mirrors hashline-core.ts's real stale errors (drives the re-read -> retry protocol)
-	"stale-tag": "stale tag: cannot uniquely relocate the edit — the file changed too much. Read the file again, then re-emit the patch with fresh numbers.",
+	"stale-tag": "stale tag: the patch digest does not match the current file. Nothing in this patch was applied. Read the file again, rebuild the complete patch with the fresh tag and current line numbers, then resubmit once.",
 	"missing-file": "ENOENT: no such file or directory",
 	"disconnect": "connection reset by peer — transient backend failure, retry the call",
 	"edit-noop": "no changes applied: the patch matched but produced identical content",

@@ -1281,3 +1281,22 @@ Package-source SHA-256:
 the optimizer remains mothballed. No push or default change occurred. Full
 case evidence is in
 `optimizer/docs/screens/PHASE3A_OCCAMY_SCREEN_2026-09-23.md`.
+
+## Hashline Edit 2.0 implementation candidate — 2026-09-24
+
+The review candidate replaces normalized xxHash tags and stale content
+relocation with exact-byte SHA-256 tags, strict UTF-8 validation, and fail-closed
+stale handling. It preserves the existing `read`/`edit` names and declared
+schemas, exact `HASHLINE=off` override behavior, and default activation. It adds
+source-stage grouping rules, exact EOL/BOM serialization, pre-commit digest
+rechecks, and attempted-target-only rollback. This changes the model-visible
+tag text and stale recovery behavior.
+
+**REPOSITORY-ONLY CANDIDATE; NOT QUALIFIED OR PROMOTED.** No inference,
+benchmark, live install, default change, or push occurred. Correctness tests do
+not establish model-performance benefit. The candidate is on branch
+`codex/hashline-edit-2-0`, based on `9a4415d`, with an uncommitted diff.
+Package-source SHA-256 from `npm run surface:hash:source`:
+`e8bf006093853a6da4b40eab16248b76da8c71810879f84f49ecb134224ed197`.
+This candidate hash is not a loaded live receipt and must be recomputed after
+any source change.

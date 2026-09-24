@@ -45,7 +45,7 @@ export function buildRules(probeAvailable: ToolProbe): HintRule[] {
 			tools: new Set(["edit", "hashline_edit"]),
 			matches: (text) => /bad patch/.test(text),
 			hint: () =>
-				"Hint: patch format is: a [path#TAG] header line, then one or more hunks (`@@ start..end` with `+` body rows to replace, `delete start..end`, or `insert N:`). Re-read the target span to get fresh line numbers and tags, then re-emit the WHOLE patch in that shape.",
+				"Hint: Hashline patch format is a [path#64-HEX-TAG] header, then replace N..M:, insert before/after N:, insert head/tail:, or delete N..M; replacement/insert lines begin with +. A stale tag never relocates. Read the file again, rebuild the complete patch with the fresh tag and absolute line numbers, then submit once.",
 		},
 	];
 }

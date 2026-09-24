@@ -1,95 +1,66 @@
-// Hashline pure core — tag, grammar, apply, relocate. No SDK imports by design:
-// extensions/hashline.ts wires it to pi; tests/hashline.test.ts runs it
-// standalone (no SDK resolution needed). Format from can1357/oh-my-pi
-// (packages/hashline: format.ts, grammar.lark).
+// Hashline v2 pure core: exact-byte file tags, strict UTF-8 decoding, patch
+// grammar, and line-ending-preserving application. No Pi SDK imports.
+import { createHash } from "node:crypto";
 
-export function normalizeText(s: string): string {
-	return s.replace(/^﻿/, "").replace(/\r\n?/g, "\n");
+export type Eol = "\n" | "\r\n" | "\r" | "";
+export type TextLine = { content: string; eol: Eol };
+export type TextDocument = { bom: boolean; lines: TextLine[] };
+
+export function fileTag(input: Uint8Array | string): string {
+	const bytes = typeof input === "string" ? Buffer.from(input, "utf8") : Buffer.from(input);
+	return createHash("sha256").update(bytes).digest("hex").toUpperCase();
 }
 
-function rotl(x: number, r: number): number {
-	return (x << r) | (x >>> (32 - r));
+export function decodeDocument(bytes: Uint8Array): TextDocument {
+	const source = Buffer.from(bytes);
+	const bom = source.length >= 3 && source[0] === 0xef && source[1] === 0xbb && source[2] === 0xbf;
+	const body = bom ? source.subarray(3) : source;
+	let text: string;
+	try {
+		// The optional byte BOM was handled above. Preserve any following U+FEFF
+		// as document content instead of allowing TextDecoder to consume it too.
+		text = new TextDecoder("utf-8", { fatal: true, ignoreBOM: true }).decode(body);
+	} catch {
+		throw new Error("unsupported text encoding: file is not valid UTF-8. Convert it explicitly before editing.");
+	}
+	if (text.includes("\0")) throw new Error("unsupported text encoding: NUL byte detected; binary files cannot be edited.");
+	return { bom, lines: parseLines(text) };
 }
 
-function read32(b: Uint8Array, i: number): number {
-	return b[i] | (b[i + 1] << 8) | (b[i + 2] << 16) | (b[i + 3] << 24);
+function parseLines(text: string): TextLine[] {
+	const lines: TextLine[] = [];
+	const re = /\r\n|\n|\r/g;
+	let start = 0;
+	for (let match = re.exec(text); match; match = re.exec(text)) {
+		lines.push({ content: text.slice(start, match.index), eol: match[0] as Eol });
+		start = match.index + match[0].length;
+	}
+	if (start < text.length) lines.push({ content: text.slice(start), eol: "" });
+	return lines;
 }
 
-// Standard xxHash32 (matches OMP's choice; exact parity not load-bearing —
-// the tag is session-internal).
-export function xxHash32(input: Uint8Array, seed = 0): number {
-	const P1 = 0x9e3779b1, P2 = 0x85ebca77, P3 = 0xc2b2ae3d, P4 = 0x27d4eb2f, P5 = 0x165667b1;
-	const len = input.length;
-	let i = 0;
-	let h: number;
-	if (len >= 16) {
-		let v1 = (seed + P1 + P2) | 0, v2 = (seed + P2) | 0, v3 = seed | 0, v4 = (seed - P1) | 0;
-		const limit = len - 16;
-		while (i <= limit) {
-			v1 = Math.imul(rotl((v1 + Math.imul(read32(input, i), P2)) | 0, 13), P1); i += 4;
-			v2 = Math.imul(rotl((v2 + Math.imul(read32(input, i), P2)) | 0, 13), P1); i += 4;
-			v3 = Math.imul(rotl((v3 + Math.imul(read32(input, i), P2)) | 0, 13), P1); i += 4;
-			v4 = Math.imul(rotl((v4 + Math.imul(read32(input, i), P2)) | 0, 13), P1); i += 4;
+export function serializeDocument(doc: TextDocument): Buffer {
+	for (const { content } of doc.lines) {
+		if (content.includes("\0")) throw new Error("unsupported proposed text: NUL byte detected.");
+		for (let i = 0; i < content.length; i += 1) {
+			const unit = content.charCodeAt(i);
+			if (unit >= 0xd800 && unit <= 0xdbff) {
+				if (i + 1 >= content.length) throw new Error("unsupported proposed text: unpaired surrogate cannot be encoded as UTF-8.");
+				const next = content.charCodeAt(i + 1);
+				if (next < 0xdc00 || next > 0xdfff) throw new Error("unsupported proposed text: unpaired surrogate cannot be encoded as UTF-8.");
+				i += 1;
+			} else if (unit >= 0xdc00 && unit <= 0xdfff) {
+				throw new Error("unsupported proposed text: unpaired surrogate cannot be encoded as UTF-8.");
+			}
 		}
-		h = (rotl(v1, 1) + rotl(v2, 7) + rotl(v3, 12) + rotl(v4, 18)) | 0;
-	} else {
-		h = (seed + P5) | 0;
 	}
-	h = (h + len) | 0;
-	while (i + 4 <= len) {
-		h = Math.imul(rotl((h + Math.imul(read32(input, i), P3)) | 0, 17), P4);
-		i += 4;
-	}
-	while (i < len) {
-		h = Math.imul(rotl((h + Math.imul(input[i], P5)) | 0, 11), P1);
-		i += 1;
-	}
-	h ^= h >>> 15;
-	h = Math.imul(h, P2);
-	h ^= h >>> 13;
-	h = Math.imul(h, P3);
-	h ^= h >>> 16;
-	return h >>> 0;
-}
-
-// 8-hex file-version tag: trailing whitespace stripped per line (CRLF/display
-// trim insensitivity, per OMP). OMP masks to 16 bits; we keep the full 32 —
-// a 1/65536 silent wrong-baseline collision is too likely over hundreds of
-// edits, and the cost is 4 extra chars per header.
-
-/**
- * Strip trailing spaces/tabs/CRs from every line, in linear time.
- *
- * This was `text.replace(/[ \t\r]+(?=\n|$)/g, "")`. Greedy `+` followed by a
- * lookahead that fails on every backtrack step is quadratic: measured on a run of
- * plain spaces, 60k took 4.8s and 120k took 19.5s — exactly 4x, and `read` accepts
- * files up to 16 MiB. Because `fileTag` is synchronous and runs once per `read` and
- * TWICE per `edit`, a single padded file stalled the entire event loop — every other
- * extension, the provider stream, and the abort handler with it.
- */
-function stripTrailingBlanks(text: string): string {
-	const lines = text.split("\n");
-	for (let i = 0; i < lines.length; i += 1) {
-		const line = lines[i];
-		let end = line.length;
-		while (end > 0) {
-			const code = line.charCodeAt(end - 1);
-			if (code !== 32 && code !== 9 && code !== 13) break;
-			end -= 1;
-		}
-		if (end !== line.length) lines[i] = line.slice(0, end);
-	}
-	return lines.join("\n");
-}
-
-export function fileTag(text: string): string {
-	const stripped = stripTrailingBlanks(text);
-	const h = xxHash32(new TextEncoder().encode(stripped)) >>> 0;
-	return h.toString(16).padStart(8, "0").toUpperCase();
+	const body = doc.lines.map((line) => line.content + line.eol).join("");
+	const text = doc.bom ? `\uFEFF${body}` : body;
+	return Buffer.from(text, "utf8");
 }
 
 export function annotate(lines: string[], startLine: number): string {
-	return lines.map((l, i) => `${startLine + i}:${l}`).join("\n");
+	return lines.map((line, i) => `${startLine + i}:${line}`).join("\n");
 }
 
 export type Hunk =
@@ -99,23 +70,7 @@ export type Hunk =
 
 export type Section = { path: string; tag: string; hunks: Hunk[] };
 
-// Hex tags only. (The HASHLINE_TAG=slug word encoding — candidate c14 — was
-// retired 2026-08-03: its mechanism hypothesis was independently refuted, jnoise
-// AUC 0.614 with the CI straddling 0.5. DARK_CANDIDATE_VERDICTS_2026-08-03.md.)
-const HEADER_RE = /^\[([^#\]]+)#([0-9A-Fa-f]{4,8})\]$/;
-
-// EOL/BOM round-trip helpers: the engine works on normalized LF text; callers
-// detect the original style and restore it on write so a one-line edit never
-// rewrites a whole CRLF/BOM'd file.
-export function detectStyle(raw: string): { crlf: boolean; bom: boolean } {
-	return { crlf: raw.includes("\r\n"), bom: raw.startsWith("﻿") };
-}
-
-export function restoreStyle(text: string, style: { crlf: boolean; bom: boolean }): string {
-	let out = style.crlf ? text.replace(/\n/g, "\r\n") : text;
-	if (style.bom && !out.startsWith("﻿")) out = "﻿" + out;
-	return out;
-}
+const HEADER_RE = /^\[([^#\]]+)#([0-9A-Fa-f]{64})\]$/;
 const REPLACE_RE = /^replace (\d+)(?:\.\.(\d+))?:$/;
 const INSERT_RE = /^insert (before|after) (\d+):$/;
 const INSERT_EDGE_RE = /^insert (head|tail):$/;
@@ -124,200 +79,236 @@ const DELETE_RE = /^delete (\d+)(?:\.\.(\d+))?:?$/;
 export function parsePatch(input: string): Section[] {
 	const sections: Section[] = [];
 	let cur: Section | null = null;
-	let curHunk: (Hunk & { body: string[] }) | null = null; // delete hunks never become curHunk
-	const lines = normalizeText(input).split("\n");
-
+	let curHunk: { op: "replace" | "insert"; body: string[] } & Partial<Hunk> | null = null;
+	const lines = input.replace(/\r\n?/g, "\n").split("\n");
 	const closeHunk = (lineNo: number) => {
 		if (!curHunk) return;
 		if (curHunk.body.length === 0) {
-			// No "+" rows. Self-correcting error — branch by op so a small model
-			// gets the exact fix (replace-with-empty would silently DELETE, so we
-			// reject it too; `delete` is the explicit removal op).
 			if (curHunk.op === "insert") {
-				throw new Error(
-					`bad patch: insert before line ${lineNo} has no "+" body rows. Each new line needs a leading "+", e.g.:\n` +
-						`insert head:\n+## [2026-01-01] note\n+\n(a bare "+" = blank line). For the top of a file use "insert head:", for the bottom "insert tail:".`,
-				);
+				throw new Error(`bad patch: insert before line ${lineNo} has no "+" body rows. Use "insert head:" or "insert tail:"; a bare "+" inserts a blank line.`);
 			}
 			throw new Error(`bad patch: replace hunk before line ${lineNo} has no "+" body rows (to remove lines use delete).`);
 		}
 		curHunk = null;
 	};
-
-	for (let n = 0; n < lines.length; n++) {
+	for (let n = 0; n < lines.length; n += 1) {
 		const raw = lines[n];
-		const line = raw.trimEnd(); // headers/ops tolerate trailing whitespace; body rows use raw
-		if (line.trim() === "" || /^\*\*\* (Begin|End) Patch$/.test(line.trim())) {
-			continue; // wrapper optional, blank lines ignored (blank BODY line = "+")
-		}
+		const line = raw.trimEnd();
+		if (line.trim() === "" || /^\*\*\* (Begin|End) Patch$/.test(line.trim())) continue;
 		if (raw.startsWith("+")) {
-			// (delete hunks never become curHunk — a "+" row after delete lands here as "outside a hunk")
-			if (!curHunk) throw new Error(`bad patch line ${n + 1}: "+" body row outside a hunk (delete takes no body)`);
-			curHunk.body.push(raw.slice(1)); // raw — body content keeps its trailing whitespace
+			if (!curHunk) throw new Error(`bad patch line ${n + 1}: "+" body row outside a hunk`);
+			curHunk.body.push(raw.slice(1));
 			continue;
 		}
 		let m: RegExpMatchArray | null;
 		if ((m = line.match(HEADER_RE))) {
 			closeHunk(n + 1);
 			if (cur && cur.hunks.length === 0) throw new Error(`bad patch: section [${cur.path}] has no hunks`);
-			// hex tags normalize to upper (case-insensitive copy tolerance).
 			cur = { path: m[1], tag: m[2].toUpperCase(), hunks: [] };
 			sections.push(cur);
 			continue;
 		}
+		if (/^\[[^#\]]+#.*\]$/.test(line)) throw new Error(`bad patch line ${n + 1}: file tag must be exactly 64 hexadecimal SHA-256 characters`);
 		if (!cur) throw new Error(`bad patch line ${n + 1}: "${line.slice(0, 60)}" before any [path#TAG] header`);
 		closeHunk(n + 1);
 		if ((m = line.match(REPLACE_RE))) {
-			const start = Number(m[1]);
-			const end = m[2] ? Number(m[2]) : start;
-			if (end < start || start < 1) throw new Error(`bad patch line ${n + 1}: range ${start}..${end}`);
+			const start = Number(m[1]), end = m[2] ? Number(m[2]) : start;
+			if (start < 1 || end < start) throw new Error(`bad patch line ${n + 1}: range ${start}..${end}`);
 			curHunk = { op: "replace", start, end, body: [] };
-			cur.hunks.push(curHunk);
+			cur.hunks.push(curHunk as Hunk);
 		} else if ((m = line.match(INSERT_RE))) {
 			const at = Number(m[2]);
 			if (at < 1) throw new Error(`bad patch line ${n + 1}: insert line ${at} (lines are 1-indexed; use "insert head:")`);
 			curHunk = { op: "insert", pos: m[1] as "before" | "after", line: at, body: [] };
-			cur.hunks.push(curHunk);
+			cur.hunks.push(curHunk as Hunk);
 		} else if ((m = line.match(INSERT_EDGE_RE))) {
 			curHunk = { op: "insert", pos: m[1] as "head" | "tail", body: [] };
-			cur.hunks.push(curHunk);
+			cur.hunks.push(curHunk as Hunk);
 		} else if ((m = line.match(DELETE_RE))) {
-			const start = Number(m[1]);
-			const end = m[2] ? Number(m[2]) : start;
-			if (end < start || start < 1) throw new Error(`bad patch line ${n + 1}: range ${start}..${end}`);
+			const start = Number(m[1]), end = m[2] ? Number(m[2]) : start;
+			if (start < 1 || end < start) throw new Error(`bad patch line ${n + 1}: range ${start}..${end}`);
 			cur.hunks.push({ op: "delete", start, end });
-			curHunk = null;
 		} else {
-			throw new Error(
-				`bad patch line ${n + 1}: "${line.slice(0, 60)}" — expected [path#TAG], ` +
-					`replace N..M: / insert before|after N: / insert head|tail: / delete N..M, or a "+" body row`,
-			);
+			throw new Error(`bad patch line ${n + 1}: "${line.slice(0, 60)}" — expected [path#64-HEX], replace N..M:, insert before|after N:, insert head|tail:, delete N..M, or a + body row`);
 		}
 	}
 	closeHunk(lines.length);
 	if (sections.length === 0) throw new Error("bad patch: no [path#TAG] section found");
-	for (const s of sections) if (s.hunks.length === 0) throw new Error(`bad patch: section [${s.path}] has no hunks`);
+	for (const section of sections) if (section.hunks.length === 0) throw new Error(`bad patch: section [${section.path}] has no hunks`);
 	return sections;
 }
 
-// Internal op form: half-open index range [start, end) replaced by body.
-type Op = { start: number; end: number; body: string[] };
-
-function toOps(hunks: Hunk[], lineCount: number): Op[] {
-	const ops: Op[] = [];
-	for (const h of hunks) {
-		if (h.op === "replace" || h.op === "delete") {
-			if (h.end > lineCount) throw new Error(`line ${h.end} out of bounds (file has ${lineCount} lines)`);
-			ops.push({ start: h.start - 1, end: h.end, body: h.op === "replace" ? h.body : [] });
-		} else if (h.pos === "head") {
-			ops.push({ start: 0, end: 0, body: h.body });
-		} else if (h.pos === "tail") {
-			ops.push({ start: lineCount, end: lineCount, body: h.body });
-		} else {
-			const ln = h.line ?? 0;
-			if (ln > lineCount || ln < 1) throw new Error(`line ${ln} out of bounds (file has ${lineCount} lines)`);
-			const at = h.pos === "before" ? ln - 1 : ln;
-			ops.push({ start: at, end: at, body: h.body });
-		}
-	}
-	ops.sort((a, b) => a.start - b.start || a.end - b.end);
-	for (let i = 1; i < ops.length; i++) {
-		if (ops[i].start < ops[i - 1].end) {
-			throw new Error(`overlapping hunks around line ${ops[i].start + 1} — merge them into one range`);
-		}
-	}
-	return ops;
-}
-
+type Op = { start: number; end: number; hunk: Hunk };
 export type ApplyResult = {
-	newText: string;
-	firstChangedLine: number;
-	// post-apply positions for re-grounding: [newStartLine, newLineCount] per op
+	document: TextDocument;
 	changed: { line: number; count: number }[];
 	counts: { replaced: number; inserted: number; deleted: number };
 };
 
-export function applyHunks(text: string, hunks: Hunk[]): ApplyResult {
-	const hadTrailingNL = text.endsWith("\n");
-	const lines = text === "" ? [] : text.split("\n");
-	if (hadTrailingNL) lines.pop(); // trailing sentinel is not an editable line
-	const ops = toOps(hunks, lines.length);
+/** Map prior-stage changed line spans through one later stage's source-coordinate hunks. */
+export function mapChangedLines(
+	changed: { line: number; count: number }[],
+	beforeLineCount: number,
+	hunks: Hunk[],
+	afterLineCount: number,
+): { line: number; count: number }[] {
+	if (afterLineCount === 0) return [];
+	const ops = hunks.map((hunk) => opFor(hunk, beforeLineCount)).sort((a, b) => a.start - b.start || a.end - b.end);
+	const mapIndex = (sourceIndex: number): number => {
+		let delta = 0;
+		for (const op of ops) {
+			const hunk = op.hunk;
+			const inserted = hunk.op === "delete" ? 0 : hunk.op === "replace" ? hunk.body.length : hunk.body.length;
+			if (op.start === op.end) {
+				if (op.start <= sourceIndex) delta += inserted;
+				else break;
+				continue;
+			}
+			if (sourceIndex < op.start) break;
+			const width = op.end - op.start;
+			if (sourceIndex < op.end) {
+				const mappedStart = op.start + delta;
+				return inserted === 0 ? mappedStart : mappedStart + Math.min(sourceIndex - op.start, inserted - 1);
+			}
+			delta += inserted - width;
+		}
+		return sourceIndex + delta;
+	};
+	const mapped = new Set<number>();
+	for (const span of changed) {
+		const length = Math.max(1, span.count);
+		for (let offset = 0; offset < length; offset += 1) {
+			const sourceIndex = Math.min(beforeLineCount - 1, Math.max(0, span.line - 1 + offset));
+			const targetIndex = Math.min(afterLineCount - 1, Math.max(0, mapIndex(sourceIndex)));
+			mapped.add(targetIndex);
+		}
+	}
+	const sorted = [...mapped].sort((a, b) => a - b);
+	const result: { line: number; count: number }[] = [];
+	for (const index of sorted) {
+		const last = result[result.length - 1];
+		if (last && last.line + last.count === index + 1) last.count += 1;
+		else result.push({ line: index + 1, count: 1 });
+	}
+	return result;
+}
 
+function dominantEol(lines: TextLine[]): Eol {
+	const counts = new Map<Eol, number>();
+	let best: Eol = "";
+	let bestCount = 0;
+	for (const { eol } of lines) {
+		if (eol === "") continue;
+		const n = (counts.get(eol) ?? 0) + 1;
+		counts.set(eol, n);
+		if (n > bestCount) { best = eol; bestCount = n; }
+	}
+	return best || "\n";
+}
+
+function nearestEol(lines: TextLine[], start: number, end: number): Eol {
+	for (let distance = 0; distance < lines.length; distance += 1) {
+		const before = start - 1 - distance;
+		if (before >= 0 && lines[before].eol) return lines[before].eol;
+		const after = end + distance;
+		if (after < lines.length && lines[after].eol) return lines[after].eol;
+	}
+	return dominantEol(lines);
+}
+
+function rangeEol(lines: TextLine[], start: number, end: number): Eol {
+	const counts = new Map<Eol, number>();
+	let best: Eol = "";
+	let bestCount = 0;
+	for (let i = start; i < end; i += 1) {
+		const eol = lines[i].eol;
+		if (!eol) continue;
+		const n = (counts.get(eol) ?? 0) + 1;
+		counts.set(eol, n);
+		if (n > bestCount) { best = eol; bestCount = n; }
+	}
+	return best || nearestEol(lines, start, end);
+}
+
+function opFor(hunk: Hunk, lineCount: number): Op {
+	if (hunk.op === "replace" || hunk.op === "delete") {
+		if (hunk.end > lineCount) throw new Error(`line ${hunk.end} out of bounds (file has ${lineCount} lines)`);
+		return { start: hunk.start - 1, end: hunk.end, hunk };
+	}
+	if (hunk.pos === "head") return { start: 0, end: 0, hunk };
+	if (hunk.pos === "tail") return { start: lineCount, end: lineCount, hunk };
+	const line = hunk.line ?? 0;
+	if (line < 1 || line > lineCount) throw new Error(`line ${line} out of bounds (file has ${lineCount} lines)`);
+	const at = hunk.pos === "before" ? line - 1 : line;
+	return { start: at, end: at, hunk };
+}
+
+export function applyHunks(document: TextDocument, hunks: Hunk[]): ApplyResult {
+	const original = document.lines;
+	const ops = hunks.map((hunk) => opFor(hunk, original.length)).sort((a, b) => a.start - b.start || a.end - b.end);
+	for (let i = 1; i < ops.length; i += 1) {
+		const prior = ops[i - 1], current = ops[i];
+		if (current.start < prior.end) throw new Error(`overlapping hunks around line ${current.start + 1} — merge them into one range`);
+		if (current.start === prior.start && current.start === current.end && prior.start === prior.end) {
+			throw new Error(`ambiguous same-position insertions at line ${current.start + 1} — combine them into one insert hunk`);
+		}
+	}
 	const counts = { replaced: 0, inserted: 0, deleted: 0 };
-	for (const h of hunks) {
-		if (h.op === "replace") counts.replaced += 1;
-		else if (h.op === "delete") counts.deleted += 1;
+	for (const hunk of hunks) {
+		if (hunk.op === "replace") counts.replaced += 1;
+		else if (hunk.op === "delete") counts.deleted += 1;
 		else counts.inserted += 1;
 	}
-
-	// Post-apply position of each op = its start shifted by the net delta of
-	// all ops above it. Apply bottom-up so indexes stay valid.
 	const changed: { line: number; count: number }[] = [];
 	let delta = 0;
 	for (const op of ops) {
-		changed.push({ line: op.start + delta + 1, count: op.body.length });
-		delta += op.body.length - (op.end - op.start);
+		const hunk = op.hunk;
+		const count = hunk.op === "delete" ? 0 : hunk.body.length;
+		changed.push({ line: op.start + delta + 1, count });
+		delta += count - (op.end - op.start);
 	}
-	for (let i = ops.length - 1; i >= 0; i--) {
-		const op = ops[i];
-		lines.splice(op.start, op.end - op.start, ...op.body);
-	}
-
-	return {
-		newText: lines.join("\n") + (hadTrailingNL ? "\n" : ""),
-		firstChangedLine: ops.length ? ops[0].start + 1 : 1,
-		changed,
-		counts,
-	};
-}
-
-// Stale-tag rebase: for each hunk, take the SNAPSHOT's target lines ±1 context
-// line and find a unique exact match in the live file; shift line numbers by
-// the offset. No unique match → stale error (model must re-read).
-export function relocateHunks(snapText: string, liveText: string, hunks: Hunk[]): Hunk[] {
-	const snap = snapText.replace(/\n$/, "").split("\n");
-	const live = liveText.replace(/\n$/, "").split("\n");
-
-	const findUnique = (window: string[], around: number): number => {
-		if (window.length === 0) return -1;
-		const hits: number[] = [];
-		for (let i = 0; i + window.length <= live.length; i++) {
-			let ok = true;
-			for (let j = 0; j < window.length; j++) {
-				if (live[i + j] !== window[j]) { ok = false; break; }
+	const lines = original.map((line) => ({ ...line }));
+	for (let i = ops.length - 1; i >= 0; i -= 1) {
+		const op = ops[i], hunk = op.hunk;
+		if (hunk.op === "delete") {
+			const removed = lines.splice(op.start, op.end - op.start);
+			if (op.end === original.length && lines.length > 0 && removed.length > 0 && removed[removed.length - 1].eol === "") {
+				lines[lines.length - 1].eol = "";
 			}
-			if (ok) hits.push(i);
+			continue;
 		}
-		if (hits.length === 1) return hits[0];
-		if (hits.length > 1) {
-			// prefer the hit STRICTLY closest to the original position; a tie is ambiguous
-			hits.sort((a, b) => Math.abs(a - around) - Math.abs(b - around));
-			if (Math.abs(hits[0] - around) < Math.abs(hits[1] - around)) return hits[0];
+		if (hunk.op === "replace") {
+			const inherited = rangeEol(original, op.start, op.end);
+			const finalEol = original[op.end - 1].eol;
+			const replacement = hunk.body.map((content, index) => ({ content, eol: index === hunk.body.length - 1 ? finalEol : inherited } as TextLine));
+			lines.splice(op.start, op.end - op.start, ...replacement);
+			continue;
 		}
-		return -1;
-	};
-
-	return hunks.map((h) => {
-		if (h.op === "insert" && (h.pos === "head" || h.pos === "tail")) return h; // no anchor needed
-		const ref = h.op === "insert" ? (h.line ?? 1) : h.start;
-		const s = ref - 1;
-		const e = h.op === "insert" ? ref : h.end;
-		if (e > snap.length) throw new Error(`stale tag: line ${e} not in the tagged snapshot — read the file again`);
-		// ±2 context lines: ±1 made 3-line windows, too thin against repetitive
-		// code (imports, test boilerplate) — a duplicate window relocates an edit
-		// onto the wrong copy.
-		const winStart = Math.max(0, s - 2);
-		const winEnd = Math.min(snap.length, e + 2);
-		const window = snap.slice(winStart, winEnd);
-		const at = findUnique(window, winStart);
-		if (at < 0) {
-			throw new Error(
-				`stale tag: cannot uniquely relocate ${h.op} at line ${ref} — the file changed too much. Read the file again, then re-emit the patch with fresh numbers.`,
-			);
+		const body = hunk.body;
+		let eol: Eol;
+		if (hunk.pos === "before") eol = original[op.start]?.eol || dominantEol(original);
+		else if (hunk.pos === "after" && op.start < original.length) eol = original[op.start]?.eol || dominantEol(original);
+		else if (hunk.pos === "after" && original.length > 0) eol = original[original.length - 1].eol || dominantEol(original);
+		else if (hunk.pos === "tail" && original.length > 0) eol = original[original.length - 1].eol || dominantEol(original);
+		else if (hunk.pos === "head" && original.length > 0) eol = original[0].eol || dominantEol(original);
+		else eol = dominantEol(original);
+		const finalEol: Eol = hunk.pos === "tail" && original.length > 0 ? original[original.length - 1].eol :
+			hunk.pos === "after" && op.start === original.length ? original[original.length - 1]?.eol ?? "" :
+			original.length === 0 ? "" : eol;
+		const inserted = body.map((content, index) => ({ content, eol: index === body.length - 1 ? finalEol : eol } as TextLine));
+		if ((hunk.pos === "tail" || (hunk.pos === "after" && op.start === original.length)) && lines.length > 0 && lines[lines.length - 1].eol === "") {
+			lines[lines.length - 1].eol = eol;
 		}
-		const shift = at - winStart;
-		if (h.op === "insert") return { ...h, line: ref + shift };
-		return { ...h, start: h.start + shift, end: h.end + shift };
-	});
+		lines.splice(op.start, 0, ...inserted);
+	}
+	// Every non-final logical line needs a physical separator. Simultaneous
+	// operations can otherwise overwrite each other's EOL decisions (for example,
+	// replacing an unterminated EOF line while also appending at tail).
+	if (lines.length > 0 && original.length > 0) {
+		const separator = dominantEol(original);
+		for (let i = 0; i < lines.length - 1; i += 1) if (!lines[i].eol) lines[i].eol = separator;
+		// Preserve the exact original final terminator, including absence.
+		lines[lines.length - 1].eol = original[original.length - 1].eol;
+	}
+	return { document: { bom: document.bom, lines }, changed, counts };
 }
-

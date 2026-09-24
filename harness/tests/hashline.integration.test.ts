@@ -8,12 +8,12 @@ import { mkdtempSync, readFileSync, symlinkSync, truncateSync, writeFileSync } f
 import { writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { fileTag, normalizeText } from "../lib/hashline-core.ts";
+import { fileTag } from "../lib/hashline-core.ts";
 import { registerHashline, withMutationQueues, type HashlineIo } from "../extensions/hashline.ts";
 import { callTool, expectToolError, makeFakePi } from "./integration-harness.ts";
 
 const tmp = () => mkdtempSync(join(tmpdir(), "pi-hl-"));
-const tagOf = (path: string) => fileTag(normalizeText(readFileSync(path, "utf8")));
+const tagOf = (path: string) => fileTag(readFileSync(path));
 
 function fresh(io?: HashlineIo) {
 	const fp = makeFakePi();
@@ -60,7 +60,7 @@ test("hashline: oversized image and text are refused by stat preflight", async (
 	writeFileSync(join(cwd, "huge.txt"), "");
 	truncateSync(join(cwd, "huge.txt"), 16 * 1024 * 1024 + 1);
 	await expectToolError(fp, "read", { path: "huge.txt", limit: 1 }, cwd, /limit parameter only bounds returned context/);
-	await expectToolError(fp, "edit", { input: "[huge.txt#deadbeef]\nreplace 1..1:\n+x\n" }, cwd, /purpose-built bounded span tool/);
+	await expectToolError(fp, "edit", { input: `[huge.txt#${fileTag(readFileSync(join(cwd, "huge.txt")))}]\nreplace 1..1:\n+x\n` }, cwd, /purpose-built bounded span tool/);
 });
 
 test("hashline: single-file edit applies with the live tag", async () => {
@@ -72,20 +72,121 @@ test("hashline: single-file edit applies with the live tag", async () => {
 	assert.equal(readFileSync(join(cwd, "a.txt"), "utf8"), "HELLO\n");
 });
 
+test("hashline: read advertises the exact raw-byte SHA-256 and preserves the declared tool schemas", async () => {
+	if (process.env.HASHLINE === "off") return;
+	const fp = fresh();
+	assert.deepEqual([...fp.tools.keys()].sort(), ["edit", "read"]);
+	const read = fp.tools.get("read")! as any;
+	const edit = fp.tools.get("edit")! as any;
+	assert.deepEqual(Object.keys(read.parameters.properties).sort(), ["limit", "offset", "path"]);
+	assert.deepEqual(read.parameters.required, ["path"]);
+	assert.equal(read.parameters.properties.path.type, "string");
+	assert.equal(read.parameters.properties.offset.type, "number");
+	assert.equal(read.parameters.properties.offset.minimum, 1);
+	assert.equal(read.parameters.properties.limit.type, "number");
+	assert.equal(read.parameters.properties.limit.minimum, 1);
+	assert.deepEqual(Object.keys(edit.parameters.properties), ["input"]);
+	assert.deepEqual(edit.parameters.required, ["input"]);
+	assert.equal(edit.parameters.properties.input.type, "string");
+	const cwd = tmp();
+	const bytes = Buffer.from("\uFEFFone\r\ntwo ", "utf8");
+	writeFileSync(join(cwd, "tag.txt"), bytes);
+	const result = await callTool(fp, "read", { path: "tag.txt" }, cwd);
+	const output = result.content.map((block: { text?: string }) => block.text ?? "").join("");
+	assert.ok(output.startsWith(`[tag.txt#${fileTag(bytes)}]\n`));
+	assert.match(read.description, /exact-byte SHA-256/);
+});
+
+test("hashline: invalid UTF-8 is rejected by read and edit without altering original bytes", async () => {
+	const fp = fresh();
+	const cwd = tmp();
+	const path = join(cwd, "invalid.txt");
+	const original = Buffer.from([0xff, 0x61, 0x80]);
+	writeFileSync(path, original);
+	await expectToolError(fp, "read", { path }, cwd, /not valid UTF-8/);
+	const patch = `[invalid.txt#${fileTag(original)}]\nreplace 1:\n+valid`;
+	await expectToolError(fp, "edit", { input: patch }, cwd, /not valid UTF-8/);
+	assert.deepEqual(readFileSync(path), original);
+});
+
+test("hashline: invalid proposed NUL and surrogate content fails before any target write", async () => {
+	const cwd = tmp();
+	const path = join(cwd, "f.txt");
+	let writes = 0;
+	const fp = fresh({
+		writeTarget: async (target, text) => { writes += 1; await writeFile(target, text, "utf8"); },
+	});
+	const cases = [
+		{ index: 0, patchBody: "+b\0c", error: /NUL byte/ },
+		{ index: 1, patchBody: "+b\uD800c", error: /unpaired surrogate/ },
+		{ index: 2, patchBody: "+b\uDC00c", error: /unpaired surrogate/ },
+		{ index: 3, patchBody: "+ordinary\uD800", error: /unpaired surrogate/ },
+		{ index: 4, patchBody: "+line\uD800\n+next", error: /unpaired surrogate/ },
+	] as const;
+	for (const { index, patchBody, error } of cases) {
+		const original = Buffer.from(`source-${index}\n`);
+		writeFileSync(path, original);
+		const patch = `[f.txt#${fileTag(original)}]\nreplace 1:\n${patchBody}`;
+		await expectToolError(fp, "edit", { input: patch }, cwd, error);
+		assert.equal(writes, 0, "invalid proposed content must be rejected before the first target write");
+		assert.deepEqual(readFileSync(path), original);
+	}
+});
+
+test("hashline: invalid proposal in the last file of a multi-file patch causes zero writes", async () => {
+	const cwd = tmp();
+	const firstPath = join(cwd, "first.txt");
+	const lastPath = join(cwd, "last.txt");
+	const firstOriginal = Buffer.from("first\n");
+	const lastOriginal = Buffer.from("last\n");
+	writeFileSync(firstPath, firstOriginal);
+	writeFileSync(lastPath, lastOriginal);
+	let writes = 0;
+	const fp = fresh({
+		writeTarget: async (target, text) => { writes += 1; await writeFile(target, text, "utf8"); },
+	});
+	const patch =
+		`[first.txt#${fileTag(firstOriginal)}]\nreplace 1:\n+FIRST\n` +
+		`[last.txt#${fileTag(lastOriginal)}]\nreplace 1:\n+invalid\uD800`;
+	await expectToolError(fp, "edit", { input: patch }, cwd, /unpaired surrogate/);
+	assert.equal(writes, 0, "all targets must finish proposed-content validation before the first write");
+	assert.deepEqual(readFileSync(firstPath), firstOriginal);
+	assert.deepEqual(readFileSync(lastPath), lastOriginal);
+});
+
+test("hashline: exact HASHLINE=off leaves native tools unshadowed", async () => {
+	const previous = process.env.HASHLINE;
+	process.env.HASHLINE = "off";
+	try {
+		const extension = await import(`../extensions/hashline.ts?off=${Date.now()}-${Math.random()}`);
+		const fp = makeFakePi();
+		extension.default(fp.pi as any);
+		assert.equal(fp.tools.has("read"), false);
+		assert.equal(fp.tools.has("edit"), false);
+	} finally {
+		if (previous === undefined) delete process.env.HASHLINE;
+		else process.env.HASHLINE = previous;
+	}
+});
+
 test("hashline: concurrent same-file edits are queued and preserve both changes", async () => {
 	const fp = fresh();
 	const cwd = tmp();
 	const path = join(cwd, "race.txt");
 	writeFileSync(path, "one\ntwo\nthree\nfour\nfive\n");
-	await callTool(fp, "read", { path: "race.txt" }, cwd); // records the shared baseline snapshot
+	await callTool(fp, "read", { path: "race.txt" }, cwd);
 	const tag = tagOf(path);
 	const first = `[race.txt#${tag}]\nreplace 1..1:\n+ONE\n`;
 	const second = `[race.txt#${tag}]\nreplace 5..5:\n+FIVE\n`;
-	await Promise.all([
+	const results = await Promise.allSettled([
 		callTool(fp, "edit", { input: first }, cwd),
 		callTool(fp, "edit", { input: second }, cwd),
 	]);
-	assert.equal(readFileSync(path, "utf8"), "ONE\ntwo\nthree\nfour\nFIVE\n");
+	assert.equal(results[0].status, "fulfilled");
+	assert.equal(results[1].status, "fulfilled");
+	assert.equal((results[1] as PromiseFulfilledResult<Awaited<ReturnType<typeof callTool>>>).value.isError, true);
+	assert.match((results[1] as PromiseFulfilledResult<Awaited<ReturnType<typeof callTool>>>).value.content.map((block) => block.text ?? "").join(""), /stale tag/);
+	assert.equal(readFileSync(path, "utf8"), "ONE\ntwo\nthree\nfour\nfive\n");
 });
 
 test("hashline counterfactual: the legacy unqueued read/write transaction loses one concurrent edit", async () => {
@@ -182,37 +283,36 @@ test("hashline: multi-file edit applies both sections", async () => {
 	assert.equal(readFileSync(join(cwd, "f2.txt"), "utf8"), "BBB\n");
 });
 
-test("hashline: ATOMIC — a bad tag in a later section leaves earlier files UNTOUCHED", async () => {
+test("hashline: a stale tag with a repeated block rejects without relocating or writing any target", async () => {
 	const fp = fresh();
 	const cwd = tmp();
 	writeFileSync(join(cwd, "f1.txt"), "aaa\n");
 	writeFileSync(join(cwd, "f2.txt"), "bbb\n");
-	// section 1 valid, section 2 carries a tag that is neither live nor snapshotted
+	// The stale target text still exists, but a newly inserted duplicate changes the exact-byte digest.
+	writeFileSync(join(cwd, "f2.txt"), "bbb\nbbb\n");
 	const patch =
 		`[f1.txt#${tagOf(join(cwd, "f1.txt"))}]\nreplace 1..1:\n+AAA\n` +
-		`[f2.txt#deadbeef]\nreplace 1..1:\n+BBB\n`;
-	// The diagnosis names what was actually checked (the snapshot LRU), not a session
-	// boundary the module-scope store does not have.
-	await expectToolError(fp, "edit", { input: patch }, cwd, /no retained snapshot carries this tag/);
+		`[f2.txt#${fileTag(Buffer.from("bbb\n"))}]\nreplace 1..1:\n+BBB\n`;
+	await expectToolError(fp, "edit", { input: patch }, cwd, /stale tag.*Nothing in this patch was applied/);
 	// the whole patch must have rolled back — f1 is NOT half-applied
 	assert.equal(readFileSync(join(cwd, "f1.txt"), "utf8"), "aaa\n", "earlier file must be untouched on a later-section failure");
-	assert.equal(readFileSync(join(cwd, "f2.txt"), "utf8"), "bbb\n");
+	assert.equal(readFileSync(join(cwd, "f2.txt"), "utf8"), "bbb\nbbb\n");
 });
 
 test("hashline: same-file SAME-TAG sections merge into one exact apply (adjacent lines ok)", async () => {
 	const fp = fresh();
 	const cwd = tmp();
 	writeFileSync(join(cwd, "f.txt"), "one\ntwo\nthree\n");
-	await callTool(fp, "read", { path: "f.txt" }, cwd);
 	const tag = tagOf(join(cwd, "f.txt"));
-	// both sections carry the ORIGINAL tag (composed against one read) and sit
-	// within ±2 lines of each other — the self-relocation path fails here
-	// (pre-existing, verified against the old code); the merge pre-pass makes it exact
+	// Same-stage hunks merge, even when another file section intervenes.
+	writeFileSync(join(cwd, "g.txt"), "other\n");
 	const patch =
 		`[f.txt#${tag}]\nreplace 1..1:\n+ONE\n` +
+		`[g.txt#${tagOf(join(cwd, "g.txt"))}]\nreplace 1..1:\n+OTHER\n` +
 		`[f.txt#${tag}]\nreplace 3..3:\n+THREE\n`;
 	await callTool(fp, "edit", { input: patch }, cwd);
 	assert.equal(readFileSync(join(cwd, "f.txt"), "utf8"), "ONE\ntwo\nTHREE\n");
+	assert.equal(readFileSync(join(cwd, "g.txt"), "utf8"), "OTHER\n");
 });
 
 test("hashline: same-file CHAINED-TAG section applies against the in-memory intermediate", async () => {
@@ -221,13 +321,57 @@ test("hashline: same-file CHAINED-TAG section applies against the in-memory inte
 	writeFileSync(join(cwd, "f.txt"), "one\ntwo\nthree\n");
 	const tag1 = tagOf(join(cwd, "f.txt"));
 	const intermediate = "ONE\ntwo\nthree\n";
-	const tag2 = fileTag(normalizeText(intermediate)); // the tag section 1's result WILL have
+	const tag2 = fileTag(Buffer.from(intermediate)); // the exact intermediate bytes after stage 1
 	const patch =
 		`[f.txt#${tag1}]\nreplace 1..1:\n+ONE\n` +
 		`[f.txt#${tag2}]\nreplace 3..3:\n+THREE\n`; // different tag -> chains on the buffer, no merge
 	await callTool(fp, "edit", { input: patch }, cwd);
 	assert.equal(readFileSync(join(cwd, "f.txt"), "utf8"), "ONE\ntwo\nTHREE\n",
-		"section 2 matched the intermediate buffer's live tag without any snapshot");
+		"section 2 matched the exact intermediate byte digest");
+});
+
+test("hashline: chained-stage receipts aggregate operations and preview prior changes at final locations", async () => {
+	const fp = fresh();
+	const cwd = tmp();
+	const path = join(cwd, "f.txt");
+	const original = "one\ntwo\nthree\nfour\nfive\nsix\nseven\neight\n";
+	writeFileSync(path, original);
+	const intermediate = original.replace("seven", "SEVEN");
+	const patch =
+		`[f.txt#${fileTag(Buffer.from(original))}]\nreplace 7:\n+SEVEN\n` +
+		`[f.txt#${fileTag(Buffer.from(intermediate))}]\ninsert before 6:\n+INSERTED`;
+	const result = await callTool(fp, "edit", { input: patch }, cwd);
+	const text = result.content.map((block: { text?: string }) => block.text ?? "").join("");
+	assert.match(text, /Applied 2 hunk\(s\).*\(1 replace, 1 insert, 0 delete\)/);
+	assert.match(text, /8:SEVEN/, "prior stage's changed line 7 moves to final line 8 and must appear in the preview");
+	assert.equal((result as any).details.firstChangedLine, 6);
+	assert.equal(readFileSync(path, "utf8"), "one\ntwo\nthree\nfour\nfive\nINSERTED\nsix\nSEVEN\neight\n");
+});
+
+test("hashline: returning to a closed earlier source stage is rejected", async () => {
+	const fp = fresh();
+	const cwd = tmp();
+	writeFileSync(join(cwd, "f.txt"), "one\ntwo\n");
+	const first = tagOf(join(cwd, "f.txt"));
+	const second = fileTag(Buffer.from("ONE\ntwo\n"));
+	const patch = `[f.txt#${first}]\nreplace 1:\n+ONE\n[f.txt#${second}]\nreplace 2:\n+TWO\n[f.txt#${first}]\nreplace 1:\n+ONE-AGAIN`;
+	await expectToolError(fp, "edit", { input: patch }, cwd, /ambiguous return to an earlier source stage/);
+	assert.equal(readFileSync(join(cwd, "f.txt"), "utf8"), "one\ntwo\n");
+});
+
+test("hashline: an external write during planning is detected before the first target write", async () => {
+	const cwd = tmp();
+	const path = join(cwd, "f.txt");
+	writeFileSync(path, "before\n");
+	let writes = 0;
+	const fp = fresh({
+		beforeCommit: async () => { writeFileSync(path, "external\n"); },
+		writeTarget: async (target, text) => { writes += 1; await writeFile(target, text, "utf8"); },
+	});
+	const patch = `[f.txt#${tagOf(path)}]\nreplace 1:\n+agent`;
+	await expectToolError(fp, "edit", { input: patch }, cwd, /changed while this patch was being validated.*Nothing in this patch was written/);
+	assert.equal(writes, 0);
+	assert.equal(readFileSync(path, "utf8"), "external\n");
 });
 
 test("hashline: multi-section failure message says NOTHING was applied", async () => {
@@ -236,28 +380,38 @@ test("hashline: multi-section failure message says NOTHING was applied", async (
 	writeFileSync(join(cwd, "f1.txt"), "aaa\n");
 	const patch =
 		`[f1.txt#${tagOf(join(cwd, "f1.txt"))}]\nreplace 1..1:\n+AAA\n` +
-		`[f2.txt#deadbeef]\nreplace 1..1:\n+BBB\n`;
-	await expectToolError(fp, "edit", { input: patch }, cwd, /NONE were applied.*re-emit the ENTIRE patch/);
+		`[f2.txt#${"0".repeat(64)}]\nreplace 1..1:\n+BBB\n`;
+	await expectToolError(fp, "edit", { input: patch }, cwd, /Nothing in this patch was written/);
 });
 
-test("hashline: phase-2 WRITE failure rolls earlier files back (I/O atomicity)", async () => {
+test("hashline: write failure rolls back only attempted paths, including partial failing write", async () => {
 	const cwd = tmp();
 	const failingPath = join(cwd, "f2.txt");
+	const unattemptedPath = join(cwd, "f3.txt");
+	const attempts: string[] = [];
 	const fp = fresh({
 		writeTarget: async (path, text) => {
-			if (path === failingPath) throw Object.assign(new Error("injected target write failure"), { code: "EIO" });
+			attempts.push(path);
+			if (path.endsWith("/f2.txt")) {
+				await writeFile(path, Buffer.from(text).subarray(0, 2));
+				throw Object.assign(new Error("injected target write failure"), { code: "EIO" });
+			}
 			await writeFile(path, text, "utf8");
 		},
 	});
 	writeFileSync(join(cwd, "f1.txt"), "aaa\n");
 	writeFileSync(failingPath, "bbb\n");
+	writeFileSync(unattemptedPath, "ccc\n");
 	const patch =
 		`[f1.txt#${tagOf(join(cwd, "f1.txt"))}]\nreplace 1..1:\n+AAA\n` +
-		`[f2.txt#${tagOf(join(cwd, "f2.txt"))}]\nreplace 1..1:\n+BBB\n`;
-	await expectToolError(fp, "edit", { input: patch }, cwd, /every target was restored to its pre-patch state/);
+		`[f2.txt#${tagOf(join(cwd, "f2.txt"))}]\nreplace 1..1:\n+BBB\n` +
+		`[f3.txt#${tagOf(unattemptedPath)}]\nreplace 1..1:\n+CCC`;
+	await expectToolError(fp, "edit", { input: patch }, cwd, /attempted target was restored byte-for-byte and unattempted targets were untouched/);
+	assert.deepEqual(attempts.map((path) => path.slice(path.lastIndexOf("/") + 1)), ["f1.txt", "f2.txt"]);
 	assert.equal(readFileSync(join(cwd, "f1.txt"), "utf8"), "aaa\n",
 		"f1 was written in phase 2, then ROLLED BACK when f2's write failed");
 	assert.equal(readFileSync(failingPath, "utf8"), "bbb\n");
+	assert.equal(readFileSync(unattemptedPath, "utf8"), "ccc\n");
 });
 
 test("hashline: ATOMIC — an out-of-range hunk in a later section rolls back the earlier one", async () => {

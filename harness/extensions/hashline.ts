@@ -2,25 +2,21 @@ import { readFile, realpath, stat, writeFile } from "node:fs/promises";
 import { extname, isAbsolute, relative, resolve } from "node:path";
 import { defineTool, type ExtensionAPI, withFileMutationQueue } from "@earendil-works/pi-coding-agent";
 import { Type } from "typebox";
-import { annotate, applyHunks, detectStyle, fileTag, normalizeText, parsePatch, relocateHunks, restoreStyle } from "../lib/hashline-core.ts";
+import { annotate, applyHunks, decodeDocument, fileTag, mapChangedLines, parsePatch, serializeDocument, type Hunk } from "../lib/hashline-core.ts";
 import { emitHarnessSignal } from "../lib/harness-signals.ts";
 
 // Hashline edits — line-anchored patches instead of exact-text matching.
 //
 // Port of oh-my-pi's hashline format (github.com/can1357/oh-my-pi —
-// packages/hashline: format.ts, grammar.lark, prompt.md). Exact-text edit
-// matching is the #1 failure for small local models; hashline removes the
-// class: `read` returns a `[path#TAG]` file-version tag + `N:content` numbered
-// lines, `edit` takes a patch naming line ranges. OMP benchmarks: ~50-61%
-// fewer edit tokens, weak-model pass rate 6.7% → 68.3%.
+// packages/hashline: format.ts, grammar.lark, prompt.md). `read` returns a
+// `[path#SHA256]` exact-byte file tag + `N:content` numbered lines; `edit`
+// rejects stale tags rather than relocating line ranges.
 //
-// "Lite" port: full patch grammar EXCEPT tree-sitter block ops; in-memory
-// snapshot store (4 versions/path); stale tag → content-based relocation
-// against the snapshot, else "read again". Registering tools named
+// "Lite" port: full patch grammar EXCEPT tree-sitter block ops. Registering tools named
 // "read"/"edit" REPLACES the built-ins (extension tools merge after built-ins,
 // same name wins). HASHLINE=off skips registration → built-ins untouched.
-// Same param names/semantics as built-ins, so verify-gate / loop-breaker /
-// plan-runner / context-inlet-guard keep working unmodified.
+// Downstream observers use the stable tool names and mutation classification;
+// the hashline edit schema is intentionally distinct from Pi's native schema.
 
 const ENABLED = process.env.HASHLINE !== "off";
 const MAX_LINES = 2000; // mirror built-in read defaults
@@ -37,8 +33,6 @@ function truncateUtf8Bytes(value: string, maxBytes: number): string {
 	const tail = out.charCodeAt(out.length - 1);
 	return tail >= 0xD800 && tail <= 0xDBFF ? out.slice(0, -1) : out;
 }
-const SNAP_VERSIONS = 4;
-const SNAP_PATHS = 50;
 const IMAGE_MAX_BYTES = 4 * 1024 * 1024;
 
 function byteLimit(name: string, fallback: number): number {
@@ -73,28 +67,6 @@ function oversizedMessage(kind: "read" | "edit", size: number, max: number): str
 		"Use rg, head, tail, or a purpose-built bounded span tool.";
 }
 
-// ---------- snapshot store ----------
-
-const snaps = new Map<string, { tag: string; text: string }[]>();
-const SNAP_MAX_FILE = 2 * 1024 * 1024; // don't retain huge files; stale edits degrade to "read again"
-
-function recordSnapshot(abs: string, text: string): string {
-	const tag = fileTag(text);
-	if (text.length > SNAP_MAX_FILE) return tag; // tag-only; no retention
-	const history = snaps.get(abs) ?? [];
-	// dedupe by tag AND text: a tag collision must not stop the real new
-	// version from being stored (it would corrupt later relocation)
-	if (!history.some((s) => s.tag === tag && s.text === text)) {
-		snaps.delete(abs); // refresh insertion order → eviction is LRU, not first-read FIFO
-		snaps.set(abs, [{ tag, text }, ...history].slice(0, SNAP_VERSIONS));
-		if (snaps.size > SNAP_PATHS) {
-			const oldest = snaps.keys().next().value;
-			if (oldest && oldest !== abs) snaps.delete(oldest);
-		}
-	}
-	return tag;
-}
-
 // ---------- tools ----------
 
 const IMAGE_MIME: Record<string, string> = {
@@ -113,7 +85,7 @@ function displayPath(cwd: string, abs: string): string {
 const EDIT_DESCRIPTION = `Edit files with a hashline patch. ONE param \`input\`:
 
 *** Begin Patch
-[<RELATIVE/PATH>#<TAG>]
+[<RELATIVE/PATH>#<64-HEX-SHA256-TAG>]
 replace 12..13:
 +const x = load();
 +use(x);
@@ -122,12 +94,15 @@ insert after 20:
 delete 30..31
 *** End Patch
 
-The header above is a PLACEHOLDER. Substitute the real path you read and the real #TAG — never emit "<RELATIVE/PATH>" or "<TAG>" literally, never emit this description's old example values.
+The header above is a PLACEHOLDER. Substitute the real path and exact 64-hex #TAG from your latest read — never emit placeholders or example values.
 Ops: replace N..M: · insert before N: / after N: / head: / tail: · delete N..M. replace/insert REQUIRE "+" body rows (to remove lines use delete). Body rows start with "+" and are the FINAL content (never old lines, never context). "+" alone = blank line.
-Critical: (1) Path + #TAG + line numbers come from YOUR LAST read/edit response for that file — copy the #TAG character-for-character; never from memory, never the placeholder. (2) every edit mints a fresh #TAG and renumbers the file — take the next edit's numbers from the edit response or a fresh read. (3) Ranges tight: only lines whose content changes. (4) Multiple files = multiple [path#TAG] sections in one patch.`;
+Stale tags always fail; no content relocation is attempted. Same-path/same-tag sections belong to one source stage and may be separated by other file sections. After a newer stage for a path begins, do not return to an earlier tag. A chained section must use the exact tag shown by the prior planned stage. Same-position insertions are rejected; combine them into one hunk.
+Critical: (1) Path + #TAG + line numbers come from YOUR LAST read/edit response for that file — copy the full digest character-for-character; never use a remembered tag. (2) every successful edit returns a fresh #TAG; use it for a chained stage. (3) Ranges tight: only lines whose content changes. (4) Multiple files = multiple [path#TAG] sections in one patch.`;
 
 export type HashlineIo = {
 	writeTarget(path: string, text: string): Promise<void>;
+	/** Test seam for injecting an external edit after planning but before digest recheck. */
+	beforeCommit?(): Promise<void>;
 };
 
 const DEFAULT_IO: HashlineIo = {
@@ -142,7 +117,7 @@ export function registerHashline(pi: ExtensionAPI, io: HashlineIo = DEFAULT_IO) 
 			name: "read",
 			label: "Read (hashline)",
 			description:
-				"Read a file. Returns a `[path#TAG]` header then `N:content` numbered lines. TAG is the file-version tag — edit requires it. offset/limit read a range (numbering stays absolute).",
+				"Read a file. Returns a `[path#TAG]` header then `N:content` numbered lines. TAG is the exact-byte SHA-256 file-version tag — edit requires it. offset/limit read a range (numbering stays absolute).",
 			promptSnippet: "read(path, offset?, limit?): file as [path#TAG] + numbered lines; TAG needed by edit.",
 			parameters: Type.Object({
 				path: Type.String({ description: "Path to the file (relative or absolute)." }),
@@ -166,15 +141,16 @@ export function registerHashline(pi: ExtensionAPI, io: HashlineIo = DEFAULT_IO) 
 					emitHarnessSignal(pi.events, { v: 1, type: "capability/need", capability: "span_tools", reason: "large-file" });
 					throw new Error(oversizedMessage("read", info.size, MAX_READ_FILE_BYTES));
 				}
-				const text = normalizeText(await readFile(abs, "utf8"));
-				const tag = recordSnapshot(abs, text);
-				if (text === "") {
+				const raw = await readFile(abs);
+				const doc = decodeDocument(raw);
+				const tag = fileTag(raw);
+				if (doc.lines.length === 0) {
 					return {
 						content: [{ type: "text" as const, text: `[${disp}#${tag}]\n(empty file — add content with "insert head:")` }],
 						details: {},
 					};
 				}
-				const all = text.replace(/\n$/, "").split("\n");
+				const all = doc.lines.map((line) => line.content);
 				const start = Math.max(1, params.offset ?? 1);
 				if (start > all.length && all.length > 0) {
 					throw new Error(`Offset ${start} is beyond end of file (${all.length} lines total)`);
@@ -225,7 +201,7 @@ export function registerHashline(pi: ExtensionAPI, io: HashlineIo = DEFAULT_IO) 
 			name: "edit",
 			label: "Edit (hashline)",
 			description: EDIT_DESCRIPTION,
-			promptSnippet: "edit(input): hashline patch — replace/insert/delete by line number under a [path#TAG] header.",
+			promptSnippet: "edit(input): hashline patch — replace/insert/delete by line number under a [path#64-hex-SHA256] header.",
 			promptGuidelines: [
 				"After an edit, the response shows the new #TAG and renumbered lines around each change — use those for the next edit; old tags/numbers are dead.",
 			],
@@ -240,154 +216,141 @@ export function registerHashline(pi: ExtensionAPI, io: HashlineIo = DEFAULT_IO) 
 			},
 			async execute(_id, params, _signal, _onUpdate, ctx) {
 				const parsed = parsePatch(params.input);
-				// Merge CONSECUTIVE same-(path, tag) sections: they were composed against
-				// the SAME source state, so one applyHunks pass is exact — self-relocation
-				// (pre-existing) fails when the sections sit within ±2 lines of each other.
-				const sections: typeof parsed = [];
-				for (const sec of parsed) {
-					const last = sections[sections.length - 1];
-					if (last && last.path === sec.path && last.tag === sec.tag) last.hunks = last.hunks.concat(sec.hunks);
-					else sections.push({ ...sec, hunks: [...sec.hunks] });
-				}
-				const lockedPaths = sections.map((section) =>
-					isAbsolute(section.path) ? section.path : resolve(ctx.cwd, section.path));
-				return withMutationQueues(lockedPaths, async () => {
-				// TWO-PHASE apply (all-or-nothing multi-file): PHASE 1 reads, resolves tags,
-				// and computes every section IN MEMORY — any failure throws before a byte lands.
-				// PHASE 2 writes only once every section validated. Old code wrote inside the
-				// loop, half-applying earlier files when a later section failed.
-				type Planned = { abs: string; disp: string; finalText: string; res: ReturnType<typeof applyHunks>; hunkCount: number };
+				const sections = parsed.map((section) => ({
+					...section,
+					abs: isAbsolute(section.path) ? section.path : resolve(ctx.cwd, section.path),
+				}));
+				return withMutationQueues(sections.map((section) => section.abs), async () => {
+					type Stage = { tag: string; hunks: Hunk[] };
+					type Target = { key: string; abs: string; disp: string; stages: Stage[]; firstIndex: number };
+					type Planned = {
+						abs: string; disp: string; original: Buffer; finalBytes: Buffer;
+						res: { changed: { line: number; count: number }[]; counts: { replaced: number; inserted: number; deleted: number } };
+						hunkCount: number;
+					};
+					const targets = new Map<string, Target>();
+					for (const [index, section] of sections.entries()) {
+						let key: string;
+						try { key = await realpath(section.abs); }
+						catch { key = resolve(section.abs); }
+						let target = targets.get(key);
+						if (!target) {
+							const route = key;
+							target = { key, abs: route, disp: displayPath(ctx.cwd, section.abs), stages: [], firstIndex: index };
+							targets.set(key, target);
+						}
+						const current = target.stages[target.stages.length - 1];
+						if (current?.tag === section.tag) {
+							current.hunks.push(...section.hunks);
+						} else {
+							if (target.stages.some((stage) => stage.tag === section.tag)) {
+								throw new Error(`[${target.disp}#${section.tag}] ambiguous return to an earlier source stage. Nothing in this patch was written.`);
+							}
+							target.stages.push({ tag: section.tag, hunks: [...section.hunks] });
+						}
+					}
+					const orderedTargets = [...targets.values()].sort((a, b) => a.firstIndex - b.firstIndex);
 				const planned: Planned[] = [];
-				// Working buffers: same-file sections chain onto the prior result.
-				const buffers = new Map<string, { text: string; style: ReturnType<typeof detectStyle> }>();
-				const originals = new Map<string, string>(); // pristine bytes per file, for rollback + honesty
 				try {
-				for (const sec of sections) {
-					const abs = isAbsolute(sec.path) ? sec.path : resolve(ctx.cwd, sec.path);
-					const disp = displayPath(ctx.cwd, abs);
-					let buf = buffers.get(abs);
-					if (!buf) {
-						let raw: string;
-						try {
-							const info = await stat(abs);
-							if (info.size > MAX_EDIT_FILE_BYTES) throw new Error(oversizedMessage("edit", info.size, MAX_EDIT_FILE_BYTES));
-							raw = await readFile(abs, "utf8");
-						} catch (e) {
-							if ((e as NodeJS.ErrnoException)?.code === "ENOENT") {
-								throw new Error(
-									`file not found: ${disp}. Use the file's real relative path and the #TAG from your last read — the tool description's header is a placeholder, not a real file. To create a new file use write, not edit.`,
-								);
+					for (const target of orderedTargets) {
+						const info = await stat(target.abs);
+						if (info.size > MAX_EDIT_FILE_BYTES) throw new Error(oversizedMessage("edit", info.size, MAX_EDIT_FILE_BYTES));
+						const original = await readFile(target.abs);
+						let doc = decodeDocument(original);
+						let expectedTag = fileTag(original);
+						let changed: { line: number; count: number }[] = [];
+						const counts = { replaced: 0, inserted: 0, deleted: 0 };
+						let hunkCount = 0;
+						for (const stage of target.stages) {
+							if (stage.tag !== expectedTag) {
+								throw new Error(`stale tag: [${target.disp}#${stage.tag}] does not match current source stage #${expectedTag}. Nothing in this patch was applied. Read the file again, rebuild the complete patch with current tags and line numbers, and resubmit once.`);
 							}
-							throw e;
-						}
-						originals.set(abs, raw); // pristine bytes for phase-2 rollback
-						buf = { text: raw, style: detectStyle(raw) }; // style restored on write — a one-line edit must not rewrite the whole file
-						buffers.set(abs, buf);
-					}
-					const live = normalizeText(buf.text);
-					const liveTag = fileTag(live);
-					let hunks = sec.hunks;
-					if (sec.tag !== liveTag) {
-						const snap = (snaps.get(abs) ?? []).find((s) => s.tag === sec.tag);
-						if (!snap) {
-							// Say what was actually checked. The snapshot store is a
-							// module-scope LRU (SNAP_PATHS paths x SNAP_VERSIONS versions),
-							// which pi scopes to the extension MODULE INSTANCE -- i.e. the
-							// process, not the session. So "not from this session" was wrong
-							// in both directions: a tag from an earlier session in the same
-							// process resolves fine (its content snapshot is still valid),
-							// and a tag from THIS session fails once the LRU evicts it. The
-							// remedy is the same either way, but the diagnosis must not
-							// send a model looking for a session boundary that is not there.
-							throw new Error(
-								`[${disp}#${sec.tag}] no retained snapshot carries this tag and the live file is #${liveTag} `
-								+ `(the snapshot store keeps ${SNAP_VERSIONS} versions each for the ${SNAP_PATHS} most recently read files). `
-								+ "Read the file, then re-emit the patch with fresh numbers.",
-							);
-						}
-						hunks = relocateHunks(snap.text, live, hunks);
-					}
-					const res = applyHunks(live, hunks);
-					const finalText = restoreStyle(res.newText, buf.style);
-					if (Buffer.byteLength(finalText) > MAX_EDIT_FILE_BYTES) {
-						throw new Error(oversizedMessage("edit", Buffer.byteLength(finalText), MAX_EDIT_FILE_BYTES));
-					}
-					buf.text = finalText; // chain: a later same-file section edits this result
-					planned.push({ abs, disp, finalText, res, hunkCount: hunks.length });
-				}
-				} catch (e) {
-					// All-or-nothing honesty: a model that has seen "Applied…" replies may
-					// assume earlier sections landed — say explicitly that none did.
-					if (sections.length > 1 && e instanceof Error) {
-						e.message += " NOTE: this patch had multiple sections and NONE were applied — fix the error and re-emit the ENTIRE patch.";
-					}
-					throw e;
-				}
-
-				// PHASE 2a — commit all writes. If the OS rejects one mid-way (perms,
-				// disk full), best-effort restore every file already written from its
-				// pristine bytes so the I/O layer cannot re-open the half-applied hole.
-				try {
-					for (const p of planned) {
-						await io.writeTarget(p.abs, p.finalText);
-					}
-				} catch (e) {
-					// Restore EVERY target, including the write that rejected: writeFile
-					// may truncate or partially write before surfacing an I/O failure.
-					const rollbackFailures: string[] = [];
-					for (const abs of new Set(planned.map((p) => p.abs))) {
-						try {
-							await writeFile(abs, originals.get(abs) ?? "", "utf8");
-						} catch (rollbackError) {
-							// A read-only target commonly rejects both the original commit and
-							// rollback without ever changing. Verify bytes before declaring the
-							// rollback incomplete.
-							try {
-								if (await readFile(abs, "utf8") !== (originals.get(abs) ?? "")) {
-									rollbackFailures.push(`${abs}: ${rollbackError instanceof Error ? rollbackError.message : String(rollbackError)}`);
+							const beforeLineCount = doc.lines.length;
+							const res = applyHunks(doc, stage.hunks);
+							doc = res.document;
+							const finalBytes = serializeDocument(doc);
+							if (finalBytes.byteLength > MAX_EDIT_FILE_BYTES) throw new Error(oversizedMessage("edit", finalBytes.byteLength, MAX_EDIT_FILE_BYTES));
+							expectedTag = fileTag(finalBytes);
+							const priorChanged = mapChangedLines(changed, beforeLineCount, stage.hunks, doc.lines.length);
+							const changedSet = new Set<number>();
+							for (const span of [...priorChanged, ...res.changed]) {
+								for (let offset = 0; offset < Math.max(1, span.count); offset += 1) {
+									if (doc.lines.length > 0) changedSet.add(Math.min(doc.lines.length, span.line + offset));
 								}
+							}
+							changed = [...changedSet].sort((a, b) => a - b).map((line) => ({ line, count: 1 }));
+							counts.replaced += res.counts.replaced;
+							counts.inserted += res.counts.inserted;
+							counts.deleted += res.counts.deleted;
+							hunkCount += stage.hunks.length;
+						}
+						if (hunkCount === 0) throw new Error(`bad patch: no hunks for ${target.disp}`);
+						planned.push({ abs: target.abs, disp: target.disp, original, finalBytes: serializeDocument(doc), res: { changed, counts }, hunkCount });
+					}
+				} catch (error) {
+					if (error instanceof Error && parsed.length > 1 && !/Nothing in this patch was applied|Nothing in this patch was written/.test(error.message)) {
+						error.message += " Nothing in this patch was written; correct the issue and re-emit the complete patch.";
+					}
+					throw error;
+				}
+
+				// Detect external edits during planning. This remains a best-effort
+				// guard: another process can still write after this check.
+				await io.beforeCommit?.();
+				for (const item of planned) {
+					const current = await readFile(item.abs);
+					if (fileTag(current) !== fileTag(item.original)) {
+						throw new Error(`stale tag: ${item.disp} changed while this patch was being validated. Nothing in this patch was written. Read again and rebuild the complete patch.`);
+					}
+				}
+
+				const attempted: Planned[] = [];
+				try {
+					for (const item of planned) {
+						attempted.push(item); // include a write that may partially modify then reject
+						await io.writeTarget(item.abs, item.finalBytes.toString("utf8"));
+					}
+				} catch (error) {
+					const rollbackFailures: string[] = [];
+					for (const item of [...attempted].reverse()) {
+						try {
+							await writeFile(item.abs, item.original);
+							const restored = await readFile(item.abs);
+							if (!restored.equals(item.original)) rollbackFailures.push(`${item.disp}: restored bytes did not match original`);
+						} catch (rollbackError) {
+							try {
+								if (!(await readFile(item.abs)).equals(item.original)) rollbackFailures.push(`${item.disp}: ${rollbackError instanceof Error ? rollbackError.message : String(rollbackError)}`);
 							} catch {
-								rollbackFailures.push(`${abs}: ${rollbackError instanceof Error ? rollbackError.message : String(rollbackError)}`);
+								rollbackFailures.push(`${item.disp}: ${rollbackError instanceof Error ? rollbackError.message : String(rollbackError)}`);
 							}
 						}
 					}
-					if (e instanceof Error) {
-						e.message += rollbackFailures.length === 0
-							? " NOTE: write failed — every target was restored to its pre-patch state; nothing remains applied."
-							: ` NOTE: write failed AND rollback was incomplete (${rollbackFailures.join("; ")}). Inspect every target before continuing.`;
-					}
-					throw e;
+					const base = error instanceof Error ? error.message : String(error);
+					const message = rollbackFailures.length === 0
+						? `${base} NOTE: write failed; every attempted target was restored byte-for-byte and unattempted targets were untouched.`
+						: `${base} NOTE: rollback was incomplete for ${rollbackFailures.join("; ")}. Inspect those paths before continuing; unattempted targets were untouched.`;
+					throw new Error(message);
 				}
 
-				// PHASE 2b — everything is on disk; record snapshots and build the output.
 				const out: string[] = [];
-				let firstChanged: number | undefined;
-				for (const p of planned) {
-					const newText = normalizeText(p.finalText);
-					const newTag = recordSnapshot(p.abs, newText);
-					firstChanged = firstChanged ?? p.res.firstChangedLine;
-
-					// Re-grounding aid: ±3 renumbered lines around each change under the
-					// new tag, so the next edit needs no re-read.
-					const newLines = newText.replace(/\n$/, "").split("\n");
+				let firstChangedLine: number | undefined;
+				for (const item of planned) {
+					const doc = decodeDocument(item.finalBytes);
+					const tag = fileTag(item.finalBytes);
+					firstChangedLine = firstChangedLine ?? item.res.changed[0]?.line;
+					const lines = doc.lines.map((line) => line.content);
 					const windows: [number, number][] = [];
-					for (const c of p.res.changed) {
-						const s = Math.max(1, c.line - 3);
-						const e = Math.min(newLines.length, c.line + Math.max(c.count, 1) - 1 + 3);
-						const last = windows[windows.length - 1];
-						if (last && s <= last[1] + 1) last[1] = Math.max(last[1], e);
-						else windows.push([s, e]);
+					for (const change of item.res.changed) {
+						const start = Math.max(1, change.line - 3);
+						const end = Math.min(lines.length, change.line + Math.max(change.count, 1) - 1 + 3);
+						const previous = windows[windows.length - 1];
+						if (previous && start <= previous[1] + 1) previous[1] = Math.max(previous[1], end);
+						else windows.push([start, end]);
 					}
-					const ground = windows
-						.map(([s, e]) => annotate(newLines.slice(s - 1, e), s))
-						.join("\n…\n");
-					const c = p.res.counts;
-					out.push(
-						`Applied ${p.hunkCount} hunk(s) to ${p.disp} (${c.replaced} replace, ${c.inserted} insert, ${c.deleted} delete).\n` +
-							`[${p.disp}#${newTag}]\n${ground}\nNumbers above are CURRENT (tag ${newTag}). Old tag/numbers are dead.`,
-					);
+					const ground = windows.map(([start, end]) => annotate(lines.slice(start - 1, end), start)).join("\n…\n");
+					out.push(`Applied ${item.hunkCount} hunk(s) to ${item.disp} (${item.res.counts.replaced} replace, ${item.res.counts.inserted} insert, ${item.res.counts.deleted} delete).\n[${item.disp}#${tag}]\n${ground}\nNumbers above are CURRENT (tag ${tag}). Old tag/numbers are dead.`);
 				}
-				return { content: [{ type: "text" as const, text: out.join("\n\n") }], details: { firstChangedLine: firstChanged } };
+				return { content: [{ type: "text" as const, text: out.join("\n\n") }], details: { firstChangedLine } };
 				});
 			},
 		}),
