@@ -8,7 +8,7 @@ import { captureInitialToolSurface } from "../lib/session-bootstrap.ts";
 import { callTool, fire, makeFakePi, resetPiGlobals } from "./integration-harness.ts";
 
 const names = [
-	"read", "bash", "edit", "write", "grep", "find", "ls", "powershell", "search_spans", "read_span", "recall",
+	"read", "bash", "edit", "write", "grep", "find", "ls", "powershell", "search_spans", "read_span", "recall", "obs_recall",
 	"plan_write", "plan_update", "verify_project", "subagent", "compact_context", "web_search", "web_read",
 	"plan_expand", "plan_settle", "research_plan_start",
 	"goal_propose", "goal_inspect", "goal_update", "goal_settle", "goal_block",
@@ -79,9 +79,9 @@ test("unset tool profile adopts the bounded core surface", async () => {
 	const run = await load(undefined, [...names]);
 	try {
 		const active = run.fp.pi.getActiveTools();
-		for (const name of ["read", "bash", "edit", "write", "search_spans", "read_span", "recall", "verify_project", "capability"]) assert.ok(active.includes(name), name);
+		for (const name of ["read", "bash", "edit", "write", "search_spans", "read_span", "recall", "obs_recall", "verify_project", "capability"]) assert.ok(active.includes(name), name);
 		for (const name of ["subagent", "compact_context", "web_search", "web_read", "browser_open", "tldraw_create"]) assert.equal(active.includes(name), false, name);
-		assert.equal(active.length <= 11, true, active.join(","));
+		assert.equal(active.length <= 12, true, active.join(","));
 	} finally { run.restore(); }
 });
 
@@ -138,10 +138,22 @@ test("core profile removes specialists and preserves a small execution spine", a
 	const run = await load("core", [...names]);
 	try {
 		const active = run.fp.pi.getActiveTools();
-		for (const name of ["read", "bash", "edit", "write", "search_spans", "read_span", "recall", "verify_project", "capability"]) assert.ok(active.includes(name), name);
+		for (const name of ["read", "bash", "edit", "write", "search_spans", "read_span", "recall", "obs_recall", "verify_project", "capability"]) assert.ok(active.includes(name), name);
 		for (const name of ["subagent", "compact_context", "web_search", "web_read", "browser_open", "tldraw_create"]) assert.equal(active.includes(name), false, name);
-		assert.equal(active.length <= 11, true, active.join(","));
+		assert.equal(active.length <= 12, true, active.join(","));
 	} finally { run.restore(); }
+});
+
+test("obs_recall is core only when an enabled package registers it", async () => {
+	const withoutArchive = await load("core", names.filter((name) => name !== "obs_recall"));
+	try {
+		assert.equal(withoutArchive.fp.pi.getActiveTools().includes("obs_recall"), false);
+	} finally { withoutArchive.restore(); }
+
+	const withArchive = await load("core", [...names]);
+	try {
+		assert.ok(withArchive.fp.pi.getActiveTools().includes("obs_recall"));
+	} finally { withArchive.restore(); }
 });
 
 test("GREP_FIND_TOOLS exposes only Pi's native grep/find pair at core startup", async () => {

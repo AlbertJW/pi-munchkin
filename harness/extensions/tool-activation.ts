@@ -36,7 +36,7 @@ export const MUNCHKIN_TOOL_PROFILE_DEFAULT: Profile = "core";
 // after a reload during /plan the in-memory surface bookkeeping is gone, and the
 // only correct restore target is the baseline filtered through the same profile.
 export const CORE_NAMES = new Set([
-	"read", "bash", "edit", "write", "search_spans", "read_span", "recall",
+	"read", "bash", "edit", "write", "search_spans", "read_span", "recall", "obs_recall",
 	"verify_project", "capability", "plan_write", "plan_update",
 ]);
 const EXPLICIT_FLAG = "__pi_tool_selection_explicit";
