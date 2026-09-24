@@ -1284,19 +1284,23 @@ case evidence is in
 
 ## Hashline Edit 2.0 implementation candidate — 2026-09-24
 
-The review candidate replaces normalized xxHash tags and stale content
-relocation with exact-byte SHA-256 tags, strict UTF-8 validation, and fail-closed
-stale handling. It preserves the existing `read`/`edit` names and declared
-schemas, exact `HASHLINE=off` override behavior, and default activation. It adds
+Hashline Edit 2.0 replaces normalized xxHash tags and stale content relocation
+with exact-byte SHA-256 tags, strict UTF-8 validation, and fail-closed stale
+handling. It preserves the existing `read`/`edit` names and declared schemas,
+exact `HASHLINE=off` override behavior, and default activation. It adds
 source-stage grouping rules, exact EOL/BOM serialization, pre-commit digest
 rechecks, and attempted-target-only rollback. This changes the model-visible
 tag text and stale recovery behavior.
 
-**REPOSITORY-ONLY CANDIDATE; NOT QUALIFIED OR PROMOTED.** No inference,
-benchmark, live install, default change, or push occurred. Correctness tests do
-not establish model-performance benefit. The candidate is on branch
-`codex/hashline-edit-2-0`, based on `9a4415d`, with an uncommitted diff.
-Package-source SHA-256 from `npm run surface:hash:source`:
+**INSTALLED; NO MODEL-PERFORMANCE QUALIFICATION.** Candidate commit
+`76a0e84c3069f543539c261e2d14ab2bc80c94d7`; package-source SHA-256
 `e8bf006093853a6da4b40eab16248b76da8c71810879f84f49ecb134224ed197`.
-This candidate hash is not a loaded live receipt and must be recomputed after
-any source change.
+Installed agent-dir surface SHA-256
+`2e189c9934d2e60a037c34903ad002c7f85c0d53df7bff2f3c72ab06f1a4a26a`.
+The controlled-install inventory, verified backup, per-file hashes, and
+zero-inference fresh-process smoke evidence are recorded in
+`docs/evidence/HASHLINE_EDIT_2_0_LIVE_RELEASE_2026-09-24.json`. Correctness
+and runtime contract checks do not establish model-performance benefit. Old
+short tags fail, and stale content relocation is removed; fresh reads are
+required for stale files. No inference, default change, optimizer restart,
+SoL-Pi installation, merge, or push occurred.

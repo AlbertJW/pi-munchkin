@@ -1,6 +1,6 @@
 # Hashline Edit 2.0: research and implementation plan
 
-- **Status:** implemented review candidate; not promoted or qualified
+- **Status:** implemented and installed as the controlled Hashline 2.0 overlay; no model-performance qualification
 - **Date:** 2026-09-24
 - **Repository state inspected:** `9a4415d` (`docs: finalize Phase 4-5 harness closeout`), clean at start, `main` 11 commits ahead of `origin/main`
 - **Runtime source:** the Hashline source inspected is from that repository state. Re-pin the runtime source surface before implementation if any source changes land.
@@ -218,9 +218,9 @@ The regressions failed before the fixes and passed afterward. The final focused 
 
 The earlier surrogate validator compared `charCodeAt(i + 1)` against the low-surrogate range but did not reject `NaN` when a high surrogate ended the string. It now explicitly rejects a missing low surrogate before checking its range. Regressions cover an isolated high surrogate, a terminal high surrogate in ordinary text, one at the end of a non-final patch body line, valid surrogate pairs, and extension-level zero-write behavior for single-file and multi-file patches with the invalid proposal last. The new cases failed before the guard and pass now. Focused Hashline tests pass 32/32, typecheck is clean, and the final `npm run verify` passed all six stages (117.5s, serial). The source hash above includes this fix.
 
-## Release-review handoff — prepared, not authorized or executed
+## Controlled installation record and release handoff — 2026-09-24
 
-The implementation commit is recorded in Git and the source hash is `e8bf006093853a6da4b40eab16248b76da8c71810879f84f49ecb134224ed197`. Checks on the current pre-commit tree are 32/32 focused Hashline tests, clean typecheck, `git diff --check`, and all six `npm run verify` stages passing (136.3s, serial); these are deterministic correctness results, not model-performance evidence.
+Candidate commit: `76a0e84c3069f543539c261e2d14ab2bc80c94d7`. Package-source hash: `e8bf006093853a6da4b40eab16248b76da8c71810879f84f49ecb134224ed197`. Before installation, focused Hashline tests were 32/32, typecheck and `git diff --check` passed, and all six `npm run verify` stages passed (136.3s, serial). These are deterministic correctness results, not model-performance evidence. The committed installation receipt with full inventories and hashes is [HASHLINE_EDIT_2_0_LIVE_RELEASE_2026-09-24.json](HASHLINE_EDIT_2_0_LIVE_RELEASE_2026-09-24.json).
 
 ### Proposed live overlay
 
@@ -237,7 +237,7 @@ The latter three are runtime dependencies of the changed Hashline contract: the 
 
 Old short tags are incompatible: patches carrying the prior short tag fail the strict 64-hex tag parser. Content-based stale relocation is removed; any stale digest fails without moving the edit. Users must read again and reconstruct the complete patch. Keep the registered names (`read`, `edit`), declared schemas (`read({path, offset?, limit?})`, `edit({input})`), and activation behavior unchanged: only exact `HASHLINE=off` leaves native Pi tools unshadowed.
 
-If a separate release approval is granted, before installation:
+Under the user's explicit 2026-09-24 approval, the release procedure was executed as follows:
 
 1. Bind the package tree and all selected candidate files to the approved source hash and commit. Record a complete live-package inventory with SHA-256 for every selected and nonselected file, and confirm the live baseline has not changed since that receipt.
 2. Create a timestamped full-package backup outside the live package. Hash the backup and verify every backup file against the pre-install inventory before changing anything.
@@ -245,4 +245,6 @@ If a separate release approval is granted, before installation:
 4. Start a fresh default-activation Pi session. Confirm Hashline `read`/`edit` load with the declared schemas, read a fixture to obtain the new full digest, make a reversible fixture edit, and confirm a subsequent stale tag fails closed. Start a second fresh session with `HASHLINE=off`; confirm Hashline overrides are absent and native Pi tools are available.
 5. Record both smoke receipts, installed hashes, loaded surface hash, backup location/hash, and rollback result. On any mismatch or failed smoke, restore the full backup and verify every restored file against the baseline inventory before continuing.
 
-This remains a best-effort in-place multi-file commit. A separate process can write after the pre-commit digest check, and a crash or power loss during sequential writes can leave a partial update. Do not describe the overlay as cross-process locked or crash-atomic. Deterministic tests do not authorize or substitute for any model inference, benchmark, or model-performance claim; those require a separate explicit approval and preregistered screen. No installation, mirror, inference, promotion, default change, optimizer restart, SoL-Pi install, or push occurred in preparing this handoff.
+Installation result: all four selected files match the candidate; all 121 nonselected package entries match the pre-install inventory; the backup was verified; default and `HASHLINE=off` fresh-process direct-call checks passed with no inference. A post-install `npm run verify` also passed all six stages (127.5s, serial), and the receipt JSON/source hash rechecks passed. The installed agent-dir surface hash is `2e189c9934d2e60a037c34903ad002c7f85c0d53df7bff2f3c72ab06f1a4a26a`. The `HASHLINE=off` native-tool availability check used seeded native-tool doubles and verifies non-shadowing behavior; it was not a full interactive Pi host session.
+
+This remains a best-effort in-place multi-file commit. A separate process can write after the pre-commit digest check, and a crash or power loss during sequential writes can leave a partial update. Do not describe the overlay as cross-process locked or crash-atomic. Deterministic tests and the zero-inference runtime checks do not authorize or substitute for any model inference, benchmark, or model-performance claim; those require separate explicit approval and a preregistered screen. Defaults remain unchanged; no optimizer restart, SoL-Pi install, merge, or push occurred.
