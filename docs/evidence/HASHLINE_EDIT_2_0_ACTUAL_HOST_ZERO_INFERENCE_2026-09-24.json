@@ -1,0 +1,129 @@
+{
+  "schema_version": 1,
+  "date": "2026-09-24",
+  "status": "PASSED — actual Pi SDK/loader, installed package, zero inference",
+  "prior_receipt": {
+    "path": "docs/evidence/HASHLINE_EDIT_2_0_LIVE_RELEASE_2026-09-24.json",
+    "preserved_as": "The earlier fixture-based smokes remain valid only for what they tested. They used copied Hashline files, a stubbed signal sink, and native-tool doubles; they are not actual-host proof."
+  },
+  "candidate": {
+    "commit_under_test": "76a0e84c3069f543539c261e2d14ab2bc80c94d7",
+    "current_receipt_commit": "b865b5c19db42be226bdb72af73076ec7e7dd264",
+    "source_surface_sha256": "e8bf006093853a6da4b40eab16248b76da8c71810879f84f49ecb134224ed197"
+  },
+  "host": {
+    "pi_version": "0.87.1",
+    "pi_sdk_entry": "/opt/homebrew/lib/node_modules/@earendil-works/pi-coding-agent/dist/index.js",
+    "node_version": "v26.8.1",
+    "loader": "Pi DefaultResourceLoader plus createAgentSession from the installed Pi SDK",
+    "installed_package": "/Users/Albert.Wessels/.pi/agent/extensions/pi-munchkin",
+    "hashline_entry": "/Users/Albert.Wessels/.pi/agent/extensions/pi-munchkin/extensions/hashline.ts",
+    "process_isolation": "Each activation mode ran in a separate fresh Node process and fresh Pi session, with a temporary working directory and isolated temporary agent directory. The real installed package directory was passed to the Pi resource loader; no extension or native tool was copied or replaced.",
+    "model_registry": "Pi ModelRuntime created with modelsPath=null, refreshOnCreate=false, allowModelNetwork=false. No model request, inference, or model-catalog network access occurred."
+  },
+  "checks": {
+    "default_activation": {
+      "result": "PASS",
+      "environment": "HASHLINE unset",
+      "extension_load_errors": [],
+      "active_tools_include": ["read", "edit"],
+      "resolved_implementations": {
+        "read": "Read (hashline)",
+        "edit": "Edit (hashline)"
+      },
+      "schemas": {
+        "read": {
+          "type": "object",
+          "required": ["path"],
+          "properties": {
+            "path": { "type": "string", "description": "Path to the file (relative or absolute)." },
+            "offset": { "type": "number", "minimum": 1, "description": "1-indexed first line to read." },
+            "limit": { "type": "number", "minimum": 1, "description": "Max lines to read." }
+          }
+        },
+        "edit": {
+          "type": "object",
+          "required": ["input"],
+          "properties": {
+            "input": { "type": "string", "description": "The hashline patch (see tool description for the grammar)." }
+          }
+        }
+      }
+    },
+    "hashline_read_edit_stale_rejection": {
+      "result": "PASS",
+      "fixture": "Temporary hashline.txt containing alpha\\nbeta\\n; removed after the process.",
+      "read": "Direct invocation of the installed Hashline read tool returned the exact full SHA-256 tag E49C81E2D2F84E259D40E2FB8192F3BCD198B355184845D76D8F58807D0D78EE, matching SHA-256 of the fixture bytes.",
+      "edit": "Direct invocation of the installed Hashline edit tool changed the first line to ALPHA; resulting bytes were ALPHA\\nbeta\\n and its reported replacement digest matched the resulting bytes.",
+      "stale_edit": "Reusing the original tag was rejected with the stale-tag error. Fixture bytes before and after the stale call were byte-identical; no stale write occurred."
+    },
+    "hashline_off_native_tools": {
+      "result": "PASS",
+      "environment": "HASHLINE=off",
+      "extension_load_errors": [],
+      "resolved_implementations": {
+        "read": "read — Pi SDK native tool definition",
+        "edit": "edit — Pi SDK native tool definition"
+      },
+      "schemas": {
+        "read": {
+          "type": "object",
+          "required": ["path"],
+          "properties": {
+            "path": { "type": "string", "description": "Path to the file to read (relative or absolute)" },
+            "offset": { "type": "number", "description": "Line number to start reading from (1-indexed)" },
+            "limit": { "type": "number", "description": "Maximum number of lines to read" }
+          }
+        },
+        "edit": {
+          "type": "object",
+          "required": ["path", "edits"],
+          "properties": {
+            "path": { "type": "string", "description": "Path to the file to edit (relative or absolute)" },
+            "edits": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "required": ["oldText", "newText"],
+                "properties": {
+                  "oldText": { "type": "string", "description": "Exact text for one targeted replacement. It must be unique in the original file and must not overlap with any other edits[].oldText in the same call." },
+                  "newText": { "type": "string", "description": "Replacement text for this targeted edit." }
+                }
+              },
+              "description": "One or more targeted replacements. Each edit is matched against the original file, not incrementally. Do not include overlapping or nested edits. If two changes touch the same block or nearby lines, merge them into one edit instead."
+            }
+          }
+        }
+      },
+      "direct_tool_invocation": "The actual Pi SDK native read implementation returned native-original\\n from a temporary fixture. The actual native edit implementation replaced it with native-updated\\n. No native-tool doubles were registered or called."
+    },
+    "installed_dependency_loading": {
+      "result": "PASS",
+      "details": "Pi's real resource loader loaded the installed pi-munchkin package in both fresh sessions. Both extension load error arrays were empty; Hashline registration and tool execution succeeded in the default session."
+    },
+    "installed_file_identity": {
+      "result": "PASS",
+      "selected_file_hashes_match_release_receipt": true,
+      "hashes": {
+        "/Users/Albert.Wessels/.pi/agent/extensions/pi-munchkin/extensions/hashline.ts": "30ea3644c84456eeeeaf70e2416526a0e9ea742c43f6c70f0e827894dea383bf",
+        "/Users/Albert.Wessels/.pi/agent/extensions/pi-munchkin/lib/hashline-core.ts": "e23b98ac69a9260e2f07ca753944398c517ce318870ad34d7481102665d8de50",
+        "/Users/Albert.Wessels/.pi/agent/extensions/pi-munchkin/lib/teach-hints.ts": "d7f0f175ae1eb84c6a536ec9a98acb0434db2b07b24ac06c953d3983038431a3",
+        "/Users/Albert.Wessels/.pi/agent/lib/chaos-policy.ts": "ce69a25af6ce5d248e3b3be51c0584a345dd64f64ee540a527cdafe95009c26f"
+      }
+    }
+  },
+  "verification": {
+    "model_inference": false,
+    "user_files_modified": false,
+    "live_package_modified": false,
+    "candidate_runtime_source_modified": false,
+    "source_hash_recheck": "npm run surface:hash:source passed and returned e8bf006093853a6da4b40eab16248b76da8c71810879f84f49ecb134224ed197.",
+    "receipt_json_validation": "passed: parsed successfully with Node JSON.parse.",
+    "git_diff_check": "passed: git diff --check and staged git diff --cached --check."
+  },
+  "scope_limits": [
+    "These checks use the installed Pi SDK session and real resource loader, but do not claim an interactive TUI or RPC process smoke.",
+    "No model-performance claim is made; no inference or benchmark was run.",
+    "Earlier copied-file/stub/double smoke evidence remains unchanged in the release receipt and is not reclassified as actual-host evidence."
+  ]
+}
