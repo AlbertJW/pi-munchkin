@@ -166,6 +166,15 @@ test("core startup adds obs_recall when an enabled package registers it later in
 	} finally { run.restore(); }
 });
 
+test("late obs_recall registration does not override an explicit CLI tool selection", async () => {
+	const run = await load("core", ["read"], ["node", "pi", "--tools=read"], "obs_recall");
+	try {
+		await new Promise((resolve) => setTimeout(resolve, 10));
+		assert.equal((globalThis as any).__pi_tool_selection_explicit, true);
+		assert.equal(run.fp.pi.getActiveTools().includes("obs_recall"), false);
+	} finally { run.restore(); }
+});
+
 test("GREP_FIND_TOOLS exposes only Pi's native grep/find pair at core startup", async () => {
 	const prior = process.env.GREP_FIND_TOOLS;
 	process.env.GREP_FIND_TOOLS = "on";
