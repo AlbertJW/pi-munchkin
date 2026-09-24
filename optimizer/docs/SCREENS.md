@@ -82,3 +82,30 @@ Optimizer execution and campaign work are stopped by Albert's explicit decision.
 Existing screens and preregistrations are preserved as history; none was run or
 reclassified by this action. See `MOTHBALLED_2026-09-16.md`. A prepared study is not
 restart authorization.
+
+## Appended records — 2026-09-24
+
+The historical rows above remain unchanged. These later records supersede only
+the named unexecuted draft/protocol status; they do not alter any prior result.
+
+| screen | prereg | audit | recorded outcome |
+|---|---|---|---|
+| `JINA_READER_TASK_QUALITY_COST_REV1` | [draft](screens/PREREG_JINA_READER_TASK_QUALITY_COST_2026-09-24.md) | _none_ | SUPERSEDED BEFORE EXECUTION: JINA_READER was enabled in both arms, so control could automatically fall back to Jina; no sessions ran |
+| `JINA_READER_TASK_QUALITY_COST_REV2` | [protocol](screens/PREREG_JINA_READER_TASK_QUALITY_COST_REV2_2026-09-24.md) | _none_ | Protocol draft, not execution-ready; full flag-off versus flag-on intent-to-treat design; fixtures, score rules, runner, model, and judge unbound |
+| `RESEARCH_LEDGER_CURRENT_VALUE_REV1` | [protocol](screens/PREREG_RESEARCH_LEDGER_CURRENT_VALUE_2026-09-24.md) | _none_ | Protocol draft, not execution-ready; explicitly supersedes unexecuted stale Run 4; no sessions authorized |
+| `HIERARCHICAL_PLANNER_DIAGNOSTIC_REV1` | [protocol](screens/PREREG_HIERARCHICAL_PLANNER_CURRENT_DIAGNOSTIC_2026-09-24.md) | _none_ | Protocol draft, not execution-ready; distinct from Phase 3B; no sessions authorized |
+| `PHASE3A_OCCAMY_CONTEXT_ADMISSION` | [prereg](screens/PREREG_CONTEXT_ADMISSION_SAFETY_RECOVERY_OCCAMY_REV3_2026-09-23.md) | [screen](screens/PHASE3A_OCCAMY_SCREEN_2026-09-23.md) | 11/11 PASS; six verification stages PASS; installed live, opt-in; safety qualification only |
+| `PHASE3B_OCCAMY_PARENT_RESEARCH` | [prereg](screens/PREREG_PARENT_RESEARCH_PHASE3B_PROMOTION_REV2_2026-09-23.md) | [screen](screens/PHASE3B_OCCAMY_SCREEN_2026-09-23.md) | 10/10 PASS; six verification stages PASS; installed live, opt-in; bounded-operability qualification only |
+
+Phase 3A and 3B Occamy promotion reports and receipts are indexed in the
+mutable candidate register and the Phase 4–5 acceptance runbook. Their frozen
+historical receipts remain unchanged. This append records documentation status
+only and does not restart optimizer execution.
+
+The 2026-09-10 roster summary above is historical. The mutable candidate
+register now reflects the 2026-09-23 Phase 3A/3B opt-in promotions and current
+Phase 4–5 protocol dispositions. See
+[`QWEN_EXPERIMENTAL_CANDIDATE_REGISTER_2026-09-10.md`](QWEN_EXPERIMENTAL_CANDIDATE_REGISTER_2026-09-10.md)
+and [`../../docs/evidence/PHASE4_5_ACCEPTANCE_RUNBOOK_2026-09-24.md`](../../docs/evidence/PHASE4_5_ACCEPTANCE_RUNBOOK_2026-09-24.md).
+The optimizer remains mothballed; these appended records are documentation
+only.
