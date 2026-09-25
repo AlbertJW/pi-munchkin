@@ -1,5 +1,7 @@
 # SoL-Pi-Inspired Observation Archive: Feasibility and Plan
 
+> **Status superseded (2026-09-25):** This is the historical pre-implementation feasibility snapshot. The installed SoL-Pi checkout now contains the version-controlled ObservationPack adaptation at `5fc5c983f94da9aa2da876db6c74b58e0833fd9e`; the user configuration currently enables ObservationPack only. See [the reconciliation and release record](SOL_PI_OBSERVATION_PACK_RECONCILIATION_2026-09-25.md) for the current source/live comparison, real-host evidence, explicit limits, and proposed reconciliation. The adaptation has not been published upstream and Pi's package settings still name `1559b5cb12c72da4a485bc50fe326586b216fb19`.
+
 **Date:** 2026-09-24
 **Status:** Planning only; runtime implementation and feature activation not authorized
 **Harness baseline:** `main` at `d336a3257f34aa30ea60f50670b31ee95ca8d8c6`

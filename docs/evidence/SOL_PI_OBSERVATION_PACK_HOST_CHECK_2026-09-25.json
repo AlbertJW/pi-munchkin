@@ -1,0 +1,53 @@
+{
+  "schema": "observation-pack-host-check-v1",
+  "date": "2026-09-25",
+  "host": {
+    "pi_version": "0.87.1",
+    "mode": "rpc",
+    "offline": true,
+    "provider_requests": 0,
+    "harness_commit": "535db7bcc27ec3b30d505971029d51f675d8c01f",
+    "harness_source_surface_sha256": "3036caf58245ac7e26b50279b20946812793c1a26064504ea18dbe03708c58d7",
+    "live_tool_activation_sha256": "8c1837e0b6d0981cebcdab55f47eae2ca5dc8de7bdb242f811783b01da7c5c62",
+    "installed_sol_pi_commit": "5fc5c983f94da9aa2da876db6c74b58e0833fd9e",
+    "pi_package_setting_ref": "1559b5cb12c72da4a485bc50fe326586b216fb19",
+    "effective_flags": {
+      "actionFusion": false,
+      "observationPack": true,
+      "evidencePreservingReducer": false,
+      "onlineContextCompact": false
+    }
+  },
+  "checks": {
+    "real_loader_default_registration_and_schema": "PASS",
+    "tool_absent_at_core_snapshot_then_late_package_registration": "PASS",
+    "late_registration_default_activation": "PASS",
+    "explicit_tools_exclusion_no_placeholder": "PASS",
+    "direct_recall_exact_utf8_five_pages": "PASS",
+    "utf8_interior_offset_rejected": "PASS",
+    "corrupt_object_digest_rejected": "PASS",
+    "manual_deactivation_leaves_source_accessible": "PASS",
+    "same_session_id_fresh_process_archive_reopen": "PASS",
+    "different_session_rejects_observation_id": "PASS",
+    "session_before_tree_handler_resets_send_count": "PASS_HANDLER_INVOKED_DIRECTLY",
+    "deduplication_precedes_pack_and_reference_index_survives": "PASS",
+    "extension_load_errors": 0,
+    "final_provider_token_accounting": "NOT_RUN_NO_INFERENCE",
+    "interactive_tree_navigation_and_transcript_resume": "NOT_RUN_NO_PERSISTED_TURN_IN_ZERO_INFERENCE_FIXTURE"
+  },
+  "fixture_measures": {
+    "large_result_original_bytes": 41250,
+    "packed_placeholder_bytes": 1421,
+    "serialized_projection_before_packing_bytes": 43046,
+    "serialized_projection_after_packing_bytes": 1624,
+    "deduplicated_and_packed_repeated_read_bytes": 2113,
+    "recall_pages": 5
+  },
+  "runner": "harness/scripts/observation-pack-host-smoke.mjs",
+  "limitations": [
+    "Fixture byte deltas do not establish tokenizer savings, answer quality, or model benefit.",
+    "The registered session_before_tree handler was invoked inside the real Pi RPC process; Pi's interactive tree-navigation UI was not driven.",
+    "The same session identity was reopened with --session-id in a fresh process; restoration of a nonempty transcript was not exercised.",
+    "The final provider request and tokenizer accounting were not constructed because inference was forbidden."
+  ]
+}
