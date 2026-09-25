@@ -1,0 +1,72 @@
+{
+  "host": "Pi SDK / ExtensionRunner",
+  "piPackage": "/Users/Albert.Wessels/.pi/agent/node_modules/@earendil-works/pi-coding-agent/dist/index.js",
+  "inference": false,
+  "checks": {
+    "actualPackageLoadOrder": {
+      "pass": true,
+      "extensionPaths": [
+        "/Users/Albert.Wessels/.pi/agent/extensions/pi-munchkin/extensions/hashline.ts",
+        "/Users/Albert.Wessels/.pi/agent/extensions/pi-munchkin/extensions/context-dedup.ts",
+        "/Users/Albert.Wessels/.pi/agent/extensions/pi-munchkin/extensions/tool-activation.ts",
+        "/Users/Albert.Wessels/LLM/local-packages/sol-pi-observationpack/src/sol-pi/index.ts"
+      ],
+      "dedupIndex": 1,
+      "observationPackIndex": 3
+    },
+    "defaultActivationAndSchema": {
+      "pass": true,
+      "recallSchema": {
+        "type": "object",
+        "required": [
+          "id"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Observation id from a placeholder"
+          },
+          "offset": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Byte offset, default 0"
+          }
+        }
+      },
+      "active": true,
+      "errors": 0
+    },
+    "hashlinePreserved": {
+      "pass": true,
+      "readDescriptionHasDigestTag": true,
+      "editDescriptionHasStaleRejection": true,
+      "hashlineExtensionPath": "/Users/Albert.Wessels/.pi/agent/extensions/pi-munchkin/extensions/hashline.ts"
+    },
+    "contextPipelineAndRecallAvailability": {
+      "pass": true,
+      "loaderOrderUsed": true,
+      "sourceBytes": 47850,
+      "placeholderBytes": 1407,
+      "transformedBytes": 1610
+    },
+    "exactRecallAndUtf8Paging": {
+      "pass": true,
+      "pages": 5
+    },
+    "corruptionRejection": {
+      "pass": true
+    },
+    "explicitToolExclusion": {
+      "pass": true,
+      "noInaccessiblePlaceholder": true,
+      "sourceBytes": 19200
+    },
+    "realTreeNavigationAndTranscriptResume": {
+      "pass": true,
+      "sessionId": "01a0d8a8-3821-71eb-b9c9-b6fb1b01845e",
+      "persistedBranchEntries": 4,
+      "abandonedBranchExcluded": true,
+      "sessionFileSha256": "442e63983afdba4122e510df8c105d0cd51f13470a11163f214aa494937ffd42"
+    }
+  }
+}

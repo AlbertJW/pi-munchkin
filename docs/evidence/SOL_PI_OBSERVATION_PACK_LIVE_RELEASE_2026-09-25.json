@@ -1,0 +1,95 @@
+{
+  "record": "ObservationPack controlled installation reconciliation",
+  "date": "2026-09-25",
+  "status": "installed, enabled by existing opt-in config, and reconciled",
+  "inference": false,
+  "optimizer_restarted": false,
+  "pi": {
+    "version": "0.87.1",
+    "user_settings_path": "/Users/Albert.Wessels/.pi/agent/settings.json",
+    "registered_local_source": "../../LLM/local-packages/sol-pi-observationpack",
+    "resolved_local_source": "/Users/Albert.Wessels/LLM/local-packages/sol-pi-observationpack",
+    "package_list_verified": true
+  },
+  "adaptation": {
+    "repository": "/Users/Albert.Wessels/LLM/local-packages/sol-pi-observationpack",
+    "branch": "local/observationpack-5fc5c98",
+    "commit": "5fc5c983f94da9aa2da876db6c74b58e0833fd9e",
+    "working_tree": "clean",
+    "git_remotes": [],
+    "upstream_base": "1559b5cb12c72da4a485bc50fe326586b216fb19",
+    "committed_patch": "docs/evidence/SOL_PI_OBSERVATION_PACK_ADAPTATION_5FC5C98.patch.gz",
+    "patch_sha256": "df0c9235db499f8e80fbb09fe0b734a950f820a6d4af47b6e83fd00a79df9fb3",
+    "patch_apply_check": "PASS against a clean checkout of the exact upstream base",
+    "source_sha256": {
+      "src/sol-pi/extensions/observation-pack/index.ts": "daede6c69ce8aede0f7d1adfe4a620d62762a5339ad32bedbc28ab8f03cc9688",
+      "src/sol-pi/extensions/observation-pack/observation.ts": "a4adba8b15f951261033811554044e65253b4b916ffdcc903f477bfa2887f341",
+      "src/sol-pi/index.ts": "a9cc7b4b05724a672428288381211838dafa668ba6031d777d5fb4b912609758"
+    }
+  },
+  "effective_mechanisms": {
+    "actionFusion": false,
+    "observationPack": true,
+    "evidencePreservingReducer": false,
+    "onlineContextCompact": false,
+    "sol_pi_json_sha256_before_and_after": "595af44685ce8e1d65e1a410dedc54bd2120373c89cff9dde19155685a6549a8"
+  },
+  "live_changes": {
+    "settings_sha256_before": "a4cc39746f06bbed38a4d150f7679f24be21d8a1f0672ac55df64fd9a27b69a5",
+    "settings_sha256_after": "7af9ff2e20a884c56d8bfab34040814e7930fa2efc192a11d59a7b5d448bcd79",
+    "settings_delta": "Only the SoL-Pi packages[] entry changed: stale git:github.com/NVlabs/SoL-Pi@1559b5c... replaced by the resolved local package path. Other package entries and settings were preserved.",
+    "tool_activation_path": "/Users/Albert.Wessels/.pi/agent/extensions/pi-munchkin/extensions/tool-activation.ts",
+    "tool_activation_sha256_before": "8c1837e0b6d0981cebcdab55f47eae2ca5dc8de7bdb242f811783b01da7c5c62",
+    "tool_activation_sha256_after": "8a946c1dc8c99a1957a8321fdaee5c9b1c59348db52f1be9b64065b4f3f11d57",
+    "tool_activation_delta": "Only the ObservationPack late-registration callback was reconciled to current harness main; CORE_NAMES already included obs_recall and was preserved. Unrelated live omissions for grep/find and vision remain untouched.",
+    "old_installed_checkout_preserved": {
+      "path": "/Users/Albert.Wessels/.pi/agent/git/github.com/NVlabs/SoL-Pi",
+      "commit": "5fc5c983f94da9aa2da876db6c74b58e0833fd9e",
+      "status": "M package-lock.json",
+      "package_lock_sha256": "9391e590bb91356abd05daf46355229235463241ea4942f4776aa3120703bab4",
+      "package_lock_diff_sha256": "13d44cc4d06a51d356e59ebc7462e267a6414773d4ee20d1ab137de075cfba88"
+    }
+  },
+  "backup": {
+    "path": "/Users/Albert.Wessels/LLM/observationpack-reconciliation-backup-20260925-01",
+    "installed_package_tar_sha256": "14b31ce6b6e229f334de39599b7d498d519bf6954734f1e937efe152fb524879",
+    "inventory_path": "/Users/Albert.Wessels/LLM/observationpack-reconciliation-backup-20260925-01/installed-sol-pi-inventory.json",
+    "inventory_sha256": "fb480d1e6baf31ce61b8e270320f9e68f28ca0854b60a0a5b815f748e6442882",
+    "package_lock_copied_and_diff_saved_separately": true,
+    "settings_sha256": "a4cc39746f06bbed38a4d150f7679f24be21d8a1f0672ac55df64fd9a27b69a5",
+    "sol_pi_json_sha256": "595af44685ce8e1d65e1a410dedc54bd2120373c89cff9dde19155685a6549a8",
+    "tool_activation_sha256": "8c1837e0b6d0981cebcdab55f47eae2ca5dc8de7bdb242f811783b01da7c5c62"
+  },
+  "checks": {
+    "interactive_pi_process_check": "PASS: no interactive Pi process found before live changes; no user session was terminated",
+    "isolated_pi_local_registration": "PASS: pi install <absolute local path> --approve and pi list in disposable HOME; exact path resolved correctly",
+    "pi_compatibility_probe": "PASS against installed Pi 0.87.1 public API",
+    "actual_host_receipt": "docs/evidence/SOL_PI_OBSERVATION_PACK_ACTUAL_HOST_2026-09-25.json",
+    "actual_host_receipt_status": "PASS: actual Pi 0.87.1 SDK DefaultResourceLoader and ExtensionRunner; runtime package order observed, no ordering imposed by the test",
+    "actual_host_cases": [
+      "Munchkin Hashline, context-dedup, tool-activation, then local SoL-Pi load order",
+      "default obs_recall activation and schema",
+      "context deduplication followed by ObservationPack using the real ExtensionRunner",
+      "exact UTF-8 recall paging and digest corruption rejection through the registered tool handler",
+      "explicit read,bash allowlist excludes recall and leaves no inaccessible placeholder",
+      "Hashline read/edit descriptions retain digest-tag and stale-rejection contract",
+      "real AgentSession tree navigation, persisted branch append, SessionManager reopen, nonempty transcript resume, and exclusion of abandoned branch"
+    ],
+    "harness_source_surface_sha256": "3036caf58245ac7e26b50279b20946812793c1a26064504ea18dbe03708c58d7",
+    "harness_npm_run_verify": {
+      "status": "PASS",
+      "stages": ["test", "typecheck", "health", "pack:smoke", "optimizer:mothball-check", "secret-scan"],
+      "tests": "939 passed, 0 failed",
+      "duration_seconds": 115.9,
+      "secret_scan": "clean"
+    },
+    "sol_pi_dependency_install": "INCOMPLETE: npm ci --ignore-scripts could not fetch pinned @earendil-works/pi-tui@0.85.1 because registry DNS returned ENOTFOUND and that tarball is absent from the offline cache; npm run check/full SoL-Pi test suite was therefore not run",
+    "live_package_lock": "PASS: original dirty package-lock and diff preserved separately and old checkout restored unchanged"
+  },
+  "rollback": [
+    "Confirm no interactive Pi session is running; do not terminate one.",
+    "Restore settings.json, sol-pi.json, and tool-activation.ts from the backup directory; these restore the exact pre-change hashes.",
+    "If the old SoL-Pi checkout is absent or mismatched, restore installed-sol-pi.tar.gz into /Users/Albert.Wessels/.pi/agent/git/github.com/NVlabs and verify HEAD 5fc5c983f94da9aa2da876db6c74b58e0833fd9e plus the saved package-lock hashes.",
+    "Verify all three restored live hashes match the backup before starting Pi. The new local checkout remains untouched."
+  ]
+}
