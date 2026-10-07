@@ -1,3 +1,4 @@
+import { beginRuntimeGeneration, invalidateRuntimeBranch } from "../lib/runtime-ownership.ts";
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { agentDir } from "../lib/agent-dir.ts";
 import { captureInitialToolSurface } from "../lib/session-bootstrap.ts";
@@ -7,10 +8,12 @@ import { beginSession, record, telemetrySource } from "../lib/telemetry.ts";
 const SURFACE_HASH = /^[a-f0-9]{64}$/;
 
 export default function (pi: ExtensionAPI): void {
+	pi.on("session_before_tree", async () => { invalidateRuntimeBranch(pi.events); });
 	pi.on("session_start", async (_event, ctx) => {
 		// This extension is first in the manifest. Keep minting synchronous and
 		// first: every later handler belongs to exactly this session identity.
 		beginSession();
+		beginRuntimeGeneration(pi.events, ctx.sessionManager?.getSessionId?.() ?? `compat:${ctx.cwd}`);
 
 		if (telemetrySource() === "gate") {
 			if (!SURFACE_HASH.test(process.env.HARNESS_SURFACE_SHA256 ?? "")) {

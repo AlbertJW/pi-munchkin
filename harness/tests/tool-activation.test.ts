@@ -8,7 +8,7 @@ import { captureInitialToolSurface } from "../lib/session-bootstrap.ts";
 import { callTool, fire, makeFakePi, resetPiGlobals } from "./integration-harness.ts";
 
 const names = [
-	"read", "bash", "edit", "write", "grep", "find", "ls", "powershell", "search_spans", "read_span", "recall",
+	"read", "bash", "edit", "write", "grep", "find", "ls", "powershell", "search_spans", "read_span", "recall", "obs_recall",
 	"plan_write", "plan_update", "verify_project", "subagent", "compact_context", "web_search", "web_read",
 	"plan_expand", "plan_settle", "research_plan_start",
 	"goal_propose", "goal_inspect", "goal_update", "goal_settle", "goal_block",
@@ -28,7 +28,7 @@ test("explicit ambient rollback wins over legacy minimal surface", async () => {
 	}
 });
 
-async function load(profile: "ambient" | "core" | undefined, activeInitial: string[] = names.filter((name) => !["grep", "find", "ls"].includes(name)), argv = process.argv) {
+async function load(profile: "ambient" | "core" | undefined, activeInitial: string[] = names.filter((name) => !["grep", "find", "ls"].includes(name)), argv = process.argv, lateToolRegistration?: string) {
 	const oldProfile = process.env.MUNCHKIN_TOOL_PROFILE;
 	const oldActivation = process.env.MUNCHKIN_TOOL_ACTIVATION;
 	const oldTelemetry = process.env.TELEMETRY;
@@ -60,6 +60,7 @@ async function load(profile: "ambient" | "core" | undefined, activeInitial: stri
 	const initial = [...new Set([...activeInitial, "capability"])];
 	fp.pi.setActiveTools(initial);
 	captureInitialToolSurface(fp.pi as any);
+	if (lateToolRegistration) fp.pi.on("session_start", () => fp.pi.registerTool({ name: lateToolRegistration, parameters: { type: "object" } } as any));
 	await fire(fp, "session_start", {}, { cwd: mkdtempSync(join(tmpdir(), "pi-tools-cwd-")) });
 	return {
 		fp,
@@ -79,9 +80,9 @@ test("unset tool profile adopts the bounded core surface", async () => {
 	const run = await load(undefined, [...names]);
 	try {
 		const active = run.fp.pi.getActiveTools();
-		for (const name of ["read", "bash", "edit", "write", "search_spans", "read_span", "recall", "verify_project", "capability"]) assert.ok(active.includes(name), name);
+		for (const name of ["read", "bash", "edit", "write", "search_spans", "read_span", "recall", "obs_recall", "verify_project", "capability"]) assert.ok(active.includes(name), name);
 		for (const name of ["subagent", "compact_context", "web_search", "web_read", "browser_open", "tldraw_create"]) assert.equal(active.includes(name), false, name);
-		assert.equal(active.length <= 11, true, active.join(","));
+		assert.equal(active.length <= 12, true, active.join(","));
 	} finally { run.restore(); }
 });
 
@@ -138,9 +139,39 @@ test("core profile removes specialists and preserves a small execution spine", a
 	const run = await load("core", [...names]);
 	try {
 		const active = run.fp.pi.getActiveTools();
-		for (const name of ["read", "bash", "edit", "write", "search_spans", "read_span", "recall", "verify_project", "capability"]) assert.ok(active.includes(name), name);
+		for (const name of ["read", "bash", "edit", "write", "search_spans", "read_span", "recall", "obs_recall", "verify_project", "capability"]) assert.ok(active.includes(name), name);
 		for (const name of ["subagent", "compact_context", "web_search", "web_read", "browser_open", "tldraw_create"]) assert.equal(active.includes(name), false, name);
-		assert.equal(active.length <= 11, true, active.join(","));
+		assert.equal(active.length <= 12, true, active.join(","));
+	} finally { run.restore(); }
+});
+
+test("obs_recall is core only when an enabled package registers it", async () => {
+	const withoutArchive = await load("core", names.filter((name) => name !== "obs_recall"));
+	try {
+		assert.equal(withoutArchive.fp.pi.getActiveTools().includes("obs_recall"), false);
+	} finally { withoutArchive.restore(); }
+
+	const withArchive = await load("core", [...names]);
+	try {
+		assert.ok(withArchive.fp.pi.getActiveTools().includes("obs_recall"));
+	} finally { withArchive.restore(); }
+});
+
+test("core startup adds obs_recall when an enabled package registers it later in session_start", async () => {
+	const run = await load("core", names.filter((name) => name !== "obs_recall"), process.argv, "obs_recall");
+	try {
+		await new Promise((resolve) => setTimeout(resolve, 10));
+		assert.ok(run.fp.pi.getAllTools().some((tool: any) => tool.name === "obs_recall"));
+		assert.ok(run.fp.pi.getActiveTools().includes("obs_recall"));
+	} finally { run.restore(); }
+});
+
+test("late obs_recall registration does not override an explicit CLI tool selection", async () => {
+	const run = await load("core", ["read"], ["node", "pi", "--tools=read"], "obs_recall");
+	try {
+		await new Promise((resolve) => setTimeout(resolve, 10));
+		assert.equal((globalThis as any).__pi_tool_selection_explicit, true);
+		assert.equal(run.fp.pi.getActiveTools().includes("obs_recall"), false);
 	} finally { run.restore(); }
 });
 

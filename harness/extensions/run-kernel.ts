@@ -140,7 +140,7 @@ export function installRunKernel(pi: ExtensionAPI, options: RunKernelInstallOpti
 	});
 
 	const applied = { transition: null as RunTransitionV1 | null };
-	subscribeOnce("run-kernel:run-event", () => onRunEvent(pi.events, (event) => {
+	subscribeOnce(pi.events, "run-kernel:run-event", () => onRunEvent(pi.events, (event) => {
 		applied.transition = store.apply(event).transition;
 	}));
 	const readAppliedTransition = (): RunTransitionV1 | null => applied.transition;
@@ -214,10 +214,10 @@ export function installRunKernel(pi: ExtensionAPI, options: RunKernelInstallOpti
 		}
 	}
 
-	subscribeOnce("run-kernel:control-proposal", () => onControlProposal(pi.events, ({ proposal }) => {
+	subscribeOnce(pi.events, "run-kernel:control-proposal", () => onControlProposal(pi.events, ({ proposal }) => {
 		dispatch({ ...nextBase(), type: "run/control-proposed", proposal });
 	}));
-	subscribeOnce("run-kernel:control-decision", () => onControlDecision(pi.events, (decision) => {
+	subscribeOnce(pi.events, "run-kernel:control-decision", () => onControlDecision(pi.events, (decision) => {
 		dispatch({ ...nextBase(), type: "run/control-decided", decision });
 	}));
 	// The explicit run boundary lives WITH its consumer. Registering it in the
@@ -233,7 +233,7 @@ export function installRunKernel(pi: ExtensionAPI, options: RunKernelInstallOpti
 		},
 	});
 
-	subscribeOnce("run-kernel:domain-signal", () => onHarnessSignal(pi.events, (signal) => {
+	subscribeOnce(pi.events, "run-kernel:domain-signal", () => onHarnessSignal(pi.events, (signal) => {
 		if (signal.type === "plan/write") {
 			dispatch({ ...nextBase(), type: "run/plan-observed", runIdHash: signal.runIdHash, accepted: true, executionStarted: false, openItems: signal.openItems });
 		} else if (signal.type === "plan/go") {

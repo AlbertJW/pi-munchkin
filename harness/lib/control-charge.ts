@@ -38,7 +38,7 @@ export type DeliveryCharge = {
 export function createDeliveryCharge(events: EventBus, key: string): DeliveryCharge {
 	let pending: { hash: string; boundary: number; settle: (delivered: boolean) => void } | null = null;
 
-	subscribeOnce(`${key}:control-decision`, () => onControlDecision(events, (decision) => {
+	subscribeOnce(events, `${key}:control-decision`, () => onControlDecision(events, (decision) => {
 		// A boundary can produce NO decision at all — the arbiter clears its queue on
 		// agent_start and MAX_PENDING evicts the oldest boundary — so a parked record
 		// must only ever be settled by its OWN boundary. Resolving it against whatever

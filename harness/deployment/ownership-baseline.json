@@ -1,0 +1,96 @@
+{
+  "schema": "pi.ownership-baseline/v1",
+  "files": {
+    "extensions/pi-munchkin/extensions/active-tool-prompts.ts": {
+      "sha256": "5b4275f0b571e41b19d78035b26d0c4fd4476a2effa1b796c219d6ba0190668b",
+      "mode": 420
+    },
+    "extensions/pi-munchkin/extensions/compact-tool.ts": {
+      "sha256": "83c98240fc3b1fc79b0ff6d7e024fb7bb618734473836214ad1e769f7bad4fc3",
+      "mode": 420
+    },
+    "extensions/pi-munchkin/extensions/context-dedup.ts": {
+      "sha256": "b8dffe2a2d4f04b0d567b8d56274ceb5c9d24e0e4bfd3c1cf4176d4302079653",
+      "mode": 420
+    },
+    "extensions/pi-munchkin/extensions/control-arbiter.ts": {
+      "sha256": "39b661333c12ebf590ebb4e95308da8254eb33017c23aa5a152fe79e143aa7b1",
+      "mode": 420
+    },
+    "extensions/pi-munchkin/extensions/loop-breaker.ts": {
+      "sha256": "b5fb3a2446c11b0ca29681f73dbedb55cf3725d50e50d4065ad7b2f9357555fc",
+      "mode": 420
+    },
+    "extensions/pi-munchkin/extensions/plan-runner.ts": {
+      "sha256": "25f9f0b708aa505794e827441817ed04f596937ab3c8cfe6a4f0bd11c64e6fc9",
+      "mode": 420
+    },
+    "extensions/pi-munchkin/extensions/run-capsule.ts": {
+      "sha256": "97a480d83c46fa1a9d43d8d3a6e849a98b8af636b1a0da2ce36099f10a7bb626",
+      "mode": 420
+    },
+    "extensions/pi-munchkin/extensions/run-kernel.ts": {
+      "sha256": "576d6c589f15dd6c0c4efb30cf0f3fb045a3b10c82ed46ae627eb1ff25264c68",
+      "mode": 420
+    },
+    "extensions/pi-munchkin/extensions/session-blackboard.ts": {
+      "sha256": "b0d8370bdc859082fbce4e53b23f739bb0843532aecae6af7c6a1481047d0808",
+      "mode": 420
+    },
+    "extensions/pi-munchkin/extensions/session-bootstrap.ts": {
+      "sha256": "abc233aa9bf6f2f4ac3028931718bfa0e9fdbfba0f613f2f869598a0ee283150",
+      "mode": 420
+    },
+    "extensions/pi-munchkin/extensions/surface-receipt.ts": {
+      "sha256": "6923f86e97d9ad6ee3aec507bad8fd54cf4ea59269a6d3af3d9865cc287313da",
+      "mode": 420
+    },
+    "extensions/pi-munchkin/extensions/tool-activation.ts": {
+      "sha256": "8a946c1dc8c99a1957a8321fdaee5c9b1c59348db52f1be9b64065b4f3f11d57",
+      "mode": 420
+    },
+    "extensions/pi-munchkin/extensions/verify-gate.ts": {
+      "sha256": "a90b64c021c6b9340ad1e10a31a1d583ebae8be8eaf9e8611953603064f24687",
+      "mode": 420
+    },
+    "extensions/pi-munchkin/extensions/working-memory.ts": {
+      "sha256": "2df6020c8428529929c0e311adf91142f748353424b8470c97a8460ab33e41c2",
+      "mode": 420
+    },
+    "extensions/pi-munchkin/lib/capability-surface.ts": {
+      "sha256": "8cb91d12bbbffe19013ab2438029b5a1065a84a15634854d00e0819000e3c5fb",
+      "mode": 420
+    },
+    "extensions/pi-munchkin/lib/context-pipeline.ts": null,
+    "extensions/pi-munchkin/lib/control-charge.ts": {
+      "sha256": "f9feb85712ebe5aaa98e4e455c3b2c16d5cca9bd406d03c8841a7db5b9b53dc3",
+      "mode": 420
+    },
+    "extensions/pi-munchkin/lib/event-bus-owner.ts": null,
+    "extensions/pi-munchkin/lib/extension-lifecycle.ts": {
+      "sha256": "495d6f71804ffe83e4b95c4c0dec40c4232763975c4c62a54c2769c6c75981c2",
+      "mode": 420
+    },
+    "extensions/pi-munchkin/lib/goal-service.ts": null,
+    "extensions/pi-munchkin/lib/goal-state.ts": {
+      "sha256": "10e32813b8bd26bb8f1fa739e0598e01938b345c6b8f79d7767e87013a062609",
+      "mode": 420
+    },
+    "extensions/pi-munchkin/lib/intervention-receipts.ts": null,
+    "extensions/pi-munchkin/lib/pi-compatibility.ts": null,
+    "extensions/pi-munchkin/lib/plan-service.ts": null,
+    "extensions/pi-munchkin/lib/planning-runtime.ts": null,
+    "extensions/pi-munchkin/lib/private-state-lock.ts": null,
+    "extensions/pi-munchkin/lib/research-dispatch-service.ts": null,
+    "extensions/pi-munchkin/lib/runtime-ownership.ts": null,
+    "extensions/pi-munchkin/lib/runtime-receipt.ts": null,
+    "extensions/pi-munchkin/lib/session-bootstrap.ts": {
+      "sha256": "a90d897df74d81365a82c2b0259ca54dc006da3be326a229fd1763c2707da52d",
+      "mode": 420
+    },
+    "extensions/pi-munchkin/vendor/pi-subagent/runner-env.js": {
+      "sha256": "104684bceaeb92679990b04af52bb65df0d6f20357a23bdc95f97876097a0124",
+      "mode": 420
+    }
+  }
+}

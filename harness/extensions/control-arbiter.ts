@@ -1,3 +1,5 @@
+import { interventionReceipt } from "../lib/intervention-receipts.ts";
+import { continuationDraft, dispatchIdleContinuation, onActionableSettlement, type ContinuationBoundaryResult } from "../lib/pi-compatibility.ts";
 import { subscribeOnce } from "../lib/extension-lifecycle.ts";
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { ControlArbiterQueue } from "../lib/control-arbiter.ts";
@@ -26,6 +28,7 @@ export default function (pi: ExtensionAPI): void {
 	let continuationLifecycleGeneration = 0;
 	let continuationLive = true;
 	let agentActive = false;
+	let actionableBoundary: ContinuationBoundaryResult | null = null;
 
 	const flushContinuations = async (): Promise<void> => {
 		continuationFlushScheduled = false;
@@ -52,7 +55,7 @@ export default function (pi: ExtensionAPI): void {
 					try { authorized = await candidate.authorize(); } catch { authorized = false; }
 				}
 				if (lifecycleGeneration !== continuationLifecycleGeneration) return;
-				if (!authorized || !continuationLive || candidate.request.session_id_hash !== sessionIdHash || candidate.request.expires_at_ms < Date.now()) {
+				if (!authorized || !continuationLive || agentActive || candidate.request.session_id_hash !== sessionIdHash || candidate.request.expires_at_ms < Date.now()) {
 					record("control-arbiter", "continuation", {
 						reason: candidate.request.reason, outcome: "rejected", contenders: candidates.length,
 					});
@@ -78,7 +81,8 @@ export default function (pi: ExtensionAPI): void {
 				// states: it queues while still processing and starts immediately
 				// once idle, so the receipt cannot be recorded for a lost message.
 				dispatched = true;
-				void pi.sendUserMessage(candidate.request.message, { deliverAs: "followUp" });
+				if (actionableBoundary) { actionableBoundary.entries.push(continuationDraft(candidate.request.message)); actionableBoundary.continue = true; }
+				else dispatchIdleContinuation(pi, candidate.request.message);
 				return;
 			}
 		} finally {
@@ -102,7 +106,7 @@ export default function (pi: ExtensionAPI): void {
 		queueMicrotask(() => { void flushContinuations(); });
 	};
 
-	subscribeOnce("control-arbiter:control-proposal", () => onControlProposal(pi.events, (event) => queue.add(event)));
+	subscribeOnce(pi.events, "control-arbiter:control-proposal", () => onControlProposal(pi.events, (event) => { queue.add(event); pi.appendEntry("pi-munchkin:intervention/v1", interventionReceipt(pi.events, event.proposal, "proposed", null)); }));
 	// Continuation ownership is per Pi event bus. Unlike reloads, isolated
 	// AgentSessions legitimately have distinct buses in one process, so do not
 	// share this subscription through the reload-only subscription registry.
@@ -146,8 +150,16 @@ export default function (pi: ExtensionAPI): void {
 		agentActive = true;
 		queue.clear();
 	});
+	onActionableSettlement(pi, async event => {
+		agentActive = false;
+		if (event.outcome !== "completed") { pendingContinuations = []; return undefined; }
+		const boundary: ContinuationBoundaryResult = { entries: [], continue: false };
+		actionableBoundary = boundary;
+		try { await flushContinuations(); } finally { actionableBoundary = null; }
+		return boundary.continue ? boundary : undefined;
+	});
 	// Pi emits this only after every ordered agent_end handler has completed and
-	// after marking the run idle. It is the sole automatic-continuation boundary.
+	// after marking the run idle. On older Pi this is actionable; on Pi 1.x it handles only late idle offers.
 	pi.on("agent_settled", async () => {
 		agentActive = false;
 		if (pendingContinuations.length > 0) scheduleContinuationFlush();
@@ -156,6 +168,7 @@ export default function (pi: ExtensionAPI): void {
 		const { decision, delivery, lensMerged, verificationMerged } = queue.decide(event.turnIndex, mode);
 		if (decision.proposalCount === 0) return;
 		const winner = decision.winner;
+		if (winner) pi.appendEntry("pi-munchkin:intervention/v1", interventionReceipt(pi.events, winner, "selected", null));
 		record("control-arbiter", "decision", {
 			mode,
 			proposals: decision.proposalCount,
@@ -180,6 +193,7 @@ export default function (pi: ExtensionAPI): void {
 		}
 		if (typeof delivery.message === "string" && delivery.message.length > 0) {
 			pi.sendUserMessage(delivery.message.slice(0, 4000), { deliverAs: "steer" });
+			pi.appendEntry("pi-munchkin:intervention/v1", interventionReceipt(pi.events, winner, "dispatch-accepted", null));
 		}
 	});
 	// Mark enforcement only after the complete subscriber/handler set exists;

@@ -1,10 +1,11 @@
+import { runtimeValue } from "../lib/runtime-ownership.ts";
 import { subscribeOnce } from "../lib/extension-lifecycle.ts";
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { defineTool, type ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { Type } from "typebox";
 import { agentDir } from "../lib/agent-dir.ts";
-import { FLAT_PLAN_TOOLS, PLAN_SURFACE_TOOLS, measureActiveSurface } from "../lib/capability-surface.ts";
+import { CORE_TOOL_NAMES, capabilityTools, FLAT_PLAN_TOOLS, PLAN_SURFACE_TOOLS, measureActiveSurface } from "../lib/capability-surface.ts";
 import { classifyBashCommand } from "../lib/command-policy.ts";
 import { record } from "../lib/telemetry.ts";
 import { initialToolSurface } from "../lib/session-bootstrap.ts";
@@ -35,10 +36,7 @@ export const MUNCHKIN_TOOL_PROFILE_DEFAULT: Profile = "core";
 // Exported for plan-runner's post-restart surface restore (audit A6, 2026-08-25):
 // after a reload during /plan the in-memory surface bookkeeping is gone, and the
 // only correct restore target is the baseline filtered through the same profile.
-export const CORE_NAMES = new Set([
-	"read", "bash", "edit", "write", "search_spans", "read_span", "recall",
-	"verify_project", "capability", "plan_write", "plan_update",
-]);
+export const CORE_NAMES = new Set(CORE_TOOL_NAMES);
 const EXPLICIT_FLAG = "__pi_tool_selection_explicit";
 
 // Survives /reload. `resource-loader.reload()` calls `clearExtensionCache()`
@@ -56,13 +54,8 @@ const EXPLICIT_FLAG = "__pi_tool_selection_explicit";
 const ACTIVATION_MEMORY_KEY = "__pi_tool_activation_memory_v1";
 type ActivationMemory = { deferred: Set<string>; attempted: Set<Family>; owned: Set<string> };
 
-function activationMemory(): ActivationMemory {
-	const shared = globalThis as Record<string, unknown>;
-	const existing = shared[ACTIVATION_MEMORY_KEY] as ActivationMemory | undefined;
-	if (existing?.deferred instanceof Set && existing.attempted instanceof Set && existing.owned instanceof Set) return existing;
-	const fresh: ActivationMemory = { deferred: new Set(), attempted: new Set(), owned: new Set() };
-	shared[ACTIVATION_MEMORY_KEY] = fresh;
-	return fresh;
+function activationMemory(bus: object): ActivationMemory {
+ return runtimeValue(bus, { key: ACTIVATION_MEMORY_KEY, lifetime: "event-bus", create: () => ({ deferred: new Set<string>(), attempted: new Set<Family>(), owned: new Set<string>() }) });
 }
 
 /** Replace a set's contents without breaking the identity the memory shares. */
@@ -112,29 +105,7 @@ export function baselineLooksExplicit(argv: readonly string[] = process.argv): b
 	return commandLineIsExplicit(argv);
 }
 
-function familyTools(family: Family, all: readonly string[]): string[] {
-	switch (family) {
-		case "research": return all.filter((name) => name === "web_search" || name === "web_read");
-		case "delegation": return all.filter((name) => name === "subagent");
-		case "browser": return all.filter((name) => name.startsWith("browser_"));
-		case "canvas": return all.filter((name) => name.startsWith("tldraw_"));
-		case "context": return all.filter((name) => name === "compact_context");
-		case "goals": return all.filter((name) => ["goal_propose", "goal_inspect", "goal_update", "goal_settle", "goal_block"].includes(name));
-		case "vision": return all.filter((name) => name === "visual_observe" || name === "visual_refine_target");
-		// Flat plan tools are activatable in ANY session: skills and models may
-		// legitimately structure multi-item work without the human /plan surface
-		// (measured live 2026-08-25: the process-circleback skill instructs
-		// plan_write per meeting and had no legal route to it).
-		//
-		// Membership is REGISTRATION-driven, not flag-driven. plan-runner already
-		// encodes every dark flag in what it registers, so re-deriving those guards
-		// here only creates a second copy that can disagree with the first — and did:
-		// the graph tools were hidden at startup by plan-runner but listed by this
-		// family only under DEEP_RESEARCH_PLANNING, so with PLAN_GRAPH alone they had
-		// no route back. `all` is the registered roster, so filtering it is exact.
-		case "planning": return all.filter((name) => PLAN_SURFACE_TOOLS.includes(name));
-	}
-}
+const familyTools = capabilityTools;
 
 function isMutationResult(toolName: string, input: unknown): boolean {
 	if (toolName === "edit" || toolName === "write") return true;
@@ -149,7 +120,7 @@ export default function (pi: ExtensionAPI): void {
 	let allTools: any[] = [];
 	let allNames: string[] = [];
 	let explicit = false;
-	const memory = activationMemory();
+	const memory = activationMemory(pi.events);
 	const deferred = memory.deferred;
 	const attempted = memory.attempted;
 	const owned = memory.owned;
@@ -206,7 +177,7 @@ export default function (pi: ExtensionAPI): void {
 		}
 		const familyNames = familyTools(family, allNames);
 		const names = family === "goals" && !goalActive ? familyNames.filter((name) => name === "goal_propose") : familyNames;
-		const allowed = explicit ? names.filter((name) => (initialToolSurface()?.active ?? []).includes(name)) : names;
+		const allowed = explicit ? names.filter((name) => (initialToolSurface(pi.events)?.active ?? []).includes(name)) : names;
 		const active = pi.getActiveTools();
 		const add = allowed.filter((name) => deferred.has(name) && !active.includes(name));
 		if (!add.length) {
@@ -275,7 +246,7 @@ export default function (pi: ExtensionAPI): void {
 		},
 	}));
 
-	subscribeOnce("tool-activation:domain-signal", () => onHarnessSignal(pi.events, (signal) => {
+	subscribeOnce(pi.events, "tool-activation:domain-signal", () => onHarnessSignal(pi.events, (signal) => {
 		if (signal.type === "plan/write") lastOpenItems = signal.openItems;
 		if (signal.type === "plan/go" && lastOpenItems > 1) activateFamily("delegation", "multi-item-execution");
 		if (signal.type === "goal/state") {
@@ -329,7 +300,7 @@ export default function (pi: ExtensionAPI): void {
 		// An incomplete bootstrap baseline no longer forces explicit — that
 		// fail-closed branch bricked /plan for a condition the user did not cause;
 		// it keeps a distinct telemetry reason for observability.
-		const baseline = initialToolSurface();
+		const baseline = initialToolSurface(pi.events);
 		explicit = baselineLooksExplicit() || await settingsAreExplicit(ctx.cwd);
 		publish(explicit ? "preserved-explicit" : baseline?.complete ? "startup" : "bootstrap-incomplete");
 		if (explicit) {
@@ -376,6 +347,23 @@ export default function (pi: ExtensionAPI): void {
 			for (const name of deferred) record("tool-activation", "deferred", { tool: name, reason: "core-startup" });
 			publish("core-startup");
 			surfaceTelemetry();
+			// Package extensions may register opt-in tools from their own
+			// session_start handler, after this startup snapshot. Reconcile only
+			// obs_recall after the event handlers finish; preserve explicit user
+			// allowlists and leave the tool absent when the feature is disabled.
+			setTimeout(() => {
+				if (explicit) return;
+				let registeredNames: string[];
+				try { registeredNames = pi.getAllTools().map((tool) => String(tool.name)); }
+				catch { return; }
+				if (!registeredNames.includes("obs_recall")) return;
+				const current = pi.getActiveTools();
+				if (current.includes("obs_recall")) return;
+				pi.setActiveTools([...current, "obs_recall"]);
+				record("tool-activation", "activated", { tool: "obs_recall", reason: "late-core-registration" });
+				publish("core-late-tool-registration");
+				surfaceTelemetry();
+			}, 0);
 			return;
 		}
 

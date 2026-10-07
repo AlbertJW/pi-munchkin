@@ -699,7 +699,7 @@ export default function (pi: ExtensionAPI) {
 		},
 	});
 
-	subscribeOnce("loop-breaker:domain-signal", () => onHarnessSignal(pi.events, (signal) => {
+	subscribeOnce(pi.events, "loop-breaker:domain-signal", () => onHarnessSignal(pi.events, (signal) => {
 		if (signal.type !== "recovery/resume-requested") return;
 		clearRecoveryWalls(signal.origin);
 	}));

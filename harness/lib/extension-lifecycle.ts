@@ -1,3 +1,4 @@
+import { eventBusOwner } from "./event-bus-owner.ts";
 // extension-lifecycle — state and subscriptions that know what a reload does to them.
 //
 // Pi's reload semantics, verified against the installed dist:
@@ -19,48 +20,41 @@
 //     throwing `pi.*` call, and Node's default `maxListeners` is 10 with nothing
 //     raising it — measured, the domain-signal channel goes 7 → 14 on ONE reload.
 
-const SUBSCRIPTIONS_KEY = "__pi_extension_subscriptions_v1";
-
+// Event-bus lifetime; reload generations replace only their own channel.
+const SUBSCRIPTIONS_KEY = "__pi_extension_subscriptions_v2";
 export type Disposer = () => void;
-
-function registry(): Map<string, Disposer> {
-	const shared = globalThis as Record<string, unknown>;
-	const existing = shared[SUBSCRIPTIONS_KEY];
-	if (existing instanceof Map) return existing as Map<string, Disposer>;
-	const fresh = new Map<string, Disposer>();
-	shared[SUBSCRIPTIONS_KEY] = fresh;
-	return fresh;
+type Registry = { buses: WeakMap<object, Map<string, Disposer>>; maps: Set<WeakRef<Map<string, Disposer>>> };
+function registry(): Registry {
+ const shared = globalThis as Record<string, unknown>;
+ const existing = shared[SUBSCRIPTIONS_KEY] as Registry | undefined;
+ if (existing?.buses instanceof WeakMap && existing.maps instanceof Set) return existing;
+ const fresh: Registry = { buses: new WeakMap(), maps: new Set() };
+ shared[SUBSCRIPTIONS_KEY] = fresh;
+ return fresh;
 }
-
-/**
- * Subscribe to a shared bus channel, disposing this key's PREVIOUS-generation
- * subscription first.
- *
- * Every one of the fifteen `onHarnessSignal` / `onControlProposal` /
- * `onControlDecision` / `onRunStateSnapshot` / `onRunEvent` call sites in this
- * harness discarded the unsubscribe function the bus returns. Nothing else could
- * dispose them: an extension gets no unload hook, and by the time the next
- * generation runs, the closure holding the disposer is gone. Parking it on
- * `globalThis` is what makes the next generation able to clean up after the last.
- *
- * `key` must be unique per (extension, channel).
- */
-export function subscribeOnce(key: string, subscribe: () => Disposer): void {
-	const subscriptions = registry();
-	const previous = subscriptions.get(key);
-	if (previous) {
-		// A disposer from a bus that no longer exists is not an error worth raising:
-		// the subscription it would have removed is already unreachable.
-		try { previous(); } catch { /* stale bus */ }
-	}
-	subscriptions.set(key, subscribe());
+function subscriptionsFor(bus: object): Map<string, Disposer> {
+ bus = eventBusOwner(bus);
+ const state = registry();
+ let subscriptions = state.buses.get(bus);
+ if (!subscriptions) {
+  subscriptions = new Map(); state.buses.set(bus, subscriptions);
+  for (const ref of state.maps) if (!ref.deref()) state.maps.delete(ref);
+  state.maps.add(new WeakRef(subscriptions));
+ }
+ return subscriptions;
 }
-
-/** Drop every recorded subscription. For tests and for a full process teardown. */
-export function disposeAllSubscriptions(): void {
-	const subscriptions = registry();
-	for (const dispose of subscriptions.values()) {
-		try { dispose(); } catch { /* stale bus */ }
-	}
-	subscriptions.clear();
+export function subscribeOnce(bus: object, key: string, subscribe: () => Disposer): void {
+ const subscriptions = subscriptionsFor(bus);
+ const previous = subscriptions.get(key);
+ subscriptions.delete(key);
+ try { previous?.(); } catch { /* invalidated runtime */ }
+ subscriptions.set(key, subscribe());
+}
+/** Dispose only this bus, or all reachable buses for process/test teardown. */
+export function disposeAllSubscriptions(bus?: object): void {
+ const maps = bus ? [subscriptionsFor(bus)] : [...registry().maps].flatMap(ref => ref.deref() ? [ref.deref()!] : []);
+ for (const subscriptions of maps) {
+  const disposers = [...subscriptions.values()]; subscriptions.clear();
+  for (const dispose of disposers) try { dispose(); } catch { /* invalidated runtime */ }
+ }
 }

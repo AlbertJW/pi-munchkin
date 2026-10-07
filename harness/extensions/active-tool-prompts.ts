@@ -1,3 +1,4 @@
+import { transformLegacyPrompt } from "../lib/pi-compatibility.ts";
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { ACTIVE_TOOL_PROMPTS, stripAmbientToolGuidance } from "../lib/active-tool-prompts.ts";
 
@@ -6,7 +7,5 @@ import { ACTIVE_TOOL_PROMPTS, stripAmbientToolGuidance } from "../lib/active-too
  * ACTIVE_TOOL_PROMPTS=ambient is the explicit compatibility rollback. */
 export default function (pi: ExtensionAPI): void {
 	if (!ACTIVE_TOOL_PROMPTS) return;
-	pi.on("before_agent_start", async (event) => ({
-		systemPrompt: stripAmbientToolGuidance(event.systemPrompt),
-	}));
+	pi.on("before_agent_start", async (event) => transformLegacyPrompt(event.systemPrompt, stripAmbientToolGuidance));
 }

@@ -37,7 +37,12 @@
     "secret-scan:diff": "node harness/scripts/secret-scan-diff.mjs",
     "verify:optimizer": "bash scripts/verify-optimizer.sh",
     "verify": "node harness/scripts/verify-all.mjs",
-    "mirror:apply": "node --experimental-strip-types harness/scripts/live-mirror-apply.mjs"
+    "mirror:apply": "node --experimental-strip-types harness/scripts/live-mirror-apply.mjs",
+    "acceptance:prepare": "node --experimental-strip-types harness/scripts/acceptance-study.mjs prepare",
+    "acceptance:summarize": "node --experimental-strip-types harness/scripts/acceptance-study.mjs summarize",
+    "qualify:ownership": "node harness/scripts/qualify-harness-ownership.mjs",
+    "deploy:ownership": "node harness/scripts/deploy-harness-ownership.mjs",
+    "qualify:planning-parity": "node harness/scripts/planning-trace-parity.mjs"
   },
   "pi": {
     "extensions": [
@@ -91,8 +96,8 @@
     "typescript": "5.9.3"
   },
   "peerDependencies": {
-    "@earendil-works/pi-coding-agent": ">=0.80.6 <0.85.0",
-    "@earendil-works/pi-ai": ">=0.80.6 <0.85.0"
+    "@earendil-works/pi-coding-agent": ">=0.80.6 <0.85.0 || 1.0.4",
+    "@earendil-works/pi-ai": ">=0.80.6 <0.85.0 || 1.0.4"
   },
   "files": [
     "harness/extensions/session-bootstrap.ts",
@@ -246,6 +251,24 @@
     "harness/tests/fixtures/vision-real-ui-lfm25-vl-3b-v2.json",
     "harness/tests/fixtures/grep-find-qwen-v1.json",
     "harness/tests/fixtures/jina-reader-v1.json",
-    "harness/tests/fixtures/vision-quality-qwen36-35b-vision-v2.json"
+    "harness/tests/fixtures/vision-quality-qwen36-35b-vision-v2.json",
+    "harness/lib/research-dispatch-service.ts",
+    "harness/lib/goal-service.ts",
+    "harness/lib/intervention-receipts.ts",
+    "harness/lib/pi-compatibility.ts",
+    "harness/lib/plan-service.ts",
+    "harness/lib/runtime-receipt.ts",
+    "harness/lib/planning-runtime.ts",
+    "harness/lib/acceptance-suite.ts",
+    "harness/lib/runtime-ownership.ts",
+    "harness/lib/context-pipeline.ts",
+    "harness/acceptance/tasks-v1.json",
+    "harness/scripts/acceptance-study.mjs",
+    "harness/scripts/qualify-harness-ownership.mjs",
+    "harness/scripts/deploy-harness-ownership.mjs",
+    "harness/deployment/ownership-baseline.json",
+    "harness/lib/event-bus-owner.ts",
+    "docs/HARNESS_OWNERSHIP_CONSOLIDATION.md",
+    "harness/scripts/planning-trace-parity.mjs"
   ]
 }

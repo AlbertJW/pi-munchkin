@@ -173,7 +173,7 @@ test("/reload: a capability family still activates after the factories are re-in
 
 		// pi re-invokes every factory against a fresh api, rebuilding the runtime
 		// from the narrowed surface the first generation left behind.
-		const warm = await boot({ cwd: cold.cwd, carryActive: cold.active });
+		const warm = await boot({ cwd: cold.cwd, carryActive: cold.active, carryBus: cold.fp.busHandlers, eventBus: cold.fp.events });
 		const result = await callTool(warm.fp, "capability", { action: "enable", family: "browser" }, warm.cwd);
 		const payload = JSON.parse(String(result.content[0]?.text ?? "{}"));
 		assert.equal(

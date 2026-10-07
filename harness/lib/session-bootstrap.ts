@@ -1,3 +1,4 @@
+import { runtimeValue } from "./runtime-ownership.ts";
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 
 export type InitialToolSurface = Readonly<{
@@ -28,7 +29,7 @@ function names(values: unknown): string[] | null {
 /**
  * Capture the registry before any later session_start handler can narrow it.
  *
- * First capture wins for the process lifetime. Pi re-emits session_start on
+ * First capture wins for the event-bus lifetime. Pi re-emits session_start on
  * /reload (and `pi update --extensions` reloads), and reload rebuilds the
  * runtime from the CURRENT active set — i.e. the surface this harness already
  * narrowed. Re-capturing there made the classifier read the harness's own
@@ -39,7 +40,7 @@ function names(values: unknown): string[] | null {
  * session state), so first-wins is sufficient.
  */
 export function captureInitialToolSurface(pi: ExtensionAPI): InitialToolSurface {
-	const existing = initialToolSurface();
+	const existing = initialToolSurface(pi.events);
 	if (existing) return existing;
 	let active: string[] | null = null;
 	let all: string[] | null = null;
@@ -56,12 +57,10 @@ export function captureInitialToolSurface(pi: ExtensionAPI): InitialToolSurface 
 		all: Object.freeze([...(all ?? [])]),
 		complete,
 	});
-	(globalThis as Record<string, unknown>)[BASELINE_FLAG] = baseline;
+	runtimeValue(pi.events, { key: BASELINE_FLAG, lifetime: "event-bus", create: () => ({ baseline }) }).baseline = baseline;
 	return baseline;
 }
 
-export function initialToolSurface(): InitialToolSurface | null {
-	const value = (globalThis as Record<string, unknown>)[BASELINE_FLAG];
-	if (!value || typeof value !== "object") return null;
-	return value as InitialToolSurface;
+export function initialToolSurface(bus: object): InitialToolSurface | null {
+ return runtimeValue(bus, { key: BASELINE_FLAG, lifetime: "event-bus", create: () => ({ baseline: null as InitialToolSurface | null }) }).baseline;
 }

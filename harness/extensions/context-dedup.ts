@@ -1,3 +1,4 @@
+import { beginContextRequest, observeContextStage } from "../lib/context-pipeline.ts";
 // Context read-dedup (LIVE default-on since 2026-08-07).
 //
 // READ_DEDUP=on (c26): a `context`-event view transform that collapses
@@ -20,7 +21,9 @@ const READ_DEDUP = process.env.READ_DEDUP !== "off";
 export default function (pi: ExtensionAPI): void {
 	if (READ_DEDUP) {
 		pi.on("context", async (event) => {
+			if (process.env.CONTEXT_PIPELINE_RECEIPTS === "on") beginContextRequest(pi.events);
 			const result = dedupReadResults(event.messages);
+			if (process.env.CONTEXT_PIPELINE_RECEIPTS === "on") observeContextStage(pi.events, { name: "read-dedup", boundary: "context", recovery: "earlier-message" }, event.messages, result?.messages ?? event.messages, pi.getActiveTools());
 			if (!result) return undefined; // nothing replaced — preserve the exact original array
 			record("context-dedup", "dedup", { replaced: result.replaced, saved_bytes: result.savedBytes });
 			return { messages: result.messages as typeof event.messages };

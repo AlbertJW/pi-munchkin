@@ -265,7 +265,7 @@ export default function (pi: ExtensionAPI) {
 		},
 	}));
 
-	subscribeOnce("verify-gate:domain-signal", () => onHarnessSignal(pi.events, (signal) => {
+	subscribeOnce(pi.events, "verify-gate:domain-signal", () => onHarnessSignal(pi.events, (signal) => {
 		if (signal.type !== "tool/prevented") return;
 		const kind = order.prevent(signal.toolCallId);
 		if (!kind) {

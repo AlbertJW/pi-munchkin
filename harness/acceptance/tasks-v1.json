@@ -1,0 +1,1319 @@
+{
+  "v": 1,
+  "tasks": [
+    {
+      "id": "repair-01",
+      "category": "repair",
+      "kind": "regression",
+      "title": "UTF-8 paging",
+      "prompt": "Fix implementation.js for utf-8 paging. Preserve the run(value) interface. Handle the stated invariant and boundaries; do not change the tests.",
+      "files": {
+        "implementation.js": "const run = value => value.slice(0, 3);\n"
+      },
+      "oracle": {
+        "tests": [
+          {
+            "args": [
+              "\u00e9\u00e9\u00e9"
+            ],
+            "expected": "\u00e9"
+          },
+          {
+            "args": [
+              "abc"
+            ],
+            "expected": "abc"
+          }
+        ],
+        "answer": {
+          "implementation.js": "const run = value => { let out=\"\"; for(const c of value) { if(new TextEncoder().encode(out+c).length>3)break; out+=c; } return out; };\n"
+        },
+        "externalChecks": []
+      }
+    },
+    {
+      "id": "repair-02",
+      "category": "repair",
+      "kind": "regression",
+      "title": "Stable ID delta",
+      "prompt": "Fix implementation.js for stable id delta. Preserve the run(value) interface. Handle the stated invariant and boundaries; do not change the tests.",
+      "files": {
+        "implementation.js": "const run = value => ({...value, items: value.items.map(x=>({...x,status:\"done\"}))});\n"
+      },
+      "oracle": {
+        "tests": [
+          {
+            "args": [
+              {
+                "items": [
+                  {
+                    "id": "a",
+                    "status": "pending"
+                  },
+                  {
+                    "id": "b",
+                    "status": "pending"
+                  }
+                ],
+                "id": "b"
+              }
+            ],
+            "expected": {
+              "items": [
+                {
+                  "id": "a",
+                  "status": "pending"
+                },
+                {
+                  "id": "b",
+                  "status": "done"
+                }
+              ],
+              "id": "b"
+            }
+          }
+        ],
+        "answer": {
+          "implementation.js": "const run = value => ({...value,items:value.items.map(x=>x.id===value.id?{...x,status:\"done\"}:x)});\n"
+        },
+        "externalChecks": []
+      }
+    },
+    {
+      "id": "repair-03",
+      "category": "repair",
+      "kind": "regression",
+      "title": "Pause authority",
+      "prompt": "Fix implementation.js for pause authority. Preserve the run(value) interface. Handle the stated invariant and boundaries; do not change the tests.",
+      "files": {
+        "implementation.js": "const run = value => \"active\";\n"
+      },
+      "oracle": {
+        "tests": [
+          {
+            "args": [
+              {
+                "status": "paused",
+                "event": "observation"
+              }
+            ],
+            "expected": "paused"
+          },
+          {
+            "args": [
+              {
+                "status": "active",
+                "event": "observation"
+              }
+            ],
+            "expected": "active"
+          }
+        ],
+        "answer": {
+          "implementation.js": "const run = value => value.status;\n"
+        },
+        "externalChecks": []
+      }
+    },
+    {
+      "id": "repair-04",
+      "category": "repair",
+      "kind": "regression",
+      "title": "Cursor revision",
+      "prompt": "Fix implementation.js for cursor revision. Preserve the run(value) interface. Handle the stated invariant and boundaries; do not change the tests.",
+      "files": {
+        "implementation.js": "const run = value => true;\n"
+      },
+      "oracle": {
+        "tests": [
+          {
+            "args": [
+              {
+                "cursorRevision": 2,
+                "revision": 3
+              }
+            ],
+            "expected": false
+          },
+          {
+            "args": [
+              {
+                "cursorRevision": 3,
+                "revision": 3
+              }
+            ],
+            "expected": true
+          }
+        ],
+        "answer": {
+          "implementation.js": "const run = value => value.cursorRevision === value.revision;\n"
+        },
+        "externalChecks": []
+      }
+    },
+    {
+      "id": "repair-05",
+      "category": "repair",
+      "kind": "regression",
+      "title": "Lease generation",
+      "prompt": "Fix implementation.js for lease generation. Preserve the run(value) interface. Handle the stated invariant and boundaries; do not change the tests.",
+      "files": {
+        "implementation.js": "const run = value => true;\n"
+      },
+      "oracle": {
+        "tests": [
+          {
+            "args": [
+              {
+                "lease": 1,
+                "generation": 2
+              }
+            ],
+            "expected": false
+          },
+          {
+            "args": [
+              {
+                "lease": 2,
+                "generation": 2
+              }
+            ],
+            "expected": true
+          }
+        ],
+        "answer": {
+          "implementation.js": "const run = value => value.lease===value.generation;\n"
+        },
+        "externalChecks": []
+      }
+    },
+    {
+      "id": "repair-06",
+      "category": "repair",
+      "kind": "capability",
+      "title": "Budget conservation",
+      "prompt": "Fix implementation.js for budget conservation. Preserve the run(value) interface. Handle the stated invariant and boundaries; do not change the tests.",
+      "files": {
+        "implementation.js": "const run = value => value.allocated;\n"
+      },
+      "oracle": {
+        "tests": [
+          {
+            "args": [
+              {
+                "allocated": 5,
+                "used": 3
+              }
+            ],
+            "expected": 2
+          },
+          {
+            "args": [
+              {
+                "allocated": 5,
+                "used": 7
+              }
+            ],
+            "expected": 0
+          }
+        ],
+        "answer": {
+          "implementation.js": "const run = value => Math.max(0,value.allocated-value.used);\n"
+        },
+        "externalChecks": []
+      }
+    },
+    {
+      "id": "repair-07",
+      "category": "repair",
+      "kind": "capability",
+      "title": "Distinct observations",
+      "prompt": "Fix implementation.js for distinct observations. Preserve the run(value) interface. Handle the stated invariant and boundaries; do not change the tests.",
+      "files": {
+        "implementation.js": "const run = value => [value.at(-1)];\n"
+      },
+      "oracle": {
+        "tests": [
+          {
+            "args": [
+              [
+                "a",
+                "b",
+                "a"
+              ]
+            ],
+            "expected": [
+              "a",
+              "b"
+            ]
+          }
+        ],
+        "answer": {
+          "implementation.js": "const run = value => [...new Set(value)];\n"
+        },
+        "externalChecks": []
+      }
+    },
+    {
+      "id": "repair-08",
+      "category": "repair",
+      "kind": "capability",
+      "title": "Exact source identity",
+      "prompt": "Fix implementation.js for exact source identity. Preserve the run(value) interface. Handle the stated invariant and boundaries; do not change the tests.",
+      "files": {
+        "implementation.js": "const run = value => value.trim();\n"
+      },
+      "oracle": {
+        "tests": [
+          {
+            "args": [
+              " x\n"
+            ],
+            "expected": " x\n"
+          }
+        ],
+        "answer": {
+          "implementation.js": "const run = value => value;\n"
+        },
+        "externalChecks": []
+      }
+    },
+    {
+      "id": "repair-09",
+      "category": "repair",
+      "kind": "capability",
+      "title": "Incomplete coverage",
+      "prompt": "Fix implementation.js for incomplete coverage. Preserve the run(value) interface. Handle the stated invariant and boundaries; do not change the tests.",
+      "files": {
+        "implementation.js": "const run = value => \"done\";\n"
+      },
+      "oracle": {
+        "tests": [
+          {
+            "args": [
+              {
+                "leads": 2,
+                "complete": false
+              }
+            ],
+            "expected": "deferred"
+          },
+          {
+            "args": [
+              {
+                "leads": 2,
+                "complete": true
+              }
+            ],
+            "expected": "done"
+          }
+        ],
+        "answer": {
+          "implementation.js": "const run = value => value.complete?\"done\":\"deferred\";\n"
+        },
+        "externalChecks": []
+      }
+    },
+    {
+      "id": "repair-10",
+      "category": "repair",
+      "kind": "capability",
+      "title": "Bounded tool roster",
+      "prompt": "Fix implementation.js for bounded tool roster. Preserve the run(value) interface. Handle the stated invariant and boundaries; do not change the tests.",
+      "files": {
+        "implementation.js": "const run = value => value.registered;\n"
+      },
+      "oracle": {
+        "tests": [
+          {
+            "args": [
+              {
+                "registered": [
+                  "read",
+                  "obs_recall"
+                ],
+                "allowed": [
+                  "read"
+                ]
+              }
+            ],
+            "expected": [
+              "read"
+            ]
+          }
+        ],
+        "answer": {
+          "implementation.js": "const run = value => value.registered.filter(x=>value.allowed.includes(x));\n"
+        },
+        "externalChecks": []
+      }
+    },
+    {
+      "id": "research-01",
+      "category": "research",
+      "kind": "regression",
+      "title": "Window identity",
+      "prompt": "Read the supplied sources and reconcile the dated observations. Write answer.json with value, sources (filenames), and benefitEstablished. Cite the applicable source; do not infer a model-quality benefit.",
+      "files": {
+        "source-current.txt": "Dated 2026-10-07. Window identity: 64. This is a deterministic fixture observation; no model-benefit evaluation was performed.\n",
+        "source-old.txt": "Dated 2026-09-01. Window identity: 48. This older observation is superseded for this fixture.\n"
+      },
+      "oracle": {
+        "tests": [],
+        "answer": {
+          "answer.json": "{\"value\": 64, \"sources\": [\"source-current.txt\"], \"benefitEstablished\": false}\n"
+        },
+        "externalChecks": []
+      }
+    },
+    {
+      "id": "research-02",
+      "category": "research",
+      "kind": "regression",
+      "title": "Retry allowance",
+      "prompt": "Read the supplied sources and reconcile the dated observations. Write answer.json with value, sources (filenames), and benefitEstablished. Cite the applicable source; do not infer a model-quality benefit.",
+      "files": {
+        "source-current.txt": "Dated 2026-10-07. Retry allowance: 3. This is a deterministic fixture observation; no model-benefit evaluation was performed.\n",
+        "source-old.txt": "Dated 2026-09-01. Retry allowance: 2. This older observation is superseded for this fixture.\n"
+      },
+      "oracle": {
+        "tests": [],
+        "answer": {
+          "answer.json": "{\"value\": 3, \"sources\": [\"source-current.txt\"], \"benefitEstablished\": false}\n"
+        },
+        "externalChecks": []
+      }
+    },
+    {
+      "id": "research-03",
+      "category": "research",
+      "kind": "regression",
+      "title": "Elapsed time",
+      "prompt": "Read the supplied sources and reconcile the dated observations. Write answer.json with value, sources (filenames), and benefitEstablished. Cite the applicable source; do not infer a model-quality benefit.",
+      "files": {
+        "source-current.txt": "Dated 2026-10-07. Elapsed time: 120. This is a deterministic fixture observation; no model-benefit evaluation was performed.\n",
+        "source-old.txt": "Dated 2026-09-01. Elapsed time: 90. This older observation is superseded for this fixture.\n"
+      },
+      "oracle": {
+        "tests": [],
+        "answer": {
+          "answer.json": "{\"value\": 120, \"sources\": [\"source-current.txt\"], \"benefitEstablished\": false}\n"
+        },
+        "externalChecks": []
+      }
+    },
+    {
+      "id": "research-04",
+      "category": "research",
+      "kind": "regression",
+      "title": "Fixture bytes",
+      "prompt": "Read the supplied sources and reconcile the dated observations. Write answer.json with value, sources (filenames), and benefitEstablished. Cite the applicable source; do not infer a model-quality benefit.",
+      "files": {
+        "source-current.txt": "Dated 2026-10-07. Fixture bytes: 43046. This is a deterministic fixture observation; no model-benefit evaluation was performed.\n",
+        "source-old.txt": "Dated 2026-09-01. Fixture bytes: 1624. This older observation is superseded for this fixture.\n"
+      },
+      "oracle": {
+        "tests": [],
+        "answer": {
+          "answer.json": "{\"value\": 43046, \"sources\": [\"source-current.txt\"], \"benefitEstablished\": false}\n"
+        },
+        "externalChecks": []
+      }
+    },
+    {
+      "id": "research-05",
+      "category": "research",
+      "kind": "regression",
+      "title": "Read budget",
+      "prompt": "Read the supplied sources and reconcile the dated observations. Write answer.json with value, sources (filenames), and benefitEstablished. Cite the applicable source; do not infer a model-quality benefit.",
+      "files": {
+        "source-current.txt": "Dated 2026-10-07. Read budget: 5. This is a deterministic fixture observation; no model-benefit evaluation was performed.\n",
+        "source-old.txt": "Dated 2026-09-01. Read budget: 3. This older observation is superseded for this fixture.\n"
+      },
+      "oracle": {
+        "tests": [],
+        "answer": {
+          "answer.json": "{\"value\": 5, \"sources\": [\"source-current.txt\"], \"benefitEstablished\": false}\n"
+        },
+        "externalChecks": []
+      }
+    },
+    {
+      "id": "research-06",
+      "category": "research",
+      "kind": "capability",
+      "title": "Search budget",
+      "prompt": "Read the supplied sources and reconcile the dated observations. Write answer.json with value, sources (filenames), and benefitEstablished. Cite the applicable source; do not infer a model-quality benefit.",
+      "files": {
+        "source-current.txt": "Dated 2026-10-07. Search budget: 3. This is a deterministic fixture observation; no model-benefit evaluation was performed.\n",
+        "source-old.txt": "Dated 2026-09-01. Search budget: 1. This older observation is superseded for this fixture.\n"
+      },
+      "oracle": {
+        "tests": [],
+        "answer": {
+          "answer.json": "{\"value\": 3, \"sources\": [\"source-current.txt\"], \"benefitEstablished\": false}\n"
+        },
+        "externalChecks": []
+      }
+    },
+    {
+      "id": "research-07",
+      "category": "research",
+      "kind": "capability",
+      "title": "Tool roster",
+      "prompt": "Read the supplied sources and reconcile the dated observations. Write answer.json with value, sources (filenames), and benefitEstablished. Cite the applicable source; do not infer a model-quality benefit.",
+      "files": {
+        "source-current.txt": "Dated 2026-10-07. Tool roster: 32. This is a deterministic fixture observation; no model-benefit evaluation was performed.\n",
+        "source-old.txt": "Dated 2026-09-01. Tool roster: 31. This older observation is superseded for this fixture.\n"
+      },
+      "oracle": {
+        "tests": [],
+        "answer": {
+          "answer.json": "{\"value\": 32, \"sources\": [\"source-current.txt\"], \"benefitEstablished\": false}\n"
+        },
+        "externalChecks": []
+      }
+    },
+    {
+      "id": "research-08",
+      "category": "research",
+      "kind": "capability",
+      "title": "Sample size",
+      "prompt": "Read the supplied sources and reconcile the dated observations. Write answer.json with value, sources (filenames), and benefitEstablished. Cite the applicable source; do not infer a model-quality benefit.",
+      "files": {
+        "source-current.txt": "Dated 2026-10-07. Sample size: 40. This is a deterministic fixture observation; no model-benefit evaluation was performed.\n",
+        "source-old.txt": "Dated 2026-09-01. Sample size: 20. This older observation is superseded for this fixture.\n"
+      },
+      "oracle": {
+        "tests": [],
+        "answer": {
+          "answer.json": "{\"value\": 40, \"sources\": [\"source-current.txt\"], \"benefitEstablished\": false}\n"
+        },
+        "externalChecks": []
+      }
+    },
+    {
+      "id": "research-09",
+      "category": "research",
+      "kind": "capability",
+      "title": "Token allowance",
+      "prompt": "Read the supplied sources and reconcile the dated observations. Write answer.json with value, sources (filenames), and benefitEstablished. Cite the applicable source; do not infer a model-quality benefit.",
+      "files": {
+        "source-current.txt": "Dated 2026-10-07. Token allowance: 1024. This is a deterministic fixture observation; no model-benefit evaluation was performed.\n",
+        "source-old.txt": "Dated 2026-09-01. Token allowance: 512. This older observation is superseded for this fixture.\n"
+      },
+      "oracle": {
+        "tests": [],
+        "answer": {
+          "answer.json": "{\"value\": 1024, \"sources\": [\"source-current.txt\"], \"benefitEstablished\": false}\n"
+        },
+        "externalChecks": []
+      }
+    },
+    {
+      "id": "research-10",
+      "category": "research",
+      "kind": "capability",
+      "title": "Revision identity",
+      "prompt": "Read the supplied sources and reconcile the dated observations. Write answer.json with value, sources (filenames), and benefitEstablished. Cite the applicable source; do not infer a model-quality benefit.",
+      "files": {
+        "source-current.txt": "Dated 2026-10-07. Revision identity: 7. This is a deterministic fixture observation; no model-benefit evaluation was performed.\n",
+        "source-old.txt": "Dated 2026-09-01. Revision identity: 6. This older observation is superseded for this fixture.\n"
+      },
+      "oracle": {
+        "tests": [],
+        "answer": {
+          "answer.json": "{\"value\": 7, \"sources\": [\"source-current.txt\"], \"benefitEstablished\": false}\n"
+        },
+        "externalChecks": []
+      }
+    },
+    {
+      "id": "resume-01",
+      "category": "resume",
+      "kind": "regression",
+      "title": "paused after observation",
+      "prompt": "Repair workflow.js so run(state) preserves durable evidence and respects user-only pause/cancellation/resume authority. The study runner must additionally interrupt and resume this task according to lifecycle.json; offline function tests alone do not establish resume operability.",
+      "files": {
+        "workflow.js": "const run = value => ({status:\"active\",evidence:[]});\n",
+        "state.json": "{\"status\": \"paused\", \"evidence\": [\"before-compaction\"], \"event\": \"observation\"}",
+        "lifecycle.json": "{\"turns\": [\"inspect state and identify invariant\", \"resume with state intact; implement and verify\"], \"interruptAfter\": \"first-provider-settlement\", \"resume\": \"same-session-fresh-process\"}"
+      },
+      "oracle": {
+        "tests": [
+          {
+            "args": [
+              {
+                "status": "paused",
+                "evidence": [
+                  "before-compaction"
+                ],
+                "event": "observation"
+              }
+            ],
+            "expected": {
+              "status": "paused",
+              "evidence": [
+                "before-compaction"
+              ]
+            }
+          }
+        ],
+        "answer": {
+          "workflow.js": "const run = value => ({ status: value.event===\"user-pause\"?\"paused\":value.event===\"user-cancel\"?\"cancelled\":value.event===\"user-resume\" && [\"paused\",\"blocked\"].includes(value.status)?\"active\":value.status, evidence: value.evidence });\n"
+        },
+        "externalChecks": [
+          "fresh-process transcript resume",
+          "retains pre-interruption evidence"
+        ]
+      }
+    },
+    {
+      "id": "resume-02",
+      "category": "resume",
+      "kind": "regression",
+      "title": "cancelled after stale-update",
+      "prompt": "Repair workflow.js so run(state) preserves durable evidence and respects user-only pause/cancellation/resume authority. The study runner must additionally interrupt and resume this task according to lifecycle.json; offline function tests alone do not establish resume operability.",
+      "files": {
+        "workflow.js": "const run = value => ({status:\"active\",evidence:[]});\n",
+        "state.json": "{\"status\": \"cancelled\", \"evidence\": [\"before-compaction\"], \"event\": \"stale-update\"}",
+        "lifecycle.json": "{\"turns\": [\"inspect state and identify invariant\", \"resume with state intact; implement and verify\"], \"interruptAfter\": \"first-provider-settlement\", \"resume\": \"same-session-fresh-process\"}"
+      },
+      "oracle": {
+        "tests": [
+          {
+            "args": [
+              {
+                "status": "cancelled",
+                "evidence": [
+                  "before-compaction"
+                ],
+                "event": "stale-update"
+              }
+            ],
+            "expected": {
+              "status": "cancelled",
+              "evidence": [
+                "before-compaction"
+              ]
+            }
+          }
+        ],
+        "answer": {
+          "workflow.js": "const run = value => ({ status: value.event===\"user-pause\"?\"paused\":value.event===\"user-cancel\"?\"cancelled\":value.event===\"user-resume\" && [\"paused\",\"blocked\"].includes(value.status)?\"active\":value.status, evidence: value.evidence });\n"
+        },
+        "externalChecks": [
+          "fresh-process transcript resume",
+          "retains pre-interruption evidence"
+        ]
+      }
+    },
+    {
+      "id": "resume-03",
+      "category": "resume",
+      "kind": "regression",
+      "title": "blocked after stale-update",
+      "prompt": "Repair workflow.js so run(state) preserves durable evidence and respects user-only pause/cancellation/resume authority. The study runner must additionally interrupt and resume this task according to lifecycle.json; offline function tests alone do not establish resume operability.",
+      "files": {
+        "workflow.js": "const run = value => ({status:\"active\",evidence:[]});\n",
+        "state.json": "{\"status\": \"blocked\", \"evidence\": [\"before-compaction\"], \"event\": \"stale-update\"}",
+        "lifecycle.json": "{\"turns\": [\"inspect state and identify invariant\", \"resume with state intact; implement and verify\"], \"interruptAfter\": \"first-provider-settlement\", \"resume\": \"same-session-fresh-process\"}"
+      },
+      "oracle": {
+        "tests": [
+          {
+            "args": [
+              {
+                "status": "blocked",
+                "evidence": [
+                  "before-compaction"
+                ],
+                "event": "stale-update"
+              }
+            ],
+            "expected": {
+              "status": "blocked",
+              "evidence": [
+                "before-compaction"
+              ]
+            }
+          }
+        ],
+        "answer": {
+          "workflow.js": "const run = value => ({ status: value.event===\"user-pause\"?\"paused\":value.event===\"user-cancel\"?\"cancelled\":value.event===\"user-resume\" && [\"paused\",\"blocked\"].includes(value.status)?\"active\":value.status, evidence: value.evidence });\n"
+        },
+        "externalChecks": [
+          "fresh-process transcript resume",
+          "retains pre-interruption evidence"
+        ]
+      }
+    },
+    {
+      "id": "resume-04",
+      "category": "resume",
+      "kind": "regression",
+      "title": "complete after resume-model",
+      "prompt": "Repair workflow.js so run(state) preserves durable evidence and respects user-only pause/cancellation/resume authority. The study runner must additionally interrupt and resume this task according to lifecycle.json; offline function tests alone do not establish resume operability.",
+      "files": {
+        "workflow.js": "const run = value => ({status:\"active\",evidence:[]});\n",
+        "state.json": "{\"status\": \"complete\", \"evidence\": [\"before-compaction\"], \"event\": \"resume-model\"}",
+        "lifecycle.json": "{\"turns\": [\"inspect state and identify invariant\", \"resume with state intact; implement and verify\"], \"interruptAfter\": \"first-provider-settlement\", \"resume\": \"same-session-fresh-process\"}"
+      },
+      "oracle": {
+        "tests": [
+          {
+            "args": [
+              {
+                "status": "complete",
+                "evidence": [
+                  "before-compaction"
+                ],
+                "event": "resume-model"
+              }
+            ],
+            "expected": {
+              "status": "complete",
+              "evidence": [
+                "before-compaction"
+              ]
+            }
+          }
+        ],
+        "answer": {
+          "workflow.js": "const run = value => ({ status: value.event===\"user-pause\"?\"paused\":value.event===\"user-cancel\"?\"cancelled\":value.event===\"user-resume\" && [\"paused\",\"blocked\"].includes(value.status)?\"active\":value.status, evidence: value.evidence });\n"
+        },
+        "externalChecks": [
+          "fresh-process transcript resume",
+          "retains pre-interruption evidence"
+        ]
+      }
+    },
+    {
+      "id": "resume-05",
+      "category": "resume",
+      "kind": "regression",
+      "title": "accepted_80_20 after observation",
+      "prompt": "Repair workflow.js so run(state) preserves durable evidence and respects user-only pause/cancellation/resume authority. The study runner must additionally interrupt and resume this task according to lifecycle.json; offline function tests alone do not establish resume operability.",
+      "files": {
+        "workflow.js": "const run = value => ({status:\"active\",evidence:[]});\n",
+        "state.json": "{\"status\": \"accepted_80_20\", \"evidence\": [\"before-compaction\"], \"event\": \"observation\"}",
+        "lifecycle.json": "{\"turns\": [\"inspect state and identify invariant\", \"resume with state intact; implement and verify\"], \"interruptAfter\": \"first-provider-settlement\", \"resume\": \"same-session-fresh-process\"}"
+      },
+      "oracle": {
+        "tests": [
+          {
+            "args": [
+              {
+                "status": "accepted_80_20",
+                "evidence": [
+                  "before-compaction"
+                ],
+                "event": "observation"
+              }
+            ],
+            "expected": {
+              "status": "accepted_80_20",
+              "evidence": [
+                "before-compaction"
+              ]
+            }
+          }
+        ],
+        "answer": {
+          "workflow.js": "const run = value => ({ status: value.event===\"user-pause\"?\"paused\":value.event===\"user-cancel\"?\"cancelled\":value.event===\"user-resume\" && [\"paused\",\"blocked\"].includes(value.status)?\"active\":value.status, evidence: value.evidence });\n"
+        },
+        "externalChecks": [
+          "fresh-process transcript resume",
+          "retains pre-interruption evidence"
+        ]
+      }
+    },
+    {
+      "id": "resume-06",
+      "category": "resume",
+      "kind": "capability",
+      "title": "active after user-pause",
+      "prompt": "Repair workflow.js so run(state) preserves durable evidence and respects user-only pause/cancellation/resume authority. The study runner must additionally interrupt and resume this task according to lifecycle.json; offline function tests alone do not establish resume operability.",
+      "files": {
+        "workflow.js": "const run = value => ({status:\"active\",evidence:[]});\n",
+        "state.json": "{\"status\": \"active\", \"evidence\": [\"before-compaction\"], \"event\": \"user-pause\"}",
+        "lifecycle.json": "{\"turns\": [\"inspect state and identify invariant\", \"resume with state intact; implement and verify\"], \"interruptAfter\": \"first-provider-settlement\", \"resume\": \"same-session-fresh-process\"}"
+      },
+      "oracle": {
+        "tests": [
+          {
+            "args": [
+              {
+                "status": "active",
+                "evidence": [
+                  "before-compaction"
+                ],
+                "event": "user-pause"
+              }
+            ],
+            "expected": {
+              "status": "paused",
+              "evidence": [
+                "before-compaction"
+              ]
+            }
+          }
+        ],
+        "answer": {
+          "workflow.js": "const run = value => ({ status: value.event===\"user-pause\"?\"paused\":value.event===\"user-cancel\"?\"cancelled\":value.event===\"user-resume\" && [\"paused\",\"blocked\"].includes(value.status)?\"active\":value.status, evidence: value.evidence });\n"
+        },
+        "externalChecks": [
+          "fresh-process transcript resume",
+          "retains pre-interruption evidence"
+        ]
+      }
+    },
+    {
+      "id": "resume-07",
+      "category": "resume",
+      "kind": "capability",
+      "title": "active after user-cancel",
+      "prompt": "Repair workflow.js so run(state) preserves durable evidence and respects user-only pause/cancellation/resume authority. The study runner must additionally interrupt and resume this task according to lifecycle.json; offline function tests alone do not establish resume operability.",
+      "files": {
+        "workflow.js": "const run = value => ({status:\"active\",evidence:[]});\n",
+        "state.json": "{\"status\": \"active\", \"evidence\": [\"before-compaction\"], \"event\": \"user-cancel\"}",
+        "lifecycle.json": "{\"turns\": [\"inspect state and identify invariant\", \"resume with state intact; implement and verify\"], \"interruptAfter\": \"first-provider-settlement\", \"resume\": \"same-session-fresh-process\"}"
+      },
+      "oracle": {
+        "tests": [
+          {
+            "args": [
+              {
+                "status": "active",
+                "evidence": [
+                  "before-compaction"
+                ],
+                "event": "user-cancel"
+              }
+            ],
+            "expected": {
+              "status": "cancelled",
+              "evidence": [
+                "before-compaction"
+              ]
+            }
+          }
+        ],
+        "answer": {
+          "workflow.js": "const run = value => ({ status: value.event===\"user-pause\"?\"paused\":value.event===\"user-cancel\"?\"cancelled\":value.event===\"user-resume\" && [\"paused\",\"blocked\"].includes(value.status)?\"active\":value.status, evidence: value.evidence });\n"
+        },
+        "externalChecks": [
+          "fresh-process transcript resume",
+          "retains pre-interruption evidence"
+        ]
+      }
+    },
+    {
+      "id": "resume-08",
+      "category": "resume",
+      "kind": "capability",
+      "title": "paused after user-resume",
+      "prompt": "Repair workflow.js so run(state) preserves durable evidence and respects user-only pause/cancellation/resume authority. The study runner must additionally interrupt and resume this task according to lifecycle.json; offline function tests alone do not establish resume operability.",
+      "files": {
+        "workflow.js": "const run = value => ({status:\"active\",evidence:[]});\n",
+        "state.json": "{\"status\": \"paused\", \"evidence\": [\"before-compaction\"], \"event\": \"user-resume\"}",
+        "lifecycle.json": "{\"turns\": [\"inspect state and identify invariant\", \"resume with state intact; implement and verify\"], \"interruptAfter\": \"first-provider-settlement\", \"resume\": \"same-session-fresh-process\"}"
+      },
+      "oracle": {
+        "tests": [
+          {
+            "args": [
+              {
+                "status": "paused",
+                "evidence": [
+                  "before-compaction"
+                ],
+                "event": "user-resume"
+              }
+            ],
+            "expected": {
+              "status": "active",
+              "evidence": [
+                "before-compaction"
+              ]
+            }
+          }
+        ],
+        "answer": {
+          "workflow.js": "const run = value => ({ status: value.event===\"user-pause\"?\"paused\":value.event===\"user-cancel\"?\"cancelled\":value.event===\"user-resume\" && [\"paused\",\"blocked\"].includes(value.status)?\"active\":value.status, evidence: value.evidence });\n"
+        },
+        "externalChecks": [
+          "fresh-process transcript resume",
+          "retains pre-interruption evidence"
+        ]
+      }
+    },
+    {
+      "id": "resume-09",
+      "category": "resume",
+      "kind": "capability",
+      "title": "blocked after user-resume",
+      "prompt": "Repair workflow.js so run(state) preserves durable evidence and respects user-only pause/cancellation/resume authority. The study runner must additionally interrupt and resume this task according to lifecycle.json; offline function tests alone do not establish resume operability.",
+      "files": {
+        "workflow.js": "const run = value => ({status:\"active\",evidence:[]});\n",
+        "state.json": "{\"status\": \"blocked\", \"evidence\": [\"before-compaction\"], \"event\": \"user-resume\"}",
+        "lifecycle.json": "{\"turns\": [\"inspect state and identify invariant\", \"resume with state intact; implement and verify\"], \"interruptAfter\": \"first-provider-settlement\", \"resume\": \"same-session-fresh-process\"}"
+      },
+      "oracle": {
+        "tests": [
+          {
+            "args": [
+              {
+                "status": "blocked",
+                "evidence": [
+                  "before-compaction"
+                ],
+                "event": "user-resume"
+              }
+            ],
+            "expected": {
+              "status": "active",
+              "evidence": [
+                "before-compaction"
+              ]
+            }
+          }
+        ],
+        "answer": {
+          "workflow.js": "const run = value => ({ status: value.event===\"user-pause\"?\"paused\":value.event===\"user-cancel\"?\"cancelled\":value.event===\"user-resume\" && [\"paused\",\"blocked\"].includes(value.status)?\"active\":value.status, evidence: value.evidence });\n"
+        },
+        "externalChecks": [
+          "fresh-process transcript resume",
+          "retains pre-interruption evidence"
+        ]
+      }
+    },
+    {
+      "id": "resume-10",
+      "category": "resume",
+      "kind": "capability",
+      "title": "active after observation",
+      "prompt": "Repair workflow.js so run(state) preserves durable evidence and respects user-only pause/cancellation/resume authority. The study runner must additionally interrupt and resume this task according to lifecycle.json; offline function tests alone do not establish resume operability.",
+      "files": {
+        "workflow.js": "const run = value => ({status:\"active\",evidence:[]});\n",
+        "state.json": "{\"status\": \"active\", \"evidence\": [\"before-compaction\"], \"event\": \"observation\"}",
+        "lifecycle.json": "{\"turns\": [\"inspect state and identify invariant\", \"resume with state intact; implement and verify\"], \"interruptAfter\": \"first-provider-settlement\", \"resume\": \"same-session-fresh-process\"}"
+      },
+      "oracle": {
+        "tests": [
+          {
+            "args": [
+              {
+                "status": "active",
+                "evidence": [
+                  "before-compaction"
+                ],
+                "event": "observation"
+              }
+            ],
+            "expected": {
+              "status": "active",
+              "evidence": [
+                "before-compaction"
+              ]
+            }
+          }
+        ],
+        "answer": {
+          "workflow.js": "const run = value => ({ status: value.event===\"user-pause\"?\"paused\":value.event===\"user-cancel\"?\"cancelled\":value.event===\"user-resume\" && [\"paused\",\"blocked\"].includes(value.status)?\"active\":value.status, evidence: value.evidence });\n"
+        },
+        "externalChecks": [
+          "fresh-process transcript resume",
+          "retains pre-interruption evidence"
+        ]
+      }
+    },
+    {
+      "id": "browser-01",
+      "category": "browser",
+      "kind": "regression",
+      "title": "UTF-8 paging",
+      "prompt": "Fix index.html so the Apply workflow implements utf-8 paging. Exercise the actual rendered input, button and output for all supplied scenarios. Preserve these accessible controls and verify the rendered outcome.",
+      "files": {
+        "index.html": "<!doctype html><html><body><label for=\"input\">JSON input</label><textarea id=\"input\"></textarea><button id=\"apply\">Apply</button><output id=\"result\"></output><script>const run = value => value.slice(0, 3); document.querySelector(\"#apply\").onclick=()=>{document.querySelector(\"#result\").textContent=JSON.stringify(run(JSON.parse(document.querySelector(\"#input\").value)));};</script></body></html>\n"
+      },
+      "oracle": {
+        "tests": [
+          {
+            "args": [
+              "\u00e9\u00e9\u00e9"
+            ],
+            "expected": "\u00e9"
+          },
+          {
+            "args": [
+              "abc"
+            ],
+            "expected": "abc"
+          }
+        ],
+        "answer": {
+          "index.html": "<!doctype html><html><body><label for=\"input\">JSON input</label><textarea id=\"input\"></textarea><button id=\"apply\">Apply</button><output id=\"result\"></output><script>const run = value => { let out=\"\"; for(const c of value) { if(new TextEncoder().encode(out+c).length>3)break; out+=c; } return out; }; document.querySelector(\"#apply\").onclick=()=>{document.querySelector(\"#result\").textContent=JSON.stringify(run(JSON.parse(document.querySelector(\"#input\").value)));};</script></body></html>\n"
+        },
+        "externalChecks": [
+          "rendered input accepts JSON",
+          "Apply click yields oracle output",
+          "no uncaught browser errors"
+        ]
+      }
+    },
+    {
+      "id": "browser-02",
+      "category": "browser",
+      "kind": "regression",
+      "title": "Stable ID delta",
+      "prompt": "Fix index.html so the Apply workflow implements stable id delta. Exercise the actual rendered input, button and output for all supplied scenarios. Preserve these accessible controls and verify the rendered outcome.",
+      "files": {
+        "index.html": "<!doctype html><html><body><label for=\"input\">JSON input</label><textarea id=\"input\"></textarea><button id=\"apply\">Apply</button><output id=\"result\"></output><script>const run = value => ({...value, items: value.items.map(x=>({...x,status:\"done\"}))}); document.querySelector(\"#apply\").onclick=()=>{document.querySelector(\"#result\").textContent=JSON.stringify(run(JSON.parse(document.querySelector(\"#input\").value)));};</script></body></html>\n"
+      },
+      "oracle": {
+        "tests": [
+          {
+            "args": [
+              {
+                "items": [
+                  {
+                    "id": "a",
+                    "status": "pending"
+                  },
+                  {
+                    "id": "b",
+                    "status": "pending"
+                  }
+                ],
+                "id": "b"
+              }
+            ],
+            "expected": {
+              "items": [
+                {
+                  "id": "a",
+                  "status": "pending"
+                },
+                {
+                  "id": "b",
+                  "status": "done"
+                }
+              ],
+              "id": "b"
+            }
+          }
+        ],
+        "answer": {
+          "index.html": "<!doctype html><html><body><label for=\"input\">JSON input</label><textarea id=\"input\"></textarea><button id=\"apply\">Apply</button><output id=\"result\"></output><script>const run = value => ({...value,items:value.items.map(x=>x.id===value.id?{...x,status:\"done\"}:x)}); document.querySelector(\"#apply\").onclick=()=>{document.querySelector(\"#result\").textContent=JSON.stringify(run(JSON.parse(document.querySelector(\"#input\").value)));};</script></body></html>\n"
+        },
+        "externalChecks": [
+          "rendered input accepts JSON",
+          "Apply click yields oracle output",
+          "no uncaught browser errors"
+        ]
+      }
+    },
+    {
+      "id": "browser-03",
+      "category": "browser",
+      "kind": "regression",
+      "title": "Pause authority",
+      "prompt": "Fix index.html so the Apply workflow implements pause authority. Exercise the actual rendered input, button and output for all supplied scenarios. Preserve these accessible controls and verify the rendered outcome.",
+      "files": {
+        "index.html": "<!doctype html><html><body><label for=\"input\">JSON input</label><textarea id=\"input\"></textarea><button id=\"apply\">Apply</button><output id=\"result\"></output><script>const run = value => \"active\"; document.querySelector(\"#apply\").onclick=()=>{document.querySelector(\"#result\").textContent=JSON.stringify(run(JSON.parse(document.querySelector(\"#input\").value)));};</script></body></html>\n"
+      },
+      "oracle": {
+        "tests": [
+          {
+            "args": [
+              {
+                "status": "paused",
+                "event": "observation"
+              }
+            ],
+            "expected": "paused"
+          },
+          {
+            "args": [
+              {
+                "status": "active",
+                "event": "observation"
+              }
+            ],
+            "expected": "active"
+          }
+        ],
+        "answer": {
+          "index.html": "<!doctype html><html><body><label for=\"input\">JSON input</label><textarea id=\"input\"></textarea><button id=\"apply\">Apply</button><output id=\"result\"></output><script>const run = value => value.status; document.querySelector(\"#apply\").onclick=()=>{document.querySelector(\"#result\").textContent=JSON.stringify(run(JSON.parse(document.querySelector(\"#input\").value)));};</script></body></html>\n"
+        },
+        "externalChecks": [
+          "rendered input accepts JSON",
+          "Apply click yields oracle output",
+          "no uncaught browser errors"
+        ]
+      }
+    },
+    {
+      "id": "browser-04",
+      "category": "browser",
+      "kind": "regression",
+      "title": "Cursor revision",
+      "prompt": "Fix index.html so the Apply workflow implements cursor revision. Exercise the actual rendered input, button and output for all supplied scenarios. Preserve these accessible controls and verify the rendered outcome.",
+      "files": {
+        "index.html": "<!doctype html><html><body><label for=\"input\">JSON input</label><textarea id=\"input\"></textarea><button id=\"apply\">Apply</button><output id=\"result\"></output><script>const run = value => true; document.querySelector(\"#apply\").onclick=()=>{document.querySelector(\"#result\").textContent=JSON.stringify(run(JSON.parse(document.querySelector(\"#input\").value)));};</script></body></html>\n"
+      },
+      "oracle": {
+        "tests": [
+          {
+            "args": [
+              {
+                "cursorRevision": 2,
+                "revision": 3
+              }
+            ],
+            "expected": false
+          },
+          {
+            "args": [
+              {
+                "cursorRevision": 3,
+                "revision": 3
+              }
+            ],
+            "expected": true
+          }
+        ],
+        "answer": {
+          "index.html": "<!doctype html><html><body><label for=\"input\">JSON input</label><textarea id=\"input\"></textarea><button id=\"apply\">Apply</button><output id=\"result\"></output><script>const run = value => value.cursorRevision === value.revision; document.querySelector(\"#apply\").onclick=()=>{document.querySelector(\"#result\").textContent=JSON.stringify(run(JSON.parse(document.querySelector(\"#input\").value)));};</script></body></html>\n"
+        },
+        "externalChecks": [
+          "rendered input accepts JSON",
+          "Apply click yields oracle output",
+          "no uncaught browser errors"
+        ]
+      }
+    },
+    {
+      "id": "browser-05",
+      "category": "browser",
+      "kind": "regression",
+      "title": "Lease generation",
+      "prompt": "Fix index.html so the Apply workflow implements lease generation. Exercise the actual rendered input, button and output for all supplied scenarios. Preserve these accessible controls and verify the rendered outcome.",
+      "files": {
+        "index.html": "<!doctype html><html><body><label for=\"input\">JSON input</label><textarea id=\"input\"></textarea><button id=\"apply\">Apply</button><output id=\"result\"></output><script>const run = value => true; document.querySelector(\"#apply\").onclick=()=>{document.querySelector(\"#result\").textContent=JSON.stringify(run(JSON.parse(document.querySelector(\"#input\").value)));};</script></body></html>\n"
+      },
+      "oracle": {
+        "tests": [
+          {
+            "args": [
+              {
+                "lease": 1,
+                "generation": 2
+              }
+            ],
+            "expected": false
+          },
+          {
+            "args": [
+              {
+                "lease": 2,
+                "generation": 2
+              }
+            ],
+            "expected": true
+          }
+        ],
+        "answer": {
+          "index.html": "<!doctype html><html><body><label for=\"input\">JSON input</label><textarea id=\"input\"></textarea><button id=\"apply\">Apply</button><output id=\"result\"></output><script>const run = value => value.lease===value.generation; document.querySelector(\"#apply\").onclick=()=>{document.querySelector(\"#result\").textContent=JSON.stringify(run(JSON.parse(document.querySelector(\"#input\").value)));};</script></body></html>\n"
+        },
+        "externalChecks": [
+          "rendered input accepts JSON",
+          "Apply click yields oracle output",
+          "no uncaught browser errors"
+        ]
+      }
+    },
+    {
+      "id": "browser-06",
+      "category": "browser",
+      "kind": "capability",
+      "title": "Budget conservation",
+      "prompt": "Fix index.html so the Apply workflow implements budget conservation. Exercise the actual rendered input, button and output for all supplied scenarios. Preserve these accessible controls and verify the rendered outcome.",
+      "files": {
+        "index.html": "<!doctype html><html><body><label for=\"input\">JSON input</label><textarea id=\"input\"></textarea><button id=\"apply\">Apply</button><output id=\"result\"></output><script>const run = value => value.allocated; document.querySelector(\"#apply\").onclick=()=>{document.querySelector(\"#result\").textContent=JSON.stringify(run(JSON.parse(document.querySelector(\"#input\").value)));};</script></body></html>\n"
+      },
+      "oracle": {
+        "tests": [
+          {
+            "args": [
+              {
+                "allocated": 5,
+                "used": 3
+              }
+            ],
+            "expected": 2
+          },
+          {
+            "args": [
+              {
+                "allocated": 5,
+                "used": 7
+              }
+            ],
+            "expected": 0
+          }
+        ],
+        "answer": {
+          "index.html": "<!doctype html><html><body><label for=\"input\">JSON input</label><textarea id=\"input\"></textarea><button id=\"apply\">Apply</button><output id=\"result\"></output><script>const run = value => Math.max(0,value.allocated-value.used); document.querySelector(\"#apply\").onclick=()=>{document.querySelector(\"#result\").textContent=JSON.stringify(run(JSON.parse(document.querySelector(\"#input\").value)));};</script></body></html>\n"
+        },
+        "externalChecks": [
+          "rendered input accepts JSON",
+          "Apply click yields oracle output",
+          "no uncaught browser errors"
+        ]
+      }
+    },
+    {
+      "id": "browser-07",
+      "category": "browser",
+      "kind": "capability",
+      "title": "Distinct observations",
+      "prompt": "Fix index.html so the Apply workflow implements distinct observations. Exercise the actual rendered input, button and output for all supplied scenarios. Preserve these accessible controls and verify the rendered outcome.",
+      "files": {
+        "index.html": "<!doctype html><html><body><label for=\"input\">JSON input</label><textarea id=\"input\"></textarea><button id=\"apply\">Apply</button><output id=\"result\"></output><script>const run = value => [value.at(-1)]; document.querySelector(\"#apply\").onclick=()=>{document.querySelector(\"#result\").textContent=JSON.stringify(run(JSON.parse(document.querySelector(\"#input\").value)));};</script></body></html>\n"
+      },
+      "oracle": {
+        "tests": [
+          {
+            "args": [
+              [
+                "a",
+                "b",
+                "a"
+              ]
+            ],
+            "expected": [
+              "a",
+              "b"
+            ]
+          }
+        ],
+        "answer": {
+          "index.html": "<!doctype html><html><body><label for=\"input\">JSON input</label><textarea id=\"input\"></textarea><button id=\"apply\">Apply</button><output id=\"result\"></output><script>const run = value => [...new Set(value)]; document.querySelector(\"#apply\").onclick=()=>{document.querySelector(\"#result\").textContent=JSON.stringify(run(JSON.parse(document.querySelector(\"#input\").value)));};</script></body></html>\n"
+        },
+        "externalChecks": [
+          "rendered input accepts JSON",
+          "Apply click yields oracle output",
+          "no uncaught browser errors"
+        ]
+      }
+    },
+    {
+      "id": "browser-08",
+      "category": "browser",
+      "kind": "capability",
+      "title": "Exact source identity",
+      "prompt": "Fix index.html so the Apply workflow implements exact source identity. Exercise the actual rendered input, button and output for all supplied scenarios. Preserve these accessible controls and verify the rendered outcome.",
+      "files": {
+        "index.html": "<!doctype html><html><body><label for=\"input\">JSON input</label><textarea id=\"input\"></textarea><button id=\"apply\">Apply</button><output id=\"result\"></output><script>const run = value => value.trim(); document.querySelector(\"#apply\").onclick=()=>{document.querySelector(\"#result\").textContent=JSON.stringify(run(JSON.parse(document.querySelector(\"#input\").value)));};</script></body></html>\n"
+      },
+      "oracle": {
+        "tests": [
+          {
+            "args": [
+              " x\n"
+            ],
+            "expected": " x\n"
+          }
+        ],
+        "answer": {
+          "index.html": "<!doctype html><html><body><label for=\"input\">JSON input</label><textarea id=\"input\"></textarea><button id=\"apply\">Apply</button><output id=\"result\"></output><script>const run = value => value; document.querySelector(\"#apply\").onclick=()=>{document.querySelector(\"#result\").textContent=JSON.stringify(run(JSON.parse(document.querySelector(\"#input\").value)));};</script></body></html>\n"
+        },
+        "externalChecks": [
+          "rendered input accepts JSON",
+          "Apply click yields oracle output",
+          "no uncaught browser errors"
+        ]
+      }
+    },
+    {
+      "id": "browser-09",
+      "category": "browser",
+      "kind": "capability",
+      "title": "Incomplete coverage",
+      "prompt": "Fix index.html so the Apply workflow implements incomplete coverage. Exercise the actual rendered input, button and output for all supplied scenarios. Preserve these accessible controls and verify the rendered outcome.",
+      "files": {
+        "index.html": "<!doctype html><html><body><label for=\"input\">JSON input</label><textarea id=\"input\"></textarea><button id=\"apply\">Apply</button><output id=\"result\"></output><script>const run = value => \"done\"; document.querySelector(\"#apply\").onclick=()=>{document.querySelector(\"#result\").textContent=JSON.stringify(run(JSON.parse(document.querySelector(\"#input\").value)));};</script></body></html>\n"
+      },
+      "oracle": {
+        "tests": [
+          {
+            "args": [
+              {
+                "leads": 2,
+                "complete": false
+              }
+            ],
+            "expected": "deferred"
+          },
+          {
+            "args": [
+              {
+                "leads": 2,
+                "complete": true
+              }
+            ],
+            "expected": "done"
+          }
+        ],
+        "answer": {
+          "index.html": "<!doctype html><html><body><label for=\"input\">JSON input</label><textarea id=\"input\"></textarea><button id=\"apply\">Apply</button><output id=\"result\"></output><script>const run = value => value.complete?\"done\":\"deferred\"; document.querySelector(\"#apply\").onclick=()=>{document.querySelector(\"#result\").textContent=JSON.stringify(run(JSON.parse(document.querySelector(\"#input\").value)));};</script></body></html>\n"
+        },
+        "externalChecks": [
+          "rendered input accepts JSON",
+          "Apply click yields oracle output",
+          "no uncaught browser errors"
+        ]
+      }
+    },
+    {
+      "id": "browser-10",
+      "category": "browser",
+      "kind": "capability",
+      "title": "Bounded tool roster",
+      "prompt": "Fix index.html so the Apply workflow implements bounded tool roster. Exercise the actual rendered input, button and output for all supplied scenarios. Preserve these accessible controls and verify the rendered outcome.",
+      "files": {
+        "index.html": "<!doctype html><html><body><label for=\"input\">JSON input</label><textarea id=\"input\"></textarea><button id=\"apply\">Apply</button><output id=\"result\"></output><script>const run = value => value.registered; document.querySelector(\"#apply\").onclick=()=>{document.querySelector(\"#result\").textContent=JSON.stringify(run(JSON.parse(document.querySelector(\"#input\").value)));};</script></body></html>\n"
+      },
+      "oracle": {
+        "tests": [
+          {
+            "args": [
+              {
+                "registered": [
+                  "read",
+                  "obs_recall"
+                ],
+                "allowed": [
+                  "read"
+                ]
+              }
+            ],
+            "expected": [
+              "read"
+            ]
+          }
+        ],
+        "answer": {
+          "index.html": "<!doctype html><html><body><label for=\"input\">JSON input</label><textarea id=\"input\"></textarea><button id=\"apply\">Apply</button><output id=\"result\"></output><script>const run = value => value.registered.filter(x=>value.allowed.includes(x)); document.querySelector(\"#apply\").onclick=()=>{document.querySelector(\"#result\").textContent=JSON.stringify(run(JSON.parse(document.querySelector(\"#input\").value)));};</script></body></html>\n"
+        },
+        "externalChecks": [
+          "rendered input accepts JSON",
+          "Apply click yields oracle output",
+          "no uncaught browser errors"
+        ]
+      }
+    }
+  ]
+}

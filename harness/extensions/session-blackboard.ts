@@ -60,8 +60,8 @@ export default function (pi: ExtensionAPI): void {
 	let lastLensProposalBoundary = -Infinity;
 	const lensCharge = createDeliveryCharge(pi.events, "session-blackboard-lens");
 
-	subscribeOnce("session-blackboard:domain-signal", () => onHarnessSignal(pi.events, (signal) => noteHarnessSignal(boardState(), signal)));
-	subscribeOnce("session-blackboard:control-proposal", () => onControlProposal(pi.events, ({ proposal }) => {
+	subscribeOnce(pi.events, "session-blackboard:domain-signal", () => onHarnessSignal(pi.events, (signal) => noteHarnessSignal(boardState(), signal)));
+	subscribeOnce(pi.events, "session-blackboard:control-proposal", () => onControlProposal(pi.events, ({ proposal }) => {
 		// effect guard: abort/shutdown proposals are hard stops. Loop-breaker
 		// deliberately injects NO steer in those modes (a corrective user message
 		// fights the abort and can restart the run) — the lens must not reintroduce

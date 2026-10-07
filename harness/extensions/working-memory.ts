@@ -98,7 +98,7 @@ export default function (pi: ExtensionAPI): void {
 		return store;
 	}
 
-	subscribeOnce("working-memory:domain-signal", () => onHarnessSignal(pi.events, (signal) => {
+	subscribeOnce(pi.events, "working-memory:domain-signal", () => onHarnessSignal(pi.events, (signal) => {
 		if (signal.type === "capsule/identity" && sessionStarted) void bind(false);
 	}));
 

@@ -139,7 +139,7 @@ export default function (pi: ExtensionAPI): void {
 		(queue ??= createQueue()).request(snapshot);
 	}
 
-	subscribeOnce("run-capsule:run-state-snapshot", () => onRunStateSnapshot(pi.events, (event) => request(event.state, event.reason === "phase")));
+	subscribeOnce(pi.events, "run-capsule:run-state-snapshot", () => onRunStateSnapshot(pi.events, (event) => request(event.state, event.reason === "phase")));
 
 	pi.on("session_start", async (event, ctx) => {
 		cwd = ctx.cwd ?? process.cwd();
@@ -244,7 +244,7 @@ export default function (pi: ExtensionAPI): void {
 		});
 	}
 
-	subscribeOnce("run-capsule:domain-signal", () => onHarnessSignal(pi.events, (signal) => {
+	subscribeOnce(pi.events, "run-capsule:domain-signal", () => onHarnessSignal(pi.events, (signal) => {
 		if (mode !== "recovery" || signal.type !== "recovery/resumed" || !latestState) return;
 		const assembly = assembleRecoveryBrief(renderRecoveryBrief(latestState, { reason: "manual_resume" }), "");
 		if (!assembly.ok) {

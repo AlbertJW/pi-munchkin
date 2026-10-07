@@ -33,7 +33,7 @@ function bytes(value: unknown): number {
 }
 
 /** Measure only what is active; inactive schemas and prompt guidance contribute zero. */
-export function measureActiveSurface(tools: CapabilityTool[], activeNames: Iterable<string>): {
+export function measureActiveSurface(tools: readonly CapabilityTool[], activeNames: Iterable<string>): {
 	schemaBytes: number;
 	guidelineBytes: number;
 } {
@@ -46,4 +46,22 @@ export function measureActiveSurface(tools: CapabilityTool[], activeNames: Itera
 		guidelineBytes += bytes(tool.promptSnippet) + bytes(tool.promptGuidelines);
 	}
 	return { schemaBytes, guidelineBytes };
+}
+
+export type CapabilityFamily = "research" | "delegation" | "browser" | "canvas" | "context" | "planning" | "goals" | "vision";
+export const CORE_TOOL_NAMES: readonly string[] = ["read", "bash", "edit", "write", "search_spans", "read_span", "recall", "obs_recall", "verify_project", "capability", "plan_write", "plan_update"];
+const FAMILY_NAMES: Record<Exclude<CapabilityFamily, "browser" | "canvas">, readonly string[]> = {
+ research: ["web_search", "web_read"], delegation: ["subagent"], context: ["compact_context"], planning: PLAN_SURFACE_TOOLS,
+ goals: ["goal_propose", "goal_inspect", "goal_update", "goal_settle", "goal_block"], vision: ["visual_observe", "visual_refine_target"],
+};
+/** Registration is the authority; this never activates an unregistered or excluded tool. */
+export function capabilityTools(family: CapabilityFamily, registered: readonly string[]): string[] {
+ return registered.filter(name => family === "browser" ? name.startsWith("browser_") : family === "canvas" ? name.startsWith("tldraw_") : FAMILY_NAMES[family].includes(name));
+}
+export function capabilityRoster(registered: readonly CapabilityTool[], activeNames: readonly string[]) {
+ const active = new Set(activeNames);
+ return Object.fromEntries((["research", "delegation", "browser", "canvas", "context", "planning", "goals", "vision"] as const).map(family => {
+  const names = capabilityTools(family, registered.map(tool => tool.name));
+  return [family, { registered: names, active: names.filter(name => active.has(name)), ...measureActiveSurface(registered, names.filter(name => active.has(name))) }];
+ }));
 }

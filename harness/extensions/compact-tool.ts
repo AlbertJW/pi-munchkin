@@ -44,7 +44,7 @@ export default function (pi: ExtensionAPI) {
 	let inFlight = false;
 	let recoveryState: RunStateV1 | null = null;
 	const recoveryMode = runCapsuleMode() === "recovery";
-	subscribeOnce("compact-tool:run-state-snapshot", () => onRunStateSnapshot(pi.events, (event) => { recoveryState = event.state; }));
+	subscribeOnce(pi.events, "compact-tool:run-state-snapshot", () => onRunStateSnapshot(pi.events, (event) => { recoveryState = event.state; }));
 	pi.on("session_start", async () => {
 		resetCompactionCoordinator();
 		inFlight = false;
