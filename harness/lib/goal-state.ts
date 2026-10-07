@@ -1,10 +1,11 @@
 import { randomUUID, createHash } from "node:crypto";
-import { chmod, mkdir, readFile } from "node:fs/promises";
+import { chmod, lstat, mkdir, open } from "node:fs/promises";
 import { existsSync, readFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { withFileMutationQueue } from "@earendil-works/pi-coding-agent";
 import { agentDir } from "./agent-dir.ts";
 import { atomicWritePrivateFiles } from "./private-artifact.ts";
+import { withPrivateStateLock } from "./private-state-lock.ts";
 
 /**
  * Persistent goal state is deliberately separate from the plan graph. A plan
@@ -405,46 +406,99 @@ function migrateLedgerV1(value: unknown): GoalLedgerV2 | undefined {
 	return validateGoalLedger(ledger).length ? undefined : ledger;
 }
 
-async function readGoalLedger(cwd: string, env: NodeJS.ProcessEnv): Promise<GoalLedgerV2 | undefined> {
+export type GoalLedgerLoad =
+	| { kind: "absent"; path: string }
+	| { kind: "valid"; path: string; ledger: GoalLedgerV2 }
+	| { kind: "invalid" | "unsupported" | "identity_mismatch" | "inaccessible"; path: string };
+
+/** Bounded reads preserve the distinction between missing and damaged authority.
+ * Compatibility recovery reads stay fail-closed; mutation and status use this
+ * result so corruption can never become permission to create a replacement. */
+export async function loadGoalLedger(cwd: string, env: NodeJS.ProcessEnv = process.env): Promise<GoalLedgerLoad> {
 	const scope = goalScope(env);
 	const expectedHash = hash(`${scope}:${goalScopeIdentity(cwd, scope)}`);
 	for (const path of [goalStoragePath(cwd, env), legacyGoalStoragePath(cwd, env)]) {
+		let text: string;
 		try {
-			const parsed: unknown = JSON.parse(await readFile(path, "utf8"));
-			const ledger = validateGoalLedger(parsed).length === 0 ? parsed as GoalLedgerV2 : migrateLedgerV1(parsed);
-			if (ledger) {
-				if (ledger.scope !== scope || ledger.cwd_hash !== expectedHash) return undefined;
-				return structuredClone(ledger);
-			}
-			const goal = migrateGoalV1(parsed);
-			if (goal && goal.scope === scope && goal.cwd_hash === expectedHash) {
-				return { schema_version: GOAL_SCHEMA_VERSION, scope, cwd_hash: expectedHash, current_goal_id: ["complete", "cancelled"].includes(goal.status) ? null : goal.goal_id, goals: [goal] };
-			}
-			return undefined;
+			const handle = await open(path, "r");
+			try {
+				const buffer = Buffer.alloc(GOAL_LEDGER_MAX_BYTES + 1);
+				let length = 0;
+				while (length < buffer.length) {
+					const { bytesRead } = await handle.read(buffer, length, buffer.length - length, null);
+					if (bytesRead === 0) break;
+					length += bytesRead;
+				}
+				if (length > GOAL_LEDGER_MAX_BYTES) return { kind: "invalid", path };
+				text = buffer.subarray(0, length).toString("utf8");
+			} finally { await handle.close(); }
 		} catch (error) {
 			// Only absence permits migration. A damaged or unreadable current
 			// authority must never fall back to an older active goal.
-			if ((error as NodeJS.ErrnoException)?.code !== "ENOENT") return undefined;
+			if ((error as NodeJS.ErrnoException)?.code !== "ENOENT") return { kind: "inaccessible", path };
+			// A dangling link is present authority, not permission to replace it.
+			try { await lstat(path); return { kind: "inaccessible", path }; }
+			catch (statError) { if ((statError as NodeJS.ErrnoException)?.code !== "ENOENT") return { kind: "inaccessible", path }; }
+			continue;
 		}
+		let parsed: unknown;
+		try { parsed = JSON.parse(text); } catch { return { kind: "invalid", path }; }
+		const version = parsed && typeof parsed === "object" ? (parsed as Record<string, unknown>).schema_version : undefined;
+		if (version !== undefined && version !== 1 && version !== GOAL_SCHEMA_VERSION) return { kind: "unsupported", path };
+		let ledger = validateGoalLedger(parsed).length === 0 ? parsed as GoalLedgerV2 : migrateLedgerV1(parsed);
+		if (!ledger) {
+			const goal = migrateGoalV1(parsed);
+			if (goal) ledger = { schema_version: GOAL_SCHEMA_VERSION, scope: goal.scope, cwd_hash: goal.cwd_hash, current_goal_id: ["complete", "cancelled"].includes(goal.status) ? null : goal.goal_id, goals: [goal] };
+		}
+		if (!ledger) return { kind: "invalid", path };
+		if (ledger.scope !== scope || ledger.cwd_hash !== expectedHash) return { kind: "identity_mismatch", path };
+		return { kind: "valid", path, ledger: structuredClone(ledger) };
 	}
-	return undefined;
+	return { kind: "absent", path: goalStoragePath(cwd, env) };
 }
 
-export async function writeGoal(goal: GoalState, cwd: string, env: NodeJS.ProcessEnv = process.env): Promise<void> {
+export function goalLedgerLoadError(load: Exclude<GoalLedgerLoad, { kind: "valid" | "absent" }>): string {
+	return `Goal ledger ${load.kind}: ${load.path}. State was preserved. Stop goal writers and inspect or restore this file before retrying; no older ledger will be reactivated.`;
+}
+
+async function readGoalLedger(cwd: string, env: NodeJS.ProcessEnv): Promise<GoalLedgerV2 | undefined> {
+	const load = await loadGoalLedger(cwd, env);
+	return load.kind === "valid" ? load.ledger : undefined;
+}
+
+function writableLedger(load: GoalLedgerLoad): GoalLedgerV2 | undefined {
+	if (load.kind === "valid") return load.ledger;
+	if (load.kind === "absent") return undefined;
+	throw new Error(goalLedgerLoadError(load));
+}
+
+export function goalRevision(goal: GoalState): string { return hash(JSON.stringify(goal)); }
+
+async function writeGoalUnlocked(goal: GoalState, cwd: string, env: NodeJS.ProcessEnv, prior: GoalLedgerV2 | undefined): Promise<void> {
 	assertValid(goal);
 	const scope = goalScope(env);
 	const identity = goalScopeIdentity(cwd, scope);
 	if (goal.scope !== scope || goal.cwd_hash !== hash(`${scope}:${identity}`)) throw new Error("goal rejected: scope does not match the current project/worktree");
 	const path = goalStoragePath(cwd, env);
-	await mkdir(dirname(path), { recursive: true, mode: 0o700 });
-	await chmod(dirname(path), 0o700);
-	const prior = await readGoalLedger(cwd, env);
 	const goals = [...(prior?.goals ?? []).filter((entry) => entry.goal_id !== goal.goal_id), goal].slice(-64);
 	const current = ["complete", "cancelled"].includes(goal.status) ? null : goal.goal_id;
 	const priorCurrent = prior?.current_goal_id && prior.current_goal_id !== goal.goal_id ? prior.current_goal_id : null;
 	const ledger: GoalLedgerV2 = { schema_version: GOAL_SCHEMA_VERSION, scope, cwd_hash: hash(`${scope}:${identity}`), current_goal_id: current ?? priorCurrent, goals };
 	if (validateGoalLedger(ledger).length) throw new Error("goal ledger rejected");
 	await atomicWritePrivateFiles([{ path, text: `${JSON.stringify(ledger, null, 2)}\n` }]);
+}
+
+/** Direct replacement requires the revision the caller actually read. Prefer
+ * mutateGoal, whose reducer receives current state inside the writer lock. */
+export async function writeGoal(goal: GoalState, cwd: string, env: NodeJS.ProcessEnv = process.env, expectedRevision?: string): Promise<void> {
+	await withGoalTransaction(cwd, env, async prior => {
+		const existing = prior?.goals.find(entry => entry.goal_id === goal.goal_id);
+		if ((expectedRevision !== undefined && (!existing || expectedRevision !== goalRevision(existing))) ||
+			(existing && goalRevision(existing) !== goalRevision(goal) && expectedRevision === undefined)) {
+			throw new Error("goal write rejected: current revision required; use mutateGoal to update current state");
+		}
+		await writeGoalUnlocked(goal, cwd, env, prior);
+	});
 }
 
 function validateGoalLedger(value: unknown): string[] {
@@ -462,6 +516,7 @@ function validateGoalLedger(value: unknown): string[] {
 		for (const rawGoal of ledger.goals) {
 			if (!rawGoal || typeof rawGoal !== "object" || Array.isArray(rawGoal)) continue;
 			const goal = rawGoal as GoalState;
+			if (goal.scope !== scope || goal.cwd_hash !== cwdHash) errors.push("goal identity does not match ledger");
 			if (typeof goal.goal_id === "string" && ids.has(goal.goal_id)) errors.push("duplicate goal id");
 			if (typeof goal.goal_id === "string") ids.add(goal.goal_id);
 			if (!["complete", "cancelled"].includes(goal.status)) { nonTerminal += 1; nonTerminalId = goal.goal_id; }
@@ -476,21 +531,24 @@ function validateGoalLedger(value: unknown): string[] {
 	return errors;
 }
 
-export async function mutateGoal<T>(cwd: string, fn: (goal: GoalState | undefined) => Promise<{ goal?: GoalState; result: T }> | { goal?: GoalState; result: T }, env: NodeJS.ProcessEnv = process.env): Promise<T> {
+async function withGoalTransaction<T>(cwd: string, env: NodeJS.ProcessEnv, fn: (ledger: GoalLedgerV2 | undefined) => Promise<T>): Promise<T> {
 	const path = goalStoragePath(cwd, env);
 	await mkdir(dirname(path), { recursive: true, mode: 0o700 });
 	await chmod(dirname(path), 0o700);
-	return withFileMutationQueue(path, async () => {
-		const result = await fn(await readCurrentGoal(cwd, env));
-		if (result.goal) await writeGoal(result.goal, cwd, env);
+	return withFileMutationQueue(path, () => withPrivateStateLock(path, async () => fn(writableLedger(await loadGoalLedger(cwd, env)))));
+}
+
+export async function mutateGoal<T>(cwd: string, fn: (goal: GoalState | undefined) => Promise<{ goal?: GoalState; result: T }> | { goal?: GoalState; result: T }, env: NodeJS.ProcessEnv = process.env): Promise<T> {
+	return withGoalTransaction(cwd, env, async ledger => {
+		const result = await fn(ledger?.goals.find(goal => goal.goal_id === ledger.current_goal_id));
+		if (result.goal) await writeGoalUnlocked(result.goal, cwd, env, ledger);
 		return result.result;
 	});
 }
 
 export async function clearGoal(cwd: string, env: NodeJS.ProcessEnv = process.env): Promise<void> {
 	const path = goalStoragePath(cwd, env);
-	await withFileMutationQueue(path, async () => {
-		const ledger = await readGoalLedger(cwd, env);
+	await withGoalTransaction(cwd, env, async ledger => {
 		if (!ledger) return;
 		const active = ledger.goals.find((goal) => goal.goal_id === ledger.current_goal_id);
 		const next = active && active.status !== "cancelled" ? transition(active, "cancelled", "goal cleared") : undefined;
@@ -573,20 +631,21 @@ function goalInspectionText(goal: GoalState, section: GoalInspectSection): strin
 
 export function inspectGoal(goal: GoalState, section: GoalInspectSection = "all", cursor?: string, maxBytes = 4_096): GoalInspectPage {
 	if (goal.status !== "active") throw new Error("goal inspection requires an active goal");
-	const revision = hash(JSON.stringify(goal));
-	const prefix = revision.slice(0, 16);
+	const revision = goalRevision(goal);
+	if (!["all", "criteria", "constraints", "evidence", "risks", "deferred"].includes(section)) throw new Error("invalid goal inspection section");
 	let offset = 0;
 	if (cursor) {
-		const match = /^([a-f0-9]{16}):(\d+)$/.exec(cursor);
-		if (!match || match[1] !== prefix) throw new Error("goal inspection cursor is invalid or stale");
-		offset = Number(match[2]);
+		const match = /^v2:([a-f0-9]{64}):(all|criteria|constraints|evidence|risks|deferred):(\d+)$/.exec(cursor);
+		if (!match || match[1] !== revision || match[2] !== section) throw new Error("goal inspection cursor is invalid or stale; restart this section");
+		offset = Number(match[3]);
 	}
 	const full = goalInspectionText(goal, section);
 	if (!Number.isSafeInteger(offset) || offset < 0 || offset > full.length) throw new Error("goal inspection cursor is out of range");
+	if (offset > 0 && /[\uDC00-\uDFFF]/u.test(full.charAt(offset)) && /[\uD800-\uDBFF]/u.test(full.charAt(offset - 1))) throw new Error("goal inspection cursor splits a character");
 	const text = truncateUtf8(full.slice(offset), Math.max(1, Math.min(4_096, maxBytes)));
 	const nextOffset = offset + text.length;
 	return {
 		schema: "pi.goal-inspect/v1", revision_sha256: revision, section, text,
-		next_cursor: nextOffset < full.length ? `${prefix}:${nextOffset}` : null,
+		next_cursor: nextOffset < full.length ? `v2:${revision}:${section}:${nextOffset}` : null,
 	};
 }

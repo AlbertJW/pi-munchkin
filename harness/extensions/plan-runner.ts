@@ -42,8 +42,8 @@ import {
 } from "../lib/continuation-authority.ts";
 import { CORE_NAMES, profileFromEnvironment } from "./tool-activation.ts";
 import {
-	acceptGoal, blockGoal, cancelGoal, createGoal, goalAmbientSummary, goalContinuationDecision, goalsEnabled, inspectGoal, mutateGoal, pauseGoal, readCurrentGoal,
-	readExecutableGoal, readGoals, resumeGoal, settleGoal, updateGoal, GOAL_MAX_CRITERIA, GOAL_MODEL_TEXT_MAX_BYTES, goalScope, renderGoalRecoveryBrief,
+	acceptGoal, blockGoal, cancelGoal, createGoal, goalAmbientSummary, goalContinuationDecision, goalsEnabled, goalLedgerLoadError, loadGoalLedger, inspectGoal, mutateGoal, pauseGoal, readCurrentGoal,
+	readExecutableGoal, resumeGoal, settleGoal, updateGoal, GOAL_MAX_CRITERIA, GOAL_MODEL_TEXT_MAX_BYTES, goalScope, renderGoalRecoveryBrief,
 	type CriterionStatus, type DeferredGoalItem, type GoalInspectSection, type GoalState,
 } from "../lib/goal-state.ts";
 
@@ -2666,8 +2666,17 @@ export default function (pi: ExtensionAPI): void {
 		pi.registerCommand("goal-status", {
 			description: "Show the active persistent goal and its evidence-backed criteria.",
 			handler: async (_args, ctx) => {
-				const goal = await rebindActiveGoal(ctx.cwd);
-				ctx.ui.notify(renderGoal(goal, await readGoals(ctx.cwd)), "info");
+				const load = await loadGoalLedger(ctx.cwd);
+				if (load.kind !== "valid" && load.kind !== "absent") {
+					publishGoal(undefined);
+					emitGoalState(pi, undefined);
+					ctx.ui.notify(goalLedgerLoadError(load), "error");
+					return;
+				}
+				const all = load.kind === "valid" ? load.ledger.goals : [];
+				const goal = load.kind === "valid" ? all.find(entry => entry.goal_id === load.ledger.current_goal_id) : undefined;
+				publishGoal(goal);
+				ctx.ui.notify(renderGoal(goal, all), "info");
 			},
 		});
 		pi.registerCommand("goal-resume", {

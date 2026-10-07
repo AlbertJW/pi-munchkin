@@ -7,7 +7,7 @@ import { resetCompactionCoordinator } from "../lib/compaction-coordinator.ts";
 import {
 	calibrateContext, contextNeedsHandoff, contextProfileFor, handoffReason, modelFingerprint, outputReserveFor, safeInputBudget,
 } from "../lib/context-profile.ts";
-import { fire, makeFakePi } from "./integration-harness.ts";
+import { fire, makeFakePi, waitForCondition } from "./integration-harness.ts";
 import { onContinuationRequest, setContinuationDispatcherActive, type ContinuationEnvelope } from "../lib/continuation-authority.ts";
 
 function watchContinuations(fp: ReturnType<typeof makeFakePi>): ContinuationEnvelope[] {
@@ -17,8 +17,8 @@ function watchContinuations(fp: ReturnType<typeof makeFakePi>): ContinuationEnve
 	return offers;
 }
 
-async function settleOffers(): Promise<void> {
-	for (let turn = 0; turn < 4; turn += 1) await new Promise<void>((resolve) => setImmediate(resolve));
+async function settleOffers(offers: ContinuationEnvelope[]): Promise<void> {
+	await waitForCondition(() => offers.length > 0, "committed handoff must publish its continuation after asynchronous goal recovery");
 }
 
 test("context profiles derive a model-specific safe budget and stable serving fingerprint", () => {
@@ -138,7 +138,7 @@ test("a served-window shrink at settlement immediately triggers the one-shot han
 		await fire(fp, "after_provider_response", { status: 200 }, ctx);
 		await fire(fp, "agent_settled", {}, ctx);
 		assert.equal(compactions, 1, "the lower served budget must be enforced before another provider request");
-		await settleOffers();
+		await settleOffers(offers);
 		assert.ok(offers.some((offer) => /preserved active task state/.test(offer.request.message)));
 		assert.equal(offers.some((offer) => /preserved goal/.test(offer.request.message)), false, "ordinary tasks must not claim a goal exists");
 	} finally {
@@ -187,7 +187,7 @@ test("runtime model switching creates a new epoch and automatically hands off an
 		assert.equal(profile.epoch, 1);
 		assert.equal(profile.model, "small");
 		assert.match(compacted, /Model handoff/);
-		await settleOffers();
+		await settleOffers(offers);
 		assert.ok(offers.some((offer) => /Model handoff complete/.test(offer.request.message)));
 	} finally {
 		if (prior === undefined) delete process.env.CONTEXT_HANDOFF; else process.env.CONTEXT_HANDOFF = prior;
@@ -218,7 +218,7 @@ test("an over-budget pre-request context is handed off before another request st
 		await fire(fp, "before_provider_request", {}, ctx);
 		assert.equal(compactions, 1, "an over-budget follow-up must compact before it is sent");
 		assert.equal(aborts, 1, "the in-flight request must be aborted before asynchronous compaction starts");
-		await settleOffers();
+		await settleOffers(offers);
 		assert.ok(offers.some((offer) => /Model handoff complete/.test(offer.request.message)));
 	} finally {
 		if (prior === undefined) delete process.env.CONTEXT_HANDOFF; else process.env.CONTEXT_HANDOFF = prior;
@@ -432,7 +432,7 @@ test("a committed handoff compaction stays successful if a later callback report
 		fail?.();
 		await fire(fp, "turn_end", {}, ctx);
 		assert.equal(compactions, 1, "a committed handoff must not be retried");
-		await settleOffers();
+		await settleOffers(offers);
 		assert.ok(offers.some((offer) => /Model handoff complete/.test(offer.request.message)), "the committed compaction still offers resumption through the authority");
 	} finally {
 		if (prior === undefined) delete process.env.CONTEXT_HANDOFF; else process.env.CONTEXT_HANDOFF = prior;

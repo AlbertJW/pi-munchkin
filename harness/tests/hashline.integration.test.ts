@@ -169,7 +169,7 @@ test("hashline: exact HASHLINE=off leaves native tools unshadowed", async () => 
 	}
 });
 
-test("hashline: concurrent same-file edits are queued and preserve both changes", async () => {
+test("hashline: concurrent same-file edits serialize and reject exactly one stale tag", async () => {
 	const fp = fresh();
 	const cwd = tmp();
 	const path = join(cwd, "race.txt");
@@ -184,9 +184,10 @@ test("hashline: concurrent same-file edits are queued and preserve both changes"
 	]);
 	assert.equal(results[0].status, "fulfilled");
 	assert.equal(results[1].status, "fulfilled");
-	assert.equal((results[1] as PromiseFulfilledResult<Awaited<ReturnType<typeof callTool>>>).value.isError, true);
-	assert.match((results[1] as PromiseFulfilledResult<Awaited<ReturnType<typeof callTool>>>).value.content.map((block) => block.text ?? "").join(""), /stale tag/);
-	assert.equal(readFileSync(path, "utf8"), "ONE\ntwo\nthree\nfour\nfive\n");
+	const values = results.map(result => (result as PromiseFulfilledResult<Awaited<ReturnType<typeof callTool>>>).value);
+	assert.equal(values.filter(value => value.isError).length, 1, "one contender succeeds; the other must read its committed tag");
+	assert.match(values.find(value => value.isError)!.content.map(block => block.text ?? "").join(""), /stale tag/);
+	assert.equal(readFileSync(path, "utf8"), values[0].isError ? "one\ntwo\nthree\nfour\nFIVE\n" : "ONE\ntwo\nthree\nfour\nfive\n");
 });
 
 test("hashline counterfactual: the legacy unqueued read/write transaction loses one concurrent edit", async () => {

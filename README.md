@@ -157,6 +157,14 @@ Most behaviour is automatic. The primary commands are:
   finish while the outcome remains active or resumable. Model-driven goal proposals and updates
   use the deferred `goals` capability (`capability(action="enable", family="goals")`) so the
   low-context core surface stays small.
+  Goal writes serialize across processes. Invalid, unsupported, or unreadable ledgers are
+  preserved and reject mutations; `/goal-status` reports the affected file. Inspect or restore
+  that file with goal writers stopped. An interrupted writer may leave `goal-v2.json.lock`:
+  stop every session using that scope, inspect its `owner.json`, and remove only the lock
+  directory before retrying. Locks are never stolen based on age or a PID check. All writers
+  sharing a scope must run this repaired version. Direct library updates use `mutateGoal`, or
+  pass the previously read `goalRevision` as the fourth argument to `writeGoal`. Inspection
+  cursors are bound to both section and revision; restart pagination after either changes.
 - With the dark `PLAN_GRAPH=on` candidate, plans may contain bounded parent/child nodes,
   `plan_expand` attaches children, `plan_settle` enforces terminal/evidence conditions, and
   `/plan-status <item-id>` expands one subtree. Ordinary plans remain flat.

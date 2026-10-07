@@ -1,10 +1,10 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { ExtensionRunner } from "@earendil-works/pi-coding-agent";
-import { existsSync, mkdtempSync, readFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { randomUUID } from "node:crypto";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import { callTool, expectToolError, fire, makeCtx, makeFakePi, resetPiGlobals } from "./integration-harness.ts";
 import { HARNESS_SIGNAL_CHANNEL } from "../lib/harness-signals.ts";
 import { captureInitialToolSurface } from "../lib/session-bootstrap.ts";
@@ -338,6 +338,22 @@ test("delegated child processes cannot mutate the goal ledger through slash comm
 		else process.env.PI_SUBAGENT_DEPTH = priorDepth;
 		resetPiGlobals();
 	}
+});
+
+test("damaged goal authority is reported and cannot start a replacement turn", async () => {
+	const fp = fresh();
+	const cwd = tmp();
+	const { ctx, notes } = makeCtx(cwd);
+	const path = goalStoragePath(cwd);
+	mkdirSync(dirname(path), { recursive: true });
+	writeFileSync(path, "{broken");
+	try {
+		await fp.commands.get("goal-status").handler("", ctx);
+		assert.match(notes.at(-1) ?? "", /Goal ledger invalid.*State was preserved/);
+		await assert.rejects(fp.commands.get("goal").handler("Replacement", ctx), /Goal ledger invalid/);
+		assert.equal(fp.customDeliveries.length, 0);
+		assert.equal(readFileSync(path, "utf8"), "{broken");
+	} finally { resetPiGlobals(); }
 });
 
 test("GOALS=off removes the whole goal surface as one rollback switch", async () => {

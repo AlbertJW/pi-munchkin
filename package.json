@@ -178,6 +178,7 @@
     "harness/lib/live-mirror.ts",
     "harness/lib/plan-gate-diagnostic.ts",
     "harness/lib/private-artifact.ts",
+    "harness/lib/private-state-lock.ts",
     "harness/lib/process-writer.ts",
     "harness/lib/public-url.ts",
     "harness/lib/role-routing.ts",
