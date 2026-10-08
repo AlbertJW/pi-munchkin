@@ -192,8 +192,13 @@ export default function (pi: ExtensionAPI): void {
 			return;
 		}
 		if (typeof delivery.message === "string" && delivery.message.length > 0) {
-			pi.sendUserMessage(delivery.message.slice(0, 4000), { deliverAs: "steer" });
-			pi.appendEntry("pi-munchkin:intervention/v1", interventionReceipt(pi.events, winner, "dispatch-accepted", null));
+			try {
+				await pi.sendUserMessage(delivery.message.slice(0, 4000), { deliverAs: "steer" });
+				pi.appendEntry("pi-munchkin:intervention/v1", interventionReceipt(pi.events, winner, "dispatch-accepted", null));
+			} catch (error) {
+				pi.appendEntry("pi-munchkin:intervention/v1", interventionReceipt(pi.events, winner, "dispatch-rejected", null));
+				throw error;
+			}
 		}
 	});
 	// Mark enforcement only after the complete subscriber/handler set exists;

@@ -936,3 +936,16 @@ test("delivered excludes a winner the arbiter will not actually act on", async (
 	queue.add(realTerminal);
 	assert.deepEqual(queue.decide(24, "enforce").decision.delivered, [realTerminal.proposal.proposalIdHash]);
 });
+
+test("rejected Pi delivery cannot produce an accepted intervention or request correlation", async () => {
+ const old=process.env.CONTROL_ARBITER;process.env.CONTROL_ARBITER="enforce";
+ try {
+  const extension=(await import("../extensions/control-arbiter.ts")).default;
+  const fp=makeFakePi();fp.pi.sendUserMessage=(()=>Promise.reject(new Error("delivery rejected"))) as any;extension(fp.pi as any);
+  const offer=envelope("failure_recovery");emitControlProposal(fp.pi.events as any,offer.proposal,offer.delivery);
+  await fire(fp,"turn_end",{turnIndex:1});
+  const stages=fp.entries.filter(entry=>entry.type==="pi-munchkin:intervention/v1").map(entry=>(entry.data as any).stage);
+  assert.deepEqual(stages,["proposed","selected","dispatch-rejected"]);
+  const {beginProviderRequest}=await import("../lib/intervention-receipts.ts");assert.deepEqual(beginProviderRequest(fp.pi.events).acceptedProposalIds,[]);
+ }finally{if(old===undefined)delete process.env.CONTROL_ARBITER;else process.env.CONTROL_ARBITER=old;resetPiGlobals();}
+});
