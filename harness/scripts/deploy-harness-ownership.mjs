@@ -3,7 +3,7 @@
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
-import { chmod, copyFile, lstat, mkdir, readFile, readdir, readlink, rename, unlink, writeFile } from 'node:fs/promises';
+import { chmod, copyFile, lstat, mkdir, readFile, readdir, readlink, realpath, rename, unlink, writeFile } from 'node:fs/promises';
 import { basename, dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -146,6 +146,7 @@ async function prepare(agent, backup, baseline) {
 async function restore(receipt, backup) {
   stopped();
   for (let i = 0; i < destinations.length; i++) {
+    stopped();
     const file = receipt.files[i], target = resolve(receipt.agent, destinations[i]);
     await safeParents(receipt.agent, destinations[i]);
     const current = await state(target);
@@ -158,6 +159,7 @@ async function restore(receipt, backup) {
     } else if (current) await unlink(target);
     assert.deepEqual(await state(target), file.before);
   }
+  stopped();
   assert.deepEqual(await inventory(receipt.agent), receipt.beforeInventory, 'rollback inventory differs');
 }
 async function run(action, receiptPath) {
@@ -198,7 +200,7 @@ async function check(receipt) {
   for (const file of receipt.files) assert.deepEqual(await state(resolve(receipt.agent, file.destination)), file.after);
   assert.deepEqual(unaffected(await inventory(receipt.agent)), unaffected(receipt.beforeInventory), 'unrelated live files changed');
 }
-if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+if (process.argv[1] && await realpath(resolve(process.argv[1])) === fileURLToPath(import.meta.url)) {
   const [action, ...args] = process.argv.slice(2);
   try {
     if (action === 'prepare') {
