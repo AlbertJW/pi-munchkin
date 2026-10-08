@@ -19,8 +19,10 @@ process.env.HOME = join(fixture, 'home'); await mkdir(process.env.HOME);
 let networkRequests = 0;
 globalThis.fetch = async () => { networkRequests++; throw new Error('network forbidden in qualification'); };
 net.Socket.prototype.connect = function () { networkRequests++; throw new Error('network forbidden in qualification'); };
-const candidate = join(fixture, 'extensions/pi-munchkin'); await mkdir(candidate, {recursive:true});
-for (const dir of ['extensions','lib','vendor']) await cp(join(liveAgent,'extensions/pi-munchkin',dir),join(candidate,dir),{recursive:true});
+for (const dir of ['extensions','lib','vendor','agents','skills']) {
+ try { await cp(join(liveAgent,dir),join(fixture,dir),{recursive:true}); } catch(error) { if(error.code!=='ENOENT')throw error; }
+}
+const candidate = join(fixture, 'extensions/pi-munchkin');
 const manifest = JSON.parse(await readFile(join(liveAgent,'extensions/pi-munchkin/package.json'),'utf8'));
 await writeFile(join(candidate,'package.json'),JSON.stringify(manifest));
 if(mode !== '--live-copy') for(const destination of destinations){

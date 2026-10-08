@@ -112,7 +112,8 @@ boundaries. The ownership qualifier takes the host package and live agent direct
 npm run qualify:ownership -- /absolute/pi-package /absolute/live-agent /absolute/receipt.json
 ```
 
-It copies the live first-party package into temporary storage, overlays only the
+It copies the actual global extension tree and its local dependencies into temporary
+storage (including the retained dormant chaos extension), overlays only the
 committed deployment allowlist, loads the actual installed external packages, and
 uses a scripted provider. It checks bounded active continuation and terminal states,
 two real AgentSessions across three reloads, actual context order, exact UTF-8 recall,
@@ -155,3 +156,20 @@ npm run qualify:planning-parity -- /absolute/goal-repair-baseline /absolute/pari
 Request sequence numbers now belong to the session and survive reload. Request
 receipts link accepted proposal IDs and hashed task/run/branch identifiers. This
 is correlation evidence; it does not assert model consumption of a correction.
+
+
+## Abandoned goal lock recovery
+
+Stop every Pi or other writer sharing the goal scope; establish this through process
+inspection. If inspection is unavailable, stop here. Use the exact `.lock` directory
+reported by the error, not a guessed scope. Inspect its ownership, permissions and
+`owner.json`, then preserve a copy of both the ledger and lock for diagnosis. A dead
+PID or old timestamp alone never authorizes removal.
+
+After confirming all writers are stopped and that the path is a regular directory,
+remove only `owner.json`, then use `rmdir` on that exact lock directory. If acquisition
+was interrupted before `owner.json` existed, use `rmdir` alone. If `rmdir` reports
+unexpected contents, inspect them; do not use recursive removal. Leave the adjacent
+`goal-v2.json` ledger unchanged. Retry through the repaired transaction API before
+restarting sessions. See `docs/evidence/GOAL_AUTHORITY_REPAIR_RELEASE_2026-10-07.md`
+for the authority contract and restricted repair release.
