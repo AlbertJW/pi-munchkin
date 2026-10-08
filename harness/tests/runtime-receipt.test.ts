@@ -13,6 +13,8 @@ test("actual source changes invalidate receipts; undeclared credentials and inva
   const first = await buildRuntimeReceipt(input); await writeFile(entry, "export default 2;");
   assert.notEqual((await buildRuntimeReceipt(input)).sourceHash, first.sourceHash);
   assert.equal(JSON.stringify(first).includes("sensitive"), false); assert.equal(JSON.stringify(first).includes("private-session"), false);
+  assert.equal(first.flags.RUN_CAPSULE.effective, "recovery");
+  assert.equal(first.flags.CONTROL_ARBITER.effective, "enforce");
   assert.equal(first.evidence, "loaded"); assert.equal(first.effectiveProvider, null);
  } finally { await rm(dir, { recursive: true }); }
 });

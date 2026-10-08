@@ -85,7 +85,9 @@ execution must use an isolated executor and independent browser/resume verificat
 
 Prepare a manifest with exact baseline/candidate commits, loaded receipt hashes,
 provider/model/serving identity, all three positive integer budgets (provider requests,
-output tokens and deadline), ordering seed and independent judge identity:
+output tokens and deadline), ordering seed and independent judge identity. Bind a named comparison and frozen
+baseline/candidate configuration maps differing on exactly one axis; the initial
+comparison catalog is `harness/acceptance/interventions-v1.json`:
 
 ```
 npm run acceptance:prepare -- manifest.json /absolute/new-study-directory
@@ -97,7 +99,7 @@ Preparation writes fixture projects and a deterministic 240-task-run schedule
 an optimizer. Model-run execution is deliberately absent. Separate authorization,
 verified receipt bindings, artifact isolation, browser/resume graders and a held-out
 corpus are prerequisites to any real study. Summary reports completion, repeated
-success, aggregate cost/latency/harm, paired task differences and a deterministic
+success, normalized artifact quality, input/output tokens, aggregate cost/latency/harm, paired task differences and a deterministic
 10,000-resample task-level bootstrap interval. It never automatically promotes a
 feature or infers significance from a screen.
 
@@ -149,3 +151,7 @@ flat-plan parity check, not an exhaustive equivalence proof for research workflo
 ```
 npm run qualify:planning-parity -- /absolute/goal-repair-baseline /absolute/parity.json
 ```
+
+Request sequence numbers now belong to the session and survive reload. Request
+receipts link accepted proposal IDs and hashed task/run/branch identifiers. This
+is correlation evidence; it does not assert model consumption of a correction.

@@ -1,3 +1,4 @@
+import { beginProviderRequest } from "../lib/intervention-receipts.ts";
 import { VERSION } from "@earendil-works/pi-coding-agent";
 import { agentDir } from "../lib/agent-dir.ts";
 import { discoverEntryPoints } from "../lib/surface-walk.ts";
@@ -28,7 +29,8 @@ export default function (pi: ExtensionAPI) {
  pi.on("session_start", async () => { observedProvider = null; request = 0; });
  pi.on("before_provider_request", async (_event, ctx) => {
   const model = ctx.model;
-  pi.appendEntry("pi-munchkin:request-identity/v1", { v: 1, request: ++request, ...runtimeIdentity(pi.events),
+  const correlation = beginProviderRequest(pi.events); request = correlation.request;
+  pi.appendEntry("pi-munchkin:request-identity/v1", { v: 1, ...correlation, ...runtimeIdentity(pi.events),
    requestedProvider: model ? { provider: model.provider, model: model.id, api: model.api } : null,
    registeredTools: pi.getAllTools().map(tool => tool.name), activeTools: pi.getActiveTools(),
    sourceHash: SHA256_HEX.test(process.env.HARNESS_SURFACE_SHA256 ?? "") ? process.env.HARNESS_SURFACE_SHA256 : null });

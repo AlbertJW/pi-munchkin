@@ -24,3 +24,11 @@ test("initial tool selection is per bus and reload cannot reinterpret harness na
  assert.deepEqual(captureInitialToolSurface(a.pi as never).active, ["read"]);
  assert.deepEqual(initialToolSurface(b.pi.events)!.active, ["bash"]);
 });
+
+test("provider request correlation survives reload, resets with sessions and stays bus-local", async () => {
+ const { beginProviderRequest } = await import("../lib/intervention-receipts.ts");
+ const a={}, b={}; beginRuntimeGeneration(a,"a");beginRuntimeGeneration(b,"b");
+ assert.equal(beginProviderRequest(a).request,1);beginRuntimeGeneration(a,"a");
+ assert.equal(beginProviderRequest(a).request,2);assert.equal(beginProviderRequest(b).request,1);
+ beginRuntimeGeneration(a,"replacement");assert.equal(beginProviderRequest(a).request,1);
+});

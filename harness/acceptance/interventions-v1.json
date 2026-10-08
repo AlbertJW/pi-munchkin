@@ -1,0 +1,34 @@
+{
+  "v": 1,
+  "benefitEstablished": false,
+  "executionAuthorized": false,
+  "comparisons": [
+    {
+      "id": "context-brief",
+      "namedFailure": "Repeated repository discovery delays work",
+      "configurationAxis": "CONTEXT_BRIEF",
+      "disposition": "retain",
+      "outcomeChecks": "Final artifact correctness, stale inventory harm and discovery turns",
+      "deliveryEvidence": "proposal, selection, Pi API acceptance and subsequent request correlation; model consumption remains unproven",
+      "benefitEstablished": false
+    },
+    {
+      "id": "loop-verification-steering",
+      "namedFailure": "Unproductive repetition or unverified handoff",
+      "configurationAxis": "CONTROL_ARBITER",
+      "disposition": "retain",
+      "outcomeChecks": "Final verified state and unnecessary or wrong corrections",
+      "deliveryEvidence": "proposal, selection, Pi API acceptance and subsequent request correlation; model consumption remains unproven",
+      "benefitEstablished": false
+    },
+    {
+      "id": "combined-context-reduction",
+      "namedFailure": "Large tool histories exhaust request capacity",
+      "configurationAxis": "context-stack-profile",
+      "disposition": "experimental",
+      "outcomeChecks": "Evidence retrieval after packing, branch navigation, resume and compaction",
+      "deliveryEvidence": "proposal, selection, Pi API acceptance and subsequent request correlation; model consumption remains unproven",
+      "benefitEstablished": false
+    }
+  ]
+}

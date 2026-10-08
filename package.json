@@ -269,6 +269,7 @@
     "harness/deployment/ownership-baseline.json",
     "harness/lib/event-bus-owner.ts",
     "docs/HARNESS_OWNERSHIP_CONSOLIDATION.md",
-    "harness/scripts/planning-trace-parity.mjs"
+    "harness/scripts/planning-trace-parity.mjs",
+    "harness/acceptance/interventions-v1.json"
   ]
 }

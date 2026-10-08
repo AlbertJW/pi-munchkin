@@ -26,8 +26,8 @@ export async function buildRuntimeReceipt(input: RuntimeReceiptInput) {
  const files = await walkRelativeImports([...input.entryPoints]);
  const sources = await Promise.all([...files].sort().map(async path => ({ path: relative(input.baseDir, path), sha256: digest(await readFile(path)) })));
  const entries = await Promise.all(input.entryPoints.map(async path => ({ path: relative(input.baseDir, path), package: await packageIdentity(path) })));
- const defaults: Record<string, string> = { GOALS: "on", PLAN_GRAPH: "off", PLAN_STORAGE: "capsule", DEEP_RESEARCH_PLANNING: "off", RESEARCH_WORKFLOW: "legacy", CONTROL_ARBITER: "enforce", RUN_KERNEL: "shadow", READ_DEDUP: "on", CONTEXT_BRIEF: "on", CONTEXT_ADMISSION: "off", CONTEXT_PIPELINE_RECEIPTS: "off", WORKING_MEMORY: "off", VISION: "off", HASHLINE: "on", MUNCHKIN_TOOL_PROFILE: "core", MUNCHKIN_TOOL_ACTIVATION: "dynamic", MUNCHKIN_TOOL_SURFACE: "default", GOAL_SCOPE: "worktree", RUN_CAPSULE: "shadow", ACTIVE_TOOL_PROMPTS: "derived", VERIFY_GATE: "on", VERIFICATION_PLATEAU: "enforce", FORCE_PLAN_WRITE: "off" };
- const allowed = new Set(["on", "off", "capsule", "private", "project", "parent", "legacy", "enforce", "shadow", "core", "ambient", "derived", "active", "minimal", "dynamic", "phase", "worktree", "default"]);
+ const defaults: Record<string, string> = { GOALS: "on", PLAN_GRAPH: "off", PLAN_STORAGE: "capsule", DEEP_RESEARCH_PLANNING: "off", RESEARCH_WORKFLOW: "legacy", CONTROL_ARBITER: "enforce", RUN_KERNEL: "shadow", READ_DEDUP: "on", CONTEXT_BRIEF: "on", CONTEXT_ADMISSION: "off", CONTEXT_PIPELINE_RECEIPTS: "off", WORKING_MEMORY: "off", VISION: "off", HASHLINE: "on", MUNCHKIN_TOOL_PROFILE: "core", MUNCHKIN_TOOL_ACTIVATION: "dynamic", MUNCHKIN_TOOL_SURFACE: "default", GOAL_SCOPE: "worktree", RUN_CAPSULE: "recovery", ACTIVE_TOOL_PROMPTS: "derived", VERIFY_GATE: "on", VERIFICATION_PLATEAU: "enforce", FORCE_PLAN_WRITE: "off" };
+ const allowed = new Set(["on", "off", "capsule", "private", "project", "parent", "legacy", "enforce", "shadow", "core", "ambient", "derived", "active", "minimal", "dynamic", "phase", "worktree", "default", "recovery"]);
  const flags = Object.fromEntries(RECEIPT_FLAGS.map(name => {
   const configured = input.env?.[name];
   const env = input.env ?? {};
@@ -38,6 +38,9 @@ export async function buildRuntimeReceipt(input: RuntimeReceiptInput) {
   if (name === "RESEARCH_WORKFLOW") effective = env.PLAN_GRAPH === "on" && env.DEEP_RESEARCH_PLANNING === "on" && configured === "parent" ? "parent" : "legacy";
   if (name === "PLAN_STORAGE") effective = configured === "project" || env.RUN_CAPSULE === "off" ? "project" : "capsule";
   if (name === "GOAL_SCOPE") effective = configured === "project" ? "project" : "worktree";
+  if (name === "RUN_CAPSULE") effective = configured === "off" || configured === "shadow" ? configured : "recovery";
+  if (name === "CONTROL_ARBITER") effective = configured === "off" || configured === "shadow" ? configured : "enforce";
+  if (name === "MUNCHKIN_TOOL_ACTIVATION") effective = configured === "ambient" || configured === "phase" ? configured : "dynamic";
   if (name === "RUN_KERNEL") effective = configured === "off" ? "off" : "shadow";
   if (name === "MUNCHKIN_TOOL_PROFILE") effective = configured === "ambient" ? "ambient" : "core";
   if (name === "ACTIVE_TOOL_PROMPTS") effective = configured === "active" ? "derived" : configured === "ambient" ? "ambient" : env.MUNCHKIN_TOOL_SURFACE === "minimal" || env.MUNCHKIN_TOOL_ACTIVATION !== "ambient" ? "derived" : "ambient";
