@@ -60,8 +60,9 @@ second.
   acceptance with residual risks.*
 - **`git-guard`** — asks for confirmation before any command that could discard uncommitted work.
   *Confirms commands that could discard uncommitted work.*
-- **context and Bash guards** — refuse oversized input or output instead of silently cutting it off
-  half-way. *Block oversized provider-bound input/output instead of silently truncating it.*
+- **context guard** — refuses an oversized file read instead of silently cutting it off half-way.
+  *Blocks oversized provider-bound input instead of silently truncating it.* (The equivalent Bash
+  output guard exists but is dark: `BASH_OUTPUT_GUARD=on`.)
 - **blackboard** — keeps a small, redacted running summary of the session and a private local
   dashboard to view it. *Persists bounded redacted state and renders a private human cockpit
   outside repositories.*
@@ -122,7 +123,9 @@ configuration surface, security boundaries, and the measurement archive.
 
 ## Install
 
-Node.js 22.6 or newer is required. Pi 0.80.6 through 0.84.x is supported.
+Node.js 22.6 or newer is required. Pi 1.0.4 or newer within 1.x is supported. The harness refuses
+to load on older Pi or a new major version. A newer 1.x release it has not been qualified on still
+loads, with one warning; see [Updating Pi](#updating-pi).
 
 ```sh
 pi package install github:AlbertJW/pi-munchkin
@@ -225,7 +228,7 @@ model's own window in place with one resume handoff.
 | `READ_DEDUP` | default-on; later identical `read` results collapse to a back-reference in the per-call context view | `off` |
 | `SPAN_TOOLS` | default-on; `search_spans`/`read_span` for bounded work on large files | `off` removes both tools |
 | `KETCH` | default-on public search/read | `off` for offline/private sessions |
-| `JINA_READER` | `off`; when enabled, `web_read` accepts `reader:"jina"` to format validated public URLs through the free, no-key Jina Reader endpoint while restoring the original citation URL | `on` is opt-in only; Ketch remains the search/native reader and its existing 3-search/5-read bounds still apply |
+| `JINA_READER` | `off`; when enabled, `web_read` accepts `reader:"jina"` to format validated public URLs through the free, no-key Jina Reader endpoint while restoring the original citation URL | `on` is opt-in only; Ketch remains the search/native reader. Search/read budgets are enforced only with `RESEARCH_LEDGER=on`, `RESEARCH_BUDGET=on`, or an active research plan graph |
 | `RESEARCH_LEDGER` | dark. After three consecutive unverifiable citations, `research_note` stops returning errors and tells the model to cite inline — an uncapped refusal stream escalated loop-breaker to an abort and killed two Run 3 sessions outright. (`on` enables the parent-verified citation pipeline: session page cache, genuine-error `research_note`, recovery-only `research_recall`, a hard 3-search/5-distinct-read skill envelope even outside a plan graph, budget footers, and a private bounded v2 JSONL ledger under `${PI_CODING_AGENT_DIR}/artifacts/research-ledgers/`) | unset keeps both research-note tools absent; no project-local ledger is written |
 | `RESEARCH_BUDGET` | unset; opt-in budget-only comparison control. (`on` enforces the same non-graph 3-search/5-distinct-read wall as the ledger without registering research-note/recall tools, writing a ledger, exposing ledger state, caching pages, adding budget footers, or steering at wrap-up) | unset leaves the fully legacy ledger-off path unchanged; `RESEARCH_LEDGER=on` implies the wall |
 | `RUN_KERNEL` | `shadow`; observes canonical execution receipts, semantic phases, lifecycle settlement, and legacy-state disagreements | `off` registers no kernel handlers or event-bus subscriber; shadow mode never prompts, steers, blocks, activates tools, or persists a capsule |
@@ -236,6 +239,8 @@ model's own window in place with one resume handoff.
 | `verify_project` | registered only when an exact project gate exists; runs that gate without a model-supplied command and returns bounded sanitized diagnostics | exact Bash execution remains compatible, but pipes/wrappers cannot count as exact evidence |
 | `VERIFICATION_PLATEAU` | `enforce` (adopted 2026-08-24, Albert-approved judgment adoption — AVO's supervisor pillar); after three successful mutation→recognized failed-TAP epochs with no frontier advance it proposes ONE arbiter-owned correction, plus an additive capability request at five; it never aborts | `shadow` records the same plateaus without steering; `off` disables collection |
 | `ACTIVE_TOOL_PROMPTS` | `derived`; inactive tools contribute no ambient guidance and Pi supplies definition-owned guidance only for active tools | `ambient` restores the broader legacy prompt; manual `/tools` disable removes active-tool guidance |
+| `MUNCHKIN_MAX_AUTO_CONTINUATIONS` | `3`; at most this many provider turns the harness itself starts (goal, compaction resume, handoff, research synthesis, drift review) per user message, then one notice | `unbounded` restores the previous unlimited behaviour; `0` disables automatic continuation |
+| `MUNCHKIN_AUTO_CONTINUATION_WINDOW_MS` | `1200000` (20 min) after the user's message, no further automatic continuation | any positive integer |
 | `CONTROL_ARBITER` | `enforce`; one highest-priority corrective voice acts per boundary, with bounded lens/verification supplements where applicable | `shadow` restores legacy producer delivery while recording the winner; `off` removes the arbiter while typed plan/context/loop signals continue |
 | `TELEMETRY_WRITER` | `sync`; gate source and inherited-FD telemetry are always synchronous | `async` enables the bounded ordered interactive file writer; settlement and shutdown await its flush |
 | `TELEMETRY_ASYNC_MAX_ROWS`, `TELEMETRY_ASYNC_MAX_BYTES` | `1024` rows and `1 MiB`; cap queued observational telemetry | bounded to 8–65,536 rows and 4 KiB–64 MiB; overflow is dropped and later reported as a count only |
@@ -348,7 +353,7 @@ npm run verify
 ```
 
 `verify` is network-independent and runs the complete discovered Node test suite, TypeScript
-checking against the locked Pi 0.80.6 lower bound, health checks, a local pack/extract/load smoke,
+checking against the locked development Pi (currently 1.1.0), health checks, a local pack/extract/load smoke,
 a check that optimizer execution remains disabled, and the secret scan. Do not rely on a hard-coded test count;
 the command output is authoritative.
 
@@ -375,10 +380,24 @@ directory holds a `.ts` file the manifest does not declare — pi auto-loads tho
 dropped from the manifest would otherwise keep running forever with the check still green.
 
 The registry-dependent CI matrix is deliberately separate from `verify`. It installs the packed
-tarball into isolated consumers using the latest available 0.80, 0.81, 0.82, 0.83, and 0.84
-releases,
-typechecks the shipped TypeScript, loads every extension, and discovers both skills. A separate
-job proves strict peer-install behaviour below, at, within, and at the upper support boundary.
+tarball into isolated consumers on the Pi 1.0.4 floor and the newest Pi release, typechecks the
+shipped TypeScript, loads every extension, and discovers both skills. A separate job proves strict
+peer-install behaviour below, at, within, and above the supported range.
+
+### Updating Pi
+
+Pi releases often. Check a new release before updating; nothing contacts a model:
+
+```sh
+npm run qualify:pi -- --stage latest   # install newest Pi into scratch and qualify it
+pi update                              # only after VERDICT: QUALIFIED
+```
+
+`npm run qualify:pi` with no arguments checks the Pi you already have installed. It runs the test
+suite, a typecheck against that Pi's types, and a real-host qualification of the full extension
+stack (copied read-only from `~/.pi/agent`) with a scripted provider, from a `git archive` copy of
+HEAD inside a sandbox. On success it prints the version to add to `QUALIFIED_PI_VERSIONS` in
+`harness/lib/pi-compatibility.ts`; committing that line removes the startup warning.
 
 Before any public push: inspect the diff, run the non-echoing secret scan, run `npm run verify`,
 and confirm unrelated user changes are not staged. After an approved live rollout, run the mirror
