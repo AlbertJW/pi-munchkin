@@ -42,7 +42,8 @@
     "acceptance:summarize": "node --experimental-strip-types harness/scripts/acceptance-study.mjs summarize",
     "qualify:ownership": "node harness/scripts/qualify-harness-ownership.mjs",
     "deploy:ownership": "node harness/scripts/deploy-harness-ownership.mjs",
-    "qualify:planning-parity": "node harness/scripts/planning-trace-parity.mjs"
+    "qualify:planning-parity": "node harness/scripts/planning-trace-parity.mjs",
+    "qualify:pi": "bash harness/scripts/qualify-pi.sh"
   },
   "pi": {
     "extensions": [

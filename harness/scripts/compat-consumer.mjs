@@ -7,16 +7,14 @@ import { tmpdir } from "node:os";
 import { resolve } from "node:path";
 
 const root = resolve(import.meta.dirname, "../..");
+// A Pi version or dist-tag: the supported floor (1.0.4) or "latest".
 const minor = process.argv[2];
-if (!/^0\.(?:80|81|82|83|84)$/.test(minor ?? "")) {
-  console.error("usage: compat-consumer.mjs 0.80|0.81|0.82|0.83|0.84");
+if (!/^(?:latest|\d+\.\d+\.\d+)$/.test(minor ?? "")) {
+  console.error("usage: compat-consumer.mjs <pi-version>|latest   e.g. 1.0.4 or latest");
   process.exit(2);
 }
-
-const nextMinor = `0.${Number(minor.split(".")[1]) + 1}.0`;
-const lower = minor === "0.80" ? "0.80.6" : `${minor}.0`;
-const piRange = `>=${lower} <${nextMinor}`;
-const work = await mkdtemp(resolve(tmpdir(), `pi-munchkin-compat-${minor.replace(".", "-")}-`));
+const piRange = minor;
+const work = await mkdtemp(resolve(tmpdir(), `pi-munchkin-compat-${minor.replaceAll(".", "-")}-`));
 const packDir = resolve(work, "pack");
 const consumer = resolve(work, "consumer");
 const home = resolve(work, "home");

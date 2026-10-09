@@ -43,13 +43,12 @@ try {
     cwd: root, encoding: "utf8", env,
   }));
   const tarball = resolve(packDir, packed[0].filename);
-  await installCase("below-lower", "0.80.5", false, tarball);
-  await installCase("at-lower", "0.80.6", true, tarball);
-  await installCase("inside-upper-minor", "0.84.99", true, tarball);
-  await installCase("at-upper", "0.85.0", false, tarball);
-  await installCase("qualified-installed", "1.0.4", true, tarball);
-  await installCase("unqualified-before-installed", "1.0.3", false, tarball);
-  await installCase("unqualified-after-installed", "1.0.5", false, tarball);
+  await installCase("retired-0.80", "0.80.6", false, tarball);
+  await installCase("below-floor", "1.0.3", false, tarball);
+  await installCase("at-floor", "1.0.4", true, tarball);
+  await installCase("current", "1.1.0", true, tarball);
+  await installCase("future-minor", "1.99.0", true, tarball);
+  await installCase("next-major", "2.0.0", false, tarball);
 } finally {
   await rm(work, { recursive: true, force: true });
 }
