@@ -46,6 +46,9 @@ export interface ContinuationReceiptV1 {
 	idempotency_key: string;
 	session_id_hash: string;
 	delivered_at_ms: number;
+	/** Present on receipts written since 2026-10: the delivered owner revision. */
+	owner_id_hash?: string;
+	generation?: string;
 }
 
 const HASH = /^[a-f0-9]{64}$/;
@@ -126,9 +129,12 @@ export function isContinuationReceipt(value: unknown): value is ContinuationRece
 	if (!value || typeof value !== "object" || Array.isArray(value)) return false;
 	const receipt = value as Record<string, unknown>;
 	const keys = ["v", "idempotency_key", "session_id_hash", "delivered_at_ms"];
-	return Object.keys(receipt).length === keys.length && keys.every((key) => key in receipt) &&
+	const owned = "owner_id_hash" in receipt || "generation" in receipt;
+	const expected = owned ? [...keys, "owner_id_hash", "generation"] : keys;
+	return Object.keys(receipt).length === expected.length && expected.every((key) => key in receipt) &&
 		receipt.v === 1 && typeof receipt.idempotency_key === "string" && receipt.idempotency_key.length > 0 &&
-		HASH.test(String(receipt.session_id_hash)) && Number.isSafeInteger(receipt.delivered_at_ms) && Number(receipt.delivered_at_ms) > 0;
+		HASH.test(String(receipt.session_id_hash)) && Number.isSafeInteger(receipt.delivered_at_ms) && Number(receipt.delivered_at_ms) > 0 &&
+		(!owned || (HASH.test(String(receipt.owner_id_hash)) && typeof receipt.generation === "string" && receipt.generation.length > 0 && receipt.generation.length <= 256));
 }
 
 export function emitContinuationRequest(bus: EventBus, envelope: ContinuationEnvelope): boolean {
@@ -194,4 +200,34 @@ export function continuationReceipts(entries: readonly unknown[], sessionIdHash:
 		if (item.data.session_id_hash === sessionIdHash) delivered.add(item.data.idempotency_key);
 	}
 	return delivered;
+}
+
+/** One delivered continuation per owner revision: a goal resumed after compaction
+ * must not also receive a separate goal continuation for the same revision. */
+export function continuationOwnerKey(request: Pick<ContinuationRequestV1, "owner_id_hash" | "generation">): string {
+	return `${request.owner_id_hash}:${request.generation}`;
+}
+
+export function deliveredOwnerGenerations(entries: readonly unknown[], sessionIdHash: string): Set<string> {
+	const delivered = new Set<string>();
+	for (const entry of entries) {
+		if (!entry || typeof entry !== "object") continue;
+		const item = entry as { type?: unknown; customType?: unknown; data?: unknown };
+		if (item.type !== "custom" || item.customType !== CONTINUATION_RECEIPT_TYPE || !isContinuationReceipt(item.data)) continue;
+		const data = item.data;
+		if (data.session_id_hash === sessionIdHash && data.owner_id_hash && data.generation) delivered.add(continuationOwnerKey({ owner_id_hash: data.owner_id_hash, generation: data.generation }));
+	}
+	return delivered;
+}
+
+/** Automatic continuations allowed per user-initiated turn. Model-agnostic: counts
+ * provider turns the harness itself starts, never tokens or model behaviour.
+ * MUNCHKIN_MAX_AUTO_CONTINUATIONS=unbounded restores the previous unlimited behaviour. */
+export function continuationBudget(env: NodeJS.ProcessEnv = process.env): { max: number; windowMs: number } {
+	const rawMax = env.MUNCHKIN_MAX_AUTO_CONTINUATIONS?.trim();
+	const max = rawMax === "unbounded" ? Number.POSITIVE_INFINITY
+		: rawMax && /^\d+$/.test(rawMax) ? Number(rawMax) : 3;
+	const rawWindow = env.MUNCHKIN_AUTO_CONTINUATION_WINDOW_MS?.trim();
+	const windowMs = rawWindow && /^\d+$/.test(rawWindow) && Number(rawWindow) > 0 ? Number(rawWindow) : 20 * 60_000;
+	return { max, windowMs };
 }

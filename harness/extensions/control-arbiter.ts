@@ -7,10 +7,11 @@ import {
 	controlArbiterMode, emitControlDecision, onControlProposal, setControlArbiterActive,
 } from "../lib/control-proposal.ts";
 import {
-	continuationReceipts, hashContinuationIdentity, replaceContinuationAuthority,
-	setContinuationDispatcherActive, type ContinuationEnvelope,
+	continuationBudget, continuationOwnerKey, continuationReceipts, deliveredOwnerGenerations, hashContinuationIdentity,
+	replaceContinuationAuthority, setContinuationDispatcherActive, type ContinuationEnvelope,
 } from "../lib/continuation-authority.ts";
 import { record } from "../lib/telemetry.ts";
+import { currentCompactionOwner } from "../lib/compaction-coordinator.ts";
 
 export default function (pi: ExtensionAPI): void {
 	const mode = controlArbiterMode();
@@ -29,6 +30,24 @@ export default function (pi: ExtensionAPI): void {
 	let continuationLive = true;
 	let agentActive = false;
 	let actionableBoundary: ContinuationBoundaryResult | null = null;
+	// One delivery per owner revision (goal id + goal revision, plan run, commit...),
+	// whichever producer offered it first: compaction resume and goal continuation
+	// for the same goal revision coalesce instead of costing two provider turns.
+	let deliveredOwners = new Set<string>();
+	// Per user-initiated turn: how many provider turns the harness itself started.
+	const budget = continuationBudget();
+	let turnContinuations = 0;
+	let turnStartedAt = Date.now();
+	let harnessStartedRun = false;
+	let budgetNoticeSent = false;
+	// An aborted run stays stopped until the user sends something new.
+	let stoppedByAbort = false;
+	let notify: ((message: string) => void) | null = null;
+	let compactionAbort = false;
+	// ctx.compact() aborts the active run before compacting; that abort belongs to
+	// the harness, and its compaction resume is legitimate. Pi native compaction
+	// reports through session_before_compact as well.
+	const userAbort = (aborted: boolean): boolean => aborted && !compactionAbort && currentCompactionOwner() === null;
 
 	const flushContinuations = async (): Promise<void> => {
 		continuationFlushScheduled = false;
@@ -40,8 +59,21 @@ export default function (pi: ExtensionAPI): void {
 			if (!continuationLive || !sessionIdHash || agentActive) return;
 			const pending = pendingContinuations;
 			pendingContinuations = [];
+			if (pending.length > 0 && stoppedByAbort) {
+				record("control-arbiter", "continuation", { reason: pending[0].request.reason, outcome: "rejected_after_abort", contenders: pending.length });
+				return;
+			}
+			if (pending.length > 0 && (turnContinuations >= budget.max || Date.now() - turnStartedAt > budget.windowMs)) {
+				record("control-arbiter", "continuation", { reason: pending[0].request.reason, outcome: "budget_exhausted", contenders: pending.length });
+				if (!budgetNoticeSent) {
+					budgetNoticeSent = true;
+					try { notify?.(`pi-munchkin: stopped automatic continuation after ${turnContinuations} harness-started turn(s) for this request. Send a message to continue.`); } catch { /* stale ui */ }
+				}
+				return;
+			}
 			const candidates = pending
-				.filter(({ request }) => request.session_id_hash === sessionIdHash && request.expires_at_ms >= Date.now() && !deliveredContinuations.has(request.idempotency_key))
+				.filter(({ request }) => request.session_id_hash === sessionIdHash && request.expires_at_ms >= Date.now() &&
+					!deliveredContinuations.has(request.idempotency_key) && !deliveredOwners.has(continuationOwnerKey(request)))
 				.map((envelope, index) => ({ envelope, index }))
 				.sort((left, right) => right.envelope.request.priority - left.envelope.request.priority || left.index - right.index);
 			for (const { envelope: candidate } of candidates) {
@@ -63,26 +95,25 @@ export default function (pi: ExtensionAPI): void {
 					continue;
 				}
 				deliveredContinuations.add(candidate.request.idempotency_key);
+				deliveredOwners.add(continuationOwnerKey(candidate.request));
+				turnContinuations += 1;
 				pi.appendEntry("pi-munchkin:continuation-receipt/v1", {
 					v: 1,
 					idempotency_key: candidate.request.idempotency_key,
 					session_id_hash: sessionIdHash,
 					delivered_at_ms: Date.now(),
+					owner_id_hash: candidate.request.owner_id_hash,
+					generation: candidate.request.generation,
 				});
 				record("control-arbiter", "continuation", {
 					reason: candidate.request.reason, outcome: "delivered", contenders: candidates.length,
 				});
-				// `agent_settled` has made Pi idle before this flush. Starting the next
-				// turn here avoids placing an irrevocable message in Pi's private queue;
-				// the lifecycle authority has therefore checked the durable state at the
-				// exact dispatch boundary.
-				// Pi 0.80.6 can report `agent_settled` one event before its
-				// sendUserMessage guard observes idle. `followUp` is safe in both
-				// states: it queues while still processing and starts immediately
-				// once idle, so the receipt cannot be recorded for a lost message.
+				// Inside agent_before_settle the continuation is one more request in the
+				// same run. A late offer (after agent_settled, e.g. a delegated result)
+				// starts a new run, which before_agent_start must not count as a user turn.
 				dispatched = true;
 				if (actionableBoundary) { actionableBoundary.entries.push(continuationDraft(candidate.request.message)); actionableBoundary.continue = true; }
-				else dispatchIdleContinuation(pi, candidate.request.message);
+				else { harnessStartedRun = true; dispatchIdleContinuation(pi, candidate.request.message); }
 				return;
 			}
 		} finally {
@@ -127,6 +158,9 @@ export default function (pi: ExtensionAPI): void {
 		continuationLive = true;
 		sessionIdHash = hashContinuationIdentity(ctx.sessionManager?.getSessionId?.() ?? `compat:${ctx.cwd}`);
 		deliveredContinuations = continuationReceipts(ctx.sessionManager?.getEntries?.() ?? [], sessionIdHash);
+		deliveredOwners = deliveredOwnerGenerations(ctx.sessionManager?.getEntries?.() ?? [], sessionIdHash);
+		notify = (message) => ctx.ui.notify(message, "warning");
+		turnContinuations = 0; turnStartedAt = Date.now(); harnessStartedRun = false; budgetNoticeSent = false; stoppedByAbort = false; compactionAbort = false;
 		pendingContinuations = [];
 		// Pi may reuse this extension instance for /new, /fork, or a same-cwd
 		// resume after session_shutdown. Rebind both shared authorities instead of
@@ -146,22 +180,31 @@ export default function (pi: ExtensionAPI): void {
 		setControlArbiterActive(pi.events, false);
 		setContinuationDispatcherActive(pi.events, false);
 	});
+	pi.on("session_before_compact", async () => { compactionAbort = true; stoppedByAbort = false; });
+	pi.on("session_compact", async () => { compactionAbort = false; stoppedByAbort = false; });
+	pi.on("before_agent_start", async () => {
+		// A run the harness started is part of the current user turn; anything else is new user input.
+		if (harnessStartedRun) { harnessStartedRun = false; return; }
+		turnContinuations = 0; turnStartedAt = Date.now(); budgetNoticeSent = false; stoppedByAbort = false; compactionAbort = false;
+	});
 	pi.on("agent_start", async () => {
 		agentActive = true;
 		queue.clear();
 	});
 	onActionableSettlement(pi, async event => {
 		agentActive = false;
-		if (event.outcome !== "completed") { pendingContinuations = []; return undefined; }
+		if (event.outcome !== "completed") { stoppedByAbort = userAbort(event.outcome === "aborted"); pendingContinuations = []; return undefined; }
 		const boundary: ContinuationBoundaryResult = { entries: [], continue: false };
 		actionableBoundary = boundary;
 		try { await flushContinuations(); } finally { actionableBoundary = null; }
 		return boundary.continue ? boundary : undefined;
 	});
-	// Pi emits this only after every ordered agent_end handler has completed and
-	// after marking the run idle. On older Pi this is actionable; on Pi 1.x it handles only late idle offers.
-	pi.on("agent_settled", async () => {
+	// Final, notification-only boundary: handles late idle offers (delegated
+	// results, drift review). Pi 1.1+ reports aborts here too.
+	pi.on("agent_settled", async (event) => {
 		agentActive = false;
+		if (userAbort((event as { aborted?: unknown }).aborted === true)) stoppedByAbort = true;
+		if (stoppedByAbort) { pendingContinuations = []; return; }
 		if (pendingContinuations.length > 0) scheduleContinuationFlush();
 	});
 	pi.on("turn_end", async (event) => {
