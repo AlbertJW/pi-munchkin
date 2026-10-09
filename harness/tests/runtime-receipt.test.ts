@@ -18,8 +18,11 @@ test("actual source changes invalidate receipts; undeclared credentials and inva
   assert.equal(first.evidence, "loaded"); assert.equal(first.effectiveProvider, null);
  } finally { await rm(dir, { recursive: true }); }
 });
-test("compatibility keeps the pinned contract and selects Pi 1.x actionable settlement", () => {
- assert.equal(piCompatibility("0.80.6").actionableSettlement, false);
- assert.equal(piCompatibility("1.0.4").actionableSettlement, true);
+test("compatibility enforces the Pi 1.0.4 floor and reports unqualified 1.x minors", () => {
+ assert.throws(() => piCompatibility("0.80.6"), /requires Pi 1\.0\.4/);
+ assert.throws(() => piCompatibility("1.0.3"), /requires Pi 1\.0\.4/);
+ assert.equal(piCompatibility("1.0.4").qualified, true);
+ assert.equal(piCompatibility("1.1.0").qualified, true);
+ assert.equal(piCompatibility("1.2.0").qualified, false, "a newer 1.x loads but is reported unqualified");
  assert.throws(() => piCompatibility("2.0.0")); assert.throws(() => piCompatibility("unknown"));
 });

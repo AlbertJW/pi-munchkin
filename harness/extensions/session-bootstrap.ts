@@ -4,6 +4,7 @@ import { agentDir } from "../lib/agent-dir.ts";
 import { captureInitialToolSurface } from "../lib/session-bootstrap.ts";
 import { discoverEntryPoints, hashSurface, walkRelativeImports } from "../lib/surface-walk.ts";
 import { beginSession, record, telemetrySource } from "../lib/telemetry.ts";
+import { piCompatibility } from "../lib/pi-compatibility.ts";
 
 const SURFACE_HASH = /^[a-f0-9]{64}$/;
 
@@ -39,6 +40,15 @@ export default function (pi: ExtensionAPI): void {
 		}
 
 		captureInitialToolSurface(pi);
+		const compat = piCompatibility();
+		if (!compat.qualified) {
+			record("session-bootstrap", "pi-unqualified", { pi_version: compat.version });
+			const shared = globalThis as Record<string, unknown>;
+			if (shared.__pi_munchkin_unqualified_notice !== compat.version) {
+				shared.__pi_munchkin_unqualified_notice = compat.version;
+				ctx.ui.notify(`pi-munchkin has not been qualified on Pi ${compat.version}. It will run; check with \`npm run qualify:pi\` in the harness repo.`, "warning");
+			}
+		}
 		if (!SURFACE_HASH.test(process.env.HARNESS_SURFACE_SHA256 ?? "")) {
 			record("session-bootstrap", "surface-unavailable", { reason: "surface_unavailable" });
 		}

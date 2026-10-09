@@ -5,10 +5,11 @@ import { join } from "node:path";
 import test from "node:test";
 import { Agent } from "@earendil-works/pi-agent-core";
 import {
-	AgentSession, AuthStorage, createEventBus, ModelRegistry, SessionManager, SettingsManager, convertToLlm, type ResourceLoader,
+	AgentSession, createEventBus, SessionManager, SettingsManager, convertToLlm, type ResourceLoader,
 } from "@earendil-works/pi-coding-agent";
 import { createExtensionRuntime, loadExtensionFromFactory } from "../../node_modules/@earendil-works/pi-coding-agent/dist/core/extensions/index.js";
 import { createAssistantMessageEventStream, type AssistantMessage, type Model } from "@earendil-works/pi-ai";
+import { scriptedModelRuntime } from "./session-fixture.ts";
 
 const previousVision = process.env.VISION;
 process.env.VISION = "on";
@@ -38,7 +39,7 @@ test("a real AgentSession delivers a fresh visual image block to a vision model"
 		getExtensions: () => ({ extensions: [extension], errors: [], runtime }),
 		getSkills: () => ({ skills: [], diagnostics: [] }), getPrompts: () => ({ prompts: [], diagnostics: [] }),
 		getThemes: () => ({ themes: [], diagnostics: [] }), getAgentsFiles: () => ({ agentsFiles: [] }),
-		getSystemPrompt: () => undefined, getAppendSystemPrompt: () => [], extendResources: () => undefined, reload: async () => undefined,
+		getSystemPrompt: () => undefined, getSystemPromptSource: () => undefined, getAppendSystemPrompt: () => [], getAppendSystemPromptSources: () => [], extendResources: () => undefined, reload: async () => undefined,
 	};
 	let requests = 0;
 	let imageDelivered = false;
@@ -60,7 +61,7 @@ test("a real AgentSession delivers a fresh visual image block to a vision model"
 	});
 	const session = new AgentSession({
 		agent, cwd, sessionManager: SessionManager.inMemory(cwd), settingsManager: SettingsManager.inMemory(), resourceLoader,
-		modelRegistry: ModelRegistry.inMemory(AuthStorage.inMemory({ fixture: { type: "api_key", key: "no-network" } })),
+		modelRuntime: await scriptedModelRuntime(model),
 		initialActiveToolNames: ["visual_observe"], baseToolsOverride: {},
 	});
 	await session.bindExtensions({ onError: (error) => assert.fail(`${error.extensionPath}:${error.event}:${error.error}`) });

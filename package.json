@@ -88,16 +88,16 @@
     "typebox": "1.1.38"
   },
   "devDependencies": {
-    "@earendil-works/pi-agent-core": "0.80.6",
-    "@earendil-works/pi-ai": "0.80.6",
-    "@earendil-works/pi-coding-agent": "0.80.6",
-    "@earendil-works/pi-tui": "0.80.6",
+    "@earendil-works/pi-agent-core": "1.1.0",
+    "@earendil-works/pi-ai": "1.1.0",
+    "@earendil-works/pi-coding-agent": "1.1.0",
+    "@earendil-works/pi-tui": "1.1.0",
     "@types/node": "25.2.3",
     "typescript": "5.9.3"
   },
   "peerDependencies": {
-    "@earendil-works/pi-coding-agent": ">=0.80.6 <0.85.0 || 1.0.4",
-    "@earendil-works/pi-ai": ">=0.80.6 <0.85.0 || 1.0.4"
+    "@earendil-works/pi-coding-agent": ">=1.0.4 <2",
+    "@earendil-works/pi-ai": ">=1.0.4 <2"
   },
   "files": [
     "harness/extensions/session-bootstrap.ts",

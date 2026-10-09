@@ -93,6 +93,7 @@
     "runtime/context-profile",
     "runtime/provider-timing",
     "runtime/serving-truth",
+    "session-bootstrap/pi-unqualified",
     "session-bootstrap/surface-unavailable",
     "span-tools/read",
     "span-tools/search",

@@ -5,7 +5,7 @@ import { join } from "node:path";
 import test from "node:test";
 import { Agent } from "@earendil-works/pi-agent-core";
 import {
-	AgentSession, AuthStorage, createEventBus, ModelRegistry, SessionManager, SettingsManager, convertToLlm, type ResourceLoader,
+	AgentSession, createEventBus, SessionManager, SettingsManager, convertToLlm, type ResourceLoader,
 } from "@earendil-works/pi-coding-agent";
 import { createExtensionRuntime, loadExtensionFromFactory } from "../../node_modules/@earendil-works/pi-coding-agent/dist/core/extensions/index.js";
 import { createAssistantMessageEventStream, type AssistantMessage, type Model } from "@earendil-works/pi-ai";
@@ -13,6 +13,7 @@ import { claimIdForText, RESEARCH_EVIDENCE_CARDS_KEY } from "../lib/research-evi
 import { ownerRef, type GraphPlanState } from "../lib/plan-graph.ts";
 import { privatePlanStatePath } from "../lib/plan-state-storage.ts";
 import { ResearchRoundLedger, researchRoundPath, writeResearchRoundLedger } from "../lib/research-round.ts";
+import { scriptedModelRuntime } from "./session-fixture.ts";
 
 // This is a provider-neutral lifecycle fixture: the scripted provider emits a
 // real plan_settle tool call, while all evidence and graph state are prepared by
@@ -80,7 +81,7 @@ test("G04-C: a real AgentSession delivers exactly one parent final answer and ig
 	const resourceLoader: ResourceLoader = {
 		getExtensions: () => ({ extensions: [extensions], errors: [], runtime }), getSkills: () => ({ skills: [], diagnostics: [] }),
 		getPrompts: () => ({ prompts: [], diagnostics: [] }), getThemes: () => ({ themes: [], diagnostics: [] }), getAgentsFiles: () => ({ agentsFiles: [] }),
-		getSystemPrompt: () => undefined, getAppendSystemPrompt: () => [], extendResources: () => undefined, reload: async () => undefined,
+		getSystemPrompt: () => undefined, getSystemPromptSource: () => undefined, getAppendSystemPrompt: () => [], getAppendSystemPromptSources: () => [], extendResources: () => undefined, reload: async () => undefined,
 	};
 	let requests = 0;
 	const requestTexts: string[] = [];
@@ -100,7 +101,7 @@ test("G04-C: a real AgentSession delivers exactly one parent final answer and ig
 	});
 	const session = new AgentSession({
 		agent, cwd, sessionManager: SessionManager.inMemory(cwd), settingsManager: SettingsManager.inMemory(), resourceLoader,
-		modelRegistry: ModelRegistry.inMemory(AuthStorage.inMemory({ test: { type: "api_key", key: "scripted-no-network" } })),
+		modelRuntime: await scriptedModelRuntime(model),
 		initialActiveToolNames: ["plan_settle"], baseToolsOverride: {},
 	});
 	await session.bindExtensions({ onError: (error) => assert.fail(`${error.extensionPath}:${error.event}:${error.error}`) });
@@ -148,7 +149,7 @@ test("G04-A: a real Pi compaction and fresh session preserve an outstanding rese
 	const resourceLoader: ResourceLoader = {
 		getExtensions: () => ({ extensions: [compaction, runner], errors: [], runtime }), getSkills: () => ({ skills: [], diagnostics: [] }),
 		getPrompts: () => ({ prompts: [], diagnostics: [] }), getThemes: () => ({ themes: [], diagnostics: [] }), getAgentsFiles: () => ({ agentsFiles: [] }),
-		getSystemPrompt: () => undefined, getAppendSystemPrompt: () => [], extendResources: () => undefined, reload: async () => undefined,
+		getSystemPrompt: () => undefined, getSystemPromptSource: () => undefined, getAppendSystemPrompt: () => [], getAppendSystemPromptSources: () => [], extendResources: () => undefined, reload: async () => undefined,
 	};
 	const sessionManager = SessionManager.inMemory(cwd);
 	for (let index = 0; index < 6; index += 1) {
@@ -161,7 +162,7 @@ test("G04-A: a real Pi compaction and fresh session preserve an outstanding rese
 	});
 	const session = new AgentSession({
 		agent, cwd, sessionManager, settingsManager: SettingsManager.inMemory({ compaction: { keepRecentTokens: 1 } }), resourceLoader,
-		modelRegistry: ModelRegistry.inMemory(AuthStorage.inMemory({ test: { type: "api_key", key: "scripted-no-network" } })), initialActiveToolNames: [], baseToolsOverride: {},
+		modelRuntime: await scriptedModelRuntime(model), initialActiveToolNames: [], baseToolsOverride: {},
 	});
 	await session.bindExtensions({ onError: (error) => assert.fail(`${error.extensionPath}:${error.event}:${error.error}`) });
 	await session.sendUserMessage("preserve the research state");
@@ -174,7 +175,7 @@ test("G04-A: a real Pi compaction and fresh session preserve an outstanding rese
 	const recoveredAgent = new Agent({ initialState: { systemPrompt: "", model, thinkingLevel: "off", tools: [] }, convertToLlm, streamFn: () => { const stream = createAssistantMessageEventStream(); const message = assistantText(); stream.push({ type: "start", partial: message }); stream.push({ type: "done", reason: "stop", message }); return stream; } });
 	const recovered = new AgentSession({
 		agent: recoveredAgent, cwd, sessionManager: SessionManager.inMemory(cwd), settingsManager: SettingsManager.inMemory(), resourceLoader,
-		modelRegistry: ModelRegistry.inMemory(AuthStorage.inMemory({ test: { type: "api_key", key: "scripted-no-network" } })), initialActiveToolNames: [], baseToolsOverride: {},
+		modelRuntime: await scriptedModelRuntime(model), initialActiveToolNames: [], baseToolsOverride: {},
 	});
 	await recovered.bindExtensions({ onError: (error) => assert.fail(`${error.extensionPath}:${error.event}:${error.error}`) });
 	const recoveredLedger = await import("../lib/research-round.ts").then(async (module) => module.readResearchRoundLedger(researchRoundPath(cwd, runId, process.env)));

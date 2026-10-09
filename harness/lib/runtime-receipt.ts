@@ -2,6 +2,7 @@ import { createHash } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import { dirname, join, relative } from "node:path";
 import { walkRelativeImports } from "./surface-walk.ts";
+import { QUALIFIED_PI_VERSIONS } from "./pi-compatibility.ts";
 
 /** Only behavioral modes are exported. Credentials, commands, endpoints and arbitrary env are excluded. */
 export const RECEIPT_FLAGS = ["GOALS", "PLAN_GRAPH", "PLAN_STORAGE", "DEEP_RESEARCH_PLANNING", "RESEARCH_WORKFLOW", "CONTROL_ARBITER", "RUN_KERNEL", "READ_DEDUP", "CONTEXT_BRIEF", "CONTEXT_ADMISSION", "CONTEXT_PIPELINE_RECEIPTS", "WORKING_MEMORY", "VISION", "HASHLINE", "MUNCHKIN_TOOL_PROFILE", "MUNCHKIN_TOOL_ACTIVATION", "MUNCHKIN_TOOL_SURFACE", "GOAL_SCOPE", "RUN_CAPSULE", "ACTIVE_TOOL_PROMPTS", "VERIFY_GATE", "VERIFICATION_PLATEAU", "FORCE_PLAN_WRITE"] as const;
@@ -49,7 +50,7 @@ export async function buildRuntimeReceipt(input: RuntimeReceiptInput) {
   return [name, { configured: configured === undefined ? null : allowed.has(configured) ? configured : "invalid", default: defaults[name], effective }];
  }));
  return { v: 1 as const, evidence: input.evidence, closure: "relative-imports" as const,
-  piVersion: input.piVersion, generation: input.generation, sessionIdHash: input.sessionId === null ? null : digest(input.sessionId),
+  piVersion: input.piVersion, piQualified: QUALIFIED_PI_VERSIONS.includes(input.piVersion), generation: input.generation, sessionIdHash: input.sessionId === null ? null : digest(input.sessionId),
   entries, sources, sourceHash: digest(JSON.stringify({ entries, sources })), flags,
   registeredTools: [...new Set(input.registeredTools)].sort(), activeTools: [...new Set(input.activeTools)].sort(),
   requestedProvider: input.requestedProvider ?? null, effectiveProvider: input.effectiveProvider ?? null };

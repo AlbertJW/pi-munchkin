@@ -6,8 +6,8 @@ import test from "node:test";
 import { waitForCondition } from "./integration-harness.ts";
 import { Agent, type AgentTool } from "@earendil-works/pi-agent-core";
 import {
-	AgentSession, AuthStorage, createEventBus,
-	ModelRegistry, SessionManager, SettingsManager, convertToLlm, type ResourceLoader,
+	AgentSession, createEventBus,
+	SessionManager, SettingsManager, convertToLlm, type ResourceLoader,
 } from "@earendil-works/pi-coding-agent";
 import { createExtensionRuntime, loadExtensionFromFactory } from "../../node_modules/@earendil-works/pi-coding-agent/dist/core/extensions/index.js";
 import { createAssistantMessageEventStream, type AssistantMessage, type Model } from "@earendil-works/pi-ai";
@@ -18,6 +18,7 @@ import { resetCompactionCoordinator } from "../lib/compaction-coordinator.ts";
 import { blockGoal, cancelGoal, createGoal, mutateGoal, pauseGoal, readCurrentGoal, readExecutableGoal, settleGoal } from "../lib/goal-state.ts";
 import { onContinuationRequest } from "../lib/continuation-authority.ts";
 import { Type } from "typebox";
+import { scriptedModelRuntime } from "./session-fixture.ts";
 
 const AGENT_DIR = mkdtempSync(join(tmpdir(), "pi-g01-agent-dir-"));
 process.env.PI_CODING_AGENT_DIR = AGENT_DIR;
@@ -57,7 +58,7 @@ async function sessionFixture(cwd: string, afterFirstEnd?: () => Promise<void>, 
 		}
 	}
 	const pauseExtension = afterFirstEnd
-		? [(pi: Parameters<typeof planRunner>[0]) => pi.on("agent_end", async () => { if (++ends === 1) await afterFirstEnd(); })]
+		? [(pi: Parameters<typeof planRunner>[0]) => { pi.on("agent_end", async () => { if (++ends === 1) await afterFirstEnd(); }); }]
 		: [];
 	const extensions = await Promise.all([
 		loadExtensionFromFactory(planRunner, cwd, bus, runtime, "g01-plan-runner"),
@@ -85,7 +86,7 @@ async function sessionFixture(cwd: string, afterFirstEnd?: () => Promise<void>, 
 		getExtensions: () => ({ extensions, errors: [], runtime }),
 		getSkills: () => ({ skills: [], diagnostics: [] }), getPrompts: () => ({ prompts: [], diagnostics: [] }),
 		getThemes: () => ({ themes: [], diagnostics: [] }), getAgentsFiles: () => ({ agentsFiles: [] }),
-		getSystemPrompt: () => undefined, getAppendSystemPrompt: () => [], extendResources: () => undefined, reload: async () => undefined,
+		getSystemPrompt: () => undefined, getSystemPromptSource: () => undefined, getAppendSystemPrompt: () => [], getAppendSystemPromptSources: () => [], extendResources: () => undefined, reload: async () => undefined,
 	};
 	let requestCount = 0;
 	const requestTexts: string[] = [];
@@ -119,10 +120,9 @@ async function sessionFixture(cwd: string, afterFirstEnd?: () => Promise<void>, 
 		name: "g01_echo", label: "G01 echo", description: "A deterministic qualification tool.", parameters: Type.Object({ value: Type.String() }),
 		execute: async (_id, params) => ({ content: [{ type: "text" as const, text: `echo:${(params as { value: string }).value}` }], details: {} }),
 	};
-	const authStorage = AuthStorage.inMemory({ test: { type: "api_key", key: "scripted-no-network" } });
 	const session = new AgentSession({
 		agent, cwd, sessionManager, settingsManager,
-		resourceLoader, modelRegistry: ModelRegistry.inMemory(authStorage), initialActiveToolNames: withTool ? ["g01_echo"] : [],
+		resourceLoader, modelRuntime: await scriptedModelRuntime(model), initialActiveToolNames: withTool ? ["g01_echo"] : [],
 		baseToolsOverride: withTool ? { g01_echo: tool } : {},
 	});
 	if (withCompaction) session.setActiveToolsByName(["compact_context"]);
@@ -193,7 +193,9 @@ test("G01-D: a real AgentSession gives an unchanged active goal exactly one cont
 	assert.equal(continuationOffers(), 1, "plan-runner must offer an active-goal continuation");
 	assert.equal(session.sessionManager.getEntries().filter((entry) => entry.type === "custom" && entry.customType === "pi-munchkin:continuation-receipt/v1").length, 1, "the arbiter must record its one delivery");
 	assert.equal(requests(), 2, "one original request plus one authority-approved continuation");
-	assert.equal(settles(), 2, "the continuation is a second settled Pi turn, not a hidden queue entry");
+	// Pi 1.x continues inside the run through agent_before_settle, so one continuation
+	// is one settled run with a second provider request, not a second settled turn.
+	assert.equal(settles(), 1, "the continuation runs inside the same settled Pi run");
 });
 
 test("G01-E: request and tool execution counts come from one real AgentSession lifecycle", async () => {
@@ -203,7 +205,8 @@ test("G01-E: request and tool execution counts come from one real AgentSession l
 	const { session, requests, toolExecutions, settles } = await sessionFixture(cwd, undefined, true);
 	await session.sendUserMessage("use the deterministic tool once");
 	await session.waitForIdle();
-	assert.equal(requests(), 2, "the provider sees the tool-call turn and the tool-result turn");
+	// tool-call turn + tool-result turn + the active goal's one continuation.
+	assert.equal(requests(), 3, "the provider sees the tool-call turn, the tool-result turn, and one goal continuation");
 	assert.equal(toolExecutions(), 1, "the harness counts the actual AgentSession tool execution event");
 	assert.equal(settles(), 1, "the tool call and result remain one settled user turn");
 });
