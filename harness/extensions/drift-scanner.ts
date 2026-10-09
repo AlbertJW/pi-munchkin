@@ -25,9 +25,11 @@ import { continuationDispatcherActive, emitContinuationRequest, hashContinuation
 //
 // Every unhappy path — no commit this turn, no active model, no/stale HEAD, empty
 // diff, can't authenticate, endpoint down, timeout, aborted, non-"stop" finish —
-// fails open silently. Disable with DRIFT_SCANNER=off.
+// fails open silently. Opt-in with DRIFT_SCANNER=on (off by default since 2026-10:
+// it is a background provider call the user never asked for, on whatever model is
+// selected).
 
-const ENABLED = process.env.DRIFT_SCANNER !== "off";
+const ENABLED = process.env.DRIFT_SCANNER === "on";
 const TIMEOUT_MS = 90_000; // the local 35B is slow; bound the worst case
 const FRESH_SECS = 300; // HEAD older than this wasn't the commit this turn just made
 
@@ -188,7 +190,7 @@ export default function (pi: ExtensionAPI) {
 				priority: 150,
 				idempotency_key: `drift:${next.sessionIdHash}:${next.headHash}`,
 				message: "[drift-scanner] Advisory review of your latest commit — possible drift it introduced " +
-					"(non-blocking). Make a fixup commit if real; ignore false positives. (DRIFT_SCANNER=off disables.)\n\n" + clamped,
+					"(non-blocking). Make a fixup commit if real; ignore false positives.\n\n" + clamped,
 				expires_at_ms: Date.now() + 60_000,
 			};
 			const authorize = () => Boolean(

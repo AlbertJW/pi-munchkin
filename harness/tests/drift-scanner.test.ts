@@ -63,6 +63,25 @@ test("extractFindings: only posts complete, non-CLEAN reviews", () => {
 // two tests somewhere.
 const piAiResolvable = existsSync(join(process.cwd(), "node_modules", "@earendil-works", "pi-ai"));
 const extTest = piAiResolvable ? test : test.skip;
+// The reviewer is opt-in; the extension tests below exercise the enabled path.
+async function importEnabledScanner(tag: string) {
+	const prior = process.env.DRIFT_SCANNER;
+	process.env.DRIFT_SCANNER = "on";
+	try { return await import(`../extensions/drift-scanner.ts?${tag}=${Date.now()}-${Math.random()}`); }
+	finally { if (prior === undefined) delete process.env.DRIFT_SCANNER; else process.env.DRIFT_SCANNER = prior; }
+}
+
+extTest("the drift reviewer is off by default and registers no handlers", async () => {
+	const { makeFakePi } = await import("./integration-harness.ts");
+	const prior = process.env.DRIFT_SCANNER;
+	delete process.env.DRIFT_SCANNER;
+	try {
+		const fp = makeFakePi();
+		const mod = await import(`../extensions/drift-scanner.ts?default=${Date.now()}-${Math.random()}`);
+		mod.default(fp.pi as never);
+		assert.equal(fp.handlers.size, 0, "no turn_end/agent_settled handlers means no background provider call");
+	} finally { if (prior !== undefined) process.env.DRIFT_SCANNER = prior; }
+});
 
 extTest("turn_end captures only; review starts detached after agent_settled", async () => {
 	// pi awaits extension handlers serially inside the agent loop, so awaiting a
@@ -85,7 +104,7 @@ extTest("turn_end captures only; review starts detached after agent_settled", as
 	const neverSettles = new Promise(() => {});
 
 	const fp = makeFakePi();
-	const mod = await import(`../extensions/drift-scanner.ts?detach=${Date.now()}-${Math.random()}`);
+	const mod = await importEnabledScanner("detach");
 	mod.default(fp.pi as never);
 
 	const ctx = {
@@ -143,7 +162,7 @@ extTest("a new agent run aborts a detached review and delivers no advisory", asy
 	const gate = new Promise<void>((r) => { release = r; });
 	let authCalls = 0;
 	const fp = makeFakePi();
-	const mod = await import(`../extensions/drift-scanner.ts?inflight=${Date.now()}-${Math.random()}`);
+	const mod = await importEnabledScanner("inflight");
 	mod.default(fp.pi as never);
 	const ctx = {
 		cwd,
