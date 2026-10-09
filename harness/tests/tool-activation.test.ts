@@ -402,3 +402,60 @@ test("context family activates at the first 60 percent crossing", async () => {
 		assert.equal(run.fp.pi.getActiveTools().includes("compact_context"), true);
 	} finally { run.restore(); }
 });
+
+test("Pi's short and inline tool flags are explicit user selections", async () => {
+	const { commandLineToolSelection } = await import("../extensions/tool-activation.ts");
+	for (const argv of [["-t", "read"], ["--tools", "read,bash"], ["--tools=read"], ["-xt", "web_search"], ["--exclude-tools=mcp__*"], ["-nt"], ["-nbt"], ["--no-tools"]]) {
+		assert.equal(commandLineToolSelection(["node", "pi", ...argv]).explicit, true, argv.join(" "));
+	}
+	assert.equal(commandLineToolSelection(["node", "pi", "--model", "x"]).explicit, false);
+});
+
+test("additive +name/-name lists keep the core profile and record removals", async () => {
+	const { commandLineToolSelection } = await import("../extensions/tool-activation.ts");
+	const selection = commandLineToolSelection(["node", "pi", "-t", "+codemode,-obs_recall"]);
+	assert.equal(selection.explicit, false);
+	assert.deepEqual([...selection.removed], ["obs_recall"]);
+});
+
+test("`pi -t read` never gains a late obs_recall", async () => {
+	const run = await load("core", ["read"], ["node", "pi", "-t", "read"], "obs_recall");
+	try {
+		await new Promise((resolve) => setTimeout(resolve, 10));
+		assert.equal((globalThis as any).__pi_tool_selection_explicit, true);
+		assert.equal(run.fp.pi.getActiveTools().includes("obs_recall"), false);
+	} finally { run.restore(); }
+});
+
+test("a tool removed with -name is never re-activated by the core profile", async () => {
+	const run = await load("core", names.filter((name) => name !== "obs_recall"), ["node", "pi", "--tools", "-obs_recall"], "obs_recall");
+	try {
+		await new Promise((resolve) => setTimeout(resolve, 10));
+		assert.equal((globalThis as any).__pi_tool_selection_explicit, false, "additive list keeps the core profile");
+		assert.equal(run.fp.pi.getActiveTools().includes("obs_recall"), false);
+	} finally { run.restore(); }
+});
+
+test("settings defaultTools: additive keeps the core profile, plain names are explicit", async () => {
+	const { mkdirSync, writeFileSync } = await import("node:fs");
+	for (const [defaultTools, explicit] of [[["+codemode"], false], [["read", "bash"], true]] as const) {
+		const priorAgent = process.env.PI_CODING_AGENT_DIR;
+		const agent = mkdtempSync(join(tmpdir(), "pi-tools-settings-"));
+		mkdirSync(agent, { recursive: true });
+		writeFileSync(join(agent, "settings.json"), JSON.stringify({ defaultTools }));
+		process.env.PI_CODING_AGENT_DIR = agent;
+		try {
+			const fp = makeFakePi();
+			for (const name of names) fp.pi.registerTool({ name, parameters: { type: "object" } } as any);
+			const mod = await import(`../extensions/tool-activation.ts?settings=${Date.now()}-${Math.random()}`);
+			mod.default(fp.pi as any);
+			fp.pi.setActiveTools([...names, "capability"]);
+			captureInitialToolSurface(fp.pi as any);
+			await fire(fp, "session_start", {}, { cwd: mkdtempSync(join(tmpdir(), "pi-tools-cwd-")) });
+			assert.equal((globalThis as any).__pi_tool_selection_explicit, explicit, JSON.stringify(defaultTools));
+		} finally {
+			if (priorAgent === undefined) delete process.env.PI_CODING_AGENT_DIR; else process.env.PI_CODING_AGENT_DIR = priorAgent;
+			resetPiGlobals();
+		}
+	}
+});

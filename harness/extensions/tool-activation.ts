@@ -75,19 +75,39 @@ function legacyMode(): LegacyMode {
 	return value === "ambient" || value === "phase" ? value : "dynamic";
 }
 
-function commandLineIsExplicit(argv: readonly string[] = process.argv): boolean {
-	return argv.some((arg) => ["--tools", "--exclude-tools", "--no-tools", "--no-builtin-tools"].includes(arg) ||
-		arg.startsWith("--tools=") || arg.startsWith("--exclude-tools="));
+export type ToolSelection = { explicit: boolean; removed: Set<string> };
+
+/** Pi semantics (docs/cli.md "Tools", docs/settings.md `defaultTools`): plain names
+ * REPLACE the selection (explicit allowlist); a list of only `+name`/`-name` entries
+ * ADJUSTS Pi's defaults, so the harness profile still applies but `-name` tools must
+ * never be re-activated. Exclusion and no-tools flags are always explicit. */
+function readToolList(entries: readonly unknown[], selection: ToolSelection): void {
+	const names = entries.filter((entry): entry is string => typeof entry === "string").map((entry) => entry.trim()).filter(Boolean);
+	if (names.length > 0 && names.every((name) => name.startsWith("+") || name.startsWith("-"))) {
+		for (const name of names) if (name.startsWith("-")) selection.removed.add(name.slice(1));
+		return;
+	}
+	selection.explicit = true;
 }
 
-async function settingsAreExplicit(cwd: string): Promise<boolean> {
+export function commandLineToolSelection(argv: readonly string[] = process.argv): ToolSelection {
+	const selection: ToolSelection = { explicit: false, removed: new Set() };
+	for (let index = 0; index < argv.length; index += 1) {
+		const arg = argv[index];
+		const [flag, inline] = arg.includes("=") ? [arg.slice(0, arg.indexOf("=")), arg.slice(arg.indexOf("=") + 1)] : [arg, undefined];
+		if (["--no-tools", "-nt", "--no-builtin-tools", "-nbt", "--exclude-tools", "-xt"].includes(flag)) selection.explicit = true;
+		else if (flag === "--tools" || flag === "-t") readToolList((inline ?? argv[index + 1] ?? "").split(","), selection);
+	}
+	return selection;
+}
+
+async function settingsToolSelection(cwd: string, selection: ToolSelection): Promise<void> {
 	for (const path of [join(agentDir(), "settings.json"), join(cwd, ".pi", "settings.json")]) {
 		try {
 			const value = JSON.parse(await readFile(path, "utf8"));
-			if (Array.isArray(value?.defaultTools)) return true;
+			if (Array.isArray(value?.defaultTools)) readToolList(value.defaultTools, selection);
 		} catch { /* absent or malformed settings are not evidence of explicit intent */ }
 	}
-	return false;
 }
 
 /**
@@ -102,7 +122,7 @@ async function settingsAreExplicit(cwd: string): Promise<boolean> {
  * tool at a clean baseline is Pi's own default, not a user's selection.
  */
 export function baselineLooksExplicit(argv: readonly string[] = process.argv): boolean {
-	return commandLineIsExplicit(argv);
+	return commandLineToolSelection(argv).explicit;
 }
 
 const familyTools = capabilityTools;
@@ -120,6 +140,9 @@ export default function (pi: ExtensionAPI): void {
 	let allTools: any[] = [];
 	let allNames: string[] = [];
 	let explicit = false;
+	// Tools the user removed with `-name`; the harness never re-activates them.
+	let userRemoved = new Set<string>();
+	const allowedByUser = (name: string) => !userRemoved.has(name);
 	const memory = activationMemory(pi.events);
 	const deferred = memory.deferred;
 	const attempted = memory.attempted;
@@ -179,7 +202,7 @@ export default function (pi: ExtensionAPI): void {
 		const names = family === "goals" && !goalActive ? familyNames.filter((name) => name === "goal_propose") : familyNames;
 		const allowed = explicit ? names.filter((name) => (initialToolSurface(pi.events)?.active ?? []).includes(name)) : names;
 		const active = pi.getActiveTools();
-		const add = allowed.filter((name) => deferred.has(name) && !active.includes(name));
+		const add = allowed.filter((name) => deferred.has(name) && !active.includes(name) && allowedByUser(name));
 		if (!add.length) {
 			const alreadyActive = names.length > 0 && names.every((name) => active.includes(name));
 			if (alreadyActive) attempted.add(family);
@@ -262,7 +285,7 @@ export default function (pi: ExtensionAPI): void {
 		// repairing its own mistimed decision, not the model spending its one attempt.
 		if (signal.type === "plan/rebound" && !explicit && signal.openItems > 0) {
 			const active = pi.getActiveTools();
-			const restore = FLAT_PLAN_TOOLS.filter((name) => deferred.has(name) && !active.includes(name));
+			const restore = FLAT_PLAN_TOOLS.filter((name) => deferred.has(name) && !active.includes(name) && allowedByUser(name));
 			if (restore.length) {
 				pi.setActiveTools([...active, ...restore]);
 				for (const name of restore) {
@@ -301,7 +324,10 @@ export default function (pi: ExtensionAPI): void {
 		// fail-closed branch bricked /plan for a condition the user did not cause;
 		// it keeps a distinct telemetry reason for observability.
 		const baseline = initialToolSurface(pi.events);
-		explicit = baselineLooksExplicit() || await settingsAreExplicit(ctx.cwd);
+		const selection = commandLineToolSelection();
+		await settingsToolSelection(ctx.cwd, selection);
+		explicit = selection.explicit;
+		userRemoved = selection.removed;
 		publish(explicit ? "preserved-explicit" : baseline?.complete ? "startup" : "bootstrap-incomplete");
 		if (explicit) {
 			for (const family of ["research", "delegation", "browser", "canvas", "context", ...(DEEP_RESEARCH_PLANNING_ENABLED ? ["planning" as const] : [])] as Family[]) {
@@ -330,11 +356,11 @@ export default function (pi: ExtensionAPI): void {
 			for (const name of previouslyDeferred) if (registered.has(name)) pool.add(name);
 			for (const name of PLAN_SURFACE_TOOLS) if (registered.has(name)) pool.add(name);
 			const activeGoalTools = new Set(activeGoal ? familyTools("goals", allNames) : []);
-			const core = [...pool].filter((name) =>
+			const core = [...pool].filter((name) => allowedByUser(name) && (
 				(CORE_NAMES.has(name) && (activePlan || (name !== "plan_write" && name !== "plan_update"))) ||
 				(NATIVE_GREP_FIND_ENABLED && (name === "grep" || name === "find")) ||
 				activeGoalTools.has(name) || (HEADLESS_PLAN_ENABLED && HEADLESS_PLAN_TOOLS.has(name)) ||
-				(BRANCH_PLANNER_PROCESS && name === "branch_plan"));
+				(BRANCH_PLANNER_PROCESS && name === "branch_plan")));
 			setTo(deferred, [...pool].filter((name) => !core.includes(name)));
 			for (const name of activeGoalTools) if (core.includes(name)) owned.add(name);
 			if (DEEP_RESEARCH_PLANNING_ENABLED) for (const name of familyTools("planning", allNames)) if (!core.includes(name)) deferred.add(name);
@@ -356,7 +382,7 @@ export default function (pi: ExtensionAPI): void {
 				let registeredNames: string[];
 				try { registeredNames = pi.getAllTools().map((tool) => String(tool.name)); }
 				catch { return; }
-				if (!registeredNames.includes("obs_recall")) return;
+				if (!registeredNames.includes("obs_recall") || !allowedByUser("obs_recall")) return;
 				const current = pi.getActiveTools();
 				if (current.includes("obs_recall")) return;
 				pi.setActiveTools([...current, "obs_recall"]);
