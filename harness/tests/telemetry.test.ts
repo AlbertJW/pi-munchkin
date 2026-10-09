@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
 import { createHmac } from "node:crypto";
-import { encodeTelemetryRow, isAuthoritativeTelemetryRow, record } from "../lib/telemetry.ts";
+import { encodeTelemetryRow, isAuthoritativeTelemetryRow, record, setSelectedModel } from "../lib/telemetry.ts";
 
 const TELEMETRY_ENV = ["TELEMETRY", "TELEMETRY_FILE", "TELEMETRY_FD", "TELEMETRY_HMAC_FD", "TELEMETRY_MAX_BYTES", "TELEMETRY_SOURCE", "TELEMETRY_STRICT"] as const;
 
@@ -287,5 +287,28 @@ test("si: one stable id within a session, shared across module instances", async
 		fresh.record("loop-breaker", "steer", { tier: 1, byTool: true, byReason: false, repeat: 3, streak: 3, injected_chars: 4, turnIndex: 1 });
 		const row = JSON.parse(readFileSync(file, "utf8").trim().split("\n").pop() as string);
 		assert.equal(row.si, shared, "a fresh module instance must share the CURRENT session id");
+	});
+});
+
+test("interactive rows carry the currently selected model, and follow a model switch", () => {
+	withFile((file) => {
+		const priorProvider = process.env.PI_MODEL_PROVIDER, priorModel = process.env.PI_MODEL_ID;
+		delete process.env.PI_MODEL_PROVIDER; delete process.env.PI_MODEL_ID;
+		try {
+			setSelectedModel({ provider: "local", id: "model-a" });
+			record("verify-gate", "steer", { failed: false, fires: 1, sessionFires: 1, injected_chars: 1, turnIndex: 1 });
+			setSelectedModel({ provider: "cloud", id: "model-b" });
+			record("verify-gate", "steer", { failed: false, fires: 2, sessionFires: 2, injected_chars: 1, turnIndex: 2 });
+			process.env.PI_MODEL_PROVIDER = "launcher"; process.env.PI_MODEL_ID = "pinned";
+			record("verify-gate", "steer", { failed: false, fires: 3, sessionFires: 3, injected_chars: 1, turnIndex: 3 });
+			const rows = readFileSync(file, "utf8").trim().split("\n").map((line) => JSON.parse(line));
+			assert.deepEqual(rows.map((row) => [row.provider, row.model, row.requested_model]), [
+				["local", "model-a", "model-a"], ["cloud", "model-b", "model-b"], ["launcher", "pinned", "model-b"],
+			], "a gate launcher's identity still wins over the selected model");
+		} finally {
+			setSelectedModel(null);
+			if (priorProvider === undefined) delete process.env.PI_MODEL_PROVIDER; else process.env.PI_MODEL_PROVIDER = priorProvider;
+			if (priorModel === undefined) delete process.env.PI_MODEL_ID; else process.env.PI_MODEL_ID = priorModel;
+		}
 	});
 });

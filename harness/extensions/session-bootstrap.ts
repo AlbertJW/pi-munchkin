@@ -3,17 +3,19 @@ import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { agentDir } from "../lib/agent-dir.ts";
 import { captureInitialToolSurface } from "../lib/session-bootstrap.ts";
 import { discoverEntryPoints, hashSurface, walkRelativeImports } from "../lib/surface-walk.ts";
-import { beginSession, record, telemetrySource } from "../lib/telemetry.ts";
+import { beginSession, record, setSelectedModel, telemetrySource } from "../lib/telemetry.ts";
 import { piCompatibility } from "../lib/pi-compatibility.ts";
 
 const SURFACE_HASH = /^[a-f0-9]{64}$/;
 
 export default function (pi: ExtensionAPI): void {
 	pi.on("session_before_tree", async () => { invalidateRuntimeBranch(pi.events); });
+	pi.on("model_select", async (event) => { setSelectedModel(event.model); });
 	pi.on("session_start", async (_event, ctx) => {
 		// This extension is first in the manifest. Keep minting synchronous and
 		// first: every later handler belongs to exactly this session identity.
 		beginSession();
+		setSelectedModel(ctx.model);
 		beginRuntimeGeneration(pi.events, ctx.sessionManager?.getSessionId?.() ?? `compat:${ctx.cwd}`);
 
 		if (telemetrySource() === "gate") {

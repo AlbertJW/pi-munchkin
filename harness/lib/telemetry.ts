@@ -279,16 +279,31 @@ function envelope(ext: string, kind: string, detail: Record<string, unknown>): R
 		// in detail; allowing that snapshot to shadow the launcher would make one
 		// authenticated stream contain multiple providers/models. Interactive
 		// callers still get the detail fallback when no launcher identity exists.
-		provider: process.env.PI_MODEL_PROVIDER || (typeof detail.provider === "string" ? detail.provider : null),
-		model: process.env.PI_MODEL_ID || (typeof detail.model === "string" ? detail.model : null),
-		requested_provider: process.env.PI_REQUESTED_PROVIDER || null,
-		requested_model: process.env.PI_REQUESTED_MODEL || null,
+		provider: process.env.PI_MODEL_PROVIDER || (typeof detail.provider === "string" ? detail.provider : null) || selectedModel()?.provider || null,
+		model: process.env.PI_MODEL_ID || (typeof detail.model === "string" ? detail.model : null) || selectedModel()?.id || null,
+		requested_provider: process.env.PI_REQUESTED_PROVIDER || selectedModel()?.provider || null,
+		requested_model: process.env.PI_REQUESTED_MODEL || selectedModel()?.id || null,
 		invocation_id: process.env.PI_GATE_INVOCATION_ID || null,
 		harness_surface_sha256: process.env.HARNESS_SURFACE_SHA256 || null,
 		config_sha256: process.env.HARNESS_CONFIG_SHA256 || null,
 		ext,
 		kind,
 	};
+}
+
+// The model the user currently has selected, whatever it is. Interactive sessions
+// have no launcher env, so without this almost every row had provider/model = null
+// and nothing could be attributed to a model. Process-global like the rest of this
+// module; updated on session_start and every model_select.
+const SELECTED_MODEL_KEY = "__pi_munchkin_selected_model_v1";
+type SelectedModel = { provider: string; id: string };
+function selectedModel(): SelectedModel | null {
+	return ((globalThis as Record<string, unknown>)[SELECTED_MODEL_KEY] as SelectedModel | undefined) ?? null;
+}
+export function setSelectedModel(model: { provider?: unknown; id?: unknown } | null | undefined): void {
+	const shared = globalThis as Record<string, unknown>;
+	if (model && typeof model.provider === "string" && typeof model.id === "string") shared[SELECTED_MODEL_KEY] = { provider: model.provider, id: model.id };
+	else delete shared[SELECTED_MODEL_KEY];
 }
 
 export function record(ext: string, kind: string, detail: Record<string, unknown> = {}): void {
