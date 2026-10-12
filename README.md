@@ -56,8 +56,9 @@ second.
   and small status deltas; no per-item correctness or gate receipts.*
 - **goal mode** — keeps a persistent project/worktree outcome across planner exit, compaction,
   recovery, and model switches. *`/goal` starts one, `goal_propose` is advisory until
-  `/goal-accept`, and `goal_settle` records evidence-backed completion or an explicit 80/20
-  acceptance with residual risks.*
+  `/goal-accept`, and `goal_settle` records evidence-backed completion or *proposes* an 80/20
+  settlement that only the user can accept (`/goal-accept`) or decline (`/goal-resume`). Settlements
+  record whether project verification was green.*
 - **`git-guard`** — asks for confirmation before any command that could discard uncommitted work.
   *Confirms commands that could discard uncommitted work.*
 - **context guard** — refuses an oversized file read instead of silently cutting it off half-way.
@@ -160,6 +161,10 @@ Most behaviour is automatic. The primary commands are:
   finish while the outcome remains active or resumable. Model-driven goal proposals and updates
   use the deferred `goals` capability (`capability(action="enable", family="goals")`) so the
   low-context core surface stays small.
+  The goal brief is added to context once per goal revision (and again after any compaction),
+  not on every message: Pi keeps injected messages in the conversation, so repeating an unchanged
+  brief only duplicated it. While parent-led research is paused or awaiting `/research-extend`,
+  an active goal does not restart it.
   Goal writes serialize across processes. Invalid, unsupported, or unreadable ledgers are
   preserved and reject mutations; `/goal-status` reports the affected file. Inspect or restore
   that file with goal writers stopped. An interrupted writer may leave `goal-v2.json.lock`:
