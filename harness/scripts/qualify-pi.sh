@@ -5,7 +5,7 @@
 #   npm run qualify:pi -- --stage latest        install the newest Pi into scratch first (npm registry)
 #   npm run qualify:pi -- --stage 1.2.0         a specific version
 #   npm run qualify:pi -- --pi-dir DIR          any unpacked @earendil-works/pi-coding-agent
-#   npm run qualify:pi -- --agent-dir DIR       live stack copied (read-only) for host qualification
+#   npm run qualify:pi -- --agent-dir DIR       live stack copied (read-only); the candidate harness is overlaid on the copy
 #   npm run qualify:pi -- --no-host             skip host qualification (no live stack, e.g. CI)
 #
 # Never contacts a model. Nothing in this checkout or the agent dir is modified: HEAD is
@@ -64,7 +64,7 @@ box npm test >"$WORK/test.log" 2>&1; TEST_RC=$?
 box npm run -s typecheck >"$WORK/typecheck.log" 2>&1; TSC_RC=$?
 HOST_RC=0
 if [ "$HOST" = 1 ]; then
-  box node --experimental-strip-types harness/scripts/qualify-harness-ownership.mjs "$PI_DIR" "$AGENT_DIR" "$WORK/host-receipt.json" --live-copy >"$WORK/host.log" 2>&1; HOST_RC=$?
+  box node --experimental-strip-types harness/scripts/qualify-harness-ownership.mjs "$PI_DIR" "$AGENT_DIR" "$WORK/host-receipt.json" --candidate >"$WORK/host.log" 2>&1; HOST_RC=$?
 fi
 
 count() { grep -E "^ℹ $1 " "$WORK/test.log" | awk '{print $3}'; }

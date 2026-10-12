@@ -9,7 +9,10 @@ import { pathToFileURL } from 'node:url';
 import net from 'node:net';
 import { destinations } from './deploy-harness-ownership.mjs';
 const [piPath, liveAgentPath, receiptPath, mode] = process.argv.slice(2);
-assert.ok(mode === undefined || mode === "--live-copy", "unknown qualification mode");
+// (none): overlay the 2026-10-08 release allowlist; --live-copy: the installed stack as-is;
+// --candidate: the installed stack with this checkout's complete harness overlaid, exactly
+// the file plan `mirror:apply` would deploy (used by `npm run qualify:pi`).
+assert.ok(mode === undefined || mode === "--live-copy" || mode === "--candidate", "unknown qualification mode");
 assert.ok(piPath && liveAgentPath, 'qualify-harness-ownership <pi-package-dir> <live-agent-dir> [receipt.json]');
 const root = resolve(import.meta.dirname, '../..'), piRoot = resolve(piPath), liveAgent = resolve(liveAgentPath);
 const fixture = await mkdtemp(resolve(tmpdir(), 'munchkin-ownership-host-'));
@@ -23,9 +26,16 @@ for (const dir of ['extensions','lib','vendor','agents','skills']) {
  try { await cp(join(liveAgent,dir),join(fixture,dir),{recursive:true}); } catch(error) { if(error.code!=='ENOENT')throw error; }
 }
 const candidate = join(fixture, 'extensions/pi-munchkin');
-const manifest = JSON.parse(await readFile(join(liveAgent,'extensions/pi-munchkin/package.json'),'utf8'));
+if (mode === '--candidate') {
+ const { buildLiveMirrorPlan } = await import('../lib/live-mirror.ts');
+ for (const entry of await buildLiveMirrorPlan(root, JSON.parse(await readFile(join(root, 'package.json'), 'utf8')))) {
+  const target = join(fixture, entry.destination); await mkdir(dirname(target), { recursive: true });
+  if (entry.kind === 'copy') await cp(join(root, entry.source), target); else await writeFile(target, entry.content);
+ }
+}
+const manifest = JSON.parse(await readFile(mode === '--candidate' ? join(candidate,'package.json') : join(liveAgent,'extensions/pi-munchkin/package.json'),'utf8'));
 await writeFile(join(candidate,'package.json'),JSON.stringify(manifest));
-if(mode !== '--live-copy') for(const destination of destinations){
+if(mode === undefined) for(const destination of destinations){
  const target=join(fixture,destination);await mkdir(dirname(target),{recursive:true});
  await cp(join(root,'harness',destination.slice('extensions/pi-munchkin/'.length)),target);
 }
@@ -176,6 +186,6 @@ try{
  runtimeReceipt=await receiptLib.buildRuntimeReceipt({piVersion:version,baseDir:fixture,entryPoints:actualPaths,evidence:'loaded',registeredTools:tools,activeTools:active,generation:1,sessionId:stack.sessionManager.getSessionId(),env:process.env});
 }finally{stack.dispose();}
 assert.equal(networkRequests,0);
-const summary={piVersion:version,mode:mode==='--live-copy'?'deployed-live-copy':'staged-live-overlay',fixture,extensionsLoaded:loaded.extensions.length,cases,isolation:{sessions:2,reloads:3,signalsPerSession:4},pipeline,runtimeReceipt,networkRequests,realProviderRequests:0};
+const summary={piVersion:version,mode:mode==='--live-copy'?'deployed-live-copy':mode==='--candidate'?'candidate-overlay':'staged-live-overlay',fixture,extensionsLoaded:loaded.extensions.length,cases,isolation:{sessions:2,reloads:3,signalsPerSession:4},pipeline,runtimeReceipt,networkRequests,realProviderRequests:0};
 if(receiptPath)await writeFile(resolve(receiptPath),JSON.stringify(summary,null,2)+'\n');
 console.log(JSON.stringify({piVersion:version,fixture,extensionsLoaded:loaded.extensions.length,cases,networkRequests,realProviderRequests:0,receiptPath},null,2));
