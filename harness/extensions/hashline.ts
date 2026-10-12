@@ -2,7 +2,7 @@ import { readFile, realpath, stat, writeFile } from "node:fs/promises";
 import { extname, isAbsolute, relative, resolve } from "node:path";
 import { defineTool, type ExtensionAPI, withFileMutationQueue } from "@earendil-works/pi-coding-agent";
 import { Type } from "typebox";
-import { annotate, applyHunks, decodeDocument, fileTag, mapChangedLines, parsePatch, serializeDocument, type Hunk } from "../lib/hashline-core.ts";
+import { annotate, applyHunks, decodeDocument, fileTag, mapChangedLines, normalizePatchText, parsePatch, serializeDocument, type Hunk } from "../lib/hashline-core.ts";
 import { emitHarnessSignal } from "../lib/harness-signals.ts";
 
 // Hashline edits — line-anchored patches instead of exact-text matching.
@@ -215,7 +215,8 @@ export function registerHashline(pi: ExtensionAPI, io: HashlineIo = DEFAULT_IO) 
 				return args as { input: string };
 			},
 			async execute(_id, params, _signal, _onUpdate, ctx) {
-				const parsed = parsePatch(params.input);
+				const normalized = normalizePatchText(params.input);
+				const parsed = parsePatch(normalized.text);
 				const sections = parsed.map((section) => ({
 					...section,
 					abs: isAbsolute(section.path) ? section.path : resolve(ctx.cwd, section.path),
@@ -350,6 +351,7 @@ export function registerHashline(pi: ExtensionAPI, io: HashlineIo = DEFAULT_IO) 
 					const ground = windows.map(([start, end]) => annotate(lines.slice(start - 1, end), start)).join("\n…\n");
 					out.push(`Applied ${item.hunkCount} hunk(s) to ${item.disp} (${item.res.counts.replaced} replace, ${item.res.counts.inserted} insert, ${item.res.counts.deleted} delete).\n[${item.disp}#${tag}]\n${ground}\nNumbers above are CURRENT (tag ${tag}). Old tag/numbers are dead.`);
 				}
+				if (normalized.notes.length) out.push(`Note: ${normalized.notes.join("; ")}. Send real newlines next time.`);
 				return { content: [{ type: "text" as const, text: out.join("\n\n") }], details: { firstChangedLine } };
 				});
 			},

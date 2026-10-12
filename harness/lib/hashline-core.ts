@@ -76,6 +76,34 @@ const INSERT_RE = /^insert (before|after) (\d+):$/;
 const INSERT_EDGE_RE = /^insert (head|tail):$/;
 const DELETE_RE = /^delete (\d+)(?:\.\.(\d+))?:?$/;
 
+const PATCH_EXAMPLE = "Expected shape:\n[src/file.ts#<the 64-hex tag from your last read>]\nreplace 3..4:\n+new line 3\n+new line 4\ndelete 9..9";
+
+/** Purely mechanical repairs that cannot change what an edit means (the #TAG check
+ * still guards every section). 2026-10 traces: patches arriving double-escaped (one
+ * line with literal \n) and command lines ending in a stray backslash. Anything that
+ * would need a guess about intent stays an error. */
+export function normalizePatchText(input: string): { text: string; notes: string[] } {
+	const notes: string[] = [];
+	let text = input;
+	if (!text.includes("\n") && /\\n/.test(text) && /^\s*\[[^\]]+#[0-9A-Fa-f]{64}\]/.test(text)) {
+		text = text.replace(/\\r\\n|\\n/g, "\n").replace(/\\t/g, "\t").replace(/\\"/g, '"');
+		notes.push("the patch arrived as one line with literal \\n sequences; they were read as newlines");
+	}
+	let stripped = 0;
+	text = text.split("\n").map((line) => {
+		const body = line.trimEnd();
+		if (!body.endsWith("\\") || line.startsWith("+")) return line;
+		const candidate = body.slice(0, -1).trimEnd();
+		if (HEADER_RE.test(candidate) || REPLACE_RE.test(candidate) || INSERT_RE.test(candidate) || INSERT_EDGE_RE.test(candidate) || DELETE_RE.test(candidate)) {
+			stripped += 1;
+			return candidate;
+		}
+		return line;
+	}).join("\n");
+	if (stripped) notes.push(`removed a stray trailing backslash from ${stripped} command line(s)`);
+	return { text, notes };
+}
+
 export function parsePatch(input: string): Section[] {
 	const sections: Section[] = [];
 	let cur: Section | null = null;
@@ -85,9 +113,9 @@ export function parsePatch(input: string): Section[] {
 		if (!curHunk) return;
 		if (curHunk.body.length === 0) {
 			if (curHunk.op === "insert") {
-				throw new Error(`bad patch: insert before line ${lineNo} has no "+" body rows. Use "insert head:" or "insert tail:"; a bare "+" inserts a blank line.`);
+				throw new Error(`bad patch: insert before line ${lineNo} has no "+" body rows. Every inserted line starts with "+"; a bare "+" inserts a blank line.\n${PATCH_EXAMPLE}`);
 			}
-			throw new Error(`bad patch: replace hunk before line ${lineNo} has no "+" body rows (to remove lines use delete).`);
+			throw new Error(`bad patch: replace hunk before line ${lineNo} has no "+" body rows. Every replacement line starts with "+"; to remove lines use delete N..M.\n${PATCH_EXAMPLE}`);
 		}
 		curHunk = null;
 	};
@@ -109,7 +137,7 @@ export function parsePatch(input: string): Section[] {
 			continue;
 		}
 		if (/^\[[^#\]]+#.*\]$/.test(line)) throw new Error(`bad patch line ${n + 1}: file tag must be exactly 64 hexadecimal SHA-256 characters`);
-		if (!cur) throw new Error(`bad patch line ${n + 1}: "${line.slice(0, 60)}" before any [path#TAG] header`);
+		if (!cur) throw new Error(`bad patch line ${n + 1}: "${line.slice(0, 60)}" before any [path#TAG] header. Start each file with [path#TAG] using the tag from your last read of that file.\n${PATCH_EXAMPLE}`);
 		closeHunk(n + 1);
 		if ((m = line.match(REPLACE_RE))) {
 			const start = Number(m[1]), end = m[2] ? Number(m[2]) : start;
@@ -129,7 +157,7 @@ export function parsePatch(input: string): Section[] {
 			if (start < 1 || end < start) throw new Error(`bad patch line ${n + 1}: range ${start}..${end}`);
 			cur.hunks.push({ op: "delete", start, end });
 		} else {
-			throw new Error(`bad patch line ${n + 1}: "${line.slice(0, 60)}" — expected [path#64-HEX], replace N..M:, insert before|after N:, insert head|tail:, delete N..M, or a + body row`);
+			throw new Error(`bad patch line ${n + 1}: "${line.slice(0, 60)}" — expected [path#64-HEX], replace N..M:, insert before|after N:, insert head|tail:, delete N..M, or a + body row. If this is new content, prefix it with "+".\n${PATCH_EXAMPLE}`);
 		}
 	}
 	closeHunk(lines.length);
