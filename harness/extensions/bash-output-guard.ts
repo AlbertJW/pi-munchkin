@@ -39,8 +39,11 @@ export default function (pi: ExtensionAPI) {
 
 		const command = String((event.input as Record<string, unknown> | undefined)?.command ?? "");
 		const cwdEscapeSuspected = looksLikeCwdEscape(command, ctx.cwd);
-		const message = outputGuardMessage(chars, MAX_CHARS, cwdEscapeSuspected);
+		const fullOutputPath = (event.details as { fullOutputPath?: unknown } | undefined)?.fullOutputPath;
+		const message = outputGuardMessage(chars, MAX_CHARS, cwdEscapeSuspected, event.isError === true, typeof fullOutputPath === "string" ? fullOutputPath : undefined);
 		record("bash-output-guard", "withheld", { chars, max_chars: MAX_CHARS, cwd_escape_suspected: cwdEscapeSuspected });
-		return { content: [{ type: "text" as const, text: message }], isError: true };
+		// The command already ran. Keep its real status: reporting a successful (possibly
+		// mutating) command as failed invites the model to run it a second time.
+		return { content: [{ type: "text" as const, text: message }], isError: event.isError === true };
 	});
 }

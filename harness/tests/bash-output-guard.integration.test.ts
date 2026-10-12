@@ -17,7 +17,11 @@ test("bash-output-guard: withholds oversized bash output when enabled; silent ot
 	assert.ok(withheld, "handler withheld the result");
 	assert.ok(JSON.stringify(withheld.content).includes("too large to use directly"));
 	assert.ok(JSON.stringify(withheld.content).includes("searched outside"));
-	assert.equal(withheld.isError, true);
+	assert.equal(withheld.isError, false, "a successful command is not reported as failed");
+	assert.ok(JSON.stringify(withheld.content).includes("SUCCEEDED"));
+	const failed = await fire(fp, "tool_result", { ...event(), isError: true, details: { fullOutputPath: "/tmp/pi-bash-full.log" } }, { cwd: "/tmp/project" });
+	assert.equal(failed.isError, true, "a failed command stays failed");
+	assert.ok(JSON.stringify(failed.content).includes("/tmp/pi-bash-full.log"), "points at Pi's saved full output");
 	// disabled -> no handler registered
 	process.env.BASH_OUTPUT_GUARD = "";
 	fp = makeFakePi();

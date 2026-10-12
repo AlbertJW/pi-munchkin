@@ -27,8 +27,10 @@ export function looksLikeCwdEscape(command: string, cwd: string): boolean {
 	return false;
 }
 
-export function outputGuardMessage(chars: number, maxChars: number, cwdEscapeSuspected: boolean): string {
-	const base = `failure_class=context_intake_risk. This command produced ${chars} characters of output — too large to use directly (limit ${maxChars}). Re-run narrower: pipe through head/wc -l/grep for just what you need, or scope the command to a specific subdirectory.`;
+export function outputGuardMessage(chars: number, maxChars: number, cwdEscapeSuspected: boolean, commandFailed = false, fullOutputPath?: string): string {
+	const status = commandFailed ? "The command FAILED." : "The command SUCCEEDED; do not run it again just to see its output.";
+	const saved = fullOutputPath ? ` The full output is saved at ${fullOutputPath}; inspect it with grep/head/tail instead of re-running.` : "";
+	const base = `failure_class=context_intake_risk. ${status} Its output (${chars} characters) is too large to use directly (limit ${maxChars}).${saved} Otherwise re-run narrower: pipe through head/wc -l/grep for just what you need, or scope the command to a specific subdirectory.`;
 	if (!cwdEscapeSuspected) return base;
 	return `${base}\nThis looks like it searched outside your working directory. Do all work in the directory you started in — never search $HOME or other projects; if a file seems missing, run \`pwd\` and \`ls\` first.`;
 }
