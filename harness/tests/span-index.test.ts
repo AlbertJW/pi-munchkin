@@ -92,3 +92,13 @@ test("span tools default-on: unset registers search_spans/read_span; SPAN_TOOLS=
 		if (prev === undefined) delete process.env.SPAN_TOOLS; else process.env.SPAN_TOOLS = prev;
 	}
 });
+
+test("an invalid regex falls back to a literal search instead of failing", async () => {
+	const { searchSpans: search } = await import("../lib/span-index.ts");
+	const literal = search("x foo|(bar y\nz\nfoo|(bar", "foo|(bar");
+	assert.equal(literal.total, 2);
+	assert.equal(literal.literal, true);
+	const regex = search("abc\nabd\nabe", "ab[cd]");
+	assert.equal(regex.total, 2);
+	assert.equal(regex.literal, false);
+});

@@ -46,8 +46,11 @@ function searchableLines(text: string): string[] {
 }
 
 // Regex search over lines; capped matches, capped per-line excerpt, capped total bytes.
-export function searchSpans(text: string, pattern: string, maxMatches = MAX_MATCHES): SpanSearch {
-	const re = new RegExp(pattern);
+export function searchSpans(text: string, pattern: string, maxMatches = MAX_MATCHES): SpanSearch & { literal: boolean } {
+	// An invalid regex (models write `foo|(bar`) falls back to a literal search instead of failing.
+	let re: RegExp;
+	let literal = false;
+	try { re = new RegExp(pattern); } catch { re = new RegExp(pattern.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")); literal = true; }
 	const lines = searchableLines(text);
 	const matches: SpanMatch[] = [];
 	let total = 0;
@@ -62,7 +65,7 @@ export function searchSpans(text: string, pattern: string, maxMatches = MAX_MATC
 		bytes += excerptBytes;
 		matches.push({ line: i + 1, text: excerpt });
 	}
-	return { matches, total, totalLinesScanned: lines.length, complete: true };
+	return { matches, total, totalLinesScanned: lines.length, complete: true, literal };
 }
 
 // Bounded slice with provenance. 1-indexed inclusive; clamps to caps and file bounds.

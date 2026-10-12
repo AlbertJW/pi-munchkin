@@ -89,7 +89,7 @@ export default function (pi: ExtensionAPI) {
 			async execute(_id, params, _signal, _onUpdate, ctx) {
 				const path = resolveReadPath(ctx.cwd, params.path);
 				const loaded = await load(path);
-				const { matches, total, totalLinesScanned, complete } = searchSpans(loaded.text, params.pattern);
+				const { matches, total, totalLinesScanned, complete, literal } = searchSpans(loaded.text, params.pattern);
 				const receipt = buildSearchReceipt({
 					requested_file: params.path,
 					normalized_file: loaded.normalizedPath,
@@ -103,7 +103,7 @@ export default function (pi: ExtensionAPI) {
 				});
 				record("span-tools", "search", { total, shown: matches.length });
 				const body = matches.map((m) => `${m.line}:${m.text}`).join("\n");
-				const header = `[receipt ${receipt.schema} sha256=${receipt.sha256.slice(0, 12)} bytes=${receipt.bytes_examined}/${receipt.size_bytes} lines=${receipt.total_lines_scanned} complete=${receipt.complete}; ${total} matches, showing ${matches.length}]`;
+				const header = `[receipt ${receipt.schema} sha256=${receipt.sha256.slice(0, 12)} bytes=${receipt.bytes_examined}/${receipt.size_bytes} lines=${receipt.total_lines_scanned} complete=${receipt.complete}; ${total} matches, showing ${matches.length}]${literal ? "\n(pattern was not a valid regex; searched for it as literal text)" : ""}`;
 				return { content: [{ type: "text" as const, text: `${header}\n${body}` }], details: { receipt } };
 			},
 		}),
