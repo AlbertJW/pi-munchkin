@@ -32,6 +32,8 @@ import { createHash } from "node:crypto";
 
 const RESUME =
 	"Context compaction finished. Re-read the active task and current filesystem state, then resume from the next unresolved step. Do not repeat completed work.";
+const RESUME_AFTER_FAILURE =
+	"Context compaction failed; the conversation was not shortened. Do not call compact_context again for this. Continue with smaller steps: read bounded pages, avoid re-reading large outputs, and finish the next unresolved step.";
 const DEFAULT_FOCUS =
 	"Preserve a compact structured capsule: active task and constraints; decisions; changed paths and exact identifiers; verified commands/results; unresolved errors or blockers; next action. Keep the most recent raw evidence needed to continue.";
 
@@ -99,7 +101,7 @@ export default function (pi: ExtensionAPI) {
 						v: 1 as const, session_id_hash: sessionIdHash, owner_id_hash: ownerIdHash, generation,
 						scope: goal ? "goal" as const : "session" as const, reason: "compaction_resume" as const, priority: 400,
 						idempotency_key: `compact:${sessionIdHash}:${generation}`,
-						message: RESUME, expires_at_ms: Date.now() + 60_000,
+						message: status === "complete" ? RESUME : RESUME_AFTER_FAILURE, expires_at_ms: Date.now() + 60_000,
 					};
 					const authorize = async () => {
 						const current = goalsEnabled() ? await readCurrentGoal(ctx.cwd) : undefined;

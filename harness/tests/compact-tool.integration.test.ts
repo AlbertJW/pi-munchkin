@@ -77,6 +77,8 @@ test("compact_context resumes after failure because Pi already aborted the turn"
 	await waitForOffers(h.offers, 1);
 	assert.equal(h.offers.length, 1);
 	assert.match(h.notes[0], /compaction failed \(failure_class=provider\)/);
+	assert.match(h.offers[0]!.request.message, /compaction failed; the conversation was not shortened/, "the resume must not claim success");
+	assert.doesNotMatch(h.offers[0]!.request.message, /compaction finished/);
 	const visible = JSON.stringify({ notes: h.notes, offers: h.offers });
 	assert.doesNotMatch(visible, /DUMMY_COMPACTION_SECRET|private\.invalid|\/Users\/alice/);
 });
