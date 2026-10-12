@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { readFile, realpath, stat } from "node:fs/promises";
 import { extname } from "node:path";
-import { defineTool, type ExtensionAPI } from "@earendil-works/pi-coding-agent";
+import { defineTool, formatDimensionNote, resizeImage, type ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { Type } from "typebox";
 import { resolveReadPath } from "../lib/context-inlet.ts";
 import { modelFingerprint as contextModelFingerprint } from "../lib/context-profile.ts";
@@ -9,7 +9,7 @@ import { reserveContextOutput } from "../lib/context-accounting.ts";
 import { record } from "../lib/telemetry.ts";
 import { cropPng, imageDigest, perceptualHash, pngLuma, regionDigests, VisualObservationCache, visualTelemetry, type VisualGeometry } from "../lib/visual-observation.ts";
 import { refineWithSam, type SamAdapter, type GroundingHint } from "../lib/visual-grounding.ts";
-import { createMacScreenCapture, type CaptureCrop } from "../lib/visual-capture.ts";
+import { captureScreenshot, createMacScreenCapture, type CaptureCrop } from "../lib/visual-capture.ts";
 import { createSam2TinyAdapter } from "../lib/sam2-tiny.ts";
 
 const ENABLED = process.env.VISION === "on";
@@ -69,6 +69,36 @@ function validateCapture(captured: VisualCapture): void {
 		!Number.isSafeInteger(captured.width) || !Number.isSafeInteger(captured.height) || captured.width < 1 || captured.height < 1 ||
 		captured.width > 32_000 || captured.height > 32_000) throw new Error("visual capture has invalid image metadata");
 	if (captured.bytes.byteLength > MAX_IMAGE_BYTES) throw new Error(`visual_observe refuses captures over ${MAX_IMAGE_BYTES} bytes`);
+}
+
+// ponytail: one generic long-edge cap; a model's own inputLimits win when Pi has them.
+const SCREENSHOT_RESIZE = { maxWidth: 1568, maxHeight: 1568 };
+
+/** Always on: the plain way for any vision-capable model to see the screen. */
+export function registerScreenshotTool(pi: ExtensionAPI, options: { command?: string } = {}): void {
+	pi.registerTool(defineTool({
+		name: "screenshot",
+		label: "Screenshot",
+		description: "Capture what is on screen now (the main display, another display, or a region in screen points) and return it as an image. macOS; needs a model with image input. To look at an image file instead, use read.",
+		promptSnippet: "screenshot(display?, region?): see the screen",
+		parameters: Type.Object({
+			display: Type.Optional(Type.Integer({ minimum: 1, maximum: 16, description: "1 is the main display" })),
+			region: Type.Optional(Type.Object({ x: Type.Integer({ minimum: 0 }), y: Type.Integer({ minimum: 0 }), width: Type.Integer({ minimum: 1 }), height: Type.Integer({ minimum: 1 }) }, { description: "Screen points from the top-left of the main display" })),
+		}),
+		async execute(id, params, signal, _update, ctx) {
+			const model = modelFor(ctx);
+			if (!supportsVision(model)) return { content: [{ type: "text" as const, text: unavailableModelMessage(model) }], details: { tool_name: "screenshot", success: false, reason: "vision-unavailable" } };
+			const png = await captureScreenshot(params, options, signal);
+			const limits = (ctx.model as { inputLimits?: { images?: { resize?: typeof SCREENSHOT_RESIZE } } } | undefined)?.inputLimits?.images?.resize;
+			const image = await resizeImage(png, "image/png", limits ?? SCREENSHOT_RESIZE);
+			if (!image) throw new Error("screenshot could not be reduced to a size the model accepts; capture a smaller region");
+			const reservation = reserveContextOutput(id, visualTokenEstimate(image.width, image.height));
+			if (reservation && !reservation.ok) throw new Error("a screenshot exceeds the remaining context allowance; compact or capture a smaller region first");
+			record("visual-observe", "screenshot", { width: image.width, height: image.height, original_width: image.originalWidth, original_height: image.originalHeight, region: params.region != null });
+			const note = [`Screenshot ${image.width}x${image.height} (captured ${image.originalWidth}x${image.originalHeight} device pixels; Retina displays have 2 pixels per screen point).`, formatDimensionNote(image)].filter(Boolean).join("\n");
+			return { content: [{ type: "text" as const, text: note }, { type: "image" as const, data: image.data, mimeType: image.mimeType }], details: { tool_name: "screenshot", success: true, width: image.width, height: image.height, original_width: image.originalWidth, original_height: image.originalHeight } };
+		},
+	}));
 }
 
 export function registerVisualTools(pi: ExtensionAPI, options: VisualToolOptions = {}): void {
@@ -284,4 +314,4 @@ export function samAdapterFromEnv(): SamAdapter | undefined {
 	}
 }
 
-export default function (pi: ExtensionAPI): void { registerVisualTools(pi, { samAdapter: samAdapterFromEnv() }); }
+export default function (pi: ExtensionAPI): void { registerScreenshotTool(pi); registerVisualTools(pi, { samAdapter: samAdapterFromEnv() }); }

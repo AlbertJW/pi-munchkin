@@ -52,7 +52,7 @@ export type CapabilityFamily = "research" | "delegation" | "browser" | "canvas" 
 export const CORE_TOOL_NAMES: readonly string[] = ["read", "bash", "edit", "write", "search_spans", "read_span", "recall", "obs_recall", "verify_project", "capability", "plan_write", "plan_update"];
 const FAMILY_NAMES: Record<Exclude<CapabilityFamily, "browser" | "canvas">, readonly string[]> = {
  research: ["web_search", "web_read"], delegation: ["subagent"], context: ["compact_context"], planning: PLAN_SURFACE_TOOLS,
- goals: ["goal_propose", "goal_inspect", "goal_update", "goal_settle", "goal_block"], vision: ["visual_observe", "visual_refine_target"],
+ goals: ["goal_propose", "goal_inspect", "goal_update", "goal_settle", "goal_block"], vision: ["screenshot", "visual_observe", "visual_refine_target"],
 };
 /** Registration is the authority; this never activates an unregistered or excluded tool. */
 export function capabilityTools(family: CapabilityFamily, registered: readonly string[]): string[] {

@@ -127,6 +127,44 @@ export function createMacScreenCapture(options: LocalCaptureOptions = {}) {
 	};
 }
 
+export const MAX_SCREENSHOT_BYTES = 64 * 1024 * 1024;
+export type ScreenshotTarget = { display?: number; region?: CaptureCrop };
+
+/**
+ * Capture a whole display (default: the main one) or a region in global screen
+ * points with `/usr/sbin/screencapture`, at full device resolution. The caller
+ * downscales. Without the Screen Recording permission macOS returns only the
+ * desktop background rather than an error.
+ */
+export async function captureScreenshot(target: ScreenshotTarget = {}, options: { command?: string; timeout_ms?: number } = {}, signal?: AbortSignal): Promise<Uint8Array> {
+	if (!options.command && process.platform !== "darwin") throw new VisualCaptureError("unsupported", "screenshots are available only on macOS");
+	const args = ["-x", "-t", "png"];
+	if (target.region) {
+		const { x, y, width, height } = target.region;
+		if (![x, y, width, height].every(Number.isSafeInteger) || x < 0 || y < 0 || width < 1 || height < 1) throw new VisualCaptureError("invalid-target", "screenshot region must be whole, non-negative screen points");
+		args.push(`-R${x},${y},${width},${height}`);
+	} else if (target.display !== undefined) {
+		if (!Number.isSafeInteger(target.display) || target.display < 1 || target.display > 16) throw new VisualCaptureError("invalid-target", "screenshot display must be 1-16");
+		args.push(`-D${target.display}`);
+	}
+	let directory: string;
+	try { directory = await mkdtemp(join(tmpdir(), "pi-screenshot-")); }
+	catch { throw new VisualCaptureError("failed", "screenshot could not allocate a private workspace"); }
+	const file = join(directory, "screen.png");
+	try {
+		await runCapture(options.command ?? "/usr/sbin/screencapture", [...args, file], directory, options.timeout_ms ?? 10_000, signal).catch((error) => {
+			if (error instanceof VisualCaptureError && error.reason === "failed") throw new VisualCaptureError("failed", "screenshot failed: macOS refused to capture the display. Grant Screen Recording to the terminal app running Pi (System Settings > Privacy & Security > Screen & System Audio Recording), then restart it.");
+			throw error;
+		});
+		const info = await stat(file).catch(() => null);
+		if (!info || info.size < 1) throw new VisualCaptureError("failed", "screenshot produced no image (is the display or region on screen?)");
+		if (info.size > MAX_SCREENSHOT_BYTES) throw new VisualCaptureError("oversize", "screenshot exceeded its byte budget; capture a region");
+		return new Uint8Array(await readFile(file));
+	} finally {
+		await rm(directory, { recursive: true, force: true }).catch(() => undefined);
+	}
+}
+
 /** Keep an adapter contract honest in tests and integrations without exposing
  * the temporary capture path or bytes. */
 export function validateLocalCapture(capture: unknown): asserts capture is LocalVisualCapture {

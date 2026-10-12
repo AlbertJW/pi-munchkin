@@ -159,6 +159,7 @@ export const EVENT_CATALOG = {
 		lists: "number", resolutions: "number", supersessions: "number",
 	},
 	"visual-observe/cache": { decision: "string", matched_observation: ["string", "null"], phash_distance: ["number", "null"], cache_key: "string" },
+	"visual-observe/screenshot": { width: "number", height: "number", original_width: "number", original_height: "number", region: "boolean" },
 	"visual-observe/grounding": { segmenter: "string", segmenter_version: "string", mask_digest: "string", observation_id: "string", exact_sha256: "string" },
 	"loop-breaker/compact-reset": { streak: "number", blocked: "number" },
 	"loop-breaker/session-repeat": { repeats: "number", turnIndex: "number" },

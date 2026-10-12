@@ -248,7 +248,7 @@ export default function (pi: ExtensionAPI): void {
 		name: "capability",
 		label: "Capability Switch",
 		description: "Enable one specialist tool family for this session, or report bounded family status.",
-		promptSnippet: "capability: enable research, delegation, browser, canvas, context, planning, goals, or vision tools only when needed",
+		promptSnippet: "capability: enable research, delegation, browser, canvas, context, planning, goals, or vision (screenshots) tools only when needed",
 		parameters: Type.Object({
 			action: Type.Union([Type.Literal("enable"), Type.Literal("status")]),
 			family: Type.Optional(Type.Union([

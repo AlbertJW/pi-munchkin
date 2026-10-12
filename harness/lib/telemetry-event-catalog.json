@@ -122,6 +122,7 @@
     "verify-gate/verify-project",
     "verify-gate/unverified-end",
     "visual-observe/cache",
+    "visual-observe/screenshot",
     "visual-observe/grounding",
     "working-memory/list",
     "working-memory/resolve",
