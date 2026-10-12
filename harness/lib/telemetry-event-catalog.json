@@ -119,6 +119,7 @@
     "verify-gate/gate-green-consumed",
     "verify-gate/gate-green-execution-ordered",
     "verify-gate/steer",
+    "verify-gate/verify-project",
     "verify-gate/unverified-end",
     "visual-observe/cache",
     "visual-observe/grounding",

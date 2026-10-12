@@ -27,6 +27,7 @@ export const EVENT_CATALOG = {
 	"control-arbiter/continuation": { reason: "string", outcome: "string", contenders: "number" },
 	"verify-gate/gate-green-consumed": {},
 	"verify-gate/gate-green-execution-ordered": { started_sequence: "number", ended_sequence: "number" },
+	"verify-gate/verify-project": { reused: "boolean", pass: "boolean" },
 	"verify-gate/steer": { failed: "boolean", fires: "number", sessionFires: "number", injected_chars: "number", turnIndex: "number" },
 	"verify-gate/unverified-end": { fires: "number", sessionFires: "number" },
 	"verification-frontier/settled": {

@@ -17,6 +17,7 @@ import { VerificationPlateauTracker, type VerificationPlateauMode } from "../lib
 import { buildControlProposal, controlArbiterMode, controlEnforces, emitControlProposal } from "../lib/control-proposal.ts";
 import { planItemHash, sha256 } from "../lib/failure-episodes.ts";
 import { emitHarnessSignal, onHarnessSignal } from "../lib/harness-signals.ts";
+import { workingTreeFingerprint } from "../lib/tree-fingerprint.ts";
 
 // Boundary verify gate ("the handoff is sacred").
 //
@@ -240,6 +241,26 @@ export default function (pi: ExtensionAPI) {
 		mutationEpochChanged = false;
 	};
 
+	// Result reuse (2026-10 trace study: 51 verify_project runs had no file change since an
+	// identical run). The gate is deterministic over the working tree, so an unchanged tree
+	// gives the same answer. Reuse requires all three: the same user turn, no tool call
+	// since that could have changed files, and an identical git working-tree fingerprint.
+	// Outside a git work tree nothing is reused; `force: true` always re-runs.
+	let changeEpoch = 0;
+	let lastGate: { epoch: number; fingerprint: string; result: GateResult; at: number } | null = null;
+	const READ_ONLY_TOOLS = new Set(["read", "read_span", "search_spans", "recall", "obs_recall", "grep", "find", "ls",
+		"web_search", "web_read", "capability", "verify_project", "plan_write", "plan_update", "goal_inspect", "goal_update", "goal_propose"]);
+	const mayChangeFiles = (toolName: string, args: Record<string, unknown>): boolean => {
+		if (READ_ONLY_TOOLS.has(toolName)) return false;
+		if (toolName === "bash") return classifyBashCommand(String(args.command ?? ""), gateCmd ? [gateCmd] : []).mutates !== false;
+		return true;
+	};
+	pi.on("before_agent_start", async () => { changeEpoch += 1; }); // the user may have edited files between messages
+	pi.on("tool_execution_start", async (event) => {
+		const args = event.args && typeof event.args === "object" ? event.args as Record<string, unknown> : {};
+		if (mayChangeFiles(event.toolName, args)) changeEpoch += 1;
+	});
+
 	pi.registerTool(defineTool({
 		name: "verify_project",
 		label: "Verify Project",
@@ -248,10 +269,26 @@ export default function (pi: ExtensionAPI) {
 		promptGuidelines: [
 			"Use verify_project after the latest source mutation; do not wrap the project gate in Bash syntax.",
 		],
-		parameters: Type.Object({}),
-		async execute(toolCallId, _params, signal, _onUpdate, ctx) {
+		parameters: Type.Object({
+			force: Type.Optional(Type.Boolean({ description: "Re-run even if nothing changed since the last identical run." })),
+		}),
+		async execute(toolCallId, params, signal, _onUpdate, ctx) {
 			if (!gateCmd) throw new Error("verify_project unavailable: no exact project gate was detected");
-			const result = await runReadonlyGate(pi.exec.bind(pi), ctx.cwd, gateCmd, 600_000, signal);
+			const epoch = changeEpoch;
+			const fingerprint = await workingTreeFingerprint(pi.exec.bind(pi) as never, ctx.cwd);
+			const reusable = !params.force && fingerprint !== null && lastGate !== null &&
+				lastGate.epoch === epoch && lastGate.fingerprint === fingerprint;
+			const reusedFrom = reusable ? lastGate : null;
+			const result = reusedFrom ? reusedFrom.result : await runReadonlyGate(pi.exec.bind(pi), ctx.cwd, gateCmd, 600_000, signal);
+			const note = reusedFrom
+				? ` (no files changed since the identical run ${Math.max(0, Math.round((Date.now() - reusedFrom.at) / 1000))}s ago, so its result was reused; pass force: true to re-run)`
+				: "";
+			if (!reusedFrom && fingerprint !== null && epoch === changeEpoch) {
+				// Record only if the gate itself left the tree exactly as it tested it.
+				const after = await workingTreeFingerprint(pi.exec.bind(pi) as never, ctx.cwd);
+				lastGate = after === fingerprint && epoch === changeEpoch ? { epoch, fingerprint, result, at: Date.now() } : null;
+			}
+			record("verify-gate", "verify-project", { reused: Boolean(reusedFrom), pass: result.pass });
 			verifyProjectResults.set(toolCallId, result);
 			trimOldest(verifyProjectResults as Map<string, unknown>, 128);
 			if (!result.pass) {
@@ -259,9 +296,9 @@ export default function (pi: ExtensionAPI) {
 				throw new Error(renderSafeGateFailure({
 					diagnostic,
 					requiredNextAction: "fix the implementation using this bounded evidence, then call verify_project again",
-				}));
+				}) + note);
 			}
-			return { content: [{ type: "text" as const, text: "Exact project gate passed after the latest mutation." }], details: { tool_name: "verify_project", success: true } };
+			return { content: [{ type: "text" as const, text: `Exact project gate passed after the latest mutation.${note}` }], details: { tool_name: "verify_project", success: true, reused: Boolean(reusedFrom) } };
 		},
 	}));
 

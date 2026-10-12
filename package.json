@@ -195,6 +195,7 @@
     "harness/lib/teach-hints.ts",
     "harness/lib/surface-walk.ts",
     "harness/lib/telemetry.ts",
+    "harness/lib/tree-fingerprint.ts",
     "harness/lib/telemetry-writer.ts",
     "harness/lib/telemetry-catalog.ts",
     "harness/lib/ketch-runtime.ts",
