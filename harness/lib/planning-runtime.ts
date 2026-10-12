@@ -11,7 +11,7 @@ import { classifyBashCommand } from "./command-policy.ts";
 import { currentCompactionOwner } from "./compaction-coordinator.ts";
 import { continuationDispatcherActive, emitContinuationRequest, hashContinuationIdentity, type ContinuationRequestV1, } from "./continuation-authority.ts";
 import { subscribeOnce } from "./extension-lifecycle.ts";
-import { goalContinuationDecision, goalsEnabled, readExecutableGoal } from "./goal-state.ts";
+import { goalContinuationDecision, goalRevision, goalsEnabled, readExecutableGoal } from "./goal-state.ts";
 import { emitHarnessSignal, onHarnessSignal, signalRunId } from "./harness-signals.ts";
 import { withPiFileMutationQueue as withFileMutationQueue } from "./pi-compatibility.ts";
 import { applyPlanDeltas, type PlanDelta } from "./plan-delta.ts";
@@ -27,7 +27,7 @@ import { RESEARCH_ROUND_MAX_GAPS, RESEARCH_SETTLE_ELIGIBLE_PHASES, ResearchRound
 import { inspectResearchPage, renderCoverageDigest } from "./research-view.ts";
 import { initialToolSurface } from "./session-bootstrap.ts";
 import { record } from "./telemetry.ts";
-import { createGoalTools, goalContinuationInstruction, goalExecutionPrompt, rebindActiveGoal, registerGoalCommands } from './goal-service.ts';
+import { createGoalTools, goalBriefInContext, goalContinuationInstruction, goalExecutionPrompt, noteGoalBriefInContext, rebindActiveGoal, registerGoalCommands } from './goal-service.ts';
 import { blockedItemCount, cleanText, currentItem, itemId, openItemCount, rejectPlanTool, renderTodo, structuralItems, truncateBytes, utf8Bytes, validateStateSize, type Autonomy, type MutatePlanOptions, type PlanItem, type PlanState } from './plan-service.ts';
 import { createResearchDispatchService, explainCoverageInvariant, normalizePartialDoneReport } from './research-dispatch-service.ts';
 import { runtimeValue } from './runtime-ownership.ts';
@@ -208,6 +208,8 @@ export function createPlanningRuntime() {
         // with it; a normal turn re-offers on its own next agent_end regardless.
         if (currentCompactionOwner() !== null)
             return;
+        if (await researchHoldsExecution(ctx.cwd))
+            return;
         const goal = await readExecutableGoal(ctx.cwd);
         const decision = goalContinuationDecision(goal);
         if (decision === "stop" || !goal)
@@ -230,6 +232,8 @@ export function createPlanningRuntime() {
             message: goalContinuationInstruction(goal, decision),
             expires_at_ms: Date.now() + 60000,
         }, async () => {
+            if (await researchHoldsExecution(ctx.cwd))
+                return false;
             const current = await readExecutableGoal(ctx.cwd);
             return Boolean(current &&
                 createHash("sha256").update(current.goal_id).digest("hex") === goalIdHash &&
@@ -238,6 +242,17 @@ export function createPlanningRuntime() {
         });
         if (accepted)
             goalContinuationOffers().add(offerKey);
+    }
+    /** Parent-led research that is paused, awaiting the user's /research-extend, or blocked
+     * owns the next turn: an active goal must not restart it behind the user's back. */
+    async function researchHoldsExecution(cwd: string): Promise<boolean> {
+        if (!PARENT_RESEARCH_WORKFLOW)
+            return false;
+        const plan = await readState(cwd);
+        if (plan?.profile?.name !== "deep-research" || plan.settled_at)
+            return false;
+        const aggregate = await readResearchAggregate(researchAggregatePath(cwd, plan.run_id, process.env));
+        return Boolean(aggregate && aggregate.phase !== "active" && aggregate.phase !== "settled");
     }
     function rejectChildPlanMutation(): void {
         if (IS_SUBAGENT_PROCESS)
@@ -2403,16 +2418,24 @@ export function createPlanningRuntime() {
             if (!GOALS_ENABLED || !lastSessionCwd)
                 return;
             const goal = await rebindActiveGoal(lastSessionCwd);
-            if (goal?.status === "active")
-                return {
-                    message: {
-                        customType: "pi-munchkin:goal-context",
-                        content: goalExecutionPrompt(goal),
-                        display: false,
-                        details: { status: goal.status },
-                    },
-                };
+            if (goal?.status !== "active")
+                return;
+            // Inject only when this revision's brief is not already in the live context.
+            const revision = goalRevision(goal);
+            if (goalBriefInContext(pi.events) === revision)
+                return;
+            noteGoalBriefInContext(pi.events, revision);
+            return {
+                message: {
+                    customType: "pi-munchkin:goal-context",
+                    content: goalExecutionPrompt(goal),
+                    display: false,
+                    details: { status: goal.status },
+                },
+            };
         });
+        // Every compaction engine (Pi native, Blackhole, compact_context) may drop the brief.
+        pi.on("session_compact", async () => { noteGoalBriefInContext(pi.events, null); });
         pi.registerCommand("plan", { description: "Enter bounded read-only planning for a request.", handler: async (args, ctx) => startPlanCommand(args, ctx, pi) });
         if (GOALS_ENABLED)
             registerGoalCommands(pi);

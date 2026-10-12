@@ -73,6 +73,7 @@ export const EVENT_CATALOG = {
 	"goal-runner/started": { goal_id_hash: "string", status: "string", open_criteria: "number" },
 	"goal-runner/accepted": { goal_id_hash: "string", status: "string", open_criteria: "number" },
 	"goal-runner/updated": { goal_id_hash: "string", status: "string", open_criteria: "number" },
+	"goal-runner/settlement-proposed": { goal_id_hash: "string", status: "string", open_criteria: "number", deferred: "number" },
 	"goal-runner/settled": { goal_id_hash: "string", status: "string", open_criteria: "number", outcome: "string", deferred: "number" },
 	"goal-runner/resumed": { goal_id_hash: "string", status: "string", open_criteria: "number" },
 	"goal-runner/paused": { goal_id_hash: "string", status: "string", open_criteria: "number" },

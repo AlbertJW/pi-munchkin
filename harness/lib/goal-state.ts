@@ -54,6 +54,18 @@ export type DeferredGoalItem = {
 	rationale: string;
 };
 
+export type GoalVerification = "verified" | "unverified" | "no_gate" | "unchanged" | "unknown";
+export type SettlementProposal = {
+	outcome: "accepted_80_20";
+	delivered_value: string;
+	confidence: number;
+	residual_risks: string[];
+	deferred: DeferredGoalItem[];
+	evidence: string[];
+	verification: GoalVerification;
+	proposed_at: string;
+};
+
 export type GoalState = {
 	schema_version: typeof GOAL_SCHEMA_VERSION;
 	goal_id: string;
@@ -70,6 +82,10 @@ export type GoalState = {
 	blocked?: { reason: string; evidence: string[]; unblock_condition: string; blocked_at: string };
 	delivered_value?: string;
 	confidence?: number;
+	/** Project verification state recorded when the goal was settled. */
+	verification?: GoalVerification;
+	/** A model-proposed 80/20 settlement awaiting the user's /goal-accept. */
+	settlement_proposal?: SettlementProposal;
 	residual_risks: string[];
 	deferred: DeferredGoalItem[];
 	evidence: string[];
@@ -88,7 +104,8 @@ export type GoalContinuationDecision = "continue" | "settle" | "stop";
 
 /** Lifecycle-only policy; the model still chooses the next useful action. */
 export function goalContinuationDecision(goal: GoalState | undefined): GoalContinuationDecision {
-	if (!goal || goal.status !== "active") return "stop";
+	// A pending 80/20 proposal waits for the user; continuing would only re-argue it.
+	if (!goal || goal.status !== "active" || goal.settlement_proposal) return "stop";
 	return goal.criteria.some((criterion) => criterion.status === "open" || (criterion.required && criterion.status !== "met")) ? "continue" : "settle";
 }
 
@@ -209,12 +226,37 @@ export function validateGoal(value: unknown): string[] {
 		typeof goal.blocked.unblock_condition !== "string" || !goal.blocked.unblock_condition || bytes(goal.blocked.unblock_condition) > MAX_SHORT || typeof goal.blocked.blocked_at !== "string")) errors.push("invalid blocked record");
 	if (goal.delivered_value !== undefined && (typeof goal.delivered_value !== "string" || bytes(goal.delivered_value) > MAX_TEXT)) errors.push("invalid delivered value");
 	if (goal.confidence !== undefined && (typeof goal.confidence !== "number" || !Number.isFinite(goal.confidence) || goal.confidence < 0 || goal.confidence > 1)) errors.push("invalid confidence");
+	if (goal.verification !== undefined && !VERIFICATION_STATES.has(goal.verification)) errors.push("invalid verification");
+	if (goal.settlement_proposal !== undefined && !validProposal(goal.settlement_proposal)) errors.push("invalid settlement proposal");
 	if (!Array.isArray(goal.residual_risks) || goal.residual_risks.length > MAX_LIST || !goal.residual_risks.every((entry) => typeof entry === "string" && bytes(entry) <= MAX_SHORT)) errors.push("invalid residual risks");
 	if (!Array.isArray(goal.deferred) || goal.deferred.length > MAX_LIST || !goal.deferred.every((entry) => Boolean(entry) && typeof entry.value === "string" && typeof entry.risk === "string" && typeof entry.rationale === "string" && bytes(entry.value) <= MAX_SHORT && bytes(entry.risk) <= MAX_SHORT && bytes(entry.rationale) <= MAX_TEXT)) errors.push("invalid deferred items");
 	if (!Array.isArray(goal.evidence) || goal.evidence.length > MAX_LIST || !goal.evidence.every((entry) => typeof entry === "string" && bytes(entry) <= MAX_SHORT)) errors.push("invalid evidence");
 	if (!Array.isArray(goal.history) || goal.history.length > GOAL_MAX_HISTORY || !goal.history.every((entry) => Boolean(entry) && typeof entry.at === "string" && validStatus(entry.from) && validStatus(entry.to) && typeof entry.reason === "string" && bytes(entry.reason) <= MAX_SHORT)) errors.push("invalid history");
 	try { if (bytes(`${JSON.stringify(value)}\n`) > GOAL_MAX_BYTES) errors.push("goal exceeds byte cap"); } catch { errors.push("goal is not serializable"); }
 	return errors;
+}
+
+const VERIFICATION_STATES = new Set<GoalVerification>(["verified", "unverified", "no_gate", "unchanged", "unknown"]);
+function shortList(value: unknown): boolean {
+	return Array.isArray(value) && value.length <= MAX_LIST && value.every((entry) => typeof entry === "string" && bytes(entry) <= MAX_SHORT);
+}
+function validProposal(value: unknown): boolean {
+	if (!value || typeof value !== "object" || Array.isArray(value)) return false;
+	const p = value as Partial<SettlementProposal>;
+	return p.outcome === "accepted_80_20" && typeof p.delivered_value === "string" && p.delivered_value.length > 0 && bytes(p.delivered_value) <= MAX_TEXT &&
+		typeof p.confidence === "number" && Number.isFinite(p.confidence) && p.confidence >= 0 && p.confidence <= 1 &&
+		shortList(p.residual_risks) && shortList(p.evidence) && Array.isArray(p.evidence) && p.evidence.length > 0 &&
+		Array.isArray(p.deferred) && p.deferred.length <= MAX_LIST && p.deferred.every((entry) => Boolean(entry) && typeof entry.value === "string" && typeof entry.risk === "string" && typeof entry.rationale === "string" && bytes(entry.value) <= MAX_SHORT && bytes(entry.risk) <= MAX_SHORT && bytes(entry.rationale) <= MAX_TEXT) &&
+		VERIFICATION_STATES.has(p.verification as GoalVerification) && typeof p.proposed_at === "string";
+}
+
+/** Read the session's project-verification state as verify-gate last published it. */
+export function currentVerification(): GoalVerification {
+	const state = (globalThis as Record<string, unknown>).__pi_vg_state as { gateCmd?: unknown; mutated?: unknown; verifiedOk?: unknown } | undefined;
+	if (!state) return "unknown";
+	if (state.verifiedOk === true) return "verified";
+	if (state.mutated !== true) return "unchanged";
+	return state.gateCmd ? "unverified" : "no_gate";
 }
 
 function assertValid(goal: GoalState): void {
@@ -270,6 +312,14 @@ export function acceptGoal(goal: GoalState, reason = "user accepted skill propos
 }
 
 export function resumeGoal(goal: GoalState): GoalState {
+	if (goal.status === "active" && goal.settlement_proposal) {
+		// The user declined the proposed 80/20 settlement and wants the work to continue.
+		const next = structuredClone(goal);
+		delete next.settlement_proposal;
+		next.updated_at = now();
+		assertValid(next);
+		return next;
+	}
 	if (!["accepted_80_20", "paused", "blocked"].includes(goal.status)) throw new Error("goal is not resumable");
 	const next = transition(goal, "active", "goal resumed by user");
 	delete next.blocked;
@@ -309,6 +359,8 @@ export function updateGoal(goal: GoalState, input: {
 }): GoalState {
 	if (goal.status !== "active") throw new Error("only an active goal can be updated; ask the user to resume an inactive goal first");
 	const next = structuredClone(goal);
+	// New progress supersedes a pending 80/20 proposal: the facts it was based on changed.
+	delete next.settlement_proposal;
 	const byId = new Map(next.criteria.map((criterion) => [criterion.id, criterion]));
 	for (const update of input.criteria ?? []) {
 		const criterion = byId.get(update.id);
@@ -329,14 +381,45 @@ export function updateGoal(goal: GoalState, input: {
 	return next;
 }
 
-export function settleGoal(goal: GoalState, input: {
+export type SettlementInput = {
 	outcome: "complete" | "accepted_80_20";
 	deliveredValue: string;
 	confidence: number;
 	residualRisks: string[];
 	deferred?: DeferredGoalItem[];
 	evidence: string[];
-}): GoalState {
+	verification?: GoalVerification;
+};
+
+/** The model's path: completion settles; an 80/20 settlement only becomes a proposal
+ * the user must accept with /goal-accept, because it waives part of the user's goal. */
+export function settleOrProposeGoal(goal: GoalState, input: SettlementInput): GoalState {
+	if (input.outcome === "complete") return settleGoal(goal, input);
+	const validated = settleGoal(goal, input); // same evidence rules, discarded below
+	const next = structuredClone(goal);
+	next.settlement_proposal = {
+		outcome: "accepted_80_20", delivered_value: validated.delivered_value!, confidence: validated.confidence!,
+		residual_risks: validated.residual_risks, deferred: validated.deferred, evidence: validated.evidence,
+		verification: validated.verification ?? "unknown", proposed_at: now(),
+	};
+	next.updated_at = now();
+	assertValid(next);
+	return next;
+}
+
+/** The user's path: accept the pending 80/20 proposal exactly as proposed. */
+export function acceptSettlementProposal(goal: GoalState): GoalState {
+	const proposal = goal.settlement_proposal;
+	if (goal.status !== "active" || !proposal) throw new Error("no pending settlement proposal");
+	const base = structuredClone(goal);
+	delete base.settlement_proposal;
+	return settleGoal(base, {
+		outcome: "accepted_80_20", deliveredValue: proposal.delivered_value, confidence: proposal.confidence,
+		residualRisks: proposal.residual_risks, deferred: proposal.deferred, evidence: proposal.evidence, verification: proposal.verification,
+	});
+}
+
+export function settleGoal(goal: GoalState, input: SettlementInput): GoalState {
 	if (goal.status !== "active") throw new Error("goal is not active; ask the user to resume it first");
 	if (!clean(input.deliveredValue)) throw new Error("settlement requires delivered value");
 	if (!Number.isFinite(input.confidence) || input.confidence < 0 || input.confidence > 1) throw new Error("settlement confidence must be between 0 and 1");
@@ -359,6 +442,8 @@ export function settleGoal(goal: GoalState, input: {
 	next.residual_risks = input.residualRisks.map((entry) => clean(entry, MAX_SHORT)).filter(Boolean).slice(0, MAX_LIST);
 	next.deferred = (input.deferred ?? []).map((entry) => ({ value: clean(entry.value, MAX_SHORT), risk: clean(entry.risk, MAX_SHORT), rationale: clean(entry.rationale) })).slice(0, MAX_LIST);
 	next.evidence = [...new Set(input.evidence.map((entry) => clean(entry, MAX_SHORT)))].filter(Boolean).slice(0, MAX_LIST);
+	if (input.verification) next.verification = input.verification;
+	delete next.settlement_proposal;
 	assertValid(next);
 	return next;
 }
@@ -599,6 +684,7 @@ export function renderGoalRecoveryBrief(goal: GoalState | undefined, maxBytes = 
 		`evidence_summary: ${goal.evidence.map((entry) => truncateUtf8(entry, 120)).join(" | ") || "none"}`,
 		`residual_risks: ${goal.residual_risks.map((entry) => truncateUtf8(entry, 120)).join(" | ") || "none"}`,
 		`deferrals: ${goal.deferred.map((entry) => truncateUtf8(`${entry.value}: ${entry.risk}`, 160)).join(" | ") || "none"}`,
+		...(goal.settlement_proposal ? ["settlement: an 80/20 settlement is proposed and awaits the user's /goal-accept; do not propose it again"] : []),
 	].join("\n");
 	// `details_complete` is appended per-branch, never carried inside the truncatable
 	// body: when it lived in the body a narrow band of budgets kept the "true" line

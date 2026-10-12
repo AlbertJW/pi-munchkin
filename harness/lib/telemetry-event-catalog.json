@@ -37,6 +37,7 @@
     "goal-runner/proposed",
     "goal-runner/resumed",
     "goal-runner/settled",
+    "goal-runner/settlement-proposed",
     "goal-runner/started",
     "goal-runner/updated",
     "ketch/read",

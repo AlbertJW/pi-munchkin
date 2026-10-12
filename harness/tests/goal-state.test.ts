@@ -358,3 +358,51 @@ test("a truncated recovery brief never claims both complete and incomplete detai
 		}
 	} finally { rmSync(root, { recursive: true, force: true }); }
 });
+
+test("the model can only PROPOSE an 80/20 settlement; the user accepts or declines it", async () => {
+	const { acceptSettlementProposal, settleOrProposeGoal, goalContinuationDecision: decide, resumeGoal: resume } = await import("../lib/goal-state.ts");
+	const cwd = mkdtempSync(join(tmpdir(), "goal-proposal-"));
+	const active = createGoal({ cwd, objective: "Ship docs", criteria: [{ id: "core", text: "Core docs" }, { id: "polish", text: "Polish", required: false }] });
+	const progressed = updateGoal(active, { criteria: [{ id: "core", status: "met", evidence: ["gate passed"] }, { id: "polish", status: "deferred" }] });
+	const settlement = { outcome: "accepted_80_20" as const, deliveredValue: "Core docs shipped", confidence: 0.8, residualRisks: ["polish later"], deferred: [{ value: "polish", risk: "minor", rationale: "not needed now" }], evidence: ["gate passed"], verification: "verified" as const };
+	const proposed = settleOrProposeGoal(progressed, settlement);
+	assert.equal(proposed.status, "active", "the user's goal is not closed by the model");
+	assert.equal(proposed.settlement_proposal?.verification, "verified");
+	assert.equal(decide(proposed), "stop", "no automatic continuation while the proposal waits");
+	assert.deepEqual(validateGoal(proposed), []);
+
+	const accepted = acceptSettlementProposal(proposed);
+	assert.equal(accepted.status, "accepted_80_20");
+	assert.equal(accepted.settlement_proposal, undefined);
+	assert.equal(accepted.verification, "verified");
+	assert.equal(accepted.delivered_value, "Core docs shipped");
+
+	const declined = resume(proposed);
+	assert.equal(declined.status, "active");
+	assert.equal(declined.settlement_proposal, undefined);
+	assert.equal(decide(declined), "settle", "declining reopens the work, not the criteria");
+
+	const superseded = updateGoal(proposed, { progressEvidence: ["more work"] });
+	assert.equal(superseded.settlement_proposal, undefined, "new progress supersedes a stale proposal");
+
+	const complete = settleOrProposeGoal(updateGoal(progressed, { criteria: [{ id: "polish", status: "met", evidence: ["polished"] }] }),
+		{ outcome: "complete", deliveredValue: "All docs", confidence: 1, residualRisks: [], evidence: ["gate passed"], verification: "no_gate" });
+	assert.equal(complete.status, "complete", "evidence-backed completion still settles directly");
+	assert.equal(complete.verification, "no_gate");
+
+	assert.throws(() => acceptSettlementProposal(progressed), /no pending settlement proposal/);
+	assert.ok(validateGoal({ ...proposed, settlement_proposal: { ...proposed.settlement_proposal!, verification: "maybe" } }).includes("invalid settlement proposal"));
+});
+
+test("verification state is read from verify-gate's published snapshot", async () => {
+	const { currentVerification } = await import("../lib/goal-state.ts");
+	const shared = globalThis as Record<string, unknown>;
+	const prior = shared.__pi_vg_state;
+	try {
+		delete shared.__pi_vg_state; assert.equal(currentVerification(), "unknown");
+		shared.__pi_vg_state = { gateCmd: "npm test", mutated: true, verifiedOk: true }; assert.equal(currentVerification(), "verified");
+		shared.__pi_vg_state = { gateCmd: "npm test", mutated: true, verifiedOk: false }; assert.equal(currentVerification(), "unverified");
+		shared.__pi_vg_state = { gateCmd: null, mutated: true, verifiedOk: false }; assert.equal(currentVerification(), "no_gate");
+		shared.__pi_vg_state = { gateCmd: "npm test", mutated: false, verifiedOk: false }; assert.equal(currentVerification(), "unchanged");
+	} finally { if (prior === undefined) delete shared.__pi_vg_state; else shared.__pi_vg_state = prior; }
+});

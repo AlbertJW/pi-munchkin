@@ -1,10 +1,20 @@
 import { defineTool, type ExtensionAPI } from '@earendil-works/pi-coding-agent';
 import { createHash } from 'node:crypto';
+import { readFile, stat } from 'node:fs/promises';
+import { join } from 'node:path';
 import { Type } from 'typebox';
-import { acceptGoal, blockGoal, cancelGoal, createGoal, GOAL_MAX_CRITERIA, GOAL_MODEL_TEXT_MAX_BYTES, goalAmbientSummary, goalLedgerLoadError, goalScope, inspectGoal, loadGoalLedger, mutateGoal, pauseGoal, readCurrentGoal, readExecutableGoal, renderGoalRecoveryBrief, resumeGoal, settleGoal, updateGoal, type CriterionStatus, type DeferredGoalItem, type GoalInspectSection, type GoalState } from "./goal-state.ts";
+import { acceptGoal, acceptSettlementProposal, blockGoal, currentVerification, goalStoragePath, settleOrProposeGoal, cancelGoal, createGoal, GOAL_MAX_CRITERIA, GOAL_MODEL_TEXT_MAX_BYTES, goalAmbientSummary, goalLedgerLoadError, goalRevision, goalScope, inspectGoal, loadGoalLedger, mutateGoal, pauseGoal, readCurrentGoal, readExecutableGoal, renderGoalRecoveryBrief, resumeGoal, updateGoal, type CriterionStatus, type DeferredGoalItem, type GoalInspectSection, type GoalState } from "./goal-state.ts";
 import { emitHarnessSignal } from './harness-signals.ts';
 import { cleanText } from './plan-service.ts';
 import { record } from './telemetry.ts';
+import { runtimeValue } from './runtime-ownership.ts';
+
+/** The goal revision whose brief is already in this session's live context. Pi persists
+ * every before_agent_start message in the conversation, so re-injecting an unchanged
+ * brief on every run stacks duplicate copies until compaction. Cleared on compaction. */
+const BRIEF_FIELD = { key: "goal-brief-in-context", lifetime: "session" as const, create: () => ({ revision: null as string | null }) };
+export function goalBriefInContext(bus: object): string | null { return runtimeValue(bus, BRIEF_FIELD).revision; }
+export function noteGoalBriefInContext(bus: object, revision: string | null): void { runtimeValue(bus, BRIEF_FIELD).revision = revision; }
 export function goalContinuationInstruction(goal: GoalState, decision: "continue" | "settle"): string {
     if (decision === "settle") {
         return goal.criteria.some((criterion) => criterion.status === "deferred")
@@ -38,6 +48,9 @@ export function goalEvent(kind: string, goal: GoalState | undefined, detail: Rec
             break;
         case "settled":
             record("goal-runner", "settled", payload);
+            break;
+        case "settlement-proposed":
+            record("goal-runner", "settlement-proposed", payload);
             break;
         case "resumed":
             record("goal-runner", "resumed", payload);
@@ -73,6 +86,7 @@ export function goalExecutionPrompt(goal: GoalState): string {
 }
 export async function startGoalTurn(pi: ExtensionAPI, ctx: any, goal: GoalState, action: "goal" | "goal-accept" | "goal-resume"): Promise<void> {
     emitGoalState(pi, goal);
+    noteGoalBriefInContext(pi.events, goalRevision(goal)); // goalExecutionPrompt carries the brief
     pi.sendMessage({
         customType: "pi-munchkin:goal-command",
         content: goalExecutionPrompt(goal),
@@ -81,6 +95,18 @@ export async function startGoalTurn(pi: ExtensionAPI, ctx: any, goal: GoalState,
     }, { triggerTurn: true });
     if (typeof ctx.waitForIdle === "function")
         await ctx.waitForIdle();
+}
+/** A writer that crashed mid-write leaves `goal-v2.json.lock`; locks are never stolen. */
+async function goalLockNotice(cwd: string): Promise<string | null> {
+    const lockPath = `${goalStoragePath(cwd)}.lock`;
+    const advice = "If no Pi session is writing goals, stop all sessions using this project and remove that directory.";
+    try {
+        const owner = JSON.parse(await readFile(join(lockPath, "owner.json"), "utf8")) as { pid?: unknown; created_at?: unknown };
+        return `Goal lock present: ${lockPath} (pid ${String(owner.pid)}, since ${String(owner.created_at)}). ${advice}`;
+    } catch {
+        try { await stat(lockPath); } catch { return null; }
+        return `Goal lock present without a readable owner record: ${lockPath}. ${advice}`;
+    }
 }
 export function rejectChildGoalMutation(): void {
     if (process.env.PI_SUBAGENT_DEPTH !== undefined && process.env.PI_SUBAGENT_DEPTH !== "0")
@@ -100,6 +126,13 @@ export function renderGoal(goal: GoalState | undefined, all: GoalState[] = []): 
         `Criteria (${goal.criteria.filter((criterion) => criterion.status === "met").length}/${goal.criteria.length} met):`, criteria || "(none)",
         `Evidence: ${goal.evidence.length}`, `Deferred: ${goal.deferred.length}`, `Confidence: ${goal.confidence ?? "unknown"}`,
         goal.delivered_value ? `Delivered: ${goal.delivered_value}` : "Delivered: not settled",
+        ...(goal.verification ? [`Verification at settlement: ${goal.verification}`] : []),
+        ...(goal.settlement_proposal ? [
+            `Pending 80/20 settlement proposed by the model (verification: ${goal.settlement_proposal.verification}):`,
+            `  Delivered: ${goal.settlement_proposal.delivered_value}`,
+            ...goal.settlement_proposal.deferred.map((item) => `  Deferred: ${item.value} — risk: ${item.risk}`),
+            "  /goal-accept accepts it; /goal-resume declines it and continues the work.",
+        ] : []),
     ].join("\n");
 }
 export function createGoalTools(getApi: () => ExtensionAPI) {
@@ -158,7 +191,7 @@ export function createGoalTools(getApi: () => ExtensionAPI) {
         },
     });
     const goalSettle = defineTool({
-        name: "goal_settle", label: "Settle Goal", description: "Settle a persistent goal as complete or evidence-backed 80/20 accepted. Required criteria and safety obligations cannot be waived.",
+        name: "goal_settle", label: "Settle Goal", description: "Settle a persistent goal as complete, or propose an evidence-backed 80/20 settlement for the user to accept. Required criteria and safety obligations cannot be waived.",
         promptSnippet: "goal_settle: close a goal with evidence, delivered value, confidence, risks, and deferrals",
         parameters: Type.Object({
             outcome: Type.Union([Type.Literal("complete"), Type.Literal("accepted_80_20")]),
@@ -173,13 +206,17 @@ export function createGoalTools(getApi: () => ExtensionAPI) {
             const result = await mutateGoal(ctx.cwd, async (previous) => {
                 if (!previous)
                     throw new Error("goal_settle rejected: no active goal");
-                const goal = settleGoal(previous, { outcome: params.outcome, deliveredValue: params.delivered_value, confidence: params.confidence, residualRisks: params.residual_risks, deferred: params.deferred as DeferredGoalItem[] | undefined, evidence: params.evidence });
+                const goal = settleOrProposeGoal(previous, { outcome: params.outcome, deliveredValue: params.delivered_value, confidence: params.confidence, residualRisks: params.residual_risks, deferred: params.deferred as DeferredGoalItem[] | undefined, evidence: params.evidence, verification: currentVerification() });
                 return { goal, result: goal };
             });
             publishGoal(result);
             emitGoalState(getApi(), result);
+            if (result.settlement_proposal) {
+                goalEvent("settlement-proposed", result, { deferred: result.settlement_proposal.deferred.length });
+                return { content: [{ type: "text" as const, text: "80/20 settlement proposed. The goal stays active until the user accepts it with /goal-accept or declines it with /goal-resume. Stop here and summarise what was delivered and what is deferred." }], details: { tool_name: "goal_settle", success: true, outcome: "settlement_proposed" } };
+            }
             goalEvent("settled", result, { outcome: result.status, deferred: result.deferred.length });
-            return { content: [{ type: "text" as const, text: `Goal ${result.status}. Planner execution may stop; the goal remains resumable with /goal-resume unless it is complete.` }], details: { tool_name: "goal_settle", success: true, outcome: result.status } };
+            return { content: [{ type: "text" as const, text: `Goal ${result.status} (verification: ${result.verification ?? "unknown"}). Planner execution may stop.` }], details: { tool_name: "goal_settle", success: true, outcome: result.status } };
         },
     });
     const goalBlock = defineTool({
@@ -246,17 +283,22 @@ export function registerGoalCommands(pi: ExtensionAPI): void {
             },
         });
         pi.registerCommand("goal-accept", {
-            description: "Accept the current skill-proposed goal and activate it.",
+            description: "Accept what the model proposed: a new goal, or an 80/20 settlement of the active goal.",
             handler: async (_args, ctx) => {
                 rejectChildGoalMutation();
                 const result = await mutateGoal(ctx.cwd, async (previous) => {
                     if (!previous)
-                        throw new Error("No proposed goal exists.");
-                    const goal = acceptGoal(previous);
+                        throw new Error("Nothing to accept: no proposed goal or settlement exists.");
+                    const goal = previous.status === "active" && previous.settlement_proposal ? acceptSettlementProposal(previous) : acceptGoal(previous);
                     return { goal, result: goal };
                 });
                 publishGoal(result);
                 emitGoalState(pi, result);
+                if (result.status === "accepted_80_20") {
+                    goalEvent("settled", result, { outcome: result.status, deferred: result.deferred.length });
+                    ctx.ui.notify(`80/20 settlement accepted: ${result.goal_id}. /goal-resume reopens it.`, "info");
+                    return;
+                }
                 goalEvent("accepted", result);
                 ctx.ui.notify(`Goal accepted: ${result.goal_id}`, "info");
                 await startGoalTurn(pi, ctx, result, "goal-accept");
@@ -275,7 +317,8 @@ export function registerGoalCommands(pi: ExtensionAPI): void {
                 const all = load.kind === "valid" ? load.ledger.goals : [];
                 const goal = load.kind === "valid" ? all.find(entry => entry.goal_id === load.ledger.current_goal_id) : undefined;
                 publishGoal(goal);
-                ctx.ui.notify(renderGoal(goal, all), "info");
+                const lock = await goalLockNotice(ctx.cwd);
+                ctx.ui.notify(lock ? `${renderGoal(goal, all)}\n${lock}` : renderGoal(goal, all), "info");
             },
         });
         pi.registerCommand("goal-resume", {

@@ -426,8 +426,11 @@ test("/goal enters a persistent model-visible execution mode", async () => {
 	}
 
 	const ambient: any = await fire(fp, "before_agent_start", { systemPrompt: "base" }, { ...ctx, cwd });
-	assert.match((ambient?.messages ?? []).map((message: any) => message.content ?? "").join("\n"), /repair the release pipeline/,
-		"the active goal is visible to the model on every later turn");
+	assert.equal(ambient?.messages?.length ?? 0, 0, "the /goal message already carries this brief; Pi persists injections, so no duplicate");
+	await fire(fp, "session_compact", {}, { ...ctx, cwd });
+	const afterCompaction: any = await fire(fp, "before_agent_start", { systemPrompt: "base" }, { ...ctx, cwd });
+	assert.match((afterCompaction?.messages ?? []).map((message: any) => message.content ?? "").join("\n"), /repair the release pipeline/,
+		"after compaction the active goal brief is restored to context");
 	await fire(fp, "session_start", {}, { ...ctx, cwd });
 	for (const name of ["goal_propose", "goal_inspect", "goal_update", "goal_settle", "goal_block"]) {
 		assert.ok(fp.pi.getActiveTools().includes(name), `${name} remains active after goal rebind`);
