@@ -1,4 +1,5 @@
 import { childrenOf, depthOf, descendantCount, graphItemId, graphTerminal, validateGraph, type GraphPlanItem, type GraphPlanState } from './plan-graph.ts';
+import { dependencyStatusErrors, dependencyStructureErrors, readyItems, stuckItems, unmetDependencies } from './plan-dependencies.ts';
 import { PLAN_MAX_ITEMS as MAX_ITEMS, PLAN_NOTE_MAX_BYTES as MAX_NOTE_BYTES, PLAN_STATE_MAX_BYTES as MAX_PLAN_BYTES, PLAN_TITLE_MAX_BYTES as MAX_TITLE_BYTES } from './plan-limits.ts';
 export type Autonomy = 'lean' | 'yolo';
 export type Phase = 'planned' | 'executing';
@@ -56,7 +57,7 @@ export function cleanText(value: unknown): string {
         .trim();
 }
 export function currentItem(state: PlanState): PlanItem | undefined {
-    return state.items.find((item) => item.status === "in_progress") ?? state.items.find((item) => item.status === "pending");
+    return state.items.find((item) => item.status === "in_progress") ?? readyItems(state.items)[0] ?? state.items.find((item) => item.status === "pending");
 }
 export function openItemCount(state: PlanState): number { return state.items.filter((item) => !graphTerminal(item)).length; }
 export function blockedItemCount(state: PlanState): number { return state.items.filter((item) => item.status === "blocked").length; }
@@ -72,6 +73,11 @@ export function derivedStatus(state: PlanState): string {
         return "blocked";
     if (requiresSettlement && state.items.every((item) => graphTerminal(item)))
         return "ready for settlement";
+    if (!state.items.some((item) => item.status === "in_progress") && readyItems(state.items).length === 0) {
+        const stuck = stuckItems(state.items);
+        if (stuck.length)
+            return `stuck: ${stuck.map((entry) => `${entry.item.id} waits on ${entry.on.join(", ")}`).join("; ")} (blocked or deferred; re-plan with plan_write)`;
+    }
     return state.phase === "planned" ? "planned (awaiting /plan-go)" : "executing";
 }
 export function renderItems(state: PlanState, selectedId?: string, includeDescendants = false): string {
@@ -102,7 +108,9 @@ export function renderItems(state: PlanState, selectedId?: string, includeDescen
         const lease = item.lease ? " dispatch=in-flight" : "";
         const coverage = item.coverage ? ` coverage=${item.coverage.complete ? "complete" : "incomplete"}:${item.coverage.strategy}` : "";
         const graph = descendants || gaps || lease ? ` descendants=${descendants} gaps=${gaps}${budget}${lease}${coverage}` : `${budget}${coverage}`;
-        const first = `${indent}${item.id}  [${item.status.replace("_", " ")}] ${item.title}`;
+        const waiting = graphTerminal(item) ? [] : unmetDependencies(state.items, item);
+        const needs = waiting.length ? `  needs: ${waiting.join(", ")}` : "";
+        const first = `${indent}${item.id}  [${item.status.replace("_", " ")}] ${item.title}${needs}`;
         if (!item.note)
             return [`${first}${graph}`];
         return [`${first}${graph}`, ...item.note.split("\n").filter(Boolean).map((line) => `${indent}  - ${line.replace(/^[-*]\s*/, "")}`)];
@@ -117,6 +125,9 @@ export function renderTodo(state: PlanState, selectedId?: string, includeDescend
     ].join("\n");
 }
 export function validateStateSize(state: PlanState): void {
+    const dependencyErrors = [...dependencyStructureErrors(state.items), ...dependencyStatusErrors(state.items)];
+    if (dependencyErrors.length)
+        rejectPlanTool(`plan rejected: ${dependencyErrors.join("; ")}`);
     if (state.schema_version === 5 && !(state.phase === "planned" && state.items.length === 0)) {
         const errors = validateGraph(state as GraphPlanState);
         if (errors.length)
@@ -127,11 +138,14 @@ export function validateStateSize(state: PlanState): void {
         rejectPlanTool(`plan rejected: authoritative state would be ${bytes} bytes; maximum is ${MAX_PLAN_BYTES}`);
 }
 export function rejectPlanTool(text: string): never { throw new Error(text); }
-export function validateIncoming(items: Array<{
+export type IncomingPlanItem = {
     item_id?: string;
     title: string;
     note?: string;
-}>): void {
+    /** Item ids (item_id values in this plan) that must be done first. Omitted keeps the previous list; [] clears it. */
+    depends_on?: string[];
+};
+export function validateIncoming(items: IncomingPlanItem[]): void {
     if (items.length < 1 || items.length > MAX_ITEMS)
         rejectPlanTool(`plan_write rejected: provide 1-${MAX_ITEMS} top-level items`);
     const ids = new Set<string>();
@@ -151,13 +165,11 @@ export function validateIncoming(items: Array<{
                 rejectPlanTool(`plan_write rejected: duplicate item_id ${item.item_id}`);
             ids.add(item.item_id);
         }
+        if (item.depends_on !== undefined && (!Array.isArray(item.depends_on) || item.depends_on.some((dep) => typeof dep !== "string")))
+            rejectPlanTool(`plan_write rejected: item ${index + 1} depends_on must be a list of item_id values`);
     }
 }
-export function structuralItems(previous: PlanState | undefined, incoming: Array<{
-    item_id?: string;
-    title: string;
-    note?: string;
-}>): PlanItem[] {
+export function structuralItems(previous: PlanState | undefined, incoming: IncomingPlanItem[]): PlanItem[] {
     validateIncoming(incoming);
     const byId = new Map((previous?.items ?? []).map((item) => [item.id, item]));
     const retained = new Set<string>();
@@ -168,12 +180,26 @@ export function structuralItems(previous: PlanState | undefined, incoming: Array
         // An unknown, well-formed item_id is the model's chosen stable id for a NEW item
         // (2026-10 traces: fresh plans were rejected with "Valid ids: (none)"). Dropping an
         // unresolved item from an executing plan is still refused below.
+        const dependsOn = item.depends_on === undefined ? prior?.depends_on : [...item.depends_on];
         return {
             id: prior?.id ?? item.item_id ?? itemId(), title: cleanText(item.title),
             note: item.note === undefined ? prior?.note : (cleanText(item.note) || undefined),
             status: prior?.status ?? "pending",
+            ...(dependsOn?.length ? { depends_on: dependsOn } : {}),
         } satisfies PlanItem;
     });
+    // An omitted depends_on keeps the previous list, minus items this rewrite removed.
+    const present = new Set(next.map((item) => item.id));
+    for (const [index, item] of next.entries()) {
+        if (incoming[index].depends_on !== undefined || !item.depends_on)
+            continue;
+        const kept = item.depends_on.filter((dep) => present.has(dep));
+        if (kept.length) item.depends_on = kept;
+        else delete item.depends_on;
+    }
+    const structure = dependencyStructureErrors(next);
+    if (structure.length)
+        rejectPlanTool(`plan_write rejected: ${structure.join("; ")}. Give every item you depend on an item_id and list those ids in depends_on.`);
     // Unresolved work may not silently disappear from an EXECUTING plan. During
     // pre-go review (phase "planned") a structural rewrite that drops items is
     // legitimate revision — and the old unconditional rule was a trap there: the

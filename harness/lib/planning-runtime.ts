@@ -16,7 +16,7 @@ import { emitHarnessSignal, onHarnessSignal, signalRunId } from "./harness-signa
 import { withPiFileMutationQueue as withFileMutationQueue } from "./pi-compatibility.ts";
 import { applyPlanDeltas, type PlanDelta } from "./plan-delta.ts";
 import { DEEP_RESEARCH_MAX_CHILDREN, DEEP_RESEARCH_MAX_DEPTH, DEEP_RESEARCH_MAX_ROOTS, addBudget, budgetWithin, childrenOf, expandGraph, graphTerminal, ownerRef, settleErrors, validateGraph, type BranchChildInput, type GraphPlanState, type ParentEvidenceCard, type PlanStatus, type ResearchBudget } from "./plan-graph.ts";
-import { PLAN_DEFER_FIELD_MAX_BYTES, PLAN_MAX_DELTAS, PLAN_MAX_ITEMS, PLAN_NOTE_MAX_BYTES, PLAN_STATE_MAX_BYTES, PLAN_TITLE_MAX_BYTES, } from "./plan-limits.ts";
+import { PLAN_DEFER_FIELD_MAX_BYTES, PLAN_MAX_DELTAS, PLAN_MAX_DEPENDENCIES, PLAN_MAX_ITEMS, PLAN_NOTE_MAX_BYTES, PLAN_STATE_MAX_BYTES, PLAN_TITLE_MAX_BYTES, } from "./plan-limits.ts";
 import { planStorageMode, privatePlanProjectionPath, privatePlanStatePath, privatePlanTracePath } from "./plan-state-storage.ts";
 import { atomicWriteFile } from "./private-artifact.ts";
 import { processWriterMarker } from "./process-writer.ts";
@@ -28,6 +28,7 @@ import { inspectResearchPage, renderCoverageDigest } from "./research-view.ts";
 import { initialToolSurface } from "./session-bootstrap.ts";
 import { record } from "./telemetry.ts";
 import { createGoalTools, goalBriefInContext, goalContinuationInstruction, goalExecutionPrompt, noteGoalBriefInContext, rebindActiveGoal, registerGoalCommands } from './goal-service.ts';
+import { dependencyStatusErrors, dependencyStructureErrors, readyItems, unmetDependencies } from './plan-dependencies.ts';
 import { blockedItemCount, cleanText, currentItem, itemId, openItemCount, rejectPlanTool, renderTodo, structuralItems, truncateBytes, utf8Bytes, validateStateSize, type Autonomy, type MutatePlanOptions, type PlanItem, type PlanState } from './plan-service.ts';
 import { createResearchDispatchService, explainCoverageInvariant, normalizePartialDoneReport } from './research-dispatch-service.ts';
 import { runtimeValue } from './runtime-ownership.ts';
@@ -414,7 +415,20 @@ export function createPlanningRuntime() {
             ...(raw.schema_version === 5 && item.defer ? { defer: item.defer } : {}),
             ...(raw.schema_version === 5 && item.lease ? { lease: item.lease } : {}),
             ...(raw.schema_version === 5 && item.dispatch_epoch !== undefined ? { dispatch_epoch: item.dispatch_epoch } : {}),
+            ...(Array.isArray(item.depends_on) && item.depends_on.length ? { depends_on: item.depends_on.filter((dep: unknown) => typeof dep === "string").slice(0, PLAN_MAX_DEPENDENCIES) } : {}),
         }));
+        // Legacy cleanup may re-mint malformed ids; a dependency that no longer resolves,
+        // or a list that would break validation, is dropped rather than losing the plan.
+        // (v5 state was fully validated above, so this only ever touches legacy input.)
+        const migratedIds = new Set(items.map((item) => item.id));
+        for (const item of items) {
+            if (!item.depends_on) continue;
+            const kept = item.depends_on.filter((dep) => migratedIds.has(dep) && dep !== item.id);
+            if (kept.length) item.depends_on = [...new Set(kept)];
+            else delete item.depends_on;
+        }
+        if (dependencyStructureErrors(items).length || dependencyStatusErrors(items).length)
+            for (const item of items) delete item.depends_on;
         const now = isoNow();
         const state: PlanState = {
             schema_version: PLAN_GRAPH ? 5 : 4,
@@ -814,7 +828,7 @@ export function createPlanningRuntime() {
     }
     function executionPrompt(state: PlanState): string {
         const open = state.items.filter((item) => item.status === "pending" || item.status === "in_progress")
-            .map((item) => `${item.id} [${item.status}] ${item.title}${item.note ? `\n  ${item.note.replace(/\n/g, "\n  ")}` : ""}`)
+            .map((item) => { const needs = unmetDependencies(state.items, item); return `${item.id} [${item.status}] ${item.title}${needs.length ? ` (needs ${needs.join(", ")})` : ""}${item.note ? `\n  ${item.note.replace(/\n/g, "\n  ")}` : ""}`; })
             .join("\n");
         return `MODE: RUN\nREQUEST: ${state.request}\nOPEN ITEMS:\n${open || "(none)"}\n\nUse plan_update for status or notes; do not replay the full plan for routine progress. Keep at most one item in_progress. Verify the project once after the latest source mutation before final handoff.`;
     }
@@ -827,12 +841,14 @@ export function createPlanningRuntime() {
         promptGuidelines: ACTIVE_TOOL_PROMPTS ? [
             "Use short top-level items. Put compact substeps in note instead of multiplying items.",
             "Retain item_id when revising an existing item; a new item may carry a short stable item_id of your choice. Use plan_update for status changes.",
+            "When an item can only start after others finish, give those items an item_id and list them in its depends_on. Omit depends_on to keep the previous list; [] clears it.",
         ] : undefined,
         parameters: Type.Object({
             summary: Type.Optional(Type.String({ maxLength: PLAN_DEFER_FIELD_MAX_BYTES })),
             items: Type.Array(Type.Object({
                 item_id: Type.Optional(Type.String({ minLength: 1, maxLength: 96 })),
                 title: Type.String({ minLength: 1, maxLength: PLAN_TITLE_MAX_BYTES }), note: Type.Optional(Type.String({ maxLength: PLAN_NOTE_MAX_BYTES })),
+                depends_on: Type.Optional(Type.Array(Type.String({ minLength: 1, maxLength: 96 }), { maxItems: PLAN_MAX_DEPENDENCIES, description: "item_id values that must be done before this item can start." })),
             }), { minItems: 1, maxItems: MAX_ITEMS }),
         }),
         async execute(_toolCallId, params, _signal, _onUpdate, ctx) {
@@ -865,7 +881,7 @@ export function createPlanningRuntime() {
                 return { state, result: state };
             });
             planEvent("write", result.run_id, { items: result.items.length, open_items: openItemCount(result), rewrite: true });
-            const listing = result.items.map((item) => `${item.id} ${item.title}`).join("\n");
+            const listing = result.items.map((item) => `${item.id} ${item.title}${item.depends_on?.length ? ` (after ${item.depends_on.join(", ")})` : ""}`).join("\n");
             return { content: [{ type: "text" as const, text: `Plan saved (${result.items.length}/${MAX_ITEMS} items).\n${listing}\n${isPlanning() ? "Stop now. The user reviews the plan and starts execution." : "Use plan_update for progress."}` }], details: { tool_name: "plan_write", success: true } };
         },
     });
@@ -959,7 +975,9 @@ export function createPlanningRuntime() {
                         return next;
                     }), ...((applied.items as PlanItem[]).every((item) => graphTerminal(item)) ? { head_terminal_at: previous.head_terminal_at ?? isoNow() } : { head_terminal_at: undefined }) };
                 validateStateSize(state);
-                return { state, result: { state, changed: applied.changed, idempotent: applied.idempotent } };
+                const readyBefore = new Set(readyItems(previous.items).map((item) => item.id));
+                const nowReady = readyItems(state.items).filter((item) => !readyBefore.has(item.id) && (item.depends_on?.length ?? 0) > 0).map((item) => item.id);
+                return { state, result: { state, changed: applied.changed, idempotent: applied.idempotent, nowReady } };
             }, {
                 beforePersist: async (nextState) => {
                     if (PARENT_RESEARCH_WORKFLOW && nextState.profile?.name === "deep-research")
@@ -967,7 +985,8 @@ export function createPlanningRuntime() {
                 },
             });
             planEvent("delta", outcome.state.run_id, { changed: outcome.changed, idempotent: outcome.idempotent, open_items: openItemCount(outcome.state) });
-            return { content: [{ type: "text" as const, text: `Plan updated: ${outcome.changed} changed, ${outcome.idempotent} already current, ${openItemCount(outcome.state)} open.` }], details: { tool_name: "plan_update", success: true } };
+            const readyNote = outcome.nowReady.length ? ` Now ready: ${outcome.nowReady.join(", ")}.` : "";
+            return { content: [{ type: "text" as const, text: `Plan updated: ${outcome.changed} changed, ${outcome.idempotent} already current, ${openItemCount(outcome.state)} open.${readyNote}` }], details: { tool_name: "plan_update", success: true } };
         },
     });
     const BudgetSchema = Type.Object({

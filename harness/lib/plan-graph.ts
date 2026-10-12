@@ -1,3 +1,4 @@
+import { dependencyStatusErrors, dependencyStructureErrors } from "./plan-dependencies.ts";
 import { PLAN_NOTE_MAX_BYTES, PLAN_TITLE_MAX_BYTES } from "./plan-limits.ts";
 import { createHash, randomUUID } from "node:crypto";
 import { canonicalResearchUrl } from "./research-evidence.ts";
@@ -53,6 +54,8 @@ export type GraphPlanItem = {
 	lease?: ResearchBranchLease;
 	/** Durable generation incremented only when a terminal research root is explicitly reopened. */
 	dispatch_epoch?: number;
+	/** Items that must be done before this one may start (see plan-dependencies.ts). */
+	depends_on?: string[];
 };
 
 export type ResearchProfile = {
@@ -220,7 +223,7 @@ export function descendantCount(items: GraphPlanItem[], itemId: string): number 
 }
 
 const GRAPH_STATE_FIELDS = new Set(["schema_version", "run_id", "request", "summary", "autonomy", "phase", "created_at", "updated_at", "items", "profile", "research_round_contract", "head_terminal_at", "settled_at", "final_answer", "writer"]);
-const GRAPH_ITEM_FIELDS = new Set(["id", "title", "note", "status", "parent_id", "kind", "owner_ref", "budget", "evidence_gaps", "source_leads", "claim_ids", "coverage", "defer", "lease", "dispatch_epoch"]);
+const GRAPH_ITEM_FIELDS = new Set(["id", "title", "note", "status", "parent_id", "kind", "owner_ref", "budget", "evidence_gaps", "source_leads", "claim_ids", "coverage", "defer", "lease", "dispatch_epoch", "depends_on"]);
 const GRAPH_PROFILE_FIELDS = new Set(["name", "max_depth", "max_children", "discovery_budget", "validation_reads"]);
 
 function isGraphItem(value: unknown): value is GraphPlanItem {
@@ -371,6 +374,7 @@ export function validateGraph(state: GraphPlanState): string[] {
 		const allocated = roots.reduce((sum, item) => addBudget(sum, item.budget?.allocated ?? { searches: 0, reads: 0 }), { searches: 0, reads: 0 });
 		if (!budgetWithin(allocated, state.profile.discovery_budget)) errors.push("root budgets exceed the deep-research discovery envelope");
 	}
+	errors.push(...dependencyStructureErrors(validItems), ...dependencyStatusErrors(validItems));
 	return [...new Set(errors)].slice(0, 16);
 }
 

@@ -149,6 +149,7 @@
     "harness/lib/branch-report.ts",
     "harness/lib/plan-limits.ts",
     "harness/lib/plan-delta.ts",
+    "harness/lib/plan-dependencies.ts",
     "harness/lib/plan-graph.ts",
     "harness/lib/plan-state-storage.ts",
     "harness/lib/bash-output.ts",

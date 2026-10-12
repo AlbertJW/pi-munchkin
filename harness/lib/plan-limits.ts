@@ -33,3 +33,6 @@ export const PLAN_MAX_DELTAS = 24;
  *  notes is roughly 27.7 KB, so this must stay clear of that or note churn simply
  *  becomes whole-plan-rejection churn. */
 export const PLAN_STATE_MAX_BYTES = 32 * 1024;
+
+/** Dependencies (`depends_on`) one plan item may declare. */
+export const PLAN_MAX_DEPENDENCIES = 8;

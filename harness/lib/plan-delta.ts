@@ -1,5 +1,6 @@
 import { PLAN_DEFER_FIELD_MAX_BYTES, PLAN_NOTE_MAX_BYTES } from "./plan-limits.ts";
 import type { Deferral } from "./plan-graph.ts";
+import { dependencyStatusErrors } from "./plan-dependencies.ts";
 
 export type DeltaStatus = "pending" | "in_progress" | "done" | "blocked" | "deferred";
 export type PlanDelta = {
@@ -8,7 +9,7 @@ export type PlanDelta = {
 	note?: string;
 	defer?: Deferral;
 };
-export type DeltaItem = { id: string; status: DeltaStatus; note?: string; owner_ref?: string; defer?: Deferral };
+export type DeltaItem = { id: string; status: DeltaStatus; note?: string; owner_ref?: string; defer?: Deferral; depends_on?: string[] };
 
 export type DeltaResult =
 	| { ok: true; items: DeltaItem[]; changed: number; idempotent: number }
@@ -63,5 +64,10 @@ export function applyPlanDeltas(items: DeltaItem[], deltas: PlanDelta[]): DeltaR
 	if (local.length > 1 || new Set(owners).size !== owners.length) {
 		return { ok: false, errors: [`at most one item may be in_progress (currently in_progress: ${active.map((item) => item.id).join(", ")})`] };
 	}
+	// Judged on the resulting plan, so "finish a, start b" works in one update.
+	const before = new Map(items.map((item) => [item.id, item.status]));
+	const newlyDone = new Set(next.filter((item) => item.status === "done" && before.get(item.id) !== "done").map((item) => item.id));
+	const dependencyErrors = dependencyStatusErrors(next, newlyDone);
+	if (dependencyErrors.length) return { ok: false, errors: dependencyErrors.slice(0, 16) };
 	return { ok: true, items: next, changed, idempotent };
 }

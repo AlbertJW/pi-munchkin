@@ -155,7 +155,12 @@ Most behaviour is automatic. The primary commands are:
 - `/plan <request>` enters a read-only planning surface; `/plan-go` starts execution,
   `/plan-cancel` discards the draft, and `/plan-status` renders the bounded plan. Plans hold at
   most 24 stable-ID items; routine progress uses small `plan_update` deltas. Verification belongs
-  to the session, not to individual plan items.
+  to the session, not to individual plan items. An item may list up to 8 `depends_on` item ids:
+  it cannot start or be marked done until those are done (unknown ids, self-references and cycles
+  are rejected; finishing one item and starting the next in one `plan_update` works). The next
+  item is the first one that is ready, `plan_update` names items that just became ready, and a
+  plan whose remaining work waits on a blocked or deferred item reports itself as stuck. In a
+  `plan_write` revision, an omitted `depends_on` keeps the previous list and `[]` clears it.
 - `/goal <objective>` starts a persistent goal; `/goal-status`, `/goal-pause`, `/goal-resume`,
   and `/goal-cancel` manage it. Goals are private and separate from plan state, so a plan can
   finish while the outcome remains active or resumable. Model-driven goal proposals and updates
