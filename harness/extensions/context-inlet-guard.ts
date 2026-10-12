@@ -1,9 +1,8 @@
 import { stat } from "node:fs/promises";
-import { basename, extname } from "node:path";
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import {
 	isPositiveNumber, LARGE_FILE_BYTES, limitBypassesInletGate, resolveReadPath,
-	RISKY_MAX_LIMIT, SUPPORT_FILE_BYTES,
+	RISKY_MAX_LIMIT, riskySupportPath, SUPPORT_FILE_BYTES,
 } from "../lib/context-inlet.ts";
 import { record } from "../lib/telemetry.ts";
 import { emitHarnessSignal } from "../lib/harness-signals.ts";
@@ -13,28 +12,6 @@ type ReadInput = {
 	offset?: unknown;
 	limit?: unknown;
 };
-
-const RISKY_EXTENSIONS = new Set([".csv", ".tsv", ".jsonl", ".ndjson", ".log", ".trace", ".parquet"]);
-// Generic format/role markers for big low-value files (project-agnostic). Add
-// project-specific markers with CTX_GUARD_RISKY=part1,part2 (comma list, appends).
-const RISKY_PATH_PARTS = [
-	"trace",
-	"session",
-	"dump",
-	"snapshot",
-	"backup",
-	"generated",
-	...(process.env.CTX_GUARD_RISKY || "")
-		.split(",")
-		.map((s) => s.trim().toLowerCase())
-		.filter(Boolean),
-];
-
-function riskySupportPath(path: string): boolean {
-	const lowerPath = path.toLowerCase();
-	const lowerBase = basename(lowerPath);
-	return RISKY_EXTENSIONS.has(extname(lowerBase)) || RISKY_PATH_PARTS.some((part) => lowerPath.includes(part));
-}
 
 function blockReason(path: string, bytes: number, risky: boolean): string {
 	const kind = risky ? "support/risky" : "large";

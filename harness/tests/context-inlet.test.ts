@@ -79,3 +79,14 @@ test("large reads require bounded pages before their contents enter context", as
 		await rm(root, { recursive: true, force: true });
 	}
 });
+
+test("risky support paths are judged by role, not by an incidental substring", async () => {
+	const { riskySupportPath } = await import("../lib/context-inlet.ts");
+	for (const path of ["src/session-manager.ts", "harness/extensions/session-blackboard.ts", "lib/run-kernel-snapshot.ts", "pkg/trace_utils.py", "docs/backup-strategy.md"]) {
+		assert.equal(riskySupportPath(path, {}), false, `${path} is ordinary source`);
+	}
+	for (const path of ["logs/run.log", "data/rows.csv", "events.jsonl", "traces/today.json", "src/__snapshots__/app.test.ts.snap", "generated/api.ts", "session-dump.json", "backups/db.sql"]) {
+		assert.equal(riskySupportPath(path, {}), true, `${path} is bulk support data`);
+	}
+	assert.equal(riskySupportPath("fixtures/golden/big.json", { CTX_GUARD_RISKY: "golden" }), true, "project markers still apply");
+});

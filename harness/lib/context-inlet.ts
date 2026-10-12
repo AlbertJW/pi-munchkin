@@ -30,3 +30,26 @@ export function limitBypassesInletGate(limit: unknown): boolean {
 export function limitBypassesRiskyGate(limit: unknown, risky: boolean): boolean {
 	return risky && limitBypassesInletGate(limit);
 }
+
+const RISKY_EXTENSIONS = new Set([".csv", ".tsv", ".jsonl", ".ndjson", ".log", ".trace", ".parquet"]);
+// Low-value bulk content by role. Project-specific markers: CTX_GUARD_RISKY=part1,part2.
+const RISKY_MARKERS = ["trace", "session", "dump", "snapshot", "backup", "generated"];
+// Source and docs are the work itself: their NAMES never make them risky
+// (session-manager.ts, trace-utils.py). Their directory still can (traces/, __snapshots__/).
+const SOURCE_EXTENSIONS = new Set([".ts", ".tsx", ".mts", ".cts", ".js", ".jsx", ".mjs", ".cjs", ".py", ".rs", ".go", ".java", ".kt", ".swift", ".c", ".h", ".cc", ".cpp", ".hpp", ".cs", ".rb", ".php", ".scala", ".sh", ".md", ".rst", ".txt", ".toml", ".yaml", ".yml"]);
+
+function markerIn(word: string, markers: readonly string[]): boolean {
+	return word.split(/[^a-z0-9]+/).some((token) => markers.some((marker) => token === marker || token === `${marker}s`));
+}
+
+/** Large files whose content is usually bulk data: risky extension, a directory named
+ * after a marker, or a non-source file whose name contains one. */
+export function riskySupportPath(path: string, env: NodeJS.ProcessEnv = process.env): boolean {
+	const markers = [...RISKY_MARKERS, ...(env.CTX_GUARD_RISKY || "").split(",").map((part) => part.trim().toLowerCase()).filter(Boolean)];
+	const parts = path.toLowerCase().split(/[\\/]+/).filter(Boolean);
+	const name = parts.pop() ?? "";
+	const ext = name.includes(".") ? name.slice(name.lastIndexOf(".")) : "";
+	if (RISKY_EXTENSIONS.has(ext)) return true;
+	if (parts.some((dir) => markerIn(dir, markers))) return true;
+	return !SOURCE_EXTENSIONS.has(ext) && markerIn(name, markers);
+}
