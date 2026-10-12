@@ -34,6 +34,7 @@ import {
 } from "./types.js";
 import { ACTIVE_TOOL_PROMPTS } from "../../lib/active-tool-prompts.ts";
 import { emitHarnessSignal } from "../../lib/harness-signals.ts";
+import { contractFields, contractNote, missingContractFields } from "../../lib/subagent-contract.ts";
 import { BRANCH_REPORT_ENV, PLAN_CONTEXT_ENV, RESEARCH_SCOUT_ENV, RESEARCH_SCOUT_DISPATCHED_KEY, readBranchReport, readPlanContext, researchUsageFromMessages, validateRootResearchDispatch, validateScoutDispatch, type PlanContextV1, type ScoutReceiptV1 } from "../../lib/branch-report.ts";
 import type { PlanStatus, ResearchBudget } from "../../lib/plan-graph.ts";
 import { acquireResearchBranchLease, releaseResearchBranchLease, researchBranchDispatchContext, researchBranchDispatchEpoch } from "../../extensions/plan-runner.ts";
@@ -1064,6 +1065,14 @@ This guard prevents self-recursion and cyclic handoffs (for example A -> B -> A)
     });
   }
 
+  // A planned research child is validated through its typed branch report instead.
+  function reportContractNote(agents: AgentConfig[], result: SingleResult): string {
+    if (result.planContext || isResultError(result)) return "";
+    const agent = agents.find((candidate) => candidate.name === result.agent);
+    if (!agent) return "";
+    return contractNote(result.agent, missingContractFields(contractFields(agent.systemPrompt), getResultSummaryText(result)));
+  }
+
   // -----------------------------------------------------------------------
   // Mode implementations
   // -----------------------------------------------------------------------
@@ -1141,7 +1150,7 @@ This guard prevents self-recursion and cyclic handoffs (for example A -> B -> A)
       content: [
         {
           type: "text" as const,
-            text: `${getResultSummaryText(result)}${plannedResultGuidance([result])}`,
+            text: `${getResultSummaryText(result)}${reportContractNote(agents, result)}${plannedResultGuidance([result])}`,
         },
       ],
       details: makeDetails("single")([result]),
@@ -1257,7 +1266,7 @@ This guard prevents self-recursion and cyclic handoffs (for example A -> B -> A)
       content: [
         {
           type: "text" as const,
-          text: `${formatParallelSummaryText(results)}${plannedResultGuidance(results)}`,
+          text: `${formatParallelSummaryText(results)}${results.map((result) => reportContractNote(agents, result)).join("")}${plannedResultGuidance(results)}`,
         },
       ],
       details: makeDetails("parallel")(results),
