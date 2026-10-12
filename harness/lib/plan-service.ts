@@ -163,12 +163,13 @@ export function structuralItems(previous: PlanState | undefined, incoming: Array
     const retained = new Set<string>();
     const next = incoming.map((item) => {
         const prior = item.item_id ? byId.get(item.item_id) : undefined;
-        if (item.item_id && !prior)
-            rejectPlanTool(`plan_write rejected: unknown item_id ${item.item_id}. Valid ids: ${[...byId.keys()].join(", ") || "(none)"}`);
         if (prior)
             retained.add(prior.id);
+        // An unknown, well-formed item_id is the model's chosen stable id for a NEW item
+        // (2026-10 traces: fresh plans were rejected with "Valid ids: (none)"). Dropping an
+        // unresolved item from an executing plan is still refused below.
         return {
-            id: prior?.id ?? itemId(), title: cleanText(item.title),
+            id: prior?.id ?? item.item_id ?? itemId(), title: cleanText(item.title),
             note: item.note === undefined ? prior?.note : (cleanText(item.note) || undefined),
             status: prior?.status ?? "pending",
         } satisfies PlanItem;

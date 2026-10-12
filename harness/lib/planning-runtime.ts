@@ -826,7 +826,7 @@ export function createPlanningRuntime() {
         promptSnippet: "plan_write: create or structurally revise the bounded plan",
         promptGuidelines: ACTIVE_TOOL_PROMPTS ? [
             "Use short top-level items. Put compact substeps in note instead of multiplying items.",
-            "Retain item_id when revising an existing item; use plan_update for status changes.",
+            "Retain item_id when revising an existing item; a new item may carry a short stable item_id of your choice. Use plan_update for status changes.",
         ] : undefined,
         parameters: Type.Object({
             summary: Type.Optional(Type.String({ maxLength: PLAN_DEFER_FIELD_MAX_BYTES })),
