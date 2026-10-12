@@ -204,7 +204,10 @@ export function makeFakePi(options: { streaming?: boolean; busHandlers?: Map<str
 			new Promise<{ stdout: string; stderr: string; code: number; killed: boolean }>((resolve) => {
 				execFile(cmd, args, { cwd: opts?.cwd, timeout: opts?.timeout ?? 30_000 }, (err, stdout, stderr) => {
 					const code = err ? (typeof (err as any).code === "number" ? (err as any).code : 1) : 0;
-					resolve({ stdout: String(stdout), stderr: String(stderr), code, killed: Boolean((err as any)?.killed) });
+					// A spawn failure (EAGAIN, ENOENT, maxBuffer) has no exit status and often no
+					// output; keep its message so a test failure says why instead of "exited 1".
+					const errText = err && !stdout && !stderr ? `${(err as any).code ?? ""} ${err.message}`.trim() : "";
+					resolve({ stdout: String(stdout), stderr: String(stderr) || errText, code, killed: Boolean((err as any)?.killed) });
 				});
 			}),
 		// DOC:1435 + SESSION:829-830 — streaming without deliverAs throws inside pi,
