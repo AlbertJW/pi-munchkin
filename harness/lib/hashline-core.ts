@@ -64,17 +64,18 @@ export function annotate(lines: string[], startLine: number): string {
 }
 
 export type Hunk =
-	| { op: "replace"; start: number; end: number; body: string[] }
+	| { op: "replace"; start: number; end: number; body: string[]; expected?: string[] }
 	| { op: "insert"; pos: "before" | "after" | "head" | "tail"; line?: number; body: string[] }
-	| { op: "delete"; start: number; end: number };
+	| { op: "delete"; start: number; end: number; expected?: string[] };
 
-export type Section = { path: string; tag: string; hunks: Hunk[] };
+export type Section = { path: string; tag: string; hunks: Hunk[]; format?: "tagged-unified" };
 
 const HEADER_RE = /^\[([^#\]]+)#([0-9A-Fa-f]{64})\]$/;
 const REPLACE_RE = /^replace (\d+)(?:\.\.(\d+))?:$/;
 const INSERT_RE = /^insert (before|after) (\d+):$/;
 const INSERT_EDGE_RE = /^insert (head|tail):$/;
 const DELETE_RE = /^delete (\d+)(?:\.\.(\d+))?:?$/;
+const UNIFIED_HUNK_RE = /^@@ -(\d+)(?:,(\d+))? \+(\d+)(?:,(\d+))? @@(?: .*)?$/;
 
 const PATCH_EXAMPLE = "Expected shape:\n[src/file.ts#<the 64-hex tag from your last read>]\nreplace 3..4:\n+new line 3\n+new line 4\ndelete 9..9";
 
@@ -105,10 +106,14 @@ export function normalizePatchText(input: string): { text: string; notes: string
 }
 
 export function parsePatch(input: string): Section[] {
+	const normalized = input.replace(/\r\n?/g, "\n");
+	if (normalized.split("\n").some((line) => UNIFIED_HUNK_RE.test(line.trimEnd()))) {
+		return parseTaggedUnifiedPatch(normalized);
+	}
 	const sections: Section[] = [];
 	let cur: Section | null = null;
 	let curHunk: { op: "replace" | "insert"; body: string[] } & Partial<Hunk> | null = null;
-	const lines = input.replace(/\r\n?/g, "\n").split("\n");
+	const lines = normalized.split("\n");
 	const closeHunk = (lineNo: number) => {
 		if (!curHunk) return;
 		if (curHunk.body.length === 0) {
@@ -162,6 +167,88 @@ export function parsePatch(input: string): Section[] {
 	}
 	closeHunk(lines.length);
 	if (sections.length === 0) throw new Error("bad patch: no [path#TAG] section found");
+	for (const section of sections) if (section.hunks.length === 0) throw new Error(`bad patch: section [${section.path}] has no hunks`);
+	return sections;
+}
+
+/** Compatibility for the common unified-diff surface emitted by coding models.
+ * It deliberately retains the hashline authority model: every file still needs
+ * an exact content tag, old/context rows are checked at their declared location,
+ * and no fuzzy search or relocation is attempted. Declared hunk counts are only
+ * syntax because models frequently copy stale counts; the actual prefixed rows
+ * define the deterministic replacement. */
+function parseTaggedUnifiedPatch(input: string): Section[] {
+	const lines = input.split("\n");
+	const sections: Section[] = [];
+	let current: Section | null = null;
+	let index = 0;
+	while (index < lines.length) {
+		const raw = lines[index];
+		const line = raw.trimEnd();
+		if (line.trim() === "" || /^\*\*\* (Begin|End) Patch$/.test(line.trim())) {
+			index += 1;
+			continue;
+		}
+		if (/^\*\*\* (Update|Add|Delete) File:/.test(line)) {
+			throw new Error("tagged unified compatibility requires a tagged hashline header; an untagged Update File directive is rejected");
+		}
+		const header = line.match(HEADER_RE);
+		if (header) {
+			if (current && current.hunks.length === 0) throw new Error(`bad patch: section [${current.path}] has no hunks`);
+			current = { path: header[1], tag: header[2].toUpperCase(), hunks: [], format: "tagged-unified" };
+			sections.push(current);
+			index += 1;
+			continue;
+		}
+		if (/^\[[^#\]]+#.*\]$/.test(line)) throw new Error(`bad patch line ${index + 1}: file tag must be exactly 64 hexadecimal SHA-256 characters`);
+		const marker = line.match(UNIFIED_HUNK_RE);
+		if (!marker) {
+			if (!current) throw new Error(`bad patch line ${index + 1}: tagged unified compatibility requires a [path#TAG] header before any hunk`);
+			throw new Error(`bad tagged unified patch line ${index + 1}: expected an @@ hunk header or another [path#TAG] section`);
+		}
+		if (!current) throw new Error(`bad patch line ${index + 1}: tagged unified compatibility requires a [path#TAG] header before any hunk`);
+		const oldStart = Number(marker[1]);
+		const oldRows: string[] = [];
+		const newRows: string[] = [];
+		let changed = false;
+		index += 1;
+		while (index < lines.length) {
+			const row = lines[index];
+			if (UNIFIED_HUNK_RE.test(row.trimEnd()) || HEADER_RE.test(row.trimEnd()) || /^\*\*\* End Patch$/.test(row.trim())) break;
+			if (row === "" && index === lines.length - 1) break;
+			if (row.startsWith("\\ No newline at end of file")) {
+				throw new Error(`bad tagged unified patch line ${index + 1}: no-newline markers are unsupported; use native hashline syntax`);
+			}
+			const prefix = row[0];
+			const content = row.slice(1);
+			if (prefix === " ") {
+				oldRows.push(content);
+				newRows.push(content);
+			} else if (prefix === "-") {
+				oldRows.push(content);
+				changed = true;
+			} else if (prefix === "+") {
+				newRows.push(content);
+				changed = true;
+			} else {
+				throw new Error(`bad tagged unified patch line ${index + 1}: every hunk row must begin with space, "-", or "+"`);
+			}
+			index += 1;
+		}
+		if (!changed) throw new Error(`bad tagged unified hunk at line ${index + 1}: no added or removed rows`);
+		if (oldRows.length > 0 && newRows.length > 0) {
+			if (oldStart < 1) throw new Error("bad tagged unified hunk: a replacement must start at line 1 or later");
+			current.hunks.push({ op: "replace", start: oldStart, end: oldStart + oldRows.length - 1, body: newRows, expected: oldRows });
+		} else if (oldRows.length > 0) {
+			if (oldStart < 1) throw new Error("bad tagged unified hunk: a deletion must start at line 1 or later");
+			current.hunks.push({ op: "delete", start: oldStart, end: oldStart + oldRows.length - 1, expected: oldRows });
+		} else {
+			current.hunks.push(oldStart === 0
+				? { op: "insert", pos: "head", body: newRows }
+				: { op: "insert", pos: "after", line: oldStart, body: newRows });
+		}
+	}
+	if (sections.length === 0) throw new Error("bad tagged unified patch: no [path#TAG] section found");
 	for (const section of sections) if (section.hunks.length === 0) throw new Error(`bad patch: section [${section.path}] has no hunks`);
 	return sections;
 }
@@ -274,6 +361,13 @@ function opFor(hunk: Hunk, lineCount: number): Op {
 export function applyHunks(document: TextDocument, hunks: Hunk[]): ApplyResult {
 	const original = document.lines;
 	const ops = hunks.map((hunk) => opFor(hunk, original.length)).sort((a, b) => a.start - b.start || a.end - b.end);
+	for (const { start, end, hunk } of ops) {
+		if (!("expected" in hunk) || !hunk.expected) continue;
+		const actual = original.slice(start, end).map((line) => line.content);
+		if (actual.length !== hunk.expected.length || actual.some((line, i) => line !== hunk.expected?.[i])) {
+			throw new Error(`tagged unified source mismatch at lines ${start + 1}..${end}; reread the file and rebuild the patch from current content`);
+		}
+	}
 	for (let i = 1; i < ops.length; i += 1) {
 		const prior = ops[i - 1], current = ops[i];
 		if (current.start < prior.end) throw new Error(`overlapping hunks around line ${current.start + 1} — merge them into one range`);

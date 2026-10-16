@@ -5,7 +5,14 @@ import test from "node:test";
 import { mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { fileTag, normalizePatchText, parsePatch } from "../lib/hashline-core.ts";
+import {
+	applyHunks,
+	decodeDocument,
+	fileTag,
+	normalizePatchText,
+	parsePatch,
+	serializeDocument,
+} from "../lib/hashline-core.ts";
 import { registerHashline } from "../extensions/hashline.ts";
 import { callTool, makeFakePi } from "./integration-harness.ts";
 
@@ -31,6 +38,64 @@ test("well-formed patches are untouched, and text with real newlines is never un
 test("errors that need a guess stay errors but show the exact expected shape", () => {
 	assert.throws(() => parsePatch(`[a.ts#${TAG}]\nreplace 1..1:\n});`), /Every replacement line starts with "\+"[\s\S]*Expected shape:/);
 	assert.throws(() => parsePatch("replace 1..1:\n+x"), /before any \[path#TAG\] header[\s\S]*Expected shape:/);
+});
+
+test("a tagged unified diff is converted deterministically even when its declared counts are stale", () => {
+	const source = "old\nkeep\n";
+	const input = `*** Begin Patch
+[a.ts#${fileTag(source)}]
+@@ -1,13 +1,13 @@
+-old
++new
+*** End Patch`;
+	const [section] = parsePatch(input);
+	assert.equal(section.format, "tagged-unified");
+	assert.deepEqual(section.hunks, [{ op: "replace", start: 1, end: 1, body: ["new"], expected: ["old"] }]);
+	const result = applyHunks(decodeDocument(Buffer.from(source)), section.hunks);
+	assert.equal(serializeDocument(result.document).toString(), "new\nkeep\n");
+});
+
+test("tagged unified diffs validate their old/context rows instead of relocating", () => {
+	const source = "actual\nkeep\n";
+	const [section] = parsePatch(`[a.ts#${fileTag(source)}]\n@@ -1,1 +1,1 @@\n-wrong\n+new`);
+	assert.throws(
+		() => applyHunks(decodeDocument(Buffer.from(source)), section.hunks),
+		/tagged unified source mismatch at lines 1\.\.1/,
+	);
+	assert.throws(
+		() => parsePatch("*** Begin Patch\n*** Update File: a.ts\n@@ -1,1 +1,1 @@\n-old\n+new\n*** End Patch"),
+		/tagged hashline header.*untagged Update File/s,
+	);
+});
+
+test("tagged unified context, deletion, and insertion retain exact line semantics", () => {
+	const source = "alpha\nold\nkeep\ntail\n";
+	const [section] = parsePatch(`[a.ts#${fileTag(source)}]
+@@ -1,3 +1,3 @@
+ alpha
+-old
++new
+ keep
+@@ -4,1 +4,0 @@
+-tail
+@@ -3,0 +4,1 @@
++added`);
+	const result = applyHunks(decodeDocument(Buffer.from(source)), section.hunks);
+	assert.equal(serializeDocument(result.document).toString(), "alpha\nnew\nkeep\nadded\n");
+});
+
+test("the edit tool accepts a tagged unified diff through the full transaction", async () => {
+	const cwd = mkdtempSync(join(tmpdir(), "hashline-unified-"));
+	const file = join(cwd, "a.txt");
+	writeFileSync(file, "one\ntwo\n");
+	const fp = makeFakePi();
+	registerHashline(fp.pi as any);
+	const tag = fileTag(readFileSync(file));
+	const result = await callTool(fp, "edit", {
+		input: `[a.txt#${tag}]\n@@ -1,2 +1,2 @@\n one\n-two\n+TWO`,
+	}, cwd);
+	assert.equal(result.isError, false, JSON.stringify(result.content));
+	assert.equal(readFileSync(file, "utf8"), "one\nTWO\n");
 });
 
 test("the edit tool applies a double-escaped patch and says what it normalized", async () => {

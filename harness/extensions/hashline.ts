@@ -96,6 +96,7 @@ delete 30..31
 
 The header above is a PLACEHOLDER. Substitute the real path and exact 64-hex #TAG from your latest read — never emit placeholders or example values.
 Ops: replace N..M: · insert before N: / after N: / head: / tail: · delete N..M. replace/insert REQUIRE "+" body rows (to remove lines use delete). Body rows start with "+" and are the FINAL content (never old lines, never context). "+" alone = blank line.
+Preferred format is the native hashline syntax above. A unified \`@@\` diff is accepted only beneath an exact \`[path#TAG]\` header; its old/context rows must match at the declared lines. Untagged \`*** Update File\` patches are rejected.
 Stale tags always fail; no content relocation is attempted. Same-path/same-tag sections belong to one source stage and may be separated by other file sections. After a newer stage for a path begins, do not return to an earlier tag. A chained section must use the exact tag shown by the prior planned stage. Same-position insertions are rejected; combine them into one hunk.
 Critical: (1) Path + #TAG + line numbers come from YOUR LAST read/edit response for that file — copy the full digest character-for-character; never use a remembered tag. (2) every successful edit returns a fresh #TAG; use it for a chained stage. (3) Ranges tight: only lines whose content changes. (4) Multiple files = multiple [path#TAG] sections in one patch.`;
 
