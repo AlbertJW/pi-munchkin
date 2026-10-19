@@ -1,5 +1,10 @@
 # Harness modernization — October 2026
 
+Current operational status is maintained in `NEXT_STEPS_2026-10-19.md` and
+`evidence/RELEASE_AND_VISION_2026-10-19.md`. This document preserves the October
+implementation rationale; its original branch labels and upcoming-Pi snapshot are
+historical.
+
 Branch `codex/pi-update-lane`, from live release `813553b`. Follows
 `MUNCHKIN_HARNESS_AUDIT_AND_ROADMAP_2026-10.md` and
 `PI_UPDATES_AND_HARNESS_STRUCTURE_OPTIONS_2026-10.md` (in the findings checkout).
@@ -57,11 +62,17 @@ the continuation budget treats a `/goal` command run as the user's turn, which i
 
 ## Not done yet
 
-- Deploying this branch (release-clone procedure; stop Pi sessions first). When deploying, also
-  remove the live top-level `~/.pi/agent/extensions/chaos.ts` and the stale `~/.pi/agent/lib/` it
-  imports — both are test-only.
-- Vision (dark, not deployed): downscale captures and map coordinates before any promotion.
-- Retention for run capsules and cockpits (manual today).
+- **Release status updated 2026-10-19:** `main` and the live managed mirror now
+  include the modernization and subsequent screenshot/hashline/crop repairs.
+  Offline qualification and the live Ling load receipt are recorded in the release
+  evidence. The mirror reports no unmanaged extensions or package orphans.
+- Plain screenshots now resize images and report the original dimensions. Advanced
+  visual caching/checkpoints and segmentation still need their own task-quality
+  evaluation; they retain their opt-ins.
+- Capsule/cockpit retention now has an explicit manual policy in
+  `ARTIFACT_RETENTION.md`. It adds no automatic deletion. The legacy root library and
+  any test-only local files are outside this managed release; their removal is not
+  claimed here.
 
 ## Sources
 

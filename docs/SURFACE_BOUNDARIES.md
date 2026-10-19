@@ -1336,3 +1336,35 @@ The source/live comparison still differs on seven of 154 managed files. No live
 file, default, optimizer state, or deployment was changed. A release must review
 all seven differences, obtain the required authorization, and record its own
 installed/loaded identity; older evidence must not be pooled into this boundary.
+
+## Live release receipt — 2026-10-19
+
+**MERGED, PUSHED, MIRRORED, AND SMOKED.** This receipt supersedes the pending
+release status immediately above. Source commit `de19f27` was fast-forwarded into
+`main` and pushed with `codex/vision`. After the user closed an open Pi session,
+the clean release worktree mirrored 154 artifacts. `mirror:check` reports 154/154,
+no unmanaged extensions or package orphans; an independent inventory verifies the
+seven reviewed changed files and the unchanged bytes of the other 147.
+
+Source SHA-256 remains
+`e449bf3a84997dd7ae23c08d0e8442f6cbbd786bee21c63bc7f13f62fa38d0e3`.
+Installed and live-smoke-observed loaded SHA-256 is
+`836c990fe9950fe437ebde43a0b32c4e6557b5ea7d4b809c7e7bfa6c278a76fc`.
+The installed Pi 1.1.0 stack passed the offline full-host check (37 extensions,
+zero real provider/network requests). The real Ling load smoke exited 0 in 15.195s,
+returned exact `OK`, had zero stderr, and stamped all 72 telemetry rows with that
+loaded hash. The separate fixed-browser vision screen passed all four narrow
+full/cropped color observations on Gemma E4B and Qwen Vision; it establishes no
+general task quality or adoption decision. Advanced vision flags remain unchanged.
+
+The user's next evaluation focus is the newest registered local LFM, `lfm25-24b`.
+Its text-input protocol result, private receipt digests, rollback inventory,
+retention policy, and qualification limits are recorded in
+`docs/evidence/RELEASE_AND_VISION_2026-10-19.md`. Documentation receipts do not
+change the runtime source or installed hash. No optimizer was restarted.
+
+LFM follow-up: the anchored-edit toy task timed out with an incorrect final file;
+a separate `HASHLINE=off` native-edit control passed the byte and verification
+oracle in 29.721s with zero tool errors. Replay found the anchored writes matched
+the supplied transformations. Both are exploratory observations, with the config
+mode recorded separately; they are not an adoption decision or pooled arm score.

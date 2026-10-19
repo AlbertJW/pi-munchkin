@@ -4,6 +4,16 @@ All notable changes to pi-munchkin are documented here. Releases follow semantic
 
 ## Unreleased
 
+### Released to live (2026-10-19 — verified screenshot/hashline/crop delta)
+
+Merged and pushed `de19f27`, mirrored all 154 managed artifacts with zero drift,
+and recorded a fresh loaded hash plus the 72-row Ling live smoke. The installed
+Pi 1.1.0 host check passed, and Gemma E4B/Qwen Vision each answered the full/cropped
+fixed-dialog color cases correctly. Advanced visual caching/segmentation keep
+their opt-ins. Added a reconciled roadmap and manual artifact-retention policy;
+the next model-testing focus is the registered LFM2.5-24B-A2B text route.
+See `docs/evidence/RELEASE_AND_VISION_2026-10-19.md` for limits and receipts.
+
 ### Fixed (2026-10-19 — hashline integrity and cropped vision; pending rollout)
 
 Tagged unified edits now require exact hunk row counts and validate every
