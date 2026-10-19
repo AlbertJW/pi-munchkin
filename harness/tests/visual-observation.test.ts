@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { mkdtempSync, writeFileSync } from "node:fs";
+import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { deflateSync } from "node:zlib";
@@ -8,6 +8,7 @@ import { CONTEXT_RESERVATION_KEY } from "../lib/context-accounting.ts";
 import { cropPng, hammingDistance, imageDigest, perceptualHash, pngLuma, regionDigests, VisualObservationCache } from "../lib/visual-observation.ts";
 import { refineWithSam, validateGroundingResult, type GroundingRequest } from "../lib/visual-grounding.ts";
 import { fire } from "./integration-harness.ts";
+import type { VisualToolOptions } from "../extensions/visual-observe.ts";
 
 const geometry = { width: 32, height: 32, device_scale: 2 };
 const base = new Uint8Array(32 * 32);
@@ -149,6 +150,79 @@ test("visual observe delivers image content to a vision model and reuses exact f
 		await assert.rejects(() => bad.tools.get("visual_observe").execute("bad", { source: "screen", source_id: "window-a", question: "bad" }, undefined, undefined, ctx), /invalid image metadata/);
 	} finally {
 		if (previous === undefined) delete process.env.VISION; else process.env.VISION = previous;
+	}
+});
+
+test("screen crops retain their original viewport through observation and checkpoints", async () => {
+	const previous = process.env.VISION; process.env.VISION = "on";
+	try {
+		const { makeFakePi } = await import("./integration-harness.ts");
+		const { registerVisualTools } = await import(`../extensions/visual-observe.ts?crop-checkpoint=${Date.now()}`);
+		const fp = makeFakePi();
+		const crop = { x: 10, y: 20, width: 2, height: 1 };
+		let captures = 0;
+		registerVisualTools(fp.pi as any, { capture: async (_source, _id, requested) => {
+			assert.deepEqual(requested, crop); captures += 1;
+			return { bytes: fixturePng(), mime: "image/png", width: 2, height: 1, device_scale: 2, viewport: crop };
+		} } satisfies VisualToolOptions);
+		const ctx = { cwd: tmpdir(), model: { provider: "fixture", id: "vision", supportsVision: true } };
+		const result = await fp.tools.get("visual_observe").execute("crop", { source: "screen", source_id: "123", question: "read the label", crop }, undefined, undefined, ctx);
+		assert.equal(result.content[0].type, "image");
+		await fire(fp, "tool_execution_end", { type: "tool_execution_end", toolCallId: "click", toolName: "click", result: {}, isError: false }, ctx);
+		const messages = await fire(fp, "context", { type: "context", messages: [] }, ctx);
+		assert.equal(captures, 2);
+		assert.deepEqual(messages[0].details.geometry, { width: 2, height: 1, device_scale: 2, viewport: crop });
+	} finally { if (previous === undefined) delete process.env.VISION; else process.env.VISION = previous; }
+});
+
+test("screen crops reject missing or mismatched adapter geometry before caching or checkpointing", async () => {
+	const previous = process.env.VISION; process.env.VISION = "on";
+	try {
+		const { makeFakePi } = await import("./integration-harness.ts");
+		const { registerVisualTools } = await import(`../extensions/visual-observe.ts?crop-invalid=${Date.now()}`);
+		const crop = { x: 0, y: 0, width: 1, height: 1 };
+		for (const metadata of [{}, { viewport: { ...crop, x: 1 } }, { viewport: crop, width: 2 }]) {
+			const fp = makeFakePi(); let calls = 0;
+			registerVisualTools(fp.pi as any, { capture: async () => {
+				calls += 1;
+				return { bytes: fixturePng(), mime: "image/png", width: 1, height: 1, ...metadata };
+			} });
+			const ctx = { cwd: tmpdir(), model: { provider: "fixture", id: "vision", supportsVision: true } };
+			await assert.rejects(() => fp.tools.get("visual_observe").execute("bad-crop", { source: "screen", source_id: "123", question: "read", crop }, undefined, undefined, ctx), /crop metadata/);
+			for (let n = 0; n < 3; n++) await fire(fp, "context", { type: "context", messages: [] }, ctx);
+			assert.equal(calls, 1, "a refused crop cannot arm a watcher");
+		}
+	} finally { if (previous === undefined) delete process.env.VISION; else process.env.VISION = previous; }
+});
+
+test("cropped image observations can be refined with SAM while preserving viewport identity", async (t) => {
+	const previous = process.env.VISION, grounding = process.env.VISION_GROUNDING;
+	process.env.VISION = "on"; process.env.VISION_GROUNDING = "sam";
+	try {
+		const { makeFakePi } = await import("./integration-harness.ts");
+		const { registerVisualTools } = await import(`../extensions/visual-observe.ts?crop-sam=${Date.now()}`);
+		const fp = makeFakePi(); const cwd = mkdtempSync(join(tmpdir(), "pi-visual-crop-sam-"));
+		t.after(() => rmSync(cwd, { recursive: true, force: true }));
+		writeFileSync(join(cwd, "frame.png"), fixturePng());
+		let refinements = 0;
+		registerVisualTools(fp.pi as any, { samAdapter: { name: "fixture", version: "1", refine: async () => {
+			refinements += 1;
+			return { segmenter: "fixture", segmenter_version: "1", mask_digest: "a".repeat(64), box: { x: 0, y: 0, width: 1, height: 1 }, safe_point: { x: 0.5, y: 0.5 }, model_score: 0.9 };
+		} } });
+		const crop = { x: 1, y: 0, width: 1, height: 1 };
+		const ctx = { cwd, model: { provider: "fixture", id: "vision", supportsVision: true } };
+		const observed = await fp.tools.get("visual_observe").execute("observe", { path: "frame.png", question: "target", crop }, undefined, undefined, ctx);
+		const params = { observation_id: observed.details.observation_id, exact_sha256: imageDigest(cropPng(fixturePng(), crop)!), geometry: { width: 1, height: 1, device_scale: 1 }, hint: { kind: "point", x: 0.5, y: 0.5 }, purpose: "verify" };
+		const refine = fp.tools.get("visual_refine_target");
+		const result = await refine.execute("refine", params, undefined, undefined, ctx);
+		assert.equal(result.details.success, true, JSON.stringify(result.content));
+		assert.deepEqual(JSON.parse(result.content[0].text).geometry, { ...params.geometry, viewport: crop });
+		const wrong = await refine.execute("wrong", { ...params, geometry: { ...params.geometry, width: 2 } }, undefined, undefined, ctx);
+		assert.equal(wrong.details.reason, "observation-not-current");
+		assert.equal(refinements, 1);
+	} finally {
+		if (previous === undefined) delete process.env.VISION; else process.env.VISION = previous;
+		if (grounding === undefined) delete process.env.VISION_GROUNDING; else process.env.VISION_GROUNDING = grounding;
 	}
 });
 

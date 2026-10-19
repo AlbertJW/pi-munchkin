@@ -20,6 +20,8 @@ const IMAGE_MIME: Record<string, string> = { ".png": "image/png", ".jpg": "image
 
 type VisualModel = { provider?: unknown; id?: unknown; baseUrl?: unknown; contextWindow?: unknown; input?: unknown; modalities?: unknown; supportsVision?: unknown; capabilities?: { input?: unknown } };
 export type VisualCapture = { bytes: Uint8Array; mime: string; width: number; height: number; device_scale?: number; viewport?: CaptureCrop; captured_at?: number };
+// Capture adapters own original-image bounds and materialize requested crops in
+// device pixels. They return the cropped dimensions and echo its original viewport.
 export type VisualToolOptions = { samAdapter?: SamAdapter; sessionId?: string; capture?: (source: "screen" | "browser", sourceId: string, crop?: CaptureCrop, signal?: AbortSignal) => Promise<VisualCapture> };
 type ActiveVisual = { source: "screen" | "browser"; source_id: string; question: string; crop?: CaptureCrop; force: boolean; checkpoint_count: number };
 
@@ -46,9 +48,9 @@ function geometryFor(width: number, height: number, deviceScale: number, crop?: 
 	return geometry;
 }
 
-function validateCrop(crop: { x: number; y: number; width: number; height: number } | undefined, width: number, height: number): void {
+function validateCrop(crop: CaptureCrop | undefined, width?: number, height?: number): void {
 	if (!crop) return;
-	if (![crop.x, crop.y, crop.width, crop.height].every(Number.isFinite) || ![crop.x, crop.y, crop.width, crop.height].every(Number.isSafeInteger) || crop.x < 0 || crop.y < 0 || crop.width < 1 || crop.height < 1 || crop.x + crop.width > width || crop.y + crop.height > height) throw new Error("visual crop is outside the image");
+	if (![crop.x, crop.y, crop.width, crop.height, crop.x + crop.width, crop.y + crop.height].every(Number.isSafeInteger) || crop.x < 0 || crop.y < 0 || crop.width < 1 || crop.height < 1 || (width !== undefined && crop.x + crop.width > width) || (height !== undefined && crop.y + crop.height > height)) throw new Error("visual crop is outside the image");
 }
 
 function unavailableModelMessage(model: VisualModel): string {
@@ -64,11 +66,15 @@ function visualTokenEstimate(width: number, height: number): number {
 	return Math.min(16_384, Math.max(256, Math.ceil(width * height / 256)));
 }
 
-function validateCapture(captured: VisualCapture): void {
+function validateCapture(captured: VisualCapture, crop?: CaptureCrop): void {
 	if (!captured || typeof captured !== "object" || !(captured.bytes instanceof Uint8Array) || !Object.values(IMAGE_MIME).includes(captured.mime) ||
 		!Number.isSafeInteger(captured.width) || !Number.isSafeInteger(captured.height) || captured.width < 1 || captured.height < 1 ||
 		captured.width > 32_000 || captured.height > 32_000) throw new Error("visual capture has invalid image metadata");
 	if (captured.bytes.byteLength > MAX_IMAGE_BYTES) throw new Error(`visual_observe refuses captures over ${MAX_IMAGE_BYTES} bytes`);
+	if (crop && (!captured.viewport || captured.width !== crop.width || captured.height !== crop.height ||
+		captured.viewport.x !== crop.x || captured.viewport.y !== crop.y || captured.viewport.width !== crop.width || captured.viewport.height !== crop.height)) {
+		throw new Error("visual capture crop metadata does not match the requested viewport");
+	}
 }
 
 // ponytail: one generic long-edge cap; a model's own inputLimits win when Pi has them.
@@ -150,7 +156,7 @@ export function registerVisualTools(pi: ExtensionAPI, options: VisualToolOptions
 			try {
 				const captured = await capture(active.source, active.source_id, active.crop, abort.signal);
 				if (activeVisual !== active || lifecycleGeneration !== generation || abort.signal.aborted) return null;
-				validateCapture(captured);
+				validateCapture(captured, active.crop);
 				const model = modelFor(ctx);
 				const deviceScale = captured.device_scale ?? 1;
 				const capturedAt = captured.captured_at ?? Date.now();
@@ -214,7 +220,7 @@ export function registerVisualTools(pi: ExtensionAPI, options: VisualToolOptions
 			source_id: Type.Optional(Type.String({ minLength: 1, maxLength: 512 })),
 			question: Type.String({ minLength: 1, maxLength: 1_000 }),
 			device_scale: Type.Optional(Type.Number({ minimum: 0.1, maximum: 8 })),
-			crop: Type.Optional(Type.Object({ x: Type.Integer({ minimum: 0 }), y: Type.Integer({ minimum: 0 }), width: Type.Integer({ minimum: 1 }), height: Type.Integer({ minimum: 1 }) })),
+			crop: Type.Optional(Type.Object({ x: Type.Integer({ minimum: 0 }), y: Type.Integer({ minimum: 0 }), width: Type.Integer({ minimum: 1 }), height: Type.Integer({ minimum: 1 }) }, { description: "Region in the original image's device pixels; the returned image is already cropped." })),
 			force: Type.Optional(Type.Boolean()),
 			uncertain: Type.Optional(Type.Boolean()),
 			ttl_ms: Type.Optional(Type.Integer({ minimum: 0, maximum: 86_400_000 })),
@@ -244,8 +250,9 @@ export function registerVisualTools(pi: ExtensionAPI, options: VisualToolOptions
 			} else {
 				if (!params.source_id) throw new Error("visual_observe requires source_id for screen or browser sources");
 				if (signal?.aborted) throw new Error("visual observation cancelled");
+				validateCrop(params.crop);
 				const captured = await capture(source, params.source_id, params.crop, signal);
-				validateCapture(captured);
+				validateCapture(captured, params.crop);
 				bytes = captured.bytes; mime = captured.mime; width = captured.width; height = captured.height; sourceId = params.source_id;
 				if (captured.device_scale != null) deviceScale = captured.device_scale;
 				if (captured.captured_at != null) capturedAt = captured.captured_at;
@@ -253,7 +260,6 @@ export function registerVisualTools(pi: ExtensionAPI, options: VisualToolOptions
 			}
 			const digest = imageDigest(bytes);
 			const png = mime === "image/png" ? pngLuma(bytes) : null;
-			if (source !== "image") validateCrop(params.crop, width, height);
 			const geometry = geometryFor(width, height, deviceScale, viewport);
 			const request = { session_id: sessionId, source, source_id: sourceId, geometry, exact_sha256: digest, phash: png ? perceptualHash(png.luma, png.width, png.height) : null, region_digests: png ? regionDigests(png.luma, png.width, png.height) : null, question: params.question, model_fingerprint: modelFingerprint(model), analysis_version: "visual-observe/v1", ttl_ms: params.ttl_ms ?? DEFAULT_TTL_MS, force: params.force, uncertain: params.uncertain, captured_at: capturedAt };
 			const decision = cache.decide(request);
@@ -292,10 +298,12 @@ export function registerVisualTools(pi: ExtensionAPI, options: VisualToolOptions
 			if (signal?.aborted) return { content: [{ type: "text" as const, text: "Visual segmentation cancelled before execution." }], details: { tool_name: "visual_refine_target", success: false, reason: "cancelled" } };
 			const observation = cache.find(params.observation_id);
 			const frame = cache.findFrame(params.observation_id);
-			if (!observation || !frame || observation.exact_sha256 !== params.exact_sha256 || JSON.stringify(observation.geometry) !== JSON.stringify(params.geometry)) return { content: [{ type: "text" as const, text: "Visual segmentation refused: observation is not from the current visual cache or geometry. Capture a fresh image first." }], details: { tool_name: "visual_refine_target", success: false, reason: "observation-not-current" } };
+			// The tool accepts local image geometry; the original viewport is owned
+			// by the cached observation and cannot be supplied or changed by a caller.
+			if (!observation || !frame || observation.exact_sha256 !== params.exact_sha256 || observation.geometry.width !== params.geometry.width || observation.geometry.height !== params.geometry.height || observation.geometry.device_scale !== params.geometry.device_scale) return { content: [{ type: "text" as const, text: "Visual segmentation refused: observation is not from the current visual cache or geometry. Capture a fresh image first." }], details: { tool_name: "visual_refine_target", success: false, reason: "observation-not-current" } };
 			const result = await refineWithSam(options.samAdapter, { ...(params as { observation_id: string; exact_sha256: string; geometry: { width: number; height: number; device_scale: number }; hint: GroundingHint; purpose: "click" | "drag" | "crop" | "verify"; expected_label?: string }), image_bytes: frame, signal });
 			record("visual-observe", "grounding", { segmenter: result.segmenter, segmenter_version: result.segmenter_version, mask_digest: result.mask_digest, observation_id: result.observation_id, exact_sha256: result.exact_sha256 });
-			return { content: [{ type: "text" as const, text: JSON.stringify({ ...result, click_safe: "requires fresh snapshot and independent target validation" }) }], details: { tool_name: "visual_refine_target", success: true, grounding_digest: result.mask_digest } };
+			return { content: [{ type: "text" as const, text: JSON.stringify({ ...result, geometry: observation.geometry, click_safe: "requires fresh snapshot and independent target validation" }) }], details: { tool_name: "visual_refine_target", success: true, grounding_digest: result.mask_digest } };
 		},
 	}));
 }
