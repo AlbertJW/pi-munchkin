@@ -4,6 +4,23 @@ All notable changes to pi-munchkin are documented here. Releases follow semantic
 
 ## Unreleased
 
+### Fixed (2026-10-19 — hashline integrity and cropped vision; pending rollout)
+
+Tagged unified edits now require exact hunk row counts and validate every
+old/context row before writing. Incomplete replacements cannot silently become
+insertions or deletions; context resembling a patch wrapper cannot bypass validation;
+unchanged mixed-EOL/BOM bytes remain intact. Native and unified sections can share
+one transaction. Stale-count tolerance from the October trace-follow-up is withdrawn.
+
+`visual_observe` no longer rechecks an original crop offset against an already-cropped
+image. Capture metadata must match the requested viewport. Cropped observations can
+reach SAM refinement with cache-owned viewport geometry preserved in the response.
+This does not make segmentation output independently safe for clicking.
+
+Both repairs have failing-before/passing-after regressions and an offline candidate
+check on installed Pi 1.1.0. No defaults, live files, inference, or deployment changed.
+Evidence: `docs/evidence/FRESH_QA_2026-10-19.md`.
+
 ### Fixed (2026-09-10 — a pending compaction could deliver a duplicate goal continuation)
 
 `compact_context`'s own continuation resolves asynchronously, after its tool

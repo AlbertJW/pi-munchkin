@@ -1305,3 +1305,34 @@ and runtime contract checks do not establish model-performance benefit. Old
 short tags fail, and stale content relocation is removed; fresh reads are
 required for stale files. No inference, default change, optimizer restart,
 SoL-Pi installation, merge, or push occurred.
+
+## Hashline and crop integrity repairs — 2026-10-19
+
+**REPOSITORY-ONLY; PENDING RELEASE REVIEW.** The source-only October trace
+follow-up is superseded by this corrected boundary. Two independently reversible
+packages change the model-visible contract:
+
+1. Hashline (`eb345d7`): unified hunks require matching declared counts. Complete old spans
+   are validated, wrapper-looking context remains data, and unchanged context
+   bytes are preserved. Native/unified sections can share an atomic transaction.
+   Stale-count repair is deliberately withdrawn because it can reinterpret a
+   truncated replacement as a different operation.
+2. Cropped vision (`63f0f9b`): validates adapter-returned dimensions and the original viewport
+   without reapplying original offsets to the cropped image. SAM refinement uses
+   local image dimensions/scale and returns the authoritative cached viewport;
+   independent target validation is still required before any click.
+
+Combined package-source SHA-256:
+`e449bf3a84997dd7ae23c08d0e8442f6cbbd786bee21c63bc7f13f62fa38d0e3`.
+Both commits are independent rollback points; reverting either restores its
+documented defects. Final offline verification passed all six stages in 136.4s,
+including 1,038 harness tests and 65 optimizer shutdown checks.
+Counterfactual regression receipts and the offline installed-Pi 1.1.0 qualification
+are recorded in `docs/evidence/FRESH_QA_2026-10-19.md`. The latter loaded 37
+extensions in a temporary candidate overlay and made zero network/real-provider
+requests. It is not a live loaded-surface receipt or model-quality evaluation.
+
+The source/live comparison still differs on seven of 154 managed files. No live
+file, default, optimizer state, or deployment was changed. A release must review
+all seven differences, obtain the required authorization, and record its own
+installed/loaded identity; older evidence must not be pooled into this boundary.
