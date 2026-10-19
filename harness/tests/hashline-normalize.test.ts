@@ -40,17 +40,17 @@ test("errors that need a guess stay errors but show the exact expected shape", (
 	assert.throws(() => parsePatch("replace 1..1:\n+x"), /before any \[path#TAG\] header[\s\S]*Expected shape:/);
 });
 
-test("a tagged unified diff is converted deterministically even when its declared counts are stale", () => {
+test("a complete tagged unified diff is converted deterministically", () => {
 	const source = "old\nkeep\n";
 	const input = `*** Begin Patch
 [a.ts#${fileTag(source)}]
-@@ -1,13 +1,13 @@
+@@ -1,1 +1,1 @@
 -old
 +new
 *** End Patch`;
 	const [section] = parsePatch(input);
 	assert.equal(section.format, "tagged-unified");
-	assert.deepEqual(section.hunks, [{ op: "replace", start: 1, end: 1, body: ["new"], expected: ["old"] }]);
+	assert.deepEqual(section.hunks, [{ op: "replace", start: 1, end: 1, body: ["new"], source: { start: 1, lines: ["old"] } }]);
 	const result = applyHunks(decodeDocument(Buffer.from(source)), section.hunks);
 	assert.equal(serializeDocument(result.document).toString(), "new\nkeep\n");
 });
