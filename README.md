@@ -1,10 +1,12 @@
-# pi_munchkin
+# pi-munchkin
 
 <p align="center">
   <img src="assets/pi-munchkin.png" alt="pi-munchkin mascot" width="320">
 </p>
 
 > A harness for making small, locally served LLMs competent multi-turn coding agents.
+
+For evidence and limitations, see [What the evidence shows (and does not)](#what-the-evidence-shows-and-does-not).
 
 **Status:** a personal research project, under active development. Licensed [MIT](LICENSE).
 
